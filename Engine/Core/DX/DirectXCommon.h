@@ -11,9 +11,12 @@
 // Engine
 #include "WinApp./WinApp.h"
 
+
 // DirectX
 #include "DirectXTex.h"
 
+// Math
+#include "Vector4.h"
 
 /// <summary>
 /// DirectX基盤
@@ -94,6 +97,8 @@ public: // 各種初期化
 	/// </summary>
 	void CreateDXCompiler();
 
+
+
 	/// <summary>
 	/// ログ
 	/// </summary>
@@ -118,6 +123,12 @@ public: // メンバ関数
 	/// 深度バッファのリソース
 	/// </summary>
 	Microsoft::WRL::ComPtr<ID3D12Resource> CreateDepthStencilTextureResource(Microsoft::WRL::ComPtr<ID3D12Device> device, int32_t width, int32_t height);
+
+	/// <summary>
+	/// レンダーテクスチャ作成
+	/// </summary>
+	/// <returns></returns>
+	Microsoft::WRL::ComPtr<ID3D12Resource> CreateRenderTextureResource(uint32_t width, uint32_t height,DXGI_FORMAT format, const Vector4& clearColor);
 
 	/// <summary>
 	/// 指定番号のCPUの取得
