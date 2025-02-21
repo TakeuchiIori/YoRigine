@@ -25,7 +25,10 @@ void Framework::Initialize()
 
 	// SRVマネージャの生成
 	srvManager_ = SrvManager::GetInstance();
-	srvManager_->Initialize(dxCommon_);
+	srvManager_->Initialize();
+
+	// オフスクリーンのSRV生成
+	dxCommon_->CreateSRVForOffScreen();
 
 	// テクスチャマネージャの生成
 	textureManager_ = TextureManager::GetInstance();

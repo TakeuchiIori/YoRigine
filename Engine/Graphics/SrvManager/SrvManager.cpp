@@ -1,4 +1,5 @@
 #include "SrvManager.h"
+#include "DX./DirectXCommon.h"
 #include "Loaders./Texture./TextureManager.h"
 
 SrvManager* SrvManager::instance = nullptr;
@@ -20,10 +21,10 @@ void SrvManager::Finalize()
 }
 
 
-void SrvManager::Initialize(DirectXCommon* dxCommon)
+void SrvManager::Initialize()
 {
 	// 引数で受け取ってメンバ変数に記録する
-	dxCommon_ = dxCommon;
+	dxCommon_ = DirectXCommon::GetInstance();
 
 	// デスクリプタヒープの生成
 	descriptorHeap_ = dxCommon_->CreateDescriptorHeap(dxCommon_->GetDevice(),D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, kMaxSRVCount_,true);
@@ -108,5 +109,18 @@ void SrvManager::CreateSRVforStructuredBuffer(uint32_t srvIndex, ID3D12Resource*
 
 	// SRV を作成
 	dxCommon_->GetDevice()->CreateShaderResourceView(pResource, &srvDesc, GetCPUSRVDescriptorHandle(srvIndex));
+}
+
+void SrvManager::CreateSRVforRenderTexture(uint32_t srvIndex, ID3D12Resource* pResource)
+{
+	// SRVの設定。FormatはResourceと同じにしておく
+	D3D12_SHADER_RESOURCE_VIEW_DESC renderTextureSrvDesc{};
+	renderTextureSrvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+	renderTextureSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	renderTextureSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	renderTextureSrvDesc.Texture2D.MipLevels = 1;
+
+	// SRVの生成
+	dxCommon_->GetDevice()->CreateShaderResourceView(pResource, &renderTextureSrvDesc, GetCPUSRVDescriptorHandle(srvIndex));
 }
 

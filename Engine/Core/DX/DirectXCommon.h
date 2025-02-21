@@ -10,7 +10,7 @@
 
 // Engine
 #include "WinApp./WinApp.h"
-
+#include "SrvManager/SrvManager.h"
 
 // DirectX
 #include "DirectXTex.h"
@@ -42,6 +42,7 @@ public: // 各種初期化
 	/// </summary>
 	void Initialize(WinApp* winApp);
 
+private:
 	/// <summary>
 	/// DXGIデバイス初期化
 	/// </summary>
@@ -97,20 +98,8 @@ public: // 各種初期化
 	/// </summary>
 	void CreateDXCompiler();
 
-
-
-	/// <summary>
-	/// ログ
-	/// </summary>
-	/// <param name="message"></param>
-	static void Log(const std::string& message);
-	static std::wstring ConvertString(const std::string& str);
-	static std::string ConvertString(const std::wstring& str);
-
-public: // 描画関連
-	// 描画前処理
+public:
 	void PreDraw();
-	// 描画後処理
 	void PostDraw();
 
 public: // メンバ関数
@@ -128,7 +117,7 @@ public: // メンバ関数
 	/// レンダーテクスチャ作成
 	/// </summary>
 	/// <returns></returns>
-	Microsoft::WRL::ComPtr<ID3D12Resource> CreateRenderTextureResource(uint32_t width, uint32_t height,DXGI_FORMAT format, const Vector4& clearColor);
+	Microsoft::WRL::ComPtr<ID3D12Resource> CreateRenderTextureResource(uint32_t width, uint32_t height, D3D12_CLEAR_VALUE clearValue);
 
 	/// <summary>
 	/// 指定番号のCPUの取得
@@ -186,11 +175,18 @@ public:
 	Microsoft::WRL::ComPtr<ID3D12Resource> UploadTextureData(Microsoft::WRL::ComPtr<ID3D12Resource> texture, const DirectX::ScratchImage& mipImages);
 
 	/// <summary>
-	/// テクスチャファイルの読み込み
+	/// オフスクリーンのSRVを生成
 	/// </summary>
-	/// <param name ="failePath">テクスチャファイルのパス</param>
-	/// <reeturns>画像イメージデータ</returns>
-	static DirectX::ScratchImage LoadTexture(const std::string& filePath);
+	/// <param name="srvManager"></param>
+	void CreateSRVForOffScreen();
+
+	/// <summary>
+	/// ログ
+	/// </summary>
+	/// <param name="message"></param>
+	static void Log(const std::string& message);
+	static std::wstring ConvertString(const std::string& str);
+	static std::string ConvertString(const std::wstring& str);
 
 public: // アクセッサ
 
@@ -215,14 +211,9 @@ public: // アクセッサ
 
 	D3D12_CPU_DESCRIPTOR_HANDLE* GetrtvHandles() { return rtvHandles_; }
 	HANDLE GetFenceEvent() { return fenceEvent_; }
-	// バックバッファの数を取得
 	UINT GetBackBufferCount()const { return  backBufferIndex; }
 
-
-
-
 private:
-
 	/// <summary>
 	/// デフォルトコンストラクタ（シングルトンパターンのためプライベートに設定）
 	/// </summary>
@@ -234,61 +225,101 @@ private:
 	~DirectXCommon() = default;
 
 
-	// WindowsAPI
+	/*=================================================================
+	
+								DirectX基盤
+
+   =================================================================*/
+   // WindowsAPI
 	WinApp* winApp_ = nullptr;
 	// DirectX12デバイス
 	Microsoft::WRL::ComPtr<ID3D12Device> device_;
 	// DXGIファクトリ
 	Microsoft::WRL::ComPtr<IDXGIFactory7> dxgiFactory_;
-	// DXCコンパイラ関連
-	Microsoft::WRL::ComPtr<IDxcUtils> dxcUtils_;
-	Microsoft::WRL::ComPtr<IDxcCompiler3> dxcCompiler_;
 
+	/*=================================================================
+	
+								コマンド関連
+
+	=================================================================*/
 	// コマンドキュー
 	Microsoft::WRL::ComPtr<ID3D12CommandQueue> commandQueue_;
 	// コマンドアロケータ
 	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> commandAllocator_;
 	// コマンドリスト
 	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList_;
-
 	// フェンス
 	Microsoft::WRL::ComPtr<ID3D12Fence> fence_;
-
-	// スワップチェーン
-	Microsoft::WRL::ComPtr<IDXGISwapChain4> swapChain_;
-	std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, 2> swapChainResources_;
-	// スワップチェーン
-	DXGI_SWAP_CHAIN_DESC1 swapChainDesc{};
-
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> rtvDescriptorHeap_;
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> dsvDescriptorHeap_;
-
-	// 現時点ではincludeはしないが、includeに対応するための設定を行っておく
-	IDxcIncludeHandler* includeHandler_ = nullptr;
-
-	Microsoft::WRL::ComPtr<ID3D12Resource> depthStencilResource_;
-
-	//uint32_t descriptotSizeSRV_;
-	uint32_t descriptotSizeRTV_;
-	uint32_t descriptotSizeDSV_;
-	// RTVを2つ作るのでディスクリプタを2つ用意
-	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandles_[2];
-	// RTV
-	D3D12_RENDER_TARGET_VIEW_DESC rtvDesc_{};
-
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap;
 	uint64_t fenceValue_ = 0;
 	HANDLE fenceEvent_;
+
+	/*=================================================================
+	
+								スワップチェーン
+
+	=================================================================*/
+	// スワップチェーン
+	Microsoft::WRL::ComPtr<IDXGISwapChain4> swapChain_;
+	DXGI_SWAP_CHAIN_DESC1 swapChainDesc{};
+	std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, 2> swapChainResources_;
+	int backBuffers = 2; // ダブルバッファ
+	UINT backBufferIndex = backBuffers;
+
+	/*=================================================================
+	
+							 ディスクリプタヒープ
+
+	=================================================================*/
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> rtvDescriptorHeap_;
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> dsvDescriptorHeap_;
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap;
+
+	uint32_t descriptotSizeRTV_;
+	uint32_t descriptotSizeDSV_;
+
+	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandles_[3];
+	D3D12_RENDER_TARGET_VIEW_DESC rtvDesc_{};
+
+	/*=================================================================
+	
+								深度バッファ
+
+	=================================================================*/
+	Microsoft::WRL::ComPtr<ID3D12Resource> depthStencilResource_;
+
+	/*=================================================================
+	
+								描画設定
+
+	=================================================================*/
 	// ビューポート
 	D3D12_VIEWPORT viewport_{};
 	// シザー矩形
 	D3D12_RECT scissorRect_{};
-
-
 	// TransitionBarrierの設定
 	D3D12_RESOURCE_BARRIER barrier_{};
 
-	int backBuffers = 2; // ダブルバッファ
-	UINT backBufferIndex = backBuffers;
+	/*=================================================================
+	
+								 シェーダー関連
+
+	=================================================================*/
+	// DXCコンパイラ関連
+	Microsoft::WRL::ComPtr<IDxcUtils> dxcUtils_;
+	Microsoft::WRL::ComPtr<IDxcCompiler3> dxcCompiler_;
+	// 現時点ではincludeはしないが、includeに対応するための設定を行っておく
+	IDxcIncludeHandler* includeHandler_ = nullptr;
+
+	/*=================================================================
+
+								オフスクリーン
+
+	=================================================================*/
+	D3D12_CLEAR_VALUE renderTargetClearColor_;
+	Microsoft::WRL::ComPtr<ID3D12Resource> offScreenResource_;
+
+	uint32_t offScreenSrvIndex_ = 0;
+	D3D12_CPU_DESCRIPTOR_HANDLE offScreenSrvHandleCPU_;
+	D3D12_GPU_DESCRIPTOR_HANDLE offScreenSrvHandleGPU_;
 };
 

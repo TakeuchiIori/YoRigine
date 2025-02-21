@@ -5,8 +5,8 @@
 #include <wrl.h>
 #include <d3d12.h>
 #include <dxgi1_6.h>
-#include "DX./DirectXCommon.h"
 
+class DirectXCommon;
 // SRV管理
 class SrvManager
 {
@@ -27,7 +27,7 @@ public: // メンバ関数
 	/// 初期化
 	/// </summary>
 	/// <param name="dxCommon"></param>
-	void Initialize(DirectXCommon* dxCommon);
+	void Initialize();
 
 	/// <summary>
 	/// アロケータ
@@ -62,13 +62,13 @@ public: // メンバ関数
 
 	/// <summary>
 	/// SRV生成（テクスチャ用）
-	/// SRV生成（Structured Buffer用）
+	/// SRV生成（Structured Buffer用)
+	/// SRV生成（RenderTexture用）
 	/// </summary>
 	void CreateSRVforTexture2D(uint32_t srvIndex, ID3D12Resource* pResource, DXGI_FORMAT Format, UINT MipLevels);
-	void CreateSRVforStructuredBuffer(uint32_t srvIndex, ID3D12Resource* pResource, UINT numElements, UINT
-		structureByteStride);
-	void CreateSkinClusterSRVforStructuredBuffer(uint32_t srvIndex, ID3D12Resource* pResource, UINT numElements, UINT
-		structureByteStride);
+	void CreateSRVforStructuredBuffer(uint32_t srvIndex, ID3D12Resource* pResource, UINT numElements, UINT structureByteStride);
+	void CreateSRVforRenderTexture(uint32_t srvIndex, ID3D12Resource* pResource);
+
 public:
 	// 最大SRV数（最大テクスチャ枚数）
 	static const uint32_t kMaxSRVCount_;

@@ -3,7 +3,7 @@
 #include "algorithm"
 void Fade::Initialize(const std::string textureFilePath) {
 	// スプライトの生成
-	sprite_ = make_unique<Sprite>();
+	sprite_ = std::make_unique<Sprite>();
 	sprite_->Initialize(textureFilePath);
 	sprite_->SetSize(Vector2(1280, 720));
 	sprite_->SetTextureSize(Vector2(1280, 720));

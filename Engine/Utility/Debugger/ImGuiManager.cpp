@@ -28,11 +28,15 @@ void ImGuiManager::Initialize(WinApp* winApp, DirectXCommon* dxCommon)
 
 	winApp_ = winApp;
 
+	// メモリアロケータのカスタマイズ
+	ImGui::SetAllocatorFunctions(
+		[](size_t size, void* user_data) { return _aligned_malloc(size, 16); },
+		[](void* ptr, void* user_data) { _aligned_free(ptr); },
+		nullptr
+	);
+
 	// ImGuiのコンテキストを生成
 	ImGui::CreateContext();
-
-	ImGuiIO& io = ImGui::GetIO();
-	io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable; // 追加
 
 	// Editorの設定
 	CustomizeEditor();
@@ -45,9 +49,6 @@ void ImGuiManager::Initialize(WinApp* winApp, DirectXCommon* dxCommon)
 
 	// DirectX12の初期化
 	InitialzeDX12();
-
-
-	
 
 #endif
 }
@@ -76,13 +77,11 @@ void ImGuiManager::End()
 	ImGui::EndFrame();
 	// 描画前準備
 	ImGui::Render();
-	ID3D12GraphicsCommandList* commandList = dxCommon_->GetCommandList().Get();
-
 	ImGuiIO& io = ImGui::GetIO();
 	if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
 	{
 		ImGui::UpdatePlatformWindows();
-		ImGui::RenderPlatformWindowsDefault(nullptr, (void*)commandList);
+		ImGui::RenderPlatformWindowsDefault(nullptr, (void*)dxCommon_->GetCommandList().Get());
 	}
 	Draw();
 #endif
@@ -163,43 +162,43 @@ void ImGuiManager::CustomizeColor()
 		ImVec4* colors = style.Colors;
 
 		// DockSpace背景色を透明に設定
-		colors[ImGuiCol_DockingEmptyBg] = ImVec4(0.0f, 0.0f, 0.0f, 0.0f); // 完全に透明
+		colors[ImGuiCol_DockingEmptyBg] = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);			// 完全に透明
 		// パディングとスペーシングの調整
-		style.WindowPadding = ImVec2(0.0f, 0.0f); // ウィンドウ内の余白をゼロに
+		style.WindowPadding = ImVec2(0.0f, 0.0f);									// ウィンドウ内の余白をゼロに
 
 		// ここでカラーやスタイル設定を変更
-		colors[ImGuiCol_WindowBg] = ImVec4(0.3f, 0.3f, 0.3f, 1.0f);    // 背景色 (ダークグレー)
-		colors[ImGuiCol_TitleBg] = ImVec4(0.45f, 0.45f, 0.48f, 1.0f);  // タイトルバー (暗い灰色)
-		colors[ImGuiCol_TitleBgActive] = ImVec4(0.5f, 0.5f, 0.55f, 1.0f);    // アクティブなタイトルバー (少し明るい灰色)
-		colors[ImGuiCol_TitleBgCollapsed] = ImVec4(0.4f, 0.4f, 0.42f, 1.0f);    // 折りたたまれたタイトルバー
-		colors[ImGuiCol_Button] = ImVec4(0.5f, 0.52f, 0.6f, 1.0f);    // ボタン (青灰色)
-		colors[ImGuiCol_ButtonHovered] = ImVec4(0.6f, 0.65f, 0.75f, 1.0f);   // ホバーしたボタン (明るい青灰色)
-		colors[ImGuiCol_ButtonActive] = ImVec4(0.55f, 0.58f, 0.65f, 1.0f);  // 押されたボタン (少し暗めの青灰色)
-		colors[ImGuiCol_FrameBg] = ImVec4(0.45f, 0.45f, 0.48f, 1.0f);  // 入力欄やフレーム背景
-		colors[ImGuiCol_FrameBgHovered] = ImVec4(0.5f, 0.5f, 0.55f, 1.0f);    // ホバーしたフレーム背景
-		colors[ImGuiCol_FrameBgActive] = ImVec4(0.55f, 0.55f, 0.6f, 1.0f);   // アクティブなフレーム背景
-		colors[ImGuiCol_CheckMark] = ImVec4(0.56f, 0.9f, 1.15f, 1.0f);   // チェックマーク (青アクセント)
-		colors[ImGuiCol_SliderGrab] = ImVec4(0.56f, 0.9f, 1.15f, 1.0f);   // スライダーつまみ (青アクセント)
-		colors[ImGuiCol_SliderGrabActive] = ImVec4(0.67f, 1.0f, 1.25f, 1.0f);   // アクティブなスライダーつまみ
-		colors[ImGuiCol_Header] = ImVec4(0.5f, 0.55f, 0.6f, 1.0f);    // ヘッダー背景
-		colors[ImGuiCol_HeaderHovered] = ImVec4(0.6f, 0.65f, 0.7f, 1.0f);    // ホバーしたヘッダー
-		colors[ImGuiCol_HeaderActive] = ImVec4(0.55f, 0.6f, 0.65f, 1.0f);   // アクティブなヘッダー
-		colors[ImGuiCol_Tab] = ImVec4(0.45f, 0.48f, 0.52f, 1.0f);  // タブ背景
-		colors[ImGuiCol_TabHovered] = ImVec4(0.55f, 0.6f, 0.7f, 1.0f);    // ホバーしたタブ
-		colors[ImGuiCol_TabActive] = ImVec4(0.5f, 0.55f, 0.65f, 1.0f);   // アクティブなタブ
-		colors[ImGuiCol_Separator] = ImVec4(0.55f, 0.55f, 0.6f, 1.0f);   // セパレーター
-		colors[ImGuiCol_SeparatorHovered] = ImVec4(0.65f, 0.7f, 0.75f, 1.0f);   // ホバーしたセパレーター
-		colors[ImGuiCol_SeparatorActive] = ImVec4(0.75f, 0.8f, 0.85f, 1.0f);   // アクティブなセパレーター
-		colors[ImGuiCol_Text] = ImVec4(1.2f, 1.2f, 1.2f, 1.0f);     // テキスト (白)
-		colors[ImGuiCol_TextDisabled] = ImVec4(0.8f, 0.8f, 0.8f, 1.0f);     // 無効化されたテキスト (灰色)
-		colors[ImGuiCol_Border] = ImVec4(0.5f, 0.5f, 0.55f, 1.0f);    // 境界線
-		colors[ImGuiCol_BorderShadow] = ImVec4(0.3f, 0.3f, 0.3f, 0.0f);     // 境界線の影
-
-		ImVec4 inactiveTabColor = ImVec4(0.4f, 0.4f, 0.4f, 1.0f); // 選択していないタブの色
-		ImVec4 inactiveTabActiveColor = ImVec4(0.5f, 0.5f, 0.5f, 1.0f); // 選択していないがアクティブなタブの色
-		ImVec4 activeTabColor = ImVec4(0.6f, 0.6f, 0.6f, 1.0f); // 選択されたタブの色
-		colors[ImGuiCol_TabUnfocused] = inactiveTabColor;         // 非アクティブなタブの色
+		colors[ImGuiCol_WindowBg] = ImVec4(0.3f, 0.3f, 0.3f, 1.0f);					// 背景色 (ダークグレー)
+		colors[ImGuiCol_TitleBg] = ImVec4(0.45f, 0.45f, 0.48f, 1.0f);				// タイトルバー (暗い灰色)
+		colors[ImGuiCol_TitleBgActive] = ImVec4(0.5f, 0.5f, 0.55f, 1.0f);			// アクティブなタイトルバー (少し明るい灰色)
+		colors[ImGuiCol_TitleBgCollapsed] = ImVec4(0.4f, 0.4f, 0.42f, 1.0f);		// 折りたたまれたタイトルバー
+		colors[ImGuiCol_Button] = ImVec4(0.5f, 0.52f, 0.6f, 1.0f);					// ボタン (青灰色)
+		colors[ImGuiCol_ButtonHovered] = ImVec4(0.6f, 0.65f, 0.75f, 1.0f);			// ホバーしたボタン (明るい青灰色)
+		colors[ImGuiCol_ButtonActive] = ImVec4(0.55f, 0.58f, 0.65f, 1.0f);			// 押されたボタン (少し暗めの青灰色)
+		colors[ImGuiCol_FrameBg] = ImVec4(0.45f, 0.45f, 0.48f, 1.0f);				// 入力欄やフレーム背景
+		colors[ImGuiCol_FrameBgHovered] = ImVec4(0.5f, 0.5f, 0.55f, 1.0f);			// ホバーしたフレーム背景
+		colors[ImGuiCol_FrameBgActive] = ImVec4(0.55f, 0.55f, 0.6f, 1.0f);			// アクティブなフレーム背景
+		colors[ImGuiCol_CheckMark] = ImVec4(0.56f, 0.9f, 1.15f, 1.0f);				// チェックマーク (青アクセント)
+		colors[ImGuiCol_SliderGrab] = ImVec4(0.56f, 0.9f, 1.15f, 1.0f);				// スライダーつまみ (青アクセント)
+		colors[ImGuiCol_SliderGrabActive] = ImVec4(0.67f, 1.0f, 1.25f, 1.0f);		// アクティブなスライダーつまみ
+		colors[ImGuiCol_Header] = ImVec4(0.5f, 0.55f, 0.6f, 1.0f);					// ヘッダー背景
+		colors[ImGuiCol_HeaderHovered] = ImVec4(0.6f, 0.65f, 0.7f, 1.0f);			// ホバーしたヘッダー
+		colors[ImGuiCol_HeaderActive] = ImVec4(0.55f, 0.6f, 0.65f, 1.0f);			// アクティブなヘッダー
+		colors[ImGuiCol_Tab] = ImVec4(0.45f, 0.48f, 0.52f, 1.0f);					// タブ背景
+		colors[ImGuiCol_TabHovered] = ImVec4(0.55f, 0.6f, 0.7f, 1.0f);				// ホバーしたタブ
+		colors[ImGuiCol_TabActive] = ImVec4(0.5f, 0.55f, 0.65f, 1.0f);				// アクティブなタブ
+		colors[ImGuiCol_Separator] = ImVec4(0.55f, 0.55f, 0.6f, 1.0f);				// セパレーター
+		colors[ImGuiCol_SeparatorHovered] = ImVec4(0.65f, 0.7f, 0.75f, 1.0f);		// ホバーしたセパレーター
+		colors[ImGuiCol_SeparatorActive] = ImVec4(0.75f, 0.8f, 0.85f, 1.0f);		// アクティブなセパレーター
+		colors[ImGuiCol_Text] = ImVec4(1.2f, 1.2f, 1.2f, 1.0f);						// テキスト (白)
+		colors[ImGuiCol_TextDisabled] = ImVec4(0.8f, 0.8f, 0.8f, 1.0f);				// 無効化されたテキスト (灰色)
+		colors[ImGuiCol_Border] = ImVec4(0.5f, 0.5f, 0.55f, 1.0f);					// 境界線
+		colors[ImGuiCol_BorderShadow] = ImVec4(0.3f, 0.3f, 0.3f, 0.0f);				// 境界線の影
+		ImVec4 inactiveTabColor = ImVec4(0.4f, 0.4f, 0.4f, 1.0f);					// 選択していないタブの色
+		ImVec4 inactiveTabActiveColor = ImVec4(0.5f, 0.5f, 0.5f, 1.0f);				// 選択していないがアクティブなタブの色
+		ImVec4 activeTabColor = ImVec4(0.6f, 0.6f, 0.6f, 1.0f);						// 選択されたタブの色
+		colors[ImGuiCol_TabUnfocused] = inactiveTabColor;							// 非アクティブなタブの色
 		colors[ImGuiCol_TabUnfocusedActive] = inactiveTabActiveColor;
+		
 		// スタイルの変更
 		style.WindowRounding = 15.0f;      // ウィンドウの角丸
 		style.FrameRounding = 4.0f;        // フレームの角丸
@@ -216,15 +215,23 @@ void ImGuiManager::CustomizeEditor()
 #ifdef _DEBUG
 	// エディター同士をドッキング
 	ImGuiIO& io = ImGui::GetIO();
+	io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
-	// フォントファイルのパスとサイズを指定してフォントをロードする
-	io.Fonts->AddFontFromFileTTF(
-		"Resources/Fonts/SourceHanMonoSC-MediumIt.otf", 17.0f // フォントファイルのパスとフォントサイズ
-	);
-	// 標準フォントを追加する
-	io.Fonts->AddFontDefault();
+	ImFontConfig config;
+	config.OversampleH = 1;
+	config.OversampleV = 1;
+	config.PixelSnapH = true;
+	config.FontDataOwnedByAtlas = false;  // フォントデータの所有権を移譲しない
 
+	// 必要な文字範囲のみロード
+	static const ImWchar ranges[] = {
+		0x0020, 0x00FF,  // Basic Latin
+		0x3000, 0x30FF,  // CJK Symbols, Hiragana, Katakana
+		0x4E00, 0x9FAF,  // CJK Ideographs
+		0,
+	};
+	io.Fonts->AddFontFromFileTTF("Resources/Fonts/FiraMono-Medium.ttf", 14.0f, &config, ranges);
 #endif;
 }
 

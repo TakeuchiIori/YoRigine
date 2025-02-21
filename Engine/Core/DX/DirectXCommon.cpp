@@ -209,14 +209,27 @@ void DirectXCommon::InitializeRenderTarget()
 	// ディスクリプタの先頭を取得する
 	D3D12_CPU_DESCRIPTOR_HANDLE rtvStartHandle = rtvDescriptorHeap_->GetCPUDescriptorHandleForHeapStart();
 
-
+	// 1つ目のRTV
 	rtvHandles_[0] = rtvStartHandle;
 	device_->CreateRenderTargetView(swapChainResources_[0].Get(), &rtvDesc_, rtvHandles_[0]);
-	// ポインタを進める
+
+	// 2つ目のRTV用にポインタを進める
 	rtvStartHandle.ptr += device_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	rtvHandles_[1] = rtvStartHandle;
 	device_->CreateRenderTargetView(swapChainResources_[1].Get(), &rtvDesc_, rtvHandles_[1]);
 
+	renderTargetClearColor_.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+	renderTargetClearColor_.Color[0] = { 1.0f };
+	renderTargetClearColor_.Color[1] = { 1.0f };
+	renderTargetClearColor_.Color[2] = { 1.0f };
+	renderTargetClearColor_.Color[3] = { 1.0f };
+	
+
+	offScreenResource_ = CreateRenderTextureResource(WinApp::kClientWidth, WinApp::kClientHeight, renderTargetClearColor_);
+	// 3つ目のRTV（オフスクリーン）用にポインタをさらに進める
+	rtvStartHandle.ptr += device_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	rtvHandles_[2] = rtvStartHandle;
+	device_->CreateRenderTargetView(offScreenResource_.Get(), &rtvDesc_, rtvHandles_[2]);
 }
 
 void DirectXCommon::InitializeDepthStencilView() {
@@ -260,7 +273,7 @@ void DirectXCommon::CreateDescriptorHeap()
 	descriptotSizeDSV_ = device_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
 
 	// ディスクリプタヒープの生成 
-	rtvDescriptorHeap_ = CreateDescriptorHeap(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 2, false);
+	rtvDescriptorHeap_ = CreateDescriptorHeap(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 3, false);
 	dsvDescriptorHeap_ = CreateDescriptorHeap(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1, false);
 
 }
@@ -377,16 +390,18 @@ void DirectXCommon::InitializeScissorRevtangle()
 
 Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> DirectXCommon::CreateDescriptorHeap(Microsoft::WRL::ComPtr<ID3D12Device> device, D3D12_DESCRIPTOR_HEAP_TYPE heapType, UINT numDescriptors, bool shaderVisible)
 {
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> heap; // ローカル変数を使用
 	D3D12_DESCRIPTOR_HEAP_DESC descriptorHeapDesc{};
-	descriptorHeapDesc.Type = heapType;							 //レンダーターゲットビュー用
-	descriptorHeapDesc.NumDescriptors = numDescriptors;			 //ダブルバッファ用に2つ。多くても別に構わない
+	descriptorHeapDesc.Type = heapType;
+	descriptorHeapDesc.NumDescriptors = numDescriptors;
 	descriptorHeapDesc.Flags = shaderVisible ? D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE :
 		D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 	HRESULT hr = device_->CreateDescriptorHeap(&descriptorHeapDesc,
-		IID_PPV_ARGS(&descriptorHeap));
+		IID_PPV_ARGS(&heap));  // ローカル変数に格納
 	// ディスクリプタヒープが作れなかったので起動できない
 	assert(SUCCEEDED(hr));
-	return descriptorHeap;
+	return heap;  // ローカル変数を返す
+
 }
 
 Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::CreateDepthStencilTextureResource(Microsoft::WRL::ComPtr<ID3D12Device> device, int32_t width, int32_t height)
@@ -425,31 +440,23 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::CreateDepthStencilTextureR
 	return resource;
 }
 
-Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::CreateRenderTextureResource(uint32_t width, uint32_t height, DXGI_FORMAT format, const Vector4& clearColor)
+Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::CreateRenderTextureResource(uint32_t width, uint32_t height, D3D12_CLEAR_VALUE clearValue)
 {
-	// 生成するResourceの設定
 	D3D12_RESOURCE_DESC resourceDesc{};
 	resourceDesc.Width = width;
 	resourceDesc.Height = height;
 	resourceDesc.MipLevels = 1;
 	resourceDesc.DepthOrArraySize = 1;
-	resourceDesc.Format = format;
+	resourceDesc.Format = clearValue.Format;
 	resourceDesc.SampleDesc.Count = 1;
+	resourceDesc.SampleDesc.Quality = 0;
 	resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-	//2次元
 	resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+	resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 
 	D3D12_HEAP_PROPERTIES heapProperties{};
 	heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
 
-	D3D12_CLEAR_VALUE clearValue{};
-	clearValue.Format = format;
-	clearValue.Color[0] = clearColor.x;
-	clearValue.Color[1] = clearColor.y;
-	clearValue.Color[2] = clearColor.z;
-	clearValue.Color[3] = clearColor.w;
-
-	// Resourceの生成
 	Microsoft::WRL::ComPtr<ID3D12Resource> resource = nullptr;
 	HRESULT hr = device_->CreateCommittedResource(
 		&heapProperties,
@@ -458,6 +465,7 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::CreateRenderTextureResourc
 		D3D12_RESOURCE_STATE_RENDER_TARGET,
 		&clearValue,
 		IID_PPV_ARGS(&resource));
+
 	assert(SUCCEEDED(hr));
 	return resource;
 }
@@ -659,6 +667,18 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::UploadTextureData(Microsof
 	return intermediateResource;
 }
 
+void DirectXCommon::CreateSRVForOffScreen()
+{
+	offScreenSrvIndex_ = SrvManager::GetInstance()->Allocate();
+	SrvManager::GetInstance()->CreateSRVforRenderTexture(offScreenSrvIndex_, offScreenResource_.Get());
+	offScreenSrvHandleCPU_ = SrvManager::GetInstance()->GetCPUSRVDescriptorHandle(offScreenSrvIndex_);
+	offScreenSrvHandleGPU_ = SrvManager::GetInstance()->GetGPUSRVDescriptorHandle(offScreenSrvIndex_);
+}
+/*-----------------------------------------------------------------------------------
+
+								Debugging Related
+
+------------------------------------------------------------------------------------*/
 std::wstring DirectXCommon::ConvertString(const std::string& str)
 {
 	if (str.empty()) {
@@ -687,23 +707,6 @@ std::string DirectXCommon::ConvertString(const std::wstring& str)
 	std::string result(sizeNeeded, 0);
 	WideCharToMultiByte(CP_UTF8, 0, str.data(), static_cast<int>(str.size()), result.data(), sizeNeeded, NULL, NULL);
 	return result;
-}
-
-DirectX::ScratchImage DirectXCommon::LoadTexture(const std::string& filePath)
-{
-	// テクスチャファイルを読んでプログラムで扱えるようにする
-	DirectX::ScratchImage image{};
-	std::wstring filepathW = ConvertString(filePath);
-	HRESULT hr = DirectX::LoadFromWICFile(filepathW.c_str(), DirectX::WIC_FLAGS_FORCE_SRGB, nullptr, image);
-	assert(SUCCEEDED(hr));
-
-	// ミニマップの作成
-	DirectX::ScratchImage mipImages{};
-	hr = DirectX::GenerateMipMaps(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DirectX::TEX_FILTER_SRGB, 0, mipImages);
-	assert(SUCCEEDED(hr));
-
-	// ミニマップ付きのデータを返す
-	return mipImages;
 }
 
 void DirectXCommon::Log(const std::string& message)
