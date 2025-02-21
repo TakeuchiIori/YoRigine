@@ -55,6 +55,12 @@ void DirectXCommon::Initialize(WinApp* winApp)
 	InitializeScissorRevtangle();
 	// DXCコンパイラの生成
 	CreateDXCompiler();
+
+	for (UINT i = 0; i < backBuffers; i++) {
+		resourceStates_[swapChainResources_[i].Get()] = D3D12_RESOURCE_STATE_COMMON;
+	}
+	resourceStates_[offScreenResource_.Get()] = D3D12_RESOURCE_STATE_COMMON;
+	resourceStates_[depthStencilResource_.Get()] = D3D12_RESOURCE_STATE_DEPTH_WRITE;
 }
 
 void DirectXCommon::InitializeDXGIDevice()
@@ -189,45 +195,44 @@ void DirectXCommon::CreateSwapChain()
 
 void DirectXCommon::InitializeRenderTarget()
 {
-	/*=============================================//
-			SwapChainからResourceを引っ張ってくる
-	//=============================================*/
-
 	HRESULT hr;
-	hr = swapChain_->GetBuffer(0, IID_PPV_ARGS(&swapChainResources_[0]));
-	// うまく取得できなければ起動できない
-	assert(SUCCEEDED(hr));
-	hr = swapChain_->GetBuffer(1, IID_PPV_ARGS(&swapChainResources_[1]));
-	assert(SUCCEEDED(hr));
 
-	/*=============================================//
-						RTVの設定
-	//=============================================*/
+	// SwapChainリソースの取得と状態設定
+	for (UINT i = 0; i < backBuffers; i++) {
+		hr = swapChain_->GetBuffer(i, IID_PPV_ARGS(&swapChainResources_[i]));
+		assert(SUCCEEDED(hr));
+		// スワップチェーンの初期状態はPRESENT
+		resourceStates_[swapChainResources_[i].Get()] = D3D12_RESOURCE_STATE_PRESENT;
+	}
 
+	// RTV設定
 	rtvDesc_.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
 	rtvDesc_.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-	// ディスクリプタの先頭を取得する
+
 	D3D12_CPU_DESCRIPTOR_HANDLE rtvStartHandle = rtvDescriptorHeap_->GetCPUDescriptorHandleForHeapStart();
 
-	// 1つ目のRTV
-	rtvHandles_[0] = rtvStartHandle;
-	device_->CreateRenderTargetView(swapChainResources_[0].Get(), &rtvDesc_, rtvHandles_[0]);
+	for (UINT i = 0; i < backBuffers; i++) {
+		rtvHandles_[i] = rtvStartHandle;
+		device_->CreateRenderTargetView(swapChainResources_[i].Get(), &rtvDesc_, rtvHandles_[i]);
+		rtvStartHandle.ptr += device_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	}
 
-	// 2つ目のRTV用にポインタを進める
-	rtvStartHandle.ptr += device_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	rtvHandles_[1] = rtvStartHandle;
-	device_->CreateRenderTargetView(swapChainResources_[1].Get(), &rtvDesc_, rtvHandles_[1]);
+	// オフスクリーンリソースの作成
+	renderTargetClearColor_ = {
+		DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+		{ 1.0f, 0.0f, 0.0f, 1.0f }
+	};
 
-	renderTargetClearColor_.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-	renderTargetClearColor_.Color[0] = { 1.0f };
-	renderTargetClearColor_.Color[1] = { 1.0f };
-	renderTargetClearColor_.Color[2] = { 1.0f };
-	renderTargetClearColor_.Color[3] = { 1.0f };
+	offScreenResource_ = CreateRenderTextureResource(
+		WinApp::kClientWidth,
+		WinApp::kClientHeight,
+		renderTargetClearColor_);
 
+	// オフスクリーンの初期状態はRENDER_TARGET
+	resourceStates_[offScreenResource_.Get()] = D3D12_RESOURCE_STATE_RENDER_TARGET;
+	offScreenState_ = D3D12_RESOURCE_STATE_RENDER_TARGET;
 
-	offScreenResource_ = CreateRenderTextureResource(WinApp::kClientWidth, WinApp::kClientHeight, renderTargetClearColor_);
-	// 3つ目のRTV（オフスクリーン）用にポインタをさらに進める
-	rtvStartHandle.ptr += device_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	// オフスクリーン用RTV作成
 	rtvHandles_[2] = rtvStartHandle;
 	device_->CreateRenderTargetView(offScreenResource_.Get(), &rtvDesc_, rtvHandles_[2]);
 }
@@ -289,47 +294,49 @@ void DirectXCommon::CreateDXCompiler()
 	assert(SUCCEEDED(hr));
 }
 
-void DirectXCommon::TransitionResource(ID3D12Resource* resource,D3D12_RESOURCE_STATES beforeState,D3D12_RESOURCE_STATES afterState)
-{
-	D3D12_RESOURCE_BARRIER barrier{};
-	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-	barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-	barrier.Transition.pResource = resource;
-	barrier.Transition.StateBefore = beforeState;
-	barrier.Transition.StateAfter = afterState;
-	commandList_->ResourceBarrier(1, &barrier);
-}
+//void DirectXCommon::TransitionResource(ID3D12Resource* resource,D3D12_RESOURCE_STATES beforeState,D3D12_RESOURCE_STATES afterState)
+//{
+//	D3D12_RESOURCE_BARRIER barrier{};
+//	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+//	barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+//	barrier.Transition.pResource = resource;
+//	barrier.Transition.StateBefore = beforeState;
+//	barrier.Transition.StateAfter = afterState;
+//	commandList_->ResourceBarrier(1, &barrier);
+//}
 
 void DirectXCommon::PreDrawScene()
 {
-	// これから書き込むバックバッファのインデックスを取得
-	backBufferIndex = swapChain_->GetCurrentBackBufferIndex();
-
-	TransitionResource(swapChainResources_[backBufferIndex].Get(),D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
-
-	// 描画先のRTVとDSVを設定する
-	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = GetDSVCPUDescriptorHandle(0); // 適切か確認要
-	commandList_->OMSetRenderTargets(1, &rtvHandles_[backBufferIndex], FALSE, &dsvHandle);
-
-	// 指定した深度で画面全体をクリアにする
+	// オフスクリーンリソースをレンダーターゲットとして使用
+	TransitionOffScreen(D3D12_RESOURCE_STATE_RENDER_TARGET);
+	// レンダーターゲットとデプスステンシルビューをセット
+	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = GetDSVCPUDescriptorHandle(0);
+	BeginRenderTargetRTV(rtvHandles_[2], &dsvHandle);
+	// クリア処理
+	commandList_->ClearRenderTargetView(rtvHandles_[2], renderTargetClearColor_.Color, 0, nullptr);
 	commandList_->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
-
-	// 指定した色で画面全体をクリアする
-	float clearColor[] = { 0.1f, 0.25f, 0.5f, 1.0f };
-	commandList_->ClearRenderTargetView(rtvHandles_[backBufferIndex], clearColor, 0, nullptr);
-
-	// ディスクリプタヒープの設定
-
-	commandList_->RSSetViewports(1, &viewport_);
-	commandList_->RSSetScissorRects(1, &scissorRect_);
-
 }
 
-void DirectXCommon::PostDrawScene()
+
+void DirectXCommon::PreDrawImGui()
+{
+	backBufferIndex = swapChain_->GetCurrentBackBufferIndex();
+	// バックバッファをレンダーターゲットとして使用
+	TransitionResource(swapChainResources_[backBufferIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET);
+	// レンダーターゲットをセット（デプスステンシルなし）
+	BeginRenderTargetRTV(rtvHandles_[backBufferIndex]);
+	float clearColor[] = { 0.1f, 0.25f, 0.5f, 1.0f };
+	commandList_->ClearRenderTargetView(rtvHandles_[backBufferIndex], clearColor, 0, nullptr);
+}
+
+
+void DirectXCommon::PostDraw()
 {
 	HRESULT hr;
-	backBufferIndex = swapChain_->GetCurrentBackBufferIndex();
-	TransitionResource(swapChainResources_[backBufferIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+	UINT backBufferIndex = swapChain_->GetCurrentBackBufferIndex();
+	// バックバッファを表示用に変更
+	TransitionResource(swapChainResources_[backBufferIndex].Get(), D3D12_RESOURCE_STATE_PRESENT);
+
 	// コマンドリストの内容を確定させる。全てのコマンドを積んでからCloseすること
 	hr = commandList_->Close();
 	assert(SUCCEEDED(hr));
@@ -363,43 +370,9 @@ void DirectXCommon::PostDrawScene()
 
 }
 
-void DirectXCommon::PreDrawImGui()
-{
-	// これから書き込むバックバッファのインデックスを取得
-	backBufferIndex = swapChain_->GetCurrentBackBufferIndex();
-
-
-	barrier_.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-	// Noneにしておく
-	barrier_.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-	// バリアを張る対象のリソース。現在のバックバッファに対して行う
-
-	barrier_.Transition.pResource = swapChainResources_[backBufferIndex].Get();
-	// 遷移前 (現在) のResourceState
-	barrier_.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
-	// 遷移後のResourceState
-	barrier_.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
-	// TransitionBarrierを張る
-	commandList_->ResourceBarrier(1, &barrier_);
-
-
-	// 描画先のRTVとDSVを設定する
-	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = GetDSVCPUDescriptorHandle(0); // 適切か確認要
-	commandList_->OMSetRenderTargets(1, &rtvHandles_[backBufferIndex], FALSE, &dsvHandle);
-
-	// 指定した色で画面全体をクリアする
-	float clearColor[] = { 0.1f, 0.25f, 0.5f, 1.0f };
-	commandList_->ClearRenderTargetView(rtvHandles_[backBufferIndex], clearColor, 0, nullptr);
-
-	// ディスクリプタヒープの設定
-
-	commandList_->RSSetViewports(1, &viewport_);
-	commandList_->RSSetScissorRects(1, &scissorRect_);
-}
-
-void DirectXCommon::PostDrawImGui()
-{
-}
+//void DirectXCommon::PostDrawImGui()
+//{
+//}
 
 void DirectXCommon::InitializeViewPortRevtangle()
 {
@@ -745,4 +718,60 @@ std::string DirectXCommon::ConvertString(const std::wstring& str)
 void DirectXCommon::Log(const std::string& message)
 {
 	OutputDebugStringA(message.c_str());
+}
+
+void DirectXCommon::TransitionResource(ID3D12Resource* resource, D3D12_RESOURCE_STATES newState)
+{
+	if (!resource) return;
+
+	// 現在の状態を取得
+	D3D12_RESOURCE_STATES currentState = D3D12_RESOURCE_STATE_COMMON;
+	auto it = resourceStates_.find(resource);
+	if (it != resourceStates_.end()) {
+		currentState = it->second;
+	}
+
+	// 状態が異なる場合のみバリアを設定
+	if (currentState != newState) {
+		D3D12_RESOURCE_BARRIER barrier{};
+		barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+		barrier.Transition.pResource = resource;
+		barrier.Transition.StateBefore = currentState;
+		barrier.Transition.StateAfter = newState;
+		barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+
+		commandList_->ResourceBarrier(1, &barrier);
+		resourceStates_[resource] = newState;
+	}
+}
+
+void DirectXCommon::TransitionOffScreen(D3D12_RESOURCE_STATES newState)
+{
+	if (offScreenState_ != newState) {
+		D3D12_RESOURCE_BARRIER barrier{};
+		barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+		barrier.Transition.pResource = offScreenResource_.Get();
+		barrier.Transition.StateBefore = offScreenState_;
+		barrier.Transition.StateAfter = newState;
+		barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+
+		commandList_->ResourceBarrier(1, &barrier);
+		offScreenState_ = newState;
+	}
+}
+
+void DirectXCommon::BeginRenderTargetRTV(const D3D12_CPU_DESCRIPTOR_HANDLE& rtvHandle, const D3D12_CPU_DESCRIPTOR_HANDLE* dsvHandle)
+{
+	// レンダーターゲットとデプスステンシルビューをセット
+	if (dsvHandle) {
+		commandList_->OMSetRenderTargets(1, &rtvHandle, FALSE, dsvHandle);
+	} else {
+		commandList_->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+	}
+
+	// ビューポートとシザー矩形の設定
+	commandList_->RSSetViewports(1, &viewport_);
+	commandList_->RSSetScissorRects(1, &scissorRect_);
 }

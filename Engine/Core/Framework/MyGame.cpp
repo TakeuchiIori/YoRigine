@@ -47,9 +47,9 @@ void MyGame::Draw()
 	// ゲームの描画
 	SceneManager::GetInstance()->Draw();
 
-
+	dxCommon_->PreDrawImGui();
 	imguiManager_->Draw();
 
 	// DirectXの描画終了
-	dxCommon_->PostDrawScene();
+	dxCommon_->PostDraw();
 }

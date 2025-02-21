@@ -33,7 +33,7 @@ public:
     void SetPlayer(Player* player) { player_ = player; }
     Enemy* GetEnemy(int i) { return enemies_[i].get(); }
     size_t GetEnemyCount() const { return enemies_.size(); }
-     bool IsAllEnemiesDefeated() const { return deadNum_ >= maxEnemyCount_; }
+     bool IsAllEnemiesDefeated() const { return deadNum_ >= static_cast<int>(maxEnemyCount_); }
     
      // 全ての敵にヒットストップを適用
      void ApplyHitStopToAllEnemies(HitStop::HitStopType type) {

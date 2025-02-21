@@ -105,21 +105,28 @@ private:
 	/// <param name="beforeState"></param>
 	/// <param name="afterState"></param>
 	/// <param name="subresource"></param>
-	void TransitionResource(ID3D12Resource* resource, D3D12_RESOURCE_STATES beforeState, D3D12_RESOURCE_STATES afterState);
+	void TransitionResource(ID3D12Resource* resource, D3D12_RESOURCE_STATES newState);
+
+	void BeginRenderTargetRTV(const D3D12_CPU_DESCRIPTOR_HANDLE& rtvHandle, const D3D12_CPU_DESCRIPTOR_HANDLE* dsvHandle = nullptr);
+	void EndRenderTargetRTV();
+
+	// リソース状態管理
+	
+	void TransitionOffScreen(D3D12_RESOURCE_STATES newState);
 
 public:
 	
 	/// <summary>
-	/// シーンの描画処理
+	/// 描画前処理
 	/// </summary>
 	void PreDrawScene();
-	void PostDrawScene();
+	void PreDrawImGui();
 	
 	/// <summary>
-	/// ImGuiの描画処理
+	/// 描画後処理
 	/// </summary>
-	void PreDrawImGui();
-	void PostDrawImGui();
+	void PostDraw();
+
 
 public: // メンバ関数
 	/// <summary>
@@ -340,5 +347,9 @@ private:
 	uint32_t offScreenSrvIndex_ = 0;
 	D3D12_CPU_DESCRIPTOR_HANDLE offScreenSrvHandleCPU_;
 	D3D12_GPU_DESCRIPTOR_HANDLE offScreenSrvHandleGPU_;
+	// リソース状態の追跡用
+	std::unordered_map<ID3D12Resource*, D3D12_RESOURCE_STATES> resourceStates_;
+	D3D12_RESOURCE_STATES offScreenState_ = D3D12_RESOURCE_STATE_COMMON;
+
 };
 
