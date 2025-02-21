@@ -167,10 +167,10 @@ void PipelineManager::CreatePSO_Sprite()
 	// Shaderをコンパイルする
 	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob;
 	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob;
-	vertexShaderBlob = dxCommon_->CompileShader(L"Resources/shaders/Sprite.VS.hlsl",
+	vertexShaderBlob = dxCommon_->CompileShader(L"Resources/Shaders/Sprite/Sprite.VS.hlsl",
 		L"vs_6_0");
 	assert(vertexShaderBlob != nullptr);
-	pixelShaderBlob = dxCommon_->CompileShader(L"Resources/shaders/Sprite.PS.hlsl",
+	pixelShaderBlob = dxCommon_->CompileShader(L"Resources/Shaders/Sprite/Sprite.PS.hlsl",
 		L"ps_6_0");
 	assert(pixelShaderBlob != nullptr);
 
@@ -340,10 +340,10 @@ void PipelineManager::CreatePSO_Object()
 	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob;
 	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob;
 
-	vertexShaderBlob = dxCommon_->CompileShader(L"Resources/shaders/Object3d.VS.hlsl",
+	vertexShaderBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3d/Object3d.VS.hlsl",
 		L"vs_6_0");
 	assert(vertexShaderBlob != nullptr);
-	pixelShaderBlob = dxCommon_->CompileShader(L"Resources/shaders/Object3d.PS.hlsl",
+	pixelShaderBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3d/Object3d.PS.hlsl",
 		L"ps_6_0");
 	assert(pixelShaderBlob != nullptr);
 
@@ -497,10 +497,10 @@ void PipelineManager::CreatePSO_Animation()
 
 	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob;
 	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob;
-	vertexShaderBlob = dxCommon_->CompileShader(L"Resources/shaders/Skinning.VS.hlsl",
+	vertexShaderBlob = dxCommon_->CompileShader(L"Resources/Shaders/Skinning/Skinning.VS.hlsl",
 		L"vs_6_0");
 	assert(vertexShaderBlob != nullptr);
-	pixelShaderBlob = dxCommon_->CompileShader(L"Resources/shaders/Skinning.PS.hlsl",
+	pixelShaderBlob = dxCommon_->CompileShader(L"Resources/Shaders/Skinning/Skinning.PS.hlsl",
 		L"ps_6_0");
 	assert(pixelShaderBlob != nullptr);
 
@@ -630,10 +630,10 @@ void PipelineManager::CreatePSO_Line()
 	// Shaderをコンパイルする
 	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob;
 	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob;
-	vertexShaderBlob = dxCommon_->CompileShader(L"Resources/shaders/Line.VS.hlsl",
+	vertexShaderBlob = dxCommon_->CompileShader(L"Resources/Shaders/Line/Line.VS.hlsl",
 		L"vs_6_0");
 	assert(vertexShaderBlob != nullptr);
-	pixelShaderBlob = dxCommon_->CompileShader(L"Resources/shaders/Line.PS.hlsl",
+	pixelShaderBlob = dxCommon_->CompileShader(L"Resources/Shaders/Line/Line.PS.hlsl",
 		L"ps_6_0");
 	assert(pixelShaderBlob != nullptr);
 
@@ -801,10 +801,10 @@ void PipelineManager::CreatePSO_Particle()
 	// Shaderをコンパイルする
 	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob;
 	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob;
-	vertexShaderBlob = dxCommon_->CompileShader(L"Resources/shaders/Particle.VS.hlsl",
+	vertexShaderBlob = dxCommon_->CompileShader(L"Resources/Shaders/Particle/Particle.VS.hlsl",
 		L"vs_6_0");
 	assert(vertexShaderBlob != nullptr);
-	pixelShaderBlob = dxCommon_->CompileShader(L"Resources/shaders/Particle.PS.hlsl",
+	pixelShaderBlob = dxCommon_->CompileShader(L"Resources/Shaders/Particle/Particle.PS.hlsl",
 		L"ps_6_0");
 	assert(pixelShaderBlob != nullptr);
 

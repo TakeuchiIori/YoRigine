@@ -499,10 +499,10 @@ void ParticleManager::CreateRootSignature()
 	// 三角形の中を塗りつぶす
 	rasterrizerDesc_.FillMode = D3D12_FILL_MODE_SOLID;
 	// 4. Shaderをコンパイルする
-	vertexShaderBlob_ = dxCommon_->CompileShader(L"Resources/shaders/Particle.VS.hlsl",
+	vertexShaderBlob_ = dxCommon_->CompileShader(L"Resources/Shaders/Particle/Particle.VS.hlsl",
 		L"vs_6_0");
 	assert(vertexShaderBlob_ != nullptr);
-	pixelShaderBlob_ = dxCommon_->CompileShader(L"Resources/shaders/Particle.PS.hlsl",
+	pixelShaderBlob_ = dxCommon_->CompileShader(L"Resources/Shaders/Particle/Particle.PS.hlsl",
 		L"ps_6_0");
 	assert(pixelShaderBlob_ != nullptr);
 
