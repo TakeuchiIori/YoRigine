@@ -83,7 +83,6 @@ void ImGuiManager::End()
 		ImGui::UpdatePlatformWindows();
 		ImGui::RenderPlatformWindowsDefault(nullptr, (void*)dxCommon_->GetCommandList().Get());
 	}
-	//Draw();
 #endif
 }
 

@@ -223,7 +223,7 @@ void DirectXCommon::InitializeRenderTarget()
 	renderTargetClearColor_.Color[1] = { 1.0f };
 	renderTargetClearColor_.Color[2] = { 1.0f };
 	renderTargetClearColor_.Color[3] = { 1.0f };
-	
+
 
 	offScreenResource_ = CreateRenderTextureResource(WinApp::kClientWidth, WinApp::kClientHeight, renderTargetClearColor_);
 	// 3つ目のRTV（オフスクリーン）用にポインタをさらに進める
@@ -289,7 +289,81 @@ void DirectXCommon::CreateDXCompiler()
 	assert(SUCCEEDED(hr));
 }
 
-void DirectXCommon::PreDraw()
+void DirectXCommon::TransitionResource(ID3D12Resource* resource,D3D12_RESOURCE_STATES beforeState,D3D12_RESOURCE_STATES afterState)
+{
+	D3D12_RESOURCE_BARRIER barrier{};
+	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+	barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+	barrier.Transition.pResource = resource;
+	barrier.Transition.StateBefore = beforeState;
+	barrier.Transition.StateAfter = afterState;
+	commandList_->ResourceBarrier(1, &barrier);
+}
+
+void DirectXCommon::PreDrawScene()
+{
+	// これから書き込むバックバッファのインデックスを取得
+	backBufferIndex = swapChain_->GetCurrentBackBufferIndex();
+
+	TransitionResource(swapChainResources_[backBufferIndex].Get(),D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+
+	// 描画先のRTVとDSVを設定する
+	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = GetDSVCPUDescriptorHandle(0); // 適切か確認要
+	commandList_->OMSetRenderTargets(1, &rtvHandles_[backBufferIndex], FALSE, &dsvHandle);
+
+	// 指定した深度で画面全体をクリアにする
+	commandList_->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+
+	// 指定した色で画面全体をクリアする
+	float clearColor[] = { 0.1f, 0.25f, 0.5f, 1.0f };
+	commandList_->ClearRenderTargetView(rtvHandles_[backBufferIndex], clearColor, 0, nullptr);
+
+	// ディスクリプタヒープの設定
+
+	commandList_->RSSetViewports(1, &viewport_);
+	commandList_->RSSetScissorRects(1, &scissorRect_);
+
+}
+
+void DirectXCommon::PostDrawScene()
+{
+	HRESULT hr;
+	backBufferIndex = swapChain_->GetCurrentBackBufferIndex();
+	TransitionResource(swapChainResources_[backBufferIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+	// コマンドリストの内容を確定させる。全てのコマンドを積んでからCloseすること
+	hr = commandList_->Close();
+	assert(SUCCEEDED(hr));
+	// コマンドリストの実行を行わせる
+	ID3D12CommandList* commandLists[] = { commandList_.Get() };
+	commandQueue_->ExecuteCommandLists(1, commandLists);
+
+	// GPUと05に画面の交換を行うよう通知する
+	swapChain_->Present(1, 0);
+	//------------------ GPUにSigalを送る ------------------//
+	// Fenceの値を更新
+	fenceValue_++;
+	// コマンドリストの実行完了を待つ
+	commandQueue_->Signal(fence_.Get(), ++fenceValue_);
+	if (fence_->GetCompletedValue() != fenceValue_) {
+		HANDLE event = CreateEvent(nullptr, false, false, nullptr);
+		fence_->SetEventOnCompletion(fenceValue_, event);
+		WaitForSingleObject(event, INFINITE);
+		CloseHandle(event);
+	}
+
+
+	//FPS固定
+	UpdateFixFPS();
+
+	// 次のフレーム用のコマンドリストを準備
+	hr = commandAllocator_->Reset();
+	assert(SUCCEEDED(hr));
+	hr = commandList_->Reset(commandAllocator_.Get(), nullptr);
+	assert(SUCCEEDED(hr));
+
+}
+
+void DirectXCommon::PreDrawImGui()
 {
 	// これから書き込むバックバッファのインデックスを取得
 	backBufferIndex = swapChain_->GetCurrentBackBufferIndex();
@@ -313,9 +387,6 @@ void DirectXCommon::PreDraw()
 	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = GetDSVCPUDescriptorHandle(0); // 適切か確認要
 	commandList_->OMSetRenderTargets(1, &rtvHandles_[backBufferIndex], FALSE, &dsvHandle);
 
-	// 指定した深度で画面全体をクリアにする
-	commandList_->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
-
 	// 指定した色で画面全体をクリアする
 	float clearColor[] = { 0.1f, 0.25f, 0.5f, 1.0f };
 	commandList_->ClearRenderTargetView(rtvHandles_[backBufferIndex], clearColor, 0, nullptr);
@@ -324,48 +395,10 @@ void DirectXCommon::PreDraw()
 
 	commandList_->RSSetViewports(1, &viewport_);
 	commandList_->RSSetScissorRects(1, &scissorRect_);
-
 }
 
-void DirectXCommon::PostDraw()
+void DirectXCommon::PostDrawImGui()
 {
-	HRESULT hr;
-	backBufferIndex = swapChain_->GetCurrentBackBufferIndex();
-	// 今回はRendeerTargetからPresentにする
-	barrier_.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
-	barrier_.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
-	// TransitionBarrierを張る
-	commandList_->ResourceBarrier(1, &barrier_);
-	// コマンドリストの内容を確定させる。全てのコマンドを積んでからCloseすること
-	hr = commandList_->Close();
-	assert(SUCCEEDED(hr));
-	// コマンドリストの実行を行わせる
-	ID3D12CommandList* commandLists[] = { commandList_.Get() };
-	commandQueue_->ExecuteCommandLists(1, commandLists);
-
-	// GPUと05に画面の交換を行うよう通知する
-	swapChain_->Present(1, 0);
-	//------------------ GPUにSigalを送る ------------------//
-	// Fenceの値を更新
-	fenceValue_++;
-	// コマンドリストの実行完了を待つ
-	commandQueue_->Signal(fence_.Get(), ++fenceValue_);
-	if (fence_->GetCompletedValue() != fenceValue_) {
-		HANDLE event = CreateEvent(nullptr, false, false, nullptr);
-		fence_->SetEventOnCompletion(fenceValue_, event);
-		WaitForSingleObject(event, INFINITE);
-		CloseHandle(event);
-	}
-
-	//FPS固定
-	UpdateFixFPS();
-
-	// 次のフレーム用のコマンドリストを準備
-	hr = commandAllocator_->Reset();
-	assert(SUCCEEDED(hr));
-	hr = commandList_->Reset(commandAllocator_.Get(), nullptr);
-	assert(SUCCEEDED(hr));
-
 }
 
 void DirectXCommon::InitializeViewPortRevtangle()

@@ -98,9 +98,28 @@ private:
 	/// </summary>
 	void CreateDXCompiler();
 
+	/// <summary>
+	/// バリア
+	/// </summary>
+	/// <param name="resource"></param>
+	/// <param name="beforeState"></param>
+	/// <param name="afterState"></param>
+	/// <param name="subresource"></param>
+	void TransitionResource(ID3D12Resource* resource, D3D12_RESOURCE_STATES beforeState, D3D12_RESOURCE_STATES afterState);
+
 public:
-	void PreDraw();
-	void PostDraw();
+	
+	/// <summary>
+	/// シーンの描画処理
+	/// </summary>
+	void PreDrawScene();
+	void PostDrawScene();
+	
+	/// <summary>
+	/// ImGuiの描画処理
+	/// </summary>
+	void PreDrawImGui();
+	void PostDrawImGui();
 
 public: // メンバ関数
 	/// <summary>

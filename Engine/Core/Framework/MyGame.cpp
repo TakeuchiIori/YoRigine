@@ -40,7 +40,7 @@ void MyGame::Update()
 void MyGame::Draw()
 {
 	// DirectXの描画準備
-	dxCommon_->PreDraw();
+	dxCommon_->PreDrawScene();
 	// Srvの描画準備
 	srvManager_->PreDraw();
 
@@ -48,8 +48,8 @@ void MyGame::Draw()
 	SceneManager::GetInstance()->Draw();
 
 
-	//imguiManager_->Draw();
+	imguiManager_->Draw();
 
 	// DirectXの描画終了
-	dxCommon_->PostDraw();
+	dxCommon_->PostDrawScene();
 }
