@@ -119,6 +119,7 @@ public:
 	/// <summary>
 	/// 描画前処理
 	/// </summary>
+	void RenderTexture();
 	void PreDrawScene();
 	void PreDrawImGui();
 	

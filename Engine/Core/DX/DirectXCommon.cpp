@@ -293,6 +293,17 @@ void DirectXCommon::CreateDXCompiler()
 	assert(SUCCEEDED(hr));
 }
 
+void DirectXCommon::RenderTexture()
+{// オフスクリーンリソースをレンダーターゲットとして使用
+	TransitionOffScreen(D3D12_RESOURCE_STATE_RENDER_TARGET);
+	// レンダーターゲットとデプスステンシルビューをセット
+	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = GetDSVCPUDescriptorHandle(0);
+	BeginRenderTargetRTV(rtvHandles_[2], &dsvHandle);
+	// クリア処理
+	commandList_->ClearRenderTargetView(rtvHandles_[2], renderTargetClearColor_.Color, 0, nullptr);
+	commandList_->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+}
+
 void DirectXCommon::PreDrawScene()
 {
 	// オフスクリーンリソースをレンダーターゲットとして使用
@@ -303,6 +314,9 @@ void DirectXCommon::PreDrawScene()
 	// クリア処理
 	commandList_->ClearRenderTargetView(rtvHandles_[2], renderTargetClearColor_.Color, 0, nullptr);
 	commandList_->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+
+	commandList_->RSSetViewports(1, &viewport_);
+	commandList_->RSSetScissorRects(1, &scissorRect_);
 }
 
 

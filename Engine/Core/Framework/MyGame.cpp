@@ -40,6 +40,7 @@ void MyGame::Update()
 void MyGame::Draw()
 {
 	// DirectXの描画準備
+	dxCommon_->RenderTexture();
 	dxCommon_->PreDrawScene();
 	// Srvの描画準備
 	srvManager_->PreDraw();
