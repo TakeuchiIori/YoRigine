@@ -722,5 +722,6 @@
     <FxCompile Include="Resources\shaders\Sprite.VS.hlsl" />
     <FxCompile Include="Resources\Shaders\CopyImage\CopyImage.PS.hlsl" />
     <FxCompile Include="Resources\Shaders\CopyImage\CopyImage.VS.hlsl" />
+    <FxCompile Include="Resources\Shaders\Grayscale\Grayscale.PS.hlsl" />
   </ItemGroup>
 </Project>
