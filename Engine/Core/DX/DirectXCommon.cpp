@@ -231,7 +231,6 @@ void DirectXCommon::InitializeRenderTarget()
 	// オフスクリーンの初期状態はRENDER_TARGET
 	resourceStates_[offScreenResource_.Get()] = D3D12_RESOURCE_STATE_RENDER_TARGET;
 	offScreenState_ = D3D12_RESOURCE_STATE_RENDER_TARGET;
-
 	// オフスクリーン用RTV作成
 	rtvHandles_[2] = rtvStartHandle;
 	device_->CreateRenderTargetView(offScreenResource_.Get(), &rtvDesc_, rtvHandles_[2]);
@@ -294,17 +293,6 @@ void DirectXCommon::CreateDXCompiler()
 	assert(SUCCEEDED(hr));
 }
 
-//void DirectXCommon::TransitionResource(ID3D12Resource* resource,D3D12_RESOURCE_STATES beforeState,D3D12_RESOURCE_STATES afterState)
-//{
-//	D3D12_RESOURCE_BARRIER barrier{};
-//	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-//	barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-//	barrier.Transition.pResource = resource;
-//	barrier.Transition.StateBefore = beforeState;
-//	barrier.Transition.StateAfter = afterState;
-//	commandList_->ResourceBarrier(1, &barrier);
-//}
-
 void DirectXCommon::PreDrawScene()
 {
 	// オフスクリーンリソースをレンダーターゲットとして使用
@@ -320,6 +308,7 @@ void DirectXCommon::PreDrawScene()
 
 void DirectXCommon::PreDrawImGui()
 {
+	TransitionOffScreen(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 	backBufferIndex = swapChain_->GetCurrentBackBufferIndex();
 	// バックバッファをレンダーターゲットとして使用
 	TransitionResource(swapChainResources_[backBufferIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET);
@@ -336,7 +325,7 @@ void DirectXCommon::PostDraw()
 	UINT backBufferIndex = swapChain_->GetCurrentBackBufferIndex();
 	// バックバッファを表示用に変更
 	TransitionResource(swapChainResources_[backBufferIndex].Get(), D3D12_RESOURCE_STATE_PRESENT);
-
+	TransitionOffScreen(D3D12_RESOURCE_STATE_RENDER_TARGET);
 	// コマンドリストの内容を確定させる。全てのコマンドを積んでからCloseすること
 	hr = commandList_->Close();
 	assert(SUCCEEDED(hr));
@@ -370,9 +359,6 @@ void DirectXCommon::PostDraw()
 
 }
 
-//void DirectXCommon::PostDrawImGui()
-//{
-//}
 
 void DirectXCommon::InitializeViewPortRevtangle()
 {

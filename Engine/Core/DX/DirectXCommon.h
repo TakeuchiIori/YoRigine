@@ -165,6 +165,13 @@ public: // メンバ関数
 	/// </summary>
 	D3D12_GPU_DESCRIPTOR_HANDLE GetDSVGPUDescriptorHandle(uint32_t index);
 
+	/// <summary>
+	/// オフスクリーンのGPUハンドルを取得
+	/// </summary>
+	/// <returns></returns>
+	D3D12_GPU_DESCRIPTOR_HANDLE GetOffScreenGPUHandle() { return offScreenSrvHandleGPU_; }
+	D3D12_CPU_DESCRIPTOR_HANDLE GetOffScreenCPUHandle() { return offScreenSrvHandleCPU_; }
+
 private:
 	/// <summary>
 	/// FPS固定初期化

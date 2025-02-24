@@ -20,7 +20,7 @@
 #include "Player/InputHandle/InputHandleMove.h"
 #include "Ground/Ground.h"
 #include "../Transitions/Fade/Fade.h"
-
+#include "OffScreen/OffScreen.h"
 
 // Math
 #include "Vector3.h"
@@ -63,12 +63,6 @@ public:
 private:
 
     /// <summary>
-    /// フェースの切り替え
-    /// </summary>
-    void ChangePahse();
-
-
-    /// <summary>
     /// カメラモードを更新する
     /// </summary>
     void UpdateCameraMode();
@@ -108,6 +102,8 @@ private:
     // 3Dモデル
     std::unique_ptr<Object3d> test_;
     WorldTransform testWorldTransform_;
+
+	std::unique_ptr<OffScreen> offScreen_;
 
     // プレイヤー
     std::unique_ptr<Player> player_;

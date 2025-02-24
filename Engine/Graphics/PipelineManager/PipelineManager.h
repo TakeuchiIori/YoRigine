@@ -70,9 +70,14 @@ private:
 	void CreatePSO_Line();
 
 	/// <summary>
-	/// ライン用のパイプライン
+	/// パーティクル用のパイプライン
 	/// </summary>
 	void CreatePSO_Particle();
+
+	/// <summary>
+	/// オフスクリーン用のパイプライン
+	/// </summary>
+	void CreatePSO_OffScreen();
 
 
 private:
