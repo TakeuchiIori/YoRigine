@@ -82,8 +82,12 @@ private:
 	/// <summary>
 	/// オフスクリーン用のパイプライン
 	/// </summary>
-	void CreatePSO_OffScreen();
+	//void CreatePSO_OffScreen();
 
+	void CreatePSO_BaseOffScreen(
+		const std::wstring& pixelShaderPath = L"",
+		const std::string& pipelineKey = ""
+	);
 
 private:
 	PipelineManager(const  PipelineManager&) = delete;
