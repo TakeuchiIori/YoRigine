@@ -106,9 +106,8 @@ private:
 	/// <param name="afterState"></param>
 	/// <param name="subresource"></param>
 	void TransitionResource(ID3D12Resource* resource, D3D12_RESOURCE_STATES newState);
-
+	void TransitionResource(ID3D12Resource* pResource, D3D12_RESOURCE_STATES Before, D3D12_RESOURCE_STATES After);
 	void BeginRenderTargetRTV(const D3D12_CPU_DESCRIPTOR_HANDLE& rtvHandle, const D3D12_CPU_DESCRIPTOR_HANDLE* dsvHandle = nullptr);
-	void EndRenderTargetRTV();
 
 	// リソース状態管理
 	
@@ -213,6 +212,8 @@ public:
 	/// </summary>
 	/// <param name="srvManager"></param>
 	void CreateSRVForOffScreen();
+
+	
 
 	/// <summary>
 	/// ログ
@@ -355,9 +356,6 @@ private:
 	uint32_t offScreenSrvIndex_ = 0;
 	D3D12_CPU_DESCRIPTOR_HANDLE offScreenSrvHandleCPU_;
 	D3D12_GPU_DESCRIPTOR_HANDLE offScreenSrvHandleGPU_;
-	// リソース状態の追跡用
-	std::unordered_map<ID3D12Resource*, D3D12_RESOURCE_STATES> resourceStates_;
-	D3D12_RESOURCE_STATES offScreenState_ = D3D12_RESOURCE_STATE_COMMON;
 
 };
 

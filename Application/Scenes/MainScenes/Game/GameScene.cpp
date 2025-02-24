@@ -68,8 +68,7 @@ void GameScene::Initialize()
     //test_->SetModel("sneakWalk.gltf", true);
     testWorldTransform_.Initialize();
 
-	offScreen_ = std::make_unique<OffScreen>();
-	offScreen_->Initialize();
+
    
 
     // 初期カメラモード設定
@@ -227,7 +226,7 @@ ParticleManager::GetInstance()->Draw();
 
 #pragma endregion
 
-	offScreen_->Draw();
+
     
 }
 

@@ -20,7 +20,7 @@
 #include "Player/InputHandle/InputHandleMove.h"
 #include "Ground/Ground.h"
 #include "../Transitions/Fade/Fade.h"
-#include "OffScreen/OffScreen.h"
+
 
 // Math
 #include "Vector3.h"
@@ -103,7 +103,7 @@ private:
     std::unique_ptr<Object3d> test_;
     WorldTransform testWorldTransform_;
 
-	std::unique_ptr<OffScreen> offScreen_;
+	
 
     // プレイヤー
     std::unique_ptr<Player> player_;

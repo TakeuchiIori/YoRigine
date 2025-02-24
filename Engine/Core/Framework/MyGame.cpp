@@ -11,6 +11,8 @@ void MyGame::Initialize()
 	SceneManager::GetInstance()->SetSceneFactory(sceneFactory_.get());
 	SceneManager::GetInstance()->SetTransitionFactory(std::make_unique<FadeTransitionFactory>());
 	SceneManager::GetInstance()->Initialize();
+	offScreen_ = std::make_unique<OffScreen>();
+	offScreen_->Initialize();
 #ifdef _DEBUG
 	SceneManager::GetInstance()->ChangeScene("Game");
 #else
@@ -39,8 +41,6 @@ void MyGame::Update()
 
 void MyGame::Draw()
 {
-	// DirectXの描画準備
-	dxCommon_->RenderTexture();
 	dxCommon_->PreDrawScene();
 	// Srvの描画準備
 	srvManager_->PreDraw();
@@ -49,6 +49,7 @@ void MyGame::Draw()
 	SceneManager::GetInstance()->Draw();
 
 	dxCommon_->PreDrawImGui();
+	offScreen_->Draw();
 	imguiManager_->Draw();
 
 	// DirectXの描画終了
