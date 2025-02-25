@@ -88,6 +88,10 @@ private:
 		const std::wstring& pixelShaderPath = L"",
 		const std::string& pipelineKey = ""
 	);
+	void CreatePSO_Smoothing(
+		const std::wstring& pixelShaderPath = L"",
+		const std::string& pipelineKey = ""
+	);
 
 private:
 	PipelineManager(const  PipelineManager&) = delete;

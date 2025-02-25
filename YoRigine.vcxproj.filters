@@ -725,5 +725,6 @@
     <FxCompile Include="Resources\Shaders\PostEffect\Grayscale\Grayscale.PS.hlsl" />
     <FxCompile Include="Resources\Shaders\PostEffect\Vignette\Vignette.PS.hlsl" />
     <FxCompile Include="Resources\Shaders\PostEffect\Sepia\Sepia.PS.hlsl" />
+    <FxCompile Include="Resources\Shaders\PostEffect\Smoothing\BoxFilter.PS.hlsl" />
   </ItemGroup>
 </Project>
