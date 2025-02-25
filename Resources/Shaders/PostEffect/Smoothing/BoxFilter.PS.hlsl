@@ -59,9 +59,9 @@ PixelShaderOutput main(VertexShaderOutput input)
     
     if (kernelSize == 3)
     {
-        for (int x = 0; x <= 3; ++x)
+        for (int x = 0; x < 3; ++x)
         {
-            for (int y = 0; y <= 3; ++y)
+            for (int y = 0; y < 3; ++y)
             {
                 float2 texcoord = input.texCoord + kIndex3x3[x][y] * uvStepSize;
                 float3 fetchColor = gTexture.Sample(gSampler, texcoord).rgb;
@@ -71,9 +71,9 @@ PixelShaderOutput main(VertexShaderOutput input)
     }
     else if (kernelSize == 5)
     {
-        for (int x = 0; x <= 5; ++x)
+        for (int x = 0; x < 5; ++x)
         {
-            for (int y = 0; y <= 5; ++y)
+            for (int y = 0; y < 5; ++y)
             {
                 float2 texcoord = input.texCoord + kIndex5x5[x][y] * uvStepSize;
                 float3 fetchColor = gTexture.Sample(gSampler, texcoord).rgb;
