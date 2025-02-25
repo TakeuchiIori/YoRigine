@@ -21,19 +21,22 @@ void PipelineManager::Initialize()
 	CreatePSO_Object();
 	CreatePSO_Line();
 	CreatePSO_Animation();
-	//CreatePSO_BaseOffScreen();
-	//CreatePSO_BaseOffScreen(
-	//	L"Resources/Shaders/PostEffect/Grayscale/Grayscale.PS.hlsl",
-	//	"OffScreen_Grayscale");
-	//CreatePSO_BaseOffScreen(
-	//	L"Resources/Shaders/PostEffect/Sepia/Sepia.PS.hlsl",
-	//	"OffScreen_Sepia");
-	//CreatePSO_BaseOffScreen(
-	//	L"Resources/Shaders/PostEffect/Vignette/Vignette.PS.hlsl",
-	//	"OffScreen_Vignette");
+	CreatePSO_BaseOffScreen();
+	CreatePSO_BaseOffScreen(
+		L"Resources/Shaders/PostEffect/Grayscale/Grayscale.PS.hlsl",
+		"OffScreen_Grayscale");
+	CreatePSO_BaseOffScreen(
+		L"Resources/Shaders/PostEffect/Sepia/Sepia.PS.hlsl",
+		"OffScreen_Sepia");
+	CreatePSO_BaseOffScreen(
+		L"Resources/Shaders/PostEffect/Vignette/Vignette.PS.hlsl",
+		"OffScreen_Vignette");
 	CreatePSO_Smoothing(
 		L"Resources/Shaders/PostEffect/Smoothing/BoxFilter.PS.hlsl",
-		"OffScreen_Smoothing");
+		"OffScreen_BoxSmoothing");
+	CreatePSO_Smoothing(
+		L"Resources/Shaders/PostEffect/Smoothing/GaussianFilter.PS.hlsl",
+		"OffScreen_GaussSmoothing");
 	//CreatePSO_Particle();
 }
 
@@ -1106,18 +1109,18 @@ void PipelineManager::CreatePSO_Smoothing(const std::wstring& pixelShaderPath, c
 	rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 
 	// ディスクリプタレンジの設定
-	D3D12_DESCRIPTOR_RANGE descriptorRange = {};
-	descriptorRange.BaseShaderRegister = 0;
-	descriptorRange.NumDescriptors = 1;
-	descriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-	descriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	D3D12_DESCRIPTOR_RANGE descriptorRange[1] = {};
+	descriptorRange[0].BaseShaderRegister = 0;
+	descriptorRange[0].NumDescriptors = 1;
+	descriptorRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	descriptorRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 	// ルートパラメータの設定
 	D3D12_ROOT_PARAMETER rootParameters[2] = {};
 	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-	rootParameters[0].DescriptorTable.pDescriptorRanges = &descriptorRange;
-	rootParameters[0].DescriptorTable.NumDescriptorRanges = 1;
+	rootParameters[0].DescriptorTable.pDescriptorRanges = descriptorRange;
+	rootParameters[0].DescriptorTable.NumDescriptorRanges = _countof(descriptorRange);
 
 	rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;

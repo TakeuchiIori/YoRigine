@@ -726,5 +726,6 @@
     <FxCompile Include="Resources\Shaders\PostEffect\Vignette\Vignette.PS.hlsl" />
     <FxCompile Include="Resources\Shaders\PostEffect\Sepia\Sepia.PS.hlsl" />
     <FxCompile Include="Resources\Shaders\PostEffect\Smoothing\BoxFilter.PS.hlsl" />
+    <FxCompile Include="Resources\Shaders\PostEffect\Smoothing\GaussianFilter.PS.hlsl" />
   </ItemGroup>
 </Project>
