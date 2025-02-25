@@ -21,6 +21,9 @@ void PipelineManager::Initialize()
 	CreatePSO_BaseOffScreen(
 		L"Resources/Shaders/Grayscale/Grayscale.PS.hlsl",
 		"OffScreen_Grayscale");
+	CreatePSO_BaseOffScreen(
+		L"Resources/Shaders/Vignette/Vignette.PS.hlsl",
+		"OffScreen_Vignette");
 
 	//CreatePSO_Particle();
 }

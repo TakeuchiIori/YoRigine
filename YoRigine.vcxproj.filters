@@ -723,5 +723,6 @@
     <FxCompile Include="Resources\Shaders\CopyImage\CopyImage.PS.hlsl" />
     <FxCompile Include="Resources\Shaders\CopyImage\CopyImage.VS.hlsl" />
     <FxCompile Include="Resources\Shaders\Grayscale\Grayscale.PS.hlsl" />
+    <FxCompile Include="Resources\Shaders\Vignette\Vignette.PS.hlsl" />
   </ItemGroup>
 </Project>
