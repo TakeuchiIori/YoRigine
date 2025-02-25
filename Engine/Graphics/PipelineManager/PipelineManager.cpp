@@ -2,6 +2,10 @@
 #include "DX./DirectXCommon.h"
 #include <d3dx12.h>
 
+namespace {
+	const std::wstring DEFAULT_VS_PATH = L"Resources/Shaders/PostEffect/FullScreen/FullScreen.VS.hlsl";
+	const std::wstring DEFAULT_PS_PATH = L"Resources/Shaders/PostEffect/CopyImage/CopyImage.PS.hlsl";
+}
 
 PipelineManager* PipelineManager::GetInstance()
 {
@@ -19,12 +23,14 @@ void PipelineManager::Initialize()
 	CreatePSO_Animation();
 	CreatePSO_BaseOffScreen();
 	CreatePSO_BaseOffScreen(
-		L"Resources/Shaders/Grayscale/Grayscale.PS.hlsl",
+		L"Resources/Shaders/PostEffect/Grayscale/Grayscale.PS.hlsl",
 		"OffScreen_Grayscale");
 	CreatePSO_BaseOffScreen(
-		L"Resources/Shaders/Vignette/Vignette.PS.hlsl",
+		L"Resources/Shaders/PostEffect/Sepia/Sepia.PS.hlsl",
+		"OffScreen_Sepia");
+	CreatePSO_BaseOffScreen(
+		L"Resources/Shaders/PostEffect/Vignette/Vignette.PS.hlsl",
 		"OffScreen_Vignette");
-
 	//CreatePSO_Particle();
 }
 
@@ -971,8 +977,8 @@ void PipelineManager::CreatePSO_Particle()
 void PipelineManager::CreatePSO_BaseOffScreen(const std::wstring& pixelShaderPath, const std::string& pipelineKey)
 {
 	// 引数が空の場合はデフォルト値を使用
-	std::wstring vsPath = L"Resources/Shaders/FullScreen/FullScreen.VS.hlsl";
-	std::wstring psPath = pixelShaderPath.empty() ? L"Resources/Shaders/CopyImage/CopyImage.PS.hlsl" : pixelShaderPath;
+	std::wstring vsPath = DEFAULT_VS_PATH;
+	std::wstring psPath = pixelShaderPath.empty() ? DEFAULT_PS_PATH : pixelShaderPath;
 	std::string key = pipelineKey.empty() ? "OffScreen" : pipelineKey;
 	// ルートシグネチャの設定
 	D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};

@@ -720,9 +720,10 @@
     <FxCompile Include="Resources\shaders\Skinning.VS.hlsl" />
     <FxCompile Include="Resources\shaders\Sprite.PS.hlsl" />
     <FxCompile Include="Resources\shaders\Sprite.VS.hlsl" />
-    <FxCompile Include="Resources\Shaders\CopyImage\CopyImage.PS.hlsl" />
+    <FxCompile Include="Resources\Shaders\PostEffect\CopyImage\CopyImage.PS.hlsl" />
     <FxCompile Include="Resources\Shaders\CopyImage\CopyImage.VS.hlsl" />
-    <FxCompile Include="Resources\Shaders\Grayscale\Grayscale.PS.hlsl" />
-    <FxCompile Include="Resources\Shaders\Vignette\Vignette.PS.hlsl" />
+    <FxCompile Include="Resources\Shaders\PostEffect\Grayscale\Grayscale.PS.hlsl" />
+    <FxCompile Include="Resources\Shaders\PostEffect\Vignette\Vignette.PS.hlsl" />
+    <FxCompile Include="Resources\Shaders\PostEffect\Sepia\Sepia.PS.hlsl" />
   </ItemGroup>
 </Project>

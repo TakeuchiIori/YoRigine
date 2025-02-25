@@ -4,8 +4,8 @@
 void OffScreen::Initialize()
 {
 	dxCommon_ = DirectXCommon::GetInstance();
-	rootSignature_  = PipelineManager::GetInstance()->GetRootSignature("OffScreen_Vignette");
-	pipelineState_  = PipelineManager::GetInstance()->GetPipeLineStateObject("OffScreen_Vignette");
+	rootSignature_  = PipelineManager::GetInstance()->GetRootSignature("OffScreen_Sepia");
+	pipelineState_  = PipelineManager::GetInstance()->GetPipeLineStateObject("OffScreen_Sepia");
 }
 
 
