@@ -37,9 +37,12 @@ void PipelineManager::Initialize()
 	CreatePSO_Smoothing(
 		L"Resources/Shaders/PostEffect/Smoothing/GaussianFilter.PS.hlsl",
 		"OffScreen_GaussSmoothing");
-	CreatePSO_Edge(
-		L"Resources/Shaders/PostEffect/OutLine/LuminanceBasedOutLine.PS.hlsl",
-		"OffScreen_OutLine");
+	//CreatePSO_Edge(
+	//	L"Resources/Shaders/PostEffect/OutLine/LuminanceBasedOutLine.PS.hlsl",
+	//	"OffScreen_OutLine");
+	CreatePSO_DepthOutLine(
+		L"Resources/Shaders/PostEffect/OutLine/DepthBasedOutLine.PS.hlsl",
+		"OffScreen_DepthOutLine");
 	//CreatePSO_Particle();
 }
 
@@ -1361,10 +1364,10 @@ void PipelineManager::CreatePSO_DepthOutLine(const std::wstring& pixelShaderPath
 	descriptorRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 	descriptorRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-	descriptorRange[0].BaseShaderRegister = 1;
-	descriptorRange[0].NumDescriptors = 1;
-	descriptorRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-	descriptorRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	descriptorRange[1].BaseShaderRegister = 1;
+	descriptorRange[1].NumDescriptors = 1;
+	descriptorRange[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	descriptorRange[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 	// ルートパラメータの設定 : (CB)
 	D3D12_ROOT_PARAMETER rootParameters[3] = {};
@@ -1372,14 +1375,14 @@ void PipelineManager::CreatePSO_DepthOutLine(const std::wstring& pixelShaderPath
 	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 	rootParameters[0].DescriptorTable.pDescriptorRanges = &descriptorRange[0];
-	rootParameters[0].DescriptorTable.NumDescriptorRanges = _countof(descriptorRange);
+	rootParameters[0].DescriptorTable.NumDescriptorRanges = 1;
 	/// デプス
 	rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 	rootParameters[1].DescriptorTable.pDescriptorRanges = &descriptorRange[1];
-	rootParameters[1].DescriptorTable.NumDescriptorRanges = _countof(descriptorRange);
+	rootParameters[1].DescriptorTable.NumDescriptorRanges =1;
 	/// マテリアル
-	rootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
+	rootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 	rootParameters[2].Descriptor.ShaderRegister = 0;
 
@@ -1398,7 +1401,7 @@ void PipelineManager::CreatePSO_DepthOutLine(const std::wstring& pixelShaderPath
 	staticSampler[0].ShaderRegister = 0;
 	staticSampler[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
-	staticSampler[1].Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+	staticSampler[1].Filter = D3D12_FILTER_MIN_MAG_MIP_POINT; // ポイントフィルタ
 	staticSampler[1].AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
 	staticSampler[1].AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
 	staticSampler[1].AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
@@ -1458,6 +1461,18 @@ void PipelineManager::CreatePSO_DepthOutLine(const std::wstring& pixelShaderPath
 	depthStencilDesc.StencilEnable = false;
 	depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
 	depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+
+	//// 前面（FrontFace）ステンシル操作の設定
+	//depthStencilDesc.FrontFace.StencilFailOp = D3D12_STENCIL_OP_KEEP;
+	//depthStencilDesc.FrontFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;
+	//depthStencilDesc.FrontFace.StencilPassOp = D3D12_STENCIL_OP_KEEP;
+	//depthStencilDesc.FrontFace.StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+
+	//// 背面（BackFace）ステンシル操作の設定
+	//depthStencilDesc.BackFace.StencilFailOp = D3D12_STENCIL_OP_KEEP;
+	//depthStencilDesc.BackFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;
+	//depthStencilDesc.BackFace.StencilPassOp = D3D12_STENCIL_OP_KEEP;
+	//depthStencilDesc.BackFace.StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS;
 
 	// グラフィックスパイプラインステートの設定
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineStateDesc{};

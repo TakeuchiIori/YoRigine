@@ -29,7 +29,7 @@ void Framework::Initialize()
 
 	// オフスクリーンのSRV生成
 	dxCommon_->CreateSRVForOffScreen();
-
+	dxCommon_->CreateSRVDepth();
 	// テクスチャマネージャの生成
 	textureManager_ = TextureManager::GetInstance();
 	textureManager_->Initialize(dxCommon_, srvManager_);

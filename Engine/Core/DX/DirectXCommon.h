@@ -101,9 +101,9 @@ private:
 	/// <summary>
 	/// バリア
 	/// </summary>
-	void TransitionResource(ID3D12Resource* pResource, D3D12_RESOURCE_STATES Before, D3D12_RESOURCE_STATES After);
+	void TransitionBarrier(ID3D12Resource* pResource, D3D12_RESOURCE_STATES Before, D3D12_RESOURCE_STATES After);
 	void BeginRenderTargetRTV(const D3D12_CPU_DESCRIPTOR_HANDLE& rtvHandle, const D3D12_CPU_DESCRIPTOR_HANDLE* dsvHandle = nullptr);
-
+	
 
 public:
 	
@@ -158,11 +158,13 @@ public: // メンバ関数
 	D3D12_GPU_DESCRIPTOR_HANDLE GetDSVGPUDescriptorHandle(uint32_t index);
 
 	/// <summary>
-	/// オフスクリーンのGPUハンドルを取得
+	/// ハンドルを取得（OffScreen）
+	/// ハンドルを取得（Depth）
 	/// </summary>
-	/// <returns></returns>
 	D3D12_GPU_DESCRIPTOR_HANDLE GetOffScreenGPUHandle() { return offScreenSrvHandleGPU_; }
 	D3D12_CPU_DESCRIPTOR_HANDLE GetOffScreenCPUHandle() { return offScreenSrvHandleCPU_; }
+	D3D12_GPU_DESCRIPTOR_HANDLE GetDepthGPUHandle() { return depthSrvHandleGPU_; }
+	D3D12_CPU_DESCRIPTOR_HANDLE GetDepthCPUHandle() { return depthSrvHandleCPU_; }
 
 private:
 	/// <summary>
@@ -212,6 +214,7 @@ public:
 	/// Depth用のSRVを生成
 	/// </summary>
 	void CreateSRVDepth();
+	void DepthResourceBarrier();
 
 public:
 

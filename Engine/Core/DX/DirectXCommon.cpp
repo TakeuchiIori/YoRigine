@@ -55,12 +55,6 @@ void DirectXCommon::Initialize(WinApp* winApp)
 	InitializeScissorRevtangle();
 	// DXCコンパイラの生成
 	CreateDXCompiler();
-
-	//for (UINT i = 0; i < backBuffers; i++) {
-	//	resourceStates_[swapChainResources_[i].Get()] = D3D12_RESOURCE_STATE_COMMON;
-	//}
-	//resourceStates_[offScreenResource_.Get()] = D3D12_RESOURCE_STATE_COMMON;
-	//resourceStates_[depthStencilResource_.Get()] = D3D12_RESOURCE_STATE_DEPTH_WRITE;
 }
 
 void DirectXCommon::InitializeDXGIDevice()
@@ -291,7 +285,7 @@ void DirectXCommon::CreateDXCompiler()
 
 void DirectXCommon::RenderTexture()
 {// オフスクリーンリソースをレンダーターゲットとして使用
-	TransitionResource(offScreenResource_.Get(),D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	TransitionBarrier(offScreenResource_.Get(),D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET);
 	// レンダーターゲットとデプスステンシルビューをセット
 	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = GetDSVCPUDescriptorHandle(0);
 	BeginRenderTargetRTV(rtvHandles_[2], &dsvHandle);
@@ -303,7 +297,7 @@ void DirectXCommon::RenderTexture()
 void DirectXCommon::PreDrawScene()
 {
 	// オフスクリーンリソースをレンダーターゲットとして使用
-	TransitionResource(offScreenResource_.Get(), D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	TransitionBarrier(offScreenResource_.Get(), D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET);
 	// レンダーターゲットとデプスステンシルビューをセット
 	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = GetDSVCPUDescriptorHandle(0);
 	BeginRenderTargetRTV(rtvHandles_[2], &dsvHandle);
@@ -318,16 +312,19 @@ void DirectXCommon::PreDrawScene()
 
 void DirectXCommon::PreDrawImGui()
 {
-	TransitionResource(offScreenResource_.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ);
 	UINT backBufferIndex = swapChain_->GetCurrentBackBufferIndex();
-	// バックバッファをレンダーターゲットとして使用
+	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = GetDSVCPUDescriptorHandle(0);
+
+	TransitionBarrier(depthStencilResource_.Get(), D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+	TransitionBarrier(offScreenResource_.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ);
+	TransitionBarrier(swapChainResources_[backBufferIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 	
 
-	TransitionResource(swapChainResources_[backBufferIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
-	// レンダーターゲットをセット（デプスステンシルなし）
-	BeginRenderTargetRTV(rtvHandles_[backBufferIndex]);
-	float clearColor[] = { 0.1f, 0.25f, 0.5f, 1.0f };
-	commandList_->ClearRenderTargetView(rtvHandles_[backBufferIndex], clearColor, 0, nullptr);
+	BeginRenderTargetRTV(rtvHandles_[backBufferIndex], nullptr);
+	commandList_->ClearRenderTargetView(rtvHandles_[backBufferIndex], renderTargetClearColor_.Color, 0, nullptr);
+
+	commandList_->RSSetViewports(1, &viewport_);
+	commandList_->RSSetScissorRects(1, &scissorRect_);
 }
 
 
@@ -335,8 +332,9 @@ void DirectXCommon::PostDraw()
 {
 	HRESULT hr;
 	UINT backBufferIndex = swapChain_->GetCurrentBackBufferIndex();
+	TransitionBarrier(depthStencilResource_.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 	// バックバッファを表示用に変更
-	TransitionResource(swapChainResources_[backBufferIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+	TransitionBarrier(swapChainResources_[backBufferIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
 	// コマンドリストの内容を確定させる。全てのコマンドを積んでからCloseすること
 	hr = commandList_->Close();
 	assert(SUCCEEDED(hr));
@@ -686,7 +684,7 @@ void DirectXCommon::CreateSRVDepth()
 	depthSrvHandleGPU_ = SrvManager::GetInstance()->GetGPUSRVDescriptorHandle(depthSrvIndex_);
 }
 
-void DirectXCommon::TransitionResource(ID3D12Resource* pResource, D3D12_RESOURCE_STATES Before, D3D12_RESOURCE_STATES After)
+void DirectXCommon::TransitionBarrier(ID3D12Resource* pResource, D3D12_RESOURCE_STATES Before, D3D12_RESOURCE_STATES After)
 {
 	// 今回のバリアはTransition
 	barrier_.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -750,7 +748,12 @@ void DirectXCommon::BeginRenderTargetRTV(const D3D12_CPU_DESCRIPTOR_HANDLE& rtvH
 		commandList_->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
 	}
 
-	// ビューポートとシザー矩形の設定
-	commandList_->RSSetViewports(1, &viewport_);
-	commandList_->RSSetScissorRects(1, &scissorRect_);
+	//// ビューポートとシザー矩形の設定
+	//commandList_->RSSetViewports(1, &viewport_);
+	//commandList_->RSSetScissorRects(1, &scissorRect_);
+}
+
+void DirectXCommon::DepthResourceBarrier()
+{
+	
 }
