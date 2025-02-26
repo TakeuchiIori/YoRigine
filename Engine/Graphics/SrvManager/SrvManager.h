@@ -64,10 +64,12 @@ public: // メンバ関数
 	/// SRV生成（テクスチャ用）
 	/// SRV生成（Structured Buffer用)
 	/// SRV生成（RenderTexture用）
+	/// SRV生成（Depth用）
 	/// </summary>
 	void CreateSRVforTexture2D(uint32_t srvIndex, ID3D12Resource* pResource, DXGI_FORMAT Format, UINT MipLevels);
 	void CreateSRVforStructuredBuffer(uint32_t srvIndex, ID3D12Resource* pResource, UINT numElements, UINT structureByteStride);
 	void CreateSRVforRenderTexture(uint32_t srvIndex, ID3D12Resource* pResource);
+	void CreateSRVforDepth(uint32_t srvIndex, ID3D12Resource* pResource);
 
 public:
 	// 最大SRV数（最大テクスチャ枚数）

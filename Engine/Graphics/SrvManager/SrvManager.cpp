@@ -122,3 +122,14 @@ void SrvManager::CreateSRVforRenderTexture(uint32_t srvIndex, ID3D12Resource* pR
 	dxCommon_->GetDevice()->CreateShaderResourceView(pResource, &renderTextureSrvDesc, GetCPUSRVDescriptorHandle(srvIndex));
 }
 
+void SrvManager::CreateSRVforDepth(uint32_t srvIndex, ID3D12Resource* pResource)
+{
+	// SRVの設定。FormatはResourceと同じにしておく
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+	srvDesc.Format = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	srvDesc.Texture2D.MipLevels = 1;
+	// SRVの生成
+	dxCommon_->GetDevice()->CreateShaderResourceView(pResource, &srvDesc, GetCPUSRVDescriptorHandle(srvIndex));
+}

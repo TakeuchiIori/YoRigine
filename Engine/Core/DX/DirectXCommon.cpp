@@ -678,6 +678,14 @@ void DirectXCommon::CreateSRVForOffScreen()
 	offScreenSrvHandleGPU_ = SrvManager::GetInstance()->GetGPUSRVDescriptorHandle(offScreenSrvIndex_);
 }
 
+void DirectXCommon::CreateSRVDepth()
+{
+	depthSrvIndex_ = SrvManager::GetInstance()->Allocate();
+	SrvManager::GetInstance()->CreateSRVforDepth(depthSrvIndex_, depthStencilResource_.Get());
+	depthSrvHandleCPU_ = SrvManager::GetInstance()->GetCPUSRVDescriptorHandle(depthSrvIndex_);
+	depthSrvHandleGPU_ = SrvManager::GetInstance()->GetGPUSRVDescriptorHandle(depthSrvIndex_);
+}
+
 void DirectXCommon::TransitionResource(ID3D12Resource* pResource, D3D12_RESOURCE_STATES Before, D3D12_RESOURCE_STATES After)
 {
 	// 今回のバリアはTransition
@@ -731,48 +739,6 @@ std::string DirectXCommon::ConvertString(const std::wstring& str)
 void DirectXCommon::Log(const std::string& message)
 {
 	OutputDebugStringA(message.c_str());
-}
-
-void DirectXCommon::TransitionResource(ID3D12Resource* resource, D3D12_RESOURCE_STATES newState)
-{
-	//if (!resource) return;
-
-	//// 現在の状態を取得
-	//D3D12_RESOURCE_STATES currentState = D3D12_RESOURCE_STATE_COMMON;
-	//auto it = resourceStates_.find(resource);
-	//if (it != resourceStates_.end()) {
-	//	currentState = it->second;
-	//}
-
-	//// 状態が異なる場合のみバリアを設定
-	//if (currentState != newState) {
-	//	D3D12_RESOURCE_BARRIER barrier{};
-	//	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-	//	barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-	//	barrier.Transition.pResource = resource;
-	//	barrier.Transition.StateBefore = currentState;
-	//	barrier.Transition.StateAfter = newState;
-	//	barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-
-	//	commandList_->ResourceBarrier(1, &barrier);
-	//	resourceStates_[resource] = newState;
-	//}
-}
-
-void DirectXCommon::TransitionOffScreen(D3D12_RESOURCE_STATES newState)
-{
-	//if (offScreenState_ != newState) {
-	//	D3D12_RESOURCE_BARRIER barrier{};
-	//	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-	//	barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-	//	barrier.Transition.pResource = offScreenResource_.Get();
-	//	barrier.Transition.StateBefore = offScreenState_;
-	//	barrier.Transition.StateAfter = newState;
-	//	barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-
-	//	commandList_->ResourceBarrier(1, &barrier);
-	//	offScreenState_ = newState;
-	//}
 }
 
 void DirectXCommon::BeginRenderTargetRTV(const D3D12_CPU_DESCRIPTOR_HANDLE& rtvHandle, const D3D12_CPU_DESCRIPTOR_HANDLE* dsvHandle)
