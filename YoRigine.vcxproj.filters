@@ -728,5 +728,6 @@
     <FxCompile Include="Resources\Shaders\PostEffect\Smoothing\BoxFilter.PS.hlsl" />
     <FxCompile Include="Resources\Shaders\PostEffect\Smoothing\GaussianFilter.PS.hlsl" />
     <FxCompile Include="Resources\Shaders\PostEffect\OutLine\LuminanceBasedOutLine.PS.hlsl" />
+    <FxCompile Include="Resources\Shaders\PostEffect\OutLine\DepthBasedOutLine.PS.hlsl" />
   </ItemGroup>
 </Project>
