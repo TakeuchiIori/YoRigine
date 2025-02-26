@@ -61,11 +61,19 @@ void ImGuiManager::Begin()
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
 
+	ImGuiIO& io = ImGui::GetIO();
+	ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f)); // ウィンドウ全体をカバーする
+
+	ImGui::SetNextWindowSize(io.DisplaySize);
+	ImGui::SetNextWindowBgAlpha(0.0f); // 背景を透明にする
 	ImGuiWindowFlags dockspace_flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse |
 		ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
 		ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus |
 		ImGuiWindowFlags_NoBackground;
-	ImGui::Begin("MainDockSpace", nullptr, ImGuiWindowFlags_NoCollapse);
+
+	ImGui::Begin("MainDockSpace", nullptr, dockspace_flags);
+
+	// DockSpaceの作成
 	ImGui::DockSpace(ImGui::GetID("MainDockSpace"), ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
 	ImGui::End();
 #endif
@@ -77,12 +85,6 @@ void ImGuiManager::End()
 	ImGui::EndFrame();
 	// 描画前準備
 	ImGui::Render();
-	ImGuiIO& io = ImGui::GetIO();
-	if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
-	{
-		ImGui::UpdatePlatformWindows();
-		ImGui::RenderPlatformWindowsDefault(nullptr, (void*)dxCommon_->GetCommandList().Get());
-	}
 #endif
 }
 
@@ -90,7 +92,7 @@ void ImGuiManager::Draw()
 {
 #ifdef _DEBUG
 	// デスクリプターヒープの配列をセットするコマンド
-	ID3D12DescriptorHeap* ppHeaps[] = { srvHeap_.Get()};
+	ID3D12DescriptorHeap* ppHeaps[] = { srvHeap_.Get() };
 	dxCommon_->GetCommandList()->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 	if (ImGui::GetDrawData()->TotalVtxCount == 0) {
 		printf("Warning: No vertices to render!\n");
@@ -98,7 +100,7 @@ void ImGuiManager::Draw()
 	}
 	// 描画コマンドを発行
 	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), dxCommon_->GetCommandList().Get());
-	
+
 #endif
 }
 
@@ -134,7 +136,7 @@ void ImGuiManager::InitialzeDX12()
 	HRESULT hr = ImGui_ImplDX12_Init(
 		dxCommon_->GetDevice().Get(),
 		dxCommon_->GetBackBufferCount(),
-		DXGI_FORMAT_R8G8B8A8_UNORM, srvHeap_.Get(),
+		DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, srvHeap_.Get(),
 		srvHeap_->GetCPUDescriptorHandleForHeapStart(),
 		srvHeap_->GetGPUDescriptorHandleForHeapStart()
 	);
@@ -159,14 +161,10 @@ void ImGuiManager::CustomizeColor()
 	{
 		ImGuiStyle& style = ImGui::GetStyle();
 		ImVec4* colors = style.Colors;
-
-		// DockSpace背景色を透明に設定
-		colors[ImGuiCol_DockingEmptyBg] = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);			// 完全に透明
 		// パディングとスペーシングの調整
 		style.WindowPadding = ImVec2(0.0f, 0.0f);									// ウィンドウ内の余白をゼロに
 
 		// ここでカラーやスタイル設定を変更
-		colors[ImGuiCol_WindowBg] = ImVec4(0.3f, 0.3f, 0.3f, 1.0f);					// 背景色 (ダークグレー)
 		colors[ImGuiCol_TitleBg] = ImVec4(0.45f, 0.45f, 0.48f, 1.0f);				// タイトルバー (暗い灰色)
 		colors[ImGuiCol_TitleBgActive] = ImVec4(0.5f, 0.5f, 0.55f, 1.0f);			// アクティブなタイトルバー (少し明るい灰色)
 		colors[ImGuiCol_TitleBgCollapsed] = ImVec4(0.4f, 0.4f, 0.42f, 1.0f);		// 折りたたまれたタイトルバー
@@ -197,7 +195,7 @@ void ImGuiManager::CustomizeColor()
 		ImVec4 activeTabColor = ImVec4(0.6f, 0.6f, 0.6f, 1.0f);						// 選択されたタブの色
 		colors[ImGuiCol_TabUnfocused] = inactiveTabColor;							// 非アクティブなタブの色
 		colors[ImGuiCol_TabUnfocusedActive] = inactiveTabActiveColor;
-		
+
 		// スタイルの変更
 		style.WindowRounding = 15.0f;      // ウィンドウの角丸
 		style.FrameRounding = 4.0f;        // フレームの角丸
@@ -214,7 +212,6 @@ void ImGuiManager::CustomizeEditor()
 #ifdef _DEBUG
 	// エディター同士をドッキング
 	ImGuiIO& io = ImGui::GetIO();
-	io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
 	ImFontConfig config;

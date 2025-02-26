@@ -218,7 +218,7 @@ void DirectXCommon::InitializeRenderTarget()
 	// オフスクリーンリソースの作成
 	renderTargetClearColor_ = {
 		DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
-		{ 1.0f, 0.0f, 0.0f, 1.0f }
+		{ 0.1f, 0.4f, 0.1f, 1.0f }
 	};
 
 	offScreenResource_ = CreateRenderTextureResource(
