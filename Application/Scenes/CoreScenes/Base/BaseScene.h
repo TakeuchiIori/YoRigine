@@ -1,5 +1,5 @@
 #pragma once
-
+#include "Matrix4x4.h"
 // 前方宣言
 class SceneManager;
 // 基底クラス
@@ -30,6 +30,11 @@ public: // 純粋仮想関数
 	/// デストラクタ
 	/// </summary>
 	virtual ~BaseScene() = default;
+
+	/// <summary>
+	/// 
+	/// </summary>
+	virtual Matrix4x4 GetViewProjection() = 0;
 
 public: // アクセッサ
 

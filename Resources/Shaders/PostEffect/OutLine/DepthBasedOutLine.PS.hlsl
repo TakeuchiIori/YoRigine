@@ -3,6 +3,7 @@ struct Material
 {
     float4x4 projectionInverse;
     int kernelSize;
+    float4 outlineColor;
 };
 
 
@@ -227,51 +228,51 @@ PixelShaderOutput main(VertexShaderOutput input)
             }
         }
     }
-    //else if (gMaterial.kernelSize == 5)
-    //{
-    //    for (int x = 0; x < 5; ++x)
-    //    {
-    //        for (int y = 0; y < 5; ++y)
-    //        {
-    //            float2 texcoord = input.texCoord + kIndex5x5[x][y] * uvStepSize;
-    //            float ndcDepth = gDepthTexture.Sample(gSamplerPoint, texcoord);
-    //            float4 viewSpace = mul(float4(0.0f, 0.0f, ndcDepth, 1.0f), gMaterial.projectionInverse);
-    //            float viewZ = viewSpace.z * rcp(viewSpace.w);
-    //            difference.x += viewZ * kPrewittHorizontalKernel5x5[x][y];
-    //            difference.y += viewZ * kPrewittVerticalKernel5x5[x][y];
-    //        }
-    //    }
-    //}
-    //else if (gMaterial.kernelSize == 7)
-    //{
-    //    for (int x = 0; x < 7; ++x)
-    //    {
-    //        for (int y = 0; y < 7; ++y)
-    //        {
-    //            float2 texcoord = input.texCoord + kIndex7x7[x][y] * uvStepSize;
-    //            float ndcDepth = gDepthTexture.Sample(gSamplerPoint, texcoord);
-    //            float4 viewSpace = mul(float4(0.0f, 0.0f, ndcDepth, 1.0f), gMaterial.projectionInverse);
-    //            float viewZ = viewSpace.z * rcp(viewSpace.w);
-    //            difference.x += viewZ * kPrewittHorizontalKernel7x7[x][y];
-    //            difference.y += viewZ * kPrewittVerticalKernel7x7[x][y];
-    //        }
-    //    }
-    //}
-    //else if (gMaterial.kernelSize == 9)
-    //{
-    //    for (int x = 0; x < 9; ++x)
-    //    {
-    //        for (int y = 0; y < 9; ++y)
-    //        {
-    //            float2 texcoord = input.texCoord + kIndex9x9[x][y] * uvStepSize;
-    //            float ndcDepth = gDepthTexture.Sample(gSamplerPoint, texcoord);
-    //            float4 viewSpace = mul(float4(0.0f, 0.0f, ndcDepth, 1.0f), gMaterial.projectionInverse);
-    //            float viewZ = viewSpace.z * rcp(viewSpace.w);
-    //            difference.x += viewZ * kPrewittHorizontalKernel9x9[x][y];
-    //            difference.y += viewZ * kPrewittVerticalKernel9x9[x][y];
-    //        }
-    //    }
-    //}
+    else if (gMaterial.kernelSize == 5)
+    {
+        for (int x = 0; x < 5; ++x)
+        {
+            for (int y = 0; y < 5; ++y)
+            {
+                float2 texcoord = input.texCoord + kIndex5x5[x][y] * uvStepSize;
+                float ndcDepth = gDepthTexture.Sample(gSamplerPoint, texcoord);
+                float4 viewSpace = mul(float4(0.0f, 0.0f, ndcDepth, 1.0f), gMaterial.projectionInverse);
+                float viewZ = viewSpace.z * rcp(viewSpace.w);
+                difference.x += viewZ * kPrewittHorizontalKernel5x5[x][y];
+                difference.y += viewZ * kPrewittVerticalKernel5x5[x][y];
+            }
+        }
+    }
+    else if (gMaterial.kernelSize == 7)
+    {
+        for (int x = 0; x < 7; ++x)
+        {
+            for (int y = 0; y < 7; ++y)
+            {
+                float2 texcoord = input.texCoord + kIndex7x7[x][y] * uvStepSize;
+                float ndcDepth = gDepthTexture.Sample(gSamplerPoint, texcoord);
+                float4 viewSpace = mul(float4(0.0f, 0.0f, ndcDepth, 1.0f), gMaterial.projectionInverse);
+                float viewZ = viewSpace.z * rcp(viewSpace.w);
+                difference.x += viewZ * kPrewittHorizontalKernel7x7[x][y];
+                difference.y += viewZ * kPrewittVerticalKernel7x7[x][y];
+            }
+        }
+    }
+    else if (gMaterial.kernelSize == 9)
+    {
+        for (int x = 0; x < 9; ++x)
+        {
+            for (int y = 0; y < 9; ++y)
+            {
+                float2 texcoord = input.texCoord + kIndex9x9[x][y] * uvStepSize;
+                float ndcDepth = gDepthTexture.Sample(gSamplerPoint, texcoord);
+                float4 viewSpace = mul(float4(0.0f, 0.0f, ndcDepth, 1.0f), gMaterial.projectionInverse);
+                float viewZ = viewSpace.z * rcp(viewSpace.w);
+                difference.x += viewZ * kPrewittHorizontalKernel9x9[x][y];
+                difference.y += viewZ * kPrewittVerticalKernel9x9[x][y];
+            }
+        }
+    }
     
     
     
@@ -281,7 +282,7 @@ PixelShaderOutput main(VertexShaderOutput input)
     weight = saturate(weight);
     
     PixelShaderOutput output;
-    output.color.rgb = (1.0f - weight) * gTexture.Sample(gSampler, input.texCoord).rgb;
+    output.color.rgb = lerp(gMaterial.outlineColor.rgb, gTexture.Sample(gSampler, input.texCoord).rgb, 1.0f - weight);
     output.color.a = 1.0f;
     
     return output;

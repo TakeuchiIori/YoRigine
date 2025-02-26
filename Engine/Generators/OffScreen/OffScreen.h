@@ -3,6 +3,10 @@
 #include <d3d12.h>
 
 #include "Matrix4x4.h"
+
+
+// Math
+#include "Vector4.h"
 class DirectXCommon;
 class OffScreen
 {
@@ -18,11 +22,17 @@ public:
 	/// </summary>
 	void Draw();
 
+	/// <summary>
+	/// 逆行列のセット
+	/// </summary>
+	/// <param name="projectionMatrix"></param>
+	void SetProjection(Matrix4x4 projectionMatrix) { projectionInverse_ = projectionMatrix; }
 private:
 
 	void CreateBoxFilterResource();
 	void CreateGaussFilterResource();
 	void CreateMaterialResource();
+
 private:
 	struct KernelForGPU {
 		int kernelSize;
@@ -34,6 +44,8 @@ private:
 	struct Material {
 		Matrix4x4 Inverse;
 		int kernelSize;
+		int padding[3];
+		Vector4 outlineColor;
 	};
 
 	DirectXCommon* dxCommon_ = nullptr;
@@ -47,5 +59,6 @@ private:
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource_;
 	Material* materialData_ = nullptr;
+	Matrix4x4 projectionInverse_;
 };
 

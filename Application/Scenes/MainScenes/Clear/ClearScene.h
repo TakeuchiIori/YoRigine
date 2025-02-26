@@ -44,7 +44,7 @@ public:
 	/// </summary>
 	void Draw() override;
 
-
+	Matrix4x4 GetViewProjection() override { return currentCamera_->viewProjectionMatrix_; }
 
 private:
 	// カメラ

@@ -49,7 +49,7 @@ void MyGame::Draw()
 	SceneManager::GetInstance()->Draw();
 
 	dxCommon_->PreDrawImGui();
-	
+	offScreen_->SetProjection(SceneManager::GetInstance()->GetScene()->GetViewProjection());
 	offScreen_->Draw();
 	imguiManager_->Draw();
 	// DirectXの描画終了

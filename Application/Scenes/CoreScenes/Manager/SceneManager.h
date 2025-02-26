@@ -38,6 +38,8 @@ public:
     // アクセッサ
     void SetSceneFactory(AbstractSceneFactory* sceneFactory) { sceneFactory_ = sceneFactory; }
     void SetTransitionFactory(std::unique_ptr<TransitionFactory> factory) { transitionFactory_ = std::move(factory); }
+	BaseScene* GetScene() const { return scene_; }
+
 
 private:
     // シングルトン

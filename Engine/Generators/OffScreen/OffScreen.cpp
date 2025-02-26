@@ -17,6 +17,7 @@ void OffScreen::Initialize()
 
 void OffScreen::Draw()
 {
+	materialData_->Inverse = Inverse(projectionInverse_);
 	dxCommon_->GetCommandList()->SetPipelineState(pipelineState_.Get());
 	dxCommon_->GetCommandList()->SetGraphicsRootSignature(rootSignature_.Get());
 	dxCommon_->GetCommandList()->SetGraphicsRootDescriptorTable(0, dxCommon_->GetOffScreenGPUHandle());
@@ -51,5 +52,6 @@ void OffScreen::CreateMaterialResource()
 	materialResource_->Unmap(0, nullptr);
 	materialData_->Inverse = MakeIdentity4x4();
 	materialData_->kernelSize = 3;
+	materialData_->outlineColor = { 1.0f, 0.0f, 0.0f, 1.0f };
 }
 
