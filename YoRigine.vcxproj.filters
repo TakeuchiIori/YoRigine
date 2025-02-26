@@ -727,5 +727,6 @@
     <FxCompile Include="Resources\Shaders\PostEffect\Sepia\Sepia.PS.hlsl" />
     <FxCompile Include="Resources\Shaders\PostEffect\Smoothing\BoxFilter.PS.hlsl" />
     <FxCompile Include="Resources\Shaders\PostEffect\Smoothing\GaussianFilter.PS.hlsl" />
+    <FxCompile Include="Resources\Shaders\PostEffect\OutLine\LuminanceBasedOutLine.PS.hlsl" />
   </ItemGroup>
 </Project>
