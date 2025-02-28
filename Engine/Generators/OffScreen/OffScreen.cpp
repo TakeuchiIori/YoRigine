@@ -51,7 +51,7 @@ void OffScreen::CreateMaterialResource()
 	materialResource_->Map(0, nullptr, reinterpret_cast<void**>(&materialData_));
 	materialResource_->Unmap(0, nullptr);
 	materialData_->Inverse = MakeIdentity4x4();
-	materialData_->kernelSize = 3;
-	materialData_->outlineColor = { 1.0f, 0.0f, 0.0f, 1.0f };
+	materialData_->kernelSize = 5;
+	materialData_->outlineColor = { 1.0f, 0.0f, 1.0f, 1.0f };
 }
 
