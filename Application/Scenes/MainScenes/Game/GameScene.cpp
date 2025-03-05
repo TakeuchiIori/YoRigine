@@ -213,20 +213,14 @@ void GameScene::DrawObject()
 
 	// オクルージョンクエリ開始
 	uint32_t queryIndex = 0;
-
-	// Player のオクルージョンチェック
-	commandList_->BeginQuery(queryHeap_.Get(), D3D12_QUERY_TYPE_OCCLUSION, queryIndex);
 	player_->Draw();
-	commandList_->EndQuery(queryHeap_.Get(), D3D12_QUERY_TYPE_OCCLUSION, queryIndex);
-	queryIndex++;
-
 	// Ground のオクルージョンチェック
 	commandList_->BeginQuery(queryHeap_.Get(), D3D12_QUERY_TYPE_OCCLUSION, queryIndex);
 	ground_->Draw();
 	commandList_->EndQuery(queryHeap_.Get(), D3D12_QUERY_TYPE_OCCLUSION, queryIndex);
-	queryIndex++;
 
-	ResolvedOcclusionQuery();
+
+	//ResolvedOcclusionQuery();
 
 }
 
@@ -237,7 +231,14 @@ void GameScene::DrawSprite()
 
 void GameScene::DrawAnimation()
 {
+	// Player のオクルージョンチェック
+	uint32_t queryIndex = 1;
+	commandList_->BeginQuery(queryHeap_.Get(), D3D12_QUERY_TYPE_OCCLUSION, queryIndex);
 	test_->Draw(sceneCamera_.get(), testWorldTransform_);
+	commandList_->EndQuery(queryHeap_.Get(), D3D12_QUERY_TYPE_OCCLUSION, queryIndex);
+	queryIndex++;
+	ResolvedOcclusionQuery();
+	
 }
 
 void GameScene::DrawLine()
@@ -349,8 +350,8 @@ void GameScene::ShowImGui()
 
 	ImGui::End();
 	ImGui::Begin("Occlusion Query");
-	ImGui::Text("Occlusion Player: %lld", occlusionResults_[0]);
-	ImGui::Text("Occlusion Ground: %lld", occlusionResults_[1]);
+	ImGui::Text("Occlusion Ground: %lld", occlusionResults_[0]);
+	ImGui::Text("Occlusion AnimationModel: %lld", occlusionResults_[1]);
 	ImGui::End();
 
 #endif // _DEBUG
