@@ -3,6 +3,8 @@
 // C++
 #include <memory>
 #include <map>
+#include <d3d12.h>
+#include <wrl.h>
 
 // Engine
 #include "CoreScenes/Base/BaseScene.h"
@@ -21,24 +23,20 @@
 #include "Ground/Ground.h"
 #include "../Transitions/Fade/Fade.h"
 
-
 // Math
 #include "Vector3.h"
 #include "../../../SystemsApp/Cameras/FollowCamera/FollowCamera.h"
 #include "../../../SystemsApp/Cameras/TopDownCamera/TopDownCamera.h"
 #include <Enemy/EnemyManager.h>
 
-enum class CameraMode
-{
+enum class CameraMode {
     DEFAULT,
     FOLLOW,
     TOP_DOWN,
     FPS
-
 };
 
-class GameScene : public BaseScene
-{
+class GameScene : public BaseScene {
 public:
     /// <summary>
     /// 初期化
@@ -67,14 +65,13 @@ public:
     Matrix4x4 GetViewProjection() override { return sceneCamera_->viewProjectionMatrix_; }
 
 private:
-
     /// <summary>
     /// 3Dオブジェクトの描画
     /// </summary>
     void DrawObject();
 
     /// <summary>
-	/// 2Dスプライトの描画
+    /// 2Dスプライトの描画
     /// </summary>
     void DrawSprite();
 
@@ -89,7 +86,6 @@ private:
     void DrawLine();
 
 private:
-
     /// <summary>
     /// カメラモードを更新する
     /// </summary>
@@ -107,51 +103,106 @@ private:
 
     void CheckAllCollisions();
 
+private:
+    /// <summary>
+    /// オクルージョンクエリの初期化
+    /// </summary>
+    void InitializeOcclusionQuery();
+
+    /// <summary>
+    /// 読み取り開始
+    /// </summary>
+    void BeginOcclusionQuery();
+
+    /// <summary>
+    /// 読み取りの終了
+    /// </summary>
+    void EndOcclusionQuery();
+
+    /// <summary>
+    /// オクルージョンクエリの解決
+    /// </summary>
+    void ResolvedOcclusionQuery();
 
 private:
-    // カメラ
+    /*=================================================================
+
+                               カメラ関連
+
+    =================================================================*/
     CameraMode cameraMode_;
     std::shared_ptr<Camera> sceneCamera_;
     CameraManager cameraManager_;
-	FollowCamera followCamera_;
+    FollowCamera followCamera_;
     TopDownCamera topDownCamera_;
-    // サウンド
+
+    /*=================================================================
+
+                               サウンド関連
+
+    =================================================================*/
     Audio::SoundData soundData;
     IXAudio2SourceVoice* sourceVoice;
-    // パーティクルエミッター
+
+    /*=================================================================
+
+                              パーティクル関連
+
+    =================================================================*/
     std::unique_ptr<ParticleEmitter> particleEmitter_[2];
     Vector3 emitterPosition_;
     uint32_t particleCount_;
 
+    /*=================================================================
+
+                               スプライト関連
+
+    =================================================================*/
     Vector3 weaponPos;
-
     std::unique_ptr<Sprite> sprite_;
-
-    // 3Dモデル
-    std::unique_ptr<Object3d> test_;
-    WorldTransform testWorldTransform_;
-
-	
-
-    // プレイヤー
-    std::unique_ptr<Player> player_;
-
-    // 地面
-    std::unique_ptr< Ground> ground_;
-
-    // 2Dスプライト
     std::vector<std::unique_ptr<Sprite>> sprites;
 
+    /*=================================================================
+
+                               オブジェクト関連
+
+    =================================================================*/
+    std::unique_ptr<Object3d> test_;
+    WorldTransform testWorldTransform_;
+    std::unique_ptr<Player> player_;
+    std::unique_ptr<Ground> ground_;
+
+    /*=================================================================
+
+                                   線
+
+    =================================================================*/
+    std::unique_ptr<Line> line_;
+    std::unique_ptr<Line> boneLine_;
+    Vector3 start_ = { 0.0f, 0.0f, 0.0f };
+    Vector3 end_ = { 10.0f, 0.0f, 10.0f };
+
+    /*=================================================================
+
+                                 その他
+
+    =================================================================*/
     // コマンドパターン
     std::unique_ptr<InputHandleMove> inputHandler_ = nullptr;
     ICommandMove* iCommand_ = nullptr;
 
-    // Line
-    std::unique_ptr<Line> line_;
-    std::unique_ptr<Line> boneLine_;
-    Vector3 start_ = { 0.0f,0.0f,0.0f };
-    Vector3 end_ = { 10.0f,0.0f,10.0f };
+    bool isClear_ = false;
 
-     bool isClear_ = false;
- 
+private:
+    /*=================================================================
+
+                            オクルージョンクエリ
+
+    =================================================================*/
+    Microsoft::WRL::ComPtr<ID3D12QueryHeap> queryHeap_;
+    Microsoft::WRL::ComPtr<ID3D12Resource> queryResultBuffer_;
+    UINT64 occlusionResult_ = 0;
+    ID3D12GraphicsCommandList* commandList_;
+    std::vector<std::unique_ptr<Object3d>> occlusionObjects_; // オクルージョンクエリ対象オブジェクト
+
 };

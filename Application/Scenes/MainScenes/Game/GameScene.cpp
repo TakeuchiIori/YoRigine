@@ -99,6 +99,8 @@ void GameScene::Initialize()
 
 	ParticleManager::GetInstance()->SetCamera(sceneCamera_.get());
 
+	InitializeOcclusionQuery();
+
 }
 
 /// <summary>
@@ -208,8 +210,14 @@ void GameScene::Draw()
 void GameScene::DrawObject()
 {
 	CollisionManager::GetInstance()->Draw();
+
+	BeginOcclusionQuery();
 	player_->Draw();
 	ground_->Draw();
+
+	EndOcclusionQuery();
+	ResolvedOcclusionQuery();
+
 }
 
 void GameScene::DrawSprite()
@@ -219,7 +227,12 @@ void GameScene::DrawSprite()
 
 void GameScene::DrawAnimation()
 {
+	BeginOcclusionQuery();
 	test_->Draw(sceneCamera_.get(), testWorldTransform_);
+	EndOcclusionQuery();
+	ResolvedOcclusionQuery();
+
+
 }
 
 void GameScene::DrawLine()
@@ -330,6 +343,11 @@ void GameScene::ShowImGui()
 
 
 	ImGui::End();
+
+	ImGui::Begin("Occlusion Query");
+	ImGui::Text("Occlusion Result: %llu", occlusionResult_);
+	ImGui::End();
+
 #endif // _DEBUG
 }
 
@@ -349,5 +367,71 @@ void GameScene::CheckAllCollisions() {
 
 	 // 衝突判定と応答
 	CollisionManager::GetInstance()->CheckAllCollisions();
+
+}
+
+void GameScene::InitializeOcclusionQuery()
+{
+    ID3D12Device* device = DirectXCommon::GetInstance()->GetDevice().Get();
+	commandList_ = DirectXCommon::GetInstance()->GetCommandList().Get();
+	// QueryHeapの作成
+	D3D12_QUERY_HEAP_DESC queryHeapDesc = {};
+	queryHeapDesc.Type = D3D12_QUERY_HEAP_TYPE_OCCLUSION;
+	queryHeapDesc.Count = 1;
+	device->CreateQueryHeap(&queryHeapDesc, IID_PPV_ARGS(&queryHeap_));
+
+	// 結果を格納するリソース
+	D3D12_RESOURCE_DESC bufferDesc = {};
+	bufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	bufferDesc.Width = sizeof(UINT64);
+	bufferDesc.Height = 1;
+	bufferDesc.DepthOrArraySize = 1;
+	bufferDesc.MipLevels = 1;
+	bufferDesc.Format = DXGI_FORMAT_UNKNOWN;
+	bufferDesc.SampleDesc.Count = 1;
+	bufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+	bufferDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+	D3D12_HEAP_PROPERTIES heapProps = {};
+	heapProps.Type = D3D12_HEAP_TYPE_READBACK;
+
+	device->CreateCommittedResource(
+		&heapProps,
+		D3D12_HEAP_FLAG_NONE,
+		&bufferDesc,
+		D3D12_RESOURCE_STATE_COPY_DEST,
+		nullptr,
+		IID_PPV_ARGS(&queryResultBuffer_)
+	);
+
+}
+
+void GameScene::BeginOcclusionQuery()
+{
+	commandList_->BeginQuery(queryHeap_.Get(), D3D12_QUERY_TYPE_OCCLUSION, 0);
+}
+
+void GameScene::EndOcclusionQuery()
+{
+	commandList_->EndQuery(queryHeap_.Get(), D3D12_QUERY_TYPE_OCCLUSION, 0);
+}
+
+void GameScene::ResolvedOcclusionQuery()
+{
+	commandList_->ResolveQueryData(
+		queryHeap_.Get(),
+		D3D12_QUERY_TYPE_OCCLUSION,
+		0, 1,
+		queryResultBuffer_.Get(),
+		0
+	);
+
+	// 結果の取得
+	void* mappedData = nullptr;
+	D3D12_RANGE readRange = { 0, sizeof(UINT64) };
+	if (SUCCEEDED(queryResultBuffer_->Map(0, &readRange, &mappedData))) {
+		occlusionResult_ = *reinterpret_cast<UINT64*>(mappedData);
+		queryResultBuffer_->Unmap(0, nullptr);
+	}
 
 }
