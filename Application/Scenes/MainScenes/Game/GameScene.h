@@ -5,6 +5,7 @@
 #include <map>
 #include <d3d12.h>
 #include <wrl.h>
+#include <vector>
 
 // Engine
 #include "CoreScenes/Base/BaseScene.h"
@@ -112,12 +113,12 @@ private:
     /// <summary>
     /// 読み取り開始
     /// </summary>
-    void BeginOcclusionQuery();
+    void BeginOcclusionQuery(UINT queryIndex);
 
     /// <summary>
     /// 読み取りの終了
     /// </summary>
-    void EndOcclusionQuery();
+    void EndOcclusionQuery(UINT queryIndex);
 
     /// <summary>
     /// オクルージョンクエリの解決
@@ -201,8 +202,8 @@ private:
     =================================================================*/
     Microsoft::WRL::ComPtr<ID3D12QueryHeap> queryHeap_;
     Microsoft::WRL::ComPtr<ID3D12Resource> queryResultBuffer_;
-    UINT64 occlusionResult_ = 0;
+    std::vector<UINT64> occlusionResults_;                          // オブジェクトごとに結果を保持
+    uint32_t queryCount_ = 2;                                       // オクルージョンクエリの数
     ID3D12GraphicsCommandList* commandList_;
-    std::vector<std::unique_ptr<Object3d>> occlusionObjects_; // オクルージョンクエリ対象オブジェクト
 
 };

@@ -211,11 +211,21 @@ void GameScene::DrawObject()
 {
 	CollisionManager::GetInstance()->Draw();
 
-	BeginOcclusionQuery();
-	player_->Draw();
-	ground_->Draw();
+	// オクルージョンクエリ開始
+	uint32_t queryIndex = 0;
 
-	EndOcclusionQuery();
+	// Player のオクルージョンチェック
+	commandList_->BeginQuery(queryHeap_.Get(), D3D12_QUERY_TYPE_OCCLUSION, queryIndex);
+	player_->Draw();
+	commandList_->EndQuery(queryHeap_.Get(), D3D12_QUERY_TYPE_OCCLUSION, queryIndex);
+	queryIndex++;
+
+	// Ground のオクルージョンチェック
+	commandList_->BeginQuery(queryHeap_.Get(), D3D12_QUERY_TYPE_OCCLUSION, queryIndex);
+	ground_->Draw();
+	commandList_->EndQuery(queryHeap_.Get(), D3D12_QUERY_TYPE_OCCLUSION, queryIndex);
+	queryIndex++;
+
 	ResolvedOcclusionQuery();
 
 }
@@ -227,12 +237,7 @@ void GameScene::DrawSprite()
 
 void GameScene::DrawAnimation()
 {
-	BeginOcclusionQuery();
 	test_->Draw(sceneCamera_.get(), testWorldTransform_);
-	EndOcclusionQuery();
-	ResolvedOcclusionQuery();
-
-
 }
 
 void GameScene::DrawLine()
@@ -343,9 +348,9 @@ void GameScene::ShowImGui()
 
 
 	ImGui::End();
-
 	ImGui::Begin("Occlusion Query");
-	ImGui::Text("Occlusion Result: %llu", occlusionResult_);
+	ImGui::Text("Occlusion Player: %lld", occlusionResults_[0]);
+	ImGui::Text("Occlusion Ground: %lld", occlusionResults_[1]);
 	ImGui::End();
 
 #endif // _DEBUG
@@ -374,16 +379,25 @@ void GameScene::InitializeOcclusionQuery()
 {
     ID3D12Device* device = DirectXCommon::GetInstance()->GetDevice().Get();
 	commandList_ = DirectXCommon::GetInstance()->GetCommandList().Get();
-	// QueryHeapの作成
-	D3D12_QUERY_HEAP_DESC queryHeapDesc = {};
-	queryHeapDesc.Type = D3D12_QUERY_HEAP_TYPE_OCCLUSION;
-	queryHeapDesc.Count = 1;
-	device->CreateQueryHeap(&queryHeapDesc, IID_PPV_ARGS(&queryHeap_));
+	
+	// クエリの数をオブジェクト数に合わせる
+	occlusionResults_.resize(queryCount_, 0);
 
-	// 結果を格納するリソース
+	D3D12_QUERY_HEAP_DESC queryHeapDesc = {};
+	queryHeapDesc.Count = queryCount_;
+	queryHeapDesc.Type = D3D12_QUERY_HEAP_TYPE_OCCLUSION;
+	queryHeapDesc.NodeMask = 0;
+
+	// クエリヒープ作成
+	HRESULT hr = device->CreateQueryHeap(&queryHeapDesc, IID_PPV_ARGS(&queryHeap_));
+	if (FAILED(hr)) {
+		throw std::runtime_error("Failed to create Query Heap.");
+	}
+
+	// クエリ結果格納用のバッファを作成
 	D3D12_RESOURCE_DESC bufferDesc = {};
 	bufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	bufferDesc.Width = sizeof(UINT64);
+	bufferDesc.Width = sizeof(UINT64) * queryCount_; // クエリ数に応じたサイズ
 	bufferDesc.Height = 1;
 	bufferDesc.DepthOrArraySize = 1;
 	bufferDesc.MipLevels = 1;
@@ -392,46 +406,51 @@ void GameScene::InitializeOcclusionQuery()
 	bufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 	bufferDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
 
-	D3D12_HEAP_PROPERTIES heapProps = {};
-	heapProps.Type = D3D12_HEAP_TYPE_READBACK;
+	D3D12_HEAP_PROPERTIES heapProps = { D3D12_HEAP_TYPE_READBACK };
 
-	device->CreateCommittedResource(
-		&heapProps,
-		D3D12_HEAP_FLAG_NONE,
-		&bufferDesc,
-		D3D12_RESOURCE_STATE_COPY_DEST,
-		nullptr,
+	hr = device->CreateCommittedResource(
+		&heapProps, D3D12_HEAP_FLAG_NONE, &bufferDesc,
+		D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
 		IID_PPV_ARGS(&queryResultBuffer_)
 	);
 
+	if (FAILED(hr)) {
+		throw std::runtime_error("Failed to create Query Result Buffer.");
+	}
 }
 
-void GameScene::BeginOcclusionQuery()
+void GameScene::BeginOcclusionQuery(UINT queryIndex)
 {
-	commandList_->BeginQuery(queryHeap_.Get(), D3D12_QUERY_TYPE_OCCLUSION, 0);
+	commandList_->BeginQuery(queryHeap_.Get(), D3D12_QUERY_TYPE_OCCLUSION, queryIndex);
 }
 
-void GameScene::EndOcclusionQuery()
+void GameScene::EndOcclusionQuery(UINT queryIndex)
 {
-	commandList_->EndQuery(queryHeap_.Get(), D3D12_QUERY_TYPE_OCCLUSION, 0);
+	commandList_->EndQuery(queryHeap_.Get(), D3D12_QUERY_TYPE_OCCLUSION, queryIndex);
 }
 
 void GameScene::ResolvedOcclusionQuery()
 {
-	commandList_->ResolveQueryData(
+	// クエリ結果をリソースにコピー
+	commandList_->ResolveQueryData
+	(
 		queryHeap_.Get(),
 		D3D12_QUERY_TYPE_OCCLUSION,
-		0, 1,
+		0,
+		queryCount_,
 		queryResultBuffer_.Get(),
 		0
 	);
 
-	// 結果の取得
+	// 結果をマッピング
 	void* mappedData = nullptr;
-	D3D12_RANGE readRange = { 0, sizeof(UINT64) };
-	if (SUCCEEDED(queryResultBuffer_->Map(0, &readRange, &mappedData))) {
-		occlusionResult_ = *reinterpret_cast<UINT64*>(mappedData);
+	D3D12_RANGE readRange = { 0, sizeof(UINT64) * queryCount_ };
+	if (SUCCEEDED(queryResultBuffer_->Map(0, &readRange, &mappedData)))
+	{
+		UINT64* queryData = static_cast<UINT64*>(mappedData);
+		for (uint32_t i = 0; i < queryCount_; i++) {
+			occlusionResults_[i] = queryData[i]; // 結果を保存
+		}
 		queryResultBuffer_->Unmap(0, nullptr);
 	}
-
 }
