@@ -60,7 +60,33 @@ public:
     /// </summary>
     void Draw() override;
 
+    /// <summary>
+    /// ビュープロジェクション取得
+    /// </summary>
+    /// <returns></returns>
     Matrix4x4 GetViewProjection() override { return sceneCamera_->viewProjectionMatrix_; }
+
+private:
+
+    /// <summary>
+    /// 3Dオブジェクトの描画
+    /// </summary>
+    void DrawObject();
+
+    /// <summary>
+	/// 2Dスプライトの描画
+    /// </summary>
+    void DrawSprite();
+
+    /// <summary>
+    /// アニメーション描画
+    /// </summary>
+    void DrawAnimation();
+
+    /// <summary>
+    /// 線描画
+    /// </summary>
+    void DrawLine();
 
 private:
 
