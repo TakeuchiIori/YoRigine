@@ -153,6 +153,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="Engine\Utility\Systems\GameTime\GameTIme.cpp" />
     <ClCompile Include="Application\Scenes\MainScenes\Transitions\Base\ISceneTransition.cpp" />
     <ClCompile Include="Application\Scenes\MainScenes\Transitions\Fade\FadeTransition.cpp" />
+    <ClCompile Include="Engine\Utility\Systems\MapChip\MapChipField.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Engine\Utility\Loaders\Model\Material.cpp" />
     <ClCompile Include="Math\Matrix4x4.cpp" />
@@ -226,6 +227,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="Application\Scenes\MainScenes\Transitions\Base\ISceneTransition.h" />
     <ClInclude Include="Application\Scenes\MainScenes\Transitions\Fade\FadeTransition.h" />
     <ClInclude Include="Engine\Utility\Loaders\Model\Material.h" />
+    <ClInclude Include="Engine\Utility\Systems\MapChip\MapChipField.h" />
     <ClInclude Include="Math\MathFunc.h" />
     <ClInclude Include="Math\Matrix3x3.h" />
     <ClInclude Include="Math\Matrix4x4.h" />
