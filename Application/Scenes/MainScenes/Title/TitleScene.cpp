@@ -25,8 +25,8 @@ void TitleScene::Initialize()
 
 
     // 各オブジェクトの初期化
-    player_ = std::make_unique<Player>();
-    player_->Initialize(currentCamera_.get());
+    //player_ = std::make_unique<Player>();
+    //player_->Initialize(currentCamera_.get());
 
     sprite_ = std::make_unique<Sprite>();
     sprite_->Initialize("Resources/Textures/KoboTitle.png");
@@ -95,7 +95,7 @@ void TitleScene::Draw()
     /// ここから描画可能です
     /// </summary>
 
-    player_->Draw();
+   // player_->Draw();
 
 
 #pragma endregion

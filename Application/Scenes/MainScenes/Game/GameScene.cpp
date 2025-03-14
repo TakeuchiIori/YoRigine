@@ -59,6 +59,8 @@ void GameScene::Initialize()
 	// 各オブジェクトの初期化
 	player_ = std::make_unique<Player>(mpInfo_->GetMapChipField());
 	player_->Initialize(sceneCamera_.get());
+	Vector3 playerPosition = mpInfo_->GetMapChipField()->GetMapChipPositionByIndex(1, 16);
+	player_->SetPosition(playerPosition);
 	followCamera_.SetTarget(player_.get()->GetWorldTransform());
 
 	// 地面

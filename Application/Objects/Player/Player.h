@@ -167,6 +167,7 @@ public: // アクセッサ
 
 	void SetCameraSprite(Camera* camera) { sprite_->SetCamera(camera); }
 	void SetCamera(Camera* camera) { camera_ = camera; }
+	void SetPosition(Vector3 pos) { worldTransform_.translation_ = pos; }
 
 private: 
 	/*===============================================================//

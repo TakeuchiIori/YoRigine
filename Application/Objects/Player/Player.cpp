@@ -12,8 +12,6 @@
 
 
 
-
-
 void Player::Initialize(Camera* camera)
 {
 	camera_ = camera;
