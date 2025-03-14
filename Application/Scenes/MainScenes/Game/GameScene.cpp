@@ -101,8 +101,9 @@ void GameScene::Initialize()
 
 	InitializeOcclusionQuery();
 
-	mapChipField_.LoadMapChipCsv("Resources/images/MapChip.csv");
-
+	mpInfo_ = std::make_unique<MapChipInfo>();
+	mpInfo_->Initialize();
+	mpInfo_->SetCamera(sceneCamera_.get());
 }
 
 /// <summary>
@@ -121,8 +122,8 @@ void GameScene::Update()
 	//    iCommand_->Exec(*player_.get());
 	//}
 
-		   // パーティクル更新
-
+	// パーティクル更新
+	mpInfo_->Update();
 	CheckAllCollisions();
 	CollisionManager::GetInstance()->UpdateWorldTransform();
 	// スポーンタイマーを更新
@@ -212,7 +213,7 @@ void GameScene::Draw()
 void GameScene::DrawObject()
 {
 	CollisionManager::GetInstance()->Draw();
-
+	mpInfo_->Draw();
 	// オクルージョンクエリ開始
 	uint32_t queryIndex = 0;
 	player_->Draw();

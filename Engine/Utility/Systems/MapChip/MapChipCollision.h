@@ -74,8 +74,6 @@ public:
         std::function<void(const CollisionInfo&)> collisionCallback = nullptr);
 
 
-
-
 private:
     MapChipField& mapChipField_;
 };

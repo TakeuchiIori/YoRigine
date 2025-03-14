@@ -157,6 +157,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Engine\Utility\Loaders\Model\Material.cpp" />
     <ClCompile Include="Engine\Utility\Systems\MapChip\MapChipCollision.cpp" />
+    <ClCompile Include="Engine\Utility\Systems\MapChip\MapChipInfo.cpp" />
     <ClCompile Include="Math\Matrix4x4.cpp" />
     <ClCompile Include="Engine\Utility\Loaders\Model\Model.cpp" />
     <ClCompile Include="Engine\Utility\Loaders\Model\ModelCommon.cpp" />
@@ -230,6 +231,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="Engine\Utility\Loaders\Model\Material.h" />
     <ClInclude Include="Engine\Utility\Systems\MapChip\MapChipField.h" />
     <ClInclude Include="Engine\Utility\Systems\MapChip\MapChipCollision.h" />
+    <ClInclude Include="Engine\Utility\Systems\MapChip\MapChipInfo.h" />
     <ClInclude Include="Math\MathFunc.h" />
     <ClInclude Include="Math\Matrix3x3.h" />
     <ClInclude Include="Math\Matrix4x4.h" />

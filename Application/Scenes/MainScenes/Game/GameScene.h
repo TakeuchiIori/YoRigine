@@ -23,7 +23,7 @@
 #include "Player/InputHandle/InputHandleMove.h"
 #include "Ground/Ground.h"
 #include "../Transitions/Fade/Fade.h"
-#include "Systems/MapChip/MapChipField.h"
+#include "Systems/MapChip/MapChipInfo.h"
 
 // Math
 #include "Vector3.h"
@@ -195,7 +195,7 @@ private:
 
     bool isClear_ = false;
 
-	MapChipField mapChipField_;
+    std::unique_ptr<MapChipInfo> mpInfo_;
 
 private:
     /*=================================================================
