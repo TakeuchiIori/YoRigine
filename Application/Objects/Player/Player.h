@@ -10,6 +10,7 @@
 #include <Systems/GameTime/GameTIme.h>
 #include <Particle/ParticleManager.h>
 #include <Particle/ParticleEmitter.h>
+#include "Systems/MapChip/MapChipCollision.h"
 
 #include "Loaders/Json/JsonManager.h"
 // C++
@@ -24,6 +25,16 @@ class Player : public Collider
 {
 
 public: // メンバ関数（公開）
+
+	Player(MapChipField* mapChipField)
+		: velocity_(0, 0, 0),
+		mpCollision_(mapChipField) {
+		// プレイヤーの衝突判定用矩形を設定
+		colliderRect_ = { 0.8f, 0.8f, 0.0f, 0.0f };
+		worldTransform_.translation_ = { 0.0f, 0.0f, 0.0f };
+	}
+
+
 
 	/// <summary>
 	/// 初期化
@@ -164,7 +175,7 @@ private:
 
 	WorldTransform worldTransform_;
 	WorldTransform WS_;
-	Camera* camera_;
+	Camera* camera_ = nullptr;
 	/*===============================================================//
 								ポインタ
 	//===============================================================*/
@@ -176,6 +187,9 @@ private:
 	std::unique_ptr<ParticleEmitter> particleEmitter_;
 
 	std::unique_ptr <JsonManager> jsonManager_;
+
+	MapChipCollision mpCollision_;
+	MapChipCollision::ColliderRect colliderRect_;
 
 	/*===============================================================//
 								フラグ関連
@@ -228,6 +242,7 @@ private:
 
 	std::string timeID_;
 	GameTime* gameTime_ = nullptr;
-	float deltaTime_;
+	float deltaTime_ = 0.0f;
 };
 
+void HandleBlockCollision(const CollisionInfo& info);

@@ -51,9 +51,13 @@ void GameScene::Initialize()
 
 	GameTime::GetInstance()->Initialize();
 
+	mpInfo_ = std::make_unique<MapChipInfo>();
+	mpInfo_->Initialize();
+	mpInfo_->SetCamera(sceneCamera_.get());
+
 	followCamera_.Initialize();
 	// 各オブジェクトの初期化
-	player_ = std::make_unique<Player>();
+	player_ = std::make_unique<Player>(mpInfo_->GetMapChipField());
 	player_->Initialize(sceneCamera_.get());
 	followCamera_.SetTarget(player_.get()->GetWorldTransform());
 
@@ -101,9 +105,7 @@ void GameScene::Initialize()
 
 	InitializeOcclusionQuery();
 
-	mpInfo_ = std::make_unique<MapChipInfo>();
-	mpInfo_->Initialize();
-	mpInfo_->SetCamera(sceneCamera_.get());
+
 }
 
 /// <summary>

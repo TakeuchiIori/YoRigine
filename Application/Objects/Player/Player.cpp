@@ -270,6 +270,19 @@ void Player::MoveKey()
 	if (weapon_->GetIsJumpAttack()) {
 		worldTransform_.translation_ += direction * moveSpeed_;
 	}
+
+	// マップチップとの衝突判定と解決
+	mpCollision_.DetectAndResolveCollision(
+		colliderRect_,  // 衝突判定用矩形
+		worldTransform_.translation_,    // 更新される位置
+		velocity_,      // 更新される速度
+		MapChipCollision::CollisionFlag::All,  // すべての方向をチェック
+		[this](const CollisionInfo& info) {
+			// 衝突時の処理（例：特殊ブロック対応）
+			HandleBlockCollision(info);
+		}
+	);
+
 }
 
 
@@ -344,6 +357,31 @@ void Player::Dash()
 			isDash_ = false;
 			dashTime_ = 0.0f; // ダッシュ時間をリセット
 		}
+	}
+}
+
+void HandleBlockCollision(const CollisionInfo& info) {
+	// 衝突したブロックの種類に応じた処理
+	switch (info.blockType) {
+	case MapChipType::kBlock:
+		// 通常ブロックの処理
+		break;
+
+		// 将来的に追加される特殊ブロックの処理
+		// case MapChipType::kDamageBlock:
+		//     TakeDamage(10);
+		//     break;
+		// case MapChipType::kJumpBlock:
+		//     velocity_.y = 10.0f;  // ジャンプさせる
+		//     break;
+
+	default:
+		break;
+	}
+
+	// 衝突方向に応じた処理
+	if (info.direction == 4) {  // 下方向の衝突 = 着地
+		//isGrounded_ = true;
 	}
 }
 

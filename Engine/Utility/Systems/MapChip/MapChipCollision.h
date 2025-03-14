@@ -58,7 +58,7 @@ public:
     };
 
     // コンストラクタ
-    MapChipCollision(MapChipField& mapChipField) : mapChipField_(mapChipField) {}
+    MapChipCollision(MapChipField* mapChipField) : mapChipField_(mapChipField) {}
 
     // 指定した位置と速度をもとに衝突判定と解決を行う
     // colliderRect: 衝突判定に使用する矩形
@@ -75,5 +75,5 @@ public:
 
 
 private:
-    MapChipField& mapChipField_;
+    MapChipField* mapChipField_;
 };

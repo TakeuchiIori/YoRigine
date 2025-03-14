@@ -10,7 +10,7 @@ void MapChipCollision::DetectAndResolveCollision(
 	std::vector<CollisionInfo> collisions;
 
 	// 現在位置からマップチップインデックスを取得
-	MapChipField::IndexSet currentIndex = mapChipField_.GetMapChipIndexSetByPosition(position);
+	MapChipField::IndexSet currentIndex = mapChipField_->GetMapChipIndexSetByPosition(position);
 
 	// 検査範囲（最適化のため、必要最小限のブロックだけチェック）
 	int searchRadius = 2; // 移動速度が速い場合は大きくする
@@ -33,7 +33,7 @@ void MapChipCollision::DetectAndResolveCollision(
 			uint32_t yIndex = static_cast<uint32_t>(checkY);
 
 			// ブロックタイプを取得
-			MapChipType blockType = mapChipField_.GetMapChipTypeByIndex(xIndex, yIndex);
+			MapChipType blockType = mapChipField_->GetMapChipTypeByIndex(xIndex, yIndex);
 
 			// 空白ブロックならスキップ
 			if (blockType == MapChipType::kBlank) {
@@ -41,7 +41,7 @@ void MapChipCollision::DetectAndResolveCollision(
 			}
 
 			// ブロックの矩形を取得
-			MapChipField::Rect blockRect = mapChipField_.GetRectByIndex(xIndex, yIndex);
+			MapChipField::Rect blockRect = mapChipField_->GetRectByIndex(xIndex, yIndex);
 
 			// オブジェクトの現在の矩形を計算
 			MapChipField::Rect objectRect = {
