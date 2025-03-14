@@ -253,13 +253,13 @@ void Player::MoveKey()
 
 	// キーボードの入力で移動と方向の決定
 	if (input_->PushKey(DIK_W)) {
-		direction.y += 1.0f; // Z軸正方向に進む
+		direction.z += 1.0f; // Z軸正方向に進む
 	}
 	if (input_->PushKey(DIK_A)) {
 		direction.x -= 1.0f; // X軸負方向に進む
 	}
 	if (input_->PushKey(DIK_S)) {
-		direction.y -= 1.0f; // Z軸負方向に進む
+		direction.z -= 1.0f; // Z軸負方向に進む
 	}
 	if (input_->PushKey(DIK_D)) {
 		direction.x += 1.0f; // X軸正方向に進む
@@ -272,7 +272,7 @@ void Player::MoveKey()
 	}
 
 	// 方向ベクトルを正規化して一定速度にする
-	if (direction.x != 0.0f || direction.y != 0.0f) {
+	if (direction.x != 0.0f || direction.z != 0.0f) {
 		direction = Normalize(direction);
 		// 入力がある場合、新しい速度を設定
 		velocity_ = direction * moveSpeed_;
