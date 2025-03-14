@@ -89,9 +89,9 @@ private:
     MapChipData mapChipData_;
     std::map<std::string, MapChipType> mapChipTable_;
 
-    // 1ブロックのサイズ
-    static inline const float kBlockWidth = 1.0f;
-    static inline const float kBlockHeight = 1.0f;
+    // 1ブロックのサイズ(2で固定)
+    static inline const float kBlockWidth = 2.0f;
+    static inline const float kBlockHeight = 2.0f;
 
     // ブロックの個数
     static inline const uint32_t kNumBlockVertical = 20;      // 縦
