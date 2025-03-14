@@ -90,17 +90,19 @@ private:
     std::map<std::string, MapChipType> mapChipTable_;
 
     // 1ブロックのサイズ
-    static inline const float kBlockWidth = 2.0f;
-    static inline const float kBlockHeight = 2.0f;
+    static inline const float kBlockWidth = 1.0f;
+    static inline const float kBlockHeight = 1.0f;
+
     // ブロックの個数
     static inline const uint32_t kNumBlockVertical = 20;      // 縦
     static inline const uint32_t kNumBlockHorizontal = 100;   // 横  
 
-public: // アクセッサ
+public:
 
     // 1ブロックのサイズ
     static inline float GetBlockWidth() { return kBlockWidth; }
     static inline float GetBlockHeight() { return kBlockHeight; }
+
     // ブロックの個数
     static inline uint32_t GetNumBlockVertical() { return kNumBlockVertical; }
     static inline uint32_t GetNumBlockHorizontal() { return kNumBlockHorizontal; }
