@@ -46,6 +46,15 @@ private:
 	void GenerateBlocks();
 
 
+public:
+
+	void SetMapChipField(MapChipField* mpField) { mpField_ = mpField; }
+	void SetWorldTransform(std::vector<std::vector<WorldTransform*>> wt) { wt_ = wt; }
+	void SetObject(Object3d* obj) { obj_ = obj; }
+
+	void GetMapChipField(MapChipField* mpField) { mpField_ = mpField; }
+	void GetWorldTransform(std::vector<std::vector<WorldTransform*>> wt) { wt_ = wt; }
+	void GetObject3D(Object3d* obj) { obj_ = obj; }
 
 private:
 	/*=======================================================================
