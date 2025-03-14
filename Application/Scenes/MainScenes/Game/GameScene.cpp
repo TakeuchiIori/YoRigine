@@ -101,6 +101,8 @@ void GameScene::Initialize()
 
 	InitializeOcclusionQuery();
 
+	mapChipField_.LoadMapChipCsv("Resources/images/MapChip.csv");
+
 }
 
 /// <summary>

@@ -23,6 +23,7 @@
 #include "Player/InputHandle/InputHandleMove.h"
 #include "Ground/Ground.h"
 #include "../Transitions/Fade/Fade.h"
+#include "Systems/MapChip/MapChipField.h"
 
 // Math
 #include "Vector3.h"
@@ -193,6 +194,8 @@ private:
     ICommandMove* iCommand_ = nullptr;
 
     bool isClear_ = false;
+
+	MapChipField mapChipField_;
 
 private:
     /*=================================================================
