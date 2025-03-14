@@ -30,7 +30,7 @@ public: // メンバ関数（公開）
 		: velocity_(0, 0, 0),
 		mpCollision_(mapChipField) {
 		// プレイヤーの衝突判定用矩形を設定
-		colliderRect_ = { 0.8f, 0.8f, 0.0f, 0.0f };
+		colliderRect_ = { 2.0f, 2.0f, 0.0f, 0.0f };
 		worldTransform_.translation_ = { 0.0f, 0.0f, 0.0f };
 	}
 
@@ -234,7 +234,7 @@ private:
 
 
 	float rotrateSpeed_ = 0.25f;
-	float moveSpeed_ = 0.25f;
+	float moveSpeed_ = 4.25f;
 	float maxMoveSpeed_ = 0.35f;  // 最大移動速度
 	Vector3 velocity_ = { 0.0f, 0.0f, 0.0f };  // 現在の速度ベクトル
 	//float acceleration_ = 0.0f;  // 加速度

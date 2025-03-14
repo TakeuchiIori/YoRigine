@@ -18,7 +18,7 @@ void Player::Initialize(Camera* camera)
 	// OBject3dの初期化
 	base_ = std::make_unique<Object3d>();
 	base_->Initialize();
-	base_->SetModel("player.obj");
+	base_->SetModel("cube.obj");
 
 	weapon_ = std::make_unique<PlayerWeapon>();
 	weapon_->Initialize();
@@ -244,35 +244,47 @@ void Player::MoveController()
 
 void Player::MoveKey()
 {
+
+
 	// プレイヤーの移動方向を計算するベクトル
 	Vector3 direction = { 0.0f, 0.0f, 0.0f };
+	// 前回の速度を減衰させる
+	velocity_ = velocity_ * 0.9f;
 
 	// キーボードの入力で移動と方向の決定
 	if (input_->PushKey(DIK_W)) {
-		worldTransform_.translation_.z += moveSpeed_; // 前進
-		direction.z += 1.0f; // Z軸正方向に進む
+		direction.y += 1.0f; // Z軸正方向に進む
 	}
 	if (input_->PushKey(DIK_A)) {
-		worldTransform_.translation_.x -= moveSpeed_; // 左移動
 		direction.x -= 1.0f; // X軸負方向に進む
 	}
 	if (input_->PushKey(DIK_S)) {
-		worldTransform_.translation_.z -= moveSpeed_; // 後退
-		direction.z -= 1.0f; // Z軸負方向に進む
+		direction.y -= 1.0f; // Z軸負方向に進む
 	}
 	if (input_->PushKey(DIK_D)) {
-		worldTransform_.translation_.x += moveSpeed_; // 右移動
 		direction.x += 1.0f; // X軸正方向に進む
 	}
 
+	direction = Normalize(direction);
+
 	if (weapon_->GetIsJumpAttack()) {
-		worldTransform_.translation_ += direction * moveSpeed_;
+		worldTransform_.translation_ += direction;
 	}
+
+	// 方向ベクトルを正規化して一定速度にする
+	if (direction.x != 0.0f || direction.y != 0.0f) {
+		direction = Normalize(direction);
+		// 入力がある場合、新しい速度を設定
+		velocity_ = direction * moveSpeed_;
+	}
+
+	// 新しい位置を計算（まだ適用しない）
+	Vector3 newPosition = worldTransform_.translation_ + velocity_;
 
 	// マップチップとの衝突判定と解決
 	mpCollision_.DetectAndResolveCollision(
 		colliderRect_,  // 衝突判定用矩形
-		worldTransform_.translation_,    // 更新される位置
+		newPosition,    // 更新される位置（衝突解決後）
 		velocity_,      // 更新される速度
 		MapChipCollision::CollisionFlag::All,  // すべての方向をチェック
 		[this](const CollisionInfo& info) {
@@ -281,7 +293,11 @@ void Player::MoveKey()
 		}
 	);
 
+
+	// 衝突解決後の位置を適用
+	worldTransform_.translation_ = newPosition;
 }
+
 
 
 

@@ -85,13 +85,18 @@ public:
     /// <param name="type">対応するマップチップタイプ</param>
     void RegisterMapChipType(const std::string& key, MapChipType type);
 
+    float GetBlockSize() const { return blockSize; }
+
 private:
+    
     MapChipData mapChipData_;
     std::map<std::string, MapChipType> mapChipTable_;
 
     // 1ブロックのサイズ(2で固定)
     static inline const float kBlockWidth = 2.0f;
     static inline const float kBlockHeight = 2.0f;
+
+    static inline const float blockSize = 2.0f;
 
     // ブロックの個数
     static inline const uint32_t kNumBlockVertical = 20;      // 縦
