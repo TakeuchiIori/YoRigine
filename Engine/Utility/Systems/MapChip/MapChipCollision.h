@@ -8,11 +8,11 @@
 
 
 enum CollisionDirection {
-    None = 0,
-    Left = 1,
-    Right = 2,
-    Top = 3,
-    Bottom = 4
+    NoneDir = 0,
+    LeftDir = 1,
+    RightDir = 2,
+    TopDir = 3,
+    BottomDir = 4
 };
 
 struct CollisionInfo {
@@ -54,12 +54,6 @@ public:
         Right = 1 << 1,
         Top = 1 << 2,
         Bottom = 1 << 3,
-
-		LeftTop = Left | Top,
-		RightTop = Right | Top,
-		LeftBottom = Left | Bottom,
-		RightBottom = Right | Bottom,
-
         All = Left | Right | Top | Bottom
     };
 

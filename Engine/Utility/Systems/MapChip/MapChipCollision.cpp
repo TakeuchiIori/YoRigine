@@ -4,8 +4,8 @@ void MapChipCollision::DetectAndResolveCollision(
 	const ColliderRect& colliderRect,
 	Vector3& position,
 	Vector3& velocity,
-	int checkFlags = CollisionFlag::All,
-	std::function<void(const CollisionInfo&)> collisionCallback = nullptr) {
+	int checkFlags,
+	std::function<void(const CollisionInfo&)> collisionCallback) {
 	// 衝突情報のリスト
 	std::vector<CollisionInfo> collisions;
 
@@ -84,30 +84,30 @@ void MapChipCollision::DetectAndResolveCollision(
 
 				// 最小めり込み方向を探す
 				float minPenetration = std::numeric_limits<float>::max();
-				CollisionDirection  collisionDirection;
+				CollisionDirection  collisionDirection{};
 
 				/// 左方向の衝突チェック
 				if ((checkFlags & CollisionFlag::Left) && velocity.x > 0 && leftPenetration < minPenetration) {
 					minPenetration = leftPenetration;
-					collisionDirection = CollisionDirection::Left;
+					collisionDirection = CollisionDirection::LeftDir;
 				}
 
 				/// 右方向の衝突チェック
 				if ((checkFlags & CollisionFlag::Right) && velocity.x < 0 && rightPenetration < minPenetration) {
 					minPenetration = rightPenetration;
-					collisionDirection = CollisionDirection::Right;
+					collisionDirection = CollisionDirection::RightDir;
 				}
 
 				/// 上方向の衝突チェック
 				if ((checkFlags & CollisionFlag::Top) && velocity.y > 0 && topPenetration < minPenetration) {
 					minPenetration = topPenetration;
-					collisionDirection = CollisionDirection::Top;
+					collisionDirection = CollisionDirection::TopDir;
 				}
 
 				/// 下方向の衝突チェック
 				if ((checkFlags & CollisionFlag::Bottom) && velocity.y < 0 && bottomPenetration < minPenetration) {
 					minPenetration = bottomPenetration;
-					collisionDirection = CollisionDirection::Bottom;
+					collisionDirection = CollisionDirection::BottomDir;
 				}
 
 				// 衝突情報を設定
@@ -135,22 +135,22 @@ void MapChipCollision::DetectAndResolveCollision(
 	for (const auto& collision : collisions) {
 		// 衝突方向に応じた処理
 		switch (collision.direction) {
-		case Left:
+		case LeftDir:
 			position.x = collision.blockRect.left - colliderRect.width / 2.0f - colliderRect.offsetX;
 			velocity.x = 0;
 			break;
 
-		case Right:
+		case RightDir:
 			position.x = collision.blockRect.right + colliderRect.width / 2.0f - colliderRect.offsetX;
 			velocity.x = 0;
 			break;
 
-		case Top:
+		case TopDir:
 			position.y = collision.blockRect.bottom - colliderRect.height / 2.0f - colliderRect.offsetY;
 			velocity.y = 0;
 			break;
 
-		case Bottom:
+		case BottomDir:
 			position.y = collision.blockRect.top + colliderRect.height / 2.0f - colliderRect.offsetY;
 			velocity.y = 0;
 			break;
