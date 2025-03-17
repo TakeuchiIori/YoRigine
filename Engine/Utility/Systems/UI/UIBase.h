@@ -27,7 +27,7 @@ class Camera;
 class UIBase {
 public:
     // コンストラクタ & デストラクタ
-    UIBase();
+    UIBase(const std::string& name = "UIBase");
     virtual ~UIBase();
 
     // 初期化

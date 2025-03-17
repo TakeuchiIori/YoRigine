@@ -198,6 +198,7 @@ private:
 
     std::unique_ptr<MapChipInfo> mpInfo_;
 	std::unique_ptr<UIBase> uiBase_;
+    std::unique_ptr<UIBase> uiSub_;
 
 private:
     /*=================================================================

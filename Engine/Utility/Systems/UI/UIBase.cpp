@@ -10,10 +10,10 @@
 #endif // _DEBUG
 
 
-UIBase::UIBase() :
+UIBase::UIBase(const std::string& name) :
     sprite_(nullptr),
     hotReloadEnabled_(false),
-    name_("UIBase") {
+    name_(name) {
 }
 
 UIBase::~UIBase() {
@@ -76,6 +76,7 @@ void UIBase::Draw() {
 
 void UIBase::ImGUi() {
     if (!sprite_) return;
+    ImGui::Begin(name_.c_str());
 
     bool modified = false;  // 変更があったかどうかを追跡するフラグ
 
@@ -357,6 +358,9 @@ void UIBase::ImGUi() {
         ImGui::SameLine();
         ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "* 未保存の変更があります");
     }
+
+    // ウィンドウ終了
+    ImGui::End();
 }
 
 void UIBase::EnableHotReload(bool enable) {
