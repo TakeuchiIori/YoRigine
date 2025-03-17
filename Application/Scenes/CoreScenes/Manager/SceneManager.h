@@ -28,6 +28,9 @@ public:
     /// <summary> 描画 </summary>
     void Draw();
 
+	/// <summary> オフスクリーン描画 </summary>
+    void DrawForOffscreen();
+
     /// <summary> 次シーン予約 </summary>
     /// <param name="sceneName"></param>
     void ChangeScene(const std::string& sceneName);

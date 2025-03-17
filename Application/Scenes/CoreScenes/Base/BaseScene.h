@@ -25,6 +25,11 @@ public: // 純粋仮想関数
 	/// 描画
 	/// </summary>
 	virtual void Draw() = 0;
+
+	/// <summary>
+	/// 
+	/// </summary>
+	virtual void DrawOffScreen() = 0;
 	
 	/// <summary>
 	/// デストラクタ

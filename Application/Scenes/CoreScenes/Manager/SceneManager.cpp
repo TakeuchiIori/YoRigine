@@ -85,6 +85,15 @@ void SceneManager::Draw()
     }
 }
 
+void SceneManager::DrawForOffscreen()
+{
+    // 現在のシーンの描画
+    if (scene_) {
+        scene_->DrawOffScreen();
+    }
+}
+
+
 void SceneManager::ChangeScene(const std::string& sceneName)
 {
     assert(sceneFactory_);

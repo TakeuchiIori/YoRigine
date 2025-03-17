@@ -51,6 +51,11 @@ void MyGame::Draw()
 	dxCommon_->PreDrawImGui();
 	offScreen_->SetProjection(SceneManager::GetInstance()->GetScene()->GetViewProjection());
 	offScreen_->Draw();
+
+	dxCommon_->DepthBarrier();
+	SceneManager::GetInstance()->DrawForOffscreen();
+
+
 	imguiManager_->Draw();
 	// DirectXの描画終了
 	dxCommon_->PostDraw();

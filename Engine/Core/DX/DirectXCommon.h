@@ -103,21 +103,30 @@ private:
 	/// </summary>
 	void TransitionBarrier(ID3D12Resource* pResource, D3D12_RESOURCE_STATES Before, D3D12_RESOURCE_STATES After);
 	void BeginRenderTargetRTV(const D3D12_CPU_DESCRIPTOR_HANDLE& rtvHandle, const D3D12_CPU_DESCRIPTOR_HANDLE* dsvHandle = nullptr);
-	
+
 
 public:
-	
+
 	/// <summary>
 	/// 描画前処理
 	/// </summary>
-	void RenderTexture();
 	void PreDrawScene();
 	void PreDrawImGui();
-	
+
 	/// <summary>
 	/// 描画後処理
 	/// </summary>
 	void PostDraw();
+
+	/// <summary>
+	/// 
+	/// </summary>
+	void DepthBarrier();
+
+	/// <summary>
+	/// GPUに
+	/// </summary>
+	void WaitForGpu();
 
 
 public: // メンバ関数
@@ -251,6 +260,16 @@ public: // アクセッサ
 	HANDLE GetFenceEvent() { return fenceEvent_; }
 	UINT GetBackBufferCount()const { return  backBufferIndex; }
 
+
+	Microsoft::WRL::ComPtr<ID3D12Resource> GetOffScreenResource() { return offScreenResource_; }
+	D3D12_CLEAR_VALUE GetRenderTargetClearColor() { return renderTargetClearColor_; }
+	Microsoft::WRL::ComPtr<ID3D12Resource> GetDepthStencilResource() { return depthStencilResource_; }
+
+	uint32_t GetOffScreenSrvIndex() { return offScreenSrvIndex_; }
+	UINT GetCurrentBackBufferIndex() const {
+		// スワップチェーンから現在のバックバッファインデックスを取得
+		return swapChain_->GetCurrentBackBufferIndex();
+	}
 private:
 	/// <summary>
 	/// デフォルトコンストラクタ（シングルトンパターンのためプライベートに設定）
@@ -264,7 +283,7 @@ private:
 
 
 	/*=================================================================
-	
+
 								DirectX基盤
 
    =================================================================*/
@@ -276,7 +295,7 @@ private:
 	Microsoft::WRL::ComPtr<IDXGIFactory7> dxgiFactory_;
 
 	/*=================================================================
-	
+
 								コマンド関連
 
 	=================================================================*/
@@ -292,7 +311,7 @@ private:
 	HANDLE fenceEvent_;
 
 	/*=================================================================
-	
+
 								スワップチェーン
 
 	=================================================================*/
@@ -304,7 +323,7 @@ private:
 	UINT backBufferIndex = backBuffers;
 
 	/*=================================================================
-	
+
 							 ディスクリプタヒープ
 
 	=================================================================*/
@@ -319,7 +338,7 @@ private:
 	D3D12_RENDER_TARGET_VIEW_DESC rtvDesc_{};
 
 	/*=================================================================
-	
+
 								深度バッファ
 
 	=================================================================*/
@@ -328,7 +347,7 @@ private:
 	D3D12_CPU_DESCRIPTOR_HANDLE depthSrvHandleCPU_;
 	D3D12_GPU_DESCRIPTOR_HANDLE depthSrvHandleGPU_;
 	/*=================================================================
-	
+
 								描画設定
 
 	=================================================================*/
@@ -340,7 +359,7 @@ private:
 	D3D12_RESOURCE_BARRIER barrier_{};
 
 	/*=================================================================
-	
+
 								 シェーダー関連
 
 	=================================================================*/
