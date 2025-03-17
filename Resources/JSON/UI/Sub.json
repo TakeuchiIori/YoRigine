@@ -13,8 +13,8 @@
     "flipY": false,
     "name": "UISub",
     "position": {
-        "x": 0.0,
-        "y": 0.0,
+        "x": 172.0,
+        "y": 103.0,
         "z": 0.0
     },
     "rotation": {
@@ -23,16 +23,12 @@
         "z": 0.0
     },
     "scale": {
-        "x": 200.0,
-        "y": 400.0
+        "x": 213.5,
+        "y": 180.5
     },
     "textureLeftTop": {
         "x": 0.0,
         "y": 0.0
     },
-    "texturePath": "./Resources/images/white.png",
-    "textureSize": {
-        "x": 512.0,
-        "y": 512.0
-    }
+    "texturePath": "./Resources/images/circle.png"
 }

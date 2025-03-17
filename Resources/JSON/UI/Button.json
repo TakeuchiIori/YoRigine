@@ -13,8 +13,8 @@
     "flipY": false,
     "name": "UIButton",
     "position": {
-        "x": 291.0,
-        "y": 0.0,
+        "x": 16.0,
+        "y": 16.0,
         "z": 0.0
     },
     "rotation": {
@@ -23,16 +23,12 @@
         "z": 0.0
     },
     "scale": {
-        "x": 400.0,
-        "y": 300.0
+        "x": 196.5,
+        "y": 157.5
     },
     "textureLeftTop": {
         "x": 0.0,
         "y": 0.0
     },
-    "texturePath": "./Resources/images/white.png",
-    "textureSize": {
-        "x": 16.0,
-        "y": 16.0
-    }
+    "texturePath": "./Resources/images/uvChecker.png"
 }

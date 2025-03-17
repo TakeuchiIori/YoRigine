@@ -94,7 +94,7 @@ void UIBase::ImGUi() {
        
         // スケール設定
         Vector2 scale = GetScale();
-        if (ImGui::DragFloat2("拡大縮小", &scale.x, 0.1f)) {
+        if (ImGui::DragFloat2("拡大縮小", &scale.x, 0.5f)) {
             SetScale(scale);
             modified = true;
         }
@@ -292,20 +292,10 @@ void UIBase::ImGUi() {
         }
     
 
-
-
-
         // テクスチャ座標設定
         Vector2 leftTop = sprite_->GetTextureLeftTop();
         if (ImGui::DragFloat2("左上座標", &leftTop.x, 1.0f)) {
             sprite_->SetTextureLeftTop(leftTop);
-            modified = true;
-        }
-
-        // テクスチャサイズ設定
-        Vector2 size = sprite_->GetTextureSize();
-        if (ImGui::DragFloat2("テクスチャサイズ", &size.x, 1.0f)) {
-            sprite_->SetTextureSize(size);
             modified = true;
         }
 
@@ -605,10 +595,10 @@ nlohmann::json UIBase::CreateJSONFromCurrentState() {
             {"y", sprite_->GetTextureLeftTop().y}
         };
 
-        data["textureSize"] = {
-            {"x", sprite_->GetTextureSize().x},
-            {"y", sprite_->GetTextureSize().y}
-        };
+        //data["textureSize"] = {
+        //    {"x", sprite_->GetTextureSize().x},
+        //    {"y", sprite_->GetTextureSize().y}
+        //};
 
         data["anchorPoint"] = {
             {"x", sprite_->GetAnchorPoint().x},
@@ -697,12 +687,12 @@ void UIBase::ApplyJSONToState(const nlohmann::json& data) {
             sprite_->SetTextureLeftTop(leftTop);
         }
 
-        if (data.contains("textureSize")) {
-            Vector2 size;
-            size.x = data["textureSize"]["x"];
-            size.y = data["textureSize"]["y"];
-            //sprite_->SetTextureSize(size);
-        }
+        //if (data.contains("textureSize")) {
+        //    Vector2 size;
+        //    size.x = data["textureSize"]["x"];
+        //    size.y = data["textureSize"]["y"];
+        //    //sprite_->SetTextureSize(size);
+        //}
 
         if (data.contains("anchorPoint")) {
             Vector2 anchor;

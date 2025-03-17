@@ -177,6 +177,7 @@ void GameScene::Update()
 
 	sprite_->Update();
 	uiBase_->Update();
+
 	uiSub_->Update();
 
 }
