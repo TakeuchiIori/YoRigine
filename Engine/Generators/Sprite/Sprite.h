@@ -62,6 +62,12 @@ public: // 基本的関数
 	/// </summary>
 	void ChangeTexture(const std::string textureFilePath);
 
+	/// <summary>
+	/// テクスチャサイズをイメージに合わせる
+	/// </summary>
+	void AdjustTaxtureSize();
+
+
 private: // メンバ関数
 
 	/// <summary>
@@ -94,10 +100,7 @@ private: // メンバ関数
 	/// </summary>
 	void TransformResource();
 
-	/// <summary>
-	/// テクスチャサイズをイメージに合わせる
-	/// </summary>
-	void AdjustTaxtureSize();
+
 
 
 public: // アクセッサ

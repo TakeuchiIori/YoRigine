@@ -143,52 +143,156 @@ void UIBase::ImGUi() {
     if (ImGui::CollapsingHeader("テクスチャ", ImGuiTreeNodeFlags_DefaultOpen)) {
         // 現在のテクスチャパスを表示
         ImGui::Text("現在のテクスチャ: %s", texturePath_.c_str());
+        // テクスチャフォルダ選択ダイアログ
+        static char dialogCurrentPath[512] = "";
+        static bool showHiddenFiles = false;
+        static std::vector<std::string> dialogFiles;
+        static std::vector<std::string> dialogDirs;
+        static char navigationPath[512] = "";
+        static bool needsRefresh = true;
 
         // テクスチャファイル選択ボタン
-        if (ImGui::Button("テクスチャ変更...")) {
-            // 注意: これはファイルダイアログのプレースホルダーです
-            // 実際の実装では、ファイルダイアログライブラリを統合する必要があります
-            // 例: ImGuiFileDialog, tinyfiledialogs, nativefiledialog など
-
-            // 例として、新しいパスを取得したと仮定します:
-            // std::string newTexturePath = ShowFileOpenDialog("*.png,*.jpg");
-            // if (!newTexturePath.empty()) {
-            //     SetTexture(newTexturePath);
-            //     modified = true;
-            // }
-
-            // 代替として手動入力を有効にします
-            ImGui::OpenPopup("TexturePathPopup");
+        if (ImGui::Button("テクスチャフォルダ選択")) {
+            ImGui::OpenPopup("TextureFolderDialog");
+            // 初回表示時または再表示時にダイアログの状態を初期化
+            static bool initialized = false;
+            if (!initialized) {
+                // 現在のパスがあればそれを初期値に
+                if (!texturePath_.empty()) {
+                    strncpy_s(dialogCurrentPath, std::filesystem::path(texturePath_).parent_path().string().c_str(), sizeof(dialogCurrentPath) - 1);
+                }
+                initialized = true;
+            }
         }
 
-        // テクスチャパス手動入力ポップアップ
-        if (ImGui::BeginPopup("TexturePathPopup")) {
-            static char pathBuffer[512] = "";
-            ImGui::Text("テクスチャパス:");
-            if (ImGui::InputText("##TexturePath", pathBuffer, sizeof(pathBuffer), ImGuiInputTextFlags_EnterReturnsTrue)) {
-                if (strlen(pathBuffer) > 0) {
-                    SetTexture(pathBuffer);
+
+
+        // ダイアログのモーダルウィンドウ
+        if (ImGui::BeginPopupModal("TextureFolderDialog", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+            // パス表示・編集バー
+            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 60);
+            if (ImGui::InputText("##Path", dialogCurrentPath, sizeof(dialogCurrentPath), ImGuiInputTextFlags_EnterReturnsTrue)) {
+                needsRefresh = true;
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("移動")) {
+                needsRefresh = true;
+            }
+
+            // 親ディレクトリへの移動ボタン
+            if (ImGui::Button("上へ")) {
+                std::string currentPath = dialogCurrentPath;
+                std::filesystem::path path(currentPath);
+                if (path.has_parent_path()) {
+                    path = path.parent_path();
+                    strncpy_s(dialogCurrentPath, path.string().c_str(), sizeof(dialogCurrentPath) - 1);
+                    needsRefresh = true;
+                }
+            }
+            ImGui::SameLine();
+            ImGui::Checkbox("隠しファイルを表示", &showHiddenFiles);
+
+            // ファイルリストを更新
+            if (needsRefresh) {
+                dialogFiles.clear();
+                dialogDirs.clear();
+
+                try {
+                    // 現在のパスからファイルとディレクトリを取得
+                    std::filesystem::path currentPath(dialogCurrentPath);
+                    if (std::filesystem::exists(currentPath) && std::filesystem::is_directory(currentPath)) {
+                        for (const auto& entry : std::filesystem::directory_iterator(currentPath)) {
+                            std::string filename = entry.path().filename().string();
+
+                            // 隠しファイルのフィルタリング（先頭が.のファイル）
+                            if (!showHiddenFiles && filename[0] == '.') {
+                                continue;
+                            }
+
+                            if (entry.is_directory()) {
+                                dialogDirs.push_back(filename);
+                            } else if (entry.is_regular_file()) {
+                                std::string ext = entry.path().extension().string();
+                                if (ext == ".png" || ext == ".jpg" || ext == ".jpeg") {
+                                    dialogFiles.push_back(filename);
+                                }
+                            }
+                        }
+
+                        // アルファベット順にソート
+                        std::sort(dialogDirs.begin(), dialogDirs.end());
+                        std::sort(dialogFiles.begin(), dialogFiles.end());
+                    }
+                }
+                catch (const std::exception& e) {
+                    ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "エラー: %s", e.what());
+                }
+
+                needsRefresh = false;
+            }
+
+            // ファイルブラウザ表示部分
+            float listHeight = 300.0f;
+            ImGui::BeginChild("FileBrowser", ImVec2(500, listHeight), true, ImGuiWindowFlags_HorizontalScrollbar);
+
+            // ディレクトリの表示
+            for (const auto& dir : dialogDirs) {
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 0.0f, 1.0f)); // フォルダは黄色で表示
+                if (ImGui::Selectable(("[DIR] " + dir).c_str(), false)) {
+                    // ディレクトリをクリックしたら、そのディレクトリに移動
+                    std::string newPath = std::string(dialogCurrentPath) + "/" + dir;
+                    strncpy_s(dialogCurrentPath, newPath.c_str(), sizeof(dialogCurrentPath) - 1);
+                    needsRefresh = true;
+                }
+                ImGui::PopStyleColor();
+            }
+
+            // テクスチャファイルの表示
+            static std::string selectedFile = "";
+            for (const auto& file : dialogFiles) {
+                bool isSelected = (selectedFile == file);
+                if (ImGui::Selectable(file.c_str(), isSelected)) {
+                    selectedFile = file;
+                    // 選択されたファイルのフルパスを作成
+                    std::string fullPath = std::string(dialogCurrentPath) + "/" + file;
+                    strncpy_s(navigationPath, fullPath.c_str(), sizeof(navigationPath) - 1);
+                }
+
+                // ダブルクリックで選択確定
+                if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)) {
+                    std::string fullPath = std::string(dialogCurrentPath) + "/" + file;
+                    strncpy_s(navigationPath, fullPath.c_str(), sizeof(navigationPath) - 1);
+                    // 選択して閉じる
+                    SetTexture(navigationPath);
                     modified = true;
                     ImGui::CloseCurrentPopup();
                 }
             }
 
-            // 適用ボタン
-            if (ImGui::Button("適用") && strlen(pathBuffer) > 0) {
-                SetTexture(pathBuffer);
-                modified = true;
-                ImGui::CloseCurrentPopup();
+            ImGui::EndChild();
+
+            // 現在選択されているファイルの表示
+            ImGui::Text("選択: %s", navigationPath);
+
+            // ボタン：選択・キャンセル
+            if (ImGui::Button("選択", ImVec2(120, 0))) {
+                if (strlen(navigationPath) > 0) {
+                    SetTexture(navigationPath);
+                    modified = true;
+                    ImGui::CloseCurrentPopup();
+                }
             }
-
             ImGui::SameLine();
-
-            // キャンセルボタン
-            if (ImGui::Button("キャンセル")) {
+            if (ImGui::Button("キャンセル", ImVec2(120, 0))) {
                 ImGui::CloseCurrentPopup();
             }
 
             ImGui::EndPopup();
         }
+    
+
+
+
 
         // テクスチャ座標設定
         Vector2 leftTop = sprite_->GetTextureLeftTop();
@@ -593,7 +697,7 @@ void UIBase::ApplyJSONToState(const nlohmann::json& data) {
             Vector2 size;
             size.x = data["textureSize"]["x"];
             size.y = data["textureSize"]["y"];
-            sprite_->SetTextureSize(size);
+            //sprite_->SetTextureSize(size);
         }
 
         if (data.contains("anchorPoint")) {
