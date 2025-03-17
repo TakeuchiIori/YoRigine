@@ -734,6 +734,9 @@
     <ClInclude Include="Engine\Utility\Systems\UI\UIButton.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="resource.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\shaders\Particle.hlsli" />
@@ -759,5 +762,15 @@
     <FxCompile Include="Resources\Shaders\PostEffect\Smoothing\GaussianFilter.PS.hlsl" />
     <FxCompile Include="Resources\Shaders\PostEffect\OutLine\LuminanceBasedOutLine.PS.hlsl" />
     <FxCompile Include="Resources\Shaders\PostEffect\OutLine\DepthBasedOutLine.PS.hlsl" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="YoRigine.rc">
+      <Filter>リソース ファイル</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="Resources\Textures\icon.ico">
+      <Filter>リソース ファイル</Filter>
+    </Image>
   </ItemGroup>
 </Project>
