@@ -14,28 +14,26 @@ void Sprite::Initialize(const std::string& textureFilePath)
 
 	filePath_ = textureFilePath;
 
-	VertexResource();
-
-	IndexResource();
-
 	MaterialResource();
 
 	TextureManager::GetInstance()->LoadTexture(textureFilePath);
 
 	textureIndex_ = TextureManager::GetInstance()->GetTextureIndexByFilePath(textureFilePath);
 
+	VertexResource();
+	IndexResource();
+
 	AdjustTaxtureSize();
 
 	transform_ = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 
-	
+	CreateVertex();
 }
 
 void Sprite::Update()
 {
 	
-	// スプライトのSRT
-	CreateVertex();
+	
 	transform_.translate = { position_.x,position_.y,position_.z};
 	transform_.rotate = { rotation_.x,rotation_.y,rotation_.z };
 	transform_.scale = { size_.x,size_.y,1.0f };
@@ -85,8 +83,6 @@ void Sprite::VertexResource()
 	vertexBufferView_.SizeInBytes = sizeof(VertexData) * 6;
 	// 1頂点あたりのサイズ
 	vertexBufferView_.StrideInBytes = sizeof(VertexData);
-
-
 }
 
 void Sprite::CreateVertex()

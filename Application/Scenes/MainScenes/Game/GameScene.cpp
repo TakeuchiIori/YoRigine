@@ -233,7 +233,7 @@ void GameScene::DrawObject()
 
 void GameScene::DrawSprite()
 {
-	//sprite_->Draw();
+	sprite_->Draw();
 }
 
 void GameScene::DrawAnimation()
