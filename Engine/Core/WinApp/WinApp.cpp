@@ -57,7 +57,7 @@ void WinApp::Initialize()
 	// カーソル
 	wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
 	// アイコン
-	wc.hIcon = LoadIcon(wc.hInstance, MAKEINTRESOURCE(IDI_ICON1));
+	wc.hIcon = LoadIcon(wc.hInstance, MAKEINTRESOURCE(IDI_ICON1));					/// メインアイコン
 
 	// ウィンドウクラスを登録する
 	RegisterClass(&wc);

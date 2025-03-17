@@ -58,3 +58,7 @@ void ClearScene::Draw()
 #pragma endregion
 
 }
+
+void ClearScene::DrawOffScreen()
+{
+}

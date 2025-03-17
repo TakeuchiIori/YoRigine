@@ -62,6 +62,11 @@ public:
     void Draw() override;
 
     /// <summary>
+    /// オフスクリーンに移したくないものの描画
+    /// </summary>
+    void DrawOffScreen() override;
+
+    /// <summary>
     /// ビュープロジェクション取得
     /// </summary>
     /// <returns></returns>

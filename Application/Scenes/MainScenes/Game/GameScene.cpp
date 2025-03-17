@@ -203,9 +203,16 @@ void GameScene::Draw()
 	SkinningManager::GetInstance()->DrawPreference();
 	LightManager::GetInstance()->SetCommandList();
 	DrawAnimation();
-	DrawLine();
+	
 
 
+
+
+
+}
+
+void GameScene::DrawOffScreen()
+{
 	//----------
 	// Particle
 	//----------
@@ -217,6 +224,10 @@ void GameScene::Draw()
 	SpriteCommon::GetInstance()->DrawPreference();
 	DrawSprite();
 
+	//----------
+	// Line
+	//----------
+	DrawLine();
 
 }
 
@@ -239,7 +250,7 @@ void GameScene::DrawObject()
 
 void GameScene::DrawSprite()
 {
-	sprite_->Draw();
+	//sprite_->Draw();
 	uiBase_->Draw();
 	uiSub_->Draw();
 }
