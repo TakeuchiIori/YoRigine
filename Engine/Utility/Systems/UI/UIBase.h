@@ -10,7 +10,15 @@
 #include "Vector2.h"
 #include "Vector3.h"
 #include "Vector4.h"
-#include "json.hpp" // nlohmann jsonライブラリを使用
+#include "json.hpp" 
+
+#include <filesystem>
+#include <algorithm>
+#include <vector>
+#include <string>
+
+// Windows APIを使用する場合
+#include <Windows.h>
 
 // 前方宣言
 class SpriteCommon;
@@ -28,6 +36,8 @@ public:
     // コア機能
     virtual void Update();
     virtual void Draw();
+
+    void ImGUi();
 
     // ホットリロード機能
     void EnableHotReload(bool enable);
@@ -70,11 +80,11 @@ public:
     bool GetFlipY() const;
 
     // 基盤となるスプライトポインタを返す
-    Sprite* GetSprite() { return sprite_.get(); }
+    Sprite* GetSprite() { return sprite_; }
 
 protected:
     // 基盤となるスプライト
-    std::unique_ptr<Sprite> sprite_;
+    Sprite* sprite_;
 
     // 設定ファイルパス
     std::string configPath_;
@@ -88,6 +98,9 @@ protected:
 
     // ホットリロード設定
     bool hotReloadEnabled_;
+
+    bool showFileBrowser = false;
+    std::string currentDir;
 
     // JSONヘルパー
     nlohmann::json CreateJSONFromCurrentState();

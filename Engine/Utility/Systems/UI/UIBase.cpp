@@ -5,16 +5,21 @@
 #include <thread>
 #include "Sprite/SpriteCommon.h"
 
+#ifdef _DEBUG
+#include <imgui.h>
+#endif // _DEBUG
+
+
 UIBase::UIBase() :
     sprite_(nullptr),
     hotReloadEnabled_(false),
-    name_("UIElement") {
+    name_("UIBase") {
 }
 
 UIBase::~UIBase() {
     // 設定パスがある場合は現在の状態を保存
     if (!configPath_.empty()) {
-        SaveToJSON();
+       // SaveToJSON();
     }
 }
 
@@ -22,13 +27,21 @@ void UIBase::Initialize(const std::string& jsonConfigPath) {
     configPath_ = jsonConfigPath;
 
     // スプライトを作成
-    sprite_ = std::make_unique<Sprite>();
+    sprite_ = new Sprite ();
 
-    // まずJSONからの読み込みを試みる
-    if (!LoadFromJSON(jsonConfigPath)) {
-        // JSONの読み込みに失敗した場合はデフォルト初期化
-        sprite_->Initialize("./Assets/Images/default.png");
-        texturePath_ = "./Assets/Images/default.png";
+    // JSONファイルが存在するか確認
+    bool jsonExists = std::filesystem::exists(jsonConfigPath);
+
+    if (jsonExists) {
+        // JSONファイルが存在する場合は読み込み
+        LoadFromJSON(jsonConfigPath);
+    } else {
+        // JSONファイルが存在しない場合はデフォルト初期化
+        sprite_->Initialize("./Resources/images/white.png");
+        texturePath_ = "./Resources/images/white.png";
+
+        // デフォルト設定でJSONファイルを作成
+        SaveToJSON();
     }
 
     // ホットリロード用に初期ファイル更新時間を保存
@@ -36,6 +49,7 @@ void UIBase::Initialize(const std::string& jsonConfigPath) {
         lastModTime_ = std::filesystem::last_write_time(configPath_);
     }
 }
+
 
 void UIBase::Update() {
     // ホットリロードが有効な場合はJSONファイルの変更を確認
@@ -47,11 +61,197 @@ void UIBase::Update() {
     if (sprite_) {
         sprite_->Update();
     }
+
+#ifdef _DEBUG
+    ImGUi();
+#endif // _DEBUG
+
 }
 
 void UIBase::Draw() {
     if (sprite_) {
         sprite_->Draw();
+    }
+}
+
+void UIBase::ImGUi() {
+    if (!sprite_) return;
+
+    bool modified = false;  // 変更があったかどうかを追跡するフラグ
+
+    // UI名前設定
+    char nameBuffer[256];
+    strncpy_s(nameBuffer, name_.c_str(), sizeof(nameBuffer) - 1);
+    nameBuffer[sizeof(nameBuffer) - 1] = '\0';
+    if (ImGui::InputText("名前", nameBuffer, sizeof(nameBuffer))) {
+        name_ = nameBuffer;
+        modified = true;
+    }
+
+    // トランスフォーム設定
+    if (ImGui::CollapsingHeader("変形", ImGuiTreeNodeFlags_DefaultOpen)) {
+       
+        // スケール設定
+        Vector2 scale = GetScale();
+        if (ImGui::DragFloat2("拡大縮小", &scale.x, 0.1f)) {
+            SetScale(scale);
+            modified = true;
+        }
+        
+        // 回転設定
+        Vector3 rotation = GetRotation();
+        if (ImGui::DragFloat3("回転", &rotation.x, 0.1f)) {
+            SetRotation(rotation);
+            modified = true;
+        }
+
+        // 位置設定
+        Vector3 position = GetPosition();
+        if (ImGui::DragFloat3("位置", &position.x, 1.0f)) {
+            SetPosition(position);
+            modified = true;
+        }
+    }
+
+    // 外観設定
+    if (ImGui::CollapsingHeader("外観", ImGuiTreeNodeFlags_DefaultOpen)) {
+        // 色設定（RGBA）
+        Vector4 color = GetColor();
+        if (ImGui::ColorEdit4("色", &color.x)) {
+            SetColor(color);
+            modified = true;
+        }
+
+        // X軸反転設定
+        bool flipX = GetFlipX();
+        if (ImGui::Checkbox("X軸反転", &flipX)) {
+            SetFlipX(flipX);
+            modified = true;
+        }
+
+        ImGui::SameLine();
+
+        // Y軸反転設定
+        bool flipY = GetFlipY();
+        if (ImGui::Checkbox("Y軸反転", &flipY)) {
+            SetFlipY(flipY);
+            modified = true;
+        }
+    }
+
+    // テクスチャ設定
+    if (ImGui::CollapsingHeader("テクスチャ", ImGuiTreeNodeFlags_DefaultOpen)) {
+        // 現在のテクスチャパスを表示
+        ImGui::Text("現在のテクスチャ: %s", texturePath_.c_str());
+
+        // テクスチャファイル選択ボタン
+        if (ImGui::Button("テクスチャ変更...")) {
+            // 注意: これはファイルダイアログのプレースホルダーです
+            // 実際の実装では、ファイルダイアログライブラリを統合する必要があります
+            // 例: ImGuiFileDialog, tinyfiledialogs, nativefiledialog など
+
+            // 例として、新しいパスを取得したと仮定します:
+            // std::string newTexturePath = ShowFileOpenDialog("*.png,*.jpg");
+            // if (!newTexturePath.empty()) {
+            //     SetTexture(newTexturePath);
+            //     modified = true;
+            // }
+
+            // 代替として手動入力を有効にします
+            ImGui::OpenPopup("TexturePathPopup");
+        }
+
+        // テクスチャパス手動入力ポップアップ
+        if (ImGui::BeginPopup("TexturePathPopup")) {
+            static char pathBuffer[512] = "";
+            ImGui::Text("テクスチャパス:");
+            if (ImGui::InputText("##TexturePath", pathBuffer, sizeof(pathBuffer), ImGuiInputTextFlags_EnterReturnsTrue)) {
+                if (strlen(pathBuffer) > 0) {
+                    SetTexture(pathBuffer);
+                    modified = true;
+                    ImGui::CloseCurrentPopup();
+                }
+            }
+
+            // 適用ボタン
+            if (ImGui::Button("適用") && strlen(pathBuffer) > 0) {
+                SetTexture(pathBuffer);
+                modified = true;
+                ImGui::CloseCurrentPopup();
+            }
+
+            ImGui::SameLine();
+
+            // キャンセルボタン
+            if (ImGui::Button("キャンセル")) {
+                ImGui::CloseCurrentPopup();
+            }
+
+            ImGui::EndPopup();
+        }
+
+        // テクスチャ座標設定
+        Vector2 leftTop = sprite_->GetTextureLeftTop();
+        if (ImGui::DragFloat2("左上座標", &leftTop.x, 1.0f)) {
+            sprite_->SetTextureLeftTop(leftTop);
+            modified = true;
+        }
+
+        // テクスチャサイズ設定
+        Vector2 size = sprite_->GetTextureSize();
+        if (ImGui::DragFloat2("テクスチャサイズ", &size.x, 1.0f)) {
+            sprite_->SetTextureSize(size);
+            modified = true;
+        }
+
+        // アンカーポイント設定（0.0〜1.0の範囲）
+        Vector2 anchor = sprite_->GetAnchorPoint();
+        if (ImGui::DragFloat2("アンカーポイント", &anchor.x, 0.01f, 0.0f, 1.0f)) {
+            sprite_->SetAnchorPoint(anchor);
+            modified = true;
+        }
+    }
+
+    // ホットリロード設定
+    bool hotReload = hotReloadEnabled_;
+    if (ImGui::Checkbox("ホットリロード", &hotReload)) {
+        EnableHotReload(hotReload);
+    }
+
+    // 区切り線
+    ImGui::Separator();
+
+    // 変更保存ボタン
+    if (ImGui::Button("変更を保存")) {
+        if (SaveToJSON()) {
+            ImGui::OpenPopup("SaveSuccessPopup");
+        } else {
+            ImGui::OpenPopup("SaveFailedPopup");
+        }
+    }
+
+    // 保存成功ポップアップ
+    if (ImGui::BeginPopupModal("SaveSuccessPopup", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Text("設定が正常に保存されました。");
+        if (ImGui::Button("OK")) {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
+    // 保存失敗ポップアップ
+    if (ImGui::BeginPopupModal("SaveFailedPopup", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Text("設定の保存に失敗しました。");
+        if (ImGui::Button("OK")) {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
+    // 変更があったことを視覚的に通知（オプション）
+    if (modified) {
+        ImGui::SameLine();
+        ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "* 未保存の変更があります");
     }
 }
 
@@ -108,6 +308,14 @@ bool UIBase::SaveToJSON(const std::string& jsonPath) {
     }
 
     try {
+        // 保存先ディレクトリが存在するか確認
+        std::filesystem::path dirPath = std::filesystem::path(savePath).parent_path();
+
+        // ディレクトリが存在しない場合は作成
+        if (!dirPath.empty() && !std::filesystem::exists(dirPath)) {
+            std::filesystem::create_directories(dirPath);
+        }
+
         // 現在の状態からJSONを作成
         nlohmann::json data = CreateJSONFromCurrentState();
 
@@ -123,7 +331,7 @@ bool UIBase::SaveToJSON(const std::string& jsonPath) {
         return true;
     }
     catch (const std::exception& e) {
-        // エラーをログに記録（あなたのロギングシステムに置き換えてください）
+        // エラーをログに記録
         printf("JSONへのUI保存中にエラー発生: %s\n", e.what());
         return false;
     }
@@ -310,17 +518,18 @@ void UIBase::ApplyJSONToState(const nlohmann::json& data) {
 
         // スプライトがまだ作成されていない場合は初期化
         if (!sprite_) {
-            sprite_ = std::make_unique<Sprite>();
+            sprite_ = new Sprite();
             sprite_->Initialize(texturePath_);
         } else {
             // すでにある場合はテクスチャを変更
-            sprite_->ChangeTexture(texturePath_);
+            sprite_->Initialize(texturePath_);
+            //sprite_->ChangeTexture(texturePath_);
         }
     } else if (!sprite_) {
         // テクスチャが指定されていない場合はデフォルトテクスチャで初期化
-        sprite_ = std::make_unique<Sprite>();
-        sprite_->Initialize("./Assets/Images/default.png");
-        texturePath_ = "./Assets/Images/default.png";
+        sprite_ = new Sprite();
+        sprite_->Initialize("./Resources/images/white.png");
+        texturePath_ = "./Resources/images/white.png";
     }
 
     // 名前

@@ -24,6 +24,7 @@
 #include "Ground/Ground.h"
 #include "../Transitions/Fade/Fade.h"
 #include "Systems/MapChip/MapChipInfo.h"
+#include "Systems/UI/UIBase.h"
 
 // Math
 #include "Vector3.h"
@@ -196,6 +197,7 @@ private:
     bool isClear_ = false;
 
     std::unique_ptr<MapChipInfo> mpInfo_;
+	std::unique_ptr<UIBase> uiBase_;
 
 private:
     /*=================================================================

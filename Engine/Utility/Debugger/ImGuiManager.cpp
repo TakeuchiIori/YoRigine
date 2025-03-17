@@ -227,7 +227,7 @@ void ImGuiManager::CustomizeEditor()
 		0x4E00, 0x9FAF,  // CJK Ideographs
 		0,
 	};
-	io.Fonts->AddFontFromFileTTF("Resources/Fonts/FiraMono-Medium.ttf", 14.0f, &config, ranges);
+	io.Fonts->AddFontFromFileTTF("Resources/Fonts/ipaexg.ttf", 14.0f, &config, ranges);
 #endif;
 }
 

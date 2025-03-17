@@ -27,12 +27,13 @@ void Sprite::Initialize(const std::string& textureFilePath)
 
 	transform_ = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 
-	CreateVertex();
+	
 }
 
 void Sprite::Update()
 {
-	
+	/// ※アンカーポイントを考慮するため更新内にある
+	CreateVertex();
 	
 	transform_.translate = { position_.x,position_.y,position_.z};
 	transform_.rotate = { rotation_.x,rotation_.y,rotation_.z };
@@ -69,18 +70,18 @@ void Sprite::Draw()
 	// SRVの設定
 	srvManagaer_->SetGraphicsRootDescriptorTable(2, textureIndex_);
 	// 描画！！！DrawCall/ドローコール）
-	spriteCommon_->GetDxCommon()->GetCommandList()->DrawIndexedInstanced(6, 1, 0, 0, 0);
+	spriteCommon_->GetDxCommon()->GetCommandList()->DrawIndexedInstanced(numVertices_, 1, 0, 0, 0);
 }
 
 
 void Sprite::VertexResource()
 {
 	// リソース
-	vertexResource_ = spriteCommon_->GetDxCommon()->CreateBufferResource(sizeof(VertexData) * 6);
+	vertexResource_ = spriteCommon_->GetDxCommon()->CreateBufferResource(sizeof(VertexData) * numVertices_);
 	// リソースの先頭アドレスから使う
 	vertexBufferView_.BufferLocation = vertexResource_->GetGPUVirtualAddress();
 	// 使用するリソースサイズは頂点3つ分のサイズ
-	vertexBufferView_.SizeInBytes = sizeof(VertexData) * 6;
+	vertexBufferView_.SizeInBytes = sizeof(VertexData) * numVertices_;
 	// 1頂点あたりのサイズ
 	vertexBufferView_.StrideInBytes = sizeof(VertexData);
 }
@@ -168,11 +169,11 @@ void Sprite::CreateVertex()
 void Sprite::IndexResource()
 {
 	// リソース
-	indexResource_ = spriteCommon_->GetDxCommon()->CreateBufferResource(sizeof(uint32_t) * 6);
+	indexResource_ = spriteCommon_->GetDxCommon()->CreateBufferResource(sizeof(uint32_t) * numVertices_);
 	// リソースの先頭アドレスから使う
 	indexBufferView_.BufferLocation = indexResource_->GetGPUVirtualAddress();
 	// 使用するリソースサイズはもとの頂点のサイズ
-	indexBufferView_.SizeInBytes = sizeof(uint32_t) * 6;
+	indexBufferView_.SizeInBytes = sizeof(uint32_t) * numVertices_;
 	// インデックスはuint32_tとする
 	indexBufferView_.Format = DXGI_FORMAT_R32_UINT;
 

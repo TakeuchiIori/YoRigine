@@ -1,0 +1,38 @@
+{
+    "anchorPoint": {
+        "x": 0.0,
+        "y": 0.0
+    },
+    "color": {
+        "a": 1.0,
+        "b": 1.0,
+        "g": 1.0,
+        "r": 1.0
+    },
+    "flipX": false,
+    "flipY": false,
+    "name": "UIBase",
+    "position": {
+        "x": 246.0,
+        "y": 169.0,
+        "z": 0.0
+    },
+    "rotation": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 6.599999904632568
+    },
+    "scale": {
+        "x": 292.29998779296875,
+        "y": 282.70001220703125
+    },
+    "textureLeftTop": {
+        "x": 0.0,
+        "y": 0.0
+    },
+    "texturePath": "Resources/images/white.png",
+    "textureSize": {
+        "x": 16.0,
+        "y": 16.0
+    }
+}
