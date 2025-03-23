@@ -70,7 +70,7 @@ void DebugCamera::UpdateInput()
         float deltaY = currentMousePos.y - prevMousePos_.y;
 
         // 移動量に応じてカメラの位置を変更
-        Vector3 moveDelta = { -deltaX * moveSpeed_ * 0.1f, deltaY * moveSpeed_ * 0.1f, 0.0f };
+        Vector3 moveDelta = { -deltaX * moveSpeed_ * 0.1f, 0.0f, deltaY * moveSpeed_ * 0.1f };
 
         // カメラの回転に応じた移動ベクトルを計算
         Matrix4x4 rotMat = MakeRotateMatrixXYZ(rotate_);
