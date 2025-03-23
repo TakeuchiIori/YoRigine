@@ -120,9 +120,10 @@ void GameScene::Initialize()
 /// </summary>
 void GameScene::Update()
 {
-	if (Input::GetInstance()->TriggerKey(DIK_RETURN) || Input::GetInstance()->IsPadTriggered(0,GamePadButton::RT)) {
-		isDebugCamera_ = true;
+	if (Input::GetInstance()->TriggerKey(DIK_RETURN) || Input::GetInstance()->IsPadTriggered(0, GamePadButton::RT)) {
+		isDebugCamera_ = !isDebugCamera_;  // 現在の状態を反転
 	}
+
 
 	//particleEmitter_[0]->SetPosition(player_->GetPosition());
 
