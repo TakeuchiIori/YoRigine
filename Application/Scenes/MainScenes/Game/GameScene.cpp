@@ -120,7 +120,7 @@ void GameScene::Initialize()
 /// </summary>
 void GameScene::Update()
 {
-	if (Input::GetInstance()->TriggerKey(DIK_RETURN) || Input::GetInstance()->IsPadTriggered(0, GamePadButton::RT)) {
+	if (Input::GetInstance()->TriggerKey(DIK_LCONTROL) || Input::GetInstance()->IsPadTriggered(0, GamePadButton::RT)) {
 		isDebugCamera_ = !isDebugCamera_;  // 現在の状態を反転
 	}
 
