@@ -26,17 +26,21 @@
 #include "Systems/MapChip/MapChipInfo.h"
 #include "Systems/UI/UIBase.h"
 
-// Math
-#include "Vector3.h"
+// Cameras
+#include "../../../SystemsApp/Cameras/DebugCamera/DebugCamera.h"
 #include "../../../SystemsApp/Cameras/FollowCamera/FollowCamera.h"
 #include "../../../SystemsApp/Cameras/TopDownCamera/TopDownCamera.h"
+
+// Math
+#include "Vector3.h"
+
 #include <Enemy/EnemyManager.h>
 
 enum class CameraMode {
     DEFAULT,
     FOLLOW,
     TOP_DOWN,
-    FPS
+    DEBUG
 };
 
 class GameScene : public BaseScene {
@@ -143,7 +147,8 @@ private:
     CameraManager cameraManager_;
     FollowCamera followCamera_;
     TopDownCamera topDownCamera_;
-
+	DebugCamera debugCamera_;
+	bool isDebugCamera_ = false;
     /*=================================================================
 
                                サウンド関連

@@ -116,6 +116,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Application\SystemsApp\Cameras\DebugCamera\DebugCamera.cpp" />
     <ClCompile Include="Engine\Utility\Loaders\Model\AnimationSystem.cpp" />
     <ClCompile Include="Application\Objects\Enemy\Enemy.cpp" />
     <ClCompile Include="Application\Objects\Enemy\EnemyManager.cpp" />
@@ -195,6 +196,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="Engine\Utility\Systems\UI\UIButton.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Application\SystemsApp\Cameras\DebugCamera\DebugCamera.h" />
     <ClInclude Include="Engine\Utility\Loaders\Model\AnimationSystem.h" />
     <ClInclude Include="Application\Objects\Enemy\Enemy.h" />
     <ClInclude Include="Application\Objects\Enemy\EnemyManager.h" />

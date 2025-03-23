@@ -56,6 +56,7 @@ void GameScene::Initialize()
 	mpInfo_->SetCamera(sceneCamera_.get());
 
 	followCamera_.Initialize();
+	debugCamera_.Initialize();
 	// 各オブジェクトの初期化
 	player_ = std::make_unique<Player>(mpInfo_->GetMapChipField());
 	player_->Initialize(sceneCamera_.get());
@@ -119,7 +120,9 @@ void GameScene::Initialize()
 /// </summary>
 void GameScene::Update()
 {
-
+	if (Input::GetInstance()->TriggerKey(DIK_RETURN) || Input::GetInstance()->IsPadTriggered(0,GamePadButton::RT)) {
+		isDebugCamera_ = true;
+	}
 
 	//particleEmitter_[0]->SetPosition(player_->GetPosition());
 
@@ -137,7 +140,9 @@ void GameScene::Update()
 	// スポーンタイマーを更新
 
 	// objの更新
+	if (!isDebugCamera_) {
 	player_->Update();
+	}
 	player_->JsonImGui();
 	//followCamera_.JsonImGui();
 
@@ -299,8 +304,8 @@ void GameScene::UpdateCameraMode()
 	if (ImGui::Button("Top-Down Camera")) {
 		cameraMode_ = CameraMode::TOP_DOWN;
 	}
-	if (ImGui::Button("FPS Camera")) {
-		cameraMode_ = CameraMode::FPS;
+	if (ImGui::Button("Debug Camera")) {
+		cameraMode_ = CameraMode::DEBUG;
 	}
 	ImGui::End();
 #endif
@@ -340,9 +345,16 @@ void GameScene::UpdateCamera()
 		sceneCamera_->UpdateMatrix();
 	}
 	break;
-	case CameraMode::FPS:
+	case CameraMode::DEBUG:
 	{
-
+		if (isDebugCamera_) {
+			sceneCamera_->SetFovY(debugCamera_.GetFov());
+			debugCamera_.Update();
+			sceneCamera_->viewMatrix_ = debugCamera_.matView_;
+			sceneCamera_->transform_.translate = debugCamera_.translate_;
+			sceneCamera_->transform_.rotate = debugCamera_.rotate_;
+			sceneCamera_->UpdateMatrix();
+		}
 	}
 	break;
 
