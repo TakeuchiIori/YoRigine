@@ -113,7 +113,7 @@ private:
     /// </summary>
     void ShowImGui();
 
-    void CheckAllCollisions();
+    //void CheckAllCollisions();
 
 private:
     /// <summary>

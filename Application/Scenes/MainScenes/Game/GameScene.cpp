@@ -136,7 +136,7 @@ void GameScene::Update()
 
 	// パーティクル更新
 	mpInfo_->Update();
-	CheckAllCollisions();
+	//CheckAllCollisions();
 	CollisionManager::GetInstance()->UpdateWorldTransform();
 	// スポーンタイマーを更新
 
@@ -396,24 +396,24 @@ void GameScene::ShowImGui()
 #endif // _DEBUG
 }
 
-void GameScene::CheckAllCollisions() {
-
-	// 衝突マネージャーのリセット
-	CollisionManager::GetInstance()->Reset();
-
-	// コライダーをリストに登録
-	CollisionManager::GetInstance()->AddCollider(player_.get());
-
-	// コライダーリストに登録
-	CollisionManager::GetInstance()->AddCollider(player_->GetPlayerWeapon());
-
-
-	// CollisionManager::GetInstance()->AddCollider(enemy_.get());
-
-	 // 衝突判定と応答
-	CollisionManager::GetInstance()->CheckAllCollisions();
-
-}
+//void GameScene::CheckAllCollisions() {
+//
+//	// 衝突マネージャーのリセット
+//	CollisionManager::GetInstance()->Reset();
+//
+//	// コライダーをリストに登録
+//	CollisionManager::GetInstance()->AddCollider(player_.get());
+//
+//	// コライダーリストに登録
+//	CollisionManager::GetInstance()->AddCollider(player_->GetPlayerWeapon());
+//
+//
+//	// CollisionManager::GetInstance()->AddCollider(enemy_.get());
+//
+//	 // 衝突判定と応答
+//	CollisionManager::GetInstance()->CheckAllCollisions();
+//
+//}
 
 void GameScene::InitializeOcclusionQuery()
 {

@@ -29,8 +29,6 @@ public:
 	/// </summary>
 	void DrawLine();
 
-	void ClearVertices();
-
 	/// <summary>
 	/// 頂点を作成
 	/// </summary>

@@ -16,7 +16,7 @@ using json = nlohmann::json;
 #include <Collision/ContactRecord.h>
 #include <Collision/Effect.h>
 
-class PlayerWeapon final : public Collider
+class PlayerWeapon
 {
 public:
 	//==========================================================================//
@@ -176,22 +176,22 @@ private:
 
 public: // ポリモーフィズム
 
-	/// <summary>
-	/// 衝突を検出したら呼び出されるコールバック関数
-	/// </summary>
-	void OnCollision([[maybe_unused]] Collider* other) override;
+	///// <summary>
+	///// 衝突を検出したら呼び出されるコールバック関数
+	///// </summary>
+	//void OnCollision([[maybe_unused]] Collider* other) override;
 
-	/// <summary>
-	/// 中心座標を取得
-	/// </summary>
-	/// <returns></returns>
-	Vector3 GetCenterPosition() const override;
+	///// <summary>
+	///// 中心座標を取得
+	///// </summary>
+	///// <returns></returns>
+	//Vector3 GetCenterPosition() const override;
 
-	/// <summary>
-	/// 
-	/// </summary>
-	/// <returns></returns>
-	Matrix4x4 GetWorldMatrix() const override;
+	///// <summary>
+	///// 
+	///// </summary>
+	///// <returns></returns>
+	//Matrix4x4 GetWorldMatrix() const override;
 
 	void ApplyGlobalVariables();
 

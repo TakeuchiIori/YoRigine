@@ -50,7 +50,7 @@ void Enemy::Initialize(Camera* camera, const Vector3& pos)
    // GlobalVariables::GetInstance()->CreateGroup(groupName);
    // Collider::Initialize();
     // TypeIDの設定
-    Collider::SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kEnemy));
+    //Collider::SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kEnemy));
 
     isActive_ = true;
     isAlive_ = true;
@@ -146,48 +146,48 @@ void Enemy::ShowCoordinatesImGui()
 
 }
 
-void Enemy::OnCollision(Collider* other)
-{
-    // 衝突相手の種別IDを取得
-    uint32_t typeID = other->GetTypeID();
-    // 衝突相手が武器かプレイヤーなら
-    if (typeID == static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon)) {
-
-        isHit_ = true;
-		base_->SetMaterialColor({ 1.0f, 0.0f, 0.0f, 1.0f });
-        hp_ -= 2;
-        if (hp_ <= 0) {
-            isAlive_ = false;
-            isActive_ = false;  // 完全に無効化
-        }
-		isShake_ = true;
-
-        HitStop::GetInstance()->Start("Player", HitStop::HitStopType::Heavy);
-    }
-
-    
-
-}
-
-Vector3 Enemy::GetCenterPosition() const
-{
-    // ローカル座標でのオフセット
-    const Vector3 offset = { 0.0f, 0.0f, 0.0f };
-    // ワールド座標に変換
-    Vector3 worldPos = TransformCoordinates(offset, worldTransform_.matWorld_);
-
-    return worldPos;
-}
-
-Matrix4x4 Enemy::GetWorldMatrix() const
-{
-    return worldTransform_.matWorld_;
-}
-
-void Enemy::EnemyAllHitStop()
-{
-    enemyManager_->ApplyHitStopToAllEnemies(HitStop::HitStopType::Heavy);
-}
+//void Enemy::OnCollision(Collider* other)
+//{
+//    // 衝突相手の種別IDを取得
+//    uint32_t typeID = other->GetTypeID();
+//    // 衝突相手が武器かプレイヤーなら
+//    if (typeID == static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon)) {
+//
+//        isHit_ = true;
+//		base_->SetMaterialColor({ 1.0f, 0.0f, 0.0f, 1.0f });
+//        hp_ -= 2;
+//        if (hp_ <= 0) {
+//            isAlive_ = false;
+//            isActive_ = false;  // 完全に無効化
+//        }
+//		isShake_ = true;
+//
+//        HitStop::GetInstance()->Start("Player", HitStop::HitStopType::Heavy);
+//    }
+//
+//    
+//
+//}
+//
+//Vector3 Enemy::GetCenterPosition() const
+//{
+//    // ローカル座標でのオフセット
+//    const Vector3 offset = { 0.0f, 0.0f, 0.0f };
+//    // ワールド座標に変換
+//    Vector3 worldPos = TransformCoordinates(offset, worldTransform_.matWorld_);
+//
+//    return worldPos;
+//}
+//
+//Matrix4x4 Enemy::GetWorldMatrix() const
+//{
+//    return worldTransform_.matWorld_;
+//}
+//
+//void Enemy::EnemyAllHitStop()
+//{
+//    enemyManager_->ApplyHitStopToAllEnemies(HitStop::HitStopType::Heavy);
+//}
 
 void Enemy::Move() {
     // デルタタイムの取得

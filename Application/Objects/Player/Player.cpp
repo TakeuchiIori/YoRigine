@@ -40,8 +40,8 @@ void Player::Initialize(Camera* camera)
 	weapon_->SetParent(worldTransform_);
 
 	// TypeIDの設定
-	Collider::SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayer));
-	Collider::SetRadiusFloat(2.0f);
+	//Collider::SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayer));
+	//Collider::SetRadiusFloat(2.0f);
 
 	particleEmitter_ = std::make_unique<ParticleEmitter>("Player", worldTransform_.translation_, 5);
     particleEmitter_->Initialize();
@@ -506,37 +506,37 @@ void Player::JsonImGui()
 	
 }
 
-void Player::OnCollision(Collider* other)
-{
-	// 衝突相手の種別IDを取得
-	uint32_t typeID = other->GetTypeID();
-	// 衝突相手が敵なら
-	if (typeID == static_cast<uint32_t>(CollisionTypeIdDef::kEnemy)) {
-		//isColliding_ = true;
-
-		hp_--;
-		if (hp_ <= 0) {
-			isAlive_ = false;
-		}
-	}
-
-}
-
-Vector3 Player::GetCenterPosition() const
-{
-	// ローカル座標でのオフセット
-	const Vector3 offset = { 0.0f, 0.0f, 0.0f };
-	// ワールド座標に変換
-	Vector3 worldPos = TransformCoordinates(offset, worldTransform_.matWorld_);
-
-	return worldPos;
-}
-
-Matrix4x4 Player::GetWorldMatrix() const
-{
-	return worldTransform_.matWorld_;
-}
-void Player::ApplyGlobalVariables() {
-
-
-}
+//void Player::OnCollision(Collider* other)
+//{
+//	// 衝突相手の種別IDを取得
+//	uint32_t typeID = other->GetTypeID();
+//	// 衝突相手が敵なら
+//	if (typeID == static_cast<uint32_t>(CollisionTypeIdDef::kEnemy)) {
+//		//isColliding_ = true;
+//
+//		hp_--;
+//		if (hp_ <= 0) {
+//			isAlive_ = false;
+//		}
+//	}
+//
+//}
+//
+//Vector3 Player::GetCenterPosition() const
+//{
+//	// ローカル座標でのオフセット
+//	const Vector3 offset = { 0.0f, 0.0f, 0.0f };
+//	// ワールド座標に変換
+//	Vector3 worldPos = TransformCoordinates(offset, worldTransform_.matWorld_);
+//
+//	return worldPos;
+//}
+//
+//Matrix4x4 Player::GetWorldMatrix() const
+//{
+//	return worldTransform_.matWorld_;
+//}
+//void Player::ApplyGlobalVariables() {
+//
+//
+//}

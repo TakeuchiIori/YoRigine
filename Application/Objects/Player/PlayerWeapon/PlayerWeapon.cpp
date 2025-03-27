@@ -89,12 +89,12 @@ void PlayerWeapon::Initialize()
 #pragma endregion
 
 
-	// グループを追加
-	Collider::Initialize();
-	//
-	SaveGlobalVariables();
-	// TypeIDの設定
-	Collider::SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon));
+	//// グループを追加
+	//Collider::Initialize();
+	////
+	//SaveGlobalVariables();
+	//// TypeIDの設定
+	//Collider::SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon));
 }
 
 void PlayerWeapon::SaveGlobalVariables() {
@@ -163,12 +163,12 @@ void PlayerWeapon::Update()
 	// 全状態の更新処理
 	UpdateState();
 
-	if (state_ != PlayerWeapon::WeaponState::Idle && state_ != PlayerWeapon::WeaponState::Cooldown) {
-		Collider::SetRadiusFloat(2.0f);
-	}
-	else {
-		Collider::SetRadiusFloat(0.0f);
-	}
+	//if (state_ != PlayerWeapon::WeaponState::Idle && state_ != PlayerWeapon::WeaponState::Cooldown) {
+	//	Collider::SetRadiusFloat(2.0f);
+	//}
+	//else {
+	//	Collider::SetRadiusFloat(0.0f);
+	//}
 
 
 
@@ -667,52 +667,52 @@ void PlayerWeapon::UpdateCooldown(float deltaTime)
 	}
 }
 
-void PlayerWeapon::OnCollision(Collider* other)
-{
-	// 衝突相手の種別IDを取得
-	uint32_t typeID = other->GetTypeID();
-	// 衝突相手が敵なら
-	if (typeID == static_cast<uint32_t>(CollisionTypeIdDef::kEnemy)) {
-
-		Enemy* enemy = static_cast<Enemy*>(other);
-		uint32_t serialNumber = enemy->GetSerialNumber();
-		// 接触履歴があれば何もせずに抜ける
-		if (contactRecord_.CheckHistory(serialNumber)) {
-			return;
-		}
-		// 接触履歴に登録
-		contactRecord_.record(serialNumber);
-
-		// 敵の位置にエフェクトを発生させる
-		Effect* effect = new Effect();
-		effect->Initialize();
-		effect->SetWorldTransform(enemy->GetWorldTransform());
-		effect->Update();
-		effects_.push_back(effect);
-
-		if (state_ == WeaponState::Dashing || state_ == WeaponState::JumpAttack) {
-			enemy->EnemyAllHitStop();
-		}
-
-		
-	}
-
-}
-
-Vector3 PlayerWeapon::GetCenterPosition() const
-{
-	// ローカル座標でのオフセット
-	const Vector3 offset = { 0.0f, 0.0f, 0.0f };
-	// ワールド座標に変換
-	Vector3 worldPos = TransformCoordinates(offset, worldTransform_.matWorld_);
-
-	return worldPos;
-}
-
-Matrix4x4 PlayerWeapon::GetWorldMatrix() const
-{
-	return worldTransform_.matWorld_;
-}
+//void PlayerWeapon::OnCollision(Collider* other)
+//{
+//	// 衝突相手の種別IDを取得
+//	uint32_t typeID = other->GetTypeID();
+//	// 衝突相手が敵なら
+//	if (typeID == static_cast<uint32_t>(CollisionTypeIdDef::kEnemy)) {
+//
+//		Enemy* enemy = static_cast<Enemy*>(other);
+//		uint32_t serialNumber = enemy->GetSerialNumber();
+//		// 接触履歴があれば何もせずに抜ける
+//		if (contactRecord_.CheckHistory(serialNumber)) {
+//			return;
+//		}
+//		// 接触履歴に登録
+//		contactRecord_.record(serialNumber);
+//
+//		// 敵の位置にエフェクトを発生させる
+//		Effect* effect = new Effect();
+//		effect->Initialize();
+//		effect->SetWorldTransform(enemy->GetWorldTransform());
+//		effect->Update();
+//		effects_.push_back(effect);
+//
+//		if (state_ == WeaponState::Dashing || state_ == WeaponState::JumpAttack) {
+//			enemy->EnemyAllHitStop();
+//		}
+//
+//		
+//	}
+//
+//}
+//
+//Vector3 PlayerWeapon::GetCenterPosition() const
+//{
+//	// ローカル座標でのオフセット
+//	const Vector3 offset = { 0.0f, 0.0f, 0.0f };
+//	// ワールド座標に変換
+//	Vector3 worldPos = TransformCoordinates(offset, worldTransform_.matWorld_);
+//
+//	return worldPos;
+//}
+//
+//Matrix4x4 PlayerWeapon::GetWorldMatrix() const
+//{
+//	return worldTransform_.matWorld_;
+//}
 
 void PlayerWeapon::ApplyGlobalVariables() {
 	GlobalVariables* globalVariables = GlobalVariables::GetInstance();
