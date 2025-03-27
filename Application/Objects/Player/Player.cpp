@@ -56,7 +56,7 @@ void Player::Initialize(Camera* camera)
 void Player::Update()
 {
 	if (!isUpdate_) {
-		ApplyGlobalVariables();
+		//ApplyGlobalVariables();
 	}
 
 
