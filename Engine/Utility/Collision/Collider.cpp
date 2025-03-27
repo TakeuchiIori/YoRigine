@@ -1,10 +1,11 @@
 #include "Collider.h"
+#include "CollisionManager.h"
 // Engine
 
 
 void Collider::Initialize() {
 	worldTransform_.Initialize();
-	//CollisionManager::GetInstance()->AddCollider(this);
+	CollisionManager::GetInstance()->AddCollider(this);
 }
 
 void Collider::UpdateWorldTransform() {

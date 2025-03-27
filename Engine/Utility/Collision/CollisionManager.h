@@ -29,6 +29,12 @@ public: // 基本的な関数
 	void Initialize();
 
 	/// <summary>
+	/// 当たり判定の更新
+	/// </summary>
+	void UpdateCollision();
+
+
+	/// <summary>
 	/// ワールドトランスフォームの初期化
 	/// </summary>
 	void UpdateWorldTransform();
@@ -63,6 +69,12 @@ public:
 	/// リストに登録
 	/// </summary>
 	void AddCollider(Collider* collider);
+
+	/// <summary>
+	/// コライダーの削除
+	/// </summary>
+	void RemoveCollider(Collider* collider);
+
 
 
 	void ApplyGlobalVariables();

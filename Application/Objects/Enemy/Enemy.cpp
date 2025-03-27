@@ -9,9 +9,12 @@
 #include "Particle/ParticleManager.h"
 #include <Systems/GameTime/HitStop.h>
 #include "EnemyManager.h"
+#include <Collision/CollisionManager.h>
+
 #ifdef _DEBUG
 #include "imgui.h" 
 #endif // _DEBUG
+
 // 次のシリアルナンバー
 uint32_t Enemy::nextSerialNumber_ = 0;
 Enemy::Enemy() {
@@ -19,6 +22,10 @@ Enemy::Enemy() {
     serialNumber_ = nextSerialNumber_;
     // 番号の追加
     ++nextSerialNumber_;
+}
+Enemy::~Enemy()
+{
+    CollisionManager::GetInstance()->RemoveCollider(this);
 }
 void Enemy::Initialize(Camera* camera, const Vector3& pos)
 {
@@ -50,6 +57,7 @@ void Enemy::Initialize(Camera* camera, const Vector3& pos)
    // GlobalVariables::GetInstance()->CreateGroup(groupName);
    // Collider::Initialize();
     // TypeIDの設定
+	Collider::Initialize();
     Collider::SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kEnemy));
 
     isActive_ = true;

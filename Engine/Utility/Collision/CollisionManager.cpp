@@ -25,18 +25,16 @@ CollisionManager* CollisionManager::GetInstance()
 }
 
 void CollisionManager::Initialize() {
-
-
-	// OBject3dの初期化
-	obj_ = std::make_unique<Object3d>();
-	obj_->Initialize();
-	obj_->SetModel("ICO.obj");
 	isDrawCollider_ = false;
-	//GlobalVariables* globalvariables = GlobalVariables::GetInstance();
-	//const char* groupName = "Collider";
-	//// グループを追加
-	//GlobalVariables::GetInstance()->CreateGroup(groupName);
-	//globalvariables->AddItem(groupName, "Collider", isDrawCollider_);
+}
+
+void CollisionManager::UpdateCollision()
+{
+	// ワールドトランスフォームの更新
+	UpdateWorldTransform();
+	// 衝突判定
+	CheckAllCollisions();
+	
 
 }
 void CollisionManager::UpdateWorldTransform() {
@@ -64,7 +62,7 @@ void CollisionManager::Draw() {
 	// 全てのコライダーについて
 	for (Collider* collider : colliders_) {
 		// 描画
-		//collider->Draw(obj_.get());
+		//collider->Draw(.get());
 	}
 }
 
@@ -199,9 +197,16 @@ void CollisionManager::CheckAllCollisions() {
 
 
 void CollisionManager::AddCollider(Collider* collider) {
-
+	if (!collider) return;
 	colliders_.push_back(collider);
 	std::cout << "Collider added: " << collider->GetTypeID() << std::endl;
+}
+
+void CollisionManager::RemoveCollider(Collider* collider)
+{
+	if (!collider) return;
+	colliders_.remove(collider);
+	std::cout << "Collider removed: " << collider->GetTypeID() << std::endl;
 }
 
 void CollisionManager::ApplyGlobalVariables() {

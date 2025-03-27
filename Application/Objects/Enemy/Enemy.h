@@ -24,6 +24,7 @@ class Enemy : public Collider
 public:
 
 	Enemy();
+	~Enemy();
 	/// <summary>
 	/// 初期化
 	/// </summary>

@@ -64,6 +64,10 @@ void GameScene::Initialize()
 	player_->SetPosition(playerPosition);
 	followCamera_.SetTarget(player_.get()->GetWorldTransform());
 
+	enemyManager_ = std::make_unique<EnemyManager>();
+	enemyManager_->Initialize(sceneCamera_.get());
+	enemyManager_->SetPlayer(player_.get());
+
 	// 地面
 	ground_ = std::make_unique<Ground>();
 	ground_->Initialize(sceneCamera_.get());
@@ -136,14 +140,16 @@ void GameScene::Update()
 
 	// パーティクル更新
 	mpInfo_->Update();
-	CheckAllCollisions();
-	CollisionManager::GetInstance()->UpdateWorldTransform();
+	
+	
 	// スポーンタイマーを更新
 
 	// objの更新
 	if (!isDebugCamera_) {
 	player_->Update();
 	}
+	enemyManager_->Update();
+	
 	player_->JsonImGui();
 	//followCamera_.JsonImGui();
 
@@ -172,6 +178,7 @@ void GameScene::Update()
 	// ワールドトランスフォーム更新
 	testWorldTransform_.UpdateMatrix();
 	cameraManager_.UpdateAllCameras();
+	CollisionManager::GetInstance()->UpdateCollision();
 
 	//=====================================================//
 	/*                  これより下は触るな危険　　　　　　　   　*/
@@ -248,7 +255,7 @@ void GameScene::DrawObject()
 	commandList_->BeginQuery(queryHeap_.Get(), D3D12_QUERY_TYPE_OCCLUSION, queryIndex);
 	ground_->Draw();
 	commandList_->EndQuery(queryHeap_.Get(), D3D12_QUERY_TYPE_OCCLUSION, queryIndex);
-
+	enemyManager_->Draw();
 
 	//ResolvedOcclusionQuery();
 
@@ -398,20 +405,20 @@ void GameScene::ShowImGui()
 
 void GameScene::CheckAllCollisions() {
 
-	// 衝突マネージャーのリセット
-	CollisionManager::GetInstance()->Reset();
+	//// 衝突マネージャーのリセット
+	//CollisionManager::GetInstance()->Reset();
 
-	// コライダーをリストに登録
-	CollisionManager::GetInstance()->AddCollider(player_.get());
+	//// コライダーをリストに登録
+	//CollisionManager::GetInstance()->AddCollider(player_.get());
 
-	// コライダーリストに登録
-	CollisionManager::GetInstance()->AddCollider(player_->GetPlayerWeapon());
+	//// コライダーリストに登録
+	//CollisionManager::GetInstance()->AddCollider(player_->GetPlayerWeapon());
 
 
-	// CollisionManager::GetInstance()->AddCollider(enemy_.get());
+	//// CollisionManager::GetInstance()->AddCollider(enemy_.get());
 
-	 // 衝突判定と応答
-	CollisionManager::GetInstance()->CheckAllCollisions();
+	// // 衝突判定と応答
+	//CollisionManager::GetInstance()->CheckAllCollisions();
 
 }
 

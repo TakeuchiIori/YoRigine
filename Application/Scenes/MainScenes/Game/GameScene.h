@@ -25,6 +25,8 @@
 #include "../Transitions/Fade/Fade.h"
 #include "Systems/MapChip/MapChipInfo.h"
 #include "Systems/UI/UIBase.h"
+#include "Enemy/EnemyManager.h"
+
 
 // Cameras
 #include "../../../SystemsApp/Cameras/DebugCamera/DebugCamera.h"
@@ -184,6 +186,8 @@ private:
     WorldTransform testWorldTransform_;
     std::unique_ptr<Player> player_;
     std::unique_ptr<Ground> ground_;
+	std::unique_ptr<EnemyManager> enemyManager_;
+
 
     /*=================================================================
 

@@ -40,6 +40,7 @@ void Player::Initialize(Camera* camera)
 	weapon_->SetParent(worldTransform_);
 
 	// TypeIDの設定
+	Collider::Initialize();
 	Collider::SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayer));
 	Collider::SetRadiusFloat(2.0f);
 
