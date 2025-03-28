@@ -123,15 +123,87 @@ bool Collision::Check(const SphereCollider* sphere, const OBBCollider* obb)
 
 bool Collision::Check(const AABBCollider* a, const AABBCollider* b)
 {
-	return false;
+	const AABB& aa = a->GetAABB();
+	const AABB& bb = b->GetAABB();
+	return (aa.min.x <= bb.max.x && aa.max.x >= bb.min.x) &&
+		(aa.min.y <= bb.max.y && aa.max.y >= bb.min.y) &&
+		(aa.min.z <= bb.max.z && aa.max.z >= bb.min.z);
+}
+
+bool Collision::Check(const OBB& obbA, const OBB& obbB)
+{
+	Matrix4x4 matA = MakeRotateMatrix(obbA.rotation);
+	Matrix4x4 matB = MakeRotateMatrix(obbB.rotation);
+
+	Vector3 axesA[3] = {
+		{ matA.m[0][0], matA.m[1][0], matA.m[2][0] },
+		{ matA.m[0][1], matA.m[1][1], matA.m[2][1] },
+		{ matA.m[0][2], matA.m[1][2], matA.m[2][2] }
+	};
+
+	Vector3 axesB[3] = {
+		{ matB.m[0][0], matB.m[1][0], matB.m[2][0] },
+		{ matB.m[0][1], matB.m[1][1], matB.m[2][1] },
+		{ matB.m[0][2], matB.m[1][2], matB.m[2][2] }
+	};
+
+	Vector3 distance = obbB.center - obbA.center;
+
+	for (int i = 0; i < 3; ++i) {
+		Vector3 axis = axesA[i];
+		if (!axis.IsZero()) {
+			float projA = obbA.size.x * 0.5f * fabs(Dot(axesA[0], axis)) +
+				obbA.size.y * 0.5f * fabs(Dot(axesA[1], axis)) +
+				obbA.size.z * 0.5f * fabs(Dot(axesA[2], axis));
+			float projB = obbB.size.x * 0.5f * fabs(Dot(axesB[0], axis)) +
+				obbB.size.y * 0.5f * fabs(Dot(axesB[1], axis)) +
+				obbB.size.z * 0.5f * fabs(Dot(axesB[2], axis));
+			if (fabs(Dot(distance, axis)) > projA + projB) return false;
+		}
+	}
+
+	for (int i = 0; i < 3; ++i) {
+		Vector3 axis = axesB[i];
+		if (!axis.IsZero()) {
+			float projA = obbA.size.x * 0.5f * fabs(Dot(axesA[0], axis)) +
+				obbA.size.y * 0.5f * fabs(Dot(axesA[1], axis)) +
+				obbA.size.z * 0.5f * fabs(Dot(axesA[2], axis));
+			float projB = obbB.size.x * 0.5f * fabs(Dot(axesB[0], axis)) +
+				obbB.size.y * 0.5f * fabs(Dot(axesB[1], axis)) +
+				obbB.size.z * 0.5f * fabs(Dot(axesB[2], axis));
+			if (fabs(Dot(distance, axis)) > projA + projB) return false;
+		}
+	}
+
+	for (int i = 0; i < 3; ++i) {
+		for (int j = 0; j < 3; ++j) {
+			Vector3 axis = Normalize(Cross(axesA[i], axesB[j]));
+			if (!axis.IsZero()) {
+				float projA = obbA.size.x * 0.5f * fabs(Dot(axesA[0], axis)) +
+					obbA.size.y * 0.5f * fabs(Dot(axesA[1], axis)) +
+					obbA.size.z * 0.5f * fabs(Dot(axesA[2], axis));
+				float projB = obbB.size.x * 0.5f * fabs(Dot(axesB[0], axis)) +
+					obbB.size.y * 0.5f * fabs(Dot(axesB[1], axis)) +
+					obbB.size.z * 0.5f * fabs(Dot(axesB[2], axis));
+				if (fabs(Dot(distance, axis)) > projA + projB) return false;
+			}
+		}
+	}
+
+	return true;
 }
 
 bool Collision::Check(const AABBCollider* aabb, const OBBCollider* obb)
 {
-	return false;
+	OBB aabbAsOBB;
+	aabbAsOBB.center = (aabb->GetAABB().min + aabb->GetAABB().max) * 0.5f;
+	aabbAsOBB.size = aabb->GetAABB().max - aabb->GetAABB().min;
+	aabbAsOBB.rotation = Quaternion::Identity();
+	return Collision::Check(aabbAsOBB, obb->GetOBB());
+
 }
 
 bool Collision::Check(const OBBCollider* a, const OBBCollider* b)
 {
-	return false;
+	return Check(a->GetOBB(), b->GetOBB());
 }

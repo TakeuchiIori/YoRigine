@@ -29,6 +29,9 @@ namespace Collision {
 	// AABB - AABB
 	bool Check(const AABBCollider* a, const AABBCollider* b);
 
+	// OBB - OBB
+	bool Check(const OBB& obbA, const OBB& obbB);
+
 	// AABB - OBB
 	bool Check(const AABBCollider* aabb, const OBBCollider* obb);
 
