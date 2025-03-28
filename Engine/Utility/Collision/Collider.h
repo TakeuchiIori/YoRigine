@@ -18,7 +18,7 @@ enum class ColliderType {
 };
 
 class Collider {
-public:
+protected:
 
 	void Initialize();
 

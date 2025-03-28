@@ -7,6 +7,7 @@
 #include "WorldTransform./WorldTransform.h"
 #include "Collision./Collider.h"
 #include "Collision/Sphere/SphereCollider.h"
+#include "Collision/AABB/AABBCollider.h"
 #include <json.hpp>
 using json = nlohmann::json;
 // C++
@@ -18,7 +19,7 @@ using json = nlohmann::json;
 #include <Collision/ContactRecord.h>
 #include <Collision/Effect.h>
 
-class PlayerWeapon final : public SphereCollider
+class PlayerWeapon final : public AABBCollider
 {
 public:
 	//==========================================================================//
@@ -57,7 +58,7 @@ public:
 	/// 初期化
 	/// </summary>
 	void Initialize(Camera* camera);
-
+	void InitJson();
 	void SaveGlobalVariables();
 
 	/// <summary>
@@ -222,6 +223,7 @@ private:
 
 	// ポインタ
 	std::unique_ptr<Object3d> weapon_;
+	std::unique_ptr <JsonManager> jsonCollider_;
 	Camera* camera_ = nullptr;
 	Input* input_ = nullptr;
 	// ワールドトランスフォーム

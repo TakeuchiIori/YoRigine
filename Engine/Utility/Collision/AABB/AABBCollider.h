@@ -3,8 +3,7 @@
 
 // Math
 #include "MathFunc.h"
-#include "Matrix4x4.h"
-#include "Object3D/Object3d.h"
+
 
 class AABBCollider : public Collider
 {
@@ -19,11 +18,11 @@ public:
 	//===============================================================*/
 	~AABBCollider() = default;
 	void InitJson(JsonManager* jsonManager) override;
-	Vector3 GetCenterPosition() const override {};
-	Matrix4x4 GetWorldMatrix() const override {};
-	void OnCollision([[maybe_unused]] Collider* other) override {};
-	void EnterCollision([[maybe_unused]] Collider* other) override {};
-	void ExitCollision([[maybe_unused]] Collider* other) override {};
+	Vector3 GetCenterPosition() const override = 0;
+	Matrix4x4 GetWorldMatrix() const override = 0;
+	void OnCollision([[maybe_unused]] Collider* other) override = 0;
+	void EnterCollision([[maybe_unused]] Collider* other) override = 0;
+	void ExitCollision([[maybe_unused]] Collider* other) override = 0;
 
 
 	/*===============================================================//
@@ -34,7 +33,7 @@ public:
 
 	//===============================================================*/
 	
-	void Initialzie();
+	void Initialize();
 	void Update();
 	void Draw();
 
@@ -52,6 +51,7 @@ public: // アクセッサ
 
 private:
 	AABB aabb_;
+	AABB aabbOffset_;
 
 };
 

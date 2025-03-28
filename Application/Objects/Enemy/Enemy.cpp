@@ -57,7 +57,7 @@ void Enemy::Initialize(Camera* camera, const Vector3& pos)
    // Collider::Initialize();
     // TypeIDの設定
     Collider::SetCamera(camera_);
-	SphereCollider::Initialize();
+	AABBCollider::Initialize();
     Collider::SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kEnemy));
 
     isActive_ = true;
@@ -70,7 +70,7 @@ void Enemy::Initialize(Camera* camera, const Vector3& pos)
 	gameTime_ = GameTime::GetInstance();
 	gameTime_->RegisterObject(timeID_);
 
-    //InitJson();
+    InitJson();
 }
 
 void Enemy::Update()
@@ -111,7 +111,7 @@ void Enemy::Update()
     worldTransform_.UpdateMatrix();
     WS_.UpdateMatrix();
 
-	SphereCollider::Update();
+	AABBCollider::Update();
 }
 
 void Enemy::Draw()
@@ -127,7 +127,7 @@ void Enemy::Draw()
 
 void Enemy::DrawCollision()
 {
-	SphereCollider::Draw();
+    AABBCollider::Draw();
 }
 
 void Enemy::ShowCoordinatesImGui()
@@ -285,8 +285,8 @@ void Enemy::InitJson()
 	jsonManager_ = std::make_unique<JsonManager>("Enemy", "Resources./JSON");
 	jsonManager_->Register("HP", &hp_);
 
-    jsonCollider_ = std::make_unique<JsonManager>("EnemyCollider", "Resources./JSON");
-    SphereCollider::InitJson(jsonCollider_.get());
+    jsonCollider_ = std::make_unique<JsonManager>("EnemyCollider", "Resources./JSON/Collider");
+    AABBCollider::InitJson(jsonCollider_.get());
 }
 
 Vector3 Enemy::GetWorldPosition() {
