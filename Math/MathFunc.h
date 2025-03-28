@@ -111,5 +111,5 @@ bool IsCollision(const AABB& aabb, const Vector3& point);
 // AABBと球の衝突判定を行う関数
 bool IsCollision(const AABB& aabb, const Sphere& sphere);
 
-
+float DegToRad(float degrees);
 

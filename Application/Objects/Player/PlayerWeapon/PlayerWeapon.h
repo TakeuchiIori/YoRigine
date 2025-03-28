@@ -8,6 +8,7 @@
 #include "Collision./Collider.h"
 #include "Collision/Sphere/SphereCollider.h"
 #include "Collision/AABB/AABBCollider.h"
+#include "Collision/OBB/OBBCollider.h"
 #include <json.hpp>
 using json = nlohmann::json;
 // C++
@@ -19,7 +20,7 @@ using json = nlohmann::json;
 #include <Collision/ContactRecord.h>
 #include <Collision/Effect.h>
 
-class PlayerWeapon final : public AABBCollider
+class PlayerWeapon final : public OBBCollider
 {
 public:
 	//==========================================================================//
@@ -198,6 +199,9 @@ public: // ポリモーフィズム
 	/// </summary>
 	/// <returns></returns>
 	Matrix4x4 GetWorldMatrix() const override;
+
+
+	Vector3 GetEulerRotation() override { return worldTransform_.rotation_; }
 
 	void ApplyGlobalVariables();
 

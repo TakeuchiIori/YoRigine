@@ -36,7 +36,7 @@ public: // ポリモーフィズム
 
 	virtual Vector3 GetCenterPosition() const = 0;
 	virtual Matrix4x4 GetWorldMatrix() const = 0;
-
+	virtual Vector3 GetEulerRotation() = 0;
 
 
 public: // アクセッサ

@@ -166,7 +166,7 @@ void Enemy::OnCollision(Collider* other)
     // 衝突相手の種別IDを取得
     uint32_t typeID = other->GetTypeID();
     // 衝突相手が武器かプレイヤーなら
-    if (typeID == static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon)) {
+    if (typeID == static_cast<uint32_t>(CollisionTypeIdDef::kPlayer)) {
 
         isHit_ = true;
 		base_->SetMaterialColor({ 1.0f, 0.0f, 0.0f, 1.0f });

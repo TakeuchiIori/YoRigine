@@ -69,6 +69,8 @@ public:
 	/// <returns></returns>
 	Matrix4x4 GetWorldMatrix() const override;
 
+	Vector3 GetEulerRotation() override { return worldTransform_.rotation_; }
+
 	/// <summary>
 	/// 
 	/// </summary>

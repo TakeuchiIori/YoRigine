@@ -91,7 +91,7 @@ void PlayerWeapon::Initialize(Camera* camera)
 
 	// グループを追加
 	Collider::SetCamera(camera_);
-	AABBCollider::Initialize();
+	OBBCollider::Initialize();
 	//
 	//SaveGlobalVariables();
 	// TypeIDの設定
@@ -103,7 +103,7 @@ void PlayerWeapon::Initialize(Camera* camera)
 void PlayerWeapon::InitJson()
 {
 	jsonCollider_ = std::make_unique<JsonManager>("PlayerWeaponCollider", "Resources./JSON/Collider");
-	AABBCollider::InitJson(jsonCollider_.get());
+	OBBCollider::InitJson(jsonCollider_.get());
 }
 
 void PlayerWeapon::SaveGlobalVariables() {
@@ -188,7 +188,7 @@ void PlayerWeapon::Update()
 	DrawDebugUI();
 #endif // _DEBUG
 
-	AABBCollider::Update();
+	OBBCollider::Update();
 
 }
 
@@ -205,7 +205,7 @@ void PlayerWeapon::Draw(Camera* camera)
 
 void PlayerWeapon::DrawCollision()
 {
-	AABBCollider::Draw();
+	OBBCollider::Draw();
 }
 
 /// <summary>

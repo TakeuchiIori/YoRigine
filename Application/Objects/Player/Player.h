@@ -7,6 +7,7 @@
 #include "WorldTransform./WorldTransform.h"
 #include "Collision./Collider.h"
 #include "Collision/Sphere/SphereCollider.h"
+#include "Collision/OBB/OBBCollider.h"
 #include "PlayerWeapon/PlayerWeapon.h"
 #include <Systems/GameTime/GameTIme.h>
 #include <Particle/ParticleManager.h>
@@ -22,7 +23,7 @@
 #include "Vector3.h" 
 
 class PlayerWeapon;
-class Player : public SphereCollider
+class Player : public OBBCollider
 {
 
 public: // メンバ関数（公開）
@@ -90,6 +91,8 @@ public: // ポリモーフィズム
 	/// <returns></returns>
 	Matrix4x4 GetWorldMatrix()const override;
 
+
+	Vector3 GetEulerRotation() override { return worldTransform_.rotation_; }
 
 
 

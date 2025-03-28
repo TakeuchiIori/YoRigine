@@ -76,3 +76,8 @@ bool IsCollision(const AABB& aabb, const Sphere& sphere) {
     return distanceSquared < (sphere.radius * sphere.radius);
 }
 
+float DegToRad(float degrees)
+{
+    return degrees * (3.14159265f / 180.0f);
+}
+

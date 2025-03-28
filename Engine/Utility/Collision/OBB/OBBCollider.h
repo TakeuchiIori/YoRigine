@@ -15,12 +15,13 @@ public:
 
 	~OBBCollider() = default;
 	void InitJson(JsonManager* jsonManager) override;
-	Vector3 GetCenterPosition() const override {};
-	Matrix4x4 GetWorldMatrix() const override {};
+	Vector3 GetCenterPosition() const override = 0;
+	virtual Vector3 GetEulerRotation() = 0;
+	Matrix4x4 GetWorldMatrix() const override = 0;
 	
-	void OnCollision([[maybe_unused]] Collider* other) override {};
-	void EnterCollision([[maybe_unused]] Collider* other) override {};
-	void ExitCollision([[maybe_unused]] Collider* other) override {};
+	void OnCollision([[maybe_unused]] Collider* other) override = 0;
+	void EnterCollision([[maybe_unused]] Collider* other) override = 0;
+	void ExitCollision([[maybe_unused]] Collider* other) override = 0;
 
 
 	/*===============================================================//
@@ -49,5 +50,8 @@ public:
 
 private:
 	OBB obb_;
+	OBB obbOffset_;
+	Vector3 obbEulerOffset_;
+
 };
 

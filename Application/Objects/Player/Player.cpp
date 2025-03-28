@@ -39,7 +39,7 @@ void Player::Initialize(Camera* camera)
 	weapon_->SetParent(worldTransform_);
 	// TypeIDの設定
 	Collider::SetCamera(camera_);
-	SphereCollider::Initialize();
+	OBBCollider::Initialize();
 	Collider::SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayer));
 	//Collider::SetRadiusFloat(2.0f);
 
@@ -77,7 +77,7 @@ void Player::Update()
 #ifdef _DEBUG
 	ShowCoordinatesImGui();
 #endif // _DEBUG
-	SphereCollider::Update();
+	OBBCollider::Update();
 }
 
 void Player::Draw()
@@ -89,7 +89,7 @@ void Player::Draw()
 
 void Player::DrawCollision()
 {
-	SphereCollider::Draw();
+	OBBCollider::Draw();
 	weapon_->DrawCollision();
 }
 
@@ -500,13 +500,15 @@ void Player::InitJson()
 {
 	jsonManager_ = std::make_unique<JsonManager>("Player","Resources./JSON");
 	jsonManager_->SetCategory("Objects");
-	jsonManager_->Register("World Translation", &worldTransform_.translation_);
+	jsonManager_->Register("Translation", &worldTransform_.translation_);
+	jsonManager_->Register("Rotate", &worldTransform_.rotation_);
+	jsonManager_->Register("Scale", &worldTransform_.scale_);
 	jsonManager_->Register("Speed", &moveSpeed_);
 	jsonManager_->Register("JumpHeight", &jumpHeight_);
 	jsonManager_->Register("Rotate Speed", &rotrateSpeed_);
 
 	jsonCollider_ = std::make_unique<JsonManager>("PlayerCollider", "Resources./JSON/Collider");
-	SphereCollider::InitJson(jsonCollider_.get());
+	OBBCollider::InitJson(jsonCollider_.get());
 }
 
 void Player::JsonImGui()
