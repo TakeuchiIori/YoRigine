@@ -6,7 +6,7 @@
 #include "Systems/Camera/Camera.h"
 #include "../Graphics/Drawer/LineManager/Line.h"
 #include "CollisionTypeIdDef.h"
-
+#include "Loaders/Json/JsonManager.h"
 // Math
 #include "Vector3.h"
 #include "Matrix4x4.h"
@@ -54,6 +54,7 @@ public: // アクセッサ
 protected:
 	Line* line_ = nullptr;
 	Object3d* object3d_ = nullptr;
+	JsonManager* jsonManager_ = nullptr;
 	// 種別ID
 	uint32_t typeID_ = 0u;
 
