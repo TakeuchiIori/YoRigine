@@ -5,6 +5,14 @@
 class OBBCollider : public Collider
 {
 public:
+	/*===============================================================//
+
+
+							 ポリモーフィズム
+
+
+	//===============================================================*/
+
 	~OBBCollider() = default;
 	Vector3 GetCenterPosition() const override {};
 	Matrix4x4 GetWorldMatrix() const override {};
@@ -13,7 +21,18 @@ public:
 	void EnterCollision([[maybe_unused]] Collider* other) override {};
 	void ExitCollision([[maybe_unused]] Collider* other) override {};
 
+
+	/*===============================================================//
+
+
+								基本的な関数
+
+
+	//===============================================================*/	
+	
+	
 	void Initialize();
+	void Update();
 	void Draw();
 
 public:

@@ -5,6 +5,14 @@
 class SphereCollider : public Collider
 {
 public:
+	/*===============================================================//
+	
+
+							  ポリモーフィズム
+
+
+	//===============================================================*/
+
 	~SphereCollider() = default;
 	Vector3 GetCenterPosition() const override = 0;
 	Matrix4x4 GetWorldMatrix() const override = 0;
@@ -12,7 +20,16 @@ public:
 	void EnterCollision([[maybe_unused]] Collider* other) override = 0;
 	void ExitCollision([[maybe_unused]] Collider* other) override = 0;
 
+	/*===============================================================//
+
+
+								基本的な関数
+
+
+	//===============================================================*/
+
 	void Initialize();
+	void Update();
 	void Draw();
 	
 public:

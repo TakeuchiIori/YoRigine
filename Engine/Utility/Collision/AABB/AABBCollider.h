@@ -10,16 +10,31 @@ class AABBCollider : public Collider
 {
 public:
 
+	/*===============================================================//
+
+
+							ポリモーフィズム
+
+
+	//===============================================================*/
 	~AABBCollider() = default;
-
-	void Initialzie();
-
 	Vector3 GetCenterPosition() const override {};
 	Matrix4x4 GetWorldMatrix() const override {};
 	void OnCollision([[maybe_unused]] Collider* other) override {};
 	void EnterCollision([[maybe_unused]] Collider* other) override {};
 	void ExitCollision([[maybe_unused]] Collider* other) override {};
 
+
+	/*===============================================================//
+
+
+								基本的な関数
+
+
+	//===============================================================*/
+	
+	void Initialzie();
+	void Update();
 	void Draw();
 
 public: // アクセッサ
