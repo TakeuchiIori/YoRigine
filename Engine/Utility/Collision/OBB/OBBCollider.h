@@ -16,6 +16,7 @@ public:
 	void EnterCollision([[maybe_unused]] Collider* other) override {};
 	void ExitCollision([[maybe_unused]] Collider* other) override {};
 
+	void Initialize();
 	void Draw(Camera* camera);
 
 private:

@@ -12,6 +12,8 @@ public:
 
 	~AABBCollider() = default;
 
+	void Initialzie();
+
 	Vector3 GetCenterPosition() const override {
 		return aabb_.min + (aabb_.max - aabb_.min) * 0.5f;
 	}
