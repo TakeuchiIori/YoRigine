@@ -56,6 +56,7 @@ void Enemy::Initialize(Camera* camera, const Vector3& pos)
    // GlobalVariables::GetInstance()->CreateGroup(groupName);
    // Collider::Initialize();
     // TypeIDの設定
+    Collider::SetCamera(camera_);
 	SphereCollider::Initialize();
     Collider::SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kEnemy));
 
@@ -108,7 +109,7 @@ void Enemy::Update()
     worldTransform_.UpdateMatrix();
     WS_.UpdateMatrix();
 
-    
+	SphereCollider::Update();
 }
 
 void Enemy::Draw()
@@ -120,6 +121,11 @@ void Enemy::Draw()
         shadow_->Draw(camera_,WS_);
   
     
+}
+
+void Enemy::DrawCollision()
+{
+	SphereCollider::Draw();
 }
 
 void Enemy::ShowCoordinatesImGui()

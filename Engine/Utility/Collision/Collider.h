@@ -24,7 +24,7 @@ public:
 
 public: // ポリモーフィズム
 
-	virtual ~Collider() = default;
+	virtual ~Collider();
 
 	// 衝突中に呼ばれる関数
 	virtual void OnCollision([[maybe_unused]] Collider* other) {}
@@ -59,10 +59,11 @@ public: // アクセッサ
 protected:
 	Line* line_ = nullptr;
 	Object3d* object3d_ = nullptr;
-	Camera* camera_ = nullptr;
+	
 	JsonManager* jsonManager_ = nullptr;
 	// 種別ID
 	uint32_t typeID_ = 0u;
 
-
+private:
+	Camera* camera_ = nullptr;
 };

@@ -31,7 +31,7 @@ public:
 	void Initialize();
 	void Update();
 	void Draw();
-	
+	void InitJson();
 public:
 
 	/// <summary>
@@ -47,6 +47,7 @@ public:
 	float GetRadius() { return sphere_.radius; }
 private:
 	Sphere sphere_;
-	Vector3 offset_;
+	Sphere sphereOffset_;
+	float radius_;
 };
 

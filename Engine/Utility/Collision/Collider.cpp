@@ -11,6 +11,13 @@ void Collider::Initialize()
 	CollisionManager::GetInstance()->AddCollider(this);
 }
 
+Collider::~Collider()
+{
+	CollisionManager::GetInstance()->RemoveCollider(this);
+}
+
+
+
 
 
 

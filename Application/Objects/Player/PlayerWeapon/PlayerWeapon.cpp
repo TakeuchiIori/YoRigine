@@ -21,8 +21,9 @@
 /// <summary>
 /// 初期化
 /// </summary>
-void PlayerWeapon::Initialize()
+void PlayerWeapon::Initialize(Camera* camera)
 {
+	camera_ = camera;
 	// object3dの初期化
 	weapon_ = std::make_unique<Object3d>();
 	weapon_->Initialize();
@@ -89,9 +90,10 @@ void PlayerWeapon::Initialize()
 
 
 	// グループを追加
+	Collider::SetCamera(camera_);
 	SphereCollider::Initialize();
 	//
-	SaveGlobalVariables();
+	//SaveGlobalVariables();
 	// TypeIDの設定
 	Collider::SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon));
 }
@@ -178,6 +180,8 @@ void PlayerWeapon::Update()
 	DrawDebugUI();
 #endif // _DEBUG
 
+	SphereCollider::Update();
+
 }
 
 /// <summary>
@@ -189,6 +193,11 @@ void PlayerWeapon::Draw(Camera* camera)
 		effect->Draw(camera);
 	}
 	weapon_->Draw(camera,worldTransform_);
+}
+
+void PlayerWeapon::DrawCollision()
+{
+	SphereCollider::Draw();
 }
 
 /// <summary>

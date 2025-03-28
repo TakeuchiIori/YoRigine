@@ -40,6 +40,7 @@ public:
 	/// 描画
 	/// </summary>
 	void Draw();
+	void DrawCollision();
 
 	/// <summary>
 	/// ImGui

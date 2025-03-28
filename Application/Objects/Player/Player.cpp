@@ -20,7 +20,7 @@ void Player::Initialize(Camera* camera)
 	base_->SetModel("cube.obj");
 
 	weapon_ = std::make_unique<PlayerWeapon>();
-	weapon_->Initialize();
+	weapon_->Initialize(camera_);
 
 	shadow_ = std::make_unique<Object3d>();
 	shadow_->Initialize();
@@ -37,7 +37,6 @@ void Player::Initialize(Camera* camera)
 	worldTransform_.translation_.y = 1.0f;
 	worldTransform_.translation_.z = -50.0f;
 	weapon_->SetParent(worldTransform_);
-
 	// TypeIDの設定
 	Collider::SetCamera(camera_);
 	SphereCollider::Initialize();
@@ -78,6 +77,7 @@ void Player::Update()
 #ifdef _DEBUG
 	ShowCoordinatesImGui();
 #endif // _DEBUG
+	SphereCollider::Update();
 }
 
 void Player::Draw()
@@ -90,6 +90,7 @@ void Player::Draw()
 void Player::DrawCollision()
 {
 	SphereCollider::Draw();
+	weapon_->DrawCollision();
 }
 
 void Player::UpdateWorldTransform()

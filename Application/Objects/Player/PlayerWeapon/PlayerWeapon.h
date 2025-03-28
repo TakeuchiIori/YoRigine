@@ -2,6 +2,7 @@
 
 // Engine
 #include "Object3D./Object3d.h"
+#include "Systems/Camera/Camera.h"
 #include "Systems/Input./Input.h"
 #include "WorldTransform./WorldTransform.h"
 #include "Collision./Collider.h"
@@ -55,7 +56,7 @@ public:
 	/// <summary>
 	/// 初期化
 	/// </summary>
-	void Initialize();
+	void Initialize(Camera* camera);
 
 	void SaveGlobalVariables();
 
@@ -67,7 +68,8 @@ public:
 	/// <summary>
 	/// 描画
 	/// </summary>
-	void Draw(Camera* camera);  
+	void Draw(Camera* camera); 
+	void DrawCollision();
 
 	/// <summary>
 	/// デバッグ用UIの描画
@@ -205,7 +207,6 @@ public:
 	
 	void SetParent(WorldTransform& worldTransform) { worldTransform_.parent_ = &worldTransform; }
 
-
 	const WorldTransform& GetWorldTransform() { return worldTransform_; }
 	const Vector3& GetScale() { return worldTransform_.scale_; }
 	const Vector3& GetRotation() { return worldTransform_.rotation_; }
@@ -221,6 +222,7 @@ private:
 
 	// ポインタ
 	std::unique_ptr<Object3d> weapon_;
+	Camera* camera_ = nullptr;
 	Input* input_ = nullptr;
 	// ワールドトランスフォーム
 	WorldTransform worldTransform_;

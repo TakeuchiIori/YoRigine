@@ -309,6 +309,7 @@ void GameScene::DrawLine()
 	line_->DrawLine();
 
 	player_->DrawCollision();
+	enemyManager_->DrawCollision();
 }
 
 
