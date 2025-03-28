@@ -40,9 +40,9 @@ void Player::Initialize(Camera* camera)
 	weapon_->SetParent(worldTransform_);
 
 	// TypeIDの設定
-	Collider::Initialize();
+	Collider::AddCollider();
 	Collider::SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayer));
-	Collider::SetRadiusFloat(2.0f);
+	//Collider::SetRadiusFloat(2.0f);
 
 	particleEmitter_ = std::make_unique<ParticleEmitter>("Player", worldTransform_.translation_, 5);
     particleEmitter_->Initialize();
@@ -528,7 +528,7 @@ Vector3 Player::GetCenterPosition() const
 	// ローカル座標でのオフセット
 	const Vector3 offset = { 0.0f, 0.0f, 0.0f };
 	// ワールド座標に変換
-	Vector3 worldPos = TransformCoordinates(offset, worldTransform_.matWorld_);
+	Vector3 worldPos = Transform(offset, worldTransform_.matWorld_);
 
 	return worldPos;
 }

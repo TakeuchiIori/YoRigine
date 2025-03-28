@@ -116,6 +116,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Engine\Utility\Collision\AABB\AABBCollider.cpp" />
     <ClCompile Include="Application\SystemsApp\Cameras\DebugCamera\DebugCamera.cpp" />
     <ClCompile Include="Engine\Utility\Loaders\Model\AnimationSystem.cpp" />
     <ClCompile Include="Application\Objects\Enemy\Enemy.cpp" />
@@ -194,8 +195,11 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="Engine\Generators\OffScreen\OffScreen.cpp" />
     <ClCompile Include="Engine\Utility\Systems\UI\UIBase.cpp" />
     <ClCompile Include="Engine\Utility\Systems\UI\UIButton.cpp" />
+    <ClCompile Include="Engine\Utility\Collision\Sphere\SphereCollider.cpp" />
+    <ClCompile Include="Engine\Utility\Collision\OBB\OBBCollider.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Engine\Utility\Collision\AABB\AABBCollider.h" />
     <ClInclude Include="Application\SystemsApp\Cameras\DebugCamera\DebugCamera.h" />
     <ClInclude Include="Engine\Utility\Loaders\Model\AnimationSystem.h" />
     <ClInclude Include="Application\Objects\Enemy\Enemy.h" />
@@ -280,7 +284,9 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="Engine\Generators\OffScreen\OffScreen.h" />
     <ClInclude Include="Engine\Utility\Systems\UI\UIBase.h" />
     <ClInclude Include="Engine\Utility\Systems\UI\UIButton.h" />
+    <ClInclude Include="Engine\Utility\Collision\OBB\OBBCollider.h" />
     <ClInclude Include="resource.h" />
+    <ClInclude Include="Engine\Utility\Collision\Sphere\SphereCollider.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="externals\DirectXTex\DirectXTex_Desktop_2022_Win10.vcxproj">

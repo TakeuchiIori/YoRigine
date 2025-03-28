@@ -12,6 +12,7 @@
 #include <Systems/GameTime/HitStop.h>
 #include <cstdlib>
 #include <ctime>
+#include <numbers>
 
 #ifdef _DEBUG
 #include "imgui.h"
@@ -19,7 +20,7 @@
 #include "LightManager/LightManager.h"
 #include "Sprite/SpriteCommon.h"
 #include <Systems/GameTime/GameTIme.h>
-
+#include "Quaternion.h"
 /// <summary>
 /// 初期化処理
 /// </summary>
@@ -117,6 +118,10 @@ void GameScene::Initialize()
 
 	uiSub_ = std::make_unique<UIBase>("UISub");
 	uiSub_->Initialize("Resources/JSON/UI/Sub.json");
+
+	obb.center = { 0.0f, 2.0f, 0.0f },
+	obb.size = { 1.0f, 2.0f, 0.5f },
+	obb.rotation = { 0.0f,0.0f,0.0f,1.0f };
 }
 
 /// <summary>
@@ -166,9 +171,6 @@ void GameScene::Update()
 	UpdateCamera();
 
 
-
-
-	// ParticleManager::GetInstance()->UpdateParticlePlayerWeapon(weaponPos);
 	ShowImGui();
 
 
@@ -178,7 +180,7 @@ void GameScene::Update()
 	// ワールドトランスフォーム更新
 	testWorldTransform_.UpdateMatrix();
 	cameraManager_.UpdateAllCameras();
-	CollisionManager::GetInstance()->UpdateCollision();
+	CollisionManager::GetInstance()->Update();
 
 	//=====================================================//
 	/*                  これより下は触るな危険　　　　　　　   　*/
@@ -192,6 +194,21 @@ void GameScene::Update()
 	uiBase_->Update();
 
 	uiSub_->Update();
+
+
+	if (ImGui::TreeNode("OBB")) {
+		// 中心座標の操作
+		ImGui::DragFloat3("Center", &obb.center.x, 0.1f);
+		// サイズの操作
+		ImGui::DragFloat3("Size", &obb.size.x, 0.1f, 0.01f, 100.0f);
+		if (ImGui::DragFloat3("Rotation (Euler deg)", &eulerDeg.x, 1.0f)) {
+			Vector3 eulerRad = eulerDeg * (std::numbers::pi_v<float>);
+			obb.rotation = EulerToQuaternion(eulerRad);
+		}
+		ImGui::TreePop();
+	}
+
+
 
 }
 
@@ -207,8 +224,7 @@ void GameScene::Draw()
 	Object3dCommon::GetInstance()->DrawPreference();
 	LightManager::GetInstance()->SetCommandList();
 	DrawObject();
-	///line_->UpdateVertices(start_, end_);
-	///line_->DrawLine();
+
 
 	//---------
 	// Animation
@@ -246,7 +262,6 @@ void GameScene::DrawOffScreen()
 
 void GameScene::DrawObject()
 {
-	CollisionManager::GetInstance()->Draw();
 	mpInfo_->Draw();
 	// オクルージョンクエリ開始
 	uint32_t queryIndex = 0;
@@ -287,6 +302,11 @@ void GameScene::DrawLine()
 		test_->DrawSkeleton(test_->GetModel()->GetSkeleton(), *boneLine_);
 		boneLine_->DrawLine();
 	}
+
+	line_->DrawSphere(sphere_.center, sphere_.radius, 32);
+	line_->DrawAABB(aabb.min,aabb.max);
+	line_->DrawOBB(obb.center,obb.rotation,obb.size);
+	line_->DrawLine();
 }
 
 

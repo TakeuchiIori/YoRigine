@@ -29,14 +29,22 @@ public:
 	/// </summary>
 	void DrawLine();
 
-	void ClearVertices();
-
 	/// <summary>
-	/// 頂点を作成
+	/// 頂点の登録
 	/// </summary>
-	void UpdateVertices(const Vector3& start, const Vector3& end);
+	void RegsterLine(const Vector3& start, const Vector3& end);
+
+
+	void DrawSphere(const Vector3& center, float radius, int resolution);
+	void DrawAABB(const Vector3& min, const Vector3& max);
+	void DrawOBB(const Vector3& center, const Quaternion& rotation, const Vector3& size);
+	//void DrawOBB(const Vector3& center, const Vector3& size, const Vector3 orientations[3]);
+	//void DrawOBB(const OBB& obb);
+	//void DrawOBB(const Vector3& center, const Vector3& size, const Matrix4x4& rotation);
 
 private:
+
+	
 
 
 

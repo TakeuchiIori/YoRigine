@@ -272,7 +272,7 @@ Matrix4x4 MakeTranslateMatrix(const Vector3& translate) {
 
 
 //=====================================9.座標変換===============================================//
-Vector3 TransformCoordinates(const Vector3& vector, const Matrix4x4& matrix) {
+Vector3 Transform(const Vector3& vector, const Matrix4x4& matrix) {
 	Vector3 result;
 	result.x = vector.x * matrix.m[0][0] + vector.y * matrix.m[1][0] + vector.z * matrix.m[2][0] + 1.0f * matrix.m[3][0];
 	result.y = vector.x * matrix.m[0][1] + vector.y * matrix.m[1][1] + vector.z * matrix.m[2][1] + 1.0f * matrix.m[3][1];
@@ -368,7 +368,7 @@ Matrix4x4 MakeRotateMatrixZ(float radian) {
 
 	return result;
 }
-Matrix4x4 MakeRotateMatrixXYZ(Vector3& rad)
+Matrix4x4 MakeRotateMatrixXYZ(Vector3 rad)
 {
 
 	return Multiply(Multiply(MakeRotateMatrixX(rad.x), MakeRotateMatrixY(rad.y)), MakeRotateMatrixZ(rad.z));

@@ -90,7 +90,7 @@ void PlayerWeapon::Initialize()
 
 
 	// グループを追加
-	Collider::Initialize();
+	Collider::AddCollider();
 	//
 	SaveGlobalVariables();
 	// TypeIDの設定
@@ -164,10 +164,10 @@ void PlayerWeapon::Update()
 	UpdateState();
 
 	if (state_ != PlayerWeapon::WeaponState::Idle && state_ != PlayerWeapon::WeaponState::Cooldown) {
-		Collider::SetRadiusFloat(2.0f);
+		//Collider::SetRadiusFloat(2.0f);
 	}
 	else {
-		Collider::SetRadiusFloat(0.0f);
+		//Collider::SetRadiusFloat(0.0f);
 	}
 
 
@@ -704,7 +704,7 @@ Vector3 PlayerWeapon::GetCenterPosition() const
 	// ローカル座標でのオフセット
 	const Vector3 offset = { 0.0f, 0.0f, 0.0f };
 	// ワールド座標に変換
-	Vector3 worldPos = TransformCoordinates(offset, worldTransform_.matWorld_);
+	Vector3 worldPos = Transform(offset, worldTransform_.matWorld_);
 
 	return worldPos;
 }

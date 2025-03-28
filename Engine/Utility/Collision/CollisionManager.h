@@ -31,18 +31,8 @@ public: // 基本的な関数
 	/// <summary>
 	/// 当たり判定の更新
 	/// </summary>
-	void UpdateCollision();
+	void Update();
 
-
-	/// <summary>
-	/// ワールドトランスフォームの初期化
-	/// </summary>
-	void UpdateWorldTransform();
-
-	/// <summary>
-	/// 描画
-	/// </summary>
-	void Draw();
 
 	/// <summary>
 	/// ImGui
@@ -75,12 +65,6 @@ public:
 	/// </summary>
 	void RemoveCollider(Collider* collider);
 
-
-
-	void ApplyGlobalVariables();
-
-	bool TestAxis(const Vector3& axis, const Vector3& T, const Vector3 axesA[3], const Vector3& halfExtentsA, const Vector3 axesB[3], const Vector3& halfExtentsB);
-
 private:
 
 	// コピーコンストラクタと代入演算子を削除して複製を防ぐ
@@ -91,5 +75,4 @@ private:
 	std::list<Collider*> colliders_;
 	// bool型
 	bool isDrawCollider_ = false;
-	std::unique_ptr<Object3d> obj_;
 };

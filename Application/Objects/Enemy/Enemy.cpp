@@ -57,7 +57,7 @@ void Enemy::Initialize(Camera* camera, const Vector3& pos)
    // GlobalVariables::GetInstance()->CreateGroup(groupName);
    // Collider::Initialize();
     // TypeIDの設定
-	Collider::Initialize();
+	Collider::AddCollider();
     Collider::SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kEnemy));
 
     isActive_ = true;
@@ -182,7 +182,7 @@ Vector3 Enemy::GetCenterPosition() const
     // ローカル座標でのオフセット
     const Vector3 offset = { 0.0f, 0.0f, 0.0f };
     // ワールド座標に変換
-    Vector3 worldPos = TransformCoordinates(offset, worldTransform_.matWorld_);
+    Vector3 worldPos = Transform(offset, worldTransform_.matWorld_);
 
     return worldPos;
 }
