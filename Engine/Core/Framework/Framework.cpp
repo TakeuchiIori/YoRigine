@@ -1,5 +1,4 @@
 #include "Framework.h"
-#include <Collision/GlobalVariables.h>
 
 void Framework::Initialize()
 {

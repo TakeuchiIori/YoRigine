@@ -3,7 +3,6 @@
 // Engine
 #include "Loaders./Model./ModelManager.h"
 #include "Object3D./Object3dCommon.h"
-#include "Collision./GlobalVariables.h"
 #include "Collision/CollisionTypeIdDef.h"
 #include "Player/Player.h"
 #include "Particle/ParticleManager.h"

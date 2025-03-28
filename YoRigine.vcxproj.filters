@@ -342,9 +342,6 @@
     <ClCompile Include="Engine\Utility\Collision\Effect.cpp">
       <Filter>ソース ファイル\NOIR\Utility\Collision</Filter>
     </ClCompile>
-    <ClCompile Include="Engine\Utility\Collision\GlobalVariables.cpp">
-      <Filter>ソース ファイル\NOIR\Utility\Collision</Filter>
-    </ClCompile>
     <ClCompile Include="Engine\Utility\Debugger\ImGuiManager.cpp">
       <Filter>ソース ファイル\NOIR\Utility\Debugger</Filter>
     </ClCompile>
@@ -600,9 +597,6 @@
       <Filter>ヘッダー ファイル\NOIR\Utility\Collision</Filter>
     </ClInclude>
     <ClInclude Include="Engine\Utility\Collision\CollisionTypeIdDef.h">
-      <Filter>ヘッダー ファイル\NOIR\Utility\Collision</Filter>
-    </ClInclude>
-    <ClInclude Include="Engine\Utility\Collision\GlobalVariables.h">
       <Filter>ヘッダー ファイル\NOIR\Utility\Collision</Filter>
     </ClInclude>
     <ClInclude Include="Engine\Utility\Collision\Effect.h">

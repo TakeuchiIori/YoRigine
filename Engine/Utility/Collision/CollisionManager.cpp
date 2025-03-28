@@ -4,7 +4,6 @@
 #include <iostream>
 
 // Engine
-#include "GlobalVariables.h"
 #include "Loaders./Model/ModelManager.h"
 #include "CollisionTypeIdDef.h"
 
