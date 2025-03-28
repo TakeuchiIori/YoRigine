@@ -10,4 +10,5 @@ void OBBCollider::Initialize()
 void OBBCollider::Draw(Camera* camera)
 {
 	line_->DrawOBB(obb_.center, obb_.rotation, obb_.size);
+	line_->DrawLine()
 }

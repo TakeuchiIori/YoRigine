@@ -9,6 +9,33 @@
 #include <memory>
 
 #include "MathFunc.h"
+// Collision.h
+#pragma once
+#include "Sphere/SphereCollider.h"
+#include "AABB/AABBCollider.h"
+#include "OBB/OBBCollider.h"
+
+namespace Collision {
+
+	// Sphere - Sphere
+	bool Check(const SphereCollider* a, const SphereCollider* b);
+
+	// Sphere - AABB
+	bool Check(const SphereCollider* sphere, const AABBCollider* aabb);
+
+	// Sphere - OBB
+	bool Check(const SphereCollider* sphere, const OBBCollider* obb);
+
+	// AABB - AABB
+	bool Check(const AABBCollider* a, const AABBCollider* b);
+
+	// AABB - OBB
+	bool Check(const AABBCollider* aabb, const OBBCollider* obb);
+
+	// OBB - OBB
+	bool Check(const OBBCollider* a, const OBBCollider* b);
+
+}
 
 class CollisionManager {
 public: // 基本的な関数
@@ -32,12 +59,6 @@ public: // 基本的な関数
 	/// 当たり判定の更新
 	/// </summary>
 	void Update();
-
-
-	/// <summary>
-	/// ImGui
-	/// </summary>
-	void DebugImGui();
 
 public:
 	/// <summary>

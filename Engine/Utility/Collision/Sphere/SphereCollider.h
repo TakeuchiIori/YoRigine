@@ -19,6 +19,19 @@ public:
 	void Initialize();
 	void Draw(Camera* camera);
 	
+public:
+
+	/// <summary>
+	///  球を取得
+	/// </summary>
+	Sphere GetSphere() const { return sphere_; }
+	/// <summary>
+	///  球を設定
+	/// </summary>
+	void SetSphere(Sphere sphere) { sphere_ = sphere; }
+
+	float GetRadius() const { return sphere_.radius; }
+	float GetRadius() { return sphere_.radius; }
 private:
 	Sphere sphere_;
 

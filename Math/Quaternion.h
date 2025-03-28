@@ -11,6 +11,12 @@ struct Quaternion
         return { 0.0f, 0.0f, 0.0f, 1.0f };
     }
 
+    // クォータニオンの逆（共役）を返すメソッド
+    Quaternion Inverse() const {
+        float lengthSq = x * x + y * y + z * z + w * w;
+        return Quaternion(-x / lengthSq, -y / lengthSq, -z / lengthSq, w / lengthSq);
+    }
+
     // クォータニオンの掛け算（演算子オーバーロード）
     Quaternion operator*(const Quaternion& q) const {
         return Quaternion(
@@ -72,6 +78,19 @@ struct Quaternion
     friend Quaternion operator*(float scalar, const Quaternion& q) {
         return Quaternion(q.w * scalar, q.x * scalar, q.y * scalar, q.z * scalar);
        
+    }
+
+    Vector3 RotateVector(const Vector3& v) const {
+        Quaternion q = *this;
+        Quaternion qInv = q.Inverse();
+        Quaternion vectorQuat(0, v.x, v.y, v.z);
+        Quaternion rotatedQuat = q * vectorQuat * qInv;
+        return Vector3(rotatedQuat.x, rotatedQuat.y, rotatedQuat.z);
+    }
+
+    // ベクトルとクォータニオンの乗算演算子
+    friend Vector3 operator*(const Quaternion& q, const Vector3& v) {
+        return q.RotateVector(v);
     }
 };
 

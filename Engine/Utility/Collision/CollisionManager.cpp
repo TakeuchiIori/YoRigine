@@ -9,6 +9,8 @@
 
 // C++
 #include "MathFunc.h"
+#include <algorithm>
+
 
 #ifdef _DEBUG
 #include "imgui.h"
@@ -94,5 +96,42 @@ void CollisionManager::RemoveCollider(Collider* collider)
 	std::cout << "Collider removed: " << collider->GetTypeID() << std::endl;
 }
 
+bool Collision::Check(const SphereCollider* a, const SphereCollider* b)
+{
+	Vector3 diff = b->GetCenterPosition() - a->GetCenterPosition();
+	float distSq = Length(diff);
+	float radiusSum = a->GetRadius() + b->GetRadius();
+	return distSq <= radiusSum * radiusSum;
+}
 
+bool Collision::Check(const SphereCollider* sphere, const AABBCollider* aabb)
+{
+	Vector3 closest = std::clamp(sphere->GetCenterPosition(), aabb->GetAABB().min, aabb->GetAABB().max);
+	Vector3 diff = closest - sphere->GetCenterPosition();
+	return Length(diff) <= sphere->GetRadius() * sphere->GetRadius();
+}
 
+bool Collision::Check(const SphereCollider* sphere, const OBBCollider* obb)
+{
+	const OBB& ob = obb->GetOBB();
+	Vector3 localPos = ob.rotation.Inverse() * (sphere->GetCenterPosition() - ob.center);
+	Vector3 clamped = Clamp(localPos, -ob.size * 0.5f, ob.size * 0.5f);
+	Vector3 closest = ob.center + ob.rotation * clamped;
+	Vector3 diff = closest - sphere->GetCenterPosition();
+	return Length(diff) <= sphere->GetRadius() * sphere->GetRadius();
+}
+
+bool Collision::Check(const AABBCollider* a, const AABBCollider* b)
+{
+	return false;
+}
+
+bool Collision::Check(const AABBCollider* aabb, const OBBCollider* obb)
+{
+	return false;
+}
+
+bool Collision::Check(const OBBCollider* a, const OBBCollider* b)
+{
+	return false;
+}

@@ -193,6 +193,15 @@ std::vector<double> CubicSplineInterpolation(
     return result;
 }
 
+Vector3 Clamp(const Vector3& v, const Vector3& min, const Vector3& max)
+{
+    return Vector3(
+        std::clamp(v.x, min.x, max.x),
+        std::clamp(v.y, min.y, max.y),
+        std::clamp(v.z, min.z, max.z)
+    );
+}
+
 Vector3 CatmullRomSpline(const std::vector<Vector3>& controlPoints, float t) {
     // コントロールポイントが4つでないときはエラーを表示する。
     if (controlPoints.size() != 4) {

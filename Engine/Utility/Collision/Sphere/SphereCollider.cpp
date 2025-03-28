@@ -10,4 +10,5 @@ void SphereCollider::Initialize()
 void SphereCollider::Draw(Camera* camera)
 {
 	line_->DrawSphere(sphere_.center, sphere_.radius, 32);
+	line_->DrawLine();
 }

@@ -14,12 +14,8 @@ public:
 
 	void Initialzie();
 
-	Vector3 GetCenterPosition() const override {
-		return aabb_.min + (aabb_.max - aabb_.min) * 0.5f;
-	}
-	Matrix4x4 GetWorldMatrix() const override {
-		return MakeIdentity4x4();
-	}
+	Vector3 GetCenterPosition() const override {};
+	Matrix4x4 GetWorldMatrix() const override {};
 	void OnCollision([[maybe_unused]] Collider* other) override {};
 	void EnterCollision([[maybe_unused]] Collider* other) override {};
 	void ExitCollision([[maybe_unused]] Collider* other) override {};
@@ -32,6 +28,7 @@ public: // アクセッサ
 	///  AABBを取得
 	/// </summary>
 	AABB GetAABB() const { return aabb_; }
+
 	/// <summary>
 	///  AABBを設定
 	/// </summary>
