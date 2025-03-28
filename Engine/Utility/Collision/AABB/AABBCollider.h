@@ -18,6 +18,7 @@ public:
 
 	//===============================================================*/
 	~AABBCollider() = default;
+	void InitJson(JsonManager* jsonManager) override;
 	Vector3 GetCenterPosition() const override {};
 	Matrix4x4 GetWorldMatrix() const override {};
 	void OnCollision([[maybe_unused]] Collider* other) override {};

@@ -118,7 +118,8 @@ private:
 	Input* input_ = nullptr;
 	Camera* camera_ = nullptr;
 	Player* player_ = nullptr; 
-	JsonManager* jsonManager_ = nullptr;
+	std::unique_ptr <JsonManager> jsonManager_;
+	std::unique_ptr <JsonManager> jsonCollider_;
 	std::unique_ptr<ParticleEmitter> particleEmitter_;
 	std::unique_ptr<Object3d> shadow_;
 	std::unique_ptr<Object3d> base_ = nullptr;

@@ -69,6 +69,8 @@ void Enemy::Initialize(Camera* camera, const Vector3& pos)
 	timeID_ = "Enemy : " + std::to_string(serialNumber_);
 	gameTime_ = GameTime::GetInstance();
 	gameTime_->RegisterObject(timeID_);
+
+    //InitJson();
 }
 
 void Enemy::Update()
@@ -280,9 +282,11 @@ void Enemy::CameraShake()
 
 void Enemy::InitJson()
 {
-	jsonManager_ = new JsonManager("Enemy", "Resources./JSON");
+	jsonManager_ = std::make_unique<JsonManager>("Enemy", "Resources./JSON");
 	jsonManager_->Register("HP", &hp_);
 
+    jsonCollider_ = std::make_unique<JsonManager>("EnemyCollider", "Resources./JSON");
+    SphereCollider::InitJson(jsonCollider_.get());
 }
 
 Vector3 Enemy::GetWorldPosition() {

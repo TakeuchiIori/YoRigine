@@ -504,6 +504,9 @@ void Player::InitJson()
 	jsonManager_->Register("Speed", &moveSpeed_);
 	jsonManager_->Register("JumpHeight", &jumpHeight_);
 	jsonManager_->Register("Rotate Speed", &rotrateSpeed_);
+
+	jsonCollider_ = std::make_unique<JsonManager>("PlayerCollider", "Resources./JSON");
+	SphereCollider::InitJson(jsonCollider_.get());
 }
 
 void Player::JsonImGui()

@@ -1,5 +1,9 @@
 #include "AABBCollider.h"
 
+void AABBCollider::InitJson(JsonManager* jsonManager)
+{
+}
+
 void AABBCollider::Initialzie()
 {
 

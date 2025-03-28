@@ -14,6 +14,7 @@ public:
 	//===============================================================*/
 
 	~OBBCollider() = default;
+	void InitJson(JsonManager* jsonManager) override;
 	Vector3 GetCenterPosition() const override {};
 	Matrix4x4 GetWorldMatrix() const override {};
 	

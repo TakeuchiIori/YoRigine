@@ -24,8 +24,9 @@ public:
 
 public: // ポリモーフィズム
 
-	virtual ~Collider();
 
+	virtual ~Collider();
+	virtual void InitJson(JsonManager* jsonManager) = 0;
 	// 衝突中に呼ばれる関数
 	virtual void OnCollision([[maybe_unused]] Collider* other) {}
 	// 衝突した瞬間に呼ばれる関数
@@ -60,7 +61,7 @@ protected:
 	Line* line_ = nullptr;
 	Object3d* object3d_ = nullptr;
 	
-	JsonManager* jsonManager_ = nullptr;
+	//JsonManager* jsonManager_ = nullptr;
 	// 種別ID
 	uint32_t typeID_ = 0u;
 

@@ -1,5 +1,9 @@
 #include "OBBCollider.h"
 
+void OBBCollider::InitJson(JsonManager* jsonManager)
+{
+}
+
 void OBBCollider::Initialize()
 {
 	Collider::Initialize();

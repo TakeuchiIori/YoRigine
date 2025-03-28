@@ -14,6 +14,7 @@ public:
 	//===============================================================*/
 
 	~SphereCollider() = default;
+	void InitJson(JsonManager* jsonManager) override;
 	Vector3 GetCenterPosition() const override = 0;
 	Matrix4x4 GetWorldMatrix() const override = 0;
 	void OnCollision([[maybe_unused]] Collider* other) override = 0;

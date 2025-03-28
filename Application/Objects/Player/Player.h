@@ -191,6 +191,8 @@ private:
 	std::unique_ptr<ParticleEmitter> particleEmitter_;
 
 	std::unique_ptr <JsonManager> jsonManager_;
+	std::unique_ptr <JsonManager> jsonCollider_;
+
 
 	MapChipCollision mpCollision_;
 	MapChipCollision::ColliderRect colliderRect_;
