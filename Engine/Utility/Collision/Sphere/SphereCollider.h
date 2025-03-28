@@ -6,18 +6,14 @@ class SphereCollider : public Collider
 {
 public:
 	~SphereCollider() = default;
-	Vector3 GetCenterPosition() const override {
-		return sphere_.center;
-	}
-	Matrix4x4 GetWorldMatrix() const override {
-		return MakeIdentity4x4();
-	}
-	void OnCollision([[maybe_unused]] Collider* other) override {};
-	void EnterCollision([[maybe_unused]] Collider* other) override {};
-	void ExitCollision([[maybe_unused]] Collider* other) override {};
+	Vector3 GetCenterPosition() const override = 0;
+	Matrix4x4 GetWorldMatrix() const override = 0;
+	void OnCollision([[maybe_unused]] Collider* other) override = 0;
+	void EnterCollision([[maybe_unused]] Collider* other) override = 0;
+	void ExitCollision([[maybe_unused]] Collider* other) override = 0;
 
 	void Initialize();
-	void Draw(Camera* camera);
+	void Draw();
 	
 public:
 
@@ -34,6 +30,6 @@ public:
 	float GetRadius() { return sphere_.radius; }
 private:
 	Sphere sphere_;
-
+	Vector3 offset_;
 };
 

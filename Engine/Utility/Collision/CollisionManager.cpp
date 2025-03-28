@@ -9,7 +9,6 @@
 
 // C++
 #include "MathFunc.h"
-#include <algorithm>
 
 
 #ifdef _DEBUG
@@ -37,7 +36,7 @@ bool Collision::Check(const SphereCollider* a, const SphereCollider* b)
 
 bool Collision::Check(const SphereCollider* sphere, const AABBCollider* aabb)
 {
-	Vector3 closest = std::clamp(sphere->GetCenterPosition(), aabb->GetAABB().min, aabb->GetAABB().max);
+	Vector3 closest = Clamp(sphere->GetCenterPosition(), aabb->GetAABB().min, aabb->GetAABB().max);
 	Vector3 diff = closest - sphere->GetCenterPosition();
 	return Length(diff) <= sphere->GetRadius() * sphere->GetRadius();
 }
@@ -160,24 +159,41 @@ void CollisionManager::Reset() {
 
 }
 
-void CollisionManager::CheckCollisionPair(Collider* colliderA, Collider* colliderB) {
-	// コライダーAの座標を取得
-	Vector3 PosA = colliderA->GetCenterPosition();
-	// コライダーBの座標を取得
-	Vector3 PosB = colliderB->GetCenterPosition();
-	// 座標の差分ベクトル
-	Vector3 subtract = PosB - PosA;
-	// 座標AとBの距離を求める
-	float distance = Length(subtract);
+void CollisionManager::CheckCollisionPair(Collider* a, Collider* b) {
+	// Sphere
+	if (auto sa = dynamic_cast<SphereCollider*>(a)) {
+		if (auto sb = dynamic_cast<SphereCollider*>(b)) {
+			if (Collision::Check(sa, sb)) { sa->OnCollision(sb); sb->OnCollision(sa); }
+		} else if (auto ab = dynamic_cast<AABBCollider*>(b)) {
+			if (Collision::Check(sa, ab)) { sa->OnCollision(ab); ab->OnCollision(sa); }
+		} else if (auto ob = dynamic_cast<OBBCollider*>(b)) {
+			if (Collision::Check(sa, ob)) { sa->OnCollision(ob); ob->OnCollision(sa); }
+		}
+	}
 
-	// 球と球の交差判定
-	//if (distance <= (colliderA->GetRadius() + colliderB->GetRadius())) {
-	//	// コライダーAの衝突時コールバックを呼び出す
-	//	colliderA->OnCollision(colliderB);
-	//	// コライダーBの衝突時コールバックを呼び出す
-	//	colliderB->OnCollision(colliderA);
-	//}
+	// AABB
+	else if (auto aa = dynamic_cast<AABBCollider*>(a)) {
+		if (auto sb = dynamic_cast<SphereCollider*>(b)) {
+			if (Collision::Check(sb, aa)) { aa->OnCollision(sb); sb->OnCollision(aa); } // 順序注意
+		} else if (auto ab = dynamic_cast<AABBCollider*>(b)) {
+			if (Collision::Check(aa, ab)) { aa->OnCollision(ab); ab->OnCollision(aa); }
+		} else if (auto ob = dynamic_cast<OBBCollider*>(b)) {
+			if (Collision::Check(aa, ob)) { aa->OnCollision(ob); ob->OnCollision(aa); }
+		}
+	}
+
+	// OBB
+	else if (auto oa = dynamic_cast<OBBCollider*>(a)) {
+		if (auto sb = dynamic_cast<SphereCollider*>(b)) {
+			if (Collision::Check(sb, oa)) { oa->OnCollision(sb); sb->OnCollision(oa); } // 順序注意
+		} else if (auto ab = dynamic_cast<AABBCollider*>(b)) {
+			if (Collision::Check(ab, oa)) { oa->OnCollision(ab); ab->OnCollision(oa); } // 順序注意
+		} else if (auto ob = dynamic_cast<OBBCollider*>(b)) {
+			if (Collision::Check(oa, ob)) { oa->OnCollision(ob); ob->OnCollision(oa); }
+		}
+	}
 }
+
 
 void CollisionManager::CheckAllCollisions() {
 	// リスト内のペアを総当たり

@@ -307,6 +307,8 @@ void GameScene::DrawLine()
 	line_->DrawAABB(aabb.min,aabb.max);
 	line_->DrawOBB(obb.center,obb.rotation,obb.size);
 	line_->DrawLine();
+
+	player_->DrawCollision();
 }
 
 

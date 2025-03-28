@@ -89,7 +89,7 @@ void PlayerWeapon::Initialize()
 
 
 	// グループを追加
-	Collider::AddCollider();
+	SphereCollider::Initialize();
 	//
 	SaveGlobalVariables();
 	// TypeIDの設定
@@ -696,6 +696,14 @@ void PlayerWeapon::OnCollision(Collider* other)
 		
 	}
 
+}
+
+void PlayerWeapon::EnterCollision(Collider* other)
+{
+}
+
+void PlayerWeapon::ExitCollision(Collider* other)
+{
 }
 
 Vector3 PlayerWeapon::GetCenterPosition() const

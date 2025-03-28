@@ -2,13 +2,11 @@
 
 void OBBCollider::Initialize()
 {
-	line_ = new Line();
-	line_->Initialize();
-	Collider::AddCollider();
+	Collider::Initialize();
 }
 
-void OBBCollider::Draw(Camera* camera)
+void OBBCollider::Draw()
 {
 	line_->DrawOBB(obb_.center, obb_.rotation, obb_.size);
-	line_->DrawLine()
+	line_->DrawLine();
 }

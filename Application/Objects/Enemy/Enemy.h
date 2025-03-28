@@ -5,6 +5,7 @@
 #include "Systems/Input./Input.h"
 #include "WorldTransform./WorldTransform.h"
 #include "Collision./Collider.h"
+#include "Collision/Sphere/SphereCollider.h"
 #include "Loaders/Json/JsonManager.h"
 #include "Systems/Camera/Camera.h"
 #include <Systems/GameTime/GameTIme.h>
@@ -19,7 +20,7 @@
 
 class EnemyManager;
 class Player;
-class Enemy : public Collider
+class Enemy : public SphereCollider
 {
 public:
 
@@ -50,6 +51,9 @@ public:
 	/// 衝突を検出したら呼び出されるコールバック関数
 	/// </summary>
 	void OnCollision([[maybe_unused]] Collider* other) override;
+	void EnterCollision([[maybe_unused]] Collider* other) override;
+	void ExitCollision([[maybe_unused]] Collider* other) override;
+
 
 	/// <summary>
 	/// 中心座標を取得

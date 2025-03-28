@@ -2,12 +2,13 @@
 
 void SphereCollider::Initialize()
 {
-	line_ = new Line();
-	line_->Initialize();
-	Collider::AddCollider();
+	Collider::Initialize();
+
+	sphere_.center = GetCenterPosition();
+	sphere_.radius = 1.0f;
 }
 
-void SphereCollider::Draw(Camera* camera)
+void SphereCollider::Draw()
 {
 	line_->DrawSphere(sphere_.center, sphere_.radius, 32);
 	line_->DrawLine();

@@ -6,6 +6,7 @@
 #include "Systems/Input./Input.h"
 #include "WorldTransform./WorldTransform.h"
 #include "Collision./Collider.h"
+#include "Collision/Sphere/SphereCollider.h"
 #include "PlayerWeapon/PlayerWeapon.h"
 #include <Systems/GameTime/GameTIme.h>
 #include <Particle/ParticleManager.h>
@@ -21,7 +22,7 @@
 #include "Vector3.h" 
 
 class PlayerWeapon;
-class Player : public Collider
+class Player : public SphereCollider
 {
 
 public: // メンバ関数（公開）
@@ -51,6 +52,10 @@ public: // メンバ関数（公開）
 	/// </summary>
 	void Draw();
 
+	/// <summary>
+	/// 線の描画
+	/// </summary>
+	void DrawCollision();
 
 
 	/// <summary>
@@ -70,23 +75,21 @@ public: // ポリモーフィズム
 	/// 衝突を検出したら呼び出されるコールバック関数
 	/// </summary>
 	void OnCollision([[maybe_unused]] Collider* other) override;
+	void EnterCollision([[maybe_unused]] Collider* other) override;
+	void ExitCollision([[maybe_unused]] Collider* other) override;
 
 	/// <summary>
 	/// 中心座標を取得
 	/// </summary>
 	/// <returns></returns>
-	Vector3 GetCenterPosition() const override;
+	Vector3 GetCenterPosition()const override;
 
 	/// <summary>
 	/// 
 	/// </summary>
 	/// <returns></returns>
-	Matrix4x4 GetWorldMatrix() const override;
+	Matrix4x4 GetWorldMatrix()const override;
 
-	/// <summary>
-	/// 調整項目の保存
-	/// </summary>
-	void ApplyGlobalVariables();
 
 
 

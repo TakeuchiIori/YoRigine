@@ -72,7 +72,7 @@ public:
 	/// <summary>
 	/// コライダー2つの衝突判定と応答
 	/// </summary>
-	void CheckCollisionPair(Collider* colliderA, Collider* colliderB);
+	void CheckCollisionPair(Collider* a, Collider* b);
 
 	/// <summary>
 	/// 全ての当たり判定チェック

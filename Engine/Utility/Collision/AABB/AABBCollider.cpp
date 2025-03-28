@@ -2,13 +2,11 @@
 
 void AABBCollider::Initialzie()
 {
-	line_ = new Line();
-	line_->Initialize();
 
-	Collider::AddCollider();
+	Collider::Initialize();
 }
 
-void AABBCollider::Draw(Camera* camera)
+void AABBCollider::Draw()
 {
 	line_->DrawAABB(aabb_.min, aabb_.max);
 	line_->DrawLine();

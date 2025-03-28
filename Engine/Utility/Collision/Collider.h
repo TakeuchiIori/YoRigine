@@ -20,7 +20,7 @@ enum class ColliderType {
 class Collider {
 public:
 
-	void AddCollider();
+	void Initialize();
 
 public: // ポリモーフィズム
 
@@ -50,10 +50,16 @@ public: // アクセッサ
 	/// </summary>
 	void SetTypeID(uint32_t typeID) { typeID_ = typeID; }
 
+	/// <summary>
+	/// カメラのセット
+	/// </summary>
+	/// <param name="camera"></param>
+	void SetCamera(Camera* camera) { camera_ = camera; }
 
 protected:
 	Line* line_ = nullptr;
 	Object3d* object3d_ = nullptr;
+	Camera* camera_ = nullptr;
 	JsonManager* jsonManager_ = nullptr;
 	// 種別ID
 	uint32_t typeID_ = 0u;

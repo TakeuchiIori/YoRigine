@@ -56,7 +56,7 @@ void Enemy::Initialize(Camera* camera, const Vector3& pos)
    // GlobalVariables::GetInstance()->CreateGroup(groupName);
    // Collider::Initialize();
     // TypeIDの設定
-	Collider::AddCollider();
+	SphereCollider::Initialize();
     Collider::SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kEnemy));
 
     isActive_ = true;
@@ -174,6 +174,14 @@ void Enemy::OnCollision(Collider* other)
 
     
 
+}
+
+void Enemy::EnterCollision(Collider* other)
+{
+}
+
+void Enemy::ExitCollision(Collider* other)
+{
 }
 
 Vector3 Enemy::GetCenterPosition() const

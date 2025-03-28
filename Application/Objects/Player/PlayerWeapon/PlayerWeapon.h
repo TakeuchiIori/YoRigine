@@ -5,6 +5,7 @@
 #include "Systems/Input./Input.h"
 #include "WorldTransform./WorldTransform.h"
 #include "Collision./Collider.h"
+#include "Collision/Sphere/SphereCollider.h"
 #include <json.hpp>
 using json = nlohmann::json;
 // C++
@@ -16,7 +17,7 @@ using json = nlohmann::json;
 #include <Collision/ContactRecord.h>
 #include <Collision/Effect.h>
 
-class PlayerWeapon final : public Collider
+class PlayerWeapon final : public SphereCollider
 {
 public:
 	//==========================================================================//
@@ -180,6 +181,8 @@ public: // ポリモーフィズム
 	/// 衝突を検出したら呼び出されるコールバック関数
 	/// </summary>
 	void OnCollision([[maybe_unused]] Collider* other) override;
+	void EnterCollision([[maybe_unused]] Collider* other) override;
+	void ExitCollision([[maybe_unused]] Collider* other) override;
 
 	/// <summary>
 	/// 中心座標を取得

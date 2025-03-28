@@ -39,7 +39,8 @@ void Player::Initialize(Camera* camera)
 	weapon_->SetParent(worldTransform_);
 
 	// TypeIDの設定
-	Collider::AddCollider();
+	Collider::SetCamera(camera_);
+	SphereCollider::Initialize();
 	Collider::SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayer));
 	//Collider::SetRadiusFloat(2.0f);
 
@@ -55,9 +56,6 @@ void Player::Initialize(Camera* camera)
 
 void Player::Update()
 {
-	if (!isUpdate_) {
-		ApplyGlobalVariables();
-	}
 
 
 	Move();
@@ -87,6 +85,11 @@ void Player::Draw()
 	base_->Draw(camera_,worldTransform_);
 	shadow_->Draw(camera_, WS_);
 	weapon_->Draw(camera_);
+}
+
+void Player::DrawCollision()
+{
+	SphereCollider::Draw();
 }
 
 void Player::UpdateWorldTransform()
@@ -522,6 +525,14 @@ void Player::OnCollision(Collider* other)
 
 }
 
+void Player::EnterCollision(Collider* other)
+{
+}
+
+void Player::ExitCollision(Collider* other)
+{
+}
+
 Vector3 Player::GetCenterPosition() const
 {
 	// ローカル座標でのオフセット
@@ -535,8 +546,4 @@ Vector3 Player::GetCenterPosition() const
 Matrix4x4 Player::GetWorldMatrix() const
 {
 	return worldTransform_.matWorld_;
-}
-void Player::ApplyGlobalVariables() {
-
-
 }
