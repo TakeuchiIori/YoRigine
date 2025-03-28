@@ -20,10 +20,10 @@ void MyGame::Initialize()
 #endif
 	// パーティクルマネージャ生成
 	ParticleManager::GetInstance()->Initialize(srvManager_);
-	ParticleManager::GetInstance()->CreateParticleGroup("Enemy", "Resources/images/circle.png");
+	ParticleManager::GetInstance()->CreateParticleGroup("EnemyParticle", "Resources/images/circle.png");
 	ParticleManager::GetInstance()->CreateParticleGroup("W", "Resources/images/circle.png");
 	ParticleManager::GetInstance()->CreateParticleGroup("Circle", "Resources/images/circle.png");
-	ParticleManager::GetInstance()->CreateParticleGroup("Player", "Resources/images/circle.png");
+	ParticleManager::GetInstance()->CreateParticleGroup("PlayerParticle", "Resources/images/circle.png");
 }
 
 void MyGame::Finalize()

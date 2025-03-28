@@ -74,6 +74,7 @@ void FollowCamera::FollowProsess()
 void FollowCamera::InitJson()
 {
 	jsonManager_ = std::make_unique<JsonManager>("FollowCamera", "Resources/JSON");
+	jsonManager_->SetCategory("Cameras");
 	jsonManager_->Register("OffSet Translate", &offset_);
 	jsonManager_->Register("Rotate", &rotate_);
 }

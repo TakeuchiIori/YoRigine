@@ -63,7 +63,7 @@ void Enemy::Initialize(Camera* camera, const Vector3& pos)
     isActive_ = true;
     isAlive_ = true;
 
-    particleEmitter_ = std::make_unique<ParticleEmitter>("Enemy", worldTransform_.translation_, 5);
+    particleEmitter_ = std::make_unique<ParticleEmitter>("EnemyParticle", worldTransform_.translation_, 5);
     particleEmitter_->Initialize();
 	
 	timeID_ = "Enemy : " + std::to_string(serialNumber_);

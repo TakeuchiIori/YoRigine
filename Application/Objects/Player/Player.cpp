@@ -43,7 +43,7 @@ void Player::Initialize(Camera* camera)
 	Collider::SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayer));
 	//Collider::SetRadiusFloat(2.0f);
 
-	particleEmitter_ = std::make_unique<ParticleEmitter>("Player", worldTransform_.translation_, 5);
+	particleEmitter_ = std::make_unique<ParticleEmitter>("PlayerParticle", worldTransform_.translation_, 5);
     particleEmitter_->Initialize();
 
 	InitJson();
@@ -66,7 +66,7 @@ void Player::Update()
 
 
 	
-    particleEmitter_->UpdateEmit("Player", worldTransform_.translation_, 3);
+    particleEmitter_->UpdateEmit("PlayerParticle", worldTransform_.translation_, 3);
 
 	//ParticleManager::GetInstance()->Emit("Player", worldTransform_.translation_, 10);
 	UpdateWorldTransform();
@@ -499,6 +499,7 @@ void Player::ShowCoordinatesImGui()
 void Player::InitJson()
 {
 	jsonManager_ = std::make_unique<JsonManager>("Player","Resources./JSON");
+	jsonManager_->SetCategory("Objects");
 	jsonManager_->Register("World Translation", &worldTransform_.translation_);
 	jsonManager_->Register("Speed", &moveSpeed_);
 	jsonManager_->Register("JumpHeight", &jumpHeight_);
