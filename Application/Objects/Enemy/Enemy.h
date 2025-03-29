@@ -7,6 +7,7 @@
 #include "Collision./Collider.h"
 #include "Collision/Sphere/SphereCollider.h"
 #include "Collision/AABB/AABBCollider.h"
+#include "Collision/OBB/OBBCollider.h"	
 #include "Loaders/Json/JsonManager.h"
 #include "Systems/Camera/Camera.h"
 #include <Systems/GameTime/GameTIme.h>
@@ -21,7 +22,7 @@
 
 class EnemyManager;
 class Player;
-class Enemy : public AABBCollider
+class Enemy : public OBBCollider
 {
 public:
 

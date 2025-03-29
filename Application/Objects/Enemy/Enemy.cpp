@@ -57,7 +57,7 @@ void Enemy::Initialize(Camera* camera, const Vector3& pos)
    // Collider::Initialize();
     // TypeIDの設定
     Collider::SetCamera(camera_);
-	AABBCollider::Initialize();
+	OBBCollider::Initialize();
     Collider::SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kEnemy));
 
     isActive_ = true;
@@ -111,7 +111,7 @@ void Enemy::Update()
     worldTransform_.UpdateMatrix();
     WS_.UpdateMatrix();
 
-	AABBCollider::Update();
+	OBBCollider::Update();
 }
 
 void Enemy::Draw()
@@ -127,7 +127,7 @@ void Enemy::Draw()
 
 void Enemy::DrawCollision()
 {
-    AABBCollider::Draw();
+    OBBCollider::Draw();
 }
 
 void Enemy::ShowCoordinatesImGui()
@@ -166,7 +166,7 @@ void Enemy::OnCollision(Collider* other)
     // 衝突相手の種別IDを取得
     uint32_t typeID = other->GetTypeID();
     // 衝突相手が武器かプレイヤーなら
-    if (typeID == static_cast<uint32_t>(CollisionTypeIdDef::kPlayer)) {
+    if (typeID == static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon)) {
 
         isHit_ = true;
 		base_->SetMaterialColor({ 1.0f, 0.0f, 0.0f, 1.0f });
@@ -286,7 +286,7 @@ void Enemy::InitJson()
 	jsonManager_->Register("HP", &hp_);
 
     jsonCollider_ = std::make_unique<JsonManager>("EnemyCollider", "Resources./JSON/Collider");
-    AABBCollider::InitJson(jsonCollider_.get());
+    OBBCollider::InitJson(jsonCollider_.get());
 }
 
 Vector3 Enemy::GetWorldPosition() {

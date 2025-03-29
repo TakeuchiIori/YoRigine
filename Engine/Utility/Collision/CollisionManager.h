@@ -53,6 +53,7 @@ public: // 基本的な関数
 	CollisionManager() = default;
 	~CollisionManager() = default;
 
+	
 	/// <summary>
 	/// 初期化
 	/// </summary>
@@ -100,3 +101,5 @@ private:
 	// bool型
 	bool isDrawCollider_ = false;
 };
+
+

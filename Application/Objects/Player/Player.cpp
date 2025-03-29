@@ -89,7 +89,7 @@ void Player::Draw()
 
 void Player::DrawCollision()
 {
-	OBBCollider::Draw();
+	//OBBCollider::Draw();
 	weapon_->DrawCollision();
 }
 

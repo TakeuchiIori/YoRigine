@@ -302,10 +302,10 @@ void GameScene::DrawLine()
 		boneLine_->DrawLine();
 	}
 
-	line_->DrawSphere(sphere_.center, sphere_.radius, 32);
-	line_->DrawAABB(aabb.min,aabb.max);
-	line_->DrawOBB(obb.center,obb.rotation,obb.size);
-	line_->DrawLine();
+	//line_->DrawSphere(sphere_.center, sphere_.radius, 32);
+	//line_->DrawAABB(aabb.min,aabb.max);
+	//line_->DrawOBB(obb.center,obb.rotation,obb.size);
+	//line_->DrawLine();
 
 	player_->DrawCollision();
 	enemyManager_->DrawCollision();

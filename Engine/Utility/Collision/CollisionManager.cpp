@@ -25,6 +25,11 @@ CollisionManager* CollisionManager::GetInstance()
 }
 
 
+inline float ProjectOBB(const OBB& obb, const Vector3& axis, const Vector3 axes[3]) {
+	return	obb.size.x  * fabs(Dot(axes[0], axis)) +
+			obb.size.y  * fabs(Dot(axes[1], axis)) +
+			obb.size.z  * fabs(Dot(axes[2], axis));
+}
 
 bool Collision::Check(const SphereCollider* a, const SphereCollider* b)
 {
@@ -72,66 +77,88 @@ bool Collision::Check(const AABBCollider* a, const AABBCollider* b)
 
 bool Collision::Check(const OBB& obbA, const OBB& obbB)
 {
+	// 事前に早期リターンを行う球体近似チェック（オプション）
+	float radiusA = Length(obbA.size);
+	float radiusB = Length(obbB.size);
+	float distance = Length(obbB.center - obbA.center);
+	if (distance > radiusA + radiusB) {
+		return false; // 明らかに離れている場合は早期リターン
+	}
+
+	// 回転行列を取得
 	Matrix4x4 matA = MakeRotateMatrixXYZ(obbA.rotation);
 	Matrix4x4 matB = MakeRotateMatrixXYZ(obbB.rotation);
 
+	// 各OBBの軸を抽出
 	Vector3 axesA[3] = {
 		{ matA.m[0][0], matA.m[1][0], matA.m[2][0] },
 		{ matA.m[0][1], matA.m[1][1], matA.m[2][1] },
 		{ matA.m[0][2], matA.m[1][2], matA.m[2][2] }
 	};
-
 	Vector3 axesB[3] = {
 		{ matB.m[0][0], matB.m[1][0], matB.m[2][0] },
 		{ matB.m[0][1], matB.m[1][1], matB.m[2][1] },
 		{ matB.m[0][2], matB.m[1][2], matB.m[2][2] }
 	};
 
-	Vector3 distance = obbB.center - obbA.center;
+	// 中心間の距離ベクトル
+	Vector3 distanceVec = obbB.center - obbA.center;
 
-	// 分離軸テスト（SAT）
+	const float EPSILON = 1e-6f; // 数値的に安定した閾値
+
+	// テスト1: obbAの主軸でのテスト
 	for (int i = 0; i < 3; ++i) {
-		Vector3 axis = axesA[i];
-		if (!axis.IsZero()) {
-			float projA = obbA.size.x * 0.5f * fabs(Dot(axesA[0], axis)) +
-				obbA.size.y * 0.5f * fabs(Dot(axesA[1], axis)) +
-				obbA.size.z * 0.5f * fabs(Dot(axesA[2], axis));
-			float projB = obbB.size.x * 0.5f * fabs(Dot(axesB[0], axis)) +
-				obbB.size.y * 0.5f * fabs(Dot(axesB[1], axis)) +
-				obbB.size.z * 0.5f * fabs(Dot(axesB[2], axis));
-			if (fabs(Dot(distance, axis)) > projA + projB) return false;
+		const Vector3& axis = axesA[i];
+
+		// 軸の長さをチェック（ゼロ除算防止）
+		if (LengthSquared(axis) < EPSILON) continue;
+
+		// 各OBBの投影を計算
+		float projA = ProjectOBB(obbA, axis, axesA);
+		float projB = ProjectOBB(obbB, axis, axesB);
+
+		// 分離軸チェック
+		if (fabs(Dot(distanceVec, axis)) > projA + projB) {
+			return false; // 分離軸が見つかった
 		}
 	}
 
+	// テスト2: obbBの主軸でのテスト
 	for (int i = 0; i < 3; ++i) {
-		Vector3 axis = axesB[i];
-		if (!axis.IsZero()) {
-			float projA = obbA.size.x * 0.5f * fabs(Dot(axesA[0], axis)) +
-				obbA.size.y * 0.5f * fabs(Dot(axesA[1], axis)) +
-				obbA.size.z * 0.5f * fabs(Dot(axesA[2], axis));
-			float projB = obbB.size.x * 0.5f * fabs(Dot(axesB[0], axis)) +
-				obbB.size.y * 0.5f * fabs(Dot(axesB[1], axis)) +
-				obbB.size.z * 0.5f * fabs(Dot(axesB[2], axis));
-			if (fabs(Dot(distance, axis)) > projA + projB) return false;
+		const Vector3& axis = axesB[i];
+
+		if (LengthSquared(axis) < EPSILON) continue;
+
+		float projA = ProjectOBB(obbA, axis, axesA);
+		float projB = ProjectOBB(obbB, axis, axesB);
+
+		if (fabs(Dot(distanceVec, axis)) > projA + projB) {
+			return false;
 		}
 	}
 
+	// テスト3: 両方のOBBの主軸の外積でのテスト
 	for (int i = 0; i < 3; ++i) {
 		for (int j = 0; j < 3; ++j) {
 			Vector3 axis = Cross(axesA[i], axesB[j]);
-			if (!axis.IsZero()) {
-				axis = Normalize(axis);
-				float projA = obbA.size.x * 0.5f * fabs(Dot(axesA[0], axis)) +
-					obbA.size.y * 0.5f * fabs(Dot(axesA[1], axis)) +
-					obbA.size.z * 0.5f * fabs(Dot(axesA[2], axis));
-				float projB = obbB.size.x * 0.5f * fabs(Dot(axesB[0], axis)) +
-					obbB.size.y * 0.5f * fabs(Dot(axesB[1], axis)) +
-					obbB.size.z * 0.5f * fabs(Dot(axesB[2], axis));
-				if (fabs(Dot(distance, axis)) > projA + projB) return false;
+
+			// 外積が十分な大きさかチェック
+			float axisLengthSq = LengthSquared(axis);
+			if (axisLengthSq < EPSILON) continue;
+
+			// 単位ベクトルに正規化
+			axis = axis * (1.0f / sqrt(axisLengthSq));
+
+			float projA = ProjectOBB(obbA, axis, axesA);
+			float projB = ProjectOBB(obbB, axis, axesB);
+
+			if (fabs(Dot(distanceVec, axis)) > projA + projB) {
+				return false;
 			}
 		}
 	}
 
+	// すべてのテストにパスしたら衝突している
 	return true;
 }
 
@@ -149,6 +176,7 @@ bool Collision::Check(const OBBCollider* a, const OBBCollider* b)
 {
 	return Check(a->GetOBB(), b->GetOBB());
 }
+
 
 
 

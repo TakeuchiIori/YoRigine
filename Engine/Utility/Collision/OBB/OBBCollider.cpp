@@ -25,12 +25,13 @@ void OBBCollider::Initialize()
 	obbEulerOffset_ = { 0.0f, 0.0f, 0.0f }; // ← 角度（度数法）
 }
 
+/// <summary>
+/// クォータニオンには対応してないです
+/// </summary>
 void OBBCollider::Update()
 {
-
 	// ワールド行列は位置と中心の変換だけに使う
 	Matrix4x4 worldMatrix = GetWorldMatrix();
-
 	// 中心とサイズの更新
 	obb_.center = Transform(obbOffset_.center, worldMatrix);
 	obb_.size = obbOffset_.size;
@@ -49,8 +50,6 @@ void OBBCollider::Update()
 	Matrix4x4 combinedRot = Multiply(rotWorld, rotOffset);
 
 	obb_.rotation = MatrixToEuler(combinedRot);
-
-
 
 }
 
