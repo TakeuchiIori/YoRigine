@@ -146,3 +146,6 @@ Matrix4x4 ScaleMatrixFromVector3(const Vector3& scale);
 
 // Vector3から平行移動行列を作成する関数
 Matrix4x4 TranslationMatrixFromVector3(const Vector3& translate);
+
+
+Vector3 MatrixToEuler(const Matrix4x4& m);

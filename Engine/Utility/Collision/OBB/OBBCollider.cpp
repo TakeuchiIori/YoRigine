@@ -28,30 +28,29 @@ void OBBCollider::Initialize()
 void OBBCollider::Update()
 {
 
-	// ワールド行列は位置と中心の変換だけに使う（回転は使わない）
+	// ワールド行列は位置と中心の変換だけに使う
 	Matrix4x4 worldMatrix = GetWorldMatrix();
 
-	// OBB中心とサイズの更新
+	// 中心とサイズの更新
 	obb_.center = Transform(obbOffset_.center, worldMatrix);
 	obb_.size = obbOffset_.size;
 
-	// ① オフセット回転をラジアンに変換
+	// オフセット・ワールド回転（ラジアン）
 	Vector3 offsetEulerRad = {
 		DegToRad(obbEulerOffset_.x),
 		DegToRad(obbEulerOffset_.y),
 		DegToRad(obbEulerOffset_.z)
 	};
+	Vector3 worldEulerRad = GetEulerRotation(); // ← 修正点！
 
-	// ② ワールド回転（オブジェクトの回転）をラジアンに変換
-	Vector3 worldEulerDeg = GetEulerRotation(); // ← worldTransform_.rotation_
-	Vector3 worldEulerRad = {
-		DegToRad(worldEulerDeg.x),
-		DegToRad(worldEulerDeg.y),
-		DegToRad(worldEulerDeg.z)
-	};
+	Matrix4x4 rotOffset = MakeRotateMatrixXYZ(offsetEulerRad);
+	Matrix4x4 rotWorld = MakeRotateMatrixXYZ(worldEulerRad);
 
-	// ③ 回転を加算（合成）して保存
-	obb_.rotation = worldEulerRad + offsetEulerRad;
+	Matrix4x4 combinedRot = Multiply(rotWorld, rotOffset);
+
+	obb_.rotation = MatrixToEuler(combinedRot);
+
+
 
 }
 
