@@ -180,15 +180,17 @@ void PlayerWeapon::Update()
 	}
 
 
+	
 
 	// ワールドトランスフォームの更新
 	worldTransform_.UpdateMatrix();
+
+	OBBCollider::Update();
 
 #ifdef _DEBUG
 	DrawDebugUI();
 #endif // _DEBUG
 
-	OBBCollider::Update();
 
 }
 

@@ -55,7 +55,7 @@ void Line::DrawLine()
 
 
 
-void Line::RegsterLine(const Vector3& start, const Vector3& end)
+void Line::RegisterLine(const Vector3& start, const Vector3& end)
 {
 	assert(index < kMaxNum);
 
@@ -74,17 +74,17 @@ void Line::DrawSphere(const Vector3& center, float radius, int resolution)
 		float theta2 = float(i + 1) / resolution * 2.0f * std::numbers::pi_v<float>;
 
 		// XY 平面
-		RegsterLine(
+		RegisterLine(
 			{ center.x + radius * cosf(theta1), center.y + radius * sinf(theta1), center.z },
 			{ center.x + radius * cosf(theta2), center.y + radius * sinf(theta2), center.z });
 
 		// XZ 平面
-		RegsterLine(
+		RegisterLine(
 			{ center.x + radius * cosf(theta1), center.y, center.z + radius * sinf(theta1) },
 			{ center.x + radius * cosf(theta2), center.y, center.z + radius * sinf(theta2) });
 
 		// YZ 平面
-		RegsterLine(
+		RegisterLine(
 			{ center.x, center.y + radius * cosf(theta1), center.z + radius * sinf(theta1) },
 			{ center.x, center.y + radius * cosf(theta2), center.z + radius * sinf(theta2) });
 	}
@@ -173,17 +173,16 @@ void Line::DrawAABB(const Vector3& min, const Vector3& max)
 	};
 
 	for (auto& edge : edges) {
-		RegsterLine(corners[edge[0]], corners[edge[1]]);
+		RegisterLine(corners[edge[0]], corners[edge[1]]);
 	}
 }
 
 /// <summary>
 /// OBBを描画（rotation: Quaternion, size: Vector3）
 /// </summary>
-void Line::DrawOBB(const Vector3& center, const Quaternion& rotation, const Vector3& size)
-{
-	// クォータニオン → 回転行列
-	Matrix4x4 rotMat = MakeRotateMatrix(rotation);
+void Line::DrawOBB(const Vector3& center, const Vector3& rotationEuler, const Vector3& size) {
+	// 回転行列をオイラー角から作成（ラジアン前提）
+	Matrix4x4 rotMat = MakeRotateMatrixXYZ(rotationEuler); // ここをVector3→Matrixに
 
 	// 各軸方向 × サイズで orientations を生成（スケーリング込み）
 	Vector3 orientations[3] = {
@@ -216,11 +215,17 @@ void Line::DrawOBB(const Vector3& center, const Quaternion& rotation, const Vect
 		{0,4}, {1,5}, {2,6}, {3,7}  // 側面
 	};
 
-	// 描画
+	// ライン登録
 	for (const auto& edge : edges) {
-		RegsterLine(corners[edge[0]], corners[edge[1]]);
+		RegisterLine(corners[edge[0]], corners[edge[1]]);
 	}
 }
+
+void Line::DrawOBB(const Vector3& center, const Quaternion& rotation, const Vector3& size)
+{
+
+}
+
 
 
 

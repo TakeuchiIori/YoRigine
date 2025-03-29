@@ -44,10 +44,20 @@ bool Collision::Check(const SphereCollider* sphere, const AABBCollider* aabb)
 bool Collision::Check(const SphereCollider* sphere, const OBBCollider* obb)
 {
 	const OBB& ob = obb->GetOBB();
-	Vector3 localPos = ob.rotation.Inverse() * (sphere->GetCenterPosition() - ob.center);
+
+	// 回転行列を作成（オイラー角 → 回転行列）
+	Matrix4x4 rotMat = MakeRotateMatrixXYZ(ob.rotation);
+
+	// ワールド→ローカル変換：回転行列の転置を使う（回転の逆）
+	Matrix4x4 invRot = TransPose(rotMat);
+
+	Vector3 localPos = Transform(sphere->GetCenterPosition() - ob.center, invRot);
 	Vector3 clamped = Clamp(localPos, -ob.size * 0.5f, ob.size * 0.5f);
-	Vector3 closest = ob.center + ob.rotation * clamped;
+
+	// ローカル→ワールドに戻す
+	Vector3 closest = ob.center + Transform(clamped, rotMat);
 	Vector3 diff = closest - sphere->GetCenterPosition();
+
 	return Length(diff) <= sphere->GetRadius() * sphere->GetRadius();
 }
 
@@ -62,8 +72,8 @@ bool Collision::Check(const AABBCollider* a, const AABBCollider* b)
 
 bool Collision::Check(const OBB& obbA, const OBB& obbB)
 {
-	Matrix4x4 matA = MakeRotateMatrix(obbA.rotation);
-	Matrix4x4 matB = MakeRotateMatrix(obbB.rotation);
+	Matrix4x4 matA = MakeRotateMatrixXYZ(obbA.rotation);
+	Matrix4x4 matB = MakeRotateMatrixXYZ(obbB.rotation);
 
 	Vector3 axesA[3] = {
 		{ matA.m[0][0], matA.m[1][0], matA.m[2][0] },
@@ -79,6 +89,7 @@ bool Collision::Check(const OBB& obbA, const OBB& obbB)
 
 	Vector3 distance = obbB.center - obbA.center;
 
+	// 分離軸テスト（SAT）
 	for (int i = 0; i < 3; ++i) {
 		Vector3 axis = axesA[i];
 		if (!axis.IsZero()) {
@@ -107,8 +118,9 @@ bool Collision::Check(const OBB& obbA, const OBB& obbB)
 
 	for (int i = 0; i < 3; ++i) {
 		for (int j = 0; j < 3; ++j) {
-			Vector3 axis = Normalize(Cross(axesA[i], axesB[j]));
+			Vector3 axis = Cross(axesA[i], axesB[j]);
 			if (!axis.IsZero()) {
+				axis = Normalize(axis);
 				float projA = obbA.size.x * 0.5f * fabs(Dot(axesA[0], axis)) +
 					obbA.size.y * 0.5f * fabs(Dot(axesA[1], axis)) +
 					obbA.size.z * 0.5f * fabs(Dot(axesA[2], axis));
@@ -128,7 +140,7 @@ bool Collision::Check(const AABBCollider* aabb, const OBBCollider* obb)
 	OBB aabbAsOBB;
 	aabbAsOBB.center = (aabb->GetAABB().min + aabb->GetAABB().max) * 0.5f;
 	aabbAsOBB.size = aabb->GetAABB().max - aabb->GetAABB().min;
-	aabbAsOBB.rotation = Quaternion::Identity();
+	aabbAsOBB.rotation = { 0.0f,0.0f,0.0f };
 	return Collision::Check(aabbAsOBB, obb->GetOBB());
 
 }

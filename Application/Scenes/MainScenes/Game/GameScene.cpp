@@ -121,7 +121,7 @@ void GameScene::Initialize()
 
 	obb.center = { 0.0f, 2.0f, 0.0f },
 	obb.size = { 1.0f, 2.0f, 0.5f },
-	obb.rotation = { 0.0f,0.0f,0.0f,1.0f };
+	obb.rotation = { 0.0f,0.0f,0.0f};
 }
 
 /// <summary>
@@ -201,10 +201,9 @@ void GameScene::Update()
 		ImGui::DragFloat3("Center", &obb.center.x, 0.1f);
 		// サイズの操作
 		ImGui::DragFloat3("Size", &obb.size.x, 0.1f, 0.01f, 100.0f);
-		if (ImGui::DragFloat3("Rotation (Euler deg)", &eulerDeg.x, 1.0f)) {
-			Vector3 eulerRad = eulerDeg * (std::numbers::pi_v<float>);
-			obb.rotation = EulerToQuaternion(eulerRad);
-		}
+
+		ImGui::DragFloat3("Rotation", &obb.rotation.x, 0.1f);
+
 		ImGui::TreePop();
 	}
 

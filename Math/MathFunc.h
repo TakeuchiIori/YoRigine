@@ -39,7 +39,7 @@ struct OBB {
 	Vector3 center = { 0.0f, 0.0f, 0.0f };
 
 	// 回転（オイラー角）
-	Quaternion rotation = { 0.0f, 0.0f, 0.0f ,0.0f}; // radians
+	Vector3 rotation = { 0.0f, 0.0f, 0.0f}; // radians
 
 	// 半サイズ（幅/高さ/奥行きの半分）
 	Vector3 size = { 1.0f, 1.0f, 1.0f };
@@ -49,27 +49,6 @@ struct OBB {
 
 	// ワールド変換行列（必要なら）
 	Matrix4x4 worldMatrix;
-
-	/// <summary>
-	/// 各軸ベクトルを更新（rotationとsizeから）
-	/// </summary>
-	void UpdateOrientations() {
-		Matrix4x4 rotMat = MakeRotateMatrix(rotation);
-
-		orientations[0] = Transform({ 1, 0, 0 }, rotMat) * size.x; // X軸
-		orientations[1] = Transform({ 0, 1, 0 }, rotMat) * size.y; // Y軸
-		orientations[2] = Transform({ 0, 0, 1 }, rotMat) * size.z; // Z軸
-	}
-
-	/// <summary>
-	/// ワールド行列を更新（スケール・回転・平行移動）
-	/// </summary>
-	void UpdateMatrix() {
-		Matrix4x4 scaleMat = MakeScaleMatrix(size);
-		Matrix4x4 rotMat = MakeRotateMatrix(rotation);
-		Matrix4x4 transMat = MakeTranslateMatrix(center);
-		worldMatrix = Multiply(scaleMat, Multiply(rotMat, transMat));
-	}
 };
 
 

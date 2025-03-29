@@ -28,31 +28,30 @@ void OBBCollider::Initialize()
 void OBBCollider::Update()
 {
 
-	// ワールド行列は位置と中心の変換だけに使う（回転は使わない！）
+	// ワールド行列は位置と中心の変換だけに使う（回転は使わない）
 	Matrix4x4 worldMatrix = GetWorldMatrix();
 
-	// OBB中心の計算（親オブジェクトの座標系に対して）
+	// OBB中心とサイズの更新
 	obb_.center = Transform(obbOffset_.center, worldMatrix);
 	obb_.size = obbOffset_.size;
 
-	// ① オフセット回転をQuaternionに変換
-	Quaternion offsetQ = EulerToQuaternion({
+	// ① オフセット回転をラジアンに変換
+	Vector3 offsetEulerRad = {
 		DegToRad(obbEulerOffset_.x),
 		DegToRad(obbEulerOffset_.y),
 		DegToRad(obbEulerOffset_.z)
-		});
+	};
 
-	// ② 親の回転（行列からではなく、オイラー角から直接作る！）
+	// ② ワールド回転（オブジェクトの回転）をラジアンに変換
 	Vector3 worldEulerDeg = GetEulerRotation(); // ← worldTransform_.rotation_
-	Quaternion worldQ = EulerToQuaternion({
+	Vector3 worldEulerRad = {
 		DegToRad(worldEulerDeg.x),
 		DegToRad(worldEulerDeg.y),
 		DegToRad(worldEulerDeg.z)
-		});
+	};
 
-	// ③ 回転合成（親 → オフセット）
-	obb_.rotation = worldQ * offsetQ;
-
+	// ③ 回転を加算（合成）して保存
+	obb_.rotation = worldEulerRad + offsetEulerRad;
 
 }
 
