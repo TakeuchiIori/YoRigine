@@ -39,7 +39,7 @@ void Player::Initialize(Camera* camera)
 	weapon_->SetParent(worldTransform_);
 	// TypeIDの設定
 	Collider::SetCamera(camera_);
-	OBBCollider::Initialize();
+	SphereCollider::Initialize();
 	Collider::SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayer));
 	//Collider::SetRadiusFloat(2.0f);
 
@@ -77,7 +77,7 @@ void Player::Update()
 #ifdef _DEBUG
 	ShowCoordinatesImGui();
 #endif // _DEBUG
-	OBBCollider::Update();
+	SphereCollider::Update();
 }
 
 void Player::Draw()
@@ -89,7 +89,7 @@ void Player::Draw()
 
 void Player::DrawCollision()
 {
-	//OBBCollider::Draw();
+	SphereCollider::Draw();
 	weapon_->DrawCollision();
 }
 
@@ -508,7 +508,7 @@ void Player::InitJson()
 	jsonManager_->Register("Rotate Speed", &rotrateSpeed_);
 
 	jsonCollider_ = std::make_unique<JsonManager>("PlayerCollider", "Resources./JSON/Collider");
-	OBBCollider::InitJson(jsonCollider_.get());
+	SphereCollider::InitJson(jsonCollider_.get());
 }
 
 void Player::JsonImGui()

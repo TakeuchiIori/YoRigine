@@ -57,7 +57,7 @@ bool Collision::Check(const SphereCollider* sphere, const OBBCollider* obb)
 	Matrix4x4 invRot = TransPose(rotMat);
 
 	Vector3 localPos = Transform(sphere->GetCenterPosition() - ob.center, invRot);
-	Vector3 clamped = Clamp(localPos, -ob.size * 0.5f, ob.size * 0.5f);
+	Vector3 clamped = Clamp(localPos, -ob.size, ob.size);
 
 	// ローカル→ワールドに戻す
 	Vector3 closest = ob.center + Transform(clamped, rotMat);

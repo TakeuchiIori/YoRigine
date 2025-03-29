@@ -8,6 +8,7 @@
 #include "Collision./Collider.h"
 #include "Collision/Sphere/SphereCollider.h"
 #include "Collision/OBB/OBBCollider.h"
+#include "Collision/AABB/AABBCollider.h"
 #include "PlayerWeapon/PlayerWeapon.h"
 #include <Systems/GameTime/GameTIme.h>
 #include <Particle/ParticleManager.h>
@@ -23,7 +24,7 @@
 #include "Vector3.h" 
 
 class PlayerWeapon;
-class Player : public OBBCollider
+class Player : public SphereCollider
 {
 
 public: // メンバ関数（公開）
