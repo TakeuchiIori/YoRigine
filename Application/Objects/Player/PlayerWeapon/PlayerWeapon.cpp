@@ -97,6 +97,7 @@ void PlayerWeapon::Initialize(Camera* camera)
 void PlayerWeapon::InitJson()
 {
 	jsonCollider_ = std::make_unique<JsonManager>("PlayerWeaponCollider", "Resources./JSON/BaseCollider");
+	obbCollider_->InitJson(jsonCollider_.get());
 	//aabbCollider_->InitJson(jsonCollider_.get());
 	//sphereCollider_->InitJson(jsonCollider_.get());
 }
@@ -106,7 +107,6 @@ void PlayerWeapon::InitCollision()
 	// OBB
 	obbCollider_ = std::make_unique<OBBCollider>();
 	obbCollider_->SetCamera(camera_);
-	obbCollider_->InitJson(jsonCollider_.get());
 	obbCollider_->Initialize();
 	obbCollider_->SetTransform(&worldTransform_);
 
