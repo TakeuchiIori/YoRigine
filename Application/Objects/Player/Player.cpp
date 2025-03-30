@@ -541,7 +541,7 @@ void Player::InitJson()
 	jsonManager_->Register("JumpHeight", &jumpHeight_);
 	jsonManager_->Register("Rotate Speed", &rotrateSpeed_);
 
-	jsonCollider_ = std::make_unique<JsonManager>("PlayerCollider", "Resources./JSON/BaseCollider");
+	jsonCollider_ = std::make_unique<JsonManager>("PlayerCollider", "Resources/Json/Colliders");
 	obbCollider_->InitJson(jsonCollider_.get());
 	//aabbCollider_->InitJson(jsonCollider_.get());
 }

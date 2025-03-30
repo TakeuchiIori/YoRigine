@@ -167,7 +167,7 @@ void DebugCamera::UpdateInput()
 void DebugCamera::InitJson()
 {
     // JSON管理クラスを初期化
-    jsonManager_ = std::make_unique<JsonManager>("DebugCamera", "Resources/JSON");
+    jsonManager_ = std::make_unique<JsonManager>("DebugCamera", "Resources/Json/Cameras");
 	jsonManager_->SetCategory("Cameras");
     jsonManager_->Register("Translate", &translate_);
     jsonManager_->Register("Rotate", &rotate_);

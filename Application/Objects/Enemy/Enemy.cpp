@@ -336,7 +336,7 @@ void Enemy::InitJson()
 	jsonManager_ = std::make_unique<JsonManager>("Enemy", "Resources./JSON");
 	jsonManager_->Register("HP", &hp_);
 
-    jsonCollider_ = std::make_unique<JsonManager>("EnemyCollider", "Resources./JSON/BaseCollider");
+    jsonCollider_ = std::make_unique<JsonManager>("EnemyCollider", "Resources/Json/Colliders");
 	obbCollider_->InitJson(jsonCollider_.get());
 }
 
