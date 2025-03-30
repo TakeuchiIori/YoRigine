@@ -286,7 +286,7 @@ private:
 	/// </summary>
 	Animation LoadAnimationFile(const std::string& directoryPath, const std::string& filename);
 
-	std::string GetGLTFInterpolation(const aiScene* scene, const std::string& gltfFilePath, uint32_t samplerIndex);
+	std::string GetGLTFInterpolation(const std::string& gltfFilePath, uint32_t samplerIndex); // 引数にsceneがあたったけど消した
 
 	static bool HasBones(const aiScene* scene);
 

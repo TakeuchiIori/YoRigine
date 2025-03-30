@@ -75,7 +75,7 @@ void Object3d::Draw(Camera* camera,WorldTransform& worldTransform)
 	}
 }
 
-void Object3d::DrawSkeleton(const Model::Skeleton& skeleton, Line& line)
+void Object3d::DrawSkeleton(Line& line)
 {
 	model_->DrawSkeleton(model_->GetSkeleton(),line);
 }

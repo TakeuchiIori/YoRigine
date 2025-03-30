@@ -293,7 +293,7 @@ void GameScene::DrawLine()
 {
 	// 骨描画
 	if (test_ && test_->GetModel()->GetSkeleton().joints.size() > 0) {
-		test_->DrawSkeleton(test_->GetModel()->GetSkeleton(), *boneLine_);
+		test_->DrawSkeleton(*boneLine_);
 		boneLine_->DrawLine();
 	}
 

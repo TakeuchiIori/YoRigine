@@ -108,13 +108,13 @@ Audio::SoundData Audio::LoadAudio(const wchar_t* filename)
     hr = pAudioType->SetGUID(MF_MT_SUBTYPE, MFAudioFormat_PCM);
     assert(SUCCEEDED(hr));
 
-    hr = pReader->SetCurrentMediaType(MF_SOURCE_READER_FIRST_AUDIO_STREAM, nullptr, pAudioType);
+    hr = pReader->SetCurrentMediaType(static_cast<DWORD>(MF_SOURCE_READER_FIRST_AUDIO_STREAM), nullptr, pAudioType);
     pAudioType->Release();
     assert(SUCCEEDED(hr) && "Failed to set media type to PCM");
 
     // メディアタイプから WAVEFORMATEX を取得
     IMFMediaType* pActualType = nullptr;
-    hr = pReader->GetCurrentMediaType(MF_SOURCE_READER_FIRST_AUDIO_STREAM, &pActualType);
+    hr = pReader->GetCurrentMediaType(static_cast<DWORD>(MF_SOURCE_READER_FIRST_AUDIO_STREAM), &pActualType);
     assert(SUCCEEDED(hr) && "Failed to get current media type");
 
     // GetWaveFormatEx を MFCreateWaveFormatExFromMFMediaType に置き換え
@@ -137,7 +137,7 @@ Audio::SoundData Audio::LoadAudio(const wchar_t* filename)
         DWORD dwFlags = 0;
         IMFSample* pSample = nullptr;
         hr = pReader->ReadSample(
-            MF_SOURCE_READER_FIRST_AUDIO_STREAM,
+            static_cast<DWORD>(MF_SOURCE_READER_FIRST_AUDIO_STREAM),
             0,
             nullptr,
             &dwFlags,

@@ -269,7 +269,7 @@ void PlayerWeapon::DrawDebugUI() {
 	ImGui::SliderFloat3("Scale", &worldTransform_.scale_.x, 0.0f, 100.0f, "%.2f");
 
 	// 各モーションのパラメータ調整
-	for (size_t i = 0; i < attackMotions_.size(); ++i) {
+	for (int i = 0; i < attackMotions_.size(); ++i) {
 		ImGui::PushID(i);
 		if (ImGui::CollapsingHeader(("Motion " + std::to_string(i)).c_str())) {
 			ImGui::Text("Motion Parameters:");
