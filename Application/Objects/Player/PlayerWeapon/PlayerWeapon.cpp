@@ -90,12 +90,12 @@ void PlayerWeapon::Initialize(Camera* camera)
 
 
 	// グループを追加
-	Collider::SetCamera(camera_);
+	BaseCollider::SetCamera(camera_);
 	OBBCollider::Initialize();
 	//
 	//SaveGlobalVariables();
 	// TypeIDの設定
-	Collider::SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon));
+	BaseCollider::SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon));
 	InitJson();
 }
 
@@ -105,7 +105,7 @@ void PlayerWeapon::SaveGlobalVariables() {
 
 void PlayerWeapon::InitJson()
 {
-	jsonCollider_ = std::make_unique<JsonManager>("PlayerWeaponCollider", "Resources./JSON/Collider");
+	jsonCollider_ = std::make_unique<JsonManager>("PlayerWeaponCollider", "Resources./JSON/BaseCollider");
 	OBBCollider::InitJson(jsonCollider_.get());
 }
 
@@ -642,7 +642,7 @@ void PlayerWeapon::UpdateCooldown(float deltaTime)
 	}
 }
 
-void PlayerWeapon::OnCollision(Collider* other)
+void PlayerWeapon::OnCollision(BaseCollider* other)
 {
 	// 衝突相手の種別IDを取得
 	uint32_t typeID = other->GetTypeID();
@@ -674,11 +674,11 @@ void PlayerWeapon::OnCollision(Collider* other)
 
 }
 
-void PlayerWeapon::EnterCollision(Collider* other)
+void PlayerWeapon::EnterCollision(BaseCollider* other)
 {
 }
 
-void PlayerWeapon::ExitCollision(Collider* other)
+void PlayerWeapon::ExitCollision(BaseCollider* other)
 {
 }
 

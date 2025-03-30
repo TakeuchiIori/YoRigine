@@ -38,9 +38,9 @@ void Player::Initialize(Camera* camera)
 	worldTransform_.translation_.z = -50.0f;
 	weapon_->SetParent(worldTransform_);
 	// TypeIDの設定
-	Collider::SetCamera(camera_);
+	BaseCollider::SetCamera(camera_);
 	OBBCollider::Initialize();
-	Collider::SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayer));
+	BaseCollider::SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayer));
 
 	particleEmitter_ = std::make_unique<ParticleEmitter>("PlayerParticle", worldTransform_.translation_, 5);
     particleEmitter_->Initialize();
@@ -506,7 +506,7 @@ void Player::InitJson()
 	jsonManager_->Register("JumpHeight", &jumpHeight_);
 	jsonManager_->Register("Rotate Speed", &rotrateSpeed_);
 
-	jsonCollider_ = std::make_unique<JsonManager>("PlayerCollider", "Resources./JSON/Collider");
+	jsonCollider_ = std::make_unique<JsonManager>("PlayerCollider", "Resources./JSON/BaseCollider");
 	OBBCollider::InitJson(jsonCollider_.get());
 }
 
@@ -515,7 +515,7 @@ void Player::JsonImGui()
 	
 }
 
-void Player::OnCollision(Collider* other)
+void Player::OnCollision(BaseCollider* other)
 {
 	// 衝突相手の種別IDを取得
 	uint32_t typeID = other->GetTypeID();
@@ -531,11 +531,11 @@ void Player::OnCollision(Collider* other)
 
 }
 
-void Player::EnterCollision(Collider* other)
+void Player::EnterCollision(BaseCollider* other)
 {
 }
 
-void Player::ExitCollision(Collider* other)
+void Player::ExitCollision(BaseCollider* other)
 {
 }
 

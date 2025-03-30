@@ -1,6 +1,6 @@
 #pragma once
 // Engine
-#include "Collider.h"
+#include "BaseCollider.h"
 #include "Object3D/Object3d.h"
 #include "WorldTransform./WorldTransform.h"
 
@@ -73,7 +73,7 @@ public:
 	/// <summary>
 	/// コライダー2つの衝突判定と応答
 	/// </summary>
-	void CheckCollisionPair(Collider* a, Collider* b);
+	void CheckCollisionPair(BaseCollider* a, BaseCollider* b);
 
 	/// <summary>
 	/// 全ての当たり判定チェック
@@ -83,12 +83,12 @@ public:
 	/// <summary>
 	/// リストに登録
 	/// </summary>
-	void AddCollider(Collider* collider);
+	void AddCollider(BaseCollider* collider);
 
 	/// <summary>
 	/// コライダーの削除
 	/// </summary>
-	void RemoveCollider(Collider* collider);
+	void RemoveCollider(BaseCollider* collider);
 
 private:
 
@@ -97,7 +97,7 @@ private:
 	CollisionManager& operator=(const CollisionManager&) = delete;
 
 	// コライダー
-	std::list<Collider*> colliders_;
+	std::list<BaseCollider*> colliders_;
 	// bool型
 	bool isDrawCollider_ = false;
 };

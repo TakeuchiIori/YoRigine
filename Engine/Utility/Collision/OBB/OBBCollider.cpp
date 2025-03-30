@@ -18,7 +18,7 @@ void OBBCollider::InitJson(JsonManager* jsonManager)
 
 void OBBCollider::Initialize()
 {
-	Collider::Initialize();
+	BaseCollider::Initialize();
 
 	obbOffset_.center = { 0.0f, 0.0f, 0.0f };
 	obbOffset_.size = { 1.0f, 1.0f, 1.0f };

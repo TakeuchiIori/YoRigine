@@ -1,8 +1,8 @@
 #pragma once
-#include "../Collider.h"
+#include "../BaseCollider.h"
 #include "MathFunc.h"
 
-class SphereCollider : public Collider
+class SphereCollider : public BaseCollider
 {
 public:
 	/*===============================================================//
@@ -18,9 +18,9 @@ public:
 	Vector3 GetCenterPosition() const override = 0;
 	virtual Vector3 GetEulerRotation() = 0;
 	Matrix4x4 GetWorldMatrix() const override = 0;
-	void OnCollision([[maybe_unused]] Collider* other) override = 0;
-	void EnterCollision([[maybe_unused]] Collider* other) override = 0;
-	void ExitCollision([[maybe_unused]] Collider* other) override = 0;
+	void OnCollision([[maybe_unused]] BaseCollider* other) override = 0;
+	void EnterCollision([[maybe_unused]] BaseCollider* other) override = 0;
+	void ExitCollision([[maybe_unused]] BaseCollider* other) override = 0;
 
 	/*===============================================================//
 

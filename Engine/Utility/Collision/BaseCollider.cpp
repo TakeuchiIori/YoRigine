@@ -1,9 +1,9 @@
-#include "Collider.h"
+#include "BaseCollider.h"
 #include "CollisionManager.h"
 // Engine
 
 
-void Collider::Initialize()
+void BaseCollider::Initialize()
 {
 	line_ = new Line();
 	line_->Initialize();
@@ -11,7 +11,7 @@ void Collider::Initialize()
 	CollisionManager::GetInstance()->AddCollider(this);
 }
 
-Collider::~Collider()
+BaseCollider::~BaseCollider()
 {
 	CollisionManager::GetInstance()->RemoveCollider(this);
 }

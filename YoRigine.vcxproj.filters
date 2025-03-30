@@ -330,7 +330,7 @@
     <ClCompile Include="Engine\Graphics\PipelineManager\PipelineManager.cpp">
       <Filter>ソース ファイル\NOIR\Graphics\PipelineManager</Filter>
     </ClCompile>
-    <ClCompile Include="Engine\Utility\Collision\Collider.cpp">
+    <ClCompile Include="Engine\Utility\Collision\BaseCollider.cpp">
       <Filter>ソース ファイル\NOIR\Utility\Collision</Filter>
     </ClCompile>
     <ClCompile Include="Engine\Utility\Collision\CollisionManager.cpp">
@@ -593,7 +593,7 @@
     <ClInclude Include="Engine\Utility\Systems\Camera\CameraManager.h">
       <Filter>ヘッダー ファイル\NOIR\Utility\Systems\Camera</Filter>
     </ClInclude>
-    <ClInclude Include="Engine\Utility\Collision\Collider.h">
+    <ClInclude Include="Engine\Utility\Collision\BaseCollider.h">
       <Filter>ヘッダー ファイル\NOIR\Utility\Collision</Filter>
     </ClInclude>
     <ClInclude Include="Engine\Utility\Collision\CollisionTypeIdDef.h">
