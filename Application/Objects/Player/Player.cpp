@@ -41,7 +41,6 @@ void Player::Initialize(Camera* camera)
 	Collider::SetCamera(camera_);
 	OBBCollider::Initialize();
 	Collider::SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayer));
-	//Collider::SetRadiusFloat(2.0f);
 
 	particleEmitter_ = std::make_unique<ParticleEmitter>("PlayerParticle", worldTransform_.translation_, 5);
     particleEmitter_->Initialize();

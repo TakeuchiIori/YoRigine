@@ -212,6 +212,7 @@ void Enemy::EnemyAllHitStop()
     enemyManager_->ApplyHitStopToAllEnemies(HitStop::HitStopType::Heavy);
 }
 
+
 void Enemy::Move() {
     // デルタタイムの取得
     deltaTime_ = gameTime_->GetDeltaTime(timeID_);

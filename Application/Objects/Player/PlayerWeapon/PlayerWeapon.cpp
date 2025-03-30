@@ -97,6 +97,9 @@ void PlayerWeapon::Initialize(Camera* camera)
 	// TypeIDの設定
 	Collider::SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon));
 	InitJson();
+}
+
+void PlayerWeapon::SaveGlobalVariables() {
 
 }
 
@@ -171,13 +174,6 @@ void PlayerWeapon::Update()
 
 	// 全状態の更新処理
 	UpdateState();
-
-	if (state_ != PlayerWeapon::WeaponState::Idle && state_ != PlayerWeapon::WeaponState::Cooldown) {
-		//Collider::SetRadiusFloat(2.0f);
-	}
-	else {
-		//Collider::SetRadiusFloat(0.0f);
-	}
 
 
 	

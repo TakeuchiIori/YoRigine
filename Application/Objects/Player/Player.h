@@ -92,7 +92,6 @@ public: // ポリモーフィズム
 	/// <returns></returns>
 	Matrix4x4 GetWorldMatrix()const override;
 
-
 	Vector3 GetEulerRotation() override { return worldTransform_.rotation_; }
 
 
