@@ -90,7 +90,7 @@ void DebugCamera::UpdateInput()
     int32_t wheel = input->GetWheel();
     if (wheel != 0) {
         Vector3 forward = TransformNormal({ 0, 0, 1.0f }, MakeRotateMatrixXYZ(rotate_));
-        translate_ += forward * wheel * moveSpeed_ * 0.1f;
+        translate_ += forward * static_cast<float>(wheel) * moveSpeed_ * 0.1f;
     }
 
     // ===== キーボードによる操作 =====

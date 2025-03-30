@@ -179,7 +179,7 @@ void DirectXCommon::CreateSwapChain()
 	swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;				//色の形成
 	swapChainDesc.SampleDesc.Count = 1;								//マルチサンプルしない
 	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;	//描画のターゲットとして利用する
-	swapChainDesc.BufferCount = backBuffers;						//ダブルバッファ
+	swapChainDesc.BufferCount = backBuffers_;						//ダブルバッファ
 	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;		//モニタに映したら、中身を破棄
 
 	//--------------- コマンドキュー、ウィンドウハンドル、設定を渡して生成する ---------------//		
@@ -203,7 +203,7 @@ void DirectXCommon::InitializeRenderTarget()
 
 	D3D12_CPU_DESCRIPTOR_HANDLE rtvStartHandle = rtvDescriptorHeap_->GetCPUDescriptorHandleForHeapStart();
 
-	for (UINT i = 0; i < backBuffers; i++) {
+	for (int i = 0; i < backBuffers_; i++) {
 		rtvHandles_[i] = rtvStartHandle;
 		device_->CreateRenderTargetView(swapChainResources_[i].Get(), &rtvDesc_, rtvHandles_[i]);
 		rtvStartHandle.ptr += device_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
@@ -292,7 +292,7 @@ void DirectXCommon::PreDrawScene()
 	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = GetDSVCPUDescriptorHandle(0);
 	BeginRenderTargetRTV(rtvHandles_[2], &dsvHandle);
 	// クリア処理
-	commandList_->OMSetRenderTargets(1, &rtvHandles_[backBufferIndex], false, &dsvHandle);
+	commandList_->OMSetRenderTargets(1, &rtvHandles_[backBufferIndex_], false, &dsvHandle);
 	commandList_->ClearRenderTargetView(rtvHandles_[2], renderTargetClearColor_.Color, 0, nullptr);
 	commandList_->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 

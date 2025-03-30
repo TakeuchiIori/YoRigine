@@ -258,7 +258,7 @@ public: // アクセッサ
 
 	D3D12_CPU_DESCRIPTOR_HANDLE* GetrtvHandles() { return rtvHandles_; }
 	HANDLE GetFenceEvent() { return fenceEvent_; }
-	UINT GetBackBufferCount()const { return  backBufferIndex; }
+	UINT GetBackBufferCount()const { return  backBufferIndex_; }
 
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> GetOffScreenResource() { return offScreenResource_; }
@@ -319,8 +319,8 @@ private:
 	Microsoft::WRL::ComPtr<IDXGISwapChain4> swapChain_;
 	DXGI_SWAP_CHAIN_DESC1 swapChainDesc{};
 	std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, 2> swapChainResources_;
-	int backBuffers = 2; // ダブルバッファ
-	UINT backBufferIndex = backBuffers;
+	int backBuffers_ = 2; // ダブルバッファ
+	UINT backBufferIndex_ = backBuffers_;
 
 	/*=================================================================
 

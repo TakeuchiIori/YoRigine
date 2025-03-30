@@ -633,7 +633,7 @@ Model::Animation Model::LoadAnimationFile(const std::string& directoryPath, cons
 		/// ------
 
 		// 補間方法を取得
-		const std::string interpolation = GetGLTFInterpolation(scene, filePath, channelIndex);
+		const std::string interpolation = GetGLTFInterpolation(filePath, channelIndex);
 
 		if (interpolation == "LINEAR") {
 			nodeAnimation.interpolationType = InterpolationType::Linear;
@@ -682,7 +682,7 @@ Model::Animation Model::LoadAnimationFile(const std::string& directoryPath, cons
 }
 
 
-std::string Model::GetGLTFInterpolation(const aiScene* scene, const std::string& gltfFilePath, uint32_t samplerIndex) {
+std::string Model::GetGLTFInterpolation(const std::string& gltfFilePath, uint32_t samplerIndex) {
 	try {
 		// GLTFファイルを直接解析して補間方法を取得
 		return ParseGLTFInterpolation(gltfFilePath, samplerIndex);

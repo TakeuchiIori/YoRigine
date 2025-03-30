@@ -44,7 +44,7 @@ public: // メンバ関数
 	/// <summary>
 	/// スケルトン描画
 	/// </summary>
-	void DrawSkeleton(const Model::Skeleton& skeleton, Line& line);
+	void DrawSkeleton(Line& line);
 
 	/// <summary>
 	/// モデルのセット
