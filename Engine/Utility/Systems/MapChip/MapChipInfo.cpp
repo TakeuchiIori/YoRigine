@@ -4,6 +4,20 @@
 #include "Matrix4x4.h"
 #include "MathFunc.h"
 
+MapChipInfo::~MapChipInfo()
+{
+
+	for (auto& row : wt_) {
+		for (auto& ptr : row) {
+			delete ptr;
+			ptr = nullptr;
+		}
+	}
+
+	delete obj_;
+	delete mpField_;
+}
+
 void MapChipInfo::Initialize()
 {
 	mpField_ = new MapChipField();
@@ -19,9 +33,9 @@ void MapChipInfo::Initialize()
 void MapChipInfo::Update()
 {
 
-    for (std::vector<WorldTransform*>& row : wt_) {
-        for (WorldTransform* wt : row) {
-            if (wt) {
+	for (std::vector<WorldTransform*>& row : wt_) {
+		for (WorldTransform* wt : row) {
+			if (wt) {
 				Matrix4x4 scaleMatrix = MakeScaleMatrix(wt->scale_);
 				// 各軸の回転行列
 				Matrix4x4 rotX = MakeRotateMatrixX(wt->rotation_.x);
@@ -30,10 +44,10 @@ void MapChipInfo::Update()
 				Matrix4x4 rotXYZ = Multiply(rotX, Multiply(rotY, rotZ));
 				// 平行移動行列
 				Matrix4x4 translateMatrix = MakeTranslateMatrix(wt->translation_);
-                wt->UpdateMatrix();
-            }
-        }
-    }
+				wt->UpdateMatrix();
+			}
+		}
+	}
 
 
 }
@@ -44,7 +58,7 @@ void MapChipInfo::Draw()
 		for (WorldTransform* worldTransformBlock : wt) {
 			if (!worldTransformBlock)
 				continue;
-			obj_->Draw(camera_,*worldTransformBlock);
+			obj_->Draw(camera_, *worldTransformBlock);
 
 		}
 	}

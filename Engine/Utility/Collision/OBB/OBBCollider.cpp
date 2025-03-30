@@ -1,6 +1,11 @@
 #include "OBBCollider.h"
 #include "Matrix4x4.h"
 
+
+OBBCollider::~OBBCollider()
+{
+	BaseCollider::~BaseCollider();
+}
 void OBBCollider::InitJson(JsonManager* jsonManager)
 {
 	jsonManager->SetCategory("Colliders");
@@ -57,4 +62,21 @@ void OBBCollider::Draw()
 {
 	line_->DrawOBB(obb_.center, obb_.rotation, obb_.size);
 	line_->DrawLine();
+}
+
+Vector3 OBBCollider::GetCenterPosition() const {
+
+	Vector3 newPos;
+	newPos.x = worldTransform_->matWorld_.m[3][0];
+	newPos.y = worldTransform_->matWorld_.m[3][1];
+	newPos.z = worldTransform_->matWorld_.m[3][2];
+	return newPos;
+}
+
+Matrix4x4 OBBCollider::GetWorldMatrix() const {
+	return worldTransform_ ? worldTransform_->matWorld_ : MakeIdentity4x4();
+}
+
+Vector3 OBBCollider::GetEulerRotation() const {
+	return worldTransform_ ? worldTransform_->rotation_ : Vector3{};
 }

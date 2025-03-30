@@ -1,13 +1,18 @@
 #include "SphereCollider.h"
 
+SphereCollider::~SphereCollider()
+{
+	BaseCollider::~BaseCollider();
+}
+
 void SphereCollider::InitJson(JsonManager* jsonManager)
 {
 	// 衝突球のオフセットや半径を JSON に登録
 	jsonManager->SetCategory("Colliders");
-	jsonManager->Register("BaseCollider Offset X", &sphereOffset_.center.x);
-	jsonManager->Register("BaseCollider Offset Y", &sphereOffset_.center.y);
-	jsonManager->Register("BaseCollider Offset Z", &sphereOffset_.center.z);
-	jsonManager->Register("BaseCollider Radius", &radius_);
+	jsonManager->Register("Sphere Offset X", &sphereOffset_.center.x);
+	jsonManager->Register("Sphere Offset Y", &sphereOffset_.center.y);
+	jsonManager->Register("Sphere Offset Z", &sphereOffset_.center.z);
+	jsonManager->Register("Sphere Radius", &radius_);
 }
 
 void SphereCollider::Initialize()
@@ -34,7 +39,19 @@ void SphereCollider::Draw()
 	line_->DrawLine();
 }
 
-void SphereCollider::InitJson()
-{
+Vector3 SphereCollider::GetCenterPosition() const {
 
+	Vector3 newPos;
+	newPos.x = worldTransform_->matWorld_.m[3][0];
+	newPos.y = worldTransform_->matWorld_.m[3][1];
+	newPos.z = worldTransform_->matWorld_.m[3][2];
+	return newPos;
+}
+
+Matrix4x4 SphereCollider::GetWorldMatrix() const {
+	return worldTransform_ ? worldTransform_->matWorld_ : MakeIdentity4x4();
+}
+
+Vector3 SphereCollider::GetEulerRotation() const {
+	return worldTransform_ ? worldTransform_->rotation_ : Vector3{};
 }

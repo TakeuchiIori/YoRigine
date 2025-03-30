@@ -2,9 +2,13 @@
 #include "CollisionManager.h"
 // Engine
 
-
 void BaseCollider::Initialize()
 {
+	if (line_) {
+		delete line_;
+		line_ = nullptr;
+	}
+
 	line_ = new Line();
 	line_->Initialize();
 	line_->SetCamera(camera_);
@@ -14,6 +18,8 @@ void BaseCollider::Initialize()
 BaseCollider::~BaseCollider()
 {
 	CollisionManager::GetInstance()->RemoveCollider(this);
+	delete line_;
+	line_ = nullptr;
 }
 
 

@@ -38,9 +38,11 @@ void Player::Initialize(Camera* camera)
 	worldTransform_.translation_.z = -50.0f;
 	weapon_->SetParent(worldTransform_);
 	// TypeIDの設定
-	BaseCollider::SetCamera(camera_);
-	OBBCollider::Initialize();
-	BaseCollider::SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayer));
+	//BaseCollider::SetCamera(camera_);
+	//OBBCollider::Initialize();
+	//BaseCollider::SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayer));
+
+	InitCollision();
 
 	particleEmitter_ = std::make_unique<ParticleEmitter>("PlayerParticle", worldTransform_.translation_, 5);
     particleEmitter_->Initialize();
@@ -50,6 +52,45 @@ void Player::Initialize(Camera* camera)
 	timeID_ = "Player";
 	gameTime_ = GameTime::GetInstance();
 	gameTime_->RegisterObject(timeID_);
+}
+
+void Player::InitCollision()
+{
+	// OBB
+	obbCollider_ = std::make_unique<OBBCollider>();
+	obbCollider_->SetTransform(&worldTransform_);
+	obbCollider_->SetCamera(camera_);
+	obbCollider_->Initialize();
+	obbCollider_->SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayer));
+
+	// メンバ関数ポインタの登録
+	obbCollider_->SetOnEnterCollision([this](BaseCollider* self, BaseCollider* other) {
+		this->OnEnterCollision(self, other);
+		});
+	obbCollider_->SetOnCollision([this](BaseCollider* self, BaseCollider* other) {
+		this->OnCollision(self, other);
+		});
+	obbCollider_->SetOnExitCollision([this](BaseCollider* self, BaseCollider* other) {
+		this->OnExitCollision(self, other);
+		});
+
+	//aabbCollider_ = std::make_unique<AABBCollider>();
+	//aabbCollider_->SetTransform(&worldTransform_);
+	//aabbCollider_->SetCamera(camera_);
+	//aabbCollider_->Initialize();
+	//aabbCollider_->SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayer));
+	//aabbCollider_->SetOnEnterCollision([this](BaseCollider* self, BaseCollider* other) {
+	//	this->OnEnterCollision(self, other);
+	//	});
+	//aabbCollider_->SetOnCollision([this](BaseCollider* self, BaseCollider* other) {
+	//	this->OnCollision(self, other);
+	//	});
+	//aabbCollider_->SetOnExitCollision([this](BaseCollider* self, BaseCollider* other) {
+	//	this->OnExitCollision(self, other);
+	//	});
+
+
+
 }
 
 void Player::Update()
@@ -67,7 +108,6 @@ void Player::Update()
 	
     particleEmitter_->UpdateEmit("PlayerParticle", worldTransform_.translation_, 3);
 
-	//ParticleManager::GetInstance()->Emit("Player", worldTransform_.translation_, 10);
 	UpdateWorldTransform();
 
 	
@@ -76,7 +116,9 @@ void Player::Update()
 #ifdef _DEBUG
 	ShowCoordinatesImGui();
 #endif // _DEBUG
-	OBBCollider::Update();
+	//OBBCollider::Update();
+	obbCollider_->Update();
+	//aabbCollider_->Update();
 }
 
 void Player::Draw()
@@ -88,7 +130,9 @@ void Player::Draw()
 
 void Player::DrawCollision()
 {
-	OBBCollider::Draw();
+	//OBBCollider::Draw();
+	obbCollider_->Draw();
+	//aabbCollider_->Draw();
 	weapon_->DrawCollision();
 }
 
@@ -102,15 +146,6 @@ void Player::UpdateWorldTransform()
 
 void Player::Move()
 {
-	//// 衝突中フラグが立っている場合は非表示に
-	//if (isColliding_) {
-	//    isDrawEnabled_ = false; // 描画を無効に
-	//}
-	//else {
-	//    isDrawEnabled_ = true; // 描画を有効に
-	//}
-	//// 衝突状態をリセット
-	//isColliding_ = false; // 毎フレーム初期化
 
 	if (!isDash_ && weapon_->GetIsDashAttack()) {
 		isDash_ = true;
@@ -506,50 +541,20 @@ void Player::InitJson()
 	jsonManager_->Register("JumpHeight", &jumpHeight_);
 	jsonManager_->Register("Rotate Speed", &rotrateSpeed_);
 
-	jsonCollider_ = std::make_unique<JsonManager>("PlayerCollider", "Resources./JSON/BaseCollider");
-	OBBCollider::InitJson(jsonCollider_.get());
+	jsonCollider_ = std::make_unique<JsonManager>("PlayerCollider", "Resources/Json/Colliders");
+	obbCollider_->InitJson(jsonCollider_.get());
+	//aabbCollider_->InitJson(jsonCollider_.get());
 }
 
-void Player::JsonImGui()
-{
-	
-}
 
-void Player::OnCollision(BaseCollider* other)
-{
-	// 衝突相手の種別IDを取得
-	uint32_t typeID = other->GetTypeID();
-	// 衝突相手が敵なら
-	if (typeID == static_cast<uint32_t>(CollisionTypeIdDef::kEnemy)) {
-		//isColliding_ = true;
-
-		hp_--;
-		if (hp_ <= 0) {
-			isAlive_ = false;
-		}
-	}
-
-}
-
-void Player::EnterCollision(BaseCollider* other)
+void Player::OnEnterCollision(BaseCollider* self, BaseCollider* other)
 {
 }
 
-void Player::ExitCollision(BaseCollider* other)
+void Player::OnCollision(BaseCollider* self, BaseCollider* other)
 {
 }
 
-Vector3 Player::GetCenterPosition() const
+void Player::OnExitCollision(BaseCollider* self, BaseCollider* other)
 {
-	// ローカル座標でのオフセット
-	const Vector3 offset = { 0.0f, 0.0f, 0.0f };
-	// ワールド座標に変換
-	Vector3 worldPos = Transform(offset, worldTransform_.matWorld_);
-
-	return worldPos;
-}
-
-Matrix4x4 Player::GetWorldMatrix() const
-{
-	return worldTransform_.matWorld_;
 }
