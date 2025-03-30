@@ -204,8 +204,9 @@ Vector3 Enemy::GetCenterPosition() const
 
 Matrix4x4 Enemy::GetWorldMatrix() const
 {
-    return worldTransform_.matWorld_;
+	return worldTransform_.matWorld_;
 }
+
 
 void Enemy::EnemyAllHitStop()
 {

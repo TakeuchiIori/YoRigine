@@ -109,45 +109,6 @@ void PlayerWeapon::InitJson()
 	OBBCollider::InitJson(jsonCollider_.get());
 }
 
-void PlayerWeapon::SaveGlobalVariables() {
-	//GlobalVariables* globalVariables = GlobalVariables::GetInstance();
-	//const char* groupName = "PlayerWeapon";
-	//// グループを追加
-	//GlobalVariables::GetInstance()->CreateGroup(groupName);
-
-	//// 武器の位置・回転・スケール
-	//globalVariables->AddItem(groupName, "Translation", worldTransform_.translation_);
-	//globalVariables->AddItem(groupName, "Rotation", worldTransform_.rotation_);
-	//globalVariables->AddItem(groupName, "Scale", worldTransform_.scale_);
-
-	//// クールダウン時間
-	//globalVariables->AddItem(groupName, "CooldownTime", cooldownTime_);
-
-	//// コンボ猶予時間
-	//globalVariables->AddItem(groupName, "ComboWindow", comboWindow_);
-
-	//// 各モーションのパラメータ
-	//for (size_t i = 0; i < attackMotions_.size(); ++i) {
-	//	std::string motionName = "AttackMotion_" + std::to_string(i);
-
-	//	globalVariables->AddItem(groupName, motionName + "_Duration", attackMotions_[i].duration);
-	//	globalVariables->AddItem(groupName, motionName + "_HitStartTime", attackMotions_[i].hitStartTime);
-	//	globalVariables->AddItem(groupName, motionName + "_HitEndTime", attackMotions_[i].hitEndTime);
-
-	//	for (size_t j = 0; j < attackMotions_[i].srtKeyframes.size(); ++j) {
-	//		std::string keyframeName = motionName + "_Keyframe_" + std::to_string(j);
-
-	//		globalVariables->AddItem(groupName, keyframeName + "_Time", attackMotions_[i].srtKeyframes[j].time);
-	//		globalVariables->AddItem(groupName, keyframeName + "_Position", attackMotions_[i].srtKeyframes[j].position);
-	//		globalVariables->AddItem(groupName, keyframeName + "_Scale", attackMotions_[i].srtKeyframes[j].scale);
-	//		globalVariables->AddItem(groupName, keyframeName + "_Rotation", attackMotions_[i].srtKeyframes[j].rotation);
-	//	}
-	//}
-
-	//// 保存
-	////globalVariables->SaveFile(groupName);
-}
-
 
 /// <summary>
 /// 更新

@@ -57,18 +57,18 @@ public:
 	void EnterCollision([[maybe_unused]] Collider* other) override;
 	void ExitCollision([[maybe_unused]] Collider* other) override;
 
+	/// <summary>
+	/// 中心座標を取得
+	/// </summary>
+	/// <returns></returns>
+	Vector3 GetCenterPosition()const override;
 
-	///// <summary>
-	///// 中心座標を取得
-	///// </summary>
-	///// <returns></returns>
-	//Vector3 GetCenterPosition() const override;
+	/// <summary>
+	/// ワールド行列を取得
+	/// </summary>
+	/// <returns></returns>
+	Matrix4x4 GetWorldMatrix()const override;
 
-	///// <summary>
-	///// 
-	///// </summary>
-	///// <returns></returns>
-	//Matrix4x4 GetWorldMatrix() const override;
 
 	Vector3 GetEulerRotation() override { return worldTransform_.rotation_; }
 
