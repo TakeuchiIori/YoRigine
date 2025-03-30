@@ -359,3 +359,13 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# ↓これが `.gitignore` の一番最後の行に来るように
+# assimpのlibフォルダを除外対象から外す
+!externals/assimp/lib/Debug/
+!externals/assimp/lib/Debug/*.lib
+
+# Release
+!externals/assimp/lib/Release/
+!externals/assimp/lib/Release/*.lib
+
