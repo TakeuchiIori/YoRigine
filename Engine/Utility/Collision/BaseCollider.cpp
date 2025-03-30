@@ -2,7 +2,6 @@
 #include "CollisionManager.h"
 // Engine
 
-
 void BaseCollider::Initialize()
 {
 	line_ = new Line();

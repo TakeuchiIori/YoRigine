@@ -24,7 +24,7 @@ Enemy::Enemy() {
 }
 Enemy::~Enemy()
 {
-    CollisionManager::GetInstance()->RemoveCollider(this);
+	obbCollider_->~OBBCollider();
 }
 void Enemy::Initialize(Camera* camera, const Vector3& pos)
 {
@@ -55,11 +55,12 @@ void Enemy::Initialize(Camera* camera, const Vector3& pos)
     // グループを追加
    // GlobalVariables::GetInstance()->CreateGroup(groupName);
    // BaseCollider::Initialize();
-    // TypeIDの設定
-    BaseCollider::SetCamera(camera_);
-    OBBCollider::Initialize();
-    BaseCollider::SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kEnemy));
+    //// TypeIDの設定
+    //BaseCollider::SetCamera(camera_);
+    //OBBCollider::Initialize();
+    //BaseCollider::SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kEnemy));
 
+    InitCollision();
     isActive_ = true;
     isAlive_ = true;
 
@@ -71,6 +72,27 @@ void Enemy::Initialize(Camera* camera, const Vector3& pos)
 	gameTime_->RegisterObject(timeID_);
 
     InitJson();
+}
+
+void Enemy::InitCollision()
+{
+    obbCollider_ = std::make_unique<OBBCollider>();
+    obbCollider_->SetTransform(&worldTransform_);
+    obbCollider_->SetCamera(camera_);
+    obbCollider_->Initialize();
+    obbCollider_->SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kEnemy));
+
+    obbCollider_->SetOnEnterCollision([this](BaseCollider* self, BaseCollider* other) {
+        this->OnEnterCollision(self, other);
+        });
+    obbCollider_->SetOnCollision([this](BaseCollider* self, BaseCollider* other) {
+        this->OnCollision(self, other);
+        });
+    obbCollider_->SetOnExitCollision([this](BaseCollider* self, BaseCollider* other) {
+        this->OnExitCollision(self, other);
+        });
+
+
 }
 
 void Enemy::Update()
@@ -111,7 +133,8 @@ void Enemy::Update()
     worldTransform_.UpdateMatrix();
     WS_.UpdateMatrix();
 
-	OBBCollider::Update();
+	//OBBCollider::Update();
+	obbCollider_->Update();
 }
 
 void Enemy::Draw()
@@ -127,7 +150,7 @@ void Enemy::Draw()
 
 void Enemy::DrawCollision()
 {
-    OBBCollider::Draw();
+	obbCollider_->Draw();
 }
 
 void Enemy::ShowCoordinatesImGui()
@@ -161,51 +184,77 @@ void Enemy::ShowCoordinatesImGui()
 
 }
 
-void Enemy::OnCollision(BaseCollider* other)
+void Enemy::OnEnterCollision(BaseCollider* self, BaseCollider* other)
+{
+}
+
+void Enemy::OnCollision(BaseCollider* self, BaseCollider* other)
 {
     // 衝突相手の種別IDを取得
-    uint32_t typeID = other->GetTypeID();
-    // 衝突相手が武器かプレイヤーなら
-    if (typeID == static_cast<uint32_t>(CollisionTypeIdDef::kPlayer)) {
-
-        isHit_ = true;
+	uint32_t typeID = other->GetTypeID();
+	// 衝突相手が武器かプレイヤーなら
+	if (typeID == static_cast<uint32_t>(CollisionTypeIdDef::kPlayer)) {
+		isHit_ = true;
 		base_->SetMaterialColor({ 1.0f, 0.0f, 0.0f, 1.0f });
-        //hp_ -= 2;
-        if (hp_ <= 0) {
-            isAlive_ = false;
-            isActive_ = false;  // 完全に無効化
-        }
+		//hp_ -= 2;
+		if (hp_ <= 0) {
+			isAlive_ = false;
+			isActive_ = false;  // 完全に無効化
+		}
 		isShake_ = true;
-
-        HitStop::GetInstance()->Start("Player", HitStop::HitStopType::Heavy);
-    }
-
-    
-
+		HitStop::GetInstance()->Start("Player", HitStop::HitStopType::Heavy);
+	}
 }
 
-void Enemy::EnterCollision(BaseCollider* other)
+void Enemy::OnExitCollision(BaseCollider* self, BaseCollider* other)
 {
 }
 
-void Enemy::ExitCollision(BaseCollider* other)
-{
-}
-
-Vector3 Enemy::GetCenterPosition() const
-{
-    // ローカル座標でのオフセット
-    const Vector3 offset = { 0.0f, 0.0f, 0.0f };
-    // ワールド座標に変換
-    Vector3 worldPos = Transform(offset, worldTransform_.matWorld_);
-
-    return worldPos;
-}
-
-Matrix4x4 Enemy::GetWorldMatrix() const
-{
-	return worldTransform_.matWorld_;
-}
+//void Enemy::OnCollision(BaseCollider* other)
+//{
+//    // 衝突相手の種別IDを取得
+//    uint32_t typeID = other->GetTypeID();
+//    // 衝突相手が武器かプレイヤーなら
+//    if (typeID == static_cast<uint32_t>(CollisionTypeIdDef::kPlayer)) {
+//
+//        isHit_ = true;
+//		base_->SetMaterialColor({ 1.0f, 0.0f, 0.0f, 1.0f });
+//        //hp_ -= 2;
+//        if (hp_ <= 0) {
+//            isAlive_ = false;
+//            isActive_ = false;  // 完全に無効化
+//        }
+//		isShake_ = true;
+//
+//        HitStop::GetInstance()->Start("Player", HitStop::HitStopType::Heavy);
+//    }
+//
+//    
+//
+//}
+//
+//void Enemy::EnterCollision(BaseCollider* other)
+//{
+//}
+//
+//void Enemy::ExitCollision(BaseCollider* other)
+//{
+//}
+//
+//Vector3 Enemy::GetCenterPosition() const
+//{
+//    // ローカル座標でのオフセット
+//    const Vector3 offset = { 0.0f, 0.0f, 0.0f };
+//    // ワールド座標に変換
+//    Vector3 worldPos = Transform(offset, worldTransform_.matWorld_);
+//
+//    return worldPos;
+//}
+//
+//Matrix4x4 Enemy::GetWorldMatrix() const
+//{
+//	return worldTransform_.matWorld_;
+//}
 
 
 void Enemy::EnemyAllHitStop()
@@ -288,7 +337,7 @@ void Enemy::InitJson()
 	jsonManager_->Register("HP", &hp_);
 
     jsonCollider_ = std::make_unique<JsonManager>("EnemyCollider", "Resources./JSON/BaseCollider");
-    OBBCollider::InitJson(jsonCollider_.get());
+	obbCollider_->InitJson(jsonCollider_.get());
 }
 
 Vector3 Enemy::GetWorldPosition() {

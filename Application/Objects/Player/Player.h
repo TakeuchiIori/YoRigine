@@ -24,7 +24,7 @@
 #include "Vector3.h" 
 
 class PlayerWeapon;
-class Player : public OBBCollider
+class Player
 {
 
 public: // メンバ関数（公開）
@@ -43,6 +43,11 @@ public: // メンバ関数（公開）
 	/// 初期化
 	/// </summary>
 	void Initialize(Camera* camera);
+
+	/// <summary>
+	/// 当たり判定の初期化
+	/// </summary>
+	void InitCollision();
 
 	/// <summary>
 	/// 更新
@@ -71,28 +76,13 @@ public: // メンバ関数（公開）
 
 	void JsonImGui();
 
-public: // ポリモーフィズム
+public: 
 
-	/// <summary>
-	/// 衝突を検出したら呼び出されるコールバック関数
-	/// </summary>
-	void OnCollision([[maybe_unused]] BaseCollider* other) override;
-	void EnterCollision([[maybe_unused]] BaseCollider* other) override;
-	void ExitCollision([[maybe_unused]] BaseCollider* other) override;
+	// 衝突イベント（共通で受け取る）
+	void OnEnterCollision(BaseCollider* self, BaseCollider* other);
+	void OnCollision(BaseCollider* self, BaseCollider* other);
+	void OnExitCollision(BaseCollider* self, BaseCollider* other);
 
-	/// <summary>
-	/// 中心座標を取得
-	/// </summary>
-	/// <returns></returns>
-	Vector3 GetCenterPosition()const override;
-
-	/// <summary>
-	/// 
-	/// </summary>
-	/// <returns></returns>
-	Matrix4x4 GetWorldMatrix()const override;
-
-	Vector3 GetEulerRotation() override { return worldTransform_.rotation_; }
 
 
 
@@ -199,6 +189,10 @@ private:
 
 	MapChipCollision mpCollision_;
 	MapChipCollision::ColliderRect colliderRect_;
+
+	std::unique_ptr<OBBCollider> obbCollider_;
+	std::unique_ptr<AABBCollider> aabbCollider_;
+	//std::unique_ptr<SphereCollider> sphereCollider_;
 
 	/*===============================================================//
 								フラグ関連

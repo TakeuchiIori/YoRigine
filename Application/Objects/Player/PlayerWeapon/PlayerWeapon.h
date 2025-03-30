@@ -20,7 +20,7 @@ using json = nlohmann::json;
 #include <Collision/ContactRecord.h>
 #include <Collision/Effect.h>
 
-class PlayerWeapon final : public OBBCollider
+class PlayerWeapon
 {
 public:
 	//==========================================================================//
@@ -181,29 +181,28 @@ private:
 
 public: // ポリモーフィズム
 
-	/// <summary>
-	/// 衝突を検出したら呼び出されるコールバック関数
-	/// </summary>
-	void OnCollision([[maybe_unused]] BaseCollider* other) override;
-	void EnterCollision([[maybe_unused]] BaseCollider* other) override;
-	void ExitCollision([[maybe_unused]] BaseCollider* other) override;
+	///// <summary>
+	///// 衝突を検出したら呼び出されるコールバック関数
+	///// </summary>
+	//void OnCollision([[maybe_unused]] BaseCollider* other) override;
+	//void EnterCollision([[maybe_unused]] BaseCollider* other) override;
+	//void ExitCollision([[maybe_unused]] BaseCollider* other) override;
 
-	/// <summary>
-	/// 中心座標を取得
-	/// </summary>
-	/// <returns></returns>
-	Vector3 GetCenterPosition() const override;
+	///// <summary>
+	///// 中心座標を取得
+	///// </summary>
+	///// <returns></returns>
+	//Vector3 GetCenterPosition() const override;
 
-	/// <summary>
-	/// 
-	/// </summary>
-	/// <returns></returns>
-	Matrix4x4 GetWorldMatrix() const override;
+	///// <summary>
+	///// 
+	///// </summary>
+	///// <returns></returns>
+	//Matrix4x4 GetWorldMatrix() const override;
 
 
-	Vector3 GetEulerRotation() override { return worldTransform_.rotation_; }
+	//Vector3 GetEulerRotation() override { return worldTransform_.rotation_; }
 
-	void ApplyGlobalVariables();
 
 public:
 	//==========================================================================//
