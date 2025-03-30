@@ -553,7 +553,7 @@ void Player::InitJson()
 
 	jsonCollider_ = std::make_unique<JsonManager>("PlayerCollider", "Resources./JSON/BaseCollider");
 	obbCollider_->InitJson(jsonCollider_.get());
-	
+	aabbCollider_->InitJson(jsonCollider_.get());
 }
 
 void Player::JsonImGui()

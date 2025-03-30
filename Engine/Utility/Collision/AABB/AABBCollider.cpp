@@ -10,12 +10,12 @@ void AABBCollider::InitJson(JsonManager* jsonManager)
 {
 	// 衝突球のオフセットや半径を JSON に登録
 	jsonManager->SetCategory("Colliders");
-	jsonManager->Register("BaseCollider Offset Min X", &aabbOffset_.min.x);
-	jsonManager->Register("BaseCollider Offset Min Y", &aabbOffset_.min.y);
-	jsonManager->Register("BaseCollider Offset Min Z", &aabbOffset_.min.z);
-	jsonManager->Register("BaseCollider Offset Max X", &aabbOffset_.max.x);
-	jsonManager->Register("BaseCollider Offset Max Y", &aabbOffset_.max.y);
-	jsonManager->Register("BaseCollider Offset Max Z", &aabbOffset_.max.z);
+	jsonManager->Register("AABB Offset Min X", &aabbOffset_.min.x);
+	jsonManager->Register("AABB Offset Min Y", &aabbOffset_.min.y);
+	jsonManager->Register("AABB Offset Min Z", &aabbOffset_.min.z);
+	jsonManager->Register("AABB Offset Max X", &aabbOffset_.max.x);
+	jsonManager->Register("AABB Offset Max Y", &aabbOffset_.max.y);
+	jsonManager->Register("AABB Offset Max Z", &aabbOffset_.max.z);
 	
 }
 
