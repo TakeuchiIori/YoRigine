@@ -24,6 +24,11 @@ CollisionManager* CollisionManager::GetInstance()
 	return &instance;
 }
 
+CollisionManager::~CollisionManager()
+{
+	Reset();
+}
+
 
 inline float ProjectOBB(const OBB& obb, const Vector3& axis, const Vector3 axes[3]) {
 	return	obb.size.x  * fabs(Dot(axes[0], axis)) +
@@ -213,7 +218,7 @@ void CollisionManager::Update()
 void CollisionManager::Reset() {
 	// リストを空っぽにする
 	colliders_.clear();
-
+	collidingPairs_.clear();
 }
 
 void CollisionManager::CheckCollisionPair(BaseCollider* a, BaseCollider* b) {

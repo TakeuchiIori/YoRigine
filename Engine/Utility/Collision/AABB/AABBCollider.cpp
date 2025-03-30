@@ -4,6 +4,7 @@
 AABBCollider::~AABBCollider()
 {
 	BaseCollider::~BaseCollider();
+
 }
 
 void AABBCollider::InitJson(JsonManager* jsonManager)

@@ -74,10 +74,7 @@ public: // アクセッサ
 protected:
 	Line* line_ = nullptr;
 	const WorldTransform* worldTransform_ = nullptr;
-
-	// 種別ID
 	uint32_t typeID_ = 0u;
-
 private:
 	Camera* camera_ = nullptr;
 	CollisionCallback enterCallback_;

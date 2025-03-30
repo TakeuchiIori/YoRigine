@@ -27,7 +27,7 @@ void UIBase::Initialize(const std::string& jsonConfigPath) {
     configPath_ = jsonConfigPath;
 
     // スプライトを作成
-    sprite_ = new Sprite ();
+    sprite_ = std::make_unique<Sprite>();
 
     // JSONファイルが存在するか確認
     bool jsonExists = std::filesystem::exists(jsonConfigPath);
@@ -616,7 +616,7 @@ void UIBase::ApplyJSONToState(const nlohmann::json& data) {
 
         // スプライトがまだ作成されていない場合は初期化
         if (!sprite_) {
-            sprite_ = new Sprite();
+            sprite_ = std::make_unique<Sprite>();
             sprite_->Initialize(texturePath_);
         } else {
             // すでにある場合はテクスチャを変更
@@ -625,7 +625,7 @@ void UIBase::ApplyJSONToState(const nlohmann::json& data) {
         }
     } else if (!sprite_) {
         // テクスチャが指定されていない場合はデフォルトテクスチャで初期化
-        sprite_ = new Sprite();
+        sprite_ = std::make_unique<Sprite>();
         sprite_->Initialize("./Resources/images/white.png");
         texturePath_ = "./Resources/images/white.png";
     }

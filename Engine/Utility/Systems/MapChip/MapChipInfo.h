@@ -16,6 +16,8 @@ class MapChipInfo
 {
 public:
 
+	~MapChipInfo();
+
 	/// <summary>
 	/// 初期化
 	/// </summary>

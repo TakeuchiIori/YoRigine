@@ -4,7 +4,7 @@
 
 OBBCollider::~OBBCollider()
 {
-	//BaseCollider::~BaseCollider();
+	BaseCollider::~BaseCollider();
 }
 void OBBCollider::InitJson(JsonManager* jsonManager)
 {

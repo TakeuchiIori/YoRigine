@@ -55,7 +55,7 @@ public: // 基本的な関数
 	// コンストラクタ
 	// デストラクタ
 	CollisionManager() = default;
-	~CollisionManager() = default;
+	~CollisionManager();
 
 	
 	/// <summary>
