@@ -2,7 +2,6 @@
 // Engine
 #include "Loaders./Model./ModelManager.h"
 #include "Object3D./Object3dCommon.h"
-#include "Collision/GlobalVariables.h"
 
 
 
@@ -22,8 +21,9 @@
 /// <summary>
 /// 初期化
 /// </summary>
-void PlayerWeapon::Initialize()
+void PlayerWeapon::Initialize(Camera* camera)
 {
+	camera_ = camera;
 	// object3dの初期化
 	weapon_ = std::make_unique<Object3d>();
 	weapon_->Initialize();
@@ -89,51 +89,63 @@ void PlayerWeapon::Initialize()
 #pragma endregion
 
 
-	//// グループを追加
-	//Collider::Initialize();
-	////
+	// グループを追加
+	Collider::SetCamera(camera_);
+	OBBCollider::Initialize();
+	//
 	//SaveGlobalVariables();
-	//// TypeIDの設定
-	//Collider::SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon));
+	// TypeIDの設定
+	Collider::SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon));
+	InitJson();
 }
 
 void PlayerWeapon::SaveGlobalVariables() {
-	GlobalVariables* globalVariables = GlobalVariables::GetInstance();
-	const char* groupName = "PlayerWeapon";
-	// グループを追加
-	GlobalVariables::GetInstance()->CreateGroup(groupName);
 
-	// 武器の位置・回転・スケール
-	globalVariables->AddItem(groupName, "Translation", worldTransform_.translation_);
-	globalVariables->AddItem(groupName, "Rotation", worldTransform_.rotation_);
-	globalVariables->AddItem(groupName, "Scale", worldTransform_.scale_);
+}
 
-	// クールダウン時間
-	globalVariables->AddItem(groupName, "CooldownTime", cooldownTime_);
+void PlayerWeapon::InitJson()
+{
+	jsonCollider_ = std::make_unique<JsonManager>("PlayerWeaponCollider", "Resources./JSON/Collider");
+	OBBCollider::InitJson(jsonCollider_.get());
+}
 
-	// コンボ猶予時間
-	globalVariables->AddItem(groupName, "ComboWindow", comboWindow_);
+void PlayerWeapon::SaveGlobalVariables() {
+	//GlobalVariables* globalVariables = GlobalVariables::GetInstance();
+	//const char* groupName = "PlayerWeapon";
+	//// グループを追加
+	//GlobalVariables::GetInstance()->CreateGroup(groupName);
 
-	// 各モーションのパラメータ
-	for (size_t i = 0; i < attackMotions_.size(); ++i) {
-		std::string motionName = "AttackMotion_" + std::to_string(i);
+	//// 武器の位置・回転・スケール
+	//globalVariables->AddItem(groupName, "Translation", worldTransform_.translation_);
+	//globalVariables->AddItem(groupName, "Rotation", worldTransform_.rotation_);
+	//globalVariables->AddItem(groupName, "Scale", worldTransform_.scale_);
 
-		globalVariables->AddItem(groupName, motionName + "_Duration", attackMotions_[i].duration);
-		globalVariables->AddItem(groupName, motionName + "_HitStartTime", attackMotions_[i].hitStartTime);
-		globalVariables->AddItem(groupName, motionName + "_HitEndTime", attackMotions_[i].hitEndTime);
+	//// クールダウン時間
+	//globalVariables->AddItem(groupName, "CooldownTime", cooldownTime_);
 
-		for (size_t j = 0; j < attackMotions_[i].srtKeyframes.size(); ++j) {
-			std::string keyframeName = motionName + "_Keyframe_" + std::to_string(j);
+	//// コンボ猶予時間
+	//globalVariables->AddItem(groupName, "ComboWindow", comboWindow_);
 
-			globalVariables->AddItem(groupName, keyframeName + "_Time", attackMotions_[i].srtKeyframes[j].time);
-			globalVariables->AddItem(groupName, keyframeName + "_Position", attackMotions_[i].srtKeyframes[j].position);
-			globalVariables->AddItem(groupName, keyframeName + "_Scale", attackMotions_[i].srtKeyframes[j].scale);
-			globalVariables->AddItem(groupName, keyframeName + "_Rotation", attackMotions_[i].srtKeyframes[j].rotation);
-		}
-	}
+	//// 各モーションのパラメータ
+	//for (size_t i = 0; i < attackMotions_.size(); ++i) {
+	//	std::string motionName = "AttackMotion_" + std::to_string(i);
 
-	// 保存
-	//globalVariables->SaveFile(groupName);
+	//	globalVariables->AddItem(groupName, motionName + "_Duration", attackMotions_[i].duration);
+	//	globalVariables->AddItem(groupName, motionName + "_HitStartTime", attackMotions_[i].hitStartTime);
+	//	globalVariables->AddItem(groupName, motionName + "_HitEndTime", attackMotions_[i].hitEndTime);
+
+	//	for (size_t j = 0; j < attackMotions_[i].srtKeyframes.size(); ++j) {
+	//		std::string keyframeName = motionName + "_Keyframe_" + std::to_string(j);
+
+	//		globalVariables->AddItem(groupName, keyframeName + "_Time", attackMotions_[i].srtKeyframes[j].time);
+	//		globalVariables->AddItem(groupName, keyframeName + "_Position", attackMotions_[i].srtKeyframes[j].position);
+	//		globalVariables->AddItem(groupName, keyframeName + "_Scale", attackMotions_[i].srtKeyframes[j].scale);
+	//		globalVariables->AddItem(groupName, keyframeName + "_Rotation", attackMotions_[i].srtKeyframes[j].rotation);
+	//	}
+	//}
+
+	//// 保存
+	////globalVariables->SaveFile(groupName);
 }
 
 
@@ -163,21 +175,18 @@ void PlayerWeapon::Update()
 	// 全状態の更新処理
 	UpdateState();
 
-	//if (state_ != PlayerWeapon::WeaponState::Idle && state_ != PlayerWeapon::WeaponState::Cooldown) {
-	//	Collider::SetRadiusFloat(2.0f);
-	//}
-	//else {
-	//	Collider::SetRadiusFloat(0.0f);
-	//}
 
-
+	
 
 	// ワールドトランスフォームの更新
 	worldTransform_.UpdateMatrix();
 
+	OBBCollider::Update();
+
 #ifdef _DEBUG
 	DrawDebugUI();
 #endif // _DEBUG
+
 
 }
 
@@ -190,6 +199,11 @@ void PlayerWeapon::Draw(Camera* camera)
 		effect->Draw(camera);
 	}
 	weapon_->Draw(camera,worldTransform_);
+}
+
+void PlayerWeapon::DrawCollision()
+{
+	OBBCollider::Draw();
 }
 
 /// <summary>
@@ -667,83 +681,91 @@ void PlayerWeapon::UpdateCooldown(float deltaTime)
 	}
 }
 
-//void PlayerWeapon::OnCollision(Collider* other)
-//{
-//	// 衝突相手の種別IDを取得
-//	uint32_t typeID = other->GetTypeID();
-//	// 衝突相手が敵なら
-//	if (typeID == static_cast<uint32_t>(CollisionTypeIdDef::kEnemy)) {
-//
-//		Enemy* enemy = static_cast<Enemy*>(other);
-//		uint32_t serialNumber = enemy->GetSerialNumber();
-//		// 接触履歴があれば何もせずに抜ける
-//		if (contactRecord_.CheckHistory(serialNumber)) {
-//			return;
-//		}
-//		// 接触履歴に登録
-//		contactRecord_.record(serialNumber);
-//
-//		// 敵の位置にエフェクトを発生させる
-//		Effect* effect = new Effect();
-//		effect->Initialize();
-//		effect->SetWorldTransform(enemy->GetWorldTransform());
-//		effect->Update();
-//		effects_.push_back(effect);
-//
-//		if (state_ == WeaponState::Dashing || state_ == WeaponState::JumpAttack) {
-//			enemy->EnemyAllHitStop();
-//		}
-//
-//		
-//	}
-//
-//}
-//
-//Vector3 PlayerWeapon::GetCenterPosition() const
-//{
-//	// ローカル座標でのオフセット
-//	const Vector3 offset = { 0.0f, 0.0f, 0.0f };
-//	// ワールド座標に変換
-//	Vector3 worldPos = TransformCoordinates(offset, worldTransform_.matWorld_);
-//
-//	return worldPos;
-//}
-//
-//Matrix4x4 PlayerWeapon::GetWorldMatrix() const
-//{
-//	return worldTransform_.matWorld_;
-//}
+void PlayerWeapon::OnCollision(Collider* other)
+{
+	// 衝突相手の種別IDを取得
+	uint32_t typeID = other->GetTypeID();
+	// 衝突相手が敵なら
+	if (typeID == static_cast<uint32_t>(CollisionTypeIdDef::kEnemy)) {
+
+		Enemy* enemy = static_cast<Enemy*>(other);
+		uint32_t serialNumber = enemy->GetSerialNumber();
+		// 接触履歴があれば何もせずに抜ける
+		if (contactRecord_.CheckHistory(serialNumber)) {
+			return;
+		}
+		// 接触履歴に登録
+		contactRecord_.record(serialNumber);
+
+		// 敵の位置にエフェクトを発生させる
+		Effect* effect = new Effect();
+		effect->Initialize();
+		effect->SetWorldTransform(enemy->GetWorldTransform());
+		effect->Update();
+		effects_.push_back(effect);
+
+		if (state_ == WeaponState::Dashing || state_ == WeaponState::JumpAttack) {
+			enemy->EnemyAllHitStop();
+		}
+
+		
+	}
+
+}
+
+void PlayerWeapon::EnterCollision(Collider* other)
+{
+}
+
+void PlayerWeapon::ExitCollision(Collider* other)
+{
+}
+
+Vector3 PlayerWeapon::GetCenterPosition() const
+{
+	// ローカル座標でのオフセット
+	const Vector3 offset = { 0.0f, 0.0f, 0.0f };
+	// ワールド座標に変換
+	Vector3 worldPos = Transform(offset, worldTransform_.matWorld_);
+
+	return worldPos;
+}
+
+Matrix4x4 PlayerWeapon::GetWorldMatrix() const
+{
+	return worldTransform_.matWorld_;
+}
 
 void PlayerWeapon::ApplyGlobalVariables() {
-	GlobalVariables* globalVariables = GlobalVariables::GetInstance();
-	const char* groupName = "PlayerWeapon";
+	//GlobalVariables* globalVariables = GlobalVariables::GetInstance();
+	//const char* groupName = "PlayerWeapon";
 
-	// 武器の位置・回転・スケール
-	worldTransform_.translation_ = globalVariables->GetVector3Value(groupName, "Translation");
-	worldTransform_.rotation_ = globalVariables->GetVector3Value(groupName, "Rotation");
-	worldTransform_.scale_ = globalVariables->GetVector3Value(groupName, "Scale");
+	//// 武器の位置・回転・スケール
+	//worldTransform_.translation_ = globalVariables->GetVector3Value(groupName, "Translation");
+	//worldTransform_.rotation_ = globalVariables->GetVector3Value(groupName, "Rotation");
+	//worldTransform_.scale_ = globalVariables->GetVector3Value(groupName, "Scale");
 
-	// クールダウン時間
-	cooldownTime_ = globalVariables->GetFloatValue(groupName, "CooldownTime");
+	//// クールダウン時間
+	//cooldownTime_ = globalVariables->GetFloatValue(groupName, "CooldownTime");
 
-	// コンボ猶予時間
-	comboWindow_ = globalVariables->GetFloatValue(groupName, "ComboWindow");
+	//// コンボ猶予時間
+	//comboWindow_ = globalVariables->GetFloatValue(groupName, "ComboWindow");
 
-	// 各モーションのパラメータ
-	for (size_t i = 0; i < attackMotions_.size(); ++i) {
-		std::string motionName = "AttackMotion_" + std::to_string(i);
+	//// 各モーションのパラメータ
+	//for (size_t i = 0; i < attackMotions_.size(); ++i) {
+	//	std::string motionName = "AttackMotion_" + std::to_string(i);
 
-		attackMotions_[i].duration = globalVariables->GetFloatValue(groupName, motionName + "_Duration");
-		attackMotions_[i].hitStartTime = globalVariables->GetFloatValue(groupName, motionName + "_HitStartTime");
-		attackMotions_[i].hitEndTime = globalVariables->GetFloatValue(groupName, motionName + "_HitEndTime");
+	//	attackMotions_[i].duration = globalVariables->GetFloatValue(groupName, motionName + "_Duration");
+	//	attackMotions_[i].hitStartTime = globalVariables->GetFloatValue(groupName, motionName + "_HitStartTime");
+	//	attackMotions_[i].hitEndTime = globalVariables->GetFloatValue(groupName, motionName + "_HitEndTime");
 
-		for (size_t j = 0; j < attackMotions_[i].srtKeyframes.size(); ++j) {
-			std::string keyframeName = motionName + "_Keyframe_" + std::to_string(j);
+	//	for (size_t j = 0; j < attackMotions_[i].srtKeyframes.size(); ++j) {
+	//		std::string keyframeName = motionName + "_Keyframe_" + std::to_string(j);
 
-			attackMotions_[i].srtKeyframes[j].time = globalVariables->GetFloatValue(groupName, keyframeName + "_Time");
-			attackMotions_[i].srtKeyframes[j].position = globalVariables->GetVector3Value(groupName, keyframeName + "_Position");
-			attackMotions_[i].srtKeyframes[j].scale = globalVariables->GetVector3Value(groupName, keyframeName + "_Scale");
-			attackMotions_[i].srtKeyframes[j].rotation = globalVariables->GetQuaternionValue(groupName, keyframeName + "_Rotation");
-		}
-	}
+	//		attackMotions_[i].srtKeyframes[j].time = globalVariables->GetFloatValue(groupName, keyframeName + "_Time");
+	//		attackMotions_[i].srtKeyframes[j].position = globalVariables->GetVector3Value(groupName, keyframeName + "_Position");
+	//		attackMotions_[i].srtKeyframes[j].scale = globalVariables->GetVector3Value(groupName, keyframeName + "_Scale");
+	//		attackMotions_[i].srtKeyframes[j].rotation = globalVariables->GetQuaternionValue(groupName, keyframeName + "_Rotation");
+	//	}
+	//}
 }

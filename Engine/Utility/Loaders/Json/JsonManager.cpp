@@ -156,66 +156,75 @@ void JsonManager::ImGui(const std::string& className)
 #endif // _DEBUG
 }
 
+// JsonManager.cpp の ImGuiManager を修正
 void JsonManager::ImGuiManager()
 {
 #ifdef _DEBUG
-	ImGui::Begin("JsonManager"); // Parent window
+	ImGui::Begin("JsonManager"); // 親ウィンドウ
 
-	ImGui::Text("Select Class:");
-	ImGui::Separator();
+	ImGui::Text("Select Category:");
+	//ImGui::Separator();
 
-	// Start child window with scrollbar
-	ImGui::BeginChild("ClassList", ImVec2(0, 150), true);
-
-	// Display class name buttons vertically
-	for (auto& instance : instances) {
-		ImGui::PushTextWrapPos(ImGui::GetWindowWidth() - 20.0f);
-		if (ImGui::Button(instance.first.c_str(),
-			ImVec2(250, 30))) // Unified button width
-		{
-			selectedClass = instance.first; // Update selected class
-		}
-		ImGui::PopTextWrapPos();
+	// カテゴリごとのマップを作る
+	std::unordered_map<std::string, std::vector<std::string>> categoryMap;
+	for (const auto& [name, manager] : instances) {
+		std::string category = manager->GetCategory().empty() ? "Uncategorized" : manager->GetCategory();
+		categoryMap[category].push_back(name);
 	}
 
-	ImGui::EndChild();  // End child window
-	ImGui::Separator(); // Separator line
+	// クラス選択スクロール部分（固定せず最大限使う）
+	ImGui::BeginChild("ClassList", ImVec2(0, 0), true, ImGuiWindowFlags_AlwaysVerticalScrollbar);
 
-	// Display only the selected class
+	for (const auto& [category, classList] : categoryMap) {
+		if (ImGui::TreeNode(category.c_str())) {
+			for (const auto& className : classList) {
+				if (ImGui::Button(className.c_str(), ImVec2(250, 30))) {
+					selectedClass = className;
+				}
+			}
+			ImGui::TreePop();
+		}
+	}
+
+	ImGui::EndChild(); // クラス一覧パネル終わり
+
+	//ImGui::Separator();
+
+	// 選択されたクラスを表示
 	if (!selectedClass.empty()) {
 		auto it = instances.find(selectedClass);
 		if (it != instances.end()) {
 			JsonManager* instance = it->second;
 
-			std::string windowTitle = "JsonManager - " + selectedClass;
-			ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "[ %s ]",
-				selectedClass.c_str());
+			ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "[ %s ]", selectedClass.c_str());
+			//ImGui::Separator();
 
-			ImGui::Separator();
+			ImGui::PushID(selectedClass.c_str());
 
-			ImGui::PushID(selectedClass.c_str()); // Set ID for each class
-
-			// Start child window with scrollbar for variables
-			ImGui::BeginChild("VariableList", ImVec2(0, 200), true);
+			// 変数表示もスクロールできるように
+			ImGui::BeginChild("VariableList", ImVec2(0, 200), true, ImGuiWindowFlags_AlwaysVerticalScrollbar);
 
 			for (auto& pair : instance->variables_) {
 				pair.second->ShowImGui(pair.first, selectedClass);
 			}
 
-			ImGui::EndChild(); // End child window for variables
+			ImGui::EndChild();
 
 			if (ImGui::Button(("Save " + selectedClass).c_str())) {
 				std::string message = format("{}.json Saved!!.", selectedClass);
 				MessageBoxA(nullptr, message.c_str(), "JsonManager", 0);
 				instance->Save();
 			}
+
 			ImGui::PopID();
 		}
 	}
 
-	ImGui::End();
+	ImGui::End(); // 親ウィンドウ終わり
 #endif
 }
+
+
 
 std::string JsonManager::MakeFullPath(const std::string& folder, const std::string& file) const
 {

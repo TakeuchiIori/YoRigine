@@ -4,12 +4,12 @@
 #include <iostream>
 
 // Engine
-#include "GlobalVariables.h"
 #include "Loaders./Model/ModelManager.h"
 #include "CollisionTypeIdDef.h"
 
 // C++
 #include "MathFunc.h"
+
 
 #ifdef _DEBUG
 #include "imgui.h"
@@ -24,75 +24,171 @@ CollisionManager* CollisionManager::GetInstance()
 	return &instance;
 }
 
-void CollisionManager::Initialize() {
 
-
-	// OBject3dの初期化
-	obj_ = std::make_unique<Object3d>();
-	obj_->Initialize();
-	obj_->SetModel("ICO.obj");
-	isDrawCollider_ = false;
-	//GlobalVariables* globalvariables = GlobalVariables::GetInstance();
-	//const char* groupName = "Collider";
-	//// グループを追加
-	//GlobalVariables::GetInstance()->CreateGroup(groupName);
-	//globalvariables->AddItem(groupName, "Collider", isDrawCollider_);
-
-}
-void CollisionManager::UpdateWorldTransform() {
-
-	//ApplyGlobalVariables();
-	DebugImGui();
-	// 非表示なら抜ける
-	if (!isDrawCollider_) {
-		return;
-	}
-	// 全てのコライダーについて
-	for (Collider* collider : colliders_) {
-		// 更新
-		collider->UpdateWorldTransform();
-	}
-
-
-
-}
-void CollisionManager::Draw() {
-	// 非表示なら抜ける
-	if (!isDrawCollider_) {
-		return;
-	}
-	// 全てのコライダーについて
-	for (Collider* collider : colliders_) {
-		// 描画
-		//collider->Draw(obj_.get());
-	}
+inline float ProjectOBB(const OBB& obb, const Vector3& axis, const Vector3 axes[3]) {
+	return	obb.size.x  * fabs(Dot(axes[0], axis)) +
+			obb.size.y  * fabs(Dot(axes[1], axis)) +
+			obb.size.z  * fabs(Dot(axes[2], axis));
 }
 
-
-void CollisionManager::DebugImGui()
+bool Collision::Check(const SphereCollider* a, const SphereCollider* b)
 {
-#ifdef _DEBUG
-	if (ImGui::Begin("Collision Manager Debug")) {
-		// 登録されたコライダーの数を表示
-		ImGui::Text("Number of Colliders: %zu", colliders_.size());
+	Vector3 diff = b->GetCenterPosition() - a->GetCenterPosition();
+	float distSq = Length(diff);
+	float radiusSum = a->GetRadius() + b->GetRadius();
+	return distSq <= radiusSum * radiusSum;
+}
 
-		// 各コライダーの情報を表示
-		int index = 0;
-		for (auto* collider : colliders_) {
-			ImGui::PushID(index);
-			if (ImGui::CollapsingHeader(("Collider " + std::to_string(index)).c_str())) {
-				ImGui::Text("Type ID: %u", collider->GetTypeID());
-				Vector3 pos = collider->GetCenterPosition();
-				ImGui::Text("Position: (%.2f,%.2f,%.2f)", pos.x,pos.y,pos.z);
-				float radius = collider->GetRadiusFloat();
-				ImGui::Text("Radius: (%.2f)", radius);
-			}
-			ImGui::PopID();
-			++index;
+bool Collision::Check(const SphereCollider* sphere, const AABBCollider* aabb)
+{
+	Vector3 closest = Clamp(sphere->GetCenterPosition(), aabb->GetAABB().min, aabb->GetAABB().max);
+	Vector3 diff = closest - sphere->GetCenterPosition();
+	return Length(diff) <= sphere->GetRadius() * sphere->GetRadius();
+}
+
+bool Collision::Check(const SphereCollider* sphere, const OBBCollider* obb)
+{
+	const OBB& ob = obb->GetOBB();
+
+	// 回転行列を作成（オイラー角 → 回転行列）
+	Matrix4x4 rotMat = MakeRotateMatrixXYZ(ob.rotation);
+
+	// ワールド→ローカル変換：回転行列の転置を使う（回転の逆）
+	Matrix4x4 invRot = TransPose(rotMat);
+
+	Vector3 localPos = Transform(sphere->GetCenterPosition() - ob.center, invRot);
+	Vector3 clamped = Clamp(localPos, -ob.size, ob.size);
+
+	// ローカル→ワールドに戻す
+	Vector3 closest = ob.center + Transform(clamped, rotMat);
+	Vector3 diff = closest - sphere->GetCenterPosition();
+
+	return Length(diff) <= sphere->GetRadius() * sphere->GetRadius();
+}
+
+bool Collision::Check(const AABBCollider* a, const AABBCollider* b)
+{
+	const AABB& aa = a->GetAABB();
+	const AABB& bb = b->GetAABB();
+	return (aa.min.x <= bb.max.x && aa.max.x >= bb.min.x) &&
+		(aa.min.y <= bb.max.y && aa.max.y >= bb.min.y) &&
+		(aa.min.z <= bb.max.z && aa.max.z >= bb.min.z);
+}
+
+bool Collision::Check(const OBB& obbA, const OBB& obbB)
+{
+	// 事前に早期リターンを行う球体近似チェック（オプション）
+	float radiusA = Length(obbA.size);
+	float radiusB = Length(obbB.size);
+	float distance = Length(obbB.center - obbA.center);
+	if (distance > radiusA + radiusB) {
+		return false; // 明らかに離れている場合は早期リターン
+	}
+
+	// 回転行列を取得
+	Matrix4x4 matA = MakeRotateMatrixXYZ(obbA.rotation);
+	Matrix4x4 matB = MakeRotateMatrixXYZ(obbB.rotation);
+
+	// 各OBBの軸を抽出
+	Vector3 axesA[3] = {
+		{ matA.m[0][0], matA.m[1][0], matA.m[2][0] },
+		{ matA.m[0][1], matA.m[1][1], matA.m[2][1] },
+		{ matA.m[0][2], matA.m[1][2], matA.m[2][2] }
+	};
+	Vector3 axesB[3] = {
+		{ matB.m[0][0], matB.m[1][0], matB.m[2][0] },
+		{ matB.m[0][1], matB.m[1][1], matB.m[2][1] },
+		{ matB.m[0][2], matB.m[1][2], matB.m[2][2] }
+	};
+
+	// 中心間の距離ベクトル
+	Vector3 distanceVec = obbB.center - obbA.center;
+
+	const float EPSILON = 1e-6f; // 数値的に安定した閾値
+
+	// テスト1: obbAの主軸でのテスト
+	for (int i = 0; i < 3; ++i) {
+		const Vector3& axis = axesA[i];
+
+		// 軸の長さをチェック（ゼロ除算防止）
+		if (LengthSquared(axis) < EPSILON) continue;
+
+		// 各OBBの投影を計算
+		float projA = ProjectOBB(obbA, axis, axesA);
+		float projB = ProjectOBB(obbB, axis, axesB);
+
+		// 分離軸チェック
+		if (fabs(Dot(distanceVec, axis)) > projA + projB) {
+			return false; // 分離軸が見つかった
 		}
 	}
-	ImGui::End();
-#endif
+
+	// テスト2: obbBの主軸でのテスト
+	for (int i = 0; i < 3; ++i) {
+		const Vector3& axis = axesB[i];
+
+		if (LengthSquared(axis) < EPSILON) continue;
+
+		float projA = ProjectOBB(obbA, axis, axesA);
+		float projB = ProjectOBB(obbB, axis, axesB);
+
+		if (fabs(Dot(distanceVec, axis)) > projA + projB) {
+			return false;
+		}
+	}
+
+	// テスト3: 両方のOBBの主軸の外積でのテスト
+	for (int i = 0; i < 3; ++i) {
+		for (int j = 0; j < 3; ++j) {
+			Vector3 axis = Cross(axesA[i], axesB[j]);
+
+			// 外積が十分な大きさかチェック
+			float axisLengthSq = LengthSquared(axis);
+			if (axisLengthSq < EPSILON) continue;
+
+			// 単位ベクトルに正規化
+			axis = axis * (1.0f / sqrt(axisLengthSq));
+
+			float projA = ProjectOBB(obbA, axis, axesA);
+			float projB = ProjectOBB(obbB, axis, axesB);
+
+			if (fabs(Dot(distanceVec, axis)) > projA + projB) {
+				return false;
+			}
+		}
+	}
+
+	// すべてのテストにパスしたら衝突している
+	return true;
+}
+
+bool Collision::Check(const AABBCollider* aabb, const OBBCollider* obb)
+{
+	OBB aabbAsOBB;
+	aabbAsOBB.center = (aabb->GetAABB().min + aabb->GetAABB().max) * 0.5f;
+	aabbAsOBB.size = (aabb->GetAABB().max - aabb->GetAABB().min) * 0.5f;
+	aabbAsOBB.rotation = { 0.0f,0.0f,0.0f };
+	return Collision::Check(aabbAsOBB, obb->GetOBB());
+
+}
+
+bool Collision::Check(const OBBCollider* a, const OBBCollider* b)
+{
+	return Check(a->GetOBB(), b->GetOBB());
+}
+
+
+
+
+
+void CollisionManager::Initialize() {
+	isDrawCollider_ = false;
+}
+
+void CollisionManager::Update()
+{
+	CheckAllCollisions();
+
 }
 
 
@@ -103,24 +199,41 @@ void CollisionManager::Reset() {
 
 }
 
-void CollisionManager::CheckCollisionPair(Collider* colliderA, Collider* colliderB) {
-	// コライダーAの座標を取得
-	Vector3 PosA = colliderA->GetCenterPosition();
-	// コライダーBの座標を取得
-	Vector3 PosB = colliderB->GetCenterPosition();
-	// 座標の差分ベクトル
-	Vector3 subtract = PosB - PosA;
-	// 座標AとBの距離を求める
-	float distance = Length(subtract);
+void CollisionManager::CheckCollisionPair(Collider* a, Collider* b) {
+	// Sphere
+	if (auto sa = dynamic_cast<SphereCollider*>(a)) {
+		if (auto sb = dynamic_cast<SphereCollider*>(b)) {
+			if (Collision::Check(sa, sb)) { sa->OnCollision(sb); sb->OnCollision(sa); }
+		} else if (auto ab = dynamic_cast<AABBCollider*>(b)) {
+			if (Collision::Check(sa, ab)) { sa->OnCollision(ab); ab->OnCollision(sa); }
+		} else if (auto ob = dynamic_cast<OBBCollider*>(b)) {
+			if (Collision::Check(sa, ob)) { sa->OnCollision(ob); ob->OnCollision(sa); }
+		}
+	}
 
-	// 球と球の交差判定
-	if (distance <= (colliderA->GetRadiusFloat() + colliderB->GetRadiusFloat())) {
-		// コライダーAの衝突時コールバックを呼び出す
-		colliderA->OnCollision(colliderB);
-		// コライダーBの衝突時コールバックを呼び出す
-		colliderB->OnCollision(colliderA);
+	// AABB
+	else if (auto aa = dynamic_cast<AABBCollider*>(a)) {
+		if (auto sb = dynamic_cast<SphereCollider*>(b)) {
+			if (Collision::Check(sb, aa)) { aa->OnCollision(sb); sb->OnCollision(aa); } // 順序注意
+		} else if (auto ab = dynamic_cast<AABBCollider*>(b)) {
+			if (Collision::Check(aa, ab)) { aa->OnCollision(ab); ab->OnCollision(aa); }
+		} else if (auto ob = dynamic_cast<OBBCollider*>(b)) {
+			if (Collision::Check(aa, ob)) { aa->OnCollision(ob); ob->OnCollision(aa); }
+		}
+	}
+
+	// OBB
+	else if (auto oa = dynamic_cast<OBBCollider*>(a)) {
+		if (auto sb = dynamic_cast<SphereCollider*>(b)) {
+			if (Collision::Check(sb, oa)) { oa->OnCollision(sb); sb->OnCollision(oa); } // 順序注意
+		} else if (auto ab = dynamic_cast<AABBCollider*>(b)) {
+			if (Collision::Check(ab, oa)) { oa->OnCollision(ab); ab->OnCollision(oa); } // 順序注意
+		} else if (auto ob = dynamic_cast<OBBCollider*>(b)) {
+			if (Collision::Check(oa, ob)) { oa->OnCollision(ob); ob->OnCollision(oa); }
+		}
 	}
 }
+
 
 void CollisionManager::CheckAllCollisions() {
 	// リスト内のペアを総当たり
@@ -142,102 +255,16 @@ void CollisionManager::CheckAllCollisions() {
 }
 
 
-//void CollisionManager::CheckCollisionPair(Collider* colliderA, Collider* colliderB) {
-//	// 両方のIDが同じかどちらかがNoneだった場合早期リターン
-//	if (colliderA->GetTypeID() == colliderB->GetTypeID() ||
-//		colliderA->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kNone) ||
-//		colliderB->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kNone)) {
-//		return;
-//	}
-//
-//	// OBBデータを取得（中心位置、半径、軸ベクトル）
-//	Vector3 centerA = colliderA->GetCenterPosition();
-//	Vector3 centerB = colliderB->GetCenterPosition();
-//
-//	Matrix4x4 matA = colliderA->GetWorldMatrix();
-//	Matrix4x4 matB = colliderB->GetWorldMatrix();
-//
-//	Vector3 axesA[3] = {
-//		Vector3(matA.m[0][0], matA.m[0][1], matA.m[0][2]),
-//		Vector3(matA.m[1][0], matA.m[1][1], matA.m[1][2]),
-//		Vector3(matA.m[2][0], matA.m[2][1], matA.m[2][2])
-//	};
-//
-//	Vector3 axesB[3] = {
-//		Vector3(matB.m[0][0], matB.m[0][1], matB.m[0][2]),
-//		Vector3(matB.m[1][0], matB.m[1][1], matB.m[1][2]),
-//		Vector3(matB.m[2][0], matB.m[2][1], matB.m[2][2])
-//	};
-//
-//	Vector3 halfExtentsA = colliderA->GetRadiusVector3(); // Aの半径
-//	Vector3 halfExtentsB = colliderB->GetRadiusVector3(); // Bの半径
-//
-//	// 中心間ベクトル
-//	Vector3 T = centerB - centerA;
-//
-//	// 15軸で判定（3+3+9）
-//	for (int i = 0; i < 3; ++i) {
-//		// Aの軸
-//		if (!TestAxis(axesA[i], T, axesA, halfExtentsA, axesB, halfExtentsB)) return;
-//		// Bの軸
-//		if (!TestAxis(axesB[i], T, axesA, halfExtentsA, axesB, halfExtentsB)) return;
-//	}
-//
-//	// 交差チェック成功時
-//	for (int i = 0; i < 3; ++i) {
-//		for (int j = 0; j < 3; ++j) {
-//			Vector3 axis = Cross(axesA[i], axesB[j]);
-//			if (!TestAxis(axis, T, axesA, halfExtentsA, axesB, halfExtentsB)) return;
-//		}
-//	}
-//
-//	// 衝突が検出された場合
-//	colliderA->OnCollision(colliderB);
-//	colliderB->OnCollision(colliderA);
-//
-//}
-
 
 void CollisionManager::AddCollider(Collider* collider) {
-
+	if (!collider) return;
 	colliders_.push_back(collider);
 	std::cout << "Collider added: " << collider->GetTypeID() << std::endl;
 }
 
-void CollisionManager::ApplyGlobalVariables() {
-	GlobalVariables* globalVariables = GlobalVariables::GetInstance();
-	const char* groupName = "Collider";
-	isDrawCollider_ = globalVariables->GetBoolValue(groupName, "Collider");
-
-}
-
-// 分離軸テスト関数
-// 分離軸テスト関数（TestAxis）
-bool CollisionManager::TestAxis(
-	const Vector3& axis,
-	const Vector3& T,
-	const Vector3 axesA[3],
-	const Vector3& halfExtentsA,
-	const Vector3 axesB[3],
-	const Vector3& halfExtentsB
-) {
-	if (Length(axis) < 0.0001f) return true; // ほぼ0ベクトルは無視
-
-	// Aの投影半径を計算
-	float radiusA =
-		fabs(Dot(axesA[0], axis)) * halfExtentsA.x +
-		fabs(Dot(axesA[1], axis)) * halfExtentsA.y +
-		fabs(Dot(axesA[2], axis)) * halfExtentsA.z;
-
-	// Bの投影半径を計算
-	float radiusB =
-		fabs(Dot(axesB[0], axis)) * halfExtentsB.x +
-		fabs(Dot(axesB[1], axis)) * halfExtentsB.y +
-		fabs(Dot(axesB[2], axis)) * halfExtentsB.z;
-
-	// Tを軸に投影した距離
-	float distance = fabs(Dot(T, axis));
-
-	// 投影距離が半径の合計以下なら衝突
-	return distance <= (radiusA + radiusB);
+void CollisionManager::RemoveCollider(Collider* collider)
+{
+	if (!collider) return;
+	colliders_.remove(collider);
+	std::cout << "Collider removed: " << collider->GetTypeID() << std::endl;
 }

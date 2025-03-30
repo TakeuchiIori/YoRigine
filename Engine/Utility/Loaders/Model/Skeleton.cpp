@@ -39,6 +39,6 @@ void Skeleton::DrawSkeleton(Line& line)
 		// 親ジョイントと子ジョイントのワールド座標を取得
 		const Vector3& parentPosition = Joint::ExtractJointPosition(joints_[parentIndex]);
 		const Vector3& childPosition = Joint::ExtractJointPosition(joints_[childIndex]);
-		line.UpdateVertices(parentPosition, childPosition);
+		line.RegisterLine(parentPosition, childPosition);
 	}
 }

@@ -23,6 +23,7 @@ public:
     /// 描画
     /// </summary>
     void Draw();
+	void DrawCollision();
 
     /// <summary>
     /// 敵のスポーン処理
@@ -49,7 +50,7 @@ private:
     float spawnTimer_ = 0.0f;
     float spawnInterval_ = 5.0f;  // スポーン間隔（秒）
     float spawnRange_ = 30.0f;    // スポーン範囲
-    const uint32_t maxEnemyCount_ = 5;  // 最大敵数
+    const uint32_t maxEnemyCount_ = 1;  // 最大敵数
     int deadNum_ = 0;
 
     // ポインタ

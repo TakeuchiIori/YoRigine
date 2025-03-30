@@ -2,7 +2,6 @@
 // Engine
 #include "Loaders./Model./ModelManager.h"
 #include "Object3D./Object3dCommon.h"
-#include "Collision./GlobalVariables.h"
 #include "Collision/CollisionTypeIdDef.h"
 
 
@@ -21,7 +20,7 @@ void Player::Initialize(Camera* camera)
 	base_->SetModel("cube.obj");
 
 	weapon_ = std::make_unique<PlayerWeapon>();
-	weapon_->Initialize();
+	weapon_->Initialize(camera_);
 
 	shadow_ = std::make_unique<Object3d>();
 	shadow_->Initialize();
@@ -38,12 +37,12 @@ void Player::Initialize(Camera* camera)
 	worldTransform_.translation_.y = 1.0f;
 	worldTransform_.translation_.z = -50.0f;
 	weapon_->SetParent(worldTransform_);
-
 	// TypeIDの設定
-	//Collider::SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayer));
-	//Collider::SetRadiusFloat(2.0f);
+	Collider::SetCamera(camera_);
+	OBBCollider::Initialize();
+	Collider::SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayer));
 
-	particleEmitter_ = std::make_unique<ParticleEmitter>("Player", worldTransform_.translation_, 5);
+	particleEmitter_ = std::make_unique<ParticleEmitter>("PlayerParticle", worldTransform_.translation_, 5);
     particleEmitter_->Initialize();
 
 	InitJson();
@@ -55,9 +54,6 @@ void Player::Initialize(Camera* camera)
 
 void Player::Update()
 {
-	if (!isUpdate_) {
-		//ApplyGlobalVariables();
-	}
 
 
 	Move();
@@ -69,7 +65,7 @@ void Player::Update()
 
 
 	
-    particleEmitter_->UpdateEmit("Player", worldTransform_.translation_, 3);
+    particleEmitter_->UpdateEmit("PlayerParticle", worldTransform_.translation_, 3);
 
 	//ParticleManager::GetInstance()->Emit("Player", worldTransform_.translation_, 10);
 	UpdateWorldTransform();
@@ -80,6 +76,7 @@ void Player::Update()
 #ifdef _DEBUG
 	ShowCoordinatesImGui();
 #endif // _DEBUG
+	OBBCollider::Update();
 }
 
 void Player::Draw()
@@ -87,6 +84,12 @@ void Player::Draw()
 	base_->Draw(camera_,worldTransform_);
 	shadow_->Draw(camera_, WS_);
 	weapon_->Draw(camera_);
+}
+
+void Player::DrawCollision()
+{
+	OBBCollider::Draw();
+	weapon_->DrawCollision();
 }
 
 void Player::UpdateWorldTransform()
@@ -495,10 +498,16 @@ void Player::ShowCoordinatesImGui()
 void Player::InitJson()
 {
 	jsonManager_ = std::make_unique<JsonManager>("Player","Resources./JSON");
-	jsonManager_->Register("World Translation", &worldTransform_.translation_);
+	jsonManager_->SetCategory("Objects");
+	jsonManager_->Register("Translation", &worldTransform_.translation_);
+	jsonManager_->Register("Rotate", &worldTransform_.rotation_);
+	jsonManager_->Register("Scale", &worldTransform_.scale_);
 	jsonManager_->Register("Speed", &moveSpeed_);
 	jsonManager_->Register("JumpHeight", &jumpHeight_);
 	jsonManager_->Register("Rotate Speed", &rotrateSpeed_);
+
+	jsonCollider_ = std::make_unique<JsonManager>("PlayerCollider", "Resources./JSON/Collider");
+	OBBCollider::InitJson(jsonCollider_.get());
 }
 
 void Player::JsonImGui()
@@ -506,37 +515,41 @@ void Player::JsonImGui()
 	
 }
 
-//void Player::OnCollision(Collider* other)
-//{
-//	// 衝突相手の種別IDを取得
-//	uint32_t typeID = other->GetTypeID();
-//	// 衝突相手が敵なら
-//	if (typeID == static_cast<uint32_t>(CollisionTypeIdDef::kEnemy)) {
-//		//isColliding_ = true;
-//
-//		hp_--;
-//		if (hp_ <= 0) {
-//			isAlive_ = false;
-//		}
-//	}
-//
-//}
-//
-//Vector3 Player::GetCenterPosition() const
-//{
-//	// ローカル座標でのオフセット
-//	const Vector3 offset = { 0.0f, 0.0f, 0.0f };
-//	// ワールド座標に変換
-//	Vector3 worldPos = TransformCoordinates(offset, worldTransform_.matWorld_);
-//
-//	return worldPos;
-//}
-//
-//Matrix4x4 Player::GetWorldMatrix() const
-//{
-//	return worldTransform_.matWorld_;
-//}
-//void Player::ApplyGlobalVariables() {
-//
-//
-//}
+void Player::OnCollision(Collider* other)
+{
+	// 衝突相手の種別IDを取得
+	uint32_t typeID = other->GetTypeID();
+	// 衝突相手が敵なら
+	if (typeID == static_cast<uint32_t>(CollisionTypeIdDef::kEnemy)) {
+		//isColliding_ = true;
+
+		hp_--;
+		if (hp_ <= 0) {
+			isAlive_ = false;
+		}
+	}
+
+}
+
+void Player::EnterCollision(Collider* other)
+{
+}
+
+void Player::ExitCollision(Collider* other)
+{
+}
+
+Vector3 Player::GetCenterPosition() const
+{
+	// ローカル座標でのオフセット
+	const Vector3 offset = { 0.0f, 0.0f, 0.0f };
+	// ワールド座標に変換
+	Vector3 worldPos = Transform(offset, worldTransform_.matWorld_);
+
+	return worldPos;
+}
+
+Matrix4x4 Player::GetWorldMatrix() const
+{
+	return worldTransform_.matWorld_;
+}

@@ -833,7 +833,8 @@ void ParticleManager::SetBlendMode(D3D12_BLEND_DESC& blendDesc, BlendMode blendM
 void ParticleManager::InitJson(const std::string& name)
 {
 	const std::string base = name + " : "; // 名前空間を分けるためのプレフィックス
-	jsonManager_ = new JsonManager("ParticleParameter_"+name, "Resources./JSON./ParticleParameter");
+	jsonManager_ = new JsonManager(name, "Resources./JSON./ParticleParameter");
+	jsonManager_->SetCategory("ParticleParameter");
 	// Transform設定の登録
 	jsonManager_->Register("Scale.X", &particleParameters_[name].baseTransform.scaleX);
 	jsonManager_->Register("Scale.Y", &particleParameters_[name].baseTransform.scaleY);

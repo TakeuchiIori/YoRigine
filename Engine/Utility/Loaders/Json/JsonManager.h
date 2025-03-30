@@ -64,6 +64,11 @@ public:
 	/// </summary>
 	static void ImGuiManager();
 
+public:
+
+	void SetCategory(const std::string& category) { category_ = category; }
+	const std::string& GetCategory() const { return category_; }
+
 private:
 	/// <summary>
 	///  フォルダパスとファイル名からフルパス文字列を組み立てる
@@ -82,4 +87,5 @@ private:
 	std::unordered_map<std::string, std::unique_ptr<IVariableJson>> variables_;
 	static inline std::unordered_map<std::string, JsonManager*> instances;
 	static inline std::string selectedClass;
+	std::string category_;
 };
