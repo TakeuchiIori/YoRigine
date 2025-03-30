@@ -190,20 +190,6 @@ void GameScene::Update()
 
 	uiSub_->Update();
 
-
-	if (ImGui::TreeNode("OBB")) {
-		// 中心座標の操作
-		ImGui::DragFloat3("Center", &obb.center.x, 0.1f);
-		// サイズの操作
-		ImGui::DragFloat3("Size", &obb.size.x, 0.1f, 0.01f, 100.0f);
-
-		ImGui::DragFloat3("Rotation", &obb.rotation.x, 0.1f);
-
-		ImGui::TreePop();
-	}
-
-
-
 }
 
 
