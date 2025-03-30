@@ -80,11 +80,11 @@ public:
     bool GetFlipY() const;
 
     // 基盤となるスプライトポインタを返す
-    Sprite* GetSprite() { return sprite_; }
+    Sprite* GetSprite() { return sprite_.get(); }
 
 protected:
     // 基盤となるスプライト
-    Sprite* sprite_;
+    std::unique_ptr<Sprite> sprite_;
 
     // 設定ファイルパス
     std::string configPath_;

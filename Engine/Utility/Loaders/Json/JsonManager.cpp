@@ -1,11 +1,18 @@
 #include "JsonManager.h"
+#include <filesystem>
 
 JsonManager::JsonManager(const std::string& fileName, const std::string& folderPath)
 	: fileName_(fileName), folderPath_(folderPath)
 {
-	// マネージャ生成時に自動でロードを実行
-	//LoadAll();
-	if (instances.find(fileName) == instances.end()) // 重複チェック
+	
+	// フォルダが存在しない場合は作成
+	if (!std::filesystem::exists(folderPath))
+	{
+		std::filesystem::create_directories(folderPath);
+	}
+
+	// 重複チェック
+	if (instances.find(fileName) == instances.end()) 
 	{
 		instances[fileName] = this; // 一意のインスタンスのみ登録
 		LoadAll();

@@ -293,7 +293,7 @@ private: // メンバ変数
 	Material* materialData_ = nullptr;
 	Camera* camera_ = nullptr;
 	ParticleForGPU* instancingData_ = nullptr;
-	JsonManager* jsonManager_ = nullptr;
+	std::unique_ptr<JsonManager> jsonManager_;
 
 	// ルートシグネチャ
 	D3D12_ROOT_SIGNATURE_DESC descriptionRootSignature_{};

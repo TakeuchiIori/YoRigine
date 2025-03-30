@@ -22,7 +22,7 @@
 
 class EnemyManager;
 class Player;
-class Enemy : public OBBCollider
+class Enemy
 {
 public:
 
@@ -32,6 +32,8 @@ public:
 	/// 初期化
 	/// </summary>
 	void Initialize(Camera* camera,const Vector3& pos);
+
+	void InitCollision();
 
 	/// <summary>
 	/// 更新
@@ -50,27 +52,10 @@ public:
 	void ShowCoordinatesImGui();
 
 
-	/// <summary>
-	/// 衝突を検出したら呼び出されるコールバック関数
-	/// </summary>
-	void OnCollision([[maybe_unused]] BaseCollider* other) override;
-	void EnterCollision([[maybe_unused]] BaseCollider* other) override;
-	void ExitCollision([[maybe_unused]] BaseCollider* other) override;
-
-	/// <summary>
-	/// 中心座標を取得
-	/// </summary>
-	/// <returns></returns>
-	Vector3 GetCenterPosition()const override;
-
-	/// <summary>
-	/// ワールド行列を取得
-	/// </summary>
-	/// <returns></returns>
-	Matrix4x4 GetWorldMatrix()const override;
-
-
-	Vector3 GetEulerRotation() override { return worldTransform_.rotation_; }
+	// 衝突イベント（共通で受け取る）
+	void OnEnterCollision(BaseCollider* self, BaseCollider* other);
+	void OnCollision(BaseCollider* self, BaseCollider* other);
+	void OnExitCollision(BaseCollider* self, BaseCollider* other);
 
 	/// <summary>
 	/// 
@@ -127,6 +112,11 @@ private:
 	std::unique_ptr<ParticleEmitter> particleEmitter_;
 	std::unique_ptr<Object3d> shadow_;
 	std::unique_ptr<Object3d> base_ = nullptr;
+
+	std::unique_ptr<OBBCollider> obbCollider_;
+	//std::unique_ptr<AABBCollider> aabbCollider_;
+	//std::unique_ptr<SphereCollider> sphereCollider_;
+
 
 	WorldTransform worldTransform_;
 	WorldTransform WS_;

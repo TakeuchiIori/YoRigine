@@ -20,7 +20,7 @@ using json = nlohmann::json;
 #include <Collision/ContactRecord.h>
 #include <Collision/Effect.h>
 
-class PlayerWeapon final : public OBBCollider
+class PlayerWeapon
 {
 public:
 	//==========================================================================//
@@ -60,7 +60,6 @@ public:
 	/// </summary>
 	void Initialize(Camera* camera);
 	void InitJson();
-	void SaveGlobalVariables();
 
 	/// <summary>
 	///  更新
@@ -83,6 +82,10 @@ private:
 	//								メンバ関数								　　	//
 	//==========================================================================//
 
+	/// <summary>
+	/// 当たり判定の初期化
+	/// </summary>
+	void InitCollision();
 
 	/// <summary>
 	/// コンボが可能かどうかを判定
@@ -179,31 +182,11 @@ private:
 	/// <param name="deltaTime"></param>
 	void UpdateCooldown(float deltaTime);
 
-public: // ポリモーフィズム
+public:
 
-	/// <summary>
-	/// 衝突を検出したら呼び出されるコールバック関数
-	/// </summary>
-	void OnCollision([[maybe_unused]] BaseCollider* other) override;
-	void EnterCollision([[maybe_unused]] BaseCollider* other) override;
-	void ExitCollision([[maybe_unused]] BaseCollider* other) override;
-
-	/// <summary>
-	/// 中心座標を取得
-	/// </summary>
-	/// <returns></returns>
-	Vector3 GetCenterPosition() const override;
-
-	/// <summary>
-	/// 
-	/// </summary>
-	/// <returns></returns>
-	Matrix4x4 GetWorldMatrix() const override;
-
-
-	Vector3 GetEulerRotation() override { return worldTransform_.rotation_; }
-
-	void ApplyGlobalVariables();
+	void OnEnterCollision(BaseCollider* self, BaseCollider* other);
+	void OnCollision(BaseCollider* self, BaseCollider* other);
+	void OnExitCollision(BaseCollider* self, BaseCollider* other);
 
 public:
 	//==========================================================================//
@@ -221,15 +204,22 @@ public:
 	const bool& GetIsDashAttack() { return isDashAttack_; }
 
 private:
-	//==========================================================================//
-	//								メンバ変数								　　	//
-	//==========================================================================//
+	/*===============================================================/
+	
+								ポインタ
 
-	// ポインタ
+	//===============================================================*/
+	
 	std::unique_ptr<Object3d> weapon_;
 	std::unique_ptr <JsonManager> jsonCollider_;
 	Camera* camera_ = nullptr;
 	Input* input_ = nullptr;
+
+	// コリジョン
+	std::unique_ptr<OBBCollider> obbCollider_;
+	//std::unique_ptr<AABBCollider> aabbCollider_;
+	//std::unique_ptr<SphereCollider> sphereCollider_;
+	
 	// ワールドトランスフォーム
 	WorldTransform worldTransform_;
 	// 接触記録クラス

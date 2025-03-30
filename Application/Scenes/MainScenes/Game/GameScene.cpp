@@ -153,10 +153,7 @@ void GameScene::Update()
 	}
 	enemyManager_->Update();
 	
-	player_->JsonImGui();
-	//followCamera_.JsonImGui();
 
-	// enemy_->Update();
 	ground_->Update();
 	test_->UpdateAnimation();
 
@@ -261,12 +258,12 @@ void GameScene::DrawObject()
 {
 	mpInfo_->Draw();
 	// オクルージョンクエリ開始
-	uint32_t queryIndex = 0;
+	//uint32_t queryIndex = 0;
 	player_->Draw();
 	// Ground のオクルージョンチェック
-	commandList_->BeginQuery(queryHeap_.Get(), D3D12_QUERY_TYPE_OCCLUSION, queryIndex);
+	//commandList_->BeginQuery(queryHeap_.Get(), D3D12_QUERY_TYPE_OCCLUSION, queryIndex);
 	ground_->Draw();
-	commandList_->EndQuery(queryHeap_.Get(), D3D12_QUERY_TYPE_OCCLUSION, queryIndex);
+	//commandList_->EndQuery(queryHeap_.Get(), D3D12_QUERY_TYPE_OCCLUSION, queryIndex);
 	enemyManager_->Draw();
 
 	//ResolvedOcclusionQuery();
@@ -283,12 +280,12 @@ void GameScene::DrawSprite()
 void GameScene::DrawAnimation()
 {
 	// Player のオクルージョンチェック
-	uint32_t queryIndex = 1;
-	commandList_->BeginQuery(queryHeap_.Get(), D3D12_QUERY_TYPE_OCCLUSION, queryIndex);
+	//uint32_t queryIndex = 1;
+	//commandList_->BeginQuery(queryHeap_.Get(), D3D12_QUERY_TYPE_OCCLUSION, queryIndex);
 	test_->Draw(sceneCamera_.get(), testWorldTransform_);
-	commandList_->EndQuery(queryHeap_.Get(), D3D12_QUERY_TYPE_OCCLUSION, queryIndex);
-	queryIndex++;
-	ResolvedOcclusionQuery();
+	//commandList_->EndQuery(queryHeap_.Get(), D3D12_QUERY_TYPE_OCCLUSION, queryIndex);
+	//queryIndex++;
+	//ResolvedOcclusionQuery();
 	
 }
 

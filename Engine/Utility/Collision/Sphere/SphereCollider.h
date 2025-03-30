@@ -13,14 +13,11 @@ public:
 
 	//===============================================================*/
 
-	~SphereCollider() = default;
-	void InitJson(JsonManager* jsonManager) override;
-	Vector3 GetCenterPosition() const override = 0;
-	virtual Vector3 GetEulerRotation() = 0;
-	Matrix4x4 GetWorldMatrix() const override = 0;
-	void OnCollision([[maybe_unused]] BaseCollider* other) override = 0;
-	void EnterCollision([[maybe_unused]] BaseCollider* other) override = 0;
-	void ExitCollision([[maybe_unused]] BaseCollider* other) override = 0;
+	~SphereCollider();
+	void InitJson(JsonManager* jsonManager);
+	Vector3 GetCenterPosition() const override;
+	Matrix4x4 GetWorldMatrix() const override;
+	Vector3 GetEulerRotation() const override;
 
 	/*===============================================================//
 
@@ -33,7 +30,6 @@ public:
 	void Initialize();
 	void Update();
 	void Draw();
-	void InitJson();
 public:
 
 	/// <summary>
