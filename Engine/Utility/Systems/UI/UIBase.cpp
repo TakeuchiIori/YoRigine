@@ -75,6 +75,8 @@ void UIBase::Draw() {
 }
 
 void UIBase::ImGUi() {
+#ifdef _DEBUG
+
     if (!sprite_) return;
     ImGui::Begin(name_.c_str());
 
@@ -351,6 +353,7 @@ void UIBase::ImGUi() {
 
     // ウィンドウ終了
     ImGui::End();
+#endif // _DEBUG
 }
 
 void UIBase::EnableHotReload(bool enable) {

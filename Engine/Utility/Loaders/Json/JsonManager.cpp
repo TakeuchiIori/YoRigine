@@ -271,6 +271,8 @@ void JsonManager::ImGuiManager()
 
 void JsonManager::ChildReset(std::string parentFileName, std::string childName)
 {
+#ifdef _DEBUG
+
 	auto it = instances.find(selectedClass);
 	if (it != instances.end()) {
 		JsonManager* instance = it->second;
@@ -311,6 +313,7 @@ void JsonManager::ChildReset(std::string parentFileName, std::string childName)
 			}
 		}
 	}
+#endif // _DEBUG
 }
 
 void JsonManager::ClearRegister(std::string parentFileName)
