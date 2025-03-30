@@ -69,12 +69,7 @@ public: // メンバ関数（公開）
 	/// ImGui
 	/// </summary>
 	void ShowCoordinatesImGui();
-
-
 	void InitJson();
-
-
-	void JsonImGui();
 
 public: 
 

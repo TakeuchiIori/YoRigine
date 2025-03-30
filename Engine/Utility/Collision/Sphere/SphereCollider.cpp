@@ -9,10 +9,10 @@ void SphereCollider::InitJson(JsonManager* jsonManager)
 {
 	// 衝突球のオフセットや半径を JSON に登録
 	jsonManager->SetCategory("Colliders");
-	jsonManager->Register("BaseCollider Offset X", &sphereOffset_.center.x);
-	jsonManager->Register("BaseCollider Offset Y", &sphereOffset_.center.y);
-	jsonManager->Register("BaseCollider Offset Z", &sphereOffset_.center.z);
-	jsonManager->Register("BaseCollider Radius", &radius_);
+	jsonManager->Register("Sphere Offset X", &sphereOffset_.center.x);
+	jsonManager->Register("Sphere Offset Y", &sphereOffset_.center.y);
+	jsonManager->Register("Sphere Offset Z", &sphereOffset_.center.z);
+	jsonManager->Register("Sphere Radius", &radius_);
 }
 
 void SphereCollider::Initialize()

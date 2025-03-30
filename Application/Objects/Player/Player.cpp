@@ -78,7 +78,7 @@ void Player::InitCollision()
 	aabbCollider_->SetTransform(&worldTransform_);
 	aabbCollider_->SetCamera(camera_);
 	aabbCollider_->Initialize();
-	aabbCollider_->SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon));
+	aabbCollider_->SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayer));
 	aabbCollider_->SetOnEnterCollision([this](BaseCollider* self, BaseCollider* other) {
 		this->OnEnterCollision(self, other);
 		});
@@ -108,7 +108,6 @@ void Player::Update()
 	
     particleEmitter_->UpdateEmit("PlayerParticle", worldTransform_.translation_, 3);
 
-	//ParticleManager::GetInstance()->Emit("Player", worldTransform_.translation_, 10);
 	UpdateWorldTransform();
 
 	
@@ -147,15 +146,6 @@ void Player::UpdateWorldTransform()
 
 void Player::Move()
 {
-	//// 衝突中フラグが立っている場合は非表示に
-	//if (isColliding_) {
-	//    isDrawEnabled_ = false; // 描画を無効に
-	//}
-	//else {
-	//    isDrawEnabled_ = true; // 描画を有効に
-	//}
-	//// 衝突状態をリセット
-	//isColliding_ = false; // 毎フレーム初期化
 
 	if (!isDash_ && weapon_->GetIsDashAttack()) {
 		isDash_ = true;
@@ -556,10 +546,6 @@ void Player::InitJson()
 	aabbCollider_->InitJson(jsonCollider_.get());
 }
 
-void Player::JsonImGui()
-{
-	
-}
 
 void Player::OnEnterCollision(BaseCollider* self, BaseCollider* other)
 {

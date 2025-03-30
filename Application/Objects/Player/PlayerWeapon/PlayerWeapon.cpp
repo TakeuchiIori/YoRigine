@@ -88,25 +88,18 @@ void PlayerWeapon::Initialize(Camera* camera)
 
 #pragma endregion
 
-
-	//// グループを追加
-	//BaseCollider::SetCamera(camera_);
-	//OBBCollider::Initialize();
-	////
-	////SaveGlobalVariables();
-	//// TypeIDの設定
-	//BaseCollider::SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon));
+	InitCollision();
 	InitJson();
-}
-
-void PlayerWeapon::SaveGlobalVariables() {
 
 }
+
 
 void PlayerWeapon::InitJson()
 {
 	jsonCollider_ = std::make_unique<JsonManager>("PlayerWeaponCollider", "Resources./JSON/BaseCollider");
-	//OBBCollider::InitJson(jsonCollider_.get());
+	obbCollider_->InitJson(jsonCollider_.get());
+	aabbCollider_->InitJson(jsonCollider_.get());
+	sphereCollider_->InitJson(jsonCollider_.get());
 }
 
 
@@ -133,13 +126,13 @@ void PlayerWeapon::Update()
 	// 全状態の更新処理
 	UpdateState();
 
-
-	
-
 	// ワールドトランスフォームの更新
 	worldTransform_.UpdateMatrix();
 
-	//OBBCollider::Update();
+	// コリジョンの更新
+	obbCollider_->Update();
+	aabbCollider_->Update();
+	sphereCollider_->Update();
 
 #ifdef _DEBUG
 	DrawDebugUI();
@@ -161,7 +154,9 @@ void PlayerWeapon::Draw(Camera* camera)
 
 void PlayerWeapon::DrawCollision()
 {
-	//OBBCollider::Draw();
+	obbCollider_->Draw();
+	aabbCollider_->Draw();
+	sphereCollider_->Draw();
 }
 
 /// <summary>
@@ -255,6 +250,62 @@ void PlayerWeapon::DrawDebugUI() {
 
 	ImGui::End();
 #endif
+
+}
+
+void PlayerWeapon::InitCollision()
+{
+	// OBB
+	obbCollider_ = std::make_unique<OBBCollider>();
+	obbCollider_->SetTransform(&worldTransform_);
+	obbCollider_->SetCamera(camera_);
+	obbCollider_->Initialize();
+	obbCollider_->SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon));
+
+	
+	obbCollider_->SetOnEnterCollision([this](BaseCollider* self, BaseCollider* other) {
+		this->OnEnterCollision(self, other);
+		});
+	obbCollider_->SetOnCollision([this](BaseCollider* self, BaseCollider* other) {
+		this->OnCollision(self, other);
+		});
+	obbCollider_->SetOnExitCollision([this](BaseCollider* self, BaseCollider* other) {
+		this->OnExitCollision(self, other);
+		});
+
+	// AABB
+	aabbCollider_ = std::make_unique<AABBCollider>();
+	aabbCollider_->SetTransform(&worldTransform_);
+	aabbCollider_->SetCamera(camera_);
+	aabbCollider_->Initialize();
+	aabbCollider_->SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon));
+	aabbCollider_->SetOnEnterCollision([this](BaseCollider* self, BaseCollider* other) {
+		this->OnEnterCollision(self, other);
+		});
+	aabbCollider_->SetOnCollision([this](BaseCollider* self, BaseCollider* other) {
+		this->OnCollision(self, other);
+		});
+	aabbCollider_->SetOnExitCollision([this](BaseCollider* self, BaseCollider* other) {
+		this->OnExitCollision(self, other);
+		});
+
+	// Sphere
+	sphereCollider_ = std::make_unique<SphereCollider>();
+	sphereCollider_->SetTransform(&worldTransform_);
+	sphereCollider_->SetCamera(camera_);
+	sphereCollider_->Initialize();
+	sphereCollider_->SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon));
+	sphereCollider_->SetOnEnterCollision([this](BaseCollider* self, BaseCollider* other) {
+		this->OnEnterCollision(self, other);
+		});
+	sphereCollider_->SetOnCollision([this](BaseCollider* self, BaseCollider* other) {
+		this->OnCollision(self, other);
+		});
+	sphereCollider_->SetOnExitCollision([this](BaseCollider* self, BaseCollider* other) {
+		this->OnExitCollision(self, other);
+		});
+
+
 
 }
 
@@ -637,6 +688,18 @@ void PlayerWeapon::UpdateCooldown(float deltaTime)
 		stateRequest_ = WeaponState::Idle; // 武器の状態を待機に戻す
 		elapsedCooldownTime_ = 0.0f; // 経過時間をリセット
 	}
+}
+
+void PlayerWeapon::OnEnterCollision(BaseCollider* self, BaseCollider* other)
+{
+}
+
+void PlayerWeapon::OnCollision(BaseCollider* self, BaseCollider* other)
+{
+}
+
+void PlayerWeapon::OnExitCollision(BaseCollider* self, BaseCollider* other)
+{
 }
 
 
