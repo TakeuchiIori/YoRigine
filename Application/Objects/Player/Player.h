@@ -186,7 +186,7 @@ private:
 	MapChipCollision::ColliderRect colliderRect_;
 
 	std::unique_ptr<OBBCollider> obbCollider_;
-	std::unique_ptr<AABBCollider> aabbCollider_;
+	//std::unique_ptr<AABBCollider> aabbCollider_;
 	//std::unique_ptr<SphereCollider> sphereCollider_;
 
 	/*===============================================================//

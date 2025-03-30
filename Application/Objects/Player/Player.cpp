@@ -74,20 +74,20 @@ void Player::InitCollision()
 		this->OnExitCollision(self, other);
 		});
 
-	aabbCollider_ = std::make_unique<AABBCollider>();
-	aabbCollider_->SetTransform(&worldTransform_);
-	aabbCollider_->SetCamera(camera_);
-	aabbCollider_->Initialize();
-	aabbCollider_->SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayer));
-	aabbCollider_->SetOnEnterCollision([this](BaseCollider* self, BaseCollider* other) {
-		this->OnEnterCollision(self, other);
-		});
-	aabbCollider_->SetOnCollision([this](BaseCollider* self, BaseCollider* other) {
-		this->OnCollision(self, other);
-		});
-	aabbCollider_->SetOnExitCollision([this](BaseCollider* self, BaseCollider* other) {
-		this->OnExitCollision(self, other);
-		});
+	//aabbCollider_ = std::make_unique<AABBCollider>();
+	//aabbCollider_->SetTransform(&worldTransform_);
+	//aabbCollider_->SetCamera(camera_);
+	//aabbCollider_->Initialize();
+	//aabbCollider_->SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayer));
+	//aabbCollider_->SetOnEnterCollision([this](BaseCollider* self, BaseCollider* other) {
+	//	this->OnEnterCollision(self, other);
+	//	});
+	//aabbCollider_->SetOnCollision([this](BaseCollider* self, BaseCollider* other) {
+	//	this->OnCollision(self, other);
+	//	});
+	//aabbCollider_->SetOnExitCollision([this](BaseCollider* self, BaseCollider* other) {
+	//	this->OnExitCollision(self, other);
+	//	});
 
 
 
@@ -118,7 +118,7 @@ void Player::Update()
 #endif // _DEBUG
 	//OBBCollider::Update();
 	obbCollider_->Update();
-	aabbCollider_->Update();
+	//aabbCollider_->Update();
 }
 
 void Player::Draw()
@@ -132,7 +132,7 @@ void Player::DrawCollision()
 {
 	//OBBCollider::Draw();
 	obbCollider_->Draw();
-	aabbCollider_->Draw();
+	//aabbCollider_->Draw();
 	weapon_->DrawCollision();
 }
 
@@ -543,7 +543,7 @@ void Player::InitJson()
 
 	jsonCollider_ = std::make_unique<JsonManager>("PlayerCollider", "Resources./JSON/BaseCollider");
 	obbCollider_->InitJson(jsonCollider_.get());
-	aabbCollider_->InitJson(jsonCollider_.get());
+	//aabbCollider_->InitJson(jsonCollider_.get());
 }
 
 
