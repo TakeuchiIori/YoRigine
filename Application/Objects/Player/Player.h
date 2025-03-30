@@ -24,7 +24,7 @@
 #include "Vector3.h" 
 
 class PlayerWeapon;
-class Player : public SphereCollider
+class Player : public OBBCollider
 {
 
 public: // メンバ関数（公開）

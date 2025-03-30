@@ -22,7 +22,7 @@
 
 class EnemyManager;
 class Player;
-class Enemy : public AABBCollider
+class Enemy : public OBBCollider
 {
 public:
 

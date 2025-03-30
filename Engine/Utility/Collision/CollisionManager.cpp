@@ -166,7 +166,7 @@ bool Collision::Check(const AABBCollider* aabb, const OBBCollider* obb)
 {
 	OBB aabbAsOBB;
 	aabbAsOBB.center = (aabb->GetAABB().min + aabb->GetAABB().max) * 0.5f;
-	aabbAsOBB.size = aabb->GetAABB().max - aabb->GetAABB().min;
+	aabbAsOBB.size = (aabb->GetAABB().max - aabb->GetAABB().min) * 0.5f;
 	aabbAsOBB.rotation = { 0.0f,0.0f,0.0f };
 	return Collision::Check(aabbAsOBB, obb->GetOBB());
 
