@@ -41,6 +41,13 @@ public:
 		LoadAll();
 	}
 
+
+	/// <summary>
+/// 指定した変数を登録解除（削除）
+/// </summary>
+/// <param name="name">削除したい変数のキー</param>
+	void Unregister(const std::string& name);
+
 	void Reset(bool clearVariables = false);
 
 	/// <summary>
@@ -64,6 +71,14 @@ public:
 	/// </summary>
 	static void ImGuiManager();
 
+
+	template <typename T>
+	void ChildRegister(std::string parentFileName, std::string childName, const std::string& name, T* ptr);
+
+	void ChildReset(std::string parentFileName, std::string childName);
+
+
+	void ClearRegister(std::string parentFileName);
 public:
 
 	void SetCategory(const std::string& category) { category_ = category; }
@@ -85,7 +100,17 @@ private:
 	std::string folderPath_;
 	// 登録名 -> 変数オブジェクト
 	std::unordered_map<std::string, std::unique_ptr<IVariableJson>> variables_;
+	std::unordered_map<std::string, bool> child_;
 	static inline std::unordered_map<std::string, JsonManager*> instances;
 	static inline std::string selectedClass;
 	std::string category_;
 };
+template<typename T>
+inline void JsonManager::ChildRegister(std::string parentFileName, std::string childName, const std::string& name, T* ptr)
+{
+	if (instances.find(parentFileName) != instances.end()) // 親ファイルがあるかチェック
+	{
+		instances[parentFileName]->child_.insert({ childName, true });
+		instances[parentFileName]->Register(childName + " : " + name, ptr);
+	}
+}
