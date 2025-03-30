@@ -28,4 +28,4 @@ jobs:
             /p:Platform=x64 `
             /p:Configuration=$env:CONFIGURATION `
             /verbosity:normal `
-            /consoleloggerparameters:ErrorsOnly;Summary
+            "/consoleloggerparameters:ErrorsOnly;Summary"
