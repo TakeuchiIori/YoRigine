@@ -5,7 +5,7 @@
 #include "Systems/Camera/Camera.h"
 #include "Systems/Input./Input.h"
 #include "WorldTransform./WorldTransform.h"
-#include "Collision./Collider.h"
+#include "Collision./BaseCollider.h"
 #include "Collision/Sphere/SphereCollider.h"
 #include "Collision/OBB/OBBCollider.h"
 #include "Collision/AABB/AABBCollider.h"
@@ -76,9 +76,9 @@ public: // ポリモーフィズム
 	/// <summary>
 	/// 衝突を検出したら呼び出されるコールバック関数
 	/// </summary>
-	void OnCollision([[maybe_unused]] Collider* other) override;
-	void EnterCollision([[maybe_unused]] Collider* other) override;
-	void ExitCollision([[maybe_unused]] Collider* other) override;
+	void OnCollision([[maybe_unused]] BaseCollider* other) override;
+	void EnterCollision([[maybe_unused]] BaseCollider* other) override;
+	void ExitCollision([[maybe_unused]] BaseCollider* other) override;
 
 	/// <summary>
 	/// 中心座標を取得

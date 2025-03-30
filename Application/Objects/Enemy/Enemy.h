@@ -4,7 +4,7 @@
 #include "Object3D./Object3d.h"
 #include "Systems/Input./Input.h"
 #include "WorldTransform./WorldTransform.h"
-#include "Collision./Collider.h"
+#include "Collision./BaseCollider.h"
 #include "Collision/Sphere/SphereCollider.h"
 #include "Collision/AABB/AABBCollider.h"
 #include "Collision/OBB/OBBCollider.h"	
@@ -53,9 +53,9 @@ public:
 	/// <summary>
 	/// 衝突を検出したら呼び出されるコールバック関数
 	/// </summary>
-	void OnCollision([[maybe_unused]] Collider* other) override;
-	void EnterCollision([[maybe_unused]] Collider* other) override;
-	void ExitCollision([[maybe_unused]] Collider* other) override;
+	void OnCollision([[maybe_unused]] BaseCollider* other) override;
+	void EnterCollision([[maybe_unused]] BaseCollider* other) override;
+	void ExitCollision([[maybe_unused]] BaseCollider* other) override;
 
 	/// <summary>
 	/// 中心座標を取得

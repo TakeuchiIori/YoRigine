@@ -17,7 +17,7 @@ enum class ColliderType {
 	OBB,
 };
 
-class Collider {
+class BaseCollider {
 protected:
 
 	void Initialize();
@@ -25,14 +25,14 @@ protected:
 public: // ポリモーフィズム
 
 
-	virtual ~Collider();
+	virtual ~BaseCollider();
 	virtual void InitJson(JsonManager* jsonManager) = 0;
 	// 衝突中に呼ばれる関数
-	virtual void OnCollision([[maybe_unused]] Collider* other) {}
+	virtual void OnCollision([[maybe_unused]] BaseCollider* other) {}
 	// 衝突した瞬間に呼ばれる関数
-	virtual void EnterCollision([[maybe_unused]] Collider* other) {}
+	virtual void EnterCollision([[maybe_unused]] BaseCollider* other) {}
 	// 衝突から離れた瞬間に呼ばれる関数
-	virtual void ExitCollision([[maybe_unused]] Collider* other) {}
+	virtual void ExitCollision([[maybe_unused]] BaseCollider* other) {}
 
 	virtual Vector3 GetCenterPosition() const = 0;
 	virtual Matrix4x4 GetWorldMatrix() const = 0;

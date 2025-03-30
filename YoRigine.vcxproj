@@ -128,7 +128,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="Application\Scenes\CoreScenes\Manager\SceneManager.cpp" />
     <ClCompile Include="Application\Scenes\MainScenes\Title\TitleScene.cpp" />
     <ClCompile Include="Engine\Utility\Systems\Camera\CameraManager.cpp" />
-    <ClCompile Include="Engine\Utility\Collision\Collider.cpp" />
+    <ClCompile Include="Engine\Utility\Collision\BaseCollider.cpp" />
     <ClCompile Include="Engine\Utility\Collision\CollisionManager.cpp" />
     <ClCompile Include="Engine\Utility\Collision\ContactRecord.cpp" />
     <ClCompile Include="Engine\Utility\Collision\Effect.cpp" />
@@ -212,7 +212,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="Application\Scenes\CoreScenes\Manager\SceneManager.h" />
     <ClInclude Include="Application\Scenes\MainScenes\Title\TitleScene.h" />
     <ClInclude Include="Engine\Utility\Systems\Camera\CameraManager.h" />
-    <ClInclude Include="Engine\Utility\Collision\Collider.h" />
+    <ClInclude Include="Engine\Utility\Collision\BaseCollider.h" />
     <ClInclude Include="Engine\Utility\Collision\CollisionManager.h" />
     <ClInclude Include="Engine\Utility\Collision\CollisionTypeIdDef.h" />
     <ClInclude Include="Engine\Utility\Collision\ContactRecord.h" />

@@ -54,11 +54,11 @@ void Enemy::Initialize(Camera* camera, const Vector3& pos)
    // const char* groupName = "Enemy";
     // グループを追加
    // GlobalVariables::GetInstance()->CreateGroup(groupName);
-   // Collider::Initialize();
+   // BaseCollider::Initialize();
     // TypeIDの設定
-    Collider::SetCamera(camera_);
+    BaseCollider::SetCamera(camera_);
     OBBCollider::Initialize();
-    Collider::SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kEnemy));
+    BaseCollider::SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kEnemy));
 
     isActive_ = true;
     isAlive_ = true;
@@ -161,7 +161,7 @@ void Enemy::ShowCoordinatesImGui()
 
 }
 
-void Enemy::OnCollision(Collider* other)
+void Enemy::OnCollision(BaseCollider* other)
 {
     // 衝突相手の種別IDを取得
     uint32_t typeID = other->GetTypeID();
@@ -184,11 +184,11 @@ void Enemy::OnCollision(Collider* other)
 
 }
 
-void Enemy::EnterCollision(Collider* other)
+void Enemy::EnterCollision(BaseCollider* other)
 {
 }
 
-void Enemy::ExitCollision(Collider* other)
+void Enemy::ExitCollision(BaseCollider* other)
 {
 }
 
@@ -287,7 +287,7 @@ void Enemy::InitJson()
 	jsonManager_ = std::make_unique<JsonManager>("Enemy", "Resources./JSON");
 	jsonManager_->Register("HP", &hp_);
 
-    jsonCollider_ = std::make_unique<JsonManager>("EnemyCollider", "Resources./JSON/Collider");
+    jsonCollider_ = std::make_unique<JsonManager>("EnemyCollider", "Resources./JSON/BaseCollider");
     OBBCollider::InitJson(jsonCollider_.get());
 }
 

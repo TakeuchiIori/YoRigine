@@ -199,7 +199,7 @@ void CollisionManager::Reset() {
 
 }
 
-void CollisionManager::CheckCollisionPair(Collider* a, Collider* b) {
+void CollisionManager::CheckCollisionPair(BaseCollider* a, BaseCollider* b) {
 	// Sphere
 	if (auto sa = dynamic_cast<SphereCollider*>(a)) {
 		if (auto sb = dynamic_cast<SphereCollider*>(b)) {
@@ -237,16 +237,16 @@ void CollisionManager::CheckCollisionPair(Collider* a, Collider* b) {
 
 void CollisionManager::CheckAllCollisions() {
 	// リスト内のペアを総当たり
-	std::list<Collider*>::iterator itrA = colliders_.begin();
+	std::list<BaseCollider*>::iterator itrA = colliders_.begin();
 	for (; itrA != colliders_.end(); ++itrA) {
-		Collider* colliderA = *itrA;
+		BaseCollider* colliderA = *itrA;
 
 		// イテレーターBはイテレーターAの次の要素から回す（重複判定を回避）
-		std::list<Collider*>::iterator itrB = itrA;
+		std::list<BaseCollider*>::iterator itrB = itrA;
 		itrB++;
 
 		for (; itrB != colliders_.end(); ++itrB) {
-			Collider* colliderB = *itrB;
+			BaseCollider* colliderB = *itrB;
 
 			// ペアの当たり判定
 			CheckCollisionPair(colliderA, colliderB);
@@ -256,15 +256,15 @@ void CollisionManager::CheckAllCollisions() {
 
 
 
-void CollisionManager::AddCollider(Collider* collider) {
+void CollisionManager::AddCollider(BaseCollider* collider) {
 	if (!collider) return;
 	colliders_.push_back(collider);
-	std::cout << "Collider added: " << collider->GetTypeID() << std::endl;
+	std::cout << "BaseCollider added: " << collider->GetTypeID() << std::endl;
 }
 
-void CollisionManager::RemoveCollider(Collider* collider)
+void CollisionManager::RemoveCollider(BaseCollider* collider)
 {
 	if (!collider) return;
 	colliders_.remove(collider);
-	std::cout << "Collider removed: " << collider->GetTypeID() << std::endl;
+	std::cout << "BaseCollider removed: " << collider->GetTypeID() << std::endl;
 }
