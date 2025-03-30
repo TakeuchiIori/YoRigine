@@ -36,6 +36,13 @@ void EnemyManager::Draw() {
     }
 }
 
+void EnemyManager::DrawCollision()
+{
+	for (auto& enemy : enemies_) {
+		enemy->DrawCollision();
+	}
+}
+
 void EnemyManager::SpawnEnemy() {
     if (!player_) return;
 

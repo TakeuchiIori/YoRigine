@@ -150,7 +150,7 @@ void ModelTest::DrawSkeleton(const Skeleton& skeleton, Line& line) {
 		const Vector3& childPosition = ExtractJointPosition(skeleton.joints[childIndex]);
 
 
-		line.UpdateVertices(parentPosition, childPosition);
+		line.RegisterLine(parentPosition, childPosition);
 	}
 }
 

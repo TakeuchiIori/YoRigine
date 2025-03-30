@@ -3,15 +3,17 @@
 // Engine
 #include "Loaders./Model./ModelManager.h"
 #include "Object3D./Object3dCommon.h"
-#include "Collision./GlobalVariables.h"
 #include "Collision/CollisionTypeIdDef.h"
 #include "Player/Player.h"
 #include "Particle/ParticleManager.h"
 #include <Systems/GameTime/HitStop.h>
 #include "EnemyManager.h"
+#include <Collision/CollisionManager.h>
+
 #ifdef _DEBUG
 #include "imgui.h" 
 #endif // _DEBUG
+
 // 次のシリアルナンバー
 uint32_t Enemy::nextSerialNumber_ = 0;
 Enemy::Enemy() {
@@ -19,6 +21,10 @@ Enemy::Enemy() {
     serialNumber_ = nextSerialNumber_;
     // 番号の追加
     ++nextSerialNumber_;
+}
+Enemy::~Enemy()
+{
+    CollisionManager::GetInstance()->RemoveCollider(this);
 }
 void Enemy::Initialize(Camera* camera, const Vector3& pos)
 {
@@ -50,17 +56,21 @@ void Enemy::Initialize(Camera* camera, const Vector3& pos)
    // GlobalVariables::GetInstance()->CreateGroup(groupName);
    // Collider::Initialize();
     // TypeIDの設定
+    Collider::SetCamera(camera_);
+    OBBCollider::Initialize();
     Collider::SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kEnemy));
 
     isActive_ = true;
     isAlive_ = true;
 
-    particleEmitter_ = std::make_unique<ParticleEmitter>("Enemy", worldTransform_.translation_, 5);
+    particleEmitter_ = std::make_unique<ParticleEmitter>("EnemyParticle", worldTransform_.translation_, 5);
     particleEmitter_->Initialize();
 	
 	timeID_ = "Enemy : " + std::to_string(serialNumber_);
 	gameTime_ = GameTime::GetInstance();
 	gameTime_->RegisterObject(timeID_);
+
+    InitJson();
 }
 
 void Enemy::Update()
@@ -73,7 +83,7 @@ void Enemy::Update()
 
 
  
-    Move();
+    //Move();
 
    
 
@@ -101,7 +111,7 @@ void Enemy::Update()
     worldTransform_.UpdateMatrix();
     WS_.UpdateMatrix();
 
-    
+	OBBCollider::Update();
 }
 
 void Enemy::Draw()
@@ -113,6 +123,11 @@ void Enemy::Draw()
         shadow_->Draw(camera_,WS_);
   
     
+}
+
+void Enemy::DrawCollision()
+{
+    OBBCollider::Draw();
 }
 
 void Enemy::ShowCoordinatesImGui()
@@ -151,11 +166,11 @@ void Enemy::OnCollision(Collider* other)
     // 衝突相手の種別IDを取得
     uint32_t typeID = other->GetTypeID();
     // 衝突相手が武器かプレイヤーなら
-    if (typeID == static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon)) {
+    if (typeID == static_cast<uint32_t>(CollisionTypeIdDef::kPlayer)) {
 
         isHit_ = true;
 		base_->SetMaterialColor({ 1.0f, 0.0f, 0.0f, 1.0f });
-        hp_ -= 2;
+        //hp_ -= 2;
         if (hp_ <= 0) {
             isAlive_ = false;
             isActive_ = false;  // 完全に無効化
@@ -169,25 +184,35 @@ void Enemy::OnCollision(Collider* other)
 
 }
 
+void Enemy::EnterCollision(Collider* other)
+{
+}
+
+void Enemy::ExitCollision(Collider* other)
+{
+}
+
 Vector3 Enemy::GetCenterPosition() const
 {
     // ローカル座標でのオフセット
     const Vector3 offset = { 0.0f, 0.0f, 0.0f };
     // ワールド座標に変換
-    Vector3 worldPos = TransformCoordinates(offset, worldTransform_.matWorld_);
+    Vector3 worldPos = Transform(offset, worldTransform_.matWorld_);
 
     return worldPos;
 }
 
 Matrix4x4 Enemy::GetWorldMatrix() const
 {
-    return worldTransform_.matWorld_;
+	return worldTransform_.matWorld_;
 }
+
 
 void Enemy::EnemyAllHitStop()
 {
     enemyManager_->ApplyHitStopToAllEnemies(HitStop::HitStopType::Heavy);
 }
+
 
 void Enemy::Move() {
     // デルタタイムの取得
@@ -259,9 +284,11 @@ void Enemy::CameraShake()
 
 void Enemy::InitJson()
 {
-	jsonManager_ = new JsonManager("Enemy", "Resources./JSON");
+	jsonManager_ = std::make_unique<JsonManager>("Enemy", "Resources./JSON");
 	jsonManager_->Register("HP", &hp_);
 
+    jsonCollider_ = std::make_unique<JsonManager>("EnemyCollider", "Resources./JSON/Collider");
+    OBBCollider::InitJson(jsonCollider_.get());
 }
 
 Vector3 Enemy::GetWorldPosition() {

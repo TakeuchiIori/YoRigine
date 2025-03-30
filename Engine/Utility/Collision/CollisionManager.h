@@ -9,6 +9,36 @@
 #include <memory>
 
 #include "MathFunc.h"
+// Collision.h
+#pragma once
+#include "Sphere/SphereCollider.h"
+#include "AABB/AABBCollider.h"
+#include "OBB/OBBCollider.h"
+
+namespace Collision {
+
+	// Sphere - Sphere
+	bool Check(const SphereCollider* a, const SphereCollider* b);
+
+	// Sphere - AABB
+	bool Check(const SphereCollider* sphere, const AABBCollider* aabb);
+
+	// Sphere - OBB
+	bool Check(const SphereCollider* sphere, const OBBCollider* obb);
+
+	// AABB - AABB
+	bool Check(const AABBCollider* a, const AABBCollider* b);
+
+	// OBB - OBB
+	bool Check(const OBB& obbA, const OBB& obbB);
+
+	// AABB - OBB
+	bool Check(const AABBCollider* aabb, const OBBCollider* obb);
+
+	// OBB - OBB
+	bool Check(const OBBCollider* a, const OBBCollider* b);
+
+}
 
 class CollisionManager {
 public: // 基本的な関数
@@ -23,25 +53,16 @@ public: // 基本的な関数
 	CollisionManager() = default;
 	~CollisionManager() = default;
 
+	
 	/// <summary>
 	/// 初期化
 	/// </summary>
 	void Initialize();
 
 	/// <summary>
-	/// ワールドトランスフォームの初期化
+	/// 当たり判定の更新
 	/// </summary>
-	void UpdateWorldTransform();
-
-	/// <summary>
-	/// 描画
-	/// </summary>
-	void Draw();
-
-	/// <summary>
-	/// ImGui
-	/// </summary>
-	void DebugImGui();
+	void Update();
 
 public:
 	/// <summary>
@@ -52,7 +73,7 @@ public:
 	/// <summary>
 	/// コライダー2つの衝突判定と応答
 	/// </summary>
-	void CheckCollisionPair(Collider* colliderA, Collider* colliderB);
+	void CheckCollisionPair(Collider* a, Collider* b);
 
 	/// <summary>
 	/// 全ての当たり判定チェック
@@ -64,10 +85,10 @@ public:
 	/// </summary>
 	void AddCollider(Collider* collider);
 
-
-	void ApplyGlobalVariables();
-
-	bool TestAxis(const Vector3& axis, const Vector3& T, const Vector3 axesA[3], const Vector3& halfExtentsA, const Vector3 axesB[3], const Vector3& halfExtentsB);
+	/// <summary>
+	/// コライダーの削除
+	/// </summary>
+	void RemoveCollider(Collider* collider);
 
 private:
 
@@ -79,5 +100,6 @@ private:
 	std::list<Collider*> colliders_;
 	// bool型
 	bool isDrawCollider_ = false;
-	std::unique_ptr<Object3d> obj_;
 };
+
+

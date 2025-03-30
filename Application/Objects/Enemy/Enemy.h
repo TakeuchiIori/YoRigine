@@ -5,6 +5,9 @@
 #include "Systems/Input./Input.h"
 #include "WorldTransform./WorldTransform.h"
 #include "Collision./Collider.h"
+#include "Collision/Sphere/SphereCollider.h"
+#include "Collision/AABB/AABBCollider.h"
+#include "Collision/OBB/OBBCollider.h"	
 #include "Loaders/Json/JsonManager.h"
 #include "Systems/Camera/Camera.h"
 #include <Systems/GameTime/GameTIme.h>
@@ -19,11 +22,12 @@
 
 class EnemyManager;
 class Player;
-class Enemy : public Collider
+class Enemy : public OBBCollider
 {
 public:
 
 	Enemy();
+	~Enemy();
 	/// <summary>
 	/// 初期化
 	/// </summary>
@@ -38,6 +42,7 @@ public:
 	/// 描画
 	/// </summary>
 	void Draw();
+	void DrawCollision();
 
 	/// <summary>
 	/// ImGui
@@ -49,18 +54,23 @@ public:
 	/// 衝突を検出したら呼び出されるコールバック関数
 	/// </summary>
 	void OnCollision([[maybe_unused]] Collider* other) override;
+	void EnterCollision([[maybe_unused]] Collider* other) override;
+	void ExitCollision([[maybe_unused]] Collider* other) override;
 
 	/// <summary>
 	/// 中心座標を取得
 	/// </summary>
 	/// <returns></returns>
-	Vector3 GetCenterPosition() const override;
+	Vector3 GetCenterPosition()const override;
 
 	/// <summary>
-	/// 
+	/// ワールド行列を取得
 	/// </summary>
 	/// <returns></returns>
-	Matrix4x4 GetWorldMatrix() const override;
+	Matrix4x4 GetWorldMatrix()const override;
+
+
+	Vector3 GetEulerRotation() override { return worldTransform_.rotation_; }
 
 	/// <summary>
 	/// 
@@ -112,7 +122,8 @@ private:
 	Input* input_ = nullptr;
 	Camera* camera_ = nullptr;
 	Player* player_ = nullptr; 
-	JsonManager* jsonManager_ = nullptr;
+	std::unique_ptr <JsonManager> jsonManager_;
+	std::unique_ptr <JsonManager> jsonCollider_;
 	std::unique_ptr<ParticleEmitter> particleEmitter_;
 	std::unique_ptr<Object3d> shadow_;
 	std::unique_ptr<Object3d> base_ = nullptr;

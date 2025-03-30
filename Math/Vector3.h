@@ -34,6 +34,11 @@ struct Vector3 final {
         return { x - other.x, y - other.y, z - other.z };
     }
 
+    Vector3 operator-() const {
+        return Vector3(-x, -y, -z);
+    }
+
+
     // 減算代入演算子 -=
     Vector3& operator-=(const Vector3& other) {
         x -= other.x;
@@ -171,8 +176,7 @@ std::vector<double> CubicSplineInterpolation(
     const std::vector<double>& xQuery
 );
 
-
-
+Vector3 Clamp(const Vector3& v, const Vector3& min, const Vector3& max);
 
 
 

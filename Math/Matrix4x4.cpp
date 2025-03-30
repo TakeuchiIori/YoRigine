@@ -1,5 +1,5 @@
 #include "Matrix4x4.h"
-
+#include <numbers>
 
 Matrix4x4::Matrix4x4(std::initializer_list<float> list) {
 	if (list.size() != 16) {
@@ -272,7 +272,7 @@ Matrix4x4 MakeTranslateMatrix(const Vector3& translate) {
 
 
 //=====================================9.座標変換===============================================//
-Vector3 TransformCoordinates(const Vector3& vector, const Matrix4x4& matrix) {
+Vector3 Transform(const Vector3& vector, const Matrix4x4& matrix) {
 	Vector3 result;
 	result.x = vector.x * matrix.m[0][0] + vector.y * matrix.m[1][0] + vector.z * matrix.m[2][0] + 1.0f * matrix.m[3][0];
 	result.y = vector.x * matrix.m[0][1] + vector.y * matrix.m[1][1] + vector.z * matrix.m[2][1] + 1.0f * matrix.m[3][1];
@@ -368,7 +368,7 @@ Matrix4x4 MakeRotateMatrixZ(float radian) {
 
 	return result;
 }
-Matrix4x4 MakeRotateMatrixXYZ(Vector3& rad)
+Matrix4x4 MakeRotateMatrixXYZ(Vector3 rad)
 {
 
 	return Multiply(Multiply(MakeRotateMatrixX(rad.x), MakeRotateMatrixY(rad.y)), MakeRotateMatrixZ(rad.z));
@@ -538,3 +538,29 @@ Matrix4x4 TranslationMatrixFromVector3(const Vector3& translate)
 
 	return translationMatrix;
 }
+
+Vector3 MatrixToEuler(const Matrix4x4& m) {
+	Vector3 euler;
+
+	// Y軸の角度を計算（より安定した判定のために小さな閾値を使用）
+	float threshold = 0.9999f; // ジンバルロックの判定閾値
+
+	if (fabs(m.m[0][2]) < threshold) {
+		// 通常のケース
+		euler.y = std::asin(-m.m[0][2]);
+		euler.x = std::atan2(m.m[1][2], m.m[2][2]);
+		euler.z = std::atan2(m.m[0][1], m.m[0][0]);
+	} else {
+		// ジンバルロック状態
+		float sign = (m.m[0][2] > 0) ? -1.0f : 1.0f;
+		euler.y = sign * std::numbers::pi_v<float> / 2.0f;
+
+		// XとZの自由度が1つになるため、任意に1つを固定することが一般的
+		euler.z = 0.0f;
+		euler.x = std::atan2(-sign * m.m[1][0], sign * m.m[1][1]);
+	}
+
+	return euler;
+}
+
+

@@ -12,6 +12,7 @@
 #include <Systems/GameTime/HitStop.h>
 #include <cstdlib>
 #include <ctime>
+#include <numbers>
 
 #ifdef _DEBUG
 #include "imgui.h"
@@ -19,7 +20,7 @@
 #include "LightManager/LightManager.h"
 #include "Sprite/SpriteCommon.h"
 #include <Systems/GameTime/GameTIme.h>
-
+#include "Quaternion.h"
 /// <summary>
 /// 初期化処理
 /// </summary>
@@ -63,6 +64,10 @@ void GameScene::Initialize()
 	Vector3 playerPosition = mpInfo_->GetMapChipField()->GetMapChipPositionByIndex(1, 16);
 	player_->SetPosition(playerPosition);
 	followCamera_.SetTarget(player_.get()->GetWorldTransform());
+
+	enemyManager_ = std::make_unique<EnemyManager>();
+	enemyManager_->Initialize(sceneCamera_.get());
+	enemyManager_->SetPlayer(player_.get());
 
 	// 地面
 	ground_ = std::make_unique<Ground>();
@@ -113,6 +118,10 @@ void GameScene::Initialize()
 
 	uiSub_ = std::make_unique<UIBase>("UISub");
 	uiSub_->Initialize("Resources/JSON/UI/Sub.json");
+
+	obb.center = { 0.0f, 2.0f, 0.0f },
+	obb.size = { 1.0f, 2.0f, 0.5f },
+	obb.rotation = { 0.0f,0.0f,0.0f};
 }
 
 /// <summary>
@@ -136,14 +145,14 @@ void GameScene::Update()
 
 	// パーティクル更新
 	mpInfo_->Update();
-	CheckAllCollisions();
-	CollisionManager::GetInstance()->UpdateWorldTransform();
-	// スポーンタイマーを更新
+
 
 	// objの更新
 	if (!isDebugCamera_) {
 	player_->Update();
 	}
+	enemyManager_->Update();
+	
 	player_->JsonImGui();
 	//followCamera_.JsonImGui();
 
@@ -160,9 +169,6 @@ void GameScene::Update()
 	UpdateCamera();
 
 
-
-
-	// ParticleManager::GetInstance()->UpdateParticlePlayerWeapon(weaponPos);
 	ShowImGui();
 
 
@@ -172,6 +178,7 @@ void GameScene::Update()
 	// ワールドトランスフォーム更新
 	testWorldTransform_.UpdateMatrix();
 	cameraManager_.UpdateAllCameras();
+	CollisionManager::GetInstance()->Update();
 
 	//=====================================================//
 	/*                  これより下は触るな危険　　　　　　　   　*/
@@ -185,6 +192,20 @@ void GameScene::Update()
 	uiBase_->Update();
 
 	uiSub_->Update();
+
+
+	if (ImGui::TreeNode("OBB")) {
+		// 中心座標の操作
+		ImGui::DragFloat3("Center", &obb.center.x, 0.1f);
+		// サイズの操作
+		ImGui::DragFloat3("Size", &obb.size.x, 0.1f, 0.01f, 100.0f);
+
+		ImGui::DragFloat3("Rotation", &obb.rotation.x, 0.1f);
+
+		ImGui::TreePop();
+	}
+
+
 
 }
 
@@ -200,8 +221,7 @@ void GameScene::Draw()
 	Object3dCommon::GetInstance()->DrawPreference();
 	LightManager::GetInstance()->SetCommandList();
 	DrawObject();
-	///line_->UpdateVertices(start_, end_);
-	///line_->DrawLine();
+
 
 	//---------
 	// Animation
@@ -239,7 +259,6 @@ void GameScene::DrawOffScreen()
 
 void GameScene::DrawObject()
 {
-	CollisionManager::GetInstance()->Draw();
 	mpInfo_->Draw();
 	// オクルージョンクエリ開始
 	uint32_t queryIndex = 0;
@@ -248,7 +267,7 @@ void GameScene::DrawObject()
 	commandList_->BeginQuery(queryHeap_.Get(), D3D12_QUERY_TYPE_OCCLUSION, queryIndex);
 	ground_->Draw();
 	commandList_->EndQuery(queryHeap_.Get(), D3D12_QUERY_TYPE_OCCLUSION, queryIndex);
-
+	enemyManager_->Draw();
 
 	//ResolvedOcclusionQuery();
 
@@ -280,6 +299,14 @@ void GameScene::DrawLine()
 		test_->DrawSkeleton(test_->GetModel()->GetSkeleton(), *boneLine_);
 		boneLine_->DrawLine();
 	}
+
+	//line_->DrawSphere(sphere_.center, sphere_.radius, 32);
+	//line_->DrawAABB(aabb.min,aabb.max);
+	//line_->DrawOBB(obb.center,obb.rotation,obb.size);
+	//line_->DrawLine();
+
+	player_->DrawCollision();
+	enemyManager_->DrawCollision();
 }
 
 
@@ -396,24 +423,6 @@ void GameScene::ShowImGui()
 #endif // _DEBUG
 }
 
-void GameScene::CheckAllCollisions() {
-
-	// 衝突マネージャーのリセット
-	CollisionManager::GetInstance()->Reset();
-
-	// コライダーをリストに登録
-	CollisionManager::GetInstance()->AddCollider(player_.get());
-
-	// コライダーリストに登録
-	CollisionManager::GetInstance()->AddCollider(player_->GetPlayerWeapon());
-
-
-	// CollisionManager::GetInstance()->AddCollider(enemy_.get());
-
-	 // 衝突判定と応答
-	CollisionManager::GetInstance()->CheckAllCollisions();
-
-}
 
 void GameScene::InitializeOcclusionQuery()
 {

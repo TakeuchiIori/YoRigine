@@ -25,6 +25,8 @@
 #include "../Transitions/Fade/Fade.h"
 #include "Systems/MapChip/MapChipInfo.h"
 #include "Systems/UI/UIBase.h"
+#include "Enemy/EnemyManager.h"
+
 
 // Cameras
 #include "../../../SystemsApp/Cameras/DebugCamera/DebugCamera.h"
@@ -33,7 +35,7 @@
 
 // Math
 #include "Vector3.h"
-
+#include "Quaternion.h"
 #include <Enemy/EnemyManager.h>
 
 enum class CameraMode {
@@ -113,7 +115,7 @@ private:
     /// </summary>
     void ShowImGui();
 
-    void CheckAllCollisions();
+    //void CheckAllCollisions();
 
 private:
     /// <summary>
@@ -184,6 +186,8 @@ private:
     WorldTransform testWorldTransform_;
     std::unique_ptr<Player> player_;
     std::unique_ptr<Ground> ground_;
+	std::unique_ptr<EnemyManager> enemyManager_;
+
 
     /*=================================================================
 
@@ -194,6 +198,21 @@ private:
     std::unique_ptr<Line> boneLine_;
     Vector3 start_ = { 0.0f, 0.0f, 0.0f };
     Vector3 end_ = { 10.0f, 0.0f, 10.0f };
+    Sphere sphere_ =
+    {
+        Vector3(0.0f, 0.0f, 0.0f),
+        5.0f
+    };
+
+	AABB aabb = {
+		Vector3(0.0f, 0.0f, 0.0f),
+		Vector3(5.0f, 5.0f, 5.0f)
+	};
+
+    OBB obb;
+    // これをグローバルまたはクラス内に保持（毎フレーム初期化しない）
+    Vector3 eulerDeg = { 0, 0, 0 }; // 度数（初期値）
+
 
     /*=================================================================
 
