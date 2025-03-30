@@ -22,10 +22,10 @@ jobs:
         with:
           msbuild-architecture: x64
 
-      - name: Build (Verbose)
+      - name: Build with Verbose Logging
         run: |
-          msbuild ${{ env.SOLUTION_FILE_PATH }} ^
-            /p:Platform=x64 ^
-            /p:Configuration=${{ env.CONFIGURATION }} ^
-            /verbosity:normal ^
+          msbuild $env:SOLUTION_FILE_PATH `
+            /p:Platform=x64 `
+            /p:Configuration=$env:CONFIGURATION `
+            /verbosity:normal `
             /consoleloggerparameters:ErrorsOnly;Summary
