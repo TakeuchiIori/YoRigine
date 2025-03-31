@@ -1,5 +1,5 @@
 #pragma once
-#include "../BaseCollider.h"
+#include "../Core/BaseCollider.h"
 
 // Math
 #include "MathFunc.h"

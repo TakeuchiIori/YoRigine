@@ -11,9 +11,9 @@
 #include "MathFunc.h"
 // Collision.h
 #pragma once
-#include "Sphere/SphereCollider.h"
-#include "AABB/AABBCollider.h"
-#include "OBB/OBBCollider.h"
+#include "../Sphere/SphereCollider.h"
+#include "../AABB/AABBCollider.h"
+#include "../OBB/OBBCollider.h"
 #include <set>
 
 namespace Collision {

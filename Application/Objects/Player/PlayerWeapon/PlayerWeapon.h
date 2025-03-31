@@ -5,7 +5,6 @@
 #include "Systems/Camera/Camera.h"
 #include "Systems/Input./Input.h"
 #include "WorldTransform./WorldTransform.h"
-#include "Collision./BaseCollider.h"
 #include "Collision/Sphere/SphereCollider.h"
 #include "Collision/AABB/AABBCollider.h"
 #include "Collision/OBB/OBBCollider.h"
@@ -17,8 +16,8 @@ using json = nlohmann::json;
 // Math
 #include "MathFunc.h"
 #include "Vector3.h" 
-#include <Collision/ContactRecord.h>
-#include <Collision/Effect.h>
+#include <Collision/Core/ContactRecord.h>
+#include <Collision/Core/Effect.h>
 
 class PlayerWeapon
 {

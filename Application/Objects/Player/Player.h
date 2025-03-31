@@ -5,10 +5,10 @@
 #include "Systems/Camera/Camera.h"
 #include "Systems/Input./Input.h"
 #include "WorldTransform./WorldTransform.h"
-#include "Collision./BaseCollider.h"
 #include "Collision/Sphere/SphereCollider.h"
 #include "Collision/OBB/OBBCollider.h"
 #include "Collision/AABB/AABBCollider.h"
+#include "Collision/Core/ColliderFactory.h"
 #include "PlayerWeapon/PlayerWeapon.h"
 #include <Systems/GameTime/GameTIme.h>
 #include <Particle/ParticleManager.h>
@@ -186,9 +186,9 @@ private:
 	MapChipCollision mpCollision_;
 	MapChipCollision::ColliderRect colliderRect_;
 
-	std::unique_ptr<OBBCollider> obbCollider_;
-	//std::unique_ptr<AABBCollider> aabbCollider_;
-	//std::unique_ptr<SphereCollider> sphereCollider_;
+	std::shared_ptr<OBBCollider> obbCollider_;
+	//std::shared_ptr<AABBCollider> aabbCollider_;
+	//std::shared_ptr<SphereCollider> sphereCollider_;
 
 	/*===============================================================//
 								フラグ関連

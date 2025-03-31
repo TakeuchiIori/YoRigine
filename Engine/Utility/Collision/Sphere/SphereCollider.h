@@ -1,5 +1,5 @@
 #pragma once
-#include "../BaseCollider.h"
+#include "../Core/BaseCollider.h"
 #include "MathFunc.h"
 
 class SphereCollider : public BaseCollider

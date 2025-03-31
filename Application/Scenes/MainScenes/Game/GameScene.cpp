@@ -8,7 +8,7 @@
 #include "Object3D/Object3dCommon.h"
 #include "PipelineManager/SkinningManager.h"
 #include "Loaders/Model/Model.h"
-#include "Collision/CollisionManager.h"
+#include "Collision/Core/CollisionManager.h"
 #include <Systems/GameTime/HitStop.h>
 #include <cstdlib>
 #include <ctime>

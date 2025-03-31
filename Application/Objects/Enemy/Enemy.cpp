@@ -3,12 +3,12 @@
 // Engine
 #include "Loaders./Model./ModelManager.h"
 #include "Object3D./Object3dCommon.h"
-#include "Collision/CollisionTypeIdDef.h"
+#include "Collision/Core/CollisionTypeIdDef.h"
 #include "Player/Player.h"
 #include "Particle/ParticleManager.h"
 #include <Systems/GameTime/HitStop.h>
 #include "EnemyManager.h"
-#include <Collision/CollisionManager.h>
+#include <Collision/Core/CollisionManager.h>
 
 #ifdef _DEBUG
 #include "imgui.h" 
@@ -71,7 +71,7 @@ void Enemy::Initialize(Camera* camera, const Vector3& pos)
 	gameTime_ = GameTime::GetInstance();
 	gameTime_->RegisterObject(timeID_);
 
-    InitJson();
+    //InitJson();
 }
 
 void Enemy::InitCollision()
@@ -107,22 +107,12 @@ void Enemy::InitCollision()
 	//	this->OnExitCollision(self, other);
 	//	});
 
-
-	sphereCollider_ = std::make_unique<SphereCollider>();
-	sphereCollider_->SetTransform(&worldTransform_);
-	sphereCollider_->SetCamera(camera_);
-	sphereCollider_->Initialize();
-	sphereCollider_->SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kEnemy));
-	sphereCollider_->SetOnEnterCollision([this](BaseCollider* self, BaseCollider* other) {
-		this->OnEnterCollision(self, other);
-		});
-	sphereCollider_->SetOnCollision([this](BaseCollider* self, BaseCollider* other) {
-		this->OnCollision(self, other);
-		});
-	sphereCollider_->SetOnExitCollision([this](BaseCollider* self, BaseCollider* other) {
-		this->OnExitCollision(self, other);
-		});
-
+    sphereCollider_ = ColliderFactory::Create<SphereCollider>(
+        this,
+        &worldTransform_,
+        camera_,
+        static_cast<uint32_t>(CollisionTypeIdDef::kEnemy)
+    );
 }
 
 void Enemy::Update()
@@ -398,7 +388,7 @@ void Enemy::InitJson()
 	jsonManager_ = std::make_unique<JsonManager>("Enemy", "Resources./JSON");
 	jsonManager_->Register("HP", &hp_);
 
-    jsonCollider_ = std::make_unique<JsonManager>("EnemyCollider", "Resources/Json/Colliders");
+    //jsonCollider_ = std::make_unique<JsonManager>("EnemyCollider", "Resources/Json/Colliders");
 	//obbCollider_->InitJson(jsonCollider_.get());
 }
 

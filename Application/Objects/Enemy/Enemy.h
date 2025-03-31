@@ -4,10 +4,10 @@
 #include "Object3D./Object3d.h"
 #include "Systems/Input./Input.h"
 #include "WorldTransform./WorldTransform.h"
-#include "Collision./BaseCollider.h"
 #include "Collision/Sphere/SphereCollider.h"
 #include "Collision/AABB/AABBCollider.h"
-#include "Collision/OBB/OBBCollider.h"	
+#include "Collision/OBB/OBBCollider.h"
+#include "Collision/Core/ColliderFactory.h"
 #include "Loaders/Json/JsonManager.h"
 #include "Systems/Camera/Camera.h"
 #include <Systems/GameTime/GameTIme.h>
@@ -113,9 +113,9 @@ private:
 	std::unique_ptr<Object3d> shadow_;
 	std::unique_ptr<Object3d> base_ = nullptr;
 
-	//std::unique_ptr<OBBCollider> obbCollider_;
-	//std::unique_ptr<AABBCollider> aabbCollider_;
-	std::unique_ptr<SphereCollider> sphereCollider_;
+	//std::shared_ptr<OBBCollider> obbCollider_;
+	//std::shared_ptr<AABBCollider> aabbCollider_;
+	std::shared_ptr<SphereCollider> sphereCollider_;
 
 
 	WorldTransform worldTransform_;

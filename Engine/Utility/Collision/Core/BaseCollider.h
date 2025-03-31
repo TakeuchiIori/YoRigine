@@ -2,7 +2,7 @@
 // Engine
 #include "WorldTransform./WorldTransform.h"
 #include "Object3D./Object3d.h"
-#include "Collision./CollisionTypeIdDef.h"
+#include "CollisionTypeIdDef.h"
 #include "Systems/Camera/Camera.h"
 #include "../Graphics/Drawer/LineManager/Line.h"
 #include "CollisionTypeIdDef.h"
@@ -49,6 +49,14 @@ public: // ポリモーフィズム
 	virtual Vector3 GetEulerRotation() const = 0;
 
 
+	/// <summary>
+	/// 衝突判定の有効フラグ
+	/// </summary>
+	/// <returns></returns>
+	bool IsActive() const { return isActive_; }
+	void SetActive(bool isActive) { isActive_ = isActive; }
+
+
 public: // アクセッサ
 
 	/// <summary>
@@ -79,6 +87,7 @@ protected:
 	uint32_t typeID_ = 0u;
 private:
 	Camera* camera_ = nullptr;
+	bool isActive_ = true;
 	CollisionCallback enterCallback_;
 	CollisionCallback collisionCallback_;
 	CollisionCallback exitCallback_;
