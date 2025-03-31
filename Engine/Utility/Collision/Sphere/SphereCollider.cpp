@@ -53,5 +53,5 @@ Matrix4x4 SphereCollider::GetWorldMatrix() const {
 }
 
 Vector3 SphereCollider::GetEulerRotation() const {
-	return worldTransform_ ? worldTransform_->rotation_ : Vector3{};
+	return {};
 }

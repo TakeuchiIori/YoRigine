@@ -113,9 +113,9 @@ private:
 	std::unique_ptr<Object3d> shadow_;
 	std::unique_ptr<Object3d> base_ = nullptr;
 
-	std::unique_ptr<OBBCollider> obbCollider_;
+	//std::unique_ptr<OBBCollider> obbCollider_;
 	//std::unique_ptr<AABBCollider> aabbCollider_;
-	//std::unique_ptr<SphereCollider> sphereCollider_;
+	std::unique_ptr<SphereCollider> sphereCollider_;
 
 
 	WorldTransform worldTransform_;

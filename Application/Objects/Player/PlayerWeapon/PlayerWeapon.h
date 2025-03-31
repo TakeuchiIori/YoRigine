@@ -216,7 +216,7 @@ private:
 	Input* input_ = nullptr;
 
 	// コリジョン
-	std::unique_ptr<OBBCollider> obbCollider_;
+	//std::unique_ptr<OBBCollider> obbCollider_;
 	//std::unique_ptr<AABBCollider> aabbCollider_;
 	//std::unique_ptr<SphereCollider> sphereCollider_;
 	

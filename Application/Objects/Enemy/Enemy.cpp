@@ -24,7 +24,7 @@ Enemy::Enemy() {
 }
 Enemy::~Enemy()
 {
-	obbCollider_->~OBBCollider();
+	//obbCollider_->~OBBCollider();
 }
 void Enemy::Initialize(Camera* camera, const Vector3& pos)
 {
@@ -76,22 +76,36 @@ void Enemy::Initialize(Camera* camera, const Vector3& pos)
 
 void Enemy::InitCollision()
 {
-    obbCollider_ = std::make_unique<OBBCollider>();
-    obbCollider_->SetTransform(&worldTransform_);
-    obbCollider_->SetCamera(camera_);
-    obbCollider_->Initialize();
-    obbCollider_->SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kEnemy));
+    //obbCollider_ = std::make_unique<OBBCollider>();
+    //obbCollider_->SetTransform(&worldTransform_);
+    //obbCollider_->SetCamera(camera_);
+    //obbCollider_->Initialize();
+    //obbCollider_->SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kEnemy));
 
-    obbCollider_->SetOnEnterCollision([this](BaseCollider* self, BaseCollider* other) {
-        this->OnEnterCollision(self, other);
-        });
-    obbCollider_->SetOnCollision([this](BaseCollider* self, BaseCollider* other) {
-        this->OnCollision(self, other);
-        });
-    obbCollider_->SetOnExitCollision([this](BaseCollider* self, BaseCollider* other) {
-        this->OnExitCollision(self, other);
-        });
+    //obbCollider_->SetOnEnterCollision([this](BaseCollider* self, BaseCollider* other) {
+    //    this->OnEnterCollision(self, other);
+    //    });
+    //obbCollider_->SetOnCollision([this](BaseCollider* self, BaseCollider* other) {
+    //    this->OnCollision(self, other);
+    //    });
+    //obbCollider_->SetOnExitCollision([this](BaseCollider* self, BaseCollider* other) {
+    //    this->OnExitCollision(self, other);
+    //    });
 
+	sphereCollider_ = std::make_unique<SphereCollider>();
+	sphereCollider_->SetTransform(&worldTransform_);
+	sphereCollider_->SetCamera(camera_);
+	sphereCollider_->Initialize();
+	sphereCollider_->SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kEnemy));
+	sphereCollider_->SetOnEnterCollision([this](BaseCollider* self, BaseCollider* other) {
+		this->OnEnterCollision(self, other);
+		});
+	sphereCollider_->SetOnCollision([this](BaseCollider* self, BaseCollider* other) {
+		this->OnCollision(self, other);
+		});
+	sphereCollider_->SetOnExitCollision([this](BaseCollider* self, BaseCollider* other) {
+		this->OnExitCollision(self, other);
+		});
 
 }
 
@@ -134,7 +148,8 @@ void Enemy::Update()
     WS_.UpdateMatrix();
 
 	//OBBCollider::Update();
-	obbCollider_->Update();
+	//obbCollider_->Update();
+	sphereCollider_->Update();
 }
 
 void Enemy::Draw()
@@ -150,7 +165,8 @@ void Enemy::Draw()
 
 void Enemy::DrawCollision()
 {
-	obbCollider_->Draw();
+	//obbCollider_->Draw();
+	sphereCollider_->Draw();
 }
 
 void Enemy::ShowCoordinatesImGui()
@@ -205,19 +221,19 @@ void Enemy::OnEnterCollision(BaseCollider* self, BaseCollider* other)
 void Enemy::OnCollision(BaseCollider* self, BaseCollider* other)
 {
     // 衝突相手の種別IDを取得
-    //uint32_t typeID = other->GetTypeID();
-    //// 衝突相手が武器かプレイヤーなら
-    //if (typeID == static_cast<uint32_t>(CollisionTypeIdDef::kPlayer) || static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon)) {
-    //    isHit_ = true;
-    //    base_->SetMaterialColor({ 1.0f, 0.0f, 0.0f, 1.0f });
-    //    //hp_ -= 2;
-    //    if (hp_ <= 0) {
-    //        isAlive_ = false;
-    //        isActive_ = false;  // 完全に無効化
-    //    }
-    //    isShake_ = true;
-    //    HitStop::GetInstance()->Start("Player", HitStop::HitStopType::Heavy);
-    //}
+    uint32_t typeID = other->GetTypeID();
+    // 衝突相手が武器かプレイヤーなら
+    if (typeID == static_cast<uint32_t>(CollisionTypeIdDef::kPlayer)/* || static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon)*/) {
+        isHit_ = true;
+        base_->SetMaterialColor({ 1.0f, 0.0f, 0.0f, 1.0f });
+        //hp_ -= 2;
+        if (hp_ <= 0) {
+            isAlive_ = false;
+            isActive_ = false;  // 完全に無効化
+        }
+        isShake_ = true;
+        HitStop::GetInstance()->Start("Player", HitStop::HitStopType::Heavy);
+    }
 }
 
 void Enemy::OnExitCollision(BaseCollider* self, BaseCollider* other)
@@ -365,7 +381,7 @@ void Enemy::InitJson()
 	jsonManager_->Register("HP", &hp_);
 
     jsonCollider_ = std::make_unique<JsonManager>("EnemyCollider", "Resources/Json/Colliders");
-	obbCollider_->InitJson(jsonCollider_.get());
+	//obbCollider_->InitJson(jsonCollider_.get());
 }
 
 Vector3 Enemy::GetWorldPosition() {
