@@ -377,10 +377,7 @@ Matrix4x4 MakeRotateMatrixXYZ(Vector3 rad)
 //=============================11. 3次元のアフィン変換行列=============================//
 Matrix4x4 MakeAffineMatrix(const Vector3& scale, const Vector3& rotate, const Vector3& translate) {
 	Matrix4x4 result;
-	Matrix4x4 rotateMatrixX = MakeRotateMatrixX(rotate.x);
-	Matrix4x4 rotateMatrixY = MakeRotateMatrixY(rotate.y);
-	Matrix4x4 rotateMatrixZ = MakeRotateMatrixZ(rotate.z);
-	Matrix4x4 rotateMatrixXYZ = Multiply(rotateMatrixX, Multiply(rotateMatrixY, rotateMatrixZ));
+	Matrix4x4 rotateMatrixXYZ = MakeRotateMatrixXYZ(rotate);
 	result.m[0][0] = scale.x * rotateMatrixXYZ.m[0][0];
 	result.m[0][1] = scale.x * rotateMatrixXYZ.m[0][1];
 	result.m[0][2] = scale.x * rotateMatrixXYZ.m[0][2];
