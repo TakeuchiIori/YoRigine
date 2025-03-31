@@ -64,6 +64,11 @@ void OBBCollider::Draw()
 	line_->DrawLine();
 }
 
+Vector3 OBBCollider::GetScale() const
+{
+	return worldTransform_->scale_;
+}
+
 Vector3 OBBCollider::GetCenterPosition() const {
 
 	Vector3 newPos;

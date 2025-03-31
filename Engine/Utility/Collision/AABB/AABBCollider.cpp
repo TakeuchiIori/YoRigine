@@ -43,6 +43,11 @@ void AABBCollider::Draw()
 	line_->DrawLine();
 }
 
+Vector3 AABBCollider::GetScale() const
+{
+	return worldTransform_->scale_;
+}
+
 Vector3 AABBCollider::GetCenterPosition() const {
 
 	Vector3 newPos;

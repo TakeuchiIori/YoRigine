@@ -16,6 +16,7 @@ public:
 	~SphereCollider();
 	void InitJson(JsonManager* jsonManager);
 	Vector3 GetCenterPosition() const override;
+	Vector3 GetScale() const override;
 	Matrix4x4 GetWorldMatrix() const override;
 	Vector3 GetEulerRotation() const override;
 
