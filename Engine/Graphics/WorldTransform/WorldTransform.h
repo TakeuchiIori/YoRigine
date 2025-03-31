@@ -24,6 +24,8 @@ public:
 		Vector3 translate;
 	};
 
+	// アンカーポイント
+	Vector3 anchorPoint_ = { 0, 0, 0 };
 	// ローカルスケール
 	Vector3 scale_ = { 1, 1, 1 };
 	// X,Y,Z軸回りのローカル回転角
@@ -52,6 +54,10 @@ public:
 	/// 行列を転送する
 	/// </summary>
 	void UpdateMatrix();
+
+	const Vector3& GetAnchorPoint() const;
+
+	void SetAnchorPoint(const Vector3& anchorPoint);
 
 	/// <summary>
 	/// 定数バッファの取得

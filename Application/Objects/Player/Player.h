@@ -166,6 +166,7 @@ private:
 	//===============================================================*/
 
 	WorldTransform worldTransform_;
+	Vector3 anchorPoint_ = { 0.5f, 0.5f, 0.5f };
 	WorldTransform WS_;
 	Camera* camera_ = nullptr;
 	/*===============================================================//
