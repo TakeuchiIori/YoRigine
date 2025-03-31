@@ -46,6 +46,16 @@ bool Collision::Check(const SphereCollider* a, const SphereCollider* b)
 
 bool Collision::Check(const SphereCollider* sphere, const AABBCollider* aabb)
 {
+	Vector3 center = sphere->GetCenterPosition();
+	float radius = sphere->GetRadius();
+
+	// 値が正常かチェック
+	if (std::isnan(center.x) || std::isnan(center.y) || std::isnan(center.z) ||
+		std::isnan(radius) || radius < 0.0f || !std::isfinite(radius)) {
+		return false;
+	}
+
+
 	Vector3 closest = Clamp(sphere->GetCenterPosition(), aabb->GetAABB().min, aabb->GetAABB().max);
 	Vector3 diff = closest - sphere->GetCenterPosition();
 	return Length(diff) <= sphere->GetRadius() * sphere->GetRadius();
@@ -53,6 +63,15 @@ bool Collision::Check(const SphereCollider* sphere, const AABBCollider* aabb)
 
 bool Collision::Check(const SphereCollider* sphere, const OBBCollider* obb)
 {
+	Vector3 center = sphere->GetCenterPosition();
+	float radius = sphere->GetRadius();
+
+	// 値が正常かチェック
+	if (std::isnan(center.x) || std::isnan(center.y) || std::isnan(center.z) ||
+		std::isnan(radius) || radius < 0.0f || !std::isfinite(radius)) {
+		return false;
+	}
+
 	const OBB& ob = obb->GetOBB();
 
 	// 回転行列を作成（オイラー角 → 回転行列）

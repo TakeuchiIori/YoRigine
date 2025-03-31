@@ -43,6 +43,8 @@ public: // ポリモーフィズム
 
 	// 継承先で実装：位置・行列・回転
 	virtual Vector3 GetCenterPosition() const = 0;
+	virtual Vector3 GetScale() const = 0;
+	virtual Vector3 GetAnchorPoint() const = 0;
 	virtual Matrix4x4 GetWorldMatrix() const = 0;
 	virtual Vector3 GetEulerRotation() const = 0;
 

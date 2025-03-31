@@ -166,6 +166,7 @@ private:
 	//===============================================================*/
 
 	WorldTransform worldTransform_;
+	Vector3 anchorPoint_ = { 0.5f, 0.5f, 0.5f };
 	WorldTransform WS_;
 	Camera* camera_ = nullptr;
 	/*===============================================================//
@@ -185,9 +186,9 @@ private:
 	MapChipCollision mpCollision_;
 	MapChipCollision::ColliderRect colliderRect_;
 
-	//std::unique_ptr<OBBCollider> obbCollider_;
+	std::unique_ptr<OBBCollider> obbCollider_;
 	//std::unique_ptr<AABBCollider> aabbCollider_;
-	std::unique_ptr<SphereCollider> sphereCollider_;
+	//std::unique_ptr<SphereCollider> sphereCollider_;
 
 	/*===============================================================//
 								フラグ関連

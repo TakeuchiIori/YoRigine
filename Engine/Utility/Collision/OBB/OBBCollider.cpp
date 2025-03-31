@@ -35,19 +35,38 @@ void OBBCollider::Initialize()
 /// </summary>
 void OBBCollider::Update()
 {
-	// ワールド行列は位置と中心の変換だけに使う
-	Matrix4x4 worldMatrix = GetWorldMatrix();
-	// 中心とサイズの更新
-	obb_.center = Transform(obbOffset_.center, worldMatrix);
-	obb_.size = obbOffset_.size;
+	// スケールとアンカーポイントを取得
+	Vector3 scale = GetScale();
+	Vector3 anchor = GetAnchorPoint();
+	Vector3 center = GetCenterPosition();
 
-	// オフセット・ワールド回転（ラジアン）
+	// サイズをスケールに応じて拡大
+	Vector3 scaledSize = {
+		obbOffset_.size.x * std::abs(scale.x),
+		obbOffset_.size.y * std::abs(scale.y),
+		obbOffset_.size.z * std::abs(scale.z),
+	};
+
+	// アンカーポイント補正（AABBと同様）
+	Vector3 anchorOffset = {
+		scaledSize.x * (anchor.x - 0.5f),
+		scaledSize.y * (anchor.y - 0.5f),
+		scaledSize.z * (anchor.z - 0.5f)
+	};
+
+	// OBBの中心はアンカーポイントを考慮した位置
+	obb_.center = /*center*/ /*- anchorOffset + */Transform(obbOffset_.center, GetWorldMatrix());
+
+	// サイズ設定（すでにスケーリングされてる）
+	obb_.size = scaledSize;
+
+	// 回転行列の合成（ローカル→ワールド）
 	Vector3 offsetEulerRad = {
 		DegToRad(obbEulerOffset_.x),
 		DegToRad(obbEulerOffset_.y),
 		DegToRad(obbEulerOffset_.z)
 	};
-	Vector3 worldEulerRad = GetEulerRotation(); // ← 修正点！
+	Vector3 worldEulerRad = GetEulerRotation();
 
 	Matrix4x4 rotOffset = MakeRotateMatrixXYZ(offsetEulerRad);
 	Matrix4x4 rotWorld = MakeRotateMatrixXYZ(worldEulerRad);
@@ -55,13 +74,23 @@ void OBBCollider::Update()
 	Matrix4x4 combinedRot = Multiply(rotWorld, rotOffset);
 
 	obb_.rotation = MatrixToEuler(combinedRot);
-
 }
+
 
 void OBBCollider::Draw()
 {
 	line_->DrawOBB(obb_.center, obb_.rotation, obb_.size);
 	line_->DrawLine();
+}
+
+Vector3 OBBCollider::GetScale() const
+{
+	return worldTransform_->scale_;
+}
+
+Vector3 OBBCollider::GetAnchorPoint() const
+{
+	return worldTransform_->anchorPoint_;
 }
 
 Vector3 OBBCollider::GetCenterPosition() const {
