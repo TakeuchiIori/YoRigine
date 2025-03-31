@@ -47,18 +47,11 @@ void WorldTransform::CreateConstBuffer()
 
 void WorldTransform::UpdateMatrix()
 {
-    // --- 0~1範囲のアンカーポイントを -0.5~0.5 に変換（中心が0） ---
-    Vector3 correctedAnchor = {
-        (anchorPoint_.x - 0.5f),
-        (anchorPoint_.y - 0.5f),
-        (anchorPoint_.z - 0.5f)
-    };
+    // アンカーポイントの補正行列を作成
+    Matrix4x4 translateToOrigin = MakeTranslateMatrix({ -anchorPoint_.x, -anchorPoint_.y, -anchorPoint_.z });
+    Matrix4x4 translateBack = MakeTranslateMatrix(anchorPoint_);
 
-    // アンカーポイントの補正行列
-    Matrix4x4 translateToOrigin = MakeTranslateMatrix({ -correctedAnchor.x, -correctedAnchor.y, -correctedAnchor.z });
-    Matrix4x4 translateBack = MakeTranslateMatrix(correctedAnchor);
-
-    // 各種行列
+    // 各種行列を作成
     Matrix4x4 scaleMatrix = MakeScaleMatrix(scale_);
     Matrix4x4 rotateMatrix = MakeRotateMatrixXYZ(rotation_);
     Matrix4x4 translateMatrix = MakeTranslateMatrix(translation_);
@@ -68,15 +61,16 @@ void WorldTransform::UpdateMatrix()
 
     // ワールド行列を定数バッファに転送
     if (transformData_ != nullptr) {
+        // 親が存在する場合、親のワールド行列を掛け合わせる
         if (parent_) {
-            matWorld_ = matWorld_ * parent_->matWorld_;
+            Matrix4x4 parentMatrix = parent_->matWorld_;
+            matWorld_ = matWorld_ * parentMatrix; // 親の行列と自身の行列を合成
         }
 
-        transformData_->World = matWorld_;
+        transformData_->World = matWorld_; // 定数バッファに行列をコピー
         transformData_->WorldInverse = Inverse(matWorld_);
     }
 }
-
 
 /// <summary>
 /// アンカーポイントの取得
