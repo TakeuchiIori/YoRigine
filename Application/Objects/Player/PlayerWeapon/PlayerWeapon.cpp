@@ -97,7 +97,7 @@ void PlayerWeapon::Initialize(Camera* camera)
 void PlayerWeapon::InitJson()
 {
 	jsonCollider_ = std::make_unique<JsonManager>("PlayerWeaponCollider", "Resources/Json/Colliders");
-	obbCollider_->InitJson(jsonCollider_.get());
+	//obbCollider_->InitJson(jsonCollider_.get());
 	//aabbCollider_->InitJson(jsonCollider_.get());
 	//sphereCollider_->InitJson(jsonCollider_.get());
 }
@@ -105,7 +105,7 @@ void PlayerWeapon::InitJson()
 void PlayerWeapon::InitCollision()
 {
 	// OBB
-	obbCollider_ = std::make_unique<OBBCollider>();
+	/*obbCollider_ = std::make_unique<OBBCollider>();
 	obbCollider_->SetCamera(camera_);
 	obbCollider_->Initialize();
 	obbCollider_->SetTransform(&worldTransform_);
@@ -121,7 +121,7 @@ void PlayerWeapon::InitCollision()
 		});
 	obbCollider_->SetOnExitCollision([this](BaseCollider* self, BaseCollider* other) {
 		this->OnExitCollision(self, other);
-		});
+		});*/
 
 	//// AABB
 	//aabbCollider_ = std::make_unique<AABBCollider>();
@@ -187,7 +187,7 @@ void PlayerWeapon::Update()
 	worldTransform_.UpdateMatrix();
 
 	// コリジョンの更新
-	obbCollider_->Update();
+	//obbCollider_->Update();
 	//aabbCollider_->Update();
 	//sphereCollider_->Update();
 
@@ -211,7 +211,7 @@ void PlayerWeapon::Draw(Camera* camera)
 
 void PlayerWeapon::DrawCollision()
 {
-	obbCollider_->Draw();
+	//obbCollider_->Draw();
 	//aabbCollider_->Draw();
 	//sphereCollider_->Draw();
 }

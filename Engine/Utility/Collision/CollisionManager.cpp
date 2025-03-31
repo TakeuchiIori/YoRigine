@@ -41,7 +41,7 @@ bool Collision::Check(const SphereCollider* a, const SphereCollider* b)
 	Vector3 diff = b->GetCenterPosition() - a->GetCenterPosition();
 	float distSq = Length(diff);
 	float radiusSum = a->GetRadius() + b->GetRadius();
-	return distSq <= radiusSum * radiusSum;
+	return distSq <= radiusSum;
 }
 
 bool Collision::Check(const SphereCollider* sphere, const AABBCollider* aabb)
