@@ -69,6 +69,11 @@ Vector3 OBBCollider::GetScale() const
 	return worldTransform_->scale_;
 }
 
+Vector3 OBBCollider::GetAnchorPoint() const
+{
+	return worldTransform_->anchorPoint_;
+}
+
 Vector3 OBBCollider::GetCenterPosition() const {
 
 	Vector3 newPos;

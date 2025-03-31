@@ -74,36 +74,36 @@ void Player::InitCollision()
 	//	this->OnExitCollision(self, other);
 	//	});
 
-	//aabbCollider_ = std::make_unique<AABBCollider>();
-	//aabbCollider_->SetTransform(&worldTransform_);
-	//aabbCollider_->SetCamera(camera_);
-	//aabbCollider_->Initialize();
-	//aabbCollider_->SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayer));
-	//aabbCollider_->SetOnEnterCollision([this](BaseCollider* self, BaseCollider* other) {
-	//	this->OnEnterCollision(self, other);
-	//	});
-	//aabbCollider_->SetOnCollision([this](BaseCollider* self, BaseCollider* other) {
-	//	this->OnCollision(self, other);
-	//	});
-	//aabbCollider_->SetOnExitCollision([this](BaseCollider* self, BaseCollider* other) {
-	//	this->OnExitCollision(self, other);
-	//	});
-
-	
-	sphereCollider_ = std::make_unique<SphereCollider>();
-	sphereCollider_->SetTransform(&worldTransform_);
-	sphereCollider_->SetCamera(camera_);
-	sphereCollider_->Initialize();
-	sphereCollider_->SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayer));
-	sphereCollider_->SetOnEnterCollision([this](BaseCollider* self, BaseCollider* other) {
+	aabbCollider_ = std::make_unique<AABBCollider>();
+	aabbCollider_->SetTransform(&worldTransform_);
+	aabbCollider_->SetCamera(camera_);
+	aabbCollider_->Initialize();
+	aabbCollider_->SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayer));
+	aabbCollider_->SetOnEnterCollision([this](BaseCollider* self, BaseCollider* other) {
 		this->OnEnterCollision(self, other);
 		});
-	sphereCollider_->SetOnCollision([this](BaseCollider* self, BaseCollider* other) {
+	aabbCollider_->SetOnCollision([this](BaseCollider* self, BaseCollider* other) {
 		this->OnCollision(self, other);
 		});
-	sphereCollider_->SetOnExitCollision([this](BaseCollider* self, BaseCollider* other) {
+	aabbCollider_->SetOnExitCollision([this](BaseCollider* self, BaseCollider* other) {
 		this->OnExitCollision(self, other);
 		});
+
+	
+	//sphereCollider_ = std::make_unique<SphereCollider>();
+	//sphereCollider_->SetTransform(&worldTransform_);
+	//sphereCollider_->SetCamera(camera_);
+	//sphereCollider_->Initialize();
+	//sphereCollider_->SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayer));
+	//sphereCollider_->SetOnEnterCollision([this](BaseCollider* self, BaseCollider* other) {
+	//	this->OnEnterCollision(self, other);
+	//	});
+	//sphereCollider_->SetOnCollision([this](BaseCollider* self, BaseCollider* other) {
+	//	this->OnCollision(self, other);
+	//	});
+	//sphereCollider_->SetOnExitCollision([this](BaseCollider* self, BaseCollider* other) {
+	//	this->OnExitCollision(self, other);
+	//	});
 
 
 }
@@ -133,8 +133,8 @@ void Player::Update()
 #endif // _DEBUG
 	//OBBCollider::Update();
 	//obbCollider_->Update();
-	//aabbCollider_->Update();
-	sphereCollider_->Update();
+	aabbCollider_->Update();
+	//sphereCollider_->Update();
 }
 
 void Player::Draw()
@@ -148,8 +148,8 @@ void Player::DrawCollision()
 {
 	//OBBCollider::Draw();
 	//obbCollider_->Draw();
-	//aabbCollider_->Draw();
-	sphereCollider_->Draw();
+	aabbCollider_->Draw();
+	//sphereCollider_->Draw();
 	//weapon_->DrawCollision();
 }
 

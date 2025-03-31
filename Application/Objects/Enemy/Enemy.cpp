@@ -92,6 +92,22 @@ void Enemy::InitCollision()
     //    this->OnExitCollision(self, other);
     //    });
 
+	//aabbCollider_ = std::make_unique<AABBCollider>();
+	//aabbCollider_->SetTransform(&worldTransform_);
+	//aabbCollider_->SetCamera(camera_);
+	//aabbCollider_->Initialize();
+	//aabbCollider_->SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kEnemy));
+	//aabbCollider_->SetOnEnterCollision([this](BaseCollider* self, BaseCollider* other) {
+	//	this->OnEnterCollision(self, other);
+	//	});
+	//aabbCollider_->SetOnCollision([this](BaseCollider* self, BaseCollider* other) {
+	//	this->OnCollision(self, other);
+	//	});
+	//aabbCollider_->SetOnExitCollision([this](BaseCollider* self, BaseCollider* other) {
+	//	this->OnExitCollision(self, other);
+	//	});
+
+
 	sphereCollider_ = std::make_unique<SphereCollider>();
 	sphereCollider_->SetTransform(&worldTransform_);
 	sphereCollider_->SetCamera(camera_);
@@ -150,6 +166,7 @@ void Enemy::Update()
 	//OBBCollider::Update();
 	//obbCollider_->Update();
 	sphereCollider_->Update();
+	//aabbCollider_->Update();
 }
 
 void Enemy::Draw()
@@ -167,6 +184,7 @@ void Enemy::DrawCollision()
 {
 	//obbCollider_->Draw();
 	sphereCollider_->Draw();
+	//aabbCollider_->Draw();
 }
 
 void Enemy::ShowCoordinatesImGui()

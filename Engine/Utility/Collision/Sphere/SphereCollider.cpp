@@ -53,6 +53,11 @@ Vector3 SphereCollider::GetScale() const
 	return worldTransform_->scale_;
 }
 
+Vector3 SphereCollider::GetAnchorPoint() const
+{
+	return worldTransform_->anchorPoint_;
+}
+
 Matrix4x4 SphereCollider::GetWorldMatrix() const {
 	return worldTransform_ ? worldTransform_->matWorld_ : MakeIdentity4x4();
 }
