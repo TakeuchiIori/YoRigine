@@ -555,6 +555,7 @@ void Player::InitJson()
 	jsonManager_->Register("Translation", &worldTransform_.translation_);
 	jsonManager_->Register("Rotate", &worldTransform_.rotation_);
 	jsonManager_->Register("Scale", &worldTransform_.scale_);
+	jsonManager_->Register("Use Anchor Point", &worldTransform_.useAnchorPoint_);
 	jsonManager_->Register("AnchorPoint", &anchorPoint_);
 	jsonManager_->Register("Speed", &moveSpeed_);
 	jsonManager_->Register("JumpHeight", &jumpHeight_);
