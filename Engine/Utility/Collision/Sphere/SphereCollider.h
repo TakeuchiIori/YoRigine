@@ -13,12 +13,10 @@ public:
 
 	//===============================================================*/
 
-	~SphereCollider();
-	void InitJson(JsonManager* jsonManager);
+	~SphereCollider() = default;
+	void InitJson(JsonManager* jsonManager) override;
 	Vector3 GetCenterPosition() const override;
-	Vector3 GetScale() const override;
-	Vector3 GetAnchorPoint() const override;
-	Matrix4x4 GetWorldMatrix() const override;
+	const WorldTransform& GetWorldTransform() override;
 	Vector3 GetEulerRotation() const override;
 
 	/*===============================================================//
@@ -32,6 +30,7 @@ public:
 	void Initialize();
 	void Update();
 	void Draw();
+	void InitJson();
 public:
 
 	/// <summary>
@@ -45,6 +44,8 @@ public:
 
 	float GetRadius() const { return sphere_.radius; }
 	float GetRadius() { return sphere_.radius; }
+
+	void SetRadius(float radius) { radius_ = radius; }
 private:
 	Sphere sphere_;
 	Sphere sphereOffset_;

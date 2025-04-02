@@ -85,6 +85,14 @@ public:
 	void CheckAllCollisions();
 
 	/// <summary>
+	/// カメラ範囲チェック
+	/// </summary>
+	/// <param name="position"></param>
+	/// <param name="camera"></param>
+	/// <returns></returns>
+	bool IsColliderInView(const Vector3& position, const Camera* camera);
+
+	/// <summary>
 	/// リストに登録
 	/// </summary>
 	void AddCollider(BaseCollider* collider);

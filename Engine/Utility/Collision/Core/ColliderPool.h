@@ -38,7 +38,7 @@ inline std::shared_ptr<T> ColliderPool::GetCollider()
 
 	auto& it = pool_[typeid(T)];
 	for (auto& collider : it) {
-		if (!collider->IsActive()) {
+		if (!collider->GetIsActive()) {
 			collider->SetActive(true);
 			return std::static_pointer_cast<T>(collider);
 		}

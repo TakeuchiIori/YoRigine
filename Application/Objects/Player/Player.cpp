@@ -137,7 +137,7 @@ void Player::Move()
 		if (Input::GetInstance()->IsRightStickMoving()) {
 			Rotate();
 			
-		}
+		}  
 		else {
 			MoveController();
 		}

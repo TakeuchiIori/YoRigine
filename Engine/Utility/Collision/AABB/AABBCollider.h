@@ -16,12 +16,10 @@ public:
 
 
 	//===============================================================*/
-	~AABBCollider();
-	void InitJson(JsonManager* jsonManager);
+	~AABBCollider() = default;
+	void InitJson(JsonManager* jsonManager) override;
 	Vector3 GetCenterPosition() const override;
-	Vector3 GetScale() const override;
-	Vector3 GetAnchorPoint() const override;
-	Matrix4x4 GetWorldMatrix() const override;
+	const WorldTransform& GetWorldTransform() override;
 	Vector3 GetEulerRotation() const override;
 
 

@@ -1,18 +1,34 @@
 #include "SphereCollider.h"
-
-SphereCollider::~SphereCollider()
-{
-	BaseCollider::~BaseCollider();
-}
+#include "MathFunc.h"
+#include "Vector3.h"
 
 void SphereCollider::InitJson(JsonManager* jsonManager)
 {
 	// 衝突球のオフセットや半径を JSON に登録
 	jsonManager->SetCategory("Colliders");
-	jsonManager->Register("Sphere Offset X", &sphereOffset_.center.x);
-	jsonManager->Register("Sphere Offset Y", &sphereOffset_.center.y);
-	jsonManager->Register("Sphere Offset Z", &sphereOffset_.center.z);
-	jsonManager->Register("Sphere Radius", &radius_);
+	jsonManager->Register("Collider Offset X", &sphereOffset_.center.x);
+	jsonManager->Register("Collider Offset Y", &sphereOffset_.center.y);
+	jsonManager->Register("Collider Offset Z", &sphereOffset_.center.z);
+	jsonManager->Register("Collider Radius", &radius_);
+}
+
+Vector3 SphereCollider::GetCenterPosition() const
+{
+	Vector3 newPos;
+	newPos.x = wt_->matWorld_.m[3][0];
+	newPos.y = wt_->matWorld_.m[3][1];
+	newPos.z = wt_->matWorld_.m[3][2];
+	return newPos;
+}
+
+const WorldTransform& SphereCollider::GetWorldTransform()
+{
+	return *wt_;
+}
+
+Vector3 SphereCollider::GetEulerRotation() const
+{
+	return wt_ ? wt_->rotation_ : Vector3{};
 }
 
 void SphereCollider::Initialize()
@@ -29,6 +45,7 @@ void SphereCollider::Initialize()
 
 void SphereCollider::Update()
 {
+	radius_ = GetWorldTransform().scale_.x;
 	sphere_.center = GetCenterPosition() + sphereOffset_.center;
 	sphere_.radius = radius_ + sphereOffset_.radius;
 }
@@ -39,29 +56,7 @@ void SphereCollider::Draw()
 	line_->DrawLine();
 }
 
-Vector3 SphereCollider::GetCenterPosition() const {
-
-	Vector3 newPos;
-	newPos.x = worldTransform_->matWorld_.m[3][0];
-	newPos.y = worldTransform_->matWorld_.m[3][1];
-	newPos.z = worldTransform_->matWorld_.m[3][2];
-	return newPos;
-}
-
-Vector3 SphereCollider::GetScale() const
+void SphereCollider::InitJson()
 {
-	return worldTransform_->scale_;
-}
 
-Vector3 SphereCollider::GetAnchorPoint() const
-{
-	return worldTransform_->anchorPoint_;
-}
-
-Matrix4x4 SphereCollider::GetWorldMatrix() const {
-	return worldTransform_ ? worldTransform_->matWorld_ : MakeIdentity4x4();
-}
-
-Vector3 SphereCollider::GetEulerRotation() const {
-	return {};
 }

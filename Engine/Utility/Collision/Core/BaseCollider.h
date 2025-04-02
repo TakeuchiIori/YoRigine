@@ -1,32 +1,38 @@
 #pragma once
+
 // Engine
 #include "WorldTransform./WorldTransform.h"
 #include "Object3D./Object3d.h"
 #include "CollisionTypeIdDef.h"
 #include "Systems/Camera/Camera.h"
 #include "../Graphics/Drawer/LineManager/Line.h"
-#include "CollisionTypeIdDef.h"
 #include "Loaders/Json/JsonManager.h"
+
 // Math
 #include "Vector3.h"
 #include "Matrix4x4.h"
 
-enum class ColliderType {
-	Sphere,
-	AABB,
-	OBB,
-};
-
+/// <summary>
+/// コライダーの基本クラス（継承してSphere/AABB/OBBを実装）
+/// </summary>
 class BaseCollider {
 protected:
 
+	/// <summary>
+	/// 初期化（派生クラスから呼び出す）
+	/// </summary>
 	void Initialize();
 
-public: // ポリモーフィズム
+public:
 
 	using CollisionCallback = std::function<void(BaseCollider* self, BaseCollider* other)>;
 	virtual ~BaseCollider();
-	// 衝突イベント（コールバック）
+
+	/*=======================================================
+
+						  コールバック
+
+	=======================================================*/
 	void SetOnEnterCollision(CollisionCallback cb) { enterCallback_ = cb; }
 	void SetOnCollision(CollisionCallback cb) { collisionCallback_ = cb; }
 	void SetOnExitCollision(CollisionCallback cb) { exitCallback_ = cb; }
@@ -41,53 +47,105 @@ public: // ポリモーフィズム
 		if (exitCallback_) exitCallback_(this, other);
 	}
 
-	// 継承先で実装：位置・行列・回転
+	/*=======================================================
+
+						  純粋仮想関数
+
+	=======================================================*/
+	/// <summary>
+	/// 中心座標を取得（派生クラスで実装）
+	/// </summary>
 	virtual Vector3 GetCenterPosition() const = 0;
-	virtual Vector3 GetScale() const = 0;
-	virtual Vector3 GetAnchorPoint() const = 0;
-	virtual Matrix4x4 GetWorldMatrix() const = 0;
+
+	/// <summary>
+	/// ワールドトランスフォーム取得（派生クラスで実装）
+	/// </summary>
+	virtual const WorldTransform& GetWorldTransform() = 0;
+
+	/// <summary>
+	/// オイラー角取得（派生クラスで実装）
+	/// </summary>
 	virtual Vector3 GetEulerRotation() const = 0;
 
-
 	/// <summary>
-	/// 衝突判定の有効フラグ
+	/// JSON読み込み
 	/// </summary>
-	/// <returns></returns>
-	bool IsActive() const { return isActive_; }
-	void SetActive(bool isActive) { isActive_ = isActive; }
+	virtual void InitJson(JsonManager* jsonManager) = 0;
 
+public:
 
-public: // アクセッサ
+	/*=======================================================
+
+						 アクセッサ
+
+	=======================================================*/
 
 	/// <summary>
-	///  種別IDを取得
+	/// コライダータイプID取得
 	/// </summary>
 	uint32_t GetTypeID() const { return typeID_; }
 
 	/// <summary>
-	///  種別IDを\設定
+	/// コライダータイプID設定
 	/// </summary>
 	void SetTypeID(uint32_t typeID) { typeID_ = typeID; }
 
 	/// <summary>
 	/// カメラのセット
 	/// </summary>
-	/// <param name="camera"></param>
 	void SetCamera(Camera* camera) { camera_ = camera; }
 
 	/// <summary>
 	/// ワールドトランスフォームのセット
 	/// </summary>
-	/// <param name="worldTransform"></param>
-	void SetTransform(const WorldTransform* worldTransform) { worldTransform_ = worldTransform; }
+	void SetTransform(const WorldTransform* worldTransform) { wt_ = worldTransform; }
+
+	/// <summary>
+	/// 当たり判定の有効/無効を設定
+	/// </summary>
+	void SetCollisionEnabled(bool enabled) { isCollisionEnabled_ = enabled; }
+
+	/// <summary>
+	/// 当たり判定の有効フラグ取得
+	/// </summary>
+	bool IsCollisionEnabled() const { return isCollisionEnabled_; }
+
+	/// <summary>
+	/// 当たり判定そのもの有効フラグ
+	/// </summary>
+	bool GetIsActive() const { return isActive_; }
+
+	/// <summary>
+	/// 当たり判定そのもの有効/無効を切り替え
+	/// </summary>
+	void SetActive(bool isActive) { isActive_ = isActive; }
 
 protected:
-	Line* line_ = nullptr;
-	const WorldTransform* worldTransform_ = nullptr;
-	uint32_t typeID_ = 0u;
+
+	/*=======================================================
+
+						 継承クラス用
+
+	=======================================================*/
+	Line* line_ = nullptr;					// 当たり判定の可視化用ライン
+	const WorldTransform* wt_ = nullptr;	// 所有者のワールド変換
+	uint32_t typeID_ = 0u;					// 衝突タイプID
+
+public:
+
+	bool isCollisionEnabled_ = true;		// 当たり判定有効フラグ
+	Camera* camera_ = nullptr;				// カメラ参照（ライン描画用）
+
 private:
-	Camera* camera_ = nullptr;
-	bool isActive_ = true;
+
+	/*=======================================================
+
+						   非公開
+
+	=======================================================*/
+	bool isActive_ = true;					// コライダーが有効かどうか
+
+	// 衝突時コールバック
 	CollisionCallback enterCallback_;
 	CollisionCallback collisionCallback_;
 	CollisionCallback exitCallback_;

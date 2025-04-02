@@ -26,10 +26,14 @@ public:
 
 		// コールバック関数の登録
 		collider->SetOnEnterCollision([owner](BaseCollider* self, BaseCollider* other) {
-			owner->OnEnterCollision(self, other);
+			if (owner) {
+				owner->OnEnterCollision(self, other);
+			}
 			});
 		collider->SetOnCollision([owner](BaseCollider* self, BaseCollider* other) {
-			owner->OnCollision(self, other);
+			if (owner) {
+				owner->OnCollision(self, other);
+			}
 			});
 		collider->SetOnExitCollision([owner](BaseCollider* self, BaseCollider* other) {
 			owner->OnExitCollision(self, other);
