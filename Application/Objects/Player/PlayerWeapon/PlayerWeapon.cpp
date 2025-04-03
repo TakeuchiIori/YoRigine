@@ -97,6 +97,7 @@ void PlayerWeapon::Initialize(Camera* camera)
 void PlayerWeapon::InitJson()
 {
 	jsonCollider_ = std::make_unique<JsonManager>("PlayerWeaponCollider", "Resources/Json/Colliders");
+	jsonCollider_->SetCategory("Colliders");
 	//obbCollider_->InitJson(jsonCollider_.get());
 	//aabbCollider_->InitJson(jsonCollider_.get());
 	//sphereCollider_->InitJson(jsonCollider_.get());

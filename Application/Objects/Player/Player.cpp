@@ -2,7 +2,7 @@
 // Engine
 #include "Loaders./Model./ModelManager.h"
 #include "Object3D./Object3dCommon.h"
-#include "Collision/CollisionTypeIdDef.h"
+#include "Collision/Core/CollisionTypeIdDef.h"
 
 
 #ifdef _DEBUG
@@ -57,53 +57,12 @@ void Player::Initialize(Camera* camera)
 void Player::InitCollision()
 {
 	// OBB
-	obbCollider_ = std::make_unique<OBBCollider>();
-	obbCollider_->SetTransform(&worldTransform_);
-	obbCollider_->SetCamera(camera_);
-	obbCollider_->Initialize();
-	obbCollider_->SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayer));
-
-	// メンバ関数ポインタの登録
-	obbCollider_->SetOnEnterCollision([this](BaseCollider* self, BaseCollider* other) {
-		this->OnEnterCollision(self, other);
-		});
-	obbCollider_->SetOnCollision([this](BaseCollider* self, BaseCollider* other) {
-		this->OnCollision(self, other);
-		});
-	obbCollider_->SetOnExitCollision([this](BaseCollider* self, BaseCollider* other) {
-		this->OnExitCollision(self, other);
-		});
-
-	//aabbCollider_ = std::make_unique<AABBCollider>();
-	//aabbCollider_->SetTransform(&worldTransform_);
-	//aabbCollider_->SetCamera(camera_);
-	//aabbCollider_->Initialize();
-	//aabbCollider_->SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayer));
-	//aabbCollider_->SetOnEnterCollision([this](BaseCollider* self, BaseCollider* other) {
-	//	this->OnEnterCollision(self, other);
-	//	});
-	//aabbCollider_->SetOnCollision([this](BaseCollider* self, BaseCollider* other) {
-	//	this->OnCollision(self, other);
-	//	});
-	//aabbCollider_->SetOnExitCollision([this](BaseCollider* self, BaseCollider* other) {
-	//	this->OnExitCollision(self, other);
-	//	});
-
-	
-	//sphereCollider_ = std::make_unique<SphereCollider>();
-	//sphereCollider_->SetTransform(&worldTransform_);
-	//sphereCollider_->SetCamera(camera_);
-	//sphereCollider_->Initialize();
-	//sphereCollider_->SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayer));
-	//sphereCollider_->SetOnEnterCollision([this](BaseCollider* self, BaseCollider* other) {
-	//	this->OnEnterCollision(self, other);
-	//	});
-	//sphereCollider_->SetOnCollision([this](BaseCollider* self, BaseCollider* other) {
-	//	this->OnCollision(self, other);
-	//	});
-	//sphereCollider_->SetOnExitCollision([this](BaseCollider* self, BaseCollider* other) {
-	//	this->OnExitCollision(self, other);
-	//	});
+	obbCollider_ = ColliderFactory::Create<OBBCollider>(
+		this,
+		&worldTransform_,
+		camera_,
+		static_cast<uint32_t>(CollisionTypeIdDef::kPlayer)
+	);
 
 
 }
@@ -178,7 +137,7 @@ void Player::Move()
 		if (Input::GetInstance()->IsRightStickMoving()) {
 			Rotate();
 			
-		}
+		}  
 		else {
 			MoveController();
 		}

@@ -92,7 +92,7 @@ void UIBase::ImGUi() {
     }
 
     // トランスフォーム設定
-    if (ImGui::CollapsingHeader("変形", ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (ImGui::CollapsingHeader("トランスフォーム", ImGuiTreeNodeFlags_DefaultOpen)) {
        
         // スケール設定
         Vector2 scale = GetScale();
@@ -117,7 +117,7 @@ void UIBase::ImGUi() {
     }
 
     // 外観設定
-    if (ImGui::CollapsingHeader("外観", ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (ImGui::CollapsingHeader("マテリアル", ImGuiTreeNodeFlags_DefaultOpen)) {
         // 色設定（RGBA）
         Vector4 color = GetColor();
         if (ImGui::ColorEdit4("色", &color.x)) {
@@ -298,6 +298,13 @@ void UIBase::ImGUi() {
         Vector2 leftTop = sprite_->GetTextureLeftTop();
         if (ImGui::DragFloat2("左上座標", &leftTop.x, 1.0f)) {
             sprite_->SetTextureLeftTop(leftTop);
+            modified = true;
+        }
+
+        // テクスチャサイズ設定
+        Vector2 textureSize = sprite_->GetTextureSize();
+        if (ImGui::DragFloat2("テクスチャサイズ", &textureSize.x, 1.0f)) {
+            sprite_->SetTextureSize(textureSize);
             modified = true;
         }
 
@@ -554,6 +561,45 @@ bool UIBase::GetFlipY() const {
     return false;
 }
 
+void UIBase::SetTextureLeftTop(const Vector2& leftTop) {
+    if (sprite_) {
+        sprite_->SetTextureLeftTop(leftTop);
+    }
+}
+
+Vector2 UIBase::GetTextureLeftTop() const {
+    if (sprite_) {
+        return sprite_->GetTextureLeftTop();
+    }
+    return { 0.0f, 0.0f };
+}
+
+void UIBase::SetTextureSize(const Vector2& size) {
+    if (sprite_) {
+        sprite_->SetTextureSize(size);
+    }
+}
+
+Vector2 UIBase::GetTextureSize() const {
+    if (sprite_) {
+        return sprite_->GetTextureSize();
+    }
+    return { 1.0f, 1.0f };
+}
+
+void UIBase::SetAnchorPoint(const Vector2& anchor) {
+    if (sprite_) {
+        sprite_->SetAnchorPoint(anchor);
+    }
+}
+
+Vector2 UIBase::GetAnchorPoint() const {
+    if (sprite_) {
+        return sprite_->GetAnchorPoint();
+    }
+    return { 0.0f, 0.0f };
+}
+
 nlohmann::json UIBase::CreateJSONFromCurrentState() {
     nlohmann::json data;
 
@@ -606,6 +652,14 @@ nlohmann::json UIBase::CreateJSONFromCurrentState() {
         data["anchorPoint"] = {
             {"x", sprite_->GetAnchorPoint().x},
             {"y", sprite_->GetAnchorPoint().y}
+        };
+    }
+
+    // テクスチャサイズ
+    if (sprite_) {
+        data["textureSize"] = {
+            {"x", sprite_->GetTextureSize().x},
+            {"y", sprite_->GetTextureSize().y}
         };
     }
 
@@ -702,6 +756,13 @@ void UIBase::ApplyJSONToState(const nlohmann::json& data) {
             anchor.x = data["anchorPoint"]["x"];
             anchor.y = data["anchorPoint"]["y"];
             sprite_->SetAnchorPoint(anchor);
+        }
+
+        if (data.contains("textureSize")) {
+            Vector2 size;
+            size.x = data["textureSize"]["x"];
+            size.y = data["textureSize"]["y"];
+            sprite_->SetTextureSize(size);
         }
     }
 }

@@ -11,9 +11,9 @@
 #include "MathFunc.h"
 // Collision.h
 #pragma once
-#include "Sphere/SphereCollider.h"
-#include "AABB/AABBCollider.h"
-#include "OBB/OBBCollider.h"
+#include "../Sphere/SphereCollider.h"
+#include "../AABB/AABBCollider.h"
+#include "../OBB/OBBCollider.h"
 #include <set>
 
 namespace Collision {
@@ -83,6 +83,14 @@ public:
 	/// 全ての当たり判定チェック
 	/// </summary>
 	void CheckAllCollisions();
+
+	/// <summary>
+	/// カメラ範囲チェック
+	/// </summary>
+	/// <param name="position"></param>
+	/// <param name="camera"></param>
+	/// <returns></returns>
+	bool IsColliderInView(const Vector3& position, const Camera* camera);
 
 	/// <summary>
 	/// リストに登録

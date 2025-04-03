@@ -31,9 +31,9 @@ CollisionManager::~CollisionManager()
 
 
 inline float ProjectOBB(const OBB& obb, const Vector3& axis, const Vector3 axes[3]) {
-	return	obb.size.x  * fabs(Dot(axes[0], axis)) +
-			obb.size.y  * fabs(Dot(axes[1], axis)) +
-			obb.size.z  * fabs(Dot(axes[2], axis));
+	return	obb.size.x * fabs(Dot(axes[0], axis)) +
+		obb.size.y * fabs(Dot(axes[1], axis)) +
+		obb.size.z * fabs(Dot(axes[2], axis));
 }
 
 bool Collision::Check(const SphereCollider* a, const SphereCollider* b)
@@ -228,6 +228,24 @@ void CollisionManager::Initialize() {
 
 void CollisionManager::Update()
 {
+
+	///カメラ外だったら判定をしない(全て)
+	for (BaseCollider* collider : colliders_) {
+		if (!collider) continue;
+		if (!collider->GetIsActive()) continue;
+
+		const Camera* cam = collider->camera_;
+		if (!cam) continue;
+
+		Vector3 center = collider->GetCenterPosition();
+		bool isVisible = IsColliderInView(center, cam);
+
+		// ここで無効化するのは当たり判定だけ！
+		collider->SetCollisionEnabled(isVisible);
+	}
+
+
+	// 有効なものだけで衝突判定を実行
 	CheckAllCollisions();
 
 }
@@ -242,46 +260,63 @@ void CollisionManager::Reset() {
 
 void CollisionManager::CheckCollisionPair(BaseCollider* a, BaseCollider* b) {
 	// 順序を統一してペアのキーにする（ポインタの小さい順）
-    auto key = std::minmax(a, b);
-    bool isNowColliding = Collision::Check(a, b); // ← BaseCollider* 用のオーバーロードが必要
-    bool wasColliding = collidingPairs_.contains(key);
+	auto key = std::minmax(a, b);
+	bool isNowColliding = Collision::Check(a, b); // ← BaseCollider* 用のオーバーロードが必要
+	bool wasColliding = collidingPairs_.contains(key);
 
-    if (isNowColliding) {
-        if (!wasColliding) {
-            a->CallOnEnterCollision(b);
-            b->CallOnEnterCollision(a);
-            collidingPairs_.insert(key);
-        }
-        a->CallOnCollision(b);
-        b->CallOnCollision(a);
-    } else {
-        if (wasColliding) {
-            a->CallOnExitCollision(b);
-            b->CallOnExitCollision(a);
-            collidingPairs_.erase(key);
-        }
-    }
+	if (isNowColliding) {
+		if (!wasColliding) {
+			a->CallOnEnterCollision(b);
+			b->CallOnEnterCollision(a);
+			collidingPairs_.insert(key);
+		}
+		a->CallOnCollision(b);
+		b->CallOnCollision(a);
+	} else {
+		if (wasColliding) {
+			a->CallOnExitCollision(b);
+			b->CallOnExitCollision(a);
+			collidingPairs_.erase(key);
+		}
+	}
 }
 
-
 void CollisionManager::CheckAllCollisions() {
+
 	// リスト内のペアを総当たり
 	std::list<BaseCollider*>::iterator itrA = colliders_.begin();
 	for (; itrA != colliders_.end(); ++itrA) {
 		BaseCollider* colliderA = *itrA;
 
-		// イテレーターBはイテレーターAの次の要素から回す（重複判定を回避）
+		// 無効なコライダーはスキップ
+		if (!colliderA || !colliderA->GetIsActive() || !colliderA->IsCollisionEnabled()) continue;
+
 		std::list<BaseCollider*>::iterator itrB = itrA;
 		itrB++;
 
 		for (; itrB != colliders_.end(); ++itrB) {
 			BaseCollider* colliderB = *itrB;
 
+			// 無効なコライダーはスキップ
+			if (!colliderB || !colliderB->GetIsActive() || !colliderB->IsCollisionEnabled()) continue;
+
 			// ペアの当たり判定
 			CheckCollisionPair(colliderA, colliderB);
 		}
 	}
 }
+
+
+
+bool CollisionManager::IsColliderInView(const Vector3& position, const Camera* camera) {
+	Vector3 clipPos = Transform(position, camera->GetViewProjectionMatrix());
+
+	// 正規化デバイス座標系（NDC）での可視範囲は -1 ~ +1
+	return (clipPos.x >= -1.0f && clipPos.x <= 1.0f &&
+		clipPos.y >= -1.0f && clipPos.y <= 1.0f &&
+		clipPos.z >= 0.0f && clipPos.z <= 1.0f); // zは0〜1（DirectX系）
+}
+
 
 
 

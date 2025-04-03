@@ -1,11 +1,6 @@
 #include "OBBCollider.h"
 #include "Matrix4x4.h"
 
-
-OBBCollider::~OBBCollider()
-{
-	BaseCollider::~BaseCollider();
-}
 void OBBCollider::InitJson(JsonManager* jsonManager)
 {
 	jsonManager->SetCategory("Colliders");
@@ -19,6 +14,25 @@ void OBBCollider::InitJson(JsonManager* jsonManager)
 	jsonManager->Register("OBB Offset Size Z", &obbOffset_.size.z);
 
 	jsonManager->Register("OBB Offset Euler (degrees)", &obbEulerOffset_);
+}
+
+Vector3 OBBCollider::GetCenterPosition() const
+{
+	Vector3 newPos;
+	newPos.x = wt_->matWorld_.m[3][0];
+	newPos.y = wt_->matWorld_.m[3][1];
+	newPos.z = wt_->matWorld_.m[3][2];
+	return newPos;
+}
+
+const WorldTransform& OBBCollider::GetWorldTransform()
+{
+	return *wt_;
+}
+
+Vector3 OBBCollider::GetEulerRotation() const
+{
+	return wt_ ? wt_->rotation_ : Vector3{};
 }
 
 void OBBCollider::Initialize()
@@ -36,8 +50,8 @@ void OBBCollider::Initialize()
 void OBBCollider::Update()
 {
 	// スケールとアンカーポイントを取得
-	Vector3 scale = GetScale();
-	Vector3 anchor = GetAnchorPoint();
+	Vector3 scale = GetWorldTransform().scale_;
+	Vector3 anchor = GetWorldTransform().anchorPoint_;
 	Vector3 center = GetCenterPosition();
 
 	// サイズをスケールに応じて拡大
@@ -55,7 +69,7 @@ void OBBCollider::Update()
 	};
 
 	// OBBの中心はアンカーポイントを考慮した位置
-	obb_.center = /*center*/ /*- anchorOffset + */Transform(obbOffset_.center, GetWorldMatrix());
+	obb_.center = /*center*/ /*- anchorOffset + */Transform(obbOffset_.center, GetWorldTransform().matWorld_);
 
 	// サイズ設定（すでにスケーリングされてる）
 	obb_.size = scaledSize;
@@ -74,38 +88,11 @@ void OBBCollider::Update()
 	Matrix4x4 combinedRot = Multiply(rotWorld, rotOffset);
 
 	obb_.rotation = MatrixToEuler(combinedRot);
-}
 
+}
 
 void OBBCollider::Draw()
 {
 	line_->DrawOBB(obb_.center, obb_.rotation, obb_.size);
 	line_->DrawLine();
-}
-
-Vector3 OBBCollider::GetScale() const
-{
-	return worldTransform_->scale_;
-}
-
-Vector3 OBBCollider::GetAnchorPoint() const
-{
-	return worldTransform_->anchorPoint_;
-}
-
-Vector3 OBBCollider::GetCenterPosition() const {
-
-	Vector3 newPos;
-	newPos.x = worldTransform_->matWorld_.m[3][0];
-	newPos.y = worldTransform_->matWorld_.m[3][1];
-	newPos.z = worldTransform_->matWorld_.m[3][2];
-	return newPos;
-}
-
-Matrix4x4 OBBCollider::GetWorldMatrix() const {
-	return worldTransform_ ? worldTransform_->matWorld_ : MakeIdentity4x4();
-}
-
-Vector3 OBBCollider::GetEulerRotation() const {
-	return worldTransform_ ? worldTransform_->rotation_ : Vector3{};
 }

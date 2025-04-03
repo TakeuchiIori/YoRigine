@@ -1,5 +1,5 @@
 #pragma once
-#include "../BaseCollider.h"
+#include "../Core/BaseCollider.h"
 #include "MathFunc.h"
 
 class OBBCollider : public BaseCollider
@@ -13,14 +13,11 @@ public:
 
 	//===============================================================*/
 
-	~OBBCollider();
-	void InitJson(JsonManager* jsonManager);
+	~OBBCollider() = default;
+	void InitJson(JsonManager* jsonManager) override;
 	Vector3 GetCenterPosition() const override;
-	Vector3 GetScale() const override;
-	Vector3 GetAnchorPoint() const override;
-	Matrix4x4 GetWorldMatrix() const override;
+	const WorldTransform& GetWorldTransform() override;
 	Vector3 GetEulerRotation() const override;
-
 
 	/*===============================================================//
 
