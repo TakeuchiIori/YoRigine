@@ -219,6 +219,62 @@ bool Collision::Check(BaseCollider* a, BaseCollider* b) {
 	return false;
 }
 
+bool Collision::CheckHitDirection(const AABB& a, const AABB& b, HitDirection* hitDirection)
+{
+	bool isHitX = (a.min.x <= b.max.x && a.max.x >= b.min.x);
+	bool isHitY = (a.min.y <= b.max.y && a.max.y >= b.min.y);
+	bool isHitZ = (a.min.z <= b.max.z && a.max.z >= b.min.z);
+
+	// 衝突していない場合
+	if (!(isHitX && isHitY && isHitZ)) {
+		if(hitDirection)*hitDirection = HitDirection::None;
+		return false;
+	}
+
+	if (hitDirection) {
+		Vector3 aCenter = (a.min + a.max) * 0.5f;
+		Vector3 bCenter = (b.min + b.max) * 0.5f;
+		Vector3 diff = bCenter - aCenter;
+
+		Vector3 overlap = {
+			std::abs(diff.x) - ((a.max.x - a.min.x) + (b.max.x - b.min.x)) * 0.5f,
+			std::abs(diff.y) - ((a.max.y - a.min.y) + (b.max.y - b.min.y)) * 0.5f,
+			std::abs(diff.z) - ((a.max.z - a.min.z) + (b.max.z - b.min.z)) * 0.5f,
+		};
+
+
+		if (std::abs(overlap.x) < std::abs(overlap.y) && std::abs(overlap.x) < std::abs(overlap.z)) {
+			*hitDirection = (diff.x > 0.0f) ? HitDirection::Left : HitDirection::Right;
+		} else if (std::abs(overlap.y) < std::abs(overlap.x) && std::abs(overlap.y) < std::abs(overlap.z)) {
+			*hitDirection = (diff.y > 0.0f) ? HitDirection::Top : HitDirection::Bottom;
+		} else {
+			*hitDirection = (diff.z > 0.0f) ? HitDirection::Front : HitDirection::Back;
+		}
+
+
+
+
+
+
+
+
+
+
+	}
+
+
+}
+
+bool Collision::CheckHitDirection(const AABB& aabb, const OBB& obb, HitDirection* hitDirection)
+{
+	return false;
+}
+
+bool Collision::CheckHitDirection(const OBB& obbA, const OBB& obbB, HitDirection* hitDirection)
+{
+	return false;
+}
+
 
 
 
@@ -287,8 +343,8 @@ void CollisionManager::CheckAllCollisions() {
 	std::list<BaseCollider*>::iterator itrA = colliders_.begin();
 	for (; itrA != colliders_.end(); ++itrA) {
 		BaseCollider* colliderA = *itrA;
-
 		// 無効なコライダーはスキップ
+		if (colliderA->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kNone)) continue;
 		if (!colliderA || !colliderA->GetIsActive() || !colliderA->IsCollisionEnabled()) continue;
 
 		std::list<BaseCollider*>::iterator itrB = itrA;
@@ -296,8 +352,9 @@ void CollisionManager::CheckAllCollisions() {
 
 		for (; itrB != colliders_.end(); ++itrB) {
 			BaseCollider* colliderB = *itrB;
-
 			// 無効なコライダーはスキップ
+			if (colliderB->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kNone)) continue;
+			if (colliderA == colliderB) continue; // 自分自身との当たり判定はしない
 			if (!colliderB || !colliderB->GetIsActive() || !colliderB->IsCollisionEnabled()) continue;
 
 			// ペアの当たり判定
