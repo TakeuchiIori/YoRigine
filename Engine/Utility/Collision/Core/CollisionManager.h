@@ -14,18 +14,10 @@
 #include "../Sphere/SphereCollider.h"
 #include "../AABB/AABBCollider.h"
 #include "../OBB/OBBCollider.h"
+#include "CollisionDirection.h"
 #include <set>
 
 
-enum class HitDirection {
-	None,
-	Top,
-	Bottom,
-	Left,
-	Right,
-	Front,
-	Back
-};
 
 namespace Collision {
 
@@ -79,6 +71,9 @@ namespace Collision {
 	// OBB - OBB
 	bool CheckHitDirection(const OBB& obbA, const OBB& obbB, HitDirection* hitDirection);
 
+	HitDirection ConvertVectorToHitDirection(const Vector3& dir);
+
+	HitDirection InverseHitDirection(HitDirection hitdirection);
 
 }
 

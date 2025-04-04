@@ -45,7 +45,7 @@ void SphereCollider::Initialize()
 
 void SphereCollider::Update()
 {
-	radius_ = GetWorldTransform().scale_.x;
+	//radius_ = GetWorldTransform().scale_.x;
 	sphere_.center = GetCenterPosition() + sphereOffset_.center;
 	sphere_.radius = radius_ + sphereOffset_.radius;
 }
@@ -54,9 +54,4 @@ void SphereCollider::Draw()
 {
 	line_->DrawSphere(sphere_.center, sphere_.radius, 32);
 	line_->DrawLine();
-}
-
-void SphereCollider::InitJson()
-{
-
 }

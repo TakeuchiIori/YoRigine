@@ -11,7 +11,7 @@
 #include "Loaders/Json/JsonManager.h"
 #include "Systems/Camera/Camera.h"
 #include <Systems/GameTime/GameTIme.h>
-
+#include "Collision/Core/CollisionDirection.h"
 // C++
 #include <memory>
 
@@ -56,6 +56,7 @@ public:
 	void OnEnterCollision(BaseCollider* self, BaseCollider* other);
 	void OnCollision(BaseCollider* self, BaseCollider* other);
 	void OnExitCollision(BaseCollider* self, BaseCollider* other);
+	void OnDirectionCollision(BaseCollider* self, BaseCollider* other, HitDirection dir);
 
 	/// <summary>
 	/// 
@@ -114,7 +115,7 @@ private:
 	std::unique_ptr<Object3d> base_ = nullptr;
 
 	//std::shared_ptr<OBBCollider> obbCollider_;
-	//std::shared_ptr<AABBCollider> aabbCollider_;
+	std::shared_ptr<AABBCollider> aabbCollider_;
 	std::shared_ptr<SphereCollider> sphereCollider_;
 
 

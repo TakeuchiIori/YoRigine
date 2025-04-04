@@ -64,6 +64,12 @@ void Player::InitCollision()
 		static_cast<uint32_t>(CollisionTypeIdDef::kPlayer)
 	);
 
+	aabbCollider_ = ColliderFactory::Create<AABBCollider>(
+		this,
+		&worldTransform_,
+		camera_,
+		static_cast<uint32_t>(CollisionTypeIdDef::kPlayer)
+	);
 
 }
 
@@ -91,7 +97,8 @@ void Player::Update()
 	ShowCoordinatesImGui();
 #endif // _DEBUG
 	//OBBCollider::Update();
-	obbCollider_->Update();
+	//obbCollider_->Update();
+	aabbCollider_->Update();
 	//aabbCollider_->Update();
 	//sphereCollider_->Update();
 }
@@ -106,7 +113,8 @@ void Player::Draw()
 void Player::DrawCollision()
 {
 	//OBBCollider::Draw();
-	obbCollider_->Draw();
+	//obbCollider_->Draw();
+	aabbCollider_->Draw();
 	//aabbCollider_->Draw();
 	//sphereCollider_->Draw();
 	//weapon_->DrawCollision();
@@ -536,4 +544,26 @@ void Player::OnCollision(BaseCollider* self, BaseCollider* other)
 
 void Player::OnExitCollision(BaseCollider* self, BaseCollider* other)
 {
+}
+
+void Player::OnDirectionCollision(BaseCollider* self, BaseCollider* other, HitDirection dir)
+{
+	if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kEnemy)) {
+		switch (dir) {
+		case HitDirection::Left:
+			base_->SetMaterialColor(Vector4(0.0f, 1.0f, 0.0f, 0.0f));
+			break;
+		case HitDirection::Right:
+			base_->SetMaterialColor(Vector4(1.0f, 0.0f, 0.0f, 0.0f));
+			break;
+		case HitDirection::Top:
+			base_->SetMaterialColor(Vector4(0.0f, 0.0f, 1.0f, 0.0f));
+			break;
+		case HitDirection::Bottom:
+			base_->SetMaterialColor(Vector4(1.0f, 1.0f, 0.0f, 0.0f));
+			break;
+		default:
+			break;
+		}
+	}
 }

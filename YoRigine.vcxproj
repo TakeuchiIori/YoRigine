@@ -206,6 +206,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="Engine\Utility\Collision\AABB\AABBCollider.h" />
     <ClInclude Include="Application\SystemsApp\Cameras\DebugCamera\DebugCamera.h" />
     <ClInclude Include="Engine\Utility\Collision\Core\ColliderPool.h" />
+    <ClInclude Include="Engine\Utility\Collision\Core\CollisionDirection.h" />
     <ClInclude Include="Engine\Utility\Loaders\Model\AnimationSystem.h" />
     <ClInclude Include="Application\Objects\Enemy\Enemy.h" />
     <ClInclude Include="Application\Objects\Enemy\EnemyManager.h" />

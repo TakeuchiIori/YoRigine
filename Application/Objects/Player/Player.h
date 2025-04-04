@@ -14,7 +14,7 @@
 #include <Particle/ParticleManager.h>
 #include <Particle/ParticleEmitter.h>
 #include "Systems/MapChip/MapChipCollision.h"
-
+#include "Collision/Core/CollisionDirection.h"
 #include "Loaders/Json/JsonManager.h"
 // C++
 #include <memory>
@@ -77,7 +77,7 @@ public:
 	void OnEnterCollision(BaseCollider* self, BaseCollider* other);
 	void OnCollision(BaseCollider* self, BaseCollider* other);
 	void OnExitCollision(BaseCollider* self, BaseCollider* other);
-
+	void OnDirectionCollision(BaseCollider* self, BaseCollider* other, HitDirection dir);
 
 
 
@@ -187,7 +187,7 @@ private:
 	MapChipCollision::ColliderRect colliderRect_;
 
 	std::shared_ptr<OBBCollider> obbCollider_;
-	//std::shared_ptr<AABBCollider> aabbCollider_;
+	std::shared_ptr<AABBCollider> aabbCollider_;
 	//std::shared_ptr<SphereCollider> sphereCollider_;
 
 	/*===============================================================//

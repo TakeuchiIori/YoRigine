@@ -38,6 +38,9 @@ public:
 		collider->SetOnExitCollision([owner](BaseCollider* self, BaseCollider* other) {
 			owner->OnExitCollision(self, other);
 			});
+		collider->SetOnDirectionCollision([owner](BaseCollider* self, BaseCollider* other,HitDirection dir) {
+			owner->OnDirectionCollision(self, other,dir);
+			});
 
 		return collider;
 	}
