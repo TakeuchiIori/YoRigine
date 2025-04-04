@@ -200,6 +200,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="Engine\Utility\Systems\UI\UIButton.cpp" />
     <ClCompile Include="Engine\Utility\Collision\Sphere\SphereCollider.cpp" />
     <ClCompile Include="Engine\Utility\Collision\OBB\OBBCollider.cpp" />
+    <ClCompile Include="Engine\Graphics\Culling\OcclusionCullingManager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Engine\Utility\Collision\Core\ColliderFactory.h" />
@@ -290,6 +291,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="Engine\Utility\Systems\UI\UIBase.h" />
     <ClInclude Include="Engine\Utility\Systems\UI\UIButton.h" />
     <ClInclude Include="Engine\Utility\Collision\OBB\OBBCollider.h" />
+    <ClInclude Include="Engine\Graphics\Culling\OcclusionCullingManager.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="Engine\Utility\Collision\Sphere\SphereCollider.h" />
   </ItemGroup>

@@ -118,25 +118,25 @@ private:
     //void CheckAllCollisions();
 
 private:
-    /// <summary>
-    /// オクルージョンクエリの初期化
-    /// </summary>
-    void InitializeOcclusionQuery();
+    ///// <summary>
+    ///// オクルージョンクエリの初期化
+    ///// </summary>
+    //void InitializeOcclusionQuery();
 
-    /// <summary>
-    /// 読み取り開始
-    /// </summary>
-    void BeginOcclusionQuery(UINT queryIndex);
+    ///// <summary>
+    ///// 読み取り開始
+    ///// </summary>
+    //void BeginOcclusionQuery(UINT queryIndex);
 
-    /// <summary>
-    /// 読み取りの終了
-    /// </summary>
-    void EndOcclusionQuery(UINT queryIndex);
+    ///// <summary>
+    ///// 読み取りの終了
+    ///// </summary>
+    //void EndOcclusionQuery(UINT queryIndex);
 
-    /// <summary>
-    /// オクルージョンクエリの解決
-    /// </summary>
-    void ResolvedOcclusionQuery();
+    ///// <summary>
+    ///// オクルージョンクエリの解決
+    ///// </summary>
+    //void ResolvedOcclusionQuery();
 
 private:
     /*=================================================================
@@ -230,15 +230,6 @@ private:
     std::unique_ptr<UIBase> uiSub_;
 
 private:
-    /*=================================================================
 
-                            オクルージョンクエリ
-
-    =================================================================*/
-    Microsoft::WRL::ComPtr<ID3D12QueryHeap> queryHeap_;
-    Microsoft::WRL::ComPtr<ID3D12Resource> queryResultBuffer_;
-    std::vector<UINT64> occlusionResults_;                          // オブジェクトごとに結果を保持
-    uint32_t queryCount_ = 2;                                       // オクルージョンクエリの数
-    ID3D12GraphicsCommandList* commandList_;
 
 };

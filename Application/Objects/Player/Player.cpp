@@ -94,7 +94,7 @@ void Player::Update()
 	weapon_->Update();
 
 #ifdef _DEBUG
-	ShowCoordinatesImGui();
+	//ShowCoordinatesImGui();
 #endif // _DEBUG
 	//OBBCollider::Update();
 	//obbCollider_->Update();
@@ -138,9 +138,9 @@ void Player::Move()
 
 	// キーボードで移動
 	if (!isJumping_ && !weapon_->GetIsJumpAttack() || !isDash_) {
-#ifdef _DEBUG
+//#ifdef _DEBUG
 		MoveKey();
-#endif // _DEBUG
+//#endif // _DEBUG
 
 		if (Input::GetInstance()->IsRightStickMoving()) {
 			Rotate();

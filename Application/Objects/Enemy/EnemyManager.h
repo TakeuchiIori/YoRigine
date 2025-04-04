@@ -48,9 +48,9 @@ public:
 private:
     // 各種パラメータ
     float spawnTimer_ = 0.0f;
-    float spawnInterval_ = 5.0f;  // スポーン間隔（秒）
+    float spawnInterval_ = 0.0f;  // スポーン間隔（秒）
     float spawnRange_ = 30.0f;    // スポーン範囲
-    const uint32_t maxEnemyCount_ = 1;  // 最大敵数
+    const uint32_t maxEnemyCount_ = 10;  // 最大敵数
     int deadNum_ = 0;
 
     // ポインタ

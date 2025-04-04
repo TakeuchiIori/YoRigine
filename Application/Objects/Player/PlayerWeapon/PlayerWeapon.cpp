@@ -193,7 +193,7 @@ void PlayerWeapon::Update()
 	//sphereCollider_->Update();
 
 #ifdef _DEBUG
-	DrawDebugUI();
+	//DrawDebugUI();
 #endif // _DEBUG
 
 

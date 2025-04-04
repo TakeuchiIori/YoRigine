@@ -9,6 +9,7 @@
 // Engine
 #include "Systems/Camera/Camera.h"
 #include "Loaders/Model/Model.h"
+#include "../Graphics/Culling/OcclusionCullingManager.h"
 
 // Math
 #include "Vector4.h"
@@ -25,6 +26,8 @@ class Model;
 class Object3d
 {
 public: // メンバ関数
+
+	Object3d();
 
 	/// <summary>
 	/// 初期化
@@ -149,5 +152,8 @@ private:
 	bool isFlipX_ = false;
 	// 上下フリップ
 	bool isFlipY_ = false;
+
+	// クエリインデックス
+	UINT queryIndex_ = 0;
 };
 
