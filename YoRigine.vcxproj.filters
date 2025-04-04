@@ -783,6 +783,7 @@
     <None Include="Resources\shaders\Skinning.PS.hlsl" />
     <None Include="Resources\shaders\Sprite.hlsli" />
     <None Include="Resources\Shaders\CopyImage\CopyImage.hlsli" />
+    <None Include="Resources\Shaders\Object3d\InstanceObj.hlsli" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Resources\shaders\Particle.PS.hlsl" />
@@ -801,6 +802,8 @@
     <FxCompile Include="Resources\Shaders\PostEffect\Smoothing\GaussianFilter.PS.hlsl" />
     <FxCompile Include="Resources\Shaders\PostEffect\OutLine\LuminanceBasedOutLine.PS.hlsl" />
     <FxCompile Include="Resources\Shaders\PostEffect\OutLine\DepthBasedOutLine.PS.hlsl" />
+    <FxCompile Include="Resources\Shaders\Object3d\InstanceObj.PS.hlsl" />
+    <FxCompile Include="Resources\Shaders\Object3d\InstanceObj.VS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="YoRigine.rc">

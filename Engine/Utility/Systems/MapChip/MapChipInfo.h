@@ -52,8 +52,6 @@ public:
 
 	void SetMapChipField(MapChipField* mpField) { mpField_ = mpField; }
 	void SetWorldTransform(std::vector<std::vector<WorldTransform*>> wt) { wt_ = wt; }
-	void SetObject(Object3d* obj) { obj_ = obj; }
-
 	MapChipField* GetMapChipField() { return mpField_; }
 
 private:
@@ -65,7 +63,6 @@ private:
 	Camera* camera_ = nullptr;
 	std::vector<std::vector<WorldTransform*>> wt_;
 	MapChipField* mpField_ = nullptr;
-	//MapChipCollision* mpCollision_ = nullptr;
-	Object3d* obj_ = nullptr;
+	std::vector<std::vector<Object3d*>> objects_;
 };
 

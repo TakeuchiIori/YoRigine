@@ -14,7 +14,7 @@ MapChipInfo::~MapChipInfo()
 		}
 	}
 
-	delete obj_;
+	//delete obj_;
 	delete mpField_;
 }
 
@@ -22,10 +22,6 @@ void MapChipInfo::Initialize()
 {
 	mpField_ = new MapChipField();
 	mpField_->LoadMapChipCsv("Resources/images/MapChip.csv");
-
-	obj_ = new Object3d();
-	obj_->Initialize();
-	obj_->SetModel("cube.obj");
 
 	GenerateBlocks();
 }
@@ -52,19 +48,16 @@ void MapChipInfo::Update()
 
 }
 
-void MapChipInfo::Draw()
-{
-	for (std::vector<WorldTransform*>& wt : wt_) {
-		for (WorldTransform* worldTransformBlock : wt) {
-			if (!worldTransformBlock)
-				continue;
-			obj_->Draw(camera_, *worldTransformBlock);
-
+void MapChipInfo::Draw() {
+	for (uint32_t i = 0; i < wt_.size(); ++i) {
+		for (uint32_t j = 0; j < wt_[i].size(); ++j) {
+			if (wt_[i][j] && objects_[i][j]) {
+				objects_[i][j]->Draw(camera_, *wt_[i][j]);
+			}
 		}
 	}
-
-
 }
+
 
 void MapChipInfo::GenerateBlocks()
 {
@@ -73,10 +66,12 @@ void MapChipInfo::GenerateBlocks()
 	uint32_t numBlockHorizotal = mpField_->GetNumBlockHorizontal();
 	// 列数を設定 (縦方向のブロック数)
 	wt_.resize(numBlockVirtical);
+	objects_.resize(numBlockVirtical);
 	// キューブの生成
 	for (uint32_t i = 0; i < numBlockVirtical; ++i) {
 		// 1列の要素数を設定 (横方向のブロック数)
 		wt_[i].resize(numBlockHorizotal);
+		objects_[i].resize(numBlockHorizotal);
 	}
 	// ブロックの生成
 	for (uint32_t i = 0; i < numBlockVirtical; ++i) {
@@ -88,6 +83,11 @@ void MapChipInfo::GenerateBlocks()
 				worldTransform->Initialize();
 				wt_[i][j] = worldTransform;
 				wt_[i][j]->translation_ = mpField_->GetMapChipPositionByIndex(j, i);
+
+				Object3d* obj = new Object3d();
+				obj->Initialize();
+				obj->SetModel("cube.obj");
+				objects_[i][j] = obj;
 			}
 		}
 	}
