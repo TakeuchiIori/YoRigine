@@ -248,16 +248,10 @@ void GameScene::DrawOffScreen()
 void GameScene::DrawObject()
 {
 	mpInfo_->Draw();
-	// オクルージョンクエリ開始
-	//uint32_t queryIndex = 0;
 	player_->Draw();
-	// Ground のオクルージョンチェック
-	//commandList_->BeginQuery(queryHeap_.Get(), D3D12_QUERY_TYPE_OCCLUSION, queryIndex);
 	ground_->Draw();
-	//commandList_->EndQuery(queryHeap_.Get(), D3D12_QUERY_TYPE_OCCLUSION, queryIndex);
 	enemyManager_->Draw();
 
-	//ResolvedOcclusionQuery();
 
 }
 
@@ -270,13 +264,7 @@ void GameScene::DrawSprite()
 
 void GameScene::DrawAnimation()
 {
-	// Player のオクルージョンチェック
-	//uint32_t queryIndex = 0;
-	//commandList_->BeginQuery(queryHeap_.Get(), D3D12_QUERY_TYPE_OCCLUSION, queryIndex);
 	test_->Draw(sceneCamera_.get(), testWorldTransform_);
-	//commandList_->EndQuery(queryHeap_.Get(), D3D12_QUERY_TYPE_OCCLUSION, queryIndex);
-	//queryIndex++;
-	//ResolvedOcclusionQuery();
 	
 }
 
@@ -287,12 +275,6 @@ void GameScene::DrawLine()
 		test_->DrawSkeleton(*boneLine_);
 		boneLine_->DrawLine();
 	}
-
-	//line_->DrawSphere(sphere_.center, sphere_.radius, 32);
-	//line_->DrawAABB(aabb.min,aabb.max);
-	//line_->DrawOBB(obb.center,obb.rotation,obb.size);
-	//line_->DrawLine();
-
 	player_->DrawCollision();
 	//enemyManager_->DrawCollision();
 }
@@ -403,91 +385,6 @@ void GameScene::ShowImGui()
 
 
 	ImGui::End();
-	//ImGui::Begin("Occlusion Query");
-	////ImGui::Text("Occlusion Ground: %lld", occlusionResults_[0]);
-	////ImGui::Text("Occlusion AnimationModel: %lld", occlusionResults_[1]);
-	//ImGui::End();
 
 #endif // _DEBUG
 }
-
-
-//void GameScene::InitializeOcclusionQuery()
-//{
-//    ID3D12Device* device = DirectXCommon::GetInstance()->GetDevice().Get();
-//	commandList_ = DirectXCommon::GetInstance()->GetCommandList().Get();
-//	
-//	// クエリの数をオブジェクト数に合わせる
-//	occlusionResults_.resize(queryCount_, 0);
-//
-//	D3D12_QUERY_HEAP_DESC queryHeapDesc = {};
-//	queryHeapDesc.Count = queryCount_;
-//	queryHeapDesc.Type = D3D12_QUERY_HEAP_TYPE_OCCLUSION;
-//	queryHeapDesc.NodeMask = 0;
-//
-//	// クエリヒープ作成
-//	HRESULT hr = device->CreateQueryHeap(&queryHeapDesc, IID_PPV_ARGS(&queryHeap_));
-//	if (FAILED(hr)) {
-//		throw std::runtime_error("Failed to create Query Heap.");
-//	}
-//
-//	// クエリ結果格納用のバッファを作成
-//	D3D12_RESOURCE_DESC bufferDesc = {};
-//	bufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-//	bufferDesc.Width = sizeof(UINT64) * queryCount_; // クエリ数に応じたサイズ
-//	bufferDesc.Height = 1;
-//	bufferDesc.DepthOrArraySize = 1;
-//	bufferDesc.MipLevels = 1;
-//	bufferDesc.Format = DXGI_FORMAT_UNKNOWN;
-//	bufferDesc.SampleDesc.Count = 1;
-//	bufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-//	bufferDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-//
-//	D3D12_HEAP_PROPERTIES heapProps = { D3D12_HEAP_TYPE_READBACK };
-//
-//	hr = device->CreateCommittedResource(
-//		&heapProps, D3D12_HEAP_FLAG_NONE, &bufferDesc,
-//		D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
-//		IID_PPV_ARGS(&queryResultBuffer_)
-//	);
-//
-//	if (FAILED(hr)) {
-//		throw std::runtime_error("Failed to create Query Result Buffer.");
-//	}
-//}
-//
-//void GameScene::BeginOcclusionQuery(UINT queryIndex)
-//{
-//	commandList_->BeginQuery(queryHeap_.Get(), D3D12_QUERY_TYPE_OCCLUSION, queryIndex);
-//}
-//
-//void GameScene::EndOcclusionQuery(UINT queryIndex)
-//{
-//	commandList_->EndQuery(queryHeap_.Get(), D3D12_QUERY_TYPE_OCCLUSION, queryIndex);
-//}
-//
-//void GameScene::ResolvedOcclusionQuery()
-//{
-//	// クエリ結果をリソースにコピー
-//	commandList_->ResolveQueryData
-//	(
-//		queryHeap_.Get(),
-//		D3D12_QUERY_TYPE_OCCLUSION,
-//		0,
-//		queryCount_,
-//		queryResultBuffer_.Get(),
-//		0
-//	);
-//
-//	// 結果をマッピング
-//	void* mappedData = nullptr;
-//	D3D12_RANGE readRange = { 0, sizeof(UINT64) * queryCount_ };
-//	if (SUCCEEDED(queryResultBuffer_->Map(0, &readRange, &mappedData)))
-//	{
-//		UINT64* queryData = static_cast<UINT64*>(mappedData);
-//		for (uint32_t i = 0; i < queryCount_; i++) {
-//			occlusionResults_[i] = queryData[i]; // 結果を保存
-//		}
-//		queryResultBuffer_->Unmap(0, nullptr);
-//	}
-//}

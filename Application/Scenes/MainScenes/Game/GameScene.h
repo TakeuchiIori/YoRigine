@@ -115,29 +115,6 @@ private:
     /// </summary>
     void ShowImGui();
 
-    //void CheckAllCollisions();
-
-private:
-    ///// <summary>
-    ///// オクルージョンクエリの初期化
-    ///// </summary>
-    //void InitializeOcclusionQuery();
-
-    ///// <summary>
-    ///// 読み取り開始
-    ///// </summary>
-    //void BeginOcclusionQuery(UINT queryIndex);
-
-    ///// <summary>
-    ///// 読み取りの終了
-    ///// </summary>
-    //void EndOcclusionQuery(UINT queryIndex);
-
-    ///// <summary>
-    ///// オクルージョンクエリの解決
-    ///// </summary>
-    //void ResolvedOcclusionQuery();
-
 private:
     /*=================================================================
 
