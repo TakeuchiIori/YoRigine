@@ -6,6 +6,8 @@ void Mesh::Initialize()
 	dxCommon_ = DirectXCommon::GetInstance();
 	meshData_.vertices.clear();
 	meshData_.indices.clear();
+
+	InitializeResource();
 }
 
 void Mesh::InitializeResource()
