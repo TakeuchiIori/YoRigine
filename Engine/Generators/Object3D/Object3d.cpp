@@ -119,6 +119,7 @@ void Object3d::CreateCameraResource()
 
 
 
+
 void Object3d::SetModel(const std::string& filePath, bool isAnimation)
 {
 	// 拡張子を取り除く処理
