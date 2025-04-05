@@ -58,6 +58,7 @@ private:
 	/// オブジェクト用のパイプライン
 	/// </summary>
 	void CreatePSO_Object();
+	void CreatePSO_ObjectInstance();
 
 	/// <summary>
 	/// ライン用のパイプライン
