@@ -49,7 +49,7 @@ void Object3d::Draw(Camera* camera,WorldTransform& worldTransform)
 	bool shouldDraw = OcclusionCullingManager::GetInstance()->ShouldDraw(queryIndex_, 10);
 	static uint32_t globalFrameCounter = 0;
 	globalFrameCounter++;
-	if (!shouldDraw && globalFrameCounter % 10 == 0) {
+	if (!shouldDraw && globalFrameCounter % 1 == 0) {
 		shouldDraw = true;
 	}
 

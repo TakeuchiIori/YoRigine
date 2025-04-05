@@ -23,6 +23,7 @@ public:
             RebuildResources(newIndex + 1); // ⬅ 必ず対応
         }
         // フラグやバッファの安全拡張
+        wasVisibleLastFrame_.resize(queryCount_, true);
         queriedFlags_.resize(queryCount_, false);
         invisibleCounts_.resize(queryCount_, 0);
         occlusionResults_.resize(queryCount_, 0);
@@ -47,11 +48,12 @@ public:
         return 1; // デフォルト：表示されてる扱い
     }
 
-    bool ShouldDraw(uint32_t index, uint32_t maxSkipFrames = 1) const {
+    bool ShouldDraw(uint32_t index, uint32_t maxSkipFrames = 2) const {
         if (index >= invisibleCounts_.size()) return true;
-
         // 一度もクエリが実行されてない → 表示する（初期フレーム想定）
         if (!queriedFlags_[index]) return true;
+
+        if (wasVisibleLastFrame_[index]) return true;
 
         // クエリされた上で、連続不可視フレームが閾値以内なら表示
         return invisibleCounts_[index] <= maxSkipFrames;
@@ -74,4 +76,6 @@ private:
     UINT queryCount_ = 0;                                           // オクルージョンクエリの数
     UINT currentIndex_ = 0;
     ID3D12GraphicsCommandList* commandList_;
+    std::vector<bool> wasVisibleLastFrame_;
+
 };

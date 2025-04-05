@@ -12,6 +12,7 @@ void OcclusionCullingManager::Initialize()
 
 	// クエリの数をオブジェクト数に合わせる
 	occlusionResults_.resize(queryCount, 0);
+	wasVisibleLastFrame_.resize(queryCount, true);
 
 	D3D12_QUERY_HEAP_DESC queryHeapDesc = {};
 	queryHeapDesc.Count = queryCount_;
@@ -81,15 +82,17 @@ void OcclusionCullingManager::ResolvedOcclusionQuery()
 	{
 		UINT64* queryData = static_cast<UINT64*>(mappedData);
 		for (uint32_t i = 0; i < queryCount_; i++) {
+			bool wasVisible = (queryData[i] > 0);
 			occlusionResults_[i] = queryData[i];
 
-			// ★ 追加：連続不可視カウントの更新
+			// ★連続不可視の更新
 			if (queriedFlags_[i]) {
-				if (queryData[i] > 0) {
+				if (wasVisible) {
 					invisibleCounts_[i] = 0;
-				} else {
+				}else {
 					invisibleCounts_[i]++;
 				}
+				wasVisibleLastFrame_[i] = wasVisible;
 			}
 		}
 		queryResultBuffer_->Unmap(0, nullptr);
