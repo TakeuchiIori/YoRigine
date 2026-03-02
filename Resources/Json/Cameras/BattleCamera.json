@@ -1,0 +1,32 @@
+{
+  "Exit.CustomPitch": 0.0,
+  "Exit.CustomYaw": 0.0,
+  "Exit.LookAtTarget": true,
+  "Exit.Mode": -858993460,
+  "Exit.Position": {
+    "x": 0.0,
+    "y": 4.300000190734863,
+    "z": -35.20000076293945
+  },
+  "Hold.CustomPitch": 0.0,
+  "Hold.CustomYaw": 0.0,
+  "Hold.LookAtTarget": true,
+  "Hold.Mode": -858993460,
+  "Hold.Position": {
+    "x": 0.0,
+    "y": 4.0,
+    "z": -10.0
+  },
+  "Start.CustomPitch": 0.0,
+  "Start.CustomYaw": 0.0,
+  "Start.LookAtTarget": true,
+  "Start.Mode": -858993460,
+  "Start.Position": {
+    "x": 0.0,
+    "y": 4.300000190734863,
+    "z": -35.20000076293945
+  },
+  "Timing.ApproachTime": 1.0,
+  "Timing.ExitTime": 1.0,
+  "Timing.HoldTime": 1.5
+}

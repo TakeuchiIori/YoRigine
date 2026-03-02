@@ -1,0 +1,40 @@
+{
+  "anchorPoint": {
+    "x": 0.0,
+    "y": 0.0
+  },
+  "color": {
+    "a": 0.5906871557235718,
+    "b": 1.0,
+    "g": 1.0,
+    "r": 1.0
+  },
+  "flipX": false,
+  "flipY": false,
+  "layer": 0,
+  "name": "A",
+  "position": {
+    "x": 728.0,
+    "y": 470.0,
+    "z": 0.0
+  },
+  "rotation": {
+    "x": 0.0,
+    "y": 0.0,
+    "z": 0.0
+  },
+  "scale": {
+    "x": 150.0,
+    "y": 150.0
+  },
+  "textureLeftTop": {
+    "x": 0.0,
+    "y": 0.0
+  },
+  "texturePath": "./Resources/Textures/TitleScene\\Start.dds",
+  "textureSize": {
+    "x": 400.0,
+    "y": 400.0
+  },
+  "visible": false
+}

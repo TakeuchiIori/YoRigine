@@ -1,0 +1,32 @@
+name: DebugBuild
+on:
+  push:
+    branches:
+      - '**' 
+env:
+  SOLUTION_FILE_PATH: YoRigine.sln
+  CONFIGURATION: Debug
+
+jobs:
+  build:
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      #Premakeの実行
+      - name: Run Premake to Generate Solution
+        run: |
+          # リポジトリにあるバッチファイルを実行
+          .\premake.bat 
+      # -----------------------------------
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v2
+        with:
+          msbuild-architecture: x64
+
+      - name: Debug Build
+        # Premakeによって生成された YoRigine.sln を使ってビルドする
+        run: |
+          msbuild ${{ env.SOLUTION_FILE_PATH }} /p:Platform=x64,Configuration=${{ env.CONFIGURATION }}

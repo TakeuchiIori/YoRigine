@@ -1,0 +1,49 @@
+{
+    "anchorPoint": {
+        "x": 0.5,
+        "y": 0.5
+    },
+    "color": {
+        "a": 0.9686274528503418,
+        "b": 0.0,
+        "g": 0.0,
+        "r": 0.0
+    },
+    "flipX": false,
+    "flipY": false,
+    "layer": 2,
+    "name": "UIBackGround",
+    "position": {
+        "x": 800.0,
+        "y": 450.0,
+        "z": 0.0
+    },
+    "rotation": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+    },
+    "scale": {
+        "x": 1600.0,
+        "y": 900.0
+    },
+    "textureLeftTop": {
+        "x": 0.0,
+        "y": 0.0
+    },
+    "texturePath": "Resources/Textures/white.png",
+    "textureSize": {
+        "x": 16.0,
+        "y": 16.0
+    },
+    "uvRotation": 0.0,
+    "uvScale": {
+        "x": 1.0,
+        "y": 1.0
+    },
+    "uvTranslation": {
+        "x": 0.0,
+        "y": 0.0
+    },
+    "visible": true
+}

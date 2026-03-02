@@ -1,0 +1,16 @@
+{
+    "MoveSpeed": 0.5,
+    "MoveSpeed Controller": 1.0,
+    "Rotate": {
+        "x": 0.2500148117542267,
+        "y": 6.154123783111572,
+        "z": 0.0
+    },
+    "RotateSpeed": 0.10000000149011612,
+    "RotateSpeed Controller": 0.02500000037252903,
+    "Translate": {
+        "x": 0.0,
+        "y": 6.0,
+        "z": -40.0
+    }
+}

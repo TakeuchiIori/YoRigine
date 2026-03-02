@@ -1,0 +1,222 @@
+name: Generate & Publish Combined Code File
+
+on:
+  push:
+    branches:
+      - master
+  # 手動実行を可能にする
+  workflow_dispatch:
+
+# 💡 ワークフロー全体で使用する環境変数
+env:
+  # 出力ファイル名
+  OUTPUT_FILENAME: combined.txt
+  # 出力先ブランチ名
+  TARGET_BRANCH: combine-code
+  # ターゲット拡張子
+  TARGET_EXTENSIONS: .cpp,.h,.hpp,.vcxproj,.vcxproj.filters
+  # 除外ディレクトリ
+  EXCLUDE_DIRS: externals,resources
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    
+    # 💡 ターゲットブランチへのプッシュに必要な書き込み権限を付与
+    permissions:
+      contents: write 
+
+    steps:
+      - name: Checkout master (Shallow depth)
+        # 結合するコードを取得（デフォルトでshallow clone）
+        uses: actions/checkout@v4 
+
+      # 1. ソースコード結合ファイルの生成
+      - name: Generate Code Summary
+        id: generate
+        shell: python
+        run: |
+          import os
+          import hashlib
+          
+          # --- 環境変数からの設定読み込み ---
+          target_extensions = tuple(os.environ['TARGET_EXTENSIONS'].split(','))
+          exclude_dirs = set(os.environ['EXCLUDE_DIRS'].split(','))
+          output_file = os.environ['OUTPUT_FILENAME']
+          root_dir = '.'
+          # 固定で除外するディレクトリを追加
+          exclude_dirs.update({'.git', '.github', '.vs', 'build', 'out'})
+          # -----------------------------------
+
+          def is_excluded(dir_name):
+              return dir_name in exclude_dirs
+
+          # --- ファイルツリー生成関数 ---
+          def generate_tree(dir_path, prefix=''):
+              tree = []
+              # ルートディレクトリの項目を準備
+              items = sorted([f for f in os.listdir(dir_path) if f != output_file and f not in exclude_dirs])
+
+              pointers = [('├── ', '└── ') if i != len(items) - 1 else ('└── ', '    ') for i in range(len(items))]
+
+              for i, item in enumerate(items):
+                  full_path = os.path.join(dir_path, item)
+                  pointer = pointers[i]
+                  
+                  if os.path.isdir(full_path):
+                      # 除外ディレクトリはツリーにも含めない
+                      if not is_excluded(item):
+                          tree.append(f"{prefix}{pointer[0]}{item}/")
+                          tree.extend(generate_tree(full_path, prefix + pointer[1]))
+                  else:
+                      # 対象の拡張子を持つファイルのみツリーに含める
+                      if item.endswith(target_extensions):
+                          tree.append(f"{prefix}{pointer[0]}{item}")
+              return tree
+
+          # --- ファイル内容の処理関数 ---
+          def process_directory(current_path, outfile):
+              try:
+                  items = sorted(os.listdir(current_path))
+              except OSError:
+                  return
+
+              for item in items:
+                  full_path = os.path.join(current_path, item)
+                  
+                  if os.path.isdir(full_path):
+                      if not is_excluded(item):
+                          process_directory(full_path, outfile)
+                  else:
+                      if item.endswith(target_extensions):
+                          rel_path = os.path.relpath(full_path, root_dir)
+                          
+                          outfile.write(f"\n{'='*60}\n")
+                          outfile.write(f"File Path: {rel_path}\n")
+                          outfile.write(f"{'='*60}\n")
+                          
+                          try:
+                              with open(full_path, 'r', encoding='utf-8', errors='replace') as f:
+                                  outfile.write(f.read())
+                          except Exception as e:
+                              outfile.write(f"[Error reading file: {e}]\n")
+                          
+                          outfile.write("\n")
+
+          # --- メイン処理 ---
+          print(f"Generating {output_file}...")
+          with open(output_file, 'w', encoding='utf-8') as outfile:
+              
+              # 1. ファイルツリーを書き込む
+              outfile.write("### 🌳 Codebase File Tree (Excluding ignored directories)\n\n")
+              
+              tree_output = generate_tree(root_dir)
+              if tree_output:
+                  outfile.write("\n".join(tree_output))
+              else:
+                  outfile.write("No files matching the target extensions found.\n")
+              
+              outfile.write("\n" + "="*80 + "\n\n")
+
+              # 2. ファイル内容を結合する
+              process_directory(root_dir, outfile)
+          print("Done.")
+
+          # 生成ファイルのハッシュ値を出力し、次のステップで利用可能にする
+          with open(output_file, 'rb') as f:
+              file_hash = hashlib.sha256(f.read()).hexdigest()
+          
+          print(f"::set-output name=file_hash::{file_hash}")
+          print(f"::set-output name=output_file::{output_file}")
+
+
+      # 1.5. 既存ファイルの内容チェックとスキップ
+      - name: Check for Content Changes and Skip Push
+        id: check_changes
+        # 依存関係として sha256sum を使用するため、Linux環境で実行
+        run: |
+          OUTPUT_FILENAME="${{ steps.generate.outputs.output_file }}"
+          CURRENT_HASH="${{ steps.generate.outputs.file_hash }}"
+          TARGET_BRANCH="${{ env.TARGET_BRANCH }}"
+          
+          # ターゲットブランチが存在しない場合は、必ずコミットし、スキップしない
+          if ! git ls-remote --heads origin "$TARGET_BRANCH" | grep "$TARGET_BRANCH"; then
+            echo "Target branch does not exist. Must commit."
+            echo "::set-output name=skip_commit::false"
+            exit 0
+          fi
+          
+          # ターゲットブランチをフェッチ
+          git fetch origin "$TARGET_BRANCH"
+          
+          # ターゲットブランチの最新コミットからファイルのハッシュ値を取得
+          # ファイルがない場合は空のハッシュ値となる (|| echo "")
+          EXISTING_HASH=$(git show origin/"$TARGET_BRANCH":"$OUTPUT_FILENAME" | sha256sum | awk '{print $1}' || echo "")
+          
+          echo "Current file hash: $CURRENT_HASH"
+          echo "Existing file hash: $EXISTING_HASH"
+          
+          if [ "$CURRENT_HASH" = "$EXISTING_HASH" ]; then
+            echo "✅ Content unchanged. Skipping commit and push."
+            echo "::set-output name=skip_commit::true"
+          else
+            echo "🔄 Content changed. Proceeding with commit."
+            echo "::set-output name=skip_commit::false"
+          fi
+
+      # 2. ターゲットブランチのセットアップとコミット
+      # 💡 変更がない場合はこのステップ全体をスキップ
+      - name: Setup Target Branch and Commit (Hybrid Logic)
+        if: steps.check_changes.outputs.skip_commit == 'false'
+        run: |
+          TARGET_BRANCH="${{ env.TARGET_BRANCH }}"
+          OUTPUT_FILENAME="${{ steps.generate.outputs.output_file }}"
+          
+          # 1. 生成されたファイルを一時的に保存 (ブランチ切り替えに備える)
+          cp "$OUTPUT_FILENAME" /tmp/"$OUTPUT_FILENAME"
+          
+          # 2. ターゲットブランチの存在チェックと切り替え
+          BRANCH_EXISTS=$(git ls-remote --heads origin "$TARGET_BRANCH" | wc -l)
+
+          if [ "$BRANCH_EXISTS" -ne 0 ]; then
+            # --- A. ブランチが存在する場合 (効率的な更新) ---
+            echo "Target branch '$TARGET_BRANCH' exists. Checking out."
+            git fetch origin "$TARGET_BRANCH"
+            # 既存ブランチをチェックアウトする前にローカルファイルを削除し衝突回避
+            if [ -f "$OUTPUT_FILENAME" ]; then
+              rm "$OUTPUT_FILENAME"
+            fi
+            git checkout "$TARGET_BRANCH"
+          else
+            # --- B. ブランチが存在しない場合 (クリーンな初回作成) ---
+            echo "Target branch '$TARGET_BRANCH' does not exist. Creating from initial commit."
+            
+            # 全履歴を取得 (fetch-depth: 0 相当)
+            echo "Fetching full history..."
+            git fetch --unshallow || git fetch origin master --depth=0
+            
+            INITIAL_COMMIT_ID=$(git rev-list --max-parents=0 HEAD)
+            echo "Initial Commit ID: $INITIAL_COMMIT_ID"
+            
+            # 初期コミットから新しいブランチを作成し、チェックアウト
+            git checkout -b "$TARGET_BRANCH" "$INITIAL_COMMIT_ID"
+            
+            # 初期コミットから分岐したため、作業ディレクトリをクリーンアップ
+            git rm -rf . || true
+          fi
+          
+          # 3. 共通処理: ファイルを復元してステージング
+          cp /tmp/"$OUTPUT_FILENAME" .
+          git add "$OUTPUT_FILENAME"
+          
+          # 4. コミットとプッシュ
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          
+          # masterの最新SHAをコミットメッセージに含める
+          git commit -m "Auto: Update summary for AI review (${{ github.sha }})"
+          
+          # 強制プッシュでリモートブランチを更新/作成
+          git push -u origin "$TARGET_BRANCH" --force
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,49 @@
+{
+    "anchorPoint": {
+        "x": 0.5,
+        "y": 0.5
+    },
+    "color": {
+        "a": 1.0,
+        "b": 1.0,
+        "g": 1.0,
+        "r": 1.0
+    },
+    "flipX": false,
+    "flipY": false,
+    "layer": 2,
+    "name": "B_attack",
+    "position": {
+        "x": 1404.0,
+        "y": 687.0,
+        "z": 0.0
+    },
+    "rotation": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+    },
+    "scale": {
+        "x": 100.0,
+        "y": 100.0
+    },
+    "textureLeftTop": {
+        "x": 0.0,
+        "y": 0.0
+    },
+    "texturePath": "Resources/Textures/Operation/B_attack.png",
+    "textureSize": {
+        "x": 800.0,
+        "y": 700.0
+    },
+    "uvRotation": 0.0,
+    "uvScale": {
+        "x": 1.0,
+        "y": 1.0
+    },
+    "uvTranslation": {
+        "x": 0.0,
+        "y": 0.0
+    },
+    "visible": true
+}

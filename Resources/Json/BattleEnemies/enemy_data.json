@@ -1,0 +1,157 @@
+{
+    "battleEnemies": [
+        {
+            "approachStateRange": 15.0,
+            "attack": 18,
+            "attackParams": {
+                "charge": {
+                    "chargeTime": 1.75,
+                    "cooldownTime": 1.0,
+                    "rushTime": 0.5,
+                    "speedMultiplier": 12.0
+                },
+                "combo": {
+                    "cooldownTime": 0.800000011920929,
+                    "phaseDuration": 0.800000011920929,
+                    "rushSpeedMultiplier": 8.0,
+                    "subChargeTime": 0.4000000059604645,
+                    "subRushTime": 0.20000000298023224
+                },
+                "leap": {
+                    "chargeTime": 0.5,
+                    "cooldownTime": 0.699999988079071,
+                    "crouchDepth": 0.30000001192092896,
+                    "jumpHeight": 6.0,
+                    "jumpTime": 0.699999988079071
+                },
+                "rush": {
+                    "chargeTime": 1.0,
+                    "cooldownTime": 1.2000000476837158,
+                    "rushTime": 0.5,
+                    "speedMultiplier": 7.0
+                },
+                "spin": {
+                    "chargeTime": 0.30000001192092896,
+                    "cooldownTime": 0.5,
+                    "moveSpeedMultiplier": 2.0,
+                    "rotationCount": 2.0,
+                    "spinTime": 1.0
+                }
+            },
+            "attackPatterns": [
+                "leap",
+                "charge"
+            ],
+            "attackStateRange": 10.0,
+            "defense": 12,
+            "enemyId": "alien",
+            "hp": 200,
+            "level": 3,
+            "modelPath": "Alien.obj",
+            "moveSpeed": 5.0
+        },
+        {
+            "approachStateRange": 15.0,
+            "attack": 15,
+            "attackParams": {
+                "charge": {
+                    "chargeTime": 1.5,
+                    "cooldownTime": 1.0,
+                    "rushTime": 0.5,
+                    "speedMultiplier": 12.0
+                },
+                "combo": {
+                    "cooldownTime": 0.800000011920929,
+                    "phaseDuration": 0.800000011920929,
+                    "rushSpeedMultiplier": 8.0,
+                    "subChargeTime": 0.4000000059604645,
+                    "subRushTime": 0.20000000298023224
+                },
+                "leap": {
+                    "chargeTime": 0.5,
+                    "cooldownTime": 0.6000000238418579,
+                    "crouchDepth": 0.30000001192092896,
+                    "jumpHeight": 4.0,
+                    "jumpTime": 0.699999988079071
+                },
+                "rush": {
+                    "chargeTime": 0.8500000238418579,
+                    "cooldownTime": 1.2000000476837158,
+                    "rushTime": 0.5,
+                    "speedMultiplier": 7.5
+                },
+                "spin": {
+                    "chargeTime": 0.25,
+                    "cooldownTime": 0.5,
+                    "moveSpeedMultiplier": 4.0,
+                    "rotationCount": 5.0,
+                    "spinTime": 1.0
+                }
+            },
+            "attackPatterns": [
+                "rush",
+                "spin",
+                "charge",
+                "combo"
+            ],
+            "attackStateRange": 10.0,
+            "defense": 30,
+            "enemyId": "green_blob",
+            "hp": 350,
+            "level": 5,
+            "modelPath": "GreenSpikyBlob.obj",
+            "moveSpeed": 3.0
+        },
+        {
+            "approachStateRange": 15.0,
+            "attack": 22,
+            "attackParams": {
+                "charge": {
+                    "chargeTime": 1.5,
+                    "cooldownTime": 1.0,
+                    "rushTime": 0.5,
+                    "speedMultiplier": 12.0
+                },
+                "combo": {
+                    "cooldownTime": 0.800000011920929,
+                    "phaseDuration": 0.8999999761581421,
+                    "rushSpeedMultiplier": 8.5,
+                    "subChargeTime": 0.4000000059604645,
+                    "subRushTime": 0.25
+                },
+                "leap": {
+                    "chargeTime": 0.5,
+                    "cooldownTime": 0.6000000238418579,
+                    "crouchDepth": 0.30000001192092896,
+                    "jumpHeight": 4.0,
+                    "jumpTime": 0.699999988079071
+                },
+                "rush": {
+                    "chargeTime": 1.0,
+                    "cooldownTime": 1.2000000476837158,
+                    "rushTime": 0.5,
+                    "speedMultiplier": 7.0
+                },
+                "spin": {
+                    "chargeTime": 0.30000001192092896,
+                    "cooldownTime": 0.5,
+                    "moveSpeedMultiplier": 2.0,
+                    "rotationCount": 2.0,
+                    "spinTime": 1.0
+                }
+            },
+            "attackPatterns": [
+                "rush",
+                "charge",
+                "combo"
+            ],
+            "attackStateRange": 10.0,
+            "defense": 8,
+            "enemyId": "mushnub",
+            "hp": 250,
+            "level": 4,
+            "modelPath": "Mushnub_Evolved.obj",
+            "moveSpeed": 3.0
+        }
+    ]
+}

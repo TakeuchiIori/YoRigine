@@ -1,0 +1,49 @@
+{
+    "anchorPoint": {
+        "x": 0.0,
+        "y": 0.5
+    },
+    "color": {
+        "a": 0.954919159412384,
+        "b": 0.12093019485473633,
+        "g": 1.0,
+        "r": 0.0
+    },
+    "flipX": false,
+    "flipY": false,
+    "layer": 1,
+    "name": "playerHPBar",
+    "position": {
+        "x": 71.0,
+        "y": 760.0,
+        "z": 0.0
+    },
+    "rotation": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+    },
+    "scale": {
+        "x": 421.5,
+        "y": 60.5
+    },
+    "textureLeftTop": {
+        "x": 0.0,
+        "y": 0.0
+    },
+    "texturePath": "Resources/Textures/GameScene/EnemyHPBar.png",
+    "textureSize": {
+        "x": 500.0,
+        "y": 200.0
+    },
+    "uvRotation": 0.0,
+    "uvScale": {
+        "x": 1.0,
+        "y": 1.0
+    },
+    "uvTranslation": {
+        "x": 0.0,
+        "y": 0.0
+    },
+    "visible": true
+}

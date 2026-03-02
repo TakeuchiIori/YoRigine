@@ -1,0 +1,140 @@
+#pragma once
+#ifdef USE_IMGUI
+
+#include "YEmitterGroupManager.h"
+#include "FileOperations/FileBrowser.h"
+#include "Debugger/Gizmo/GizmoController.h"
+#include "YEmitterGizmable.h"
+#include "YEmitterGroupGizmable.h"
+
+#include <string>
+#include <vector>
+#include <memory>
+#include <set>
+
+/// <summary>
+/// YEmitterGroup の ImGui エディタ（ギズモ統合版）
+///
+/// ■ ギズモ操作の流れ
+///   1. グループ行をクリック        → グループ全体 (YEmitterGroupGizmable) をギズモ対象に
+///   2. エミッター行の [G] ボタン   → 個別エミッター (YEmitterGizmable) をギズモ対象に
+///   3. Ctrl + [G] ボタン           → 複数エミッター同時選択 → 差分移動
+///   4. DrawGizmo() をビューポート後に呼ぶとギズモが描画される
+///
+/// ■ 呼び出し方（例: YParticleEditor）
+///   void YParticleEditor::Update() {
+///       auto& editor = YEmitterGroupEditor::GetInstance();
+///       editor.SetCamera(camera_);
+///       editor.SetViewport(viewportPos, viewportSize);
+///   }
+///   void YParticleEditor::ShowEditorTab() {
+///       editor.ShowEditor();   // ImGui ウィンドウ内
+///   }
+///   void YParticleEditor::DrawGizmo() {
+///       editor.DrawGizmo();    // ImGui::Image の直後
+///   }
+/// </summary>
+class YEmitterGroupEditor {
+public:
+    //=================================================================
+    // シングルトン
+    //=================================================================
+
+    static YEmitterGroupEditor& GetInstance() {
+        static YEmitterGroupEditor instance;
+        return instance;
+    }
+
+    YEmitterGroupEditor(const YEmitterGroupEditor&) = delete;
+    YEmitterGroupEditor& operator=(const YEmitterGroupEditor&) = delete;
+
+    //=================================================================
+    // セットアップ（毎フレームまたは初期化時）
+    //=================================================================
+
+    void SetCamera(Camera* camera) { camera_ = camera; }
+
+    //=================================================================
+    // 描画
+    //=================================================================
+
+    /// ImGui ウィンドウ内（タブ内）で呼ぶ
+    void ShowEditor();
+
+    /// ImGui::Image の直後（同フレーム・同ウィンドウ内）で呼ぶ
+    void DrawGizmo();
+
+private:
+    YEmitterGroupEditor();
+    ~YEmitterGroupEditor() = default;
+
+    //=================================================================
+    // 内部描画
+    //=================================================================
+
+    void ShowGizmoToolbar();
+    void ShowGroupList();
+    void ShowGroupDetail();
+    bool ShowEmitterRow(YEmitterGroup& group, size_t index);
+    void ShowCreateGroupUI();
+    void ShowFileButtons();
+    void ShowSelectedEmitterDetail(YParticleEmitter& emitter);
+
+    //=================================================================
+    // ギズモ選択
+    //=================================================================
+
+    // グループ全体を選択（グループギズモ）
+    void SelectGroup(const std::string& groupName);
+
+    // エミッターを選択（multiSelect=true で Ctrl+クリック）
+    void SelectEmitter(const std::string& groupName, int index, bool multiSelect);
+
+    // 選択状態から gizmoTargets_ を再構築する
+    void RebuildGizmoTargets();
+
+    //=================================================================
+    // 選択モード
+    //=================================================================
+
+    enum class SelectionMode { None, Group, Emitter };
+    SelectionMode selectionMode_ = SelectionMode::None;
+
+    std::string   selectedGroupName_;
+    std::set<int> selectedEmitterIndices_;  // 複数選択対応
+    int           selectedEmitterIndex_ = -1;  // Detail 表示用（最後に選択されたもの）
+
+    //=================================================================
+    // ギズモ
+    //=================================================================
+
+    GizmoController gizmoCtrl_;
+    Camera* camera_ = nullptr;
+
+    // アダプタ（毎回 RebuildGizmoTargets() で作り直す）
+    std::unique_ptr<YEmitterGroupGizmable>         groupGizmable_;
+    std::vector<std::unique_ptr<YEmitterGizmable>> emitterGizmables_;
+    std::vector<IGizmable*>                        gizmoTargets_;
+
+    //=================================================================
+    // UI 状態
+    //=================================================================
+
+    char  newGroupNameBuf_[128] = "";
+    char  newEmitterSystemName_[128] = "";
+    float newEmitterOffset_[3] = { 0, 0, 0 };
+    float groupListWidth_ = 180.0f;
+
+    const std::string emitterDirectory_ = "Resources/Json/YEmitterGroups/";
+
+    //=================================================================
+    // FileBrowser
+    //=================================================================
+
+    YoRigine::FileBrowser saveBrowser_;
+    YoRigine::FileBrowser loadBrowser_;
+    bool showSavePopup_ = false;
+    bool showLoadPopup_ = false;
+};
+
+#endif // USE_IMGUI

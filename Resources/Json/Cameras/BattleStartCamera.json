@@ -1,0 +1,44 @@
+{
+    "ExitLook.LookAtTargetOnExit": true,
+    "Framing.FitMargin": 1.149999976158142,
+    "Framing.FovY": 0.8999999761581421,
+    "Framing.SubjectHeight": 1.7000000476837158,
+    "Positions.FinalOffset": {
+        "x": 0.0,
+        "y": 15.0,
+        "z": -40.0
+    },
+    "Positions.FinalOffsetRotate": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+    },
+    "Positions.HoldOffset": {
+        "x": 0.0,
+        "y": 5.0,
+        "z": -10.0
+    },
+    "Positions.HoldOffsetRotate": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+    },
+    "Positions.StartOffset": {
+        "x": 0.0,
+        "y": 15.0,
+        "z": -40.0
+    },
+    "Positions.StartOffsetRotate": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+    },
+    "Positions.UseFinalRelativeToTarget": true,
+    "Positions.UseHoldRelativeToTarget": true,
+    "Positions.UseStartRelativeToTarget": true,
+    "Timing.ApproachArcYawDeg": 60.0,
+    "Timing.ApproachTime": 3.0,
+    "Timing.BankRollDeg": 6.0,
+    "Timing.ExitTime": 1.5,
+    "Timing.HoldTime": 1.5
+}

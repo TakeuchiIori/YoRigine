@@ -1,0 +1,349 @@
+{
+    "groups": [
+        {
+            "currentTime": 0.0,
+            "emitters": [
+                {
+                    "boxParams": {
+                        "count": 100.0,
+                        "emitInterval": 1.0,
+                        "size": {
+                            "x": 10.0,
+                            "y": 10.0,
+                            "z": 10.0
+                        },
+                        "translate": {
+                            "x": 0.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        }
+                    },
+                    "coneParams": {
+                        "count": 100.0,
+                        "direction": {
+                            "x": 0.0,
+                            "y": 1.0,
+                            "z": 0.0
+                        },
+                        "emitInterval": 1.0,
+                        "height": 20.0,
+                        "radius": 10.0,
+                        "translate": {
+                            "x": 0.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        }
+                    },
+                    "isActive": true,
+                    "meshParams": {
+                        "count": 10000.0,
+                        "emitInterval": 1.0,
+                        "emitMode": 0,
+                        "modelName": "Cube.obj",
+                        "rotation": {
+                            "w": 1.0,
+                            "x": 0.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        },
+                        "scale": {
+                            "x": 50.0,
+                            "y": 50.0,
+                            "z": 50.0
+                        },
+                        "translate": {
+                            "x": 0.0,
+                            "y": 100.0,
+                            "z": 0.0
+                        }
+                    },
+                    "name": "ss",
+                    "particleParams": {
+                        "endColor": {
+                            "w": 0.0,
+                            "x": 1.0,
+                            "y": 1.0,
+                            "z": 1.0
+                        },
+                        "endColorVariance": {
+                            "w": 0.0,
+                            "x": 0.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        },
+                        "endScale": {
+                            "x": 0.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        },
+                        "endScaleVariance": {
+                            "x": 0.30000001192092896,
+                            "y": 0.30000001192092896,
+                            "z": 0.30000001192092896
+                        },
+                        "gravity": 0.0,
+                        "isBillboard": true,
+                        "isInheritScale": true,
+                        "isTrail": false,
+                        "lifeTime": 3.0,
+                        "lifeTimeVariance": 0.5,
+                        "rotation": 0.0,
+                        "rotationSpeed": 0.0,
+                        "rotationSpeedVariance": 0.0,
+                        "rotationVariance": 0.0,
+                        "startColor": {
+                            "w": 1.0,
+                            "x": 1.0,
+                            "y": 1.0,
+                            "z": 1.0
+                        },
+                        "startColorVariance": {
+                            "w": 0.0,
+                            "x": 0.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        },
+                        "startScale": {
+                            "x": 1.0,
+                            "y": 1.0,
+                            "z": 1.0
+                        },
+                        "startScaleVariance": {
+                            "x": 0.30000001192092896,
+                            "y": 0.30000001192092896,
+                            "z": 0.30000001192092896
+                        },
+                        "trailEmissionCount": 1,
+                        "trailEndScale": 0.0,
+                        "trailLifeTime": 0.5,
+                        "trailMinDistance": 0.5,
+                        "trailStartScale": 0.5,
+                        "velocity": {
+                            "x": 0.0,
+                            "y": 0.10000000149011612,
+                            "z": 0.0
+                        },
+                        "velocityVariance": {
+                            "x": 0.10000000149011612,
+                            "y": 0.05000000074505806,
+                            "z": 0.10000000149011612
+                        }
+                    },
+                    "shape": 4,
+                    "sphereParams": {
+                        "count": 100.0,
+                        "emitInterval": 1.0,
+                        "radius": 10.0,
+                        "translate": {
+                            "x": 0.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        }
+                    },
+                    "textureFilePath": "Resources/Effects\\circle.png",
+                    "trail": {
+                        "emissionCount": 1.0,
+                        "enabled": false,
+                        "inheritScale": true,
+                        "lifeTime": 0.0,
+                        "minDistance": 0.10000000149011612
+                    },
+                    "triangleParams": {
+                        "count": 100.0,
+                        "emitInterval": 1.0,
+                        "v1": {
+                            "x": -5.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        },
+                        "v2": {
+                            "x": 5.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        },
+                        "v3": {
+                            "x": 0.0,
+                            "y": 5.0,
+                            "z": 0.0
+                        }
+                    }
+                },
+                {
+                    "boxParams": {
+                        "count": 100.0,
+                        "emitInterval": 1.0,
+                        "size": {
+                            "x": 10.0,
+                            "y": 10.0,
+                            "z": 10.0
+                        },
+                        "translate": {
+                            "x": 0.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        }
+                    },
+                    "coneParams": {
+                        "count": 100.0,
+                        "direction": {
+                            "x": 0.0,
+                            "y": 1.0,
+                            "z": 0.0
+                        },
+                        "emitInterval": 1.0,
+                        "height": 20.0,
+                        "radius": 10.0,
+                        "translate": {
+                            "x": 0.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        }
+                    },
+                    "isActive": true,
+                    "meshParams": {
+                        "count": 100000.0,
+                        "emitInterval": 1.0,
+                        "emitMode": 2,
+                        "modelName": "Cube.obj",
+                        "rotation": {
+                            "w": 1.0,
+                            "x": 0.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        },
+                        "scale": {
+                            "x": 50.0,
+                            "y": 50.0,
+                            "z": 50.0
+                        },
+                        "translate": {
+                            "x": 0.0,
+                            "y": 100.0,
+                            "z": 0.0
+                        }
+                    },
+                    "name": "dd",
+                    "particleParams": {
+                        "endColor": {
+                            "w": 0.0,
+                            "x": 1.0,
+                            "y": 1.0,
+                            "z": 1.0
+                        },
+                        "endColorVariance": {
+                            "w": 0.0,
+                            "x": 0.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        },
+                        "endScale": {
+                            "x": 0.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        },
+                        "endScaleVariance": {
+                            "x": 0.30000001192092896,
+                            "y": 0.30000001192092896,
+                            "z": 0.30000001192092896
+                        },
+                        "gravity": 0.0,
+                        "isBillboard": true,
+                        "isInheritScale": true,
+                        "isTrail": false,
+                        "lifeTime": 3.0,
+                        "lifeTimeVariance": 0.5,
+                        "rotation": 0.0,
+                        "rotationSpeed": 0.0,
+                        "rotationSpeedVariance": 0.0,
+                        "rotationVariance": 0.0,
+                        "startColor": {
+                            "w": 1.0,
+                            "x": 1.0,
+                            "y": 1.0,
+                            "z": 1.0
+                        },
+                        "startColorVariance": {
+                            "w": 0.0,
+                            "x": 0.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        },
+                        "startScale": {
+                            "x": 1.0,
+                            "y": 1.0,
+                            "z": 1.0
+                        },
+                        "startScaleVariance": {
+                            "x": 0.30000001192092896,
+                            "y": 0.30000001192092896,
+                            "z": 0.30000001192092896
+                        },
+                        "trailEmissionCount": 1,
+                        "trailEndScale": 0.0,
+                        "trailLifeTime": 0.5,
+                        "trailMinDistance": 0.5,
+                        "trailStartScale": 0.5,
+                        "velocity": {
+                            "x": 0.0,
+                            "y": 0.10000000149011612,
+                            "z": 0.0
+                        },
+                        "velocityVariance": {
+                            "x": 0.10000000149011612,
+                            "y": 0.05000000074505806,
+                            "z": 0.10000000149011612
+                        }
+                    },
+                    "shape": 4,
+                    "sphereParams": {
+                        "count": 100.0,
+                        "emitInterval": 1.0,
+                        "radius": 10.0,
+                        "translate": {
+                            "x": 0.0,
+                            "y": 100.0,
+                            "z": 0.0
+                        }
+                    },
+                    "textureFilePath": "Resources/Effects\\circle2.png",
+                    "trail": {
+                        "emissionCount": 1.0,
+                        "enabled": false,
+                        "inheritScale": true,
+                        "lifeTime": 0.0,
+                        "minDistance": 0.10000000149011612
+                    },
+                    "triangleParams": {
+                        "count": 100.0,
+                        "emitInterval": 1.0,
+                        "v1": {
+                            "x": -5.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        },
+                        "v2": {
+                            "x": 5.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        },
+                        "v3": {
+                            "x": 0.0,
+                            "y": 5.0,
+                            "z": 0.0
+                        }
+                    }
+                }
+            ],
+            "groupName": "ss",
+            "isActive": true,
+            "isPlaying": true,
+            "systemDuration": 0.0,
+            "translate": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            }
+        }
+    ],
+    "version": "1.0"
+}

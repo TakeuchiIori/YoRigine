@@ -1,0 +1,12 @@
+{
+    "drawOrder": [
+        "Clear"
+    ],
+    "groups": null,
+    "uis": [
+        {
+            "configPath": "./Resources/UIConfigs/ClearScene/Clear.json",
+            "id": "Clear"
+        }
+    ]
+}

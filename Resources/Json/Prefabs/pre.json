@@ -1,0 +1,47 @@
+{
+    "objects": [
+        {
+            "filePath": "Multi\\Multi.obj",
+            "id": 0,
+            "modelName": "Multi",
+            "parentID": -1,
+            "position": [
+                -3.606455087661743,
+                0.19835078716278076,
+                1.6617213487625122
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ]
+        },
+        {
+            "filePath": "cube\\cube.obj",
+            "id": 1,
+            "modelName": "cube",
+            "parentID": -1,
+            "position": [
+                4.571605205535889,
+                6.7066240310668945,
+                0.0
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ]
+        }
+    ],
+    "version": 1
+}

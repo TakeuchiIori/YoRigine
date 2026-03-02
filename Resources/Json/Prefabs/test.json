@@ -1,0 +1,68 @@
+{
+    "objects": [
+        {
+            "filePath": "Blacksmith\\Blacksmith.obj",
+            "id": 0,
+            "modelName": "Blacksmith",
+            "parentID": -1,
+            "position": [
+                0.0,
+                0.0,
+                8.2703857421875
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ]
+        },
+        {
+            "filePath": "Bell_Tower\\Bell_Tower.obj",
+            "id": 1,
+            "modelName": "Bell_Tower",
+            "parentID": -1,
+            "position": [
+                22.9210262298584,
+                0.0,
+                0.0
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ]
+        },
+        {
+            "filePath": "GreenSpikyBlob\\GreenSpikyBlob.obj",
+            "id": 2,
+            "modelName": "GreenSpikyBlob",
+            "parentID": -1,
+            "position": [
+                -8.88857650756836,
+                0.0,
+                0.0
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ]
+        }
+    ],
+    "version": 1
+}
