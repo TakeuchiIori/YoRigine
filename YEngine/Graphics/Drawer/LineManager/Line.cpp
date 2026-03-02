@@ -22,6 +22,7 @@ void Line::Initialize()
 	CrateMaterialResource();
 	CrateVetexResource();
 
+
 	CreateTransformResource();
 }
 
