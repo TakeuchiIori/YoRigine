@@ -1,7 +1,7 @@
 # デバッグ状態
-[![DebugBuild](https://github.com/TakeuchiIori/YoRigine_Engine/actions/workflows/Debug.yml/badge.svg)](https://github.com/TakeuchiIori/YoRigine_Engine/actions/workflows/Debug.yml)
+[![DebugBuild](https://github.com/TakeuchiIori/YoRigine/actions/workflows/Debug.yml/badge.svg)](https://github.com/TakeuchiIori/YoRigine/actions/workflows/Debug.yml)
 
-[![ReleaseBuild](https://github.com/TakeuchiIori/YoRigine_Engine/actions/workflows/Release.yml/badge.svg)](https://github.com/TakeuchiIori/YoRigine_Engine/actions/workflows/Release.yml)
+[![ReleaseBuild](https://github.com/TakeuchiIori/YoRigine/actions/workflows/Release.yml/badge.svg)](https://github.com/TakeuchiIori/YoRigine/actions/workflows/Release.yml)
 # ビルド方法
 1. ダウンロードしたら **`premake.bat`** を起動します。
 2. **`.sln`** (ソリューションファイル) が生成されるので、**Visual Studio** で開きます。
