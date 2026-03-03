@@ -36043,7 +36043,7 @@ File Path: Externals/DirectXTex/DirectXTex_Desktop_2022_Win10.vcxproj
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectName>DirectXTex</ProjectName>
-    <ProjectGuid>{371B9FA9-4C90-4AC6-A123-ACED756D6C77}</ProjectGuid>
+    <ProjectGuid>{A90EE592-95C6-26E0-FECD-FF3BEAA4C1D0}</ProjectGuid>
     <RootNamespace>DirectXTex</RootNamespace>
     <Keyword>Win32Proj</Keyword>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
@@ -47523,7 +47523,7 @@ File Path: Externals/ImGui/ImGui.vcxproj
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{6e335bc2-0464-425a-b059-fac8526af405}</ProjectGuid>
+    <ProjectGuid>{C0FF640D-2C14-8DBE-F595-301E616989EF}</ProjectGuid>
     <RootNamespace>ImGui</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
