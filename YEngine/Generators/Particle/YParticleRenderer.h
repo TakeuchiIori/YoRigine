@@ -31,6 +31,10 @@ public:
     // 溜まったデータを一気に描画
     void EndFrame(const std::shared_ptr<Mesh>& mesh, uint32_t textureIndex, BlendMode blendMode);
 
+    void CommitBatch();
+
+    void ResetBatchOffset();
+
 public:
 
     // ビルボード設定
@@ -57,4 +61,7 @@ private:
     std::unique_ptr<MaterialUV> materialUV_;
     bool enableBillboard_ = true;   // ビルボード有効/無効
 
+
+    std::vector<uint32_t> batchEndOffsets_;
+    uint32_t batchDrawIndex_ = 0;
 };

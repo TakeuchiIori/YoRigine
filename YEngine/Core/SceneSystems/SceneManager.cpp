@@ -87,10 +87,6 @@ void SceneManager::Update() {
 }
 
 void SceneManager::PerformSceneTransition() {
-	//------------------------------------------------------------
-	// ステップ1: 全てのGPU処理の完了を待機（唯一のGPU同期ポイント）
-	//------------------------------------------------------------
-	YoRigine::DirectXCommon::GetInstance()->WaitForGPU();
 
 	//------------------------------------------------------------
 	// ステップ2: 現在のシーンを安全に終了
@@ -159,8 +155,6 @@ void SceneManager::ChangeScene(const std::string& sceneName) {
 	}
 
 	nextScene_ = sceneFactory_->CreateScene(sceneName);
-	YoRigine::DirectXCommon::GetInstance()->WaitForGPU();
-
 	//------------------------------------------------------------
 	// 初回シーン生成処理（アプリ起動直後）
 	//------------------------------------------------------------
@@ -189,7 +183,7 @@ void SceneManager::ChangeSceneImmediate(const std::string& sceneName) {
 		scene_->Finalize();
 		scene_ = nullptr;
 	}
-	YoRigine::DirectXCommon::GetInstance()->WaitForGPU();
+	//YoRigine::DirectXCommon::GetInstance()->WaitForGPU();
 
 	// 新しいシーンを生成して初期化
 	scene_ = sceneFactory_->CreateScene(sceneName);

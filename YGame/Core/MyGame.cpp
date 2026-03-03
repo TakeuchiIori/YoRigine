@@ -40,9 +40,10 @@ void MyGame::Initialize() {
 
 	YParticleManager::GetInstance().Initialize(dxCommon_->GetSrvManager(), 50000);
 
-	//YParticleManager::GetInstance().LoadSystemsFromFile("Resources/Json/YParticleSystems/EnemyHit1.json");
-	//YParticleManager::GetInstance().LoadSystemsFromFile("Resources/Json/YParticleSystems/EnemyHit2.json");	
-	//YEmitterGroupManager::GetInstance().LoadAllFromFile("Resources/Json/YEmitterGroups/EnemyHit.json");
+	YParticleManager::GetInstance().LoadSystemsFromFile("Resources/Json/YParticleSystems/EnemyHit1.json");
+	YParticleManager::GetInstance().LoadSystemsFromFile("Resources/Json/YParticleSystems/EnemyHit2.json");	
+	YEmitterGroupManager::GetInstance().LoadAllFromFile("Resources/Json/YEmitterGroups/EnemyHit.json");
+
 	//------------------------------------------------------------
 	// パーティクル関連の初期化
 	//------------------------------------------------------------

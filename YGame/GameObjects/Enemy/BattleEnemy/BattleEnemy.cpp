@@ -101,6 +101,12 @@ void BattleEnemy::Update() {
 	if (player_->GetCombat()->IsDead())
 		return;
 
+	// 死亡チェック
+	if (enemyData_.currentHp_ == 0) {
+		ChangeState(std::make_unique<BattleDeadState>());
+		PlayDeathEffect();
+	}
+
 	float dt = YoRigine::GameTime::GetDeltaTime();
 	stateTimer_ += dt;
 
@@ -137,12 +143,6 @@ void BattleEnemy::Update() {
 
 	// ノックバック更新
 	UpdateKnockback(dt);
-
-	// 死亡チェック
-	if (enemyData_.currentHp_ == 0) {
-		ChangeState(std::make_unique<BattleDeadState>());
-		PlayDeathEffect();
-	}
 
 
 
@@ -262,19 +262,19 @@ void BattleEnemy::UpdateKnockback(float dt)
 //========================================================================*/
 void BattleEnemy::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other) {
 
+	if (isAlive_) {
 	// 攻撃を食らった時
 	if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon)) {
-		if (isAlive_) {
 			TakeDamage(static_cast<int>(player_->GetCombat()->GetCombo()->GetCurrentDamage()));
 
 			// --------------------- ヒットエフェクトの処理 --------------------- //
-			//auto* enemyHitEmitterGroup_ = YEmitterGroupManager::GetInstance().GetGroup("EnemyHit");
-			//if (enemyHitEmitterGroup_) {
-			//	enemyHitEmitterGroup_->SetPosition(wt_.translate_);
-			//	enemyHitEmitterGroup_->SetActive(true);
-			//	enemyHitEmitterGroup_->SetAutoEmitAll(false);  // 自動射出OFF
-			//	enemyHitEmitterGroup_->EmitAll(10);  // 手動で100個発生
-			//}
+			auto* enemyHitEmitterGroup_ = YEmitterGroupManager::GetInstance().GetGroup("EnemyHit");
+			if (enemyHitEmitterGroup_) {
+				enemyHitEmitterGroup_->SetPosition(wt_.translate_);
+				enemyHitEmitterGroup_->SetActive(true);
+				enemyHitEmitterGroup_->SetAutoEmitAll(false);  // 自動射出OFF
+				enemyHitEmitterGroup_->EmitAll(10);  // 手動で100個発生
+			}
 
 			// --------------------- ヒットカウントの処理 --------------------- //
 			// 連続ヒットカウント増加

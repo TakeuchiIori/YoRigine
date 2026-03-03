@@ -174,6 +174,7 @@ private:
         uint32_t textureIndex;
         ParticleLightSetting lightSetting;
         std::vector<YParticleSystem*> systems;
+		BlendMode blendMode;
     };
 
     void CreateRenderBatches(std::vector<RenderBatch>& batches);

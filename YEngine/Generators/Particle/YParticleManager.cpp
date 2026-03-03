@@ -140,7 +140,6 @@ void YParticleManager::LoadSystemsFromJson(const nlohmann::json& json) {
 		system->SetBlendMode(static_cast<BlendMode>(json["BlendMode"].get<int>()));
 	if (json.contains("Lighting"))
 		system->SetLightSetting(json["Lighting"].get<bool>() ? ParticleLightSetting{ true, true, true } : ParticleLightSetting{ false, false, false });
-
 	if (json.contains("mesh")) {
 		const auto& meshJson = json["mesh"];
 		if (meshJson.contains("type") && meshJson.contains("params"))
@@ -238,7 +237,6 @@ void YParticleManager::Update(float deltaTime) {
 //=================================================================
 // 描画
 //=================================================================
-
 void YParticleManager::CreateRenderBatches(std::vector<RenderBatch>& batches) {
 	batches.clear();
 
@@ -264,8 +262,10 @@ void YParticleManager::CreateRenderBatches(std::vector<RenderBatch>& batches) {
 		// 既存のバッチを検索（同じメッシュ＋テクスチャ＋ライト設定）
 		bool foundBatch = false;
 		for (auto& batch : batches) {
-			if (batch.mesh == mesh && batch.textureIndex == texIndex
-				&& batch.lightSetting == system->GetLightSetting()) {
+			if (batch.mesh == mesh 
+				&& batch.textureIndex == texIndex
+				&& batch.lightSetting == system->GetLightSetting()
+				&& batch.blendMode == system->GetBlendMode()) {
 				batch.systems.push_back(system.get());
 				foundBatch = true;
 				break;
@@ -277,8 +277,9 @@ void YParticleManager::CreateRenderBatches(std::vector<RenderBatch>& batches) {
 			RenderBatch newBatch;
 			newBatch.mesh = mesh;
 			newBatch.textureIndex = texIndex;
-			newBatch.lightSetting = system->GetLightSetting();   // ← 追加
+			newBatch.lightSetting = system->GetLightSetting();
 			newBatch.systems.push_back(system.get());
+			newBatch.blendMode = system->GetBlendMode();
 			batches.push_back(newBatch);
 		}
 	}
@@ -294,33 +295,25 @@ void YParticleManager::Draw() {
 
 	auto commandList = YoRigine::DirectXCommon::GetInstance()->GetCommandList();
 	commandList->SetGraphicsRootSignature(rootSignature_.Get());
-	commandList->SetPipelineState(pipelineState_.Get());
 
-	auto pm = YPipelineManager::GetInstance();
-	const auto& indices = pm->GetParameterIndices("YParticle");
-	YoRigine::LightManager::GetInstance()->SetCommandList(
-		indices.at("gDirectionalLight"),
-		indices.at("gPointLight"),
-		indices.at("gSpotLight"));
+	renderer_->BeginFrame();
 
-	// ★ バッチごとにBeginFrame()を呼ぶ
-		renderer_->BeginFrame();  // ← バッファをリセット
+	// フェーズ1：全バッチのデータをバッファに書き込むだけ
 	for (const auto& batch : batches) {
-		renderer_->ApplyLightSetting(batch.lightSetting);
-
-		// バッチ内のすべてのシステムを追加
 		for (auto* system : batch.systems) {
 			renderer_->AddSystem(*system, camera_);
+			renderer_->CommitBatch();  // ← システムごとにCommit
 		}
-
-		// ★ ブレンドモードを渡す（バッチ内の最初のシステムから取得）
-		BlendMode blendMode = batch.systems.empty() ?
-			BlendMode::kBlendModeNormal :
-			batch.systems[0]->GetBlendMode();
-
-		renderer_->EndFrame(batch.mesh, batch.textureIndex, blendMode);
 	}
 
+	// フェーズ2：Drawコマンドもシステムごとのバッチとして積む
+	renderer_->ResetBatchOffset();
+	for (const auto& batch : batches) {
+		renderer_->ApplyLightSetting(batch.lightSetting);
+		for (size_t i = 0; i < batch.systems.size(); ++i) {
+			renderer_->EndFrame(batch.mesh, batch.textureIndex, batch.blendMode);
+		}
+	}
 	auto endTime = std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
 	stats_.renderTimeMs = duration.count() / 1000.0f;
