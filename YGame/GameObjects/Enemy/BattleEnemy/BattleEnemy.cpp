@@ -16,6 +16,7 @@
 #include "Debugger/Logger.h"
 #include <Collision/AreaCollision/Base/AreaManager.h>
 #include "States/BattleRecoveryState.h"
+#include "Particle/YEmitterGroupManager.h"
 
 /*==========================================================================
 デストラクタ
@@ -43,6 +44,7 @@ void BattleEnemy::Initialize(Camera* camera) {
 	animation_ = std::make_unique<ObjectAnimation>();
 	animation_->SetBaseColor({ 1.0f,1.0f,1.0f,1.0f });
 	animation_->SetBaseScale({ 1.0f,1.0f,1.0f });
+
 }
 
 /*==========================================================================
@@ -265,6 +267,14 @@ void BattleEnemy::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 		if (isAlive_) {
 			TakeDamage(static_cast<int>(player_->GetCombat()->GetCombo()->GetCurrentDamage()));
 
+			// --------------------- ヒットエフェクトの処理 --------------------- //
+			//auto* enemyHitEmitterGroup_ = YEmitterGroupManager::GetInstance().GetGroup("EnemyHit");
+			//if (enemyHitEmitterGroup_) {
+			//	enemyHitEmitterGroup_->SetPosition(wt_.translate_);
+			//	enemyHitEmitterGroup_->SetActive(true);
+			//	enemyHitEmitterGroup_->SetAutoEmitAll(false);  // 自動射出OFF
+			//	enemyHitEmitterGroup_->EmitAll(10);  // 手動で100個発生
+			//}
 
 			// --------------------- ヒットカウントの処理 --------------------- //
 			// 連続ヒットカウント増加

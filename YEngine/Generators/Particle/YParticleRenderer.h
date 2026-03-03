@@ -29,7 +29,7 @@ public:
     void AddSystem(const YParticleSystem& system, Camera* camera);
 
     // 溜まったデータを一気に描画
-    void EndFrame(const std::shared_ptr<Mesh>& mesh, uint32_t textureIndex);
+    void EndFrame(const std::shared_ptr<Mesh>& mesh, uint32_t textureIndex, BlendMode blendMode);
 
 public:
 
@@ -42,6 +42,7 @@ private:
     uint32_t srvIndex_;
     uint32_t maxTotalParticles_;
     uint32_t currentInstanceOffset_ = 0;
+    uint32_t  batchStartOffset_ = 0;
 
     SrvManager* srvManager_ = nullptr;
     YoRigine::DirectXCommon* dxCommon_ = nullptr;

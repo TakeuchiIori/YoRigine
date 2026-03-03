@@ -215,8 +215,8 @@ void PlayerSword::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 		//------------------------------------------------------------
 		Vector3 hitPos = other->GetWorldTransform().translate_;
 		hitPos.y += 1.5f;
-		hitParticleEmitter_->FollowEmit(hitPos, 5);
-		particleEmitter_->FollowEmit(hitPos, 30);
+		//hitParticleEmitter_->FollowEmit(hitPos, 5);
+		//particleEmitter_->FollowEmit(hitPos, 30);
 		player_->GetCombat()->GetCombo()->RecoverCC(2);
 
 	}

@@ -4,6 +4,7 @@
 #include <PipelineManager/YPipelineManager.h>
 #include "YEmitterGroupManager.h"
 #include "DirectXCommon.h"
+#include "YParticleModuleFactory.h"
 
 #ifdef USE_IMGUI
 #include "imgui.h"
@@ -104,6 +105,96 @@ std::vector<std::string> YParticleManager::GetAllSystemNames() const {
 	return names;
 }
 
+#include <fstream>
+
+bool YParticleManager::LoadSystemsFromFile(const std::string& filePath) {
+	try {
+		std::ifstream file(filePath);
+		if (!file.is_open()) return false;
+
+		nlohmann::json json;
+		file >> json;
+		LoadSystemsFromJson(json);
+		return true;
+	}
+	catch (const std::exception&) {
+		return false;
+	}
+}
+
+void YParticleManager::LoadSystemsFromJson(const nlohmann::json& json) {
+	if (!json.contains("name")) return;
+
+	std::string name = json["name"];
+	uint32_t maxP = json.value("maxParticles", 1000);
+
+	auto& manager = YParticleManager::GetInstance();
+	auto* system = manager.CreateSystem(name, maxP);
+	if (!system) return;
+
+	if (json.contains("texture"))      system->SetTexture(json["texture"]);
+	if (json.contains("isRelative"))   system->SetRelative(json["isRelative"]);
+	if (json.contains("billboardType"))
+		system->SetBillboardType(static_cast<BillboardType>(json["billboardType"].get<uint32_t>()));
+	if (json.contains("BlendMode"))
+		system->SetBlendMode(static_cast<BlendMode>(json["BlendMode"].get<int>()));
+	if (json.contains("Lighting"))
+		system->SetLightSetting(json["Lighting"].get<bool>() ? ParticleLightSetting{ true, true, true } : ParticleLightSetting{ false, false, false });
+
+	if (json.contains("mesh")) {
+		const auto& meshJson = json["mesh"];
+		if (meshJson.contains("type") && meshJson.contains("params"))
+			system->SetMeshType(meshJson["type"], meshJson["params"]);
+	}
+
+	if (json.contains("spawnModules")) {
+		for (const auto& mj : json["spawnModules"]) {
+			if (!mj.contains("type")) continue;
+			auto module = YParticleModuleFactory::GetInstance().CreateSpawnModule(mj["type"]);
+			if (module) {
+				if (mj.contains("data")) module->LoadFromJson(mj["data"]);
+				system->AddSpawnModule(module);
+			}
+		}
+	}
+
+	if (json.contains("updateModules")) {
+		for (const auto& mj : json["updateModules"]) {
+			if (!mj.contains("type")) continue;
+			auto module = YParticleModuleFactory::GetInstance().CreateUpdateModule(mj["type"]);
+			if (module) {
+				if (mj.contains("data")) module->LoadFromJson(mj["data"]);
+				system->AddUpdateModule(module);
+			}
+		}
+	}
+}
+
+bool YParticleManager::SaveSystemsToFile(const std::string& filePath) const {
+	try {
+		nlohmann::json json;
+		json["version"] = "1.0";
+		json["systems"] = nlohmann::json::array();
+
+		for (const auto& [name, system] : systems_) {
+			nlohmann::json sysJson;
+			sysJson["name"] = system->GetName();
+			sysJson["maxParticles"] = system->GetMaxParticles();
+			sysJson["texture"] = system->GetTextureFilePath();
+			// ... その他の設定
+			json["systems"].push_back(sysJson);
+		}
+
+		std::ofstream file(filePath);
+		if (!file.is_open()) return false;
+		file << json.dump(4);
+		return true;
+	}
+	catch (const std::exception&) {
+		return false;
+	}
+}
+
 //=================================================================
 // 更新
 //=================================================================
@@ -198,25 +289,23 @@ void YParticleManager::Draw() {
 
 	auto startTime = std::chrono::high_resolution_clock::now();
 
-	// レンダーバッチを作成
 	std::vector<RenderBatch> batches;
 	CreateRenderBatches(batches);
 
-	// パイプラインセット
 	auto commandList = YoRigine::DirectXCommon::GetInstance()->GetCommandList();
 	commandList->SetGraphicsRootSignature(rootSignature_.Get());
 	commandList->SetPipelineState(pipelineState_.Get());
 
 	auto pm = YPipelineManager::GetInstance();
 	const auto& indices = pm->GetParameterIndices("YParticle");
-	// ライトマネージャーにコマンドリストをセット
-	YoRigine::LightManager::GetInstance()->SetCommandList(indices.at("gDirectionalLight"), indices.at("gPointLight"), indices.at("gSpotLight"));
+	YoRigine::LightManager::GetInstance()->SetCommandList(
+		indices.at("gDirectionalLight"),
+		indices.at("gPointLight"),
+		indices.at("gSpotLight"));
 
-	// バッチごとに描画
-	renderer_->BeginFrame();
+	// ★ バッチごとにBeginFrame()を呼ぶ
+		renderer_->BeginFrame();  // ← バッファをリセット
 	for (const auto& batch : batches) {
-
-		// バッチのライト設定を Renderer に反映
 		renderer_->ApplyLightSetting(batch.lightSetting);
 
 		// バッチ内のすべてのシステムを追加
@@ -224,15 +313,18 @@ void YParticleManager::Draw() {
 			renderer_->AddSystem(*system, camera_);
 		}
 
-		// まとめて描画
-		renderer_->EndFrame(batch.mesh, batch.textureIndex);
+		// ★ ブレンドモードを渡す（バッチ内の最初のシステムから取得）
+		BlendMode blendMode = batch.systems.empty() ?
+			BlendMode::kBlendModeNormal :
+			batch.systems[0]->GetBlendMode();
+
+		renderer_->EndFrame(batch.mesh, batch.textureIndex, blendMode);
 	}
 
 	auto endTime = std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
 	stats_.renderTimeMs = duration.count() / 1000.0f;
 }
-
 //=================================================================
 // 便利メソッド
 //=================================================================

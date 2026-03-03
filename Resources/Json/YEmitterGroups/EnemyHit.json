@@ -1,0 +1,33 @@
+{
+    "groups": [
+        {
+            "emitters": [
+                {
+                    "autoEmit": true,
+                    "emissionRate": 10.0,
+                    "emitCount": 1,
+                    "offsetX": 0.0,
+                    "offsetY": 0.0,
+                    "offsetZ": 0.0,
+                    "systemName": "EnemyHit1"
+                },
+                {
+                    "autoEmit": true,
+                    "emissionRate": 10.0,
+                    "emitCount": 1,
+                    "offsetX": 0.0,
+                    "offsetY": 0.0,
+                    "offsetZ": 0.0,
+                    "systemName": "EnemyHit2"
+                }
+            ],
+            "groupName": "EnemyHit",
+            "isActive": true,
+            "position": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        }
+    ]
+}

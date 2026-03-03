@@ -30,6 +30,7 @@ void YParticleRenderer::Initialize(SrvManager* srvManager, uint32_t maxTotalPart
 
 void YParticleRenderer::BeginFrame() {
     currentInstanceOffset_ = 0; // 書き込み位置を先頭に戻す
+    batchStartOffset_ = 0;
 }
 
 void YParticleRenderer::ApplyLightSetting(const ParticleLightSetting& setting) {
@@ -161,12 +162,8 @@ void YParticleRenderer::AddSystem(const YParticleSystem& system, Camera* camera)
         mappedData_[currentInstanceOffset_].color = attr.color;
         currentInstanceOffset_++;
     }
-
-    auto commandList = dxCommon_->GetCommandList();
-    auto pm = YPipelineManager::GetInstance();
-    commandList->SetPipelineState(pm->GetBlendModePSO("YParticle", system.GetBlendMode()));
 }
-void YParticleRenderer::EndFrame(const std::shared_ptr<Mesh>& mesh, uint32_t textureIndex) {
+void YParticleRenderer::EndFrame(const std::shared_ptr<Mesh>& mesh, uint32_t textureIndex, BlendMode blendMode) {
     if (currentInstanceOffset_ == 0 || !mesh) return;
 
     auto commandList = dxCommon_->GetCommandList();
@@ -174,6 +171,7 @@ void YParticleRenderer::EndFrame(const std::shared_ptr<Mesh>& mesh, uint32_t tex
 
     auto pm = YPipelineManager::GetInstance();
     const auto& indices = pm->GetParameterIndices("YParticle");
+    commandList->SetPipelineState(pm->GetBlendModePSO("YParticle", blendMode));
 
     commandList->IASetVertexBuffers(0, 1, &meshRes.vertexBufferView);
     commandList->IASetIndexBuffer(&meshRes.indexBufferView);
@@ -199,8 +197,9 @@ void YParticleRenderer::EndFrame(const std::shared_ptr<Mesh>& mesh, uint32_t tex
     // 描画（全システム分を1回で！）
     commandList->DrawIndexedInstanced(
         static_cast<UINT>(mesh->GetIndexCount()), // メッシュごとのインデックス数
-        currentInstanceOffset_,                                // 合計のインスタンス数
-        0, 0, 0
+        currentInstanceOffset_ - batchStartOffset_,                                // 合計のインスタンス数
+        0, 0, batchStartOffset_
     );
-    currentInstanceOffset_ = 0;
+
+    batchStartOffset_ = currentInstanceOffset_;
 }

@@ -8,6 +8,8 @@
 #include <Particle/ParticleEmitter.h>
 #include "Object3d/BaseObject.h"
 
+#include "Particle/YEmitterGroup.h"
+
 class Player;
 /// <summary>
 /// プレイヤーの剣クラス
@@ -77,6 +79,8 @@ private:
 	std::unique_ptr<ParticleEmitter> hitParticleEmitter_;
 	std::unique_ptr<ParticleEmitter> particleEmitter_;
 	std::unique_ptr<ParticleEmitter> testEmitter_;
+
+
 
 	///************************* ジョイント関連 *************************///
 	std::string handJointName_ = "mixamorig:RightHand";  // 手ジョイント名
