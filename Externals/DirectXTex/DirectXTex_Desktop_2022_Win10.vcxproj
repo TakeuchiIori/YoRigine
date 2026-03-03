@@ -40,7 +40,7 @@
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectName>DirectXTex</ProjectName>
-    <ProjectGuid>{371B9FA9-4C90-4AC6-A123-ACED756D6C77}</ProjectGuid>
+    <ProjectGuid>{A90EE592-95C6-26E0-FECD-FF3BEAA4C1D0}</ProjectGuid>
     <RootNamespace>DirectXTex</RootNamespace>
     <Keyword>Win32Proj</Keyword>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
