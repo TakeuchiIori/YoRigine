@@ -235,7 +235,7 @@ void YParticleManager::Update(float deltaTime) {
 }
 
 //=================================================================
-// 描画
+// 描画　（「描画設定が同じシステムをグループ化して、後でまとめて描画するための仕分け処理）
 //=================================================================
 void YParticleManager::CreateRenderBatches(std::vector<RenderBatch>& batches) {
 	batches.clear();
@@ -278,8 +278,8 @@ void YParticleManager::CreateRenderBatches(std::vector<RenderBatch>& batches) {
 			newBatch.mesh = mesh;
 			newBatch.textureIndex = texIndex;
 			newBatch.lightSetting = system->GetLightSetting();
-			newBatch.systems.push_back(system.get());
 			newBatch.blendMode = system->GetBlendMode();
+			newBatch.systems.push_back(system.get());
 			batches.push_back(newBatch);
 		}
 	}
@@ -288,35 +288,25 @@ void YParticleManager::CreateRenderBatches(std::vector<RenderBatch>& batches) {
 void YParticleManager::Draw() {
 	if (!initialized_ || !renderer_ || !camera_) return;
 
-	auto startTime = std::chrono::high_resolution_clock::now();
-
 	std::vector<RenderBatch> batches;
 	CreateRenderBatches(batches);
 
 	auto commandList = YoRigine::DirectXCommon::GetInstance()->GetCommandList();
 	commandList->SetGraphicsRootSignature(rootSignature_.Get());
 
+
 	renderer_->BeginFrame();
-
-	// フェーズ1：全バッチのデータをバッファに書き込むだけ
-	for (const auto& batch : batches) {
-		for (auto* system : batch.systems) {
-			renderer_->AddSystem(*system, camera_);
-			renderer_->CommitBatch();  // ← システムごとにCommit
-		}
-	}
-
-	// フェーズ2：Drawコマンドもシステムごとのバッチとして積む
-	renderer_->ResetBatchOffset();
 	for (const auto& batch : batches) {
 		renderer_->ApplyLightSetting(batch.lightSetting);
-		for (size_t i = 0; i < batch.systems.size(); ++i) {
-			renderer_->EndFrame(batch.mesh, batch.textureIndex, batch.blendMode);
+
+		// バッチ内の全システムをまずバッファに書く
+		for (auto* system : batch.systems) {
+			renderer_->AddSystem(*system, camera_);
 		}
+
+		// 書き終わったら1回だけDrawする（バッチ統合の本来の姿）
+		renderer_->EndFrame(batch.mesh, batch.textureIndex, batch.blendMode);
 	}
-	auto endTime = std::chrono::high_resolution_clock::now();
-	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
-	stats_.renderTimeMs = duration.count() / 1000.0f;
 }
 //=================================================================
 // 便利メソッド

@@ -26,6 +26,9 @@ void YParticleRenderer::Initialize(SrvManager* srvManager, uint32_t maxTotalPart
     materialLighting_->Initialize();
     materialUV_ = std::make_unique<MaterialUV>();
     materialUV_->Initialize();
+
+    instanceOffsetCB_ = dxCommon_->CreateBufferResource(256 * MAX_BATCHES);
+    instanceOffsetCB_->Map(0, nullptr, reinterpret_cast<void**>(&mappedOffsetBase_));
 }
 
 void YParticleRenderer::BeginFrame() {
@@ -33,6 +36,7 @@ void YParticleRenderer::BeginFrame() {
     batchStartOffset_ = 0;
     batchDrawIndex_ = 0;
     batchEndOffsets_.clear();
+    currentBatchIndex_ = 0;
 }
 
 void YParticleRenderer::ApplyLightSetting(const ParticleLightSetting& setting) {
@@ -172,17 +176,14 @@ void YParticleRenderer::AddSystem(const YParticleSystem& system, Camera* camera)
     }
 }
 void YParticleRenderer::EndFrame(const std::shared_ptr<Mesh>& mesh, uint32_t textureIndex, BlendMode blendMode) {
-    uint32_t start = (batchDrawIndex_ == 0) ? 0 : batchEndOffsets_[batchDrawIndex_ - 1];
-    uint32_t end = batchEndOffsets_[batchDrawIndex_];
-    uint32_t instanceCount = end - start;
-
-    char buf[256];
-    sprintf_s(buf, "EndFrame: drawIndex=%u, start=%u, end=%u, instanceCount=%u, blendMode=%d\n",
-        batchDrawIndex_, start, end, instanceCount, (int)blendMode);
-    OutputDebugStringA(buf);
-    batchDrawIndex_++;
-
+    uint32_t instanceCount = currentInstanceOffset_ - batchStartOffset_;
+    uint32_t start = batchStartOffset_;
+    batchStartOffset_ = currentInstanceOffset_;
     if (instanceCount == 0 || !mesh) return;
+
+    // ★このバッチ専用のスロットに書く（256バイト区切り）
+    uint8_t* slot = mappedOffsetBase_ + 256 * currentBatchIndex_;
+    reinterpret_cast<uint32_t*>(slot)[0] = start;
 
     auto commandList = dxCommon_->GetCommandList();
     auto& meshRes = mesh->GetMeshResource();
@@ -204,12 +205,13 @@ void YParticleRenderer::EndFrame(const std::shared_ptr<Mesh>& mesh, uint32_t tex
     }
     materialLighting_->RecordDrawCommands(commandList.Get(), indices.at("gMaterialLight"));
     commandList->SetGraphicsRootConstantBufferView(indices.at("gCamera"), camera_->GetCameraResource()->GetGPUVirtualAddress());
-
+    commandList->SetGraphicsRootConstantBufferView(indices.at("InstanceOffsetCB"), instanceOffsetCB_->GetGPUVirtualAddress() + 256 * currentBatchIndex_);
     commandList->DrawIndexedInstanced(
         static_cast<UINT>(mesh->GetIndexCount()),
         instanceCount,
-        0, 0, start
+        0, 0, 0
     );
+    currentBatchIndex_++;
 }
 
 // バッチのオフセットだけ記録してDrawはしない

@@ -64,4 +64,17 @@ private:
 
     std::vector<uint32_t> batchEndOffsets_;
     uint32_t batchDrawIndex_ = 0;
+
+private:
+    // インスタンスオフセット用定数バッファ
+    Microsoft::WRL::ComPtr<ID3D12Resource> instanceOffsetCB_;
+    struct InstanceOffsetData {
+        uint32_t offset;
+        float padding[3];
+    };
+    static constexpr uint32_t MAX_BATCHES = 32;
+
+    uint8_t* mappedOffsetBase_ = nullptr;  // uint8_t*にして手動でオフセット計算
+    uint32_t currentBatchIndex_ = 0;
+    uint32_t currentBatchStartOffset_ = 0;
 };
