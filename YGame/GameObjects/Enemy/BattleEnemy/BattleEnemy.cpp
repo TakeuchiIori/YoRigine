@@ -15,6 +15,7 @@
 
 #include "Debugger/Logger.h"
 #include <Collision/AreaCollision/Base/AreaManager.h>
+#include "States/BattleRecoveryState.h"
 
 /*==========================================================================
 デストラクタ
@@ -38,6 +39,10 @@ void BattleEnemy::Initialize(Camera* camera) {
 
 	healthBarUI_ = std::make_unique<EnemyHealthBarUI>(this, camera);
 	healthBarUI_->Initialize();
+
+	animation_ = std::make_unique<ObjectAnimation>();
+	animation_->SetBaseColor({ 1.0f,1.0f,1.0f,1.0f });
+	animation_->SetBaseScale({ 1.0f,1.0f,1.0f });
 }
 
 /*==========================================================================
@@ -96,6 +101,32 @@ void BattleEnemy::Update() {
 
 	float dt = YoRigine::GameTime::GetDeltaTime();
 	stateTimer_ += dt;
+
+	// アニメーター更新
+	if (animation_) {
+		animation_->Update(dt);
+
+		// アニメーション中の場合、スケールを適用
+		if (animation_->IsScaleAnimating()) {
+			wt_.scale_ = animation_->GetCurrentScale();
+		}
+
+		// カラーアニメーション中の場合、色を適用
+		if (animation_->IsColorAnimating()) {
+			if (obj_) {
+				obj_->SetMaterialColor(animation_->GetCurrentColor());
+			}
+		}
+	}
+
+	// ヒットカウントのリセット処理
+	if (consecutiveHitCount_ > 0 && !isInvincible_) {
+		hitCountResetTimer_ += dt;
+		if (hitCountResetTimer_ > hitCountResetTime_) {
+			consecutiveHitCount_ = 0;
+			hitCountResetTimer_ = 0.0f;
+		}
+	}
 
 	// 現在のステートを更新
 	if (currentState_) {
@@ -233,8 +264,23 @@ void BattleEnemy::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 	if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon)) {
 		if (isAlive_) {
 			TakeDamage(static_cast<int>(player_->GetCombat()->GetCombo()->GetCurrentDamage()));
-			ChangeState(std::make_unique<BattleDamageState>());
 
+
+			// --------------------- ヒットカウントの処理 --------------------- //
+			// 連続ヒットカウント増加
+			consecutiveHitCount_++;
+			hitCountResetTimer_ = 0.0f;
+			// 連続ヒット数が限界を超えたら回復状態へ
+			if (consecutiveHitCount_ >= maxConsecutiveHits_) {
+				ChangeState(std::make_unique<BattleRecoveryState>());
+				consecutiveHitCount_ = 0;  // リセット
+			}
+			else {
+				// 通常のダメージ状態
+				ChangeState(std::make_unique<BattleDamageState>());
+			}
+
+			// --------------------- ノックバックの処理 --------------------- //
 			Vector3 knockbackDir = wt_.translate_ - player_->GetWorldPosition();
 			knockbackDir.y = 0.0f;
 			knockbackDir = Vector3::Normalize(knockbackDir);
@@ -243,7 +289,7 @@ void BattleEnemy::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 			float duration = player_->GetCombat()->GetCombo()->GetCurrentKnockbackDuration();
 			StartKnockback(knockbackDir, power, duration);
 
-			// 攻撃ヒット時の前進ステップを発火
+			// --------------------- 攻撃ヒット時の前進ステップを発火 --------------------- //
 			player_->GetCombat()->GetCombo()->OnHitStep(wt_.translate_);
 
 		}
