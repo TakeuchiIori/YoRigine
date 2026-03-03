@@ -375,8 +375,10 @@ FodyWeavers.xsd
 *.vcxproj.user
 
 # 例外的に外部ライブラリは含める（無いとPremakeが実行されない為）
-!Externals\ImGui\ImGui.vcxproj
-!Externals\DirectXTex\DirectXTex_Desktop_2022_Win10.vcxproj
+!Externals/ImGui/*.vcxproj
+!Externals/ImGui/*.filters
+!Externals/DirectXTex/*.vcxproj
+!Externals/DirectXTex/*.filters
 # INI configuration files
 *.ini
 
