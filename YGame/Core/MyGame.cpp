@@ -22,7 +22,7 @@ void MyGame::Initialize() {
 	// 基盤・シーン管理の初期化
 	//------------------------------------------------------------
 	Framework::Initialize();
-	texturePreloader_.PreloadDirectory("Resources/Textures/");
+	//texturePreloader_.PreloadDirectory("Resources/Textures/");
 	audio_->PreloadAllInPath("Resources/Audio/");
 
 	sceneFactory_ = std::make_unique<SceneFactory>();
@@ -150,7 +150,7 @@ void MyGame::Update() {
 #ifdef USE_IMGUI
 	ImGuizmo::BeginFrame();
 #endif
-	texturePreloader_.FlushPendingUploads(10);
+	//texturePreloader_.FlushPendingUploads(10);
 
 #ifdef USE_IMGUI
 	Editor::GetInstance()->Draw();

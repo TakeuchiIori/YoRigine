@@ -70,6 +70,8 @@ namespace YoRigine {
         ID3D12RootSignature* GetPickRootSignature() const { return pickRootSig_.Get(); }
         ID3D12PipelineState* GetPickPipelineState() const { return pickPSO_.Get(); }
 
+		bool IsPickPending() const { return hasPendingPick_; }
+
         static constexpr uint32_t ROOT_PARAM_MVP_CBV = 0; // b0: WVP (VS)
         static constexpr uint32_t ROOT_PARAM_OBJECT_ID = 1; // b1: objectID+1 (PS)
 
