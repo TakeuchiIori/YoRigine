@@ -43,7 +43,7 @@ void ClearScene::Initialize() {
 	cameraEditor_->LoadFileOrDefault(cameraEditor_->GetFilePath(), "Clear");
 	cameraMode_ = CameraMode::CLEAR;
 	// カメラの登録
-	auto clearCamera = director->GetCamera("Clear");
+	auto clearCamera = director->GetCamera("ClearCamera");
 	auto debug = director->GetCamera("MainDebug");
 
 

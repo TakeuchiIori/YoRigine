@@ -9,7 +9,6 @@
 #include "Systems/Camera/CameraDirector.h"
 #include "Systems/Camera/CameraEditor.h"
 #include "Systems/Camera/Camera.h"
-#include "Systems/Camera/CameraManager.h"
 #include "Systems/Camera/CameraMode.h"
 
 #include "Systems/Audio/Audio.h"

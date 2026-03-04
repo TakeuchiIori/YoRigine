@@ -1,0 +1,45 @@
+{
+    "cameras": [
+        {
+            "fovY": 0.44999998807907104,
+            "moveSpeed": 0.5,
+            "moveSpeedController": 0.10000000149011612,
+            "name": "MainDebug",
+            "priority": 0,
+            "rotate": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "rotateSpeed": 0.05000000074505806,
+            "rotateSpeedController": 0.004999999888241291,
+            "translate": [
+                0.0,
+                6.0,
+                -40.0
+            ],
+            "type": "Debug"
+        },
+        {
+            "enableOrbit": true,
+            "fovY": 0.44999998807907104,
+            "name": "TitleCamera",
+            "orbitAngle": 3.774608612060547,
+            "orbitHeight": 3.200000047683716,
+            "orbitRadius": 35.900001525878906,
+            "orbitSpeed": 0.05999999865889549,
+            "priority": 10,
+            "rotate": [
+                -0.08890152722597122,
+                0.9377803206443787,
+                0.0
+            ],
+            "translate": [
+                -28.94426918029785,
+                3.200000047683716,
+                -21.237689971923828
+            ],
+            "type": "Title"
+        }
+    ]
+}

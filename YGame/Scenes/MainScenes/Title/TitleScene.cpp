@@ -15,6 +15,7 @@
 #include <Systems/GameTime/GameTime.h>
 #include <ModelManipulator/ModelManipulator.h>
 #include "OffScreen/PostEffectManager.h"
+#include "Systems/Camera/Virtuals/TitleCamera/TitleCamera.h"
 
 #ifdef USE_IMGUI
 #include "imgui.h"
@@ -41,7 +42,7 @@ void TitleScene::Initialize() {
 	cameraEditor_->LoadFileOrDefault(cameraEditor_->GetFilePath(), "Title");
 	cameraMode_ = CameraMode::TITLE;
 	// カメラの登録
-	auto titleCamera = director->GetCamera("Title");
+	auto titleCamera = director->GetCamera("TitleCamera");
 	auto debug = director->GetCamera("MainDebug");
 	//------------------------------------------------------------
 	// システム初期化
@@ -63,8 +64,9 @@ void TitleScene::Initialize() {
 	player_->Initialize(sceneCamera_.get());
 	player_->SetMotion("Idle1");
 
-	//defaultCamera_.SetTarget(player_->GetWT());
-	//defaultCamera_.enableOrbit_ = true; // カメラ回転有効
+	auto playerCam = std::dynamic_pointer_cast<TitleCamera>(titleCamera);
+	playerCam->SetTarget(player_->GetWT());
+	playerCam->enableOrbit_ = true; // カメラ回転有効
 
 	skyBox_ = std::make_unique<SkyBox>();
 	skyBox_->Initialize(sceneCamera_.get(), "Resources/DDS/vz_sinister_land_cubemap_ue.dds");
@@ -76,6 +78,7 @@ void TitleScene::Initialize() {
 	// エディター登録（デバッグ用）
 	//------------------------------------------------------------
 #ifdef USE_IMGUI
+	Editor::GetInstance()->RegisterGameUI("カメラエディター", [this]() {cameraEditor_->Update(); }, "Title");
 	Editor::GetInstance()->RegisterGameUI("カメラモード切り替え", [this]() {UpdateCameraMode(); },"Title");
 	Editor::GetInstance()->RegisterGameUI("ライティング", [this]() { YoRigine::LightManager::GetInstance()->ShowLightingEditor(); }, "Title");
 #endif

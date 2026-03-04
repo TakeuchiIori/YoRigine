@@ -153,4 +153,9 @@ void CameraEditor::InitializeDefaults(const std::string& sceneType)
 		clear->Initialize();
 		director->AddCamera("ClearCamera", clear);
 	}
+	else if (sceneType == "Title") {
+		auto title = CameraFactory::Create("Title");
+		title->Initialize();
+		director->AddCamera("TitleCamera", title);
+	}
 }

@@ -26,11 +26,6 @@ private:
 	const WorldTransform* target_;
 
 	Vector2 prevMousePos_ = { 0.0f, 0.0f };
-	bool isDragging_ = false;
-	float rotateSpeed_ = 0.05f;
-	float rotateSpeedController_ = 0.005f;
-	float moveSpeed_ = 0.5f;
-	float moveSpeedController_ = 0.1f;
 	float fov_ = 0.90f;
 
 
@@ -39,7 +34,4 @@ private:
 	float orbitSpeed_ = 0.3f;    // 回転速度
 	float orbitHeight_ = 4.0f;    // 高さ
 	float orbitAngle_ = 0.0f;    // 現在の角度
-
-
 };
-
