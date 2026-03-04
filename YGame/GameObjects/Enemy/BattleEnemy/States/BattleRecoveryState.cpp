@@ -2,6 +2,7 @@
 
 #include "Attack/BattleRushAttackState.h"
 #include "BattleIdleState.h"
+#include "Attack/BattleCounterAttackState.h"
 
 void BattleRecoveryState::Enter(BattleEnemy& enemy) {
     enemy.SetCanAct(false);
@@ -45,7 +46,7 @@ void BattleRecoveryState::Update(BattleEnemy& enemy, float dt) {
     // 回復時間終了で攻撃状態へ
     if (timer > recoveryDuration_) {
         // 反撃
-        enemy.ChangeState(std::make_unique<BattleRushAttackState>());
+        enemy.ChangeState(std::make_unique<BattleCounterAttackState>());
     }
 }
 
