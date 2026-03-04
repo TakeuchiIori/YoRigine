@@ -262,9 +262,9 @@ void BattleEnemy::UpdateKnockback(float dt)
 //========================================================================*/
 void BattleEnemy::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other) {
 
-	if (isAlive_) {
-	// 攻撃を食らった時
-	if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon)) {
+	if (isAlive_ && !isInvincible_) {
+		// 攻撃を食らった時
+		if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon)) {
 			TakeDamage(static_cast<int>(player_->GetCombat()->GetCombo()->GetCurrentDamage()));
 
 			// --------------------- ヒットエフェクトの処理 --------------------- //
@@ -303,23 +303,23 @@ void BattleEnemy::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 			player_->GetCombat()->GetCombo()->OnHitStep(wt_.translate_);
 
 		}
-	}
 
-	// 盾に当たった時
-	if (dynamic_cast<BattleRushAttackState*>(GetCurrentState()) != nullptr) {
-		if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayerShield)) {
-			if (player_->GetCombat()->GetGuard()->GetState() == PlayerGuard::State::Active ||
-				player_->GetCombat()->GetGuard()->GetState() == PlayerGuard::State::Recovery) {
-				if (isAlive_) {
-					ChangeState(std::make_unique<BattleDownedState>());
+		// 盾に当たった時
+		if (dynamic_cast<BattleRushAttackState*>(GetCurrentState()) != nullptr) {
+			if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayerShield)) {
+				if (player_->GetCombat()->GetGuard()->GetState() == PlayerGuard::State::Active ||
+					player_->GetCombat()->GetGuard()->GetState() == PlayerGuard::State::Recovery) {
+					if (isAlive_) {
+						ChangeState(std::make_unique<BattleDownedState>());
+					}
 				}
 			}
 		}
-	}
 
-	// プレイヤー本体に当たった時
-	if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayer)) {
-		PerformBasicAttack();
+		// プレイヤー本体に当たった時
+		if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayer)) {
+			PerformBasicAttack();
+		}
 	}
 }
 

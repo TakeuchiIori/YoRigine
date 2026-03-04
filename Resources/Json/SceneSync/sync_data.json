@@ -1,17 +1,61 @@
 {
     "currentSceneState": {
         "customData": {
-            "currentEnemyGroup": "GreenSpikyBlob",
-            "playerHpRatio": 1.0,
-            "stats": {
-                "battleDuration": 26.0867862701416,
-                "droppedItems": [],
-                "enemiesDefeated": 1,
-                "expGained": 0,
-                "goldGained": 0
+            "activeEnemies": [
+                {
+                    "id": "Alien",
+                    "position": {
+                        "x": -12.48924732208252,
+                        "y": 0.0,
+                        "z": -34.62831115722656
+                    }
+                },
+                {
+                    "id": "GreenSpikyBlob",
+                    "position": {
+                        "x": 12.465868949890137,
+                        "y": 0.0,
+                        "z": -24.47856330871582
+                    }
+                },
+                {
+                    "id": "Mushnub_Evolved",
+                    "position": {
+                        "x": 23.91448974609375,
+                        "y": 0.0,
+                        "z": 21.71072006225586
+                    }
+                },
+                {
+                    "id": "Alien",
+                    "position": {
+                        "x": -31.755590438842773,
+                        "y": 0.0,
+                        "z": 1.7144877910614014
+                    }
+                },
+                {
+                    "id": "NewEnemy_2",
+                    "position": {
+                        "x": -18.898601531982422,
+                        "y": 0.0,
+                        "z": 21.53106689453125
+                    }
+                }
+            ],
+            "cameraMode": 2,
+            "cameraPosition": {
+                "x": -13.104446411132813,
+                "y": 11.927312850952148,
+                "z": -12.309981346130371
+            },
+            "playerPosition": {
+                "x": 9.86760139465332,
+                "y": 0.0,
+                "z": -24.698854446411133
             }
         },
-        "sceneName": "Battle",
-        "timestamp": 1772546812
+        "sceneName": "Field",
+        "timestamp": 1772609391
     }
 }

@@ -7,7 +7,7 @@
 /// <summary>
 /// チャージ攻撃状態（長めに溜めて強力な突進）
 /// </summary>
-class BattleChargeAttackState : public IEnemyState<BattleEnemy> {
+class BattleChargeRushAttackState : public IEnemyState<BattleEnemy> {
 public:
 	void Enter(BattleEnemy& enemy) override;
 

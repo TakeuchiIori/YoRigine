@@ -6,7 +6,7 @@
 /// <summary>
 /// 跳躍攻撃状態（ジャンプして叩きつける）
 /// </summary>
-class BattleLeapAttackState : public IEnemyState<BattleEnemy> {
+class BattleJumpAttackState : public IEnemyState<BattleEnemy> {
 public:
 	void Enter(BattleEnemy& enemy) override;
 

@@ -1,9 +1,9 @@
 #pragma once
 #include "../../BattleEnemy.h"
 #include "BattleRushAttackState.h"
-#include "BattleLeapAttackState.h"
+#include "BattleJumpAttackState.h"
 #include "BattleSpinAttackState.h"
-#include "BattleChargeAttackState.h"
+#include "BattleChargeRushAttackState.h"
 #include "BattleComboAttackState.h"
 
 #include "Player/Player.h"
@@ -168,11 +168,11 @@ public:
 
 		// 遠距離
 		if (distance > config_.distance.midRange) {
-			if (HasPattern(patterns, "leap")) {
-				return std::make_unique<BattleLeapAttackState>();
+			if (HasPattern(patterns, "jump")) {
+				return std::make_unique<BattleJumpAttackState>();
 			}
-			if (HasPattern(patterns, "charge")) {
-				return std::make_unique<BattleChargeAttackState>();
+			if (HasPattern(patterns, "chargeRush")) {
+				return std::make_unique<BattleChargeRushAttackState>();
 			}
 		}
 		// 中距離
@@ -235,38 +235,38 @@ private:
 			// 超近距離（0-2m）
 			if (pattern == "rush") return affinity.rushVeryClose;
 			if (pattern == "spin") return affinity.spinVeryClose;
-			if (pattern == "charge") return affinity.chargeVeryClose;
-			if (pattern == "leap") return affinity.leapVeryClose;
+			if (pattern == "chargeRush") return affinity.chargeVeryClose;
+			if (pattern == "jump") return affinity.leapVeryClose;
 			if (pattern == "combo") return affinity.comboVeryClose;
 		}
 		else if (distance < config_.distance.closeRange) {
 			// 近距離（2-4m）
 			if (pattern == "rush") return affinity.rushClose;
 			if (pattern == "spin") return affinity.spinClose;
-			if (pattern == "charge") return affinity.chargeClose;
-			if (pattern == "leap") return affinity.leapClose;
+			if (pattern == "chargeRush") return affinity.chargeClose;
+			if (pattern == "jump") return affinity.leapClose;
 			if (pattern == "combo") return affinity.comboClose;
 		}
 		else if (distance < config_.distance.midRange) {
 			// 中距離（4-8m）
 			if (pattern == "rush") return affinity.rushMid;
 			if (pattern == "spin") return affinity.spinMid;
-			if (pattern == "charge") return affinity.chargeMid;
-			if (pattern == "leap") return affinity.leapMid;
+			if (pattern == "chargeRush") return affinity.chargeMid;
+			if (pattern == "jump") return affinity.leapMid;
 			if (pattern == "combo") return affinity.comboMid;
 		}
 		else if (distance < config_.distance.farRange) {
 			// 遠距離（8-15m）
 			if (pattern == "rush") return affinity.rushFar;
 			if (pattern == "spin") return affinity.spinFar;
-			if (pattern == "charge") return affinity.chargeFar;
-			if (pattern == "leap") return affinity.leapFar;
+			if (pattern == "chargeRush") return affinity.chargeFar;
+			if (pattern == "jump") return affinity.leapFar;
 			if (pattern == "combo") return affinity.comboFar;
 		}
 		else {
 			// 超遠距離（15m以上）
-			if (pattern == "charge") return affinity.chargeFar * 1.2f;
-			if (pattern == "leap") return affinity.leapFar * 1.2f;
+			if (pattern == "chargeRush") return affinity.chargeFar * 1.2f;
+			if (pattern == "jump") return affinity.leapFar * 1.2f;
 			return 0.1f; // その他の攻撃は超遠距離では不向き
 		}
 
@@ -303,7 +303,7 @@ private:
 		if (pattern == "rush") attackPriority = priority.rushPriority;
 		else if (pattern == "spin") attackPriority = priority.spinPriority;
 		else if (pattern == "charge") attackPriority = priority.chargePriority;
-		else if (pattern == "leap") attackPriority = priority.leapPriority;
+		else if (pattern == "jump") attackPriority = priority.leapPriority;
 		else if (pattern == "combo") attackPriority = priority.comboPriority;
 
 		return hpMultiplier * attackPriority;
@@ -355,14 +355,14 @@ private:
 		if (patternName == "rush") {
 			return std::make_unique<BattleRushAttackState>();
 		}
-		else if (patternName == "leap") {
-			return std::make_unique<BattleLeapAttackState>();
+		else if (patternName == "jump") {
+			return std::make_unique<BattleJumpAttackState>();
 		}
 		else if (patternName == "spin") {
 			return std::make_unique<BattleSpinAttackState>();
 		}
-		else if (patternName == "charge") {
-			return std::make_unique<BattleChargeAttackState>();
+		else if (patternName == "chargeRush") {
+			return std::make_unique<BattleChargeRushAttackState>();
 		}
 		else if (patternName == "combo") {
 			return std::make_unique<BattleComboAttackState>();

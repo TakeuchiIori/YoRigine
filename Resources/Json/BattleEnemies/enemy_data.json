@@ -4,7 +4,7 @@
             "approachStateRange": 15.0,
             "attack": 18,
             "attackParams": {
-                "charge": {
+                "chargeRush": {
                     "chargeTime": 1.75,
                     "cooldownTime": 1.0,
                     "rushTime": 0.5,
@@ -17,7 +17,7 @@
                     "subChargeTime": 0.4000000059604645,
                     "subRushTime": 0.20000000298023224
                 },
-                "leap": {
+                "jump": {
                     "chargeTime": 0.5,
                     "cooldownTime": 0.699999988079071,
                     "crouchDepth": 0.30000001192092896,
@@ -39,8 +39,8 @@
                 }
             },
             "attackPatterns": [
-                "leap",
-                "charge"
+                "jump",
+                "chargeRush"
             ],
             "attackStateRange": 10.0,
             "defense": 12,
@@ -54,7 +54,7 @@
             "approachStateRange": 15.0,
             "attack": 15,
             "attackParams": {
-                "charge": {
+                "chargeRush": {
                     "chargeTime": 1.5,
                     "cooldownTime": 1.0,
                     "rushTime": 0.5,
@@ -67,7 +67,7 @@
                     "subChargeTime": 0.4000000059604645,
                     "subRushTime": 0.20000000298023224
                 },
-                "leap": {
+                "jump": {
                     "chargeTime": 0.5,
                     "cooldownTime": 0.6000000238418579,
                     "crouchDepth": 0.30000001192092896,
@@ -89,10 +89,9 @@
                 }
             },
             "attackPatterns": [
-                "rush",
+                "jump",
                 "spin",
-                "charge",
-                "combo"
+                "rush"
             ],
             "attackStateRange": 10.0,
             "defense": 30,
@@ -106,7 +105,7 @@
             "approachStateRange": 15.0,
             "attack": 22,
             "attackParams": {
-                "charge": {
+                "chargeRush": {
                     "chargeTime": 1.5,
                     "cooldownTime": 1.0,
                     "rushTime": 0.5,
@@ -119,7 +118,7 @@
                     "subChargeTime": 0.4000000059604645,
                     "subRushTime": 0.25
                 },
-                "leap": {
+                "jump": {
                     "chargeTime": 0.5,
                     "cooldownTime": 0.6000000238418579,
                     "crouchDepth": 0.30000001192092896,
@@ -142,7 +141,7 @@
             },
             "attackPatterns": [
                 "rush",
-                "charge",
+                "chargeRush",
                 "combo"
             ],
             "attackStateRange": 10.0,

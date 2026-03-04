@@ -703,12 +703,12 @@ bool BattleEnemyManager::SaveEnemyData(const std::string& filePath) const {
 			{"cooldownTime", data.attackParams.rush.cooldownTime}
 		};
 
-		// チャージ攻撃 (Charge)
-		ap["charge"] = {
-			{"chargeTime", data.attackParams.charge.chargeTime},
-			{"rushTime", data.attackParams.charge.rushTime},
-			{"speedMultiplier", data.attackParams.charge.speedMultiplier},
-			{"cooldownTime", data.attackParams.charge.cooldownTime}
+		// チャージ攻撃 (chargeRush)
+		ap["chargeRush"] = {
+			{"chargeTime", data.attackParams.chargeRush.chargeTime},
+			{"rushTime", data.attackParams.chargeRush.rushTime},
+			{"speedMultiplier", data.attackParams.chargeRush.speedMultiplier},
+			{"cooldownTime", data.attackParams.chargeRush.cooldownTime}
 		};
 
 		// 回転攻撃 (Spin)
@@ -720,13 +720,13 @@ bool BattleEnemyManager::SaveEnemyData(const std::string& filePath) const {
 			{"cooldownTime", data.attackParams.spin.cooldownTime}
 		};
 
-		// ジャンプ攻撃 (Leap)
-		ap["leap"] = {
-			{"chargeTime", data.attackParams.leap.chargeTime},
-			{"jumpTime", data.attackParams.leap.jumpTime},
-			{"jumpHeight", data.attackParams.leap.jumpHeight},
-			{"crouchDepth", data.attackParams.leap.crouchDepth},
-			{"cooldownTime", data.attackParams.leap.cooldownTime}
+		// ジャンプ攻撃 (jump)
+		ap["jump"] = {
+			{"chargeTime", data.attackParams.jump.chargeTime},
+			{"jumpTime", data.attackParams.jump.jumpTime},
+			{"jumpHeight", data.attackParams.jump.jumpHeight},
+			{"crouchDepth", data.attackParams.jump.crouchDepth},
+			{"cooldownTime", data.attackParams.jump.cooldownTime}
 		};
 
 		// コンボ攻撃 (Combo)
@@ -819,16 +819,23 @@ bool BattleEnemyManager::LoadEnemyData(const std::string& filePath) {
 				if (ap.contains("rush")) {
 					const auto& c = ap["rush"];
 					auto& target = data.attackParams.rush;
+					target.anticipationTime = c.value("anticipationTime", 0.5f);
+					target.anticipationDistance = c.value("anticipationDistance", 1.5f);
+
 					target.chargeTime = c.value("chargeTime", 1.0f);
 					target.rushTime = c.value("rushTime", 0.5f);
 					target.speedMultiplier = c.value("speedMultiplier", 7.0f);
 					target.cooldownTime = c.value("cooldownTime", 1.2f);
 				}
 
-				// チャージ攻撃 (Charge)
-				if (ap.contains("charge")) {
-					const auto& c = ap["charge"];
-					auto& target = data.attackParams.charge;
+				// チャージ攻撃 (chargeRush)
+				if (ap.contains("chargeRush")) {
+					const auto& c = ap["chargeRush"];
+					auto& target = data.attackParams.chargeRush;
+					target.anticipationTime = c.value("anticipationTime", 0.8f);
+					target.stompIntensity = c.value("stompIntensity", 0.4f);
+					target.anticipationColorPulseSpeed = c.value("anticipationColorPulseSpeed", 8.0f);
+					
 					target.chargeTime = c.value("chargeTime", 1.5f);
 					target.rushTime = c.value("rushTime", 0.5f);
 					target.speedMultiplier = c.value("speedMultiplier", 12.0f);
@@ -839,6 +846,10 @@ bool BattleEnemyManager::LoadEnemyData(const std::string& filePath) {
 				if (ap.contains("spin")) {
 					const auto& l = ap["spin"];
 					auto& target = data.attackParams.spin;
+					target.anticipationTime = l.value("anticipationTime", 0.5f);
+					target.twistAngle = l.value("twistAngle", 1.57f);
+					target.anticipationColorIntensity = l.value("anticipationColorIntensity", 0.7f);
+
 					target.chargeTime = l.value("chargeTime", 0.3f);
 					target.spinTime = l.value("spinTime", 1.0f);
 					target.rotationCount = l.value("rotationCount", 2.0f);
@@ -846,10 +857,14 @@ bool BattleEnemyManager::LoadEnemyData(const std::string& filePath) {
 					target.cooldownTime = l.value("cooldownTime", 0.5f);
 				}
 
-				// ジャンプ攻撃 (Leap)
-				if (ap.contains("leap")) {
-					const auto& l = ap["leap"];
-					auto& target = data.attackParams.leap;
+				// ジャンプ攻撃 (jump)
+				if (ap.contains("jump")) {
+					const auto& l = ap["jump"];
+					auto& target = data.attackParams.jump;
+					target.anticipationTime = l.value("anticipationTime", 0.7f);
+					target.anticipationCrouchDepth = l.value("anticipationCrouchDepth", 0.8f);
+					target.anticipationColorPulseSpeed = l.value("anticipationColorPulseSpeed", 6.0f);
+
 					target.chargeTime = l.value("chargeTime", 0.5f);
 					target.jumpTime = l.value("jumpTime", 0.7f);
 					target.jumpHeight = l.value("jumpHeight", 4.0f);
@@ -1044,7 +1059,7 @@ void BattleEnemyManager::ShowDebugInfo() {
 
 		// 使用可能な攻撃パターンのリスト
 		static const char* availablePatterns[] = {
-			"rush", "leap", "spin", "charge", "sidestep", "combo"
+			"rush", "jump", "spin", "chargeRush", "sidestep", "combo"
 		};
 		static const int patternCount = 6;
 
@@ -1066,6 +1081,8 @@ void BattleEnemyManager::ShowDebugInfo() {
 					// --- Rush ---
 					if (ImGui::TreeNode("Rush (基本突進)")) {
 						auto& r = data.attackParams.rush;
+						ImGui::DragFloat("予備動作", &r.anticipationTime, 0.05f, 0.0f, 3.0f, "%.2f秒");
+						ImGui::DragFloat(" 後退する距離", &r.anticipationDistance, 0.05f, 0.0f, 5.0f, "%.2秒");
 						ImGui::DragFloat("溜め時間", &r.chargeTime, 0.05f, 0.0f, 5.0f, "%.2f秒");
 						ImGui::DragFloat("突進時間", &r.rushTime, 0.05f, 0.0f, 5.0f, "%.2f秒");
 						ImGui::DragFloat("速度倍率", &r.speedMultiplier, 0.1f, 0.0f, 20.0f, "x%.1f");
@@ -1073,9 +1090,9 @@ void BattleEnemyManager::ShowDebugInfo() {
 						ImGui::TreePop();
 					}
 
-					// --- Charge ---
-					if (ImGui::TreeNode("Charge (強力突進)")) {
-						auto& c = data.attackParams.charge;
+					// --- chargeRush ---
+					if (ImGui::TreeNode("chargeRush (強力突進)")) {
+						auto& c = data.attackParams.chargeRush;
 						ImGui::DragFloat("溜め(追尾)時間", &c.chargeTime, 0.05f, 0.0f, 10.0f, "%.2f秒");
 						ImGui::DragFloat("突進時間", &c.rushTime, 0.05f, 0.0f, 5.0f, "%.2f秒");
 						ImGui::DragFloat("速度倍率", &c.speedMultiplier, 0.1f, 0.0f, 30.0f, "x%.1f");
@@ -1094,9 +1111,9 @@ void BattleEnemyManager::ShowDebugInfo() {
 						ImGui::TreePop();
 					}
 
-					// --- Leap ---
-					if (ImGui::TreeNode("Leap (ジャンプ攻撃)")) {
-						auto& l = data.attackParams.leap;
+					// --- jump ---
+					if (ImGui::TreeNode("jump (ジャンプ攻撃)")) {
+						auto& l = data.attackParams.jump;
 						ImGui::DragFloat("踏み込み時間", &l.chargeTime, 0.05f, 0.0f, 3.0f, "%.2f秒");
 						ImGui::DragFloat("滞空時間", &l.jumpTime, 0.05f, 0.0f, 5.0f, "%.2f秒");
 						ImGui::DragFloat("ジャンプ高度", &l.jumpHeight, 0.1f, 0.0f, 20.0f, "%.1fm");
@@ -1201,8 +1218,8 @@ void BattleEnemyManager::ShowDebugInfo() {
 						data.attackPatterns = { "rush" };
 					}
 					ImGui::SameLine();
-					if (ImGui::Button("アグレッシブ (rush, charge, combo)")) {
-						data.attackPatterns = { "rush", "charge", "combo" };
+					if (ImGui::Button("アグレッシブ (rush, chargeRush, combo)")) {
+						data.attackPatterns = { "rush", "chargeRush", "combo" };
 					}
 
 					if (ImGui::Button("トリッキー (sidestep, spin)")) {
@@ -1210,7 +1227,7 @@ void BattleEnemyManager::ShowDebugInfo() {
 					}
 					ImGui::SameLine();
 					if (ImGui::Button("全種類")) {
-						data.attackPatterns = { "rush", "leap", "spin", "charge", "sidestep", "combo" };
+						data.attackPatterns = { "rush", "jump", "spin", "chargeRush", "combo" };
 					}
 
 					ImGui::TreePop();

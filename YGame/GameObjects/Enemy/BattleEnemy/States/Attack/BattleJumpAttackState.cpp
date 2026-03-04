@@ -1,6 +1,6 @@
-#include "BattleLeapAttackState.h"
+#include "BattleJumpAttackState.h"
 
-void BattleLeapAttackState::Enter(BattleEnemy& enemy)
+void BattleJumpAttackState::Enter(BattleEnemy& enemy)
 {
 	enemy.SetCanAct(false);
 	enemy.ResetStateTimer();
@@ -22,9 +22,9 @@ void BattleLeapAttackState::Enter(BattleEnemy& enemy)
 	}
 }
 
-void BattleLeapAttackState::Update(BattleEnemy& enemy, [[maybe_unused]] float dt)
+void BattleJumpAttackState::Update(BattleEnemy& enemy, [[maybe_unused]] float dt)
 {
-	const auto& params = enemy.GetEnemyData().attackParams.leap;
+	const auto& params = enemy.GetEnemyData().attackParams.jump;
 	const float currentTime = enemy.GetStateTimer();
 
 	// フェーズの境界時間を計算
@@ -100,7 +100,7 @@ void BattleLeapAttackState::Update(BattleEnemy& enemy, [[maybe_unused]] float dt
 	}
 }
 
-void BattleLeapAttackState::Exit(BattleEnemy& enemy)
+void BattleJumpAttackState::Exit(BattleEnemy& enemy)
 {
 	// 元の高さに戻す
 	Vector3 pos = enemy.GetTranslate();
