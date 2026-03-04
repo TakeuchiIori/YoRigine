@@ -4,6 +4,7 @@
 void BattleDeadState::Enter(BattleEnemy& enemy)
 {
 	enemy.SetCanAct(false);
+	enemy.IsInvincible() = true;
 }
 
 
@@ -18,4 +19,5 @@ void BattleDeadState::Update(BattleEnemy& enemy, float dt)
 
 void BattleDeadState::Exit([[maybe_unused]] BattleEnemy& enemy)
 {
+	enemy.IsInvincible() = false;
 }

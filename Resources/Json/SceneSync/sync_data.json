@@ -1,17 +1,17 @@
 {
     "currentSceneState": {
         "customData": {
-            "currentEnemyGroup": "GreenSpikyBlob",
+            "currentEnemyGroup": "NewEnemy_2",
             "playerHpRatio": 1.0,
             "stats": {
-                "battleDuration": 26.0867862701416,
+                "battleDuration": 21.544700622558594,
                 "droppedItems": [],
-                "enemiesDefeated": 1,
+                "enemiesDefeated": 2,
                 "expGained": 0,
                 "goldGained": 0
             }
         },
         "sceneName": "Battle",
-        "timestamp": 1772546812
+        "timestamp": 1772602199
     }
 }
