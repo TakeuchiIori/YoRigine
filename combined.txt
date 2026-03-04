@@ -626,11 +626,8 @@
 └──     └──     └── TexturePreloader.h
 └──     └── Systems/
 └──         ├── Animation/
-└──         └── ├── Animation.cpp
-└──         └── ├── Animation.h
-└──         └── ├── AnimationDefines.h
-└──         └── ├── AnimationSystem.cpp
-└──         └── └── AnimationSystem.h
+└──         └── ├── ObjectAnimation.cpp
+└──         └── └── ObjectAnimation.h
 └──         ├── Audio/
 └──         └── ├── Audio.cpp
 └──         └── └── Audio.h
@@ -734,7 +731,9 @@
 └── └── └── └──     ├── BattleDownedState.cpp
 └── └── └── └──     ├── BattleDownedState.h
 └── └── └── └──     ├── BattleIdleState.cpp
-└── └── └── └──     └── BattleIdleState.h
+└── └── └── └──     ├── BattleIdleState.h
+└── └── └── └──     ├── BattleRecoveryState.cpp
+└── └── └── └──     └── BattleRecoveryState.h
 └── └── └── ├── FieldEnemy/
 └── └── └── └── ├── FieldEnemy.cpp
 └── └── └── └── ├── FieldEnemy.h
@@ -193202,10 +193201,6 @@ void SceneManager::Update() {
 }
 
 void SceneManager::PerformSceneTransition() {
-	//------------------------------------------------------------
-	// ステップ1: 全てのGPU処理の完了を待機（唯一のGPU同期ポイント）
-	//------------------------------------------------------------
-	YoRigine::DirectXCommon::GetInstance()->WaitForGPU();
 
 	//------------------------------------------------------------
 	// ステップ2: 現在のシーンを安全に終了
@@ -193274,8 +193269,6 @@ void SceneManager::ChangeScene(const std::string& sceneName) {
 	}
 
 	nextScene_ = sceneFactory_->CreateScene(sceneName);
-	YoRigine::DirectXCommon::GetInstance()->WaitForGPU();
-
 	//------------------------------------------------------------
 	// 初回シーン生成処理（アプリ起動直後）
 	//------------------------------------------------------------
@@ -193304,7 +193297,7 @@ void SceneManager::ChangeSceneImmediate(const std::string& sceneName) {
 		scene_->Finalize();
 		scene_ = nullptr;
 	}
-	YoRigine::DirectXCommon::GetInstance()->WaitForGPU();
+	//YoRigine::DirectXCommon::GetInstance()->WaitForGPU();
 
 	// 新しいシーンを生成して初期化
 	scene_ = sceneFactory_->CreateScene(sceneName);
@@ -199011,6 +199004,7 @@ namespace YoRigine {
 #ifdef USE_IMGUI
         if (!isInitialized_ || !pickBuffer_) return;
 
+		if (!pickBuffer_->IsPickPending()) return; // クリックがないなら描画しない（無駄なGPU負荷を避ける）
         pickBuffer_->BeginPickPass();
         DrawForPick();
         pickBuffer_->EndPickPass();
@@ -200038,6 +200032,8 @@ namespace YoRigine {
 
         ID3D12RootSignature* GetPickRootSignature() const { return pickRootSig_.Get(); }
         ID3D12PipelineState* GetPickPipelineState() const { return pickPSO_.Get(); }
+
+		bool IsPickPending() const { return hasPendingPick_; }
 
         static constexpr uint32_t ROOT_PARAM_MVP_CBV = 0; // b0: WVP (VS)
         static constexpr uint32_t ROOT_PARAM_OBJECT_ID = 1; // b1: objectID+1 (PS)
@@ -214931,6 +214927,7 @@ File Path: YEngine/Generators/Particle/YParticleManager.cpp
 #include <PipelineManager/YPipelineManager.h>
 #include "YEmitterGroupManager.h"
 #include "DirectXCommon.h"
+#include "YParticleModuleFactory.h"
 
 #ifdef USE_IMGUI
 #include "imgui.h"
@@ -215031,6 +215028,95 @@ std::vector<std::string> YParticleManager::GetAllSystemNames() const {
 	return names;
 }
 
+#include <fstream>
+
+bool YParticleManager::LoadSystemsFromFile(const std::string& filePath) {
+	try {
+		std::ifstream file(filePath);
+		if (!file.is_open()) return false;
+
+		nlohmann::json json;
+		file >> json;
+		LoadSystemsFromJson(json);
+		return true;
+	}
+	catch (const std::exception&) {
+		return false;
+	}
+}
+
+void YParticleManager::LoadSystemsFromJson(const nlohmann::json& json) {
+	if (!json.contains("name")) return;
+
+	std::string name = json["name"];
+	uint32_t maxP = json.value("maxParticles", 1000);
+
+	auto& manager = YParticleManager::GetInstance();
+	auto* system = manager.CreateSystem(name, maxP);
+	if (!system) return;
+
+	if (json.contains("texture"))      system->SetTexture(json["texture"]);
+	if (json.contains("isRelative"))   system->SetRelative(json["isRelative"]);
+	if (json.contains("billboardType"))
+		system->SetBillboardType(static_cast<BillboardType>(json["billboardType"].get<uint32_t>()));
+	if (json.contains("BlendMode"))
+		system->SetBlendMode(static_cast<BlendMode>(json["BlendMode"].get<int>()));
+	if (json.contains("Lighting"))
+		system->SetLightSetting(json["Lighting"].get<bool>() ? ParticleLightSetting{ true, true, true } : ParticleLightSetting{ false, false, false });
+	if (json.contains("mesh")) {
+		const auto& meshJson = json["mesh"];
+		if (meshJson.contains("type") && meshJson.contains("params"))
+			system->SetMeshType(meshJson["type"], meshJson["params"]);
+	}
+
+	if (json.contains("spawnModules")) {
+		for (const auto& mj : json["spawnModules"]) {
+			if (!mj.contains("type")) continue;
+			auto module = YParticleModuleFactory::GetInstance().CreateSpawnModule(mj["type"]);
+			if (module) {
+				if (mj.contains("data")) module->LoadFromJson(mj["data"]);
+				system->AddSpawnModule(module);
+			}
+		}
+	}
+
+	if (json.contains("updateModules")) {
+		for (const auto& mj : json["updateModules"]) {
+			if (!mj.contains("type")) continue;
+			auto module = YParticleModuleFactory::GetInstance().CreateUpdateModule(mj["type"]);
+			if (module) {
+				if (mj.contains("data")) module->LoadFromJson(mj["data"]);
+				system->AddUpdateModule(module);
+			}
+		}
+	}
+}
+
+bool YParticleManager::SaveSystemsToFile(const std::string& filePath) const {
+	try {
+		nlohmann::json json;
+		json["version"] = "1.0";
+		json["systems"] = nlohmann::json::array();
+
+		for (const auto& [name, system] : systems_) {
+			nlohmann::json sysJson;
+			sysJson["name"] = system->GetName();
+			sysJson["maxParticles"] = system->GetMaxParticles();
+			sysJson["texture"] = system->GetTextureFilePath();
+			// ... その他の設定
+			json["systems"].push_back(sysJson);
+		}
+
+		std::ofstream file(filePath);
+		if (!file.is_open()) return false;
+		file << json.dump(4);
+		return true;
+	}
+	catch (const std::exception&) {
+		return false;
+	}
+}
+
 //=================================================================
 // 更新
 //=================================================================
@@ -215072,9 +215158,8 @@ void YParticleManager::Update(float deltaTime) {
 }
 
 //=================================================================
-// 描画
+// 描画　（「描画設定が同じシステムをグループ化して、後でまとめて描画するための仕分け処理）
 //=================================================================
-
 void YParticleManager::CreateRenderBatches(std::vector<RenderBatch>& batches) {
 	batches.clear();
 
@@ -215100,8 +215185,10 @@ void YParticleManager::CreateRenderBatches(std::vector<RenderBatch>& batches) {
 		// 既存のバッチを検索（同じメッシュ＋テクスチャ＋ライト設定）
 		bool foundBatch = false;
 		for (auto& batch : batches) {
-			if (batch.mesh == mesh && batch.textureIndex == texIndex
-				&& batch.lightSetting == system->GetLightSetting()) {
+			if (batch.mesh == mesh 
+				&& batch.textureIndex == texIndex
+				&& batch.lightSetting == system->GetLightSetting()
+				&& batch.blendMode == system->GetBlendMode()) {
 				batch.systems.push_back(system.get());
 				foundBatch = true;
 				break;
@@ -215113,7 +215200,8 @@ void YParticleManager::CreateRenderBatches(std::vector<RenderBatch>& batches) {
 			RenderBatch newBatch;
 			newBatch.mesh = mesh;
 			newBatch.textureIndex = texIndex;
-			newBatch.lightSetting = system->GetLightSetting();   // ← 追加
+			newBatch.lightSetting = system->GetLightSetting();
+			newBatch.blendMode = system->GetBlendMode();
 			newBatch.systems.push_back(system.get());
 			batches.push_back(newBatch);
 		}
@@ -215123,43 +215211,26 @@ void YParticleManager::CreateRenderBatches(std::vector<RenderBatch>& batches) {
 void YParticleManager::Draw() {
 	if (!initialized_ || !renderer_ || !camera_) return;
 
-	auto startTime = std::chrono::high_resolution_clock::now();
-
-	// レンダーバッチを作成
 	std::vector<RenderBatch> batches;
 	CreateRenderBatches(batches);
 
-	// パイプラインセット
 	auto commandList = YoRigine::DirectXCommon::GetInstance()->GetCommandList();
 	commandList->SetGraphicsRootSignature(rootSignature_.Get());
-	commandList->SetPipelineState(pipelineState_.Get());
 
-	auto pm = YPipelineManager::GetInstance();
-	const auto& indices = pm->GetParameterIndices("YParticle");
-	// ライトマネージャーにコマンドリストをセット
-	YoRigine::LightManager::GetInstance()->SetCommandList(indices.at("gDirectionalLight"), indices.at("gPointLight"), indices.at("gSpotLight"));
 
-	// バッチごとに描画
 	renderer_->BeginFrame();
 	for (const auto& batch : batches) {
-
-		// バッチのライト設定を Renderer に反映
 		renderer_->ApplyLightSetting(batch.lightSetting);
 
-		// バッチ内のすべてのシステムを追加
+		// バッチ内の全システムをまずバッファに書く
 		for (auto* system : batch.systems) {
 			renderer_->AddSystem(*system, camera_);
 		}
 
-		// まとめて描画
-		renderer_->EndFrame(batch.mesh, batch.textureIndex);
+		// 書き終わったら1回だけDrawする（バッチ統合の本来の姿）
+		renderer_->EndFrame(batch.mesh, batch.textureIndex, batch.blendMode);
 	}
-
-	auto endTime = std::chrono::high_resolution_clock::now();
-	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
-	stats_.renderTimeMs = duration.count() / 1000.0f;
 }
-
 //=================================================================
 // 便利メソッド
 //=================================================================
@@ -215271,6 +215342,25 @@ public:
     size_t GetSystemCount() const { return systems_.size(); }
 
     //=================================================================
+    // ファイル操作（追加）
+    //=================================================================
+
+    /// <summary>
+    /// JSONファイルからすべてのシステムを読み込み
+    /// </summary>
+    bool LoadSystemsFromFile(const std::string& filePath);
+
+    /// <summary>
+    /// JSONからすべてのシステムを読み込み
+    /// </summary>
+    void LoadSystemsFromJson(const nlohmann::json& json);
+
+    /// <summary>
+    /// すべてのシステムをファイルに保存
+    /// </summary>
+    bool SaveSystemsToFile(const std::string& filePath) const;
+
+    //=================================================================
     // 更新・描画
     //=================================================================
 
@@ -215338,6 +215428,7 @@ private:
         uint32_t textureIndex;
         ParticleLightSetting lightSetting;
         std::vector<YParticleSystem*> systems;
+		BlendMode blendMode;
     };
 
     void CreateRenderBatches(std::vector<RenderBatch>& batches);
@@ -215563,10 +215654,17 @@ void YParticleRenderer::Initialize(SrvManager* srvManager, uint32_t maxTotalPart
     materialLighting_->Initialize();
     materialUV_ = std::make_unique<MaterialUV>();
     materialUV_->Initialize();
+
+    instanceOffsetCB_ = dxCommon_->CreateBufferResource(256 * MAX_BATCHES);
+    instanceOffsetCB_->Map(0, nullptr, reinterpret_cast<void**>(&mappedOffsetBase_));
 }
 
 void YParticleRenderer::BeginFrame() {
-    currentInstanceOffset_ = 0; // 書き込み位置を先頭に戻す
+    currentInstanceOffset_ = 0;
+    batchStartOffset_ = 0;
+    batchDrawIndex_ = 0;
+    batchEndOffsets_.clear();
+    currentBatchIndex_ = 0;
 }
 
 void YParticleRenderer::ApplyLightSetting(const ParticleLightSetting& setting) {
@@ -215650,7 +215748,7 @@ void YParticleRenderer::AddSystem(const YParticleSystem& system, Camera* camera)
     // 相対座標用の親行列
     Matrix4x4 parentMat = system.IsRelative() ? system.GetParentMatrix() : MakeIdentity4x4();
     BillboardType billboardType = system.GetBillboardType();
-
+    uint32_t writtenCount = 0;
     for (const auto& attr : attributes) {
         if (!attr.isActive) continue;
 
@@ -215697,49 +215795,66 @@ void YParticleRenderer::AddSystem(const YParticleSystem& system, Camera* camera)
         mappedData_[currentInstanceOffset_].WVP = Multiply(localWorld, viewProj);
         mappedData_[currentInstanceOffset_].color = attr.color;
         currentInstanceOffset_++;
-    }
+        writtenCount++;
 
-    auto commandList = dxCommon_->GetCommandList();
-    auto pm = YPipelineManager::GetInstance();
-    commandList->SetPipelineState(pm->GetBlendModePSO("YParticle", system.GetBlendMode()));
+        char buf[256];
+        sprintf_s(buf, "AddSystem: %s, written=%u, totalOffset=%u\n",
+            system.GetName().c_str(), writtenCount, currentInstanceOffset_);
+        OutputDebugStringA(buf);
+    }
 }
-void YParticleRenderer::EndFrame(const std::shared_ptr<Mesh>& mesh, uint32_t textureIndex) {
-    if (currentInstanceOffset_ == 0 || !mesh) return;
+void YParticleRenderer::EndFrame(const std::shared_ptr<Mesh>& mesh, uint32_t textureIndex, BlendMode blendMode) {
+    uint32_t instanceCount = currentInstanceOffset_ - batchStartOffset_;
+    uint32_t start = batchStartOffset_;
+    batchStartOffset_ = currentInstanceOffset_;
+    if (instanceCount == 0 || !mesh) return;
+
+    // ★このバッチ専用のスロットに書く（256バイト区切り）
+    uint8_t* slot = mappedOffsetBase_ + 256 * currentBatchIndex_;
+    reinterpret_cast<uint32_t*>(slot)[0] = start;
 
     auto commandList = dxCommon_->GetCommandList();
     auto& meshRes = mesh->GetMeshResource();
 
     auto pm = YPipelineManager::GetInstance();
     const auto& indices = pm->GetParameterIndices("YParticle");
+    commandList->SetPipelineState(pm->GetBlendModePSO("YParticle", blendMode));
 
     commandList->IASetVertexBuffers(0, 1, &meshRes.vertexBufferView);
     commandList->IASetIndexBuffer(&meshRes.indexBufferView);
     commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-    // StructuredBuffer (t0)
     srvManager_->SetGraphicsRootDescriptorTable(indices.at("gParticle"), srvIndex_);
-    // Texture (t1)
     srvManager_->SetGraphicsRootDescriptorTable(indices.at("gTexture"), textureIndex);
-    // MaterialColor
     materialColor_->RecordDrawCommands(commandList.Get(), indices.at("gMaterialColor"));
-    // MaterialUV
     materialUV_->RecordDrawCommands(commandList.Get(), indices.at("gMaterialUV"));
-    // MaterialLighting にライト設定を反映してから描画コマンドを積む
     if (materialLighting_) {
         materialLighting_->SetEnableLighting(currentLightSetting_.enableDirectionalLight);
     }
-    // MaterialLighting
     materialLighting_->RecordDrawCommands(commandList.Get(), indices.at("gMaterialLight"));
-    // Camera
     commandList->SetGraphicsRootConstantBufferView(indices.at("gCamera"), camera_->GetCameraResource()->GetGPUVirtualAddress());
-
-    // 描画（全システム分を1回で！）
+    commandList->SetGraphicsRootConstantBufferView(indices.at("InstanceOffsetCB"), instanceOffsetCB_->GetGPUVirtualAddress() + 256 * currentBatchIndex_);
     commandList->DrawIndexedInstanced(
-        static_cast<UINT>(mesh->GetIndexCount()), // メッシュごとのインデックス数
-        currentInstanceOffset_,                                // 合計のインスタンス数
+        static_cast<UINT>(mesh->GetIndexCount()),
+        instanceCount,
         0, 0, 0
     );
-    currentInstanceOffset_ = 0;
+    currentBatchIndex_++;
+}
+
+// バッチのオフセットだけ記録してDrawはしない
+void YParticleRenderer::CommitBatch() {
+    batchEndOffsets_.push_back(currentInstanceOffset_);
+    batchStartOffset_ = currentInstanceOffset_;
+
+    char buf[256];
+    sprintf_s(buf, "CommitBatch: offset=%u\n", currentInstanceOffset_);
+    OutputDebugStringA(buf);
+}
+
+void YParticleRenderer::ResetBatchOffset() {
+    batchStartOffset_ = 0;
+    batchDrawIndex_ = 0;
 }
 
 ============================================================
@@ -215776,7 +215891,11 @@ public:
     void AddSystem(const YParticleSystem& system, Camera* camera);
 
     // 溜まったデータを一気に描画
-    void EndFrame(const std::shared_ptr<Mesh>& mesh, uint32_t textureIndex);
+    void EndFrame(const std::shared_ptr<Mesh>& mesh, uint32_t textureIndex, BlendMode blendMode);
+
+    void CommitBatch();
+
+    void ResetBatchOffset();
 
 public:
 
@@ -215789,6 +215908,7 @@ private:
     uint32_t srvIndex_;
     uint32_t maxTotalParticles_;
     uint32_t currentInstanceOffset_ = 0;
+    uint32_t  batchStartOffset_ = 0;
 
     SrvManager* srvManager_ = nullptr;
     YoRigine::DirectXCommon* dxCommon_ = nullptr;
@@ -215803,6 +215923,22 @@ private:
     std::unique_ptr<MaterialUV> materialUV_;
     bool enableBillboard_ = true;   // ビルボード有効/無効
 
+
+    std::vector<uint32_t> batchEndOffsets_;
+    uint32_t batchDrawIndex_ = 0;
+
+private:
+    // インスタンスオフセット用定数バッファ
+    Microsoft::WRL::ComPtr<ID3D12Resource> instanceOffsetCB_;
+    struct InstanceOffsetData {
+        uint32_t offset;
+        float padding[3];
+    };
+    static constexpr uint32_t MAX_BATCHES = 32;
+
+    uint8_t* mappedOffsetBase_ = nullptr;  // uint8_t*にして手動でオフセット計算
+    uint32_t currentBatchIndex_ = 0;
+    uint32_t currentBatchStartOffset_ = 0;
 };
 
 
@@ -238797,69 +238933,325 @@ private:
 };
 
 ============================================================
-File Path: YEngine/Utilities/Systems/Animation/Animation.cpp
+File Path: YEngine/Utilities/Systems/Animation/ObjectAnimation.cpp
 ============================================================
-#include "Animation.h"
+#include "ObjectAnimation.h"
+#include <random>
 
+void ObjectAnimation::StartScaleAnimation(
+    Vector3 fromScale,
+    Vector3 toScale,
+    float duration,
+    Easing::Function easeFunc,
+    std::function<void()> onComplete
+) {
+    scaleAnim_.type = AnimationType::Scale;
+    scaleAnim_.timer = 0.0f;
+    scaleAnim_.duration = duration;
+    scaleAnim_.easeFunc = easeFunc;
+    scaleAnim_.startScale = fromScale;
+    scaleAnim_.targetScale = toScale;
+    scaleAnim_.isActive = true;
+    scaleAnim_.onComplete = onComplete;
+
+    currentScale_ = fromScale;
+}
+
+void ObjectAnimation::StartColorAnimation(
+    Vector4 fromColor,
+    Vector4 toColor,
+    float duration,
+    Easing::Function easeFunc,
+    std::function<void()> onComplete
+) {
+    colorAnim_.type = AnimationType::Color;
+    colorAnim_.timer = 0.0f;
+    colorAnim_.duration = duration;
+    colorAnim_.easeFunc = easeFunc;
+    colorAnim_.startColor = fromColor;
+    colorAnim_.targetColor = toColor;
+    colorAnim_.isActive = true;
+    colorAnim_.onComplete = onComplete;
+
+    currentColor_ = fromColor;
+}
+
+void ObjectAnimation::PlayPunchAnimation(float strength, float duration) {
+    Vector3 punchScale = baseScale_ * (1.0f + strength);
+    StartScaleAnimation(
+        punchScale,
+        baseScale_,
+        duration,
+        Easing::Function::EaseOutQuad
+    );
+}
+
+void ObjectAnimation::PlayShakeAnimation(float intensity, float duration) {
+    isShaking_ = true;
+    shakeTimer_ = 0.0f;
+    shakeDuration_ = duration;
+    shakeIntensity_ = intensity;
+}
+
+void ObjectAnimation::PlayBounceScaleAnimation(float targetScale, float duration) {
+    Vector3 bounceScale = baseScale_ * targetScale;
+    StartScaleAnimation(
+        bounceScale,
+        baseScale_,
+        duration,
+        Easing::Function::EaseOutGrowBounce // 既存のカスタムイージング使用
+    );
+}
+
+void ObjectAnimation::Update(float dt) {
+    // スケールアニメーション更新
+    if (scaleAnim_.isActive) {
+        UpdateAnimation(scaleAnim_, dt);
+    }
+
+    // カラーアニメーション更新
+    if (colorAnim_.isActive) {
+        UpdateAnimation(colorAnim_, dt);
+    }
+
+    // シェイク更新
+    if (isShaking_) {
+        shakeTimer_ += dt;
+
+        if (shakeTimer_ < shakeDuration_) {
+            // ランダムなオフセットを生成
+            static std::random_device rd;
+            static std::mt19937 gen(rd());
+            std::uniform_real_distribution<float> dis(-1.0f, 1.0f);
+
+            // 時間経過で減衰
+            float decay = 1.0f - (shakeTimer_ / shakeDuration_);
+            float currentIntensity = shakeIntensity_ * decay;
+
+            Vector3 shakeOffset = {
+                dis(gen) * currentIntensity,
+                dis(gen) * currentIntensity,
+                dis(gen) * currentIntensity
+            };
+
+            currentPosition_ = basePosition_ + shakeOffset;
+        }
+        else {
+            isShaking_ = false;
+            currentPosition_ = basePosition_;
+        }
+    }
+}
+
+void ObjectAnimation::UpdateAnimation(AnimationData& anim, float dt) {
+    anim.timer += dt;
+    float t = std::min(anim.timer / anim.duration, 1.0f);
+
+    // Easingクラスを使用して補間値を計算
+    float easedT = Easing::Ease(anim.easeFunc, t);
+
+    // アニメーションタイプに応じて値を更新
+    switch (anim.type) {
+    case AnimationType::Scale:
+        currentScale_ = Lerp(anim.startScale, anim.targetScale, easedT);
+        break;
+
+    case AnimationType::Color:
+        currentColor_ = Lerp(anim.startColor, anim.targetColor, easedT);
+        break;
+
+    case AnimationType::Rotation:
+        currentRotation_ = Lerp(anim.startRotation, anim.targetRotation, easedT);
+        break;
+
+    case AnimationType::Position:
+        currentPosition_ = Lerp(anim.startPosition, anim.targetPosition, easedT);
+        break;
+    }
+
+    // アニメーション終了処理
+    if (t >= 1.0f) {
+        anim.isActive = false;
+
+        if (anim.onComplete) {
+            anim.onComplete();
+        }
+    }
+}
+
+void ObjectAnimation::StopAll() {
+    scaleAnim_.isActive = false;
+    colorAnim_.isActive = false;
+    rotationAnim_.isActive = false;
+    positionAnim_.isActive = false;
+    isShaking_ = false;
+}
+
+bool ObjectAnimation::IsAnimating() const {
+    return scaleAnim_.isActive ||
+        colorAnim_.isActive ||
+        rotationAnim_.isActive ||
+        positionAnim_.isActive ||
+        isShaking_;
+}
 
 ============================================================
-File Path: YEngine/Utilities/Systems/Animation/Animation.h
+File Path: YEngine/Utilities/Systems/Animation/ObjectAnimation.h
 ============================================================
 #pragma once
+#include <functional>
+#include <memory>
+#include <vector>
 
-
-
-class Animation
-{
-public:
-
-
-
-
-
-
-private:
-
-
-
-
-};
-
-
-============================================================
-File Path: YEngine/Utilities/Systems/Animation/AnimationDefines.h
-============================================================
-#pragma once
 // Math
 #include "Vector3.h"
-#include "Quaternion.h"
-#include "Matrix4x4.h"
-#include "MathFunc.h"
+#include "Vector4.h"
+#include "Easing.h"
 
 
-enum class LoopType {
-	Once,			  // 一度だけ再生
-	Loop,			  // ループ
-	Reverse,		  // 逆再生
-	PingPong,		  // 往復して再生
-	Clamp,			  // 最後までいったら静止
+
+// アニメーションの種類
+enum class AnimationType {
+    Scale,
+    Color,
+    Rotation,
+    Position
 };
 
-============================================================
-File Path: YEngine/Utilities/Systems/Animation/AnimationSystem.cpp
-============================================================
-#include "AnimationSystem.h"
+// アニメーションデータ構造
+struct AnimationData {
+    AnimationType type;
+    float timer = 0.0f;
+    float duration = 0.0f;
+    Easing::Function easeFunc = Easing::Function::Linear;
 
+    // スケール用
+    Vector3 startScale;
+    Vector3 targetScale;
 
-============================================================
-File Path: YEngine/Utilities/Systems/Animation/AnimationSystem.h
-============================================================
-#pragma once
-class AnimationSystem
-{
+    // カラー用
+    Vector4 startColor;
+    Vector4 targetColor;
+
+    // 回転用
+    Vector3 startRotation;
+    Vector3 targetRotation;
+
+    // 位置用
+    Vector3 startPosition;
+    Vector3 targetPosition;
+
+    bool isActive = false;
+    std::function<void()> onComplete = nullptr;
 };
 
+/// <summary>
+/// 汎用3Dオブジェクトアニメーター
+/// スケール、カラー、回転、位置のアニメーションを管理
+/// </summary>
+class ObjectAnimation {
+public:
+    ObjectAnimation() = default;
+    ~ObjectAnimation() = default;
 
+    /// <summary>
+    /// スケールアニメーションを開始
+    /// </summary>
+    void StartScaleAnimation(
+        Vector3 fromScale,
+        Vector3 toScale,
+        float duration,
+        Easing::Function easeFunc = Easing::Function::EaseOutQuad,
+        std::function<void()> onComplete = nullptr
+    );
+
+    /// <summary>
+    /// カラーアニメーションを開始
+    /// </summary>
+    void StartColorAnimation(
+        Vector4 fromColor,
+        Vector4 toColor,
+        float duration,
+        Easing::Function easeFunc = Easing::Function::Linear,
+        std::function<void()> onComplete = nullptr
+    );
+
+    /// <summary>
+    /// パンチアニメーション（ヒット時に一瞬大きくなる）
+    /// </summary>
+    void PlayPunchAnimation(float strength = 0.2f, float duration = 0.3f);
+
+    /// <summary>
+    /// シェイクアニメーション（揺れ）
+    /// </summary>
+    void PlayShakeAnimation(float intensity = 0.1f, float duration = 0.2f);
+
+    /// <summary>
+    /// バウンススケールアニメーション（弾むように拡大）
+    /// </summary>
+    void PlayBounceScaleAnimation(float targetScale = 1.2f, float duration = 0.5f);
+
+    /// <summary>
+    /// 更新処理
+    /// </summary>
+    void Update(float dt);
+
+    /// <summary>
+    /// すべてのアニメーションを停止
+    /// </summary>
+    void StopAll();
+
+    /// <summary>
+    /// 現在のアニメーション値を取得
+    /// </summary>
+    Vector3 GetCurrentScale() const { return currentScale_; }
+    Vector4 GetCurrentColor() const { return currentColor_; }
+    Vector3 GetCurrentRotation() const { return currentRotation_; }
+    Vector3 GetCurrentPosition() const { return currentPosition_; }
+
+    /// <summary>
+    /// ベース値を設定（アニメーションが適用されていない時の値）
+    /// </summary>
+    void SetBaseScale(const Vector3& scale) { baseScale_ = scale; }
+    void SetBaseColor(const Vector4& color) { baseColor_ = color; }
+    void SetBaseRotation(const Vector3& rotation) { baseRotation_ = rotation; }
+    void SetBasePosition(const Vector3& position) { basePosition_ = position; }
+
+    /// <summary>
+    /// アニメーション中か判定
+    /// </summary>
+    bool IsAnimating() const;
+    bool IsScaleAnimating() const { return scaleAnim_.isActive; }
+    bool IsColorAnimating() const { return colorAnim_.isActive; }
+
+private:
+    // 各アニメーションデータ
+    AnimationData scaleAnim_;
+    AnimationData colorAnim_;
+    AnimationData rotationAnim_;
+    AnimationData positionAnim_;
+
+    // 現在の値
+    Vector3 currentScale_ = { 1.0f, 1.0f, 1.0f };
+    Vector4 currentColor_ = { 1.0f, 1.0f, 1.0f, 1.0f };
+    Vector3 currentRotation_ = { 0.0f, 0.0f, 0.0f };
+    Vector3 currentPosition_ = { 0.0f, 0.0f, 0.0f };
+
+    // ベース値（アニメーションが適用されていない時の値）
+    Vector3 baseScale_ = { 1.0f, 1.0f, 1.0f };
+    Vector4 baseColor_ = { 1.0f, 1.0f, 1.0f, 1.0f };
+    Vector3 baseRotation_ = { 0.0f, 0.0f, 0.0f };
+    Vector3 basePosition_ = { 0.0f, 0.0f, 0.0f };
+
+    // シェイク用
+    float shakeTimer_ = 0.0f;
+    float shakeDuration_ = 0.0f;
+    float shakeIntensity_ = 0.0f;
+    bool isShaking_ = false;
+
+    // 個別のアニメーションを更新
+    void UpdateAnimation(AnimationData& anim, float dt);
+};
 
 ============================================================
 File Path: YEngine/Utilities/Systems/Audio/Audio.cpp
@@ -249733,6 +250125,7 @@ File Path: YGame/Core/MyGame.cpp
 #include "Particle/YParticleManager.h"
 #include "Particle/YEmitterGroupEditor.h"
 
+#include "Particle/YEmitterGroupManager.h"
 /// <summary>
 /// ゲーム全体の初期化処理（起動時に一度だけ実行）
 /// </summary>
@@ -249742,7 +250135,7 @@ void MyGame::Initialize() {
 	// 基盤・シーン管理の初期化
 	//------------------------------------------------------------
 	Framework::Initialize();
-	texturePreloader_.PreloadDirectory("Resources/Textures/");
+	//texturePreloader_.PreloadDirectory("Resources/Textures/");
 	audio_->PreloadAllInPath("Resources/Audio/");
 
 	sceneFactory_ = std::make_unique<SceneFactory>();
@@ -249758,8 +250151,11 @@ void MyGame::Initialize() {
 
 	PostEffectManager::GetInstance()->Initialize();
 
-	YParticleManager::GetInstance().Initialize(dxCommon_->GetSrvManager(), 20000);
-	YParticleManager::GetInstance().CreateSystem("DefaultParticleSystem", 5000);
+	YParticleManager::GetInstance().Initialize(dxCommon_->GetSrvManager(), 50000);
+
+	YParticleManager::GetInstance().LoadSystemsFromFile("Resources/Json/YParticleSystems/EnemyHit1.json");
+	YParticleManager::GetInstance().LoadSystemsFromFile("Resources/Json/YParticleSystems/EnemyHit2.json");	
+	YEmitterGroupManager::GetInstance().LoadAllFromFile("Resources/Json/YEmitterGroups/EnemyHit.json");
 
 	//------------------------------------------------------------
 	// パーティクル関連の初期化
@@ -249767,6 +250163,7 @@ void MyGame::Initialize() {
 	ParticleEditor::GetInstance().Initialize();
 	YoRigine::ParticleManager::GetInstance()->Initialize(dxCommon_->GetSrvManager());
 	YoRigine::GpuEmitManager::GetInstance()->Initialize();
+
 
 	// パーティクルグループ作成
 	YoRigine::ParticleManager::GetInstance()->CreateParticleGroup("PlayerParticle", "Resources/images/circle.png");
@@ -249866,7 +250263,7 @@ void MyGame::Update() {
 #ifdef USE_IMGUI
 	ImGuizmo::BeginFrame();
 #endif
-	texturePreloader_.FlushPendingUploads(10);
+	//texturePreloader_.FlushPendingUploads(10);
 
 #ifdef USE_IMGUI
 	Editor::GetInstance()->Draw();
@@ -250052,6 +250449,8 @@ File Path: YGame/GameObjects/Enemy/BattleEnemy/BattleEnemy.cpp
 
 #include "Debugger/Logger.h"
 #include <Collision/AreaCollision/Base/AreaManager.h>
+#include "States/BattleRecoveryState.h"
+#include "Particle/YEmitterGroupManager.h"
 
 /*==========================================================================
 デストラクタ
@@ -250075,6 +250474,11 @@ void BattleEnemy::Initialize(Camera* camera) {
 
 	healthBarUI_ = std::make_unique<EnemyHealthBarUI>(this, camera);
 	healthBarUI_->Initialize();
+
+	animation_ = std::make_unique<ObjectAnimation>();
+	animation_->SetBaseColor({ 1.0f,1.0f,1.0f,1.0f });
+	animation_->SetBaseScale({ 1.0f,1.0f,1.0f });
+
 }
 
 /*==========================================================================
@@ -250131,8 +250535,40 @@ void BattleEnemy::Update() {
 	if (player_->GetCombat()->IsDead())
 		return;
 
+	// 死亡チェック
+	if (enemyData_.currentHp_ == 0) {
+		ChangeState(std::make_unique<BattleDeadState>());
+		PlayDeathEffect();
+	}
+
 	float dt = YoRigine::GameTime::GetDeltaTime();
 	stateTimer_ += dt;
+
+	// アニメーター更新
+	if (animation_) {
+		animation_->Update(dt);
+
+		// アニメーション中の場合、スケールを適用
+		if (animation_->IsScaleAnimating()) {
+			wt_.scale_ = animation_->GetCurrentScale();
+		}
+
+		// カラーアニメーション中の場合、色を適用
+		if (animation_->IsColorAnimating()) {
+			if (obj_) {
+				obj_->SetMaterialColor(animation_->GetCurrentColor());
+			}
+		}
+	}
+
+	// ヒットカウントのリセット処理
+	if (consecutiveHitCount_ > 0 && !isInvincible_) {
+		hitCountResetTimer_ += dt;
+		if (hitCountResetTimer_ > hitCountResetTime_) {
+			consecutiveHitCount_ = 0;
+			hitCountResetTimer_ = 0.0f;
+		}
+	}
 
 	// 現在のステートを更新
 	if (currentState_) {
@@ -250141,12 +250577,6 @@ void BattleEnemy::Update() {
 
 	// ノックバック更新
 	UpdateKnockback(dt);
-
-	// 死亡チェック
-	if (enemyData_.currentHp_ == 0) {
-		ChangeState(std::make_unique<BattleDeadState>());
-		PlayDeathEffect();
-	}
 
 
 
@@ -250266,12 +250696,35 @@ void BattleEnemy::UpdateKnockback(float dt)
 //========================================================================*/
 void BattleEnemy::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other) {
 
+	if (isAlive_) {
 	// 攻撃を食らった時
 	if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon)) {
-		if (isAlive_) {
 			TakeDamage(static_cast<int>(player_->GetCombat()->GetCombo()->GetCurrentDamage()));
-			ChangeState(std::make_unique<BattleDamageState>());
 
+			// --------------------- ヒットエフェクトの処理 --------------------- //
+			auto* enemyHitEmitterGroup_ = YEmitterGroupManager::GetInstance().GetGroup("EnemyHit");
+			if (enemyHitEmitterGroup_) {
+				enemyHitEmitterGroup_->SetPosition(wt_.translate_);
+				enemyHitEmitterGroup_->SetActive(true);
+				enemyHitEmitterGroup_->SetAutoEmitAll(false);  // 自動射出OFF
+				enemyHitEmitterGroup_->EmitAll(10);  // 手動で100個発生
+			}
+
+			// --------------------- ヒットカウントの処理 --------------------- //
+			// 連続ヒットカウント増加
+			consecutiveHitCount_++;
+			hitCountResetTimer_ = 0.0f;
+			// 連続ヒット数が限界を超えたら回復状態へ
+			if (consecutiveHitCount_ >= maxConsecutiveHits_) {
+				ChangeState(std::make_unique<BattleRecoveryState>());
+				consecutiveHitCount_ = 0;  // リセット
+			}
+			else {
+				// 通常のダメージ状態
+				ChangeState(std::make_unique<BattleDamageState>());
+			}
+
+			// --------------------- ノックバックの処理 --------------------- //
 			Vector3 knockbackDir = wt_.translate_ - player_->GetWorldPosition();
 			knockbackDir.y = 0.0f;
 			knockbackDir = Vector3::Normalize(knockbackDir);
@@ -250280,7 +250733,7 @@ void BattleEnemy::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 			float duration = player_->GetCombat()->GetCombo()->GetCurrentKnockbackDuration();
 			StartKnockback(knockbackDir, power, duration);
 
-			// 攻撃ヒット時の前進ステップを発火
+			// --------------------- 攻撃ヒット時の前進ステップを発火 --------------------- //
 			player_->GetCombat()->GetCombo()->OnHitStep(wt_.translate_);
 
 		}
@@ -250385,11 +250838,15 @@ File Path: YGame/GameObjects/Enemy/BattleEnemy/BattleEnemy.h
 #include "BattleEnemyData.h"
 #include "UI/HealthBar/EnemyHealthBarUI.h"
 
+
 #include <string>
 #include <vector>
 #include <memory>
 #include <cmath>
 #include <random>
+
+#include <Systems/Animation/ObjectAnimation.h>
+#include "Particle/YEmitterGroup.h"
 
 class Player;
 
@@ -250547,7 +251004,15 @@ public:
 	// ノックバックデータを取得
 	const KnockbackData& GetKnockbackData() { return knockbackData_; }
 
+	// オブジェクト名を取得
 	void SetObjectName(const std::string& name) { objectName_ = name; }
+
+	// アニメーション管理クラスを取得
+	ObjectAnimation* GetAnimation() { return animation_.get(); }
+
+	// ヒットカウント関連
+	int GetConsecutiveHitCount() const { return consecutiveHitCount_; }
+	void ResetConsecutiveHitCount() { consecutiveHitCount_ = 0; hitCountResetTimer_ = 0.0f; }
 
 	///************************* 攻撃・エフェクト処理 *************************///
 
@@ -250616,6 +251081,15 @@ private:
 	KnockbackData knockbackData_;
 	std::unique_ptr<EnemyHealthBarUI> healthBarUI_;
 	std::string objectName_ = "BattleEnemy"; // デフォルト名
+
+	// アニメーション管理
+	std::unique_ptr<ObjectAnimation> animation_;
+
+	// 連続ヒット管理
+	int consecutiveHitCount_ = 0;           // 連続ヒット数
+	float hitCountResetTimer_ = 0.0f;       // ヒットカウントリセットタイマー
+	const int maxConsecutiveHits_ = 3;      // 最大連続ヒット数（これを超えたらRecovery状態へ）
+	const float hitCountResetTime_ = 2.5f;  // この時間攻撃を受けなければカウントリセット
 };
 
 
@@ -253490,40 +253964,60 @@ File Path: YGame/GameObjects/Enemy/BattleEnemy/States/BattleDamageState.cpp
 /// ダメージ状態開始処理
 /// </summary>
 void BattleDamageState::Enter(BattleEnemy& enemy) {
-	enemy.SetCanAct(false);
-	enemy.IsDamageBlinking() = true;
-	enemy.ResetStateTimer();
+    enemy.SetCanAct(false);
+    enemy.IsDamageBlinking() = true;
+    enemy.ResetStateTimer();
+
+    // パンチアニメーション（ヒット時に少し拡大）
+    if (enemy.GetAnimation()) {
+        enemy.GetAnimation()->PlayPunchAnimation(0.15f, 0.25f);
+    }
+
+    // カラーアニメーション（白→赤に点滅）
+    if (enemy.GetAnimation()) {
+        enemy.GetAnimation()->StartColorAnimation(
+            { 1.5f, 1.5f, 1.5f, 1.0f }, // 一瞬明るく
+            { 1.0f, 0.2f, 0.2f, 1.0f }, // 赤く
+            0.2f,
+            Easing::Function::EaseOutQuad
+        );
+    }
 }
 
 /// <summary>
 /// ダメージ状態更新処理
 /// </summary>
 void BattleDamageState::Update(BattleEnemy& enemy, float dt) {
-	// 点滅させる
-	enemy.UpdateBlinking(dt);
+	(void)dt; // dtは今のところ使用しない
+    // ノックバック中の場合は待機
+    if (enemy.GetKnockbackData().isKnockingBack_) {
+        enemy.ResetStateTimer();
+        return;
+    }
 
-	// ノックバック中の場合は待機
-	if (enemy.GetKnockbackData().isKnockingBack_) {
-		// ここでノックバックを優先するため、状態タイマーは進めない、またはノックバック終了後にタイマーをリセット
-		enemy.ResetStateTimer();
-		return;
-	}
-
-	// 一定時間経過で攻撃状態へ
-	if (enemy.GetStateTimer() > 1.0f) {
-		enemy.ChangeState(std::make_unique<BattleRushAttackState>());
-	}
+    // 一定時間経過で攻撃状態へ
+    if (enemy.GetStateTimer() > 1.0f) {
+        enemy.ChangeState(std::make_unique<BattleRushAttackState>());
+    }
 }
 
 /// <summary>
 /// ダメージ状態終了処理
 /// </summary>
 void BattleDamageState::Exit(BattleEnemy& enemy) {
-	enemy.SetCanAct(true);
-	enemy.IsDamageBlinking() = false;
-	enemy.SetColor({ 1, 1, 1, 1 });
-}
+    enemy.SetCanAct(true);
+    enemy.IsDamageBlinking() = false;
 
+    // 色を元に戻す
+    if (enemy.GetAnimation()) {
+        enemy.GetAnimation()->StartColorAnimation(
+            enemy.GetAnimation()->GetCurrentColor(),
+            { 1.0f, 1.0f, 1.0f, 1.0f },
+            0.15f,
+            Easing::Function::Linear
+        );
+    }
+}
 
 ============================================================
 File Path: YGame/GameObjects/Enemy/BattleEnemy/States/BattleDamageState.h
@@ -253759,6 +254253,91 @@ public:
 	void Exit(BattleEnemy& enemy) override;
 };
 
+
+============================================================
+File Path: YGame/GameObjects/Enemy/BattleEnemy/States/BattleRecoveryState.cpp
+============================================================
+#include "BattleRecoveryState.h"
+
+#include "Attack/BattleRushAttackState.h"
+#include "BattleIdleState.h"
+
+void BattleRecoveryState::Enter(BattleEnemy& enemy) {
+    enemy.SetCanAct(false);
+    enemy.IsInvincible() = true;  // 無敵状態にする
+    enemy.ResetStateTimer();
+    hasPlayedAnimation_ = false;
+
+    // バウンススケールアニメーション（気合を溜めるような演出）
+    if (enemy.GetAnimation()) {
+        enemy.GetAnimation()->PlayBounceScaleAnimation(1.3f, 0.8f);
+    }
+
+    // カラーアニメーション（青白く光る）
+    if (enemy.GetAnimation()) {
+        enemy.GetAnimation()->StartColorAnimation(
+            { 1.0f, 1.0f, 1.0f, 1.0f },
+            { 0.7f, 0.9f, 1.2f, 1.0f },
+            0.5f,
+            Easing::Function::EaseInOutQuad
+        );
+    }
+}
+
+void BattleRecoveryState::Update(BattleEnemy& enemy, float dt) {
+	(void)dt; // dtは今のところ使用しない
+    float timer = enemy.GetStateTimer();
+
+    // 回復時間の70%経過したら色を戻し始める
+    if (timer > recoveryDuration_ * 0.7f && !hasPlayedAnimation_) {
+        hasPlayedAnimation_ = true;
+        if (enemy.GetAnimation()) {
+            enemy.GetAnimation()->StartColorAnimation(
+                enemy.GetAnimation()->GetCurrentColor(),
+                { 1.0f, 1.0f, 1.0f, 1.0f },
+                0.3f,
+                Easing::Function::EaseOutQuad
+            );
+        }
+    }
+
+    // 回復時間終了で攻撃状態へ
+    if (timer > recoveryDuration_) {
+        // 反撃
+        enemy.ChangeState(std::make_unique<BattleRushAttackState>());
+    }
+}
+
+void BattleRecoveryState::Exit(BattleEnemy& enemy) {
+    enemy.SetCanAct(true);
+    enemy.IsInvincible() = false;
+
+    // 念のため色をリセット
+    enemy.SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+}
+
+============================================================
+File Path: YGame/GameObjects/Enemy/BattleEnemy/States/BattleRecoveryState.h
+============================================================
+#pragma once
+#include "../../IEnemyState.h"
+#include "../BattleEnemy.h"
+
+/// <summary>
+/// 回復/反撃準備状態（スーパーアーマー付き）
+/// 一定回数攻撃を受けた後、この状態に移行して反撃チャンスを作る
+/// </summary>
+class BattleRecoveryState : public IEnemyState<BattleEnemy> {
+public:
+    void Enter(BattleEnemy& enemy) override;
+    void Update(BattleEnemy& enemy, float dt) override;
+    void Exit(BattleEnemy& enemy) override;
+
+private:
+    float recoveryDuration_ = 1.5f;  // 回復時間
+    bool canCounter_ = false;        // カウンター可能フラグ
+	bool hasPlayedAnimation_ = false; // アニメーション再生フラグ
+};
 
 ============================================================
 File Path: YGame/GameObjects/Enemy/FieldEnemy/FieldEnemy.cpp
@@ -262638,8 +263217,8 @@ void PlayerSword::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 		//------------------------------------------------------------
 		Vector3 hitPos = other->GetWorldTransform().translate_;
 		hitPos.y += 1.5f;
-		hitParticleEmitter_->FollowEmit(hitPos, 5);
-		particleEmitter_->FollowEmit(hitPos, 30);
+		//hitParticleEmitter_->FollowEmit(hitPos, 5);
+		//particleEmitter_->FollowEmit(hitPos, 30);
 		player_->GetCombat()->GetCombo()->RecoverCC(2);
 
 	}
@@ -262725,6 +263304,8 @@ File Path: YGame/GameObjects/Weapon/PlayerSword.h
 #include <Particle/ParticleEmitter.h>
 #include "Object3d/BaseObject.h"
 
+#include "Particle/YEmitterGroup.h"
+
 class Player;
 /// <summary>
 /// プレイヤーの剣クラス
@@ -262794,6 +263375,8 @@ private:
 	std::unique_ptr<ParticleEmitter> hitParticleEmitter_;
 	std::unique_ptr<ParticleEmitter> particleEmitter_;
 	std::unique_ptr<ParticleEmitter> testEmitter_;
+
+
 
 	///************************* ジョイント関連 *************************///
 	std::string handJointName_ = "mixamorig:RightHand";  // 手ジョイント名
