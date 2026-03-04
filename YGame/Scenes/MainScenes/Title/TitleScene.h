@@ -5,14 +5,12 @@
 
 // Engine
 #include <SceneSystems/BaseScene.h>
+
+#include "Systems/Camera/CameraDirector.h"
+#include "Systems/Camera/CameraEditor.h"
 #include "Systems/Camera/Camera.h"
 #include "Systems/Camera/CameraManager.h"
-
-
-#include "../../../SystemsApp/Cameras/TopDownCamera/TopDownCamera.h"
-#include "../../../SystemsApp/Cameras/SplineCamera/SplineCamera.h"
-#include "../../../SystemsApp/Cameras/DefaultCamera/DefaultCamera.h"
-
+#include "Systems/Camera/CameraMode.h"
 
 #include "Systems/Audio/Audio.h"
 #include "Particle/ParticleEmitter.h"
@@ -34,14 +32,6 @@
 /// </summary>
 class TitleScene : public BaseScene
 {
-	// カメラモード
-	enum class CameraMode {
-		DEFAULT,
-		FOLLOW,
-		TOP_DOWN,
-		SPLINE,
-		DEBUG,
-	};
 
 public:
 
@@ -72,14 +62,10 @@ private:
 private:
 	///************************* メンバ変数 *************************///
 
-	// カメラ
+	// 出力用カメラ（実体）
+	std::unique_ptr<Camera> sceneCamera_;
 	CameraMode cameraMode_;
-	std::shared_ptr<Camera> sceneCamera_;
-	CameraManager cameraManager_;
-
-	TopDownCamera topDownCamera_;
-	SplineCamera splineCamera_;
-	DefaultCamera defaultCamera_;
+	std::unique_ptr<CameraEditor> cameraEditor_;
 	bool isDebugCamera_ = false;
 
 	// サウンド

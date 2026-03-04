@@ -24,8 +24,25 @@
 /// 初期化処理
 /// </summary>
 void TitleScene::Initialize() {
-	sceneCamera_ = cameraManager_.AddCamera();
 
+	//------------------------------------------------------------
+	// カメラ初期化
+	//------------------------------------------------------------
+
+	// 出力用カメラの実体を生成
+	sceneCamera_ = std::make_unique<Camera>();
+	auto director = CameraDirector::GetInstance();
+	director->Initialize();
+
+
+	cameraEditor_ = std::make_unique<CameraEditor>();
+	cameraEditor_->Initialize();
+	cameraEditor_->SetFilePath("Resources/Json/VirtualCameraData/TitleScene.json");
+	cameraEditor_->LoadFileOrDefault(cameraEditor_->GetFilePath(), "Title");
+	cameraMode_ = CameraMode::TITLE;
+	// カメラの登録
+	auto titleCamera = director->GetCamera("Title");
+	auto debug = director->GetCamera("MainDebug");
 	//------------------------------------------------------------
 	// システム初期化
 	//------------------------------------------------------------
@@ -37,14 +54,6 @@ void TitleScene::Initialize() {
 	YoRigine::ModelManipulator::GetInstance()->SetCamera(sceneCamera_.get());
 
 	//------------------------------------------------------------
-	// カメラ初期化
-	//------------------------------------------------------------
-	splineCamera_.Initialize();
-	topDownCamera_.Initialize();
-	defaultCamera_.Initialize();
-	cameraMode_ = CameraMode::DEFAULT;
-
-	//------------------------------------------------------------
 	// タイトル専用要素の初期化
 	//------------------------------------------------------------
 	titleUI_ = std::make_unique<TitleUI>();
@@ -54,8 +63,8 @@ void TitleScene::Initialize() {
 	player_->Initialize(sceneCamera_.get());
 	player_->SetMotion("Idle1");
 
-	defaultCamera_.SetTarget(player_->GetWT());
-	defaultCamera_.enableOrbit_ = true; // カメラ回転有効
+	//defaultCamera_.SetTarget(player_->GetWT());
+	//defaultCamera_.enableOrbit_ = true; // カメラ回転有効
 
 	skyBox_ = std::make_unique<SkyBox>();
 	skyBox_->Initialize(sceneCamera_.get(), "Resources/DDS/vz_sinister_land_cubemap_ue.dds");
@@ -67,7 +76,7 @@ void TitleScene::Initialize() {
 	// エディター登録（デバッグ用）
 	//------------------------------------------------------------
 #ifdef USE_IMGUI
-	Editor::GetInstance()->RegisterGameUI("カメラモード", [this]() { UpdateCameraMode(); }, "Title");
+	Editor::GetInstance()->RegisterGameUI("カメラモード切り替え", [this]() {UpdateCameraMode(); },"Title");
 	Editor::GetInstance()->RegisterGameUI("ライティング", [this]() { YoRigine::LightManager::GetInstance()->ShowLightingEditor(); }, "Title");
 #endif
 }
@@ -102,7 +111,6 @@ void TitleScene::Update() {
 	YoRigine::ParticleManager::GetInstance()->Emit("TitleParticle", Vector3(0, 3, 0), 10);
 
 	YoRigine::ModelManipulator::GetInstance()->Update();
-	cameraManager_.UpdateAllCameras();
 	YoRigine::CollisionManager::GetInstance()->Update();
 	YoRigine::ParticleManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
 	YoRigine::LightManager::GetInstance()->UpdateShadowMatrix(sceneCamera_.get());
@@ -152,7 +160,6 @@ void TitleScene::DrawShadow()
 /// </summary>
 void TitleScene::Finalize() {
 	YoRigine::JsonManager::ClearSceneInstances("TitleScene");
-	cameraManager_.RemoveCamera(sceneCamera_);
 }
 
 /// <summary>
@@ -179,49 +186,73 @@ void TitleScene::DrawUI() {}
 /// </summary>
 void TitleScene::UpdateCameraMode() {
 #ifdef USE_IMGUI
-	ImGui::Begin("Camera Mode");
-	if (ImGui::Button("DEFAULT Camera")) cameraMode_ = CameraMode::DEFAULT;
-	if (ImGui::Button("Follow Camera")) cameraMode_ = CameraMode::FOLLOW;
-	if (ImGui::Button("Top-Down Camera")) cameraMode_ = CameraMode::TOP_DOWN;
-	if (ImGui::Button("Debug Camera")) cameraMode_ = CameraMode::DEBUG;
-	ImGui::End();
+	if (ImGui::Button("Title Camera")) {
+		cameraMode_ = CameraMode::CLEAR;
+		CameraDirector::GetInstance()->SetEnableBlending(false);
+	}
+	if (ImGui::Button("Debug Camera")) {
+		cameraMode_ = CameraMode::DEBUG;
+		CameraDirector::GetInstance()->SetEnableBlending(false);
+	}
 #endif
 }
 
-/// <summary>
-/// カメラ更新処理
-/// </summary>
 void TitleScene::UpdateCamera() {
-	switch (cameraMode_) {
-	case CameraMode::DEFAULT:
-		sceneCamera_->SetFovY(defaultCamera_.GetFov());
-		defaultCamera_.Update();
-		sceneCamera_->viewMatrix_ = defaultCamera_.matView_;
-		sceneCamera_->transform_.translate = defaultCamera_.translate_;
-		sceneCamera_->transform_.rotate = defaultCamera_.rotate_;
-		sceneCamera_->UpdateMatrix();
-		break;
+	auto director = CameraDirector::GetInstance();
 
-	case CameraMode::TOP_DOWN:
-		if (player_) topDownCamera_.SetTarget(player_->GetWT());
-		topDownCamera_.Update();
-		sceneCamera_->viewMatrix_ = topDownCamera_.matView_;
-		sceneCamera_->transform_.translate = topDownCamera_.translate_;
-		sceneCamera_->transform_.rotate = topDownCamera_.rotate_;
-		sceneCamera_->UpdateMatrix();
-		break;
 
-	case CameraMode::SPLINE:
-		if (player_) splineCamera_.SetTarget(player_->GetWT());
-		splineCamera_.RegisterControlPoints();
-		splineCamera_.Update();
-		sceneCamera_->viewMatrix_ = splineCamera_.matView_;
-		sceneCamera_->transform_.translate = splineCamera_.translate_;
-		sceneCamera_->transform_.rotate = splineCamera_.rotate_;
-		sceneCamera_->UpdateMatrix();
-		break;
+	if (YoRigine::GameTime::IsPause()) {
+		return;
+	}
 
+	// カメラの優先度
+	switch (cameraMode_)
+	{
+	case CameraMode::TITLE:
+		director->SetPriority("Title", 10);
+		director->SetPriority("MainDebug", 0);
+		director->SnapToActiveCamera();
+		break;
 	case CameraMode::DEBUG:
+		director->SetPriority("MainDebug", 10);
+		director->SetPriority("Title", 0);
 		break;
 	}
+
+
+	//------------------------------------------------------------
+	// デバッグ用：カメラ切り替え入力
+	//------------------------------------------------------------
+# ifdef _DEBUG	
+	YoRigine::Input* input = YoRigine::Input::GetInstance();
+	if (input->TriggerKey(DIK_F3)) {
+		isDebugCamera_ = !isDebugCamera_;
+		if (isDebugCamera_) {
+			cameraMode_ = CameraMode::DEBUG;
+			CameraDirector::GetInstance()->SetEnableBlending(false);
+		}
+		else {
+			cameraMode_ = CameraMode::CLEAR;
+			CameraDirector::GetInstance()->SetEnableBlending(false);
+		}
+	}
+#endif
+
+	//------------------------------------------------------------
+	// Directorの更新（VirtualCameraの計算 ＋ ブレンド処理）
+	//------------------------------------------------------------
+	director->Update(YoRigine::GameTime::GetDeltaTime());
+
+	//------------------------------------------------------------
+	// 出力用カメラ(sceneCamera_)への同期
+	//------------------------------------------------------------
+	// Directorが導き出した「理想の座標・回転・レンズ情報」をコピー
+	sceneCamera_->SetTranslate(director->GetActiveCameraPos());
+	sceneCamera_->SetRotate(director->GetActiveCameraRot());
+	sceneCamera_->SetFovY(director->GetFovY());
+	sceneCamera_->viewMatrix_ = director->GetViewMatrix();
+	// カメラ自体の更新（内部でのシェイク計算など）
+	sceneCamera_->Update();
+	// 最終的な行列の計算
+	sceneCamera_->UpdateMatrix();
 }
