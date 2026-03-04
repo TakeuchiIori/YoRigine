@@ -12,6 +12,7 @@
 #include "Particle/YParticleManager.h"
 #include "Particle/YEmitterGroupEditor.h"
 
+#include "Particle/YEmitterGroupManager.h"
 /// <summary>
 /// ゲーム全体の初期化処理（起動時に一度だけ実行）
 /// </summary>
@@ -21,7 +22,7 @@ void MyGame::Initialize() {
 	// 基盤・シーン管理の初期化
 	//------------------------------------------------------------
 	Framework::Initialize();
-	texturePreloader_.PreloadDirectory("Resources/Textures/");
+	//texturePreloader_.PreloadDirectory("Resources/Textures/");
 	audio_->PreloadAllInPath("Resources/Audio/");
 
 	sceneFactory_ = std::make_unique<SceneFactory>();
@@ -37,8 +38,11 @@ void MyGame::Initialize() {
 
 	PostEffectManager::GetInstance()->Initialize();
 
-	YParticleManager::GetInstance().Initialize(dxCommon_->GetSrvManager(), 20000);
-	YParticleManager::GetInstance().CreateSystem("DefaultParticleSystem", 5000);
+	YParticleManager::GetInstance().Initialize(dxCommon_->GetSrvManager(), 50000);
+
+	YParticleManager::GetInstance().LoadSystemsFromFile("Resources/Json/YParticleSystems/EnemyHit1.json");
+	YParticleManager::GetInstance().LoadSystemsFromFile("Resources/Json/YParticleSystems/EnemyHit2.json");	
+	YEmitterGroupManager::GetInstance().LoadAllFromFile("Resources/Json/YEmitterGroups/EnemyHit.json");
 
 	//------------------------------------------------------------
 	// パーティクル関連の初期化
@@ -46,6 +50,7 @@ void MyGame::Initialize() {
 	ParticleEditor::GetInstance().Initialize();
 	YoRigine::ParticleManager::GetInstance()->Initialize(dxCommon_->GetSrvManager());
 	YoRigine::GpuEmitManager::GetInstance()->Initialize();
+
 
 	// パーティクルグループ作成
 	YoRigine::ParticleManager::GetInstance()->CreateParticleGroup("PlayerParticle", "Resources/images/circle.png");
@@ -145,7 +150,7 @@ void MyGame::Update() {
 #ifdef USE_IMGUI
 	ImGuizmo::BeginFrame();
 #endif
-	texturePreloader_.FlushPendingUploads(10);
+	//texturePreloader_.FlushPendingUploads(10);
 
 #ifdef USE_IMGUI
 	Editor::GetInstance()->Draw();

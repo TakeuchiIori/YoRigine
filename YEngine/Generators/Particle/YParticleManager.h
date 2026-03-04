@@ -88,6 +88,25 @@ public:
     size_t GetSystemCount() const { return systems_.size(); }
 
     //=================================================================
+    // ファイル操作（追加）
+    //=================================================================
+
+    /// <summary>
+    /// JSONファイルからすべてのシステムを読み込み
+    /// </summary>
+    bool LoadSystemsFromFile(const std::string& filePath);
+
+    /// <summary>
+    /// JSONからすべてのシステムを読み込み
+    /// </summary>
+    void LoadSystemsFromJson(const nlohmann::json& json);
+
+    /// <summary>
+    /// すべてのシステムをファイルに保存
+    /// </summary>
+    bool SaveSystemsToFile(const std::string& filePath) const;
+
+    //=================================================================
     // 更新・描画
     //=================================================================
 
@@ -155,6 +174,7 @@ private:
         uint32_t textureIndex;
         ParticleLightSetting lightSetting;
         std::vector<YParticleSystem*> systems;
+		BlendMode blendMode;
     };
 
     void CreateRenderBatches(std::vector<RenderBatch>& batches);

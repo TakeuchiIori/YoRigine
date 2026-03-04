@@ -117,6 +117,7 @@ namespace YoRigine {
 #ifdef USE_IMGUI
         if (!isInitialized_ || !pickBuffer_) return;
 
+		if (!pickBuffer_->IsPickPending()) return; // クリックがないなら描画しない（無駄なGPU負荷を避ける）
         pickBuffer_->BeginPickPass();
         DrawForPick();
         pickBuffer_->EndPickPass();

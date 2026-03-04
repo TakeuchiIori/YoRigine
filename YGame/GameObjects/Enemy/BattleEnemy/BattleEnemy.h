@@ -4,11 +4,15 @@
 #include "BattleEnemyData.h"
 #include "UI/HealthBar/EnemyHealthBarUI.h"
 
+
 #include <string>
 #include <vector>
 #include <memory>
 #include <cmath>
 #include <random>
+
+#include <Systems/Animation/ObjectAnimation.h>
+#include "Particle/YEmitterGroup.h"
 
 class Player;
 
@@ -166,7 +170,15 @@ public:
 	// ノックバックデータを取得
 	const KnockbackData& GetKnockbackData() { return knockbackData_; }
 
+	// オブジェクト名を取得
 	void SetObjectName(const std::string& name) { objectName_ = name; }
+
+	// アニメーション管理クラスを取得
+	ObjectAnimation* GetAnimation() { return animation_.get(); }
+
+	// ヒットカウント関連
+	int GetConsecutiveHitCount() const { return consecutiveHitCount_; }
+	void ResetConsecutiveHitCount() { consecutiveHitCount_ = 0; hitCountResetTimer_ = 0.0f; }
 
 	///************************* 攻撃・エフェクト処理 *************************///
 
@@ -235,4 +247,13 @@ private:
 	KnockbackData knockbackData_;
 	std::unique_ptr<EnemyHealthBarUI> healthBarUI_;
 	std::string objectName_ = "BattleEnemy"; // デフォルト名
+
+	// アニメーション管理
+	std::unique_ptr<ObjectAnimation> animation_;
+
+	// 連続ヒット管理
+	int consecutiveHitCount_ = 0;           // 連続ヒット数
+	float hitCountResetTimer_ = 0.0f;       // ヒットカウントリセットタイマー
+	const int maxConsecutiveHits_ = 3;      // 最大連続ヒット数（これを超えたらRecovery状態へ）
+	const float hitCountResetTime_ = 2.5f;  // この時間攻撃を受けなければカウントリセット
 };

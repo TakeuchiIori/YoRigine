@@ -26,10 +26,17 @@ void YParticleRenderer::Initialize(SrvManager* srvManager, uint32_t maxTotalPart
     materialLighting_->Initialize();
     materialUV_ = std::make_unique<MaterialUV>();
     materialUV_->Initialize();
+
+    instanceOffsetCB_ = dxCommon_->CreateBufferResource(256 * MAX_BATCHES);
+    instanceOffsetCB_->Map(0, nullptr, reinterpret_cast<void**>(&mappedOffsetBase_));
 }
 
 void YParticleRenderer::BeginFrame() {
-    currentInstanceOffset_ = 0; // 書き込み位置を先頭に戻す
+    currentInstanceOffset_ = 0;
+    batchStartOffset_ = 0;
+    batchDrawIndex_ = 0;
+    batchEndOffsets_.clear();
+    currentBatchIndex_ = 0;
 }
 
 void YParticleRenderer::ApplyLightSetting(const ParticleLightSetting& setting) {
@@ -113,7 +120,7 @@ void YParticleRenderer::AddSystem(const YParticleSystem& system, Camera* camera)
     // 相対座標用の親行列
     Matrix4x4 parentMat = system.IsRelative() ? system.GetParentMatrix() : MakeIdentity4x4();
     BillboardType billboardType = system.GetBillboardType();
-
+    uint32_t writtenCount = 0;
     for (const auto& attr : attributes) {
         if (!attr.isActive) continue;
 
@@ -160,47 +167,64 @@ void YParticleRenderer::AddSystem(const YParticleSystem& system, Camera* camera)
         mappedData_[currentInstanceOffset_].WVP = Multiply(localWorld, viewProj);
         mappedData_[currentInstanceOffset_].color = attr.color;
         currentInstanceOffset_++;
-    }
+        writtenCount++;
 
-    auto commandList = dxCommon_->GetCommandList();
-    auto pm = YPipelineManager::GetInstance();
-    commandList->SetPipelineState(pm->GetBlendModePSO("YParticle", system.GetBlendMode()));
+        char buf[256];
+        sprintf_s(buf, "AddSystem: %s, written=%u, totalOffset=%u\n",
+            system.GetName().c_str(), writtenCount, currentInstanceOffset_);
+        OutputDebugStringA(buf);
+    }
 }
-void YParticleRenderer::EndFrame(const std::shared_ptr<Mesh>& mesh, uint32_t textureIndex) {
-    if (currentInstanceOffset_ == 0 || !mesh) return;
+void YParticleRenderer::EndFrame(const std::shared_ptr<Mesh>& mesh, uint32_t textureIndex, BlendMode blendMode) {
+    uint32_t instanceCount = currentInstanceOffset_ - batchStartOffset_;
+    uint32_t start = batchStartOffset_;
+    batchStartOffset_ = currentInstanceOffset_;
+    if (instanceCount == 0 || !mesh) return;
+
+    // ★このバッチ専用のスロットに書く（256バイト区切り）
+    uint8_t* slot = mappedOffsetBase_ + 256 * currentBatchIndex_;
+    reinterpret_cast<uint32_t*>(slot)[0] = start;
 
     auto commandList = dxCommon_->GetCommandList();
     auto& meshRes = mesh->GetMeshResource();
 
     auto pm = YPipelineManager::GetInstance();
     const auto& indices = pm->GetParameterIndices("YParticle");
+    commandList->SetPipelineState(pm->GetBlendModePSO("YParticle", blendMode));
 
     commandList->IASetVertexBuffers(0, 1, &meshRes.vertexBufferView);
     commandList->IASetIndexBuffer(&meshRes.indexBufferView);
     commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-    // StructuredBuffer (t0)
     srvManager_->SetGraphicsRootDescriptorTable(indices.at("gParticle"), srvIndex_);
-    // Texture (t1)
     srvManager_->SetGraphicsRootDescriptorTable(indices.at("gTexture"), textureIndex);
-    // MaterialColor
     materialColor_->RecordDrawCommands(commandList.Get(), indices.at("gMaterialColor"));
-    // MaterialUV
     materialUV_->RecordDrawCommands(commandList.Get(), indices.at("gMaterialUV"));
-    // MaterialLighting にライト設定を反映してから描画コマンドを積む
     if (materialLighting_) {
         materialLighting_->SetEnableLighting(currentLightSetting_.enableDirectionalLight);
     }
-    // MaterialLighting
     materialLighting_->RecordDrawCommands(commandList.Get(), indices.at("gMaterialLight"));
-    // Camera
     commandList->SetGraphicsRootConstantBufferView(indices.at("gCamera"), camera_->GetCameraResource()->GetGPUVirtualAddress());
-
-    // 描画（全システム分を1回で！）
+    commandList->SetGraphicsRootConstantBufferView(indices.at("InstanceOffsetCB"), instanceOffsetCB_->GetGPUVirtualAddress() + 256 * currentBatchIndex_);
     commandList->DrawIndexedInstanced(
-        static_cast<UINT>(mesh->GetIndexCount()), // メッシュごとのインデックス数
-        currentInstanceOffset_,                                // 合計のインスタンス数
+        static_cast<UINT>(mesh->GetIndexCount()),
+        instanceCount,
         0, 0, 0
     );
-    currentInstanceOffset_ = 0;
+    currentBatchIndex_++;
+}
+
+// バッチのオフセットだけ記録してDrawはしない
+void YParticleRenderer::CommitBatch() {
+    batchEndOffsets_.push_back(currentInstanceOffset_);
+    batchStartOffset_ = currentInstanceOffset_;
+
+    char buf[256];
+    sprintf_s(buf, "CommitBatch: offset=%u\n", currentInstanceOffset_);
+    OutputDebugStringA(buf);
+}
+
+void YParticleRenderer::ResetBatchOffset() {
+    batchStartOffset_ = 0;
+    batchDrawIndex_ = 0;
 }
