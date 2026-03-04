@@ -1,6 +1,6 @@
-#include "BattleChargeAttackState.h"
+#include "BattleChargeRushAttackState.h"
 
-void BattleChargeAttackState::Enter(BattleEnemy& enemy)
+void BattleChargeRushAttackState::Enter(BattleEnemy& enemy)
 {
 	enemy.SetCanAct(false);
 	enemy.ResetStateTimer();
@@ -17,10 +17,10 @@ void BattleChargeAttackState::Enter(BattleEnemy& enemy)
 	}
 }
 
-void BattleChargeAttackState::Update(BattleEnemy& enemy, float dt)
+void BattleChargeRushAttackState::Update(BattleEnemy& enemy, float dt)
 {
 	const float currentTime = enemy.GetStateTimer();
-	const auto& params = enemy.GetEnemyData().attackParams.charge;
+	const auto& params = enemy.GetEnemyData().attackParams.chargeRush;
 
 	// フェーズの境界時間を計算
 	const float anticipationEndTime = params.anticipationTime;
@@ -84,7 +84,7 @@ void BattleChargeAttackState::Update(BattleEnemy& enemy, float dt)
 	}
 }
 
-void BattleChargeAttackState::Exit(BattleEnemy& enemy)
+void BattleChargeRushAttackState::Exit(BattleEnemy& enemy)
 {
 	enemy.SetCanAct(true);
 	enemy.SetColor({ 1, 1, 1, 1 });

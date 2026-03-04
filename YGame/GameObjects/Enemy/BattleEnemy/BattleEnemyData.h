@@ -14,9 +14,11 @@ enum class BattleEnemyState {
 };
 
 ///************************* 攻撃用構造体 *************************///
+
+// 突進攻撃
 struct RushAttackParams {
 	// 予備動作フェーズ（後ろに引く）
-	float anticipationTime = 0.6f;     // 予備動作時間
+	float anticipationTime = 0.5f;     // 予備動作時間
 	float anticipationDistance = 1.5f; // 後退する距離
 
 	float chargeTime = 1.0f;      // 溜め時間
@@ -25,7 +27,8 @@ struct RushAttackParams {
 	float cooldownTime = 1.2f;    // 突進後の硬直
 };
 
-struct ChargeAttackParams {
+// 強力な突進攻撃
+struct ChargeRushAttackParams {
 	// 予備動作フェーズ（地面を踏み込む）
 	float anticipationTime = 0.8f;       // 予備動作時間
 	float stompIntensity = 0.4f;         // 踏み込みの沈み込み
@@ -50,7 +53,8 @@ struct SpinAttackParams {
 	float cooldownTime = 0.5f;
 };
 
-struct LeapAttackParams {
+// しゃがんで攻撃
+struct JumpAttackParams {
 	// 予備動作フェーズ（深くしゃがむ）
 	float anticipationTime = 0.7f;     // 予備動作時間
 	float anticipationCrouchDepth = 0.8f; // 予備動作の沈み込み
@@ -79,9 +83,9 @@ struct ComboAttackParams {
 // 各状態の攻撃パラメータをまとめた構造体
 struct EnemyAttackParams {
 	RushAttackParams rush;
-	ChargeAttackParams charge;
+	ChargeRushAttackParams chargeRush;
 	SpinAttackParams spin;
-	LeapAttackParams leap;
+	JumpAttackParams jump;
 	ComboAttackParams combo;
 };
 
@@ -105,7 +109,7 @@ struct BattleEnemyData {
 	// 攻撃状態に入る距離
 	float attackStateRange = 10.0f;
 
-	std::vector<std::string> attackPatterns = { "rush","spin","charge","combo","leap" };
+	std::vector<std::string> attackPatterns = { "rush","spin","chargeRush","combo","jump" };
 	// 攻撃調整用パラメータ
 	EnemyAttackParams attackParams;
 };
