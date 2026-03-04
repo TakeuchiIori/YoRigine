@@ -712,12 +712,14 @@
 └── └── └── └── └── States/
 └── └── └── └──     ├── Attack/
 └── └── └── └──     └── ├── AttackSelector.h
-└── └── └── └──     └── ├── BattleChargeAttackState.cpp
-└── └── └── └──     └── ├── BattleChargeAttackState.h
+└── └── └── └──     └── ├── BattleChargeRushAttackState.cpp
+└── └── └── └──     └── ├── BattleChargeRushAttackState.h
 └── └── └── └──     └── ├── BattleComboAttackState.cpp
 └── └── └── └──     └── ├── BattleComboAttackState.h
-└── └── └── └──     └── ├── BattleLeapAttackState.cpp
-└── └── └── └──     └── ├── BattleLeapAttackState.h
+└── └── └── └──     └── ├── BattleCounterAttackState.cpp
+└── └── └── └──     └── ├── BattleCounterAttackState.h
+└── └── └── └──     └── ├── BattleJumpAttackState.cpp
+└── └── └── └──     └── ├── BattleJumpAttackState.h
 └── └── └── └──     └── ├── BattleRushAttackState.cpp
 └── └── └── └──     └── ├── BattleRushAttackState.h
 └── └── └── └──     └── ├── BattleSpinAttackState.cpp
@@ -250230,7 +250232,7 @@ void MyGame::Initialize() {
 	// 初期シーン設定
 	//------------------------------------------------------------
 #ifdef _DEBUG
-	SceneManager::GetInstance()->ChangeScene("Develop");   // デバッグ時はゲームシーン
+	SceneManager::GetInstance()->ChangeScene("Game");   // デバッグ時はゲームシーン
 #else
 	SceneManager::GetInstance()->ChangeScene("Title");  // 製品版はタイトルシーン
 #endif
@@ -250696,9 +250698,9 @@ void BattleEnemy::UpdateKnockback(float dt)
 //========================================================================*/
 void BattleEnemy::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other) {
 
-	if (isAlive_) {
-	// 攻撃を食らった時
-	if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon)) {
+	if (isAlive_ && !isInvincible_) {
+		// 攻撃を食らった時
+		if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon)) {
 			TakeDamage(static_cast<int>(player_->GetCombat()->GetCombo()->GetCurrentDamage()));
 
 			// --------------------- ヒットエフェクトの処理 --------------------- //
@@ -250737,23 +250739,23 @@ void BattleEnemy::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 			player_->GetCombat()->GetCombo()->OnHitStep(wt_.translate_);
 
 		}
-	}
 
-	// 盾に当たった時
-	if (dynamic_cast<BattleRushAttackState*>(GetCurrentState()) != nullptr) {
-		if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayerShield)) {
-			if (player_->GetCombat()->GetGuard()->GetState() == PlayerGuard::State::Active ||
-				player_->GetCombat()->GetGuard()->GetState() == PlayerGuard::State::Recovery) {
-				if (isAlive_) {
-					ChangeState(std::make_unique<BattleDownedState>());
+		// 盾に当たった時
+		if (dynamic_cast<BattleRushAttackState*>(GetCurrentState()) != nullptr) {
+			if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayerShield)) {
+				if (player_->GetCombat()->GetGuard()->GetState() == PlayerGuard::State::Active ||
+					player_->GetCombat()->GetGuard()->GetState() == PlayerGuard::State::Recovery) {
+					if (isAlive_) {
+						ChangeState(std::make_unique<BattleDownedState>());
+					}
 				}
 			}
 		}
-	}
 
-	// プレイヤー本体に当たった時
-	if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayer)) {
-		PerformBasicAttack();
+		// プレイヤー本体に当たった時
+		if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayer)) {
+			PerformBasicAttack();
+		}
 	}
 }
 
@@ -251112,9 +251114,11 @@ enum class BattleEnemyState {
 };
 
 ///************************* 攻撃用構造体 *************************///
+
+// 突進攻撃
 struct RushAttackParams {
 	// 予備動作フェーズ（後ろに引く）
-	float anticipationTime = 0.6f;     // 予備動作時間
+	float anticipationTime = 0.5f;     // 予備動作時間
 	float anticipationDistance = 1.5f; // 後退する距離
 
 	float chargeTime = 1.0f;      // 溜め時間
@@ -251123,7 +251127,8 @@ struct RushAttackParams {
 	float cooldownTime = 1.2f;    // 突進後の硬直
 };
 
-struct ChargeAttackParams {
+// 強力な突進攻撃
+struct ChargeRushAttackParams {
 	// 予備動作フェーズ（地面を踏み込む）
 	float anticipationTime = 0.8f;       // 予備動作時間
 	float stompIntensity = 0.4f;         // 踏み込みの沈み込み
@@ -251148,7 +251153,8 @@ struct SpinAttackParams {
 	float cooldownTime = 0.5f;
 };
 
-struct LeapAttackParams {
+// しゃがんで攻撃
+struct JumpAttackParams {
 	// 予備動作フェーズ（深くしゃがむ）
 	float anticipationTime = 0.7f;     // 予備動作時間
 	float anticipationCrouchDepth = 0.8f; // 予備動作の沈み込み
@@ -251177,9 +251183,9 @@ struct ComboAttackParams {
 // 各状態の攻撃パラメータをまとめた構造体
 struct EnemyAttackParams {
 	RushAttackParams rush;
-	ChargeAttackParams charge;
+	ChargeRushAttackParams chargeRush;
 	SpinAttackParams spin;
-	LeapAttackParams leap;
+	JumpAttackParams jump;
 	ComboAttackParams combo;
 };
 
@@ -251203,7 +251209,7 @@ struct BattleEnemyData {
 	// 攻撃状態に入る距離
 	float attackStateRange = 10.0f;
 
-	std::vector<std::string> attackPatterns = { "rush","spin","charge","combo","leap" };
+	std::vector<std::string> attackPatterns = { "rush","spin","chargeRush","combo","jump" };
 	// 攻撃調整用パラメータ
 	EnemyAttackParams attackParams;
 };
@@ -251925,12 +251931,12 @@ bool BattleEnemyManager::SaveEnemyData(const std::string& filePath) const {
 			{"cooldownTime", data.attackParams.rush.cooldownTime}
 		};
 
-		// チャージ攻撃 (Charge)
-		ap["charge"] = {
-			{"chargeTime", data.attackParams.charge.chargeTime},
-			{"rushTime", data.attackParams.charge.rushTime},
-			{"speedMultiplier", data.attackParams.charge.speedMultiplier},
-			{"cooldownTime", data.attackParams.charge.cooldownTime}
+		// チャージ攻撃 (chargeRush)
+		ap["chargeRush"] = {
+			{"chargeTime", data.attackParams.chargeRush.chargeTime},
+			{"rushTime", data.attackParams.chargeRush.rushTime},
+			{"speedMultiplier", data.attackParams.chargeRush.speedMultiplier},
+			{"cooldownTime", data.attackParams.chargeRush.cooldownTime}
 		};
 
 		// 回転攻撃 (Spin)
@@ -251942,13 +251948,13 @@ bool BattleEnemyManager::SaveEnemyData(const std::string& filePath) const {
 			{"cooldownTime", data.attackParams.spin.cooldownTime}
 		};
 
-		// ジャンプ攻撃 (Leap)
-		ap["leap"] = {
-			{"chargeTime", data.attackParams.leap.chargeTime},
-			{"jumpTime", data.attackParams.leap.jumpTime},
-			{"jumpHeight", data.attackParams.leap.jumpHeight},
-			{"crouchDepth", data.attackParams.leap.crouchDepth},
-			{"cooldownTime", data.attackParams.leap.cooldownTime}
+		// ジャンプ攻撃 (jump)
+		ap["jump"] = {
+			{"chargeTime", data.attackParams.jump.chargeTime},
+			{"jumpTime", data.attackParams.jump.jumpTime},
+			{"jumpHeight", data.attackParams.jump.jumpHeight},
+			{"crouchDepth", data.attackParams.jump.crouchDepth},
+			{"cooldownTime", data.attackParams.jump.cooldownTime}
 		};
 
 		// コンボ攻撃 (Combo)
@@ -252041,16 +252047,23 @@ bool BattleEnemyManager::LoadEnemyData(const std::string& filePath) {
 				if (ap.contains("rush")) {
 					const auto& c = ap["rush"];
 					auto& target = data.attackParams.rush;
+					target.anticipationTime = c.value("anticipationTime", 0.5f);
+					target.anticipationDistance = c.value("anticipationDistance", 1.5f);
+
 					target.chargeTime = c.value("chargeTime", 1.0f);
 					target.rushTime = c.value("rushTime", 0.5f);
 					target.speedMultiplier = c.value("speedMultiplier", 7.0f);
 					target.cooldownTime = c.value("cooldownTime", 1.2f);
 				}
 
-				// チャージ攻撃 (Charge)
-				if (ap.contains("charge")) {
-					const auto& c = ap["charge"];
-					auto& target = data.attackParams.charge;
+				// チャージ攻撃 (chargeRush)
+				if (ap.contains("chargeRush")) {
+					const auto& c = ap["chargeRush"];
+					auto& target = data.attackParams.chargeRush;
+					target.anticipationTime = c.value("anticipationTime", 0.8f);
+					target.stompIntensity = c.value("stompIntensity", 0.4f);
+					target.anticipationColorPulseSpeed = c.value("anticipationColorPulseSpeed", 8.0f);
+					
 					target.chargeTime = c.value("chargeTime", 1.5f);
 					target.rushTime = c.value("rushTime", 0.5f);
 					target.speedMultiplier = c.value("speedMultiplier", 12.0f);
@@ -252061,6 +252074,10 @@ bool BattleEnemyManager::LoadEnemyData(const std::string& filePath) {
 				if (ap.contains("spin")) {
 					const auto& l = ap["spin"];
 					auto& target = data.attackParams.spin;
+					target.anticipationTime = l.value("anticipationTime", 0.5f);
+					target.twistAngle = l.value("twistAngle", 1.57f);
+					target.anticipationColorIntensity = l.value("anticipationColorIntensity", 0.7f);
+
 					target.chargeTime = l.value("chargeTime", 0.3f);
 					target.spinTime = l.value("spinTime", 1.0f);
 					target.rotationCount = l.value("rotationCount", 2.0f);
@@ -252068,10 +252085,14 @@ bool BattleEnemyManager::LoadEnemyData(const std::string& filePath) {
 					target.cooldownTime = l.value("cooldownTime", 0.5f);
 				}
 
-				// ジャンプ攻撃 (Leap)
-				if (ap.contains("leap")) {
-					const auto& l = ap["leap"];
-					auto& target = data.attackParams.leap;
+				// ジャンプ攻撃 (jump)
+				if (ap.contains("jump")) {
+					const auto& l = ap["jump"];
+					auto& target = data.attackParams.jump;
+					target.anticipationTime = l.value("anticipationTime", 0.7f);
+					target.anticipationCrouchDepth = l.value("anticipationCrouchDepth", 0.8f);
+					target.anticipationColorPulseSpeed = l.value("anticipationColorPulseSpeed", 6.0f);
+
 					target.chargeTime = l.value("chargeTime", 0.5f);
 					target.jumpTime = l.value("jumpTime", 0.7f);
 					target.jumpHeight = l.value("jumpHeight", 4.0f);
@@ -252266,7 +252287,7 @@ void BattleEnemyManager::ShowDebugInfo() {
 
 		// 使用可能な攻撃パターンのリスト
 		static const char* availablePatterns[] = {
-			"rush", "leap", "spin", "charge", "sidestep", "combo"
+			"rush", "jump", "spin", "chargeRush", "sidestep", "combo"
 		};
 		static const int patternCount = 6;
 
@@ -252288,6 +252309,8 @@ void BattleEnemyManager::ShowDebugInfo() {
 					// --- Rush ---
 					if (ImGui::TreeNode("Rush (基本突進)")) {
 						auto& r = data.attackParams.rush;
+						ImGui::DragFloat("予備動作", &r.anticipationTime, 0.05f, 0.0f, 3.0f, "%.2f秒");
+						ImGui::DragFloat(" 後退する距離", &r.anticipationDistance, 0.05f, 0.0f, 5.0f, "%.2秒");
 						ImGui::DragFloat("溜め時間", &r.chargeTime, 0.05f, 0.0f, 5.0f, "%.2f秒");
 						ImGui::DragFloat("突進時間", &r.rushTime, 0.05f, 0.0f, 5.0f, "%.2f秒");
 						ImGui::DragFloat("速度倍率", &r.speedMultiplier, 0.1f, 0.0f, 20.0f, "x%.1f");
@@ -252295,9 +252318,9 @@ void BattleEnemyManager::ShowDebugInfo() {
 						ImGui::TreePop();
 					}
 
-					// --- Charge ---
-					if (ImGui::TreeNode("Charge (強力突進)")) {
-						auto& c = data.attackParams.charge;
+					// --- chargeRush ---
+					if (ImGui::TreeNode("chargeRush (強力突進)")) {
+						auto& c = data.attackParams.chargeRush;
 						ImGui::DragFloat("溜め(追尾)時間", &c.chargeTime, 0.05f, 0.0f, 10.0f, "%.2f秒");
 						ImGui::DragFloat("突進時間", &c.rushTime, 0.05f, 0.0f, 5.0f, "%.2f秒");
 						ImGui::DragFloat("速度倍率", &c.speedMultiplier, 0.1f, 0.0f, 30.0f, "x%.1f");
@@ -252316,9 +252339,9 @@ void BattleEnemyManager::ShowDebugInfo() {
 						ImGui::TreePop();
 					}
 
-					// --- Leap ---
-					if (ImGui::TreeNode("Leap (ジャンプ攻撃)")) {
-						auto& l = data.attackParams.leap;
+					// --- jump ---
+					if (ImGui::TreeNode("jump (ジャンプ攻撃)")) {
+						auto& l = data.attackParams.jump;
 						ImGui::DragFloat("踏み込み時間", &l.chargeTime, 0.05f, 0.0f, 3.0f, "%.2f秒");
 						ImGui::DragFloat("滞空時間", &l.jumpTime, 0.05f, 0.0f, 5.0f, "%.2f秒");
 						ImGui::DragFloat("ジャンプ高度", &l.jumpHeight, 0.1f, 0.0f, 20.0f, "%.1fm");
@@ -252423,8 +252446,8 @@ void BattleEnemyManager::ShowDebugInfo() {
 						data.attackPatterns = { "rush" };
 					}
 					ImGui::SameLine();
-					if (ImGui::Button("アグレッシブ (rush, charge, combo)")) {
-						data.attackPatterns = { "rush", "charge", "combo" };
+					if (ImGui::Button("アグレッシブ (rush, chargeRush, combo)")) {
+						data.attackPatterns = { "rush", "chargeRush", "combo" };
 					}
 
 					if (ImGui::Button("トリッキー (sidestep, spin)")) {
@@ -252432,7 +252455,7 @@ void BattleEnemyManager::ShowDebugInfo() {
 					}
 					ImGui::SameLine();
 					if (ImGui::Button("全種類")) {
-						data.attackPatterns = { "rush", "leap", "spin", "charge", "sidestep", "combo" };
+						data.attackPatterns = { "rush", "jump", "spin", "chargeRush", "combo" };
 					}
 
 					ImGui::TreePop();
@@ -252849,9 +252872,9 @@ File Path: YGame/GameObjects/Enemy/BattleEnemy/States/Attack/AttackSelector.h
 #pragma once
 #include "../../BattleEnemy.h"
 #include "BattleRushAttackState.h"
-#include "BattleLeapAttackState.h"
+#include "BattleJumpAttackState.h"
 #include "BattleSpinAttackState.h"
-#include "BattleChargeAttackState.h"
+#include "BattleChargeRushAttackState.h"
 #include "BattleComboAttackState.h"
 
 #include "Player/Player.h"
@@ -253016,11 +253039,11 @@ public:
 
 		// 遠距離
 		if (distance > config_.distance.midRange) {
-			if (HasPattern(patterns, "leap")) {
-				return std::make_unique<BattleLeapAttackState>();
+			if (HasPattern(patterns, "jump")) {
+				return std::make_unique<BattleJumpAttackState>();
 			}
-			if (HasPattern(patterns, "charge")) {
-				return std::make_unique<BattleChargeAttackState>();
+			if (HasPattern(patterns, "chargeRush")) {
+				return std::make_unique<BattleChargeRushAttackState>();
 			}
 		}
 		// 中距離
@@ -253083,38 +253106,38 @@ private:
 			// 超近距離（0-2m）
 			if (pattern == "rush") return affinity.rushVeryClose;
 			if (pattern == "spin") return affinity.spinVeryClose;
-			if (pattern == "charge") return affinity.chargeVeryClose;
-			if (pattern == "leap") return affinity.leapVeryClose;
+			if (pattern == "chargeRush") return affinity.chargeVeryClose;
+			if (pattern == "jump") return affinity.leapVeryClose;
 			if (pattern == "combo") return affinity.comboVeryClose;
 		}
 		else if (distance < config_.distance.closeRange) {
 			// 近距離（2-4m）
 			if (pattern == "rush") return affinity.rushClose;
 			if (pattern == "spin") return affinity.spinClose;
-			if (pattern == "charge") return affinity.chargeClose;
-			if (pattern == "leap") return affinity.leapClose;
+			if (pattern == "chargeRush") return affinity.chargeClose;
+			if (pattern == "jump") return affinity.leapClose;
 			if (pattern == "combo") return affinity.comboClose;
 		}
 		else if (distance < config_.distance.midRange) {
 			// 中距離（4-8m）
 			if (pattern == "rush") return affinity.rushMid;
 			if (pattern == "spin") return affinity.spinMid;
-			if (pattern == "charge") return affinity.chargeMid;
-			if (pattern == "leap") return affinity.leapMid;
+			if (pattern == "chargeRush") return affinity.chargeMid;
+			if (pattern == "jump") return affinity.leapMid;
 			if (pattern == "combo") return affinity.comboMid;
 		}
 		else if (distance < config_.distance.farRange) {
 			// 遠距離（8-15m）
 			if (pattern == "rush") return affinity.rushFar;
 			if (pattern == "spin") return affinity.spinFar;
-			if (pattern == "charge") return affinity.chargeFar;
-			if (pattern == "leap") return affinity.leapFar;
+			if (pattern == "chargeRush") return affinity.chargeFar;
+			if (pattern == "jump") return affinity.leapFar;
 			if (pattern == "combo") return affinity.comboFar;
 		}
 		else {
 			// 超遠距離（15m以上）
-			if (pattern == "charge") return affinity.chargeFar * 1.2f;
-			if (pattern == "leap") return affinity.leapFar * 1.2f;
+			if (pattern == "chargeRush") return affinity.chargeFar * 1.2f;
+			if (pattern == "jump") return affinity.leapFar * 1.2f;
 			return 0.1f; // その他の攻撃は超遠距離では不向き
 		}
 
@@ -253151,7 +253174,7 @@ private:
 		if (pattern == "rush") attackPriority = priority.rushPriority;
 		else if (pattern == "spin") attackPriority = priority.spinPriority;
 		else if (pattern == "charge") attackPriority = priority.chargePriority;
-		else if (pattern == "leap") attackPriority = priority.leapPriority;
+		else if (pattern == "jump") attackPriority = priority.leapPriority;
 		else if (pattern == "combo") attackPriority = priority.comboPriority;
 
 		return hpMultiplier * attackPriority;
@@ -253203,14 +253226,14 @@ private:
 		if (patternName == "rush") {
 			return std::make_unique<BattleRushAttackState>();
 		}
-		else if (patternName == "leap") {
-			return std::make_unique<BattleLeapAttackState>();
+		else if (patternName == "jump") {
+			return std::make_unique<BattleJumpAttackState>();
 		}
 		else if (patternName == "spin") {
 			return std::make_unique<BattleSpinAttackState>();
 		}
-		else if (patternName == "charge") {
-			return std::make_unique<BattleChargeAttackState>();
+		else if (patternName == "chargeRush") {
+			return std::make_unique<BattleChargeRushAttackState>();
 		}
 		else if (patternName == "combo") {
 			return std::make_unique<BattleComboAttackState>();
@@ -253237,11 +253260,11 @@ private:
 inline AttackWeightConfig AttackSelector::config_ = AttackWeightConfig();
 
 ============================================================
-File Path: YGame/GameObjects/Enemy/BattleEnemy/States/Attack/BattleChargeAttackState.cpp
+File Path: YGame/GameObjects/Enemy/BattleEnemy/States/Attack/BattleChargeRushAttackState.cpp
 ============================================================
-#include "BattleChargeAttackState.h"
+#include "BattleChargeRushAttackState.h"
 
-void BattleChargeAttackState::Enter(BattleEnemy& enemy)
+void BattleChargeRushAttackState::Enter(BattleEnemy& enemy)
 {
 	enemy.SetCanAct(false);
 	enemy.ResetStateTimer();
@@ -253258,10 +253281,10 @@ void BattleChargeAttackState::Enter(BattleEnemy& enemy)
 	}
 }
 
-void BattleChargeAttackState::Update(BattleEnemy& enemy, float dt)
+void BattleChargeRushAttackState::Update(BattleEnemy& enemy, float dt)
 {
 	const float currentTime = enemy.GetStateTimer();
-	const auto& params = enemy.GetEnemyData().attackParams.charge;
+	const auto& params = enemy.GetEnemyData().attackParams.chargeRush;
 
 	// フェーズの境界時間を計算
 	const float anticipationEndTime = params.anticipationTime;
@@ -253325,7 +253348,7 @@ void BattleChargeAttackState::Update(BattleEnemy& enemy, float dt)
 	}
 }
 
-void BattleChargeAttackState::Exit(BattleEnemy& enemy)
+void BattleChargeRushAttackState::Exit(BattleEnemy& enemy)
 {
 	enemy.SetCanAct(true);
 	enemy.SetColor({ 1, 1, 1, 1 });
@@ -253337,7 +253360,7 @@ void BattleChargeAttackState::Exit(BattleEnemy& enemy)
 }
 
 ============================================================
-File Path: YGame/GameObjects/Enemy/BattleEnemy/States/Attack/BattleChargeAttackState.h
+File Path: YGame/GameObjects/Enemy/BattleEnemy/States/Attack/BattleChargeRushAttackState.h
 ============================================================
 #pragma once
 #include "../../../IEnemyState.h"
@@ -253348,7 +253371,7 @@ File Path: YGame/GameObjects/Enemy/BattleEnemy/States/Attack/BattleChargeAttackS
 /// <summary>
 /// チャージ攻撃状態（長めに溜めて強力な突進）
 /// </summary>
-class BattleChargeAttackState : public IEnemyState<BattleEnemy> {
+class BattleChargeRushAttackState : public IEnemyState<BattleEnemy> {
 public:
 	void Enter(BattleEnemy& enemy) override;
 
@@ -253516,11 +253539,182 @@ private:
 };
 
 ============================================================
-File Path: YGame/GameObjects/Enemy/BattleEnemy/States/Attack/BattleLeapAttackState.cpp
+File Path: YGame/GameObjects/Enemy/BattleEnemy/States/Attack/BattleCounterAttackState.cpp
 ============================================================
-#include "BattleLeapAttackState.h"
+#include "BattleCounterAttackState.h"
+#include "../BattleIdleState.h"
+#include <cmath>
 
-void BattleLeapAttackState::Enter(BattleEnemy& enemy)
+/// <summary>
+/// 反撃状態開始処理
+/// RecoveryStateから来るため、入った時点では無敵を維持する
+/// </summary>
+void BattleCounterAttackState::Enter(BattleEnemy& enemy) {
+    enemy.SetCanAct(false);
+    enemy.ResetStateTimer();
+    enemy.IsInvincible() = true;  // 起動フェーズ中は無敵を維持
+
+    anticipationStartPos_ = enemy.GetTranslate();
+
+    // 入った瞬間にプレイヤー方向を確定
+    if (enemy.GetPlayer()) {
+        attackDir_ = enemy.GetPlayerPosition() - enemy.GetTranslate();
+        if (Length(attackDir_) > 0.01f) {
+            attackDir_ = Normalize(attackDir_);
+            enemy.SetRotationY(std::atan2(attackDir_.x, attackDir_.z));
+        }
+    }
+
+    // 青白くフラッシュ → 赤に変化する起動演出
+    if (enemy.GetAnimation()) {
+        enemy.GetAnimation()->StartColorAnimation(
+            { 0.3f, 0.7f, 2.0f, 1.0f },  // 強い青白フラッシュ
+            { 1.0f, 0.1f, 0.0f, 1.0f },  // 赤へ変化
+            counterStartupTime_,
+            Easing::Function::EaseInQuad
+        );
+        enemy.GetAnimation()->PlayBounceScaleAnimation(1.3f, 0.85f);
+    }
+}
+
+/// <summary>
+/// 反撃状態更新処理
+/// </summary>
+void BattleCounterAttackState::Update(BattleEnemy& enemy, float dt) {
+    const float currentTime = enemy.GetStateTimer();
+
+    // フェーズ境界時間
+    const float startupEnd = counterStartupTime_;
+    const float anticipationEnd = startupEnd + anticipationTime_;
+    const float chargeEnd = anticipationEnd + chargeTime_;
+    const float rushEnd = chargeEnd + rushTime_;
+    const float totalDuration = rushEnd + cooldownTime_;
+
+    // === フェーズ1: カウンター起動（無敵・演出のみ） ===
+    if (currentTime < startupEnd) {
+        // 起動中もプレイヤーを追尾して向く（逃がさない）
+        if (enemy.GetPlayer()) {
+            attackDir_ = enemy.GetPlayerPosition() - enemy.GetTranslate();
+            if (Length(attackDir_) > 0.01f) {
+                attackDir_ = Normalize(attackDir_);
+                enemy.SetRotationY(std::atan2(attackDir_.x, attackDir_.z));
+            }
+        }
+        return;
+    }
+
+    // === フェーズ2: 予備動作（素早く後退）※この間はまだ無敵 ===
+    if (currentTime < anticipationEnd) {
+        const float localTime = currentTime - startupEnd;
+        const float progress = localTime / anticipationTime_;
+
+        // ease-out cubicで素早くスパッと引く
+        const float easeProgress = 1.0f - std::pow(1.0f - progress, 3.0f);
+        const Vector3 backwardOffset = -attackDir_ * anticipationDistance_ * easeProgress;
+        enemy.SetTranslate(anticipationStartPos_ + backwardOffset);
+
+    }
+    // === フェーズ3: チャージ（予備動作完了 → ここで無敵解除、プレイヤーをロックオン追尾） ===
+    else if (currentTime < chargeEnd) {
+        // チャージ開始の瞬間に無敵解除（後退完了済みなので安全）
+        if (enemy.IsInvincible()) {
+            enemy.IsInvincible() = false;
+        }
+        // チャージ中もリアルタイムでプレイヤーを追尾して方向を更新
+        if (enemy.GetPlayer()) {
+            attackDir_ = enemy.GetPlayerPosition() - enemy.GetTranslate();
+            if (Length(attackDir_) > 0.01f) {
+                attackDir_ = Normalize(attackDir_);
+                enemy.SetRotationY(std::atan2(attackDir_.x, attackDir_.z));
+            }
+        }
+
+        const float chargeProgress = (currentTime - anticipationEnd) / chargeTime_;
+        enemy.SetColor({ 1.0f, chargeProgress * 0.15f, 0.0f, 1.0f });
+    }
+    // === フェーズ4: 突進（超高速 & 突進中もプレイヤーを追従） ===
+    else if (currentTime < rushEnd) {
+        enemy.SetColor({ 1.0f, 0.0f, 0.0f, 1.0f });
+
+        // 突進中もプレイヤー方向を毎フレーム更新（ホーミング）
+        if (enemy.GetPlayer()) {
+            Vector3 toPlayer = enemy.GetPlayerPosition() - enemy.GetTranslate();
+            if (Length(toPlayer) > 0.01f) {
+                // 完全ホーミングではなく少し補間して自然に追う
+                Vector3 newDir = Normalize(toPlayer);
+                attackDir_ = Normalize(attackDir_ + newDir * 4.0f * dt);
+                enemy.SetRotationY(std::atan2(attackDir_.x, attackDir_.z));
+            }
+        }
+
+        enemy.AddTranslate(attackDir_ * enemy.GetEnemyData().moveSpeed * rushSpeedMultiplier_ * dt);
+    }
+    // === フェーズ5: クールダウン ===
+    else if (currentTime >= totalDuration) {
+        enemy.ChangeState(std::make_unique<BattleIdleState>());
+    }
+}
+
+/// <summary>
+/// 反撃状態終了処理
+/// </summary>
+void BattleCounterAttackState::Exit(BattleEnemy& enemy) {
+    enemy.SetCanAct(true);
+    enemy.IsInvincible() = false;  // 念のためリセット
+    enemy.SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+}
+
+============================================================
+File Path: YGame/GameObjects/Enemy/BattleEnemy/States/Attack/BattleCounterAttackState.h
+============================================================
+#pragma once
+#include "../../../IEnemyState.h"
+#include "../../BattleEnemy.h"
+#include "../BattleIdleState.h"
+#include <cmath>
+
+/// <summary>
+/// 反撃状態（最強性能版）
+/// RecoveryState終了後に移行する専用攻撃State
+/// 起動フェーズ中は無敵、攻撃フェーズで無敵解除
+/// プレイヤーを逃がさない超強化パラメータを使用
+/// </summary>
+class BattleCounterAttackState : public IEnemyState<BattleEnemy> {
+public:
+    void Enter(BattleEnemy& enemy) override;
+    void Update(BattleEnemy& enemy, float dt) override;
+    void Exit(BattleEnemy& enemy) override;
+
+private:
+    Vector3 attackDir_{ 0, 0, 0 };
+    Vector3 anticipationStartPos_{ 0, 0, 0 };
+
+    // ========== 反撃専用パラメータ ==========
+
+    // フェーズ1: カウンター起動（この間は無敵）
+    const float counterStartupTime_ = 0.2f;
+
+    // フェーズ2: 予備動作（短くキビキビ）
+    const float anticipationTime_ = 0.15f;
+    const float anticipationDistance_ = 5.8f;   // 後退距離）
+
+    // フェーズ3: チャージ（プレイヤーをロックオン追尾）
+    const float chargeTime_ = 0.25f;
+
+    // フェーズ4: 突進（超高速 & 突進中もプレイヤーを追従）
+    const float rushTime_ = 0.45f;
+    const float rushSpeedMultiplier_ = 18.0f;
+
+    // フェーズ5: クールダウン
+    const float cooldownTime_ = 0.8f;
+};
+
+============================================================
+File Path: YGame/GameObjects/Enemy/BattleEnemy/States/Attack/BattleJumpAttackState.cpp
+============================================================
+#include "BattleJumpAttackState.h"
+
+void BattleJumpAttackState::Enter(BattleEnemy& enemy)
 {
 	enemy.SetCanAct(false);
 	enemy.ResetStateTimer();
@@ -253542,9 +253736,9 @@ void BattleLeapAttackState::Enter(BattleEnemy& enemy)
 	}
 }
 
-void BattleLeapAttackState::Update(BattleEnemy& enemy, [[maybe_unused]] float dt)
+void BattleJumpAttackState::Update(BattleEnemy& enemy, [[maybe_unused]] float dt)
 {
-	const auto& params = enemy.GetEnemyData().attackParams.leap;
+	const auto& params = enemy.GetEnemyData().attackParams.jump;
 	const float currentTime = enemy.GetStateTimer();
 
 	// フェーズの境界時間を計算
@@ -253620,7 +253814,7 @@ void BattleLeapAttackState::Update(BattleEnemy& enemy, [[maybe_unused]] float dt
 	}
 }
 
-void BattleLeapAttackState::Exit(BattleEnemy& enemy)
+void BattleJumpAttackState::Exit(BattleEnemy& enemy)
 {
 	// 元の高さに戻す
 	Vector3 pos = enemy.GetTranslate();
@@ -253632,7 +253826,7 @@ void BattleLeapAttackState::Exit(BattleEnemy& enemy)
 }
 
 ============================================================
-File Path: YGame/GameObjects/Enemy/BattleEnemy/States/Attack/BattleLeapAttackState.h
+File Path: YGame/GameObjects/Enemy/BattleEnemy/States/Attack/BattleJumpAttackState.h
 ============================================================
 #pragma once
 #include "../../../IEnemyState.h"
@@ -253642,7 +253836,7 @@ File Path: YGame/GameObjects/Enemy/BattleEnemy/States/Attack/BattleLeapAttackSta
 /// <summary>
 /// 跳躍攻撃状態（ジャンプして叩きつける）
 /// </summary>
-class BattleLeapAttackState : public IEnemyState<BattleEnemy> {
+class BattleJumpAttackState : public IEnemyState<BattleEnemy> {
 public:
 	void Enter(BattleEnemy& enemy) override;
 
@@ -254048,6 +254242,7 @@ File Path: YGame/GameObjects/Enemy/BattleEnemy/States/BattleDeadState.cpp
 void BattleDeadState::Enter(BattleEnemy& enemy)
 {
 	enemy.SetCanAct(false);
+	enemy.IsInvincible() = true;
 }
 
 
@@ -254062,6 +254257,7 @@ void BattleDeadState::Update(BattleEnemy& enemy, float dt)
 
 void BattleDeadState::Exit([[maybe_unused]] BattleEnemy& enemy)
 {
+	enemy.IsInvincible() = false;
 }
 
 
@@ -254261,6 +254457,7 @@ File Path: YGame/GameObjects/Enemy/BattleEnemy/States/BattleRecoveryState.cpp
 
 #include "Attack/BattleRushAttackState.h"
 #include "BattleIdleState.h"
+#include "Attack/BattleCounterAttackState.h"
 
 void BattleRecoveryState::Enter(BattleEnemy& enemy) {
     enemy.SetCanAct(false);
@@ -254304,7 +254501,7 @@ void BattleRecoveryState::Update(BattleEnemy& enemy, float dt) {
     // 回復時間終了で攻撃状態へ
     if (timer > recoveryDuration_) {
         // 反撃
-        enemy.ChangeState(std::make_unique<BattleRushAttackState>());
+        enemy.ChangeState(std::make_unique<BattleCounterAttackState>());
     }
 }
 
