@@ -206,7 +206,7 @@ Motion Motion::LoadBinary(const std::string& path)
 
 	Motion motion;
 
-	// duration
+	// 間隔
 	ifs.read(reinterpret_cast<char*>(&motion.animation_.duration_), sizeof(float));
 
 	// ノード数

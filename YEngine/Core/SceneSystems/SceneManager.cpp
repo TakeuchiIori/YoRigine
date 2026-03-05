@@ -89,7 +89,7 @@ void SceneManager::Update() {
 void SceneManager::PerformSceneTransition() {
 
 	//------------------------------------------------------------
-	// ステップ2: 現在のシーンを安全に終了
+	// 現在のシーンを安全に終了
 	//------------------------------------------------------------
 	if (scene_) {
 		scene_->Finalize();
@@ -97,7 +97,7 @@ void SceneManager::PerformSceneTransition() {
 	}
 
 	//------------------------------------------------------------
-	// ステップ3: 新しいシーンに切り替え
+	// 新しいシーンに切り替え
 	//------------------------------------------------------------
 	scene_ = std::move(nextScene_);
 	nextScene_ = nullptr;
@@ -156,7 +156,7 @@ void SceneManager::ChangeScene(const std::string& sceneName) {
 
 	nextScene_ = sceneFactory_->CreateScene(sceneName);
 	//------------------------------------------------------------
-	// 初回シーン生成処理（アプリ起動直後）
+	// 初回シーン生成処理
 	//------------------------------------------------------------
 	if (!scene_) {
 		scene_ = std::move(nextScene_);
@@ -183,13 +183,12 @@ void SceneManager::ChangeSceneImmediate(const std::string& sceneName) {
 		scene_->Finalize();
 		scene_ = nullptr;
 	}
-	//YoRigine::DirectXCommon::GetInstance()->WaitForGPU();
 
 	// 新しいシーンを生成して初期化
 	scene_ = sceneFactory_->CreateScene(sceneName);
 	scene_->SetSceneManager(this);
 	scene_->Initialize();
 
-	// トランジションの状態をリセット（実行中だった場合のため）
+	// トランジションの状態をリセット
 	transitionState_ = TransitionState::None;
 }

@@ -35,7 +35,7 @@ public:
 
 	// ベクトルのキーフレーム
 	using KeyframeVector3 = Keyframe<Vector3>;
-	using KeyframeFloat = Keyframe<float>;
+	using KeyframeFloat =	Keyframe<float>;
 
 	// 回転のキーフレーム
 	using KeyframeQuaternion = Keyframe<Quaternion>;
@@ -63,7 +63,6 @@ public:
 	struct AnimationModel {
 		float duration_;
 		std::map<std::string, NodeAnimation> nodeAnimations_;
-		//SpeedCurve speedCurve;
 	};
 
 public:
@@ -88,8 +87,8 @@ public:
 	void PlayerAnimation(float animationTime, Node& node);
 
 	// ベクトル値取得
+	float	CalculateValue(const std::vector<KeyframeFloat>& keyframes, float time, InterpolationType interpolationType);
 	Vector3 CalculateValue(const std::vector<KeyframeVector3>& keyframes, float time, InterpolationType interpolationType);
-	float CalculateValue(const std::vector<KeyframeFloat>& keyframes, float time, InterpolationType interpolationType);
 	// 回転値取得
 	Quaternion CalculateValue(const std::vector<KeyframeQuaternion>& keyframes, float time, InterpolationType interpolationType);
 
