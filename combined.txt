@@ -639,8 +639,6 @@
 └──         └── ├── CameraEditor.cpp
 └──         └── ├── CameraEditor.h
 └──         └── ├── CameraFactory.h
-└──         └── ├── CameraManager.cpp
-└──         └── ├── CameraManager.h
 └──         └── ├── CameraMode.h
 └──         └── └── Virtuals/
 └──         └──     ├── BattleStartCamera/
@@ -671,6 +669,9 @@
 └──         └──     ├── KeyframeCamera/
 └──         └──     └── ├── KeyframeCamera.cpp
 └──         └──     └── └── KeyframeCamera.h
+└──         └──     ├── TitleCamera/
+└──         └──     └── ├── TitleCamera.cpp
+└──         └──     └── └── TitleCamera.h
 └──         └──     ├── VirtualCamera.cpp
 └──         └──     └── VirtualCamera.h
 └──         ├── Convert/
@@ -192756,9 +192757,6 @@ void BaseScene::InitializeCommon()
 	YoRigine::GameTime::Initialize();
 	YoRigine::CollisionManager::GetInstance()->Initialize();
 
-	// カメラ
-	sceneCamera_ = cameraManager_.AddCamera();
-
 	// パーティクル
 	YoRigine::ParticleManager::GetInstance()->SetCamera(sceneCamera_.get());
 
@@ -192770,7 +192768,6 @@ void BaseScene::InitializeCommon()
 void BaseScene::UpdateCommon()
 {
 	YoRigine::GameTime::Update();
-	cameraManager_.UpdateAllCameras();
 	YoRigine::ModelManipulator::GetInstance()->Update();
 	YoRigine::ParticleManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
 	YoRigine::CollisionManager::GetInstance()->Update();
@@ -192797,7 +192794,6 @@ File Path: YEngine/Core/SceneSystems/BaseScene.h
 // Engine
 #include <memory>
 #include <Systems/Camera/Camera.h>
-#include <Systems/Camera/CameraManager.h>
 #include <Systems/GameTime/GameTime.h>
 #include <Collision/Core/CollisionManager.h>
 #include <Particle/ParticleManager.h>
@@ -192850,7 +192846,6 @@ private:
 	std::string sceneName_;
 	// カメラ
 	std::shared_ptr<Camera> sceneCamera_;
-	CameraManager cameraManager_;
 
 };
 
@@ -192950,10 +192945,10 @@ void DevelopScene::Initialize() {
 /// </summary>
 void DevelopScene::Update() {
 	YoRigine::GameTime::Update();
+	UpdateCamera();
 	motionEditor_->Update();
 
 
-	UpdateCamera();
 	YoRigine::ModelManipulator::GetInstance()->Update();
 	YoRigine::ParticleManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
 	YParticleManager::GetInstance().Update(YoRigine::GameTime::GetDeltaTime());
@@ -193067,7 +193062,6 @@ File Path: YEngine/Core/SceneSystems/DevelopScene/DevelopScene.h
 #include "Systems/Camera/CameraDirector.h"
 #include "Systems/Camera/CameraEditor.h"
 #include "Systems/Camera/Camera.h"
-#include "Systems/Camera/CameraManager.h"
 
 #include "Motion/MotionEditor.h"
 
@@ -193205,7 +193199,7 @@ void SceneManager::Update() {
 void SceneManager::PerformSceneTransition() {
 
 	//------------------------------------------------------------
-	// ステップ2: 現在のシーンを安全に終了
+	// 現在のシーンを安全に終了
 	//------------------------------------------------------------
 	if (scene_) {
 		scene_->Finalize();
@@ -193213,7 +193207,7 @@ void SceneManager::PerformSceneTransition() {
 	}
 
 	//------------------------------------------------------------
-	// ステップ3: 新しいシーンに切り替え
+	// 新しいシーンに切り替え
 	//------------------------------------------------------------
 	scene_ = std::move(nextScene_);
 	nextScene_ = nullptr;
@@ -193272,7 +193266,7 @@ void SceneManager::ChangeScene(const std::string& sceneName) {
 
 	nextScene_ = sceneFactory_->CreateScene(sceneName);
 	//------------------------------------------------------------
-	// 初回シーン生成処理（アプリ起動直後）
+	// 初回シーン生成処理
 	//------------------------------------------------------------
 	if (!scene_) {
 		scene_ = std::move(nextScene_);
@@ -193299,14 +193293,13 @@ void SceneManager::ChangeSceneImmediate(const std::string& sceneName) {
 		scene_->Finalize();
 		scene_ = nullptr;
 	}
-	//YoRigine::DirectXCommon::GetInstance()->WaitForGPU();
 
 	// 新しいシーンを生成して初期化
 	scene_ = sceneFactory_->CreateScene(sceneName);
 	scene_->SetSceneManager(this);
 	scene_->Initialize();
 
-	// トランジションの状態をリセット（実行中だった場合のため）
+	// トランジションの状態をリセット
 	transitionState_ = TransitionState::None;
 }
 
@@ -193947,7 +193940,7 @@ void WinApp::Finalize()
 
 
 /// <summary>
-/// メッセージ処理（閉じる要求が来たら true）
+/// メッセージ処理
 /// </summary>
 bool WinApp::ProcessMessage()
 {
@@ -194001,8 +193994,6 @@ public:
 	// クライアント領域のサイズ 16 : 9
 	static const int32_t kClientWidth = 1600;
 	static const int32_t kClientHeight = 900;
-
-
 private:
 	///************************* メンバ変数 *************************///
 	static WinApp* instance;
@@ -225175,7 +225166,6 @@ File Path: YEngine/Model/Model.cpp
 // C++
 #include <fstream>
 #include <assert.h>
-#include <fstream>
 #include <sstream>
 #include <iostream>
 
@@ -226416,7 +226406,7 @@ Motion Motion::LoadBinary(const std::string& path)
 
 	Motion motion;
 
-	// duration
+	// 間隔
 	ifs.read(reinterpret_cast<char*>(&motion.animation_.duration_), sizeof(float));
 
 	// ノード数
@@ -226611,7 +226601,6 @@ Quaternion Motion::CalculateValue(const std::vector<KeyframeQuaternion>& keyfram
 	return (*keyframes.rbegin()).value;
 }
 
-
 ============================================================
 File Path: YEngine/Model/Motion/Motion.h
 ============================================================
@@ -226652,7 +226641,7 @@ public:
 
 	// ベクトルのキーフレーム
 	using KeyframeVector3 = Keyframe<Vector3>;
-	using KeyframeFloat = Keyframe<float>;
+	using KeyframeFloat =	Keyframe<float>;
 
 	// 回転のキーフレーム
 	using KeyframeQuaternion = Keyframe<Quaternion>;
@@ -226680,7 +226669,6 @@ public:
 	struct AnimationModel {
 		float duration_;
 		std::map<std::string, NodeAnimation> nodeAnimations_;
-		//SpeedCurve speedCurve;
 	};
 
 public:
@@ -226705,8 +226693,8 @@ public:
 	void PlayerAnimation(float animationTime, Node& node);
 
 	// ベクトル値取得
+	float	CalculateValue(const std::vector<KeyframeFloat>& keyframes, float time, InterpolationType interpolationType);
 	Vector3 CalculateValue(const std::vector<KeyframeVector3>& keyframes, float time, InterpolationType interpolationType);
-	float CalculateValue(const std::vector<KeyframeFloat>& keyframes, float time, InterpolationType interpolationType);
 	// 回転値取得
 	Quaternion CalculateValue(const std::vector<KeyframeQuaternion>& keyframes, float time, InterpolationType interpolationType);
 
@@ -228417,12 +228405,10 @@ void MotionSystem::Update(float deltaTime)
 
 	// 終了した瞬間コールバックする
 	if (!wasFinished && isFinished_) {
-		if (onMationFinished_) {
-			onMationFinished_();
+		if (onMotionFinished_) {
+			onMotionFinished_();
 		}
 	}
-
-
 }
 
 
@@ -228440,12 +228426,14 @@ void MotionSystem::Apply()
 		if (skinCluster_) {
 			skinCluster_->UpdateMatrixPalette(skeleton_->GetJoints());
 		}
+
 	} else if (skeleton_) {
 		animation_->ApplyAnimation(skeleton_->GetJoints(), animationTime_);
 		skeleton_->Update();
 		if (skinCluster_) {
 			skinCluster_->UpdateMatrixPalette(skeleton_->GetJoints());
 		}
+
 	} else if (node_) {
 		animation_->PlayerAnimation(animationTime_, *node_);
 	}
@@ -228453,13 +228441,11 @@ void MotionSystem::Apply()
 
 
 void MotionSystem::PlayOnce() {
-	//animationTime_ = 0.0f;
 	playMode_ = MotionPlayMode::Once;
 	isFinished_ = false;
 }
 
 void MotionSystem::PlayLoop() {
-	//animationTime_ = 0.0f;
 	playMode_ = MotionPlayMode::Loop;
 	isFinished_ = false;
 }
@@ -228551,7 +228537,6 @@ void MotionSystem::SetPlayMode(MotionPlayMode playMode)
 	isFinished_ = false;
 
 	if (!animationBlendState_.isBlending) {
-		//animationBlendState_.fromTime = animationTime_;
 		animationBlendState_.toTime = 0.0f;
 		animationTime_ = 0.0f;
 	}
@@ -228570,8 +228555,8 @@ void MotionSystem::BlendAndApplyAnimation(const Motion& from, const Motion& to, 
 
 		QuaternionTransform fromTr = GetTransformAnimation(from, name, fromSampleTime);
 		QuaternionTransform toTr = GetTransformAnimation(to, name, toSampleTime);
-
 		QuaternionTransform blended;
+
 		blended.translate = Lerp(fromTr.translate, toTr.translate, t);
 		blended.rotate = Slerp(fromTr.rotate, toTr.rotate, t);
 		blended.scale = Lerp(fromTr.scale, toTr.scale, t);
@@ -228631,9 +228616,9 @@ public:
 
 	// モーションが終了したとき
 	void SetOnMotionFinishedCallback(const std::function<void()>& callback) {
-		onMationFinished_ = callback;
+		onMotionFinished_ = callback;
 	}
-	std::function<void()> onMationFinished_;
+	std::function<void()> onMotionFinished_;
 
 public:
 	///************************* アクセッサ *************************///
@@ -241260,6 +241245,11 @@ void CameraEditor::InitializeDefaults(const std::string& sceneType)
 		clear->Initialize();
 		director->AddCamera("ClearCamera", clear);
 	}
+	else if (sceneType == "Title") {
+		auto title = CameraFactory::Create("Title");
+		title->Initialize();
+		director->AddCamera("TitleCamera", title);
+	}
 }
 
 
@@ -241305,6 +241295,7 @@ File Path: YEngine/Utilities/Systems/Camera/CameraFactory.h
 #include "Virtuals/DebugCamera/DebugCamera.h"
 #include "Virtuals/FollowCamera/FollowCamera.h"
 #include "Virtuals/ClearCamera/ClearCamera.h"
+#include "Virtuals/TitleCamera/TitleCamera.h"
 
 class CameraFactory
 {
@@ -241313,110 +241304,24 @@ public:
 		if (type == "Debug") return std::make_shared<DebugCamera>();
 		if (type == "Follow") return std::make_shared<FollowCamera>();
 		if (type == "Clear") return std::make_shared<ClearCamera>();
+		if (type == "Title") return std::make_shared<TitleCamera>();
 		return nullptr;
 	}
 
 	// エディタの選択肢用
 	static std::vector<std::string> GetTypeList() {
-		return { "Debug", "Follow" ,"Clear"};
+		return { "Debug", "Follow" ,"Clear","Title"};
 	}
 
 	static std::string GetTypeName(std::shared_ptr<VirtualCamera> cam) {
 		if (std::dynamic_pointer_cast<DebugCamera>(cam))  return "Debug";
 		if (std::dynamic_pointer_cast<FollowCamera>(cam)) return "Follow";
 		if (std::dynamic_pointer_cast<ClearCamera>(cam)) return "Clear";
+		if (std::dynamic_pointer_cast<TitleCamera>(cam)) return "Title";
 		return "Unknown";
 	}
 };
 
-
-
-============================================================
-File Path: YEngine/Utilities/Systems/Camera/CameraManager.cpp
-============================================================
-#include "CameraManager.h"
-
-// C++
-#include <algorithm>
-
-std::shared_ptr<Camera> CameraManager::AddCamera()
-{
-    auto camera = std::make_shared<Camera>();
-    cameras_.emplace_back(camera);
-    return camera;
-}
-
-void CameraManager::RemoveCamera(std::shared_ptr<Camera> camera)
-{
-    cameras_.erase(std::remove(cameras_.begin(), cameras_.end(), camera), cameras_.end());
-}
-
-void CameraManager::SetCurrentCamera(std::shared_ptr<Camera> camera)
-{
-    currentCamera_ = camera;
-}
-
-std::shared_ptr<Camera> CameraManager::GetCurrentCamera() const
-{
-    return currentCamera_;
-}
-
-void CameraManager::UpdateAllCameras()
-{
-    for (auto& camera : cameras_)
-    {
-        camera->Update();
-    }
-}
-
-
-============================================================
-File Path: YEngine/Utilities/Systems/Camera/CameraManager.h
-============================================================
-#pragma once
-#include "Camera.h"
-
-// C++
-#include <vector>
-#include <memory>
-
-// カメラの追加・削除・切り替え・更新を統括して管理するクラス
-class CameraManager
-{
-public:
-	///************************* 基本関数 *************************///
-
-	// コンストラクタ
-	CameraManager() = default;
-
-public:
-	///************************* カメラ生成・削除 *************************///
-
-	// 新しいカメラを追加
-	std::shared_ptr<Camera> AddCamera();
-
-	// カメラを削除
-	void RemoveCamera(std::shared_ptr<Camera> camera);
-
-public:
-	///************************* カメラ制御 *************************///
-
-	// 現在使用中のカメラを設定
-	void SetCurrentCamera(std::shared_ptr<Camera> camera);
-
-	// 現在のカメラを取得
-	std::shared_ptr<Camera> GetCurrentCamera() const;
-
-	// すべてのカメラを更新
-	void UpdateAllCameras();
-
-private:
-	///************************* メンバ変数 *************************///
-
-	std::vector<std::shared_ptr<Camera>> cameras_;
-	std::shared_ptr<Camera> currentCamera_;
-
-};
 
 
 ============================================================
@@ -241427,6 +241332,7 @@ File Path: YEngine/Utilities/Systems/Camera/CameraMode.h
 enum class CameraMode {
 	DEFAULT,
 	CLEAR,
+	TITLE,
 	FOLLOW,
 	DEBUG,
 	BATTLE_START
@@ -243915,6 +243821,131 @@ private:
 	bool isPlaying_ = false;
 	bool isLooping_ = true;
 	float playbackSpeed_ = 1.0f;
+};
+
+============================================================
+File Path: YEngine/Utilities/Systems/Camera/Virtuals/TitleCamera/TitleCamera.cpp
+============================================================
+#include "TitleCamera.h"
+#include <Systems/GameTime/GameTime.h>
+#include <Systems/Input/Input.h>
+
+#ifdef USE_IMGUI
+#include "imgui.h"
+#endif // USE_IMGUI
+
+
+void TitleCamera::Initialize()
+{
+	VirtualCamera::Initialize();
+	// カメラ初期位置設定
+	transform_.translate = { 0.0f, 6.0f, -40.0f };
+
+	// 初期マウス位置を取得
+	YoRigine::Input* input = YoRigine::Input::GetInstance();
+	prevMousePos_ = input->GetMousePosition();
+
+}
+
+void TitleCamera::Update()
+{
+	if (enableOrbit_ && target_) {
+		//------------------------------------------------------------
+		// オービットモード（ターゲット中心に回転）
+		//------------------------------------------------------------
+		orbitAngle_ += orbitSpeed_ * YoRigine::GameTime::GetDeltaTime();
+		if (orbitAngle_ > 2.0f * std::numbers::pi_v<float>) {
+			orbitAngle_ -= 2.0f * std::numbers::pi_v<float>;
+		}
+
+		Vector3 targetPos = target_->translate_;
+		 transform_.translate.x = targetPos.x + cosf(orbitAngle_) * orbitRadius_;
+		 transform_.translate.z = targetPos.z + sinf(orbitAngle_) * orbitRadius_;
+		 transform_.translate.y = targetPos.y + orbitHeight_;
+
+		Vector3 forward = Normalize(targetPos -  transform_.translate);
+		 transform_.rotate.y = atan2f(forward.x, forward.z);
+		 transform_.rotate.x = asinf(forward.y);
+
+		 viewMatrix_ = Inverse(MakeAffineMatrix(transform_.scale, transform_.rotate,transform_.translate));
+	}
+}
+
+void TitleCamera::DrawDebugGui()
+{
+#ifdef USE_IMGUI
+	ImGui::Text("カメラ設定");
+	ImGui::DragFloat3("位置", &transform_.translate.x, 0.1f);
+	ImGui::DragFloat3("回転", &transform_.rotate.x, 0.01f);
+	ImGui::Separator();
+	ImGui::DragFloat("回転速度", &orbitSpeed_, 0.01f);
+	ImGui::DragFloat("回り込み半径", &orbitRadius_, 0.1f);
+	ImGui::DragFloat("回り込み高さ", &orbitHeight_, 0.1f);
+	ImGui::DragFloat("角度", &orbitAngle_, 0.1f);
+	ImGui::Checkbox("オービットモード", &enableOrbit_);
+#endif
+}
+
+void TitleCamera::Save(nlohmann::json& j) const
+{
+	VirtualCamera::Save(j); // 名前や座標などの共通項目
+	j["orbitSpeed"] = orbitSpeed_;
+	j["orbitRadius"] = orbitRadius_;
+	j["orbitHeight"] = orbitHeight_;
+	j["enableOrbit"] = enableOrbit_;
+	j["orbitAngle"] = orbitAngle_;
+}
+
+void TitleCamera::Load(const nlohmann::json& j)
+{
+	VirtualCamera::Load(j);
+	orbitSpeed_ = j.value("orbitSpeed", 0.3f);
+	orbitRadius_ = j.value("orbitRadius", 25.0f);
+	orbitHeight_ = j.value("orbitHeight", 4.0f);
+	enableOrbit_ = j.value("enableOrbit", 0.005f);
+	orbitAngle_ = j.value("orbitAngle", 0.0f);
+}
+
+
+============================================================
+File Path: YEngine/Utilities/Systems/Camera/Virtuals/TitleCamera/TitleCamera.h
+============================================================
+#pragma once
+#include "../VirtualCamera.h"
+#include <WorldTransform/WorldTransform.h>
+
+class TitleCamera : public VirtualCamera
+{
+public:
+	///************************* 基本的な関数 *************************///
+	void Initialize() override;
+	void Update() override;
+	void DrawDebugGui() override;
+
+	// エディタでの保存・読み込み用
+	void Save(nlohmann::json& j) const override;
+	void Load(const nlohmann::json& j) override;
+
+
+	bool  enableOrbit_ = false;
+	void SetTarget(const WorldTransform& target) { target_ = &target; }
+	void SetPosition(const Vector3& position) { transform_.translate = position; }
+	Vector3 GetPosition() const { return transform_.translate; }
+	float GetFov() const { return (fov_ >= 110.0f) ? fov_ : fov_; }
+
+private:
+	///************************* メンバ変数 *************************///
+	const WorldTransform* target_;
+
+	Vector2 prevMousePos_ = { 0.0f, 0.0f };
+	float fov_ = 0.90f;
+
+
+	// 回り込みカメラ用パラメータ
+	float orbitRadius_ = 25.0f;   // プレイヤーからの距離
+	float orbitSpeed_ = 0.3f;    // 回転速度
+	float orbitHeight_ = 4.0f;    // 高さ
+	float orbitAngle_ = 0.0f;    // 現在の角度
 };
 
 ============================================================
@@ -250232,7 +250263,7 @@ void MyGame::Initialize() {
 	// 初期シーン設定
 	//------------------------------------------------------------
 #ifdef _DEBUG
-	SceneManager::GetInstance()->ChangeScene("Game");   // デバッグ時はゲームシーン
+	SceneManager::GetInstance()->ChangeScene("Title");   // デバッグ時はゲームシーン
 #else
 	SceneManager::GetInstance()->ChangeScene("Title");  // 製品版はタイトルシーン
 #endif
@@ -263692,7 +263723,7 @@ void ClearScene::Initialize() {
 	cameraEditor_->LoadFileOrDefault(cameraEditor_->GetFilePath(), "Clear");
 	cameraMode_ = CameraMode::CLEAR;
 	// カメラの登録
-	auto clearCamera = director->GetCamera("Clear");
+	auto clearCamera = director->GetCamera("ClearCamera");
 	auto debug = director->GetCamera("MainDebug");
 
 
@@ -263934,19 +263965,12 @@ File Path: YGame/Scenes/MainScenes/Clear/ClearScene.h
 #include "Systems/Camera/CameraDirector.h"
 #include "Systems/Camera/CameraEditor.h"
 #include "Systems/Camera/Camera.h"
-#include "Systems/Camera/CameraManager.h"
 #include "Systems/Camera/CameraMode.h"
 
 // Math
 #include "Vector3.h"
 
 // App
-#include "Systems/Audio/Audio.h"
-#include "Particle/ParticleEmitter.h"
-#include "Object3D/Object3d.h"
-#include "Player/Player.h"
-#include "WorldTransform./WorldTransform.h"
-#include "Drawer/LineManager/Line.h"
 #include "Player/DemoPlayer.h"
 #include "SkyBox/SkyBox.h"
 #include "Ground/Ground.h"
@@ -264547,7 +264571,6 @@ File Path: YGame/Scenes/MainScenes/Game/GameScene.h
 #include "Systems/Camera/CameraDirector.h"
 #include "Systems/Camera/CameraEditor.h"
 #include "Systems/Camera/Camera.h"
-#include "Systems/Camera/CameraManager.h"
 
 #include "Particle/YParticleEmitter.h"
 // App
@@ -264656,6 +264679,7 @@ File Path: YGame/Scenes/MainScenes/Title/TitleScene.cpp
 #include <Systems/GameTime/GameTime.h>
 #include <ModelManipulator/ModelManipulator.h>
 #include "OffScreen/PostEffectManager.h"
+#include "Systems/Camera/Virtuals/TitleCamera/TitleCamera.h"
 
 #ifdef USE_IMGUI
 #include "imgui.h"
@@ -264665,8 +264689,25 @@ File Path: YGame/Scenes/MainScenes/Title/TitleScene.cpp
 /// 初期化処理
 /// </summary>
 void TitleScene::Initialize() {
-	sceneCamera_ = cameraManager_.AddCamera();
 
+	//------------------------------------------------------------
+	// カメラ初期化
+	//------------------------------------------------------------
+
+	// 出力用カメラの実体を生成
+	sceneCamera_ = std::make_unique<Camera>();
+	auto director = CameraDirector::GetInstance();
+	director->Initialize();
+
+
+	cameraEditor_ = std::make_unique<CameraEditor>();
+	cameraEditor_->Initialize();
+	cameraEditor_->SetFilePath("Resources/Json/VirtualCameraData/TitleScene.json");
+	cameraEditor_->LoadFileOrDefault(cameraEditor_->GetFilePath(), "Title");
+	cameraMode_ = CameraMode::TITLE;
+	// カメラの登録
+	auto titleCamera = director->GetCamera("TitleCamera");
+	auto debug = director->GetCamera("MainDebug");
 	//------------------------------------------------------------
 	// システム初期化
 	//------------------------------------------------------------
@@ -264678,14 +264719,6 @@ void TitleScene::Initialize() {
 	YoRigine::ModelManipulator::GetInstance()->SetCamera(sceneCamera_.get());
 
 	//------------------------------------------------------------
-	// カメラ初期化
-	//------------------------------------------------------------
-	splineCamera_.Initialize();
-	topDownCamera_.Initialize();
-	defaultCamera_.Initialize();
-	cameraMode_ = CameraMode::DEFAULT;
-
-	//------------------------------------------------------------
 	// タイトル専用要素の初期化
 	//------------------------------------------------------------
 	titleUI_ = std::make_unique<TitleUI>();
@@ -264695,8 +264728,9 @@ void TitleScene::Initialize() {
 	player_->Initialize(sceneCamera_.get());
 	player_->SetMotion("Idle1");
 
-	defaultCamera_.SetTarget(player_->GetWT());
-	defaultCamera_.enableOrbit_ = true; // カメラ回転有効
+	auto playerCam = std::dynamic_pointer_cast<TitleCamera>(titleCamera);
+	playerCam->SetTarget(player_->GetWT());
+	playerCam->enableOrbit_ = true; // カメラ回転有効
 
 	skyBox_ = std::make_unique<SkyBox>();
 	skyBox_->Initialize(sceneCamera_.get(), "Resources/DDS/vz_sinister_land_cubemap_ue.dds");
@@ -264708,7 +264742,8 @@ void TitleScene::Initialize() {
 	// エディター登録（デバッグ用）
 	//------------------------------------------------------------
 #ifdef USE_IMGUI
-	Editor::GetInstance()->RegisterGameUI("カメラモード", [this]() { UpdateCameraMode(); }, "Title");
+	Editor::GetInstance()->RegisterGameUI("カメラエディター", [this]() {cameraEditor_->Update(); }, "Title");
+	Editor::GetInstance()->RegisterGameUI("カメラモード切り替え", [this]() {UpdateCameraMode(); },"Title");
 	Editor::GetInstance()->RegisterGameUI("ライティング", [this]() { YoRigine::LightManager::GetInstance()->ShowLightingEditor(); }, "Title");
 #endif
 }
@@ -264743,7 +264778,6 @@ void TitleScene::Update() {
 	YoRigine::ParticleManager::GetInstance()->Emit("TitleParticle", Vector3(0, 3, 0), 10);
 
 	YoRigine::ModelManipulator::GetInstance()->Update();
-	cameraManager_.UpdateAllCameras();
 	YoRigine::CollisionManager::GetInstance()->Update();
 	YoRigine::ParticleManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
 	YoRigine::LightManager::GetInstance()->UpdateShadowMatrix(sceneCamera_.get());
@@ -264793,7 +264827,6 @@ void TitleScene::DrawShadow()
 /// </summary>
 void TitleScene::Finalize() {
 	YoRigine::JsonManager::ClearSceneInstances("TitleScene");
-	cameraManager_.RemoveCamera(sceneCamera_);
 }
 
 /// <summary>
@@ -264820,51 +264853,75 @@ void TitleScene::DrawUI() {}
 /// </summary>
 void TitleScene::UpdateCameraMode() {
 #ifdef USE_IMGUI
-	ImGui::Begin("Camera Mode");
-	if (ImGui::Button("DEFAULT Camera")) cameraMode_ = CameraMode::DEFAULT;
-	if (ImGui::Button("Follow Camera")) cameraMode_ = CameraMode::FOLLOW;
-	if (ImGui::Button("Top-Down Camera")) cameraMode_ = CameraMode::TOP_DOWN;
-	if (ImGui::Button("Debug Camera")) cameraMode_ = CameraMode::DEBUG;
-	ImGui::End();
+	if (ImGui::Button("Title Camera")) {
+		cameraMode_ = CameraMode::CLEAR;
+		CameraDirector::GetInstance()->SetEnableBlending(false);
+	}
+	if (ImGui::Button("Debug Camera")) {
+		cameraMode_ = CameraMode::DEBUG;
+		CameraDirector::GetInstance()->SetEnableBlending(false);
+	}
 #endif
 }
 
-/// <summary>
-/// カメラ更新処理
-/// </summary>
 void TitleScene::UpdateCamera() {
-	switch (cameraMode_) {
-	case CameraMode::DEFAULT:
-		sceneCamera_->SetFovY(defaultCamera_.GetFov());
-		defaultCamera_.Update();
-		sceneCamera_->viewMatrix_ = defaultCamera_.matView_;
-		sceneCamera_->transform_.translate = defaultCamera_.translate_;
-		sceneCamera_->transform_.rotate = defaultCamera_.rotate_;
-		sceneCamera_->UpdateMatrix();
-		break;
+	auto director = CameraDirector::GetInstance();
 
-	case CameraMode::TOP_DOWN:
-		if (player_) topDownCamera_.SetTarget(player_->GetWT());
-		topDownCamera_.Update();
-		sceneCamera_->viewMatrix_ = topDownCamera_.matView_;
-		sceneCamera_->transform_.translate = topDownCamera_.translate_;
-		sceneCamera_->transform_.rotate = topDownCamera_.rotate_;
-		sceneCamera_->UpdateMatrix();
-		break;
 
-	case CameraMode::SPLINE:
-		if (player_) splineCamera_.SetTarget(player_->GetWT());
-		splineCamera_.RegisterControlPoints();
-		splineCamera_.Update();
-		sceneCamera_->viewMatrix_ = splineCamera_.matView_;
-		sceneCamera_->transform_.translate = splineCamera_.translate_;
-		sceneCamera_->transform_.rotate = splineCamera_.rotate_;
-		sceneCamera_->UpdateMatrix();
-		break;
+	if (YoRigine::GameTime::IsPause()) {
+		return;
+	}
 
+	// カメラの優先度
+	switch (cameraMode_)
+	{
+	case CameraMode::TITLE:
+		director->SetPriority("Title", 10);
+		director->SetPriority("MainDebug", 0);
+		director->SnapToActiveCamera();
+		break;
 	case CameraMode::DEBUG:
+		director->SetPriority("MainDebug", 10);
+		director->SetPriority("Title", 0);
 		break;
 	}
+
+
+	//------------------------------------------------------------
+	// デバッグ用：カメラ切り替え入力
+	//------------------------------------------------------------
+# ifdef _DEBUG	
+	YoRigine::Input* input = YoRigine::Input::GetInstance();
+	if (input->TriggerKey(DIK_F3)) {
+		isDebugCamera_ = !isDebugCamera_;
+		if (isDebugCamera_) {
+			cameraMode_ = CameraMode::DEBUG;
+			CameraDirector::GetInstance()->SetEnableBlending(false);
+		}
+		else {
+			cameraMode_ = CameraMode::CLEAR;
+			CameraDirector::GetInstance()->SetEnableBlending(false);
+		}
+	}
+#endif
+
+	//------------------------------------------------------------
+	// Directorの更新（VirtualCameraの計算 ＋ ブレンド処理）
+	//------------------------------------------------------------
+	director->Update(YoRigine::GameTime::GetDeltaTime());
+
+	//------------------------------------------------------------
+	// 出力用カメラ(sceneCamera_)への同期
+	//------------------------------------------------------------
+	// Directorが導き出した「理想の座標・回転・レンズ情報」をコピー
+	sceneCamera_->SetTranslate(director->GetActiveCameraPos());
+	sceneCamera_->SetRotate(director->GetActiveCameraRot());
+	sceneCamera_->SetFovY(director->GetFovY());
+	sceneCamera_->viewMatrix_ = director->GetViewMatrix();
+	// カメラ自体の更新（内部でのシェイク計算など）
+	sceneCamera_->Update();
+	// 最終的な行列の計算
+	sceneCamera_->UpdateMatrix();
 }
 
 ============================================================
@@ -264877,14 +264934,11 @@ File Path: YGame/Scenes/MainScenes/Title/TitleScene.h
 
 // Engine
 #include <SceneSystems/BaseScene.h>
+
+#include "Systems/Camera/CameraDirector.h"
+#include "Systems/Camera/CameraEditor.h"
 #include "Systems/Camera/Camera.h"
-#include "Systems/Camera/CameraManager.h"
-
-
-#include "../../../SystemsApp/Cameras/TopDownCamera/TopDownCamera.h"
-#include "../../../SystemsApp/Cameras/SplineCamera/SplineCamera.h"
-#include "../../../SystemsApp/Cameras/DefaultCamera/DefaultCamera.h"
-
+#include "Systems/Camera/CameraMode.h"
 
 #include "Systems/Audio/Audio.h"
 #include "Particle/ParticleEmitter.h"
@@ -264906,14 +264960,6 @@ File Path: YGame/Scenes/MainScenes/Title/TitleScene.h
 /// </summary>
 class TitleScene : public BaseScene
 {
-	// カメラモード
-	enum class CameraMode {
-		DEFAULT,
-		FOLLOW,
-		TOP_DOWN,
-		SPLINE,
-		DEBUG,
-	};
 
 public:
 
@@ -264944,14 +264990,10 @@ private:
 private:
 	///************************* メンバ変数 *************************///
 
-	// カメラ
+	// 出力用カメラ（実体）
+	std::unique_ptr<Camera> sceneCamera_;
 	CameraMode cameraMode_;
-	std::shared_ptr<Camera> sceneCamera_;
-	CameraManager cameraManager_;
-
-	TopDownCamera topDownCamera_;
-	SplineCamera splineCamera_;
-	DefaultCamera defaultCamera_;
+	std::unique_ptr<CameraEditor> cameraEditor_;
 	bool isDebugCamera_ = false;
 
 	// サウンド
