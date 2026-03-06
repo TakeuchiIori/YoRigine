@@ -38,7 +38,7 @@ public:
 	void DrawCircleXZ(const Vector3& center, float radius, int resolution);
 	void DrawAABB(const Vector3& min, const Vector3& max);
 	void DrawOBB(const Vector3& center, const Vector3& rotationEuler, const Vector3& size);
-
+	void DrawCone(const Vector3& position, float rotationY,float viewDistance, float viewAngleDeg, int resolution = 16);
 private:
 	///************************* 内部処理 *************************///
 

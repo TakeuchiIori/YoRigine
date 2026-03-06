@@ -1,40 +1,8 @@
 #include "Object3d.hlsli"
-
+#include "../Light/Light.hlsli"
 struct Material
 {
     float4x4 uvTransform;
-};
-
-struct DirectionalLight
-{
-    float4 color; // ライトの色
-    float3 direction; // ライトの向き
-    float intensity; // 輝度
-    int isEnableDirectionalLighting;
-};
-
-
-struct PointLight
-{
-    float4 color;
-    float3 position;
-    float intensity;
-    int isEnablePointLight;
-    float radius; // ライトの届く最大距離
-    float decay; // 減衰率
-};
-
-struct SpotLight
-{
-    float4 color;
-    float3 position;
-    float intensity;
-    float3 direction;
-    float distance;
-    float decay;
-    float cosAngle;
-    float cosFalloffStart;
-    int isEnableSpotLight;
 };
 
 struct MaterialColor
@@ -58,10 +26,10 @@ struct MaterialConstant
 };
 
 ConstantBuffer<Material> gMaterial : register(b0);
-ConstantBuffer<DirectionalLight> gDirectionalLight : register(b2);
+ConstantBuffer<DirectionalLightData> gDirectionalLight : register(b2);
 ConstantBuffer<Camera> gCamera : register(b3);
-ConstantBuffer<PointLight> gPointLight : register(b4);
-ConstantBuffer<SpotLight> gSpotLight : register(b5);
+ConstantBuffer<PointLights> gPointLights : register(b4);
+ConstantBuffer<SpotLights> gSpotLights : register(b5);
 ConstantBuffer<MaterialColor> gMaterialColor : register(b6);
 ConstantBuffer<MaterialLight> gMaterialLight : register(b7);
 ConstantBuffer<MaterialConstant> gMaterialConstant : register(b8);
@@ -151,21 +119,25 @@ PixelShaderOutput main(VertexShaderOutput input)
         
         //===========================================================//
         
-        if (gPointLight.isEnablePointLight)
+        for (int i = 0; i < min(gPointLights.numPointLights, MAX_LIGHT_COUNT); i++)
         {
+            PointLightData pl = gPointLights.pointLights[i];
+            // ライトが有効でない場合はスキップ
+            if (!pl.isEnablePointLight)
+                continue;
             // ライト方向ベクトル
-            float3 pointLightDirection = normalize(gPointLight.position - input.worldPosition);
+            float3 pointLightDirection = normalize(pl.position - input.worldPosition);
             
-            float distance = length(gPointLight.position - input.worldPosition); // ポイントライトへの距離
-            float factor = pow(saturate(-distance / gPointLight.radius + 1.0f), gPointLight.decay); //指数によるコントロール
+            float distance = length(pl.position - input.worldPosition); // ポイントライトへの距離
+            float factor = pow(saturate(-distance / pl.radius + 1.0f), pl.decay); //指数によるコントロール
             
             // 拡散反射
             float NdotLPoint = max(dot(normalize(input.normal), pointLightDirection), 0.0f);
-            float3 diffusePoint = gMaterialColor.color.rgb * baseColor.rgb * gPointLight.color.rgb * NdotLPoint * gPointLight.intensity * factor;
+            float3 diffusePoint = gMaterialColor.color.rgb * baseColor.rgb * pl.color.rgb * NdotLPoint * pl.intensity * factor;
             // 鏡面反射 (Blinn-Phong)
             float3 halfVectorPoint = normalize(pointLightDirection + toEye);
             float NdotHPoint = max(dot(normalize(input.normal), halfVectorPoint), 0.0f);
-            float3 specularPoint = gPointLight.color.rgb * gPointLight.intensity * pow(saturate(NdotHPoint), gMaterialLight.shininess) * factor;
+            float3 specularPoint = pl.color.rgb * pl.intensity * pow(saturate(NdotHPoint), gMaterialLight.shininess) * factor;
         
             // フラグで有効化
             if (gMaterialLight.enableSpecular != 0)
@@ -181,32 +153,32 @@ PixelShaderOutput main(VertexShaderOutput input)
         
         //===========================================================//
         
-        if (gSpotLight.isEnableSpotLight)
+        for (int j = 0; j < min(gSpotLights.numSpotLights, MAX_LIGHT_COUNT); j++)
         {
+            SpotLightData sl = gSpotLights.spotLights[j];
+            // ライトが有効でない場合はスキップ
+            if(!sl.isEnableSpotLight) continue;
+            
             // スポットライトの方向ベクトル
-            float3 spotLightDirectionOnSurface = normalize(input.worldPosition - gSpotLight.position);
-
+            float3 spotLightDirectionOnSurface = normalize(input.worldPosition - sl.position);
             // ライトとの距離
-            float distanceToSurface = length(gSpotLight.position - input.worldPosition);
-
+            float distanceToSurface = length(sl.position - input.worldPosition);
             // 距離による減衰率 (逆距離の減衰計算)
-            float distanceDecay = pow(saturate(-distanceToSurface / gSpotLight.distance + 1.0f), gSpotLight.decay);
-
+            float distanceDecay = pow(saturate(-distanceToSurface / sl.distance + 1.0f), sl.decay);
             // スポットライトの角度による減衰 (Falloff開始角度を考慮)
-            float cosAngle = dot(spotLightDirectionOnSurface, gSpotLight.direction);
-            float angleFalloff = saturate((cosAngle - gSpotLight.cosFalloffStart) / (gSpotLight.cosAngle - gSpotLight.cosFalloffStart));
-
+            float cosAngle = dot(spotLightDirectionOnSurface, sl.direction);
+            float angleFalloff = saturate((cosAngle - sl.cosFalloffStart) / (sl.cosAngle - sl.cosFalloffStart));
             // 総減衰係数
             float falloffFactor = angleFalloff * distanceDecay;
 
             // 拡散反射 (NdotL)
             float NdotLPoint = max(dot(normalize(input.normal), -spotLightDirectionOnSurface), 0.0f);
-            float3 diffusePoint = gMaterialColor.color.rgb * baseColor.rgb * gSpotLight.color.rgb * NdotLPoint * gSpotLight.intensity * falloffFactor;
+            float3 diffusePoint = gMaterialColor.color.rgb * baseColor.rgb * sl.color.rgb * NdotLPoint * sl.intensity * falloffFactor;
 
             // 鏡面反射 (Blinn-Phong)
             float3 halfVectorPoint = normalize(-spotLightDirectionOnSurface + toEye);
             float NdotHPoint = max(dot(normalize(input.normal), halfVectorPoint), 0.0f);
-            float3 specularPoint = gSpotLight.color.rgb * gSpotLight.intensity * pow(saturate(NdotHPoint), gMaterialLight.shininess) * falloffFactor;
+            float3 specularPoint = sl.color.rgb * sl.intensity * pow(saturate(NdotHPoint), gMaterialLight.shininess) * falloffFactor;
 
             // スペキュラー反射の有効化
             if (gMaterialLight.enableSpecular != 0)

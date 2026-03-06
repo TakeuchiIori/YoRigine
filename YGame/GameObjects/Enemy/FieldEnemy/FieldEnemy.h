@@ -4,6 +4,7 @@
 #include <string>
 #include <memory>
 #include <vector>
+#include "Graphics/Drawer/LineManager/Line.h"
 
 // 状態
 enum class FieldEnemyState {
@@ -111,6 +112,7 @@ public:
 
 	// 当たり判定の可視化描画
 	void DrawCollision() override;
+	void DrawLine(Line* line);
 
 	///************************* 当たり判定 *************************///
 

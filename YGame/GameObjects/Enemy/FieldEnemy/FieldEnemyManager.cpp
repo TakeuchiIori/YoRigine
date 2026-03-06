@@ -900,6 +900,15 @@ void FieldEnemyManager::DrawCollision() {
 	}
 }
 
+void FieldEnemyManager::DrawLine(Line* line)
+{
+	for (auto& enemy : fieldEnemies_) {
+		if (enemy && enemy->IsActive()) {
+			enemy->DrawLine(line);
+		}
+	}
+}
+
 /// <summary>
 /// 終了処理（全データのクリア）
 /// </summary>

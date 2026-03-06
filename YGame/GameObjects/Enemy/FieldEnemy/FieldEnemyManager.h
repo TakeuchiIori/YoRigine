@@ -72,6 +72,7 @@ public:
 
 	// 当たり判定の描画
 	void DrawCollision();
+	void DrawLine(Line* line);
 
 	// 終了処理
 	void Finalize();

@@ -45,66 +45,39 @@ namespace YoRigine {
 	}
 
 	//=====================================================================
-	// コマンドリストへ CBV 設定
-	//=====================================================================
-	void LightManager::SetCommandList(UINT directionalIndex, UINT pointIndex, UINT spotIndex)
-	{
-		object3dCommon_->GetDxCommon()->GetCommandList()->SetGraphicsRootConstantBufferView(directionalIndex, directionalLightResource_->GetGPUVirtualAddress());
-		object3dCommon_->GetDxCommon()->GetCommandList()->SetGraphicsRootConstantBufferView(pointIndex, pointLightResource_->GetGPUVirtualAddress());
-		object3dCommon_->GetDxCommon()->GetCommandList()->SetGraphicsRootConstantBufferView(spotIndex, spotLightResource_->GetGPUVirtualAddress());
-	}
-
-	//=====================================================================
 	// 平行光源リソース作成
 	//=====================================================================
 	void LightManager::CreateDirectionalLightResource()
 	{
-		directionalLightResource_ = object3dCommon_->GetDxCommon()->CreateBufferResource(sizeof(DirectionalLight));
+		directionalLightResource_ = object3dCommon_->GetDxCommon()->CreateBufferResource(sizeof(DirectionalLightData));
 		directionalLightResource_->Map(0, nullptr, reinterpret_cast<void**>(&directionalLight_));
 
 		directionalLight_->color = { 1.0f, 1.0f, 1.0f, 1.0f };
 		directionalLight_->direction = Normalize({ 0.0f, -1.0f, 1.0f });
 		directionalLight_->intensity = 1.0f;
-		directionalLight_->enableDirectionalLight = true;
+		directionalLight_->isEnableDirectionalLighting = true;
 	}
 
 	//=====================================================================
 	// ポイントライトリソース作成
 	//=====================================================================
-	void LightManager::CreatePointLightResource()
-	{
-		pointLightResource_ = object3dCommon_->GetDxCommon()->CreateBufferResource(sizeof(PointLight));
-		pointLightResource_->Map(0, nullptr, reinterpret_cast<void**>(&pointLight_));
-
-		pointLight_->color = { 1.0f, 1.0f, 1.0f, 1.0f };
-		pointLight_->position = { 0.0f, 2.0f, 0.0f };
-		pointLight_->intensity = 1.0f;
-		pointLight_->radius = 10.0f;
-		pointLight_->decay = 1.0f;
-		pointLight_->enablePointLight = false;
+	void LightManager::CreatePointLightResource() {
+		UINT64 size = (sizeof(PointLightArray) + 255) & ~255;
+		pointLightsResource_ = object3dCommon_->GetDxCommon()->CreateBufferResource(size);
+		pointLightsResource_->Map(0, nullptr, reinterpret_cast<void**>(&pointLights_));
+		ZeroMemory(pointLights_, sizeof(PointLightArray));
+		pointLights_->count = 0;
 	}
-
 
 	//=====================================================================
 	// スポットライトリソース作成
 	//=====================================================================
-	void LightManager::CreateSpotLightResource()
-	{
-		spotLightResource_ = object3dCommon_->GetDxCommon()->CreateBufferResource(sizeof(SpotLight));
-		spotLightResource_->Map(0, nullptr, reinterpret_cast<void**>(&spotLight_));
-
-		spotLight_->color = { 1.0f, 1.0f, 1.0f, 1.0f };
-		spotLight_->position = { 2.0f, 1.25f, 0.0f };
-		spotLight_->distance = 7.0f;
-		spotLight_->direction = Normalize(Vector3{ -1.0f,-1.0f,0.0f });
-		spotLight_->intensity = 4.0f;
-		spotLight_->decay = 2.0f;
-
-		// cosAngle, cosFalloffStart は角度ではなく“コサイン値”に注意
-		spotLight_->cosAngle = std::cos(std::numbers::pi_v<float> / 3.0f);      // 60°
-		spotLight_->cosFalloffStart = std::cos(std::numbers::pi_v<float> / 4.0f); // 45°
-
-		spotLight_->enableSpotLight = false;
+	void LightManager::CreateSpotLightResource() {
+		UINT64 size = (sizeof(SpotLightArray) + 255) & ~255;
+		spotLightsResource_ = object3dCommon_->GetDxCommon()->CreateBufferResource(size);
+		spotLightsResource_->Map(0, nullptr, reinterpret_cast<void**>(&spotLights_));
+		ZeroMemory(spotLights_, sizeof(SpotLightArray));
+		spotLights_->count = 0;
 	}
 
 	/*==========================================================================
@@ -119,10 +92,9 @@ namespace YoRigine {
 		shadow_->lightViewProjection = MakeIdentity4x4();
 	}
 
-
-	/*==========================================================================
-	影の計算処理（現状平行光源のみ）
-	//========================================================================*/
+	//===========================================================================
+	// 影の計算処理（現状平行光源のみ）
+	//===========================================================================
 	void LightManager::UpdateShadowMatrix(Camera* camera)
 	{
 		camera_ = camera;
@@ -133,12 +105,12 @@ namespace YoRigine {
 		// シャドウマップの生成中心（カメラ位置）
 		Vector3 target = camera_->transform_.translate;
 
-		// ★ライトの位置設定
+		// ライトの位置設定
 		// カメラ位置からライト方向に大きく離した場所に「仮想的なライト位置」を置く
 		float distanceResults = 200.0f;
 		Vector3 lightPos = target - lightDir * distanceResults;
 
-		// ★垂直方向の対策：ライトが真上/真下に近い場合、Upベクトルを調整
+		// 垂直方向の対策：ライトが真上/真下に近い場合、Upベクトルを調整
 		Vector3 up = Vector3(0.0f, 1.0f, 0.0f);
 		if (std::abs(lightDir.y) > 0.99f) {
 			up = Vector3(1.0f, 0.0f, 0.0f);
@@ -148,7 +120,7 @@ namespace YoRigine {
 		Matrix4x4 lightView = MatrixLookAtLH(lightPos, target, up);
 
 		// -------------------------------------------------------------
-		// ★ ピクセルスナップ処理（ちらつき防止）
+		// ピクセルスナップ処理（ちらつき防止）
 		// ワールド原点 (0,0,0) を基準にしてテクセルグリッドを固定します
 		// -------------------------------------------------------------
 
@@ -185,10 +157,7 @@ namespace YoRigine {
 		float minY = worldOriginInLight.y + snappedDistY;
 		float maxY = minY + height;
 
-		// ★ Z軸の範囲設定（ShadowmapSettingsの値を使用）
-		// 修正：以前の `targetInLight.z - nearZ` (=199) ではライト寄りの空間がクリップされるため、
-		// minZ はライト原点基準の `nearZ` をそのまま使用して、遮蔽物（カメラとライトの間）をカバーします。
-		// maxZ はカメラ位置よりさらに奥（farZ分）まで含めます。
+		// Z軸の範囲設定（ShadowmapSettingsの値を使用）
 		float minZ = shadowMapSettings_.nearZ;
 		float maxZ = targetInLight.z + shadowMapSettings_.farZ;
 
@@ -201,174 +170,250 @@ namespace YoRigine {
 		// 最終的なライトビュー射影行列
 		shadow_->lightViewProjection = lightView * lightProj;
 	}
-	/*==========================================================================
-	平行光源のセット
-	//========================================================================*/
-	void LightManager::SetDirectionalLight(const Vector4& color, const Vector3& direction, float intensity, bool enable)
-	{
-		directionalLight_->color = color;
-		directionalLight_->direction = direction;
-		directionalLight_->intensity = intensity;
-		directionalLight_->enableDirectionalLight = enable;
+
+	//===========================================================================
+	// オブジェクト用
+	//===========================================================================
+	void LightManager::SetCommandList(UINT directionalIndex, UINT pointIndex, UINT spotIndex) {
+		auto cmdList = object3dCommon_->GetDxCommon()->GetCommandList();
+		cmdList->SetGraphicsRootConstantBufferView(directionalIndex, directionalLightResource_->GetGPUVirtualAddress());
+		cmdList->SetGraphicsRootConstantBufferView(pointIndex, pointLightsResource_->GetGPUVirtualAddress());
+		cmdList->SetGraphicsRootConstantBufferView(spotIndex, spotLightsResource_->GetGPUVirtualAddress());
 	}
-	/*==========================================================================
-	ポイントライトのセット
-	//========================================================================*/
-	void LightManager::SetPointLight(const Vector4& color, const Vector3& position, float intensity, float radius, float decay, bool enable)
-	{
-		pointLight_->color = color;
-		pointLight_->position = position;
-		pointLight_->intensity = intensity;
-		pointLight_->radius = radius;
-		pointLight_->decay = decay;
-		pointLight_->enablePointLight = enable;
+
+	//===========================================================================
+	// 平行光源のみ
+	//===========================================================================
+	void LightManager::SetCommandListDirectionalOnly(UINT directionalIndex) {
+		object3dCommon_->GetDxCommon()->GetCommandList()
+			->SetGraphicsRootConstantBufferView(directionalIndex, directionalLightResource_->GetGPUVirtualAddress());
 	}
+
+	//===========================================================================
+	// ポイントライトの追加
+	//===========================================================================
+	int LightManager::AddPointLight(const PointLightData& light) {
+		assert(pointLights_->count < kMaxPointLights);
+		int idx = pointLights_->count++;
+		pointLights_->lights[idx] = light;
+		return idx;
+	}
+
+	//===========================================================================
+	// ポイントライトの更新
+	//===========================================================================
+	void LightManager::UpdatePointLight(int index, const PointLightData& light) {
+		assert(index >= 0 && index < pointLights_->count);
+		pointLights_->lights[index] = light;
+	}
+	
+	//===========================================================================
+	// ポイントライトの削除
+	//===========================================================================
+	void LightManager::RemovePointLight(int index) {
+		assert(index >= 0 && index < pointLights_->count);
+		int last = --pointLights_->count;
+		if (index != last)
+			pointLights_->lights[index] = pointLights_->lights[last];
+	}
+
+	//===========================================================================
+	// スポットライトの追加
+	//===========================================================================
+	int LightManager::AddSpotLight(const SpotLightData& light) {
+		assert(spotLights_->count < kMaxSpotLights);
+		int idx = spotLights_->count++;
+		spotLights_->lights[idx] = light;
+		return idx;
+	}
+
+	//===========================================================================
+	// スポットライトの更新
+	//===========================================================================
+	void LightManager::UpdateSpotLight(int index, const SpotLightData& light) {
+		assert(index >= 0 && index < spotLights_->count);
+		spotLights_->lights[index] = light;
+	}
+
+	//===========================================================================
+	// スポットライトの削除
+	//===========================================================================
+	void LightManager::RemoveSpotLight(int index) {
+		assert(index >= 0 && index < spotLights_->count);
+		int last = --spotLights_->count;
+		if (index != last)
+			spotLights_->lights[index] = spotLights_->lights[last];
+	}
+
 
 	//=====================================================================
 	// ImGui ライティング編集ウィンドウ
 	//=====================================================================
-	void LightManager::ShowLightingEditor()
-	{
+	void LightManager::ShowLightingEditor() {
 #ifdef USE_IMGUI
 
 		//------------------------------------------------------------
 		// 平行光源
 		//------------------------------------------------------------
-		ImGui::Text("Directional Light");
+		if (ImGui::CollapsingHeader("Directional Light")) {
+			bool enabled = IsDirectionalLightEnabled();
+			if (ImGui::Checkbox("Enabled##Dir", &enabled))
+				SetDirectionalLightEnabled(enabled);
 
-		bool directionalLightEnabled = IsDirectionalLightEnabled();
-		if (ImGui::Checkbox("Directional Enabled", &directionalLightEnabled)) {
-			SetDirectionalLightEnabled(directionalLightEnabled);
-		}
+			Vector3 dir = GetDirectionalLightDirection();
+			if (ImGui::SliderFloat3("Direction", &dir.x, -1.0f, 1.0f, "%.2f"))
+				SetDirectionalLightDirection(dir);
 
-		Vector3 lightDirection = GetDirectionalLightDirection();
-		if (ImGui::SliderFloat3("Direction", &lightDirection.x, -1.0f, 1.0f, "%.2f")) {
-			SetDirectionalLightDirection(lightDirection);
-		}
+			Vector4 color = GetDirectionalLightColor();
+			if (ImGui::ColorEdit4("Color##Dir", &color.x))
+				SetDirectionalLightColor(color);
 
-		Vector4 lightColor = GetDirectionalLightColor();
-		if (ImGui::ColorEdit4("Color", &lightColor.x)) {
-			SetDirectionalLightColor(lightColor);
-		}
-
-		float lightIntensity = GetDirectionalLightIntensity();
-		if (ImGui::SliderFloat("Intensity", &lightIntensity, 0.0f, 10.0f, "%.2f")) {
-			SetDirectionalLightIntensity(lightIntensity);
+			float intensity = GetDirectionalLightIntensity();
+			if (ImGui::SliderFloat("Intensity##Dir", &intensity, 0.0f, 10.0f, "%.2f"))
+				SetDirectionalLightIntensity(intensity);
 		}
 
 		//------------------------------------------------------------
 		// ポイントライト
 		//------------------------------------------------------------
-		ImGui::Separator();
-		ImGui::Text("Point Light");
+		if (ImGui::CollapsingHeader("Point Lights")) {
+			ImGui::Text("Count: %d / %d", pointLights_->count, kMaxPointLights);
 
-		bool pointLightEnabled = IsPointLightEnabled();
-		if (ImGui::Checkbox("Enabled", &pointLightEnabled)) {
-			SetPointLightEnabled(pointLightEnabled);
-		}
+			// 追加ボタン
+			if (pointLights_->count < kMaxPointLights) {
+				if (ImGui::Button("Add Point Light")) {
+					AddPointLight({
+						.color = { 1.0f, 1.0f, 1.0f, 1.0f },
+						.position = { 0.0f, 2.0f, 0.0f },
+						.intensity = 1.0f,
+						.isEnablePointLight = true,
+						.radius = 10.0f,
+						.decay = 1.0f,
+						});
+				}
+			}
 
-		Vector4 pointLightColor = GetPointLightColor();
-		if (ImGui::ColorEdit4("Point Color", &pointLightColor.x)) {
-			SetPointLightColor(pointLightColor);
-		}
+			// 各ライトの編集
+			for (int i = 0; i < pointLights_->count; ++i) {
+				PointLightData& pl = pointLights_->lights[i];
 
-		Vector3 pointLightPosition = GetPointLightPosition();
-		if (ImGui::SliderFloat3("Position", &pointLightPosition.x, -10.0f, 10.0f, "%.2f")) {
-			SetPointLightPosition(pointLightPosition);
-		}
+				ImGui::PushID(i);
+				// ラベルを折りたたみで表示
+				std::string label = "Point Light [" + std::to_string(i) + "]";
+				if (ImGui::TreeNode(label.c_str())) {
+					bool enabled = pl.isEnablePointLight != 0;
+					if (ImGui::Checkbox("Enabled", &enabled))
+						pl.isEnablePointLight = enabled;
 
-		float pointLightIntensity = GetPointLightIntensity();
-		if (ImGui::SliderFloat("Point Intensity", &pointLightIntensity, 0.0f, 10.0f, "%.2f")) {
-			SetPointLightIntensity(pointLightIntensity);
-		}
+					ImGui::ColorEdit4("Color", &pl.color.x);
+					ImGui::DragFloat3("Position", &pl.position.x, 0.1f);
+					ImGui::SliderFloat("Intensity", &pl.intensity, 0.0f, 10.0f, "%.2f");
+					ImGui::SliderFloat("Radius", &pl.radius, 0.0f, 100.0f, "%.2f");
+					ImGui::SliderFloat("Decay", &pl.decay, 0.0f, 10.0f, "%.2f");
 
-		float radius = GetPointLightRadius();
-		if (ImGui::SliderFloat("Point Radius", &radius, 0.0f, 1000.0f, "%.2f")) {
-			SetPointLightRadius(radius);
-		}
+					// 削除ボタン
+					if (ImGui::Button("Remove")) {
+						RemovePointLight(i);
+						ImGui::TreePop();
+						ImGui::PopID();
+						break; // 削除で配列が変わるのでループを抜ける
+					}
 
-		float decay = GetPointLightDecay();
-		if (ImGui::SliderFloat("Point Decay", &decay, 0.0f, 10.0f, "%.2f")) {
-			SetPointLightDecay(decay);
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
 		}
 
 		//------------------------------------------------------------
 		// スポットライト
 		//------------------------------------------------------------
-		ImGui::Separator();
-		ImGui::Text("Spot Light");
+		if (ImGui::CollapsingHeader("Spot Lights")) {
+			ImGui::Text("Count: %d / %d", spotLights_->count, kMaxSpotLights);
 
-		bool spotLightEnabled = IsSpotLightEnabled();
-		if (ImGui::Checkbox("Spot Enabled", &spotLightEnabled)) {
-			SetSpotLightEnabled(spotLightEnabled);
-		}
+			// 追加ボタン
+			if (spotLights_->count < kMaxSpotLights) {
+				if (ImGui::Button("Add Spot Light")) {
+					AddSpotLight({
+						.color = { 1.0f, 1.0f, 1.0f, 1.0f },
+						.position = { 0.0f, 3.0f, 0.0f },
+						.intensity = 4.0f,
+						.direction = Normalize(Vector3{ 0.0f, -1.0f, 0.0f }),
+						.distance = 7.0f,
+						.decay = 2.0f,
+						.cosAngle = std::cos(std::numbers::pi_v<float> / 3.0f),
+						.cosFalloffStart = std::cos(std::numbers::pi_v<float> / 4.0f),
+						.isEnableSpotLight = true,
+						});
+				}
+			}
 
-		Vector4 spotLightColor = GetSpotLightColor();
-		if (ImGui::ColorEdit4("Spot Color", &spotLightColor.x)) {
-			SetSpotLightColor(spotLightColor);
-		}
+			// 各ライトの編集
+			for (int i = 0; i < spotLights_->count; ++i) {
+				SpotLightData& sl = spotLights_->lights[i];
 
-		Vector3 spotLightPosition = GetSpotLightPosition();
-		if (ImGui::SliderFloat3("Spot Position", &spotLightPosition.x, -10.0f, 10.0f, "%.2f")) {
-			SetSpotLightPosition(spotLightPosition);
-		}
+				ImGui::PushID(i + kMaxPointLights); // ポイントライトとIDが被らないようにオフセット
+				std::string label = "Spot Light [" + std::to_string(i) + "]";
+				if (ImGui::TreeNode(label.c_str())) {
+					bool enabled = sl.isEnableSpotLight != 0;
+					if (ImGui::Checkbox("Enabled", &enabled))
+						sl.isEnableSpotLight = enabled;
 
-		Vector3 spotLightDirection = GetSpotLightDirection();
-		if (ImGui::SliderFloat3("Spot Direction", &spotLightDirection.x, -10.0f, 10.0f, "%.2f")) {
-			SetSpotLightDirection(spotLightDirection);
-		}
+					ImGui::ColorEdit4("Color", &sl.color.x);
+					ImGui::DragFloat3("Position", &sl.position.x, 0.1f);
+					ImGui::DragFloat3("Direction", &sl.direction.x, 0.01f, -1.0f, 1.0f);
+					ImGui::SliderFloat("Intensity", &sl.intensity, 0.0f, 100.0f, "%.2f");
+					ImGui::SliderFloat("Distance", &sl.distance, 0.0f, 200.0f, "%.2f");
+					ImGui::SliderFloat("Decay", &sl.decay, 0.0f, 100.0f, "%.2f");
+					///*** 角度を degree で編集（cosAngle=内側, cosFalloffStart=外側）***///
+					constexpr float kRad2Deg = 180.0f / std::numbers::pi_v<float>;
+					constexpr float kDeg2Rad = std::numbers::pi_v<float> / 180.0f;
 
-		float spotLightIntensity = GetSpotLightIntensity();
-		if (ImGui::SliderFloat("Spot Intensity", &spotLightIntensity, 0.0f, 100.0f, "%.2f")) {
-			SetSpotLightIntensity(spotLightIntensity);
-		}
+					float innerDeg = std::acos(std::clamp(sl.cosAngle, -1.0f, 1.0f)) * kRad2Deg;
+					float outerDeg = std::acos(std::clamp(sl.cosFalloffStart, -1.0f, 1.0f)) * kRad2Deg;
 
-		float spotLightDistance = GetSpotLightDistance();
-		if (ImGui::SliderFloat("Spot Distance", &spotLightDistance, 0.0f, 200.0f, "%.2f")) {
-			SetSpotLightDistance(spotLightDistance);
-		}
 
-		float spotLightDecay = GetSpotLightDecay();
-		if (ImGui::SliderFloat("Spot Decay", &spotLightDecay, 0.0f, 100.0f, "%.2f")) {
-			SetSpotLightDecay(spotLightDecay);
-		}
+					// cos → degree（内側・外側）
+					// 内側角度スライダー（外角より必ず小さく）
+					//float innerMax = std::max(outerDeg - 1.0f, 0.0f);
+					if (ImGui::SliderFloat("Inner Angle [deg]", &innerDeg, 0.0f, 89.0f, "%.1f deg")) {
+						innerDeg = std::min(innerDeg, outerDeg - 1.0f);
+						sl.cosAngle = std::cos(innerDeg * kDeg2Rad);
+					}
 
-		float spotLightCosAngle = GetSpotLightCosAngle();
-		if (ImGui::SliderFloat("Spot Angle", &spotLightCosAngle, 0.0f, 1.0f, "%.2f")) {
-			SetSpotLightCosAngle(spotLightCosAngle);
-		}
+					// 外側角度スライダー（内角より必ず大きく）
+					if (ImGui::SliderFloat("Outer Angle [deg]", &outerDeg, 1.0f, 90.0f, "%.1f deg")) {
+						outerDeg = std::max(outerDeg, innerDeg + 1.0f);
+						sl.cosFalloffStart = std::cos(outerDeg * kDeg2Rad);
+					}
 
-		float spotLightCosFalloffStart = spotLight_->cosFalloffStart;
-		if (ImGui::SliderFloat("Spot Falloff Start", &spotLightCosFalloffStart, 0.0f, 1.0f, "%.2f")) {
-			spotLight_->cosFalloffStart = spotLightCosFalloffStart;
+					ImGui::TextDisabled("cosAngle(inner)=%.3f  cosFalloffStart(outer)=%.3f",
+						sl.cosAngle, sl.cosFalloffStart);
+
+					if (ImGui::Button("Remove")) {
+						RemoveSpotLight(i);
+						ImGui::TreePop();
+						ImGui::PopID();
+						break;
+					}
+
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
 		}
 
 		//------------------------------------------------------------
-		// シャドウマップ	
+		// シャドウマップ
 		//------------------------------------------------------------
-		ImGui::Separator();
-		ImGui::Text("Shadowmap Settings");
-		float shadowDistance = shadowMapSettings_.shadowDistance;
-		if (ImGui::DragFloat("Shadow Distance", &shadowDistance, 1.0f, 500.0f)) {
-			shadowMapSettings_.shadowDistance = shadowDistance;
-		}
-		float orthoWidth = shadowMapSettings_.orthoWidth;
-		if (ImGui::DragFloat("Shadow orthoWidth", &orthoWidth, 1.0f, 500.0f)) {
-			shadowMapSettings_.orthoWidth = orthoWidth;
-		}
-		float orthoHeight = shadowMapSettings_.orthoHeight;
-		if (ImGui::DragFloat("Shadow orthoHeight", &orthoHeight, 1.0f, 500.0f)) {
-			shadowMapSettings_.orthoHeight = orthoHeight;
-		}
-		float nearZ = shadowMapSettings_.nearZ;
-		if (ImGui::DragFloat("Shadow nearZ", &nearZ, 1.0f, 500.0f)) {
-			shadowMapSettings_.nearZ = nearZ;
-		}
-		float farZ = shadowMapSettings_.farZ;
-		if (ImGui::DragFloat("Shadow farZ", &farZ, 1.0f, 500.0f)) {
-			shadowMapSettings_.farZ = farZ;
+		if (ImGui::CollapsingHeader("Shadowmap Settings")) {
+			ImGui::DragFloat("Shadow Distance", &shadowMapSettings_.shadowDistance, 1.0f, 0.0f, 500.0f);
+			ImGui::DragFloat("Ortho Width", &shadowMapSettings_.orthoWidth, 1.0f, 0.0f, 500.0f);
+			ImGui::DragFloat("Ortho Height", &shadowMapSettings_.orthoHeight, 1.0f, 0.0f, 500.0f);
+			ImGui::DragFloat("Near Z", &shadowMapSettings_.nearZ, 1.0f, 0.0f, 500.0f);
+			ImGui::DragFloat("Far Z", &shadowMapSettings_.farZ, 1.0f, 0.0f, 500.0f);
 		}
 
-#endif // _DEBUG
+#endif // USE_IMGUI
 	}
 }
