@@ -40,7 +40,10 @@ void Object3dCommon::DrawPreference()
 	SetRootSignature();
 	SetGraphicsCommand();
 	SetPrimitiveTopology();
-	YoRigine::LightManager::GetInstance()->SetCommandList();
+	auto pm = YPipelineManager::GetInstance();
+	const auto& indices = pm->GetParameterIndices("Object");
+
+	YoRigine::LightManager::GetInstance()->SetCommandList(indices.at("gDirectionalLight"),indices.at("gPointLights"),indices.at("gSpotLights"));
 }
 
 

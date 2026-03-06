@@ -26,7 +26,6 @@ void BaseScene::UpdateCommon()
 void BaseScene::DrawCommonObject()
 {
 	Object3dCommon::GetInstance()->DrawPreference();
-	YoRigine::LightManager::GetInstance()->SetCommandList();
 }
 
 void BaseScene::DrawCommonParticles()

@@ -1,184 +1,164 @@
 #pragma once
-// C++
 #include <wrl.h>
 #include <d3d12.h>
 #include <string>
 #include <vector>
+#include <cassert>
 
-// Engine
 #include "Systems./Camera/Camera.h"
-
-// Math
 #include "Vector4.h"
 #include "Matrix4x4.h"
 #include "Vector2.h"
 #include "Vector3.h"
 
-
-class DirectXCommon;
 class Object3dCommon;
-/// <summary>
-/// ライト管理クラス
-/// </summary>
+
 namespace YoRigine {
-	class LightManager final
-	{
-	public:
-		struct ShadowMapSettings {
-			float shadowDistance = 1.0f;
-			float orthoWidth = 150.0f;
-			float orthoHeight = 150.0f;
-			float nearZ = 1.0f;
-			float farZ = 150.0f;
-		};
-		///************************* 基本関数 *************************///
-		static LightManager* GetInstance();
-		void Initialize();
+    class LightManager final
+    {
+    public:
+        static constexpr int kMaxPointLights = 10;
+        static constexpr int kMaxSpotLights = 10;
 
-		void UpdateShadowMatrix(Camera* camera);
-		void SetCommandList(UINT directionalIndex = 3,UINT pointIndex = 5,UINT spotIndex = 6);
+        struct ShadowMapSettings {
+            float shadowDistance = 1.0f;
+            float orthoWidth = 150.0f;
+            float orthoHeight = 150.0f;
+            float nearZ = 1.0f;
+            float farZ = 150.0f;
+        };
 
-	public:
-		///************************* ライトのパラメーラー設定 *************************///
+        ///************************* GPU用の構造体（HLSLと完全一致）*************************///
 
-		void SetDirectionalLight(const Vector4& color, const Vector3& direction, float intensity, bool enable);
-		void SetPointLight(const Vector4& color, const Vector3& position, float intensity, float radius, float decay, bool enable);
-		void ShowLightingEditor();
+        struct DirectionalLightData {
+            Vector4  color;
+            Vector3  direction;
+            float    intensity;
+            int32_t  isEnableDirectionalLighting;
+        };
 
-		/// <summary>
-		/// リソースの取得関数
-		/// </summary>
-		ID3D12Resource* GetDirectionalLightResource() const { return directionalLightResource_.Get(); }
-		ID3D12Resource* GetPointLightResource() const { return pointLightResource_.Get(); }
-		ID3D12Resource* GetShadowResource() const { return shadowResource_.Get(); }
+        struct PointLightData {
+            Vector4  color;
+            Vector3  position;
+            float    intensity;
+            int32_t  isEnablePointLight;
+            float    radius;
+            float    decay;
+            float    padding;    // 48バイトに揃える
+        };
 
-	private:
-		///************************* 内部処理 *************************///
-		void CreateDirectionalLightResource();
-		void CreatePointLightResource();
-		void CreateSpotLightResource();
-		void CreateShadowResource();
+        struct SpotLightData {
+            Vector4  color;
+            Vector3  position;
+            float    intensity;
+            Vector3  direction;
+            float    distance;
+            float    decay;
+            float    cosAngle;
+            float    cosFalloffStart;
+            int32_t  isEnableSpotLight; // 64バイト、パディング不要
+        };
 
-	public:
-		///************************* アクセッサ *************************///
+        struct PointLightArray {
+            PointLightData lights[kMaxPointLights];
+            int32_t        count;
+            float          padding[3];
+        };
 
-		// 平行光源
-		const Vector4& GetDirectionalLightColor() const { return directionalLight_->color; }
-		void SetDirectionalLightColor(const Vector4& color) { directionalLight_->color = color; }
-		const Vector3& GetDirectionalLightDirection() const { return directionalLight_->direction; }
-		void SetDirectionalLightDirection(const Vector3& direction) { directionalLight_->direction = direction; }
-		float GetDirectionalLightIntensity() const { return directionalLight_->intensity; }
-		void SetDirectionalLightIntensity(float intensity) { directionalLight_->intensity = intensity; }
-		bool IsDirectionalLightEnabled() const { return directionalLight_->enableDirectionalLight != 0; }
-		void SetDirectionalLightEnabled(bool enable) { directionalLight_->enableDirectionalLight = enable; }
+        struct SpotLightArray {
+            SpotLightData lights[kMaxSpotLights];
+            int32_t       count;
+            float         padding[3];
+        };
 
-		// ポイントライト
-		const Vector4& GetPointLightColor() const { return pointLight_->color; }
-		void SetPointLightColor(const Vector4& color) { pointLight_->color = color; }
-		const Vector3& GetPointLightPosition() const { return pointLight_->position; }
-		void SetPointLightPosition(const Vector3& position) { pointLight_->position = position; }
-		float GetPointLightIntensity() const { return pointLight_->intensity; }
-		void SetPointLightIntensity(float intensity) { pointLight_->intensity = intensity; }
-		float GetPointLightRadius() const { return pointLight_->radius; }
-		void SetPointLightRadius(float radius) { pointLight_->radius = radius; }
-		float GetPointLightDecay() const { return pointLight_->decay; }
-		void SetPointLightDecay(float decay) { pointLight_->decay = decay; }
-		bool IsPointLightEnabled() const { return pointLight_->enablePointLight != 0; }
-		void SetPointLightEnabled(bool enable) { pointLight_->enablePointLight = enable; }
+    private:
+        struct ShadowMatrix {
+            Matrix4x4 lightViewProjection;
+        };
 
-		// スポットライト
-		const Vector4& GetSpotLightColor() const { return spotLight_->color; }
-		void SetSpotLightColor(const Vector4& color) { spotLight_->color = color; }
-		const Vector3& GetSpotLightPosition() const { return spotLight_->position; }
-		void SetSpotLightPosition(const Vector3& position) { spotLight_->position = position; }
-		const Vector3& GetSpotLightDirection() const { return spotLight_->direction; }
-		void SetSpotLightDirection(const Vector3& direction) { spotLight_->direction = direction; }
-		float GetSpotLightIntensity() const { return spotLight_->intensity; }
-		void SetSpotLightIntensity(float intensity) { spotLight_->intensity = intensity; }
-		float GetSpotLightDistance() const { return spotLight_->distance; }
-		void SetSpotLightDistance(float distance) { spotLight_->distance = distance; }
-		float GetSpotLightDecay() const { return spotLight_->decay; }
-		void SetSpotLightDecay(float decay) { spotLight_->decay = decay; }
-		float GetSpotLightCosAngle() const { return spotLight_->cosAngle; }
-		void SetSpotLightCosAngle(float cosAngle) { spotLight_->cosAngle = cosAngle; }
-		float GetSpotLightCosFalloffStart() const { return spotLight_->cosFalloffStart; }
-		void SetSpotLightCosFalloffStart(float cosFalloffStart) { spotLight_->cosFalloffStart = cosFalloffStart; }
-		bool IsSpotLightEnabled() const { return spotLight_->enableSpotLight; }
-		void SetSpotLightEnabled(bool enabled) { spotLight_->enableSpotLight = enabled; }
+    public:
+        ///************************* 基本関数 *************************///
+        static LightManager* GetInstance();
+        void Initialize();
+        void UpdateShadowMatrix(Camera* camera);
 
-		// シャドウマップ設定
-		ShadowMapSettings& GetShadowMapSettings() { return shadowMapSettings_; }
-		void SetShadowMapSettings(const ShadowMapSettings& settings) { shadowMapSettings_ = settings; }
+        // 3Dオブジェクト用（全ライト）
+        void SetCommandList(UINT directionalIndex,
+            UINT pointIndex,
+            UINT spotIndex);
 
-	private:
-		// コンストラクタとデストラクタ
-		LightManager() = default;
-		~LightManager() = default;
-		// シングルトン
-		LightManager(const LightManager&) = delete;
-		LightManager& operator=(const LightManager&) = delete;
-		LightManager(LightManager&&) = delete;
-		LightManager& operator=(LightManager&&) = delete;
-		///************************* GPU用の構造体 *************************///
-		// 平行光源
-		struct DirectionalLight {
-			Vector4 color;						// ライトの色
-			Vector3 direction;					// ライトの向き
-			float intensity;					// 輝度
-			int32_t enableDirectionalLight;		// フラグ
-		};
-		// ポイントライト
-		struct PointLight {
-			Vector4 color;						// 色
-			Vector3 position;					// 位置
-			float intensity;					// 輝度
-			int32_t enablePointLight;
+        // パーティクル・スプライト用（平行光源のみ）
+        void SetCommandListDirectionalOnly(UINT directionalIndex);
 
-			float radius;						// ライトの届く最大距離
-			float decay;						// 減衰率
-			float padding[2];
-		};
-		// スポットライト
-		struct SpotLight {
-			Vector4 color;						// 色
-			Vector3 position;					// 位置
-			float intensity;					// 輝度
-			Vector3 direction;					// 方向
-			float distance;						// 最大距離
-			float decay;						// 減衰率
-			float cosAngle;						// 余弦
-			float cosFalloffStart;				// フォールオフ開始角度（コサイン値） 追加
-			int32_t enableSpotLight;			// フラグ
-			float padding[2];
-		};
+        ///************************* ポイントライト操作 *************************///
+        int  AddPointLight(const PointLightData& light);
+        void UpdatePointLight(int index, const PointLightData& light);
+        void RemovePointLight(int index);
+        int  GetPointLightCount() const { return pointLights_->count; }
+        PointLightData& GetPointLight(int index) {
+            assert(index >= 0 && index < pointLights_->count);
+            return pointLights_->lights[index];
+        }
 
-		// シャドウ用CB
-		struct ShadowMatrix {
-			Matrix4x4 lightViewProjection;
-		};
+        ///************************* スポットライト操作 *************************///
+        int  AddSpotLight(const SpotLightData& light);
+        void UpdateSpotLight(int index, const SpotLightData& light);
+        void RemoveSpotLight(int index);
+        int  GetSpotLightCount() const { return spotLights_->count; }
+        SpotLightData& GetSpotLight(int index) {
+            assert(index >= 0 && index < spotLights_->count);
+            return spotLights_->lights[index];
+        }
 
-	private:
-		///************************* メンバ変数 *************************///
+        ///************************* 平行光源アクセッサ *************************///
+        const Vector4& GetDirectionalLightColor()     const { return directionalLight_->color; }
+        void SetDirectionalLightColor(const Vector4& c) { directionalLight_->color = c; }
+        const Vector3& GetDirectionalLightDirection() const { return directionalLight_->direction; }
+        void SetDirectionalLightDirection(const Vector3& d) { directionalLight_->direction = d; }
+        float GetDirectionalLightIntensity()          const { return directionalLight_->intensity; }
+        void SetDirectionalLightIntensity(float v) { directionalLight_->intensity = v; }
+        bool IsDirectionalLightEnabled()              const { return directionalLight_->isEnableDirectionalLighting != 0; }
+        void SetDirectionalLightEnabled(bool v) { directionalLight_->isEnableDirectionalLighting = v; }
 
-		// 平行光源のリソース
-		Microsoft::WRL::ComPtr<ID3D12Resource> directionalLightResource_;
-		DirectionalLight* directionalLight_ = nullptr;
+        ///************************* リソース取得 *************************///
+        ID3D12Resource* GetDirectionalLightResource() const { return directionalLightResource_.Get(); }
+        ID3D12Resource* GetShadowResource()           const { return shadowResource_.Get(); }
 
-		// ポイントライトのリソース
-		Microsoft::WRL::ComPtr<ID3D12Resource> pointLightResource_;
-		PointLight* pointLight_ = nullptr;
+        ///************************* シャドウマップ設定 *************************///
+        ShadowMapSettings& GetShadowMapSettings() { return shadowMapSettings_; }
+        void SetShadowMapSettings(const ShadowMapSettings& s) { shadowMapSettings_ = s; }
 
-		// スポットライトのリソース
-		Microsoft::WRL::ComPtr<ID3D12Resource> spotLightResource_;
-		SpotLight* spotLight_ = nullptr;
+        ///************************* ImGui *************************///
+        void ShowLightingEditor();
 
-		// シャドウマップ用リソース
-		Microsoft::WRL::ComPtr<ID3D12Resource> shadowResource_;
-		ShadowMatrix* shadow_ = nullptr;
+    private:
+        void CreateDirectionalLightResource();
+        void CreatePointLightResource();
+        void CreateSpotLightResource();
+        void CreateShadowResource();
 
-		Object3dCommon* object3dCommon_ = nullptr;
-		Camera* camera_ = nullptr;
+        LightManager() = default;
+        ~LightManager() = default;
+        LightManager(const LightManager&) = delete;
+        LightManager& operator=(const LightManager&) = delete;
+        LightManager(LightManager&&) = delete;
+        LightManager& operator=(LightManager&&) = delete;
 
-		ShadowMapSettings shadowMapSettings_;
-	};
+        ///************************* メンバ変数 *************************///
+        Microsoft::WRL::ComPtr<ID3D12Resource> directionalLightResource_;
+        DirectionalLightData* directionalLight_ = nullptr;
+
+        Microsoft::WRL::ComPtr<ID3D12Resource> pointLightsResource_;
+        PointLightArray* pointLights_ = nullptr;
+
+        Microsoft::WRL::ComPtr<ID3D12Resource> spotLightsResource_;
+        SpotLightArray* spotLights_ = nullptr;
+
+        Microsoft::WRL::ComPtr<ID3D12Resource> shadowResource_;
+        ShadowMatrix* shadow_ = nullptr;
+
+        Object3dCommon* object3dCommon_ = nullptr;
+        Camera* camera_ = nullptr;
+        ShadowMapSettings shadowMapSettings_;
+    };
 }

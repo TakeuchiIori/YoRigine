@@ -119,7 +119,7 @@ PixelShaderOutput main(VertexShaderOutput input)
         
         //===========================================================//
         
-        for (int i = 0; i < gPointLights.numPointLights; i++)
+        for (int i = 0; i < min(gPointLights.numPointLights, MAX_LIGHT_COUNT); i++)
         {
             PointLightData pl = gPointLights.pointLights[i];
             // ライトが有効でない場合はスキップ
@@ -153,7 +153,7 @@ PixelShaderOutput main(VertexShaderOutput input)
         
         //===========================================================//
         
-        for (int j = 0; j < gSpotLights.numSpotLights; j++)
+        for (int j = 0; j < min(gSpotLights.numSpotLights, MAX_LIGHT_COUNT); j++)
         {
             SpotLightData sl = gSpotLights.spotLights[j];
             // ライトが有効でない場合はスキップ

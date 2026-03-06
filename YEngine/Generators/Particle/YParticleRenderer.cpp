@@ -2,7 +2,7 @@
 #include "DirectXCommon.h"
 #include "Matrix4x4.h"
 #include "PipelineManager/YPipelineManager.h"
-
+#include "Graphics/LightManager/LightManager.h"
 #ifdef USE_IMGUI
 #include "imgui.h"
 #endif
@@ -203,6 +203,8 @@ void YParticleRenderer::EndFrame(const std::shared_ptr<Mesh>& mesh, uint32_t tex
     if (materialLighting_) {
         materialLighting_->SetEnableLighting(currentLightSetting_.enableDirectionalLight);
     }
+
+	YoRigine::LightManager::GetInstance()->SetCommandListDirectionalOnly(indices.at("gDirectionalLight"));
     materialLighting_->RecordDrawCommands(commandList.Get(), indices.at("gMaterialLight"));
     commandList->SetGraphicsRootConstantBufferView(indices.at("gCamera"), camera_->GetCameraResource()->GetGPUVirtualAddress());
     commandList->SetGraphicsRootConstantBufferView(indices.at("InstanceOffsetCB"), instanceOffsetCB_->GetGPUVirtualAddress() + 256 * currentBatchIndex_);

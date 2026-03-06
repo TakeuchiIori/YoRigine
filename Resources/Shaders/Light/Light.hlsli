@@ -2,44 +2,49 @@
 
 struct DirectionalLightData
 {
-    float4 color;                       // ライトの色
-    float3 direction;                   // ライトの向き
-    float intensity;                    // 輝度
-    int isEnableDirectionalLighting;    // ライトの有効フラグ
+    float4 color;
+    float3 direction;
+    float intensity;
+    int isEnableDirectionalLighting;
 };
-
 
 struct PointLightData
 {
-    float4 color;               // ライトの色
-    float3 position;            // ライトの位置
-    float intensity;            // 輝度
-    int isEnablePointLight;     // ライトの有効フラグ
-    float radius;               // ライトの届く最大距離
-    float decay;                // 減衰率
+    float4 color;
+    float3 position;
+    float intensity;
+    int isEnablePointLight;
+    float radius;
+    float decay;
+    // 修正: 配列を展開し、隙間なくパックされるように個別のfloatにします
+    float pad;
 };
 
 struct SpotLightData
 {
-    float4 color;               // ライトの色
-    float3 position;            // ライトの位置
-    float intensity;            // 輝度
-    float3 direction;           // ライトの向き
-    float distance;             // ライトの届く最大距離
-    float decay;                // 減衰率
-    float cosAngle;             // cosで表現されたスポットライトの角度
-    float cosFalloffStart;      // cosで表現されたスポットライトの減衰開始角度
-    int isEnableSpotLight;      // ライトの有効フラグ
+    float4 color;
+    float3 position;
+    float intensity;
+    float3 direction;
+    float distance;
+    float decay;
+    float cosAngle;
+    float cosFalloffStart;
+    int isEnableSpotLight;
 };
 
 struct PointLights
 {
-    PointLightData pointLights[MAX_LIGHT_COUNT];    // ポイントライトの配列
-    int numPointLights;                             // 使用するポイントライトの数
+    PointLightData pointLights[MAX_LIGHT_COUNT];
+    int numPointLights;
+    // 修正: float配列[3]ではなく、float3を使用します
+    float3 padding;
 };
 
 struct SpotLights
 {
-    SpotLightData spotLights[MAX_LIGHT_COUNT];      // スポットライトの配列
-    int numSpotLights;                              // 使用するスポットライトの数
+    SpotLightData spotLights[MAX_LIGHT_COUNT];
+    int numSpotLights;
+    // 修正: float配列[3]ではなく、float3を使用します
+    float3 padding;
 };

@@ -87,7 +87,7 @@ void ParticleRenderer::RenderSystem(ParticleSystem& system) {
 
 	// LightManagerのライト情報をセット
 	if (lightManager_) {
-		lightManager_->SetCommandList(indices.at("gDirectionalLight"),indices.at("gPointLight"),indices.at("gSpotLight"));
+		lightManager_->SetCommandListDirectionalOnly(indices.at("gDirectionalLight"));
 	}
 
 	// テクスチャ（SRV）設定
@@ -105,52 +105,53 @@ void ParticleRenderer::RenderSystem(ParticleSystem& system) {
 /// パーティクルのトレイル描画
 /// </summary>
 void ParticleRenderer::RenderTrails(ParticleSystem& system) {
-	if (!system.GetSettings().GetTrailEnabled() ||
-		system.GetTrailInstanceCount() == 0) return;
+	(void)system;
+	//if (!system.GetSettings().GetTrailEnabled() ||
+	//	system.GetTrailInstanceCount() == 0) return;
 
-	auto commandList = dxCommon_->GetCommandList();
+	//auto commandList = dxCommon_->GetCommandList();
 
-	// トレイル専用 PSO / RootSig
-	commandList->SetPipelineState(trailPipelineState_.Get());
-	commandList->SetGraphicsRootSignature(trailRootSignature_.Get());
-	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	//// トレイル専用 PSO / RootSig
+	//commandList->SetPipelineState(trailPipelineState_.Get());
+	//commandList->SetGraphicsRootSignature(trailRootSignature_.Get());
+	//commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-	// マテリアルCB設定
-	commandList->SetGraphicsRootConstantBufferView(0, materialResource_->GetGPUVirtualAddress());
+	//// マテリアルCB設定
+	//commandList->SetGraphicsRootConstantBufferView(0, materialResource_->GetGPUVirtualAddress());
 
-	// LightManagerのライト情報をセット
-	if (lightManager_) {
-		lightManager_->SetCommandList();
-	}
+	//// LightManagerのライト情報をセット
+	//if (lightManager_) {
+	//	lightManager_->SetCommandList();
+	//}
 
-	// VB / IB 設定
-	auto vb = system.GetTrailVertexBuffer();
-	auto ib = system.GetTrailIndexBuffer();
+	//// VB / IB 設定
+	//auto vb = system.GetTrailVertexBuffer();
+	//auto ib = system.GetTrailIndexBuffer();
 
-	if (vb && ib && system.GetTrailVertexCount() > 0) {
-		D3D12_VERTEX_BUFFER_VIEW vbv = {};
-		vbv.BufferLocation = vb->GetGPUVirtualAddress();
-		vbv.SizeInBytes = static_cast<UINT>(system.GetTrailVertexCount() * sizeof(ParticleSystem::TrailVertex));
-		vbv.StrideInBytes = sizeof(ParticleSystem::TrailVertex);
+	//if (vb && ib && system.GetTrailVertexCount() > 0) {
+	//	D3D12_VERTEX_BUFFER_VIEW vbv = {};
+	//	vbv.BufferLocation = vb->GetGPUVirtualAddress();
+	//	vbv.SizeInBytes = static_cast<UINT>(system.GetTrailVertexCount() * sizeof(ParticleSystem::TrailVertex));
+	//	vbv.StrideInBytes = sizeof(ParticleSystem::TrailVertex);
 
-		D3D12_INDEX_BUFFER_VIEW ibv = {};
-		ibv.BufferLocation = ib->GetGPUVirtualAddress();
-		ibv.SizeInBytes = static_cast<UINT>(system.GetTrailIndexCount() * sizeof(uint32_t));
-		ibv.Format = DXGI_FORMAT_R32_UINT;
+	//	D3D12_INDEX_BUFFER_VIEW ibv = {};
+	//	ibv.BufferLocation = ib->GetGPUVirtualAddress();
+	//	ibv.SizeInBytes = static_cast<UINT>(system.GetTrailIndexCount() * sizeof(uint32_t));
+	//	ibv.Format = DXGI_FORMAT_R32_UINT;
 
-		commandList->IASetVertexBuffers(0, 1, &vbv);
-		commandList->IASetIndexBuffer(&ibv);
+	//	commandList->IASetVertexBuffers(0, 1, &vbv);
+	//	commandList->IASetIndexBuffer(&ibv);
 
-		// トレイルのテクスチャ
-		SetupTexture(system.GetTexture(), system.GetTextureIndexSRV());
+	//	// トレイルのテクスチャ
+	//	SetupTexture(system.GetTexture(), system.GetTextureIndexSRV());
 
-		// 描画
-		commandList->DrawIndexedInstanced(
-			(UINT)system.GetTrailIndexCount(),
-			1,
-			0, 0, 0
-		);
-	}
+	//	// 描画
+	//	commandList->DrawIndexedInstanced(
+	//		(UINT)system.GetTrailIndexCount(),
+	//		1,
+	//		0, 0, 0
+	//	);
+	//}
 }
 
 //=================================================================
