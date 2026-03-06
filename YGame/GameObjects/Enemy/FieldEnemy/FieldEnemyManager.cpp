@@ -504,6 +504,24 @@ void FieldEnemyManager::SaveEnemyData(const std::string& filePath) {
 			enemyJson["chaseRange"] = data.chaseRange;
 			enemyJson["returnDistance"] = data.returnDistance;
 
+			// 移動パラメータ
+			enemyJson["patrolRadius"] = data.patrolRadius;
+			enemyJson["patrolSpeed"] = data.patrolSpeed;
+			enemyJson["chaseSpeed"] = data.chaseSpeed;
+			enemyJson["chaseRange"] = data.chaseRange;
+			enemyJson["returnDistance"] = data.returnDistance;
+
+			// 視界パラメータ
+			enemyJson["viewDistance"] = data.viewDistance;
+			enemyJson["viewAngle"] = data.viewAngle;
+			enemyJson["noiseDetectionRange"] = data.noiseDetectionRange;
+
+			// 回転・リアクションパラメータ
+			enemyJson["rotationSpeed"] = data.rotationSpeed;
+			enemyJson["alertDuration"] = data.alertDuration;
+			enemyJson["searchDuration"] = data.searchDuration;
+			enemyJson["searchSweepAngle"] = data.searchSweepAngle;
+
 			// カスタムカラー
 			enemyJson["useCustomColor"] = data.useCustomColor;
 			if (data.useCustomColor) {
@@ -595,12 +613,24 @@ void FieldEnemyManager::LoadEnemyData(const std::string& filePath) {
 				data.scale.z = s.value("z", 1.0f);
 			}
 
-			// パラメータ
+			// 移動パラメータ
 			data.patrolRadius = enemyJson.value("patrolRadius", 10.0f);
 			data.patrolSpeed = enemyJson.value("patrolSpeed", 1.0f);
 			data.chaseSpeed = enemyJson.value("chaseSpeed", 2.0f);
 			data.chaseRange = enemyJson.value("chaseRange", 20.0f);
 			data.returnDistance = enemyJson.value("returnDistance", 30.0f);
+
+			// 視界パラメータ（既存 JSON に無い場合はデフォルト値を使用）
+			data.viewDistance = enemyJson.value("viewDistance", 15.0f);
+			data.viewAngle = enemyJson.value("viewAngle", 60.0f);
+			data.noiseDetectionRange = enemyJson.value("noiseDetectionRange", 8.0f);
+
+			// 回転・リアクションパラメータ（既存 JSON に無い場合はデフォルト値を使用）
+			data.rotationSpeed = enemyJson.value("rotationSpeed", 5.0f);
+			data.alertDuration = enemyJson.value("alertDuration", 0.8f);
+			data.searchDuration = enemyJson.value("searchDuration", 3.0f);
+			data.searchSweepAngle = enemyJson.value("searchSweepAngle", 70.0f);
+
 
 			// カスタムカラー
 			data.useCustomColor = enemyJson.value("useCustomColor", false);
@@ -812,18 +842,7 @@ void FieldEnemyManager::ShowDebugInfo() {
 						enemy->ResetEncounterState();
 						Logger("[FieldEnemyManager] エンカウントリセット: " + data.enemyId + "\n");
 					}
-
 					ImGui::Separator();
-
-					ImGui::Text("=== パラメータ ===");
-					ImGui::Text("巡回半径: %.1f", data.patrolRadius);
-					ImGui::Text("巡回速度: %.1f", data.patrolSpeed);
-					ImGui::Text("追跡速度: %.1f", data.chaseSpeed);
-					ImGui::Text("追跡範囲: %.1f", data.chaseRange);
-					ImGui::Text("帰還距離: %.1f", data.returnDistance);
-
-					ImGui::Separator();
-
 					if (ImGui::Button("この敵を削除")) {
 						enemy->Despawn();
 					}
@@ -1072,6 +1091,43 @@ void FieldEnemyManager::ShowEnemyDataEditor() {
 		changed |= ImGui::DragFloat("追跡速度", &editorEnemyData_.chaseSpeed, 0.1f, 0.1f, 20.0f);
 		changed |= ImGui::DragFloat("追跡範囲", &editorEnemyData_.chaseRange, 0.5f, 1.0f, 50.0f);
 		changed |= ImGui::DragFloat("帰還距離", &editorEnemyData_.returnDistance, 0.5f, 1.0f, 50.0f);
+
+
+		ImGui::Separator();
+		ImGui::Text("=== 移動パラメータ ===");
+		changed |= ImGui::DragFloat("巡回半径", &editorEnemyData_.patrolRadius, 0.5f, 0.0f, 50.0f);
+		changed |= ImGui::DragFloat("巡回速度", &editorEnemyData_.patrolSpeed, 0.1f, 0.1f, 20.0f);
+		changed |= ImGui::DragFloat("追跡速度", &editorEnemyData_.chaseSpeed, 0.1f, 0.1f, 20.0f);
+		changed |= ImGui::DragFloat("追跡範囲", &editorEnemyData_.chaseRange, 0.5f, 1.0f, 50.0f);
+		changed |= ImGui::DragFloat("帰還距離", &editorEnemyData_.returnDistance, 0.5f, 1.0f, 50.0f);
+
+		ImGui::Separator();
+		ImGui::Text("=== 視界・索敵パラメータ ===");
+		if (ImGui::IsItemHovered()) {
+			ImGui::SetTooltip("DrawViewCone の描画と完全に連動します");
+		}
+		changed |= ImGui::DragFloat("視界距離", &editorEnemyData_.viewDistance, 0.5f, 1.0f, 100.0f);
+		changed |= ImGui::DragFloat("視野角 (度)", &editorEnemyData_.viewAngle, 1.0f, 1.0f, 180.0f);
+		changed |= ImGui::DragFloat("足音検知範囲", &editorEnemyData_.noiseDetectionRange, 0.5f, 1.0f, 50.0f);
+
+		ImGui::Separator();
+		ImGui::Text("=== 回転・リアクションパラメータ ===");
+		ImGui::SetNextItemWidth(200.0f);
+		changed |= ImGui::DragFloat("補間回転速度 (rad/s)", &editorEnemyData_.rotationSpeed, 0.1f, 0.5f, 30.0f);
+		ImGui::SameLine();
+		ImGui::TextDisabled("(大きいほど素早く向く)");
+
+		changed |= ImGui::DragFloat("発見リアクション時間 (秒)", &editorEnemyData_.alertDuration, 0.05f, 0.1f, 3.0f);
+		ImGui::SameLine();
+		ImGui::TextDisabled("！停止時間");
+
+		changed |= ImGui::DragFloat("索敵継続時間 (秒)", &editorEnemyData_.searchDuration, 0.1f, 0.5f, 10.0f);
+		ImGui::SameLine();
+		ImGui::TextDisabled("？首振り時間");
+
+		changed |= ImGui::DragFloat("索敵スウィープ角 (度)", &editorEnemyData_.searchSweepAngle, 1.0f, 10.0f, 120.0f);
+		ImGui::SameLine();
+		ImGui::TextDisabled("左右に振れる角度");
 
 		ImGui::Separator();
 		ImGui::Text("=== 見た目設定 ===");

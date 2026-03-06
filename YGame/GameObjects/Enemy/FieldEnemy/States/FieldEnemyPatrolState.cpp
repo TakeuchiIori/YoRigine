@@ -1,6 +1,6 @@
 #include "FieldEnemyPatrolState.h"
 #include "../FieldEnemy.h"
-#include "FieldEnemyChaseState.h"
+#include "FieldEnemyAlertState.h"
 #include "MathFunc.h"
 #include <random>
 #include <numbers>
@@ -10,7 +10,6 @@
 /// <summary>
 /// 巡回状態に入った際の初期化処理
 /// </summary>
-/// <param name="enemy">対象のフィールド敵</param>
 void FieldEnemyPatrolState::Enter(FieldEnemy& enemy) {
 	enemy.SetLogicalState(FieldEnemyState::Patrol);
 	GenerateNewPatrolTarget(enemy);
@@ -19,56 +18,8 @@ void FieldEnemyPatrolState::Enter(FieldEnemy& enemy) {
 /// <summary>
 /// 巡回状態の更新処理
 /// </summary>
-/// <param name="enemy">更新対象のフィールド敵</param>
-/// <param name="dt">経過時間（デルタタイム）</param>
 void FieldEnemyPatrolState::Update(FieldEnemy& enemy, float dt) {
-
-	//// 1. プレイヤーのポインタを取得
-	//Player* player = enemy.GetPlayer();
-	//if (!player) return;
-
-	//// --- プレイヤー検知ロジック ---
-
-	//Vector3 enemyPos = enemy.GetPosition();
-	//Vector3 playerPos = player->GetWorldPosition();
-	//Vector3 toPlayer = playerPos - enemyPos;
-	//float distSq = Length(toPlayer);
-
-	//bool isDetected = false;
-
-	//// A. 視界判定（視野角内か？）
-	//if (distSq <= enemy.GetEnemyData().viewDistance * enemy.GetEnemyData().viewDistance) {
-	//	// 敵の前方ベクトル（Z軸）を取得
-	//	const Matrix4x4& mat = enemy.GetWT().matWorld_;
-	//	Vector3 forward = { mat.m[2][0], mat.m[2][1], mat.m[2][2] };
-	//	forward = Normalize(forward);
-
-	//	Vector3 dirToPlayer = Normalize(toPlayer);
-	//	float dot = Dot(forward, dirToPlayer);
-
-	//	// 内積から角度(ラジアン)を求め、度数に変換
-	//	float angle = acosf(std::clamp(dot, -1.0f, 1.0f)) * (180.0f / 3.141592f);
-
-	//	if (angle <= enemy.GetEnemyData().viewAngle * 0.5f) {
-	//		isDetected = true; // 視界内で見つかった
-	//	}
-	//}
-
-	//// B. 足音判定（視野外でも走っていればバレる）
-	//if (!isDetected && player->GetMovement()->IsRunning()) {
-	//	if (distSq <= enemy.GetEnemyData().noiseDetectionRange * enemy.GetEnemyData().noiseDetectionRange) {
-	//		isDetected = true; // 視野外だが走る音でバレた
-	//	}
-	//}
-
-	//// --- 状態遷移 ---
-	//if (isDetected) {
-	//	Logger("[FieldEnemy] 見つけた！追跡状態へ移行します。\n");
-	//	enemy.ChangeState(std::make_unique<FieldEnemyChaseState>()); // ChaseStateへ切り替え
-	//	return;
-	//}
-
-	// 新しい巡回ターゲットが必要かチェック
+	// ターゲット到達チェック
 	if (HasReachedTarget(enemy)) {
 		GenerateNewPatrolTarget(enemy);
 	}
@@ -76,22 +27,18 @@ void FieldEnemyPatrolState::Update(FieldEnemy& enemy, float dt) {
 	// ターゲットに向かって移動
 	MoveTowardsTarget(enemy, dt);
 
-	// プレイヤーが範囲内にいるかチェック
+	// プレイヤー検知
 	CheckForPlayer(enemy);
 }
 
 /// <summary>
 /// 状態を抜ける際の処理
 /// </summary>
-/// <param name="enemy">対象のフィールド敵（未使用）</param>
-void FieldEnemyPatrolState::Exit([[maybe_unused]] FieldEnemy& enemy) {
-	// 必要に応じてクリーンアップ
-}
+void FieldEnemyPatrolState::Exit([[maybe_unused]] FieldEnemy& enemy) {}
 
 /// <summary>
 /// 新しい巡回目標地点を生成する
 /// </summary>
-/// <param name="enemy">対象のフィールド敵</param>
 void FieldEnemyPatrolState::GenerateNewPatrolTarget(FieldEnemy& enemy) {
 	std::random_device rd;
 	std::mt19937 gen(rd());
@@ -116,24 +63,15 @@ void FieldEnemyPatrolState::GenerateNewPatrolTarget(FieldEnemy& enemy) {
 /// <summary>
 /// 現在の目標地点に到達したかを判定する
 /// </summary>
-/// <param name="enemy">対象のフィールド敵</param>
-/// <returns>true: 到達済み / false: 未到達</returns>
 bool FieldEnemyPatrolState::HasReachedTarget(const FieldEnemy& enemy) const {
-	Vector3 currentPos = enemy.GetPosition();
-	Vector3 target = enemy.GetPatrolTarget();
-
-	Vector3 direction = target - currentPos;
-	direction.y = 0.0f;
-
-	float distance = Length(direction);
-	return distance < 0.5f;
+	Vector3 dir = enemy.GetPatrolTarget() - enemy.GetPosition();
+	dir.y = 0.0f;
+	return Length(dir) < 0.5f;
 }
 
 /// <summary>
-/// 目標地点に向かって移動する処理
+/// 目標地点に向かって移動する処理（補間回転を使用）
 /// </summary>
-/// <param name="enemy">対象のフィールド敵</param>
-/// <param name="dt">経過時間（デルタタイム）</param>
 void FieldEnemyPatrolState::MoveTowardsTarget(FieldEnemy& enemy, float dt) {
 	Vector3 currentPos = enemy.GetPosition();
 	Vector3 target = enemy.GetPatrolTarget();
@@ -142,41 +80,21 @@ void FieldEnemyPatrolState::MoveTowardsTarget(FieldEnemy& enemy, float dt) {
 	direction.y = 0.0f;
 
 	float distance = Length(direction);
-
 	if (distance > 0.1f) {
-		// 正規化して移動
 		direction = direction / distance;
 
 		const auto& data = enemy.GetEnemyData();
-		Vector3 movement = direction * data.patrolSpeed * dt;
-		enemy.AddTranslate(movement);
+		enemy.AddTranslate(direction * data.patrolSpeed * dt);
 
-		// 移動方向を向く
-		float angle = std::atan2(direction.x, direction.z);
-		enemy.SetRotationY(angle);
+		// 補間回転：移動方向へなめらかに向く
+		enemy.RotateTowardsDirection(direction, data.rotationSpeed, dt);
 	}
 }
 
 /// <summary>
-/// プレイヤーを検知し、追跡状態に遷移するかを判定
+/// プレイヤー検知 → Alert 状態へ遷移
+/// （直接 Chase に飛ばさず、発見リアクションを挟む）
 /// </summary>
-/// <param name="enemy">対象のフィールド敵</param>
-//void FieldEnemyPatrolState::CheckForPlayer(FieldEnemy& enemy) {
-//	if (!enemy.HasPlayer()) {
-//		return;
-//	}
-//
-//	Vector3 playerPos = enemy.GetPlayerPosition();
-//	Vector3 enemyPos = enemy.GetPosition();
-//
-//	float distanceToPlayer = Length(playerPos - enemyPos);
-//
-//	const auto& data = enemy.GetEnemyData();
-//	if (distanceToPlayer < data.chaseRange) {
-//		// Chase状態に遷移
-//		enemy.ChangeState(std::make_unique<FieldEnemyChaseState>());
-//	}
-//}
 void FieldEnemyPatrolState::CheckForPlayer(FieldEnemy& enemy) {
 	Player* player = enemy.GetPlayer();
 	if (!player) return;
@@ -184,26 +102,23 @@ void FieldEnemyPatrolState::CheckForPlayer(FieldEnemy& enemy) {
 	Vector3 enemyPos = enemy.GetPosition();
 	Vector3 playerPos = player->GetWorldPosition();
 	Vector3 toPlayer = playerPos - enemyPos;
-	toPlayer.y = 0.0f; // Y軸は無視（水平面のみで判定）
+	toPlayer.y = 0.0f;
 
 	float distSq = toPlayer.x * toPlayer.x + toPlayer.z * toPlayer.z;
-
 	bool isDetected = false;
 
-	// A. 視界判定 --- DrawViewCone と完全に同じ計算
+	// A. 視界判定：DrawViewCone と同じ計算
 	float viewDist = enemy.GetEnemyData().viewDistance;
 	if (distSq <= viewDist * viewDist) {
-
-		// DrawViewCone と同じ: rotationY から前方ベクトルを作る
 		float rotY = enemy.GetRotationY();
 		Vector3 forward = { sinf(rotY), 0.0f, cosf(rotY) };
 
 		float dist = sqrtf(distSq);
 		if (dist > 0.001f) {
 			Vector3 dirToPlayer = toPlayer / dist;
-
 			float dot = Dot(forward, dirToPlayer);
-			float angle = acosf(std::clamp(dot, -1.0f, 1.0f)) * (180.0f / std::numbers::pi_v<float>);
+			float angle = acosf(std::clamp(dot, -1.0f, 1.0f))
+				* (180.0f / std::numbers::pi_v<float>);
 
 			if (angle <= enemy.GetEnemyData().viewAngle * 0.5f) {
 				isDetected = true;
@@ -211,7 +126,7 @@ void FieldEnemyPatrolState::CheckForPlayer(FieldEnemy& enemy) {
 		}
 	}
 
-	// B. 足音判定（走っている時のみ・視野角は関係なし）
+	// B. 足音判定（走っている時のみ）
 	if (!isDetected && player->GetMovement()->IsRunning()) {
 		float noiseDist = enemy.GetEnemyData().noiseDetectionRange;
 		if (distSq <= noiseDist * noiseDist) {
@@ -220,7 +135,7 @@ void FieldEnemyPatrolState::CheckForPlayer(FieldEnemy& enemy) {
 	}
 
 	if (isDetected) {
-		Logger("[FieldEnemy] プレイヤーを検知！追跡を開始します。\n");
-		enemy.ChangeState(std::make_unique<FieldEnemyChaseState>());
+		// Chase に直接行かず、Alert（発見リアクション）を挟む
+		enemy.ChangeState(std::make_unique<FieldEnemyAlertState>());
 	}
 }
