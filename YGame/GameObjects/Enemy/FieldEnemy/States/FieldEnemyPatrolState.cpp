@@ -184,32 +184,34 @@ void FieldEnemyPatrolState::CheckForPlayer(FieldEnemy& enemy) {
 	Vector3 enemyPos = enemy.GetPosition();
 	Vector3 playerPos = player->GetWorldPosition();
 	Vector3 toPlayer = playerPos - enemyPos;
-	// 距離の平方は LengthSq があればそれを使うのが高速です
-	float distSq = (toPlayer.x * toPlayer.x + toPlayer.y * toPlayer.y + toPlayer.z * toPlayer.z);
+	toPlayer.y = 0.0f; // Y軸は無視（水平面のみで判定）
+
+	float distSq = toPlayer.x * toPlayer.x + toPlayer.z * toPlayer.z;
 
 	bool isDetected = false;
 
-	// A. 視界判定
+	// A. 視界判定 --- DrawViewCone と完全に同じ計算
 	float viewDist = enemy.GetEnemyData().viewDistance;
 	if (distSq <= viewDist * viewDist) {
-		// 前方ベクトル算出
-		const Matrix4x4& mat = enemy.GetWT().matWorld_;
-		Vector3 forward = { mat.m[2][0], mat.m[2][1], mat.m[2][2] };
-		forward = Normalize(forward);
 
-		Vector3 dirToPlayer = Normalize(toPlayer);
-		float dot = Dot(forward, dirToPlayer);
+		// DrawViewCone と同じ: rotationY から前方ベクトルを作る
+		float rotY = enemy.GetRotationY();
+		Vector3 forward = { sinf(rotY), 0.0f, cosf(rotY) };
 
-		// クランプして誤差回避しつつ角度算出
-		float angle = acosf(std::clamp(dot, -1.0f, 1.0f)) * (180.0f / 3.141592f);
+		float dist = sqrtf(distSq);
+		if (dist > 0.001f) {
+			Vector3 dirToPlayer = toPlayer / dist;
 
-		if (angle <= enemy.GetEnemyData().viewAngle * 0.5f) {
-			isDetected = true;
+			float dot = Dot(forward, dirToPlayer);
+			float angle = acosf(std::clamp(dot, -1.0f, 1.0f)) * (180.0f / std::numbers::pi_v<float>);
+
+			if (angle <= enemy.GetEnemyData().viewAngle * 0.5f) {
+				isDetected = true;
+			}
 		}
 	}
 
-	// B. 足音判定（走っている時のみ）
-	// ※GetMovement()の実装に合わせて調整してください
+	// B. 足音判定（走っている時のみ・視野角は関係なし）
 	if (!isDetected && player->GetMovement()->IsRunning()) {
 		float noiseDist = enemy.GetEnemyData().noiseDetectionRange;
 		if (distSq <= noiseDist * noiseDist) {
@@ -217,10 +219,8 @@ void FieldEnemyPatrolState::CheckForPlayer(FieldEnemy& enemy) {
 		}
 	}
 
-	// --- 状態遷移 ---
 	if (isDetected) {
 		Logger("[FieldEnemy] プレイヤーを検知！追跡を開始します。\n");
-		// ここで状態を変えるので、これ以降の Patrol 処理は不要になる
 		enemy.ChangeState(std::make_unique<FieldEnemyChaseState>());
 	}
 }

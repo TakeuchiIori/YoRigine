@@ -315,3 +315,15 @@ void FieldEnemy::DrawCollision() {
 		obbCollider_->Draw();
 	}
 }
+
+void FieldEnemy::DrawLine(Line* line) {
+	if(!line || logicalState_ == FieldEnemyState::Despawn) {
+		return;
+	}
+	line->DrawCone(
+		GetPosition(),
+		GetRotae().y,
+		enemyData_.viewDistance,
+		enemyData_.viewAngle
+	);
+}

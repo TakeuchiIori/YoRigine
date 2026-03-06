@@ -187,6 +187,42 @@ void Line::DrawOBB(const Vector3& center, const Vector3& rotationEuler, const Ve
 	}
 }
 
+void Line::DrawCone(const Vector3& position, float rotationY, float viewDistance, float viewAngleDeg, int resolution) {
+
+	float halfAngle = viewAngleDeg * 0.5f * (std::numbers::pi_v<float> / 180.0f);
+	float leftAngle = rotationY - halfAngle;
+	float rightAngle = rotationY + halfAngle;
+
+	Vector3 origin = { position.x, position.y + 0.05f, position.z };
+
+	// 端点を変数として確定させる
+	Vector3 leftEnd = origin + Vector3{ sinf(leftAngle),  0.0f, cosf(leftAngle) } *viewDistance;
+	Vector3 rightEnd = origin + Vector3{ sinf(rightAngle), 0.0f, cosf(rightAngle) } *viewDistance;
+
+	// 境界線
+	RegisterLine(origin, leftEnd);
+	RegisterLine(origin, rightEnd);
+
+	// 弧 --- leftEnd/rightEnd を直接始点・終点として使う
+	for (int i = 0; i < resolution; ++i) {
+		float t1 = leftAngle + (rightAngle - leftAngle) * float(i) / resolution;
+		float t2 = leftAngle + (rightAngle - leftAngle) * float(i + 1) / resolution;
+
+		// 両端は再計算せず確定済みの端点を使う
+		Vector3 p1 = (i == 0) ? leftEnd
+			: origin + Vector3{ sinf(t1), 0.0f, cosf(t1) } *viewDistance;
+		Vector3 p2 = (i == resolution - 1) ? rightEnd
+			: origin + Vector3{ sinf(t2), 0.0f, cosf(t2) } *viewDistance;
+
+		RegisterLine(p1, p2);
+	}
+
+	// 原点マーカー
+	float cross = 0.3f;
+	RegisterLine(origin + Vector3{ -cross, 0, 0 }, origin + Vector3{ cross, 0, 0 });
+	RegisterLine(origin + Vector3{ 0, 0, -cross }, origin + Vector3{ 0, 0, cross });
+}
+
 /// <summary>
 /// 頂点バッファ（ライン用）の生成
 /// </summary>

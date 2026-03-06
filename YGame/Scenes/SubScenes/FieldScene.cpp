@@ -115,6 +115,7 @@ void FieldScene::DrawLine() {
 #ifdef USE_IMGUI
 	player_->DrawCollision();
 	fieldEnemyManager_->DrawCollision();
+	fieldEnemyManager_->DrawLine(line_.get());
 	player_->DrawBone(*line_.get());
 	battleFieldArea_->Draw(line_.get());
 #endif
