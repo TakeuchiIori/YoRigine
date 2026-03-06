@@ -3,6 +3,7 @@
 enum class CameraMode {
 	DEFAULT,
 	CLEAR,
+	TITLE,
 	FOLLOW,
 	DEBUG,
 	BATTLE_START

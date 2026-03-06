@@ -31,8 +31,6 @@ public:
 	// クライアント領域のサイズ 16 : 9
 	static const int32_t kClientWidth = 1600;
 	static const int32_t kClientHeight = 900;
-
-
 private:
 	///************************* メンバ変数 *************************///
 	static WinApp* instance;

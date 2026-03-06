@@ -58,12 +58,10 @@ void MotionSystem::Update(float deltaTime)
 
 	// 終了した瞬間コールバックする
 	if (!wasFinished && isFinished_) {
-		if (onMationFinished_) {
-			onMationFinished_();
+		if (onMotionFinished_) {
+			onMotionFinished_();
 		}
 	}
-
-
 }
 
 
@@ -81,12 +79,14 @@ void MotionSystem::Apply()
 		if (skinCluster_) {
 			skinCluster_->UpdateMatrixPalette(skeleton_->GetJoints());
 		}
+
 	} else if (skeleton_) {
 		animation_->ApplyAnimation(skeleton_->GetJoints(), animationTime_);
 		skeleton_->Update();
 		if (skinCluster_) {
 			skinCluster_->UpdateMatrixPalette(skeleton_->GetJoints());
 		}
+
 	} else if (node_) {
 		animation_->PlayerAnimation(animationTime_, *node_);
 	}
@@ -94,13 +94,11 @@ void MotionSystem::Apply()
 
 
 void MotionSystem::PlayOnce() {
-	//animationTime_ = 0.0f;
 	playMode_ = MotionPlayMode::Once;
 	isFinished_ = false;
 }
 
 void MotionSystem::PlayLoop() {
-	//animationTime_ = 0.0f;
 	playMode_ = MotionPlayMode::Loop;
 	isFinished_ = false;
 }
@@ -192,7 +190,6 @@ void MotionSystem::SetPlayMode(MotionPlayMode playMode)
 	isFinished_ = false;
 
 	if (!animationBlendState_.isBlending) {
-		//animationBlendState_.fromTime = animationTime_;
 		animationBlendState_.toTime = 0.0f;
 		animationTime_ = 0.0f;
 	}
@@ -211,8 +208,8 @@ void MotionSystem::BlendAndApplyAnimation(const Motion& from, const Motion& to, 
 
 		QuaternionTransform fromTr = GetTransformAnimation(from, name, fromSampleTime);
 		QuaternionTransform toTr = GetTransformAnimation(to, name, toSampleTime);
-
 		QuaternionTransform blended;
+
 		blended.translate = Lerp(fromTr.translate, toTr.translate, t);
 		blended.rotate = Slerp(fromTr.rotate, toTr.rotate, t);
 		blended.scale = Lerp(fromTr.scale, toTr.scale, t);

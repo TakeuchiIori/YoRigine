@@ -3,7 +3,6 @@
 // Engine
 #include <memory>
 #include <Systems/Camera/Camera.h>
-#include <Systems/Camera/CameraManager.h>
 #include <Systems/GameTime/GameTime.h>
 #include <Collision/Core/CollisionManager.h>
 #include <Particle/ParticleManager.h>
@@ -56,7 +55,6 @@ private:
 	std::string sceneName_;
 	// カメラ
 	std::shared_ptr<Camera> sceneCamera_;
-	CameraManager cameraManager_;
 
 };
 

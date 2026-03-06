@@ -134,7 +134,7 @@ void WinApp::Finalize()
 
 
 /// <summary>
-/// メッセージ処理（閉じる要求が来たら true）
+/// メッセージ処理
 /// </summary>
 bool WinApp::ProcessMessage()
 {

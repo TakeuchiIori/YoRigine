@@ -6,9 +6,6 @@ void BaseScene::InitializeCommon()
 	YoRigine::GameTime::Initialize();
 	YoRigine::CollisionManager::GetInstance()->Initialize();
 
-	// カメラ
-	sceneCamera_ = cameraManager_.AddCamera();
-
 	// パーティクル
 	YoRigine::ParticleManager::GetInstance()->SetCamera(sceneCamera_.get());
 
@@ -20,7 +17,6 @@ void BaseScene::InitializeCommon()
 void BaseScene::UpdateCommon()
 {
 	YoRigine::GameTime::Update();
-	cameraManager_.UpdateAllCameras();
 	YoRigine::ModelManipulator::GetInstance()->Update();
 	YoRigine::ParticleManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
 	YoRigine::CollisionManager::GetInstance()->Update();

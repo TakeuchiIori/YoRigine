@@ -43,9 +43,9 @@ public:
 
 	// モーションが終了したとき
 	void SetOnMotionFinishedCallback(const std::function<void()>& callback) {
-		onMationFinished_ = callback;
+		onMotionFinished_ = callback;
 	}
-	std::function<void()> onMationFinished_;
+	std::function<void()> onMotionFinished_;
 
 public:
 	///************************* アクセッサ *************************///

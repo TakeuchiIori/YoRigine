@@ -89,10 +89,10 @@ void DevelopScene::Initialize() {
 /// </summary>
 void DevelopScene::Update() {
 	YoRigine::GameTime::Update();
+	UpdateCamera();
 	motionEditor_->Update();
 
 
-	UpdateCamera();
 	YoRigine::ModelManipulator::GetInstance()->Update();
 	YoRigine::ParticleManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
 	YParticleManager::GetInstance().Update(YoRigine::GameTime::GetDeltaTime());

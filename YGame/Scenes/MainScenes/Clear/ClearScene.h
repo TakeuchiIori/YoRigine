@@ -19,19 +19,12 @@
 #include "Systems/Camera/CameraDirector.h"
 #include "Systems/Camera/CameraEditor.h"
 #include "Systems/Camera/Camera.h"
-#include "Systems/Camera/CameraManager.h"
 #include "Systems/Camera/CameraMode.h"
 
 // Math
 #include "Vector3.h"
 
 // App
-#include "Systems/Audio/Audio.h"
-#include "Particle/ParticleEmitter.h"
-#include "Object3D/Object3d.h"
-#include "Player/Player.h"
-#include "WorldTransform./WorldTransform.h"
-#include "Drawer/LineManager/Line.h"
 #include "Player/DemoPlayer.h"
 #include "SkyBox/SkyBox.h"
 #include "Ground/Ground.h"
