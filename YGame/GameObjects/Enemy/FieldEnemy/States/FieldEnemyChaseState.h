@@ -4,7 +4,8 @@
 class FieldEnemy;
 
 /// <summary>
-/// 接近状態
+/// 追跡状態
+/// 見失った場合は Patrol に直接戻らず、SearchState を挟む
 /// </summary>
 class FieldEnemyChaseState : public IEnemyState<FieldEnemy> {
 public:
@@ -14,6 +15,5 @@ public:
 
 private:
 	void ChasePlayer(FieldEnemy& enemy, float dt);
-	bool ShouldReturnToPatrol(const FieldEnemy& enemy) const;
-	void FacePlayer(FieldEnemy& enemy);
+	bool ShouldGiveUpChase(const FieldEnemy& enemy) const;
 };

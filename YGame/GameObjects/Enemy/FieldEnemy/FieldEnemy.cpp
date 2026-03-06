@@ -327,3 +327,49 @@ void FieldEnemy::DrawLine(Line* line) {
 		enemyData_.viewAngle
 	);
 }
+
+/// <summary>
+/// 目標角度に向かって補間回転する
+/// </summary>
+void FieldEnemy::RotateTowards(float targetAngle, float speed, float dt) {
+	float current = wt_.rotate_.y;
+
+	// 差分を [-π, π] に正規化
+	float diff = targetAngle - current;
+	while (diff > std::numbers::pi_v<float>) diff -= 2.0f * std::numbers::pi_v<float>;
+	while (diff < -std::numbers::pi_v<float>) diff += 2.0f * std::numbers::pi_v<float>;
+
+	float maxDelta = speed * dt;
+	if (std::abs(diff) <= maxDelta) {
+		wt_.rotate_.y = targetAngle;
+	}
+	else {
+		wt_.rotate_.y = current + std::copysign(maxDelta, diff);
+	}
+}
+
+/// <summary>
+/// プレイヤー方向へ補間回転する
+/// </summary>
+void FieldEnemy::RotateTowardsPlayer(float speed, float dt) {
+	if (!HasPlayer()) return;
+
+	Vector3 dir = GetPlayerPosition() - GetPosition();
+	dir.y = 0.0f;
+	float dist = Length(dir);
+	if (dist < 0.1f) return;
+
+	float targetAngle = std::atan2(dir.x, dir.z);
+	RotateTowards(targetAngle, speed, dt);
+}
+
+/// <summary>
+/// 移動方向へ補間回転する
+/// </summary>
+void FieldEnemy::RotateTowardsDirection(const Vector3& direction, float speed, float dt) {
+	float dist = Length(direction);
+	if (dist < 0.1f) return;
+
+	float targetAngle = std::atan2(direction.x, direction.z);
+	RotateTowards(targetAngle, speed, dt);
+}

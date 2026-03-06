@@ -6,6 +6,7 @@ class FieldEnemy;
 
 /// <summary>
 /// パトロール状態
+/// プレイヤーを発見した場合は Chase に直接遷移せず、AlertState を挟む
 /// </summary>
 class FieldEnemyPatrolState : public IEnemyState<FieldEnemy> {
 public:
