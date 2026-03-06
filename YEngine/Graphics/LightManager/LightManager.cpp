@@ -365,8 +365,30 @@ namespace YoRigine {
 					ImGui::SliderFloat("Intensity", &sl.intensity, 0.0f, 100.0f, "%.2f");
 					ImGui::SliderFloat("Distance", &sl.distance, 0.0f, 200.0f, "%.2f");
 					ImGui::SliderFloat("Decay", &sl.decay, 0.0f, 100.0f, "%.2f");
-					ImGui::SliderFloat("CosAngle", &sl.cosAngle, 0.0f, 1.0f, "%.2f");
-					ImGui::SliderFloat("CosFalloffStart", &sl.cosFalloffStart, 0.0f, 1.0f, "%.2f");
+					///*** 角度を degree で編集（cosAngle=内側, cosFalloffStart=外側）***///
+					constexpr float kRad2Deg = 180.0f / std::numbers::pi_v<float>;
+					constexpr float kDeg2Rad = std::numbers::pi_v<float> / 180.0f;
+
+					float innerDeg = std::acos(std::clamp(sl.cosAngle, -1.0f, 1.0f)) * kRad2Deg;
+					float outerDeg = std::acos(std::clamp(sl.cosFalloffStart, -1.0f, 1.0f)) * kRad2Deg;
+
+
+					// cos → degree（内側・外側）
+					// 内側角度スライダー（外角より必ず小さく）
+					//float innerMax = std::max(outerDeg - 1.0f, 0.0f);
+					if (ImGui::SliderFloat("Inner Angle [deg]", &innerDeg, 0.0f, 89.0f, "%.1f deg")) {
+						innerDeg = std::min(innerDeg, outerDeg - 1.0f);
+						sl.cosAngle = std::cos(innerDeg * kDeg2Rad);
+					}
+
+					// 外側角度スライダー（内角より必ず大きく）
+					if (ImGui::SliderFloat("Outer Angle [deg]", &outerDeg, 1.0f, 90.0f, "%.1f deg")) {
+						outerDeg = std::max(outerDeg, innerDeg + 1.0f);
+						sl.cosFalloffStart = std::cos(outerDeg * kDeg2Rad);
+					}
+
+					ImGui::TextDisabled("cosAngle(inner)=%.3f  cosFalloffStart(outer)=%.3f",
+						sl.cosAngle, sl.cosFalloffStart);
 
 					if (ImGui::Button("Remove")) {
 						RemoveSpotLight(i);
