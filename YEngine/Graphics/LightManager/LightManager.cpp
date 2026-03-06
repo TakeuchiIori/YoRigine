@@ -313,8 +313,8 @@ namespace YoRigine {
 			SetSpotLightPosition(spotLightPosition);
 		}
 
-		Vector3 spotLightDirection = GetSpotLightDirection();
-		if (ImGui::SliderFloat3("Spot Direction", &spotLightDirection.x, -10.0f, 10.0f, "%.2f")) {
+		Vector3 spotLightDirection = Normalize(GetSpotLightDirection());
+		if (ImGui::SliderFloat3("Spot Direction", &spotLightDirection.x, 0.0f, 1.0f, "%.2f")) {
 			SetSpotLightDirection(spotLightDirection);
 		}
 
