@@ -14,7 +14,6 @@
 #include "imgui.h"
 #endif
 #include <Debugger/Logger.h>
-#include <Systems/Camera/Virtuals/FollowCamera/BattleStartCameraState.h>
 
 /// <summary>
 /// バトルシーン初期化
@@ -207,7 +206,8 @@ void BattleScene::OnEnter() {
 		if (!transitionData.battleEnemyIds.empty()) {
 			encounter.enemyIds = transitionData.battleEnemyIds;
 			Logger("[BattleScene] 複数体バトル開始\n");
-		} else {
+		}
+		else {
 			encounter.enemyIds = { transitionData.battleEnemyId };
 			Logger("[BattleScene] 単体バトル開始\n");
 		}
@@ -227,8 +227,9 @@ void BattleScene::OnEnter() {
 
 		// プレイヤー位置リセット
 		player_->LookAtDirection(Vector3(0.0f, 0.0f, 0.0f));
-		auto battleStartState = std::make_unique<BattleStartCameraState>();
-		player_->GetFollowCamera()->ChangeState(std::move(battleStartState));
+
+		// 保存済みの設定（CameraEditorで調整した値）で演出を再生
+		player_->GetFollowCamera()->PlayBattleStart();
 
 		// 戦闘開始
 		if (battleEnemyManager_) {
@@ -239,7 +240,8 @@ void BattleScene::OnEnter() {
 
 		syncData->ClearBattleTransitionData();
 		Logger("[BattleScene] バトルデータ設定完了\n");
-	} else {
+	}
+	else {
 		Logger("[BattleScene] エラー: バトル遷移データが存在しません\n");
 	}
 
@@ -330,7 +332,8 @@ void BattleScene::HandleBattleEnd(BattleResult result, const BattleStats& stats)
 
 		Logger("[BattleScene] ===== HandleBattleEnd() END (Clear Scene) =====\n");
 		return;  // フィールドに戻るコールバックを実行しない
-	} else {
+	}
+	else {
 		if (isFinalBattle_) {
 			Logger("[BattleScene] Final battle but not victory (Defeat?)\n");
 		}
