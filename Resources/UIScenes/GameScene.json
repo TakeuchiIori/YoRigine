@@ -19,6 +19,7 @@
         "ripples",
         "playerHPBG",
         "playerHPBar",
+        "EnemyAlert",
         "UIBackGround",
         "A",
         "B",
@@ -106,6 +107,10 @@
         {
             "configPath": "./Resources/UIConfigs/GameScene/playerHPBar.json",
             "id": "playerHPBar"
+        },
+        {
+            "configPath": "./Resources/UIConfigs/GameScene/EnemyAlert.json",
+            "id": "EnemyAlert"
         },
         {
             "configPath": "./Resources/UIConfigs/GameScene/UIBackGround.json",
