@@ -1,0 +1,94 @@
+{
+    "BlendMode": 1,
+    "Lighting": false,
+    "billboardType": 0,
+    "isRelative": false,
+    "maxParticles": 1000,
+    "mesh": {
+        "params": [
+            12.199999809265137,
+            1.0,
+            125.0,
+            16.0
+        ],
+        "type": 5
+    },
+    "name": "f",
+    "spawnModules": [
+        {
+            "data": {
+                "initialOffset": {
+                    "x": 0.0,
+                    "y": 0.0
+                },
+                "initialScale": {
+                    "x": 1.0,
+                    "y": 1.0
+                }
+            },
+            "name": "UV初期設定",
+            "type": "SpawnUV"
+        },
+        {
+            "data": {
+                "maxColor": [
+                    1.0,
+                    1.0,
+                    1.0,
+                    0.07058823853731155
+                ],
+                "minColor": [
+                    1.0,
+                    1.0,
+                    1.0,
+                    0.01568627543747425
+                ]
+            },
+            "name": "ランダム色",
+            "type": "SpawnRandomColor"
+        },
+        {
+            "data": {
+                "initialOffset": {
+                    "x": 0.0,
+                    "y": 0.0
+                },
+                "initialScale": {
+                    "x": 1.0,
+                    "y": 1.0
+                }
+            },
+            "name": "UV初期設定",
+            "type": "SpawnUV"
+        },
+        {
+            "data": {
+                "maxColor": [
+                    1.0,
+                    1.0,
+                    1.0,
+                    0.07058823853731155
+                ],
+                "minColor": [
+                    1.0,
+                    1.0,
+                    1.0,
+                    0.01568627543747425
+                ]
+            },
+            "name": "ランダム色",
+            "type": "SpawnRandomColor"
+        }
+    ],
+    "texture": "Resources/Effects/uiuiui.png",
+    "updateModules": [
+        {
+            "data": {
+                "scrollSpeedX": 0.5,
+                "scrollSpeedY": 0.550000011920929
+            },
+            "name": "UVスクロール",
+            "type": "UpdateUVScroll"
+        }
+    ]
+}
