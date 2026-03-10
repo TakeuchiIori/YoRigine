@@ -6,12 +6,13 @@ struct ParticleInstance
     float4x4 WVP;
     float4x4 World;
     float4 color;
+    float4x4 uvTransform;
 };
 
 // StructuredBuffer（インスタンシングデータ）
 StructuredBuffer<ParticleInstance> gParticle : register(t0);
 
-cbuffer InstanceOffsetCB : register(b7) // 既存のbスロットと被らない番号に
+cbuffer InstanceOffsetCB : register(b0) // 既存のbスロットと被らない番号に
 {
     uint gInstanceOffset;
     float3 padding;
@@ -34,8 +35,8 @@ VertexShaderOutput main(VertexShaderInput input, uint instanceId : SV_InstanceID
     // インスタンスごとのWVP行列で座標変換
     output.position = mul(input.position, gParticle[id].WVP);
     
-    // テクスチャ座標をそのまま渡す
-    output.texcoord = input.texcoord;
+    // テクスチャ座標をインスタンスごとのUV変換行列で変換
+    output.texcoord = mul(float4(input.texcoord, 0.0f, 1.0f), gParticle[id].uvTransform).xy;
     
     // 法線をワールド空間に変換
     output.normal = normalize(mul(input.normal, (float3x3) gParticle[id].World));

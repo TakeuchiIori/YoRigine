@@ -580,6 +580,22 @@ Matrix4x4 MatrixLookAtLH(const Vector3& eye, const Vector3& target, const Vector
 	return result;
 }
 
+Matrix4x4 MakeUVTransform(const Vector2& offset, const Vector2& scale)
+{
+	// すべて 0 で初期化、または単位行列を作成
+	Matrix4x4 mat = MakeIdentity4x4();
+
+	// 1. スケーリング (UとVの密度)
+	mat.m[0][0] = scale.x;
+	mat.m[1][1] = scale.y;
+
+	// 2. 平行移動 (UとVのスクロール量)
+	mat.m[3][0] = offset.x;
+	mat.m[3][1] = offset.y;
+
+	return mat;
+}
+
 
 
 

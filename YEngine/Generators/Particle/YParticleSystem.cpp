@@ -15,6 +15,7 @@
 #include "Modules/Spawn/Transform/SpawnRandomScale.h"
 #include "Modules/Spawn/Transform/SpawnRandomRotate.h"
 
+#include "Modules/Spawn/UV/SpawnUV.h"
 
 // Updateモジュール
 #include "Modules/Update/Physics/UpdateGravity.h"
@@ -36,6 +37,8 @@
 
 #include "Modules/Update/Transform/UpdateRotation.h"
 #include "Modules/Update/Transform/UpdateScale.h"
+
+#include "Modules/Update/UV/UpdateUVScroll.h"
 
 #ifdef USE_IMGUI
 #include "imgui.h"
@@ -59,6 +62,7 @@ YParticleSystem::YParticleSystem(const std::string& name, uint32_t maxParticles)
 #endif
 	// 全パーティクル属性配列の初期化
 	attributes_.resize(maxParticles_);
+
 }
 
 void YParticleSystem::AddSpawnModule(std::shared_ptr<ISpawnModule> module)
@@ -192,6 +196,7 @@ void YParticleSystem::RefreshMesh()
 	case 2: mesh_ = MeshPrimitive::CreateRing(meshParams_[0], meshParams_[1], (uint32_t)meshParams_[2]); break;
 	case 3: mesh_ = MeshPrimitive::CreateCylinder(meshParams_[0], meshParams_[1], (uint32_t)meshParams_[2], meshParams_[3]); break;
 	case 4: mesh_ = MeshPrimitive::CreateFanShape(meshParams_[0], meshParams_[1], (uint32_t)meshParams_[2]); break;
+	case 5: mesh_ = MeshPrimitive::CreateSphere(meshParams_[0], (uint32_t)meshParams_[2]); break;
 	}
 }
 
@@ -249,7 +254,7 @@ void YParticleSystem::ShowEditor()
 	// --- メッシュ設定 ---
 	if (ImGui::TreeNode("メッシュ設定")) {
 		bool changed = false;
-		const char* meshTypes[] = { "平面", "ボックス", "リング", "シリンダー","扇形" };
+		const char* meshTypes[] = { "平面", "ボックス", "リング", "シリンダー","扇形","円形"};
 
 		// Comboでタイプ選択
 		if (ImGui::Combo("プリミティブタイプ", &currentMeshType_, meshTypes, IM_ARRAYSIZE(meshTypes))) {
@@ -301,6 +306,17 @@ void YParticleSystem::ShowEditor()
 					changed = true;
 				}
 			}
+
+		case 5: // Sphere (radius, -, divide)
+			changed |= ImGui::DragFloat("半径", &meshParams_[0], 0.1f, 0.1f, 100.0f);
+			{
+				int div = (int)meshParams_[2];
+				if (ImGui::DragInt("分割数", &div, 1, 3, 128)) {
+					meshParams_[2] = (float)div;
+					changed = true;
+				}
+			}
+			break;
 		}
 
 		// 値が変わった場合のみ再生成（メモリリーク防止のため）
@@ -417,6 +433,7 @@ void YParticleSystem::ShowEditor()
 		};
 		static SpawnModuleEntry availableSpawnModules[] = {
 			{ "速度", []() { return std::make_shared<SpawnVelocity>(); } },
+			{  "UV", []() { return std::make_shared<SpawnUV>(); } },
 			{ "コーン速度", []() { return std::make_shared<SpawnConeVelocity>(); } },
 			{ "放射状速度", []() { return std::make_shared<SpawnRadialVelocity>(); } },
 			{ "ランダムカラー", []() { return std::make_shared<SpawnRandomColor>(); } },
@@ -516,6 +533,7 @@ void YParticleSystem::ShowEditor()
 		};
 		static UpdateModuleEntry availableUpdateModules[] = {
 			{ "速度", []() { return std::make_shared<UpdateVelocity>(); } },
+			{  "UVスクロール", []() { return std::make_shared<UpdateUVScroll>(); } },
 			{ "重力", []() { return std::make_shared<UpdateGravity>(); } },
 			{ "カラー", []() { return std::make_shared<UpdateColor>(); } },
 			{ "アトラクタ", []() { return std::make_shared<UpdateAttractor>(); } },

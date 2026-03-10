@@ -117,8 +117,8 @@ void MyGame::Initialize() {
 	// 初期シーン設定
 	//------------------------------------------------------------
 #ifdef _DEBUG
-	SceneManager::GetInstance()->ChangeScene("Title");   // デバッグ時はゲームシーン
-#else
+	SceneManager::GetInstance()->ChangeScene("Develop");   // デバッグ時はゲームシーン
+#else 
 	SceneManager::GetInstance()->ChangeScene("Title");  // 製品版はタイトルシーン
 #endif
 }

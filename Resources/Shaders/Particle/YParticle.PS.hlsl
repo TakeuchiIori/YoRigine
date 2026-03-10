@@ -1,15 +1,6 @@
 #include "YParticle.hlsli"
 #include "../Light/Light.hlsli"
 
-struct MaterialColorData
-{
-    float4 color; // 16バイト
-};
-
-struct MaterialUV
-{
-    float4x4 uvTransform; // 64バイト
-};
 // MaterialLighting
 struct MaterialLight
 {
@@ -33,14 +24,10 @@ struct CameraForGPU
 // 定数バッファ
 //=================================================================
 
-// マテリアル関連
-ConstantBuffer<MaterialColorData> gMaterialColor : register(b0);
-ConstantBuffer<MaterialUV> gMaterialUV : register(b1);
-
 // ライティング関連
-ConstantBuffer<MaterialLight> gMaterialLight : register(b2);
-ConstantBuffer<DirectionalLightData> gDirectionalLight : register(b3);
-ConstantBuffer<CameraForGPU> gCamera : register(b4);
+ConstantBuffer<MaterialLight> gMaterialLight : register(b1);
+ConstantBuffer<DirectionalLightData> gDirectionalLight : register(b2);
+ConstantBuffer<CameraForGPU> gCamera : register(b3);
 //=================================================================
 // テクスチャとサンプラー
 //=================================================================
@@ -111,12 +98,11 @@ PixelShaderOutput main(VertexShaderOutput input)
     PixelShaderOutput output;
     
     // UV変換を適用してテクスチャサンプリング
-    float4 transformedUV = mul(float4(input.texcoord, 0.0f, 1.0f), gMaterialUV.uvTransform);
-    float4 textureColor = gTexture.Sample(gSampler, transformedUV.xy);
+    float4 textureColor = gTexture.Sample(gSampler, input.texcoord);
     
     // 基本色の計算
     // 頂点カラー × テクスチャカラー × マテリアルカラー
-    float4 baseColor = gMaterialColor.color * textureColor * input.color;
+    float4 baseColor =  textureColor * input.color;
     
     // アルファテスト（完全に透明なピクセルは破棄）
     if (baseColor.a < 0.01f)
