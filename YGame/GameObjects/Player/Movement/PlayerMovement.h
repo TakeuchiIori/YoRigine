@@ -54,7 +54,7 @@ public:
 	Vector3 GetVelocity() const { return velocity_; }
 	float GetSpeed() const;
 	bool IsMoving() const;
-	bool CanMove() const { return canMove_; }  // ← 追加：移動可能かどうかを返す
+	bool CanMove() const { return canMove_; }
 	void SetCanMove(bool canMove) { canMove_ = canMove; }
 	void ForceStop();
 

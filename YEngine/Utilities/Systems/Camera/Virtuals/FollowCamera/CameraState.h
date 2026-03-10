@@ -27,7 +27,7 @@ public:
     // 保存・読込
     virtual void Save([[maybe_unused]] nlohmann::json& j) const {}
     virtual void Load([[maybe_unused]] const nlohmann::json& j) {}
-    
+    virtual bool IsPerformance() const { return false; }
     // ImGuiでの編集
     virtual void DrawEditGui() {}
 

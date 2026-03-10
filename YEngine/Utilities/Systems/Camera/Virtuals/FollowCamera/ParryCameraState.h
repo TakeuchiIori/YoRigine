@@ -25,7 +25,7 @@ public:
     
     // ImGuiでの編集
     void DrawEditGui() override;
-    
+    bool IsPerformance() const override { return true; }
 private:
     void SetupControlPoints(FollowCamera* camera);
     ParryType parryType_ = ParryType::Quick;

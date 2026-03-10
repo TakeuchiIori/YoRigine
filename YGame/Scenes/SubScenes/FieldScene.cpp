@@ -275,7 +275,7 @@ void FieldScene::HandleDetailedEncounter(const EncountInfo& encounterInfo) {
 	}
 
 	transitionData.isFinalBattle = isFinalBattle;
-	transitionData.totalRemainingFieldEnemies = remainingGroups; // ★追加
+	transitionData.totalRemainingFieldEnemies = remainingGroups;
 
 	auto* syncData = SceneSyncData::GetInstance();
 	syncData->SaveBattleTransitionData(transitionData);

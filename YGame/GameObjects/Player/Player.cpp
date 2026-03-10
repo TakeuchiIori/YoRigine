@@ -106,6 +106,7 @@ void Player::InitCombatSystem() {
 /// </summary>
 void Player::HandleCombatInput() {
 
+	if (followCamera_->IsInPerformance()) return;
 	if (!combat_->IsIdle()) return;
 
 	// A（軽攻撃）
@@ -124,12 +125,6 @@ void Player::HandleCombatInput() {
 		combat_->TryGuard();
 	}
 
-	//// キャンセル
-	//if (input_->IsPadTriggered(0, GamePadButton::X)) {
-	//	if (combat_->TryCancel()) {
-	//		Logger("Combo cancelled!\n");
-	//	}
-	//}
 }
 
 /// <summary>
@@ -460,6 +455,13 @@ void Player::Revive(int reviveHP) {
 	obj_->SetChangeMotion("Player.gltf", MotionPlayMode::Loop, "Idle4");
 }
 
+void Player::SetInitialPosition()
+{
+	LookAtDirection(Vector3(0.0f, 0.0f, 0.0f));
+	SetPosition({ 23.4f, 0.0f, 4.4f });
+	wt_.UpdateMatrix();
+}
+
 /// <summary>
 ///	指定方向を向く関数
 /// </summary>
@@ -470,5 +472,6 @@ void Player::LookAtDirection(const Vector3& direction)
 	dir.y = 0.0f; // 水平方向のみ
 	dir = Vector3::Normalize(dir);
 	float targetYaw = std::atan2f(dir.x, dir.z); // ラジアンで計算
+	wt_.rotate_.y = targetYaw;
 	followCamera_->SetRotate({ followCamera_->GetRotate().x, targetYaw,followCamera_->GetRotate().z});
 }

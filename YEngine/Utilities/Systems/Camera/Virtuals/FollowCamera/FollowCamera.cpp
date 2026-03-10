@@ -4,10 +4,8 @@
 #include <algorithm>
 #include <cmath>
 
-// ステート関連のインクルード
 #include "CameraState.h"
 #include "DefaultCameraState.h"
-#include "CameraStatePresetManager.h"
 
 #ifdef USE_IMGUI
 #include <imgui.h>
@@ -17,7 +15,7 @@
 void FollowCamera::Initialize() {
 	VirtualCamera::Initialize();
 	currentScale_ = 1.0f;
-	
+
 	// デフォルトステートを設定
 	currentState_ = std::make_unique<DefaultCameraState>();
 	currentState_->Enter(this);
@@ -29,13 +27,14 @@ void FollowCamera::Update() {
 	}
 
 	if (!target_) return;
-	
+
 	// ステート更新
 	if (currentState_) {
 		currentState_->Update(this);
-		
+
 		// ステートが終了したらデフォルトに戻る
 		if (currentState_->IsFinished()) {
+			isPreviewMode_ = false;
 			ChangeState(std::make_unique<DefaultCameraState>());
 		}
 	}
@@ -90,9 +89,9 @@ void FollowCamera::ChangeState(std::unique_ptr<CameraState> newState) {
 	if (currentState_) {
 		currentState_->Exit(this);
 	}
-	
+
 	currentState_ = std::move(newState);
-	
+
 	if (currentState_) {
 		currentState_->Enter(this);
 	}
@@ -105,12 +104,12 @@ void FollowCamera::GetDefaultCameraParams(Vector3& outPos, Vector3& outRot, floa
 		outFov = fovY_;
 		return;
 	}
-	
+
 	// デフォルトの追従位置を計算
 	Vector3 offset = offset_ * currentScale_;
 	Matrix4x4 rotateMat = MakeRotateMatrixXYZ(transform_.rotate);
 	offset = TransformNormal(offset, rotateMat);
-	
+
 	outPos = target_->translate_ + offset;
 	outRot = transform_.rotate;
 	outFov = fovY_;
@@ -119,59 +118,9 @@ void FollowCamera::GetDefaultCameraParams(Vector3& outPos, Vector3& outRot, floa
 void FollowCamera::DrawDebugGui() {
 #ifdef USE_IMGUI
 	ImGui::Text("追従カメラ設定");
-	
-	// 現在のステート表示
-	if (currentState_) {
-		ImGui::Text("現在のステート: %s", currentState_->GetStateName());
-		
-		// ステートの編集UI
-		if (ImGui::TreeNode("ステート編集")) {
-			currentState_->DrawEditGui();
-			
-			ImGui::Separator();
-			
-			// プリセット保存
-			static char presetName[64] = "";
-			ImGui::InputText("プリセット名", presetName, sizeof(presetName));
-			
-			if (ImGui::Button("プリセットとして保存")) {
-				if (strlen(presetName) > 0) {
-					CameraStatePresetManager::GetInstance()->SavePreset(
-						presetName, 
-						currentState_->GetStateName(), 
-						currentState_.get()
-					);
-				}
-			}
-			
-			ImGui::Separator();
-			
-			// プリセット読込
-			auto presetNames = CameraStatePresetManager::GetInstance()->GetPresetNames();
-			if (!presetNames.empty()) {
-				static int selectedPreset = 0;
-				std::vector<const char*> presetNamePtrs;
-				for (const auto& name : presetNames) {
-					presetNamePtrs.push_back(name.c_str());
-				}
-				
-				ImGui::Combo("プリセット選択", &selectedPreset, presetNamePtrs.data(), static_cast<int>(presetNamePtrs.size()));
-				
-				if (ImGui::Button("プリセットを読込")) {
-					if (selectedPreset >= 0 && selectedPreset < static_cast<int>(presetNames.size())) {
-						auto loadedState = CameraStatePresetManager::GetInstance()->LoadPreset(presetNames[selectedPreset]);
-						if (loadedState) {
-							ChangeState(std::move(loadedState));
-						}
-					}
-				}
-			}
-			
-			ImGui::TreePop();
-		}
-	}
 	ImGui::Separator();
-	
+
+	// ── 追従パラメータ ──
 	if (ImGui::TreeNode("追従パラメータ")) {
 		ImGui::DragFloat3("オフセット距離", &offset_.x, 0.1f, -100.0f, 100.0f);
 		ImGui::DragFloat3("角度", &transform_.rotate.x, 0.01f, -6.28f, 6.28f);
@@ -180,20 +129,74 @@ void FollowCamera::DrawDebugGui() {
 	}
 
 	ImGui::Separator();
-	ImGui::Text("演出設定");
-	ImGui::Checkbox("クローズアップ有効", &isCloseUp_);
-	ImGui::DragFloat("クローズアップ倍率", &closeUpScale_, 0.01f, 0.1f, 1.0f);
-	ImGui::DragFloat("補間速度", &interpSpeed_, 0.1f, 0.1f, 20.0f);
+
+	// ── 演出設定 ──
+	if (ImGui::TreeNode("演出設定")) {
+		ImGui::Checkbox("クローズアップ有効", &isCloseUp_);
+		ImGui::DragFloat("クローズアップ倍率", &closeUpScale_, 0.01f, 0.1f, 1.0f);
+		ImGui::DragFloat("補間速度", &interpSpeed_, 0.1f, 0.1f, 20.0f);
+		ImGui::TreePop();
+	}
 
 	ImGui::Separator();
-	ImGui::Text("現在の状態");
-	ImGui::Value("現在の拡大率", currentScale_);
 
-	ImGui::Text("シェイク状態");
-	ImGui::Value("シェイク強度", shakeIntensity_);
-	ImGui::Value("シェイクタイマー", shakeTimer_);
-	ImGui::DragFloat3("シェイクオフセット", &shakeOffset_.x, 0.01f);
+	// ── 戦闘開始カメラ演出 ──
+	if (ImGui::TreeNode("戦闘開始カメラ演出")) {
 
+		// battleStartState_ がなければ自動生成
+		if (!battleStartState_) {
+			battleStartState_ = std::make_shared<BattleStartCameraState>();
+		}
+
+		// パラメータ編集（保存は CameraEditor の「すべての設定を保存」で一括）
+		battleStartState_->DrawEditGui();
+
+		ImGui::Separator();
+
+		// プレビュー
+		if (!isPreviewMode_) {
+			if (ImGui::Button("▶  プレビュー再生")) {
+				auto preview = std::make_unique<BattleStartCameraState>();
+				nlohmann::json j;
+				battleStartState_->Save(j);
+				preview->Load(j);
+				preview->RebuildControlPoints(this);
+				ChangeState(std::move(preview));
+				isPreviewMode_ = true;
+			}
+		}
+		else {
+			ImGui::TextColored(ImVec4(0.3f, 1.0f, 0.3f, 1.0f), "● 再生中");
+			ImGui::SameLine();
+			if (ImGui::Button("■  停止")) {
+				ChangeState(std::make_unique<DefaultCameraState>());
+				isPreviewMode_ = false;
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("↺  最初から")) {
+				ChangeState(std::make_unique<DefaultCameraState>());
+				auto preview = std::make_unique<BattleStartCameraState>();
+				nlohmann::json j;
+				battleStartState_->Save(j);
+				preview->Load(j);
+				preview->RebuildControlPoints(this);
+				ChangeState(std::move(preview));
+				isPreviewMode_ = true;
+			}
+
+			// 演出終了で自動停止
+			if (currentState_ && currentState_->IsFinished()) {
+				isPreviewMode_ = false;
+			}
+		}
+
+		ImGui::TreePop();
+	}
+
+	ImGui::Separator();
+
+	// ── デバッグ情報 ──
+	ImGui::Text("現在のステート: %s", currentState_ ? currentState_->GetStateName() : "なし");
 	if (target_) {
 		ImGui::Text("追従対象: セット済み");
 	}
@@ -212,6 +215,13 @@ void FollowCamera::Save(nlohmann::json& j) const {
 	j["interpSpeed"] = interpSpeed_;
 	j["rotateSpeed"] = kRotateSpeed_;
 	j["closeUpScale"] = closeUpScale_;
+
+	// BattleStartState の設定も一緒に保存
+	if (battleStartState_) {
+		nlohmann::json stateJson;
+		battleStartState_->Save(stateJson);
+		j["battleStartState"] = stateJson;
+	}
 }
 
 void FollowCamera::Load(const nlohmann::json& j) {
@@ -226,4 +236,12 @@ void FollowCamera::Load(const nlohmann::json& j) {
 	kRotateSpeed_ = j.value("rotateSpeed", 0.1f);
 	interpSpeed_ = j.value("interpSpeed", 5.0f);
 	closeUpScale_ = j.value("closeUpScale", 0.3f);
+
+	// BattleStartState の設定を復元
+	if (j.contains("battleStartState")) {
+		if (!battleStartState_) {
+			battleStartState_ = std::make_shared<BattleStartCameraState>();
+		}
+		battleStartState_->Load(j["battleStartState"]);
+	}
 }

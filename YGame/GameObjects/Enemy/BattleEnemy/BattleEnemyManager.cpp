@@ -1001,14 +1001,6 @@ void BattleEnemyManager::ShowDebugInfo() {
 
 	ImGui::Separator();
 
-	if (ImGui::Button("テスト戦闘開始")) {
-		EnemyEncounterData testEncounter;
-		testEncounter.encounterName = "テスト戦闘";
-		testEncounter.enemyIds = { "goblin", "orc" };
-		testEncounter.formations = { Vector3(-2.0f, 0.0f, 5.0f), Vector3(2.0f, 0.0f, 5.0f) };
-		StartBattle(testEncounter);
-	}
-
 	ImGui::SameLine();
 	if (ImGui::Button("戦闘終了")) {
 		ForceBattleEnd();
