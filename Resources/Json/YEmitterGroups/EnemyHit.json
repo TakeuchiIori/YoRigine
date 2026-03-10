@@ -3,21 +3,23 @@
         {
             "emitters": [
                 {
-                    "autoEmit": true,
+                    "autoEmit": false,
                     "emissionRate": 10.0,
                     "emitCount": 1,
                     "offsetX": 0.0,
                     "offsetY": 0.0,
                     "offsetZ": 0.0,
+                    "shapeType": 0,
                     "systemName": "EnemyHit1"
                 },
                 {
-                    "autoEmit": true,
+                    "autoEmit": false,
                     "emissionRate": 10.0,
                     "emitCount": 1,
                     "offsetX": 0.0,
                     "offsetY": 0.0,
                     "offsetZ": 0.0,
+                    "shapeType": 0,
                     "systemName": "EnemyHit2"
                 }
             ],
