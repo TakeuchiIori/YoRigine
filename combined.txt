@@ -642,9 +642,6 @@
 └──         └── ├── CameraFactory.h
 └──         └── ├── CameraMode.h
 └──         └── └── Virtuals/
-└──         └──     ├── BattleStartCamera/
-└──         └──     └── ├── BattleStartCamera.cpp
-└──         └──     └── └── BattleStartCamera.h
 └──         └──     ├── ClearCamera/
 └──         └──     └── ├── ClearCamera.cpp
 └──         └──     └── └── ClearCamera.h
@@ -839,24 +836,10 @@
 └── └──     ├── SceneSyncData.h
 └── └──     ├── SubSceneManager.cpp
 └── └──     └── SubSceneManager.h
-└── ├── SystemsApp/
-└── └── └── Cameras/
-└── └──     ├── BattleStartCamera/
-└── └──     └── ├── BattleStartCamera.cpp
-└── └──     └── └── BattleStartCamera.h
-└── └──     ├── ClearCamera/
-└── └──     └── ├── ClearCamera.cpp
-└── └──     └── └── ClearCamera.h
-└── └──     ├── DefaultCamera/
-└── └──     └── ├── DefaultCamera.cpp
-└── └──     └── └── DefaultCamera.h
-└── └──     ├── SplineCamera/
-└── └──     └── ├── SplineCamera.cpp
-└── └──     └── └── SplineCamera.h
-└── └──     └── TopDownCamera/
-└── └──         ├── TopDownCamera.cpp
-└── └──         └── TopDownCamera.h
 └── └── UI/
+└──     ├── Alert/
+└──     └── ├── EnemyAlert.cpp
+└──     └── └── EnemyAlert.h
 └──     ├── ClearUI.cpp
 └──     ├── ClearUI.h
 └──     ├── Control/
@@ -241410,428 +241393,6 @@ enum class CameraMode {
 };
 
 ============================================================
-File Path: YEngine/Utilities/Systems/Camera/Virtuals/BattleStartCamera/BattleStartCamera.cpp
-============================================================
-#include "BattleStartCamera.h"
-
-// C++
-#include <algorithm>
-#include <cmath>
-
-// Engine
-#include <MathFunc.h>
-#include "Easing.h"
-#include "Systems/Input/Input.h"
-#include <Systems/GameTime/GameTime.h>
-
-#pragma region 小ユーティリティ関数群
-
-/// <summary>
-/// 線形補間（float
-/// </summary>
-static inline float LerpF(float a, float b, float t) { return a + (b - a) * t; }
-
-/// <summary>
-/// 線形補間（Vector3）
-/// </summary>
-static inline Vector3 LerpV(const Vector3& a, const Vector3& b, float t) {
-	return { LerpF(a.x, b.x, t), LerpF(a.y, b.y, t), LerpF(a.z, b.z, t) };
-}
-
-/// <summary>
-/// 角度補間（ラジアン）
-/// </summary>
-static inline float LerpAngle(float a, float b, float t) {
-	float d = b - a;
-	while (d > 3.14159265f) d -= 6.28318531f;
-	while (d < -3.14159265f) d += 6.28318531f;
-	return a + d * t;
-}
-
-/// <summary>
-/// ローカル回転（XYZ回転）をオフセットに適用
-/// </summary>
-static inline Vector3 RotateOffsetXYZ(const Vector3& offset, const Vector3& eulerXYZ) {
-	Matrix4x4 rot = MakeRotateMatrixXYZ(eulerXYZ);
-	return TransformNormal(offset, rot);
-}
-
-/// <summary>
-/// from→to の方向ベクトルからヨー/ピッチを計算
-/// </summary>
-static inline std::pair<float, float> YawPitchTo(const Vector3& from, const Vector3& to) {
-	Vector3 dir = Normalize(to - from);
-	float yaw = std::atan2f(dir.x, dir.z);
-	float pitch = std::asinf(dir.y);
-	return { yaw, pitch };
-}
-
-#pragma endregion
-
-///=============================================================================================
-/// メイン実装
-///=============================================================================================
-
-/// <summary>
-/// 被写体を画角に収めるための適正距離を算出
-/// </summary>
-float BattleStartCamera::ComputeFitDistance(float subjectHeight, float fovY, float margin) const {
-	float half = subjectHeight * 0.5f * std::max(1.0f, margin);
-	float denom = std::tan(std::max(0.1f, fovY * 0.5f));
-	return (denom > 0.0f) ? (half / denom) : half * 3.0f;
-}
-
-/// <summary>
-/// ターゲットのYaw角（ラジアン）を取得
-/// </summary>
-float BattleStartCamera::GetTargetYawRad() const {
-	return target_ ? target_->rotate_.y : 0.0f;
-}
-
-/// <summary>
-/// Y軸回転を適用したベクトルを返す
-/// </summary>
-Vector3 BattleStartCamera::RotateY(const Vector3& v, float yawRad) const {
-	float s = std::sinf(yawRad), c = std::cosf(yawRad);
-	return { v.x * c + v.z * s, v.y, -v.x * s + v.z * c };
-}
-
-/// <summary>
-/// ターゲットを基準とするかどうかでワールド座標を算出
-/// </summary>
-Vector3 BattleStartCamera::ToWorldFromOffset(bool useRelativeToTarget,
-	const Vector3& offset,
-	const Vector3& offsetEuler) const
-{
-	Vector3 local = RotateOffsetXYZ(offset, offsetEuler);
-
-	if (!useRelativeToTarget) {
-		return local; // ワールド絶対位置
-	}
-
-	Vector3 targetPos = target_ ? target_->translate_ : Vector3{ 0,0,0 };
-	Vector3 rotated = RotateY(local, GetTargetYawRad());
-	return targetPos + rotated;
-}
-
-/// <summary>
-/// 接近時の円弧パスを構築（Start→Hold）
-/// </summary>
-void BattleStartCamera::BuildApproachArc(const Vector3& startWorld, const Vector3& holdWorld) {
-	Vector3 targetPos = target_ ? target_->translate_ : Vector3{ 0,0,0 };
-	Vector3 vS = startWorld - targetPos;
-	Vector3 vH = holdWorld - targetPos;
-
-	arcStartAngle_ = std::atan2f(vS.x, vS.z);
-	arcEndAngle_ = arcStartAngle_ + (p_.approachArcYawDeg * 3.14159265f / 180.0f);
-	arcStartRadius_ = std::max(0.01f, std::sqrtf(vS.x * vS.x + vS.z * vS.z));
-	arcEndRadius_ = std::max(0.01f, std::sqrtf(vH.x * vH.x + vH.z * vH.z));
-	holdHeight_ = holdWorld.y;
-}
-
-/// <summary>
-/// 現在位置からターゲットを注視するよう回転を更新
-/// </summary>
-void BattleStartCamera::LookAtTarget() {
-	Vector3 targetPos = target_ ? target_->translate_ : Vector3{ 0,0,0 };
-	auto [yaw, pitch] = YawPitchTo(transform_.translate, targetPos);
-	transform_.rotate.y = yaw;
-	transform_.rotate.x = -pitch;
-	transform_.rotate.z = 0.0f;
-}
-
-/// <summary>
-/// JSON設定登録・初期化
-/// </summary>
-void BattleStartCamera::InitJson() {
-	json_ = std::make_unique<YoRigine::JsonManager>("BattleStartCamera", "Resources/Json/Cameras");
-	json_->SetCategory("Cameras");
-	json_->SetSubCategory("BattleStart");
-
-	//------------------------------------------------------------
-	// Timing
-	//------------------------------------------------------------
-	json_->SetTreePrefix("Timing");
-	json_->Register("ApproachTime", &p_.approachTime);
-	json_->Register("HoldTime", &p_.holdTime);
-	json_->Register("ExitTime", &p_.exitTime);
-	json_->Register("ApproachArcYawDeg", &p_.approachArcYawDeg);
-	json_->Register("BankRollDeg", &p_.bankRollDeg);
-	json_->ClearTreePrefix();
-
-	//------------------------------------------------------------
-	// Framing
-	//------------------------------------------------------------
-	json_->SetTreePrefix("Framing");
-	json_->Register("SubjectHeight", &p_.subjectHeight);
-	json_->Register("FovY", &p_.fovY);
-	json_->Register("FitMargin", &p_.fitMargin);
-	json_->ClearTreePrefix();
-
-	//------------------------------------------------------------
-	// Positions
-	//------------------------------------------------------------
-	json_->SetTreePrefix("Positions");
-	json_->Register("UseStartRelativeToTarget", &p_.useStartRelativeToTarget);
-	json_->Register("StartOffset", &p_.startOffset);
-	json_->Register("StartOffsetRotate", &p_.startOffsetRotate);
-	json_->Register("UseHoldRelativeToTarget", &p_.useHoldRelativeToTarget);
-	json_->Register("HoldOffset", &p_.holdOffset);
-	json_->Register("HoldOffsetRotate", &p_.holdOffsetRotate);
-	json_->Register("UseFinalRelativeToTarget", &p_.useFinalRelativeToTarget);
-	json_->Register("FinalOffset", &p_.finalOffset);
-	json_->Register("FinalOffsetRotate", &p_.finalOffsetRotate);
-	json_->ClearTreePrefix();
-
-	//------------------------------------------------------------
-	// ExitLook
-	//------------------------------------------------------------
-	json_->SetTreePrefix("ExitLook");
-	json_->Register("LookAtTargetOnExit", &p_.lookAtTargetOnExit);
-	json_->ClearTreePrefix();
-}
-
-/// <summary>
-/// 初期化処理
-/// </summary>
-void BattleStartCamera::Initialize() {
-	InitJson();
-
-	stage_ = Stage::Approach;
-	t_ = 0.0f;
-
-	//------------------------------------------------------------
-	// 各種初期値の算出
-	//------------------------------------------------------------
-	fitDist_ = ComputeFitDistance(p_.subjectHeight, p_.fovY, p_.fitMargin);
-
-	Vector3 targetPos = target_ ? target_->translate_ : Vector3{ 0,0,0 };
-
-	Vector3 startWorld = ToWorldFromOffset(p_.useStartRelativeToTarget, p_.startOffset, p_.startOffsetRotate);
-	auto [startYaw, _] = YawPitchTo(startWorld, targetPos);
-	Vector3 approachDir = Normalize(Vector3{ std::sinf(startYaw), 0.0f, std::cosf(startYaw) });
-
-	Vector3 fitPos = targetPos - approachDir * fitDist_;
-	fitPos.y = targetPos.y + LerpF(p_.startOffset.y, 0.0f, 0.5f);
-
-	Vector3 holdLocal = RotateOffsetXYZ(p_.holdOffset, p_.holdOffsetRotate);
-	Vector3 holdWorld = fitPos + RotateY(holdLocal, GetTargetYawRad());
-
-	transform_.translate = startWorld;
-	LookAtTarget();
-
-	startPos_ = startWorld;
-	holdPos_ = holdWorld;
-
-	BuildApproachArc(startWorld, holdWorld);
-
-	projectionMatrix_ = Inverse(MakeAffineMatrix(transform_.scale, transform_.rotate, transform_.translate));
-}
-
-/// <summary>
-/// 更新処理（アプローチ → ホールド → 退出）
-/// </summary>
-void BattleStartCamera::Update() {
-	if (stage_ == Stage::Done) return;
-
-	//------------------------------------------------------------
-	// スキップ入力（Aボタン）
-	//------------------------------------------------------------
-	if (YoRigine::Input::GetInstance()->IsPadPressed(0, GamePadButton::A)) {
-		stage_ = Stage::Done;
-		return;
-	}
-
-	const float dt = YoRigine::GameTime::GetDeltaTime();
-	t_ += dt;
-
-	Vector3 targetPos = target_ ? target_->translate_ : Vector3{ 0,0,0 };
-
-	//------------------------------------------------------------
-	// Approachフェーズ
-	//------------------------------------------------------------
-	if (stage_ == Stage::Approach) {
-		const float s = std::clamp(t_ / std::max(0.001f, p_.approachTime), 0.0f, 1.0f);
-		const float u = Easing::EaseInOutCubic(s);
-
-		const float ang = LerpAngle(arcStartAngle_, arcEndAngle_, u);
-		const float rad = LerpF(arcStartRadius_, arcEndRadius_, u);
-		const float h = LerpF(startPos_.y, holdHeight_, u);
-
-		Vector3 posLocalXZ = { std::sinf(ang) * rad, h, std::cosf(ang) * rad };
-		transform_.translate = targetPos + posLocalXZ;
-
-		LookAtTarget();
-
-		const float bankRad = (p_.bankRollDeg != 0.0f) ? (p_.bankRollDeg * 3.14159265f / 180.0f) : 0.0f;
-		transform_.rotate.z = bankRad * std::sinf(u * 3.14159265f);
-
-		if (t_ >= p_.approachTime) {
-			stage_ = Stage::Hold;
-			t_ = 0.0f;
-			transform_.translate = holdPos_;
-			LookAtTarget();
-			transform_.rotate.z = 0.0f;
-		}
-	}
-	//------------------------------------------------------------
-	// Holdフェーズ
-	//------------------------------------------------------------
-	else if (stage_ == Stage::Hold) {
-		const float s = std::clamp(t_ / std::max(0.001f, p_.holdTime), 0.0f, 1.0f);
-		const float u = Easing::EaseOutCubic(s);
-
-		transform_.translate = LerpV(holdStartPos_, holdPos_, u);
-		LookAtTarget();
-		transform_.rotate.z = 0.0f;
-
-		if (t_ >= p_.holdTime) {
-			stage_ = Stage::Exit;
-			t_ = 0.0f;
-			exitStartPos_ = transform_.translate;
-			Vector3 finalWorld = ToWorldFromOffset(p_.useFinalRelativeToTarget, p_.finalOffset, p_.finalOffsetRotate);
-			finalPos_ = finalWorld;
-		}
-	}
-	//------------------------------------------------------------
-	// Exitフェーズ
-	//------------------------------------------------------------
-	else if (stage_ == Stage::Exit) {
-		const float s = std::clamp(t_ / std::max(0.001f, p_.exitTime), 0.0f, 1.0f);
-		const float u = Easing::EaseOutCubic(s);
-
-		transform_.translate = LerpV(exitStartPos_, finalPos_, u);
-
-		if (p_.lookAtTargetOnExit) {
-			LookAtTarget();
-		}
-
-		transform_.rotate.z = 0.0f;
-
-		if (t_ >= p_.exitTime) {
-			stage_ = Stage::Done;
-		}
-	}
-
-	//------------------------------------------------------------
-	// ビュー行列更新
-	//------------------------------------------------------------
-	projectionMatrix_ = Inverse(MakeAffineMatrix(transform_.scale, transform_.rotate, transform_.translate));
-}
-void BattleStartCamera::DrawDebugGui()
-{
-
-}
-
-
-============================================================
-File Path: YEngine/Utilities/Systems/Camera/Virtuals/BattleStartCamera/BattleStartCamera.h
-============================================================
-#pragma once
-#include "../VirtualCamera.h"
-#include <WorldTransform/WorldTransform.h>
-#include "Loaders/Json/JsonManager.h"
-
-/// <summary>
-/// バトル開始時のカメラクラス
-/// </summary>
-class BattleStartCamera : public VirtualCamera
-{
-public:
-	void Initialize() override;
-	void Update() override;
-	void DrawDebugGui() override;
-
-	void Save(nlohmann::json& j) const override;
-	void Load(const nlohmann::json& j) override;
-
-	void SetTarget(WorldTransform* wt) { target_ = wt; }
-	bool IsFinished() const { return stage_ == Stage::Done; }
-
-
-private:
-	enum class Stage { Approach, Hold, Exit, Done };
-
-	struct Params
-	{
-		// ===== Timing =====
-		float approachTime = 0.9f;  // 寄り（回り込み）時間
-		float holdTime = 0.6f;  // 据えカット時間
-		float exitTime = 0.8f;  // 退出時間
-
-		// ===== Framing / Fit =====
-		float subjectHeight = 1.6f; // 画面に入れたい被写体高さ
-		float fovY = 0.7f;
-		float fitMargin = 1.15f; // 少し余白
-
-		// ===== Arc (Approach) =====
-		float approachArcYawDeg = 60.0f; // 回り込み角度（+右回り / -左回り）
-		float bankRollDeg = 6.0f;  // 回り込み中の最大ロール（0で無効）
-
-		// ===== Positions =====
-		// Start
-		bool    useStartRelativeToTarget = true;  // true: ターゲット基準, false: ワールド絶対
-		Vector3 startOffset{ 0.0f, 2.0f, -10.0f };    // 基準（ターゲット向きが前）
-		Vector3 startOffsetRotate{ 0.0f, 0.0f, 0.0f }; // ローカル回転(XYZラジアン)
-
-		// Hold（肩越し/対面の据え位置）
-		bool    useHoldRelativeToTarget = true;
-		Vector3 holdOffset{ 2.0f, 1.6f, -5.0f };
-		Vector3 holdOffsetRotate{ 0.0f, 0.0f, 0.0f };
-
-		// Exit（退出用）
-		bool    useFinalRelativeToTarget = true;
-		Vector3 finalOffset{ -6.0f, 3.0f, -8.0f };
-		Vector3 finalOffsetRotate{ 0.0f, 0.0f, 0.0f };
-
-		// Exit の注視
-		bool    lookAtTargetOnExit = true;
-	} p_;
-
-private:
-	// JSON 登録
-	void InitJson();
-
-	// 基本計算
-	float ComputeFitDistance(float subjectHeight, float fovY, float margin) const;
-	float GetTargetYawRad() const;
-	Vector3 RotateY(const Vector3& v, float yawRad) const;
-
-	// オフセットをターゲット基準/ワールド絶対でワールド座標に変換
-	Vector3 ToWorldFromOffset(bool useRelativeToTarget,
-		const Vector3& offset,
-		const Vector3& offsetEuler) const;
-
-	// 円弧補間の事前計算
-	void BuildApproachArc(const Vector3& startWorld, const Vector3& holdWorld);
-
-	// 注視を現在姿勢から算出
-	void LookAtTarget();
-
-private:
-	const WorldTransform* target_ = nullptr;
-	std::unique_ptr<YoRigine::JsonManager> json_;
-
-	Stage stage_ = Stage::Approach;
-	float t_ = 0.0f;
-
-	// 端点
-	Vector3 startPos_{}, holdPos_{}, finalPos_{}, exitStartPos_{}, holdStartPos_;
-
-	// 円弧補間（XZ平面・中心はターゲット）
-	float arcStartAngle_ = 0.0f;
-	float arcEndAngle_ = 0.0f;
-	float arcStartRadius_ = 0.0f;
-	float arcEndRadius_ = 0.0f;
-	float holdHeight_ = 0.0f;
-
-	// 距離（fit）
-	float fitDist_ = 6.0f;
-};
-
-
-
-============================================================
 File Path: YEngine/Utilities/Systems/Camera/Virtuals/ClearCamera/ClearCamera.cpp
 ============================================================
 #include "ClearCamera.h"
@@ -242199,62 +241760,156 @@ File Path: YEngine/Utilities/Systems/Camera/Virtuals/FollowCamera/BattleStartCam
 #include <imgui.h>
 #endif
 
+// -------------------------------------------------------
+// Enter
+// -------------------------------------------------------
 void BattleStartCameraState::Enter(FollowCamera* camera) {
-    SetupControlPoints(camera);
+    if (GetControlPoints().empty()) {
+        RebuildControlPoints(camera);
+    }
+    else {
+        ApplyTargetOffset(camera);
+    }
     CinematicCameraState::Enter(camera);
 }
 
-void BattleStartCameraState::SetupControlPoints(FollowCamera* camera) {
+// -------------------------------------------------------
+// RebuildControlPoints
+// メンバ変数の値だけで制御点を組み立てる。値は一切上書きしない。
+// -------------------------------------------------------
+void BattleStartCameraState::RebuildControlPoints(FollowCamera* camera) {
     ClearControlPoints();
-    
-    if (!camera->GetTarget()) return;
-    
-    Vector3 targetPos = camera->GetTarget()->translate_;
-    
-    SetReturnInterpTime(0.5f);
-    SetLookAtTarget(true);
-    
-    // 制御点1: 遠くから俯瞰
-    AddControlPoint({
-        targetPos + Vector3{0.0f, 15.0f, -20.0f},
-        {0.6f, 0.0f, 0.0f},
-        0.5f,
-        0.6f
-    });
-    
-    // 制御点2: 横から回り込む
-    AddControlPoint({
-        targetPos + Vector3{10.0f, 5.0f, -5.0f},
-        {0.2f, -0.8f, 0.0f},
-        0.45f,
-        0.5f
-    });
-    
-    // 制御点3: プレイヤーの後ろへ移動
-    AddControlPoint({
-        targetPos + Vector3{-2.0f, 4.0f, -12.0f},
-        {0.1f, 0.0f, 0.0f},
-        0.45f,
-        0.6f
-    });
+
+    Vector3 targetPos = { 0.0f, 0.0f, 0.0f };
+    if (camera && camera->GetTarget()) {
+        targetPos = camera->GetTarget()->translate_;
+    }
+    lastTargetPos_ = targetPos;
+
+    SetReturnInterpTime(returnInterpTime_);
+    SetLookAtTarget(lookAtTargetFlag_);
+
+    for (int i = 0; i < kPointCount; ++i) {
+        AddControlPoint({
+            targetPos + offsets_[i],
+            rotations_[i],
+            fovs_[i],
+            controlPointTimes_[i]
+            });
+    }
 }
 
+// -------------------------------------------------------
+// SetupDefaultControlPoints  ※リセットボタン専用
+// -------------------------------------------------------
+void BattleStartCameraState::SetupDefaultControlPoints(FollowCamera* camera) {
+    offsets_[0] = { 0.0f, 15.0f, -20.0f };
+    offsets_[1] = { 10.0f,  5.0f,  -5.0f };
+    offsets_[2] = { -2.0f,  4.0f, -12.0f };
+    rotations_[0] = { 0.6f,  0.0f, 0.0f };
+    rotations_[1] = { 0.2f, -0.8f, 0.0f };
+    rotations_[2] = { 0.1f,  0.0f, 0.0f };
+    fovs_[0] = 0.5f;  fovs_[1] = 0.45f; fovs_[2] = 0.45f;
+    controlPointTimes_[0] = 0.6f;
+    controlPointTimes_[1] = 0.5f;
+    controlPointTimes_[2] = 0.6f;
+    returnInterpTime_ = 0.5f;
+    lookAtTargetFlag_ = true;
+    RebuildControlPoints(camera);
+}
+
+// -------------------------------------------------------
+// ApplyTargetOffset  ターゲット移動分だけ position を追従
+// -------------------------------------------------------
+void BattleStartCameraState::ApplyTargetOffset(FollowCamera* camera) {
+    if (!camera || !camera->GetTarget()) return;
+    Vector3 targetPos = camera->GetTarget()->translate_;
+    Vector3 delta = targetPos - lastTargetPos_;
+    for (auto& pt : GetControlPoints()) {
+        pt.position = pt.position + delta;
+    }
+    lastTargetPos_ = targetPos;
+}
+
+// -------------------------------------------------------
+// Save / Load  ― 全メンバを保存・復元
+// -------------------------------------------------------
+void BattleStartCameraState::Save(nlohmann::json& j) const {
+    // 基底クラスの controlPoints_ も一応保存
+    CinematicCameraState::Save(j);
+
+    j["lookAtTargetFlag"] = lookAtTargetFlag_;
+    j["returnInterpTime"] = returnInterpTime_;
+
+    for (int i = 0; i < kPointCount; ++i) {
+        j["offsets"][i] = { offsets_[i].x,   offsets_[i].y,   offsets_[i].z };
+        j["rotations"][i] = { rotations_[i].x, rotations_[i].y, rotations_[i].z };
+        j["fovs"][i] = fovs_[i];
+        j["controlPointTimes"][i] = controlPointTimes_[i];
+    }
+}
+
+void BattleStartCameraState::Load(const nlohmann::json& j) {
+    CinematicCameraState::Load(j);
+
+    lookAtTargetFlag_ = j.value("lookAtTargetFlag", true);
+    returnInterpTime_ = j.value("returnInterpTime", 0.5f);
+
+    for (int i = 0; i < kPointCount; ++i) {
+        if (j.contains("offsets") && static_cast<int>(j["offsets"].size()) > i) {
+            offsets_[i] = { j["offsets"][i][0], j["offsets"][i][1], j["offsets"][i][2] };
+        }
+        if (j.contains("rotations") && static_cast<int>(j["rotations"].size()) > i) {
+            rotations_[i] = { j["rotations"][i][0], j["rotations"][i][1], j["rotations"][i][2] };
+        }
+        if (j.contains("fovs") && static_cast<int>(j["fovs"].size()) > i) {
+            fovs_[i] = j["fovs"][i];
+        }
+        if (j.contains("controlPointTimes") && static_cast<int>(j["controlPointTimes"].size()) > i) {
+            controlPointTimes_[i] = j["controlPointTimes"][i];
+        }
+    }
+}
+
+// -------------------------------------------------------
+// DrawEditGui
+// -------------------------------------------------------
 void BattleStartCameraState::DrawEditGui() {
 #ifdef USE_IMGUI
     ImGui::Text("戦闘開始カメラ設定");
     ImGui::Separator();
-    
-    if (ImGui::Button("制御点を再生成")) {
-        SetupControlPoints(nullptr);
+
+    if (ImGui::Checkbox("ターゲットを常に見る", &lookAtTargetFlag_)) {
+        SetLookAtTarget(lookAtTargetFlag_);
     }
-    
+    if (ImGui::DragFloat("復帰補間時間", &returnInterpTime_, 0.01f, 0.1f, 5.0f)) {
+        SetReturnInterpTime(returnInterpTime_);
+    }
+
     ImGui::Separator();
-    
-    // 基底クラスの編集UIを表示
-    CinematicCameraState::DrawEditGui();
+    ImGui::Text("制御点（ターゲットからの相対座標）");
+
+    const char* labels[] = { "制御点1: 俯瞰", "制御点2: 回り込み", "制御点3: 後方" };
+
+    for (int i = 0; i < kPointCount; ++i) {
+        ImGui::PushID(i);
+        if (ImGui::TreeNode(labels[i])) {
+            // すべてメンバ変数を直接編集 → RebuildControlPoints は呼ばない
+            ImGui::DragFloat3("オフセット", &offsets_[i].x, 0.1f, -100.0f, 100.0f);
+            ImGui::DragFloat3("回転", &rotations_[i].x, 0.01f, -6.28f, 6.28f);
+            ImGui::DragFloat("FOV", &fovs_[i], 0.005f, 0.1f, 1.5f);
+            ImGui::DragFloat("到達時間(秒)", &controlPointTimes_[i], 0.01f, 0.05f, 10.0f);
+            ImGui::TreePop();
+        }
+        ImGui::PopID();
+    }
+
+    ImGui::Separator();
+    if (ImGui::Button("デフォルト設定にリセット")) {
+        SetupDefaultControlPoints(nullptr);
+    }
 #endif
 }
-
 
 ============================================================
 File Path: YEngine/Utilities/Systems/Camera/Virtuals/FollowCamera/BattleStartCameraState.h
@@ -242269,14 +241924,44 @@ class BattleStartCameraState : public CinematicCameraState {
 public:
     void Enter(FollowCamera* camera) override;
     const char* GetStateName() const override { return "BattleStart"; }
-    
+
+    // 保存・読込
+    void Save(nlohmann::json& j) const override;
+    void Load(const nlohmann::json& j) override;
+
     // ImGuiでの編集
     void DrawEditGui() override;
-    
-private:
-    void SetupControlPoints(FollowCamera* camera);
-};
 
+    /// 現在のメンバ変数でターゲット基準に制御点を再構築（プレビュー開始前に呼ぶ）
+    void RebuildControlPoints(FollowCamera* camera);
+
+    /// 全パラメータをデフォルト値に戻してから再構築（「リセット」ボタン専用）
+    void SetupDefaultControlPoints(FollowCamera* camera);
+    bool IsPerformance() const override { return true; }
+private:
+    void ApplyTargetOffset(FollowCamera* camera);
+
+    // ---- 制御点ごとの編集パラメータ（全てメンバで保持） ----
+    static constexpr int kPointCount = 3;
+
+    Vector3 offsets_[kPointCount] = {
+        {  0.0f, 15.0f, -20.0f },
+        { 10.0f,  5.0f,  -5.0f },
+        { -2.0f,  4.0f, -12.0f }
+    };
+    Vector3 rotations_[kPointCount] = {
+        { 0.6f,  0.0f, 0.0f },
+        { 0.2f, -0.8f, 0.0f },
+        { 0.1f,  0.0f, 0.0f }
+    };
+    float fovs_[kPointCount] = { 0.5f,  0.45f, 0.45f };
+    float controlPointTimes_[kPointCount] = { 0.6f,  0.5f,  0.6f };
+
+    float returnInterpTime_ = 0.5f;
+    bool  lookAtTargetFlag_ = true;
+
+    Vector3 lastTargetPos_ = { 0.0f, 0.0f, 0.0f };
+};
 
 ============================================================
 File Path: YEngine/Utilities/Systems/Camera/Virtuals/FollowCamera/CameraState.h
@@ -242310,7 +241995,7 @@ public:
     // 保存・読込
     virtual void Save([[maybe_unused]] nlohmann::json& j) const {}
     virtual void Load([[maybe_unused]] const nlohmann::json& j) {}
-    
+    virtual bool IsPerformance() const { return false; }
     // ImGuiでの編集
     virtual void DrawEditGui() {}
 
@@ -242346,49 +242031,69 @@ void CameraStateEditor::SetEditingState(std::unique_ptr<CameraState> state) {
 void CameraStateEditor::DrawEditorWindow() {
 #ifdef USE_IMGUI
     ImGui::Begin("Camera State Editor", nullptr, ImGuiWindowFlags_MenuBar);
-    
+
+    // ファイルパス（ウィンドウ上部に常時表示）
+    static char filepath[256] = "camera_presets.json";
+
     // メニューバー
     if (ImGui::BeginMenuBar()) {
         if (ImGui::BeginMenu("ファイル")) {
-            static char filepath[256] = "camera_presets.json";
-            ImGui::InputText("##filepath", filepath, sizeof(filepath));
-            
-            if (ImGui::MenuItem("保存")) {
+            if (ImGui::MenuItem("JSONに保存")) {
                 CameraStatePresetManager::GetInstance()->SaveToFile(filepath);
+                ImGui::OpenPopup("MenuFileSaved");
             }
-            if (ImGui::MenuItem("読込")) {
+            if (ImGui::MenuItem("JSONから読込")) {
                 CameraStatePresetManager::GetInstance()->LoadFromFile(filepath);
             }
             ImGui::EndMenu();
         }
         ImGui::EndMenuBar();
     }
-    
+
+    // 保存完了ポップアップ（メニューバー用）
+    if (ImGui::BeginPopupModal("MenuFileSaved", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Text("'%s' に保存しました", filepath);
+        if (ImGui::Button("OK")) ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+    }
+
+    // ファイルパス入力を常時表示
+    ImGui::InputText("JSONファイルパス", filepath, sizeof(filepath));
+    ImGui::SameLine();
+    if (ImGui::Button("保存##header")) {
+        CameraStatePresetManager::GetInstance()->SaveToFile(filepath);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("読込##header")) {
+        CameraStatePresetManager::GetInstance()->LoadFromFile(filepath);
+    }
+    ImGui::Separator();
+
     // タブ
     if (ImGui::BeginTabBar("EditorTabs")) {
         if (ImGui::BeginTabItem("新規作成")) {
             DrawStateCreationUI();
             ImGui::EndTabItem();
         }
-        
+
         if (ImGui::BeginTabItem("編集")) {
             DrawStateEditorUI();
             ImGui::EndTabItem();
         }
-        
+
         if (ImGui::BeginTabItem("プリセット管理")) {
             DrawPresetManagerUI();
             ImGui::EndTabItem();
         }
-        
+
         if (ImGui::BeginTabItem("プレビュー")) {
             DrawPreviewControlUI();
             ImGui::EndTabItem();
         }
-        
+
         ImGui::EndTabBar();
     }
-    
+
     ImGui::End();
 #endif
 }
@@ -242397,10 +242102,10 @@ void CameraStateEditor::DrawStateCreationUI() {
 #ifdef USE_IMGUI
     ImGui::Text("新しいカメラステートを作成");
     ImGui::Separator();
-    
+
     const char* stateTypes[] = { "Cinematic", "Parry", "BattleStart" };
     ImGui::Combo("ステートタイプ", &selectedStateType_, stateTypes, 3);
-    
+
     if (ImGui::Button("作成")) {
         switch (selectedStateType_) {
         case 0:
@@ -242414,9 +242119,9 @@ void CameraStateEditor::DrawStateCreationUI() {
             break;
         }
     }
-    
+
     ImGui::Separator();
-    
+
     if (editingState_) {
         ImGui::TextColored(ImVec4(0, 1, 0, 1), "作成されたステート: %s", editingState_->GetStateName());
         ImGui::Text("「編集」タブで詳細を設定できます");
@@ -242432,19 +242137,19 @@ void CameraStateEditor::DrawStateEditorUI() {
         ImGui::Text("「プリセット管理」タブから読み込んでください");
         return;
     }
-    
+
     ImGui::Text("編集中のステート: %s", editingState_->GetStateName());
     ImGui::Separator();
-    
+
     // ステート固有の編集UI
     editingState_->DrawEditGui();
-    
+
     ImGui::Separator();
-    
+
     // プリセット保存
     ImGui::Text("プリセットとして保存:");
     ImGui::InputText("プリセット名", newPresetName_, sizeof(newPresetName_));
-    
+
     if (ImGui::Button("保存")) {
         if (strlen(newPresetName_) > 0) {
             CameraStatePresetManager::GetInstance()->SavePreset(
@@ -242455,7 +242160,7 @@ void CameraStateEditor::DrawStateEditorUI() {
             ImGui::OpenPopup("保存完了");
         }
     }
-    
+
     // 保存完了ポップアップ
     if (ImGui::BeginPopupModal("保存完了", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::Text("プリセットを保存しました: %s", newPresetName_);
@@ -242471,20 +242176,20 @@ void CameraStateEditor::DrawPresetManagerUI() {
 #ifdef USE_IMGUI
     ImGui::Text("プリセット一覧");
     ImGui::Separator();
-    
+
     auto presetNames = CameraStatePresetManager::GetInstance()->GetPresetNames();
-    
+
     if (presetNames.empty()) {
         ImGui::TextColored(ImVec4(1, 1, 0, 1), "保存されたプリセットがありません");
         return;
     }
-    
+
     for (const auto& name : presetNames) {
         ImGui::PushID(name.c_str());
-        
+
         ImGui::Text("%s", name.c_str());
         ImGui::SameLine(200);
-        
+
         if (ImGui::Button("編集")) {
             auto loadedState = CameraStatePresetManager::GetInstance()->LoadPreset(name);
             if (loadedState) {
@@ -242492,16 +242197,16 @@ void CameraStateEditor::DrawPresetManagerUI() {
                 strncpy_s(newPresetName_, name.c_str(), sizeof(newPresetName_) - 1);
             }
         }
-        
+
         ImGui::SameLine();
         if (ImGui::Button("削除")) {
             ImGui::OpenPopup("削除確認");
         }
-        
+
         // 削除確認ポップアップ
         if (ImGui::BeginPopupModal("削除確認", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
             ImGui::Text("プリセット '%s' を削除しますか?", name.c_str());
-            
+
             if (ImGui::Button("はい")) {
                 CameraStatePresetManager::GetInstance()->DeletePreset(name);
                 ImGui::CloseCurrentPopup();
@@ -242512,7 +242217,7 @@ void CameraStateEditor::DrawPresetManagerUI() {
             }
             ImGui::EndPopup();
         }
-        
+
         ImGui::SameLine();
         if (ImGui::Button("カメラに適用")) {
             if (camera_) {
@@ -242522,7 +242227,7 @@ void CameraStateEditor::DrawPresetManagerUI() {
                 }
             }
         }
-        
+
         ImGui::PopID();
     }
 #endif
@@ -242534,54 +242239,114 @@ void CameraStateEditor::DrawPreviewControlUI() {
         ImGui::TextColored(ImVec4(1, 0, 0, 1), "プレビュー用のカメラが設定されていません");
         return;
     }
-    
+
     if (!editingState_) {
         ImGui::TextColored(ImVec4(1, 1, 0, 1), "プレビューするステートがありません");
         return;
     }
-    
+
     ImGui::Text("プレビューコントロール");
     ImGui::Separator();
-    
+
     ImGui::Text("編集中のステート: %s", editingState_->GetStateName());
-    
-    if (ImGui::Button("プレビュー開始")) {
-        // 編集中のステートのコピーを作成してカメラに適用
-        nlohmann::json j;
-        editingState_->Save(j);
-        
-        std::unique_ptr<CameraState> previewState;
-        std::string stateName = editingState_->GetStateName();
-        
-        if (stateName == "Parry") {
-            previewState = std::make_unique<ParryCameraState>();
-        } else if (stateName == "BattleStart") {
-            previewState = std::make_unique<BattleStartCameraState>();
-        } else if (stateName == "Cinematic") {
-            previewState = std::make_unique<CinematicCameraState>();
+    ImGui::Spacing();
+
+    // ── プレビュー開始 ──
+    if (!isPreviewMode_) {
+        if (ImGui::Button("▶  プレビュー開始")) {
+            StartPreview();
         }
-        
-        if (previewState) {
-            previewState->Load(j);
-            camera_->ChangeState(std::move(previewState));
-            isPreviewMode_ = true;
-        }
+        ImGui::TextDisabled("※ プレビュー開始でカメラが演出を再生します");
     }
-    
-    if (isPreviewMode_) {
+    else {
+        // プレビュー中の操作
+        ImGui::TextColored(ImVec4(0.3f, 1.0f, 0.3f, 1.0f), "● 再生中");
         ImGui::SameLine();
-        if (ImGui::Button("プレビュー停止")) {
-            camera_->ChangeState(std::make_unique<DefaultCameraState>());
+        if (ImGui::Button("■  停止")) {
+            StopPreview();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("↺  最初から再生")) {
+            StopPreview();
+            StartPreview();
+        }
+
+        // 現在のステートが終了したら自動でフラグを戻す
+        if (camera_->GetCurrentState() && camera_->GetCurrentState()->IsFinished()) {
             isPreviewMode_ = false;
         }
     }
-    
+
     ImGui::Separator();
-    ImGui::Text("現在のカメラステート: %s", 
+
+    // ── BattleStart 専用パネル ──
+    if (std::string(editingState_->GetStateName()) == "BattleStart") {
+        ImGui::Text("[ 戦闘開始カメラ専用 ]");
+
+        if (ImGui::Button("ターゲット座標でプレビュー")) {
+            // 制御点をターゲット基準で再構築してからプレビュー
+            auto* bsState = static_cast<BattleStartCameraState*>(editingState_.get());
+            bsState->SetupDefaultControlPoints(camera_);
+            StopPreview();
+            StartPreview();
+        }
+        ImGui::SameLine();
+        ImGui::TextDisabled("(カメラのターゲット位置を使用)");
+        ImGui::Spacing();
+    }
+
+    ImGui::Separator();
+    ImGui::Text("現在のカメラステート: %s",
         camera_->GetCurrentState() ? camera_->GetCurrentState()->GetStateName() : "なし");
 #endif
 }
 
+// ── プライベートヘルパー実装 ──
+void CameraStateEditor::StartPreview() {
+    if (!camera_ || !editingState_) return;
+
+    std::string stateName = editingState_->GetStateName();
+    std::unique_ptr<CameraState> previewState;
+
+    if (stateName == "BattleStart") {
+        // BattleStart は全パラメータをメンバ変数で管理しているので
+        // Save/Load で完全に複製できる
+        auto dst = std::make_unique<BattleStartCameraState>();
+        nlohmann::json j;
+        editingState_->Save(j);
+        dst->Load(j);
+        // ターゲット座標で制御点を組み立て直す（位置だけ更新、回転・FOVは保持）
+        dst->RebuildControlPoints(camera_);
+        previewState = std::move(dst);
+
+    }
+    else if (stateName == "Parry") {
+        auto dst = std::make_unique<ParryCameraState>();
+        nlohmann::json j;
+        editingState_->Save(j);
+        dst->Load(j);
+        previewState = std::move(dst);
+
+    }
+    else if (stateName == "Cinematic") {
+        auto dst = std::make_unique<CinematicCameraState>();
+        nlohmann::json j;
+        editingState_->Save(j);
+        dst->Load(j);
+        previewState = std::move(dst);
+    }
+
+    if (previewState) {
+        camera_->ChangeState(std::move(previewState));
+        isPreviewMode_ = true;
+    }
+}
+
+void CameraStateEditor::StopPreview() {
+    if (!camera_) return;
+    camera_->ChangeState(std::make_unique<DefaultCameraState>());
+    isPreviewMode_ = false;
+}
 
 ============================================================
 File Path: YEngine/Utilities/Systems/Camera/Virtuals/FollowCamera/CameraStateEditor.h
@@ -242599,36 +242364,45 @@ class FollowCamera;
 class CameraStateEditor {
 public:
     static CameraStateEditor* GetInstance();
-    
+
     // エディタUIの描画
     void DrawEditorWindow();
-    
+
     // 現在編集中のステートを設定
     void SetEditingState(std::unique_ptr<CameraState> state);
-    
+
     // カメラのセット（プレビュー用）
     void SetCamera(FollowCamera* camera) { camera_ = camera; }
-    
+
+    // 編集中ステートの取得
+    CameraState* GetEditingState() const { return editingState_.get(); }
+
+    // プレビュー操作（FollowCamera::DrawDebugGui からも呼べるよう公開）
+    void StartPreview();
+    void StopPreview();
+
+    // FollowCamera::Update() から演出終了を通知してもらう
+    void NotifyPreviewFinished() { isPreviewMode_ = false; }
+
 private:
     CameraStateEditor() = default;
     ~CameraStateEditor() = default;
     CameraStateEditor(const CameraStateEditor&) = delete;
     CameraStateEditor& operator=(const CameraStateEditor&) = delete;
-    
+
     void DrawStateCreationUI();
     void DrawStateEditorUI();
     void DrawPresetManagerUI();
     void DrawPreviewControlUI();
-    
+
     std::unique_ptr<CameraState> editingState_;
     FollowCamera* camera_ = nullptr;
-    
+
     // UI状態
     int selectedStateType_ = 0;
     char newPresetName_[64] = "";
     bool isPreviewMode_ = false;
 };
-
 
 ============================================================
 File Path: YEngine/Utilities/Systems/Camera/Virtuals/FollowCamera/CameraStatePresetManager.cpp
@@ -243163,6 +242937,8 @@ public:
     
     // ImGuiでの編集
     void DrawEditGui() override;
+
+    bool IsPerformance() const override { return true; }
     
     // 制御点の取得（編集用）
     std::vector<CameraControlPoint>& GetControlPoints() { return controlPoints_; }
@@ -243228,7 +243004,7 @@ public:
     void Enter(FollowCamera* camera) override;
     void Update(FollowCamera* camera) override;
     void Exit(FollowCamera* camera) override;
-    
+    bool IsPerformance() const override { return false; }
     const char* GetStateName() const override { return "Default"; }
 };
 
@@ -243242,10 +243018,8 @@ File Path: YEngine/Utilities/Systems/Camera/Virtuals/FollowCamera/FollowCamera.c
 #include <algorithm>
 #include <cmath>
 
-// ステート関連のインクルード
 #include "CameraState.h"
 #include "DefaultCameraState.h"
-#include "CameraStatePresetManager.h"
 
 #ifdef USE_IMGUI
 #include <imgui.h>
@@ -243255,7 +243029,7 @@ File Path: YEngine/Utilities/Systems/Camera/Virtuals/FollowCamera/FollowCamera.c
 void FollowCamera::Initialize() {
 	VirtualCamera::Initialize();
 	currentScale_ = 1.0f;
-	
+
 	// デフォルトステートを設定
 	currentState_ = std::make_unique<DefaultCameraState>();
 	currentState_->Enter(this);
@@ -243267,13 +243041,14 @@ void FollowCamera::Update() {
 	}
 
 	if (!target_) return;
-	
+
 	// ステート更新
 	if (currentState_) {
 		currentState_->Update(this);
-		
+
 		// ステートが終了したらデフォルトに戻る
 		if (currentState_->IsFinished()) {
+			isPreviewMode_ = false;
 			ChangeState(std::make_unique<DefaultCameraState>());
 		}
 	}
@@ -243328,9 +243103,9 @@ void FollowCamera::ChangeState(std::unique_ptr<CameraState> newState) {
 	if (currentState_) {
 		currentState_->Exit(this);
 	}
-	
+
 	currentState_ = std::move(newState);
-	
+
 	if (currentState_) {
 		currentState_->Enter(this);
 	}
@@ -243343,12 +243118,12 @@ void FollowCamera::GetDefaultCameraParams(Vector3& outPos, Vector3& outRot, floa
 		outFov = fovY_;
 		return;
 	}
-	
+
 	// デフォルトの追従位置を計算
 	Vector3 offset = offset_ * currentScale_;
 	Matrix4x4 rotateMat = MakeRotateMatrixXYZ(transform_.rotate);
 	offset = TransformNormal(offset, rotateMat);
-	
+
 	outPos = target_->translate_ + offset;
 	outRot = transform_.rotate;
 	outFov = fovY_;
@@ -243357,59 +243132,9 @@ void FollowCamera::GetDefaultCameraParams(Vector3& outPos, Vector3& outRot, floa
 void FollowCamera::DrawDebugGui() {
 #ifdef USE_IMGUI
 	ImGui::Text("追従カメラ設定");
-	
-	// 現在のステート表示
-	if (currentState_) {
-		ImGui::Text("現在のステート: %s", currentState_->GetStateName());
-		
-		// ステートの編集UI
-		if (ImGui::TreeNode("ステート編集")) {
-			currentState_->DrawEditGui();
-			
-			ImGui::Separator();
-			
-			// プリセット保存
-			static char presetName[64] = "";
-			ImGui::InputText("プリセット名", presetName, sizeof(presetName));
-			
-			if (ImGui::Button("プリセットとして保存")) {
-				if (strlen(presetName) > 0) {
-					CameraStatePresetManager::GetInstance()->SavePreset(
-						presetName, 
-						currentState_->GetStateName(), 
-						currentState_.get()
-					);
-				}
-			}
-			
-			ImGui::Separator();
-			
-			// プリセット読込
-			auto presetNames = CameraStatePresetManager::GetInstance()->GetPresetNames();
-			if (!presetNames.empty()) {
-				static int selectedPreset = 0;
-				std::vector<const char*> presetNamePtrs;
-				for (const auto& name : presetNames) {
-					presetNamePtrs.push_back(name.c_str());
-				}
-				
-				ImGui::Combo("プリセット選択", &selectedPreset, presetNamePtrs.data(), static_cast<int>(presetNamePtrs.size()));
-				
-				if (ImGui::Button("プリセットを読込")) {
-					if (selectedPreset >= 0 && selectedPreset < static_cast<int>(presetNames.size())) {
-						auto loadedState = CameraStatePresetManager::GetInstance()->LoadPreset(presetNames[selectedPreset]);
-						if (loadedState) {
-							ChangeState(std::move(loadedState));
-						}
-					}
-				}
-			}
-			
-			ImGui::TreePop();
-		}
-	}
 	ImGui::Separator();
-	
+
+	// ── 追従パラメータ ──
 	if (ImGui::TreeNode("追従パラメータ")) {
 		ImGui::DragFloat3("オフセット距離", &offset_.x, 0.1f, -100.0f, 100.0f);
 		ImGui::DragFloat3("角度", &transform_.rotate.x, 0.01f, -6.28f, 6.28f);
@@ -243418,20 +243143,74 @@ void FollowCamera::DrawDebugGui() {
 	}
 
 	ImGui::Separator();
-	ImGui::Text("演出設定");
-	ImGui::Checkbox("クローズアップ有効", &isCloseUp_);
-	ImGui::DragFloat("クローズアップ倍率", &closeUpScale_, 0.01f, 0.1f, 1.0f);
-	ImGui::DragFloat("補間速度", &interpSpeed_, 0.1f, 0.1f, 20.0f);
+
+	// ── 演出設定 ──
+	if (ImGui::TreeNode("演出設定")) {
+		ImGui::Checkbox("クローズアップ有効", &isCloseUp_);
+		ImGui::DragFloat("クローズアップ倍率", &closeUpScale_, 0.01f, 0.1f, 1.0f);
+		ImGui::DragFloat("補間速度", &interpSpeed_, 0.1f, 0.1f, 20.0f);
+		ImGui::TreePop();
+	}
 
 	ImGui::Separator();
-	ImGui::Text("現在の状態");
-	ImGui::Value("現在の拡大率", currentScale_);
 
-	ImGui::Text("シェイク状態");
-	ImGui::Value("シェイク強度", shakeIntensity_);
-	ImGui::Value("シェイクタイマー", shakeTimer_);
-	ImGui::DragFloat3("シェイクオフセット", &shakeOffset_.x, 0.01f);
+	// ── 戦闘開始カメラ演出 ──
+	if (ImGui::TreeNode("戦闘開始カメラ演出")) {
 
+		// battleStartState_ がなければ自動生成
+		if (!battleStartState_) {
+			battleStartState_ = std::make_shared<BattleStartCameraState>();
+		}
+
+		// パラメータ編集（保存は CameraEditor の「すべての設定を保存」で一括）
+		battleStartState_->DrawEditGui();
+
+		ImGui::Separator();
+
+		// プレビュー
+		if (!isPreviewMode_) {
+			if (ImGui::Button("▶  プレビュー再生")) {
+				auto preview = std::make_unique<BattleStartCameraState>();
+				nlohmann::json j;
+				battleStartState_->Save(j);
+				preview->Load(j);
+				preview->RebuildControlPoints(this);
+				ChangeState(std::move(preview));
+				isPreviewMode_ = true;
+			}
+		}
+		else {
+			ImGui::TextColored(ImVec4(0.3f, 1.0f, 0.3f, 1.0f), "● 再生中");
+			ImGui::SameLine();
+			if (ImGui::Button("■  停止")) {
+				ChangeState(std::make_unique<DefaultCameraState>());
+				isPreviewMode_ = false;
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("↺  最初から")) {
+				ChangeState(std::make_unique<DefaultCameraState>());
+				auto preview = std::make_unique<BattleStartCameraState>();
+				nlohmann::json j;
+				battleStartState_->Save(j);
+				preview->Load(j);
+				preview->RebuildControlPoints(this);
+				ChangeState(std::move(preview));
+				isPreviewMode_ = true;
+			}
+
+			// 演出終了で自動停止
+			if (currentState_ && currentState_->IsFinished()) {
+				isPreviewMode_ = false;
+			}
+		}
+
+		ImGui::TreePop();
+	}
+
+	ImGui::Separator();
+
+	// ── デバッグ情報 ──
+	ImGui::Text("現在のステート: %s", currentState_ ? currentState_->GetStateName() : "なし");
 	if (target_) {
 		ImGui::Text("追従対象: セット済み");
 	}
@@ -243450,6 +243229,13 @@ void FollowCamera::Save(nlohmann::json& j) const {
 	j["interpSpeed"] = interpSpeed_;
 	j["rotateSpeed"] = kRotateSpeed_;
 	j["closeUpScale"] = closeUpScale_;
+
+	// BattleStartState の設定も一緒に保存
+	if (battleStartState_) {
+		nlohmann::json stateJson;
+		battleStartState_->Save(stateJson);
+		j["battleStartState"] = stateJson;
+	}
 }
 
 void FollowCamera::Load(const nlohmann::json& j) {
@@ -243464,8 +243250,15 @@ void FollowCamera::Load(const nlohmann::json& j) {
 	kRotateSpeed_ = j.value("rotateSpeed", 0.1f);
 	interpSpeed_ = j.value("interpSpeed", 5.0f);
 	closeUpScale_ = j.value("closeUpScale", 0.3f);
-}
 
+	// BattleStartState の設定を復元
+	if (j.contains("battleStartState")) {
+		if (!battleStartState_) {
+			battleStartState_ = std::make_shared<BattleStartCameraState>();
+		}
+		battleStartState_->Load(j["battleStartState"]);
+	}
+}
 
 ============================================================
 File Path: YEngine/Utilities/Systems/Camera/Virtuals/FollowCamera/FollowCamera.h
@@ -243474,6 +243267,8 @@ File Path: YEngine/Utilities/Systems/Camera/Virtuals/FollowCamera/FollowCamera.h
 #include "../VirtualCamera.h"
 #include <WorldTransform/WorldTransform.h>
 #include "CameraState.h"
+#include "BattleStartCameraState.h"
+
 /// <summary>
 /// デバッグカメラクラス(ターゲットを追従するカメラ)
 /// </summary>
@@ -243484,7 +243279,6 @@ public:
 	void Update() override;
 	void DrawDebugGui() override;
 
-	// セッター
 	void SetTarget(const WorldTransform* target, const std::string& name) {
 		target_ = target;
 		targetName_ = name;
@@ -243492,26 +243286,45 @@ public:
 	void SetIsCloseUp(bool isCloseUp) { isCloseUp_ = isCloseUp; }
 	const std::string& GetTargetName() const { return targetName_; }
 
-	// JSON用のSave/Loadオーバーライド
 	void Save(nlohmann::json& j) const override;
 	void Load(const nlohmann::json& j) override;
 
-	const WorldTransform* GetTarget()  { return target_; }
+	const WorldTransform* GetTarget() { return target_; }
 	void ChangeState(std::unique_ptr<CameraState> newState);
-
 	void GetDefaultCameraParams(Vector3& outPos, Vector3& outRot, float& outFov) const;
-
 	CameraState* GetCurrentState() const { return currentState_.get(); }
+
+	/// 戦闘開始演出を発火（ゲームシーンから呼ぶだけでOK）
+	void PlayBattleStart() {
+		if (!battleStartState_) {
+			battleStartState_ = std::make_shared<BattleStartCameraState>();
+		}
+		auto play = std::make_unique<BattleStartCameraState>();
+		nlohmann::json j;
+		battleStartState_->Save(j);
+		play->Load(j);
+		play->RebuildControlPoints(this);
+		ChangeState(std::move(play));
+	}
+
 	void UpdateInput();
 	void FollowProcess();
-private:
 
+	// 現在のステートが戦闘開始演出中かどうか
+	bool IsInPerformance() const {
+		if (currentState_) {
+			return currentState_->IsPerformance();
+		}
+		return false;
+	}
 
 private:
 	const WorldTransform* target_ = nullptr;
-	std::string targetName_ = ""; // 保存用の文字列
-	
+	std::string targetName_ = "";
 	std::unique_ptr<CameraState> currentState_ = nullptr;
+
+	/// 戦闘開始ステートの設定を保持（編集・Save/Load用）
+	std::shared_ptr<BattleStartCameraState> battleStartState_ = nullptr;
 
 	// 追従パラメータ
 	Vector3 offset_ = { 0.0f, 6.0f, -40.0f };
@@ -243523,14 +243336,14 @@ private:
 	float interpSpeed_ = 5.0f;
 	float currentScale_ = 1.0f;
 
-	float kDeadZoneL_ = 100.0f;
-
 	// カメラシェイク
 	Vector3 shakeOffset_ = { 0.0f, 0.0f, 0.0f };
 	float shakeIntensity_ = 0.0f;
 	float shakeDuration_ = 0.0f;
 	float shakeTimer_ = 0.0f;
 
+	// プレビュー状態
+	bool isPreviewMode_ = false;
 };
 
 ============================================================
@@ -243699,7 +243512,7 @@ public:
     
     // ImGuiでの編集
     void DrawEditGui() override;
-    
+    bool IsPerformance() const override { return true; }
 private:
     void SetupControlPoints(FollowCamera* camera);
     ParryType parryType_ = ParryType::Quick;
@@ -252330,14 +252143,6 @@ void BattleEnemyManager::ShowDebugInfo() {
 	ImGui::Text("戦闘時間: %.1f秒", battleStats_.battleDuration);
 
 	ImGui::Separator();
-
-	if (ImGui::Button("テスト戦闘開始")) {
-		EnemyEncounterData testEncounter;
-		testEncounter.encounterName = "テスト戦闘";
-		testEncounter.enemyIds = { "goblin", "orc" };
-		testEncounter.formations = { Vector3(-2.0f, 0.0f, 5.0f), Vector3(2.0f, 0.0f, 5.0f) };
-		StartBattle(testEncounter);
-	}
 
 	ImGui::SameLine();
 	if (ImGui::Button("戦闘終了")) {
@@ -261993,7 +261798,7 @@ public:
 	Vector3 GetVelocity() const { return velocity_; }
 	float GetSpeed() const;
 	bool IsMoving() const;
-	bool CanMove() const { return canMove_; }  // ← 追加：移動可能かどうかを返す
+	bool CanMove() const { return canMove_; }
 	void SetCanMove(bool canMove) { canMove_ = canMove; }
 	void ForceStop();
 
@@ -262205,6 +262010,7 @@ void Player::InitCombatSystem() {
 /// </summary>
 void Player::HandleCombatInput() {
 
+	if (followCamera_->IsInPerformance()) return;
 	if (!combat_->IsIdle()) return;
 
 	// A（軽攻撃）
@@ -262223,12 +262029,6 @@ void Player::HandleCombatInput() {
 		combat_->TryGuard();
 	}
 
-	//// キャンセル
-	//if (input_->IsPadTriggered(0, GamePadButton::X)) {
-	//	if (combat_->TryCancel()) {
-	//		Logger("Combo cancelled!\n");
-	//	}
-	//}
 }
 
 /// <summary>
@@ -262559,6 +262359,13 @@ void Player::Revive(int reviveHP) {
 	obj_->SetChangeMotion("Player.gltf", MotionPlayMode::Loop, "Idle4");
 }
 
+void Player::SetInitialPosition()
+{
+	LookAtDirection(Vector3(0.0f, 0.0f, 0.0f));
+	SetPosition({ 23.4f, 0.0f, 4.4f });
+	wt_.UpdateMatrix();
+}
+
 /// <summary>
 ///	指定方向を向く関数
 /// </summary>
@@ -262569,6 +262376,7 @@ void Player::LookAtDirection(const Vector3& direction)
 	dir.y = 0.0f; // 水平方向のみ
 	dir = Vector3::Normalize(dir);
 	float targetYaw = std::atan2f(dir.x, dir.z); // ラジアンで計算
+	wt_.rotate_.y = targetYaw;
 	followCamera_->SetRotate({ followCamera_->GetRotate().x, targetYaw,followCamera_->GetRotate().z});
 }
 
@@ -262626,15 +262434,13 @@ public:
 
 	// プレイヤーの状態をリセット
 	void Reset();
-
 	// ダメージを受ける関数
 	void TakeDamage(int damage);
-
 	// 復活する関数
 	void Revive(int reviveHP);
+	// バトルシーンから開始する際の初期位置設定
+	void SetInitialPosition();
 
-	// 指定方向を向く関数
-	void LookAtDirection(const Vector3& direction);
 public:
 	///************************* アクセッサ *************************///
 
@@ -262678,16 +262484,19 @@ public:
 
 private:
 	///************************* 内部処理関数 *************************///
-	void InitStates();
-	void InitCombatSystem();
-	void HandleCombatInput();
 
+	// 初期化関数
 	void InitCollision() override;
 	void InitJson() override;
+	void InitStates();
+	void InitCombatSystem();
 
+	// 入力処理関数
+	void HandleCombatInput();
 	// モーションの再生時間を更新する関数
 	void UpdateMotionTime();
-
+	// 指定方向を向く関数
+	void LookAtDirection(const Vector3& direction);
 private:
 	///************************* メンバ変数 *************************///
 
@@ -265315,7 +265124,6 @@ File Path: YGame/Scenes/SubScenes/BattleScene.cpp
 #include "imgui.h"
 #endif
 #include <Debugger/Logger.h>
-#include <Systems/Camera/Virtuals/FollowCamera/BattleStartCameraState.h>
 
 /// <summary>
 /// バトルシーン初期化
@@ -265478,6 +265286,9 @@ void BattleScene::OnEnter() {
 	battleCameraFinished_ = true;
 	shouldResetBattleCamera_ = true;
 
+	// プレイヤー位置リセット
+	player_->SetInitialPosition();
+
 	//------------------------------------------------------------
 	// バトル遷移データの読み込み
 	//------------------------------------------------------------
@@ -265508,7 +265319,8 @@ void BattleScene::OnEnter() {
 		if (!transitionData.battleEnemyIds.empty()) {
 			encounter.enemyIds = transitionData.battleEnemyIds;
 			Logger("[BattleScene] 複数体バトル開始\n");
-		} else {
+		}
+		else {
 			encounter.enemyIds = { transitionData.battleEnemyId };
 			Logger("[BattleScene] 単体バトル開始\n");
 		}
@@ -265526,11 +265338,8 @@ void BattleScene::OnEnter() {
 			encounter.formations = battleEnemyManager_->GetFormationPositions(encounter.enemyIds.size());
 		}
 
-		// プレイヤー位置リセット
-		player_->LookAtDirection(Vector3(0.0f, 0.0f, 0.0f));
-		auto battleStartState = std::make_unique<BattleStartCameraState>();
-		player_->GetFollowCamera()->ChangeState(std::move(battleStartState));
-
+		// バトル開始時のスタート演出カメラの再生
+		player_->GetFollowCamera()->PlayBattleStart();
 		// 戦闘開始
 		if (battleEnemyManager_) {
 			// BattleEnemyManagerに最終バトル情報を渡す
@@ -265540,7 +265349,8 @@ void BattleScene::OnEnter() {
 
 		syncData->ClearBattleTransitionData();
 		Logger("[BattleScene] バトルデータ設定完了\n");
-	} else {
+	}
+	else {
 		Logger("[BattleScene] エラー: バトル遷移データが存在しません\n");
 	}
 
@@ -265631,7 +265441,8 @@ void BattleScene::HandleBattleEnd(BattleResult result, const BattleStats& stats)
 
 		Logger("[BattleScene] ===== HandleBattleEnd() END (Clear Scene) =====\n");
 		return;  // フィールドに戻るコールバックを実行しない
-	} else {
+	}
+	else {
 		if (isFinalBattle_) {
 			Logger("[BattleScene] Final battle but not victory (Defeat?)\n");
 		}
@@ -266137,7 +265948,7 @@ void FieldScene::HandleDetailedEncounter(const EncountInfo& encounterInfo) {
 	}
 
 	transitionData.isFinalBattle = isFinalBattle;
-	transitionData.totalRemainingFieldEnemies = remainingGroups; // ★追加
+	transitionData.totalRemainingFieldEnemies = remainingGroups;
 
 	auto* syncData = SceneSyncData::GetInstance();
 	syncData->SaveBattleTransitionData(transitionData);
@@ -266458,7 +266269,7 @@ void SceneSyncData::SaveBattleTransitionData(const BattleTransitionData& data) {
 }
 
 /// <summary>
-/// バトル遷移データを読み込み
+/// バトル遷移データを読み込み（バトルシーンではプレイヤーの位置を固定する）
 /// </summary>
 BattleTransitionData SceneSyncData::LoadBattleTransitionData() {
 	BattleTransitionData data;
@@ -266474,7 +266285,6 @@ BattleTransitionData SceneSyncData::LoadBattleTransitionData() {
 			}
 			data.battleEnemyId = j.value("battleEnemyId", "");
 
-			if (j.contains("playerPosition")) data.playerPosition = JsonToVector3(j["playerPosition"]);
 			if (j.contains("cameraPosition")) data.cameraPosition = JsonToVector3(j["cameraPosition"]);
 			if (j.contains("cameraMode")) data.cameraMode = JsonToCameraMode(j["cameraMode"]);
 			if (j.contains("isFinalBattle"))
@@ -267346,1146 +267156,51 @@ private:
 
 
 ============================================================
-File Path: YGame/SystemsApp/Cameras/BattleStartCamera/BattleStartCamera.cpp
+File Path: YGame/UI/Alert/EnemyAlert.cpp
 ============================================================
-#include "BattleStartCamera.h"
-#include "BattleStartCamera.h"
+#include "EnemyAlert.h"
+#include "Systems/UI/UIManager.h"
 
-// C++
-#include <algorithm>
-#include <cmath>
 
-// Engine
-#include <MathFunc.h>
-#include "Easing.h"
-#include "Systems/Input/Input.h"
-#include <Systems/GameTime/GameTime.h>
-
-#pragma region 小ユーティリティ関数群
-
-/// <summary>
-/// 線形補間（float
-/// </summary>
-static inline float LerpF(float a, float b, float t) { return a + (b - a) * t; }
-
-/// <summary>
-/// 線形補間（Vector3）
-/// </summary>
-static inline Vector3 LerpV(const Vector3& a, const Vector3& b, float t) {
-	return { LerpF(a.x, b.x, t), LerpF(a.y, b.y, t), LerpF(a.z, b.z, t) };
-}
-
-/// <summary>
-/// 角度補間（ラジアン）
-/// </summary>
-static inline float LerpAngle(float a, float b, float t) {
-	float d = b - a;
-	while (d > 3.14159265f) d -= 6.28318531f;
-	while (d < -3.14159265f) d += 6.28318531f;
-	return a + d * t;
-}
-
-/// <summary>
-/// ローカル回転（XYZ回転）をオフセットに適用
-/// </summary>
-static inline Vector3 RotateOffsetXYZ(const Vector3& offset, const Vector3& eulerXYZ) {
-	Matrix4x4 rot = MakeRotateMatrixXYZ(eulerXYZ);
-	return TransformNormal(offset, rot);
-}
-
-/// <summary>
-/// from→to の方向ベクトルからヨー/ピッチを計算
-/// </summary>
-static inline std::pair<float, float> YawPitchTo(const Vector3& from, const Vector3& to) {
-	Vector3 dir = Normalize(to - from);
-	float yaw = std::atan2f(dir.x, dir.z);
-	float pitch = std::asinf(dir.y);
-	return { yaw, pitch };
-}
-
-#pragma endregion
-
-///=============================================================================================
-/// メイン実装
-///=============================================================================================
-
-/// <summary>
-/// 被写体を画角に収めるための適正距離を算出
-/// </summary>
-float BattleStartCamera::ComputeFitDistance(float subjectHeight, float fovY, float margin) const {
-	float half = subjectHeight * 0.5f * std::max(1.0f, margin);
-	float denom = std::tan(std::max(0.1f, fovY * 0.5f));
-	return (denom > 0.0f) ? (half / denom) : half * 3.0f;
-}
-
-/// <summary>
-/// ターゲットのYaw角（ラジアン）を取得
-/// </summary>
-float BattleStartCamera::GetTargetYawRad() const {
-	return target_ ? target_->rotate_.y : 0.0f;
-}
-
-/// <summary>
-/// Y軸回転を適用したベクトルを返す
-/// </summary>
-Vector3 BattleStartCamera::RotateY(const Vector3& v, float yawRad) const {
-	float s = std::sinf(yawRad), c = std::cosf(yawRad);
-	return { v.x * c + v.z * s, v.y, -v.x * s + v.z * c };
-}
-
-/// <summary>
-/// ターゲットを基準とするかどうかでワールド座標を算出
-/// </summary>
-Vector3 BattleStartCamera::ToWorldFromOffset(bool useRelativeToTarget,
-	const Vector3& offset,
-	const Vector3& offsetEuler) const
-{
-	Vector3 local = RotateOffsetXYZ(offset, offsetEuler);
-
-	if (!useRelativeToTarget) {
-		return local; // ワールド絶対位置
+void EnemyAlert::Initialize() {
+	alertUI_ = YoRigine::UIManager::GetInstance()->GetUI("enemyAlert");
+	if (alertUI_) {
+		defaultScale_ = alertUI_->GetScale();
 	}
-
-	Vector3 targetPos = target_ ? target_->translate_ : Vector3{ 0,0,0 };
-	Vector3 rotated = RotateY(local, GetTargetYawRad());
-	return targetPos + rotated;
 }
 
-/// <summary>
-/// 接近時の円弧パスを構築（Start→Hold）
-/// </summary>
-void BattleStartCamera::BuildApproachArc(const Vector3& startWorld, const Vector3& holdWorld) {
-	Vector3 targetPos = target_ ? target_->translate_ : Vector3{ 0,0,0 };
-	Vector3 vS = startWorld - targetPos;
-	Vector3 vH = holdWorld - targetPos;
+void EnemyAlert::Update() {
 
-	arcStartAngle_ = std::atan2f(vS.x, vS.z);
-	arcEndAngle_ = arcStartAngle_ + (p_.approachArcYawDeg * 3.14159265f / 180.0f);
-	arcStartRadius_ = std::max(0.01f, std::sqrtf(vS.x * vS.x + vS.z * vS.z));
-	arcEndRadius_ = std::max(0.01f, std::sqrtf(vH.x * vH.x + vH.z * vH.z));
-	holdHeight_ = holdWorld.y;
 }
 
-/// <summary>
-/// 現在位置からターゲットを注視するよう回転を更新
-/// </summary>
-void BattleStartCamera::LookAtTarget() {
-	Vector3 targetPos = target_ ? target_->translate_ : Vector3{ 0,0,0 };
-	auto [yaw, pitch] = YawPitchTo(translate_, targetPos);
-	rotate_.y = yaw;
-	rotate_.x = -pitch;
-	rotate_.z = 0.0f;
-}
-
-/// <summary>
-/// JSON設定登録・初期化
-/// </summary>
-void BattleStartCamera::InitJson() {
-	json_ = std::make_unique<YoRigine::JsonManager>("BattleStartCamera", "Resources/Json/Cameras");
-	json_->SetCategory("Cameras");
-	json_->SetSubCategory("BattleStart");
-
-	//------------------------------------------------------------
-	// Timing
-	//------------------------------------------------------------
-	json_->SetTreePrefix("Timing");
-	json_->Register("ApproachTime", &p_.approachTime);
-	json_->Register("HoldTime", &p_.holdTime);
-	json_->Register("ExitTime", &p_.exitTime);
-	json_->Register("ApproachArcYawDeg", &p_.approachArcYawDeg);
-	json_->Register("BankRollDeg", &p_.bankRollDeg);
-	json_->ClearTreePrefix();
-
-	//------------------------------------------------------------
-	// Framing
-	//------------------------------------------------------------
-	json_->SetTreePrefix("Framing");
-	json_->Register("SubjectHeight", &p_.subjectHeight);
-	json_->Register("FovY", &p_.fovY);
-	json_->Register("FitMargin", &p_.fitMargin);
-	json_->ClearTreePrefix();
-
-	//------------------------------------------------------------
-	// Positions
-	//------------------------------------------------------------
-	json_->SetTreePrefix("Positions");
-	json_->Register("UseStartRelativeToTarget", &p_.useStartRelativeToTarget);
-	json_->Register("StartOffset", &p_.startOffset);
-	json_->Register("StartOffsetRotate", &p_.startOffsetRotate);
-	json_->Register("UseHoldRelativeToTarget", &p_.useHoldRelativeToTarget);
-	json_->Register("HoldOffset", &p_.holdOffset);
-	json_->Register("HoldOffsetRotate", &p_.holdOffsetRotate);
-	json_->Register("UseFinalRelativeToTarget", &p_.useFinalRelativeToTarget);
-	json_->Register("FinalOffset", &p_.finalOffset);
-	json_->Register("FinalOffsetRotate", &p_.finalOffsetRotate);
-	json_->ClearTreePrefix();
-
-	//------------------------------------------------------------
-	// ExitLook
-	//------------------------------------------------------------
-	json_->SetTreePrefix("ExitLook");
-	json_->Register("LookAtTargetOnExit", &p_.lookAtTargetOnExit);
-	json_->ClearTreePrefix();
-}
-
-/// <summary>
-/// 初期化処理
-/// </summary>
-void BattleStartCamera::Initialize() {
-	InitJson();
-
-	stage_ = Stage::Approach;
-	t_ = 0.0f;
-
-	//------------------------------------------------------------
-	// 各種初期値の算出
-	//------------------------------------------------------------
-	fitDist_ = ComputeFitDistance(p_.subjectHeight, p_.fovY, p_.fitMargin);
-
-	Vector3 targetPos = target_ ? target_->translate_ : Vector3{ 0,0,0 };
-
-	Vector3 startWorld = ToWorldFromOffset(p_.useStartRelativeToTarget, p_.startOffset, p_.startOffsetRotate);
-	auto [startYaw, _] = YawPitchTo(startWorld, targetPos);
-	Vector3 approachDir = Normalize(Vector3{ std::sinf(startYaw), 0.0f, std::cosf(startYaw) });
-
-	Vector3 fitPos = targetPos - approachDir * fitDist_;
-	fitPos.y = targetPos.y + LerpF(p_.startOffset.y, 0.0f, 0.5f);
-
-	Vector3 holdLocal = RotateOffsetXYZ(p_.holdOffset, p_.holdOffsetRotate);
-	Vector3 holdWorld = fitPos + RotateY(holdLocal, GetTargetYawRad());
-
-	translate_ = startWorld;
-	LookAtTarget();
-
-	startPos_ = startWorld;
-	holdPos_ = holdWorld;
-
-	BuildApproachArc(startWorld, holdWorld);
-
-	matView_ = Inverse(MakeAffineMatrix(scale_, rotate_, translate_));
-}
-
-/// <summary>
-/// 更新処理（アプローチ → ホールド → 退出）
-/// </summary>
-void BattleStartCamera::Update() {
-	if (stage_ == Stage::Done) return;
-
-	//------------------------------------------------------------
-	// スキップ入力（Aボタン）
-	//------------------------------------------------------------
-	if (YoRigine::Input::GetInstance()->IsPadPressed(0, GamePadButton::A)) {
-		stage_ = Stage::Done;
-		return;
+void EnemyAlert::Draw() {
+	if (alertUI_) {
+		alertUI_->Draw();
 	}
-
-	const float dt = YoRigine::GameTime::GetDeltaTime();
-	t_ += dt;
-
-	Vector3 targetPos = target_ ? target_->translate_ : Vector3{ 0,0,0 };
-
-	//------------------------------------------------------------
-	// Approachフェーズ
-	//------------------------------------------------------------
-	if (stage_ == Stage::Approach) {
-		const float s = std::clamp(t_ / std::max(0.001f, p_.approachTime), 0.0f, 1.0f);
-		const float u = Easing::EaseInOutCubic(s);
-
-		const float ang = LerpAngle(arcStartAngle_, arcEndAngle_, u);
-		const float rad = LerpF(arcStartRadius_, arcEndRadius_, u);
-		const float h = LerpF(startPos_.y, holdHeight_, u);
-
-		Vector3 posLocalXZ = { std::sinf(ang) * rad, h, std::cosf(ang) * rad };
-		translate_ = targetPos + posLocalXZ;
-
-		LookAtTarget();
-
-		const float bankRad = (p_.bankRollDeg != 0.0f) ? (p_.bankRollDeg * 3.14159265f / 180.0f) : 0.0f;
-		rotate_.z = bankRad * std::sinf(u * 3.14159265f);
-
-		if (t_ >= p_.approachTime) {
-			stage_ = Stage::Hold;
-			t_ = 0.0f;
-			translate_ = holdPos_;
-			LookAtTarget();
-			rotate_.z = 0.0f;
-		}
-	}
-	//------------------------------------------------------------
-	// Holdフェーズ
-	//------------------------------------------------------------
-	else if (stage_ == Stage::Hold) {
-		const float s = std::clamp(t_ / std::max(0.001f, p_.holdTime), 0.0f, 1.0f);
-		const float u = Easing::EaseOutCubic(s);
-
-		translate_ = LerpV(holdStartPos_, holdPos_, u);
-		LookAtTarget();
-		rotate_.z = 0.0f;
-
-		if (t_ >= p_.holdTime) {
-			stage_ = Stage::Exit;
-			t_ = 0.0f;
-			exitStartPos_ = translate_;
-			Vector3 finalWorld = ToWorldFromOffset(p_.useFinalRelativeToTarget, p_.finalOffset, p_.finalOffsetRotate);
-			finalPos_ = finalWorld;
-		}
-	}
-	//------------------------------------------------------------
-	// Exitフェーズ
-	//------------------------------------------------------------
-	else if (stage_ == Stage::Exit) {
-		const float s = std::clamp(t_ / std::max(0.001f, p_.exitTime), 0.0f, 1.0f);
-		const float u = Easing::EaseOutCubic(s);
-
-		translate_ = LerpV(exitStartPos_, finalPos_, u);
-
-		if (p_.lookAtTargetOnExit) {
-			LookAtTarget();
-		}
-
-		rotate_.z = 0.0f;
-
-		if (t_ >= p_.exitTime) {
-			stage_ = Stage::Done;
-		}
-	}
-
-	//------------------------------------------------------------
-	// ビュー行列更新
-	//------------------------------------------------------------
-	matView_ = Inverse(MakeAffineMatrix(scale_, rotate_, translate_));
 }
 
 ============================================================
-File Path: YGame/SystemsApp/Cameras/BattleStartCamera/BattleStartCamera.h
+File Path: YGame/UI/Alert/EnemyAlert.h
 ============================================================
 #pragma once
-
-#include <Vector3.h>
-#include <Matrix4x4.h>
-#include <WorldTransform/WorldTransform.h>
-#include <Loaders/Json/JsonManager.h>
-#include <memory>
-
-/// <summary>
-/// Tales of Graces 風の「戦闘開始カメラ」
-/// - アプローチ: ターゲット周りを扇状に回り込み＋ドリー（軽いバンク）
-/// - ホールド: 肩越し/対面など任意の据えカット
-/// - 退出: 任意の位置へフェードアウト用/通常カメラへの受け渡し
-/// 位置指定は「ターゲット基準（ターゲットの向きに整列）」または「ワールド絶対」
-/// </summary>
-class BattleStartCamera
+#include "Systems/UI/UIBase.h"
+class EnemyAlert
 {
+
 public:
+
 	void Initialize();
+
 	void Update();
 
-	void SetTarget(WorldTransform* wt) { target_ = wt; }
-	const Matrix4x4& GetViewMatrix() const { return matView_; }
-	bool IsFinished() const { return stage_ == Stage::Done; }
-
-	// カメラの現在姿勢（必要に応じて外から読む想定）
-	Vector3 translate_{ 0.0f, 2.0f, -8.0f };
-	Vector3 rotate_{ 0.0f, 0.0f, 0.0f };   // x=pitch(下向き+), y=yaw(右旋回+), z=roll(右傾き+)
-	Vector3 scale_{ 1.0f, 1.0f, 1.0f };
-	Matrix4x4 matView_{};
+	void Draw();
 
 private:
-	enum class Stage { Approach, Hold, Exit, Done };
 
-	struct Params
-	{
-		// ===== Timing =====
-		float approachTime = 0.9f;  // 寄り（回り込み）時間
-		float holdTime = 0.6f;  // 据えカット時間
-		float exitTime = 0.8f;  // 退出時間
-
-		// ===== Framing / Fit =====
-		float subjectHeight = 1.6f; // 画面に入れたい被写体高さ
-		float fovY = 0.7f;
-		float fitMargin = 1.15f; // 少し余白
-
-		// ===== Arc (Approach) =====
-		float approachArcYawDeg = 60.0f; // 回り込み角度（+右回り / -左回り）
-		float bankRollDeg = 6.0f;  // 回り込み中の最大ロール（0で無効）
-
-		// ===== Positions =====
-		// Start
-		bool    useStartRelativeToTarget = true;  // true: ターゲット基準, false: ワールド絶対
-		Vector3 startOffset{ 0.0f, 2.0f, -10.0f };    // 基準（ターゲット向きが前）
-		Vector3 startOffsetRotate{ 0.0f, 0.0f, 0.0f }; // ローカル回転(XYZラジアン)
-
-		// Hold（肩越し/対面の据え位置）
-		bool    useHoldRelativeToTarget = true;
-		Vector3 holdOffset{ 2.0f, 1.6f, -5.0f };
-		Vector3 holdOffsetRotate{ 0.0f, 0.0f, 0.0f };
-
-		// Exit（退出用）
-		bool    useFinalRelativeToTarget = true;
-		Vector3 finalOffset{ -6.0f, 3.0f, -8.0f };
-		Vector3 finalOffsetRotate{ 0.0f, 0.0f, 0.0f };
-
-		// Exit の注視
-		bool    lookAtTargetOnExit = true;
-	} p_;
-
-private:
-	// JSON 登録
-	void InitJson();
-
-	// 基本計算
-	float ComputeFitDistance(float subjectHeight, float fovY, float margin) const;
-	float GetTargetYawRad() const;
-	Vector3 RotateY(const Vector3& v, float yawRad) const;
-
-	// オフセットをターゲット基準/ワールド絶対でワールド座標に変換
-	Vector3 ToWorldFromOffset(bool useRelativeToTarget,
-		const Vector3& offset,
-		const Vector3& offsetEuler) const;
-
-	// 円弧補間の事前計算（アプローチ）
-	void BuildApproachArc(const Vector3& startWorld, const Vector3& holdWorld);
-
-	// 注視を現在姿勢から算出（ターゲットを見る）
-	void LookAtTarget();
-
-private:
-	const WorldTransform* target_ = nullptr;
-	std::unique_ptr<YoRigine::JsonManager> json_;
-
-	Stage stage_ = Stage::Approach;
-	float t_ = 0.0f;
-
-	// 端点
-	Vector3 startPos_{}, holdPos_{}, finalPos_{}, exitStartPos_{}, holdStartPos_;
-
-	// 円弧補間（XZ平面・中心はターゲット）
-	float arcStartAngle_ = 0.0f;
-	float arcEndAngle_ = 0.0f;
-	float arcStartRadius_ = 0.0f;
-	float arcEndRadius_ = 0.0f;
-	float holdHeight_ = 0.0f;
-
-	// 距離（fit）
-	float fitDist_ = 6.0f;
+	UIBase* alertUI_ = nullptr;
+	Vector2 defaultScale_{};
 };
 
-
-============================================================
-File Path: YGame/SystemsApp/Cameras/ClearCamera/ClearCamera.cpp
-============================================================
-#include "ClearCamera.h"
-#include "MathFunc.h"
-#include "Matrix4x4.h"
-#include <Systems/Input/Input.h>
-#include <DirectXMath.h>
-#include <algorithm>
-
-#ifdef USE_IMGUI
-#include <imgui.h>
-#endif
-#include <Systems/GameTime/GameTime.h>
-
-/// <summary>
-/// 初期化処理
-/// </summary>
-void ClearCamera::Initialize()
-{
-	translate_ = { 0.0f, 6.0f, -40.0f };
-
-	YoRigine::Input* input = YoRigine::Input::GetInstance();
-	prevMousePos_ = input->GetMousePosition();
-
-	InitJson();
-}
-
-/// <summary>
-/// 更新処理
-/// </summary>
-void ClearCamera::Update()
-{
-	if (enableOrbit_ && target_) {
-
-		orbitAngle_ += orbitSpeed_ * YoRigine::GameTime::GetDeltaTime();
-		if (orbitAngle_ > 2.0f * std::numbers::pi_v<float>) {
-			orbitAngle_ -= 2.0f * std::numbers::pi_v<float>;
-		}
-
-		Vector3 targetPos = target_->translate_;
-		translate_.x = targetPos.x + cosf(orbitAngle_) * orbitRadius_;
-		translate_.z = targetPos.z + sinf(orbitAngle_) * orbitRadius_;
-		translate_.y = targetPos.y + orbitHeight_;
-
-		Vector3 forward = Normalize(targetPos - translate_);
-		rotate_.y = atan2f(forward.x, forward.z);
-		rotate_.x = asinf(forward.y);
-
-		matView_ = Inverse(MakeAffineMatrix(scale_, rotate_, translate_));
-	} else {
-
-#ifdef USE_IMGUI
-		UpdateInput();
-		matView_ = Inverse(MakeAffineMatrix(scale_, rotate_, translate_));
-#endif
-	}
-}
-
-/// <summary>
-/// 入力処理
-/// </summary>
-void ClearCamera::UpdateInput()
-{
-	YoRigine::Input* input = YoRigine::Input::GetInstance();
-	Vector2 currentMousePos = input->GetMousePosition();
-
-	if (input->IsPressMouse(1)) {
-		if (!isDragging_) {
-			isDragging_ = true;
-			prevMousePos_ = currentMousePos;
-		}
-
-		float dx = currentMousePos.x - prevMousePos_.x;
-		float dy = currentMousePos.y - prevMousePos_.y;
-
-		rotate_.y += dx * rotateSpeed_ * 0.01f;
-		rotate_.x += dy * rotateSpeed_ * 0.01f;
-		rotate_.x = std::clamp(rotate_.x, -1.5f, 1.5f);
-	} else {
-		isDragging_ = false;
-	}
-
-	prevMousePos_ = currentMousePos;
-
-	Vector3 moveDir{};
-
-	if (input->PushKey(DIK_W)) moveDir.z += 1.0f;
-	if (input->PushKey(DIK_S)) moveDir.z -= 1.0f;
-	if (input->PushKey(DIK_A)) moveDir.x -= 1.0f;
-	if (input->PushKey(DIK_D)) moveDir.x += 1.0f;
-	if (input->PushKey(DIK_Q) || input->IsPressMouse(3)) moveDir.y += 1.0f;
-	if (input->PushKey(DIK_E) || input->IsPressMouse(4)) moveDir.y -= 1.0f;
-
-	float multiplier = (input->PushKey(DIK_LSHIFT) || input->PushKey(DIK_RSHIFT)) ? 3.0f : 1.0f;
-
-	if (Length(moveDir) > 0.0f) {
-		moveDir = Normalize(moveDir);
-		Matrix4x4 rotMat = MakeRotateMatrixXYZ(rotate_);
-		Vector3 transformed = TransformNormal(moveDir, rotMat);
-		translate_ += transformed * moveSpeed_ * multiplier;
-	}
-}
-
-/// <summary>
-/// JSON初期化
-/// </summary>
-void ClearCamera::InitJson()
-{
-	jsonManager_ = std::make_unique<YoRigine::JsonManager>("ClearCamera", "Resources/Json/Cameras");
-	jsonManager_->SetCategory("Cameras");
-	jsonManager_->SetSubCategory("ClearCamera");
-
-	jsonManager_->Register("Translate", &translate_);
-	jsonManager_->Register("Rotate", &rotate_);
-	jsonManager_->Register("RotateSpeed", &rotateSpeed_);
-	jsonManager_->Register("RotateSpeed Controller", &rotateSpeedController_);
-	jsonManager_->Register("MoveSpeed", &moveSpeed_);
-	jsonManager_->Register("MoveSpeed Controller", &moveSpeedController_);
-}
-
-
-============================================================
-File Path: YGame/SystemsApp/Cameras/ClearCamera/ClearCamera.h
-============================================================
-#pragma once
-#include <Vector3.h>
-#include <WorldTransform/WorldTransform.h>
-#include "Loaders/Json/JsonManager.h"
-
-/// <summary>
-/// クリアシーン用カメラクラス
-/// </summary>
-class ClearCamera
-{
-public:
-	void Initialize();
-	void Update();
-	void UpdateInput();
-
-	Vector3 translate_ = { 0, 0, -40.0f };
-	Vector3 scale_ = { 1, 1, 1 };
-	Vector3 rotate_ = { 0, 0, 0 };
-
-	Matrix4x4 matView_ = {};
-	bool  enableOrbit_ = false;
-
-	void SetTarget(const WorldTransform& target) { target_ = &target; }
-	void SetPosition(const Vector3& position) { translate_ = position; }
-	Vector3 GetPosition() const { return translate_; }
-	float GetFov() const { return (fov_ >= 110.0f) ? fov_ : fov_; }
-
-private:
-	void ImGui();
-	void InitJson();
-
-private:
-	std::unique_ptr<YoRigine::JsonManager> jsonManager_;
-	const WorldTransform* target_;
-
-	Vector2 prevMousePos_ = { 0.0f, 0.0f };
-	bool isDragging_ = false;
-
-	float rotateSpeed_ = 0.05f;
-	float rotateSpeedController_ = 0.005f;
-	float moveSpeed_ = 0.5f;
-	float moveSpeedController_ = 0.1f;
-	float fov_ = 0.90f;
-
-	// 回り込みカメラ用パラメータ
-	float orbitRadius_ = 25.0f;
-	float orbitSpeed_ = 0.3f;
-	float orbitHeight_ = 4.0f;
-	float orbitAngle_ = 0.0f;
-};
-
-
-============================================================
-File Path: YGame/SystemsApp/Cameras/DefaultCamera/DefaultCamera.cpp
-============================================================
-#include "DefaultCamera.h"
-#include "MathFunc.h"
-#include "Matrix4x4.h"
-#include <Systems/Input/Input.h>
-#include <DirectXMath.h>
-#include <algorithm>
-
-#ifdef USE_IMGUI
-#include <imgui.h>
-#endif
-#include <Systems/GameTime/GameTime.h>
-
-/// <summary>
-/// 初期化処理
-/// </summary>
-void DefaultCamera::Initialize()
-{
-	// カメラ初期位置設定
-	translate_ = { 0.0f, 6.0f, -40.0f };
-
-	// 初期マウス位置を取得
-	YoRigine::Input* input = YoRigine::Input::GetInstance();
-	prevMousePos_ = input->GetMousePosition();
-
-	InitJson();
-}
-
-/// <summary>
-/// 更新処理
-/// </summary>
-void DefaultCamera::Update()
-{
-	if (enableOrbit_ && target_) {
-		//------------------------------------------------------------
-		// オービットモード（ターゲット中心に回転）
-		//------------------------------------------------------------
-		orbitAngle_ += orbitSpeed_ * YoRigine::GameTime::GetDeltaTime();
-		if (orbitAngle_ > 2.0f * std::numbers::pi_v<float>) {
-			orbitAngle_ -= 2.0f * std::numbers::pi_v<float>;
-		}
-
-		Vector3 targetPos = target_->translate_;
-		translate_.x = targetPos.x + cosf(orbitAngle_) * orbitRadius_;
-		translate_.z = targetPos.z + sinf(orbitAngle_) * orbitRadius_;
-		translate_.y = targetPos.y + orbitHeight_;
-
-		Vector3 forward = Normalize(targetPos - translate_);
-		rotate_.y = atan2f(forward.x, forward.z);
-		rotate_.x = asinf(forward.y);
-
-		matView_ = Inverse(MakeAffineMatrix(scale_, rotate_, translate_));
-	} else {
-#ifdef USE_IMGUI
-		//------------------------------------------------------------
-		// 通常（自由移動）モード
-		//------------------------------------------------------------
-		UpdateInput();
-		matView_ = Inverse(MakeAffineMatrix(scale_, rotate_, translate_));
-#endif
-	}
-}
-
-/// <summary>
-/// 入力処理（マウス・キーボード・コントローラー）
-/// </summary>
-void DefaultCamera::UpdateInput()
-{
-	YoRigine::Input* input = YoRigine::Input::GetInstance();
-
-	//------------------------------------------------------------
-	// マウス操作
-	//------------------------------------------------------------
-	Vector2 currentMousePos = input->GetMousePosition();
-
-	// 右クリックでカメラ回転
-	if (input->IsPressMouse(1)) {
-		if (!isDragging_) {
-			isDragging_ = true;
-			prevMousePos_ = currentMousePos;
-		}
-
-		float deltaX = currentMousePos.x - prevMousePos_.x;
-		float deltaY = currentMousePos.y - prevMousePos_.y;
-
-		rotate_.y += deltaX * rotateSpeed_ * 0.01f;
-		rotate_.x += deltaY * rotateSpeed_ * 0.01f;
-
-		rotate_.x = std::clamp(rotate_.x, -1.5f, 1.5f);
-	} else {
-		isDragging_ = false;
-	}
-
-	prevMousePos_ = currentMousePos;
-
-	//------------------------------------------------------------
-	// キーボード操作（WASDQE）
-	//------------------------------------------------------------
-	Vector3 moveDirection = { 0, 0, 0 };
-
-	if (input->PushKey(DIK_W)) moveDirection.z += 1.0f;
-	if (input->PushKey(DIK_S)) moveDirection.z -= 1.0f;
-	if (input->PushKey(DIK_A)) moveDirection.x -= 1.0f;
-	if (input->PushKey(DIK_D)) moveDirection.x += 1.0f;
-	if (input->PushKey(DIK_Q) || input->IsPressMouse(3)) moveDirection.y += 1.0f;
-	if (input->PushKey(DIK_E) || input->IsPressMouse(4)) moveDirection.y -= 1.0f;
-
-	float speedMultiplier = (input->PushKey(DIK_LSHIFT) || input->PushKey(DIK_RSHIFT)) ? 3.0f : 1.0f;
-
-	if (Length(moveDirection) > 0.0f) {
-		moveDirection = Normalize(moveDirection);
-
-		Matrix4x4 rotMat = MakeRotateMatrixXYZ(rotate_);
-		Vector3 transformedMove = TransformNormal(moveDirection, rotMat);
-
-		translate_ += transformedMove * moveSpeed_ * speedMultiplier;
-	}
-
-	//------------------------------------------------------------
-	// コントローラー操作
-	//------------------------------------------------------------
-	if (input->IsControllerConnected()) {
-		XINPUT_STATE joyState;
-		if (input->GetJoystickState(0, joyState)) {
-
-			// 右スティックで回転
-			Vector3 rotateMove{};
-			rotateMove.y += static_cast<float>(joyState.Gamepad.sThumbRX) * rotateSpeedController_ * 0.0001f;
-			rotateMove.x -= static_cast<float>(joyState.Gamepad.sThumbRY) * rotateSpeedController_ * 0.0001f;
-
-			rotate_ += rotateMove;
-			rotate_.x = std::clamp(rotate_.x, -1.5f, 1.5f);
-
-			// 左スティックで移動
-			Vector3 stickMove{};
-			stickMove.x = static_cast<float>(joyState.Gamepad.sThumbLX);
-			stickMove.z = static_cast<float>(joyState.Gamepad.sThumbLY);
-
-			if (Length(stickMove) > 0.0f) {
-				stickMove = Normalize(stickMove) * moveSpeedController_ * 0.1f;
-
-				Matrix4x4 rotMat = MakeRotateMatrixXYZ(rotate_);
-				Vector3 transformedMove = TransformNormal(stickMove, rotMat);
-
-				translate_ += transformedMove;
-			}
-
-			// トリガーで上下移動
-			if (joyState.Gamepad.bLeftTrigger > 0) {
-				translate_.y -= moveSpeedController_ * 0.1f * (joyState.Gamepad.bLeftTrigger / 255.0f);
-			}
-			if (joyState.Gamepad.bRightTrigger > 0) {
-				translate_.y += moveSpeedController_ * 0.1f * (joyState.Gamepad.bRightTrigger / 255.0f);
-			}
-		}
-	}
-}
-
-/// <summary>
-/// JSON初期化（パラメータ登録）
-/// </summary>
-void DefaultCamera::InitJson()
-{
-	jsonManager_ = std::make_unique<YoRigine::JsonManager>("DefaultCamera", "Resources/Json/Cameras");
-	jsonManager_->SetCategory("Cameras");
-	jsonManager_->SetSubCategory("DefaultCamera");
-
-	jsonManager_->Register("Translate", &translate_);
-	jsonManager_->Register("Rotate", &rotate_);
-	jsonManager_->Register("RotateSpeed", &rotateSpeed_);
-	jsonManager_->Register("RotateSpeed Controller", &rotateSpeedController_);
-	jsonManager_->Register("MoveSpeed", &moveSpeed_);
-	jsonManager_->Register("MoveSpeed Controller", &moveSpeedController_);
-}
-
-/// <summary>
-/// デバッグ用ImGui表示
-/// </summary>
-void DefaultCamera::ImGui()
-{
-#ifdef USE_IMGUI
-	ImGui::Begin("DefaultCamera Info");
-
-	ImGui::DragFloat3("Position", &translate_.x, 0.1f);
-	ImGui::DragFloat3("Rotation", &rotate_.x, 0.01f);
-	ImGui::DragFloat("Rotate Speed", &rotateSpeed_, 0.01f, 0.01f, 2.0f);
-	ImGui::DragFloat("Move Speed", &moveSpeed_, 0.1f, 0.1f, 10.0f);
-
-	ImGui::End();
-#endif
-}
-
-
-============================================================
-File Path: YGame/SystemsApp/Cameras/DefaultCamera/DefaultCamera.h
-============================================================
-#pragma once
-#include <Vector3.h>
-#include <WorldTransform/WorldTransform.h>
-#include "Loaders/Json/JsonManager.h"
-
-/// <summary>
-/// 通常カメラクラス
-/// </summary>
-class DefaultCamera
-{
-public:
-	///************************* 基本的な関数 *************************///
-	void Initialize();
-	void Update();
-	void UpdateInput();
-
-	Vector3 translate_ = { 0, 0, -40.0f };
-	Vector3 scale_ = { 1, 1, 1 };
-	Vector3 rotate_ = { 0, 0, 0 };
-
-	Matrix4x4 matView_ = {};
-	bool  enableOrbit_ = false;
-	void SetTarget(const WorldTransform& target) { target_ = &target; }
-	void SetPosition(const Vector3& position) { translate_ = position; }
-	Vector3 GetPosition() const { return translate_; }
-	float GetFov() const { return (fov_ >= 110.0f) ? fov_ : fov_; }
-
-private:
-	///************************* 内部処理 *************************///
-	void ImGui();
-	void InitJson();
-
-private:
-	///************************* メンバ変数 *************************///
-	std::unique_ptr<YoRigine::JsonManager> jsonManager_;
-	const WorldTransform* target_;
-
-	Vector2 prevMousePos_ = { 0.0f, 0.0f };
-	bool isDragging_ = false;
-	float rotateSpeed_ = 0.05f;
-	float rotateSpeedController_ = 0.005f;
-	float moveSpeed_ = 0.5f;
-	float moveSpeedController_ = 0.1f;
-	float fov_ = 0.90f;
-
-
-	// 回り込みカメラ用パラメータ
-	float orbitRadius_ = 25.0f;   // プレイヤーからの距離
-	float orbitSpeed_ = 0.3f;    // 回転速度
-	float orbitHeight_ = 4.0f;    // 高さ
-	float orbitAngle_ = 0.0f;    // 現在の角度
-
-
-};
-
-============================================================
-File Path: YGame/SystemsApp/Cameras/SplineCamera/SplineCamera.cpp
-============================================================
-#include "SplineCamera.h"
-#include "Systems/GameTime/GameTime.h"
-
-// C++
-#include <numbers>
-#include <string>
-
-/// <summary>
-/// 初期化処理
-/// </summary>
-void SplineCamera::Initialize()
-{
-	translate_.z = -82.5f;
-	InitJson();
-	t_ = 0.0f;
-	hasCalledFinish_ = false;
-}
-
-/// <summary>
-/// JSON初期化処理（パラメータ登録）
-/// </summary>
-void SplineCamera::InitJson()
-{
-	jsonManager_ = std::make_unique<YoRigine::JsonManager>("SplineCamera", "Resources/Json/Cameras");
-	jsonManager_->SetCategory("Cameras");
-	jsonManager_->SetSubCategory("SplineCamera");
-
-	jsonManager_->Register("Rotate", &rotate_);
-	jsonManager_->Register("カメラの移動速度", &speed_);
-	jsonManager_->Register("制御点", &controlPoints_);
-}
-
-/// <summary>
-/// 更新処理
-/// </summary>
-void SplineCamera::Update()
-{
-	t_ += speed_;
-	if (t_ > float(controlPoints_.size() - 1)) {
-		t_ = float(controlPoints_.size() - 1);
-	}
-
-	// スプライン補間により座標を更新
-	translate_ = EvaluateSpline(t_);
-
-	//------------------------------------------------------------
-	// ターゲットがある場合は注視方向を計算
-	//------------------------------------------------------------
-	if (target_) {
-		rotate_ = GetEulerAnglesFromToDirection(translate_, target_->translate_);
-		matView_ = Inverse(MakeAffineMatrix(scale_, rotate_, translate_));
-	}
-
-	//------------------------------------------------------------
-	// カメラ移動完了コールバック呼び出し
-	//------------------------------------------------------------
-	if (!hasCalledFinish_ && isFinishedMove_ && t_ >= float(controlPoints_.size() - 1.0f)) {
-		isFinishedMove_();
-		hasCalledFinish_ = true;
-	}
-}
-
-/// <summary>
-/// ターゲット追従処理（オフセット付き）
-/// </summary>
-void SplineCamera::FollowProsess()
-{
-	if (target_ == nullptr) {
-		return;
-	}
-
-	Vector3 offset = offset_;
-	Matrix4x4 rotate = MakeRotateMatrixXYZ(rotate_);
-	offset = TransformNormal(offset, rotate);
-
-	// このゲームではX、Z軸は無視してY軸中心で追従
-	Vector3 targetTranslate = Vector3(0.0f, target_->translate_.y, 0.0f);
-	translate_ = targetTranslate + offset;
-
-	matView_ = Inverse(MakeAffineMatrix(scale_, rotate_, translate_));
-}
-
-/// <summary>
-/// 制御点をもとに可視化オブジェクトを登録
-/// </summary>
-void SplineCamera::RegisterControlPoints()
-{
-	if (wt_.size() < controlPoints_.size()) {
-		for (size_t i = wt_.size(); i < controlPoints_.size(); ++i) {
-			auto wt = std::make_unique<WorldTransform>();
-			wt->Initialize();
-			wt->translate_ = controlPoints_[i];
-			wt_.push_back(std::move(wt));
-
-			auto obj = std::make_unique<Object3d>();
-			obj->Initialize();
-			obj->SetModel("cube.obj");
-			obj->SetMaterialColor({ 1.0f, 0.0f, 1.0f, 1.0f });
-			obj_.push_back(std::move(obj));
-		}
-	}
-
-	// 制御点位置を反映
-	for (size_t i = 0; i < std::min(wt_.size(), controlPoints_.size()); ++i) {
-		wt_[i]->translate_ = controlPoints_[i];
-	}
-}
-
-/// <summary>
-/// カメラ経路上の位置をスプライン補間で算出
-/// </summary>
-/// <param name="t">現在の補間パラメータ</param>
-/// <returns>補間後の座標</returns>
-Vector3 SplineCamera::EvaluateSpline(float t)
-{
-	if (controlPoints_.size() < 2) return Vector3{};
-
-	int seg = std::clamp(int(t), 0, int(controlPoints_.size() - 2));
-	float localT = t - float(seg);
-
-	return Lerp(controlPoints_[seg], controlPoints_[seg + 1], localT);
-}
-
-/// <summary>
-/// 制御点デバッグ描画
-/// </summary>
-void SplineCamera::Draw(Camera* camera)
-{
-	for (size_t i = 0; i < obj_.size(); ++i) {
-		wt_[i]->UpdateMatrix();
-		obj_[i]->Draw(camera, *wt_[i]);
-	}
-}
-
-
-============================================================
-File Path: YGame/SystemsApp/Cameras/SplineCamera/SplineCamera.h
-============================================================
-#pragma once
-#include <Vector3.h>
-#include <Matrix4x4.h>
-#include "MathFunc.h"
-#include <WorldTransform/WorldTransform.h>
-#include "Loaders/Json/JsonManager.h"
-#include "Object3D/Object3d.h"
-
-
-/// <summary>
-/// スプラインを使用してカメラ制御するクラス
-/// </summary>
-class SplineCamera
-{
-public:
-	///************************* 基本的な関数 *************************///
-	void Initialize();
-	void InitJson();
-	void Update();
-	void FollowProsess();
-	void Draw(Camera* camera);
-
-	/// <summary>
-	/// 制御点の登録
-	/// </summary>
-	void RegisterControlPoints();
-
-
-public:
-
-	// 移動完了時のコールバック関数を登録
-	std::function<void()> isFinishedMove_ = nullptr;
-	Vector3 translate_ = { 0,0,0 };
-	Vector3 scale_ = { 1,1,1 };
-	Vector3 rotate_ = { 0,0,0 };
-	Matrix4x4 matView_ = {};
-	void SetTarget(const WorldTransform& target) { target_ = &target; }
-	float GetFov() const { return (fov_ >= 110.0f) ? fov_ : fov_; }
-
-private:
-	///************************* 内部処理 *************************///
-	Vector3 EvaluateSpline(float t);
-
-private:
-	///************************* メンバ変数 *************************///
-	std::unique_ptr <YoRigine::JsonManager> jsonManager_;
-	std::vector<std::unique_ptr<Object3d>> obj_;
-	std::vector<std::unique_ptr<WorldTransform>> wt_;
-	std::vector<Vector3> controlPoints_;
-
-	// 追従処理関連
-	Vector3 rotation_;
-	const WorldTransform* target_;
-	Vector3 offset_ = { 0.0f, 6.0f, -40.0f };
-
-	float fov_ = 0.90f;
-	float t_ = 0.0f;
-	float speed_ = 0.01f;
-	bool hasCalledFinish_ = false;
-
-};
-
-
-
-============================================================
-File Path: YGame/SystemsApp/Cameras/TopDownCamera/TopDownCamera.cpp
-============================================================
-#include "TopDownCamera.h"
-#include "MathFunc.h"
-#include "Matrix4x4.h"
-#include <DirectXMath.h>
-
-#ifdef USE_IMGUI
-#include <imgui.h>
-#endif // _DEBUG
-
-/// <summary>
-/// 初期化処理
-/// </summary>
-void TopDownCamera::Initialize()
-{
-}
-
-/// <summary>
-/// 更新処理
-/// </summary>
-void TopDownCamera::Update()
-{
-	TopDownProsess();
-}
-
-/// <summary>
-/// 真上視点の処理
-/// </summary>
-void TopDownCamera::TopDownProsess()
-{
-	// ターゲットがない場合は処理しない
-	if (target_ == nullptr) {
-		return;
-	}
-
-	// 真上から見下ろす角度に設定
-	rotate_ = { DirectX::XMConvertToRadians(90), 0.0f, 0.0f };
-
-	// ターゲット位置にオフセットを加算
-	translate_ = target_->translate_ + offset_;
-
-	// ビュー行列を更新
-	matView_ = Inverse(MakeAffineMatrix(scale_, rotate_, translate_));
-}
-
-
-============================================================
-File Path: YGame/SystemsApp/Cameras/TopDownCamera/TopDownCamera.h
-============================================================
-#pragma once
-#include <Vector3.h>
-#include <WorldTransform/WorldTransform.h>
-
-/// <summary>
-/// 見下ろしカメラクラス
-/// </summary>
-class TopDownCamera
-{
-public:
-	///************************* 基本的な関数 *************************///
-	void Initialize();
-	void Update();
-	void TopDownProsess();
-
-	Vector3 translate_ = { 0,0,0 };
-	Vector3 scale_ = { 1,1,1 };
-	Vector3 rotate_ = { 0,0,0 };
-	Matrix4x4 matView_ = {};
-	void SetTarget(const WorldTransform& target) { target_ = &target; }
-
-private:
-	///************************* メンバ変数 *************************///
-
-	// 真上から見ている
-	Vector3 offset_ = { 0.0f, 50.0f, 0.0f };
-	// 追従対象
-	const WorldTransform* target_;
-};
 
 
 ============================================================
