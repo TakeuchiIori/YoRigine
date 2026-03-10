@@ -48,15 +48,13 @@ public:
 
 	// プレイヤーの状態をリセット
 	void Reset();
-
 	// ダメージを受ける関数
 	void TakeDamage(int damage);
-
 	// 復活する関数
 	void Revive(int reviveHP);
+	// バトルシーンから開始する際の初期位置設定
+	void SetInitialPosition();
 
-	// 指定方向を向く関数
-	void LookAtDirection(const Vector3& direction);
 public:
 	///************************* アクセッサ *************************///
 
@@ -100,16 +98,19 @@ public:
 
 private:
 	///************************* 内部処理関数 *************************///
-	void InitStates();
-	void InitCombatSystem();
-	void HandleCombatInput();
 
+	// 初期化関数
 	void InitCollision() override;
 	void InitJson() override;
+	void InitStates();
+	void InitCombatSystem();
 
+	// 入力処理関数
+	void HandleCombatInput();
 	// モーションの再生時間を更新する関数
 	void UpdateMotionTime();
-
+	// 指定方向を向く関数
+	void LookAtDirection(const Vector3& direction);
 private:
 	///************************* メンバ変数 *************************///
 

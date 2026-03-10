@@ -32,7 +32,7 @@ void SceneSyncData::SaveBattleTransitionData(const BattleTransitionData& data) {
 }
 
 /// <summary>
-/// バトル遷移データを読み込み
+/// バトル遷移データを読み込み（バトルシーンではプレイヤーの位置を固定する）
 /// </summary>
 BattleTransitionData SceneSyncData::LoadBattleTransitionData() {
 	BattleTransitionData data;
@@ -48,7 +48,6 @@ BattleTransitionData SceneSyncData::LoadBattleTransitionData() {
 			}
 			data.battleEnemyId = j.value("battleEnemyId", "");
 
-			if (j.contains("playerPosition")) data.playerPosition = JsonToVector3(j["playerPosition"]);
 			if (j.contains("cameraPosition")) data.cameraPosition = JsonToVector3(j["cameraPosition"]);
 			if (j.contains("cameraMode")) data.cameraMode = JsonToCameraMode(j["cameraMode"]);
 			if (j.contains("isFinalBattle"))

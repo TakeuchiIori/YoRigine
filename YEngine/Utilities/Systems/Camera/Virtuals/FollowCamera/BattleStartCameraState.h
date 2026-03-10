@@ -21,7 +21,7 @@ public:
 
     /// 全パラメータをデフォルト値に戻してから再構築（「リセット」ボタン専用）
     void SetupDefaultControlPoints(FollowCamera* camera);
-
+    bool IsPerformance() const override { return true; }
 private:
     void ApplyTargetOffset(FollowCamera* camera);
 

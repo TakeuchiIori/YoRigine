@@ -47,6 +47,8 @@ public:
     
     // ImGuiでの編集
     void DrawEditGui() override;
+
+    bool IsPerformance() const override { return true; }
     
     // 制御点の取得（編集用）
     std::vector<CameraControlPoint>& GetControlPoints() { return controlPoints_; }

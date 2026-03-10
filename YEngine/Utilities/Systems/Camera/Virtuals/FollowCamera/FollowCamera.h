@@ -45,6 +45,14 @@ public:
 	void UpdateInput();
 	void FollowProcess();
 
+	// 現在のステートが戦闘開始演出中かどうか
+	bool IsInPerformance() const {
+		if (currentState_) {
+			return currentState_->IsPerformance();
+		}
+		return false;
+	}
+
 private:
 	const WorldTransform* target_ = nullptr;
 	std::string targetName_ = "";

@@ -176,6 +176,9 @@ void BattleScene::OnEnter() {
 	battleCameraFinished_ = true;
 	shouldResetBattleCamera_ = true;
 
+	// プレイヤー位置リセット
+	player_->SetInitialPosition();
+
 	//------------------------------------------------------------
 	// バトル遷移データの読み込み
 	//------------------------------------------------------------
@@ -225,12 +228,8 @@ void BattleScene::OnEnter() {
 			encounter.formations = battleEnemyManager_->GetFormationPositions(encounter.enemyIds.size());
 		}
 
-		// プレイヤー位置リセット
-		player_->LookAtDirection(Vector3(0.0f, 0.0f, 0.0f));
-
-		// 保存済みの設定（CameraEditorで調整した値）で演出を再生
+		// バトル開始時のスタート演出カメラの再生
 		player_->GetFollowCamera()->PlayBattleStart();
-
 		// 戦闘開始
 		if (battleEnemyManager_) {
 			// BattleEnemyManagerに最終バトル情報を渡す
