@@ -398,11 +398,14 @@
 └── └── └── └── └── └── ├── SpawnRadialVelocity.h
 └── └── └── └── └── └── ├── SpawnVelocity.cpp
 └── └── └── └── └── └── └── SpawnVelocity.h
-└── └── └── └── └── └── Transform/
-└── └── └── └── └──     ├── SpawnRandomRotate.cpp
-└── └── └── └── └──     ├── SpawnRandomRotate.h
-└── └── └── └── └──     ├── SpawnRandomScale.cpp
-└── └── └── └── └──     └── SpawnRandomScale.h
+└── └── └── └── └── ├── Transform/
+└── └── └── └── └── └── ├── SpawnRandomRotate.cpp
+└── └── └── └── └── └── ├── SpawnRandomRotate.h
+└── └── └── └── └── └── ├── SpawnRandomScale.cpp
+└── └── └── └── └── └── └── SpawnRandomScale.h
+└── └── └── └── └── └── UV/
+└── └── └── └── └──     ├── SpawnUV.cpp
+└── └── └── └── └──     └── SpawnUV.h
 └── └── └── └── └── Update/
 └── └── └── └──     ├── Animation/
 └── └── └── └──     └── ├── UpdatePulse.cpp
@@ -433,11 +436,14 @@
 └── └── └── └──     ├── Random/
 └── └── └── └──     └── ├── UpdateNoise.cpp
 └── └── └── └──     └── └── UpdateNoise.h
-└── └── └── └──     └── Transform/
-└── └── └── └──         ├── UpdateRotation.cpp
-└── └── └── └──         ├── UpdateRotation.h
-└── └── └── └──         ├── UpdateScale.cpp
-└── └── └── └──         └── UpdateScale.h
+└── └── └── └──     ├── Transform/
+└── └── └── └──     └── ├── UpdateRotation.cpp
+└── └── └── └──     └── ├── UpdateRotation.h
+└── └── └── └──     └── ├── UpdateScale.cpp
+└── └── └── └──     └── └── UpdateScale.h
+└── └── └── └──     └── UV/
+└── └── └── └──         ├── UpdateUVScroll.cpp
+└── └── └── └──         └── UpdateUVScroll.h
 └── └── └── ├── ParticleEditor.cpp
 └── └── └── ├── ParticleEditor.h
 └── └── └── ├── ParticleEmitter.cpp
@@ -194282,7 +194288,7 @@ namespace YoRigine {
 	/// </summary>
 	void CubeMap::CreateMesh()
 	{
-		mesh_ = MeshPrimitive::CreateBox(1000.0f, 1000.0f, 1000.0f);
+		mesh_ = MeshPrimitive::CreateBox(250.0f, 250.0f, 250.0f);
 	}
 }
 
@@ -205010,6 +205016,7 @@ File Path: YEngine/Generators/Particle/Modules/ParticleAttribute.h
 #pragma once
 #include "Vector3.h"
 #include "Vector4.h"
+#include "Vector2.h"
 
 struct ParticleAttribute {
     Vector3 position;
@@ -205017,9 +205024,15 @@ struct ParticleAttribute {
     Vector3 scale;
     Vector3 rotation;
     Vector4 color;
-	float lifeTime = 1.0f;  // パーティクルの寿命（秒）
-	float currentTime = 0.0f; // パーティクルが生成されてからの経過時間（秒）
+	float lifeTime = 1.0f;          // パーティクルの寿命（秒）
+	float currentTime = 0.0f;       // パーティクルが生成されてからの経過時間（秒）
     bool isActive = false;
+
+    Vector2 uvOffset{};             // UVアニメーション用のオフセット
+	Vector2 uvScale{ 1.0f, 1.0f };  // UVアニメーション用のスケール
+
+
+
     // ageは計算プロパティとして扱う（フィールドではなく都度計算）
     float GetNormalizedAge() const {
         return (lifeTime > 0.0f) ? (currentTime / lifeTime) : 1.0f;
@@ -205609,6 +205622,79 @@ private:
 
 REGISTER_SPAWN_MODULE(SpawnRandomScale)
 
+
+============================================================
+File Path: YEngine/Generators/Particle/Modules/Spawn/UV/SpawnUV.cpp
+============================================================
+#include "SpawnUV.h"
+
+void SpawnUV::OnSpawn(ParticleAttribute* attrs, uint32_t index)
+{
+    attrs[index].uvScale = initialScale;
+    attrs[index].uvOffset = initialOffset;
+}
+
+void SpawnUV::DrawEditor()
+{
+#ifdef USE_IMGUI
+    ImGui::DragFloat2("スケール", &initialScale.x, 0.1f);
+    ImGui::DragFloat2("オフセット", &initialOffset.x, 0.1f);
+#endif
+}
+
+void SpawnUV::SaveToJson(nlohmann::json& json) const
+{
+    json = {
+        {"initialScale", {{"x", initialScale.x}, {"y", initialScale.y}}},
+        {"initialOffset", {{"x", initialOffset.x}, {"y", initialOffset.y}}}
+	};
+}
+
+void SpawnUV::LoadFromJson(const nlohmann::json& json)
+{
+    if (json.contains("initialScale") && json["initialScale"].is_object()) {
+        const auto& scaleJson = json["initialScale"];
+        if (scaleJson.contains("x") && scaleJson.contains("y")) {
+            initialScale.x = scaleJson["x"].get<float>();
+            initialScale.y = scaleJson["y"].get<float>();
+        }
+    }
+    if (json.contains("initialOffset") && json["initialOffset"].is_object()) {
+        const auto& offsetJson = json["initialOffset"];
+        if (offsetJson.contains("x") && offsetJson.contains("y")) {
+            initialOffset.x = offsetJson["x"].get<float>();
+            initialOffset.y = offsetJson["y"].get<float>();
+        }
+	}
+}
+
+
+============================================================
+File Path: YEngine/Generators/Particle/Modules/Spawn/UV/SpawnUV.h
+============================================================
+#pragma once
+#include "../../IParticleModule.h"
+#include "../../../YParticleModuleFactory.h"
+
+#include "Vector2.h"
+
+class SpawnUV : public ISpawnModule {
+public:
+    void OnSpawn(ParticleAttribute* attrs, uint32_t index) override;
+    void DrawEditor() override;
+
+    std::string GetName() const override { return "UV初期設定"; }
+    std::string GetTypeName() const override { return "SpawnUV"; }
+
+    void SaveToJson(nlohmann::json& json) const override;
+    void LoadFromJson(const nlohmann::json& json) override;
+private:
+    Vector2 initialScale = { 1.0f, 1.0f };
+    Vector2 initialOffset = { 0.0f, 0.0f };
+
+};
+
+REGISTER_SPAWN_MODULE(SpawnUV)
 
 ============================================================
 File Path: YEngine/Generators/Particle/Modules/Update/Animation/UpdatePulse.cpp
@@ -206805,6 +206891,63 @@ private:
 };
 
 REGISTER_UPDATE_MODULE(UpdateScale)
+
+============================================================
+File Path: YEngine/Generators/Particle/Modules/Update/UV/UpdateUVScroll.cpp
+============================================================
+#include "UpdateUVScroll.h"
+
+void UpdateUVScroll::OnUpdate(ParticleAttribute* attrs, uint32_t index, float dt){
+    attrs[index].uvOffset.x += scrollSpeed.x * dt;
+    attrs[index].uvOffset.y += scrollSpeed.y * dt;
+
+    // 値が大きくなりすぎないようにループ
+    attrs[index].uvOffset.x = fmodf(attrs[index].uvOffset.x, 1.0f);
+    attrs[index].uvOffset.y = fmodf(attrs[index].uvOffset.y, 1.0f);
+}
+
+void UpdateUVScroll::DrawEditor(){
+#ifdef USE_IMGUI
+    ImGui::DragFloat2("スクロール速度", &scrollSpeed.x, 0.01f);
+#endif
+}
+
+void UpdateUVScroll::SaveToJson(nlohmann::json& json) const{
+    json = {
+        {"scrollSpeedX", scrollSpeed.x},
+        {"scrollSpeedY", scrollSpeed.y}
+	};
+}
+
+void UpdateUVScroll::LoadFromJson(const nlohmann::json& json){
+    if (json.contains("scrollSpeedX")) scrollSpeed.x = json["scrollSpeedX"];
+	if (json.contains("scrollSpeedY")) scrollSpeed.y = json["scrollSpeedY"];
+}
+
+
+============================================================
+File Path: YEngine/Generators/Particle/Modules/Update/UV/UpdateUVScroll.h
+============================================================
+#pragma once
+#include "../../IParticleModule.h"
+#include "../../../YParticleModuleFactory.h"
+
+#include "Vector2.h"
+
+class UpdateUVScroll : public IUpdateModule {
+public:
+
+    void OnUpdate(ParticleAttribute* attrs, uint32_t index, float dt) override;
+    void DrawEditor() override;
+    std::string GetName() const override { return "UVスクロール"; }
+    std::string GetTypeName() const override { return "UpdateUVScroll"; }
+
+    void SaveToJson(nlohmann::json& json) const override;
+    void LoadFromJson(const nlohmann::json& json) override;
+
+private:
+    Vector2 scrollSpeed = { 0.5f, 0.0f }; // 1秒間にどれだけずらすか
+};
 
 ============================================================
 File Path: YEngine/Generators/Particle/ParticleEditor.cpp
@@ -215631,13 +215774,9 @@ void YParticleRenderer::Initialize(SrvManager* srvManager, uint32_t maxTotalPart
     srvIndex_ = srvManager_->Allocate();
     srvManager_->CreateSRVforStructuredBuffer(srvIndex_, instancingResource_.Get(), maxTotalParticles_, sizeof(TransformForGPU));
 
-    // 既存マテリアルクラスの初期化
-    materialColor_ = std::make_unique<MaterialColor>();
-    materialColor_->Initialize();
+    // マテリアルクラスの初期化
     materialLighting_ = std::make_unique<MaterialLighting>();
     materialLighting_->Initialize();
-    materialUV_ = std::make_unique<MaterialUV>();
-    materialUV_->Initialize();
 
     instanceOffsetCB_ = dxCommon_->CreateBufferResource(256 * MAX_BATCHES);
     instanceOffsetCB_->Map(0, nullptr, reinterpret_cast<void**>(&mappedOffsetBase_));
@@ -215778,6 +215917,7 @@ void YParticleRenderer::AddSystem(const YParticleSystem& system, Camera* camera)
         mappedData_[currentInstanceOffset_].World = localWorld;
         mappedData_[currentInstanceOffset_].WVP = Multiply(localWorld, viewProj);
         mappedData_[currentInstanceOffset_].color = attr.color;
+		mappedData_[currentInstanceOffset_].uvTransform = MakeUVTransform(attr.uvOffset, attr.uvScale);
         currentInstanceOffset_++;
         writtenCount++;
 
@@ -215810,8 +215950,6 @@ void YParticleRenderer::EndFrame(const std::shared_ptr<Mesh>& mesh, uint32_t tex
 
     srvManager_->SetGraphicsRootDescriptorTable(indices.at("gParticle"), srvIndex_);
     srvManager_->SetGraphicsRootDescriptorTable(indices.at("gTexture"), textureIndex);
-    materialColor_->RecordDrawCommands(commandList.Get(), indices.at("gMaterialColor"));
-    materialUV_->RecordDrawCommands(commandList.Get(), indices.at("gMaterialUV"));
     if (materialLighting_) {
         materialLighting_->SetEnableLighting(currentLightSetting_.enableDirectionalLight);
     }
@@ -215853,15 +215991,15 @@ File Path: YEngine/Generators/Particle/YParticleRenderer.h
 #include "Systems/Camera/Camera.h"
 
 
-#include "Material/MaterialColor.h"
 #include "Material/MaterialLighting.h"
-#include "Material/MaterialUV.h"
+
 #include <Mesh/Mesh.h>
 
 struct TransformForGPU {
     Matrix4x4 WVP;
     Matrix4x4 World;
     Vector4 color;
+	Matrix4x4 uvTransform;
 };
 
 class YParticleRenderer {
@@ -215903,10 +216041,8 @@ private:
     // 現在のバッチに適用するライト設定
     ParticleLightSetting currentLightSetting_;
 
-    // エンジンの既存マテリアル機能をコンポーネントとして保持
-    std::unique_ptr<MaterialColor> materialColor_;
     std::unique_ptr<MaterialLighting> materialLighting_;
-    std::unique_ptr<MaterialUV> materialUV_;
+
     bool enableBillboard_ = true;   // ビルボード有効/無効
 
 
@@ -215993,6 +216129,7 @@ File Path: YEngine/Generators/Particle/YParticleSystem.cpp
 #include "Modules/Spawn/Transform/SpawnRandomScale.h"
 #include "Modules/Spawn/Transform/SpawnRandomRotate.h"
 
+#include "Modules/Spawn/UV/SpawnUV.h"
 
 // Updateモジュール
 #include "Modules/Update/Physics/UpdateGravity.h"
@@ -216014,6 +216151,8 @@ File Path: YEngine/Generators/Particle/YParticleSystem.cpp
 
 #include "Modules/Update/Transform/UpdateRotation.h"
 #include "Modules/Update/Transform/UpdateScale.h"
+
+#include "Modules/Update/UV/UpdateUVScroll.h"
 
 #ifdef USE_IMGUI
 #include "imgui.h"
@@ -216037,6 +216176,7 @@ YParticleSystem::YParticleSystem(const std::string& name, uint32_t maxParticles)
 #endif
 	// 全パーティクル属性配列の初期化
 	attributes_.resize(maxParticles_);
+
 }
 
 void YParticleSystem::AddSpawnModule(std::shared_ptr<ISpawnModule> module)
@@ -216170,6 +216310,7 @@ void YParticleSystem::RefreshMesh()
 	case 2: mesh_ = MeshPrimitive::CreateRing(meshParams_[0], meshParams_[1], (uint32_t)meshParams_[2]); break;
 	case 3: mesh_ = MeshPrimitive::CreateCylinder(meshParams_[0], meshParams_[1], (uint32_t)meshParams_[2], meshParams_[3]); break;
 	case 4: mesh_ = MeshPrimitive::CreateFanShape(meshParams_[0], meshParams_[1], (uint32_t)meshParams_[2]); break;
+	case 5: mesh_ = MeshPrimitive::CreateSphere(meshParams_[0], (uint32_t)meshParams_[2]); break;
 	}
 }
 
@@ -216227,7 +216368,7 @@ void YParticleSystem::ShowEditor()
 	// --- メッシュ設定 ---
 	if (ImGui::TreeNode("メッシュ設定")) {
 		bool changed = false;
-		const char* meshTypes[] = { "平面", "ボックス", "リング", "シリンダー","扇形" };
+		const char* meshTypes[] = { "平面", "ボックス", "リング", "シリンダー","扇形","円形"};
 
 		// Comboでタイプ選択
 		if (ImGui::Combo("プリミティブタイプ", &currentMeshType_, meshTypes, IM_ARRAYSIZE(meshTypes))) {
@@ -216279,6 +216420,17 @@ void YParticleSystem::ShowEditor()
 					changed = true;
 				}
 			}
+
+		case 5: // Sphere (radius, -, divide)
+			changed |= ImGui::DragFloat("半径", &meshParams_[0], 0.1f, 0.1f, 100.0f);
+			{
+				int div = (int)meshParams_[2];
+				if (ImGui::DragInt("分割数", &div, 1, 3, 128)) {
+					meshParams_[2] = (float)div;
+					changed = true;
+				}
+			}
+			break;
 		}
 
 		// 値が変わった場合のみ再生成（メモリリーク防止のため）
@@ -216395,6 +216547,7 @@ void YParticleSystem::ShowEditor()
 		};
 		static SpawnModuleEntry availableSpawnModules[] = {
 			{ "速度", []() { return std::make_shared<SpawnVelocity>(); } },
+			{  "UV", []() { return std::make_shared<SpawnUV>(); } },
 			{ "コーン速度", []() { return std::make_shared<SpawnConeVelocity>(); } },
 			{ "放射状速度", []() { return std::make_shared<SpawnRadialVelocity>(); } },
 			{ "ランダムカラー", []() { return std::make_shared<SpawnRandomColor>(); } },
@@ -216494,6 +216647,7 @@ void YParticleSystem::ShowEditor()
 		};
 		static UpdateModuleEntry availableUpdateModules[] = {
 			{ "速度", []() { return std::make_shared<UpdateVelocity>(); } },
+			{  "UVスクロール", []() { return std::make_shared<UpdateUVScroll>(); } },
 			{ "重力", []() { return std::make_shared<UpdateGravity>(); } },
 			{ "カラー", []() { return std::make_shared<UpdateColor>(); } },
 			{ "アトラクタ", []() { return std::make_shared<UpdateAttractor>(); } },
@@ -250147,8 +250301,8 @@ void MyGame::Initialize() {
 	// 初期シーン設定
 	//------------------------------------------------------------
 #ifdef _DEBUG
-	SceneManager::GetInstance()->ChangeScene("Title");   // デバッグ時はゲームシーン
-#else
+	SceneManager::GetInstance()->ChangeScene("Develop");   // デバッグ時はゲームシーン
+#else 
 	SceneManager::GetInstance()->ChangeScene("Title");  // 製品版はタイトルシーン
 #endif
 }
@@ -269680,6 +269834,22 @@ Matrix4x4 MatrixLookAtLH(const Vector3& eye, const Vector3& target, const Vector
 	return result;
 }
 
+Matrix4x4 MakeUVTransform(const Vector2& offset, const Vector2& scale)
+{
+	// すべて 0 で初期化、または単位行列を作成
+	Matrix4x4 mat = MakeIdentity4x4();
+
+	// 1. スケーリング (UとVの密度)
+	mat.m[0][0] = scale.x;
+	mat.m[1][1] = scale.y;
+
+	// 2. 平行移動 (UとVのスクロール量)
+	mat.m[3][0] = offset.x;
+	mat.m[3][1] = offset.y;
+
+	return mat;
+}
+
 
 
 
@@ -269695,6 +269865,7 @@ File Path: YMath/Matrix4x4.h
 
 // Math
 #include "Vector3.h"
+#include "Vector2.h" 
 #include <initializer_list>
 #include <stdexcept>
 
@@ -269871,6 +270042,8 @@ Vector3 MatrixToEuler(const Matrix4x4& m);
 DirectX::XMMATRIX ConvertToXMMATRIX(const Matrix4x4& matrix);
 
 Matrix4x4 MatrixLookAtLH(const Vector3& eye, const Vector3& target, const Vector3& up);
+
+Matrix4x4 MakeUVTransform(const Vector2& offset, const Vector2& scale);
 
 ============================================================
 File Path: YMath/Quaternion.cpp
