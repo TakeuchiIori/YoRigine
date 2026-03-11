@@ -102,6 +102,6 @@ namespace YoRigine {
 	/// </summary>
 	void CubeMap::CreateMesh()
 	{
-		mesh_ = MeshPrimitive::CreateBox(1000.0f, 1000.0f, 1000.0f);
+		mesh_ = MeshPrimitive::CreateBox(250.0f, 250.0f, 250.0f);
 	}
 }

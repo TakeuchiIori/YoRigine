@@ -5,15 +5,15 @@
 #include "Systems/Camera/Camera.h"
 
 
-#include "Material/MaterialColor.h"
 #include "Material/MaterialLighting.h"
-#include "Material/MaterialUV.h"
+
 #include <Mesh/Mesh.h>
 
 struct TransformForGPU {
     Matrix4x4 WVP;
     Matrix4x4 World;
     Vector4 color;
+	Matrix4x4 uvTransform;
 };
 
 class YParticleRenderer {
@@ -55,10 +55,8 @@ private:
     // 現在のバッチに適用するライト設定
     ParticleLightSetting currentLightSetting_;
 
-    // エンジンの既存マテリアル機能をコンポーネントとして保持
-    std::unique_ptr<MaterialColor> materialColor_;
     std::unique_ptr<MaterialLighting> materialLighting_;
-    std::unique_ptr<MaterialUV> materialUV_;
+
     bool enableBillboard_ = true;   // ビルボード有効/無効
 
 

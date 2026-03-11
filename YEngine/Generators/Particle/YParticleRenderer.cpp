@@ -19,13 +19,9 @@ void YParticleRenderer::Initialize(SrvManager* srvManager, uint32_t maxTotalPart
     srvIndex_ = srvManager_->Allocate();
     srvManager_->CreateSRVforStructuredBuffer(srvIndex_, instancingResource_.Get(), maxTotalParticles_, sizeof(TransformForGPU));
 
-    // 既存マテリアルクラスの初期化
-    materialColor_ = std::make_unique<MaterialColor>();
-    materialColor_->Initialize();
+    // マテリアルクラスの初期化
     materialLighting_ = std::make_unique<MaterialLighting>();
     materialLighting_->Initialize();
-    materialUV_ = std::make_unique<MaterialUV>();
-    materialUV_->Initialize();
 
     instanceOffsetCB_ = dxCommon_->CreateBufferResource(256 * MAX_BATCHES);
     instanceOffsetCB_->Map(0, nullptr, reinterpret_cast<void**>(&mappedOffsetBase_));
@@ -166,6 +162,7 @@ void YParticleRenderer::AddSystem(const YParticleSystem& system, Camera* camera)
         mappedData_[currentInstanceOffset_].World = localWorld;
         mappedData_[currentInstanceOffset_].WVP = Multiply(localWorld, viewProj);
         mappedData_[currentInstanceOffset_].color = attr.color;
+		mappedData_[currentInstanceOffset_].uvTransform = MakeUVTransform(attr.uvOffset, attr.uvScale);
         currentInstanceOffset_++;
         writtenCount++;
 
@@ -198,8 +195,6 @@ void YParticleRenderer::EndFrame(const std::shared_ptr<Mesh>& mesh, uint32_t tex
 
     srvManager_->SetGraphicsRootDescriptorTable(indices.at("gParticle"), srvIndex_);
     srvManager_->SetGraphicsRootDescriptorTable(indices.at("gTexture"), textureIndex);
-    materialColor_->RecordDrawCommands(commandList.Get(), indices.at("gMaterialColor"));
-    materialUV_->RecordDrawCommands(commandList.Get(), indices.at("gMaterialUV"));
     if (materialLighting_) {
         materialLighting_->SetEnableLighting(currentLightSetting_.enableDirectionalLight);
     }
