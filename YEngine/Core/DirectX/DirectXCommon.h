@@ -20,9 +20,6 @@
 #include "DSVManager.h"
 #include "DescriptorHeap.h"
 
-// DirectX
-#include "DirectXTex.h"
-
 // Math
 #include "Vector4.h"
 

@@ -6,7 +6,7 @@
 #include <cassert>
 
 // フレームコンテキスト
-struct FrameComtext {
+struct FrameContext {
 
 	// コマンドアロケータ
 	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> commandAllocator;

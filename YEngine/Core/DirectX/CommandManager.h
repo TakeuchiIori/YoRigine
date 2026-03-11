@@ -59,14 +59,21 @@ public:
 	void Reset(uint32_t frameindex);
 
 	/// <summary>
-	/// 次のフレームのあるけーたが使い終わっているかだけ待つ
+	/// 次のフレームのアローケータが使い終わっているかだけ待つ
 	/// </summary>
 	/// <param name="backBufferIndex"></param>
 	void PrepareNextFrame(uint32_t backBufferIndex);
 
-	// 指定したインデックスの完了を待つ関数
+	/// <summary>
+	/// 指定したインデックスの完了を待つ関数
+	/// </summary>
+	/// <param name="frameIndex"></param>
 	void WaitFrame(uint32_t frameIndex);
-	// 現在のFence値をインクリメントしてSignalを送る
+
+	/// <summary>
+	/// 現在のFence値をインクリメントしてSignalを送る
+	/// </summary>
+	/// <param name="frameIndex"></param>
 	void Signal(uint32_t frameIndex);
 
 private:
@@ -80,7 +87,7 @@ private:
 	/// <summary>
 	/// フェンスの生成
 	/// </summary>
-	void CreateFecnce();
+	void CreateFence();
 
 	/// <summary>
 	/// フレームコンテキストの生成
@@ -118,7 +125,7 @@ private:
 	HANDLE fenceEvent_ = nullptr;
 
 	// フレームコンテキストの配列
-	std::array<FrameComtext, kFrameCount> frameContexts_;
+	std::array<FrameContext, kFrameCount> frameContexts_;
 
 	// 現在のフレームインデックス
 	uint32_t currentFrameIndex_ = 0;

@@ -15,7 +15,7 @@ void CommandManager::Initialize(DeviceManager* deviceManager)
 	CreateCommands();
 
 	// フェンスの作成
-	CreateFecnce();
+	CreateFence();
 
 	// フレームコンテキストの初期化（フレームごとのコマンドアロケータ）
 	InitializeFrameContexts();
@@ -206,7 +206,7 @@ void CommandManager::CreateCommands()
 /// <summary>
 /// フェンスとフェンスイベントの作成
 /// </summary>
-void CommandManager::CreateFecnce()
+void CommandManager::CreateFence()
 {
 	HRESULT hr;
 
