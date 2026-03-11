@@ -73,6 +73,16 @@ public:
 	// 実際の再生速度
 	float GetEffectiveSpeed() const { return motionSpeed_ * currentAnimationSpeed_; }
 
+	/// アニメーション時刻を直接セット（ドープシートのシークなどに使用）
+	/// Stop状態でなくても上書きする（プレビュー目的）
+	void SetAnimationTime(float time);
+
+	/// 現在のアニメーション時刻を取得
+	float GetAnimationTime() const { return animationTime_; }
+
+	/// アニメーション全体の長さを取得
+	float GetDuration() const { return animation_ ? animation_->GetDuration() : 0.0f; }
+
 private:
 	///************************* 内部処理 *************************///
 

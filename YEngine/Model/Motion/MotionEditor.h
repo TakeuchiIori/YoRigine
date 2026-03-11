@@ -4,13 +4,12 @@
 #include <vector>
 #include <memory>
 #include <filesystem>
-#include <optional>
-#include <map>
 
 // Engine
 #include "Object3d/Object3d.h"
 #include "WorldTransform/WorldTransform.h"
 #include "Editor/Command/CommandHistory.h"
+#include "Debugger/DopeSheet/DopeSheetEditor.h"
 
 // Math
 #include "Vector3.h"
@@ -84,6 +83,11 @@ private:
 	float TimeToX(float t, float cx) const { return cx + t * timelineZoom_ - timelineScroll_; }
 	float XToTime(float x, float cx) const { return (x - cx + timelineScroll_) / timelineZoom_; }
 
+
+	///************************* DopeSheet *************************///
+	void RebuildTracks();
+	void ApplyTracksToMotion();
+
 	///************************* キーフレーム操作 *************************///
 	void InsertKeyframe(const std::string& bone, float time);
 	void DeleteKeyframe(const std::string& bone, float time);
@@ -113,6 +117,13 @@ private:
 
 private:
 	///************************* メンバ変数 *************************///
+
+	// ドープシートエディタ
+	DopeSheetEditor dopeSheet_;
+	std::vector<DopeTrack> tracks_;
+	std::vector<std::pair<std::string, int>> trackBoneMap_;
+	bool tracksDirty_ = false;    // ドープシートの内容が Motion に反映されていない状態
+	int fps_ = 60;
 
 	// プレビュー
 	std::unique_ptr<Object3d> previewObject_;
