@@ -775,10 +775,6 @@ void MotionEditor::DrawTimeline()
 		statusMsg_ = "KF 削除";
 		});
 
-	// ---- ズーム同期（既存の timelineZoom_ と DopeSheetEditor のズームを連動）----
-	// timelineZoom_ = px/秒, dopeSheet_.zoom = px/フレーム
-	dopeSheet_.SetZoom(timelineZoom_ / static_cast<float>(fps_));
-
 	// ---- DopeSheetEditor に描画を委譲 ----
 	bool changed = dopeSheet_.Draw("MotionTimeline", tracks_, totalFrames, fps_);
 
@@ -796,16 +792,6 @@ void MotionEditor::DrawTimeline()
 		float newTime = seekFrame / static_cast<float>(fps_);
 		if (std::abs(newTime - scrubTime_) > 1e-4f) {
 			scrubTime_ = newTime;
-		}
-	}
-
-	// ---- ホイール操作（既存の動作を維持）----
-	if (ImGui::IsWindowHovered()) {
-		ImGuiIO& io = ImGui::GetIO();
-		if (io.KeyCtrl && io.MouseWheel != 0) {
-			timelineZoom_ = std::clamp(timelineZoom_ * (1.0f + io.MouseWheel * 0.1f), 10.0f, 600.0f);
-		} else if (io.MouseWheel != 0) {
-			timelineScroll_ = std::max(0.0f, timelineScroll_ - io.MouseWheel * 30.0f);
 		}
 	}
 
@@ -828,9 +814,9 @@ void MotionEditor::RebuildTracks()
 	if (!currentMotion_) return;
 
 	// チャンネル色（既存のCol名前空間に合わせる）
-	static const ImVec4 colT = { 1.0f, 0.59f, 0.2f, 1.0f };  // オレンジ: 位置
-	static const ImVec4 colR = { 0.35f, 0.78f, 0.35f, 1.0f }; // 緑:    回転
-	static const ImVec4 colS = { 0.31f, 0.59f, 1.0f, 1.0f };  // 青:    拡縮
+	static const DopeSheet::Color colT = { 1.0f, 0.59f, 0.2f, 1.0f };  // オレンジ: 位置
+	static const DopeSheet::Color colR = { 0.35f, 0.78f, 0.35f, 1.0f }; // 緑:    回転
+	static const DopeSheet::Color colS = { 0.31f, 0.59f, 1.0f, 1.0f };  // 青:    拡縮
 
 	auto& nodeAnims = currentMotion_->animation_.nodeAnimations_;
 
@@ -846,7 +832,7 @@ void MotionEditor::RebuildTracks()
 
 		// グループヘッダー行（ボーン名）
 		{
-			DopeTrack header;
+			DopeSheet::DopeTrack header;
 			header.label = boneName;
 			header.isGroupHeader = true;
 			header.groupExpanded = (selBone_ == boneName || selKF_.boneName == boneName
@@ -857,7 +843,7 @@ void MotionEditor::RebuildTracks()
 
 		// T行
 		{
-			DopeTrack t;
+			DopeSheet::DopeTrack t;
 			t.label = "  T";
 			t.color = colT;
 			t.groupDepth = 1;
@@ -868,7 +854,7 @@ void MotionEditor::RebuildTracks()
 		}
 		// R行
 		{
-			DopeTrack r;
+			DopeSheet::DopeTrack r;
 			r.label = "  R";
 			r.color = colR;
 			r.groupDepth = 1;
@@ -879,7 +865,7 @@ void MotionEditor::RebuildTracks()
 		}
 		// S行
 		{
-			DopeTrack s;
+			DopeSheet::DopeTrack s;
 			s.label = "  S";
 			s.color = colS;
 			s.groupDepth = 1;

@@ -119,8 +119,8 @@ private:
 	///************************* メンバ変数 *************************///
 
 	// ドープシートエディタ
-	DopeSheetEditor dopeSheet_;
-	std::vector<DopeTrack> tracks_;
+	DopeSheet::DopeSheetEditor dopeSheet_;
+	std::vector<DopeSheet::DopeTrack> tracks_;
 	std::vector<std::pair<std::string, int>> trackBoneMap_;
 	bool tracksDirty_ = false;    // ドープシートの内容が Motion に反映されていない状態
 	int fps_ = 60;
