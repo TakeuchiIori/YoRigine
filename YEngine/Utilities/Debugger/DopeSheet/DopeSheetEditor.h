@@ -109,10 +109,14 @@ private:
 
     struct DragState
     {
-        int   trackIdx    = -1;
-        int   keyIdx      = -1;
-        bool  active      = false;
-        int   startFrame  = 0;
+        enum class Mode { None, Move, ResizeLeft, ResizeRight };
+
+        int   trackIdx = -1;
+        int   keyIdx = -1;
+        bool  active = false;
+        Mode  mode = Mode::None;
+        int   startFrame = 0;       // ドラッグ開始時の key.frame
+        int   startDuration = 0;    // ドラッグ開始時の key.duration
         float startMouseX = 0.0f;
     };
     DragState drag_;

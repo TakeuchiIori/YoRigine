@@ -1,0 +1,30 @@
+[
+    {
+        "attackName": "NewAttack_1",
+        "cancelStart": 0,
+        "comboWindowEnd": 0,
+        "comboWindowStart": 0,
+        "effects": [],
+        "fps": 60,
+        "hitEnd": 0,
+        "hitStart": 0,
+        "invincibleEnd": 0,
+        "invincibleStart": 0,
+        "sounds": [],
+        "totalFrames": 60
+    },
+    {
+        "attackName": "NewAttack_0",
+        "cancelStart": 0,
+        "comboWindowEnd": 0,
+        "comboWindowStart": 0,
+        "effects": [],
+        "fps": 84,
+        "hitEnd": 0,
+        "hitStart": 0,
+        "invincibleEnd": 0,
+        "invincibleStart": 0,
+        "sounds": [],
+        "totalFrames": 60
+    }
+]

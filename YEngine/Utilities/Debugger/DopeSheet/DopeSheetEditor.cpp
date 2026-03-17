@@ -422,7 +422,7 @@ namespace DopeSheet
 
             if (ImGui::IsMouseClicked(0) && !drag_.active)
             {
-                drag_ = { trackIdx, keyIdx, true, key.frame, ImGui::GetMousePos().x };
+                drag_ = { trackIdx, keyIdx, true,DragState::Mode::Move, key.frame, 0,ImGui::GetMousePos().x };
                 key.selected = true;
                 if (onSelectKey_) onSelectKey_(trackIdx, keyIdx, true);
             }
@@ -448,16 +448,29 @@ namespace DopeSheet
     void DopeSheetEditor::DrawKeyBar(
         ImDrawList* dl, ImVec2 rowMin, float cellW,
         DopeKey& key, int trackIdx, int keyIdx,
-        ImU32 fillCol, int /*totalFrames*/)
+        ImU32 fillCol, int totalFrames)
     {
         const float pad = 2.0f;
+        const float edgeW = 6.0f;  // 左右リサイズハンドル幅
+
         float x0 = rowMin.x + key.frame * cellW + pad;
         float x1 = rowMin.x + key.EndFrame() * cellW - pad;
         float y0 = rowMin.y + pad;
         float y1 = rowMin.y + kRowH - pad;
         if (x1 <= x0) x1 = x0 + 4.0f;
 
-        ImU32 outCol = key.selected ? IM_COL32(255, 255, 255, 200) : IM_COL32(255, 255, 255, 80);
+        ImU32 outCol = key.selected
+            ? IM_COL32(255, 255, 255, 200)
+            : IM_COL32(255, 255, 255, 80);
+
+        // ── 描画（ラベル列にはみ出さないようクリップ）──
+        ImVec2 winPos = ImGui::GetWindowPos();
+        float  clipLeft = winPos.x + kLabelW;
+        dl->PushClipRect(
+            { clipLeft,                          rowMin.y },
+            { winPos.x + ImGui::GetWindowWidth(), rowMin.y + kRowH },
+            true);
+
         dl->AddRectFilled({ x0, y0 }, { x1, y1 }, fillCol, 3.0f);
         dl->AddRect({ x0, y0 }, { x1, y1 }, outCol, 3.0f, 0, 1.5f);
 
@@ -468,18 +481,93 @@ namespace DopeSheet
             dl->AddText({ x0 + 4, y0 + 3 }, IM_COL32(255, 255, 255, 200), buf);
         }
 
-        if (ImGui::IsMouseHoveringRect({ x0, y0 }, { x1, y1 }))
+        // ── リサイズハンドル強調 ──
+        ImVec2 leftMin = { x0,         y0 };
+        ImVec2 leftMax = { x0 + edgeW, y1 };
+        ImVec2 rightMin = { x1 - edgeW, y0 };
+        ImVec2 rightMax = { x1,         y1 };
+
+        bool hovLeft = ImGui::IsMouseHoveringRect(leftMin, leftMax);
+        bool hovRight = ImGui::IsMouseHoveringRect(rightMin, rightMax);
+
+        if (!drag_.active && hovLeft)
+            dl->AddRectFilled(leftMin, leftMax, IM_COL32(255, 255, 255, 60), 2.0f);
+        if (!drag_.active && hovRight)
+            dl->AddRectFilled(rightMin, rightMax, IM_COL32(255, 255, 255, 60), 2.0f);
+
+        dl->PopClipRect();
+
+        // ── カーソル変更（クリップ外でOK）──
+        if (!drag_.active)
+        {
+            if (hovLeft || hovRight)
+                ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+            else if (ImGui::IsMouseHoveringRect({ x0, y0 }, { x1, y1 }))
+                ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+        }
+
+        // ── ツールチップ ──
+        bool hovBar = ImGui::IsMouseHoveringRect({ x0, y0 }, { x1, y1 });
+        if (hovBar && !drag_.active)
         {
             ImGui::BeginTooltip();
             ImGui::Text("start=%d  end=%d  dur=%d  value=%.3f",
                 key.frame, key.EndFrame(), key.duration, key.value);
             if (!key.tag.empty()) ImGui::Text("tag: %s", key.tag.c_str());
             ImGui::EndTooltip();
+        }
 
-            if (ImGui::IsMouseClicked(0))
+        // ── ドラッグ開始 ──
+        if (!drag_.active && ImGui::IsMouseClicked(0))
+        {
+            if (hovLeft)
             {
-                key.selected = !key.selected;
-                if (onSelectKey_) onSelectKey_(trackIdx, keyIdx, key.selected);
+                drag_ = { trackIdx, keyIdx, true, DragState::Mode::ResizeLeft,
+                          key.frame, key.duration, ImGui::GetMousePos().x };
+                key.selected = true;
+            }
+            else if (hovRight)
+            {
+                drag_ = { trackIdx, keyIdx, true, DragState::Mode::ResizeRight,
+                          key.frame, key.duration, ImGui::GetMousePos().x };
+                key.selected = true;
+            }
+            else if (hovBar)
+            {
+                drag_ = { trackIdx, keyIdx, true, DragState::Mode::Move,
+                          key.frame, key.duration, ImGui::GetMousePos().x };
+                key.selected = true;
+                if (onSelectKey_) onSelectKey_(trackIdx, keyIdx, true);
+            }
+        }
+
+        // ── ドラッグ中の更新 ──
+        if (drag_.active && drag_.trackIdx == trackIdx && drag_.keyIdx == keyIdx
+            && ImGui::IsMouseDown(0))
+        {
+            int delta = static_cast<int>(
+                (ImGui::GetMousePos().x - drag_.startMouseX) / cellW);
+
+            switch (drag_.mode)
+            {
+            case DragState::Mode::Move:
+                key.frame = std::clamp(drag_.startFrame + delta, 0, totalFrames);
+                break;
+
+            case DragState::Mode::ResizeLeft:
+            {
+                int newFrame = std::clamp(drag_.startFrame + delta, 0,
+                    drag_.startFrame + drag_.startDuration - 1);
+                key.duration = drag_.startDuration - (newFrame - drag_.startFrame);
+                key.frame = newFrame;
+                break;
+            }
+            case DragState::Mode::ResizeRight:
+                key.duration = std::clamp(
+                    drag_.startDuration + delta, 1, totalFrames - drag_.startFrame);
+                break;
+
+            default: break;
             }
         }
     }
