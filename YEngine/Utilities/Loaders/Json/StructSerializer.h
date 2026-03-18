@@ -36,8 +36,20 @@ struct HasXYZMembers<T, std::void_t<
     decltype(std::declval<T>().z)
     >> : std::true_type {};
 
+
+template <typename, typename = void>
+struct HasXYMembers : std::false_type {};
+template <typename T>
+struct HasXYMembers<T, std::void_t<
+    decltype(std::declval<T>().x),
+    decltype(std::declval<T>().y)
+    >> : std::true_type {};
+
+template <typename T>
+constexpr bool HasXYMembers_v = HasXYMembers<T>::value;
 template <typename T>
 constexpr bool HasXYZMembers_v = HasXYZMembers<T>::value;
+
 
 ///************************* 汎用構造体シリアライザー *************************///
 
@@ -285,7 +297,30 @@ private:
             };
     }
 
-    // Vector3系（x, y, zメンバーを持つ構造体）
+    // Vector2
+    template <typename FieldType>
+    std::enable_if_t<
+        !std::is_same_v<FieldType, int> &&
+        !std::is_same_v<FieldType, float> &&
+        !std::is_same_v<FieldType, double> &&
+        !std::is_same_v<FieldType, bool> &&
+        !std::is_same_v<FieldType, std::string> &&
+        !IsVector_v<FieldType>&&
+        HasXYMembers_v<FieldType>
+    >
+        RegisterImGuiDrawer(const std::string& name, FieldType T::* field) {
+        imguiDrawers_[name] = [field, name](T& obj) -> bool {
+            float vec[2] = { (obj.*field).x, (obj.*field).y };
+            bool changed = ImGui::InputFloat2(name.c_str(), vec);
+            if (changed) {
+                (obj.*field).x = vec[0];
+                (obj.*field).y = vec[1];
+            }
+            return changed;
+            };
+    }
+
+    // Vector3
     template <typename FieldType>
     std::enable_if_t<
         !std::is_same_v<FieldType, int> &&
@@ -318,6 +353,7 @@ private:
         !std::is_same_v<FieldType, bool> &&
         !std::is_same_v<FieldType, std::string> &&
         !IsVector_v<FieldType> &&
+        !HasXYMembers_v<FieldType> &&
         !HasXYZMembers_v<FieldType>
     >
         RegisterImGuiDrawer(const std::string& name, FieldType T::* field) {

@@ -4,7 +4,7 @@
 #include <vector>
 #include <map>
 #include "Vector3.h"
-
+#include "Vector2.h"
 // Engine
 #include "Loaders/Json/StructSerializer.h"
 

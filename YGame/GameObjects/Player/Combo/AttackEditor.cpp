@@ -130,7 +130,7 @@ void AttackDataEditor::DrawDopeSheet()
 }
 
 //=============================================================================
-// OnAttackSelected  ── ★ 新規
+// OnAttackSelected  ── ★新規
 // 攻撃を選択したとき呼ばれる。FrameData を取得して BuildTracks する
 //=============================================================================
 void AttackDataEditor::OnAttackSelected()
