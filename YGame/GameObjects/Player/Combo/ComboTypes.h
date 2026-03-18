@@ -26,38 +26,42 @@ enum class AttackType {
 
 // 攻撃データ（完全自由式）
 struct AttackData {
-	std::string name;               // 攻撃名
-	std::string animationName;      // アニメーション名
-	AttackType type;                // 攻撃タイプ
+	std::string name;						// 攻撃名
+	std::string animationName;				// アニメーション名
+	AttackType type;						// 攻撃タイプ
 	std::string cameraEffect = "None";
 
+	// 当たり判定の時間
+	Vector2 hitDuration;					// ヒット判定の開始と終了時間（秒）
+
 	// タイミング設定
-	float duration;                 // 攻撃時間（秒）
-	float recovery;                 // 硬直時間（秒）
-	float continueWindow;           // 次の攻撃受付時間（秒）
+	float duration;							// 攻撃時間（秒）
+	float recovery;							// 硬直時間（秒）
+	float continueWindow;					// 次の攻撃受付時間（秒）
 
 	// ダメージ・効果
-	float baseDamage;               // 基本ダメージ
-	float knockback;                // ノックバック力
-	float knockbackDuration;       // ノックバック持続時間
-	Vector3 attackRange;            // 攻撃範囲（x:幅, y:高さ, z:奥行）
+	float baseDamage;						// 基本ダメージ
+	float knockback;						// ノックバック力
+	float knockbackDuration;				// ノックバック持続時間
+	Vector3 attackRange;					// 攻撃範囲（x:幅, y:高さ, z:奥行）
 
 	// CC（コンバットコスト）システム
-	int ccCost;                     // CC消費量
-	int ccOnHit;                    // ヒット時CC回復量（カウンター等）
+	int ccCost;								// CC消費量
+	int ccOnHit;							// ヒット時CC回復量（カウンター等）
 
 	// コンボ特性
-	bool canCancel;                 // 他の攻撃でキャンセル可能
-	bool canChainToAny;             // 任意の攻撃に繋げられる
-	std::vector<AttackType> preferredNext; // 推奨次攻撃（ボーナス有）
+	bool canCancel;							// 他の攻撃でキャンセル可能
+	bool canChainToAny;						// 任意の攻撃に繋げられる
+	std::vector<AttackType> preferredNext;	// 推奨次攻撃（ボーナス有）
 
 	float stepDistance = 0.0f;
-	// 特殊効果
-	bool launches;                  // 敵を浮かす
-	bool wallBounce;                // 壁バウンド誘発
-	bool groundBounce;              // 地面バウンド誘発
-	std::string effect;             // 特殊エフェクト名
-	float motionSpeed = 1.0f;       // アニメーション速度
+
+	// その他効果
+	bool launches;							// 敵を浮かす
+	bool wallBounce;						// 壁バウンド誘発
+	bool groundBounce;						// 地面バウンド誘発
+	std::string effect;						// 特殊エフェクト名
+	float motionSpeed = 1.0f;				// アニメーション速度
 
 
 	// デフォルトコンストラクタ
@@ -65,11 +69,11 @@ struct AttackData {
 
 	// 全項目指定コンストラクタ
 	AttackData(const std::string& n, const std::string& anim, AttackType t, std::string camEffect,
-		float dur, float rec, float window, float dmg, float kb, float kbd,
+		Vector2 hitDur,float dur, float rec, float window, float dmg, float kb, float kbd,
 		const Vector3& range, int cc, int ccHit, bool cancel, bool chain,
 		const std::vector<AttackType>& preferred, float stepDis, bool launch, bool wall, bool ground,
 		const std::string& fx, float animSpeed = 1.0f)
-		: name(n), animationName(anim), type(t), cameraEffect(camEffect), duration(dur), recovery(rec),
+		: name(n), animationName(anim), type(t), cameraEffect(camEffect), hitDuration(hitDur),duration(dur), recovery(rec),
 		continueWindow(window), baseDamage(dmg), knockback(kb), knockbackDuration(kbd), attackRange(range),
 		ccCost(cc), ccOnHit(ccHit), canCancel(cancel), canChainToAny(chain),
 		preferredNext(preferred), stepDistance(stepDis), launches(launch), wallBounce(wall),
@@ -115,6 +119,7 @@ SERIALIZE_FIELD(AttackData, name)
 SERIALIZE_FIELD(AttackData, animationName)
 SERIALIZE_ENUM_FIELD(AttackData, type)
 SERIALIZE_FIELD(AttackData, cameraEffect)
+SERIALIZE_FIELD(AttackData, hitDuration);
 SERIALIZE_FIELD(AttackData, duration)
 SERIALIZE_FIELD(AttackData, recovery)
 SERIALIZE_FIELD(AttackData, continueWindow)
