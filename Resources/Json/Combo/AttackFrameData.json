@@ -15,11 +15,11 @@
     },
     {
         "attackName": "NewAttack_0",
-        "cancelStart": 0,
+        "cancelStart": 2,
         "comboWindowEnd": 0,
         "comboWindowStart": 0,
         "effects": [],
-        "fps": 84,
+        "fps": 81,
         "hitEnd": 0,
         "hitStart": 0,
         "invincibleEnd": 0,

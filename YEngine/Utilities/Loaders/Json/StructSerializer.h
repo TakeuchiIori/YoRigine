@@ -306,7 +306,8 @@ private:
         !std::is_same_v<FieldType, bool> &&
         !std::is_same_v<FieldType, std::string> &&
         !IsVector_v<FieldType>&&
-        HasXYMembers_v<FieldType>
+        HasXYMembers_v<FieldType> &&
+		!HasXYZMembers_v<FieldType>
     >
         RegisterImGuiDrawer(const std::string& name, FieldType T::* field) {
         imguiDrawers_[name] = [field, name](T& obj) -> bool {

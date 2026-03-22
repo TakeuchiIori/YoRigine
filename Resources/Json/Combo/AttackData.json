@@ -12,10 +12,14 @@
         "canChainToAny": true,
         "ccCost": 1,
         "ccOnHit": 0,
-        "continueWindow": 0.7142857313156128,
+        "continueWindow": 0.7160493731498718,
         "duration": 0.0,
         "effect": "",
         "groundBounce": false,
+        "hitDuration": {
+            "x": 0.0,
+            "y": 0.0
+        },
         "knockback": 6.109476089477539e-07,
         "knockbackDuration": -7.450580596923828e-08,
         "launches": false,
@@ -44,6 +48,10 @@
         "duration": 0.30000001192092896,
         "effect": "",
         "groundBounce": false,
+        "hitDuration": {
+            "x": 0.0,
+            "y": 0.0
+        },
         "knockback": 3.0,
         "knockbackDuration": 1.0,
         "launches": false,
@@ -72,6 +80,10 @@
         "duration": 0.0,
         "effect": "",
         "groundBounce": false,
+        "hitDuration": {
+            "x": 0.0,
+            "y": 0.0
+        },
         "knockback": 3.0,
         "knockbackDuration": 1.0,
         "launches": false,
@@ -100,6 +112,10 @@
         "duration": -1.4901161193847656e-08,
         "effect": "",
         "groundBounce": false,
+        "hitDuration": {
+            "x": 0.0,
+            "y": 0.0
+        },
         "knockback": 3.0,
         "knockbackDuration": 1.0,
         "launches": false,
@@ -128,6 +144,10 @@
         "duration": 0.699999988079071,
         "effect": "",
         "groundBounce": false,
+        "hitDuration": {
+            "x": 0.0,
+            "y": 0.0
+        },
         "knockback": 3.0,
         "knockbackDuration": 1.0,
         "launches": false,

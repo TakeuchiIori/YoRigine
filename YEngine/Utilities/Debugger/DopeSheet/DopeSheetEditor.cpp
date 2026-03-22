@@ -583,12 +583,51 @@ namespace DopeSheet
         if (seekFrame_ < 0 || seekFrame_ > totalFrames) return;
 
         float sx = origin.x + kLabelW + seekFrame_ * zoomX_;
+
+        // ── 描画 ──
         dl->AddTriangleFilled(
             { sx - 5, origin.y }, { sx + 5, origin.y }, { sx, origin.y + 10 },
             IM_COL32(255, 220, 50, 230));
         dl->AddLine(
             { sx, origin.y + 10 }, { sx, origin.y + timelineH },
             IM_COL32(255, 220, 50, 180), 1.5f);
+
+        // ── ドラッグ判定 ──
+        // 三角形のヒット領域
+        ImVec2 hitMin = { sx - 6, origin.y };
+        ImVec2 hitMax = { sx + 6, origin.y + 12 };
+        bool hovered = ImGui::IsMouseHoveringRect(hitMin, hitMax);
+
+        if (hovered)
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+
+        // ドラッグ中（シークバー専用フラグで他のドラッグと区別）
+        static bool seekDragging = false;
+
+        if (hovered && ImGui::IsMouseClicked(0))
+            seekDragging = true;
+
+        if (seekDragging)
+        {
+            if (ImGui::IsMouseDown(0))
+            {
+                // マウスX座標からフレームを逆算
+                float mouseX = ImGui::GetMousePos().x;
+                float relX = mouseX - (origin.x + kLabelW);
+                int   newFrame = std::clamp(
+                    static_cast<int>(relX / zoomX_), 0, totalFrames);
+
+                if (newFrame != seekFrame_)
+                {
+                    seekFrame_ = newFrame;
+                    if (onSeek_) onSeek_(seekFrame_);
+                }
+            }
+            else
+            {
+                seekDragging = false;
+            }
+        }
     }
 #endif
 
