@@ -119,7 +119,7 @@ struct AttackData {
     void SyncFramesToSeconds()
     {
         if (fps <= 0) return;
-        const float invFps = 1.0f / static_cast<float>(fps);
+        //const float invFps = 1.0f / static_cast<float>(fps);
         //recovery = static_cast<float>(recoveryEnd - recoveryStart) * invFps;
         //continueWindow = static_cast<float>(comboWindowEnd - comboWindowStart) * invFps;
     }

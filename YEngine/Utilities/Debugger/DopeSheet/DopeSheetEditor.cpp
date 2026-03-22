@@ -43,58 +43,141 @@ namespace DopeSheet
             ? height
             : kRulerH + kRowH * visibleRows + 4.0f;
 
-        // ツールバー
         ImGui::PushID(id);
+
+        // ── ツールバー ──
         ImGui::Text("ズーム: %.0fpx/f", zoomX_);
         ImGui::SameLine();
-        ImGui::Text("| %d f  (%.2f s)", seekFrame_, seekFrame_ / (float)fps);
+        ImGui::Text("| %d f  (%.2f s)", seekFrame_, seekFrame_ / static_cast<float>(fps));
         ImGui::SameLine();
         if (ImGui::SmallButton("リセット")) ResetView();
         ImGui::SameLine();
         ImGui::TextDisabled("(Ctrl+ホイール で拡縮)");
 
-        // スクロール子ウィンドウ
-        const std::string childId = std::string("##DopeScroll_") + id;
+        // =========================================================
+        // 左ペイン：ラベル列（固定・スクロールなし）
+        // =========================================================
+        const std::string labelId = std::string("##DopeLabel_") + id;
         ImGui::BeginChild(
-            childId.c_str(),
+            labelId.c_str(),
+            { kLabelW, timelineH + 4 },
+            false,
+            ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+
+        {
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            ImVec2 winPos = ImGui::GetWindowPos();
+
+            // ルーラー部分の背景（ラベル側）
+            dl->AddRectFilled(
+                { winPos.x, winPos.y },
+                { winPos.x + kLabelW, winPos.y + kRulerH },
+                IM_COL32(30, 30, 30, 255));
+
+            // 各トラックのラベルを描画
+            bool collapsed = false;
+            int  row = 0;
+            for (int ti = 0; ti < static_cast<int>(tracks.size()); ++ti)
+            {
+                const DopeTrack& track = tracks[ti];
+                if (!track.visible) continue;
+
+                float y = winPos.y + kRulerH + row * kRowH;
+
+                if (track.isGroupHeader)
+                {
+                    collapsed = !track.groupExpanded;
+                    dl->AddRectFilled(
+                        { winPos.x, y },
+                        { winPos.x + kLabelW, y + kHeaderH },
+                        IM_COL32(35, 55, 75, 255));
+
+                    float indentX = winPos.x + 4 + track.groupDepth * 12.0f;
+                    dl->AddText(
+                        { indentX, y + kHeaderH * 0.5f - 6.0f },
+                        IM_COL32(200, 200, 200, 255),
+                        track.groupExpanded ? "v" : ">");
+                    dl->AddText(
+                        { indentX + 14, y + 4 },
+                        IM_COL32(230, 230, 230, 255),
+                        track.label.c_str());
+                    row++;
+                    continue;
+                }
+                if (collapsed) continue;
+
+                // 行背景
+                ImU32 bg = (row % 2 == 0)
+                    ? IM_COL32(46, 46, 46, 255)
+                    : IM_COL32(38, 38, 38, 255);
+                dl->AddRectFilled(
+                    { winPos.x, y },
+                    { winPos.x + kLabelW, y + kRowH }, bg);
+
+                // 左端のカラーバー
+                dl->AddRectFilled(
+                    { winPos.x, y },
+                    { winPos.x + 3.0f, y + kRowH },
+                    track.color.ToImU32());
+
+                // アイコン・ラベルテキスト（ラベル列内にクリップ）
+                dl->PushClipRect(
+                    { winPos.x, y },
+                    { winPos.x + kLabelW, y + kRowH },
+                    true);
+
+                float indentX = winPos.x + 6 + track.groupDepth * 12.0f;
+                dl->AddText({ indentX,      y + 4 },
+                    IM_COL32(130, 130, 130, 200), GetTrackIcon(track.type));
+                dl->AddText({ indentX + 28, y + 4 },
+                    IM_COL32(180, 180, 180, 255), track.label.c_str());
+
+                dl->PopClipRect();
+                row++;
+            }
+        }
+
+        ImGui::EndChild();
+        ImGui::SameLine(0, 0); // 隙間なく横に並べる
+
+        // =========================================================
+        // 右ペイン：タイムライン列（横スクロールあり）
+        // =========================================================
+        const std::string timelineId = std::string("##DopeScroll_") + id;
+        ImGui::BeginChild(
+            timelineId.c_str(),
             { 0, timelineH + 4 },
             false,
             ImGuiWindowFlags_HorizontalScrollbar);
 
         const float windowW = ImGui::GetContentRegionAvail().x;
+        const float timelineW = totalFrames * zoomX_ + 20.0f;
 
         // Ctrl + マウスホイール でズーム
-        // scrollX_ を自前管理することで SetScrollX の1フレーム遅延を回避する
         if (ImGui::IsWindowHovered() && ImGui::GetIO().KeyCtrl)
         {
             float wheel = ImGui::GetIO().MouseWheel;
             if (wheel != 0.0f)
             {
-                // カーソル下のフレームをズーム前に記録
                 float mouseLocalX = ImGui::GetMousePos().x - ImGui::GetWindowPos().x;
-                float frameAtMouse = (mouseLocalX + scrollX_ - kLabelW) / zoomX_;
+                float frameAtMouse = (mouseLocalX + scrollX_) / zoomX_;
 
-                // ズーム適用
                 zoomX_ = std::clamp(zoomX_ + wheel * 1.5f, 2.0f, 60.0f);
-
-                // ズーム後も同じフレームがカーソル下に来るようスクロール補正
-                scrollX_ = std::max(0.0f, frameAtMouse * zoomX_ - mouseLocalX + kLabelW);
+                scrollX_ = std::max(0.0f, frameAtMouse * zoomX_ - mouseLocalX);
             }
         }
 
-        // 通常の横スクロール（Ctrl なし）は ImGui のスクロールバーと同期
+        // 通常スクロールは ImGui のスクロールバーと同期
         if (!ImGui::GetIO().KeyCtrl)
             scrollX_ = ImGui::GetScrollX();
         else
             ImGui::SetScrollX(scrollX_);
 
-        // ズーム・スクロール確定後に timelineW を計算
-        const float timelineW = kLabelW + totalFrames * zoomX_ + 20.0f;
         scrollX_ = std::min(scrollX_, std::max(0.0f, timelineW - windowW));
 
         ImDrawList* dl = ImGui::GetWindowDrawList();
 
-        // origin にスクロールを反映した描画基点を作る
+        // origin はタイムライン列の左端（ラベル列を含まない）
         const ImVec2 winPos = ImGui::GetWindowPos();
         const ImVec2 origin = { winPos.x - scrollX_, winPos.y };
 
@@ -107,8 +190,8 @@ namespace DopeSheet
 
         // ルーラークリックでシーク
         {
-            ImVec2 rMin = { origin.x + kLabelW, origin.y };
-            ImVec2 rMax = { origin.x + timelineW, origin.y + kRulerH };
+            ImVec2 rMin = { origin.x, winPos.y };
+            ImVec2 rMax = { origin.x + timelineW, winPos.y + kRulerH };
             if (ImGui::IsMouseHoveringRect(rMin, rMax) && ImGui::IsMouseDown(0))
             {
                 int f = std::clamp(
@@ -131,7 +214,7 @@ namespace DopeSheet
     }
 
     //=============================================================================
-    // 背景縞模様
+    // 背景縞模様（タイムライン列用）
     //=============================================================================
 #ifdef USE_IMGUI
     void DopeSheetEditor::DrawBackground(
@@ -158,21 +241,25 @@ namespace DopeSheet
             }
             if (collapsed) continue;
 
-            ImU32 bg = (row % 2 == 0) ? IM_COL32(46, 46, 46, 255) : IM_COL32(38, 38, 38, 255);
-            dl->AddRectFilled({ origin.x, y }, { origin.x + timelineW, y + kRowH }, bg);
+            ImU32 bg = (row % 2 == 0)
+                ? IM_COL32(46, 46, 46, 255)
+                : IM_COL32(38, 38, 38, 255);
+            dl->AddRectFilled(
+                { origin.x, y },
+                { origin.x + timelineW, y + kRowH }, bg);
             row++;
         }
     }
 #endif
 
     //=============================================================================
-    // ルーラー
+    // ルーラー（タイムライン列用・kLabelW オフセットなし）
     //=============================================================================
 #ifdef USE_IMGUI
     void DopeSheetEditor::DrawRuler(
         ImDrawList* dl, ImVec2 origin, float cellW, int totalFrames, int fps)
     {
-        const float totalW = kLabelW + totalFrames * cellW + 20.0f;
+        const float totalW = totalFrames * cellW + 20.0f;
 
         dl->AddRectFilled(
             { origin.x, origin.y },
@@ -183,14 +270,17 @@ namespace DopeSheet
 
         for (int f = 0; f <= totalFrames; ++f)
         {
-            float x = origin.x + kLabelW + f * cellW;
+            float x = origin.x + f * cellW;  // kLabelW オフセット不要
             bool  isMajor = (f % fps == 0);
             bool  isMedium = (f % 5 == 0);
 
             ImU32 gridCol = isMajor ? IM_COL32(100, 100, 100, 200)
                 : isMedium ? IM_COL32(70, 70, 70, 150)
                 : IM_COL32(50, 50, 50, 100);
-            dl->AddLine({ x, origin.y + kRulerH }, { x, origin.y + kRulerH + kRowH * 64 }, gridCol);
+            dl->AddLine(
+                { x, origin.y + kRulerH },
+                { x, origin.y + kRulerH + kRowH * 64 },
+                gridCol);
 
             float tickH = isMajor ? kRulerH * 0.6f : kRulerH * 0.35f;
             dl->AddLine(
@@ -201,15 +291,13 @@ namespace DopeSheet
             if (f % step == 0)
             {
                 char buf[16];
-                std::snprintf(buf, sizeof(buf), isMajor ? "%ds" : "%d", isMajor ? f / fps : f);
-                dl->AddText({ x + 2, origin.y + 2 }, IM_COL32(180, 180, 180, 255), buf);
+                std::snprintf(buf, sizeof(buf),
+                    isMajor ? "%ds" : "%d",
+                    isMajor ? f / fps : f);
+                dl->AddText({ x + 2, origin.y + 2 },
+                    IM_COL32(180, 180, 180, 255), buf);
             }
         }
-
-        dl->AddLine(
-            { origin.x + kLabelW, origin.y },
-            { origin.x + kLabelW, origin.y + kRulerH },
-            IM_COL32(80, 80, 80, 255));
 
         if (onRulerOverlay_)
             onRulerOverlay_(dl, origin, cellW, totalFrames);
@@ -217,7 +305,7 @@ namespace DopeSheet
 #endif
 
     //=============================================================================
-    // 全トラック描画
+    // 全トラック描画（タイムライン列のみ・ラベルは左ペインで描画済み）
     //=============================================================================
 #ifdef USE_IMGUI
     void DopeSheetEditor::DrawAllTracks(
@@ -234,25 +322,15 @@ namespace DopeSheet
 
             float y = origin.y + kRulerH + row * kRowH;
 
-            // グループヘッダー
             if (track.isGroupHeader)
             {
                 collapsed = !track.groupExpanded;
 
-                float  indentX = origin.x + 4 + track.groupDepth * 12.0f;
-                dl->AddText(
-                    { indentX, y + kHeaderH * 0.5f - 6.0f },
-                    IM_COL32(200, 200, 200, 255),
-                    track.groupExpanded ? "v" : ">");
-                dl->AddText(
-                    { indentX + 14, y + 4 },
-                    IM_COL32(230, 230, 230, 255),
-                    track.label.c_str());
-
+                // グループヘッダーのクリック判定
                 ImGui::SetCursorScreenPos({ origin.x, y });
                 ImGui::InvisibleButton(
                     (std::string("##grp_") + std::to_string(ti)).c_str(),
-                    { kLabelW + totalFrames * cellW, kHeaderH });
+                    { totalFrames * cellW, kHeaderH });
                 if (ImGui::IsItemClicked())
                 {
                     track.groupExpanded = !track.groupExpanded;
@@ -261,23 +339,10 @@ namespace DopeSheet
                 row++;
                 continue;
             }
-
             if (collapsed) continue;
 
-            // ラベル列
-            {
-                dl->AddRectFilled(
-                    { origin.x, y },
-                    { origin.x + 3.0f, y + kRowH },
-                    track.color.ToImU32());
-
-                float indentX = origin.x + 6 + track.groupDepth * 12.0f;
-                dl->AddText({ indentX,      y + 4 }, IM_COL32(130, 130, 130, 200), GetTrackIcon(track.type));
-                dl->AddText({ indentX + 28, y + 4 }, IM_COL32(180, 180, 180, 255), track.label.c_str());
-            }
-
-            // キーフレーム行
-            if (DrawTrackRow(dl, { origin.x + kLabelW, y }, cellW, totalFrames, track, ti))
+            // キーフレーム行（origin.x がタイムライン列の左端）
+            if (DrawTrackRow(dl, { origin.x, y }, cellW, totalFrames, track, ti))
                 anyChanged = true;
 
             row++;
@@ -300,11 +365,20 @@ namespace DopeSheet
         // ドラッグ終了
         if (drag_.active && drag_.trackIdx == trackIdx && !ImGui::IsMouseDown(0))
         {
-            track.SortKeys();
-            if (onMoveKey_ && drag_.keyIdx < static_cast<int>(track.keys.size()))
-                onMoveKey_(trackIdx, drag_.keyIdx, track.keys[drag_.keyIdx].frame);
+            const int endFrame = (drag_.keyIdx < static_cast<int>(track.keys.size()))
+                ? track.keys[drag_.keyIdx].frame : drag_.startFrame;
+            const int endDur = (drag_.keyIdx < static_cast<int>(track.keys.size()))
+                ? track.keys[drag_.keyIdx].duration : drag_.startDuration;
+
+            // 実際に動いたときだけ changed = true
+            if (endFrame != drag_.startFrame || endDur != drag_.startDuration)
+            {
+                track.SortKeys();
+                if (onMoveKey_ && drag_.keyIdx < static_cast<int>(track.keys.size()))
+                    onMoveKey_(trackIdx, drag_.keyIdx, endFrame);
+                changed = true;
+            }
             drag_.active = false;
-            changed = true;
         }
 
         int removeIdx = -1;
@@ -341,14 +415,32 @@ namespace DopeSheet
             changed = true;
         }
 
-        // 右クリック → 追加ポップアップ
+        // 右クリック → 追加/削除ポップアップ（バー上では追加を出さない）
         if (!track.readOnly)
         {
             ImVec2 trackMax = { rowMin.x + totalFrames * cellW, rowMin.y + kRowH };
-            if (ImGui::IsMouseHoveringRect(rowMin, trackMax) && ImGui::IsMouseClicked(1))
+
+            bool hoveringAnyBar = false;
+            for (const auto& k : track.keys)
+            {
+                if (k.duration > 0)
+                {
+                    float bx0 = rowMin.x + k.frame * cellW;
+                    float bx1 = rowMin.x + k.EndFrame() * cellW;
+                    if (ImGui::IsMouseHoveringRect({ bx0, rowMin.y }, { bx1, rowMin.y + kRowH }))
+                    {
+                        hoveringAnyBar = true; break;
+                    }
+                }
+            }
+
+            if (!hoveringAnyBar
+                && ImGui::IsMouseHoveringRect(rowMin, trackMax)
+                && ImGui::IsMouseClicked(1))
             {
                 pendingFrame_ = std::clamp(
-                    static_cast<int>((ImGui::GetMousePos().x - rowMin.x) / cellW), 0, totalFrames);
+                    static_cast<int>((ImGui::GetMousePos().x - rowMin.x) / cellW),
+                    0, totalFrames);
                 pendingValue_ = 0.0f;
                 pendingDuration_ = 10;
                 pendingTrackIdx_ = trackIdx;
@@ -382,7 +474,6 @@ namespace DopeSheet
             dl->AddCircleFilled({ cx, cy }, radius, fillCol);
             dl->AddCircle({ cx, cy }, radius, outlineCol, 0, 1.5f);
             break;
-
         case KeyShape::Triangle:
             dl->AddTriangleFilled(
                 { cx,          cy - radius },
@@ -393,7 +484,6 @@ namespace DopeSheet
                 { cx + radius, cy + radius * 0.6f },
                 { cx - radius, cy + radius * 0.6f }, outlineCol, 1.2f);
             break;
-
         default: // Diamond
             dl->AddQuadFilled(
                 { cx, cy - radius }, { cx + radius, cy },
@@ -422,7 +512,8 @@ namespace DopeSheet
 
             if (ImGui::IsMouseClicked(0) && !drag_.active)
             {
-                drag_ = { trackIdx, keyIdx, true,DragState::Mode::Move, key.frame, 0,ImGui::GetMousePos().x };
+                drag_ = { trackIdx, keyIdx, true, DragState::Mode::Move,
+                          key.frame, 0, ImGui::GetMousePos().x };
                 key.selected = true;
                 if (onSelectKey_) onSelectKey_(trackIdx, keyIdx, true);
             }
@@ -432,7 +523,8 @@ namespace DopeSheet
             && ImGui::IsMouseDown(0))
         {
             int newFrame = std::clamp(
-                drag_.startFrame + static_cast<int>((ImGui::GetMousePos().x - drag_.startMouseX) / cellW),
+                drag_.startFrame + static_cast<int>(
+                    (ImGui::GetMousePos().x - drag_.startMouseX) / cellW),
                 0, totalFrames);
             if (newFrame != key.frame) { key.frame = newFrame; changed = true; }
         }
@@ -451,7 +543,7 @@ namespace DopeSheet
         ImU32 fillCol, int totalFrames)
     {
         const float pad = 2.0f;
-        const float edgeW = 6.0f;  // 左右リサイズハンドル幅
+        const float edgeW = 6.0f;
 
         float x0 = rowMin.x + key.frame * cellW + pad;
         float x1 = rowMin.x + key.EndFrame() * cellW - pad;
@@ -463,14 +555,7 @@ namespace DopeSheet
             ? IM_COL32(255, 255, 255, 200)
             : IM_COL32(255, 255, 255, 80);
 
-        // ── 描画（ラベル列にはみ出さないようクリップ）──
-        ImVec2 winPos = ImGui::GetWindowPos();
-        float  clipLeft = winPos.x + kLabelW;
-        dl->PushClipRect(
-            { clipLeft,                          rowMin.y },
-            { winPos.x + ImGui::GetWindowWidth(), rowMin.y + kRowH },
-            true);
-
+        // ── 描画 ──
         dl->AddRectFilled({ x0, y0 }, { x1, y1 }, fillCol, 3.0f);
         dl->AddRect({ x0, y0 }, { x1, y1 }, outCol, 3.0f, 0, 1.5f);
 
@@ -481,7 +566,7 @@ namespace DopeSheet
             dl->AddText({ x0 + 4, y0 + 3 }, IM_COL32(255, 255, 255, 200), buf);
         }
 
-        // ── リサイズハンドル強調 ──
+        // ── リサイズハンドル ──
         ImVec2 leftMin = { x0,         y0 };
         ImVec2 leftMax = { x0 + edgeW, y1 };
         ImVec2 rightMin = { x1 - edgeW, y0 };
@@ -489,56 +574,68 @@ namespace DopeSheet
 
         bool hovLeft = ImGui::IsMouseHoveringRect(leftMin, leftMax);
         bool hovRight = ImGui::IsMouseHoveringRect(rightMin, rightMax);
+        bool hovBar = ImGui::IsMouseHoveringRect({ x0, y0 }, { x1, y1 });
 
         if (!drag_.active && hovLeft)
             dl->AddRectFilled(leftMin, leftMax, IM_COL32(255, 255, 255, 60), 2.0f);
         if (!drag_.active && hovRight)
             dl->AddRectFilled(rightMin, rightMax, IM_COL32(255, 255, 255, 60), 2.0f);
 
-        dl->PopClipRect();
-
-        // ── カーソル変更（クリップ外でOK）──
+        // ── カーソル変更 ──
         if (!drag_.active)
         {
             if (hovLeft || hovRight)
                 ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
-            else if (ImGui::IsMouseHoveringRect({ x0, y0 }, { x1, y1 }))
+            else if (hovBar)
                 ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
         }
 
         // ── ツールチップ ──
-        bool hovBar = ImGui::IsMouseHoveringRect({ x0, y0 }, { x1, y1 });
         if (hovBar && !drag_.active)
         {
             ImGui::BeginTooltip();
-            ImGui::Text("start=%d  end=%d  dur=%d  value=%.3f",
-                key.frame, key.EndFrame(), key.duration, key.value);
+            ImGui::Text("start=%d  end=%d  dur=%d",
+                key.frame, key.EndFrame(), key.duration);
             if (!key.tag.empty()) ImGui::Text("tag: %s", key.tag.c_str());
             ImGui::EndTooltip();
+        }
+
+        // ── 右クリック削除メニュー ──
+        const std::string popupId = "##DeleteBar_"
+            + std::to_string(trackIdx) + "_" + std::to_string(keyIdx);
+
+        if (hovBar && ImGui::IsMouseClicked(1) && !drag_.active)
+            ImGui::OpenPopup(popupId.c_str());
+
+        if (ImGui::BeginPopup(popupId.c_str()))
+        {
+            ImGui::Text("frame=%d  dur=%df", key.frame, key.duration);
+            ImGui::Separator();
+            if (ImGui::MenuItem("削除"))
+            {
+                if (onDeleteKey_) onDeleteKey_(trackIdx, keyIdx);
+                else              key.selected = true;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
         }
 
         // ── ドラッグ開始 ──
         if (!drag_.active && ImGui::IsMouseClicked(0))
         {
             if (hovLeft)
-            {
                 drag_ = { trackIdx, keyIdx, true, DragState::Mode::ResizeLeft,
                           key.frame, key.duration, ImGui::GetMousePos().x };
-                key.selected = true;
-            }
             else if (hovRight)
-            {
                 drag_ = { trackIdx, keyIdx, true, DragState::Mode::ResizeRight,
                           key.frame, key.duration, ImGui::GetMousePos().x };
-                key.selected = true;
-            }
             else if (hovBar)
             {
                 drag_ = { trackIdx, keyIdx, true, DragState::Mode::Move,
                           key.frame, key.duration, ImGui::GetMousePos().x };
-                key.selected = true;
                 if (onSelectKey_) onSelectKey_(trackIdx, keyIdx, true);
             }
+            if (drag_.active) key.selected = true;
         }
 
         // ── ドラッグ中の更新 ──
@@ -553,7 +650,6 @@ namespace DopeSheet
             case DragState::Mode::Move:
                 key.frame = std::clamp(drag_.startFrame + delta, 0, totalFrames);
                 break;
-
             case DragState::Mode::ResizeLeft:
             {
                 int newFrame = std::clamp(drag_.startFrame + delta, 0,
@@ -566,7 +662,6 @@ namespace DopeSheet
                 key.duration = std::clamp(
                     drag_.startDuration + delta, 1, totalFrames - drag_.startFrame);
                 break;
-
             default: break;
             }
         }
@@ -582,9 +677,8 @@ namespace DopeSheet
     {
         if (seekFrame_ < 0 || seekFrame_ > totalFrames) return;
 
-        float sx = origin.x + kLabelW + seekFrame_ * zoomX_;
+        float sx = origin.x + seekFrame_ * zoomX_;  // kLabelW オフセット不要
 
-        // ── 描画 ──
         dl->AddTriangleFilled(
             { sx - 5, origin.y }, { sx + 5, origin.y }, { sx, origin.y + 10 },
             IM_COL32(255, 220, 50, 230));
@@ -592,31 +686,22 @@ namespace DopeSheet
             { sx, origin.y + 10 }, { sx, origin.y + timelineH },
             IM_COL32(255, 220, 50, 180), 1.5f);
 
-        // ── ドラッグ判定 ──
-        // 三角形のヒット領域
         ImVec2 hitMin = { sx - 6, origin.y };
         ImVec2 hitMax = { sx + 6, origin.y + 12 };
-        bool hovered = ImGui::IsMouseHoveringRect(hitMin, hitMax);
+        bool   hovered = ImGui::IsMouseHoveringRect(hitMin, hitMax);
 
-        if (hovered)
-            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+        if (hovered) ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
 
-        // ドラッグ中（シークバー専用フラグで他のドラッグと区別）
         static bool seekDragging = false;
-
-        if (hovered && ImGui::IsMouseClicked(0))
-            seekDragging = true;
+        if (hovered && ImGui::IsMouseClicked(0)) seekDragging = true;
 
         if (seekDragging)
         {
             if (ImGui::IsMouseDown(0))
             {
-                // マウスX座標からフレームを逆算
-                float mouseX = ImGui::GetMousePos().x;
-                float relX = mouseX - (origin.x + kLabelW);
+                float relX = ImGui::GetMousePos().x - origin.x;
                 int   newFrame = std::clamp(
                     static_cast<int>(relX / zoomX_), 0, totalFrames);
-
                 if (newFrame != seekFrame_)
                 {
                     seekFrame_ = newFrame;
@@ -645,8 +730,10 @@ namespace DopeSheet
 
         ImGui::Text("キー追加  [%s]  frame=%d", label, pendingFrame_);
         ImGui::Separator();
-        ImGui::SetNextItemWidth(100); ImGui::InputFloat("値", &pendingValue_, 0.1f);
-        ImGui::SetNextItemWidth(100); ImGui::InputInt("持続(f)", &pendingDuration_);
+        ImGui::SetNextItemWidth(100);
+        ImGui::InputFloat("値", &pendingValue_, 0.1f);
+        ImGui::SetNextItemWidth(100);
+        ImGui::InputInt("持続(f)", &pendingDuration_);
         pendingDuration_ = std::max(0, pendingDuration_);
         ImGui::Separator();
 
@@ -659,13 +746,20 @@ namespace DopeSheet
             else
             {
                 auto& t = tracks[pendingTrackIdx_];
-                if (!t.readOnly) t.AddKey(pendingFrame_, pendingValue_, 0, pendingDuration_);
+                if (!t.readOnly)
+                    t.AddKey(pendingFrame_, pendingValue_, 0, pendingDuration_);
             }
-            pendingValue_ = 0.0f; pendingDuration_ = 0; showAddPopup_ = false;
+            pendingValue_ = 0.0f;
+            pendingDuration_ = 0;
+            showAddPopup_ = false;
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
-        if (ImGui::Button("キャンセル")) { showAddPopup_ = false; ImGui::CloseCurrentPopup(); }
+        if (ImGui::Button("キャンセル"))
+        {
+            showAddPopup_ = false;
+            ImGui::CloseCurrentPopup();
+        }
 
         ImGui::EndPopup();
     }
