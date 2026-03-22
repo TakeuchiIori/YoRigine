@@ -56,20 +56,20 @@ struct AttackData {
     int totalFrames = 60;  // この攻撃の全体フレーム数
     int fps = 60;  // フレームレート（秒換算に使用）
 
-    int hitStart = 0;   // 攻撃判定  開始フレーム
-    int hitEnd = 0;   // 攻撃判定  終了フレーム
-    int recoveryStart = 0;   // 硬直      開始フレーム
-    int recoveryEnd = 0;   // 硬直      終了フレーム
-    int cancelStart = 0;   // キャンセル受付 開始フレーム
+    int hitStart = 0;           // 攻撃判定  開始フレーム
+    int hitEnd = 0;             // 攻撃判定  終了フレーム
+    int recoveryStart = 0;      // 硬直      開始フレーム
+    int recoveryEnd = 0;        // 硬直      終了フレーム
+    int cancelStart = 0;        // キャンセル受付 開始フレーム
     int comboWindowStart = 0;   // コンボ入力受付 開始フレーム
-    int comboWindowEnd = 0;   // コンボ入力受付 終了フレーム
-    int invincibleStart = 0;   // 無敵      開始フレーム
-    int invincibleEnd = 0;   // 無敵      終了フレーム
+    int comboWindowEnd = 0;     // コンボ入力受付 終了フレーム
+    int invincibleStart = 0;    // 無敵      開始フレーム
+    int invincibleEnd = 0;      // 無敵      終了フレーム
 
     // フレームイベント（エフェクト・SE の発生タイミング）
     struct FrameEvent {
         int         frame = 0;
-        std::string tag;        // エフェクト名・SE名など
+        std::string tag;                // エフェクト名・SE名など
     };
     std::vector<FrameEvent> effects;    // エフェクト発生タイミング一覧
     std::vector<FrameEvent> sounds;     // SE 再生タイミング一覧
@@ -78,40 +78,39 @@ struct AttackData {
     // タイミング設定（ゲームロジック用・秒単位）
     // SyncFramesToSeconds() で自動計算される。直接編集も可能。
     //-------------------------------------------------------------------------
-    float duration = 0.0f;   // 攻撃判定の持続時間（秒）
-    float recovery = 0.0f;   // 硬直時間（秒）
-    float continueWindow = 0.0f;   // コンボ入力受付時間（秒）
+    float duration = 0.0f;          // 攻撃判定の持続時間（秒）
+    float recovery = 0.0f;          // 硬直時間（秒）
+    float continueWindow = 0.0f;    // コンボ入力受付時間（秒）
 
     //-------------------------------------------------------------------------
     // ダメージ・物理効果
     //-------------------------------------------------------------------------
-    float   baseDamage = 0.0f;           // 基本ダメージ
-    float   knockback = 0.0f;           // ノックバック力
-    float   knockbackDuration = 0.0f;           // ノックバック持続時間（秒）
-    Vector3 attackRange = { 0,0,0 };      // 攻撃範囲（幅・高さ・奥行）
-    float   stepDistance = 0.0f;           // 攻撃時の踏み込み距離
+    float   baseDamage = 0.0f;              // 基本ダメージ
+    float   knockback = 0.0f;               // ノックバック力
+    float   knockbackDuration = 0.0f;       // ノックバック持続時間（秒）
+    float   stepDistance = 0.0f;            // 攻撃時の踏み込み距離
 
     //-------------------------------------------------------------------------
     // CC（コンバットコスト）システム
     //-------------------------------------------------------------------------
     int ccCost = 0;    // CC 消費量
-    int ccOnHit = 0;    // ヒット時 CC 回復量
+    int ccOnHit = 0;   // ヒット時 CC 回復量
 
     //-------------------------------------------------------------------------
     // コンボ特性
     //-------------------------------------------------------------------------
-    bool canCancel = true;  // 他の攻撃でキャンセル可能か
-    bool canChainToAny = true;  // 任意の攻撃に繋げられるか
+    bool canCancel = true;                  // 他の攻撃でキャンセル可能か
+    bool canChainToAny = true;              // 任意の攻撃に繋げられるか
     std::vector<AttackType> preferredNext;  // 推奨次攻撃（ボーナス有）
 
     //-------------------------------------------------------------------------
     // 特殊効果フラグ
     //-------------------------------------------------------------------------
-    bool        launches = false;    // 敵を浮かす
-    bool        wallBounce = false;    // 壁バウンド誘発
-    bool        groundBounce = false;    // 地面バウンド誘発
-    std::string effect;                 // 特殊エフェクト名
-    float       motionSpeed = 1.0f;     // アニメーション再生速度
+    bool        launches = false;           // 敵を浮かす
+    bool        wallBounce = false;         // 壁バウンド誘発
+    bool        groundBounce = false;       // 地面バウンド誘発
+    std::string effect;                     // 特殊エフェクト名
+    float       motionSpeed = 1.0f;         // アニメーション再生速度
 
     //-------------------------------------------------------------------------
     // フレーム → 秒 の自動計算
@@ -135,11 +134,11 @@ struct AttackData {
 // CC 設定
 //=============================================================================
 struct CCConfig {
-    int   maxCC = 5;       // 最大 CC 値
-    float regenRate = 1.0f;    // CC 回復速度（毎秒）
-    float regenDelay = 1.5f;    // 攻撃後の CC 回復開始遅延（秒）
-    int   dodgeRecovery = 2;       // 回避成功時の CC 回復量
-    int   counterRecovery = 1;       // カウンター成功時の CC 回復量
+    int   maxCC = 5;                    // 最大 CC 値
+    float regenRate = 1.0f;             // CC 回復速度（毎秒）
+    float regenDelay = 1.5f;            // 攻撃後の CC 回復開始遅延（秒）
+    int   dodgeRecovery = 2;            // 回避成功時の CC 回復量
+    int   counterRecovery = 1;          // カウンター成功時の CC 回復量
 
     CCConfig() = default;
     CCConfig(int max, float rate, float delay, int dodge, int counter)
@@ -152,11 +151,11 @@ struct CCConfig {
 // コンボ設定
 //=============================================================================
 struct ComboConfig {
-    int   maxLength = 20;      // 最大コンボ長
-    float damageDecay = 0.95f;   // コンボ減衰率（3ヒット目以降）
-    float chainBonus = 1.15f;   // 推奨チェーンボーナス倍率
-    bool  enableFreeChain = true;    // 自由チェーン有効
-    float comboResetTime = 1.0f;    // コンボリセット時間（秒）
+    int   maxLength = 20;               // 最大コンボ長
+    float damageDecay = 0.95f;          // コンボ減衰率（3ヒット目以降）
+    float chainBonus = 1.15f;           // 推奨チェーンボーナス倍率
+    bool  enableFreeChain = true;       // 自由チェーン有効
+    float comboResetTime = 1.0f;        // コンボリセット時間（秒）
 
     ComboConfig() = default;
     ComboConfig(int length, float decay, float bonus, bool freeChain, float resetTime)
@@ -195,7 +194,6 @@ SERIALIZE_FIELD(AttackData, continueWindow)
 SERIALIZE_FIELD(AttackData, baseDamage)
 SERIALIZE_FIELD(AttackData, knockback)
 SERIALIZE_FIELD(AttackData, knockbackDuration)
-SERIALIZE_FIELD(AttackData, attackRange)
 SERIALIZE_FIELD(AttackData, stepDistance)
 // CC
 SERIALIZE_FIELD(AttackData, ccCost)
