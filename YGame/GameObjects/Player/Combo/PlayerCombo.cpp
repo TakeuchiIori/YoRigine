@@ -159,7 +159,7 @@ AttackData* PlayerCombo::FindBestAttack(AttackType type) {
 				if (combo->type == type) sameTypeCount++;
 				else break;
 			}
-			int index = std::min(sameTypeCount, static_cast<int>(attacks.size()) - 1);
+			int index = sameTypeCount % static_cast<int>(attacks.size());
 			return const_cast<AttackData*>(&attacks[index]);
 		} else {
 			// 異なるタイプからの派生：基本攻撃に戻す
@@ -215,7 +215,7 @@ void PlayerCombo::UpdateAttacking() {
 		&& (currentFrame < currentAttack_->hitEnd);
 
 
-	if (onHitWindowChanged_) onHitWindowChanged_(inHitWindow);
+	if (onSwordColliderChanged_) onSwordColliderChanged_(inHitWindow);
 	// 攻撃時間終了チェック
 	if (stateTimer_ >= currentAttack_->duration) {
 		if (currentAttack_->canChainToAny && currentCC_ > 0)
@@ -323,7 +323,7 @@ void PlayerCombo::ExitState(ComboState oldState) {
 	switch (oldState) {
 	case ComboState::Attacking:
 		// 攻撃終了時はヒットウィンドウを閉じる
-		if (onHitWindowChanged_) onHitWindowChanged_(false);
+		if (onSwordColliderChanged_) onSwordColliderChanged_(false);
 		break;
 	case ComboState::CanContinue:
 		break;
