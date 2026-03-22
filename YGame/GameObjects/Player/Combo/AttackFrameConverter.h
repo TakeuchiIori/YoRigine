@@ -50,21 +50,21 @@ public:
             DopeSheet::TrackType::InvincibleFrame,
             attack.invincibleStart, attack.invincibleEnd));
 
-        // Effect（エフェクト発生タイミング・ポイントキー）
-        {
-            auto track = DopeSheet::DopeTrack::Make(DopeSheet::TrackType::Effect);
-            for (const auto& ev : attack.effects)
-                track.AddKey(MakeEventKey(ev.frame, ev.tag));
-            tracks.push_back(std::move(track));
-        }
+        //// Effect（エフェクト発生タイミング・ポイントキー）
+        //{
+        //    auto track = DopeSheet::DopeTrack::Make(DopeSheet::TrackType::Effect);
+        //    for (const auto& ev : attack.effects)
+        //        track.AddKey(MakeEventKey(ev.frame, ev.tag));
+        //    tracks.push_back(std::move(track));
+        //}
 
-        // Sound（SE 再生タイミング・ポイントキー）
-        {
-            auto track = DopeSheet::DopeTrack::Make(DopeSheet::TrackType::Sound);
-            for (const auto& ev : attack.sounds)
-                track.AddKey(MakeEventKey(ev.frame, ev.tag));
-            tracks.push_back(std::move(track));
-        }
+        //// Sound（SE 再生タイミング・ポイントキー）
+        //{
+        //    auto track = DopeSheet::DopeTrack::Make(DopeSheet::TrackType::Sound);
+        //    for (const auto& ev : attack.sounds)
+        //        track.AddKey(MakeEventKey(ev.frame, ev.tag));
+        //    tracks.push_back(std::move(track));
+        //}
 
         return tracks;
     }
