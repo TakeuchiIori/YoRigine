@@ -53,11 +53,11 @@ struct AttackData {
     // タイムライン設定（エディタ用・フレーム単位）
     // ドープシートで直接編集する値
     //-------------------------------------------------------------------------
-    int totalFrames = 60;  // この攻撃の全体フレーム数
-    int fps = 60;  // フレームレート（秒換算に使用）
+    int totalFrames = 60;       // この攻撃の全体フレーム数
+    int fps = 60;               // フレームレート（秒換算に使用）
 
     int hitStart = 0;           // 攻撃判定  開始フレーム
-    int hitEnd = 0;             // 攻撃判定  終了フレーム
+    int hitEnd = 10;            // 攻撃判定  終了フレーム
     int recoveryStart = 0;      // 硬直      開始フレーム
     int recoveryEnd = 0;        // 硬直      終了フレーム
     int cancelStart = 0;        // キャンセル受付 開始フレーム
@@ -120,10 +120,8 @@ struct AttackData {
     {
         if (fps <= 0) return;
         const float invFps = 1.0f / static_cast<float>(fps);
-
-        duration = static_cast<float>(hitEnd - hitStart) * invFps;
-        recovery = static_cast<float>(recoveryEnd - recoveryStart) * invFps;
-        continueWindow = static_cast<float>(comboWindowEnd - comboWindowStart) * invFps;
+        //recovery = static_cast<float>(recoveryEnd - recoveryStart) * invFps;
+        //continueWindow = static_cast<float>(comboWindowEnd - comboWindowStart) * invFps;
     }
 
     // デフォルトコンストラクタ

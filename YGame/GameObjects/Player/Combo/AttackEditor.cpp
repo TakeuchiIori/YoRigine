@@ -200,7 +200,6 @@ void AttackDataEditor::DrawAttackDetail()
         changed |= ImGui::InputFloat("基本ダメージ", &atk.baseDamage, 1.0f, 10.0f, "%.1f");
         changed |= ImGui::InputFloat("ノックバック", &atk.knockback, 0.1f, 1.0f, "%.1f");
         changed |= ImGui::InputFloat("ノックバック持続時間", &atk.knockbackDuration, 0.1f, 1.0f, "%.2f");
-        changed |= ImGui::InputFloat3("攻撃範囲", &atk.attackRange.x);
         changed |= ImGui::InputFloat("踏み込み距離", &atk.stepDistance, 0.1f, 1.0f, "%.2f");
     }
 
@@ -330,9 +329,10 @@ void AttackDataEditor::NewAttack()
     data.totalFrames = 60;
     data.fps = 60;
     data.baseDamage = 30.0f;
+    data.hitStart = 0;
+	data.hitEnd = 10;
     data.knockback = 5.0f;
     data.knockbackDuration = 0.5f;
-    data.attackRange = { 2.0f, 1.0f, 1.5f };
     data.ccCost = 1;
     data.canCancel = true;
     data.canChainToAny = true;

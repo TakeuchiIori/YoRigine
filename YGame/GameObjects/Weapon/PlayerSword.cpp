@@ -249,6 +249,9 @@ void PlayerSword::InitCollision() {
 		this, &colliderWT_, camera_,
 		static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon)
 	);
+
+	// 初期状態では当たり判定無効
+	obbCollider_->isCollisionEnabled_ = false;
 }
 
 /// <summary>

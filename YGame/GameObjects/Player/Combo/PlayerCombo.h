@@ -161,14 +161,6 @@ public:
 		return 0.0f;
 	}
 
-	// 現在の攻撃範囲取得
-	Vector3 GetCurrentAttackRange() const {
-		if (currentAttack_) {
-			return currentAttack_->attackRange;
-		}
-		return Vector3(0.0f, 0.0f, 0.0f);
-	}
-
 
 private:
 	///************************* 内部処理関数 *************************///

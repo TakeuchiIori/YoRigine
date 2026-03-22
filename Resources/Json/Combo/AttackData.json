@@ -1,11 +1,6 @@
 [
     {
         "animationName": "Slash3",
-        "attackRange": {
-            "x": 2.0,
-            "y": 1.0,
-            "z": 1.5
-        },
         "baseDamage": 30.0,
         "cameraEffect": "LightAttack",
         "canCancel": true,
@@ -16,11 +11,11 @@
         "comboWindowEnd": 0,
         "comboWindowStart": 0,
         "continueWindow": 0.0,
-        "duration": 0.0,
+        "duration": 1.0,
         "effect": "",
         "fps": 60,
         "groundBounce": false,
-        "hitEnd": 0,
+        "hitEnd": 1,
         "hitStart": 0,
         "invincibleEnd": 0,
         "invincibleStart": 0,
@@ -40,11 +35,6 @@
     },
     {
         "animationName": "Slash4",
-        "attackRange": {
-            "x": 2.0,
-            "y": 1.0,
-            "z": 1.5
-        },
         "baseDamage": 30.0,
         "cameraEffect": "None",
         "canCancel": true,
@@ -79,11 +69,6 @@
     },
     {
         "animationName": "Attack2",
-        "attackRange": {
-            "x": 2.0,
-            "y": 1.0,
-            "z": 1.5
-        },
         "baseDamage": 30.0,
         "cameraEffect": "None",
         "canCancel": true,
@@ -94,7 +79,7 @@
         "comboWindowEnd": 0,
         "comboWindowStart": 0,
         "continueWindow": 0.0,
-        "duration": 1.0,
+        "duration": 0.75,
         "effect": "",
         "fps": 60,
         "groundBounce": false,
@@ -118,11 +103,6 @@
     },
     {
         "animationName": "Attack4",
-        "attackRange": {
-            "x": 2.0,
-            "y": 1.0,
-            "z": 1.5
-        },
         "baseDamage": 30.0,
         "cameraEffect": "None",
         "canCancel": true,
@@ -157,11 +137,6 @@
     },
     {
         "animationName": "Slash2",
-        "attackRange": {
-            "x": 2.0,
-            "y": 1.0,
-            "z": 1.5
-        },
         "baseDamage": 30.0,
         "cameraEffect": "None",
         "canCancel": true,

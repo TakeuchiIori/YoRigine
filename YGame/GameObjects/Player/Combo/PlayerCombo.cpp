@@ -202,6 +202,20 @@ void PlayerCombo::UpdateAttacking() {
 	// 現在の攻撃が無効なら待機状態に戻す
 	if (!currentAttack_) { ChangeState(ComboState::Idle); return; }
 
+	// 経過時間をフレームに変換
+	const float frameDuration = (currentAttack_->fps > 0)
+		? 1.0f / static_cast<float>(currentAttack_->fps)
+		: 1.0f / 60.0f;
+
+	const int currentFrame = static_cast<int>(stateTimer_ / frameDuration);
+
+	// hitStart〜hitEnd の間だけ剣コライダーをON
+	const bool inHitWindow = (currentAttack_->hitEnd > currentAttack_->hitStart)
+		&& (currentFrame >= currentAttack_->hitStart)
+		&& (currentFrame < currentAttack_->hitEnd);
+
+
+	if (onHitWindowChanged_) onHitWindowChanged_(inHitWindow);
 	// 攻撃時間終了チェック
 	if (stateTimer_ >= currentAttack_->duration) {
 		if (currentAttack_->canChainToAny && currentCC_ > 0)
@@ -308,6 +322,8 @@ void PlayerCombo::ExitState(ComboState oldState) {
 	// 必要に応じて終了処理
 	switch (oldState) {
 	case ComboState::Attacking:
+		// 攻撃終了時はヒットウィンドウを閉じる
+		if (onHitWindowChanged_) onHitWindowChanged_(false);
 		break;
 	case ComboState::CanContinue:
 		break;
@@ -318,6 +334,7 @@ void PlayerCombo::ExitState(ComboState oldState) {
 	case ComboState::Finished:
 		break;
 	}
+
 }
 
 /// <summary>
