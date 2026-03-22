@@ -25,7 +25,7 @@ AttackingCombatState::AttackingCombatState(PlayerCombat* combat) : combat_(comba
 
 		// 攻撃アニメーションを再生
 		auto* obj = player->GetObject3d();
-		obj->SetMotionSpeed(player->GetMotionSpeed(1)); // 攻撃モーション速度
+		obj->SetMotionSpeed(attack.motionSpeed); // 攻撃モーション速度
 		obj->SetChangeMotion("Player.gltf", MotionPlayMode::Once, attack.animationName);
 		// 通知ログ
 		combat->NotifyAction("コンボ開始: " + attack.animationName);
@@ -44,7 +44,7 @@ AttackingCombatState::AttackingCombatState(PlayerCombat* combat) : combat_(comba
 
 		// 攻撃アニメーション再生
 		auto* obj = player->GetObject3d();
-		obj->SetMotionSpeed(player->GetMotionSpeed(1));
+		obj->SetMotionSpeed(attack.motionSpeed);
 		obj->SetChangeMotion("Player.gltf", MotionPlayMode::Once, attack.animationName);
 
 		// 通知ログ
@@ -93,6 +93,11 @@ AttackingCombatState::AttackingCombatState(PlayerCombat* combat) : combat_(comba
 	// ---------------------------------------------------------------------------------------------
 	combo->SetCCChangeCallback([]([[maybe_unused]] int oldCC, [[maybe_unused]] int newCC) {
 		// CC（Chain Capacity）の変化通知など
+		});
+
+	// 剣コライダーの ON/OFF をフレーム精度で制御
+	combo->SetHitWindowCallback([player](bool isActive) {
+		player->GetSword()->SetEnableCollider(isActive);
 		});
 }
 

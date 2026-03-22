@@ -195,6 +195,15 @@ void MotionSystem::SetPlayMode(MotionPlayMode playMode)
 	}
 }
 
+/// アニメーション時刻を直接セット（ドープシートのシークなどに使用）
+/// Stop状態でなくても上書きする（プレビュー目的）
+void MotionSystem::SetAnimationTime(float time)
+{
+	if (!animation_) return;
+	float duration = animation_->GetDuration();
+	animationTime_ = std::clamp(time, 0.0f, duration);
+}
+
 void MotionSystem::BlendAndApplyAnimation(const Motion& from, const Motion& to, float t)
 {
 	float fromSampleTime = animationBlendState_.fromTime + animationBlendState_.currentTime;

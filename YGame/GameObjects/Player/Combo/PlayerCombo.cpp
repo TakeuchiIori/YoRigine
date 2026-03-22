@@ -27,7 +27,8 @@ PlayerCombo::PlayerCombo(Player* owner)
 	if (!g_AttackEditor) {
 		g_AttackEditor = std::make_unique<AttackDataEditor>();
 		g_AttackEditor->SetFilePath("Resources/Json/Combo/AttackData.json");
-		g_AttackEditor->SetOpen(false); // 初期状態は閉じている
+		g_AttackEditor->SetReloadCallback([this]() { ReloadAttacks(); });               // ★
+		g_AttackEditor->SetOpen(false);
 	}
 }
 
@@ -559,6 +560,15 @@ void PlayerCombo::ShowDebugImGui() {
 	//---------------------------------------------------------------------------------------------
 	// エディターボタン
 	//---------------------------------------------------------------------------------------------
+
+	// ★ エディターウィンドウ描画（isOpen_ が true のときだけ表示）
+	if (g_AttackEditor && g_AttackEditor->IsOpen())
+	{
+		ImGui::Begin("コンボエディター", nullptr);
+		g_AttackEditor->DrawImGui();
+		ImGui::End();
+	}
+
 	if (ImGui::Button("攻撃エディターを開く")) {
 		if (g_AttackEditor) {
 			g_AttackEditor->SetOpen(true);

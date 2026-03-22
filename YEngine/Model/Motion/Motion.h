@@ -35,7 +35,7 @@ public:
 
 	// ベクトルのキーフレーム
 	using KeyframeVector3 = Keyframe<Vector3>;
-	using KeyframeFloat =	Keyframe<float>;
+	using KeyframeFloat = Keyframe<float>;
 
 	// 回転のキーフレーム
 	using KeyframeQuaternion = Keyframe<Quaternion>;

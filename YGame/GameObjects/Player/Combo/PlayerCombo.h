@@ -132,6 +132,8 @@ public:
 	void SetCCChangeCallback(std::function<void(int, int)> callback) {
 		onCCChanged_ = callback;
 	}
+	using HitWindowCallback = std::function<void(bool isActive)>;
+	void SetHitWindowCallback(HitWindowCallback cb) { onHitWindowChanged_ = cb; }
 
 	///************************* アクセッサ *************************///
 
@@ -230,4 +232,6 @@ private:
 	std::function<void(int)> onComboEnd_;                       // コンボ終了時
 	std::function<void()> onComboReset_;                        // コンボリセット時
 	std::function<void(int, int)> onCCChanged_;                 // CC変化時
+
+	HitWindowCallback onHitWindowChanged_;
 };
