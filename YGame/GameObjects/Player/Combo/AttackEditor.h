@@ -5,11 +5,18 @@
 #include <functional>
 #include "ComboTypes.h"
 #include "AttackDatabase.h"
-#include "AttackFrameData.h"
-#include "AttackFrameDatabase.h"
 #include "AttackFrameConverter.h"
 #include <Debugger/DopeSheet/DopeSheetEditor.h>
 
+//=============================================================================
+// AttackDataEditor
+// AttackData の一覧を ImGui で編集するエディタ
+//
+// 【構成】
+//   上段左  : 攻撃リスト（タイプ別折りたたみ）
+//   上段右  : プロパティインスペクタ（数値・フラグ類）
+//   下段    : ドープシート（フレーム単位のタイムライン編集）
+//=============================================================================
 class AttackDataEditor
 {
 public:
@@ -18,70 +25,55 @@ public:
     // 編集対象のリストを設定（省略可、デフォルトは AttackDatabase::Get()）
     void SetTarget(std::vector<AttackData>* list);
 
-    // JSONファイルパスを設定
+    // JSON ファイルパスを設定
     void SetFilePath(const std::string& path);
 
-    // フレームデータ用JSONファイルパスを設定
-    void SetFrameFilePath(const std::string& path);
-
-    // リロードコールバックを設定（自動リロード時に呼ばれる）
+    // リロードコールバックを設定（保存後にゲーム側へ通知したいときに使う）
     void SetReloadCallback(std::function<void()> callback);
 
-    // エディターウィンドウを表示
+    // エディタ全体を描画する
     void DrawImGui();
 
-    // エディターの開閉状態
+    // 開閉状態
     void SetOpen(bool open) { isOpen_ = open; }
-    bool IsOpen() const { return isOpen_; }
+    bool IsOpen()   const { return isOpen_; }
 
-    // 自動リロード設定
+    // 自動リロード（編集のたびに保存 & リロードする）
     void SetAutoReload(bool enable) { autoReload_ = enable; }
     bool IsAutoReload() const { return autoReload_; }
 
 private:
-    // UI描画関数群
     void DrawToolbar();
     void DrawAttackList();
     void DrawAttackDetail();
-    void DrawDopeSheet();           // ★ 追加：ドープシートエリア
+    void DrawDopeSheet();
 
-    // 操作関数群
     void NewAttack();
     void DuplicateAttack();
     void DeleteAttack();
     void MoveUp();
     void MoveDown();
 
-    // JSON関連
     void LoadFromJson();
     void SaveToJson();
-
-    // フレームデータ JSON関連
-    void LoadFrameDataFromJson();
-    void SaveFrameDataToJson();
-
-    // リロードをトリガー
     void TriggerReload();
 
-    // ドープシート同期
-    void OnAttackSelected();        // ★ 攻撃選択時に BuildTracks を呼ぶ
-    AttackFrameData& GetOrCreateFrameData(); // ★ 現在選択中の FrameData を取得/生成
+    // 攻撃選択時に BuildTracks を呼んでドープシートを初期化する
+    void OnAttackSelected();
 
 private:
-    // ── 既存メンバ ──
     std::vector<AttackData>* attacks_ = nullptr;
-    int  currentIndex_  = -1;
-    int  prevIndex_     = -1;      // ★ 選択変化の検知用
-    std::string filePath_      = "Resources/Json/Combo/AttackData.json";
-    std::string frameFilePath_ = "Resources/Json/Combo/AttackFrameData.json"; // ★
-    bool isOpen_     = false;
-    bool autoReload_ = true;
+    int                      currentIndex_ = -1;
+    int                      prevIndex_ = -1;
+
+    std::string filePath_ = "Resources/Json/Combo/AttackData.json";
+    bool        isOpen_ = false;
+    bool        autoReload_ = true;
 
     char nameBuffer_[256];
 
     std::function<void()> onReloadCallback_;
 
-    // ── 追加メンバ ──
-    DopeSheet::DopeSheetEditor          dopeEditor_;   // ★
-    std::vector<DopeSheet::DopeTrack>   dopeTracks_;   // ★ 現在選択中の攻撃分
+    DopeSheet::DopeSheetEditor        dopeEditor_;
+    std::vector<DopeSheet::DopeTrack> dopeTracks_;
 };

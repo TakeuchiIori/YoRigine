@@ -1,118 +1,68 @@
 #pragma once
 
 #include <vector>
-#include "AttackFrameData.h"
+#include "ComboTypes.h"
 #include <Debugger/DopeSheet/DopeTrack.h>
 
 //=============================================================================
 // AttackFrameConverter
-// AttackFrameData（フレーム単位データ）と
-// vector<DopeTrack>（DopeSheetEditor用）を双方向に変換する
+// AttackData（フレームフィールド）と vector<DopeTrack> を双方向に変換する
+//
+// 【使い方】
+//   攻撃を選択したとき   : tracks = BuildTracks(attack)
+//   ドープシート編集後   : ApplyTracks(tracks, attack) → attack.SyncFramesToSeconds()
 //=============================================================================
 class AttackFrameConverter
 {
 public:
     //=========================================================================
-    // AttackFrameData → vector<DopeTrack>
+    // AttackData → vector<DopeTrack>
     // 攻撃を選択したとき・リロード時に呼ぶ
     //=========================================================================
-    static std::vector<DopeSheet::DopeTrack> BuildTracks(const AttackFrameData& data)
+    static std::vector<DopeSheet::DopeTrack> BuildTracks(const AttackData& attack)
     {
         std::vector<DopeSheet::DopeTrack> tracks;
 
-        // -----------------------------------------------------------------
-        // 1. Attack Hitbox トラック（区間バー）
-        // -----------------------------------------------------------------
-        {
-            auto track = DopeSheet::DopeTrack::Make(DopeSheet::TrackType::AttackHitbox);
-            if (data.hitEnd > data.hitStart)
-            {
-                DopeSheet::DopeKey key;
-                key.frame = data.hitStart;
-                key.duration = data.hitEnd - data.hitStart;
-                key.shape = DopeSheet::KeyShape::Bar;
-                track.AddKey(key);
-            }
-            tracks.push_back(std::move(track));
-        }
+        // Attack Hitbox（攻撃判定の区間）
+        tracks.push_back(MakeBarTrack(
+            DopeSheet::TrackType::AttackHitbox,
+            attack.hitStart, attack.hitEnd));
 
-        // -----------------------------------------------------------------
-        // 2. Cancel Window トラック（区間バー）
-        // -----------------------------------------------------------------
-        {
-            auto track = DopeSheet::DopeTrack::Make(DopeSheet::TrackType::CancelWindow);
-            if (data.cancelStart < data.totalFrames)
-            {
-                DopeSheet::DopeKey key;
-                key.frame = data.cancelStart;
-                key.duration = data.totalFrames - data.cancelStart;
-                key.shape = DopeSheet::KeyShape::Bar;
-                track.AddKey(key);
-            }
-            tracks.push_back(std::move(track));
-        }
+        // Recovery（硬直の区間）
+        // ArmorFrame を Recovery トラックとして流用しラベルを上書き
+        tracks.push_back(MakeBarTrack(
+            DopeSheet::TrackType::ArmorFrame,
+            attack.recoveryStart, attack.recoveryEnd,
+            "Recovery"));
 
-        // -----------------------------------------------------------------
-        // 3. Combo Window トラック（区間バー）
-        // -----------------------------------------------------------------
-        {
-            auto track = DopeSheet::DopeTrack::Make(DopeSheet::TrackType::ComboWindow);
-            if (data.comboWindowEnd > data.comboWindowStart)
-            {
-                DopeSheet::DopeKey key;
-                key.frame = data.comboWindowStart;
-                key.duration = data.comboWindowEnd - data.comboWindowStart;
-                key.shape = DopeSheet::KeyShape::Bar;
-                track.AddKey(key);
-            }
-            tracks.push_back(std::move(track));
-        }
+        // Cancel Window（キャンセル受付の区間）
+        tracks.push_back(MakeBarTrack(
+            DopeSheet::TrackType::CancelWindow,
+            attack.cancelStart, attack.totalFrames));
 
-        // -----------------------------------------------------------------
-        // 4. Invincible Frame トラック（区間バー）
-        // -----------------------------------------------------------------
-        {
-            auto track = DopeSheet::DopeTrack::Make(DopeSheet::TrackType::InvincibleFrame);
-            if (data.invincibleEnd > data.invincibleStart)
-            {
-                DopeSheet::DopeKey key;
-                key.frame = data.invincibleStart;
-                key.duration = data.invincibleEnd - data.invincibleStart;
-                key.shape = DopeSheet::KeyShape::Bar;
-                track.AddKey(key);
-            }
-            tracks.push_back(std::move(track));
-        }
+        // Combo Window（コンボ入力受付の区間）
+        tracks.push_back(MakeBarTrack(
+            DopeSheet::TrackType::ComboWindow,
+            attack.comboWindowStart, attack.comboWindowEnd));
 
-        // -----------------------------------------------------------------
-        // 5. Effect トラック（ポイントキー）
-        // -----------------------------------------------------------------
+        // Invincible（無敵の区間）
+        tracks.push_back(MakeBarTrack(
+            DopeSheet::TrackType::InvincibleFrame,
+            attack.invincibleStart, attack.invincibleEnd));
+
+        // Effect（エフェクト発生タイミング・ポイントキー）
         {
             auto track = DopeSheet::DopeTrack::Make(DopeSheet::TrackType::Effect);
-            for (const auto& ev : data.effects)
-            {
-                DopeSheet::DopeKey key;
-                key.frame = ev.frame;
-                key.tag = ev.tag;
-                key.shape = DopeSheet::KeyShape::Diamond;
-                track.AddKey(key);
-            }
+            for (const auto& ev : attack.effects)
+                track.AddKey(MakeEventKey(ev.frame, ev.tag));
             tracks.push_back(std::move(track));
         }
 
-        // -----------------------------------------------------------------
-        // 6. Sound トラック（ポイントキー）
-        // -----------------------------------------------------------------
+        // Sound（SE 再生タイミング・ポイントキー）
         {
             auto track = DopeSheet::DopeTrack::Make(DopeSheet::TrackType::Sound);
-            for (const auto& ev : data.sounds)
-            {
-                DopeSheet::DopeKey key;
-                key.frame = ev.frame;
-                key.tag = ev.tag;
-                key.shape = DopeSheet::KeyShape::Diamond;
-                track.AddKey(key);
-            }
+            for (const auto& ev : attack.sounds)
+                track.AddKey(MakeEventKey(ev.frame, ev.tag));
             tracks.push_back(std::move(track));
         }
 
@@ -120,117 +70,53 @@ public:
     }
 
     //=========================================================================
-    // vector<DopeTrack> → AttackFrameData
-    // DopeSheetEditor の編集結果を書き戻すときに呼ぶ
+    // vector<DopeTrack> → AttackData
+    // ドープシートの編集結果を書き戻すときに呼ぶ
+    // 呼び出し後に attack.SyncFramesToSeconds() を呼ぶこと
     //=========================================================================
     static void ApplyTracks(
         const std::vector<DopeSheet::DopeTrack>& tracks,
-        AttackFrameData& data)
+        AttackData& attack)
     {
         for (const auto& track : tracks)
         {
             switch (track.type)
             {
-                // -----------------------------------------------------------------
-                // Attack Hitbox：先頭のバーキーだけ読む
-                // -----------------------------------------------------------------
             case DopeSheet::TrackType::AttackHitbox:
-            {
-                if (!track.keys.empty())
-                {
-                    const auto& key = track.keys.front();
-                    data.hitStart = key.frame;
-                    data.hitEnd = key.EndFrame();
-                }
-                else
-                {
-                    data.hitStart = 0;
-                    data.hitEnd = 0;
-                }
+                ReadBarTrack(track, attack.hitStart, attack.hitEnd);
                 break;
-            }
 
-            // -----------------------------------------------------------------
-            // Cancel Window：先頭キーの開始フレームだけ読む
-            // -----------------------------------------------------------------
+                // ArmorFrame = Recovery トラック
+            case DopeSheet::TrackType::ArmorFrame:
+                ReadBarTrack(track, attack.recoveryStart, attack.recoveryEnd);
+                break;
+
             case DopeSheet::TrackType::CancelWindow:
-            {
-                if (!track.keys.empty())
-                    data.cancelStart = track.keys.front().frame;
-                else
-                    data.cancelStart = data.totalFrames;
+                // キャンセル受付は開始フレームのみ保持
+                attack.cancelStart = track.keys.empty()
+                    ? attack.totalFrames
+                    : track.keys.front().frame;
                 break;
-            }
 
-            // -----------------------------------------------------------------
-            // Combo Window：先頭のバーキーだけ読む
-            // -----------------------------------------------------------------
             case DopeSheet::TrackType::ComboWindow:
-            {
-                if (!track.keys.empty())
-                {
-                    const auto& key = track.keys.front();
-                    data.comboWindowStart = key.frame;
-                    data.comboWindowEnd = key.EndFrame();
-                }
-                else
-                {
-                    data.comboWindowStart = 0;
-                    data.comboWindowEnd = 0;
-                }
+                ReadBarTrack(track, attack.comboWindowStart, attack.comboWindowEnd);
                 break;
-            }
 
-            // -----------------------------------------------------------------
-            // Invincible Frame：先頭のバーキーだけ読む
-            // -----------------------------------------------------------------
             case DopeSheet::TrackType::InvincibleFrame:
-            {
-                if (!track.keys.empty())
-                {
-                    const auto& key = track.keys.front();
-                    data.invincibleStart = key.frame;
-                    data.invincibleEnd = key.EndFrame();
-                }
-                else
-                {
-                    data.invincibleStart = 0;
-                    data.invincibleEnd = 0;
-                }
+                ReadBarTrack(track, attack.invincibleStart, attack.invincibleEnd);
                 break;
-            }
 
-            // -----------------------------------------------------------------
-            // Effect：全キーをイベントリストに書き戻す
-            // -----------------------------------------------------------------
             case DopeSheet::TrackType::Effect:
-            {
-                data.effects.clear();
+                attack.effects.clear();
                 for (const auto& key : track.keys)
-                {
-                    AttackFrameData::FrameEvent ev;
-                    ev.frame = key.frame;
-                    ev.tag = key.tag;
-                    data.effects.push_back(ev);
-                }
+                    attack.effects.push_back({ key.frame, key.tag });
                 break;
-            }
 
-            // -----------------------------------------------------------------
-            // Sound：全キーをイベントリストに書き戻す
-            // -----------------------------------------------------------------
             case DopeSheet::TrackType::Sound:
-            {
-                data.sounds.clear();
+                attack.sounds.clear();
                 for (const auto& key : track.keys)
-                {
-                    AttackFrameData::FrameEvent ev;
-                    ev.frame = key.frame;
-                    ev.tag = key.tag;
-                    data.sounds.push_back(ev);
-                }
+                    attack.sounds.push_back({ key.frame, key.tag });
                 break;
-            }
 
             default:
                 break;
@@ -238,21 +124,52 @@ public:
         }
     }
 
-    //=========================================================================
-    // AttackFrameData → AttackData への秒単位書き戻し
-    // fps を使ってフレーム→秒に変換する
-    //=========================================================================
-    static void SyncToAttackData(const AttackFrameData& frame, AttackData& attack)
+private:
+    // 区間バートラックを1つ生成する
+    static DopeSheet::DopeTrack MakeBarTrack(
+        DopeSheet::TrackType   type,
+        int                    startFrame,
+        int                    endFrame,
+        const std::string& labelOverride = "")
     {
-        if (frame.fps <= 0) return;
+        auto track = DopeSheet::DopeTrack::Make(type, labelOverride);
 
-        const float invFps = 1.0f / static_cast<float>(frame.fps);
+        if (endFrame > startFrame)
+        {
+            DopeSheet::DopeKey key;
+            key.frame = startFrame;
+            key.duration = endFrame - startFrame;
+            key.shape = DopeSheet::KeyShape::Bar;
+            track.AddKey(key);
+        }
+        return track;
+    }
 
-        // 攻撃判定の終了フレームを duration に反映
-        attack.duration = static_cast<float>(frame.hitEnd) * invFps;
+    // ポイントイベントキーを1つ生成する
+    static DopeSheet::DopeKey MakeEventKey(int frame, const std::string& tag)
+    {
+        DopeSheet::DopeKey key;
+        key.frame = frame;
+        key.tag = tag;
+        key.shape = DopeSheet::KeyShape::Diamond;
+        return key;
+    }
 
-        // キャンセル開始フレームを continueWindow に反映
-        // （totalFrames - cancelStart = キャンセル可能な残り時間）
-        attack.continueWindow = static_cast<float>(frame.totalFrames - frame.cancelStart) * invFps;
+    // 区間バートラックの先頭キーから start/end を読み取る
+    static void ReadBarTrack(
+        const DopeSheet::DopeTrack& track,
+        int& outStart,
+        int& outEnd)
+    {
+        if (!track.keys.empty())
+        {
+            outStart = track.keys.front().frame;
+            outEnd = track.keys.front().EndFrame();
+        }
+        else
+        {
+            outStart = 0;
+            outEnd = 0;
+        }
     }
 };

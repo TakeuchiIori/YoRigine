@@ -122,8 +122,8 @@ namespace DopeSheet
             }
         }
 
-        ImGui::EndChild();
         DrawAddKeyPopup(tracks);
+        ImGui::EndChild();
         ImGui::PopID();
 
         return anyChanged;
@@ -350,7 +350,7 @@ namespace DopeSheet
                 pendingFrame_ = std::clamp(
                     static_cast<int>((ImGui::GetMousePos().x - rowMin.x) / cellW), 0, totalFrames);
                 pendingValue_ = 0.0f;
-                pendingDuration_ = 0;
+                pendingDuration_ = 10;
                 pendingTrackIdx_ = trackIdx;
                 showAddPopup_ = true;
                 ImGui::OpenPopup("##DopeAddKey");

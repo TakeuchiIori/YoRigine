@@ -2,7 +2,6 @@
 #include "../Player.h"
 #include "AttackDatabase.h"
 #include "AttackEditor.h"
-#include "AttackFrameDatabase.h"
 
 #ifdef USE_IMGUI
 #include "imgui.h"
@@ -28,7 +27,6 @@ PlayerCombo::PlayerCombo(Player* owner)
 	if (!g_AttackEditor) {
 		g_AttackEditor = std::make_unique<AttackDataEditor>();
 		g_AttackEditor->SetFilePath("Resources/Json/Combo/AttackData.json");
-		g_AttackEditor->SetFrameFilePath("Resources/Json/Combo/AttackFrameData.json"); // ★
 		g_AttackEditor->SetReloadCallback([this]() { ReloadAttacks(); });               // ★
 		g_AttackEditor->SetOpen(false);
 	}
@@ -520,7 +518,6 @@ void PlayerCombo::InitializeAttacks()
 		OutputDebugStringA("[PlayerCombo] AttackData.json load failed!\n");
 		return;
 	}
-	AttackFrameDatabase::LoadFromFile("Resources/Json/Combo/AttackFrameData.json");
 
 	// 現行の attackDatabase_ を初期化
 	attackDatabase_.clear();

@@ -1,12 +1,11 @@
 #include "AttackEditor.h"
 #include <algorithm>
+#include <map>
 
 #include <Debugger/Logger.h>
 #ifdef USE_IMGUI
 #include <imgui.h>
 #endif
-
-using json = nlohmann::json;
 
 AttackDataEditor::AttackDataEditor()
 {
@@ -16,24 +15,15 @@ AttackDataEditor::AttackDataEditor()
 
 void AttackDataEditor::SetTarget(std::vector<AttackData>* list)
 {
-    attacks_      = list;
+    attacks_ = list;
     currentIndex_ = (attacks_ && !attacks_->empty()) ? 0 : -1;
-    prevIndex_    = -1;
+    prevIndex_ = -1;
 }
 
 void AttackDataEditor::SetFilePath(const std::string& path)
 {
     filePath_ = path;
-    std::string msg = "[AttackEditor] File path set to: " + filePath_ + "\n";
-    Logger(msg.c_str());
-}
-
-// ★ 追加
-void AttackDataEditor::SetFrameFilePath(const std::string& path)
-{
-    frameFilePath_ = path;
-    std::string msg = "[AttackEditor] Frame file path set to: " + frameFilePath_ + "\n";
-    Logger(msg.c_str());
+    Logger(("[AttackEditor] File path: " + filePath_ + "\n").c_str());
 }
 
 void AttackDataEditor::SetReloadCallback(std::function<void()> callback)
@@ -50,7 +40,7 @@ void AttackDataEditor::DrawImGui()
     DrawToolbar();
     ImGui::Separator();
 
-    // ── 上段：攻撃リスト | プロパティインスペクタ ──
+    // 上段：攻撃リスト（左）| プロパティインスペクタ（右）
     ImGui::Columns(2, nullptr, true);
     DrawAttackList();
     ImGui::NextColumn();
@@ -59,150 +49,22 @@ void AttackDataEditor::DrawImGui()
 
     ImGui::Separator();
 
-    // ── 下段：ドープシート ──（★ 追加）
+    // 下段：ドープシート
     DrawDopeSheet();
 #endif
 }
 
 //=============================================================================
-// DrawDopeSheet  ── ★ 新規
+// DrawToolbar
 //=============================================================================
-void AttackDataEditor::DrawDopeSheet()
-{
-#ifdef USE_IMGUI
-    if (!attacks_ || currentIndex_ < 0 || currentIndex_ >= static_cast<int>(attacks_->size()))
-    {
-        ImGui::TextDisabled("攻撃を選択するとタイムラインが表示されます");
-        return;
-    }
-
-    // 選択が変わったら BuildTracks を呼ぶ
-    if (currentIndex_ != prevIndex_)
-    {
-        OnAttackSelected();
-        prevIndex_ = currentIndex_;
-    }
-
-    const AttackData& attack = attacks_->at(currentIndex_);
-
-    // ドープシートのヘッダー
-    ImGui::Text("タイムライン : %s", attack.animationName.c_str());
-
-    // fps と totalFrames をインラインで編集できるようにする
-    AttackFrameData& fd = GetOrCreateFrameData();
-    bool frameChanged = false;
-    ImGui::SetNextItemWidth(80.0f);
-    frameChanged |= ImGui::InputInt("総フレーム数", &fd.totalFrames);
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(60.0f);
-    frameChanged |= ImGui::InputInt("FPS", &fd.fps);
-    fd.totalFrames = std::max(1,  fd.totalFrames);
-    fd.fps         = std::max(1,  fd.fps);
-
-    ImGui::Separator();
-
-    // DopeSheetEditor 本体を描画
-    // Draw() が true を返したらトラックが編集されたので書き戻す
-    bool dopeChanged = dopeEditor_.Draw(
-        "##combo_dope",
-        dopeTracks_,
-        fd.totalFrames,
-        fd.fps
-    );
-
-    if (dopeChanged || frameChanged)
-    {
-        // tracks → AttackFrameData
-        AttackFrameConverter::ApplyTracks(dopeTracks_, fd);
-
-        // AttackFrameData → AttackData（秒単位フィールド）
-        AttackData& atk = attacks_->at(currentIndex_);
-        AttackFrameConverter::SyncToAttackData(fd, atk);
-
-        if (autoReload_)
-        {
-            SaveFrameDataToJson();
-            SaveToJson();
-            TriggerReload();
-        }
-    }
-#endif
-}
-
-//=============================================================================
-// OnAttackSelected  ── ★新規
-// 攻撃を選択したとき呼ばれる。FrameData を取得して BuildTracks する
-//=============================================================================
-void AttackDataEditor::OnAttackSelected()
-{
-    if (!attacks_ || currentIndex_ < 0) return;
-
-    const AttackData& attack = attacks_->at(currentIndex_);
-    AttackFrameData&  fd     = GetOrCreateFrameData();
-
-    // AttackFrameData → DopeTrack リスト
-    dopeTracks_ = AttackFrameConverter::BuildTracks(fd);
-
-    // シークバーをリセット
-    dopeEditor_.ResetView();
-
-    std::string msg = "[AttackEditor] Tracks built for: " + attack.name + "\n";
-    Logger(msg.c_str());
-}
-
-//=============================================================================
-// GetOrCreateFrameData  ── ★ 新規
-//=============================================================================
-AttackFrameData& AttackDataEditor::GetOrCreateFrameData()
-{
-    const std::string& name = attacks_->at(currentIndex_).name;
-    return AttackFrameDatabase::FindOrCreate(name);
-}
-
-//=============================================================================
-// LoadFrameDataFromJson / SaveFrameDataToJson  ── ★ 新規
-//=============================================================================
-void AttackDataEditor::LoadFrameDataFromJson()
-{
-    AttackFrameDatabase::LoadFromFile(frameFilePath_);
-
-    // 選択中の攻撃のトラックも再構築する
-    if (currentIndex_ >= 0)
-        OnAttackSelected();
-}
-
-void AttackDataEditor::SaveFrameDataToJson()
-{
-    AttackFrameDatabase::SaveToFile(frameFilePath_);
-}
-
-//=============================================================================
-// 以下は既存コードそのまま
-//=============================================================================
-
 void AttackDataEditor::DrawToolbar()
 {
 #ifdef USE_IMGUI
-    if (ImGui::Button("保存"))
-    {
-        SaveToJson();
-        SaveFrameDataToJson(); // ★ フレームデータも一緒に保存
-        TriggerReload();
-    }
+    if (ImGui::Button("保存")) { SaveToJson(); TriggerReload(); }
     ImGui::SameLine();
-    if (ImGui::Button("読み込み"))
-    {
-        LoadFromJson();
-        LoadFrameDataFromJson(); // ★ フレームデータも一緒に読み込み
-        TriggerReload();
-    }
+    if (ImGui::Button("読み込み")) { LoadFromJson(); TriggerReload(); }
     ImGui::SameLine();
-    if (ImGui::Button("保存 & リロード"))
-    {
-        SaveToJson();
-        SaveFrameDataToJson(); // ★
-        TriggerReload();
-    }
+    if (ImGui::Button("保存 & リロード")) { SaveToJson(); TriggerReload(); }
 
     ImGui::SameLine();
     ImGui::Text("ファイル: %s", filePath_.c_str());
@@ -213,216 +75,272 @@ void AttackDataEditor::DrawToolbar()
     if (ImGui::Checkbox("編集時に自動リロード", &autoReload_))
     {
         Logger(autoReload_
-            ? "[AttackEditor] 自動リロードが有効になりました\n"
-            : "[AttackEditor] 自動リロードが無効になりました\n");
+            ? "[AttackEditor] 自動リロード: ON\n"
+            : "[AttackEditor] 自動リロード: OFF\n");
     }
     ImGui::SameLine();
     ImGui::TextDisabled("(?)");
     if (ImGui::IsItemHovered())
     {
         ImGui::BeginTooltip();
-        ImGui::Text("編集時に攻撃設定を自動的にリロードします");
+        ImGui::Text("編集のたびに保存してゲーム側に反映します");
         ImGui::EndTooltip();
     }
 #endif
 }
 
+//=============================================================================
+// DrawAttackList  ── 左カラム
+//=============================================================================
 void AttackDataEditor::DrawAttackList()
 {
 #ifdef USE_IMGUI
-    if (!attacks_)
-    {
-        ImGui::Text("攻撃リストがありません。");
-        return;
-    }
+    if (!attacks_) { ImGui::Text("攻撃リストがありません。"); return; }
 
     ImGui::Text("攻撃数 (%d)", static_cast<int>(attacks_->size()));
     ImGui::Separator();
 
-    std::map<AttackType, std::vector<int>> categorizedAttacks;
+    // タイプ別に分類して表示
+    std::map<AttackType, std::vector<int>> byType;
     for (int i = 0; i < static_cast<int>(attacks_->size()); ++i)
-        categorizedAttacks[attacks_->at(i).type].push_back(i);
+        byType[attacks_->at(i).type].push_back(i);
 
-    static const char* attackTypes[] = { "A技 (軽)", "B技 (重)", "奥義 (究極)" };
+    static const char* typeLabels[] = { "A技 (軽)", "B技 (重)", "奥義 (究極)" };
 
-    for (int typeIndex = 0; typeIndex < 3; ++typeIndex)
+    for (int t = 0; t < 3; ++t)
     {
-        AttackType type = static_cast<AttackType>(typeIndex);
-        if (ImGui::CollapsingHeader(attackTypes[typeIndex], ImGuiTreeNodeFlags_DefaultOpen))
+        if (!ImGui::CollapsingHeader(typeLabels[t], ImGuiTreeNodeFlags_DefaultOpen)) continue;
+
+        for (int i : byType[static_cast<AttackType>(t)])
         {
-            for (int i : categorizedAttacks[type])
-            {
-                const bool isSelected = (i == currentIndex_);
-                const std::string label = attacks_->at(i).name + "##attack_" + std::to_string(i);
+            const bool selected = (i == currentIndex_);
+            if (selected)
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f));
 
-                if (isSelected)
-                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.2f, 0.2f, 1.0f));
+            if (ImGui::Selectable(
+                (attacks_->at(i).name + "##atk" + std::to_string(i)).c_str(), selected))
+                currentIndex_ = i;
 
-                if (ImGui::Selectable(label.c_str(), isSelected))
-                    currentIndex_ = i;
-
-                if (isSelected)
-                    ImGui::PopStyleColor();
-            }
+            if (selected)
+                ImGui::PopStyleColor();
         }
     }
 
     ImGui::Separator();
-    if (ImGui::Button("新規作成"))  { NewAttack();       if (autoReload_) TriggerReload(); }
+    if (ImGui::Button("新規")) { NewAttack();       if (autoReload_) TriggerReload(); }
     ImGui::SameLine();
-    if (ImGui::Button("複製"))      { DuplicateAttack(); if (autoReload_) TriggerReload(); }
+    if (ImGui::Button("複製")) { DuplicateAttack(); if (autoReload_) TriggerReload(); }
     ImGui::SameLine();
-    if (ImGui::Button("削除"))      { DeleteAttack();    if (autoReload_) TriggerReload(); }
+    if (ImGui::Button("削除")) { DeleteAttack();    if (autoReload_) TriggerReload(); }
 #endif
 }
 
+//=============================================================================
+// DrawAttackDetail  ── 右カラム
+//=============================================================================
 void AttackDataEditor::DrawAttackDetail()
 {
 #ifdef USE_IMGUI
     if (!attacks_ || currentIndex_ < 0 || currentIndex_ >= static_cast<int>(attacks_->size()))
     {
-        ImGui::Text("攻撃が選択されていません。");
+        ImGui::TextDisabled("攻撃を選択してください");
         return;
     }
 
-    AttackData& attack = attacks_->at(currentIndex_);
-    static const char* attackTypes[] = { "A技 (軽)", "B技 (重)", "奥義 (究極)" };
+    AttackData& atk = attacks_->at(currentIndex_);
+    static const char* typeLabels[] = { "A技 (軽)", "B技 (重)", "奥義 (究極)" };
+    bool changed = false;
 
     ImGui::Text("詳細");
     ImGui::Separator();
 
-    bool changed = false;
-
     // 名前
-    std::snprintf(nameBuffer_, sizeof(nameBuffer_), "%s", attack.name.c_str());
+    std::snprintf(nameBuffer_, sizeof(nameBuffer_), "%s", atk.name.c_str());
     if (ImGui::InputText("名前", nameBuffer_, sizeof(nameBuffer_)))
     {
-        attack.name = nameBuffer_;
-        changed = true;
+        atk.name = nameBuffer_; changed = true;
     }
     ImGui::Separator();
 
-    if (ImGui::CollapsingHeader("基本情報", ImGuiTreeNodeFlags_None))
+    if (ImGui::CollapsingHeader("基本情報"))
     {
-        char animBuffer[256];
-        std::snprintf(animBuffer, sizeof(animBuffer), "%s", attack.animationName.c_str());
-        if (ImGui::InputText("アニメーション名", animBuffer, sizeof(animBuffer)))
+        char buf[256];
+        std::snprintf(buf, sizeof(buf), "%s", atk.animationName.c_str());
+        if (ImGui::InputText("アニメーション名", buf, sizeof(buf)))
         {
-            attack.animationName = animBuffer;
-            changed = true;
+            atk.animationName = buf; changed = true;
         }
-        int currentType = static_cast<int>(attack.type);
-        if (ImGui::Combo("タイプ", &currentType, attackTypes, 3))
+
+        int t = static_cast<int>(atk.type);
+        if (ImGui::Combo("タイプ", &t, typeLabels, 3))
         {
-            attack.type = static_cast<AttackType>(currentType);
-            changed = true;
+            atk.type = static_cast<AttackType>(t); changed = true;
         }
-        char cameraEffectBuffer[256];
-        std::snprintf(cameraEffectBuffer, sizeof(cameraEffectBuffer), "%s", attack.cameraEffect.c_str());
-        if (ImGui::InputText("カメラ効果", cameraEffectBuffer, sizeof(cameraEffectBuffer)))
+
+        std::snprintf(buf, sizeof(buf), "%s", atk.cameraEffect.c_str());
+        if (ImGui::InputText("カメラ効果", buf, sizeof(buf)))
         {
-            attack.cameraEffect = cameraEffectBuffer;
-            changed = true;
+            atk.cameraEffect = buf; changed = true;
         }
     }
 
-    if (ImGui::CollapsingHeader("タイミング", ImGuiTreeNodeFlags_None))
+    if (ImGui::CollapsingHeader("タイミング（秒単位・参照用）"))
     {
-        changed |= ImGui::InputFloat("持続時間",       &attack.duration,       0.01f, 0.1f, "%.2f");
-        changed |= ImGui::InputFloat("硬直時間",       &attack.recovery,       0.01f, 0.1f, "%.2f");
-        changed |= ImGui::InputFloat("継続受付時間",   &attack.continueWindow, 0.01f, 0.1f, "%.2f");
-        changed |= ImGui::InputFloat("モーション速度", &attack.motionSpeed,    0.01f, 0.1f, "%.2f");
+        // ドープシートで設定したフレームから自動計算された値を表示
+        // 直接編集も可能だが、次回ドープシート保存時に上書きされる
+        ImGui::TextDisabled("ドープシートで編集すると自動更新されます");
+        changed |= ImGui::InputFloat("持続時間", &atk.duration, 0.01f, 0.1f, "%.2f");
+        changed |= ImGui::InputFloat("硬直時間", &atk.recovery, 0.01f, 0.1f, "%.2f");
+        changed |= ImGui::InputFloat("継続受付時間", &atk.continueWindow, 0.01f, 0.1f, "%.2f");
+        changed |= ImGui::InputFloat("モーション速度", &atk.motionSpeed, 0.01f, 0.1f, "%.2f");
     }
 
-    if (ImGui::CollapsingHeader("ダメージ & 効果", ImGuiTreeNodeFlags_None))
+    if (ImGui::CollapsingHeader("ダメージ & 効果"))
     {
-        changed |= ImGui::InputFloat("基本ダメージ",           &attack.baseDamage,        1.0f,  10.0f, "%.1f");
-        changed |= ImGui::InputFloat("ノックバック",           &attack.knockback,         0.1f,  1.0f,  "%.1f");
-        changed |= ImGui::InputFloat("ノックバック持続時間",   &attack.knockbackDuration, 0.1f,  1.0f,  "%.2f");
-        changed |= ImGui::InputFloat3("攻撃範囲",              &attack.attackRange.x);
-        changed |= ImGui::InputFloat("攻撃時のステップ距離",   &attack.stepDistance,      0.1f,  1.0f,  "%.2f");
+        changed |= ImGui::InputFloat("基本ダメージ", &atk.baseDamage, 1.0f, 10.0f, "%.1f");
+        changed |= ImGui::InputFloat("ノックバック", &atk.knockback, 0.1f, 1.0f, "%.1f");
+        changed |= ImGui::InputFloat("ノックバック持続時間", &atk.knockbackDuration, 0.1f, 1.0f, "%.2f");
+        changed |= ImGui::InputFloat3("攻撃範囲", &atk.attackRange.x);
+        changed |= ImGui::InputFloat("踏み込み距離", &atk.stepDistance, 0.1f, 1.0f, "%.2f");
     }
 
     if (ImGui::CollapsingHeader("CCシステム"))
     {
-        changed |= ImGui::InputInt("CC消費",         &attack.ccCost);
-        changed |= ImGui::InputInt("CCヒット時回復", &attack.ccOnHit);
+        changed |= ImGui::InputInt("CC消費", &atk.ccCost);
+        changed |= ImGui::InputInt("CCヒット時回復", &atk.ccOnHit);
     }
 
     if (ImGui::CollapsingHeader("コンボ特性"))
     {
-        changed |= ImGui::Checkbox("キャンセル可能",   &attack.canCancel);
-        changed |= ImGui::Checkbox("任意に連携可能",   &attack.canChainToAny);
+        changed |= ImGui::Checkbox("キャンセル可能", &atk.canCancel);
+        changed |= ImGui::Checkbox("任意に連携可能", &atk.canChainToAny);
 
         if (ImGui::TreeNode("推奨次攻撃"))
         {
-            for (size_t i = 0; i < attack.preferredNext.size(); ++i)
+            for (size_t i = 0; i < atk.preferredNext.size(); ++i)
             {
                 ImGui::PushID(static_cast<int>(i));
-                int currentPreferred = static_cast<int>(attack.preferredNext[i]);
-                if (ImGui::Combo(("##" + std::to_string(i)).c_str(), &currentPreferred, attackTypes, 3))
+                int p = static_cast<int>(atk.preferredNext[i]);
+                if (ImGui::Combo("##pref", &p, typeLabels, 3))
                 {
-                    attack.preferredNext[i] = static_cast<AttackType>(currentPreferred);
-                    changed = true;
+                    atk.preferredNext[i] = static_cast<AttackType>(p); changed = true;
                 }
                 ImGui::SameLine();
                 if (ImGui::Button("X"))
                 {
-                    attack.preferredNext.erase(attack.preferredNext.begin() + i);
-                    changed = true;
-                    ImGui::PopID();
-                    break;
+                    atk.preferredNext.erase(atk.preferredNext.begin() + i); changed = true; ImGui::PopID(); break;
                 }
                 ImGui::PopID();
             }
-            if (ImGui::Button("推奨を追加"))
+            if (ImGui::Button("追加"))
             {
-                attack.preferredNext.push_back(AttackType::A_Arte);
-                changed = true;
+                atk.preferredNext.push_back(AttackType::A_Arte); changed = true;
             }
             ImGui::TreePop();
         }
     }
 
-    if (changed && autoReload_)
+    if (changed && autoReload_) { SaveToJson(); TriggerReload(); }
+#endif
+}
+
+//=============================================================================
+// DrawDopeSheet  ── 下段
+//=============================================================================
+void AttackDataEditor::DrawDopeSheet()
+{
+#ifdef USE_IMGUI
+    if (!attacks_ || currentIndex_ < 0 || currentIndex_ >= static_cast<int>(attacks_->size()))
     {
-        SaveToJson();
-        TriggerReload();
+        ImGui::TextDisabled("攻撃を選択するとタイムラインが表示されます");
+        return;
+    }
+
+    // 選択が変わったらトラックを再構築する
+    if (currentIndex_ != prevIndex_)
+    {
+        OnAttackSelected();
+        prevIndex_ = currentIndex_;
+    }
+
+    AttackData& atk = attacks_->at(currentIndex_);
+
+    // タイムライン設定（totalFrames・fps をインライン編集できる）
+    ImGui::Text("タイムライン : %s", atk.animationName.c_str());
+    bool headerChanged = false;
+    ImGui::SetNextItemWidth(80.0f);
+    headerChanged |= ImGui::InputInt("総フレーム数", &atk.totalFrames);
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(60.0f);
+    headerChanged |= ImGui::InputInt("FPS", &atk.fps);
+    atk.totalFrames = std::max(1, atk.totalFrames);
+    atk.fps = std::max(1, atk.fps);
+
+    ImGui::Separator();
+
+    // ドープシート本体を描画
+    // Draw() が true を返したらキーが編集されたので AttackData に書き戻す
+    bool dopeChanged = dopeEditor_.Draw(
+        "##combo_dope",
+        dopeTracks_,
+        atk.totalFrames,
+        atk.fps);
+
+    if (dopeChanged || headerChanged)
+    {
+        // DopeTrack → AttackData のフレームフィールドへ書き戻す
+        AttackFrameConverter::ApplyTracks(dopeTracks_, atk);
+
+        // フレームフィールド → 秒フィールドへ自動計算
+        atk.SyncFramesToSeconds();
+
+        if (autoReload_) { SaveToJson(); TriggerReload(); }
     }
 #endif
 }
 
+//=============================================================================
+// OnAttackSelected
+// 攻撃リストで選択が変わったときに呼ばれる
+//=============================================================================
+void AttackDataEditor::OnAttackSelected()
+{
+    if (!attacks_ || currentIndex_ < 0) return;
+
+    const AttackData& atk = attacks_->at(currentIndex_);
+
+    // AttackData のフレームフィールドからトラックを生成する
+    dopeTracks_ = AttackFrameConverter::BuildTracks(atk);
+    dopeEditor_.ResetView();
+
+    Logger(("[AttackEditor] Tracks built for: " + atk.name + "\n").c_str());
+}
+
+//=============================================================================
+// 攻撃の追加・複製・削除
+//=============================================================================
 void AttackDataEditor::NewAttack()
 {
     if (!attacks_) return;
 
     AttackData data;
-    data.name             = "NewAttack_" + std::to_string(attacks_->size());
-    data.animationName    = "Idle";
-    data.type             = AttackType::A_Arte;
-    data.duration         = 0.3f;
-    data.recovery         = 0.2f;
-    data.continueWindow   = 0.3f;
-    data.baseDamage       = 30.0f;
-    data.knockback        = 5.0f;
-    data.knockbackDuration= 0.5f;
-    data.attackRange      = { 2.0f, 1.0f, 1.5f };
-    data.ccCost           = 1;
-    data.ccOnHit          = 0;
-    data.canCancel        = true;
-    data.canChainToAny    = true;
-    data.launches         = false;
-    data.wallBounce       = false;
-    data.groundBounce     = false;
-    data.effect           = "";
-    data.motionSpeed      = 1.0f;
+    data.name = "NewAttack_" + std::to_string(attacks_->size());
+    data.animationName = "Idle";
+    data.type = AttackType::A_Arte;
+    data.totalFrames = 60;
+    data.fps = 60;
+    data.baseDamage = 30.0f;
+    data.knockback = 5.0f;
+    data.knockbackDuration = 0.5f;
+    data.attackRange = { 2.0f, 1.0f, 1.5f };
+    data.ccCost = 1;
+    data.canCancel = true;
+    data.canChainToAny = true;
+    data.motionSpeed = 1.0f;
 
     attacks_->push_back(data);
     currentIndex_ = static_cast<int>(attacks_->size()) - 1;
-    prevIndex_    = -1; // ★ 強制的に BuildTracks させる
-
-    // ★ 新規攻撃のフレームデータも生成しておく
-    AttackFrameDatabase::FindOrCreate(data.name);
+    prevIndex_ = -1;
 
     Logger("[AttackEditor] New attack created\n");
 }
@@ -431,17 +349,11 @@ void AttackDataEditor::DuplicateAttack()
 {
     if (!attacks_ || currentIndex_ < 0 || currentIndex_ >= static_cast<int>(attacks_->size())) return;
 
-    AttackData copy  = attacks_->at(currentIndex_);
-    copy.name       += "_copy";
+    AttackData copy = attacks_->at(currentIndex_);
+    copy.name += "_copy";
     attacks_->push_back(copy);
-    currentIndex_    = static_cast<int>(attacks_->size()) - 1;
-    prevIndex_       = -1; // ★
-
-    // ★ コピー元のフレームデータを複製する
-    AttackFrameData& srcFd = AttackFrameDatabase::FindOrCreate(attacks_->at(currentIndex_ - 1).name);
-    AttackFrameData  dstFd = srcFd;
-    dstFd.attackName       = copy.name;
-    AttackFrameDatabase::Get().push_back(dstFd);
+    currentIndex_ = static_cast<int>(attacks_->size()) - 1;
+    prevIndex_ = -1;
 
     Logger("[AttackEditor] Attack duplicated\n");
 }
@@ -454,7 +366,7 @@ void AttackDataEditor::DeleteAttack()
     if (currentIndex_ >= static_cast<int>(attacks_->size()))
         currentIndex_ = static_cast<int>(attacks_->size()) - 1;
 
-    prevIndex_ = -1; // ★
+    prevIndex_ = -1;
     dopeTracks_.clear();
 
     Logger("[AttackEditor] Attack deleted\n");
@@ -474,38 +386,41 @@ void AttackDataEditor::MoveDown()
     ++currentIndex_;
 }
 
+//=============================================================================
+// JSON I/O
+//=============================================================================
 void AttackDataEditor::LoadFromJson()
 {
-    Logger("[AttackEditor] ===== Load Start =====\n");
-    if (!attacks_) { Logger("[AttackEditor] ERROR: attacks_ is null!\n"); return; }
+    Logger("[AttackEditor] Load start\n");
+    if (!attacks_) { Logger("[AttackEditor] ERROR: attacks_ is null\n"); return; }
 
-    bool loadResult = AttackDatabase::LoadFromFile(filePath_);
-    Logger(loadResult ? "[AttackEditor] ===== Load Success =====\n"
-                      : "[AttackEditor] ===== Load Failed =====\n");
-
-    if (loadResult)
+    if (AttackDatabase::LoadFromFile(filePath_))
     {
         attacks_ = &AttackDatabase::Get();
         currentIndex_ = attacks_->empty() ? -1
             : std::clamp(currentIndex_, 0, static_cast<int>(attacks_->size()) - 1);
-        prevIndex_ = -1; // ★ 再選択を強制
+        prevIndex_ = -1;
+        Logger("[AttackEditor] Load success\n");
+    }
+    else
+    {
+        Logger("[AttackEditor] Load failed\n");
     }
 }
 
 void AttackDataEditor::SaveToJson()
 {
-    Logger("[AttackEditor] ===== Save Start =====\n");
-    bool saveResult = AttackDatabase::SaveToFile(filePath_);
-    Logger(saveResult ? "[AttackEditor] ===== Save Success =====\n"
-                      : "[AttackEditor] ===== Save Failed =====\n");
+    Logger("[AttackEditor] Save start\n");
+    AttackDatabase::SaveToFile(filePath_)
+        ? Logger("[AttackEditor] Save success\n")
+        : Logger("[AttackEditor] Save failed\n");
 }
 
 void AttackDataEditor::TriggerReload()
 {
     if (onReloadCallback_)
     {
-        Logger("[AttackEditor] Triggering reload callback...\n");
+        Logger("[AttackEditor] Reload triggered\n");
         onReloadCallback_();
-        Logger("[AttackEditor] Reload callback completed\n");
     }
 }
