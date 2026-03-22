@@ -95,8 +95,10 @@ AttackingCombatState::AttackingCombatState(PlayerCombat* combat) : combat_(comba
 		// CC（Chain Capacity）の変化通知など
 		});
 
+	// ---------------------------------------------------------------------------------------------
 	// 剣コライダーの ON/OFF をフレーム精度で制御
-	combo->SetHitWindowCallback([player](bool isActive) {
+	// ---------------------------------------------------------------------------------------------
+	combo->SetSwordColliderCallback([player](bool isActive) {
 		player->GetSword()->SetEnableCollider(isActive);
 		});
 }

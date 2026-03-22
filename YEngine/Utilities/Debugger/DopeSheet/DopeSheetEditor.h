@@ -76,7 +76,7 @@ public:
     // レイアウト定数
     //=========================================================================
     static constexpr float kRowH    = 22.0f;
-    static constexpr float kLabelW  = 120.0f;
+    static constexpr float kLabelW  = 150.0f;
     static constexpr float kRulerH  = 20.0f;
     static constexpr float kHeaderH = 20.0f;
 
