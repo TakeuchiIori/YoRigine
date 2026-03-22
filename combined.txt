@@ -232887,58 +232887,141 @@ namespace DopeSheet
             ? height
             : kRulerH + kRowH * visibleRows + 4.0f;
 
-        // ツールバー
         ImGui::PushID(id);
+
+        // ── ツールバー ──
         ImGui::Text("ズーム: %.0fpx/f", zoomX_);
         ImGui::SameLine();
-        ImGui::Text("| %d f  (%.2f s)", seekFrame_, seekFrame_ / (float)fps);
+        ImGui::Text("| %d f  (%.2f s)", seekFrame_, seekFrame_ / static_cast<float>(fps));
         ImGui::SameLine();
         if (ImGui::SmallButton("リセット")) ResetView();
         ImGui::SameLine();
         ImGui::TextDisabled("(Ctrl+ホイール で拡縮)");
 
-        // スクロール子ウィンドウ
-        const std::string childId = std::string("##DopeScroll_") + id;
+        // =========================================================
+        // 左ペイン：ラベル列（固定・スクロールなし）
+        // =========================================================
+        const std::string labelId = std::string("##DopeLabel_") + id;
         ImGui::BeginChild(
-            childId.c_str(),
+            labelId.c_str(),
+            { kLabelW, timelineH + 4 },
+            false,
+            ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+
+        {
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            ImVec2 winPos = ImGui::GetWindowPos();
+
+            // ルーラー部分の背景（ラベル側）
+            dl->AddRectFilled(
+                { winPos.x, winPos.y },
+                { winPos.x + kLabelW, winPos.y + kRulerH },
+                IM_COL32(30, 30, 30, 255));
+
+            // 各トラックのラベルを描画
+            bool collapsed = false;
+            int  row = 0;
+            for (int ti = 0; ti < static_cast<int>(tracks.size()); ++ti)
+            {
+                const DopeTrack& track = tracks[ti];
+                if (!track.visible) continue;
+
+                float y = winPos.y + kRulerH + row * kRowH;
+
+                if (track.isGroupHeader)
+                {
+                    collapsed = !track.groupExpanded;
+                    dl->AddRectFilled(
+                        { winPos.x, y },
+                        { winPos.x + kLabelW, y + kHeaderH },
+                        IM_COL32(35, 55, 75, 255));
+
+                    float indentX = winPos.x + 4 + track.groupDepth * 12.0f;
+                    dl->AddText(
+                        { indentX, y + kHeaderH * 0.5f - 6.0f },
+                        IM_COL32(200, 200, 200, 255),
+                        track.groupExpanded ? "v" : ">");
+                    dl->AddText(
+                        { indentX + 14, y + 4 },
+                        IM_COL32(230, 230, 230, 255),
+                        track.label.c_str());
+                    row++;
+                    continue;
+                }
+                if (collapsed) continue;
+
+                // 行背景
+                ImU32 bg = (row % 2 == 0)
+                    ? IM_COL32(46, 46, 46, 255)
+                    : IM_COL32(38, 38, 38, 255);
+                dl->AddRectFilled(
+                    { winPos.x, y },
+                    { winPos.x + kLabelW, y + kRowH }, bg);
+
+                // 左端のカラーバー
+                dl->AddRectFilled(
+                    { winPos.x, y },
+                    { winPos.x + 3.0f, y + kRowH },
+                    track.color.ToImU32());
+
+                // アイコン・ラベルテキスト（ラベル列内にクリップ）
+                dl->PushClipRect(
+                    { winPos.x, y },
+                    { winPos.x + kLabelW, y + kRowH },
+                    true);
+
+                float indentX = winPos.x + 6 + track.groupDepth * 12.0f;
+                dl->AddText({ indentX,      y + 4 },
+                    IM_COL32(130, 130, 130, 200), GetTrackIcon(track.type));
+                dl->AddText({ indentX + 28, y + 4 },
+                    IM_COL32(180, 180, 180, 255), track.label.c_str());
+
+                dl->PopClipRect();
+                row++;
+            }
+        }
+
+        ImGui::EndChild();
+        ImGui::SameLine(0, 0); // 隙間なく横に並べる
+
+        // =========================================================
+        // 右ペイン：タイムライン列（横スクロールあり）
+        // =========================================================
+        const std::string timelineId = std::string("##DopeScroll_") + id;
+        ImGui::BeginChild(
+            timelineId.c_str(),
             { 0, timelineH + 4 },
             false,
             ImGuiWindowFlags_HorizontalScrollbar);
 
         const float windowW = ImGui::GetContentRegionAvail().x;
+        const float timelineW = totalFrames * zoomX_ + 20.0f;
 
         // Ctrl + マウスホイール でズーム
-        // scrollX_ を自前管理することで SetScrollX の1フレーム遅延を回避する
         if (ImGui::IsWindowHovered() && ImGui::GetIO().KeyCtrl)
         {
             float wheel = ImGui::GetIO().MouseWheel;
             if (wheel != 0.0f)
             {
-                // カーソル下のフレームをズーム前に記録
                 float mouseLocalX = ImGui::GetMousePos().x - ImGui::GetWindowPos().x;
-                float frameAtMouse = (mouseLocalX + scrollX_ - kLabelW) / zoomX_;
+                float frameAtMouse = (mouseLocalX + scrollX_) / zoomX_;
 
-                // ズーム適用
                 zoomX_ = std::clamp(zoomX_ + wheel * 1.5f, 2.0f, 60.0f);
-
-                // ズーム後も同じフレームがカーソル下に来るようスクロール補正
-                scrollX_ = std::max(0.0f, frameAtMouse * zoomX_ - mouseLocalX + kLabelW);
+                scrollX_ = std::max(0.0f, frameAtMouse * zoomX_ - mouseLocalX);
             }
         }
 
-        // 通常の横スクロール（Ctrl なし）は ImGui のスクロールバーと同期
+        // 通常スクロールは ImGui のスクロールバーと同期
         if (!ImGui::GetIO().KeyCtrl)
             scrollX_ = ImGui::GetScrollX();
         else
             ImGui::SetScrollX(scrollX_);
 
-        // ズーム・スクロール確定後に timelineW を計算
-        const float timelineW = kLabelW + totalFrames * zoomX_ + 20.0f;
         scrollX_ = std::min(scrollX_, std::max(0.0f, timelineW - windowW));
 
         ImDrawList* dl = ImGui::GetWindowDrawList();
 
-        // origin にスクロールを反映した描画基点を作る
+        // origin はタイムライン列の左端（ラベル列を含まない）
         const ImVec2 winPos = ImGui::GetWindowPos();
         const ImVec2 origin = { winPos.x - scrollX_, winPos.y };
 
@@ -232951,8 +233034,8 @@ namespace DopeSheet
 
         // ルーラークリックでシーク
         {
-            ImVec2 rMin = { origin.x + kLabelW, origin.y };
-            ImVec2 rMax = { origin.x + timelineW, origin.y + kRulerH };
+            ImVec2 rMin = { origin.x, winPos.y };
+            ImVec2 rMax = { origin.x + timelineW, winPos.y + kRulerH };
             if (ImGui::IsMouseHoveringRect(rMin, rMax) && ImGui::IsMouseDown(0))
             {
                 int f = std::clamp(
@@ -232975,7 +233058,7 @@ namespace DopeSheet
     }
 
     //=============================================================================
-    // 背景縞模様
+    // 背景縞模様（タイムライン列用）
     //=============================================================================
 #ifdef USE_IMGUI
     void DopeSheetEditor::DrawBackground(
@@ -233002,21 +233085,25 @@ namespace DopeSheet
             }
             if (collapsed) continue;
 
-            ImU32 bg = (row % 2 == 0) ? IM_COL32(46, 46, 46, 255) : IM_COL32(38, 38, 38, 255);
-            dl->AddRectFilled({ origin.x, y }, { origin.x + timelineW, y + kRowH }, bg);
+            ImU32 bg = (row % 2 == 0)
+                ? IM_COL32(46, 46, 46, 255)
+                : IM_COL32(38, 38, 38, 255);
+            dl->AddRectFilled(
+                { origin.x, y },
+                { origin.x + timelineW, y + kRowH }, bg);
             row++;
         }
     }
 #endif
 
     //=============================================================================
-    // ルーラー
+    // ルーラー（タイムライン列用・kLabelW オフセットなし）
     //=============================================================================
 #ifdef USE_IMGUI
     void DopeSheetEditor::DrawRuler(
         ImDrawList* dl, ImVec2 origin, float cellW, int totalFrames, int fps)
     {
-        const float totalW = kLabelW + totalFrames * cellW + 20.0f;
+        const float totalW = totalFrames * cellW + 20.0f;
 
         dl->AddRectFilled(
             { origin.x, origin.y },
@@ -233027,14 +233114,17 @@ namespace DopeSheet
 
         for (int f = 0; f <= totalFrames; ++f)
         {
-            float x = origin.x + kLabelW + f * cellW;
+            float x = origin.x + f * cellW;  // kLabelW オフセット不要
             bool  isMajor = (f % fps == 0);
             bool  isMedium = (f % 5 == 0);
 
             ImU32 gridCol = isMajor ? IM_COL32(100, 100, 100, 200)
                 : isMedium ? IM_COL32(70, 70, 70, 150)
                 : IM_COL32(50, 50, 50, 100);
-            dl->AddLine({ x, origin.y + kRulerH }, { x, origin.y + kRulerH + kRowH * 64 }, gridCol);
+            dl->AddLine(
+                { x, origin.y + kRulerH },
+                { x, origin.y + kRulerH + kRowH * 64 },
+                gridCol);
 
             float tickH = isMajor ? kRulerH * 0.6f : kRulerH * 0.35f;
             dl->AddLine(
@@ -233045,15 +233135,13 @@ namespace DopeSheet
             if (f % step == 0)
             {
                 char buf[16];
-                std::snprintf(buf, sizeof(buf), isMajor ? "%ds" : "%d", isMajor ? f / fps : f);
-                dl->AddText({ x + 2, origin.y + 2 }, IM_COL32(180, 180, 180, 255), buf);
+                std::snprintf(buf, sizeof(buf),
+                    isMajor ? "%ds" : "%d",
+                    isMajor ? f / fps : f);
+                dl->AddText({ x + 2, origin.y + 2 },
+                    IM_COL32(180, 180, 180, 255), buf);
             }
         }
-
-        dl->AddLine(
-            { origin.x + kLabelW, origin.y },
-            { origin.x + kLabelW, origin.y + kRulerH },
-            IM_COL32(80, 80, 80, 255));
 
         if (onRulerOverlay_)
             onRulerOverlay_(dl, origin, cellW, totalFrames);
@@ -233061,7 +233149,7 @@ namespace DopeSheet
 #endif
 
     //=============================================================================
-    // 全トラック描画
+    // 全トラック描画（タイムライン列のみ・ラベルは左ペインで描画済み）
     //=============================================================================
 #ifdef USE_IMGUI
     void DopeSheetEditor::DrawAllTracks(
@@ -233078,25 +233166,15 @@ namespace DopeSheet
 
             float y = origin.y + kRulerH + row * kRowH;
 
-            // グループヘッダー
             if (track.isGroupHeader)
             {
                 collapsed = !track.groupExpanded;
 
-                float  indentX = origin.x + 4 + track.groupDepth * 12.0f;
-                dl->AddText(
-                    { indentX, y + kHeaderH * 0.5f - 6.0f },
-                    IM_COL32(200, 200, 200, 255),
-                    track.groupExpanded ? "v" : ">");
-                dl->AddText(
-                    { indentX + 14, y + 4 },
-                    IM_COL32(230, 230, 230, 255),
-                    track.label.c_str());
-
+                // グループヘッダーのクリック判定
                 ImGui::SetCursorScreenPos({ origin.x, y });
                 ImGui::InvisibleButton(
                     (std::string("##grp_") + std::to_string(ti)).c_str(),
-                    { kLabelW + totalFrames * cellW, kHeaderH });
+                    { totalFrames * cellW, kHeaderH });
                 if (ImGui::IsItemClicked())
                 {
                     track.groupExpanded = !track.groupExpanded;
@@ -233105,23 +233183,10 @@ namespace DopeSheet
                 row++;
                 continue;
             }
-
             if (collapsed) continue;
 
-            // ラベル列
-            {
-                dl->AddRectFilled(
-                    { origin.x, y },
-                    { origin.x + 3.0f, y + kRowH },
-                    track.color.ToImU32());
-
-                float indentX = origin.x + 6 + track.groupDepth * 12.0f;
-                dl->AddText({ indentX,      y + 4 }, IM_COL32(130, 130, 130, 200), GetTrackIcon(track.type));
-                dl->AddText({ indentX + 28, y + 4 }, IM_COL32(180, 180, 180, 255), track.label.c_str());
-            }
-
-            // キーフレーム行
-            if (DrawTrackRow(dl, { origin.x + kLabelW, y }, cellW, totalFrames, track, ti))
+            // キーフレーム行（origin.x がタイムライン列の左端）
+            if (DrawTrackRow(dl, { origin.x, y }, cellW, totalFrames, track, ti))
                 anyChanged = true;
 
             row++;
@@ -233144,11 +233209,20 @@ namespace DopeSheet
         // ドラッグ終了
         if (drag_.active && drag_.trackIdx == trackIdx && !ImGui::IsMouseDown(0))
         {
-            track.SortKeys();
-            if (onMoveKey_ && drag_.keyIdx < static_cast<int>(track.keys.size()))
-                onMoveKey_(trackIdx, drag_.keyIdx, track.keys[drag_.keyIdx].frame);
+            const int endFrame = (drag_.keyIdx < static_cast<int>(track.keys.size()))
+                ? track.keys[drag_.keyIdx].frame : drag_.startFrame;
+            const int endDur = (drag_.keyIdx < static_cast<int>(track.keys.size()))
+                ? track.keys[drag_.keyIdx].duration : drag_.startDuration;
+
+            // 実際に動いたときだけ changed = true
+            if (endFrame != drag_.startFrame || endDur != drag_.startDuration)
+            {
+                track.SortKeys();
+                if (onMoveKey_ && drag_.keyIdx < static_cast<int>(track.keys.size()))
+                    onMoveKey_(trackIdx, drag_.keyIdx, endFrame);
+                changed = true;
+            }
             drag_.active = false;
-            changed = true;
         }
 
         int removeIdx = -1;
@@ -233185,14 +233259,32 @@ namespace DopeSheet
             changed = true;
         }
 
-        // 右クリック → 追加ポップアップ
+        // 右クリック → 追加/削除ポップアップ（バー上では追加を出さない）
         if (!track.readOnly)
         {
             ImVec2 trackMax = { rowMin.x + totalFrames * cellW, rowMin.y + kRowH };
-            if (ImGui::IsMouseHoveringRect(rowMin, trackMax) && ImGui::IsMouseClicked(1))
+
+            bool hoveringAnyBar = false;
+            for (const auto& k : track.keys)
+            {
+                if (k.duration > 0)
+                {
+                    float bx0 = rowMin.x + k.frame * cellW;
+                    float bx1 = rowMin.x + k.EndFrame() * cellW;
+                    if (ImGui::IsMouseHoveringRect({ bx0, rowMin.y }, { bx1, rowMin.y + kRowH }))
+                    {
+                        hoveringAnyBar = true; break;
+                    }
+                }
+            }
+
+            if (!hoveringAnyBar
+                && ImGui::IsMouseHoveringRect(rowMin, trackMax)
+                && ImGui::IsMouseClicked(1))
             {
                 pendingFrame_ = std::clamp(
-                    static_cast<int>((ImGui::GetMousePos().x - rowMin.x) / cellW), 0, totalFrames);
+                    static_cast<int>((ImGui::GetMousePos().x - rowMin.x) / cellW),
+                    0, totalFrames);
                 pendingValue_ = 0.0f;
                 pendingDuration_ = 10;
                 pendingTrackIdx_ = trackIdx;
@@ -233226,7 +233318,6 @@ namespace DopeSheet
             dl->AddCircleFilled({ cx, cy }, radius, fillCol);
             dl->AddCircle({ cx, cy }, radius, outlineCol, 0, 1.5f);
             break;
-
         case KeyShape::Triangle:
             dl->AddTriangleFilled(
                 { cx,          cy - radius },
@@ -233237,7 +233328,6 @@ namespace DopeSheet
                 { cx + radius, cy + radius * 0.6f },
                 { cx - radius, cy + radius * 0.6f }, outlineCol, 1.2f);
             break;
-
         default: // Diamond
             dl->AddQuadFilled(
                 { cx, cy - radius }, { cx + radius, cy },
@@ -233266,7 +233356,8 @@ namespace DopeSheet
 
             if (ImGui::IsMouseClicked(0) && !drag_.active)
             {
-                drag_ = { trackIdx, keyIdx, true,DragState::Mode::Move, key.frame, 0,ImGui::GetMousePos().x };
+                drag_ = { trackIdx, keyIdx, true, DragState::Mode::Move,
+                          key.frame, 0, ImGui::GetMousePos().x };
                 key.selected = true;
                 if (onSelectKey_) onSelectKey_(trackIdx, keyIdx, true);
             }
@@ -233276,7 +233367,8 @@ namespace DopeSheet
             && ImGui::IsMouseDown(0))
         {
             int newFrame = std::clamp(
-                drag_.startFrame + static_cast<int>((ImGui::GetMousePos().x - drag_.startMouseX) / cellW),
+                drag_.startFrame + static_cast<int>(
+                    (ImGui::GetMousePos().x - drag_.startMouseX) / cellW),
                 0, totalFrames);
             if (newFrame != key.frame) { key.frame = newFrame; changed = true; }
         }
@@ -233295,7 +233387,7 @@ namespace DopeSheet
         ImU32 fillCol, int totalFrames)
     {
         const float pad = 2.0f;
-        const float edgeW = 6.0f;  // 左右リサイズハンドル幅
+        const float edgeW = 6.0f;
 
         float x0 = rowMin.x + key.frame * cellW + pad;
         float x1 = rowMin.x + key.EndFrame() * cellW - pad;
@@ -233307,14 +233399,7 @@ namespace DopeSheet
             ? IM_COL32(255, 255, 255, 200)
             : IM_COL32(255, 255, 255, 80);
 
-        // ── 描画（ラベル列にはみ出さないようクリップ）──
-        ImVec2 winPos = ImGui::GetWindowPos();
-        float  clipLeft = winPos.x + kLabelW;
-        dl->PushClipRect(
-            { clipLeft,                          rowMin.y },
-            { winPos.x + ImGui::GetWindowWidth(), rowMin.y + kRowH },
-            true);
-
+        // ── 描画 ──
         dl->AddRectFilled({ x0, y0 }, { x1, y1 }, fillCol, 3.0f);
         dl->AddRect({ x0, y0 }, { x1, y1 }, outCol, 3.0f, 0, 1.5f);
 
@@ -233325,7 +233410,7 @@ namespace DopeSheet
             dl->AddText({ x0 + 4, y0 + 3 }, IM_COL32(255, 255, 255, 200), buf);
         }
 
-        // ── リサイズハンドル強調 ──
+        // ── リサイズハンドル ──
         ImVec2 leftMin = { x0,         y0 };
         ImVec2 leftMax = { x0 + edgeW, y1 };
         ImVec2 rightMin = { x1 - edgeW, y0 };
@@ -233333,56 +233418,68 @@ namespace DopeSheet
 
         bool hovLeft = ImGui::IsMouseHoveringRect(leftMin, leftMax);
         bool hovRight = ImGui::IsMouseHoveringRect(rightMin, rightMax);
+        bool hovBar = ImGui::IsMouseHoveringRect({ x0, y0 }, { x1, y1 });
 
         if (!drag_.active && hovLeft)
             dl->AddRectFilled(leftMin, leftMax, IM_COL32(255, 255, 255, 60), 2.0f);
         if (!drag_.active && hovRight)
             dl->AddRectFilled(rightMin, rightMax, IM_COL32(255, 255, 255, 60), 2.0f);
 
-        dl->PopClipRect();
-
-        // ── カーソル変更（クリップ外でOK）──
+        // ── カーソル変更 ──
         if (!drag_.active)
         {
             if (hovLeft || hovRight)
                 ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
-            else if (ImGui::IsMouseHoveringRect({ x0, y0 }, { x1, y1 }))
+            else if (hovBar)
                 ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
         }
 
         // ── ツールチップ ──
-        bool hovBar = ImGui::IsMouseHoveringRect({ x0, y0 }, { x1, y1 });
         if (hovBar && !drag_.active)
         {
             ImGui::BeginTooltip();
-            ImGui::Text("start=%d  end=%d  dur=%d  value=%.3f",
-                key.frame, key.EndFrame(), key.duration, key.value);
+            ImGui::Text("start=%d  end=%d  dur=%d",
+                key.frame, key.EndFrame(), key.duration);
             if (!key.tag.empty()) ImGui::Text("tag: %s", key.tag.c_str());
             ImGui::EndTooltip();
+        }
+
+        // ── 右クリック削除メニュー ──
+        const std::string popupId = "##DeleteBar_"
+            + std::to_string(trackIdx) + "_" + std::to_string(keyIdx);
+
+        if (hovBar && ImGui::IsMouseClicked(1) && !drag_.active)
+            ImGui::OpenPopup(popupId.c_str());
+
+        if (ImGui::BeginPopup(popupId.c_str()))
+        {
+            ImGui::Text("frame=%d  dur=%df", key.frame, key.duration);
+            ImGui::Separator();
+            if (ImGui::MenuItem("削除"))
+            {
+                if (onDeleteKey_) onDeleteKey_(trackIdx, keyIdx);
+                else              key.selected = true;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
         }
 
         // ── ドラッグ開始 ──
         if (!drag_.active && ImGui::IsMouseClicked(0))
         {
             if (hovLeft)
-            {
                 drag_ = { trackIdx, keyIdx, true, DragState::Mode::ResizeLeft,
                           key.frame, key.duration, ImGui::GetMousePos().x };
-                key.selected = true;
-            }
             else if (hovRight)
-            {
                 drag_ = { trackIdx, keyIdx, true, DragState::Mode::ResizeRight,
                           key.frame, key.duration, ImGui::GetMousePos().x };
-                key.selected = true;
-            }
             else if (hovBar)
             {
                 drag_ = { trackIdx, keyIdx, true, DragState::Mode::Move,
                           key.frame, key.duration, ImGui::GetMousePos().x };
-                key.selected = true;
                 if (onSelectKey_) onSelectKey_(trackIdx, keyIdx, true);
             }
+            if (drag_.active) key.selected = true;
         }
 
         // ── ドラッグ中の更新 ──
@@ -233397,7 +233494,6 @@ namespace DopeSheet
             case DragState::Mode::Move:
                 key.frame = std::clamp(drag_.startFrame + delta, 0, totalFrames);
                 break;
-
             case DragState::Mode::ResizeLeft:
             {
                 int newFrame = std::clamp(drag_.startFrame + delta, 0,
@@ -233410,7 +233506,6 @@ namespace DopeSheet
                 key.duration = std::clamp(
                     drag_.startDuration + delta, 1, totalFrames - drag_.startFrame);
                 break;
-
             default: break;
             }
         }
@@ -233426,9 +233521,8 @@ namespace DopeSheet
     {
         if (seekFrame_ < 0 || seekFrame_ > totalFrames) return;
 
-        float sx = origin.x + kLabelW + seekFrame_ * zoomX_;
+        float sx = origin.x + seekFrame_ * zoomX_;  // kLabelW オフセット不要
 
-        // ── 描画 ──
         dl->AddTriangleFilled(
             { sx - 5, origin.y }, { sx + 5, origin.y }, { sx, origin.y + 10 },
             IM_COL32(255, 220, 50, 230));
@@ -233436,31 +233530,22 @@ namespace DopeSheet
             { sx, origin.y + 10 }, { sx, origin.y + timelineH },
             IM_COL32(255, 220, 50, 180), 1.5f);
 
-        // ── ドラッグ判定 ──
-        // 三角形のヒット領域
         ImVec2 hitMin = { sx - 6, origin.y };
         ImVec2 hitMax = { sx + 6, origin.y + 12 };
-        bool hovered = ImGui::IsMouseHoveringRect(hitMin, hitMax);
+        bool   hovered = ImGui::IsMouseHoveringRect(hitMin, hitMax);
 
-        if (hovered)
-            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+        if (hovered) ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
 
-        // ドラッグ中（シークバー専用フラグで他のドラッグと区別）
         static bool seekDragging = false;
-
-        if (hovered && ImGui::IsMouseClicked(0))
-            seekDragging = true;
+        if (hovered && ImGui::IsMouseClicked(0)) seekDragging = true;
 
         if (seekDragging)
         {
             if (ImGui::IsMouseDown(0))
             {
-                // マウスX座標からフレームを逆算
-                float mouseX = ImGui::GetMousePos().x;
-                float relX = mouseX - (origin.x + kLabelW);
+                float relX = ImGui::GetMousePos().x - origin.x;
                 int   newFrame = std::clamp(
                     static_cast<int>(relX / zoomX_), 0, totalFrames);
-
                 if (newFrame != seekFrame_)
                 {
                     seekFrame_ = newFrame;
@@ -233489,8 +233574,10 @@ namespace DopeSheet
 
         ImGui::Text("キー追加  [%s]  frame=%d", label, pendingFrame_);
         ImGui::Separator();
-        ImGui::SetNextItemWidth(100); ImGui::InputFloat("値", &pendingValue_, 0.1f);
-        ImGui::SetNextItemWidth(100); ImGui::InputInt("持続(f)", &pendingDuration_);
+        ImGui::SetNextItemWidth(100);
+        ImGui::InputFloat("値", &pendingValue_, 0.1f);
+        ImGui::SetNextItemWidth(100);
+        ImGui::InputInt("持続(f)", &pendingDuration_);
         pendingDuration_ = std::max(0, pendingDuration_);
         ImGui::Separator();
 
@@ -233503,13 +233590,20 @@ namespace DopeSheet
             else
             {
                 auto& t = tracks[pendingTrackIdx_];
-                if (!t.readOnly) t.AddKey(pendingFrame_, pendingValue_, 0, pendingDuration_);
+                if (!t.readOnly)
+                    t.AddKey(pendingFrame_, pendingValue_, 0, pendingDuration_);
             }
-            pendingValue_ = 0.0f; pendingDuration_ = 0; showAddPopup_ = false;
+            pendingValue_ = 0.0f;
+            pendingDuration_ = 0;
+            showAddPopup_ = false;
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
-        if (ImGui::Button("キャンセル")) { showAddPopup_ = false; ImGui::CloseCurrentPopup(); }
+        if (ImGui::Button("キャンセル"))
+        {
+            showAddPopup_ = false;
+            ImGui::CloseCurrentPopup();
+        }
 
         ImGui::EndPopup();
     }
@@ -233616,7 +233710,7 @@ public:
     // レイアウト定数
     //=========================================================================
     static constexpr float kRowH    = 22.0f;
-    static constexpr float kLabelW  = 120.0f;
+    static constexpr float kLabelW  = 150.0f;
     static constexpr float kRulerH  = 20.0f;
     static constexpr float kHeaderH = 20.0f;
 
@@ -258666,8 +258760,10 @@ AttackingCombatState::AttackingCombatState(PlayerCombat* combat) : combat_(comba
 		// CC（Chain Capacity）の変化通知など
 		});
 
+	// ---------------------------------------------------------------------------------------------
 	// 剣コライダーの ON/OFF をフレーム精度で制御
-	combo->SetHitWindowCallback([player](bool isActive) {
+	// ---------------------------------------------------------------------------------------------
+	combo->SetSwordColliderCallback([player](bool isActive) {
 		player->GetSword()->SetEnableCollider(isActive);
 		});
 }
@@ -259508,7 +259604,6 @@ void AttackDataEditor::DrawAttackDetail()
         changed |= ImGui::InputFloat("基本ダメージ", &atk.baseDamage, 1.0f, 10.0f, "%.1f");
         changed |= ImGui::InputFloat("ノックバック", &atk.knockback, 0.1f, 1.0f, "%.1f");
         changed |= ImGui::InputFloat("ノックバック持続時間", &atk.knockbackDuration, 0.1f, 1.0f, "%.2f");
-        changed |= ImGui::InputFloat3("攻撃範囲", &atk.attackRange.x);
         changed |= ImGui::InputFloat("踏み込み距離", &atk.stepDistance, 0.1f, 1.0f, "%.2f");
     }
 
@@ -259638,9 +259733,10 @@ void AttackDataEditor::NewAttack()
     data.totalFrames = 60;
     data.fps = 60;
     data.baseDamage = 30.0f;
+    data.hitStart = 0;
+	data.hitEnd = 10;
     data.knockback = 5.0f;
     data.knockbackDuration = 0.5f;
-    data.attackRange = { 2.0f, 1.0f, 1.5f };
     data.ccCost = 1;
     data.canCancel = true;
     data.canChainToAny = true;
@@ -259871,21 +259967,21 @@ public:
             DopeSheet::TrackType::InvincibleFrame,
             attack.invincibleStart, attack.invincibleEnd));
 
-        // Effect（エフェクト発生タイミング・ポイントキー）
-        {
-            auto track = DopeSheet::DopeTrack::Make(DopeSheet::TrackType::Effect);
-            for (const auto& ev : attack.effects)
-                track.AddKey(MakeEventKey(ev.frame, ev.tag));
-            tracks.push_back(std::move(track));
-        }
+        //// Effect（エフェクト発生タイミング・ポイントキー）
+        //{
+        //    auto track = DopeSheet::DopeTrack::Make(DopeSheet::TrackType::Effect);
+        //    for (const auto& ev : attack.effects)
+        //        track.AddKey(MakeEventKey(ev.frame, ev.tag));
+        //    tracks.push_back(std::move(track));
+        //}
 
-        // Sound（SE 再生タイミング・ポイントキー）
-        {
-            auto track = DopeSheet::DopeTrack::Make(DopeSheet::TrackType::Sound);
-            for (const auto& ev : attack.sounds)
-                track.AddKey(MakeEventKey(ev.frame, ev.tag));
-            tracks.push_back(std::move(track));
-        }
+        //// Sound（SE 再生タイミング・ポイントキー）
+        //{
+        //    auto track = DopeSheet::DopeTrack::Make(DopeSheet::TrackType::Sound);
+        //    for (const auto& ev : attack.sounds)
+        //        track.AddKey(MakeEventKey(ev.frame, ev.tag));
+        //    tracks.push_back(std::move(track));
+        //}
 
         return tracks;
     }
@@ -260281,23 +260377,23 @@ struct AttackData {
     // タイムライン設定（エディタ用・フレーム単位）
     // ドープシートで直接編集する値
     //-------------------------------------------------------------------------
-    int totalFrames = 60;  // この攻撃の全体フレーム数
-    int fps = 60;  // フレームレート（秒換算に使用）
+    int totalFrames = 60;       // この攻撃の全体フレーム数
+    int fps = 60;               // フレームレート（秒換算に使用）
 
-    int hitStart = 0;   // 攻撃判定  開始フレーム
-    int hitEnd = 0;   // 攻撃判定  終了フレーム
-    int recoveryStart = 0;   // 硬直      開始フレーム
-    int recoveryEnd = 0;   // 硬直      終了フレーム
-    int cancelStart = 0;   // キャンセル受付 開始フレーム
+    int hitStart = 0;           // 攻撃判定  開始フレーム
+    int hitEnd = 10;            // 攻撃判定  終了フレーム
+    int recoveryStart = 0;      // 硬直      開始フレーム
+    int recoveryEnd = 0;        // 硬直      終了フレーム
+    int cancelStart = 0;        // キャンセル受付 開始フレーム
     int comboWindowStart = 0;   // コンボ入力受付 開始フレーム
-    int comboWindowEnd = 0;   // コンボ入力受付 終了フレーム
-    int invincibleStart = 0;   // 無敵      開始フレーム
-    int invincibleEnd = 0;   // 無敵      終了フレーム
+    int comboWindowEnd = 0;     // コンボ入力受付 終了フレーム
+    int invincibleStart = 0;    // 無敵      開始フレーム
+    int invincibleEnd = 0;      // 無敵      終了フレーム
 
     // フレームイベント（エフェクト・SE の発生タイミング）
     struct FrameEvent {
         int         frame = 0;
-        std::string tag;        // エフェクト名・SE名など
+        std::string tag;                // エフェクト名・SE名など
     };
     std::vector<FrameEvent> effects;    // エフェクト発生タイミング一覧
     std::vector<FrameEvent> sounds;     // SE 再生タイミング一覧
@@ -260306,40 +260402,39 @@ struct AttackData {
     // タイミング設定（ゲームロジック用・秒単位）
     // SyncFramesToSeconds() で自動計算される。直接編集も可能。
     //-------------------------------------------------------------------------
-    float duration = 0.0f;   // 攻撃判定の持続時間（秒）
-    float recovery = 0.0f;   // 硬直時間（秒）
-    float continueWindow = 0.0f;   // コンボ入力受付時間（秒）
+    float duration = 0.0f;          // 攻撃判定の持続時間（秒）
+    float recovery = 0.0f;          // 硬直時間（秒）
+    float continueWindow = 0.0f;    // コンボ入力受付時間（秒）
 
     //-------------------------------------------------------------------------
     // ダメージ・物理効果
     //-------------------------------------------------------------------------
-    float   baseDamage = 0.0f;           // 基本ダメージ
-    float   knockback = 0.0f;           // ノックバック力
-    float   knockbackDuration = 0.0f;           // ノックバック持続時間（秒）
-    Vector3 attackRange = { 0,0,0 };      // 攻撃範囲（幅・高さ・奥行）
-    float   stepDistance = 0.0f;           // 攻撃時の踏み込み距離
+    float   baseDamage = 0.0f;              // 基本ダメージ
+    float   knockback = 0.0f;               // ノックバック力
+    float   knockbackDuration = 0.0f;       // ノックバック持続時間（秒）
+    float   stepDistance = 0.0f;            // 攻撃時の踏み込み距離
 
     //-------------------------------------------------------------------------
     // CC（コンバットコスト）システム
     //-------------------------------------------------------------------------
     int ccCost = 0;    // CC 消費量
-    int ccOnHit = 0;    // ヒット時 CC 回復量
+    int ccOnHit = 0;   // ヒット時 CC 回復量
 
     //-------------------------------------------------------------------------
     // コンボ特性
     //-------------------------------------------------------------------------
-    bool canCancel = true;  // 他の攻撃でキャンセル可能か
-    bool canChainToAny = true;  // 任意の攻撃に繋げられるか
+    bool canCancel = true;                  // 他の攻撃でキャンセル可能か
+    bool canChainToAny = true;              // 任意の攻撃に繋げられるか
     std::vector<AttackType> preferredNext;  // 推奨次攻撃（ボーナス有）
 
     //-------------------------------------------------------------------------
     // 特殊効果フラグ
     //-------------------------------------------------------------------------
-    bool        launches = false;    // 敵を浮かす
-    bool        wallBounce = false;    // 壁バウンド誘発
-    bool        groundBounce = false;    // 地面バウンド誘発
-    std::string effect;                 // 特殊エフェクト名
-    float       motionSpeed = 1.0f;     // アニメーション再生速度
+    bool        launches = false;           // 敵を浮かす
+    bool        wallBounce = false;         // 壁バウンド誘発
+    bool        groundBounce = false;       // 地面バウンド誘発
+    std::string effect;                     // 特殊エフェクト名
+    float       motionSpeed = 1.0f;         // アニメーション再生速度
 
     //-------------------------------------------------------------------------
     // フレーム → 秒 の自動計算
@@ -260348,11 +260443,9 @@ struct AttackData {
     void SyncFramesToSeconds()
     {
         if (fps <= 0) return;
-        const float invFps = 1.0f / static_cast<float>(fps);
-
-        duration = static_cast<float>(hitEnd - hitStart) * invFps;
-        recovery = static_cast<float>(recoveryEnd - recoveryStart) * invFps;
-        continueWindow = static_cast<float>(comboWindowEnd - comboWindowStart) * invFps;
+        //const float invFps = 1.0f / static_cast<float>(fps);
+        //recovery = static_cast<float>(recoveryEnd - recoveryStart) * invFps;
+        //continueWindow = static_cast<float>(comboWindowEnd - comboWindowStart) * invFps;
     }
 
     // デフォルトコンストラクタ
@@ -260363,11 +260456,11 @@ struct AttackData {
 // CC 設定
 //=============================================================================
 struct CCConfig {
-    int   maxCC = 5;       // 最大 CC 値
-    float regenRate = 1.0f;    // CC 回復速度（毎秒）
-    float regenDelay = 1.5f;    // 攻撃後の CC 回復開始遅延（秒）
-    int   dodgeRecovery = 2;       // 回避成功時の CC 回復量
-    int   counterRecovery = 1;       // カウンター成功時の CC 回復量
+    int   maxCC = 5;                    // 最大 CC 値
+    float regenRate = 1.0f;             // CC 回復速度（毎秒）
+    float regenDelay = 1.5f;            // 攻撃後の CC 回復開始遅延（秒）
+    int   dodgeRecovery = 2;            // 回避成功時の CC 回復量
+    int   counterRecovery = 1;          // カウンター成功時の CC 回復量
 
     CCConfig() = default;
     CCConfig(int max, float rate, float delay, int dodge, int counter)
@@ -260380,11 +260473,11 @@ struct CCConfig {
 // コンボ設定
 //=============================================================================
 struct ComboConfig {
-    int   maxLength = 20;      // 最大コンボ長
-    float damageDecay = 0.95f;   // コンボ減衰率（3ヒット目以降）
-    float chainBonus = 1.15f;   // 推奨チェーンボーナス倍率
-    bool  enableFreeChain = true;    // 自由チェーン有効
-    float comboResetTime = 1.0f;    // コンボリセット時間（秒）
+    int   maxLength = 20;               // 最大コンボ長
+    float damageDecay = 0.95f;          // コンボ減衰率（3ヒット目以降）
+    float chainBonus = 1.15f;           // 推奨チェーンボーナス倍率
+    bool  enableFreeChain = true;       // 自由チェーン有効
+    float comboResetTime = 1.0f;        // コンボリセット時間（秒）
 
     ComboConfig() = default;
     ComboConfig(int length, float decay, float bonus, bool freeChain, float resetTime)
@@ -260423,7 +260516,6 @@ SERIALIZE_FIELD(AttackData, continueWindow)
 SERIALIZE_FIELD(AttackData, baseDamage)
 SERIALIZE_FIELD(AttackData, knockback)
 SERIALIZE_FIELD(AttackData, knockbackDuration)
-SERIALIZE_FIELD(AttackData, attackRange)
 SERIALIZE_FIELD(AttackData, stepDistance)
 // CC
 SERIALIZE_FIELD(AttackData, ccCost)
@@ -260620,7 +260712,7 @@ AttackData* PlayerCombo::FindBestAttack(AttackType type) {
 				if (combo->type == type) sameTypeCount++;
 				else break;
 			}
-			int index = std::min(sameTypeCount, static_cast<int>(attacks.size()) - 1);
+			int index = sameTypeCount % static_cast<int>(attacks.size());
 			return const_cast<AttackData*>(&attacks[index]);
 		} else {
 			// 異なるタイプからの派生：基本攻撃に戻す
@@ -260663,6 +260755,20 @@ void PlayerCombo::UpdateAttacking() {
 	// 現在の攻撃が無効なら待機状態に戻す
 	if (!currentAttack_) { ChangeState(ComboState::Idle); return; }
 
+	// 経過時間をフレームに変換
+	const float frameDuration = (currentAttack_->fps > 0)
+		? 1.0f / static_cast<float>(currentAttack_->fps)
+		: 1.0f / 60.0f;
+
+	const int currentFrame = static_cast<int>(stateTimer_ / frameDuration);
+
+	// hitStart〜hitEnd の間だけ剣コライダーをON
+	const bool inHitWindow = (currentAttack_->hitEnd > currentAttack_->hitStart)
+		&& (currentFrame >= currentAttack_->hitStart)
+		&& (currentFrame < currentAttack_->hitEnd);
+
+
+	if (onSwordColliderChanged_) onSwordColliderChanged_(inHitWindow);
 	// 攻撃時間終了チェック
 	if (stateTimer_ >= currentAttack_->duration) {
 		if (currentAttack_->canChainToAny && currentCC_ > 0)
@@ -260769,6 +260875,8 @@ void PlayerCombo::ExitState(ComboState oldState) {
 	// 必要に応じて終了処理
 	switch (oldState) {
 	case ComboState::Attacking:
+		// 攻撃終了時はヒットウィンドウを閉じる
+		if (onSwordColliderChanged_) onSwordColliderChanged_(false);
 		break;
 	case ComboState::CanContinue:
 		break;
@@ -260779,6 +260887,7 @@ void PlayerCombo::ExitState(ComboState oldState) {
 	case ComboState::Finished:
 		break;
 	}
+
 }
 
 /// <summary>
@@ -261325,8 +261434,10 @@ public:
 	void SetCCChangeCallback(std::function<void(int, int)> callback) {
 		onCCChanged_ = callback;
 	}
-	using HitWindowCallback = std::function<void(bool isActive)>;
-	void SetHitWindowCallback(HitWindowCallback cb) { onHitWindowChanged_ = cb; }
+
+	// 剣の当たり判定有効/無効コールバック
+	using SwordColliderCallback = std::function<void(bool isActive)>;
+	void SetSwordColliderCallback(SwordColliderCallback cb) { onSwordColliderChanged_ = cb; }
 
 	///************************* アクセッサ *************************///
 
@@ -261352,14 +261463,6 @@ public:
 			return currentAttack_->knockbackDuration;
 		}
 		return 0.0f;
-	}
-
-	// 現在の攻撃範囲取得
-	Vector3 GetCurrentAttackRange() const {
-		if (currentAttack_) {
-			return currentAttack_->attackRange;
-		}
-		return Vector3(0.0f, 0.0f, 0.0f);
 	}
 
 
@@ -261425,8 +261528,7 @@ private:
 	std::function<void(int)> onComboEnd_;                       // コンボ終了時
 	std::function<void()> onComboReset_;                        // コンボリセット時
 	std::function<void(int, int)> onCCChanged_;                 // CC変化時
-
-	HitWindowCallback onHitWindowChanged_;
+	SwordColliderCallback onSwordColliderChanged_;				// 剣の当たり判定　有効/無効
 };
 
 ============================================================
@@ -263819,12 +263921,12 @@ void Player::Update() {
 	// 生存時処理
 	//------------------------------------------------------------
 
-	// 剣のコライダーON/OFF制御
-	if (combat_->GetCurrentState() == CombatState::Attacking) {
-		playerSword_->SetEnableCollider(true);
-	} else {
-		playerSword_->SetEnableCollider(false);
-	}
+	//// 剣のコライダーON/OFF制御
+	//if (combat_->GetCurrentState() == CombatState::Attacking) {
+	//	playerSword_->SetEnableCollider(true);
+	//} else {
+	//	playerSword_->SetEnableCollider(false);
+	//}
 
 	// 盾のコライダーON/OFF制御
 	if (combat_->GetCurrentState() == CombatState::Guarding) {
@@ -265203,6 +265305,9 @@ void PlayerSword::InitCollision() {
 		this, &colliderWT_, camera_,
 		static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon)
 	);
+
+	// 初期状態では当たり判定無効
+	obbCollider_->isCollisionEnabled_ = false;
 }
 
 /// <summary>
