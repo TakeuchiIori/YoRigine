@@ -232866,6 +232866,8 @@ namespace DopeSheet
         float                   height)
     {
 #ifndef USE_IMGUI
+		// ImGui を使わないビルドでは何も描画せず false を返すだけ
+		(void) id; (void)tracks; (void)totalFrames; (void)fps; (void)height;
         return false;
 #else
         bool anyChanged = false;
