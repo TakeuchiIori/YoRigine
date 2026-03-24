@@ -8,7 +8,7 @@
                     "chargeTime": 1.75,
                     "cooldownTime": 1.0,
                     "rushTime": 0.5,
-                    "speedMultiplier": 12.0
+                    "speedMultiplier": 8.5
                 },
                 "combo": {
                     "cooldownTime": 0.800000011920929,
@@ -18,7 +18,7 @@
                     "subRushTime": 0.20000000298023224
                 },
                 "jump": {
-                    "chargeTime": 0.5,
+                    "chargeTime": 0.30000001192092896,
                     "cooldownTime": 0.699999988079071,
                     "crouchDepth": 0.30000001192092896,
                     "jumpHeight": 6.0,
@@ -112,9 +112,9 @@
                     "speedMultiplier": 12.0
                 },
                 "combo": {
-                    "cooldownTime": 0.800000011920929,
+                    "cooldownTime": 1.2000000476837158,
                     "phaseDuration": 0.8999999761581421,
-                    "rushSpeedMultiplier": 8.5,
+                    "rushSpeedMultiplier": 6.5,
                     "subChargeTime": 0.4000000059604645,
                     "subRushTime": 0.25
                 },
