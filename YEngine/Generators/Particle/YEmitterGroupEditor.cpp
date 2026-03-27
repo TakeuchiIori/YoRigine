@@ -255,7 +255,7 @@ void YEmitterGroupEditor::ShowGroupDetail() {
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.42f, 0.18f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.28f, 0.58f, 0.28f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.12f, 0.32f, 0.12f, 1.0f));
-    if (ImGui::Button((std::string(Icon::Play) +"x1##EAG").c_str(), ImVec2(68, 0))) group->EmitAll(1);
+    if (ImGui::Button((std::string(Icon::Play) + "x1##EAG").c_str(), ImVec2(68, 0))) group->EmitAll(1);
     ImGui::PopStyleColor(3);
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("全エミッターから 1 個ずつ発生");
     ImGui::SameLine();
@@ -264,7 +264,7 @@ void YEmitterGroupEditor::ShowGroupDetail() {
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.22f, 0.42f, 0.12f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.32f, 0.58f, 0.18f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.16f, 0.32f, 0.08f, 1.0f));
-    if (ImGui::Button((std::string(Icon::Play)+ "x10##EAG").c_str(), ImVec2(76, 0))) group->EmitAll(10);
+    if (ImGui::Button((std::string(Icon::Play) + "x10##EAG").c_str(), ImVec2(76, 0))) group->EmitAll(10);
     ImGui::PopStyleColor(3);
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("全エミッターから 10 個ずつ発生");
     ImGui::SameLine();
@@ -273,7 +273,7 @@ void YEmitterGroupEditor::ShowGroupDetail() {
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.50f, 0.32f, 0.08f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.70f, 0.48f, 0.12f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.38f, 0.24f, 0.05f, 1.0f));
-    if (ImGui::Button((std::string (Icon::Bolt) + "x100##EAG").c_str(), ImVec2(80, 0))) group->EmitAll(100);
+    if (ImGui::Button((std::string(Icon::Bolt) + "x100##EAG").c_str(), ImVec2(80, 0))) group->EmitAll(100);
     ImGui::PopStyleColor(3);
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("全エミッターから一気に 100 個バースト発生");
     ImGui::SameLine();
@@ -290,7 +290,7 @@ void YEmitterGroupEditor::ShowGroupDetail() {
         anyAutoOn ? ImVec4(0.15f, 0.35f, 0.55f, 1.0f) : ImVec4(0.24f, 0.24f, 0.24f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.22f, 0.48f, 0.70f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.10f, 0.28f, 0.45f, 1.0f));
-    if (ImGui::Button((std::string(Icon::Refresh) +  "自動ON##AG").c_str(), ImVec2(90, 0))) group->SetAutoEmitAll(true);
+    if (ImGui::Button((std::string(Icon::Refresh) + "自動ON##AG").c_str(), ImVec2(90, 0))) group->SetAutoEmitAll(true);
     ImGui::PopStyleColor(3);
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("全エミッターの自動発生を ON にする");
     ImGui::SameLine();
@@ -299,7 +299,7 @@ void YEmitterGroupEditor::ShowGroupDetail() {
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.40f, 0.16f, 0.16f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.56f, 0.24f, 0.24f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.30f, 0.10f, 0.10f, 1.0f));
-    if (ImGui::Button((std::string (Icon::Stop) + "自動OFF##AG").c_str(), ImVec2(96, 0))) group->SetAutoEmitAll(false);
+    if (ImGui::Button((std::string(Icon::Stop) + "自動OFF##AG").c_str(), ImVec2(96, 0))) group->SetAutoEmitAll(false);
     ImGui::PopStyleColor(3);
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("全エミッターの自動発生を OFF にする");
 
@@ -364,7 +364,7 @@ void YEmitterGroupEditor::ShowGroupDetail() {
                     (std::string(Icon::CheckCircle) + "\"%s\" が存在します").c_str(), newEmitterSystemName_);
             else
                 ImGui::TextColored({ 1.0f, 0.6f, 0.1f, 1.0f },
-                    (std::string(Icon::Xmark) +"\"%s\" は未登録です").c_str(), newEmitterSystemName_);
+                    (std::string(Icon::Xmark) + "\"%s\" は未登録です").c_str(), newEmitterSystemName_);
         }
         ImGui::Separator();
         ImGui::Text("ローカルオフセット:");
@@ -409,8 +409,21 @@ void YEmitterGroupEditor::ShowGroupDetail() {
         }
         if (deleteIndex >= 0) {
             group->RemoveEmitter(deleteIndex);
-            selectedEmitterIndices_.erase(deleteIndex);
-            if (selectedEmitterIndex_ == deleteIndex) selectedEmitterIndex_ = -1;
+
+            // 削除されたインデックスより大きい要素を -1 して補正
+            std::set<int> newSet;
+            for (int idx : selectedEmitterIndices_) {
+                if (idx < deleteIndex)      newSet.insert(idx);
+                else if (idx > deleteIndex) newSet.insert(idx - 1);
+                // idx == deleteIndex は削除済みなのでスキップ
+            }
+            selectedEmitterIndices_ = std::move(newSet);
+
+            if (selectedEmitterIndex_ == deleteIndex)
+                selectedEmitterIndex_ = -1;
+            else if (selectedEmitterIndex_ > deleteIndex)
+                selectedEmitterIndex_--;
+
             RebuildGizmoTargets();
         }
         ImGui::EndTable();
@@ -436,10 +449,17 @@ bool YEmitterGroupEditor::ShowEmitterRow(YEmitterGroup& group, size_t index) {
     bool isGizmoSelected = (selectionMode_ == SelectionMode::Emitter &&
         selectedEmitterIndices_.count((int)index) > 0);
 
-    ImGui::TableSetColumnIndex(0);
+    // ★ SpanAllColumns を使うとゴミ箱ボタンのクリックを横取りするため除去
+    // 代わりに TableSetBgColor で行ハイライトを再現する
     bool isRowSelected = (selectedEmitterIndex_ == (int)index);
+    if (isRowSelected) {
+        ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1,
+            ImGui::GetColorU32(ImVec4(0.17f, 0.36f, 0.53f, 0.45f)));
+    }
+
+    ImGui::TableSetColumnIndex(0);
     if (ImGui::Selectable(emitter->GetSystemName().c_str(), isRowSelected,
-        ImGuiSelectableFlags_SpanAllColumns))
+        ImGuiSelectableFlags_None))
         selectedEmitterIndex_ = (int)index;
 
     ImGui::TableSetColumnIndex(1);
