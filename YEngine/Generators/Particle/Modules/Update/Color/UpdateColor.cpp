@@ -3,6 +3,7 @@
 #ifdef USE_IMGUI
 #include "imgui.h"
 #include <ImCurveEdit.h>
+#include <cstdio>
 #endif
 
 //=============================================================================
@@ -29,8 +30,8 @@ void UpdateColor::SetColorMode(ColorMode m) {
 //=============================================================================
 
 void UpdateColor::OnUpdate(ParticleAttribute* attrs, uint32_t index, float /*dt*/) {
-    const float t = attrs[index].GetNormalizedAge(); // 0.0〜1.0
-    const float rand = 0.5f; // ★ per-particle ランダムを使う場合は ParticleAttribute に持たせる
+    const float t = attrs[index].GetNormalizedAge();
+    const float rand = 0.5f;
 
     switch (colorMode_) {
     case ColorMode::TwoColor:
@@ -86,7 +87,6 @@ void UpdateColor::LoadFromJson(const nlohmann::json& json) {
 #ifdef USE_IMGUI
 
 void UpdateColor::DrawEditor() {
-    // カラーモードセレクタ
     static const char* kModeNames[] = { "2色補間", "カーブ (R/G/B/A)" };
     int modeIdx = static_cast<int>(colorMode_);
     if (ImGui::Combo("カラーモード", &modeIdx, kModeNames, 2))
@@ -108,26 +108,33 @@ void UpdateColor::DrawTwoColorEditor() {
 
 void UpdateColor::RebuildDelegate() {
     delegate_ = std::make_unique<CurveDelegate>();
-    // ABGR 順（ImGui の色フォーマット: 0xAABBGGRR）
     delegate_->AddChannel(&curveR_.GetChannel(), 0xFF4444FF, "R");
     delegate_->AddChannel(&curveG_.GetChannel(), 0xFF44FF44, "G");
     delegate_->AddChannel(&curveB_.GetChannel(), 0xFFFF4444, "B");
     delegate_->AddChannel(&curveA_.GetChannel(), 0xFFAAAAAA, "A");
-    delegate_->SetViewRange(ImVec2(0.0f, -0.1f), ImVec2(1.0f, 1.1f));
+    delegate_->SetViewRange(ImVec2(0.0f, -0.06f), ImVec2(1.0f, 1.06f));
     delegateDirty_ = false;
 }
 
 void UpdateColor::DrawGradientCurveEditor() {
     if (delegateDirty_) RebuildDelegate();
 
-    // ── 可視フラグ切り替え ──────────────────────────────────
+    // ── 可視フラグ切り替え ────────────────────────────────────────────────
     static const char* kChLabels[] = { "R", "G", "B", "A" };
-    static const ImVec4 kChColors[] = {
-        { 0.5f, 0.3f, 0.3f, 1.0f },
-        { 0.3f, 0.5f, 0.3f, 1.0f },
-        { 0.3f, 0.3f, 0.7f, 1.0f },
-        { 0.6f, 0.6f, 0.6f, 1.0f },
+    static const ImVec4  kChColors[] = {
+        { 0.9f, 0.4f, 0.4f, 1.0f },
+        { 0.4f, 0.9f, 0.4f, 1.0f },
+        { 0.4f, 0.5f, 1.0f, 1.0f },
+        { 0.7f, 0.7f, 0.7f, 1.0f },
     };
+    // キー値オーバーレイ用 IM_COL32（チャンネルごとに色を分ける）
+    static const ImU32 kChOverlayColors[] = {
+        IM_COL32(255, 120, 120, 230),
+        IM_COL32(120, 255, 120, 230),
+        IM_COL32(120, 160, 255, 230),
+        IM_COL32(210, 210, 210, 230),
+    };
+
     for (int i = 0; i < 4; ++i) {
         bool vis = delegate_->GetVisible(i);
         ImGui::PushStyleColor(ImGuiCol_Text, kChColors[i]);
@@ -137,48 +144,112 @@ void UpdateColor::DrawGradientCurveEditor() {
         if (i < 3) ImGui::SameLine();
     }
 
-    // ── カーブエディタ ─────────────────────────────────────
+    // ── 合成カーブエディタ（4チャンネル同時表示） ─────────────────────────
     float w = ImGui::GetContentRegionAvail().x;
     ImCurveEdit::Edit(*delegate_, ImVec2(w, 180.0f),
         ImGui::GetID("##colorCurveEdit"));
 
+    // ── オーバーレイ（Y軸目盛 + チャンネルごとのキー値） ───────────────────
+    {
+        ImVec2 rMin = ImGui::GetItemRectMin();
+        ImVec2 rMax = ImGui::GetItemRectMax();
+        float  vMin = delegate_->GetViewMinValue().y;
+        float  vMax = delegate_->GetViewMaxValue().y;
+        float  vRng = vMax - vMin;
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+
+        // Y 軸目盛（5分割）
+        constexpr int kYDiv = 5;
+        for (int i = 0; i <= kYDiv; ++i) {
+            float frac = static_cast<float>(i) / kYDiv;
+            float val = vMax - vRng * frac;
+            float sy = rMin.y + (rMax.y - rMin.y) * frac;
+
+            dl->AddLine(ImVec2(rMin.x, sy),
+                ImVec2(rMin.x + 6, sy),
+                IM_COL32(200, 200, 200, 130));
+            dl->AddLine(ImVec2(rMin.x + 6, sy),
+                ImVec2(rMax.x, sy),
+                IM_COL32(180, 180, 180, 30));
+
+            char buf[12];
+            std::snprintf(buf, sizeof(buf), "%.2f", val);
+            dl->AddText(ImVec2(rMin.x + 8, sy - 6),
+                IM_COL32(230, 230, 230, 200), buf);
+        }
+
+        // 各チャンネルのキー値オーバーレイ（表示中チャンネルのみ）
+        CurveProperty* channels[4] = { &curveR_, &curveG_, &curveB_, &curveA_ };
+        for (int ci = 0; ci < 4; ++ci) {
+            if (!delegate_->GetVisible(ci)) continue;
+            for (const auto& k : channels[ci]->GetChannel().GetKeys()) {
+                float fx = k.time;
+                float fy = (vRng > 1e-6f) ? 1.0f - (k.value - vMin) / vRng : 0.0f;
+                float sx = rMin.x + fx * (rMax.x - rMin.x);
+                float sy = rMin.y + fy * (rMax.y - rMin.y);
+
+                char buf[12];
+                std::snprintf(buf, sizeof(buf), "%.2f", k.value);
+                // 黒縁→チャンネル色
+                dl->AddText(ImVec2(sx + 5, sy - 15), IM_COL32(0, 0, 0, 180), buf);
+                dl->AddText(ImVec2(sx + 4, sy - 16), kChOverlayColors[ci], buf);
+            }
+        }
+    }
+
     ImGui::Separator();
 
-    // ── チャンネルごとの詳細設定 ───────────────────────────
-    if (ImGui::TreeNode("チャンネル詳細")) {
-        static const char* kInterpNames[] = { "Step", "Linear", "CatmullRom", "Bezier" };
+    // ── チャンネルごとの詳細エディタ ─────────────────────────────────────
+    // CurveProperty::DrawEditor に委譲することで
+    // モード選択・補間変更・キー追加/削除を自動的に取得する
+    static const uint32_t kChCurveColors[] = {
+        0xFF4444FF, 0xFF44FF44, 0xFFFF4444, 0xFFAAAAAA
+    };
 
+    if (ImGui::TreeNode("チャンネル詳細")) {
         CurveProperty* channels[4] = { &curveR_, &curveG_, &curveB_, &curveA_ };
+
         for (int i = 0; i < 4; ++i) {
             ImGui::PushID(i);
-            ImGui::PushStyleColor(ImGuiCol_Text, kChColors[i]);
-            ImGui::Text("%s", kChLabels[i]);
-            ImGui::PopStyleColor();
-            ImGui::SameLine();
+            const ImVec4& c = kChColors[i];
+            ImGui::PushStyleColor(ImGuiCol_Header,
+                ImVec4(c.x, c.y, c.z, c.w * 0.3f));
+            ImGui::PushStyleColor(ImGuiCol_HeaderHovered,
+                ImVec4(c.x, c.y, c.z, c.w * 0.5f));
 
-            // チャンネルのモード（Constant / Random / Curve）
-            static const char* kPropModes[] = { "固定", "ランダム", "カーブ" };
-            int pm = static_cast<int>(channels[i]->GetMode());
-            ImGui::SetNextItemWidth(80.0f);
-            if (ImGui::Combo("##pm", &pm, kPropModes, 3)) {
-                channels[i]->SetMode(static_cast<CurveProperty::Mode>(pm));
-                delegateDirty_ = true;
+            // TreeNode 内に DrawEditor を展開
+            if (ImGui::TreeNode(kChLabels[i])) {
+                // 変化検知（delegateDirty_ のため）
+                auto prevMode = channels[i]->GetMode();
+                auto prevInterp = channels[i]->GetChannel().GetDefaultMode();
+                int  prevKeys = channels[i]->GetChannel().GetKeyCount();
+
+                CurveProperty::EditorConfig cfg;
+                cfg.valueMin = 0.0f;
+                cfg.valueMax = 1.0f;
+                cfg.editorHeight = 100.0f;
+                cfg.dragSpeed = 0.005f;
+                cfg.curveColor = kChCurveColors[i];
+                cfg.showYLabels = true;
+                cfg.yLabelCount = 4;
+                cfg.showXLabels = false;
+                cfg.showKeyValues = true;
+                cfg.showKeyList = true;
+                cfg.minKeyCount = 2;
+
+                channels[i]->DrawEditor(kChLabels[i], cfg);
+
+                // モード・補間・キー数のいずれかが変わったら合成ビューを再構築
+                if (channels[i]->GetMode() != prevMode ||
+                    channels[i]->GetChannel().GetDefaultMode() != prevInterp ||
+                    channels[i]->GetChannel().GetKeyCount() != prevKeys) {
+                    delegateDirty_ = true;
+                }
+
+                ImGui::TreePop();
             }
-            ImGui::SameLine();
 
-            // 補間モード（Curve モード時のみ意味がある）
-            int im = static_cast<int>(channels[i]->GetChannel().GetDefaultMode());
-            ImGui::SetNextItemWidth(100.0f);
-            if (ImGui::Combo("補間##im", &im, kInterpNames, 4)) {
-                auto newMode = static_cast<InterpolationMode>(im);
-                channels[i]->GetChannel().SetDefaultMode(newMode);
-                for (auto& k : channels[i]->GetChannel().GetKeys())
-                    k.interpMode = newMode;
-                delegateDirty_ = true;
-            }
-            ImGui::SameLine();
-            ImGui::TextDisabled("(%d keys)", channels[i]->GetChannel().GetKeyCount());
-
+            ImGui::PopStyleColor(2);
             ImGui::PopID();
         }
         ImGui::TreePop();
