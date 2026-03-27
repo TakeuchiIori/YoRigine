@@ -19,11 +19,10 @@ namespace DopeSheet
         std::vector<DopeTrack>& tracks,
         int                     totalFrames,
         int                     fps,
-        float                   height)
-    {
+        float                   height) {
 #ifndef USE_IMGUI
-		// ImGui を使わないビルドでは何も描画せず false を返すだけ
-		(void) id; (void)tracks; (void)totalFrames; (void)fps; (void)height;
+        // ImGui を使わないビルドでは何も描画せず false を返すだけ
+        (void) id; (void)tracks; (void)totalFrames; (void)fps; (void)height;
         return false;
 #else
         bool anyChanged = false;
@@ -33,8 +32,7 @@ namespace DopeSheet
         int visibleRows = 0;
         {
             bool collapsed = false;
-            for (const auto& t : tracks)
-            {
+            for (const auto& t : tracks) {
                 if (!t.visible) continue;
                 if (t.isGroupHeader) { collapsed = !t.groupExpanded; visibleRows++; continue; }
                 if (!collapsed) visibleRows++;
@@ -79,15 +77,13 @@ namespace DopeSheet
             // 各トラックのラベルを描画
             bool collapsed = false;
             int  row = 0;
-            for (int ti = 0; ti < static_cast<int>(tracks.size()); ++ti)
-            {
+            for (int ti = 0; ti < static_cast<int>(tracks.size()); ++ti) {
                 const DopeTrack& track = tracks[ti];
                 if (!track.visible) continue;
 
                 float y = winPos.y + kRulerH + row * kRowH;
 
-                if (track.isGroupHeader)
-                {
+                if (track.isGroupHeader) {
                     collapsed = !track.groupExpanded;
                     dl->AddRectFilled(
                         { winPos.x, y },
@@ -156,11 +152,9 @@ namespace DopeSheet
         const float timelineW = totalFrames * zoomX_ + 20.0f;
 
         // Ctrl + マウスホイール でズーム
-        if (ImGui::IsWindowHovered() && ImGui::GetIO().KeyCtrl)
-        {
+        if (ImGui::IsWindowHovered() && ImGui::GetIO().KeyCtrl) {
             float wheel = ImGui::GetIO().MouseWheel;
-            if (wheel != 0.0f)
-            {
+            if (wheel != 0.0f) {
                 float mouseLocalX = ImGui::GetMousePos().x - ImGui::GetWindowPos().x;
                 float frameAtMouse = (mouseLocalX + scrollX_) / zoomX_;
 
@@ -194,13 +188,11 @@ namespace DopeSheet
         {
             ImVec2 rMin = { origin.x, winPos.y };
             ImVec2 rMax = { origin.x + timelineW, winPos.y + kRulerH };
-            if (ImGui::IsMouseHoveringRect(rMin, rMax) && ImGui::IsMouseDown(0))
-            {
+            if (ImGui::IsMouseHoveringRect(rMin, rMax) && ImGui::IsMouseDown(0)) {
                 int f = std::clamp(
                     static_cast<int>((ImGui::GetMousePos().x - rMin.x) / zoomX_),
                     0, totalFrames);
-                if (f != seekFrame_)
-                {
+                if (f != seekFrame_) {
                     seekFrame_ = f;
                     if (onSeek_) onSeek_(seekFrame_);
                 }
@@ -221,18 +213,15 @@ namespace DopeSheet
 #ifdef USE_IMGUI
     void DopeSheetEditor::DrawBackground(
         ImDrawList* dl, ImVec2 origin, float timelineW,
-        const std::vector<DopeTrack>& tracks)
-    {
+        const std::vector<DopeTrack>& tracks) {
         bool collapsed = false;
         int  row = 0;
 
-        for (const auto& t : tracks)
-        {
+        for (const auto& t : tracks) {
             if (!t.visible) continue;
             float y = origin.y + kRulerH + row * kRowH;
 
-            if (t.isGroupHeader)
-            {
+            if (t.isGroupHeader) {
                 collapsed = !t.groupExpanded;
                 dl->AddRectFilled(
                     { origin.x, y },
@@ -259,8 +248,7 @@ namespace DopeSheet
     //=============================================================================
 #ifdef USE_IMGUI
     void DopeSheetEditor::DrawRuler(
-        ImDrawList* dl, ImVec2 origin, float cellW, int totalFrames, int fps)
-    {
+        ImDrawList* dl, ImVec2 origin, float cellW, int totalFrames, int fps) {
         const float totalW = totalFrames * cellW + 20.0f;
 
         dl->AddRectFilled(
@@ -270,8 +258,7 @@ namespace DopeSheet
 
         const int step = std::max(1, static_cast<int>(30.0f / cellW));
 
-        for (int f = 0; f <= totalFrames; ++f)
-        {
+        for (int f = 0; f <= totalFrames; ++f) {
             float x = origin.x + f * cellW;  // kLabelW オフセット不要
             bool  isMajor = (f % fps == 0);
             bool  isMedium = (f % 5 == 0);
@@ -290,8 +277,7 @@ namespace DopeSheet
                 { x, origin.y + kRulerH },
                 IM_COL32(180, 180, 180, 200));
 
-            if (f % step == 0)
-            {
+            if (f % step == 0) {
                 char buf[16];
                 std::snprintf(buf, sizeof(buf),
                     isMajor ? "%ds" : "%d",
@@ -312,20 +298,17 @@ namespace DopeSheet
 #ifdef USE_IMGUI
     void DopeSheetEditor::DrawAllTracks(
         ImDrawList* dl, ImVec2 origin, float cellW, int totalFrames,
-        std::vector<DopeTrack>& tracks, bool& anyChanged)
-    {
+        std::vector<DopeTrack>& tracks, bool& anyChanged) {
         bool collapsed = false;
         int  row = 0;
 
-        for (int ti = 0; ti < static_cast<int>(tracks.size()); ++ti)
-        {
+        for (int ti = 0; ti < static_cast<int>(tracks.size()); ++ti) {
             DopeTrack& track = tracks[ti];
             if (!track.visible) continue;
 
             float y = origin.y + kRulerH + row * kRowH;
 
-            if (track.isGroupHeader)
-            {
+            if (track.isGroupHeader) {
                 collapsed = !track.groupExpanded;
 
                 // グループヘッダーのクリック判定
@@ -333,8 +316,7 @@ namespace DopeSheet
                 ImGui::InvisibleButton(
                     (std::string("##grp_") + std::to_string(ti)).c_str(),
                     { totalFrames * cellW, kHeaderH });
-                if (ImGui::IsItemClicked())
-                {
+                if (ImGui::IsItemClicked()) {
                     track.groupExpanded = !track.groupExpanded;
                     anyChanged = true;
                 }
@@ -349,6 +331,23 @@ namespace DopeSheet
 
             row++;
         }
+
+        // いずれかのキーがクリックされた → 全トラックの選択をクリアしてから
+        // selectionRequests_ に積まれたキーだけ selected = true に戻す
+        if (!selectionRequests_.empty()) {
+            for (auto& t : tracks)
+                for (auto& k : t.keys)
+                    k.selected = false;
+
+            for (const auto& req : selectionRequests_) {
+                if (req.trackIdx >= 0 && req.trackIdx < static_cast<int>(tracks.size())) {
+                    auto& dkeys = tracks[req.trackIdx].keys;
+                    if (req.keyIdx >= 0 && req.keyIdx < static_cast<int>(dkeys.size()))
+                        dkeys[req.keyIdx].selected = true;
+                }
+            }
+            selectionRequests_.clear();
+        }
     }
 #endif
 
@@ -358,23 +357,20 @@ namespace DopeSheet
 #ifdef USE_IMGUI
     bool DopeSheetEditor::DrawTrackRow(
         ImDrawList* dl, ImVec2 rowMin, float cellW,
-        int totalFrames, DopeTrack& track, int trackIdx)
-    {
+        int totalFrames, DopeTrack& track, int trackIdx) {
         bool changed = false;
         const float halfH = kRowH * 0.5f;
         const float radius = std::min(halfH * 0.55f, cellW * 0.45f);
 
         // ドラッグ終了
-        if (drag_.active && drag_.trackIdx == trackIdx && !ImGui::IsMouseDown(0))
-        {
+        if (drag_.active && drag_.trackIdx == trackIdx && !ImGui::IsMouseDown(0)) {
             const int endFrame = (drag_.keyIdx < static_cast<int>(track.keys.size()))
                 ? track.keys[drag_.keyIdx].frame : drag_.startFrame;
             const int endDur = (drag_.keyIdx < static_cast<int>(track.keys.size()))
                 ? track.keys[drag_.keyIdx].duration : drag_.startDuration;
 
             // 実際に動いたときだけ changed = true
-            if (endFrame != drag_.startFrame || endDur != drag_.startDuration)
-            {
+            if (endFrame != drag_.startFrame || endDur != drag_.startDuration) {
                 track.SortKeys();
                 if (onMoveKey_ && drag_.keyIdx < static_cast<int>(track.keys.size()))
                     onMoveKey_(trackIdx, drag_.keyIdx, endFrame);
@@ -384,18 +380,15 @@ namespace DopeSheet
         }
 
         int removeIdx = -1;
-        for (int ki = 0; ki < static_cast<int>(track.keys.size()); ++ki)
-        {
+        for (int ki = 0; ki < static_cast<int>(track.keys.size()); ++ki) {
             DopeKey& key = track.keys[ki];
             ImU32    fillCol = ResolveKeyColor(track, key, false);
             bool     keyChanged = false;
 
-            if (key.shape == KeyShape::Bar || key.duration > 0)
-            {
+            if (key.shape == KeyShape::Bar || key.duration > 0) {
                 DrawKeyBar(dl, rowMin, cellW, key, trackIdx, ki, fillCol, totalFrames);
             }
-            else
-            {
+            else {
                 keyChanged = DrawKey(
                     dl,
                     { rowMin.x + key.frame * cellW, rowMin.y + halfH },
@@ -406,31 +399,26 @@ namespace DopeSheet
 
             if (keyChanged && !track.readOnly) changed = true;
 
-            if (key.selected && ImGui::IsKeyPressed(ImGuiKey_Delete) && !track.readOnly)
+            if (key.selected && ImGui::IsKeyPressed(ImGuiKey_Delete) || ImGui::IsKeyPressed(ImGuiKey_Backspace) && !track.readOnly)
                 removeIdx = ki;
         }
 
-        if (removeIdx >= 0)
-        {
+        if (removeIdx >= 0) {
             if (onDeleteKey_) onDeleteKey_(trackIdx, removeIdx);
             else              track.RemoveKey(removeIdx);
             changed = true;
         }
 
         // 右クリック → 追加/削除ポップアップ（バー上では追加を出さない）
-        if (!track.readOnly)
-        {
+        if (!track.readOnly) {
             ImVec2 trackMax = { rowMin.x + totalFrames * cellW, rowMin.y + kRowH };
 
             bool hoveringAnyBar = false;
-            for (const auto& k : track.keys)
-            {
-                if (k.duration > 0)
-                {
+            for (const auto& k : track.keys) {
+                if (k.duration > 0) {
                     float bx0 = rowMin.x + k.frame * cellW;
                     float bx1 = rowMin.x + k.EndFrame() * cellW;
-                    if (ImGui::IsMouseHoveringRect({ bx0, rowMin.y }, { bx1, rowMin.y + kRowH }))
-                    {
+                    if (ImGui::IsMouseHoveringRect({ bx0, rowMin.y }, { bx1, rowMin.y + kRowH })) {
                         hoveringAnyBar = true; break;
                     }
                 }
@@ -438,8 +426,7 @@ namespace DopeSheet
 
             if (!hoveringAnyBar
                 && ImGui::IsMouseHoveringRect(rowMin, trackMax)
-                && ImGui::IsMouseClicked(1))
-            {
+                && ImGui::IsMouseClicked(1)) {
                 pendingFrame_ = std::clamp(
                     static_cast<int>((ImGui::GetMousePos().x - rowMin.x) / cellW),
                     0, totalFrames);
@@ -463,15 +450,13 @@ namespace DopeSheet
         ImDrawList* dl, ImVec2 center, float radius,
         ImU32 fillCol, ImU32 outlineCol,
         DopeKey& key, int trackIdx, int keyIdx,
-        float cellW, int totalFrames)
-    {
+        float cellW, int totalFrames) {
         bool  changed = false;
         float cx = center.x, cy = center.y;
 
         if (key.selected) outlineCol = IM_COL32(255, 255, 255, 200);
 
-        switch (key.shape)
-        {
+        switch (key.shape) {
         case KeyShape::Circle:
             dl->AddCircleFilled({ cx, cy }, radius, fillCol);
             dl->AddCircle({ cx, cy }, radius, outlineCol, 0, 1.5f);
@@ -500,8 +485,7 @@ namespace DopeSheet
         ImVec2 hitMax = { cx + radius + 4, cy + radius + 4 };
         bool   hovered = ImGui::IsMouseHoveringRect(hitMin, hitMax);
 
-        if (hovered)
-        {
+        if (hovered) {
             dl->AddQuad(
                 { cx, cy - radius - 2 }, { cx + radius + 2, cy },
                 { cx, cy + radius + 2 }, { cx - radius - 2, cy },
@@ -512,18 +496,17 @@ namespace DopeSheet
             if (!key.tag.empty()) ImGui::Text("tag: %s", key.tag.c_str());
             ImGui::EndTooltip();
 
-            if (ImGui::IsMouseClicked(0) && !drag_.active)
-            {
+            if (ImGui::IsMouseClicked(0) && !drag_.active) {
                 drag_ = { trackIdx, keyIdx, true, DragState::Mode::Move,
                           key.frame, 0, ImGui::GetMousePos().x };
+                selectionRequests_.push_back({ trackIdx, keyIdx });
                 key.selected = true;
                 if (onSelectKey_) onSelectKey_(trackIdx, keyIdx, true);
             }
         }
 
         if (drag_.active && drag_.trackIdx == trackIdx && drag_.keyIdx == keyIdx
-            && ImGui::IsMouseDown(0))
-        {
+            && ImGui::IsMouseDown(0)) {
             int newFrame = std::clamp(
                 drag_.startFrame + static_cast<int>(
                     (ImGui::GetMousePos().x - drag_.startMouseX) / cellW),
@@ -542,8 +525,7 @@ namespace DopeSheet
     void DopeSheetEditor::DrawKeyBar(
         ImDrawList* dl, ImVec2 rowMin, float cellW,
         DopeKey& key, int trackIdx, int keyIdx,
-        ImU32 fillCol, int totalFrames)
-    {
+        ImU32 fillCol, int totalFrames) {
         const float pad = 2.0f;
         const float edgeW = 6.0f;
 
@@ -561,8 +543,7 @@ namespace DopeSheet
         dl->AddRectFilled({ x0, y0 }, { x1, y1 }, fillCol, 3.0f);
         dl->AddRect({ x0, y0 }, { x1, y1 }, outCol, 3.0f, 0, 1.5f);
 
-        if ((x1 - x0) > 20.0f)
-        {
+        if ((x1 - x0) > 20.0f) {
             char buf[16];
             std::snprintf(buf, sizeof(buf), "%df", key.duration);
             dl->AddText({ x0 + 4, y0 + 3 }, IM_COL32(255, 255, 255, 200), buf);
@@ -584,8 +565,7 @@ namespace DopeSheet
             dl->AddRectFilled(rightMin, rightMax, IM_COL32(255, 255, 255, 60), 2.0f);
 
         // ── カーソル変更 ──
-        if (!drag_.active)
-        {
+        if (!drag_.active) {
             if (hovLeft || hovRight)
                 ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
             else if (hovBar)
@@ -593,8 +573,7 @@ namespace DopeSheet
         }
 
         // ── ツールチップ ──
-        if (hovBar && !drag_.active)
-        {
+        if (hovBar && !drag_.active) {
             ImGui::BeginTooltip();
             ImGui::Text("start=%d  end=%d  dur=%d",
                 key.frame, key.EndFrame(), key.duration);
@@ -602,53 +581,50 @@ namespace DopeSheet
             ImGui::EndTooltip();
         }
 
-        // ── 右クリック削除メニュー ──
-        const std::string popupId = "##DeleteBar_"
-            + std::to_string(trackIdx) + "_" + std::to_string(keyIdx);
+        //// ── 右クリック削除メニュー ──
+        //const std::string popupId = "##DeleteBar_"
+        //    + std::to_string(trackIdx) + "_" + std::to_string(keyIdx);
 
-        if (hovBar && ImGui::IsMouseClicked(1) && !drag_.active)
-            ImGui::OpenPopup(popupId.c_str());
+        //if (hovBar && ImGui::IsMouseClicked(1) && !drag_.active)
+        //    ImGui::OpenPopup(popupId.c_str());
 
-        if (ImGui::BeginPopup(popupId.c_str()))
-        {
-            ImGui::Text("frame=%d  dur=%df", key.frame, key.duration);
-            ImGui::Separator();
-            if (ImGui::MenuItem("削除"))
-            {
-                if (onDeleteKey_) onDeleteKey_(trackIdx, keyIdx);
-                else              key.selected = true;
-                ImGui::CloseCurrentPopup();
-            }
-            ImGui::EndPopup();
-        }
+        //if (ImGui::BeginPopup(popupId.c_str())) {
+        //    ImGui::Text("frame=%d  dur=%df", key.frame, key.duration);
+        //    ImGui::Separator();
+        //    if (ImGui::MenuItem("削除")) {
+        //        if (onDeleteKey_) onDeleteKey_(trackIdx, keyIdx);
+        //        else              track.RemoveKey(keyIdx);
+        //        ImGui::CloseCurrentPopup();
+        //    }
+        //    ImGui::EndPopup();
+        //}
 
         // ── ドラッグ開始 ──
-        if (!drag_.active && ImGui::IsMouseClicked(0))
-        {
+        if (!drag_.active && ImGui::IsMouseClicked(0)) {
             if (hovLeft)
                 drag_ = { trackIdx, keyIdx, true, DragState::Mode::ResizeLeft,
                           key.frame, key.duration, ImGui::GetMousePos().x };
             else if (hovRight)
                 drag_ = { trackIdx, keyIdx, true, DragState::Mode::ResizeRight,
                           key.frame, key.duration, ImGui::GetMousePos().x };
-            else if (hovBar)
-            {
+            else if (hovBar) {
                 drag_ = { trackIdx, keyIdx, true, DragState::Mode::Move,
                           key.frame, key.duration, ImGui::GetMousePos().x };
                 if (onSelectKey_) onSelectKey_(trackIdx, keyIdx, true);
             }
-            if (drag_.active) key.selected = true;
+            if (drag_.active) {
+                selectionRequests_.push_back({ trackIdx, keyIdx });
+                key.selected = true;
+            }
         }
 
         // ── ドラッグ中の更新 ──
         if (drag_.active && drag_.trackIdx == trackIdx && drag_.keyIdx == keyIdx
-            && ImGui::IsMouseDown(0))
-        {
+            && ImGui::IsMouseDown(0)) {
             int delta = static_cast<int>(
                 (ImGui::GetMousePos().x - drag_.startMouseX) / cellW);
 
-            switch (drag_.mode)
-            {
+            switch (drag_.mode) {
             case DragState::Mode::Move:
                 key.frame = std::clamp(drag_.startFrame + delta, 0, totalFrames);
                 break;
@@ -675,8 +651,7 @@ namespace DopeSheet
     //=============================================================================
 #ifdef USE_IMGUI
     void DopeSheetEditor::DrawSeekBar(
-        ImDrawList* dl, ImVec2 origin, float timelineH, int totalFrames)
-    {
+        ImDrawList* dl, ImVec2 origin, float timelineH, int totalFrames) {
         if (seekFrame_ < 0 || seekFrame_ > totalFrames) return;
 
         float sx = origin.x + seekFrame_ * zoomX_;  // kLabelW オフセット不要
@@ -697,21 +672,17 @@ namespace DopeSheet
         static bool seekDragging = false;
         if (hovered && ImGui::IsMouseClicked(0)) seekDragging = true;
 
-        if (seekDragging)
-        {
-            if (ImGui::IsMouseDown(0))
-            {
+        if (seekDragging) {
+            if (ImGui::IsMouseDown(0)) {
                 float relX = ImGui::GetMousePos().x - origin.x;
                 int   newFrame = std::clamp(
                     static_cast<int>(relX / zoomX_), 0, totalFrames);
-                if (newFrame != seekFrame_)
-                {
+                if (newFrame != seekFrame_) {
                     seekFrame_ = newFrame;
                     if (onSeek_) onSeek_(seekFrame_);
                 }
             }
-            else
-            {
+            else {
                 seekDragging = false;
             }
         }
@@ -722,8 +693,7 @@ namespace DopeSheet
     // キー追加ポップアップ
     //=============================================================================
 #ifdef USE_IMGUI
-    void DopeSheetEditor::DrawAddKeyPopup(std::vector<DopeTrack>& tracks)
-    {
+    void DopeSheetEditor::DrawAddKeyPopup(std::vector<DopeTrack>& tracks) {
         if (!ImGui::BeginPopup("##DopeAddKey")) return;
 
         const bool  valid = (pendingTrackIdx_ >= 0 &&
@@ -739,14 +709,11 @@ namespace DopeSheet
         pendingDuration_ = std::max(0, pendingDuration_);
         ImGui::Separator();
 
-        if (ImGui::Button("追加") && valid)
-        {
-            if (onAddKey_)
-            {
+        if (ImGui::Button("追加") && valid) {
+            if (onAddKey_) {
                 onAddKey_(pendingTrackIdx_, pendingFrame_, pendingValue_);
             }
-            else
-            {
+            else {
                 auto& t = tracks[pendingTrackIdx_];
                 if (!t.readOnly)
                     t.AddKey(pendingFrame_, pendingValue_, 0, pendingDuration_);
@@ -757,8 +724,7 @@ namespace DopeSheet
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
-        if (ImGui::Button("キャンセル"))
-        {
+        if (ImGui::Button("キャンセル")) {
             showAddPopup_ = false;
             ImGui::CloseCurrentPopup();
         }
@@ -772,8 +738,7 @@ namespace DopeSheet
     //=============================================================================
 #ifdef USE_IMGUI
     ImU32 DopeSheetEditor::ResolveKeyColor(
-        const DopeTrack& track, const DopeKey& key, bool hovered) const
-    {
+        const DopeTrack& track, const DopeKey& key, bool hovered) const {
         Color col = (!track.subColors.empty() &&
             key.subType >= 0 &&
             key.subType < static_cast<int>(track.subColors.size()))
