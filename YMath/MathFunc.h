@@ -70,9 +70,6 @@ float Magnitude(const Vector4& v);
 // スカラー値を正規化する関数
 float Normalize(const float& v);
 
-// Vector4を正規化する関数
-Vector4 Normalize(const Vector4& v);
-
 // 2つのVector3間の距離を計算する関数
 float Distance(const Vector3& a, const Vector3& b);
 
@@ -92,7 +89,9 @@ bool IsCollision(const AABB& aabb, const Sphere& sphere);
 
 // 度数からラジアン
 float DegToRad(float degrees);
+
 // ラジアンから度数
 float RadToDeg(float radius);
-// スプライン補間
+
+// スプライン補間（float型）
 float CubicSplineInterpolate(float p0, float p1, float p2, float p3, float t);

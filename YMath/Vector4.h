@@ -127,3 +127,6 @@ inline Vector4 operator*(const Matrix4x4& m, const Vector4& v)
 }
 
 Vector4 Transform(const Vector4& vector, const Matrix4x4& matrix);
+
+// Vector4を正規化する関数
+Vector4 Normalize(const Vector4& v);

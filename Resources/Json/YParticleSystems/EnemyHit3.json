@@ -1,20 +1,39 @@
 {
-    "BlendMode": 1,
+    "BlendMode": 2,
     "Lighting": false,
     "billboardType": 1,
     "isRelative": false,
     "maxParticles": 1000,
     "mesh": {
         "params": [
-            1.0,
-            1.0,
-            1.0,
+            6.099999904632568,
+            5.800000190734863,
+            9.300000190734863,
             16.0
         ],
-        "type": 0
+        "type": 1
     },
     "name": "EnemyHit3",
-    "spawnModules": [],
-    "texture": "Resources/Effects/energyRing.png",
+    "spawnModules": [
+        {
+            "data": {
+                "maxColor": [
+                    0.03529411926865578,
+                    0.6000000238418579,
+                    0.729411780834198,
+                    1.0
+                ],
+                "minColor": [
+                    0.03553527221083641,
+                    0.6010122895240784,
+                    0.730088472366333,
+                    1.0
+                ]
+            },
+            "name": "ランダム色",
+            "type": "SpawnRandomColor"
+        }
+    ],
+    "texture": "Resources/Effects/solarGlow.png",
     "updateModules": []
 }
