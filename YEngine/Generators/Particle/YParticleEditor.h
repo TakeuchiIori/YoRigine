@@ -74,6 +74,18 @@ private:
 	/// </summary>
 	void ShowFileOperationsUI();
 
+	/// <summary>
+	/// 保存/読み込み通知トーストを描画（タイマーが残っている間だけ表示）
+	/// </summary>
+	void ShowSaveNotification();
+
+	/// <summary>
+	/// 保存通知をセット
+	/// </summary>
+	/// <param name="success">保存成功かどうか</param>
+	/// <param name="message">表示するメッセージ</param>
+	void SetNotification(bool success, const std::string& message);
+
 	//=================================================================
 	// メンバ変数
 	//=================================================================
@@ -103,6 +115,14 @@ private:
 
 	// ポップアップ内の新規ファイル名バッファ（各ブラウザ共用）
 	char saveAsNameBuf_[256] = "";
+
+	//=================================================================
+	// 保存完了トースト通知
+	//=================================================================
+
+	float       saveNotifyTimer_ = 0.0f;	  // 残り表示時間（秒）
+	bool        saveNotifySuccess_ = true;    // true=成功 / false=失敗
+	std::string saveNotifyMessage_;           // 表示するメッセージ文字列
 };
 
 #endif // USE_IMGUI

@@ -80,6 +80,16 @@ private:
     void ShowFileButtons();
     void ShowSelectedEmitterDetail(YParticleEmitter& emitter);
 
+    /// <summary>
+    /// 保存/読み込み完了トーストを描画（タイマーが残っている間だけ表示）
+    /// </summary>
+    void ShowSaveNotification();
+
+    /// <summary>
+    /// 通知をセット
+    /// </summary>
+    void SetNotification(bool success, const std::string& message);
+
     //=================================================================
     // ギズモ選択
     //=================================================================
@@ -135,6 +145,14 @@ private:
     YoRigine::FileBrowser loadBrowser_;
     bool showSavePopup_ = false;
     bool showLoadPopup_ = false;
+
+    //=================================================================
+    // 保存完了トースト通知
+    //=================================================================
+
+    float       saveNotifyTimer_ = 0.0f;   // 残り表示時間（秒）
+    bool        saveNotifySuccess_ = true;    // true=成功 / false=失敗
+    std::string saveNotifyMessage_;           // 表示するメッセージ文字列
 };
 
 #endif // USE_IMGUI

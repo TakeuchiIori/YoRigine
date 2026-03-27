@@ -1,15 +1,17 @@
 #ifdef USE_IMGUI
 
 #include "YEmitterGroupEditor.h"
+#include "YParticleManager.h"
 #include "imgui.h"
 #include <Editor/Editor.h>
+#include <algorithm>
+#include <cmath>
 
 //=================================================================
 // 内部ヘルパー：ドラッグ可能な垂直分割線（既存コードそのまま）
 //=================================================================
 
-static void Splitter(float thickness, float* size1, float min_size1, float min_size2, float height = -1.0f)
-{
+static void Splitter(float thickness, float* size1, float min_size1, float min_size2, float height = -1.0f) {
     ImVec2 backup_pos = ImGui::GetCursorPos();
     if (height < 0)
         height = ImGui::GetContentRegionAvail().y;
@@ -35,19 +37,49 @@ static void Splitter(float thickness, float* size1, float min_size1, float min_s
 
 YEmitterGroupEditor::YEmitterGroupEditor()
     : saveBrowser_(emitterDirectory_, { ".json" }, YoRigine::FileBrowser::DisplayMode::List)
-    , loadBrowser_(emitterDirectory_, { ".json" }, YoRigine::FileBrowser::DisplayMode::List)
-{
+    , loadBrowser_(emitterDirectory_, { ".json" }, YoRigine::FileBrowser::DisplayMode::List) {
     gizmoCtrl_.Initialize();
 
     saveBrowser_.SetOnFileSelected([this](const std::string& path) {
-        YEmitterGroupManager::GetInstance().SaveAllToFile(path);
+        bool ok = YEmitterGroupManager::GetInstance().SaveAllToFile(path);
         showSavePopup_ = false;
+        SetNotification(ok, ok ? "保存完了: " + path : "保存失敗: " + path);
         });
 
     loadBrowser_.SetOnFileSelected([this](const std::string& path) {
-        YEmitterGroupManager::GetInstance().LoadAllFromFile(path);
+        bool ok = YEmitterGroupManager::GetInstance().LoadAllFromFile(path);
         showLoadPopup_ = false;
+        SetNotification(ok, ok ? "読み込み完了: " + path : "読み込み失敗: " + path);
         });
+}
+
+//=================================================================
+// 通知ヘルパー
+//=================================================================
+
+void YEmitterGroupEditor::SetNotification(bool success, const std::string& message) {
+    saveNotifySuccess_ = success;
+    saveNotifyMessage_ = message;
+    saveNotifyTimer_ = 3.0f;
+}
+
+void YEmitterGroupEditor::ShowSaveNotification() {
+    if (saveNotifyTimer_ <= 0.0f) return;
+
+    saveNotifyTimer_ -= ImGui::GetIO().DeltaTime;
+
+    float alpha = std::min(1.0f, saveNotifyTimer_ / 0.5f);
+    alpha = std::min(alpha, 1.0f);
+
+    ImVec4 col = saveNotifySuccess_
+        ? ImVec4(0.2f, 1.0f, 0.3f, alpha)
+        : ImVec4(1.0f, 0.3f, 0.2f, alpha);
+
+    const char* icon = saveNotifySuccess_ ? "\uf00c" : "\uf00d ";
+    ImGui::PushStyleColor(ImGuiCol_Text, col);
+    ImGui::Text("%s%s", icon, saveNotifyMessage_.c_str());
+    ImGui::PopStyleColor();
+    ImGui::Separator();
 }
 
 //=================================================================
@@ -55,8 +87,7 @@ YEmitterGroupEditor::YEmitterGroupEditor()
 // ImGui::Image の直後・同一ウィンドウ内で呼ぶ
 //=================================================================
 
-void YEmitterGroupEditor::DrawGizmo()
-{
+void YEmitterGroupEditor::DrawGizmo() {
     if (!camera_ || gizmoTargets_.empty()) return;
 
     gizmoCtrl_.Draw(
@@ -70,8 +101,7 @@ void YEmitterGroupEditor::DrawGizmo()
 // ギズモ選択 — グループ単位
 //=================================================================
 
-void YEmitterGroupEditor::SelectGroup(const std::string& groupName)
-{
+void YEmitterGroupEditor::SelectGroup(const std::string& groupName) {
     selectedGroupName_ = groupName;
     selectedEmitterIndices_.clear();
     selectedEmitterIndex_ = -1;
@@ -84,8 +114,7 @@ void YEmitterGroupEditor::SelectGroup(const std::string& groupName)
 //=================================================================
 
 void YEmitterGroupEditor::SelectEmitter(
-    const std::string& groupName, int index, bool multiSelect)
-{
+    const std::string& groupName, int index, bool multiSelect) {
     // グループが変わったときは選択リセット
     if (groupName != selectedGroupName_) {
         selectedGroupName_ = groupName;
@@ -114,8 +143,7 @@ void YEmitterGroupEditor::SelectEmitter(
 // RebuildGizmoTargets — 選択状態に合わせてアダプタを再構築
 //=================================================================
 
-void YEmitterGroupEditor::RebuildGizmoTargets()
-{
+void YEmitterGroupEditor::RebuildGizmoTargets() {
     groupGizmable_.reset();
     emitterGizmables_.clear();
     gizmoTargets_.clear();
@@ -151,8 +179,10 @@ void YEmitterGroupEditor::RebuildGizmoTargets()
 // ShowEditor — メイン描画エントリポイント
 //=================================================================
 
-void YEmitterGroupEditor::ShowEditor()
-{
+void YEmitterGroupEditor::ShowEditor() {
+    // ── トースト通知（最上部に表示）────────────────────────
+    ShowSaveNotification();
+
     // ギズモモード切替ツールバー（上部に常時表示）
     ShowGizmoToolbar();
     ImGui::Separator();
@@ -176,8 +206,7 @@ void YEmitterGroupEditor::ShowEditor()
 // ShowGizmoToolbar — T/R/S 切替 + 選択状態の表示
 //=================================================================
 
-void YEmitterGroupEditor::ShowGizmoToolbar()
-{
+void YEmitterGroupEditor::ShowGizmoToolbar() {
     gizmoCtrl_.DrawSettings();
 }
 
@@ -185,8 +214,7 @@ void YEmitterGroupEditor::ShowGizmoToolbar()
 // ShowGroupList — 左ペイン（グループ選択でギズモと連動）
 //=================================================================
 
-void YEmitterGroupEditor::ShowGroupList()
-{
+void YEmitterGroupEditor::ShowGroupList() {
     ImGui::Text("エミッターグループ");
     ImGui::Separator();
 
@@ -238,8 +266,7 @@ void YEmitterGroupEditor::ShowGroupList()
 // ShowCreateGroupUI — 既存コードそのまま
 //=================================================================
 
-void YEmitterGroupEditor::ShowCreateGroupUI()
-{
+void YEmitterGroupEditor::ShowCreateGroupUI() {
     ImGui::Text("新規グループ");
     ImGui::SetNextItemWidth(-1);
     ImGui::InputText("##NewGroupName", newGroupNameBuf_, sizeof(newGroupNameBuf_));
@@ -257,8 +284,7 @@ void YEmitterGroupEditor::ShowCreateGroupUI()
 // ShowGroupDetail — 右ペイン（エミッター選択をギズモと連動）
 //=================================================================
 
-void YEmitterGroupEditor::ShowGroupDetail()
-{
+void YEmitterGroupEditor::ShowGroupDetail() {
     if (selectedGroupName_.empty()) {
         ImGui::TextDisabled("← グループを選択または作成してください");
         return;
@@ -333,24 +359,102 @@ void YEmitterGroupEditor::ShowGroupDetail()
     if (ImGui::SmallButton("+ エミッターを追加"))
         ImGui::OpenPopup("AddEmitterPopup");
 
+    // ★ エミッター追加ポップアップ（システム一覧から選択方式）
+    ImGui::SetNextWindowSize(ImVec2(360, 0), ImGuiCond_Appearing);
     if (ImGui::BeginPopup("AddEmitterPopup")) {
-        ImGui::Text("システム名:");
-        ImGui::SetNextItemWidth(200);
-        ImGui::InputText("##NewESys", newEmitterSystemName_, sizeof(newEmitterSystemName_));
-        ImGui::Text("ローカルオフセット:");
-        ImGui::SetNextItemWidth(200);
-        ImGui::DragFloat3("##NewEOff", newEmitterOffset_, 0.1f);
-        if (ImGui::Button("追加")) {
-            if (newEmitterSystemName_[0] != '\0') {
-                group->AddEmitter(newEmitterSystemName_,
-                    { newEmitterOffset_[0], newEmitterOffset_[1], newEmitterOffset_[2] });
-                newEmitterSystemName_[0] = '\0';
-                newEmitterOffset_[0] = newEmitterOffset_[1] = newEmitterOffset_[2] = 0;
+
+        ImGui::Text("エミッターを追加");
+        ImGui::Separator();
+
+        // ── システム一覧から選択 ──────────────────────────────
+        auto& pmgr = YParticleManager::GetInstance();
+        auto sysNames = pmgr.GetAllSystemNames();
+
+        if (!sysNames.empty()) {
+            ImGui::Text("システムを選択:");
+
+            // 選択中の名前が一覧に存在するかチェックし、ハイライト
+            std::string currentSel(newEmitterSystemName_);
+
+            // リストボックスの高さ: 最大6行分、ただし件数が少なければそれに合わせる
+            int visibleRows = static_cast<int>(std::min(sysNames.size(), size_t(6)));
+            float listH = visibleRows * ImGui::GetTextLineHeightWithSpacing() + 6.0f;
+
+            ImGui::SetNextItemWidth(-1);
+            if (ImGui::BeginListBox("##SysPickList", ImVec2(-1, listH))) {
+                for (const auto& sysName : sysNames) {
+                    bool isSelected = (currentSel == sysName);
+
+                    // 対象システムが存在するか色で区別
+                    auto* sys = pmgr.GetSystem(sysName);
+                    bool  connected = (sys != nullptr);
+                    if (!connected)
+                        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.6f, 0.6f, 0.6f, 1.0f));
+
+                    if (ImGui::Selectable(sysName.c_str(), isSelected)) {
+                        strncpy_s(newEmitterSystemName_, sysName.c_str(), sizeof(newEmitterSystemName_));
+                    }
+
+                    if (!connected) ImGui::PopStyleColor();
+
+                    if (ImGui::IsItemHovered() && connected) {
+                        // ホバー時にパーティクル数をツールチップ表示
+                        size_t activeCnt = 0;
+                        for (const auto& attr : sys->GetAttributes())
+                            if (attr.isActive) activeCnt++;
+                        ImGui::SetTooltip("最大: %u  有効: %zu", sys->GetMaxParticles(), activeCnt);
+                    }
+                }
+                ImGui::EndListBox();
             }
+        }
+        else {
+            ImGui::TextColored({ 1.0f, 0.7f, 0.0f, 1.0f },
+                "読み込み済みのシステムがありません");
+            ImGui::TextDisabled("パーティクルシステムを先に作成してください");
+        }
+
+        ImGui::Separator();
+
+        // ── 直接入力（一覧にないシステム名も入力可） ─────────
+        ImGui::Text("システム名 (直接入力):");
+        ImGui::SetNextItemWidth(-1);
+        ImGui::InputText("##NewESys", newEmitterSystemName_, sizeof(newEmitterSystemName_));
+
+        // 現在の選択をプレビュー
+        if (newEmitterSystemName_[0] != '\0') {
+            bool exists = (pmgr.GetSystem(newEmitterSystemName_) != nullptr);
+            if (exists)
+                ImGui::TextColored({ 0.2f, 1.0f, 0.3f, 1.0f }, "\uf00c \"%s\" が存在します", newEmitterSystemName_);
+            else
+                ImGui::TextColored({ 1.0f, 0.6f, 0.1f, 1.0f }, "\uf071\"%s\" は未登録です", newEmitterSystemName_);
+        }
+
+        ImGui::Separator();
+
+        // ── ローカルオフセット ────────────────────────────────
+        ImGui::Text("ローカルオフセット:");
+        ImGui::SetNextItemWidth(-1);
+        ImGui::DragFloat3("##NewEOff", newEmitterOffset_, 0.1f);
+
+        ImGui::Spacing();
+
+        // ── 追加 / キャンセル ─────────────────────────────────
+        bool canAdd = (newEmitterSystemName_[0] != '\0');
+        ImGui::BeginDisabled(!canAdd);
+        if (ImGui::Button("追加", ImVec2(120, 0))) {
+            group->AddEmitter(newEmitterSystemName_,
+                { newEmitterOffset_[0], newEmitterOffset_[1], newEmitterOffset_[2] });
+            newEmitterSystemName_[0] = '\0';
+            newEmitterOffset_[0] = newEmitterOffset_[1] = newEmitterOffset_[2] = 0.0f;
             ImGui::CloseCurrentPopup();
         }
+        ImGui::EndDisabled();
+
         ImGui::SameLine();
-        if (ImGui::Button("キャンセル")) ImGui::CloseCurrentPopup();
+        if (ImGui::Button("キャンセル", ImVec2(120, 0)))
+            ImGui::CloseCurrentPopup();
+
         ImGui::EndPopup();
     }
 
@@ -391,8 +495,7 @@ void YEmitterGroupEditor::ShowGroupDetail()
 
     // ── 選択エミッターの詳細設定 ──────────────────────────────
     if (selectedEmitterIndex_ >= 0 &&
-        selectedEmitterIndex_ < (int)group->GetEmitterCount())
-    {
+        selectedEmitterIndex_ < (int)group->GetEmitterCount()) {
         auto* emitter = group->GetEmitter(selectedEmitterIndex_);
         if (emitter) {
             ImGui::Separator();
@@ -408,8 +511,7 @@ void YEmitterGroupEditor::ShowGroupDetail()
 // ShowEmitterRow — テーブル行1件（Gizmo列を追加）
 //=================================================================
 
-bool YEmitterGroupEditor::ShowEmitterRow(YEmitterGroup& group, size_t index)
-{
+bool YEmitterGroupEditor::ShowEmitterRow(YEmitterGroup& group, size_t index) {
     auto* emitter = group.GetEmitter(index);
     if (!emitter) return false;
 
@@ -423,8 +525,7 @@ bool YEmitterGroupEditor::ShowEmitterRow(YEmitterGroup& group, size_t index)
     ImGui::TableSetColumnIndex(0);
     bool isRowSelected = (selectedEmitterIndex_ == (int)index);
     if (ImGui::Selectable(emitter->GetSystemName().c_str(), isRowSelected,
-        ImGuiSelectableFlags_SpanAllColumns))
-    {
+        ImGuiSelectableFlags_SpanAllColumns)) {
         selectedEmitterIndex_ = (int)index;  // Detail 表示用のみ更新
     }
 
@@ -475,21 +576,54 @@ bool YEmitterGroupEditor::ShowEmitterRow(YEmitterGroup& group, size_t index)
 // ShowSelectedEmitterDetail — 既存コードそのまま
 //=================================================================
 
-void YEmitterGroupEditor::ShowSelectedEmitterDetail(YParticleEmitter& emitter)
-{
+void YEmitterGroupEditor::ShowSelectedEmitterDetail(YParticleEmitter& emitter) {
     ImGui::Columns(2, "##EmitterDetailCols", false);
     ImGui::SetColumnWidth(0, 160);
 
+    // ── システム名（一覧から選択 or 直接入力） ────────────────
     ImGui::Text("システム名");
     ImGui::NextColumn();
+
     char sysBuf[128];
     strncpy_s(sysBuf, emitter.GetSystemName().c_str(), sizeof(sysBuf));
     ImGui::SetNextItemWidth(-1);
+
+    // Enterキーで確定
     if (ImGui::InputText("##SysName", sysBuf, sizeof(sysBuf), ImGuiInputTextFlags_EnterReturnsTrue)) {
         auto& pmgr = YParticleManager::GetInstance();
         if (!pmgr.GetSystem(sysBuf)) pmgr.CreateSystem(sysBuf, 1000);
         emitter.SetSystemName(sysBuf);
     }
+
+    // 詳細欄にも小さくシステム選択ドロップダウンを置く
+    ImGui::SameLine();
+    if (ImGui::SmallButton("...##SysPick"))
+        ImGui::OpenPopup("##DetailSysPick");
+
+    if (ImGui::BeginPopup("##DetailSysPick")) {
+        ImGui::Text("システム選択:");
+        auto& pmgr2 = YParticleManager::GetInstance();
+        auto sysNames2 = pmgr2.GetAllSystemNames();
+        if (sysNames2.empty()) {
+            ImGui::TextDisabled("システムがありません");
+        }
+        else {
+            int visRows = static_cast<int>(std::min(sysNames2.size(), size_t(8)));
+            float lh = visRows * ImGui::GetTextLineHeightWithSpacing() + 6.0f;
+            if (ImGui::BeginListBox("##DetailSysLB", ImVec2(240, lh))) {
+                for (const auto& sn : sysNames2) {
+                    bool isSel = (emitter.GetSystemName() == sn);
+                    if (ImGui::Selectable(sn.c_str(), isSel)) {
+                        emitter.SetSystemName(sn);
+                        ImGui::CloseCurrentPopup();
+                    }
+                }
+                ImGui::EndListBox();
+            }
+        }
+        ImGui::EndPopup();
+    }
+
     ImGui::NextColumn();
 
     ImGui::Text("有効");
@@ -600,11 +734,10 @@ void YEmitterGroupEditor::ShowSelectedEmitterDetail(YParticleEmitter& emitter)
 }
 
 //=================================================================
-// ShowFileButtons — 既存コードそのまま
+// ShowFileButtons — 保存完了通知付き
 //=================================================================
 
-void YEmitterGroupEditor::ShowFileButtons()
-{
+void YEmitterGroupEditor::ShowFileButtons() {
     ImGui::Text("ファイル");
 
     if (ImGui::Button("すべて保存", ImVec2(-1, 0))) {
@@ -615,8 +748,7 @@ void YEmitterGroupEditor::ShowFileButtons()
 
     ImGui::SetNextWindowSize(ImVec2(480, 380), ImGuiCond_Appearing);
     if (ImGui::BeginPopupModal("##SaveEmitterGroups", &showSavePopup_,
-        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize))
-    {
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize)) {
         ImGui::Text("保存 — ファイルをクリックして上書き、または下に新しい名前を入力");
         ImGui::Separator();
         saveBrowser_.Draw("##SaveBrowserChild", ImVec2(0, 260));
@@ -629,7 +761,8 @@ void YEmitterGroupEditor::ShowFileButtons()
         if (ImGui::Button("名前を付けて保存")) {
             if (saveAsName[0] != '\0') {
                 std::string path = saveBrowser_.GetCurrentDir() + saveAsName;
-                YEmitterGroupManager::GetInstance().SaveAllToFile(path);
+                bool ok = YEmitterGroupManager::GetInstance().SaveAllToFile(path);
+                SetNotification(ok, ok ? "保存完了: " + path : "保存失敗: " + path);
                 saveAsName[0] = '\0';
                 showSavePopup_ = false;
                 ImGui::CloseCurrentPopup();
@@ -650,8 +783,7 @@ void YEmitterGroupEditor::ShowFileButtons()
 
     ImGui::SetNextWindowSize(ImVec2(480, 360), ImGuiCond_Appearing);
     if (ImGui::BeginPopupModal("##LoadEmitterGroups", &showLoadPopup_,
-        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize))
-    {
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize)) {
         ImGui::Text("読み込み — JSONファイルを選択してください");
         ImGui::Separator();
         loadBrowser_.Draw("##LoadBrowserChild", ImVec2(0, 280));
