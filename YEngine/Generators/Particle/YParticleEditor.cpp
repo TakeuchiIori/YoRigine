@@ -4,6 +4,7 @@
 #include "YParticleModuleFactory.h"
 #include "YParticleManager.h"
 #include "YEmitterGroupEditor.h"
+#include "Editor/Icon/EditorIcon.h"
 
 #include "imgui.h"
 #include <fstream>
@@ -102,7 +103,7 @@ void YParticleEditor::ShowSaveNotification() {
 		? ImVec4(0.2f, 1.0f, 0.3f, alpha)
 		: ImVec4(1.0f, 0.3f, 0.2f, alpha);
 
-	const char* icon = saveNotifySuccess_ ? "\uf00c" : "\uf00d ";
+	const char* icon = saveNotifySuccess_ ? Icon::Check :Icon::Xmark;
 	ImGui::PushStyleColor(ImGuiCol_Text, col);
 	ImGui::Text("%s%s", icon, saveNotifyMessage_.c_str());
 	ImGui::PopStyleColor();
