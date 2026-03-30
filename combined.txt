@@ -183,6 +183,7 @@
 └──     ├── json.hpp
 └──     └── json_fwd.hpp
 ├── Resources/
+└── ├── Audio/
 └── ├── Binary/
 └── └── ├── Pipeline/
 └── ├── DDS/
@@ -300,7 +301,9 @@
 └── └── └── ├── Command/
 └── └── └── └── └── CommandHistory.h
 └── └── └── ├── Editor.cpp
-└── └── └── └── Editor.h
+└── └── └── ├── Editor.h
+└── └── └── └── Icon/
+└── └── └──     └── EditorIcon.h
 └── └── ├── Framework/
 └── └── └── ├── Framework.cpp
 └── └── └── └── Framework.h
@@ -591,6 +594,14 @@
 └──     └──     └── SphereCollider.h
 └──     ├── Debugger/
 └──     └── ├── ConvertString.h
+└──     └── ├── CurveEditor/
+└──     └── └── ├── CurveChannel.cpp
+└──     └── └── ├── CurveChannel.h
+└──     └── └── ├── CurveDelegate.cpp
+└──     └── └── ├── CurveDelegate.h
+└──     └── └── ├── CurveKey.h
+└──     └── └── ├── CurveProperty.cpp
+└──     └── └── └── CurveProperty.h
 └──     └── ├── D3DResourceLeakChecker.cpp
 └──     └── ├── D3DResourceLeakChecker.h
 └──     └── ├── DebugConsole.cpp
@@ -192366,6 +192377,31 @@ private:
 #endif // USE_IMGUI
 
 ============================================================
+File Path: YEngine/Core/Editor/Icon/EditorIcon.h
+============================================================
+#pragma once
+//=================================================================
+// FontAwesome 5 Free — アイコン Unicode 定義 (Modern C++ 版)
+//=================================================================
+namespace Icon {
+    static constexpr const char* Play = "\uf04b";
+    static constexpr const char* Xmark = "\uf00d";
+    static constexpr const char* Check = "\uf00c";
+    static constexpr const char* Danger = "\uf071";
+    static constexpr const char* Bolt = "\uf0e7";
+    static constexpr const char* Bullhorn = "\uf0a1";
+    static constexpr const char* Refresh = "\uf021";
+    static constexpr const char* Stop = "\uf04d";
+    static constexpr const char* PlusCircle = "\uf055";
+    static constexpr const char* Trash = "\uf1f8";
+    static constexpr const char* Cog = "\uf013";
+    static constexpr const char* FloppyDisk = "\uf0c7";
+    static constexpr const char* FolderOpen = "\uf115";
+    static constexpr const char* CheckCircle = "\uf058";
+    static constexpr const char* TimesCircle = "\uf057";
+}
+
+============================================================
 File Path: YEngine/Core/Framework/Framework.cpp
 ============================================================
 #include "Framework.h"
@@ -205788,63 +205824,263 @@ File Path: YEngine/Generators/Particle/Modules/Update/Color/UpdateColor.cpp
 ============================================================
 #include "UpdateColor.h"
 
-void UpdateColor::OnUpdate(ParticleAttribute* attrs, uint32_t index, float dt)
-{
-	(void)dt; // 未使用警告回避
+#ifdef USE_IMGUI
+#include "imgui.h"
+#include <ImCurveEdit.h>
+#include <cstdio>
+#endif
 
-	// dt ではなく、そのパーティクルの現在の寿命割合(0.0~1.0)を使う
-	float t = attrs[index].GetNormalizedAge();
+//=============================================================================
+// 構築
+//=============================================================================
 
-	// 0.0〜1.0の範囲にクランプ
-	//t = std::max(0.0f, std::min(1.0f, t));
-
-	// 線形補間
-	attrs[index].color = Lerp(startColor_, endColor_, t);
+UpdateColor::UpdateColor() {
+    // Alpha のデフォルトカーブ: 1.0 → 0.0 (フェードアウト)
+    curveA_.GetChannel().Clear();
+    curveA_.GetChannel().AddKey(0.0f, 1.0f);
+    curveA_.GetChannel().AddKey(1.0f, 0.0f);
+    curveA_.SetMode(CurveProperty::Mode::Curve);
 }
 
-void UpdateColor::DrawEditor()
-{
+void UpdateColor::SetColorMode(ColorMode m) {
+    colorMode_ = m;
 #ifdef USE_IMGUI
-	ImGui::ColorEdit4("開始色", &startColor_.x);
-	ImGui::ColorEdit4("終了色", &endColor_.x);
+    delegateDirty_ = true;
 #endif
 }
 
-void UpdateColor::SaveToJson(nlohmann::json& json) const
-{
-	json = {
-		{"startColor", {
-			{"x", startColor_.x},
-			{"y", startColor_.y},
-			{"z", startColor_.z},
-			{"w", startColor_.w}
-		}},
-		{"endColor", {
-			{"x", endColor_.x},
-			{"y", endColor_.y},
-			{"z", endColor_.z},
-			{"w", endColor_.w}
-		}}
-	};
+//=============================================================================
+// OnUpdate
+//=============================================================================
+
+void UpdateColor::OnUpdate(ParticleAttribute* attrs, uint32_t index, float /*dt*/) {
+    const float t = attrs[index].GetNormalizedAge();
+    const float rand = 0.5f;
+
+    switch (colorMode_) {
+    case ColorMode::TwoColor:
+        attrs[index].color = Lerp(startColor_, endColor_, t);
+        break;
+
+    case ColorMode::GradientCurve:
+        attrs[index].color = {
+            curveR_.Evaluate(t, rand),
+            curveG_.Evaluate(t, rand),
+            curveB_.Evaluate(t, rand),
+            curveA_.Evaluate(t, rand)
+        };
+        break;
+    }
 }
 
-void UpdateColor::LoadFromJson(const nlohmann::json& json)
-{
-	if (json.contains("startColor")) {
-		startColor_.x = json["startColor"]["x"];
-		startColor_.y = json["startColor"]["y"];
-		startColor_.z = json["startColor"]["z"];
-		startColor_.w = json["startColor"]["w"];
-	}
+//=============================================================================
+// JSON シリアライズ
+//=============================================================================
 
-	if (json.contains("endColor")) {
-		endColor_.x = json["endColor"]["x"];
-		endColor_.y = json["endColor"]["y"];
-		endColor_.z = json["endColor"]["z"];
-		endColor_.w = json["endColor"]["w"];
-	}
+void UpdateColor::SaveToJson(nlohmann::json& json) const {
+    json["colorMode"] = static_cast<int>(colorMode_);
+    json["startColor"] = { startColor_.x, startColor_.y, startColor_.z, startColor_.w };
+    json["endColor"] = { endColor_.x,   endColor_.y,   endColor_.z,   endColor_.w };
+    json["curveR"] = curveR_.SaveToJson();
+    json["curveG"] = curveG_.SaveToJson();
+    json["curveB"] = curveB_.SaveToJson();
+    json["curveA"] = curveA_.SaveToJson();
 }
 
+void UpdateColor::LoadFromJson(const nlohmann::json& json) {
+    colorMode_ = static_cast<ColorMode>(json.value("colorMode", 0));
+#ifdef USE_IMGUI
+    delegateDirty_ = true;
+#endif
+    if (json.contains("startColor"))
+        startColor_ = { json["startColor"][0], json["startColor"][1],
+                        json["startColor"][2], json["startColor"][3] };
+    if (json.contains("endColor"))
+        endColor_ = { json["endColor"][0], json["endColor"][1],
+                      json["endColor"][2], json["endColor"][3] };
+
+    if (json.contains("curveR")) curveR_.LoadFromJson(json["curveR"]);
+    if (json.contains("curveG")) curveG_.LoadFromJson(json["curveG"]);
+    if (json.contains("curveB")) curveB_.LoadFromJson(json["curveB"]);
+    if (json.contains("curveA")) curveA_.LoadFromJson(json["curveA"]);
+}
+
+//=============================================================================
+// DrawEditor
+//=============================================================================
+#ifdef USE_IMGUI
+
+void UpdateColor::DrawEditor() {
+    static const char* kModeNames[] = { "2色補間", "カーブ (R/G/B/A)" };
+    int modeIdx = static_cast<int>(colorMode_);
+    if (ImGui::Combo("カラーモード", &modeIdx, kModeNames, 2))
+        SetColorMode(static_cast<ColorMode>(modeIdx));
+
+    ImGui::Separator();
+
+    switch (colorMode_) {
+    case ColorMode::TwoColor:      DrawTwoColorEditor();      break;
+    case ColorMode::GradientCurve: DrawGradientCurveEditor(); break;
+    }
+}
+
+void UpdateColor::DrawTwoColorEditor() {
+    ImGui::ColorEdit4("開始色", &startColor_.x);
+    ImGui::ColorEdit4("終了色", &endColor_.x);
+    ImGui::TextDisabled("(開始色 → 終了色 を寿命に沿ってLinear補間)");
+}
+
+void UpdateColor::RebuildDelegate() {
+    delegate_ = std::make_unique<CurveDelegate>();
+    delegate_->AddChannel(&curveR_.GetChannel(), 0xFF4444FF, "R");
+    delegate_->AddChannel(&curveG_.GetChannel(), 0xFF44FF44, "G");
+    delegate_->AddChannel(&curveB_.GetChannel(), 0xFFFF4444, "B");
+    delegate_->AddChannel(&curveA_.GetChannel(), 0xFFAAAAAA, "A");
+    delegate_->SetViewRange(ImVec2(0.0f, -0.06f), ImVec2(1.0f, 1.06f));
+    delegateDirty_ = false;
+}
+
+void UpdateColor::DrawGradientCurveEditor() {
+    if (delegateDirty_) RebuildDelegate();
+
+    // ── 可視フラグ切り替え ────────────────────────────────────────────────
+    static const char* kChLabels[] = { "R", "G", "B", "A" };
+    static const ImVec4  kChColors[] = {
+        { 0.9f, 0.4f, 0.4f, 1.0f },
+        { 0.4f, 0.9f, 0.4f, 1.0f },
+        { 0.4f, 0.5f, 1.0f, 1.0f },
+        { 0.7f, 0.7f, 0.7f, 1.0f },
+    };
+    // キー値オーバーレイ用 IM_COL32（チャンネルごとに色を分ける）
+    static const ImU32 kChOverlayColors[] = {
+        IM_COL32(255, 120, 120, 230),
+        IM_COL32(120, 255, 120, 230),
+        IM_COL32(120, 160, 255, 230),
+        IM_COL32(210, 210, 210, 230),
+    };
+
+    for (int i = 0; i < 4; ++i) {
+        bool vis = delegate_->GetVisible(i);
+        ImGui::PushStyleColor(ImGuiCol_Text, kChColors[i]);
+        if (ImGui::Checkbox(kChLabels[i], &vis))
+            delegate_->SetVisible(i, vis);
+        ImGui::PopStyleColor();
+        if (i < 3) ImGui::SameLine();
+    }
+
+    // ── 合成カーブエディタ（4チャンネル同時表示） ─────────────────────────
+    float w = ImGui::GetContentRegionAvail().x;
+    ImCurveEdit::Edit(*delegate_, ImVec2(w, 180.0f),
+        ImGui::GetID("##colorCurveEdit"));
+
+    // ── オーバーレイ（Y軸目盛 + チャンネルごとのキー値） ───────────────────
+    {
+        ImVec2 rMin = ImGui::GetItemRectMin();
+        ImVec2 rMax = ImGui::GetItemRectMax();
+        float  vMin = delegate_->GetViewMinValue().y;
+        float  vMax = delegate_->GetViewMaxValue().y;
+        float  vRng = vMax - vMin;
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+
+        // Y 軸目盛（5分割）
+        constexpr int kYDiv = 5;
+        for (int i = 0; i <= kYDiv; ++i) {
+            float frac = static_cast<float>(i) / kYDiv;
+            float val = vMax - vRng * frac;
+            float sy = rMin.y + (rMax.y - rMin.y) * frac;
+
+            dl->AddLine(ImVec2(rMin.x, sy),
+                ImVec2(rMin.x + 6, sy),
+                IM_COL32(200, 200, 200, 130));
+            dl->AddLine(ImVec2(rMin.x + 6, sy),
+                ImVec2(rMax.x, sy),
+                IM_COL32(180, 180, 180, 30));
+
+            char buf[12];
+            std::snprintf(buf, sizeof(buf), "%.2f", val);
+            dl->AddText(ImVec2(rMin.x + 8, sy - 6),
+                IM_COL32(230, 230, 230, 200), buf);
+        }
+
+        // 各チャンネルのキー値オーバーレイ（表示中チャンネルのみ）
+        CurveProperty* channels[4] = { &curveR_, &curveG_, &curveB_, &curveA_ };
+        for (int ci = 0; ci < 4; ++ci) {
+            if (!delegate_->GetVisible(ci)) continue;
+            for (const auto& k : channels[ci]->GetChannel().GetKeys()) {
+                float fx = k.time;
+                float fy = (vRng > 1e-6f) ? 1.0f - (k.value - vMin) / vRng : 0.0f;
+                float sx = rMin.x + fx * (rMax.x - rMin.x);
+                float sy = rMin.y + fy * (rMax.y - rMin.y);
+
+                char buf[12];
+                std::snprintf(buf, sizeof(buf), "%.2f", k.value);
+                // 黒縁→チャンネル色
+                dl->AddText(ImVec2(sx + 5, sy - 15), IM_COL32(0, 0, 0, 180), buf);
+                dl->AddText(ImVec2(sx + 4, sy - 16), kChOverlayColors[ci], buf);
+            }
+        }
+    }
+
+    ImGui::Separator();
+
+    // ── チャンネルごとの詳細エディタ ─────────────────────────────────────
+    // CurveProperty::DrawEditor に委譲することで
+    // モード選択・補間変更・キー追加/削除を自動的に取得する
+    static const uint32_t kChCurveColors[] = {
+        0xFF4444FF, 0xFF44FF44, 0xFFFF4444, 0xFFAAAAAA
+    };
+
+    if (ImGui::TreeNode("チャンネル詳細")) {
+        CurveProperty* channels[4] = { &curveR_, &curveG_, &curveB_, &curveA_ };
+
+        for (int i = 0; i < 4; ++i) {
+            ImGui::PushID(i);
+            const ImVec4& c = kChColors[i];
+            ImGui::PushStyleColor(ImGuiCol_Header,
+                ImVec4(c.x, c.y, c.z, c.w * 0.3f));
+            ImGui::PushStyleColor(ImGuiCol_HeaderHovered,
+                ImVec4(c.x, c.y, c.z, c.w * 0.5f));
+
+            // TreeNode 内に DrawEditor を展開
+            if (ImGui::TreeNode(kChLabels[i])) {
+                // 変化検知（delegateDirty_ のため）
+                auto prevMode = channels[i]->GetMode();
+                auto prevInterp = channels[i]->GetChannel().GetDefaultMode();
+                int  prevKeys = channels[i]->GetChannel().GetKeyCount();
+
+                CurveProperty::EditorConfig cfg;
+                cfg.valueMin = 0.0f;
+                cfg.valueMax = 1.0f;
+                cfg.editorHeight = 100.0f;
+                cfg.dragSpeed = 0.005f;
+                cfg.curveColor = kChCurveColors[i];
+                cfg.showYLabels = true;
+                cfg.yLabelCount = 4;
+                cfg.showXLabels = false;
+                cfg.showKeyValues = true;
+                cfg.showKeyList = true;
+                cfg.minKeyCount = 2;
+
+                channels[i]->DrawEditor(kChLabels[i], cfg);
+
+                // モード・補間・キー数のいずれかが変わったら合成ビューを再構築
+                if (channels[i]->GetMode() != prevMode ||
+                    channels[i]->GetChannel().GetDefaultMode() != prevInterp ||
+                    channels[i]->GetChannel().GetKeyCount() != prevKeys) {
+                    delegateDirty_ = true;
+                }
+
+                ImGui::TreePop();
+            }
+
+            ImGui::PopStyleColor(2);
+            ImGui::PopID();
+        }
+        ImGui::TreePop();
+    }
+}
+
+#endif // USE_IMGUI
 
 ============================================================
 File Path: YEngine/Generators/Particle/Modules/Update/Color/UpdateColor.h
@@ -205852,22 +206088,79 @@ File Path: YEngine/Generators/Particle/Modules/Update/Color/UpdateColor.h
 #pragma once
 #include "../../IParticleModule.h"
 #include "../../../YParticleModuleFactory.h"
+#include "Debugger/CurveEditor/CurveProperty.h"
 
+#ifdef USE_IMGUI
+#include <memory>
+#include "Debugger/CurveEditor/CurveDelegate.h"
+#endif
+
+/// <summary>
+/// ライフタイムに応じて色を変化させるモジュール。
+///
+/// ■ モード
+///   TwoColor      : 開始色→終了色を線形補間（旧来の動作と互換）
+///   GradientCurve : R / G / B / A を個別の CurveProperty でカーブ制御
+///
+/// ■ GradientCurve モード
+///   各チャンネルは独立して Constant / RandomBetween / Curve を選択できる。
+///   DrawEditor では RGBA 4 本のカーブを CurveDelegate で同一ビューに表示。
+/// </summary>
 class UpdateColor : public IUpdateModule
 {
 public:
-    void OnUpdate(ParticleAttribute* attrs, uint32_t index, float dt) override;
-    void DrawEditor() override;
-    std::string GetName() const override { return "色"; }
-    std::string  GetTypeName() const override { return "UpdateColor"; }
+    enum class ColorMode : uint8_t {
+        TwoColor,       // 2色の線形補間
+        GradientCurve   // R/G/B/A 個別カーブ
+    };
 
-    void SaveToJson(nlohmann::json& json) const override;
-    void LoadFromJson(const nlohmann::json& json) override;
+    UpdateColor();
+
+    //===== IUpdateModule =====
+    void        OnUpdate(ParticleAttribute* attrs, uint32_t index, float dt) override;
+    void        DrawEditor()                                                  override;
+    std::string GetName()     const override { return "色"; }
+    std::string GetTypeName() const override { return "UpdateColor"; }
+
+    //===== シリアライズ =====
+    void SaveToJson(nlohmann::json& json)        const override;
+    void LoadFromJson(const nlohmann::json& json)      override;
+
+    //===== アクセス =====
+    ColorMode      GetColorMode()        const { return colorMode_; }
+    void           SetColorMode(ColorMode m);
+
+    const Vector4& GetStartColor()       const { return startColor_; }
+    const Vector4& GetEndColor()         const { return endColor_; }
+    void           SetStartColor(const Vector4& c) { startColor_ = c; }
+    void           SetEndColor(const Vector4& c) { endColor_ = c; }
+
+    CurveProperty& GetRCurve() { return curveR_; }
+    CurveProperty& GetGCurve() { return curveG_; }
+    CurveProperty& GetBCurve() { return curveB_; }
+    CurveProperty& GetACurve() { return curveA_; }
+
 private:
-    Vector4 startColor_{ 1.0f, 1.0f, 1.0f, 1.0f };
-	Vector4 endColor_{ 1.0f, 0.0f, 0.0f, 0.0f };
+#ifdef USE_IMGUI
+    void DrawTwoColorEditor();
+    void DrawGradientCurveEditor();
+    void RebuildDelegate();
+
+    std::unique_ptr<CurveDelegate> delegate_;
+    bool delegateDirty_ = true;
+#endif
+
+    ColorMode colorMode_ = ColorMode::TwoColor;
+    Vector4   startColor_{ 1.0f, 1.0f, 1.0f, 1.0f };
+    Vector4   endColor_{ 1.0f, 0.0f, 0.0f, 0.0f };
+
+    // GradientCurve モード用の各チャンネル
+    CurveProperty curveR_{ 1.0f, "R" };
+    CurveProperty curveG_{ 1.0f, "G" };
+    CurveProperty curveB_{ 1.0f, "B" };
+    CurveProperty curveA_{ 1.0f, "A" };
 };
-// ファクトリーに登録
+
 REGISTER_UPDATE_MODULE(UpdateColor)
 
 ============================================================
@@ -212937,19 +213230,17 @@ File Path: YEngine/Generators/Particle/YEmitterGroupEditor.cpp
 #ifdef USE_IMGUI
 
 #include "YEmitterGroupEditor.h"
-#include "imgui.h"
+#include "YParticleManager.h"
+#include <Editor/Icon/EditorIcon.h>
 #include <Editor/Editor.h>
+#include <algorithm>
+#include <cmath>
+#include "imgui.h"
 
-//=================================================================
-// 内部ヘルパー：ドラッグ可能な垂直分割線（既存コードそのまま）
-//=================================================================
 
-static void Splitter(float thickness, float* size1, float min_size1, float min_size2, float height = -1.0f)
-{
+static void Splitter(float thickness, float* size1, float min_size1, float min_size2, float height = -1.0f) {
     ImVec2 backup_pos = ImGui::GetCursorPos();
-    if (height < 0)
-        height = ImGui::GetContentRegionAvail().y;
-
+    if (height < 0) height = ImGui::GetContentRegionAvail().y;
     ImGui::Button("##vsplitter", ImVec2(thickness, height));
     if (ImGui::IsItemActive()) {
         float delta = ImGui::GetIO().MouseDelta.x;
@@ -212960,54 +213251,55 @@ static void Splitter(float thickness, float* size1, float min_size1, float min_s
                 *size1 = ImGui::GetContentRegionAvail().x - min_size2 - thickness;
         }
     }
-    if (ImGui::IsItemHovered())
-        ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+    if (ImGui::IsItemHovered()) ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
     ImGui::SetCursorPos(backup_pos);
 }
 
-//=================================================================
-// コンストラクタ
-//=================================================================
-
 YEmitterGroupEditor::YEmitterGroupEditor()
     : saveBrowser_(emitterDirectory_, { ".json" }, YoRigine::FileBrowser::DisplayMode::List)
-    , loadBrowser_(emitterDirectory_, { ".json" }, YoRigine::FileBrowser::DisplayMode::List)
-{
+    , loadBrowser_(emitterDirectory_, { ".json" }, YoRigine::FileBrowser::DisplayMode::List) {
     gizmoCtrl_.Initialize();
-
     saveBrowser_.SetOnFileSelected([this](const std::string& path) {
-        YEmitterGroupManager::GetInstance().SaveAllToFile(path);
+        bool ok = YEmitterGroupManager::GetInstance().SaveAllToFile(path);
         showSavePopup_ = false;
+        SetNotification(ok, ok ? "保存完了: " + path : "保存失敗: " + path);
         });
-
     loadBrowser_.SetOnFileSelected([this](const std::string& path) {
-        YEmitterGroupManager::GetInstance().LoadAllFromFile(path);
+        bool ok = YEmitterGroupManager::GetInstance().LoadAllFromFile(path);
         showLoadPopup_ = false;
+        SetNotification(ok, ok ? "読み込み完了: " + path : "読み込み失敗: " + path);
         });
 }
 
-//=================================================================
-// DrawGizmo — ビューポート上にギズモを描画
-// ImGui::Image の直後・同一ウィンドウ内で呼ぶ
-//=================================================================
+void YEmitterGroupEditor::SetNotification(bool success, const std::string& message) {
+    saveNotifySuccess_ = success;
+    saveNotifyMessage_ = message;
+    saveNotifyTimer_ = 3.0f;
+}
 
-void YEmitterGroupEditor::DrawGizmo()
-{
+void YEmitterGroupEditor::ShowSaveNotification() {
+    if (saveNotifyTimer_ <= 0.0f) return;
+    saveNotifyTimer_ -= ImGui::GetIO().DeltaTime;
+    float alpha = std::min(1.0f, saveNotifyTimer_ / 0.5f);
+    ImVec4 col = saveNotifySuccess_
+        ? ImVec4(0.2f, 1.0f, 0.3f, alpha)
+        : ImVec4(1.0f, 0.3f, 0.2f, alpha);
+    ImGui::PushStyleColor(ImGuiCol_Text, col);
+    ImGui::Text("%s %s",
+        saveNotifySuccess_ ? Icon::CheckCircle : Icon::TimesCircle,
+        saveNotifyMessage_.c_str());
+    ImGui::PopStyleColor();
+    ImGui::Separator();
+}
+
+void YEmitterGroupEditor::DrawGizmo() {
     if (!camera_ || gizmoTargets_.empty()) return;
-
-    gizmoCtrl_.Draw(
-        camera_,
-        gizmoTargets_,
+    gizmoCtrl_.Draw(camera_, gizmoTargets_,
         Editor::GetInstance()->GetGameViewPos(),
         Editor::GetInstance()->GetGameViewSize());
 }
 
-//=================================================================
-// ギズモ選択 — グループ単位
-//=================================================================
-
-void YEmitterGroupEditor::SelectGroup(const std::string& groupName)
-{
+void YEmitterGroupEditor::SelectGroup(const std::string& groupName) {
     selectedGroupName_ = groupName;
     selectedEmitterIndices_.clear();
     selectedEmitterIndex_ = -1;
@@ -213015,136 +213307,81 @@ void YEmitterGroupEditor::SelectGroup(const std::string& groupName)
     RebuildGizmoTargets();
 }
 
-//=================================================================
-// ギズモ選択 — 個別エミッター（Ctrl で複数追加）
-//=================================================================
-
-void YEmitterGroupEditor::SelectEmitter(
-    const std::string& groupName, int index, bool multiSelect)
-{
-    // グループが変わったときは選択リセット
+void YEmitterGroupEditor::SelectEmitter(const std::string& groupName, int index, bool multiSelect) {
     if (groupName != selectedGroupName_) {
         selectedGroupName_ = groupName;
         selectedEmitterIndices_.clear();
     }
-
     selectionMode_ = SelectionMode::Emitter;
-
     if (multiSelect) {
-        // トグル
-        if (selectedEmitterIndices_.count(index))
-            selectedEmitterIndices_.erase(index);
-        else
-            selectedEmitterIndices_.insert(index);
+        if (selectedEmitterIndices_.count(index)) selectedEmitterIndices_.erase(index);
+        else selectedEmitterIndices_.insert(index);
     }
     else {
         selectedEmitterIndices_.clear();
         selectedEmitterIndices_.insert(index);
     }
-
-    selectedEmitterIndex_ = index;  // Detail 表示用
+    selectedEmitterIndex_ = index;
     RebuildGizmoTargets();
 }
 
-//=================================================================
-// RebuildGizmoTargets — 選択状態に合わせてアダプタを再構築
-//=================================================================
-
-void YEmitterGroupEditor::RebuildGizmoTargets()
-{
+void YEmitterGroupEditor::RebuildGizmoTargets() {
     groupGizmable_.reset();
     emitterGizmables_.clear();
     gizmoTargets_.clear();
-
     auto& mgr = YEmitterGroupManager::GetInstance();
-
     if (selectionMode_ == SelectionMode::Group) {
         auto* group = mgr.GetGroup(selectedGroupName_);
         if (!group) return;
-
         groupGizmable_ = std::make_unique<YEmitterGroupGizmable>(group);
         gizmoTargets_.push_back(groupGizmable_.get());
-
     }
     else if (selectionMode_ == SelectionMode::Emitter) {
         auto* group = mgr.GetGroup(selectedGroupName_);
         if (!group) return;
-
         for (int idx : selectedEmitterIndices_) {
             auto* emitter = group->GetEmitter(static_cast<size_t>(idx));
             if (!emitter) continue;
-
             auto gizmable = std::make_unique<YEmitterGizmable>(
-                emitter,
-                selectedGroupName_ + "[" + std::to_string(idx) + "]");
+                emitter, selectedGroupName_ + "[" + std::to_string(idx) + "]");
             gizmoTargets_.push_back(gizmable.get());
             emitterGizmables_.push_back(std::move(gizmable));
         }
     }
 }
 
-//=================================================================
-// ShowEditor — メイン描画エントリポイント
-//=================================================================
-
-void YEmitterGroupEditor::ShowEditor()
-{
-    // ギズモモード切替ツールバー（上部に常時表示）
+void YEmitterGroupEditor::ShowEditor() {
+    ShowSaveNotification();
     ShowGizmoToolbar();
     ImGui::Separator();
-
     float availHeight = ImGui::GetContentRegionAvail().y;
-
     ImGui::BeginChild("##GroupList", ImVec2(groupListWidth_, 0), true);
     ShowGroupList();
     ImGui::EndChild();
-
     ImGui::SameLine();
     Splitter(4.0f, &groupListWidth_, 120.0f, 200.0f, availHeight);
     ImGui::SameLine();
-
     ImGui::BeginChild("##GroupDetail", ImVec2(0, 0), true);
     ShowGroupDetail();
     ImGui::EndChild();
 }
 
-//=================================================================
-// ShowGizmoToolbar — T/R/S 切替 + 選択状態の表示
-//=================================================================
+void YEmitterGroupEditor::ShowGizmoToolbar() { gizmoCtrl_.DrawSettings(); }
 
-void YEmitterGroupEditor::ShowGizmoToolbar()
-{
-    gizmoCtrl_.DrawSettings();
-}
-
-//=================================================================
-// ShowGroupList — 左ペイン（グループ選択でギズモと連動）
-//=================================================================
-
-void YEmitterGroupEditor::ShowGroupList()
-{
+void YEmitterGroupEditor::ShowGroupList() {
     ImGui::Text("エミッターグループ");
     ImGui::Separator();
-
     auto& mgr = YEmitterGroupManager::GetInstance();
     auto  names = mgr.GetAllGroupNames();
-
     for (const auto& name : names) {
         auto* group = mgr.GetGroup(name);
         bool  active = group ? group->IsActive() : false;
-
-        if (!active)
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
-
+        if (!active) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
         bool isSelected = (name == selectedGroupName_);
-        if (ImGui::Selectable(name.c_str(), isSelected))
-            SelectGroup(name);  // クリックでグループギズモに切替
-
+        if (ImGui::Selectable(name.c_str(), isSelected)) SelectGroup(name);
         if (!active) ImGui::PopStyleColor();
-
         if (ImGui::BeginPopupContextItem(name.c_str())) {
-            if (ImGui::MenuItem("グループギズモを選択"))
-                SelectGroup(name);
+            if (ImGui::MenuItem("グループギズモを選択")) SelectGroup(name);
             ImGui::Separator();
             if (ImGui::MenuItem("グループを削除")) {
                 mgr.RemoveGroup(name);
@@ -213163,23 +213400,16 @@ void YEmitterGroupEditor::ShowGroupList()
             ImGui::EndPopup();
         }
     }
-
     ImGui::Separator();
     ShowCreateGroupUI();
     ImGui::Separator();
     ShowFileButtons();
 }
 
-//=================================================================
-// ShowCreateGroupUI — 既存コードそのまま
-//=================================================================
-
-void YEmitterGroupEditor::ShowCreateGroupUI()
-{
+void YEmitterGroupEditor::ShowCreateGroupUI() {
     ImGui::Text("新規グループ");
     ImGui::SetNextItemWidth(-1);
     ImGui::InputText("##NewGroupName", newGroupNameBuf_, sizeof(newGroupNameBuf_));
-
     if (ImGui::Button("グループを作成", ImVec2(-1, 0))) {
         if (newGroupNameBuf_[0] != '\0') {
             YEmitterGroupManager::GetInstance().CreateGroup(newGroupNameBuf_);
@@ -213189,17 +213419,11 @@ void YEmitterGroupEditor::ShowCreateGroupUI()
     }
 }
 
-//=================================================================
-// ShowGroupDetail — 右ペイン（エミッター選択をギズモと連動）
-//=================================================================
-
-void YEmitterGroupEditor::ShowGroupDetail()
-{
+void YEmitterGroupEditor::ShowGroupDetail() {
     if (selectedGroupName_.empty()) {
         ImGui::TextDisabled("← グループを選択または作成してください");
         return;
     }
-
     auto& mgr = YEmitterGroupManager::GetInstance();
     auto* group = mgr.GetGroup(selectedGroupName_);
     if (!group) {
@@ -213207,7 +213431,7 @@ void YEmitterGroupEditor::ShowGroupDetail()
         return;
     }
 
-    // ── グループ名・有効フラグ ────────────────────────────────
+    // ── グループ名・有効フラグ・位置 ─────────────────────────
     char nameBuf[128];
     strncpy_s(nameBuf, group->GetName().c_str(), sizeof(nameBuf));
     ImGui::Text("グループ: ");
@@ -213225,13 +213449,9 @@ void YEmitterGroupEditor::ShowGroupDetail()
             return;
         }
     }
-
     ImGui::SameLine();
     bool active = group->IsActive();
-    if (ImGui::Checkbox("有効##Group", &active))
-        group->SetActive(active);
-
-    // グループ位置（ギズモと同期・手動入力も可）
+    if (ImGui::Checkbox("有効##Group", &active)) group->SetActive(active);
     ImGui::SameLine();
     Vector3 gpos = group->GetPosition();
     float   posArr[3] = { gpos.x, gpos.y, gpos.z };
@@ -213240,24 +213460,80 @@ void YEmitterGroupEditor::ShowGroupDetail()
         group->SetPosition({ posArr[0], posArr[1], posArr[2] });
         RebuildGizmoTargets();
     }
-
-    // グループ全体をギズモ対象にするボタン
     ImGui::SameLine();
-    bool isGroupGizmo = (selectionMode_ == SelectionMode::Group &&
-        selectedGroupName_ == group->GetName());
-    if (isGroupGizmo)
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.17f, 0.36f, 0.53f, 1.0f));
-    if (ImGui::SmallButton("ギズモ(グループ)"))
-        SelectGroup(group->GetName());
-    if (isGroupGizmo)
-        ImGui::PopStyleColor();
+    bool isGroupGizmo = (selectionMode_ == SelectionMode::Group && selectedGroupName_ == group->GetName());
+    if (isGroupGizmo) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.17f, 0.36f, 0.53f, 1.0f));
+    if (ImGui::SmallButton("ギズモ(グループ)")) SelectGroup(group->GetName());
+    if (isGroupGizmo) ImGui::PopStyleColor();
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip("このグループをギズモ対象に選択\n(すべてのエミッターを一緒に移動)");
 
+    ImGui::Separator();
+
+    // ================================================================
+    // ★ グループ全体 Emit コントロールパネル
+    // ================================================================
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.10f, 0.13f, 0.17f, 1.0f));
+    ImGui::BeginChild("##EmitCtrlPanel", ImVec2(0, 78), true,
+        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+
+    ImGui::TextColored({ 0.55f, 0.85f, 1.0f, 1.0f }, (std::string(Icon::Bullhorn) + "グループ全体 Emit").c_str());
+    ImGui::Spacing();
+
+    // x1
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.42f, 0.18f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.28f, 0.58f, 0.28f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.12f, 0.32f, 0.12f, 1.0f));
+    if (ImGui::Button((std::string(Icon::Play) + "x1##EAG").c_str(), ImVec2(68, 0))) group->EmitAll(1);
+    ImGui::PopStyleColor(3);
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("全エミッターから 1 個ずつ発生");
     ImGui::SameLine();
-    if (ImGui::SmallButton("自動ON##G"))  group->SetAutoEmitAll(true);
+
+    // x10
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.22f, 0.42f, 0.12f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.32f, 0.58f, 0.18f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.16f, 0.32f, 0.08f, 1.0f));
+    if (ImGui::Button((std::string(Icon::Play) + "x10##EAG").c_str(), ImVec2(76, 0))) group->EmitAll(10);
+    ImGui::PopStyleColor(3);
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("全エミッターから 10 個ずつ発生");
     ImGui::SameLine();
-    if (ImGui::SmallButton("自動OFF##G")) group->SetAutoEmitAll(false);
+
+    // x100 バースト
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.50f, 0.32f, 0.08f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.70f, 0.48f, 0.12f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.38f, 0.24f, 0.05f, 1.0f));
+    if (ImGui::Button((std::string(Icon::Bolt) + "x100##EAG").c_str(), ImVec2(80, 0))) group->EmitAll(100);
+    ImGui::PopStyleColor(3);
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("全エミッターから一気に 100 個バースト発生");
+    ImGui::SameLine();
+    ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
+    ImGui::SameLine();
+
+    // 自動 ON
+    bool anyAutoOn = false;
+    for (size_t i = 0; i < group->GetEmitterCount(); ++i) {
+        auto* e = group->GetEmitter(i);
+        if (e && e->GetAutoEmit()) { anyAutoOn = true; break; }
+    }
+    ImGui::PushStyleColor(ImGuiCol_Button,
+        anyAutoOn ? ImVec4(0.15f, 0.35f, 0.55f, 1.0f) : ImVec4(0.24f, 0.24f, 0.24f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.22f, 0.48f, 0.70f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.10f, 0.28f, 0.45f, 1.0f));
+    if (ImGui::Button((std::string(Icon::Refresh) + "自動ON##AG").c_str(), ImVec2(90, 0))) group->SetAutoEmitAll(true);
+    ImGui::PopStyleColor(3);
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("全エミッターの自動発生を ON にする");
+    ImGui::SameLine();
+
+    // 自動 OFF
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.40f, 0.16f, 0.16f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.56f, 0.24f, 0.24f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.30f, 0.10f, 0.10f, 1.0f));
+    if (ImGui::Button((std::string(Icon::Stop) + "自動OFF##AG").c_str(), ImVec2(96, 0))) group->SetAutoEmitAll(false);
+    ImGui::PopStyleColor(3);
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("全エミッターの自動発生を OFF にする");
+
+    ImGui::EndChild();
+    ImGui::PopStyleColor(); // ChildBg
 
     ImGui::Separator();
 
@@ -213266,27 +213542,76 @@ void YEmitterGroupEditor::ShowGroupDetail()
     ImGui::SameLine();
     ImGui::TextColored({ 0.5f, 0.7f, 1.0f, 1.0f }, "(Ctrl+[G]で複数ギズモ選択)");
     ImGui::SameLine();
-    if (ImGui::SmallButton("+ エミッターを追加"))
+    if (ImGui::Button((std::string(Icon::PlusCircle) + "エミッターを追加##AddE").c_str()))
         ImGui::OpenPopup("AddEmitterPopup");
 
+    // システム一覧選択ポップアップ
+    ImGui::SetNextWindowSize(ImVec2(360, 0), ImGuiCond_Appearing);
     if (ImGui::BeginPopup("AddEmitterPopup")) {
-        ImGui::Text("システム名:");
-        ImGui::SetNextItemWidth(200);
-        ImGui::InputText("##NewESys", newEmitterSystemName_, sizeof(newEmitterSystemName_));
-        ImGui::Text("ローカルオフセット:");
-        ImGui::SetNextItemWidth(200);
-        ImGui::DragFloat3("##NewEOff", newEmitterOffset_, 0.1f);
-        if (ImGui::Button("追加")) {
-            if (newEmitterSystemName_[0] != '\0') {
-                group->AddEmitter(newEmitterSystemName_,
-                    { newEmitterOffset_[0], newEmitterOffset_[1], newEmitterOffset_[2] });
-                newEmitterSystemName_[0] = '\0';
-                newEmitterOffset_[0] = newEmitterOffset_[1] = newEmitterOffset_[2] = 0;
+        ImGui::Text((std::string(Icon::PlusCircle) + "エミッターを追加").c_str());
+        ImGui::Separator();
+        auto& pmgr = YParticleManager::GetInstance();
+        auto sysNames = pmgr.GetAllSystemNames();
+        if (!sysNames.empty()) {
+            ImGui::Text("システムを選択:");
+            std::string currentSel(newEmitterSystemName_);
+            int visibleRows = static_cast<int>(std::min(sysNames.size(), size_t(6)));
+            float listH = visibleRows * ImGui::GetTextLineHeightWithSpacing() + 6.0f;
+            ImGui::SetNextItemWidth(-1);
+            if (ImGui::BeginListBox("##SysPickList", ImVec2(-1, listH))) {
+                for (const auto& sysName : sysNames) {
+                    bool isSelected = (currentSel == sysName);
+                    auto* sys = pmgr.GetSystem(sysName);
+                    bool  connected = (sys != nullptr);
+                    if (!connected) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.6f, 0.6f, 0.6f, 1.0f));
+                    if (ImGui::Selectable(sysName.c_str(), isSelected))
+                        strncpy_s(newEmitterSystemName_, sysName.c_str(), sizeof(newEmitterSystemName_));
+                    if (!connected) ImGui::PopStyleColor();
+                    if (ImGui::IsItemHovered() && connected) {
+                        size_t activeCnt = 0;
+                        for (const auto& attr : sys->GetAttributes())
+                            if (attr.isActive) activeCnt++;
+                        ImGui::SetTooltip("最大: %u  有効: %zu", sys->GetMaxParticles(), activeCnt);
+                    }
+                }
+                ImGui::EndListBox();
             }
+        }
+        else {
+            ImGui::TextColored({ 1.0f, 0.7f, 0.0f, 1.0f },
+                (std::string(Icon::Xmark) + "読み込み済みのシステムがありません").c_str());
+            ImGui::TextDisabled("パーティクルシステムを先に作成してください");
+        }
+        ImGui::Separator();
+        ImGui::Text("システム名 (直接入力):");
+        ImGui::SetNextItemWidth(-1);
+        ImGui::InputText("##NewESys", newEmitterSystemName_, sizeof(newEmitterSystemName_));
+        if (newEmitterSystemName_[0] != '\0') {
+            bool exists = (pmgr.GetSystem(newEmitterSystemName_) != nullptr);
+            if (exists)
+                ImGui::TextColored({ 0.2f, 1.0f, 0.3f, 1.0f },
+                    (std::string(Icon::CheckCircle) + "\"%s\" が存在します").c_str(), newEmitterSystemName_);
+            else
+                ImGui::TextColored({ 1.0f, 0.6f, 0.1f, 1.0f },
+                    (std::string(Icon::Xmark) + "\"%s\" は未登録です").c_str(), newEmitterSystemName_);
+        }
+        ImGui::Separator();
+        ImGui::Text("ローカルオフセット:");
+        ImGui::SetNextItemWidth(-1);
+        ImGui::DragFloat3("##NewEOff", newEmitterOffset_, 0.1f);
+        ImGui::Spacing();
+        bool canAdd = (newEmitterSystemName_[0] != '\0');
+        ImGui::BeginDisabled(!canAdd);
+        if (ImGui::Button((std::string(Icon::PlusCircle) + "追加##EA").c_str(), ImVec2(120, 0))) {
+            group->AddEmitter(newEmitterSystemName_,
+                { newEmitterOffset_[0], newEmitterOffset_[1], newEmitterOffset_[2] });
+            newEmitterSystemName_[0] = '\0';
+            newEmitterOffset_[0] = newEmitterOffset_[1] = newEmitterOffset_[2] = 0.0f;
             ImGui::CloseCurrentPopup();
         }
+        ImGui::EndDisabled();
         ImGui::SameLine();
-        if (ImGui::Button("キャンセル")) ImGui::CloseCurrentPopup();
+        if (ImGui::Button("キャンセル##EA", ImVec2(120, 0))) ImGui::CloseCurrentPopup();
         ImGui::EndPopup();
     }
 
@@ -213295,10 +213620,8 @@ void YEmitterGroupEditor::ShowGroupDetail()
     const ImGuiTableFlags tableFlags =
         ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
         ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingStretchProp;
-
     float tableHeight = ImGui::GetContentRegionAvail().y * 0.4f;
 
-    // ★ Gizmo 列を1列追加（元は5列 → 6列）
     if (ImGui::BeginTable("##EmitterTable", 6, tableFlags, ImVec2(0, tableHeight))) {
         ImGui::TableSetupScrollFreeze(0, 1);
         ImGui::TableSetupColumn("システム", ImGuiTableColumnFlags_WidthStretch, 2.0f);
@@ -213308,31 +213631,38 @@ void YEmitterGroupEditor::ShowGroupDetail()
         ImGui::TableSetupColumn("ギズモ", ImGuiTableColumnFlags_WidthFixed, 46);
         ImGui::TableSetupColumn("##Del", ImGuiTableColumnFlags_WidthFixed, 30);
         ImGui::TableHeadersRow();
-
         int deleteIndex = -1;
         for (size_t i = 0; i < group->GetEmitterCount(); ++i) {
             ImGui::TableNextRow();
-            if (ShowEmitterRow(*group, i))
-                deleteIndex = (int)i;
+            if (ShowEmitterRow(*group, i)) deleteIndex = (int)i;
         }
-
         if (deleteIndex >= 0) {
             group->RemoveEmitter(deleteIndex);
-            selectedEmitterIndices_.erase(deleteIndex);
-            if (selectedEmitterIndex_ == deleteIndex) selectedEmitterIndex_ = -1;
+
+            // 削除されたインデックスより大きい要素を -1 して補正
+            std::set<int> newSet;
+            for (int idx : selectedEmitterIndices_) {
+                if (idx < deleteIndex)      newSet.insert(idx);
+                else if (idx > deleteIndex) newSet.insert(idx - 1);
+                // idx == deleteIndex は削除済みなのでスキップ
+            }
+            selectedEmitterIndices_ = std::move(newSet);
+
+            if (selectedEmitterIndex_ == deleteIndex)
+                selectedEmitterIndex_ = -1;
+            else if (selectedEmitterIndex_ > deleteIndex)
+                selectedEmitterIndex_--;
+
             RebuildGizmoTargets();
         }
         ImGui::EndTable();
     }
 
-    // ── 選択エミッターの詳細設定 ──────────────────────────────
-    if (selectedEmitterIndex_ >= 0 &&
-        selectedEmitterIndex_ < (int)group->GetEmitterCount())
-    {
+    if (selectedEmitterIndex_ >= 0 && selectedEmitterIndex_ < (int)group->GetEmitterCount()) {
         auto* emitter = group->GetEmitter(selectedEmitterIndex_);
         if (emitter) {
             ImGui::Separator();
-            ImGui::Text("詳細: エミッター [%d]  システム: %s",
+            ImGui::Text((std::string(Icon::Cog) + "詳細: エミッター [%d]  システム: %s").c_str(),
                 selectedEmitterIndex_, emitter->GetSystemName().c_str());
             ImGui::Separator();
             ShowSelectedEmitterDetail(*emitter);
@@ -213340,79 +213670,63 @@ void YEmitterGroupEditor::ShowGroupDetail()
     }
 }
 
-//=================================================================
-// ShowEmitterRow — テーブル行1件（Gizmo列を追加）
-//=================================================================
-
-bool YEmitterGroupEditor::ShowEmitterRow(YEmitterGroup& group, size_t index)
-{
+bool YEmitterGroupEditor::ShowEmitterRow(YEmitterGroup& group, size_t index) {
     auto* emitter = group.GetEmitter(index);
     if (!emitter) return false;
-
     ImGui::PushID((int)index);
-
     bool deleteRequested = false;
     bool isGizmoSelected = (selectionMode_ == SelectionMode::Emitter &&
         selectedEmitterIndices_.count((int)index) > 0);
 
-    // ── System 列（クリックで Detail 表示のみ・ギズモには影響しない）──
-    ImGui::TableSetColumnIndex(0);
+    // ★ SpanAllColumns を使うとゴミ箱ボタンのクリックを横取りするため除去
+    // 代わりに TableSetBgColor で行ハイライトを再現する
     bool isRowSelected = (selectedEmitterIndex_ == (int)index);
-    if (ImGui::Selectable(emitter->GetSystemName().c_str(), isRowSelected,
-        ImGuiSelectableFlags_SpanAllColumns))
-    {
-        selectedEmitterIndex_ = (int)index;  // Detail 表示用のみ更新
+    if (isRowSelected) {
+        ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1,
+            ImGui::GetColorU32(ImVec4(0.17f, 0.36f, 0.53f, 0.45f)));
     }
 
-    // ── Rate 列 ───────────────────────────────────────────────
+    ImGui::TableSetColumnIndex(0);
+    if (ImGui::Selectable(emitter->GetSystemName().c_str(), isRowSelected,
+        ImGuiSelectableFlags_None))
+        selectedEmitterIndex_ = (int)index;
+
     ImGui::TableSetColumnIndex(1);
     float rate = emitter->GetEmissionRate();
     ImGui::SetNextItemWidth(-1);
     if (ImGui::DragFloat("##Rate", &rate, 1.0f, 0.0f, 10000.0f, "%.1f"))
         emitter->SetEmissionRate(rate);
 
-    // ── Count 列 ──────────────────────────────────────────────
     ImGui::TableSetColumnIndex(2);
     int cnt = emitter->GetEmitCount();
     ImGui::SetNextItemWidth(-1);
     if (ImGui::DragInt("##Cnt", &cnt, 1, 1, 9999))
         emitter->SetEmitCount(cnt);
 
-    // ── Auto 列 ───────────────────────────────────────────────
     ImGui::TableSetColumnIndex(3);
     bool autoEmit = emitter->GetAutoEmit();
-    if (ImGui::Checkbox("##Auto", &autoEmit))
-        emitter->SetAutoEmit(autoEmit);
+    if (ImGui::Checkbox("##Auto", &autoEmit)) emitter->SetAutoEmit(autoEmit);
 
-    // ── Gizmo 列（★ 追加） ────────────────────────────────────
     ImGui::TableSetColumnIndex(4);
-    if (isGizmoSelected)
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.17f, 0.36f, 0.53f, 1.0f));
-
+    if (isGizmoSelected) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.17f, 0.36f, 0.53f, 1.0f));
     if (ImGui::SmallButton("G##Giz"))
         SelectEmitter(group.GetName(), (int)index, ImGui::GetIO().KeyCtrl);
+    if (isGizmoSelected) ImGui::PopStyleColor();
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("ギズモ対象に選択  (Ctrl+クリック: 複数選択)");
 
-    if (isGizmoSelected)
-        ImGui::PopStyleColor();
-
-    if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("ギズモ対象に選択  (Ctrl+クリック: 複数選択)");
-
-    // ── Delete 列 ─────────────────────────────────────────────
     ImGui::TableSetColumnIndex(5);
-    if (ImGui::SmallButton("x##Del"))
-        deleteRequested = true;
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.6f, 0.1f, 0.1f, 0.8f));
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.3f, 0.3f, 1.0f));
+    if (ImGui::SmallButton((std::string(Icon::Trash) + "##Del").c_str())) deleteRequested = true;
+    ImGui::PopStyleColor(3);
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("このエミッターを削除");
 
     ImGui::PopID();
     return deleteRequested;
 }
 
-//=================================================================
-// ShowSelectedEmitterDetail — 既存コードそのまま
-//=================================================================
-
-void YEmitterGroupEditor::ShowSelectedEmitterDetail(YParticleEmitter& emitter)
-{
+void YEmitterGroupEditor::ShowSelectedEmitterDetail(YParticleEmitter& emitter) {
     ImGui::Columns(2, "##EmitterDetailCols", false);
     ImGui::SetColumnWidth(0, 160);
 
@@ -213420,60 +213734,76 @@ void YEmitterGroupEditor::ShowSelectedEmitterDetail(YParticleEmitter& emitter)
     ImGui::NextColumn();
     char sysBuf[128];
     strncpy_s(sysBuf, emitter.GetSystemName().c_str(), sizeof(sysBuf));
-    ImGui::SetNextItemWidth(-1);
+    ImGui::SetNextItemWidth(-40);
     if (ImGui::InputText("##SysName", sysBuf, sizeof(sysBuf), ImGuiInputTextFlags_EnterReturnsTrue)) {
         auto& pmgr = YParticleManager::GetInstance();
         if (!pmgr.GetSystem(sysBuf)) pmgr.CreateSystem(sysBuf, 1000);
         emitter.SetSystemName(sysBuf);
     }
+    ImGui::SameLine();
+    if (ImGui::SmallButton((std::string(Icon::Cog) + "##SysPick").c_str())) ImGui::OpenPopup("##DetailSysPick");
+    if (ImGui::BeginPopup("##DetailSysPick")) {
+        ImGui::Text((std::string(Icon::Cog) + "システム選択:").c_str());
+        auto& pmgr2 = YParticleManager::GetInstance();
+        auto sysNames2 = pmgr2.GetAllSystemNames();
+        if (sysNames2.empty()) {
+            ImGui::TextDisabled("システムがありません");
+        }
+        else {
+            int visRows = static_cast<int>(std::min(sysNames2.size(), size_t(8)));
+            float lh = visRows * ImGui::GetTextLineHeightWithSpacing() + 6.0f;
+            if (ImGui::BeginListBox("##DetailSysLB", ImVec2(240, lh))) {
+                for (const auto& sn : sysNames2) {
+                    bool isSel = (emitter.GetSystemName() == sn);
+                    if (ImGui::Selectable(sn.c_str(), isSel)) {
+                        emitter.SetSystemName(sn);
+                        ImGui::CloseCurrentPopup();
+                    }
+                }
+                ImGui::EndListBox();
+            }
+        }
+        ImGui::EndPopup();
+    }
     ImGui::NextColumn();
 
-    ImGui::Text("有効");
-    ImGui::NextColumn();
+    ImGui::Text("有効");           ImGui::NextColumn();
     bool act = emitter.IsActive();
     if (ImGui::Checkbox("##EAct", &act)) emitter.SetActive(act);
     ImGui::NextColumn();
 
-    ImGui::Text("自動発生");
-    ImGui::NextColumn();
+    ImGui::Text("自動発生");       ImGui::NextColumn();
     bool autoE = emitter.GetAutoEmit();
     if (ImGui::Checkbox("##EAuto", &autoE)) emitter.SetAutoEmit(autoE);
     ImGui::NextColumn();
 
-    ImGui::Text("レート (毎秒)");
-    ImGui::NextColumn();
+    ImGui::Text("レート (毎秒)");  ImGui::NextColumn();
     float rate = emitter.GetEmissionRate();
     ImGui::SetNextItemWidth(-1);
     if (ImGui::DragFloat("##ERate", &rate, 0.5f, 0.0f, 10000.0f))
         emitter.SetEmissionRate(rate);
     ImGui::NextColumn();
 
-    ImGui::Text("発生数");
-    ImGui::NextColumn();
+    ImGui::Text("発生数");         ImGui::NextColumn();
     int cnt = emitter.GetEmitCount();
     ImGui::SetNextItemWidth(-1);
-    if (ImGui::DragInt("##ECnt", &cnt, 1, 1, 9999))
-        emitter.SetEmitCount(cnt);
+    if (ImGui::DragInt("##ECnt", &cnt, 1, 1, 9999)) emitter.SetEmitCount(cnt);
     ImGui::NextColumn();
 
-    ImGui::Text("位置");
-    ImGui::NextColumn();
+    ImGui::Text("位置");           ImGui::NextColumn();
     Vector3 pos = emitter.GetPosition();
     float   posArr[3] = { pos.x, pos.y, pos.z };
     ImGui::SetNextItemWidth(-1);
     if (ImGui::DragFloat3("##EPos", posArr, 0.1f)) {
         emitter.SetPosition({ posArr[0], posArr[1], posArr[2] });
-        RebuildGizmoTargets();  // 手動変更時もギズモ位置に反映
+        RebuildGizmoTargets();
     }
     ImGui::NextColumn();
-
     ImGui::Columns(1);
     ImGui::Spacing();
 
-    // ── 形状設定 ──────────────────────────────────────────────
-    ImGui::Text("形状");
-    ImGui::SameLine();
-
+    // 形状設定
+    ImGui::Text("形状"); ImGui::SameLine();
     int currentType = 0;
     if (auto* shape = emitter.GetShape()) {
         switch (shape->GetType()) {
@@ -213491,7 +213821,6 @@ void YEmitterGroupEditor::ShowSelectedEmitterDetail(YParticleEmitter& emitter)
         case 2: emitter.SetShapeBox({ 1, 1, 1 }); break;
         }
     }
-
     if (auto* shape = emitter.GetShape()) {
         ImGui::Indent();
         switch (shape->GetType()) {
@@ -213511,14 +213840,22 @@ void YEmitterGroupEditor::ShowSelectedEmitterDetail(YParticleEmitter& emitter)
         ImGui::Unindent();
     }
 
+    // 手動発生
     ImGui::Spacing();
-    ImGui::Text("手動発生:");
+    ImGui::Text("手動発生 (このエミッター):"); ImGui::SameLine();
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.42f, 0.18f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.28f, 0.58f, 0.28f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.12f, 0.32f, 0.12f, 1.0f));
+    if (ImGui::SmallButton((std::string(Icon::Play) + " x1##ED").c_str()))  emitter.Emit(1);
     ImGui::SameLine();
-    if (ImGui::SmallButton("x1"))   emitter.Emit(1);
+    if (ImGui::SmallButton((std::string(Icon::Play) + " x10##ED").c_str())) emitter.Emit(10);
+    ImGui::PopStyleColor(3);
     ImGui::SameLine();
-    if (ImGui::SmallButton("x10"))  emitter.Emit(10);
-    ImGui::SameLine();
-    if (ImGui::SmallButton("x100")) emitter.EmitBurst(100);
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.50f, 0.32f, 0.08f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.70f, 0.48f, 0.12f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.38f, 0.24f, 0.05f, 1.0f));
+    if (ImGui::SmallButton((std::string(Icon::Bolt) + " x100##ED").c_str())) emitter.EmitBurst(100);
+    ImGui::PopStyleColor(3);
 
     ImGui::Spacing();
     auto* sys = emitter.GetTargetSystem();
@@ -213526,38 +213863,31 @@ void YEmitterGroupEditor::ShowSelectedEmitterDetail(YParticleEmitter& emitter)
         size_t activeCnt = 0;
         for (const auto& attr : sys->GetAttributes())
             if (attr.isActive) activeCnt++;
-        ImGui::TextColored({ 0, 1, 0, 1 }, "接続済み  最大:%u  有効:%zu",
+        ImGui::TextColored({ 0.2f, 1.0f, 0.3f, 1.0f },
+            (std::string(Icon::CheckCircle) + "  接続済み  最大:%u  有効:%zu").c_str(),
             sys->GetMaxParticles(), activeCnt);
     }
     else {
-        ImGui::TextColored({ 1, 0.4f, 0, 1 },
-            "システム \"%s\" が見つかりません", emitter.GetSystemName().c_str());
+        ImGui::TextColored({ 1.0f, 0.4f, 0.0f, 1.0f },
+            (std::string(Icon::Xmark) + " システム \"%s\" が見つかりません").c_str(),
+            emitter.GetSystemName().c_str());
     }
 }
 
-//=================================================================
-// ShowFileButtons — 既存コードそのまま
-//=================================================================
-
-void YEmitterGroupEditor::ShowFileButtons()
-{
+void YEmitterGroupEditor::ShowFileButtons() {
     ImGui::Text("ファイル");
-
-    if (ImGui::Button("すべて保存", ImVec2(-1, 0))) {
+    if (ImGui::Button((std::string(Icon::FloppyDisk) + "すべて保存##FG").c_str(), ImVec2(-1, 0))) {
         saveBrowser_.Scan();
         showSavePopup_ = true;
     }
     if (showSavePopup_) ImGui::OpenPopup("##SaveEmitterGroups");
-
     ImGui::SetNextWindowSize(ImVec2(480, 380), ImGuiCond_Appearing);
     if (ImGui::BeginPopupModal("##SaveEmitterGroups", &showSavePopup_,
-        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize))
-    {
-        ImGui::Text("保存 — ファイルをクリックして上書き、または下に新しい名前を入力");
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize)) {
+        ImGui::Text((std::string(Icon::FloppyDisk) + " 保存 — ファイルをクリックして上書き、または下に新しい名前を入力").c_str());
         ImGui::Separator();
         saveBrowser_.Draw("##SaveBrowserChild", ImVec2(0, 260));
         ImGui::Separator();
-
         static char saveAsName[256] = "";
         ImGui::SetNextItemWidth(-80);
         ImGui::InputTextWithHint("##SaveAsName", "新規ファイル.json", saveAsName, sizeof(saveAsName));
@@ -213565,7 +213895,8 @@ void YEmitterGroupEditor::ShowFileButtons()
         if (ImGui::Button("名前を付けて保存")) {
             if (saveAsName[0] != '\0') {
                 std::string path = saveBrowser_.GetCurrentDir() + saveAsName;
-                YEmitterGroupManager::GetInstance().SaveAllToFile(path);
+                bool ok = YEmitterGroupManager::GetInstance().SaveAllToFile(path);
+                SetNotification(ok, ok ? "保存完了: " + path : "保存失敗: " + path);
                 saveAsName[0] = '\0';
                 showSavePopup_ = false;
                 ImGui::CloseCurrentPopup();
@@ -213578,17 +213909,15 @@ void YEmitterGroupEditor::ShowFileButtons()
         ImGui::EndPopup();
     }
 
-    if (ImGui::Button("すべて読み込み", ImVec2(-1, 0))) {
+    if (ImGui::Button((std::string(Icon::FolderOpen) + "すべて読み込み##FG").c_str(), ImVec2(-1, 0))) {
         loadBrowser_.Scan();
         showLoadPopup_ = true;
     }
     if (showLoadPopup_) ImGui::OpenPopup("##LoadEmitterGroups");
-
     ImGui::SetNextWindowSize(ImVec2(480, 360), ImGuiCond_Appearing);
     if (ImGui::BeginPopupModal("##LoadEmitterGroups", &showLoadPopup_,
-        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize))
-    {
-        ImGui::Text("読み込み — JSONファイルを選択してください");
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize)) {
+        ImGui::Text((std::string(Icon::FolderOpen) + "読み込み — JSONファイルを選択してください").c_str());
         ImGui::Separator();
         loadBrowser_.Draw("##LoadBrowserChild", ImVec2(0, 280));
         ImGui::Separator();
@@ -213687,6 +214016,16 @@ private:
     void ShowFileButtons();
     void ShowSelectedEmitterDetail(YParticleEmitter& emitter);
 
+    /// <summary>
+    /// 保存/読み込み完了トーストを描画（タイマーが残っている間だけ表示）
+    /// </summary>
+    void ShowSaveNotification();
+
+    /// <summary>
+    /// 通知をセット
+    /// </summary>
+    void SetNotification(bool success, const std::string& message);
+
     //=================================================================
     // ギズモ選択
     //=================================================================
@@ -213742,6 +214081,14 @@ private:
     YoRigine::FileBrowser loadBrowser_;
     bool showSavePopup_ = false;
     bool showLoadPopup_ = false;
+
+    //=================================================================
+    // 保存完了トースト通知
+    //=================================================================
+
+    float       saveNotifyTimer_ = 0.0f;   // 残り表示時間（秒）
+    bool        saveNotifySuccess_ = true;    // true=成功 / false=失敗
+    std::string saveNotifyMessage_;           // 表示するメッセージ文字列
 };
 
 #endif // USE_IMGUI
@@ -214167,16 +214514,18 @@ File Path: YEngine/Generators/Particle/YParticleEditor.cpp
 #include "YParticleModuleFactory.h"
 #include "YParticleManager.h"
 #include "YEmitterGroupEditor.h"
+#include "Editor/Icon/EditorIcon.h"
 
 #include "imgui.h"
 #include <fstream>
+#include <algorithm>
+#include <cmath>
 
 //=================================================================
 // 内部ヘルパー: 垂直分割線（シンプル版）
 //=================================================================
 
-static void Splitter(float thickness, float* size1, float min_size1, float min_size2, float height = -1.0f)
-{
+static void Splitter(float thickness, float* size1, float min_size1, float min_size2, float height = -1.0f) {
 	ImVec2 backup_pos = ImGui::GetCursorPos();
 	if (height < 0)
 		height = ImGui::GetContentRegionAvail().y;
@@ -214205,33 +214554,70 @@ YParticleEditor::YParticleEditor()
 	: saveAllBrowser_(jsonDirectory_, { ".json" }, YoRigine::FileBrowser::DisplayMode::List)
 	, loadAllBrowser_(jsonDirectory_, { ".json" }, YoRigine::FileBrowser::DisplayMode::List)
 	, saveSingleBrowser_(jsonDirectory_, { ".json" }, YoRigine::FileBrowser::DisplayMode::List)
-	, loadSingleBrowser_(jsonDirectory_, { ".json" }, YoRigine::FileBrowser::DisplayMode::List)
-{
+	, loadSingleBrowser_(jsonDirectory_, { ".json" }, YoRigine::FileBrowser::DisplayMode::List) {
 	// Save All: 既存ファイルをクリックで上書き保存
 	saveAllBrowser_.SetOnFileSelected([this](const std::string& path) {
-		SaveAllSystemsToFile(path);
+		bool ok = SaveAllSystemsToFile(path);
 		showSaveAllPopup_ = false;
+		SetNotification(ok, ok ? "全システム保存完了: " + path : "保存失敗: " + path);
 		});
 
 	// Load All: ファイルをクリックでロード
 	loadAllBrowser_.SetOnFileSelected([this](const std::string& path) {
-		LoadAllSystemsFromFile(path);
+		bool ok = LoadAllSystemsFromFile(path);
 		showLoadAllPopup_ = false;
+		SetNotification(ok, ok ? "全システム読み込み完了: " + path : "読み込み失敗: " + path);
 		});
 
 	// Save Selected: 既存ファイルをクリックで上書き保存
 	saveSingleBrowser_.SetOnFileSelected([this](const std::string& path) {
 		if (!selectedSystemName_.empty()) {
-			SaveSystemToFile(selectedSystemName_, path);
+			bool ok = SaveSystemToFile(selectedSystemName_, path);
+			SetNotification(ok, ok ? "保存完了: " + path : "保存失敗: " + path);
 		}
 		showSaveSinglePopup_ = false;
 		});
 
 	// Load Single: ファイルをクリックでロード
 	loadSingleBrowser_.SetOnFileSelected([this](const std::string& path) {
-		LoadSystemFromFile(path);
+		bool ok = LoadSystemFromFile(path);
 		showLoadSinglePopup_ = false;
+		SetNotification(ok, ok ? "読み込み完了: " + path : "読み込み失敗: " + path);
 		});
+}
+
+//=================================================================
+// 通知ヘルパー
+//=================================================================
+
+void YParticleEditor::SetNotification(bool success, const std::string& message) {
+	saveNotifySuccess_ = success;
+	saveNotifyMessage_ = message;
+	saveNotifyTimer_ = 3.0f;   // 3秒間表示
+}
+
+/// <summary>
+/// トースト通知をウィンドウ下部にオーバーレイ描画する
+/// ShowEditorWindow() の先頭で毎フレーム呼ぶ
+/// </summary>
+void YParticleEditor::ShowSaveNotification() {
+	if (saveNotifyTimer_ <= 0.0f) return;
+
+	saveNotifyTimer_ -= ImGui::GetIO().DeltaTime;
+
+	// フェードアウト（残り0.5秒から）
+	float alpha = std::min(1.0f, saveNotifyTimer_ / 0.5f);
+	alpha = std::min(alpha, 1.0f);
+
+	ImVec4 col = saveNotifySuccess_
+		? ImVec4(0.2f, 1.0f, 0.3f, alpha)
+		: ImVec4(1.0f, 0.3f, 0.2f, alpha);
+
+	const char* icon = saveNotifySuccess_ ? Icon::Check :Icon::Xmark;
+	ImGui::PushStyleColor(ImGuiCol_Text, col);
+	ImGui::Text("%s%s", icon, saveNotifyMessage_.c_str());
+	ImGui::PopStyleColor();
+	ImGui::Separator();
 }
 
 //=================================================================
@@ -214240,11 +214626,16 @@ YParticleEditor::YParticleEditor()
 
 void YParticleEditor::ShowEditorWindow() {
 
+	// ── トースト通知（最上部に表示）──────────────────────────
+	ShowSaveNotification();
+
 	// メニューバー
 	if (ImGui::BeginMenuBar()) {
 		if (ImGui::BeginMenu("保存・読み込み設定")) {
 			if (ImGui::MenuItem("全てのシステムを保存")) {
 				saveAllBrowser_.Scan();
+				// 全保存のデフォルト名は空にしておく
+				saveAsNameBuf_[0] = '\0';
 				showSaveAllPopup_ = true;
 			}
 			if (ImGui::MenuItem("全てのシステムを読み込み")) {
@@ -214255,6 +214646,9 @@ void YParticleEditor::ShowEditorWindow() {
 			if (ImGui::MenuItem("選択しているシステムを保存")) {
 				if (!selectedSystemName_.empty()) {
 					saveSingleBrowser_.Scan();
+					// ★ テンプレート名: 選択中のシステム名 + ".json"
+					std::string defaultName = selectedSystemName_ + ".json";
+					strncpy_s(saveAsNameBuf_, defaultName.c_str(), sizeof(saveAsNameBuf_));
 					showSaveSinglePopup_ = true;
 				}
 			}
@@ -214527,14 +214921,12 @@ static void DrawBrowserPopup(
 	char* saveAsNameBuf,
 	size_t saveAsNameBufSize,
 	std::function<void(const std::string&)> onSaveAs   // nullptr なら「上書き専用」（Load 用）
-)
-{
+) {
 	if (showFlag) ImGui::OpenPopup(popupId);
 
 	ImGui::SetNextWindowSize(ImVec2(500, 400), ImGuiCond_Appearing);
 	if (ImGui::BeginPopupModal(popupId, &showFlag,
-		ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize))
-	{
+		ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize)) {
 		ImGui::Text("%s", title);
 		ImGui::Separator();
 
@@ -214574,13 +214966,17 @@ void YParticleEditor::ShowFileOperationsUI() {
 	// ── Save All ────────────────────────────────────────────
 	if (ImGui::Button("すべてのシステムを保存", ImVec2(220, 30))) {
 		saveAllBrowser_.Scan();
+		saveAsNameBuf_[0] = '\0';   // 全保存はデフォルト名なし
 		showSaveAllPopup_ = true;
 	}
 	DrawBrowserPopup(
 		"##SaveAll", showSaveAllPopup_,
 		"すべてのシステムを保存 — クリックで上書き、または新しい名前を入力",
 		saveAllBrowser_, saveAsNameBuf_, sizeof(saveAsNameBuf_),
-		[this](const std::string& path) { SaveAllSystemsToFile(path); }
+		[this](const std::string& path) {
+			bool ok = SaveAllSystemsToFile(path);
+			SetNotification(ok, ok ? "全システム保存完了: " + path : "保存失敗: " + path);
+		}
 	);
 
 	// ── Load All ────────────────────────────────────────────
@@ -214604,6 +215000,9 @@ void YParticleEditor::ShowFileOperationsUI() {
 	}
 	if (ImGui::Button("選択したシステムを保存", ImVec2(220, 30))) {
 		saveSingleBrowser_.Scan();
+		// ★ テンプレート名: 選択中のシステム名 + ".json"
+		std::string defaultName = selectedSystemName_ + ".json";
+		strncpy_s(saveAsNameBuf_, defaultName.c_str(), sizeof(saveAsNameBuf_));
 		showSaveSinglePopup_ = true;
 	}
 	ImGui::EndDisabled();
@@ -214613,7 +215012,10 @@ void YParticleEditor::ShowFileOperationsUI() {
 		"選択したシステムを保存 — クリックで上書き、または新しい名前を入力",
 		saveSingleBrowser_, saveAsNameBuf_, sizeof(saveAsNameBuf_),
 		[this](const std::string& path) {
-			if (!selectedSystemName_.empty()) SaveSystemToFile(selectedSystemName_, path);
+			if (!selectedSystemName_.empty()) {
+				bool ok = SaveSystemToFile(selectedSystemName_, path);
+				SetNotification(ok, ok ? "保存完了: " + path : "保存失敗: " + path);
+			}
 		}
 	);
 
@@ -214710,6 +215112,18 @@ private:
 	/// </summary>
 	void ShowFileOperationsUI();
 
+	/// <summary>
+	/// 保存/読み込み通知トーストを描画（タイマーが残っている間だけ表示）
+	/// </summary>
+	void ShowSaveNotification();
+
+	/// <summary>
+	/// 保存通知をセット
+	/// </summary>
+	/// <param name="success">保存成功かどうか</param>
+	/// <param name="message">表示するメッセージ</param>
+	void SetNotification(bool success, const std::string& message);
+
 	//=================================================================
 	// メンバ変数
 	//=================================================================
@@ -214739,6 +215153,14 @@ private:
 
 	// ポップアップ内の新規ファイル名バッファ（各ブラウザ共用）
 	char saveAsNameBuf_[256] = "";
+
+	//=================================================================
+	// 保存完了トースト通知
+	//=================================================================
+
+	float       saveNotifyTimer_ = 0.0f;	  // 残り表示時間（秒）
+	bool        saveNotifySuccess_ = true;    // true=成功 / false=失敗
+	std::string saveNotifyMessage_;           // 表示するメッセージ文字列
 };
 
 #endif // USE_IMGUI
@@ -215931,11 +216353,6 @@ void YParticleRenderer::AddSystem(const YParticleSystem& system, Camera* camera)
 		mappedData_[currentInstanceOffset_].uvTransform = MakeUVTransform(attr.uvOffset, attr.uvScale);
         currentInstanceOffset_++;
         writtenCount++;
-
-        char buf[256];
-        sprintf_s(buf, "AddSystem: %s, written=%u, totalOffset=%u\n",
-            system.GetName().c_str(), writtenCount, currentInstanceOffset_);
-        OutputDebugStringA(buf);
     }
 }
 void YParticleRenderer::EndFrame(const std::shared_ptr<Mesh>& mesh, uint32_t textureIndex, BlendMode blendMode) {
@@ -226725,8 +227142,8 @@ Vector3 Motion::CalculateValue(const std::vector<KeyframeVector3>& keyframes, fl
 			case InterpolationType::CubicSpline: {
 				size_t prevIndex = (index == 0) ? index : index - 1;
 				size_t nextNextIndex = (nextIndex + 1 < keyframes.size()) ? nextIndex + 1 : nextIndex;
-
-				return CubicSplineInterpolate(
+				
+				return CatmullRomInterpolation(
 					keyframes[prevIndex].value,
 					keyframes[index].value,
 					keyframes[nextIndex].value,
@@ -232325,6 +232742,1146 @@ static std::wstring ConvertString(const std::string& str)
 	return result;
 }
 
+
+============================================================
+File Path: YEngine/Utilities/Debugger/CurveEditor/CurveChannel.cpp
+============================================================
+#include "CurveChannel.h"
+#include <algorithm>
+#include <cmath>
+
+//=============================================================================
+// 構築
+//=============================================================================
+
+CurveChannel::CurveChannel()
+    : name_("Channel"), viewMin_(0.0f), viewMax_(1.0f)
+{
+    Reset();
+}
+
+CurveChannel::CurveChannel(const std::string& name, float viewMin, float viewMax)
+    : name_(name), viewMin_(viewMin), viewMax_(viewMax)
+{
+    Reset();
+}
+
+//=============================================================================
+// キー操作
+//=============================================================================
+
+void CurveChannel::AddKey(float time, float value, InterpolationMode mode,
+                           float inTangent, float outTangent)
+{
+    keys_.emplace_back(time, value, mode, inTangent, outTangent);
+    SortByTime();
+}
+
+void CurveChannel::RemoveKey(int index)
+{
+    if (index < 0 || index >= (int)keys_.size()) return;
+    keys_.erase(keys_.begin() + index);
+}
+
+void CurveChannel::MoveKey(int index, float newTime, float newValue)
+{
+    if (index < 0 || index >= (int)keys_.size()) return;
+    keys_[index].time  = newTime;
+    keys_[index].value = newValue;
+    SortByTime();
+}
+
+void CurveChannel::SetKeyTangents(int index, float inT, float outT)
+{
+    if (index < 0 || index >= (int)keys_.size()) return;
+    keys_[index].inTangent  = inT;
+    keys_[index].outTangent = outT;
+}
+
+void CurveChannel::SetKeyMode(int index, InterpolationMode mode)
+{
+    if (index < 0 || index >= (int)keys_.size()) return;
+    keys_[index].interpMode = mode;
+}
+
+void CurveChannel::SortByTime()
+{
+    std::sort(keys_.begin(), keys_.end());
+}
+
+void CurveChannel::Clear()
+{
+    keys_.clear();
+}
+
+void CurveChannel::Reset(float constValue)
+{
+    keys_.clear();
+    keys_.emplace_back(0.0f, constValue, defaultMode_);
+    keys_.emplace_back(1.0f, constValue, defaultMode_);
+}
+
+//=============================================================================
+// 評価
+//=============================================================================
+
+float CurveChannel::Evaluate(float t) const
+{
+    if (keys_.empty()) return 0.0f;
+    // keys の範囲にクランプ
+    t = std::max(keys_.front().time, std::min(keys_.back().time, t));
+    return EvaluateAt(t);
+}
+
+float CurveChannel::EvaluateUnclamped(float t) const
+{
+    if (keys_.empty())            return 0.0f;
+    if (t <= keys_.front().time)  return keys_.front().value;
+    if (t >= keys_.back().time)   return keys_.back().value;
+    return EvaluateAt(t);
+}
+
+float CurveChannel::EvaluateAt(float t) const
+{
+    if (keys_.size() == 1) return keys_[0].value;
+
+    for (int i = 0; i < (int)keys_.size() - 1; ++i)
+    {
+        if (t >= keys_[i].time && t <= keys_[i + 1].time)
+        {
+            float segLen = keys_[i + 1].time - keys_[i].time;
+            float localT = (segLen > 1e-7f) ? (t - keys_[i].time) / segLen : 0.0f;
+            return EvaluateSegment(i, localT);
+        }
+    }
+    return keys_.back().value;
+}
+
+float CurveChannel::EvaluateSegment(int i, float localT) const
+{
+    const CurveKey& k0 = keys_[i];
+    const CurveKey& k1 = keys_[i + 1];
+
+    switch (k0.interpMode)
+    {
+    case InterpolationMode::Step:
+        return k0.value;
+
+    case InterpolationMode::Linear:
+        return k0.value + (k1.value - k0.value) * localT;
+
+    case InterpolationMode::CatmullRom:
+    {
+        // 端点はクランプ（phantom を重複させる）
+        float p0 = (i > 0)                     ? keys_[i - 1].value : k0.value;
+        float p3 = (i + 2 < (int)keys_.size()) ? keys_[i + 2].value : k1.value;
+        return CatmullRomInterp(p0, k0.value, k1.value, p3, localT);
+    }
+
+    case InterpolationMode::Bezier:
+    {
+        // エルミート→ベジェ変換：cp = value ± tangent * segLen / 3
+        float segLen = keys_[i + 1].time - keys_[i].time;
+        float cp1    = k0.value + k0.outTangent * segLen / 3.0f;
+        float cp2    = k1.value - k1.inTangent  * segLen / 3.0f;
+        return CubicBezierInterp(k0.value, cp1, cp2, k1.value, localT);
+    }
+    }
+    return k0.value;
+}
+
+//=============================================================================
+// 補間アルゴリズム
+//=============================================================================
+
+float CurveChannel::CatmullRomInterp(float p0, float p1,
+                                      float p2, float p3, float t) const
+{
+    // 標準 Catmull-Rom 式
+    const float t2 = t * t;
+    const float t3 = t2 * t;
+    return 0.5f * (
+          (2.0f * p1)
+        + (-p0 + p2)                          * t
+        + (2.0f * p0 - 5.0f * p1 + 4.0f * p2 - p3) * t2
+        + (-p0 + 3.0f * p1 - 3.0f * p2 + p3) * t3
+    );
+}
+
+float CurveChannel::CubicBezierInterp(float v0, float cp1,
+                                       float cp2, float v1, float t) const
+{
+    // De Casteljau 多項式展開
+    const float mt  = 1.0f - t;
+    const float mt2 = mt  * mt;
+    const float mt3 = mt2 * mt;
+    const float t2  = t   * t;
+    const float t3  = t2  * t;
+    return mt3 * v0
+         + 3.0f * mt2 * t  * cp1
+         + 3.0f * mt  * t2 * cp2
+         +              t3 * v1;
+}
+
+//=============================================================================
+// JSON シリアライズ
+//=============================================================================
+
+nlohmann::json CurveChannel::SaveToJson() const
+{
+    nlohmann::json j;
+    j["name"]        = name_;
+    j["defaultMode"] = static_cast<int>(defaultMode_);
+    j["viewMin"]     = viewMin_;
+    j["viewMax"]     = viewMax_;
+    j["keys"]        = nlohmann::json::array();
+
+    for (const auto& k : keys_)
+    {
+        j["keys"].push_back({
+            { "time",       k.time       },
+            { "value",      k.value      },
+            { "inTangent",  k.inTangent  },
+            { "outTangent", k.outTangent },
+            { "interpMode", static_cast<int>(k.interpMode) }
+        });
+    }
+    return j;
+}
+
+void CurveChannel::LoadFromJson(const nlohmann::json& j)
+{
+    name_        = j.value("name",        name_);
+    defaultMode_ = static_cast<InterpolationMode>(j.value("defaultMode", 1));
+    viewMin_     = j.value("viewMin",     viewMin_);
+    viewMax_     = j.value("viewMax",     viewMax_);
+
+    keys_.clear();
+    if (!j.contains("keys")) { Reset(); return; }
+
+    for (const auto& kj : j["keys"])
+    {
+        CurveKey k;
+        k.time       = kj.value("time",       0.0f);
+        k.value      = kj.value("value",      0.0f);
+        k.inTangent  = kj.value("inTangent",  0.0f);
+        k.outTangent = kj.value("outTangent", 0.0f);
+        k.interpMode = static_cast<InterpolationMode>(kj.value("interpMode", 1));
+        keys_.push_back(k);
+    }
+
+    SortByTime();
+    if (keys_.empty()) Reset();
+}
+
+
+============================================================
+File Path: YEngine/Utilities/Debugger/CurveEditor/CurveChannel.h
+============================================================
+#pragma once
+#include "CurveKey.h"
+#include <vector>
+#include <string>
+#include <json.hpp>
+
+/// <summary>
+/// 1 チャンネル分のフロートカーブ。
+/// 複数の CurveKey を保持し、任意の時刻 t に対してサンプリングできる。
+/// ImGui に非依存 — リリースビルドでもそのまま使用可。
+///
+/// 補間モードはキー単位で指定できる（あるキーから次のキーへの補間方法）。
+/// SetDefaultMode() でまとめて変更する場合は以降に追加するキーに適用される。
+/// </summary>
+class CurveChannel {
+public:
+    //===== 構築 =====
+    CurveChannel();
+    explicit CurveChannel(const std::string& name,
+                          float viewMin = 0.0f,
+                          float viewMax = 1.0f);
+
+    //===== キー操作 =====
+    void AddKey(float time, float value,
+                InterpolationMode mode = InterpolationMode::Linear,
+                float inTangent  = 0.0f,
+                float outTangent = 0.0f);
+
+    void RemoveKey(int index);
+    void MoveKey(int index, float newTime, float newValue);
+    void SetKeyTangents(int index, float inT, float outT);
+    void SetKeyMode(int index, InterpolationMode mode);
+    void SortByTime();
+    void Clear();
+
+    /// デフォルト値で 2 点（t=0, t=1）にリセット
+    void Reset(float constValue = 1.0f);
+
+    //===== 評価 =====
+    /// t を keys の範囲内にクランプして評価
+    float Evaluate(float t) const;
+
+    /// 範囲外は端点の値を返す（クランプせず外挿しない）
+    float EvaluateUnclamped(float t) const;
+
+    //===== アクセス =====
+    int                          GetKeyCount() const { return (int)keys_.size(); }
+    const CurveKey&              GetKey(int i) const { return keys_[i]; }
+    CurveKey&                    GetKey(int i)       { return keys_[i]; }
+    const std::vector<CurveKey>& GetKeys()     const { return keys_; }
+    std::vector<CurveKey>&       GetKeys()           { return keys_; }
+
+    const std::string& GetName()   const               { return name_; }
+    void               SetName(const std::string& n)   { name_ = n; }
+
+    /// ImCurveEdit 表示域（CurveDelegate が参照する）
+    float GetViewMin() const { return viewMin_; }
+    float GetViewMax() const { return viewMax_; }
+    void  SetViewRange(float mn, float mx) { viewMin_ = mn; viewMax_ = mx; }
+
+    InterpolationMode GetDefaultMode() const           { return defaultMode_; }
+    void              SetDefaultMode(InterpolationMode m){ defaultMode_ = m; }
+
+    //===== シリアライズ =====
+    nlohmann::json SaveToJson()                       const;
+    void           LoadFromJson(const nlohmann::json& j);
+
+private:
+    //--- 内部評価 ---
+    float EvaluateAt(float t)                          const;
+    float EvaluateSegment(int i, float localT)         const;
+    float CatmullRomInterp(float p0, float p1,
+                           float p2, float p3,
+                           float t)                    const;
+    float CubicBezierInterp(float v0, float cp1,
+                            float cp2, float v1,
+                            float t)                   const;
+
+    std::string           name_;
+    std::vector<CurveKey> keys_;
+    InterpolationMode     defaultMode_ = InterpolationMode::Linear;
+    float                 viewMin_     = 0.0f;
+    float                 viewMax_     = 1.0f;
+};
+
+
+============================================================
+File Path: YEngine/Utilities/Debugger/CurveEditor/CurveDelegate.cpp
+============================================================
+#include "CurveDelegate.h"
+
+#ifdef USE_IMGUI
+
+//=============================================================================
+// チャンネル管理
+//=============================================================================
+
+void CurveDelegate::AddChannel(CurveChannel* ch, uint32_t color,
+                                const std::string& label)
+{
+    ChannelDesc desc;
+    desc.channel = ch;
+    desc.color   = color;
+    desc.label   = label.empty() ? ch->GetName() : label;
+    channels_.push_back(std::move(desc));
+    SyncFromChannel(channels_.size() - 1);
+}
+
+void CurveDelegate::RemoveChannel(size_t index)
+{
+    if (index < channels_.size())
+        channels_.erase(channels_.begin() + index);
+}
+
+void CurveDelegate::ClearChannels()
+{
+    channels_.clear();
+}
+
+void CurveDelegate::SyncAll()
+{
+    for (size_t i = 0; i < channels_.size(); ++i)
+        SyncFromChannel(i);
+}
+
+void CurveDelegate::SetVisible(size_t index, bool v)
+{
+    if (index < channels_.size()) channels_[index].visible = v;
+}
+
+bool CurveDelegate::GetVisible(size_t index) const
+{
+    if (index < channels_.size()) return channels_[index].visible;
+    return false;
+}
+
+//=============================================================================
+// ImCurveEdit::Delegate 実装
+//=============================================================================
+
+size_t CurveDelegate::GetCurveCount()
+{
+    return channels_.size();
+}
+
+bool CurveDelegate::IsVisible(size_t idx)
+{
+    if (idx >= channels_.size()) return false;
+    return channels_[idx].visible;
+}
+
+size_t CurveDelegate::GetPointCount(size_t idx)
+{
+    if (idx >= channels_.size()) return 0;
+    return channels_[idx].cache.size();
+}
+
+uint32_t CurveDelegate::GetCurveColor(size_t idx)
+{
+    if (idx >= channels_.size()) return 0xFFFFFFFF;
+    return channels_[idx].color;
+}
+
+ImVec2* CurveDelegate::GetPoints(size_t idx)
+{
+    if (idx >= channels_.size() || channels_[idx].cache.empty())
+        return nullptr;
+    return channels_[idx].cache.data();
+}
+
+ImCurveEdit::CurveType CurveDelegate::GetCurveType(size_t idx) const
+{
+    if (idx >= channels_.size() || !channels_[idx].channel)
+        return ImCurveEdit::CurveLinear;
+
+    switch (channels_[idx].channel->GetDefaultMode()) {
+    case InterpolationMode::Step:       return ImCurveEdit::CurveDiscrete;
+    case InterpolationMode::CatmullRom: return ImCurveEdit::CurveSmooth;
+    case InterpolationMode::Bezier:     return ImCurveEdit::CurveBezier;
+    default:                            return ImCurveEdit::CurveLinear;
+    }
+}
+
+int CurveDelegate::EditPoint(size_t curveIdx, int ptIdx, ImVec2 val)
+{
+    if (curveIdx >= channels_.size()) return ptIdx;
+    auto& cache = channels_[curveIdx].cache;
+    if (ptIdx < 0 || ptIdx >= (int)cache.size()) return ptIdx;
+
+    cache[ptIdx] = val;
+    SyncToChannel(curveIdx);
+    return ptIdx;
+}
+
+void CurveDelegate::AddPoint(size_t curveIdx, ImVec2 val)
+{
+    if (curveIdx >= channels_.size()) return;
+    channels_[curveIdx].cache.push_back(val);
+    SyncToChannel(curveIdx);
+    SyncFromChannel(curveIdx); // re-sort
+}
+
+int CurveDelegate::DeletePoints(size_t curveIdx, bool* pts)
+{
+    if (curveIdx >= channels_.size()) return 0;
+    auto& cache = channels_[curveIdx].cache;
+
+    std::vector<ImVec2> keep;
+    keep.reserve(cache.size());
+    for (size_t i = 0; i < cache.size(); ++i)
+        if (!pts[i]) keep.push_back(cache[i]);
+
+    int removed = (int)(cache.size() - keep.size());
+    cache = std::move(keep);
+    SyncToChannel(curveIdx);
+    return removed;
+}
+
+//=============================================================================
+// 同期ヘルパー
+//=============================================================================
+
+void CurveDelegate::SyncFromChannel(size_t idx)
+{
+    if (idx >= channels_.size() || !channels_[idx].channel) return;
+    auto& cache = channels_[idx].cache;
+    cache.clear();
+    for (const auto& k : channels_[idx].channel->GetKeys())
+        cache.emplace_back(k.time, k.value);
+}
+
+void CurveDelegate::SyncToChannel(size_t idx)
+{
+    if (idx >= channels_.size() || !channels_[idx].channel) return;
+
+    CurveChannel& ch   = *channels_[idx].channel;
+    auto          mode = ch.GetDefaultMode();
+
+    std::vector<CurveKey> newKeys;
+    newKeys.reserve(channels_[idx].cache.size());
+    for (const auto& p : channels_[idx].cache)
+        newKeys.emplace_back(p.x, p.y, mode);
+
+    ch.GetKeys() = std::move(newKeys);
+    ch.SortByTime();
+}
+
+#endif // USE_IMGUI
+
+
+============================================================
+File Path: YEngine/Utilities/Debugger/CurveEditor/CurveDelegate.h
+============================================================
+#pragma once
+#ifdef USE_IMGUI
+
+#include <ImCurveEdit.h>
+#include "CurveChannel.h"
+#include <vector>
+#include <string>
+#include <cstdint>
+
+/// <summary>
+/// ImCurveEdit への汎用アダプタ。
+/// 複数の CurveChannel を同一ビューポートで同時表示・編集できる。
+///
+/// ■ 典型的な使用例（UpdateColor の RGBA 4 チャンネル）
+///   CurveDelegate del;
+///   del.AddChannel(&rCh, 0xFF4444FF, "R");
+///   del.AddChannel(&gCh, 0xFF44FF44, "G");
+///   del.AddChannel(&bCh, 0xFFFF4444, "B");
+///   del.AddChannel(&aCh, 0xFFAAAAAA, "A");
+///   del.SetViewRange(ImVec2(0,-0.1f), ImVec2(1,1.1f));
+///   ImCurveEdit::Edit(del, ImVec2(w, h), id);
+///
+/// ■ 注意
+///   channel ポインタの生存期間を管理するのは呼び出し側の責任。
+///   SetColorMode / RebuildDelegate 時に SyncAll() を呼ぶこと。
+/// </summary>
+class CurveDelegate : public ImCurveEdit::Delegate
+{
+public:
+    CurveDelegate() = default;
+
+    //--- チャンネル情報 ---
+    struct ChannelDesc {
+        CurveChannel*       channel = nullptr;
+        uint32_t            color   = 0xFFFFFFFF;
+        std::string         label;
+        bool                visible = true;
+        std::vector<ImVec2> cache;  // ImCurveEdit に渡すキャッシュ
+    };
+
+    //===== チャンネル管理 =====
+    void   AddChannel(CurveChannel* ch, uint32_t color,
+                      const std::string& label = "");
+    void   RemoveChannel(size_t index);
+    void   ClearChannels();
+    size_t GetChannelCount() const { return channels_.size(); }
+
+    /// 全チャンネルのキャッシュを再構築（外部からキーを変更した後に呼ぶ）
+    void SyncAll();
+
+    //===== 表示範囲 =====
+    void   SetViewRange(ImVec2 mn, ImVec2 mx) { viewMin_ = mn; viewMax_ = mx; }
+    ImVec2 GetViewMinValue() const { return viewMin_; }
+    ImVec2 GetViewMaxValue() const { return viewMax_; }
+
+    //===== 可視フラグ =====
+    void SetVisible(size_t index, bool v);
+    bool GetVisible(size_t index) const;
+
+    //===== ImCurveEdit::Delegate =====
+    size_t   GetCurveCount()                                 override;
+    bool     IsVisible(size_t curveIndex)                    override;
+    size_t   GetPointCount(size_t curveIndex)                override;
+    uint32_t GetCurveColor(size_t curveIndex)                override;
+    ImVec2*  GetPoints(size_t curveIndex)                    override;
+    ImCurveEdit::CurveType GetCurveType(size_t curveIndex) const override;
+    int      EditPoint(size_t curveIndex, int ptIndex, ImVec2 value) override;
+    void     AddPoint(size_t curveIndex, ImVec2 value)       override;
+    int      DeletePoints(size_t curveIndex, bool* points);
+    ImVec2&  GetMin()                                        override { return viewMin_; }
+    ImVec2&  GetMax()                                        override { return viewMax_; }
+
+private:
+    void SyncFromChannel(size_t index);
+    void SyncToChannel(size_t index);
+
+    std::vector<ChannelDesc> channels_;
+    ImVec2 viewMin_{ 0.0f, -0.1f };
+    ImVec2 viewMax_{ 1.0f,  1.1f };
+};
+
+#endif // USE_IMGUI
+
+
+============================================================
+File Path: YEngine/Utilities/Debugger/CurveEditor/CurveKey.h
+============================================================
+#pragma once
+#include <cstdint>
+
+/// <summary>
+/// カーブの補間方法
+/// ※ ImGui 非依存 — リリースビルドでも使用可
+/// </summary>
+enum class InterpolationMode : uint8_t {
+    Step,        // 前の値を維持（階段状）
+    Linear,      // 線形補間
+    CatmullRom,  // Catmull-Rom スプライン（タンジェント自動計算・滑らか）
+    Bezier       // 三次ベジェ（inTangent / outTangent を使用）
+};
+
+/// <summary>
+/// カーブの 1 キーフレーム。
+/// time は任意範囲だが、パーティクルモジュールでは 0.0〜1.0 の正規化寿命を想定。
+/// </summary>
+struct CurveKey {
+    float             time        = 0.0f;
+    float             value       = 0.0f;
+    float             inTangent   = 0.0f;   // Bezier 入力タンジェント（傾き）
+    float             outTangent  = 0.0f;   // Bezier 出力タンジェント
+    InterpolationMode interpMode  = InterpolationMode::Linear;
+
+    CurveKey() = default;
+
+    CurveKey(float t, float v,
+             InterpolationMode mode = InterpolationMode::Linear,
+             float inT  = 0.0f,
+             float outT = 0.0f)
+        : time(t), value(v)
+        , inTangent(inT), outTangent(outT)
+        , interpMode(mode)
+    {}
+
+    bool operator<(const CurveKey& rhs) const noexcept { return time < rhs.time; }
+};
+
+
+============================================================
+File Path: YEngine/Utilities/Debugger/CurveEditor/CurveProperty.cpp
+============================================================
+#include "CurveProperty.h"
+
+#ifdef USE_IMGUI
+#include "imgui.h"
+#include <ImCurveEdit.h>
+#include <algorithm>
+#include <cstdio>
+
+//=============================================================================
+// anonymous namespace — CurveProperty 専用ヘルパー
+//=============================================================================
+namespace {
+
+    //-----------------------------------------------------------------------------
+    // SingleChannelDelegate
+    // EditorConfig を受け取り viewMin/viewMax を config 準拠で設定する
+    //-----------------------------------------------------------------------------
+    class SingleChannelDelegate : public ImCurveEdit::Delegate
+    {
+    public:
+        SingleChannelDelegate(CurveChannel& ch, const CurveProperty::EditorConfig& cfg)
+            : ch_(ch), color_(cfg.curveColor) {
+            SyncFromChannel();
+            // config の値域に小さな余白を付けて表示範囲を設定
+            float pad = (cfg.valueMax - cfg.valueMin) * 0.06f + 0.001f;
+            viewMin_ = ImVec2(0.0f, cfg.valueMin - pad);
+            viewMax_ = ImVec2(1.0f, cfg.valueMax + pad);
+        }
+
+        size_t   GetCurveCount()       override { return 1; }
+        bool     IsVisible(size_t)     override { return true; }
+        size_t   GetPointCount(size_t) override { return cache_.size(); }
+        uint32_t GetCurveColor(size_t) override { return color_; }
+        ImVec2* GetPoints(size_t)     override { return cache_.empty() ? nullptr : cache_.data(); }
+        ImVec2& GetMin()              override { return viewMin_; }
+        ImVec2& GetMax()              override { return viewMax_; }
+
+        ImCurveEdit::CurveType GetCurveType(size_t) const override {
+            switch (ch_.GetDefaultMode()) {
+            case InterpolationMode::Step:       return ImCurveEdit::CurveDiscrete;
+            case InterpolationMode::CatmullRom: return ImCurveEdit::CurveSmooth;
+            case InterpolationMode::Bezier:     return ImCurveEdit::CurveBezier;
+            default:                            return ImCurveEdit::CurveLinear;
+            }
+        }
+
+        int EditPoint(size_t, int ptIdx, ImVec2 val) override {
+            if (ptIdx >= 0 && ptIdx < (int)cache_.size()) {
+                cache_[ptIdx] = val;
+                SyncToChannel();
+            }
+            return ptIdx;
+        }
+
+        void AddPoint(size_t, ImVec2 val) override {
+            cache_.push_back(val);
+            SyncToChannel();
+            SyncFromChannel(); // ソート反映
+        }
+
+        int DeletePoints(size_t, bool* pts) {
+            std::vector<ImVec2> keep;
+            keep.reserve(cache_.size());
+            for (size_t i = 0; i < cache_.size(); ++i)
+                if (!pts[i]) keep.push_back(cache_[i]);
+            int removed = (int)(cache_.size() - keep.size());
+            cache_ = std::move(keep);
+            SyncToChannel();
+            return removed;
+        }
+
+    private:
+        void SyncFromChannel() {
+            cache_.clear();
+            for (const auto& k : ch_.GetKeys())
+                cache_.emplace_back(k.time, k.value);
+        }
+
+        void SyncToChannel() {
+            auto mode = ch_.GetDefaultMode();
+            std::vector<CurveKey> newKeys;
+            newKeys.reserve(cache_.size());
+            for (const auto& p : cache_)
+                newKeys.emplace_back(p.x, p.y, mode);
+            ch_.GetKeys() = std::move(newKeys);
+            ch_.SortByTime();
+        }
+
+        CurveChannel& ch_;
+        uint32_t            color_;
+        std::vector<ImVec2> cache_;
+        ImVec2              viewMin_{ 0.0f, -0.1f };
+        ImVec2              viewMax_{ 1.0f,  1.1f };
+    };
+
+    //-----------------------------------------------------------------------------
+    // Y 軸目盛ラベルをカーブエディタの上にオーバーレイ描画
+    // rMin/rMax : ImGui::GetItemRectMin/Max() で得た矩形（スクリーン座標）
+    // vMin/vMax : ImCurveEdit の viewMin/Max の Y 成分（実値域）
+    //-----------------------------------------------------------------------------
+    static void DrawYLabels(ImVec2 rMin, ImVec2 rMax,
+        float vMin, float vMax, int count) {
+        const float vRange = vMax - vMin;
+        if (vRange < 1e-6f || count <= 0) return;
+
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+
+        for (int i = 0; i <= count; ++i) {
+            float frac = static_cast<float>(i) / static_cast<float>(count);
+            float val = vMax - vRange * frac;          // 上端 = 大きい値
+            float sy = rMin.y + (rMax.y - rMin.y) * frac;
+
+            // 短いティック
+            dl->AddLine(
+                ImVec2(rMin.x, sy),
+                ImVec2(rMin.x + 6, sy),
+                IM_COL32(200, 200, 200, 130)
+            );
+            // 薄いグリッドライン
+            dl->AddLine(
+                ImVec2(rMin.x + 6, sy),
+                ImVec2(rMax.x, sy),
+                IM_COL32(180, 180, 180, 35)
+            );
+            // 数値ラベル
+            char buf[16];
+            std::snprintf(buf, sizeof(buf), "%.2f", val);
+            dl->AddText(
+                ImVec2(rMin.x + 8, sy - 6),
+                IM_COL32(230, 230, 230, 210),
+                buf
+            );
+        }
+    }
+
+    //-----------------------------------------------------------------------------
+    // X 軸(時間)目盛ラベルをオーバーレイ描画
+    //-----------------------------------------------------------------------------
+    static void DrawXLabels(ImVec2 rMin, ImVec2 rMax, int count) {
+        if (count <= 0) return;
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+
+        for (int i = 0; i <= count; ++i) {
+            float frac = static_cast<float>(i) / static_cast<float>(count);
+            float sx = rMin.x + (rMax.x - rMin.x) * frac;
+
+            // 短いティック（下端）
+            dl->AddLine(
+                ImVec2(sx, rMax.y - 6),
+                ImVec2(sx, rMax.y),
+                IM_COL32(200, 200, 200, 130)
+            );
+            // 薄いグリッドライン
+            dl->AddLine(
+                ImVec2(sx, rMin.y),
+                ImVec2(sx, rMax.y - 6),
+                IM_COL32(180, 180, 180, 35)
+            );
+            // 数値ラベル（下端の内側）
+            char buf[8];
+            std::snprintf(buf, sizeof(buf), "%.2f", frac);
+            float textX = (i == count) ? sx - 22 : sx + 2; // 右端は左寄せ
+            dl->AddText(
+                ImVec2(textX, rMax.y - 14),
+                IM_COL32(230, 230, 230, 180),
+                buf
+            );
+        }
+    }
+
+    //-----------------------------------------------------------------------------
+    // 各キーポイントの値をカーブの点の近くにオーバーレイ表示
+    //-----------------------------------------------------------------------------
+    static void DrawKeyValueOverlay(ImVec2 rMin, ImVec2 rMax,
+        const CurveChannel& ch,
+        float vMin, float vMax) {
+        const float vRange = vMax - vMin;
+        if (vRange < 1e-6f) return;
+
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+
+        for (const auto& k : ch.GetKeys()) {
+            // スクリーン座標へ変換 (t: 0..1 固定、値域は vMin..vMax)
+            float fx = k.time;                              // 0〜1
+            float fy = 1.0f - (k.value - vMin) / vRange;   // 上が大きい
+
+            float sx = rMin.x + fx * (rMax.x - rMin.x);
+            float sy = rMin.y + fy * (rMax.y - rMin.y);
+
+            // ラベル（キーの丸より少し上右）
+            char buf[16];
+            std::snprintf(buf, sizeof(buf), "%.3f", k.value);
+
+            // 黒縁→黄文字で視認性を確保
+            dl->AddText(ImVec2(sx + 5, sy - 15), IM_COL32(0, 0, 0, 200), buf);
+            dl->AddText(ImVec2(sx + 4, sy - 16), IM_COL32(255, 220, 60, 230), buf);
+        }
+    }
+
+} // anonymous namespace
+#endif // USE_IMGUI
+
+//=============================================================================
+// 構築
+//=============================================================================
+
+CurveProperty::CurveProperty()
+    : mode_(Mode::Constant), valMin_(1.0f), valMax_(1.0f) {
+    channel_.Reset(1.0f);
+}
+
+CurveProperty::CurveProperty(float constValue, const std::string& channelName)
+    : mode_(Mode::Constant), valMin_(constValue), valMax_(constValue) {
+    channel_.SetName(channelName);
+    channel_.Reset(constValue);
+}
+
+//=============================================================================
+// 評価
+//=============================================================================
+
+float CurveProperty::Evaluate(float t, float rand) const {
+    switch (mode_) {
+    case Mode::Constant:      return valMin_;
+    case Mode::RandomBetween: return valMin_ + (valMax_ - valMin_) * rand;
+    case Mode::Curve:         return channel_.Evaluate(t);
+    }
+    return valMin_;
+}
+
+//=============================================================================
+// JSON
+//=============================================================================
+
+nlohmann::json CurveProperty::SaveToJson() const {
+    nlohmann::json j;
+    j["mode"] = static_cast<int>(mode_);
+    j["valMin"] = valMin_;
+    j["valMax"] = valMax_;
+    j["channel"] = channel_.SaveToJson();
+    return j;
+}
+
+void CurveProperty::LoadFromJson(const nlohmann::json& j) {
+    mode_ = static_cast<Mode>(j.value("mode", 0));
+    valMin_ = j.value("valMin", 1.0f);
+    valMax_ = j.value("valMax", 1.0f);
+    if (j.contains("channel"))
+        channel_.LoadFromJson(j["channel"]);
+}
+
+//=============================================================================
+// DrawEditor
+//=============================================================================
+#ifdef USE_IMGUI
+
+void CurveProperty::DrawEditor(const char* label, const EditorConfig& cfg) {
+    ImGui::PushID(label);
+
+    //--- モードセレクタ ---
+    static const char* kModeNames[] = { "固定値", "ランダム", "カーブ" };
+    int modeIdx = static_cast<int>(mode_);
+    ImGui::SetNextItemWidth(100.0f);
+    if (ImGui::Combo("##Mode", &modeIdx, kModeNames, 3))
+        mode_ = static_cast<Mode>(modeIdx);
+
+    ImGui::SameLine();
+    ImGui::TextUnformatted(label[0] == '#' ? channel_.GetName().c_str() : label);
+
+    switch (mode_) {
+        //=========================================================================
+    case Mode::Constant:
+        //=========================================================================
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::DragFloat("##Val", &valMin_, cfg.dragSpeed,
+            cfg.valueMin, cfg.valueMax, "%.3f");
+        valMax_ = valMin_;
+        break;
+
+        //=========================================================================
+    case Mode::RandomBetween:
+        //=========================================================================
+    {
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::DragFloat("##Min", &valMin_, cfg.dragSpeed,
+            cfg.valueMin, cfg.valueMax, "Min %.3f");
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::DragFloat("##Max", &valMax_, cfg.dragSpeed,
+            cfg.valueMin, cfg.valueMax, "Max %.3f");
+        if (valMin_ > valMax_) std::swap(valMin_, valMax_);
+        break;
+    }
+
+    //=========================================================================
+    case Mode::Curve:
+        //=========================================================================
+    {
+        //--- 補間モード変更 ---
+        static const char* kInterpNames[] = { "Step", "Linear", "CatmullRom", "Bezier" };
+        int interpIdx = static_cast<int>(channel_.GetDefaultMode());
+        ImGui::SetNextItemWidth(110.0f);
+        if (ImGui::Combo("補間##IP", &interpIdx, kInterpNames, 4)) {
+            auto newMode = static_cast<InterpolationMode>(interpIdx);
+            channel_.SetDefaultMode(newMode);
+            for (auto& k : channel_.GetKeys())
+                k.interpMode = newMode;
+        }
+
+        //--- カーブエディタ本体 ---
+        // 即時モードでデリゲートを生成（毎フレーム問題なし）
+        SingleChannelDelegate del(channel_, cfg);
+        float w = ImGui::GetContentRegionAvail().x;
+        ImCurveEdit::Edit(del, ImVec2(w, cfg.editorHeight),
+            ImGui::GetID("##singleCurve"));
+
+        //--- オーバーレイ（エディタ widget の矩形を取得してから描く）---
+        {
+            ImVec2 rMin = ImGui::GetItemRectMin();
+            ImVec2 rMax = ImGui::GetItemRectMax();
+            float  vMin = del.GetMin().y;
+            float  vMax = del.GetMax().y;
+
+            if (cfg.showYLabels)
+                DrawYLabels(rMin, rMax, vMin, vMax, cfg.yLabelCount);
+
+            if (cfg.showXLabels)
+                DrawXLabels(rMin, rMax, cfg.xLabelCount);
+
+            if (cfg.showKeyValues)
+                DrawKeyValueOverlay(rMin, rMax, channel_, vMin, vMax);
+        }
+
+        //--- キー管理パネル ---
+        if (cfg.showKeyList) {
+            ImGui::Separator();
+
+            // ── 追加コントロール ─────────────────────────────────────
+            ImGui::PushID("##keyAdd");
+
+            ImGui::TextUnformatted("追加:");
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(62.0f);
+            ImGui::DragFloat("##addT", &addKeyTime_,
+                0.005f, 0.0f, 1.0f, "T:%.3f");
+
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(72.0f);
+            ImGui::DragFloat("##addV", &addKeyValue_,
+                cfg.dragSpeed,
+                cfg.valueMin, cfg.valueMax, "V:%.3f");
+
+            ImGui::SameLine();
+            if (ImGui::SmallButton("+ 追加"))
+                channel_.AddKey(addKeyTime_, addKeyValue_,
+                    channel_.GetDefaultMode());
+
+            ImGui::PopID();
+
+            // ── キー一覧 ─────────────────────────────────────────────
+            // ヘッダ行
+            ImGui::Separator();
+            ImGui::TextDisabled("  #   Time       Value");
+
+            auto& keys = channel_.GetKeys();
+            int   toDelete = -1;
+            bool  needSort = false;
+
+            for (int i = 0; i < (int)keys.size(); ++i) {
+                ImGui::PushID(i);
+
+                // インデックス
+                char idxBuf[6];
+                std::snprintf(idxBuf, sizeof(idxBuf), "[%d]", i);
+                ImGui::TextDisabled("%s", idxBuf);
+                ImGui::SameLine();
+
+                // Time 編集
+                ImGui::SetNextItemWidth(65.0f);
+                if (ImGui::DragFloat("##t", &keys[i].time,
+                    0.005f, 0.0f, 1.0f, "%.3f"))
+                    needSort = true;
+                ImGui::SameLine();
+
+                // Value 編集
+                ImGui::SetNextItemWidth(75.0f);
+                ImGui::DragFloat("##v", &keys[i].value,
+                    cfg.dragSpeed,
+                    cfg.valueMin, cfg.valueMax, "%.3f");
+                ImGui::SameLine();
+
+                // 削除ボタン（minKeyCount 以下なら無効）
+                const bool canDelete = (int)keys.size() > cfg.minKeyCount;
+                if (!canDelete) ImGui::BeginDisabled();
+
+                if (ImGui::SmallButton("削除"))
+                    toDelete = i;
+
+                if (!canDelete) {
+                    ImGui::EndDisabled();
+                    ImGui::SameLine();
+                    ImGui::TextDisabled("(最低%d点)", cfg.minKeyCount);
+                }
+
+                ImGui::PopID();
+            }
+
+            // ループ後にまとめて適用（ループ中のインデックス破壊を防ぐ）
+            if (needSort)    channel_.SortByTime();
+            if (toDelete >= 0) channel_.RemoveKey(toDelete);
+        }
+        break;
+    }
+    } // switch (mode_)
+
+    ImGui::PopID();
+}
+
+#endif // USE_IMGUI
+
+============================================================
+File Path: YEngine/Utilities/Debugger/CurveEditor/CurveProperty.h
+============================================================
+#pragma once
+#include "CurveChannel.h"
+#include <json.hpp>
+#include <string>
+
+/// <summary>
+/// 1 つのフロート値を扱うプロパティ。
+/// Constant / RandomBetween / Curve の 3 モードを統一インターフェースで提供。
+///
+/// ■ 複数チャンネルが必要な場合（RGBA など）
+///   CurveProperty を 4 つ組み合わせて使う（UpdateColor 参照）。
+///
+/// ■ DrawEditor
+///   USE_IMGUI 定義時のみ有効。
+///   EditorConfig を渡すことで数値表示・キー管理UIを呼び出し側から制御できる。
+/// </summary>
+class CurveProperty {
+public:
+    enum class Mode : uint8_t {
+        Constant,       ///< valMin を固定値として使用
+        RandomBetween,  ///< [valMin, valMax] の範囲でランダム
+        Curve           ///< channel のカーブに沿った値
+    };
+
+    //===== 構築 =====
+    CurveProperty();
+    explicit CurveProperty(float constValue,
+        const std::string& channelName = "value");
+
+    //===== 評価 =====
+    /// @param t    0.0〜1.0 の正規化時刻（Curve モードで使用）
+    /// @param rand 0.0〜1.0 のランダム値（RandomBetween モードで使用）
+    float Evaluate(float t, float rand = 0.5f) const;
+
+    //===== モード / 値 =====
+    void  SetMode(Mode m) { mode_ = m; }
+    Mode  GetMode()               const { return mode_; }
+
+    void  SetConstant(float v) { valMin_ = valMax_ = v; mode_ = Mode::Constant; }
+    void  SetRandom(float mn, float mx) { valMin_ = mn; valMax_ = mx; mode_ = Mode::RandomBetween; }
+
+    float GetValMin()             const { return valMin_; }
+    float GetValMax()             const { return valMax_; }
+    void  SetValMin(float v) { valMin_ = v; }
+    void  SetValMax(float v) { valMax_ = v; }
+
+    //===== チャンネルアクセス =====
+    CurveChannel& GetChannel() { return channel_; }
+    const CurveChannel& GetChannel() const { return channel_; }
+
+    //===== JSON =====
+    nlohmann::json SaveToJson()                        const;
+    void           LoadFromJson(const nlohmann::json& j);
+
+#ifdef USE_IMGUI
+    /// <summary>
+    /// DrawEditor の表示設定。呼び出し側で自由にカスタマイズして渡す。
+    /// </summary>
+    struct EditorConfig {
+        // ---- 基本 ----
+        float    editorHeight = 120.0f;    ///< カーブエディタの高さ (px)
+        float    dragSpeed = 0.01f;     ///< DragFloat のスピード
+        float    valueMin = 0.0f;      ///< Y軸の表示下限
+        float    valueMax = 1.0f;      ///< Y軸の表示上限
+        uint32_t curveColor = 0xFF00CCFF;///< カーブ色 (ImGui ABGR)
+
+        // ---- 数値可視化 ----
+        bool     showYLabels = true;      ///< Y軸目盛ラベルを表示するか
+        int      yLabelCount = 5;         ///< Y軸ラベルの分割数
+        bool     showXLabels = false;     ///< X軸(時間)目盛ラベルを表示するか
+        int      xLabelCount = 4;         ///< X軸ラベルの分割数
+        bool     showKeyValues = true;      ///< 各キーポイントの値をオーバーレイ表示するか
+
+        // ---- キー管理UI ----
+        bool     showKeyList = true;      ///< キー一覧 + 追加/削除パネルを表示するか
+        int      minKeyCount = 2;         ///< 削除ガード：これ以下では削除ボタンを無効化
+    };
+
+    /// <summary>
+    /// モードセレクタ + 値入力 / カーブエディタを表示。
+    /// </summary>
+    /// @param label   ラベル文字列（ImGui::PushID に使用。"#" 始まりならチャンネル名を代用）
+    /// @param config  表示設定（省略時はデフォルト値）
+    void DrawEditor(const char* label = "##CurveProp",
+        const EditorConfig& config = {});
+#endif
+
+private:
+    Mode         mode_ = Mode::Constant;
+    float        valMin_ = 1.0f;
+    float        valMax_ = 1.0f;
+    CurveChannel channel_;
+
+#ifdef USE_IMGUI
+    // キー追加パネルの入力値（インスタンスごとに独立させるためメンバ変数）
+    float addKeyTime_ = 0.5f;
+    float addKeyValue_ = 1.0f;
+#endif
+};
 
 ============================================================
 File Path: YEngine/Utilities/Debugger/D3DResourceLeakChecker.cpp
@@ -252023,7 +253580,7 @@ void BattleEnemy::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 				enemyHitEmitterGroup_->SetPosition(wt_.translate_);
 				enemyHitEmitterGroup_->SetActive(true);
 				enemyHitEmitterGroup_->SetAutoEmitAll(false);  // 自動射出OFF
-				enemyHitEmitterGroup_->EmitAll(10);  // 手動で100個発生
+				enemyHitEmitterGroup_->EmitAll(10);
 			}
 
 			// --------------------- ヒットカウントの処理 --------------------- //
@@ -263612,7 +265169,7 @@ void Player::HandleCombatInput() {
 
 	// ガード
 	if (input_->IsPadTriggered(0, GamePadButton::X)
-		|| input_->GetInstance()->IsPressMouse(3)) {
+		|| input_->GetInstance()->TriggerKey(DIK_N)) {
 		combat_->TryGuard();
 	}
 
@@ -270506,12 +272063,6 @@ float Normalize(const float& v) {
 	return v / std::fabs(v); // 修正：v/v は問題があるため、fabs を使います
 }
 
-
-Vector4 Normalize(const Vector4& v) {
-	float mag = Magnitude(v);
-	return { v.x / mag, v.y / mag, v.z / mag , v.w / mag };
-}
-
 float Distance(const Vector3& a, const Vector3& b) {
 	float dx = b.x - a.x;
 	float dy = b.y - a.y;
@@ -270649,9 +272200,6 @@ float Magnitude(const Vector4& v);
 // スカラー値を正規化する関数
 float Normalize(const float& v);
 
-// Vector4を正規化する関数
-Vector4 Normalize(const Vector4& v);
-
 // 2つのVector3間の距離を計算する関数
 float Distance(const Vector3& a, const Vector3& b);
 
@@ -270671,9 +272219,11 @@ bool IsCollision(const AABB& aabb, const Sphere& sphere);
 
 // 度数からラジアン
 float DegToRad(float degrees);
+
 // ラジアンから度数
 float RadToDeg(float radius);
-// スプライン補間
+
+// スプライン補間（float型）
 float CubicSplineInterpolate(float p0, float p1, float p2, float p3, float t);
 
 ============================================================
@@ -272429,22 +273979,6 @@ Vector3 Lerp(const Vector3& a, const Vector3& b, float t)
     return a * (1.0f - t) + b * t;
 }
 
-Vector3 CubicSplineInterpolate(const Vector3& p0, const Vector3& p1, const Vector3& p2, const Vector3& p3, float t) {
-    // t の二乗および三乗を計算
-    float t2 = t * t;
-    float t3 = t2 * t;
-
-    // Catmull-Rom スプラインの基底行列
-    Vector3 a = p1 * 2.0f;
-    Vector3 b = (p2 - p0) * t;
-    Vector3 c = (p0 * 2.0f - p1 * 5.0f + p2 * 4.0f - p3) * t2;
-    Vector3 d = (-1 * p0 + p1 * 3.0f - p2 * 3.0f + p3) * t3;
-
-    Vector3 result = (a + b + c + d) * 0.5f;
-    return result;
-}
-
-
 Vector3 Multiply(const Vector3& v, float scalar) {
     return { v.x * scalar, v.y * scalar, v.z * scalar };
 }
@@ -272467,126 +274001,6 @@ Vector3 Normalize(Vector3& vec) {
     }
     return Vector3{ 0, 0, 0 };
 }
-std::vector<double> CubicSplineInterpolation(
-    const std::vector<double>& xData,
-    const std::vector<double>& yData,
-    const std::vector<double>& xQuery
-)
-{
-    // xData, yData が妥当かチェック
-    if (xData.size() != yData.size() || xData.size() < 2) {
-        throw std::invalid_argument("xData と yData のサイズ不一致、またはデータ点が不足しています。");
-    }
-
-    // 入力データが単調増加になっているか（最低限の確認）
-    for (size_t i = 1; i < xData.size(); ++i) {
-        if (xData[i] <= xData[i - 1]) {
-            throw std::invalid_argument("xData は単調増加である必要があります。");
-        }
-    }
-
-    // データ点の数
-    const size_t n = xData.size();
-
-    // 便宜上 yData を a にコピー
-    // スプライン係数の計算で a[i] が f_i (yData[i]) を表すことが多いため
-    std::vector<double> a = yData;
-
-    // 区間幅 h[i] = xData[i+1] - xData[i] (i=0..n-2)
-    std::vector<double> h(n - 1);
-    for (size_t i = 0; i < n - 1; ++i) {
-        h[i] = xData[i + 1] - xData[i];
-    }
-
-    // 求めたいスプライン係数: b, c, d
-    // 今回は自然スプラインなので、両端条件: c[0] = 0, c[n-1] = 0
-    std::vector<double> b(n), c(n), d(n);
-
-    // c を求めるための三重対角行列を解く
-    // まず alpha[i] を計算
-    std::vector<double> alpha(n);
-    alpha[0] = 0.0; // 自然スプラインの場合、両端は 0
-    alpha[n - 1] = 0.0;
-
-    for (size_t i = 1; i < n - 1; ++i) {
-        alpha[i] = (3.0 / h[i]) * (a[i + 1] - a[i])
-            - (3.0 / h[i - 1]) * (a[i] - a[i - 1]);
-    }
-
-    // l, mu, z は三重対角行列を前進・後退代入で解く際に使用
-    std::vector<double> l(n), mu(n), z(n);
-    l[0] = 1.0;
-    mu[0] = 0.0;
-    z[0] = 0.0;
-
-    for (size_t i = 1; i < n - 1; ++i) {
-        l[i] = 2.0 * (xData[i + 1] - xData[i - 1]) - h[i - 1] * mu[i - 1];
-        mu[i] = h[i] / l[i];
-        z[i] = (alpha[i] - h[i - 1] * z[i - 1]) / l[i];
-    }
-
-    l[n - 1] = 1.0;
-    z[n - 1] = 0.0;
-    c[n - 1] = 0.0;
-
-    // 後退代入 (c を求める)
-    for (int j = static_cast<int>(n) - 2; j >= 0; --j) {
-        c[j] = z[j] - mu[j] * c[j + 1];
-    }
-
-    // b, d を求める
-    for (size_t i = 0; i < n - 1; ++i) {
-        b[i] = (a[i + 1] - a[i]) / h[i] - (h[i] / 3.0) * (c[i + 1] + 2.0 * c[i]);
-        d[i] = (c[i + 1] - c[i]) / (3.0 * h[i]);
-    }
-    // b[n-1], d[n-1] は使わないが、エラーを避けるため初期化
-    b[n - 1] = b[n - 2];
-    d[n - 1] = d[n - 2];
-
-    // xQuery に対して補間結果を求める
-    std::vector<double> result;
-    result.reserve(xQuery.size());
-
-    for (auto x : xQuery) {
-        // x が xData の範囲外にある場合の扱い (今回は外挿せずに端点近辺を使う例)
-        if (x <= xData.front()) {
-            // 区間[0,1]の延長 (厳密には外挿)
-            double dx = x - xData[0];
-            double y = a[0]
-                + b[0] * dx
-                + c[0] * dx * dx
-                + d[0] * dx * dx * dx;
-            result.push_back(y);
-            continue;
-        }
-        else if (x >= xData.back()) {
-            // 区間[n-2, n-1]の延長
-            size_t i = n - 2;
-            double dx = x - xData[i];
-            double y = a[i]
-                + b[i] * dx
-                + c[i] * dx * dx
-                + d[i] * dx * dx * dx;
-            result.push_back(y);
-            continue;
-        }
-
-        // 2分探索などで x の属する区間を探す
-        // std::upper_bound を使って x が挿入される位置を探す
-        auto it = std::upper_bound(xData.begin(), xData.end(), x);
-        size_t i = static_cast<size_t>(std::distance(xData.begin(), it) - 1);
-
-        // i番目の区間 [xData[i], xData[i+1]) に x は属するとする
-        double dx = x - xData[i];
-        double y = a[i]
-            + b[i] * dx
-            + c[i] * dx * dx
-            + d[i] * dx * dx * dx;
-        result.push_back(y);
-    }
-
-    return result;
-}
 
 Vector3 Clamp(const Vector3& v, const Vector3& min, const Vector3& max)
 {
@@ -272596,61 +274010,6 @@ Vector3 Clamp(const Vector3& v, const Vector3& min, const Vector3& max)
         std::clamp(v.z, min.z, max.z)
     );
 }
-
-Vector3 CatmullRomSpline(const std::vector<Vector3>& controlPoints, float t) {
-    // コントロールポイントが4つでないときはエラーを表示する。
-    if (controlPoints.size() != 4) {
-        throw std::invalid_argument("Catmull-Rom Splineには4つのコントロールポイントが必要です。");
-    }
-
-    // t の2乗と3乗を計算
-    float t2 = t * t;
-    float t3 = t2 * t;
-
-    // 各コントロールポイントを変数に代入
-    const Vector3& p0 = controlPoints[0];
-    const Vector3& p1 = controlPoints[1];
-    const Vector3& p2 = controlPoints[2];
-    const Vector3& p3 = controlPoints[3];
-
-    // X, Y, Z 軸成分の Catmull-Rom 補間計算
-    float x = 0.5f * ((2.0f * p1.x) + (-p0.x + p2.x) * t + (2.0f * p0.x - 5.0f * p1.x + 4.0f * p2.x - p3.x) * t2 + (-p0.x + 3.0f * p1.x - 3.0f * p2.x + p3.x) * t3);
-    float y = 0.5f * ((2.0f * p1.y) + (-p0.y + p2.y) * t + (2.0f * p0.y - 5.0f * p1.y + 4.0f * p2.y - p3.y) * t2 + (-p0.y + 3.0f * p1.y - 3.0f * p2.y + p3.y) * t3);
-    float z = 0.5f * ((2.0f * p1.z) + (-p0.z + p2.z) * t + (2.0f * p0.z - 5.0f * p1.z + 4.0f * p2.z - p3.z) * t2 + (-p0.z + 3.0f * p1.z - 3.0f * p2.z + p3.z) * t3);
-
-    // 計算された位置をVector3で返す
-    return Vector3(x, y, z);
-}
-
-std::vector<Vector3> GenerateCatmullRomSplinePoints(const std::vector<Vector3>& controlPoints, size_t segmentCount) {
-    std::vector<Vector3> pointsDrawing;
-
-    // コントロールポイント数の確認
-    if (controlPoints.size() < 4) {
-        throw std::invalid_argument("Catmull-Rom Splineには少なくとも4つのコントロールポイントが必要です。");
-    }
-
-    // 各4つのコントロールポイントについて補間を行う
-    for (size_t i = 0; i < controlPoints.size() - 3; ++i) {
-        std::vector<Vector3> segmentControlPoints = {
-            controlPoints[i],
-            controlPoints[i + 1],
-            controlPoints[i + 2],
-            controlPoints[i + 3]
-        };
-
-        // セグメントを分割して頂点を生成
-        for (size_t j = 0; j <= segmentCount; ++j) {
-            float t = static_cast<float>(j) / static_cast<float>(segmentCount);
-            Vector3 pos = CatmullRomSpline(segmentControlPoints, t);
-            pointsDrawing.push_back(pos);
-        }
-    }
-
-    return pointsDrawing;
-}
-
-
 
 Vector3 CatmullRomInterpolation(const Vector3& p0, const Vector3& p1, const Vector3& p2, const Vector3& p3, float t) {
     const float s = 0.5f;
@@ -272667,48 +274026,6 @@ Vector3 CatmullRomInterpolation(const Vector3& p0, const Vector3& p1, const Vect
     return s * (e3 * t3 + e2 * t2 + e1 * t + e0);
 };
 
-
-Vector3 CatmullRomPosition(const std::vector<Vector3>& points, float t) {
-    assert(points.size() >= 4 && "制御点は4点以上必要です");
-
-    // 区間数は制御点の数-1
-    size_t division = points.size() - 1;
-    // 1区間の長さ
-    float areaWidth = 1.0f / division;
-
-    // 区間内の始点を0.0f, 終点を1.0fとした時の現在位置
-    float t_2 = std::fmod(t, areaWidth) * division;
-    // 加減(0.0f)と上限(1.0f)の範囲に収める
-    t_2 = std::clamp(t_2, 0.0f, 1.0f);
-
-    // 区間番号を計算し、範囲内に収める
-    size_t index = static_cast<size_t>(t / areaWidth);
-    // 上限を超えないように抑える
-    index = std::min(index, points.size() - 2);
-
-    // 4点分のインデックス
-    size_t index0 = index - 1;
-    size_t index1 = index;
-    size_t index2 = index + 1;
-    size_t index3 = index + 2;
-
-    // 最初の区間のp0はp1を重複使用する
-    if (index == 0) {
-        index0 = index1;
-    }
-    // 最後の区間のp3はp2を重複使用する
-    if (index3 >= points.size()) {
-        index3 = index2;
-    }
-
-    // 4点の座標
-    const Vector3& p0 = points[index0];
-    const Vector3& p1 = points[index1];
-    const Vector3& p2 = points[index2];
-    const Vector3& p3 = points[index3];
-
-    return CatmullRomInterpolation(p0, p1, p2, p3, t_2);
-}
 
 Vector3 lerp(const Vector3& a, const Vector3& b, float t) {
     return {
@@ -273002,13 +274319,6 @@ Vector3 Multiply(const Vector3& v, float scalar);
 Vector3 Normalize(const Vector3& vec);
 Vector3 Normalize(Vector3& vec);
 
-// Catmull-Romスプライン補間を用いて曲線上の点を計算する関数
-Vector3 CatmullRomSpline(const std::vector<Vector3>& controlPoints, float t);
-// Catmull-Romスプラインのポイントを生成する関数
-std::vector<Vector3> GenerateCatmullRomSplinePoints(const std::vector<Vector3>& controlPoints, size_t segmentCount);
-// ご提供
-Vector3 CatmullRomInterpolation(const Vector3& p0, const Vector3& p1, const Vector3& p2, const Vector3& p3, float t);
-Vector3 CatmullRomPosition(const std::vector<Vector3>& points, float t);
 
 // Vector3同士の加算を行う関数
 Vector3 Add(const Vector3& v1, const Vector3& v2);
@@ -273019,31 +274329,27 @@ Vector3 Subtract(const Vector3& v1, const Vector3& v2);
 // ベクトルのクロス積を計算する関数
 Vector3 Cross(const Vector3& v1, const Vector3& v2);
 
-Vector3 Lerp(const Vector3& a, const Vector3& b, float t);
-
-Vector3 CubicSplineInterpolate(const Vector3& p0, const Vector3& p1, const Vector3& p2, const Vector3& p3, float t);
-
-Vector3 lerp(const Vector3& a, const Vector3& b, float t);
-float lerp(float a, float b, float t);
-
-Vector3 Slerp(const Vector3& v0, const Vector3& v1, float t);
-std::vector<double> CubicSplineInterpolation(
-	const std::vector<double>& xData,
-	const std::vector<double>& yData,
-	const std::vector<double>& xQuery
-);
-
+// ベクトルを指定した範囲内にクランプする関数
 Vector3 Clamp(const Vector3& v, const Vector3& min, const Vector3& max);
 
 // Blender → DirectX変換（Position）
 Vector3 ConvertPosition(const Vector3& pos);
-
 Vector3 GetEulerAnglesFromToDirection(const Vector3& from, const Vector3& to);
+
+//==================================== 補間するメソッド =====================================//
+// Catmull-Romスプライン曲線上の点を計算する
+Vector3 CatmullRomInterpolation(const Vector3& p0, const Vector3& p1, const Vector3& p2, const Vector3& p3, float t);
+Vector3 Lerp(const Vector3& a, const Vector3& b, float t);
+float lerp(float a, float b, float t);
+Vector3 Slerp(const Vector3& v0, const Vector3& v1, float t);
+
+
 
 ============================================================
 File Path: YMath/Vector4.cpp
 ============================================================
 #include "Vector4.h"
+#include <MathFunc.h>
 
 Vector4 lerp(const Vector4& a, const Vector4& b, float t) {
     return Vector4(
@@ -273082,6 +274388,10 @@ Vector4 Transform(const Vector4& vector, const Matrix4x4& matrix)
 	return result;
 }
 
+Vector4 Normalize(const Vector4& v) {
+	float mag = Magnitude(v);
+	return { v.x / mag, v.y / mag, v.z / mag , v.w / mag };
+}
 
 ============================================================
 File Path: YMath/Vector4.h
@@ -273215,6 +274525,9 @@ inline Vector4 operator*(const Matrix4x4& m, const Vector4& v)
 }
 
 Vector4 Transform(const Vector4& vector, const Matrix4x4& matrix);
+
+// Vector4を正規化する関数
+Vector4 Normalize(const Vector4& v);
 
 ============================================================
 File Path: YMath/YoRigineMath.cpp
