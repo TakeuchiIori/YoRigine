@@ -76,16 +76,16 @@
                 },
                 "rush": {
                     "chargeTime": 0.8500000238418579,
-                    "cooldownTime": 1.2000000476837158,
+                    "cooldownTime": 0.6499999761581421,
                     "rushTime": 0.5,
                     "speedMultiplier": 7.5
                 },
                 "spin": {
-                    "chargeTime": 0.25,
-                    "cooldownTime": 0.5,
-                    "moveSpeedMultiplier": 4.0,
+                    "chargeTime": 0.44999998807907104,
+                    "cooldownTime": 0.550000011920929,
+                    "moveSpeedMultiplier": 5.0,
                     "rotationCount": 5.0,
-                    "spinTime": 1.0
+                    "spinTime": 0.6499999761581421
                 }
             },
             "attackPatterns": [

@@ -26,15 +26,15 @@ private:
     const float counterStartupTime_ = 0.2f;
 
     // フェーズ2: 予備動作（短くキビキビ）
-    const float anticipationTime_ = 0.15f;
-    const float anticipationDistance_ = 5.8f;   // 後退距離）
+    const float anticipationTime_ = 0.5f;
+    const float anticipationDistance_ = 10.8f;   // 後退距離）
 
     // フェーズ3: チャージ（プレイヤーをロックオン追尾）
     const float chargeTime_ = 0.25f;
 
     // フェーズ4: 突進（超高速 & 突進中もプレイヤーを追従）
-    const float rushTime_ = 0.45f;
-    const float rushSpeedMultiplier_ = 18.0f;
+    const float rushTime_ = 0.55f;
+    const float rushSpeedMultiplier_ = 15.0f;
 
     // フェーズ5: クールダウン
     const float cooldownTime_ = 0.8f;
