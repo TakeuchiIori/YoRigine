@@ -2,19 +2,21 @@
 #include "../BattleIdleState.h"
 #include <cmath>
 
-/// <summary>
-/// 攻撃状態開始処理
-/// </summary>
 void BattleRushAttackState::Enter(BattleEnemy& enemy) {
 	enemy.SetCanAct(false);
 	enemy.ResetStateTimer();
-	enemy.SetColor({ 1, 1, 0.0f, 1 }); // 黄色で予備動作を示す
 	dirLocked_ = false;
 
-	// 予備動作の開始位置を記録
+	if (auto anim = enemy.GetAnimation()) {
+		anim->StartColorAnimation({ 1, 1, 1, 1 }, { 1.0f, 1.0f, 0.0f, 1.0f }, 0.2f);
+		anim->StartScaleAnimation({ 1, 1, 1 }, { 1.1f, 0.9f, 0.7f }, enemy.GetEnemyData().attackParams.rush.anticipationTime, Easing::Function::EaseOutQuad);
+	}
+	else {
+		enemy.SetColor({ 1, 1, 0.0f, 1 });
+	}
+
 	anticipationStartPos_ = enemy.GetTranslate();
 
-	// 攻撃方向を決定
 	if (enemy.GetPlayer()) {
 		attackDir_ = enemy.GetPlayerPosition() - enemy.GetTranslate();
 		if (Length(attackDir_) > 0.01f) {
@@ -24,35 +26,25 @@ void BattleRushAttackState::Enter(BattleEnemy& enemy) {
 	}
 }
 
-/// <summary>
-/// 攻撃状態更新処理
-/// </summary>
 void BattleRushAttackState::Update(BattleEnemy& enemy, float dt) {
 	const float currentTime = enemy.GetStateTimer();
+	const float previousTime = currentTime - dt;
 	const auto& params = enemy.GetEnemyData().attackParams.rush;
 
-	// フェーズの境界時間を計算
 	const float anticipationEndTime = params.anticipationTime;
 	const float chargeEndTime = anticipationEndTime + params.chargeTime;
 	const float rushEndTime = chargeEndTime + params.rushTime;
 	const float totalDuration = rushEndTime + params.cooldownTime;
 
-	// === フェーズ1: 予備動作（後ろに引く） ===
+	// === フェーズ1: 予備動作 ===
 	if (currentTime < anticipationEndTime) {
 		const float progress = currentTime / params.anticipationTime;
-
-		// 後ろに引く動き（イージングを使用してスムーズに）
-		const float easeProgress = 1.0f - std::pow(1.0f - progress, 3.0f); // ease-out cubic
+		const float easeProgress = 1.0f - std::pow(1.0f - progress, 3.0f);
 		const Vector3 backwardOffset = -attackDir_ * params.anticipationDistance * easeProgress;
 		enemy.SetTranslate(anticipationStartPos_ + backwardOffset);
-
-		// 色を点滅させて警告
-		const float colorPulse = 0.5f + 0.5f * std::sin(currentTime * 12.0f);
-		enemy.SetColor({ 1, colorPulse, 0.0f, 1 });
 	}
-	// === フェーズ2: チャージ（溜め） ===
+	// === フェーズ2: チャージ ===
 	else if (currentTime < chargeEndTime) {
-		// チャージ中もプレイヤーを追尾
 		if (enemy.GetPlayer()) {
 			attackDir_ = enemy.GetPlayerPosition() - enemy.GetTranslate();
 			if (Length(attackDir_) > 0.01f) {
@@ -60,15 +52,21 @@ void BattleRushAttackState::Update(BattleEnemy& enemy, float dt) {
 				enemy.SetRotationY(std::atan2(attackDir_.x, attackDir_.z));
 			}
 		}
-
-		// 色を赤く変化
-		const float chargeProgress = (currentTime - anticipationEndTime) / params.chargeTime;
-		const float redIntensity = 0.5f + 0.5f * chargeProgress;
-		enemy.SetColor({ 1, redIntensity * 0.3f, 0.0f, 1 });
+		if (!enemy.GetAnimation()) {
+			const float chargeProgress = (currentTime - anticipationEndTime) / params.chargeTime;
+			const float redIntensity = 0.5f + 0.5f * chargeProgress;
+			enemy.SetColor({ 1, redIntensity * 0.3f, 0.0f, 1 });
+		}
 	}
 	// === フェーズ3: 突進 ===
 	else if (currentTime < rushEndTime) {
-		enemy.SetColor({ 1, 0.0f, 0.0f, 1 }); // 真っ赤
+		if (previousTime < chargeEndTime && currentTime >= chargeEndTime) {
+			if (auto anim = enemy.GetAnimation()) {
+				// 突進時に細長くなる
+				anim->StartScaleAnimation(anim->GetCurrentScale(), { 0.8f, 0.8f, 1.3f }, 0.1f);
+			}
+		}
+		enemy.SetColor({ 1, 0.0f, 0.0f, 1 });
 		enemy.AddTranslate(attackDir_ * enemy.GetEnemyData().moveSpeed * params.speedMultiplier * dt);
 	}
 	// === フェーズ4: クールダウン ===
@@ -77,10 +75,15 @@ void BattleRushAttackState::Update(BattleEnemy& enemy, float dt) {
 	}
 }
 
-/// <summary>
-/// 攻撃状態終了処理
-/// </summary>
 void BattleRushAttackState::Exit(BattleEnemy& enemy) {
 	enemy.SetCanAct(true);
-	enemy.SetColor({ 1, 1, 1, 1 });
+
+	if (auto anim = enemy.GetAnimation()) {
+		anim->StopAll();
+		anim->StartScaleAnimation(anim->GetCurrentScale(), { 1, 1, 1 }, 0.2f);
+		anim->StartColorAnimation(anim->GetCurrentColor(), { 1, 1, 1, 1 }, 0.2f);
+	}
+	else {
+		enemy.SetColor({ 1, 1, 1, 1 });
+	}
 }

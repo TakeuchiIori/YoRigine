@@ -268,13 +268,13 @@ void BattleEnemy::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 			TakeDamage(static_cast<int>(player_->GetCombat()->GetCombo()->GetCurrentDamage()));
 
 			// --------------------- ヒットエフェクトの処理 --------------------- //
-			auto* enemyHitEmitterGroup_ = YEmitterGroupManager::GetInstance().GetGroup("EnemyHit");
-			if (enemyHitEmitterGroup_) {
-				enemyHitEmitterGroup_->SetPosition(wt_.translate_);
-				enemyHitEmitterGroup_->SetActive(true);
-				enemyHitEmitterGroup_->SetAutoEmitAll(false);  // 自動射出OFF
-				enemyHitEmitterGroup_->EmitAll(10);
-			}
+			//auto* enemyHitEmitterGroup_ = YEmitterGroupManager::GetInstance().GetGroup("EnemyHit");
+			//if (enemyHitEmitterGroup_) {
+			//	enemyHitEmitterGroup_->SetPosition(wt_.translate_);
+			//	enemyHitEmitterGroup_->SetActive(true);
+			//	enemyHitEmitterGroup_->SetAutoEmitAll(false);  // 自動射出OFF
+			//	enemyHitEmitterGroup_->EmitAll(10);
+			//}
 
 			// --------------------- ヒットカウントの処理 --------------------- //
 			// 連続ヒットカウント増加

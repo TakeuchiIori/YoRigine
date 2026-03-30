@@ -533,15 +533,15 @@ void BattleEnemyManager::LoadDefaultFormations() {
 	BattleFormationData single;
 	single.formationName = "single";
 	single.description = "単体敵用の中央配置";
-	single.positions = { Vector3(0.0f, 0.0f, 5.0f) };
+	single.positions = { Vector3(0.0f, 0.0f, 0.0f) };
 	formationMap_["single"] = single;
 
 	BattleFormationData dual;
 	dual.formationName = "dual";
 	dual.description = "2体の敵を左右に配置";
 	dual.positions = {
-		Vector3(-2.0f, 0.0f, 5.0f),
-		Vector3(2.0f, 0.0f, 5.0f)
+		Vector3(0.0f, 0.0f, -10.0f),
+		Vector3(0.0f, 0.0f, 10.0f)
 	};
 	formationMap_["dual"] = dual;
 
@@ -549,20 +549,22 @@ void BattleEnemyManager::LoadDefaultFormations() {
 	triple.formationName = "triple";
 	triple.description = "3体の敵を横一列に配置";
 	triple.positions = {
-		Vector3(-3.0f, 0.0f, 5.0f),
-		Vector3(0.0f, 0.0f, 5.0f),
-		Vector3(3.0f, 0.0f, 5.0f)
+		Vector3(0.0f, 0.0f, -10.0f),
+		Vector3(0.0f, 0.0f, 0.0f),
+		Vector3(0.0f, 0.0f, 10.0f)
 	};
 	formationMap_["triple"] = triple;
 
 	BattleFormationData quad;
 	quad.formationName = "quad";
-	quad.description = "4体の敵を2x2で配置";
+	quad.description = "4体の敵を2x2で広めに配置";
 	quad.positions = {
-		Vector3(-2.0f, 0.0f, 4.0f),
-		Vector3(2.0f, 0.0f, 4.0f),
-		Vector3(-2.0f, 0.0f, 6.0f),
-		Vector3(2.0f, 0.0f, 6.0f)
+		// 前列
+		Vector3(0.0f, 0.0f, -7.5f),
+		Vector3(0.0f, 0.0f, 7.5f),
+		// 後列
+		Vector3(0.0f, 0.0f, -12.0f),
+		Vector3(0.0f, 0.0f, 12.0f)
 	};
 	formationMap_["quad"] = quad;
 

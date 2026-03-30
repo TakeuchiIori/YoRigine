@@ -1092,15 +1092,6 @@ void FieldEnemyManager::ShowEnemyDataEditor() {
 		changed |= ImGui::DragFloat("追跡範囲", &editorEnemyData_.chaseRange, 0.5f, 1.0f, 50.0f);
 		changed |= ImGui::DragFloat("帰還距離", &editorEnemyData_.returnDistance, 0.5f, 1.0f, 50.0f);
 
-
-		ImGui::Separator();
-		ImGui::Text("=== 移動パラメータ ===");
-		changed |= ImGui::DragFloat("巡回半径", &editorEnemyData_.patrolRadius, 0.5f, 0.0f, 50.0f);
-		changed |= ImGui::DragFloat("巡回速度", &editorEnemyData_.patrolSpeed, 0.1f, 0.1f, 20.0f);
-		changed |= ImGui::DragFloat("追跡速度", &editorEnemyData_.chaseSpeed, 0.1f, 0.1f, 20.0f);
-		changed |= ImGui::DragFloat("追跡範囲", &editorEnemyData_.chaseRange, 0.5f, 1.0f, 50.0f);
-		changed |= ImGui::DragFloat("帰還距離", &editorEnemyData_.returnDistance, 0.5f, 1.0f, 50.0f);
-
 		ImGui::Separator();
 		ImGui::Text("=== 視界・索敵パラメータ ===");
 		if (ImGui::IsItemHovered()) {
