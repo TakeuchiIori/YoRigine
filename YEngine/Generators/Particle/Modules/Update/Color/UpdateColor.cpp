@@ -84,9 +84,9 @@ void UpdateColor::LoadFromJson(const nlohmann::json& json) {
 //=============================================================================
 // DrawEditor
 //=============================================================================
-#ifdef USE_IMGUI
 
 void UpdateColor::DrawEditor() {
+#ifdef USE_IMGUI
     static const char* kModeNames[] = { "2色補間", "カーブ (R/G/B/A)" };
     int modeIdx = static_cast<int>(colorMode_);
     if (ImGui::Combo("カラーモード", &modeIdx, kModeNames, 2))
@@ -254,6 +254,5 @@ void UpdateColor::DrawGradientCurveEditor() {
         }
         ImGui::TreePop();
     }
-}
-
 #endif // USE_IMGUI
+}
