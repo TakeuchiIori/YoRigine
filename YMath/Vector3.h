@@ -175,13 +175,6 @@ Vector3 Multiply(const Vector3& v, float scalar);
 Vector3 Normalize(const Vector3& vec);
 Vector3 Normalize(Vector3& vec);
 
-// Catmull-Romスプライン補間を用いて曲線上の点を計算する関数
-Vector3 CatmullRomSpline(const std::vector<Vector3>& controlPoints, float t);
-// Catmull-Romスプラインのポイントを生成する関数
-std::vector<Vector3> GenerateCatmullRomSplinePoints(const std::vector<Vector3>& controlPoints, size_t segmentCount);
-// ご提供
-Vector3 CatmullRomInterpolation(const Vector3& p0, const Vector3& p1, const Vector3& p2, const Vector3& p3, float t);
-Vector3 CatmullRomPosition(const std::vector<Vector3>& points, float t);
 
 // Vector3同士の加算を行う関数
 Vector3 Add(const Vector3& v1, const Vector3& v2);
@@ -192,23 +185,17 @@ Vector3 Subtract(const Vector3& v1, const Vector3& v2);
 // ベクトルのクロス積を計算する関数
 Vector3 Cross(const Vector3& v1, const Vector3& v2);
 
-Vector3 Lerp(const Vector3& a, const Vector3& b, float t);
-
-Vector3 CubicSplineInterpolate(const Vector3& p0, const Vector3& p1, const Vector3& p2, const Vector3& p3, float t);
-
-Vector3 lerp(const Vector3& a, const Vector3& b, float t);
-float lerp(float a, float b, float t);
-
-Vector3 Slerp(const Vector3& v0, const Vector3& v1, float t);
-std::vector<double> CubicSplineInterpolation(
-	const std::vector<double>& xData,
-	const std::vector<double>& yData,
-	const std::vector<double>& xQuery
-);
-
+// ベクトルを指定した範囲内にクランプする関数
 Vector3 Clamp(const Vector3& v, const Vector3& min, const Vector3& max);
 
 // Blender → DirectX変換（Position）
 Vector3 ConvertPosition(const Vector3& pos);
-
 Vector3 GetEulerAnglesFromToDirection(const Vector3& from, const Vector3& to);
+
+//==================================== 補間するメソッド =====================================//
+// Catmull-Romスプライン曲線上の点を計算する
+Vector3 CatmullRomInterpolation(const Vector3& p0, const Vector3& p1, const Vector3& p2, const Vector3& p3, float t);
+Vector3 Lerp(const Vector3& a, const Vector3& b, float t);
+float lerp(float a, float b, float t);
+Vector3 Slerp(const Vector3& v0, const Vector3& v1, float t);
+

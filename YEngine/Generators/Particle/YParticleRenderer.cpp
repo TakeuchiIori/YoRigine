@@ -165,11 +165,6 @@ void YParticleRenderer::AddSystem(const YParticleSystem& system, Camera* camera)
 		mappedData_[currentInstanceOffset_].uvTransform = MakeUVTransform(attr.uvOffset, attr.uvScale);
         currentInstanceOffset_++;
         writtenCount++;
-
-        char buf[256];
-        sprintf_s(buf, "AddSystem: %s, written=%u, totalOffset=%u\n",
-            system.GetName().c_str(), writtenCount, currentInstanceOffset_);
-        OutputDebugStringA(buf);
     }
 }
 void YParticleRenderer::EndFrame(const std::shared_ptr<Mesh>& mesh, uint32_t textureIndex, BlendMode blendMode) {

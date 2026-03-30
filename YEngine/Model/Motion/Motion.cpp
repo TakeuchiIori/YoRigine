@@ -306,8 +306,8 @@ Vector3 Motion::CalculateValue(const std::vector<KeyframeVector3>& keyframes, fl
 			case InterpolationType::CubicSpline: {
 				size_t prevIndex = (index == 0) ? index : index - 1;
 				size_t nextNextIndex = (nextIndex + 1 < keyframes.size()) ? nextIndex + 1 : nextIndex;
-
-				return CubicSplineInterpolate(
+				
+				return CatmullRomInterpolation(
 					keyframes[prevIndex].value,
 					keyframes[index].value,
 					keyframes[nextIndex].value,

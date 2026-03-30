@@ -1,4 +1,5 @@
 #include "Vector4.h"
+#include <MathFunc.h>
 
 Vector4 lerp(const Vector4& a, const Vector4& b, float t) {
     return Vector4(
@@ -35,4 +36,9 @@ Vector4 Transform(const Vector4& vector, const Matrix4x4& matrix)
 	result.w = x * m[0][3] + y * m[1][3] + z * m[2][3] + w * m[3][3];
 
 	return result;
+}
+
+Vector4 Normalize(const Vector4& v) {
+	float mag = Magnitude(v);
+	return { v.x / mag, v.y / mag, v.z / mag , v.w / mag };
 }

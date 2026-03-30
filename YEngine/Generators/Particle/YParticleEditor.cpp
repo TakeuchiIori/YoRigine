@@ -4,16 +4,18 @@
 #include "YParticleModuleFactory.h"
 #include "YParticleManager.h"
 #include "YEmitterGroupEditor.h"
+#include "Editor/Icon/EditorIcon.h"
 
 #include "imgui.h"
 #include <fstream>
+#include <algorithm>
+#include <cmath>
 
 //=================================================================
 // 内部ヘルパー: 垂直分割線（シンプル版）
 //=================================================================
 
-static void Splitter(float thickness, float* size1, float min_size1, float min_size2, float height = -1.0f)
-{
+static void Splitter(float thickness, float* size1, float min_size1, float min_size2, float height = -1.0f) {
 	ImVec2 backup_pos = ImGui::GetCursorPos();
 	if (height < 0)
 		height = ImGui::GetContentRegionAvail().y;
@@ -42,33 +44,70 @@ YParticleEditor::YParticleEditor()
 	: saveAllBrowser_(jsonDirectory_, { ".json" }, YoRigine::FileBrowser::DisplayMode::List)
 	, loadAllBrowser_(jsonDirectory_, { ".json" }, YoRigine::FileBrowser::DisplayMode::List)
 	, saveSingleBrowser_(jsonDirectory_, { ".json" }, YoRigine::FileBrowser::DisplayMode::List)
-	, loadSingleBrowser_(jsonDirectory_, { ".json" }, YoRigine::FileBrowser::DisplayMode::List)
-{
+	, loadSingleBrowser_(jsonDirectory_, { ".json" }, YoRigine::FileBrowser::DisplayMode::List) {
 	// Save All: 既存ファイルをクリックで上書き保存
 	saveAllBrowser_.SetOnFileSelected([this](const std::string& path) {
-		SaveAllSystemsToFile(path);
+		bool ok = SaveAllSystemsToFile(path);
 		showSaveAllPopup_ = false;
+		SetNotification(ok, ok ? "全システム保存完了: " + path : "保存失敗: " + path);
 		});
 
 	// Load All: ファイルをクリックでロード
 	loadAllBrowser_.SetOnFileSelected([this](const std::string& path) {
-		LoadAllSystemsFromFile(path);
+		bool ok = LoadAllSystemsFromFile(path);
 		showLoadAllPopup_ = false;
+		SetNotification(ok, ok ? "全システム読み込み完了: " + path : "読み込み失敗: " + path);
 		});
 
 	// Save Selected: 既存ファイルをクリックで上書き保存
 	saveSingleBrowser_.SetOnFileSelected([this](const std::string& path) {
 		if (!selectedSystemName_.empty()) {
-			SaveSystemToFile(selectedSystemName_, path);
+			bool ok = SaveSystemToFile(selectedSystemName_, path);
+			SetNotification(ok, ok ? "保存完了: " + path : "保存失敗: " + path);
 		}
 		showSaveSinglePopup_ = false;
 		});
 
 	// Load Single: ファイルをクリックでロード
 	loadSingleBrowser_.SetOnFileSelected([this](const std::string& path) {
-		LoadSystemFromFile(path);
+		bool ok = LoadSystemFromFile(path);
 		showLoadSinglePopup_ = false;
+		SetNotification(ok, ok ? "読み込み完了: " + path : "読み込み失敗: " + path);
 		});
+}
+
+//=================================================================
+// 通知ヘルパー
+//=================================================================
+
+void YParticleEditor::SetNotification(bool success, const std::string& message) {
+	saveNotifySuccess_ = success;
+	saveNotifyMessage_ = message;
+	saveNotifyTimer_ = 3.0f;   // 3秒間表示
+}
+
+/// <summary>
+/// トースト通知をウィンドウ下部にオーバーレイ描画する
+/// ShowEditorWindow() の先頭で毎フレーム呼ぶ
+/// </summary>
+void YParticleEditor::ShowSaveNotification() {
+	if (saveNotifyTimer_ <= 0.0f) return;
+
+	saveNotifyTimer_ -= ImGui::GetIO().DeltaTime;
+
+	// フェードアウト（残り0.5秒から）
+	float alpha = std::min(1.0f, saveNotifyTimer_ / 0.5f);
+	alpha = std::min(alpha, 1.0f);
+
+	ImVec4 col = saveNotifySuccess_
+		? ImVec4(0.2f, 1.0f, 0.3f, alpha)
+		: ImVec4(1.0f, 0.3f, 0.2f, alpha);
+
+	const char* icon = saveNotifySuccess_ ? Icon::Check :Icon::Xmark;
+	ImGui::PushStyleColor(ImGuiCol_Text, col);
+	ImGui::Text("%s%s", icon, saveNotifyMessage_.c_str());
+	ImGui::PopStyleColor();
+	ImGui::Separator();
 }
 
 //=================================================================
@@ -77,11 +116,16 @@ YParticleEditor::YParticleEditor()
 
 void YParticleEditor::ShowEditorWindow() {
 
+	// ── トースト通知（最上部に表示）──────────────────────────
+	ShowSaveNotification();
+
 	// メニューバー
 	if (ImGui::BeginMenuBar()) {
 		if (ImGui::BeginMenu("保存・読み込み設定")) {
 			if (ImGui::MenuItem("全てのシステムを保存")) {
 				saveAllBrowser_.Scan();
+				// 全保存のデフォルト名は空にしておく
+				saveAsNameBuf_[0] = '\0';
 				showSaveAllPopup_ = true;
 			}
 			if (ImGui::MenuItem("全てのシステムを読み込み")) {
@@ -92,6 +136,9 @@ void YParticleEditor::ShowEditorWindow() {
 			if (ImGui::MenuItem("選択しているシステムを保存")) {
 				if (!selectedSystemName_.empty()) {
 					saveSingleBrowser_.Scan();
+					// ★ テンプレート名: 選択中のシステム名 + ".json"
+					std::string defaultName = selectedSystemName_ + ".json";
+					strncpy_s(saveAsNameBuf_, defaultName.c_str(), sizeof(saveAsNameBuf_));
 					showSaveSinglePopup_ = true;
 				}
 			}
@@ -364,14 +411,12 @@ static void DrawBrowserPopup(
 	char* saveAsNameBuf,
 	size_t saveAsNameBufSize,
 	std::function<void(const std::string&)> onSaveAs   // nullptr なら「上書き専用」（Load 用）
-)
-{
+) {
 	if (showFlag) ImGui::OpenPopup(popupId);
 
 	ImGui::SetNextWindowSize(ImVec2(500, 400), ImGuiCond_Appearing);
 	if (ImGui::BeginPopupModal(popupId, &showFlag,
-		ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize))
-	{
+		ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize)) {
 		ImGui::Text("%s", title);
 		ImGui::Separator();
 
@@ -411,13 +456,17 @@ void YParticleEditor::ShowFileOperationsUI() {
 	// ── Save All ────────────────────────────────────────────
 	if (ImGui::Button("すべてのシステムを保存", ImVec2(220, 30))) {
 		saveAllBrowser_.Scan();
+		saveAsNameBuf_[0] = '\0';   // 全保存はデフォルト名なし
 		showSaveAllPopup_ = true;
 	}
 	DrawBrowserPopup(
 		"##SaveAll", showSaveAllPopup_,
 		"すべてのシステムを保存 — クリックで上書き、または新しい名前を入力",
 		saveAllBrowser_, saveAsNameBuf_, sizeof(saveAsNameBuf_),
-		[this](const std::string& path) { SaveAllSystemsToFile(path); }
+		[this](const std::string& path) {
+			bool ok = SaveAllSystemsToFile(path);
+			SetNotification(ok, ok ? "全システム保存完了: " + path : "保存失敗: " + path);
+		}
 	);
 
 	// ── Load All ────────────────────────────────────────────
@@ -441,6 +490,9 @@ void YParticleEditor::ShowFileOperationsUI() {
 	}
 	if (ImGui::Button("選択したシステムを保存", ImVec2(220, 30))) {
 		saveSingleBrowser_.Scan();
+		// ★ テンプレート名: 選択中のシステム名 + ".json"
+		std::string defaultName = selectedSystemName_ + ".json";
+		strncpy_s(saveAsNameBuf_, defaultName.c_str(), sizeof(saveAsNameBuf_));
 		showSaveSinglePopup_ = true;
 	}
 	ImGui::EndDisabled();
@@ -450,7 +502,10 @@ void YParticleEditor::ShowFileOperationsUI() {
 		"選択したシステムを保存 — クリックで上書き、または新しい名前を入力",
 		saveSingleBrowser_, saveAsNameBuf_, sizeof(saveAsNameBuf_),
 		[this](const std::string& path) {
-			if (!selectedSystemName_.empty()) SaveSystemToFile(selectedSystemName_, path);
+			if (!selectedSystemName_.empty()) {
+				bool ok = SaveSystemToFile(selectedSystemName_, path);
+				SetNotification(ok, ok ? "保存完了: " + path : "保存失敗: " + path);
+			}
 		}
 	);
 

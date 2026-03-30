@@ -273,7 +273,7 @@ void BattleEnemy::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 				enemyHitEmitterGroup_->SetPosition(wt_.translate_);
 				enemyHitEmitterGroup_->SetActive(true);
 				enemyHitEmitterGroup_->SetAutoEmitAll(false);  // 自動射出OFF
-				enemyHitEmitterGroup_->EmitAll(10);  // 手動で100個発生
+				enemyHitEmitterGroup_->EmitAll(10);
 			}
 
 			// --------------------- ヒットカウントの処理 --------------------- //

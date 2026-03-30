@@ -21,14 +21,24 @@
                     "offsetZ": 0.0,
                     "shapeType": 0,
                     "systemName": "EnemyHit2"
+                },
+                {
+                    "autoEmit": false,
+                    "emissionRate": 10.0,
+                    "emitCount": 1,
+                    "offsetX": 0.0,
+                    "offsetY": 0.0,
+                    "offsetZ": 0.0,
+                    "shapeType": 0,
+                    "systemName": "EnemyHit3"
                 }
             ],
             "groupName": "EnemyHit",
             "isActive": true,
             "position": [
                 0.0,
-                0.0,
-                0.0
+                1.4327610731124878,
+                -3.283900737762451
             ]
         }
     ]

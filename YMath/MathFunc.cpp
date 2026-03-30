@@ -34,12 +34,6 @@ float Normalize(const float& v) {
 	return v / std::fabs(v); // 修正：v/v は問題があるため、fabs を使います
 }
 
-
-Vector4 Normalize(const Vector4& v) {
-	float mag = Magnitude(v);
-	return { v.x / mag, v.y / mag, v.z / mag , v.w / mag };
-}
-
 float Distance(const Vector3& a, const Vector3& b) {
 	float dx = b.x - a.x;
 	float dy = b.y - a.y;

@@ -121,7 +121,7 @@ void Player::HandleCombatInput() {
 
 	// ガード
 	if (input_->IsPadTriggered(0, GamePadButton::X)
-		|| input_->GetInstance()->IsPressMouse(3)) {
+		|| input_->GetInstance()->TriggerKey(DIK_N)) {
 		combat_->TryGuard();
 	}
 
