@@ -71,6 +71,15 @@ namespace YoRigine {
             float         padding[3];
         };
 
+        struct PointLightInstance {
+            std::string name;
+            PointLightData data;
+        };
+        struct SpotLightInstance {
+            std::string name;
+            SpotLightData data;
+        };
+
     private:
         struct ShadowMatrix {
             Matrix4x4 lightViewProjection;
@@ -80,6 +89,7 @@ namespace YoRigine {
         ///************************* 基本関数 *************************///
         static LightManager* GetInstance();
         void Initialize();
+        void TransferData();
         void UpdateShadowMatrix(Camera* camera);
 
         // 3Dオブジェクト用（全ライト）
@@ -100,6 +110,10 @@ namespace YoRigine {
             return pointLights_->lights[index];
         }
 
+        void AddPointLight(const std::string& name, const PointLightData& data);
+        PointLightData* GetPointLight(const std::string& name);
+        void RemovePointLight(const std::string& name);
+
         ///************************* スポットライト操作 *************************///
         int  AddSpotLight(const SpotLightData& light);
         void UpdateSpotLight(int index, const SpotLightData& light);
@@ -109,6 +123,10 @@ namespace YoRigine {
             assert(index >= 0 && index < spotLights_->count);
             return spotLights_->lights[index];
         }
+
+        void AddSpotLight(const std::string& name, const SpotLightData& data);
+        SpotLightData* GetSpotLight(const std::string& name);
+        void RemoveSpotLight(const std::string& name);
 
         ///************************* 平行光源アクセッサ *************************///
         const Vector4& GetDirectionalLightColor()     const { return directionalLight_->color; }
@@ -153,6 +171,13 @@ namespace YoRigine {
 
         Microsoft::WRL::ComPtr<ID3D12Resource> spotLightsResource_;
         SpotLightArray* spotLights_ = nullptr;
+
+        // --- 管理用コンテナ ---
+        std::vector<PointLightInstance> pointLightInstances_;
+        std::unordered_map<std::string, size_t> pointLightIndexMap_;
+
+        std::vector<SpotLightInstance> spotLightInstances_;
+        std::unordered_map<std::string, size_t> spotLightIndexMap_;
 
         Microsoft::WRL::ComPtr<ID3D12Resource> shadowResource_;
         ShadowMatrix* shadow_ = nullptr;

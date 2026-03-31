@@ -26,6 +26,10 @@ FieldEnemy::~FieldEnemy() {
 	if (obbCollider_) {
 		obbCollider_->~OBBCollider();
 	}
+
+	if (!spotLightName_.empty()) {
+		YoRigine::LightManager::GetInstance()->RemoveSpotLight(spotLightName_);
+	}
 }
 
 /// <summary>
@@ -73,6 +77,25 @@ void FieldEnemy::InitializeFieldData(const FieldEnemyData& data, const Vector3& 
 	// 初期状態をPatrolに設定
 	ChangeState(std::make_unique<FieldEnemyPatrolState>());
 
+		// --- スポットライトの登録 ---
+	spotLightName_ = "EnemySpot_" + spawnId_;
+	YoRigine::LightManager::SpotLightData lightData{};
+	lightData.color = { 1.0f, 0.2f, 0.2f, 1.0f }; // 敵視界だと分かりやすいように赤味がかった色
+	lightData.position = GetPosition() + Vector3(0.0f, 1.0f, 0.0f); // 目の高さくらいに調整
+	lightData.intensity = 5.0f;
+	// 視野角を元にライトの広がり（cosAngle）を設定
+	float halfAngleRad = (data.viewAngle * 0.5f) * (std::numbers::pi_v<float> / 180.0f);
+	lightData.cosAngle = std::cos(halfAngleRad);
+	lightData.cosFalloffStart = std::cos(halfAngleRad + 0.1f); // 少しぼかす
+	lightData.distance = data.viewDistance;
+	lightData.decay = 2.0f;
+	lightData.isEnableSpotLight = true;
+	
+	// 初期方向（とりあえず正面）
+	lightData.direction = Normalize(Vector3(std::sin(wt_.rotate_.y), -0.2f, std::cos(wt_.rotate_.y)));
+
+	YoRigine::LightManager::GetInstance()->AddSpotLight(spotLightName_, lightData);
+
 	std::string battleInfo = data.battleEnemyIds.empty() ?
 		data.battleEnemyId :
 		std::to_string(data.battleEnemyIds.size()) + "体グループ";
@@ -111,6 +134,12 @@ void FieldEnemy::InitJson() {
 /// </summary>
 void FieldEnemy::Update() {
 	if (logicalState_ == FieldEnemyState::Despawn) {
+		// 消滅時はライトを無効化
+		if (!spotLightName_.empty()) {
+			if (auto* light = YoRigine::LightManager::GetInstance()->GetSpotLight(spotLightName_)) {
+				light->isEnableSpotLight = false;
+			}
+		}
 		return;
 	}
 
@@ -130,6 +159,31 @@ void FieldEnemy::Update() {
 	// 基底クラスの更新処理
 	wt_.UpdateMatrix();
 	obbCollider_->Update();
+
+	// --- スポットライトの追従更新 ---
+	if (auto* light = YoRigine::LightManager::GetInstance()->GetSpotLight(spotLightName_)) {
+		light->isEnableSpotLight = enemyData_.useSpotLight;
+
+		if (enemyData_.useSpotLight) {
+			// リアルタイム反映のためにパラメータを毎フレーム同期
+			light->color = enemyData_.spotLightColor;
+			light->intensity = enemyData_.spotLightIntensity;
+			light->decay = enemyData_.spotLightDecay;
+
+			// 位置の同期（オフセット適用）
+			light->position = GetPosition() + enemyData_.spotLightOffset;
+
+			// 向いている方向にライトを向ける
+			Vector3 forwardDir = { std::sin(wt_.rotate_.y), enemyData_.spotLightPitch, std::cos(wt_.rotate_.y) };
+			light->direction = Normalize(forwardDir);
+
+			// 敵データの視界情報が更新されたら反映
+			float halfAngleRad = (enemyData_.viewAngle * 0.5f) * (std::numbers::pi_v<float> / 180.0f);
+			light->cosAngle = std::cos(halfAngleRad);
+			light->cosFalloffStart = std::cos(halfAngleRad + 0.1f);
+			light->distance = enemyData_.viewDistance;
+		}
+	}
 }
 
 /// <summary>

@@ -45,6 +45,24 @@ namespace YoRigine {
 	}
 
 	//=====================================================================
+	// GPUへデータ転送
+	//=====================================================================
+	void LightManager::TransferData()
+	{
+		// ポイントライトの同期
+		pointLights_->count = static_cast<int32_t>(pointLightInstances_.size());
+		for (size_t i = 0; i < pointLightInstances_.size(); ++i) {
+			pointLights_->lights[i] = pointLightInstances_[i].data;
+		}
+
+		// スポットライトの同期
+		spotLights_->count = static_cast<int32_t>(spotLightInstances_.size());
+		for (size_t i = 0; i < spotLightInstances_.size(); ++i) {
+			spotLights_->lights[i] = spotLightInstances_[i].data;
+		}
+	}
+
+	//=====================================================================
 	// 平行光源リソース作成
 	//=====================================================================
 	void LightManager::CreateDirectionalLightResource()
@@ -218,6 +236,53 @@ namespace YoRigine {
 	}
 
 	//===========================================================================
+	// ポイントライトの追加（名前で追加）
+	//===========================================================================
+	void LightManager::AddPointLight(const std::string& name, const PointLightData& data)
+	{
+		if (pointLightIndexMap_.contains(name)) {
+			pointLightInstances_[pointLightIndexMap_[name]].data = data;
+			return;
+		}
+		if (pointLightInstances_.size() >= kMaxSpotLights) return;
+
+		pointLightIndexMap_[name] = pointLightInstances_.size();
+		pointLightInstances_.push_back({ name, data });
+	}
+
+	//===========================================================================
+	// ポイントライトの取得
+	//===========================================================================
+	LightManager::PointLightData* LightManager::GetPointLight(const std::string& name)
+	{
+		if (pointLightIndexMap_.contains(name)) {
+			return &pointLightInstances_[pointLightIndexMap_[name]].data;
+		}
+		return nullptr;
+	}
+
+	//===========================================================================
+	// ポイントライトの削除（名前を指定して削除）
+	//===========================================================================
+	void LightManager::RemovePointLight(const std::string& name)
+	{
+		if (!pointLightIndexMap_.contains(name)) return;
+
+		size_t targetIdx = pointLightIndexMap_[name];
+		size_t lastIdx = pointLightInstances_.size() - 1;
+
+		// 削除対象が末尾でないなら、末尾要素を削除場所に移動
+		if (targetIdx != lastIdx) {
+			pointLightInstances_[targetIdx] = std::move(pointLightInstances_.back());
+			// 移動した要素のインデックス情報をマップで更新
+			pointLightIndexMap_[pointLightInstances_[targetIdx].name] = targetIdx;
+		}
+
+		pointLightInstances_.pop_back();
+		pointLightIndexMap_.erase(name);
+	}
+
+	//===========================================================================
 	// スポットライトの追加
 	//===========================================================================
 	int LightManager::AddSpotLight(const SpotLightData& light) {
@@ -245,6 +310,52 @@ namespace YoRigine {
 			spotLights_->lights[index] = spotLights_->lights[last];
 	}
 
+	//===========================================================================
+	// スポットライトの追加（名前で追加）
+	//===========================================================================
+	void LightManager::AddSpotLight(const std::string& name, const SpotLightData& data)
+	{
+		if (spotLightIndexMap_.contains(name)) {
+			spotLightInstances_[spotLightIndexMap_[name]].data = data;
+			return;
+		}
+		if (spotLightInstances_.size() >= kMaxSpotLights) return;
+
+		spotLightIndexMap_[name] = spotLightInstances_.size();
+		spotLightInstances_.push_back({ name, data });
+	}
+
+	//===========================================================================
+	// スポットライトの取得（名前で取得）
+	//===========================================================================
+	LightManager::SpotLightData* LightManager::GetSpotLight(const std::string& name)
+	{
+		if (spotLightIndexMap_.contains(name)) {
+			return &spotLightInstances_[spotLightIndexMap_[name]].data;
+		}
+		return nullptr;
+	}
+
+	//===========================================================================
+	// スポットライトの削除（名前で削除）
+	//===========================================================================
+	void LightManager::RemoveSpotLight(const std::string& name)
+	{
+		if (!spotLightIndexMap_.contains(name)) return;
+
+		size_t targetIdx = spotLightIndexMap_[name];
+		size_t lastIdx = spotLightInstances_.size() - 1;
+
+		// 削除対象が末尾でないなら、末尾要素を削除場所に移動
+		if (targetIdx != lastIdx) {
+			spotLightInstances_[targetIdx] = std::move(spotLightInstances_.back());
+			// 移動した要素のインデックス情報をマップで更新
+			spotLightIndexMap_[spotLightInstances_[targetIdx].name] = targetIdx;
+		}
+
+		spotLightInstances_.pop_back();
+		spotLightIndexMap_.erase(name);
+	}
 
 	//=====================================================================
 	// ImGui ライティング編集ウィンドウ
@@ -277,12 +388,14 @@ namespace YoRigine {
 		// ポイントライト
 		//------------------------------------------------------------
 		if (ImGui::CollapsingHeader("Point Lights")) {
-			ImGui::Text("Count: %d / %d", pointLights_->count, kMaxPointLights);
+			ImGui::Text("Count: %zu / %d", pointLightInstances_.size(), kMaxPointLights);
 
 			// 追加ボタン
-			if (pointLights_->count < kMaxPointLights) {
+			if (pointLightInstances_.size() < kMaxPointLights) {
 				if (ImGui::Button("Add Point Light")) {
-					AddPointLight({
+					static int plCounter = 0;
+					std::string newName = "PointLight_" + std::to_string(plCounter++);
+					AddPointLight(newName, {
 						.color = { 1.0f, 1.0f, 1.0f, 1.0f },
 						.position = { 0.0f, 2.0f, 0.0f },
 						.intensity = 1.0f,
@@ -294,12 +407,12 @@ namespace YoRigine {
 			}
 
 			// 各ライトの編集
-			for (int i = 0; i < pointLights_->count; ++i) {
-				PointLightData& pl = pointLights_->lights[i];
+			for (size_t i = 0; i < pointLightInstances_.size(); ++i) {
+				auto& instance = pointLightInstances_[i];
+				PointLightData& pl = instance.data;
 
-				ImGui::PushID(i);
-				// ラベルを折りたたみで表示
-				std::string label = "Point Light [" + std::to_string(i) + "]";
+				ImGui::PushID(instance.name.c_str()); // 名前をIDにして衝突回避
+				std::string label = instance.name;
 				if (ImGui::TreeNode(label.c_str())) {
 					bool enabled = pl.isEnablePointLight != 0;
 					if (ImGui::Checkbox("Enabled", &enabled))
@@ -313,7 +426,7 @@ namespace YoRigine {
 
 					// 削除ボタン
 					if (ImGui::Button("Remove")) {
-						RemovePointLight(i);
+						RemovePointLight(instance.name);
 						ImGui::TreePop();
 						ImGui::PopID();
 						break; // 削除で配列が変わるのでループを抜ける
@@ -329,12 +442,14 @@ namespace YoRigine {
 		// スポットライト
 		//------------------------------------------------------------
 		if (ImGui::CollapsingHeader("Spot Lights")) {
-			ImGui::Text("Count: %d / %d", spotLights_->count, kMaxSpotLights);
+			ImGui::Text("Count: %zu / %d", spotLightInstances_.size(), kMaxSpotLights);
 
 			// 追加ボタン
-			if (spotLights_->count < kMaxSpotLights) {
+			if (spotLightInstances_.size() < kMaxSpotLights) {
 				if (ImGui::Button("Add Spot Light")) {
-					AddSpotLight({
+					static int slCounter = 0;
+					std::string newName = "SpotLight_" + std::to_string(slCounter++);
+					AddSpotLight(newName, {
 						.color = { 1.0f, 1.0f, 1.0f, 1.0f },
 						.position = { 0.0f, 3.0f, 0.0f },
 						.intensity = 4.0f,
@@ -349,11 +464,12 @@ namespace YoRigine {
 			}
 
 			// 各ライトの編集
-			for (int i = 0; i < spotLights_->count; ++i) {
-				SpotLightData& sl = spotLights_->lights[i];
+			for (size_t i = 0; i < spotLightInstances_.size(); ++i) {
+				auto& instance = spotLightInstances_[i];
+				SpotLightData& sl = instance.data;
 
-				ImGui::PushID(i + kMaxPointLights); // ポイントライトとIDが被らないようにオフセット
-				std::string label = "Spot Light [" + std::to_string(i) + "]";
+				ImGui::PushID(instance.name.c_str());
+				std::string label = instance.name;
 				if (ImGui::TreeNode(label.c_str())) {
 					bool enabled = sl.isEnableSpotLight != 0;
 					if (ImGui::Checkbox("Enabled", &enabled))
@@ -372,10 +488,8 @@ namespace YoRigine {
 					float innerDeg = std::acos(std::clamp(sl.cosAngle, -1.0f, 1.0f)) * kRad2Deg;
 					float outerDeg = std::acos(std::clamp(sl.cosFalloffStart, -1.0f, 1.0f)) * kRad2Deg;
 
-
 					// cos → degree（内側・外側）
 					// 内側角度スライダー（外角より必ず小さく）
-					//float innerMax = std::max(outerDeg - 1.0f, 0.0f);
 					if (ImGui::SliderFloat("Inner Angle [deg]", &innerDeg, 0.0f, 89.0f, "%.1f deg")) {
 						innerDeg = std::min(innerDeg, outerDeg - 1.0f);
 						sl.cosAngle = std::cos(innerDeg * kDeg2Rad);
@@ -391,7 +505,7 @@ namespace YoRigine {
 						sl.cosAngle, sl.cosFalloffStart);
 
 					if (ImGui::Button("Remove")) {
-						RemoveSpotLight(i);
+						RemoveSpotLight(instance.name);
 						ImGui::TreePop();
 						ImGui::PopID();
 						break;
@@ -402,6 +516,7 @@ namespace YoRigine {
 				ImGui::PopID();
 			}
 		}
+
 
 		//------------------------------------------------------------
 		// シャドウマップ
