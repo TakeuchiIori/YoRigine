@@ -66,7 +66,6 @@ struct FieldEnemyData {
 	Vector3 spotLightOffset = Vector3(0.0f, 1.0f, 0.0f); // 目の高さなどのオフセット
 	float spotLightPitch = -0.2f;                        // ライトの下向き加減(方向ベクトルのY成分)
 
-
 	// ビジュアル設定
 	Vector4 modelColor = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
 	bool useCustomColor = false;
@@ -110,6 +109,9 @@ public:
 	void DrawShadow();
 	void DrawCollision() override;
 	void DrawLine(Line* line);
+
+	// ライトの有効/無効を強制的に切り替える
+	void SetLightActive(bool isActive);
 
 	///************************* 当たり判定 *************************///
 

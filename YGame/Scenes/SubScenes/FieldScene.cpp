@@ -215,6 +215,7 @@ void FieldScene::OnExit() {
 				});
 		}
 		fieldState["activeEnemies"] = enemyList;
+		fieldEnemyManager_->SetAllEnemiesActive(false);
 	}
 
 	syncData->SaveCurrentSceneState("Field", fieldState);

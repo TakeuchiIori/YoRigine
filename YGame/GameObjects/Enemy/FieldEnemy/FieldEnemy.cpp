@@ -382,6 +382,16 @@ void FieldEnemy::DrawLine(Line* line) {
 	);
 }
 
+void FieldEnemy::SetLightActive(bool isActive)
+{
+	if (!spotLightName_.empty()) {
+		if (auto* light = YoRigine::LightManager::GetInstance()->GetSpotLight(spotLightName_)) {
+			// true の場合は敵データの設定に従う、false の場合は強制OFF
+			light->isEnableSpotLight = isActive ? enemyData_.useSpotLight : false;
+		}
+	}
+}
+
 /// <summary>
 /// 目標角度に向かって補間回転する
 /// </summary>

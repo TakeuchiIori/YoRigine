@@ -267,6 +267,12 @@ void FieldEnemyManager::ClearDefeatedEnemies() {
 /// </summary>
 void FieldEnemyManager::SetAllEnemiesActive(bool isActive) {
 	isActive_ = isActive;
+	// アクティブ状態に応じて全敵のライトを切り替える
+	for (auto& enemy : fieldEnemies_) {
+		if (enemy && enemy->IsActive()) {
+			enemy->SetLightActive(isActive);
+		}
+	}
 }
 
 /// <summary>
