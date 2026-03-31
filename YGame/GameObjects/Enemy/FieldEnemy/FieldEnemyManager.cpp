@@ -267,6 +267,12 @@ void FieldEnemyManager::ClearDefeatedEnemies() {
 /// </summary>
 void FieldEnemyManager::SetAllEnemiesActive(bool isActive) {
 	isActive_ = isActive;
+	// アクティブ状態に応じて全敵のライトを切り替える
+	for (auto& enemy : fieldEnemies_) {
+		if (enemy && enemy->IsActive()) {
+			enemy->SetLightActive(isActive);
+		}
+	}
 }
 
 /// <summary>
@@ -531,6 +537,20 @@ void FieldEnemyManager::SaveEnemyData(const std::string& filePath) {
 				enemyJson["modelColor"]["a"] = data.modelColor.w;
 			}
 
+			// スポットライト
+			enemyJson["useSpotLight"] = data.useSpotLight;
+			enemyJson["spotLightColor"]["r"] = data.spotLightColor.x;
+			enemyJson["spotLightColor"]["g"] = data.spotLightColor.y;
+			enemyJson["spotLightColor"]["b"] = data.spotLightColor.z;
+			enemyJson["spotLightColor"]["a"] = data.spotLightColor.w;
+			enemyJson["spotLightIntensity"] = data.spotLightIntensity;
+			enemyJson["spotLightDecay"] = data.spotLightDecay;
+			enemyJson["spotLightOffset"]["x"] = data.spotLightOffset.x;
+			enemyJson["spotLightOffset"]["y"] = data.spotLightOffset.y;
+			enemyJson["spotLightOffset"]["z"] = data.spotLightOffset.z;
+			enemyJson["spotLightPitch"] = data.spotLightPitch;
+
+
 			json["fieldEnemies"].push_back(enemyJson);
 		}
 
@@ -640,7 +660,27 @@ void FieldEnemyManager::LoadEnemyData(const std::string& filePath) {
 				data.modelColor.y = c.value("g", 1.0f);
 				data.modelColor.z = c.value("b", 1.0f);
 				data.modelColor.w = c.value("a", 1.0f);
+
 			}
+
+			// スポットライトパラメータ
+			data.useSpotLight = enemyJson.value("useSpotLight", true);
+			if (enemyJson.contains("spotLightColor")) {
+				auto c = enemyJson["spotLightColor"];
+				data.spotLightColor.x = c.value("r", 1.0f);
+				data.spotLightColor.y = c.value("g", 0.2f);
+				data.spotLightColor.z = c.value("b", 0.2f);
+				data.spotLightColor.w = c.value("a", 1.0f);
+			}
+			data.spotLightIntensity = enemyJson.value("spotLightIntensity", 5.0f);
+			data.spotLightDecay = enemyJson.value("spotLightDecay", 2.0f);
+			if (enemyJson.contains("spotLightOffset")) {
+				auto o = enemyJson["spotLightOffset"];
+				data.spotLightOffset.x = o.value("x", 0.0f);
+				data.spotLightOffset.y = o.value("y", 1.0f);
+				data.spotLightOffset.z = o.value("z", 0.0f);
+			}
+			data.spotLightPitch = enemyJson.value("spotLightPitch", -0.2f);
 
 			// map に登録
 			if (!data.enemyId.empty()) {
@@ -1092,15 +1132,6 @@ void FieldEnemyManager::ShowEnemyDataEditor() {
 		changed |= ImGui::DragFloat("追跡範囲", &editorEnemyData_.chaseRange, 0.5f, 1.0f, 50.0f);
 		changed |= ImGui::DragFloat("帰還距離", &editorEnemyData_.returnDistance, 0.5f, 1.0f, 50.0f);
 
-
-		ImGui::Separator();
-		ImGui::Text("=== 移動パラメータ ===");
-		changed |= ImGui::DragFloat("巡回半径", &editorEnemyData_.patrolRadius, 0.5f, 0.0f, 50.0f);
-		changed |= ImGui::DragFloat("巡回速度", &editorEnemyData_.patrolSpeed, 0.1f, 0.1f, 20.0f);
-		changed |= ImGui::DragFloat("追跡速度", &editorEnemyData_.chaseSpeed, 0.1f, 0.1f, 20.0f);
-		changed |= ImGui::DragFloat("追跡範囲", &editorEnemyData_.chaseRange, 0.5f, 1.0f, 50.0f);
-		changed |= ImGui::DragFloat("帰還距離", &editorEnemyData_.returnDistance, 0.5f, 1.0f, 50.0f);
-
 		ImGui::Separator();
 		ImGui::Text("=== 視界・索敵パラメータ ===");
 		if (ImGui::IsItemHovered()) {
@@ -1135,6 +1166,18 @@ void FieldEnemyManager::ShowEnemyDataEditor() {
 		if (editorEnemyData_.useCustomColor) {
 			changed |= ImGui::ColorEdit4("モデルカラー", &editorEnemyData_.modelColor.x);
 		}
+
+		ImGui::Separator();
+		ImGui::Text("=== スポットライト(視界)設定 ===");
+		changed |= ImGui::Checkbox("スポットライトを使用", &editorEnemyData_.useSpotLight);
+		if (editorEnemyData_.useSpotLight) {
+			changed |= ImGui::ColorEdit4("ライトカラー", &editorEnemyData_.spotLightColor.x);
+			changed |= ImGui::DragFloat("強度", &editorEnemyData_.spotLightIntensity, 0.1f, 0.0f, 1000.0f);
+			changed |= ImGui::DragFloat("減衰(Decay)", &editorEnemyData_.spotLightDecay, 0.1f, 0.0f, 10.0f);
+			changed |= ImGui::DragFloat3("位置オフセット", &editorEnemyData_.spotLightOffset.x, 0.1f);
+			changed |= ImGui::DragFloat("ピッチ(下向き加減)", &editorEnemyData_.spotLightPitch, 0.01f, -1.0f, 1.0f);
+		}
+
 
 		// ★★★ リアルタイム反映処理 ★★★
 		if (changed) {

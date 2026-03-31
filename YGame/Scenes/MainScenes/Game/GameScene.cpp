@@ -283,6 +283,7 @@ void GameScene::Update() {
 	YoRigine::ParticleManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
 	YParticleManager::GetInstance().Update(YoRigine::GameTime::GetDeltaTime());
 	YoRigine::LightManager::GetInstance()->UpdateShadowMatrix(sceneCamera_.get());
+	YoRigine::LightManager::GetInstance()->TransferData();
 	YoRigine::GpuEmitManager::GetInstance()->Update();
 }
 

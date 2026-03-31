@@ -4,6 +4,7 @@
 #include "Collision/Core/CollisionManager.h"
 #include "MathFunc.h"
 #include "Systems/GameTime/GameTime.h"
+#include "Particle/YEmitterGroupManager.h"
 
 #ifdef USE_IMGUI
 #include "imgui.h"
@@ -217,6 +218,14 @@ void PlayerSword::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 		hitPos.y += 1.5f;
 		//hitParticleEmitter_->FollowEmit(hitPos, 5);
 		//particleEmitter_->FollowEmit(hitPos, 30);
+
+		auto* enemyHitEmitterGroup_ = YEmitterGroupManager::GetInstance().GetGroup("EnemyHit");
+		if (enemyHitEmitterGroup_) {
+			enemyHitEmitterGroup_->SetPosition(hitPos);
+			enemyHitEmitterGroup_->SetActive(true);
+			enemyHitEmitterGroup_->SetAutoEmitAll(false);  // 自動射出OFF
+			enemyHitEmitterGroup_->EmitAll(10);
+		}
 		player_->GetCombat()->GetCombo()->RecoverCC(2);
 
 	}

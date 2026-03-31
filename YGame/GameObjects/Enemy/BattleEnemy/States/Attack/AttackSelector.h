@@ -19,10 +19,10 @@
 struct AttackWeightConfig {
 	// 距離による重み係数
 	struct DistanceWeights {
-		float veryCloseRange = 5.0f;     // 超近距離判定の閾値
-		float closeRange = 8.0f;         // 近距離判定の閾値
+		float veryCloseRange = 5.0f;      // 超近距離判定の閾値
+		float closeRange = 8.0f;          // 近距離判定の閾値
 		float midRange = 12.0f;           // 中距離判定の閾値
-		float farRange = 15.0f;          // 遠距離判定の閾値
+		float farRange = 16.0f;           // 遠距離判定の閾値
 	};
 
 	// プレイヤーのHP状態による重み補正
@@ -156,8 +156,7 @@ public:
 	/// 距離に応じて最適な攻撃を選択（従来のロジック保持）
 	/// </summary>
 	static std::unique_ptr<IEnemyState<BattleEnemy>> SelectSmartAttack(
-		const BattleEnemy& enemy)
-	{
+		const BattleEnemy& enemy) {
 		if (!enemy.GetPlayer()) {
 			return std::make_unique<BattleRushAttackState>();
 		}
@@ -166,35 +165,41 @@ public:
 		Vector3 toPlayer = enemy.GetPlayerPosition() - enemy.GetTranslate();
 		float distance = Length(toPlayer);
 
+		// 条件に合致する攻撃名を格納するリスト
+		std::vector<std::string> candidatePatterns;
+
+		// --- 距離に応じた候補の絞り込み ---
 		// 遠距離
 		if (distance > config_.distance.midRange) {
-			if (HasPattern(patterns, "jump")) {
-				return std::make_unique<BattleJumpAttackState>();
-			}
-			if (HasPattern(patterns, "chargeRush")) {
-				return std::make_unique<BattleChargeRushAttackState>();
-			}
+			if (HasPattern(patterns, "jump")) candidatePatterns.push_back("jump");
+			if (HasPattern(patterns, "chargeRush")) candidatePatterns.push_back("chargeRush");
 		}
 		// 中距離
 		else if (distance > config_.distance.closeRange) {
-			if (HasPattern(patterns, "rush")) {
-				return std::make_unique<BattleRushAttackState>();
-			}
+			if (HasPattern(patterns, "rush")) candidatePatterns.push_back("rush");
+			// もし中距離に他の候補を追加したい場合はここに追記
 		}
 		// 近距離
 		else {
-			if (HasPattern(patterns, "spin")) {
-				return std::make_unique<BattleSpinAttackState>();
-			}
-			if (HasPattern(patterns, "combo")) {
-				return std::make_unique<BattleComboAttackState>();
-			}
+			if (HasPattern(patterns, "spin")) candidatePatterns.push_back("spin");
+			if (HasPattern(patterns, "combo")) candidatePatterns.push_back("combo");
 		}
 
-		// フォールバック
+		// --- 抽選処理 ---
+		// 候補が見つかった場合、その中からランダムで1つ選ぶ
+		if (!candidatePatterns.empty()) {
+			static std::random_device rd;
+			static std::mt19937 gen(rd());
+			std::uniform_int_distribution<size_t> dist(0, candidatePatterns.size() - 1);
+
+			std::string selected = candidatePatterns[dist(gen)];
+			return CreateAttackState(selected);
+		}
+
+		// 候補が空（その距離に適した攻撃を所持していない）場合は、
+		// 全所持パターンから重み付けで選ぶフォールバックへ
 		return SelectWeightedAttack(enemy);
 	}
-
 private:
 	/// <summary>
 	/// 各攻撃の重みを計算

@@ -67,15 +67,10 @@ void ObjectAnimation::PlayBounceScaleAnimation(float targetScale, float duration
 }
 
 void ObjectAnimation::Update(float dt) {
-    // スケールアニメーション更新
-    if (scaleAnim_.isActive) {
-        UpdateAnimation(scaleAnim_, dt);
-    }
-
-    // カラーアニメーション更新
-    if (colorAnim_.isActive) {
-        UpdateAnimation(colorAnim_, dt);
-    }
+    if (scaleAnim_.isActive) UpdateAnimation(scaleAnim_, dt);
+    if (colorAnim_.isActive) UpdateAnimation(colorAnim_, dt);
+    if (rotationAnim_.isActive) UpdateAnimation(rotationAnim_, dt);
+    if (positionAnim_.isActive) UpdateAnimation(positionAnim_, dt);
 
     // シェイク更新
     if (isShaking_) {
@@ -156,4 +151,28 @@ bool ObjectAnimation::IsAnimating() const {
         rotationAnim_.isActive ||
         positionAnim_.isActive ||
         isShaking_;
+}
+
+void ObjectAnimation::StartRotationAnimation(Vector3 fromRotation, Vector3 toRotation, float duration, Easing::Function easeFunc, std::function<void()> onComplete) {
+    rotationAnim_.type = AnimationType::Rotation;
+    rotationAnim_.timer = 0.0f;
+    rotationAnim_.duration = duration;
+    rotationAnim_.easeFunc = easeFunc;
+    rotationAnim_.startRotation = fromRotation;
+    rotationAnim_.targetRotation = toRotation;
+    rotationAnim_.isActive = true;
+    rotationAnim_.onComplete = onComplete;
+    currentRotation_ = fromRotation;
+}
+
+void ObjectAnimation::StartPositionAnimation(Vector3 fromPosition, Vector3 toPosition, float duration, Easing::Function easeFunc, std::function<void()> onComplete) {
+    positionAnim_.type = AnimationType::Position;
+    positionAnim_.timer = 0.0f;
+    positionAnim_.duration = duration;
+    positionAnim_.easeFunc = easeFunc;
+    positionAnim_.startPosition = fromPosition;
+    positionAnim_.targetPosition = toPosition;
+    positionAnim_.isActive = true;
+    positionAnim_.onComplete = onComplete;
+    currentPosition_ = fromPosition;
 }

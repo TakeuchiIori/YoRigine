@@ -1,11 +1,18 @@
 #include "BattleComboAttackState.h"
 #include "Player/Player.h"
 
-void BattleComboAttackState::Enter(BattleEnemy& enemy)
-{
+void BattleComboAttackState::Enter(BattleEnemy& enemy) {
 	enemy.SetCanAct(false);
 	enemy.ResetStateTimer();
-	enemy.SetColor({ 1, 0.0f, 1, 1 }); // マゼンタ色で予備動作を示す
+
+	if (auto anim = enemy.GetAnimation()) {
+		anim->StartColorAnimation({ 1, 1, 1, 1 }, { 1.0f, 0.0f, 1.0f, 1.0f }, 0.2f);
+		anim->StartScaleAnimation({ 1, 1, 1 }, { 0.8f, 1.2f, 0.8f }, enemy.GetEnemyData().attackParams.combo.anticipationTime);
+	}
+	else {
+		enemy.SetColor({ 1, 0.0f, 1, 1 });
+	}
+
 	comboCount_ = 0;
 	hasPerformedAnticipation_ = false;
 	anticipationStartPos_ = enemy.GetTranslate();
@@ -16,37 +23,25 @@ void BattleComboAttackState::Update(BattleEnemy& enemy, float dt) {
 	const float currentTime = enemy.GetStateTimer();
 	const int maxHits = 3;
 
-	// 予備動作の時間
 	const float anticipationEndTime = params.anticipationTime;
 	const float totalComboTime = anticipationEndTime + (params.phaseDuration * maxHits);
 	const float totalDuration = totalComboTime + params.cooldownTime;
 
-	// === フェーズ1: 予備動作（素早く後退） ===
+	// === フェーズ1: 予備動作 ===
 	if (currentTime < anticipationEndTime && !hasPerformedAnticipation_) {
 		const float progress = currentTime / params.anticipationTime;
-
-		// プレイヤーとは逆方向に後退
 		Player* player = enemy.GetPlayer();
 		if (player) {
 			Vector3 toPlayer = player->GetTranslate() - anticipationStartPos_;
 			if (Length(toPlayer) > 0.01f) {
 				Vector3 backwardDir = -Normalize(toPlayer);
-
-				// イージングを使って後退（ease-out）
 				const float easeProgress = 1.0f - std::pow(1.0f - progress, 2.0f);
 				const Vector3 backstepOffset = backwardDir * params.anticipationBackstepDistance * easeProgress;
 				enemy.SetTranslate(anticipationStartPos_ + backstepOffset);
-
-				// プレイヤーの方を向き続ける
 				enemy.SetRotationY(std::atan2(toPlayer.x, toPlayer.z));
 			}
 		}
 
-		// 色を変化
-		const float colorIntensity = params.anticipationColorIntensity + (1.0f - params.anticipationColorIntensity) * progress;
-		enemy.SetColor({ 1, 0.0f, colorIntensity, 1 });
-
-		// 予備動作完了フラグ
 		if (progress >= 0.99f) {
 			hasPerformedAnticipation_ = true;
 		}
@@ -56,26 +51,37 @@ void BattleComboAttackState::Update(BattleEnemy& enemy, float dt) {
 		const float comboTime = currentTime - anticipationEndTime;
 		const int currentHit = static_cast<int>(comboTime / params.phaseDuration);
 		const float timeInPhase = std::fmod(comboTime, params.phaseDuration);
+		const float previousTimeInPhase = timeInPhase - dt;
 		comboCount_ = currentHit;
 
-		// サブフェーズ判定
 		const bool isSubCharging = (timeInPhase < params.subChargeTime);
 		const bool isSubRushing = (!isSubCharging && timeInPhase < params.subChargeTime + params.subRushTime);
 
 		if (isSubCharging) {
-			//--- プレイヤーの方を向く ---//
 			UpdateOrientation(enemy);
 
-			// チャージ中の色変化
-			const float chargeProgress = timeInPhase / params.subChargeTime;
-			enemy.SetColor({ 1, 0.0f, 0.5f + 0.5f * chargeProgress, 1 });
+			// 各ヒットの溜め開始時
+			if (previousTimeInPhase < 0.0f && timeInPhase >= 0.0f) {
+				if (auto anim = enemy.GetAnimation()) {
+					anim->StartScaleAnimation({ 0.8f, 1.2f, 0.8f }, { 1.0f, 0.9f, 0.9f }, params.subChargeTime);
+				}
+			}
+
+			if (!enemy.GetAnimation()) {
+				const float chargeProgress = timeInPhase / params.subChargeTime;
+				enemy.SetColor({ 1, 0.0f, 0.5f + 0.5f * chargeProgress, 1 });
+			}
 		}
 		else if (isSubRushing) {
-			//--- 突進する ---//
+			// 各ヒットの突進開始時
+			if (previousTimeInPhase < params.subChargeTime && timeInPhase >= params.subChargeTime) {
+				if (auto anim = enemy.GetAnimation()) {
+					anim->StartScaleAnimation({ 1.0f, 0.9f, 0.9f }, { 0.8f, 0.8f, 1.2f }, params.subRushTime);
+				}
+			}
+
 			const float currentMultiplier = params.rushSpeedMultiplier + (comboCount_ * 1.0f);
 			ExecuteRush(enemy, currentMultiplier, dt);
-
-			// 突進中は赤色
 			enemy.SetColor({ 1, 0.0f, 0.0f, 1 });
 		}
 	}
@@ -85,17 +91,21 @@ void BattleComboAttackState::Update(BattleEnemy& enemy, float dt) {
 	}
 }
 
-void BattleComboAttackState::Exit(BattleEnemy& enemy)
-{
+void BattleComboAttackState::Exit(BattleEnemy& enemy) {
 	enemy.SetCanAct(true);
-	enemy.SetColor({ 1, 1, 1, 1 });
+	if (auto anim = enemy.GetAnimation()) {
+		anim->StopAll();
+		anim->StartScaleAnimation(anim->GetCurrentScale(), { 1, 1, 1 }, 0.2f);
+		anim->StartColorAnimation(anim->GetCurrentColor(), { 1, 1, 1, 1 }, 0.2f);
+	}
+	else {
+		enemy.SetColor({ 1, 1, 1, 1 });
+	}
 }
 
-// --- 補助関数の定義 ---
 void BattleComboAttackState::UpdateOrientation(BattleEnemy& enemy) {
 	Player* player = enemy.GetPlayer();
 	if (!player) return;
-
 	Vector3 toPlayer = player->GetTranslate() - enemy.GetTranslate();
 	if (Length(toPlayer) > 0.01f) {
 		Vector3 dir = Normalize(toPlayer);
@@ -106,13 +116,9 @@ void BattleComboAttackState::UpdateOrientation(BattleEnemy& enemy) {
 void BattleComboAttackState::ExecuteRush(BattleEnemy& enemy, float speedMultiplier, float dt) {
 	Player* player = enemy.GetPlayer();
 	if (!player) return;
-
-	// ターゲットへの方向を計算
 	Vector3 toPlayer = player->GetTranslate() - enemy.GetTranslate();
 	if (Length(toPlayer) > 0.01f) {
 		Vector3 dir = Normalize(toPlayer);
-
-		// 実際の移動速度を計算
 		const float finalSpeed = enemy.GetEnemyData().moveSpeed * speedMultiplier;
 		enemy.AddTranslate(dir * finalSpeed * dt);
 	}

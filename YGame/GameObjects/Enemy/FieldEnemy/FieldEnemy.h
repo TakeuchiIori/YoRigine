@@ -58,6 +58,14 @@ struct FieldEnemyData {
 	float searchDuration = 3.0f;    // 索敵持続時間（秒）
 	float searchSweepAngle = 70.0f; // 索敵時の左右スウィープ角度（度）
 
+	// スポットライト(視界)設定
+	bool useSpotLight = true;
+	Vector4 spotLightColor = Vector4(1.0f, 0.2f, 0.2f, 1.0f);
+	float spotLightIntensity = 5.0f;
+	float spotLightDecay = 2.0f;
+	Vector3 spotLightOffset = Vector3(0.0f, 1.0f, 0.0f); // 目の高さなどのオフセット
+	float spotLightPitch = -0.2f;                        // ライトの下向き加減(方向ベクトルのY成分)
+
 	// ビジュアル設定
 	Vector4 modelColor = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
 	bool useCustomColor = false;
@@ -101,6 +109,9 @@ public:
 	void DrawShadow();
 	void DrawCollision() override;
 	void DrawLine(Line* line);
+
+	// ライトの有効/無効を強制的に切り替える
+	void SetLightActive(bool isActive);
 
 	///************************* 当たり判定 *************************///
 
@@ -214,4 +225,7 @@ private:
 	float encounterCooldownDuration_ = 1.0f;
 
 	float takeDamage_ = 0.0f;
+
+	// スポットライト管理用
+	std::string spotLightName_;
 };

@@ -1,10 +1,17 @@
 #include "BattleJumpAttackState.h"
 
-void BattleJumpAttackState::Enter(BattleEnemy& enemy)
-{
+void BattleJumpAttackState::Enter(BattleEnemy& enemy) {
 	enemy.SetCanAct(false);
 	enemy.ResetStateTimer();
-	enemy.SetColor({ 0.0f, 1, 1, 1 }); // シアン色で予備動作を示す
+
+	if (auto anim = enemy.GetAnimation()) {
+		// ジャンプ前はシアン色に変化しつつ、横に平べったく（縦に潰れる）なる
+		anim->StartColorAnimation({ 1, 1, 1, 1 }, { 0.0f, 1.0f, 1.0f, 1.0f }, 0.3f);
+		anim->StartScaleAnimation({ 1, 1, 1 }, { 1.3f, 0.6f, 1.3f }, 0.3f, Easing::Function::EaseOutQuad);
+	}
+	else {
+		enemy.SetColor({ 0.0f, 1, 1, 1 });
+	}
 
 	startPos_ = enemy.GetTranslate();
 	startY_ = startPos_.y;
@@ -22,10 +29,10 @@ void BattleJumpAttackState::Enter(BattleEnemy& enemy)
 	}
 }
 
-void BattleJumpAttackState::Update(BattleEnemy& enemy, [[maybe_unused]] float dt)
-{
+void BattleJumpAttackState::Update(BattleEnemy& enemy, float dt) {
 	const auto& params = enemy.GetEnemyData().attackParams.jump;
 	const float currentTime = enemy.GetStateTimer();
+	const float previousTime = currentTime - dt;
 
 	// フェーズの境界時間を計算
 	const float anticipationEndTime = params.anticipationTime;
@@ -45,8 +52,10 @@ void BattleJumpAttackState::Update(BattleEnemy& enemy, [[maybe_unused]] float dt
 		enemy.SetTranslate(pos);
 
 		// 色を点滅させて警告
-		const float colorPulse = 0.5f + 0.5f * std::sin(currentTime * params.anticipationColorPulseSpeed);
-		enemy.SetColor({ colorPulse, 1, 1, 1 });
+		if (!enemy.GetAnimation()) {
+			const float colorPulse = 0.5f + 0.5f * std::sin(currentTime * params.anticipationColorPulseSpeed);
+			enemy.SetColor({ colorPulse, 1, 1, 1 });
+		}
 	}
 	// === フェーズ2: チャージ（溜め） ===
 	else if (currentTime < chargeEndTime) {
@@ -59,11 +68,20 @@ void BattleJumpAttackState::Update(BattleEnemy& enemy, [[maybe_unused]] float dt
 		enemy.SetTranslate(pos);
 
 		// 色を変化させる
-		const float intensity = 0.5f + 0.5f * std::sin(chargeTime * 12.0f);
-		enemy.SetColor({ intensity, 1, 0.0f, 1 });
+		if (!enemy.GetAnimation()) {
+			const float intensity = 0.5f + 0.5f * std::sin(chargeTime * 12.0f);
+			enemy.SetColor({ intensity, 1, 0.0f, 1 });
+		}
 	}
 	// === フェーズ3: ジャンプ ===
 	else if (currentTime < jumpEndTime) {
+		// ジャンプ開始の瞬間に縦長に引き伸ばすアニメーション
+		if (previousTime < chargeEndTime && currentTime >= chargeEndTime) {
+			if (auto anim = enemy.GetAnimation()) {
+				anim->StartScaleAnimation({ 1.3f, 0.6f, 1.3f }, { 0.8f, 1.4f, 0.8f }, 0.15f, Easing::Function::EaseOutQuad);
+			}
+		}
+
 		const float jumpTime = currentTime - chargeEndTime;
 		const float jumpProgress = jumpTime / params.jumpTime;
 
@@ -78,21 +96,33 @@ void BattleJumpAttackState::Update(BattleEnemy& enemy, [[maybe_unused]] float dt
 
 		enemy.SetTranslate(pos);
 
-		// ジャンプ中は赤色
 		enemy.SetColor({ 1, 0.0f, 0.0f, 1 });
 	}
 	// === フェーズ4: 着地（クールダウン） ===
 	else if (currentTime < totalDuration) {
+		// 着地した瞬間に少し潰れるアニメーション（バウンド感）
+		if (previousTime < jumpEndTime && currentTime >= jumpEndTime) {
+			if (auto anim = enemy.GetAnimation()) {
+				anim->StartScaleAnimation({ 0.8f, 1.4f, 0.8f }, { 1.2f, 0.8f, 1.2f }, 0.1f, Easing::Function::EaseOutQuad, [enemyPtr = &enemy]() {
+					if (auto a = enemyPtr->GetAnimation()) {
+						a->StartScaleAnimation({ 1.2f, 0.8f, 1.2f }, { 1.0f, 1.0f, 1.0f }, 0.2f);
+					}
+					});
+			}
+		}
+
 		// 着地位置で硬直
 		Vector3 pos = targetPos_;
 		pos.y = startY_;
 		enemy.SetTranslate(pos);
 
 		// 徐々に色を戻す
-		const float recoveryTime = currentTime - jumpEndTime;
-		const float recoveryProgress = recoveryTime / params.cooldownTime;
-		const float colorRecover = 1.0f - (1.0f - recoveryProgress) * 0.5f;
-		enemy.SetColor({ 1, colorRecover, colorRecover, 1 });
+		if (!enemy.GetAnimation()) {
+			const float recoveryTime = currentTime - jumpEndTime;
+			const float recoveryProgress = recoveryTime / params.cooldownTime;
+			const float colorRecover = 1.0f - (1.0f - recoveryProgress) * 0.5f;
+			enemy.SetColor({ 1, colorRecover, colorRecover, 1 });
+		}
 	}
 	else {
 		// 状態遷移
@@ -100,13 +130,20 @@ void BattleJumpAttackState::Update(BattleEnemy& enemy, [[maybe_unused]] float dt
 	}
 }
 
-void BattleJumpAttackState::Exit(BattleEnemy& enemy)
-{
+void BattleJumpAttackState::Exit(BattleEnemy& enemy) {
 	// 元の高さに戻す
 	Vector3 pos = enemy.GetTranslate();
 	pos.y = startY_;
 	enemy.SetTranslate(pos);
 
 	enemy.SetCanAct(true);
-	enemy.SetColor({ 1, 1, 1, 1 });
+
+	if (auto anim = enemy.GetAnimation()) {
+		anim->StopAll();
+		anim->StartScaleAnimation(anim->GetCurrentScale(), { 1, 1, 1 }, 0.2f);
+		anim->StartColorAnimation(anim->GetCurrentColor(), { 1, 1, 1, 1 }, 0.2f);
+	}
+	else {
+		enemy.SetColor({ 1, 1, 1, 1 });
+	}
 }
