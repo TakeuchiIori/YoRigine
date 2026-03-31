@@ -205908,9 +205908,9 @@ void UpdateColor::LoadFromJson(const nlohmann::json& json) {
 //=============================================================================
 // DrawEditor
 //=============================================================================
-#ifdef USE_IMGUI
 
 void UpdateColor::DrawEditor() {
+#ifdef USE_IMGUI
     static const char* kModeNames[] = { "2色補間", "カーブ (R/G/B/A)" };
     int modeIdx = static_cast<int>(colorMode_);
     if (ImGui::Combo("カラーモード", &modeIdx, kModeNames, 2))
@@ -206078,9 +206078,9 @@ void UpdateColor::DrawGradientCurveEditor() {
         }
         ImGui::TreePop();
     }
+#endif // USE_IMGUI
 }
 
-#endif // USE_IMGUI
 
 ============================================================
 File Path: YEngine/Generators/Particle/Modules/Update/Color/UpdateColor.h
@@ -218958,6 +218958,24 @@ namespace YoRigine {
 	}
 
 	//=====================================================================
+	// GPUへデータ転送
+	//=====================================================================
+	void LightManager::TransferData()
+	{
+		// ポイントライトの同期
+		pointLights_->count = static_cast<int32_t>(pointLightInstances_.size());
+		for (size_t i = 0; i < pointLightInstances_.size(); ++i) {
+			pointLights_->lights[i] = pointLightInstances_[i].data;
+		}
+
+		// スポットライトの同期
+		spotLights_->count = static_cast<int32_t>(spotLightInstances_.size());
+		for (size_t i = 0; i < spotLightInstances_.size(); ++i) {
+			spotLights_->lights[i] = spotLightInstances_[i].data;
+		}
+	}
+
+	//=====================================================================
 	// 平行光源リソース作成
 	//=====================================================================
 	void LightManager::CreateDirectionalLightResource()
@@ -219131,6 +219149,53 @@ namespace YoRigine {
 	}
 
 	//===========================================================================
+	// ポイントライトの追加（名前で追加）
+	//===========================================================================
+	void LightManager::AddPointLight(const std::string& name, const PointLightData& data)
+	{
+		if (pointLightIndexMap_.contains(name)) {
+			pointLightInstances_[pointLightIndexMap_[name]].data = data;
+			return;
+		}
+		if (pointLightInstances_.size() >= kMaxSpotLights) return;
+
+		pointLightIndexMap_[name] = pointLightInstances_.size();
+		pointLightInstances_.push_back({ name, data });
+	}
+
+	//===========================================================================
+	// ポイントライトの取得
+	//===========================================================================
+	LightManager::PointLightData* LightManager::GetPointLight(const std::string& name)
+	{
+		if (pointLightIndexMap_.contains(name)) {
+			return &pointLightInstances_[pointLightIndexMap_[name]].data;
+		}
+		return nullptr;
+	}
+
+	//===========================================================================
+	// ポイントライトの削除（名前を指定して削除）
+	//===========================================================================
+	void LightManager::RemovePointLight(const std::string& name)
+	{
+		if (!pointLightIndexMap_.contains(name)) return;
+
+		size_t targetIdx = pointLightIndexMap_[name];
+		size_t lastIdx = pointLightInstances_.size() - 1;
+
+		// 削除対象が末尾でないなら、末尾要素を削除場所に移動
+		if (targetIdx != lastIdx) {
+			pointLightInstances_[targetIdx] = std::move(pointLightInstances_.back());
+			// 移動した要素のインデックス情報をマップで更新
+			pointLightIndexMap_[pointLightInstances_[targetIdx].name] = targetIdx;
+		}
+
+		pointLightInstances_.pop_back();
+		pointLightIndexMap_.erase(name);
+	}
+
+	//===========================================================================
 	// スポットライトの追加
 	//===========================================================================
 	int LightManager::AddSpotLight(const SpotLightData& light) {
@@ -219158,6 +219223,52 @@ namespace YoRigine {
 			spotLights_->lights[index] = spotLights_->lights[last];
 	}
 
+	//===========================================================================
+	// スポットライトの追加（名前で追加）
+	//===========================================================================
+	void LightManager::AddSpotLight(const std::string& name, const SpotLightData& data)
+	{
+		if (spotLightIndexMap_.contains(name)) {
+			spotLightInstances_[spotLightIndexMap_[name]].data = data;
+			return;
+		}
+		if (spotLightInstances_.size() >= kMaxSpotLights) return;
+
+		spotLightIndexMap_[name] = spotLightInstances_.size();
+		spotLightInstances_.push_back({ name, data });
+	}
+
+	//===========================================================================
+	// スポットライトの取得（名前で取得）
+	//===========================================================================
+	LightManager::SpotLightData* LightManager::GetSpotLight(const std::string& name)
+	{
+		if (spotLightIndexMap_.contains(name)) {
+			return &spotLightInstances_[spotLightIndexMap_[name]].data;
+		}
+		return nullptr;
+	}
+
+	//===========================================================================
+	// スポットライトの削除（名前で削除）
+	//===========================================================================
+	void LightManager::RemoveSpotLight(const std::string& name)
+	{
+		if (!spotLightIndexMap_.contains(name)) return;
+
+		size_t targetIdx = spotLightIndexMap_[name];
+		size_t lastIdx = spotLightInstances_.size() - 1;
+
+		// 削除対象が末尾でないなら、末尾要素を削除場所に移動
+		if (targetIdx != lastIdx) {
+			spotLightInstances_[targetIdx] = std::move(spotLightInstances_.back());
+			// 移動した要素のインデックス情報をマップで更新
+			spotLightIndexMap_[spotLightInstances_[targetIdx].name] = targetIdx;
+		}
+
+		spotLightInstances_.pop_back();
+		spotLightIndexMap_.erase(name);
+	}
 
 	//=====================================================================
 	// ImGui ライティング編集ウィンドウ
@@ -219190,12 +219301,14 @@ namespace YoRigine {
 		// ポイントライト
 		//------------------------------------------------------------
 		if (ImGui::CollapsingHeader("Point Lights")) {
-			ImGui::Text("Count: %d / %d", pointLights_->count, kMaxPointLights);
+			ImGui::Text("Count: %zu / %d", pointLightInstances_.size(), kMaxPointLights);
 
 			// 追加ボタン
-			if (pointLights_->count < kMaxPointLights) {
+			if (pointLightInstances_.size() < kMaxPointLights) {
 				if (ImGui::Button("Add Point Light")) {
-					AddPointLight({
+					static int plCounter = 0;
+					std::string newName = "PointLight_" + std::to_string(plCounter++);
+					AddPointLight(newName, {
 						.color = { 1.0f, 1.0f, 1.0f, 1.0f },
 						.position = { 0.0f, 2.0f, 0.0f },
 						.intensity = 1.0f,
@@ -219207,12 +219320,12 @@ namespace YoRigine {
 			}
 
 			// 各ライトの編集
-			for (int i = 0; i < pointLights_->count; ++i) {
-				PointLightData& pl = pointLights_->lights[i];
+			for (size_t i = 0; i < pointLightInstances_.size(); ++i) {
+				auto& instance = pointLightInstances_[i];
+				PointLightData& pl = instance.data;
 
-				ImGui::PushID(i);
-				// ラベルを折りたたみで表示
-				std::string label = "Point Light [" + std::to_string(i) + "]";
+				ImGui::PushID(instance.name.c_str()); // 名前をIDにして衝突回避
+				std::string label = instance.name;
 				if (ImGui::TreeNode(label.c_str())) {
 					bool enabled = pl.isEnablePointLight != 0;
 					if (ImGui::Checkbox("Enabled", &enabled))
@@ -219226,7 +219339,7 @@ namespace YoRigine {
 
 					// 削除ボタン
 					if (ImGui::Button("Remove")) {
-						RemovePointLight(i);
+						RemovePointLight(instance.name);
 						ImGui::TreePop();
 						ImGui::PopID();
 						break; // 削除で配列が変わるのでループを抜ける
@@ -219242,12 +219355,14 @@ namespace YoRigine {
 		// スポットライト
 		//------------------------------------------------------------
 		if (ImGui::CollapsingHeader("Spot Lights")) {
-			ImGui::Text("Count: %d / %d", spotLights_->count, kMaxSpotLights);
+			ImGui::Text("Count: %zu / %d", spotLightInstances_.size(), kMaxSpotLights);
 
 			// 追加ボタン
-			if (spotLights_->count < kMaxSpotLights) {
+			if (spotLightInstances_.size() < kMaxSpotLights) {
 				if (ImGui::Button("Add Spot Light")) {
-					AddSpotLight({
+					static int slCounter = 0;
+					std::string newName = "SpotLight_" + std::to_string(slCounter++);
+					AddSpotLight(newName, {
 						.color = { 1.0f, 1.0f, 1.0f, 1.0f },
 						.position = { 0.0f, 3.0f, 0.0f },
 						.intensity = 4.0f,
@@ -219262,11 +219377,12 @@ namespace YoRigine {
 			}
 
 			// 各ライトの編集
-			for (int i = 0; i < spotLights_->count; ++i) {
-				SpotLightData& sl = spotLights_->lights[i];
+			for (size_t i = 0; i < spotLightInstances_.size(); ++i) {
+				auto& instance = spotLightInstances_[i];
+				SpotLightData& sl = instance.data;
 
-				ImGui::PushID(i + kMaxPointLights); // ポイントライトとIDが被らないようにオフセット
-				std::string label = "Spot Light [" + std::to_string(i) + "]";
+				ImGui::PushID(instance.name.c_str());
+				std::string label = instance.name;
 				if (ImGui::TreeNode(label.c_str())) {
 					bool enabled = sl.isEnableSpotLight != 0;
 					if (ImGui::Checkbox("Enabled", &enabled))
@@ -219285,10 +219401,8 @@ namespace YoRigine {
 					float innerDeg = std::acos(std::clamp(sl.cosAngle, -1.0f, 1.0f)) * kRad2Deg;
 					float outerDeg = std::acos(std::clamp(sl.cosFalloffStart, -1.0f, 1.0f)) * kRad2Deg;
 
-
 					// cos → degree（内側・外側）
 					// 内側角度スライダー（外角より必ず小さく）
-					//float innerMax = std::max(outerDeg - 1.0f, 0.0f);
 					if (ImGui::SliderFloat("Inner Angle [deg]", &innerDeg, 0.0f, 89.0f, "%.1f deg")) {
 						innerDeg = std::min(innerDeg, outerDeg - 1.0f);
 						sl.cosAngle = std::cos(innerDeg * kDeg2Rad);
@@ -219304,7 +219418,7 @@ namespace YoRigine {
 						sl.cosAngle, sl.cosFalloffStart);
 
 					if (ImGui::Button("Remove")) {
-						RemoveSpotLight(i);
+						RemoveSpotLight(instance.name);
 						ImGui::TreePop();
 						ImGui::PopID();
 						break;
@@ -219315,6 +219429,7 @@ namespace YoRigine {
 				ImGui::PopID();
 			}
 		}
+
 
 		//------------------------------------------------------------
 		// シャドウマップ
@@ -219407,6 +219522,15 @@ namespace YoRigine {
             float         padding[3];
         };
 
+        struct PointLightInstance {
+            std::string name;
+            PointLightData data;
+        };
+        struct SpotLightInstance {
+            std::string name;
+            SpotLightData data;
+        };
+
     private:
         struct ShadowMatrix {
             Matrix4x4 lightViewProjection;
@@ -219416,6 +219540,7 @@ namespace YoRigine {
         ///************************* 基本関数 *************************///
         static LightManager* GetInstance();
         void Initialize();
+        void TransferData();
         void UpdateShadowMatrix(Camera* camera);
 
         // 3Dオブジェクト用（全ライト）
@@ -219436,6 +219561,10 @@ namespace YoRigine {
             return pointLights_->lights[index];
         }
 
+        void AddPointLight(const std::string& name, const PointLightData& data);
+        PointLightData* GetPointLight(const std::string& name);
+        void RemovePointLight(const std::string& name);
+
         ///************************* スポットライト操作 *************************///
         int  AddSpotLight(const SpotLightData& light);
         void UpdateSpotLight(int index, const SpotLightData& light);
@@ -219445,6 +219574,10 @@ namespace YoRigine {
             assert(index >= 0 && index < spotLights_->count);
             return spotLights_->lights[index];
         }
+
+        void AddSpotLight(const std::string& name, const SpotLightData& data);
+        SpotLightData* GetSpotLight(const std::string& name);
+        void RemoveSpotLight(const std::string& name);
 
         ///************************* 平行光源アクセッサ *************************///
         const Vector4& GetDirectionalLightColor()     const { return directionalLight_->color; }
@@ -219489,6 +219622,13 @@ namespace YoRigine {
 
         Microsoft::WRL::ComPtr<ID3D12Resource> spotLightsResource_;
         SpotLightArray* spotLights_ = nullptr;
+
+        // --- 管理用コンテナ ---
+        std::vector<PointLightInstance> pointLightInstances_;
+        std::unordered_map<std::string, size_t> pointLightIndexMap_;
+
+        std::vector<SpotLightInstance> spotLightInstances_;
+        std::unordered_map<std::string, size_t> spotLightIndexMap_;
 
         Microsoft::WRL::ComPtr<ID3D12Resource> shadowResource_;
         ShadowMatrix* shadow_ = nullptr;
@@ -242001,15 +242141,10 @@ void ObjectAnimation::PlayBounceScaleAnimation(float targetScale, float duration
 }
 
 void ObjectAnimation::Update(float dt) {
-    // スケールアニメーション更新
-    if (scaleAnim_.isActive) {
-        UpdateAnimation(scaleAnim_, dt);
-    }
-
-    // カラーアニメーション更新
-    if (colorAnim_.isActive) {
-        UpdateAnimation(colorAnim_, dt);
-    }
+    if (scaleAnim_.isActive) UpdateAnimation(scaleAnim_, dt);
+    if (colorAnim_.isActive) UpdateAnimation(colorAnim_, dt);
+    if (rotationAnim_.isActive) UpdateAnimation(rotationAnim_, dt);
+    if (positionAnim_.isActive) UpdateAnimation(positionAnim_, dt);
 
     // シェイク更新
     if (isShaking_) {
@@ -242092,6 +242227,30 @@ bool ObjectAnimation::IsAnimating() const {
         isShaking_;
 }
 
+void ObjectAnimation::StartRotationAnimation(Vector3 fromRotation, Vector3 toRotation, float duration, Easing::Function easeFunc, std::function<void()> onComplete) {
+    rotationAnim_.type = AnimationType::Rotation;
+    rotationAnim_.timer = 0.0f;
+    rotationAnim_.duration = duration;
+    rotationAnim_.easeFunc = easeFunc;
+    rotationAnim_.startRotation = fromRotation;
+    rotationAnim_.targetRotation = toRotation;
+    rotationAnim_.isActive = true;
+    rotationAnim_.onComplete = onComplete;
+    currentRotation_ = fromRotation;
+}
+
+void ObjectAnimation::StartPositionAnimation(Vector3 fromPosition, Vector3 toPosition, float duration, Easing::Function easeFunc, std::function<void()> onComplete) {
+    positionAnim_.type = AnimationType::Position;
+    positionAnim_.timer = 0.0f;
+    positionAnim_.duration = duration;
+    positionAnim_.easeFunc = easeFunc;
+    positionAnim_.startPosition = fromPosition;
+    positionAnim_.targetPosition = toPosition;
+    positionAnim_.isActive = true;
+    positionAnim_.onComplete = onComplete;
+    currentPosition_ = fromPosition;
+}
+
 ============================================================
 File Path: YEngine/Utilities/Systems/Animation/ObjectAnimation.h
 ============================================================
@@ -242104,8 +242263,6 @@ File Path: YEngine/Utilities/Systems/Animation/ObjectAnimation.h
 #include "Vector3.h"
 #include "Vector4.h"
 #include "Easing.h"
-
-
 
 // アニメーションの種類
 enum class AnimationType {
@@ -242122,19 +242279,15 @@ struct AnimationData {
     float duration = 0.0f;
     Easing::Function easeFunc = Easing::Function::Linear;
 
-    // スケール用
     Vector3 startScale;
     Vector3 targetScale;
 
-    // カラー用
     Vector4 startColor;
     Vector4 targetColor;
 
-    // 回転用
     Vector3 startRotation;
     Vector3 targetRotation;
 
-    // 位置用
     Vector3 startPosition;
     Vector3 targetPosition;
 
@@ -242142,111 +242295,81 @@ struct AnimationData {
     std::function<void()> onComplete = nullptr;
 };
 
-/// <summary>
-/// 汎用3Dオブジェクトアニメーター
-/// スケール、カラー、回転、位置のアニメーションを管理
-/// </summary>
 class ObjectAnimation {
 public:
     ObjectAnimation() = default;
     ~ObjectAnimation() = default;
 
-    /// <summary>
-    /// スケールアニメーションを開始
-    /// </summary>
     void StartScaleAnimation(
-        Vector3 fromScale,
-        Vector3 toScale,
-        float duration,
+        Vector3 fromScale, Vector3 toScale, float duration,
         Easing::Function easeFunc = Easing::Function::EaseOutQuad,
         std::function<void()> onComplete = nullptr
     );
 
-    /// <summary>
-    /// カラーアニメーションを開始
-    /// </summary>
     void StartColorAnimation(
-        Vector4 fromColor,
-        Vector4 toColor,
-        float duration,
+        Vector4 fromColor, Vector4 toColor, float duration,
         Easing::Function easeFunc = Easing::Function::Linear,
         std::function<void()> onComplete = nullptr
     );
 
-    /// <summary>
-    /// パンチアニメーション（ヒット時に一瞬大きくなる）
-    /// </summary>
+    // 新たに追加：回転アニメーション
+    void StartRotationAnimation(
+        Vector3 fromRotation, Vector3 toRotation, float duration,
+        Easing::Function easeFunc = Easing::Function::EaseOutQuad,
+        std::function<void()> onComplete = nullptr
+    );
+
+    // 新たに追加：位置アニメーション
+    void StartPositionAnimation(
+        Vector3 fromPosition, Vector3 toPosition, float duration,
+        Easing::Function easeFunc = Easing::Function::EaseOutQuad,
+        std::function<void()> onComplete = nullptr
+    );
+
     void PlayPunchAnimation(float strength = 0.2f, float duration = 0.3f);
-
-    /// <summary>
-    /// シェイクアニメーション（揺れ）
-    /// </summary>
     void PlayShakeAnimation(float intensity = 0.1f, float duration = 0.2f);
-
-    /// <summary>
-    /// バウンススケールアニメーション（弾むように拡大）
-    /// </summary>
     void PlayBounceScaleAnimation(float targetScale = 1.2f, float duration = 0.5f);
 
-    /// <summary>
-    /// 更新処理
-    /// </summary>
     void Update(float dt);
-
-    /// <summary>
-    /// すべてのアニメーションを停止
-    /// </summary>
     void StopAll();
 
-    /// <summary>
-    /// 現在のアニメーション値を取得
-    /// </summary>
     Vector3 GetCurrentScale() const { return currentScale_; }
     Vector4 GetCurrentColor() const { return currentColor_; }
     Vector3 GetCurrentRotation() const { return currentRotation_; }
     Vector3 GetCurrentPosition() const { return currentPosition_; }
 
-    /// <summary>
-    /// ベース値を設定（アニメーションが適用されていない時の値）
-    /// </summary>
-    void SetBaseScale(const Vector3& scale) { baseScale_ = scale; }
-    void SetBaseColor(const Vector4& color) { baseColor_ = color; }
-    void SetBaseRotation(const Vector3& rotation) { baseRotation_ = rotation; }
-    void SetBasePosition(const Vector3& position) { basePosition_ = position; }
+    void SetBaseScale(const Vector3& scale) { baseScale_ = scale; currentScale_ = scale; }
+    void SetBaseColor(const Vector4& color) { baseColor_ = color; currentColor_ = color; }
+    void SetBaseRotation(const Vector3& rotation) { baseRotation_ = rotation; currentRotation_ = rotation; }
+    void SetBasePosition(const Vector3& position) { basePosition_ = position; currentPosition_ = position; }
 
-    /// <summary>
-    /// アニメーション中か判定
-    /// </summary>
     bool IsAnimating() const;
     bool IsScaleAnimating() const { return scaleAnim_.isActive; }
     bool IsColorAnimating() const { return colorAnim_.isActive; }
+    bool IsRotationAnimating() const { return rotationAnim_.isActive; }
+    bool IsPositionAnimating() const { return positionAnim_.isActive; }
 
 private:
-    // 各アニメーションデータ
     AnimationData scaleAnim_;
     AnimationData colorAnim_;
     AnimationData rotationAnim_;
     AnimationData positionAnim_;
 
-    // 現在の値
     Vector3 currentScale_ = { 1.0f, 1.0f, 1.0f };
     Vector4 currentColor_ = { 1.0f, 1.0f, 1.0f, 1.0f };
     Vector3 currentRotation_ = { 0.0f, 0.0f, 0.0f };
     Vector3 currentPosition_ = { 0.0f, 0.0f, 0.0f };
 
-    // ベース値（アニメーションが適用されていない時の値）
     Vector3 baseScale_ = { 1.0f, 1.0f, 1.0f };
     Vector4 baseColor_ = { 1.0f, 1.0f, 1.0f, 1.0f };
     Vector3 baseRotation_ = { 0.0f, 0.0f, 0.0f };
     Vector3 basePosition_ = { 0.0f, 0.0f, 0.0f };
 
-    // シェイク用
     float shakeTimer_ = 0.0f;
     float shakeDuration_ = 0.0f;
     float shakeIntensity_ = 0.0f;
     bool isShaking_ = false;
 
-    // 個別のアニメーションを更新
     void UpdateAnimation(AnimationData& anim, float dt);
 };
 
@@ -253575,13 +253698,13 @@ void BattleEnemy::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 			TakeDamage(static_cast<int>(player_->GetCombat()->GetCombo()->GetCurrentDamage()));
 
 			// --------------------- ヒットエフェクトの処理 --------------------- //
-			auto* enemyHitEmitterGroup_ = YEmitterGroupManager::GetInstance().GetGroup("EnemyHit");
-			if (enemyHitEmitterGroup_) {
-				enemyHitEmitterGroup_->SetPosition(wt_.translate_);
-				enemyHitEmitterGroup_->SetActive(true);
-				enemyHitEmitterGroup_->SetAutoEmitAll(false);  // 自動射出OFF
-				enemyHitEmitterGroup_->EmitAll(10);
-			}
+			//auto* enemyHitEmitterGroup_ = YEmitterGroupManager::GetInstance().GetGroup("EnemyHit");
+			//if (enemyHitEmitterGroup_) {
+			//	enemyHitEmitterGroup_->SetPosition(wt_.translate_);
+			//	enemyHitEmitterGroup_->SetActive(true);
+			//	enemyHitEmitterGroup_->SetAutoEmitAll(false);  // 自動射出OFF
+			//	enemyHitEmitterGroup_->EmitAll(10);
+			//}
 
 			// --------------------- ヒットカウントの処理 --------------------- //
 			// 連続ヒットカウント増加
@@ -254632,15 +254755,15 @@ void BattleEnemyManager::LoadDefaultFormations() {
 	BattleFormationData single;
 	single.formationName = "single";
 	single.description = "単体敵用の中央配置";
-	single.positions = { Vector3(0.0f, 0.0f, 5.0f) };
+	single.positions = { Vector3(0.0f, 0.0f, 0.0f) };
 	formationMap_["single"] = single;
 
 	BattleFormationData dual;
 	dual.formationName = "dual";
 	dual.description = "2体の敵を左右に配置";
 	dual.positions = {
-		Vector3(-2.0f, 0.0f, 5.0f),
-		Vector3(2.0f, 0.0f, 5.0f)
+		Vector3(0.0f, 0.0f, -10.0f),
+		Vector3(0.0f, 0.0f, 10.0f)
 	};
 	formationMap_["dual"] = dual;
 
@@ -254648,20 +254771,22 @@ void BattleEnemyManager::LoadDefaultFormations() {
 	triple.formationName = "triple";
 	triple.description = "3体の敵を横一列に配置";
 	triple.positions = {
-		Vector3(-3.0f, 0.0f, 5.0f),
-		Vector3(0.0f, 0.0f, 5.0f),
-		Vector3(3.0f, 0.0f, 5.0f)
+		Vector3(0.0f, 0.0f, -10.0f),
+		Vector3(0.0f, 0.0f, 0.0f),
+		Vector3(0.0f, 0.0f, 10.0f)
 	};
 	formationMap_["triple"] = triple;
 
 	BattleFormationData quad;
 	quad.formationName = "quad";
-	quad.description = "4体の敵を2x2で配置";
+	quad.description = "4体の敵を2x2で広めに配置";
 	quad.positions = {
-		Vector3(-2.0f, 0.0f, 4.0f),
-		Vector3(2.0f, 0.0f, 4.0f),
-		Vector3(-2.0f, 0.0f, 6.0f),
-		Vector3(2.0f, 0.0f, 6.0f)
+		// 前列
+		Vector3(0.0f, 0.0f, -7.5f),
+		Vector3(0.0f, 0.0f, 7.5f),
+		// 後列
+		Vector3(0.0f, 0.0f, -12.0f),
+		Vector3(0.0f, 0.0f, 12.0f)
 	};
 	formationMap_["quad"] = quad;
 
@@ -255753,10 +255878,10 @@ File Path: YGame/GameObjects/Enemy/BattleEnemy/States/Attack/AttackSelector.h
 struct AttackWeightConfig {
 	// 距離による重み係数
 	struct DistanceWeights {
-		float veryCloseRange = 5.0f;     // 超近距離判定の閾値
-		float closeRange = 8.0f;         // 近距離判定の閾値
+		float veryCloseRange = 5.0f;      // 超近距離判定の閾値
+		float closeRange = 8.0f;          // 近距離判定の閾値
 		float midRange = 12.0f;           // 中距離判定の閾値
-		float farRange = 15.0f;          // 遠距離判定の閾値
+		float farRange = 16.0f;           // 遠距離判定の閾値
 	};
 
 	// プレイヤーのHP状態による重み補正
@@ -255890,8 +256015,7 @@ public:
 	/// 距離に応じて最適な攻撃を選択（従来のロジック保持）
 	/// </summary>
 	static std::unique_ptr<IEnemyState<BattleEnemy>> SelectSmartAttack(
-		const BattleEnemy& enemy)
-	{
+		const BattleEnemy& enemy) {
 		if (!enemy.GetPlayer()) {
 			return std::make_unique<BattleRushAttackState>();
 		}
@@ -255900,35 +256024,41 @@ public:
 		Vector3 toPlayer = enemy.GetPlayerPosition() - enemy.GetTranslate();
 		float distance = Length(toPlayer);
 
+		// 条件に合致する攻撃名を格納するリスト
+		std::vector<std::string> candidatePatterns;
+
+		// --- 距離に応じた候補の絞り込み ---
 		// 遠距離
 		if (distance > config_.distance.midRange) {
-			if (HasPattern(patterns, "jump")) {
-				return std::make_unique<BattleJumpAttackState>();
-			}
-			if (HasPattern(patterns, "chargeRush")) {
-				return std::make_unique<BattleChargeRushAttackState>();
-			}
+			if (HasPattern(patterns, "jump")) candidatePatterns.push_back("jump");
+			if (HasPattern(patterns, "chargeRush")) candidatePatterns.push_back("chargeRush");
 		}
 		// 中距離
 		else if (distance > config_.distance.closeRange) {
-			if (HasPattern(patterns, "rush")) {
-				return std::make_unique<BattleRushAttackState>();
-			}
+			if (HasPattern(patterns, "rush")) candidatePatterns.push_back("rush");
+			// もし中距離に他の候補を追加したい場合はここに追記
 		}
 		// 近距離
 		else {
-			if (HasPattern(patterns, "spin")) {
-				return std::make_unique<BattleSpinAttackState>();
-			}
-			if (HasPattern(patterns, "combo")) {
-				return std::make_unique<BattleComboAttackState>();
-			}
+			if (HasPattern(patterns, "spin")) candidatePatterns.push_back("spin");
+			if (HasPattern(patterns, "combo")) candidatePatterns.push_back("combo");
 		}
 
-		// フォールバック
+		// --- 抽選処理 ---
+		// 候補が見つかった場合、その中からランダムで1つ選ぶ
+		if (!candidatePatterns.empty()) {
+			static std::random_device rd;
+			static std::mt19937 gen(rd());
+			std::uniform_int_distribution<size_t> dist(0, candidatePatterns.size() - 1);
+
+			std::string selected = candidatePatterns[dist(gen)];
+			return CreateAttackState(selected);
+		}
+
+		// 候補が空（その距離に適した攻撃を所持していない）場合は、
+		// 全所持パターンから重み付けで選ぶフォールバックへ
 		return SelectWeightedAttack(enemy);
 	}
-
 private:
 	/// <summary>
 	/// 各攻撃の重みを計算
@@ -256127,11 +256257,17 @@ File Path: YGame/GameObjects/Enemy/BattleEnemy/States/Attack/BattleChargeRushAtt
 ============================================================
 #include "BattleChargeRushAttackState.h"
 
-void BattleChargeRushAttackState::Enter(BattleEnemy& enemy)
-{
+void BattleChargeRushAttackState::Enter(BattleEnemy& enemy) {
 	enemy.SetCanAct(false);
 	enemy.ResetStateTimer();
-	enemy.SetColor({ 1, 0.8f, 0.0f, 1 }); // オレンジ色で警告
+
+	if (auto anim = enemy.GetAnimation()) {
+		anim->StartColorAnimation({ 1, 1, 1, 1 }, { 1.0f, 0.5f, 0.0f, 1.0f }, 0.3f);
+		anim->StartScaleAnimation({ 1, 1, 1 }, { 1.2f, 0.7f, 1.2f }, enemy.GetEnemyData().attackParams.chargeRush.anticipationTime);
+	}
+	else {
+		enemy.SetColor({ 1, 0.8f, 0.0f, 1 });
+	}
 
 	startY_ = enemy.GetTranslate().y;
 
@@ -256144,32 +256280,24 @@ void BattleChargeRushAttackState::Enter(BattleEnemy& enemy)
 	}
 }
 
-void BattleChargeRushAttackState::Update(BattleEnemy& enemy, float dt)
-{
+void BattleChargeRushAttackState::Update(BattleEnemy& enemy, float dt) {
 	const float currentTime = enemy.GetStateTimer();
+	const float previousTime = currentTime - dt;
 	const auto& params = enemy.GetEnemyData().attackParams.chargeRush;
 
-	// フェーズの境界時間を計算
 	const float anticipationEndTime = params.anticipationTime;
 	const float chargeEndTime = anticipationEndTime + params.chargeTime;
 	const float rushEndTime = chargeEndTime + params.rushTime;
 	const float totalDuration = rushEndTime + params.cooldownTime;
 
-	// === フェーズ1: 予備動作（地面を踏み込む） ===
+	// === フェーズ1: 予備動作 ===
 	if (currentTime < anticipationEndTime) {
 		const float progress = currentTime / params.anticipationTime;
-
-		// 沈み込む動き
-		const float sinkProgress = std::sin(progress * 3.14159f); // 0→1→0の曲線
+		const float sinkProgress = std::sin(progress * 3.14159f);
 		Vector3 pos = enemy.GetTranslate();
 		pos.y = startY_ - (params.stompIntensity * sinkProgress);
 		enemy.SetTranslate(pos);
 
-		// 色を激しく点滅
-		const float colorPulse = 0.5f + 0.5f * std::sin(currentTime * params.anticipationColorPulseSpeed);
-		enemy.SetColor({ 1, 0.5f + colorPulse * 0.3f, 0.0f, 1 });
-
-		// プレイヤーの方を向き続ける
 		if (enemy.GetPlayer()) {
 			attackDir_ = enemy.GetPlayerPosition() - enemy.GetTranslate();
 			if (Length(attackDir_) > 0.01f) {
@@ -256178,14 +256306,18 @@ void BattleChargeRushAttackState::Update(BattleEnemy& enemy, float dt)
 			}
 		}
 	}
-	// === フェーズ2: チャージ（溜め） ===
+	// === フェーズ2: チャージ ===
 	else if (currentTime < chargeEndTime) {
-		// 元の高さに戻す
 		Vector3 pos = enemy.GetTranslate();
 		pos.y = startY_;
 		enemy.SetTranslate(pos);
 
-		// チャージ中プレイヤーを追尾
+		if (previousTime < anticipationEndTime && currentTime >= anticipationEndTime) {
+			if (auto anim = enemy.GetAnimation()) {
+				anim->PlayShakeAnimation(0.2f, params.chargeTime); // チャージ中震える
+			}
+		}
+
 		if (enemy.GetPlayer()) {
 			attackDir_ = enemy.GetPlayerPosition() - enemy.GetTranslate();
 			if (Length(attackDir_) > 0.01f) {
@@ -256194,14 +256326,20 @@ void BattleChargeRushAttackState::Update(BattleEnemy& enemy, float dt)
 			}
 		}
 
-		// 色を点滅させて警告
-		const float chargeTime = currentTime - anticipationEndTime;
-		const float blink = std::sin(chargeTime * 10.0f) * 0.3f + 0.7f;
-		enemy.SetColor({ 1, 0.5f * blink, 0.0f, 1 });
+		if (!enemy.GetAnimation()) {
+			const float chargeTime = currentTime - anticipationEndTime;
+			const float blink = std::sin(chargeTime * 10.0f) * 0.3f + 0.7f;
+			enemy.SetColor({ 1, 0.5f * blink, 0.0f, 1 });
+		}
 	}
 	// === フェーズ3: 高速突進 ===
 	else if (currentTime < rushEndTime) {
-		// 高速突進して色を変更
+		if (previousTime < chargeEndTime && currentTime >= chargeEndTime) {
+			if (auto anim = enemy.GetAnimation()) {
+				anim->StopAll(); // シェイク停止
+				anim->StartScaleAnimation(anim->GetCurrentScale(), { 0.7f, 0.7f, 1.5f }, 0.1f);
+			}
+		}
 		enemy.SetColor({ 1, 0.0f, 0.0f, 1 });
 		enemy.AddTranslate(attackDir_ * enemy.GetEnemyData().moveSpeed * params.speedMultiplier * dt);
 	}
@@ -256211,12 +256349,18 @@ void BattleChargeRushAttackState::Update(BattleEnemy& enemy, float dt)
 	}
 }
 
-void BattleChargeRushAttackState::Exit(BattleEnemy& enemy)
-{
+void BattleChargeRushAttackState::Exit(BattleEnemy& enemy) {
 	enemy.SetCanAct(true);
-	enemy.SetColor({ 1, 1, 1, 1 });
 
-	// 高さを元に戻す
+	if (auto anim = enemy.GetAnimation()) {
+		anim->StopAll();
+		anim->StartScaleAnimation(anim->GetCurrentScale(), { 1, 1, 1 }, 0.2f);
+		anim->StartColorAnimation(anim->GetCurrentColor(), { 1, 1, 1, 1 }, 0.2f);
+	}
+	else {
+		enemy.SetColor({ 1, 1, 1, 1 });
+	}
+
 	Vector3 pos = enemy.GetTranslate();
 	pos.y = startY_;
 	enemy.SetTranslate(pos);
@@ -256253,11 +256397,18 @@ File Path: YGame/GameObjects/Enemy/BattleEnemy/States/Attack/BattleComboAttackSt
 #include "BattleComboAttackState.h"
 #include "Player/Player.h"
 
-void BattleComboAttackState::Enter(BattleEnemy& enemy)
-{
+void BattleComboAttackState::Enter(BattleEnemy& enemy) {
 	enemy.SetCanAct(false);
 	enemy.ResetStateTimer();
-	enemy.SetColor({ 1, 0.0f, 1, 1 }); // マゼンタ色で予備動作を示す
+
+	if (auto anim = enemy.GetAnimation()) {
+		anim->StartColorAnimation({ 1, 1, 1, 1 }, { 1.0f, 0.0f, 1.0f, 1.0f }, 0.2f);
+		anim->StartScaleAnimation({ 1, 1, 1 }, { 0.8f, 1.2f, 0.8f }, enemy.GetEnemyData().attackParams.combo.anticipationTime);
+	}
+	else {
+		enemy.SetColor({ 1, 0.0f, 1, 1 });
+	}
+
 	comboCount_ = 0;
 	hasPerformedAnticipation_ = false;
 	anticipationStartPos_ = enemy.GetTranslate();
@@ -256268,37 +256419,25 @@ void BattleComboAttackState::Update(BattleEnemy& enemy, float dt) {
 	const float currentTime = enemy.GetStateTimer();
 	const int maxHits = 3;
 
-	// 予備動作の時間
 	const float anticipationEndTime = params.anticipationTime;
 	const float totalComboTime = anticipationEndTime + (params.phaseDuration * maxHits);
 	const float totalDuration = totalComboTime + params.cooldownTime;
 
-	// === フェーズ1: 予備動作（素早く後退） ===
+	// === フェーズ1: 予備動作 ===
 	if (currentTime < anticipationEndTime && !hasPerformedAnticipation_) {
 		const float progress = currentTime / params.anticipationTime;
-
-		// プレイヤーとは逆方向に後退
 		Player* player = enemy.GetPlayer();
 		if (player) {
 			Vector3 toPlayer = player->GetTranslate() - anticipationStartPos_;
 			if (Length(toPlayer) > 0.01f) {
 				Vector3 backwardDir = -Normalize(toPlayer);
-
-				// イージングを使って後退（ease-out）
 				const float easeProgress = 1.0f - std::pow(1.0f - progress, 2.0f);
 				const Vector3 backstepOffset = backwardDir * params.anticipationBackstepDistance * easeProgress;
 				enemy.SetTranslate(anticipationStartPos_ + backstepOffset);
-
-				// プレイヤーの方を向き続ける
 				enemy.SetRotationY(std::atan2(toPlayer.x, toPlayer.z));
 			}
 		}
 
-		// 色を変化
-		const float colorIntensity = params.anticipationColorIntensity + (1.0f - params.anticipationColorIntensity) * progress;
-		enemy.SetColor({ 1, 0.0f, colorIntensity, 1 });
-
-		// 予備動作完了フラグ
 		if (progress >= 0.99f) {
 			hasPerformedAnticipation_ = true;
 		}
@@ -256308,26 +256447,37 @@ void BattleComboAttackState::Update(BattleEnemy& enemy, float dt) {
 		const float comboTime = currentTime - anticipationEndTime;
 		const int currentHit = static_cast<int>(comboTime / params.phaseDuration);
 		const float timeInPhase = std::fmod(comboTime, params.phaseDuration);
+		const float previousTimeInPhase = timeInPhase - dt;
 		comboCount_ = currentHit;
 
-		// サブフェーズ判定
 		const bool isSubCharging = (timeInPhase < params.subChargeTime);
 		const bool isSubRushing = (!isSubCharging && timeInPhase < params.subChargeTime + params.subRushTime);
 
 		if (isSubCharging) {
-			//--- プレイヤーの方を向く ---//
 			UpdateOrientation(enemy);
 
-			// チャージ中の色変化
-			const float chargeProgress = timeInPhase / params.subChargeTime;
-			enemy.SetColor({ 1, 0.0f, 0.5f + 0.5f * chargeProgress, 1 });
+			// 各ヒットの溜め開始時
+			if (previousTimeInPhase < 0.0f && timeInPhase >= 0.0f) {
+				if (auto anim = enemy.GetAnimation()) {
+					anim->StartScaleAnimation({ 0.8f, 1.2f, 0.8f }, { 1.0f, 0.9f, 0.9f }, params.subChargeTime);
+				}
+			}
+
+			if (!enemy.GetAnimation()) {
+				const float chargeProgress = timeInPhase / params.subChargeTime;
+				enemy.SetColor({ 1, 0.0f, 0.5f + 0.5f * chargeProgress, 1 });
+			}
 		}
 		else if (isSubRushing) {
-			//--- 突進する ---//
+			// 各ヒットの突進開始時
+			if (previousTimeInPhase < params.subChargeTime && timeInPhase >= params.subChargeTime) {
+				if (auto anim = enemy.GetAnimation()) {
+					anim->StartScaleAnimation({ 1.0f, 0.9f, 0.9f }, { 0.8f, 0.8f, 1.2f }, params.subRushTime);
+				}
+			}
+
 			const float currentMultiplier = params.rushSpeedMultiplier + (comboCount_ * 1.0f);
 			ExecuteRush(enemy, currentMultiplier, dt);
-
-			// 突進中は赤色
 			enemy.SetColor({ 1, 0.0f, 0.0f, 1 });
 		}
 	}
@@ -256337,17 +256487,21 @@ void BattleComboAttackState::Update(BattleEnemy& enemy, float dt) {
 	}
 }
 
-void BattleComboAttackState::Exit(BattleEnemy& enemy)
-{
+void BattleComboAttackState::Exit(BattleEnemy& enemy) {
 	enemy.SetCanAct(true);
-	enemy.SetColor({ 1, 1, 1, 1 });
+	if (auto anim = enemy.GetAnimation()) {
+		anim->StopAll();
+		anim->StartScaleAnimation(anim->GetCurrentScale(), { 1, 1, 1 }, 0.2f);
+		anim->StartColorAnimation(anim->GetCurrentColor(), { 1, 1, 1, 1 }, 0.2f);
+	}
+	else {
+		enemy.SetColor({ 1, 1, 1, 1 });
+	}
 }
 
-// --- 補助関数の定義 ---
 void BattleComboAttackState::UpdateOrientation(BattleEnemy& enemy) {
 	Player* player = enemy.GetPlayer();
 	if (!player) return;
-
 	Vector3 toPlayer = player->GetTranslate() - enemy.GetTranslate();
 	if (Length(toPlayer) > 0.01f) {
 		Vector3 dir = Normalize(toPlayer);
@@ -256358,13 +256512,9 @@ void BattleComboAttackState::UpdateOrientation(BattleEnemy& enemy) {
 void BattleComboAttackState::ExecuteRush(BattleEnemy& enemy, float speedMultiplier, float dt) {
 	Player* player = enemy.GetPlayer();
 	if (!player) return;
-
-	// ターゲットへの方向を計算
 	Vector3 toPlayer = player->GetTranslate() - enemy.GetTranslate();
 	if (Length(toPlayer) > 0.01f) {
 		Vector3 dir = Normalize(toPlayer);
-
-		// 実際の移動速度を計算
 		const float finalSpeed = enemy.GetEnemyData().moveSpeed * speedMultiplier;
 		enemy.AddTranslate(dir * finalSpeed * dt);
 	}
@@ -256408,18 +256558,13 @@ File Path: YGame/GameObjects/Enemy/BattleEnemy/States/Attack/BattleCounterAttack
 #include "../BattleIdleState.h"
 #include <cmath>
 
-/// <summary>
-/// 反撃状態開始処理
-/// RecoveryStateから来るため、入った時点では無敵を維持する
-/// </summary>
 void BattleCounterAttackState::Enter(BattleEnemy& enemy) {
     enemy.SetCanAct(false);
     enemy.ResetStateTimer();
-    enemy.IsInvincible() = true;  // 起動フェーズ中は無敵を維持
+    enemy.IsInvincible() = true;
 
     anticipationStartPos_ = enemy.GetTranslate();
 
-    // 入った瞬間にプレイヤー方向を確定
     if (enemy.GetPlayer()) {
         attackDir_ = enemy.GetPlayerPosition() - enemy.GetTranslate();
         if (Length(attackDir_) > 0.01f) {
@@ -256428,34 +256573,27 @@ void BattleCounterAttackState::Enter(BattleEnemy& enemy) {
         }
     }
 
-    // 青白くフラッシュ → 赤に変化する起動演出
-    if (enemy.GetAnimation()) {
-        enemy.GetAnimation()->StartColorAnimation(
-            { 0.3f, 0.7f, 2.0f, 1.0f },  // 強い青白フラッシュ
-            { 1.0f, 0.1f, 0.0f, 1.0f },  // 赤へ変化
+    if (auto anim = enemy.GetAnimation()) {
+        anim->StartColorAnimation(
+            { 0.3f, 0.7f, 2.0f, 1.0f },
+            { 1.0f, 0.1f, 0.0f, 1.0f },
             counterStartupTime_,
             Easing::Function::EaseInQuad
         );
-        enemy.GetAnimation()->PlayBounceScaleAnimation(1.3f, 0.85f);
+        anim->PlayBounceScaleAnimation(1.3f, 0.85f);
     }
 }
 
-/// <summary>
-/// 反撃状態更新処理
-/// </summary>
 void BattleCounterAttackState::Update(BattleEnemy& enemy, float dt) {
     const float currentTime = enemy.GetStateTimer();
 
-    // フェーズ境界時間
     const float startupEnd = counterStartupTime_;
     const float anticipationEnd = startupEnd + anticipationTime_;
     const float chargeEnd = anticipationEnd + chargeTime_;
     const float rushEnd = chargeEnd + rushTime_;
     const float totalDuration = rushEnd + cooldownTime_;
 
-    // === フェーズ1: カウンター起動（無敵・演出のみ） ===
     if (currentTime < startupEnd) {
-        // 起動中もプレイヤーを追尾して向く（逃がさない）
         if (enemy.GetPlayer()) {
             attackDir_ = enemy.GetPlayerPosition() - enemy.GetTranslate();
             if (Length(attackDir_) > 0.01f) {
@@ -256466,24 +256604,17 @@ void BattleCounterAttackState::Update(BattleEnemy& enemy, float dt) {
         return;
     }
 
-    // === フェーズ2: 予備動作（素早く後退）※この間はまだ無敵 ===
     if (currentTime < anticipationEnd) {
         const float localTime = currentTime - startupEnd;
         const float progress = localTime / anticipationTime_;
-
-        // ease-out cubicで素早くスパッと引く
         const float easeProgress = 1.0f - std::pow(1.0f - progress, 3.0f);
         const Vector3 backwardOffset = -attackDir_ * anticipationDistance_ * easeProgress;
         enemy.SetTranslate(anticipationStartPos_ + backwardOffset);
-
     }
-    // === フェーズ3: チャージ（予備動作完了 → ここで無敵解除、プレイヤーをロックオン追尾） ===
     else if (currentTime < chargeEnd) {
-        // チャージ開始の瞬間に無敵解除（後退完了済みなので安全）
         if (enemy.IsInvincible()) {
             enemy.IsInvincible() = false;
         }
-        // チャージ中もリアルタイムでプレイヤーを追尾して方向を更新
         if (enemy.GetPlayer()) {
             attackDir_ = enemy.GetPlayerPosition() - enemy.GetTranslate();
             if (Length(attackDir_) > 0.01f) {
@@ -256491,40 +256622,40 @@ void BattleCounterAttackState::Update(BattleEnemy& enemy, float dt) {
                 enemy.SetRotationY(std::atan2(attackDir_.x, attackDir_.z));
             }
         }
-
-        const float chargeProgress = (currentTime - anticipationEnd) / chargeTime_;
-        enemy.SetColor({ 1.0f, chargeProgress * 0.15f, 0.0f, 1.0f });
+        if (!enemy.GetAnimation()) {
+            const float chargeProgress = (currentTime - anticipationEnd) / chargeTime_;
+            enemy.SetColor({ 1.0f, chargeProgress * 0.15f, 0.0f, 1.0f });
+        }
     }
-    // === フェーズ4: 突進（超高速 & 突進中もプレイヤーを追従） ===
     else if (currentTime < rushEnd) {
         enemy.SetColor({ 1.0f, 0.0f, 0.0f, 1.0f });
-
-        // 突進中もプレイヤー方向を毎フレーム更新（ホーミング）
         if (enemy.GetPlayer()) {
             Vector3 toPlayer = enemy.GetPlayerPosition() - enemy.GetTranslate();
             if (Length(toPlayer) > 0.01f) {
-                // 完全ホーミングではなく少し補間して自然に追う
                 Vector3 newDir = Normalize(toPlayer);
                 attackDir_ = Normalize(attackDir_ + newDir * 4.0f * dt);
                 enemy.SetRotationY(std::atan2(attackDir_.x, attackDir_.z));
             }
         }
-
         enemy.AddTranslate(attackDir_ * enemy.GetEnemyData().moveSpeed * rushSpeedMultiplier_ * dt);
     }
-    // === フェーズ5: クールダウン ===
     else if (currentTime >= totalDuration) {
         enemy.ChangeState(std::make_unique<BattleIdleState>());
     }
 }
 
-/// <summary>
-/// 反撃状態終了処理
-/// </summary>
 void BattleCounterAttackState::Exit(BattleEnemy& enemy) {
     enemy.SetCanAct(true);
-    enemy.IsInvincible() = false;  // 念のためリセット
-    enemy.SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+    enemy.IsInvincible() = false;
+
+    if (auto anim = enemy.GetAnimation()) {
+        anim->StopAll();
+        anim->StartScaleAnimation(anim->GetCurrentScale(), { 1.0f, 1.0f, 1.0f }, 0.2f);
+        anim->StartColorAnimation(anim->GetCurrentColor(), { 1.0f, 1.0f, 1.0f, 1.0f }, 0.2f);
+    }
+    else {
+        enemy.SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+    }
 }
 
 ============================================================
@@ -256558,15 +256689,15 @@ private:
     const float counterStartupTime_ = 0.2f;
 
     // フェーズ2: 予備動作（短くキビキビ）
-    const float anticipationTime_ = 0.15f;
-    const float anticipationDistance_ = 5.8f;   // 後退距離）
+    const float anticipationTime_ = 0.5f;
+    const float anticipationDistance_ = 10.8f;   // 後退距離）
 
     // フェーズ3: チャージ（プレイヤーをロックオン追尾）
     const float chargeTime_ = 0.25f;
 
     // フェーズ4: 突進（超高速 & 突進中もプレイヤーを追従）
-    const float rushTime_ = 0.45f;
-    const float rushSpeedMultiplier_ = 18.0f;
+    const float rushTime_ = 0.55f;
+    const float rushSpeedMultiplier_ = 15.0f;
 
     // フェーズ5: クールダウン
     const float cooldownTime_ = 0.8f;
@@ -256577,11 +256708,18 @@ File Path: YGame/GameObjects/Enemy/BattleEnemy/States/Attack/BattleJumpAttackSta
 ============================================================
 #include "BattleJumpAttackState.h"
 
-void BattleJumpAttackState::Enter(BattleEnemy& enemy)
-{
+void BattleJumpAttackState::Enter(BattleEnemy& enemy) {
 	enemy.SetCanAct(false);
 	enemy.ResetStateTimer();
-	enemy.SetColor({ 0.0f, 1, 1, 1 }); // シアン色で予備動作を示す
+
+	if (auto anim = enemy.GetAnimation()) {
+		// ジャンプ前はシアン色に変化しつつ、横に平べったく（縦に潰れる）なる
+		anim->StartColorAnimation({ 1, 1, 1, 1 }, { 0.0f, 1.0f, 1.0f, 1.0f }, 0.3f);
+		anim->StartScaleAnimation({ 1, 1, 1 }, { 1.3f, 0.6f, 1.3f }, 0.3f, Easing::Function::EaseOutQuad);
+	}
+	else {
+		enemy.SetColor({ 0.0f, 1, 1, 1 });
+	}
 
 	startPos_ = enemy.GetTranslate();
 	startY_ = startPos_.y;
@@ -256599,10 +256737,10 @@ void BattleJumpAttackState::Enter(BattleEnemy& enemy)
 	}
 }
 
-void BattleJumpAttackState::Update(BattleEnemy& enemy, [[maybe_unused]] float dt)
-{
+void BattleJumpAttackState::Update(BattleEnemy& enemy, float dt) {
 	const auto& params = enemy.GetEnemyData().attackParams.jump;
 	const float currentTime = enemy.GetStateTimer();
+	const float previousTime = currentTime - dt;
 
 	// フェーズの境界時間を計算
 	const float anticipationEndTime = params.anticipationTime;
@@ -256622,8 +256760,10 @@ void BattleJumpAttackState::Update(BattleEnemy& enemy, [[maybe_unused]] float dt
 		enemy.SetTranslate(pos);
 
 		// 色を点滅させて警告
-		const float colorPulse = 0.5f + 0.5f * std::sin(currentTime * params.anticipationColorPulseSpeed);
-		enemy.SetColor({ colorPulse, 1, 1, 1 });
+		if (!enemy.GetAnimation()) {
+			const float colorPulse = 0.5f + 0.5f * std::sin(currentTime * params.anticipationColorPulseSpeed);
+			enemy.SetColor({ colorPulse, 1, 1, 1 });
+		}
 	}
 	// === フェーズ2: チャージ（溜め） ===
 	else if (currentTime < chargeEndTime) {
@@ -256636,11 +256776,20 @@ void BattleJumpAttackState::Update(BattleEnemy& enemy, [[maybe_unused]] float dt
 		enemy.SetTranslate(pos);
 
 		// 色を変化させる
-		const float intensity = 0.5f + 0.5f * std::sin(chargeTime * 12.0f);
-		enemy.SetColor({ intensity, 1, 0.0f, 1 });
+		if (!enemy.GetAnimation()) {
+			const float intensity = 0.5f + 0.5f * std::sin(chargeTime * 12.0f);
+			enemy.SetColor({ intensity, 1, 0.0f, 1 });
+		}
 	}
 	// === フェーズ3: ジャンプ ===
 	else if (currentTime < jumpEndTime) {
+		// ジャンプ開始の瞬間に縦長に引き伸ばすアニメーション
+		if (previousTime < chargeEndTime && currentTime >= chargeEndTime) {
+			if (auto anim = enemy.GetAnimation()) {
+				anim->StartScaleAnimation({ 1.3f, 0.6f, 1.3f }, { 0.8f, 1.4f, 0.8f }, 0.15f, Easing::Function::EaseOutQuad);
+			}
+		}
+
 		const float jumpTime = currentTime - chargeEndTime;
 		const float jumpProgress = jumpTime / params.jumpTime;
 
@@ -256655,21 +256804,33 @@ void BattleJumpAttackState::Update(BattleEnemy& enemy, [[maybe_unused]] float dt
 
 		enemy.SetTranslate(pos);
 
-		// ジャンプ中は赤色
 		enemy.SetColor({ 1, 0.0f, 0.0f, 1 });
 	}
 	// === フェーズ4: 着地（クールダウン） ===
 	else if (currentTime < totalDuration) {
+		// 着地した瞬間に少し潰れるアニメーション（バウンド感）
+		if (previousTime < jumpEndTime && currentTime >= jumpEndTime) {
+			if (auto anim = enemy.GetAnimation()) {
+				anim->StartScaleAnimation({ 0.8f, 1.4f, 0.8f }, { 1.2f, 0.8f, 1.2f }, 0.1f, Easing::Function::EaseOutQuad, [enemyPtr = &enemy]() {
+					if (auto a = enemyPtr->GetAnimation()) {
+						a->StartScaleAnimation({ 1.2f, 0.8f, 1.2f }, { 1.0f, 1.0f, 1.0f }, 0.2f);
+					}
+					});
+			}
+		}
+
 		// 着地位置で硬直
 		Vector3 pos = targetPos_;
 		pos.y = startY_;
 		enemy.SetTranslate(pos);
 
 		// 徐々に色を戻す
-		const float recoveryTime = currentTime - jumpEndTime;
-		const float recoveryProgress = recoveryTime / params.cooldownTime;
-		const float colorRecover = 1.0f - (1.0f - recoveryProgress) * 0.5f;
-		enemy.SetColor({ 1, colorRecover, colorRecover, 1 });
+		if (!enemy.GetAnimation()) {
+			const float recoveryTime = currentTime - jumpEndTime;
+			const float recoveryProgress = recoveryTime / params.cooldownTime;
+			const float colorRecover = 1.0f - (1.0f - recoveryProgress) * 0.5f;
+			enemy.SetColor({ 1, colorRecover, colorRecover, 1 });
+		}
 	}
 	else {
 		// 状態遷移
@@ -256677,15 +256838,22 @@ void BattleJumpAttackState::Update(BattleEnemy& enemy, [[maybe_unused]] float dt
 	}
 }
 
-void BattleJumpAttackState::Exit(BattleEnemy& enemy)
-{
+void BattleJumpAttackState::Exit(BattleEnemy& enemy) {
 	// 元の高さに戻す
 	Vector3 pos = enemy.GetTranslate();
 	pos.y = startY_;
 	enemy.SetTranslate(pos);
 
 	enemy.SetCanAct(true);
-	enemy.SetColor({ 1, 1, 1, 1 });
+
+	if (auto anim = enemy.GetAnimation()) {
+		anim->StopAll();
+		anim->StartScaleAnimation(anim->GetCurrentScale(), { 1, 1, 1 }, 0.2f);
+		anim->StartColorAnimation(anim->GetCurrentColor(), { 1, 1, 1, 1 }, 0.2f);
+	}
+	else {
+		enemy.SetColor({ 1, 1, 1, 1 });
+	}
 }
 
 ============================================================
@@ -256720,19 +256888,21 @@ File Path: YGame/GameObjects/Enemy/BattleEnemy/States/Attack/BattleRushAttackSta
 #include "../BattleIdleState.h"
 #include <cmath>
 
-/// <summary>
-/// 攻撃状態開始処理
-/// </summary>
 void BattleRushAttackState::Enter(BattleEnemy& enemy) {
 	enemy.SetCanAct(false);
 	enemy.ResetStateTimer();
-	enemy.SetColor({ 1, 1, 0.0f, 1 }); // 黄色で予備動作を示す
 	dirLocked_ = false;
 
-	// 予備動作の開始位置を記録
+	if (auto anim = enemy.GetAnimation()) {
+		anim->StartColorAnimation({ 1, 1, 1, 1 }, { 1.0f, 1.0f, 0.0f, 1.0f }, 0.2f);
+		anim->StartScaleAnimation({ 1, 1, 1 }, { 1.1f, 0.9f, 0.7f }, enemy.GetEnemyData().attackParams.rush.anticipationTime, Easing::Function::EaseOutQuad);
+	}
+	else {
+		enemy.SetColor({ 1, 1, 0.0f, 1 });
+	}
+
 	anticipationStartPos_ = enemy.GetTranslate();
 
-	// 攻撃方向を決定
 	if (enemy.GetPlayer()) {
 		attackDir_ = enemy.GetPlayerPosition() - enemy.GetTranslate();
 		if (Length(attackDir_) > 0.01f) {
@@ -256742,35 +256912,25 @@ void BattleRushAttackState::Enter(BattleEnemy& enemy) {
 	}
 }
 
-/// <summary>
-/// 攻撃状態更新処理
-/// </summary>
 void BattleRushAttackState::Update(BattleEnemy& enemy, float dt) {
 	const float currentTime = enemy.GetStateTimer();
+	const float previousTime = currentTime - dt;
 	const auto& params = enemy.GetEnemyData().attackParams.rush;
 
-	// フェーズの境界時間を計算
 	const float anticipationEndTime = params.anticipationTime;
 	const float chargeEndTime = anticipationEndTime + params.chargeTime;
 	const float rushEndTime = chargeEndTime + params.rushTime;
 	const float totalDuration = rushEndTime + params.cooldownTime;
 
-	// === フェーズ1: 予備動作（後ろに引く） ===
+	// === フェーズ1: 予備動作 ===
 	if (currentTime < anticipationEndTime) {
 		const float progress = currentTime / params.anticipationTime;
-
-		// 後ろに引く動き（イージングを使用してスムーズに）
-		const float easeProgress = 1.0f - std::pow(1.0f - progress, 3.0f); // ease-out cubic
+		const float easeProgress = 1.0f - std::pow(1.0f - progress, 3.0f);
 		const Vector3 backwardOffset = -attackDir_ * params.anticipationDistance * easeProgress;
 		enemy.SetTranslate(anticipationStartPos_ + backwardOffset);
-
-		// 色を点滅させて警告
-		const float colorPulse = 0.5f + 0.5f * std::sin(currentTime * 12.0f);
-		enemy.SetColor({ 1, colorPulse, 0.0f, 1 });
 	}
-	// === フェーズ2: チャージ（溜め） ===
+	// === フェーズ2: チャージ ===
 	else if (currentTime < chargeEndTime) {
-		// チャージ中もプレイヤーを追尾
 		if (enemy.GetPlayer()) {
 			attackDir_ = enemy.GetPlayerPosition() - enemy.GetTranslate();
 			if (Length(attackDir_) > 0.01f) {
@@ -256778,15 +256938,21 @@ void BattleRushAttackState::Update(BattleEnemy& enemy, float dt) {
 				enemy.SetRotationY(std::atan2(attackDir_.x, attackDir_.z));
 			}
 		}
-
-		// 色を赤く変化
-		const float chargeProgress = (currentTime - anticipationEndTime) / params.chargeTime;
-		const float redIntensity = 0.5f + 0.5f * chargeProgress;
-		enemy.SetColor({ 1, redIntensity * 0.3f, 0.0f, 1 });
+		if (!enemy.GetAnimation()) {
+			const float chargeProgress = (currentTime - anticipationEndTime) / params.chargeTime;
+			const float redIntensity = 0.5f + 0.5f * chargeProgress;
+			enemy.SetColor({ 1, redIntensity * 0.3f, 0.0f, 1 });
+		}
 	}
 	// === フェーズ3: 突進 ===
 	else if (currentTime < rushEndTime) {
-		enemy.SetColor({ 1, 0.0f, 0.0f, 1 }); // 真っ赤
+		if (previousTime < chargeEndTime && currentTime >= chargeEndTime) {
+			if (auto anim = enemy.GetAnimation()) {
+				// 突進時に細長くなる
+				anim->StartScaleAnimation(anim->GetCurrentScale(), { 0.8f, 0.8f, 1.3f }, 0.1f);
+			}
+		}
+		enemy.SetColor({ 1, 0.0f, 0.0f, 1 });
 		enemy.AddTranslate(attackDir_ * enemy.GetEnemyData().moveSpeed * params.speedMultiplier * dt);
 	}
 	// === フェーズ4: クールダウン ===
@@ -256795,12 +256961,17 @@ void BattleRushAttackState::Update(BattleEnemy& enemy, float dt) {
 	}
 }
 
-/// <summary>
-/// 攻撃状態終了処理
-/// </summary>
 void BattleRushAttackState::Exit(BattleEnemy& enemy) {
 	enemy.SetCanAct(true);
-	enemy.SetColor({ 1, 1, 1, 1 });
+
+	if (auto anim = enemy.GetAnimation()) {
+		anim->StopAll();
+		anim->StartScaleAnimation(anim->GetCurrentScale(), { 1, 1, 1 }, 0.2f);
+		anim->StartColorAnimation(anim->GetCurrentColor(), { 1, 1, 1, 1 }, 0.2f);
+	}
+	else {
+		enemy.SetColor({ 1, 1, 1, 1 });
+	}
 }
 
 ============================================================
@@ -256830,15 +257001,20 @@ File Path: YGame/GameObjects/Enemy/BattleEnemy/States/Attack/BattleSpinAttackSta
 ============================================================
 #include "BattleSpinAttackState.h"
 
-void BattleSpinAttackState::Enter(BattleEnemy& enemy)
-{
+void BattleSpinAttackState::Enter(BattleEnemy& enemy) {
 	enemy.SetCanAct(false);
 	enemy.ResetStateTimer();
-	enemy.SetColor({ 1, 0.5f, 1, 1 }); // 紫色で予備動作を示す
+
+	if (auto anim = enemy.GetAnimation()) {
+		anim->StartColorAnimation({ 1, 1, 1, 1 }, { 1.0f, 0.5f, 1.0f, 1.0f }, 0.3f);
+		anim->StartScaleAnimation({ 1, 1, 1 }, { 1.3f, 0.8f, 1.3f }, enemy.GetEnemyData().attackParams.spin.anticipationTime);
+	}
+	else {
+		enemy.SetColor({ 1, 0.5f, 1, 1 });
+	}
 
 	startRotation_ = enemy.GetRotationY();
 
-	// プレイヤーの方を向く
 	if (enemy.GetPlayer()) {
 		Vector3 dir = enemy.GetPlayerPosition() - enemy.GetTranslate();
 		if (Length(dir) > 0.01f) {
@@ -256847,58 +257023,46 @@ void BattleSpinAttackState::Enter(BattleEnemy& enemy)
 		}
 	}
 
-	// 捻り目標角度を設定（逆方向に捻る）
 	targetTwistRotation_ = startRotation_ - enemy.GetEnemyData().attackParams.spin.twistAngle;
 }
 
-void BattleSpinAttackState::Update(BattleEnemy& enemy, float dt)
-{
+void BattleSpinAttackState::Update(BattleEnemy& enemy, float dt) {
 	const float currentTime = enemy.GetStateTimer();
 	const auto& params = enemy.GetEnemyData().attackParams.spin;
-	const float PI = 3.14159f;
+	const float PI = std::numbers::pi_v<float>;
 
-	// フェーズの境界時間を計算
 	const float anticipationEndTime = params.anticipationTime;
 	const float chargeEndTime = anticipationEndTime + params.chargeTime;
 	const float spinEndTime = chargeEndTime + params.spinTime;
 	const float totalDuration = spinEndTime + params.cooldownTime;
 
-	// === フェーズ1: 予備動作（体を捻る） ===
+	// === フェーズ1: 予備動作 ===
 	if (currentTime < anticipationEndTime) {
 		const float progress = currentTime / params.anticipationTime;
-
-		// イージングを使って体を捻る（ease-in-out）
 		const float easeProgress = progress < 0.5f
 			? 2.0f * progress * progress
 			: 1.0f - std::pow(-2.0f * progress + 2.0f, 2.0f) / 2.0f;
 
 		const float currentRotation = startRotation_ + (targetTwistRotation_ - startRotation_) * easeProgress;
 		enemy.SetRotationY(currentRotation);
-
-		// 色の変化
-		const float colorIntensity = params.anticipationColorIntensity + (1.0f - params.anticipationColorIntensity) * progress;
-		enemy.SetColor({ 1, 0.5f * colorIntensity, 1, 1 });
 	}
-	// === フェーズ2: チャージ（短い溜め） ===
+	// === フェーズ2: チャージ ===
 	else if (currentTime < chargeEndTime) {
-		// 捻った状態を維持
 		enemy.SetRotationY(targetTwistRotation_);
-
-		// 色を点滅
-		const float chargeTime = currentTime - anticipationEndTime;
-		const float pulse = 0.5f + 0.5f * std::sin(chargeTime * 15.0f);
-		enemy.SetColor({ 1, 0.2f + pulse * 0.3f, 1, 1 });
+		if (!enemy.GetAnimation()) {
+			const float chargeTime = currentTime - anticipationEndTime;
+			const float pulse = 0.5f + 0.5f * std::sin(chargeTime * 15.0f);
+			enemy.SetColor({ 1, 0.2f + pulse * 0.3f, 1, 1 });
+		}
 	}
 	// === フェーズ3: 回転攻撃 ===
 	else if (currentTime < spinEndTime) {
 		const float spinTime = currentTime - chargeEndTime;
 		const float spinProgress = spinTime / params.spinTime;
 
-		// 回転する
 		const float totalRotation = params.rotationCount * 2.0f * PI;
 		enemy.SetRotationY(targetTwistRotation_ + spinProgress * totalRotation);
 
-		// 回転しながら少し前進
 		if (enemy.GetPlayer()) {
 			Vector3 dir = enemy.GetPlayerPosition() - enemy.GetTranslate();
 			if (Length(dir) > 0.01f) {
@@ -256907,7 +257071,6 @@ void BattleSpinAttackState::Update(BattleEnemy& enemy, float dt)
 			}
 		}
 
-		// 回転中は赤色
 		enemy.SetColor({ 1, 0.0f, 0.0f, 1 });
 	}
 	// === フェーズ4: クールダウン ===
@@ -256916,9 +257079,7 @@ void BattleSpinAttackState::Update(BattleEnemy& enemy, float dt)
 	}
 }
 
-void BattleSpinAttackState::Exit(BattleEnemy& enemy)
-{
-	// プレイヤーの方を向く
+void BattleSpinAttackState::Exit(BattleEnemy& enemy) {
 	if (enemy.GetPlayer()) {
 		Vector3 dir = enemy.GetPlayerPosition() - enemy.GetTranslate();
 		if (Length(dir) > 0.01f) {
@@ -256927,7 +257088,15 @@ void BattleSpinAttackState::Exit(BattleEnemy& enemy)
 	}
 
 	enemy.SetCanAct(true);
-	enemy.SetColor({ 1, 1, 1, 1 });
+
+	if (auto anim = enemy.GetAnimation()) {
+		anim->StopAll();
+		anim->StartScaleAnimation(anim->GetCurrentScale(), { 1, 1, 1 }, 0.2f);
+		anim->StartColorAnimation(anim->GetCurrentColor(), { 1, 1, 1, 1 }, 0.2f);
+	}
+	else {
+		enemy.SetColor({ 1, 1, 1, 1 });
+	}
 }
 
 ============================================================
@@ -257430,6 +257599,10 @@ FieldEnemy::~FieldEnemy() {
 	if (obbCollider_) {
 		obbCollider_->~OBBCollider();
 	}
+
+	if (!spotLightName_.empty()) {
+		YoRigine::LightManager::GetInstance()->RemoveSpotLight(spotLightName_);
+	}
 }
 
 /// <summary>
@@ -257477,6 +257650,25 @@ void FieldEnemy::InitializeFieldData(const FieldEnemyData& data, const Vector3& 
 	// 初期状態をPatrolに設定
 	ChangeState(std::make_unique<FieldEnemyPatrolState>());
 
+		// --- スポットライトの登録 ---
+	spotLightName_ = "EnemySpot_" + spawnId_;
+	YoRigine::LightManager::SpotLightData lightData{};
+	lightData.color = { 1.0f, 0.2f, 0.2f, 1.0f }; // 敵視界だと分かりやすいように赤味がかった色
+	lightData.position = GetPosition() + Vector3(0.0f, 1.0f, 0.0f); // 目の高さくらいに調整
+	lightData.intensity = 5.0f;
+	// 視野角を元にライトの広がり（cosAngle）を設定
+	float halfAngleRad = (data.viewAngle * 0.5f) * (std::numbers::pi_v<float> / 180.0f);
+	lightData.cosAngle = std::cos(halfAngleRad);
+	lightData.cosFalloffStart = std::cos(halfAngleRad + 0.1f); // 少しぼかす
+	lightData.distance = data.viewDistance;
+	lightData.decay = 2.0f;
+	lightData.isEnableSpotLight = true;
+	
+	// 初期方向（とりあえず正面）
+	lightData.direction = Normalize(Vector3(std::sin(wt_.rotate_.y), -0.2f, std::cos(wt_.rotate_.y)));
+
+	YoRigine::LightManager::GetInstance()->AddSpotLight(spotLightName_, lightData);
+
 	std::string battleInfo = data.battleEnemyIds.empty() ?
 		data.battleEnemyId :
 		std::to_string(data.battleEnemyIds.size()) + "体グループ";
@@ -257515,6 +257707,12 @@ void FieldEnemy::InitJson() {
 /// </summary>
 void FieldEnemy::Update() {
 	if (logicalState_ == FieldEnemyState::Despawn) {
+		// 消滅時はライトを無効化
+		if (!spotLightName_.empty()) {
+			if (auto* light = YoRigine::LightManager::GetInstance()->GetSpotLight(spotLightName_)) {
+				light->isEnableSpotLight = false;
+			}
+		}
 		return;
 	}
 
@@ -257534,6 +257732,31 @@ void FieldEnemy::Update() {
 	// 基底クラスの更新処理
 	wt_.UpdateMatrix();
 	obbCollider_->Update();
+
+	// --- スポットライトの追従更新 ---
+	if (auto* light = YoRigine::LightManager::GetInstance()->GetSpotLight(spotLightName_)) {
+		light->isEnableSpotLight = enemyData_.useSpotLight;
+
+		if (enemyData_.useSpotLight) {
+			// リアルタイム反映のためにパラメータを毎フレーム同期
+			light->color = enemyData_.spotLightColor;
+			light->intensity = enemyData_.spotLightIntensity;
+			light->decay = enemyData_.spotLightDecay;
+
+			// 位置の同期（オフセット適用）
+			light->position = GetPosition() + enemyData_.spotLightOffset;
+
+			// 向いている方向にライトを向ける
+			Vector3 forwardDir = { std::sin(wt_.rotate_.y), enemyData_.spotLightPitch, std::cos(wt_.rotate_.y) };
+			light->direction = Normalize(forwardDir);
+
+			// 敵データの視界情報が更新されたら反映
+			float halfAngleRad = (enemyData_.viewAngle * 0.5f) * (std::numbers::pi_v<float> / 180.0f);
+			light->cosAngle = std::cos(halfAngleRad);
+			light->cosFalloffStart = std::cos(halfAngleRad + 0.1f);
+			light->distance = enemyData_.viewDistance;
+		}
+	}
 }
 
 /// <summary>
@@ -257732,6 +257955,16 @@ void FieldEnemy::DrawLine(Line* line) {
 	);
 }
 
+void FieldEnemy::SetLightActive(bool isActive)
+{
+	if (!spotLightName_.empty()) {
+		if (auto* light = YoRigine::LightManager::GetInstance()->GetSpotLight(spotLightName_)) {
+			// true の場合は敵データの設定に従う、false の場合は強制OFF
+			light->isEnableSpotLight = isActive ? enemyData_.useSpotLight : false;
+		}
+	}
+}
+
 /// <summary>
 /// 目標角度に向かって補間回転する
 /// </summary>
@@ -257841,6 +258074,14 @@ struct FieldEnemyData {
 	float searchDuration = 3.0f;    // 索敵持続時間（秒）
 	float searchSweepAngle = 70.0f; // 索敵時の左右スウィープ角度（度）
 
+	// スポットライト(視界)設定
+	bool useSpotLight = true;
+	Vector4 spotLightColor = Vector4(1.0f, 0.2f, 0.2f, 1.0f);
+	float spotLightIntensity = 5.0f;
+	float spotLightDecay = 2.0f;
+	Vector3 spotLightOffset = Vector3(0.0f, 1.0f, 0.0f); // 目の高さなどのオフセット
+	float spotLightPitch = -0.2f;                        // ライトの下向き加減(方向ベクトルのY成分)
+
 	// ビジュアル設定
 	Vector4 modelColor = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
 	bool useCustomColor = false;
@@ -257884,6 +258125,9 @@ public:
 	void DrawShadow();
 	void DrawCollision() override;
 	void DrawLine(Line* line);
+
+	// ライトの有効/無効を強制的に切り替える
+	void SetLightActive(bool isActive);
 
 	///************************* 当たり判定 *************************///
 
@@ -257997,6 +258241,9 @@ private:
 	float encounterCooldownDuration_ = 1.0f;
 
 	float takeDamage_ = 0.0f;
+
+	// スポットライト管理用
+	std::string spotLightName_;
 };
 
 ============================================================
@@ -258271,6 +258518,12 @@ void FieldEnemyManager::ClearDefeatedEnemies() {
 /// </summary>
 void FieldEnemyManager::SetAllEnemiesActive(bool isActive) {
 	isActive_ = isActive;
+	// アクティブ状態に応じて全敵のライトを切り替える
+	for (auto& enemy : fieldEnemies_) {
+		if (enemy && enemy->IsActive()) {
+			enemy->SetLightActive(isActive);
+		}
+	}
 }
 
 /// <summary>
@@ -258535,6 +258788,20 @@ void FieldEnemyManager::SaveEnemyData(const std::string& filePath) {
 				enemyJson["modelColor"]["a"] = data.modelColor.w;
 			}
 
+			// スポットライト
+			enemyJson["useSpotLight"] = data.useSpotLight;
+			enemyJson["spotLightColor"]["r"] = data.spotLightColor.x;
+			enemyJson["spotLightColor"]["g"] = data.spotLightColor.y;
+			enemyJson["spotLightColor"]["b"] = data.spotLightColor.z;
+			enemyJson["spotLightColor"]["a"] = data.spotLightColor.w;
+			enemyJson["spotLightIntensity"] = data.spotLightIntensity;
+			enemyJson["spotLightDecay"] = data.spotLightDecay;
+			enemyJson["spotLightOffset"]["x"] = data.spotLightOffset.x;
+			enemyJson["spotLightOffset"]["y"] = data.spotLightOffset.y;
+			enemyJson["spotLightOffset"]["z"] = data.spotLightOffset.z;
+			enemyJson["spotLightPitch"] = data.spotLightPitch;
+
+
 			json["fieldEnemies"].push_back(enemyJson);
 		}
 
@@ -258644,7 +258911,27 @@ void FieldEnemyManager::LoadEnemyData(const std::string& filePath) {
 				data.modelColor.y = c.value("g", 1.0f);
 				data.modelColor.z = c.value("b", 1.0f);
 				data.modelColor.w = c.value("a", 1.0f);
+
 			}
+
+			// スポットライトパラメータ
+			data.useSpotLight = enemyJson.value("useSpotLight", true);
+			if (enemyJson.contains("spotLightColor")) {
+				auto c = enemyJson["spotLightColor"];
+				data.spotLightColor.x = c.value("r", 1.0f);
+				data.spotLightColor.y = c.value("g", 0.2f);
+				data.spotLightColor.z = c.value("b", 0.2f);
+				data.spotLightColor.w = c.value("a", 1.0f);
+			}
+			data.spotLightIntensity = enemyJson.value("spotLightIntensity", 5.0f);
+			data.spotLightDecay = enemyJson.value("spotLightDecay", 2.0f);
+			if (enemyJson.contains("spotLightOffset")) {
+				auto o = enemyJson["spotLightOffset"];
+				data.spotLightOffset.x = o.value("x", 0.0f);
+				data.spotLightOffset.y = o.value("y", 1.0f);
+				data.spotLightOffset.z = o.value("z", 0.0f);
+			}
+			data.spotLightPitch = enemyJson.value("spotLightPitch", -0.2f);
 
 			// map に登録
 			if (!data.enemyId.empty()) {
@@ -259096,15 +259383,6 @@ void FieldEnemyManager::ShowEnemyDataEditor() {
 		changed |= ImGui::DragFloat("追跡範囲", &editorEnemyData_.chaseRange, 0.5f, 1.0f, 50.0f);
 		changed |= ImGui::DragFloat("帰還距離", &editorEnemyData_.returnDistance, 0.5f, 1.0f, 50.0f);
 
-
-		ImGui::Separator();
-		ImGui::Text("=== 移動パラメータ ===");
-		changed |= ImGui::DragFloat("巡回半径", &editorEnemyData_.patrolRadius, 0.5f, 0.0f, 50.0f);
-		changed |= ImGui::DragFloat("巡回速度", &editorEnemyData_.patrolSpeed, 0.1f, 0.1f, 20.0f);
-		changed |= ImGui::DragFloat("追跡速度", &editorEnemyData_.chaseSpeed, 0.1f, 0.1f, 20.0f);
-		changed |= ImGui::DragFloat("追跡範囲", &editorEnemyData_.chaseRange, 0.5f, 1.0f, 50.0f);
-		changed |= ImGui::DragFloat("帰還距離", &editorEnemyData_.returnDistance, 0.5f, 1.0f, 50.0f);
-
 		ImGui::Separator();
 		ImGui::Text("=== 視界・索敵パラメータ ===");
 		if (ImGui::IsItemHovered()) {
@@ -259139,6 +259417,18 @@ void FieldEnemyManager::ShowEnemyDataEditor() {
 		if (editorEnemyData_.useCustomColor) {
 			changed |= ImGui::ColorEdit4("モデルカラー", &editorEnemyData_.modelColor.x);
 		}
+
+		ImGui::Separator();
+		ImGui::Text("=== スポットライト(視界)設定 ===");
+		changed |= ImGui::Checkbox("スポットライトを使用", &editorEnemyData_.useSpotLight);
+		if (editorEnemyData_.useSpotLight) {
+			changed |= ImGui::ColorEdit4("ライトカラー", &editorEnemyData_.spotLightColor.x);
+			changed |= ImGui::DragFloat("強度", &editorEnemyData_.spotLightIntensity, 0.1f, 0.0f, 1000.0f);
+			changed |= ImGui::DragFloat("減衰(Decay)", &editorEnemyData_.spotLightDecay, 0.1f, 0.0f, 10.0f);
+			changed |= ImGui::DragFloat3("位置オフセット", &editorEnemyData_.spotLightOffset.x, 0.1f);
+			changed |= ImGui::DragFloat("ピッチ(下向き加減)", &editorEnemyData_.spotLightPitch, 0.01f, -1.0f, 1.0f);
+		}
+
 
 		// ★★★ リアルタイム反映処理 ★★★
 		if (changed) {
@@ -266356,6 +266646,7 @@ File Path: YGame/GameObjects/Weapon/PlayerSword.cpp
 #include "Collision/Core/CollisionManager.h"
 #include "MathFunc.h"
 #include "Systems/GameTime/GameTime.h"
+#include "Particle/YEmitterGroupManager.h"
 
 #ifdef USE_IMGUI
 #include "imgui.h"
@@ -266569,6 +266860,14 @@ void PlayerSword::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 		hitPos.y += 1.5f;
 		//hitParticleEmitter_->FollowEmit(hitPos, 5);
 		//particleEmitter_->FollowEmit(hitPos, 30);
+
+		auto* enemyHitEmitterGroup_ = YEmitterGroupManager::GetInstance().GetGroup("EnemyHit");
+		if (enemyHitEmitterGroup_) {
+			enemyHitEmitterGroup_->SetPosition(hitPos);
+			enemyHitEmitterGroup_->SetActive(true);
+			enemyHitEmitterGroup_->SetAutoEmitAll(false);  // 自動射出OFF
+			enemyHitEmitterGroup_->EmitAll(10);
+		}
 		player_->GetCombat()->GetCombo()->RecoverCC(2);
 
 	}
@@ -267436,6 +267735,7 @@ void GameScene::Update() {
 	YoRigine::ParticleManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
 	YParticleManager::GetInstance().Update(YoRigine::GameTime::GetDeltaTime());
 	YoRigine::LightManager::GetInstance()->UpdateShadowMatrix(sceneCamera_.get());
+	YoRigine::LightManager::GetInstance()->TransferData();
 	YoRigine::GpuEmitManager::GetInstance()->Update();
 }
 
@@ -269035,6 +269335,7 @@ void FieldScene::OnExit() {
 				});
 		}
 		fieldState["activeEnemies"] = enemyList;
+		fieldEnemyManager_->SetAllEnemiesActive(false);
 	}
 
 	syncData->SaveCurrentSceneState("Field", fieldState);
