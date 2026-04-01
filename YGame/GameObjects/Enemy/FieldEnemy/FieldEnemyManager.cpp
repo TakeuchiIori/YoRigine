@@ -15,7 +15,13 @@
 #include <Editor/Editor.h>
 
 FieldEnemyManager::FieldEnemyManager() = default;
-FieldEnemyManager::~FieldEnemyManager() = default;
+
+FieldEnemyManager::~FieldEnemyManager() {
+	fieldEnemies_.clear();
+	spawnDataMap_.clear();
+	enemyDataMap_.clear();
+	respawnQueue_.clear();
+};
 
 /// <summary>
 /// フィールド敵マネージャーの初期化
