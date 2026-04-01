@@ -1,5 +1,4 @@
-
-#include "ProceduralMesh.hlsli"
+#include "VfxMesh_Common.hlsli"
 
 ConstantBuffer<MeshTrailParams> gMeshParam : register(b1);
 

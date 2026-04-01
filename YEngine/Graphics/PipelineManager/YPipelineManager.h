@@ -149,6 +149,11 @@ private:
 	/// </summary>
 	void CreatePSO_EffectObject();
 
+    /// <summary>
+    /// Meshを使用したVFX
+    /// </summary>
+    void CreatePSO_VfxMeshTrail();
+    void CreatePSO_VfxMeshVolume();
     // ===== ポストエフェクト系パイプライン作成関数群 =====
 
     /// <summary>

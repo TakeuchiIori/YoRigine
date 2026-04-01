@@ -1,4 +1,4 @@
-#include "ProceduralMesh.hlsli"
+#include "VfxMesh_Common.hlsli"
 
 ConstantBuffer<Camera> gCamera : register(b0);
 ConstantBuffer<LightVolumeParams> gMeshParam : register(b1);

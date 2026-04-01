@@ -660,6 +660,52 @@ void YPipelineManager::CreatePSO_EffectObject()
     parameterIndices_["EffectObject"] = result.parameterIndices;
 }
 
+/// <summary>
+/// Meshを使用したVFX
+/// </summary>
+void YPipelineManager::CreatePSO_VfxMeshTrail() {
+    // シェーダーをコンパイル
+    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Vfx/VfxMesh/VfxMesh.VS.hlsl", L"vs_6_0");
+    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Vfx/VfxMesh/VfxMesh_Trail.PS.hlsl", L"ps_6_0");
+
+    // リフレクションベースで完全自動生成
+    ReflectionBasedPipelineBuilder builder;
+    auto result = builder
+        .SetRasterizerState(RasterizerPresets::CreateNoCull())
+        .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
+        .BuildFromCompiledShaders(
+            dxCommon_->GetDevice().Get(),
+            vsBlob.Get(),
+            psBlob.Get()
+        );
+
+    rootSignatures_["VfxMeshTrail"] = result.rootSignature;
+    pipelineStates_["VfxMeshTrail"] = result.pipelineState;
+    parameterIndices_["VfxMeshTrail"] = result.parameterIndices;
+
+}
+
+void YPipelineManager::CreatePSO_VfxMeshVolume() {
+    // シェーダーをコンパイル
+    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Effect/Effect.VS.hlsl", L"vs_6_0");
+    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Effect/Effect.PS.hlsl", L"ps_6_0");
+
+    // リフレクションベースで完全自動生成
+    ReflectionBasedPipelineBuilder builder;
+    auto result = builder
+        .SetRasterizerState(RasterizerPresets::CreateNoCull())
+        .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
+        .BuildFromCompiledShaders(
+            dxCommon_->GetDevice().Get(),
+            vsBlob.Get(),
+            psBlob.Get()
+        );
+
+    rootSignatures_["EffectObject"] = result.rootSignature;
+    pipelineStates_["EffectObject"] = result.pipelineState;
+    parameterIndices_["EffectObject"] = result.parameterIndices;
+}
+
 
 // ===== ポストエフェクト系パイプライン =====
 
