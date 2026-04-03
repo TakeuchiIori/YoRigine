@@ -1,5 +1,5 @@
 #include "UpdateColor.h"
-
+#include "Loaders/Json/JsonConverters.h"
 #ifdef USE_IMGUI
 #include "imgui.h"
 #include <ImCurveEdit.h>
@@ -55,8 +55,8 @@ void UpdateColor::OnUpdate(ParticleAttribute* attrs, uint32_t index, float /*dt*
 
 void UpdateColor::SaveToJson(nlohmann::json& json) const {
     json["colorMode"] = static_cast<int>(colorMode_);
-    json["startColor"] = { startColor_.x, startColor_.y, startColor_.z, startColor_.w };
-    json["endColor"] = { endColor_.x,   endColor_.y,   endColor_.z,   endColor_.w };
+	json["startColor"] = Vector4ToJson(startColor_);
+	json["endColor"] = Vector4ToJson(endColor_);
     json["curveR"] = curveR_.SaveToJson();
     json["curveG"] = curveG_.SaveToJson();
     json["curveB"] = curveB_.SaveToJson();
@@ -68,12 +68,8 @@ void UpdateColor::LoadFromJson(const nlohmann::json& json) {
 #ifdef USE_IMGUI
     delegateDirty_ = true;
 #endif
-    if (json.contains("startColor"))
-        startColor_ = { json["startColor"][0], json["startColor"][1],
-                        json["startColor"][2], json["startColor"][3] };
-    if (json.contains("endColor"))
-        endColor_ = { json["endColor"][0], json["endColor"][1],
-                      json["endColor"][2], json["endColor"][3] };
+    if (json.contains("startColor"))startColor_ = JsonToVector4(json["startColor"]);
+    if (json.contains("endColor")) endColor_ = JsonToVector4(json["endcolor"]);
 
     if (json.contains("curveR")) curveR_.LoadFromJson(json["curveR"]);
     if (json.contains("curveG")) curveG_.LoadFromJson(json["curveG"]);
