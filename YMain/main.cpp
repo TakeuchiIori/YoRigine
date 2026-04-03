@@ -6,6 +6,14 @@
 #include "Framework/Framework.h"
 #include "Debugger/Logger.h"
 
+// ============================================================
+// Live++ (Debug ビルドのみ有効)
+// ============================================================
+#ifdef _DEBUG
+#include "x64/LPP_API_x64_CPP.h"
+static lpp::LppDefaultAgent s_lppAgent;
+#endif
+
 //-----------------------------------------------------------------------------
 // グローバル
 //-----------------------------------------------------------------------------
@@ -82,6 +90,23 @@ bool LoadGameDLL() {
 		return false;
 	}
 
+	// ============================================================
+	// Live++: ロードした DLL を Live++ に登録する
+	// ============================================================
+#ifdef _DEBUG
+	if (lpp::LppIsValidDefaultAgent(&s_lppAgent)) {
+		// DLL のパスを取得して Live++ に登録
+		wchar_t dllFullPath[MAX_PATH];
+		GetModuleFileNameW(hGameDLL, dllFullPath, MAX_PATH);
+		s_lppAgent.EnableModule(
+			dllFullPath,
+			lpp::LPP_MODULES_OPTION_ALL_IMPORT_MODULES,
+			nullptr, nullptr
+		);
+		Logger("Live++: YGame_Hot.dll registered.");
+	}
+#endif
+
 	// 関数アドレス取得
 	CreateGameFn = (CreateGameFunc)GetProcAddress(hGameDLL, "CreateGame");
 	DestroyGameFn = (DestroyGameFunc)GetProcAddress(hGameDLL, "DestroyGame");
@@ -107,8 +132,37 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
+	// ============================================================
+	// Live++ 初期化 (Debug ビルドのみ)
+	// ============================================================
+#ifdef _DEBUG
+	// LivePP フォルダは EXE の隣にある前提
+	// (または Externals/LivePP への絶対パス を指定してもよい)
+// 例: Externals/LivePP が プロジェクトルートにある場合
+	s_lppAgent = lpp::LppCreateDefaultAgent(nullptr, L"Externals/LivePP");
+
+	if (lpp::LppIsValidDefaultAgent(&s_lppAgent)) {
+		// EXE 本体のパスを取得して Live++ に登録
+		wchar_t exeFullPath[MAX_PATH];
+		GetModuleFileNameW(nullptr, exeFullPath, MAX_PATH);
+		s_lppAgent.EnableModule(
+			exeFullPath,
+			lpp::LPP_MODULES_OPTION_ALL_IMPORT_MODULES,
+			nullptr, nullptr
+		);
+		Logger("Live++ initialized.");
+	}
+	else {
+		// Live++ が見つからなくても続行（任意で MessageBox に変えてもよい）
+		Logger("Warning: Live++ agent could not be created. Continuing without Live++.");
+	}
+#endif
+
 	// 初回ロード
 	if (!LoadGameDLL()) {
+#ifdef _DEBUG
+		lpp::LppDestroyDefaultAgent(&s_lppAgent);
+#endif
 		return -1;
 	}
 
@@ -124,7 +178,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			DispatchMessageW(&msg);
 		}
 
-		// ホットリロードチェック
+		// ホットリロードチェック（DLL まるごと入れ替え）
 		try {
 			auto exeDir = GetExecutableDir();
 			auto dllOrigin = exeDir / "YGame.dll";
@@ -150,6 +204,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	if (gameInstance)
 		DestroyGameFn(gameInstance);
+
+	// ============================================================
+	// Live++ 終了処理
+	// ============================================================
+#ifdef _DEBUG
+	lpp::LppDestroyDefaultAgent(&s_lppAgent);
+#endif
 
 	return 0;
 }

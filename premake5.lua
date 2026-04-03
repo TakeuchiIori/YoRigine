@@ -1,7 +1,11 @@
-
 -- 出力ディレクトリと中間ディレクトリの定義
 local outputDir = "$(SolutionDir)../generated/outputs/%{cfg.buildcfg}"
 local intDir    = "$(SolutionDir)../generated/intermediates/%{prj.name}/%{cfg.buildcfg}"
+
+-- =============================================================================
+-- Live++ のパス定義
+-- =============================================================================
+local livepp_dir = "%{wks.basedir}/Externals/LivePP"
 
 -- =============================================================================
 -- ワークスペース定義
@@ -11,7 +15,7 @@ workspace "YoRigine"
     configurations { "Debug", "Release" }
     platforms { "x64" }
 
-    startproject "YMain" -- EXEプロジェクトを開始プロジェクトに設定
+    startproject "YMain"
     location "%{wks.basedir}" 
     
     language "C++"
@@ -20,7 +24,6 @@ workspace "YoRigine"
     warnings "Extra"
     flags { "MultiProcessorCompile" }
 
-    -- PlatformToolset
     toolset "v143"
     
     buildoptions { "/utf-8", "/permissive-" }
@@ -29,9 +32,29 @@ workspace "YoRigine"
     targetdir (outputDir)
     objdir    (intDir)
 
+    -- ★★★ Live++ ドキュメント完全準拠のDebug設定 ★★★
     filter "configurations:Debug"
         defines { "_DEBUG" }
-        symbols "On"
+        symbols "On"          -- /Z7 または /Zi (デバッグ情報の生成)
+        editandcontinue "Off" -- /ZI (エディットコンティニュ) は非対応のため無効化
+
+        -- 【Live++: コンパイラ設定】
+        buildoptions {
+            "/Gm-", -- Enable Minimal Rebuild: No (最小リビルド無効化)
+            "/Gy",  -- Enable Function-Level Linking: Yes (関数レベルリンク有効化 - 推奨)
+            "/Gw"   -- Optimize Global Data: Yes (グローバルデータの最適化 - 推奨)
+            -- ※ x64環境のため /hotpatch は不要です
+        }
+
+        -- 【Live++: リンカー設定】
+        linkoptions {
+            "/INCREMENTAL:NO", -- Enable Incremental Linking: No (インクリメンタルリンク無効化)
+            "/OPT:NOREF",      -- References: Keep Unreferenced Data (未参照データを保持)
+            "/OPT:NOICF",      -- Enable COMDAT Folding: No (COMDAT折りたたみ無効化)
+            "/DEBUG:FULL" ,     -- FastLinkを無効化し、完全なPDBを生成する
+            "/FUNCTIONPADMIN"
+        }
+    -- ★★★ ここまで ★★★
 
     filter "configurations:Release"
         defines { "NDEBUG" }
@@ -55,7 +78,8 @@ local engine_includes = {
     "Externals/nlohmann",
     "Externals/DirectXTex",
     "Externals/imgui",
-    "Externals/assimp/include"
+    "Externals/assimp/include",
+    livepp_dir .. "/API"  -- 【追加】Live++のAPIヘッダー
 }
 
 local directx_libs = {
@@ -75,12 +99,8 @@ local game_includes = {
 -- プロジェクト定義
 -- =============================================================================
 
---------------------------------------------------------------------------------
--- グループ: Externals (外部ライブラリ)
---------------------------------------------------------------------------------
 group "Externals"
 
-    --------------------- ImGui (既存のvcxprojを参照) ---------------------
     externalproject "ImGui"
         location "Externals/ImGui"
         filename "ImGui"
@@ -88,7 +108,6 @@ group "Externals"
         language "C++"
         warnings "Default"
 
-    --------------------- DirectXTex (既存のvcxprojを参照) ---------------------
     externalproject "DirectXTex"
         location "Externals/DirectXTex"
         filename "DirectXTex_Desktop_2022_Win10"
@@ -96,12 +115,8 @@ group "Externals"
         language "C++"
         toolset "v143"
 
---------------------------------------------------------------------------------
--- グループ: Engine (エンジン・コア)
---------------------------------------------------------------------------------
 group "Engine"
 
-    --------------------- YMath (Static Library) ---------------------
     project "YMath"
         kind "StaticLib"
         language "C++"
@@ -113,16 +128,9 @@ group "Engine"
             "%{wks.basedir}/YMath/**.h",
             "%{wks.basedir}/YMath/**.cpp"
         }
+        includedirs { "%{wks.basedir}/YMath" }
+        vpaths { ["*"] = "YMath/**" }
 
-        includedirs {
-            "%{wks.basedir}/YMath"
-        }
-
-        vpaths {
-            ["*"] = "YMath/**"
-        }
-
-    --------------------- YEngine (Static Library) ---------------------
     project "YEngine"
         kind "StaticLib"
         location "%{wks.basedir}/YEngine"
@@ -131,22 +139,13 @@ group "Engine"
         fatalwarnings { "All" }
         linkoptions { "/ignore:4099" }
 
-        files {
-            "YEngine/**.h",
-            "YEngine/**.cpp",
-        }
-        
-        vpaths {
-            ["YEngine/*"] = "YEngine/**",
-        }
-
+        files { "YEngine/**.h", "YEngine/**.cpp" }
+        vpaths { ["YEngine/*"] = "YEngine/**" }
         includedirs(engine_includes)
-        
         dependson { "YMath","DirectXTex" }
         links { "YMath", "DirectXTex.lib" }
 
         postbuildcommands {
-            -- DXC/DXIL DLLのコピーは引き続き行う
             'xcopy /Q /Y /I "$(WindowsSdkDir)bin\\$(TargetPlatformVersion)\\x64\\dxcompiler.dll" "%{cfg.targetdir}"',
             'xcopy /Q /Y /I "$(WindowsSdkDir)bin\\$(TargetPlatformVersion)\\x64\\dxil.dll" "%{cfg.targetdir}"',
         }
@@ -154,47 +153,28 @@ group "Engine"
         filter "configurations:Debug"
             defines { "USE_IMGUI" }
             dependson { "ImGui"}
-            links { "ImGui" } -- 外部プロジェクト名と合わせる
-            libdirs { 
-                "Externals/assimp/lib/Debug",
-                outputDir
-            }
+            links { "ImGui" }
+            libdirs { "Externals/assimp/lib/Debug", outputDir }
             links { "assimp-vc143-mtd" }
 
         filter "configurations:Release"
             undefines { "USE_IMGUI" }
-            libdirs { 
-                "Externals/assimp/lib/Release",
-                outputDir
-            }
+            libdirs { "Externals/assimp/lib/Release", outputDir }
             links { "assimp-vc143-mt" }
-
         filter {}
 
---------------------------------------------------------------------------------
--- グループ: Game (ゲーム本体)
---------------------------------------------------------------------------------
 group "Game"
 
-    --------------------- GameDll (Shared Library) ---------------------
     project "YGame"
         kind "SharedLib"
         location "%{wks.basedir}/YGame"
         defines { "GAME_BUILD_DLL" }
 
         fatalwarnings { "All" }
-        linkoptions { "/ignore:4099" }
 
-        files {
-            "YGame/**.h",
-            "YGame/**.cpp"
-        }
+        files { "YGame/**.h", "YGame/**.cpp" }
         removefiles { "YGame/Main.cpp" }
-
-        vpaths {
-            ["YGame/*"] = "YGame/**"
-        }
-
+        vpaths { ["YGame/*"] = "YGame/**" }
         includedirs(game_includes)
         includedirs(engine_includes)
 
@@ -206,76 +186,50 @@ group "Game"
             defines { "USE_IMGUI" }
             dependson { "ImGui"}
             links { "ImGui" }
+            linkoptions { "/ignore:4099" }
             libdirs { outputDir }
 
         filter "configurations:Release"
             undefines { "USE_IMGUI" }
             removefiles { "Externals/imgui/**.cpp" }
             libdirs { outputDir }
-
+            linkoptions { "/ignore:4099" }
         filter {}
 
-    --------------------- EXE (Windowed Application) ---------------------
     project "YMain"
         kind "WindowedApp"
         location "%{wks.basedir}/YMain"
 
-        -- 先にGame側をビルド
         dependson { "YGame" ,"YResources"}
-        
-        -- 【変更点 1】デバッグ時の作業ディレクトリをワークスペースルートに設定
-        -- これにより、EXEはここで実行され、"Resources"はソースフォルダを指す
         debugdir "%{wks.basedir}" 
         fatalwarnings { "All" }
 
         files { "YMain/Main.cpp" }
-        vpaths {
-            ["YMain/*"] = "YMain/**",
-        }
-
+        vpaths { ["YMain/*"] = "YMain/**" }
         includedirs { "." }
         includedirs(engine_includes)
         includedirs(game_includes)
         
-        -- 【変更点 2】共通のpostbuildcommandsからリソースコピーを削除
-        -- DXC/DXIL DLLのコピーはYEngineに移したので、ここは空でOK
         postbuildcommands { } 
 
         filter "configurations:Debug"
             defines { "_DEBUG" }
-            -- Debug時はリソースコピー処理なし (元のフォルダを直接読み書き)
-        
+            
         filter "configurations:Release"
             defines { "NDEBUG" }
-            -- 【変更点 3】Release時のみリソースをEXEの隣にコピー
             postbuildcommands {
                  'xcopy /Q /E /I /Y "%{wks.basedir}/Resources" "%{cfg.targetdir}/Resources"'
             }
-
             linkoptions { "/ignore:4006" }
-
         filter {}
 
---------------------------------------------------------------------------------
--- グループ終了
---------------------------------------------------------------------------------
 group ""
 
---------------------------------------------------------------------------------
--- Resources (リソース管理)
---------------------------------------------------------------------------------
 group "Resources"
-
     project "YResources"
         kind "None" 
         location "Resources"
-        
         files { "Resources/**.*" }
-        
-        vpaths {
-           ["Resources/*"] = "Resources/**"
-        }
-
+        vpaths { ["Resources/*"] = "Resources/**" }
         excludes { "Resources/**.*" }
-
 group ""
