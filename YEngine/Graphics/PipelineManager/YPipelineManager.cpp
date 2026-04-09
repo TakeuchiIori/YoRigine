@@ -148,6 +148,10 @@ void YPipelineManager::Initialize()
         L"Resources/Shaders/PostEffect/Transition/ShatterTransition.PS.hlsl",
         "ShatterTransition");
 
+	// Meshを使用したVFX用パイプライン
+    CreatePSO_VfxMeshTrail();
+    CreatePSO_VfxMeshVolume();
+
     // 統計情報を出力
     auto stats = psoCache_->GetStats();
     char buf[512];
@@ -658,6 +662,79 @@ void YPipelineManager::CreatePSO_EffectObject()
     rootSignatures_["EffectObject"] = result.rootSignature;
     pipelineStates_["EffectObject"] = result.pipelineState;
     parameterIndices_["EffectObject"] = result.parameterIndices;
+}
+
+/// <summary>
+/// Meshを使用したVFX
+/// </summary>
+void YPipelineManager::CreatePSO_VfxMeshTrail() {
+
+    // シェーダーコンパイル
+    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Vfx/VfxMesh/VfxMesh.VS.hlsl", L"vs_6_0");
+    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Vfx/VfxMesh/VfxMesh_Trail.PS.hlsl", L"ps_6_0");
+
+    // ブレンドモード設定
+    struct BlendConfig {
+        BlendMode mode;
+        std::string name;
+        D3D12_BLEND_DESC blendDesc;
+    };
+
+    BlendConfig configs[] = {
+        { BlendMode::kBlendModeNone, "None", BlendPresets::CreateNone() },
+        { BlendMode::kBlendModeNormal, "Normal", BlendPresets::CreateAlphaBlend() },
+        { BlendMode::kBlendModeAdd, "Add", BlendPresets::CreateAdditive() },
+        { BlendMode::kBlendModeSubtract, "Subtract", BlendPresets::CreateSubtractive() },
+        { BlendMode::kBlendModeMultiply, "Multiply", BlendPresets::CreateMultiply() },
+        { BlendMode::kBlendModeScreen, "Screen", BlendPresets::CreateScreen() },
+    };
+
+    // 各ブレンドモードごとにPSOを生成
+    for (const auto& config : configs) {
+        ReflectionBasedPipelineBuilder builder;
+        auto result = builder
+            .SetBlendState(config.blendDesc)
+            .SetRasterizerState(RasterizerPresets::CreateNoCull())
+            .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
+            .BuildFromCompiledShaders(
+                dxCommon_->GetDevice().Get(),
+                vsBlob.Get(),
+                psBlob.Get()
+            );
+
+        std::string psoName = "VfxMeshTrail_" + config.name;
+        pipelineStates_[psoName] = result.pipelineState;
+        blendModePipelineStates_["VfxMeshTrail"][config.mode] = result.pipelineState;
+
+        // 最初のモードだけルートシグネチャとインデックスを保存
+        if (config.mode == BlendMode::kBlendModeNormal) {
+            rootSignatures_["VfxMeshTrail"] = result.rootSignature;
+            parameterIndices_["VfxMeshTrail"] = result.parameterIndices;
+        }
+    }
+
+}
+
+void YPipelineManager::CreatePSO_VfxMeshVolume() {
+    // シェーダーをコンパイル
+    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Vfx/VfxMesh/VfxMesh.VS.hlsl", L"vs_6_0");
+    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Vfx/VfxMesh/VfxMesh_Volume.PS.hlsl", L"ps_6_0");
+
+    // リフレクションベースで完全自動生成
+    ReflectionBasedPipelineBuilder builder;
+    auto result = builder
+        .SetRasterizerState(RasterizerPresets::CreateNoCull())
+        .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
+		.SetBlendState(BlendPresets::CreateAdditive())
+        .BuildFromCompiledShaders(
+            dxCommon_->GetDevice().Get(),
+            vsBlob.Get(),
+            psBlob.Get()
+        );
+
+    rootSignatures_["VfxMeshVolume"] = result.rootSignature;
+    pipelineStates_["VfxMeshVolume"] = result.pipelineState;
+    parameterIndices_["VfxMeshVolume"] = result.parameterIndices;
 }
 
 

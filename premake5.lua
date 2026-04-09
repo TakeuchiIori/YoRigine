@@ -1,4 +1,3 @@
-
 -- 出力ディレクトリと中間ディレクトリの定義
 local outputDir = "$(SolutionDir)../generated/outputs/%{cfg.buildcfg}"
 local intDir    = "$(SolutionDir)../generated/intermediates/%{prj.name}/%{cfg.buildcfg}"
@@ -176,11 +175,10 @@ group "Engine"
 --------------------------------------------------------------------------------
 group "Game"
 
-    --------------------- GameDll (Shared Library) ---------------------
+    --------------------- YGame (Debug=DLL / Release=StaticLib) ---------------------
     project "YGame"
-        kind "SharedLib"
+        -- kind は filter で設定
         location "%{wks.basedir}/YGame"
-        defines { "GAME_BUILD_DLL" }
 
         fatalwarnings { "All" }
         linkoptions { "/ignore:4099" }
@@ -202,13 +200,19 @@ group "Game"
         links { "YMath", "YEngine", "DirectXTex.lib" }
         links(directx_libs)
 
+        -- Debug: DLL として配布・暗黙的リンク
         filter "configurations:Debug"
+            kind "SharedLib"
+            defines { "GAME_BUILD_DLL" }  -- dllexport が有効
             defines { "USE_IMGUI" }
-            dependson { "ImGui"}
+            dependson { "ImGui" }
             links { "ImGui" }
             libdirs { outputDir }
 
+        -- Release: StaticLib として EXE に直接埋め込む
+        -- GAME_BUILD_DLL 未定義 → GAME_API が空 → dllexport/import が消える
         filter "configurations:Release"
+            kind "StaticLib"
             undefines { "USE_IMGUI" }
             removefiles { "Externals/imgui/**.cpp" }
             libdirs { outputDir }
@@ -220,11 +224,8 @@ group "Game"
         kind "WindowedApp"
         location "%{wks.basedir}/YMain"
 
-        -- 先にGame側をビルド
-        dependson { "YGame" ,"YResources"}
+        dependson { "YGame", "YResources" }
         
-        -- 【変更点 1】デバッグ時の作業ディレクトリをワークスペースルートに設定
-        -- これにより、EXEはここで実行され、"Resources"はソースフォルダを指す
         debugdir "%{wks.basedir}" 
         fatalwarnings { "All" }
 
@@ -236,22 +237,22 @@ group "Game"
         includedirs { "." }
         includedirs(engine_includes)
         includedirs(game_includes)
-        
-        -- 【変更点 2】共通のpostbuildcommandsからリソースコピーを削除
-        -- DXC/DXIL DLLのコピーはYEngineに移したので、ここは空でOK
+
+        -- 【追加】YGame.lib（インポートライブラリ）を暗黙的リンク
+        libdirs { outputDir }
+        links { "YGame" }
+
         postbuildcommands { } 
 
         filter "configurations:Debug"
             defines { "_DEBUG" }
-            -- Debug時はリソースコピー処理なし (元のフォルダを直接読み書き)
+            defines { "GAME_IMPORT_DLL" }  -- YGame.dll のインポート宣言を有効化
         
         filter "configurations:Release"
             defines { "NDEBUG" }
-            -- 【変更点 3】Release時のみリソースをEXEの隣にコピー
             postbuildcommands {
                  'xcopy /Q /E /I /Y "%{wks.basedir}/Resources" "%{cfg.targetdir}/Resources"'
             }
-
             linkoptions { "/ignore:4006" }
 
         filter {}

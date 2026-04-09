@@ -520,4 +520,5 @@ void GameScene::HandleGameClear() {
 void GameScene::Finalize() {
 	YoRigine::JsonManager::ClearSceneInstances("GameScene");
 	if (subSceneManager_) subSceneManager_->Finalize();
+	subSceneManager_ = nullptr;
 }
