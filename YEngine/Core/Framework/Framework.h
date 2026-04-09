@@ -20,11 +20,10 @@
 #include "Debugger/DebugConsole.h"
 #include "Debugger/D3DResourceLeakChecker.h"
 #include "Object3D/ObjectManager.h"
-#include <../YGame/GameAPI.h>
 /// <summary>
 /// 全体の枠組みを管理するクラス
 /// </summary>
-class GAME_API Framework
+class Framework
 {
 public:
 	///************************* 基本関数 *************************///
