@@ -278,6 +278,7 @@
 └── └── ├── GameScene/
 └── └── ├── Title/
 └── ├── UIScenes/
+└── ├── Vfx/
 └── └── images/
 ├── YEngine/
 └── ├── Core/
@@ -192924,13 +192925,14 @@ File Path: YEngine/Core/SceneSystems/DevelopScene/DevelopScene.cpp
 
 #include "Object3D/Object3dCommon.h"
 #include "LightManager/LightManager.h"
+#include <Systems/GameTime/GameTime.h>
 
 #include "Particle./ParticleManager.h"
 #include "Particle/YParticleManager.h"
 #include "Particle/YParticleEditor.h"
 #include "Particle/YEmitterGroupEditor.h"
 #include "GPUParticle/GpuEmitManager.h"
-
+#include <Vfx/VfxMesh/VfxMeshEditor.h>
 
 
 // Camera
@@ -192991,8 +192993,11 @@ void DevelopScene::Initialize() {
 	Editor::GetInstance()->RegisterGameUI("GpuParticle", [this]() { YoRigine::GpuEmitManager::GetInstance()->DrawImGui(); }, "Develop");
 	Editor::GetInstance()->RegisterGameUI("YoRigine:パーティクルエディター", [this]() {YParticleEditor::GetInstance().ShowEditorWindow(); }, "Develop");
 	Editor::GetInstance()->RegisterGameUI("モーションエディタ", [this]() {motionEditor_->ShowEditor(); }, "Develop");
+	Editor::GetInstance()->RegisterGameUI("VFX", [this]() { YoRigine::VfxMeshEditor::GetInstance()->DrawImGui(); }, "Develop");
 
 #endif
+
+	YoRigine::VfxMeshEditor::GetInstance()->Initialize();
 }
 
 /// <summary>
@@ -193009,7 +193014,7 @@ void DevelopScene::Update() {
 	YParticleManager::GetInstance().Update(YoRigine::GameTime::GetDeltaTime());
 	YoRigine::LightManager::GetInstance()->UpdateShadowMatrix(sceneCamera_.get());
 	YoRigine::GpuEmitManager::GetInstance()->Update();
-
+	YoRigine::VfxMeshEditor::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
 }
 
 /// <summary>
@@ -193030,6 +193035,7 @@ void DevelopScene::Draw() {
 	YParticleManager::GetInstance().Draw();
 	DrawLine();
 	YoRigine::GpuEmitManager::GetInstance()->Draw();
+	YoRigine::VfxMeshEditor::GetInstance()->DrawPreview(YoRigine::DirectXCommon::GetInstance()->GetCommandList().Get(), sceneCamera_->GetCameraResource()->GetGPUVirtualAddress());
 }
 
 /// <summary>
@@ -193119,6 +193125,7 @@ File Path: YEngine/Core/SceneSystems/DevelopScene/DevelopScene.h
 #include "Systems/Camera/Camera.h"
 
 #include "Motion/MotionEditor.h"
+
 
 class DevelopScene : public BaseScene
 {
@@ -218196,105 +218203,79 @@ File Path: YEngine/Generators/Vfx/VfxMesh/ProceduralMeshBase.h
 #pragma once
 // ===========================================================
 // ProceduralMeshBase.h
-//
-// TrailMesh / LightVolumeMesh の共通基底クラス
-// DynamicVertexBuffer + PSO の保持と描画コマンド発行を担う
 // ===========================================================
 #include <d3d12.h>
 #include <wrl.h>
-#include <string>
-#include "Buffers/DynamicVertexBuffer.h"
+#include <vector>
+#include <Buffers/DynamicVertexBuffer.h>
 #include "MathFunc.h"
 
 namespace YoRigine {
 
-class DirectXCommon;
+    class DirectXCommon;
 
-// -----------------------------------------------------------
-// 共通頂点レイアウト  (VfxMesh_Common.hlsli に対応)
-// -----------------------------------------------------------
-struct ProceduralMeshVertex
-{
-    Vector3 position;   // POSITION
-    Vector2 texcoord;   // TEXCOORD0
-    Vector4 color;      // COLOR0   (rgba, alpha はフェード済み)
-    float   age;        // TEXCOORD1 (0=新しい, 1=古い/端)
-};
-
-// -----------------------------------------------------------
-// PSO 種別 (VfxEditor の BlendMode と対応させる)
-// -----------------------------------------------------------
-enum class VfxPsoType : uint8_t
-{
-    TrailAdd = 0,   // Trail 加算
-    TrailAlpha,     // Trail 通常アルファ
-    LightVolume,    // LightVolume 加算
-};
-
-// -----------------------------------------------------------
-// 基底クラス
-// -----------------------------------------------------------
-class ProceduralMeshBase
-{
-public:
-    ProceduralMeshBase() = default;
-    virtual ~ProceduralMeshBase() = default;
-
-    // コピー禁止
-    ProceduralMeshBase(const ProceduralMeshBase&)            = delete;
-    ProceduralMeshBase& operator=(const ProceduralMeshBase&) = delete;
-
-    // --------------------------------------------------------
-    // 継承クラスが実装するインターフェース
-    // --------------------------------------------------------
-
-    /// 毎フレーム頂点データを更新する (CPU 側ロジック)
-    /// @param deltaTime 前フレームからの経過秒
-    virtual void Update(float deltaTime) = 0;
-
-    /// GPU バッファへ Upload → SetVB → DrawInstanced
-    /// コマンドリスト記録フェーズに呼ぶ
-    virtual void Draw(ID3D12GraphicsCommandList* cmdList) = 0;
-
-    // --------------------------------------------------------
-    // 共通アクセサ
-    // --------------------------------------------------------
-    bool IsVisible()  const { return isVisible_; }
-    void SetVisible(bool v) { isVisible_ = v; }
-
-    uint32_t GetVertexCount() const { return vertexBuffer_.GetActiveVertexCount(); }
-
-protected:
-    // --------------------------------------------------------
-    // 派生クラスから使うユーティリティ
-    // --------------------------------------------------------
-
-    /// DynamicVertexBuffer を初期化する (派生クラスのInitialize内で呼ぶ)
-    void InitBuffer(size_t initialCapacity)
+    // -----------------------------------------------------------
+    // 共通頂点レイアウト  (VfxMesh_Common.hlsli に対応)
+    // -----------------------------------------------------------
+    struct ProceduralMeshVertex
     {
-        vertexBuffer_.Initialize(initialCapacity, sizeof(ProceduralMeshVertex));
-    }
+        Vector3 position;   // POSITION
+        Vector2 texcoord;   // TEXCOORD0
+        Vector4 color;      // COLOR0
+        float   age;        // TEXCOORD1
+    };
 
-    /// 頂点列を GPU へ送り VBV を更新する
-    uint32_t UploadVertices(const std::vector<ProceduralMeshVertex>& verts)
+    // -----------------------------------------------------------
+    // 基底クラス
+    // -----------------------------------------------------------
+    class ProceduralMeshBase
     {
-        return vertexBuffer_.Upload(verts);
-    }
+    public:
+        ProceduralMeshBase() = default;
+        virtual ~ProceduralMeshBase() = default;
 
-    /// VBV を CommandList にセットする
-    void BindVertexBuffer(ID3D12GraphicsCommandList* cmdList) const
-    {
-        const auto& vbv = vertexBuffer_.GetView();
-        cmdList->IASetVertexBuffers(0, 1, &vbv);
-    }
+        ProceduralMeshBase(const ProceduralMeshBase&) = delete;
+        ProceduralMeshBase& operator=(const ProceduralMeshBase&) = delete;
 
-protected:
-    DynamicVertexBuffer vertexBuffer_;
-    bool                isVisible_ = true;
-};
+        // --------------------------------------------------------
+        // 継承クラスが実装するインターフェース
+        // --------------------------------------------------------
+
+        virtual void Update(float deltaTime) = 0;
+
+        /// @param cmdList          コマンドリスト
+        /// @param cameraGPUAddress gCamera CBV の GPU アドレス (b0)
+        ///                         他のパイプラインと同様に引数で受け取る
+        virtual void Draw(ID3D12GraphicsCommandList* cmdList) = 0;
+
+        // --------------------------------------------------------
+        bool     IsVisible()    const { return isVisible_; }
+        void     SetVisible(bool v) { isVisible_ = v; }
+        uint32_t GetVertexCount() const { return vertexBuffer_.GetActiveVertexCount(); }
+
+    protected:
+        void InitBuffer(size_t initialCapacity)
+        {
+            vertexBuffer_.Initialize(initialCapacity, sizeof(ProceduralMeshVertex));
+        }
+
+        uint32_t UploadVertices(const std::vector<ProceduralMeshVertex>& verts)
+        {
+            return vertexBuffer_.Upload(verts);
+        }
+
+        void BindVertexBuffer(ID3D12GraphicsCommandList* cmdList) const
+        {
+            const auto& vbv = vertexBuffer_.GetView();
+            cmdList->IASetVertexBuffers(0, 1, &vbv);
+        }
+
+    protected:
+        DynamicVertexBuffer vertexBuffer_;
+        bool                isVisible_ = true;
+    };
 
 } // namespace YoRigine
-
 
 ============================================================
 File Path: YEngine/Generators/Vfx/VfxMesh/TrailMesh.cpp
@@ -218308,138 +218289,310 @@ File Path: YEngine/Generators/Vfx/VfxMesh/TrailMesh.cpp
 
 namespace YoRigine {
 
-// -----------------------------------------------------------
-void TrailMesh::Initialize(const TrailEffectParam& param)
-{
-    param_ = param;
-    // 最大 maxPoints 点 × 2 頂点(tip/root) のストリップ
-    const size_t maxVerts = static_cast<size_t>(param_.maxPoints) * 2;
-    InitBuffer(maxVerts);
-    vertices_.reserve(maxVerts);
-}
-
-// -----------------------------------------------------------
-void TrailMesh::ApplyParam(const TrailEffectParam& param)
-{
-    param_ = param;
-    // maxPoints が増えていたらバッファも拡張 (DynamicVertexBuffer が自動リサイズするので特別な処理不要)
-}
-
-// -----------------------------------------------------------
-void TrailMesh::Clear()
-{
-    points_.clear();
-    vertices_.clear();
-    time_ = 0.f;
-}
-
-// -----------------------------------------------------------
-void TrailMesh::AddPoint(const Vector3& tip, const Vector3& root)
-{
-    // maxPoints を超えたら古い端を削除
-    while (static_cast<int>(points_.size()) >= param_.maxPoints) {
-        points_.pop_back();
-    }
-
-    TrailPoint p;
-    p.tip  = tip;
-    p.root = root;
-    p.age  = 0.f;
-    points_.push_front(p);
-}
-
-// -----------------------------------------------------------
-void TrailMesh::Update(float deltaTime)
-{
-    time_ += deltaTime;
-
-    // 全ポイントの age を進める
-    for (auto& p : points_) {
-        p.age += deltaTime;
-    }
-
-    // 寿命切れを末尾から削除
-    while (!points_.empty() && points_.back().age >= param_.lifetime) {
-        points_.pop_back();
-    }
-
-    // 頂点を再構築して GPU へ
-    RebuildVertices();
-}
-
-// -----------------------------------------------------------
-void TrailMesh::RebuildVertices()
-{
-    vertices_.clear();
-
-    const size_t n = points_.size();
-    if (n < 2) {
-        // 1点以下では面が作れない → 頂点ゼロで Upload して描画をスキップ
-        UploadVertices(vertices_);
-        return;
-    }
-
-    vertices_.reserve(n * 2);
-
-    for (size_t i = 0; i < n; ++i)
+    // -----------------------------------------------------------
+    void TrailMesh::Initialize(const TrailEffectParam& param)
     {
-        const TrailPoint& p = points_[i];
+        param_ = param;
+        // --- 新規追加: パラメータの適用 ---
+        shapeType_ = param_.shapeType;
+        widthSegments_ = param_.widthSegments;
+        arcAngleDeg_ = param_.arcAngleDeg;
 
-        // texcoord.x : 0=tip(刃先), 1=root(根本)
-        // texcoord.y : 0=最新ポイント, 1=最古ポイント (UV スクロール対応)
-        const float tY = static_cast<float>(i) / static_cast<float>(n - 1);
-
-        // 幅補間: 新しい端 → widthStart, 古い端 → widthEnd
-        //   ※ 実際の幅は (tip - root) の長さで既に決まっているので
-        //     ここでは色/フェード用に age を正規化して渡す
-        const float normalizedAge = NormalizeAge(p.age);
-
-        // 色グラデーション: colorStart(根元) ↔ colorEnd(先端) を lerp
-        //   実際のブレンドはシェーダーが gMeshParam.colorInner/Outer で行う
-        //   頂点カラーは乗算マスクとして白～フェード値を渡す
-        const float fade = 1.f - normalizedAge; // 古いほど透明
-        const Vector4 vColor = { 1.f, 1.f, 1.f, fade };
-
-        // UV スクロール: texcoord.y にオフセット加算
-        const float uvY = tY + time_ * param_.uvScrollSpeed;
-
-        // Tip 頂点 (texcoord.x = 0)
-        ProceduralMeshVertex vTip;
-        vTip.position = p.tip;
-        vTip.texcoord = { 0.f, uvY };
-        vTip.color    = vColor;
-        vTip.age      = normalizedAge;
-        vertices_.push_back(vTip);
-
-        // Root 頂点 (texcoord.x = 1)
-        ProceduralMeshVertex vRoot;
-        vRoot.position = p.root;
-        vRoot.texcoord = { 1.f, uvY };
-        vRoot.color    = vColor;
-        vRoot.age      = normalizedAge;
-        vertices_.push_back(vRoot);
+        // 最大 maxPoints 点 × 2 頂点(tip/root) のストリップ
+        const size_t maxVerts = static_cast<size_t>(param_.maxPoints) * 2;
+        InitBuffer(maxVerts);
+        vertices_.reserve(maxVerts);
     }
 
-    UploadVertices(vertices_);
-}
+    // -----------------------------------------------------------
+    void TrailMesh::ApplyParam(const TrailEffectParam& param)
+    {
+        param_ = param;
+        shapeType_ = param_.shapeType;
+        widthSegments_ = param_.widthSegments;
+        arcAngleDeg_ = param_.arcAngleDeg;
 
-// -----------------------------------------------------------
-void TrailMesh::Draw(ID3D12GraphicsCommandList* cmdList)
-{
-    if (!isVisible_) return;
+        // maxPoints が増えていたらバッファも拡張 (DynamicVertexBuffer が自動リサイズするので特別な処理不要)
+    }
 
-    const uint32_t vertCount = GetVertexCount();
-    if (vertCount < 4) return; // 最低 2 ポイント = 4 頂点必要
+    // -----------------------------------------------------------
+    void TrailMesh::Clear()
+    {
+        points_.clear();
+        vertices_.clear();
+        time_ = 0.f;
+    }
 
-    // PSO / ルートシグネチャ / CBV は呼び出し元でセット済みを前提
+    // -----------------------------------------------------------
+    void TrailMesh::AddPoint(const Vector3& tip, const Vector3& root)
+    {
+        AddPoint(tip, root, Vector3{ 1.f, 0.f, 0.f }); // widthDir はデフォルトで X 軸
+    }
 
-    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-    BindVertexBuffer(cmdList);
-    cmdList->DrawInstanced(vertCount, 1, 0, 0);
-}
+    // -----------------------------------------------------------
+    void TrailMesh::AddPoint(const Vector3& tip, const Vector3& root, const Vector3& widthDir)
+    {
+        // maxPoints を超えたら古い端を削除
+        while (static_cast<int>(points_.size()) >= param_.maxPoints) {
+            points_.pop_back();
+        }
+
+        TrailPoint p;
+        p.tip = tip;
+        p.root = root;
+        p.widthDir = widthDir;
+        p.age = 0.f;
+        points_.push_front(p);
+    }
+
+    // -----------------------------------------------------------
+    void TrailMesh::Update(float deltaTime)
+    {
+        time_ += deltaTime;
+
+        // 全ポイントの age を進める
+        for (auto& p : points_) {
+            p.age += deltaTime;
+        }
+
+        // 寿命切れを末尾から削除
+        while (!points_.empty() && points_.back().age >= param_.lifetime) {
+            points_.pop_back();
+        }
+
+        // 頂点を再構築して GPU へ
+        RebuildVertices();
+    }
+
+    // -----------------------------------------------------------
+    void TrailMesh::RebuildVertices()
+    {
+        vertices_.clear();
+
+        switch (shapeType_) {
+        case TrailShapeType::Arc: RebuildArc(); break;
+        case TrailShapeType::Fan: RebuildFan(); break;
+        case TrailShapeType::Flat:
+        default:                  RebuildFlat(); break;
+        }
+
+        UploadVertices(vertices_);
+    }
+
+    // -----------------------------------------------------------
+    // Flat: 従来通り tip/root の 2 列ストリップ
+    // -----------------------------------------------------------
+    void TrailMesh::RebuildFlat()
+    {
+        const size_t n = points_.size();
+        if (n < 2) return;
+
+        vertices_.reserve(n * 2);
+
+        for (size_t i = 0; i < n; ++i)
+        {
+            const TrailPoint& p = points_[i];
+            const float tY = static_cast<float>(i) / static_cast<float>(n - 1);
+            const float normalizedAge = NormalizeAge(p.age);
+            const Vector4 vColor = CalcFadeColor(normalizedAge);
+            const float uvY = tY + time_ * param_.uvScrollSpeed;
+
+            ProceduralMeshVertex vTip;
+            vTip.position = p.tip;
+            vTip.texcoord = { 0.f, uvY };
+            vTip.color = vColor;
+            vTip.age = normalizedAge;
+            vertices_.push_back(vTip);
+
+            ProceduralMeshVertex vRoot;
+            vRoot.position = p.root;
+            vRoot.texcoord = { 1.f, uvY };
+            vRoot.color = vColor;
+            vRoot.age = normalizedAge;
+            vertices_.push_back(vRoot);
+        }
+    }
+
+    // -----------------------------------------------------------
+    // Arc: 各ポイントで断面を widthSegments 本の列に分割し
+    //      tip→root 方向を弧状に曲げた断面を生成する
+    //
+    //  断面イメージ (widthSegments=4, arcAngleDeg=120 の場合):
+    //
+    //      tip
+    //       |  ← 弧の中心軸 (tip-root ベクトル)
+    //   col0 col1 col2 col3 col4
+    //      root
+    //
+    //  各列の位置は tip-root 中点を中心に widthDir 方向へ弧を描く
+    // -----------------------------------------------------------
+    void TrailMesh::RebuildArc()
+    {
+        const size_t n = points_.size();
+        if (n < 2) return;
+
+        const int   segs = std::max(1, widthSegments_);
+        const float halfRad = (arcAngleDeg_ * 3.14159265f / 180.f) * 0.5f;
+
+        // 頂点数: n ポイント × (segs+1) 列
+        // TriangleStrip でポイント間を繋ぐので各セグメント列ごとにストリップを分ける
+        // セグメント s と s+1 の列を交互に並べた n*2 頂点のストリップを segs 本作る
+
+        for (int s = 0; s < segs; ++s)
+        {
+            // 縮退三角形でセグメント間を接続
+            if (s > 0 && !vertices_.empty()) {
+                vertices_.push_back(vertices_.back());
+                vertices_.push_back({});  // ダミー (後で上書き)
+            }
+
+            bool firstInSeg = true;
+
+            for (size_t i = 0; i < n; ++i)
+            {
+                const TrailPoint& p = points_[i];
+                const float tY = static_cast<float>(i) / static_cast<float>(n - 1);
+                const float normalizedAge = NormalizeAge(p.age);
+                const Vector4 vColor = CalcFadeColor(normalizedAge);
+                const float uvY = tY + time_ * param_.uvScrollSpeed;
+
+                // tip-root の中点と半径
+                const Vector3 center = {
+                    (p.tip.x + p.root.x) * 0.5f,
+                    (p.tip.y + p.root.y) * 0.5f,
+                    (p.tip.z + p.root.z) * 0.5f
+                };
+                const float radius = std::sqrt(
+                    (p.tip.x - center.x) * (p.tip.x - center.x) +
+                    (p.tip.y - center.y) * (p.tip.y - center.y) +
+                    (p.tip.z - center.z) * (p.tip.z - center.z));
+
+                // セグメント s と s+1 の弧角度
+                for (int col = s; col <= s + 1; ++col)
+                {
+                    const float t = static_cast<float>(col) / static_cast<float>(segs);
+                    const float ang = -halfRad + t * (arcAngleDeg_ * 3.14159265f / 180.f);
+
+                    // 弧上の位置: center + widthDir*sin(ang)*r + (tip-center)*cos(ang)
+                    const float cosA = std::cos(ang);
+                    const float sinA = std::sin(ang);
+
+                    const Vector3 tipDir = {
+                        (p.tip.x - center.x) / (radius + 1e-6f),
+                        (p.tip.y - center.y) / (radius + 1e-6f),
+                        (p.tip.z - center.z) / (radius + 1e-6f)
+                    };
+
+                    ProceduralMeshVertex v;
+                    v.position = {
+                        center.x + (tipDir.x * cosA + p.widthDir.x * sinA) * radius,
+                        center.y + (tipDir.y * cosA + p.widthDir.y * sinA) * radius,
+                        center.z + (tipDir.z * cosA + p.widthDir.z * sinA) * radius
+                    };
+                    v.texcoord = { t, uvY };
+                    v.color = vColor;
+                    v.age = normalizedAge;
+
+                    // 縮退ダミーの上書き
+                    if (s > 0 && firstInSeg && col == s) {
+                        vertices_.back() = v;
+                        firstInSeg = false;
+                    }
+                    vertices_.push_back(v);
+                }
+            }
+        }
+    }
+
+    // -----------------------------------------------------------
+    // Fan: tip を頂点とした扇形断面
+    //      tip から root 方向に widthDir で広げる
+    //
+    //  断面イメージ (segs=3 の場合):
+    //
+    //       tip (固定)
+    //      /  |  \
+    //   r0   r1   r2   r3   ← root 側を分割
+    // -----------------------------------------------------------
+    void TrailMesh::RebuildFan()
+    {
+        const size_t n = points_.size();
+        if (n < 2) return;
+
+        const int   segs = std::max(1, widthSegments_);
+        const float halfRad = (arcAngleDeg_ * 3.14159265f / 180.f) * 0.5f;
+
+        for (int s = 0; s < segs; ++s)
+        {
+            if (s > 0 && !vertices_.empty()) {
+                vertices_.push_back(vertices_.back());
+                vertices_.push_back({});
+            }
+
+            bool firstInSeg = true;
+
+            for (size_t i = 0; i < n; ++i)
+            {
+                const TrailPoint& p = points_[i];
+                const float tY = static_cast<float>(i) / static_cast<float>(n - 1);
+                const float normalizedAge = NormalizeAge(p.age);
+                const Vector4 vColor = CalcFadeColor(normalizedAge);
+                const float uvY = tY + time_ * param_.uvScrollSpeed;
+
+                // root 方向の単位ベクトル
+                const Vector3 toRoot = {
+                    p.root.x - p.tip.x,
+                    p.root.y - p.tip.y,
+                    p.root.z - p.tip.z
+                };
+                const float len = std::sqrt(
+                    toRoot.x * toRoot.x + toRoot.y * toRoot.y + toRoot.z * toRoot.z) + 1e-6f;
+                const Vector3 rootDir = { toRoot.x / len, toRoot.y / len, toRoot.z / len };
+
+                for (int col = s; col <= s + 1; ++col)
+                {
+                    const float t = static_cast<float>(col) / static_cast<float>(segs);
+                    const float ang = -halfRad + t * (arcAngleDeg_ * 3.14159265f / 180.f);
+
+                    const float cosA = std::cos(ang);
+                    const float sinA = std::sin(ang);
+
+                    ProceduralMeshVertex v;
+                    v.position = {
+                        p.tip.x + (rootDir.x * cosA + p.widthDir.x * sinA) * len,
+                        p.tip.y + (rootDir.y * cosA + p.widthDir.y * sinA) * len,
+                        p.tip.z + (rootDir.z * cosA + p.widthDir.z * sinA) * len
+                    };
+                    v.texcoord = { t, uvY };
+                    v.color = vColor;
+                    v.age = normalizedAge;
+
+                    if (s > 0 && firstInSeg && col == s) {
+                        vertices_.back() = v;
+                        firstInSeg = false;
+                    }
+                    vertices_.push_back(v);
+                }
+            }
+        }
+    }
+
+    // -----------------------------------------------------------
+    void TrailMesh::Draw(ID3D12GraphicsCommandList* cmdList)
+    {
+        if (!isVisible_) return;
+
+        const uint32_t vertCount = GetVertexCount();
+        if (vertCount < 4) return; // 最低 2 ポイント = 4 頂点必要
+
+        // PSO / ルートシグネチャ / CBV は呼び出し元でセット済みを前提
+
+        cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+        BindVertexBuffer(cmdList);
+        cmdList->DrawInstanced(vertCount, 1, 0, 0);
+    }
 
 } // namespace YoRigine
-
 
 ============================================================
 File Path: YEngine/Generators/Vfx/VfxMesh/TrailMesh.h
@@ -218465,88 +218618,126 @@ File Path: YEngine/Generators/Vfx/VfxMesh/TrailMesh.h
 #include <deque>
 
 namespace YoRigine {
-
-// -----------------------------------------------------------
-// トレイル1点分の履歴
-// -----------------------------------------------------------
-struct TrailPoint
-{
-    Vector3 tip;    // 刃先ワールド座標
-    Vector3 root;   // 根本ワールド座標
-    float   age;    // 経過時間 (秒)
-};
-
-// -----------------------------------------------------------
-class TrailMesh : public ProceduralMeshBase
-{
-public:
-    TrailMesh()  = default;
-    ~TrailMesh() override = default;
-
-    // --------------------------------------------------------
-    // 初期化 / リセット
-    // --------------------------------------------------------
-
-    /// VfxEffectAsset の TrailEffectParam を使って初期化する
-    void Initialize(const TrailEffectParam& param);
-
-    /// パラメータだけ差し替える (ホットリロード対応)
-    void ApplyParam(const TrailEffectParam& param);
-
-    /// ポイント履歴をすべてクリア
-    void Clear();
-
-    // --------------------------------------------------------
-    // 毎フレーム
-    // --------------------------------------------------------
-
-    /// ポイントを先頭に追加する
-    /// @param tip   刃先ワールド座標
-    /// @param root  根本ワールド座標
-    void AddPoint(const Vector3& tip, const Vector3& root);
-
-    /// 寿命切れポイントの削除 + 頂点バッファ再構築
-    void Update(float deltaTime) override;
-
-    /// 描画コマンド発行
-    /// b0=Camera CBV, b1=MeshTrailParams CBV は呼び出し元でセット済みを想定
-    void Draw(ID3D12GraphicsCommandList* cmdList) override;
-
-    // --------------------------------------------------------
-    // アクセサ
-    // --------------------------------------------------------
-    size_t GetPointCount() const { return points_.size(); }
-    const TrailEffectParam& GetParam() const { return param_; }
-
-private:
-    // --------------------------------------------------------
-    // 内部処理
-    // --------------------------------------------------------
-
-    /// points_ から ProceduralMeshVertex のストリップを生成
-    void RebuildVertices();
-
-    /// age を [0,1] に正規化 (0=新しい端, 1=古い端)
-    float NormalizeAge(float age) const
+    // -----------------------------------------------------------
+    // トレイル1点分の履歴
+    // -----------------------------------------------------------
+    struct TrailPoint
     {
-        return (param_.lifetime > 0.f) ? std::min(age / param_.lifetime, 1.f) : 1.f;
-    }
+        Vector3 tip;      // 刃先ワールド座標
+        Vector3 root;     // 根本ワールド座標
+        Vector3 widthDir; // 幅方向の単位ベクトル (Arc/Fan 用)
+        float   age;      // 経過時間 (秒)
+    };
 
-private:
-    TrailEffectParam param_;
+    // -----------------------------------------------------------
+    class TrailMesh : public ProceduralMeshBase
+    {
+    public:
+        TrailMesh() = default;
+        ~TrailMesh() override = default;
 
-    // ポイント履歴 (front = 最新, back = 最古)
-    std::deque<TrailPoint> points_;
+        // --------------------------------------------------------
+        // 初期化 / リセット
+        // --------------------------------------------------------
 
-    // 頂点バッファの CPU 側コピー
-    std::vector<ProceduralMeshVertex> vertices_;
+        /// VfxEffectAsset の TrailEffectParam を使って初期化する
+        void Initialize(const TrailEffectParam& param);
 
-    // 累積時間 (UV スクロール用)
-    float time_ = 0.f;
-};
+        /// パラメータだけ差し替える (ホットリロード対応)
+        void ApplyParam(const TrailEffectParam& param);
+
+        /// ポイント履歴をすべてクリア
+        void Clear();
+
+        // --------------------------------------------------------
+        // 毎フレーム
+        // --------------------------------------------------------
+
+        /// ポイントを先頭に追加する (Flat 形状向け)
+        /// @param tip   刃先ワールド座標
+        /// @param root  根本ワールド座標
+        void AddPoint(const Vector3& tip, const Vector3& root);
+
+        /// ポイントを先頭に追加する (Arc / Fan 形状向け)
+        /// @param tip      刃先ワールド座標
+        /// @param root     根本ワールド座標
+        /// @param widthDir 幅方向の単位ベクトル (剣の横向きなど)
+        void AddPoint(const Vector3& tip, const Vector3& root, const Vector3& widthDir);
+
+        /// 寿命切れポイントの削除 + 頂点バッファ再構築
+        void Update(float deltaTime) override;
+
+        /// 描画コマンド発行
+        /// b0=Camera CBV, b1=MeshTrailParams CBV は呼び出し元でセット済みを想定
+        void Draw(ID3D12GraphicsCommandList* cmdList) override;
+
+        // --------------------------------------------------------
+        // アクセサ
+        // --------------------------------------------------------
+        size_t GetPointCount() const { return points_.size(); }
+        const TrailEffectParam& GetParam() const { return param_; }
+
+        /// 断面形状タイプを設定する
+        void SetShapeType(TrailShapeType type) { shapeType_ = type; }
+        TrailShapeType GetShapeType() const { return shapeType_; }
+
+        /// 幅方向の分割数を設定する (Flat の場合は無視, Arc/Fan は 2 以上推奨)
+        void SetWidthSegments(int segments) { widthSegments_ = std::max(1, segments); }
+        int GetWidthSegments() const { return widthSegments_; }
+
+        /// Arc 形状の弧の角度 (度数法, 両側なので 180 = 半円)
+        void SetArcAngleDeg(float deg) { arcAngleDeg_ = deg; }
+        float GetArcAngleDeg() const { return arcAngleDeg_; }
+
+    private:
+        // --------------------------------------------------------
+        // 内部処理
+        // --------------------------------------------------------
+
+        /// points_ から ProceduralMeshVertex のストリップを生成
+        void RebuildVertices();
+
+        /// Flat (平板) 形状のストリップ生成
+        void RebuildFlat();
+
+        /// Arc (円弧断面) 形状のストリップ生成
+        void RebuildArc();
+
+        /// Fan (扇形断面) 形状のストリップ生成
+        void RebuildFan();
+
+        /// age を [0,1] に正規化 (0=新しい端, 1=古い端)
+        float NormalizeAge(float age) const
+        {
+            return (param_.lifetime > 0.f) ? std::min(age / param_.lifetime, 1.f) : 1.f;
+        }
+
+        /// フェードカラーを計算
+        Vector4 CalcFadeColor(float normalizedAge) const
+        {
+            const float fade = 1.f - normalizedAge;
+            return { 1.f, 1.f, 1.f, fade };
+        }
+
+    private:
+        TrailEffectParam param_;
+
+        // 断面形状
+        TrailShapeType shapeType_ = TrailShapeType::Flat;
+        int            widthSegments_ = 1;   // 幅方向の分割数 (Flat=1固定, Arc/Fan は可変)
+        float          arcAngleDeg_ = 120.f; // Arc 形状の弧の角度 (度数法)
+
+        // ポイント履歴 (front = 最新, back = 最古)
+        std::deque<TrailPoint> points_;
+
+        // 頂点バッファの CPU 側コピー
+        std::vector<ProceduralMeshVertex> vertices_;
+
+        // 累積時間 (UV スクロール用)
+        float time_ = 0.f;
+    };
 
 } // namespace YoRigine
-
 
 ============================================================
 File Path: YEngine/Generators/Vfx/VfxMesh/VfxEffectAsset.cpp
@@ -218582,6 +218773,7 @@ namespace YoRigine {
         t["blendMode"] = static_cast<int>(trail.blendMode);
         t["uvScrollSpeed"] = trail.uvScrollSpeed;
         t["texturePath"] = trail.texturePath;
+        t["noiseTexturePath"] = trail.noiseTexturePath;
 
         // --- LightVolume ---
         auto& lv = j["lightVolume"];
@@ -218617,6 +218809,7 @@ namespace YoRigine {
             trail.maxPoints = t.value("maxPoints", trail.maxPoints);
             trail.uvScrollSpeed = t.value("uvScrollSpeed", trail.uvScrollSpeed);
             trail.texturePath = t.value("texturePath", trail.texturePath);
+            trail.noiseTexturePath = t.value("noiseTexturePath", trail.noiseTexturePath);
             trail.blendMode = static_cast<BlendMode>(t.value("blendMode", static_cast<int>(trail.blendMode)));
             if (t.contains("colorStart")) trail.colorStart = JsonToVector4(t["colorStart"]);
             if (t.contains("colorEnd"))   trail.colorEnd = JsonToVector4(t["colorEnd"]);
@@ -218652,6 +218845,15 @@ namespace YoRigine {
     // -------------------------------------------------------
     // Trail パラメータ
     // -------------------------------------------------------
+
+    enum class TrailShapeType : int
+    {
+        Flat = 0,  // 従来の平板 (tip-root 2点)
+        Arc = 1,   // 円弧断面 (widthSegments 分割)
+        Fan = 2,   // 扇形断面 (tip を中心に root 側を広げる)
+    };
+
+
     struct TrailEffectParam
     {
         float widthStart = 0.3f;  // 根元の幅
@@ -218666,6 +218868,11 @@ namespace YoRigine {
 
         float uvScrollSpeed = 0.5f;  // UV スクロール速度
         std::string texturePath = ""; // テクスチャパス (空なら白)
+        std::string noiseTexturePath = ""; // 歪みノイズ
+
+        TrailShapeType shapeType = TrailShapeType::Flat;
+        int widthSegments = 1;
+        float arcAngleDeg = 120.0f;
     };
 
     // -------------------------------------------------------
@@ -218704,143 +218911,270 @@ File Path: YEngine/Generators/Vfx/VfxMesh/VfxMeshEditor.cpp
 // VfxMeshEditor.cpp
 // ===========================================================
 #include "VfxMeshEditor.h"
+#include "DirectXCommon.h"
+#include <PipelineManager/YPipelineManager.h>
 #include <imgui.h>
 #include <filesystem>
 #include <chrono>
 #include <algorithm>
 #include <cmath>
 #include "Debugger/Logger.h"
+#include <Loaders/Texture/TextureManager.h>
 
 namespace fs = std::filesystem;
+
+static constexpr size_t kCBVAlignment = 256;
+template<typename T>
+static constexpr size_t AlignedSize() {
+    return (sizeof(T) + kCBVAlignment - 1) & ~(kCBVAlignment - 1);
+}
 
 namespace YoRigine {
 
     // ===========================================================
     // コンストラクタ
+    // YParticleSystem と同じパターン:
+    //   コンストラクタ本体で FileBrowser を構築し
+    //   ThumbnailProvider と OnFileSelected を設定する
     // ===========================================================
-    VfxMeshEditor::VfxMeshEditor(const std::string& jsonPath) {
-        lastCheckTime_ = std::chrono::steady_clock::now();
+    VfxMeshEditor::VfxMeshEditor()
+    {
+        // ---- ランプテクスチャ用 (t1: gTexRamp) ----
+        rampBrowser_ = FileBrowser(
+            "Resources/Textures/",
+            { ".png", ".jpg", ".jpeg", ".dds" },
+            FileBrowser::DisplayMode::Grid);
 
-        // プレビュー用メッシュを生成 (パラメータは後で RebuildMeshes で適用)
+        rampBrowser_.SetThumbnailProvider([](const std::string& path) -> ImTextureID {
+            TextureManager::GetInstance()->LoadTexture(path);
+            auto handle = TextureManager::GetInstance()->GetsrvHandleGPU(path);
+            return handle.ptr != 0 ? static_cast<ImTextureID>(handle.ptr) : 0;
+            });
+
+        rampBrowser_.SetOnFileSelected([this](const std::string& path) {
+            auto* sel = Selected();
+            if (!sel) return;
+            VfxEffectAsset before = sel->asset;
+            sel->asset.trail.texturePath = path;
+            CommitChange(before, "Trail ランプテクスチャ");
+            showRampPopup_ = false;
+            });
+
+        // ---- ノイズテクスチャ用 (t0: gTexNoise) ----
+        noiseBrowser_ = FileBrowser(
+            "Resources/Textures/",
+            { ".png", ".jpg", ".jpeg", ".dds" },
+            FileBrowser::DisplayMode::Grid);
+
+        noiseBrowser_.SetThumbnailProvider([](const std::string& path) -> ImTextureID {
+            TextureManager::GetInstance()->LoadTexture(path);
+            auto handle = TextureManager::GetInstance()->GetsrvHandleGPU(path);
+            return handle.ptr != 0 ? static_cast<ImTextureID>(handle.ptr) : 0;
+            });
+
+        noiseBrowser_.SetOnFileSelected([this](const std::string& path) {
+            auto* sel = Selected();
+            if (!sel) return;
+            VfxEffectAsset before = sel->asset;
+            sel->asset.trail.noiseTexturePath = path;
+            CommitChange(before, "Trail ノイズテクスチャ");
+            showNoisePopup_ = false;
+            });
+    }
+
+    // ===========================================================
+    // シングルトン
+    // ===========================================================
+    VfxMeshEditor* VfxMeshEditor::GetInstance()
+    {
+        static VfxMeshEditor instance;
+        return &instance;
+    }
+
+    // ===========================================================
+    // 初期化 / 終了
+    // ===========================================================
+    void VfxMeshEditor::Initialize(const std::string& scanRoot)
+    {
+        dxCommon_ = DirectXCommon::GetInstance();
+        scanRoot_ = scanRoot;
+
         previewTrail_ = std::make_unique<TrailMesh>();
         previewVolume_ = std::make_unique<LightVolumeMesh>();
+        InitCBVs();
 
-        if (!jsonPath.empty()) {
-            Load(jsonPath);          // Load 内で RebuildMeshes を呼ぶ
+        // Resources/Vfx/ 以下をスキャンしてエフェクト一覧を構築
+        ScanDirectory(scanRoot_);
+
+        // エントリがあれば先頭を選択
+        if (!entries_.empty()) {
+            SelectEffect(0);
         }
-        else {
-            RebuildMeshes();         // デフォルトパラメータで初期化
+    }
+
+    void VfxMeshEditor::Finalize()
+    {
+        if (trailCBMapped_ && trailCBResource_) { trailCBResource_->Unmap(0, nullptr);  trailCBMapped_ = nullptr; }
+        if (volumeCBMapped_ && volumeCBResource_) { volumeCBResource_->Unmap(0, nullptr); volumeCBMapped_ = nullptr; }
+        entries_.clear();
+        selectedIndex_ = -1;
+    }
+
+    // ===========================================================
+    // ディレクトリスキャン
+    // ===========================================================
+    void VfxMeshEditor::ScanDirectory(const std::string& dir)
+    {
+        entries_.clear();
+
+        std::error_code ec;
+        if (!fs::exists(dir, ec)) {
+            Logger("VfxMeshEditor: スキャン対象ディレクトリが存在しません: " + dir);
+            return;
         }
+
+        for (const auto& entry : fs::recursive_directory_iterator(dir, ec)) {
+            if (ec) break;
+            if (entry.path().extension() != ".json") continue;
+
+            VfxEffectEntry e;
+            e.filePath = entry.path().string();
+            if (e.asset.LoadFromJson(e.filePath)) {
+                entries_.push_back(std::move(e));
+                Logger("VfxMeshEditor: ロード -> " + entries_.back().filePath);
+            }
+        }
+
+        Logger("VfxMeshEditor: " + std::to_string(entries_.size()) + " エフェクトをロードしました");
+    }
+
+    // ===========================================================
+    // エフェクト選択
+    // ===========================================================
+    void VfxMeshEditor::SelectEffect(int index)
+    {
+        if (index < 0 || index >= static_cast<int>(entries_.size())) return;
+
+        selectedIndex_ = index;
+        history_.Clear();
+
+        // プレビューメッシュをリセット
+        previewTrail_->Clear();
+        previewTimer_ = 0.f;
+        previewPlaying_ = false;
+        RebuildPreviewMeshes();
     }
 
     // ===========================================================
     // 毎フレーム
     // ===========================================================
-    void VfxMeshEditor::Update(float deltaTime) {
-        if (hotReload_) PollFileChange();
-
-        if (!previewPlaying_) return;
+    void VfxMeshEditor::Update(float deltaTime)
+    {
+        auto* sel = Selected();
+        if (!sel || !previewPlaying_) return;
 
         previewTimer_ += deltaTime;
+        const auto& asset = sel->asset;
 
-        // Trail プレビュー: 原点から ±Y 方向に往復する仮ポイントを追加
-        if (asset_.useTrail) {
-            previewTrail_->ApplyParam(asset_.trail);
+        if (asset.useTrail) {
+            previewTrail_->ApplyParam(asset.trail);
 
-            // 単純な往復アニメーション (周期 = lifetime * 2)
-            const float period = std::max(asset_.trail.lifetime * 2.f, 0.2f);
-            const float t = std::fmod(previewTimer_, period) / period; // 0→1
+            const float period = std::max(asset.trail.lifetime * 2.f, 0.2f);
+            const float t = std::fmod(previewTimer_, period) / period;
             const float swing = std::sin(t * 3.14159f * 2.f);
 
-            const Vector3 tip = {
-                previewCenter_.x + swing * 0.5f,
-                previewCenter_.y + 1.0f,
-                previewCenter_.z
-            };
-            const Vector3 root = {
-                previewCenter_.x + swing * 0.5f,
-                previewCenter_.y - 1.0f,
-                previewCenter_.z
-            };
+            const Vector3 tip = { previewCenter_.x + swing * 0.5f,
+                                    previewCenter_.y + 1.0f,
+                                    previewCenter_.z };
+            const Vector3 root = { previewCenter_.x + swing * 0.5f,
+                                    previewCenter_.y - 1.0f,
+                                    previewCenter_.z };
             previewTrail_->AddPoint(tip, root);
             previewTrail_->Update(deltaTime);
         }
 
-        // LightVolume プレビュー: previewCenter_ + previewYaw_ でそのまま配置
-        if (asset_.useLightVolume) {
-            previewVolume_->ApplyParam(asset_.lightVolume);
+        if (asset.useLightVolume) {
+            previewVolume_->ApplyParam(asset.lightVolume);
             previewVolume_->SetTransform(previewCenter_, previewYaw_);
             previewVolume_->Update(deltaTime);
         }
     }
 
     // ===========================================================
-    // プレビュー描画 (ゲームの Draw パスと同じ場所で呼ぶ)
+    // DrawPreview
     // ===========================================================
     void VfxMeshEditor::DrawPreview(ID3D12GraphicsCommandList* cmdList,
-        D3D12_GPU_VIRTUAL_ADDRESS ) {
-        if (!previewPlaying_) return;
+        D3D12_GPU_VIRTUAL_ADDRESS  cameraGPUAddress)
+    {
+        auto* sel = Selected();
+        if (!sel || !previewPlaying_) return;
 
-        if (asset_.useTrail) {
+        const auto& asset = sel->asset;
+        auto* pm = YPipelineManager::GetInstance();
+
+        if (asset.useTrail) {
+            const auto& idx = pm->GetParameterIndices("VfxMeshTrail");
+            UpdateTrailCBV(previewTimer_);
+
+            auto* texMgr = TextureManager::GetInstance();
+
+            // t0: gTexNoise — noiseTexturePath が空ならホワイトテクスチャでフォールバック
+            D3D12_GPU_DESCRIPTOR_HANDLE hNoise =
+                (!asset.trail.noiseTexturePath.empty())
+                ? texMgr->GetsrvHandleGPU(asset.trail.noiseTexturePath)
+                : texMgr->GetsrvHandleGPU("Resources/Textures/white1x1.png");
+
+            // t1: gTexRamp — texturePath が空なら同様にフォールバック
+            D3D12_GPU_DESCRIPTOR_HANDLE hRamp =
+                (!asset.trail.texturePath.empty())
+                ? texMgr->GetsrvHandleGPU(asset.trail.texturePath)
+                : texMgr->GetsrvHandleGPU("Resources/Textures/white1x1.png");
+
+            cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshTrail"));
+            cmdList->SetPipelineState(pm->GetBlendModePSO("VfxMeshTrail", asset.trail.blendMode));
+            cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"), cameraGPUAddress);
+            cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), trailCBResource_->GetGPUVirtualAddress());
+            cmdList->SetGraphicsRootDescriptorTable(idx.at("gTexNoise"), hNoise); // t0
+            cmdList->SetGraphicsRootDescriptorTable(idx.at("gTexRamp"), hRamp);  // t1
+
             previewTrail_->Draw(cmdList);
         }
-        if (asset_.useLightVolume) {
+
+        if (asset.useLightVolume) {
+            const auto& idx = pm->GetParameterIndices("VfxMeshVolume");
+            UpdateVolumeCBV(previewTimer_);
+
+            cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshVolume"));
+            cmdList->SetPipelineState(pm->GetPipeLineStateObject("VfxMeshVolume"));
+            cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"), cameraGPUAddress);
+            cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), volumeCBResource_->GetGPUVirtualAddress());
+
             previewVolume_->Draw(cmdList);
         }
     }
 
     // ===========================================================
-    // メイン ImGui ウィンドウ
+    // ImGui メインウィンドウ
     // ===========================================================
-    void VfxMeshEditor::DrawImGui() {
-        ImGui::SetNextWindowSize(ImVec2(440, 760), ImGuiCond_FirstUseEver);
-        if (!ImGui::Begin("VFX Mesh Editor")) { ImGui::End(); return; }
-
-        // Undo/Redo ショートカット & ボタンは CommandHistory に委譲
+    void VfxMeshEditor::DrawImGui()
+    {
         history_.HandleKeyInput();
 
-        DrawToolbar();
-        ImGui::Separator();
-        DrawFileSection();
-        ImGui::Separator();
-        DrawNameSection();
-        ImGui::Separator();
+        ImGui::SetNextWindowSize(ImVec2(760, 680), ImGuiCond_FirstUseEver);
+        if (!ImGui::Begin("VFX Mesh Editor")) { ImGui::End(); return; }
 
-        // ---- Trail ----
-        {
-            VfxEffectAsset before = asset_;
-            ImGui::PushID("UseTrail");
-            bool changed = ImGui::Checkbox("##UseTrail", &asset_.useTrail);
-            ImGui::PopID();
-            ImGui::SameLine();
-            if (ImGui::TreeNodeEx("Trail", ImGuiTreeNodeFlags_DefaultOpen)) {
-                if (asset_.useTrail) DrawTrailSection();
-                else                 ImGui::TextDisabled("  (disabled)");
-                ImGui::TreePop();
-            }
-            if (changed) CommitChange(before, "Trail 有効切替");
-        }
-        ImGui::Separator();
+        // 左右分割レイアウト
+        // 左: エフェクト一覧 (幅 200px 固定)
+        ImGui::BeginChild("##list", ImVec2(200, 0), true);
+        DrawListPanel();
+        ImGui::EndChild();
 
-        // ---- LightVolume ----
-        {
-            VfxEffectAsset before = asset_;
-            ImGui::PushID("UseLightVolume");
-            bool changed = ImGui::Checkbox("##UseLightVolume", &asset_.useLightVolume);
-            ImGui::PopID();
-            ImGui::SameLine();
-            if (ImGui::TreeNodeEx("Light Volume", ImGuiTreeNodeFlags_DefaultOpen)) {
-                if (asset_.useLightVolume) DrawLightVolumeSection();
-                else                       ImGui::TextDisabled("  (disabled)");
-                ImGui::TreePop();
-            }
-            if (changed) CommitChange(before, "Volume 有効切替");
-        }
-        ImGui::Separator();
+        ImGui::SameLine();
 
-        DrawPreviewSection();
-
-        if (autoSave_ && isDirty_) Save();
+        // 右: パラメータ編集 + プレビュー
+        ImGui::BeginChild("##edit", ImVec2(0, 0), true);
+        DrawEditPanel();
+        ImGui::EndChild();
 
         DrawNewEffectDialog();
 
@@ -218848,208 +219182,260 @@ namespace YoRigine {
     }
 
     // ===========================================================
-    // ツールバー
+    // 左パネル: エフェクト一覧
     // ===========================================================
-    void VfxMeshEditor::DrawToolbar() {
-        if (ImGui::Button("New")) { showNewDialog_ = true; }
+    void VfxMeshEditor::DrawListPanel()
+    {
+        // ヘッダー + 新規作成ボタン
+        ImGui::TextDisabled("エフェクト一覧");
         ImGui::SameLine();
-
-        if (ImGui::Button("Open")) {
-            if (browseCallback_) {
-                std::string picked;
-                browseCallback_(picked);
-                if (!picked.empty()) Load(picked);
+        if (ImGui::SmallButton("+")) { showNewDialog_ = true; }
+        ImGui::SameLine();
+        // 再スキャンボタン
+        if (ImGui::SmallButton("R")) {
+            int prevSel = selectedIndex_;
+            ScanDirectory(scanRoot_);
+            // 再スキャン後に選択を復元 (同じパスが残っていれば)
+            selectedIndex_ = -1;
+            if (prevSel >= 0 && prevSel < static_cast<int>(entries_.size())) {
+                SelectEffect(prevSel);
+            }
+            else if (!entries_.empty()) {
+                SelectEffect(0);
             }
         }
-        ImGui::SameLine();
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("ディレクトリを再スキャン");
 
-        if (currentPath_.empty()) ImGui::BeginDisabled();
-        if (ImGui::Button("Save")) Save();
-        if (currentPath_.empty()) ImGui::EndDisabled();
-        ImGui::SameLine();
+        ImGui::Separator();
 
-        if (ImGui::Button("Save As")) {
-            if (browseCallback_) {
-                std::string picked;
-                browseCallback_(picked);
-                if (!picked.empty()) Save(picked);
+        // エフェクト一覧
+        for (int i = 0; i < static_cast<int>(entries_.size()); ++i) {
+            const auto& e = entries_[i];
+
+            // dirty マークを名前に付加
+            std::string label = e.asset.name;
+            if (e.isDirty) label += " *";
+
+            bool selected = (selectedIndex_ == i);
+            if (ImGui::Selectable(label.c_str(), selected,
+                ImGuiSelectableFlags_AllowDoubleClick)) {
+                SelectEffect(i);
+            }
+
+            // 右クリックコンテキストメニュー
+            if (ImGui::BeginPopupContextItem()) {
+                if (ImGui::MenuItem("保存")) {
+                    selectedIndex_ = i;
+                    SaveCurrent();
+                }
+                if (ImGui::MenuItem("削除")) {
+                    selectedIndex_ = i;
+                    DeleteCurrent();
+                    ImGui::EndPopup();
+                    break; // entries_ が変わったのでループを抜ける
+                }
+                ImGui::EndPopup();
+            }
+
+            // ツールチップにファイルパスを表示
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("%s", e.filePath.c_str());
             }
         }
-        ImGui::SameLine();
 
-        ImGui::Spacing(); ImGui::SameLine();
+        if (entries_.empty()) {
+            ImGui::TextDisabled("(エフェクトなし)");
+        }
+    }
 
-        // Undo/Redo ボタン + 履歴ツリーは CommandHistory::DrawImGui() に任せる
+    // ===========================================================
+    // 右パネル: パラメータ編集
+    // ===========================================================
+    void VfxMeshEditor::DrawEditPanel()
+    {
+        auto* sel = Selected();
+        if (!sel) {
+            ImGui::TextDisabled("エフェクトを選択してください");
+            return;
+        }
+        auto& asset = sel->asset;
+
+        // ---- ツールバー ----
         history_.DrawImGui();
-
-        if (isDirty_) {
+        ImGui::SameLine();
+        if (ImGui::Button("保存")) SaveCurrent();
+        if (sel->isDirty) {
             ImGui::SameLine();
             ImGui::TextColored(ImVec4(1.f, 0.6f, 0.1f, 1.f), "* 未保存");
         }
-    }
+        ImGui::Separator();
 
-    // ===========================================================
-    // ファイルセクション
-    // ===========================================================
-    void VfxMeshEditor::DrawFileSection() {
-        ImGui::TextDisabled("Path: ");
-        ImGui::SameLine();
-        if (currentPath_.empty()) ImGui::TextColored(ImVec4(0.8f, 0.4f, 0.4f, 1.f), "(未保存)");
-        else                      ImGui::TextUnformatted(currentPath_.c_str());
+        // ---- ファイルパス (表示のみ) ----
+        ImGui::TextDisabled("Path: %s", sel->filePath.c_str());
+        ImGui::Separator();
 
-        ImGui::Checkbox("Auto Save", &autoSave_);
-        ImGui::SameLine();
-        ImGui::Checkbox("Hot Reload", &hotReload_);
-    }
-
-    // ===========================================================
-    // 新規作成ダイアログ
-    // ===========================================================
-    void VfxMeshEditor::DrawNewEffectDialog() {
-        if (!showNewDialog_) return;
-
-        ImGui::OpenPopup("新規エフェクト作成");
-        ImVec2 center = ImGui::GetMainViewport()->GetCenter();
-        ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-        ImGui::SetNextWindowSize(ImVec2(400, 0), ImGuiCond_Appearing);
-
-        if (!ImGui::BeginPopupModal("新規エフェクト作成", &showNewDialog_,
-            ImGuiWindowFlags_AlwaysAutoResize)) return;
-
-        ImGui::Text("エフェクト名");
+        // ---- エフェクト名 ----
+        strncpy_s(nameBuffer_, asset.name.c_str(), sizeof(nameBuffer_));
         ImGui::SetNextItemWidth(-1);
-        ImGui::InputText("##newname", newNameBuffer_, sizeof(newNameBuffer_));
-
-        ImGui::Spacing(); ImGui::Text("保存先 JSON パス");
-        ImGui::SetNextItemWidth(browseCallback_ ? 300.0f : -1.0f);
-        ImGui::InputText("##newpath", newPathBuffer_, sizeof(newPathBuffer_));
-        if (browseCallback_) {
-            ImGui::SameLine();
-            if (ImGui::Button("...")) {
-                std::string picked; browseCallback_(picked);
-                if (!picked.empty()) strncpy_s(newPathBuffer_, picked.c_str(), sizeof(newPathBuffer_));
-            }
-        }
-
-        ImGui::Spacing(); ImGui::Text("プリセット");
-        const char* presetNames[] = { "Blank", "Trail Only", "Volume Only", "Sword (剣閃)", "Magic (魔法陣)" };
-        ImGui::SetNextItemWidth(-1);
-        ImGui::Combo("##preset", &newPresetIdx_, presetNames, IM_ARRAYSIZE(presetNames));
-
-        ImGui::Spacing(); ImGui::Separator(); ImGui::Spacing();
-
-        bool pathOk = (newPathBuffer_[0] != '\0');
-        if (!pathOk) ImGui::BeginDisabled();
-        if (ImGui::Button("作成", ImVec2(120, 0))) {
-            asset_ = MakePreset(static_cast<VfxPreset>(newPresetIdx_));
-            asset_.name = newNameBuffer_;
-            currentPath_ = newPathBuffer_;
-            isDirty_ = true;
-            showNewDialog_ = false;
-            history_.Clear();
-            RebuildMeshes();
-            Save(currentPath_);
-            if (onChangedCallback_) onChangedCallback_(asset_);
-            ImGui::CloseCurrentPopup();
-        }
-        if (!pathOk) ImGui::EndDisabled();
-        ImGui::SameLine();
-        if (ImGui::Button("キャンセル", ImVec2(120, 0))) {
-            showNewDialog_ = false; ImGui::CloseCurrentPopup();
-        }
-        ImGui::EndPopup();
-    }
-
-    // ===========================================================
-    // エフェクト名
-    // ===========================================================
-    void VfxMeshEditor::DrawNameSection() {
-        strncpy_s(nameBuffer_, asset_.name.c_str(), sizeof(nameBuffer_));
-        ImGui::SetNextItemWidth(-1);
-        VfxEffectAsset before = asset_;
+        VfxEffectAsset before = asset;
         if (ImGui::InputText("##effectname", nameBuffer_, sizeof(nameBuffer_),
             ImGuiInputTextFlags_EnterReturnsTrue)) {
-            asset_.name = nameBuffer_;
+            asset.name = nameBuffer_;
             CommitChange(before, "名前変更");
         }
         ImGui::SameLine(0, 4); ImGui::TextDisabled("名前");
+        ImGui::Separator();
+
+        // ---- Trail ----
+        {
+            VfxEffectAsset b = asset;
+            ImGui::PushID("UseTrail");
+            bool changed = ImGui::Checkbox("##UseTrail", &asset.useTrail);
+            ImGui::PopID();
+            ImGui::SameLine();
+            if (ImGui::TreeNodeEx("Trail", ImGuiTreeNodeFlags_DefaultOpen)) {
+                if (asset.useTrail) DrawTrailSection();
+                else                ImGui::TextDisabled("  (disabled)");
+                ImGui::TreePop();
+            }
+            if (changed) CommitChange(b, "Trail 有効切替");
+        }
+        ImGui::Separator();
+
+        // ---- LightVolume ----
+        {
+            VfxEffectAsset b = asset;
+            ImGui::PushID("UseLightVolume");
+            bool changed = ImGui::Checkbox("##UseLightVolume", &asset.useLightVolume);
+            ImGui::PopID();
+            ImGui::SameLine();
+            if (ImGui::TreeNodeEx("Light Volume", ImGuiTreeNodeFlags_DefaultOpen)) {
+                if (asset.useLightVolume) DrawLightVolumeSection();
+                else                      ImGui::TextDisabled("  (disabled)");
+                ImGui::TreePop();
+            }
+            if (changed) CommitChange(b, "Volume 有効切替");
+        }
+        ImGui::Separator();
+
+        DrawPreviewSection();
     }
 
     // ===========================================================
-    // Trail セクション
+    // Trail パラメータ編集
     // ===========================================================
-    void VfxMeshEditor::DrawTrailSection() {
-        auto& t = asset_.trail;
+    void VfxMeshEditor::DrawTrailSection()
+    {
+        auto* sel = Selected();
+        if (!sel) return;
+        auto& t = sel->asset.trail;
+
+        ImGui::SeparatorText("形状設定");
+        {
+            VfxEffectAsset b = sel->asset;
+            bool c = false;
+
+            const char* shapeNames[] = { "Flat (平板)", "Arc (円弧)", "Fan (扇形)" };
+            int shapeIdx = static_cast<int>(t.shapeType);
+            ImGui::SetNextItemWidth(-1);
+            if (ImGui::Combo("##shape", &shapeIdx, shapeNames, IM_ARRAYSIZE(shapeNames))) {
+                t.shapeType = static_cast<TrailShapeType>(shapeIdx);
+                c = true;
+            }
+            ImGui::SameLine(0, 4); ImGui::TextDisabled("断面形状");
+
+            // Flat 以外のときだけ分割数と角度を表示
+            if (t.shapeType != TrailShapeType::Flat) {
+                c |= ImGui::SliderInt("幅の分割数##wseg", &t.widthSegments, 1, 16);
+                c |= ImGui::SliderFloat("円弧の角度(度)##arcang", &t.arcAngleDeg, 10.f, 360.f, "%.1f");
+            }
+
+            if (c) CommitChange(b, "Trail 形状設定");
+        }
 
         ImGui::SeparatorText("幅");
         {
-            VfxEffectAsset before = asset_;
+            VfxEffectAsset b = sel->asset;
             bool c = false;
-            c |= ImGui::SliderFloat("根元幅##ws", &t.widthStart, 0.0f, 5.0f, "%.3f");
-            c |= ImGui::SliderFloat("先端幅##we", &t.widthEnd, 0.0f, 5.0f, "%.3f");
-            if (c) CommitChange(before, "Trail 幅");
+            c |= ImGui::SliderFloat("根元幅##ws", &t.widthStart, 0.f, 5.f, "%.3f");
+            c |= ImGui::SliderFloat("先端幅##we", &t.widthEnd, 0.f, 5.f, "%.3f");
+            if (c) CommitChange(b, "Trail 幅");
         }
 
         ImGui::SeparatorText("寿命 / ポイント数");
         {
-            VfxEffectAsset before = asset_;
+            VfxEffectAsset b = sel->asset;
             bool c = false;
-            c |= ImGui::SliderFloat("寿命 (秒)##lt", &t.lifetime, 0.05f, 5.0f, "%.2f");
+            c |= ImGui::SliderFloat("寿命 (秒)##lt", &t.lifetime, 0.05f, 5.f, "%.2f");
             c |= ImGui::SliderInt("最大ポイント##mp", &t.maxPoints, 4, 128);
-            if (c) CommitChange(before, "Trail 寿命");
+            if (c) CommitChange(b, "Trail 寿命");
         }
 
         ImGui::SeparatorText("カラーグラデーション");
         {
-            VfxEffectAsset before = asset_;
+            VfxEffectAsset b = sel->asset;
             bool c = false;
             c |= ImGui::ColorEdit4("根元カラー##cs", &t.colorStart.x);
             c |= ImGui::ColorEdit4("先端カラー##ce", &t.colorEnd.x);
-            if (c) CommitChange(before, "Trail カラー");
+            if (c) CommitChange(b, "Trail カラー");
         }
 
         ImGui::SeparatorText("ブレンドモード");
         {
-            VfxEffectAsset before = asset_;
+            VfxEffectAsset b = sel->asset;
             const char* names[] = { "通常", "加算", "減算", "乗算" };
             int idx = static_cast<int>(t.blendMode);
             ImGui::SetNextItemWidth(-1);
             if (ImGui::Combo("##blend", &idx, names, IM_ARRAYSIZE(names))) {
                 t.blendMode = static_cast<BlendMode>(idx);
-                CommitChange(before, "Trail ブレンド");
+                CommitChange(b, "Trail ブレンド");
             }
         }
 
         ImGui::SeparatorText("シェーダー");
         {
-            VfxEffectAsset before = asset_;
+            VfxEffectAsset b = sel->asset;
             if (ImGui::SliderFloat("UV スクロール速度##uvs", &t.uvScrollSpeed, -5.f, 5.f, "%.2f"))
-                CommitChange(before, "Trail UV スクロール");
+                CommitChange(b, "Trail UV スクロール");
         }
 
         ImGui::SeparatorText("テクスチャ");
         {
-            strncpy_s(textureBuffer_, t.texturePath.c_str(), sizeof(textureBuffer_));
-            float bw = browseCallback_ ? 100.f : 52.f;
-            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - bw - 8);
-            VfxEffectAsset before = asset_;
-            if (ImGui::InputText("##texpath", textureBuffer_, sizeof(textureBuffer_))) {
-                t.texturePath = textureBuffer_; CommitChange(before, "Trail テクスチャ");
+            // ---------- ランプテクスチャ (t1: gTexRamp) ----------
+            ImGui::TextDisabled("ランプ (t1)");
+            ImGui::SameLine(80);
+            ImGui::TextDisabled("%s", t.texturePath.empty() ? "(未設定)" : t.texturePath.c_str());
+
+            if (ImGui::SmallButton("参照##ramp")) {
+                rampBrowser_.Scan();
+                showRampPopup_ = true;
             }
             ImGui::SameLine();
-            if (ImGui::SmallButton("クリア")) {
-                before = asset_; t.texturePath.clear(); CommitChange(before, "Trail テクスチャクリア");
+            if (ImGui::SmallButton("クリア##ramp")) {
+                VfxEffectAsset b = sel->asset;
+                t.texturePath.clear();
+                CommitChange(b, "Trail ランプテクスチャクリア");
             }
-            if (browseCallback_) {
-                ImGui::SameLine();
-                if (ImGui::SmallButton("参照")) {
-                    std::string picked; browseCallback_(picked);
-                    if (!picked.empty()) {
-                        before = asset_; t.texturePath = picked;
-                        CommitChange(before, "Trail テクスチャ参照");
-                    }
-                }
+
+            ImGui::Spacing();
+
+            // ---------- ノイズテクスチャ (t0: gTexNoise) ----------
+            ImGui::TextDisabled("ノイズ (t0)");
+            ImGui::SameLine(80);
+            ImGui::TextDisabled("%s", t.noiseTexturePath.empty() ? "(未設定)" : t.noiseTexturePath.c_str());
+
+            if (ImGui::SmallButton("参照##noise")) {
+                noiseBrowser_.Scan();
+                showNoisePopup_ = true;
             }
+            ImGui::SameLine();
+            if (ImGui::SmallButton("クリア##noise")) {
+                VfxEffectAsset b = sel->asset;
+                t.noiseTexturePath.clear();
+                CommitChange(b, "Trail ノイズテクスチャクリア");
+            }
+
+            DrawTextureSelectPopup();
         }
 
         ImGui::Spacing();
@@ -219058,32 +219444,80 @@ namespace YoRigine {
     }
 
     // ===========================================================
-    // LightVolume セクション
+    // テクスチャ選択ポップアップ
+    // YParticleSystem::ShowEditor と同じ構造:
+    //   showXxxPopup_ が true のとき OpenPopup → BeginPopupModal → Draw
     // ===========================================================
-    void VfxMeshEditor::DrawLightVolumeSection() {
-        auto& lv = asset_.lightVolume;
+    void VfxMeshEditor::DrawTextureSelectPopup()
+    {
+        // ---- ランプテクスチャ (t1: gTexRamp) ----
+        if (showRampPopup_) ImGui::OpenPopup("##RampTexSelect");
+
+        ImGui::SetNextWindowSize(ImVec2(500, 420), ImGuiCond_Appearing);
+        if (ImGui::BeginPopupModal("##RampTexSelect", &showRampPopup_,
+            ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize))
+        {
+            ImGui::Text("ランプテクスチャを選択 (t1: gTexRamp)");
+            ImGui::Separator();
+            // Grid モードで表示 — クリックでコールバックが発火し自動クローズ
+            rampBrowser_.Draw("##RampBrowserChild", ImVec2(0, 340));
+            ImGui::Separator();
+            if (ImGui::Button("キャンセル", ImVec2(-1, 0))) {
+                showRampPopup_ = false;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+
+        // ---- ノイズテクスチャ (t0: gTexNoise) ----
+        if (showNoisePopup_) ImGui::OpenPopup("##NoiseTexSelect");
+
+        ImGui::SetNextWindowSize(ImVec2(500, 420), ImGuiCond_Appearing);
+        if (ImGui::BeginPopupModal("##NoiseTexSelect", &showNoisePopup_,
+            ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize))
+        {
+            ImGui::Text("ノイズテクスチャを選択 (t0: gTexNoise)");
+            ImGui::Separator();
+            noiseBrowser_.Draw("##NoiseBrowserChild", ImVec2(0, 340));
+            ImGui::Separator();
+            if (ImGui::Button("キャンセル", ImVec2(-1, 0))) {
+                showNoisePopup_ = false;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+    }
+
+    // ===========================================================
+    // LightVolume パラメータ編集
+    // ===========================================================
+    void VfxMeshEditor::DrawLightVolumeSection()
+    {
+        auto* sel = Selected();
+        if (!sel) return;
+        auto& lv = sel->asset.lightVolume;
 
         ImGui::SeparatorText("OBB サイズ  (X=右 / Y=上 / Z=前)");
         {
-            VfxEffectAsset before = asset_;
+            VfxEffectAsset b = sel->asset;
             if (ImGui::DragFloat3("半辺長##he", &lv.halfExtents.x, 0.05f, 0.01f, 50.f, "%.2f"))
-                CommitChange(before, "Volume サイズ");
+                CommitChange(b, "Volume サイズ");
         }
 
         ImGui::SeparatorText("カラー  (α = ボリューム濃度)");
         {
-            VfxEffectAsset before = asset_;
+            VfxEffectAsset b = sel->asset;
             bool c = false;
             c |= ImGui::ColorEdit4("ボリュームカラー##vc", &lv.color.x);
             c |= ImGui::SliderFloat("輝度##inten", &lv.intensity, 0.f, 10.f, "%.2f");
-            if (c) CommitChange(before, "Volume カラー");
+            if (c) CommitChange(b, "Volume カラー");
         }
 
         ImGui::Spacing();
         {
-            VfxEffectAsset before = asset_;
+            VfxEffectAsset b = sel->asset;
             if (ImGui::Checkbox("ボリューム有効##en", &lv.isEnable))
-                CommitChange(before, "Volume 有効切替");
+                CommitChange(b, "Volume 有効切替");
         }
 
         ImGui::Spacing();
@@ -219094,7 +219528,8 @@ namespace YoRigine {
     // ===========================================================
     // プレビューセクション
     // ===========================================================
-    void VfxMeshEditor::DrawPreviewSection() {
+    void VfxMeshEditor::DrawPreviewSection()
+    {
         ImGui::SeparatorText("プレビュー");
 
         if (previewPlaying_) {
@@ -219116,128 +219551,250 @@ namespace YoRigine {
             previewTrail_->Clear();
         }
 
-        // 位置・回転 調整スライダー
         ImGui::DragFloat3("プレビュー位置", &previewCenter_.x, 0.05f, -20.f, 20.f);
         ImGui::SliderAngle("プレビューYaw", &previewYaw_, -180.f, 180.f);
 
-        // Trail タイムバー
-        if (asset_.useTrail && asset_.trail.lifetime > 0.f) {
-            char ov[48];
-            snprintf(ov, sizeof(ov), "Trail  %.2f / %.2f s",
-                previewTimer_, asset_.trail.lifetime);
-            ImGui::ProgressBar(
-                std::min(previewTimer_ / asset_.trail.lifetime, 1.f),
-                ImVec2(-1, 0), ov);
+        auto* sel = Selected();
+        if (sel) {
+            if (sel->asset.useTrail && sel->asset.trail.lifetime > 0.f) {
+                char ov[48];
+                snprintf(ov, sizeof(ov), "Trail  %.2f / %.2f s",
+                    previewTimer_, sel->asset.trail.lifetime);
+                ImGui::ProgressBar(
+                    std::min(previewTimer_ / sel->asset.trail.lifetime, 1.f),
+                    ImVec2(-1, 0), ov);
+            }
+            if (sel->asset.useLightVolume && sel->asset.lightVolume.isEnable) {
+                ImGui::ProgressBar(1.f, ImVec2(-1, 0), "Light Volume  (active)");
+            }
         }
-
-        // Volume インジケータ
-        if (asset_.useLightVolume && asset_.lightVolume.isEnable) {
-            ImGui::ProgressBar(1.f, ImVec2(-1, 0), "Light Volume  (active)");
-        }
-
         ImGui::TextDisabled("時刻: %.3f s", previewTimer_);
     }
 
     // ===========================================================
-    // CommitChange — 変更を CommandHistory に登録してDirtyマーク
+    // 新規作成ダイアログ
     // ===========================================================
-    void VfxMeshEditor::CommitChange(const VfxEffectAsset& before, const char* label) {
-        VfxEffectAsset after = asset_;  // 変更後
+    void VfxMeshEditor::DrawNewEffectDialog()
+    {
+        if (!showNewDialog_) return;
 
-        history_.Execute(MakeLambdaCommand(
-            label,
-            // Execute: after を適用 (Redo 時に使われる)
-            [this, after]() {
-                asset_ = after;
-                MarkDirty();
-                previewTrail_->ApplyParam(asset_.trail);
-                previewVolume_->ApplyParam(asset_.lightVolume);
-            },
-            // Undo: before に戻す
-            [this, before]() {
-                asset_ = before;
-                MarkDirty();
-                previewTrail_->ApplyParam(asset_.trail);
-                previewVolume_->ApplyParam(asset_.lightVolume);
-            }
-        ));
+        ImGui::OpenPopup("新規エフェクト作成");
+        ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+        ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+        ImGui::SetNextWindowSize(ImVec2(420, 0), ImGuiCond_Appearing);
 
-        MarkDirty();
-        // Execute はコマンド内で asset_ を after に再セットするが、
-        // ここでは ImGui がすでに asset_ を書き換えた後なので
-        // Execute の中身は Redo 専用として機能する
+        if (!ImGui::BeginPopupModal("新規エフェクト作成", &showNewDialog_,
+            ImGuiWindowFlags_AlwaysAutoResize)) return;
+
+        ImGui::Text("エフェクト名");
+        ImGui::SetNextItemWidth(-1);
+        ImGui::InputText("##newname", newNameBuffer_, sizeof(newNameBuffer_));
+
+        ImGui::Spacing();
+        ImGui::Text("保存先 JSON パス");
+        ImGui::SetNextItemWidth(-1);
+        ImGui::InputText("##newpath", newPathBuffer_, sizeof(newPathBuffer_));
+
+        // パスが空の場合はスキャンルート + 名前で自動補完
+        if (newPathBuffer_[0] == '\0' && newNameBuffer_[0] != '\0') {
+            std::string autoPath = scanRoot_ + newNameBuffer_ + ".json";
+            ImGui::TextDisabled("→ %s", autoPath.c_str());
+        }
+
+        ImGui::Spacing();
+        ImGui::Text("プリセット");
+        const char* presetNames[] = { "Blank", "Trail Only", "Volume Only", "Sword (剣閃)", "Magic (魔法陣)" };
+        ImGui::SetNextItemWidth(-1);
+        ImGui::Combo("##preset", &newPresetIdx_, presetNames, IM_ARRAYSIZE(presetNames));
+
+        ImGui::Spacing(); ImGui::Separator(); ImGui::Spacing();
+
+        if (ImGui::Button("作成", ImVec2(120, 0))) {
+            // パスが空なら自動生成
+            std::string path = newPathBuffer_;
+            if (path.empty()) path = scanRoot_ + newNameBuffer_ + ".json";
+
+            CreateNew(newNameBuffer_, path, static_cast<VfxPreset>(newPresetIdx_));
+            showNewDialog_ = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("キャンセル", ImVec2(120, 0))) {
+            showNewDialog_ = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
     }
 
-    void VfxMeshEditor::MarkDirty() {
-        isDirty_ = true;
-        if (onChangedCallback_) onChangedCallback_(asset_);
-    }
+    // ===========================================================
+    // エフェクト操作
+    // ===========================================================
+    void VfxMeshEditor::SaveCurrent()
+    {
+        auto* sel = Selected();
+        if (!sel) return;
 
-    // ===========================================================
-    // RebuildMeshes — アセットパラメータでメッシュを再初期化
-    // ===========================================================
-    void VfxMeshEditor::RebuildMeshes() {
-        previewTrail_->Initialize(asset_.trail);
-        previewVolume_->Initialize(asset_.lightVolume);
-    }
-
-    // ===========================================================
-    // Save / Load
-    // ===========================================================
-    void VfxMeshEditor::Save(const std::string& path) {
-        const std::string& target = path.empty() ? currentPath_ : path;
-        if (target.empty()) { Logger("VfxMeshEditor: 保存パスが空です"); return; }
-
-        fs::path p(target);
+        // ディレクトリが存在しなければ作成
+        fs::path p(sel->filePath);
         if (!p.parent_path().empty()) {
             std::error_code ec;
             fs::create_directories(p.parent_path(), ec);
         }
-        asset_.SaveToJson(target);
-        currentPath_ = target;
-        lastFileTime_ = GetFileTime(currentPath_);
-        isDirty_ = false;
-        Logger("VfxMeshEditor: 保存 -> " + currentPath_);
+        sel->asset.SaveToJson(sel->filePath);
+        sel->isDirty = false;
+        Logger("VfxMeshEditor: 保存 -> " + sel->filePath);
     }
 
-    bool VfxMeshEditor::Load(const std::string& path) {
-        if (!asset_.LoadFromJson(path)) return false;
-        currentPath_ = path;
-        lastFileTime_ = GetFileTime(path);
-        isDirty_ = false;
-        history_.Clear();
-        RebuildMeshes();
-        if (onChangedCallback_) onChangedCallback_(asset_);
-        Logger("VfxMeshEditor: ロード -> " + currentPath_);
-        return true;
+    void VfxMeshEditor::SaveAs(const std::string& newPath)
+    {
+        auto* sel = Selected();
+        if (!sel) return;
+
+        sel->filePath = newPath;
+        SaveCurrent();
     }
 
-    // ===========================================================
-    // ホットリロード
-    // ===========================================================
-    void VfxMeshEditor::PollFileChange() {
-        if (currentPath_.empty()) return;
-        auto now = std::chrono::steady_clock::now();
-        if (std::chrono::duration<float>(now - lastCheckTime_).count() < pollIntervalSec_) return;
-        lastCheckTime_ = now;
+    void VfxMeshEditor::DeleteCurrent()
+    {
+        auto* sel = Selected();
+        if (!sel) return;
 
-        auto t = GetFileTime(currentPath_);
-        if (t != lastFileTime_) {
-            Logger("VfxMeshEditor: ホットリロード -> " + currentPath_);
-            Load(currentPath_);
+        // ファイルを削除
+        std::error_code ec;
+        fs::remove(sel->filePath, ec);
+        if (ec) Logger("VfxMeshEditor: 削除失敗 -> " + sel->filePath);
+        else    Logger("VfxMeshEditor: 削除 -> " + sel->filePath);
+
+        entries_.erase(entries_.begin() + selectedIndex_);
+
+        // 選択を調整
+        if (entries_.empty()) {
+            selectedIndex_ = -1;
+        }
+        else {
+            selectedIndex_ = std::min(selectedIndex_,
+                static_cast<int>(entries_.size()) - 1);
+            SelectEffect(selectedIndex_);
         }
     }
 
-    std::filesystem::file_time_type VfxMeshEditor::GetFileTime(const std::string& path) const {
-        std::error_code ec;
-        auto t = fs::last_write_time(path, ec);
-        return ec ? fs::file_time_type{} : t;
+    void VfxMeshEditor::CreateNew(const std::string& name,
+        const std::string& filePath,
+        VfxPreset          preset)
+    {
+        VfxEffectEntry e;
+        e.asset = MakePreset(preset);
+        e.asset.name = name;
+        e.filePath = filePath;
+        e.isDirty = true;
+        entries_.push_back(std::move(e));
+
+        // 新規作成したエフェクトを選択して即保存
+        SelectEffect(static_cast<int>(entries_.size()) - 1);
+        SaveCurrent();
+
+        Logger("VfxMeshEditor: 新規作成 -> " + filePath);
+    }
+
+    // ===========================================================
+    // CommitChange
+    // ===========================================================
+    void VfxMeshEditor::CommitChange(const VfxEffectAsset& before, const char* label)
+    {
+        auto* sel = Selected();
+        if (!sel) return;
+
+        VfxEffectAsset after = sel->asset;
+        const int idx = selectedIndex_;
+
+        history_.Execute(MakeLambdaCommand(
+            label,
+            [this, idx, after]() {  // Redo
+                if (idx < static_cast<int>(entries_.size())) {
+                    entries_[idx].asset = after;
+                    entries_[idx].isDirty = true;
+                    previewTrail_->ApplyParam(after.trail);
+                    previewVolume_->ApplyParam(after.lightVolume);
+                }
+            },
+            [this, idx, before]() { // Undo
+                if (idx < static_cast<int>(entries_.size())) {
+                    entries_[idx].asset = before;
+                    entries_[idx].isDirty = true;
+                    previewTrail_->ApplyParam(before.trail);
+                    previewVolume_->ApplyParam(before.lightVolume);
+                }
+            }
+        ));
+
+        sel->isDirty = true;
+    }
+
+    // ===========================================================
+    // プレビューメッシュ再構築
+    // ===========================================================
+    void VfxMeshEditor::RebuildPreviewMeshes()
+    {
+        auto* sel = Selected();
+        if (!sel) return;
+        previewTrail_->Initialize(sel->asset.trail);
+        previewVolume_->Initialize(sel->asset.lightVolume);
+    }
+
+    // ===========================================================
+    // CBV
+    // ===========================================================
+    void VfxMeshEditor::InitCBVs()
+    {
+        trailCBResource_ = dxCommon_->CreateBufferResource(AlignedSize<MeshTrailParamsCB>());
+        trailCBResource_->Map(0, nullptr, reinterpret_cast<void**>(&trailCBMapped_));
+
+        volumeCBResource_ = dxCommon_->CreateBufferResource(AlignedSize<LightVolumeParamsCB>());
+        volumeCBResource_->Map(0, nullptr, reinterpret_cast<void**>(&volumeCBMapped_));
+    }
+
+    void VfxMeshEditor::UpdateTrailCBV(float time)
+    {
+        auto* sel = Selected();
+        if (!sel || !trailCBMapped_) return;
+        const auto& t = sel->asset.trail;
+
+        trailCBMapped_->colorInner[0] = t.colorEnd.x;
+        trailCBMapped_->colorInner[1] = t.colorEnd.y;
+        trailCBMapped_->colorInner[2] = t.colorEnd.z;
+        trailCBMapped_->colorInner[3] = t.colorEnd.w;
+        trailCBMapped_->colorOuter[0] = t.colorStart.x;
+        trailCBMapped_->colorOuter[1] = t.colorStart.y;
+        trailCBMapped_->colorOuter[2] = t.colorStart.z;
+        trailCBMapped_->colorOuter[3] = t.colorStart.w;
+        trailCBMapped_->softness = 0.15f;
+        trailCBMapped_->glowPower = 1.5f;
+        trailCBMapped_->distortion = 0.0f;
+        trailCBMapped_->time = time;
+    }
+
+    void VfxMeshEditor::UpdateVolumeCBV(float time)
+    {
+        auto* sel = Selected();
+        if (!sel || !volumeCBMapped_) return;
+        const auto& lv = sel->asset.lightVolume;
+
+        volumeCBMapped_->color[0] = lv.color.x;
+        volumeCBMapped_->color[1] = lv.color.y;
+        volumeCBMapped_->color[2] = lv.color.z;
+        volumeCBMapped_->color[3] = lv.color.w * lv.intensity;
+        volumeCBMapped_->edgeFade = 0.15f;
+        volumeCBMapped_->depthFade = 1.0f;
+        volumeCBMapped_->noiseTiling = 2.0f;
+        volumeCBMapped_->noiseStrength = 0.0f;
+        volumeCBMapped_->time = time;
     }
 
     // ===========================================================
     // プリセット
     // ===========================================================
-    VfxEffectAsset VfxMeshEditor::MakePreset(VfxPreset preset) {
+    VfxEffectAsset VfxMeshEditor::MakePreset(VfxPreset preset)
+    {
         VfxEffectAsset a;
         switch (preset) {
         case VfxPreset::TrailOnly:
@@ -219247,25 +219804,25 @@ namespace YoRigine {
         case VfxPreset::Sword:
             a.useTrail = true; a.useLightVolume = true;
             a.trail.widthStart = 0.05f; a.trail.widthEnd = 0.f;
-            a.trail.lifetime = 0.25f;   a.trail.maxPoints = 48;
-            a.trail.colorStart = { 1.f,0.95f,0.7f,1.f };
-            a.trail.colorEnd = { 0.8f,0.5f,0.1f,0.f };
+            a.trail.lifetime = 0.25f; a.trail.maxPoints = 48;
+            a.trail.colorStart = { 1.f, 0.95f, 0.7f, 1.f };
+            a.trail.colorEnd = { 0.8f, 0.5f, 0.1f, 0.f };
             a.trail.blendMode = BlendMode::kBlendModeAdd;
             a.trail.uvScrollSpeed = 0.3f;
-            a.lightVolume.halfExtents = { 0.04f,0.04f,0.6f };
-            a.lightVolume.color = { 1.f,0.9f,0.5f,0.18f };
+            a.lightVolume.halfExtents = { 0.04f, 0.04f, 0.6f };
+            a.lightVolume.color = { 1.f, 0.9f, 0.5f, 0.18f };
             a.lightVolume.intensity = 1.5f;
             break;
         case VfxPreset::Magic:
             a.useTrail = true; a.useLightVolume = true;
             a.trail.widthStart = 0.4f;  a.trail.widthEnd = 0.05f;
-            a.trail.lifetime = 1.2f;    a.trail.maxPoints = 96;
-            a.trail.colorStart = { 0.4f,0.2f,1.f,1.f };
-            a.trail.colorEnd = { 0.2f,0.6f,1.f,0.f };
+            a.trail.lifetime = 1.2f;  a.trail.maxPoints = 96;
+            a.trail.colorStart = { 0.4f, 0.2f, 1.f, 1.f };
+            a.trail.colorEnd = { 0.2f, 0.6f, 1.f, 0.f };
             a.trail.blendMode = BlendMode::kBlendModeAdd;
             a.trail.uvScrollSpeed = 0.8f;
-            a.lightVolume.halfExtents = { 1.5f,1.5f,4.f };
-            a.lightVolume.color = { 0.5f,0.3f,1.f,0.25f };
+            a.lightVolume.halfExtents = { 1.5f, 1.5f, 4.f };
+            a.lightVolume.color = { 0.5f, 0.3f, 1.f, 0.25f };
             a.lightVolume.intensity = 3.f;
             break;
         default: break;
@@ -219281,22 +219838,51 @@ File Path: YEngine/Generators/Vfx/VfxMesh/VfxMeshEditor.h
 #pragma once
 // ===========================================================
 // VfxMeshEditor.h
-//
-// ・ImGui でパラメータ編集
-// ・TrailMesh / LightVolumeMesh を内部で持ちプレビューまで完結
-// ・Undo/Redo は CommandHistory に委譲
 // ===========================================================
 #include <string>
+#include <vector>
 #include <memory>
-#include <chrono>
 #include <functional>
 #include <filesystem>
+#include <wrl.h>
+#include <d3d12.h>
 #include "VfxEffectAsset.h"
 #include "TrailMesh.h"
 #include "LightVolumeMesh.h"
-#include "Editor/Command/CommandHistory.h"
+#include <Core/Editor/Command/CommandHistory.h>
+#include "FileOperations/FileBrowser.h"  // YParticleEditor と同じパス
 
 namespace YoRigine {
+
+    class DirectXCommon;
+
+    struct VfxEffectEntry
+    {
+        VfxEffectAsset asset;
+        std::string    filePath;
+        bool           isDirty = false;
+    };
+
+    struct MeshTrailParamsCB
+    {
+        float colorInner[4];
+        float colorOuter[4];
+        float softness;
+        float glowPower;
+        float distortion;
+        float time;
+    };
+
+    struct LightVolumeParamsCB
+    {
+        float color[4];
+        float edgeFade;
+        float depthFade;
+        float noiseTiling;
+        float noiseStrength;
+        float time;
+        float _pad[3];
+    };
 
     enum class VfxPreset : int
     {
@@ -219306,123 +219892,108 @@ namespace YoRigine {
     class VfxMeshEditor
     {
     public:
-        explicit VfxMeshEditor(const std::string& jsonPath = "");
-        ~VfxMeshEditor() = default;
+        static VfxMeshEditor* GetInstance();
 
-        // ----------------------------------------------------------
-        // 毎フレーム
-        // ----------------------------------------------------------
+        void Initialize(const std::string& scanRoot = "Resources/Vfx/");
+        void Finalize();
 
-        /// ホットリロード監視 + プレビュー駆動
-        /// プレビュー再生中は内部の TrailMesh / LightVolumeMesh を自動 Update する
         void Update(float deltaTime);
-
-        /// ImGui ウィンドウ描画
         void DrawImGui();
-
-        /// プレビュー描画 — ゲームの Draw パスと同じ場所で呼ぶ
-        /// @param cmdList          コマンドリスト
-        /// @param cameraGPUAddress gCamera CBV の GPU アドレス (他の Draw と同じ引数)
         void DrawPreview(ID3D12GraphicsCommandList* cmdList,
             D3D12_GPU_VIRTUAL_ADDRESS  cameraGPUAddress);
 
-        // ----------------------------------------------------------
-        // パラメータ参照
-        // ----------------------------------------------------------
-        const VfxEffectAsset& GetAsset() const { return asset_; }
-        VfxEffectAsset& GetAsset() { return asset_; }
-
-        // ----------------------------------------------------------
-        // ファイル操作
-        // ----------------------------------------------------------
-        void Save(const std::string& path = "");
-        bool Load(const std::string& path);
-        void ForceReload() { if (!currentPath_.empty()) Load(currentPath_); }
-        bool IsDirty() const { return isDirty_; }
-
-        // ----------------------------------------------------------
-        // コールバック
-        // ----------------------------------------------------------
-        using BrowseCallback = std::function<void(std::string& outPath)>;
-        using OnChangedCallback = std::function<void(const VfxEffectAsset&)>;
-
-        void SetBrowseCallback(BrowseCallback cb) { browseCallback_ = std::move(cb); }
-        void SetOnChangedCallback(OnChangedCallback cb) { onChangedCallback_ = std::move(cb); }
-
     private:
-        // ImGui サブセクション
-        void DrawToolbar();
-        void DrawFileSection();
-        void DrawNewEffectDialog();
-        void DrawNameSection();
+        VfxMeshEditor();
+        ~VfxMeshEditor() = default;
+
+        // ImGui パネル
+        void DrawListPanel();
+        void DrawEditPanel();
         void DrawTrailSection();
         void DrawLightVolumeSection();
         void DrawPreviewSection();
+        void DrawNewEffectDialog();
 
-        // パラメータ変更時に呼ぶ
-        // before: 変更前の asset_ スナップショット (PushUndo の代わり)
+        // テクスチャ選択ポップアップ
+        void DrawTextureSelectPopup();
+
+        // エフェクト操作
+        void ScanDirectory(const std::string& dir);
+        void SelectEffect(int index);
+        void SaveCurrent();
+        void SaveAs(const std::string& newPath);
+        void DeleteCurrent();
+        void CreateNew(const std::string& name,
+            const std::string& filePath,
+            VfxPreset          preset);
+
+        // Undo/Redo
         void CommitChange(const VfxEffectAsset& before, const char* label);
 
-        void MarkDirty();
+        // プレビュー用メッシュ / CBV
+        void RebuildPreviewMeshes();
+        void InitCBVs();
+        void UpdateTrailCBV(float time);
+        void UpdateVolumeCBV(float time);
 
-        // ホットリロード
-        void PollFileChange();
-        std::filesystem::file_time_type GetFileTime(const std::string& path) const;
-
-        // プリセット
         static VfxEffectAsset MakePreset(VfxPreset preset);
-
-        // メッシュをアセットパラメータで再初期化
-        void RebuildMeshes();
 
         // ----------------------------------------------------------
         // 状態
         // ----------------------------------------------------------
-        VfxEffectAsset asset_;
-        std::string    currentPath_;
-        bool           isDirty_ = false;
-        bool           hotReload_ = true;
-        bool           autoSave_ = false;
+        DirectXCommon* dxCommon_ = nullptr;
+        std::string    scanRoot_;
 
-        // ホットリロード
-        std::chrono::steady_clock::time_point lastCheckTime_;
-        std::filesystem::file_time_type       lastFileTime_;
-        float pollIntervalSec_ = 1.0f;
+        std::vector<VfxEffectEntry> entries_;
+        int selectedIndex_ = -1;
 
-        // Undo/Redo — CommandHistory に完全委譲
+        VfxEffectEntry* Selected() {
+            if (selectedIndex_ < 0 ||
+                selectedIndex_ >= static_cast<int>(entries_.size())) return nullptr;
+            return &entries_[selectedIndex_];
+        }
+
         CommandHistory history_;
 
-        // ----------------------------------------------------------
-        // プレビュー用メッシュ (エディタが所有)
-        // ----------------------------------------------------------
+        // プレビュー
         std::unique_ptr<TrailMesh>       previewTrail_;
         std::unique_ptr<LightVolumeMesh> previewVolume_;
 
-        // プレビュー再生状態
-        bool  previewPlaying_ = false;
-        float previewTimer_ = 0.f;
-
-        // プレビュー用の仮トランスフォーム (ImGui で動かせる)
+        bool    previewPlaying_ = false;
+        float   previewTimer_ = 0.f;
         Vector3 previewCenter_ = { 0.f, 0.f, 0.f };
         float   previewYaw_ = 0.f;
+
+        // CBV
+        Microsoft::WRL::ComPtr<ID3D12Resource> trailCBResource_;
+        MeshTrailParamsCB* trailCBMapped_ = nullptr;
+        Microsoft::WRL::ComPtr<ID3D12Resource> volumeCBResource_;
+        LightVolumeParamsCB* volumeCBMapped_ = nullptr;
 
         // 新規作成ダイアログ
         bool showNewDialog_ = false;
         char newNameBuffer_[128] = "NewEffect";
-        char newPathBuffer_[512] = "Resources/Vfx/NewEffect.json";
+        char newPathBuffer_[512] = "";
         int  newPresetIdx_ = static_cast<int>(VfxPreset::Sword);
 
-        // デバッグ表示
+        // デバッグ
         bool showTrailDebug_ = false;
         bool showVolumeDebug_ = false;
 
         // ImGui 用バッファ
         char nameBuffer_[128] = {};
-        char textureBuffer_[512] = {};
 
-        // コールバック
-        BrowseCallback    browseCallback_;
-        OnChangedCallback onChangedCallback_;
+        // ----------------------------------------------------------
+        // テクスチャ選択 FileBrowser
+        // YParticleSystem と同じパターン:
+        //   コンストラクタ本体で構築 → ThumbnailProvider → OnFileSelected
+        // ----------------------------------------------------------
+        FileBrowser rampBrowser_;           // ランプテクスチャ (t1: gTexRamp)
+        bool        showRampPopup_ = false;
+
+        FileBrowser noiseBrowser_;          // ノイズテクスチャ (t0: gTexNoise)
+        bool        showNoisePopup_ = false;
+
     };
 
 } // namespace YoRigine
@@ -273607,7 +274178,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
-	// ゲームインスタンス生成（DLLの暗黙的リンクでWindowsが起動時に解決）
+	// ゲームインスタンス生成
 	Framework* gameInstance = CreateGame();
 	if (!gameInstance) {
 		MessageBoxW(nullptr, L"ゲームの初期化に失敗しました", L"Error", MB_OK);
