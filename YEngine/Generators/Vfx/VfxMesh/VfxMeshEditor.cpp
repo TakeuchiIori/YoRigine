@@ -421,6 +421,29 @@ namespace YoRigine {
         if (!sel) return;
         auto& t = sel->asset.trail;
 
+        ImGui::SeparatorText("形状設定");
+        {
+            VfxEffectAsset b = sel->asset;
+            bool c = false;
+
+            const char* shapeNames[] = { "Flat (平板)", "Arc (円弧)", "Fan (扇形)" };
+            int shapeIdx = static_cast<int>(t.shapeType);
+            ImGui::SetNextItemWidth(-1);
+            if (ImGui::Combo("##shape", &shapeIdx, shapeNames, IM_ARRAYSIZE(shapeNames))) {
+                t.shapeType = static_cast<TrailShapeType>(shapeIdx);
+                c = true;
+            }
+            ImGui::SameLine(0, 4); ImGui::TextDisabled("断面形状");
+
+            // Flat 以外のときだけ分割数と角度を表示
+            if (t.shapeType != TrailShapeType::Flat) {
+                c |= ImGui::SliderInt("幅の分割数##wseg", &t.widthSegments, 1, 16);
+                c |= ImGui::SliderFloat("円弧の角度(度)##arcang", &t.arcAngleDeg, 10.f, 360.f, "%.1f");
+            }
+
+            if (c) CommitChange(b, "Trail 形状設定");
+        }
+
         ImGui::SeparatorText("幅");
         {
             VfxEffectAsset b = sel->asset;
