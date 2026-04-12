@@ -20,6 +20,7 @@ namespace YoRigine {
         Flat = 0,  // 従来の平板 (tip-root 2点)
         Arc = 1,   // 円弧断面 (widthSegments 分割)
         Fan = 2,   // 扇形断面 (tip を中心に root 側を広げる)
+        Custom = 3,
     };
 
 
@@ -28,7 +29,7 @@ namespace YoRigine {
         float widthStart = 0.3f;  // 根元の幅
         float widthEnd = 0.0f;  // 先端の幅
         float lifetime = 0.5f;  // トレイル1点の寿命(秒)
-        int   maxPoints = 32;    // 最大保持ポイント数
+        int   maxPoints = 512;    // 最大保持ポイント数
 
         Vector4 colorStart = { 1.f, 0.8f, 0.f, 1.f }; // 根元カラー(RGBA)
         Vector4 colorEnd = { 1.f, 0.3f, 0.f, 0.f }; // 先端カラー(RGBA)
@@ -42,6 +43,10 @@ namespace YoRigine {
         TrailShapeType shapeType = TrailShapeType::Flat;
         int widthSegments = 1;
         float arcAngleDeg = 120.0f;
+
+        bool  crescentShape = true;  // 三日月型（中間を太く、両端を細くする）
+        float thickness = 0.1f;      // 厚み（立体感）
+        std::vector<Vector2> customVertices;
     };
 
     // -------------------------------------------------------

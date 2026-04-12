@@ -1,6 +1,8 @@
 #pragma once
 //=================================================================
 // FontAwesome 5 Free — アイコン Unicode 定義 (Modern C++ 版)
+// 
+// 使用例）if (ImGui::Button((std::string(Icon::Play) +"再生").c_str()))
 //=================================================================
 namespace Icon {
     static constexpr const char* Play = "\uf04b";

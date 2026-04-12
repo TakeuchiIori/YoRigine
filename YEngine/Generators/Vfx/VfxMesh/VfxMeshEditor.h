@@ -52,6 +52,13 @@ namespace YoRigine {
         Blank = 0, TrailOnly, VolumeOnly, Sword, Magic, COUNT
     };
 
+    enum class PreviewAnimMode : int {
+        Wobble = 0,       // 従来の左右往復
+        SlashHorizontal,  // 横なぎの剣閃
+        SlashVertical,    // 縦斬りの剣閃
+        Spin              // 回転斬り
+    };
+
     class VfxMeshEditor
     {
     public:
@@ -121,6 +128,9 @@ namespace YoRigine {
         // プレビュー
         std::unique_ptr<TrailMesh>       previewTrail_;
         std::unique_ptr<LightVolumeMesh> previewVolume_;
+
+        PreviewAnimMode previewAnim_ = PreviewAnimMode::SlashHorizontal; // デフォルトを横なぎに
+        float swordLength_ = 2.0f; // プレビュー用の剣の長さ
 
         bool    previewPlaying_ = false;
         float   previewTimer_ = 0.f;

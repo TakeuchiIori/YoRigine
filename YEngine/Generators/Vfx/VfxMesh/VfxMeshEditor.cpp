@@ -11,7 +11,7 @@
 #include <cmath>
 #include "Debugger/Logger.h"
 #include <Loaders/Texture/TextureManager.h>
-
+#include <Editor/Icon/EditorIcon.h>
 namespace fs = std::filesystem;
 
 static constexpr size_t kCBVAlignment = 256;
@@ -170,17 +170,49 @@ namespace YoRigine {
         if (asset.useTrail) {
             previewTrail_->ApplyParam(asset.trail);
 
-            const float period = std::max(asset.trail.lifetime * 2.f, 0.2f);
-            const float t = std::fmod(previewTimer_, period) / period;
-            const float swing = std::sin(t * 3.14159f * 2.f);
+            Vector3 tip = previewCenter_;
+            Vector3 root = previewCenter_;
+            Vector3 widthDir = { 0.f, 1.f, 0.f }; // Arc/Fan用の幅方向
 
-            const Vector3 tip = { previewCenter_.x + swing * 0.5f,
-                                    previewCenter_.y + 1.0f,
-                                    previewCenter_.z };
-            const Vector3 root = { previewCenter_.x + swing * 0.5f,
-                                    previewCenter_.y - 1.0f,
-                                    previewCenter_.z };
-            previewTrail_->AddPoint(tip, root);
+            const float period = std::max(asset.trail.lifetime * 1.5f, 0.5f);
+            const float t = std::fmod(previewTimer_, period) / period; // 0.0 ~ 1.0
+
+            switch (previewAnim_) {
+            case PreviewAnimMode::Wobble: {
+                const float swing = std::sin(t * 3.14159f * 2.f);
+                tip = { previewCenter_.x + swing * 0.5f, previewCenter_.y + swordLength_ * 0.5f, previewCenter_.z };
+                root = { previewCenter_.x + swing * 0.5f, previewCenter_.y - swordLength_ * 0.5f, previewCenter_.z };
+                widthDir = { 1.f, 0.f, 0.f };
+                break;
+            }
+            case PreviewAnimMode::SlashHorizontal: {
+                // 素早く振ってゆっくり戻るようなイージング (pow)
+                const float easeT = std::pow(t, 0.3f);
+                const float angle = -3.14159f + easeT * 3.14159f * 1.5f; // 弧を描く
+                tip = { previewCenter_.x + std::cos(angle) * swordLength_, previewCenter_.y, previewCenter_.z + std::sin(angle) * swordLength_ };
+                root = previewCenter_; // 根本は中心に固定
+                widthDir = { 0.f, 1.f, 0.f }; // 縦方向に幅を広げる
+                break;
+            }
+            case PreviewAnimMode::SlashVertical: {
+                const float easeT = std::pow(t, 0.3f);
+                const float angle = 3.14159f * 0.8f - easeT * 3.14159f * 1.6f; // 上から下へ
+                tip = { previewCenter_.x, previewCenter_.y + std::sin(angle) * swordLength_, previewCenter_.z + std::cos(angle) * swordLength_ };
+                root = previewCenter_;
+                widthDir = { 1.f, 0.f, 0.f }; // 横方向に幅を広げる
+                break;
+            }
+            case PreviewAnimMode::Spin: {
+                const float angle = t * 3.14159f * 2.f; // ぐるぐる回る
+                tip = { previewCenter_.x + std::cos(angle) * swordLength_, previewCenter_.y, previewCenter_.z + std::sin(angle) * swordLength_ };
+                root = previewCenter_;
+                widthDir = { 0.f, 1.f, 0.f };
+                break;
+            }
+            }
+
+            // 新しく追加した AddPoint (widthDir付き) を呼び出す
+            previewTrail_->AddPoint(tip, root, widthDir);
             previewTrail_->Update(deltaTime);
         }
 
@@ -426,7 +458,7 @@ namespace YoRigine {
             VfxEffectAsset b = sel->asset;
             bool c = false;
 
-            const char* shapeNames[] = { "Flat (平板)", "Arc (円弧)", "Fan (扇形)" };
+            const char* shapeNames[] = { "Flat (平板)", "Arc (円弧)", "Fan (扇形)" ,"Custom (カスタム)" };
             int shapeIdx = static_cast<int>(t.shapeType);
             ImGui::SetNextItemWidth(-1);
             if (ImGui::Combo("##shape", &shapeIdx, shapeNames, IM_ARRAYSIZE(shapeNames))) {
@@ -444,6 +476,124 @@ namespace YoRigine {
             if (c) CommitChange(b, "Trail 形状設定");
         }
 
+        ImGui::SeparatorText("立体感・三日月化");
+        {
+            VfxEffectAsset b = sel->asset;
+            bool c = false;
+            c |= ImGui::Checkbox("三日月カーブにする##crescent", &t.crescentShape);
+            c |= ImGui::SliderFloat("厚み (Thickness)##thick", &t.thickness, 0.0f, 2.0f, "%.3f");
+            if (c) CommitChange(b, "Trail 形状モディファイア");
+        }
+
+        // ===========================================================
+// カスタム形状エディター (ImGui キャンバス)
+// ===========================================================
+        ImGui::SeparatorText("カスタムメッシュ形状エディター");
+        if (sel) {
+            VfxEffectAsset b = sel->asset;
+            bool changed = false;
+
+            if (ImGui::Button("頂点をすべてクリア")) {
+                t.customVertices.clear();
+                changed = true;
+            }
+            ImGui::SameLine();
+            ImGui::TextDisabled("左クリック: 追加/移動 | 右クリック: 削除");
+
+            // キャンバスのサイズと位置の設定
+            ImVec2 canvas_p0 = ImGui::GetCursorScreenPos();    // キャンバス左上
+            ImVec2 canvas_sz = ImVec2(ImGui::GetContentRegionAvail().x, 300.0f); // 幅いっぱい、高さ300px
+            ImVec2 canvas_p1 = ImVec2(canvas_p0.x + canvas_sz.x, canvas_p0.y + canvas_sz.y);
+
+            // キャンバスの背景を描画
+            ImDrawList* draw_list = ImGui::GetWindowDrawList();
+            draw_list->AddRectFilled(canvas_p0, canvas_p1, IM_COL32(30, 30, 30, 255));
+            draw_list->AddRect(canvas_p0, canvas_p1, IM_COL32(100, 100, 100, 255));
+
+            // マウスのインタラクション用に見えないボタンを配置
+            ImGui::InvisibleButton("canvas", canvas_sz, ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
+            const bool is_hovered = ImGui::IsItemHovered();
+            const bool is_active = ImGui::IsItemActive();
+            const ImVec2 mouse_pos_in_canvas = ImVec2(ImGui::GetIO().MousePos.x - canvas_p0.x, ImGui::GetIO().MousePos.y - canvas_p0.y);
+
+            // キャンバス中心を (0,0) とするためのオフセット
+            ImVec2 origin(canvas_p0.x + canvas_sz.x * 0.5f, canvas_p0.y + canvas_sz.y * 0.5f);
+            const float zoom = 50.0f; // 1単位を50ピクセルとして描画
+
+            // 頂点の操作ロジック
+            static int dragging_idx = -1; // ドラッグ中の頂点インデックス
+
+            if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                // 既存の頂点をクリックしたかチェック（ドラッグ開始）
+                dragging_idx = -1;
+                for (int i = 0; i < t.customVertices.size(); ++i) {
+                    ImVec2 p(origin.x + t.customVertices[i].x * zoom, origin.y - t.customVertices[i].y * zoom); // Y軸は上がプラス
+                    float dx = ImGui::GetIO().MousePos.x - p.x;
+                    float dy = ImGui::GetIO().MousePos.y - p.y;
+                    if (dx * dx + dy * dy < 100.0f) { // 半径10px以内
+                        dragging_idx = i;
+                        break;
+                    }
+                }
+                // 既存の頂点でなければ新規追加
+                if (dragging_idx == -1) {
+                    t.customVertices.push_back({ (mouse_pos_in_canvas.x - canvas_sz.x * 0.5f) / zoom,
+                                                -(mouse_pos_in_canvas.y - canvas_sz.y * 0.5f) / zoom });
+                    dragging_idx = static_cast<int>(t.customVertices.size()) - 1;
+                    changed = true;
+                }
+            }
+
+            // ドラッグ中の移動
+            if (is_active && ImGui::IsMouseDragging(ImGuiMouseButton_Left) && dragging_idx >= 0) {
+                t.customVertices[dragging_idx].x += ImGui::GetIO().MouseDelta.x / zoom;
+                t.customVertices[dragging_idx].y -= ImGui::GetIO().MouseDelta.y / zoom;
+                changed = true;
+            }
+            else if (!is_active) {
+                dragging_idx = -1;
+            }
+
+            // 右クリックで頂点削除
+            if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+                for (int i = 0; i < t.customVertices.size(); ++i) {
+                    ImVec2 p(origin.x + t.customVertices[i].x * zoom, origin.y - t.customVertices[i].y * zoom);
+                    float dx = ImGui::GetIO().MousePos.x - p.x;
+                    float dy = ImGui::GetIO().MousePos.y - p.y;
+                    if (dx * dx + dy * dy < 100.0f) {
+                        t.customVertices.erase(t.customVertices.begin() + i);
+                        changed = true;
+                        break;
+                    }
+                }
+            }
+
+            // --- 描画処理 ---
+            // グリッド線（基準線）
+            draw_list->AddLine(ImVec2(origin.x, canvas_p0.y), ImVec2(origin.x, canvas_p1.y), IM_COL32(100, 100, 100, 150));
+            draw_list->AddLine(ImVec2(canvas_p0.x, origin.y), ImVec2(canvas_p1.x, origin.y), IM_COL32(100, 100, 100, 150));
+
+            // 頂点を繋ぐ線（閉じたポリゴンとして描画）
+            if (t.customVertices.size() >= 2) {
+                for (int i = 0; i < t.customVertices.size(); ++i) {
+                    int next_i = (i + 1) % t.customVertices.size(); // 最後は最初と繋ぐ
+                    ImVec2 p1(origin.x + t.customVertices[i].x * zoom, origin.y - t.customVertices[i].y * zoom);
+                    ImVec2 p2(origin.x + t.customVertices[next_i].x * zoom, origin.y - t.customVertices[next_i].y * zoom);
+                    draw_list->AddLine(p1, p2, IM_COL32(0, 255, 255, 255), 2.0f);
+                }
+            }
+
+            // 頂点の丸を描画
+            for (int i = 0; i < t.customVertices.size(); ++i) {
+                ImVec2 p(origin.x + t.customVertices[i].x * zoom, origin.y - t.customVertices[i].y * zoom);
+                draw_list->AddCircleFilled(p, 5.0f, (i == dragging_idx) ? IM_COL32(255, 0, 0, 255) : IM_COL32(255, 255, 0, 255));
+            }
+
+            if (changed) {
+                CommitChange(b, "カスタムメッシュ編集");
+            }
+        }
+
         ImGui::SeparatorText("幅");
         {
             VfxEffectAsset b = sel->asset;
@@ -458,7 +608,7 @@ namespace YoRigine {
             VfxEffectAsset b = sel->asset;
             bool c = false;
             c |= ImGui::SliderFloat("寿命 (秒)##lt", &t.lifetime, 0.05f, 5.f, "%.2f");
-            c |= ImGui::SliderInt("最大ポイント##mp", &t.maxPoints, 4, 128);
+            c |= ImGui::SliderInt("最大ポイント##mp", &t.maxPoints, 4, 512);
             if (c) CommitChange(b, "Trail 寿命");
         }
 
@@ -622,22 +772,34 @@ namespace YoRigine {
     void VfxMeshEditor::DrawPreviewSection()
     {
         ImGui::SeparatorText("プレビュー");
+        // --- 新規追加: プレビューの動き選択 ---
+        const char* animNames[] = { "Wobble (往復)", "Slash (横なぎ)", "Slash (縦斬り)", "Spin (回転)" };
+        int animIdx = static_cast<int>(previewAnim_);
+        ImGui::SetNextItemWidth(150);
+        if (ImGui::Combo("軌道アニメ", &animIdx, animNames, IM_ARRAYSIZE(animNames))) {
+            previewAnim_ = static_cast<PreviewAnimMode>(animIdx);
+            previewTrail_->Clear(); // アニメ変更時にトレイルをリセット
+        }
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(100);
+        ImGui::DragFloat("剣の長さ", &swordLength_, 0.1f, 0.5f, 10.f, "%.1f");
+        // ------------------------------------
 
         if (previewPlaying_) {
-            if (ImGui::Button("■ 停止")) {
+            if (ImGui::Button((std::string(Icon::Stop) +"■ 停止").c_str())) {
                 previewPlaying_ = false;
                 previewTrail_->Clear();
             }
         }
         else {
-            if (ImGui::Button("▶ 再生")) {
+            if (ImGui::Button((std::string(Icon::Play) +"再生").c_str())) {
                 previewPlaying_ = true;
                 previewTimer_ = 0.f;
                 previewTrail_->Clear();
             }
         }
         ImGui::SameLine();
-        if (ImGui::Button("↺ リセット")) {
+        if (ImGui::Button((std::string(Icon::Refresh) + "↺ リセット").c_str())) {
             previewTimer_ = 0.f;
             previewTrail_->Clear();
         }

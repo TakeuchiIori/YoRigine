@@ -107,6 +107,11 @@ namespace YoRigine {
         /// Fan (扇形断面) 形状のストリップ生成
         void RebuildFan();
 
+        ///
+        void RebuildCustom();
+
+        bool IsPointInTriangle(const Vector2& p, const Vector2& a, const Vector2& b, const Vector2& c) const;
+
         /// age を [0,1] に正規化 (0=新しい端, 1=古い端)
         float NormalizeAge(float age) const
         {

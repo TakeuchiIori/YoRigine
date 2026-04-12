@@ -90,6 +90,7 @@ namespace YoRigine {
         switch (shapeType_) {
         case TrailShapeType::Arc: RebuildArc(); break;
         case TrailShapeType::Fan: RebuildFan(); break;
+        case TrailShapeType::Custom: RebuildCustom(); break;
         case TrailShapeType::Flat:
         default:                  RebuildFlat(); break;
         }
@@ -115,15 +116,32 @@ namespace YoRigine {
             const Vector4 vColor = CalcFadeColor(normalizedAge);
             const float uvY = tY + time_ * param_.uvScrollSpeed;
 
+            // ★ 三日月カーブ: ageが0(最新)と1(最古)のときに0になり、0.5のときに1になるサイン波
+            float widthScale = 1.0f;
+            if (param_.crescentShape) {
+                // sin(π * t) で両端が細くなる三日月型を作る
+                widthScale = std::sin(normalizedAge * 3.14159265f);
+            }
+
+            // 中心点と方向ベクトルを計算
+            Vector3 center = { (p.tip.x + p.root.x) * 0.5f, (p.tip.y + p.root.y) * 0.5f, (p.tip.z + p.root.z) * 0.5f };
+            Vector3 toTip = { p.tip.x - center.x, p.tip.y - center.y, p.tip.z - center.z };
+
+            // 幅をスケールして現在のTipとRootを計算
+            Vector3 currentTip = { center.x + toTip.x * widthScale, center.y + toTip.y * widthScale, center.z + toTip.z * widthScale };
+            Vector3 currentRoot = { center.x - toTip.x * widthScale, center.y - toTip.y * widthScale, center.z - toTip.z * widthScale };
+
+            // 頂点の追加 (Tip側)
             ProceduralMeshVertex vTip;
-            vTip.position = p.tip;
+            vTip.position = currentTip;
             vTip.texcoord = { 0.f, uvY };
             vTip.color = vColor;
             vTip.age = normalizedAge;
             vertices_.push_back(vTip);
 
+            // 頂点の追加 (Root側)
             ProceduralMeshVertex vRoot;
-            vRoot.position = p.root;
+            vRoot.position = currentRoot;
             vRoot.texcoord = { 1.f, uvY };
             vRoot.color = vColor;
             vRoot.age = normalizedAge;
@@ -295,6 +313,125 @@ namespace YoRigine {
         }
     }
 
+    void TrailMesh::RebuildCustom()
+    {
+        const auto& outline = param_.customVertices;
+        if (outline.size() < 3) return; // 3点未満は面を作れない
+
+        // 厚み（Z値の幅）
+        float halfThick = param_.thickness * 0.5f;
+        if (halfThick <= 0.001f) halfThick = 0.05f; // 最低限の厚み
+
+        // 1. Ear Clipping（耳切り法）による 2Dポリゴンの三角形分割
+        std::vector<int> indices;
+        std::vector<int> remainingList;
+        for (int i = 0; i < outline.size(); ++i) remainingList.push_back(i);
+
+        int safety = 1000;
+        while (remainingList.size() > 3 && safety-- > 0)
+        {
+            bool earFound = false;
+            for (size_t i = 0; i < remainingList.size(); ++i) {
+                int prev = remainingList[(i == 0) ? remainingList.size() - 1 : i - 1];
+                int curr = remainingList[i];
+                int next = remainingList[(i + 1) % remainingList.size()];
+
+                Vector2 a = outline[prev];
+                Vector2 b = outline[curr];
+                Vector2 c = outline[next];
+
+                // 外積で凸(Convex)か判定 (時計回り/反時計回りで符号が変わる)
+                float cross = (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x);
+                if (cross <= 0.0f) continue; // 凹んでいる部分はスキップ
+
+                // 他の点がこの三角形の中に含まれていないかチェック
+                bool isEar = true;
+                for (int idx : remainingList) {
+                    if (idx == prev || idx == curr || idx == next) continue;
+                    if (IsPointInTriangle(outline[idx], a, b, c)) {
+                        isEar = false;
+                        break;
+                    }
+                }
+
+                if (isEar) {
+                    indices.push_back(prev);
+                    indices.push_back(curr);
+                    indices.push_back(next);
+                    remainingList.erase(remainingList.begin() + i);
+                    earFound = true;
+                    break;
+                }
+            }
+            if (!earFound) break; // 複雑すぎる交差などがあれば強制終了
+        }
+        // 最後の3点
+        if (remainingList.size() == 3) {
+            indices.push_back(remainingList[0]);
+            indices.push_back(remainingList[1]);
+            indices.push_back(remainingList[2]);
+        }
+
+        // 2. 頂点を GPU 用のフォーマットに変換し、Z方向の厚みをつける
+        // ※今回は TriangleStrip ではなく、TriangleList として描画するため、
+        // 頂点配列にそのまま三角形をポンポン入れていきます（後でTopologyの変更が必要）
+        auto addTriangle = [&](const Vector3& p1, const Vector3& p2, const Vector3& p3, float uvX) {
+            ProceduralMeshVertex v;
+            v.color = { 1.f, 1.f, 1.f, 1.f };
+            v.age = 0.f;
+
+            v.position = p1; v.texcoord = { uvX, 0.f }; vertices_.push_back(v);
+            v.position = p2; v.texcoord = { uvX, 1.f }; vertices_.push_back(v);
+            v.position = p3; v.texcoord = { uvX, 0.5f }; vertices_.push_back(v);
+            };
+
+        // 表面 (+Z) と 裏面 (-Z)
+        for (size_t i = 0; i < indices.size(); i += 3) {
+            int i1 = indices[i], i2 = indices[i + 1], i3 = indices[i + 2];
+
+            // 表面
+            addTriangle(
+                { outline[i1].x, outline[i1].y, halfThick },
+                { outline[i2].x, outline[i2].y, halfThick },
+                { outline[i3].x, outline[i3].y, halfThick }, 0.0f
+            );
+            // 裏面 (カリングされないように頂点順を逆にする)
+            addTriangle(
+                { outline[i1].x, outline[i1].y, -halfThick },
+                { outline[i3].x, outline[i3].y, -halfThick },
+                { outline[i2].x, outline[i2].y, -halfThick }, 1.0f
+            );
+        }
+
+        // 側面 (フチの部分を四角形で繋ぐ)
+        for (size_t i = 0; i < outline.size(); ++i) {
+            int next = static_cast<int>((i + 1) % outline.size());
+            Vector3 p1_f = { outline[i].x, outline[i].y, halfThick };
+            Vector3 p2_f = { outline[next].x, outline[next].y, halfThick };
+            Vector3 p1_b = { outline[i].x, outline[i].y, -halfThick };
+            Vector3 p2_b = { outline[next].x, outline[next].y, -halfThick };
+
+            // 四角形は2つの三角形
+            addTriangle(p1_f, p2_f, p1_b, 0.5f);
+            addTriangle(p1_b, p2_f, p2_b, 0.5f);
+        }
+    }
+
+    bool TrailMesh::IsPointInTriangle(const Vector2& p, const Vector2& a, const Vector2& b, const Vector2& c) const
+    {
+        auto crossProduct = [](const Vector2& v1, const Vector2& v2) { return v1.x * v2.y - v1.y * v2.x; };
+        Vector2 ab = { b.x - a.x, b.y - a.y };
+        Vector2 bc = { c.x - b.x, c.y - b.y };
+        Vector2 ca = { a.x - c.x, a.y - c.y };
+        Vector2 ap = { p.x - a.x, p.y - a.y };
+        Vector2 bp = { p.x - b.x, p.y - b.y };
+        Vector2 cp = { p.x - c.x, p.y - c.y };
+        float c1 = crossProduct(ab, ap);
+        float c2 = crossProduct(bc, bp);
+        float c3 = crossProduct(ca, cp);
+        return ((c1 >= 0.0f && c2 >= 0.0f && c3 >= 0.0f) || (c1 <= 0.0f && c2 <= 0.0f && c3 <= 0.0f));
+    }
+
     // -----------------------------------------------------------
     void TrailMesh::Draw(ID3D12GraphicsCommandList* cmdList)
     {
@@ -304,8 +441,12 @@ namespace YoRigine {
         if (vertCount < 4) return; // 最低 2 ポイント = 4 頂点必要
 
         // PSO / ルートシグネチャ / CBV は呼び出し元でセット済みを前提
-
-        cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+        if (shapeType_ == TrailShapeType::Custom) {
+            cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        }
+        else {
+            cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+        }
         BindVertexBuffer(cmdList);
         cmdList->DrawInstanced(vertCount, 1, 0, 0);
     }

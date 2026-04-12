@@ -18,9 +18,9 @@
     "trail": {
         "blendMode": 2,
         "colorEnd": {
-            "w": 0.0,
+            "w": 1.0,
             "x": 1.0,
-            "y": 0.30000001192092896,
+            "y": 0.2980392277240753,
             "z": 0.0
         },
         "colorStart": {
@@ -29,9 +29,10 @@
             "y": 0.800000011920929,
             "z": 0.0
         },
-        "lifetime": 0.5,
-        "maxPoints": 32,
-        "texturePath": "",
+        "lifetime": 0.5600000023841858,
+        "maxPoints": 30,
+        "noiseTexturePath": "Resources/Textures/white.png",
+        "texturePath": "Resources/Textures/white.png",
         "uvScrollSpeed": 0.5,
         "widthEnd": 0.0,
         "widthStart": 0.30000001192092896
