@@ -14,6 +14,15 @@ namespace YoRigine {
     // -------------------------------------------------------
     // Trail パラメータ
     // -------------------------------------------------------
+
+    enum class TrailShapeType : int
+    {
+        Flat = 0,  // 従来の平板 (tip-root 2点)
+        Arc = 1,   // 円弧断面 (widthSegments 分割)
+        Fan = 2,   // 扇形断面 (tip を中心に root 側を広げる)
+    };
+
+
     struct TrailEffectParam
     {
         float widthStart = 0.3f;  // 根元の幅
@@ -28,6 +37,11 @@ namespace YoRigine {
 
         float uvScrollSpeed = 0.5f;  // UV スクロール速度
         std::string texturePath = ""; // テクスチャパス (空なら白)
+        std::string noiseTexturePath = ""; // 歪みノイズ
+
+        TrailShapeType shapeType = TrailShapeType::Flat;
+        int widthSegments = 1;
+        float arcAngleDeg = 120.0f;
     };
 
     // -------------------------------------------------------

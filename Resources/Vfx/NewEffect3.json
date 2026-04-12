@@ -1,0 +1,42 @@
+{
+    "lightVolume": {
+        "color": {
+            "w": 0.18000000715255737,
+            "x": 1.0,
+            "y": 0.8999999761581421,
+            "z": 0.5
+        },
+        "halfExtents": {
+            "x": 0.03999999910593033,
+            "y": 0.03999999910593033,
+            "z": 0.6000000238418579
+        },
+        "intensity": 1.5,
+        "isEnable": true
+    },
+    "name": "NewEffect3",
+    "trail": {
+        "blendMode": 2,
+        "colorEnd": {
+            "w": 0.0,
+            "x": 0.800000011920929,
+            "y": 0.5,
+            "z": 0.10000000149011612
+        },
+        "colorStart": {
+            "w": 1.0,
+            "x": 1.0,
+            "y": 0.949999988079071,
+            "z": 0.699999988079071
+        },
+        "lifetime": 0.25,
+        "maxPoints": 48,
+        "noiseTexturePath": "",
+        "texturePath": "",
+        "uvScrollSpeed": 0.30000001192092896,
+        "widthEnd": 0.0,
+        "widthStart": 0.05000000074505806
+    },
+    "useLightVolume": true,
+    "useTrail": true
+}
