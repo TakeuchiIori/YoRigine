@@ -1,22 +1,51 @@
 #pragma once
 // ===========================================================
 // VfxMeshEditor.h
-//
-// ・ImGui でパラメータ編集
-// ・TrailMesh / LightVolumeMesh を内部で持ちプレビューまで完結
-// ・Undo/Redo は CommandHistory に委譲
 // ===========================================================
 #include <string>
+#include <vector>
 #include <memory>
-#include <chrono>
 #include <functional>
 #include <filesystem>
+#include <wrl.h>
+#include <d3d12.h>
 #include "VfxEffectAsset.h"
 #include "TrailMesh.h"
 #include "LightVolumeMesh.h"
-#include "Editor/Command/CommandHistory.h"
+#include <Core/Editor/Command/CommandHistory.h>
+#include "FileOperations/FileBrowser.h"  // YParticleEditor と同じパス
 
 namespace YoRigine {
+
+    class DirectXCommon;
+
+    struct VfxEffectEntry
+    {
+        VfxEffectAsset asset;
+        std::string    filePath;
+        bool           isDirty = false;
+    };
+
+    struct MeshTrailParamsCB
+    {
+        float colorInner[4];
+        float colorOuter[4];
+        float softness;
+        float glowPower;
+        float distortion;
+        float time;
+    };
+
+    struct LightVolumeParamsCB
+    {
+        float color[4];
+        float edgeFade;
+        float depthFade;
+        float noiseTiling;
+        float noiseStrength;
+        float time;
+        float _pad[3];
+    };
 
     enum class VfxPreset : int
     {
@@ -26,123 +55,108 @@ namespace YoRigine {
     class VfxMeshEditor
     {
     public:
-        explicit VfxMeshEditor(const std::string& jsonPath = "");
-        ~VfxMeshEditor() = default;
+        static VfxMeshEditor* GetInstance();
 
-        // ----------------------------------------------------------
-        // 毎フレーム
-        // ----------------------------------------------------------
+        void Initialize(const std::string& scanRoot = "Resources/Vfx/");
+        void Finalize();
 
-        /// ホットリロード監視 + プレビュー駆動
-        /// プレビュー再生中は内部の TrailMesh / LightVolumeMesh を自動 Update する
         void Update(float deltaTime);
-
-        /// ImGui ウィンドウ描画
         void DrawImGui();
-
-        /// プレビュー描画 — ゲームの Draw パスと同じ場所で呼ぶ
-        /// @param cmdList          コマンドリスト
-        /// @param cameraGPUAddress gCamera CBV の GPU アドレス (他の Draw と同じ引数)
         void DrawPreview(ID3D12GraphicsCommandList* cmdList,
             D3D12_GPU_VIRTUAL_ADDRESS  cameraGPUAddress);
 
-        // ----------------------------------------------------------
-        // パラメータ参照
-        // ----------------------------------------------------------
-        const VfxEffectAsset& GetAsset() const { return asset_; }
-        VfxEffectAsset& GetAsset() { return asset_; }
-
-        // ----------------------------------------------------------
-        // ファイル操作
-        // ----------------------------------------------------------
-        void Save(const std::string& path = "");
-        bool Load(const std::string& path);
-        void ForceReload() { if (!currentPath_.empty()) Load(currentPath_); }
-        bool IsDirty() const { return isDirty_; }
-
-        // ----------------------------------------------------------
-        // コールバック
-        // ----------------------------------------------------------
-        using BrowseCallback = std::function<void(std::string& outPath)>;
-        using OnChangedCallback = std::function<void(const VfxEffectAsset&)>;
-
-        void SetBrowseCallback(BrowseCallback cb) { browseCallback_ = std::move(cb); }
-        void SetOnChangedCallback(OnChangedCallback cb) { onChangedCallback_ = std::move(cb); }
-
     private:
-        // ImGui サブセクション
-        void DrawToolbar();
-        void DrawFileSection();
-        void DrawNewEffectDialog();
-        void DrawNameSection();
+        VfxMeshEditor();
+        ~VfxMeshEditor() = default;
+
+        // ImGui パネル
+        void DrawListPanel();
+        void DrawEditPanel();
         void DrawTrailSection();
         void DrawLightVolumeSection();
         void DrawPreviewSection();
+        void DrawNewEffectDialog();
 
-        // パラメータ変更時に呼ぶ
-        // before: 変更前の asset_ スナップショット (PushUndo の代わり)
+        // テクスチャ選択ポップアップ
+        void DrawTextureSelectPopup();
+
+        // エフェクト操作
+        void ScanDirectory(const std::string& dir);
+        void SelectEffect(int index);
+        void SaveCurrent();
+        void SaveAs(const std::string& newPath);
+        void DeleteCurrent();
+        void CreateNew(const std::string& name,
+            const std::string& filePath,
+            VfxPreset          preset);
+
+        // Undo/Redo
         void CommitChange(const VfxEffectAsset& before, const char* label);
 
-        void MarkDirty();
+        // プレビュー用メッシュ / CBV
+        void RebuildPreviewMeshes();
+        void InitCBVs();
+        void UpdateTrailCBV(float time);
+        void UpdateVolumeCBV(float time);
 
-        // ホットリロード
-        void PollFileChange();
-        std::filesystem::file_time_type GetFileTime(const std::string& path) const;
-
-        // プリセット
         static VfxEffectAsset MakePreset(VfxPreset preset);
-
-        // メッシュをアセットパラメータで再初期化
-        void RebuildMeshes();
 
         // ----------------------------------------------------------
         // 状態
         // ----------------------------------------------------------
-        VfxEffectAsset asset_;
-        std::string    currentPath_;
-        bool           isDirty_ = false;
-        bool           hotReload_ = true;
-        bool           autoSave_ = false;
+        DirectXCommon* dxCommon_ = nullptr;
+        std::string    scanRoot_;
 
-        // ホットリロード
-        std::chrono::steady_clock::time_point lastCheckTime_;
-        std::filesystem::file_time_type       lastFileTime_;
-        float pollIntervalSec_ = 1.0f;
+        std::vector<VfxEffectEntry> entries_;
+        int selectedIndex_ = -1;
 
-        // Undo/Redo — CommandHistory に完全委譲
+        VfxEffectEntry* Selected() {
+            if (selectedIndex_ < 0 ||
+                selectedIndex_ >= static_cast<int>(entries_.size())) return nullptr;
+            return &entries_[selectedIndex_];
+        }
+
         CommandHistory history_;
 
-        // ----------------------------------------------------------
-        // プレビュー用メッシュ (エディタが所有)
-        // ----------------------------------------------------------
+        // プレビュー
         std::unique_ptr<TrailMesh>       previewTrail_;
         std::unique_ptr<LightVolumeMesh> previewVolume_;
 
-        // プレビュー再生状態
-        bool  previewPlaying_ = false;
-        float previewTimer_ = 0.f;
-
-        // プレビュー用の仮トランスフォーム (ImGui で動かせる)
+        bool    previewPlaying_ = false;
+        float   previewTimer_ = 0.f;
         Vector3 previewCenter_ = { 0.f, 0.f, 0.f };
         float   previewYaw_ = 0.f;
+
+        // CBV
+        Microsoft::WRL::ComPtr<ID3D12Resource> trailCBResource_;
+        MeshTrailParamsCB* trailCBMapped_ = nullptr;
+        Microsoft::WRL::ComPtr<ID3D12Resource> volumeCBResource_;
+        LightVolumeParamsCB* volumeCBMapped_ = nullptr;
 
         // 新規作成ダイアログ
         bool showNewDialog_ = false;
         char newNameBuffer_[128] = "NewEffect";
-        char newPathBuffer_[512] = "Resources/Vfx/NewEffect.json";
+        char newPathBuffer_[512] = "";
         int  newPresetIdx_ = static_cast<int>(VfxPreset::Sword);
 
-        // デバッグ表示
+        // デバッグ
         bool showTrailDebug_ = false;
         bool showVolumeDebug_ = false;
 
         // ImGui 用バッファ
         char nameBuffer_[128] = {};
-        char textureBuffer_[512] = {};
 
-        // コールバック
-        BrowseCallback    browseCallback_;
-        OnChangedCallback onChangedCallback_;
+        // ----------------------------------------------------------
+        // テクスチャ選択 FileBrowser
+        // YParticleSystem と同じパターン:
+        //   コンストラクタ本体で構築 → ThumbnailProvider → OnFileSelected
+        // ----------------------------------------------------------
+        FileBrowser rampBrowser_;           // ランプテクスチャ (t1: gTexRamp)
+        bool        showRampPopup_ = false;
+
+        FileBrowser noiseBrowser_;          // ノイズテクスチャ (t0: gTexNoise)
+        bool        showNoisePopup_ = false;
+
     };
 
 } // namespace YoRigine

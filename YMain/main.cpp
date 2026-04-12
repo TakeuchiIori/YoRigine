@@ -10,7 +10,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
-	// ゲームインスタンス生成（DLLの暗黙的リンクでWindowsが起動時に解決）
+	// ゲームインスタンス生成
 	Framework* gameInstance = CreateGame();
 	if (!gameInstance) {
 		MessageBoxW(nullptr, L"ゲームの初期化に失敗しました", L"Error", MB_OK);

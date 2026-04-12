@@ -28,6 +28,7 @@ namespace YoRigine {
 
         float uvScrollSpeed = 0.5f;  // UV スクロール速度
         std::string texturePath = ""; // テクスチャパス (空なら白)
+        std::string noiseTexturePath = ""; // 歪みノイズ
     };
 
     // -------------------------------------------------------

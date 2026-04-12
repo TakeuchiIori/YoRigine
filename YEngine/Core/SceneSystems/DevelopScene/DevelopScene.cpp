@@ -13,13 +13,14 @@
 
 #include "Object3D/Object3dCommon.h"
 #include "LightManager/LightManager.h"
+#include <Systems/GameTime/GameTime.h>
 
 #include "Particle./ParticleManager.h"
 #include "Particle/YParticleManager.h"
 #include "Particle/YParticleEditor.h"
 #include "Particle/YEmitterGroupEditor.h"
 #include "GPUParticle/GpuEmitManager.h"
-
+#include <Vfx/VfxMesh/VfxMeshEditor.h>
 
 
 // Camera
@@ -80,8 +81,11 @@ void DevelopScene::Initialize() {
 	Editor::GetInstance()->RegisterGameUI("GpuParticle", [this]() { YoRigine::GpuEmitManager::GetInstance()->DrawImGui(); }, "Develop");
 	Editor::GetInstance()->RegisterGameUI("YoRigine:パーティクルエディター", [this]() {YParticleEditor::GetInstance().ShowEditorWindow(); }, "Develop");
 	Editor::GetInstance()->RegisterGameUI("モーションエディタ", [this]() {motionEditor_->ShowEditor(); }, "Develop");
+	Editor::GetInstance()->RegisterGameUI("VFX", [this]() { YoRigine::VfxMeshEditor::GetInstance()->DrawImGui(); }, "Develop");
 
 #endif
+
+	YoRigine::VfxMeshEditor::GetInstance()->Initialize();
 }
 
 /// <summary>
@@ -98,7 +102,7 @@ void DevelopScene::Update() {
 	YParticleManager::GetInstance().Update(YoRigine::GameTime::GetDeltaTime());
 	YoRigine::LightManager::GetInstance()->UpdateShadowMatrix(sceneCamera_.get());
 	YoRigine::GpuEmitManager::GetInstance()->Update();
-
+	YoRigine::VfxMeshEditor::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
 }
 
 /// <summary>
@@ -119,6 +123,7 @@ void DevelopScene::Draw() {
 	YParticleManager::GetInstance().Draw();
 	DrawLine();
 	YoRigine::GpuEmitManager::GetInstance()->Draw();
+	YoRigine::VfxMeshEditor::GetInstance()->DrawPreview(YoRigine::DirectXCommon::GetInstance()->GetCommandList().Get(), sceneCamera_->GetCameraResource()->GetGPUVirtualAddress());
 }
 
 /// <summary>
