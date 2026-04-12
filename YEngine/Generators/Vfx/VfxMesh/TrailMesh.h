@@ -89,6 +89,11 @@ private:
 private:
     TrailEffectParam param_;
 
+    // 形状パラメータ
+    TrailShapeType shapeType_    = TrailShapeType::Flat;
+    int            widthSegments_ = 1;
+    float          arcAngleDeg_  = 120.0f;
+
     // ポイント履歴 (front = 最新, back = 最古)
     std::deque<TrailPoint> points_;
 

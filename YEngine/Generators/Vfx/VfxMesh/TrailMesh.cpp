@@ -11,6 +11,9 @@ namespace YoRigine {
 void TrailMesh::Initialize(const TrailEffectParam& param)
 {
     param_ = param;
+    shapeType_    = param_.shapeType;
+    widthSegments_ = param_.widthSegments;
+    arcAngleDeg_  = param_.arcAngleDeg;
     // 最大 maxPoints 点 × 2 頂点(tip/root) のストリップ
     const size_t maxVerts = static_cast<size_t>(param_.maxPoints) * 2;
     InitBuffer(maxVerts);
@@ -21,6 +24,9 @@ void TrailMesh::Initialize(const TrailEffectParam& param)
 void TrailMesh::ApplyParam(const TrailEffectParam& param)
 {
     param_ = param;
+    shapeType_    = param_.shapeType;
+    widthSegments_ = param_.widthSegments;
+    arcAngleDeg_  = param_.arcAngleDeg;
     // maxPoints が増えていたらバッファも拡張 (DynamicVertexBuffer が自動リサイズするので特別な処理不要)
 }
 

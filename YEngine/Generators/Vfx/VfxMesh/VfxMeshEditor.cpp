@@ -279,6 +279,23 @@ namespace YoRigine {
     void VfxMeshEditor::DrawTrailSection() {
         auto& t = asset_.trail;
 
+        ImGui::SeparatorText("形状");
+        {
+            VfxEffectAsset before = asset_;
+            bool c = false;
+            const char* shapeNames[] = { "Flat", "Arc", "Fan" };
+            int shapeIdx = static_cast<int>(t.shapeType);
+            ImGui::SetNextItemWidth(-1);
+            if (ImGui::Combo("##shapeType", &shapeIdx, shapeNames, IM_ARRAYSIZE(shapeNames))) {
+                t.shapeType = static_cast<TrailShapeType>(shapeIdx);
+                c = true;
+            }
+            c |= ImGui::SliderInt("幅分割数##ws", &t.widthSegments, 1, 16);
+            if (t.shapeType != TrailShapeType::Flat)
+                c |= ImGui::SliderFloat("弧角度 (度)##arc", &t.arcAngleDeg, 10.0f, 360.0f, "%.1f");
+            if (c) CommitChange(before, "Trail 形状");
+        }
+
         ImGui::SeparatorText("幅");
         {
             VfxEffectAsset before = asset_;

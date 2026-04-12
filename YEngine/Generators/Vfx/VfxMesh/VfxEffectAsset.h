@@ -12,6 +12,16 @@
 namespace YoRigine {
 
     // -------------------------------------------------------
+    // トレイル形状タイプ
+    // -------------------------------------------------------
+    enum class TrailShapeType : int
+    {
+        Flat = 0, // 平面 (デフォルト)
+        Arc  = 1, // 弧状
+        Fan  = 2, // 扇状
+    };
+
+    // -------------------------------------------------------
     // Trail パラメータ
     // -------------------------------------------------------
     struct TrailEffectParam
@@ -28,6 +38,10 @@ namespace YoRigine {
 
         float uvScrollSpeed = 0.5f;  // UV スクロール速度
         std::string texturePath = ""; // テクスチャパス (空なら白)
+
+        TrailShapeType shapeType    = TrailShapeType::Flat; // 形状タイプ
+        int            widthSegments = 1;                   // 幅方向の分割数 (1〜16)
+        float          arcAngleDeg   = 120.0f;              // 弧/扇の角度 (10〜360 度)
     };
 
     // -------------------------------------------------------

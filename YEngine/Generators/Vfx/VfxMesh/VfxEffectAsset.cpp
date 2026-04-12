@@ -29,6 +29,9 @@ namespace YoRigine {
         t["blendMode"] = static_cast<int>(trail.blendMode);
         t["uvScrollSpeed"] = trail.uvScrollSpeed;
         t["texturePath"] = trail.texturePath;
+        t["shapeType"] = static_cast<int>(trail.shapeType);
+        t["widthSegments"] = trail.widthSegments;
+        t["arcAngleDeg"] = trail.arcAngleDeg;
 
         // --- LightVolume ---
         auto& lv = j["lightVolume"];
@@ -65,6 +68,9 @@ namespace YoRigine {
             trail.uvScrollSpeed = t.value("uvScrollSpeed", trail.uvScrollSpeed);
             trail.texturePath = t.value("texturePath", trail.texturePath);
             trail.blendMode = static_cast<BlendMode>(t.value("blendMode", static_cast<int>(trail.blendMode)));
+            trail.shapeType = static_cast<TrailShapeType>(t.value("shapeType", static_cast<int>(trail.shapeType)));
+            trail.widthSegments = t.value("widthSegments", trail.widthSegments);
+            trail.arcAngleDeg   = t.value("arcAngleDeg",   trail.arcAngleDeg);
             if (t.contains("colorStart")) trail.colorStart = JsonToVector4(t["colorStart"]);
             if (t.contains("colorEnd"))   trail.colorEnd = JsonToVector4(t["colorEnd"]);
         }
