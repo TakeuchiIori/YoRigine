@@ -35,6 +35,7 @@ public:
 	void DrawBone(Line& line);
 	void DrawShadow();
 	void DrawImGui();
+	void DrawVfx();
 
 	///************************* 当たり判定 *************************///
 	void OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other);

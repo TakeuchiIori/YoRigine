@@ -19,7 +19,7 @@
 /// デストラクタ
 /// </summary>
 Player::~Player() {
-	obbCollider_->~OBBCollider();
+	//obbCollider_->~OBBCollider();
 }
 
 /// <summary>
@@ -246,6 +246,10 @@ void Player::DrawShadow() {
 void Player::DrawImGui() {
 	movement_->ShowStateDebug();
 	combat_->ShowDebugImGui();
+}
+
+void Player::DrawVfx() {
+	playerSword_->DrawVfx();
 }
 
 /// <summary>

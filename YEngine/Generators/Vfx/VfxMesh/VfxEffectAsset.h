@@ -26,19 +26,19 @@ namespace YoRigine {
 
     struct TrailEffectParam
     {
-        float widthStart = 0.3f;  // 根元の幅
-        float widthEnd = 0.0f;  // 先端の幅
-        float lifetime = 0.5f;  // トレイル1点の寿命(秒)
-        int   maxPoints = 512;    // 最大保持ポイント数
+        float widthStart = 0.3f;    // 根元の幅
+        float widthEnd = 0.0f;      // 先端の幅
+        float lifetime = 0.5f;      // トレイル1点の寿命(秒)
+        int   maxPoints = 512;      // 最大保持ポイント数
 
-        Vector4 colorStart = { 1.f, 0.8f, 0.f, 1.f }; // 根元カラー(RGBA)
-        Vector4 colorEnd = { 1.f, 0.3f, 0.f, 0.f }; // 先端カラー(RGBA)
+        Vector4 colorStart = { 1.f, 0.8f, 0.f, 1.f };   // 根元カラー(RGBA)
+        Vector4 colorEnd = { 1.f, 0.3f, 0.f, 0.f };     // 先端カラー(RGBA)
 
         BlendMode blendMode = BlendMode::kBlendModeAdd; // ブレンドモード
 
-        float uvScrollSpeed = 0.5f;  // UV スクロール速度
-        std::string texturePath = ""; // テクスチャパス (空なら白)
-        std::string noiseTexturePath = ""; // 歪みノイズ
+        float uvScrollSpeed = 0.5f;         // UV スクロール速度
+        std::string texturePath = "";       // テクスチャパス (空なら白)
+        std::string noiseTexturePath = "";  // 歪みノイズ
 
         TrailShapeType shapeType = TrailShapeType::Flat;
         int widthSegments = 1;

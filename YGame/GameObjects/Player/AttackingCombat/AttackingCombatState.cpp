@@ -21,12 +21,17 @@ AttackingCombatState::AttackingCombatState(PlayerCombat* combat) : combat_(comba
 		auto* movement = player->GetMovement();
 		movement->SetCanMove(false);
 		movement->SetCanRotate(false);
-		movement->ForceStop();  // 即座に停止させる
+
+		// 即座に停止させる
+		movement->ForceStop();  
 
 		// 攻撃アニメーションを再生
 		auto* obj = player->GetObject3d();
-		obj->SetMotionSpeed(attack.motionSpeed); // 攻撃モーション速度
+		obj->SetMotionSpeed(attack.motionSpeed);
 		obj->SetChangeMotion("Player.gltf", MotionPlayMode::Once, attack.animationName);
+
+		// アニメーション再生と同時に剣のトレイルエフェクトも再生開始
+		player->GetSword()->PlayTrail();
 		// 通知ログ
 		combat->NotifyAction("コンボ開始: " + attack.animationName);
 		});
@@ -47,6 +52,8 @@ AttackingCombatState::AttackingCombatState(PlayerCombat* combat) : combat_(comba
 		obj->SetMotionSpeed(attack.motionSpeed);
 		obj->SetChangeMotion("Player.gltf", MotionPlayMode::Once, attack.animationName);
 
+		// トレイルをリセットして再生開始
+		player->GetSword()->PlayTrail();
 		// 通知ログ
 		combat->NotifyAction("コンボ継続: " + attack.animationName);
 		});
@@ -66,16 +73,11 @@ AttackingCombatState::AttackingCombatState(PlayerCombat* combat) : combat_(comba
 		auto* obj = player->GetObject3d();
 		obj->SetMotionSpeed(player->GetMotionSpeed(0));
 
-		switch (player->GetMovement()->GetCurrentState()) {
-		case MovementState::Idle:
-		case MovementState::Moving:
-			//obj->SetChangeMotion("Player.gltf", MotionPlayMode::Loop, "Idle4");
-			break;
-		}
+		// トレイルエフェクトを停止
+		player->GetSword()->StopTrail();
 
 		// 通知ログ
 		combat->NotifyAction("コンボ終了");
-
 		// 攻撃終了後にIdle状態へ戻す
 		combat->ChangeState(CombatState::Idle);
 		});
@@ -127,6 +129,8 @@ void AttackingCombatState::OnExit() {
 	movement->SetCanMove(true);
 	movement->SetCanRotate(true);
 
+	// 攻撃終了後はエフェクトも停止
+	player->GetSword()->StopTrail();
 }
 
 /// <summary>

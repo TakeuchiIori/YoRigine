@@ -26,6 +26,7 @@
 #include "Systems/Camera/CameraEditor.h"
 #include "Systems/Camera/Virtuals/FollowCamera/FollowCamera.h"
 #include "Systems/Camera/Virtuals/DebugCamera/DebugCamera.h"
+#include <Vfx/VfxMesh/VfxMeshEditor.h>
 
 // C++
 #include <cstdlib>
@@ -306,6 +307,11 @@ void GameScene::Draw() {
 	YParticleManager::GetInstance().Draw();
 	DrawLine();
 	YoRigine::GpuEmitManager::GetInstance()->Draw();
+
+	//------------------------------------------------------------
+	// VFX描画
+	//------------------------------------------------------------
+	player_->DrawVfx();
 
 	//------------------------------------------------------------
 	// UI描画

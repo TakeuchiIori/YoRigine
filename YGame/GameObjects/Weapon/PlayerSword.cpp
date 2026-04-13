@@ -10,12 +10,6 @@
 #include "imgui.h"
 #endif
 
-/// <summary>
-/// デストラクタ
-/// </summary>
-PlayerSword::~PlayerSword() {
-	obbCollider_->~OBBCollider();
-}
 
 /// <summary>
 /// 初期化処理
@@ -48,14 +42,22 @@ void PlayerSword::Initialize(Camera* camera) {
 	}
 
 	//------------------------------------------------------------
-	// コライダー・Json・パーティクル初期化
+	// コライダー・Json初期化
 	//------------------------------------------------------------
 	InitCollision();
 	InitJson();
 
+
+	//------------------------------------------------------------
+	// エフェクト関連の初期化
+	//------------------------------------------------------------
 	particleEmitter_ = std::make_unique<ParticleEmitter>("PlayerParticle", wt_.translate_, 5);
 	hitParticleEmitter_ = std::make_unique<ParticleEmitter>("PlayerHitParticle", wt_.translate_, 5);
 	testEmitter_ = std::make_unique<ParticleEmitter>("TestParticle", wt_.translate_, 10);
+	
+	trailEmitter_ = std::make_unique<YoRigine::TrailMeshEmitter>();
+	trailEmitter_->SetCamera(camera_);
+	trailEmitter_->LoadAsset("Resources/Vfx/NewEffect.json");
 }
 
 /// <summary>
@@ -67,6 +69,11 @@ void PlayerSword::Update() {
 		SetPlayerWeaponPosition();
 		UpdateColliderWorldTransform();
 	}
+
+	Vector3 rootW = Transform(localRoot, finalMatrix_);
+	Vector3 tipW = Transform(localTip, finalMatrix_);
+	trailEmitter_->AddPoint(tipW, rootW);
+	trailEmitter_->Update(YoRigine::GameTime::GetDeltaTime());
 
 	// 当たり判定更新
 	Vector3 handPos = GetHandPosition();
@@ -141,11 +148,11 @@ void PlayerSword::UpdateColliderWorldTransform() {
 	Matrix4x4 weaponMatrix = MakeAffineMatrix(wt_.scale_, wt_.rotate_, wt_.translate_);
 
 	// 手と剣の行列を合成して最終的な位置を求める
-	Matrix4x4 finalMatrix = Multiply(weaponMatrix, handWT.matWorld_);
+	finalMatrix_ = Multiply(weaponMatrix, handWT.matWorld_);
 
 	// コライダー用に結果を適用
-	colliderWT_.matWorld_ = finalMatrix;
-	colliderWT_.translate_ = ExtractTranslation(finalMatrix);
+	colliderWT_.matWorld_ = finalMatrix_;
+	colliderWT_.translate_ = ExtractTranslation(finalMatrix_);
 }
 
 /// <summary>
@@ -190,6 +197,9 @@ void PlayerSword::Draw() {
 	}
 }
 
+/// <summary>
+/// 影の描画
+/// </summary>
 void PlayerSword::DrawShadow()
 {
 	if (obj_) {
@@ -207,6 +217,15 @@ void PlayerSword::DrawCollision() {
 }
 
 /// <summary>
+/// 剣の残像エフェクト描画
+/// </summary>
+void PlayerSword::DrawVfx() {
+	if (trailEmitter_) {
+		trailEmitter_->Draw();
+	}
+}
+
+/// <summary>
 /// 衝突開始時の処理
 /// </summary>
 void PlayerSword::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other) {
@@ -216,8 +235,6 @@ void PlayerSword::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 		//------------------------------------------------------------
 		Vector3 hitPos = other->GetWorldTransform().translate_;
 		hitPos.y += 1.5f;
-		//hitParticleEmitter_->FollowEmit(hitPos, 5);
-		//particleEmitter_->FollowEmit(hitPos, 30);
 
 		auto* enemyHitEmitterGroup_ = YEmitterGroupManager::GetInstance().GetGroup("EnemyHit");
 		if (enemyHitEmitterGroup_) {
@@ -293,6 +310,13 @@ void PlayerSword::InitJson() {
 	//------------------------------------------------------------
 	jsonManager_->SetTreePrefix("Color");
 	jsonManager_->Register("", &obj_->GetColor());
+
+	//------------------------------------------------------------
+	// VFX情報
+	//------------------------------------------------------------
+	jsonManager_->SetTreePrefix("Trail");
+	jsonManager_->Register("Local Root", &localRoot);
+	jsonManager_->Register("Local Tip", &localTip);
 
 	//------------------------------------------------------------
 	// コライダー情報

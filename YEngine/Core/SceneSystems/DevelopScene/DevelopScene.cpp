@@ -86,6 +86,7 @@ void DevelopScene::Initialize() {
 #endif
 
 	YoRigine::VfxMeshEditor::GetInstance()->Initialize();
+	YoRigine::VfxMeshEditor::GetInstance()->SetCamera(sceneCamera_.get());
 }
 
 /// <summary>
@@ -123,7 +124,8 @@ void DevelopScene::Draw() {
 	YParticleManager::GetInstance().Draw();
 	DrawLine();
 	YoRigine::GpuEmitManager::GetInstance()->Draw();
-	YoRigine::VfxMeshEditor::GetInstance()->DrawPreview(YoRigine::DirectXCommon::GetInstance()->GetCommandList().Get(), sceneCamera_->GetCameraResource()->GetGPUVirtualAddress());
+	YoRigine::VfxMeshEditor::GetInstance()->DrawPreview();
+	
 }
 
 /// <summary>

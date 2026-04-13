@@ -89,7 +89,7 @@ void WinApp::Initialize()
 	//-----------------------------------------
 	hwnd_ = CreateWindow(
 		wc_.lpszClassName,						// クラス名
-		L"LE4A_16_タケウチ_イオリ_ゴルディン",		// タイトル
+		L"ゴルディン",		// タイトル
 		WS_OVERLAPPEDWINDOW,					// ウィンドウスタイル
 		CW_USEDEFAULT,							// X
 		CW_USEDEFAULT,							// Y

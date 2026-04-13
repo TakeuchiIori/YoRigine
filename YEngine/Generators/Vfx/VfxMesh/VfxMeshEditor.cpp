@@ -12,6 +12,7 @@
 #include "Debugger/Logger.h"
 #include <Loaders/Texture/TextureManager.h>
 #include <Editor/Icon/EditorIcon.h>
+
 namespace fs = std::filesystem;
 
 static constexpr size_t kCBVAlignment = 256;
@@ -22,12 +23,6 @@ static constexpr size_t AlignedSize() {
 
 namespace YoRigine {
 
-    // ===========================================================
-    // コンストラクタ
-    // YParticleSystem と同じパターン:
-    //   コンストラクタ本体で FileBrowser を構築し
-    //   ThumbnailProvider と OnFileSelected を設定する
-    // ===========================================================
     VfxMeshEditor::VfxMeshEditor()
     {
         // ---- ランプテクスチャ用 (t1: gTexRamp) ----
@@ -73,31 +68,24 @@ namespace YoRigine {
             });
     }
 
-    // ===========================================================
-    // シングルトン
-    // ===========================================================
     VfxMeshEditor* VfxMeshEditor::GetInstance()
     {
         static VfxMeshEditor instance;
         return &instance;
     }
 
-    // ===========================================================
-    // 初期化 / 終了
-    // ===========================================================
     void VfxMeshEditor::Initialize(const std::string& scanRoot)
     {
         dxCommon_ = DirectXCommon::GetInstance();
         scanRoot_ = scanRoot;
 
-        previewTrail_ = std::make_unique<TrailMesh>();
+        // ★ Trail用のプレビューはEmitterに委譲
+        previewTrailEmitter_ = std::make_unique<TrailMeshEmitter>();
         previewVolume_ = std::make_unique<LightVolumeMesh>();
-        InitCBVs();
 
-        // Resources/Vfx/ 以下をスキャンしてエフェクト一覧を構築
+        InitCBVs();
         ScanDirectory(scanRoot_);
 
-        // エントリがあれば先頭を選択
         if (!entries_.empty()) {
             SelectEffect(0);
         }
@@ -105,15 +93,14 @@ namespace YoRigine {
 
     void VfxMeshEditor::Finalize()
     {
-        if (trailCBMapped_ && trailCBResource_) { trailCBResource_->Unmap(0, nullptr);  trailCBMapped_ = nullptr; }
-        if (volumeCBMapped_ && volumeCBResource_) { volumeCBResource_->Unmap(0, nullptr); volumeCBMapped_ = nullptr; }
+        if (volumeCBMapped_ && volumeCBResource_) {
+            volumeCBResource_->Unmap(0, nullptr);
+            volumeCBMapped_ = nullptr;
+        }
         entries_.clear();
         selectedIndex_ = -1;
     }
 
-    // ===========================================================
-    // ディレクトリスキャン
-    // ===========================================================
     void VfxMeshEditor::ScanDirectory(const std::string& dir)
     {
         entries_.clear();
@@ -135,13 +122,9 @@ namespace YoRigine {
                 Logger("VfxMeshEditor: ロード -> " + entries_.back().filePath);
             }
         }
-
         Logger("VfxMeshEditor: " + std::to_string(entries_.size()) + " エフェクトをロードしました");
     }
 
-    // ===========================================================
-    // エフェクト選択
-    // ===========================================================
     void VfxMeshEditor::SelectEffect(int index)
     {
         if (index < 0 || index >= static_cast<int>(entries_.size())) return;
@@ -149,16 +132,22 @@ namespace YoRigine {
         selectedIndex_ = index;
         history_.Clear();
 
-        // プレビューメッシュをリセット
-        previewTrail_->Clear();
         previewTimer_ = 0.f;
         previewPlaying_ = false;
+
+        // ★ Emitter に現在のアセットを反映させる
+        if (previewTrailEmitter_) {
+            previewTrailEmitter_->Stop();
+            previewTrailEmitter_->SetCamera(camera_);
+            previewTrailEmitter_->LoadAsset(entries_[selectedIndex_].filePath);
+            previewTrailEmitter_->SetAsset(entries_[selectedIndex_].asset); // 最新状態を同期
+        }
+
+        previewTrailEmitter_->Play();
+
         RebuildPreviewMeshes();
     }
 
-    // ===========================================================
-    // 毎フレーム
-    // ===========================================================
     void VfxMeshEditor::Update(float deltaTime)
     {
         auto* sel = Selected();
@@ -167,15 +156,14 @@ namespace YoRigine {
         previewTimer_ += deltaTime;
         const auto& asset = sel->asset;
 
-        if (asset.useTrail) {
-            previewTrail_->ApplyParam(asset.trail);
-
+        // ★ Emitterを使って頂点を更新
+        if (asset.useTrail && previewTrailEmitter_) {
             Vector3 tip = previewCenter_;
             Vector3 root = previewCenter_;
-            Vector3 widthDir = { 0.f, 1.f, 0.f }; // Arc/Fan用の幅方向
+            Vector3 widthDir = { 0.f, 1.f, 0.f };
 
             const float period = std::max(asset.trail.lifetime * 1.5f, 0.5f);
-            const float t = std::fmod(previewTimer_, period) / period; // 0.0 ~ 1.0
+            const float t = std::fmod(previewTimer_, period) / period;
 
             switch (previewAnim_) {
             case PreviewAnimMode::Wobble: {
@@ -186,24 +174,23 @@ namespace YoRigine {
                 break;
             }
             case PreviewAnimMode::SlashHorizontal: {
-                // 素早く振ってゆっくり戻るようなイージング (pow)
                 const float easeT = std::pow(t, 0.3f);
-                const float angle = -3.14159f + easeT * 3.14159f * 1.5f; // 弧を描く
+                const float angle = -3.14159f + easeT * 3.14159f * 1.5f;
                 tip = { previewCenter_.x + std::cos(angle) * swordLength_, previewCenter_.y, previewCenter_.z + std::sin(angle) * swordLength_ };
-                root = previewCenter_; // 根本は中心に固定
-                widthDir = { 0.f, 1.f, 0.f }; // 縦方向に幅を広げる
+                root = previewCenter_;
+                widthDir = { 0.f, 1.f, 0.f };
                 break;
             }
             case PreviewAnimMode::SlashVertical: {
                 const float easeT = std::pow(t, 0.3f);
-                const float angle = 3.14159f * 0.8f - easeT * 3.14159f * 1.6f; // 上から下へ
+                const float angle = 3.14159f * 0.8f - easeT * 3.14159f * 1.6f;
                 tip = { previewCenter_.x, previewCenter_.y + std::sin(angle) * swordLength_, previewCenter_.z + std::cos(angle) * swordLength_ };
                 root = previewCenter_;
-                widthDir = { 1.f, 0.f, 0.f }; // 横方向に幅を広げる
+                widthDir = { 1.f, 0.f, 0.f };
                 break;
             }
             case PreviewAnimMode::Spin: {
-                const float angle = t * 3.14159f * 2.f; // ぐるぐる回る
+                const float angle = t * 3.14159f * 2.f;
                 tip = { previewCenter_.x + std::cos(angle) * swordLength_, previewCenter_.y, previewCenter_.z + std::sin(angle) * swordLength_ };
                 root = previewCenter_;
                 widthDir = { 0.f, 1.f, 0.f };
@@ -211,9 +198,9 @@ namespace YoRigine {
             }
             }
 
-            // 新しく追加した AddPoint (widthDir付き) を呼び出す
-            previewTrail_->AddPoint(tip, root, widthDir);
-            previewTrail_->Update(deltaTime);
+            // ★ Emitterに点を追加（widthDirも渡す）
+            previewTrailEmitter_->AddPoint(tip, root, widthDir);
+            previewTrailEmitter_->Update(deltaTime);
         }
 
         if (asset.useLightVolume) {
@@ -224,61 +211,37 @@ namespace YoRigine {
     }
 
     // ===========================================================
-    // DrawPreview
+    // ★ 描画（cmdListを受け取らず、Emitter側のDrawを呼ぶ）
     // ===========================================================
-    void VfxMeshEditor::DrawPreview(ID3D12GraphicsCommandList* cmdList,
-        D3D12_GPU_VIRTUAL_ADDRESS  cameraGPUAddress)
+    void VfxMeshEditor::DrawPreview()
     {
         auto* sel = Selected();
         if (!sel || !previewPlaying_) return;
 
         const auto& asset = sel->asset;
-        auto* pm = YPipelineManager::GetInstance();
 
-        if (asset.useTrail) {
-            const auto& idx = pm->GetParameterIndices("VfxMeshTrail");
-            UpdateTrailCBV(previewTimer_);
-
-            auto* texMgr = TextureManager::GetInstance();
-
-            // t0: gTexNoise — noiseTexturePath が空ならホワイトテクスチャでフォールバック
-            D3D12_GPU_DESCRIPTOR_HANDLE hNoise =
-                (!asset.trail.noiseTexturePath.empty())
-                ? texMgr->GetsrvHandleGPU(asset.trail.noiseTexturePath)
-                : texMgr->GetsrvHandleGPU("Resources/Textures/white1x1.png");
-
-            // t1: gTexRamp — texturePath が空なら同様にフォールバック
-            D3D12_GPU_DESCRIPTOR_HANDLE hRamp =
-                (!asset.trail.texturePath.empty())
-                ? texMgr->GetsrvHandleGPU(asset.trail.texturePath)
-                : texMgr->GetsrvHandleGPU("Resources/Textures/white1x1.png");
-
-            cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshTrail"));
-            cmdList->SetPipelineState(pm->GetBlendModePSO("VfxMeshTrail", asset.trail.blendMode));
-            cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"), cameraGPUAddress);
-            cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), trailCBResource_->GetGPUVirtualAddress());
-            cmdList->SetGraphicsRootDescriptorTable(idx.at("gTexNoise"), hNoise); // t0
-            cmdList->SetGraphicsRootDescriptorTable(idx.at("gTexRamp"), hRamp);  // t1
-
-            previewTrail_->Draw(cmdList);
+        // ★ Trail は Emitter 内で完結して描画される
+        if (asset.useTrail && previewTrailEmitter_) {
+            previewTrailEmitter_->SetCamera(camera_);
+            previewTrailEmitter_->Draw();
         }
 
-        if (asset.useLightVolume) {
+        // Volume は従来通り
+        if (asset.useLightVolume && camera_) {
+            auto* pm = YPipelineManager::GetInstance();
             const auto& idx = pm->GetParameterIndices("VfxMeshVolume");
             UpdateVolumeCBV(previewTimer_);
 
+            auto* cmdList = DirectXCommon::GetInstance()->GetCommandList().Get();
             cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshVolume"));
             cmdList->SetPipelineState(pm->GetPipeLineStateObject("VfxMeshVolume"));
-            cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"), cameraGPUAddress);
+            cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"), camera_->GetCameraResource()->GetGPUVirtualAddress());
             cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), volumeCBResource_->GetGPUVirtualAddress());
 
             previewVolume_->Draw(cmdList);
         }
     }
 
-    // ===========================================================
-    // ImGui メインウィンドウ
-    // ===========================================================
     void VfxMeshEditor::DrawImGui()
     {
         history_.HandleKeyInput();
@@ -286,15 +249,12 @@ namespace YoRigine {
         ImGui::SetNextWindowSize(ImVec2(760, 680), ImGuiCond_FirstUseEver);
         if (!ImGui::Begin("VFX Mesh Editor")) { ImGui::End(); return; }
 
-        // 左右分割レイアウト
-        // 左: エフェクト一覧 (幅 200px 固定)
         ImGui::BeginChild("##list", ImVec2(200, 0), true);
         DrawListPanel();
         ImGui::EndChild();
 
         ImGui::SameLine();
 
-        // 右: パラメータ編集 + プレビュー
         ImGui::BeginChild("##edit", ImVec2(0, 0), true);
         DrawEditPanel();
         ImGui::EndChild();
@@ -304,21 +264,15 @@ namespace YoRigine {
         ImGui::End();
     }
 
-    // ===========================================================
-    // 左パネル: エフェクト一覧
-    // ===========================================================
     void VfxMeshEditor::DrawListPanel()
     {
-        // ヘッダー + 新規作成ボタン
         ImGui::TextDisabled("エフェクト一覧");
         ImGui::SameLine();
         if (ImGui::SmallButton("+")) { showNewDialog_ = true; }
         ImGui::SameLine();
-        // 再スキャンボタン
         if (ImGui::SmallButton("R")) {
             int prevSel = selectedIndex_;
             ScanDirectory(scanRoot_);
-            // 再スキャン後に選択を復元 (同じパスが残っていれば)
             selectedIndex_ = -1;
             if (prevSel >= 0 && prevSel < static_cast<int>(entries_.size())) {
                 SelectEffect(prevSel);
@@ -331,21 +285,17 @@ namespace YoRigine {
 
         ImGui::Separator();
 
-        // エフェクト一覧
         for (int i = 0; i < static_cast<int>(entries_.size()); ++i) {
             const auto& e = entries_[i];
 
-            // dirty マークを名前に付加
             std::string label = e.asset.name;
             if (e.isDirty) label += " *";
 
             bool selected = (selectedIndex_ == i);
-            if (ImGui::Selectable(label.c_str(), selected,
-                ImGuiSelectableFlags_AllowDoubleClick)) {
+            if (ImGui::Selectable(label.c_str(), selected, ImGuiSelectableFlags_AllowDoubleClick)) {
                 SelectEffect(i);
             }
 
-            // 右クリックコンテキストメニュー
             if (ImGui::BeginPopupContextItem()) {
                 if (ImGui::MenuItem("保存")) {
                     selectedIndex_ = i;
@@ -355,12 +305,11 @@ namespace YoRigine {
                     selectedIndex_ = i;
                     DeleteCurrent();
                     ImGui::EndPopup();
-                    break; // entries_ が変わったのでループを抜ける
+                    break;
                 }
                 ImGui::EndPopup();
             }
 
-            // ツールチップにファイルパスを表示
             if (ImGui::IsItemHovered()) {
                 ImGui::SetTooltip("%s", e.filePath.c_str());
             }
@@ -371,9 +320,6 @@ namespace YoRigine {
         }
     }
 
-    // ===========================================================
-    // 右パネル: パラメータ編集
-    // ===========================================================
     void VfxMeshEditor::DrawEditPanel()
     {
         auto* sel = Selected();
@@ -383,7 +329,6 @@ namespace YoRigine {
         }
         auto& asset = sel->asset;
 
-        // ---- ツールバー ----
         history_.DrawImGui();
         ImGui::SameLine();
         if (ImGui::Button("保存")) SaveCurrent();
@@ -393,23 +338,19 @@ namespace YoRigine {
         }
         ImGui::Separator();
 
-        // ---- ファイルパス (表示のみ) ----
         ImGui::TextDisabled("Path: %s", sel->filePath.c_str());
         ImGui::Separator();
 
-        // ---- エフェクト名 ----
         strncpy_s(nameBuffer_, asset.name.c_str(), sizeof(nameBuffer_));
         ImGui::SetNextItemWidth(-1);
         VfxEffectAsset before = asset;
-        if (ImGui::InputText("##effectname", nameBuffer_, sizeof(nameBuffer_),
-            ImGuiInputTextFlags_EnterReturnsTrue)) {
+        if (ImGui::InputText("##effectname", nameBuffer_, sizeof(nameBuffer_), ImGuiInputTextFlags_EnterReturnsTrue)) {
             asset.name = nameBuffer_;
             CommitChange(before, "名前変更");
         }
         ImGui::SameLine(0, 4); ImGui::TextDisabled("名前");
         ImGui::Separator();
 
-        // ---- Trail ----
         {
             VfxEffectAsset b = asset;
             ImGui::PushID("UseTrail");
@@ -425,7 +366,6 @@ namespace YoRigine {
         }
         ImGui::Separator();
 
-        // ---- LightVolume ----
         {
             VfxEffectAsset b = asset;
             ImGui::PushID("UseLightVolume");
@@ -444,9 +384,6 @@ namespace YoRigine {
         DrawPreviewSection();
     }
 
-    // ===========================================================
-    // Trail パラメータ編集
-    // ===========================================================
     void VfxMeshEditor::DrawTrailSection()
     {
         auto* sel = Selected();
@@ -467,12 +404,10 @@ namespace YoRigine {
             }
             ImGui::SameLine(0, 4); ImGui::TextDisabled("断面形状");
 
-            // Flat 以外のときだけ分割数と角度を表示
             if (t.shapeType != TrailShapeType::Flat) {
                 c |= ImGui::SliderInt("幅の分割数##wseg", &t.widthSegments, 1, 16);
                 c |= ImGui::SliderFloat("円弧の角度(度)##arcang", &t.arcAngleDeg, 10.f, 360.f, "%.1f");
             }
-
             if (c) CommitChange(b, "Trail 形状設定");
         }
 
@@ -485,9 +420,6 @@ namespace YoRigine {
             if (c) CommitChange(b, "Trail 形状モディファイア");
         }
 
-        // ===========================================================
-// カスタム形状エディター (ImGui キャンバス)
-// ===========================================================
         ImGui::SeparatorText("カスタムメッシュ形状エディター");
         if (sel) {
             VfxEffectAsset b = sel->asset;
@@ -500,42 +432,34 @@ namespace YoRigine {
             ImGui::SameLine();
             ImGui::TextDisabled("左クリック: 追加/移動 | 右クリック: 削除");
 
-            // キャンバスのサイズと位置の設定
-            ImVec2 canvas_p0 = ImGui::GetCursorScreenPos();    // キャンバス左上
-            ImVec2 canvas_sz = ImVec2(ImGui::GetContentRegionAvail().x, 300.0f); // 幅いっぱい、高さ300px
+            ImVec2 canvas_p0 = ImGui::GetCursorScreenPos();
+            ImVec2 canvas_sz = ImVec2(ImGui::GetContentRegionAvail().x, 300.0f);
             ImVec2 canvas_p1 = ImVec2(canvas_p0.x + canvas_sz.x, canvas_p0.y + canvas_sz.y);
 
-            // キャンバスの背景を描画
             ImDrawList* draw_list = ImGui::GetWindowDrawList();
             draw_list->AddRectFilled(canvas_p0, canvas_p1, IM_COL32(30, 30, 30, 255));
             draw_list->AddRect(canvas_p0, canvas_p1, IM_COL32(100, 100, 100, 255));
 
-            // マウスのインタラクション用に見えないボタンを配置
             ImGui::InvisibleButton("canvas", canvas_sz, ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
             const bool is_hovered = ImGui::IsItemHovered();
             const bool is_active = ImGui::IsItemActive();
             const ImVec2 mouse_pos_in_canvas = ImVec2(ImGui::GetIO().MousePos.x - canvas_p0.x, ImGui::GetIO().MousePos.y - canvas_p0.y);
 
-            // キャンバス中心を (0,0) とするためのオフセット
             ImVec2 origin(canvas_p0.x + canvas_sz.x * 0.5f, canvas_p0.y + canvas_sz.y * 0.5f);
-            const float zoom = 50.0f; // 1単位を50ピクセルとして描画
-
-            // 頂点の操作ロジック
-            static int dragging_idx = -1; // ドラッグ中の頂点インデックス
+            const float zoom = 50.0f;
+            static int dragging_idx = -1;
 
             if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-                // 既存の頂点をクリックしたかチェック（ドラッグ開始）
                 dragging_idx = -1;
                 for (int i = 0; i < t.customVertices.size(); ++i) {
-                    ImVec2 p(origin.x + t.customVertices[i].x * zoom, origin.y - t.customVertices[i].y * zoom); // Y軸は上がプラス
+                    ImVec2 p(origin.x + t.customVertices[i].x * zoom, origin.y - t.customVertices[i].y * zoom);
                     float dx = ImGui::GetIO().MousePos.x - p.x;
                     float dy = ImGui::GetIO().MousePos.y - p.y;
-                    if (dx * dx + dy * dy < 100.0f) { // 半径10px以内
+                    if (dx * dx + dy * dy < 100.0f) {
                         dragging_idx = i;
                         break;
                     }
                 }
-                // 既存の頂点でなければ新規追加
                 if (dragging_idx == -1) {
                     t.customVertices.push_back({ (mouse_pos_in_canvas.x - canvas_sz.x * 0.5f) / zoom,
                                                 -(mouse_pos_in_canvas.y - canvas_sz.y * 0.5f) / zoom });
@@ -544,7 +468,6 @@ namespace YoRigine {
                 }
             }
 
-            // ドラッグ中の移動
             if (is_active && ImGui::IsMouseDragging(ImGuiMouseButton_Left) && dragging_idx >= 0) {
                 t.customVertices[dragging_idx].x += ImGui::GetIO().MouseDelta.x / zoom;
                 t.customVertices[dragging_idx].y -= ImGui::GetIO().MouseDelta.y / zoom;
@@ -554,7 +477,6 @@ namespace YoRigine {
                 dragging_idx = -1;
             }
 
-            // 右クリックで頂点削除
             if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
                 for (int i = 0; i < t.customVertices.size(); ++i) {
                     ImVec2 p(origin.x + t.customVertices[i].x * zoom, origin.y - t.customVertices[i].y * zoom);
@@ -568,30 +490,24 @@ namespace YoRigine {
                 }
             }
 
-            // --- 描画処理 ---
-            // グリッド線（基準線）
             draw_list->AddLine(ImVec2(origin.x, canvas_p0.y), ImVec2(origin.x, canvas_p1.y), IM_COL32(100, 100, 100, 150));
             draw_list->AddLine(ImVec2(canvas_p0.x, origin.y), ImVec2(canvas_p1.x, origin.y), IM_COL32(100, 100, 100, 150));
 
-            // 頂点を繋ぐ線（閉じたポリゴンとして描画）
             if (t.customVertices.size() >= 2) {
                 for (int i = 0; i < t.customVertices.size(); ++i) {
-                    int next_i = (i + 1) % t.customVertices.size(); // 最後は最初と繋ぐ
+                    int next_i = (i + 1) % t.customVertices.size();
                     ImVec2 p1(origin.x + t.customVertices[i].x * zoom, origin.y - t.customVertices[i].y * zoom);
                     ImVec2 p2(origin.x + t.customVertices[next_i].x * zoom, origin.y - t.customVertices[next_i].y * zoom);
                     draw_list->AddLine(p1, p2, IM_COL32(0, 255, 255, 255), 2.0f);
                 }
             }
 
-            // 頂点の丸を描画
             for (int i = 0; i < t.customVertices.size(); ++i) {
                 ImVec2 p(origin.x + t.customVertices[i].x * zoom, origin.y - t.customVertices[i].y * zoom);
                 draw_list->AddCircleFilled(p, 5.0f, (i == dragging_idx) ? IM_COL32(255, 0, 0, 255) : IM_COL32(255, 255, 0, 255));
             }
 
-            if (changed) {
-                CommitChange(b, "カスタムメッシュ編集");
-            }
+            if (changed) CommitChange(b, "カスタムメッシュ編集");
         }
 
         ImGui::SeparatorText("幅");
@@ -642,7 +558,6 @@ namespace YoRigine {
 
         ImGui::SeparatorText("テクスチャ");
         {
-            // ---------- ランプテクスチャ (t1: gTexRamp) ----------
             ImGui::TextDisabled("ランプ (t1)");
             ImGui::SameLine(80);
             ImGui::TextDisabled("%s", t.texturePath.empty() ? "(未設定)" : t.texturePath.c_str());
@@ -660,7 +575,6 @@ namespace YoRigine {
 
             ImGui::Spacing();
 
-            // ---------- ノイズテクスチャ (t0: gTexNoise) ----------
             ImGui::TextDisabled("ノイズ (t0)");
             ImGui::SameLine(80);
             ImGui::TextDisabled("%s", t.noiseTexturePath.empty() ? "(未設定)" : t.noiseTexturePath.c_str());
@@ -684,23 +598,15 @@ namespace YoRigine {
         if (showTrailDebug_) ImGui::TextColored(ImVec4(1, 1, 0, 1), "  > デバッグオーバーレイ ON");
     }
 
-    // ===========================================================
-    // テクスチャ選択ポップアップ
-    // YParticleSystem::ShowEditor と同じ構造:
-    //   showXxxPopup_ が true のとき OpenPopup → BeginPopupModal → Draw
-    // ===========================================================
     void VfxMeshEditor::DrawTextureSelectPopup()
     {
-        // ---- ランプテクスチャ (t1: gTexRamp) ----
         if (showRampPopup_) ImGui::OpenPopup("##RampTexSelect");
 
         ImGui::SetNextWindowSize(ImVec2(500, 420), ImGuiCond_Appearing);
-        if (ImGui::BeginPopupModal("##RampTexSelect", &showRampPopup_,
-            ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize))
+        if (ImGui::BeginPopupModal("##RampTexSelect", &showRampPopup_, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize))
         {
             ImGui::Text("ランプテクスチャを選択 (t1: gTexRamp)");
             ImGui::Separator();
-            // Grid モードで表示 — クリックでコールバックが発火し自動クローズ
             rampBrowser_.Draw("##RampBrowserChild", ImVec2(0, 340));
             ImGui::Separator();
             if (ImGui::Button("キャンセル", ImVec2(-1, 0))) {
@@ -710,12 +616,10 @@ namespace YoRigine {
             ImGui::EndPopup();
         }
 
-        // ---- ノイズテクスチャ (t0: gTexNoise) ----
         if (showNoisePopup_) ImGui::OpenPopup("##NoiseTexSelect");
 
         ImGui::SetNextWindowSize(ImVec2(500, 420), ImGuiCond_Appearing);
-        if (ImGui::BeginPopupModal("##NoiseTexSelect", &showNoisePopup_,
-            ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize))
+        if (ImGui::BeginPopupModal("##NoiseTexSelect", &showNoisePopup_, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize))
         {
             ImGui::Text("ノイズテクスチャを選択 (t0: gTexNoise)");
             ImGui::Separator();
@@ -729,9 +633,6 @@ namespace YoRigine {
         }
     }
 
-    // ===========================================================
-    // LightVolume パラメータ編集
-    // ===========================================================
     void VfxMeshEditor::DrawLightVolumeSection()
     {
         auto* sel = Selected();
@@ -766,42 +667,40 @@ namespace YoRigine {
         if (showVolumeDebug_) ImGui::TextColored(ImVec4(1, 1, 0, 1), "  > OBB ワイヤーフレーム ON");
     }
 
-    // ===========================================================
-    // プレビューセクション
-    // ===========================================================
     void VfxMeshEditor::DrawPreviewSection()
     {
         ImGui::SeparatorText("プレビュー");
-        // --- 新規追加: プレビューの動き選択 ---
         const char* animNames[] = { "Wobble (往復)", "Slash (横なぎ)", "Slash (縦斬り)", "Spin (回転)" };
         int animIdx = static_cast<int>(previewAnim_);
         ImGui::SetNextItemWidth(150);
         if (ImGui::Combo("軌道アニメ", &animIdx, animNames, IM_ARRAYSIZE(animNames))) {
             previewAnim_ = static_cast<PreviewAnimMode>(animIdx);
-            previewTrail_->Clear(); // アニメ変更時にトレイルをリセット
+            if (previewTrailEmitter_) previewTrailEmitter_->Play(); // アニメ変更時にリセットして再生
         }
         ImGui::SameLine();
         ImGui::SetNextItemWidth(100);
         ImGui::DragFloat("剣の長さ", &swordLength_, 0.1f, 0.5f, 10.f, "%.1f");
-        // ------------------------------------
 
         if (previewPlaying_) {
-            if (ImGui::Button((std::string(Icon::Stop) +"■ 停止").c_str())) {
+            // ★ 停止ボタン
+            if (ImGui::Button((std::string(Icon::Stop) + "停止").c_str())) {
                 previewPlaying_ = false;
-                previewTrail_->Clear();
+                if (previewTrailEmitter_) previewTrailEmitter_->Stop(); // Emitterを停止（描画されなくなる）
             }
         }
         else {
-            if (ImGui::Button((std::string(Icon::Play) +"再生").c_str())) {
+            // ★ 再生ボタン
+            if (ImGui::Button((std::string(Icon::Play) + "再生").c_str())) {
                 previewPlaying_ = true;
                 previewTimer_ = 0.f;
-                previewTrail_->Clear();
+                if (previewTrailEmitter_) previewTrailEmitter_->Play(); // Emitterを再生（描画再開）
             }
         }
         ImGui::SameLine();
-        if (ImGui::Button((std::string(Icon::Refresh) + "↺ リセット").c_str())) {
+        // ★ リセットボタン
+        if (ImGui::Button((std::string(Icon::Refresh) + "リセット").c_str())) {
             previewTimer_ = 0.f;
-            previewTrail_->Clear();
+            if (previewTrailEmitter_) previewTrailEmitter_->Play(); // リセットして最初から再生
         }
 
         ImGui::DragFloat3("プレビュー位置", &previewCenter_.x, 0.05f, -20.f, 20.f);
@@ -823,10 +722,6 @@ namespace YoRigine {
         }
         ImGui::TextDisabled("時刻: %.3f s", previewTimer_);
     }
-
-    // ===========================================================
-    // 新規作成ダイアログ
-    // ===========================================================
     void VfxMeshEditor::DrawNewEffectDialog()
     {
         if (!showNewDialog_) return;
@@ -836,8 +731,7 @@ namespace YoRigine {
         ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         ImGui::SetNextWindowSize(ImVec2(420, 0), ImGuiCond_Appearing);
 
-        if (!ImGui::BeginPopupModal("新規エフェクト作成", &showNewDialog_,
-            ImGuiWindowFlags_AlwaysAutoResize)) return;
+        if (!ImGui::BeginPopupModal("新規エフェクト作成", &showNewDialog_, ImGuiWindowFlags_AlwaysAutoResize)) return;
 
         ImGui::Text("エフェクト名");
         ImGui::SetNextItemWidth(-1);
@@ -848,7 +742,6 @@ namespace YoRigine {
         ImGui::SetNextItemWidth(-1);
         ImGui::InputText("##newpath", newPathBuffer_, sizeof(newPathBuffer_));
 
-        // パスが空の場合はスキャンルート + 名前で自動補完
         if (newPathBuffer_[0] == '\0' && newNameBuffer_[0] != '\0') {
             std::string autoPath = scanRoot_ + newNameBuffer_ + ".json";
             ImGui::TextDisabled("→ %s", autoPath.c_str());
@@ -856,14 +749,13 @@ namespace YoRigine {
 
         ImGui::Spacing();
         ImGui::Text("プリセット");
-        const char* presetNames[] = { "Blank", "Trail Only", "Volume Only", "Sword (剣閃)", "Magic (魔法陣)" };
+        const char* presetNames[] = { "Blank", "Trail Only", "Volume Only", "Sword", "Magic" };
         ImGui::SetNextItemWidth(-1);
         ImGui::Combo("##preset", &newPresetIdx_, presetNames, IM_ARRAYSIZE(presetNames));
 
         ImGui::Spacing(); ImGui::Separator(); ImGui::Spacing();
 
         if (ImGui::Button("作成", ImVec2(120, 0))) {
-            // パスが空なら自動生成
             std::string path = newPathBuffer_;
             if (path.empty()) path = scanRoot_ + newNameBuffer_ + ".json";
 
@@ -879,15 +771,11 @@ namespace YoRigine {
         ImGui::EndPopup();
     }
 
-    // ===========================================================
-    // エフェクト操作
-    // ===========================================================
     void VfxMeshEditor::SaveCurrent()
     {
         auto* sel = Selected();
         if (!sel) return;
 
-        // ディレクトリが存在しなければ作成
         fs::path p(sel->filePath);
         if (!p.parent_path().empty()) {
             std::error_code ec;
@@ -912,7 +800,6 @@ namespace YoRigine {
         auto* sel = Selected();
         if (!sel) return;
 
-        // ファイルを削除
         std::error_code ec;
         fs::remove(sel->filePath, ec);
         if (ec) Logger("VfxMeshEditor: 削除失敗 -> " + sel->filePath);
@@ -920,13 +807,11 @@ namespace YoRigine {
 
         entries_.erase(entries_.begin() + selectedIndex_);
 
-        // 選択を調整
         if (entries_.empty()) {
             selectedIndex_ = -1;
         }
         else {
-            selectedIndex_ = std::min(selectedIndex_,
-                static_cast<int>(entries_.size()) - 1);
+            selectedIndex_ = std::min(selectedIndex_, static_cast<int>(entries_.size()) - 1);
             SelectEffect(selectedIndex_);
         }
     }
@@ -942,16 +827,13 @@ namespace YoRigine {
         e.isDirty = true;
         entries_.push_back(std::move(e));
 
-        // 新規作成したエフェクトを選択して即保存
         SelectEffect(static_cast<int>(entries_.size()) - 1);
         SaveCurrent();
 
         Logger("VfxMeshEditor: 新規作成 -> " + filePath);
     }
 
-    // ===========================================================
-    // CommitChange
-    // ===========================================================
+    // ★ 編集を即時プレビューに反映
     void VfxMeshEditor::CommitChange(const VfxEffectAsset& before, const char* label)
     {
         auto* sel = Selected();
@@ -962,68 +844,43 @@ namespace YoRigine {
 
         history_.Execute(MakeLambdaCommand(
             label,
-            [this, idx, after]() {  // Redo
+            [this, idx, after]() {
                 if (idx < static_cast<int>(entries_.size())) {
                     entries_[idx].asset = after;
                     entries_[idx].isDirty = true;
-                    previewTrail_->ApplyParam(after.trail);
-                    previewVolume_->ApplyParam(after.lightVolume);
+                    if (previewTrailEmitter_) previewTrailEmitter_->SetAsset(after); // ★即時反映
+                    if (previewVolume_) previewVolume_->ApplyParam(after.lightVolume);
                 }
             },
-            [this, idx, before]() { // Undo
+            [this, idx, before]() {
                 if (idx < static_cast<int>(entries_.size())) {
                     entries_[idx].asset = before;
                     entries_[idx].isDirty = true;
-                    previewTrail_->ApplyParam(before.trail);
-                    previewVolume_->ApplyParam(before.lightVolume);
+                    if (previewTrailEmitter_) previewTrailEmitter_->SetAsset(before); // ★Undo即時反映
+                    if (previewVolume_) previewVolume_->ApplyParam(before.lightVolume);
                 }
             }
         ));
 
         sel->isDirty = true;
+
+        // 今回の編集分もプレビューに反映させる
+        if (previewTrailEmitter_) {
+            previewTrailEmitter_->SetAsset(sel->asset);
+        }
     }
 
-    // ===========================================================
-    // プレビューメッシュ再構築
-    // ===========================================================
     void VfxMeshEditor::RebuildPreviewMeshes()
     {
         auto* sel = Selected();
         if (!sel) return;
-        previewTrail_->Initialize(sel->asset.trail);
         previewVolume_->Initialize(sel->asset.lightVolume);
     }
 
-    // ===========================================================
-    // CBV
-    // ===========================================================
     void VfxMeshEditor::InitCBVs()
     {
-        trailCBResource_ = dxCommon_->CreateBufferResource(AlignedSize<MeshTrailParamsCB>());
-        trailCBResource_->Map(0, nullptr, reinterpret_cast<void**>(&trailCBMapped_));
-
         volumeCBResource_ = dxCommon_->CreateBufferResource(AlignedSize<LightVolumeParamsCB>());
         volumeCBResource_->Map(0, nullptr, reinterpret_cast<void**>(&volumeCBMapped_));
-    }
-
-    void VfxMeshEditor::UpdateTrailCBV(float time)
-    {
-        auto* sel = Selected();
-        if (!sel || !trailCBMapped_) return;
-        const auto& t = sel->asset.trail;
-
-        trailCBMapped_->colorInner[0] = t.colorEnd.x;
-        trailCBMapped_->colorInner[1] = t.colorEnd.y;
-        trailCBMapped_->colorInner[2] = t.colorEnd.z;
-        trailCBMapped_->colorInner[3] = t.colorEnd.w;
-        trailCBMapped_->colorOuter[0] = t.colorStart.x;
-        trailCBMapped_->colorOuter[1] = t.colorStart.y;
-        trailCBMapped_->colorOuter[2] = t.colorStart.z;
-        trailCBMapped_->colorOuter[3] = t.colorStart.w;
-        trailCBMapped_->softness = 0.15f;
-        trailCBMapped_->glowPower = 1.5f;
-        trailCBMapped_->distortion = 0.0f;
-        trailCBMapped_->time = time;
     }
 
     void VfxMeshEditor::UpdateVolumeCBV(float time)
@@ -1043,9 +900,6 @@ namespace YoRigine {
         volumeCBMapped_->time = time;
     }
 
-    // ===========================================================
-    // プリセット
-    // ===========================================================
     VfxEffectAsset VfxMeshEditor::MakePreset(VfxPreset preset)
     {
         VfxEffectAsset a;
