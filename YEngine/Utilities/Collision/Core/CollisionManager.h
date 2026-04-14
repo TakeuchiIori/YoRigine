@@ -22,6 +22,13 @@
 namespace YoRigine {
 	///************************* ヒット方向定義 *************************///
 
+	// 衝突結果をまとめる構造体
+	struct CollisionResult {
+		bool isHit = false;
+		Vector3 normal = {};
+		float penetrationDepth = 0.0f;
+	};
+
 	// 衝突方向のビット列定義
 	enum HitDirectionFlags {
 		HitDirection_None = 0,
@@ -92,6 +99,11 @@ namespace YoRigine {
 
 		// シンプルな方向ビット取得
 		HitDirectionBits GetSelfLocalHitDirectionsSimple(BaseCollider* self, BaseCollider* other);
+
+		///************************* 押し戻しの処理 *************************///
+		CollisionResult Resolve(const SphereCollider* a, const SphereCollider* b);
+		CollisionResult Resolve(const OBB& obbA, const OBB& obbB);
+		CollisionResult Resolve(const SphereCollider* sphere, const OBB& obb);
 	}
 
 	///************************* コリジョン管理クラス *************************///

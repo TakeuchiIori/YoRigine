@@ -206,11 +206,13 @@ namespace YoRigine {
 			if (auto sb = dynamic_cast<SphereCollider*>(b)) return Check(sa, sb);
 			if (auto ob = dynamic_cast<OBBCollider*>(b))    return Check(sa, ob);
 			if (auto ab = dynamic_cast<AABBCollider*>(b))    return Check(sa, ab);
-		} else if (auto oa = dynamic_cast<OBBCollider*>(a)) {
+		}
+		else if (auto oa = dynamic_cast<OBBCollider*>(a)) {
 			if (auto sb = dynamic_cast<SphereCollider*>(b)) return Check(sb, oa); // 順序逆
 			if (auto ob = dynamic_cast<OBBCollider*>(b))    return Check(oa, ob);
 			if (auto ab = dynamic_cast<AABBCollider*>(b))    return Check(ab, oa); // 順序逆
-		} else if (auto aa = dynamic_cast<AABBCollider*>(a)) {
+		}
+		else if (auto aa = dynamic_cast<AABBCollider*>(a)) {
 			if (auto sb = dynamic_cast<SphereCollider*>(b)) return Check(sb, aa); // 順序逆
 			if (auto ob = dynamic_cast<OBBCollider*>(b))    return Check(aa, ob);
 			if (auto ab = dynamic_cast<AABBCollider*>(b))    return Check(aa, ab);
@@ -244,9 +246,11 @@ namespace YoRigine {
 
 			if (std::abs(overlap.x) < std::abs(overlap.y) && std::abs(overlap.x) < std::abs(overlap.z)) {
 				*hitDirection = (diff.x > 0.0f) ? HitDirection::Left : HitDirection::Right;
-			} else if (std::abs(overlap.y) < std::abs(overlap.x) && std::abs(overlap.y) < std::abs(overlap.z)) {
+			}
+			else if (std::abs(overlap.y) < std::abs(overlap.x) && std::abs(overlap.y) < std::abs(overlap.z)) {
 				*hitDirection = (diff.y > 0.0f) ? HitDirection::Top : HitDirection::Bottom;
-			} else {
+			}
+			else {
 				*hitDirection = (diff.z > 0.0f) ? HitDirection::Front : HitDirection::Back;
 			}
 		}
@@ -372,9 +376,11 @@ namespace YoRigine {
 	{
 		if (fabs(dir.x) > fabs(dir.y) && fabs(dir.x) > fabs(dir.z)) {
 			return dir.x > 0 ? HitDirection::Right : HitDirection::Left;
-		} else if (fabs(dir.y) > fabs(dir.z)) {
+		}
+		else if (fabs(dir.y) > fabs(dir.z)) {
 			return dir.y > 0 ? HitDirection::Top : HitDirection::Bottom;
-		} else {
+		}
+		else {
 			return dir.z > 0 ? HitDirection::Front : HitDirection::Back;
 		}
 	}
@@ -483,6 +489,143 @@ namespace YoRigine {
 		return flags;
 	}
 
+	// ---------------------------------------------------------
+		// ★追加: Sphere同士の押し戻し計算
+		// ---------------------------------------------------------
+	CollisionResult Collision::Resolve(const SphereCollider* a, const SphereCollider* b) {
+		CollisionResult res;
+		Vector3 diff = a->GetCenterPosition() - b->GetCenterPosition();
+		float distSq = LengthSquared(diff);
+		float radiusSum = a->GetRadius() + b->GetRadius();
+
+		if (distSq <= radiusSum * radiusSum && distSq > 0.0001f) {
+			float dist = std::sqrt(distSq);
+			res.isHit = true;
+			res.normal = diff * (1.0f / dist); // BからAへの正規化ベクトル
+			res.penetrationDepth = radiusSum - dist;
+		}
+		return res;
+	}
+
+	// ---------------------------------------------------------
+	// ★追加: OBB同士の押し戻し計算 (現在のCheckHitDirectionを応用)
+	// ---------------------------------------------------------
+	CollisionResult Collision::Resolve(const OBB& obbA, const OBB& obbB) {
+		CollisionResult res;
+		const float EPSILON = 1e-6f;
+
+		Matrix4x4 matA = MakeRotateMatrixXYZ(obbA.rotation);
+		Matrix4x4 matB = MakeRotateMatrixXYZ(obbB.rotation);
+
+		Vector3 axes[15];
+		// obbAの軸 (0,1,2)
+		axes[0] = { matA.m[0][0], matA.m[1][0], matA.m[2][0] };
+		axes[1] = { matA.m[0][1], matA.m[1][1], matA.m[2][1] };
+		axes[2] = { matA.m[0][2], matA.m[1][2], matA.m[2][2] };
+		// obbBの軸 (3,4,5)
+		axes[3] = { matB.m[0][0], matB.m[1][0], matB.m[2][0] };
+		axes[4] = { matB.m[0][1], matB.m[1][1], matB.m[2][1] };
+		axes[5] = { matB.m[0][2], matB.m[1][2], matB.m[2][2] };
+
+		// 外積による軸 (6～14)
+		int axisIdx = 6;
+		for (int i = 0; i < 3; i++) {
+			for (int j = 0; j < 3; j++) {
+				axes[axisIdx++] = Cross(axes[i], axes[3 + j]);
+			}
+		}
+
+		Vector3 distanceVec = obbB.center - obbA.center;
+		float minOverlap = FLT_MAX;
+		Vector3 minAxis = { 0, 0, 0 };
+
+		// 全15軸の分離軸テスト
+		for (int i = 0; i < 15; i++) {
+			Vector3 axis = axes[i];
+			float lenSq = LengthSquared(axis);
+			if (lenSq < EPSILON) continue;
+			axis = axis * (1.0f / std::sqrt(lenSq)); // 正規化
+
+			// a, b 両方の軸群を渡す関数が既存にある想定 (ProjectOBB)
+			float projA = ProjectOBB(obbA, axis, &axes[0]);
+			float projB = ProjectOBB(obbB, axis, &axes[3]);
+
+			float distance = std::abs(Dot(distanceVec, axis));
+			float overlap = projA + projB - distance;
+
+			if (overlap < 0.0f) {
+				return res; // 分離軸が見つかった＝当たっていない
+			}
+
+			if (overlap < minOverlap) {
+				minOverlap = overlap;
+				minAxis = axis;
+			}
+		}
+
+		// BからAに向かう方向にする
+		if (Dot(distanceVec, minAxis) > 0.0f) {
+			minAxis = minAxis * -1.0f;
+		}
+
+		res.isHit = true;
+		res.normal = minAxis;
+		res.penetrationDepth = minOverlap;
+		return res;
+	}
+
+	// ---------------------------------------------------------
+	// ★追加: Sphere と OBB の押し戻し計算
+	// ---------------------------------------------------------
+	CollisionResult Collision::Resolve(const SphereCollider* sphere, const OBB& obb) {
+		CollisionResult res;
+		Vector3 center = sphere->GetCenterPosition();
+		float radius = sphere->GetRadius();
+
+		// 1. OBBの回転を逆にして、球の中心をOBBのローカル空間（回転ゼロの世界）に持っていく
+		Matrix4x4 rotMat = MakeRotateMatrixXYZ(obb.rotation);
+		Matrix4x4 invRot = TransPose(rotMat); // 逆行列（回転のみなら転置でOK）
+		Vector3 localCenter = Transform(center - obb.center, invRot);
+
+		// 2. OBBのサイズ内にクランプして、OBB上で最も球の中心に近いローカル座標の点を求める
+		Vector3 closestLocal = Clamp(localCenter, -obb.size, obb.size);
+
+		// 3. 最も近い点をワールド座標（元の世界）に戻す
+		Vector3 closestWorld = obb.center + Transform(closestLocal, rotMat);
+
+		// 4. 球の中心と、OBB上の最も近い点との差分ベクトルを計算
+		Vector3 diff = center - closestWorld;
+		float distSq = LengthSquared(diff);
+
+		// 5. 距離が半径より小さければヒット！
+		if (distSq <= radius * radius) {
+			res.isHit = true;
+			float dist = std::sqrt(distSq);
+
+			if (dist > 0.0001f) {
+				// OBBから球へ向かう正規化ベクトル
+				res.normal = diff * (1.0f / dist);
+				// 半径から実際の距離を引いた分がめり込み量
+				res.penetrationDepth = radius - dist;
+			}
+			else {
+				// ※球の中心が完全にOBBの内部に入ってしまった場合の緊急脱出（上方向に押し出す）
+				res.normal = { 0.0f, 1.0f, 0.0f };
+				res.penetrationDepth = radius;
+			}
+		}
+		return res;
+	}
+
+	// AABBをOBBに変換するユーティリティ関数（これを通すことでAABBvsAABB、AABBvsOBBをカバー）
+	OBB ConvertAABBToOBB(const AABB& aabb) {
+		OBB obb;
+		obb.center = (aabb.min + aabb.max) * 0.5f;
+		obb.size = (aabb.max - aabb.min) * 0.5f;
+		obb.rotation = { 0.0f, 0.0f, 0.0f };
+		return obb;
+	}
+
 
 
 
@@ -522,56 +665,100 @@ namespace YoRigine {
 		collidingPairs_.clear();
 	}
 
+	// ★追加: ペアの判定と押し戻し実行
 	void CollisionManager::CheckCollisionPair(BaseCollider* a, BaseCollider* b) {
+		if (!a || !b) return;
 		auto key = std::minmax(a, b);
 		bool wasColliding = collidingPairs_.contains(key);
-		bool isNowColliding = false;
-		HitDirection dirA = HitDirection::None;
-		HitDirection dirB = HitDirection::None;
 
-		if (auto aa = dynamic_cast<AABBCollider*>(a)) {
-			if (auto ab = dynamic_cast<AABBCollider*>(b)) {
-				isNowColliding = Collision::CheckHitDirection(aa->GetAABB(), ab->GetAABB(), &dirA);
-				dirB = Collision::InverseHitDirection(dirA);
-			} else if (auto ob = dynamic_cast<OBBCollider*>(b)) {
-				isNowColliding = Collision::CheckHitDirection(aa->GetAABB(), ob->GetOBB(), &dirA);
-				dirB = Collision::GetSelfLocalHitDirection(ob, aa); // ★ これに修正！
-			} else {
-				isNowColliding = Collision::Check(a, b);
+		CollisionResult res;
+
+		// --- ポリモーフィズムで適切な判定を呼ぶ ---
+		// 【AがSphereの場合】
+		if (auto sa = dynamic_cast<SphereCollider*>(a)) {
+			if (auto sb = dynamic_cast<SphereCollider*>(b)) {
+				res = Collision::Resolve(sa, sb); // Sphere vs Sphere
 			}
-		} else if (auto oa = dynamic_cast<OBBCollider*>(a)) {
-			if (auto ab = dynamic_cast<AABBCollider*>(b)) {
-				isNowColliding = Collision::CheckHitDirection(ab->GetAABB(), oa->GetOBB(), &dirB);
-				dirA = Collision::GetSelfLocalHitDirection(oa, ab); // ★ こっちも逆視点で判定！
-			} else if (auto ob = dynamic_cast<OBBCollider*>(b)) {
-				isNowColliding = Collision::CheckHitDirection(oa->GetOBB(), ob->GetOBB(), &dirA);
-				dirB = Collision::GetSelfLocalHitDirection(ob, oa); // ★ 片方はSAT、もう片方はローカル視点
-			} else {
-				isNowColliding = Collision::Check(a, b);
+			else if (auto ob = dynamic_cast<OBBCollider*>(b)) {
+				res = Collision::Resolve(sa, ob->GetOBB()); // Sphere vs OBB
 			}
-		} else {
-			isNowColliding = Collision::Check(a, b);
+			else if (auto ab = dynamic_cast<AABBCollider*>(b)) {
+				// ★ Sphere vs AABB (AABBをOBBに変換して丸投げ！)
+				res = Collision::Resolve(sa, ConvertAABBToOBB(ab->GetAABB()));
+			}
+		}
+		// 【AがOBBの場合】
+		else if (auto oa = dynamic_cast<OBBCollider*>(a)) {
+			if (auto sb = dynamic_cast<SphereCollider*>(b)) {
+				res = Collision::Resolve(sb, oa->GetOBB()); // 逆にして計算
+				res.normal = res.normal * -1.0f; // 基準が逆になるので押し戻し方向を反転
+			}
+			else if (auto ob = dynamic_cast<OBBCollider*>(b)) {
+				res = Collision::Resolve(oa->GetOBB(), ob->GetOBB()); // OBB vs OBB
+			}
+			else if (auto ab = dynamic_cast<AABBCollider*>(b)) {
+				// ★ OBB vs AABB
+				res = Collision::Resolve(oa->GetOBB(), ConvertAABBToOBB(ab->GetAABB()));
+			}
+		}
+		// 【AがAABBの場合】
+		else if (auto aa = dynamic_cast<AABBCollider*>(a)) {
+			if (auto sb = dynamic_cast<SphereCollider*>(b)) {
+				// ★ AABB vs Sphere
+				res = Collision::Resolve(sb, ConvertAABBToOBB(aa->GetAABB()));
+				res.normal = res.normal * -1.0f; // 基準が逆になるので反転
+			}
+			else if (auto ob = dynamic_cast<OBBCollider*>(b)) {
+				// ★ AABB vs OBB
+				res = Collision::Resolve(ConvertAABBToOBB(aa->GetAABB()), ob->GetOBB());
+			}
+			else if (auto ab = dynamic_cast<AABBCollider*>(b)) {
+				// ★ AABB vs AABB (両方OBBに変換！)
+				res = Collision::Resolve(ConvertAABBToOBB(aa->GetAABB()), ConvertAABBToOBB(ab->GetAABB()));
+			}
 		}
 
-		// イベント処理
-		if (isNowColliding) {
+		// --- 押し戻しの適用 ---
+		if (res.isHit && res.penetrationDepth > 0.0f) {
+
+			if (a->GetEnablePenetration() && b->GetEnablePenetration()) {
+				WorldTransform* wtA = a->GetWT();
+				WorldTransform* wtB = b->GetWT();
+				bool staticA = a->GetIsStatic();
+				bool staticB = b->GetIsStatic();
+
+				if (wtA && wtB) {
+					if (!staticA && !staticB) {
+						// 両方動く場合は 1:1 で押し戻し
+						wtA->translate_ += res.normal * (res.penetrationDepth * 0.5f);
+						wtB->translate_ -= res.normal * (res.penetrationDepth * 0.5f);
+					}
+					else if (!staticA) {
+						// Aだけ動く
+						wtA->translate_ += res.normal * res.penetrationDepth;
+						wtA->UpdateMatrix();
+						a->Update();
+					}
+					else if (!staticB) {
+						// Bだけ動く
+						wtB->translate_ -= res.normal * res.penetrationDepth;
+						wtB->UpdateMatrix();
+					}
+				}
+			}
+		}
+
+		// --- 既存のイベント呼び出し ---
+		if (res.isHit) {
 			if (!wasColliding) {
 				a->CallOnEnterCollision(b);
 				b->CallOnEnterCollision(a);
-				if (dirA != HitDirection::None || dirB != HitDirection::None) {
-					a->CallOnEnterDirectionCollision(b, dirA);
-					b->CallOnEnterDirectionCollision(a, dirB);
-				}
 				collidingPairs_.insert(key);
 			}
 			a->CallOnCollision(b);
 			b->CallOnCollision(a);
-
-			if (dirA != HitDirection::None || dirB != HitDirection::None) {
-				a->CallOnDirectionCollision(b, dirA);
-				b->CallOnDirectionCollision(a, dirB);
-			}
-		} else {
+		}
+		else {
 			if (wasColliding) {
 				a->CallOnExitCollision(b);
 				b->CallOnExitCollision(a);

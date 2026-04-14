@@ -1,10 +1,10 @@
 {
     "currentSceneState": {
         "customData": {
-            "currentEnemyGroup": "Alien",
+            "currentEnemyGroup": "Mushnub_Evolved",
             "playerHpRatio": 1.0,
             "stats": {
-                "battleDuration": 22.44968605041504,
+                "battleDuration": 37.64590072631836,
                 "droppedItems": [],
                 "enemiesDefeated": 1,
                 "expGained": 0,
@@ -12,6 +12,6 @@
             }
         },
         "sceneName": "Battle",
-        "timestamp": 1774977915
+        "timestamp": 1776187501
     }
 }

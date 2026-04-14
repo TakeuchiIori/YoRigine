@@ -135,6 +135,7 @@ void Player::InitCollision() {
 		this, &wt_, camera_,
 		static_cast<uint32_t>(CollisionTypeIdDef::kPlayer)
 	);
+	obbCollider_->SetIsStatic(false);
 }
 
 /// <summary>

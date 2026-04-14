@@ -278,6 +278,8 @@ void PlayerSword::InitCollision() {
 
 	// 初期状態では当たり判定無効
 	obbCollider_->isCollisionEnabled_ = false;
+	// 押し戻しはしないように
+	obbCollider_->SetEnablePenetration(false);
 }
 
 /// <summary>

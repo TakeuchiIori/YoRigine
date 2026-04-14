@@ -79,6 +79,7 @@ void BattleEnemy::InitCollision() {
 	// OBBコライダー生成
 	obbCollider_ = ColliderFactory::Create<OBBCollider>(
 		this, &wt_, camera_, static_cast<uint32_t>(CollisionTypeIdDef::kBattleEnemy));
+	obbCollider_->SetIsStatic(false);
 }
 
 /*==========================================================================
