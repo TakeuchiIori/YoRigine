@@ -199,8 +199,6 @@ void GameScene::Initialize() {
 	Editor::GetInstance()->RegisterGameUI("GpuParticle", [this]() { YoRigine::GpuEmitManager::GetInstance()->DrawImGui(); }, "Game");
 	Editor::GetInstance()->RegisterGameUI("プレイヤー攻撃エディター", [this]() {attackEditor_->DrawImGui(); }, "Game");
 	Editor::GetInstance()->RegisterGameUI("YoRigine:パーティクルエディター", [this]() {YParticleEditor::GetInstance().ShowEditorWindow(); }, "Game");
-
-
 #endif
 
 	//------------------------------------------------------------

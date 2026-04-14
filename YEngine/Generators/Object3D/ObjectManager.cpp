@@ -365,5 +365,13 @@ void ObjectManager::InitializePlacedObject(
 	obj.parentID = -1;
 	obj.isActive = true;
 
+	// 当たり判定
+	obj.collider = ColliderPool::GetInstance()->GetCollider<AABBCollider>();
+	if (obj.collider) {
+		obj.collider->Initialize();
+		obj.collider->SetWT(obj.worldTransform.get());
+		obj.collider->SetIsStatic(true);			// 壁なので動かない
+		obj.collider->SetEnablePenetration(true);	// 押し戻し有効
+	}
 	UpdateObjectTransform(obj);
 }

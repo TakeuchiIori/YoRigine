@@ -10,6 +10,9 @@
 #include <Memory/PoolAllocator.h>
 #include "Vector3.h"
 
+#include <Collision/AABB/AABBCollider.h>
+#include <Collision/Core/ColliderPool.h>
+
 /// <summary>
 /// オブジェクトの管理クラス
 /// </summary>
@@ -34,6 +37,7 @@ public:
 		// アニメーション関連
 		bool isAnimation = false;
 		std::string animationName = "";
+		std::shared_ptr<AABBCollider> collider; // コリジョン用のAABBコライダー
 
 		PlacedObject() = default;
 		~PlacedObject() = default;

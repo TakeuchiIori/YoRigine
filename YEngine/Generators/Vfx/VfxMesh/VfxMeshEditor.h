@@ -2,6 +2,7 @@
 // ===========================================================
 // VfxMeshEditor.h
 // ===========================================================
+#ifdef USE_IMGUI
 #include <string>
 #include <vector>
 #include <memory>
@@ -140,10 +141,10 @@ namespace YoRigine {
         char nameBuffer_[128] = {};
 
         FileBrowser rampBrowser_;
-        bool        showRampPopup_ = false;
-
         FileBrowser noiseBrowser_;
+        bool        showRampPopup_ = false;
         bool        showNoisePopup_ = false;
     };
 
 } // namespace YoRigine
+#endif

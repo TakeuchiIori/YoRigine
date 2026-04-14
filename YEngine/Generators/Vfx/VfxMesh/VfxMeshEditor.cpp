@@ -1,6 +1,7 @@
 // ===========================================================
 // VfxMeshEditor.cpp
 // ===========================================================
+#ifdef USE_IMGUI
 #include "VfxMeshEditor.h"
 #include "DirectXCommon.h"
 #include <PipelineManager/YPipelineManager.h>
@@ -940,3 +941,4 @@ namespace YoRigine {
     }
 
 } // namespace YoRigine
+#endif

@@ -63,6 +63,8 @@ void DevelopScene::Initialize() {
 
 #ifdef USE_IMGUI
 	YEmitterGroupEditor::GetInstance().SetCamera(sceneCamera_.get());
+	YoRigine::VfxMeshEditor::GetInstance()->Initialize();
+	YoRigine::VfxMeshEditor::GetInstance()->SetCamera(sceneCamera_.get());
 #endif
 	YoRigine::ParticleManager::GetInstance()->SetCamera(sceneCamera_.get());
 	YoRigine::ModelManipulator::GetInstance()->SetCamera(sceneCamera_.get());
@@ -84,9 +86,6 @@ void DevelopScene::Initialize() {
 	Editor::GetInstance()->RegisterGameUI("VFX", [this]() { YoRigine::VfxMeshEditor::GetInstance()->DrawImGui(); }, "Develop");
 
 #endif
-
-	YoRigine::VfxMeshEditor::GetInstance()->Initialize();
-	YoRigine::VfxMeshEditor::GetInstance()->SetCamera(sceneCamera_.get());
 }
 
 /// <summary>
@@ -103,7 +102,10 @@ void DevelopScene::Update() {
 	YParticleManager::GetInstance().Update(YoRigine::GameTime::GetDeltaTime());
 	YoRigine::LightManager::GetInstance()->UpdateShadowMatrix(sceneCamera_.get());
 	YoRigine::GpuEmitManager::GetInstance()->Update();
+
+#ifdef USE_IMGUI
 	YoRigine::VfxMeshEditor::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
+#endif
 }
 
 /// <summary>
@@ -124,7 +126,10 @@ void DevelopScene::Draw() {
 	YParticleManager::GetInstance().Draw();
 	DrawLine();
 	YoRigine::GpuEmitManager::GetInstance()->Draw();
+
+#ifdef USE_IMGUI
 	YoRigine::VfxMeshEditor::GetInstance()->DrawPreview();
+#endif
 	
 }
 
