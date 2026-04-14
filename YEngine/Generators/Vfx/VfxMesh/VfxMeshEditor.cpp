@@ -408,6 +408,8 @@ namespace YoRigine {
                 c |= ImGui::SliderInt("幅の分割数##wseg", &t.widthSegments, 1, 16);
                 c |= ImGui::SliderFloat("円弧の角度(度)##arcang", &t.arcAngleDeg, 10.f, 360.f, "%.1f");
             }
+            c |= ImGui::DragInt("滑らかさ(補間分割数)##spline", &t.splineSubdivisions, 1, 512);
+
             if (c) CommitChange(b, "Trail 形状設定");
         }
 

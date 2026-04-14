@@ -18,21 +18,22 @@
     "trail": {
         "blendMode": 2,
         "colorEnd": {
-            "w": 0.8980392217636108,
-            "x": 1.0,
-            "y": 0.0,
-            "z": 0.0
-        },
-        "colorStart": {
             "w": 1.0,
-            "x": 0.0,
+            "x": 0.7256631851196289,
             "y": 0.0,
             "z": 1.0
         },
-        "lifetime": 0.5,
+        "colorStart": {
+            "w": 1.0,
+            "x": 0.4023023843765259,
+            "y": 0.36283183097839355,
+            "z": 1.0
+        },
+        "lifetime": 0.9900000095367432,
         "maxPoints": 512,
         "noiseTexturePath": "Resources/Textures/white.png",
         "shapeType": 0,
+        "splineSubdivisions": 128,
         "texturePath": "Resources/Textures/white.png",
         "uvScrollSpeed": 0.5,
         "widthEnd": 2.950000047683716,

@@ -106,32 +106,52 @@ namespace YoRigine {
         const size_t n = points_.size();
         if (n < 2) return;
 
-        vertices_.reserve(n * 2);
+        // ★ エディターの値を反映（最低1以上にする）
+        const int subdivisions = std::max(1, param_.splineSubdivisions);
 
-        for (size_t i = 0; i < n; ++i)
+        std::vector<TrailPoint> smoothPoints;
+        smoothPoints.reserve((n - 1) * subdivisions + 1);
+
+        for (size_t i = 0; i < n - 1; ++i) {
+            const TrailPoint& p0 = points_[i == 0 ? 0 : i - 1];
+            const TrailPoint& p1 = points_[i];
+            const TrailPoint& p2 = points_[i + 1];
+            const TrailPoint& p3 = points_[i + 2 >= n ? n - 1 : i + 2];
+
+            int steps = (i == n - 2) ? subdivisions + 1 : subdivisions;
+            for (int j = 0; j < steps; ++j) {
+                float t = static_cast<float>(j) / static_cast<float>(subdivisions);
+
+                TrailPoint sp;
+                sp.tip = CatmullRomInterpolation(p0.tip, p1.tip, p2.tip, p3.tip, t);
+                sp.root = CatmullRomInterpolation(p0.root, p1.root, p2.root, p3.root, t);
+                sp.age = p1.age + (p2.age - p1.age) * t;
+                smoothPoints.push_back(sp);
+            }
+        }
+
+        const size_t smoothCount = smoothPoints.size();
+        vertices_.reserve(smoothCount * 2);
+
+        for (size_t i = 0; i < smoothCount; ++i)
         {
-            const TrailPoint& p = points_[i];
-            const float tY = static_cast<float>(i) / static_cast<float>(n - 1);
+            const TrailPoint& p = smoothPoints[i];
+            const float tY = static_cast<float>(i) / static_cast<float>(smoothCount - 1);
             const float normalizedAge = NormalizeAge(p.age);
             const Vector4 vColor = CalcFadeColor(normalizedAge);
             const float uvY = tY + time_ * param_.uvScrollSpeed;
 
-            // ★ 三日月カーブ: ageが0(最新)と1(最古)のときに0になり、0.5のときに1になるサイン波
             float widthScale = 1.0f;
             if (param_.crescentShape) {
-                // sin(π * t) で両端が細くなる三日月型を作る
                 widthScale = std::sin(normalizedAge * 3.14159265f);
             }
 
-            // 中心点と方向ベクトルを計算
             Vector3 center = { (p.tip.x + p.root.x) * 0.5f, (p.tip.y + p.root.y) * 0.5f, (p.tip.z + p.root.z) * 0.5f };
             Vector3 toTip = { p.tip.x - center.x, p.tip.y - center.y, p.tip.z - center.z };
 
-            // 幅をスケールして現在のTipとRootを計算
             Vector3 currentTip = { center.x + toTip.x * widthScale, center.y + toTip.y * widthScale, center.z + toTip.z * widthScale };
             Vector3 currentRoot = { center.x - toTip.x * widthScale, center.y - toTip.y * widthScale, center.z - toTip.z * widthScale };
 
-            // 頂点の追加 (Tip側)
             ProceduralMeshVertex vTip;
             vTip.position = currentTip;
             vTip.texcoord = { 0.f, uvY };
@@ -139,7 +159,6 @@ namespace YoRigine {
             vTip.age = normalizedAge;
             vertices_.push_back(vTip);
 
-            // 頂点の追加 (Root側)
             ProceduralMeshVertex vRoot;
             vRoot.position = currentRoot;
             vRoot.texcoord = { 1.f, uvY };

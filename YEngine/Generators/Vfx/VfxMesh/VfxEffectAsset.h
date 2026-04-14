@@ -47,6 +47,7 @@ namespace YoRigine {
         bool  crescentShape = true;  // 三日月型（中間を太く、両端を細くする）
         float thickness = 0.1f;      // 厚み（立体感）
         std::vector<Vector2> customVertices;
+		int splineSubdivisions = 4; // Custom 形状のスプライン補間数
     };
 
     // -------------------------------------------------------

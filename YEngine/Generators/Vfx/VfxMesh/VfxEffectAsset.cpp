@@ -35,6 +35,7 @@ namespace YoRigine {
         for (const auto& v : trail.customVertices) {
             t["trail"]["customVertices"].push_back({ v.x, v.y });
         }
+		t["splineSubdivisions"] = trail.splineSubdivisions;
 
         // --- LightVolume ---
         auto& lv = j["lightVolume"];
@@ -82,6 +83,7 @@ namespace YoRigine {
                     trail.customVertices.push_back({ v[0].get<float>(), v[1].get<float>() });
                 }
             }
+			trail.splineSubdivisions = t.value("splineSubdivisions", trail.splineSubdivisions);
         }
         if (j.contains("lightVolume")) {
             auto& lv = j["lightVolume"];
