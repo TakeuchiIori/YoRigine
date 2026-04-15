@@ -20,4 +20,17 @@ namespace Icon {
     static constexpr const char* FolderOpen = "\uf115";
     static constexpr const char* CheckCircle = "\uf058";
     static constexpr const char* TimesCircle = "\uf057";
+
+    static constexpr const char* Cube = "\uf1b2";       // オブジェクト/3Dモデル
+    static constexpr const char* List = "\uf0ca";       // アウトライナー(階層)
+    static constexpr const char* Sliders = "\uf1de";    // ディテール(プロパティ)
+    static constexpr const char* Folder = "\uf07b";     // コンテンツブラウザ
+    static constexpr const char* Search = "\uf002";     // 検索
+    static constexpr const char* Copy = "\uf0c5";       // 複製
+    static constexpr const char* Puzzle = "\uf12e";     // プレファブ
+    static constexpr const char* Plus = "\uf067";       // 追加
+    static constexpr const char* Sieve = "\uf0b0";      // フィルター
+    static constexpr const char* Eye = "\uf06e";        // 表示/非表示用
+    static constexpr const char* Wrench = "\uf0ad";     // ツール (Wrench/レンチ)
+    static constexpr const char* File = "\uf15b";       // ファイル
 }
