@@ -384,8 +384,6 @@ float PlayerCombo::CalculateDamageMultiplier() const {
 bool PlayerCombo::IsChainPreferred(AttackType from, AttackType to) const {
 	if (from == AttackType::A_Arte && to == AttackType::B_Arte) return true;
 	if (from == AttackType::B_Arte && to == AttackType::A_Arte) return true;
-	if (from == AttackType::A_Arte && to == AttackType::Arcane_Arte) return true;
-	if (from == AttackType::B_Arte && to == AttackType::Arcane_Arte) return true;
 	return false;
 }
 
@@ -638,7 +636,6 @@ void PlayerCombo::ShowDebugImGui() {
 	ImGui::Text("=== 攻撃データベース ===");
 	ImGui::Text("A攻撃数: %d", static_cast<int>(attackDatabase_[AttackType::A_Arte].size()));
 	ImGui::Text("B攻撃数: %d", static_cast<int>(attackDatabase_[AttackType::B_Arte].size()));
-	ImGui::Text("奥義数: %d", static_cast<int>(attackDatabase_[AttackType::Arcane_Arte].size()));
 
 	//---------------------------------------------------------------------------------------------
 	// 現在攻撃情報
@@ -658,7 +655,6 @@ void PlayerCombo::ShowDebugImGui() {
 		switch (currentAttack_->type) {
 		case AttackType::A_Arte: typeStr = "A"; break;
 		case AttackType::B_Arte: typeStr = "B"; break;
-		case AttackType::Arcane_Arte: typeStr = "奥義"; break;
 		}
 		ImGui::Text("タイプ: %s", typeStr);
 	}
@@ -712,8 +708,6 @@ void PlayerCombo::ShowDebugImGui() {
 	if (ImGui::Button("A攻撃")) TryAttack(AttackType::A_Arte);
 	ImGui::SameLine();
 	if (ImGui::Button("B攻撃")) TryAttack(AttackType::B_Arte);
-	ImGui::SameLine();
-	if (ImGui::Button("奥義")) TryAttack(AttackType::Arcane_Arte);
 #endif
 }
 
