@@ -10,7 +10,7 @@
 #include "WorldTransform/WorldTransform.h"
 #include "Editor/Command/CommandHistory.h"
 #include "Debugger/DopeSheet/DopeSheetEditor.h"
-
+#include <Graphics/Drawer/LineManager/Line.h>
 // Math
 #include "Vector3.h"
 #include "Quaternion.h"
@@ -54,9 +54,10 @@ class MotionEditor
 {
 public:
 	///************************* 基本的関数 *************************///
-	void Initialize();
+	void Initialize(Camera* camera);
 	void Update();
-	void Draw(Camera* camera);
+	void Draw();
+	void DrawBone();
 	void ShowEditor();
 
 private:
@@ -125,6 +126,8 @@ private:
 	bool tracksDirty_ = false;    // ドープシートの内容が Motion に反映されていない状態
 	int fps_ = 60;
 
+	Camera* camera_ = nullptr;
+
 	// プレビュー
 	std::unique_ptr<Object3d> previewObject_;
 	WorldTransform            previewTransform_;
@@ -141,6 +144,8 @@ private:
 	int              animNameIndex_ = -1;
 	std::string      loadAnimName_ = "";
 	bool             showLoadPopup_ = false;
+	std::unique_ptr<Line> lineDrawer_;
+	bool             isDrawBone_ = false;
 
 	// モーション選択
 	std::string selectedAnimKey_ = "";    // animationCache_ のキー

@@ -69,12 +69,17 @@ static ImU32 ChannelColor(KFChannel ch, bool selected)
 //  初期化 / 更新 / 描画
 // ============================================================
 
-void MotionEditor::Initialize()
+void MotionEditor::Initialize(Camera* camera)
 {
+	camera_ = camera;
 	previewTransform_.Initialize();
 	modelBrowser_.currentDirectory = kModelRootDir;
 	binaryBrowser_.currentDirectory = "Resources/Binary";
 	binaryBrowser_.filterExtension = ".anim";
+	lineDrawer_ = std::make_unique<Line>();
+	lineDrawer_->Initialize();
+	lineDrawer_->SetCamera(camera_);
+	lineDrawer_->SetColor({ 0.5f, 0.5f, 0.5f, 1.0f });
 }
 
 void MotionEditor::Update()
@@ -83,7 +88,8 @@ void MotionEditor::Update()
 
 	if (selBone_.empty()) {
 		previewObject_->UpdateAnimation();
-	} else {
+	}
+	else {
 		// ボーン編集中はモーションの上書きを防ぎ、スケルトンだけ手動更新
 		Model* m = previewObject_->GetModel();
 		if (m && m->GetSkeleton()) {
@@ -95,10 +101,18 @@ void MotionEditor::Update()
 	previewTransform_.UpdateMatrix();
 }
 
-void MotionEditor::Draw(Camera* camera)
+void MotionEditor::Draw()
 {
-	if (previewObject_)
-		previewObject_->Draw(camera, previewTransform_);
+	if (previewObject_ && !isDrawBone_)
+		previewObject_->Draw(camera_, previewTransform_);
+}
+
+void MotionEditor::DrawBone()
+{
+	// --- ボーン表示モード ---
+	if (isDrawBone_) {
+		previewObject_->DrawBone(*lineDrawer_.get(), previewTransform_.matWorld_);
+	}
 }
 
 // ============================================================
@@ -371,6 +385,13 @@ void MotionEditor::DrawToolbar()
 			ImGui::SetTooltip("アニメーションの全体の長さ（秒）");
 	}
 
+	// ---- 表示オプション ----
+	ImGui::SameLine(0, 20);
+	ImGui::Checkbox("ボーン表示", &isDrawBone_);
+	if (ImGui::IsItemHovered()) {
+		ImGui::SetTooltip("メッシュ描画とボーン（線）描画を切り替えます");
+	}
+
 	ImGui::SameLine(0, 20);
 
 	// ---- ファイル操作ボタン ----
@@ -463,7 +484,8 @@ void MotionEditor::DrawPropertyPanel()
 	{
 		if (selBone_.empty()) {
 			ImGui::TextDisabled("左のリストからボーンを選択してください");
-		} else {
+		}
+		else {
 			// 選択ボーン名
 			ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.2f, 1.0f),
 				"選択中: %s", selBone_.c_str());
@@ -527,7 +549,8 @@ void MotionEditor::DrawPropertyPanel()
 				if (ImGui::IsItemHovered())
 					ImGui::SetTooltip("現在の姿勢をこの時刻にキーフレームとして記録します\n"
 						"下のタイムラインに◆が追加されます");
-			} else {
+			}
+			else {
 				ImGui::TextDisabled("(アニメーションを選択するとKFを打てます)");
 			}
 		}
@@ -544,12 +567,15 @@ void MotionEditor::DrawPropertyPanel()
 	{
 		if (!selKF_.IsValid()) {
 			ImGui::TextDisabled("タイムラインで◆をクリックしてキーフレームを選択してください");
-		} else if (!currentMotion_) {
+		}
+		else if (!currentMotion_) {
 			ImGui::TextDisabled("アニメーションがありません");
-		} else {
+		}
+		else {
 			auto& nodeAnims = currentMotion_->animation_.nodeAnimations_;
 			auto it = nodeAnims.find(selKF_.boneName);
-			if (it == nodeAnims.end()) { ImGui::TextDisabled("データなし"); } else {
+			if (it == nodeAnims.end()) { ImGui::TextDisabled("データなし"); }
+			else {
 				auto& na = it->second;
 				int   idx = selKF_.index;
 				std::string bone = selKF_.boneName;
@@ -598,8 +624,10 @@ void MotionEditor::DrawPropertyPanel()
 									[this, bone, idx, nv]() { currentMotion_->animation_.nodeAnimations_[bone].translate.keyframes[idx].value = nv; },
 									[this, bone, idx, ov]() { currentMotion_->animation_.nodeAnimations_[bone].translate.keyframes[idx].value = ov; }));
 								statusMsg_ = "KF位置変更: " + bone;
-							} else if (ch) { kf.value = { v[0],v[1],v[2] }; }
-						} else { ImGui::TextDisabled("この KF に位置データなし"); }
+							}
+							else if (ch) { kf.value = { v[0],v[1],v[2] }; }
+						}
+						else { ImGui::TextDisabled("この KF に位置データなし"); }
 						ImGui::EndTabItem();
 					}
 
@@ -622,10 +650,12 @@ void MotionEditor::DrawPropertyPanel()
 									[this, bone, idx, nv]() { currentMotion_->animation_.nodeAnimations_[bone].rotate.keyframes[idx].value = nv; },
 									[this, bone, idx, ov]() { currentMotion_->animation_.nodeAnimations_[bone].rotate.keyframes[idx].value = ov; }));
 								statusMsg_ = "KF回転変更: " + bone;
-							} else if (ch) {
+							}
+							else if (ch) {
 								kf.value = EulerToQuaternion({ deg[0] * (kPi / 180), deg[1] * (kPi / 180), deg[2] * (kPi / 180) });
 							}
-						} else { ImGui::TextDisabled("この KF に回転データなし"); }
+						}
+						else { ImGui::TextDisabled("この KF に回転データなし"); }
 						ImGui::EndTabItem();
 					}
 
@@ -646,8 +676,10 @@ void MotionEditor::DrawPropertyPanel()
 									[this, bone, idx, nv]() { currentMotion_->animation_.nodeAnimations_[bone].scale.keyframes[idx].value = nv; },
 									[this, bone, idx, ov]() { currentMotion_->animation_.nodeAnimations_[bone].scale.keyframes[idx].value = ov; }));
 								statusMsg_ = "KFスケール変更: " + bone;
-							} else if (ch) { kf.value = { v[0],v[1],v[2] }; }
-						} else { ImGui::TextDisabled("この KF に拡縮データなし"); }
+							}
+							else if (ch) { kf.value = { v[0],v[1],v[2] }; }
+						}
+						else { ImGui::TextDisabled("この KF に拡縮データなし"); }
 						ImGui::EndTabItem();
 					}
 
@@ -996,7 +1028,8 @@ void MotionEditor::DrawModelLoadPopup()
 				}
 				ImGui::EndCombo();
 			}
-		} else {
+		}
+		else {
 			char abuf[256]; strncpy_s(abuf, sizeof(abuf), loadAnimName_.c_str(), _TRUNCATE);
 			ImGui::SetNextItemWidth(-1);
 			if (ImGui::InputText("##animinput", abuf, sizeof(abuf)))
@@ -1170,7 +1203,8 @@ void MotionEditor::DrawFileBrowser(FileBrowserState& state, const char* title)
 				}
 			}
 			ImGui::PopStyleColor();
-		} else {
+		}
+		else {
 			bool isSel = (state.selectedFilePath == e.path().string());
 			if (ImGui::Selectable(name.c_str(), isSel, ImGuiSelectableFlags_AllowDoubleClick)) {
 				state.selectedFilePath = e.path().string();
@@ -1219,7 +1253,8 @@ void MotionEditor::InsertKeyframe(const std::string& bone, float time)
 				using KF = typename std::remove_reference<decltype(kfs)>::type::value_type;
 				auto it = std::find_if(kfs.begin(), kfs.end(),
 					[time](const KF& k) { return std::abs(k.time - time) < 1e-4f; });
-				if (it != kfs.end()) { it->value = val; } else {
+				if (it != kfs.end()) { it->value = val; }
+				else {
 					KF k; k.time = time; k.value = val; kfs.push_back(k);
 					std::sort(kfs.begin(), kfs.end(), [](const KF& a, const KF& b) { return a.time < b.time; });
 				}
@@ -1360,11 +1395,13 @@ std::vector<fs::directory_entry> MotionEditor::GetDirectoryEntries(
 	std::error_code ec;
 	for (const auto& e : fs::directory_iterator(dir, ec)) {
 		if (ec) break;
-		if (e.is_directory()) { dirs.push_back(e); } else if (e.is_regular_file()) {
+		if (e.is_directory()) { dirs.push_back(e); }
+		else if (e.is_regular_file()) {
 			std::string ex = e.path().extension().string();
 			if (ext.empty()) {
 				if (ex == ".gltf" || ex == ".obj" || ex == ".anim") files.push_back(e);
-			} else {
+			}
+			else {
 				if (ex == ext) files.push_back(e);
 			}
 		}

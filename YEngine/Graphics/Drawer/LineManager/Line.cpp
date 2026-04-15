@@ -56,7 +56,7 @@ void Line::DrawLine()
 	commandList->SetGraphicsRootConstantBufferView(indices.at("gTransformationMatrix"), transformationResource_->GetGPUVirtualAddress());
 
 	// index / 2 本のライン（2 頂点 = 1 ライン）
-	commandList->DrawInstanced(index, index / 2, 0, 0);
+	commandList->DrawInstanced(index, 1, 0, 0);
 
 	// 描画後にクリア
 	index = 0u;

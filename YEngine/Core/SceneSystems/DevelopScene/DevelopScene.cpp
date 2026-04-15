@@ -72,7 +72,7 @@ void DevelopScene::Initialize() {
 
 
 	motionEditor_ = std::make_unique<MotionEditor>();
-	motionEditor_->Initialize();
+	motionEditor_->Initialize(sceneCamera_.get());
 
 	//------------------------------------------------------------
 	// エディター用GUI登録
@@ -158,14 +158,14 @@ void DevelopScene::Finalize() {
 /// オブジェクト描画
 /// </summary>
 void DevelopScene::DrawObject() {
-	motionEditor_->Draw(sceneCamera_.get());
+	motionEditor_->Draw();
 }
 
 /// <summary>
 /// ライン描画
 /// </summary>
 void DevelopScene::DrawLine() {
-
+	motionEditor_->DrawBone();
 }
 
 
