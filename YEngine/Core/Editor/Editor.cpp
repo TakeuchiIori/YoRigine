@@ -301,6 +301,16 @@ void Editor::DrawGameWindow()
 			if (gizmoDrawCallback_) {
 				gizmoDrawCallback_();
 			}
+
+			// モデルをドラッグアンドドロップで配置するためのドロップターゲット
+			if (ImGui::BeginDragDropTarget()) {
+				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("DND_MODEL_PATH")) {
+					const char* path = (const char*)payload->Data;
+					// 配置コールバックを呼び出す (ModelManipulator::PlaceObject が呼ばれるようにする)
+					YoRigine::ModelManipulator::GetInstance()->PlaceObject(path);
+				}
+				ImGui::EndDragDropTarget();
+			}
 		}
 	}
 	ImGui::End();

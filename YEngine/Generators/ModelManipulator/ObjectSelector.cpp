@@ -89,7 +89,7 @@ namespace YoRigine {
                     static_cast<uint32_t>(viewportSize.y));
 
                 pickBuffer_->RequestPick(relX, relY);
-                pendingMultiSelect_ = ImGui::GetIO().KeyCtrl;
+                pendingMultiSelect_ = ImGui::GetIO().KeyShift;
                 hasPendingRead_ = true;
             }
         }

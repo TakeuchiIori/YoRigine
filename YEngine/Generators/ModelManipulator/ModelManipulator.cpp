@@ -107,11 +107,24 @@ namespace YoRigine {
     {
         if (!isInitialized_ || !camera_) return;
         for (auto* obj : objectManager_->GetAllActiveObjects()) {
-            if (obj && obj->object && obj->worldTransform)
+            if (obj && obj->object && obj->worldTransform) {
+
+                // 選択状態に応じた色の変更処理
+                bool isSelected = selector_.IsSelected(obj->id);
+                if (isSelected) {
+                    // オブジェクトの色を赤っぽくする
+                    obj->object->SetMaterialColor({ 1.0f, 0.2f, 0.2f, 1.0f });
+                }
+                else {
+                    // 通常の色に戻す
+                     obj->object->SetMaterialColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+                }
+                // ------------------------------------------
+
                 obj->object->Draw(camera_, *obj->worldTransform);
+            }
         }
     }
-
     void ModelManipulator::DrawPickPass()
     {
 #ifdef USE_IMGUI
@@ -168,16 +181,24 @@ namespace YoRigine {
         gizmables_.clear();
         std::vector<IGizmable*> targets;
 
-        // 複数選択時でもギズモは primaryId_（最後に選択したオブジェクト）の1つだけ表示する。
-        // 全選択IDにギズモを出すと ImGuizmo が複数重なって操作できなくなるため。
-        auto* obj = objectManager_->GetObjectById(selector_.GetPrimaryId());
-        if (obj && obj->worldTransform) {
-            gizmables_.emplace_back(obj, objectManager_);
-            targets.push_back(&gizmables_.back());
+        const auto& selectedIds = selector_.GetSelectedIds();
+        // reallocによるポインタ無効化を防ぐため、事前に要素数を確保
+        gizmables_.reserve(selectedIds.size());
+
+        // 選択されているすべてのオブジェクトをリストに追加
+        for (int id : selectedIds) {
+            auto* obj = objectManager_->GetObjectById(id);
+            if (obj && obj->worldTransform) {
+                gizmables_.emplace_back(obj, objectManager_);
+            }
+        }
+
+        // pointerをtargetsに登録
+        for (auto& g : gizmables_) {
+            targets.push_back(&g);
         }
 
         if (targets.empty()) return;
-        if (!selector_.HasSelection()) return;
         gizmoCtrl_.Draw(
             camera_,
             targets,

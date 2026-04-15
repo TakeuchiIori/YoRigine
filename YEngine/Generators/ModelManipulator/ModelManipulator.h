@@ -56,6 +56,7 @@ public:
     void DrawForPick();
     void Finalize();
 
+    void PlaceObject(const std::string& modelPath);
     void LoadScene(const std::string& sceneName);
     void SetCamera(Camera* camera);
 
@@ -74,7 +75,6 @@ private:
     // 内部処理
     //=========================================================================
     void ShortcutKey();
-    void PlaceObject(const std::string& modelPath);
     void CopyObject();
 	void PasteObject();
     //=========================================================================
