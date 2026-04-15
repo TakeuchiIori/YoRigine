@@ -151,6 +151,11 @@ ObjectManager::PlacedObject* ObjectManager::DuplicateObject(
 }
 
 
+Object3d* ObjectManager::GetObject3dById(int id) {
+	PlacedObject* obj = GetObjectById(id);
+	return (obj && obj->object) ? obj->object.get() : nullptr;
+}
+
 /// <summary>
 /// ID から取得
 /// </summary>
@@ -233,7 +238,8 @@ void ObjectManager::UpdateObjectTransform(PlacedObject& obj) {
 		obj.worldTransform->parent_ =
 			(parent && parent->worldTransform) ? parent->worldTransform.get() : nullptr;
 		if (!parent) obj.parentID = -1;
-	} else {
+	}
+	else {
 		obj.worldTransform->parent_ = nullptr;
 	}
 

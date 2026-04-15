@@ -94,9 +94,10 @@ void DevelopScene::Initialize() {
 void DevelopScene::Update() {
 	YoRigine::GameTime::Update();
 	UpdateCamera();
+
+	int selectedId = YoRigine::ModelManipulator::GetInstance()->GetSelector().GetPrimaryId();
+	motionEditor_->SetTargetObjectId(selectedId);
 	motionEditor_->Update();
-
-
 	YoRigine::ModelManipulator::GetInstance()->Update();
 	YoRigine::ParticleManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
 	YParticleManager::GetInstance().Update(YoRigine::GameTime::GetDeltaTime());
@@ -158,7 +159,7 @@ void DevelopScene::Finalize() {
 /// オブジェクト描画
 /// </summary>
 void DevelopScene::DrawObject() {
-	motionEditor_->Draw();
+
 }
 
 /// <summary>

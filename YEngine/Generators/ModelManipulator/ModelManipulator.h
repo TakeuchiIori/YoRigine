@@ -65,7 +65,6 @@ public:
     //=========================================================================
     SceneSerializer& GetSerializer() { return serializer_; }
     ObjectSelector&  GetSelector()   { return selector_; }
-
 #ifdef USE_IMGUI
     //GizmoController& GetGizmoController() { return gizmoCtrl_; }
 #endif

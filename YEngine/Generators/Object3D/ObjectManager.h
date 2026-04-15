@@ -72,6 +72,7 @@ public:
 
 	///************************* オブジェクト検索 *************************///
 
+	Object3d* GetObject3dById(int id);
 	PlacedObject* GetObjectById(int id);
 	const PlacedObject* GetObjectById(int id) const;
 

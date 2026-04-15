@@ -11,6 +11,8 @@
 #include "Editor/Command/CommandHistory.h"
 #include "Debugger/DopeSheet/DopeSheetEditor.h"
 #include <Graphics/Drawer/LineManager/Line.h>
+
+#include "Object3D/ObjectManager.h" 
 // Math
 #include "Vector3.h"
 #include "Quaternion.h"
@@ -56,10 +58,9 @@ public:
 	///************************* 基本的関数 *************************///
 	void Initialize(Camera* camera);
 	void Update();
-	void Draw();
 	void DrawBone();
 	void ShowEditor();
-
+	void SetTargetObjectId(int id);
 private:
 	///************************* その他描画 *************************///
 	void DrawMenuBar();
@@ -70,7 +71,6 @@ private:
 	void DrawStatusBar();
 
 	///************************* ポップアップ *************************///
-	void DrawModelLoadPopup();
 	void DrawSaveLoadPopup();
 	void DrawFileBrowser(FileBrowserState& state, const char* title);
 
@@ -109,6 +109,13 @@ private:
 	void SyncJointToBuffer(const std::string& bone);  // Joint の現在値 → 編集バッファ
 	void SyncBufferToJoint();                          // 編集バッファ → Joint
 
+	Object3d* GetTargetObject() const {
+		if (targetObjectId_ != -1) {
+			return ObjectManager::GetInstance()->GetObject3dById(targetObjectId_);
+		}
+		return nullptr;
+	}
+
 private:
 	///************************* 定数 *************************///
 	static constexpr const char* kModelRootDir = "Resources/Models";
@@ -129,7 +136,7 @@ private:
 	Camera* camera_ = nullptr;
 
 	// プレビュー
-	std::unique_ptr<Object3d> previewObject_;
+	int targetObjectId_ = -1;
 	WorldTransform            previewTransform_;
 	Motion* currentMotion_ = nullptr;
 
@@ -139,13 +146,16 @@ private:
 	// モデル読み込み
 	std::string      loadFileName_ = "";
 	std::string      loadDirectory_ = "";
-	FileBrowserState modelBrowser_;
 	std::vector<std::string> animNameList_;
 	int              animNameIndex_ = -1;
 	std::string      loadAnimName_ = "";
 	bool             showLoadPopup_ = false;
 	std::unique_ptr<Line> lineDrawer_;
 	bool             isDrawBone_ = false;
+
+	// 再生状態の管理 (UI用)
+	bool isPlaying_ = true;
+	bool isLoop_ = true;
 
 	// モーション選択
 	std::string selectedAnimKey_ = "";    // animationCache_ のキー

@@ -83,6 +83,8 @@ public:
 	/// アニメーション全体の長さを取得
 	float GetDuration() const { return animation_ ? animation_->GetDuration() : 0.0f; }
 
+	// 現在のアニメーションデータ取得
+	Motion* GetAnimation() const { return animation_; }
 private:
 	///************************* 内部処理 *************************///
 
