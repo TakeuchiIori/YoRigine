@@ -431,7 +431,20 @@ namespace DopeSheet
                     static_cast<int>((ImGui::GetMousePos().x - rowMin.x) / cellW),
                     0, totalFrames);
                 pendingValue_ = 0.0f;
-                pendingDuration_ = 10;
+
+                switch (track.type) {
+                case TrackType::AttackHitbox:
+                case TrackType::InvincibleFrame:
+                case TrackType::ArmorFrame:
+                case TrackType::ComboWindow:
+                case TrackType::CancelWindow:
+                case TrackType::CounterWindow:
+                    pendingDuration_ = 10; // 区間を扱うものはデフォルトでバーにする
+                    break;
+                default:
+                    pendingDuration_ = 0;  // それ以外（Motion系など）はひし形にする
+                    break;
+                }
                 pendingTrackIdx_ = trackIdx;
                 showAddPopup_ = true;
                 ImGui::OpenPopup("##DopeAddKey");
