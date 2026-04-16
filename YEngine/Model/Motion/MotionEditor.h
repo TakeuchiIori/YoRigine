@@ -96,7 +96,8 @@ private:
 
 
 	///************************* ボーン操作 *************************///
-	void   SetJointTransform(const std::string& bone, const QuaternionTransform& tr);
+	void SavePose(float time);
+	void SetJointTransform(const std::string& bone, const QuaternionTransform& tr);
 	Joint* FindJoint(const std::string& name) const;
 
 	///************************* ユーティリティ *************************///
@@ -108,7 +109,7 @@ private:
 	QuaternionTransform BufferToTransform() const;
 	void SyncJointToBuffer(const std::string& bone);  // Joint の現在値 → 編集バッファ
 	void SyncBufferToJoint();                          // 編集バッファ → Joint
-
+	void InsertKeyframeFromTransform(const std::string& bone, float time, const QuaternionTransform& tr);
 	Object3d* GetTargetObject() const {
 		if (targetObjectId_ != -1) {
 			return ObjectManager::GetInstance()->GetObject3dById(targetObjectId_);

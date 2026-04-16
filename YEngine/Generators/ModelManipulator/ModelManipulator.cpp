@@ -12,8 +12,8 @@
 #include <Editor/Editor.h>
 #include <Debugger/Gizmo/IGizmable.h>
 #include <DirectX/DirectXCommon.h>
-#include <Debugger/Logger.h>
 #endif
+#include <Debugger/Logger.h>
 
 namespace YoRigine {
 
@@ -38,6 +38,7 @@ namespace YoRigine {
 		prefabMgr_.ScanPrefabFolder();
 
 		selector_.SetObjectManager(objectManager_);
+		motionEditor_.Initialize(camera_);
 
 #ifdef USE_IMGUI
 		pickBuffer_ = PickBuffer::GetInstance();
@@ -93,6 +94,8 @@ namespace YoRigine {
 
 		ShortcutKey();
 
+		motionEditor_.SetTargetObjectId(selector_.GetPrimaryId());
+		motionEditor_.Update();
 		// ── selector_.Update() だけここで行う（GPU命令は積まない）──
 		selector_.SetCamera(camera_);
 		selector_.Update(
@@ -127,6 +130,14 @@ namespace YoRigine {
 				obj->object->Draw(camera_, *obj->worldTransform);
 			}
 		}
+	}
+
+	// ============================================================
+	// 線の描画
+	// ============================================================
+	void ModelManipulator::DrawLine() {
+		if (!isInitialized_ || !camera_) return;
+		motionEditor_.DrawBone();
 	}
 
 	// ============================================================
@@ -170,6 +181,7 @@ namespace YoRigine {
 			editorUI_.DrawDuplicateWindow();
 		if (*editorUI_.GetShowPrefabWindowPtr())
 			editorUI_.DrawPrefabWindow();
+		motionEditor_.ShowEditor();
 #endif
 	}
 

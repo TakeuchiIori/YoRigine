@@ -7,7 +7,7 @@
 // Engine
 #include <Object3D/ObjectManager.h>
 #include <Systems/Camera/Camera.h>
-
+#include <Motion/MotionEditor.h>
 
 #ifdef USE_IMGUI
 #include "ModelBrowser.h"
@@ -49,6 +49,7 @@ public:
     void Initialize();
     void Update();
     void Draw();
+    void DrawLine();
     void DrawPickPass();
     void DrawShadow();
     void DrawImGui();
@@ -73,6 +74,7 @@ public:
     //=========================================================================
     SceneSerializer& GetSerializer() { return serializer_; }
     ObjectSelector&  GetSelector()   { return selector_; }
+    MotionEditor& GetMotionEditor() { return motionEditor_; }
 #ifdef USE_IMGUI
     //GizmoController& GetGizmoController() { return gizmoCtrl_; }
 #endif
@@ -105,6 +107,7 @@ private:
     bool           isInitialized_   = false;
     std::string    jsonPath_;
     std::string    modelFolderPath_ = "Resources/Models/";
+    MotionEditor motionEditor_;
 
     // コピーしたオブジェクトのIDを保持
     std::vector<int> copyObjectIDs_;

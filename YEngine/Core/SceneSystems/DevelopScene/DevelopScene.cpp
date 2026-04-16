@@ -71,8 +71,8 @@ void DevelopScene::Initialize() {
 	YoRigine::GpuEmitManager::GetInstance()->SetCamera(sceneCamera_.get());
 
 
-	motionEditor_ = std::make_unique<MotionEditor>();
-	motionEditor_->Initialize(sceneCamera_.get());
+	//motionEditor_ = std::make_unique<MotionEditor>();
+	//motionEditor_->Initialize(sceneCamera_.get());
 
 	//------------------------------------------------------------
 	// エディター用GUI登録
@@ -82,7 +82,7 @@ void DevelopScene::Initialize() {
 	Editor::GetInstance()->RegisterGameUI("ライティング", [this]() { YoRigine::LightManager::GetInstance()->ShowLightingEditor(); }, "Develop");
 	Editor::GetInstance()->RegisterGameUI("GpuParticle", [this]() { YoRigine::GpuEmitManager::GetInstance()->DrawImGui(); }, "Develop");
 	Editor::GetInstance()->RegisterGameUI("YoRigine:パーティクルエディター", [this]() {YParticleEditor::GetInstance().ShowEditorWindow(); }, "Develop");
-	Editor::GetInstance()->RegisterGameUI("モーションエディタ", [this]() {motionEditor_->ShowEditor(); }, "Develop");
+	//Editor::GetInstance()->RegisterGameUI("モーションエディタ", [this]() {motionEditor_->ShowEditor(); }, "Develop");
 	Editor::GetInstance()->RegisterGameUI("VFX", [this]() { YoRigine::VfxMeshEditor::GetInstance()->DrawImGui(); }, "Develop");
 
 #endif
@@ -95,9 +95,6 @@ void DevelopScene::Update() {
 	YoRigine::GameTime::Update();
 	UpdateCamera();
 
-	int selectedId = YoRigine::ModelManipulator::GetInstance()->GetSelector().GetPrimaryId();
-	motionEditor_->SetTargetObjectId(selectedId);
-	motionEditor_->Update();
 	YoRigine::ModelManipulator::GetInstance()->Update();
 	YoRigine::ParticleManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
 	YParticleManager::GetInstance().Update(YoRigine::GameTime::GetDeltaTime());
@@ -144,8 +141,6 @@ void DevelopScene::DrawNonOffscreen() {
 // ============================================================
 void DevelopScene::DrawShadow() {
 	YoRigine::ModelManipulator::GetInstance()->DrawShadow();
-
-
 }
 
 // ============================================================
@@ -165,7 +160,7 @@ void DevelopScene::DrawObject() {
 // 線の描画
 // ============================================================
 void DevelopScene::DrawLine() {
-	motionEditor_->DrawBone();
+	YoRigine::ModelManipulator::GetInstance()->DrawLine();
 }
 
 

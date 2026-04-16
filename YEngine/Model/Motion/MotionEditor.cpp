@@ -664,6 +664,10 @@ void MotionEditor::DrawPropertyPanel()
 					InsertKeyframe(selBone_, scrubTime_);
 					statusMsg_ = "KF 挿入: " + selBone_ + " @ " + std::to_string(scrubTime_) + "s";
 				}
+				if (ImGui::Button("[ I ] 全ボーンのキーフレームを打つ (Save Pose)", ImVec2(-1, 0))) {
+					SavePose(scrubTime_);
+					statusMsg_ = "全ボーンの KF を挿入 @ " + std::to_string(scrubTime_) + "s";
+				}
 				if (ImGui::IsItemHovered())
 					ImGui::SetTooltip("現在の姿勢をこの時刻にキーフレームとして記録します\n"
 						"下のタイムラインに◆が追加されます");
@@ -1319,6 +1323,45 @@ void MotionEditor::MoveKeyframe(const std::string& bone, KFChannel ch, int idx, 
 }
 
 // ============================================================
+// ポーズの保存
+// ============================================================
+void MotionEditor::SavePose(float time)
+{
+	Object3d* target = GetTargetObject();
+	if (!target || !target->GetModel() || !target->GetModel()->GetSkeleton() || !currentMotion_) return;
+
+	Skeleton* skeleton = target->GetModel()->GetSkeleton();
+
+	// スナップショット（Undo用）
+	auto oldAnims = currentMotion_->animation_.nodeAnimations_;
+
+	// 全ジョイントをループして現在のトランスフォームを保存
+	for (const auto& joint : skeleton->GetJoints()) {
+		const std::string& boneName = joint.GetName();
+		// モーション側に該当ボーンのカーブが存在する場合のみ追加
+		if (currentMotion_->animation_.nodeAnimations_.count(boneName)) {
+			InsertKeyframeFromTransform(boneName, time, joint.GetTransform());
+		}
+	}
+
+	auto newAnims = currentMotion_->animation_.nodeAnimations_;
+
+	// 一括Undo/Redoコマンドとして登録
+	history_.Execute(MakeLambdaCommand("全ポーズ保存 @ " + std::to_string(time) + "s",
+		[this, newAnims]() {
+			if (currentMotion_) currentMotion_->animation_.nodeAnimations_ = newAnims;
+			tracksDirty_ = true;
+		},
+		[this, oldAnims]() {
+			if (currentMotion_) currentMotion_->animation_.nodeAnimations_ = oldAnims;
+			tracksDirty_ = true;
+		}
+	));
+
+	tracksDirty_ = true;
+}
+
+// ============================================================
 // ボーン操作
 // ============================================================
 void MotionEditor::SetJointTransform(const std::string& bone, const QuaternionTransform& tr)
@@ -1383,6 +1426,28 @@ void MotionEditor::SyncBufferToJoint()
 // ============================================================
 // ユーティリティ
 // ============================================================
+void MotionEditor::InsertKeyframeFromTransform(const std::string& bone, float time, const QuaternionTransform& tr)
+{
+	if (!currentMotion_) return;
+	auto& nodeAnims = currentMotion_->animation_.nodeAnimations_;
+	if (!nodeAnims.count(bone)) return;
+
+	auto insertOrReplace = [&]<typename T>(auto& kfs, T val) {
+		using KF = typename std::remove_reference<decltype(kfs)>::type::value_type;
+		auto it = std::find_if(kfs.begin(), kfs.end(),
+			[time](const KF& k) { return std::abs(k.time - time) < 1e-4f; });
+		if (it != kfs.end()) { it->value = val; }
+		else {
+			KF k; k.time = time; k.value = val; kfs.push_back(k);
+			std::sort(kfs.begin(), kfs.end(), [](const KF& a, const KF& b) { return a.time < b.time; });
+		}
+	};
+
+	insertOrReplace(nodeAnims[bone].translate.keyframes, tr.translate);
+	insertOrReplace(nodeAnims[bone].rotate.keyframes, tr.rotate);
+	insertOrReplace(nodeAnims[bone].scale.keyframes, tr.scale);
+}
+
 std::string MotionEditor::AnimDisplayName(const std::string& key)
 {
 	auto pos = key.find('#');
