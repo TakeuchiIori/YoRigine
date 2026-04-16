@@ -502,6 +502,8 @@
 └── └──         ├── ProceduralMeshBase.h
 └── └──         ├── TrailMesh.cpp
 └── └──         ├── TrailMesh.h
+└── └──         ├── TrailMeshEmitter.cpp
+└── └──         ├── TrailMeshEmitter.h
 └── └──         ├── VfxEffectAsset.cpp
 └── └──         ├── VfxEffectAsset.h
 └── └──         ├── VfxMeshEditor.cpp
@@ -191901,6 +191903,16 @@ void Editor::DrawGameWindow()
 			if (gizmoDrawCallback_) {
 				gizmoDrawCallback_();
 			}
+
+			// モデルをドラッグアンドドロップで配置するためのドロップターゲット
+			if (ImGui::BeginDragDropTarget()) {
+				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("DND_MODEL_PATH")) {
+					const char* path = (const char*)payload->Data;
+					// 配置コールバックを呼び出す (ModelManipulator::PlaceObject が呼ばれるようにする)
+					YoRigine::ModelManipulator::GetInstance()->PlaceObject(path);
+				}
+				ImGui::EndDragDropTarget();
+			}
 		}
 	}
 	ImGui::End();
@@ -192399,23 +192411,45 @@ File Path: YEngine/Core/Editor/Icon/EditorIcon.h
 #pragma once
 //=================================================================
 // FontAwesome 5 Free — アイコン Unicode 定義 (Modern C++ 版)
+// 
+// 使用例）if (ImGui::Button((std::string(Icon::Play) +"再生").c_str()))
 //=================================================================
 namespace Icon {
-    static constexpr const char* Play = "\uf04b";
-    static constexpr const char* Xmark = "\uf00d";
-    static constexpr const char* Check = "\uf00c";
-    static constexpr const char* Danger = "\uf071";
-    static constexpr const char* Bolt = "\uf0e7";
-    static constexpr const char* Bullhorn = "\uf0a1";
-    static constexpr const char* Refresh = "\uf021";
-    static constexpr const char* Stop = "\uf04d";
-    static constexpr const char* PlusCircle = "\uf055";
-    static constexpr const char* Trash = "\uf1f8";
-    static constexpr const char* Cog = "\uf013";
-    static constexpr const char* FloppyDisk = "\uf0c7";
-    static constexpr const char* FolderOpen = "\uf115";
-    static constexpr const char* CheckCircle = "\uf058";
-    static constexpr const char* TimesCircle = "\uf057";
+	static constexpr const char* Play = "\uf04b";			// 再生
+	static constexpr const char* Xmark = "\uf00d";			// キャンセル/閉じる
+	static constexpr const char* Check = "\uf00c";			// チェックマーク
+	static constexpr const char* Danger = "\uf071";			// 警告
+	static constexpr const char* Bolt = "\uf0e7";			// 稲妻（高速/パフォーマンス）
+	static constexpr const char* Bullhorn = "\uf0a1";		// メガホン（アナウンス/通知）
+	static constexpr const char* Refresh = "\uf021";		// 更新/リロード
+	static constexpr const char* Stop = "\uf04d";			// 停止
+	static constexpr const char* PlusCircle = "\uf055";		// 追加（丸）
+	static constexpr const char* Trash = "\uf1f8";			// ゴミ箱（削除）
+	static constexpr const char* Cog = "\uf013";			// 歯車（設定）
+	static constexpr const char* FloppyDisk = "\uf0c7";		// 保存
+	static constexpr const char* FolderOpen = "\uf115";		// フォルダ（開いてる）
+	static constexpr const char* CheckCircle = "\uf058";	// チェックマーク（丸）
+	static constexpr const char* TimesCircle = "\uf057";	// バツマーク（丸）
+
+    static constexpr const char* Cube = "\uf1b2";			// オブジェクト/3Dモデル
+    static constexpr const char* List = "\uf0ca";			// アウトライナー(階層)
+    static constexpr const char* Sliders = "\uf1de";		// ディテール(プロパティ)
+    static constexpr const char* Folder = "\uf07b";			// コンテンツブラウザ
+    static constexpr const char* Search = "\uf002";			// 検索
+    static constexpr const char* Copy = "\uf0c5";			// 複製
+    static constexpr const char* Puzzle = "\uf12e";			// プレファブ
+    static constexpr const char* Plus = "\uf067";			// 追加
+    static constexpr const char* Sieve = "\uf0b0";			// フィルター
+    static constexpr const char* Eye = "\uf06e";			// 表示/非表示用
+    static constexpr const char* Wrench = "\uf0ad";			// ツール (Wrench/レンチ)
+    static constexpr const char* File = "\uf15b";			// ファイル
+
+    static constexpr const char* Pause = "\uf04c";			// 一時停止
+	static constexpr const char* Infinity = "\uf534";		// ループ (無限大)
+
+	static constexpr const char* ArrowsAlt = "\uf0b2";		// 移動/位置 (Translate)
+	static constexpr const char* SyncAlt = "\uf2f1";		// 回転 (Rotate)
+	static constexpr const char* ExpandArrowsAlt = "\uf31e";// 拡縮 (Scale)
 }
 
 ============================================================
@@ -192975,6 +193009,8 @@ void DevelopScene::Initialize() {
 
 #ifdef USE_IMGUI
 	YEmitterGroupEditor::GetInstance().SetCamera(sceneCamera_.get());
+	YoRigine::VfxMeshEditor::GetInstance()->Initialize();
+	YoRigine::VfxMeshEditor::GetInstance()->SetCamera(sceneCamera_.get());
 #endif
 	YoRigine::ParticleManager::GetInstance()->SetCamera(sceneCamera_.get());
 	YoRigine::ModelManipulator::GetInstance()->SetCamera(sceneCamera_.get());
@@ -192982,7 +193018,7 @@ void DevelopScene::Initialize() {
 
 
 	motionEditor_ = std::make_unique<MotionEditor>();
-	motionEditor_->Initialize();
+	motionEditor_->Initialize(sceneCamera_.get());
 
 	//------------------------------------------------------------
 	// エディター用GUI登録
@@ -192996,8 +193032,6 @@ void DevelopScene::Initialize() {
 	Editor::GetInstance()->RegisterGameUI("VFX", [this]() { YoRigine::VfxMeshEditor::GetInstance()->DrawImGui(); }, "Develop");
 
 #endif
-
-	YoRigine::VfxMeshEditor::GetInstance()->Initialize();
 }
 
 /// <summary>
@@ -193006,15 +193040,19 @@ void DevelopScene::Initialize() {
 void DevelopScene::Update() {
 	YoRigine::GameTime::Update();
 	UpdateCamera();
+
+	int selectedId = YoRigine::ModelManipulator::GetInstance()->GetSelector().GetPrimaryId();
+	motionEditor_->SetTargetObjectId(selectedId);
 	motionEditor_->Update();
-
-
 	YoRigine::ModelManipulator::GetInstance()->Update();
 	YoRigine::ParticleManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
 	YParticleManager::GetInstance().Update(YoRigine::GameTime::GetDeltaTime());
 	YoRigine::LightManager::GetInstance()->UpdateShadowMatrix(sceneCamera_.get());
 	YoRigine::GpuEmitManager::GetInstance()->Update();
+
+#ifdef USE_IMGUI
 	YoRigine::VfxMeshEditor::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
+#endif
 }
 
 /// <summary>
@@ -193035,7 +193073,11 @@ void DevelopScene::Draw() {
 	YParticleManager::GetInstance().Draw();
 	DrawLine();
 	YoRigine::GpuEmitManager::GetInstance()->Draw();
-	YoRigine::VfxMeshEditor::GetInstance()->DrawPreview(YoRigine::DirectXCommon::GetInstance()->GetCommandList().Get(), sceneCamera_->GetCameraResource()->GetGPUVirtualAddress());
+
+#ifdef USE_IMGUI
+	YoRigine::VfxMeshEditor::GetInstance()->DrawPreview();
+#endif
+	
 }
 
 /// <summary>
@@ -193063,14 +193105,14 @@ void DevelopScene::Finalize() {
 /// オブジェクト描画
 /// </summary>
 void DevelopScene::DrawObject() {
-	motionEditor_->Draw(sceneCamera_.get());
+
 }
 
 /// <summary>
 /// ライン描画
 /// </summary>
 void DevelopScene::DrawLine() {
-
+	motionEditor_->DrawBone();
 }
 
 
@@ -193957,7 +193999,7 @@ void WinApp::Initialize()
 	//-----------------------------------------
 	hwnd_ = CreateWindow(
 		wc_.lpszClassName,						// クラス名
-		L"LE4A_16_タケウチ_イオリ_ゴルディン",		// タイトル
+		L"ゴルディン",		// タイトル
 		WS_OVERLAPPEDWINDOW,					// ウィンドウスタイル
 		CW_USEDEFAULT,							// X
 		CW_USEDEFAULT,							// Y
@@ -198836,6 +198878,14 @@ void ModelBrowser::Draw()
                 if (IsValidIndex(idx) && placeCallback_)
                     placeCallback_(modelFiles_[idx]);
             }
+
+            if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
+                const char* payloadPath = modelFiles_[idx].c_str();
+                // ペイロード（データ）としてファイルパスを送信
+                ImGui::SetDragDropPayload("DND_MODEL_PATH", payloadPath, strlen(payloadPath) + 1);
+                ImGui::Text("配置: %s", modelNames_[idx].c_str());
+                ImGui::EndDragDropSource();
+            }
         }
         ImGui::EndListBox();
     }
@@ -199049,11 +199099,24 @@ namespace YoRigine {
     {
         if (!isInitialized_ || !camera_) return;
         for (auto* obj : objectManager_->GetAllActiveObjects()) {
-            if (obj && obj->object && obj->worldTransform)
+            if (obj && obj->object && obj->worldTransform) {
+
+                // 選択状態に応じた色の変更処理
+                bool isSelected = selector_.IsSelected(obj->id);
+                if (isSelected) {
+                    // オブジェクトの色を赤っぽくする
+                    obj->object->SetMaterialColor({ 1.0f, 0.2f, 0.2f, 1.0f });
+                }
+                else {
+                    // 通常の色に戻す
+                     obj->object->SetMaterialColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+                }
+                // ------------------------------------------
+
                 obj->object->Draw(camera_, *obj->worldTransform);
+            }
         }
     }
-
     void ModelManipulator::DrawPickPass()
     {
 #ifdef USE_IMGUI
@@ -199110,16 +199173,24 @@ namespace YoRigine {
         gizmables_.clear();
         std::vector<IGizmable*> targets;
 
-        // 複数選択時でもギズモは primaryId_（最後に選択したオブジェクト）の1つだけ表示する。
-        // 全選択IDにギズモを出すと ImGuizmo が複数重なって操作できなくなるため。
-        auto* obj = objectManager_->GetObjectById(selector_.GetPrimaryId());
-        if (obj && obj->worldTransform) {
-            gizmables_.emplace_back(obj, objectManager_);
-            targets.push_back(&gizmables_.back());
+        const auto& selectedIds = selector_.GetSelectedIds();
+        // reallocによるポインタ無効化を防ぐため、事前に要素数を確保
+        gizmables_.reserve(selectedIds.size());
+
+        // 選択されているすべてのオブジェクトをリストに追加
+        for (int id : selectedIds) {
+            auto* obj = objectManager_->GetObjectById(id);
+            if (obj && obj->worldTransform) {
+                gizmables_.emplace_back(obj, objectManager_);
+            }
+        }
+
+        // pointerをtargetsに登録
+        for (auto& g : gizmables_) {
+            targets.push_back(&g);
         }
 
         if (targets.empty()) return;
-        if (!selector_.HasSelection()) return;
         gizmoCtrl_.Draw(
             camera_,
             targets,
@@ -199363,6 +199434,7 @@ public:
     void DrawForPick();
     void Finalize();
 
+    void PlaceObject(const std::string& modelPath);
     void LoadScene(const std::string& sceneName);
     void SetCamera(Camera* camera);
 
@@ -199371,7 +199443,6 @@ public:
     //=========================================================================
     SceneSerializer& GetSerializer() { return serializer_; }
     ObjectSelector&  GetSelector()   { return selector_; }
-
 #ifdef USE_IMGUI
     //GizmoController& GetGizmoController() { return gizmoCtrl_; }
 #endif
@@ -199381,7 +199452,6 @@ private:
     // 内部処理
     //=========================================================================
     void ShortcutKey();
-    void PlaceObject(const std::string& modelPath);
     void CopyObject();
 	void PasteObject();
     //=========================================================================
@@ -199519,7 +199589,7 @@ namespace YoRigine {
                     static_cast<uint32_t>(viewportSize.y));
 
                 pickBuffer_->RequestPick(relX, relY);
-                pendingMultiSelect_ = ImGui::GetIO().KeyCtrl;
+                pendingMultiSelect_ = ImGui::GetIO().KeyShift;
                 hasPendingRead_ = true;
             }
         }
@@ -200390,11 +200460,11 @@ namespace YoRigine {
 //=============================================================================
 void SceneEditorUI::DrawMenuBar()
 {
-    if (!ImGui::BeginMenu("Create Object")) return;
+    if (!ImGui::BeginMenu("シーンオブジェクト")) return;
 
-    if (ImGui::BeginMenu("View")) {
-        ImGui::MenuItem("Object List",         nullptr, &showObjectList_);
-        ImGui::MenuItem("Transform Controls",  nullptr, &showTransformControls_);
+    if (ImGui::BeginMenu("ビュー")) {
+        ImGui::MenuItem("オブジェクト一覧",         nullptr, &showObjectList_);
+        ImGui::MenuItem("トランスフォーム操作",  nullptr, &showTransformControls_);
         ImGui::EndMenu();
     }
 
@@ -201792,6 +201862,11 @@ ObjectManager::PlacedObject* ObjectManager::DuplicateObject(
 }
 
 
+Object3d* ObjectManager::GetObject3dById(int id) {
+	PlacedObject* obj = GetObjectById(id);
+	return (obj && obj->object) ? obj->object.get() : nullptr;
+}
+
 /// <summary>
 /// ID から取得
 /// </summary>
@@ -201874,7 +201949,8 @@ void ObjectManager::UpdateObjectTransform(PlacedObject& obj) {
 		obj.worldTransform->parent_ =
 			(parent && parent->worldTransform) ? parent->worldTransform.get() : nullptr;
 		if (!parent) obj.parentID = -1;
-	} else {
+	}
+	else {
 		obj.worldTransform->parent_ = nullptr;
 	}
 
@@ -202006,6 +202082,14 @@ void ObjectManager::InitializePlacedObject(
 	obj.parentID = -1;
 	obj.isActive = true;
 
+	// 当たり判定
+	obj.collider = ColliderPool::GetInstance()->GetCollider<AABBCollider>();
+	if (obj.collider) {
+		obj.collider->Initialize();
+		obj.collider->SetWT(obj.worldTransform.get());
+		obj.collider->SetIsStatic(true);			// 壁なので動かない
+		obj.collider->SetEnablePenetration(true);	// 押し戻し有効
+	}
 	UpdateObjectTransform(obj);
 }
 
@@ -202024,6 +202108,9 @@ File Path: YEngine/Generators/Object3D/ObjectManager.h
 #include "WorldTransform/WorldTransform.h"
 #include <Memory/PoolAllocator.h>
 #include "Vector3.h"
+
+#include <Collision/AABB/AABBCollider.h>
+#include <Collision/Core/ColliderPool.h>
 
 /// <summary>
 /// オブジェクトの管理クラス
@@ -202049,6 +202136,7 @@ public:
 		// アニメーション関連
 		bool isAnimation = false;
 		std::string animationName = "";
+		std::shared_ptr<AABBCollider> collider; // コリジョン用のAABBコライダー
 
 		PlacedObject() = default;
 		~PlacedObject() = default;
@@ -202083,6 +202171,7 @@ public:
 
 	///************************* オブジェクト検索 *************************///
 
+	Object3d* GetObject3dById(int id);
 	PlacedObject* GetObjectById(int id);
 	const PlacedObject* GetObjectById(int id) const;
 
@@ -218372,6 +218461,7 @@ namespace YoRigine {
         switch (shapeType_) {
         case TrailShapeType::Arc: RebuildArc(); break;
         case TrailShapeType::Fan: RebuildFan(); break;
+        case TrailShapeType::Custom: RebuildCustom(); break;
         case TrailShapeType::Flat:
         default:                  RebuildFlat(); break;
         }
@@ -218387,25 +218477,61 @@ namespace YoRigine {
         const size_t n = points_.size();
         if (n < 2) return;
 
-        vertices_.reserve(n * 2);
+        // ★ エディターの値を反映（最低1以上にする）
+        const int subdivisions = std::max(1, param_.splineSubdivisions);
 
-        for (size_t i = 0; i < n; ++i)
+        std::vector<TrailPoint> smoothPoints;
+        smoothPoints.reserve((n - 1) * subdivisions + 1);
+
+        for (size_t i = 0; i < n - 1; ++i) {
+            const TrailPoint& p0 = points_[i == 0 ? 0 : i - 1];
+            const TrailPoint& p1 = points_[i];
+            const TrailPoint& p2 = points_[i + 1];
+            const TrailPoint& p3 = points_[i + 2 >= n ? n - 1 : i + 2];
+
+            int steps = (i == n - 2) ? subdivisions + 1 : subdivisions;
+            for (int j = 0; j < steps; ++j) {
+                float t = static_cast<float>(j) / static_cast<float>(subdivisions);
+
+                TrailPoint sp;
+                sp.tip = CatmullRomInterpolation(p0.tip, p1.tip, p2.tip, p3.tip, t);
+                sp.root = CatmullRomInterpolation(p0.root, p1.root, p2.root, p3.root, t);
+                sp.age = p1.age + (p2.age - p1.age) * t;
+                smoothPoints.push_back(sp);
+            }
+        }
+
+        const size_t smoothCount = smoothPoints.size();
+        vertices_.reserve(smoothCount * 2);
+
+        for (size_t i = 0; i < smoothCount; ++i)
         {
-            const TrailPoint& p = points_[i];
-            const float tY = static_cast<float>(i) / static_cast<float>(n - 1);
+            const TrailPoint& p = smoothPoints[i];
+            const float tY = static_cast<float>(i) / static_cast<float>(smoothCount - 1);
             const float normalizedAge = NormalizeAge(p.age);
             const Vector4 vColor = CalcFadeColor(normalizedAge);
             const float uvY = tY + time_ * param_.uvScrollSpeed;
 
+            float widthScale = 1.0f;
+            if (param_.crescentShape) {
+                widthScale = std::sin(normalizedAge * 3.14159265f);
+            }
+
+            Vector3 center = { (p.tip.x + p.root.x) * 0.5f, (p.tip.y + p.root.y) * 0.5f, (p.tip.z + p.root.z) * 0.5f };
+            Vector3 toTip = { p.tip.x - center.x, p.tip.y - center.y, p.tip.z - center.z };
+
+            Vector3 currentTip = { center.x + toTip.x * widthScale, center.y + toTip.y * widthScale, center.z + toTip.z * widthScale };
+            Vector3 currentRoot = { center.x - toTip.x * widthScale, center.y - toTip.y * widthScale, center.z - toTip.z * widthScale };
+
             ProceduralMeshVertex vTip;
-            vTip.position = p.tip;
+            vTip.position = currentTip;
             vTip.texcoord = { 0.f, uvY };
             vTip.color = vColor;
             vTip.age = normalizedAge;
             vertices_.push_back(vTip);
 
             ProceduralMeshVertex vRoot;
-            vRoot.position = p.root;
+            vRoot.position = currentRoot;
             vRoot.texcoord = { 1.f, uvY };
             vRoot.color = vColor;
             vRoot.age = normalizedAge;
@@ -218577,6 +218703,125 @@ namespace YoRigine {
         }
     }
 
+    void TrailMesh::RebuildCustom()
+    {
+        const auto& outline = param_.customVertices;
+        if (outline.size() < 3) return; // 3点未満は面を作れない
+
+        // 厚み（Z値の幅）
+        float halfThick = param_.thickness * 0.5f;
+        if (halfThick <= 0.001f) halfThick = 0.05f; // 最低限の厚み
+
+        // 1. Ear Clipping（耳切り法）による 2Dポリゴンの三角形分割
+        std::vector<int> indices;
+        std::vector<int> remainingList;
+        for (int i = 0; i < outline.size(); ++i) remainingList.push_back(i);
+
+        int safety = 1000;
+        while (remainingList.size() > 3 && safety-- > 0)
+        {
+            bool earFound = false;
+            for (size_t i = 0; i < remainingList.size(); ++i) {
+                int prev = remainingList[(i == 0) ? remainingList.size() - 1 : i - 1];
+                int curr = remainingList[i];
+                int next = remainingList[(i + 1) % remainingList.size()];
+
+                Vector2 a = outline[prev];
+                Vector2 b = outline[curr];
+                Vector2 c = outline[next];
+
+                // 外積で凸(Convex)か判定 (時計回り/反時計回りで符号が変わる)
+                float cross = (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x);
+                if (cross <= 0.0f) continue; // 凹んでいる部分はスキップ
+
+                // 他の点がこの三角形の中に含まれていないかチェック
+                bool isEar = true;
+                for (int idx : remainingList) {
+                    if (idx == prev || idx == curr || idx == next) continue;
+                    if (IsPointInTriangle(outline[idx], a, b, c)) {
+                        isEar = false;
+                        break;
+                    }
+                }
+
+                if (isEar) {
+                    indices.push_back(prev);
+                    indices.push_back(curr);
+                    indices.push_back(next);
+                    remainingList.erase(remainingList.begin() + i);
+                    earFound = true;
+                    break;
+                }
+            }
+            if (!earFound) break; // 複雑すぎる交差などがあれば強制終了
+        }
+        // 最後の3点
+        if (remainingList.size() == 3) {
+            indices.push_back(remainingList[0]);
+            indices.push_back(remainingList[1]);
+            indices.push_back(remainingList[2]);
+        }
+
+        // 2. 頂点を GPU 用のフォーマットに変換し、Z方向の厚みをつける
+        // ※今回は TriangleStrip ではなく、TriangleList として描画するため、
+        // 頂点配列にそのまま三角形をポンポン入れていきます（後でTopologyの変更が必要）
+        auto addTriangle = [&](const Vector3& p1, const Vector3& p2, const Vector3& p3, float uvX) {
+            ProceduralMeshVertex v;
+            v.color = { 1.f, 1.f, 1.f, 1.f };
+            v.age = 0.f;
+
+            v.position = p1; v.texcoord = { uvX, 0.f }; vertices_.push_back(v);
+            v.position = p2; v.texcoord = { uvX, 1.f }; vertices_.push_back(v);
+            v.position = p3; v.texcoord = { uvX, 0.5f }; vertices_.push_back(v);
+            };
+
+        // 表面 (+Z) と 裏面 (-Z)
+        for (size_t i = 0; i < indices.size(); i += 3) {
+            int i1 = indices[i], i2 = indices[i + 1], i3 = indices[i + 2];
+
+            // 表面
+            addTriangle(
+                { outline[i1].x, outline[i1].y, halfThick },
+                { outline[i2].x, outline[i2].y, halfThick },
+                { outline[i3].x, outline[i3].y, halfThick }, 0.0f
+            );
+            // 裏面 (カリングされないように頂点順を逆にする)
+            addTriangle(
+                { outline[i1].x, outline[i1].y, -halfThick },
+                { outline[i3].x, outline[i3].y, -halfThick },
+                { outline[i2].x, outline[i2].y, -halfThick }, 1.0f
+            );
+        }
+
+        // 側面 (フチの部分を四角形で繋ぐ)
+        for (size_t i = 0; i < outline.size(); ++i) {
+            int next = static_cast<int>((i + 1) % outline.size());
+            Vector3 p1_f = { outline[i].x, outline[i].y, halfThick };
+            Vector3 p2_f = { outline[next].x, outline[next].y, halfThick };
+            Vector3 p1_b = { outline[i].x, outline[i].y, -halfThick };
+            Vector3 p2_b = { outline[next].x, outline[next].y, -halfThick };
+
+            // 四角形は2つの三角形
+            addTriangle(p1_f, p2_f, p1_b, 0.5f);
+            addTriangle(p1_b, p2_f, p2_b, 0.5f);
+        }
+    }
+
+    bool TrailMesh::IsPointInTriangle(const Vector2& p, const Vector2& a, const Vector2& b, const Vector2& c) const
+    {
+        auto crossProduct = [](const Vector2& v1, const Vector2& v2) { return v1.x * v2.y - v1.y * v2.x; };
+        Vector2 ab = { b.x - a.x, b.y - a.y };
+        Vector2 bc = { c.x - b.x, c.y - b.y };
+        Vector2 ca = { a.x - c.x, a.y - c.y };
+        Vector2 ap = { p.x - a.x, p.y - a.y };
+        Vector2 bp = { p.x - b.x, p.y - b.y };
+        Vector2 cp = { p.x - c.x, p.y - c.y };
+        float c1 = crossProduct(ab, ap);
+        float c2 = crossProduct(bc, bp);
+        float c3 = crossProduct(ca, cp);
+        return ((c1 >= 0.0f && c2 >= 0.0f && c3 >= 0.0f) || (c1 <= 0.0f && c2 <= 0.0f && c3 <= 0.0f));
+    }
+
     // -----------------------------------------------------------
     void TrailMesh::Draw(ID3D12GraphicsCommandList* cmdList)
     {
@@ -218586,8 +218831,12 @@ namespace YoRigine {
         if (vertCount < 4) return; // 最低 2 ポイント = 4 頂点必要
 
         // PSO / ルートシグネチャ / CBV は呼び出し元でセット済みを前提
-
-        cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+        if (shapeType_ == TrailShapeType::Custom) {
+            cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        }
+        else {
+            cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+        }
         BindVertexBuffer(cmdList);
         cmdList->DrawInstanced(vertCount, 1, 0, 0);
     }
@@ -218706,6 +218955,11 @@ namespace YoRigine {
         /// Fan (扇形断面) 形状のストリップ生成
         void RebuildFan();
 
+        ///
+        void RebuildCustom();
+
+        bool IsPointInTriangle(const Vector2& p, const Vector2& a, const Vector2& b, const Vector2& c) const;
+
         /// age を [0,1] に正規化 (0=新しい端, 1=古い端)
         float NormalizeAge(float age) const
         {
@@ -218735,6 +218989,251 @@ namespace YoRigine {
 
         // 累積時間 (UV スクロール用)
         float time_ = 0.f;
+    };
+
+} // namespace YoRigine
+
+============================================================
+File Path: YEngine/Generators/Vfx/VfxMesh/TrailMeshEmitter.cpp
+============================================================
+#include "TrailMeshEmitter.h"
+
+#include "DirectXCommon.h"
+#include <PipelineManager/YPipelineManager.h>
+#include <Loaders/Texture/TextureManager.h>
+#include <SrvManager.h>
+
+namespace YoRigine {
+
+    namespace {
+        const std::string kFallbackWhite = "Resources/Textures/white.png";
+
+        // CBVの256バイトアライメント計算用
+        static constexpr size_t kCBVAlignment = 256;
+        template<typename T>
+        static constexpr size_t AlignedSize() {
+            return (sizeof(T) + kCBVAlignment - 1) & ~(kCBVAlignment - 1);
+        }
+    }
+
+    TrailMeshEmitter::~TrailMeshEmitter() {
+        if (trailCBMapped_ && trailCBResource_) {
+            trailCBResource_->Unmap(0, nullptr);
+            trailCBMapped_ = nullptr;
+        }
+    }
+
+    void TrailMeshEmitter::EnsureCB() {
+        if (trailCBResource_) return;
+
+        auto* dxCommon = YoRigine::DirectXCommon::GetInstance();
+        trailCBResource_ = dxCommon->CreateBufferResource(AlignedSize<MeshTrailParamsCB>());
+        trailCBResource_->Map(0, nullptr, reinterpret_cast<void**>(&trailCBMapped_));
+    }
+
+    void TrailMeshEmitter::UpdateCB() {
+        if (!trailCBMapped_) return;
+
+        const auto& t = asset_.trail;
+        trailCBMapped_->colorInner[0] = t.colorEnd.x;
+        trailCBMapped_->colorInner[1] = t.colorEnd.y;
+        trailCBMapped_->colorInner[2] = t.colorEnd.z;
+        trailCBMapped_->colorInner[3] = t.colorEnd.w;
+
+        trailCBMapped_->colorOuter[0] = t.colorStart.x;
+        trailCBMapped_->colorOuter[1] = t.colorStart.y;
+        trailCBMapped_->colorOuter[2] = t.colorStart.z;
+        trailCBMapped_->colorOuter[3] = t.colorStart.w;
+
+        trailCBMapped_->softness = 0.15f;
+        trailCBMapped_->glowPower = 1.5f;
+        trailCBMapped_->distortion = 0.0f;
+        trailCBMapped_->time = time_;
+    }
+
+    bool TrailMeshEmitter::LoadAsset(const std::string& filePath) {
+        if (!asset_.LoadFromJson(filePath)) return false;
+
+        if (!trailMesh_) trailMesh_ = std::make_unique<YoRigine::TrailMesh>();
+        trailMesh_->Initialize(asset_.trail);
+        trailMesh_->Clear();
+
+        // テクスチャロードの保証
+        auto* texMgr = TextureManager::GetInstance();
+        texMgr->LoadTexture(kFallbackWhite);
+
+        if (!asset_.trail.noiseTexturePath.empty()) {
+            texMgr->LoadTexture(asset_.trail.noiseTexturePath);
+        }
+        if (!asset_.trail.texturePath.empty()) {
+            texMgr->LoadTexture(asset_.trail.texturePath);
+        }
+
+        EnsureCB();
+        UpdateCB();
+
+        return true;
+    }
+
+    void TrailMeshEmitter::SetAsset(const YoRigine::VfxEffectAsset& asset) {
+        asset_ = asset;
+        if (trailMesh_) {
+            trailMesh_->ApplyParam(asset_.trail);
+        }
+        EnsureCB();
+        UpdateCB();
+    }
+
+    void TrailMeshEmitter::AddPoint(const Vector3& tip, const Vector3& root) {
+        if (!isPlaying_ || !trailMesh_) return;
+        trailMesh_->AddPoint(tip, root);
+    }
+
+    void TrailMeshEmitter::AddPoint(const Vector3& tip, const Vector3& root, const Vector3& widthDir) {
+        if (!isPlaying_ || !trailMesh_) return;
+        trailMesh_->AddPoint(tip, root, widthDir);
+    }
+
+    void TrailMeshEmitter::Update(float deltaTime) {
+        if (!isPlaying_ || !trailMesh_) return;
+        time_ += deltaTime;
+        trailMesh_->Update(deltaTime);
+        UpdateCB();
+    }
+
+    void TrailMeshEmitter::Draw() {
+        auto* cmd = YoRigine::DirectXCommon::GetInstance()->GetCommandList().Get();
+        Draw(cmd);
+    }
+
+    void TrailMeshEmitter::Draw(ID3D12GraphicsCommandList* cmdList) {
+        if (!isPlaying_ || !trailMesh_) return;
+        if (!camera_) return;
+        if (!trailCBResource_) return;
+
+        // ===== 重要：SRV DescriptorHeap を必ずセット =====
+        SrvManager::GetInstance()->PreDraw();
+
+        auto* pm = YPipelineManager::GetInstance();
+        const auto& idx = pm->GetParameterIndices("VfxMeshTrail");
+        auto* texMgr = TextureManager::GetInstance();
+
+        // SRVハンドル取得
+        D3D12_GPU_DESCRIPTOR_HANDLE hNoise =
+            (!asset_.trail.noiseTexturePath.empty())
+            ? texMgr->GetsrvHandleGPU(asset_.trail.noiseTexturePath)
+            : texMgr->GetsrvHandleGPU(kFallbackWhite);
+
+        D3D12_GPU_DESCRIPTOR_HANDLE hRamp =
+            (!asset_.trail.texturePath.empty())
+            ? texMgr->GetsrvHandleGPU(asset_.trail.texturePath)
+            : texMgr->GetsrvHandleGPU(kFallbackWhite);
+
+        // PSO / RootSignature / RootParams
+        cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshTrail"));
+        cmdList->SetPipelineState(pm->GetBlendModePSO("VfxMeshTrail", asset_.trail.blendMode));
+
+        cmdList->SetGraphicsRootConstantBufferView(
+            idx.at("gCamera"),
+            camera_->GetCameraResource()->GetGPUVirtualAddress()
+        );
+        cmdList->SetGraphicsRootConstantBufferView(
+            idx.at("gMeshParam"),
+            trailCBResource_->GetGPUVirtualAddress()
+        );
+        cmdList->SetGraphicsRootDescriptorTable(idx.at("gTexNoise"), hNoise); // t0
+        cmdList->SetGraphicsRootDescriptorTable(idx.at("gTexRamp"), hRamp);   // t1
+
+        // 描画
+        trailMesh_->Draw(cmdList);
+    }
+
+    void TrailMeshEmitter::Play() {
+        isPlaying_ = true;
+        time_ = 0.0f;
+        if (trailMesh_) trailMesh_->Clear();
+    }
+
+    void TrailMeshEmitter::Stop() {
+        isPlaying_ = false;
+        if (trailMesh_) trailMesh_->Clear();
+    }
+
+} // namespace YoRigine
+
+============================================================
+File Path: YEngine/Generators/Vfx/VfxMesh/TrailMeshEmitter.h
+============================================================
+#pragma once
+#include <memory>
+#include <string>
+#include <wrl.h>
+#include <d3d12.h>
+
+#include "VfxEffectAsset.h"
+#include "TrailMesh.h"
+#include "Systems/Camera/Camera.h"
+
+namespace YoRigine {
+
+    // Emitterが自前で管理する定数バッファの構造体
+    struct MeshTrailParamsCB
+    {
+        float colorInner[4];
+        float colorOuter[4];
+        float softness;
+        float glowPower;
+        float distortion;
+        float time;
+    };
+
+    class TrailMeshEmitter
+    {
+    public:
+        TrailMeshEmitter() = default;
+        ~TrailMeshEmitter();
+
+        // アセットのロードと反映
+        bool LoadAsset(const std::string& filePath);
+
+        // Editorからのリアルタイム反映用
+        void SetAsset(const YoRigine::VfxEffectAsset& asset);
+
+        // ポイント追加
+        void AddPoint(const Vector3& tip, const Vector3& root);
+        void AddPoint(const Vector3& tip, const Vector3& root, const Vector3& widthDir);
+
+        void Update(float deltaTime);
+
+        // Draw を完結させる：呼び出し側は cmdList を渡さなくて良い
+        void Draw();
+        // 既存互換
+        void Draw(ID3D12GraphicsCommandList* cmdList);
+
+        // 再生・停止
+        void Play();
+        void Stop();
+
+    public:
+        YoRigine::TrailMesh* GetTrailMesh() const { return trailMesh_.get(); }
+        const YoRigine::VfxEffectAsset& GetAsset() const { return asset_; }
+        void SetCamera(Camera* camera) { camera_ = camera; }
+
+    private:
+        void EnsureCB();
+        void UpdateCB();
+
+    private:
+        YoRigine::VfxEffectAsset asset_;
+        std::unique_ptr<YoRigine::TrailMesh> trailMesh_;
+        bool isPlaying_ = false;
+
+        Camera* camera_ = nullptr;
+        float time_ = 0.0f; // シェーダーに渡す時間
+
+        // 定数バッファ
+        Microsoft::WRL::ComPtr<ID3D12Resource> trailCBResource_;
+        MeshTrailParamsCB* trailCBMapped_ = nullptr;
     };
 
 } // namespace YoRigine
@@ -218774,6 +219273,12 @@ namespace YoRigine {
         t["uvScrollSpeed"] = trail.uvScrollSpeed;
         t["texturePath"] = trail.texturePath;
         t["noiseTexturePath"] = trail.noiseTexturePath;
+		t["shapeType"] = static_cast<int>(trail.shapeType);
+		t["widthSegments"] = trail.widthSegments;
+        for (const auto& v : trail.customVertices) {
+            t["trail"]["customVertices"].push_back({ v.x, v.y });
+        }
+		t["splineSubdivisions"] = trail.splineSubdivisions;
 
         // --- LightVolume ---
         auto& lv = j["lightVolume"];
@@ -218813,6 +219318,15 @@ namespace YoRigine {
             trail.blendMode = static_cast<BlendMode>(t.value("blendMode", static_cast<int>(trail.blendMode)));
             if (t.contains("colorStart")) trail.colorStart = JsonToVector4(t["colorStart"]);
             if (t.contains("colorEnd"))   trail.colorEnd = JsonToVector4(t["colorEnd"]);
+			trail.shapeType = static_cast<TrailShapeType>(t.value("shapeType", static_cast<int>(trail.shapeType)));
+            trail.widthSegments = t.value("widthSegments", trail.widthSegments);
+            if (t["trail"].contains("customVertices")) {
+                trail.customVertices.clear();
+                for (const auto& v : t["trail"]["customVertices"]) {
+                    trail.customVertices.push_back({ v[0].get<float>(), v[1].get<float>() });
+                }
+            }
+			trail.splineSubdivisions = t.value("splineSubdivisions", trail.splineSubdivisions);
         }
         if (j.contains("lightVolume")) {
             auto& lv = j["lightVolume"];
@@ -218851,28 +219365,34 @@ namespace YoRigine {
         Flat = 0,  // 従来の平板 (tip-root 2点)
         Arc = 1,   // 円弧断面 (widthSegments 分割)
         Fan = 2,   // 扇形断面 (tip を中心に root 側を広げる)
+        Custom = 3,
     };
 
 
     struct TrailEffectParam
     {
-        float widthStart = 0.3f;  // 根元の幅
-        float widthEnd = 0.0f;  // 先端の幅
-        float lifetime = 0.5f;  // トレイル1点の寿命(秒)
-        int   maxPoints = 32;    // 最大保持ポイント数
+        float widthStart = 0.3f;    // 根元の幅
+        float widthEnd = 0.0f;      // 先端の幅
+        float lifetime = 0.5f;      // トレイル1点の寿命(秒)
+        int   maxPoints = 512;      // 最大保持ポイント数
 
-        Vector4 colorStart = { 1.f, 0.8f, 0.f, 1.f }; // 根元カラー(RGBA)
-        Vector4 colorEnd = { 1.f, 0.3f, 0.f, 0.f }; // 先端カラー(RGBA)
+        Vector4 colorStart = { 1.f, 0.8f, 0.f, 1.f };   // 根元カラー(RGBA)
+        Vector4 colorEnd = { 1.f, 0.3f, 0.f, 0.f };     // 先端カラー(RGBA)
 
         BlendMode blendMode = BlendMode::kBlendModeAdd; // ブレンドモード
 
-        float uvScrollSpeed = 0.5f;  // UV スクロール速度
-        std::string texturePath = ""; // テクスチャパス (空なら白)
-        std::string noiseTexturePath = ""; // 歪みノイズ
+        float uvScrollSpeed = 0.5f;         // UV スクロール速度
+        std::string texturePath = "";       // テクスチャパス (空なら白)
+        std::string noiseTexturePath = "";  // 歪みノイズ
 
         TrailShapeType shapeType = TrailShapeType::Flat;
         int widthSegments = 1;
         float arcAngleDeg = 120.0f;
+
+        bool  crescentShape = true;  // 三日月型（中間を太く、両端を細くする）
+        float thickness = 0.1f;      // 厚み（立体感）
+        std::vector<Vector2> customVertices;
+		int splineSubdivisions = 4; // Custom 形状のスプライン補間数
     };
 
     // -------------------------------------------------------
@@ -218910,6 +219430,7 @@ File Path: YEngine/Generators/Vfx/VfxMesh/VfxMeshEditor.cpp
 // ===========================================================
 // VfxMeshEditor.cpp
 // ===========================================================
+#ifdef USE_IMGUI
 #include "VfxMeshEditor.h"
 #include "DirectXCommon.h"
 #include <PipelineManager/YPipelineManager.h>
@@ -218920,6 +219441,7 @@ File Path: YEngine/Generators/Vfx/VfxMesh/VfxMeshEditor.cpp
 #include <cmath>
 #include "Debugger/Logger.h"
 #include <Loaders/Texture/TextureManager.h>
+#include <Editor/Icon/EditorIcon.h>
 
 namespace fs = std::filesystem;
 
@@ -218931,12 +219453,6 @@ static constexpr size_t AlignedSize() {
 
 namespace YoRigine {
 
-    // ===========================================================
-    // コンストラクタ
-    // YParticleSystem と同じパターン:
-    //   コンストラクタ本体で FileBrowser を構築し
-    //   ThumbnailProvider と OnFileSelected を設定する
-    // ===========================================================
     VfxMeshEditor::VfxMeshEditor()
     {
         // ---- ランプテクスチャ用 (t1: gTexRamp) ----
@@ -218982,31 +219498,24 @@ namespace YoRigine {
             });
     }
 
-    // ===========================================================
-    // シングルトン
-    // ===========================================================
     VfxMeshEditor* VfxMeshEditor::GetInstance()
     {
         static VfxMeshEditor instance;
         return &instance;
     }
 
-    // ===========================================================
-    // 初期化 / 終了
-    // ===========================================================
     void VfxMeshEditor::Initialize(const std::string& scanRoot)
     {
         dxCommon_ = DirectXCommon::GetInstance();
         scanRoot_ = scanRoot;
 
-        previewTrail_ = std::make_unique<TrailMesh>();
+        // ★ Trail用のプレビューはEmitterに委譲
+        previewTrailEmitter_ = std::make_unique<TrailMeshEmitter>();
         previewVolume_ = std::make_unique<LightVolumeMesh>();
-        InitCBVs();
 
-        // Resources/Vfx/ 以下をスキャンしてエフェクト一覧を構築
+        InitCBVs();
         ScanDirectory(scanRoot_);
 
-        // エントリがあれば先頭を選択
         if (!entries_.empty()) {
             SelectEffect(0);
         }
@@ -219014,15 +219523,14 @@ namespace YoRigine {
 
     void VfxMeshEditor::Finalize()
     {
-        if (trailCBMapped_ && trailCBResource_) { trailCBResource_->Unmap(0, nullptr);  trailCBMapped_ = nullptr; }
-        if (volumeCBMapped_ && volumeCBResource_) { volumeCBResource_->Unmap(0, nullptr); volumeCBMapped_ = nullptr; }
+        if (volumeCBMapped_ && volumeCBResource_) {
+            volumeCBResource_->Unmap(0, nullptr);
+            volumeCBMapped_ = nullptr;
+        }
         entries_.clear();
         selectedIndex_ = -1;
     }
 
-    // ===========================================================
-    // ディレクトリスキャン
-    // ===========================================================
     void VfxMeshEditor::ScanDirectory(const std::string& dir)
     {
         entries_.clear();
@@ -219044,13 +219552,9 @@ namespace YoRigine {
                 Logger("VfxMeshEditor: ロード -> " + entries_.back().filePath);
             }
         }
-
         Logger("VfxMeshEditor: " + std::to_string(entries_.size()) + " エフェクトをロードしました");
     }
 
-    // ===========================================================
-    // エフェクト選択
-    // ===========================================================
     void VfxMeshEditor::SelectEffect(int index)
     {
         if (index < 0 || index >= static_cast<int>(entries_.size())) return;
@@ -219058,16 +219562,22 @@ namespace YoRigine {
         selectedIndex_ = index;
         history_.Clear();
 
-        // プレビューメッシュをリセット
-        previewTrail_->Clear();
         previewTimer_ = 0.f;
         previewPlaying_ = false;
+
+        // ★ Emitter に現在のアセットを反映させる
+        if (previewTrailEmitter_) {
+            previewTrailEmitter_->Stop();
+            previewTrailEmitter_->SetCamera(camera_);
+            previewTrailEmitter_->LoadAsset(entries_[selectedIndex_].filePath);
+            previewTrailEmitter_->SetAsset(entries_[selectedIndex_].asset); // 最新状態を同期
+        }
+
+        previewTrailEmitter_->Play();
+
         RebuildPreviewMeshes();
     }
 
-    // ===========================================================
-    // 毎フレーム
-    // ===========================================================
     void VfxMeshEditor::Update(float deltaTime)
     {
         auto* sel = Selected();
@@ -219076,21 +219586,51 @@ namespace YoRigine {
         previewTimer_ += deltaTime;
         const auto& asset = sel->asset;
 
-        if (asset.useTrail) {
-            previewTrail_->ApplyParam(asset.trail);
+        // ★ Emitterを使って頂点を更新
+        if (asset.useTrail && previewTrailEmitter_) {
+            Vector3 tip = previewCenter_;
+            Vector3 root = previewCenter_;
+            Vector3 widthDir = { 0.f, 1.f, 0.f };
 
-            const float period = std::max(asset.trail.lifetime * 2.f, 0.2f);
+            const float period = std::max(asset.trail.lifetime * 1.5f, 0.5f);
             const float t = std::fmod(previewTimer_, period) / period;
-            const float swing = std::sin(t * 3.14159f * 2.f);
 
-            const Vector3 tip = { previewCenter_.x + swing * 0.5f,
-                                    previewCenter_.y + 1.0f,
-                                    previewCenter_.z };
-            const Vector3 root = { previewCenter_.x + swing * 0.5f,
-                                    previewCenter_.y - 1.0f,
-                                    previewCenter_.z };
-            previewTrail_->AddPoint(tip, root);
-            previewTrail_->Update(deltaTime);
+            switch (previewAnim_) {
+            case PreviewAnimMode::Wobble: {
+                const float swing = std::sin(t * 3.14159f * 2.f);
+                tip = { previewCenter_.x + swing * 0.5f, previewCenter_.y + swordLength_ * 0.5f, previewCenter_.z };
+                root = { previewCenter_.x + swing * 0.5f, previewCenter_.y - swordLength_ * 0.5f, previewCenter_.z };
+                widthDir = { 1.f, 0.f, 0.f };
+                break;
+            }
+            case PreviewAnimMode::SlashHorizontal: {
+                const float easeT = std::pow(t, 0.3f);
+                const float angle = -3.14159f + easeT * 3.14159f * 1.5f;
+                tip = { previewCenter_.x + std::cos(angle) * swordLength_, previewCenter_.y, previewCenter_.z + std::sin(angle) * swordLength_ };
+                root = previewCenter_;
+                widthDir = { 0.f, 1.f, 0.f };
+                break;
+            }
+            case PreviewAnimMode::SlashVertical: {
+                const float easeT = std::pow(t, 0.3f);
+                const float angle = 3.14159f * 0.8f - easeT * 3.14159f * 1.6f;
+                tip = { previewCenter_.x, previewCenter_.y + std::sin(angle) * swordLength_, previewCenter_.z + std::cos(angle) * swordLength_ };
+                root = previewCenter_;
+                widthDir = { 1.f, 0.f, 0.f };
+                break;
+            }
+            case PreviewAnimMode::Spin: {
+                const float angle = t * 3.14159f * 2.f;
+                tip = { previewCenter_.x + std::cos(angle) * swordLength_, previewCenter_.y, previewCenter_.z + std::sin(angle) * swordLength_ };
+                root = previewCenter_;
+                widthDir = { 0.f, 1.f, 0.f };
+                break;
+            }
+            }
+
+            // ★ Emitterに点を追加（widthDirも渡す）
+            previewTrailEmitter_->AddPoint(tip, root, widthDir);
+            previewTrailEmitter_->Update(deltaTime);
         }
 
         if (asset.useLightVolume) {
@@ -219101,61 +219641,37 @@ namespace YoRigine {
     }
 
     // ===========================================================
-    // DrawPreview
+    // ★ 描画（cmdListを受け取らず、Emitter側のDrawを呼ぶ）
     // ===========================================================
-    void VfxMeshEditor::DrawPreview(ID3D12GraphicsCommandList* cmdList,
-        D3D12_GPU_VIRTUAL_ADDRESS  cameraGPUAddress)
+    void VfxMeshEditor::DrawPreview()
     {
         auto* sel = Selected();
         if (!sel || !previewPlaying_) return;
 
         const auto& asset = sel->asset;
-        auto* pm = YPipelineManager::GetInstance();
 
-        if (asset.useTrail) {
-            const auto& idx = pm->GetParameterIndices("VfxMeshTrail");
-            UpdateTrailCBV(previewTimer_);
-
-            auto* texMgr = TextureManager::GetInstance();
-
-            // t0: gTexNoise — noiseTexturePath が空ならホワイトテクスチャでフォールバック
-            D3D12_GPU_DESCRIPTOR_HANDLE hNoise =
-                (!asset.trail.noiseTexturePath.empty())
-                ? texMgr->GetsrvHandleGPU(asset.trail.noiseTexturePath)
-                : texMgr->GetsrvHandleGPU("Resources/Textures/white1x1.png");
-
-            // t1: gTexRamp — texturePath が空なら同様にフォールバック
-            D3D12_GPU_DESCRIPTOR_HANDLE hRamp =
-                (!asset.trail.texturePath.empty())
-                ? texMgr->GetsrvHandleGPU(asset.trail.texturePath)
-                : texMgr->GetsrvHandleGPU("Resources/Textures/white1x1.png");
-
-            cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshTrail"));
-            cmdList->SetPipelineState(pm->GetBlendModePSO("VfxMeshTrail", asset.trail.blendMode));
-            cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"), cameraGPUAddress);
-            cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), trailCBResource_->GetGPUVirtualAddress());
-            cmdList->SetGraphicsRootDescriptorTable(idx.at("gTexNoise"), hNoise); // t0
-            cmdList->SetGraphicsRootDescriptorTable(idx.at("gTexRamp"), hRamp);  // t1
-
-            previewTrail_->Draw(cmdList);
+        // ★ Trail は Emitter 内で完結して描画される
+        if (asset.useTrail && previewTrailEmitter_) {
+            previewTrailEmitter_->SetCamera(camera_);
+            previewTrailEmitter_->Draw();
         }
 
-        if (asset.useLightVolume) {
+        // Volume は従来通り
+        if (asset.useLightVolume && camera_) {
+            auto* pm = YPipelineManager::GetInstance();
             const auto& idx = pm->GetParameterIndices("VfxMeshVolume");
             UpdateVolumeCBV(previewTimer_);
 
+            auto* cmdList = DirectXCommon::GetInstance()->GetCommandList().Get();
             cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshVolume"));
             cmdList->SetPipelineState(pm->GetPipeLineStateObject("VfxMeshVolume"));
-            cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"), cameraGPUAddress);
+            cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"), camera_->GetCameraResource()->GetGPUVirtualAddress());
             cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), volumeCBResource_->GetGPUVirtualAddress());
 
             previewVolume_->Draw(cmdList);
         }
     }
 
-    // ===========================================================
-    // ImGui メインウィンドウ
-    // ===========================================================
     void VfxMeshEditor::DrawImGui()
     {
         history_.HandleKeyInput();
@@ -219163,15 +219679,12 @@ namespace YoRigine {
         ImGui::SetNextWindowSize(ImVec2(760, 680), ImGuiCond_FirstUseEver);
         if (!ImGui::Begin("VFX Mesh Editor")) { ImGui::End(); return; }
 
-        // 左右分割レイアウト
-        // 左: エフェクト一覧 (幅 200px 固定)
         ImGui::BeginChild("##list", ImVec2(200, 0), true);
         DrawListPanel();
         ImGui::EndChild();
 
         ImGui::SameLine();
 
-        // 右: パラメータ編集 + プレビュー
         ImGui::BeginChild("##edit", ImVec2(0, 0), true);
         DrawEditPanel();
         ImGui::EndChild();
@@ -219181,21 +219694,15 @@ namespace YoRigine {
         ImGui::End();
     }
 
-    // ===========================================================
-    // 左パネル: エフェクト一覧
-    // ===========================================================
     void VfxMeshEditor::DrawListPanel()
     {
-        // ヘッダー + 新規作成ボタン
         ImGui::TextDisabled("エフェクト一覧");
         ImGui::SameLine();
         if (ImGui::SmallButton("+")) { showNewDialog_ = true; }
         ImGui::SameLine();
-        // 再スキャンボタン
         if (ImGui::SmallButton("R")) {
             int prevSel = selectedIndex_;
             ScanDirectory(scanRoot_);
-            // 再スキャン後に選択を復元 (同じパスが残っていれば)
             selectedIndex_ = -1;
             if (prevSel >= 0 && prevSel < static_cast<int>(entries_.size())) {
                 SelectEffect(prevSel);
@@ -219208,21 +219715,17 @@ namespace YoRigine {
 
         ImGui::Separator();
 
-        // エフェクト一覧
         for (int i = 0; i < static_cast<int>(entries_.size()); ++i) {
             const auto& e = entries_[i];
 
-            // dirty マークを名前に付加
             std::string label = e.asset.name;
             if (e.isDirty) label += " *";
 
             bool selected = (selectedIndex_ == i);
-            if (ImGui::Selectable(label.c_str(), selected,
-                ImGuiSelectableFlags_AllowDoubleClick)) {
+            if (ImGui::Selectable(label.c_str(), selected, ImGuiSelectableFlags_AllowDoubleClick)) {
                 SelectEffect(i);
             }
 
-            // 右クリックコンテキストメニュー
             if (ImGui::BeginPopupContextItem()) {
                 if (ImGui::MenuItem("保存")) {
                     selectedIndex_ = i;
@@ -219232,12 +219735,11 @@ namespace YoRigine {
                     selectedIndex_ = i;
                     DeleteCurrent();
                     ImGui::EndPopup();
-                    break; // entries_ が変わったのでループを抜ける
+                    break;
                 }
                 ImGui::EndPopup();
             }
 
-            // ツールチップにファイルパスを表示
             if (ImGui::IsItemHovered()) {
                 ImGui::SetTooltip("%s", e.filePath.c_str());
             }
@@ -219248,9 +219750,6 @@ namespace YoRigine {
         }
     }
 
-    // ===========================================================
-    // 右パネル: パラメータ編集
-    // ===========================================================
     void VfxMeshEditor::DrawEditPanel()
     {
         auto* sel = Selected();
@@ -219260,7 +219759,6 @@ namespace YoRigine {
         }
         auto& asset = sel->asset;
 
-        // ---- ツールバー ----
         history_.DrawImGui();
         ImGui::SameLine();
         if (ImGui::Button("保存")) SaveCurrent();
@@ -219270,23 +219768,19 @@ namespace YoRigine {
         }
         ImGui::Separator();
 
-        // ---- ファイルパス (表示のみ) ----
         ImGui::TextDisabled("Path: %s", sel->filePath.c_str());
         ImGui::Separator();
 
-        // ---- エフェクト名 ----
         strncpy_s(nameBuffer_, asset.name.c_str(), sizeof(nameBuffer_));
         ImGui::SetNextItemWidth(-1);
         VfxEffectAsset before = asset;
-        if (ImGui::InputText("##effectname", nameBuffer_, sizeof(nameBuffer_),
-            ImGuiInputTextFlags_EnterReturnsTrue)) {
+        if (ImGui::InputText("##effectname", nameBuffer_, sizeof(nameBuffer_), ImGuiInputTextFlags_EnterReturnsTrue)) {
             asset.name = nameBuffer_;
             CommitChange(before, "名前変更");
         }
         ImGui::SameLine(0, 4); ImGui::TextDisabled("名前");
         ImGui::Separator();
 
-        // ---- Trail ----
         {
             VfxEffectAsset b = asset;
             ImGui::PushID("UseTrail");
@@ -219302,7 +219796,6 @@ namespace YoRigine {
         }
         ImGui::Separator();
 
-        // ---- LightVolume ----
         {
             VfxEffectAsset b = asset;
             ImGui::PushID("UseLightVolume");
@@ -219321,9 +219814,6 @@ namespace YoRigine {
         DrawPreviewSection();
     }
 
-    // ===========================================================
-    // Trail パラメータ編集
-    // ===========================================================
     void VfxMeshEditor::DrawTrailSection()
     {
         auto* sel = Selected();
@@ -219335,7 +219825,7 @@ namespace YoRigine {
             VfxEffectAsset b = sel->asset;
             bool c = false;
 
-            const char* shapeNames[] = { "Flat (平板)", "Arc (円弧)", "Fan (扇形)" };
+            const char* shapeNames[] = { "Flat (平板)", "Arc (円弧)", "Fan (扇形)" ,"Custom (カスタム)" };
             int shapeIdx = static_cast<int>(t.shapeType);
             ImGui::SetNextItemWidth(-1);
             if (ImGui::Combo("##shape", &shapeIdx, shapeNames, IM_ARRAYSIZE(shapeNames))) {
@@ -219344,13 +219834,112 @@ namespace YoRigine {
             }
             ImGui::SameLine(0, 4); ImGui::TextDisabled("断面形状");
 
-            // Flat 以外のときだけ分割数と角度を表示
             if (t.shapeType != TrailShapeType::Flat) {
                 c |= ImGui::SliderInt("幅の分割数##wseg", &t.widthSegments, 1, 16);
                 c |= ImGui::SliderFloat("円弧の角度(度)##arcang", &t.arcAngleDeg, 10.f, 360.f, "%.1f");
             }
+            c |= ImGui::DragInt("滑らかさ(補間分割数)##spline", &t.splineSubdivisions, 1, 512);
 
             if (c) CommitChange(b, "Trail 形状設定");
+        }
+
+        ImGui::SeparatorText("立体感・三日月化");
+        {
+            VfxEffectAsset b = sel->asset;
+            bool c = false;
+            c |= ImGui::Checkbox("三日月カーブにする##crescent", &t.crescentShape);
+            c |= ImGui::SliderFloat("厚み (Thickness)##thick", &t.thickness, 0.0f, 2.0f, "%.3f");
+            if (c) CommitChange(b, "Trail 形状モディファイア");
+        }
+
+        ImGui::SeparatorText("カスタムメッシュ形状エディター");
+        if (sel) {
+            VfxEffectAsset b = sel->asset;
+            bool changed = false;
+
+            if (ImGui::Button("頂点をすべてクリア")) {
+                t.customVertices.clear();
+                changed = true;
+            }
+            ImGui::SameLine();
+            ImGui::TextDisabled("左クリック: 追加/移動 | 右クリック: 削除");
+
+            ImVec2 canvas_p0 = ImGui::GetCursorScreenPos();
+            ImVec2 canvas_sz = ImVec2(ImGui::GetContentRegionAvail().x, 300.0f);
+            ImVec2 canvas_p1 = ImVec2(canvas_p0.x + canvas_sz.x, canvas_p0.y + canvas_sz.y);
+
+            ImDrawList* draw_list = ImGui::GetWindowDrawList();
+            draw_list->AddRectFilled(canvas_p0, canvas_p1, IM_COL32(30, 30, 30, 255));
+            draw_list->AddRect(canvas_p0, canvas_p1, IM_COL32(100, 100, 100, 255));
+
+            ImGui::InvisibleButton("canvas", canvas_sz, ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
+            const bool is_hovered = ImGui::IsItemHovered();
+            const bool is_active = ImGui::IsItemActive();
+            const ImVec2 mouse_pos_in_canvas = ImVec2(ImGui::GetIO().MousePos.x - canvas_p0.x, ImGui::GetIO().MousePos.y - canvas_p0.y);
+
+            ImVec2 origin(canvas_p0.x + canvas_sz.x * 0.5f, canvas_p0.y + canvas_sz.y * 0.5f);
+            const float zoom = 50.0f;
+            static int dragging_idx = -1;
+
+            if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                dragging_idx = -1;
+                for (int i = 0; i < t.customVertices.size(); ++i) {
+                    ImVec2 p(origin.x + t.customVertices[i].x * zoom, origin.y - t.customVertices[i].y * zoom);
+                    float dx = ImGui::GetIO().MousePos.x - p.x;
+                    float dy = ImGui::GetIO().MousePos.y - p.y;
+                    if (dx * dx + dy * dy < 100.0f) {
+                        dragging_idx = i;
+                        break;
+                    }
+                }
+                if (dragging_idx == -1) {
+                    t.customVertices.push_back({ (mouse_pos_in_canvas.x - canvas_sz.x * 0.5f) / zoom,
+                                                -(mouse_pos_in_canvas.y - canvas_sz.y * 0.5f) / zoom });
+                    dragging_idx = static_cast<int>(t.customVertices.size()) - 1;
+                    changed = true;
+                }
+            }
+
+            if (is_active && ImGui::IsMouseDragging(ImGuiMouseButton_Left) && dragging_idx >= 0) {
+                t.customVertices[dragging_idx].x += ImGui::GetIO().MouseDelta.x / zoom;
+                t.customVertices[dragging_idx].y -= ImGui::GetIO().MouseDelta.y / zoom;
+                changed = true;
+            }
+            else if (!is_active) {
+                dragging_idx = -1;
+            }
+
+            if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+                for (int i = 0; i < t.customVertices.size(); ++i) {
+                    ImVec2 p(origin.x + t.customVertices[i].x * zoom, origin.y - t.customVertices[i].y * zoom);
+                    float dx = ImGui::GetIO().MousePos.x - p.x;
+                    float dy = ImGui::GetIO().MousePos.y - p.y;
+                    if (dx * dx + dy * dy < 100.0f) {
+                        t.customVertices.erase(t.customVertices.begin() + i);
+                        changed = true;
+                        break;
+                    }
+                }
+            }
+
+            draw_list->AddLine(ImVec2(origin.x, canvas_p0.y), ImVec2(origin.x, canvas_p1.y), IM_COL32(100, 100, 100, 150));
+            draw_list->AddLine(ImVec2(canvas_p0.x, origin.y), ImVec2(canvas_p1.x, origin.y), IM_COL32(100, 100, 100, 150));
+
+            if (t.customVertices.size() >= 2) {
+                for (int i = 0; i < t.customVertices.size(); ++i) {
+                    int next_i = (i + 1) % t.customVertices.size();
+                    ImVec2 p1(origin.x + t.customVertices[i].x * zoom, origin.y - t.customVertices[i].y * zoom);
+                    ImVec2 p2(origin.x + t.customVertices[next_i].x * zoom, origin.y - t.customVertices[next_i].y * zoom);
+                    draw_list->AddLine(p1, p2, IM_COL32(0, 255, 255, 255), 2.0f);
+                }
+            }
+
+            for (int i = 0; i < t.customVertices.size(); ++i) {
+                ImVec2 p(origin.x + t.customVertices[i].x * zoom, origin.y - t.customVertices[i].y * zoom);
+                draw_list->AddCircleFilled(p, 5.0f, (i == dragging_idx) ? IM_COL32(255, 0, 0, 255) : IM_COL32(255, 255, 0, 255));
+            }
+
+            if (changed) CommitChange(b, "カスタムメッシュ編集");
         }
 
         ImGui::SeparatorText("幅");
@@ -219367,7 +219956,7 @@ namespace YoRigine {
             VfxEffectAsset b = sel->asset;
             bool c = false;
             c |= ImGui::SliderFloat("寿命 (秒)##lt", &t.lifetime, 0.05f, 5.f, "%.2f");
-            c |= ImGui::SliderInt("最大ポイント##mp", &t.maxPoints, 4, 128);
+            c |= ImGui::SliderInt("最大ポイント##mp", &t.maxPoints, 4, 512);
             if (c) CommitChange(b, "Trail 寿命");
         }
 
@@ -219401,7 +219990,6 @@ namespace YoRigine {
 
         ImGui::SeparatorText("テクスチャ");
         {
-            // ---------- ランプテクスチャ (t1: gTexRamp) ----------
             ImGui::TextDisabled("ランプ (t1)");
             ImGui::SameLine(80);
             ImGui::TextDisabled("%s", t.texturePath.empty() ? "(未設定)" : t.texturePath.c_str());
@@ -219419,7 +220007,6 @@ namespace YoRigine {
 
             ImGui::Spacing();
 
-            // ---------- ノイズテクスチャ (t0: gTexNoise) ----------
             ImGui::TextDisabled("ノイズ (t0)");
             ImGui::SameLine(80);
             ImGui::TextDisabled("%s", t.noiseTexturePath.empty() ? "(未設定)" : t.noiseTexturePath.c_str());
@@ -219443,23 +220030,15 @@ namespace YoRigine {
         if (showTrailDebug_) ImGui::TextColored(ImVec4(1, 1, 0, 1), "  > デバッグオーバーレイ ON");
     }
 
-    // ===========================================================
-    // テクスチャ選択ポップアップ
-    // YParticleSystem::ShowEditor と同じ構造:
-    //   showXxxPopup_ が true のとき OpenPopup → BeginPopupModal → Draw
-    // ===========================================================
     void VfxMeshEditor::DrawTextureSelectPopup()
     {
-        // ---- ランプテクスチャ (t1: gTexRamp) ----
         if (showRampPopup_) ImGui::OpenPopup("##RampTexSelect");
 
         ImGui::SetNextWindowSize(ImVec2(500, 420), ImGuiCond_Appearing);
-        if (ImGui::BeginPopupModal("##RampTexSelect", &showRampPopup_,
-            ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize))
+        if (ImGui::BeginPopupModal("##RampTexSelect", &showRampPopup_, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize))
         {
             ImGui::Text("ランプテクスチャを選択 (t1: gTexRamp)");
             ImGui::Separator();
-            // Grid モードで表示 — クリックでコールバックが発火し自動クローズ
             rampBrowser_.Draw("##RampBrowserChild", ImVec2(0, 340));
             ImGui::Separator();
             if (ImGui::Button("キャンセル", ImVec2(-1, 0))) {
@@ -219469,12 +220048,10 @@ namespace YoRigine {
             ImGui::EndPopup();
         }
 
-        // ---- ノイズテクスチャ (t0: gTexNoise) ----
         if (showNoisePopup_) ImGui::OpenPopup("##NoiseTexSelect");
 
         ImGui::SetNextWindowSize(ImVec2(500, 420), ImGuiCond_Appearing);
-        if (ImGui::BeginPopupModal("##NoiseTexSelect", &showNoisePopup_,
-            ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize))
+        if (ImGui::BeginPopupModal("##NoiseTexSelect", &showNoisePopup_, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize))
         {
             ImGui::Text("ノイズテクスチャを選択 (t0: gTexNoise)");
             ImGui::Separator();
@@ -219488,9 +220065,6 @@ namespace YoRigine {
         }
     }
 
-    // ===========================================================
-    // LightVolume パラメータ編集
-    // ===========================================================
     void VfxMeshEditor::DrawLightVolumeSection()
     {
         auto* sel = Selected();
@@ -219525,30 +220099,40 @@ namespace YoRigine {
         if (showVolumeDebug_) ImGui::TextColored(ImVec4(1, 1, 0, 1), "  > OBB ワイヤーフレーム ON");
     }
 
-    // ===========================================================
-    // プレビューセクション
-    // ===========================================================
     void VfxMeshEditor::DrawPreviewSection()
     {
         ImGui::SeparatorText("プレビュー");
+        const char* animNames[] = { "Wobble (往復)", "Slash (横なぎ)", "Slash (縦斬り)", "Spin (回転)" };
+        int animIdx = static_cast<int>(previewAnim_);
+        ImGui::SetNextItemWidth(150);
+        if (ImGui::Combo("軌道アニメ", &animIdx, animNames, IM_ARRAYSIZE(animNames))) {
+            previewAnim_ = static_cast<PreviewAnimMode>(animIdx);
+            if (previewTrailEmitter_) previewTrailEmitter_->Play(); // アニメ変更時にリセットして再生
+        }
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(100);
+        ImGui::DragFloat("剣の長さ", &swordLength_, 0.1f, 0.5f, 10.f, "%.1f");
 
         if (previewPlaying_) {
-            if (ImGui::Button("■ 停止")) {
+            // ★ 停止ボタン
+            if (ImGui::Button((std::string(Icon::Stop) + "停止").c_str())) {
                 previewPlaying_ = false;
-                previewTrail_->Clear();
+                if (previewTrailEmitter_) previewTrailEmitter_->Stop(); // Emitterを停止（描画されなくなる）
             }
         }
         else {
-            if (ImGui::Button("▶ 再生")) {
+            // ★ 再生ボタン
+            if (ImGui::Button((std::string(Icon::Play) + "再生").c_str())) {
                 previewPlaying_ = true;
                 previewTimer_ = 0.f;
-                previewTrail_->Clear();
+                if (previewTrailEmitter_) previewTrailEmitter_->Play(); // Emitterを再生（描画再開）
             }
         }
         ImGui::SameLine();
-        if (ImGui::Button("↺ リセット")) {
+        // ★ リセットボタン
+        if (ImGui::Button((std::string(Icon::Refresh) + "リセット").c_str())) {
             previewTimer_ = 0.f;
-            previewTrail_->Clear();
+            if (previewTrailEmitter_) previewTrailEmitter_->Play(); // リセットして最初から再生
         }
 
         ImGui::DragFloat3("プレビュー位置", &previewCenter_.x, 0.05f, -20.f, 20.f);
@@ -219570,10 +220154,6 @@ namespace YoRigine {
         }
         ImGui::TextDisabled("時刻: %.3f s", previewTimer_);
     }
-
-    // ===========================================================
-    // 新規作成ダイアログ
-    // ===========================================================
     void VfxMeshEditor::DrawNewEffectDialog()
     {
         if (!showNewDialog_) return;
@@ -219583,8 +220163,7 @@ namespace YoRigine {
         ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         ImGui::SetNextWindowSize(ImVec2(420, 0), ImGuiCond_Appearing);
 
-        if (!ImGui::BeginPopupModal("新規エフェクト作成", &showNewDialog_,
-            ImGuiWindowFlags_AlwaysAutoResize)) return;
+        if (!ImGui::BeginPopupModal("新規エフェクト作成", &showNewDialog_, ImGuiWindowFlags_AlwaysAutoResize)) return;
 
         ImGui::Text("エフェクト名");
         ImGui::SetNextItemWidth(-1);
@@ -219595,7 +220174,6 @@ namespace YoRigine {
         ImGui::SetNextItemWidth(-1);
         ImGui::InputText("##newpath", newPathBuffer_, sizeof(newPathBuffer_));
 
-        // パスが空の場合はスキャンルート + 名前で自動補完
         if (newPathBuffer_[0] == '\0' && newNameBuffer_[0] != '\0') {
             std::string autoPath = scanRoot_ + newNameBuffer_ + ".json";
             ImGui::TextDisabled("→ %s", autoPath.c_str());
@@ -219603,14 +220181,13 @@ namespace YoRigine {
 
         ImGui::Spacing();
         ImGui::Text("プリセット");
-        const char* presetNames[] = { "Blank", "Trail Only", "Volume Only", "Sword (剣閃)", "Magic (魔法陣)" };
+        const char* presetNames[] = { "Blank", "Trail Only", "Volume Only", "Sword", "Magic" };
         ImGui::SetNextItemWidth(-1);
         ImGui::Combo("##preset", &newPresetIdx_, presetNames, IM_ARRAYSIZE(presetNames));
 
         ImGui::Spacing(); ImGui::Separator(); ImGui::Spacing();
 
         if (ImGui::Button("作成", ImVec2(120, 0))) {
-            // パスが空なら自動生成
             std::string path = newPathBuffer_;
             if (path.empty()) path = scanRoot_ + newNameBuffer_ + ".json";
 
@@ -219626,15 +220203,11 @@ namespace YoRigine {
         ImGui::EndPopup();
     }
 
-    // ===========================================================
-    // エフェクト操作
-    // ===========================================================
     void VfxMeshEditor::SaveCurrent()
     {
         auto* sel = Selected();
         if (!sel) return;
 
-        // ディレクトリが存在しなければ作成
         fs::path p(sel->filePath);
         if (!p.parent_path().empty()) {
             std::error_code ec;
@@ -219659,7 +220232,6 @@ namespace YoRigine {
         auto* sel = Selected();
         if (!sel) return;
 
-        // ファイルを削除
         std::error_code ec;
         fs::remove(sel->filePath, ec);
         if (ec) Logger("VfxMeshEditor: 削除失敗 -> " + sel->filePath);
@@ -219667,13 +220239,11 @@ namespace YoRigine {
 
         entries_.erase(entries_.begin() + selectedIndex_);
 
-        // 選択を調整
         if (entries_.empty()) {
             selectedIndex_ = -1;
         }
         else {
-            selectedIndex_ = std::min(selectedIndex_,
-                static_cast<int>(entries_.size()) - 1);
+            selectedIndex_ = std::min(selectedIndex_, static_cast<int>(entries_.size()) - 1);
             SelectEffect(selectedIndex_);
         }
     }
@@ -219689,16 +220259,13 @@ namespace YoRigine {
         e.isDirty = true;
         entries_.push_back(std::move(e));
 
-        // 新規作成したエフェクトを選択して即保存
         SelectEffect(static_cast<int>(entries_.size()) - 1);
         SaveCurrent();
 
         Logger("VfxMeshEditor: 新規作成 -> " + filePath);
     }
 
-    // ===========================================================
-    // CommitChange
-    // ===========================================================
+    // ★ 編集を即時プレビューに反映
     void VfxMeshEditor::CommitChange(const VfxEffectAsset& before, const char* label)
     {
         auto* sel = Selected();
@@ -219709,68 +220276,43 @@ namespace YoRigine {
 
         history_.Execute(MakeLambdaCommand(
             label,
-            [this, idx, after]() {  // Redo
+            [this, idx, after]() {
                 if (idx < static_cast<int>(entries_.size())) {
                     entries_[idx].asset = after;
                     entries_[idx].isDirty = true;
-                    previewTrail_->ApplyParam(after.trail);
-                    previewVolume_->ApplyParam(after.lightVolume);
+                    if (previewTrailEmitter_) previewTrailEmitter_->SetAsset(after); // ★即時反映
+                    if (previewVolume_) previewVolume_->ApplyParam(after.lightVolume);
                 }
             },
-            [this, idx, before]() { // Undo
+            [this, idx, before]() {
                 if (idx < static_cast<int>(entries_.size())) {
                     entries_[idx].asset = before;
                     entries_[idx].isDirty = true;
-                    previewTrail_->ApplyParam(before.trail);
-                    previewVolume_->ApplyParam(before.lightVolume);
+                    if (previewTrailEmitter_) previewTrailEmitter_->SetAsset(before); // ★Undo即時反映
+                    if (previewVolume_) previewVolume_->ApplyParam(before.lightVolume);
                 }
             }
         ));
 
         sel->isDirty = true;
+
+        // 今回の編集分もプレビューに反映させる
+        if (previewTrailEmitter_) {
+            previewTrailEmitter_->SetAsset(sel->asset);
+        }
     }
 
-    // ===========================================================
-    // プレビューメッシュ再構築
-    // ===========================================================
     void VfxMeshEditor::RebuildPreviewMeshes()
     {
         auto* sel = Selected();
         if (!sel) return;
-        previewTrail_->Initialize(sel->asset.trail);
         previewVolume_->Initialize(sel->asset.lightVolume);
     }
 
-    // ===========================================================
-    // CBV
-    // ===========================================================
     void VfxMeshEditor::InitCBVs()
     {
-        trailCBResource_ = dxCommon_->CreateBufferResource(AlignedSize<MeshTrailParamsCB>());
-        trailCBResource_->Map(0, nullptr, reinterpret_cast<void**>(&trailCBMapped_));
-
         volumeCBResource_ = dxCommon_->CreateBufferResource(AlignedSize<LightVolumeParamsCB>());
         volumeCBResource_->Map(0, nullptr, reinterpret_cast<void**>(&volumeCBMapped_));
-    }
-
-    void VfxMeshEditor::UpdateTrailCBV(float time)
-    {
-        auto* sel = Selected();
-        if (!sel || !trailCBMapped_) return;
-        const auto& t = sel->asset.trail;
-
-        trailCBMapped_->colorInner[0] = t.colorEnd.x;
-        trailCBMapped_->colorInner[1] = t.colorEnd.y;
-        trailCBMapped_->colorInner[2] = t.colorEnd.z;
-        trailCBMapped_->colorInner[3] = t.colorEnd.w;
-        trailCBMapped_->colorOuter[0] = t.colorStart.x;
-        trailCBMapped_->colorOuter[1] = t.colorStart.y;
-        trailCBMapped_->colorOuter[2] = t.colorStart.z;
-        trailCBMapped_->colorOuter[3] = t.colorStart.w;
-        trailCBMapped_->softness = 0.15f;
-        trailCBMapped_->glowPower = 1.5f;
-        trailCBMapped_->distortion = 0.0f;
-        trailCBMapped_->time = time;
     }
 
     void VfxMeshEditor::UpdateVolumeCBV(float time)
@@ -219790,9 +220332,6 @@ namespace YoRigine {
         volumeCBMapped_->time = time;
     }
 
-    // ===========================================================
-    // プリセット
-    // ===========================================================
     VfxEffectAsset VfxMeshEditor::MakePreset(VfxPreset preset)
     {
         VfxEffectAsset a;
@@ -219831,6 +220370,7 @@ namespace YoRigine {
     }
 
 } // namespace YoRigine
+#endif
 
 ============================================================
 File Path: YEngine/Generators/Vfx/VfxMesh/VfxMeshEditor.h
@@ -219839,6 +220379,7 @@ File Path: YEngine/Generators/Vfx/VfxMesh/VfxMeshEditor.h
 // ===========================================================
 // VfxMeshEditor.h
 // ===========================================================
+#ifdef USE_IMGUI
 #include <string>
 #include <vector>
 #include <memory>
@@ -219847,10 +220388,13 @@ File Path: YEngine/Generators/Vfx/VfxMesh/VfxMeshEditor.h
 #include <wrl.h>
 #include <d3d12.h>
 #include "VfxEffectAsset.h"
-#include "TrailMesh.h"
 #include "LightVolumeMesh.h"
 #include <Core/Editor/Command/CommandHistory.h>
-#include "FileOperations/FileBrowser.h"  // YParticleEditor と同じパス
+#include "FileOperations/FileBrowser.h"
+
+// ★ TrailMesh ではなく Emitter を使う
+#include "Vfx/VfxMesh/TrailMeshEmitter.h"
+#include "Systems/Camera/Camera.h"
 
 namespace YoRigine {
 
@@ -219861,16 +220405,6 @@ namespace YoRigine {
         VfxEffectAsset asset;
         std::string    filePath;
         bool           isDirty = false;
-    };
-
-    struct MeshTrailParamsCB
-    {
-        float colorInner[4];
-        float colorOuter[4];
-        float softness;
-        float glowPower;
-        float distortion;
-        float time;
     };
 
     struct LightVolumeParamsCB
@@ -219889,6 +220423,13 @@ namespace YoRigine {
         Blank = 0, TrailOnly, VolumeOnly, Sword, Magic, COUNT
     };
 
+    enum class PreviewAnimMode : int {
+        Wobble = 0,
+        SlashHorizontal,
+        SlashVertical,
+        Spin
+    };
+
     class VfxMeshEditor
     {
     public:
@@ -219899,25 +220440,25 @@ namespace YoRigine {
 
         void Update(float deltaTime);
         void DrawImGui();
-        void DrawPreview(ID3D12GraphicsCommandList* cmdList,
-            D3D12_GPU_VIRTUAL_ADDRESS  cameraGPUAddress);
+
+        // ★ 引数から cmdList を削除
+        void DrawPreview();
+
+        // ★ カメラをセットするための関数
+        void SetCamera(Camera* camera) { camera_ = camera; }
 
     private:
         VfxMeshEditor();
         ~VfxMeshEditor() = default;
 
-        // ImGui パネル
         void DrawListPanel();
         void DrawEditPanel();
         void DrawTrailSection();
         void DrawLightVolumeSection();
         void DrawPreviewSection();
         void DrawNewEffectDialog();
-
-        // テクスチャ選択ポップアップ
         void DrawTextureSelectPopup();
 
-        // エフェクト操作
         void ScanDirectory(const std::string& dir);
         void SelectEffect(int index);
         void SaveCurrent();
@@ -219927,21 +220468,16 @@ namespace YoRigine {
             const std::string& filePath,
             VfxPreset          preset);
 
-        // Undo/Redo
         void CommitChange(const VfxEffectAsset& before, const char* label);
 
-        // プレビュー用メッシュ / CBV
         void RebuildPreviewMeshes();
         void InitCBVs();
-        void UpdateTrailCBV(float time);
         void UpdateVolumeCBV(float time);
 
         static VfxEffectAsset MakePreset(VfxPreset preset);
 
-        // ----------------------------------------------------------
-        // 状態
-        // ----------------------------------------------------------
         DirectXCommon* dxCommon_ = nullptr;
+        Camera* camera_ = nullptr; // ★追加
         std::string    scanRoot_;
 
         std::vector<VfxEffectEntry> entries_;
@@ -219955,48 +220491,40 @@ namespace YoRigine {
 
         CommandHistory history_;
 
-        // プレビュー
-        std::unique_ptr<TrailMesh>       previewTrail_;
-        std::unique_ptr<LightVolumeMesh> previewVolume_;
+        // ★ プレビュー（TrailはEmitterに完全委譲）
+        std::unique_ptr<TrailMeshEmitter> previewTrailEmitter_;
+        std::unique_ptr<LightVolumeMesh>  previewVolume_;
+
+        PreviewAnimMode previewAnim_ = PreviewAnimMode::SlashHorizontal;
+        float swordLength_ = 2.0f;
 
         bool    previewPlaying_ = false;
         float   previewTimer_ = 0.f;
         Vector3 previewCenter_ = { 0.f, 0.f, 0.f };
         float   previewYaw_ = 0.f;
 
-        // CBV
-        Microsoft::WRL::ComPtr<ID3D12Resource> trailCBResource_;
-        MeshTrailParamsCB* trailCBMapped_ = nullptr;
+        // ★ CBVは Volume のみ保持（TrailのCBVはEmitterが持っているため削除）
         Microsoft::WRL::ComPtr<ID3D12Resource> volumeCBResource_;
         LightVolumeParamsCB* volumeCBMapped_ = nullptr;
 
-        // 新規作成ダイアログ
         bool showNewDialog_ = false;
         char newNameBuffer_[128] = "NewEffect";
         char newPathBuffer_[512] = "";
         int  newPresetIdx_ = static_cast<int>(VfxPreset::Sword);
 
-        // デバッグ
         bool showTrailDebug_ = false;
         bool showVolumeDebug_ = false;
 
-        // ImGui 用バッファ
         char nameBuffer_[128] = {};
 
-        // ----------------------------------------------------------
-        // テクスチャ選択 FileBrowser
-        // YParticleSystem と同じパターン:
-        //   コンストラクタ本体で構築 → ThumbnailProvider → OnFileSelected
-        // ----------------------------------------------------------
-        FileBrowser rampBrowser_;           // ランプテクスチャ (t1: gTexRamp)
+        FileBrowser rampBrowser_;
+        FileBrowser noiseBrowser_;
         bool        showRampPopup_ = false;
-
-        FileBrowser noiseBrowser_;          // ノイズテクスチャ (t0: gTexNoise)
         bool        showNoisePopup_ = false;
-
     };
 
 } // namespace YoRigine
+#endif
 
 ============================================================
 File Path: YEngine/Graphics/Buffers/DynamicVertexBuffer.cpp
@@ -220803,7 +221331,7 @@ void Line::DrawLine()
 	commandList->SetGraphicsRootConstantBufferView(indices.at("gTransformationMatrix"), transformationResource_->GetGPUVirtualAddress());
 
 	// index / 2 本のライン（2 頂点 = 1 ライン）
-	commandList->DrawInstanced(index, index / 2, 0, 0);
+	commandList->DrawInstanced(index, 1, 0, 0);
 
 	// 描画後にクリア
 	index = 0u;
@@ -221060,7 +221588,7 @@ private:
 public:
 	///************************* アクセッサ *************************///
 	void SetCamera(Camera* camera) { this->camera_ = camera; }
-
+	void SetColor(const Vector4& color) { materialData_->color = color; }
 private:
 	///************************* GPU用の構造体 *************************///
 	// 頂点データ構造体
@@ -229881,42 +230409,40 @@ File Path: YEngine/Model/Motion/MotionEditor.cpp
 #include <sstream>
 #include <iomanip>
 
+#include <Editor/Icon/EditorIcon.h>
+#include "Object3D/ObjectManager.h" 
+
 namespace fs = std::filesystem;
 
 // ============================================================
-//  カラーパレット  (Blender 風)
+//  カラーパレット
 // ============================================================
 namespace Col
 {
 #ifdef USE_IMGUI
-	// 背景
 	constexpr ImU32 PanelBg = IM_COL32(45, 45, 45, 255);
 	constexpr ImU32 RowEven = IM_COL32(50, 50, 50, 220);
 	constexpr ImU32 RowOdd = IM_COL32(44, 44, 44, 220);
 	constexpr ImU32 RowSel = IM_COL32(55, 85, 145, 255);
 	constexpr ImU32 RowHov = IM_COL32(65, 70, 80, 200);
-	// タイムライン
 	constexpr ImU32 RulerBg = IM_COL32(38, 38, 38, 255);
 	constexpr ImU32 RulerLine = IM_COL32(90, 90, 90, 255);
 	constexpr ImU32 RulerText = IM_COL32(170, 170, 170, 255);
 	constexpr ImU32 Playhead = IM_COL32(255, 70, 50, 230);
 	constexpr ImU32 PlayheadTp = IM_COL32(255, 70, 50, 100);
-	// KF チャンネル色
-	constexpr ImU32 ChT = IM_COL32(255, 150, 50, 255);  // Translate オレンジ
-	constexpr ImU32 ChR = IM_COL32(90, 200, 90, 255);  // Rotate    緑
-	constexpr ImU32 ChS = IM_COL32(80, 150, 255, 255);  // Scale     青
-	constexpr ImU32 KFSel = IM_COL32(255, 240, 50, 255);  // 選択中 黄
+	constexpr ImU32 ChT = IM_COL32(255, 150, 50, 255);
+	constexpr ImU32 ChR = IM_COL32(90, 200, 90, 255);
+	constexpr ImU32 ChS = IM_COL32(80, 150, 255, 255);
+	constexpr ImU32 KFSel = IM_COL32(255, 240, 50, 255);
 	constexpr ImU32 LabelBg = IM_COL32(35, 35, 35, 255);
 	constexpr ImU32 LabelText = IM_COL32(200, 200, 200, 255);
 	constexpr ImU32 LabelSel = IM_COL32(255, 210, 80, 255);
-	// ステータス
 	constexpr ImU32 StatusBg = IM_COL32(30, 30, 30, 255);
 	constexpr ImU32 StatusText = IM_COL32(160, 220, 160, 255);
 #endif
 }
 
 #ifdef USE_IMGUI
-// チャンネル色を返す
 static ImU32 ChannelColor(KFChannel ch, bool selected)
 {
 	if (selected) return Col::KFSel;
@@ -229928,27 +230454,43 @@ static ImU32 ChannelColor(KFChannel ch, bool selected)
 	return Col::ChT;
 }
 #endif
+
 // ============================================================
 //  初期化 / 更新 / 描画
 // ============================================================
 
-void MotionEditor::Initialize()
+void MotionEditor::Initialize(Camera* camera)
 {
+	camera_ = camera;
 	previewTransform_.Initialize();
-	modelBrowser_.currentDirectory = kModelRootDir;
 	binaryBrowser_.currentDirectory = "Resources/Binary";
 	binaryBrowser_.filterExtension = ".anim";
+	lineDrawer_ = std::make_unique<Line>();
+	lineDrawer_->Initialize();
+	lineDrawer_->SetCamera(camera_);
+	lineDrawer_->SetColor({ 0.5f, 0.5f, 0.5f, 1.0f });
 }
 
 void MotionEditor::Update()
 {
-	if (!previewObject_) return;
+	Object3d* target = GetTargetObject();
+	if (!target) return;
+
+	Model* m = target->GetModel();
+	MotionSystem* ms = m ? m->GetMotionSystem() : nullptr;
+
+	if (ms) {
+		float msTime = ms->GetAnimationTime();
+		if (std::abs(msTime - scrubTime_) > 1e-4f) {
+			scrubTime_ = msTime;
+			dopeSheet_.SetSeekFrame(static_cast<int>(scrubTime_ * fps_));
+		}
+	}
 
 	if (selBone_.empty()) {
-		previewObject_->UpdateAnimation();
-	} else {
-		// ボーン編集中はモーションの上書きを防ぎ、スケルトンだけ手動更新
-		Model* m = previewObject_->GetModel();
+		// ボーン非選択時は通常更新
+	}
+	else {
 		if (m && m->GetSkeleton()) {
 			m->GetSkeleton()->Update();
 			if (m->GetSkinCluster())
@@ -229958,10 +230500,65 @@ void MotionEditor::Update()
 	previewTransform_.UpdateMatrix();
 }
 
-void MotionEditor::Draw(Camera* camera)
+void MotionEditor::DrawBone()
 {
-	if (previewObject_)
-		previewObject_->Draw(camera, previewTransform_);
+	Object3d* target = GetTargetObject();
+	if (isDrawBone_ && target) {
+		target->DrawBone(*lineDrawer_.get(), previewTransform_.matWorld_);
+	}
+}
+
+void MotionEditor::SetTargetObjectId(int id) {
+	Object3d* obj = nullptr;
+	if (id != -1) {
+		obj = ObjectManager::GetInstance()->GetObject3dById(id);
+		if (obj && obj->GetModel()) {
+			if (obj->GetModel()->GetMotionSystem() == nullptr) {
+				id = -1;
+			}
+		}
+		else {
+			id = -1;
+		}
+	}
+
+	if (targetObjectId_ != id) {
+		targetObjectId_ = id;
+
+		if (targetObjectId_ != -1) {
+			Object3d* target = GetTargetObject();
+			Model* model = target->GetModel();
+			MotionSystem* ms = model->GetMotionSystem();
+
+			loadFileName_ = model->GetName();
+			currentMotion_ = ms->GetAnimation();
+			selectedAnimKey_ = "";
+
+			if (currentMotion_) {
+				for (auto& [key, motion] : Model::animationCache_) {
+					if (&motion == currentMotion_) {
+						selectedAnimKey_ = key;
+						break;
+					}
+				}
+				tracksDirty_ = true;
+			}
+
+			scrubTime_ = ms->GetAnimationTime();
+			dopeSheet_.SetSeekFrame(static_cast<int>(scrubTime_ * fps_));
+			isPlaying_ = true; // 選択時は基本的に再生状態とする
+
+			statusMsg_ = "対象オブジェクトを同期: " + loadFileName_;
+		}
+		else {
+			currentMotion_ = nullptr;
+			selectedAnimKey_ = "";
+			selBone_ = "";
+			selKF_.Clear();
+			loadFileName_ = "";
+			statusMsg_ = "Ready";
+		}
+	}
 }
 
 // ============================================================
@@ -229971,47 +230568,48 @@ void MotionEditor::Draw(Camera* camera)
 void MotionEditor::ShowEditor()
 {
 #ifdef USE_IMGUI
-	// ---- ファイルブラウザ (別ウィンドウ) ----
-	if (modelBrowser_.isOpen) {
-		DrawFileBrowser(modelBrowser_, "モデルファイルを選択");
-		if (!modelBrowser_.isOpen && !modelBrowser_.selectedFilePath.empty()) {
-			const std::string& full = modelBrowser_.selectedFilePath;
-			auto sl = full.find_last_of("/\\");
-			loadFileName_ = (sl != std::string::npos) ? full.substr(sl + 1) : full;
-			loadDirectory_ = (sl != std::string::npos) ? full.substr(0, sl) : ".";
-			animNameList_ = FetchAnimationNames(full);
-			animNameIndex_ = animNameList_.empty() ? -1 : 0;
-			loadAnimName_ = animNameList_.empty() ? "" : animNameList_[0];
-		}
-	}
 	if (binaryBrowser_.isOpen) {
 		DrawFileBrowser(binaryBrowser_, "バイナリファイルを選択");
 		if (!binaryBrowser_.isOpen && !binaryBrowser_.selectedFilePath.empty())
 			savePath_ = binaryBrowser_.selectedFilePath;
 	}
 
-	// ---- ポップアップ ----
-	DrawModelLoadPopup();
 	DrawSaveLoadPopup();
 
-	// ============================================================
-	//  メインウィンドウ
-	// ============================================================
 	ImGui::SetNextWindowSize(ImVec2(1200, 750), ImGuiCond_FirstUseEver);
 	ImGui::Begin("Motion Editor", nullptr, ImGuiWindowFlags_MenuBar);
+
+	Object3d* target = GetTargetObject();
 
 	// フォーカス中のキー入力
 	if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)) {
 		history_.HandleKeyInput();
 
-		// Space キー : ボーン編集をいったん解除してアニメーションを一回再生
-		if (ImGui::IsKeyPressed(ImGuiKey_Space) && previewObject_) {
+		// スペースキーで再生/一時停止のトグル
+		if (ImGui::IsKeyPressed(ImGuiKey_Space) && target) {
 			selBone_ = "";
 			selKF_.Clear();
-			previewObject_->PlayOnce();
-			statusMsg_ = "[ Space ] アニメーション一回再生";
+			if (isPlaying_) {
+				if (target->GetModel() && target->GetModel()->GetMotionSystem()) {
+					target->GetModel()->GetMotionSystem()->Stop();
+				}
+				isPlaying_ = false;
+				statusMsg_ = "[ Space ] 一時停止";
+			}
+			else {
+				if (target->GetModel() && target->GetModel()->GetMotionSystem()) {
+					auto* ms = target->GetModel()->GetMotionSystem();
+					float savedTime = ms->GetAnimationTime();
+					// 最後まで行っていたら最初から再生
+					if (savedTime >= ms->GetDuration() || ms->IsFinished()) savedTime = 0.0f;
+
+					if (isLoop_) target->PlayLoop(); else target->PlayOnce();
+					ms->SetAnimationTime(savedTime); // 時間を上書きして続きから再生
+				}
+				isPlaying_ = true;
+				statusMsg_ = "[ Space ] 再生";
+			}
 		}
-		// Delete キー : 選択中 KF を削除
 		if (ImGui::IsKeyPressed(ImGuiKey_Delete) && selKF_.IsValid() && currentMotion_) {
 			auto& na = currentMotion_->animation_.nodeAnimations_[selKF_.boneName];
 			float t = 0;
@@ -230023,47 +230621,46 @@ void MotionEditor::ShowEditor()
 		}
 	}
 
-	// メニューバー
 	DrawMenuBar();
 
-	// モデル未読み込み
-	if (!previewObject_ || !previewObject_->GetModel()) {
+	if (!target || !target->GetModel()) {
 		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 40);
 		float w = ImGui::GetContentRegionAvail().x;
 		ImGui::SetCursorPosX((w - 220) * 0.5f);
-		ImGui::TextColored(ImVec4(1, 1, 0, 1), "モデルが読み込まれていません");
-		ImGui::SetCursorPosX((w - 180) * 0.5f);
-		ImGui::Spacing();
-		ImGui::SetCursorPosX((w - 180) * 0.5f);
-		if (ImGui::Button("モデルを開く...", ImVec2(180, 40)))
-			showLoadPopup_ = true;
+		ImGui::TextColored(ImVec4(1, 1, 0, 1), "シーンエディタでモデルを選択してください");
 		ImGui::End();
 		return;
 	}
 
-	// ---- ツールバー ----
 	DrawToolbar();
 	ImGui::Separator();
 
-	// ---- 上段 : ボーンパネル ＋ プロパティパネル ----
 	ImGuiIO& io = ImGui::GetIO();
-	float totalH = ImGui::GetContentRegionAvail().y - timelineH_ - 22.0f; // ステータス分引く
 	float contentW = ImGui::GetContentRegionAvail().x;
+	float contentH = ImGui::GetContentRegionAvail().y - 22.0f;
 
-	ImGui::BeginChild("##upper", ImVec2(contentW, totalH), false);
+	bool showTimeline = ImGui::CollapsingHeader("TIMELINE (タイムライン)", ImGuiTreeNodeFlags_DefaultOpen);
+
+	float upperH = contentH;
+	if (showTimeline) {
+		if (timelineH_ > contentH - 80.0f) timelineH_ = contentH - 80.0f;
+		if (timelineH_ < 50.0f) timelineH_ = 50.0f;
+		upperH = contentH - timelineH_ - 12.0f;
+	}
+
+	ImGui::BeginChild("##upper", ImVec2(contentW, upperH), false);
 	{
-		// 左: ボーンリスト
 		ImGui::BeginChild("##bones", ImVec2(bonePanelW_, 0), true);
 		DrawBonePanel();
 		ImGui::EndChild();
 
 		ImGui::SameLine();
 
-		// セパレータ (ドラッグでリサイズ)
 		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
-		ImGui::InvisibleButton("##vsep", ImVec2(4, totalH - 8));
-		if (ImGui::IsItemActive())
-			bonePanelW_ = std::clamp(bonePanelW_ + io.MouseDelta.x, 80.0f, 450.0f);
+		ImGui::InvisibleButton("##vsep", ImVec2(4, upperH));
+		if (ImGui::IsItemActive()) {
+			bonePanelW_ = std::clamp(bonePanelW_ + io.MouseDelta.x, 80.0f, contentW - 100.0f);
+		}
 		if (ImGui::IsItemHovered() || ImGui::IsItemActive()) {
 			ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
 			ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -230075,21 +230672,32 @@ void MotionEditor::ShowEditor()
 
 		ImGui::SameLine();
 
-		// 右: プロパティ
 		ImGui::BeginChild("##props", ImVec2(0, 0), true);
 		DrawPropertyPanel();
 		ImGui::EndChild();
 	}
 	ImGui::EndChild();
 
-	ImGui::Separator();
+	if (showTimeline) {
+		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
+		ImGui::InvisibleButton("##hsep", ImVec2(contentW, 4.0f));
+		if (ImGui::IsItemActive()) {
+			timelineH_ -= io.MouseDelta.y;
+		}
+		if (ImGui::IsItemHovered() || ImGui::IsItemActive()) {
+			ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+			ImDrawList* dl = ImGui::GetWindowDrawList();
+			ImVec2 p = ImGui::GetItemRectMin();
+			ImVec2 q = ImGui::GetItemRectMax();
+			dl->AddRectFilled(p, q, IM_COL32(100, 130, 200, 180));
+		}
+		ImGui::PopStyleVar();
 
-	// ---- タイムライン ----
-	ImGui::BeginChild("##timeline", ImVec2(contentW, timelineH_), true);
-	DrawTimeline();
-	ImGui::EndChild();
+		ImGui::BeginChild("##timeline", ImVec2(contentW, timelineH_), true);
+		DrawTimeline();
+		ImGui::EndChild();
+	}
 
-	// ---- ステータスバー ----
 	DrawStatusBar();
 
 	ImGui::End();
@@ -230105,14 +230713,11 @@ void MotionEditor::DrawMenuBar()
 #ifdef USE_IMGUI
 	if (!ImGui::BeginMenuBar()) return;
 
-	// ---- ファイルメニュー ----
 	if (ImGui::BeginMenu("ファイル (File)")) {
-		if (ImGui::MenuItem("モデルを開く...", ""))  showLoadPopup_ = true;
 		if (ImGui::MenuItem("バイナリ保存/読込...", ""))  showSavePopup_ = true;
 		ImGui::EndMenu();
 	}
 
-	// ---- 編集メニュー ----
 	if (ImGui::BeginMenu("編集 (Edit)")) {
 		if (ImGui::MenuItem("元に戻す", "Ctrl+Z", false, history_.CanUndo())) history_.Undo();
 		if (ImGui::MenuItem("やり直す", "Ctrl+Y", false, history_.CanRedo())) history_.Redo();
@@ -230121,7 +230726,6 @@ void MotionEditor::DrawMenuBar()
 		ImGui::EndMenu();
 	}
 
-	// ---- 表示メニュー ----
 	if (ImGui::BeginMenu("表示 (View)")) {
 		ImGui::SliderFloat("タイムライン高さ", &timelineH_, 80.0f, 500.0f, "%.0f px");
 		ImGui::SliderFloat("ボーンリスト幅", &bonePanelW_, 80.0f, 450.0f, "%.0f px");
@@ -230129,7 +230733,6 @@ void MotionEditor::DrawMenuBar()
 		ImGui::EndMenu();
 	}
 
-	// ---- クイック Undo/Redo ----
 	ImGui::Separator();
 	if (!history_.CanUndo()) ImGui::BeginDisabled();
 	if (ImGui::SmallButton(" << ")) { history_.Undo(); statusMsg_ = "元に戻す"; }
@@ -230153,9 +230756,9 @@ void MotionEditor::DrawMenuBar()
 void MotionEditor::DrawToolbar()
 {
 #ifdef USE_IMGUI
-	Model* model = previewObject_ ? previewObject_->GetModel() : nullptr;
+	Object3d* target = GetTargetObject();
+	Model* model = target ? target->GetModel() : nullptr;
 
-	// ---- モデル名 ----
 	if (model) {
 		ImGui::TextColored(ImVec4(0.6f, 1.0f, 0.6f, 1.0f), "[%s]", model->GetName().c_str());
 		ImGui::SameLine(0, 12);
@@ -230166,62 +230769,133 @@ void MotionEditor::DrawToolbar()
 	ImGui::SameLine(0, 4);
 	ImGui::SetNextItemWidth(170);
 	std::string selDisp = AnimDisplayName(selectedAnimKey_);
-	if (ImGui::BeginCombo("##anim", selDisp.empty() ? "(未選択)" : selDisp.c_str())) {
+	if (selDisp.empty()) selDisp = "(未選択)";
+
+	if (ImGui::BeginCombo("##anim", selDisp.c_str())) {
 		for (auto& [key, motion] : Model::animationCache_) {
+			if (!loadFileName_.empty() && key.find(loadFileName_) == std::string::npos && key.find("Binary:") == std::string::npos) {
+				continue;
+			}
+
 			std::string dn = AnimDisplayName(key);
+			std::string label = dn.empty() ? ("(デフォルトアニメーション)##" + key) : dn;
+
 			bool isSel = (selectedAnimKey_ == key);
-			if (ImGui::Selectable(dn.c_str(), isSel)) {
+			if (ImGui::Selectable(label.c_str(), isSel)) {
 				selectedAnimKey_ = key;
 				currentMotion_ = &motion;
-				previewObject_->SetChangeMotion(loadFileName_, MotionPlayMode::Loop, dn);
-				statusMsg_ = "アニメーション変更: " + dn;
-				tracksDirty_ = true; // ★ トラックを再構築
+				if (target) {
+					target->SetChangeMotion(loadFileName_, isLoop_ ? MotionPlayMode::Loop : MotionPlayMode::Once, dn);
+				}
+				isPlaying_ = true; // アニメ切り替え時は自動再生
+				statusMsg_ = "アニメーション変更: " + label;
+				tracksDirty_ = true;
 			}
 			if (isSel) ImGui::SetItemDefaultFocus();
 		}
 		ImGui::EndCombo();
 	}
 	if (ImGui::IsItemHovered())
-		ImGui::SetTooltip("再生するアニメーションを選択します\n変更すると自動でループ再生されます");
+		ImGui::SetTooltip("選択中のキャラクターのアニメーションを切り替えます");
 
 	ImGui::SameLine(0, 14);
 
-	// ---- 再生ボタン ----
-	if (ImGui::Button("[ Play ]")) {
-		previewObject_->PlayOnce();
-		statusMsg_ = "一回再生  [Space でも可]";
+	// ==========================================================
+	// ★ 動画プレイヤー風のアイコンボタン
+	// ==========================================================
+
+	// Play/Pause (トグル)
+	if (isPlaying_) {
+		if (ImGui::Button((std::string(Icon::Pause) + " 一時停止").c_str())) {
+			if (target && target->GetModel() && target->GetModel()->GetMotionSystem()) {
+				target->GetModel()->GetMotionSystem()->Stop();
+			}
+			isPlaying_ = false;
+			statusMsg_ = "一時停止";
+		}
+		if (ImGui::IsItemHovered()) ImGui::SetTooltip("一時停止 (Pause)");
 	}
-	if (ImGui::IsItemHovered()) ImGui::SetTooltip("一回再生  (Space キーでも可)");
+	else {
+		if (ImGui::Button((std::string(Icon::Play) + " 再生").c_str())) {
+			if (target && target->GetModel() && target->GetModel()->GetMotionSystem()) {
+				auto* ms = target->GetModel()->GetMotionSystem();
+				float savedTime = ms->GetAnimationTime();
+				// もし最後まで再生されていたら最初から
+				if (savedTime >= ms->GetDuration() || ms->IsFinished()) {
+					savedTime = 0.0f;
+				}
+				if (isLoop_) target->PlayLoop(); else target->PlayOnce();
+				ms->SetAnimationTime(savedTime);
+			}
+			isPlaying_ = true;
+			statusMsg_ = "再生 (Play)";
+		}
+		if (ImGui::IsItemHovered()) ImGui::SetTooltip("再生 (Play / Resume)");
+	}
 
 	ImGui::SameLine(0, 3);
-	if (ImGui::Button("[ Loop ]")) {
-		previewObject_->PlayLoop();
-		statusMsg_ = "ループ再生";
+
+	// Stop (停止して時間をリセット)
+	if (ImGui::Button((std::string(Icon::Stop) + " 停止").c_str())) {
+		if (target && target->GetModel() && target->GetModel()->GetMotionSystem()) {
+			target->GetModel()->GetMotionSystem()->Stop();
+			target->GetModel()->GetMotionSystem()->SetAnimationTime(0.0f);
+		}
+		isPlaying_ = false;
+		scrubTime_ = 0.0f;
+		dopeSheet_.SetSeekFrame(0);
+		statusMsg_ = "停止 (先頭に戻る)";
 	}
-	if (ImGui::IsItemHovered()) ImGui::SetTooltip("ループ再生");
+	if (ImGui::IsItemHovered()) ImGui::SetTooltip("停止して先頭に戻る (Stop)");
 
 	ImGui::SameLine(0, 3);
-	if (ImGui::Button("[ Stop ]")) {
-		previewObject_->Stop();
-		statusMsg_ = "停止";
+
+	// Loop (トグル)
+	if (isLoop_) {
+		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.6f, 0.2f, 1.0f)); // オン時は緑色
+		if (ImGui::Button((std::string(Icon::Infinity) + " ループ解除").c_str())) {
+			isLoop_ = false;
+			if (target && isPlaying_) {
+				auto* ms = target->GetModel()->GetMotionSystem();
+				float savedTime = ms->GetAnimationTime();
+				target->PlayOnce();
+				ms->SetAnimationTime(savedTime);
+			}
+			statusMsg_ = "ループ解除";
+		}
+		ImGui::PopStyleColor();
 	}
-	if (ImGui::IsItemHovered()) ImGui::SetTooltip("停止");
+	else {
+		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.4f, 0.4f, 0.4f, 1.0f)); // オフ時はグレー
+		if (ImGui::Button(" ∞ ")) {
+			isLoop_ = true;
+			if (target && isPlaying_) {
+				auto* ms = target->GetModel()->GetMotionSystem();
+				float savedTime = ms->GetAnimationTime();
+				target->PlayLoop();
+				ms->SetAnimationTime(savedTime);
+			}
+			statusMsg_ = "ループ有効";
+		}
+		ImGui::PopStyleColor();
+	}
+	if (ImGui::IsItemHovered()) ImGui::SetTooltip("ループ再生の切り替え (Loop)");
 
 	ImGui::SameLine(0, 12);
 
-	// ---- 再生速度 ----
+	// ---- スピードと長さ ----
 	if (model && model->GetMotionSystem()) {
 		float spd = model->GetMotionSystem()->GetCurrentAnimationSpeed();
 		ImGui::Text("Speed:");
 		ImGui::SameLine(0, 4);
 		ImGui::SetNextItemWidth(70);
-		if (ImGui::DragFloat("##spd", &spd, 0.05f, 0.0f, 5.0f, "x%.2f"))
-			previewObject_->SetMotionSpeed(spd);
+		if (ImGui::DragFloat("##spd", &spd, 0.05f, 0.0f, 5.0f, "x%.2f")) {
+			if (target) target->SetMotionSpeed(spd);
+		}
 		if (ImGui::IsItemHovered())
 			ImGui::SetTooltip("再生速度倍率  1.0 = 通常速度");
 	}
 
-	// ---- アニメーション長さ ----
 	if (currentMotion_) {
 		ImGui::SameLine(0, 12);
 		float dur = currentMotion_->GetDuration();
@@ -230235,14 +230909,14 @@ void MotionEditor::DrawToolbar()
 	}
 
 	ImGui::SameLine(0, 20);
+	ImGui::Checkbox("ボーン表示", &isDrawBone_);
+	if (ImGui::IsItemHovered()) {
+		ImGui::SetTooltip("メッシュ描画とボーン（線）描画を切り替えます");
+	}
 
-	// ---- ファイル操作ボタン ----
+	ImGui::SameLine(0, 20);
 	if (ImGui::Button("Save/Load..."))  showSavePopup_ = true;
 	if (ImGui::IsItemHovered()) ImGui::SetTooltip("バイナリ保存・読み込み");
-
-	ImGui::SameLine(0, 4);
-	if (ImGui::Button("Open Model...")) showLoadPopup_ = true;
-	if (ImGui::IsItemHovered()) ImGui::SetTooltip("モデルファイルを開く");
 #endif
 }
 
@@ -230253,12 +230927,15 @@ void MotionEditor::DrawToolbar()
 void MotionEditor::DrawBonePanel()
 {
 #ifdef USE_IMGUI
-	ImGui::TextColored(ImVec4(0.7f, 0.9f, 1.0f, 1.0f), "BONES");
+	if (!ImGui::CollapsingHeader("BONES (アーマチュア)", ImGuiTreeNodeFlags_DefaultOpen)) {
+		return;
+	}
 	if (ImGui::IsItemHovered())
 		ImGui::SetTooltip("編集するボーンを選択します\n選択後、右のパネルで値を変更できます");
 	ImGui::Separator();
 
-	Model* model = previewObject_ ? previewObject_->GetModel() : nullptr;
+	Object3d* target = GetTargetObject();
+	Model* model = target ? target->GetModel() : nullptr;
 	if (!model || !model->GetSkeleton()) {
 		ImGui::TextDisabled("スケルトンなし");
 		return;
@@ -230270,7 +230947,6 @@ void MotionEditor::DrawBonePanel()
 		const std::string& name = joint.GetName();
 		bool isSel = (selBone_ == name);
 
-		// 階層の深さを計算してインデント
 		int depth = 0;
 		{
 			auto par = const_cast<Joint&>(joint).GetParent();
@@ -230279,13 +230955,10 @@ void MotionEditor::DrawBonePanel()
 				par = joints[par.value()].GetParent();
 			}
 		}
-		// 階層インデント
 		ImGui::SetCursorPosX(ImGui::GetCursorPosX() + depth * 12.0f);
 
-		// 選択中は黄色ハイライト
 		if (isSel) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.85f, 0.2f, 1.0f));
 
-		// ボーン名 (選択ボタン)
 		std::string label = (depth > 0 ? "|  " : "") + name + "##b";
 		if (ImGui::Selectable(label.c_str(), isSel, 0, ImVec2(0, 0))) {
 			selBone_ = name;
@@ -230298,7 +230971,6 @@ void MotionEditor::DrawBonePanel()
 		if (isSel) ImGui::PopStyleColor();
 	}
 
-	// 選択解除ボタン
 	ImGui::Separator();
 	if (ImGui::SmallButton("選択解除")) {
 		selBone_ = "";
@@ -230316,24 +230988,19 @@ void MotionEditor::DrawBonePanel()
 void MotionEditor::DrawPropertyPanel()
 {
 #ifdef USE_IMGUI
-
-	// ================================================================
-	//  セクション 1: ボーン Transform 編集
-	// ================================================================
 	bool boneOpen = ImGui::CollapsingHeader("BONE TRANSFORM  (位置・回転・拡縮)",
 		ImGuiTreeNodeFlags_DefaultOpen);
 	if (boneOpen)
 	{
 		if (selBone_.empty()) {
 			ImGui::TextDisabled("左のリストからボーンを選択してください");
-		} else {
-			// 選択ボーン名
+		}
+		else {
 			ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.2f, 1.0f),
 				"選択中: %s", selBone_.c_str());
 			ImGui::TextDisabled("ドラッグで変更 / Ctrl+クリックで直接入力");
 			ImGui::Separator();
 
-			// SRT 各ウィジェット共通処理  (IsItemActivated を個別に判定)
 			auto handleDrag = [&](const char* label, const char* tip,
 				float* buf, float spd, float vmin, float vmax)
 				{
@@ -230343,12 +231010,10 @@ void MotionEditor::DrawPropertyPanel()
 					std::string id = std::string("##") + label;
 					bool changed = ImGui::DragFloat3(id.c_str(), buf, spd, vmin, vmax);
 
-					// 操作開始: スナップショットを取る
 					if (ImGui::IsItemActivated()) {
 						draggingBone_ = true;
 						boneSnap_ = BufferToTransform();
 					}
-					// 操作終了: Undo スタックへ
 					if (draggingBone_ && ImGui::IsItemDeactivatedAfterEdit()) {
 						draggingBone_ = false;
 						QuaternionTransform oldTr = boneSnap_;
@@ -230361,9 +231026,7 @@ void MotionEditor::DrawPropertyPanel()
 						));
 						statusMsg_ = "ボーン変更: " + bn;
 					}
-					// ドラッグ中: リアルタイムに反映
 					if (changed) SyncBufferToJoint();
-
 					if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tip);
 				};
 
@@ -230376,7 +231039,6 @@ void MotionEditor::DrawPropertyPanel()
 
 			ImGui::Spacing();
 
-			// ---- キーフレームを打つ ----
 			if (currentMotion_) {
 				ImGui::Separator();
 				ImGui::Text("現在時刻:");
@@ -230390,7 +231052,8 @@ void MotionEditor::DrawPropertyPanel()
 				if (ImGui::IsItemHovered())
 					ImGui::SetTooltip("現在の姿勢をこの時刻にキーフレームとして記録します\n"
 						"下のタイムラインに◆が追加されます");
-			} else {
+			}
+			else {
 				ImGui::TextDisabled("(アニメーションを選択するとKFを打てます)");
 			}
 		}
@@ -230398,33 +231061,31 @@ void MotionEditor::DrawPropertyPanel()
 
 	ImGui::Spacing();
 
-	// ================================================================
-	//  セクション 2: 選択 KF 値編集
-	// ================================================================
 	bool kfOpen = ImGui::CollapsingHeader("KEYFRAME  (選択中のキーフレーム値)",
 		ImGuiTreeNodeFlags_DefaultOpen);
 	if (kfOpen)
 	{
 		if (!selKF_.IsValid()) {
 			ImGui::TextDisabled("タイムラインで◆をクリックしてキーフレームを選択してください");
-		} else if (!currentMotion_) {
+		}
+		else if (!currentMotion_) {
 			ImGui::TextDisabled("アニメーションがありません");
-		} else {
+		}
+		else {
 			auto& nodeAnims = currentMotion_->animation_.nodeAnimations_;
 			auto it = nodeAnims.find(selKF_.boneName);
-			if (it == nodeAnims.end()) { ImGui::TextDisabled("データなし"); } else {
+			if (it == nodeAnims.end()) { ImGui::TextDisabled("データなし"); }
+			else {
 				auto& na = it->second;
 				int   idx = selKF_.index;
 				std::string bone = selKF_.boneName;
 
 				ImGui::Text("ボーン: %s", bone.c_str());
 
-				// 時刻を共通で取得
 				float kfTime = 0;
 				if (idx < (int)na.translate.keyframes.size())
 					kfTime = na.translate.keyframes[idx].time;
 
-				// ---- 時刻変更 ----
 				ImGui::Text("時刻:");
 				ImGui::SameLine(90);
 				ImGui::SetNextItemWidth(120);
@@ -230441,10 +231102,8 @@ void MotionEditor::DrawPropertyPanel()
 
 				ImGui::Separator();
 
-				// ---- T / R / S タブ ----
 				if (ImGui::BeginTabBar("##kftab")) {
 
-					// --- Translate タブ ---
 					bool tOpen = ImGui::BeginTabItem("位置 (T)");
 					if (ImGui::IsItemHovered()) ImGui::SetTooltip("キーフレームの位置値を編集します");
 					if (tOpen) {
@@ -230461,12 +231120,13 @@ void MotionEditor::DrawPropertyPanel()
 									[this, bone, idx, nv]() { currentMotion_->animation_.nodeAnimations_[bone].translate.keyframes[idx].value = nv; },
 									[this, bone, idx, ov]() { currentMotion_->animation_.nodeAnimations_[bone].translate.keyframes[idx].value = ov; }));
 								statusMsg_ = "KF位置変更: " + bone;
-							} else if (ch) { kf.value = { v[0],v[1],v[2] }; }
-						} else { ImGui::TextDisabled("この KF に位置データなし"); }
+							}
+							else if (ch) { kf.value = { v[0],v[1],v[2] }; }
+						}
+						else { ImGui::TextDisabled("この KF に位置データなし"); }
 						ImGui::EndTabItem();
 					}
 
-					// --- Rotate タブ ---
 					bool rOpen = ImGui::BeginTabItem("回転 (R)");
 					if (ImGui::IsItemHovered()) ImGui::SetTooltip("キーフレームの回転値を編集します\n内部はクォータニオンですが度数で表示します");
 					if (rOpen) {
@@ -230485,14 +231145,15 @@ void MotionEditor::DrawPropertyPanel()
 									[this, bone, idx, nv]() { currentMotion_->animation_.nodeAnimations_[bone].rotate.keyframes[idx].value = nv; },
 									[this, bone, idx, ov]() { currentMotion_->animation_.nodeAnimations_[bone].rotate.keyframes[idx].value = ov; }));
 								statusMsg_ = "KF回転変更: " + bone;
-							} else if (ch) {
+							}
+							else if (ch) {
 								kf.value = EulerToQuaternion({ deg[0] * (kPi / 180), deg[1] * (kPi / 180), deg[2] * (kPi / 180) });
 							}
-						} else { ImGui::TextDisabled("この KF に回転データなし"); }
+						}
+						else { ImGui::TextDisabled("この KF に回転データなし"); }
 						ImGui::EndTabItem();
 					}
 
-					// --- Scale タブ ---
 					bool sOpen = ImGui::BeginTabItem("拡縮 (S)");
 					if (ImGui::IsItemHovered()) ImGui::SetTooltip("キーフレームのスケール値を編集します");
 					if (sOpen) {
@@ -230509,8 +231170,10 @@ void MotionEditor::DrawPropertyPanel()
 									[this, bone, idx, nv]() { currentMotion_->animation_.nodeAnimations_[bone].scale.keyframes[idx].value = nv; },
 									[this, bone, idx, ov]() { currentMotion_->animation_.nodeAnimations_[bone].scale.keyframes[idx].value = ov; }));
 								statusMsg_ = "KFスケール変更: " + bone;
-							} else if (ch) { kf.value = { v[0],v[1],v[2] }; }
-						} else { ImGui::TextDisabled("この KF に拡縮データなし"); }
+							}
+							else if (ch) { kf.value = { v[0],v[1],v[2] }; }
+						}
+						else { ImGui::TextDisabled("この KF に拡縮データなし"); }
 						ImGui::EndTabItem();
 					}
 
@@ -230520,7 +231183,6 @@ void MotionEditor::DrawPropertyPanel()
 				ImGui::Spacing();
 				ImGui::Separator();
 
-				// 削除ボタン
 				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.65f, 0.12f, 0.12f, 1));
 				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.85f, 0.20f, 0.20f, 1));
 				if (ImGui::Button("このキーフレームを削除  [Delete]", ImVec2(-1, 0))) {
@@ -230537,9 +231199,6 @@ void MotionEditor::DrawPropertyPanel()
 
 	ImGui::Spacing();
 
-	// ================================================================
-	//  セクション 3: 操作履歴
-	// ================================================================
 	if (ImGui::CollapsingHeader("HISTORY  (操作履歴)")) {
 		history_.DrawImGui();
 	}
@@ -230567,17 +231226,22 @@ void MotionEditor::DrawTimeline()
 	float duration = currentMotion_->GetDuration();
 	const int totalFrames = std::max(1, static_cast<int>(duration * fps_));
 
-	// ---- 上部コントロール ----
 	float canvasW = ImGui::GetContentRegionAvail().x;
 
-	// スクラブスライダー（既存UI：秒単位で維持）
 	ImGui::Text("Time:");
 	ImGui::SameLine(0, 4);
 	ImGui::SetNextItemWidth(canvasW - 300);
+
+	Object3d* target = GetTargetObject();
+
+	// スライダー操作時に一時停止＆同期
 	if (ImGui::SliderFloat("##scrub", &scrubTime_, 0.0f, duration, "%.3f s")) {
-		if (previewObject_->GetModel() && previewObject_->GetModel()->GetMotionSystem())
-			previewObject_->GetModel()->GetMotionSystem()->Stop();
-		// スクラブ → シークフレームに同期
+		if (target && target->GetModel() && target->GetModel()->GetMotionSystem()) {
+			auto* ms = target->GetModel()->GetMotionSystem();
+			ms->Stop();
+			isPlaying_ = false; // ★ 一時停止状態にする
+			ms->SetAnimationTime(scrubTime_);
+		}
 		dopeSheet_.SetSeekFrame(static_cast<int>(scrubTime_ * fps_));
 	}
 	if (ImGui::IsItemHovered()) ImGui::SetTooltip("クリック/ドラッグで時刻を移動");
@@ -230585,71 +231249,62 @@ void MotionEditor::DrawTimeline()
 	ImGui::SameLine(0, 8);
 	if (ImGui::SmallButton("|<")) {
 		scrubTime_ = 0;
+		if (target && target->GetModel() && target->GetModel()->GetMotionSystem()) {
+			target->GetModel()->GetMotionSystem()->SetAnimationTime(0.0f);
+		}
 		dopeSheet_.SetSeekFrame(0);
 	}
 	if (ImGui::IsItemHovered()) ImGui::SetTooltip("先頭に戻る");
 
-	// ---- チャンネル凡例 ----
 	ImGui::SameLine(0, 14);
-	ImGui::TextColored(ImVec4(1.0f, 0.59f, 0.2f, 1.0f), "■ 位置");
+	ImGui::TextColored(ImVec4(1.0f, 0.59f, 0.2f, 1.0f), (std::string(Icon::ArrowsAlt) + " 位置").c_str());
 	ImGui::SameLine(0, 6);
-	ImGui::TextColored(ImVec4(0.35f, 0.78f, 0.35f, 1.0f), "■ 回転");
+	ImGui::TextColored(ImVec4(0.35f, 0.78f, 0.35f, 1.0f), (std::string(Icon::SyncAlt) + " 回転").c_str());
 	ImGui::SameLine(0, 6);
-	ImGui::TextColored(ImVec4(0.31f, 0.59f, 1.0f, 1.0f), "■ 拡縮");
+	ImGui::TextColored(ImVec4(0.31f, 0.59f, 1.0f, 1.0f), (std::string(Icon::ExpandArrowsAlt) + " 拡縮").c_str());
 	ImGui::SameLine(0, 6);
-	ImGui::TextColored(ImVec4(1.0f, 0.94f, 0.2f, 1.0f), "■ 選択中");
+	ImGui::TextColored(ImVec4(1.0f, 0.94f, 0.2f, 1.0f), (std::string(Icon::CheckCircle) + " 選択中").c_str());
 
 	ImGui::Separator();
 
-	// ---- Motion が変わったらトラックを再構築 ----
 	if (tracksDirty_) {
 		RebuildTracks();
 		tracksDirty_ = false;
 	}
 
-	// ---- DopeSheetEditor のシークコールバック設定（毎フレーム再設定しても問題なし）----
+	// ドープシート操作時に一時停止＆同期
 	dopeSheet_.SetSeekCallback([this](int frame) {
 		scrubTime_ = frame / static_cast<float>(fps_);
-		if (previewObject_ && previewObject_->GetModel()) {
-			auto* ms = previewObject_->GetModel()->GetMotionSystem();
-			if (ms) { ms->Stop(); ms->SetAnimationTime(scrubTime_); }
+		Object3d* t = GetTargetObject();
+		if (t && t->GetModel()) {
+			auto* ms = t->GetModel()->GetMotionSystem();
+			if (ms) {
+				ms->Stop();
+				isPlaying_ = false; // ★ 一時停止状態にする
+				ms->SetAnimationTime(scrubTime_);
+			}
 		}
 		});
 
-	// KFドラッグ完了コールバック（DopeSheetEditorがドロップしたとき）
 	dopeSheet_.SetDeleteKeyCallback([this](int trackIdx, int keyIdx) {
-		// trackIdx: 0=T 1=R 2=S (ボーン3行ずつのグループ)
-		// tracks_[trackIdx] の boneName を引く
 		if (trackIdx >= static_cast<int>(tracks_.size())) return;
-		// readOnly行（グループヘッダー）はスキップ済みなので tracks_ には T/R/S のみ
-		// ただし RebuildTracks でグループヘッダー行も tracks_ に入るので注意
-		// → trackInfos_ の代わりに tracks_[ti].label からボーン名を引く
-		// ここでは DeleteKeyframe を呼ぶ（選択 KF の時刻で）
 		if (!currentMotion_) return;
-		// tracks_[trackIdx] の keys[keyIdx].frame → 秒 → DeleteKeyframe
 		if (keyIdx >= static_cast<int>(tracks_[trackIdx].keys.size())) return;
 		int frame = tracks_[trackIdx].keys[keyIdx].frame;
 		float t = frame / static_cast<float>(fps_);
-		// ボーン名をトラックのラベルから復元（"  T" → グループ名は前の行）
-		// RebuildTracks でボーン名をユーザーデータとして保持する方が堅牢だが、
-		// 今は selKF_ ベースで削除する（既存ロジックと統一）
 		DeleteKeyframe(selKF_.boneName, t);
 		tracksDirty_ = true;
 		statusMsg_ = "KF 削除";
 		});
 
-	// ---- DopeSheetEditor に描画を委譲 ----
 	bool changed = dopeSheet_.Draw("MotionTimeline", tracks_, totalFrames, fps_);
 
 	if (changed) {
-		// ドラッグによるKF移動: tracks_ の変更を Motion に書き戻す
-		// ボーンとチャンネルの対応は trackBoneMap_ を使う
 		ApplyTracksToMotion();
-		tracksDirty_ = true; // 次フレームで再構築
+		tracksDirty_ = true;
 		statusMsg_ = "KF 移動完了";
 	}
 
-	// シーク → scrubTime_ 同期（DopeSheetEditor のシーク変更）
 	{
 		int seekFrame = dopeSheet_.GetSeekFrame();
 		float newTime = seekFrame / static_cast<float>(fps_);
@@ -230658,7 +231313,6 @@ void MotionEditor::DrawTimeline()
 		}
 	}
 
-	// ---- KF ドラッグ終了処理（既存フラグと互換）----
 	if (draggingKF_ && !ImGui::IsMouseDown(0)) {
 		draggingKF_ = false;
 		statusMsg_ = "KF 移動完了";
@@ -230676,14 +231330,12 @@ void MotionEditor::RebuildTracks()
 	trackBoneMap_.clear();
 	if (!currentMotion_) return;
 
-	// チャンネル色（既存のCol名前空間に合わせる）
-	static const DopeSheet::Color colT = { 1.0f, 0.59f, 0.2f, 1.0f };  // オレンジ: 位置
-	static const DopeSheet::Color colR = { 0.35f, 0.78f, 0.35f, 1.0f }; // 緑:    回転
-	static const DopeSheet::Color colS = { 0.31f, 0.59f, 1.0f, 1.0f };  // 青:    拡縮
+	static const DopeSheet::Color colT = { 1.0f, 0.59f, 0.2f, 1.0f };
+	static const DopeSheet::Color colR = { 0.35f, 0.78f, 0.35f, 1.0f };
+	static const DopeSheet::Color colS = { 0.31f, 0.59f, 1.0f, 1.0f };
 
 	auto& nodeAnims = currentMotion_->animation_.nodeAnimations_;
 
-	// ボーン名をソートして毎回順序を安定させる
 	std::vector<std::string> boneNames;
 	boneNames.reserve(nodeAnims.size());
 	for (const auto& [name, _] : nodeAnims) boneNames.push_back(name);
@@ -230693,7 +231345,6 @@ void MotionEditor::RebuildTracks()
 	{
 		const auto& na = nodeAnims.at(boneName);
 
-		// グループヘッダー行（ボーン名）
 		{
 			DopeSheet::DopeTrack header;
 			header.label = boneName;
@@ -230701,10 +231352,9 @@ void MotionEditor::RebuildTracks()
 			header.groupExpanded = (selBone_ == boneName || selKF_.boneName == boneName
 				? true : header.groupExpanded);
 			tracks_.push_back(header);
-			trackBoneMap_.push_back({ boneName, -1 }); // -1 = ヘッダー
+			trackBoneMap_.push_back({ boneName, -1 });
 		}
 
-		// T行
 		{
 			DopeSheet::DopeTrack t;
 			t.label = "  T";
@@ -230713,9 +231363,8 @@ void MotionEditor::RebuildTracks()
 			for (const auto& kf : na.translate.keyframes)
 				t.keys.emplace_back(static_cast<int>(kf.time * fps_ + 0.5f), kf.value.x, 0);
 			tracks_.push_back(t);
-			trackBoneMap_.push_back({ boneName, 0 }); // 0 = Translate
+			trackBoneMap_.push_back({ boneName, 0 });
 		}
-		// R行
 		{
 			DopeSheet::DopeTrack r;
 			r.label = "  R";
@@ -230724,9 +231373,8 @@ void MotionEditor::RebuildTracks()
 			for (const auto& kf : na.rotate.keyframes)
 				r.keys.emplace_back(static_cast<int>(kf.time * fps_ + 0.5f), kf.value.w, 1);
 			tracks_.push_back(r);
-			trackBoneMap_.push_back({ boneName, 1 }); // 1 = Rotate
+			trackBoneMap_.push_back({ boneName, 1 });
 		}
-		// S行
 		{
 			DopeSheet::DopeTrack s;
 			s.label = "  S";
@@ -230735,7 +231383,7 @@ void MotionEditor::RebuildTracks()
 			for (const auto& kf : na.scale.keyframes)
 				s.keys.emplace_back(static_cast<int>(kf.time * fps_ + 0.5f), kf.value.x, 2);
 			tracks_.push_back(s);
-			trackBoneMap_.push_back({ boneName, 2 }); // 2 = Scale
+			trackBoneMap_.push_back({ boneName, 2 });
 		}
 	}
 }
@@ -230752,7 +231400,7 @@ void MotionEditor::ApplyTracksToMotion()
 	{
 		if (ti >= static_cast<int>(trackBoneMap_.size())) break;
 		const auto& [boneName, channel] = trackBoneMap_[ti];
-		if (channel < 0) continue; // ヘッダー行はスキップ
+		if (channel < 0) continue;
 		if (!currentMotion_->animation_.nodeAnimations_.count(boneName)) continue;
 
 		auto& na = currentMotion_->animation_.nodeAnimations_[boneName];
@@ -230774,14 +231422,11 @@ void MotionEditor::ApplyTracksToMotion()
 	}
 }
 
-// DrawKFRow は DopeSheetEditor 移行後は DrawTimeline から呼ばれない。
-// 互換のため宣言は残しつつ、実装は空にする。
 #ifdef USE_IMGUI
 void MotionEditor::DrawKFRow(ImDrawList* /*dl*/,
 	const std::string& /*boneName*/, KFChannel /*ch*/,
 	float /*rowY*/, float /*canvasX*/, float /*canvasW*/, float /*labelW*/)
 {
-	// DopeSheetEditor が各トラック行の描画を担当するため、この関数は使用しない
 }
 #endif
 
@@ -230799,7 +231444,6 @@ void MotionEditor::DrawStatusBar()
 	ImGui::SetCursorPosY(3);
 	ImGui::TextColored(ImVec4(0.6f, 0.9f, 0.6f, 1.0f), "  %s", statusMsg_.c_str());
 
-	// 右端に操作ヒント
 	float hints_x = ImGui::GetContentRegionAvail().x - 400;
 	if (hints_x > 200) {
 		ImGui::SameLine(hints_x);
@@ -230810,94 +231454,6 @@ void MotionEditor::DrawStatusBar()
 	ImGui::PopStyleColor();
 #endif
 }
-
-// ============================================================
-//  モデル読み込みポップアップ
-// ============================================================
-
-#ifdef USE_IMGUI
-void MotionEditor::DrawModelLoadPopup()
-{
-	if (showLoadPopup_)
-		ImGui::OpenPopup("モデルを開く##popup");
-
-	ImGui::SetNextWindowSize(ImVec2(480, 320), ImGuiCond_Appearing);
-	if (ImGui::BeginPopupModal("モデルを開く##popup", &showLoadPopup_)) {
-
-		ImGui::Text("モデルファイル:");
-		{
-			std::string disp = loadFileName_.empty()
-				? "(未選択)"
-				: loadDirectory_ + "/" + loadFileName_;
-			char buf[512]; strncpy_s(buf, sizeof(buf), disp.c_str(), _TRUNCATE);
-			ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 90);
-			ImGui::InputText("##mpath", buf, sizeof(buf), ImGuiInputTextFlags_ReadOnly);
-			ImGui::SameLine();
-			if (ImGui::Button("参照##m")) {
-				modelBrowser_.isOpen = true;
-				modelBrowser_.selectedFilePath = "";
-				showLoadPopup_ = false;  // ブラウザ表示中はポップアップを閉じる
-				ImGui::CloseCurrentPopup();
-			}
-		}
-		if (ImGui::IsItemHovered()) ImGui::SetTooltip(".gltf または .obj ファイルを選択します");
-
-		ImGui::Spacing();
-		ImGui::Text("アニメーション:");
-		if (!animNameList_.empty()) {
-			const char* prev = (animNameIndex_ >= 0 && animNameIndex_ < (int)animNameList_.size())
-				? animNameList_[animNameIndex_].c_str() : "(選択してください)";
-			ImGui::SetNextItemWidth(-1);
-			if (ImGui::BeginCombo("##animsel", prev)) {
-				for (int i = 0; i < (int)animNameList_.size(); ++i) {
-					bool s = (animNameIndex_ == i);
-					if (ImGui::Selectable(animNameList_[i].c_str(), s)) {
-						animNameIndex_ = i;
-						loadAnimName_ = animNameList_[i];
-					}
-					if (s) ImGui::SetItemDefaultFocus();
-				}
-				ImGui::EndCombo();
-			}
-		} else {
-			char abuf[256]; strncpy_s(abuf, sizeof(abuf), loadAnimName_.c_str(), _TRUNCATE);
-			ImGui::SetNextItemWidth(-1);
-			if (ImGui::InputText("##animinput", abuf, sizeof(abuf)))
-				loadAnimName_ = abuf;
-			ImGui::TextDisabled("(gltf ファイルを選択すると自動でリストが表示されます)");
-		}
-
-		ImGui::Spacing();
-		ImGui::Separator();
-		ImGui::Spacing();
-
-		bool canLoad = !loadFileName_.empty();
-		if (!canLoad) ImGui::BeginDisabled();
-		if (ImGui::Button("読み込む", ImVec2(120, 0))) {
-			previewObject_ = Object3d::Create(loadFileName_, loadAnimName_, true);
-			currentMotion_ = nullptr;
-			selectedAnimKey_ = "";
-			selBone_ = "";
-			selKF_.Clear();
-			history_.Clear();
-			scrubTime_ = 0;
-			statusMsg_ = "モデル読み込み: " + loadFileName_;
-			showLoadPopup_ = false;
-			ImGui::CloseCurrentPopup();
-		}
-		if (!canLoad) ImGui::EndDisabled();
-
-		ImGui::SameLine();
-		if (ImGui::Button("キャンセル", ImVec2(100, 0))) {
-			showLoadPopup_ = false;
-			ImGui::CloseCurrentPopup();
-		}
-
-		ImGui::EndPopup();
-	}
-	if (!showLoadPopup_) ImGui::CloseCurrentPopup();
-}
-#endif
 
 // ============================================================
 //  バイナリ保存・読み込みポップアップ
@@ -230930,7 +231486,6 @@ void MotionEditor::DrawSaveLoadPopup()
 		ImGui::Separator();
 		ImGui::Spacing();
 
-		// 保存
 		bool canSave = currentMotion_ != nullptr;
 		if (!canSave) ImGui::BeginDisabled();
 		if (ImGui::Button("バイナリ保存", ImVec2(130, 0))) {
@@ -230948,7 +231503,8 @@ void MotionEditor::DrawSaveLoadPopup()
 
 		ImGui::SameLine(0, 10);
 
-		// 読み込み
+		Object3d* target = GetTargetObject();
+
 		if (ImGui::Button("バイナリ読み込み", ImVec2(140, 0))) {
 			try {
 				Motion loaded = Motion().LoadBinary(savePath_);
@@ -230956,8 +231512,9 @@ void MotionEditor::DrawSaveLoadPopup()
 				Model::animationCache_[key] = std::move(loaded);
 				selectedAnimKey_ = key;
 				currentMotion_ = &Model::animationCache_[key];
-				previewObject_->SetChangeMotion(loadFileName_, MotionPlayMode::Loop,
-					AnimDisplayName(key));
+				if (target) {
+					target->SetChangeMotion(loadFileName_, MotionPlayMode::Loop, AnimDisplayName(key));
+				}
 				saveMsg_ = "読み込み成功: " + savePath_;
 				statusMsg_ = saveMsg_;
 			}
@@ -230999,11 +231556,9 @@ void MotionEditor::DrawFileBrowser(FileBrowserState& state, const char* title)
 	bool open = true;
 	if (!ImGui::Begin(title, &open)) { ImGui::End(); if (!open) state.isOpen = false; return; }
 
-	// 現在パス表示
 	ImGui::TextColored(ImVec4(0.7f, 0.9f, 1, 1), "%s", state.currentDirectory.c_str());
 	ImGui::Separator();
 
-	// 上へボタン
 	bool canUp = !state.directoryHistory.empty();
 	if (!canUp) ImGui::BeginDisabled();
 	if (ImGui::Button("[ .. ] 上へ")) {
@@ -231016,7 +231571,6 @@ void MotionEditor::DrawFileBrowser(FileBrowserState& state, const char* title)
 	ImGui::TextDisabled("| ダブルクリックでフォルダを開く / ファイルを選択");
 	ImGui::Separator();
 
-	// エントリ一覧
 	auto entries = GetDirectoryEntries(state.currentDirectory, state.filterExtension);
 	ImGui::BeginChild("##fblist", ImVec2(0, -50), true);
 	for (const auto& e : entries) {
@@ -231033,7 +231587,8 @@ void MotionEditor::DrawFileBrowser(FileBrowserState& state, const char* title)
 				}
 			}
 			ImGui::PopStyleColor();
-		} else {
+		}
+		else {
 			bool isSel = (state.selectedFilePath == e.path().string());
 			if (ImGui::Selectable(name.c_str(), isSel, ImGuiSelectableFlags_AllowDoubleClick)) {
 				state.selectedFilePath = e.path().string();
@@ -231082,7 +231637,8 @@ void MotionEditor::InsertKeyframe(const std::string& bone, float time)
 				using KF = typename std::remove_reference<decltype(kfs)>::type::value_type;
 				auto it = std::find_if(kfs.begin(), kfs.end(),
 					[time](const KF& k) { return std::abs(k.time - time) < 1e-4f; });
-				if (it != kfs.end()) { it->value = val; } else {
+				if (it != kfs.end()) { it->value = val; }
+				else {
 					KF k; k.time = time; k.value = val; kfs.push_back(k);
 					std::sort(kfs.begin(), kfs.end(), [](const KF& a, const KF& b) { return a.time < b.time; });
 				}
@@ -231126,7 +231682,6 @@ void MotionEditor::MoveKeyframe(const std::string& bone, KFChannel ch, int idx, 
 	if (!currentMotion_) return;
 	auto& na = currentMotion_->animation_.nodeAnimations_[bone];
 
-	// リアルタイム更新のみ（ドラッグ完了後に Undo 登録するため、ここでは直接書き換え）
 	auto setTime = [&](auto& kfs) {
 		if (idx >= 0 && idx < (int)kfs.size()) {
 			kfs[idx].time = newTime;
@@ -231150,7 +231705,8 @@ void MotionEditor::SetJointTransform(const std::string& bone, const QuaternionTr
 	Joint* j = FindJoint(bone);
 	if (!j) return;
 	j->SetTransform(tr);
-	Model* m = previewObject_ ? previewObject_->GetModel() : nullptr;
+	Object3d* target = GetTargetObject();
+	Model* m = target ? target->GetModel() : nullptr;
 	if (m && m->GetSkeleton()) {
 		m->GetSkeleton()->Update();
 		if (m->GetSkinCluster())
@@ -231160,8 +231716,9 @@ void MotionEditor::SetJointTransform(const std::string& bone, const QuaternionTr
 
 Joint* MotionEditor::FindJoint(const std::string& name) const
 {
-	if (!previewObject_ || !previewObject_->GetModel()) return nullptr;
-	return previewObject_->GetModel()->GetJointMap(name);
+	Object3d* target = GetTargetObject();
+	if (!target || !target->GetModel()) return nullptr;
+	return target->GetModel()->GetJointMap(name);
 }
 
 QuaternionTransform MotionEditor::BufferToTransform() const
@@ -231223,11 +231780,13 @@ std::vector<fs::directory_entry> MotionEditor::GetDirectoryEntries(
 	std::error_code ec;
 	for (const auto& e : fs::directory_iterator(dir, ec)) {
 		if (ec) break;
-		if (e.is_directory()) { dirs.push_back(e); } else if (e.is_regular_file()) {
+		if (e.is_directory()) { dirs.push_back(e); }
+		else if (e.is_regular_file()) {
 			std::string ex = e.path().extension().string();
 			if (ext.empty()) {
 				if (ex == ".gltf" || ex == ".obj" || ex == ".anim") files.push_back(e);
-			} else {
+			}
+			else {
 				if (ex == ext) files.push_back(e);
 			}
 		}
@@ -231255,7 +231814,9 @@ File Path: YEngine/Model/Motion/MotionEditor.h
 #include "WorldTransform/WorldTransform.h"
 #include "Editor/Command/CommandHistory.h"
 #include "Debugger/DopeSheet/DopeSheetEditor.h"
+#include <Graphics/Drawer/LineManager/Line.h>
 
+#include "Object3D/ObjectManager.h" 
 // Math
 #include "Vector3.h"
 #include "Quaternion.h"
@@ -231299,11 +231860,11 @@ class MotionEditor
 {
 public:
 	///************************* 基本的関数 *************************///
-	void Initialize();
+	void Initialize(Camera* camera);
 	void Update();
-	void Draw(Camera* camera);
+	void DrawBone();
 	void ShowEditor();
-
+	void SetTargetObjectId(int id);
 private:
 	///************************* その他描画 *************************///
 	void DrawMenuBar();
@@ -231314,7 +231875,6 @@ private:
 	void DrawStatusBar();
 
 	///************************* ポップアップ *************************///
-	void DrawModelLoadPopup();
 	void DrawSaveLoadPopup();
 	void DrawFileBrowser(FileBrowserState& state, const char* title);
 
@@ -231353,6 +231913,13 @@ private:
 	void SyncJointToBuffer(const std::string& bone);  // Joint の現在値 → 編集バッファ
 	void SyncBufferToJoint();                          // 編集バッファ → Joint
 
+	Object3d* GetTargetObject() const {
+		if (targetObjectId_ != -1) {
+			return ObjectManager::GetInstance()->GetObject3dById(targetObjectId_);
+		}
+		return nullptr;
+	}
+
 private:
 	///************************* 定数 *************************///
 	static constexpr const char* kModelRootDir = "Resources/Models";
@@ -231370,8 +231937,10 @@ private:
 	bool tracksDirty_ = false;    // ドープシートの内容が Motion に反映されていない状態
 	int fps_ = 60;
 
+	Camera* camera_ = nullptr;
+
 	// プレビュー
-	std::unique_ptr<Object3d> previewObject_;
+	int targetObjectId_ = -1;
 	WorldTransform            previewTransform_;
 	Motion* currentMotion_ = nullptr;
 
@@ -231381,11 +231950,16 @@ private:
 	// モデル読み込み
 	std::string      loadFileName_ = "";
 	std::string      loadDirectory_ = "";
-	FileBrowserState modelBrowser_;
 	std::vector<std::string> animNameList_;
 	int              animNameIndex_ = -1;
 	std::string      loadAnimName_ = "";
 	bool             showLoadPopup_ = false;
+	std::unique_ptr<Line> lineDrawer_;
+	bool             isDrawBone_ = false;
+
+	// 再生状態の管理 (UI用)
+	bool isPlaying_ = true;
+	bool isLoop_ = true;
 
 	// モーション選択
 	std::string selectedAnimKey_ = "";    // animationCache_ のキー
@@ -231749,6 +232323,8 @@ public:
 	/// アニメーション全体の長さを取得
 	float GetDuration() const { return animation_ ? animation_->GetDuration() : 0.0f; }
 
+	// 現在のアニメーションデータ取得
+	Motion* GetAnimation() const { return animation_; }
 private:
 	///************************* 内部処理 *************************///
 
@@ -232075,19 +232651,64 @@ void Skeleton::Draw(Line& line, const Matrix4x4& worldMatrix)
 		return;
 	}
 
-	// スケルトン内の全ての接続を描画
+	// スケルトン内の全ての接続をBlenderの八面体ボーン（ワイヤーフレーム）として描画
 	for (const auto& connection : connections_) {
 		int32_t parentIndex = connection.first;
 		int32_t childIndex = connection.second;
 
-		// 親ジョイントと子ジョイントのワールド座標を取得
-		const Vector3& parentPosition = Joint::ExtractJointPosition(joints_[parentIndex]);
-		const Vector3& childPosition = Joint::ExtractJointPosition(joints_[childIndex]);
-		
-		Vector3 parentWorld = Transform(parentPosition, worldMatrix);
-		Vector3 childWorld = Transform(childPosition, worldMatrix);
-		
-		line.RegisterLine(parentWorld, childWorld);
+		// 親(Head)と子(Tail)の座標を取得
+		const Vector3& parentLocal = Joint::ExtractJointPosition(joints_[parentIndex]);
+		const Vector3& childLocal = Joint::ExtractJointPosition(joints_[childIndex]);
+
+		Vector3 pWorld = Transform(parentLocal, worldMatrix);
+		Vector3 cWorld = Transform(childLocal, worldMatrix);
+
+		// 方向と長さを計算
+		Vector3 dir = cWorld - pWorld;
+		float length = Length(dir); // ※長さを取得する関数（無ければ独自実装）
+
+		// 長さが短すぎる場合は描画をスキップ
+		if (length < 0.0001f) continue;
+
+		Vector3 forward = Normalize(dir); // ※正規化関数
+
+		// 進行方向に直交する2つの軸（right と up）を求める
+		Vector3 upGuide = { 0.0f, 1.0f, 0.0f };
+		// もしボーンが真上を向いていて外積が計算できない場合の回避処理
+		if (std::abs(Dot(forward, upGuide)) > 0.99f) {
+			upGuide = { 1.0f, 0.0f, 0.0f };
+		}
+		Vector3 right = Normalize(Cross(upGuide, forward)); // ※外積関数
+		Vector3 up = Normalize(Cross(forward, right));
+
+		// ボーンの太さと、一番太くなる位置の割合（Blender風に根元から10%の位置を太くする）
+		float headRatio = 0.1f;
+		float radius = length * 0.08f; // ボーンの長さの8%を太さ（半径）とする
+		Vector3 mid = pWorld + (forward * (length * headRatio));
+
+		// 中間（一番太い部分）の4つの頂点を計算
+		Vector3 vRight = mid + (right * radius);
+		Vector3 vLeft = mid - (right * radius);
+		Vector3 vUp = mid + (up * radius);
+		Vector3 vDown = mid - (up * radius);
+
+		// 1. 根元(Head) から 中間の4頂点へ（4本）
+		line.RegisterLine(pWorld, vRight);
+		line.RegisterLine(pWorld, vLeft);
+		line.RegisterLine(pWorld, vUp);
+		line.RegisterLine(pWorld, vDown);
+
+		// 2. 中間の4頂点 から 先端(Tail)へ（4本）
+		line.RegisterLine(vRight, cWorld);
+		line.RegisterLine(vLeft, cWorld);
+		line.RegisterLine(vUp, cWorld);
+		line.RegisterLine(vDown, cWorld);
+
+		// 3. 中間の4頂点同士を結ぶ（断面のひし形・4本）
+		line.RegisterLine(vRight, vUp);
+		line.RegisterLine(vUp, vLeft);
+		line.RegisterLine(vLeft, vDown);
+		line.RegisterLine(vDown, vRight);
 	}
 	line.DrawLine();
 }
@@ -232759,7 +233380,7 @@ public:
 	void Initialize();
 
 	// 更新
-	void Update();
+	void Update() override;
 
 	// 描画
 	void Draw();
@@ -233616,7 +234237,6 @@ protected:
 	// 初期化
 	// 継承先から呼び出して共通設定を行う
 	void Initialize();
-
 public:
 	///************************* デストラクタ *************************///
 
@@ -233682,6 +234302,8 @@ public:
 	// JSONから初期化情報を読み込む
 	virtual void InitJson(YoRigine::JsonManager* jsonManager) = 0;
 
+	// 更新
+	virtual void Update() = 0;
 public:
 	///************************* アクセッサ *************************///
 
@@ -233695,7 +234317,8 @@ public:
 	void SetCamera(Camera* camera) { camera_ = camera; }
 
 	// ワールドトランスフォーム設定
-	void SetWT(const WorldTransform* worldTransform) { wt_ = worldTransform; }
+	WorldTransform* GetWT() { return wt_; }
+	void SetWT(WorldTransform* worldTransform) { wt_ = worldTransform; }
 
 	// 当たり判定の有効フラグ設定
 	void SetCollisionEnabled(bool enabled) { isCollisionEnabled_ = enabled; }
@@ -233712,6 +234335,14 @@ public:
 	// コライダー全体の有効状態設定
 	void SetActive(bool isActive) { isActive_ = isActive; }
 
+	// 静的オブジェクトの設定
+	void SetIsStatic(bool isStatic) { isStatic_ = isStatic; }
+	bool GetIsStatic() const { return isStatic_; }
+
+	// めり込みの有効フラグ設定
+	void SetEnablePenetration(bool enable) { enablePenetration_ = enable; }
+	bool GetEnablePenetration() const { return enablePenetration_; }
+
 protected:
 	///************************* 継承クラス用変数 *************************///
 
@@ -233719,7 +234350,7 @@ protected:
 	std::unique_ptr<Line> line_ = nullptr;
 
 	// 所属オブジェクトのワールドトランスフォーム
-	const WorldTransform* wt_ = nullptr;
+	WorldTransform* wt_ = nullptr;
 
 	// 衝突タイプ識別ID（CollisionTypeIdDefで定義）
 	uint32_t typeID_ = 0u;
@@ -233732,6 +234363,12 @@ public:
 
 	// カメラ外に出た際の判定を無効化する
 	bool checkOutsideCamera = true;
+
+	// 静的オブジェクトかどうか
+	bool isStatic_ = false;
+
+	// めり込みを行うかどうか
+	bool enablePenetration_ = true;
 
 	// デバッグ表示用カメラ参照
 	Camera* camera_ = nullptr;
@@ -233787,7 +234424,7 @@ public:
 	template <typename T, typename TObject>
 	static std::shared_ptr<T> Create(
 		TObject* owner,
-		const WorldTransform* worldTransform,
+		 WorldTransform* worldTransform,
 		Camera* camera,
 		uint32_t typeID)
 	{
@@ -234227,11 +234864,13 @@ namespace YoRigine {
 			if (auto sb = dynamic_cast<SphereCollider*>(b)) return Check(sa, sb);
 			if (auto ob = dynamic_cast<OBBCollider*>(b))    return Check(sa, ob);
 			if (auto ab = dynamic_cast<AABBCollider*>(b))    return Check(sa, ab);
-		} else if (auto oa = dynamic_cast<OBBCollider*>(a)) {
+		}
+		else if (auto oa = dynamic_cast<OBBCollider*>(a)) {
 			if (auto sb = dynamic_cast<SphereCollider*>(b)) return Check(sb, oa); // 順序逆
 			if (auto ob = dynamic_cast<OBBCollider*>(b))    return Check(oa, ob);
 			if (auto ab = dynamic_cast<AABBCollider*>(b))    return Check(ab, oa); // 順序逆
-		} else if (auto aa = dynamic_cast<AABBCollider*>(a)) {
+		}
+		else if (auto aa = dynamic_cast<AABBCollider*>(a)) {
 			if (auto sb = dynamic_cast<SphereCollider*>(b)) return Check(sb, aa); // 順序逆
 			if (auto ob = dynamic_cast<OBBCollider*>(b))    return Check(aa, ob);
 			if (auto ab = dynamic_cast<AABBCollider*>(b))    return Check(aa, ab);
@@ -234265,9 +234904,11 @@ namespace YoRigine {
 
 			if (std::abs(overlap.x) < std::abs(overlap.y) && std::abs(overlap.x) < std::abs(overlap.z)) {
 				*hitDirection = (diff.x > 0.0f) ? HitDirection::Left : HitDirection::Right;
-			} else if (std::abs(overlap.y) < std::abs(overlap.x) && std::abs(overlap.y) < std::abs(overlap.z)) {
+			}
+			else if (std::abs(overlap.y) < std::abs(overlap.x) && std::abs(overlap.y) < std::abs(overlap.z)) {
 				*hitDirection = (diff.y > 0.0f) ? HitDirection::Top : HitDirection::Bottom;
-			} else {
+			}
+			else {
 				*hitDirection = (diff.z > 0.0f) ? HitDirection::Front : HitDirection::Back;
 			}
 		}
@@ -234393,9 +235034,11 @@ namespace YoRigine {
 	{
 		if (fabs(dir.x) > fabs(dir.y) && fabs(dir.x) > fabs(dir.z)) {
 			return dir.x > 0 ? HitDirection::Right : HitDirection::Left;
-		} else if (fabs(dir.y) > fabs(dir.z)) {
+		}
+		else if (fabs(dir.y) > fabs(dir.z)) {
 			return dir.y > 0 ? HitDirection::Top : HitDirection::Bottom;
-		} else {
+		}
+		else {
 			return dir.z > 0 ? HitDirection::Front : HitDirection::Back;
 		}
 	}
@@ -234504,6 +235147,143 @@ namespace YoRigine {
 		return flags;
 	}
 
+	// ---------------------------------------------------------
+		// ★追加: Sphere同士の押し戻し計算
+		// ---------------------------------------------------------
+	CollisionResult Collision::Resolve(const SphereCollider* a, const SphereCollider* b) {
+		CollisionResult res;
+		Vector3 diff = a->GetCenterPosition() - b->GetCenterPosition();
+		float distSq = LengthSquared(diff);
+		float radiusSum = a->GetRadius() + b->GetRadius();
+
+		if (distSq <= radiusSum * radiusSum && distSq > 0.0001f) {
+			float dist = std::sqrt(distSq);
+			res.isHit = true;
+			res.normal = diff * (1.0f / dist); // BからAへの正規化ベクトル
+			res.penetrationDepth = radiusSum - dist;
+		}
+		return res;
+	}
+
+	// ---------------------------------------------------------
+	// ★追加: OBB同士の押し戻し計算 (現在のCheckHitDirectionを応用)
+	// ---------------------------------------------------------
+	CollisionResult Collision::Resolve(const OBB& obbA, const OBB& obbB) {
+		CollisionResult res;
+		const float EPSILON = 1e-6f;
+
+		Matrix4x4 matA = MakeRotateMatrixXYZ(obbA.rotation);
+		Matrix4x4 matB = MakeRotateMatrixXYZ(obbB.rotation);
+
+		Vector3 axes[15];
+		// obbAの軸 (0,1,2)
+		axes[0] = { matA.m[0][0], matA.m[1][0], matA.m[2][0] };
+		axes[1] = { matA.m[0][1], matA.m[1][1], matA.m[2][1] };
+		axes[2] = { matA.m[0][2], matA.m[1][2], matA.m[2][2] };
+		// obbBの軸 (3,4,5)
+		axes[3] = { matB.m[0][0], matB.m[1][0], matB.m[2][0] };
+		axes[4] = { matB.m[0][1], matB.m[1][1], matB.m[2][1] };
+		axes[5] = { matB.m[0][2], matB.m[1][2], matB.m[2][2] };
+
+		// 外積による軸 (6～14)
+		int axisIdx = 6;
+		for (int i = 0; i < 3; i++) {
+			for (int j = 0; j < 3; j++) {
+				axes[axisIdx++] = Cross(axes[i], axes[3 + j]);
+			}
+		}
+
+		Vector3 distanceVec = obbB.center - obbA.center;
+		float minOverlap = FLT_MAX;
+		Vector3 minAxis = { 0, 0, 0 };
+
+		// 全15軸の分離軸テスト
+		for (int i = 0; i < 15; i++) {
+			Vector3 axis = axes[i];
+			float lenSq = LengthSquared(axis);
+			if (lenSq < EPSILON) continue;
+			axis = axis * (1.0f / std::sqrt(lenSq)); // 正規化
+
+			// a, b 両方の軸群を渡す関数が既存にある想定 (ProjectOBB)
+			float projA = ProjectOBB(obbA, axis, &axes[0]);
+			float projB = ProjectOBB(obbB, axis, &axes[3]);
+
+			float distance = std::abs(Dot(distanceVec, axis));
+			float overlap = projA + projB - distance;
+
+			if (overlap < 0.0f) {
+				return res; // 分離軸が見つかった＝当たっていない
+			}
+
+			if (overlap < minOverlap) {
+				minOverlap = overlap;
+				minAxis = axis;
+			}
+		}
+
+		// BからAに向かう方向にする
+		if (Dot(distanceVec, minAxis) > 0.0f) {
+			minAxis = minAxis * -1.0f;
+		}
+
+		res.isHit = true;
+		res.normal = minAxis;
+		res.penetrationDepth = minOverlap;
+		return res;
+	}
+
+	// ---------------------------------------------------------
+	// ★追加: Sphere と OBB の押し戻し計算
+	// ---------------------------------------------------------
+	CollisionResult Collision::Resolve(const SphereCollider* sphere, const OBB& obb) {
+		CollisionResult res;
+		Vector3 center = sphere->GetCenterPosition();
+		float radius = sphere->GetRadius();
+
+		// 1. OBBの回転を逆にして、球の中心をOBBのローカル空間（回転ゼロの世界）に持っていく
+		Matrix4x4 rotMat = MakeRotateMatrixXYZ(obb.rotation);
+		Matrix4x4 invRot = TransPose(rotMat); // 逆行列（回転のみなら転置でOK）
+		Vector3 localCenter = Transform(center - obb.center, invRot);
+
+		// 2. OBBのサイズ内にクランプして、OBB上で最も球の中心に近いローカル座標の点を求める
+		Vector3 closestLocal = Clamp(localCenter, -obb.size, obb.size);
+
+		// 3. 最も近い点をワールド座標（元の世界）に戻す
+		Vector3 closestWorld = obb.center + Transform(closestLocal, rotMat);
+
+		// 4. 球の中心と、OBB上の最も近い点との差分ベクトルを計算
+		Vector3 diff = center - closestWorld;
+		float distSq = LengthSquared(diff);
+
+		// 5. 距離が半径より小さければヒット！
+		if (distSq <= radius * radius) {
+			res.isHit = true;
+			float dist = std::sqrt(distSq);
+
+			if (dist > 0.0001f) {
+				// OBBから球へ向かう正規化ベクトル
+				res.normal = diff * (1.0f / dist);
+				// 半径から実際の距離を引いた分がめり込み量
+				res.penetrationDepth = radius - dist;
+			}
+			else {
+				// ※球の中心が完全にOBBの内部に入ってしまった場合の緊急脱出（上方向に押し出す）
+				res.normal = { 0.0f, 1.0f, 0.0f };
+				res.penetrationDepth = radius;
+			}
+		}
+		return res;
+	}
+
+	// AABBをOBBに変換するユーティリティ関数（これを通すことでAABBvsAABB、AABBvsOBBをカバー）
+	OBB ConvertAABBToOBB(const AABB& aabb) {
+		OBB obb;
+		obb.center = (aabb.min + aabb.max) * 0.5f;
+		obb.size = (aabb.max - aabb.min) * 0.5f;
+		obb.rotation = { 0.0f, 0.0f, 0.0f };
+		return obb;
+	}
+
 
 
 
@@ -234543,56 +235323,100 @@ namespace YoRigine {
 		collidingPairs_.clear();
 	}
 
+	// ★追加: ペアの判定と押し戻し実行
 	void CollisionManager::CheckCollisionPair(BaseCollider* a, BaseCollider* b) {
+		if (!a || !b) return;
 		auto key = std::minmax(a, b);
 		bool wasColliding = collidingPairs_.contains(key);
-		bool isNowColliding = false;
-		HitDirection dirA = HitDirection::None;
-		HitDirection dirB = HitDirection::None;
 
-		if (auto aa = dynamic_cast<AABBCollider*>(a)) {
-			if (auto ab = dynamic_cast<AABBCollider*>(b)) {
-				isNowColliding = Collision::CheckHitDirection(aa->GetAABB(), ab->GetAABB(), &dirA);
-				dirB = Collision::InverseHitDirection(dirA);
-			} else if (auto ob = dynamic_cast<OBBCollider*>(b)) {
-				isNowColliding = Collision::CheckHitDirection(aa->GetAABB(), ob->GetOBB(), &dirA);
-				dirB = Collision::GetSelfLocalHitDirection(ob, aa); // ★ これに修正！
-			} else {
-				isNowColliding = Collision::Check(a, b);
+		CollisionResult res;
+
+		// --- ポリモーフィズムで適切な判定を呼ぶ ---
+		// 【AがSphereの場合】
+		if (auto sa = dynamic_cast<SphereCollider*>(a)) {
+			if (auto sb = dynamic_cast<SphereCollider*>(b)) {
+				res = Collision::Resolve(sa, sb); // Sphere vs Sphere
 			}
-		} else if (auto oa = dynamic_cast<OBBCollider*>(a)) {
-			if (auto ab = dynamic_cast<AABBCollider*>(b)) {
-				isNowColliding = Collision::CheckHitDirection(ab->GetAABB(), oa->GetOBB(), &dirB);
-				dirA = Collision::GetSelfLocalHitDirection(oa, ab); // ★ こっちも逆視点で判定！
-			} else if (auto ob = dynamic_cast<OBBCollider*>(b)) {
-				isNowColliding = Collision::CheckHitDirection(oa->GetOBB(), ob->GetOBB(), &dirA);
-				dirB = Collision::GetSelfLocalHitDirection(ob, oa); // ★ 片方はSAT、もう片方はローカル視点
-			} else {
-				isNowColliding = Collision::Check(a, b);
+			else if (auto ob = dynamic_cast<OBBCollider*>(b)) {
+				res = Collision::Resolve(sa, ob->GetOBB()); // Sphere vs OBB
 			}
-		} else {
-			isNowColliding = Collision::Check(a, b);
+			else if (auto ab = dynamic_cast<AABBCollider*>(b)) {
+				// ★ Sphere vs AABB (AABBをOBBに変換して丸投げ！)
+				res = Collision::Resolve(sa, ConvertAABBToOBB(ab->GetAABB()));
+			}
+		}
+		// 【AがOBBの場合】
+		else if (auto oa = dynamic_cast<OBBCollider*>(a)) {
+			if (auto sb = dynamic_cast<SphereCollider*>(b)) {
+				res = Collision::Resolve(sb, oa->GetOBB()); // 逆にして計算
+				res.normal = res.normal * -1.0f; // 基準が逆になるので押し戻し方向を反転
+			}
+			else if (auto ob = dynamic_cast<OBBCollider*>(b)) {
+				res = Collision::Resolve(oa->GetOBB(), ob->GetOBB()); // OBB vs OBB
+			}
+			else if (auto ab = dynamic_cast<AABBCollider*>(b)) {
+				// ★ OBB vs AABB
+				res = Collision::Resolve(oa->GetOBB(), ConvertAABBToOBB(ab->GetAABB()));
+			}
+		}
+		// 【AがAABBの場合】
+		else if (auto aa = dynamic_cast<AABBCollider*>(a)) {
+			if (auto sb = dynamic_cast<SphereCollider*>(b)) {
+				// ★ AABB vs Sphere
+				res = Collision::Resolve(sb, ConvertAABBToOBB(aa->GetAABB()));
+				res.normal = res.normal * -1.0f; // 基準が逆になるので反転
+			}
+			else if (auto ob = dynamic_cast<OBBCollider*>(b)) {
+				// ★ AABB vs OBB
+				res = Collision::Resolve(ConvertAABBToOBB(aa->GetAABB()), ob->GetOBB());
+			}
+			else if (auto ab = dynamic_cast<AABBCollider*>(b)) {
+				// ★ AABB vs AABB (両方OBBに変換！)
+				res = Collision::Resolve(ConvertAABBToOBB(aa->GetAABB()), ConvertAABBToOBB(ab->GetAABB()));
+			}
 		}
 
-		// イベント処理
-		if (isNowColliding) {
+		// --- 押し戻しの適用 ---
+		if (res.isHit && res.penetrationDepth > 0.0f) {
+
+			if (a->GetEnablePenetration() && b->GetEnablePenetration()) {
+				WorldTransform* wtA = a->GetWT();
+				WorldTransform* wtB = b->GetWT();
+				bool staticA = a->GetIsStatic();
+				bool staticB = b->GetIsStatic();
+
+				if (wtA && wtB) {
+					if (!staticA && !staticB) {
+						// 両方動く場合は 1:1 で押し戻し
+						wtA->translate_ += res.normal * (res.penetrationDepth * 0.5f);
+						wtB->translate_ -= res.normal * (res.penetrationDepth * 0.5f);
+					}
+					else if (!staticA) {
+						// Aだけ動く
+						wtA->translate_ += res.normal * res.penetrationDepth;
+						wtA->UpdateMatrix();
+						a->Update();
+					}
+					else if (!staticB) {
+						// Bだけ動く
+						wtB->translate_ -= res.normal * res.penetrationDepth;
+						wtB->UpdateMatrix();
+					}
+				}
+			}
+		}
+
+		// --- 既存のイベント呼び出し ---
+		if (res.isHit) {
 			if (!wasColliding) {
 				a->CallOnEnterCollision(b);
 				b->CallOnEnterCollision(a);
-				if (dirA != HitDirection::None || dirB != HitDirection::None) {
-					a->CallOnEnterDirectionCollision(b, dirA);
-					b->CallOnEnterDirectionCollision(a, dirB);
-				}
 				collidingPairs_.insert(key);
 			}
 			a->CallOnCollision(b);
 			b->CallOnCollision(a);
-
-			if (dirA != HitDirection::None || dirB != HitDirection::None) {
-				a->CallOnDirectionCollision(b, dirA);
-				b->CallOnDirectionCollision(a, dirB);
-			}
-		} else {
+		}
+		else {
 			if (wasColliding) {
 				a->CallOnExitCollision(b);
 				b->CallOnExitCollision(a);
@@ -234685,6 +235509,13 @@ File Path: YEngine/Utilities/Collision/Core/CollisionManager.h
 namespace YoRigine {
 	///************************* ヒット方向定義 *************************///
 
+	// 衝突結果をまとめる構造体
+	struct CollisionResult {
+		bool isHit = false;
+		Vector3 normal = {};
+		float penetrationDepth = 0.0f;
+	};
+
 	// 衝突方向のビット列定義
 	enum HitDirectionFlags {
 		HitDirection_None = 0,
@@ -234755,6 +235586,11 @@ namespace YoRigine {
 
 		// シンプルな方向ビット取得
 		HitDirectionBits GetSelfLocalHitDirectionsSimple(BaseCollider* self, BaseCollider* other);
+
+		///************************* 押し戻しの処理 *************************///
+		CollisionResult Resolve(const SphereCollider* a, const SphereCollider* b);
+		CollisionResult Resolve(const OBB& obbA, const OBB& obbB);
+		CollisionResult Resolve(const SphereCollider* sphere, const OBB& obb);
 	}
 
 	///************************* コリジョン管理クラス *************************///
@@ -235043,7 +235879,7 @@ public:
 	void Initialize();
 
 	// 更新
-	void Update();
+	void Update() override;
 
 	// 描画
 	void Draw();
@@ -235162,7 +235998,7 @@ public:
 	void Initialize();
 
 	// 更新
-	void Update();
+	void Update() override;
 
 	// 描画
 	void Draw();
@@ -255876,6 +256712,7 @@ void BattleEnemy::InitCollision() {
 	// OBBコライダー生成
 	obbCollider_ = ColliderFactory::Create<OBBCollider>(
 		this, &wt_, camera_, static_cast<uint32_t>(CollisionTypeIdDef::kBattleEnemy));
+	obbCollider_->SetIsStatic(false);
 }
 
 /*==========================================================================
@@ -260055,6 +260892,7 @@ void FieldEnemy::InitCollision() {
 		camera_,
 		static_cast<uint32_t>(CollisionTypeIdDef::kFieldEnemy)
 	);
+	obbCollider_->SetIsStatic(false);
 }
 
 /// <summary>
@@ -262873,12 +263711,17 @@ AttackingCombatState::AttackingCombatState(PlayerCombat* combat) : combat_(comba
 		auto* movement = player->GetMovement();
 		movement->SetCanMove(false);
 		movement->SetCanRotate(false);
-		movement->ForceStop();  // 即座に停止させる
+
+		// 即座に停止させる
+		movement->ForceStop();  
 
 		// 攻撃アニメーションを再生
 		auto* obj = player->GetObject3d();
-		obj->SetMotionSpeed(attack.motionSpeed); // 攻撃モーション速度
+		obj->SetMotionSpeed(attack.motionSpeed);
 		obj->SetChangeMotion("Player.gltf", MotionPlayMode::Once, attack.animationName);
+
+		// アニメーション再生と同時に剣のトレイルエフェクトも再生開始
+		player->GetSword()->PlayTrail();
 		// 通知ログ
 		combat->NotifyAction("コンボ開始: " + attack.animationName);
 		});
@@ -262899,6 +263742,8 @@ AttackingCombatState::AttackingCombatState(PlayerCombat* combat) : combat_(comba
 		obj->SetMotionSpeed(attack.motionSpeed);
 		obj->SetChangeMotion("Player.gltf", MotionPlayMode::Once, attack.animationName);
 
+		// トレイルをリセットして再生開始
+		player->GetSword()->PlayTrail();
 		// 通知ログ
 		combat->NotifyAction("コンボ継続: " + attack.animationName);
 		});
@@ -262918,16 +263763,11 @@ AttackingCombatState::AttackingCombatState(PlayerCombat* combat) : combat_(comba
 		auto* obj = player->GetObject3d();
 		obj->SetMotionSpeed(player->GetMotionSpeed(0));
 
-		switch (player->GetMovement()->GetCurrentState()) {
-		case MovementState::Idle:
-		case MovementState::Moving:
-			//obj->SetChangeMotion("Player.gltf", MotionPlayMode::Loop, "Idle4");
-			break;
-		}
+		// トレイルエフェクトを停止
+		player->GetSword()->StopTrail();
 
 		// 通知ログ
 		combat->NotifyAction("コンボ終了");
-
 		// 攻撃終了後にIdle状態へ戻す
 		combat->ChangeState(CombatState::Idle);
 		});
@@ -262979,6 +263819,8 @@ void AttackingCombatState::OnExit() {
 	movement->SetCanMove(true);
 	movement->SetCanRotate(true);
 
+	// 攻撃終了後はエフェクトも停止
+	player->GetSword()->StopTrail();
 }
 
 /// <summary>
@@ -263286,7 +264128,6 @@ void PlayerCombat::ShowDebugImGui() {
 			ImGui::Text("操作テスト");
 			if (ImGui::Button("A攻撃")) { TryAttack(AttackType::A_Arte); } ImGui::SameLine();
 			if (ImGui::Button("B攻撃")) { TryAttack(AttackType::B_Arte); } ImGui::SameLine();
-			if (ImGui::Button("奥義")) { TryAttack(AttackType::Arcane_Arte); }
 
 			if (ImGui::Button("ガード")) { TryGuard(); } ImGui::SameLine();
 			if (ImGui::Button("キャンセル")) { TryCancel(); }
@@ -263696,9 +264537,9 @@ void AttackDataEditor::DrawAttackList()
     for (int i = 0; i < static_cast<int>(attacks_->size()); ++i)
         byType[attacks_->at(i).type].push_back(i);
 
-    static const char* typeLabels[] = { "A技 (軽)", "B技 (重)", "奥義 (究極)" };
+    static const char* typeLabels[] = { "A技 (軽)", "B技 (重)" };
 
-    for (int t = 0; t < 3; ++t)
+    for (int t = 0; t < 2; ++t)
     {
         if (!ImGui::CollapsingHeader(typeLabels[t], ImGuiTreeNodeFlags_DefaultOpen)) continue;
 
@@ -263766,12 +264607,6 @@ void AttackDataEditor::DrawAttackDetail()
         if (ImGui::Combo("タイプ", &t, typeLabels, 3))
         {
             atk.type = static_cast<AttackType>(t); changed = true;
-        }
-
-        std::snprintf(buf, sizeof(buf), "%s", atk.cameraEffect.c_str());
-        if (ImGui::InputText("カメラ効果", buf, sizeof(buf)))
-        {
-            atk.cameraEffect = buf; changed = true;
         }
     }
 
@@ -264309,7 +265144,6 @@ enum class ComboState {
 enum class AttackType {
     A_Arte,         // A（軽攻撃）- 素早い基本攻撃、CC消費少
     B_Arte,         // B（重攻撃）- 威力の高い特殊攻撃、CC消費中
-    Arcane_Arte     // 奥義（必殺技）- 最高威力の技、CC消費大
 };
 
 //=============================================================================
@@ -264330,7 +265164,6 @@ struct AttackData {
     std::string name;                       // 攻撃名
     std::string animationName;              // 使用するアニメーション名
     AttackType  type = AttackType::A_Arte;
-    std::string cameraEffect = "None";      // カメラ演出名
 
     //-------------------------------------------------------------------------
     // タイムライン設定（エディタ用・フレーム単位）
@@ -264454,7 +265287,6 @@ BEGIN_STRUCT_SERIALIZER(AttackData)
 SERIALIZE_FIELD(AttackData, name)
 SERIALIZE_FIELD(AttackData, animationName)
 SERIALIZE_ENUM_FIELD(AttackData, type)
-SERIALIZE_FIELD(AttackData, cameraEffect)
 // タイムライン（フレーム単位）
 SERIALIZE_FIELD(AttackData, totalFrames)
 SERIALIZE_FIELD(AttackData, fps)
@@ -264896,8 +265728,6 @@ float PlayerCombo::CalculateDamageMultiplier() const {
 bool PlayerCombo::IsChainPreferred(AttackType from, AttackType to) const {
 	if (from == AttackType::A_Arte && to == AttackType::B_Arte) return true;
 	if (from == AttackType::B_Arte && to == AttackType::A_Arte) return true;
-	if (from == AttackType::A_Arte && to == AttackType::Arcane_Arte) return true;
-	if (from == AttackType::B_Arte && to == AttackType::Arcane_Arte) return true;
 	return false;
 }
 
@@ -265150,7 +265980,6 @@ void PlayerCombo::ShowDebugImGui() {
 	ImGui::Text("=== 攻撃データベース ===");
 	ImGui::Text("A攻撃数: %d", static_cast<int>(attackDatabase_[AttackType::A_Arte].size()));
 	ImGui::Text("B攻撃数: %d", static_cast<int>(attackDatabase_[AttackType::B_Arte].size()));
-	ImGui::Text("奥義数: %d", static_cast<int>(attackDatabase_[AttackType::Arcane_Arte].size()));
 
 	//---------------------------------------------------------------------------------------------
 	// 現在攻撃情報
@@ -265170,7 +265999,6 @@ void PlayerCombo::ShowDebugImGui() {
 		switch (currentAttack_->type) {
 		case AttackType::A_Arte: typeStr = "A"; break;
 		case AttackType::B_Arte: typeStr = "B"; break;
-		case AttackType::Arcane_Arte: typeStr = "奥義"; break;
 		}
 		ImGui::Text("タイプ: %s", typeStr);
 	}
@@ -265224,8 +266052,6 @@ void PlayerCombo::ShowDebugImGui() {
 	if (ImGui::Button("A攻撃")) TryAttack(AttackType::A_Arte);
 	ImGui::SameLine();
 	if (ImGui::Button("B攻撃")) TryAttack(AttackType::B_Arte);
-	ImGui::SameLine();
-	if (ImGui::Button("奥義")) TryAttack(AttackType::Arcane_Arte);
 #endif
 }
 
@@ -267730,7 +268556,7 @@ File Path: YGame/GameObjects/Player/Player.cpp
 /// デストラクタ
 /// </summary>
 Player::~Player() {
-	obbCollider_->~OBBCollider();
+	//obbCollider_->~OBBCollider();
 }
 
 /// <summary>
@@ -267846,6 +268672,7 @@ void Player::InitCollision() {
 		this, &wt_, camera_,
 		static_cast<uint32_t>(CollisionTypeIdDef::kPlayer)
 	);
+	obbCollider_->SetIsStatic(false);
 }
 
 /// <summary>
@@ -267957,6 +268784,10 @@ void Player::DrawShadow() {
 void Player::DrawImGui() {
 	movement_->ShowStateDebug();
 	combat_->ShowDebugImGui();
+}
+
+void Player::DrawVfx() {
+	playerSword_->DrawVfx();
 }
 
 /// <summary>
@@ -268228,6 +269059,7 @@ public:
 	void DrawBone(Line& line);
 	void DrawShadow();
 	void DrawImGui();
+	void DrawVfx();
 
 	///************************* 当たり判定 *************************///
 	void OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other);
@@ -268893,6 +269725,9 @@ void PlayerShield::InitCollision() {
 		this, &wt_, camera_,
 		static_cast<uint32_t>(CollisionTypeIdDef::kPlayerShield)
 	);
+
+	// 押し戻しはしないように
+	obbCollider_->SetEnablePenetration(false);
 }
 
 /// <summary>
@@ -269025,12 +269860,6 @@ File Path: YGame/GameObjects/Weapon/PlayerSword.cpp
 #include "imgui.h"
 #endif
 
-/// <summary>
-/// デストラクタ
-/// </summary>
-PlayerSword::~PlayerSword() {
-	obbCollider_->~OBBCollider();
-}
 
 /// <summary>
 /// 初期化処理
@@ -269063,14 +269892,22 @@ void PlayerSword::Initialize(Camera* camera) {
 	}
 
 	//------------------------------------------------------------
-	// コライダー・Json・パーティクル初期化
+	// コライダー・Json初期化
 	//------------------------------------------------------------
 	InitCollision();
 	InitJson();
 
+
+	//------------------------------------------------------------
+	// エフェクト関連の初期化
+	//------------------------------------------------------------
 	particleEmitter_ = std::make_unique<ParticleEmitter>("PlayerParticle", wt_.translate_, 5);
 	hitParticleEmitter_ = std::make_unique<ParticleEmitter>("PlayerHitParticle", wt_.translate_, 5);
 	testEmitter_ = std::make_unique<ParticleEmitter>("TestParticle", wt_.translate_, 10);
+	
+	trailEmitter_ = std::make_unique<YoRigine::TrailMeshEmitter>();
+	trailEmitter_->SetCamera(camera_);
+	trailEmitter_->LoadAsset("Resources/Vfx/NewEffect.json");
 }
 
 /// <summary>
@@ -269082,6 +269919,11 @@ void PlayerSword::Update() {
 		SetPlayerWeaponPosition();
 		UpdateColliderWorldTransform();
 	}
+
+	Vector3 rootW = Transform(localRoot, finalMatrix_);
+	Vector3 tipW = Transform(localTip, finalMatrix_);
+	trailEmitter_->AddPoint(tipW, rootW);
+	trailEmitter_->Update(YoRigine::GameTime::GetDeltaTime());
 
 	// 当たり判定更新
 	Vector3 handPos = GetHandPosition();
@@ -269156,11 +269998,11 @@ void PlayerSword::UpdateColliderWorldTransform() {
 	Matrix4x4 weaponMatrix = MakeAffineMatrix(wt_.scale_, wt_.rotate_, wt_.translate_);
 
 	// 手と剣の行列を合成して最終的な位置を求める
-	Matrix4x4 finalMatrix = Multiply(weaponMatrix, handWT.matWorld_);
+	finalMatrix_ = Multiply(weaponMatrix, handWT.matWorld_);
 
 	// コライダー用に結果を適用
-	colliderWT_.matWorld_ = finalMatrix;
-	colliderWT_.translate_ = ExtractTranslation(finalMatrix);
+	colliderWT_.matWorld_ = finalMatrix_;
+	colliderWT_.translate_ = ExtractTranslation(finalMatrix_);
 }
 
 /// <summary>
@@ -269205,6 +270047,9 @@ void PlayerSword::Draw() {
 	}
 }
 
+/// <summary>
+/// 影の描画
+/// </summary>
 void PlayerSword::DrawShadow()
 {
 	if (obj_) {
@@ -269222,6 +270067,15 @@ void PlayerSword::DrawCollision() {
 }
 
 /// <summary>
+/// 剣の残像エフェクト描画
+/// </summary>
+void PlayerSword::DrawVfx() {
+	if (trailEmitter_) {
+		trailEmitter_->Draw();
+	}
+}
+
+/// <summary>
 /// 衝突開始時の処理
 /// </summary>
 void PlayerSword::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other) {
@@ -269231,8 +270085,6 @@ void PlayerSword::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 		//------------------------------------------------------------
 		Vector3 hitPos = other->GetWorldTransform().translate_;
 		hitPos.y += 1.5f;
-		//hitParticleEmitter_->FollowEmit(hitPos, 5);
-		//particleEmitter_->FollowEmit(hitPos, 30);
 
 		auto* enemyHitEmitterGroup_ = YEmitterGroupManager::GetInstance().GetGroup("EnemyHit");
 		if (enemyHitEmitterGroup_) {
@@ -269276,6 +270128,8 @@ void PlayerSword::InitCollision() {
 
 	// 初期状態では当たり判定無効
 	obbCollider_->isCollisionEnabled_ = false;
+	// 押し戻しはしないように
+	obbCollider_->SetEnablePenetration(false);
 }
 
 /// <summary>
@@ -269310,6 +270164,13 @@ void PlayerSword::InitJson() {
 	jsonManager_->Register("", &obj_->GetColor());
 
 	//------------------------------------------------------------
+	// VFX情報
+	//------------------------------------------------------------
+	jsonManager_->SetTreePrefix("Trail");
+	jsonManager_->Register("Local Root", &localRoot);
+	jsonManager_->Register("Local Tip", &localTip);
+
+	//------------------------------------------------------------
 	// コライダー情報
 	//------------------------------------------------------------
 	jsonCollider_ = std::make_unique<YoRigine::JsonManager>("PlayerSwordCollider", "Resources/Json/Colliders");
@@ -269330,7 +270191,7 @@ File Path: YGame/GameObjects/Weapon/PlayerSword.h
 #include "Object3d/BaseObject.h"
 
 #include "Particle/YEmitterGroup.h"
-
+#include <Vfx/VfxMesh/TrailMeshEmitter.h>
 class Player;
 /// <summary>
 /// プレイヤーの剣クラス
@@ -269340,19 +270201,13 @@ class PlayerSword : public BaseObject
 public:
 	///************************* 基本関数 *************************///
 
-	~PlayerSword();
-
 	void Initialize(Camera* camera) override;
 	void Update()override;
 	void Draw()override;
 	void DrawShadow();
 	void DrawCollision()override;
+	void DrawVfx();
 
-	/// ジョイントが有効かどうか
-	bool IsJointValid() const { return isValidJoint_; }
-
-
-public:
 	///************************* 当たり判定 *************************///
 	void OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other);
 	void OnCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other);
@@ -269360,6 +270215,14 @@ public:
 	void OnDirectionCollision([[maybe_unused]] BaseCollider* self, [[maybe_unused]] BaseCollider* other, [[maybe_unused]] HitDirection dir);
 	void OnEnterDirectionCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other, [[maybe_unused]] HitDirection dir);
 
+	///************************* VFXの操作 *************************///
+	void PlayTrail() { if (trailEmitter_) trailEmitter_->Play(); }
+	void StopTrail() { if (trailEmitter_) trailEmitter_->Stop(); }
+
+public:
+	///************************* アクセッサ *************************///
+	/// ジョイントが有効かどうか
+	bool IsJointValid() const { return isValidJoint_; }
 private:
 	///************************* 内部処理 *************************///
 
@@ -269390,6 +270253,9 @@ public:
 	void SetPlayer(Player* player) { player_ = player; }
 	void SetObject(Object3d* obj3d) { obj3d_ = obj3d; }
 
+	// トレイルエフェクトの描画設定
+	void SetisDrawTrail(bool isDraw) { isDrawTrail_ = isDraw; }
+
 private:
 	///************************* ポインタ *************************///
 	Camera* camera_ = nullptr;
@@ -269411,6 +270277,13 @@ private:
 	Vector3 offsetPos_{};
 	Vector3 offsetRot_{};
 	Vector3 offsetScale_{ 1.0f,1.0f,1.0f };
+	Matrix4x4 finalMatrix_;
+
+	///************************* VFX *************************///
+	std::unique_ptr<YoRigine::TrailMeshEmitter> trailEmitter_;
+	bool isDrawTrail_ = false;
+	Vector3 localRoot = { 0.f, 0.f, 0.f };
+	Vector3 localTip = { 0.f, 1.0f, 0.f };
 };
 
 ============================================================
@@ -269851,6 +270724,7 @@ File Path: YGame/Scenes/MainScenes/Game/GameScene.cpp
 #include "Systems/Camera/CameraEditor.h"
 #include "Systems/Camera/Virtuals/FollowCamera/FollowCamera.h"
 #include "Systems/Camera/Virtuals/DebugCamera/DebugCamera.h"
+#include <Vfx/VfxMesh/VfxMeshEditor.h>
 
 // C++
 #include <cstdlib>
@@ -270023,8 +270897,6 @@ void GameScene::Initialize() {
 	Editor::GetInstance()->RegisterGameUI("GpuParticle", [this]() { YoRigine::GpuEmitManager::GetInstance()->DrawImGui(); }, "Game");
 	Editor::GetInstance()->RegisterGameUI("プレイヤー攻撃エディター", [this]() {attackEditor_->DrawImGui(); }, "Game");
 	Editor::GetInstance()->RegisterGameUI("YoRigine:パーティクルエディター", [this]() {YParticleEditor::GetInstance().ShowEditorWindow(); }, "Game");
-
-
 #endif
 
 	//------------------------------------------------------------
@@ -270131,6 +271003,11 @@ void GameScene::Draw() {
 	YParticleManager::GetInstance().Draw();
 	DrawLine();
 	YoRigine::GpuEmitManager::GetInstance()->Draw();
+
+	//------------------------------------------------------------
+	// VFX描画
+	//------------------------------------------------------------
+	player_->DrawVfx();
 
 	//------------------------------------------------------------
 	// UI描画
