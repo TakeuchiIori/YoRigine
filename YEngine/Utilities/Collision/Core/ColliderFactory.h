@@ -24,7 +24,7 @@ public:
 	template <typename T, typename TObject>
 	static std::shared_ptr<T> Create(
 		TObject* owner,
-		const WorldTransform* worldTransform,
+		 WorldTransform* worldTransform,
 		Camera* camera,
 		uint32_t typeID)
 	{

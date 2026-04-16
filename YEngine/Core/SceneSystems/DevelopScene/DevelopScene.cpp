@@ -63,6 +63,8 @@ void DevelopScene::Initialize() {
 
 #ifdef USE_IMGUI
 	YEmitterGroupEditor::GetInstance().SetCamera(sceneCamera_.get());
+	YoRigine::VfxMeshEditor::GetInstance()->Initialize();
+	YoRigine::VfxMeshEditor::GetInstance()->SetCamera(sceneCamera_.get());
 #endif
 	YoRigine::ParticleManager::GetInstance()->SetCamera(sceneCamera_.get());
 	YoRigine::ModelManipulator::GetInstance()->SetCamera(sceneCamera_.get());
@@ -70,7 +72,7 @@ void DevelopScene::Initialize() {
 
 
 	motionEditor_ = std::make_unique<MotionEditor>();
-	motionEditor_->Initialize();
+	motionEditor_->Initialize(sceneCamera_.get());
 
 	//------------------------------------------------------------
 	// エディター用GUI登録
@@ -84,8 +86,6 @@ void DevelopScene::Initialize() {
 	Editor::GetInstance()->RegisterGameUI("VFX", [this]() { YoRigine::VfxMeshEditor::GetInstance()->DrawImGui(); }, "Develop");
 
 #endif
-
-	YoRigine::VfxMeshEditor::GetInstance()->Initialize();
 }
 
 /// <summary>
@@ -94,15 +94,19 @@ void DevelopScene::Initialize() {
 void DevelopScene::Update() {
 	YoRigine::GameTime::Update();
 	UpdateCamera();
+
+	int selectedId = YoRigine::ModelManipulator::GetInstance()->GetSelector().GetPrimaryId();
+	motionEditor_->SetTargetObjectId(selectedId);
 	motionEditor_->Update();
-
-
 	YoRigine::ModelManipulator::GetInstance()->Update();
 	YoRigine::ParticleManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
 	YParticleManager::GetInstance().Update(YoRigine::GameTime::GetDeltaTime());
 	YoRigine::LightManager::GetInstance()->UpdateShadowMatrix(sceneCamera_.get());
 	YoRigine::GpuEmitManager::GetInstance()->Update();
+
+#ifdef USE_IMGUI
 	YoRigine::VfxMeshEditor::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
+#endif
 }
 
 /// <summary>
@@ -123,7 +127,11 @@ void DevelopScene::Draw() {
 	YParticleManager::GetInstance().Draw();
 	DrawLine();
 	YoRigine::GpuEmitManager::GetInstance()->Draw();
-	YoRigine::VfxMeshEditor::GetInstance()->DrawPreview(YoRigine::DirectXCommon::GetInstance()->GetCommandList().Get(), sceneCamera_->GetCameraResource()->GetGPUVirtualAddress());
+
+#ifdef USE_IMGUI
+	YoRigine::VfxMeshEditor::GetInstance()->DrawPreview();
+#endif
+	
 }
 
 /// <summary>
@@ -151,14 +159,14 @@ void DevelopScene::Finalize() {
 /// オブジェクト描画
 /// </summary>
 void DevelopScene::DrawObject() {
-	motionEditor_->Draw(sceneCamera_.get());
+
 }
 
 /// <summary>
 /// ライン描画
 /// </summary>
 void DevelopScene::DrawLine() {
-
+	motionEditor_->DrawBone();
 }
 
 

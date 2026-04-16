@@ -266,7 +266,6 @@ void PlayerCombat::ShowDebugImGui() {
 			ImGui::Text("操作テスト");
 			if (ImGui::Button("A攻撃")) { TryAttack(AttackType::A_Arte); } ImGui::SameLine();
 			if (ImGui::Button("B攻撃")) { TryAttack(AttackType::B_Arte); } ImGui::SameLine();
-			if (ImGui::Button("奥義")) { TryAttack(AttackType::Arcane_Arte); }
 
 			if (ImGui::Button("ガード")) { TryGuard(); } ImGui::SameLine();
 			if (ImGui::Button("キャンセル")) { TryCancel(); }

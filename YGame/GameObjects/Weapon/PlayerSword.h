@@ -9,7 +9,7 @@
 #include "Object3d/BaseObject.h"
 
 #include "Particle/YEmitterGroup.h"
-
+#include <Vfx/VfxMesh/TrailMeshEmitter.h>
 class Player;
 /// <summary>
 /// プレイヤーの剣クラス
@@ -19,19 +19,13 @@ class PlayerSword : public BaseObject
 public:
 	///************************* 基本関数 *************************///
 
-	~PlayerSword();
-
 	void Initialize(Camera* camera) override;
 	void Update()override;
 	void Draw()override;
 	void DrawShadow();
 	void DrawCollision()override;
+	void DrawVfx();
 
-	/// ジョイントが有効かどうか
-	bool IsJointValid() const { return isValidJoint_; }
-
-
-public:
 	///************************* 当たり判定 *************************///
 	void OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other);
 	void OnCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other);
@@ -39,6 +33,14 @@ public:
 	void OnDirectionCollision([[maybe_unused]] BaseCollider* self, [[maybe_unused]] BaseCollider* other, [[maybe_unused]] HitDirection dir);
 	void OnEnterDirectionCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other, [[maybe_unused]] HitDirection dir);
 
+	///************************* VFXの操作 *************************///
+	void PlayTrail() { if (trailEmitter_) trailEmitter_->Play(); }
+	void StopTrail() { if (trailEmitter_) trailEmitter_->Stop(); }
+
+public:
+	///************************* アクセッサ *************************///
+	/// ジョイントが有効かどうか
+	bool IsJointValid() const { return isValidJoint_; }
 private:
 	///************************* 内部処理 *************************///
 
@@ -69,6 +71,9 @@ public:
 	void SetPlayer(Player* player) { player_ = player; }
 	void SetObject(Object3d* obj3d) { obj3d_ = obj3d; }
 
+	// トレイルエフェクトの描画設定
+	void SetisDrawTrail(bool isDraw) { isDrawTrail_ = isDraw; }
+
 private:
 	///************************* ポインタ *************************///
 	Camera* camera_ = nullptr;
@@ -90,4 +95,11 @@ private:
 	Vector3 offsetPos_{};
 	Vector3 offsetRot_{};
 	Vector3 offsetScale_{ 1.0f,1.0f,1.0f };
+	Matrix4x4 finalMatrix_;
+
+	///************************* VFX *************************///
+	std::unique_ptr<YoRigine::TrailMeshEmitter> trailEmitter_;
+	bool isDrawTrail_ = false;
+	Vector3 localRoot = { 0.f, 0.f, 0.f };
+	Vector3 localTip = { 0.f, 1.0f, 0.f };
 };

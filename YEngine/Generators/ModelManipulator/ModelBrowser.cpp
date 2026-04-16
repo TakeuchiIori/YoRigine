@@ -96,6 +96,14 @@ void ModelBrowser::Draw()
                 if (IsValidIndex(idx) && placeCallback_)
                     placeCallback_(modelFiles_[idx]);
             }
+
+            if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
+                const char* payloadPath = modelFiles_[idx].c_str();
+                // ペイロード（データ）としてファイルパスを送信
+                ImGui::SetDragDropPayload("DND_MODEL_PATH", payloadPath, strlen(payloadPath) + 1);
+                ImGui::Text("配置: %s", modelNames_[idx].c_str());
+                ImGui::EndDragDropSource();
+            }
         }
         ImGui::EndListBox();
     }

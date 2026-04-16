@@ -209,6 +209,9 @@ void PlayerShield::InitCollision() {
 		this, &wt_, camera_,
 		static_cast<uint32_t>(CollisionTypeIdDef::kPlayerShield)
 	);
+
+	// 押し戻しはしないように
+	obbCollider_->SetEnablePenetration(false);
 }
 
 /// <summary>

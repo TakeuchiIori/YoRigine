@@ -26,7 +26,6 @@ enum class ComboState {
 enum class AttackType {
     A_Arte,         // A（軽攻撃）- 素早い基本攻撃、CC消費少
     B_Arte,         // B（重攻撃）- 威力の高い特殊攻撃、CC消費中
-    Arcane_Arte     // 奥義（必殺技）- 最高威力の技、CC消費大
 };
 
 //=============================================================================
@@ -47,7 +46,6 @@ struct AttackData {
     std::string name;                       // 攻撃名
     std::string animationName;              // 使用するアニメーション名
     AttackType  type = AttackType::A_Arte;
-    std::string cameraEffect = "None";      // カメラ演出名
 
     //-------------------------------------------------------------------------
     // タイムライン設定（エディタ用・フレーム単位）
@@ -171,7 +169,6 @@ BEGIN_STRUCT_SERIALIZER(AttackData)
 SERIALIZE_FIELD(AttackData, name)
 SERIALIZE_FIELD(AttackData, animationName)
 SERIALIZE_ENUM_FIELD(AttackData, type)
-SERIALIZE_FIELD(AttackData, cameraEffect)
 // タイムライン（フレーム単位）
 SERIALIZE_FIELD(AttackData, totalFrames)
 SERIALIZE_FIELD(AttackData, fps)

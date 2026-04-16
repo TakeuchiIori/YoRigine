@@ -51,7 +51,7 @@ private:
 public:
 	///************************* アクセッサ *************************///
 	void SetCamera(Camera* camera) { this->camera_ = camera; }
-
+	void SetColor(const Vector4& color) { materialData_->color = color; }
 private:
 	///************************* GPU用の構造体 *************************///
 	// 頂点データ構造体

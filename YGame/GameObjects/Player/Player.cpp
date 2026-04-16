@@ -19,7 +19,7 @@
 /// デストラクタ
 /// </summary>
 Player::~Player() {
-	obbCollider_->~OBBCollider();
+	//obbCollider_->~OBBCollider();
 }
 
 /// <summary>
@@ -135,6 +135,7 @@ void Player::InitCollision() {
 		this, &wt_, camera_,
 		static_cast<uint32_t>(CollisionTypeIdDef::kPlayer)
 	);
+	obbCollider_->SetIsStatic(false);
 }
 
 /// <summary>
@@ -246,6 +247,10 @@ void Player::DrawShadow() {
 void Player::DrawImGui() {
 	movement_->ShowStateDebug();
 	combat_->ShowDebugImGui();
+}
+
+void Player::DrawVfx() {
+	playerSword_->DrawVfx();
 }
 
 /// <summary>

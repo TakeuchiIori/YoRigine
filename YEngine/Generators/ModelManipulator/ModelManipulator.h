@@ -56,6 +56,7 @@ public:
     void DrawForPick();
     void Finalize();
 
+    void PlaceObject(const std::string& modelPath);
     void LoadScene(const std::string& sceneName);
     void SetCamera(Camera* camera);
 
@@ -64,7 +65,6 @@ public:
     //=========================================================================
     SceneSerializer& GetSerializer() { return serializer_; }
     ObjectSelector&  GetSelector()   { return selector_; }
-
 #ifdef USE_IMGUI
     //GizmoController& GetGizmoController() { return gizmoCtrl_; }
 #endif
@@ -74,7 +74,6 @@ private:
     // 内部処理
     //=========================================================================
     void ShortcutKey();
-    void PlaceObject(const std::string& modelPath);
     void CopyObject();
 	void PasteObject();
     //=========================================================================

@@ -22,7 +22,6 @@ protected:
 	// 初期化
 	// 継承先から呼び出して共通設定を行う
 	void Initialize();
-
 public:
 	///************************* デストラクタ *************************///
 
@@ -88,6 +87,8 @@ public:
 	// JSONから初期化情報を読み込む
 	virtual void InitJson(YoRigine::JsonManager* jsonManager) = 0;
 
+	// 更新
+	virtual void Update() = 0;
 public:
 	///************************* アクセッサ *************************///
 
@@ -101,7 +102,8 @@ public:
 	void SetCamera(Camera* camera) { camera_ = camera; }
 
 	// ワールドトランスフォーム設定
-	void SetWT(const WorldTransform* worldTransform) { wt_ = worldTransform; }
+	WorldTransform* GetWT() { return wt_; }
+	void SetWT(WorldTransform* worldTransform) { wt_ = worldTransform; }
 
 	// 当たり判定の有効フラグ設定
 	void SetCollisionEnabled(bool enabled) { isCollisionEnabled_ = enabled; }
@@ -118,6 +120,14 @@ public:
 	// コライダー全体の有効状態設定
 	void SetActive(bool isActive) { isActive_ = isActive; }
 
+	// 静的オブジェクトの設定
+	void SetIsStatic(bool isStatic) { isStatic_ = isStatic; }
+	bool GetIsStatic() const { return isStatic_; }
+
+	// めり込みの有効フラグ設定
+	void SetEnablePenetration(bool enable) { enablePenetration_ = enable; }
+	bool GetEnablePenetration() const { return enablePenetration_; }
+
 protected:
 	///************************* 継承クラス用変数 *************************///
 
@@ -125,7 +135,7 @@ protected:
 	std::unique_ptr<Line> line_ = nullptr;
 
 	// 所属オブジェクトのワールドトランスフォーム
-	const WorldTransform* wt_ = nullptr;
+	WorldTransform* wt_ = nullptr;
 
 	// 衝突タイプ識別ID（CollisionTypeIdDefで定義）
 	uint32_t typeID_ = 0u;
@@ -138,6 +148,12 @@ public:
 
 	// カメラ外に出た際の判定を無効化する
 	bool checkOutsideCamera = true;
+
+	// 静的オブジェクトかどうか
+	bool isStatic_ = false;
+
+	// めり込みを行うかどうか
+	bool enablePenetration_ = true;
 
 	// デバッグ表示用カメラ参照
 	Camera* camera_ = nullptr;

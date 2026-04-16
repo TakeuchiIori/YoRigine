@@ -105,9 +105,9 @@ void AttackDataEditor::DrawAttackList()
     for (int i = 0; i < static_cast<int>(attacks_->size()); ++i)
         byType[attacks_->at(i).type].push_back(i);
 
-    static const char* typeLabels[] = { "A技 (軽)", "B技 (重)", "奥義 (究極)" };
+    static const char* typeLabels[] = { "A技 (軽)", "B技 (重)" };
 
-    for (int t = 0; t < 3; ++t)
+    for (int t = 0; t < 2; ++t)
     {
         if (!ImGui::CollapsingHeader(typeLabels[t], ImGuiTreeNodeFlags_DefaultOpen)) continue;
 
@@ -175,12 +175,6 @@ void AttackDataEditor::DrawAttackDetail()
         if (ImGui::Combo("タイプ", &t, typeLabels, 3))
         {
             atk.type = static_cast<AttackType>(t); changed = true;
-        }
-
-        std::snprintf(buf, sizeof(buf), "%s", atk.cameraEffect.c_str());
-        if (ImGui::InputText("カメラ効果", buf, sizeof(buf)))
-        {
-            atk.cameraEffect = buf; changed = true;
         }
     }
 

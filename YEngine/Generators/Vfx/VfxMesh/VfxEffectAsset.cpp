@@ -30,6 +30,12 @@ namespace YoRigine {
         t["uvScrollSpeed"] = trail.uvScrollSpeed;
         t["texturePath"] = trail.texturePath;
         t["noiseTexturePath"] = trail.noiseTexturePath;
+		t["shapeType"] = static_cast<int>(trail.shapeType);
+		t["widthSegments"] = trail.widthSegments;
+        for (const auto& v : trail.customVertices) {
+            t["trail"]["customVertices"].push_back({ v.x, v.y });
+        }
+		t["splineSubdivisions"] = trail.splineSubdivisions;
 
         // --- LightVolume ---
         auto& lv = j["lightVolume"];
@@ -69,6 +75,15 @@ namespace YoRigine {
             trail.blendMode = static_cast<BlendMode>(t.value("blendMode", static_cast<int>(trail.blendMode)));
             if (t.contains("colorStart")) trail.colorStart = JsonToVector4(t["colorStart"]);
             if (t.contains("colorEnd"))   trail.colorEnd = JsonToVector4(t["colorEnd"]);
+			trail.shapeType = static_cast<TrailShapeType>(t.value("shapeType", static_cast<int>(trail.shapeType)));
+            trail.widthSegments = t.value("widthSegments", trail.widthSegments);
+            if (t["trail"].contains("customVertices")) {
+                trail.customVertices.clear();
+                for (const auto& v : t["trail"]["customVertices"]) {
+                    trail.customVertices.push_back({ v[0].get<float>(), v[1].get<float>() });
+                }
+            }
+			trail.splineSubdivisions = t.value("splineSubdivisions", trail.splineSubdivisions);
         }
         if (j.contains("lightVolume")) {
             auto& lv = j["lightVolume"];

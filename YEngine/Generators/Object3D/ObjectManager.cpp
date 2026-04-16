@@ -151,6 +151,11 @@ ObjectManager::PlacedObject* ObjectManager::DuplicateObject(
 }
 
 
+Object3d* ObjectManager::GetObject3dById(int id) {
+	PlacedObject* obj = GetObjectById(id);
+	return (obj && obj->object) ? obj->object.get() : nullptr;
+}
+
 /// <summary>
 /// ID から取得
 /// </summary>
@@ -233,7 +238,8 @@ void ObjectManager::UpdateObjectTransform(PlacedObject& obj) {
 		obj.worldTransform->parent_ =
 			(parent && parent->worldTransform) ? parent->worldTransform.get() : nullptr;
 		if (!parent) obj.parentID = -1;
-	} else {
+	}
+	else {
 		obj.worldTransform->parent_ = nullptr;
 	}
 
@@ -365,5 +371,13 @@ void ObjectManager::InitializePlacedObject(
 	obj.parentID = -1;
 	obj.isActive = true;
 
+	// 当たり判定
+	obj.collider = ColliderPool::GetInstance()->GetCollider<AABBCollider>();
+	if (obj.collider) {
+		obj.collider->Initialize();
+		obj.collider->SetWT(obj.worldTransform.get());
+		obj.collider->SetIsStatic(true);			// 壁なので動かない
+		obj.collider->SetEnablePenetration(true);	// 押し戻し有効
+	}
 	UpdateObjectTransform(obj);
 }

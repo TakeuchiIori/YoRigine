@@ -115,6 +115,7 @@ void FieldEnemy::InitCollision() {
 		camera_,
 		static_cast<uint32_t>(CollisionTypeIdDef::kFieldEnemy)
 	);
+	obbCollider_->SetIsStatic(false);
 }
 
 /// <summary>

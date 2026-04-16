@@ -18,11 +18,11 @@ namespace YoRigine {
 //=============================================================================
 void SceneEditorUI::DrawMenuBar()
 {
-    if (!ImGui::BeginMenu("Create Object")) return;
+    if (!ImGui::BeginMenu("シーンオブジェクト")) return;
 
-    if (ImGui::BeginMenu("View")) {
-        ImGui::MenuItem("Object List",         nullptr, &showObjectList_);
-        ImGui::MenuItem("Transform Controls",  nullptr, &showTransformControls_);
+    if (ImGui::BeginMenu("ビュー")) {
+        ImGui::MenuItem("オブジェクト一覧",         nullptr, &showObjectList_);
+        ImGui::MenuItem("トランスフォーム操作",  nullptr, &showTransformControls_);
         ImGui::EndMenu();
     }
 
