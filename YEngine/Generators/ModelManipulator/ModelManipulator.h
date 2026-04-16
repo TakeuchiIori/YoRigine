@@ -56,9 +56,17 @@ public:
     void DrawForPick();
     void Finalize();
 
+    // シーンにオブジェクトを配置
     void PlaceObject(const std::string& modelPath);
+
+	// シーンの読み込み
     void LoadScene(const std::string& sceneName);
-    void SetCamera(Camera* camera);
+
+    // カメラのセット
+    void SetCamera(Camera* camera) {
+        camera_ = camera;
+        selector_.SetCamera(camera);
+    }
 
     //=========================================================================
     // サブシステムアクセッサ

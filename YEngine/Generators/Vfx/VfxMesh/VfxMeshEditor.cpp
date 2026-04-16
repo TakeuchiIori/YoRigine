@@ -248,7 +248,6 @@ namespace YoRigine {
         history_.HandleKeyInput();
 
         ImGui::SetNextWindowSize(ImVec2(760, 680), ImGuiCond_FirstUseEver);
-        if (!ImGui::Begin("VFX Mesh Editor")) { ImGui::End(); return; }
 
         ImGui::BeginChild("##list", ImVec2(200, 0), true);
         DrawListPanel();
@@ -261,8 +260,6 @@ namespace YoRigine {
         ImGui::EndChild();
 
         DrawNewEffectDialog();
-
-        ImGui::End();
     }
 
     void VfxMeshEditor::DrawListPanel()

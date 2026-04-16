@@ -24,7 +24,7 @@
 namespace fs = std::filesystem;
 
 // ============================================================
-//  カラーパレット
+// カラーパレット
 // ============================================================
 namespace Col
 {
@@ -65,9 +65,8 @@ static ImU32 ChannelColor(KFChannel ch, bool selected)
 #endif
 
 // ============================================================
-//  初期化 / 更新 / 描画
+// 初期化
 // ============================================================
-
 void MotionEditor::Initialize(Camera* camera)
 {
 	camera_ = camera;
@@ -80,6 +79,9 @@ void MotionEditor::Initialize(Camera* camera)
 	lineDrawer_->SetColor({ 0.5f, 0.5f, 0.5f, 1.0f });
 }
 
+// ============================================================
+// 更新
+// ============================================================
 void MotionEditor::Update()
 {
 	Object3d* target = GetTargetObject();
@@ -109,6 +111,9 @@ void MotionEditor::Update()
 	previewTransform_.UpdateMatrix();
 }
 
+// ============================================================
+// 骨の描画
+// ============================================================
 void MotionEditor::DrawBone()
 {
 	Object3d* target = GetTargetObject();
@@ -117,6 +122,9 @@ void MotionEditor::DrawBone()
 	}
 }
 
+// ============================================================
+// ターゲットオブジェクトの設定
+// ============================================================
 void MotionEditor::SetTargetObjectId(int id) {
 	Object3d* obj = nullptr;
 	if (id != -1) {
@@ -171,9 +179,8 @@ void MotionEditor::SetTargetObjectId(int id) {
 }
 
 // ============================================================
-//  ShowEditor  ─  メインウィンドウ
+// エディタの描画
 // ============================================================
-
 void MotionEditor::ShowEditor()
 {
 #ifdef USE_IMGUI
@@ -314,9 +321,8 @@ void MotionEditor::ShowEditor()
 }
 
 // ============================================================
-//  メニューバー
+// メニューバー
 // ============================================================
-
 void MotionEditor::DrawMenuBar()
 {
 #ifdef USE_IMGUI
@@ -1040,9 +1046,8 @@ void MotionEditor::DrawKFRow(ImDrawList* /*dl*/,
 #endif
 
 // ============================================================
-//  ステータスバー
+// ステータスバー
 // ============================================================
-
 void MotionEditor::DrawStatusBar()
 {
 #ifdef USE_IMGUI
@@ -1065,9 +1070,8 @@ void MotionEditor::DrawStatusBar()
 }
 
 // ============================================================
-//  バイナリ保存・読み込みポップアップ
+// バイナリ保存・読み込みポップアップ
 // ============================================================
-
 void MotionEditor::DrawSaveLoadPopup()
 {
 #ifdef USE_IMGUI
@@ -1155,9 +1159,8 @@ void MotionEditor::DrawSaveLoadPopup()
 }
 
 // ============================================================
-//  ファイルブラウザ
+// ファイルブラウザ
 // ============================================================
-
 #ifdef USE_IMGUI
 void MotionEditor::DrawFileBrowser(FileBrowserState& state, const char* title)
 {
@@ -1225,7 +1228,7 @@ void MotionEditor::DrawFileBrowser(FileBrowserState& state, const char* title)
 #endif
 
 // ============================================================
-//  キーフレーム操作
+// キーフレーム操作
 // ============================================================
 
 void MotionEditor::InsertKeyframe(const std::string& bone, float time)
@@ -1262,6 +1265,9 @@ void MotionEditor::InsertKeyframe(const std::string& bone, float time)
 	));
 }
 
+// ============================================================
+// キーフレーム削除
+// ============================================================
 void MotionEditor::DeleteKeyframe(const std::string& bone, float time)
 {
 	if (!currentMotion_) return;
@@ -1286,6 +1292,9 @@ void MotionEditor::DeleteKeyframe(const std::string& bone, float time)
 	));
 }
 
+// ============================================================
+// キーフレーム移動
+// ============================================================
 void MotionEditor::MoveKeyframe(const std::string& bone, KFChannel ch, int idx, float newTime)
 {
 	if (!currentMotion_) return;
@@ -1306,9 +1315,8 @@ void MotionEditor::MoveKeyframe(const std::string& bone, KFChannel ch, int idx, 
 }
 
 // ============================================================
-//  ボーン操作
+// ボーン操作
 // ============================================================
-
 void MotionEditor::SetJointTransform(const std::string& bone, const QuaternionTransform& tr)
 {
 	Joint* j = FindJoint(bone);
@@ -1323,6 +1331,9 @@ void MotionEditor::SetJointTransform(const std::string& bone, const QuaternionTr
 	}
 }
 
+// ============================================================
+// ボーンの検索
+// ============================================================
 Joint* MotionEditor::FindJoint(const std::string& name) const
 {
 	Object3d* target = GetTargetObject();
@@ -1330,6 +1341,9 @@ Joint* MotionEditor::FindJoint(const std::string& name) const
 	return target->GetModel()->GetJointMap(name);
 }
 
+// ============================================================
+// バッファからトランスフォームへの変換
+// ============================================================
 QuaternionTransform MotionEditor::BufferToTransform() const
 {
 	QuaternionTransform tr;
@@ -1339,6 +1353,9 @@ QuaternionTransform MotionEditor::BufferToTransform() const
 	return tr;
 }
 
+// ============================================================
+// ジョイントのバッファとの同期
+// ============================================================
 void MotionEditor::SyncJointToBuffer(const std::string& bone)
 {
 	Joint* j = FindJoint(bone);
@@ -1350,6 +1367,9 @@ void MotionEditor::SyncJointToBuffer(const std::string& bone)
 	editS_[0] = tr.scale.x; editS_[1] = tr.scale.y; editS_[2] = tr.scale.z;
 }
 
+// ============================================================
+// バッファからジョイントへの変換
+// ============================================================
 void MotionEditor::SyncBufferToJoint()
 {
 	Joint* j = FindJoint(selBone_);
@@ -1357,9 +1377,8 @@ void MotionEditor::SyncBufferToJoint()
 }
 
 // ============================================================
-//  ユーティリティ
+// ユーティリティ
 // ============================================================
-
 std::string MotionEditor::AnimDisplayName(const std::string& key)
 {
 	auto pos = key.find('#');
