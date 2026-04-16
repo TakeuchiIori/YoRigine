@@ -58,7 +58,6 @@ void DevelopScene::Initialize() {
 	//------------------------------------------------------------
 	YoRigine::GameTime::Initialize();
 	YoRigine::JsonManager::SetCurrentScene("DevelopScene");
-	YoRigine::ModelManipulator::GetInstance()->LoadScene("DevelopScene");
 	YParticleManager::GetInstance().SetCamera(sceneCamera_.get());
 
 #ifdef USE_IMGUI
@@ -68,6 +67,8 @@ void DevelopScene::Initialize() {
 #endif
 	YoRigine::ParticleManager::GetInstance()->SetCamera(sceneCamera_.get());
 	YoRigine::ModelManipulator::GetInstance()->SetCamera(sceneCamera_.get());
+	YoRigine::ModelManipulator::GetInstance()->LoadScene("DevelopScene");
+
 	YoRigine::GpuEmitManager::GetInstance()->SetCamera(sceneCamera_.get());
 
 

@@ -118,19 +118,24 @@ namespace YoRigine {
 				// 選択状態に応じた色の変更処理
 				bool isSelected = selector_.IsSelected(obj->id);
 				if (isSelected) {
-					// オブジェクトの色を赤っぽくする
 					obj->object->SetMaterialColor({ 1.0f, 0.2f, 0.2f, 1.0f });
 				}
 				else {
-					// 通常の色に戻す
 					obj->object->SetMaterialColor({ 1.0f, 1.0f, 1.0f, 1.0f });
 				}
 				// ------------------------------------------
 
-				obj->object->Draw(camera_, *obj->worldTransform);
+				// ★追加: ボーン表示がONで、かつモーションエディタの対象オブジェクトならメッシュを描画しない
+				bool isTargetAndBoneDraw = (motionEditor_.IsDrawBone() && obj->id == motionEditor_.GetTargetObjectId());
+
+				if (!isTargetAndBoneDraw) {
+					obj->object->Draw(camera_, *obj->worldTransform);
+				}
 			}
 		}
+		motionEditor_.Draw();
 	}
+
 
 	// ============================================================
 	// 線の描画
@@ -201,6 +206,9 @@ namespace YoRigine {
 
 		// 選択されているすべてのオブジェクトをリストに追加
 		for (int id : selectedIds) {
+			if (motionEditor_.IsDrawBone() && id == motionEditor_.GetTargetObjectId()) {
+				continue;
+			}
 			auto* obj = objectManager_->GetObjectById(id);
 			if (obj && obj->worldTransform) {
 				gizmables_.emplace_back(obj, objectManager_);
@@ -218,6 +226,8 @@ namespace YoRigine {
 			targets,
 			Editor::GetInstance()->GetGameViewPos(),
 			Editor::GetInstance()->GetGameViewSize());
+
+		motionEditor_.DrawGizmo();
 #endif
 	}
 

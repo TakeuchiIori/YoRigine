@@ -67,6 +67,7 @@ public:
     void SetCamera(Camera* camera) {
         camera_ = camera;
         selector_.SetCamera(camera);
+		motionEditor_.SetCamera(camera);
     }
 
     //=========================================================================
