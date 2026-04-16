@@ -98,16 +98,26 @@ void MotionEditor::Update()
 		}
 	}
 
-	if (selBone_.empty()) {
-		// ボーン非選択時は通常更新
-	}
-	else {
-		if (m && m->GetSkeleton()) {
-			m->GetSkeleton()->Update();
-			if (m->GetSkinCluster())
-				m->GetSkinCluster()->UpdateMatrixPalette(m->GetSkeleton()->GetJoints());
+	// 一時停止中（シーク中）にポーズをプレビューするための処理
+	if (m && m->GetSkeleton()) {
+		if (ms && !isPlaying_ && currentMotion_) {
+			// 現在のシーク時間でポーズを強制適用
+			currentMotion_->ApplyAnimation(m->GetSkeleton()->GetJoints(), scrubTime_);
+
+			// 選択中のボーンがあれば、UIプロパティ(バッファ)も同期
+			if (!selBone_.empty()) {
+				SyncJointToBuffer(selBone_);
+			}
+		}
+
+		// スケルトンとスキンクラスターを更新してメッシュを変形
+		m->GetSkeleton()->Update();
+		if (m->GetSkinCluster()) {
+			m->GetSkinCluster()->UpdateMatrixPalette(m->GetSkeleton()->GetJoints());
 		}
 	}
+	// ---------------- 追加・修正ここまで ----------------
+
 	previewTransform_.UpdateMatrix();
 }
 
