@@ -1103,9 +1103,13 @@ void MotionEditor::DrawSaveLoadPopup()
 		if (!canSave) ImGui::BeginDisabled();
 		if (ImGui::Button("バイナリ保存", ImVec2(130, 0))) {
 			try {
-				currentMotion_->SaveBinary(*currentMotion_, AnimDisplayName(selectedAnimKey_), savePath_);
-				saveMsg_ = "保存成功: " + savePath_;
-				statusMsg_ = saveMsg_;
+				if (currentMotion_) {
+					currentMotion_->SaveBinary(*currentMotion_, AnimDisplayName(selectedAnimKey_), savePath_);
+					saveMsg_ = "保存成功: " + savePath_;
+					statusMsg_ = saveMsg_;
+				} else {
+					saveMsg_ = "保存失敗: アニメーションがありません";
+				}
 			}
 			catch (const std::exception& e) {
 				saveMsg_ = std::string("保存失敗: ") + e.what();

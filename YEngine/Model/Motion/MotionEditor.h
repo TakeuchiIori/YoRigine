@@ -161,7 +161,7 @@ private:
 	std::string selectedAnimKey_ = "";    // animationCache_ のキー
 
 	// 保存・読み込み
-	std::string      savePath_ = "Resources/Binary/edited_motion.anim";
+	std::string      savePath_ = "Resources/TestBinary/edited_motion.anim";
 	FileBrowserState binaryBrowser_;
 	bool             showSavePopup_ = false;
 	std::string      saveMsg_ = "";
