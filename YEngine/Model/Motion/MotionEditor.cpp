@@ -1679,8 +1679,9 @@ void MotionEditor::ApplyBoneGizmoTransform(const std::string& boneName, const Ma
 
 	// 分解
 	float lT[3], lRDeg[3], lS[3];
+#ifdef USE_IMGUI
 	ImGuizmo::DecomposeMatrixToComponents(&newLocalMat.m[0][0], lT, lRDeg, lS);
-
+#endif
 	// UI用バッファに反映 (選択中のボーンと一致する場合のみUIに反映させるのが自然だが、ギズモ操作中＝選択中のはず)
 	if (selBone_ == boneName) {
 		editT_[0] = lT[0]; editT_[1] = lT[1]; editT_[2] = lT[2];
