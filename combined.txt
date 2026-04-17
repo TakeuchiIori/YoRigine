@@ -230,6 +230,7 @@
 └── └── ├── Ground/
 └── └── ├── House_1/
 └── └── ├── House_2/
+└── └── ├── ICO/
 └── └── ├── Inn/
 └── └── ├── Multi/
 └── └── ├── Mushnub_Evolved/
@@ -573,6 +574,8 @@
 └── └── └── ├── Node.cpp
 └── └── └── └── Node.h
 └── └── └── Skeleton/
+└── └──     ├── BoneGizmable.cpp
+└── └──     ├── BoneGizmable.h
 └── └──     ├── Joint.cpp
 └── └──     ├── Joint.h
 └── └──     ├── Skeleton.cpp
@@ -192976,9 +192979,9 @@ File Path: YEngine/Core/SceneSystems/DevelopScene/DevelopScene.cpp
 #include <cstdlib>
 #include <ctime>
 
-/// <summary>
-/// 初期化
-/// </summary>
+// ============================================================
+// シーンの初期化
+// ============================================================
 void DevelopScene::Initialize() {
 
 	//------------------------------------------------------------
@@ -193004,7 +193007,6 @@ void DevelopScene::Initialize() {
 	//------------------------------------------------------------
 	YoRigine::GameTime::Initialize();
 	YoRigine::JsonManager::SetCurrentScene("DevelopScene");
-	YoRigine::ModelManipulator::GetInstance()->LoadScene("DevelopScene");
 	YParticleManager::GetInstance().SetCamera(sceneCamera_.get());
 
 #ifdef USE_IMGUI
@@ -193014,11 +193016,13 @@ void DevelopScene::Initialize() {
 #endif
 	YoRigine::ParticleManager::GetInstance()->SetCamera(sceneCamera_.get());
 	YoRigine::ModelManipulator::GetInstance()->SetCamera(sceneCamera_.get());
+	YoRigine::ModelManipulator::GetInstance()->LoadScene("DevelopScene");
+
 	YoRigine::GpuEmitManager::GetInstance()->SetCamera(sceneCamera_.get());
 
 
-	motionEditor_ = std::make_unique<MotionEditor>();
-	motionEditor_->Initialize(sceneCamera_.get());
+	//motionEditor_ = std::make_unique<MotionEditor>();
+	//motionEditor_->Initialize(sceneCamera_.get());
 
 	//------------------------------------------------------------
 	// エディター用GUI登録
@@ -193028,22 +193032,19 @@ void DevelopScene::Initialize() {
 	Editor::GetInstance()->RegisterGameUI("ライティング", [this]() { YoRigine::LightManager::GetInstance()->ShowLightingEditor(); }, "Develop");
 	Editor::GetInstance()->RegisterGameUI("GpuParticle", [this]() { YoRigine::GpuEmitManager::GetInstance()->DrawImGui(); }, "Develop");
 	Editor::GetInstance()->RegisterGameUI("YoRigine:パーティクルエディター", [this]() {YParticleEditor::GetInstance().ShowEditorWindow(); }, "Develop");
-	Editor::GetInstance()->RegisterGameUI("モーションエディタ", [this]() {motionEditor_->ShowEditor(); }, "Develop");
+	//Editor::GetInstance()->RegisterGameUI("モーションエディタ", [this]() {motionEditor_->ShowEditor(); }, "Develop");
 	Editor::GetInstance()->RegisterGameUI("VFX", [this]() { YoRigine::VfxMeshEditor::GetInstance()->DrawImGui(); }, "Develop");
 
 #endif
 }
 
-/// <summary>
-/// シーンの更新
-/// </summary>
+// ============================================================
+// シーンの更新
+// ============================================================
 void DevelopScene::Update() {
 	YoRigine::GameTime::Update();
 	UpdateCamera();
 
-	int selectedId = YoRigine::ModelManipulator::GetInstance()->GetSelector().GetPrimaryId();
-	motionEditor_->SetTargetObjectId(selectedId);
-	motionEditor_->Update();
 	YoRigine::ModelManipulator::GetInstance()->Update();
 	YoRigine::ParticleManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
 	YParticleManager::GetInstance().Update(YoRigine::GameTime::GetDeltaTime());
@@ -193055,16 +193056,15 @@ void DevelopScene::Update() {
 #endif
 }
 
-/// <summary>
-/// 実際に描画
-/// </summary>
+// ============================================================
+// シーンの描画（PostEffectがかかる）
+// ============================================================
 void DevelopScene::Draw() {
 	//------------------------------------------------------------
 	// 3Dオブジェクト描画
 	//------------------------------------------------------------
 	Object3dCommon::GetInstance()->DrawPreference();
 	DrawObject();
-	YoRigine::ModelManipulator::GetInstance()->Draw();
 
 	//------------------------------------------------------------
 	// パーティクル描画
@@ -193080,45 +193080,43 @@ void DevelopScene::Draw() {
 	
 }
 
-/// <summary>
-/// オフスクリーン対象外の描画
-/// </summary>
+// ============================================================
+// PostEffectを掛けたくないものを描画
+// ============================================================
 void DevelopScene::DrawNonOffscreen() {
 }
 
-/// <summary>
-/// 影描画
-/// </summary>
+// ============================================================
+// 影の描画
+// ============================================================
 void DevelopScene::DrawShadow() {
 	YoRigine::ModelManipulator::GetInstance()->DrawShadow();
-
-
 }
 
-/// <summary>
-/// 終了処理
-/// </summary>
+// ============================================================
+// 終了の処理
+// ============================================================
 void DevelopScene::Finalize() {
 }
 
-/// <summary>
-/// オブジェクト描画
-/// </summary>
+// ============================================================
+// オブジェクトの描画
+// ============================================================
 void DevelopScene::DrawObject() {
-
+	YoRigine::ModelManipulator::GetInstance()->Draw();
 }
 
-/// <summary>
-/// ライン描画
-/// </summary>
+// ============================================================
+// 線の描画
+// ============================================================
 void DevelopScene::DrawLine() {
-	motionEditor_->DrawBone();
+	YoRigine::ModelManipulator::GetInstance()->DrawLine();
 }
 
 
-/// <summary>
-/// カメラ更新処理
-/// </summary>
+// ============================================================
+// カメラの更新処理
+// ============================================================
 void DevelopScene::UpdateCamera() {
 	auto director = CameraDirector::GetInstance();
 
@@ -199005,372 +199003,385 @@ File Path: YEngine/Generators/ModelManipulator/ModelManipulator.cpp
 #include <Debugger/Gizmo/IGizmable.h>
 #include <DirectX/DirectXCommon.h>
 #endif
+#include <Debugger/Logger.h>
 
 namespace YoRigine {
 
-    ModelManipulator* ModelManipulator::instance_ = nullptr;
+	ModelManipulator* ModelManipulator::instance_ = nullptr;
+	ModelManipulator* ModelManipulator::GetInstance() {
+		if (!instance_) instance_ = new ModelManipulator;
+		return instance_;
+	}
 
-    ModelManipulator* ModelManipulator::GetInstance()
-    {
-        if (!instance_) instance_ = new ModelManipulator;
-        return instance_;
-    }
+	// ============================================================
+	// 初期化
+	// ============================================================
+	void ModelManipulator::Initialize() {
+		if (isInitialized_) return; // 重複初期化を防止
 
-    void ModelManipulator::Initialize()
-    {
-        if (isInitialized_) return; // 重複初期化を防止
+		objectManager_ = ObjectManager::GetInstance();
+		serializer_.SetObjectManager(objectManager_);
+		serializer_.SetModelFolderPath(modelFolderPath_);
 
-        objectManager_ = ObjectManager::GetInstance();
-        serializer_.SetObjectManager(objectManager_);
-        serializer_.SetModelFolderPath(modelFolderPath_);
+		prefabMgr_.SetObjectManager(objectManager_);
+		prefabMgr_.SetSerializer(&serializer_);
+		prefabMgr_.ScanPrefabFolder();
 
-        prefabMgr_.SetObjectManager(objectManager_);
-        prefabMgr_.SetSerializer(&serializer_);
-        prefabMgr_.ScanPrefabFolder();
-
-        selector_.SetObjectManager(objectManager_);
+		selector_.SetObjectManager(objectManager_);
+		motionEditor_.Initialize(camera_);
 
 #ifdef USE_IMGUI
-        pickBuffer_ = PickBuffer::GetInstance();
-        pickBuffer_->Initialize(); // PickBuffer もここで一度だけ初期化
-        selector_.SetPickBuffer(pickBuffer_);
+		pickBuffer_ = PickBuffer::GetInstance();
+		pickBuffer_->Initialize(); // PickBuffer もここで一度だけ初期化
+		selector_.SetPickBuffer(pickBuffer_);
 
-        browser_.SetModelFolderPath(modelFolderPath_);
-        browser_.SetPlaceCallback([this](const std::string& path) { PlaceObject(path); });
-        browser_.ScanModelFolder();
+		browser_.SetModelFolderPath(modelFolderPath_);
+		browser_.SetPlaceCallback([this](const std::string& path) { PlaceObject(path); });
+		browser_.ScanModelFolder();
 
-        editorUI_.SetObjectManager(objectManager_);
-        editorUI_.SetSelector(&selector_);
-        editorUI_.SetPrefabManager(&prefabMgr_);
-        editorUI_.SetSerializer(&serializer_);
-        editorUI_.SetGizmoController(&gizmoCtrl_);
-        editorUI_.SetPlaceCallback([this](const std::string& path) { PlaceObject(path); });
-        editorUI_.SetSaveCallback([this]() { serializer_.SaveScene(jsonPath_); });
-        editorUI_.SetLoadCallback([this]() { serializer_.LoadScene(jsonPath_); });
+		editorUI_.SetObjectManager(objectManager_);
+		editorUI_.SetSelector(&selector_);
+		editorUI_.SetPrefabManager(&prefabMgr_);
+		editorUI_.SetSerializer(&serializer_);
+		editorUI_.SetGizmoController(&gizmoCtrl_);
+		editorUI_.SetPlaceCallback([this](const std::string& path) { PlaceObject(path); });
+		editorUI_.SetSaveCallback([this]() { serializer_.SaveScene(jsonPath_); });
+		editorUI_.SetLoadCallback([this]() { serializer_.LoadScene(jsonPath_); });
 
-        gizmoCtrl_.Initialize();
+		gizmoCtrl_.Initialize();
 
-        // Editor へのメニュー登録もここで一度だけ行う
-        Editor::GetInstance()->RegisterMenuBar([this] { editorUI_.DrawMenuBar(); });
+		// Editor へのメニュー登録もここで一度だけ行う
+		Editor::GetInstance()->RegisterMenuBar([this] { editorUI_.DrawMenuBar(); });
 #endif
 
-        isInitialized_ = true;
-    }
+		isInitialized_ = true;
+	}
 
-    // =============================================================================
-    // Update
-    //
-    // ■ Pick Pass の順番
-    //   1. BeginPickPass()     ← RT クリア・パイプラインセット
-    //   2. DrawForPick()       ← 全オブジェクトを PickPSO で描画（IDを焼き込む）
-    //   3. EndPickPass()       ← クリックがあった座標を 1px コピー + Signal
-    //   4. selector_.Update()  ← クリック検出時は RequestPick、
-    //                            前フレームの結果があれば ReadPickResult
-    //
-    //   PickBuffer の RT にはこのフレームの描画結果が入っている。
-    //   クリック座標は RequestPick で登録され、EndPickPass でコピーされ、
-    //   次フレームの Update の先頭で ReadPickResult が読み取る。
-    // =============================================================================
-    void ModelManipulator::Update()
-    {
-        if (!isInitialized_) return;
+	// =============================================================================
+	// Update
+	//
+	// ■ Pick Pass の順番
+	//   1. BeginPickPass()     ← RT クリア・パイプラインセット
+	//   2. DrawForPick()       ← 全オブジェクトを PickPSO で描画（IDを焼き込む）
+	//   3. EndPickPass()       ← クリックがあった座標を 1px コピー + Signal
+	//   4. selector_.Update()  ← クリック検出時は RequestPick、
+	//                            前フレームの結果があれば ReadPickResult
+	//
+	//   PickBuffer の RT にはこのフレームの描画結果が入っている。
+	//   クリック座標は RequestPick で登録され、EndPickPass でコピーされ、
+	//   次フレームの Update の先頭で ReadPickResult が読み取る。
+	// =============================================================================
+	void ModelManipulator::Update() {
+		if (!isInitialized_) return;
 
 #ifdef USE_IMGUI
-        if (!ImGui::GetIO().WantCaptureKeyboard) {
-            if (ImGui::GetIO().KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S)) {
-                serializer_.SaveScene(jsonPath_);
-                std::cout << "[ModelManipulator] Saved (Ctrl+S)\n";
-            }
-        }
+		if (!ImGui::GetIO().WantCaptureKeyboard) {
+			if (ImGui::GetIO().KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S)) {
+				serializer_.SaveScene(jsonPath_);
+				std::cout << "[ModelManipulator] Saved (Ctrl+S)\n";
+			}
+		}
 
-        ShortcutKey();
+		ShortcutKey();
 
-        // ── selector_.Update() だけここで行う（GPU命令は積まない）──
-        selector_.SetCamera(camera_);
-        selector_.Update(
-            true,
-            Editor::GetInstance()->GetGameViewPos(),
-            Editor::GetInstance()->GetGameViewSize());
+		motionEditor_.SetTargetObjectId(selector_.GetPrimaryId());
+		motionEditor_.Update();
+		// ── selector_.Update() だけここで行う（GPU命令は積まない）──
+		selector_.SetCamera(camera_);
+		selector_.Update(
+			true,
+			Editor::GetInstance()->GetGameViewPos(),
+			Editor::GetInstance()->GetGameViewSize());
 #endif
 
-        objectManager_->Update();
-    }
-    void ModelManipulator::Draw()
-    {
-        if (!isInitialized_ || !camera_) return;
-        for (auto* obj : objectManager_->GetAllActiveObjects()) {
-            if (obj && obj->object && obj->worldTransform) {
+		objectManager_->Update();
+	}
 
-                // 選択状態に応じた色の変更処理
-                bool isSelected = selector_.IsSelected(obj->id);
-                if (isSelected) {
-                    // オブジェクトの色を赤っぽくする
-                    obj->object->SetMaterialColor({ 1.0f, 0.2f, 0.2f, 1.0f });
-                }
-                else {
-                    // 通常の色に戻す
-                     obj->object->SetMaterialColor({ 1.0f, 1.0f, 1.0f, 1.0f });
-                }
-                // ------------------------------------------
+	// ============================================================
+	// 描画
+	// ============================================================
+	void ModelManipulator::Draw() {
+		if (!isInitialized_ || !camera_) return;
+		for (auto* obj : objectManager_->GetAllActiveObjects()) {
+			if (obj && obj->object && obj->worldTransform) {
 
-                obj->object->Draw(camera_, *obj->worldTransform);
-            }
-        }
-    }
-    void ModelManipulator::DrawPickPass()
-    {
+				// 選択状態に応じた色の変更処理
+				bool isSelected = selector_.IsSelected(obj->id);
+				if (isSelected) {
+					obj->object->SetMaterialColor({ 1.0f, 0.2f, 0.2f, 1.0f });
+				}
+				else {
+					obj->object->SetMaterialColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+				}
+				// ------------------------------------------
+
+				// ★追加: ボーン表示がONで、かつモーションエディタの対象オブジェクトならメッシュを描画しない
+				bool isTargetAndBoneDraw = (motionEditor_.IsDrawBone() && obj->id == motionEditor_.GetTargetObjectId());
+
+				if (!isTargetAndBoneDraw) {
+					obj->object->Draw(camera_, *obj->worldTransform);
+				}
+			}
+		}
+		motionEditor_.Draw();
+	}
+
+
+	// ============================================================
+	// 線の描画
+	// ============================================================
+	void ModelManipulator::DrawLine() {
+		if (!isInitialized_ || !camera_) return;
+		motionEditor_.DrawBone();
+	}
+
+	// ============================================================
+	// ピックパスの描画
+	// ============================================================
+	void ModelManipulator::DrawPickPass() {
 #ifdef USE_IMGUI
-        if (!isInitialized_ || !pickBuffer_) return;
+		if (!isInitialized_ || !pickBuffer_) return;
 
 		if (!pickBuffer_->IsPickPending()) return; // クリックがないなら描画しない（無駄なGPU負荷を避ける）
-        pickBuffer_->BeginPickPass();
-        DrawForPick();
-        pickBuffer_->EndPickPass();
+		pickBuffer_->BeginPickPass();
+		DrawForPick();
+		pickBuffer_->EndPickPass();
 #endif
-    }
+	}
 
-    void ModelManipulator::DrawShadow()
-    {
-        if (!isInitialized_) return;
-        for (auto* obj : objectManager_->GetAllActiveObjects()) {
-            if (obj && obj->object && obj->worldTransform)
-                obj->object->DrawShadow(*obj->worldTransform);
-        }
-    }
+	// ============================================================
+	// 影の描画
+	// ============================================================
+	void ModelManipulator::DrawShadow() {
+		if (!isInitialized_) return;
+		for (auto* obj : objectManager_->GetAllActiveObjects()) {
+			if (obj && obj->object && obj->worldTransform)
+				obj->object->DrawShadow(*obj->worldTransform);
+		}
+	}
 
-    void ModelManipulator::DrawImGui()
-    {
+	// ============================================================
+	// ImGuiの描画
+	// ============================================================
+	void ModelManipulator::DrawImGui() {
 #ifdef USE_IMGUI
-        if (!isInitialized_) return;
-
-        if (!ImGui::GetIO().WantCaptureKeyboard &&
-            ImGui::IsKeyPressed(ImGuiKey_Delete) &&
-            selector_.HasSelection()) {
-            for (int id : selector_.GetSelectedIds())
-                objectManager_->DeleteObject(id);
-            selector_.ClearSelection();
-        }
-
-        browser_.Draw();
-        ImGui::Separator();
-
-        if (editorUI_.GetShowObjectListPtr() && *editorUI_.GetShowObjectListPtr())
-            editorUI_.DrawObjectList();
-        if (editorUI_.GetShowTransformControlsPtr() && *editorUI_.GetShowTransformControlsPtr())
-            editorUI_.DrawTransformControls();
-        if (*editorUI_.GetShowDuplicateWindowPtr())
-            editorUI_.DrawDuplicateWindow();
-        if (*editorUI_.GetShowPrefabWindowPtr())
-            editorUI_.DrawPrefabWindow();
+		if (!isInitialized_) return;
+		browser_.Draw();
+		ImGui::Separator();
+		if (editorUI_.GetShowObjectListPtr() && *editorUI_.GetShowObjectListPtr())
+			editorUI_.DrawObjectList();
+		if (editorUI_.GetShowTransformControlsPtr() && *editorUI_.GetShowTransformControlsPtr())
+			editorUI_.DrawTransformControls();
+		if (*editorUI_.GetShowDuplicateWindowPtr())
+			editorUI_.DrawDuplicateWindow();
+		if (*editorUI_.GetShowPrefabWindowPtr())
+			editorUI_.DrawPrefabWindow();
+		motionEditor_.ShowEditor();
 #endif
-    }
+	}
 
-    void ModelManipulator::DrawGizmo()
-    {
+	// ============================================================
+	// ギズモの描画
+	// ============================================================
+	void ModelManipulator::DrawGizmo() {
 #ifdef USE_IMGUI
-        if (!camera_ || !selector_.HasSelection()) return;
+		if (!camera_ || !selector_.HasSelection()) return;
 
-        gizmables_.clear();
-        std::vector<IGizmable*> targets;
+		gizmables_.clear();
+		std::vector<IGizmable*> targets;
 
-        const auto& selectedIds = selector_.GetSelectedIds();
-        // reallocによるポインタ無効化を防ぐため、事前に要素数を確保
-        gizmables_.reserve(selectedIds.size());
+		const auto& selectedIds = selector_.GetSelectedIds();
+		// reallocによるポインタ無効化を防ぐため、事前に要素数を確保
+		gizmables_.reserve(selectedIds.size());
 
-        // 選択されているすべてのオブジェクトをリストに追加
-        for (int id : selectedIds) {
-            auto* obj = objectManager_->GetObjectById(id);
-            if (obj && obj->worldTransform) {
-                gizmables_.emplace_back(obj, objectManager_);
-            }
-        }
+		// 選択されているすべてのオブジェクトをリストに追加
+		for (int id : selectedIds) {
+			if (motionEditor_.IsDrawBone() && id == motionEditor_.GetTargetObjectId()) {
+				continue;
+			}
+			auto* obj = objectManager_->GetObjectById(id);
+			if (obj && obj->worldTransform) {
+				gizmables_.emplace_back(obj, objectManager_);
+			}
+		}
 
-        // pointerをtargetsに登録
-        for (auto& g : gizmables_) {
-            targets.push_back(&g);
-        }
+		// pointerをtargetsに登録
+		for (auto& g : gizmables_) {
+			targets.push_back(&g);
+		}
 
-        if (targets.empty()) return;
-        gizmoCtrl_.Draw(
-            camera_,
-            targets,
-            Editor::GetInstance()->GetGameViewPos(),
-            Editor::GetInstance()->GetGameViewSize());
+		if (targets.empty()) return;
+		gizmoCtrl_.Draw(
+			camera_,
+			targets,
+			Editor::GetInstance()->GetGameViewPos(),
+			Editor::GetInstance()->GetGameViewSize());
+
+		motionEditor_.DrawGizmo();
 #endif
-    }
+	}
 
-    // =============================================================================
-    // DrawForPick
-    //   BeginPickPass / EndPickPass の間に呼ぶ。
-    //   DrawShadow と同じ頂点/インデックスバッファを流用し、
-    //   PickPSO で ObjectID を R32_UINT RT に書き込む。
-    // =============================================================================
-    void ModelManipulator::DrawForPick()
-    {
+	// =============================================================================
+	// DrawForPick
+	//   BeginPickPass / EndPickPass の間に呼ぶ。
+	//   DrawShadow と同じ頂点/インデックスバッファを流用し、
+	//   PickPSO で ObjectID を R32_UINT RT に書き込む。
+	// =============================================================================
+	void ModelManipulator::DrawForPick() {
 #ifdef USE_IMGUI
-        if (!camera_ || !pickBuffer_) return;
+		if (!camera_ || !pickBuffer_) return;
 
-        auto* cmd = DirectXCommon::GetInstance()->GetCommandList().Get();
+		auto* cmd = DirectXCommon::GetInstance()->GetCommandList().Get();
 
-        for (auto* obj : objectManager_->GetAllActiveObjects()) {
-            if (!obj || !obj->object || !obj->worldTransform) continue;
+		for (auto* obj : objectManager_->GetAllActiveObjects()) {
+			if (!obj || !obj->object || !obj->worldTransform) continue;
 
-            auto* model = obj->object->GetModel();
-            if (!model) continue;
+			auto* model = obj->object->GetModel();
+			if (!model) continue;
 
-            // WVP 行列 CBV (b0)
-            cmd->SetGraphicsRootConstantBufferView(
-                PickBuffer::ROOT_PARAM_MVP_CBV,
-                obj->worldTransform->GetConstBuffer()->GetGPUVirtualAddress());
+			// WVP 行列 CBV (b0)
+			cmd->SetGraphicsRootConstantBufferView(
+				PickBuffer::ROOT_PARAM_MVP_CBV,
+				obj->worldTransform->GetConstBuffer()->GetGPUVirtualAddress());
 
-            // ObjectID ルート定数 (b1)  ※ 0 は空選択予約なので +1
-            uint32_t encodedID = static_cast<uint32_t>(obj->id) + 1;
-            cmd->SetGraphicsRoot32BitConstant(
-                PickBuffer::ROOT_PARAM_OBJECT_ID, encodedID, 0);
+			// ObjectID ルート定数 (b1)  ※ 0 は空選択予約なので +1
+			uint32_t encodedID = static_cast<uint32_t>(obj->id) + 1;
+			cmd->SetGraphicsRoot32BitConstant(
+				PickBuffer::ROOT_PARAM_OBJECT_ID, encodedID, 0);
 
-            // 頂点/インデックス描画（DrawShadow と同じ方式）
-            for (auto& mesh : model->GetMeshes()) {
-                if (mesh->HasBones() && model->GetSkinCluster()) {
-                    mesh->RecordDrawCommands(cmd, *model->GetSkinCluster());
-                }
-                else {
-                    mesh->RecordDrawCommands(cmd);
-                }
-                cmd->DrawIndexedInstanced(mesh->GetIndexCount(), 1, 0, 0, 0);
-            }
-        }
+			// 頂点/インデックス描画（DrawShadow と同じ方式）
+			for (auto& mesh : model->GetMeshes()) {
+				if (mesh->HasBones() && model->GetSkinCluster()) {
+					mesh->RecordDrawCommands(cmd, *model->GetSkinCluster());
+				}
+				else {
+					mesh->RecordDrawCommands(cmd);
+				}
+				cmd->DrawIndexedInstanced(mesh->GetIndexCount(), 1, 0, 0, 0);
+			}
+		}
 #endif
-    }
+	}
 
-    void ModelManipulator::Finalize()
-    {
+	// ============================================================
+	// 終了処理
+	// ============================================================
+	void ModelManipulator::Finalize() {
 #ifdef USE_IMGUI
-        // 状態リセットのみ（GPU同期は不要）
-        if (pickBuffer_) {
-            pickBuffer_->Reset();
-        }
+		// 状態リセットのみ（GPU同期は不要）
+		if (pickBuffer_) {
+			pickBuffer_->Reset();
+		}
 #endif
+		if (objectManager_) objectManager_->Finalize();
+		delete instance_;
+		instance_ = nullptr;
+	}
 
-        if (objectManager_) objectManager_->Finalize();
-        delete instance_;
-        instance_ = nullptr;
-    }
-
-    void ModelManipulator::LoadScene(const std::string& sceneName) {
-        // システムが初期化されていなければ初期化する (安全策)
-        if (!isInitialized_) Initialize();
-
-        // *** GPU��期はSceneManagerが行うため削除 ***
-
+	// ============================================================
+	// シーンの読み込み
+	// ============================================================
+	void ModelManipulator::LoadScene(const std::string& sceneName) {
+		// システムが初期化されていなければ初期化する (安全策)
+		if (!isInitialized_) Initialize();
 #ifdef USE_IMGUI
-    // PickBufferの状態をリセット
-        if (pickBuffer_) {
-            pickBuffer_->Reset();
-        }
+		// PickBufferの状態をリセット
+		if (pickBuffer_) {
+			pickBuffer_->Reset();
+		}
 #endif
+		jsonPath_ = "Resources/Json/Scenes/" + sceneName + ".json";
+		// 前のシーンのオブジェクトを安全にクリア
+		objectManager_->ClearAllObjects();
+		// 新しいシーンデータをロード
+		serializer_.LoadScene(jsonPath_);
+		// 選択状態をリセット
+		selector_.ClearSelection();
+		// ログの出力
+		Logger("[ModelManipulator] Scene Loaded: " + sceneName);
+	}
 
-        jsonPath_ = "Resources/Json/Scenes/" + sceneName + ".json";
-
-        // 1. 前のシーンのオブジェクトを安全にクリア
-        objectManager_->ClearAllObjects();
-
-        // 2. 新しいシーンデータをロード
-        serializer_.LoadScene(jsonPath_);
-
-        // 3. 選択状態をリセット
-        selector_.ClearSelection();
-
-        std::cout << "[ModelManipulator] Scene Loaded: " << sceneName << "\n";
-    }
-
-    void ModelManipulator::SetCamera(Camera* camera)
-    {
-        camera_ = camera;
-        selector_.SetCamera(camera);
-    }
-
-    /// <summary>
-    /// ショートカットキーの処理
-    /// </summary>
-    void ModelManipulator::ShortcutKey()
-    {
+	// ============================================================
+	// ショートカットキーの処理
+	// ============================================================
+	void ModelManipulator::ShortcutKey() {
 #ifdef USE_IMGUI
-        ImGuiIO& io = ImGui::GetIO();
-        if (io.KeyCtrl) {
-            if (ImGui::IsKeyPressed(ImGuiKey_C)) {
-                CopyObject();
-            }
-            if (ImGui::IsKeyPressed(ImGuiKey_V)) {
-                PasteObject();
-            }
-        }
+		ImGuiIO& io = ImGui::GetIO();
+		if (io.KeyCtrl) {
+			if (ImGui::IsKeyPressed(ImGuiKey_C)) {
+				CopyObject();
+			}
+			if (ImGui::IsKeyPressed(ImGuiKey_V)) {
+				PasteObject();
+			}
+		}
 #endif
-    }
+	}
 
-    void ModelManipulator::PlaceObject(const std::string& modelPath)
-    {
-        try {
-            if (modelPath.empty() || !std::filesystem::exists(modelPath)) {
-                std::cout << "[ModelManipulator] Invalid path: " << modelPath << "\n";
-                return;
-            }
+	// ============================================================
+	// 指定したモデルファイルをシーンに配置
+	// ============================================================
+	void ModelManipulator::PlaceObject(const std::string& modelPath) {
+		try {
+			if (modelPath.empty() || !std::filesystem::exists(modelPath)) {
+				std::cout << "[ModelManipulator] Invalid path: " << modelPath << "\n";
+				return;
+			}
 
-            std::filesystem::path full(modelPath);
-            std::filesystem::path rel = std::filesystem::relative(full, modelFolderPath_);
+			std::filesystem::path full(modelPath);
+			std::filesystem::path rel = std::filesystem::relative(full, modelFolderPath_);
 
-            std::string ext = full.extension().string();
-            std::transform(ext.begin(), ext.end(), ext.begin(),
-                [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-            bool isAnim = (ext == ".gltf" || ext == ".glb");
+			std::string ext = full.extension().string();
+			std::transform(ext.begin(), ext.end(), ext.begin(),
+				[](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+			bool isAnim = (ext == ".gltf" || ext == ".glb");
 
-            auto* obj = objectManager_->CreateObject(rel.string(), isAnim);
-            if (obj) {
-                selector_.ClearSelection();
-                selector_.AddToSelection(obj->id);
-                objectManager_->UpdateObjectTransform(*obj);
-                std::cout << "[ModelManipulator] Placed: " << full.filename() << "\n";
-            }
-        }
-        catch (const std::exception& e) {
-            std::cout << "[ModelManipulator] PlaceObject error: " << e.what() << "\n";
-        }
-    }
+			auto* obj = objectManager_->CreateObject(rel.string(), isAnim);
+			if (obj) {
+				selector_.ClearSelection();
+				selector_.AddToSelection(obj->id);
+				objectManager_->UpdateObjectTransform(*obj);
+				std::cout << "[ModelManipulator] Placed: " << full.filename() << "\n";
+			}
+		}
+		catch (const std::exception& e) {
+			std::cout << "[ModelManipulator] PlaceObject error: " << e.what() << "\n";
+		}
+	}
 
-    /// <summary>
-    /// 選択したオブジェクトのコピー
-    /// </summary>
-    void ModelManipulator::CopyObject()
-    {
-        auto& selectID = selector_.GetSelectedIds();
-        if (selectID.empty())return;
+	// ============================================================
+	// 選択したオブジェクトのコピー
+	// ============================================================
+	void ModelManipulator::CopyObject() {
+		auto& selectID = selector_.GetSelectedIds();
+		if (selectID.empty())return;
 
 		copyObjectIDs_.assign(selectID.begin(), selectID.end());
-    }
+	}
 
-    /// <summary>
-    /// コピーしたオブジェクトを貼り付け
-    /// </summary>
-    void ModelManipulator::PasteObject()
-    {
-        if (copyObjectIDs_.empty()) return;
-        // 貼り付けたものを新しく選択状態にするためにクリアする
-        selector_.ClearSelection();
+	// ============================================================
+	// コピーしたオブジェクトを貼り付け
+	// ============================================================
+	void ModelManipulator::PasteObject() {
+		if (copyObjectIDs_.empty()) return;
+		// 貼り付けたものを新しく選択状態にするためにクリアする
+		selector_.ClearSelection();
 
-        for (int id : copyObjectIDs_) {
-            auto* srcObj = objectManager_->GetObjectById(id);
-            if (!srcObj) continue;
+		for (int id : copyObjectIDs_) {
+			auto* srcObj = objectManager_->GetObjectById(id);
+			if (!srcObj) continue;
 
-            // 生成元のオブジェクト情報を参照してコピーを作成
-            auto* newObj = objectManager_->CreateObject(srcObj->modelName, srcObj->isAnimation);
-            newObj->position = { srcObj->position + offsetCopyPos_ };
+			// 生成元のオブジェクト情報を参照してコピーを作成
+			auto* newObj = objectManager_->CreateObject(srcObj->modelName, srcObj->isAnimation);
+			newObj->position = { srcObj->position + offsetCopyPos_ };
 			newObj->rotation = srcObj->rotation;
 			newObj->scale = srcObj->scale;
 
-            // 選択状態に追加
+			// 選択状態に追加
 			selector_.AddToSelection(newObj->id);
 			objectManager_->UpdateObjectTransform(*newObj);
-        }
-    }
+		}
+	}
 } // namespace YoRigine
 
 ============================================================
@@ -199385,7 +199396,7 @@ File Path: YEngine/Generators/ModelManipulator/ModelManipulator.h
 // Engine
 #include <Object3D/ObjectManager.h>
 #include <Systems/Camera/Camera.h>
-
+#include <Motion/MotionEditor.h>
 
 #ifdef USE_IMGUI
 #include "ModelBrowser.h"
@@ -199427,6 +199438,7 @@ public:
     void Initialize();
     void Update();
     void Draw();
+    void DrawLine();
     void DrawPickPass();
     void DrawShadow();
     void DrawImGui();
@@ -199434,15 +199446,25 @@ public:
     void DrawForPick();
     void Finalize();
 
+    // シーンにオブジェクトを配置
     void PlaceObject(const std::string& modelPath);
+
+	// シーンの読み込み
     void LoadScene(const std::string& sceneName);
-    void SetCamera(Camera* camera);
+
+    // カメラのセット
+    void SetCamera(Camera* camera) {
+        camera_ = camera;
+        selector_.SetCamera(camera);
+		motionEditor_.SetCamera(camera);
+    }
 
     //=========================================================================
     // サブシステムアクセッサ
     //=========================================================================
     SceneSerializer& GetSerializer() { return serializer_; }
     ObjectSelector&  GetSelector()   { return selector_; }
+    MotionEditor& GetMotionEditor() { return motionEditor_; }
 #ifdef USE_IMGUI
     //GizmoController& GetGizmoController() { return gizmoCtrl_; }
 #endif
@@ -199475,6 +199497,7 @@ private:
     bool           isInitialized_   = false;
     std::string    jsonPath_;
     std::string    modelFolderPath_ = "Resources/Models/";
+    MotionEditor motionEditor_;
 
     // コピーしたオブジェクトのIDを保持
     std::vector<int> copyObjectIDs_;
@@ -200519,13 +200542,25 @@ void SceneEditorUI::DrawObjectList()
 
     ImGui::Separator();
 
+    // キー入力をして選択しているオブジェクトの削除
+    if (ImGui::GetIO().WantCaptureKeyboard &&
+        ImGui::IsKeyPressed(ImGuiKey_Delete) &&
+        selector_->HasSelection()) {
+        for (int id : selector_->GetSelectedIds())
+            objectManager_->DeleteObject(id);
+        selector_->ClearSelection();
+    }
+
+    // UIからオブジェクトを削除
     if (selector_->HasSelection() &&
         ImGui::Button("選択されたオブジェクトを削除")) {
         for (int id : selector_->GetSelectedIds())
             objectManager_->DeleteObject(id);
         selector_->ClearSelection();
     }
+
     ImGui::SameLine();
+    // すべて削除
     if (ImGui::Button("全て削除")) {
         objectManager_->ClearAllObjects();
         selector_->ClearSelection();
@@ -219677,7 +219712,6 @@ namespace YoRigine {
         history_.HandleKeyInput();
 
         ImGui::SetNextWindowSize(ImVec2(760, 680), ImGuiCond_FirstUseEver);
-        if (!ImGui::Begin("VFX Mesh Editor")) { ImGui::End(); return; }
 
         ImGui::BeginChild("##list", ImVec2(200, 0), true);
         DrawListPanel();
@@ -219690,8 +219724,6 @@ namespace YoRigine {
         ImGui::EndChild();
 
         DrawNewEffectDialog();
-
-        ImGui::End();
     }
 
     void VfxMeshEditor::DrawListPanel()
@@ -227464,8 +227496,7 @@ public:
 	void SetMapWVP(const Matrix4x4& wvp) { transformData_->WVP = wvp; }
 	void SetMapWorld(const Matrix4x4& world) { transformData_->World = world; }
 	const Matrix4x4& GetMatWorld() { return matWorld_; }
-
-
+	const WorldTransform* GetParent() const { return parent_; }
 	void SetRotationEuler(const Vector3& euler);
 	void SetRotationQuaternion(const Quaternion& q);
 	Quaternion GetRotationQuaternion() const { return quaternion_; }
@@ -230391,16 +230422,12 @@ File Path: YEngine/Model/Motion/MotionEditor.cpp
 ============================================================
 #include "MotionEditor.h"
 
-#ifdef USE_IMGUI
-#include <imgui.h>
-#include <imgui_internal.h>
-#endif
-
 #include "Systems/Camera/Camera.h"
 #include "Model.h"
 #include "Motion/MotionSystem.h"
 #include "Skeleton/Joint.h"
 #include "Skeleton/Skeleton.h"
+#include "Skeleton/BoneGizmable.h"
 #include <json.hpp>
 #include <fstream>
 #include <algorithm>
@@ -230411,11 +230438,16 @@ File Path: YEngine/Model/Motion/MotionEditor.cpp
 
 #include <Editor/Icon/EditorIcon.h>
 #include "Object3D/ObjectManager.h" 
+#include <Editor/Editor.h>
+
+#ifdef USE_IMGUI
+#include "ImGuizmo.h"
+#endif
 
 namespace fs = std::filesystem;
 
 // ============================================================
-//  カラーパレット
+// カラーパレット
 // ============================================================
 namespace Col
 {
@@ -230455,10 +230487,13 @@ static ImU32 ChannelColor(KFChannel ch, bool selected)
 }
 #endif
 
-// ============================================================
-//  初期化 / 更新 / 描画
-// ============================================================
+MotionEditor::MotionEditor() {}
 
+MotionEditor::~MotionEditor() {}
+
+// ============================================================
+// 初期化
+// ============================================================
 void MotionEditor::Initialize(Camera* camera)
 {
 	camera_ = camera;
@@ -230466,11 +230501,20 @@ void MotionEditor::Initialize(Camera* camera)
 	binaryBrowser_.currentDirectory = "Resources/Binary";
 	binaryBrowser_.filterExtension = ".anim";
 	lineDrawer_ = std::make_unique<Line>();
-	lineDrawer_->Initialize();
 	lineDrawer_->SetCamera(camera_);
+	lineDrawer_->Initialize();
 	lineDrawer_->SetColor({ 0.5f, 0.5f, 0.5f, 1.0f });
+
+#ifdef USE_IMGUI
+	boneObj_ = Object3d::Create("ICO.obj");
+	gizmoCtrl_.Initialize();
+	gizmoCtrl_.SetMode(GizmoController::Mode::Local); // ボーン操作はローカル推奨
+#endif
 }
 
+// ============================================================
+// 更新
+// ============================================================
 void MotionEditor::Update()
 {
 	Object3d* target = GetTargetObject();
@@ -230487,27 +230531,128 @@ void MotionEditor::Update()
 		}
 	}
 
-	if (selBone_.empty()) {
-		// ボーン非選択時は通常更新
-	}
-	else {
-		if (m && m->GetSkeleton()) {
-			m->GetSkeleton()->Update();
-			if (m->GetSkinCluster())
-				m->GetSkinCluster()->UpdateMatrixPalette(m->GetSkeleton()->GetJoints());
+	if (m && m->GetSkeleton()) {
+		// 一時停止中（シーク中）にポーズをプレビューするための処理
+		if (ms && !isPlaying_ && currentMotion_) {
+			currentMotion_->ApplyAnimation(m->GetSkeleton()->GetJoints(), scrubTime_);
+
+			// 選択中のボーンがあればプロパティバッファを同期
+			if (!selBone_.empty()) {
+#ifdef USE_IMGUI
+				// ★修正: UIでドラッグ中、またはギズモで操作中なら、
+				// アニメーションのポーズを無視して編集中の値をジョイントに強制上書きする
+				if (draggingBone_ || gizmoCtrl_.IsUsing()) {
+					SyncBufferToJoint();
+				}
+				else {
+					SyncJointToBuffer(selBone_);
+				}
+#else
+				SyncJointToBuffer(selBone_);
+#endif
+			}
+		}
+
+		m->GetSkeleton()->Update();
+		if (m->GetSkinCluster()) {
+			m->GetSkinCluster()->UpdateMatrixPalette(m->GetSkeleton()->GetJoints());
 		}
 	}
+
 	previewTransform_.UpdateMatrix();
 }
 
+// ============================================================
+// 関節の描画
+// ============================================================
+void MotionEditor::Draw()
+{
+	Object3d* target = GetTargetObject();
+	if (isDrawBone_ && target) {
+#ifdef USE_IMGUI
+		// ICO.obj の描画
+		if (boneObj_ && target->GetModel() && target->GetModel()->GetSkeleton()) {
+			auto& joints = target->GetModel()->GetSkeleton()->GetJoints();
+
+			// ジョイント数が変わった場合（ターゲット変更時など）に再初期化
+			if (boneWorldTransforms_.size() != joints.size()) {
+				boneWorldTransforms_.resize(joints.size());
+				for (auto& wt : boneWorldTransforms_) {
+					wt.Initialize();
+				}
+			}
+
+			for (size_t i = 0; i < joints.size(); ++i) {
+				auto& wt = boneWorldTransforms_[i];
+
+				Matrix4x4 targetMat = GetTargetWorldMatrix();
+				Matrix4x4 wMat = joints[i].GetWorldTransform().matWorld_ * targetMat;
+
+				float t[3], rDeg[3], s[3];
+				ImGuizmo::DecomposeMatrixToComponents(&wMat.m[0][0], t, rDeg, s);
+
+				wt.translate_ = { t[0], t[1], t[2] };
+				wt.rotate_ = { rDeg[0] * (kPi / 180.f), rDeg[1] * (kPi / 180.f), rDeg[2] * (kPi / 180.f) };
+				wt.scale_ = { 0.1f, 0.1f, 0.1f }; // 1/10 サイズ
+				wt.UpdateMatrix();
+
+				if (selBone_ == joints[i].GetName()) {
+					boneObj_->SetMaterialColor({ 1.0f, 0.85f, 0.2f, 1.0f });
+				}
+				else {
+					boneObj_->SetMaterialColor({ 0.5f, 0.5f, 0.5f, 1.0f });
+				}
+
+				boneObj_->Draw(camera_, wt);
+			}
+		}
+#endif
+	}
+}
+
+// ============================================================
+// ギズモの描画
+// ============================================================
+void MotionEditor::DrawGizmo()
+{
+#ifdef USE_IMGUI
+	Object3d* target = GetTargetObject();
+	if (isDrawBone_ && target && target->GetModel() && target->GetModel()->GetSkeleton()) {
+		if (!selBone_.empty()) {
+			static BoneGizmable currentSelectedGizmo(this, "");
+			if (currentSelectedGizmo.GetBoneName() != selBone_) {
+				currentSelectedGizmo = BoneGizmable(this, selBone_);
+			}
+			if (!gizmoCtrl_.IsUsing()) {
+				currentSelectedGizmo.UpdateFromJoint();
+			}
+			std::vector<IGizmable*> gizmoTargets = { &currentSelectedGizmo };
+			ImVec2 viewPos = Editor::GetInstance()->GetGameViewPos();
+			ImVec2 viewSize = Editor::GetInstance()->GetGameViewSize();
+
+			// ギズモの描画
+			gizmoCtrl_.Draw(camera_, gizmoTargets, viewPos, viewSize);
+		}
+	}
+#endif
+}
+
+
+// ============================================================
+// 骨の描画
+// ============================================================
 void MotionEditor::DrawBone()
 {
 	Object3d* target = GetTargetObject();
 	if (isDrawBone_ && target) {
-		target->DrawBone(*lineDrawer_.get(), previewTransform_.matWorld_);
+		lineDrawer_->SetCamera(camera_);
+		target->DrawBone(*lineDrawer_.get(), GetTargetWorldMatrix());
 	}
 }
 
+// ============================================================
+// ターゲットオブジェクトの設定
+// ============================================================
 void MotionEditor::SetTargetObjectId(int id) {
 	Object3d* obj = nullptr;
 	if (id != -1) {
@@ -230562,9 +230707,8 @@ void MotionEditor::SetTargetObjectId(int id) {
 }
 
 // ============================================================
-//  ShowEditor  ─  メインウィンドウ
+// エディタの描画
 // ============================================================
-
 void MotionEditor::ShowEditor()
 {
 #ifdef USE_IMGUI
@@ -230581,14 +230725,61 @@ void MotionEditor::ShowEditor()
 
 	Object3d* target = GetTargetObject();
 
+	// ---------------- ボーン選択＆ギズモ処理 ----------------
+	if (isDrawBone_ && target && target->GetModel() && target->GetModel()->GetSkeleton()) {
+
+		// 1. ピッキング (画面クリックで選択)
+		if (ImGui::IsMouseClicked(0) && !ImGuizmo::IsOver() && !ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow)) {
+			gizmoCtrl_.ClearPickables();
+			boneGizmables_.clear();
+
+			auto& joints = target->GetModel()->GetSkeleton()->GetJoints();
+			for (const auto& joint : joints) {
+				auto bg = std::make_unique<BoneGizmable>(this, joint.GetName());
+				bg->UpdateFromJoint();
+				gizmoCtrl_.RegisterPickable(bg.get());
+				boneGizmables_.push_back(std::move(bg));
+			}
+
+			ImVec2 viewPos = Editor::GetInstance()->GetGameViewPos();
+			ImVec2 viewSize = Editor::GetInstance()->GetGameViewSize();
+
+			IGizmable* picked = gizmoCtrl_.TryPickObject(
+				ImGui::GetMousePos(), viewPos, viewSize, camera_
+			);
+
+			if (picked) {
+				BoneGizmable* bg = static_cast<BoneGizmable*>(picked);
+				selBone_ = bg->GetBoneName();
+				SyncJointToBuffer(selBone_);
+				statusMsg_ = "ボーン選択: " + selBone_;
+			}
+		}
+
+		// 2. ギズモの描画
+		if (!selBone_.empty()) {
+			static BoneGizmable currentSelectedGizmo(this, "");
+			if (currentSelectedGizmo.GetBoneName() != selBone_) {
+				currentSelectedGizmo = BoneGizmable(this, selBone_);
+			}
+
+			currentSelectedGizmo.UpdateFromJoint();
+
+			std::vector<IGizmable*> gizmoTargets = { &currentSelectedGizmo };
+			ImVec2 viewPos = Editor::GetInstance()->GetGameViewPos();
+			ImVec2 viewSize = Editor::GetInstance()->GetGameViewSize();
+
+			gizmoCtrl_.Draw(camera_, gizmoTargets, viewPos, viewSize);
+		}
+	}
+	// ------------------------------------------------------
+
 	// フォーカス中のキー入力
 	if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)) {
 		history_.HandleKeyInput();
 
 		// スペースキーで再生/一時停止のトグル
 		if (ImGui::IsKeyPressed(ImGuiKey_Space) && target) {
-			selBone_ = "";
-			selKF_.Clear();
 			if (isPlaying_) {
 				if (target->GetModel() && target->GetModel()->GetMotionSystem()) {
 					target->GetModel()->GetMotionSystem()->Stop();
@@ -230705,9 +230896,8 @@ void MotionEditor::ShowEditor()
 }
 
 // ============================================================
-//  メニューバー
+// メニューバー
 // ============================================================
-
 void MotionEditor::DrawMenuBar()
 {
 #ifdef USE_IMGUI
@@ -230764,7 +230954,7 @@ void MotionEditor::DrawToolbar()
 		ImGui::SameLine(0, 12);
 	}
 
-	// ---- アニメーション選択コンボ ----
+	// ---- ニメーション選択コンボ ----
 	ImGui::Text("Animation:");
 	ImGui::SameLine(0, 4);
 	ImGui::SetNextItemWidth(170);
@@ -230911,7 +231101,7 @@ void MotionEditor::DrawToolbar()
 	ImGui::SameLine(0, 20);
 	ImGui::Checkbox("ボーン表示", &isDrawBone_);
 	if (ImGui::IsItemHovered()) {
-		ImGui::SetTooltip("メッシュ描画とボーン（線）描画を切り替えます");
+		ImGui::SetTooltip("メッシュ描画とボーン（線・オブジェクト）描画を切り替えます");
 	}
 
 	ImGui::SameLine(0, 20);
@@ -230988,21 +231178,18 @@ void MotionEditor::DrawBonePanel()
 void MotionEditor::DrawPropertyPanel()
 {
 #ifdef USE_IMGUI
-	bool boneOpen = ImGui::CollapsingHeader("BONE TRANSFORM  (位置・回転・拡縮)",
-		ImGuiTreeNodeFlags_DefaultOpen);
+	bool boneOpen = ImGui::CollapsingHeader("BONE TRANSFORM  (位置・回転・拡縮)", ImGuiTreeNodeFlags_DefaultOpen);
 	if (boneOpen)
 	{
 		if (selBone_.empty()) {
 			ImGui::TextDisabled("左のリストからボーンを選択してください");
 		}
 		else {
-			ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.2f, 1.0f),
-				"選択中: %s", selBone_.c_str());
+			ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.2f, 1.0f), "選択中: %s", selBone_.c_str());
 			ImGui::TextDisabled("ドラッグで変更 / Ctrl+クリックで直接入力");
 			ImGui::Separator();
 
-			auto handleDrag = [&](const char* label, const char* tip,
-				float* buf, float spd, float vmin, float vmax)
+			auto handleDrag = [&](const char* label, const char* tip, float* buf, float spd, float vmin, float vmax)
 				{
 					ImGui::Text("%s", label);
 					ImGui::SameLine(90);
@@ -231030,12 +231217,9 @@ void MotionEditor::DrawPropertyPanel()
 					if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tip);
 				};
 
-			handleDrag("位置 (T)", "X / Y / Z 座標\nドラッグで移動",
-				editT_, 0.01f, -FLT_MAX, FLT_MAX);
-			handleDrag("回転 (R)", "X / Y / Z オイラー角 (度)\nドラッグで回転",
-				editR_, 0.5f, -FLT_MAX, FLT_MAX);
-			handleDrag("拡縮 (S)", "X / Y / Z スケール\nドラッグで拡縮 (1.0 = 等倍)",
-				editS_, 0.01f, 0.001f, 100.0f);
+			handleDrag("位置 (T)", "X / Y / Z 座標\nドラッグで移動", editT_, 0.01f, -FLT_MAX, FLT_MAX);
+			handleDrag("回転 (R)", "X / Y / Z オイラー角 (度)\nドラッグで回転", editR_, 0.5f, -FLT_MAX, FLT_MAX);
+			handleDrag("拡縮 (S)", "X / Y / Z スケール\nドラッグで拡縮 (1.0 = 等倍)", editS_, 0.01f, 0.001f, 100.0f);
 
 			ImGui::Spacing();
 
@@ -231045,13 +231229,22 @@ void MotionEditor::DrawPropertyPanel()
 				ImGui::SameLine(90);
 				ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.2f, 1.0f), "%.4f 秒", scrubTime_);
 
-				if (ImGui::Button("[ KF ] キーフレームを打つ", ImVec2(-1, 0))) {
+				// ★追加: 全ボーンの一括キーフレーム保存ボタン
+				if (ImGui::Button("[ I ] 全ボーンのキーフレームを打つ (Save Pose)", ImVec2(-1, 0))) {
+					SavePose(scrubTime_);
+					statusMsg_ = "全ボーンの KF を挿入 @ " + std::to_string(scrubTime_) + "s";
+				}
+				if (ImGui::IsItemHovered())
+					ImGui::SetTooltip("現在のスケルトン全体の姿勢をキーフレームとして記録します\n(BlenderのIキー相当)");
+
+				ImGui::Spacing();
+
+				if (ImGui::Button("[ KF ] 選択ボーンのキーフ��ームを打つ", ImVec2(-1, 0))) {
 					InsertKeyframe(selBone_, scrubTime_);
 					statusMsg_ = "KF 挿入: " + selBone_ + " @ " + std::to_string(scrubTime_) + "s";
 				}
 				if (ImGui::IsItemHovered())
-					ImGui::SetTooltip("現在の姿勢をこの時刻にキーフレームとして記録します\n"
-						"下のタイムラインに◆が追加されます");
+					ImGui::SetTooltip("現在の姿勢をこの時刻にキーフレームとして記録します\n下のタイムラインに◆が追加されます");
 			}
 			else {
 				ImGui::TextDisabled("(アニメーションを選択するとKFを打てます)");
@@ -231061,8 +231254,7 @@ void MotionEditor::DrawPropertyPanel()
 
 	ImGui::Spacing();
 
-	bool kfOpen = ImGui::CollapsingHeader("KEYFRAME  (選択中のキーフレーム値)",
-		ImGuiTreeNodeFlags_DefaultOpen);
+	bool kfOpen = ImGui::CollapsingHeader("KEYFRAME  (選択中のキーフレーム値)", ImGuiTreeNodeFlags_DefaultOpen);
 	if (kfOpen)
 	{
 		if (!selKF_.IsValid()) {
@@ -231090,8 +231282,7 @@ void MotionEditor::DrawPropertyPanel()
 				ImGui::SameLine(90);
 				ImGui::SetNextItemWidth(120);
 				float newT = kfTime;
-				if (ImGui::DragFloat("##kftime", &newT, 0.001f, 0.0f,
-					currentMotion_->GetDuration(), "%.4f s")) {
+				if (ImGui::DragFloat("##kftime", &newT, 0.001f, 0.0f, currentMotion_->GetDuration(), "%.4f s")) {
 					MoveKeyframe(bone, KFChannel::Translate, idx, newT);
 					MoveKeyframe(bone, KFChannel::Rotate, idx, newT);
 					MoveKeyframe(bone, KFChannel::Scale, idx, newT);
@@ -231105,7 +231296,6 @@ void MotionEditor::DrawPropertyPanel()
 				if (ImGui::BeginTabBar("##kftab")) {
 
 					bool tOpen = ImGui::BeginTabItem("位置 (T)");
-					if (ImGui::IsItemHovered()) ImGui::SetTooltip("キーフレームの位置値を編集します");
 					if (tOpen) {
 						if (idx < (int)na.translate.keyframes.size()) {
 							auto& kf = na.translate.keyframes[idx];
@@ -231128,7 +231318,6 @@ void MotionEditor::DrawPropertyPanel()
 					}
 
 					bool rOpen = ImGui::BeginTabItem("回転 (R)");
-					if (ImGui::IsItemHovered()) ImGui::SetTooltip("キーフレームの回転値を編集します\n内部はクォータニオンですが度数で表示します");
 					if (rOpen) {
 						if (idx < (int)na.rotate.keyframes.size()) {
 							auto& kf = na.rotate.keyframes[idx];
@@ -231155,7 +231344,6 @@ void MotionEditor::DrawPropertyPanel()
 					}
 
 					bool sOpen = ImGui::BeginTabItem("拡縮 (S)");
-					if (ImGui::IsItemHovered()) ImGui::SetTooltip("キーフレームのスケール値を編集します");
 					if (sOpen) {
 						if (idx < (int)na.scale.keyframes.size()) {
 							auto& kf = na.scale.keyframes[idx];
@@ -231191,8 +231379,6 @@ void MotionEditor::DrawPropertyPanel()
 					statusMsg_ = "KF 削除: " + bone;
 				}
 				ImGui::PopStyleColor(2);
-				if (ImGui::IsItemHovered())
-					ImGui::SetTooltip("選択中のキーフレームを削除します\nCtrl+Z で元に戻せます");
 			}
 		}
 	}
@@ -231239,7 +231425,7 @@ void MotionEditor::DrawTimeline()
 		if (target && target->GetModel() && target->GetModel()->GetMotionSystem()) {
 			auto* ms = target->GetModel()->GetMotionSystem();
 			ms->Stop();
-			isPlaying_ = false; // ★ 一時停止状態にする
+			isPlaying_ = false;
 			ms->SetAnimationTime(scrubTime_);
 		}
 		dopeSheet_.SetSeekFrame(static_cast<int>(scrubTime_ * fps_));
@@ -231280,7 +231466,7 @@ void MotionEditor::DrawTimeline()
 			auto* ms = t->GetModel()->GetMotionSystem();
 			if (ms) {
 				ms->Stop();
-				isPlaying_ = false; // ★ 一時停止状態にする
+				isPlaying_ = false;
 				ms->SetAnimationTime(scrubTime_);
 			}
 		}
@@ -231315,7 +231501,7 @@ void MotionEditor::DrawTimeline()
 
 	if (draggingKF_ && !ImGui::IsMouseDown(0)) {
 		draggingKF_ = false;
-		statusMsg_ = "KF 移動完了";
+		statusMsg_ = "KF 移動了";
 	}
 #endif
 }
@@ -231431,9 +231617,8 @@ void MotionEditor::DrawKFRow(ImDrawList* /*dl*/,
 #endif
 
 // ============================================================
-//  ステータスバー
+// ステータスバー
 // ============================================================
-
 void MotionEditor::DrawStatusBar()
 {
 #ifdef USE_IMGUI
@@ -231456,9 +231641,8 @@ void MotionEditor::DrawStatusBar()
 }
 
 // ============================================================
-//  バイナリ保存・読み込みポップアップ
+// バイナリ保存・読み込みポップアップ
 // ============================================================
-
 void MotionEditor::DrawSaveLoadPopup()
 {
 #ifdef USE_IMGUI
@@ -231490,9 +231674,14 @@ void MotionEditor::DrawSaveLoadPopup()
 		if (!canSave) ImGui::BeginDisabled();
 		if (ImGui::Button("バイナリ保存", ImVec2(130, 0))) {
 			try {
-				currentMotion_->SaveBinary(*currentMotion_, AnimDisplayName(selectedAnimKey_), savePath_);
-				saveMsg_ = "保存成功: " + savePath_;
-				statusMsg_ = saveMsg_;
+				if (currentMotion_) {
+					currentMotion_->SaveBinary(*currentMotion_, AnimDisplayName(selectedAnimKey_), savePath_);
+					saveMsg_ = "保存成功: " + savePath_;
+					statusMsg_ = saveMsg_;
+				}
+				else {
+					saveMsg_ = "保存失敗: アニメーションがありません";
+				}
 			}
 			catch (const std::exception& e) {
 				saveMsg_ = std::string("保存失敗: ") + e.what();
@@ -231546,9 +231735,8 @@ void MotionEditor::DrawSaveLoadPopup()
 }
 
 // ============================================================
-//  ファイルブラウザ
+// ファイルブラウザ
 // ============================================================
-
 #ifdef USE_IMGUI
 void MotionEditor::DrawFileBrowser(FileBrowserState& state, const char* title)
 {
@@ -231616,7 +231804,62 @@ void MotionEditor::DrawFileBrowser(FileBrowserState& state, const char* title)
 #endif
 
 // ============================================================
-//  キーフレーム操作
+// 一括ポーズ保存機能 (Save Pose)
+// ============================================================
+void MotionEditor::InsertKeyframeFromTransform(const std::string& bone, float time, const QuaternionTransform& tr)
+{
+	if (!currentMotion_) return;
+	auto& nodeAnims = currentMotion_->animation_.nodeAnimations_;
+	if (!nodeAnims.count(bone)) return;
+
+	auto insertOrReplace = [&]<typename T>(auto& kfs, T val) {
+		using KF = typename std::remove_reference<decltype(kfs)>::type::value_type;
+		auto it = std::find_if(kfs.begin(), kfs.end(),
+			[time](const KF& k) { return std::abs(k.time - time) < 1e-4f; });
+		if (it != kfs.end()) { it->value = val; }
+		else {
+			KF k; k.time = time; k.value = val; kfs.push_back(k);
+			std::sort(kfs.begin(), kfs.end(), [](const KF& a, const KF& b) { return a.time < b.time; });
+		}
+	};
+
+	insertOrReplace(nodeAnims[bone].translate.keyframes, tr.translate);
+	insertOrReplace(nodeAnims[bone].rotate.keyframes, tr.rotate);
+	insertOrReplace(nodeAnims[bone].scale.keyframes, tr.scale);
+}
+
+void MotionEditor::SavePose(float time)
+{
+	Object3d* target = GetTargetObject();
+	if (!target || !target->GetModel() || !target->GetModel()->GetSkeleton() || !currentMotion_) return;
+
+	Skeleton* skeleton = target->GetModel()->GetSkeleton();
+	auto oldAnims = currentMotion_->animation_.nodeAnimations_;
+
+	for (const auto& joint : skeleton->GetJoints()) {
+		if (currentMotion_->animation_.nodeAnimations_.count(joint.GetName())) {
+			InsertKeyframeFromTransform(joint.GetName(), time, joint.GetTransform());
+		}
+	}
+
+	auto newAnims = currentMotion_->animation_.nodeAnimations_;
+
+	history_.Execute(MakeLambdaCommand("全ポーズ保存 @ " + std::to_string(time) + "s",
+		[this, newAnims]() {
+			if (currentMotion_) currentMotion_->animation_.nodeAnimations_ = newAnims;
+			tracksDirty_ = true;
+		},
+		[this, oldAnims]() {
+			if (currentMotion_) currentMotion_->animation_.nodeAnimations_ = oldAnims;
+			tracksDirty_ = true;
+		}
+	));
+
+	tracksDirty_ = true;
+}
+
+// ============================================================
+// キーフレーム操作
 // ============================================================
 
 void MotionEditor::InsertKeyframe(const std::string& bone, float time)
@@ -231646,13 +231889,18 @@ void MotionEditor::InsertKeyframe(const std::string& bone, float time)
 			insertOrReplace(na.translate.keyframes, newT);
 			insertOrReplace(na.rotate.keyframes, newR);
 			insertOrReplace(na.scale.keyframes, newS);
+			tracksDirty_ = true;
 		},
 		[this, bone, snap]() {
 			currentMotion_->animation_.nodeAnimations_[bone] = snap;
+			tracksDirty_ = true;
 		}
 	));
 }
 
+// ============================================================
+// キーフレーム削除
+// ============================================================
 void MotionEditor::DeleteKeyframe(const std::string& bone, float time)
 {
 	if (!currentMotion_) return;
@@ -231670,13 +231918,18 @@ void MotionEditor::DeleteKeyframe(const std::string& bone, float time)
 			rem(na.translate.keyframes);
 			rem(na.rotate.keyframes);
 			rem(na.scale.keyframes);
+			tracksDirty_ = true;
 		},
 		[this, bone, snap]() {
 			currentMotion_->animation_.nodeAnimations_[bone] = snap;
+			tracksDirty_ = true;
 		}
 	));
 }
 
+// ============================================================
+// キーフレーム移動
+// ============================================================
 void MotionEditor::MoveKeyframe(const std::string& bone, KFChannel ch, int idx, float newTime)
 {
 	if (!currentMotion_) return;
@@ -231697,9 +231950,8 @@ void MotionEditor::MoveKeyframe(const std::string& bone, KFChannel ch, int idx, 
 }
 
 // ============================================================
-//  ボーン操作
+// ボーン操作
 // ============================================================
-
 void MotionEditor::SetJointTransform(const std::string& bone, const QuaternionTransform& tr)
 {
 	Joint* j = FindJoint(bone);
@@ -231714,13 +231966,19 @@ void MotionEditor::SetJointTransform(const std::string& bone, const QuaternionTr
 	}
 }
 
+// ============================================================
+// ボーンの検索
+// ============================================================
 Joint* MotionEditor::FindJoint(const std::string& name) const
 {
 	Object3d* target = GetTargetObject();
-	if (!target || !target->GetModel()) return nullptr;
-	return target->GetModel()->GetJointMap(name);
+	if (!target || !target->GetModel() || !target->GetModel()->GetSkeleton()) return nullptr;
+	return target->GetModel()->GetSkeleton()->GetJointByName(name);
 }
 
+// ============================================================
+// バッファからトランスフォームへの変換
+// ============================================================
 QuaternionTransform MotionEditor::BufferToTransform() const
 {
 	QuaternionTransform tr;
@@ -231730,6 +231988,9 @@ QuaternionTransform MotionEditor::BufferToTransform() const
 	return tr;
 }
 
+// ============================================================
+// ジョイントのバッファとの同期
+// ============================================================
 void MotionEditor::SyncJointToBuffer(const std::string& bone)
 {
 	Joint* j = FindJoint(bone);
@@ -231741,16 +232002,27 @@ void MotionEditor::SyncJointToBuffer(const std::string& bone)
 	editS_[0] = tr.scale.x; editS_[1] = tr.scale.y; editS_[2] = tr.scale.z;
 }
 
+// ============================================================
+// バッファからジョイントへの変換
+// ============================================================
 void MotionEditor::SyncBufferToJoint()
 {
 	Joint* j = FindJoint(selBone_);
-	if (j) j->SetTransform(BufferToTransform());
+	if (j) {
+		j->SetTransform(BufferToTransform());
+		Object3d* target = GetTargetObject();
+		Model* m = target ? target->GetModel() : nullptr;
+		if (m && m->GetSkeleton()) {
+			m->GetSkeleton()->Update();
+			if (m->GetSkinCluster())
+				m->GetSkinCluster()->UpdateMatrixPalette(m->GetSkeleton()->GetJoints());
+		}
+	}
 }
 
 // ============================================================
-//  ユーティリティ
+// ユーティリティ
 // ============================================================
-
 std::string MotionEditor::AnimDisplayName(const std::string& key)
 {
 	auto pos = key.find('#');
@@ -231799,6 +232071,63 @@ std::vector<fs::directory_entry> MotionEditor::GetDirectoryEntries(
 	return dirs;
 }
 
+Matrix4x4 MotionEditor::GetJointWorldMatrix(const std::string& boneName) const
+{
+	Joint* j = FindJoint(boneName);
+	if (j) {
+		// 修正：ターゲットのワールド行列を掛けて真のワールド座標にする
+		return j->GetWorldTransform().matWorld_ * GetTargetWorldMatrix();
+	}
+	return MakeIdentity4x4();
+}
+
+void MotionEditor::ApplyBoneGizmoTransform(const std::string& boneName, const Matrix4x4& newWorldMat)
+{
+	Joint* j = FindJoint(boneName);
+	if (!j) return;
+
+	// 親のワールド行列を取得
+	Matrix4x4 parentWorld = MakeIdentity4x4();
+	if (j->GetWorldTransform().parent_) {
+		// 修正：親の matWorld_（モデル空間）に対象オブジェクトのワールド行列を掛ける
+		parentWorld = j->GetWorldTransform().parent_->matWorld_ * GetTargetWorldMatrix();
+	}
+	else {
+		parentWorld = GetTargetWorldMatrix();
+	}
+
+	// ローカル行列 ＝ 新ワールド行列 × 親ワールド行列の逆行列
+	Matrix4x4 newLocalMat = newWorldMat * Inverse(parentWorld);
+
+	// 分解
+	float lT[3], lRDeg[3], lS[3];
+#ifdef USE_IMGUI
+	ImGuizmo::DecomposeMatrixToComponents(&newLocalMat.m[0][0], lT, lRDeg, lS);
+#endif
+	// UI用バッファに反映 (選択中のボーンと一致する場合のみUIに反映させるのが自然だが、ギズモ操作中＝選択中のはず)
+	if (selBone_ == boneName) {
+		editT_[0] = lT[0]; editT_[1] = lT[1]; editT_[2] = lT[2];
+		editR_[0] = lRDeg[0]; editR_[1] = lRDeg[1]; editR_[2] = lRDeg[2];
+		editS_[0] = lS[0]; editS_[1] = lS[1]; editS_[2] = lS[2];
+	}
+
+	// バッファからトランスフォームを構築して Joint にセット
+	QuaternionTransform tr;
+	tr.translate = { lT[0], lT[1], lT[2] };
+	tr.rotate = EulerToQuaternion({ lRDeg[0] * (kPi / 180), lRDeg[1] * (kPi / 180), lRDeg[2] * (kPi / 180) });
+	tr.scale = { lS[0], lS[1], lS[2] };
+
+	j->SetTransform(tr);
+
+	Object3d* target = GetTargetObject();
+	Model* m = target ? target->GetModel() : nullptr;
+	if (m && m->GetSkeleton()) {
+		m->GetSkeleton()->Update();
+		if (m->GetSkinCluster())
+			m->GetSkinCluster()->UpdateMatrixPalette(m->GetSkeleton()->GetJoints());
+	}
+}
+
 ============================================================
 File Path: YEngine/Model/Motion/MotionEditor.h
 ============================================================
@@ -231815,8 +232144,12 @@ File Path: YEngine/Model/Motion/MotionEditor.h
 #include "Editor/Command/CommandHistory.h"
 #include "Debugger/DopeSheet/DopeSheetEditor.h"
 #include <Graphics/Drawer/LineManager/Line.h>
-
 #include "Object3D/ObjectManager.h" 
+
+#ifdef USE_IMGUI
+#include "Debugger/Gizmo/GizmoController.h"
+#endif
+
 // Math
 #include "Vector3.h"
 #include "Quaternion.h"
@@ -231825,6 +232158,10 @@ class Camera;
 class Motion;
 class Joint;
 class Skeleton;
+
+#ifdef USE_IMGUI
+class BoneGizmable; // 前方宣言
+#endif
 
 // ============================================================
 //  ファイルブラウザ状態
@@ -231859,12 +232196,29 @@ struct SelectedKF
 class MotionEditor
 {
 public:
+
 	///************************* 基本的関数 *************************///
+	MotionEditor();
+	~MotionEditor();
+
 	void Initialize(Camera* camera);
 	void Update();
+	void Draw();
+	void DrawGizmo();
 	void DrawBone();
 	void ShowEditor();
 	void SetTargetObjectId(int id);
+	bool IsDrawBone() const { return isDrawBone_; }
+	int GetTargetObjectId() const { return targetObjectId_; }
+	void SetCamera(Camera* camera) { camera_ = camera; }
+	///************************* ギズモ操作用インターフェース *************************///
+
+	// ボーンの現在のワールド行列を取得
+	Matrix4x4 GetJointWorldMatrix(const std::string& boneName) const;
+
+	// ギズモで操作された新しいワールド行列をローカルに変換し、ジョイントとUIに適用する
+	void ApplyBoneGizmoTransform(const std::string& boneName, const Matrix4x4& newWorldMat);
+
 private:
 	///************************* その他描画 *************************///
 	void DrawMenuBar();
@@ -231880,7 +232234,7 @@ private:
 
 	///************************* 内部ヘルパー関数 *************************///
 #ifdef USE_IMGUI
-	/// 1 ボーン × 1 チャンネルの行を描画（KF ひし形 + クリック/ドラッグ判定）
+	/// 1 ボーン × 1 チャンネルの行を描画
 	void DrawKFRow(ImDrawList* dl,
 		const std::string& boneName, KFChannel ch,
 		float rowY, float canvasX, float canvasW, float labelW);
@@ -231898,6 +232252,10 @@ private:
 	void DeleteKeyframe(const std::string& bone, float time);
 	void MoveKeyframe(const std::string& bone, KFChannel ch, int idx, float newTime);
 
+	// ★追加: 全ボーンの現在のトランスフォームを一括保存
+	void SavePose(float time);
+	// ★追加: 特定のトランスフォームから直接キーフレームを挿入
+	void InsertKeyframeFromTransform(const std::string& bone, float time, const QuaternionTransform& tr);
 
 	///************************* ボーン操作 *************************///
 	void   SetJointTransform(const std::string& bone, const QuaternionTransform& tr);
@@ -231920,6 +232278,17 @@ private:
 		return nullptr;
 	}
 
+	// ★追加: 対象オブジェクトのワールド行列を取得する
+	Matrix4x4 GetTargetWorldMatrix() const {
+		if (targetObjectId_ != -1) {
+			auto* placedObj = ObjectManager::GetInstance()->GetObjectById(targetObjectId_);
+			if (placedObj && placedObj->worldTransform) {
+				return placedObj->worldTransform->GetMatWorld();
+			}
+		}
+		return previewTransform_.matWorld_;
+	}
+
 private:
 	///************************* 定数 *************************///
 	static constexpr const char* kModelRootDir = "Resources/Models";
@@ -231930,7 +232299,7 @@ private:
 private:
 	///************************* メンバ変数 *************************///
 
-	// ドープシートエディタ
+	// ドープシートエディ���
 	DopeSheet::DopeSheetEditor dopeSheet_;
 	std::vector<DopeSheet::DopeTrack> tracks_;
 	std::vector<std::pair<std::string, int>> trackBoneMap_;
@@ -231957,6 +232326,13 @@ private:
 	std::unique_ptr<Line> lineDrawer_;
 	bool             isDrawBone_ = false;
 
+#ifdef USE_IMGUI
+	std::unique_ptr<Object3d> boneObj_; // ICO.obj 表示用
+	GizmoController gizmoCtrl_;         // ギズモ操作用コントローラー
+	std::vector<std::unique_ptr<BoneGizmable>> boneGizmables_; // ピッキング用
+	std::vector<WorldTransform> boneWorldTransforms_; // ボーン描画用 WT（コマンドリストが参照するためフレーム間で生存させる）
+#endif
+
 	// 再生状態の管理 (UI用)
 	bool isPlaying_ = true;
 	bool isLoop_ = true;
@@ -231965,7 +232341,7 @@ private:
 	std::string selectedAnimKey_ = "";    // animationCache_ のキー
 
 	// 保存・読み込み
-	std::string      savePath_ = "Resources/Binary/edited_motion.anim";
+	std::string      savePath_ = "Resources/TestBinary/edited_motion.anim";
 	FileBrowserState binaryBrowser_;
 	bool             showSavePopup_ = false;
 	std::string      saveMsg_ = "";
@@ -231983,10 +232359,12 @@ private:
 	float     timelineZoom_ = 80.0f;   // px / 秒
 	float     timelineScroll_ = 0.0f;
 	SelectedKF selKF_;
+
 	// KF 値編集スナップショット
 	Vector3    kfSnapT_ = {};
 	Quaternion kfSnapR_ = { 0,0,0,1 };
 	Vector3    kfSnapS_ = { 1,1,1 };
+
 	// KF ドラッグ移動
 	bool  draggingKF_ = false;
 	float dragKFOrigTime_ = 0.0f;
@@ -232453,6 +232831,122 @@ public:
 
 };
 
+
+============================================================
+File Path: YEngine/Model/Skeleton/BoneGizmable.cpp
+============================================================
+#include "BoneGizmable.h"
+#include <Motion/MotionEditor.h>
+
+#ifdef USE_IMGUI
+#include "ImGuizmo.h"
+
+void BoneGizmable::UpdateFromJoint()
+{
+	// Editor 経由で対象 Joint のワールド行列を取得
+	Matrix4x4 wMat = editor_->GetJointWorldMatrix(boneName_);
+
+	float t[3], rDeg[3], s[3];
+	ImGuizmo::DecomposeMatrixToComponents(&wMat.m[0][0], t, rDeg, s);
+
+	worldPos_ = { t[0], t[1], t[2] };
+	// ImGuizmo は Degree(度数法) で返すため、Radian(弧度法) に変換して保持
+	worldRot_ = { rDeg[0] * (3.14159265f / 180.0f), rDeg[1] * (3.14159265f / 180.0f), rDeg[2] * (3.14159265f / 180.0f) };
+	worldScale_ = { s[0], s[1], s[2] };
+	isDirty_ = false;
+}
+
+void BoneGizmable::OnGizmoManipulationEnd()
+{
+	if (!isDirty_) return;
+
+	// 1. ギズモで操作された新しいワールド行列を作成
+	float t[3] = { worldPos_.x, worldPos_.y, worldPos_.z };
+	float rDeg[3] = { worldRot_.x * (180.0f / 3.14159265f), worldRot_.y * (180.0f / 3.14159265f), worldRot_.z * (180.0f / 3.14159265f) };
+	float s[3] = { worldScale_.x, worldScale_.y, worldScale_.z };
+
+	Matrix4x4 newWorldMat;
+	ImGuizmo::RecomposeMatrixFromComponents(t, rDeg, s, &newWorldMat.m[0][0]);
+
+	// 2. 新しいワールド行列の適用を MotionEditor に委譲する
+	editor_->ApplyBoneGizmoTransform(boneName_, newWorldMat);
+
+	isDirty_ = false;
+}
+
+#endif // USE_IMGUI
+
+============================================================
+File Path: YEngine/Model/Skeleton/BoneGizmable.h
+============================================================
+#pragma once
+
+#ifdef USE_IMGUI
+
+#include "Debugger/Gizmo/IGizmable.h"
+#include "MathFunc.h"
+
+class MotionEditor;
+
+/// <summary>
+/// ボーンを GizmoController で操作するためのアダプタクラス
+/// </summary>
+class BoneGizmable : public IGizmable
+{
+public:
+	BoneGizmable(MotionEditor* editor, const std::string& boneName)
+		: editor_(editor), boneName_(boneName) {
+	}
+
+	// =================================================================
+	// IGizmable のオーバーライド
+	// =================================================================
+
+	std::string GetGizmoLabel() const override { return "Bone:" + boneName_; }
+
+	// ICO.obj の 1/10 スケールに合わせてピッキング（クリック判定）の半径を小さく設定
+	float GetGizmoPickRadius() const override { return 0.2f; }
+
+	Vector3 GetGizmoPosition() const override { return worldPos_; }
+	void SetGizmoPosition(const Vector3& pos) override { worldPos_ = pos; isDirty_ = true; }
+
+	Vector3 GetGizmoRotation() const override { return worldRot_; }
+	void SetGizmoRotation(const Vector3& rot) override { worldRot_ = rot; isDirty_ = true; }
+
+	Vector3 GetGizmoScale() const override { return worldScale_; }
+	void SetGizmoScale(const Vector3& scale) override { worldScale_ = scale; isDirty_ = true; }
+
+	// =================================================================
+	// 同期処理
+	// =================================================================
+
+	/// <summary>
+	/// 毎フ��ーム、実際の Joint が持つ WorldTransform からワールド座標を算出して同期する
+	/// （ギズモを描画する直前に呼び出す）
+	/// </summary>
+	void UpdateFromJoint();
+
+	/// <summary>
+	/// ギズモ操作終了時（マウスドラッグ中～終了時）に呼ばれる。
+	/// 新しいワールド座標を MotionEditor に渡し、適用を依頼する。
+	/// </summary>
+	void OnGizmoManipulationEnd() override;
+
+	const std::string& GetBoneName() const { return boneName_; }
+
+private:
+	MotionEditor* editor_ = nullptr;
+	std::string boneName_;
+
+	Vector3 worldPos_{};
+	Vector3 worldRot_{};
+	Vector3 worldScale_{ 1, 1, 1 };
+
+	// ギズモによって値が変更されたフラグ
+	bool isDirty_ = false;
+};
+
+#endif // USE_IMGUI
 
 ============================================================
 File Path: YEngine/Model/Skeleton/Joint.cpp
@@ -238167,7 +238661,20 @@ namespace DopeSheet
                     static_cast<int>((ImGui::GetMousePos().x - rowMin.x) / cellW),
                     0, totalFrames);
                 pendingValue_ = 0.0f;
-                pendingDuration_ = 10;
+
+                switch (track.type) {
+                case TrackType::AttackHitbox:
+                case TrackType::InvincibleFrame:
+                case TrackType::ArmorFrame:
+                case TrackType::ComboWindow:
+                case TrackType::CancelWindow:
+                case TrackType::CounterWindow:
+                    pendingDuration_ = 10; // 区間を扱うものはデフォルトでバーにする
+                    break;
+                default:
+                    pendingDuration_ = 0;  // それ以外（Motion系など）はひし形にする
+                    break;
+                }
                 pendingTrackIdx_ = trackIdx;
                 showAddPopup_ = true;
                 ImGui::OpenPopup("##DopeAddKey");
