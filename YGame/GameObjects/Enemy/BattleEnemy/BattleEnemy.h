@@ -254,6 +254,6 @@ private:
 	// 連続ヒット管理
 	int consecutiveHitCount_ = 0;           // 連続ヒット数
 	float hitCountResetTimer_ = 0.0f;       // ヒットカウントリセットタイマー
-	const int maxConsecutiveHits_ = 3;      // 最大連続ヒット数（これを超えたらRecovery状態へ）
+	const int maxConsecutiveHits_ = 4;      // 最大連続ヒット数（これを超えたらRecovery状態へ）
 	const float hitCountResetTime_ = 2.5f;  // この時間攻撃を受けなければカウントリセット
 };
