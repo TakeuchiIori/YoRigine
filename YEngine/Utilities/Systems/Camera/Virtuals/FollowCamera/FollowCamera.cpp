@@ -31,7 +31,11 @@ void FollowCamera::Initialize() {
 	// めり込み防止コンポーネントの初期化と無視設定
 	// ------------------------------------------------------------
 	collisionResolver_.Initialize();
-	collisionResolver_.SetIgnoreTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayer));
+	collisionResolver_.AddIgnoreTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayer));
+	collisionResolver_.AddIgnoreTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayerShield));
+	collisionResolver_.AddIgnoreTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon));
+	collisionResolver_.AddIgnoreTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kBattleEnemy));
+	collisionResolver_.AddIgnoreTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kFieldEnemy));
 }
 
 // ============================================================
@@ -84,6 +88,11 @@ void FollowCamera::UpdateInput() {
 				move = Normalize(move) * kRotateSpeed_;
 				transform_.rotate += move;
 			}
+
+			// ------------------------------------------------------------
+			// カメラの縦回転を制限する
+			// ------------------------------------------------------------
+			transform_.rotate.x = std::clamp(transform_.rotate.x, minPitch_, maxPitch_);
 		}
 	}
 }
@@ -109,12 +118,15 @@ void FollowCamera::FollowProcess() {
 	Matrix4x4 rotateMat = MakeRotateMatrixXYZ(transform_.rotate);
 	Vector3 rotatedOffset = TransformNormal(offset, rotateMat);
 
-	Vector3 idealCameraPos = target_->translate_ + rotatedOffset;
-
 	// ------------------------------------------------------------
-	// レイの始点となる注視点（プレイヤーの頭の高さなど）を設定
+	// レイの始点であり、カメラが回る中心（プレイヤーの頭の高さなど）を設定
 	// ------------------------------------------------------------
 	Vector3 targetPivot = target_->translate_ + Vector3(0.0f, targetPivot_Height_, 0.0f);
+
+	// ------------------------------------------------------------
+	// ★修正箇所：理想のカメラ位置は「足元」ではなく「注視点（頭）」を基準にする！
+	// ------------------------------------------------------------
+	Vector3 idealCameraPos = targetPivot + rotatedOffset;
 
 	// ------------------------------------------------------------
 	// コンポーネントに地形や障害物の回避計算を依頼する
@@ -157,7 +169,9 @@ void FollowCamera::GetDefaultCameraParams(Vector3& outPos, Vector3& outRot, floa
 	Matrix4x4 rotateMat = MakeRotateMatrixXYZ(transform_.rotate);
 	offset = TransformNormal(offset, rotateMat);
 
-	outPos = target_->translate_ + offset;
+	// ★修正箇所：ここも「注視点」を基準にする
+	Vector3 targetPivot = target_->translate_ + Vector3(0.0f, targetPivot_Height_, 0.0f);
+	outPos = targetPivot + offset;
 	outRot = transform_.rotate;
 	outFov = fovY_;
 }
@@ -178,6 +192,8 @@ void FollowCamera::DrawDebugGui() {
 		ImGui::DragFloat3("角度", &transform_.rotate.x, 0.01f, -6.28f, 6.28f);
 		ImGui::DragFloat("旋回速度 (パッド)", &kRotateSpeed_, 0.01f, 0.0f, 1.0f);
 		ImGui::DragFloat("注視点の高さ", &targetPivot_Height_, 0.1f, 0.0f, 100.0f);
+		ImGui::DragFloat("見上げ限界 (Min Pitch)", &minPitch_, 0.01f, -1.5f, 0.0f);
+		ImGui::DragFloat("見下ろし限界 (Max Pitch)", &maxPitch_, 0.01f, 0.0f, 1.5f);
 		ImGui::TreePop();
 	}
 
@@ -279,7 +295,9 @@ void FollowCamera::Save(nlohmann::json& j) const {
 	j["interpSpeed"] = interpSpeed_;
 	j["rotateSpeed"] = kRotateSpeed_;
 	j["closeUpScale"] = closeUpScale_;
-
+	j["targetPivot_Height"] = targetPivot_Height_;
+	j["minPitch"] = minPitch_;
+	j["maxPitch"] = maxPitch_;
 	// めり込み防止設定の保存
 	nlohmann::json resolverJson;
 	collisionResolver_.Save(resolverJson);
@@ -308,7 +326,9 @@ void FollowCamera::Load(const nlohmann::json& j) {
 	kRotateSpeed_ = j.value("rotateSpeed", 0.1f);
 	interpSpeed_ = j.value("interpSpeed", 5.0f);
 	closeUpScale_ = j.value("closeUpScale", 0.3f);
-
+	targetPivot_Height_ = j.value("targetPivot_Height", 1.0f);
+	minPitch_ = j.value("minPitch", -1.5f);
+	maxPitch_ = j.value("maxPitch", 1.5f);
 	// めり込み防止設定の復元
 	if (j.contains("collisionResolver")) {
 		collisionResolver_.Load(j["collisionResolver"]);

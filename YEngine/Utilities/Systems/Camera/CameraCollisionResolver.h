@@ -31,22 +31,23 @@ public:
 	bool IsEnabled() const { return isEnabled_; }
 
 	// 無視するコライダーのTypeIDを設定する
-	void SetIgnoreTypeID(uint32_t typeID) { ignoreTypeID_ = typeID; }
+	void AddIgnoreTypeID(uint32_t typeID) { ignoreTypeIDs_.push_back(typeID); }
+	void ClearIgnoreTypeIDs() { ignoreTypeIDs_.clear(); }
 private:
 	///************************* メンバ関数 *************************///
 
-	bool isEnabled_ = true;              // 衝突判定を有効にするか
-	float cameraRadius_ = 0.5f;          // カメラの球体判定の半径（壁からどれくらい離すか）
-	float avoidSpeed_ = 0.3f;            // 壁が迫った時に手前に寄る素早さ (0.0~1.0)
-	float returnSpeed_ = 0.05f;          // 壁がなくなった時に元の距離に戻る素早さ (0.0~1.0)
+	bool isEnabled_ = true;							// 衝突判定を有効にするか
+	float cameraRadius_ = 0.5f;						// カメラの球体判定の半径（壁からどれくらい離すか）
+	float avoidSpeed_ = 0.3f;						// 壁が迫った時に手前に寄る素早さ (0.0~1.0)
+	float returnSpeed_ = 0.05f;						// 壁がなくなった時に元の距離に戻る素早さ (0.0~1.0)
 
 	// --- ハイアングル演出パラメータ ---
-	bool enableHighAngle_ = true;        // 接近時のハイアングル化を有効にするか
-	float highAngleThreshold_ = 0.5f;    // 距離が本来の何割未満になったら持ち上げ始めるか
-	float maxPushUpHeight_ = 3.0f;       // 最大でどれくらい上に持ち上げるか
+	bool enableHighAngle_ = true;					// 接近時のハイアングル化を有効にするか
+	float highAngleThreshold_ = 0.5f;				// 距離が本来の何割未満になったら持ち上げ始めるか
+	float maxPushUpHeight_ = 3.0f;					// 最大でどれくらい上に持ち上げるか
 
 	// --- 内部状態 ---
-	float currentDistanceRatio_ = 1.0f;  // 現在の距離の割合 (0.0 ~ 1.0、補間用)
-	float minGroundHeight_ = 0.5f;       // カメラが地面にめり込むのを防止するための最低高さ
-	uint32_t ignoreTypeID_ = 0;          // 衝突判定で無視するコライダーのタイプID（例: プレイヤー自身のコライダー）
+	float currentDistanceRatio_ = 1.0f;				// 現在の距離の割合 (0.0 ~ 1.0、補間用)
+	float minGroundHeight_ = 0.5f;					// カメラが地面にめり込むのを防止するための最低高さ
+	std::vector<uint32_t> ignoreTypeIDs_;			// 衝突判定で無視するコライダーのタイプID（例: プレイヤー自身のコライダー）
 };

@@ -64,7 +64,7 @@ namespace YoRigine {
 		// ============================================================
 		// レイキャスト判定
 		// ============================================================
-		bool Raycast(const Ray& ray, float maxDistance, RaycastHit* outHit, uint32_t ignoreTypeID = 0);
+		bool Raycast(const Ray& ray, float maxDistance, RaycastHit* outHit, const std::vector<uint32_t>& ignoreTypeIDs = {});
 
 		// ============================================================
 		// ヒット方向判定用ユーティリティ

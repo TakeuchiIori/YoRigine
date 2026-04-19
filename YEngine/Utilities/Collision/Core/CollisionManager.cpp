@@ -199,7 +199,7 @@ namespace YoRigine {
 		std::cout << "BaseCollider removed: " << collider->GetTypeID() << std::endl;
 	}
 
-	bool CollisionManager::Raycast(const Ray& ray, float maxDistance, RaycastHit* outHit, uint32_t ignoreTypeID)
+	bool CollisionManager::Raycast(const Ray& ray, float maxDistance, RaycastHit* outHit, const std::vector<uint32_t>& ignoreTypeIDs)
 	{
 		bool hitAnything = false;
 		float closestDistance = maxDistance;
@@ -208,7 +208,11 @@ namespace YoRigine {
 		for (BaseCollider* collider : colliders_) {
 			if (!collider || !collider->GetIsActive() || !collider->IsCollisionEnabled()) continue;
 			// 無視するタイプIDと一致するコライダーはスキップ
-			if (ignoreTypeID != 0 && collider->GetTypeID() == ignoreTypeID) continue;
+			if (!ignoreTypeIDs.empty()) {
+				auto it = std::find(ignoreTypeIDs.begin(), ignoreTypeIDs.end(), collider->GetTypeID());
+				if (it != ignoreTypeIDs.end()) continue; // リストにあったら無視！
+			}
+
 			bool isHit = false;
 
 			if (auto sc = dynamic_cast<SphereCollider*>(collider)) {
@@ -220,6 +224,11 @@ namespace YoRigine {
 			}
 			else if (auto ab = dynamic_cast<AABBCollider*>(collider)) {
 				isHit = Intersection::IsCollision(ray, ab->GetAABB(), &tempHit);
+			}
+
+			// 近すぎるので強制的に無視して次へ
+			if (isHit && tempHit.distance <= 0.001f) {
+				continue;
 			}
 
 			// 最も手前で当たった情報を更新

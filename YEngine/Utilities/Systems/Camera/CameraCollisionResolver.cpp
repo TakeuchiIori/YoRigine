@@ -36,9 +36,9 @@ Vector3 CameraCollisionResolver::Resolve(const Vector3& idealPos, const Vector3&
 		cameraRay.direction - rayDir;
 
 		RaycastHit hitInfo;
-		if (YoRigine::CollisionManager::GetInstance()->Raycast(cameraRay, maxDistance, &hitInfo,ignoreTypeID_)) {
-			// 障害物があった場合、カメラ半径分だけ手前をヒット距離とする
-			hitDistance - hitInfo.distance - cameraRadius_;
+		// Raycastで衝突した場合、ヒット距離をカメラ半径分だけ手前にする
+		if (YoRigine::CollisionManager::GetInstance()->Raycast(cameraRay, maxDistance, &hitInfo, ignoreTypeIDs_)) {
+			hitDistance = hitInfo.distance - cameraRadius_;
 		}
 
 		// ------------------------------------------------------------
@@ -83,7 +83,7 @@ Vector3 CameraCollisionResolver::Resolve(const Vector3& idealPos, const Vector3&
 	// ------------------------------------------------------------
 	if (enableHighAngle_ && currentDistanceRatio_ < highAngleThreshold_) {
 		float closeFactor = (highAngleThreshold_ - currentDistanceRatio_) / highAngleThreshold_;
-		finalOffset.y +- maxPushUpHeight_ * closeFactor;
+		finalOffset.y += maxPushUpHeight_ * closeFactor;
 	}
 
 	Vector3 finalCameraPos = targetPivot + finalOffset;
