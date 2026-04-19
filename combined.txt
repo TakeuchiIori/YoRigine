@@ -680,6 +680,8 @@
 └──         ├── Camera/
 └──         └── ├── Camera.cpp
 └──         └── ├── Camera.h
+└──         └── ├── CameraCollisionResolver.cpp
+└──         └── ├── CameraCollisionResolver.h
 └──         └── ├── CameraDirector.cpp
 └──         └── ├── CameraDirector.h
 └──         └── ├── CameraEditor.cpp
@@ -905,6 +907,9 @@
 ├── YMath/
 └── ├── Easing.cpp
 └── ├── Easing.h
+└── ├── Intersection/
+└── └── ├── Intersection.cpp
+└── └── └── Intersection.h
 └── ├── MathFunc.cpp
 └── ├── MathFunc.h
 └── ├── Matrix3x3.h
@@ -912,6 +917,12 @@
 └── ├── Matrix4x4.h
 └── ├── Quaternion.cpp
 └── ├── Quaternion.h
+└── ├── Ray/
+└── └── └── Raycast.h
+└── ├── Shape/
+└── └── ├── AABB.h
+└── └── ├── OBB.h
+└── └── └── Sphere.h
 └── ├── Vector2.h
 └── ├── Vector3.cpp
 └── ├── Vector3.h
@@ -233854,6 +233865,7 @@ File Path: YEngine/Utilities/Collision/AABB/AABBCollider.h
 
 // Math
 #include "MathFunc.h"
+#include "Shape/AABB.h"
 
 // AABBコライダーを扱うクラス
 class AABBCollider : public BaseCollider
@@ -234543,6 +234555,9 @@ File Path: YEngine/Utilities/Collision/AreaCollision/CircleArea.cpp
 #include "MathFunc.h"
 #include <cmath>
 
+// ============================================================
+// コンストラクタ
+// ============================================================
 CircleArea::CircleArea(const Vector3& center, float radius)
 	: center_(center)
 	, radius_(radius)
@@ -234550,6 +234565,9 @@ CircleArea::CircleArea(const Vector3& center, float radius)
 {
 }
 
+// ============================================================
+// 初期化
+// ============================================================
 void CircleArea::Initialize(const Vector3& center, float radius)
 {
 	center_ = center;
@@ -234559,9 +234577,17 @@ void CircleArea::Initialize(const Vector3& center, float radius)
 	wasInside_ = false;
 }
 
+// ============================================================
+// エリア内かどうかを判定
+// ============================================================
 bool CircleArea::IsInside(const Vector3& position) const
 {
-	// XZ平面での距離を計算（Y軸は制限しない）
+	// 高さが範囲外ならfalse
+	if (position.y < ground_.bottom || position.y > ground_.top) {
+		return false;
+	}
+
+	// XZ平面での距離を計算
 	Vector3 toPosition = position - center_;
 	toPosition.y = 0.0f;
 
@@ -234569,37 +234595,59 @@ bool CircleArea::IsInside(const Vector3& position) const
 	return distanceSq <= (radius_ * radius_);
 }
 
+// ============================================================
+// 位置をエリア内にクランプ
+// ============================================================
 Vector3 CircleArea::ClampPosition(const Vector3& position) const
 {
-	// XZ平面での距離を計算（Y軸は制限しない）
-	Vector3 toPosition = position - center_;
-	toPosition.y = 0.0f;
-
-	float distance = Length(toPosition);
-
-	// 境界内ならそのまま返す
-	if (distance <= radius_) {
-		return position;
+	Vector3 result = position;
+	// 床より下に行こうとしたら床の高さで止める
+	if (result.y < ground_.bottom) {
+		result.y = ground_.bottom;
+	}else if(result.y > ground_.top) {
+		result.y = ground_.top;
 	}
 
-	// 境界を超えている場合、境界上に補正
-	Vector3 direction = Normalize(toPosition);
-	Vector3 clampedXZ = center_ + direction * radius_;
-
-	// Y座標は元のまま
-	return Vector3(clampedXZ.x, position.y, clampedXZ.z);
-}
-
-float CircleArea::GetDistanceFromBoundary(const Vector3& position) const
-{
-	// XZ平面での距離を計算
+	// XZ（横）のはみ出し補正
 	Vector3 toPosition = position - center_;
 	toPosition.y = 0.0f;
-
 	float distance = Length(toPosition);
-	return radius_ - distance;  // 正の値 = 内側、負の値 = 外側
+	if (distance > radius_) {
+		Vector3 direction = Normalize(toPosition);
+		Vector3 clampedXZ = center_ + direction * radius_;
+		result.x = clampedXZ.x;
+		result.z = clampedXZ.z;
+	}
+
+
+	return result;
 }
 
+// ============================================================
+// エリア境界までの距離を取得
+// ============================================================
+float CircleArea::GetDistanceFromBoundary(const Vector3& position) const
+{
+	// 側面の境界までの距離
+	Vector3 toPosition = position - center_;
+	toPosition.y = 0.0f;
+	float horizontalDistance = Length(toPosition);
+	float distToSide = radius_ - horizontalDistance;
+
+	// 床までの距離
+	float distToFloor = position.y - ground_.bottom;
+
+	// 天井までの距離
+	float distToCeiling = ground_.top - position.y;
+
+	// 側面、床、天井のうち、「一番近い距離」を返す
+	// ※どれか1つでもマイナス（範囲外）になっていれば、その一番深いマイナス値が返る
+	return std::min({ distToSide, distToFloor, distToCeiling });
+}
+
+// ============================================================
+// デバッグ描画
+// ============================================================
 void CircleArea::Draw(Line* line)
 {
 	if (!line || !isDebugDrawEnabled_) {
@@ -234660,6 +234708,9 @@ public:
 
 	float GetRadius() const { return radius_; }
 
+	// 地面の高さ設定（Y軸の基準位置）
+	void SetGroundBottom(float bottom) { ground_.bottom = bottom; }
+	void SetGroundTop(float top) { ground_.top = top; }
 public:
 	///************************* デバッグ設定 *************************///
 
@@ -234669,9 +234720,16 @@ public:
 private:
 	///************************* メンバ変数 *************************///
 
+	// Y軸の基準位置（地面の高さなど、必要に応じて設定）
+	struct Ground {
+		float top = 100.0f;
+		float bottom = 0.0f;
+	}ground_;
+
 	Vector3 center_;     // 円の中心座標
 	float radius_;       // 円の半径
 	int debugSegments_;  // デバッグ描画の分割数
+
 };
 
 ============================================================
@@ -234837,6 +234895,13 @@ public:
 	void SetEnablePenetration(bool enable) { enablePenetration_ = enable; }
 	bool GetEnablePenetration() const { return enablePenetration_; }
 
+	// 質量の設定
+	void SetMass(float mass) { mass_ = mass; }
+	float GetMass() const { return mass_; }
+
+	// 速度の設定
+	void SetVelocity(const Vector3& velocity) { velocity_ = velocity; }
+	Vector3 GetVelocity() const { return velocity_; }
 protected:
 	///************************* 継承クラス用変数 *************************///
 
@@ -234849,7 +234914,6 @@ protected:
 	// 衝突タイプ識別ID（CollisionTypeIdDefで定義）
 	uint32_t typeID_ = 0u;
 
-public:
 	///************************* 設定フラグ *************************///
 
 	// 当たり判定を有効化
@@ -234866,6 +234930,11 @@ public:
 
 	// デバッグ表示用カメラ参照
 	Camera* camera_ = nullptr;
+
+	// コライダーに設定する質量
+	float mass_ = 1.0f;
+
+	Vector3 velocity_ {};
 
 private:
 	///************************* 内部管理変数 *************************///
@@ -235151,673 +235220,41 @@ enum class HitDirection {
 File Path: YEngine/Utilities/Collision/Core/CollisionManager.cpp
 ============================================================
 #include "CollisionManager.h"
-// C++
 #include <assert.h>
 #include <iostream>
-
-// Engine
 #include "CollisionTypeIdDef.h"
-
-// C++
-#include "MathFunc.h"
-
 
 #ifdef USE_IMGUI
 #include "imgui.h"
 #endif // _DEBUG
 
-
 namespace YoRigine {
 
-	CollisionManager* CollisionManager::GetInstance()
-	{
+	CollisionManager* CollisionManager::GetInstance() {
 		static CollisionManager instance;
 		return &instance;
 	}
 
-	CollisionManager::~CollisionManager()
-	{
+	CollisionManager::~CollisionManager() {
 		Reset();
 	}
-
-
-	inline float ProjectOBB(const OBB& obb, const Vector3& axis, const Vector3 axes[3]) {
-		return	obb.size.x * fabs(Dot(axes[0], axis)) +
-			obb.size.y * fabs(Dot(axes[1], axis)) +
-			obb.size.z * fabs(Dot(axes[2], axis));
-	}
-
-	bool Collision::Check(const SphereCollider* a, const SphereCollider* b)
-	{
-		Vector3 diff = b->GetCenterPosition() - a->GetCenterPosition();
-		float distSq = Length(diff);
-		float radiusSum = a->GetRadius() + b->GetRadius();
-		return distSq <= radiusSum;
-	}
-
-	bool Collision::Check(const SphereCollider* sphere, const AABBCollider* aabb)
-	{
-		Vector3 center = sphere->GetCenterPosition();
-		float radius = sphere->GetRadius();
-
-		// 値が正常かチェック
-		if (std::isnan(center.x) || std::isnan(center.y) || std::isnan(center.z) ||
-			std::isnan(radius) || radius < 0.0f || !std::isfinite(radius)) {
-			return false;
-		}
-
-
-		Vector3 closest = Clamp(sphere->GetCenterPosition(), aabb->GetAABB().min, aabb->GetAABB().max);
-		Vector3 diff = closest - sphere->GetCenterPosition();
-		return Length(diff) <= sphere->GetRadius() * sphere->GetRadius();
-	}
-
-	bool Collision::Check(const SphereCollider* sphere, const OBBCollider* obb)
-	{
-		Vector3 center = sphere->GetCenterPosition();
-		float radius = sphere->GetRadius();
-
-		// 値が正常かチェック
-		if (std::isnan(center.x) || std::isnan(center.y) || std::isnan(center.z) ||
-			std::isnan(radius) || radius < 0.0f || !std::isfinite(radius)) {
-			return false;
-		}
-
-		const OBB& ob = obb->GetOBB();
-
-		// 回転行列を作成（オイラー角 → 回転行列）
-		Matrix4x4 rotMat = MakeRotateMatrixXYZ(ob.rotation);
-
-		// ワールド→ローカル変換：回転行列の転置を使う（回転の逆）
-		Matrix4x4 invRot = TransPose(rotMat);
-
-		Vector3 localPos = Transform(sphere->GetCenterPosition() - ob.center, invRot);
-		Vector3 clamped = Clamp(localPos, -ob.size, ob.size);
-
-		// ローカル→ワールドに戻す
-		Vector3 closest = ob.center + Transform(clamped, rotMat);
-		Vector3 diff = closest - sphere->GetCenterPosition();
-
-		return Length(diff) <= sphere->GetRadius() * sphere->GetRadius();
-	}
-
-	bool Collision::Check(const AABBCollider* a, const AABBCollider* b)
-	{
-		const AABB& aa = a->GetAABB();
-		const AABB& bb = b->GetAABB();
-		return (aa.min.x <= bb.max.x && aa.max.x >= bb.min.x) &&
-			(aa.min.y <= bb.max.y && aa.max.y >= bb.min.y) &&
-			(aa.min.z <= bb.max.z && aa.max.z >= bb.min.z);
-	}
-
-	bool Collision::Check(const OBB& obbA, const OBB& obbB)
-	{
-		// 事前に早期リターンを行う球体近似チェック（オプション）
-		float radiusA = Length(obbA.size);
-		float radiusB = Length(obbB.size);
-		float distance = Length(obbB.center - obbA.center);
-		if (distance > radiusA + radiusB) {
-			return false; // 明らかに離れている場合は早期リターン
-		}
-
-		// 回転行列を取得
-		Matrix4x4 matA = MakeRotateMatrixXYZ(obbA.rotation);
-		Matrix4x4 matB = MakeRotateMatrixXYZ(obbB.rotation);
-
-		// 各OBBの軸を抽出
-		Vector3 axesA[3] = {
-			{ matA.m[0][0], matA.m[1][0], matA.m[2][0] },
-			{ matA.m[0][1], matA.m[1][1], matA.m[2][1] },
-			{ matA.m[0][2], matA.m[1][2], matA.m[2][2] }
-		};
-		Vector3 axesB[3] = {
-			{ matB.m[0][0], matB.m[1][0], matB.m[2][0] },
-			{ matB.m[0][1], matB.m[1][1], matB.m[2][1] },
-			{ matB.m[0][2], matB.m[1][2], matB.m[2][2] }
-		};
-
-		// 中心間の距離ベクトル
-		Vector3 distanceVec = obbB.center - obbA.center;
-
-		const float EPSILON = 1e-6f; // 数値的に安定した閾値
-
-		// テスト1: obbAの主軸でのテスト
-		for (int i = 0; i < 3; ++i) {
-			const Vector3& axis = axesA[i];
-
-			// 軸の長さをチェック（ゼロ除算防止）
-			if (LengthSquared(axis) < EPSILON) continue;
-
-			// 各OBBの投影を計算
-			float projA = ProjectOBB(obbA, axis, axesA);
-			float projB = ProjectOBB(obbB, axis, axesB);
-
-			// 分離軸チェック
-			if (fabs(Dot(distanceVec, axis)) > projA + projB) {
-				return false; // 分離軸が見つかった
-			}
-		}
-
-		// テスト2: obbBの主軸でのテスト
-		for (int i = 0; i < 3; ++i) {
-			const Vector3& axis = axesB[i];
-
-			if (LengthSquared(axis) < EPSILON) continue;
-
-			float projA = ProjectOBB(obbA, axis, axesA);
-			float projB = ProjectOBB(obbB, axis, axesB);
-
-			if (fabs(Dot(distanceVec, axis)) > projA + projB) {
-				return false;
-			}
-		}
-
-		// テスト3: 両方のOBBの主軸の外積でのテスト
-		for (int i = 0; i < 3; ++i) {
-			for (int j = 0; j < 3; ++j) {
-				Vector3 axis = Cross(axesA[i], axesB[j]);
-
-				// 外積が十分な大きさかチェック
-				float axisLengthSq = LengthSquared(axis);
-				if (axisLengthSq < EPSILON) continue;
-
-				// 単位ベクトルに正規化
-				axis = axis * (1.0f / sqrt(axisLengthSq));
-
-				float projA = ProjectOBB(obbA, axis, axesA);
-				float projB = ProjectOBB(obbB, axis, axesB);
-
-				if (fabs(Dot(distanceVec, axis)) > projA + projB) {
-					return false;
-				}
-			}
-		}
-
-		// すべてのテストにパスしたら衝突している
-		return true;
-	}
-
-	bool Collision::Check(const AABBCollider* aabb, const OBBCollider* obb)
-	{
-		OBB aabbAsOBB;
-		aabbAsOBB.center = (aabb->GetAABB().min + aabb->GetAABB().max) * 0.5f;
-		aabbAsOBB.size = (aabb->GetAABB().max - aabb->GetAABB().min) * 0.5f;
-		aabbAsOBB.rotation = { 0.0f,0.0f,0.0f };
-		return Collision::Check(aabbAsOBB, obb->GetOBB());
-
-	}
-
-	bool Collision::Check(const OBBCollider* a, const OBBCollider* b)
-	{
-		return Check(a->GetOBB(), b->GetOBB());
-	}
-
-	bool Collision::Check(BaseCollider* a, BaseCollider* b) {
-		// ここで dynamic_cast してペアを判定
-		if (auto sa = dynamic_cast<SphereCollider*>(a)) {
-			if (auto sb = dynamic_cast<SphereCollider*>(b)) return Check(sa, sb);
-			if (auto ob = dynamic_cast<OBBCollider*>(b))    return Check(sa, ob);
-			if (auto ab = dynamic_cast<AABBCollider*>(b))    return Check(sa, ab);
-		}
-		else if (auto oa = dynamic_cast<OBBCollider*>(a)) {
-			if (auto sb = dynamic_cast<SphereCollider*>(b)) return Check(sb, oa); // 順序逆
-			if (auto ob = dynamic_cast<OBBCollider*>(b))    return Check(oa, ob);
-			if (auto ab = dynamic_cast<AABBCollider*>(b))    return Check(ab, oa); // 順序逆
-		}
-		else if (auto aa = dynamic_cast<AABBCollider*>(a)) {
-			if (auto sb = dynamic_cast<SphereCollider*>(b)) return Check(sb, aa); // 順序逆
-			if (auto ob = dynamic_cast<OBBCollider*>(b))    return Check(aa, ob);
-			if (auto ab = dynamic_cast<AABBCollider*>(b))    return Check(aa, ab);
-		}
-		return false;
-	}
-
-	bool Collision::CheckHitDirection(const AABB& a, const AABB& b, HitDirection* hitDirection)
-	{
-		bool isHitX = (a.min.x <= b.max.x && a.max.x >= b.min.x);
-		bool isHitY = (a.min.y <= b.max.y && a.max.y >= b.min.y);
-		bool isHitZ = (a.min.z <= b.max.z && a.max.z >= b.min.z);
-
-		// 衝突していない場合
-		if (!(isHitX && isHitY && isHitZ)) {
-			if (hitDirection)*hitDirection = HitDirection::None;
-			return false;
-		}
-
-		if (hitDirection) {
-			Vector3 aCenter = (a.min + a.max) * 0.5f;
-			Vector3 bCenter = (b.min + b.max) * 0.5f;
-			Vector3 diff = bCenter - aCenter;
-
-			Vector3 overlap = {
-				std::abs(diff.x) - ((a.max.x - a.min.x) + (b.max.x - b.min.x)) * 0.5f,
-				std::abs(diff.y) - ((a.max.y - a.min.y) + (b.max.y - b.min.y)) * 0.5f,
-				std::abs(diff.z) - ((a.max.z - a.min.z) + (b.max.z - b.min.z)) * 0.5f,
-			};
-
-
-			if (std::abs(overlap.x) < std::abs(overlap.y) && std::abs(overlap.x) < std::abs(overlap.z)) {
-				*hitDirection = (diff.x > 0.0f) ? HitDirection::Left : HitDirection::Right;
-			}
-			else if (std::abs(overlap.y) < std::abs(overlap.x) && std::abs(overlap.y) < std::abs(overlap.z)) {
-				*hitDirection = (diff.y > 0.0f) ? HitDirection::Top : HitDirection::Bottom;
-			}
-			else {
-				*hitDirection = (diff.z > 0.0f) ? HitDirection::Front : HitDirection::Back;
-			}
-		}
-
-		return true;
-	}
-
-	bool Collision::CheckHitDirection(const AABB& aabb, const OBB& obb, HitDirection* hitDirection)
-	{
-		OBB aabbAcObb;
-		aabbAcObb.center = (aabb.min + aabb.max) * 0.5f;
-		aabbAcObb.size = (aabb.max - aabb.min) * 0.5f;
-		aabbAcObb.rotation = { 0.0f,0.0f,0.0f }; // AABBは回転しない
-
-		HitDirection dir;
-		bool hit = CheckHitDirection(aabbAcObb, obb, &dir);
-		if (hitDirection) {
-			*hitDirection = dir;
-		}
-
-		return hit;
-	}
-
-	bool Collision::CheckHitDirection(const OBB& obbA, const OBB& obbB, HitDirection* hitDirection)
-	{
-		const float EPSILON = 1e-6f; // 数値的に安定した閾値
-
-		// 回転行列取得
-		Matrix4x4 matA = MakeRotateMatrixXYZ(obbA.rotation);
-		Matrix4x4 matB = MakeRotateMatrixXYZ(obbB.rotation);
-
-		// 各OBBの軸を抽出
-		Vector3 axesA[3] = {
-			{ matA.m[0][0], matA.m[1][0], matA.m[2][0] },
-			{ matA.m[0][1], matA.m[1][1], matA.m[2][1] },
-			{ matA.m[0][2], matA.m[1][2], matA.m[2][2] }
-		};
-		Vector3 axesB[3] = {
-			{ matB.m[0][0], matB.m[1][0], matB.m[2][0] },
-			{ matB.m[0][1], matB.m[1][1], matB.m[2][1] },
-			{ matB.m[0][2], matB.m[1][2], matB.m[2][2] }
-		};
-		// 中心間の距離ベクトル
-		Vector3 distanceVec = obbB.center - obbA.center;
-
-		float minOverlap = FLT_MAX;
-		Vector3 minAxis{};
-
-		// obbAの処理
-		for (int i = 0; i < 3; i++) {
-			const Vector3& axisA = axesA[i];
-			if (LengthSquared(axisA) < EPSILON) continue;
-
-			float projA = ProjectOBB(obbA, axisA, axesA);
-			float projB = ProjectOBB(obbB, axisA, axesB);
-
-			float distance = fabs(Dot(distanceVec, axisA));
-			float overlap = projA + projB - distance;
-
-			if (overlap < 0) {
-				return false; // 分離軸が見つかった
-			}
-
-			if (overlap < minOverlap) {
-				minOverlap = overlap;
-				minAxis = axisA * ((Dot(distanceVec, axisA) > 0) ? -1.0f : 1.0f);
-			}
-		}
-
-
-		// obbBの処理
-		for (int i = 0; i < 3; i++) {
-			const Vector3& axisB = axesB[i];
-			if (LengthSquared(axisB) < EPSILON) continue;
-
-			float projA = ProjectOBB(obbA, axisB, axesA);
-			float projB = ProjectOBB(obbB, axisB, axesB);
-
-			float distance = fabs(Dot(distanceVec, axisB));
-			float overlap = projA + projB - distance;
-
-			if (overlap < 0) {
-				return false; // 分離軸が見つかった
-			}
-
-			if (overlap < minOverlap) {
-				minOverlap = overlap;
-				minAxis = axisB * ((Dot(distanceVec, axisB) > 0) ? -1.0f : 1.0f);
-			}
-		}
-
-
-		// 両方のOBBの主軸の外積でのテスト
-	// 最終的に取得した minAxis をローカル基準で比較して HitDirection を決定
-		Vector3 selfUp = { matA.m[1][0], matA.m[1][1], matA.m[1][2] };
-		Vector3 selfRight = { matA.m[0][0], matA.m[0][1], matA.m[0][2] };
-		Vector3 selfForward = { matA.m[2][0], matA.m[2][1], matA.m[2][2] };
-
-		// ここで、minAxis を「自分の軸基準で比較」
-		float dotUp = Dot(Normalize(minAxis), selfUp);
-		float dotDown = Dot(Normalize(minAxis), selfUp * -1.0f);
-		float dotRight = Dot(Normalize(minAxis), selfRight);
-		float dotLeft = Dot(Normalize(minAxis), selfRight * -1.0f);
-		float dotForward = Dot(Normalize(minAxis), selfForward);
-		float dotBack = Dot(Normalize(minAxis), selfForward * -1.0f);
-
-		// 一番大きい内積の方向が衝突方向
-		float maxDot = dotUp;
-		HitDirection hitDir = HitDirection::Top;
-
-		if (dotDown > maxDot) { maxDot = dotDown; hitDir = HitDirection::Bottom; }
-		if (dotRight > maxDot) { maxDot = dotRight; hitDir = HitDirection::Right; }
-		if (dotLeft > maxDot) { maxDot = dotLeft; hitDir = HitDirection::Left; }
-		if (dotForward > maxDot) { maxDot = dotForward; hitDir = HitDirection::Front; }
-		if (dotBack > maxDot) { maxDot = dotBack; hitDir = HitDirection::Back; }
-
-		*hitDirection = hitDir;
-
-		return true;
-	}
-
-	HitDirection Collision::ConvertVectorToHitDirection(const Vector3& dir)
-	{
-		if (fabs(dir.x) > fabs(dir.y) && fabs(dir.x) > fabs(dir.z)) {
-			return dir.x > 0 ? HitDirection::Right : HitDirection::Left;
-		}
-		else if (fabs(dir.y) > fabs(dir.z)) {
-			return dir.y > 0 ? HitDirection::Top : HitDirection::Bottom;
-		}
-		else {
-			return dir.z > 0 ? HitDirection::Front : HitDirection::Back;
-		}
-	}
-
-	HitDirection Collision::InverseHitDirection(HitDirection hitdirection)
-	{
-		switch (hitdirection)
-		{
-
-		case HitDirection::Top:
-			return HitDirection::Bottom;
-			break;
-		case HitDirection::Bottom:
-			return HitDirection::Top;
-			break;
-		case HitDirection::Left:
-			return HitDirection::Right;
-			break;
-		case HitDirection::Right:
-			return HitDirection::Left;
-			break;
-		case HitDirection::Front:
-			return HitDirection::Back;
-			break;
-		case HitDirection::Back:
-			return HitDirection::Front;
-			break;
-		default: return HitDirection::None;
-		}
-	}
-
-	HitDirection Collision::GetSelfLocalHitDirection(BaseCollider* self, BaseCollider* other)
-	{
-		Vector3 toOther = Normalize(other->GetCenterPosition() - self->GetCenterPosition());
-
-		const Matrix4x4& mat = self->GetWorldTransform().matWorld_;
-		Vector3 up = { mat.m[1][0], mat.m[1][1], mat.m[1][2] };
-		Vector3 right = { mat.m[0][0], mat.m[0][1], mat.m[0][2] };
-		Vector3 forward = { mat.m[2][0], mat.m[2][1], mat.m[2][2] };
-
-		struct DirDot {
-			HitDirection dir;
-			float dot;
-		};
-
-		std::vector<DirDot> dots = {
-			{ HitDirection::Top,    Dot(toOther, up) },
-			{ HitDirection::Bottom, Dot(toOther, up * -1.0f) },
-			{ HitDirection::Right,  Dot(toOther, right) },
-			{ HitDirection::Left,   Dot(toOther, right * -1.0f) },
-			{ HitDirection::Front,  Dot(toOther, forward) },
-			{ HitDirection::Back,   Dot(toOther, forward * -1.0f) },
-		};
-
-		// 閾値付きで方向分類（優しめ）
-		const float threshold = 0.5f; // ≒60度以内なら許容
-
-		for (const auto& d : dots) {
-			if (d.dot >= threshold) return d.dir;
-		}
-
-		// どれも当てはまらないときは None
-		return HitDirection::None;
-	}
-
-	HitDirectionBits Collision::GetSelfLocalHitDirectionFlags(BaseCollider* self, BaseCollider* other, float threshold)
-	{
-		HitDirectionBits flags = HitDirection_None;
-
-		Vector3 toOther = Normalize(other->GetCenterPosition() - self->GetCenterPosition());
-
-		const Matrix4x4& mat = self->GetWorldTransform().matWorld_;
-		Vector3 up = { mat.m[1][0], mat.m[1][1], mat.m[1][2] };
-		Vector3 right = { mat.m[0][0], mat.m[0][1], mat.m[0][2] };
-		Vector3 forward = { mat.m[2][0], mat.m[2][1], mat.m[2][2] };
-
-		if (Dot(toOther, up) >= threshold)     flags |= HitDirection_Top;
-		if (Dot(toOther, up * -1.0f) >= threshold)    flags |= HitDirection_Bottom;
-		if (Dot(toOther, right) >= threshold)  flags |= HitDirection_Right;
-		if (Dot(toOther, right * -1.0f) >= threshold) flags |= HitDirection_Left;
-		if (Dot(toOther, forward) >= threshold) flags |= HitDirection_Front;
-		if (Dot(toOther, forward * -1.0f) >= threshold) flags |= HitDirection_Back;
-
-		return flags;
-	}
-
-	HitDirectionBits Collision::GetSelfLocalHitDirectionsSimple(BaseCollider* self, BaseCollider* other)
-	{
-		HitDirectionBits flags = HitDirection_None;
-
-		Vector3 toOther = Normalize(other->GetCenterPosition() - self->GetCenterPosition());
-
-		const Matrix4x4& mat = self->GetWorldTransform().matWorld_;
-		Vector3 up = { mat.m[1][0], mat.m[1][1], mat.m[1][2] };
-		Vector3 right = { mat.m[0][0], mat.m[0][1], mat.m[0][2] };
-		Vector3 forward = { mat.m[2][0], mat.m[2][1], mat.m[2][2] };
-
-		// 全方向に対して判定
-		if (Dot(toOther, up) > 0.0f)         flags |= HitDirection_Top;
-		if (Dot(toOther, up * -1.0f) > 0.0f) flags |= HitDirection_Bottom;
-		if (Dot(toOther, right) > 0.0f)      flags |= HitDirection_Right;
-		if (Dot(toOther, right * -1.0f) > 0.0f) flags |= HitDirection_Left;
-		if (Dot(toOther, forward) > 0.0f)    flags |= HitDirection_Front;
-		if (Dot(toOther, forward * -1.0f) > 0.0f) flags |= HitDirection_Back;
-
-		return flags;
-	}
-
-	// ---------------------------------------------------------
-		// ★追加: Sphere同士の押し戻し計算
-		// ---------------------------------------------------------
-	CollisionResult Collision::Resolve(const SphereCollider* a, const SphereCollider* b) {
-		CollisionResult res;
-		Vector3 diff = a->GetCenterPosition() - b->GetCenterPosition();
-		float distSq = LengthSquared(diff);
-		float radiusSum = a->GetRadius() + b->GetRadius();
-
-		if (distSq <= radiusSum * radiusSum && distSq > 0.0001f) {
-			float dist = std::sqrt(distSq);
-			res.isHit = true;
-			res.normal = diff * (1.0f / dist); // BからAへの正規化ベクトル
-			res.penetrationDepth = radiusSum - dist;
-		}
-		return res;
-	}
-
-	// ---------------------------------------------------------
-	// ★追加: OBB同士の押し戻し計算 (現在のCheckHitDirectionを応用)
-	// ---------------------------------------------------------
-	CollisionResult Collision::Resolve(const OBB& obbA, const OBB& obbB) {
-		CollisionResult res;
-		const float EPSILON = 1e-6f;
-
-		Matrix4x4 matA = MakeRotateMatrixXYZ(obbA.rotation);
-		Matrix4x4 matB = MakeRotateMatrixXYZ(obbB.rotation);
-
-		Vector3 axes[15];
-		// obbAの軸 (0,1,2)
-		axes[0] = { matA.m[0][0], matA.m[1][0], matA.m[2][0] };
-		axes[1] = { matA.m[0][1], matA.m[1][1], matA.m[2][1] };
-		axes[2] = { matA.m[0][2], matA.m[1][2], matA.m[2][2] };
-		// obbBの軸 (3,4,5)
-		axes[3] = { matB.m[0][0], matB.m[1][0], matB.m[2][0] };
-		axes[4] = { matB.m[0][1], matB.m[1][1], matB.m[2][1] };
-		axes[5] = { matB.m[0][2], matB.m[1][2], matB.m[2][2] };
-
-		// 外積による軸 (6～14)
-		int axisIdx = 6;
-		for (int i = 0; i < 3; i++) {
-			for (int j = 0; j < 3; j++) {
-				axes[axisIdx++] = Cross(axes[i], axes[3 + j]);
-			}
-		}
-
-		Vector3 distanceVec = obbB.center - obbA.center;
-		float minOverlap = FLT_MAX;
-		Vector3 minAxis = { 0, 0, 0 };
-
-		// 全15軸の分離軸テスト
-		for (int i = 0; i < 15; i++) {
-			Vector3 axis = axes[i];
-			float lenSq = LengthSquared(axis);
-			if (lenSq < EPSILON) continue;
-			axis = axis * (1.0f / std::sqrt(lenSq)); // 正規化
-
-			// a, b 両方の軸群を渡す関数が既存にある想定 (ProjectOBB)
-			float projA = ProjectOBB(obbA, axis, &axes[0]);
-			float projB = ProjectOBB(obbB, axis, &axes[3]);
-
-			float distance = std::abs(Dot(distanceVec, axis));
-			float overlap = projA + projB - distance;
-
-			if (overlap < 0.0f) {
-				return res; // 分離軸が見つかった＝当たっていない
-			}
-
-			if (overlap < minOverlap) {
-				minOverlap = overlap;
-				minAxis = axis;
-			}
-		}
-
-		// BからAに向かう方向にする
-		if (Dot(distanceVec, minAxis) > 0.0f) {
-			minAxis = minAxis * -1.0f;
-		}
-
-		res.isHit = true;
-		res.normal = minAxis;
-		res.penetrationDepth = minOverlap;
-		return res;
-	}
-
-	// ---------------------------------------------------------
-	// ★追加: Sphere と OBB の押し戻し計算
-	// ---------------------------------------------------------
-	CollisionResult Collision::Resolve(const SphereCollider* sphere, const OBB& obb) {
-		CollisionResult res;
-		Vector3 center = sphere->GetCenterPosition();
-		float radius = sphere->GetRadius();
-
-		// 1. OBBの回転を逆にして、球の中心をOBBのローカル空間（回転ゼロの世界）に持っていく
-		Matrix4x4 rotMat = MakeRotateMatrixXYZ(obb.rotation);
-		Matrix4x4 invRot = TransPose(rotMat); // 逆行列（回転のみなら転置でOK）
-		Vector3 localCenter = Transform(center - obb.center, invRot);
-
-		// 2. OBBのサイズ内にクランプして、OBB上で最も球の中心に近いローカル座標の点を求める
-		Vector3 closestLocal = Clamp(localCenter, -obb.size, obb.size);
-
-		// 3. 最も近い点をワールド座標（元の世界）に戻す
-		Vector3 closestWorld = obb.center + Transform(closestLocal, rotMat);
-
-		// 4. 球の中心と、OBB上の最も近い点との差分ベクトルを計算
-		Vector3 diff = center - closestWorld;
-		float distSq = LengthSquared(diff);
-
-		// 5. 距離が半径より小さければヒット！
-		if (distSq <= radius * radius) {
-			res.isHit = true;
-			float dist = std::sqrt(distSq);
-
-			if (dist > 0.0001f) {
-				// OBBから球へ向かう正規化ベクトル
-				res.normal = diff * (1.0f / dist);
-				// 半径から実際の距離を引いた分がめり込み量
-				res.penetrationDepth = radius - dist;
-			}
-			else {
-				// ※球の中心が完全にOBBの内部に入ってしまった場合の緊急脱出（上方向に押し出す）
-				res.normal = { 0.0f, 1.0f, 0.0f };
-				res.penetrationDepth = radius;
-			}
-		}
-		return res;
-	}
-
-	// AABBをOBBに変換するユーティリティ関数（これを通すことでAABBvsAABB、AABBvsOBBをカバー）
-	OBB ConvertAABBToOBB(const AABB& aabb) {
-		OBB obb;
-		obb.center = (aabb.min + aabb.max) * 0.5f;
-		obb.size = (aabb.max - aabb.min) * 0.5f;
-		obb.rotation = { 0.0f, 0.0f, 0.0f };
-		return obb;
-	}
-
-
-
 
 	void CollisionManager::Initialize() {
 		isDrawCollider_ = false;
 	}
 
-	void CollisionManager::Update()
-	{
-
-		/////カメラ外だったら判定をしない(全て)
-		//for (BaseCollider* collider : colliders_) {
-		//	if (!collider) continue;
-		//	if (!collider->GetIsActive()) continue;
-
-		//	const Camera* cam = collider->camera_;
-		//	if (!cam) continue;
-
-		//	Vector3 center = collider->GetCenterPosition();
-		//	bool isVisible = IsColliderInView(center, cam);
-
-		//	// ここで無効化するのは当たり判定だけ！
-		//	collider->SetCollisionEnabled(isVisible);
-		//}
-
-
-		// 有効なものだけで衝突判定を実行
+	void CollisionManager::Update() {
 		CheckAllCollisions();
-
 	}
 
-
-
 	void CollisionManager::Reset() {
-		// リストを空っぽにする
 		colliders_.clear();
 		collidingPairs_.clear();
 	}
 
-	// ★追加: ペアの判定と押し戻し実行
+	// ============================================================
+	// 2つのコライダーの当たり判定とイベント呼び出し、押し戻し処理
+	// ============================================================
 	void CollisionManager::CheckCollisionPair(BaseCollider* a, BaseCollider* b) {
 		if (!a || !b) return;
 		auto key = std::minmax(a, b);
@@ -235825,54 +235262,54 @@ namespace YoRigine {
 
 		CollisionResult res;
 
-		// --- ポリモーフィズムで適切な判定を呼ぶ ---
-		// 【AがSphereの場合】
+		// ============================================================
+		// 形状ごとに Intersection::IsCollision を呼び出す
+		// ============================================================
 		if (auto sa = dynamic_cast<SphereCollider*>(a)) {
+			Sphere sphereA = { sa->GetCenterPosition(), sa->GetRadius() };
 			if (auto sb = dynamic_cast<SphereCollider*>(b)) {
-				res = Collision::Resolve(sa, sb); // Sphere vs Sphere
+				Sphere sphereB = { sb->GetCenterPosition(), sb->GetRadius() };
+				Intersection::IsCollision(sphereA, sphereB, &res);
 			}
 			else if (auto ob = dynamic_cast<OBBCollider*>(b)) {
-				res = Collision::Resolve(sa, ob->GetOBB()); // Sphere vs OBB
+				Intersection::IsCollision(sphereA, ob->GetOBB(), &res);
 			}
 			else if (auto ab = dynamic_cast<AABBCollider*>(b)) {
-				// ★ Sphere vs AABB (AABBをOBBに変換して丸投げ！)
-				res = Collision::Resolve(sa, ConvertAABBToOBB(ab->GetAABB()));
+				Intersection::IsCollision(sphereA, ab->GetAABB(), &res);
 			}
 		}
-		// 【AがOBBの場合】
 		else if (auto oa = dynamic_cast<OBBCollider*>(a)) {
 			if (auto sb = dynamic_cast<SphereCollider*>(b)) {
-				res = Collision::Resolve(sb, oa->GetOBB()); // 逆にして計算
-				res.normal = res.normal * -1.0f; // 基準が逆になるので押し戻し方向を反転
-			}
-			else if (auto ob = dynamic_cast<OBBCollider*>(b)) {
-				res = Collision::Resolve(oa->GetOBB(), ob->GetOBB()); // OBB vs OBB
-			}
-			else if (auto ab = dynamic_cast<AABBCollider*>(b)) {
-				// ★ OBB vs AABB
-				res = Collision::Resolve(oa->GetOBB(), ConvertAABBToOBB(ab->GetAABB()));
-			}
-		}
-		// 【AがAABBの場合】
-		else if (auto aa = dynamic_cast<AABBCollider*>(a)) {
-			if (auto sb = dynamic_cast<SphereCollider*>(b)) {
-				// ★ AABB vs Sphere
-				res = Collision::Resolve(sb, ConvertAABBToOBB(aa->GetAABB()));
+				Sphere sphereB = { sb->GetCenterPosition(), sb->GetRadius() };
+				Intersection::IsCollision(sphereB, oa->GetOBB(), &res);
 				res.normal = res.normal * -1.0f; // 基準が逆になるので反転
 			}
 			else if (auto ob = dynamic_cast<OBBCollider*>(b)) {
-				// ★ AABB vs OBB
-				res = Collision::Resolve(ConvertAABBToOBB(aa->GetAABB()), ob->GetOBB());
+				Intersection::IsCollision(oa->GetOBB(), ob->GetOBB(), &res);
 			}
 			else if (auto ab = dynamic_cast<AABBCollider*>(b)) {
-				// ★ AABB vs AABB (両方OBBに変換！)
-				res = Collision::Resolve(ConvertAABBToOBB(aa->GetAABB()), ConvertAABBToOBB(ab->GetAABB()));
+				Intersection::IsCollision(ab->GetAABB(), oa->GetOBB(), &res);
+				res.normal = res.normal * -1.0f; // 基準が逆になるので反転
+			}
+		}
+		else if (auto aa = dynamic_cast<AABBCollider*>(a)) {
+			if (auto sb = dynamic_cast<SphereCollider*>(b)) {
+				Sphere sphereB = { sb->GetCenterPosition(), sb->GetRadius() };
+				Intersection::IsCollision(sphereB, aa->GetAABB(), &res);
+				res.normal = res.normal * -1.0f; // 基準が逆になるので反転
+			}
+			else if (auto ob = dynamic_cast<OBBCollider*>(b)) {
+				Intersection::IsCollision(aa->GetAABB(), ob->GetOBB(), &res);
+			}
+			else if (auto ab = dynamic_cast<AABBCollider*>(b)) {
+				Intersection::IsCollision(aa->GetAABB(), ab->GetAABB(), &res);
 			}
 		}
 
-		// --- 押し戻しの適用 ---
+		// ============================================================
+		// 押し戻しの処理
+		// ============================================================
 		if (res.isHit && res.penetrationDepth > 0.0f) {
-
 			if (a->GetEnablePenetration() && b->GetEnablePenetration()) {
 				WorldTransform* wtA = a->GetWT();
 				WorldTransform* wtB = b->GetWT();
@@ -235881,26 +235318,43 @@ namespace YoRigine {
 
 				if (wtA && wtB) {
 					if (!staticA && !staticB) {
-						// 両方動く場合は 1:1 で押し戻し
-						wtA->translate_ += res.normal * (res.penetrationDepth * 0.5f);
-						wtB->translate_ -= res.normal * (res.penetrationDepth * 0.5f);
-					}
-					else if (!staticA) {
-						// Aだけ動く
-						wtA->translate_ += res.normal * res.penetrationDepth;
+						Vector3 velA = a->GetVelocity();
+						Vector3 velB = b->GetVelocity();
+						float speedSqA = velA.x * velA.x + velA.y * velA.y + velA.z * velA.z;
+						float speedSqB = velB.x * velB.x + velB.y * velB.y + velB.z * velB.z;
+
+						float ratioA = 0.5f;
+						float ratioB = 0.5f;
+
+						if (speedSqA > 0.00001f || speedSqB > 0.00001f) {
+							ratioA = speedSqA / (speedSqA + speedSqB);
+							ratioB = speedSqB / (speedSqA + speedSqB);
+						}
+						else {
+							float massA = a->GetMass();
+							float massB = b->GetMass();
+							float totalMass = massA + massB;
+							if (totalMass > 0.0f) {
+								ratioA = massB / totalMass;
+								ratioB = massA / totalMass;
+							}
+						}
+
+						wtA->translate_ += res.normal * (res.penetrationDepth * ratioA);
+						wtB->translate_ -= res.normal * (res.penetrationDepth * ratioB);
+
 						wtA->UpdateMatrix();
-						a->Update();
-					}
-					else if (!staticB) {
-						// Bだけ動く
-						wtB->translate_ -= res.normal * res.penetrationDepth;
 						wtB->UpdateMatrix();
+						a->Update();
+						b->Update();
 					}
 				}
 			}
 		}
 
-		// --- 既存のイベント呼び出し ---
+		// ============================================================
+		// イベント呼び出し
+		// ============================================================
 		if (res.isHit) {
 			if (!wasColliding) {
 				a->CallOnEnterCollision(b);
@@ -235919,48 +235373,40 @@ namespace YoRigine {
 		}
 	}
 
-
+	// ============================================================
+	// 全コライダーの当たり判定チェック
+	// ============================================================
 	void CollisionManager::CheckAllCollisions() {
-
-		// リスト内のペアを総当たり
-		std::list<BaseCollider*>::iterator itrA = colliders_.begin();
+		auto itrA = colliders_.begin();
 		for (; itrA != colliders_.end(); ++itrA) {
 			BaseCollider* colliderA = *itrA;
-			// 無効なコライダーはスキップ
 			if (colliderA->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kNone)) continue;
 			if (!colliderA || !colliderA->GetIsActive() || !colliderA->IsCollisionEnabled()) continue;
 
-			std::list<BaseCollider*>::iterator itrB = itrA;
+			auto itrB = itrA;
 			itrB++;
 
 			for (; itrB != colliders_.end(); ++itrB) {
 				BaseCollider* colliderB = *itrB;
-				// 無効なコライダーはスキップ
 				if (colliderB->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kNone)) continue;
-				if (colliderA == colliderB) continue; // 自分自身との当たり判定はしない
+				if (colliderA == colliderB) continue;
 				if (!colliderB || !colliderB->GetIsActive() || !colliderB->IsCollisionEnabled()) continue;
 
-				// ペアの当たり判定
 				CheckCollisionPair(colliderA, colliderB);
 			}
 		}
 	}
 
-
+	// ============================================================
+	// すべてのコライダーに対するレイキャスト
+	// ============================================================
 
 	bool CollisionManager::IsColliderInView(const Vector3& position, const Camera* camera) {
-
-		// ワールド座標をクリップ空間に変換
 		Vector3 clipPos = Transform(position, camera->GetViewProjectionMatrix());
-
-		// 正規化デバイス座標系（NDC）での可視範囲は -1 ~ +1
 		return (clipPos.x >= -1.0f && clipPos.x <= 1.0f &&
 			clipPos.y >= -1.0f && clipPos.y <= 1.0f &&
 			clipPos.z >= 0.0f && clipPos.z <= 1.0f);
 	}
-
-
-
 
 	void CollisionManager::AddCollider(BaseCollider* collider) {
 		if (!collider) return;
@@ -235968,11 +235414,140 @@ namespace YoRigine {
 		std::cout << "BaseCollider added: " << collider->GetTypeID() << std::endl;
 	}
 
-	void CollisionManager::RemoveCollider(BaseCollider* collider)
-	{
+	void CollisionManager::RemoveCollider(BaseCollider* collider) {
 		if (!collider) return;
 		colliders_.remove(collider);
 		std::cout << "BaseCollider removed: " << collider->GetTypeID() << std::endl;
+	}
+
+	bool CollisionManager::Raycast(const Ray& ray, float maxDistance, RaycastHit* outHit, const std::vector<uint32_t>& ignoreTypeIDs)
+	{
+		bool hitAnything = false;
+		float closestDistance = maxDistance;
+		RaycastHit tempHit;
+
+		for (BaseCollider* collider : colliders_) {
+			if (!collider || !collider->GetIsActive() || !collider->IsCollisionEnabled()) continue;
+			// 無視するタイプIDと一致するコライダーはスキップ
+			if (!ignoreTypeIDs.empty()) {
+				auto it = std::find(ignoreTypeIDs.begin(), ignoreTypeIDs.end(), collider->GetTypeID());
+				if (it != ignoreTypeIDs.end()) continue; // リストにあったら無視！
+			}
+
+			bool isHit = false;
+
+			if (auto sc = dynamic_cast<SphereCollider*>(collider)) {
+				Sphere sphere = { sc->GetCenterPosition(), sc->GetRadius() };
+				isHit = Intersection::IsCollision(ray, sphere, &tempHit);
+			}
+			else if (auto ob = dynamic_cast<OBBCollider*>(collider)) {
+				isHit = Intersection::IsCollision(ray, ob->GetOBB(), &tempHit);
+			}
+			else if (auto ab = dynamic_cast<AABBCollider*>(collider)) {
+				isHit = Intersection::IsCollision(ray, ab->GetAABB(), &tempHit);
+			}
+
+			// 近すぎるので強制的に無視して次へ
+			if (isHit && tempHit.distance <= 0.001f) {
+				continue;
+			}
+
+			// 最も手前で当たった情報を更新
+			if (isHit && tempHit.distance <= closestDistance) {
+				closestDistance = tempHit.distance;
+				if (outHit) *outHit = tempHit;
+				hitAnything = true;
+			}
+		}
+
+		return hitAnything;
+	}
+
+	// ============================================================
+	// ヒット方向判定用ユーティリティ
+	// ============================================================
+	HitDirection CollisionManager::ConvertVectorToHitDirection(const Vector3& dir) {
+		if (fabs(dir.x) > fabs(dir.y) && fabs(dir.x) > fabs(dir.z)) {
+			return dir.x > 0 ? HitDirection::Right : HitDirection::Left;
+		}
+		else if (fabs(dir.y) > fabs(dir.z)) {
+			return dir.y > 0 ? HitDirection::Top : HitDirection::Bottom;
+		}
+		else {
+			return dir.z > 0 ? HitDirection::Front : HitDirection::Back;
+		}
+	}
+
+	HitDirection CollisionManager::InverseHitDirection(HitDirection hitdirection) {
+		switch (hitdirection) {
+		case HitDirection::Top: return HitDirection::Bottom;
+		case HitDirection::Bottom: return HitDirection::Top;
+		case HitDirection::Left: return HitDirection::Right;
+		case HitDirection::Right: return HitDirection::Left;
+		case HitDirection::Front: return HitDirection::Back;
+		case HitDirection::Back: return HitDirection::Front;
+		default: return HitDirection::None;
+		}
+	}
+
+	HitDirection CollisionManager::GetSelfLocalHitDirection(BaseCollider* self, BaseCollider* other) {
+		Vector3 toOther = Normalize(other->GetCenterPosition() - self->GetCenterPosition());
+		const Matrix4x4& mat = self->GetWorldTransform().matWorld_;
+		Vector3 up = { mat.m[1][0], mat.m[1][1], mat.m[1][2] };
+		Vector3 right = { mat.m[0][0], mat.m[0][1], mat.m[0][2] };
+		Vector3 forward = { mat.m[2][0], mat.m[2][1], mat.m[2][2] };
+
+		struct DirDot { HitDirection dir; float dot; };
+		std::vector<DirDot> dots = {
+			{ HitDirection::Top,    Dot(toOther, up) },
+			{ HitDirection::Bottom, Dot(toOther, up * -1.0f) },
+			{ HitDirection::Right,  Dot(toOther, right) },
+			{ HitDirection::Left,   Dot(toOther, right * -1.0f) },
+			{ HitDirection::Front,  Dot(toOther, forward) },
+			{ HitDirection::Back,   Dot(toOther, forward * -1.0f) },
+		};
+
+		const float threshold = 0.5f;
+		for (const auto& d : dots) {
+			if (d.dot >= threshold) return d.dir;
+		}
+		return HitDirection::None;
+	}
+
+	HitDirectionBits CollisionManager::GetSelfLocalHitDirectionFlags(BaseCollider* self, BaseCollider* other, float threshold) {
+		HitDirectionBits flags = HitDirection_None;
+		Vector3 toOther = Normalize(other->GetCenterPosition() - self->GetCenterPosition());
+		const Matrix4x4& mat = self->GetWorldTransform().matWorld_;
+		Vector3 up = { mat.m[1][0], mat.m[1][1], mat.m[1][2] };
+		Vector3 right = { mat.m[0][0], mat.m[0][1], mat.m[0][2] };
+		Vector3 forward = { mat.m[2][0], mat.m[2][1], mat.m[2][2] };
+
+		if (Dot(toOther, up) >= threshold)     flags |= HitDirection_Top;
+		if (Dot(toOther, up * -1.0f) >= threshold)    flags |= HitDirection_Bottom;
+		if (Dot(toOther, right) >= threshold)  flags |= HitDirection_Right;
+		if (Dot(toOther, right * -1.0f) >= threshold) flags |= HitDirection_Left;
+		if (Dot(toOther, forward) >= threshold) flags |= HitDirection_Front;
+		if (Dot(toOther, forward * -1.0f) >= threshold) flags |= HitDirection_Back;
+
+		return flags;
+	}
+
+	HitDirectionBits CollisionManager::GetSelfLocalHitDirectionsSimple(BaseCollider* self, BaseCollider* other) {
+		HitDirectionBits flags = HitDirection_None;
+		Vector3 toOther = Normalize(other->GetCenterPosition() - self->GetCenterPosition());
+		const Matrix4x4& mat = self->GetWorldTransform().matWorld_;
+		Vector3 up = { mat.m[1][0], mat.m[1][1], mat.m[1][2] };
+		Vector3 right = { mat.m[0][0], mat.m[0][1], mat.m[0][2] };
+		Vector3 forward = { mat.m[2][0], mat.m[2][1], mat.m[2][2] };
+
+		if (Dot(toOther, up) > 0.0f)         flags |= HitDirection_Top;
+		if (Dot(toOther, up * -1.0f) > 0.0f) flags |= HitDirection_Bottom;
+		if (Dot(toOther, right) > 0.0f)      flags |= HitDirection_Right;
+		if (Dot(toOther, right * -1.0f) > 0.0f) flags |= HitDirection_Left;
+		if (Dot(toOther, forward) > 0.0f)    flags |= HitDirection_Front;
+		if (Dot(toOther, forward * -1.0f) > 0.0f) flags |= HitDirection_Back;
+
+		return flags;
 	}
 }
 
@@ -235984,7 +235559,7 @@ File Path: YEngine/Utilities/Collision/Core/CollisionManager.h
 // Engine
 #include "BaseCollider.h"
 #include "Object3D/Object3d.h"
-#include "WorldTransform./WorldTransform.h"
+#include "WorldTransform/WorldTransform.h"
 
 // C++
 #include <list>
@@ -235993,24 +235568,17 @@ File Path: YEngine/Utilities/Collision/Core/CollisionManager.h
 
 // Math
 #include "MathFunc.h"
-
-// Collider
 #include "../Sphere/SphereCollider.h"
 #include "../AABB/AABBCollider.h"
 #include "../OBB/OBBCollider.h"
 #include "CollisionDirection.h"
+#include "Intersection/Intersection.h"
 
 namespace YoRigine {
-	///************************* ヒット方向定義 *************************///
 
-	// 衝突結果をまとめる構造体
-	struct CollisionResult {
-		bool isHit = false;
-		Vector3 normal = {};
-		float penetrationDepth = 0.0f;
-	};
-
+	// ============================================================
 	// 衝突方向のビット列定義
+	// ============================================================
 	enum HitDirectionFlags {
 		HitDirection_None = 0,
 		HitDirection_Top = 1 << 0,
@@ -236021,130 +235589,55 @@ namespace YoRigine {
 		HitDirection_Back = 1 << 5,
 	};
 
-	// 複数方向を保持するための型
 	using HitDirectionBits = uint32_t;
 
-	///************************* 衝突判定関連関数 *************************///
-
-	// すべての衝突チェック処理と方向判定処理をまとめた名前空間
-	namespace Collision {
-
-		///************************* 衝突チェック *************************///
-
-		// Sphere - Sphere
-		bool Check(const SphereCollider* a, const SphereCollider* b);
-
-		// Sphere - AABB
-		bool Check(const SphereCollider* sphere, const AABBCollider* aabb);
-
-		// Sphere - OBB
-		bool Check(const SphereCollider* sphere, const OBBCollider* obb);
-
-		// AABB - AABB
-		bool Check(const AABBCollider* a, const AABBCollider* b);
-
-		// OBB - OBB（データ構造版）
-		bool Check(const OBB& obbA, const OBB& obbB);
-
-		// AABB - OBB
-		bool Check(const AABBCollider* aabb, const OBBCollider* obb);
-
-		// OBB - OBB（コライダー版）
-		bool Check(const OBBCollider* a, const OBBCollider* b);
-
-		// Base - Base（汎用）
-		bool Check(BaseCollider* a, BaseCollider* b);
-
-		///************************* 衝突方向チェック *************************///
-
-		// AABB - AABB
-		bool CheckHitDirection(const AABB& a, const AABB& b, HitDirection* hitDirection);
-
-		// AABB - OBB
-		bool CheckHitDirection(const AABB& aabb, const OBB& obb, HitDirection* hitDirection);
-
-		// OBB - OBB
-		bool CheckHitDirection(const OBB& obbA, const OBB& obbB, HitDirection* hitDirection);
-
-		// ベクトルから方向へ変換
-		HitDirection ConvertVectorToHitDirection(const Vector3& dir);
-
-		// 方向の反転
-		HitDirection InverseHitDirection(HitDirection hitdirection);
-
-		// 自分基準での衝突方向取得
-		HitDirection GetSelfLocalHitDirection(BaseCollider* self, BaseCollider* other);
-
-		// 一定閾値で方向ビットを取得
-		HitDirectionBits GetSelfLocalHitDirectionFlags(BaseCollider* self, BaseCollider* other, float threshold);
-
-		// シンプルな方向ビット取得
-		HitDirectionBits GetSelfLocalHitDirectionsSimple(BaseCollider* self, BaseCollider* other);
-
-		///************************* 押し戻しの処理 *************************///
-		CollisionResult Resolve(const SphereCollider* a, const SphereCollider* b);
-		CollisionResult Resolve(const OBB& obbA, const OBB& obbB);
-		CollisionResult Resolve(const SphereCollider* sphere, const OBB& obb);
-	}
-
-	///************************* コリジョン管理クラス *************************///
-
-	// コライダーを一括管理し、衝突判定とコールバックを制御するzz
+	// ============================================================
+	// コリジョン管理クラス
+	// ============================================================
 	class CollisionManager {
 	public:
-		///************************* シングルトン *************************///
-
 		static CollisionManager* GetInstance();
 
 		CollisionManager() = default;
 		~CollisionManager();
 
-	public:
-		///************************* 基本関数 *************************///
-
-		// 初期化
+		// ============================================================
+		// 基本関数
+		// ============================================================
 		void Initialize();
-
-		// 更新（すべての当たり判定処理を実行）
 		void Update();
-
-	public:
-		///************************* 管理操作 *************************///
-
-		// 登録情報を全リセット
 		void Reset();
 
-		// コライダー2つの衝突チェックとコールバック呼び出し
+		// ============================================================
+		// 管理操作
+		// ============================================================
 		void CheckCollisionPair(BaseCollider* a, BaseCollider* b);
-
-		// すべてのコライダー間の衝突チェック
 		void CheckAllCollisions();
-
-		// カメラ範囲内かを確認（非表示領域のコライダーをスキップ）
 		bool IsColliderInView(const Vector3& position, const Camera* camera);
-
-		// コライダーをリストに追加
 		void AddCollider(BaseCollider* collider);
-
-		// コライダーをリストから削除
 		void RemoveCollider(BaseCollider* collider);
 
-	private:
-		///************************* コピー禁止 *************************///
+		// ============================================================
+		// レイキャスト判定
+		// ============================================================
+		bool Raycast(const Ray& ray, float maxDistance, RaycastHit* outHit, const std::vector<uint32_t>& ignoreTypeIDs = {});
 
+		// ============================================================
+		// ヒット方向判定用ユーティリティ
+		// ============================================================
+		static HitDirection ConvertVectorToHitDirection(const Vector3& dir);
+		static HitDirection InverseHitDirection(HitDirection hitdirection);
+		static HitDirection GetSelfLocalHitDirection(BaseCollider* self, BaseCollider* other);
+		static HitDirectionBits GetSelfLocalHitDirectionFlags(BaseCollider* self, BaseCollider* other, float threshold);
+		static HitDirectionBits GetSelfLocalHitDirectionsSimple(BaseCollider* self, BaseCollider* other);
+
+	private:
 		CollisionManager(const CollisionManager&) = delete;
 		CollisionManager& operator=(const CollisionManager&) = delete;
 
 	private:
-		///************************* メンバ変数 *************************///
-
-		// 登録中のすべてのコライダー
 		std::list<BaseCollider*> colliders_;
-
-		// 現在衝突中のペアを記録（Enter/Exit検知用）
 		std::set<std::pair<BaseCollider*, BaseCollider*>> collidingPairs_;
-
-		// デバッグ描画フラグ
 		bool isDrawCollider_ = false;
 	};
 }
@@ -236353,6 +235846,7 @@ File Path: YEngine/Utilities/Collision/OBB/OBBCollider.h
 
 // Math
 #include "MathFunc.h"
+#include "Shape/OBB.h"
 
 // OBBコライダーを扱うクラス
 class OBBCollider : public BaseCollider
@@ -236472,6 +235966,7 @@ File Path: YEngine/Utilities/Collision/Sphere/SphereCollider.h
 
 // Math
 #include "MathFunc.h"
+#include "Shape/Sphere.h"
 
 // 球体コライダーを扱うクラス
 class SphereCollider : public BaseCollider
@@ -240000,7 +239495,7 @@ void GizmoController::DecomposeMatrix(
 // レイキャスト
 //=================================================================
 
-GizmoController::Ray GizmoController::BuildPickRay(
+Ray GizmoController::BuildPickRay(
     const ImVec2& mouseScreenPos,
     const ImVec2& viewportPos,
     const ImVec2& viewportSize,
@@ -240103,6 +239598,7 @@ File Path: YEngine/Utilities/Debugger/Gizmo/GizmoController.h
 // Math
 #include "Vector3.h"
 #include "Matrix4x4.h"
+#include "Ray/Raycast.h"
 
 // ImGui
 #include "imgui.h"
@@ -240290,7 +239786,7 @@ private:
     float RadToDeg(float r) const { return r * (180.0f / 3.14159265359f); }
 
     // レイ生成
-    struct Ray { Vector3 origin; Vector3 direction; };
+
     Ray BuildPickRay(
         const ImVec2& mouseScreenPos,
         const ImVec2& viewportPos,
@@ -247686,6 +247182,219 @@ public:
 };
 
 ============================================================
+File Path: YEngine/Utilities/Systems/Camera/CameraCollisionResolver.cpp
+============================================================
+#include "CameraCollisionResolver.h"
+#include "Collision/AreaCollision/Base/AreaManager.h"
+#include "Collision/Core/CollisionManager.h"
+
+#ifdef USE_IMGUI
+#include <imgui.h>
+#endif
+
+// ============================================================
+// 初期化
+// ============================================================
+void CameraCollisionResolver::Initialize() {
+	currentDistanceRatio_ = 1.0f;
+}
+
+// ============================================================
+// 理想のカメラ座標から地形や障害物のめり込みを計算し、安全な座標を返す
+// ============================================================
+Vector3 CameraCollisionResolver::Resolve(const Vector3& idealPos, const Vector3& targetPivot) {
+	if (!isEnabled_) {
+		return idealPos;
+	}
+
+	Vector3 rayDir = idealPos - targetPivot;
+	float maxDistance = Length(rayDir);
+	float hitDistance = maxDistance;
+
+	if (maxDistance > 0.001f) {
+		rayDir = Normalize(rayDir);
+
+		// ------------------------------------------------------------
+		// 物理コライダー（壁、岩、敵など）とのRaycast判定
+		// ------------------------------------------------------------
+		Ray cameraRay;
+		cameraRay.origin - targetPivot;
+		cameraRay.direction - rayDir;
+
+		RaycastHit hitInfo;
+		// Raycastで衝突した場合、ヒット距離をカメラ半径分だけ手前にする
+		if (YoRigine::CollisionManager::GetInstance()->Raycast(cameraRay, maxDistance, &hitInfo, ignoreTypeIDs_)) {
+			hitDistance = hitInfo.distance - cameraRadius_;
+		}
+
+		// ------------------------------------------------------------
+		// AreaManager を使った見えない壁（闘技場・エリア制限）の判定
+		// ------------------------------------------------------------
+		AreaManager* areaManager = AreaManager::GetInstance();
+
+		if (!areaManager->IsInsideAreaByPurpose(idealPos, AreaPurpose::Boundary)) {
+			// エリア外に出ていたら、境界線上の座標にクランプ（補正）する
+			Vector3 clampedPos = areaManager->ClampToNearestArea(idealPos);
+
+			// クランプされた座標までの距離を計算し、カメラ半径分だけさらに手前にする
+			float areaDistance = Length(clampedPos - targetPivot) - cameraRadius_;
+
+			// 物理コライダー(Raycast)とエリアの壁、より手前にある方を最終的なヒット距離として採用する
+			if (areaDistance < hitDistance) {
+				hitDistance = areaDistance;
+			}
+		}
+
+		if (hitDistance < 0.0f) {
+			hitDistance = 0.0f;
+		}
+	}
+
+	// ============================================================
+	// 距離の割合計算とスムーズな補間
+	// ============================================================
+	float targetDistanceRatio = (maxDistance > 0.0f) ? (hitDistance / maxDistance) : 1.0f;
+
+	if (targetDistanceRatio < currentDistanceRatio_) {
+		currentDistanceRatio_ = Lerp(currentDistanceRatio_, targetDistanceRatio, avoidSpeed_);
+	}
+	else {
+		currentDistanceRatio_ = Lerp(currentDistanceRatio_, targetDistanceRatio, returnSpeed_);
+	}
+
+	Vector3 finalOffset = (idealPos - targetPivot) * currentDistanceRatio_;
+
+	// ------------------------------------------------------------
+	// 壁際でのハイアングル（見下ろし）化
+	// ------------------------------------------------------------
+	if (enableHighAngle_ && currentDistanceRatio_ < highAngleThreshold_) {
+		float closeFactor = (highAngleThreshold_ - currentDistanceRatio_) / highAngleThreshold_;
+		finalOffset.y += maxPushUpHeight_ * closeFactor;
+	}
+
+	Vector3 finalCameraPos = targetPivot + finalOffset;
+
+	// ------------------------------------------------------------
+	// 地面（Y軸）のめり込み防止
+	// ------------------------------------------------------------
+	if (finalCameraPos.y < minGroundHeight_) {
+		finalCameraPos.y = minGroundHeight_;
+	}
+
+	return finalCameraPos;
+}
+
+// ============================================================
+// エディタ設定用
+// ============================================================
+void CameraCollisionResolver::DrawDebugGui() {
+#ifdef USE_IMGUI
+	if (ImGui::TreeNode("めり込み防止 (Collision Resolver)")) {
+		ImGui::Checkbox("コリジョン有効化", &isEnabled_);
+		if (isEnabled_) {
+			ImGui::DragFloat("カメラ半径 (Radius)", &cameraRadius_, 0.1f, 0.0f, 5.0f);
+			ImGui::DragFloat("地面の高さ (Min Y)", &minGroundHeight_, 0.1f, -10.0f, 10.0f);
+			ImGui::DragFloat("回避スピード", &avoidSpeed_, 0.01f, 0.01f, 1.0f);
+			ImGui::DragFloat("復帰スピード", &returnSpeed_, 0.01f, 0.01f, 1.0f);
+
+			ImGui::Separator();
+			ImGui::Checkbox("壁際ハイアングル化", &enableHighAngle_);
+			if (enableHighAngle_) {
+				ImGui::DragFloat("発動しきい値", &highAngleThreshold_, 0.05f, 0.1f, 1.0f);
+				ImGui::DragFloat("持ち上げ高さ", &maxPushUpHeight_, 0.1f, 0.0f, 10.0f);
+			}
+		}
+		ImGui::TreePop();
+	}
+#endif
+}
+
+// ============================================================
+// 保存
+// ============================================================
+void CameraCollisionResolver::Save(nlohmann::json& j) const {
+	j["isEnabled"] = isEnabled_;
+	j["cameraRadius"] = cameraRadius_;
+	j["minGroundHeight"] = minGroundHeight_;
+	j["avoidSpeed"] = avoidSpeed_;
+	j["returnSpeed"] = returnSpeed_;
+	j["enableHighAngle"] = enableHighAngle_;
+	j["highAngleThreshold"] = highAngleThreshold_;
+	j["maxPushUpHeight"] = maxPushUpHeight_;
+}
+
+// ============================================================
+// 読み込み
+// ============================================================
+void CameraCollisionResolver::Load(const nlohmann::json& j) {
+	isEnabled_ = j.value("isEnabled", true);
+	cameraRadius_ = j.value("cameraRadius", 0.5f);
+	minGroundHeight_ = j.value("minGroundHeight", 0.5f);
+	avoidSpeed_ = j.value("avoidSpeed", 0.3f);
+	returnSpeed_ = j.value("returnSpeed", 0.05f);
+	enableHighAngle_ = j.value("enableHighAngle", true);
+	highAngleThreshold_ = j.value("highAngleThreshold", 0.5f);
+	maxPushUpHeight_ = j.value("maxPushUpHeight", 3.0f);
+}
+
+============================================================
+File Path: YEngine/Utilities/Systems/Camera/CameraCollisionResolver.h
+============================================================
+#pragma once
+#include "Vector3.h"
+#include "MathFunc.h"
+#include "json.hpp"
+
+
+///************************* カメラの地形めり込みを防止し、滑らかな回避とハイアングル化を行うコンポーネント *************************///
+class CameraCollisionResolver {
+public:
+	///************************* 基本関数 *************************///
+
+	// 初期化
+	void Initialize();
+
+	/// <summary>
+	/// 理想のカメラ座標から地形のめり込みを計算し、最終的な安全な座標を返す
+	/// </summary>
+	/// <param name="idealPos">本来カメラが行きたい座標</param>
+	/// <param name="targetPivot">プレイヤーの頭など、レイの始点となる注視点</param>
+	/// <returns>壁避け・ハイアングル化を適用した最終座標</returns>
+	Vector3 Resolve(const Vector3& idealPos, const Vector3& targetPivot);
+
+	// エディタ設定用
+	void DrawDebugGui();
+	void Save(nlohmann::json& j) const;
+	void Load(const nlohmann::json& j);
+
+	///************************* アクセッサ *************************///
+	// オンオフ切り替え
+	void SetEnabled(bool enable) { isEnabled_ = enable; }
+	bool IsEnabled() const { return isEnabled_; }
+
+	// 無視するコライダーのTypeIDを設定する
+	void AddIgnoreTypeID(uint32_t typeID) { ignoreTypeIDs_.push_back(typeID); }
+	void ClearIgnoreTypeIDs() { ignoreTypeIDs_.clear(); }
+private:
+	///************************* メンバ関数 *************************///
+
+	bool isEnabled_ = true;							// 衝突判定を有効にするか
+	float cameraRadius_ = 0.5f;						// カメラの球体判定の半径（壁からどれくらい離すか）
+	float avoidSpeed_ = 0.3f;						// 壁が迫った時に手前に寄る素早さ (0.0~1.0)
+	float returnSpeed_ = 0.05f;						// 壁がなくなった時に元の距離に戻る素早さ (0.0~1.0)
+
+	// --- ハイアングル演出パラメータ ---
+	bool enableHighAngle_ = true;					// 接近時のハイアングル化を有効にするか
+	float highAngleThreshold_ = 0.5f;				// 距離が本来の何割未満になったら持ち上げ始めるか
+	float maxPushUpHeight_ = 3.0f;					// 最大でどれくらい上に持ち上げるか
+
+	// --- 内部状態 ---
+	float currentDistanceRatio_ = 1.0f;				// 現在の距離の割合 (0.0 ~ 1.0、補間用)
+	float minGroundHeight_ = 0.5f;					// カメラが地面にめり込むのを防止するための最低高さ
+	std::vector<uint32_t> ignoreTypeIDs_;			// 衝突判定で無視するコライダーのタイプID（例: プレイヤー自身のコライダー）
+};
+
+============================================================
 File Path: YEngine/Utilities/Systems/Camera/CameraDirector.cpp
 ============================================================
 #include "CameraDirector.h"
@@ -249816,29 +249525,53 @@ File Path: YEngine/Utilities/Systems/Camera/Virtuals/FollowCamera/FollowCamera.c
 #ifdef USE_IMGUI
 #include <imgui.h>
 #endif
+#include <Systems/GameTime/GameTime.h>
 #include <Systems/Camera/CameraDirector.h>
+#include <Collision/Core/CollisionTypeIdDef.h>
 
+// ============================================================
+// 初期化処理
+// ============================================================
 void FollowCamera::Initialize() {
 	VirtualCamera::Initialize();
 	currentScale_ = 1.0f;
 
-	// デフォルトステートを設定
+	// ------------------------------------------------------------
+	// デフォルトステートの設定
+	// ------------------------------------------------------------
 	currentState_ = std::make_unique<DefaultCameraState>();
 	currentState_->Enter(this);
+
+	// ------------------------------------------------------------
+	// めり込み防止コンポーネントの初期化と無視設定
+	// ------------------------------------------------------------
+	collisionResolver_.Initialize();
+	collisionResolver_.AddIgnoreTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayer));
+	collisionResolver_.AddIgnoreTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayerShield));
+	collisionResolver_.AddIgnoreTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon));
+	collisionResolver_.AddIgnoreTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kBattleEnemy));
+	collisionResolver_.AddIgnoreTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kFieldEnemy));
 }
 
+// ============================================================
+// 更新処理
+// ============================================================
 void FollowCamera::Update() {
+	// ------------------------------------------------------------
+	// ターゲットの再検索
+	// ------------------------------------------------------------
 	if (target_ == nullptr && !targetName_.empty()) {
 		target_ = CameraDirector::GetInstance()->FindTarget(targetName_);
 	}
 
 	if (!target_) return;
 
-	// ステート更新
+	// ------------------------------------------------------------
+	// ステートの更新と終了判定
+	// ------------------------------------------------------------
 	if (currentState_) {
 		currentState_->Update(this);
 
-		// ステートが終了したらデフォルトに戻る
 		if (currentState_->IsFinished()) {
 			isPreviewMode_ = false;
 			ChangeState(std::make_unique<DefaultCameraState>());
@@ -249846,6 +249579,9 @@ void FollowCamera::Update() {
 	}
 }
 
+// ============================================================
+// 入力情報の更新処理
+// ============================================================
 void FollowCamera::UpdateInput() {
 	if (isCloseUp_) return;
 
@@ -249854,43 +249590,73 @@ void FollowCamera::UpdateInput() {
 		if (YoRigine::Input::GetInstance()->GetJoystickState(0, joyState)) {
 			Vector3 move{ 0.0f, 0.0f, 0.0f };
 
-			// 左右の入力（Y軸まわりの回転）
+			// ------------------------------------------------------------
+			// スティック入力の取得
+			// ------------------------------------------------------------
 			move.y += static_cast<float>(joyState.Gamepad.sThumbRX);
-			// 上下の入力（X軸まわりの回転）を追加
 			move.x -= static_cast<float>(joyState.Gamepad.sThumbRY);
 
-			// デッドゾーン処理（微小な入力を無視しないと勝手に動く場合があります）
-			if (Length(move) > 5000.0f) { // 5000は目安です
+			// ------------------------------------------------------------
+			// デッドゾーン処理と回転の適用
+			// ------------------------------------------------------------
+			if (Length(move) > 5000.0f) {
 				move = Normalize(move) * kRotateSpeed_;
 				transform_.rotate += move;
 			}
+
+			// ------------------------------------------------------------
+			// カメラの縦回転を制限する
+			// ------------------------------------------------------------
+			transform_.rotate.x = std::clamp(transform_.rotate.x, minPitch_, maxPitch_);
 		}
 	}
 }
 
+// ============================================================
+// ターゲットへの追従とカメラ座標の計算
+// ============================================================
 void FollowCamera::FollowProcess() {
-	if (target_ == nullptr) return;
+	if (target_ == nullptr) {
+		return;
+	}
 
-	// クローズアップ補間
+	// ------------------------------------------------------------
+	// スケール（ズームイン/アウト）の補間計算
+	// ------------------------------------------------------------
 	float targetScale = isCloseUp_ ? closeUpScale_ : 1.0f;
-	currentScale_ += (targetScale - currentScale_) * std::clamp(interpSpeed_ * 0.016f, 0.0f, 1.0f);
+	currentScale_ += (targetScale - currentScale_) * std::clamp(interpSpeed_ * YoRigine::GameTime::GetDeltaTime(), 0.0f, 1.0f);
 
-	// 基本オフセット計算
+	// ------------------------------------------------------------
+	// 本来行きたい理想のオフセットと座標を計算
+	// ------------------------------------------------------------
 	Vector3 offset = offset_ * currentScale_;
-
-	// カメラシェイクを加算
-	offset += shakeOffset_;
-
-	// 回転行列を考慮
 	Matrix4x4 rotateMat = MakeRotateMatrixXYZ(transform_.rotate);
-	offset = TransformNormal(offset, rotateMat);
+	Vector3 rotatedOffset = TransformNormal(offset, rotateMat);
 
-	// 座標更新
-	transform_.translate = target_->translate_ + offset;
+	// ------------------------------------------------------------
+	// レイの始点であり、カメラが回る中心（プレイヤーの頭の高さなど）を設定
+	// ------------------------------------------------------------
+	Vector3 targetPivot = target_->translate_ + Vector3(0.0f, targetPivot_Height_, 0.0f);
 
-	// FOV更新(エフェクト用 + コンボ用)
+	// ------------------------------------------------------------
+	// ★修正箇所：理想のカメラ位置は「足元」ではなく「注視点（頭）」を基準にする！
+	// ------------------------------------------------------------
+	Vector3 idealCameraPos = targetPivot + rotatedOffset;
+
+	// ------------------------------------------------------------
+	// コンポーネントに地形や障害物の回避計算を依頼する
+	// ------------------------------------------------------------
+	Vector3 safePos = collisionResolver_.Resolve(idealCameraPos, targetPivot);
+
+	// ------------------------------------------------------------
+	// 最終的な座標の適用（最後にカメラシェイクの揺れを足す）
+	// ------------------------------------------------------------
+	transform_.translate = safePos + shakeOffset_;
 }
 
+// ============================================================
+// カメラステートの変更処理
+// ============================================================
 void FollowCamera::ChangeState(std::unique_ptr<CameraState> newState) {
 	if (currentState_) {
 		currentState_->Exit(this);
@@ -249903,6 +249669,9 @@ void FollowCamera::ChangeState(std::unique_ptr<CameraState> newState) {
 	}
 }
 
+// ============================================================
+// デフォルトのカメラパラメータを取得する処理
+// ============================================================
 void FollowCamera::GetDefaultCameraParams(Vector3& outPos, Vector3& outRot, float& outFov) const {
 	if (!target_) {
 		outPos = transform_.translate;
@@ -249911,32 +249680,43 @@ void FollowCamera::GetDefaultCameraParams(Vector3& outPos, Vector3& outRot, floa
 		return;
 	}
 
-	// デフォルトの追従位置を計算
 	Vector3 offset = offset_ * currentScale_;
 	Matrix4x4 rotateMat = MakeRotateMatrixXYZ(transform_.rotate);
 	offset = TransformNormal(offset, rotateMat);
 
-	outPos = target_->translate_ + offset;
+	// ★修正箇所：ここも「注視点」を基準にする
+	Vector3 targetPivot = target_->translate_ + Vector3(0.0f, targetPivot_Height_, 0.0f);
+	outPos = targetPivot + offset;
 	outRot = transform_.rotate;
 	outFov = fovY_;
 }
 
+// ============================================================
+// デバッグGUI描画処理
+// ============================================================
 void FollowCamera::DrawDebugGui() {
 #ifdef USE_IMGUI
 	ImGui::Text("追従カメラ設定");
 	ImGui::Separator();
 
-	// ── 追従パラメータ ──
+	// ------------------------------------------------------------
+	// 追従パラメータ
+	// ------------------------------------------------------------
 	if (ImGui::TreeNode("追従パラメータ")) {
 		ImGui::DragFloat3("オフセット距離", &offset_.x, 0.1f, -100.0f, 100.0f);
 		ImGui::DragFloat3("角度", &transform_.rotate.x, 0.01f, -6.28f, 6.28f);
 		ImGui::DragFloat("旋回速度 (パッド)", &kRotateSpeed_, 0.01f, 0.0f, 1.0f);
+		ImGui::DragFloat("注視点の高さ", &targetPivot_Height_, 0.1f, 0.0f, 100.0f);
+		ImGui::DragFloat("見上げ限界 (Min Pitch)", &minPitch_, 0.01f, -1.5f, 0.0f);
+		ImGui::DragFloat("見下ろし限界 (Max Pitch)", &maxPitch_, 0.01f, 0.0f, 1.5f);
 		ImGui::TreePop();
 	}
 
 	ImGui::Separator();
 
-	// ── 演出設定 ──
+	// ------------------------------------------------------------
+	// 演出設定
+	// ------------------------------------------------------------
 	if (ImGui::TreeNode("演出設定")) {
 		ImGui::Checkbox("クローズアップ有効", &isCloseUp_);
 		ImGui::DragFloat("クローズアップ倍率", &closeUpScale_, 0.01f, 0.1f, 1.0f);
@@ -249946,22 +249726,27 @@ void FollowCamera::DrawDebugGui() {
 
 	ImGui::Separator();
 
-	// ── 戦闘開始カメラ演出 ──
+	// ------------------------------------------------------------
+	// めり込み防止（Collision Resolver）
+	// ------------------------------------------------------------
+	collisionResolver_.DrawDebugGui();
+
+	ImGui::Separator();
+
+	// ------------------------------------------------------------
+	// 戦闘開始カメラ演出
+	// ------------------------------------------------------------
 	if (ImGui::TreeNode("戦闘開始カメラ演出")) {
 
-		// battleStartState_ がなければ自動生成
 		if (!battleStartState_) {
 			battleStartState_ = std::make_shared<BattleStartCameraState>();
 		}
 
-		// パラメータ編集（保存は CameraEditor の「すべての設定を保存」で一括）
 		battleStartState_->DrawEditGui();
-
 		ImGui::Separator();
 
-		// プレビュー
 		if (!isPreviewMode_) {
-			if (ImGui::Button("▶  プレビュー再生")) {
+			if (ImGui::Button("プレビュー再生")) {
 				auto preview = std::make_unique<BattleStartCameraState>();
 				nlohmann::json j;
 				battleStartState_->Save(j);
@@ -249972,14 +249757,14 @@ void FollowCamera::DrawDebugGui() {
 			}
 		}
 		else {
-			ImGui::TextColored(ImVec4(0.3f, 1.0f, 0.3f, 1.0f), "● 再生中");
+			ImGui::TextColored(ImVec4(0.3f, 1.0f, 0.3f, 1.0f), "再生中");
 			ImGui::SameLine();
-			if (ImGui::Button("■  停止")) {
+			if (ImGui::Button("停止")) {
 				ChangeState(std::make_unique<DefaultCameraState>());
 				isPreviewMode_ = false;
 			}
 			ImGui::SameLine();
-			if (ImGui::Button("↺  最初から")) {
+			if (ImGui::Button("最初から")) {
 				ChangeState(std::make_unique<DefaultCameraState>());
 				auto preview = std::make_unique<BattleStartCameraState>();
 				nlohmann::json j;
@@ -249990,7 +249775,6 @@ void FollowCamera::DrawDebugGui() {
 				isPreviewMode_ = true;
 			}
 
-			// 演出終了で自動停止
 			if (currentState_ && currentState_->IsFinished()) {
 				isPreviewMode_ = false;
 			}
@@ -250001,7 +249785,9 @@ void FollowCamera::DrawDebugGui() {
 
 	ImGui::Separator();
 
-	// ── デバッグ情報 ──
+	// ------------------------------------------------------------
+	// デバッグ情報
+	// ------------------------------------------------------------
 	ImGui::Text("現在のステート: %s", currentState_ ? currentState_->GetStateName() : "なし");
 	if (target_) {
 		ImGui::Text("追従対象: セット済み");
@@ -250013,6 +249799,9 @@ void FollowCamera::DrawDebugGui() {
 #endif
 }
 
+// ============================================================
+// セーブ処理
+// ============================================================
 void FollowCamera::Save(nlohmann::json& j) const {
 	VirtualCamera::Save(j);
 	j["targetName"] = targetName_;
@@ -250021,8 +249810,15 @@ void FollowCamera::Save(nlohmann::json& j) const {
 	j["interpSpeed"] = interpSpeed_;
 	j["rotateSpeed"] = kRotateSpeed_;
 	j["closeUpScale"] = closeUpScale_;
+	j["targetPivot_Height"] = targetPivot_Height_;
+	j["minPitch"] = minPitch_;
+	j["maxPitch"] = maxPitch_;
+	// めり込み防止設定の保存
+	nlohmann::json resolverJson;
+	collisionResolver_.Save(resolverJson);
+	j["collisionResolver"] = resolverJson;
 
-	// BattleStartState の設定も一緒に保存
+	// BattleStartState の設定保存
 	if (battleStartState_) {
 		nlohmann::json stateJson;
 		battleStartState_->Save(stateJson);
@@ -250030,6 +249826,9 @@ void FollowCamera::Save(nlohmann::json& j) const {
 	}
 }
 
+// ============================================================
+// ロード処理
+// ============================================================
 void FollowCamera::Load(const nlohmann::json& j) {
 	VirtualCamera::Load(j);
 	targetName_ = j.value("targetName", "");
@@ -250042,8 +249841,15 @@ void FollowCamera::Load(const nlohmann::json& j) {
 	kRotateSpeed_ = j.value("rotateSpeed", 0.1f);
 	interpSpeed_ = j.value("interpSpeed", 5.0f);
 	closeUpScale_ = j.value("closeUpScale", 0.3f);
+	targetPivot_Height_ = j.value("targetPivot_Height", 1.0f);
+	minPitch_ = j.value("minPitch", -1.5f);
+	maxPitch_ = j.value("maxPitch", 1.5f);
+	// めり込み防止設定の復元
+	if (j.contains("collisionResolver")) {
+		collisionResolver_.Load(j["collisionResolver"]);
+	}
 
-	// BattleStartState の設定を復元
+	// BattleStartState の設定復元
 	if (j.contains("battleStartState")) {
 		if (!battleStartState_) {
 			battleStartState_ = std::make_shared<BattleStartCameraState>();
@@ -250060,33 +249866,49 @@ File Path: YEngine/Utilities/Systems/Camera/Virtuals/FollowCamera/FollowCamera.h
 #include <WorldTransform/WorldTransform.h>
 #include "CameraState.h"
 #include "BattleStartCameraState.h"
+#include "../../CameraCollisionResolver.h"
 
-/// <summary>
-/// デバッグカメラクラス(ターゲットを追従するカメラ)
-/// </summary>
+// ============================================================
+// デバッグカメラクラス(ターゲットを追従するカメラ)
+// ============================================================
 class FollowCamera : public VirtualCamera
 {
 public:
+	// ============================================================
+	// 基本関数
+	// ============================================================
 	void Initialize() override;
 	void Update() override;
 	void DrawDebugGui() override;
 
+	void Save(nlohmann::json& j) const override;
+	void Load(const nlohmann::json& j) override;
+
+	// ============================================================
+	// アクセッサ・状態取得
+	// ============================================================
 	void SetTarget(const WorldTransform* target, const std::string& name) {
 		target_ = target;
 		targetName_ = name;
 	}
-	void SetIsCloseUp(bool isCloseUp) { isCloseUp_ = isCloseUp; }
 	const std::string& GetTargetName() const { return targetName_; }
-
-	void Save(nlohmann::json& j) const override;
-	void Load(const nlohmann::json& j) override;
-
 	const WorldTransform* GetTarget() { return target_; }
-	void ChangeState(std::unique_ptr<CameraState> newState);
-	void GetDefaultCameraParams(Vector3& outPos, Vector3& outRot, float& outFov) const;
+
+	void SetIsCloseUp(bool isCloseUp) { isCloseUp_ = isCloseUp; }
 	CameraState* GetCurrentState() const { return currentState_.get(); }
 
-	/// 戦闘開始演出を発火（ゲームシーンから呼ぶだけでOK）
+	// ============================================================
+	// カメラ制御・ステート管理
+	// ============================================================
+	void ChangeState(std::unique_ptr<CameraState> newState);
+	void GetDefaultCameraParams(Vector3& outPos, Vector3& outRot, float& outFov) const;
+
+	void UpdateInput();
+	void FollowProcess();
+
+	// ============================================================
+	// 戦闘開始演出
+	// ============================================================
 	void PlayBattleStart() {
 		if (!battleStartState_) {
 			battleStartState_ = std::make_shared<BattleStartCameraState>();
@@ -250099,10 +249921,6 @@ public:
 		ChangeState(std::move(play));
 	}
 
-	void UpdateInput();
-	void FollowProcess();
-
-	// 現在のステートが戦闘開始演出中かどうか
 	bool IsInPerformance() const {
 		if (currentState_) {
 			return currentState_->IsPerformance();
@@ -250111,31 +249929,54 @@ public:
 	}
 
 private:
+	// ============================================================
+	// ターゲット管理
+	// ============================================================
 	const WorldTransform* target_ = nullptr;
 	std::string targetName_ = "";
-	std::unique_ptr<CameraState> currentState_ = nullptr;
 
-	/// 戦闘開始ステートの設定を保持（編集・Save/Load用）
+	// ============================================================
+	// ステート管理
+	// ============================================================
+	std::unique_ptr<CameraState> currentState_ = nullptr;
 	std::shared_ptr<BattleStartCameraState> battleStartState_ = nullptr;
 
+	// ============================================================
 	// 追従パラメータ
+	// ============================================================
 	Vector3 offset_ = { 0.0f, 6.0f, -40.0f };
 	float kRotateSpeed_ = 0.1f;
 
+	// ============================================================
 	// クローズアップ関連
+	// ============================================================
 	bool isCloseUp_ = false;
 	float closeUpScale_ = 0.3f;
 	float interpSpeed_ = 5.0f;
 	float currentScale_ = 1.0f;
 
+	// ============================================================
 	// カメラシェイク
+	// ============================================================
 	Vector3 shakeOffset_ = { 0.0f, 0.0f, 0.0f };
 	float shakeIntensity_ = 0.0f;
 	float shakeDuration_ = 0.0f;
 	float shakeTimer_ = 0.0f;
 
-	// プレビュー状態
+	// ============================================================
+	// カメラの回転制限（ラジアン）
+	// ============================================================
+	float minPitch_ = -0.2f; // 見上げの限界
+	float maxPitch_ = 1.2f; // 見下ろしの限界
+
+	// ============================================================
+	// その他
+	// ============================================================
 	bool isPreviewMode_ = false;
+
+	// 壁避け用コンポーネント
+	CameraCollisionResolver collisionResolver_;
+	float targetPivot_Height_ = 1.5f; // プレイヤーの頭あたりを注視点とするための高さオフセット
 };
 
 ============================================================
@@ -257220,6 +257061,7 @@ void BattleEnemy::InitCollision() {
 	obbCollider_ = ColliderFactory::Create<OBBCollider>(
 		this, &wt_, camera_, static_cast<uint32_t>(CollisionTypeIdDef::kBattleEnemy));
 	obbCollider_->SetIsStatic(false);
+	obbCollider_->SetMass(1.0f);
 }
 
 /*==========================================================================
@@ -257250,6 +257092,7 @@ void BattleEnemy::Update() {
 
 	float dt = YoRigine::GameTime::GetDeltaTime();
 	stateTimer_ += dt;
+	previousPosition_ = wt_.translate_;
 
 	// アニメーター更新
 	if (animation_) {
@@ -257289,10 +257132,19 @@ void BattleEnemy::Update() {
 
 	// エリア制限補正
 	AreaManager::GetInstance()->UpdateSingleObject(&wt_);
-	// 行列とコリジョン更新
+
+	// 行列と更新
+	currentVelocity_ = wt_.translate_ - previousPosition_;
 	wt_.UpdateMatrix();
+	// コリジョン更新
+	if (obbCollider_) {
+		obbCollider_->Update();
+		obbCollider_->SetVelocity(currentVelocity_);
+	}
+
+
+	// UI更新
 	healthBarUI_->Update();
-	if (obbCollider_) obbCollider_->Update();
 }
 
 /*==========================================================================
@@ -257781,6 +257633,11 @@ private:
 	// 点滅スピード
 	float blinkSpeed_ = 50.0f;
 
+	// 前フレームの位置
+	Vector3 previousPosition_{ 0,0,0 }; 
+	// 現在の移動ベクトル
+	Vector3 currentVelocity_{ 0,0,0 };  
+
 	// フェードスピード
 	float fadeSpeed_ = 3.0f;
 
@@ -257795,7 +257652,7 @@ private:
 	// 連続ヒット管理
 	int consecutiveHitCount_ = 0;           // 連続ヒット数
 	float hitCountResetTimer_ = 0.0f;       // ヒットカウントリセットタイマー
-	const int maxConsecutiveHits_ = 3;      // 最大連続ヒット数（これを超えたらRecovery状態へ）
+	const int maxConsecutiveHits_ = 4;      // 最大連続ヒット数（これを超えたらRecovery状態へ）
 	const float hitCountResetTime_ = 2.5f;  // この時間攻撃を受けなければカウントリセット
 };
 
@@ -269059,16 +268916,16 @@ File Path: YGame/GameObjects/Player/Player.cpp
 #endif // _DEBUG
 #include <Systems/Audio/Audio.h>
 
-/// <summary>
-/// デストラクタ
-/// </summary>
+// ============================================================
+// デストラクタ
+// ============================================================
 Player::~Player() {
 	//obbCollider_->~OBBCollider();
 }
 
-/// <summary>
-/// プレイヤー初期化処理
-/// </summary>
+// ============================================================
+// 初期化
+// ============================================================
 void Player::Initialize(Camera* camera) {
 	camera_ = camera;
 
@@ -269119,9 +268976,9 @@ void Player::Initialize(Camera* camera) {
 	InitJson();
 }
 
-/// <summary>
-/// 移動ステート初期化
-/// </summary>
+// ============================================================
+// Stateの初期化
+// ============================================================
 void Player::InitStates() {
 	movement_ = std::make_unique<PlayerMovement>(this);
 
@@ -269134,9 +268991,9 @@ void Player::InitStates() {
 		});
 }
 
-/// <summary>
-/// 戦闘システム初期化
-/// </summary>
+// ============================================================
+// 戦闘システムの初期化
+// ============================================================
 void Player::InitCombatSystem() {
 	combat_ = std::make_unique<PlayerCombat>(this);
 
@@ -269145,9 +269002,9 @@ void Player::InitCombatSystem() {
 		});
 }
 
-/// <summary>
-/// 戦闘系入力の処理
-/// </summary>
+// ============================================================
+// 戦闘用入力の初期化
+// ============================================================
 void Player::HandleCombatInput() {
 
 	if (followCamera_->IsInPerformance()) return;
@@ -269171,20 +269028,22 @@ void Player::HandleCombatInput() {
 
 }
 
-/// <summary>
-/// コライダー初期化
-/// </summary>
+// ============================================================
+// コライダー初期化
+// ============================================================
 void Player::InitCollision() {
 	obbCollider_ = ColliderFactory::Create<OBBCollider>(
 		this, &wt_, camera_,
 		static_cast<uint32_t>(CollisionTypeIdDef::kPlayer)
 	);
 	obbCollider_->SetIsStatic(false);
+	obbCollider_->SetMass(1000.0f);
+
 }
 
-/// <summary>
-/// 毎フレーム更新処理
-/// </summary>
+// ============================================================
+// 更新処理
+// ============================================================
 void Player::Update() {
 	if (YoRigine::GameTime::IsPause()) {
 		return;
@@ -269213,14 +269072,6 @@ void Player::Update() {
 	//------------------------------------------------------------
 	// 生存時処理
 	//------------------------------------------------------------
-
-	//// 剣のコライダーON/OFF制御
-	//if (combat_->GetCurrentState() == CombatState::Attacking) {
-	//	playerSword_->SetEnableCollider(true);
-	//} else {
-	//	playerSword_->SetEnableCollider(false);
-	//}
-
 	// 盾のコライダーON/OFF制御
 	if (combat_->GetCurrentState() == CombatState::Guarding) {
 		playerShield_->SetEnableCollider(true);
@@ -269230,7 +269081,6 @@ void Player::Update() {
 
 	UpdateMotionTime();
 	Vector3 sp = playerSword_->GetWowldPosition();
-	//testEmitter_->FollowEmit(sp, 10);
 
 	// ステート更新
 	movement_->Update(YoRigine::GameTime::GetDeltaTime());
@@ -269242,27 +269092,28 @@ void Player::Update() {
 	playerSword_->Update();
 	playerShield_->Update();
 	obbCollider_->Update();
+	obbCollider_->SetVelocity(movement_->GetVelocity());
 	healthUI_->Update();
 }
 
-/// <summary>
-/// モデル描画（アニメーション付き）
-/// </summary>
+// ============================================================
+// アニメーションモデルの描画
+// ============================================================
 void Player::DrawAnimation() {
 	obj_->Draw(camera_, wt_);
 }
 
-/// <summary>
-/// 装備品描画
-/// </summary>
+// ============================================================
+// 描画
+// ============================================================
 void Player::Draw() {
 	playerSword_->Draw();
 	playerShield_->Draw();
 }
 
-/// <summary>
-/// コライダー描画
-/// </summary>
+// ============================================================
+// コライダーの描画
+// ============================================================
 void Player::DrawCollision() {
 	if (isAlive_) {
 		playerSword_->DrawCollision();
@@ -269271,15 +269122,18 @@ void Player::DrawCollision() {
 	}
 }
 
-/// <summary>
-/// 骨構造描画（デバッグ用）
-/// </summary>
+// ============================================================
+// 骨の描画
+// ============================================================
 void Player::DrawBone(Line& line) {
 	if (isAlive_) {
 		obj_->DrawBone(line, wt_.GetMatWorld());
 	}
 }
 
+// ============================================================
+// 影の描画
+// ============================================================
 void Player::DrawShadow() {
 	if (isAlive_) {
 		obj_->DrawShadow(wt_);
@@ -269288,18 +269142,24 @@ void Player::DrawShadow() {
 	}
 }
 
+// ============================================================
+// ImGui描画
+// ============================================================
 void Player::DrawImGui() {
 	movement_->ShowStateDebug();
 	combat_->ShowDebugImGui();
 }
 
+// ============================================================
+// VFXの描画
+// ============================================================
 void Player::DrawVfx() {
 	playerSword_->DrawVfx();
 }
 
-/// <summary>
-/// モーション速度変更時の更新
-/// </summary>
+// ============================================================
+// モーションの再生時間更新
+// ============================================================
 void Player::UpdateMotionTime() {
 	if (motionSpeed_ != preMotionSpeed_) {
 		if (obj_->GetModel()) {
@@ -269309,9 +269169,9 @@ void Player::UpdateMotionTime() {
 	}
 }
 
-/// <summary>
-/// ワールド座標を取得
-/// </summary>
+// ============================================================
+// ワールド座標の取得
+// ============================================================
 Vector3 Player::GetWorldPosition() {
 	return {
 		wt_.matWorld_.m[3][0],
@@ -269320,9 +269180,9 @@ Vector3 Player::GetWorldPosition() {
 	};
 }
 
-/// <summary>
-/// 現在のカメラ回転を取得
-/// </summary>
+// ============================================================
+// 現在のカメラの回転を取得
+// ============================================================
 Vector3 Player::GetCameraRotation() const {
 	if (camera_ && followCamera_) {
 		return followCamera_->GetRotate();
@@ -269330,9 +269190,9 @@ Vector3 Player::GetCameraRotation() const {
 	return Vector3(0.0f, 0.0f, 0.0f);
 }
 
-/// <summary>
-/// Jsonデータ登録処理
-/// </summary>
+// ============================================================
+//	Jsonの初期化
+// ============================================================
 void Player::InitJson() {
 	jsonManager_ = std::make_unique<YoRigine::JsonManager>("Player", "Resources/Json/Objects/Player");
 	jsonManager_->SetCategory("Objects");
@@ -269392,9 +269252,9 @@ void Player::InitJson() {
 	obbCollider_->InitJson(jsonCollider_.get());
 }
 
-/// <summary>
-/// 衝突開始時の処理
-/// </summary>
+// ============================================================
+// 衝突開始時の処理
+// ============================================================
 void Player::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other) {
 	if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kBattleEnemy)) {
 		Vector3 emitPos = wt_.translate_;
@@ -269403,34 +269263,34 @@ void Player::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseCollider*
 	}
 }
 
-/// <summary>
-/// 衝突中の処理
-/// </summary>
+// ============================================================
+// 衝突継続時の処理
+// ============================================================
 void Player::OnCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other) {
 	if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kBattleEnemy)) {
 		// obj_->SetMaterialColor({ 0.0f,0.0f,0.0f,0.0f });
 	}
 }
 
-/// <summary>
-/// 衝突終了時の処理
-/// </summary>
+// ============================================================
+// 衝突終了時の処理
+// ============================================================
 void Player::OnExitCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other) {
 	if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kBattleEnemy)) {
 		// obj_->SetMaterialColor({ 1.0f,1.0f,1.0f,1.0f });
 	}
 }
 
-/// <summary>
-/// 衝突方向ごとの処理
-/// </summary>
+// ============================================================
+// 衝突方向ごとの処理
+// ============================================================
 void Player::OnDirectionCollision([[maybe_unused]] BaseCollider* self, [[maybe_unused]] BaseCollider* other, [[maybe_unused]] HitDirection dir) {
 
 }
 
-/// <summary>
-/// 衝突判定開始時の方向ごとの処理
-/// </summary>
+// ============================================================
+// 衝突開始時の処理（方向ヒット）
+// ============================================================
 void Player::OnEnterDirectionCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other, HitDirection dir)
 {
 	if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kBattleEnemy)) {
@@ -269440,7 +269300,7 @@ void Player::OnEnterDirectionCollision([[maybe_unused]] BaseCollider* self, Base
 		//------------------------------------------------------------
 
 		// YoRigine::Audio::GetInstance()->PlayOneShot(
-		//	"Resources/Audio/isamikun.mp4",
+		//	"Resources/Audio/.mp4",
 		//	0.2f,
 		//	YoRigine::SoundCategory::SE
 		//);
@@ -269450,9 +269310,9 @@ void Player::OnEnterDirectionCollision([[maybe_unused]] BaseCollider* self, Base
 	}
 }
 
-/// <summary>
-/// 全システムのリセット処理
-/// </summary>
+// ============================================================
+// リセット
+// ============================================================
 void Player::Reset() {
 	hp_ = maxHP_;
 	isAlive_ = true;
@@ -269469,9 +269329,9 @@ void Player::Reset() {
 	}
 }
 
-/// <summary>
-/// ダメージ処理
-/// </summary>
+// ============================================================
+// ダメージ処理
+// ============================================================
 void Player::TakeDamage(int damage) {
 	if (!isAlive_ || hp_ <= 0) return;
 
@@ -269484,9 +269344,9 @@ void Player::TakeDamage(int damage) {
 	}
 }
 
-/// <summary>
-/// 復活処理
-/// </summary>
+// ============================================================
+// 復活処理
+// ============================================================
 void Player::Revive(int reviveHP) {
 	if (isAlive_) return; // すでに生存中なら処理しない
 
@@ -269504,6 +269364,9 @@ void Player::Revive(int reviveHP) {
 	obj_->SetChangeMotion("Player.gltf", MotionPlayMode::Loop, "Idle4");
 }
 
+// ============================================================
+// 初期値置
+// ============================================================
 void Player::SetInitialPosition()
 {
 	LookAtDirection(Vector3(0.0f, 0.0f, 0.0f));
@@ -269511,10 +269374,9 @@ void Player::SetInitialPosition()
 	wt_.UpdateMatrix();
 }
 
-/// <summary>
-///	指定方向を向く関数
-/// </summary>
-/// <param name="direction"></param>
+// ============================================================
+// 指定方向を向く
+// ============================================================
 void Player::LookAtDirection(const Vector3& direction)
 {
 	Vector3 dir = direction - wt_.translate_;
@@ -269916,11 +269778,9 @@ File Path: YGame/GameObjects/SkyBox/SkyBox.cpp
 #include "SkyBox.h"
 #include "CubeMap/CubeMap.h"
 
-/// <summary>
-/// スカイボックス初期化
-/// </summary>
-/// <param name="camera">使用するカメラ</param>
-/// <param name="textureFilePath">読み込むキューブマップテクスチャのパス</param>
+// ============================================================
+// 初期化
+// ============================================================
 void SkyBox::Initialize(Camera* camera, const std::string& textureFilePath) {
 	//------------------------------------------------------------
 	// キューブマップ生成と初期化
@@ -269932,9 +269792,9 @@ void SkyBox::Initialize(Camera* camera, const std::string& textureFilePath) {
 	InitJson();
 }
 
-/// <summary>
-/// 更新処理
-/// </summary>
+// ============================================================
+// 更新処理
+// ============================================================
 void SkyBox::Update() {
 	// キューブマップの更新（回転やカメラ追従など）
 	if (cubeMap_) {
@@ -269942,9 +269802,9 @@ void SkyBox::Update() {
 	}
 }
 
-/// <summary>
-/// 描画処理
-/// </summary>
+// ============================================================
+// 描画処理
+// ============================================================
 void SkyBox::Draw() {
 	// キューブマップ描画
 	if (cubeMap_) {
@@ -269952,19 +269812,18 @@ void SkyBox::Draw() {
 	}
 }
 
-/// <summary>
-/// テクスチャの差し替え
-/// </summary>
-/// <param name="filePath">新しいテクスチャのパス</param>
+// ============================================================
+// テクスチャ変更
+// ============================================================
 void SkyBox::SetTextureFilePath(const std::string& filePath) {
 	if (cubeMap_) {
 		cubeMap_->SetTextureFilePath(filePath);
 	}
 }
 
-/// <summary>
-/// JSON登録処理
-/// </summary>
+// ============================================================
+// Json初期化
+// ============================================================
 void SkyBox::InitJson() {
 	//------------------------------------------------------------
 	// YoRigine::JsonManager 設定（位置・回転・スケールを調整可能に）
@@ -270634,7 +270493,7 @@ void PlayerSword::InitCollision() {
 	);
 
 	// 初期状態では当たり判定無効
-	obbCollider_->isCollisionEnabled_ = false;
+	obbCollider_->SetCollisionEnabled(false);
 	// 押し戻しはしないように
 	obbCollider_->SetEnablePenetration(false);
 }
@@ -275972,6 +275831,428 @@ private:
 #endif // EASING_H
 
 ============================================================
+File Path: YMath/Intersection/Intersection.cpp
+============================================================
+// File name: Intersection.cpp
+#include "Intersection.h"
+#include <algorithm>
+#include <cmath>
+#include <cfloat>
+
+// ============================================================
+// 内部ヘルパー関数
+// ============================================================
+float Intersection::ProjectOBB(const OBB& obb, const Vector3& axis, const Vector3 axes[3]) {
+	return obb.size.x * std::fabs(Dot(axes[0], axis)) +
+		obb.size.y * std::fabs(Dot(axes[1], axis)) +
+		obb.size.z * std::fabs(Dot(axes[2], axis));
+}
+
+OBB Intersection::ConvertAABBToOBB(const AABB& aabb) {
+	OBB obb;
+	obb.center = (aabb.min + aabb.max) * 0.5f;
+	obb.size = (aabb.max - aabb.min) * 0.5f;
+	obb.rotation = { 0.0f, 0.0f, 0.0f };
+	return obb;
+}
+
+// ============================================================
+// レイと球の交差判定
+// ============================================================
+bool Intersection::IsCollision(const Ray& ray, const Sphere& sphere, RaycastHit* outHit) {
+	Vector3 m = ray.origin - sphere.center;
+	float b = Dot(m, ray.direction);
+	float c = Dot(m, m) - (sphere.radius * sphere.radius);
+
+	if (c > 0.0f && b > 0.0f) {
+		return false;
+	}
+
+	float discriminant = b * b - c;
+
+	if (discriminant < 0.0f) {
+		return false;
+	}
+
+	float t = -b - std::sqrt(discriminant);
+
+	if (t < 0.0f) {
+		t = -b + std::sqrt(discriminant);
+	}
+
+	if (t < 0.0f) {
+		return false;
+	}
+
+	if (outHit) {
+		outHit->isHit = true;
+		outHit->distance = t;
+		outHit->hitPoint = ray.origin + ray.direction * t;
+		outHit->normal = Normalize(outHit->hitPoint - sphere.center);
+	}
+
+	return true;
+}
+
+// ============================================================
+// レイとAABBの交差判定
+// ============================================================
+bool Intersection::IsCollision(const Ray& ray, const AABB& aabb, RaycastHit* outHit) {
+	float tMin = 0.0f;
+	float tMax = FLT_MAX;
+	Vector3 hitNormal = { 0.0f, 0.0f, 0.0f };
+
+	float t1, t2;
+
+	// X軸
+	if (std::abs(ray.direction.x) > 1e-6f) {
+		t1 = (aabb.min.x - ray.origin.x) / ray.direction.x;
+		t2 = (aabb.max.x - ray.origin.x) / ray.direction.x;
+		Vector3 normal1 = { -1.0f, 0.0f, 0.0f };
+		Vector3 normal2 = { 1.0f, 0.0f, 0.0f };
+
+		if (t1 > t2) {
+			std::swap(t1, t2);
+			std::swap(normal1, normal2);
+		}
+		if (t1 > tMin) { tMin = t1; hitNormal = normal1; }
+		if (t2 < tMax) { tMax = t2; }
+		if (tMin > tMax) return false;
+	}
+	else if (ray.origin.x < aabb.min.x || ray.origin.x > aabb.max.x) {
+		return false;
+	}
+
+	// Y軸
+	if (std::abs(ray.direction.y) > 1e-6f) {
+		t1 = (aabb.min.y - ray.origin.y) / ray.direction.y;
+		t2 = (aabb.max.y - ray.origin.y) / ray.direction.y;
+		Vector3 normal1 = { 0.0f, -1.0f, 0.0f };
+		Vector3 normal2 = { 0.0f,  1.0f, 0.0f };
+
+		if (t1 > t2) {
+			std::swap(t1, t2);
+			std::swap(normal1, normal2);
+		}
+		if (t1 > tMin) { tMin = t1; hitNormal = normal1; }
+		if (t2 < tMax) { tMax = t2; }
+		if (tMin > tMax) return false;
+	}
+	else if (ray.origin.y < aabb.min.y || ray.origin.y > aabb.max.y) {
+		return false;
+	}
+
+	// Z軸
+	if (std::abs(ray.direction.z) > 1e-6f) {
+		t1 = (aabb.min.z - ray.origin.z) / ray.direction.z;
+		t2 = (aabb.max.z - ray.origin.z) / ray.direction.z;
+		Vector3 normal1 = { 0.0f, 0.0f, -1.0f };
+		Vector3 normal2 = { 0.0f, 0.0f,  1.0f };
+
+		if (t1 > t2) {
+			std::swap(t1, t2);
+			std::swap(normal1, normal2);
+		}
+		if (t1 > tMin) { tMin = t1; hitNormal = normal1; }
+		if (t2 < tMax) { tMax = t2; }
+		if (tMin > tMax) return false;
+	}
+	else if (ray.origin.z < aabb.min.z || ray.origin.z > aabb.max.z) {
+		return false;
+	}
+
+	if (outHit) {
+		outHit->isHit = true;
+		outHit->distance = tMin;
+		outHit->hitPoint = ray.origin + ray.direction * tMin;
+		outHit->normal = hitNormal;
+	}
+
+	return true;
+}
+
+// ============================================================
+// レイとOBBの交差判定
+// ============================================================
+bool Intersection::IsCollision(const Ray& ray, const OBB& obb, RaycastHit* outHit) {
+	float tMin = 0.0f;
+	float tMax = FLT_MAX;
+	Vector3 p = obb.center - ray.origin;
+	Vector3 hitNormal = { 0.0f, 0.0f, 0.0f };
+
+	for (int i = 0; i < 3; ++i) {
+		Vector3 axis = Normalize(obb.orientations[i]);
+		float e = (i == 0) ? obb.size.x : (i == 1) ? obb.size.y : obb.size.z;
+
+		float f = Dot(axis, ray.direction);
+		float h = Dot(axis, p);
+
+		if (std::abs(f) > 1e-6f) {
+			float t1 = (h + e) / f;
+			float t2 = (h - e) / f;
+			Vector3 normal1 = axis;
+			Vector3 normal2 = -axis;
+
+			if (t1 > t2) {
+				std::swap(t1, t2);
+				std::swap(normal1, normal2);
+			}
+
+			if (t1 > tMin) {
+				tMin = t1;
+				hitNormal = normal1;
+			}
+			if (t2 < tMax) {
+				tMax = t2;
+			}
+			if (tMin > tMax) return false;
+		}
+		else if (-h - e > 0.0f || -h + e < 0.0f) {
+			return false;
+		}
+	}
+
+	if (outHit) {
+		outHit->isHit = true;
+		outHit->distance = tMin;
+		outHit->hitPoint = ray.origin + ray.direction * tMin;
+		outHit->normal = hitNormal;
+	}
+
+	return true;
+}
+
+// ============================================================
+// レイと平面の交差判定
+// ============================================================
+bool Intersection::IsCollision(const Ray& ray, const Plane& plane, RaycastHit* outHit) {
+	float denom = Dot(plane.normal, ray.direction);
+
+	if (std::abs(denom) < 1e-6f) {
+		return false;
+	}
+
+	float t = (plane.distance - Dot(plane.normal, ray.origin)) / denom;
+
+	if (t < 0.0f) {
+		return false;
+	}
+
+	if (outHit) {
+		outHit->isHit = true;
+		outHit->distance = t;
+		outHit->hitPoint = ray.origin + ray.direction * t;
+		outHit->normal = plane.normal;
+	}
+
+	return true;
+}
+
+// ============================================================
+// Sphere vs Sphere
+// ============================================================
+bool Intersection::IsCollision(const Sphere& sphereA, const Sphere& sphereB, CollisionResult* outResult) {
+	Vector3 diff = sphereA.center - sphereB.center;
+	float distSq = LengthSquared(diff);
+	float radiusSum = sphereA.radius + sphereB.radius;
+
+	if (distSq <= radiusSum * radiusSum) {
+		if (outResult) {
+			outResult->isHit = true;
+			float dist = std::sqrt(distSq);
+			if (dist > 0.0001f) {
+				outResult->normal = diff * (1.0f / dist); // BからAへのベクトル
+				outResult->penetrationDepth = radiusSum - dist;
+			}
+			else {
+				outResult->normal = { 0.0f, 1.0f, 0.0f };
+				outResult->penetrationDepth = radiusSum;
+			}
+		}
+		return true;
+	}
+	return false;
+}
+
+// ============================================================
+// Sphere vs AABB
+// ============================================================
+bool Intersection::IsCollision(const Sphere& sphere, const AABB& aabb, CollisionResult* outResult) {
+	return IsCollision(sphere, ConvertAABBToOBB(aabb), outResult);
+}
+
+// ============================================================
+// Sphere vs OBB
+// ============================================================
+bool Intersection::IsCollision(const Sphere& sphere, const OBB& obb, CollisionResult* outResult) {
+	Matrix4x4 rotMat = MakeRotateMatrixXYZ(obb.rotation);
+	Matrix4x4 invRot = TransPose(rotMat);
+	Vector3 localCenter = Transform(sphere.center - obb.center, invRot);
+
+	Vector3 closestLocal = Clamp(localCenter, -obb.size, obb.size);
+	Vector3 closestWorld = obb.center + Transform(closestLocal, rotMat);
+
+	Vector3 diff = sphere.center - closestWorld;
+	float distSq = LengthSquared(diff);
+
+	if (distSq <= sphere.radius * sphere.radius) {
+		if (outResult) {
+			outResult->isHit = true;
+			float dist = std::sqrt(distSq);
+
+			if (dist > 0.0001f) {
+				outResult->normal = diff * (1.0f / dist);
+				outResult->penetrationDepth = sphere.radius - dist;
+			}
+			else {
+				outResult->normal = { 0.0f, 1.0f, 0.0f };
+				outResult->penetrationDepth = sphere.radius;
+			}
+		}
+		return true;
+	}
+	return false;
+}
+
+// ============================================================
+// AABB vs AABB
+// ============================================================
+bool Intersection::IsCollision(const AABB& aabbA, const AABB& aabbB, CollisionResult* outResult) {
+	bool hit = (aabbA.min.x <= aabbB.max.x && aabbA.max.x >= aabbB.min.x) &&
+		(aabbA.min.y <= aabbB.max.y && aabbA.max.y >= aabbB.min.y) &&
+		(aabbA.min.z <= aabbB.max.z && aabbA.max.z >= aabbB.min.z);
+
+	if (hit && outResult) {
+		return IsCollision(ConvertAABBToOBB(aabbA), ConvertAABBToOBB(aabbB), outResult);
+	}
+	return hit;
+}
+
+// ============================================================
+// OBB vs OBB
+// ============================================================
+bool Intersection::IsCollision(const OBB& obbA, const OBB& obbB, CollisionResult* outResult) {
+	const float EPSILON = 1e-6f;
+
+	Matrix4x4 matA = MakeRotateMatrixXYZ(obbA.rotation);
+	Matrix4x4 matB = MakeRotateMatrixXYZ(obbB.rotation);
+
+	Vector3 axes[15];
+	axes[0] = { matA.m[0][0], matA.m[1][0], matA.m[2][0] };
+	axes[1] = { matA.m[0][1], matA.m[1][1], matA.m[2][1] };
+	axes[2] = { matA.m[0][2], matA.m[1][2], matA.m[2][2] };
+	axes[3] = { matB.m[0][0], matB.m[1][0], matB.m[2][0] };
+	axes[4] = { matB.m[0][1], matB.m[1][1], matB.m[2][1] };
+	axes[5] = { matB.m[0][2], matB.m[1][2], matB.m[2][2] };
+
+	int axisIdx = 6;
+	for (int i = 0; i < 3; i++) {
+		for (int j = 0; j < 3; j++) {
+			axes[axisIdx++] = Cross(axes[i], axes[3 + j]);
+		}
+	}
+
+	Vector3 distanceVec = obbB.center - obbA.center;
+	float minOverlap = FLT_MAX;
+	Vector3 minAxis = { 0, 0, 0 };
+
+	for (int i = 0; i < 15; i++) {
+		Vector3 axis = axes[i];
+		float lenSq = LengthSquared(axis);
+		if (lenSq < EPSILON) continue;
+		axis = axis * (1.0f / std::sqrt(lenSq));
+
+		float projA = ProjectOBB(obbA, axis, &axes[0]);
+		float projB = ProjectOBB(obbB, axis, &axes[3]);
+
+		float distance = std::abs(Dot(distanceVec, axis));
+		float overlap = projA + projB - distance;
+
+		if (overlap < 0.0f) {
+			return false; // 分離軸が見つかった＝当たっていない
+		}
+
+		if (overlap < minOverlap) {
+			minOverlap = overlap;
+			minAxis = axis;
+		}
+	}
+
+	if (outResult) {
+		if (Dot(distanceVec, minAxis) > 0.0f) {
+			minAxis = minAxis * -1.0f;
+		}
+		outResult->isHit = true;
+		outResult->normal = minAxis;
+		outResult->penetrationDepth = minOverlap;
+	}
+
+	return true;
+}
+
+// ============================================================
+// AABB vs OBB
+// ============================================================
+bool Intersection::IsCollision(const AABB& aabb, const OBB& obb, CollisionResult* outResult) {
+	return IsCollision(ConvertAABBToOBB(aabb), obb, outResult);
+}
+
+============================================================
+File Path: YMath/Intersection/Intersection.h
+============================================================
+#pragma once
+
+#include "../Ray/Raycast.h"
+#include "../Shape/Sphere.h"
+#include "../Shape/AABB.h"
+#include "../Shape/OBB.h"
+#include "../MathFunc.h"
+
+// ============================================================
+// 衝突結果をまとめる構造体
+// ============================================================
+struct CollisionResult {
+	bool isHit = false;
+	Vector3 normal = {};
+	float penetrationDepth = 0.0f;
+};
+
+// ============================================================
+// 交差判定クラス
+// ============================================================
+class Intersection {
+public:
+	// ============================================================
+	// レイキャスト判定
+	// ============================================================
+	static bool IsCollision(const Ray& ray, const Sphere& sphere, RaycastHit* outHit = nullptr);
+	static bool IsCollision(const Ray& ray, const AABB& aabb, RaycastHit* outHit = nullptr);
+	static bool IsCollision(const Ray& ray, const OBB& obb, RaycastHit* outHit = nullptr);
+	static bool IsCollision(const Ray& ray, const Plane& plane, RaycastHit* outHit = nullptr);
+
+	// ============================================================
+	// 形状同士の交差判定（押し戻し情報付き）
+	// ============================================================
+	static bool IsCollision(const Sphere& sphereA, const Sphere& sphereB, CollisionResult* outResult = nullptr);
+	static bool IsCollision(const Sphere& sphere, const AABB& aabb, CollisionResult* outResult = nullptr);
+	static bool IsCollision(const Sphere& sphere, const OBB& obb, CollisionResult* outResult = nullptr);
+	static bool IsCollision(const AABB& aabbA, const AABB& aabbB, CollisionResult* outResult = nullptr);
+	static bool IsCollision(const OBB& obbA, const OBB& obbB, CollisionResult* outResult = nullptr);
+	static bool IsCollision(const AABB& aabb, const OBB& obb, CollisionResult* outResult = nullptr);
+
+	// ============================================================
+	// ユーティリティ
+	// ============================================================
+	static OBB ConvertAABBToOBB(const AABB& aabb);
+
+private:
+	// ============================================================
+	// 内部計算用ヘルパー
+	// ============================================================
+	static float ProjectOBB(const OBB& obb, const Vector3& axis, const Vector3 axes[3]);
+};
+
+============================================================
 File Path: YMath/MathFunc.cpp
 ============================================================
 #include "MathFunc.h"
@@ -276023,29 +276304,6 @@ float LengthSquared(const Vector3& v) { return v.x * v.x + v.y * v.y + v.z * v.z
 
 float Length(const Vector3& v) { return std::sqrt(LengthSquared(v)); }
 
-bool IsCollision(const AABB& aabb, const Vector3& point) {
-	if (point.x < aabb.min.x || point.x > aabb.max.x) return false;
-	if (point.y < aabb.min.y || point.y > aabb.max.y) return false;
-	if (point.z < aabb.min.z || point.z > aabb.max.z) return false;
-	return true;
-}
-bool IsCollision(const AABB& aabb, const Sphere& sphere) {
-	Vector3 closestPointInAABB = sphere.center;
-
-	if (sphere.center.x < aabb.min.x) closestPointInAABB.x = aabb.min.x;
-	if (sphere.center.y < aabb.min.y) closestPointInAABB.y = aabb.min.y;
-	if (sphere.center.z < aabb.min.z) closestPointInAABB.z = aabb.min.z;
-
-	if (sphere.center.x > aabb.max.x) closestPointInAABB.x = aabb.max.x;
-	if (sphere.center.y > aabb.max.y) closestPointInAABB.y = aabb.max.y;
-	if (sphere.center.z > aabb.max.z) closestPointInAABB.z = aabb.max.z;
-
-	Vector3 difference = closestPointInAABB - sphere.center;
-	float distanceSquared = difference.x * difference.x + difference.y * difference.y + difference.z * difference.z;
-
-	return distanceSquared < (sphere.radius * sphere.radius);
-}
-
 float DegToRad(float degrees)
 {
 	return degrees * (std::numbers::pi_v<float> / 180.0f);
@@ -276090,10 +276348,7 @@ File Path: YMath/MathFunc.h
 #include "Matrix4x4.h"
 #include "Quaternion.h"
 
-struct Sphere {
-	Vector3 center; // !< 中心点
-	float radius;   // !< 半径
-};
+
 struct Plane {
 	Vector3 normal; // !<法線
 	float distance; // !<距離
@@ -276105,27 +276360,6 @@ struct Segment {
 
 struct Triangle {
 	Vector3 vertex[3];
-};
-
-struct AABB {
-	Vector3 min;
-	Vector3 max;
-};
-struct OBB {
-	// 中心座標
-	Vector3 center = { 0.0f, 0.0f, 0.0f };
-
-	// 回転（オイラー角）
-	Vector3 rotation = { 0.0f, 0.0f, 0.0f }; // radians
-
-	// 半サイズ（幅/高さ/奥行きの半分）
-	Vector3 size = { 1.0f, 1.0f, 1.0f };
-
-	// ローカル座標軸（回転後）
-	Vector3 orientations[3]; // ← X, Y, Z軸方向 × size
-
-	// ワールド変換行列（必要なら）
-	Matrix4x4 worldMatrix;
 };
 
 
@@ -276157,12 +276391,6 @@ float LengthSquared(const Vector3& v);
 
 // Vector3の長さを計算する関数
 float Length(const Vector3& v);
-
-// AABBと点の衝突判定を行う関数
-bool IsCollision(const AABB& aabb, const Vector3& point);
-
-// AABBと球の衝突判定を行う関数
-bool IsCollision(const AABB& aabb, const Sphere& sphere);
 
 // 度数からラジアン
 float DegToRad(float degrees);
@@ -277788,6 +278016,78 @@ Quaternion LookAtQuaternion(const Vector3& from, const Vector3& to, const Vector
 
 // Quaternionから前方向ベクトルを取得する関数
 Vector3 QuaternionToForward(const Quaternion& quat);
+
+============================================================
+File Path: YMath/Ray/Raycast.h
+============================================================
+#pragma once
+#include "Vector3.h"
+
+// ============================================================
+// レイの定義
+// ============================================================
+struct Ray {
+	Vector3 origin;
+	Vector3 direction;
+};
+
+// ============================================================
+// レイキャストのヒット情報
+// ============================================================
+struct RaycastHit {
+	bool isHit = false;     // 当たったかどうか
+	float distance = 0.0f;  // 発射位置からの距離
+	Vector3 hitPoint;       // 実際に当たったワールド座標
+	Vector3 normal;         // 当たった面の法線（壁の向き。跳ね返り計算などに使う）
+};
+
+============================================================
+File Path: YMath/Shape/AABB.h
+============================================================
+#pragma once
+#include "Vector3.h"
+// 軸に沿った境界ボックス（Axis-Aligned Bounding Box、AABB）の定義
+struct AABB {
+	Vector3 min;
+	Vector3 max;
+};
+
+
+============================================================
+File Path: YMath/Shape/OBB.h
+============================================================
+#pragma once
+#include "Vector3.h"
+#include "Matrix4x4.h"
+
+// OBB（Oriented Bounding Box、方向付き境界ボックス）の定義
+struct OBB {
+	// 中心座標
+	Vector3 center = { 0.0f, 0.0f, 0.0f };
+
+	// 回転（オイラー角）
+	Vector3 rotation = { 0.0f, 0.0f, 0.0f }; // radians
+
+	// 半サイズ（幅/高さ/奥行きの半分）
+	Vector3 size = { 1.0f, 1.0f, 1.0f };
+
+	// ローカル座標軸（回転後）
+	Vector3 orientations[3]; // ← X, Y, Z軸方向 × size
+
+	// ワールド変換行列（必要なら）
+	Matrix4x4 worldMatrix;
+};
+
+============================================================
+File Path: YMath/Shape/Sphere.h
+============================================================
+#pragma once
+#include "Vector3.h"
+// 球体の定義
+struct Sphere {
+	Vector3 center; // !< 中心点
+	float radius;   // !< 半径
+};
 
 ============================================================
 File Path: YMath/Vector2.h
