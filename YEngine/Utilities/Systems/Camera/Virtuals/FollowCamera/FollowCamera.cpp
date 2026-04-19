@@ -10,29 +10,53 @@
 #ifdef USE_IMGUI
 #include <imgui.h>
 #endif
+#include <Systems/GameTime/GameTime.h>
 #include <Systems/Camera/CameraDirector.h>
+#include <Collision/Core/CollisionTypeIdDef.h>
 
+// ============================================================
+// 初期化処理
+// ============================================================
 void FollowCamera::Initialize() {
 	VirtualCamera::Initialize();
 	currentScale_ = 1.0f;
 
-	// デフォルトステートを設定
+	// ------------------------------------------------------------
+	// デフォルトステートの設定
+	// ------------------------------------------------------------
 	currentState_ = std::make_unique<DefaultCameraState>();
 	currentState_->Enter(this);
+
+	// ------------------------------------------------------------
+	// めり込み防止コンポーネントの初期化と無視設定
+	// ------------------------------------------------------------
+	collisionResolver_.Initialize();
+	collisionResolver_.AddIgnoreTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayer));
+	collisionResolver_.AddIgnoreTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayerShield));
+	collisionResolver_.AddIgnoreTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon));
+	collisionResolver_.AddIgnoreTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kBattleEnemy));
+	collisionResolver_.AddIgnoreTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kFieldEnemy));
 }
 
+// ============================================================
+// 更新処理
+// ============================================================
 void FollowCamera::Update() {
+	// ------------------------------------------------------------
+	// ターゲットの再検索
+	// ------------------------------------------------------------
 	if (target_ == nullptr && !targetName_.empty()) {
 		target_ = CameraDirector::GetInstance()->FindTarget(targetName_);
 	}
 
 	if (!target_) return;
 
-	// ステート更新
+	// ------------------------------------------------------------
+	// ステートの更新と終了判定
+	// ------------------------------------------------------------
 	if (currentState_) {
 		currentState_->Update(this);
 
-		// ステートが終了したらデフォルトに戻る
 		if (currentState_->IsFinished()) {
 			isPreviewMode_ = false;
 			ChangeState(std::make_unique<DefaultCameraState>());
@@ -40,6 +64,9 @@ void FollowCamera::Update() {
 	}
 }
 
+// ============================================================
+// 入力情報の更新処理
+// ============================================================
 void FollowCamera::UpdateInput() {
 	if (isCloseUp_) return;
 
@@ -48,43 +75,73 @@ void FollowCamera::UpdateInput() {
 		if (YoRigine::Input::GetInstance()->GetJoystickState(0, joyState)) {
 			Vector3 move{ 0.0f, 0.0f, 0.0f };
 
-			// 左右の入力（Y軸まわりの回転）
+			// ------------------------------------------------------------
+			// スティック入力の取得
+			// ------------------------------------------------------------
 			move.y += static_cast<float>(joyState.Gamepad.sThumbRX);
-			// 上下の入力（X軸まわりの回転）を追加
 			move.x -= static_cast<float>(joyState.Gamepad.sThumbRY);
 
-			// デッドゾーン処理（微小な入力を無視しないと勝手に動く場合があります）
-			if (Length(move) > 5000.0f) { // 5000は目安です
+			// ------------------------------------------------------------
+			// デッドゾーン処理と回転の適用
+			// ------------------------------------------------------------
+			if (Length(move) > 5000.0f) {
 				move = Normalize(move) * kRotateSpeed_;
 				transform_.rotate += move;
 			}
+
+			// ------------------------------------------------------------
+			// カメラの縦回転を制限する
+			// ------------------------------------------------------------
+			transform_.rotate.x = std::clamp(transform_.rotate.x, minPitch_, maxPitch_);
 		}
 	}
 }
 
+// ============================================================
+// ターゲットへの追従とカメラ座標の計算
+// ============================================================
 void FollowCamera::FollowProcess() {
-	if (target_ == nullptr) return;
+	if (target_ == nullptr) {
+		return;
+	}
 
-	// クローズアップ補間
+	// ------------------------------------------------------------
+	// スケール（ズームイン/アウト）の補間計算
+	// ------------------------------------------------------------
 	float targetScale = isCloseUp_ ? closeUpScale_ : 1.0f;
-	currentScale_ += (targetScale - currentScale_) * std::clamp(interpSpeed_ * 0.016f, 0.0f, 1.0f);
+	currentScale_ += (targetScale - currentScale_) * std::clamp(interpSpeed_ * YoRigine::GameTime::GetDeltaTime(), 0.0f, 1.0f);
 
-	// 基本オフセット計算
+	// ------------------------------------------------------------
+	// 本来行きたい理想のオフセットと座標を計算
+	// ------------------------------------------------------------
 	Vector3 offset = offset_ * currentScale_;
-
-	// カメラシェイクを加算
-	offset += shakeOffset_;
-
-	// 回転行列を考慮
 	Matrix4x4 rotateMat = MakeRotateMatrixXYZ(transform_.rotate);
-	offset = TransformNormal(offset, rotateMat);
+	Vector3 rotatedOffset = TransformNormal(offset, rotateMat);
 
-	// 座標更新
-	transform_.translate = target_->translate_ + offset;
+	// ------------------------------------------------------------
+	// レイの始点であり、カメラが回る中心（プレイヤーの頭の高さなど）を設定
+	// ------------------------------------------------------------
+	Vector3 targetPivot = target_->translate_ + Vector3(0.0f, targetPivot_Height_, 0.0f);
 
-	// FOV更新(エフェクト用 + コンボ用)
+	// ------------------------------------------------------------
+	// ★修正箇所：理想のカメラ位置は「足元」ではなく「注視点（頭）」を基準にする！
+	// ------------------------------------------------------------
+	Vector3 idealCameraPos = targetPivot + rotatedOffset;
+
+	// ------------------------------------------------------------
+	// コンポーネントに地形や障害物の回避計算を依頼する
+	// ------------------------------------------------------------
+	Vector3 safePos = collisionResolver_.Resolve(idealCameraPos, targetPivot);
+
+	// ------------------------------------------------------------
+	// 最終的な座標の適用（最後にカメラシェイクの揺れを足す）
+	// ------------------------------------------------------------
+	transform_.translate = safePos + shakeOffset_;
 }
 
+// ============================================================
+// カメラステートの変更処理
+// ============================================================
 void FollowCamera::ChangeState(std::unique_ptr<CameraState> newState) {
 	if (currentState_) {
 		currentState_->Exit(this);
@@ -97,6 +154,9 @@ void FollowCamera::ChangeState(std::unique_ptr<CameraState> newState) {
 	}
 }
 
+// ============================================================
+// デフォルトのカメラパラメータを取得する処理
+// ============================================================
 void FollowCamera::GetDefaultCameraParams(Vector3& outPos, Vector3& outRot, float& outFov) const {
 	if (!target_) {
 		outPos = transform_.translate;
@@ -105,32 +165,43 @@ void FollowCamera::GetDefaultCameraParams(Vector3& outPos, Vector3& outRot, floa
 		return;
 	}
 
-	// デフォルトの追従位置を計算
 	Vector3 offset = offset_ * currentScale_;
 	Matrix4x4 rotateMat = MakeRotateMatrixXYZ(transform_.rotate);
 	offset = TransformNormal(offset, rotateMat);
 
-	outPos = target_->translate_ + offset;
+	// ★修正箇所：ここも「注視点」を基準にする
+	Vector3 targetPivot = target_->translate_ + Vector3(0.0f, targetPivot_Height_, 0.0f);
+	outPos = targetPivot + offset;
 	outRot = transform_.rotate;
 	outFov = fovY_;
 }
 
+// ============================================================
+// デバッグGUI描画処理
+// ============================================================
 void FollowCamera::DrawDebugGui() {
 #ifdef USE_IMGUI
 	ImGui::Text("追従カメラ設定");
 	ImGui::Separator();
 
-	// ── 追従パラメータ ──
+	// ------------------------------------------------------------
+	// 追従パラメータ
+	// ------------------------------------------------------------
 	if (ImGui::TreeNode("追従パラメータ")) {
 		ImGui::DragFloat3("オフセット距離", &offset_.x, 0.1f, -100.0f, 100.0f);
 		ImGui::DragFloat3("角度", &transform_.rotate.x, 0.01f, -6.28f, 6.28f);
 		ImGui::DragFloat("旋回速度 (パッド)", &kRotateSpeed_, 0.01f, 0.0f, 1.0f);
+		ImGui::DragFloat("注視点の高さ", &targetPivot_Height_, 0.1f, 0.0f, 100.0f);
+		ImGui::DragFloat("見上げ限界 (Min Pitch)", &minPitch_, 0.01f, -1.5f, 0.0f);
+		ImGui::DragFloat("見下ろし限界 (Max Pitch)", &maxPitch_, 0.01f, 0.0f, 1.5f);
 		ImGui::TreePop();
 	}
 
 	ImGui::Separator();
 
-	// ── 演出設定 ──
+	// ------------------------------------------------------------
+	// 演出設定
+	// ------------------------------------------------------------
 	if (ImGui::TreeNode("演出設定")) {
 		ImGui::Checkbox("クローズアップ有効", &isCloseUp_);
 		ImGui::DragFloat("クローズアップ倍率", &closeUpScale_, 0.01f, 0.1f, 1.0f);
@@ -140,22 +211,27 @@ void FollowCamera::DrawDebugGui() {
 
 	ImGui::Separator();
 
-	// ── 戦闘開始カメラ演出 ──
+	// ------------------------------------------------------------
+	// めり込み防止（Collision Resolver）
+	// ------------------------------------------------------------
+	collisionResolver_.DrawDebugGui();
+
+	ImGui::Separator();
+
+	// ------------------------------------------------------------
+	// 戦闘開始カメラ演出
+	// ------------------------------------------------------------
 	if (ImGui::TreeNode("戦闘開始カメラ演出")) {
 
-		// battleStartState_ がなければ自動生成
 		if (!battleStartState_) {
 			battleStartState_ = std::make_shared<BattleStartCameraState>();
 		}
 
-		// パラメータ編集（保存は CameraEditor の「すべての設定を保存」で一括）
 		battleStartState_->DrawEditGui();
-
 		ImGui::Separator();
 
-		// プレビュー
 		if (!isPreviewMode_) {
-			if (ImGui::Button("▶  プレビュー再生")) {
+			if (ImGui::Button("プレビュー再生")) {
 				auto preview = std::make_unique<BattleStartCameraState>();
 				nlohmann::json j;
 				battleStartState_->Save(j);
@@ -166,14 +242,14 @@ void FollowCamera::DrawDebugGui() {
 			}
 		}
 		else {
-			ImGui::TextColored(ImVec4(0.3f, 1.0f, 0.3f, 1.0f), "● 再生中");
+			ImGui::TextColored(ImVec4(0.3f, 1.0f, 0.3f, 1.0f), "再生中");
 			ImGui::SameLine();
-			if (ImGui::Button("■  停止")) {
+			if (ImGui::Button("停止")) {
 				ChangeState(std::make_unique<DefaultCameraState>());
 				isPreviewMode_ = false;
 			}
 			ImGui::SameLine();
-			if (ImGui::Button("↺  最初から")) {
+			if (ImGui::Button("最初から")) {
 				ChangeState(std::make_unique<DefaultCameraState>());
 				auto preview = std::make_unique<BattleStartCameraState>();
 				nlohmann::json j;
@@ -184,7 +260,6 @@ void FollowCamera::DrawDebugGui() {
 				isPreviewMode_ = true;
 			}
 
-			// 演出終了で自動停止
 			if (currentState_ && currentState_->IsFinished()) {
 				isPreviewMode_ = false;
 			}
@@ -195,7 +270,9 @@ void FollowCamera::DrawDebugGui() {
 
 	ImGui::Separator();
 
-	// ── デバッグ情報 ──
+	// ------------------------------------------------------------
+	// デバッグ情報
+	// ------------------------------------------------------------
 	ImGui::Text("現在のステート: %s", currentState_ ? currentState_->GetStateName() : "なし");
 	if (target_) {
 		ImGui::Text("追従対象: セット済み");
@@ -207,6 +284,9 @@ void FollowCamera::DrawDebugGui() {
 #endif
 }
 
+// ============================================================
+// セーブ処理
+// ============================================================
 void FollowCamera::Save(nlohmann::json& j) const {
 	VirtualCamera::Save(j);
 	j["targetName"] = targetName_;
@@ -215,8 +295,15 @@ void FollowCamera::Save(nlohmann::json& j) const {
 	j["interpSpeed"] = interpSpeed_;
 	j["rotateSpeed"] = kRotateSpeed_;
 	j["closeUpScale"] = closeUpScale_;
+	j["targetPivot_Height"] = targetPivot_Height_;
+	j["minPitch"] = minPitch_;
+	j["maxPitch"] = maxPitch_;
+	// めり込み防止設定の保存
+	nlohmann::json resolverJson;
+	collisionResolver_.Save(resolverJson);
+	j["collisionResolver"] = resolverJson;
 
-	// BattleStartState の設定も一緒に保存
+	// BattleStartState の設定保存
 	if (battleStartState_) {
 		nlohmann::json stateJson;
 		battleStartState_->Save(stateJson);
@@ -224,6 +311,9 @@ void FollowCamera::Save(nlohmann::json& j) const {
 	}
 }
 
+// ============================================================
+// ロード処理
+// ============================================================
 void FollowCamera::Load(const nlohmann::json& j) {
 	VirtualCamera::Load(j);
 	targetName_ = j.value("targetName", "");
@@ -236,8 +326,15 @@ void FollowCamera::Load(const nlohmann::json& j) {
 	kRotateSpeed_ = j.value("rotateSpeed", 0.1f);
 	interpSpeed_ = j.value("interpSpeed", 5.0f);
 	closeUpScale_ = j.value("closeUpScale", 0.3f);
+	targetPivot_Height_ = j.value("targetPivot_Height", 1.0f);
+	minPitch_ = j.value("minPitch", -1.5f);
+	maxPitch_ = j.value("maxPitch", 1.5f);
+	// めり込み防止設定の復元
+	if (j.contains("collisionResolver")) {
+		collisionResolver_.Load(j["collisionResolver"]);
+	}
 
-	// BattleStartState の設定を復元
+	// BattleStartState の設定復元
 	if (j.contains("battleStartState")) {
 		if (!battleStartState_) {
 			battleStartState_ = std::make_shared<BattleStartCameraState>();

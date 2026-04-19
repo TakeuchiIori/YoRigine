@@ -240,6 +240,11 @@ private:
 	// 点滅スピード
 	float blinkSpeed_ = 50.0f;
 
+	// 前フレームの位置
+	Vector3 previousPosition_{ 0,0,0 }; 
+	// 現在の移動ベクトル
+	Vector3 currentVelocity_{ 0,0,0 };  
+
 	// フェードスピード
 	float fadeSpeed_ = 3.0f;
 
@@ -254,6 +259,6 @@ private:
 	// 連続ヒット管理
 	int consecutiveHitCount_ = 0;           // 連続ヒット数
 	float hitCountResetTimer_ = 0.0f;       // ヒットカウントリセットタイマー
-	const int maxConsecutiveHits_ = 3;      // 最大連続ヒット数（これを超えたらRecovery状態へ）
+	const int maxConsecutiveHits_ = 4;      // 最大連続ヒット数（これを超えたらRecovery状態へ）
 	const float hitCountResetTime_ = 2.5f;  // この時間攻撃を受けなければカウントリセット
 };

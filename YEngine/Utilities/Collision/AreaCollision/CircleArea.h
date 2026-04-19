@@ -47,6 +47,9 @@ public:
 
 	float GetRadius() const { return radius_; }
 
+	// 地面の高さ設定（Y軸の基準位置）
+	void SetGroundBottom(float bottom) { ground_.bottom = bottom; }
+	void SetGroundTop(float top) { ground_.top = top; }
 public:
 	///************************* デバッグ設定 *************************///
 
@@ -56,7 +59,14 @@ public:
 private:
 	///************************* メンバ変数 *************************///
 
+	// Y軸の基準位置（地面の高さなど、必要に応じて設定）
+	struct Ground {
+		float top = 100.0f;
+		float bottom = 0.0f;
+	}ground_;
+
 	Vector3 center_;     // 円の中心座標
 	float radius_;       // 円の半径
 	int debugSegments_;  // デバッグ描画の分割数
+
 };

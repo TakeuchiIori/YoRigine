@@ -78,8 +78,7 @@ public:
 	void SetMapWVP(const Matrix4x4& wvp) { transformData_->WVP = wvp; }
 	void SetMapWorld(const Matrix4x4& world) { transformData_->World = world; }
 	const Matrix4x4& GetMatWorld() { return matWorld_; }
-
-
+	const WorldTransform* GetParent() const { return parent_; }
 	void SetRotationEuler(const Vector3& euler);
 	void SetRotationQuaternion(const Quaternion& q);
 	Quaternion GetRotationQuaternion() const { return quaternion_; }

@@ -13,10 +13,7 @@
 #include "Matrix4x4.h"
 #include "Quaternion.h"
 
-struct Sphere {
-	Vector3 center; // !< 中心点
-	float radius;   // !< 半径
-};
+
 struct Plane {
 	Vector3 normal; // !<法線
 	float distance; // !<距離
@@ -28,27 +25,6 @@ struct Segment {
 
 struct Triangle {
 	Vector3 vertex[3];
-};
-
-struct AABB {
-	Vector3 min;
-	Vector3 max;
-};
-struct OBB {
-	// 中心座標
-	Vector3 center = { 0.0f, 0.0f, 0.0f };
-
-	// 回転（オイラー角）
-	Vector3 rotation = { 0.0f, 0.0f, 0.0f }; // radians
-
-	// 半サイズ（幅/高さ/奥行きの半分）
-	Vector3 size = { 1.0f, 1.0f, 1.0f };
-
-	// ローカル座標軸（回転後）
-	Vector3 orientations[3]; // ← X, Y, Z軸方向 × size
-
-	// ワールド変換行列（必要なら）
-	Matrix4x4 worldMatrix;
 };
 
 
@@ -80,12 +56,6 @@ float LengthSquared(const Vector3& v);
 
 // Vector3の長さを計算する関数
 float Length(const Vector3& v);
-
-// AABBと点の衝突判定を行う関数
-bool IsCollision(const AABB& aabb, const Vector3& point);
-
-// AABBと球の衝突判定を行う関数
-bool IsCollision(const AABB& aabb, const Sphere& sphere);
 
 // 度数からラジアン
 float DegToRad(float degrees);

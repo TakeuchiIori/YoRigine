@@ -77,13 +77,25 @@ void SceneEditorUI::DrawObjectList()
 
     ImGui::Separator();
 
+    // キー入力をして選択しているオブジェクトの削除
+    if (ImGui::GetIO().WantCaptureKeyboard &&
+        ImGui::IsKeyPressed(ImGuiKey_Delete) &&
+        selector_->HasSelection()) {
+        for (int id : selector_->GetSelectedIds())
+            objectManager_->DeleteObject(id);
+        selector_->ClearSelection();
+    }
+
+    // UIからオブジェクトを削除
     if (selector_->HasSelection() &&
         ImGui::Button("選択されたオブジェクトを削除")) {
         for (int id : selector_->GetSelectedIds())
             objectManager_->DeleteObject(id);
         selector_->ClearSelection();
     }
+
     ImGui::SameLine();
+    // すべて削除
     if (ImGui::Button("全て削除")) {
         objectManager_->ClearAllObjects();
         selector_->ClearSelection();

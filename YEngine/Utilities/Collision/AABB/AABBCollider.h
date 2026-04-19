@@ -5,6 +5,7 @@
 
 // Math
 #include "MathFunc.h"
+#include "Shape/AABB.h"
 
 // AABBコライダーを扱うクラス
 class AABBCollider : public BaseCollider

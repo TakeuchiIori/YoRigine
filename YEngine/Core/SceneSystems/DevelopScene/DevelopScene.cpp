@@ -30,9 +30,9 @@
 #include <cstdlib>
 #include <ctime>
 
-/// <summary>
-/// 初期化
-/// </summary>
+// ============================================================
+// シーンの初期化
+// ============================================================
 void DevelopScene::Initialize() {
 
 	//------------------------------------------------------------
@@ -58,7 +58,6 @@ void DevelopScene::Initialize() {
 	//------------------------------------------------------------
 	YoRigine::GameTime::Initialize();
 	YoRigine::JsonManager::SetCurrentScene("DevelopScene");
-	YoRigine::ModelManipulator::GetInstance()->LoadScene("DevelopScene");
 	YParticleManager::GetInstance().SetCamera(sceneCamera_.get());
 
 #ifdef USE_IMGUI
@@ -68,11 +67,13 @@ void DevelopScene::Initialize() {
 #endif
 	YoRigine::ParticleManager::GetInstance()->SetCamera(sceneCamera_.get());
 	YoRigine::ModelManipulator::GetInstance()->SetCamera(sceneCamera_.get());
+	YoRigine::ModelManipulator::GetInstance()->LoadScene("DevelopScene");
+
 	YoRigine::GpuEmitManager::GetInstance()->SetCamera(sceneCamera_.get());
 
 
-	motionEditor_ = std::make_unique<MotionEditor>();
-	motionEditor_->Initialize(sceneCamera_.get());
+	//motionEditor_ = std::make_unique<MotionEditor>();
+	//motionEditor_->Initialize(sceneCamera_.get());
 
 	//------------------------------------------------------------
 	// エディター用GUI登録
@@ -82,22 +83,19 @@ void DevelopScene::Initialize() {
 	Editor::GetInstance()->RegisterGameUI("ライティング", [this]() { YoRigine::LightManager::GetInstance()->ShowLightingEditor(); }, "Develop");
 	Editor::GetInstance()->RegisterGameUI("GpuParticle", [this]() { YoRigine::GpuEmitManager::GetInstance()->DrawImGui(); }, "Develop");
 	Editor::GetInstance()->RegisterGameUI("YoRigine:パーティクルエディター", [this]() {YParticleEditor::GetInstance().ShowEditorWindow(); }, "Develop");
-	Editor::GetInstance()->RegisterGameUI("モーションエディタ", [this]() {motionEditor_->ShowEditor(); }, "Develop");
+	//Editor::GetInstance()->RegisterGameUI("モーションエディタ", [this]() {motionEditor_->ShowEditor(); }, "Develop");
 	Editor::GetInstance()->RegisterGameUI("VFX", [this]() { YoRigine::VfxMeshEditor::GetInstance()->DrawImGui(); }, "Develop");
 
 #endif
 }
 
-/// <summary>
-/// シーンの更新
-/// </summary>
+// ============================================================
+// シーンの更新
+// ============================================================
 void DevelopScene::Update() {
 	YoRigine::GameTime::Update();
 	UpdateCamera();
 
-	int selectedId = YoRigine::ModelManipulator::GetInstance()->GetSelector().GetPrimaryId();
-	motionEditor_->SetTargetObjectId(selectedId);
-	motionEditor_->Update();
 	YoRigine::ModelManipulator::GetInstance()->Update();
 	YoRigine::ParticleManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
 	YParticleManager::GetInstance().Update(YoRigine::GameTime::GetDeltaTime());
@@ -109,16 +107,15 @@ void DevelopScene::Update() {
 #endif
 }
 
-/// <summary>
-/// 実際に描画
-/// </summary>
+// ============================================================
+// シーンの描画（PostEffectがかかる）
+// ============================================================
 void DevelopScene::Draw() {
 	//------------------------------------------------------------
 	// 3Dオブジェクト描画
 	//------------------------------------------------------------
 	Object3dCommon::GetInstance()->DrawPreference();
 	DrawObject();
-	YoRigine::ModelManipulator::GetInstance()->Draw();
 
 	//------------------------------------------------------------
 	// パーティクル描画
@@ -134,45 +131,43 @@ void DevelopScene::Draw() {
 	
 }
 
-/// <summary>
-/// オフスクリーン対象外の描画
-/// </summary>
+// ============================================================
+// PostEffectを掛けたくないものを描画
+// ============================================================
 void DevelopScene::DrawNonOffscreen() {
 }
 
-/// <summary>
-/// 影描画
-/// </summary>
+// ============================================================
+// 影の描画
+// ============================================================
 void DevelopScene::DrawShadow() {
 	YoRigine::ModelManipulator::GetInstance()->DrawShadow();
-
-
 }
 
-/// <summary>
-/// 終了処理
-/// </summary>
+// ============================================================
+// 終了の処理
+// ============================================================
 void DevelopScene::Finalize() {
 }
 
-/// <summary>
-/// オブジェクト描画
-/// </summary>
+// ============================================================
+// オブジェクトの描画
+// ============================================================
 void DevelopScene::DrawObject() {
-
+	YoRigine::ModelManipulator::GetInstance()->Draw();
 }
 
-/// <summary>
-/// ライン描画
-/// </summary>
+// ============================================================
+// 線の描画
+// ============================================================
 void DevelopScene::DrawLine() {
-	motionEditor_->DrawBone();
+	YoRigine::ModelManipulator::GetInstance()->DrawLine();
 }
 
 
-/// <summary>
-/// カメラ更新処理
-/// </summary>
+// ============================================================
+// カメラの更新処理
+// ============================================================
 void DevelopScene::UpdateCamera() {
 	auto director = CameraDirector::GetInstance();
 

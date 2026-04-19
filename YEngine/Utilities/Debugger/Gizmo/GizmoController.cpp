@@ -567,7 +567,7 @@ void GizmoController::DecomposeMatrix(
 // レイキャスト
 //=================================================================
 
-GizmoController::Ray GizmoController::BuildPickRay(
+Ray GizmoController::BuildPickRay(
     const ImVec2& mouseScreenPos,
     const ImVec2& viewportPos,
     const ImVec2& viewportSize,

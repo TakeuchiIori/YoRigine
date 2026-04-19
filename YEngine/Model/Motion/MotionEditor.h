@@ -11,8 +11,12 @@
 #include "Editor/Command/CommandHistory.h"
 #include "Debugger/DopeSheet/DopeSheetEditor.h"
 #include <Graphics/Drawer/LineManager/Line.h>
-
 #include "Object3D/ObjectManager.h" 
+
+#ifdef USE_IMGUI
+#include "Debugger/Gizmo/GizmoController.h"
+#endif
+
 // Math
 #include "Vector3.h"
 #include "Quaternion.h"
@@ -21,6 +25,10 @@ class Camera;
 class Motion;
 class Joint;
 class Skeleton;
+
+#ifdef USE_IMGUI
+class BoneGizmable; // 前方宣言
+#endif
 
 // ============================================================
 //  ファイルブラウザ状態
@@ -55,12 +63,29 @@ struct SelectedKF
 class MotionEditor
 {
 public:
+
 	///************************* 基本的関数 *************************///
+	MotionEditor();
+	~MotionEditor();
+
 	void Initialize(Camera* camera);
 	void Update();
+	void Draw();
+	void DrawGizmo();
 	void DrawBone();
 	void ShowEditor();
 	void SetTargetObjectId(int id);
+	bool IsDrawBone() const { return isDrawBone_; }
+	int GetTargetObjectId() const { return targetObjectId_; }
+	void SetCamera(Camera* camera) { camera_ = camera; }
+	///************************* ギズモ操作用インターフェース *************************///
+
+	// ボーンの現在のワールド行列を取得
+	Matrix4x4 GetJointWorldMatrix(const std::string& boneName) const;
+
+	// ギズモで操作された新しいワールド行列をローカルに変換し、ジョイントとUIに適用する
+	void ApplyBoneGizmoTransform(const std::string& boneName, const Matrix4x4& newWorldMat);
+
 private:
 	///************************* その他描画 *************************///
 	void DrawMenuBar();
@@ -76,7 +101,7 @@ private:
 
 	///************************* 内部ヘルパー関数 *************************///
 #ifdef USE_IMGUI
-	/// 1 ボーン × 1 チャンネルの行を描画（KF ひし形 + クリック/ドラッグ判定）
+	/// 1 ボーン × 1 チャンネルの行を描画
 	void DrawKFRow(ImDrawList* dl,
 		const std::string& boneName, KFChannel ch,
 		float rowY, float canvasX, float canvasW, float labelW);
@@ -94,6 +119,10 @@ private:
 	void DeleteKeyframe(const std::string& bone, float time);
 	void MoveKeyframe(const std::string& bone, KFChannel ch, int idx, float newTime);
 
+	// ★追加: 全ボーンの現在のトランスフォームを一括保存
+	void SavePose(float time);
+	// ★追加: 特定のトランスフォームから直接キーフレームを挿入
+	void InsertKeyframeFromTransform(const std::string& bone, float time, const QuaternionTransform& tr);
 
 	///************************* ボーン操作 *************************///
 	void   SetJointTransform(const std::string& bone, const QuaternionTransform& tr);
@@ -116,6 +145,17 @@ private:
 		return nullptr;
 	}
 
+	// ★追加: 対象オブジェクトのワールド行列を取得する
+	Matrix4x4 GetTargetWorldMatrix() const {
+		if (targetObjectId_ != -1) {
+			auto* placedObj = ObjectManager::GetInstance()->GetObjectById(targetObjectId_);
+			if (placedObj && placedObj->worldTransform) {
+				return placedObj->worldTransform->GetMatWorld();
+			}
+		}
+		return previewTransform_.matWorld_;
+	}
+
 private:
 	///************************* 定数 *************************///
 	static constexpr const char* kModelRootDir = "Resources/Models";
@@ -126,7 +166,7 @@ private:
 private:
 	///************************* メンバ変数 *************************///
 
-	// ドープシートエディタ
+	// ドープシートエディ���
 	DopeSheet::DopeSheetEditor dopeSheet_;
 	std::vector<DopeSheet::DopeTrack> tracks_;
 	std::vector<std::pair<std::string, int>> trackBoneMap_;
@@ -153,6 +193,13 @@ private:
 	std::unique_ptr<Line> lineDrawer_;
 	bool             isDrawBone_ = false;
 
+#ifdef USE_IMGUI
+	std::unique_ptr<Object3d> boneObj_; // ICO.obj 表示用
+	GizmoController gizmoCtrl_;         // ギズモ操作用コントローラー
+	std::vector<std::unique_ptr<BoneGizmable>> boneGizmables_; // ピッキング用
+	std::vector<WorldTransform> boneWorldTransforms_; // ボーン描画用 WT（コマンドリストが参照するためフレーム間で生存させる）
+#endif
+
 	// 再生状態の管理 (UI用)
 	bool isPlaying_ = true;
 	bool isLoop_ = true;
@@ -161,7 +208,7 @@ private:
 	std::string selectedAnimKey_ = "";    // animationCache_ のキー
 
 	// 保存・読み込み
-	std::string      savePath_ = "Resources/Binary/edited_motion.anim";
+	std::string      savePath_ = "Resources/TestBinary/edited_motion.anim";
 	FileBrowserState binaryBrowser_;
 	bool             showSavePopup_ = false;
 	std::string      saveMsg_ = "";
@@ -179,10 +226,12 @@ private:
 	float     timelineZoom_ = 80.0f;   // px / 秒
 	float     timelineScroll_ = 0.0f;
 	SelectedKF selKF_;
+
 	// KF 値編集スナップショット
 	Vector3    kfSnapT_ = {};
 	Quaternion kfSnapR_ = { 0,0,0,1 };
 	Vector3    kfSnapS_ = { 1,1,1 };
+
 	// KF ドラッグ移動
 	bool  draggingKF_ = false;
 	float dragKFOrigTime_ = 0.0f;

@@ -1,15 +1,11 @@
 #include "MotionEditor.h"
 
-#ifdef USE_IMGUI
-#include <imgui.h>
-#include <imgui_internal.h>
-#endif
-
 #include "Systems/Camera/Camera.h"
 #include "Model.h"
 #include "Motion/MotionSystem.h"
 #include "Skeleton/Joint.h"
 #include "Skeleton/Skeleton.h"
+#include "Skeleton/BoneGizmable.h"
 #include <json.hpp>
 #include <fstream>
 #include <algorithm>
@@ -20,11 +16,16 @@
 
 #include <Editor/Icon/EditorIcon.h>
 #include "Object3D/ObjectManager.h" 
+#include <Editor/Editor.h>
+
+#ifdef USE_IMGUI
+#include "ImGuizmo.h"
+#endif
 
 namespace fs = std::filesystem;
 
 // ============================================================
-//  カラーパレット
+// カラーパレット
 // ============================================================
 namespace Col
 {
@@ -64,10 +65,13 @@ static ImU32 ChannelColor(KFChannel ch, bool selected)
 }
 #endif
 
-// ============================================================
-//  初期化 / 更新 / 描画
-// ============================================================
+MotionEditor::MotionEditor() {}
 
+MotionEditor::~MotionEditor() {}
+
+// ============================================================
+// 初期化
+// ============================================================
 void MotionEditor::Initialize(Camera* camera)
 {
 	camera_ = camera;
@@ -75,11 +79,20 @@ void MotionEditor::Initialize(Camera* camera)
 	binaryBrowser_.currentDirectory = "Resources/Binary";
 	binaryBrowser_.filterExtension = ".anim";
 	lineDrawer_ = std::make_unique<Line>();
-	lineDrawer_->Initialize();
 	lineDrawer_->SetCamera(camera_);
+	lineDrawer_->Initialize();
 	lineDrawer_->SetColor({ 0.5f, 0.5f, 0.5f, 1.0f });
+
+#ifdef USE_IMGUI
+	boneObj_ = Object3d::Create("ICO.obj");
+	gizmoCtrl_.Initialize();
+	gizmoCtrl_.SetMode(GizmoController::Mode::Local); // ボーン操作はローカル推奨
+#endif
 }
 
+// ============================================================
+// 更新
+// ============================================================
 void MotionEditor::Update()
 {
 	Object3d* target = GetTargetObject();
@@ -96,27 +109,128 @@ void MotionEditor::Update()
 		}
 	}
 
-	if (selBone_.empty()) {
-		// ボーン非選択時は通常更新
-	}
-	else {
-		if (m && m->GetSkeleton()) {
-			m->GetSkeleton()->Update();
-			if (m->GetSkinCluster())
-				m->GetSkinCluster()->UpdateMatrixPalette(m->GetSkeleton()->GetJoints());
+	if (m && m->GetSkeleton()) {
+		// 一時停止中（シーク中）にポーズをプレビューするための処理
+		if (ms && !isPlaying_ && currentMotion_) {
+			currentMotion_->ApplyAnimation(m->GetSkeleton()->GetJoints(), scrubTime_);
+
+			// 選択中のボーンがあればプロパティバッファを同期
+			if (!selBone_.empty()) {
+#ifdef USE_IMGUI
+				// ★修正: UIでドラッグ中、またはギズモで操作中なら、
+				// アニメーションのポーズを無視して編集中の値をジョイントに強制上書きする
+				if (draggingBone_ || gizmoCtrl_.IsUsing()) {
+					SyncBufferToJoint();
+				}
+				else {
+					SyncJointToBuffer(selBone_);
+				}
+#else
+				SyncJointToBuffer(selBone_);
+#endif
+			}
+		}
+
+		m->GetSkeleton()->Update();
+		if (m->GetSkinCluster()) {
+			m->GetSkinCluster()->UpdateMatrixPalette(m->GetSkeleton()->GetJoints());
 		}
 	}
+
 	previewTransform_.UpdateMatrix();
 }
 
+// ============================================================
+// 関節の描画
+// ============================================================
+void MotionEditor::Draw()
+{
+	Object3d* target = GetTargetObject();
+	if (isDrawBone_ && target) {
+#ifdef USE_IMGUI
+		// ICO.obj の描画
+		if (boneObj_ && target->GetModel() && target->GetModel()->GetSkeleton()) {
+			auto& joints = target->GetModel()->GetSkeleton()->GetJoints();
+
+			// ジョイント数が変わった場合（ターゲット変更時など）に再初期化
+			if (boneWorldTransforms_.size() != joints.size()) {
+				boneWorldTransforms_.resize(joints.size());
+				for (auto& wt : boneWorldTransforms_) {
+					wt.Initialize();
+				}
+			}
+
+			for (size_t i = 0; i < joints.size(); ++i) {
+				auto& wt = boneWorldTransforms_[i];
+
+				Matrix4x4 targetMat = GetTargetWorldMatrix();
+				Matrix4x4 wMat = joints[i].GetWorldTransform().matWorld_ * targetMat;
+
+				float t[3], rDeg[3], s[3];
+				ImGuizmo::DecomposeMatrixToComponents(&wMat.m[0][0], t, rDeg, s);
+
+				wt.translate_ = { t[0], t[1], t[2] };
+				wt.rotate_ = { rDeg[0] * (kPi / 180.f), rDeg[1] * (kPi / 180.f), rDeg[2] * (kPi / 180.f) };
+				wt.scale_ = { 0.1f, 0.1f, 0.1f }; // 1/10 サイズ
+				wt.UpdateMatrix();
+
+				if (selBone_ == joints[i].GetName()) {
+					boneObj_->SetMaterialColor({ 1.0f, 0.85f, 0.2f, 1.0f });
+				}
+				else {
+					boneObj_->SetMaterialColor({ 0.5f, 0.5f, 0.5f, 1.0f });
+				}
+
+				boneObj_->Draw(camera_, wt);
+			}
+		}
+#endif
+	}
+}
+
+// ============================================================
+// ギズモの描画
+// ============================================================
+void MotionEditor::DrawGizmo()
+{
+#ifdef USE_IMGUI
+	Object3d* target = GetTargetObject();
+	if (isDrawBone_ && target && target->GetModel() && target->GetModel()->GetSkeleton()) {
+		if (!selBone_.empty()) {
+			static BoneGizmable currentSelectedGizmo(this, "");
+			if (currentSelectedGizmo.GetBoneName() != selBone_) {
+				currentSelectedGizmo = BoneGizmable(this, selBone_);
+			}
+			if (!gizmoCtrl_.IsUsing()) {
+				currentSelectedGizmo.UpdateFromJoint();
+			}
+			std::vector<IGizmable*> gizmoTargets = { &currentSelectedGizmo };
+			ImVec2 viewPos = Editor::GetInstance()->GetGameViewPos();
+			ImVec2 viewSize = Editor::GetInstance()->GetGameViewSize();
+
+			// ギズモの描画
+			gizmoCtrl_.Draw(camera_, gizmoTargets, viewPos, viewSize);
+		}
+	}
+#endif
+}
+
+
+// ============================================================
+// 骨の描画
+// ============================================================
 void MotionEditor::DrawBone()
 {
 	Object3d* target = GetTargetObject();
 	if (isDrawBone_ && target) {
-		target->DrawBone(*lineDrawer_.get(), previewTransform_.matWorld_);
+		lineDrawer_->SetCamera(camera_);
+		target->DrawBone(*lineDrawer_.get(), GetTargetWorldMatrix());
 	}
 }
 
+// ============================================================
+// ターゲットオブジェクトの設定
+// ============================================================
 void MotionEditor::SetTargetObjectId(int id) {
 	Object3d* obj = nullptr;
 	if (id != -1) {
@@ -171,9 +285,8 @@ void MotionEditor::SetTargetObjectId(int id) {
 }
 
 // ============================================================
-//  ShowEditor  ─  メインウィンドウ
+// エディタの描画
 // ============================================================
-
 void MotionEditor::ShowEditor()
 {
 #ifdef USE_IMGUI
@@ -190,14 +303,61 @@ void MotionEditor::ShowEditor()
 
 	Object3d* target = GetTargetObject();
 
+	// ---------------- ボーン選択＆ギズモ処理 ----------------
+	if (isDrawBone_ && target && target->GetModel() && target->GetModel()->GetSkeleton()) {
+
+		// 1. ピッキング (画面クリックで選択)
+		if (ImGui::IsMouseClicked(0) && !ImGuizmo::IsOver() && !ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow)) {
+			gizmoCtrl_.ClearPickables();
+			boneGizmables_.clear();
+
+			auto& joints = target->GetModel()->GetSkeleton()->GetJoints();
+			for (const auto& joint : joints) {
+				auto bg = std::make_unique<BoneGizmable>(this, joint.GetName());
+				bg->UpdateFromJoint();
+				gizmoCtrl_.RegisterPickable(bg.get());
+				boneGizmables_.push_back(std::move(bg));
+			}
+
+			ImVec2 viewPos = Editor::GetInstance()->GetGameViewPos();
+			ImVec2 viewSize = Editor::GetInstance()->GetGameViewSize();
+
+			IGizmable* picked = gizmoCtrl_.TryPickObject(
+				ImGui::GetMousePos(), viewPos, viewSize, camera_
+			);
+
+			if (picked) {
+				BoneGizmable* bg = static_cast<BoneGizmable*>(picked);
+				selBone_ = bg->GetBoneName();
+				SyncJointToBuffer(selBone_);
+				statusMsg_ = "ボーン選択: " + selBone_;
+			}
+		}
+
+		// 2. ギズモの描画
+		if (!selBone_.empty()) {
+			static BoneGizmable currentSelectedGizmo(this, "");
+			if (currentSelectedGizmo.GetBoneName() != selBone_) {
+				currentSelectedGizmo = BoneGizmable(this, selBone_);
+			}
+
+			currentSelectedGizmo.UpdateFromJoint();
+
+			std::vector<IGizmable*> gizmoTargets = { &currentSelectedGizmo };
+			ImVec2 viewPos = Editor::GetInstance()->GetGameViewPos();
+			ImVec2 viewSize = Editor::GetInstance()->GetGameViewSize();
+
+			gizmoCtrl_.Draw(camera_, gizmoTargets, viewPos, viewSize);
+		}
+	}
+	// ------------------------------------------------------
+
 	// フォーカス中のキー入力
 	if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)) {
 		history_.HandleKeyInput();
 
 		// スペースキーで再生/一時停止のトグル
 		if (ImGui::IsKeyPressed(ImGuiKey_Space) && target) {
-			selBone_ = "";
-			selKF_.Clear();
 			if (isPlaying_) {
 				if (target->GetModel() && target->GetModel()->GetMotionSystem()) {
 					target->GetModel()->GetMotionSystem()->Stop();
@@ -314,9 +474,8 @@ void MotionEditor::ShowEditor()
 }
 
 // ============================================================
-//  メニューバー
+// メニューバー
 // ============================================================
-
 void MotionEditor::DrawMenuBar()
 {
 #ifdef USE_IMGUI
@@ -373,7 +532,7 @@ void MotionEditor::DrawToolbar()
 		ImGui::SameLine(0, 12);
 	}
 
-	// ---- アニメーション選択コンボ ----
+	// ---- ニメーション選択コンボ ----
 	ImGui::Text("Animation:");
 	ImGui::SameLine(0, 4);
 	ImGui::SetNextItemWidth(170);
@@ -520,7 +679,7 @@ void MotionEditor::DrawToolbar()
 	ImGui::SameLine(0, 20);
 	ImGui::Checkbox("ボーン表示", &isDrawBone_);
 	if (ImGui::IsItemHovered()) {
-		ImGui::SetTooltip("メッシュ描画とボーン（線）描画を切り替えます");
+		ImGui::SetTooltip("メッシュ描画とボーン（線・オブジェクト）描画を切り替えます");
 	}
 
 	ImGui::SameLine(0, 20);
@@ -597,21 +756,18 @@ void MotionEditor::DrawBonePanel()
 void MotionEditor::DrawPropertyPanel()
 {
 #ifdef USE_IMGUI
-	bool boneOpen = ImGui::CollapsingHeader("BONE TRANSFORM  (位置・回転・拡縮)",
-		ImGuiTreeNodeFlags_DefaultOpen);
+	bool boneOpen = ImGui::CollapsingHeader("BONE TRANSFORM  (位置・回転・拡縮)", ImGuiTreeNodeFlags_DefaultOpen);
 	if (boneOpen)
 	{
 		if (selBone_.empty()) {
 			ImGui::TextDisabled("左のリストからボーンを選択してください");
 		}
 		else {
-			ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.2f, 1.0f),
-				"選択中: %s", selBone_.c_str());
+			ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.2f, 1.0f), "選択中: %s", selBone_.c_str());
 			ImGui::TextDisabled("ドラッグで変更 / Ctrl+クリックで直接入力");
 			ImGui::Separator();
 
-			auto handleDrag = [&](const char* label, const char* tip,
-				float* buf, float spd, float vmin, float vmax)
+			auto handleDrag = [&](const char* label, const char* tip, float* buf, float spd, float vmin, float vmax)
 				{
 					ImGui::Text("%s", label);
 					ImGui::SameLine(90);
@@ -639,12 +795,9 @@ void MotionEditor::DrawPropertyPanel()
 					if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tip);
 				};
 
-			handleDrag("位置 (T)", "X / Y / Z 座標\nドラッグで移動",
-				editT_, 0.01f, -FLT_MAX, FLT_MAX);
-			handleDrag("回転 (R)", "X / Y / Z オイラー角 (度)\nドラッグで回転",
-				editR_, 0.5f, -FLT_MAX, FLT_MAX);
-			handleDrag("拡縮 (S)", "X / Y / Z スケール\nドラッグで拡縮 (1.0 = 等倍)",
-				editS_, 0.01f, 0.001f, 100.0f);
+			handleDrag("位置 (T)", "X / Y / Z 座標\nドラッグで移動", editT_, 0.01f, -FLT_MAX, FLT_MAX);
+			handleDrag("回転 (R)", "X / Y / Z オイラー角 (度)\nドラッグで回転", editR_, 0.5f, -FLT_MAX, FLT_MAX);
+			handleDrag("拡縮 (S)", "X / Y / Z スケール\nドラッグで拡縮 (1.0 = 等倍)", editS_, 0.01f, 0.001f, 100.0f);
 
 			ImGui::Spacing();
 
@@ -654,13 +807,22 @@ void MotionEditor::DrawPropertyPanel()
 				ImGui::SameLine(90);
 				ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.2f, 1.0f), "%.4f 秒", scrubTime_);
 
-				if (ImGui::Button("[ KF ] キーフレームを打つ", ImVec2(-1, 0))) {
+				// ★追加: 全ボーンの一括キーフレーム保存ボタン
+				if (ImGui::Button("[ I ] 全ボーンのキーフレームを打つ (Save Pose)", ImVec2(-1, 0))) {
+					SavePose(scrubTime_);
+					statusMsg_ = "全ボーンの KF を挿入 @ " + std::to_string(scrubTime_) + "s";
+				}
+				if (ImGui::IsItemHovered())
+					ImGui::SetTooltip("現在のスケルトン全体の姿勢をキーフレームとして記録します\n(BlenderのIキー相当)");
+
+				ImGui::Spacing();
+
+				if (ImGui::Button("[ KF ] 選択ボーンのキーフ��ームを打つ", ImVec2(-1, 0))) {
 					InsertKeyframe(selBone_, scrubTime_);
 					statusMsg_ = "KF 挿入: " + selBone_ + " @ " + std::to_string(scrubTime_) + "s";
 				}
 				if (ImGui::IsItemHovered())
-					ImGui::SetTooltip("現在の姿勢をこの時刻にキーフレームとして記録します\n"
-						"下のタイムラインに◆が追加されます");
+					ImGui::SetTooltip("現在の姿勢をこの時刻にキーフレームとして記録します\n下のタイムラインに◆が追加されます");
 			}
 			else {
 				ImGui::TextDisabled("(アニメーションを選択するとKFを打てます)");
@@ -670,8 +832,7 @@ void MotionEditor::DrawPropertyPanel()
 
 	ImGui::Spacing();
 
-	bool kfOpen = ImGui::CollapsingHeader("KEYFRAME  (選択中のキーフレーム値)",
-		ImGuiTreeNodeFlags_DefaultOpen);
+	bool kfOpen = ImGui::CollapsingHeader("KEYFRAME  (選択中のキーフレーム値)", ImGuiTreeNodeFlags_DefaultOpen);
 	if (kfOpen)
 	{
 		if (!selKF_.IsValid()) {
@@ -699,8 +860,7 @@ void MotionEditor::DrawPropertyPanel()
 				ImGui::SameLine(90);
 				ImGui::SetNextItemWidth(120);
 				float newT = kfTime;
-				if (ImGui::DragFloat("##kftime", &newT, 0.001f, 0.0f,
-					currentMotion_->GetDuration(), "%.4f s")) {
+				if (ImGui::DragFloat("##kftime", &newT, 0.001f, 0.0f, currentMotion_->GetDuration(), "%.4f s")) {
 					MoveKeyframe(bone, KFChannel::Translate, idx, newT);
 					MoveKeyframe(bone, KFChannel::Rotate, idx, newT);
 					MoveKeyframe(bone, KFChannel::Scale, idx, newT);
@@ -714,7 +874,6 @@ void MotionEditor::DrawPropertyPanel()
 				if (ImGui::BeginTabBar("##kftab")) {
 
 					bool tOpen = ImGui::BeginTabItem("位置 (T)");
-					if (ImGui::IsItemHovered()) ImGui::SetTooltip("キーフレームの位置値を編集します");
 					if (tOpen) {
 						if (idx < (int)na.translate.keyframes.size()) {
 							auto& kf = na.translate.keyframes[idx];
@@ -737,7 +896,6 @@ void MotionEditor::DrawPropertyPanel()
 					}
 
 					bool rOpen = ImGui::BeginTabItem("回転 (R)");
-					if (ImGui::IsItemHovered()) ImGui::SetTooltip("キーフレームの回転値を編集します\n内部はクォータニオンですが度数で表示します");
 					if (rOpen) {
 						if (idx < (int)na.rotate.keyframes.size()) {
 							auto& kf = na.rotate.keyframes[idx];
@@ -764,7 +922,6 @@ void MotionEditor::DrawPropertyPanel()
 					}
 
 					bool sOpen = ImGui::BeginTabItem("拡縮 (S)");
-					if (ImGui::IsItemHovered()) ImGui::SetTooltip("キーフレームのスケール値を編集します");
 					if (sOpen) {
 						if (idx < (int)na.scale.keyframes.size()) {
 							auto& kf = na.scale.keyframes[idx];
@@ -800,8 +957,6 @@ void MotionEditor::DrawPropertyPanel()
 					statusMsg_ = "KF 削除: " + bone;
 				}
 				ImGui::PopStyleColor(2);
-				if (ImGui::IsItemHovered())
-					ImGui::SetTooltip("選択中のキーフレームを削除します\nCtrl+Z で元に戻せます");
 			}
 		}
 	}
@@ -848,7 +1003,7 @@ void MotionEditor::DrawTimeline()
 		if (target && target->GetModel() && target->GetModel()->GetMotionSystem()) {
 			auto* ms = target->GetModel()->GetMotionSystem();
 			ms->Stop();
-			isPlaying_ = false; // ★ 一時停止状態にする
+			isPlaying_ = false;
 			ms->SetAnimationTime(scrubTime_);
 		}
 		dopeSheet_.SetSeekFrame(static_cast<int>(scrubTime_ * fps_));
@@ -889,7 +1044,7 @@ void MotionEditor::DrawTimeline()
 			auto* ms = t->GetModel()->GetMotionSystem();
 			if (ms) {
 				ms->Stop();
-				isPlaying_ = false; // ★ 一時停止状態にする
+				isPlaying_ = false;
 				ms->SetAnimationTime(scrubTime_);
 			}
 		}
@@ -924,7 +1079,7 @@ void MotionEditor::DrawTimeline()
 
 	if (draggingKF_ && !ImGui::IsMouseDown(0)) {
 		draggingKF_ = false;
-		statusMsg_ = "KF 移動完了";
+		statusMsg_ = "KF 移動了";
 	}
 #endif
 }
@@ -1040,9 +1195,8 @@ void MotionEditor::DrawKFRow(ImDrawList* /*dl*/,
 #endif
 
 // ============================================================
-//  ステータスバー
+// ステータスバー
 // ============================================================
-
 void MotionEditor::DrawStatusBar()
 {
 #ifdef USE_IMGUI
@@ -1065,9 +1219,8 @@ void MotionEditor::DrawStatusBar()
 }
 
 // ============================================================
-//  バイナリ保存・読み込みポップアップ
+// バイナリ保存・読み込みポップアップ
 // ============================================================
-
 void MotionEditor::DrawSaveLoadPopup()
 {
 #ifdef USE_IMGUI
@@ -1099,9 +1252,14 @@ void MotionEditor::DrawSaveLoadPopup()
 		if (!canSave) ImGui::BeginDisabled();
 		if (ImGui::Button("バイナリ保存", ImVec2(130, 0))) {
 			try {
-				currentMotion_->SaveBinary(*currentMotion_, AnimDisplayName(selectedAnimKey_), savePath_);
-				saveMsg_ = "保存成功: " + savePath_;
-				statusMsg_ = saveMsg_;
+				if (currentMotion_) {
+					currentMotion_->SaveBinary(*currentMotion_, AnimDisplayName(selectedAnimKey_), savePath_);
+					saveMsg_ = "保存成功: " + savePath_;
+					statusMsg_ = saveMsg_;
+				}
+				else {
+					saveMsg_ = "保存失敗: アニメーションがありません";
+				}
 			}
 			catch (const std::exception& e) {
 				saveMsg_ = std::string("保存失敗: ") + e.what();
@@ -1155,9 +1313,8 @@ void MotionEditor::DrawSaveLoadPopup()
 }
 
 // ============================================================
-//  ファイルブラウザ
+// ファイルブラウザ
 // ============================================================
-
 #ifdef USE_IMGUI
 void MotionEditor::DrawFileBrowser(FileBrowserState& state, const char* title)
 {
@@ -1225,7 +1382,62 @@ void MotionEditor::DrawFileBrowser(FileBrowserState& state, const char* title)
 #endif
 
 // ============================================================
-//  キーフレーム操作
+// 一括ポーズ保存機能 (Save Pose)
+// ============================================================
+void MotionEditor::InsertKeyframeFromTransform(const std::string& bone, float time, const QuaternionTransform& tr)
+{
+	if (!currentMotion_) return;
+	auto& nodeAnims = currentMotion_->animation_.nodeAnimations_;
+	if (!nodeAnims.count(bone)) return;
+
+	auto insertOrReplace = [&]<typename T>(auto& kfs, T val) {
+		using KF = typename std::remove_reference<decltype(kfs)>::type::value_type;
+		auto it = std::find_if(kfs.begin(), kfs.end(),
+			[time](const KF& k) { return std::abs(k.time - time) < 1e-4f; });
+		if (it != kfs.end()) { it->value = val; }
+		else {
+			KF k; k.time = time; k.value = val; kfs.push_back(k);
+			std::sort(kfs.begin(), kfs.end(), [](const KF& a, const KF& b) { return a.time < b.time; });
+		}
+	};
+
+	insertOrReplace(nodeAnims[bone].translate.keyframes, tr.translate);
+	insertOrReplace(nodeAnims[bone].rotate.keyframes, tr.rotate);
+	insertOrReplace(nodeAnims[bone].scale.keyframes, tr.scale);
+}
+
+void MotionEditor::SavePose(float time)
+{
+	Object3d* target = GetTargetObject();
+	if (!target || !target->GetModel() || !target->GetModel()->GetSkeleton() || !currentMotion_) return;
+
+	Skeleton* skeleton = target->GetModel()->GetSkeleton();
+	auto oldAnims = currentMotion_->animation_.nodeAnimations_;
+
+	for (const auto& joint : skeleton->GetJoints()) {
+		if (currentMotion_->animation_.nodeAnimations_.count(joint.GetName())) {
+			InsertKeyframeFromTransform(joint.GetName(), time, joint.GetTransform());
+		}
+	}
+
+	auto newAnims = currentMotion_->animation_.nodeAnimations_;
+
+	history_.Execute(MakeLambdaCommand("全ポーズ保存 @ " + std::to_string(time) + "s",
+		[this, newAnims]() {
+			if (currentMotion_) currentMotion_->animation_.nodeAnimations_ = newAnims;
+			tracksDirty_ = true;
+		},
+		[this, oldAnims]() {
+			if (currentMotion_) currentMotion_->animation_.nodeAnimations_ = oldAnims;
+			tracksDirty_ = true;
+		}
+	));
+
+	tracksDirty_ = true;
+}
+
+// ============================================================
+// キーフレーム操作
 // ============================================================
 
 void MotionEditor::InsertKeyframe(const std::string& bone, float time)
@@ -1255,13 +1467,18 @@ void MotionEditor::InsertKeyframe(const std::string& bone, float time)
 			insertOrReplace(na.translate.keyframes, newT);
 			insertOrReplace(na.rotate.keyframes, newR);
 			insertOrReplace(na.scale.keyframes, newS);
+			tracksDirty_ = true;
 		},
 		[this, bone, snap]() {
 			currentMotion_->animation_.nodeAnimations_[bone] = snap;
+			tracksDirty_ = true;
 		}
 	));
 }
 
+// ============================================================
+// キーフレーム削除
+// ============================================================
 void MotionEditor::DeleteKeyframe(const std::string& bone, float time)
 {
 	if (!currentMotion_) return;
@@ -1279,13 +1496,18 @@ void MotionEditor::DeleteKeyframe(const std::string& bone, float time)
 			rem(na.translate.keyframes);
 			rem(na.rotate.keyframes);
 			rem(na.scale.keyframes);
+			tracksDirty_ = true;
 		},
 		[this, bone, snap]() {
 			currentMotion_->animation_.nodeAnimations_[bone] = snap;
+			tracksDirty_ = true;
 		}
 	));
 }
 
+// ============================================================
+// キーフレーム移動
+// ============================================================
 void MotionEditor::MoveKeyframe(const std::string& bone, KFChannel ch, int idx, float newTime)
 {
 	if (!currentMotion_) return;
@@ -1306,9 +1528,8 @@ void MotionEditor::MoveKeyframe(const std::string& bone, KFChannel ch, int idx, 
 }
 
 // ============================================================
-//  ボーン操作
+// ボーン操作
 // ============================================================
-
 void MotionEditor::SetJointTransform(const std::string& bone, const QuaternionTransform& tr)
 {
 	Joint* j = FindJoint(bone);
@@ -1323,13 +1544,19 @@ void MotionEditor::SetJointTransform(const std::string& bone, const QuaternionTr
 	}
 }
 
+// ============================================================
+// ボーンの検索
+// ============================================================
 Joint* MotionEditor::FindJoint(const std::string& name) const
 {
 	Object3d* target = GetTargetObject();
-	if (!target || !target->GetModel()) return nullptr;
-	return target->GetModel()->GetJointMap(name);
+	if (!target || !target->GetModel() || !target->GetModel()->GetSkeleton()) return nullptr;
+	return target->GetModel()->GetSkeleton()->GetJointByName(name);
 }
 
+// ============================================================
+// バッファからトランスフォームへの変換
+// ============================================================
 QuaternionTransform MotionEditor::BufferToTransform() const
 {
 	QuaternionTransform tr;
@@ -1339,6 +1566,9 @@ QuaternionTransform MotionEditor::BufferToTransform() const
 	return tr;
 }
 
+// ============================================================
+// ジョイントのバッファとの同期
+// ============================================================
 void MotionEditor::SyncJointToBuffer(const std::string& bone)
 {
 	Joint* j = FindJoint(bone);
@@ -1350,16 +1580,27 @@ void MotionEditor::SyncJointToBuffer(const std::string& bone)
 	editS_[0] = tr.scale.x; editS_[1] = tr.scale.y; editS_[2] = tr.scale.z;
 }
 
+// ============================================================
+// バッファからジョイントへの変換
+// ============================================================
 void MotionEditor::SyncBufferToJoint()
 {
 	Joint* j = FindJoint(selBone_);
-	if (j) j->SetTransform(BufferToTransform());
+	if (j) {
+		j->SetTransform(BufferToTransform());
+		Object3d* target = GetTargetObject();
+		Model* m = target ? target->GetModel() : nullptr;
+		if (m && m->GetSkeleton()) {
+			m->GetSkeleton()->Update();
+			if (m->GetSkinCluster())
+				m->GetSkinCluster()->UpdateMatrixPalette(m->GetSkeleton()->GetJoints());
+		}
+	}
 }
 
 // ============================================================
-//  ユーティリティ
+// ユーティリティ
 // ============================================================
-
 std::string MotionEditor::AnimDisplayName(const std::string& key)
 {
 	auto pos = key.find('#');
@@ -1406,4 +1647,61 @@ std::vector<fs::directory_entry> MotionEditor::GetDirectoryEntries(
 	std::sort(files.begin(), files.end(), byName);
 	dirs.insert(dirs.end(), files.begin(), files.end());
 	return dirs;
+}
+
+Matrix4x4 MotionEditor::GetJointWorldMatrix(const std::string& boneName) const
+{
+	Joint* j = FindJoint(boneName);
+	if (j) {
+		// 修正：ターゲットのワールド行列を掛けて真のワールド座標にする
+		return j->GetWorldTransform().matWorld_ * GetTargetWorldMatrix();
+	}
+	return MakeIdentity4x4();
+}
+
+void MotionEditor::ApplyBoneGizmoTransform(const std::string& boneName, const Matrix4x4& newWorldMat)
+{
+	Joint* j = FindJoint(boneName);
+	if (!j) return;
+
+	// 親のワールド行列を取得
+	Matrix4x4 parentWorld = MakeIdentity4x4();
+	if (j->GetWorldTransform().parent_) {
+		// 修正：親の matWorld_（モデル空間）に対象オブジェクトのワールド行列を掛ける
+		parentWorld = j->GetWorldTransform().parent_->matWorld_ * GetTargetWorldMatrix();
+	}
+	else {
+		parentWorld = GetTargetWorldMatrix();
+	}
+
+	// ローカル行列 ＝ 新ワールド行列 × 親ワールド行列の逆行列
+	Matrix4x4 newLocalMat = newWorldMat * Inverse(parentWorld);
+
+	// 分解
+	float lT[3], lRDeg[3], lS[3];
+#ifdef USE_IMGUI
+	ImGuizmo::DecomposeMatrixToComponents(&newLocalMat.m[0][0], lT, lRDeg, lS);
+#endif
+	// UI用バッファに反映 (選択中のボーンと一致する場合のみUIに反映させるのが自然だが、ギズモ操作中＝選択中のはず)
+	if (selBone_ == boneName) {
+		editT_[0] = lT[0]; editT_[1] = lT[1]; editT_[2] = lT[2];
+		editR_[0] = lRDeg[0]; editR_[1] = lRDeg[1]; editR_[2] = lRDeg[2];
+		editS_[0] = lS[0]; editS_[1] = lS[1]; editS_[2] = lS[2];
+	}
+
+	// バッファからトランスフォームを構築して Joint にセット
+	QuaternionTransform tr;
+	tr.translate = { lT[0], lT[1], lT[2] };
+	tr.rotate = EulerToQuaternion({ lRDeg[0] * (kPi / 180), lRDeg[1] * (kPi / 180), lRDeg[2] * (kPi / 180) });
+	tr.scale = { lS[0], lS[1], lS[2] };
+
+	j->SetTransform(tr);
+
+	Object3d* target = GetTargetObject();
+	Model* m = target ? target->GetModel() : nullptr;
+	if (m && m->GetSkeleton()) {
+		m->GetSkeleton()->Update();
+		if (m->GetSkinCluster())
+			m->GetSkinCluster()->UpdateMatrixPalette(m->GetSkeleton()->GetJoints());
+	}
 }

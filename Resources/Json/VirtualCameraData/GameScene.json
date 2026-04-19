@@ -72,26 +72,39 @@
                 ]
             },
             "closeUpScale": 0.30000001192092896,
+            "collisionResolver": {
+                "avoidSpeed": 0.30000001192092896,
+                "cameraRadius": 5.0,
+                "enableHighAngle": true,
+                "highAngleThreshold": 0.5,
+                "isEnabled": true,
+                "maxPushUpHeight": 10.0,
+                "minGroundHeight": 0.0,
+                "returnSpeed": 0.05000000074505806
+            },
             "fovY": 0.44999998807907104,
             "interpSpeed": 5.0,
+            "maxPitch": 1.0,
+            "minPitch": 0.0,
             "name": "PlayerFollow",
             "offset": [
                 0.30000001192092896,
                 5.300000190734863,
-                -31.600000381469727
+                -34.70000076293945
             ],
             "priority": 10,
             "rotate": [
-                0.4300000071525574,
-                -1.6500000953674316,
+                0.5739930868148804,
+                -2.2145116329193115,
                 0.0
             ],
             "rotateSpeed": 0.03999999910593033,
             "targetName": "Player",
+            "targetPivot_Height": 1.0,
             "translate": [
-                48.580055236816406,
-                17.990636825561523,
-                3.0275847911834717
+                41.82564163208008,
+                24.292341232299805,
+                13.574856758117676
             ],
             "type": "Follow"
         }

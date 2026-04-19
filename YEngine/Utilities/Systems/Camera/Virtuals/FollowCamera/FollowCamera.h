@@ -3,33 +3,49 @@
 #include <WorldTransform/WorldTransform.h>
 #include "CameraState.h"
 #include "BattleStartCameraState.h"
+#include "../../CameraCollisionResolver.h"
 
-/// <summary>
-/// デバッグカメラクラス(ターゲットを追従するカメラ)
-/// </summary>
+// ============================================================
+// デバッグカメラクラス(ターゲットを追従するカメラ)
+// ============================================================
 class FollowCamera : public VirtualCamera
 {
 public:
+	// ============================================================
+	// 基本関数
+	// ============================================================
 	void Initialize() override;
 	void Update() override;
 	void DrawDebugGui() override;
 
+	void Save(nlohmann::json& j) const override;
+	void Load(const nlohmann::json& j) override;
+
+	// ============================================================
+	// アクセッサ・状態取得
+	// ============================================================
 	void SetTarget(const WorldTransform* target, const std::string& name) {
 		target_ = target;
 		targetName_ = name;
 	}
-	void SetIsCloseUp(bool isCloseUp) { isCloseUp_ = isCloseUp; }
 	const std::string& GetTargetName() const { return targetName_; }
-
-	void Save(nlohmann::json& j) const override;
-	void Load(const nlohmann::json& j) override;
-
 	const WorldTransform* GetTarget() { return target_; }
-	void ChangeState(std::unique_ptr<CameraState> newState);
-	void GetDefaultCameraParams(Vector3& outPos, Vector3& outRot, float& outFov) const;
+
+	void SetIsCloseUp(bool isCloseUp) { isCloseUp_ = isCloseUp; }
 	CameraState* GetCurrentState() const { return currentState_.get(); }
 
-	/// 戦闘開始演出を発火（ゲームシーンから呼ぶだけでOK）
+	// ============================================================
+	// カメラ制御・ステート管理
+	// ============================================================
+	void ChangeState(std::unique_ptr<CameraState> newState);
+	void GetDefaultCameraParams(Vector3& outPos, Vector3& outRot, float& outFov) const;
+
+	void UpdateInput();
+	void FollowProcess();
+
+	// ============================================================
+	// 戦闘開始演出
+	// ============================================================
 	void PlayBattleStart() {
 		if (!battleStartState_) {
 			battleStartState_ = std::make_shared<BattleStartCameraState>();
@@ -42,10 +58,6 @@ public:
 		ChangeState(std::move(play));
 	}
 
-	void UpdateInput();
-	void FollowProcess();
-
-	// 現在のステートが戦闘開始演出中かどうか
 	bool IsInPerformance() const {
 		if (currentState_) {
 			return currentState_->IsPerformance();
@@ -54,29 +66,52 @@ public:
 	}
 
 private:
+	// ============================================================
+	// ターゲット管理
+	// ============================================================
 	const WorldTransform* target_ = nullptr;
 	std::string targetName_ = "";
-	std::unique_ptr<CameraState> currentState_ = nullptr;
 
-	/// 戦闘開始ステートの設定を保持（編集・Save/Load用）
+	// ============================================================
+	// ステート管理
+	// ============================================================
+	std::unique_ptr<CameraState> currentState_ = nullptr;
 	std::shared_ptr<BattleStartCameraState> battleStartState_ = nullptr;
 
+	// ============================================================
 	// 追従パラメータ
+	// ============================================================
 	Vector3 offset_ = { 0.0f, 6.0f, -40.0f };
 	float kRotateSpeed_ = 0.1f;
 
+	// ============================================================
 	// クローズアップ関連
+	// ============================================================
 	bool isCloseUp_ = false;
 	float closeUpScale_ = 0.3f;
 	float interpSpeed_ = 5.0f;
 	float currentScale_ = 1.0f;
 
+	// ============================================================
 	// カメラシェイク
+	// ============================================================
 	Vector3 shakeOffset_ = { 0.0f, 0.0f, 0.0f };
 	float shakeIntensity_ = 0.0f;
 	float shakeDuration_ = 0.0f;
 	float shakeTimer_ = 0.0f;
 
-	// プレビュー状態
+	// ============================================================
+	// カメラの回転制限（ラジアン）
+	// ============================================================
+	float minPitch_ = -0.2f; // 見上げの限界
+	float maxPitch_ = 1.2f; // 見下ろしの限界
+
+	// ============================================================
+	// その他
+	// ============================================================
 	bool isPreviewMode_ = false;
+
+	// 壁避け用コンポーネント
+	CameraCollisionResolver collisionResolver_;
+	float targetPivot_Height_ = 1.5f; // プレイヤーの頭あたりを注視点とするための高さオフセット
 };
