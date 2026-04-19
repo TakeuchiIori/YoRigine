@@ -5,6 +5,7 @@
 
 // Math
 #include "MathFunc.h"
+#include "Shape/OBB.h"
 
 // OBBコライダーを扱うクラス
 class OBBCollider : public BaseCollider

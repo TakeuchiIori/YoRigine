@@ -11,6 +11,7 @@
 // Math
 #include "Vector3.h"
 #include "Matrix4x4.h"
+#include "Ray/Raycast.h"
 
 // ImGui
 #include "imgui.h"
@@ -198,7 +199,7 @@ private:
     float RadToDeg(float r) const { return r * (180.0f / 3.14159265359f); }
 
     // レイ生成
-    struct Ray { Vector3 origin; Vector3 direction; };
+
     Ray BuildPickRay(
         const ImVec2& mouseScreenPos,
         const ImVec2& viewportPos,

@@ -5,6 +5,7 @@
 
 // Math
 #include "MathFunc.h"
+#include "Shape/Sphere.h"
 
 // 球体コライダーを扱うクラス
 class SphereCollider : public BaseCollider
