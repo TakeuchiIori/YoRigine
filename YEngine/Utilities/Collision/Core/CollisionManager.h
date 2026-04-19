@@ -62,9 +62,9 @@ namespace YoRigine {
 		void RemoveCollider(BaseCollider* collider);
 
 		// ============================================================
-		// レイキャスト判定（新規追加）
+		// レイキャスト判定
 		// ============================================================
-		bool Raycast(const Ray& ray, float maxDistance, RaycastHit* outHit);
+		bool Raycast(const Ray& ray, float maxDistance, RaycastHit* outHit, uint32_t ignoreTypeID = 0);
 
 		// ============================================================
 		// ヒット方向判定用ユーティリティ

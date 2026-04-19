@@ -25,10 +25,13 @@ public:
 	void Save(nlohmann::json& j) const;
 	void Load(const nlohmann::json& j);
 
+	///************************* アクセッサ *************************///
 	// オンオフ切り替え
 	void SetEnabled(bool enable) { isEnabled_ = enable; }
 	bool IsEnabled() const { return isEnabled_; }
 
+	// 無視するコライダーのTypeIDを設定する
+	void SetIgnoreTypeID(uint32_t typeID) { ignoreTypeID_ = typeID; }
 private:
 	///************************* メンバ関数 *************************///
 
@@ -44,5 +47,6 @@ private:
 
 	// --- 内部状態 ---
 	float currentDistanceRatio_ = 1.0f;  // 現在の距離の割合 (0.0 ~ 1.0、補間用)
-	float minGroundHeight_ = 0.5f;          // カメラが地面にめり込むのを防止するための最低高さ
+	float minGroundHeight_ = 0.5f;       // カメラが地面にめり込むのを防止するための最低高さ
+	uint32_t ignoreTypeID_ = 0;          // 衝突判定で無視するコライダーのタイプID（例: プレイヤー自身のコライダー）
 };

@@ -36,7 +36,7 @@ Vector3 CameraCollisionResolver::Resolve(const Vector3& idealPos, const Vector3&
 		cameraRay.direction - rayDir;
 
 		RaycastHit hitInfo;
-		if (YoRigine::CollisionManager::GetInstance()->Raycast(cameraRay, maxDistance, &hitInfo)) {
+		if (YoRigine::CollisionManager::GetInstance()->Raycast(cameraRay, maxDistance, &hitInfo,ignoreTypeID_)) {
 			// 障害物があった場合、カメラ半径分だけ手前をヒット距離とする
 			hitDistance - hitInfo.distance - cameraRadius_;
 		}

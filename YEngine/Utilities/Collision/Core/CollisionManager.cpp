@@ -177,16 +177,38 @@ namespace YoRigine {
 	}
 
 	// ============================================================
-	// 新規追加：すべてのコライダーに対するレイキャスト
+	// すべてのコライダーに対するレイキャスト
 	// ============================================================
-	bool CollisionManager::Raycast(const Ray& ray, float maxDistance, RaycastHit* outHit) {
+
+	bool CollisionManager::IsColliderInView(const Vector3& position, const Camera* camera) {
+		Vector3 clipPos = Transform(position, camera->GetViewProjectionMatrix());
+		return (clipPos.x >= -1.0f && clipPos.x <= 1.0f &&
+			clipPos.y >= -1.0f && clipPos.y <= 1.0f &&
+			clipPos.z >= 0.0f && clipPos.z <= 1.0f);
+	}
+
+	void CollisionManager::AddCollider(BaseCollider* collider) {
+		if (!collider) return;
+		colliders_.push_back(collider);
+		std::cout << "BaseCollider added: " << collider->GetTypeID() << std::endl;
+	}
+
+	void CollisionManager::RemoveCollider(BaseCollider* collider) {
+		if (!collider) return;
+		colliders_.remove(collider);
+		std::cout << "BaseCollider removed: " << collider->GetTypeID() << std::endl;
+	}
+
+	bool CollisionManager::Raycast(const Ray& ray, float maxDistance, RaycastHit* outHit, uint32_t ignoreTypeID)
+	{
 		bool hitAnything = false;
 		float closestDistance = maxDistance;
 		RaycastHit tempHit;
 
 		for (BaseCollider* collider : colliders_) {
 			if (!collider || !collider->GetIsActive() || !collider->IsCollisionEnabled()) continue;
-
+			// 無視するタイプIDと一致するコライダーはスキップ
+			if (ignoreTypeID != 0 && collider->GetTypeID() == ignoreTypeID) continue;
 			bool isHit = false;
 
 			if (auto sc = dynamic_cast<SphereCollider*>(collider)) {
@@ -209,25 +231,6 @@ namespace YoRigine {
 		}
 
 		return hitAnything;
-	}
-
-	bool CollisionManager::IsColliderInView(const Vector3& position, const Camera* camera) {
-		Vector3 clipPos = Transform(position, camera->GetViewProjectionMatrix());
-		return (clipPos.x >= -1.0f && clipPos.x <= 1.0f &&
-			clipPos.y >= -1.0f && clipPos.y <= 1.0f &&
-			clipPos.z >= 0.0f && clipPos.z <= 1.0f);
-	}
-
-	void CollisionManager::AddCollider(BaseCollider* collider) {
-		if (!collider) return;
-		colliders_.push_back(collider);
-		std::cout << "BaseCollider added: " << collider->GetTypeID() << std::endl;
-	}
-
-	void CollisionManager::RemoveCollider(BaseCollider* collider) {
-		if (!collider) return;
-		colliders_.remove(collider);
-		std::cout << "BaseCollider removed: " << collider->GetTypeID() << std::endl;
 	}
 
 	// ============================================================
