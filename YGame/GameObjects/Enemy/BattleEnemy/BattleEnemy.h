@@ -240,6 +240,11 @@ private:
 	// 点滅スピード
 	float blinkSpeed_ = 50.0f;
 
+	// 前フレームの位置
+	Vector3 previousPosition_{ 0,0,0 }; 
+	// 現在の移動ベクトル
+	Vector3 currentVelocity_{ 0,0,0 };  
+
 	// フェードスピード
 	float fadeSpeed_ = 3.0f;
 

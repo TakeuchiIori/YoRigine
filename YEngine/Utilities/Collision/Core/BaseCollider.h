@@ -132,6 +132,9 @@ public:
 	void SetMass(float mass) { mass_ = mass; }
 	float GetMass() const { return mass_; }
 
+	// 速度の設定
+	void SetVelocity(const Vector3& velocity) { velocity_ = velocity; }
+	Vector3 GetVelocity() const { return velocity_; }
 protected:
 	///************************* 継承クラス用変数 *************************///
 
@@ -144,7 +147,6 @@ protected:
 	// 衝突タイプ識別ID（CollisionTypeIdDefで定義）
 	uint32_t typeID_ = 0u;
 
-public:
 	///************************* 設定フラグ *************************///
 
 	// 当たり判定を有効化
@@ -164,6 +166,8 @@ public:
 
 	// コライダーに設定する質量
 	float mass_ = 1.0f;
+
+	Vector3 velocity_ {};
 
 private:
 	///************************* 内部管理変数 *************************///

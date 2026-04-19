@@ -80,6 +80,7 @@ void BattleEnemy::InitCollision() {
 	obbCollider_ = ColliderFactory::Create<OBBCollider>(
 		this, &wt_, camera_, static_cast<uint32_t>(CollisionTypeIdDef::kBattleEnemy));
 	obbCollider_->SetIsStatic(false);
+	obbCollider_->SetMass(1.0f);
 }
 
 /*==========================================================================
@@ -110,6 +111,7 @@ void BattleEnemy::Update() {
 
 	float dt = YoRigine::GameTime::GetDeltaTime();
 	stateTimer_ += dt;
+	previousPosition_ = wt_.translate_;
 
 	// アニメーター更新
 	if (animation_) {
@@ -149,10 +151,19 @@ void BattleEnemy::Update() {
 
 	// エリア制限補正
 	AreaManager::GetInstance()->UpdateSingleObject(&wt_);
-	// 行列とコリジョン更新
+
+	// 行列と更新
+	currentVelocity_ = wt_.translate_ - previousPosition_;
 	wt_.UpdateMatrix();
+	// コリジョン更新
+	if (obbCollider_) {
+		obbCollider_->Update();
+		obbCollider_->SetVelocity(currentVelocity_);
+	}
+
+
+	// UI更新
 	healthBarUI_->Update();
-	if (obbCollider_) obbCollider_->Update();
 }
 
 /*==========================================================================

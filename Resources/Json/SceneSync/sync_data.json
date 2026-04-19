@@ -1,10 +1,10 @@
 {
     "currentSceneState": {
         "customData": {
-            "currentEnemyGroup": "GreenSpikyBlob",
+            "currentEnemyGroup": "Alien",
             "playerHpRatio": 1.0,
             "stats": {
-                "battleDuration": 16.82997703552246,
+                "battleDuration": 33.7364616394043,
                 "droppedItems": [],
                 "enemiesDefeated": 1,
                 "expGained": 0,
@@ -12,6 +12,6 @@
             }
         },
         "sceneName": "Battle",
-        "timestamp": 1776397184
+        "timestamp": 1776604551
     }
 }

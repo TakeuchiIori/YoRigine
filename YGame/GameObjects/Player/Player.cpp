@@ -136,6 +136,8 @@ void Player::InitCollision() {
 		static_cast<uint32_t>(CollisionTypeIdDef::kPlayer)
 	);
 	obbCollider_->SetIsStatic(false);
+	obbCollider_->SetMass(1000.0f);
+
 }
 
 // ============================================================
@@ -189,6 +191,7 @@ void Player::Update() {
 	playerSword_->Update();
 	playerShield_->Update();
 	obbCollider_->Update();
+	obbCollider_->SetVelocity(movement_->GetVelocity());
 	healthUI_->Update();
 }
 

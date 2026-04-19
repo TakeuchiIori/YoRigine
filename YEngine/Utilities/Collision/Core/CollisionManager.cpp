@@ -776,7 +776,9 @@ namespace YoRigine {
 			}
 		}
 
-		// --- 押し戻しの適用 ---
+		// ------------------------------------------------------------
+		// 押し戻しの処理
+		// ------------------------------------------------------------
 		if (res.isHit && res.penetrationDepth > 0.0f) {
 
 			if (a->GetEnablePenetration() && b->GetEnablePenetration()) {
@@ -787,20 +789,39 @@ namespace YoRigine {
 
 				if (wtA && wtB) {
 					if (!staticA && !staticB) {
-						// 両方動く場合は 1:1 で押し戻し
-						wtA->translate_ += res.normal * (res.penetrationDepth * 0.5f);
-						wtB->translate_ -= res.normal * (res.penetrationDepth * 0.5f);
-					}
-					else if (!staticA) {
-						// Aだけ動く
-						wtA->translate_ += res.normal * res.penetrationDepth;
+						// 互いの速度（移動量の大きさの2乗）を取得
+						Vector3 velA = a->GetVelocity();
+						Vector3 velB = b->GetVelocity();
+						float speedSqA = velA.x * velA.x + velA.y * velA.y + velA.z * velA.z;
+						float speedSqB = velB.x * velB.x + velB.y * velB.y + velB.z * velB.z;
+
+						float ratioA = 0.5f;
+						float ratioB = 0.5f;
+
+						// どちらかが動いている場合
+						if (speedSqA > 0.00001f || speedSqB > 0.00001f) {
+							// 「動いている方」がめり込みの原因なので、動いている方を押し戻す割合を高くする
+							ratioA = speedSqA / (speedSqA + speedSqB);
+							ratioB = speedSqB / (speedSqA + speedSqB);
+						}
+						else {
+							// 両方止まっている（または速度情報がない）場合は質量ベースにする
+							float massA = a->GetMass();
+							float massB = b->GetMass();
+							float totalMass = massA + massB;
+							if (totalMass > 0.0f) {
+								ratioA = massB / totalMass;
+								ratioB = massA / totalMass;
+							}
+						}
+
+						wtA->translate_ += res.normal * (res.penetrationDepth * ratioA);
+						wtB->translate_ -= res.normal * (res.penetrationDepth * ratioB);
+
 						wtA->UpdateMatrix();
-						a->Update();
-					}
-					else if (!staticB) {
-						// Bだけ動く
-						wtB->translate_ -= res.normal * res.penetrationDepth;
 						wtB->UpdateMatrix();
+						a->Update();
+						b->Update();
 					}
 				}
 			}
