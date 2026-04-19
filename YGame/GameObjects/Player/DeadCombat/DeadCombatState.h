@@ -4,9 +4,11 @@
 #include "../Combat/PlayerCombat.h"
 
 class Player;
-/// <summary>
-/// 死亡状態
-/// </summary>
+
+// ============================================================
+// 死亡ステートクラス
+// HPが0になった際のモーション再生やゲーム内時間のスロー演出を管理する
+// ============================================================
 class DeadCombatState : public IState<CombatState> {
 public:
 	DeadCombatState(PlayerCombat* combat);
@@ -20,6 +22,6 @@ public:
 private:
 	PlayerCombat* combat_ = nullptr;
 	Player* player_ = nullptr;
-	float deathTimer_ = 0.0f;           // 死亡アニメーションの経過時間
-	bool isAnimationFinished_ = false;  // アニメーションが終了したか
+	float deathTimer_ = 0.0f;
+	bool isAnimationFinished_ = false;
 };

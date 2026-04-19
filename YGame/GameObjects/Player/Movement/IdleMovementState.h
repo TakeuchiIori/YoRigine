@@ -3,9 +3,10 @@
 #include "../StateMachine.h"
 #include "PlayerMovement.h"
 
-/// <summary>
-/// 待機移動状態
-/// </summary>
+// ============================================================
+// 待機移動ステートクラス
+// プレイヤーの移動入力がない状態の処理を行う
+// ============================================================
 class IdleMovementState : public IState<MovementState> {
 public:
 	IdleMovementState(PlayerMovement* movement);

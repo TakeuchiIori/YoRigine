@@ -11,37 +11,39 @@
 #include "../StunnedCombat/StunnedCombatState.h"
 #include "../DeadCombat/DeadCombatState.h"
 #include "../HitCombat/HitCombatState.h"
+
 #ifdef USE_IMGUI
 #include "imgui.h"
 #endif
 
-/// <summary>
-/// コンストラクタ：戦闘システムの初期化
-/// </summary>
-/// <param name="owner">プレイヤーの所有者</param>
+// ============================================================
+// コンストラクタ
+// 戦闘システムの初期化およびステートマシンのセットアップを行う
+// ============================================================
 PlayerCombat::PlayerCombat(Player* owner) : owner_(owner) {
-	//---------------------------------------------------------------------------------------------
-	// システム初期化
-	//---------------------------------------------------------------------------------------------
+	// ------------------------------------------------------------
+	// システムの初期化
+	// ------------------------------------------------------------
 	combo_ = std::make_unique<PlayerCombo>(owner);
 	guard_ = std::make_unique<PlayerGuard>(owner);
 
 	// guardEmitter_ = std::make_unique<ParticleEmitter>("PlayerParticle", wt_.translate_, 5);
 	// parryEmitter_ = std::make_unique<ParticleEmitter>("PlayerHitParticle", wt_.translate_, 5);
 
-	//---------------------------------------------------------------------------------------------
-	// StateMachine初期化（各Stateがコールバック設定）
-	//---------------------------------------------------------------------------------------------
+	// ------------------------------------------------------------
+	// ステートマシンの初期化
+	// ------------------------------------------------------------
 	InitializeStateMachine();
 }
 
-/// <summary>
-/// ステートマシンの初期化
-/// </summary>
+// ============================================================
+// ステートマシンの初期化
+// 各戦闘ステートのインスタンスを登録する
+// ============================================================
 void PlayerCombat::InitializeStateMachine() {
-	//---------------------------------------------------------------------------------------------
+	// ------------------------------------------------------------
 	// 各状態を登録
-	//---------------------------------------------------------------------------------------------
+	// ------------------------------------------------------------
 	stateMachine_.RegisterState<IdleCombatState>(CombatState::Idle, this);
 	stateMachine_.RegisterState<AttackingCombatState>(CombatState::Attacking, this);
 	stateMachine_.RegisterState<GuardingCombatState>(CombatState::Guarding, this);
@@ -49,59 +51,50 @@ void PlayerCombat::InitializeStateMachine() {
 	stateMachine_.RegisterState<StunnedCombatState>(CombatState::Stunned, this);
 	stateMachine_.RegisterState<DeadCombatState>(CombatState::Dead, this);
 	stateMachine_.RegisterState<HitCombatState>(CombatState::Hit, this);
-	// 初期状態を設定
-	stateMachine_.SetInitialState(CombatState::Idle);
 
-	// オーナーを設定
+	// 初期状態とオーナーを設定
+	stateMachine_.SetInitialState(CombatState::Idle);
 	stateMachine_.SetOwner(this);
 }
 
-/// <summary>
-/// 毎フレームの更新処理
-/// </summary>
-/// <param name="deltaTime">フレーム経過時間</param>
+// ============================================================
+// 毎フレームの更新処理
+// 死亡判定と各戦闘機能の更新を呼び出す
+// ============================================================
 void PlayerCombat::Update(float deltaTime) {
-	//---------------------------------------------------------------------------------------------
-	// HPが0以下なら死亡状態に遷移
-	//---------------------------------------------------------------------------------------------
+	// ------------------------------------------------------------
+	// 死亡判定と遷移
+	// ------------------------------------------------------------
 	if (owner_->GetHP() <= 0 && GetCurrentState() != CombatState::Dead) {
 		ChangeState(CombatState::Dead);
-		return; // 死亡状態では以降の処理をスキップ
+		return;
 	}
 
-	//---------------------------------------------------------------------------------------------
-	// ステートマシン更新
-	//---------------------------------------------------------------------------------------------
+	// ------------------------------------------------------------
+	// ステートマシンおよび下層システムの更新
+	// ------------------------------------------------------------
 	stateMachine_.Update(deltaTime);
-
-	//---------------------------------------------------------------------------------------------
-	// システム更新（コンボ・ガード）
-	//---------------------------------------------------------------------------------------------
 	combo_->Update(deltaTime);
 	guard_->Update(deltaTime);
 }
 
-/// <summary>
-/// 戦闘状態をリセットする
-/// </summary>
+// ============================================================
+// 戦闘状態のリセット
+// 全てを待機状態に戻す
+// ============================================================
 void PlayerCombat::Reset() {
 	combo_->ResetCombo();
 	guard_->Reset();
 	stateMachine_.ChangeState(CombatState::Idle);
 }
 
-/// <summary>
-/// 攻撃を試みる
-/// </summary>
-/// <param name="type">攻撃タイプ</param>
-/// <returns>攻撃が成功したか</returns>
+// ============================================================
+// 攻撃実行の試行
+// ============================================================
 bool PlayerCombat::TryAttack(AttackType type) {
-	// 他の行動中は攻撃不可
 	if (!CanAct()) return false;
 
-	// 任意の攻撃タイプを直接実行
 	if (combo_->TryAttack(type)) {
-		// 攻撃成功時はIdleから攻撃状態に遷移
 		if (GetCurrentState() == CombatState::Idle) {
 			ChangeState(CombatState::Attacking);
 		}
@@ -111,25 +104,20 @@ bool PlayerCombat::TryAttack(AttackType type) {
 	return false;
 }
 
-/// <summary>
-/// 回避を試みる
-/// </summary>
-/// <returns>回避が成功したか</returns>
+// ============================================================
+// 回避実行の試行
+// ============================================================
 bool PlayerCombat::TryDodge() {
 	if (!CanAct()) return false;
 
-	// 回避状態に遷移
 	ChangeState(CombatState::Dodging);
-
-	// 回避成功時はCC回復
 	combo_->OnDodgeSuccess();
 	return true;
 }
 
-/// <summary>
-/// ガードを試みる
-/// </summary>
-/// <returns>ガードが成功したか</returns>
+// ============================================================
+// ガード実行の試行
+// ============================================================
 bool PlayerCombat::TryGuard() {
 	if (!CanAct()) return false;
 
@@ -140,20 +128,17 @@ bool PlayerCombat::TryGuard() {
 	return false;
 }
 
-/// <summary>
-/// 特殊攻撃を試みる（未実装）
-/// </summary>
+// ============================================================
+// 特殊攻撃実行の試行（未実装）
+// ============================================================
 bool PlayerCombat::TrySpecial() {
 	if (!CanAct()) return false;
-
-	// 現状は未実装
 	return false;
 }
 
-/// <summary>
-/// 行動をキャンセルする（コンボキャンセル）
-/// </summary>
-/// <returns>キャンセルが成功したか</returns>
+// ============================================================
+// コンボのアクションキャンセル
+// ============================================================
 bool PlayerCombat::TryCancel() {
 	if (combo_->GetCurrentAttack() && combo_->GetCurrentAttack()->canCancel) {
 		combo_->CancelCombo();
@@ -163,85 +148,38 @@ bool PlayerCombat::TryCancel() {
 	return false;
 }
 
-/// <summary>
-/// Idle状態か判定
-/// </summary>
-bool PlayerCombat::IsIdle() const {
-	return GetCurrentState() == CombatState::Idle;
-}
+// ============================================================
+// 各種状態確認
+// ============================================================
+bool PlayerCombat::IsIdle() const { return GetCurrentState() == CombatState::Idle; }
+bool PlayerCombat::IsAttacking() const { return GetCurrentState() == CombatState::Attacking; }
+bool PlayerCombat::IsDodging() const { return GetCurrentState() == CombatState::Dodging; }
+bool PlayerCombat::IsStunned() const { return GetCurrentState() == CombatState::Stunned; }
+bool PlayerCombat::IsDead() const { return GetCurrentState() == CombatState::Dead; }
+bool PlayerCombat::IsGuarding() const { return GetCurrentState() == CombatState::Guarding; }
+bool PlayerCombat::IsHit() const { return GetCurrentState() == CombatState::Hit; }
 
-/// <summary>
-/// 攻撃中か判定
-/// </summary>
-bool PlayerCombat::IsAttacking() const {
-	return GetCurrentState() == CombatState::Attacking;
-}
-
-/// <summary>
-/// 回避中か判定
-/// </summary>
-bool PlayerCombat::IsDodging() const {
-	return GetCurrentState() == CombatState::Dodging;
-}
-
-/// <summary>
-/// スタン中か判定
-/// </summary>
-bool PlayerCombat::IsStunned() const {
-	return GetCurrentState() == CombatState::Stunned;
-}
-
-/// <summary>
-/// 死亡状態か判定
-/// </summary>
-bool PlayerCombat::IsDead() const {
-	return GetCurrentState() == CombatState::Dead;
-}
-
-/// <summary>
-/// 移動可能か判定
-/// </summary>
 bool PlayerCombat::CanMove() const {
 	ComboState state = combo_->GetCurrentState();
 	return GetCurrentState() == CombatState::Idle ||
 		(state == ComboState::CanContinue && !IsStunned());
 }
 
-/// <summary>
-/// 行動可能か判定
-/// </summary>
 bool PlayerCombat::CanAct() const {
 	return !IsStunned();
 }
 
-/// <summary>
-/// ガード中か判定
-/// </summary>
-/// <returns></returns>
-bool PlayerCombat::IsGuarding() const
-{
-	return GetCurrentState() == CombatState::Guarding;
-}
-
-/// <summary>
-/// ヒット中か判定
-/// </summary>
-/// <returns></returns>
-bool PlayerCombat::IsHit() const
-{
-	return GetCurrentState() == CombatState::Hit;
-}
-
-/// <summary>
-/// デバッグ表示（ImGui）
-/// デバッグ情報・コンボ状態・操作ボタンの確認用
-/// </summary>
+// ============================================================
+// デバッグ表示（ImGui）
+// 戦闘ステートやコンボ情報の確認用
+// ============================================================
 void PlayerCombat::ShowDebugImGui() {
 #ifdef USE_IMGUI
-	// メインのタブバー開始（名前をユニークに、あるいは全体で1つに）
 	if (ImGui::BeginTabBar("CombatDebugSystem"))
 	{
-		// --- 戦闘ステート ---
+		// ------------------------------------------------------------
+		// 戦闘ステート情報
+		// ------------------------------------------------------------
 		if (ImGui::BeginTabItem("状態・行動"))
 		{
 			const char* stateNames[] = { "Idle", "Attacking", "Guarding", "Dodging", "Stunned","Dead","Hit" };
@@ -255,7 +193,9 @@ void PlayerCombat::ShowDebugImGui() {
 			ImGui::EndTabItem();
 		}
 
-		// --- コンボ・攻撃 ---
+		// ------------------------------------------------------------
+		// コンボや攻撃の情報
+		// ------------------------------------------------------------
 		if (ImGui::BeginTabItem("コンボ情報"))
 		{
 			ImGui::Text("コンボ数: %d", GetComboCount());
@@ -273,23 +213,22 @@ void PlayerCombat::ShowDebugImGui() {
 			ImGui::EndTabItem();
 		}
 
-		// --- コンボシステム詳細 (内部デバッグ) ---
+		// ------------------------------------------------------------
+		// コンボ・ガードシステムの詳細
+		// ------------------------------------------------------------
 		if (ImGui::BeginTabItem("システム詳細"))
 		{
-			// combo_ 側のデバッグ関数を呼ぶ。
-			// 内部でさらに TabBar を作っている場合は名前の衝突に注意
 			combo_->ShowDebugImGui();
 			ImGui::EndTabItem();
 		}
 
-		// --- ガード詳細 ---
 		if (ImGui::BeginTabItem("ガード詳細"))
 		{
 			guard_->ShowDebugImGui();
 			ImGui::EndTabItem();
 		}
 
-		ImGui::EndTabBar(); // メインタブバーを閉じる
+		ImGui::EndTabBar();
 	}
 #endif
 }

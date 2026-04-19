@@ -11,15 +11,15 @@
 #endif
 
 
-/// <summary>
-/// 初期化処理
-/// </summary>
+// ============================================================
+// 初期化処理
+// ============================================================
 void PlayerSword::Initialize(Camera* camera) {
 
 	camera_ = camera;
-	//------------------------------------------------------------
+	// ------------------------------------------------------------
 	// モデル初期化
-	//------------------------------------------------------------
+	// ------------------------------------------------------------
 	obj_ = std::make_unique<Object3d>();
 	obj_->Initialize();
 	obj_->SetModel("Sword_Golden.obj");
@@ -28,9 +28,9 @@ void PlayerSword::Initialize(Camera* camera) {
 	wt_.Initialize();
 	colliderWT_.Initialize();
 
-	//------------------------------------------------------------
+	// ------------------------------------------------------------
 	// プレイヤーの手ジョイントを探索し、剣を接続
-	//------------------------------------------------------------
+	// ------------------------------------------------------------
 	FindHandJointIndex();
 	if (isValidJoint_) {
 		WorldTransform& handWT = obj3d_
@@ -41,30 +41,29 @@ void PlayerSword::Initialize(Camera* camera) {
 		wt_.parent_ = &handWT;
 	}
 
-	//------------------------------------------------------------
+	// ------------------------------------------------------------
 	// コライダー・Json初期化
-	//------------------------------------------------------------
+	// ------------------------------------------------------------
 	InitCollision();
 	InitJson();
 
 
-	//------------------------------------------------------------
+	// ------------------------------------------------------------
 	// エフェクト関連の初期化
-	//------------------------------------------------------------
+	// ------------------------------------------------------------
 	particleEmitter_ = std::make_unique<ParticleEmitter>("PlayerParticle", wt_.translate_, 5);
 	hitParticleEmitter_ = std::make_unique<ParticleEmitter>("PlayerHitParticle", wt_.translate_, 5);
 	testEmitter_ = std::make_unique<ParticleEmitter>("TestParticle", wt_.translate_, 10);
-	
+
 	trailEmitter_ = std::make_unique<YoRigine::TrailMeshEmitter>();
 	trailEmitter_->SetCamera(camera_);
 	trailEmitter_->LoadAsset("Resources/Vfx/NewEffect.json");
 }
 
-/// <summary>
-/// 更新処理
-/// </summary>
+// ============================================================
+// 更新処理
+// ============================================================
 void PlayerSword::Update() {
-	// 剣を手に追従させ、コライダー位置を更新
 	if (obj3d_) {
 		SetPlayerWeaponPosition();
 		UpdateColliderWorldTransform();
@@ -75,14 +74,13 @@ void PlayerSword::Update() {
 	trailEmitter_->AddPoint(tipW, rootW);
 	trailEmitter_->Update(YoRigine::GameTime::GetDeltaTime());
 
-	// 当たり判定更新
 	Vector3 handPos = GetHandPosition();
 	obbCollider_->Update();
 }
 
-/// <summary>
-/// 手のジョイントを探索
-/// </summary>
+// ============================================================
+// 手のジョイントを探索
+// ============================================================
 void PlayerSword::FindHandJointIndex() {
 	if (!obj3d_ || !obj3d_->GetModel()) return;
 
@@ -93,14 +91,12 @@ void PlayerSword::FindHandJointIndex() {
 	auto it = jointMap.find(handJointName_);
 
 	if (it != jointMap.end()) {
-		// 指定ジョイントが存在
 		handleIndex_ = it->second;
 		isValidJoint_ = true;
 	}
 	else {
 		isValidJoint_ = false;
 
-		// フォールバック:一般的な手ジョイント名候補を探索
 		std::vector<std::string> handCandidates = {
 			"mixamorig:RightHand", "mixamorig:LeftHand",
 			"RightHand", "LeftHand",
@@ -119,45 +115,41 @@ void PlayerSword::FindHandJointIndex() {
 	}
 }
 
-/// <summary>
-/// 手ジョイントの相対位置に剣を配置
-/// </summary>
+// ============================================================
+// 手ジョイントの相対位置に剣を配置
+// ============================================================
 void PlayerSword::SetPlayerWeaponPosition() {
 	if (!obj3d_ || !isValidJoint_) return;
 
-	wt_.translate_ = offsetPos_;  // 相対位置
-	wt_.rotate_ = offsetRot_;     // 相対回転
-	wt_.scale_ = offsetScale_;    // 相対スケール
-	wt_.UpdateMatrix();           // 行列更新
+	wt_.translate_ = offsetPos_;
+	wt_.rotate_ = offsetRot_;
+	wt_.scale_ = offsetScale_;
+	wt_.UpdateMatrix();
 }
 
-/// <summary>
-/// コライダー用のワールド変換を更新
-/// </summary>
+// ============================================================
+// コライダー用のワールド変換を更新
+// ============================================================
 void PlayerSword::UpdateColliderWorldTransform() {
 	if (!obj3d_ || !isValidJoint_) return;
 
-	// 手のジョイントのワールド行列を取得
 	WorldTransform& handWT = obj3d_
 		->GetModel()
 		->GetSkeleton()
 		->GetJoints()[handleIndex_]
 		.GetWorldTransform();
 
-	// 剣の相対変換を行列化
 	Matrix4x4 weaponMatrix = MakeAffineMatrix(wt_.scale_, wt_.rotate_, wt_.translate_);
 
-	// 手と剣の行列を合成して最終的な位置を求める
 	finalMatrix_ = Multiply(weaponMatrix, handWT.matWorld_);
 
-	// コライダー用に結果を適用
 	colliderWT_.matWorld_ = finalMatrix_;
 	colliderWT_.translate_ = ExtractTranslation(finalMatrix_);
 }
 
-/// <summary>
-/// 手のワールド位置を取得
-/// </summary>
+// ============================================================
+// 手のワールド位置を取得
+// ============================================================
 Vector3 PlayerSword::GetHandPosition() {
 	if (!isValidJoint_) return Vector3{};
 
@@ -167,18 +159,20 @@ Vector3 PlayerSword::GetHandPosition() {
 	auto* skeleton = obj->GetModel()->GetSkeleton();
 	if (!skeleton) return Vector3{};
 
-	// 手ジョイントのワールド変換から位置を抽出
 	WorldTransform& handWT = skeleton->GetJoints()[handleIndex_].GetWorldTransform();
 	return Vector3(handWT.matWorld_.m[3][0], handWT.matWorld_.m[3][1], handWT.matWorld_.m[3][2]);
 }
 
-/// <summary>
-/// 行列から平行移動成分を抽出
-/// </summary>
+// ============================================================
+// 行列から平行移動成分を抽出
+// ============================================================
 Vector3 PlayerSword::ExtractTranslation(const Matrix4x4& matrix) {
 	return Vector3(matrix.m[3][0], matrix.m[3][1], matrix.m[3][2]);
 }
 
+// ============================================================
+// ワールド座標取得
+// ============================================================
 Vector3 PlayerSword::GetWowldPosition()
 {
 	Vector3 wp;
@@ -188,18 +182,18 @@ Vector3 PlayerSword::GetWowldPosition()
 	return wp;
 }
 
-/// <summary>
-/// 描画処理
-/// </summary>
+// ============================================================
+// 描画処理
+// ============================================================
 void PlayerSword::Draw() {
 	if (obj_) {
 		obj_->Draw(camera_, wt_);
 	}
 }
 
-/// <summary>
-/// 影の描画
-/// </summary>
+// ============================================================
+// 影の描画
+// ============================================================
 void PlayerSword::DrawShadow()
 {
 	if (obj_) {
@@ -207,32 +201,32 @@ void PlayerSword::DrawShadow()
 	}
 }
 
-/// <summary>
-/// コライダー描画(デバッグ用)
-/// </summary>
+// ============================================================
+// コライダー描画
+// ============================================================
 void PlayerSword::DrawCollision() {
 	if (obbCollider_) {
 		obbCollider_->Draw();
 	}
 }
 
-/// <summary>
-/// 剣の残像エフェクト描画
-/// </summary>
+// ============================================================
+// 剣の残像エフェクト描画
+// ============================================================
 void PlayerSword::DrawVfx() {
 	if (trailEmitter_) {
 		trailEmitter_->Draw();
 	}
 }
 
-/// <summary>
-/// 衝突開始時の処理
-/// </summary>
+// ============================================================
+// 衝突開始時の処理
+// ============================================================
 void PlayerSword::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other) {
 	if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kBattleEnemy)) {
-		//------------------------------------------------------------
+		// ------------------------------------------------------------
 		// 敵にヒット時:エフェクト発生 + CC回復処理 + カメラシェイク
-		//------------------------------------------------------------
+		// ------------------------------------------------------------
 		Vector3 hitPos = other->GetWorldTransform().translate_;
 		hitPos.y += 1.5f;
 
@@ -240,7 +234,7 @@ void PlayerSword::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 		if (enemyHitEmitterGroup_) {
 			enemyHitEmitterGroup_->SetPosition(hitPos);
 			enemyHitEmitterGroup_->SetActive(true);
-			enemyHitEmitterGroup_->SetAutoEmitAll(false);  // 自動射出OFF
+			enemyHitEmitterGroup_->SetAutoEmitAll(false);
 			enemyHitEmitterGroup_->EmitAll(10);
 		}
 		player_->GetCombat()->GetCombo()->RecoverCC(2);
@@ -248,47 +242,48 @@ void PlayerSword::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 	}
 }
 
-/// <summary>
-/// 衝突中の処理
-/// </summary>
+// ============================================================
+// 衝突中の処理
+// ============================================================
 void PlayerSword::OnCollision([[maybe_unused]] BaseCollider* self, [[maybe_unused]] BaseCollider* other) {}
 
-/// <summary>
-/// 衝突終了時の処理
-/// </summary>
+// ============================================================
+// 衝突終了時の処理
+// ============================================================
 void PlayerSword::OnExitCollision([[maybe_unused]] BaseCollider* self, [[maybe_unused]] BaseCollider* other) {}
 
-/// <summary>
-/// 衝突方向別の処理
-/// </summary>
+// ============================================================
+// 衝突方向別の処理
+// ============================================================
 void PlayerSword::OnDirectionCollision([[maybe_unused]] BaseCollider* self, [[maybe_unused]] BaseCollider* other, [[maybe_unused]] HitDirection dir) {}
 
+// ============================================================
+// 衝突方向開始時の処理
+// ============================================================
 void PlayerSword::OnEnterDirectionCollision([[maybe_unused]] BaseCollider* self, [[maybe_unused]] BaseCollider* other, [[maybe_unused]] HitDirection dir)
 {
 }
 
-/// <summary>
-/// コライダー初期化
-/// </summary>
+// ============================================================
+// コライダー初期化
+// ============================================================
 void PlayerSword::InitCollision() {
 	obbCollider_ = ColliderFactory::Create<OBBCollider>(
 		this, &colliderWT_, camera_,
 		static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon)
 	);
 
-	// 初期状態では当たり判定無効
 	obbCollider_->SetCollisionEnabled(false);
-	// 押し戻しはしないように
 	obbCollider_->SetEnablePenetration(false);
 }
 
-/// <summary>
-/// Json設定初期化
-/// </summary>
+// ============================================================
+// Json設定初期化
+// ============================================================
 void PlayerSword::InitJson() {
-	//------------------------------------------------------------
+	// ------------------------------------------------------------
 	// メイン情報
-	//------------------------------------------------------------
+	// ------------------------------------------------------------
 	jsonManager_ = std::make_unique<YoRigine::JsonManager>("PlayerSword", "Resources/Json/Weapon");
 	jsonManager_->SetCategory("Objects");
 	jsonManager_->SetSubCategory("PlayerSword");
@@ -299,30 +294,30 @@ void PlayerSword::InitJson() {
 	jsonManager_->Register("AnchorPoint", &wt_.anchorPoint_);
 	jsonManager_->Register("Hand Joint Name", &handJointName_);
 
-	//------------------------------------------------------------
-	// オフセット情報(位置・回転・スケール)
-	//------------------------------------------------------------
+	// ------------------------------------------------------------
+	// オフセット情報
+	// ------------------------------------------------------------
 	jsonManager_->SetTreePrefix("OffSet");
 	jsonManager_->Register("Offset Position", &offsetPos_);
 	jsonManager_->Register("Offset Rotation", &offsetRot_);
 	jsonManager_->Register("Offset Scale", &offsetScale_);
 
-	//------------------------------------------------------------
+	// ------------------------------------------------------------
 	// カラー情報
-	//------------------------------------------------------------
+	// ------------------------------------------------------------
 	jsonManager_->SetTreePrefix("Color");
 	jsonManager_->Register("", &obj_->GetColor());
 
-	//------------------------------------------------------------
+	// ------------------------------------------------------------
 	// VFX情報
-	//------------------------------------------------------------
+	// ------------------------------------------------------------
 	jsonManager_->SetTreePrefix("Trail");
 	jsonManager_->Register("Local Root", &localRoot);
 	jsonManager_->Register("Local Tip", &localTip);
 
-	//------------------------------------------------------------
+	// ------------------------------------------------------------
 	// コライダー情報
-	//------------------------------------------------------------
+	// ------------------------------------------------------------
 	jsonCollider_ = std::make_unique<YoRigine::JsonManager>("PlayerSwordCollider", "Resources/Json/Colliders");
 	obbCollider_->InitJson(jsonCollider_.get());
 }

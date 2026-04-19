@@ -1,9 +1,13 @@
 #pragma once
 
+// ============================================================
+// ガード用コンフィグ構造体
+// シールドの発生やパリィ判定のフレーム設定を保持する
+// ============================================================
 struct GuardConfig {
-    float   startup = 4.0f;      // ボタンを押してからシールドが有効になるまで
-    float   active = 20.0f;      // 通常ガードが有効な長さ
-    float   parryStart = 3.0f;   // active 内のパリィ開始フレーム (0〜active-1)
-    float   parryEnd = 5.0f;     // active 内のパリィ終了フレーム
-    float   recovery = 12.0f;    // 失敗時の硬直
+    float startup = 4.0f;      // ボタンを押してからシールドが有効になるまでのフレーム
+    float active = 20.0f;      // 通常ガードが有効なフレーム長
+    float parryStart = 3.0f;   // active内でパリィ判定が開始されるフレーム
+    float parryEnd = 5.0f;     // active内でパリィ判定が終了するフレーム
+    float recovery = 12.0f;    // ガード終了後から次の行動が可能になるまでの硬直フレーム
 };

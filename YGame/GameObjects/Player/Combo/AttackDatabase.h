@@ -11,17 +11,26 @@
 #include "Loaders/Json/VariableJson.h"
 #include <Debugger/Logger.h>
 
+// ============================================================
+// 攻撃データベースクラス
+// 攻撃用データ（AttackData）をメモリ上に保持し、JSONファイルとの入出力を担う
+// ============================================================
 class AttackDatabase
 {
 public:
-	// 攻撃データの一覧
+	// ============================================================
+	// 攻撃データの一覧を取得（シングルトン的なアクセス）
+	// ============================================================
 	static std::vector<AttackData>& Get()
 	{
 		static std::vector<AttackData> attacks;
 		return attacks;
 	}
 
-	// 名称 → インデックス
+	// ============================================================
+	// 名称から攻撃データのインデックスを検索
+	// 見つからない場合は -1 を返す
+	// ============================================================
 	static int FindIndex(const std::string& name)
 	{
 		auto& list = Get();
@@ -33,32 +42,33 @@ public:
 		return -1;
 	}
 
-	// JSONファイル読込（ファイルがなければ空のJSONを生成）
+	// ============================================================
+	// JSONファイルからの読み込み
+	// ファイルが存在しない場合は、対象ディレクトリと空のJSONファイルを新規作成する
+	// ============================================================
 	static bool LoadFromFile(const std::string& path)
 	{
 		std::ifstream ifs(path);
 
-		// ファイルが存在しない場合
+		// ------------------------------------------------------------
+		// ファイルが存在しない場合の初期化処理
+		// ------------------------------------------------------------
 		if (!ifs)
 		{
 			Logger("[AttackDatabase] File not found. Creating empty JSON...\n");
 
-			// 空の配列を設定
 			Get().clear();
 
-			// ディレクトリを作成（存在しない場合）
 			std::filesystem::path filePath(path);
 			std::filesystem::path dir = filePath.parent_path();
 
 			if (!dir.empty() && !std::filesystem::exists(dir))
 			{
 				std::filesystem::create_directories(dir);
-
 				std::string msg = "[AttackDatabase] Created directory: " + dir.string() + "\n";
 				Logger(msg.c_str());
 			}
 
-			// 空のJSON配列をファイルに書き込み
 			std::ofstream ofs(path);
 			if (!ofs)
 			{
@@ -66,7 +76,8 @@ public:
 				return false;
 			}
 
-			ofs << "[]";  // 空の配列
+			// 空のJSON配列を書き込んで初期化
+			ofs << "[]";
 			ofs.close();
 
 			std::string msg = "[AttackDatabase] Created empty file: " + path + "\n";
@@ -75,7 +86,9 @@ public:
 			return true;
 		}
 
-		// ファイルが存在する場合は通常通り読み込み
+		// ------------------------------------------------------------
+		// ファイルが存在する場合の通常読み込み処理
+		// ------------------------------------------------------------
 		try
 		{
 			nlohmann::json j;
@@ -96,7 +109,10 @@ public:
 		}
 	}
 
-	// JSONファイル保存
+	// ============================================================
+	// JSONファイルへの保存
+	// 現在メモリ上にある攻撃データをJSON形式で整形出力する
+	// ============================================================
 	static bool SaveToFile(const std::string& path)
 	{
 		try
@@ -111,7 +127,8 @@ public:
 				return false;
 			}
 
-			ofs << j.dump(4);  // インデント4で整形
+			// インデント4で人間が読みやすい形式に整形して保存
+			ofs << j.dump(4);
 			ofs.close();
 
 			std::string msg = "[AttackDatabase] Saved " + std::to_string(Get().size()) + " attacks to: " + path + "\n";

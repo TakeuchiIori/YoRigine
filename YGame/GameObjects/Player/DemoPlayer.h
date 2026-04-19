@@ -1,4 +1,5 @@
 #pragma once
+
 // Engine
 #include "Sprite/Sprite.h"
 #include "Systems/Input./Input.h"
@@ -16,12 +17,14 @@
 #include "Weapon/PlayerSword.h"
 #include "Weapon/PlayerShield.h"
 
-/// <summary>
-/// タイトルシーンのプレイヤークラス
-/// </summary>
+// ============================================================
+// タイトルシーンのプレイヤークラス
+// ============================================================
 class DemoPlayer : public BaseObject {
 public:
-	///************************* 基本関数 *************************///
+	// ============================================================
+	// 基本関数
+	// ============================================================
 	~DemoPlayer();
 	void Initialize(Camera* camera) override;
 
@@ -33,7 +36,9 @@ public:
 	void DrawBone(Line& line);
 	void DrawShadow();
 
-	///************************* 当たり判定 *************************///
+	// ============================================================
+	// 当たり判定
+	// ============================================================
 	void OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other);
 	void OnCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other);
 	void OnExitCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other);
@@ -41,11 +46,15 @@ public:
 	void OnEnterDirectionCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other, [[maybe_unused]] HitDirection dir);
 
 public:
-	///************************* 公開関数 *************************///
+	// ============================================================
+	// 公開関数
+	// ============================================================
 	void TakeDamage(int damege);
 
 public:
-	///************************* アクセッサ *************************///
+	// ============================================================
+	// アクセッサ
+	// ============================================================
 	Vector3 GetWorldPosition();
 	void SetPosition(const Vector3& position) { wt_.translate_ = position; }
 	Vector3 GetCameraRotation() const;
@@ -59,18 +68,18 @@ public:
 	}
 
 private:
-	///************************* 内部処理関数 *************************///
+	// ============================================================
+	// 内部処理関数
+	// ============================================================
 	void InitCollision() override;
 	void InitJson() override;
 	void UpdateWorldTransform();
-
-	// モーションの再生時間を更新する関数
 	void UpdateMotionTime();
 
 private:
-	///************************* メンバ変数 *************************///
-
-	// ポインタ
+	// ============================================================
+	// メンバ変数
+	// ============================================================
 	YoRigine::Input* input_ = nullptr;
 	FollowCamera* followCamera_ = nullptr;
 
@@ -79,14 +88,11 @@ private:
 	std::unique_ptr<PlayerShield> playerShield_;
 	std::unique_ptr<Line> boneLine_;
 
-
 	Vector3 anchorPoint_ = { 0.0f, -1.0f, 0.0f };
 
-	// モーションの再生時間係数
 	float motionSpeed_ = 1.0f;
 	float preMotionSpeed_ = 1.0f;
 
-	// ステータス
 	uint32_t maxHP_ = 100;
 	uint32_t hp_ = 100;
 	bool isAlive_ = true;
@@ -94,4 +100,3 @@ private:
 
 	float motionSpeed[3] = { 1.0f,1.0f,1.0f };
 };
-

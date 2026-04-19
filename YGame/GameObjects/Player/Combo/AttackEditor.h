@@ -8,72 +8,80 @@
 #include "AttackFrameConverter.h"
 #include <Debugger/DopeSheet/DopeSheetEditor.h>
 
-//=============================================================================
-// AttackDataEditor
-// AttackData の一覧を ImGui で編集するエディタ
+// ============================================================
+// 攻撃データエディタクラス
+// AttackData の一覧を ImGui で編集するための機能を提供する
 //
-// 【構成】
-//   上段左  : 攻撃リスト（タイプ別折りたたみ）
-//   上段右  : プロパティインスペクタ（数値・フラグ類）
-//   下段    : ドープシート（フレーム単位のタイムライン編集）
-//=============================================================================
+// [画面レイアウト]
+//   上段左 : 攻撃リスト（攻撃タイプ別に折りたたみ表示）
+//   上段右 : プロパティインスペクタ（各種数値やフラグの編集）
+//   下段   : ドープシート（フレーム単位でのタイムライン視覚編集）
+// ============================================================
 class AttackDataEditor
 {
 public:
-    AttackDataEditor();
+	// ============================================================
+	// 初期化・設定関数
+	// ============================================================
+	AttackDataEditor();
 
-    // 編集対象のリストを設定（省略可、デフォルトは AttackDatabase::Get()）
-    void SetTarget(std::vector<AttackData>* list);
+	void SetTarget(std::vector<AttackData>* list);
+	void SetFilePath(const std::string& path);
+	void SetReloadCallback(std::function<void()> callback);
 
-    // JSON ファイルパスを設定
-    void SetFilePath(const std::string& path);
+	// ============================================================
+	// 描画と状態管理
+	// ============================================================
+	void DrawImGui();
 
-    // リロードコールバックを設定（保存後にゲーム側へ通知したいときに使う）
-    void SetReloadCallback(std::function<void()> callback);
+	void SetOpen(bool open) { isOpen_ = open; }
+	bool IsOpen() const { return isOpen_; }
 
-    // エディタ全体を描画する
-    void DrawImGui();
-
-    // 開閉状態
-    void SetOpen(bool open) { isOpen_ = open; }
-    bool IsOpen()   const { return isOpen_; }
-
-    // 自動リロード（編集のたびに保存 & リロードする）
-    void SetAutoReload(bool enable) { autoReload_ = enable; }
-    bool IsAutoReload() const { return autoReload_; }
+	void SetAutoReload(bool enable) { autoReload_ = enable; }
+	bool IsAutoReload() const { return autoReload_; }
 
 private:
-    void DrawToolbar();
-    void DrawAttackList();
-    void DrawAttackDetail();
-    void DrawDopeSheet();
+	// ============================================================
+	// 各種UIの描画処理
+	// ============================================================
+	void DrawToolbar();
+	void DrawAttackList();
+	void DrawAttackDetail();
+	void DrawDopeSheet();
 
-    void NewAttack();
-    void DuplicateAttack();
-    void DeleteAttack();
-    void MoveUp();
-    void MoveDown();
+	// ============================================================
+	// 攻撃データの操作処理
+	// ============================================================
+	void NewAttack();
+	void DuplicateAttack();
+	void DeleteAttack();
+	void MoveUp();
+	void MoveDown();
 
-    void LoadFromJson();
-    void SaveToJson();
-    void TriggerReload();
-
-    // 攻撃選択時に BuildTracks を呼んでドープシートを初期化する
-    void OnAttackSelected();
+	// ============================================================
+	// セーブ・ロード・再構築処理
+	// ============================================================
+	void LoadFromJson();
+	void SaveToJson();
+	void TriggerReload();
+	void OnAttackSelected();
 
 private:
-    std::vector<AttackData>* attacks_ = nullptr;
-    int                      currentIndex_ = -1;
-    int                      prevIndex_ = -1;
+	// ============================================================
+	// メンバ変数
+	// ============================================================
+	std::vector<AttackData>* attacks_ = nullptr;
+	int currentIndex_ = -1;
+	int prevIndex_ = -1;
 
-    std::string filePath_ = "Resources/Json/Combo/AttackData.json";
-    bool        isOpen_ = false;
-    bool        autoReload_ = true;
+	std::string filePath_ = "Resources/Json/Combo/AttackData.json";
+	bool isOpen_ = false;
+	bool autoReload_ = true;
 
-    char nameBuffer_[256];
+	char nameBuffer_[256];
 
-    std::function<void()> onReloadCallback_;
+	std::function<void()> onReloadCallback_;
 
-    DopeSheet::DopeSheetEditor        dopeEditor_;
-    std::vector<DopeSheet::DopeTrack> dopeTracks_;
+	DopeSheet::DopeSheetEditor dopeEditor_;
+	std::vector<DopeSheet::DopeTrack> dopeTracks_;
 };

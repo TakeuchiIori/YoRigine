@@ -12,22 +12,25 @@
 
 class Player;
 
-/// <summary>
-/// プレイヤーの移動クラス
-/// </summary>
+// ============================================================
+// プレイヤーの移動管理クラス
+// 入力の取得、歩行/走行の速度計算、モデルの回転、カメラ基準移動やステップ補間を担当する
+// ============================================================
 class PlayerMovement {
 public:
-	///************************* 基本的関数 *************************///
+	// ============================================================
+	// 初期化と更新処理
+	// ============================================================
 	PlayerMovement(Player* owner);
 
 	void Update(float deltaTime);
 	void InitJson(YoRigine::JsonManager* jsonManager);
-
 	void ShowStateDebug();
-
 	const char* GetStateString(MovementState state) const;
 
-	///************************* StateMachine関連 *************************///
+	// ============================================================
+	// StateMachine関連
+	// ============================================================
 	void ChangeState(MovementState newState) { stateMachine_.ChangeState(newState); }
 	bool CanTransitionTo([[maybe_unused]] MovementState newState) const;
 
@@ -35,122 +38,137 @@ public:
 	MovementState GetPreviousState() const { return stateMachine_.GetPreviousState(); }
 	bool StateChanged() const { return stateMachine_.StateChanged(); }
 
-	///************************* コールバック設定 *************************///
+	// ============================================================
+	// コールバック設定
+	// ============================================================
 	void SetInputTypeChangeCallback(std::function<void(InputType)> callback) {
 		onInputTypeChanged_ = callback;
 	}
 
-public:
-	///************************* アクセッサ *************************///
-
+	// ============================================================
+	// 移動と回転のアクセッサ・状態操作
+	// ============================================================
 	bool IsRotating() const { return isRotating_; }
 	void SetIsRotating(bool isRotating) { isRotating_ = isRotating; }
 	bool CanRotate() const { return canRotate_; }
 	void SetCanRotate(bool canRotate) { canRotate_ = canRotate; }
 
 	float GetCurrentRotate() const { return currentRotateY_; }
-
 	Vector3 GetForwardDirection() const;
+
 	Vector3 GetVelocity() const { return velocity_; }
 	float GetSpeed() const;
 	bool IsMoving() const;
+
 	bool CanMove() const { return canMove_; }
 	void SetCanMove(bool canMove) { canMove_ = canMove; }
 	void ForceStop();
 
 	const MovementConfig& GetConfig() const { return config_; }
 	InputType GetCurrentInputType() const { return lastInputType_; }
-
-	///************************* State用の公開関数 *************************///
 	Player* GetOwner() const { return owner_; }
 
-	// State用の入力処理
+	// ============================================================
+	// 各Stateから呼ばれる処理
+	// ============================================================
 	InputState GetInputState() const;
 	void DetectInputType(const InputState& input);
 
-	// State用の回転処理
 	void UpdateRotate(float deltaTime, const Vector3& moveDirection);
 	void ApplyRotate();
 
-	// State用の移動処理
 	void ApplyMovement(float deltaTime);
 
-	// 攻撃時の前進ステップ（補間版）
-	// 敵の位置に向かって補間で前進を要求する
+	// ============================================================
+	// 攻撃時のステップ補間
+	// ============================================================
 	void RequestAttackStep(const Vector3& targetPosition, float stepDistance);
-	// 補間中かどうか
 	bool IsAttackStepping() const { return isAttackStepping_; }
 
-	// 内部データアクセス
+	// ============================================================
+	// 内部データへの参照取得（State更新用）
+	// ============================================================
 	Vector3& GetVelocityRef() { return velocity_; }
 	Vector3& GetTargetDirectionRef() { return targetDirection_; }
 	float& GetStateTimerRef() { return stateTimer_; }
 
-	// アクセッサに追加
 	bool IsRunning() const {
 		return GetCurrentState() == MovementState::Moving && velocity_.Length() > config_.walkSpeed + 0.01f;
 	}
-	// カメラ処理
+
+	// ============================================================
+	// カメラ計算・追従処理
+	// ============================================================
 	Vector3 CameraMoveDir(const Vector3& inputDirection, const Vector3& cameraRotation);
 	Vector3 GetCameraRotation() const;
-
-	///************************* カメラ追従関連 *************************///
 	void UpdateCameraFollow(float deltaTime);
 	bool IsCameraMoving() const { return isCameraMoving_; }
 
 private:
-	///************************* 内部処理関数 *************************///
+	// ============================================================
+	// 内部処理
+	// ============================================================
 	void InitializeStateMachine();
 
-	///************************* 入力処理 *************************///
 	InputState GetKeyboardInput() const;
 	InputState GetControllerInput() const;
 
-	///************************* 回転処理 *************************///
 	float CalculateTargetRotate(const Vector3& direction) const;
 	float LerpAngle(float from, float to, float t) const;
-
-	///************************* その他 *************************///
 	float ApplyDeadzone(float value, float deadzone) const;
 
 private:
-	///************************* メンバ変数 *************************///
-	Player* owner_;
+	// ============================================================
+	// メンバ変数
+	// ============================================================
 
-	// StateMachine
-	StateMachine<MovementState> stateMachine_;
+	// ------------------------------------------------------------
+	// システム連携・オーナー参照
+	// ------------------------------------------------------------
+	Player* owner_;                               // このコンポーネントを所有するプレイヤー
+	StateMachine<MovementState> stateMachine_;    // 移動状態（待機、移動中など）を管理するステートマシン
+	MovementConfig config_;                       // JSONから読み込む移動速度や回転速度などの設定データ
 
-	// 移動データ
-	Vector3 velocity_{ 0.0f, 0.0f, 0.0f };
-	Vector3 targetDirection_{ 0.0f, 0.0f, 0.0f };
-	MovementConfig config_;
+	// ------------------------------------------------------------
+	// 移動用パラメータ
+	// ------------------------------------------------------------
+	Vector3 velocity_{ 0.0f, 0.0f, 0.0f };        // 現在の移動速度ベクトル
+	Vector3 targetDirection_{ 0.0f, 0.0f, 0.0f }; // 入力などによって決定された目標の移動方向ベクトル
 
-	float currentRotateY_ = 0.0f;
-	float targetRotateY_ = 0.0f;
-	bool isRotating_ = false;
+	// ------------------------------------------------------------
+	// 回転用パラメータ
+	// ------------------------------------------------------------
+	float currentRotateY_ = 0.0f;                 // プレイヤーモデルの現在のY軸回転角（ラジアン）
+	float targetRotateY_ = 0.0f;                  // モデルが向くべき目標のY軸回転角（ラジアン）
+	bool isRotating_ = false;                     // 現在回転処理を実行中かどうか
 
-	// 状態別データ
-	float stateTimer_ = 0.0f;
+	// ------------------------------------------------------------
+	// 状態・制御フラグ
+	// ------------------------------------------------------------
+	float stateTimer_ = 0.0f;                     // 現在の移動ステートでの経過時間
+	bool canMove_ = true;                         // 移動操作が許可されているか（攻撃中などはfalseになる）
+	bool canRotate_ = true;                       // 回転操作が許可されているか
+	bool enableCameraRelativeMovement_ = true;    // カメラの向きを基準にした移動を行うかどうか
 
-	// 制御フラグ
-	bool canMove_ = true;
-	bool canRotate_ = true;
+	// ------------------------------------------------------------
+	// 入力デバイス管理
+	// ------------------------------------------------------------
+	InputType lastInputType_ = InputType::Keyboard; // 直前に使用された入力デバイス（キーボード or パッド）
+	float inputSwitchCooldown_ = 0.0f;            // 入力デバイスが頻繁に切り替わるのを防ぐためのクールダウン時間
+	std::function<void(InputType)> onInputTypeChanged_; // 入力デバイス切り替え時に呼ばれるコールバック
 
-	bool enableCameraRelativeMovement_ = true;
-	InputType lastInputType_ = InputType::Keyboard;
-	float inputSwitchCooldown_ = 0.0f;
+	// ------------------------------------------------------------
+	// カメラ追従制御
+	// ------------------------------------------------------------
+	float previousCameraRotationY_ = 0.0f;        // 1フレーム前のカメラのY軸回転角
+	bool isCameraMoving_ = false;                 // カメラが現在回転しているかどうかのフラグ
+	float cameraStopTimer_ = 0.0f;                // カメラの回転が停止してからの経過時間
 
-	// コールバック
-	std::function<void(InputType)> onInputTypeChanged_;
-
-	///************************* カメラ追従用 *************************///
-	float previousCameraRotationY_ = 0.0f;          // 前フレームのカメラ回転
-	bool isCameraMoving_ = false;                   // カメラが動いているか
-	float cameraStopTimer_ = 0.0f;                  // カメラが止まってからの経過時間
-
-	///******* 攻撃ステップ補間用 *//////
-	Vector3 stepStartPos_{ 0.0f, 0.0f, 0.0f };     // 補間開始位置
-	Vector3 stepTargetPos_{ 0.0f, 0.0f, 0.0f };    // 補間目標位置
-	float stepProgress_ = 0.0f;                     // 補間進行率 0.0～1.0
-	bool isAttackStepping_ = false;                 // 補間中フラグ
+	// ------------------------------------------------------------
+	// 攻撃時ステップ（前進補間）用パラメータ
+	// ------------------------------------------------------------
+	Vector3 stepStartPos_{ 0.0f, 0.0f, 0.0f };    // ステップを開始した際の位置
+	Vector3 stepTargetPos_{ 0.0f, 0.0f, 0.0f };   // ステップで到達する目標位置
+	float stepProgress_ = 0.0f;                   // ステップの進行度（0.0 ～ 1.0）
+	bool isAttackStepping_ = false;               // 現在攻撃ステップ中かどうか
 };

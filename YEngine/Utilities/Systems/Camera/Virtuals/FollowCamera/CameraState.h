@@ -6,31 +6,35 @@
 
 class FollowCamera;
 
-/// <summary>
-/// カメラステートの基底クラス
-/// </summary>
+// ============================================================
+// カメラステートの基底クラス
+// 各カメラの演出や状態遷移の基本となるインターフェース
+// ============================================================
 class CameraState {
 public:
-    virtual ~CameraState() = default;
-    
-    // 各ステートで実装する関数
-    virtual void Enter(FollowCamera* camera) = 0;  // ステート開始時
-    virtual void Update(FollowCamera* camera) = 0; // 更新処理
-    virtual void Exit(FollowCamera* camera) = 0;   // ステート終了時
-    
-    // ステートが終了したかどうか
-    virtual bool IsFinished() const { return false; }
-    
-    // デバッグ用の名前
-    virtual const char* GetStateName() const = 0;
-    
-    // 保存・読込
-    virtual void Save([[maybe_unused]] nlohmann::json& j) const {}
-    virtual void Load([[maybe_unused]] const nlohmann::json& j) {}
-    virtual bool IsPerformance() const { return false; }
-    // ImGuiでの編集
-    virtual void DrawEditGui() {}
+	virtual ~CameraState() = default;
+
+	// ============================================================
+	// 各ステートで実装する主要関数
+	// ============================================================
+	virtual void Enter(FollowCamera* camera) = 0;
+	virtual void Update(FollowCamera* camera) = 0;
+	virtual void Exit(FollowCamera* camera) = 0;
+
+	// ============================================================
+	// 状態取得
+	// ============================================================
+	virtual bool IsFinished() const { return false; }
+	virtual const char* GetStateName() const = 0;
+	virtual bool IsPerformance() const { return false; }
+
+	// ============================================================
+	// セーブ・ロード・GUI
+	// ============================================================
+	virtual void Save([[maybe_unused]] nlohmann::json& j) const {}
+	virtual void Load([[maybe_unused]] const nlohmann::json& j) {}
+	virtual void DrawEditGui() {}
 
 protected:
-    float stateTimer_ = 0.0f;  // ステート内の経過時間
+	float stateTimer_ = 0.0f;
 };

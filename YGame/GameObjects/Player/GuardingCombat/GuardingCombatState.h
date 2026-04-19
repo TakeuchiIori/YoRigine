@@ -3,9 +3,10 @@
 #include "../StateMachine.h"
 #include "../Combat/PlayerCombat.h"
 
-/// <summary>
-/// ガード状態
-/// </summary>
+// ============================================================
+// ガードステートクラス
+// プレイヤーがガード行動を行っている最中の状態遷移とアニメーションを管理する
+// ============================================================
 class GuardingCombatState : public IState<CombatState> {
 public:
 	GuardingCombatState(PlayerCombat* combat);
