@@ -1,11 +1,9 @@
 #include "SkyBox.h"
 #include "CubeMap/CubeMap.h"
 
-/// <summary>
-/// スカイボックス初期化
-/// </summary>
-/// <param name="camera">使用するカメラ</param>
-/// <param name="textureFilePath">読み込むキューブマップテクスチャのパス</param>
+// ============================================================
+// 初期化
+// ============================================================
 void SkyBox::Initialize(Camera* camera, const std::string& textureFilePath) {
 	//------------------------------------------------------------
 	// キューブマップ生成と初期化
@@ -17,9 +15,9 @@ void SkyBox::Initialize(Camera* camera, const std::string& textureFilePath) {
 	InitJson();
 }
 
-/// <summary>
-/// 更新処理
-/// </summary>
+// ============================================================
+// 更新処理
+// ============================================================
 void SkyBox::Update() {
 	// キューブマップの更新（回転やカメラ追従など）
 	if (cubeMap_) {
@@ -27,9 +25,9 @@ void SkyBox::Update() {
 	}
 }
 
-/// <summary>
-/// 描画処理
-/// </summary>
+// ============================================================
+// 描画処理
+// ============================================================
 void SkyBox::Draw() {
 	// キューブマップ描画
 	if (cubeMap_) {
@@ -37,19 +35,18 @@ void SkyBox::Draw() {
 	}
 }
 
-/// <summary>
-/// テクスチャの差し替え
-/// </summary>
-/// <param name="filePath">新しいテクスチャのパス</param>
+// ============================================================
+// テクスチャ変更
+// ============================================================
 void SkyBox::SetTextureFilePath(const std::string& filePath) {
 	if (cubeMap_) {
 		cubeMap_->SetTextureFilePath(filePath);
 	}
 }
 
-/// <summary>
-/// JSON登録処理
-/// </summary>
+// ============================================================
+// Json初期化
+// ============================================================
 void SkyBox::InitJson() {
 	//------------------------------------------------------------
 	// YoRigine::JsonManager 設定（位置・回転・スケールを調整可能に）

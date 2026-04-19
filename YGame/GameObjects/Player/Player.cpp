@@ -15,16 +15,16 @@
 #endif // _DEBUG
 #include <Systems/Audio/Audio.h>
 
-/// <summary>
-/// デストラクタ
-/// </summary>
+// ============================================================
+// デストラクタ
+// ============================================================
 Player::~Player() {
 	//obbCollider_->~OBBCollider();
 }
 
-/// <summary>
-/// プレイヤー初期化処理
-/// </summary>
+// ============================================================
+// 初期化
+// ============================================================
 void Player::Initialize(Camera* camera) {
 	camera_ = camera;
 
@@ -75,9 +75,9 @@ void Player::Initialize(Camera* camera) {
 	InitJson();
 }
 
-/// <summary>
-/// 移動ステート初期化
-/// </summary>
+// ============================================================
+// Stateの初期化
+// ============================================================
 void Player::InitStates() {
 	movement_ = std::make_unique<PlayerMovement>(this);
 
@@ -90,9 +90,9 @@ void Player::InitStates() {
 		});
 }
 
-/// <summary>
-/// 戦闘システム初期化
-/// </summary>
+// ============================================================
+// 戦闘システムの初期化
+// ============================================================
 void Player::InitCombatSystem() {
 	combat_ = std::make_unique<PlayerCombat>(this);
 
@@ -101,9 +101,9 @@ void Player::InitCombatSystem() {
 		});
 }
 
-/// <summary>
-/// 戦闘系入力の処理
-/// </summary>
+// ============================================================
+// 戦闘用入力の初期化
+// ============================================================
 void Player::HandleCombatInput() {
 
 	if (followCamera_->IsInPerformance()) return;
@@ -127,9 +127,9 @@ void Player::HandleCombatInput() {
 
 }
 
-/// <summary>
-/// コライダー初期化
-/// </summary>
+// ============================================================
+// コライダー初期化
+// ============================================================
 void Player::InitCollision() {
 	obbCollider_ = ColliderFactory::Create<OBBCollider>(
 		this, &wt_, camera_,
@@ -138,9 +138,9 @@ void Player::InitCollision() {
 	obbCollider_->SetIsStatic(false);
 }
 
-/// <summary>
-/// 毎フレーム更新処理
-/// </summary>
+// ============================================================
+// 更新処理
+// ============================================================
 void Player::Update() {
 	if (YoRigine::GameTime::IsPause()) {
 		return;
@@ -169,14 +169,6 @@ void Player::Update() {
 	//------------------------------------------------------------
 	// 生存時処理
 	//------------------------------------------------------------
-
-	//// 剣のコライダーON/OFF制御
-	//if (combat_->GetCurrentState() == CombatState::Attacking) {
-	//	playerSword_->SetEnableCollider(true);
-	//} else {
-	//	playerSword_->SetEnableCollider(false);
-	//}
-
 	// 盾のコライダーON/OFF制御
 	if (combat_->GetCurrentState() == CombatState::Guarding) {
 		playerShield_->SetEnableCollider(true);
@@ -186,7 +178,6 @@ void Player::Update() {
 
 	UpdateMotionTime();
 	Vector3 sp = playerSword_->GetWowldPosition();
-	//testEmitter_->FollowEmit(sp, 10);
 
 	// ステート更新
 	movement_->Update(YoRigine::GameTime::GetDeltaTime());
@@ -201,24 +192,24 @@ void Player::Update() {
 	healthUI_->Update();
 }
 
-/// <summary>
-/// モデル描画（アニメーション付き）
-/// </summary>
+// ============================================================
+// アニメーションモデルの描画
+// ============================================================
 void Player::DrawAnimation() {
 	obj_->Draw(camera_, wt_);
 }
 
-/// <summary>
-/// 装備品描画
-/// </summary>
+// ============================================================
+// 描画
+// ============================================================
 void Player::Draw() {
 	playerSword_->Draw();
 	playerShield_->Draw();
 }
 
-/// <summary>
-/// コライダー描画
-/// </summary>
+// ============================================================
+// コライダーの描画
+// ============================================================
 void Player::DrawCollision() {
 	if (isAlive_) {
 		playerSword_->DrawCollision();
@@ -227,15 +218,18 @@ void Player::DrawCollision() {
 	}
 }
 
-/// <summary>
-/// 骨構造描画（デバッグ用）
-/// </summary>
+// ============================================================
+// 骨の描画
+// ============================================================
 void Player::DrawBone(Line& line) {
 	if (isAlive_) {
 		obj_->DrawBone(line, wt_.GetMatWorld());
 	}
 }
 
+// ============================================================
+// 影の描画
+// ============================================================
 void Player::DrawShadow() {
 	if (isAlive_) {
 		obj_->DrawShadow(wt_);
@@ -244,18 +238,24 @@ void Player::DrawShadow() {
 	}
 }
 
+// ============================================================
+// ImGui描画
+// ============================================================
 void Player::DrawImGui() {
 	movement_->ShowStateDebug();
 	combat_->ShowDebugImGui();
 }
 
+// ============================================================
+// VFXの描画
+// ============================================================
 void Player::DrawVfx() {
 	playerSword_->DrawVfx();
 }
 
-/// <summary>
-/// モーション速度変更時の更新
-/// </summary>
+// ============================================================
+// モーションの再生時間更新
+// ============================================================
 void Player::UpdateMotionTime() {
 	if (motionSpeed_ != preMotionSpeed_) {
 		if (obj_->GetModel()) {
@@ -265,9 +265,9 @@ void Player::UpdateMotionTime() {
 	}
 }
 
-/// <summary>
-/// ワールド座標を取得
-/// </summary>
+// ============================================================
+// ワールド座標の取得
+// ============================================================
 Vector3 Player::GetWorldPosition() {
 	return {
 		wt_.matWorld_.m[3][0],
@@ -276,9 +276,9 @@ Vector3 Player::GetWorldPosition() {
 	};
 }
 
-/// <summary>
-/// 現在のカメラ回転を取得
-/// </summary>
+// ============================================================
+// 現在のカメラの回転を取得
+// ============================================================
 Vector3 Player::GetCameraRotation() const {
 	if (camera_ && followCamera_) {
 		return followCamera_->GetRotate();
@@ -286,9 +286,9 @@ Vector3 Player::GetCameraRotation() const {
 	return Vector3(0.0f, 0.0f, 0.0f);
 }
 
-/// <summary>
-/// Jsonデータ登録処理
-/// </summary>
+// ============================================================
+//	Jsonの初期化
+// ============================================================
 void Player::InitJson() {
 	jsonManager_ = std::make_unique<YoRigine::JsonManager>("Player", "Resources/Json/Objects/Player");
 	jsonManager_->SetCategory("Objects");
@@ -348,9 +348,9 @@ void Player::InitJson() {
 	obbCollider_->InitJson(jsonCollider_.get());
 }
 
-/// <summary>
-/// 衝突開始時の処理
-/// </summary>
+// ============================================================
+// 衝突開始時の処理
+// ============================================================
 void Player::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other) {
 	if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kBattleEnemy)) {
 		Vector3 emitPos = wt_.translate_;
@@ -359,34 +359,34 @@ void Player::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseCollider*
 	}
 }
 
-/// <summary>
-/// 衝突中の処理
-/// </summary>
+// ============================================================
+// 衝突継続時の処理
+// ============================================================
 void Player::OnCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other) {
 	if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kBattleEnemy)) {
 		// obj_->SetMaterialColor({ 0.0f,0.0f,0.0f,0.0f });
 	}
 }
 
-/// <summary>
-/// 衝突終了時の処理
-/// </summary>
+// ============================================================
+// 衝突終了時の処理
+// ============================================================
 void Player::OnExitCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other) {
 	if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kBattleEnemy)) {
 		// obj_->SetMaterialColor({ 1.0f,1.0f,1.0f,1.0f });
 	}
 }
 
-/// <summary>
-/// 衝突方向ごとの処理
-/// </summary>
+// ============================================================
+// 衝突方向ごとの処理
+// ============================================================
 void Player::OnDirectionCollision([[maybe_unused]] BaseCollider* self, [[maybe_unused]] BaseCollider* other, [[maybe_unused]] HitDirection dir) {
 
 }
 
-/// <summary>
-/// 衝突判定開始時の方向ごとの処理
-/// </summary>
+// ============================================================
+// 衝突開始時の処理（方向ヒット）
+// ============================================================
 void Player::OnEnterDirectionCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other, HitDirection dir)
 {
 	if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kBattleEnemy)) {
@@ -396,7 +396,7 @@ void Player::OnEnterDirectionCollision([[maybe_unused]] BaseCollider* self, Base
 		//------------------------------------------------------------
 
 		// YoRigine::Audio::GetInstance()->PlayOneShot(
-		//	"Resources/Audio/isamikun.mp4",
+		//	"Resources/Audio/.mp4",
 		//	0.2f,
 		//	YoRigine::SoundCategory::SE
 		//);
@@ -406,9 +406,9 @@ void Player::OnEnterDirectionCollision([[maybe_unused]] BaseCollider* self, Base
 	}
 }
 
-/// <summary>
-/// 全システムのリセット処理
-/// </summary>
+// ============================================================
+// リセット
+// ============================================================
 void Player::Reset() {
 	hp_ = maxHP_;
 	isAlive_ = true;
@@ -425,9 +425,9 @@ void Player::Reset() {
 	}
 }
 
-/// <summary>
-/// ダメージ処理
-/// </summary>
+// ============================================================
+// ダメージ処理
+// ============================================================
 void Player::TakeDamage(int damage) {
 	if (!isAlive_ || hp_ <= 0) return;
 
@@ -440,9 +440,9 @@ void Player::TakeDamage(int damage) {
 	}
 }
 
-/// <summary>
-/// 復活処理
-/// </summary>
+// ============================================================
+// 復活処理
+// ============================================================
 void Player::Revive(int reviveHP) {
 	if (isAlive_) return; // すでに生存中なら処理しない
 
@@ -460,6 +460,9 @@ void Player::Revive(int reviveHP) {
 	obj_->SetChangeMotion("Player.gltf", MotionPlayMode::Loop, "Idle4");
 }
 
+// ============================================================
+// 初期値置
+// ============================================================
 void Player::SetInitialPosition()
 {
 	LookAtDirection(Vector3(0.0f, 0.0f, 0.0f));
@@ -467,10 +470,9 @@ void Player::SetInitialPosition()
 	wt_.UpdateMatrix();
 }
 
-/// <summary>
-///	指定方向を向く関数
-/// </summary>
-/// <param name="direction"></param>
+// ============================================================
+// 指定方向を向く
+// ============================================================
 void Player::LookAtDirection(const Vector3& direction)
 {
 	Vector3 dir = direction - wt_.translate_;

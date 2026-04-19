@@ -128,6 +128,10 @@ public:
 	void SetEnablePenetration(bool enable) { enablePenetration_ = enable; }
 	bool GetEnablePenetration() const { return enablePenetration_; }
 
+	// 質量の設定
+	void SetMass(float mass) { mass_ = mass; }
+	float GetMass() const { return mass_; }
+
 protected:
 	///************************* 継承クラス用変数 *************************///
 
@@ -157,6 +161,9 @@ public:
 
 	// デバッグ表示用カメラ参照
 	Camera* camera_ = nullptr;
+
+	// コライダーに設定する質量
+	float mass_ = 1.0f;
 
 private:
 	///************************* 内部管理変数 *************************///

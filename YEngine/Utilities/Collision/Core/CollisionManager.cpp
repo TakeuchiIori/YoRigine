@@ -28,13 +28,18 @@ namespace YoRigine {
 		Reset();
 	}
 
-
+	// ============================================================
+	// OBBを特定の軸に投影したときの半分の長さを計算する関数
+	// ============================================================
 	inline float ProjectOBB(const OBB& obb, const Vector3& axis, const Vector3 axes[3]) {
 		return	obb.size.x * fabs(Dot(axes[0], axis)) +
 			obb.size.y * fabs(Dot(axes[1], axis)) +
 			obb.size.z * fabs(Dot(axes[2], axis));
 	}
 
+	// ============================================================
+	// 球体同士の衝突チェック関数（コライダー版）
+	// ============================================================
 	bool Collision::Check(const SphereCollider* a, const SphereCollider* b)
 	{
 		Vector3 diff = b->GetCenterPosition() - a->GetCenterPosition();
@@ -43,6 +48,9 @@ namespace YoRigine {
 		return distSq <= radiusSum;
 	}
 
+	// ============================================================
+	// 球体とAABBの衝突チェック関数（コライダー版）
+	// ============================================================
 	bool Collision::Check(const SphereCollider* sphere, const AABBCollider* aabb)
 	{
 		Vector3 center = sphere->GetCenterPosition();
@@ -60,6 +68,9 @@ namespace YoRigine {
 		return Length(diff) <= sphere->GetRadius() * sphere->GetRadius();
 	}
 
+	// ============================================================
+	// 球体とOBBの衝突チェック関数（コライダー版）
+	// ============================================================
 	bool Collision::Check(const SphereCollider* sphere, const OBBCollider* obb)
 	{
 		Vector3 center = sphere->GetCenterPosition();
@@ -89,6 +100,9 @@ namespace YoRigine {
 		return Length(diff) <= sphere->GetRadius() * sphere->GetRadius();
 	}
 
+	// ============================================================
+	// AABB同士の衝突チェック関数（コライダー版）
+	// ============================================================
 	bool Collision::Check(const AABBCollider* a, const AABBCollider* b)
 	{
 		const AABB& aa = a->GetAABB();
@@ -98,6 +112,9 @@ namespace YoRigine {
 			(aa.min.z <= bb.max.z && aa.max.z >= bb.min.z);
 	}
 
+	// ============================================================
+	// OBB同士の衝突チェック関数（データ構造版）
+	// ============================================================
 	bool Collision::Check(const OBB& obbA, const OBB& obbB)
 	{
 		// 事前に早期リターンを行う球体近似チェック（オプション）
@@ -185,6 +202,9 @@ namespace YoRigine {
 		return true;
 	}
 
+	// ============================================================
+	// AABBとOBBの衝突チェック関数（AABBColliderを引数に取るオーバーロード）
+	// ============================================================
 	bool Collision::Check(const AABBCollider* aabb, const OBBCollider* obb)
 	{
 		OBB aabbAsOBB;
@@ -195,11 +215,17 @@ namespace YoRigine {
 
 	}
 
+	// ============================================================
+	// OBB同士の衝突チェック関数（OBBColliderを引数に取るオーバーロード）
+	// ============================================================
 	bool Collision::Check(const OBBCollider* a, const OBBCollider* b)
 	{
 		return Check(a->GetOBB(), b->GetOBB());
 	}
 
+	// ============================================================
+	// BaseCollider同士の衝突チェック関数（動的キャストでペアを判定）
+	// ============================================================
 	bool Collision::Check(BaseCollider* a, BaseCollider* b) {
 		// ここで dynamic_cast してペアを判定
 		if (auto sa = dynamic_cast<SphereCollider*>(a)) {
@@ -220,6 +246,9 @@ namespace YoRigine {
 		return false;
 	}
 
+	// ============================================================
+	// AABB同士の衝突方向を判定する関数
+	// ============================================================
 	bool Collision::CheckHitDirection(const AABB& a, const AABB& b, HitDirection* hitDirection)
 	{
 		bool isHitX = (a.min.x <= b.max.x && a.max.x >= b.min.x);
@@ -258,6 +287,9 @@ namespace YoRigine {
 		return true;
 	}
 
+	// ============================================================
+	// AABBとOBBの衝突方向を判定する関数
+	// ============================================================
 	bool Collision::CheckHitDirection(const AABB& aabb, const OBB& obb, HitDirection* hitDirection)
 	{
 		OBB aabbAcObb;
@@ -274,6 +306,9 @@ namespace YoRigine {
 		return hit;
 	}
 
+	// ============================================================
+	// OBB同士の衝突方向を判定する関数
+	// ============================================================
 	bool Collision::CheckHitDirection(const OBB& obbA, const OBB& obbB, HitDirection* hitDirection)
 	{
 		const float EPSILON = 1e-6f; // 数値的に安定した閾値
@@ -344,7 +379,7 @@ namespace YoRigine {
 
 
 		// 両方のOBBの主軸の外積でのテスト
-	// 最終的に取得した minAxis をローカル基準で比較して HitDirection を決定
+		// 最終的に取得した minAxis をローカル基準で比較して HitDirection を決定
 		Vector3 selfUp = { matA.m[1][0], matA.m[1][1], matA.m[1][2] };
 		Vector3 selfRight = { matA.m[0][0], matA.m[0][1], matA.m[0][2] };
 		Vector3 selfForward = { matA.m[2][0], matA.m[2][1], matA.m[2][2] };
@@ -371,7 +406,9 @@ namespace YoRigine {
 
 		return true;
 	}
-
+	// ============================================================
+	// ベクトルからヒット方向を取得する関数
+	// ============================================================
 	HitDirection Collision::ConvertVectorToHitDirection(const Vector3& dir)
 	{
 		if (fabs(dir.x) > fabs(dir.y) && fabs(dir.x) > fabs(dir.z)) {
@@ -385,6 +422,9 @@ namespace YoRigine {
 		}
 	}
 
+	// ============================================================
+	// ヒット方向を反転させる関数（例：Top → Bottom、Left → Rightなど）
+	// ============================================================
 	HitDirection Collision::InverseHitDirection(HitDirection hitdirection)
 	{
 		switch (hitdirection)
@@ -412,6 +452,9 @@ namespace YoRigine {
 		}
 	}
 
+	// ============================================================
+	// 衝突相手の位置から、自分のローカル軸基準でヒット方向を返す関数
+	// ============================================================
 	HitDirection Collision::GetSelfLocalHitDirection(BaseCollider* self, BaseCollider* other)
 	{
 		Vector3 toOther = Normalize(other->GetCenterPosition() - self->GetCenterPosition());
@@ -446,6 +489,9 @@ namespace YoRigine {
 		return HitDirection::None;
 	}
 
+	// ============================================================
+	// 複数方向を同時に返すバージョン（閾値あり）
+	// ============================================================
 	HitDirectionBits Collision::GetSelfLocalHitDirectionFlags(BaseCollider* self, BaseCollider* other, float threshold)
 	{
 		HitDirectionBits flags = HitDirection_None;
@@ -467,6 +513,9 @@ namespace YoRigine {
 		return flags;
 	}
 
+	// ============================================================
+	// 単純に正負で判定して複数方向を同時に返すバージョン（閾値なし）
+	// ============================================================
 	HitDirectionBits Collision::GetSelfLocalHitDirectionsSimple(BaseCollider* self, BaseCollider* other)
 	{
 		HitDirectionBits flags = HitDirection_None;
@@ -489,9 +538,9 @@ namespace YoRigine {
 		return flags;
 	}
 
-	// ---------------------------------------------------------
-		// ★追加: Sphere同士の押し戻し計算
-		// ---------------------------------------------------------
+		//---------------------------------------------------------
+		// Sphere同士の押し戻し計算
+		//---------------------------------------------------------
 	CollisionResult Collision::Resolve(const SphereCollider* a, const SphereCollider* b) {
 		CollisionResult res;
 		Vector3 diff = a->GetCenterPosition() - b->GetCenterPosition();
@@ -507,9 +556,9 @@ namespace YoRigine {
 		return res;
 	}
 
-	// ---------------------------------------------------------
-	// ★追加: OBB同士の押し戻し計算 (現在のCheckHitDirectionを応用)
-	// ---------------------------------------------------------
+	//---------------------------------------------------------
+	// OBB同士の押し戻し計算 (現在のCheckHitDirectionを応用)
+	//---------------------------------------------------------
 	CollisionResult Collision::Resolve(const OBB& obbA, const OBB& obbB) {
 		CollisionResult res;
 		const float EPSILON = 1e-6f;
@@ -575,7 +624,7 @@ namespace YoRigine {
 	}
 
 	// ---------------------------------------------------------
-	// ★追加: Sphere と OBB の押し戻し計算
+	// Sphere と OBB の押し戻し計算
 	// ---------------------------------------------------------
 	CollisionResult Collision::Resolve(const SphereCollider* sphere, const OBB& obb) {
 		CollisionResult res;
@@ -628,11 +677,16 @@ namespace YoRigine {
 
 
 
-
+	// ============================================================
+	// 初期化
+	// ============================================================
 	void CollisionManager::Initialize() {
 		isDrawCollider_ = false;
 	}
 
+	// ============================================================
+	// 更新
+	// ============================================================
 	void CollisionManager::Update()
 	{
 
@@ -658,14 +712,18 @@ namespace YoRigine {
 	}
 
 
-
+	// ============================================================
+	// リセット
+	// ============================================================
 	void CollisionManager::Reset() {
 		// リストを空っぽにする
 		colliders_.clear();
 		collidingPairs_.clear();
 	}
 
-	// ★追加: ペアの判定と押し戻し実行
+	// ============================================================
+	// 2つのコライダーの当たり判定とイベント呼び出し、押し戻し処理
+	// ============================================================
 	void CollisionManager::CheckCollisionPair(BaseCollider* a, BaseCollider* b) {
 		if (!a || !b) return;
 		auto key = std::minmax(a, b);
@@ -767,7 +825,9 @@ namespace YoRigine {
 		}
 	}
 
-
+	// ============================================================
+	// 全コライダーの当たり判定チェック
+	// ============================================================
 	void CollisionManager::CheckAllCollisions() {
 
 		// リスト内のペアを総当たり
@@ -795,7 +855,9 @@ namespace YoRigine {
 	}
 
 
-
+	// ============================================================
+	// カメラ視界判定
+	// ============================================================
 	bool CollisionManager::IsColliderInView(const Vector3& position, const Camera* camera) {
 
 		// ワールド座標をクリップ空間に変換
@@ -809,13 +871,18 @@ namespace YoRigine {
 
 
 
-
+	// ============================================================
+	// コライダーの追加
+	// ============================================================
 	void CollisionManager::AddCollider(BaseCollider* collider) {
 		if (!collider) return;
 		colliders_.push_back(collider);
 		std::cout << "BaseCollider added: " << collider->GetTypeID() << std::endl;
 	}
 
+	// ============================================================
+	// コライダーの削除
+	// ============================================================
 	void CollisionManager::RemoveCollider(BaseCollider* collider)
 	{
 		if (!collider) return;
