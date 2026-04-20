@@ -1,34 +1,31 @@
 #include "MotionEditor.h"
 
+// Engine
 #include "Systems/Camera/Camera.h"
 #include "Model.h"
 #include "../Core/MotionSystem.h"
 #include "Skeleton/Joint.h"
 #include "Skeleton/Skeleton.h"
 #include "Skeleton/BoneGizmable.h"
-#include <json.hpp>
-#include <fstream>
-#include <algorithm>
-#include <filesystem>
-#include <cmath>
-#include <sstream>
-#include <iomanip>
-
-#include <Editor/Icon/EditorIcon.h>
-#include "Object3D/ObjectManager.h" 
 #include <Editor/Editor.h>
+#include "Object3D/ObjectManager.h" 
 
-// パネルのインクルード
+// Panels
+#include "Panels/MenuBarPanel.h"
+#include "Panels/SavePanel.h"
 #include "Panels/ToolbarPanel.h"
 #include "Panels/BoneListPanel.h"
 #include "Panels/PropertyPanel.h"
 #include "Panels/TimelinePanel.h"
+#include "Panels/StatusBarPanel.h"
 
 #ifdef USE_IMGUI
 #include "ImGuizmo.h"
+#include <imgui.h>
 #endif
 
-namespace fs = std::filesystem;
+#include <algorithm>
+#include <cmath>
 
 // ============================================================
 // Context Helper Implementation
@@ -50,8 +47,7 @@ void MotionEditor::Initialize(Camera* camera)
 {
 	context_.camera = camera;
 	previewTransform_.Initialize();
-	binaryBrowser_.currentDirectory = "Resources/Binary";
-	binaryBrowser_.filterExtension = ".anim";
+
 	lineDrawer_ = std::make_unique<Line>();
 	lineDrawer_->SetCamera(context_.camera);
 	lineDrawer_->Initialize();
@@ -134,10 +130,13 @@ void MotionEditor::Initialize(Camera* camera)
 	// ============================================================
 	// パネルの登録
 	// ============================================================
+	RegisterPanel(std::make_unique<MenuBarPanel>());
+	RegisterPanel(std::make_unique<SavePanel>());
 	RegisterPanel(std::make_unique<ToolbarPanel>());
 	RegisterPanel(std::make_unique<BoneListPanel>());
 	RegisterPanel(std::make_unique<PropertyPanel>());
 	RegisterPanel(std::make_unique<TimelinePanel>());
+	RegisterPanel(std::make_unique<StatusBarPanel>());
 }
 
 void MotionEditor::RegisterPanel(std::unique_ptr<IMotionEditorPanel> panel)
@@ -161,7 +160,7 @@ void MotionEditor::Update()
 		float msTime = ms->GetAnimationTime();
 		if (std::abs(msTime - context_.scrubTime) > 1e-4f) {
 			context_.scrubTime = msTime;
-			// 同期はTimelinePanel内で処理されるためここでは時間更新のみ
+			// UIとの同期は TimelinePanel が担当するためここでは時間更新のみ
 		}
 	}
 
@@ -191,26 +190,18 @@ void MotionEditor::Update()
 
 	previewTransform_.UpdateMatrix();
 
-	// 各パネルの更新
+	// 各パネルのロジック更新
 	for (auto& panel : panels_) {
 		if (panel->IsActive()) panel->Update();
 	}
 }
 
 // ============================================================
-// エディタの描画
+// エディタUIの描画
 // ============================================================
 void MotionEditor::ShowEditor()
 {
 #ifdef USE_IMGUI
-	if (binaryBrowser_.isOpen) {
-		DrawFileBrowser(binaryBrowser_, "バイナリファイルを選択");
-		if (!binaryBrowser_.isOpen && !binaryBrowser_.selectedFilePath.empty())
-			savePath_ = binaryBrowser_.selectedFilePath;
-	}
-
-	DrawSaveLoadPopup();
-
 	ImGui::SetNextWindowSize(ImVec2(1200, 750), ImGuiCond_FirstUseEver);
 	ImGui::Begin("Motion Editor", nullptr, ImGuiWindowFlags_MenuBar);
 
@@ -256,7 +247,7 @@ void MotionEditor::ShowEditor()
 		}
 	}
 
-	// フォーカス中のキー入力
+	// ---------------- キーボードショートカット ----------------
 	if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)) {
 		context_.history.HandleKeyInput();
 
@@ -291,9 +282,11 @@ void MotionEditor::ShowEditor()
 		}
 	}
 
-	DrawMenuBar();
-
 	if (!target || !target->GetModel()) {
+		// MenuBarとSaveLoad(ポップアップ)だけは描画しておく
+		panels_[0]->DrawImGui(); // MenuBarPanel
+		panels_[1]->DrawImGui(); // SaveLoadPanel
+
 		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 40);
 		float w = ImGui::GetContentRegionAvail().x;
 		ImGui::SetCursorPosX((w - 220) * 0.5f);
@@ -302,20 +295,73 @@ void MotionEditor::ShowEditor()
 		return;
 	}
 
-	// 登録されたパネルを順に描画
-	for (auto& panel : panels_) {
-		if (panel->IsActive()) {
-			panel->DrawImGui();
-		}
-	}
+	// ---------------- パネル群の描画 ----------------
+	// 0: MenuBar, 1: SaveLoad, 2: Toolbar, 3: BoneList, 4: Property, 5: Timeline, 6: StatusBar
+	panels_[0]->DrawImGui(); // MenuBar
+	panels_[1]->DrawImGui(); // SaveLoad
+	panels_[2]->DrawImGui(); // Toolbar
+	ImGui::Separator();
 
-	DrawStatusBar();
+	// レイアウト：上部は左右分割（BoneList と Property）
+	float contentW = ImGui::GetContentRegionAvail().x;
+	float upperH = ImGui::GetContentRegionAvail().y - context_.timelineH - 30.0f; // タイムラインとステータスバーの分を引く
+
+	ImGui::BeginChild("##upper", ImVec2(contentW, upperH), false);
+	{
+		// 左側: BoneList
+		ImGui::BeginChild("##bones", ImVec2(context_.bonePanelW, 0), true);
+		panels_[3]->DrawImGui();
+		ImGui::EndChild();
+
+		ImGui::SameLine();
+
+		// リサイズ用セパレータ
+		ImGuiIO& io = ImGui::GetIO();
+		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
+		ImGui::InvisibleButton("##vsep", ImVec2(4, upperH));
+		if (ImGui::IsItemActive()) {
+			context_.bonePanelW = std::clamp(context_.bonePanelW + io.MouseDelta.x, 80.0f, contentW - 100.0f);
+		}
+		if (ImGui::IsItemHovered() || ImGui::IsItemActive()) {
+			ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+			ImGui::GetWindowDrawList()->AddRectFilled(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), IM_COL32(100, 130, 200, 180));
+		}
+		ImGui::PopStyleVar();
+
+		ImGui::SameLine();
+
+		// 右側: Property
+		ImGui::BeginChild("##props", ImVec2(0, 0), true);
+		panels_[4]->DrawImGui();
+		ImGui::EndChild();
+	}
+	ImGui::EndChild();
+
+	// リサイズ用水平セパレータ
+	ImGuiIO& io = ImGui::GetIO();
+	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
+	ImGui::InvisibleButton("##hsep", ImVec2(contentW, 4.0f));
+	if (ImGui::IsItemActive()) {
+		context_.timelineH -= io.MouseDelta.y;
+	}
+	if (ImGui::IsItemHovered() || ImGui::IsItemActive()) {
+		ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+		ImGui::GetWindowDrawList()->AddRectFilled(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), IM_COL32(100, 130, 200, 180));
+	}
+	ImGui::PopStyleVar();
+
+	// 下部: Timeline
+	panels_[5]->DrawImGui();
+
+	// 最下部: StatusBar
+	panels_[6]->DrawImGui();
+
 	ImGui::End();
 #endif
 }
 
 // ============================================================
-// その他 描画・機能実装群 (既存コードを修正し維持)
+// 3D 描画・機能実装群
 // ============================================================
 void MotionEditor::Draw()
 {
@@ -400,14 +446,14 @@ void MotionEditor::SetTargetObjectId(int id) {
 			Model* model = target->GetModel();
 			MotionSystem* ms = model->GetMotionSystem();
 
-			loadFileName_ = model->GetName();
+			context_.loadFileName = model->GetName();
 			context_.currentMotion = ms->GetAnimation();
-			selectedAnimKey_ = "";
+			context_.selectedAnimKey = "";
 
 			if (context_.currentMotion) {
 				for (auto& [key, motion] : Model::animationCache_) {
 					if (&motion == context_.currentMotion) {
-						selectedAnimKey_ = key;
+						context_.selectedAnimKey = key;
 						break;
 					}
 				}
@@ -416,231 +462,18 @@ void MotionEditor::SetTargetObjectId(int id) {
 
 			context_.scrubTime = ms->GetAnimationTime();
 			context_.isPlaying = true;
-			context_.statusMsg = "対象オブジェクトを同期: " + loadFileName_;
+			context_.statusMsg = "対象オブジェクトを同期: " + context_.loadFileName;
 		}
 		else {
 			context_.currentMotion = nullptr;
-			selectedAnimKey_ = "";
+			context_.selectedAnimKey = "";
 			context_.selBone = "";
 			context_.selKF.Clear();
-			loadFileName_ = "";
+			context_.loadFileName = "";
 			context_.statusMsg = "Ready";
 		}
 	}
 }
-
-void MotionEditor::DrawMenuBar()
-{
-#ifdef USE_IMGUI
-	if (!ImGui::BeginMenuBar()) return;
-
-	if (ImGui::BeginMenu("ファイル (File)")) {
-		if (ImGui::MenuItem("バイナリ保存/読込...", ""))  context_.showSavePopup = true;
-		ImGui::EndMenu();
-	}
-
-	if (ImGui::BeginMenu("編集 (Edit)")) {
-		if (ImGui::MenuItem("元に戻す", "Ctrl+Z", false, context_.history.CanUndo())) context_.history.Undo();
-		if (ImGui::MenuItem("やり直す", "Ctrl+Y", false, context_.history.CanRedo())) context_.history.Redo();
-		ImGui::Separator();
-		if (ImGui::MenuItem("履歴をクリア")) context_.history.Clear();
-		ImGui::EndMenu();
-	}
-
-	if (ImGui::BeginMenu("表示 (View)")) {
-		ImGui::SliderFloat("タイムライン高さ", &timelineH_, 80.0f, 500.0f, "%.0f px");
-		ImGui::SliderFloat("ボーンリスト幅", &bonePanelW_, 80.0f, 450.0f, "%.0f px");
-		ImGui::SliderFloat("ズーム (px/秒)", &timelineZoom_, 20.0f, 400.0f, "%.0f");
-		ImGui::EndMenu();
-	}
-
-	ImGui::Separator();
-	if (!context_.history.CanUndo()) ImGui::BeginDisabled();
-	if (ImGui::SmallButton(" << ")) { context_.history.Undo(); context_.statusMsg = "元に戻す"; }
-	if (!context_.history.CanUndo()) ImGui::EndDisabled();
-	if (ImGui::IsItemHovered()) ImGui::SetTooltip("元に戻す (Ctrl+Z)");
-
-	ImGui::SameLine(0, 2);
-	if (!context_.history.CanRedo()) ImGui::BeginDisabled();
-	if (ImGui::SmallButton(" >> ")) { context_.history.Redo(); context_.statusMsg = "やり直す"; }
-	if (!context_.history.CanRedo()) ImGui::EndDisabled();
-	if (ImGui::IsItemHovered()) ImGui::SetTooltip("やり直す (Ctrl+Y)");
-
-	ImGui::EndMenuBar();
-#endif
-}
-
-void MotionEditor::DrawStatusBar()
-{
-#ifdef USE_IMGUI
-	float barH = 20.0f;
-	ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.12f, 0.12f, 0.12f, 1.0f));
-	ImGui::BeginChild("##status", ImVec2(0, barH), false);
-
-	ImGui::SetCursorPosY(3);
-	ImGui::TextColored(ImVec4(0.6f, 0.9f, 0.6f, 1.0f), "  %s", context_.statusMsg.c_str());
-
-	float hints_x = ImGui::GetContentRegionAvail().x - 400;
-	if (hints_x > 200) {
-		ImGui::SameLine(hints_x);
-		ImGui::TextDisabled("Space=再生  Del=KF削除  Ctrl+Z=元に戻す  Ctrl+Y=やり直す");
-	}
-
-	ImGui::EndChild();
-	ImGui::PopStyleColor();
-#endif
-}
-
-void MotionEditor::DrawSaveLoadPopup()
-{
-#ifdef USE_IMGUI
-	if (context_.showSavePopup)
-		ImGui::OpenPopup("保存 / 読み込み##popup");
-
-	ImGui::SetNextWindowSize(ImVec2(500, 280), ImGuiCond_Appearing);
-	if (ImGui::BeginPopupModal("保存 / 読み込み##popup", &context_.showSavePopup)) {
-
-		ImGui::Text("バイナリファイル (.anim):");
-		{
-			char buf[512]; strncpy_s(buf, sizeof(buf), savePath_.c_str(), _TRUNCATE);
-			ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 90);
-			if (ImGui::InputText("##savepath", buf, sizeof(buf))) savePath_ = buf;
-			ImGui::SameLine();
-			if (ImGui::Button("参照##b")) {
-				binaryBrowser_.isOpen = true;
-				binaryBrowser_.selectedFilePath = "";
-				context_.showSavePopup = false;
-				ImGui::CloseCurrentPopup();
-			}
-		}
-
-		ImGui::Spacing();
-		ImGui::Separator();
-		ImGui::Spacing();
-
-		bool canSave = context_.currentMotion != nullptr;
-		if (!canSave) ImGui::BeginDisabled();
-		if (ImGui::Button("バイナリ保存", ImVec2(130, 0))) {
-			try {
-				if (context_.currentMotion) {
-					context_.currentMotion->SaveBinary(*context_.currentMotion, AnimDisplayName(selectedAnimKey_), savePath_);
-					saveMsg_ = "保存成功: " + savePath_;
-					context_.statusMsg = saveMsg_;
-				}
-			}
-			catch (const std::exception& e) {
-				saveMsg_ = std::string("保存失敗: ") + e.what();
-			}
-		}
-		if (!canSave) ImGui::EndDisabled();
-
-		ImGui::SameLine(0, 10);
-		Object3d* target = context_.GetTargetObject();
-
-		if (ImGui::Button("バイナリ読み込み", ImVec2(140, 0))) {
-			try {
-				Motion loaded = Motion().LoadBinary(savePath_);
-				const std::string key = "Binary:" + savePath_;
-				Model::animationCache_[key] = std::move(loaded);
-				selectedAnimKey_ = key;
-				context_.currentMotion = &Model::animationCache_[key];
-				if (target) {
-					target->SetChangeMotion(loadFileName_, MotionPlayMode::Loop, AnimDisplayName(key));
-				}
-				saveMsg_ = "読み込み成功: " + savePath_;
-				context_.statusMsg = saveMsg_;
-				context_.requireTimelineRebuild = true;
-			}
-			catch (const std::exception& e) {
-				saveMsg_ = std::string("読み込み失敗: ") + e.what();
-			}
-		}
-
-		if (!saveMsg_.empty()) {
-			ImGui::Spacing();
-			bool isError = saveMsg_.find("失敗") != std::string::npos;
-			ImGui::TextColored(isError ? ImVec4(1, 0.3f, 0.3f, 1) : ImVec4(0.3f, 1, 0.3f, 1), "%s", saveMsg_.c_str());
-		}
-
-		ImGui::Spacing();
-		ImGui::Separator();
-		if (ImGui::Button("閉じる", ImVec2(100, 0))) {
-			context_.showSavePopup = false;
-			saveMsg_ = "";
-			ImGui::CloseCurrentPopup();
-		}
-
-		ImGui::EndPopup();
-	}
-	if (!context_.showSavePopup) ImGui::CloseCurrentPopup();
-#endif
-}
-
-#ifdef USE_IMGUI
-void MotionEditor::DrawFileBrowser(FileBrowserState& state, const char* title)
-{
-	ImGui::SetNextWindowSize(ImVec2(540, 420), ImGuiCond_FirstUseEver);
-	bool open = true;
-	if (!ImGui::Begin(title, &open)) { ImGui::End(); if (!open) state.isOpen = false; return; }
-
-	ImGui::TextColored(ImVec4(0.7f, 0.9f, 1, 1), "%s", state.currentDirectory.c_str());
-	ImGui::Separator();
-
-	bool canUp = !state.directoryHistory.empty();
-	if (!canUp) ImGui::BeginDisabled();
-	if (ImGui::Button("[ .. ] 上へ")) {
-		state.currentDirectory = state.directoryHistory.back();
-		state.directoryHistory.pop_back();
-		state.selectedFilePath = "";
-	}
-	if (!canUp) ImGui::EndDisabled();
-	ImGui::SameLine();
-	ImGui::TextDisabled("| ダブルクリックでフォルダを開く / ファイルを選択");
-	ImGui::Separator();
-
-	auto entries = GetDirectoryEntries(state.currentDirectory, state.filterExtension);
-	ImGui::BeginChild("##fblist", ImVec2(0, -50), true);
-	for (const auto& e : entries) {
-		std::string name = e.path().filename().string();
-		if (e.is_directory()) {
-			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.9f, 1, 1));
-			std::string lbl = "[DIR] " + name;
-			if (ImGui::Selectable(lbl.c_str(), false, ImGuiSelectableFlags_AllowDoubleClick)) {
-				if (ImGui::IsMouseDoubleClicked(0)) {
-					state.directoryHistory.push_back(state.currentDirectory);
-					state.currentDirectory = e.path().string();
-					std::replace(state.currentDirectory.begin(), state.currentDirectory.end(), '\\', '/');
-					state.selectedFilePath = "";
-				}
-			}
-			ImGui::PopStyleColor();
-		}
-		else {
-			bool isSel = (state.selectedFilePath == e.path().string());
-			if (ImGui::Selectable(name.c_str(), isSel, ImGuiSelectableFlags_AllowDoubleClick)) {
-				state.selectedFilePath = e.path().string();
-				std::replace(state.selectedFilePath.begin(), state.selectedFilePath.end(), '\\', '/');
-				if (ImGui::IsMouseDoubleClicked(0)) { state.isOpen = false; ImGui::EndChild(); ImGui::End(); return; }
-			}
-		}
-	}
-	ImGui::EndChild();
-
-	ImGui::Separator();
-	ImGui::TextUnformatted(state.selectedFilePath.empty() ? "(ファイルが未選択です)" : state.selectedFilePath.c_str());
-	float btnX = ImGui::GetContentRegionAvail().x - 120;
-	ImGui::SameLine(btnX);
-	bool canOK = !state.selectedFilePath.empty();
-	if (!canOK) ImGui::BeginDisabled();
-	if (ImGui::Button("OK", ImVec2(55, 0))) state.isOpen = false;
-	if (!canOK) ImGui::EndDisabled();
-	ImGui::SameLine();
-	if (ImGui::Button("キャンセル", ImVec2(60, 0))) { state.selectedFilePath = ""; state.isOpen = false; }
-
-	if (!open) state.isOpen = false;
-	ImGui::End();
-}
-#endif
 
 void MotionEditor::InsertKeyframeFromTransform(const std::string& bone, float time, const QuaternionTransform& tr)
 {
@@ -744,53 +577,6 @@ void MotionEditor::SyncBufferToJoint()
 			if (m->GetSkinCluster()) m->GetSkinCluster()->UpdateMatrixPalette(m->GetSkeleton()->GetJoints());
 		}
 	}
-}
-
-std::string MotionEditor::AnimDisplayName(const std::string& key)
-{
-	auto pos = key.find('#');
-	return (pos != std::string::npos) ? key.substr(pos + 1) : key;
-}
-
-std::vector<std::string> MotionEditor::FetchAnimationNames(const std::string& fullPath)
-{
-	std::vector<std::string> names;
-	if (!fullPath.ends_with(".gltf")) return names;
-	std::ifstream f(fullPath);
-	if (!f.is_open()) return names;
-	try {
-		nlohmann::json gltf; f >> gltf;
-		if (gltf.contains("animations"))
-			for (const auto& a : gltf["animations"])
-				if (a.contains("name")) names.push_back(a["name"].get<std::string>());
-	}
-	catch (...) {}
-	return names;
-}
-
-std::vector<fs::directory_entry> MotionEditor::GetDirectoryEntries(const std::string& dir, const std::string& ext) const
-{
-	std::vector<fs::directory_entry> dirs, files;
-	std::error_code ec;
-	for (const auto& e : fs::directory_iterator(dir, ec)) {
-		if (ec) break;
-		if (e.is_directory()) { dirs.push_back(e); }
-		else if (e.is_regular_file()) {
-			std::string ex = e.path().extension().string();
-			if (ext.empty()) {
-				if (ex == ".gltf" || ex == ".obj" || ex == ".anim") files.push_back(e);
-			}
-			else {
-				if (ex == ext) files.push_back(e);
-			}
-		}
-	}
-	auto byName = [](const fs::directory_entry& a, const fs::directory_entry& b) {
-		return a.path().filename().string() < b.path().filename().string(); };
-	std::sort(dirs.begin(), dirs.end(), byName);
-	std::sort(files.begin(), files.end(), byName);
-	dirs.insert(dirs.end(), files.begin(), files.end());
-	return dirs;
 }
 
 Matrix4x4 MotionEditor::GetTargetWorldMatrix() const {

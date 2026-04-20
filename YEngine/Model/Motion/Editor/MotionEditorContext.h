@@ -16,12 +16,15 @@ class Object3d;
 // ============================================================
 struct MotionEditorContext
 {
-	// ============================================================
-	// 公開変数
-	// ============================================================
 	Motion* currentMotion = nullptr;
 	Camera* camera = nullptr;
 	int targetObjectId = -1;
+
+	// ============================================================
+	// モデル・ファイル・アニメーション状態 (★ここを追加)
+	// ============================================================
+	std::string loadFileName = "";
+	std::string selectedAnimKey = "";
 
 	// 再生状態
 	float scrubTime = 0.0f;
@@ -33,29 +36,27 @@ struct MotionEditorContext
 	std::string selBone = "";
 	SelectedKF selKF;
 
-	// 編集用バッファ（プロパティパネルとギズモ操作で共有）
+	// 編集用バッファ
 	float editT[3] = { 0, 0, 0 };
 	float editR[3] = { 0, 0, 0 };
 	float editS[3] = { 1, 1, 1 };
 
-	// その他UIフラグ
+	// UIフラグとレイアウト (★ここを追加)
 	bool isDrawBone = false;
-	bool showSavePopup = false; // ツールバーとメニューで共有
+	bool showSavePopup = false;
 	std::string statusMsg = "Ready";
 	bool requireTimelineRebuild = false;
 
-	// 履歴管理
+	float timelineH = 240.0f;
+	float bonePanelW = 185.0f;
+
 	CommandHistory history;
 
-	// ============================================================
-	// 共通関数（デリゲート / ヘルパー）
-	// 各パネルがMotionEditor本体の機能を使えるようにする
-	// ============================================================
-	std::function<void()> SyncJointToBuffer;  // Jointの現在値 -> 編集バッファ
-	std::function<void()> SyncBufferToJoint;  // 編集バッファ -> Joint
-	std::function<void(const std::string&, float time)> AddKeyframe; // KF挿入処理
-	std::function<void(const std::string&, float)> DeleteKeyframe; // KF削除処理
+	// コールバック
+	std::function<void()> SyncJointToBuffer;
+	std::function<void()> SyncBufferToJoint;
+	std::function<void(const std::string&, float time)> AddKeyframe;
+	std::function<void(const std::string&, float)> DeleteKeyframe;
 
-	// 対象オブジェクト取得用ヘルパー
 	Object3d* GetTargetObject() const;
 };
