@@ -9,70 +9,82 @@
 #include "Object3d/BaseObject.h"
 
 class Player;
-/// <summary>
-/// プレイヤーの盾クラス
-/// </summary>
+
+// ============================================================
+// プレイヤー盾クラス
+// プレイヤーの腕のボーンに追従し、ガードやパリィ判定のコライダーを提供する
+// ============================================================
 class PlayerShield : public BaseObject
 {
 public:
-	///************************* 基本関数 *************************///
+	// ============================================================
+	// 初期化と更新処理
+	// ============================================================
 	~PlayerShield();
 	void Initialize(Camera* camera) override;
 
-	void Update()override;
+	void Update() override;
 
-	void Draw()override;
+	void Draw() override;
 	void DrawShadow();
-	void DrawCollision()override;
+	void DrawCollision() override;
 
-
-
-public:
-	///************************* アクセッサ *************************///
+	// ============================================================
+	// アクセッサ・状態操作
+	// ============================================================
 	void SetPlayer(Player* player) { player_ = player; }
 	void SetObject(Object3d* obj3d) { obj3d_ = obj3d; }
 	bool IsJointValid() const { return isValidJoint_; }
 	WorldTransform& GetWorldTransform() { return wt_; }
 
-public:
-	///************************* 当たり判定 *************************///
+	void SetEnableCollider(bool enable) {
+		obbCollider_->SetCollisionEnabled(enable);
+	}
+
+	// ============================================================
+	// 当たり判定コールバック
+	// ============================================================
 	void OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other);
 	void OnCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other);
 	void OnExitCollision([[maybe_unused]] BaseCollider* self, [[maybe_unused]] BaseCollider* other);
 	void OnDirectionCollision([[maybe_unused]] BaseCollider* self, [[maybe_unused]] BaseCollider* other, [[maybe_unused]] HitDirection dir);
 	void OnEnterDirectionCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other, [[maybe_unused]] HitDirection dir);
 
-	void SetEnableCollider(bool enable) {
-		obbCollider_->SetCollisionEnabled(enable);
-	}
 private:
-	///************************* 内部処理関数 *************************///
-
-	// 初期化関数
+	// ============================================================
+	// 内部処理
+	// ============================================================
 	void InitCollision() override;
-	void InitJson()override;
+	void InitJson() override;
 
-	// 手ジョイントのインデックスを探す
 	void FindHandJointIndex();
-
-	// 武器の位置をプレイヤーに合わせる
 	void SetPlayerWeaponPosition();
 
 private:
-	///************************* ポインタ *************************///
-	Camera* camera_ = nullptr;
-	Player* player_ = nullptr;
-	Object3d* obj3d_ = nullptr;
-	std::unique_ptr<ParticleEmitter> testEmitter_;
+	// ============================================================
+	// メンバ変数
+	// ============================================================
 
-	///************************* ジョイント関連 *************************///
+	// ------------------------------------------------------------
+	// システム連携・参照
+	// ------------------------------------------------------------
+	Camera* camera_ = nullptr;            // 描画に使用するカメラ
+	Player* player_ = nullptr;            // 盾を装備しているプレイヤー本体
+	Object3d* obj3d_ = nullptr;           // プレイヤーの3Dモデル（ジョイント探索用）
 
-	std::string handJointName_ = "mixamorig:LeftHand";   // 手ジョイント名
-	int handleIndex_ = 0;                                // 手ジョイントのインデックス
-	bool isValidJoint_ = false;                          // ジョイントが有効かどうか
+	// ------------------------------------------------------------
+	// パーティクル
+	// ------------------------------------------------------------
+	std::unique_ptr<ParticleEmitter> testEmitter_; // ガード成功時などのエフェクト
 
-	Vector3 offsetPos_{};
-	Vector3 offsetRot_{};
-	Vector3 offsetScale_{ 1.0f,1.0f,1.0f };
+	// ------------------------------------------------------------
+	// ジョイントアタッチ関連
+	// ------------------------------------------------------------
+	std::string handJointName_ = "mixamorig:LeftHand";  // アタッチ先の手ジョイント名
+	int handleIndex_ = 0;                               // ジョイントの配列インデックス
+	bool isValidJoint_ = false;                         // 正しいジョイントが見つかったか
+
+	Vector3 offsetPos_{};                               // 手からの位置オフセット
+	Vector3 offsetRot_{};                               // 手からの回転オフセット
+	Vector3 offsetScale_{ 1.0f,1.0f,1.0f };             // 盾のスケール
 };
-

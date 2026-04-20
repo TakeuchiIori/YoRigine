@@ -7,18 +7,29 @@
 #include <imgui.h>
 #endif
 
+// ============================================================
+// 初期化
+// ============================================================
 void DebugCamera::Initialize() {
-	VirtualCamera::Initialize(); // 基底の初期化（Scaleなどを1に）
+	VirtualCamera::Initialize();
 
+	// ------------------------------------------------------------
 	// 初期位置の設定
+	// ------------------------------------------------------------
 	transform_.translate = { 0.0f, 6.0f, -40.0f };
 
 	YoRigine::Input* input = YoRigine::Input::GetInstance();
 	prevMousePos_ = input->GetMousePosition();
 }
 
+// ============================================================
+// 更新処理
+// ============================================================
 void DebugCamera::Update() {
-	if (YoRigine::Input::GetInstance()->PushKey(DIK_LCONTROL)&& 
+	// ------------------------------------------------------------
+	// 有効無効の切り替え
+	// ------------------------------------------------------------
+	if (YoRigine::Input::GetInstance()->PushKey(DIK_LCONTROL) &&
 		YoRigine::Input::GetInstance()->PushKey(DIK_LSHIFT)) {
 		isMoving_ = !isMoving_;
 	}
@@ -27,13 +38,16 @@ void DebugCamera::Update() {
 	UpdateInput();
 }
 
+// ============================================================
+// 入力情報の更新処理
+// ============================================================
 void DebugCamera::UpdateInput() {
 	YoRigine::Input* input = YoRigine::Input::GetInstance();
 	Vector2 currentMousePos = input->GetMousePosition();
 
-	//------------------------------------------------------------
+	// ------------------------------------------------------------
 	// マウスによる回転 (右ドラッグ)
-	//------------------------------------------------------------
+	// ------------------------------------------------------------
 	if (input->IsPressMouse(1)) {
 		if (!isDragging_) {
 			isDragging_ = true;
@@ -42,7 +56,6 @@ void DebugCamera::UpdateInput() {
 		float deltaX = currentMousePos.x - prevMousePos_.x;
 		float deltaY = currentMousePos.y - prevMousePos_.y;
 
-		// 基底の rotate を更新
 		transform_.rotate.x += deltaY * rotateSpeed_ * 0.1f;
 		transform_.rotate.y += deltaX * rotateSpeed_ * 0.1f;
 		prevMousePos_ = currentMousePos;
@@ -51,12 +64,11 @@ void DebugCamera::UpdateInput() {
 		isDragging_ = false;
 	}
 
-	// 現在の回転から行列を作成（移動方向の計算用）
 	Matrix4x4 rotMat = MakeRotateMatrixXYZ(transform_.rotate);
 
-	//------------------------------------------------------------
-	// キーボードによる移動 (WASD)
-	//------------------------------------------------------------
+	// ------------------------------------------------------------
+	// キーボードによる移動 (WASD / QE)
+	// ------------------------------------------------------------
 	Vector3 move{ 0, 0, 0 };
 	if (input->PushKey(DIK_W)) move.z += moveSpeed_;
 	if (input->PushKey(DIK_S)) move.z -= moveSpeed_;
@@ -66,21 +78,18 @@ void DebugCamera::UpdateInput() {
 	if (input->PushKey(DIK_Q)) move.y -= moveSpeed_;
 	if (input->PushKey(DIK_E)) move.y += moveSpeed_;
 
-
-	// 回転に合わせて移動方向を変換して加算
 	transform_.translate += TransformNormal(move, rotMat);
 
-	//------------------------------------------------------------
+	// ------------------------------------------------------------
 	// コントローラーによる操作
-	//------------------------------------------------------------
+	// ------------------------------------------------------------
 	if (input->IsControllerConnected()) {
 		XINPUT_STATE joyState;
 		if (input->GetJoystickState(0, joyState)) {
-			// 右スティックで回転
+
 			transform_.rotate.x += static_cast<float>(joyState.Gamepad.sThumbRY) * rotateSpeedController_;
 			transform_.rotate.y += static_cast<float>(joyState.Gamepad.sThumbRX) * rotateSpeedController_;
 
-			// 左スティックで移動 (デッドゾーン 8000)
 			Vector3 stickMove{ 0, 0, 0 };
 			if (std::abs(joyState.Gamepad.sThumbLX) > 8000) stickMove.x = static_cast<float>(joyState.Gamepad.sThumbLX);
 			if (std::abs(joyState.Gamepad.sThumbLY) > 8000) stickMove.z = static_cast<float>(joyState.Gamepad.sThumbLY);
@@ -90,7 +99,6 @@ void DebugCamera::UpdateInput() {
 				transform_.translate += TransformNormal(stickMove, rotMat);
 			}
 
-			// L/Rトリガーで垂直移動
 			if (joyState.Gamepad.bLeftTrigger > 0) {
 				transform_.translate.y -= moveSpeedController_ * 0.1f * (joyState.Gamepad.bLeftTrigger / 255.0f);
 			}
@@ -101,6 +109,9 @@ void DebugCamera::UpdateInput() {
 	}
 }
 
+// ============================================================
+// エディタ用GUI描画
+// ============================================================
 void DebugCamera::DrawDebugGui() {
 #ifdef USE_IMGUI
 	ImGui::Text("デバッグカメラ設定");
@@ -124,14 +135,20 @@ void DebugCamera::DrawDebugGui() {
 #endif
 }
 
+// ============================================================
+// 保存
+// ============================================================
 void DebugCamera::Save(nlohmann::json& j) const {
-	VirtualCamera::Save(j); // 名前や座標などの共通項目
+	VirtualCamera::Save(j);
 	j["moveSpeed"] = moveSpeed_;
 	j["rotateSpeed"] = rotateSpeed_;
 	j["moveSpeedController"] = moveSpeedController_;
 	j["rotateSpeedController"] = rotateSpeedController_;
 }
 
+// ============================================================
+// 読み込み
+// ============================================================
 void DebugCamera::Load(const nlohmann::json& j) {
 	VirtualCamera::Load(j);
 	moveSpeed_ = j.value("moveSpeed", 0.5f);

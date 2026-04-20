@@ -3,9 +3,10 @@
 #include "../StateMachine.h"
 #include "PlayerMovement.h"
 
-/// <summary>
-/// 移動状態（歩行・走行を内包）
-/// </summary>
+// ============================================================
+// 移動ステートクラス
+// プレイヤーが入力によって移動(歩行・走行)している状態の処理を行う
+// ============================================================
 class MovingState : public IState<MovementState> {
 public:
 	MovingState(PlayerMovement* movement);
@@ -18,5 +19,5 @@ public:
 
 private:
 	PlayerMovement* movement_;
-	bool wasRunning_ = false;  // 前フレームで走行していたか
+	bool wasRunning_ = false;  // 前フレームで走行していたかどうか
 };

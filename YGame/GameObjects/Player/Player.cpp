@@ -54,9 +54,8 @@ void Player::Initialize(Camera* camera) {
 	playerShield_->SetObject(obj_.get());
 	playerShield_->Initialize(camera_);
 
+
 	testEmitter_ = std::make_unique<ParticleEmitter>("GuardParticle", wt_.translate_, 10);
-
-
 	healthUI_ = std::make_unique<PlayerHealthBarUI>(this);
 	healthUI_->Initialize();
 

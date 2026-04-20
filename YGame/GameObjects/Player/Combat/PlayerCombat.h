@@ -13,7 +13,9 @@
 #include <Particle/ParticleEmitter.h>
 #include "Collision/Core/CollisionDirection.h"
 
-// 戦闘状態
+// ============================================================
+// プレイヤーの戦闘状態
+// ============================================================
 enum class CombatState {
 	Idle,           // 待機
 	Attacking,      // 攻撃中
@@ -26,26 +28,33 @@ enum class CombatState {
 
 class Player;
 
-/// <summary>
-/// プレイヤーの戦闘管理クラス
-/// </summary>
+// ============================================================
+// プレイヤー戦闘管理クラス
+// 攻撃(Combo)や防御(Guard)の統合、戦闘状態(CombatState)の遷移を管理する
+// ============================================================
 class PlayerCombat {
 public:
-	///************************* 基本的関数 *************************///
+	// ============================================================
+	// 初期化と更新処理
+	// ============================================================
 	PlayerCombat(Player* owner);
 	~PlayerCombat() = default;
 
 	void Update(float deltaTime);
 	void Reset();
 
-	///************************* 攻撃実行 *************************///
+	// ============================================================
+	// 各種アクションの実行要求
+	// ============================================================
 	bool TryAttack(AttackType type);
 	bool TryDodge();
 	bool TryGuard();
 	bool TrySpecial();
 	bool TryCancel();
 
-	///************************* 状態確認 *************************///
+	// ============================================================
+	// 状態確認
+	// ============================================================
 	bool IsIdle() const;
 	bool IsAttacking() const;
 	bool IsDodging() const;
@@ -62,72 +71,82 @@ public:
 	bool StateChanged() const { return stateMachine_.StateChanged(); }
 	void ChangeState(CombatState newState) { stateMachine_.ChangeState(newState); }
 
-	///************************* コールバック設定 *************************///
-	
-	// アクション変更コールバック設定
+	// ============================================================
+	// コールバック設定・通知
+	// ============================================================
 	void SetActionCallback(std::function<void(const std::string&)> callback) {
 		onActionChanged_ = callback;
 	}
 
-	// Stateからアクションを通知
 	void NotifyAction(const std::string& action) {
 		if (onActionChanged_) {
 			onActionChanged_(action);
 		}
 	}
 
-	///************************* デバッグ *************************///
+	// ============================================================
+	// デバッグ表示
+	// ============================================================
 	void ShowDebugImGui();
 
-	///************************* アクセッサ *************************///
-
-	// コンボ・ガードシステム取得
+	// ============================================================
+	// アクセッサ
+	// ============================================================
 	PlayerCombo* GetPlayerCombo() const { return combo_.get(); }
 	Player* GetOwner() const { return owner_; }
 
-	// 衝突方向の設定・取得
 	void SetHitDirection(HitDirection dir) { lastHitDirection_ = dir; }
 	HitDirection GetHitDirection() const { return lastHitDirection_; }
 
-	// コンボ情報
 	int GetComboCount() const { return combo_->GetComboCount(); }
 	float GetComboDamageMultiplier() const { return combo_->GetComboDamageMultiplier(); }
 	ComboState GetComboState() const { return combo_->GetCurrentState(); }
 
-	// 状態クラスへアクセス
 	PlayerCombo* GetCombo() const { return combo_.get(); }
 	PlayerGuard* GetGuard() const { return guard_.get(); }
 
-	// StateMachine関連
 	CombatState GetCurrentState() const { return stateMachine_.GetCurrentState(); }
 	CombatState GetPreviousState() const { return stateMachine_.GetPreviousState(); }
 
-	// CC関連
 	int GetCurrentCC() const { return combo_->GetCurrentCC(); }
 	int GetMaxCC() const { return combo_->GetMaxCC(); }
 
 private:
-	///************************* 内部処理 *************************///
+	// ============================================================
+	// 内部処理
+	// ============================================================
 	void InitializeStateMachine();
 
 private:
-	///************************* メンバ変数 *************************///
+	// ============================================================
+	// メンバ変数
+	// ============================================================
 
-	// ポインタ
-	Player* owner_;
-	std::unique_ptr<PlayerCombo> combo_;
-	std::unique_ptr<PlayerGuard> guard_;
+	// ------------------------------------------------------------
+	// システム連携・オーナー参照
+	// ------------------------------------------------------------
+	Player* owner_;                               // この戦闘システムを所有するプレイヤーインスタンス
+	std::unique_ptr<PlayerCombo> combo_;          // 連続攻撃やCCの管理を行うコンボシステム
+	std::unique_ptr<PlayerGuard> guard_;          // ガード判定やパリィの管理を行うガードシステム
 
-	// StateMachine
-	StateMachine<CombatState> stateMachine_;
+	// ------------------------------------------------------------
+	// 状態管理 (StateMachine)
+	// ------------------------------------------------------------
+	StateMachine<CombatState> stateMachine_;      // 現在の戦闘ステート（待機、攻撃中、被弾など）を管理
 
-	std::unique_ptr<ParticleEmitter> guardEmitter_;
-	std::unique_ptr<ParticleEmitter> parryEmitter_;
+	// ------------------------------------------------------------
+	// エフェクト・パーティクル
+	// ------------------------------------------------------------
+	std::unique_ptr<ParticleEmitter> guardEmitter_;   // ガード時のエフェクト生成
+	std::unique_ptr<ParticleEmitter> parryEmitter_;   // パリィ成功時のエフェクト生成
 
-	// コールバック
-	std::function<void(const std::string&)> onActionChanged_;
+	// ------------------------------------------------------------
+	// コールバック・イベント通信
+	// ------------------------------------------------------------
+	std::function<void(const std::string&)> onActionChanged_; // アニメーション名などの行動変更を外部に通知するコールバック
 
-	// 最後に受けたヒットの方向
-	HitDirection lastHitDirection_ = HitDirection::Front;
-
+	// ------------------------------------------------------------
+	// 戦闘のパラメータ状態
+	// ------------------------------------------------------------
+	HitDirection lastHitDirection_ = HitDirection::Front;     // 直前に受けた攻撃の方向（ダメージモーションの分岐用）
 };

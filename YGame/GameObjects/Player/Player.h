@@ -18,17 +18,17 @@
 #include "Weapon/PlayerShield.h"
 #include "UI/HealthBar/PlayerHealthBarUI.h"
 
-/// <summary>
-/// ゲームシーンのプレイヤークラス
-/// </summary>
+// ============================================================
+// ゲームシーンのプレイヤークラス
+// ============================================================
 class Player : public BaseObject {
 public:
-	///************************* 基本関数 *************************///
+	// ============================================================
+	// 基本関数
+	// ============================================================
 	~Player();
 	void Initialize(Camera* camera) override;
-
 	void Update() override;
-
 	void Draw() override;
 	void DrawAnimation() override;
 	void DrawCollision() override;
@@ -37,7 +37,9 @@ public:
 	void DrawImGui();
 	void DrawVfx();
 
-	///************************* 当たり判定 *************************///
+	// ============================================================
+	// 当たり判定
+	// ============================================================
 	void OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other);
 	void OnCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other);
 	void OnExitCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other);
@@ -45,40 +47,33 @@ public:
 	void OnEnterDirectionCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other, [[maybe_unused]] HitDirection dir);
 
 public:
-	///************************* 公開関数 *************************///
-
-	// プレイヤーの状態をリセット
+	// ============================================================
+	// 公開関数
+	// ============================================================
 	void Reset();
-	// ダメージを受ける関数
 	void TakeDamage(int damage);
-	// 復活する関数
 	void Revive(int reviveHP);
-	// バトルシーンから開始する際の初期位置設定
 	void SetInitialPosition();
 
 public:
-	///************************* アクセッサ *************************///
-
-	// 位置関連
+	// ============================================================
+	// アクセッサ
+	// ============================================================
 	Vector3 GetWorldPosition();
 	void SetPosition(const Vector3& position) { wt_.translate_ = position; }
 	Vector3 GetCameraRotation() const;
 
-	// オブジェクト取得
 	Object3d* GetObject3d() { return obj_.get(); }
 	const Object3d* GetObject3d() const { return obj_.get(); }
 
-	// システム取得
 	PlayerMovement* GetMovement() const { return movement_.get(); }
 	PlayerCombat* GetCombat() const { return combat_.get(); }
 	PlayerSword* GetSword() const { return playerSword_.get(); }
 	PlayerShield* GetShield() const { return playerShield_.get(); }
 
-	// カメラ設定
 	void SetFollowCamera(FollowCamera* camera) { followCamera_ = camera; }
 	FollowCamera* GetFollowCamera() const { return followCamera_; }
 
-	// モーション速度
 	float GetMotionSpeed() const { return motionSpeed_; }
 	void SetMotionSpeed(float speed) { motionSpeed_ = speed; }
 	const float* GetMotionSpeedArray() const { return motionSpeed; }
@@ -90,7 +85,6 @@ public:
 		if (index >= 0 && index < 3) motionSpeed[index] = speed;
 	}
 
-	// HP関連
 	int32_t GetHP() const { return hp_; }
 	uint32_t GetMaxHP() const { return maxHP_; }
 	bool IsAlive() const { return isAlive_; }
@@ -98,24 +92,22 @@ public:
 	void SetMaxHP(uint32_t maxHP) { maxHP_ = maxHP; }
 
 private:
-	///************************* 内部処理関数 *************************///
-
-	// 初期化関数
+	// ============================================================
+	// 内部処理関数
+	// ============================================================
 	void InitCollision() override;
 	void InitJson() override;
 	void InitStates();
 	void InitCombatSystem();
 
-	// 入力処理関数
 	void HandleCombatInput();
-	// モーションの再生時間を更新する関数
 	void UpdateMotionTime();
-	// 指定方向を向く関数
 	void LookAtDirection(const Vector3& direction);
-private:
-	///************************* メンバ変数 *************************///
 
-	// ポインタ
+private:
+	// ============================================================
+	// メンバ変数
+	// ============================================================
 	YoRigine::Input* input_ = nullptr;
 	FollowCamera* followCamera_ = nullptr;
 
@@ -130,16 +122,13 @@ private:
 
 	Vector3 anchorPoint_ = { 0.0f, -1.0f, 0.0f };
 
-	// モーションの再生時間係数
 	float motionSpeed_ = 1.0f;
 	float preMotionSpeed_ = 1.0f;
 
-	// ステータス
 	uint32_t maxHP_ = 400;
 	int32_t hp_ = 400;
 	bool isAlive_ = true;
 	const std::string emitterPath_ = "Player";
 
-	// モーション速度配列（0:Idle, 1:Attack, 2:Guard, 3:Dead）
-	float motionSpeed[4] = { 1.0f, 1.0f, 1.0f,1.0f };
+	float motionSpeed[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
 };

@@ -5,48 +5,48 @@
 
 class FollowCamera;
 
-/// <summary>
-/// カメラステートを編集・管理するための統合エディタ
-/// </summary>
+// ============================================================
+// カメラ��テートを編集・管理するための統合エディタ
+// ============================================================
 class CameraStateEditor {
 public:
-    static CameraStateEditor* GetInstance();
+	// ============================================================
+	// 基本関数
+	// ============================================================
+	static CameraStateEditor* GetInstance();
 
-    // エディタUIの描画
-    void DrawEditorWindow();
+	void DrawEditorWindow();
+	void SetEditingState(std::unique_ptr<CameraState> state);
+	void SetCamera(FollowCamera* camera) { camera_ = camera; }
 
-    // 現在編集中のステートを設定
-    void SetEditingState(std::unique_ptr<CameraState> state);
+	CameraState* GetEditingState() const { return editingState_.get(); }
 
-    // カメラのセット（プレビュー用）
-    void SetCamera(FollowCamera* camera) { camera_ = camera; }
-
-    // 編集中ステートの取得
-    CameraState* GetEditingState() const { return editingState_.get(); }
-
-    // プレビュー操作（FollowCamera::DrawDebugGui からも呼べるよう公開）
-    void StartPreview();
-    void StopPreview();
-
-    // FollowCamera::Update() から演出終了を通知してもらう
-    void NotifyPreviewFinished() { isPreviewMode_ = false; }
+	// ============================================================
+	// プレビュー操作
+	// ============================================================
+	void StartPreview();
+	void StopPreview();
+	void NotifyPreviewFinished() { isPreviewMode_ = false; }
 
 private:
-    CameraStateEditor() = default;
-    ~CameraStateEditor() = default;
-    CameraStateEditor(const CameraStateEditor&) = delete;
-    CameraStateEditor& operator=(const CameraStateEditor&) = delete;
+	// ============================================================
+	// 内部処理・UI描画関数
+	// ============================================================
+	CameraStateEditor() = default;
+	~CameraStateEditor() = default;
+	CameraStateEditor(const CameraStateEditor&) = delete;
+	CameraStateEditor& operator=(const CameraStateEditor&) = delete;
 
-    void DrawStateCreationUI();
-    void DrawStateEditorUI();
-    void DrawPresetManagerUI();
-    void DrawPreviewControlUI();
+	void DrawStateCreationUI();
+	void DrawStateEditorUI();
+	void DrawPresetManagerUI();
+	void DrawPreviewControlUI();
 
-    std::unique_ptr<CameraState> editingState_;
-    FollowCamera* camera_ = nullptr;
+private:
+	std::unique_ptr<CameraState> editingState_;
+	FollowCamera* camera_ = nullptr;
 
-    // UI状態
-    int selectedStateType_ = 0;
-    char newPresetName_[64] = "";
-    bool isPreviewMode_ = false;
+	int selectedStateType_ = 0;
+	char newPresetName_[64] = "";
+	bool isPreviewMode_ = false;
 };

@@ -3,12 +3,16 @@
 #include "../Combat/PlayerCombat.h"
 #include "Collision/Core/CollisionDirection.h"
 
+// ============================================================
+// 被弾戦闘ステートクラス
+// 攻撃を受けた際ののけぞりモーションや移動制限を管理する
+// ============================================================
 class HitCombatState : public IState<CombatState>
 {
 public:
     // 衝突方向を受け取るコンストラクタ
     HitCombatState(PlayerCombat* combat);
-	~HitCombatState() = default;
+    ~HitCombatState() = default;
 
     void OnEnter() override;
     void OnExit() override;
@@ -17,4 +21,3 @@ public:
 private:
     PlayerCombat* combat_;
 };
-

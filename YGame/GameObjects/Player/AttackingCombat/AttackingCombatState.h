@@ -3,9 +3,10 @@
 #include "../StateMachine.h"
 #include "../Combat/PlayerCombat.h"
 
-/// <summary>
-/// 攻撃状態
-/// </summary>
+// ============================================================
+// 攻撃ステートクラス
+// 攻撃中における移動制限やエフェクト制御を担当する
+// ============================================================
 class AttackingCombatState : public IState<CombatState> {
 public:
 	AttackingCombatState(PlayerCombat* combat);

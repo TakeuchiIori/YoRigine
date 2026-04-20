@@ -1,32 +1,43 @@
 #pragma once
 #include "CinematicCameraState.h"
 
-/// <summary>
-/// パリィ成功時のカメラワーク
-/// </summary>
+// ============================================================
+// パリィ成功時のカメラワークステート
+// ============================================================
 class ParryCameraState : public CinematicCameraState {
 public:
-    void Enter(FollowCamera* camera) override;
-    const char* GetStateName() const override { return "Parry"; }
-    
-    // パリィの演出タイプ
-    enum class ParryType {
-        Quick,    // 素早いカット
-        Dramatic, // ドラマチック
-        SlowMotion // スローモーション風
-    };
-    
-    void SetParryType(ParryType type) { parryType_ = type; }
-    ParryType GetParryType() const { return parryType_; }
-    
-    // 保存・読込
-    void Save(nlohmann::json& j) const override;
-    void Load(const nlohmann::json& j) override;
-    
-    // ImGuiでの編集
-    void DrawEditGui() override;
-    bool IsPerformance() const override { return true; }
+	// パリィ演出のタイプ定義
+	enum class ParryType {
+		Quick,
+		Dramatic,
+		SlowMotion
+	};
+
+public:
+	// ============================================================
+	// 基本関数
+	// ============================================================
+	void Enter(FollowCamera* camera) override;
+	const char* GetStateName() const override { return "Parry"; }
+	bool IsPerformance() const override { return true; }
+
+	// ============================================================
+	// パラメータアクセス
+	// ============================================================
+	void SetParryType(ParryType type) { parryType_ = type; }
+	ParryType GetParryType() const { return parryType_; }
+
+	// ============================================================
+	// セーブ・ロード・GUI
+	// ============================================================
+	void Save(nlohmann::json& j) const override;
+	void Load(const nlohmann::json& j) override;
+	void DrawEditGui() override;
+
 private:
-    void SetupControlPoints(FollowCamera* camera);
-    ParryType parryType_ = ParryType::Quick;
+	// ============================================================
+	// 内部処理
+	// ============================================================
+	void SetupControlPoints(FollowCamera* camera);
+	ParryType parryType_ = ParryType::Quick;
 };

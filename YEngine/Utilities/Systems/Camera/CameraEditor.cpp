@@ -4,32 +4,46 @@
 #include <imgui.h>
 #include <fstream>
 
+// ============================================================
+// 初期化
+// ============================================================
 void CameraEditor::Initialize() {
 	selectedCameraName_ = "";
 }
 
+// ============================================================
+// ファイルのロード、存在しなければデフォルトを生成して保存
+// ============================================================
 void CameraEditor::LoadFileOrDefault(const std::string& filePath, const std::string& sceneType)
 {
 	std::ifstream file(filePath);
 	if (file.is_open()) {
-		// ✅ JSONが存在するなら普通に読む
+		// ------------------------------------------------------------
+		// JSONが存在する場合は通常ロード
+		// ------------------------------------------------------------
 		LoadFile(filePath);
 	}
 	else {
-		// ✅ JSONがなければデフォルトを生成して保存
+		// ------------------------------------------------------------
+		// JSONがない場合はデフォルトカメラを生成し、新規保存する
+		// ------------------------------------------------------------
 		InitializeDefaults(sceneType);
-		SaveFile(filePath); // 次回からはJSONで管理できる
+		SaveFile(filePath);
 	}
 }
 
+// ============================================================
+// 毎フレームの更新（ImGui描画）
+// ============================================================
 void CameraEditor::Update() {
 #ifdef USE_IMGUI
-	// 新規カメラの追加
+	// ------------------------------------------------------------
+	// 新規カメラの追加UI
+	// ------------------------------------------------------------
 	if (ImGui::CollapsingHeader("カメラの追加", ImGuiTreeNodeFlags_DefaultOpen)) {
 		static int selectedTypeIdx = 0;
-		auto types = CameraFactory::GetTypeList(); // ["DebugCamera", "FollowCamera"] 等
+		auto types = CameraFactory::GetTypeList();
 
-		// 型の選択コンボボックス
 		if (ImGui::BeginCombo("種類", types[selectedTypeIdx].c_str())) {
 			for (int i = 0; i < types.size(); i++) {
 				if (ImGui::Selectable(types[i].c_str(), selectedTypeIdx == i)) selectedTypeIdx = i;
@@ -43,7 +57,6 @@ void CameraEditor::Update() {
 			auto newCam = CameraFactory::Create(types[selectedTypeIdx]);
 			if (newCam) {
 				newCam->Initialize();
-				// ここで名前をセットしてDirectorに登録！
 				CameraDirector::GetInstance()->AddCamera(newCameraName_, newCam);
 				selectedCameraName_ = newCameraName_;
 			}
@@ -52,7 +65,9 @@ void CameraEditor::Update() {
 
 	ImGui::Separator();
 
-	// カメラリスト
+	// ------------------------------------------------------------
+	// 登録済みカメラ一覧の表示と選択
+	// ------------------------------------------------------------
 	ImGui::Text("登録済みカメラ一覧");
 	auto& cameras = CameraDirector::GetInstance()->GetAllCameras();
 
@@ -65,13 +80,14 @@ void CameraEditor::Update() {
 
 	ImGui::Separator();
 
-	// 選択中カメラの詳細設定
+	// ------------------------------------------------------------
+	// 選択中カメラの詳細設定UI
+	// ------------------------------------------------------------
 	if (!selectedCameraName_.empty()) {
 		auto cam = CameraDirector::GetInstance()->GetCamera(selectedCameraName_);
 		if (cam) {
 			ImGui::Text("編集中のカメラ: %s", selectedCameraName_.c_str());
 
-			// 共通パラメータ
 			int priority = cam->GetPriority();
 			if (ImGui::DragInt("優先度 (Priority)", &priority, 1, 0, 100)) {
 				cam->SetPriority(priority);
@@ -82,7 +98,9 @@ void CameraEditor::Update() {
 
 	ImGui::Separator();
 
-	// 保存・読み込み
+	// ------------------------------------------------------------
+	// 全体保存・読み込みボタン
+	// ------------------------------------------------------------
 	if (ImGui::Button("すべての設定を保存")) {
 		SaveFile(filePath_);
 	}
@@ -93,13 +111,17 @@ void CameraEditor::Update() {
 #endif // USE_IMGUI
 }
 
+// ============================================================
+// 全カメラ設定の保存
+// ============================================================
 void CameraEditor::SaveFile(const std::string& filePath) {
 	nlohmann::json root;
 	auto& cameras = CameraDirector::GetInstance()->GetAllCameras();
 
 	for (auto& [name, cam] : cameras) {
 		nlohmann::json camJson;
-		// 型情報を保存するのが最重要！ (Factoryが復元に使う)
+
+		// 型情報を保存（Factoryが復元時に使用する）
 		camJson["type"] = CameraFactory::GetTypeName(cam);
 		cam->Save(camJson);
 		root["cameras"].push_back(camJson);
@@ -111,6 +133,9 @@ void CameraEditor::SaveFile(const std::string& filePath) {
 	}
 }
 
+// ============================================================
+// 全カメラ設定の読み込み
+// ============================================================
 void CameraEditor::LoadFile(const std::string& filePath) {
 	std::ifstream file(filePath);
 	if (!file.is_open()) return;
@@ -118,7 +143,7 @@ void CameraEditor::LoadFile(const std::string& filePath) {
 	nlohmann::json root;
 	file >> root;
 
-	// 現在のカメラを一度クリア（任意）
+	// 現在のカメラ情報をクリア
 	CameraDirector::GetInstance()->Initialize();
 
 	for (auto& item : root["cameras"]) {
@@ -130,23 +155,32 @@ void CameraEditor::LoadFile(const std::string& filePath) {
 			CameraDirector::GetInstance()->AddCamera(cam->GetName(), cam);
 		}
 	}
+
+	// 読み込み直後にカメラをスナップさせる
 	CameraDirector::GetInstance()->SnapToActiveCamera();
 }
 
+// ============================================================
+// シーンタイプに応じたデフォルトカメラの生成
+// ============================================================
 void CameraEditor::InitializeDefaults(const std::string& sceneType)
 {
 	auto director = CameraDirector::GetInstance();
 
-	// デバッグカメラは共通で必ず追加
+	// ------------------------------------------------------------
+	// 全シーン共通のデバッグカメラ
+	// ------------------------------------------------------------
 	auto debug = CameraFactory::Create("Debug");
 	debug->Initialize();
 	director->AddCamera("MainDebug", debug);
 
+	// ------------------------------------------------------------
+	// シーン固有のカメラ設定
+	// ------------------------------------------------------------
 	if (sceneType == "Game") {
 		auto follow = CameraFactory::Create("Follow");
 		follow->Initialize();
 		director->AddCamera("PlayerFollow", follow);
-
 	}
 	else if (sceneType == "Clear") {
 		auto clear = CameraFactory::Create("Clear");

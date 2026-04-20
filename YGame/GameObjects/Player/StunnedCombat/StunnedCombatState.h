@@ -3,9 +3,10 @@
 #include "../StateMachine.h"
 #include "../Combat/PlayerCombat.h"
 
-/// <summary>
-/// スタン状態
-/// </summary>
+// ============================================================
+// スタン戦闘ステートクラス
+// 大きなダメージを受けた際など、一定時間行動不能になる状態を管理する
+// ============================================================
 class StunnedCombatState : public IState<CombatState> {
 public:
 	StunnedCombatState(PlayerCombat* combat);

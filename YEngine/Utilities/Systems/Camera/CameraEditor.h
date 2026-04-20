@@ -2,28 +2,42 @@
 #include <string>
 #include <memory>
 
+// ============================================================
+// カメラエディタクラス
+// ImGuiを使ったカメラ設定の編集や、ファイルセーブ・ロードを担う
+// ============================================================
 class CameraEditor {
 public:
-    void Initialize();
-    void LoadFileOrDefault(const std::string& filePath, const std::string& sceneType);
+	// ============================================================
+	// 基本関数
+	// ============================================================
+	void Initialize();
+	void Update();
 
-    void Update(); // 毎フレーム呼ぶ ImGui描画
+	// ============================================================
+	// ファイル入出力
+	// ============================================================
+	void LoadFileOrDefault(const std::string& filePath, const std::string& sceneType);
+	void SaveFile(const std::string& filePath);
+	void LoadFile(const std::string& filePath);
 
-    // シーン全体のカメラ構成を保存・読込
-    void SaveFile(const std::string& filePath);
-    void LoadFile(const std::string& filePath);
-
-
-    // シーンごとにパスを設定できるようにする
-    void SetFilePath(const std::string& path) { filePath_ = path; }
-    const std::string& GetFilePath() const { return filePath_; }
+	// ============================================================
+	// アクセッサ
+	// ============================================================
+	void SetFilePath(const std::string& path) { filePath_ = path; }
+	const std::string& GetFilePath() const { return filePath_; }
 
 private:
-    void InitializeDefaults(const std::string& sceneType);
+	// ============================================================
+	// 内部処理
+	// ============================================================
+	void InitializeDefaults(const std::string& sceneType);
 
 private:
-    std::string selectedCameraName_; // 現在選択中のカメラ
-    char newCameraName_[64] = "NewCamera";
-    std::string filePath_ = "Resources/Json/VirtualCameraData/VirtualCameras.json"; // デフォルト
+	// ============================================================
+	// メンバ変数
+	// ============================================================
+	std::string selectedCameraName_;
+	char newCameraName_[64] = "NewCamera";
+	std::string filePath_ = "Resources/Json/VirtualCameraData/VirtualCameras.json";
 };
-

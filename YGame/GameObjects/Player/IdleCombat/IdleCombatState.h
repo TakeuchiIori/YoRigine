@@ -3,9 +3,10 @@
 #include "../StateMachine.h"
 #include "../Combat/PlayerCombat.h"
 
-/// <summary>
-/// 待機状態
-/// </summary>
+// ============================================================
+// 待機戦闘ステートクラス
+// 何もアクションを行っていない状態を管理する
+// ============================================================
 class IdleCombatState : public IState<CombatState> {
 public:
 	IdleCombatState(PlayerCombat* combat);
