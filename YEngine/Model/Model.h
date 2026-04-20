@@ -30,7 +30,7 @@
 // assimp
 #include <assimp/scene.h>
 #include <map>
-#include "Motion/MotionSystem.h"
+#include "Motion/Core/MotionSystem.h"
 
 // モデルクラス
 class SrvManager;

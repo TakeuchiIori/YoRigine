@@ -2,7 +2,7 @@
 
 #include "Systems/Camera/Camera.h"
 #include "Model.h"
-#include "Motion/MotionSystem.h"
+#include "../Core/MotionSystem.h"
 #include "Skeleton/Joint.h"
 #include "Skeleton/Skeleton.h"
 #include "Skeleton/BoneGizmable.h"

@@ -5,8 +5,8 @@
 #include <vector>
 #include <string>
 
-#include "../Skeleton/Joint.h"
-#include "../Node/Node.h"
+#include "../../Skeleton/Joint.h"
+#include "../../Node/Node.h"
 #include "Quaternion.h"
 #include "Vector3.h"
 

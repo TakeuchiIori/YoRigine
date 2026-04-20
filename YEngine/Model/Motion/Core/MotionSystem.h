@@ -1,8 +1,8 @@
 #pragma once
 #include "Motion.h"
-#include "../Skeleton/Skeleton.h"
-#include "../Skeleton/SkinCluster.h"
-#include "../Node/Node.h"
+#include "../../Skeleton/Skeleton.h"
+#include "../../Skeleton/SkinCluster.h"
+#include "../../Node/Node.h"
 #include "Quaternion.h"
 
 #include <functional>

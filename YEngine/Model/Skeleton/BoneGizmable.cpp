@@ -1,5 +1,5 @@
 #include "BoneGizmable.h"
-#include <Motion/MotionEditor.h>
+#include <Motion/Editor/MotionEditor.h>
 
 #ifdef USE_IMGUI
 #include "ImGuizmo.h"
