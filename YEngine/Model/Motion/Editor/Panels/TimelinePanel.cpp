@@ -63,99 +63,117 @@ void TimelinePanel::DrawImGui()
 		return;
 	}
 
-	float duration = context_->currentMotion->GetDuration();
-	const int totalFrames = std::max(1, static_cast<int>(duration * fps_));
+	if (ImGui::CollapsingHeader("タイムライン", ImGuiTreeNodeFlags_DefaultOpen))
+	{
 
-	float canvasW = ImGui::GetContentRegionAvail().x;
-
-	ImGui::Text("Time:");
-	ImGui::SameLine(0, 4);
-	ImGui::SetNextItemWidth(canvasW - 300);
-
-	Object3d* target = context_->GetTargetObject();
-
-	// スライダー操作時に一時停止＆同期
-	if (ImGui::SliderFloat("##scrub", &context_->scrubTime, 0.0f, duration, "%.3f s")) {
-		if (target && target->GetModel() && target->GetModel()->GetMotionSystem()) {
-			auto* ms = target->GetModel()->GetMotionSystem();
-			ms->Stop();
-			context_->isPlaying = false;
-			ms->SetAnimationTime(context_->scrubTime);
+		if (context_->currentMotion != editingMotion_) {
+			tracksDirty_ = true;
+			editingMotion_ = context_->currentMotion; // 記憶しておく
 		}
-		dopeSheet_.SetSeekFrame(static_cast<int>(context_->scrubTime * fps_));
-	}
-	if (ImGui::IsItemHovered()) ImGui::SetTooltip("クリック/ドラッグで時刻を移動");
-
-	ImGui::SameLine(0, 8);
-	if (ImGui::SmallButton("|<")) {
-		context_->scrubTime = 0;
-		if (target && target->GetModel() && target->GetModel()->GetMotionSystem()) {
-			target->GetModel()->GetMotionSystem()->SetAnimationTime(0.0f);
+		if (context_->requireTimelineRebuild) {
+			tracksDirty_ = true;
+			context_->requireTimelineRebuild = false;
 		}
-		dopeSheet_.SetSeekFrame(0);
-	}
-	if (ImGui::IsItemHovered()) ImGui::SetTooltip("先頭に戻る");
 
-	ImGui::SameLine(0, 14);
-	ImGui::TextColored(ImVec4(1.0f, 0.59f, 0.2f, 1.0f), (std::string(Icon::ArrowsAlt) + " 位置").c_str());
-	ImGui::SameLine(0, 6);
-	ImGui::TextColored(ImVec4(0.35f, 0.78f, 0.35f, 1.0f), (std::string(Icon::SyncAlt) + " 回転").c_str());
-	ImGui::SameLine(0, 6);
-	ImGui::TextColored(ImVec4(0.31f, 0.59f, 1.0f, 1.0f), (std::string(Icon::ExpandArrowsAlt) + " 拡縮").c_str());
-	ImGui::SameLine(0, 6);
-	ImGui::TextColored(ImVec4(1.0f, 0.94f, 0.2f, 1.0f), (std::string(Icon::CheckCircle) + " 選択中").c_str());
+		// フラグが立っていたらトラック（ドープシートの行とキーフレーム）を作り直す
+		if (tracksDirty_) {
+			RebuildTracks();
+			tracksDirty_ = false;
+		}
 
-	ImGui::Separator();
+		float duration = context_->currentMotion->GetDuration();
+		const int totalFrames = std::max(1, static_cast<int>(duration * fps_));
+		float canvasW = ImGui::GetContentRegionAvail().x;
 
-	if (tracksDirty_) {
-		RebuildTracks();
-		tracksDirty_ = false;
-	}
+		ImGui::Text("Time:");
+		ImGui::SameLine(0, 4);
+		ImGui::SetNextItemWidth(canvasW - 300);
 
-	// ドープシート操作時に一時停止＆同期
-	dopeSheet_.SetSeekCallback([this](int frame) {
-		context_->scrubTime = frame / static_cast<float>(fps_);
-		Object3d* t = context_->GetTargetObject();
-		if (t && t->GetModel()) {
-			auto* ms = t->GetModel()->GetMotionSystem();
-			if (ms) {
+		Object3d* target = context_->GetTargetObject();
+
+		// スライダー操作時に一時停止＆同期
+		if (ImGui::SliderFloat("##scrub", &context_->scrubTime, 0.0f, duration, "%.3f s")) {
+			if (target && target->GetModel() && target->GetModel()->GetMotionSystem()) {
+				auto* ms = target->GetModel()->GetMotionSystem();
 				ms->Stop();
 				context_->isPlaying = false;
 				ms->SetAnimationTime(context_->scrubTime);
 			}
+			dopeSheet_.SetSeekFrame(static_cast<int>(context_->scrubTime * fps_));
 		}
-		});
+		if (ImGui::IsItemHovered()) ImGui::SetTooltip("クリック/ドラッグで時刻を移動");
 
-	dopeSheet_.SetDeleteKeyCallback([this](int trackIdx, int keyIdx) {
-		if (trackIdx >= static_cast<int>(tracks_.size())) return;
-		if (!context_->currentMotion) return;
-		if (keyIdx >= static_cast<int>(tracks_[trackIdx].keys.size())) return;
-		int frame = tracks_[trackIdx].keys[keyIdx].frame;
-		float t = frame / static_cast<float>(fps_);
-		context_->DeleteKeyframe(context_->selKF.boneName, t);
-		tracksDirty_ = true;
-		context_->statusMsg = "KF 削除";
-		});
-
-	bool changed = dopeSheet_.Draw("MotionTimeline", tracks_, totalFrames, fps_);
-
-	if (changed) {
-		ApplyTracksToMotion();
-		tracksDirty_ = true;
-		context_->statusMsg = "KF 移動完了";
-	}
-
-	{
-		int seekFrame = dopeSheet_.GetSeekFrame();
-		float newTime = seekFrame / static_cast<float>(fps_);
-		if (std::abs(newTime - context_->scrubTime) > 1e-4f) {
-			context_->scrubTime = newTime;
+		ImGui::SameLine(0, 8);
+		if (ImGui::SmallButton("|<")) {
+			context_->scrubTime = 0;
+			if (target && target->GetModel() && target->GetModel()->GetMotionSystem()) {
+				target->GetModel()->GetMotionSystem()->SetAnimationTime(0.0f);
+			}
+			dopeSheet_.SetSeekFrame(0);
 		}
-	}
+		if (ImGui::IsItemHovered()) ImGui::SetTooltip("先頭に戻る");
 
-	if (draggingKF_ && !ImGui::IsMouseDown(0)) {
-		draggingKF_ = false;
-		context_->statusMsg = "KF 移動了";
+		ImGui::SameLine(0, 14);
+		ImGui::TextColored(ImVec4(1.0f, 0.59f, 0.2f, 1.0f), (std::string(Icon::ArrowsAlt) + " 位置").c_str());
+		ImGui::SameLine(0, 6);
+		ImGui::TextColored(ImVec4(0.35f, 0.78f, 0.35f, 1.0f), (std::string(Icon::SyncAlt) + " 回転").c_str());
+		ImGui::SameLine(0, 6);
+		ImGui::TextColored(ImVec4(0.31f, 0.59f, 1.0f, 1.0f), (std::string(Icon::ExpandArrowsAlt) + " 拡縮").c_str());
+		ImGui::SameLine(0, 6);
+		ImGui::TextColored(ImVec4(1.0f, 0.94f, 0.2f, 1.0f), (std::string(Icon::CheckCircle) + " 選択中").c_str());
+
+		ImGui::Separator();
+
+		if (tracksDirty_) {
+			RebuildTracks();
+			tracksDirty_ = false;
+		}
+
+		// ドープシート操作時に一時停止＆同期
+		dopeSheet_.SetSeekCallback([this](int frame) {
+			context_->scrubTime = frame / static_cast<float>(fps_);
+			Object3d* t = context_->GetTargetObject();
+			if (t && t->GetModel()) {
+				auto* ms = t->GetModel()->GetMotionSystem();
+				if (ms) {
+					ms->Stop();
+					context_->isPlaying = false;
+					ms->SetAnimationTime(context_->scrubTime);
+				}
+			}
+			});
+
+		dopeSheet_.SetDeleteKeyCallback([this](int trackIdx, int keyIdx) {
+			if (trackIdx >= static_cast<int>(tracks_.size())) return;
+			if (!context_->currentMotion) return;
+			if (keyIdx >= static_cast<int>(tracks_[trackIdx].keys.size())) return;
+			int frame = tracks_[trackIdx].keys[keyIdx].frame;
+			float t = frame / static_cast<float>(fps_);
+			context_->DeleteKeyframe(context_->selKF.boneName, t);
+			tracksDirty_ = true;
+			context_->statusMsg = "KF 削除";
+			});
+
+		bool changed = dopeSheet_.Draw("MotionTimeline", tracks_, totalFrames, fps_);
+
+		if (changed) {
+			ApplyTracksToMotion();
+			tracksDirty_ = true;
+			context_->statusMsg = "KF 移動完了";
+		}
+
+		{
+			int seekFrame = dopeSheet_.GetSeekFrame();
+			float newTime = seekFrame / static_cast<float>(fps_);
+			if (std::abs(newTime - context_->scrubTime) > 1e-4f) {
+				context_->scrubTime = newTime;
+			}
+		}
+
+		if (draggingKF_ && !ImGui::IsMouseDown(0)) {
+			draggingKF_ = false;
+			context_->statusMsg = "KF 移動了";
+		}
 	}
 #endif
 }

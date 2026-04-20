@@ -34,4 +34,6 @@ private:
 
 	// KF ドラッグ移動
 	bool  draggingKF_ = false;
+
+	Motion* editingMotion_ = nullptr; // ドープシートで現在編集しているモーション（変更検知用）
 };
