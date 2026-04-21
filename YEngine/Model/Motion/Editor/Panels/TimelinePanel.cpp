@@ -3,6 +3,8 @@
 #include "Object3D/ObjectManager.h"
 #include "Model.h"
 #include "../../Core/MotionSystem.h"
+#include <set>
+#include <algorithm>
 
 #ifdef USE_IMGUI
 #include <imgui.h>
@@ -13,7 +15,13 @@ void TimelinePanel::Initialize(MotionEditorContext* context)
 {
 	context_ = context;
 
-	// シーク時のコールバック設定（1回だけ登録）
+	// ── 概要トラックの一括移動コールバック ──
+	// サマリーキーがドラッグされた時、全ボーン・全チャンネルを一括移動する
+	dopeSheet_.SetSummaryKeyMovedCallback([this](int fromFrame, int delta) {
+		OnSummaryKeyMoved(fromFrame, delta);
+		});
+
+	// ── シーク時のコールバック設定（1回だけ登録）──
 	dopeSheet_.SetSeekCallback([this](int frame) {
 		context_->scrubTime = frame / static_cast<float>(fps_);
 		Object3d* t = context_->GetTargetObject();
@@ -240,6 +248,9 @@ void TimelinePanel::RebuildTracks()
 			trackBoneMap_.push_back({ boneName, 2 });
 		}
 	}
+
+	// ── 概要トラックを先頭に挿入 ──
+	BuildSummaryTrack();
 }
 
 void TimelinePanel::ApplyTracksToMotion()
@@ -250,7 +261,11 @@ void TimelinePanel::ApplyTracksToMotion()
 	{
 		if (ti >= static_cast<int>(trackBoneMap_.size())) break;
 		const auto& [boneName, channel] = trackBoneMap_[ti];
+
+		// channel == -2: 概要トラック（スキップ）
+		// channel == -1: グループヘッダー（スキップ）
 		if (channel < 0) continue;
+
 		if (!context_->currentMotion->animation_.nodeAnimations_.count(boneName)) continue;
 
 		auto& na = context_->currentMotion->animation_.nodeAnimations_[boneName];
@@ -272,4 +287,89 @@ void TimelinePanel::ApplyTracksToMotion()
 	}
 }
 
-// RebuildTracks() や ApplyTracksToMotion() の実装は既存コードそのまま移植可能
+// ============================================================
+// 概要トラック生成
+//   全ボーン・全チャンネルのKF時刻を収集して重複排除し、
+//   1行のサマリートラックとして先頭に挿入する
+// ============================================================
+void TimelinePanel::BuildSummaryTrack()
+{
+	if (!context_->currentMotion) return;
+
+	// 全チャンネルのフレーム番号を収集（重複排除）
+	std::set<int> allFrames;
+	for (const auto& [name, na] : context_->currentMotion->animation_.nodeAnimations_) {
+		for (const auto& kf : na.translate.keyframes)
+			allFrames.insert(static_cast<int>(kf.time * fps_ + 0.5f));
+		for (const auto& kf : na.rotate.keyframes)
+			allFrames.insert(static_cast<int>(kf.time * fps_ + 0.5f));
+		for (const auto& kf : na.scale.keyframes)
+			allFrames.insert(static_cast<int>(kf.time * fps_ + 0.5f));
+	}
+
+	DopeSheet::DopeTrack summary;
+	summary.label = "概要";
+	summary.isSummary = true;
+	summary.color = { 1.0f, 0.82f, 0.24f, 1.0f };
+	for (int frame : allFrames)
+		summary.keys.emplace_back(frame, 0.0f, -1);
+
+	// tracks_ / trackBoneMap_ の先頭に挿入
+	tracks_.insert(tracks_.begin(), summary);
+	trackBoneMap_.insert(trackBoneMap_.begin(), { "__summary__", -2 });
+}
+
+// ============================================================
+// 概要トラックKF一括移動ハンドラ
+//   指定フレームに存在する全ボーン・全チャンネルのKFを
+//   delta フレーム分ずらし、CommandHistory に登録する
+// ============================================================
+void TimelinePanel::OnSummaryKeyMoved(int fromFrame, int delta)
+{
+	if (!context_->currentMotion || delta == 0) return;
+
+	// Undo用スナップショット
+	auto oldAnims = context_->currentMotion->animation_.nodeAnimations_;
+
+	// 全ボーン・全チャンネルを走査して fromFrame のKFを移動
+	for (auto& [boneName, na] : context_->currentMotion->animation_.nodeAnimations_) {
+
+		auto moveInTrack = [&](auto& keyframes) {
+			for (auto& kf : keyframes) {
+				int kfFrame = static_cast<int>(kf.time * fps_ + 0.5f);
+				if (kfFrame == fromFrame) {
+					float newTime = (fromFrame + delta) / static_cast<float>(fps_);
+					kf.time = std::max(0.0f, newTime);
+				}
+			}
+			// 移動後に時刻順ソートを保証
+			std::sort(keyframes.begin(), keyframes.end(),
+				[](const auto& a, const auto& b) { return a.time < b.time; });
+			};
+
+		moveInTrack(na.translate.keyframes);
+		moveInTrack(na.rotate.keyframes);
+		moveInTrack(na.scale.keyframes);
+	}
+
+	auto newAnims = context_->currentMotion->animation_.nodeAnimations_;
+
+	// CommandHistory にUndoable コマンドとして登録
+	context_->history.Execute(MakeLambdaCommand(
+		"概要KF移動: " + std::to_string(fromFrame) + " → " + std::to_string(fromFrame + delta),
+		[this, newAnims]() {
+			if (context_->currentMotion)
+				context_->currentMotion->animation_.nodeAnimations_ = newAnims;
+			tracksDirty_ = true;
+		},
+		[this, oldAnims]() {
+			if (context_->currentMotion)
+				context_->currentMotion->animation_.nodeAnimations_ = oldAnims;
+			tracksDirty_ = true;
+		}
+	));
+
+	tracksDirty_ = true;
+	context_->statusMsg = "概要: frame " + std::to_string(fromFrame)
+		+ (delta > 0 ? " +" : " ") + std::to_string(delta) + " 移動";
+}

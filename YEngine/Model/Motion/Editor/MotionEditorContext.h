@@ -21,7 +21,7 @@ struct MotionEditorContext
 	int targetObjectId = -1;
 
 	// ============================================================
-	// モデル・ファイル・アニメーション状態 (★ここを追加)
+	// モデル・ファイル・アニメーション状態
 	// ============================================================
 	std::string loadFileName = "";
 	std::string selectedAnimKey = "";
@@ -41,22 +41,30 @@ struct MotionEditorContext
 	float editR[3] = { 0, 0, 0 };
 	float editS[3] = { 1, 1, 1 };
 
-	// UIフラグとレイアウト (★ここを追加)
+	// UIフラグとレイアウト
 	bool isDrawBone = false;
 	bool showSavePopup = false;
 	std::string statusMsg = "Ready";
 	bool requireTimelineRebuild = false;
 
-	float timelineH = 240.0f;
-	float bonePanelW = 185.0f;
+	float timelineH = 200.0f;
+	float bonePanelW = 250.0f;
 
-	CommandHistory history;
-
-	// コールバック
+	// ============================================================
+	// コールバック関数
+	// ============================================================
 	std::function<void()> SyncJointToBuffer;
 	std::function<void()> SyncBufferToJoint;
-	std::function<void(const std::string&, float time)> AddKeyframe;
+	std::function<void(const std::string&, float)> AddKeyframe;
 	std::function<void(const std::string&, float)> DeleteKeyframe;
 
+	// ============================================================
+	// 履歴管理
+	// ============================================================
+	CommandHistory history;
+
+	// ============================================================
+	// ヘルパー関数
+	// ============================================================
 	Object3d* GetTargetObject() const;
 };

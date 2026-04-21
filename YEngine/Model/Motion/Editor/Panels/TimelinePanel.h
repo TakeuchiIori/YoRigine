@@ -20,6 +20,9 @@ private:
 	void RebuildTracks();
 	void ApplyTracksToMotion();
 
+	void BuildSummaryTrack();           // 全KFを集約した概要トラックを生成
+	void OnSummaryKeyMoved(int fromFrame, int delta); // 概要KF一括移動ハンドラ
+
 private:
 	MotionEditorContext* context_ = nullptr;
 

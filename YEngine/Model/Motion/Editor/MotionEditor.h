@@ -1,29 +1,40 @@
 #pragma once
-#include <string>
-#include <vector>
-#include <memory>
 
+// Engine
 #include "Object3d/Object3d.h"
 #include "WorldTransform/WorldTransform.h"
 #include <Graphics/Drawer/LineManager/Line.h>
-
-#include "MotionEditorContext.h"
-#include "Panels/IMotionEditorPanel.h"
-
 #ifdef USE_IMGUI
 #include "Debugger/Gizmo/GizmoController.h"
 #endif
 
+// App
+#include "MotionEditorContext.h"
+#include "Panels/IMotionEditorPanel.h"
+
+// Standard
+#include <string>
+#include <vector>
+#include <memory>
+
+// ============================================================
+// 前方宣言
+// ============================================================
 class Camera;
 class Joint;
-
 #ifdef USE_IMGUI
 class BoneGizmable;
 #endif
 
+// ============================================================
+// モーションエディタクラス
+// ============================================================
 class MotionEditor
 {
 public:
+	// ============================================================
+	// 基本関数
+	// ============================================================
 	MotionEditor();
 	~MotionEditor();
 
@@ -34,6 +45,9 @@ public:
 	void DrawBone();
 	void ShowEditor();
 
+	// ============================================================
+	// 公開関数
+	// ============================================================
 	void SetTargetObjectId(int id);
 	int GetTargetObjectId() const { return context_.targetObjectId; }
 	void SetCamera(Camera* camera) { context_.camera = camera; }
@@ -45,6 +59,9 @@ public:
 	void RegisterPanel(std::unique_ptr<IMotionEditorPanel> panel);
 
 private:
+	// ============================================================
+	// 内部処理関数
+	// ============================================================
 	void SavePose(float time);
 	void InsertKeyframeFromTransform(const std::string& bone, float time, const QuaternionTransform& tr);
 
@@ -57,6 +74,9 @@ private:
 	Matrix4x4 GetTargetWorldMatrix() const;
 
 private:
+	// ============================================================
+	// メンバ変数
+	// ============================================================
 	static constexpr float kPi = 3.14159265f;
 
 	MotionEditorContext context_;

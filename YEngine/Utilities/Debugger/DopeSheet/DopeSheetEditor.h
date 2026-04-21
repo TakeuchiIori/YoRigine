@@ -60,12 +60,15 @@ namespace DopeSheet
         using MoveKeyCallback = std::function<void(int trackIdx, int keyIdx, int newFrame)>;
         using SeekCallback = std::function<void(int frame)>;
         using SelectKeyCallback = std::function<void(int trackIdx, int keyIdx, bool selected)>;
+        // fromFrame: ドラッグ前のフレーム番号, delta: 移動フレーム数（正負あり）
+        using SummaryKeyMovedCallback = std::function<void(int fromFrame, int delta)>;
 
         void SetAddKeyCallback(AddKeyCallback    cb) { onAddKey_ = cb; }
         void SetDeleteKeyCallback(DeleteKeyCallback cb) { onDeleteKey_ = cb; }
         void SetMoveKeyCallback(MoveKeyCallback   cb) { onMoveKey_ = cb; }
         void SetSeekCallback(SeekCallback      cb) { onSeek_ = cb; }
         void SetSelectKeyCallback(SelectKeyCallback cb) { onSelectKey_ = cb; }
+        void SetSummaryKeyMovedCallback(SummaryKeyMovedCallback cb) { onSummaryKeyMoved_ = cb; }
 
 #ifdef USE_IMGUI
         using RulerOverlayCallback = std::function<void(ImDrawList*, ImVec2, float, int)>;
@@ -135,6 +138,7 @@ namespace DopeSheet
         MoveKeyCallback   onMoveKey_;
         SeekCallback      onSeek_;
         SelectKeyCallback onSelectKey_;
+        SummaryKeyMovedCallback onSummaryKeyMoved_;
 
 #ifdef USE_IMGUI
         RulerOverlayCallback onRulerOverlay_;
