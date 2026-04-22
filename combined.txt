@@ -564,12 +564,32 @@
 └── └── ├── ModelManager.h
 └── └── ├── ModelUtils.h
 └── └── ├── Motion/
-└── └── └── ├── Motion.cpp
-└── └── └── ├── Motion.h
-└── └── └── ├── MotionEditor.cpp
-└── └── └── ├── MotionEditor.h
-└── └── └── ├── MotionSystem.cpp
-└── └── └── └── MotionSystem.h
+└── └── └── ├── Core/
+└── └── └── └── ├── Motion.cpp
+└── └── └── └── ├── Motion.h
+└── └── └── └── ├── MotionSystem.cpp
+└── └── └── └── └── MotionSystem.h
+└── └── └── └── Editor/
+└── └── └──     ├── KeyFrame.h
+└── └── └──     ├── MotionEditor.cpp
+└── └── └──     ├── MotionEditor.h
+└── └── └──     ├── MotionEditorContext.h
+└── └── └──     └── Panels/
+└── └── └──         ├── BoneListPanel.cpp
+└── └── └──         ├── BoneListPanel.h
+└── └── └──         ├── IMotionEditorPanel.h
+└── └── └──         ├── MenuBarPanel.cpp
+└── └── └──         ├── MenuBarPanel.h
+└── └── └──         ├── PropertyPanel.cpp
+└── └── └──         ├── PropertyPanel.h
+└── └── └──         ├── SavePanel.cpp
+└── └── └──         ├── SavePanel.h
+└── └── └──         ├── StatusBarPanel.cpp
+└── └── └──         ├── StatusBarPanel.h
+└── └── └──         ├── TimelinePanel.cpp
+└── └── └──         ├── TimelinePanel.h
+└── └── └──         ├── ToolbarPanel.cpp
+└── └── └──         └── ToolbarPanel.h
 └── └── ├── Node/
 └── └── └── ├── Node.cpp
 └── └── └── └── Node.h
@@ -193175,7 +193195,7 @@ File Path: YEngine/Core/SceneSystems/DevelopScene/DevelopScene.h
 #include "Systems/Camera/CameraEditor.h"
 #include "Systems/Camera/Camera.h"
 
-#include "Motion/MotionEditor.h"
+#include "Motion/Editor/MotionEditor.h"
 
 
 class DevelopScene : public BaseScene
@@ -199407,7 +199427,7 @@ File Path: YEngine/Generators/ModelManipulator/ModelManipulator.h
 // Engine
 #include <Object3D/ObjectManager.h>
 #include <Systems/Camera/Camera.h>
-#include <Motion/MotionEditor.h>
+#include <Motion/Editor/MotionEditor.h>
 
 #ifdef USE_IMGUI
 #include "ModelBrowser.h"
@@ -201463,7 +201483,7 @@ File Path: YEngine/Generators/Object3D/Object3d.h
 #include "Material/MaterialColor.h"
 #include "Material/MaterialLighting.h"
 #include "Material/MaterialUV.h"
-#include "Motion/MotionSystem.h"
+#include "Motion/Core/MotionSystem.h"
 #include <Loaders/Json/JsonManager.h>
 
 // Math
@@ -229455,7 +229475,7 @@ File Path: YEngine/Model/Model.h
 // assimp
 #include <assimp/scene.h>
 #include <map>
-#include "Motion/MotionSystem.h"
+#include "Motion/Core/MotionSystem.h"
 
 // モデルクラス
 class SrvManager;
@@ -229903,7 +229923,7 @@ inline std::unordered_set<std::string> ignoreNodes = {
 
 
 ============================================================
-File Path: YEngine/Model/Motion/Motion.cpp
+File Path: YEngine/Model/Motion/Core/Motion.cpp
 ============================================================
 #include "Motion.h"
 #include "MathFunc.h"
@@ -230333,7 +230353,7 @@ Quaternion Motion::CalculateValue(const std::vector<KeyframeQuaternion>& keyfram
 }
 
 ============================================================
-File Path: YEngine/Model/Motion/Motion.h
+File Path: YEngine/Model/Motion/Core/Motion.h
 ============================================================
 #pragma once
 
@@ -230342,8 +230362,8 @@ File Path: YEngine/Model/Motion/Motion.h
 #include <vector>
 #include <string>
 
-#include "../Skeleton/Joint.h"
-#include "../Node/Node.h"
+#include "../../Skeleton/Joint.h"
+#include "../../Node/Node.h"
 #include "Quaternion.h"
 #include "Vector3.h"
 
@@ -230434,1972 +230454,11 @@ public:
 };
 
 ============================================================
-File Path: YEngine/Model/Motion/MotionEditor.cpp
-============================================================
-#include "MotionEditor.h"
-
-#include "Systems/Camera/Camera.h"
-#include "Model.h"
-#include "Motion/MotionSystem.h"
-#include "Skeleton/Joint.h"
-#include "Skeleton/Skeleton.h"
-#include "Skeleton/BoneGizmable.h"
-#include <json.hpp>
-#include <fstream>
-#include <algorithm>
-#include <filesystem>
-#include <cmath>
-#include <sstream>
-#include <iomanip>
-
-#include <Editor/Icon/EditorIcon.h>
-#include "Object3D/ObjectManager.h" 
-#include <Editor/Editor.h>
-
-#ifdef USE_IMGUI
-#include "ImGuizmo.h"
-#endif
-
-namespace fs = std::filesystem;
-
-// ============================================================
-// カラーパレット
-// ============================================================
-namespace Col
-{
-#ifdef USE_IMGUI
-	constexpr ImU32 PanelBg = IM_COL32(45, 45, 45, 255);
-	constexpr ImU32 RowEven = IM_COL32(50, 50, 50, 220);
-	constexpr ImU32 RowOdd = IM_COL32(44, 44, 44, 220);
-	constexpr ImU32 RowSel = IM_COL32(55, 85, 145, 255);
-	constexpr ImU32 RowHov = IM_COL32(65, 70, 80, 200);
-	constexpr ImU32 RulerBg = IM_COL32(38, 38, 38, 255);
-	constexpr ImU32 RulerLine = IM_COL32(90, 90, 90, 255);
-	constexpr ImU32 RulerText = IM_COL32(170, 170, 170, 255);
-	constexpr ImU32 Playhead = IM_COL32(255, 70, 50, 230);
-	constexpr ImU32 PlayheadTp = IM_COL32(255, 70, 50, 100);
-	constexpr ImU32 ChT = IM_COL32(255, 150, 50, 255);
-	constexpr ImU32 ChR = IM_COL32(90, 200, 90, 255);
-	constexpr ImU32 ChS = IM_COL32(80, 150, 255, 255);
-	constexpr ImU32 KFSel = IM_COL32(255, 240, 50, 255);
-	constexpr ImU32 LabelBg = IM_COL32(35, 35, 35, 255);
-	constexpr ImU32 LabelText = IM_COL32(200, 200, 200, 255);
-	constexpr ImU32 LabelSel = IM_COL32(255, 210, 80, 255);
-	constexpr ImU32 StatusBg = IM_COL32(30, 30, 30, 255);
-	constexpr ImU32 StatusText = IM_COL32(160, 220, 160, 255);
-#endif
-}
-
-#ifdef USE_IMGUI
-static ImU32 ChannelColor(KFChannel ch, bool selected)
-{
-	if (selected) return Col::KFSel;
-	switch (ch) {
-	case KFChannel::Translate: return Col::ChT;
-	case KFChannel::Rotate:    return Col::ChR;
-	case KFChannel::Scale:     return Col::ChS;
-	}
-	return Col::ChT;
-}
-#endif
-
-MotionEditor::MotionEditor() {}
-
-MotionEditor::~MotionEditor() {}
-
-// ============================================================
-// 初期化
-// ============================================================
-void MotionEditor::Initialize(Camera* camera)
-{
-	camera_ = camera;
-	previewTransform_.Initialize();
-	binaryBrowser_.currentDirectory = "Resources/Binary";
-	binaryBrowser_.filterExtension = ".anim";
-	lineDrawer_ = std::make_unique<Line>();
-	lineDrawer_->SetCamera(camera_);
-	lineDrawer_->Initialize();
-	lineDrawer_->SetColor({ 0.5f, 0.5f, 0.5f, 1.0f });
-
-#ifdef USE_IMGUI
-	boneObj_ = Object3d::Create("ICO.obj");
-	gizmoCtrl_.Initialize();
-	gizmoCtrl_.SetMode(GizmoController::Mode::Local); // ボーン操作はローカル推奨
-#endif
-}
-
-// ============================================================
-// 更新
-// ============================================================
-void MotionEditor::Update()
-{
-	Object3d* target = GetTargetObject();
-	if (!target) return;
-
-	Model* m = target->GetModel();
-	MotionSystem* ms = m ? m->GetMotionSystem() : nullptr;
-
-	if (ms) {
-		float msTime = ms->GetAnimationTime();
-		if (std::abs(msTime - scrubTime_) > 1e-4f) {
-			scrubTime_ = msTime;
-			dopeSheet_.SetSeekFrame(static_cast<int>(scrubTime_ * fps_));
-		}
-	}
-
-	if (m && m->GetSkeleton()) {
-		// 一時停止中（シーク中）にポーズをプレビューするための処理
-		if (ms && !isPlaying_ && currentMotion_) {
-			currentMotion_->ApplyAnimation(m->GetSkeleton()->GetJoints(), scrubTime_);
-
-			// 選択中のボーンがあればプロパティバッファを同期
-			if (!selBone_.empty()) {
-#ifdef USE_IMGUI
-				// ★修正: UIでドラッグ中、またはギズモで操作中なら、
-				// アニメーションのポーズを無視して編集中の値をジョイントに強制上書きする
-				if (draggingBone_ || gizmoCtrl_.IsUsing()) {
-					SyncBufferToJoint();
-				}
-				else {
-					SyncJointToBuffer(selBone_);
-				}
-#else
-				SyncJointToBuffer(selBone_);
-#endif
-			}
-		}
-
-		m->GetSkeleton()->Update();
-		if (m->GetSkinCluster()) {
-			m->GetSkinCluster()->UpdateMatrixPalette(m->GetSkeleton()->GetJoints());
-		}
-	}
-
-	previewTransform_.UpdateMatrix();
-}
-
-// ============================================================
-// 関節の描画
-// ============================================================
-void MotionEditor::Draw()
-{
-	Object3d* target = GetTargetObject();
-	if (isDrawBone_ && target) {
-#ifdef USE_IMGUI
-		// ICO.obj の描画
-		if (boneObj_ && target->GetModel() && target->GetModel()->GetSkeleton()) {
-			auto& joints = target->GetModel()->GetSkeleton()->GetJoints();
-
-			// ジョイント数が変わった場合（ターゲット変更時など）に再初期化
-			if (boneWorldTransforms_.size() != joints.size()) {
-				boneWorldTransforms_.resize(joints.size());
-				for (auto& wt : boneWorldTransforms_) {
-					wt.Initialize();
-				}
-			}
-
-			for (size_t i = 0; i < joints.size(); ++i) {
-				auto& wt = boneWorldTransforms_[i];
-
-				Matrix4x4 targetMat = GetTargetWorldMatrix();
-				Matrix4x4 wMat = joints[i].GetWorldTransform().matWorld_ * targetMat;
-
-				float t[3], rDeg[3], s[3];
-				ImGuizmo::DecomposeMatrixToComponents(&wMat.m[0][0], t, rDeg, s);
-
-				wt.translate_ = { t[0], t[1], t[2] };
-				wt.rotate_ = { rDeg[0] * (kPi / 180.f), rDeg[1] * (kPi / 180.f), rDeg[2] * (kPi / 180.f) };
-				wt.scale_ = { 0.1f, 0.1f, 0.1f }; // 1/10 サイズ
-				wt.UpdateMatrix();
-
-				if (selBone_ == joints[i].GetName()) {
-					boneObj_->SetMaterialColor({ 1.0f, 0.85f, 0.2f, 1.0f });
-				}
-				else {
-					boneObj_->SetMaterialColor({ 0.5f, 0.5f, 0.5f, 1.0f });
-				}
-
-				boneObj_->Draw(camera_, wt);
-			}
-		}
-#endif
-	}
-}
-
-// ============================================================
-// ギズモの描画
-// ============================================================
-void MotionEditor::DrawGizmo()
-{
-#ifdef USE_IMGUI
-	Object3d* target = GetTargetObject();
-	if (isDrawBone_ && target && target->GetModel() && target->GetModel()->GetSkeleton()) {
-		if (!selBone_.empty()) {
-			static BoneGizmable currentSelectedGizmo(this, "");
-			if (currentSelectedGizmo.GetBoneName() != selBone_) {
-				currentSelectedGizmo = BoneGizmable(this, selBone_);
-			}
-			if (!gizmoCtrl_.IsUsing()) {
-				currentSelectedGizmo.UpdateFromJoint();
-			}
-			std::vector<IGizmable*> gizmoTargets = { &currentSelectedGizmo };
-			ImVec2 viewPos = Editor::GetInstance()->GetGameViewPos();
-			ImVec2 viewSize = Editor::GetInstance()->GetGameViewSize();
-
-			// ギズモの描画
-			gizmoCtrl_.Draw(camera_, gizmoTargets, viewPos, viewSize);
-		}
-	}
-#endif
-}
-
-
-// ============================================================
-// 骨の描画
-// ============================================================
-void MotionEditor::DrawBone()
-{
-	Object3d* target = GetTargetObject();
-	if (isDrawBone_ && target) {
-		lineDrawer_->SetCamera(camera_);
-		target->DrawBone(*lineDrawer_.get(), GetTargetWorldMatrix());
-	}
-}
-
-// ============================================================
-// ターゲットオブジェクトの設定
-// ============================================================
-void MotionEditor::SetTargetObjectId(int id) {
-	Object3d* obj = nullptr;
-	if (id != -1) {
-		obj = ObjectManager::GetInstance()->GetObject3dById(id);
-		if (obj && obj->GetModel()) {
-			if (obj->GetModel()->GetMotionSystem() == nullptr) {
-				id = -1;
-			}
-		}
-		else {
-			id = -1;
-		}
-	}
-
-	if (targetObjectId_ != id) {
-		targetObjectId_ = id;
-
-		if (targetObjectId_ != -1) {
-			Object3d* target = GetTargetObject();
-			Model* model = target->GetModel();
-			MotionSystem* ms = model->GetMotionSystem();
-
-			loadFileName_ = model->GetName();
-			currentMotion_ = ms->GetAnimation();
-			selectedAnimKey_ = "";
-
-			if (currentMotion_) {
-				for (auto& [key, motion] : Model::animationCache_) {
-					if (&motion == currentMotion_) {
-						selectedAnimKey_ = key;
-						break;
-					}
-				}
-				tracksDirty_ = true;
-			}
-
-			scrubTime_ = ms->GetAnimationTime();
-			dopeSheet_.SetSeekFrame(static_cast<int>(scrubTime_ * fps_));
-			isPlaying_ = true; // 選択時は基本的に再生状態とする
-
-			statusMsg_ = "対象オブジェクトを同期: " + loadFileName_;
-		}
-		else {
-			currentMotion_ = nullptr;
-			selectedAnimKey_ = "";
-			selBone_ = "";
-			selKF_.Clear();
-			loadFileName_ = "";
-			statusMsg_ = "Ready";
-		}
-	}
-}
-
-// ============================================================
-// エディタの描画
-// ============================================================
-void MotionEditor::ShowEditor()
-{
-#ifdef USE_IMGUI
-	if (binaryBrowser_.isOpen) {
-		DrawFileBrowser(binaryBrowser_, "バイナリファイルを選択");
-		if (!binaryBrowser_.isOpen && !binaryBrowser_.selectedFilePath.empty())
-			savePath_ = binaryBrowser_.selectedFilePath;
-	}
-
-	DrawSaveLoadPopup();
-
-	ImGui::SetNextWindowSize(ImVec2(1200, 750), ImGuiCond_FirstUseEver);
-	ImGui::Begin("Motion Editor", nullptr, ImGuiWindowFlags_MenuBar);
-
-	Object3d* target = GetTargetObject();
-
-	// ---------------- ボーン選択＆ギズモ処理 ----------------
-	if (isDrawBone_ && target && target->GetModel() && target->GetModel()->GetSkeleton()) {
-
-		// 1. ピッキング (画面クリックで選択)
-		if (ImGui::IsMouseClicked(0) && !ImGuizmo::IsOver() && !ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow)) {
-			gizmoCtrl_.ClearPickables();
-			boneGizmables_.clear();
-
-			auto& joints = target->GetModel()->GetSkeleton()->GetJoints();
-			for (const auto& joint : joints) {
-				auto bg = std::make_unique<BoneGizmable>(this, joint.GetName());
-				bg->UpdateFromJoint();
-				gizmoCtrl_.RegisterPickable(bg.get());
-				boneGizmables_.push_back(std::move(bg));
-			}
-
-			ImVec2 viewPos = Editor::GetInstance()->GetGameViewPos();
-			ImVec2 viewSize = Editor::GetInstance()->GetGameViewSize();
-
-			IGizmable* picked = gizmoCtrl_.TryPickObject(
-				ImGui::GetMousePos(), viewPos, viewSize, camera_
-			);
-
-			if (picked) {
-				BoneGizmable* bg = static_cast<BoneGizmable*>(picked);
-				selBone_ = bg->GetBoneName();
-				SyncJointToBuffer(selBone_);
-				statusMsg_ = "ボーン選択: " + selBone_;
-			}
-		}
-
-		// 2. ギズモの描画
-		if (!selBone_.empty()) {
-			static BoneGizmable currentSelectedGizmo(this, "");
-			if (currentSelectedGizmo.GetBoneName() != selBone_) {
-				currentSelectedGizmo = BoneGizmable(this, selBone_);
-			}
-
-			currentSelectedGizmo.UpdateFromJoint();
-
-			std::vector<IGizmable*> gizmoTargets = { &currentSelectedGizmo };
-			ImVec2 viewPos = Editor::GetInstance()->GetGameViewPos();
-			ImVec2 viewSize = Editor::GetInstance()->GetGameViewSize();
-
-			gizmoCtrl_.Draw(camera_, gizmoTargets, viewPos, viewSize);
-		}
-	}
-	// ------------------------------------------------------
-
-	// フォーカス中のキー入力
-	if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)) {
-		history_.HandleKeyInput();
-
-		// スペースキーで再生/一時停止のトグル
-		if (ImGui::IsKeyPressed(ImGuiKey_Space) && target) {
-			if (isPlaying_) {
-				if (target->GetModel() && target->GetModel()->GetMotionSystem()) {
-					target->GetModel()->GetMotionSystem()->Stop();
-				}
-				isPlaying_ = false;
-				statusMsg_ = "[ Space ] 一時停止";
-			}
-			else {
-				if (target->GetModel() && target->GetModel()->GetMotionSystem()) {
-					auto* ms = target->GetModel()->GetMotionSystem();
-					float savedTime = ms->GetAnimationTime();
-					// 最後まで行っていたら最初から再生
-					if (savedTime >= ms->GetDuration() || ms->IsFinished()) savedTime = 0.0f;
-
-					if (isLoop_) target->PlayLoop(); else target->PlayOnce();
-					ms->SetAnimationTime(savedTime); // 時間を上書きして続きから再生
-				}
-				isPlaying_ = true;
-				statusMsg_ = "[ Space ] 再生";
-			}
-		}
-		if (ImGui::IsKeyPressed(ImGuiKey_Delete) && selKF_.IsValid() && currentMotion_) {
-			auto& na = currentMotion_->animation_.nodeAnimations_[selKF_.boneName];
-			float t = 0;
-			if (selKF_.index < (int)na.translate.keyframes.size())
-				t = na.translate.keyframes[selKF_.index].time;
-			DeleteKeyframe(selKF_.boneName, t);
-			selKF_.Clear();
-			statusMsg_ = "[ Del ] キーフレーム削除";
-		}
-	}
-
-	DrawMenuBar();
-
-	if (!target || !target->GetModel()) {
-		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 40);
-		float w = ImGui::GetContentRegionAvail().x;
-		ImGui::SetCursorPosX((w - 220) * 0.5f);
-		ImGui::TextColored(ImVec4(1, 1, 0, 1), "シーンエディタでモデルを選択してください");
-		ImGui::End();
-		return;
-	}
-
-	DrawToolbar();
-	ImGui::Separator();
-
-	ImGuiIO& io = ImGui::GetIO();
-	float contentW = ImGui::GetContentRegionAvail().x;
-	float contentH = ImGui::GetContentRegionAvail().y - 22.0f;
-
-	bool showTimeline = ImGui::CollapsingHeader("TIMELINE (タイムライン)", ImGuiTreeNodeFlags_DefaultOpen);
-
-	float upperH = contentH;
-	if (showTimeline) {
-		if (timelineH_ > contentH - 80.0f) timelineH_ = contentH - 80.0f;
-		if (timelineH_ < 50.0f) timelineH_ = 50.0f;
-		upperH = contentH - timelineH_ - 12.0f;
-	}
-
-	ImGui::BeginChild("##upper", ImVec2(contentW, upperH), false);
-	{
-		ImGui::BeginChild("##bones", ImVec2(bonePanelW_, 0), true);
-		DrawBonePanel();
-		ImGui::EndChild();
-
-		ImGui::SameLine();
-
-		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
-		ImGui::InvisibleButton("##vsep", ImVec2(4, upperH));
-		if (ImGui::IsItemActive()) {
-			bonePanelW_ = std::clamp(bonePanelW_ + io.MouseDelta.x, 80.0f, contentW - 100.0f);
-		}
-		if (ImGui::IsItemHovered() || ImGui::IsItemActive()) {
-			ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
-			ImDrawList* dl = ImGui::GetWindowDrawList();
-			ImVec2 p = ImGui::GetItemRectMin();
-			ImVec2 q = ImGui::GetItemRectMax();
-			dl->AddRectFilled(p, q, IM_COL32(100, 130, 200, 180));
-		}
-		ImGui::PopStyleVar();
-
-		ImGui::SameLine();
-
-		ImGui::BeginChild("##props", ImVec2(0, 0), true);
-		DrawPropertyPanel();
-		ImGui::EndChild();
-	}
-	ImGui::EndChild();
-
-	if (showTimeline) {
-		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
-		ImGui::InvisibleButton("##hsep", ImVec2(contentW, 4.0f));
-		if (ImGui::IsItemActive()) {
-			timelineH_ -= io.MouseDelta.y;
-		}
-		if (ImGui::IsItemHovered() || ImGui::IsItemActive()) {
-			ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
-			ImDrawList* dl = ImGui::GetWindowDrawList();
-			ImVec2 p = ImGui::GetItemRectMin();
-			ImVec2 q = ImGui::GetItemRectMax();
-			dl->AddRectFilled(p, q, IM_COL32(100, 130, 200, 180));
-		}
-		ImGui::PopStyleVar();
-
-		ImGui::BeginChild("##timeline", ImVec2(contentW, timelineH_), true);
-		DrawTimeline();
-		ImGui::EndChild();
-	}
-
-	DrawStatusBar();
-
-	ImGui::End();
-#endif
-}
-
-// ============================================================
-// メニューバー
-// ============================================================
-void MotionEditor::DrawMenuBar()
-{
-#ifdef USE_IMGUI
-	if (!ImGui::BeginMenuBar()) return;
-
-	if (ImGui::BeginMenu("ファイル (File)")) {
-		if (ImGui::MenuItem("バイナリ保存/読込...", ""))  showSavePopup_ = true;
-		ImGui::EndMenu();
-	}
-
-	if (ImGui::BeginMenu("編集 (Edit)")) {
-		if (ImGui::MenuItem("元に戻す", "Ctrl+Z", false, history_.CanUndo())) history_.Undo();
-		if (ImGui::MenuItem("やり直す", "Ctrl+Y", false, history_.CanRedo())) history_.Redo();
-		ImGui::Separator();
-		if (ImGui::MenuItem("履歴をクリア")) history_.Clear();
-		ImGui::EndMenu();
-	}
-
-	if (ImGui::BeginMenu("表示 (View)")) {
-		ImGui::SliderFloat("タイムライン高さ", &timelineH_, 80.0f, 500.0f, "%.0f px");
-		ImGui::SliderFloat("ボーンリスト幅", &bonePanelW_, 80.0f, 450.0f, "%.0f px");
-		ImGui::SliderFloat("ズーム (px/秒)", &timelineZoom_, 20.0f, 400.0f, "%.0f");
-		ImGui::EndMenu();
-	}
-
-	ImGui::Separator();
-	if (!history_.CanUndo()) ImGui::BeginDisabled();
-	if (ImGui::SmallButton(" << ")) { history_.Undo(); statusMsg_ = "元に戻す"; }
-	if (!history_.CanUndo()) ImGui::EndDisabled();
-	if (ImGui::IsItemHovered()) ImGui::SetTooltip("元に戻す (Ctrl+Z)");
-
-	ImGui::SameLine(0, 2);
-	if (!history_.CanRedo()) ImGui::BeginDisabled();
-	if (ImGui::SmallButton(" >> ")) { history_.Redo(); statusMsg_ = "やり直す"; }
-	if (!history_.CanRedo()) ImGui::EndDisabled();
-	if (ImGui::IsItemHovered()) ImGui::SetTooltip("やり直す (Ctrl+Y)");
-
-	ImGui::EndMenuBar();
-#endif
-}
-
-// ============================================================
-//  ツールバー
-// ============================================================
-
-void MotionEditor::DrawToolbar()
-{
-#ifdef USE_IMGUI
-	Object3d* target = GetTargetObject();
-	Model* model = target ? target->GetModel() : nullptr;
-
-	if (model) {
-		ImGui::TextColored(ImVec4(0.6f, 1.0f, 0.6f, 1.0f), "[%s]", model->GetName().c_str());
-		ImGui::SameLine(0, 12);
-	}
-
-	// ---- ニメーション選択コンボ ----
-	ImGui::Text("Animation:");
-	ImGui::SameLine(0, 4);
-	ImGui::SetNextItemWidth(170);
-	std::string selDisp = AnimDisplayName(selectedAnimKey_);
-	if (selDisp.empty()) selDisp = "(未選択)";
-
-	if (ImGui::BeginCombo("##anim", selDisp.c_str())) {
-		for (auto& [key, motion] : Model::animationCache_) {
-			if (!loadFileName_.empty() && key.find(loadFileName_) == std::string::npos && key.find("Binary:") == std::string::npos) {
-				continue;
-			}
-
-			std::string dn = AnimDisplayName(key);
-			std::string label = dn.empty() ? ("(デフォルトアニメーション)##" + key) : dn;
-
-			bool isSel = (selectedAnimKey_ == key);
-			if (ImGui::Selectable(label.c_str(), isSel)) {
-				selectedAnimKey_ = key;
-				currentMotion_ = &motion;
-				if (target) {
-					target->SetChangeMotion(loadFileName_, isLoop_ ? MotionPlayMode::Loop : MotionPlayMode::Once, dn);
-				}
-				isPlaying_ = true; // アニメ切り替え時は自動再生
-				statusMsg_ = "アニメーション変更: " + label;
-				tracksDirty_ = true;
-			}
-			if (isSel) ImGui::SetItemDefaultFocus();
-		}
-		ImGui::EndCombo();
-	}
-	if (ImGui::IsItemHovered())
-		ImGui::SetTooltip("選択中のキャラクターのアニメーションを切り替えます");
-
-	ImGui::SameLine(0, 14);
-
-	// ==========================================================
-	// ★ 動画プレイヤー風のアイコンボタン
-	// ==========================================================
-
-	// Play/Pause (トグル)
-	if (isPlaying_) {
-		if (ImGui::Button((std::string(Icon::Pause) + " 一時停止").c_str())) {
-			if (target && target->GetModel() && target->GetModel()->GetMotionSystem()) {
-				target->GetModel()->GetMotionSystem()->Stop();
-			}
-			isPlaying_ = false;
-			statusMsg_ = "一時停止";
-		}
-		if (ImGui::IsItemHovered()) ImGui::SetTooltip("一時停止 (Pause)");
-	}
-	else {
-		if (ImGui::Button((std::string(Icon::Play) + " 再生").c_str())) {
-			if (target && target->GetModel() && target->GetModel()->GetMotionSystem()) {
-				auto* ms = target->GetModel()->GetMotionSystem();
-				float savedTime = ms->GetAnimationTime();
-				// もし最後まで再生されていたら最初から
-				if (savedTime >= ms->GetDuration() || ms->IsFinished()) {
-					savedTime = 0.0f;
-				}
-				if (isLoop_) target->PlayLoop(); else target->PlayOnce();
-				ms->SetAnimationTime(savedTime);
-			}
-			isPlaying_ = true;
-			statusMsg_ = "再生 (Play)";
-		}
-		if (ImGui::IsItemHovered()) ImGui::SetTooltip("再生 (Play / Resume)");
-	}
-
-	ImGui::SameLine(0, 3);
-
-	// Stop (停止して時間をリセット)
-	if (ImGui::Button((std::string(Icon::Stop) + " 停止").c_str())) {
-		if (target && target->GetModel() && target->GetModel()->GetMotionSystem()) {
-			target->GetModel()->GetMotionSystem()->Stop();
-			target->GetModel()->GetMotionSystem()->SetAnimationTime(0.0f);
-		}
-		isPlaying_ = false;
-		scrubTime_ = 0.0f;
-		dopeSheet_.SetSeekFrame(0);
-		statusMsg_ = "停止 (先頭に戻る)";
-	}
-	if (ImGui::IsItemHovered()) ImGui::SetTooltip("停止して先頭に戻る (Stop)");
-
-	ImGui::SameLine(0, 3);
-
-	// Loop (トグル)
-	if (isLoop_) {
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.6f, 0.2f, 1.0f)); // オン時は緑色
-		if (ImGui::Button((std::string(Icon::Infinity) + " ループ解除").c_str())) {
-			isLoop_ = false;
-			if (target && isPlaying_) {
-				auto* ms = target->GetModel()->GetMotionSystem();
-				float savedTime = ms->GetAnimationTime();
-				target->PlayOnce();
-				ms->SetAnimationTime(savedTime);
-			}
-			statusMsg_ = "ループ解除";
-		}
-		ImGui::PopStyleColor();
-	}
-	else {
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.4f, 0.4f, 0.4f, 1.0f)); // オフ時はグレー
-		if (ImGui::Button(" ∞ ")) {
-			isLoop_ = true;
-			if (target && isPlaying_) {
-				auto* ms = target->GetModel()->GetMotionSystem();
-				float savedTime = ms->GetAnimationTime();
-				target->PlayLoop();
-				ms->SetAnimationTime(savedTime);
-			}
-			statusMsg_ = "ループ有効";
-		}
-		ImGui::PopStyleColor();
-	}
-	if (ImGui::IsItemHovered()) ImGui::SetTooltip("ループ再生の切り替え (Loop)");
-
-	ImGui::SameLine(0, 12);
-
-	// ---- スピードと長さ ----
-	if (model && model->GetMotionSystem()) {
-		float spd = model->GetMotionSystem()->GetCurrentAnimationSpeed();
-		ImGui::Text("Speed:");
-		ImGui::SameLine(0, 4);
-		ImGui::SetNextItemWidth(70);
-		if (ImGui::DragFloat("##spd", &spd, 0.05f, 0.0f, 5.0f, "x%.2f")) {
-			if (target) target->SetMotionSpeed(spd);
-		}
-		if (ImGui::IsItemHovered())
-			ImGui::SetTooltip("再生速度倍率  1.0 = 通常速度");
-	}
-
-	if (currentMotion_) {
-		ImGui::SameLine(0, 12);
-		float dur = currentMotion_->GetDuration();
-		ImGui::Text("Duration:");
-		ImGui::SameLine(0, 4);
-		ImGui::SetNextItemWidth(70);
-		if (ImGui::DragFloat("##dur", &dur, 0.01f, 0.0f, 9999.0f, "%.2fs"))
-			currentMotion_->SetDuration(dur);
-		if (ImGui::IsItemHovered())
-			ImGui::SetTooltip("アニメーションの全体の長さ（秒）");
-	}
-
-	ImGui::SameLine(0, 20);
-	ImGui::Checkbox("ボーン表示", &isDrawBone_);
-	if (ImGui::IsItemHovered()) {
-		ImGui::SetTooltip("メッシュ描画とボーン（線・オブジェクト）描画を切り替えます");
-	}
-
-	ImGui::SameLine(0, 20);
-	if (ImGui::Button("Save/Load..."))  showSavePopup_ = true;
-	if (ImGui::IsItemHovered()) ImGui::SetTooltip("バイナリ保存・読み込み");
-#endif
-}
-
-// ============================================================
-//  ボーンパネル (左)
-// ============================================================
-
-void MotionEditor::DrawBonePanel()
-{
-#ifdef USE_IMGUI
-	if (!ImGui::CollapsingHeader("BONES (アーマチュア)", ImGuiTreeNodeFlags_DefaultOpen)) {
-		return;
-	}
-	if (ImGui::IsItemHovered())
-		ImGui::SetTooltip("編集するボーンを選択します\n選択後、右のパネルで値を変更できます");
-	ImGui::Separator();
-
-	Object3d* target = GetTargetObject();
-	Model* model = target ? target->GetModel() : nullptr;
-	if (!model || !model->GetSkeleton()) {
-		ImGui::TextDisabled("スケルトンなし");
-		return;
-	}
-
-	auto& joints = model->GetSkeleton()->GetJoints();
-
-	for (const auto& joint : joints) {
-		const std::string& name = joint.GetName();
-		bool isSel = (selBone_ == name);
-
-		int depth = 0;
-		{
-			auto par = const_cast<Joint&>(joint).GetParent();
-			while (par.has_value()) {
-				++depth;
-				par = joints[par.value()].GetParent();
-			}
-		}
-		ImGui::SetCursorPosX(ImGui::GetCursorPosX() + depth * 12.0f);
-
-		if (isSel) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.85f, 0.2f, 1.0f));
-
-		std::string label = (depth > 0 ? "|  " : "") + name + "##b";
-		if (ImGui::Selectable(label.c_str(), isSel, 0, ImVec2(0, 0))) {
-			selBone_ = name;
-			SyncJointToBuffer(name);
-			statusMsg_ = "ボーン選択: " + name;
-		}
-		if (ImGui::IsItemHovered())
-			ImGui::SetTooltip("クリックで選択\n選択後、右パネルの位置・回転・拡縮を編集できます");
-
-		if (isSel) ImGui::PopStyleColor();
-	}
-
-	ImGui::Separator();
-	if (ImGui::SmallButton("選択解除")) {
-		selBone_ = "";
-		statusMsg_ = "ボーン選択を解除しました";
-	}
-	if (ImGui::IsItemHovered())
-		ImGui::SetTooltip("ボーン編集モードを終了し、通常のアニメーション再生に戻ります");
-#endif
-}
-
-// ============================================================
-//  プロパティパネル (右)
-// ============================================================
-
-void MotionEditor::DrawPropertyPanel()
-{
-#ifdef USE_IMGUI
-	bool boneOpen = ImGui::CollapsingHeader("BONE TRANSFORM  (位置・回転・拡縮)", ImGuiTreeNodeFlags_DefaultOpen);
-	if (boneOpen)
-	{
-		if (selBone_.empty()) {
-			ImGui::TextDisabled("左のリストからボーンを選択してください");
-		}
-		else {
-			ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.2f, 1.0f), "選択中: %s", selBone_.c_str());
-			ImGui::TextDisabled("ドラッグで変更 / Ctrl+クリックで直接入力");
-			ImGui::Separator();
-
-			auto handleDrag = [&](const char* label, const char* tip, float* buf, float spd, float vmin, float vmax)
-				{
-					ImGui::Text("%s", label);
-					ImGui::SameLine(90);
-					ImGui::SetNextItemWidth(-1);
-					std::string id = std::string("##") + label;
-					bool changed = ImGui::DragFloat3(id.c_str(), buf, spd, vmin, vmax);
-
-					if (ImGui::IsItemActivated()) {
-						draggingBone_ = true;
-						boneSnap_ = BufferToTransform();
-					}
-					if (draggingBone_ && ImGui::IsItemDeactivatedAfterEdit()) {
-						draggingBone_ = false;
-						QuaternionTransform oldTr = boneSnap_;
-						QuaternionTransform newTr = BufferToTransform();
-						std::string bn = selBone_;
-						history_.Execute(MakeLambdaCommand(
-							"ボーン編集: " + bn,
-							[this, bn, newTr]() { SetJointTransform(bn, newTr); },
-							[this, bn, oldTr]() { SetJointTransform(bn, oldTr); }
-						));
-						statusMsg_ = "ボーン変更: " + bn;
-					}
-					if (changed) SyncBufferToJoint();
-					if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tip);
-				};
-
-			handleDrag("位置 (T)", "X / Y / Z 座標\nドラッグで移動", editT_, 0.01f, -FLT_MAX, FLT_MAX);
-			handleDrag("回転 (R)", "X / Y / Z オイラー角 (度)\nドラッグで回転", editR_, 0.5f, -FLT_MAX, FLT_MAX);
-			handleDrag("拡縮 (S)", "X / Y / Z スケール\nドラッグで拡縮 (1.0 = 等倍)", editS_, 0.01f, 0.001f, 100.0f);
-
-			ImGui::Spacing();
-
-			if (currentMotion_) {
-				ImGui::Separator();
-				ImGui::Text("現在時刻:");
-				ImGui::SameLine(90);
-				ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.2f, 1.0f), "%.4f 秒", scrubTime_);
-
-				// ★追加: 全ボーンの一括キーフレーム保存ボタン
-				if (ImGui::Button("[ I ] 全ボーンのキーフレームを打つ (Save Pose)", ImVec2(-1, 0))) {
-					SavePose(scrubTime_);
-					statusMsg_ = "全ボーンの KF を挿入 @ " + std::to_string(scrubTime_) + "s";
-				}
-				if (ImGui::IsItemHovered())
-					ImGui::SetTooltip("現在のスケルトン全体の姿勢をキーフレームとして記録します\n(BlenderのIキー相当)");
-
-				ImGui::Spacing();
-
-				if (ImGui::Button("[ KF ] 選択ボーンのキーフ��ームを打つ", ImVec2(-1, 0))) {
-					InsertKeyframe(selBone_, scrubTime_);
-					statusMsg_ = "KF 挿入: " + selBone_ + " @ " + std::to_string(scrubTime_) + "s";
-				}
-				if (ImGui::IsItemHovered())
-					ImGui::SetTooltip("現在の姿勢をこの時刻にキーフレームとして記録します\n下のタイムラインに◆が追加されます");
-			}
-			else {
-				ImGui::TextDisabled("(アニメーションを選択するとKFを打てます)");
-			}
-		}
-	}
-
-	ImGui::Spacing();
-
-	bool kfOpen = ImGui::CollapsingHeader("KEYFRAME  (選択中のキーフレーム値)", ImGuiTreeNodeFlags_DefaultOpen);
-	if (kfOpen)
-	{
-		if (!selKF_.IsValid()) {
-			ImGui::TextDisabled("タイムラインで◆をクリックしてキーフレームを選択してください");
-		}
-		else if (!currentMotion_) {
-			ImGui::TextDisabled("アニメーションがありません");
-		}
-		else {
-			auto& nodeAnims = currentMotion_->animation_.nodeAnimations_;
-			auto it = nodeAnims.find(selKF_.boneName);
-			if (it == nodeAnims.end()) { ImGui::TextDisabled("データなし"); }
-			else {
-				auto& na = it->second;
-				int   idx = selKF_.index;
-				std::string bone = selKF_.boneName;
-
-				ImGui::Text("ボーン: %s", bone.c_str());
-
-				float kfTime = 0;
-				if (idx < (int)na.translate.keyframes.size())
-					kfTime = na.translate.keyframes[idx].time;
-
-				ImGui::Text("時刻:");
-				ImGui::SameLine(90);
-				ImGui::SetNextItemWidth(120);
-				float newT = kfTime;
-				if (ImGui::DragFloat("##kftime", &newT, 0.001f, 0.0f, currentMotion_->GetDuration(), "%.4f s")) {
-					MoveKeyframe(bone, KFChannel::Translate, idx, newT);
-					MoveKeyframe(bone, KFChannel::Rotate, idx, newT);
-					MoveKeyframe(bone, KFChannel::Scale, idx, newT);
-					scrubTime_ = newT;
-				}
-				if (ImGui::IsItemHovered())
-					ImGui::SetTooltip("このキーフレームの時刻を変更します\nタイムライン上でドラッグしても移動できます");
-
-				ImGui::Separator();
-
-				if (ImGui::BeginTabBar("##kftab")) {
-
-					bool tOpen = ImGui::BeginTabItem("位置 (T)");
-					if (tOpen) {
-						if (idx < (int)na.translate.keyframes.size()) {
-							auto& kf = na.translate.keyframes[idx];
-							float v[3] = { kf.value.x, kf.value.y, kf.value.z };
-							if (ImGui::IsItemActivated()) kfSnapT_ = kf.value;
-							ImGui::SetNextItemWidth(-1);
-							bool ch = ImGui::DragFloat3("##kft", v, 0.001f);
-							if (ImGui::IsItemActivated()) kfSnapT_ = kf.value;
-							if (ImGui::IsItemDeactivatedAfterEdit()) {
-								Vector3 ov = kfSnapT_, nv = { v[0],v[1],v[2] };
-								history_.Execute(MakeLambdaCommand("KF位置編集: " + bone,
-									[this, bone, idx, nv]() { currentMotion_->animation_.nodeAnimations_[bone].translate.keyframes[idx].value = nv; },
-									[this, bone, idx, ov]() { currentMotion_->animation_.nodeAnimations_[bone].translate.keyframes[idx].value = ov; }));
-								statusMsg_ = "KF位置変更: " + bone;
-							}
-							else if (ch) { kf.value = { v[0],v[1],v[2] }; }
-						}
-						else { ImGui::TextDisabled("この KF に位置データなし"); }
-						ImGui::EndTabItem();
-					}
-
-					bool rOpen = ImGui::BeginTabItem("回転 (R)");
-					if (rOpen) {
-						if (idx < (int)na.rotate.keyframes.size()) {
-							auto& kf = na.rotate.keyframes[idx];
-							Vector3 e = QuaternionToEuler(kf.value);
-							float deg[3] = { e.x * (180 / kPi), e.y * (180 / kPi), e.z * (180 / kPi) };
-							if (ImGui::IsItemActivated()) kfSnapR_ = kf.value;
-							ImGui::SetNextItemWidth(-1);
-							bool ch = ImGui::DragFloat3("##kfr", deg, 0.1f);
-							if (ImGui::IsItemActivated()) kfSnapR_ = kf.value;
-							if (ImGui::IsItemDeactivatedAfterEdit()) {
-								Quaternion ov = kfSnapR_;
-								Quaternion nv = EulerToQuaternion({ deg[0] * (kPi / 180), deg[1] * (kPi / 180), deg[2] * (kPi / 180) });
-								history_.Execute(MakeLambdaCommand("KF回転編集: " + bone,
-									[this, bone, idx, nv]() { currentMotion_->animation_.nodeAnimations_[bone].rotate.keyframes[idx].value = nv; },
-									[this, bone, idx, ov]() { currentMotion_->animation_.nodeAnimations_[bone].rotate.keyframes[idx].value = ov; }));
-								statusMsg_ = "KF回転変更: " + bone;
-							}
-							else if (ch) {
-								kf.value = EulerToQuaternion({ deg[0] * (kPi / 180), deg[1] * (kPi / 180), deg[2] * (kPi / 180) });
-							}
-						}
-						else { ImGui::TextDisabled("この KF に回転データなし"); }
-						ImGui::EndTabItem();
-					}
-
-					bool sOpen = ImGui::BeginTabItem("拡縮 (S)");
-					if (sOpen) {
-						if (idx < (int)na.scale.keyframes.size()) {
-							auto& kf = na.scale.keyframes[idx];
-							float v[3] = { kf.value.x, kf.value.y, kf.value.z };
-							if (ImGui::IsItemActivated()) kfSnapS_ = kf.value;
-							ImGui::SetNextItemWidth(-1);
-							bool ch = ImGui::DragFloat3("##kfs", v, 0.001f, 0.001f, 100.0f);
-							if (ImGui::IsItemActivated()) kfSnapS_ = kf.value;
-							if (ImGui::IsItemDeactivatedAfterEdit()) {
-								Vector3 ov = kfSnapS_, nv = { v[0],v[1],v[2] };
-								history_.Execute(MakeLambdaCommand("KF拡縮編集: " + bone,
-									[this, bone, idx, nv]() { currentMotion_->animation_.nodeAnimations_[bone].scale.keyframes[idx].value = nv; },
-									[this, bone, idx, ov]() { currentMotion_->animation_.nodeAnimations_[bone].scale.keyframes[idx].value = ov; }));
-								statusMsg_ = "KFスケール変更: " + bone;
-							}
-							else if (ch) { kf.value = { v[0],v[1],v[2] }; }
-						}
-						else { ImGui::TextDisabled("この KF に拡縮データなし"); }
-						ImGui::EndTabItem();
-					}
-
-					ImGui::EndTabBar();
-				}
-
-				ImGui::Spacing();
-				ImGui::Separator();
-
-				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.65f, 0.12f, 0.12f, 1));
-				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.85f, 0.20f, 0.20f, 1));
-				if (ImGui::Button("このキーフレームを削除  [Delete]", ImVec2(-1, 0))) {
-					DeleteKeyframe(bone, kfTime);
-					selKF_.Clear();
-					statusMsg_ = "KF 削除: " + bone;
-				}
-				ImGui::PopStyleColor(2);
-			}
-		}
-	}
-
-	ImGui::Spacing();
-
-	if (ImGui::CollapsingHeader("HISTORY  (操作履歴)")) {
-		history_.DrawImGui();
-	}
-#endif
-}
-
-// ============================================================
-//  タイムライン
-// ============================================================
-
-void MotionEditor::DrawTimeline()
-{
-#ifdef USE_IMGUI
-	if (!currentMotion_) {
-		ImGui::TextDisabled("アニメーションを選択するとタイムラインが表示されます");
-		return;
-	}
-
-	auto& nodeAnims = currentMotion_->animation_.nodeAnimations_;
-	if (nodeAnims.empty()) {
-		ImGui::TextDisabled("アニメーションデータなし");
-		return;
-	}
-
-	float duration = currentMotion_->GetDuration();
-	const int totalFrames = std::max(1, static_cast<int>(duration * fps_));
-
-	float canvasW = ImGui::GetContentRegionAvail().x;
-
-	ImGui::Text("Time:");
-	ImGui::SameLine(0, 4);
-	ImGui::SetNextItemWidth(canvasW - 300);
-
-	Object3d* target = GetTargetObject();
-
-	// スライダー操作時に一時停止＆同期
-	if (ImGui::SliderFloat("##scrub", &scrubTime_, 0.0f, duration, "%.3f s")) {
-		if (target && target->GetModel() && target->GetModel()->GetMotionSystem()) {
-			auto* ms = target->GetModel()->GetMotionSystem();
-			ms->Stop();
-			isPlaying_ = false;
-			ms->SetAnimationTime(scrubTime_);
-		}
-		dopeSheet_.SetSeekFrame(static_cast<int>(scrubTime_ * fps_));
-	}
-	if (ImGui::IsItemHovered()) ImGui::SetTooltip("クリック/ドラッグで時刻を移動");
-
-	ImGui::SameLine(0, 8);
-	if (ImGui::SmallButton("|<")) {
-		scrubTime_ = 0;
-		if (target && target->GetModel() && target->GetModel()->GetMotionSystem()) {
-			target->GetModel()->GetMotionSystem()->SetAnimationTime(0.0f);
-		}
-		dopeSheet_.SetSeekFrame(0);
-	}
-	if (ImGui::IsItemHovered()) ImGui::SetTooltip("先頭に戻る");
-
-	ImGui::SameLine(0, 14);
-	ImGui::TextColored(ImVec4(1.0f, 0.59f, 0.2f, 1.0f), (std::string(Icon::ArrowsAlt) + " 位置").c_str());
-	ImGui::SameLine(0, 6);
-	ImGui::TextColored(ImVec4(0.35f, 0.78f, 0.35f, 1.0f), (std::string(Icon::SyncAlt) + " 回転").c_str());
-	ImGui::SameLine(0, 6);
-	ImGui::TextColored(ImVec4(0.31f, 0.59f, 1.0f, 1.0f), (std::string(Icon::ExpandArrowsAlt) + " 拡縮").c_str());
-	ImGui::SameLine(0, 6);
-	ImGui::TextColored(ImVec4(1.0f, 0.94f, 0.2f, 1.0f), (std::string(Icon::CheckCircle) + " 選択中").c_str());
-
-	ImGui::Separator();
-
-	if (tracksDirty_) {
-		RebuildTracks();
-		tracksDirty_ = false;
-	}
-
-	// ドープシート操作時に一時停止＆同期
-	dopeSheet_.SetSeekCallback([this](int frame) {
-		scrubTime_ = frame / static_cast<float>(fps_);
-		Object3d* t = GetTargetObject();
-		if (t && t->GetModel()) {
-			auto* ms = t->GetModel()->GetMotionSystem();
-			if (ms) {
-				ms->Stop();
-				isPlaying_ = false;
-				ms->SetAnimationTime(scrubTime_);
-			}
-		}
-		});
-
-	dopeSheet_.SetDeleteKeyCallback([this](int trackIdx, int keyIdx) {
-		if (trackIdx >= static_cast<int>(tracks_.size())) return;
-		if (!currentMotion_) return;
-		if (keyIdx >= static_cast<int>(tracks_[trackIdx].keys.size())) return;
-		int frame = tracks_[trackIdx].keys[keyIdx].frame;
-		float t = frame / static_cast<float>(fps_);
-		DeleteKeyframe(selKF_.boneName, t);
-		tracksDirty_ = true;
-		statusMsg_ = "KF 削除";
-		});
-
-	bool changed = dopeSheet_.Draw("MotionTimeline", tracks_, totalFrames, fps_);
-
-	if (changed) {
-		ApplyTracksToMotion();
-		tracksDirty_ = true;
-		statusMsg_ = "KF 移動完了";
-	}
-
-	{
-		int seekFrame = dopeSheet_.GetSeekFrame();
-		float newTime = seekFrame / static_cast<float>(fps_);
-		if (std::abs(newTime - scrubTime_) > 1e-4f) {
-			scrubTime_ = newTime;
-		}
-	}
-
-	if (draggingKF_ && !ImGui::IsMouseDown(0)) {
-		draggingKF_ = false;
-		statusMsg_ = "KF 移動了";
-	}
-#endif
-}
-
-// ============================================================
-//  RebuildTracks  ─ Motion → DopeTrack[] 変換
-// ============================================================
-
-void MotionEditor::RebuildTracks()
-{
-	tracks_.clear();
-	trackBoneMap_.clear();
-	if (!currentMotion_) return;
-
-	static const DopeSheet::Color colT = { 1.0f, 0.59f, 0.2f, 1.0f };
-	static const DopeSheet::Color colR = { 0.35f, 0.78f, 0.35f, 1.0f };
-	static const DopeSheet::Color colS = { 0.31f, 0.59f, 1.0f, 1.0f };
-
-	auto& nodeAnims = currentMotion_->animation_.nodeAnimations_;
-
-	std::vector<std::string> boneNames;
-	boneNames.reserve(nodeAnims.size());
-	for (const auto& [name, _] : nodeAnims) boneNames.push_back(name);
-	std::sort(boneNames.begin(), boneNames.end());
-
-	for (const auto& boneName : boneNames)
-	{
-		const auto& na = nodeAnims.at(boneName);
-
-		{
-			DopeSheet::DopeTrack header;
-			header.label = boneName;
-			header.isGroupHeader = true;
-			header.groupExpanded = (selBone_ == boneName || selKF_.boneName == boneName
-				? true : header.groupExpanded);
-			tracks_.push_back(header);
-			trackBoneMap_.push_back({ boneName, -1 });
-		}
-
-		{
-			DopeSheet::DopeTrack t;
-			t.label = "  T";
-			t.color = colT;
-			t.groupDepth = 1;
-			for (const auto& kf : na.translate.keyframes)
-				t.keys.emplace_back(static_cast<int>(kf.time * fps_ + 0.5f), kf.value.x, 0);
-			tracks_.push_back(t);
-			trackBoneMap_.push_back({ boneName, 0 });
-		}
-		{
-			DopeSheet::DopeTrack r;
-			r.label = "  R";
-			r.color = colR;
-			r.groupDepth = 1;
-			for (const auto& kf : na.rotate.keyframes)
-				r.keys.emplace_back(static_cast<int>(kf.time * fps_ + 0.5f), kf.value.w, 1);
-			tracks_.push_back(r);
-			trackBoneMap_.push_back({ boneName, 1 });
-		}
-		{
-			DopeSheet::DopeTrack s;
-			s.label = "  S";
-			s.color = colS;
-			s.groupDepth = 1;
-			for (const auto& kf : na.scale.keyframes)
-				s.keys.emplace_back(static_cast<int>(kf.time * fps_ + 0.5f), kf.value.x, 2);
-			tracks_.push_back(s);
-			trackBoneMap_.push_back({ boneName, 2 });
-		}
-	}
-}
-
-// ============================================================
-//  ApplyTracksToMotion  ─ DopeTrack[] → Motion KF時刻書き戻し
-// ============================================================
-
-void MotionEditor::ApplyTracksToMotion()
-{
-	if (!currentMotion_) return;
-
-	for (int ti = 0; ti < static_cast<int>(tracks_.size()); ++ti)
-	{
-		if (ti >= static_cast<int>(trackBoneMap_.size())) break;
-		const auto& [boneName, channel] = trackBoneMap_[ti];
-		if (channel < 0) continue;
-		if (!currentMotion_->animation_.nodeAnimations_.count(boneName)) continue;
-
-		auto& na = currentMotion_->animation_.nodeAnimations_[boneName];
-		const auto& keys = tracks_[ti].keys;
-
-		auto applyTimes = [&](auto& keyframes) {
-			if (keys.size() != keyframes.size()) return;
-			for (int ki = 0; ki < static_cast<int>(keys.size()); ++ki)
-				keyframes[ki].time = keys[ki].frame / static_cast<float>(fps_);
-			std::sort(keyframes.begin(), keyframes.end(),
-				[](const auto& a, const auto& b) { return a.time < b.time; });
-			};
-
-		switch (channel) {
-		case 0: applyTimes(na.translate.keyframes); break;
-		case 1: applyTimes(na.rotate.keyframes);    break;
-		case 2: applyTimes(na.scale.keyframes);     break;
-		}
-	}
-}
-
-#ifdef USE_IMGUI
-void MotionEditor::DrawKFRow(ImDrawList* /*dl*/,
-	const std::string& /*boneName*/, KFChannel /*ch*/,
-	float /*rowY*/, float /*canvasX*/, float /*canvasW*/, float /*labelW*/)
-{
-}
-#endif
-
-// ============================================================
-// ステータスバー
-// ============================================================
-void MotionEditor::DrawStatusBar()
-{
-#ifdef USE_IMGUI
-	float barH = 20.0f;
-	ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.12f, 0.12f, 0.12f, 1.0f));
-	ImGui::BeginChild("##status", ImVec2(0, barH), false);
-
-	ImGui::SetCursorPosY(3);
-	ImGui::TextColored(ImVec4(0.6f, 0.9f, 0.6f, 1.0f), "  %s", statusMsg_.c_str());
-
-	float hints_x = ImGui::GetContentRegionAvail().x - 400;
-	if (hints_x > 200) {
-		ImGui::SameLine(hints_x);
-		ImGui::TextDisabled("Space=再生  Del=KF削除  Ctrl+Z=元に戻す  Ctrl+Y=やり直す  ホイール=スクロール  Ctrl+ホイール=ズーム");
-	}
-
-	ImGui::EndChild();
-	ImGui::PopStyleColor();
-#endif
-}
-
-// ============================================================
-// バイナリ保存・読み込みポップアップ
-// ============================================================
-void MotionEditor::DrawSaveLoadPopup()
-{
-#ifdef USE_IMGUI
-	if (showSavePopup_)
-		ImGui::OpenPopup("保存 / 読み込み##popup");
-
-	ImGui::SetNextWindowSize(ImVec2(500, 280), ImGuiCond_Appearing);
-	if (ImGui::BeginPopupModal("保存 / 読み込み##popup", &showSavePopup_)) {
-
-		ImGui::Text("バイナリファイル (.anim):");
-		{
-			char buf[512]; strncpy_s(buf, sizeof(buf), savePath_.c_str(), _TRUNCATE);
-			ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 90);
-			if (ImGui::InputText("##savepath", buf, sizeof(buf))) savePath_ = buf;
-			ImGui::SameLine();
-			if (ImGui::Button("参照##b")) {
-				binaryBrowser_.isOpen = true;
-				binaryBrowser_.selectedFilePath = "";
-				showSavePopup_ = false;
-				ImGui::CloseCurrentPopup();
-			}
-		}
-
-		ImGui::Spacing();
-		ImGui::Separator();
-		ImGui::Spacing();
-
-		bool canSave = currentMotion_ != nullptr;
-		if (!canSave) ImGui::BeginDisabled();
-		if (ImGui::Button("バイナリ保存", ImVec2(130, 0))) {
-			try {
-				if (currentMotion_) {
-					currentMotion_->SaveBinary(*currentMotion_, AnimDisplayName(selectedAnimKey_), savePath_);
-					saveMsg_ = "保存成功: " + savePath_;
-					statusMsg_ = saveMsg_;
-				}
-				else {
-					saveMsg_ = "保存失敗: アニメーションがありません";
-				}
-			}
-			catch (const std::exception& e) {
-				saveMsg_ = std::string("保存失敗: ") + e.what();
-			}
-		}
-		if (!canSave) ImGui::EndDisabled();
-		if (ImGui::IsItemHovered()) ImGui::SetTooltip("現在のアニメーションデータをバイナリファイルに保存します");
-
-		ImGui::SameLine(0, 10);
-
-		Object3d* target = GetTargetObject();
-
-		if (ImGui::Button("バイナリ読み込み", ImVec2(140, 0))) {
-			try {
-				Motion loaded = Motion().LoadBinary(savePath_);
-				const std::string key = "Binary:" + savePath_;
-				Model::animationCache_[key] = std::move(loaded);
-				selectedAnimKey_ = key;
-				currentMotion_ = &Model::animationCache_[key];
-				if (target) {
-					target->SetChangeMotion(loadFileName_, MotionPlayMode::Loop, AnimDisplayName(key));
-				}
-				saveMsg_ = "読み込み成功: " + savePath_;
-				statusMsg_ = saveMsg_;
-			}
-			catch (const std::exception& e) {
-				saveMsg_ = std::string("読み込み失敗: ") + e.what();
-			}
-		}
-		if (ImGui::IsItemHovered()) ImGui::SetTooltip("バイナリファイルからアニメーションを読み込みます");
-
-		if (!saveMsg_.empty()) {
-			ImGui::Spacing();
-			bool isError = saveMsg_.find("失敗") != std::string::npos;
-			ImGui::TextColored(isError ? ImVec4(1, 0.3f, 0.3f, 1) : ImVec4(0.3f, 1, 0.3f, 1),
-				"%s", saveMsg_.c_str());
-		}
-
-		ImGui::Spacing();
-		ImGui::Separator();
-		if (ImGui::Button("閉じる", ImVec2(100, 0))) {
-			showSavePopup_ = false;
-			saveMsg_ = "";
-			ImGui::CloseCurrentPopup();
-		}
-
-		ImGui::EndPopup();
-	}
-	if (!showSavePopup_) ImGui::CloseCurrentPopup();
-#endif
-}
-
-// ============================================================
-// ファイルブラウザ
-// ============================================================
-#ifdef USE_IMGUI
-void MotionEditor::DrawFileBrowser(FileBrowserState& state, const char* title)
-{
-	ImGui::SetNextWindowSize(ImVec2(540, 420), ImGuiCond_FirstUseEver);
-	bool open = true;
-	if (!ImGui::Begin(title, &open)) { ImGui::End(); if (!open) state.isOpen = false; return; }
-
-	ImGui::TextColored(ImVec4(0.7f, 0.9f, 1, 1), "%s", state.currentDirectory.c_str());
-	ImGui::Separator();
-
-	bool canUp = !state.directoryHistory.empty();
-	if (!canUp) ImGui::BeginDisabled();
-	if (ImGui::Button("[ .. ] 上へ")) {
-		state.currentDirectory = state.directoryHistory.back();
-		state.directoryHistory.pop_back();
-		state.selectedFilePath = "";
-	}
-	if (!canUp) ImGui::EndDisabled();
-	ImGui::SameLine();
-	ImGui::TextDisabled("| ダブルクリックでフォルダを開く / ファイルを選択");
-	ImGui::Separator();
-
-	auto entries = GetDirectoryEntries(state.currentDirectory, state.filterExtension);
-	ImGui::BeginChild("##fblist", ImVec2(0, -50), true);
-	for (const auto& e : entries) {
-		std::string name = e.path().filename().string();
-		if (e.is_directory()) {
-			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.9f, 1, 1));
-			std::string lbl = "[DIR] " + name;
-			if (ImGui::Selectable(lbl.c_str(), false, ImGuiSelectableFlags_AllowDoubleClick)) {
-				if (ImGui::IsMouseDoubleClicked(0)) {
-					state.directoryHistory.push_back(state.currentDirectory);
-					state.currentDirectory = e.path().string();
-					std::replace(state.currentDirectory.begin(), state.currentDirectory.end(), '\\', '/');
-					state.selectedFilePath = "";
-				}
-			}
-			ImGui::PopStyleColor();
-		}
-		else {
-			bool isSel = (state.selectedFilePath == e.path().string());
-			if (ImGui::Selectable(name.c_str(), isSel, ImGuiSelectableFlags_AllowDoubleClick)) {
-				state.selectedFilePath = e.path().string();
-				std::replace(state.selectedFilePath.begin(), state.selectedFilePath.end(), '\\', '/');
-				if (ImGui::IsMouseDoubleClicked(0)) { state.isOpen = false; ImGui::EndChild(); ImGui::End(); return; }
-			}
-		}
-	}
-	ImGui::EndChild();
-
-	ImGui::Separator();
-	ImGui::TextUnformatted(state.selectedFilePath.empty() ? "(ファイルが未選択です)" : state.selectedFilePath.c_str());
-	float btnX = ImGui::GetContentRegionAvail().x - 120;
-	ImGui::SameLine(btnX);
-	bool canOK = !state.selectedFilePath.empty();
-	if (!canOK) ImGui::BeginDisabled();
-	if (ImGui::Button("OK", ImVec2(55, 0))) state.isOpen = false;
-	if (!canOK) ImGui::EndDisabled();
-	ImGui::SameLine();
-	if (ImGui::Button("キャンセル", ImVec2(60, 0))) { state.selectedFilePath = ""; state.isOpen = false; }
-
-	if (!open) state.isOpen = false;
-	ImGui::End();
-}
-#endif
-
-// ============================================================
-// 一括ポーズ保存機能 (Save Pose)
-// ============================================================
-void MotionEditor::InsertKeyframeFromTransform(const std::string& bone, float time, const QuaternionTransform& tr)
-{
-	if (!currentMotion_) return;
-	auto& nodeAnims = currentMotion_->animation_.nodeAnimations_;
-	if (!nodeAnims.count(bone)) return;
-
-	auto insertOrReplace = [&]<typename T>(auto& kfs, T val) {
-		using KF = typename std::remove_reference<decltype(kfs)>::type::value_type;
-		auto it = std::find_if(kfs.begin(), kfs.end(),
-			[time](const KF& k) { return std::abs(k.time - time) < 1e-4f; });
-		if (it != kfs.end()) { it->value = val; }
-		else {
-			KF k; k.time = time; k.value = val; kfs.push_back(k);
-			std::sort(kfs.begin(), kfs.end(), [](const KF& a, const KF& b) { return a.time < b.time; });
-		}
-	};
-
-	insertOrReplace(nodeAnims[bone].translate.keyframes, tr.translate);
-	insertOrReplace(nodeAnims[bone].rotate.keyframes, tr.rotate);
-	insertOrReplace(nodeAnims[bone].scale.keyframes, tr.scale);
-}
-
-void MotionEditor::SavePose(float time)
-{
-	Object3d* target = GetTargetObject();
-	if (!target || !target->GetModel() || !target->GetModel()->GetSkeleton() || !currentMotion_) return;
-
-	Skeleton* skeleton = target->GetModel()->GetSkeleton();
-	auto oldAnims = currentMotion_->animation_.nodeAnimations_;
-
-	for (const auto& joint : skeleton->GetJoints()) {
-		if (currentMotion_->animation_.nodeAnimations_.count(joint.GetName())) {
-			InsertKeyframeFromTransform(joint.GetName(), time, joint.GetTransform());
-		}
-	}
-
-	auto newAnims = currentMotion_->animation_.nodeAnimations_;
-
-	history_.Execute(MakeLambdaCommand("全ポーズ保存 @ " + std::to_string(time) + "s",
-		[this, newAnims]() {
-			if (currentMotion_) currentMotion_->animation_.nodeAnimations_ = newAnims;
-			tracksDirty_ = true;
-		},
-		[this, oldAnims]() {
-			if (currentMotion_) currentMotion_->animation_.nodeAnimations_ = oldAnims;
-			tracksDirty_ = true;
-		}
-	));
-
-	tracksDirty_ = true;
-}
-
-// ============================================================
-// キーフレーム操作
-// ============================================================
-
-void MotionEditor::InsertKeyframe(const std::string& bone, float time)
-{
-	if (!currentMotion_) return;
-	auto& nodeAnims = currentMotion_->animation_.nodeAnimations_;
-	if (!nodeAnims.count(bone)) return;
-
-	Vector3    newT = { editT_[0], editT_[1], editT_[2] };
-	Quaternion newR = EulerToQuaternion({ editR_[0] * (kPi / 180), editR_[1] * (kPi / 180), editR_[2] * (kPi / 180) });
-	Vector3    newS = { editS_[0], editS_[1], editS_[2] };
-	Motion::NodeAnimation snap = nodeAnims[bone];
-
-	history_.Execute(MakeLambdaCommand("KF挿入: " + bone,
-		[this, bone, time, newT, newR, newS]() {
-			auto& na = currentMotion_->animation_.nodeAnimations_[bone];
-			auto insertOrReplace = [&]<typename T>(auto& kfs, T val) {
-				using KF = typename std::remove_reference<decltype(kfs)>::type::value_type;
-				auto it = std::find_if(kfs.begin(), kfs.end(),
-					[time](const KF& k) { return std::abs(k.time - time) < 1e-4f; });
-				if (it != kfs.end()) { it->value = val; }
-				else {
-					KF k; k.time = time; k.value = val; kfs.push_back(k);
-					std::sort(kfs.begin(), kfs.end(), [](const KF& a, const KF& b) { return a.time < b.time; });
-				}
-			};
-			insertOrReplace(na.translate.keyframes, newT);
-			insertOrReplace(na.rotate.keyframes, newR);
-			insertOrReplace(na.scale.keyframes, newS);
-			tracksDirty_ = true;
-		},
-		[this, bone, snap]() {
-			currentMotion_->animation_.nodeAnimations_[bone] = snap;
-			tracksDirty_ = true;
-		}
-	));
-}
-
-// ============================================================
-// キーフレーム削除
-// ============================================================
-void MotionEditor::DeleteKeyframe(const std::string& bone, float time)
-{
-	if (!currentMotion_) return;
-	auto& nodeAnims = currentMotion_->animation_.nodeAnimations_;
-	if (!nodeAnims.count(bone)) return;
-
-	Motion::NodeAnimation snap = nodeAnims[bone];
-	history_.Execute(MakeLambdaCommand("KF削除: " + bone,
-		[this, bone, time]() {
-			auto& na = currentMotion_->animation_.nodeAnimations_[bone];
-			auto rem = [time](auto& kfs) {
-				kfs.erase(std::remove_if(kfs.begin(), kfs.end(),
-					[time](const auto& k) { return std::abs(k.time - time) < 1e-4f; }), kfs.end());
-				};
-			rem(na.translate.keyframes);
-			rem(na.rotate.keyframes);
-			rem(na.scale.keyframes);
-			tracksDirty_ = true;
-		},
-		[this, bone, snap]() {
-			currentMotion_->animation_.nodeAnimations_[bone] = snap;
-			tracksDirty_ = true;
-		}
-	));
-}
-
-// ============================================================
-// キーフレーム移動
-// ============================================================
-void MotionEditor::MoveKeyframe(const std::string& bone, KFChannel ch, int idx, float newTime)
-{
-	if (!currentMotion_) return;
-	auto& na = currentMotion_->animation_.nodeAnimations_[bone];
-
-	auto setTime = [&](auto& kfs) {
-		if (idx >= 0 && idx < (int)kfs.size()) {
-			kfs[idx].time = newTime;
-			std::sort(kfs.begin(), kfs.end(),
-				[](const auto& a, const auto& b) { return a.time < b.time; });
-		}
-		};
-	switch (ch) {
-	case KFChannel::Translate: setTime(na.translate.keyframes); break;
-	case KFChannel::Rotate:    setTime(na.rotate.keyframes);    break;
-	case KFChannel::Scale:     setTime(na.scale.keyframes);     break;
-	}
-}
-
-// ============================================================
-// ボーン操作
-// ============================================================
-void MotionEditor::SetJointTransform(const std::string& bone, const QuaternionTransform& tr)
-{
-	Joint* j = FindJoint(bone);
-	if (!j) return;
-	j->SetTransform(tr);
-	Object3d* target = GetTargetObject();
-	Model* m = target ? target->GetModel() : nullptr;
-	if (m && m->GetSkeleton()) {
-		m->GetSkeleton()->Update();
-		if (m->GetSkinCluster())
-			m->GetSkinCluster()->UpdateMatrixPalette(m->GetSkeleton()->GetJoints());
-	}
-}
-
-// ============================================================
-// ボーンの検索
-// ============================================================
-Joint* MotionEditor::FindJoint(const std::string& name) const
-{
-	Object3d* target = GetTargetObject();
-	if (!target || !target->GetModel() || !target->GetModel()->GetSkeleton()) return nullptr;
-	return target->GetModel()->GetSkeleton()->GetJointByName(name);
-}
-
-// ============================================================
-// バッファからトランスフォームへの変換
-// ============================================================
-QuaternionTransform MotionEditor::BufferToTransform() const
-{
-	QuaternionTransform tr;
-	tr.translate = { editT_[0], editT_[1], editT_[2] };
-	tr.rotate = EulerToQuaternion({ editR_[0] * (kPi / 180), editR_[1] * (kPi / 180), editR_[2] * (kPi / 180) });
-	tr.scale = { editS_[0], editS_[1], editS_[2] };
-	return tr;
-}
-
-// ============================================================
-// ジョイントのバッファとの同期
-// ============================================================
-void MotionEditor::SyncJointToBuffer(const std::string& bone)
-{
-	Joint* j = FindJoint(bone);
-	if (!j) return;
-	const auto& tr = j->GetTransform();
-	editT_[0] = tr.translate.x; editT_[1] = tr.translate.y; editT_[2] = tr.translate.z;
-	Vector3 e = QuaternionToEuler(tr.rotate);
-	editR_[0] = e.x * (180 / kPi); editR_[1] = e.y * (180 / kPi); editR_[2] = e.z * (180 / kPi);
-	editS_[0] = tr.scale.x; editS_[1] = tr.scale.y; editS_[2] = tr.scale.z;
-}
-
-// ============================================================
-// バッファからジョイントへの変換
-// ============================================================
-void MotionEditor::SyncBufferToJoint()
-{
-	Joint* j = FindJoint(selBone_);
-	if (j) {
-		j->SetTransform(BufferToTransform());
-		Object3d* target = GetTargetObject();
-		Model* m = target ? target->GetModel() : nullptr;
-		if (m && m->GetSkeleton()) {
-			m->GetSkeleton()->Update();
-			if (m->GetSkinCluster())
-				m->GetSkinCluster()->UpdateMatrixPalette(m->GetSkeleton()->GetJoints());
-		}
-	}
-}
-
-// ============================================================
-// ユーティリティ
-// ============================================================
-std::string MotionEditor::AnimDisplayName(const std::string& key)
-{
-	auto pos = key.find('#');
-	return (pos != std::string::npos) ? key.substr(pos + 1) : key;
-}
-
-std::vector<std::string> MotionEditor::FetchAnimationNames(const std::string& fullPath)
-{
-	std::vector<std::string> names;
-	if (!fullPath.ends_with(".gltf")) return names;
-	std::ifstream f(fullPath);
-	if (!f.is_open()) return names;
-	try {
-		nlohmann::json gltf; f >> gltf;
-		if (gltf.contains("animations"))
-			for (const auto& a : gltf["animations"])
-				if (a.contains("name")) names.push_back(a["name"].get<std::string>());
-	}
-	catch (...) {}
-	return names;
-}
-
-std::vector<fs::directory_entry> MotionEditor::GetDirectoryEntries(
-	const std::string& dir, const std::string& ext) const
-{
-	std::vector<fs::directory_entry> dirs, files;
-	std::error_code ec;
-	for (const auto& e : fs::directory_iterator(dir, ec)) {
-		if (ec) break;
-		if (e.is_directory()) { dirs.push_back(e); }
-		else if (e.is_regular_file()) {
-			std::string ex = e.path().extension().string();
-			if (ext.empty()) {
-				if (ex == ".gltf" || ex == ".obj" || ex == ".anim") files.push_back(e);
-			}
-			else {
-				if (ex == ext) files.push_back(e);
-			}
-		}
-	}
-	auto byName = [](const fs::directory_entry& a, const fs::directory_entry& b) {
-		return a.path().filename().string() < b.path().filename().string(); };
-	std::sort(dirs.begin(), dirs.end(), byName);
-	std::sort(files.begin(), files.end(), byName);
-	dirs.insert(dirs.end(), files.begin(), files.end());
-	return dirs;
-}
-
-Matrix4x4 MotionEditor::GetJointWorldMatrix(const std::string& boneName) const
-{
-	Joint* j = FindJoint(boneName);
-	if (j) {
-		// 修正：ターゲットのワールド行列を掛けて真のワールド座標にする
-		return j->GetWorldTransform().matWorld_ * GetTargetWorldMatrix();
-	}
-	return MakeIdentity4x4();
-}
-
-void MotionEditor::ApplyBoneGizmoTransform(const std::string& boneName, const Matrix4x4& newWorldMat)
-{
-	Joint* j = FindJoint(boneName);
-	if (!j) return;
-
-	// 親のワールド行列を取得
-	Matrix4x4 parentWorld = MakeIdentity4x4();
-	if (j->GetWorldTransform().parent_) {
-		// 修正：親の matWorld_（モデル空間）に対象オブジェクトのワールド行列を掛ける
-		parentWorld = j->GetWorldTransform().parent_->matWorld_ * GetTargetWorldMatrix();
-	}
-	else {
-		parentWorld = GetTargetWorldMatrix();
-	}
-
-	// ローカル行列 ＝ 新ワールド行列 × 親ワールド行列の逆行列
-	Matrix4x4 newLocalMat = newWorldMat * Inverse(parentWorld);
-
-	// 分解
-	float lT[3], lRDeg[3], lS[3];
-#ifdef USE_IMGUI
-	ImGuizmo::DecomposeMatrixToComponents(&newLocalMat.m[0][0], lT, lRDeg, lS);
-#endif
-	// UI用バッファに反映 (選択中のボーンと一致する場合のみUIに反映させるのが自然だが、ギズモ操作中＝選択中のはず)
-	if (selBone_ == boneName) {
-		editT_[0] = lT[0]; editT_[1] = lT[1]; editT_[2] = lT[2];
-		editR_[0] = lRDeg[0]; editR_[1] = lRDeg[1]; editR_[2] = lRDeg[2];
-		editS_[0] = lS[0]; editS_[1] = lS[1]; editS_[2] = lS[2];
-	}
-
-	// バッファからトランスフォームを構築して Joint にセット
-	QuaternionTransform tr;
-	tr.translate = { lT[0], lT[1], lT[2] };
-	tr.rotate = EulerToQuaternion({ lRDeg[0] * (kPi / 180), lRDeg[1] * (kPi / 180), lRDeg[2] * (kPi / 180) });
-	tr.scale = { lS[0], lS[1], lS[2] };
-
-	j->SetTransform(tr);
-
-	Object3d* target = GetTargetObject();
-	Model* m = target ? target->GetModel() : nullptr;
-	if (m && m->GetSkeleton()) {
-		m->GetSkeleton()->Update();
-		if (m->GetSkinCluster())
-			m->GetSkinCluster()->UpdateMatrixPalette(m->GetSkeleton()->GetJoints());
-	}
-}
-
-============================================================
-File Path: YEngine/Model/Motion/MotionEditor.h
-============================================================
-#pragma once
-
-#include <string>
-#include <vector>
-#include <memory>
-#include <filesystem>
-
-// Engine
-#include "Object3d/Object3d.h"
-#include "WorldTransform/WorldTransform.h"
-#include "Editor/Command/CommandHistory.h"
-#include "Debugger/DopeSheet/DopeSheetEditor.h"
-#include <Graphics/Drawer/LineManager/Line.h>
-#include "Object3D/ObjectManager.h" 
-
-#ifdef USE_IMGUI
-#include "Debugger/Gizmo/GizmoController.h"
-#endif
-
-// Math
-#include "Vector3.h"
-#include "Quaternion.h"
-
-class Camera;
-class Motion;
-class Joint;
-class Skeleton;
-
-#ifdef USE_IMGUI
-class BoneGizmable; // 前方宣言
-#endif
-
-// ============================================================
-//  ファイルブラウザ状態
-// ============================================================
-struct FileBrowserState
-{
-	std::string currentDirectory = "Resources/Models";
-	std::string selectedFilePath = "";
-	std::vector<std::string> directoryHistory;
-	bool isOpen = false;
-	std::string filterExtension = "";
-};
-
-// ============================================================
-//  選択中キーフレーム情報
-// ============================================================
-enum class KFChannel { Translate, Rotate, Scale };
-
-struct SelectedKF
-{
-	std::string boneName = "";
-	int         index = -1;
-	KFChannel   channel = KFChannel::Translate;
-
-	bool IsValid() const { return !boneName.empty() && index >= 0; }
-	void Clear() { boneName = ""; index = -1; }
-};
-
-/// <summary>
-/// モーションを編集するエディタ
-/// </summary>
-class MotionEditor
-{
-public:
-
-	///************************* 基本的関数 *************************///
-	MotionEditor();
-	~MotionEditor();
-
-	void Initialize(Camera* camera);
-	void Update();
-	void Draw();
-	void DrawGizmo();
-	void DrawBone();
-	void ShowEditor();
-	void SetTargetObjectId(int id);
-	bool IsDrawBone() const { return isDrawBone_; }
-	int GetTargetObjectId() const { return targetObjectId_; }
-	void SetCamera(Camera* camera) { camera_ = camera; }
-	///************************* ギズモ操作用インターフェース *************************///
-
-	// ボーンの現在のワールド行列を取得
-	Matrix4x4 GetJointWorldMatrix(const std::string& boneName) const;
-
-	// ギズモで操作された新しいワールド行列をローカルに変換し、ジョイントとUIに適用する
-	void ApplyBoneGizmoTransform(const std::string& boneName, const Matrix4x4& newWorldMat);
-
-private:
-	///************************* その他描画 *************************///
-	void DrawMenuBar();
-	void DrawToolbar();
-	void DrawBonePanel();
-	void DrawPropertyPanel();
-	void DrawTimeline();
-	void DrawStatusBar();
-
-	///************************* ポップアップ *************************///
-	void DrawSaveLoadPopup();
-	void DrawFileBrowser(FileBrowserState& state, const char* title);
-
-	///************************* 内部ヘルパー関数 *************************///
-#ifdef USE_IMGUI
-	/// 1 ボーン × 1 チャンネルの行を描画
-	void DrawKFRow(ImDrawList* dl,
-		const std::string& boneName, KFChannel ch,
-		float rowY, float canvasX, float canvasW, float labelW);
-#endif
-	float TimeToX(float t, float cx) const { return cx + t * timelineZoom_ - timelineScroll_; }
-	float XToTime(float x, float cx) const { return (x - cx + timelineScroll_) / timelineZoom_; }
-
-
-	///************************* DopeSheet *************************///
-	void RebuildTracks();
-	void ApplyTracksToMotion();
-
-	///************************* キーフレーム操作 *************************///
-	void InsertKeyframe(const std::string& bone, float time);
-	void DeleteKeyframe(const std::string& bone, float time);
-	void MoveKeyframe(const std::string& bone, KFChannel ch, int idx, float newTime);
-
-	// ★追加: 全ボーンの現在のトランスフォームを一括保存
-	void SavePose(float time);
-	// ★追加: 特定のトランスフォームから直接キーフレームを挿入
-	void InsertKeyframeFromTransform(const std::string& bone, float time, const QuaternionTransform& tr);
-
-	///************************* ボーン操作 *************************///
-	void   SetJointTransform(const std::string& bone, const QuaternionTransform& tr);
-	Joint* FindJoint(const std::string& name) const;
-
-	///************************* ユーティリティ *************************///
-	static std::string AnimDisplayName(const std::string& cacheKey);
-	static std::vector<std::string> FetchAnimationNames(const std::string& fullPath);
-	std::vector<std::filesystem::directory_entry> GetDirectoryEntries(
-		const std::string& dir, const std::string& ext) const;
-
-	QuaternionTransform BufferToTransform() const;
-	void SyncJointToBuffer(const std::string& bone);  // Joint の現在値 → 編集バッファ
-	void SyncBufferToJoint();                          // 編集バッファ → Joint
-
-	Object3d* GetTargetObject() const {
-		if (targetObjectId_ != -1) {
-			return ObjectManager::GetInstance()->GetObject3dById(targetObjectId_);
-		}
-		return nullptr;
-	}
-
-	// ★追加: 対象オブジェクトのワールド行列を取得する
-	Matrix4x4 GetTargetWorldMatrix() const {
-		if (targetObjectId_ != -1) {
-			auto* placedObj = ObjectManager::GetInstance()->GetObjectById(targetObjectId_);
-			if (placedObj && placedObj->worldTransform) {
-				return placedObj->worldTransform->GetMatWorld();
-			}
-		}
-		return previewTransform_.matWorld_;
-	}
-
-private:
-	///************************* 定数 *************************///
-	static constexpr const char* kModelRootDir = "Resources/Models";
-	static constexpr float kRowH = 18.0f;    // タイムライン 1 行の高さ
-	static constexpr float kLabelW = 150.0f;   // ボーン名ラベル幅
-	static constexpr float kPi = 3.14159265f;
-
-private:
-	///************************* メンバ変数 *************************///
-
-	// ドープシートエディ���
-	DopeSheet::DopeSheetEditor dopeSheet_;
-	std::vector<DopeSheet::DopeTrack> tracks_;
-	std::vector<std::pair<std::string, int>> trackBoneMap_;
-	bool tracksDirty_ = false;    // ドープシートの内容が Motion に反映されていない状態
-	int fps_ = 60;
-
-	Camera* camera_ = nullptr;
-
-	// プレビュー
-	int targetObjectId_ = -1;
-	WorldTransform            previewTransform_;
-	Motion* currentMotion_ = nullptr;
-
-	// Undo / Redo
-	CommandHistory history_;
-
-	// モデル読み込み
-	std::string      loadFileName_ = "";
-	std::string      loadDirectory_ = "";
-	std::vector<std::string> animNameList_;
-	int              animNameIndex_ = -1;
-	std::string      loadAnimName_ = "";
-	bool             showLoadPopup_ = false;
-	std::unique_ptr<Line> lineDrawer_;
-	bool             isDrawBone_ = false;
-
-#ifdef USE_IMGUI
-	std::unique_ptr<Object3d> boneObj_; // ICO.obj 表示用
-	GizmoController gizmoCtrl_;         // ギズモ操作用コントローラー
-	std::vector<std::unique_ptr<BoneGizmable>> boneGizmables_; // ピッキング用
-	std::vector<WorldTransform> boneWorldTransforms_; // ボーン描画用 WT（コマンドリストが参照するためフレーム間で生存させる）
-#endif
-
-	// 再生状態の管理 (UI用)
-	bool isPlaying_ = true;
-	bool isLoop_ = true;
-
-	// モーション選択
-	std::string selectedAnimKey_ = "";    // animationCache_ のキー
-
-	// 保存・読み込み
-	std::string      savePath_ = "Resources/TestBinary/edited_motion.anim";
-	FileBrowserState binaryBrowser_;
-	bool             showSavePopup_ = false;
-	std::string      saveMsg_ = "";
-
-	// ボーン編集
-	std::string         selBone_ = "";
-	float               editT_[3] = { 0,0,0 };   // Translate
-	float               editR_[3] = { 0,0,0 };   // Rotate (度)
-	float               editS_[3] = { 1,1,1 };   // Scale
-	QuaternionTransform boneSnap_ = {};
-	bool                draggingBone_ = false;
-
-	// タイムライン
-	float     scrubTime_ = 0.0f;
-	float     timelineZoom_ = 80.0f;   // px / 秒
-	float     timelineScroll_ = 0.0f;
-	SelectedKF selKF_;
-
-	// KF 値編集スナップショット
-	Vector3    kfSnapT_ = {};
-	Quaternion kfSnapR_ = { 0,0,0,1 };
-	Vector3    kfSnapS_ = { 1,1,1 };
-
-	// KF ドラッグ移動
-	bool  draggingKF_ = false;
-	float dragKFOrigTime_ = 0.0f;
-	float dragKFStartMX_ = 0.0f;
-
-	// レイアウト
-	float bonePanelW_ = 185.0f;
-	float timelineH_ = 240.0f;
-
-	// ステータスバー
-	std::string statusMsg_ = "Ready";
-};
-
-============================================================
-File Path: YEngine/Model/Motion/MotionSystem.cpp
+File Path: YEngine/Model/Motion/Core/MotionSystem.cpp
 ============================================================
 #include "MotionSystem.h"
 
-#include "../ModelUtils.h"
+#include "../../ModelUtils.h"
 #include "Debugger/Logger.h"
 
 #include <Windows.h>
@@ -232674,13 +230733,13 @@ void MotionSystem::BlendAndApplyAnimation(const Motion& from, const Motion& to, 
 }
 
 ============================================================
-File Path: YEngine/Model/Motion/MotionSystem.h
+File Path: YEngine/Model/Motion/Core/MotionSystem.h
 ============================================================
 #pragma once
 #include "Motion.h"
-#include "../Skeleton/Skeleton.h"
-#include "../Skeleton/SkinCluster.h"
-#include "../Node/Node.h"
+#include "../../Skeleton/Skeleton.h"
+#include "../../Skeleton/SkinCluster.h"
+#include "../../Node/Node.h"
 #include "Quaternion.h"
 
 #include <functional>
@@ -232790,6 +230849,2093 @@ private:
 };
 
 ============================================================
+File Path: YEngine/Model/Motion/Editor/KeyFrame.h
+============================================================
+#pragma once
+#include <string>
+
+// ============================================================
+// キーフレーム関連の列挙型
+// ============================================================
+enum class KFChannel {
+	Translate,
+	Rotate,
+	Scale
+};
+
+// ============================================================
+// 選択中のキーフレーム情報
+// ============================================================
+struct SelectedKF {
+	std::string boneName = "";
+	int         index = -1;
+	KFChannel   channel = KFChannel::Translate;
+
+	bool IsValid() const { return !boneName.empty() && index >= 0; }
+	void Clear() { boneName = ""; index = -1; }
+};
+
+============================================================
+File Path: YEngine/Model/Motion/Editor/MotionEditor.cpp
+============================================================
+#include "MotionEditor.h"
+
+// Engine
+#include "Systems/Camera/Camera.h"
+#include "Model.h"
+#include "../Core/MotionSystem.h"
+#include "Skeleton/Joint.h"
+#include "Skeleton/Skeleton.h"
+#include "Skeleton/BoneGizmable.h"
+#include <Editor/Editor.h>
+#include "Object3D/ObjectManager.h" 
+
+// App
+#include "Panels/MenuBarPanel.h"
+#include "Panels/SavePanel.h"
+#include "Panels/ToolbarPanel.h"
+#include "Panels/BoneListPanel.h"
+#include "Panels/PropertyPanel.h"
+#include "Panels/TimelinePanel.h"
+#include "Panels/StatusBarPanel.h"
+
+// External
+#ifdef USE_IMGUI
+#include "ImGuizmo.h"
+#include <imgui.h>
+#endif
+
+// Standard
+#include <algorithm>
+#include <cmath>
+
+// ============================================================
+// コンテキストヘルパーの実装
+// ============================================================
+Object3d* MotionEditorContext::GetTargetObject() const {
+	if (targetObjectId != -1) {
+		return ObjectManager::GetInstance()->GetObject3dById(targetObjectId);
+	}
+	return nullptr;
+}
+
+// ============================================================
+// コンストラクタ
+// ============================================================
+MotionEditor::MotionEditor() {}
+
+// ============================================================
+// デストラクタ
+// ============================================================
+MotionEditor::~MotionEditor() {}
+
+// ============================================================
+// 初期化
+// ============================================================
+void MotionEditor::Initialize(Camera* camera)
+{
+	context_.camera = camera;
+	previewTransform_.Initialize();
+
+	lineDrawer_ = std::make_unique<Line>();
+	lineDrawer_->SetCamera(context_.camera);
+	lineDrawer_->Initialize();
+	lineDrawer_->SetColor({ 0.5f, 0.5f, 0.5f, 1.0f });
+
+#ifdef USE_IMGUI
+	// デバッグ表示用のボーンオブジェクト生成
+	boneObj_ = Object3d::Create("ICO.obj");
+	gizmoCtrl_.Initialize();
+	gizmoCtrl_.SetMode(GizmoController::Mode::Local);
+#endif
+
+	//------------------------------------------------------------
+	// コンテキストのコールバック設定 (UIとロジックの分離)
+	//------------------------------------------------------------
+	context_.SyncJointToBuffer = [this]() { SyncJointToBuffer(context_.selBone); };
+	context_.SyncBufferToJoint = [this]() { SyncBufferToJoint(); };
+
+	// キーフレーム追加処理のラムダ登録
+	context_.AddKeyframe = [this](const std::string& bone, float time) {
+		if (!context_.currentMotion) return;
+		auto& nodeAnims = context_.currentMotion->animation_.nodeAnimations_;
+		if (!nodeAnims.count(bone)) return;
+
+		// 現在のUI編集バッファからトランスフォームを作成
+		Vector3 newT = { context_.editT[0], context_.editT[1], context_.editT[2] };
+		Quaternion newR = EulerToQuaternion({ context_.editR[0] * (kPi / 180), context_.editR[1] * (kPi / 180), context_.editR[2] * (kPi / 180) });
+		Vector3 newS = { context_.editS[0], context_.editS[1], context_.editS[2] };
+		Motion::NodeAnimation snap = nodeAnims[bone];
+
+		// コマンド履歴に登録して実行
+		context_.history.Execute(MakeLambdaCommand("KF挿入: " + bone,
+			[this, bone, time, newT, newR, newS]() {
+				auto& na = context_.currentMotion->animation_.nodeAnimations_[bone];
+				auto insertOrReplace = [&]<typename T>(auto& kfs, T val) {
+					using KF = typename std::remove_reference<decltype(kfs)>::type::value_type;
+					auto it = std::find_if(kfs.begin(), kfs.end(),
+						[time](const KF& k) { return std::abs(k.time - time) < 1e-4f; });
+					if (it != kfs.end()) { it->value = val; }
+					else {
+						KF k; k.time = time; k.value = val; kfs.push_back(k);
+						std::sort(kfs.begin(), kfs.end(), [](const KF& a, const KF& b) { return a.time < b.time; });
+					}
+				};
+				insertOrReplace(na.translate.keyframes, newT);
+				insertOrReplace(na.rotate.keyframes, newR);
+				insertOrReplace(na.scale.keyframes, newS);
+				context_.requireTimelineRebuild = true;
+			},
+			[this, bone, snap]() {
+				context_.currentMotion->animation_.nodeAnimations_[bone] = snap;
+				context_.requireTimelineRebuild = true;
+			}
+		));
+		};
+
+	// キーフレーム削除処理のラムダ登録
+	context_.DeleteKeyframe = [this](const std::string& bone, float time) {
+		if (!context_.currentMotion) return;
+		auto& nodeAnims = context_.currentMotion->animation_.nodeAnimations_;
+		if (!nodeAnims.count(bone)) return;
+
+		Motion::NodeAnimation snap = nodeAnims[bone];
+		context_.history.Execute(MakeLambdaCommand("KF削除: " + bone,
+			[this, bone, time]() {
+				auto& na = context_.currentMotion->animation_.nodeAnimations_[bone];
+				auto rem = [time](auto& kfs) {
+					kfs.erase(std::remove_if(kfs.begin(), kfs.end(),
+						[time](const auto& k) { return std::abs(k.time - time) < 1e-4f; }), kfs.end());
+					};
+				rem(na.translate.keyframes);
+				rem(na.rotate.keyframes);
+				rem(na.scale.keyframes);
+				context_.requireTimelineRebuild = true;
+			},
+			[this, bone, snap]() {
+				context_.currentMotion->animation_.nodeAnimations_[bone] = snap;
+				context_.requireTimelineRebuild = true;
+			}
+		));
+		};
+
+	//------------------------------------------------------------
+	// パネルの登録
+	//------------------------------------------------------------
+	RegisterPanel(std::make_unique<MenuBarPanel>());
+	RegisterPanel(std::make_unique<SavePanel>());
+	RegisterPanel(std::make_unique<ToolbarPanel>());
+	RegisterPanel(std::make_unique<BoneListPanel>());
+	RegisterPanel(std::make_unique<PropertyPanel>());
+	RegisterPanel(std::make_unique<TimelinePanel>());
+	RegisterPanel(std::make_unique<StatusBarPanel>());
+}
+
+// ============================================================
+// パネル登録
+// ============================================================
+void MotionEditor::RegisterPanel(std::unique_ptr<IMotionEditorPanel> panel)
+{
+	panel->Initialize(&context_);
+	panels_.push_back(std::move(panel));
+}
+
+// ============================================================
+// 更新処理
+// ============================================================
+void MotionEditor::Update()
+{
+	Object3d* target = context_.GetTargetObject();
+	if (!target) return;
+
+	Model* m = target->GetModel();
+	MotionSystem* ms = m ? m->GetMotionSystem() : nullptr;
+
+	//------------------------------------------------------------
+	// アニメーション再生時間の同期
+	//------------------------------------------------------------
+	if (ms) {
+		float msTime = ms->GetAnimationTime();
+		if (std::abs(msTime - context_.scrubTime) > 1e-4f) {
+			context_.scrubTime = msTime;
+		}
+	}
+
+	//------------------------------------------------------------
+	// ボーン・スケルトンの更新
+	//------------------------------------------------------------
+	if (m && m->GetSkeleton()) {
+		// 非再生中の場合、スクラブ時間に合わせたポーズを強制適用
+		if (ms && !context_.isPlaying && context_.currentMotion) {
+			context_.currentMotion->ApplyAnimation(m->GetSkeleton()->GetJoints(), context_.scrubTime);
+
+			if (!context_.selBone.empty()) {
+#ifdef USE_IMGUI
+				// 操作中の場合はジョイントへ同期、それ以外はジョイントから取得
+				if (draggingBone_ || gizmoCtrl_.IsUsing()) {
+					SyncBufferToJoint();
+				}
+				else {
+					SyncJointToBuffer(context_.selBone);
+				}
+#else
+				SyncJointToBuffer(context_.selBone);
+#endif
+			}
+		}
+
+		// 行列計算とスキニング用パレットの更新
+		m->GetSkeleton()->Update();
+		if (m->GetSkinCluster()) {
+			m->GetSkinCluster()->UpdateMatrixPalette(m->GetSkeleton()->GetJoints());
+		}
+	}
+
+	previewTransform_.UpdateMatrix();
+
+	// 各登録パネルのロジックを回す
+	for (auto& panel : panels_) {
+		if (panel->IsActive()) panel->Update();
+	}
+}
+
+// ============================================================
+// エディタUIの描画表示
+// ============================================================
+void MotionEditor::ShowEditor()
+{
+#ifdef USE_IMGUI
+	ImGui::SetNextWindowSize(ImVec2(1200, 750), ImGuiCond_FirstUseEver);
+	ImGui::Begin("Motion Editor", nullptr, ImGuiWindowFlags_MenuBar);
+
+	Object3d* target = context_.GetTargetObject();
+
+	//------------------------------------------------------------
+	// 3Dビュー上でのボーン選択＆ギズモ処理
+	//------------------------------------------------------------
+	if (context_.isDrawBone && target && target->GetModel() && target->GetModel()->GetSkeleton()) {
+		// クリックによるボーンのピッキング判定
+		if (ImGui::IsMouseClicked(0) && !ImGuizmo::IsOver() && !ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow)) {
+			gizmoCtrl_.ClearPickables();
+			boneGizmables_.clear();
+
+			// 全ジョイントをピッキング対象として登録
+			auto& joints = target->GetModel()->GetSkeleton()->GetJoints();
+			for (const auto& joint : joints) {
+				auto bg = std::make_unique<BoneGizmable>(this, joint.GetName());
+				bg->UpdateFromJoint();
+				gizmoCtrl_.RegisterPickable(bg.get());
+				boneGizmables_.push_back(std::move(bg));
+			}
+
+			ImVec2 viewPos = Editor::GetInstance()->GetGameViewPos();
+			ImVec2 viewSize = Editor::GetInstance()->GetGameViewSize();
+
+			// レイキャスト等による当たり判定実行
+			IGizmable* picked = gizmoCtrl_.TryPickObject(ImGui::GetMousePos(), viewPos, viewSize, context_.camera);
+			if (picked) {
+				BoneGizmable* bg = static_cast<BoneGizmable*>(picked);
+				context_.selBone = bg->GetBoneName();
+				SyncJointToBuffer(context_.selBone);
+				context_.statusMsg = "ボーン選択: " + context_.selBone;
+			}
+		}
+
+		// 選択中ボーンに対するトランスフォームギズモの表示
+		if (!context_.selBone.empty()) {
+			static BoneGizmable currentSelectedGizmo(this, "");
+			if (currentSelectedGizmo.GetBoneName() != context_.selBone) {
+				currentSelectedGizmo = BoneGizmable(this, context_.selBone);
+			}
+			currentSelectedGizmo.UpdateFromJoint();
+
+			std::vector<IGizmable*> gizmoTargets = { &currentSelectedGizmo };
+			ImVec2 viewPos = Editor::GetInstance()->GetGameViewPos();
+			ImVec2 viewSize = Editor::GetInstance()->GetGameViewSize();
+			gizmoCtrl_.Draw(context_.camera, gizmoTargets, viewPos, viewSize);
+		}
+	}
+
+	//------------------------------------------------------------
+	// キーボードショートカット処理
+	//------------------------------------------------------------
+	if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)) {
+		context_.history.HandleKeyInput();
+
+		// 再生・一時停止の切り替え
+		if (ImGui::IsKeyPressed(ImGuiKey_Space) && target) {
+			if (context_.isPlaying) {
+				if (target->GetModel() && target->GetModel()->GetMotionSystem()) target->GetModel()->GetMotionSystem()->Stop();
+				context_.isPlaying = false;
+				context_.statusMsg = "[ Space ] 一時停止";
+			}
+			else {
+				if (target->GetModel() && target->GetModel()->GetMotionSystem()) {
+					auto* ms = target->GetModel()->GetMotionSystem();
+					float savedTime = ms->GetAnimationTime();
+					if (savedTime >= ms->GetDuration() || ms->IsFinished()) savedTime = 0.0f;
+					if (context_.isLoop) target->PlayLoop(); else target->PlayOnce();
+					ms->SetAnimationTime(savedTime);
+				}
+				context_.isPlaying = true;
+				context_.statusMsg = "[ Space ] 再生";
+			}
+		}
+		// 選択中のキーフレーム削除
+		if (ImGui::IsKeyPressed(ImGuiKey_Delete) && context_.selKF.IsValid() && context_.currentMotion) {
+			if (context_.DeleteKeyframe) {
+				auto& na = context_.currentMotion->animation_.nodeAnimations_[context_.selKF.boneName];
+				float t = 0;
+				if (context_.selKF.index < (int)na.translate.keyframes.size())
+					t = na.translate.keyframes[context_.selKF.index].time;
+				context_.DeleteKeyframe(context_.selKF.boneName, t);
+			}
+			context_.selKF.Clear();
+			context_.statusMsg = "[ Del ] キーフレーム削除";
+		}
+	}
+
+	//------------------------------------------------------------
+	// オブジェクト未選択時のガード表示
+	//------------------------------------------------------------
+	if (!target || !target->GetModel()) {
+		panels_[0]->DrawImGui(); // MenuBar
+		panels_[1]->DrawImGui(); // SaveLoad
+
+		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 40);
+		float w = ImGui::GetContentRegionAvail().x;
+		ImGui::SetCursorPosX((w - 220) * 0.5f);
+		ImGui::TextColored(ImVec4(1, 1, 0, 1), "シーンエディタでモデルを選択してください");
+		ImGui::End();
+		return;
+	}
+
+	//------------------------------------------------------------
+	// メインパネル群のレイアウト構成
+	//------------------------------------------------------------
+	panels_[0]->DrawImGui(); // MenuBar
+	panels_[1]->DrawImGui(); // SaveLoad
+	panels_[2]->DrawImGui(); // Toolbar
+	ImGui::Separator();
+
+	float contentW = ImGui::GetContentRegionAvail().x;
+	float upperH = ImGui::GetContentRegionAvail().y - context_.timelineH - 30.0f;
+
+	// 上部エリア: ボーンリスト(左) と プロパティ(右)
+	ImGui::BeginChild("##upper", ImVec2(contentW, upperH), false);
+	{
+		ImGui::BeginChild("##bones", ImVec2(context_.bonePanelW, 0), true);
+		panels_[3]->DrawImGui();
+		ImGui::EndChild();
+
+		ImGui::SameLine();
+
+		// 垂直リサイズバーの処理
+		ImGuiIO& io = ImGui::GetIO();
+		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
+		ImGui::InvisibleButton("##vsep", ImVec2(4, upperH));
+		if (ImGui::IsItemActive()) {
+			context_.bonePanelW = std::clamp(context_.bonePanelW + io.MouseDelta.x, 80.0f, contentW - 100.0f);
+		}
+		if (ImGui::IsItemHovered() || ImGui::IsItemActive()) {
+			ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+			ImGui::GetWindowDrawList()->AddRectFilled(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), IM_COL32(100, 130, 200, 180));
+		}
+		ImGui::PopStyleVar();
+
+		ImGui::SameLine();
+
+		ImGui::BeginChild("##props", ImVec2(0, 0), true);
+		panels_[4]->DrawImGui();
+		ImGui::EndChild();
+	}
+	ImGui::EndChild();
+
+	// 水平リサイズバーの処理 (タイムラインの高さ調節)
+	ImGuiIO& io_h = ImGui::GetIO();
+	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
+	ImGui::InvisibleButton("##hsep", ImVec2(contentW, 4.0f));
+	if (ImGui::IsItemActive()) {
+		context_.timelineH -= io_h.MouseDelta.y;
+	}
+	if (ImGui::IsItemHovered() || ImGui::IsItemActive()) {
+		ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+		ImGui::GetWindowDrawList()->AddRectFilled(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), IM_COL32(100, 130, 200, 180));
+	}
+	ImGui::PopStyleVar();
+
+	panels_[5]->DrawImGui(); // Timeline
+	panels_[6]->DrawImGui(); // StatusBar
+
+	ImGui::End();
+#endif
+}
+
+// ============================================================
+// モデル描画
+// ============================================================
+void MotionEditor::Draw()
+{
+	Object3d* target = context_.GetTargetObject();
+	if (context_.isDrawBone && target) {
+#ifdef USE_IMGUI
+		// デバッグ用ボーン形状（ICO球など）の描画
+		if (boneObj_ && target->GetModel() && target->GetModel()->GetSkeleton()) {
+			auto& joints = target->GetModel()->GetSkeleton()->GetJoints();
+			if (boneWorldTransforms_.size() != joints.size()) {
+				boneWorldTransforms_.resize(joints.size());
+				for (auto& wt : boneWorldTransforms_) wt.Initialize();
+			}
+
+			for (size_t i = 0; i < joints.size(); ++i) {
+				auto& wt = boneWorldTransforms_[i];
+				Matrix4x4 targetMat = GetTargetWorldMatrix();
+				Matrix4x4 wMat = joints[i].GetWorldTransform().matWorld_ * targetMat;
+
+				float t[3], rDeg[3], s[3];
+				ImGuizmo::DecomposeMatrixToComponents(&wMat.m[0][0], t, rDeg, s);
+
+				wt.translate_ = { t[0], t[1], t[2] };
+				wt.rotate_ = { rDeg[0] * (kPi / 180.f), rDeg[1] * (kPi / 180.f), rDeg[2] * (kPi / 180.f) };
+				wt.scale_ = { 0.1f, 0.1f, 0.1f };
+				wt.UpdateMatrix();
+
+				// 選択ボーンをハイライト
+				if (context_.selBone == joints[i].GetName()) boneObj_->SetMaterialColor({ 1.0f, 0.85f, 0.2f, 1.0f });
+				else boneObj_->SetMaterialColor({ 0.5f, 0.5f, 0.5f, 1.0f });
+
+				boneObj_->Draw(context_.camera, wt);
+			}
+		}
+#endif
+	}
+}
+
+// ============================================================
+// ギズモの描画
+// ============================================================
+void MotionEditor::DrawGizmo()
+{
+#ifdef USE_IMGUI
+	Object3d* target = context_.GetTargetObject();
+	if (context_.isDrawBone && target && target->GetModel() && target->GetModel()->GetSkeleton()) {
+		if (!context_.selBone.empty()) {
+			static BoneGizmable currentSelectedGizmo(this, "");
+			if (currentSelectedGizmo.GetBoneName() != context_.selBone) {
+				currentSelectedGizmo = BoneGizmable(this, context_.selBone);
+			}
+			// ギズモ操作中でなければ最新のボーン位置に同期
+			if (!gizmoCtrl_.IsUsing()) currentSelectedGizmo.UpdateFromJoint();
+
+			std::vector<IGizmable*> gizmoTargets = { &currentSelectedGizmo };
+			ImVec2 viewPos = Editor::GetInstance()->GetGameViewPos();
+			ImVec2 viewSize = Editor::GetInstance()->GetGameViewSize();
+			gizmoCtrl_.Draw(context_.camera, gizmoTargets, viewPos, viewSize);
+		}
+	}
+#endif
+}
+
+// ============================================================
+// ボーン構造の描画（ライン表示）
+// ============================================================
+void MotionEditor::DrawBone()
+{
+	Object3d* target = context_.GetTargetObject();
+	if (context_.isDrawBone && target) {
+		lineDrawer_->SetCamera(context_.camera);
+		target->DrawBone(*lineDrawer_.get(), GetTargetWorldMatrix());
+	}
+}
+
+// ============================================================
+// ターゲットオブジェクトの設定
+// ============================================================
+void MotionEditor::SetTargetObjectId(int id) {
+	Object3d* obj = nullptr;
+	if (id != -1) {
+		obj = ObjectManager::GetInstance()->GetObject3dById(id);
+		// アニメーションシステムを持っていないオブジェクトは対象外とするガード
+		if (obj && obj->GetModel()) {
+			if (obj->GetModel()->GetMotionSystem() == nullptr) id = -1;
+		}
+		else id = -1;
+	}
+
+	if (context_.targetObjectId != id) {
+		context_.targetObjectId = id;
+
+		// ターゲット変更に伴うコンテキストの初期化・同期
+		if (context_.targetObjectId != -1) {
+			Object3d* target = context_.GetTargetObject();
+			Model* model = target->GetModel();
+			MotionSystem* ms = model->GetMotionSystem();
+
+			context_.loadFileName = model->GetName();
+			context_.currentMotion = ms->GetAnimation();
+			context_.selectedAnimKey = "";
+
+			// キャッシュからアニメーションキーを逆引き
+			if (context_.currentMotion) {
+				for (auto& [key, motion] : Model::animationCache_) {
+					if (&motion == context_.currentMotion) {
+						context_.selectedAnimKey = key;
+						break;
+					}
+				}
+				context_.requireTimelineRebuild = true;
+			}
+
+			context_.scrubTime = ms->GetAnimationTime();
+			context_.isPlaying = true;
+			context_.statusMsg = "対象オブジェクトを同期: " + context_.loadFileName;
+		}
+		else {
+			// 解除時のクリーンアップ
+			context_.currentMotion = nullptr;
+			context_.selectedAnimKey = "";
+			context_.selBone = "";
+			context_.selKF.Clear();
+			context_.loadFileName = "";
+			context_.statusMsg = "Ready";
+		}
+	}
+}
+
+// ============================================================
+// トランスフォームからキーフレームを挿入
+// ============================================================
+void MotionEditor::InsertKeyframeFromTransform(const std::string& bone, float time, const QuaternionTransform& tr)
+{
+	if (!context_.currentMotion) return;
+	auto& nodeAnims = context_.currentMotion->animation_.nodeAnimations_;
+	if (!nodeAnims.count(bone)) return;
+
+	// 指定時間に既存KFがあれば上書き、なければ新規挿入
+	auto insertOrReplace = [&]<typename T>(auto& kfs, T val) {
+		using KF = typename std::remove_reference<decltype(kfs)>::type::value_type;
+		auto it = std::find_if(kfs.begin(), kfs.end(), [time](const KF& k) { return std::abs(k.time - time) < 1e-4f; });
+		if (it != kfs.end()) { it->value = val; }
+		else {
+			KF k; k.time = time; k.value = val; kfs.push_back(k);
+			std::sort(kfs.begin(), kfs.end(), [](const KF& a, const KF& b) { return a.time < b.time; });
+		}
+	};
+
+	insertOrReplace(nodeAnims[bone].translate.keyframes, tr.translate);
+	insertOrReplace(nodeAnims[bone].rotate.keyframes, tr.rotate);
+	insertOrReplace(nodeAnims[bone].scale.keyframes, tr.scale);
+}
+
+// ============================================================
+// 現在のポーズを全ボーン分保存
+// ============================================================
+void MotionEditor::SavePose(float time)
+{
+	Object3d* target = context_.GetTargetObject();
+	if (!target || !target->GetModel() || !target->GetModel()->GetSkeleton() || !context_.currentMotion) return;
+
+	Skeleton* skeleton = target->GetModel()->GetSkeleton();
+	auto oldAnims = context_.currentMotion->animation_.nodeAnimations_;
+
+	// 全ジョイントの現在の姿勢をKFとして刻む
+	for (const auto& joint : skeleton->GetJoints()) {
+		if (context_.currentMotion->animation_.nodeAnimations_.count(joint.GetName())) {
+			InsertKeyframeFromTransform(joint.GetName(), time, joint.GetTransform());
+		}
+	}
+
+	auto newAnims = context_.currentMotion->animation_.nodeAnimations_;
+
+	// コマンドとして履歴登録
+	context_.history.Execute(MakeLambdaCommand("全ポーズ保存 @ " + std::to_string(time) + "s",
+		[this, newAnims]() {
+			if (context_.currentMotion) context_.currentMotion->animation_.nodeAnimations_ = newAnims;
+			context_.requireTimelineRebuild = true;
+		},
+		[this, oldAnims]() {
+			if (context_.currentMotion) context_.currentMotion->animation_.nodeAnimations_ = oldAnims;
+			context_.requireTimelineRebuild = true;
+		}
+	));
+	context_.requireTimelineRebuild = true;
+}
+
+// ============================================================
+// ジョイントのトランスフォーム設定
+// ============================================================
+void MotionEditor::SetJointTransform(const std::string& bone, const QuaternionTransform& tr)
+{
+	Joint* j = FindJoint(bone);
+	if (!j) return;
+	j->SetTransform(tr);
+
+	// トランスフォーム変更をスケルトン全体に伝搬させる
+	Object3d* target = context_.GetTargetObject();
+	Model* m = target ? target->GetModel() : nullptr;
+	if (m && m->GetSkeleton()) {
+		m->GetSkeleton()->Update();
+		if (m->GetSkinCluster()) m->GetSkinCluster()->UpdateMatrixPalette(m->GetSkeleton()->GetJoints());
+	}
+}
+
+// ============================================================
+// ボーン名からジョイントを検索
+// ============================================================
+Joint* MotionEditor::FindJoint(const std::string& name) const
+{
+	Object3d* target = context_.GetTargetObject();
+	if (!target || !target->GetModel() || !target->GetModel()->GetSkeleton()) return nullptr;
+	return target->GetModel()->GetSkeleton()->GetJointByName(name);
+}
+
+// ============================================================
+// 編集バッファからトランスフォーム構造体を作成
+// ============================================================
+QuaternionTransform MotionEditor::BufferToTransform() const
+{
+	QuaternionTransform tr;
+	tr.translate = { context_.editT[0], context_.editT[1], context_.editT[2] };
+	tr.rotate = EulerToQuaternion({ context_.editR[0] * (kPi / 180), context_.editR[1] * (kPi / 180), context_.editR[2] * (kPi / 180) });
+	tr.scale = { context_.editS[0], context_.editS[1], context_.editS[2] };
+	return tr;
+}
+
+// ============================================================
+// ジョイントの値を編集バッファへ同期
+// ============================================================
+void MotionEditor::SyncJointToBuffer(const std::string& bone)
+{
+	Joint* j = FindJoint(bone);
+	if (!j) return;
+	const auto& tr = j->GetTransform();
+
+	// 内部値をUI用のバッファ（float配列）に展開
+	context_.editT[0] = tr.translate.x; context_.editT[1] = tr.translate.y; context_.editT[2] = tr.translate.z;
+	Vector3 e = QuaternionToEuler(tr.rotate);
+	context_.editR[0] = e.x * (180 / kPi); context_.editR[1] = e.y * (180 / kPi); context_.editR[2] = e.z * (180 / kPi);
+	context_.editS[0] = tr.scale.x; context_.editS[1] = tr.scale.y; context_.editS[2] = tr.scale.z;
+}
+
+// ============================================================
+// 編集バッファの値をジョイントへ同期
+// ============================================================
+void MotionEditor::SyncBufferToJoint()
+{
+	Joint* j = FindJoint(context_.selBone);
+	if (j) {
+		j->SetTransform(BufferToTransform());
+		Object3d* target = context_.GetTargetObject();
+		Model* m = target ? target->GetModel() : nullptr;
+		if (m && m->GetSkeleton()) {
+			m->GetSkeleton()->Update();
+			if (m->GetSkinCluster()) m->GetSkinCluster()->UpdateMatrixPalette(m->GetSkeleton()->GetJoints());
+		}
+	}
+}
+
+// ============================================================
+// ターゲットのワールド行列を取得
+// ============================================================
+Matrix4x4 MotionEditor::GetTargetWorldMatrix() const {
+	// 配置済みオブジェクトの場合はそのワールド行列、そうでなければプレビュー用行列を返す
+	if (context_.targetObjectId != -1) {
+		auto* placedObj = ObjectManager::GetInstance()->GetObjectById(context_.targetObjectId);
+		if (placedObj && placedObj->worldTransform) return placedObj->worldTransform->GetMatWorld();
+	}
+	return previewTransform_.matWorld_;
+}
+
+// ============================================================
+// ジョイントのワールド行列を取得
+// ============================================================
+Matrix4x4 MotionEditor::GetJointWorldMatrix(const std::string& boneName) const
+{
+	Joint* j = FindJoint(boneName);
+	if (j) return j->GetWorldTransform().matWorld_ * GetTargetWorldMatrix();
+	return MakeIdentity4x4();
+}
+
+// ============================================================
+// ギズモ操作によるボーン変換の適用
+// ============================================================
+void MotionEditor::ApplyBoneGizmoTransform(const std::string& boneName, const Matrix4x4& newWorldMat)
+{
+	Joint* j = FindJoint(boneName);
+	if (!j) return;
+
+	//------------------------------------------------------------
+	// 親のワールド行列を考慮して新しいローカル行列を算出
+	//------------------------------------------------------------
+	Matrix4x4 parentWorld = MakeIdentity4x4();
+	if (j->GetWorldTransform().parent_) {
+		parentWorld = j->GetWorldTransform().parent_->matWorld_ * GetTargetWorldMatrix();
+	}
+	else {
+		parentWorld = GetTargetWorldMatrix();
+	}
+
+	// 逆行列を掛けてローカル空間に戻す
+	Matrix4x4 newLocalMat = newWorldMat * Inverse(parentWorld);
+
+	// 行列を要素（TRS）に分解してバッファとジョイントに適用
+	float lT[3], lRDeg[3], lS[3];
+#ifdef USE_IMGUI
+	ImGuizmo::DecomposeMatrixToComponents(&newLocalMat.m[0][0], lT, lRDeg, lS);
+#endif
+	if (context_.selBone == boneName) {
+		context_.editT[0] = lT[0]; context_.editT[1] = lT[1]; context_.editT[2] = lT[2];
+		context_.editR[0] = lRDeg[0]; context_.editR[1] = lRDeg[1]; context_.editR[2] = lRDeg[2];
+		context_.editS[0] = lS[0]; context_.editS[1] = lS[1]; context_.editS[2] = lS[2];
+	}
+
+	QuaternionTransform tr;
+	tr.translate = { lT[0], lT[1], lT[2] };
+	tr.rotate = EulerToQuaternion({ lRDeg[0] * (kPi / 180), lRDeg[1] * (kPi / 180), lRDeg[2] * (kPi / 180) });
+	tr.scale = { lS[0], lS[1], lS[2] };
+
+	j->SetTransform(tr);
+
+	//------------------------------------------------------------
+	// 表示の即時反映
+	//------------------------------------------------------------
+	Object3d* target = context_.GetTargetObject();
+	Model* m = target ? target->GetModel() : nullptr;
+	if (m && m->GetSkeleton()) {
+		m->GetSkeleton()->Update();
+		if (m->GetSkinCluster()) m->GetSkinCluster()->UpdateMatrixPalette(m->GetSkeleton()->GetJoints());
+	}
+}
+
+============================================================
+File Path: YEngine/Model/Motion/Editor/MotionEditor.h
+============================================================
+#pragma once
+
+// Engine
+#include "Object3d/Object3d.h"
+#include "WorldTransform/WorldTransform.h"
+#include <Graphics/Drawer/LineManager/Line.h>
+#ifdef USE_IMGUI
+#include "Debugger/Gizmo/GizmoController.h"
+#endif
+
+// App
+#include "MotionEditorContext.h"
+#include "Panels/IMotionEditorPanel.h"
+
+// Standard
+#include <string>
+#include <vector>
+#include <memory>
+
+// ============================================================
+// 前方宣言
+// ============================================================
+class Camera;
+class Joint;
+#ifdef USE_IMGUI
+class BoneGizmable;
+#endif
+
+// ============================================================
+// モーションエディタクラス
+// ============================================================
+class MotionEditor
+{
+public:
+	// ============================================================
+	// 基本関数
+	// ============================================================
+	MotionEditor();
+	~MotionEditor();
+
+	void Initialize(Camera* camera);
+	void Update();
+	void Draw();
+	void DrawGizmo();
+	void DrawBone();
+	void ShowEditor();
+
+	// ============================================================
+	// 公開関数
+	// ============================================================
+	void SetTargetObjectId(int id);
+	int GetTargetObjectId() const { return context_.targetObjectId; }
+	void SetCamera(Camera* camera) { context_.camera = camera; }
+	bool IsDrawBone() const { return context_.isDrawBone; }
+
+	Matrix4x4 GetJointWorldMatrix(const std::string& boneName) const;
+	void ApplyBoneGizmoTransform(const std::string& boneName, const Matrix4x4& newWorldMat);
+
+	void RegisterPanel(std::unique_ptr<IMotionEditorPanel> panel);
+
+private:
+	// ============================================================
+	// 内部処理関数
+	// ============================================================
+	void SavePose(float time);
+	void InsertKeyframeFromTransform(const std::string& bone, float time, const QuaternionTransform& tr);
+
+	void SetJointTransform(const std::string& bone, const QuaternionTransform& tr);
+	Joint* FindJoint(const std::string& name) const;
+	QuaternionTransform BufferToTransform() const;
+	void SyncJointToBuffer(const std::string& bone);
+	void SyncBufferToJoint();
+
+	Matrix4x4 GetTargetWorldMatrix() const;
+
+private:
+	// ============================================================
+	// メンバ変数
+	// ============================================================
+	static constexpr float kPi = 3.14159265f;
+
+	MotionEditorContext context_;
+	std::vector<std::unique_ptr<IMotionEditorPanel>> panels_;
+
+	WorldTransform previewTransform_;
+	std::unique_ptr<Line> lineDrawer_;
+
+#ifdef USE_IMGUI
+	std::unique_ptr<Object3d> boneObj_;
+	GizmoController gizmoCtrl_;
+	std::vector<std::unique_ptr<BoneGizmable>> boneGizmables_;
+	std::vector<WorldTransform> boneWorldTransforms_;
+#endif
+
+	bool draggingBone_ = false;
+	QuaternionTransform boneSnap_ = {};
+};
+
+============================================================
+File Path: YEngine/Model/Motion/Editor/MotionEditorContext.h
+============================================================
+#pragma once
+// Engine
+#include <Editor/Command/CommandHistory.h>
+// App
+#include "KeyFrame.h"
+
+// ============================================================
+// 前方宣言
+// ============================================================
+class Motion;
+class Camera;
+class Object3d;
+
+// ============================================================
+// モーションエディタの共有コンテキスト
+// ============================================================
+struct MotionEditorContext
+{
+	Motion* currentMotion = nullptr;
+	Camera* camera = nullptr;
+	int targetObjectId = -1;
+
+	// ============================================================
+	// モデル・ファイル・アニメーション状態
+	// ============================================================
+	std::string loadFileName = "";
+	std::string selectedAnimKey = "";
+
+	// 再生状態
+	float scrubTime = 0.0f;
+	bool isPlaying = true;
+	bool isLoop = true;
+	float timelineZoom = 80.0f;
+
+	// 選択状態
+	std::string selBone = "";
+	SelectedKF selKF;
+
+	// 編集用バッファ
+	float editT[3] = { 0, 0, 0 };
+	float editR[3] = { 0, 0, 0 };
+	float editS[3] = { 1, 1, 1 };
+
+	// UIフラグとレイアウト
+	bool isDrawBone = false;
+	bool showSavePopup = false;
+	std::string statusMsg = "Ready";
+	bool requireTimelineRebuild = false;
+
+	float timelineH = 200.0f;
+	float bonePanelW = 250.0f;
+
+	// ============================================================
+	// コールバック関数
+	// ============================================================
+	std::function<void()> SyncJointToBuffer;
+	std::function<void()> SyncBufferToJoint;
+	std::function<void(const std::string&, float)> AddKeyframe;
+	std::function<void(const std::string&, float)> DeleteKeyframe;
+
+	// ============================================================
+	// 履歴管理
+	// ============================================================
+	CommandHistory history;
+
+	// ============================================================
+	// ヘルパー関数
+	// ============================================================
+	Object3d* GetTargetObject() const;
+};
+
+============================================================
+File Path: YEngine/Model/Motion/Editor/Panels/BoneListPanel.cpp
+============================================================
+#include "BoneListPanel.h"
+#include "Object3D/ObjectManager.h"
+#include "Skeleton/Skeleton.h"
+#include "Model.h"
+
+#ifdef USE_IMGUI
+#include <imgui.h>
+#endif
+
+// ============================================================
+// 初期化
+// ============================================================
+void BoneListPanel::Initialize(MotionEditorContext* context)
+{
+	context_ = context;
+}
+
+void BoneListPanel::Update()
+{
+	// ロジック更新が必要であればここに記述
+}
+
+// ============================================================
+// ImGui描画
+// ============================================================
+void BoneListPanel::DrawImGui()
+{
+#ifdef USE_IMGUI
+	// ヘッダーは少しコンパクトにするか、好みに合わせて調整
+	if (!ImGui::CollapsingHeader("BONES (アーマチュア)", ImGuiTreeNodeFlags_DefaultOpen)) {
+		return;
+	}
+	if (ImGui::IsItemHovered())
+		ImGui::SetTooltip("編集するボーンを選択します\n選択後、右のパネルで値を変更できます");
+
+	Object3d* target = context_->GetTargetObject();
+	Model* model = target ? target->GetModel() : nullptr;
+	if (!model || !model->GetSkeleton()) {
+		ImGui::TextDisabled("スケルトンなし");
+		return;
+	}
+
+	auto& joints = model->GetSkeleton()->GetJoints();
+
+	// ============================================================
+	// 1. 親子関係のマップを構築する (ツリー描画の準備)
+	// ============================================================
+	std::vector<std::vector<int>> childrenMap(joints.size());
+	std::vector<int> rootJoints; // 親を持たないルートボーンのリスト
+
+	for (int i = 0; i < joints.size(); ++i) {
+		auto par = const_cast<Joint&>(joints[i]).GetParent();
+		if (par.has_value()) {
+			childrenMap[par.value()].push_back(i);
+		}
+		else {
+			rootJoints.push_back(i);
+		}
+	}
+
+	// ============================================================
+	// 2. ツリーUIの描画
+	// ============================================================
+	// ツリー部分をスクロール可能な枠で囲むことで、エディタをさらにコンパクトに
+	ImGui::BeginChild("BoneTreeRegion", ImVec2(0, ImGui::GetContentRegionAvail().y - 30.0f), true, ImGuiWindowFlags_HorizontalScrollbar);
+
+	for (int rootIdx : rootJoints) {
+		DrawBoneNode(joints, rootIdx, childrenMap);
+	}
+
+	ImGui::EndChild();
+
+	// 下部のボタン
+	ImGui::Separator();
+	if (ImGui::SmallButton("選択解除")) {
+		context_->selBone = "";
+		context_->statusMsg = "ボーン選択を解除しました";
+	}
+#endif
+}
+
+void BoneListPanel::DrawBoneNode(const std::vector<Joint>& joints, int jointIndex, const std::vector<std::vector<int>>& childrenMap)
+{
+#ifdef USE_IMGUI
+	const auto& joint = joints[jointIndex];
+	const std::string& name = joint.GetName();
+	bool isSel = (context_->selBone == name);
+	const auto& children = childrenMap[jointIndex];
+
+	// BlenderやUnity風のツリーノード設定
+	// SpanAvailWidth: 行全体を選択可能（ハイライト）にする
+	// OpenOnArrow: 矢印（▶）をクリックした時だけ開閉し、名前クリックは選択操作にする
+	ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_SpanAvailWidth;
+
+	if (isSel) {
+		flags |= ImGuiTreeNodeFlags_Selected;
+	}
+
+	if (children.empty()) {
+		// 子がない場合は葉（Leaf）として扱い、左の矢印を消す
+		flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+	}
+	else {
+		// デフォルトで階層を開いておくかどうか。コンパクトにしたい場合は以下の行をコメントアウトする
+		flags |= ImGuiTreeNodeFlags_DefaultOpen;
+	}
+
+	// 選択中の色を変える
+	if (isSel) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.85f, 0.2f, 1.0f));
+
+	// ツリーノードの描画 (IDに一意の jointIndex を使用)
+	bool isOpen = ImGui::TreeNodeEx((void*)(intptr_t)jointIndex, flags, "%s", name.c_str());
+
+	if (isSel) ImGui::PopStyleColor();
+
+	// アイテムがクリックされた時の選択処理 (開閉の矢印クリックは除く)
+	if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen()) {
+		context_->selBone = name;
+		context_->statusMsg = "ボーン選択: " + name;
+
+		// 選択されたら即座にバッファへ同期させる
+		if (context_->SyncJointToBuffer) {
+			context_->SyncJointToBuffer();
+		}
+	}
+
+	// 階層が開かれている ＆ 子が存在する場合は再帰的に子を描画
+	if (isOpen && !children.empty()) {
+		for (int childIdx : children) {
+			DrawBoneNode(joints, childIdx, childrenMap);
+		}
+		ImGui::TreePop(); // ツリーのインデントを戻す
+	}
+#endif
+}
+
+
+============================================================
+File Path: YEngine/Model/Motion/Editor/Panels/BoneListPanel.h
+============================================================
+#pragma once
+#include "IMotionEditorPanel.h"
+#include <Model/Skeleton/Joint.h>
+
+#include <vector>
+class BoneListPanel : public IMotionEditorPanel
+{
+public:
+	void Initialize(MotionEditorContext* context) override;
+	void Update() override;
+	void DrawImGui() override;
+
+private:
+	void DrawBoneNode(const std::vector<Joint>& joints, int jointIndex, const std::vector<std::vector<int>>& childrenMap);
+private:
+	MotionEditorContext* context_ = nullptr;
+};
+
+
+
+============================================================
+File Path: YEngine/Model/Motion/Editor/Panels/IMotionEditorPanel.h
+============================================================
+#pragma once
+#include "../MotionEditorContext.h"
+class IMotionEditorPanel
+{
+public:
+	virtual ~IMotionEditorPanel() = default;
+
+	/// <summary>
+	/// パネルの初期化
+	/// </summary>
+	/// <param name="context">共有コンテキストへのポインタ</param>
+	virtual void Initialize(MotionEditorContext* context) = 0;
+
+	/// <summary>
+	/// 毎フレームのロジック更新
+	/// </summary>
+	virtual void Update() {}
+
+	/// <summary>
+	/// ImGuiによる描画処理
+	/// </summary>
+	virtual void DrawImGui() = 0;
+
+	/// <summary>
+	/// パネルが有効かどうか
+	/// </summary>
+	virtual bool IsActive() const { return isActive_; }
+
+	/// <summary>
+	/// パネルの有効/無効を切り替える
+	/// </summary>
+	virtual void SetActive(bool active) { isActive_ = active; }
+
+protected:
+	bool isActive_ = true;
+};
+
+============================================================
+File Path: YEngine/Model/Motion/Editor/Panels/MenuBarPanel.cpp
+============================================================
+#include "MenuBarPanel.h"
+#ifdef USE_IMGUI
+#include <imgui.h>
+#endif
+
+void MenuBarPanel::DrawImGui() {
+#ifdef USE_IMGUI
+	if (!ImGui::BeginMenuBar()) return;
+
+	if (ImGui::BeginMenu("ファイル (File)")) {
+		if (ImGui::MenuItem("バイナリ保存/読込", ""))  context_->showSavePopup = true;
+		ImGui::EndMenu();
+	}
+
+	if (ImGui::BeginMenu("編集 (Edit)")) {
+		if (ImGui::MenuItem("元に戻す", "Ctrl+Z", false, context_->history.CanUndo())) context_->history.Undo();
+		if (ImGui::MenuItem("やり直す", "Ctrl+Y", false, context_->history.CanRedo())) context_->history.Redo();
+		ImGui::Separator();
+		if (ImGui::MenuItem("履歴をクリア")) context_->history.Clear();
+		ImGui::EndMenu();
+	}
+
+	if (ImGui::BeginMenu("表示 (View)")) {
+		ImGui::SliderFloat("タイムライン高さ", &context_->timelineH, 80.0f, 500.0f, "%.0f px");
+		ImGui::SliderFloat("ボーンリスト幅", &context_->bonePanelW, 80.0f, 450.0f, "%.0f px");
+		ImGui::SliderFloat("ズーム (px/秒)", &context_->timelineZoom, 20.0f, 400.0f, "%.0f");
+		ImGui::EndMenu();
+	}
+
+	ImGui::Separator();
+	if (!context_->history.CanUndo()) ImGui::BeginDisabled();
+	if (ImGui::SmallButton(" << ")) { context_->history.Undo(); context_->statusMsg = "元に戻す"; }
+	if (!context_->history.CanUndo()) ImGui::EndDisabled();
+
+	ImGui::SameLine(0, 2);
+	if (!context_->history.CanRedo()) ImGui::BeginDisabled();
+	if (ImGui::SmallButton(" >> ")) { context_->history.Redo(); context_->statusMsg = "やり直す"; }
+	if (!context_->history.CanRedo()) ImGui::EndDisabled();
+
+	ImGui::EndMenuBar();
+#endif
+}
+
+============================================================
+File Path: YEngine/Model/Motion/Editor/Panels/MenuBarPanel.h
+============================================================
+#pragma once
+#include "IMotionEditorPanel.h"
+
+class MenuBarPanel : public IMotionEditorPanel {
+public:
+	void Initialize(MotionEditorContext* context) override { context_ = context; }
+	void DrawImGui() override;
+private:
+	MotionEditorContext* context_ = nullptr;
+};
+
+
+
+============================================================
+File Path: YEngine/Model/Motion/Editor/Panels/PropertyPanel.cpp
+============================================================
+#include "PropertyPanel.h"
+#include "../../Core/Motion.h"
+
+#ifdef USE_IMGUI
+#include <imgui.h>
+#endif
+
+void PropertyPanel::DrawImGui()
+{
+#ifdef USE_IMGUI
+	if (ImGui::CollapsingHeader("BONE TRANSFORM  (位置・回転・拡縮)", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		if (context_->selBone.empty()) {
+			ImGui::TextDisabled("左のリストからボーンを選択してください");
+		}
+		else {
+			ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.2f, 1.0f), "選択中: %s", context_->selBone.c_str());
+			ImGui::Separator();
+
+			// 値が変更されたら Joint に同期する
+			bool changed = false;
+			changed |= ImGui::DragFloat3("位置 (T)", context_->editT, 0.01f);
+			changed |= ImGui::DragFloat3("回転 (R)", context_->editR, 0.5f);
+			changed |= ImGui::DragFloat3("拡縮 (S)", context_->editS, 0.01f, 0.001f, 100.0f);
+
+			if (changed && context_->SyncBufferToJoint) {
+				context_->SyncBufferToJoint();
+			}
+
+			ImGui::Spacing();
+
+			if (context_->currentMotion) {
+				ImGui::Text("現在時刻: %.4f 秒", context_->scrubTime);
+				if (ImGui::Button("[ KF ] 選択ボーンのキーフレームを打つ", ImVec2(-1, 0))) {
+					// （※実際にはここに InsertKeyframe の呼び出し処理を書く）
+					if (context_->AddKeyframe) {
+						context_->AddKeyframe(context_->selBone, context_->scrubTime);
+					}
+					context_->statusMsg = "KF 挿入: " + context_->selBone;
+				}
+			}
+		}
+	}
+#endif
+}
+
+============================================================
+File Path: YEngine/Model/Motion/Editor/Panels/PropertyPanel.h
+============================================================
+#pragma once
+#include "IMotionEditorPanel.h"
+#include "../MotionEditorContext.h"
+#include "Quaternion.h"
+
+/// <summary>
+/// 選択中のボーンやキーフレームのパラメータを編集するパネル
+/// </summary>
+class PropertyPanel : public IMotionEditorPanel
+{
+public:
+	void Initialize(MotionEditorContext* context) override { context_ = context; }
+	void DrawImGui() override;
+
+private:
+	MotionEditorContext* context_ = nullptr;
+	bool draggingBone_ = false;
+
+	// ドラッグ中の元データ保持用
+	QuaternionTransform boneSnap_;
+	Vector3 kfSnapT_;
+	Quaternion kfSnapR_;
+	Vector3 kfSnapS_;
+};
+
+============================================================
+File Path: YEngine/Model/Motion/Editor/Panels/SavePanel.cpp
+============================================================
+#include "SavePanel.h"
+#include "Model.h"
+#include "Object3D/ObjectManager.h"
+#include "../../Core/Motion.h"
+
+#ifdef USE_IMGUI
+#include <imgui.h>
+#endif
+
+namespace fs = std::filesystem;
+
+void SavePanel::Initialize(MotionEditorContext* context)
+{
+	context_ = context;
+	binaryBrowser_.currentDirectory = "Resources/Binary";
+	binaryBrowser_.filterExtension = ".anim";
+}
+
+void SavePanel::DrawImGui()
+{
+#ifdef USE_IMGUI
+	if (binaryBrowser_.isOpen) {
+		DrawFileBrowser(binaryBrowser_, "バイナリファイルを選択");
+		if (!binaryBrowser_.isOpen && !binaryBrowser_.selectedFilePath.empty())
+			savePath_ = binaryBrowser_.selectedFilePath;
+	}
+
+	DrawSaveLoadPopup();
+#endif
+}
+
+void SavePanel::DrawSaveLoadPopup()
+{
+#ifdef USE_IMGUI
+	if (context_->showSavePopup) ImGui::OpenPopup("保存 / 読み込み##popup");
+
+	ImGui::SetNextWindowSize(ImVec2(500, 280), ImGuiCond_Appearing);
+	if (ImGui::BeginPopupModal("保存 / 読み込み##popup", &context_->showSavePopup)) {
+
+		ImGui::Text("バイナリファイル (.anim):");
+		{
+			char buf[512]; strncpy_s(buf, sizeof(buf), savePath_.c_str(), _TRUNCATE);
+			ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 90);
+			if (ImGui::InputText("##savepath", buf, sizeof(buf))) savePath_ = buf;
+			ImGui::SameLine();
+			if (ImGui::Button("参照##b")) {
+				binaryBrowser_.isOpen = true;
+				binaryBrowser_.selectedFilePath = "";
+				context_->showSavePopup = false;
+				ImGui::CloseCurrentPopup();
+			}
+		}
+
+		ImGui::Spacing(); ImGui::Separator(); ImGui::Spacing();
+
+		bool canSave = context_->currentMotion != nullptr;
+		if (!canSave) ImGui::BeginDisabled();
+		if (ImGui::Button("バイナリ保存", ImVec2(130, 0))) {
+			try {
+				if (context_->currentMotion) {
+					context_->currentMotion->SaveBinary(*context_->currentMotion, AnimDisplayName(context_->selectedAnimKey), savePath_);
+					saveMsg_ = "保存成功: " + savePath_;
+					context_->statusMsg = saveMsg_;
+				}
+			}
+			catch (const std::exception& e) {
+				saveMsg_ = std::string("保存失敗: ") + e.what();
+			}
+		}
+		if (!canSave) ImGui::EndDisabled();
+
+		ImGui::SameLine(0, 10);
+		Object3d* target = context_->GetTargetObject();
+
+		if (ImGui::Button("バイナリ読み込み", ImVec2(140, 0))) {
+			try {
+				Motion loaded = Motion().LoadBinary(savePath_);
+				const std::string key = "Binary:" + savePath_;
+				Model::animationCache_[key] = std::move(loaded);
+				context_->selectedAnimKey = key;
+				context_->currentMotion = &Model::animationCache_[key];
+				if (target) {
+					target->SetChangeMotion(context_->loadFileName, MotionPlayMode::Loop, AnimDisplayName(key));
+				}
+				saveMsg_ = "読み込み成功: " + savePath_;
+				context_->statusMsg = saveMsg_;
+				context_->requireTimelineRebuild = true;
+			}
+			catch (const std::exception& e) {
+				saveMsg_ = std::string("読み込み失敗: ") + e.what();
+			}
+		}
+
+		if (!saveMsg_.empty()) {
+			ImGui::Spacing();
+			bool isError = saveMsg_.find("失敗") != std::string::npos;
+			ImGui::TextColored(isError ? ImVec4(1, 0.3f, 0.3f, 1) : ImVec4(0.3f, 1, 0.3f, 1), "%s", saveMsg_.c_str());
+		}
+
+		ImGui::Spacing(); ImGui::Separator();
+		if (ImGui::Button("閉じる", ImVec2(100, 0))) {
+			context_->showSavePopup = false;
+			saveMsg_ = "";
+			ImGui::CloseCurrentPopup();
+		}
+
+		ImGui::EndPopup();
+	}
+	if (!context_->showSavePopup) ImGui::CloseCurrentPopup();
+#endif
+}
+
+void SavePanel::DrawFileBrowser(FileBrowserState& state, const char* title)
+{
+#ifdef USE_IMGUI
+	ImGui::SetNextWindowSize(ImVec2(540, 420), ImGuiCond_FirstUseEver);
+	bool open = true;
+	if (!ImGui::Begin(title, &open)) { ImGui::End(); if (!open) state.isOpen = false; return; }
+
+	ImGui::TextColored(ImVec4(0.7f, 0.9f, 1, 1), "%s", state.currentDirectory.c_str());
+	ImGui::Separator();
+
+	bool canUp = !state.directoryHistory.empty();
+	if (!canUp) ImGui::BeginDisabled();
+	if (ImGui::Button("[ .. ] 上へ")) {
+		state.currentDirectory = state.directoryHistory.back();
+		state.directoryHistory.pop_back();
+		state.selectedFilePath = "";
+	}
+	if (!canUp) ImGui::EndDisabled();
+	ImGui::SameLine();
+	ImGui::TextDisabled("| ダブルクリックでフォルダを開く / ファイルを選択");
+	ImGui::Separator();
+
+	auto entries = GetDirectoryEntries(state.currentDirectory, state.filterExtension);
+	ImGui::BeginChild("##fblist", ImVec2(0, -50), true);
+	for (const auto& e : entries) {
+		std::string name = e.path().filename().string();
+		if (e.is_directory()) {
+			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.9f, 1, 1));
+			std::string lbl = "[DIR] " + name;
+			if (ImGui::Selectable(lbl.c_str(), false, ImGuiSelectableFlags_AllowDoubleClick)) {
+				if (ImGui::IsMouseDoubleClicked(0)) {
+					state.directoryHistory.push_back(state.currentDirectory);
+					state.currentDirectory = e.path().string();
+					std::replace(state.currentDirectory.begin(), state.currentDirectory.end(), '\\', '/');
+					state.selectedFilePath = "";
+				}
+			}
+			ImGui::PopStyleColor();
+		}
+		else {
+			bool isSel = (state.selectedFilePath == e.path().string());
+			if (ImGui::Selectable(name.c_str(), isSel, ImGuiSelectableFlags_AllowDoubleClick)) {
+				state.selectedFilePath = e.path().string();
+				std::replace(state.selectedFilePath.begin(), state.selectedFilePath.end(), '\\', '/');
+				if (ImGui::IsMouseDoubleClicked(0)) { state.isOpen = false; ImGui::EndChild(); ImGui::End(); return; }
+			}
+		}
+	}
+	ImGui::EndChild();
+
+	ImGui::Separator();
+	ImGui::TextUnformatted(state.selectedFilePath.empty() ? "(ファイルが未選択です)" : state.selectedFilePath.c_str());
+	float btnX = ImGui::GetContentRegionAvail().x - 120;
+	ImGui::SameLine(btnX);
+	bool canOK = !state.selectedFilePath.empty();
+	if (!canOK) ImGui::BeginDisabled();
+	if (ImGui::Button("OK", ImVec2(55, 0))) state.isOpen = false;
+	if (!canOK) ImGui::EndDisabled();
+	ImGui::SameLine();
+	if (ImGui::Button("キャンセル", ImVec2(60, 0))) { state.selectedFilePath = ""; state.isOpen = false; }
+
+	if (!open) state.isOpen = false;
+	ImGui::End();
+#endif
+}
+
+std::string SavePanel::AnimDisplayName(const std::string& key)
+{
+	auto pos = key.find('#');
+	return (pos != std::string::npos) ? key.substr(pos + 1) : key;
+}
+
+std::vector<std::filesystem::directory_entry> SavePanel::GetDirectoryEntries(const std::string& dir, const std::string& ext) const
+{
+	std::vector<fs::directory_entry> dirs, files;
+	std::error_code ec;
+	for (const auto& e : fs::directory_iterator(dir, ec)) {
+		if (ec) break;
+		if (e.is_directory()) { dirs.push_back(e); }
+		else if (e.is_regular_file()) {
+			std::string ex = e.path().extension().string();
+			if (ext.empty()) {
+				if (ex == ".gltf" || ex == ".obj" || ex == ".anim") files.push_back(e);
+			}
+			else {
+				if (ex == ext) files.push_back(e);
+			}
+		}
+	}
+	auto byName = [](const fs::directory_entry& a, const fs::directory_entry& b) {
+		return a.path().filename().string() < b.path().filename().string(); };
+	std::sort(dirs.begin(), dirs.end(), byName);
+	std::sort(files.begin(), files.end(), byName);
+	dirs.insert(dirs.end(), files.begin(), files.end());
+	return dirs;
+}
+
+============================================================
+File Path: YEngine/Model/Motion/Editor/Panels/SavePanel.h
+============================================================
+#pragma once
+#include "IMotionEditorPanel.h"
+#include <filesystem>
+
+// 元々MotionEditor.hにあった構造体をこちらに移動
+struct FileBrowserState
+{
+	std::string currentDirectory = "Resources/Models";
+	std::string selectedFilePath = "";
+	std::vector<std::string> directoryHistory;
+	bool isOpen = false;
+	std::string filterExtension = "";
+};
+
+class SavePanel : public IMotionEditorPanel
+{
+public:
+	void Initialize(MotionEditorContext* context) override;
+	void DrawImGui() override;
+
+private:
+	void DrawSaveLoadPopup();
+	void DrawFileBrowser(FileBrowserState& state, const char* title);
+
+	// ユーティリティ
+	static std::string AnimDisplayName(const std::string& key);
+	std::vector<std::filesystem::directory_entry> GetDirectoryEntries(const std::string& dir, const std::string& ext) const;
+
+	MotionEditorContext* context_ = nullptr;
+
+	std::string savePath_ = "Resources/TestBinary/edited_motion.anim";
+	std::string saveMsg_ = "";
+	FileBrowserState binaryBrowser_;
+};
+
+
+============================================================
+File Path: YEngine/Model/Motion/Editor/Panels/StatusBarPanel.cpp
+============================================================
+#include "StatusBarPanel.h"
+#ifdef USE_IMGUI
+#include <imgui.h>
+#endif
+
+void StatusBarPanel::DrawImGui() {
+#ifdef USE_IMGUI
+	float barH = 20.0f;
+	ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.12f, 0.12f, 0.12f, 1.0f));
+	ImGui::BeginChild("##status", ImVec2(0, barH), false);
+
+	ImGui::SetCursorPosY(3);
+	ImGui::TextColored(ImVec4(0.6f, 0.9f, 0.6f, 1.0f), "  %s", context_->statusMsg.c_str());
+
+	float hints_x = ImGui::GetContentRegionAvail().x - 400;
+	if (hints_x > 200) {
+		ImGui::SameLine(hints_x);
+		ImGui::TextDisabled("Space=再生  Del=KF削除  Ctrl+Z=元に戻す  Ctrl+Y=やり直す");
+	}
+
+	ImGui::EndChild();
+	ImGui::PopStyleColor();
+#endif
+}
+
+============================================================
+File Path: YEngine/Model/Motion/Editor/Panels/StatusBarPanel.h
+============================================================
+#pragma once
+#include "IMotionEditorPanel.h"
+
+class StatusBarPanel : public IMotionEditorPanel {
+public:
+	void Initialize(MotionEditorContext* context) override { context_ = context; }
+	void DrawImGui() override;
+private:
+	MotionEditorContext* context_ = nullptr;
+};
+
+
+============================================================
+File Path: YEngine/Model/Motion/Editor/Panels/TimelinePanel.cpp
+============================================================
+#include "TimelinePanel.h"
+#include "../../Core/Motion.h"
+#include "Object3D/ObjectManager.h"
+#include "Model.h"
+#include "../../Core/MotionSystem.h"
+#include <set>
+#include <algorithm>
+
+#ifdef USE_IMGUI
+#include <imgui.h>
+#endif
+#include <Editor/Icon/EditorIcon.h>
+
+void TimelinePanel::Initialize(MotionEditorContext* context)
+{
+	context_ = context;
+
+	// ── 概要トラックの一括移動コールバック ──
+	// サマリーキーがドラッグされた時、全ボーン・全チャンネルを一括移動する
+	dopeSheet_.SetSummaryKeyMovedCallback([this](int fromFrame, int delta) {
+		OnSummaryKeyMoved(fromFrame, delta);
+		});
+
+	// ── シーク時のコールバック設定（1回だけ登録）──
+	dopeSheet_.SetSeekCallback([this](int frame) {
+		context_->scrubTime = frame / static_cast<float>(fps_);
+		Object3d* t = context_->GetTargetObject();
+		if (t && t->GetModel() && t->GetModel()->GetMotionSystem()) {
+			auto* ms = t->GetModel()->GetMotionSystem();
+			ms->Stop();
+			context_->isPlaying = false;
+			ms->SetAnimationTime(context_->scrubTime);
+		}
+		});
+
+	// KF削除時のコールバック設定（1回だけ登録）
+	dopeSheet_.SetDeleteKeyCallback([this](int trackIdx, int keyIdx) {
+		if (trackIdx >= static_cast<int>(tracks_.size())) return;
+		if (!context_->currentMotion) return;
+		if (keyIdx >= static_cast<int>(tracks_[trackIdx].keys.size())) return;
+
+		// ★修正点1: 選択中ボーンではなく、クリックされたトラックのボーン名を取得する
+		if (trackIdx >= static_cast<int>(trackBoneMap_.size())) return;
+		std::string targetBoneName = trackBoneMap_[trackIdx].first;
+
+		int frame = tracks_[trackIdx].keys[keyIdx].frame;
+		float t = frame / static_cast<float>(fps_);
+
+		// ★修正点2: コンテキストに登録された「削除ロジック」を呼び出す
+		if (context_->DeleteKeyframe) {
+			context_->DeleteKeyframe(targetBoneName, t);
+
+			// データを変更したのでドープシートの再構築フラグを立てる
+			tracksDirty_ = true;
+			context_->statusMsg = "KF 削除: " + targetBoneName;
+		}
+		});
+}
+
+void TimelinePanel::DrawImGui()
+{
+#ifdef USE_IMGUI
+	if (!context_->currentMotion) {
+		ImGui::TextDisabled("アニメーションを選択するとタイムラインが表示されます");
+		return;
+	}
+
+	auto& nodeAnims = context_->currentMotion->animation_.nodeAnimations_;
+	if (nodeAnims.empty()) {
+		ImGui::TextDisabled("アニメーションデータなし");
+		return;
+	}
+
+	if (ImGui::CollapsingHeader("タイムライン", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+
+		if (context_->currentMotion != editingMotion_) {
+			tracksDirty_ = true;
+			editingMotion_ = context_->currentMotion; // 記憶しておく
+		}
+		if (context_->requireTimelineRebuild) {
+			tracksDirty_ = true;
+			context_->requireTimelineRebuild = false;
+		}
+
+		// フラグが立っていたらトラック（ドープシートの行とキーフレーム）を作り直す
+		if (tracksDirty_) {
+			RebuildTracks();
+			tracksDirty_ = false;
+		}
+
+		float duration = context_->currentMotion->GetDuration();
+		const int totalFrames = std::max(1, static_cast<int>(duration * fps_));
+		float canvasW = ImGui::GetContentRegionAvail().x;
+
+		ImGui::Text("Time:");
+		ImGui::SameLine(0, 4);
+		ImGui::SetNextItemWidth(canvasW - 300);
+
+		Object3d* target = context_->GetTargetObject();
+
+		// スライダー操作時に一時停止＆同期
+		if (ImGui::SliderFloat("##scrub", &context_->scrubTime, 0.0f, duration, "%.3f s")) {
+			if (target && target->GetModel() && target->GetModel()->GetMotionSystem()) {
+				auto* ms = target->GetModel()->GetMotionSystem();
+				ms->Stop();
+				context_->isPlaying = false;
+				ms->SetAnimationTime(context_->scrubTime);
+			}
+			dopeSheet_.SetSeekFrame(static_cast<int>(context_->scrubTime * fps_));
+		}
+		if (ImGui::IsItemHovered()) ImGui::SetTooltip("クリック/ドラッグで時刻を移動");
+
+		ImGui::SameLine(0, 8);
+		if (ImGui::SmallButton("|<")) {
+			context_->scrubTime = 0;
+			if (target && target->GetModel() && target->GetModel()->GetMotionSystem()) {
+				target->GetModel()->GetMotionSystem()->SetAnimationTime(0.0f);
+			}
+			dopeSheet_.SetSeekFrame(0);
+		}
+		if (ImGui::IsItemHovered()) ImGui::SetTooltip("先頭に戻る");
+
+		ImGui::SameLine(0, 14);
+		ImGui::TextColored(ImVec4(1.0f, 0.59f, 0.2f, 1.0f), (std::string(Icon::ArrowsAlt) + " 位置").c_str());
+		ImGui::SameLine(0, 6);
+		ImGui::TextColored(ImVec4(0.35f, 0.78f, 0.35f, 1.0f), (std::string(Icon::SyncAlt) + " 回転").c_str());
+		ImGui::SameLine(0, 6);
+		ImGui::TextColored(ImVec4(0.31f, 0.59f, 1.0f, 1.0f), (std::string(Icon::ExpandArrowsAlt) + " 拡縮").c_str());
+		ImGui::SameLine(0, 6);
+		ImGui::TextColored(ImVec4(1.0f, 0.94f, 0.2f, 1.0f), (std::string(Icon::CheckCircle) + " 選択中").c_str());
+
+		ImGui::Separator();
+
+		if (tracksDirty_) {
+			RebuildTracks();
+			tracksDirty_ = false;
+		}
+
+		// ドープシート操作時に一時停止＆同期
+		dopeSheet_.SetSeekCallback([this](int frame) {
+			context_->scrubTime = frame / static_cast<float>(fps_);
+			Object3d* t = context_->GetTargetObject();
+			if (t && t->GetModel()) {
+				auto* ms = t->GetModel()->GetMotionSystem();
+				if (ms) {
+					ms->Stop();
+					context_->isPlaying = false;
+					ms->SetAnimationTime(context_->scrubTime);
+				}
+			}
+			});
+
+		dopeSheet_.SetDeleteKeyCallback([this](int trackIdx, int keyIdx) {
+			if (trackIdx >= static_cast<int>(tracks_.size())) return;
+			if (!context_->currentMotion) return;
+			if (keyIdx >= static_cast<int>(tracks_[trackIdx].keys.size())) return;
+			int frame = tracks_[trackIdx].keys[keyIdx].frame;
+			float t = frame / static_cast<float>(fps_);
+			context_->DeleteKeyframe(context_->selKF.boneName, t);
+			tracksDirty_ = true;
+			context_->statusMsg = "KF 削除";
+			});
+
+		bool changed = dopeSheet_.Draw("MotionTimeline", tracks_, totalFrames, fps_);
+
+		if (changed) {
+			ApplyTracksToMotion();
+			tracksDirty_ = true;
+			context_->statusMsg = "KF 移動完了";
+		}
+
+		{
+			int seekFrame = dopeSheet_.GetSeekFrame();
+			float newTime = seekFrame / static_cast<float>(fps_);
+			if (std::abs(newTime - context_->scrubTime) > 1e-4f) {
+				context_->scrubTime = newTime;
+			}
+		}
+
+		if (draggingKF_ && !ImGui::IsMouseDown(0)) {
+			draggingKF_ = false;
+			context_->statusMsg = "KF 移動了";
+		}
+	}
+#endif
+}
+
+void TimelinePanel::RebuildTracks()
+{
+	tracks_.clear();
+	trackBoneMap_.clear();
+	if (!context_->currentMotion) return;
+
+	static const DopeSheet::Color colT = { 1.0f, 0.59f, 0.2f, 1.0f };
+	static const DopeSheet::Color colR = { 0.35f, 0.78f, 0.35f, 1.0f };
+	static const DopeSheet::Color colS = { 0.31f, 0.59f, 1.0f, 1.0f };
+
+	auto& nodeAnims = context_->currentMotion->animation_.nodeAnimations_;
+
+	std::vector<std::string> boneNames;
+	boneNames.reserve(nodeAnims.size());
+	for (const auto& [name, _] : nodeAnims) boneNames.push_back(name);
+	std::sort(boneNames.begin(), boneNames.end());
+
+	for (const auto& boneName : boneNames)
+	{
+		const auto& na = nodeAnims.at(boneName);
+
+		{
+			DopeSheet::DopeTrack header;
+			header.label = boneName;
+			header.isGroupHeader = true;
+			header.groupExpanded = (context_->selBone == boneName || context_->selKF.boneName == boneName
+				? true : header.groupExpanded);
+			tracks_.push_back(header);
+			trackBoneMap_.push_back({ boneName, -1 });
+		}
+
+		{
+			DopeSheet::DopeTrack t;
+			t.label = "  T";
+			t.color = colT;
+			t.groupDepth = 1;
+			for (const auto& kf : na.translate.keyframes)
+				t.keys.emplace_back(static_cast<int>(kf.time * fps_ + 0.5f), kf.value.x, 0);
+			tracks_.push_back(t);
+			trackBoneMap_.push_back({ boneName, 0 });
+		}
+		{
+			DopeSheet::DopeTrack r;
+			r.label = "  R";
+			r.color = colR;
+			r.groupDepth = 1;
+			for (const auto& kf : na.rotate.keyframes)
+				r.keys.emplace_back(static_cast<int>(kf.time * fps_ + 0.5f), kf.value.w, 1);
+			tracks_.push_back(r);
+			trackBoneMap_.push_back({ boneName, 1 });
+		}
+		{
+			DopeSheet::DopeTrack s;
+			s.label = "  S";
+			s.color = colS;
+			s.groupDepth = 1;
+			for (const auto& kf : na.scale.keyframes)
+				s.keys.emplace_back(static_cast<int>(kf.time * fps_ + 0.5f), kf.value.x, 2);
+			tracks_.push_back(s);
+			trackBoneMap_.push_back({ boneName, 2 });
+		}
+	}
+
+	// ── 概要トラックを先頭に挿入 ──
+	BuildSummaryTrack();
+}
+
+void TimelinePanel::ApplyTracksToMotion()
+{
+	if (!context_->currentMotion) return;
+
+	for (int ti = 0; ti < static_cast<int>(tracks_.size()); ++ti)
+	{
+		if (ti >= static_cast<int>(trackBoneMap_.size())) break;
+		const auto& [boneName, channel] = trackBoneMap_[ti];
+
+		// channel == -2: 概要トラック（スキップ）
+		// channel == -1: グループヘッダー（スキップ）
+		if (channel < 0) continue;
+
+		if (!context_->currentMotion->animation_.nodeAnimations_.count(boneName)) continue;
+
+		auto& na = context_->currentMotion->animation_.nodeAnimations_[boneName];
+		const auto& keys = tracks_[ti].keys;
+
+		auto applyTimes = [&](auto& keyframes) {
+			if (keys.size() != keyframes.size()) return;
+			for (int ki = 0; ki < static_cast<int>(keys.size()); ++ki)
+				keyframes[ki].time = keys[ki].frame / static_cast<float>(fps_);
+			std::sort(keyframes.begin(), keyframes.end(),
+				[](const auto& a, const auto& b) { return a.time < b.time; });
+			};
+
+		switch (channel) {
+		case 0: applyTimes(na.translate.keyframes); break;
+		case 1: applyTimes(na.rotate.keyframes);    break;
+		case 2: applyTimes(na.scale.keyframes);     break;
+		}
+	}
+}
+
+// ============================================================
+// 概要トラック生成
+//   全ボーン・全チャンネルのKF時刻を収集して重複排除し、
+//   1行のサマリートラックとして先頭に挿入する
+// ============================================================
+void TimelinePanel::BuildSummaryTrack()
+{
+	if (!context_->currentMotion) return;
+
+	// 全チャンネルのフレーム番号を収集（重複排除）
+	std::set<int> allFrames;
+	for (const auto& [name, na] : context_->currentMotion->animation_.nodeAnimations_) {
+		for (const auto& kf : na.translate.keyframes)
+			allFrames.insert(static_cast<int>(kf.time * fps_ + 0.5f));
+		for (const auto& kf : na.rotate.keyframes)
+			allFrames.insert(static_cast<int>(kf.time * fps_ + 0.5f));
+		for (const auto& kf : na.scale.keyframes)
+			allFrames.insert(static_cast<int>(kf.time * fps_ + 0.5f));
+	}
+
+	DopeSheet::DopeTrack summary;
+	summary.label = "概要";
+	summary.isSummary = true;
+	summary.color = { 1.0f, 0.82f, 0.24f, 1.0f };
+	for (int frame : allFrames)
+		summary.keys.emplace_back(frame, 0.0f, -1);
+
+	// tracks_ / trackBoneMap_ の先頭に挿入
+	tracks_.insert(tracks_.begin(), summary);
+	trackBoneMap_.insert(trackBoneMap_.begin(), { "__summary__", -2 });
+}
+
+// ============================================================
+// 概要トラックKF一括移動ハンドラ
+//   指定フレームに存在する全ボーン・全チャンネルのKFを
+//   delta フレーム分ずらし、CommandHistory に登録する
+// ============================================================
+void TimelinePanel::OnSummaryKeyMoved(int fromFrame, int delta)
+{
+	if (!context_->currentMotion || delta == 0) return;
+
+	// Undo用スナップショット
+	auto oldAnims = context_->currentMotion->animation_.nodeAnimations_;
+
+	// 全ボーン・全チャンネルを走査して fromFrame のKFを移動
+	for (auto& [boneName, na] : context_->currentMotion->animation_.nodeAnimations_) {
+
+		auto moveInTrack = [&](auto& keyframes) {
+			for (auto& kf : keyframes) {
+				int kfFrame = static_cast<int>(kf.time * fps_ + 0.5f);
+				if (kfFrame == fromFrame) {
+					float newTime = (fromFrame + delta) / static_cast<float>(fps_);
+					kf.time = std::max(0.0f, newTime);
+				}
+			}
+			// 移動後に時刻順ソートを保証
+			std::sort(keyframes.begin(), keyframes.end(),
+				[](const auto& a, const auto& b) { return a.time < b.time; });
+			};
+
+		moveInTrack(na.translate.keyframes);
+		moveInTrack(na.rotate.keyframes);
+		moveInTrack(na.scale.keyframes);
+	}
+
+	auto newAnims = context_->currentMotion->animation_.nodeAnimations_;
+
+	// CommandHistory にUndoable コマンドとして登録
+	context_->history.Execute(MakeLambdaCommand(
+		"概要KF移動: " + std::to_string(fromFrame) + " → " + std::to_string(fromFrame + delta),
+		[this, newAnims]() {
+			if (context_->currentMotion)
+				context_->currentMotion->animation_.nodeAnimations_ = newAnims;
+			tracksDirty_ = true;
+		},
+		[this, oldAnims]() {
+			if (context_->currentMotion)
+				context_->currentMotion->animation_.nodeAnimations_ = oldAnims;
+			tracksDirty_ = true;
+		}
+	));
+
+	tracksDirty_ = true;
+	context_->statusMsg = "概要: frame " + std::to_string(fromFrame)
+		+ (delta > 0 ? " +" : " ") + std::to_string(delta) + " 移動";
+}
+
+============================================================
+File Path: YEngine/Model/Motion/Editor/Panels/TimelinePanel.h
+============================================================
+#pragma once
+#include "IMotionEditorPanel.h"
+#include "../MotionEditorContext.h"
+#include "Debugger/DopeSheet/DopeSheetEditor.h"
+#include <vector>
+
+/// <summary>
+/// アニメーションのタイムライン（ドープシート）を描画・管理するパネル
+/// </summary>
+class TimelinePanel : public IMotionEditorPanel
+{
+public:
+	void Initialize(MotionEditorContext* context) override;
+	void DrawImGui() override;
+
+	// DopeSheetの再構築要求フラグ（外部からアニメーションが切り替わった時など）
+	void SetDirty() { tracksDirty_ = true; }
+
+private:
+	void RebuildTracks();
+	void ApplyTracksToMotion();
+
+	void BuildSummaryTrack();           // 全KFを集約した概要トラックを生成
+	void OnSummaryKeyMoved(int fromFrame, int delta); // 概要KF一括移動ハンドラ
+
+private:
+	MotionEditorContext* context_ = nullptr;
+
+	// パネル内に完全に隠蔽されたタイムライン専用の変数
+	DopeSheet::DopeSheetEditor dopeSheet_;
+	std::vector<DopeSheet::DopeTrack> tracks_;
+	std::vector<std::pair<std::string, int>> trackBoneMap_;
+
+	bool tracksDirty_ = false;
+	int fps_ = 60;
+	float timelineH_ = 240.0f;
+
+	// KF ドラッグ移動
+	bool  draggingKF_ = false;
+
+	Motion* editingMotion_ = nullptr; // ドープシートで現在編集しているモーション（変更検知用）
+};
+
+============================================================
+File Path: YEngine/Model/Motion/Editor/Panels/ToolbarPanel.cpp
+============================================================
+#include "ToolbarPanel.h"
+#include <Object3D/Object3d.h>
+#include "Object3D/ObjectManager.h"
+#include "Model.h"
+#include "../../Core/MotionSystem.h"
+#include <Editor/Icon/EditorIcon.h>
+
+#ifdef USE_IMGUI
+#include <imgui.h>
+#endif
+
+void ToolbarPanel::DrawImGui()
+{
+#ifdef USE_IMGUI
+	Object3d* target = context_->GetTargetObject();
+	Model* model = target ? target->GetModel() : nullptr;
+
+	if (model) {
+		ImGui::TextColored(ImVec4(0.6f, 1.0f, 0.6f, 1.0f), "[%s]", model->GetName().c_str());
+		ImGui::SameLine(0, 12);
+	}
+
+	// ------------------------------------------------------------
+	// 再生コントロール
+	// ------------------------------------------------------------
+	if (context_->isPlaying) {
+		if (ImGui::Button((std::string(Icon::Pause) + " 一時停止").c_str())) {
+			if (model && model->GetMotionSystem()) model->GetMotionSystem()->Stop();
+			context_->isPlaying = false;
+			context_->statusMsg = "一時停止";
+		}
+	}
+	else {
+		if (ImGui::Button((std::string(Icon::Play) + " 再生").c_str())) {
+			if (model && model->GetMotionSystem()) {
+				auto* ms = model->GetMotionSystem();
+				float savedTime = ms->GetAnimationTime();
+				if (savedTime >= ms->GetDuration() || ms->IsFinished()) savedTime = 0.0f;
+
+				if (context_->isLoop) target->PlayLoop(); else target->PlayOnce();
+				ms->SetAnimationTime(savedTime);
+			}
+			context_->isPlaying = true;
+			context_->statusMsg = "再生 (Play)";
+		}
+	}
+
+	ImGui::SameLine(0, 3);
+	if (ImGui::Button((std::string(Icon::Stop) + " 停止").c_str())) {
+		if (model && model->GetMotionSystem()) {
+			model->GetMotionSystem()->Stop();
+			model->GetMotionSystem()->SetAnimationTime(0.0f);
+		}
+		context_->isPlaying = false;
+		context_->scrubTime = 0.0f;
+		context_->statusMsg = "停止 (先頭に戻る)";
+	}
+
+	ImGui::SameLine(0, 20);
+	ImGui::Checkbox("ボーン表示", &context_->isDrawBone);
+
+	ImGui::SameLine(0, 20);
+	if (ImGui::Button("Save/Load...")) {
+		context_->showSavePopup = true; // ポップアップ管理パネルへ伝達
+	}
+#endif
+}
+
+============================================================
+File Path: YEngine/Model/Motion/Editor/Panels/ToolbarPanel.h
+============================================================
+#pragma once
+#include "IMotionEditorPanel.h"
+#include "../MotionEditorContext.h"
+
+/// <summary>
+/// 再生制御やアニメーション選択を行うツールバー
+/// </summary>
+class ToolbarPanel : public IMotionEditorPanel
+{
+public:
+	void Initialize(MotionEditorContext* context) override { context_ = context; }
+	void Update() override {}
+	void DrawImGui() override;
+
+private:
+	MotionEditorContext* context_ = nullptr;
+};
+
+============================================================
 File Path: YEngine/Model/Node/Node.cpp
 ============================================================
 #include "Node.h"
@@ -232865,7 +233011,7 @@ public:
 File Path: YEngine/Model/Skeleton/BoneGizmable.cpp
 ============================================================
 #include "BoneGizmable.h"
-#include <Motion/MotionEditor.h>
+#include <Motion/Editor/MotionEditor.h>
 
 #ifdef USE_IMGUI
 #include "ImGuizmo.h"
@@ -237750,6 +237896,7 @@ File Path: YEngine/Utilities/Debugger/DopeSheet/DopeSheetEditor.cpp
 #include <imgui.h>
 #include <imgui_internal.h>
 #endif
+#include <Editor/Icon/EditorIcon.h>
 
 namespace DopeSheet
 {
@@ -237842,6 +237989,26 @@ namespace DopeSheet
                         { indentX + 14, y + 4 },
                         IM_COL32(230, 230, 230, 255),
                         track.label.c_str());
+                    row++;
+                    continue;
+                }
+
+                // ── 概要トラック（特殊表示）──
+                if (track.isSummary) {
+                    dl->AddRectFilled(
+                        { winPos.x, y },
+                        { winPos.x + kLabelW, y + kRowH },
+                        IM_COL32(52, 44, 16, 255));
+                    // 左端のゴールドバー（通常より太め）
+                    dl->AddRectFilled(
+                        { winPos.x, y },
+                        { winPos.x + 4.0f, y + kRowH },
+                        IM_COL32(255, 210, 60, 255));
+                    dl->PushClipRect({ winPos.x, y }, { winPos.x + kLabelW, y + kRowH }, true);
+                    float indentX = winPos.x + 8.0f;
+                    dl->AddText({ indentX,      y + 4 }, IM_COL32(255, 210, 60, 255), Icon::CheckCircle);
+                    dl->AddText({ indentX + 18, y + 4 }, IM_COL32(255, 224, 100, 255), track.label.c_str());
+                    dl->PopClipRect();
                     row++;
                     continue;
                 }
@@ -237970,6 +238137,16 @@ namespace DopeSheet
                     { origin.x, y },
                     { origin.x + timelineW, y + kHeaderH },
                     IM_COL32(35, 55, 75, 255));
+                row++;
+                continue;
+            }
+
+            // 概要トラックはゴールド系背景
+            if (t.isSummary) {
+                dl->AddRectFilled(
+                    { origin.x, y },
+                    { origin.x + timelineW, y + kRowH },
+                    IM_COL32(48, 40, 14, 255));
                 row++;
                 continue;
             }
@@ -238104,6 +238281,90 @@ namespace DopeSheet
         bool changed = false;
         const float halfH = kRowH * 0.5f;
         const float radius = std::min(halfH * 0.55f, cellW * 0.45f);
+
+        // =====================================================================
+        // 概要トラック専用処理
+        // 全KF時刻を大きなダイヤモンドで表示し、ドラッグで全ボーン一括移動する
+        // =====================================================================
+        if (track.isSummary) {
+            const float sumRadius = radius * 1.5f; // 通常より1.5倍大きく
+
+            // ── ドラッグ終了 ──
+            if (drag_.active && drag_.trackIdx == trackIdx && !ImGui::IsMouseDown(0)) {
+                if (drag_.keyIdx < static_cast<int>(track.keys.size())) {
+                    int endFrame = track.keys[drag_.keyIdx].frame;
+                    int delta = endFrame - drag_.startFrame;
+                    if (delta != 0 && onSummaryKeyMoved_) {
+                        onSummaryKeyMoved_(drag_.startFrame, delta);
+                    }
+                    // サマリーキーはTimelinePanel側で再構築するので元の位置に戻す
+                    track.keys[drag_.keyIdx].frame = drag_.startFrame;
+                }
+                drag_.active = false;
+            }
+
+            for (int ki = 0; ki < static_cast<int>(track.keys.size()); ++ki) {
+                DopeKey& key = track.keys[ki];
+                float    cx = rowMin.x + key.frame * cellW;
+                float    cy = rowMin.y + halfH;
+
+                bool isDraggingThis = (drag_.active && drag_.trackIdx == trackIdx && drag_.keyIdx == ki);
+
+                // ドラッグ中はビジュアルフィードバックとして一時的に位置を更新
+                if (isDraggingThis && ImGui::IsMouseDown(0)) {
+                    int newFrame = std::clamp(
+                        drag_.startFrame + static_cast<int>(
+                            (ImGui::GetMousePos().x - drag_.startMouseX) / cellW),
+                        0, totalFrames);
+                    if (newFrame != key.frame) { key.frame = newFrame; changed = true; }
+                    cx = rowMin.x + key.frame * cellW;
+                }
+
+                bool   hovered = false;
+                ImVec2 hitMin = { cx - sumRadius - 4, cy - sumRadius - 4 };
+                ImVec2 hitMax = { cx + sumRadius + 4, cy + sumRadius + 4 };
+                hovered = ImGui::IsMouseHoveringRect(hitMin, hitMax);
+
+                // 色: ホバー/選択で明るく
+                ImU32 fillCol = hovered || key.selected
+                    ? IM_COL32(255, 240, 100, 255)
+                    : IM_COL32(255, 200, 50, 230);
+                ImU32 outCol = hovered || key.selected
+                    ? IM_COL32(255, 255, 200, 220)
+                    : IM_COL32(200, 160, 30, 180);
+
+                // 大きなダイヤモンド
+                dl->AddQuadFilled(
+                    { cx,              cy - sumRadius },
+                    { cx + sumRadius,  cy },
+                    { cx,              cy + sumRadius },
+                    { cx - sumRadius,  cy }, fillCol);
+                dl->AddQuad(
+                    { cx,              cy - sumRadius },
+                    { cx + sumRadius,  cy },
+                    { cx,              cy + sumRadius },
+                    { cx - sumRadius,  cy }, outCol, 1.8f);
+
+                // ツールチップ
+                if (hovered) {
+                    ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+                    ImGui::BeginTooltip();
+                    ImGui::Text("frame=%d  (概要: 全ボーン一括移動)", key.frame);
+                    ImGui::EndTooltip();
+
+                    // ドラッグ開始
+                    if (ImGui::IsMouseClicked(0) && !drag_.active) {
+                        drag_ = { trackIdx, ki, true, DragState::Mode::Move,
+                                  key.frame, 0, ImGui::GetMousePos().x };
+                        key.selected = true;
+                    }
+                }
+            }
+            return changed;
+        }
+        // =====================================================================
+        // 通常トラック（既存処理）
+        // =====================================================================
 
         // ドラッグ終了
         if (drag_.active && drag_.trackIdx == trackIdx && !ImGui::IsMouseDown(0)) {
@@ -238573,12 +238834,15 @@ namespace DopeSheet
         using MoveKeyCallback = std::function<void(int trackIdx, int keyIdx, int newFrame)>;
         using SeekCallback = std::function<void(int frame)>;
         using SelectKeyCallback = std::function<void(int trackIdx, int keyIdx, bool selected)>;
+        // fromFrame: ドラッグ前のフレーム番号, delta: 移動フレーム数（正負あり）
+        using SummaryKeyMovedCallback = std::function<void(int fromFrame, int delta)>;
 
         void SetAddKeyCallback(AddKeyCallback    cb) { onAddKey_ = cb; }
         void SetDeleteKeyCallback(DeleteKeyCallback cb) { onDeleteKey_ = cb; }
         void SetMoveKeyCallback(MoveKeyCallback   cb) { onMoveKey_ = cb; }
         void SetSeekCallback(SeekCallback      cb) { onSeek_ = cb; }
         void SetSelectKeyCallback(SelectKeyCallback cb) { onSelectKey_ = cb; }
+        void SetSummaryKeyMovedCallback(SummaryKeyMovedCallback cb) { onSummaryKeyMoved_ = cb; }
 
 #ifdef USE_IMGUI
         using RulerOverlayCallback = std::function<void(ImDrawList*, ImVec2, float, int)>;
@@ -238648,6 +238912,7 @@ namespace DopeSheet
         MoveKeyCallback   onMoveKey_;
         SeekCallback      onSeek_;
         SelectKeyCallback onSelectKey_;
+        SummaryKeyMovedCallback onSummaryKeyMoved_;
 
 #ifdef USE_IMGUI
         RulerOverlayCallback onRulerOverlay_;
@@ -238842,104 +239107,104 @@ File Path: YEngine/Utilities/Debugger/DopeSheet/DopeTrack.h
 namespace DopeSheet
 {
 
-//=============================================================================
-// DopeTrack
-// タイムラインの 1 行分のデータ
-//=============================================================================
-struct DopeTrack
-{
-    std::string label;
-    TrackType   type          = TrackType::Generic;
-    Color       color         = Color::White();
-    std::vector<Color>   subColors;   // subType ごとの色（空なら color を使用）
-    std::vector<DopeKey> keys;
-
-    bool readOnly      = false;
-    bool visible       = true;
-    bool isGroupHeader = false;
-    bool groupExpanded = true;
-    int  groupDepth    = 0;
-
-    //=========================================================================
-    // ファクトリ
-    //=========================================================================
-
-    static DopeTrack Make(TrackType type, const std::string& customLabel = "")
+    //=============================================================================
+    // DopeTrack
+    // タイムラインの 1 行分のデータ
+    //=============================================================================
+    struct DopeTrack
     {
-        DopeTrack t;
-        t.type  = type;
-        t.color = GetDefaultTrackColor(type);
-        t.label = customLabel.empty() ? GetDefaultTrackLabel(type) : customLabel;
-        return t;
-    }
+        std::string label;
+        TrackType   type = TrackType::Generic;
+        Color       color = Color::White();
+        std::vector<Color>   subColors;   // subType ごとの色（空なら color を使用）
+        std::vector<DopeKey> keys;
 
-    static DopeTrack MakeGroup(const std::string& label, int depth = 0)
-    {
-        DopeTrack t;
-        t.label         = label;
-        t.isGroupHeader = true;
-        t.groupDepth    = depth;
-        return t;
-    }
+        bool readOnly = false;
+        bool visible = true;
+        bool isGroupHeader = false;
+        bool isSummary = false;   // 全KFを集約して表示する概要トラック
+        bool groupExpanded = true;
+        int  groupDepth = 0;
 
-    //=========================================================================
-    // キー操作
-    //=========================================================================
+        //=========================================================================
+        // ファクトリ
+        //=========================================================================
 
-    void AddKey(int frame, float value = 0.0f, int subType = 0, int duration = 0)
-    {
-        keys.emplace_back(frame, value, subType, duration);
-        SortKeys();
-    }
+        static DopeTrack Make(TrackType type, const std::string& customLabel = "")
+        {
+            DopeTrack t;
+            t.type = type;
+            t.color = GetDefaultTrackColor(type);
+            t.label = customLabel.empty() ? GetDefaultTrackLabel(type) : customLabel;
+            return t;
+        }
 
-    void AddKey(const DopeKey& key)
-    {
-        keys.push_back(key);
-        SortKeys();
-    }
+        static DopeTrack MakeGroup(const std::string& label, int depth = 0)
+        {
+            DopeTrack t;
+            t.label = label;
+            t.isGroupHeader = true;
+            t.groupDepth = depth;
+            return t;
+        }
 
-    void RemoveKey(int index)
-    {
-        if (index >= 0 && index < static_cast<int>(keys.size()))
-            keys.erase(keys.begin() + index);
-    }
+        //=========================================================================
+        // キー操作
+        //=========================================================================
 
-    void SortKeys()
-    {
-        std::sort(keys.begin(), keys.end(),
-            [](const DopeKey& a, const DopeKey& b) { return a.frame < b.frame; });
-    }
+        void AddKey(int frame, float value = 0.0f, int subType = 0, int duration = 0)
+        {
+            keys.emplace_back(frame, value, subType, duration);
+            SortKeys();
+        }
 
-    void ClearKeys() { keys.clear(); }
+        void AddKey(const DopeKey& key)
+        {
+            keys.push_back(key);
+            SortKeys();
+        }
 
-    //=========================================================================
-    // 検索
-    //=========================================================================
+        void RemoveKey(int index)
+        {
+            if (index >= 0 && index < static_cast<int>(keys.size()))
+                keys.erase(keys.begin() + index);
+        }
 
-    // 指定フレームと完全一致するキーのインデックス（なければ -1）
-    int FindKeyAt(int frame) const
-    {
-        for (int i = 0; i < static_cast<int>(keys.size()); ++i)
-            if (keys[i].frame == frame) return i;
-        return -1;
-    }
+        void SortKeys()
+        {
+            std::sort(keys.begin(), keys.end(),
+                [](const DopeKey& a, const DopeKey& b) { return a.frame < b.frame; });
+        }
 
-    // 指定フレームを区間内に含むキーのインデックス（なければ -1）
-    int FindKeyContaining(int frame) const
-    {
-        for (int i = 0; i < static_cast<int>(keys.size()); ++i)
-            if (keys[i].ContainsFrame(frame)) return i;
-        return -1;
-    }
+        void ClearKeys() { keys.clear(); }
 
-    void ClearSelection()
-    {
-        for (auto& k : keys) k.selected = false;
-    }
-};
+        //=========================================================================
+        // 検索
+        //=========================================================================
+
+        // 指定フレームと完全一致するキーのインデックス（なければ -1）
+        int FindKeyAt(int frame) const
+        {
+            for (int i = 0; i < static_cast<int>(keys.size()); ++i)
+                if (keys[i].frame == frame) return i;
+            return -1;
+        }
+
+        // 指定フレームを区間内に含むキーのインデックス（なければ -1）
+        int FindKeyContaining(int frame) const
+        {
+            for (int i = 0; i < static_cast<int>(keys.size()); ++i)
+                if (keys[i].ContainsFrame(frame)) return i;
+            return -1;
+        }
+
+        void ClearSelection()
+        {
+            for (auto& k : keys) k.selected = false;
+        }
+    };
 
 } // namespace DopeSheet
-
 
 ============================================================
 File Path: YEngine/Utilities/Debugger/Gizmo/GizmoController.cpp
@@ -264398,39 +264663,46 @@ File Path: YGame/GameObjects/Ground/Ground.cpp
 ============================================================
 #include "Ground.h"
 
-/// <summary>
-/// 地面オブジェクトを初期化
-/// </summary>
-/// <param name="camera">描画に使用するカメラ</param>
-void Ground::Initialize(Camera* camera)
-{
+// ============================================================
+// 地面オブジェクトを初期化
+// ============================================================
+void Ground::Initialize(Camera* camera) {
 	camera_ = camera;
-	// Object3dの生成
+
+	//------------------------------------------------------------
+	// Object3dの生成���初期化
+	//------------------------------------------------------------
 	obj_ = std::make_unique<Object3d>();
 	obj_->Initialize();
+
+	// 地面のモデルデータをセットする
 	obj_->SetModel("Ground.obj");
 
-	// ワールドトランスフォーム初期化
+	//------------------------------------------------------------
+	// ワールドトランスフォームの初期化
+	//------------------------------------------------------------
 	wt_.Initialize();
-	//wt_.translate_.y -= 2.0f;
 }
 
-/// <summary>
-/// 地面オブジェクトの更新処理
-/// </summary>
-void Ground::Update()
-{
+// ============================================================
+// 地面オブジェクトの更新処理
+// ============================================================
+void Ground::Update() {
+	//------------------------------------------------------------
+	// ワールド行列の更新
+	//------------------------------------------------------------
 	wt_.UpdateMatrix();
 }
 
-/// <summary>
-/// 地面オブジェクトの描画処理
-/// </summary>
-void Ground::Draw()
-{
+// ============================================================
+// 地面オブジェクトの描画処理
+// ============================================================
+void Ground::Draw() {
+	//------------------------------------------------------------
+	// 3Dオブジェクトの描画
+	//------------------------------------------------------------
 	obj_->Draw(camera_, wt_);
 }
-
 
 ============================================================
 File Path: YGame/GameObjects/Ground/Ground.h
@@ -264442,12 +264714,16 @@ File Path: YGame/GameObjects/Ground/Ground.h
 #include "WorldTransform/WorldTransform.h"
 #include "Systems/Camera/Camera.h"
 
-/// <summary>
-/// 地面クラス
-/// </summary>
+// ============================================================
+// 地面クラス
+// ============================================================
 class Ground
 {
 public:
+	// ============================================================
+	// 基本関数
+	// ============================================================
+
 	// 初期化
 	void Initialize(Camera* camera);
 
@@ -264458,17 +264734,27 @@ public:
 	void Draw();
 
 public:
+	// ============================================================
+	// アクセッサ
+	// ============================================================
+
 	// 色変更
 	Vector4& GetColor() { return obj_->GetColor(); }
+
 private:
-	// ポインタ
+	// ============================================================
+	// メンバ変数
+	// ============================================================
+
+	// 描画する3Dオブジェクトのスマートポインタ
 	std::unique_ptr<Object3d> obj_;
+
+	// 描画に使用するカメラポインタ
 	Camera* camera_;
-	// ワールドトランスフォーム
+
+	// 地面のワールド座標、回転、スケールを管理するトランスフォーム
 	WorldTransform wt_;
 };
-
-
 
 ============================================================
 File Path: YGame/GameObjects/Player/AttackingCombat/AttackingCombatState.cpp
@@ -265423,25 +265709,6 @@ void AttackDataEditor::DrawAttackDetail()
 
 		if (ImGui::TreeNode("推奨次攻撃"))
 		{
-			for (size_t i = 0; i < atk.preferredNext.size(); ++i)
-			{
-				ImGui::PushID(static_cast<int>(i));
-				int p = static_cast<int>(atk.preferredNext[i]);
-				if (ImGui::Combo("##pref", &p, typeLabels, 3))
-				{
-					atk.preferredNext[i] = static_cast<AttackType>(p); changed = true;
-				}
-				ImGui::SameLine();
-				if (ImGui::Button("X"))
-				{
-					atk.preferredNext.erase(atk.preferredNext.begin() + i); changed = true; ImGui::PopID(); break;
-				}
-				ImGui::PopID();
-			}
-			if (ImGui::Button("追加"))
-			{
-				atk.preferredNext.push_back(AttackType::A_Arte); changed = true;
-			}
 			ImGui::TreePop();
 		}
 	}
@@ -265779,34 +266046,11 @@ public:
 			attack.hitStart, attack.hitEnd));
 
 		// ------------------------------------------------------------
-		// 攻撃後の硬直区間 (Recovery)
-		// ArmorFrame用のトラックを流用し、ラベルを "Recovery" に差し替える
-		// ------------------------------------------------------------
-		tracks.push_back(MakeBarTrack(
-			DopeSheet::TrackType::ArmorFrame,
-			attack.recoveryStart, attack.recoveryEnd,
-			"Recovery"));
-
-		// ------------------------------------------------------------
-		// キャンセル受付区間 (Cancel Window)
-		// ------------------------------------------------------------
-		tracks.push_back(MakeBarTrack(
-			DopeSheet::TrackType::CancelWindow,
-			attack.cancelStart, attack.totalFrames));
-
-		// ------------------------------------------------------------
 		// コンボ入力受付区間 (Combo Window)
 		// ------------------------------------------------------------
 		tracks.push_back(MakeBarTrack(
 			DopeSheet::TrackType::ComboWindow,
 			attack.comboWindowStart, attack.comboWindowEnd));
-
-		// ------------------------------------------------------------
-		// 無敵区間 (Invincible)
-		// ------------------------------------------------------------
-		tracks.push_back(MakeBarTrack(
-			DopeSheet::TrackType::InvincibleFrame,
-			attack.invincibleStart, attack.invincibleEnd));
 
 		return tracks;
 	}
@@ -265827,35 +266071,8 @@ public:
 				ReadBarTrack(track, attack.hitStart, attack.hitEnd);
 				break;
 
-			case DopeSheet::TrackType::ArmorFrame: // Recoveryとして使用
-				ReadBarTrack(track, attack.recoveryStart, attack.recoveryEnd);
-				break;
-
-			case DopeSheet::TrackType::CancelWindow:
-				// キャンセル開始フレームのみ保存、終了はアニメーションの長さに依存
-				attack.cancelStart = track.keys.empty()
-					? attack.totalFrames
-					: track.keys.front().frame;
-				break;
-
 			case DopeSheet::TrackType::ComboWindow:
 				ReadBarTrack(track, attack.comboWindowStart, attack.comboWindowEnd);
-				break;
-
-			case DopeSheet::TrackType::InvincibleFrame:
-				ReadBarTrack(track, attack.invincibleStart, attack.invincibleEnd);
-				break;
-
-			case DopeSheet::TrackType::Effect:
-				attack.effects.clear();
-				for (const auto& key : track.keys)
-					attack.effects.push_back({ key.frame, key.tag });
-				break;
-
-			case DopeSheet::TrackType::Sound:
-				attack.sounds.clear();
-				for (const auto& key : track.keys)
-					attack.sounds.push_back({ key.frame, key.tag });
 				break;
 
 			default:
@@ -265978,20 +266195,8 @@ struct AttackData {
 
 	int hitStart = 0;
 	int hitEnd = 10;
-	int recoveryStart = 0;
-	int recoveryEnd = 0;
-	int cancelStart = 0;
 	int comboWindowStart = 0;
 	int comboWindowEnd = 0;
-	int invincibleStart = 0;
-	int invincibleEnd = 0;
-
-	struct FrameEvent {
-		int frame = 0;
-		std::string tag;
-	};
-	std::vector<FrameEvent> effects;
-	std::vector<FrameEvent> sounds;
 
 	// ------------------------------------------------------------
 	// タイミング設定（ゲームロジック用・秒単位）
@@ -266020,15 +266225,10 @@ struct AttackData {
 	// ------------------------------------------------------------
 	bool canCancel = true;
 	bool canChainToAny = true;
-	std::vector<AttackType> preferredNext;
 
 	// ------------------------------------------------------------
 	// 特殊効果フラグ
 	// ------------------------------------------------------------
-	bool launches = false;
-	bool wallBounce = false;
-	bool groundBounce = false;
-	std::string effect;
 	float motionSpeed = 1.0f;
 
 	// ------------------------------------------------------------
@@ -266090,13 +266290,8 @@ SERIALIZE_FIELD(AttackData, totalFrames)
 SERIALIZE_FIELD(AttackData, fps)
 SERIALIZE_FIELD(AttackData, hitStart)
 SERIALIZE_FIELD(AttackData, hitEnd)
-SERIALIZE_FIELD(AttackData, recoveryStart)
-SERIALIZE_FIELD(AttackData, recoveryEnd)
-SERIALIZE_FIELD(AttackData, cancelStart)
 SERIALIZE_FIELD(AttackData, comboWindowStart)
 SERIALIZE_FIELD(AttackData, comboWindowEnd)
-SERIALIZE_FIELD(AttackData, invincibleStart)
-SERIALIZE_FIELD(AttackData, invincibleEnd)
 
 SERIALIZE_FIELD(AttackData, duration)
 SERIALIZE_FIELD(AttackData, recovery)
@@ -266112,12 +266307,6 @@ SERIALIZE_FIELD(AttackData, ccOnHit)
 
 SERIALIZE_FIELD(AttackData, canCancel)
 SERIALIZE_FIELD(AttackData, canChainToAny)
-SERIALIZE_FIELD(AttackData, preferredNext)
-
-SERIALIZE_FIELD(AttackData, launches)
-SERIALIZE_FIELD(AttackData, wallBounce)
-SERIALIZE_FIELD(AttackData, groundBounce)
-SERIALIZE_FIELD(AttackData, effect)
 SERIALIZE_FIELD(AttackData, motionSpeed)
 END_STRUCT_SERIALIZER(AttackData)
 
