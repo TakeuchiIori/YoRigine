@@ -274,15 +274,27 @@ void TimelinePanel::ApplyTracksToMotion() {
 
 		// 各キーの状態を同期
 		auto syncKeys = [&](auto& curveKeys) {
+			// UI の frame 値を時間に変換して書き戻す
 			for (size_t k = 0; k < track.keys.size(); ++k) {
 				if (k < curveKeys.size()) {
 					curveKeys[k].time = track.keys[k].frame / static_cast<float>(fps_);
 				}
 			}
+
 			// 時刻順にソート
-			std::sort(curveKeys.begin(), curveKeys.end(), [](const auto& a, const auto& b) {
-				return a.time < b.time;
-				});
+			// キーを動かして前後関係が入れ替わっても正しく再生されるようにするため
+			std::sort(curveKeys.begin(), curveKeys.end(),
+				[](const auto& a, const auto& b) { return a.time < b.time; });
+
+			// 同一時刻の重複を削除（重複の防止、前のキーを優先して残す）
+			// キーを動かして既存のキーにピッタリ重ねたら、1つに統合されるようにするため
+			curveKeys.erase(
+				std::unique(curveKeys.begin(), curveKeys.end(),
+					[](const auto& a, const auto& b) {
+						return std::abs(a.time - b.time) < 1e-4f;
+					}),
+				curveKeys.end()
+			);
 			};
 
 		if (channelType == 0) syncKeys(nodeAnim.translate.keyframes);
