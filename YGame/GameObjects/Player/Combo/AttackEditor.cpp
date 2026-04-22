@@ -254,25 +254,6 @@ void AttackDataEditor::DrawAttackDetail()
 
 		if (ImGui::TreeNode("推奨次攻撃"))
 		{
-			for (size_t i = 0; i < atk.preferredNext.size(); ++i)
-			{
-				ImGui::PushID(static_cast<int>(i));
-				int p = static_cast<int>(atk.preferredNext[i]);
-				if (ImGui::Combo("##pref", &p, typeLabels, 3))
-				{
-					atk.preferredNext[i] = static_cast<AttackType>(p); changed = true;
-				}
-				ImGui::SameLine();
-				if (ImGui::Button("X"))
-				{
-					atk.preferredNext.erase(atk.preferredNext.begin() + i); changed = true; ImGui::PopID(); break;
-				}
-				ImGui::PopID();
-			}
-			if (ImGui::Button("追加"))
-			{
-				atk.preferredNext.push_back(AttackType::A_Arte); changed = true;
-			}
 			ImGui::TreePop();
 		}
 	}

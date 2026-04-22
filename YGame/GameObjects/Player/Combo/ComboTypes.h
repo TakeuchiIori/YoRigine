@@ -53,20 +53,8 @@ struct AttackData {
 
 	int hitStart = 0;
 	int hitEnd = 10;
-	int recoveryStart = 0;
-	int recoveryEnd = 0;
-	int cancelStart = 0;
 	int comboWindowStart = 0;
 	int comboWindowEnd = 0;
-	int invincibleStart = 0;
-	int invincibleEnd = 0;
-
-	struct FrameEvent {
-		int frame = 0;
-		std::string tag;
-	};
-	std::vector<FrameEvent> effects;
-	std::vector<FrameEvent> sounds;
 
 	// ------------------------------------------------------------
 	// タイミング設定（ゲームロジック用・秒単位）
@@ -95,15 +83,10 @@ struct AttackData {
 	// ------------------------------------------------------------
 	bool canCancel = true;
 	bool canChainToAny = true;
-	std::vector<AttackType> preferredNext;
 
 	// ------------------------------------------------------------
 	// 特殊効果フラグ
 	// ------------------------------------------------------------
-	bool launches = false;
-	bool wallBounce = false;
-	bool groundBounce = false;
-	std::string effect;
 	float motionSpeed = 1.0f;
 
 	// ------------------------------------------------------------
@@ -165,13 +148,8 @@ SERIALIZE_FIELD(AttackData, totalFrames)
 SERIALIZE_FIELD(AttackData, fps)
 SERIALIZE_FIELD(AttackData, hitStart)
 SERIALIZE_FIELD(AttackData, hitEnd)
-SERIALIZE_FIELD(AttackData, recoveryStart)
-SERIALIZE_FIELD(AttackData, recoveryEnd)
-SERIALIZE_FIELD(AttackData, cancelStart)
 SERIALIZE_FIELD(AttackData, comboWindowStart)
 SERIALIZE_FIELD(AttackData, comboWindowEnd)
-SERIALIZE_FIELD(AttackData, invincibleStart)
-SERIALIZE_FIELD(AttackData, invincibleEnd)
 
 SERIALIZE_FIELD(AttackData, duration)
 SERIALIZE_FIELD(AttackData, recovery)
@@ -187,12 +165,6 @@ SERIALIZE_FIELD(AttackData, ccOnHit)
 
 SERIALIZE_FIELD(AttackData, canCancel)
 SERIALIZE_FIELD(AttackData, canChainToAny)
-SERIALIZE_FIELD(AttackData, preferredNext)
-
-SERIALIZE_FIELD(AttackData, launches)
-SERIALIZE_FIELD(AttackData, wallBounce)
-SERIALIZE_FIELD(AttackData, groundBounce)
-SERIALIZE_FIELD(AttackData, effect)
 SERIALIZE_FIELD(AttackData, motionSpeed)
 END_STRUCT_SERIALIZER(AttackData)
 
