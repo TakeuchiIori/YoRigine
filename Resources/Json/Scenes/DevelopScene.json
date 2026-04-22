@@ -2,42 +2,19 @@
     "objects": [
         {
             "animationName": "",
-            "filePath": "Blacksmith\\Blacksmith.obj",
+            "filePath": "Player\\Player.gltf",
             "id": 0,
-            "isAnimation": false,
-            "modelName": "Blacksmith.obj",
+            "isAnimation": true,
+            "modelName": "Player.gltf",
             "parentID": -1,
             "position": [
-                -4.23121976852417,
-                0.0,
-                0.0
+                -10.979893684387207,
+                1.0011787414550781,
+                -13.027837753295898
             ],
             "rotate": [
                 0.0,
                 -0.0,
-                0.0
-            ],
-            "scale": [
-                1.0,
-                1.0,
-                1.0
-            ]
-        },
-        {
-            "animationName": "",
-            "filePath": "Ground\\Ground.obj",
-            "id": 1,
-            "isAnimation": false,
-            "modelName": "Ground.obj",
-            "parentID": -1,
-            "position": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "rotate": [
-                0.0,
-                0.0,
                 0.0
             ],
             "scale": [

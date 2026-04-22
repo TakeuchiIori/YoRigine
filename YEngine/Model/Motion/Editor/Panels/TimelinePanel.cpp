@@ -253,37 +253,41 @@ void TimelinePanel::RebuildTracks()
 	BuildSummaryTrack();
 }
 
-void TimelinePanel::ApplyTracksToMotion()
-{
+// TimelinePanel.cpp
+void TimelinePanel::ApplyTracksToMotion() {
 	if (!context_->currentMotion) return;
 
-	for (int ti = 0; ti < static_cast<int>(tracks_.size()); ++ti)
-	{
-		if (ti >= static_cast<int>(trackBoneMap_.size())) break;
-		const auto& [boneName, channel] = trackBoneMap_[ti];
+	auto& nodeAnims = context_->currentMotion->animation_.nodeAnimations_;
 
-		// channel == -2: 概要トラック（スキップ）
-		// channel == -1: グループヘッダー（スキップ）
-		if (channel < 0) continue;
+	// tracks_ (UIの状態) を Motion (データ) に書き戻す
+	for (size_t i = 0; i < tracks_.size(); ++i) {
+		const auto& track = tracks_[i];
+		if (track.isGroupHeader) continue; // 概要トラックやヘッダーはスキップ
 
-		if (!context_->currentMotion->animation_.nodeAnimations_.count(boneName)) continue;
+		// trackBoneMap_ を使って、どのボーンのどのチャンネルか特定する
+		// 例: pair<ボーン名, 0:T, 1:R, 2:S> と定義している場合
+		auto& mapping = trackBoneMap_[i];
+		std::string boneName = mapping.first;
+		int channelType = mapping.second;
 
-		auto& na = context_->currentMotion->animation_.nodeAnimations_[boneName];
-		const auto& keys = tracks_[ti].keys;
+		auto& nodeAnim = nodeAnims[boneName];
 
-		auto applyTimes = [&](auto& keyframes) {
-			if (keys.size() != keyframes.size()) return;
-			for (int ki = 0; ki < static_cast<int>(keys.size()); ++ki)
-				keyframes[ki].time = keys[ki].frame / static_cast<float>(fps_);
-			std::sort(keyframes.begin(), keyframes.end(),
-				[](const auto& a, const auto& b) { return a.time < b.time; });
+		// 各キーの状態を同期
+		auto syncKeys = [&](auto& curveKeys) {
+			for (size_t k = 0; k < track.keys.size(); ++k) {
+				if (k < curveKeys.size()) {
+					curveKeys[k].time = track.keys[k].frame / static_cast<float>(fps_);
+				}
+			}
+			// 時刻順にソート
+			std::sort(curveKeys.begin(), curveKeys.end(), [](const auto& a, const auto& b) {
+				return a.time < b.time;
+				});
 			};
 
-		switch (channel) {
-		case 0: applyTimes(na.translate.keyframes); break;
-		case 1: applyTimes(na.rotate.keyframes);    break;
-		case 2: applyTimes(na.scale.keyframes);     break;
-		}
+		if (channelType == 0) syncKeys(nodeAnim.translate.keyframes);
+		else if (channelType == 1) syncKeys(nodeAnim.rotate.keyframes);
+		else if (channelType == 2) syncKeys(nodeAnim.scale.keyframes);
 	}
 }
 

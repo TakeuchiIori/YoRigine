@@ -313,6 +313,24 @@ void MotionEditor::ShowEditor()
 			context_.selKF.Clear();
 			context_.statusMsg = "[ Del ] キーフレーム削除";
 		}
+
+		// キーフレーム追加
+		if (ImGui::IsKeyPressed(ImGuiKey_I) && context_.currentMotion) {
+			if (!context_.selBone.empty()) {
+				// 選択中のボーンに対してキーフレーム追加
+				SyncJointToBuffer(context_.selBone); // 追加前に最新の値をバッファに反映
+				if (context_.AddKeyframe) {
+					context_.AddKeyframe(context_.selBone, context_.scrubTime);
+				}
+				context_.statusMsg = "[ I ] キーフレーム追加" + context_.selBone;
+			}
+			else {
+				// ボーンが選択されていない場合、全ボーンのポーズを保存
+				SavePose(context_.scrubTime);
+				context_.statusMsg = "[ I ] ポーズ保存 (全ボーン)" 
+					+ std::to_string(context_.scrubTime) + "s";
+			}
+		}
 	}
 
 	//------------------------------------------------------------
