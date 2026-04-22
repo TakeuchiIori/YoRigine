@@ -7,6 +7,7 @@
 #include <imgui.h>
 #include <imgui_internal.h>
 #endif
+#include <Editor/Icon/EditorIcon.h>
 
 namespace DopeSheet
 {
@@ -99,6 +100,26 @@ namespace DopeSheet
                         { indentX + 14, y + 4 },
                         IM_COL32(230, 230, 230, 255),
                         track.label.c_str());
+                    row++;
+                    continue;
+                }
+
+                // ── 概要トラック（特殊表示）──
+                if (track.isSummary) {
+                    dl->AddRectFilled(
+                        { winPos.x, y },
+                        { winPos.x + kLabelW, y + kRowH },
+                        IM_COL32(52, 44, 16, 255));
+                    // 左端のゴールドバー（通常より太め）
+                    dl->AddRectFilled(
+                        { winPos.x, y },
+                        { winPos.x + 4.0f, y + kRowH },
+                        IM_COL32(255, 210, 60, 255));
+                    dl->PushClipRect({ winPos.x, y }, { winPos.x + kLabelW, y + kRowH }, true);
+                    float indentX = winPos.x + 8.0f;
+                    dl->AddText({ indentX,      y + 4 }, IM_COL32(255, 210, 60, 255), Icon::CheckCircle);
+                    dl->AddText({ indentX + 18, y + 4 }, IM_COL32(255, 224, 100, 255), track.label.c_str());
+                    dl->PopClipRect();
                     row++;
                     continue;
                 }
@@ -227,6 +248,16 @@ namespace DopeSheet
                     { origin.x, y },
                     { origin.x + timelineW, y + kHeaderH },
                     IM_COL32(35, 55, 75, 255));
+                row++;
+                continue;
+            }
+
+            // 概要トラックはゴールド系背景
+            if (t.isSummary) {
+                dl->AddRectFilled(
+                    { origin.x, y },
+                    { origin.x + timelineW, y + kRowH },
+                    IM_COL32(48, 40, 14, 255));
                 row++;
                 continue;
             }
@@ -361,6 +392,90 @@ namespace DopeSheet
         bool changed = false;
         const float halfH = kRowH * 0.5f;
         const float radius = std::min(halfH * 0.55f, cellW * 0.45f);
+
+        // =====================================================================
+        // 概要トラック専用処理
+        // 全KF時刻を大きなダイヤモンドで表示し、ドラッグで全ボーン一括移動する
+        // =====================================================================
+        if (track.isSummary) {
+            const float sumRadius = radius * 1.5f; // 通常より1.5倍大きく
+
+            // ── ドラッグ終了 ──
+            if (drag_.active && drag_.trackIdx == trackIdx && !ImGui::IsMouseDown(0)) {
+                if (drag_.keyIdx < static_cast<int>(track.keys.size())) {
+                    int endFrame = track.keys[drag_.keyIdx].frame;
+                    int delta = endFrame - drag_.startFrame;
+                    if (delta != 0 && onSummaryKeyMoved_) {
+                        onSummaryKeyMoved_(drag_.startFrame, delta);
+                    }
+                    // サマリーキーはTimelinePanel側で再構築するので元の位置に戻す
+                    track.keys[drag_.keyIdx].frame = drag_.startFrame;
+                }
+                drag_.active = false;
+            }
+
+            for (int ki = 0; ki < static_cast<int>(track.keys.size()); ++ki) {
+                DopeKey& key = track.keys[ki];
+                float    cx = rowMin.x + key.frame * cellW;
+                float    cy = rowMin.y + halfH;
+
+                bool isDraggingThis = (drag_.active && drag_.trackIdx == trackIdx && drag_.keyIdx == ki);
+
+                // ドラッグ中はビジュアルフィードバックとして一時的に位置を更新
+                if (isDraggingThis && ImGui::IsMouseDown(0)) {
+                    int newFrame = std::clamp(
+                        drag_.startFrame + static_cast<int>(
+                            (ImGui::GetMousePos().x - drag_.startMouseX) / cellW),
+                        0, totalFrames);
+                    if (newFrame != key.frame) { key.frame = newFrame; changed = true; }
+                    cx = rowMin.x + key.frame * cellW;
+                }
+
+                bool   hovered = false;
+                ImVec2 hitMin = { cx - sumRadius - 4, cy - sumRadius - 4 };
+                ImVec2 hitMax = { cx + sumRadius + 4, cy + sumRadius + 4 };
+                hovered = ImGui::IsMouseHoveringRect(hitMin, hitMax);
+
+                // 色: ホバー/選択で明るく
+                ImU32 fillCol = hovered || key.selected
+                    ? IM_COL32(255, 240, 100, 255)
+                    : IM_COL32(255, 200, 50, 230);
+                ImU32 outCol = hovered || key.selected
+                    ? IM_COL32(255, 255, 200, 220)
+                    : IM_COL32(200, 160, 30, 180);
+
+                // 大きなダイヤモンド
+                dl->AddQuadFilled(
+                    { cx,              cy - sumRadius },
+                    { cx + sumRadius,  cy },
+                    { cx,              cy + sumRadius },
+                    { cx - sumRadius,  cy }, fillCol);
+                dl->AddQuad(
+                    { cx,              cy - sumRadius },
+                    { cx + sumRadius,  cy },
+                    { cx,              cy + sumRadius },
+                    { cx - sumRadius,  cy }, outCol, 1.8f);
+
+                // ツールチップ
+                if (hovered) {
+                    ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+                    ImGui::BeginTooltip();
+                    ImGui::Text("frame=%d  (概要: 全ボーン一括移動)", key.frame);
+                    ImGui::EndTooltip();
+
+                    // ドラッグ開始
+                    if (ImGui::IsMouseClicked(0) && !drag_.active) {
+                        drag_ = { trackIdx, ki, true, DragState::Mode::Move,
+                                  key.frame, 0, ImGui::GetMousePos().x };
+                        key.selected = true;
+                    }
+                }
+            }
+            return changed;
+        }
+        // =====================================================================
+        // 通常トラック（既存処理）
+        // =====================================================================
 
         // ドラッグ終了
         if (drag_.active && drag_.trackIdx == trackIdx && !ImGui::IsMouseDown(0)) {

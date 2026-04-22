@@ -1,6 +1,6 @@
 #include "MotionSystem.h"
 
-#include "../ModelUtils.h"
+#include "../../ModelUtils.h"
 #include "Debugger/Logger.h"
 
 #include <Windows.h>

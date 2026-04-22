@@ -7,7 +7,7 @@
 // Engine
 #include <Object3D/ObjectManager.h>
 #include <Systems/Camera/Camera.h>
-#include <Motion/MotionEditor.h>
+#include <Motion/Editor/MotionEditor.h>
 
 #ifdef USE_IMGUI
 #include "ModelBrowser.h"

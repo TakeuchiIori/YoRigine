@@ -12,7 +12,7 @@
 #include "Material/MaterialColor.h"
 #include "Material/MaterialLighting.h"
 #include "Material/MaterialUV.h"
-#include "Motion/MotionSystem.h"
+#include "Motion/Core/MotionSystem.h"
 #include <Loaders/Json/JsonManager.h>
 
 // Math

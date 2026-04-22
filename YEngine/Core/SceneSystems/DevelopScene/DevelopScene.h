@@ -7,7 +7,7 @@
 #include "Systems/Camera/CameraEditor.h"
 #include "Systems/Camera/Camera.h"
 
-#include "Motion/MotionEditor.h"
+#include "Motion/Editor/MotionEditor.h"
 
 
 class DevelopScene : public BaseScene

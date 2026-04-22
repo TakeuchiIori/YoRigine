@@ -31,34 +31,11 @@ public:
 			attack.hitStart, attack.hitEnd));
 
 		// ------------------------------------------------------------
-		// 攻撃後の硬直区間 (Recovery)
-		// ArmorFrame用のトラックを流用し、ラベルを "Recovery" に差し替える
-		// ------------------------------------------------------------
-		tracks.push_back(MakeBarTrack(
-			DopeSheet::TrackType::ArmorFrame,
-			attack.recoveryStart, attack.recoveryEnd,
-			"Recovery"));
-
-		// ------------------------------------------------------------
-		// キャンセル受付区間 (Cancel Window)
-		// ------------------------------------------------------------
-		tracks.push_back(MakeBarTrack(
-			DopeSheet::TrackType::CancelWindow,
-			attack.cancelStart, attack.totalFrames));
-
-		// ------------------------------------------------------------
 		// コンボ入力受付区間 (Combo Window)
 		// ------------------------------------------------------------
 		tracks.push_back(MakeBarTrack(
 			DopeSheet::TrackType::ComboWindow,
 			attack.comboWindowStart, attack.comboWindowEnd));
-
-		// ------------------------------------------------------------
-		// 無敵区間 (Invincible)
-		// ------------------------------------------------------------
-		tracks.push_back(MakeBarTrack(
-			DopeSheet::TrackType::InvincibleFrame,
-			attack.invincibleStart, attack.invincibleEnd));
 
 		return tracks;
 	}
@@ -79,35 +56,8 @@ public:
 				ReadBarTrack(track, attack.hitStart, attack.hitEnd);
 				break;
 
-			case DopeSheet::TrackType::ArmorFrame: // Recoveryとして使用
-				ReadBarTrack(track, attack.recoveryStart, attack.recoveryEnd);
-				break;
-
-			case DopeSheet::TrackType::CancelWindow:
-				// キャンセル開始フレームのみ保存、終了はアニメーションの長さに依存
-				attack.cancelStart = track.keys.empty()
-					? attack.totalFrames
-					: track.keys.front().frame;
-				break;
-
 			case DopeSheet::TrackType::ComboWindow:
 				ReadBarTrack(track, attack.comboWindowStart, attack.comboWindowEnd);
-				break;
-
-			case DopeSheet::TrackType::InvincibleFrame:
-				ReadBarTrack(track, attack.invincibleStart, attack.invincibleEnd);
-				break;
-
-			case DopeSheet::TrackType::Effect:
-				attack.effects.clear();
-				for (const auto& key : track.keys)
-					attack.effects.push_back({ key.frame, key.tag });
-				break;
-
-			case DopeSheet::TrackType::Sound:
-				attack.sounds.clear();
-				for (const auto& key : track.keys)
-					attack.sounds.push_back({ key.frame, key.tag });
 				break;
 
 			default:
