@@ -69,12 +69,12 @@ void PlayerSword::Update() {
 		UpdateColliderWorldTransform();
 	}
 
-	Vector3 rootW = Transform(localRoot, finalMatrix_);
-	Vector3 tipW = Transform(localTip, finalMatrix_);
+	Vector3 rootW = Transform(localRoot, wt_.matWorld_);
+	Vector3 tipW = Transform(localTip, wt_.matWorld_);
 	trailEmitter_->AddPoint(tipW, rootW);
 	trailEmitter_->Update(YoRigine::GameTime::GetDeltaTime());
 
-	Vector3 handPos = GetHandPosition();
+	// Vector3 handPos = GetHandPosition(); // 使っていなければ削除でOK
 	obbCollider_->Update();
 }
 
@@ -269,7 +269,7 @@ void PlayerSword::OnEnterDirectionCollision([[maybe_unused]] BaseCollider* self,
 // ============================================================
 void PlayerSword::InitCollision() {
 	obbCollider_ = ColliderFactory::Create<OBBCollider>(
-		this, &colliderWT_, camera_,
+		this, &wt_, camera_,
 		static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon)
 	);
 

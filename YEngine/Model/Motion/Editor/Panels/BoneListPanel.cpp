@@ -79,9 +79,9 @@ void BoneListPanel::DrawImGui()
 #endif
 }
 
+#ifdef USE_IMGUI
 void BoneListPanel::DrawBoneNode(const std::vector<Joint>& joints, int jointIndex, const std::vector<std::vector<int>>& childrenMap)
 {
-#ifdef USE_IMGUI
 	const auto& joint = joints[jointIndex];
 	const std::string& name = joint.GetName();
 	bool isSel = (context_->selBone == name);
@@ -131,5 +131,5 @@ void BoneListPanel::DrawBoneNode(const std::vector<Joint>& joints, int jointInde
 		}
 		ImGui::TreePop(); // ツリーのインデントを戻す
 	}
-#endif
 }
+#endif

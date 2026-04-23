@@ -110,9 +110,9 @@ void SavePanel::DrawSaveLoadPopup()
 #endif
 }
 
+#ifdef USE_IMGUI
 void SavePanel::DrawFileBrowser(FileBrowserState& state, const char* title)
 {
-#ifdef USE_IMGUI
 	ImGui::SetNextWindowSize(ImVec2(540, 420), ImGuiCond_FirstUseEver);
 	bool open = true;
 	if (!ImGui::Begin(title, &open)) { ImGui::End(); if (!open) state.isOpen = false; return; }
@@ -173,8 +173,8 @@ void SavePanel::DrawFileBrowser(FileBrowserState& state, const char* title)
 
 	if (!open) state.isOpen = false;
 	ImGui::End();
-#endif
 }
+#endif
 
 std::string SavePanel::AnimDisplayName(const std::string& key)
 {

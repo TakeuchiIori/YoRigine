@@ -11,7 +11,9 @@ public:
 	void DrawImGui() override;
 
 private:
+#ifdef USE_IMGUI
 	void DrawBoneNode(const std::vector<Joint>& joints, int jointIndex, const std::vector<std::vector<int>>& childrenMap);
+#endif
 private:
 	MotionEditorContext* context_ = nullptr;
 };

@@ -20,7 +20,10 @@ public:
 
 private:
 	void DrawSaveLoadPopup();
+
+#ifdef USE_IMGUI
 	void DrawFileBrowser(FileBrowserState& state, const char* title);
+#endif
 
 	// ユーティリティ
 	static std::string AnimDisplayName(const std::string& key);
