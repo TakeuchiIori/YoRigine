@@ -1,28 +1,5 @@
 [
     {
-        "animationName": "Slash3",
-        "baseDamage": 30.0,
-        "canCancel": true,
-        "canChainToAny": true,
-        "ccCost": 1,
-        "ccOnHit": 0,
-        "comboWindowEnd": 0,
-        "comboWindowStart": 0,
-        "continueWindow": 0.0,
-        "duration": 0.5,
-        "fps": 60,
-        "hitEnd": 38,
-        "hitStart": 6,
-        "knockback": 0.0,
-        "knockbackDuration": 0.0,
-        "motionSpeed": 2.0,
-        "name": "NewAttack_0",
-        "recovery": 0.0,
-        "stepDistance": 0.5,
-        "totalFrames": 60,
-        "type": 0
-    },
-    {
         "animationName": "Slash4",
         "baseDamage": 30.0,
         "canCancel": true,

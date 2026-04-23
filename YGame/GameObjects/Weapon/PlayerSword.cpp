@@ -273,6 +273,7 @@ void PlayerSword::InitCollision() {
 		static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon)
 	);
 
+	obbCollider_->SetMass(0.0f);
 	obbCollider_->SetCollisionEnabled(false);
 	obbCollider_->SetEnablePenetration(false);
 }

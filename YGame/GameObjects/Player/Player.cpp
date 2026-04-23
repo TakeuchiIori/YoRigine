@@ -146,6 +146,7 @@ void Player::Update() {
 	if (YoRigine::GameTime::IsPause()) {
 		return;
 	}
+
 	// 入力処理
 	HandleCombatInput();
 
@@ -173,7 +174,8 @@ void Player::Update() {
 	// 盾のコライダーON/OFF制御
 	if (combat_->GetCurrentState() == CombatState::Guarding) {
 		playerShield_->SetEnableCollider(true);
-	} else {
+	}
+	else {
 		playerShield_->SetEnableCollider(false);
 	}
 
@@ -482,5 +484,5 @@ void Player::LookAtDirection(const Vector3& direction)
 	dir = Vector3::Normalize(dir);
 	float targetYaw = std::atan2f(dir.x, dir.z); // ラジアンで計算
 	wt_.rotate_.y = targetYaw;
-	followCamera_->SetRotate({ followCamera_->GetRotate().x, targetYaw,followCamera_->GetRotate().z});
+	followCamera_->SetRotate({ followCamera_->GetRotate().x, targetYaw,followCamera_->GetRotate().z });
 }

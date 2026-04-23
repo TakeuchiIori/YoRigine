@@ -1,61 +1,17 @@
 {
     "currentSceneState": {
         "customData": {
-            "activeEnemies": [
-                {
-                    "id": "Alien",
-                    "position": {
-                        "x": -12.4998197555542,
-                        "y": 0.0,
-                        "z": -35.841758728027344
-                    }
-                },
-                {
-                    "id": "GreenSpikyBlob",
-                    "position": {
-                        "x": 19.467430114746094,
-                        "y": 0.0,
-                        "z": -26.943649291992188
-                    }
-                },
-                {
-                    "id": "Mushnub_Evolved",
-                    "position": {
-                        "x": 28.586666107177734,
-                        "y": 0.0,
-                        "z": 10.878524780273438
-                    }
-                },
-                {
-                    "id": "Alien",
-                    "position": {
-                        "x": -31.584373474121094,
-                        "y": 0.0,
-                        "z": 0.6004413366317749
-                    }
-                },
-                {
-                    "id": "NewEnemy_2",
-                    "position": {
-                        "x": -18.72418975830078,
-                        "y": 0.0,
-                        "z": 25.201187133789063
-                    }
-                }
-            ],
-            "cameraMode": 3,
-            "cameraPosition": {
-                "x": 39.21987533569336,
-                "y": 24.077133178710938,
-                "z": -15.223350524902344
-            },
-            "playerPosition": {
-                "x": 29.616207122802734,
-                "y": 0.0,
-                "z": 9.41519546508789
+            "currentEnemyGroup": "Mushnub_Evolved",
+            "playerHpRatio": 1.0,
+            "stats": {
+                "battleDuration": 16.54025650024414,
+                "droppedItems": [],
+                "enemiesDefeated": 1,
+                "expGained": 0,
+                "goldGained": 0
             }
         },
-        "sceneName": "Field",
-        "timestamp": 1776963275
+        "sceneName": "Battle",
+        "timestamp": 1776964662
     }
 }
