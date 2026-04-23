@@ -127,7 +127,13 @@ void Motion::SaveBinary(const Motion& motion, const std::string& animationName, 
 {
 	std::string safeName = animationName;
 	std::replace(safeName.begin(), safeName.end(), ' ', '_');
-	std::string fullPath = path + "_" + safeName + ".anim";
+	std::string fullPath = path;
+	if (fullPath.size() < 5 || fullPath.substr(fullPath.size() - 5) != ".anim") {
+		// 拡張子がない場合のみ animName を付加
+		std::string safeName2 = animationName;
+		std::replace(safeName2.begin(), safeName2.end(), ' ', '_');
+		fullPath += "_" + safeName2 + ".anim";
+	}
 
 	std::ofstream ofs(fullPath, std::ios::binary);
 	if (!ofs) {

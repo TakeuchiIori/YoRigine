@@ -83,12 +83,11 @@ void TimelinePanel::DrawImGui()
 			context_->requireTimelineRebuild = false;
 		}
 
-		// フラグが立っていたらトラック（ドープシートの行とキーフレーム）を作り直す
-		if (tracksDirty_) {
+		// DrawImGui 内の if(tracksDirty_) を全て以下に変更
+		if (tracksDirty_ && !pendingApply_ && !pendingSummaryApply_) {
 			RebuildTracks();
 			tracksDirty_ = false;
 		}
-
 		float duration = context_->currentMotion->GetDuration();
 		const int totalFrames = std::max(1, static_cast<int>(duration * fps_));
 		float canvasW = ImGui::GetContentRegionAvail().x;
@@ -132,7 +131,7 @@ void TimelinePanel::DrawImGui()
 
 		ImGui::Separator();
 
-		if (tracksDirty_) {
+		if (tracksDirty_ && !pendingApply_ && !pendingSummaryApply_) {
 			RebuildTracks();
 			tracksDirty_ = false;
 		}
@@ -162,14 +161,60 @@ void TimelinePanel::DrawImGui()
 			context_->statusMsg = "KF 削除";
 			});
 
+		summaryMovedThisFrame_ = false;  // Draw前にリセット
+
+		bool mouseDown = ImGui::IsMouseDown(0);
 		bool changed = dopeSheet_.Draw("MotionTimeline", tracks_, totalFrames, fps_);
 
 		if (changed) {
-			ApplyTracksToMotion();
-			tracksDirty_ = true;
+			if (summaryMovedThisFrame_) {
+				// ── 概要KFドラッグ ──
+				if (mouseDown) {
+					pendingSummaryApply_ = true;
+					// tracksDirty_ に触らない → RebuildTracks を抑制
+				}
+				else {
+					// 即リリース（クリック単発移動）
+					RegisterSummaryMoveCommand();
+					pendingSummaryApply_ = false;
+					prevSummaryFromFrame_ = -1;
+					tracksDirty_ = true;
+				}
+			}
+			else {
+				// ── 個別KFドラッグ ──
+				if (changed && !pendingApply_) {
+					preApplySnapshot_ = context_->currentMotion->animation_.nodeAnimations_;
+				}
+				if (!mouseDown) {
+					ApplyTracksToMotion();
+					RegisterMoveCommand();
+					tracksDirty_ = true;
+				}
+				else {
+					pendingApply_ = true;
+				}
+			}
 			context_->statusMsg = "KF 移動完了";
 		}
 
+		// 個別KF: マウスリリース確定
+		if (pendingApply_ && wasMouseDown_ && !mouseDown) {
+			ApplyTracksToMotion();
+			RegisterMoveCommand();
+			pendingApply_ = false;
+			tracksDirty_ = true;
+		}
+
+		// 概要KF: マウスリリース確定
+		if (pendingSummaryApply_ && wasMouseDown_ && !mouseDown) {
+			RegisterSummaryMoveCommand();
+			pendingSummaryApply_ = false;
+			prevSummaryFromFrame_ = -1;
+			tracksDirty_ = true;
+		}
+
+		wasMouseDown_ = mouseDown;
 		{
 			int seekFrame = dopeSheet_.GetSeekFrame();
 			float newTime = seekFrame / static_cast<float>(fps_);
@@ -253,48 +298,48 @@ void TimelinePanel::RebuildTracks()
 	BuildSummaryTrack();
 }
 
-// TimelinePanel.cpp
 void TimelinePanel::ApplyTracksToMotion() {
 	if (!context_->currentMotion) return;
 
 	auto& nodeAnims = context_->currentMotion->animation_.nodeAnimations_;
 
-	// tracks_ (UIの状態) を Motion (データ) に書き戻す
 	for (size_t i = 0; i < tracks_.size(); ++i) {
 		const auto& track = tracks_[i];
-		if (track.isGroupHeader) continue; // 概要トラックやヘッダーはスキップ
 
-		// trackBoneMap_ を使って、どのボーンのどのチャンネルか特定する
-		// 例: pair<ボーン名, 0:T, 1:R, 2:S> と定義している場合
+		// ★ isGroupHeader に加えて isSummary もスキップ
+		if (track.isGroupHeader || track.isSummary) continue;
+
 		auto& mapping = trackBoneMap_[i];
 		std::string boneName = mapping.first;
 		int channelType = mapping.second;
 
+		// ★ channelType が負（__summary__ や ヘッダー）もスキップ
+		if (channelType < 0) continue;
+
 		auto& nodeAnim = nodeAnims[boneName];
 
-		// 各キーの状態を同期
 		auto syncKeys = [&](auto& curveKeys) {
-			// UI の frame 値を時間に変換して書き戻す
-			for (size_t k = 0; k < track.keys.size(); ++k) {
-				if (k < curveKeys.size()) {
-					curveKeys[k].time = track.keys[k].frame / static_cast<float>(fps_);
-				}
+			// UI側キー数とMotionキー数が不一致の場合はスキップ（安全ガード）
+			if (track.keys.size() != curveKeys.size()) return;
+
+			// ★ track.keys をフレーム順にコピーしてソート
+			//   （DopeSheetEditorはドラッグ後にtrack.keysを再ソートしないため）
+			auto sortedUIKeys = track.keys;
+			std::sort(sortedUIKeys.begin(), sortedUIKeys.end(),
+				[](const auto& a, const auto& b) { return a.frame < b.frame; });
+
+			// curveKeys は常にソート済みなので、インデックス順に1:1で対応付けられる
+			for (size_t k = 0; k < sortedUIKeys.size(); ++k) {
+				curveKeys[k].time = sortedUIKeys[k].frame / static_cast<float>(fps_);
 			}
 
-			// 時刻順にソート
-			// キーを動かして前後関係が入れ替わっても正しく再生されるようにするため
+			// 念のため再ソート（通常はソート済みのはずだが保険）
 			std::sort(curveKeys.begin(), curveKeys.end(),
 				[](const auto& a, const auto& b) { return a.time < b.time; });
 
-			// 同一時刻の重複を削除（重複の防止、前のキーを優先して残す）
-			// キーを動かして既存のキーにピッタリ重ねたら、1つに統合されるようにするため
-			curveKeys.erase(
-				std::unique(curveKeys.begin(), curveKeys.end(),
-					[](const auto& a, const auto& b) {
-						return std::abs(a.time - b.time) < 1e-4f;
-					}),
-				curveKeys.end()
-			);
+			// ★ std::unique による削除を廃止
+			//   キーの重複統合は AddKeyframe の insertOrReplace で行う
+			//   ここで削除するとキー数不一致が発生して消滅バグになる
 			};
 
 		if (channelType == 0) syncKeys(nodeAnim.translate.keyframes);
@@ -302,7 +347,6 @@ void TimelinePanel::ApplyTracksToMotion() {
 		else if (channelType == 2) syncKeys(nodeAnim.scale.keyframes);
 	}
 }
-
 // ============================================================
 // 概要トラック生成
 //   全ボーン・全チャンネルのKF時刻を収集して重複排除し、
@@ -344,35 +388,53 @@ void TimelinePanel::OnSummaryKeyMoved(int fromFrame, int delta)
 {
 	if (!context_->currentMotion || delta == 0) return;
 
-	// Undo用スナップショット
-	auto oldAnims = context_->currentMotion->animation_.nodeAnimations_;
+	// ドラッグ開始（fromFrame が変わった）時だけスナップショットを取得
+	if (prevSummaryFromFrame_ != fromFrame) {
+		summaryDragSnapshot_ = context_->currentMotion->animation_.nodeAnimations_;
+		prevSummaryFromFrame_ = fromFrame;
+	}
 
-	// 全ボーン・全チャンネルを走査して fromFrame のKFを移動
+	// ★毎フレームスナップショットに戻してから累積deltaを適用する
+	//   こうすることで「fromFrameにキーが見つからない」問題を回避
+	context_->currentMotion->animation_.nodeAnimations_ = summaryDragSnapshot_;
+
 	for (auto& [boneName, na] : context_->currentMotion->animation_.nodeAnimations_) {
-
 		auto moveInTrack = [&](auto& keyframes) {
 			for (auto& kf : keyframes) {
 				int kfFrame = static_cast<int>(kf.time * fps_ + 0.5f);
 				if (kfFrame == fromFrame) {
-					float newTime = (fromFrame + delta) / static_cast<float>(fps_);
-					kf.time = std::max(0.0f, newTime);
+					kf.time = std::max(0.0f, (fromFrame + delta) / static_cast<float>(fps_));
 				}
 			}
-			// 移動後に時刻順ソートを保証
 			std::sort(keyframes.begin(), keyframes.end(),
 				[](const auto& a, const auto& b) { return a.time < b.time; });
 			};
-
 		moveInTrack(na.translate.keyframes);
 		moveInTrack(na.rotate.keyframes);
 		moveInTrack(na.scale.keyframes);
 	}
 
+	// ★ここでは history と tracksDirty_ に触らない
+	//   ドラッグ中に RebuildTracks が走るのを防ぐため
+	//   Undo登録とtracksDirty_はマウスリリース時にDrawImGui側で行う
+	summaryMovedThisFrame_ = true;
+
+	context_->statusMsg = "概要: frame " + std::to_string(fromFrame)
+		+ (delta > 0 ? " +" : " ") + std::to_string(delta) + " 移動";
+}
+
+void TimelinePanel::RegisterMoveCommand()
+{
+	if (!context_->currentMotion) return;
+
+	// ApplyTracksToMotion 実行後の状態をスナップショット
 	auto newAnims = context_->currentMotion->animation_.nodeAnimations_;
 
-	// CommandHistory にUndoable コマンドとして登録
-	context_->history.Execute(MakeLambdaCommand(
-		"概要KF移動: " + std::to_string(fromFrame) + " → " + std::to_string(fromFrame + delta),
+	// oldAnims は RebuildTracks の直前に保存しておく必要があるため、
+	// メンバ変数 preApplySnapshot_ を使う（下記参照）
+	auto oldAnims = preApplySnapshot_;
+
+	context_->history.Execute(MakeLambdaCommand("KF移動",
 		[this, newAnims]() {
 			if (context_->currentMotion)
 				context_->currentMotion->animation_.nodeAnimations_ = newAnims;
@@ -384,8 +446,25 @@ void TimelinePanel::OnSummaryKeyMoved(int fromFrame, int delta)
 			tracksDirty_ = true;
 		}
 	));
+}
 
-	tracksDirty_ = true;
-	context_->statusMsg = "概要: frame " + std::to_string(fromFrame)
-		+ (delta > 0 ? " +" : " ") + std::to_string(delta) + " 移動";
+void TimelinePanel::RegisterSummaryMoveCommand()
+{
+	if (!context_->currentMotion) return;
+
+	auto oldAnims = summaryDragSnapshot_;
+	auto newAnims = context_->currentMotion->animation_.nodeAnimations_;
+
+	context_->history.Execute(MakeLambdaCommand("概要KF移動",
+		[this, newAnims]() {
+			if (context_->currentMotion)
+				context_->currentMotion->animation_.nodeAnimations_ = newAnims;
+			tracksDirty_ = true;
+		},
+		[this, oldAnims]() {
+			if (context_->currentMotion)
+				context_->currentMotion->animation_.nodeAnimations_ = oldAnims;
+			tracksDirty_ = true;
+		}
+	));
 }

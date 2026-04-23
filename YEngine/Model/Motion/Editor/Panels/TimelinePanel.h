@@ -3,6 +3,7 @@
 #include "../MotionEditorContext.h"
 #include "Debugger/DopeSheet/DopeSheetEditor.h"
 #include <vector>
+#include <Motion/Core/Motion.h>
 
 /// <summary>
 /// アニメーションのタイムライン（ドープシート）を描画・管理するパネル
@@ -23,6 +24,10 @@ private:
 	void BuildSummaryTrack();           // 全KFを集約した概要トラックを生成
 	void OnSummaryKeyMoved(int fromFrame, int delta); // 概要KF一括移動ハンドラ
 
+	void RegisterMoveCommand();
+
+	void RegisterSummaryMoveCommand();
+
 private:
 	MotionEditorContext* context_ = nullptr;
 
@@ -38,5 +43,17 @@ private:
 	// KF ドラッグ移動
 	bool  draggingKF_ = false;
 
+	// 概要KFドラッグ用
+	bool summaryMovedThisFrame_ = false;
+	int  prevSummaryFromFrame_ = -1;
+	std::map<std::string, Motion::NodeAnimation> summaryDragSnapshot_;
+
+	// ドラッグ判定用
+	// 前フレームのマウス状態を保持
+	bool wasMouseDown_ = false;
+	// マウスリリース時にApplyTracksを走らせる
+	bool pendingApply_ = false;
+	bool pendingSummaryApply_ = false; // 概要KF移動の確定待ちフラグ
+	std::map<std::string, Motion::NodeAnimation> preApplySnapshot_;
 	Motion* editingMotion_ = nullptr; // ドープシートで現在編集しているモーション（変更検知用）
 };
