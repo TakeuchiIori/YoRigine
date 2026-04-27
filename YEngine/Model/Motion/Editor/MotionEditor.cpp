@@ -179,6 +179,19 @@ void MotionEditor::Update()
 		if (std::abs(msTime - context_.scrubTime) > 1e-4f) {
 			context_.scrubTime = msTime;
 		}
+
+		// ピンポン再生: 端に達したら方向反転
+		if (context_.isPingPong && context_.isPlaying) {
+			float duration = ms->GetDuration();
+			if (context_.pingPongForward && msTime >= duration - 0.01f) {
+				context_.pingPongForward = false;
+				ms->SetMotionSpeed(-context_.playbackSpeed);
+			}
+			else if (!context_.pingPongForward && msTime <= 0.01f) {
+				context_.pingPongForward = true;
+				ms->SetMotionSpeed(context_.playbackSpeed);
+			}
+		}
 	}
 
 	//------------------------------------------------------------
@@ -186,22 +199,25 @@ void MotionEditor::Update()
 	//------------------------------------------------------------
 	if (m && m->GetSkeleton()) {
 		// 非再生中の場合、スクラブ時間に合わせたポーズを強制適用
+		// ※スクラブ時間が変化した時のみ適用し、ユーザーの手動編集を保護する
 		if (ms && !context_.isPlaying && context_.currentMotion) {
-			context_.currentMotion->ApplyAnimation(m->GetSkeleton()->GetJoints(), context_.scrubTime);
+			bool scrubChanged = std::abs(context_.scrubTime - context_.lastAppliedScrubTime) > 1e-5f;
+			if (scrubChanged) {
+				context_.currentMotion->ApplyAnimation(m->GetSkeleton()->GetJoints(), context_.scrubTime);
+				context_.lastAppliedScrubTime = context_.scrubTime;
 
-			if (!context_.selBone.empty()) {
+				if (!context_.selBone.empty()) {
+					SyncJointToBuffer(context_.selBone);
+				}
+			}
 #ifdef USE_IMGUI
-				// 操作中の場合はジョイントへ同期、それ以外はジョイントから取得
+			else if (!context_.selBone.empty()) {
+				// スクラブ時間が変わっていない場合、ギズモ操作中はバッファ→ジョイントへ同期
 				if (draggingBone_ || gizmoCtrl_.IsUsing()) {
 					SyncBufferToJoint();
 				}
-				else {
-					SyncJointToBuffer(context_.selBone);
-				}
-#else
-				SyncJointToBuffer(context_.selBone);
-#endif
 			}
+#endif
 		}
 
 		// 行列計算とスキニング用パレットの更新
@@ -287,14 +303,19 @@ void MotionEditor::ShowEditor()
 			if (context_.isPlaying) {
 				if (target->GetModel() && target->GetModel()->GetMotionSystem()) target->GetModel()->GetMotionSystem()->Stop();
 				context_.isPlaying = false;
+				context_.lastAppliedScrubTime = -1.0f;
 				context_.statusMsg = "[ Space ] 一時停止";
 			}
 			else {
 				if (target->GetModel() && target->GetModel()->GetMotionSystem()) {
 					auto* ms = target->GetModel()->GetMotionSystem();
+					// エディタで読み込んだモーションをMotionSystemに同期
+					if (context_.currentMotion && ms->GetAnimation() != context_.currentMotion) {
+						ms->SetAnimation(context_.currentMotion);
+					}
 					float savedTime = ms->GetAnimationTime();
 					if (savedTime >= ms->GetDuration() || ms->IsFinished()) savedTime = 0.0f;
-					if (context_.isLoop) target->PlayLoop(); else target->PlayOnce();
+					if (context_.isLoop) ms->PlayLoop(); else ms->PlayOnce();
 					ms->SetAnimationTime(savedTime);
 				}
 				context_.isPlaying = true;
@@ -330,6 +351,33 @@ void MotionEditor::ShowEditor()
 				context_.statusMsg = "[ I ] ポーズ保存 (全ボーン)" 
 					+ std::to_string(context_.scrubTime) + "s";
 			}
+		}
+
+		// コピー (Ctrl+C)
+		if (ImGui::GetIO().KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_C) && !context_.selBone.empty()) {
+			auto& cb = context_.clipboard;
+			cb.hasData = true;
+			cb.translate = { context_.editT[0], context_.editT[1], context_.editT[2] };
+			cb.rotate = EulerToQuaternion({ context_.editR[0] * (kPi / 180), context_.editR[1] * (kPi / 180), context_.editR[2] * (kPi / 180) });
+			cb.scale = { context_.editS[0], context_.editS[1], context_.editS[2] };
+			cb.sourceBone = context_.selBone;
+			cb.sourceTime = context_.scrubTime;
+			context_.statusMsg = "[ Ctrl+C ] コピー: " + context_.selBone;
+		}
+
+		// ペースト (Ctrl+V)
+		if (ImGui::GetIO().KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_V) && !context_.selBone.empty() && context_.clipboard.hasData) {
+			auto& cb = context_.clipboard;
+			context_.editT[0] = cb.translate.x; context_.editT[1] = cb.translate.y; context_.editT[2] = cb.translate.z;
+			Vector3 euler = QuaternionToEuler(cb.rotate);
+			context_.editR[0] = euler.x * (180 / kPi); context_.editR[1] = euler.y * (180 / kPi); context_.editR[2] = euler.z * (180 / kPi);
+			context_.editS[0] = cb.scale.x; context_.editS[1] = cb.scale.y; context_.editS[2] = cb.scale.z;
+			if (context_.SyncBufferToJoint) context_.SyncBufferToJoint();
+			// ペースト時にキーフレームも自動挿入
+			if (context_.AddKeyframe && context_.currentMotion) {
+				context_.AddKeyframe(context_.selBone, context_.scrubTime);
+			}
+			context_.statusMsg = "[ Ctrl+V ] ペースト + KF挿入: " + context_.selBone;
 		}
 	}
 

@@ -135,10 +135,15 @@ void Motion::SaveBinary(const Motion& motion, const std::string& animationName, 
 		fullPath += "_" + safeName2 + ".anim";
 	}
 
+	// ディレクトリが存在しなければ作成
+	std::filesystem::path filePath(fullPath);
+	if (filePath.has_parent_path()) {
+		std::filesystem::create_directories(filePath.parent_path());
+	}
+
 	std::ofstream ofs(fullPath, std::ios::binary);
 	if (!ofs) {
-		std::cerr << "[ERROR] 書き込みできない: " << fullPath << std::endl;
-		return;
+		throw std::runtime_error("書き込みできない: " + fullPath);
 	}
 
 	// ------------------------------------------------------------

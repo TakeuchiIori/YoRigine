@@ -69,6 +69,15 @@ void MotionSystem::Update(float deltaTime)
 			isFinished_ = true;
 		}
 	}
+	else if (animationTime_ < 0.0f) {
+		if (playMode_ == MotionPlayMode::Loop) {
+			animationTime_ = duration;
+		}
+		else {
+			animationTime_ = 0.0f;
+			isFinished_ = true;
+		}
+	}
 
 	// ------------------------------------------------------------
 	// 終了検知とコールバック実行
