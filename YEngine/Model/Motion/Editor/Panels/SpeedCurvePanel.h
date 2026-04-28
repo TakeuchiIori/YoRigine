@@ -13,14 +13,11 @@
 // ============================================================
 struct SpeedCurveDelegate : ImCurveEdit::Delegate
 {
-    // 編集中の制御点 (x = 正規化時間 [0,1], y = 速度倍率)
     std::vector<ImVec2> points;
 
-    // GetMin/GetMax は参照を返す必要があるためメンバ変数で保持
     ImVec2 boundsMin{ 0.0f, 0.0f };
     ImVec2 boundsMax{ 1.0f, 4.0f };
 
-    // --- ImCurveEdit::Delegate 実装 ---
     size_t   GetCurveCount()                           override { return 1; }
     bool     IsVisible(size_t)                         override { return true; }
     ImCurveEdit::CurveType GetCurveType(size_t) const override { return ImCurveEdit::CurveLinear; }
@@ -35,7 +32,6 @@ struct SpeedCurveDelegate : ImCurveEdit::Delegate
     {
         value = Clamp(value);
         points[pointIdx] = value;
-        // ソート後に同じ点のインデックスを探して返す
         std::sort(points.begin(), points.end(),
             [](const ImVec2& a, const ImVec2& b) { return a.x < b.x; });
         for (int i = 0; i < static_cast<int>(points.size()); ++i) {
@@ -90,14 +86,23 @@ private:
     void PushToMotion();
     void BakeSpeedCurve();
 
+    // 焼き込み前スナップショットをオーバーレイ描画
+    void DrawBakedPreviewOverlay(ImVec2 rectMin, ImVec2 rectMax) const;
+
     MotionEditorContext* context_ = nullptr;
 
 #ifdef USE_IMGUI
-    SpeedCurveDelegate              delegate_;
-    ImVector<ImCurveEdit::EditPoint> selection_;  // Edit() が要求する型
-    float maxSpeedEdit_ = 4.0f;
+    SpeedCurveDelegate               delegate_;
+    ImVector<ImCurveEdit::EditPoint> selection_;
+    float                            maxSpeedEdit_ = 4.0f;
+
+    // 焼き込みプレビュー
+    std::vector<ImVec2>              bakedSnapshot_;     // Bake直前の制御点スナップショット
+    bool                             hasBakedSnapshot_ = false;
+    bool                             showBakedPreview_ = true;  // オーバーレイ表示トグル
 #endif
 
     bool    isDirty_ = false;
+    bool    bakeConfirmPending_ = false;
     Motion* lastMotion_ = nullptr;
 };
