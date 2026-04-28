@@ -57,9 +57,16 @@ void MotionSystem::Update(float deltaTime)
 	// 通常のアニメーション再生処理
 	// ------------------------------------------------------------
 	bool wasFinished = isFinished_;
-	animationTime_ += deltaTime * GetEffectiveSpeed();
 
+	// タイムスケールカーブが設定されている場合は正規化時間で速度倍率を取得
 	float duration = animation_->GetDuration();
+	float speedMul = 1.0f;
+	if (animation_->HasSpeedCurve() && duration > 0.0f) {
+		float normalizedT = std::clamp(animationTime_ / duration, 0.0f, 1.0f);
+		speedMul = animation_->EvaluateSpeedCurve(normalizedT);
+	}
+	animationTime_ += deltaTime * GetEffectiveSpeed() * speedMul;
+
 	if (animationTime_ >= duration) {
 		if (playMode_ == MotionPlayMode::Loop) {
 			animationTime_ = 0.0f;

@@ -28,6 +28,7 @@
 // Standard
 #include <algorithm>
 #include <cmath>
+#include "Panels/SpeedCurvePanel.h"
 
 // ============================================================
 // コンテキストヘルパーの実装
@@ -149,6 +150,7 @@ void MotionEditor::Initialize(Camera* camera)
 	RegisterPanel(std::make_unique<PropertyPanel>());
 	RegisterPanel(std::make_unique<TimelinePanel>());
 	RegisterPanel(std::make_unique<StatusBarPanel>());
+	RegisterPanel(std::make_unique<SpeedCurvePanel>());
 }
 
 // ============================================================
@@ -402,6 +404,7 @@ void MotionEditor::ShowEditor()
 	panels_[0]->DrawImGui(); // MenuBar
 	panels_[1]->DrawImGui(); // SaveLoad
 	panels_[2]->DrawImGui(); // Toolbar
+	panels_[7]->DrawImGui(); // SpeedCurve
 	ImGui::Separator();
 
 	float contentW = ImGui::GetContentRegionAvail().x;
