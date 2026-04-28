@@ -142,11 +142,15 @@ private:
     void PushToMotion();
     void BakeSpeedCurve();
 
+#ifdef USE_IMGUI
+
+
     // カスタムカーブエディタ描画（戻り値: dirty になったか）
     bool DrawCurveEditor(ImVec2 size);
 
     // 焼き込み前スナップショットオーバーレイ
     void DrawBakedPreviewOverlay(ImVec2 rectMin, ImVec2 rectMax) const;
+#endif // USE_IMGUI
 
     MotionEditorContext* context_ = nullptr;
 

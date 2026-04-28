@@ -24,11 +24,9 @@ void SpeedCurvePanel::Initialize(MotionEditorContext* context)
 //   ・右クリック(空白): 点を追加
 //   ・右クリック(点上): コンテキストメニュー → 削除
 // -----------------------------------------------------------------------
+#ifdef USE_IMGUI
 bool SpeedCurvePanel::DrawCurveEditor(ImVec2 size)
 {
-#ifndef USE_IMGUI
-    return false;
-#else
     bool dirty = false;
 
     ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -259,8 +257,8 @@ bool SpeedCurvePanel::DrawCurveEditor(ImVec2 size)
     ImGui::Dummy({ 0, 14.0f });
 
     return dirty;
-#endif
 }
+#endif
 
 // -----------------------------------------------------------------------
 // DrawImGui
@@ -439,9 +437,9 @@ void SpeedCurvePanel::DrawImGui()
 // -----------------------------------------------------------------------
 // DrawBakedPreviewOverlay
 // -----------------------------------------------------------------------
+#ifdef USE_IMGUI
 void SpeedCurvePanel::DrawBakedPreviewOverlay(ImVec2 rMin, ImVec2 rMax) const
 {
-#ifdef USE_IMGUI
     if (bakedSnapshot_.size() < 2) return;
 
     float w = rMax.x - rMin.x;
@@ -495,15 +493,15 @@ void SpeedCurvePanel::DrawBakedPreviewOverlay(ImVec2 rMin, ImVec2 rMax) const
         { rMin.x + 90, rMax.y - 6 },
         IM_COL32(30, 30, 30, 180), 3.f);
     dl->AddText({ rMin.x + 8, rMax.y - 18 }, dotCol, "Bake\xe5\x89\x8d"); // "Bake前"
-#endif
 }
+#endif
 
 // -----------------------------------------------------------------------
 // PullFromMotion
 // -----------------------------------------------------------------------
+#ifdef USE_IMGUI
 void SpeedCurvePanel::PullFromMotion()
 {
-#ifdef USE_IMGUI
     delegate_.points.clear();
     Motion* motion = context_ ? context_->currentMotion : nullptr;
     if (!motion) return;
@@ -518,15 +516,15 @@ void SpeedCurvePanel::PullFromMotion()
         delegate_.Sort();
     }
     delegate_.EnsureEndpoints();
-#endif
 }
+#endif
 
 // -----------------------------------------------------------------------
 // PushToMotion
 // -----------------------------------------------------------------------
+#ifdef USE_IMGUI
 void SpeedCurvePanel::PushToMotion()
 {
-#ifdef USE_IMGUI
     Motion* motion = context_ ? context_->currentMotion : nullptr;
     if (!motion) return;
 
@@ -539,8 +537,8 @@ void SpeedCurvePanel::PushToMotion()
         [](const Motion::Keyframe<float>& a, const Motion::Keyframe<float>& b) {
             return a.time < b.time;
         });
-#endif
 }
+#endif
 
 // -----------------------------------------------------------------------
 // BakeSpeedCurve  (元の実装を維持)
