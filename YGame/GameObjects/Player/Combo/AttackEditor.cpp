@@ -161,6 +161,14 @@ void AttackDataEditor::DrawAttackList()
 	if (ImGui::Button("複製")) { DuplicateAttack(); if (autoReload_) TriggerReload(); }
 	ImGui::SameLine();
 	if (ImGui::Button("削除")) { DeleteAttack();    if (autoReload_) TriggerReload(); }
+
+	ImGui::SameLine();
+	ImGui::Text(" | ");
+	ImGui::SameLine();
+
+	if (ImGui::Button("↑")) { MoveUp();   if (autoReload_) TriggerReload(); }
+	ImGui::SameLine();
+	if (ImGui::Button("↓")) { MoveDown(); if (autoReload_) TriggerReload(); }
 #endif
 }
 

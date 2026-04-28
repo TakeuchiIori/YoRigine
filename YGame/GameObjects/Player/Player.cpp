@@ -109,12 +109,12 @@ void Player::HandleCombatInput() {
 	if (!combat_->IsIdle()) return;
 
 	// A（軽攻撃）
-	if (input_->IsPadTriggered(0, GamePadButton::A) || input_->GetInstance()->TriggerKey(DIK_Q)) {
+	if (input_->IsPadTriggered(0, GamePadButton::A) /*|| input_->GetInstance()->TriggerKey(DIK_Q)*/) {
 		combat_->TryAttack(AttackType::A_Arte);
 	}
 
 	// B（重攻撃）
-	if (input_->IsPadTriggered(0, GamePadButton::B) || input_->GetInstance()->TriggerKey(DIK_E)) {
+	if (input_->IsPadTriggered(0, GamePadButton::B) /*|| input_->GetInstance()->TriggerKey(DIK_E)*/) {
 		combat_->TryAttack(AttackType::B_Arte);
 	}
 

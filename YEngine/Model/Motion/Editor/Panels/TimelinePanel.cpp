@@ -298,7 +298,8 @@ void TimelinePanel::RebuildTracks()
 	BuildSummaryTrack();
 }
 
-void TimelinePanel::ApplyTracksToMotion() {
+void TimelinePanel::ApplyTracksToMotion()
+{
 	if (!context_->currentMotion) return;
 
 	auto& nodeAnims = context_->currentMotion->animation_.nodeAnimations_;
@@ -306,40 +307,51 @@ void TimelinePanel::ApplyTracksToMotion() {
 	for (size_t i = 0; i < tracks_.size(); ++i) {
 		const auto& track = tracks_[i];
 
-		// ★ isGroupHeader に加えて isSummary もスキップ
+		// サマリー・グループヘッダはスキップ
 		if (track.isGroupHeader || track.isSummary) continue;
 
-		auto& mapping = trackBoneMap_[i];
-		std::string boneName = mapping.first;
+		const auto& mapping = trackBoneMap_[i];
+		const std::string& boneName = mapping.first;
 		int channelType = mapping.second;
 
-		// ★ channelType が負（__summary__ や ヘッダー）もスキップ
 		if (channelType < 0) continue;
 
-		auto& nodeAnim = nodeAnims[boneName];
+		auto it = nodeAnims.find(boneName);
+		if (it == nodeAnims.end()) continue;
+		auto& nodeAnim = it->second;
 
-		auto syncKeys = [&](auto& curveKeys) {
-			// UI側キー数とMotionキー数が不一致の場合はスキップ（安全ガード）
-			if (track.keys.size() != curveKeys.size()) return;
+		// -----------------------------------------------------------
+		// syncKeys:
+		//   curveKeys  … Motion 側の実データ（value を持つ）
+		//   track.keys … UI 側のドープシートデータ（frame のみ）
+		//
+		//   両者をそれぞれ昇順ソートしてから k 番目同士を対応付け、
+		//   curveKeys[k].time = uiKeys[k].frame / fps_ と書き換える。
+		//   value には一切触れない。
+		// -----------------------------------------------------------
+		auto syncKeys = [&](auto& curveKeys)
+			{
+				if (track.keys.size() != curveKeys.size()) return;
 
-			// ★ track.keys をフレーム順にコピーしてソート
-			//   （DopeSheetEditorはドラッグ後にtrack.keysを再ソートしないため）
-			auto sortedUIKeys = track.keys;
-			std::sort(sortedUIKeys.begin(), sortedUIKeys.end(),
-				[](const auto& a, const auto& b) { return a.frame < b.frame; });
+				// ── UI側キーをフレーム昇順にソートしたコピーを作る ──
+				auto sortedUIKeys = track.keys;
+				std::sort(sortedUIKeys.begin(), sortedUIKeys.end(),
+					[](const auto& a, const auto& b) { return a.frame < b.frame; });
 
-			// curveKeys は常にソート済みなので、インデックス順に1:1で対応付けられる
-			for (size_t k = 0; k < sortedUIKeys.size(); ++k) {
-				curveKeys[k].time = sortedUIKeys[k].frame / static_cast<float>(fps_);
-			}
+				// ── Motion側キーを time 昇順にソート（value ごと移動する）──
+				std::sort(curveKeys.begin(), curveKeys.end(),
+					[](const auto& a, const auto& b) { return a.time < b.time; });
 
-			// 念のため再ソート（通常はソート済みのはずだが保険）
-			std::sort(curveKeys.begin(), curveKeys.end(),
-				[](const auto& a, const auto& b) { return a.time < b.time; });
+				// ── k 番目同士を対応付けて time だけ上書き ──
+				// （両者ともソート済みなのでインデックス順に1:1対応）
+				for (size_t k = 0; k < sortedUIKeys.size(); ++k) {
+					curveKeys[k].time =
+						sortedUIKeys[k].frame / static_cast<float>(fps_);
+				}
 
-			// ★ std::unique による削除を廃止
-			//   キーの重複統合は AddKeyframe の insertOrReplace で行う
-			//   ここで削除するとキー数不一致が発生して消滅バグになる
+				// ── time 書き換え後に再ソート（万一の保険）──
+				std::sort(curveKeys.begin(), curveKeys.end(),
+					[](const auto& a, const auto& b) { return a.time < b.time; });
 			};
 
 		if (channelType == 0) syncKeys(nodeAnim.translate.keyframes);
