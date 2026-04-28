@@ -1,6 +1,6 @@
 [
     {
-        "animationName": "Slash4",
+        "animationName": "Slash4test",
         "baseDamage": 30.0,
         "canCancel": true,
         "canChainToAny": true,
