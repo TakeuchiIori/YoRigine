@@ -263,6 +263,13 @@ void PlayerSword::OnDirectionCollision([[maybe_unused]] BaseCollider* self, [[ma
 void PlayerSword::OnEnterDirectionCollision([[maybe_unused]] BaseCollider* self, [[maybe_unused]] BaseCollider* other, [[maybe_unused]] HitDirection dir)
 {
 }
+// ============================================================
+// VFXアセットの読み込み
+// ============================================================
+void PlayerSword::LoadVfxAssets(const std::string vfxAssetPath)
+{
+	trailEmitter_->LoadAsset(vfxAssetPath);
+}
 
 // ============================================================
 // コライダー初期化

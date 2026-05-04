@@ -25,6 +25,13 @@ AttackingCombatState::AttackingCombatState(PlayerCombat* combat) : combat_(comba
 		obj->SetMotionSpeed(attack.motionSpeed);
 		obj->SetChangeMotion("Player.gltf", MotionPlayMode::Once, attack.animationName);
 
+		// 攻撃タイプに応じたエフェクトの読み込み
+		if (attack.type == AttackType::A_Arte) {
+			player->GetSword()->LoadVfxAssets("Resources/Vfx/NewEffect.json");
+		}else if(attack.type == AttackType::B_Arte) {
+			player->GetSword()->LoadVfxAssets("Resources/Vfx/NewEffect2.json");
+		}
+
 		player->GetSword()->PlayTrail();
 		combat->NotifyAction("コンボ開始: " + attack.animationName);
 		});
@@ -43,6 +50,13 @@ AttackingCombatState::AttackingCombatState(PlayerCombat* combat) : combat_(comba
 		obj->SetMotionSpeed(attack.motionSpeed);
 		obj->SetChangeMotion("Player.gltf", MotionPlayMode::Once, attack.animationName);
 
+		// 攻撃タイプに応じたエフェクトの読み込み
+		if (attack.type == AttackType::A_Arte) {
+			player->GetSword()->LoadVfxAssets("Resources/Vfx/NewEffect.json");
+		}
+		else if (attack.type == AttackType::B_Arte) {
+			player->GetSword()->LoadVfxAssets("Resources/Vfx/NewEffect2.json");
+		}
 		player->GetSword()->PlayTrail();
 		combat->NotifyAction("コンボ継続: " + attack.animationName);
 		});
