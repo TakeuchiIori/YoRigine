@@ -12,10 +12,10 @@ void StatusBarPanel::DrawImGui() {
 	ImGui::SetCursorPosY(3);
 	ImGui::TextColored(ImVec4(0.6f, 0.9f, 0.6f, 1.0f), "  %s", context_->statusMsg.c_str());
 
-	float hints_x = ImGui::GetContentRegionAvail().x - 400;
+	float hints_x = ImGui::GetContentRegionAvail().x - 600;
 	if (hints_x > 200) {
 		ImGui::SameLine(hints_x);
-		ImGui::TextDisabled("Space=再生  Del=KF削除  Ctrl+Z=元に戻す  Ctrl+Y=やり直す");
+		ImGui::TextDisabled("Space=再生  I=KF追加  Del=KF削除  Ctrl+C/V=コピー/ペースト  Ctrl+Z/Y=元に戻す/やり直す");
 	}
 
 	ImGui::EndChild();

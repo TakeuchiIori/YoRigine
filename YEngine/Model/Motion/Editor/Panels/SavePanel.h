@@ -2,15 +2,9 @@
 #include "IMotionEditorPanel.h"
 #include <filesystem>
 
-// 元々MotionEditor.hにあった構造体をこちらに移動
-struct FileBrowserState
-{
-	std::string currentDirectory = "Resources/Models";
-	std::string selectedFilePath = "";
-	std::vector<std::string> directoryHistory;
-	bool isOpen = false;
-	std::string filterExtension = "";
-};
+#ifdef USE_IMGUI
+#include <FileOperations/FileBrowser.h>
+#endif
 
 class SavePanel : public IMotionEditorPanel
 {
@@ -20,15 +14,23 @@ public:
 
 private:
 	void DrawSaveLoadPopup();
-	void DrawFileBrowser(FileBrowserState& state, const char* title);
+
+#ifdef USE_IMGUI
+	void DrawBrowserWindow();
+#endif
 
 	// ユーティリティ
 	static std::string AnimDisplayName(const std::string& key);
-	std::vector<std::filesystem::directory_entry> GetDirectoryEntries(const std::string& dir, const std::string& ext) const;
+
+	void LoadBinary(const std::string& path);
 
 	MotionEditorContext* context_ = nullptr;
 
 	std::string savePath_ = "Resources/TestBinary/edited_motion.anim";
 	std::string saveMsg_ = "";
-	FileBrowserState binaryBrowser_;
+
+#ifdef USE_IMGUI
+	YoRigine::FileBrowser fileBrowser_;
+	bool browserOpen_ = false;
+#endif
 };

@@ -4,6 +4,8 @@
 //
 // Trail と LightVolume のパラメータをまとめるデータ構造
 // JSON にシリアライズして保存・ホットリロードに対応
+//
+// ★ UE Niagara Ribbon Trail 参考の拡張パラメータ追加済み
 // ===========================================================
 #include "MathFunc.h"
 #include <string>
@@ -17,62 +19,92 @@ namespace YoRigine {
 
     enum class TrailShapeType : int
     {
-        Flat = 0,  // 従来の平板 (tip-root 2点)
-        Arc = 1,   // 円弧断面 (widthSegments 分割)
-        Fan = 2,   // 扇形断面 (tip を中心に root 側を広げる)
+        Flat   = 0,
+        Arc    = 1,
+        Fan    = 2,
         Custom = 3,
     };
 
 
     struct TrailEffectParam
     {
-        float widthStart = 0.3f;    // 根元の幅
-        float widthEnd = 0.0f;      // 先端の幅
-        float lifetime = 0.5f;      // トレイル1点の寿命(秒)
-        int   maxPoints = 512;      // 最大保持ポイント数
+        // --- 基本 ---
+        float widthStart   = 0.3f;
+        float widthEnd     = 0.0f;
+        float lifetime     = 0.5f;
+        int   maxPoints    = 512;
 
-        Vector4 colorStart = { 1.f, 0.8f, 0.f, 1.f };   // 根元カラー(RGBA)
-        Vector4 colorEnd = { 1.f, 0.3f, 0.f, 0.f };     // 先端カラー(RGBA)
+        Vector4 colorStart = { 1.f, 0.8f, 0.f, 1.f };
+        Vector4 colorEnd   = { 1.f, 0.3f, 0.f, 0.f };
 
-        BlendMode blendMode = BlendMode::kBlendModeAdd; // ブレンドモード
+        BlendMode blendMode      = BlendMode::kBlendModeAdd;
+        float     uvScrollSpeed  = 0.5f;
 
-        float uvScrollSpeed = 0.5f;         // UV スクロール速度
-        std::string texturePath = "";       // テクスチャパス (空なら白)
-        std::string noiseTexturePath = "";  // 歪みノイズ
+        std::string texturePath      = "";
+        std::string noiseTexturePath = "";
 
-        TrailShapeType shapeType = TrailShapeType::Flat;
-        int widthSegments = 1;
-        float arcAngleDeg = 120.0f;
+        // --- 断面形状 ---
+        TrailShapeType shapeType     = TrailShapeType::Flat;
+        int            widthSegments = 1;
+        float          arcAngleDeg   = 120.0f;
 
-        bool  crescentShape = true;  // 三日月型（中間を太く、両端を細くする）
-        float thickness = 0.1f;      // 厚み（立体感）
+        bool  crescentShape = true;
+        float thickness     = 0.1f;
         std::vector<Vector2> customVertices;
-		int splineSubdivisions = 4; // Custom 形状のスプライン補間数
+        int splineSubdivisions = 4;
+
+        // ★★ UE Niagara 参考の拡張パラメータ ★★
+
+        // --- グロー / エッジ ---
+        float   softness       = 0.15f;    // エッジソフトフェード幅
+        float   glowPower      = 1.5f;     // 中心コアグロー強度
+        float   fresnelStrength = 1.0f;    // エッジフレネルグロー強度
+        float   trailSharpness  = 2.0f;    // エッジシャープネス
+        Vector4 rimColor       = { 0.4f, 0.7f, 1.f, 1.f }; // エッジリムカラー
+
+        // --- ノイズ歪み ---
+        float distortion    = 0.0f;     // UV 歪み強度 (0=OFF)
+        float noiseOctaves  = 2.0f;     // FBM オクターブ数 (1-4)
+
+        // --- エネルギーライン (UE の電気/魔力ライン) ---
+        float energyIntensity = 1.5f;   // エネルギーライン輝度
+        float energySpeed     = 2.5f;   // エネルギーラインスクロール速度
+
+        // --- スパークル ---
+        float sparkleAmount = 0.4f;     // スパークル輝度 (0=OFF)
+        float sparkleSpeed  = 4.0f;     // スパークルアニメ速度
+
+        // --- カラーウェーブ ---
+        float colorWaveFreq = 3.0f;     // 色波の周波数
+        float colorWaveAmp  = 0.15f;    // 色波の振幅 (0=OFF)
+
+        // --- 幅ウェーブ (慣性感) ---
+        float widthWaveAmp  = 0.05f;    // 幅のサイン波振幅 (0=OFF)
+        float widthWaveFreq = 8.0f;     // 幅のサイン波周波数
     };
 
     // -------------------------------------------------------
-    // LightVolume パラメータ
+    // LightVolume パラメータ (変更なし)
     // -------------------------------------------------------
     struct LightVolumeEffectParam
     {
-        Vector3 halfExtents = { 2.f, 1.5f, 5.f }; // OBB 半辺長 (X/Y/Z)
-        Vector4 color = { 1.f, 0.9f, 0.f, 0.15f }; // RGB + アルファ強度
-        float intensity = 1.0f;
-        bool  isEnable = true;
+        Vector3 halfExtents  = { 2.f, 1.5f, 5.f };
+        Vector4 color        = { 1.f, 0.9f, 0.f, 0.15f };
+        float   intensity    = 1.0f;
+        bool    isEnable     = true;
     };
 
     // -------------------------------------------------------
-    // まとめアセット（1ファイル = 1エフェクト定義）
+    // まとめアセット
     // -------------------------------------------------------
     struct VfxEffectAsset
     {
         std::string       name = "NewEffect";
         TrailEffectParam  trail;
         LightVolumeEffectParam lightVolume;
-        bool useTrail = true;
+        bool useTrail       = true;
         bool useLightVolume = true;
 
-        // JSON 入出力
         void SaveToJson(const std::string& filePath) const;
         bool LoadFromJson(const std::string& filePath);
     };

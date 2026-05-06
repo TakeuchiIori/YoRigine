@@ -42,6 +42,7 @@ public:
 	// ============================================================
 	// VFXの操作
 	// ============================================================
+	void LoadVfxAssets(const std::string vfxAssetPath);
 	void PlayTrail() { if (trailEmitter_) trailEmitter_->Play(); }
 	void StopTrail() { if (trailEmitter_) trailEmitter_->Stop(); }
 

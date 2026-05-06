@@ -19,23 +19,26 @@
         "blendMode": 2,
         "colorEnd": {
             "w": 1.0,
-            "x": 1.0,
-            "y": 0.2980392277240753,
-            "z": 0.0
+            "x": 0.4867253303527832,
+            "y": 0.0,
+            "z": 1.0
         },
         "colorStart": {
             "w": 1.0,
-            "x": 1.0,
-            "y": 0.800000011920929,
-            "z": 0.0
+            "x": 0.0,
+            "y": 0.5221240520477295,
+            "z": 1.0
         },
-        "lifetime": 0.5600000023841858,
-        "maxPoints": 30,
-        "noiseTexturePath": "Resources/Textures/white.png",
+        "lifetime": 0.44999998807907104,
+        "maxPoints": 512,
+        "noiseTexturePath": "",
+        "shapeType": 0,
+        "splineSubdivisions": 616,
         "texturePath": "Resources/Textures/white.png",
         "uvScrollSpeed": 0.5,
-        "widthEnd": 0.0,
-        "widthStart": 0.30000001192092896
+        "widthEnd": 1.1920000314712524,
+        "widthSegments": 1,
+        "widthStart": 5.0
     },
     "useLightVolume": false,
     "useTrail": true

@@ -3,6 +3,8 @@
 #include <Editor/Command/CommandHistory.h>
 // App
 #include "KeyFrame.h"
+#include "Quaternion.h"
+#include "Vector3.h"
 
 // ============================================================
 // 前方宣言
@@ -10,6 +12,20 @@
 class Motion;
 class Camera;
 class Object3d;
+
+// ============================================================
+// キーフレームクリップボード
+// ============================================================
+struct KeyframeClipboard
+{
+	bool hasData = false;
+	Vector3 translate = { 0, 0, 0 };
+	Quaternion rotate = { 0, 0, 0, 1 };
+	Vector3 scale = { 1, 1, 1 };
+	// コピー元情報（表示用）
+	std::string sourceBone = "";
+	float sourceTime = 0.0f;
+};
 
 // ============================================================
 // モーションエディタの共有コンテキスト
@@ -28,9 +44,19 @@ struct MotionEditorContext
 
 	// 再生状態
 	float scrubTime = 0.0f;
+	float lastAppliedScrubTime = -1.0f;
 	bool isPlaying = true;
 	bool isLoop = true;
+	bool isReverse = false;
+	bool isPingPong = false;
+	bool pingPongForward = true;
+	float playbackSpeed = 1.0f;
 	float timelineZoom = 80.0f;
+
+	// トリム範囲 (0 = 無効)
+	float trimStart = 0.0f;
+	float trimEnd = 0.0f;
+	bool useTrim = false;
 
 	// 選択状態
 	std::string selBone = "";
@@ -40,6 +66,9 @@ struct MotionEditorContext
 	float editT[3] = { 0, 0, 0 };
 	float editR[3] = { 0, 0, 0 };
 	float editS[3] = { 1, 1, 1 };
+
+	// キーフレームクリップボード
+	KeyframeClipboard clipboard;
 
 	// UIフラグとレイアウト
 	bool isDrawBone = false;

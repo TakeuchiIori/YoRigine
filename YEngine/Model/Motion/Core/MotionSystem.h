@@ -71,6 +71,7 @@ public:
 	float GetDuration() const { return animation_ ? animation_->GetDuration() : 0.0f; }
 
 	Motion* GetAnimation() const { return animation_; }
+	void SetAnimation(Motion* anim) { animation_ = anim; }
 
 private:
 	// ============================================================

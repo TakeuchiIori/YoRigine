@@ -127,12 +127,23 @@ void Motion::SaveBinary(const Motion& motion, const std::string& animationName, 
 {
 	std::string safeName = animationName;
 	std::replace(safeName.begin(), safeName.end(), ' ', '_');
-	std::string fullPath = path + "_" + safeName + ".anim";
+	std::string fullPath = path;
+	if (fullPath.size() < 5 || fullPath.substr(fullPath.size() - 5) != ".anim") {
+		// 拡張子がない場合のみ animName を付加
+		std::string safeName2 = animationName;
+		std::replace(safeName2.begin(), safeName2.end(), ' ', '_');
+		fullPath += "_" + safeName2 + ".anim";
+	}
+
+	// ディレクトリが存在しなければ作成
+	std::filesystem::path filePath(fullPath);
+	if (filePath.has_parent_path()) {
+		std::filesystem::create_directories(filePath.parent_path());
+	}
 
 	std::ofstream ofs(fullPath, std::ios::binary);
 	if (!ofs) {
-		std::cerr << "[ERROR] 書き込みできない: " << fullPath << std::endl;
-		return;
+		throw std::runtime_error("書き込みできない: " + fullPath);
 	}
 
 	// ------------------------------------------------------------
