@@ -268,6 +268,7 @@
 └── └── ├── Sprite/
 └── └── └── Vfx/
 └── └──     └── VfxMesh/
+└── ├── TestBinary/
 └── ├── Textures/
 └── └── ├── ClearScene/
 └── └── ├── GameScene/
@@ -584,6 +585,8 @@
 └── └── └──         ├── PropertyPanel.h
 └── └── └──         ├── SavePanel.cpp
 └── └── └──         ├── SavePanel.h
+└── └── └──         ├── SpeedCurvePanel.cpp
+└── └── └──         ├── SpeedCurvePanel.h
 └── └── └──         ├── StatusBarPanel.cpp
 └── └── └──         ├── StatusBarPanel.h
 └── └── └──         ├── TimelinePanel.cpp
@@ -218437,6 +218440,10 @@ File Path: YEngine/Generators/Vfx/VfxMesh/TrailMesh.cpp
 ============================================================
 // ===========================================================
 // TrailMesh.cpp
+// ★ UE Niagara Ribbon 参考の拡張
+//   - Arc / Fan にも Catmull-Rom スムージング適用
+//   - 幅ウェーブ (widthWaveAmp/Freq) による慣性感
+//   - crescentShape を全 Shape タイプで統一
 // ===========================================================
 #include "TrailMesh.h"
 #include <algorithm>
@@ -218444,17 +218451,68 @@ File Path: YEngine/Generators/Vfx/VfxMesh/TrailMesh.cpp
 
 namespace YoRigine {
 
+    static constexpr float kPi = 3.14159265f;
+
+    // -----------------------------------------------------------
+    // Catmull-Rom スプライン補間 (共通ヘルパー)
+    // -----------------------------------------------------------
+    static Vector3 CatmullRom(const Vector3& p0, const Vector3& p1,
+                               const Vector3& p2, const Vector3& p3, float t)
+    {
+        float t2 = t * t;
+        float t3 = t2 * t;
+        return {
+            0.5f * ((2*p1.x) + (-p0.x+p2.x)*t + (2*p0.x-5*p1.x+4*p2.x-p3.x)*t2 + (-p0.x+3*p1.x-3*p2.x+p3.x)*t3),
+            0.5f * ((2*p1.y) + (-p0.y+p2.y)*t + (2*p0.y-5*p1.y+4*p2.y-p3.y)*t2 + (-p0.y+3*p1.y-3*p2.y+p3.y)*t3),
+            0.5f * ((2*p1.z) + (-p0.z+p2.z)*t + (2*p0.z-5*p1.z+4*p2.z-p3.z)*t2 + (-p0.z+3*p1.z-3*p2.z+p3.z)*t3),
+        };
+    }
+
+    // ポイント列を Catmull-Rom でスムージングして返す
+    static std::vector<TrailPoint> SmoothPoints(const std::deque<TrailPoint>& pts, int subdivisions)
+    {
+        const size_t n = pts.size();
+        if (n < 2) return {};
+
+        const int steps = std::max(1, subdivisions);
+        std::vector<TrailPoint> result;
+        result.reserve((n - 1) * steps + 1);
+
+        for (size_t i = 0; i < n - 1; ++i)
+        {
+            const TrailPoint& p0 = pts[(i == 0)     ? 0     : i - 1];
+            const TrailPoint& p1 = pts[i];
+            const TrailPoint& p2 = pts[i + 1];
+            const TrailPoint& p3 = pts[(i + 2 >= n) ? n - 1 : i + 2];
+
+            int count = (i == n - 2) ? steps + 1 : steps;
+            for (int j = 0; j < count; ++j)
+            {
+                float t = static_cast<float>(j) / static_cast<float>(steps);
+
+                TrailPoint sp;
+                sp.tip      = CatmullRom(p0.tip,      p1.tip,      p2.tip,      p3.tip,      t);
+                sp.root     = CatmullRom(p0.root,      p1.root,      p2.root,      p3.root,      t);
+                sp.widthDir = CatmullRom(p0.widthDir,  p1.widthDir,  p2.widthDir,  p3.widthDir,  t);
+                // widthDir を再正規化
+                float len = std::sqrt(sp.widthDir.x*sp.widthDir.x + sp.widthDir.y*sp.widthDir.y + sp.widthDir.z*sp.widthDir.z);
+                if (len > 1e-6f) { sp.widthDir.x/=len; sp.widthDir.y/=len; sp.widthDir.z/=len; }
+                sp.age      = p1.age + (p2.age - p1.age) * t;
+                result.push_back(sp);
+            }
+        }
+        return result;
+    }
+
     // -----------------------------------------------------------
     void TrailMesh::Initialize(const TrailEffectParam& param)
     {
-        param_ = param;
-        // --- 新規追加: パラメータの適用 ---
-        shapeType_ = param_.shapeType;
+        param_         = param;
+        shapeType_     = param_.shapeType;
         widthSegments_ = param_.widthSegments;
-        arcAngleDeg_ = param_.arcAngleDeg;
+        arcAngleDeg_   = param_.arcAngleDeg;
 
-        // 最大 maxPoints 点 × 2 頂点(tip/root) のストリップ
-        const size_t maxVerts = static_cast<size_t>(param_.maxPoints) * 2;
+        const size_t maxVerts = static_cast<size_t>(param_.maxPoints) * 2 * std::max(1, param_.widthSegments);
         InitBuffer(maxVerts);
         vertices_.reserve(maxVerts);
     }
@@ -218462,12 +218520,10 @@ namespace YoRigine {
     // -----------------------------------------------------------
     void TrailMesh::ApplyParam(const TrailEffectParam& param)
     {
-        param_ = param;
-        shapeType_ = param_.shapeType;
+        param_         = param;
+        shapeType_     = param_.shapeType;
         widthSegments_ = param_.widthSegments;
-        arcAngleDeg_ = param_.arcAngleDeg;
-
-        // maxPoints が増えていたらバッファも拡張 (DynamicVertexBuffer が自動リサイズするので特別な処理不要)
+        arcAngleDeg_   = param_.arcAngleDeg;
     }
 
     // -----------------------------------------------------------
@@ -218481,22 +218537,19 @@ namespace YoRigine {
     // -----------------------------------------------------------
     void TrailMesh::AddPoint(const Vector3& tip, const Vector3& root)
     {
-        AddPoint(tip, root, Vector3{ 1.f, 0.f, 0.f }); // widthDir はデフォルトで X 軸
+        AddPoint(tip, root, Vector3{ 1.f, 0.f, 0.f });
     }
 
-    // -----------------------------------------------------------
     void TrailMesh::AddPoint(const Vector3& tip, const Vector3& root, const Vector3& widthDir)
     {
-        // maxPoints を超えたら古い端を削除
         while (static_cast<int>(points_.size()) >= param_.maxPoints) {
             points_.pop_back();
         }
-
         TrailPoint p;
-        p.tip = tip;
-        p.root = root;
+        p.tip      = tip;
+        p.root     = root;
         p.widthDir = widthDir;
-        p.age = 0.f;
+        p.age      = 0.f;
         points_.push_front(p);
     }
 
@@ -218505,17 +218558,12 @@ namespace YoRigine {
     {
         time_ += deltaTime;
 
-        // 全ポイントの age を進める
-        for (auto& p : points_) {
-            p.age += deltaTime;
-        }
+        for (auto& p : points_) p.age += deltaTime;
 
-        // 寿命切れを末尾から削除
         while (!points_.empty() && points_.back().age >= param_.lifetime) {
             points_.pop_back();
         }
 
-        // 頂点を再構築して GPU へ
         RebuildVertices();
     }
 
@@ -218523,196 +218571,120 @@ namespace YoRigine {
     void TrailMesh::RebuildVertices()
     {
         vertices_.clear();
-
         switch (shapeType_) {
-        case TrailShapeType::Arc: RebuildArc(); break;
-        case TrailShapeType::Fan: RebuildFan(); break;
+        case TrailShapeType::Arc:    RebuildArc();    break;
+        case TrailShapeType::Fan:    RebuildFan();    break;
         case TrailShapeType::Custom: RebuildCustom(); break;
         case TrailShapeType::Flat:
-        default:                  RebuildFlat(); break;
+        default:                     RebuildFlat();   break;
         }
-
         UploadVertices(vertices_);
     }
 
     // -----------------------------------------------------------
-    // Flat: 従来通り tip/root の 2 列ストリップ
+    // ★ 幅スケールの計算 (全 Shape で共通)
+    //   crescentShape: サイン曲線で中間を太く
+    //   widthWave:     サイン波で微細な幅ゆらぎ
+    // -----------------------------------------------------------
+    float TrailMesh::CalcWidthScale(float normalizedAge, float tY) const
+    {
+        float scale = 1.0f;
+
+        // 先端→根本にかけて width を lerp
+        float widthRatio = (param_.widthStart > 1e-6f)
+            ? lerp(1.0f, param_.widthEnd / param_.widthStart, normalizedAge)
+            : 0.f;
+        scale *= widthRatio;
+
+        if (param_.crescentShape) {
+            // 中間 (age=0.5) で最も太い三日月型
+            scale *= std::sin(normalizedAge * kPi);
+        }
+
+        // ★ 幅ウェーブ (UE の Sine-over-life 相当)
+        if (param_.widthWaveAmp > 0.001f) {
+            float wave = std::sin(tY * param_.widthWaveFreq * kPi * 2.0f) * param_.widthWaveAmp;
+            scale *= (1.0f + wave);
+        }
+
+        return std::max(scale, 0.0f);
+    }
+
+    // -----------------------------------------------------------
+    // Flat (★ Catmull-Rom スムージング済み)
     // -----------------------------------------------------------
     void TrailMesh::RebuildFlat()
     {
         const size_t n = points_.size();
         if (n < 2) return;
 
-        // ★ エディターの値を反映（最低1以上にする）
-        const int subdivisions = std::max(1, param_.splineSubdivisions);
+        auto smoothed = SmoothPoints(points_, std::max(1, param_.splineSubdivisions));
+        const size_t sn = smoothed.size();
+        if (sn < 2) return;
 
-        std::vector<TrailPoint> smoothPoints;
-        smoothPoints.reserve((n - 1) * subdivisions + 1);
+        vertices_.reserve(sn * 2);
 
-        for (size_t i = 0; i < n - 1; ++i) {
-            const TrailPoint& p0 = points_[i == 0 ? 0 : i - 1];
-            const TrailPoint& p1 = points_[i];
-            const TrailPoint& p2 = points_[i + 1];
-            const TrailPoint& p3 = points_[i + 2 >= n ? n - 1 : i + 2];
-
-            int steps = (i == n - 2) ? subdivisions + 1 : subdivisions;
-            for (int j = 0; j < steps; ++j) {
-                float t = static_cast<float>(j) / static_cast<float>(subdivisions);
-
-                TrailPoint sp;
-                sp.tip = CatmullRomInterpolation(p0.tip, p1.tip, p2.tip, p3.tip, t);
-                sp.root = CatmullRomInterpolation(p0.root, p1.root, p2.root, p3.root, t);
-                sp.age = p1.age + (p2.age - p1.age) * t;
-                smoothPoints.push_back(sp);
-            }
-        }
-
-        const size_t smoothCount = smoothPoints.size();
-        vertices_.reserve(smoothCount * 2);
-
-        for (size_t i = 0; i < smoothCount; ++i)
+        for (size_t i = 0; i < sn; ++i)
         {
-            const TrailPoint& p = smoothPoints[i];
-            const float tY = static_cast<float>(i) / static_cast<float>(smoothCount - 1);
+            const TrailPoint& p = smoothed[i];
+            const float tY            = static_cast<float>(i) / static_cast<float>(sn - 1);
             const float normalizedAge = NormalizeAge(p.age);
-            const Vector4 vColor = CalcFadeColor(normalizedAge);
-            const float uvY = tY + time_ * param_.uvScrollSpeed;
+            const Vector4 vColor      = CalcFadeColor(normalizedAge);
+            const float uvY           = tY + time_ * param_.uvScrollSpeed;
+            const float widthScale    = CalcWidthScale(normalizedAge, tY);
 
-            float widthScale = 1.0f;
-            if (param_.crescentShape) {
-                widthScale = std::sin(normalizedAge * 3.14159265f);
-            }
+            Vector3 center = {
+                (p.tip.x + p.root.x) * 0.5f,
+                (p.tip.y + p.root.y) * 0.5f,
+                (p.tip.z + p.root.z) * 0.5f
+            };
+            Vector3 toTip = {
+                p.tip.x - center.x,
+                p.tip.y - center.y,
+                p.tip.z - center.z
+            };
 
-            Vector3 center = { (p.tip.x + p.root.x) * 0.5f, (p.tip.y + p.root.y) * 0.5f, (p.tip.z + p.root.z) * 0.5f };
-            Vector3 toTip = { p.tip.x - center.x, p.tip.y - center.y, p.tip.z - center.z };
-
-            Vector3 currentTip = { center.x + toTip.x * widthScale, center.y + toTip.y * widthScale, center.z + toTip.z * widthScale };
-            Vector3 currentRoot = { center.x - toTip.x * widthScale, center.y - toTip.y * widthScale, center.z - toTip.z * widthScale };
+            Vector3 currentTip = {
+                center.x + toTip.x * widthScale,
+                center.y + toTip.y * widthScale,
+                center.z + toTip.z * widthScale
+            };
+            Vector3 currentRoot = {
+                center.x - toTip.x * widthScale,
+                center.y - toTip.y * widthScale,
+                center.z - toTip.z * widthScale
+            };
 
             ProceduralMeshVertex vTip;
             vTip.position = currentTip;
             vTip.texcoord = { 0.f, uvY };
-            vTip.color = vColor;
-            vTip.age = normalizedAge;
+            vTip.color    = vColor;
+            vTip.age      = normalizedAge;
             vertices_.push_back(vTip);
 
             ProceduralMeshVertex vRoot;
             vRoot.position = currentRoot;
             vRoot.texcoord = { 1.f, uvY };
-            vRoot.color = vColor;
-            vRoot.age = normalizedAge;
+            vRoot.color    = vColor;
+            vRoot.age      = normalizedAge;
             vertices_.push_back(vRoot);
         }
     }
 
     // -----------------------------------------------------------
-    // Arc: 各ポイントで断面を widthSegments 本の列に分割し
-    //      tip→root 方向を弧状に曲げた断面を生成する
-    //
-    //  断面イメージ (widthSegments=4, arcAngleDeg=120 の場合):
-    //
-    //      tip
-    //       |  ← 弧の中心軸 (tip-root ベクトル)
-    //   col0 col1 col2 col3 col4
-    //      root
-    //
-    //  各列の位置は tip-root 中点を中心に widthDir 方向へ弧を描く
+    // ★ Arc (Catmull-Rom スムージング追加)
     // -----------------------------------------------------------
     void TrailMesh::RebuildArc()
     {
         const size_t n = points_.size();
         if (n < 2) return;
 
-        const int   segs = std::max(1, widthSegments_);
-        const float halfRad = (arcAngleDeg_ * 3.14159265f / 180.f) * 0.5f;
+        auto smoothed = SmoothPoints(points_, std::max(1, param_.splineSubdivisions));
+        const size_t sn = smoothed.size();
+        if (sn < 2) return;
 
-        // 頂点数: n ポイント × (segs+1) 列
-        // TriangleStrip でポイント間を繋ぐので各セグメント列ごとにストリップを分ける
-        // セグメント s と s+1 の列を交互に並べた n*2 頂点のストリップを segs 本作る
-
-        for (int s = 0; s < segs; ++s)
-        {
-            // 縮退三角形でセグメント間を接続
-            if (s > 0 && !vertices_.empty()) {
-                vertices_.push_back(vertices_.back());
-                vertices_.push_back({});  // ダミー (後で上書き)
-            }
-
-            bool firstInSeg = true;
-
-            for (size_t i = 0; i < n; ++i)
-            {
-                const TrailPoint& p = points_[i];
-                const float tY = static_cast<float>(i) / static_cast<float>(n - 1);
-                const float normalizedAge = NormalizeAge(p.age);
-                const Vector4 vColor = CalcFadeColor(normalizedAge);
-                const float uvY = tY + time_ * param_.uvScrollSpeed;
-
-                // tip-root の中点と半径
-                const Vector3 center = {
-                    (p.tip.x + p.root.x) * 0.5f,
-                    (p.tip.y + p.root.y) * 0.5f,
-                    (p.tip.z + p.root.z) * 0.5f
-                };
-                const float radius = std::sqrt(
-                    (p.tip.x - center.x) * (p.tip.x - center.x) +
-                    (p.tip.y - center.y) * (p.tip.y - center.y) +
-                    (p.tip.z - center.z) * (p.tip.z - center.z));
-
-                // セグメント s と s+1 の弧角度
-                for (int col = s; col <= s + 1; ++col)
-                {
-                    const float t = static_cast<float>(col) / static_cast<float>(segs);
-                    const float ang = -halfRad + t * (arcAngleDeg_ * 3.14159265f / 180.f);
-
-                    // 弧上の位置: center + widthDir*sin(ang)*r + (tip-center)*cos(ang)
-                    const float cosA = std::cos(ang);
-                    const float sinA = std::sin(ang);
-
-                    const Vector3 tipDir = {
-                        (p.tip.x - center.x) / (radius + 1e-6f),
-                        (p.tip.y - center.y) / (radius + 1e-6f),
-                        (p.tip.z - center.z) / (radius + 1e-6f)
-                    };
-
-                    ProceduralMeshVertex v;
-                    v.position = {
-                        center.x + (tipDir.x * cosA + p.widthDir.x * sinA) * radius,
-                        center.y + (tipDir.y * cosA + p.widthDir.y * sinA) * radius,
-                        center.z + (tipDir.z * cosA + p.widthDir.z * sinA) * radius
-                    };
-                    v.texcoord = { t, uvY };
-                    v.color = vColor;
-                    v.age = normalizedAge;
-
-                    // 縮退ダミーの上書き
-                    if (s > 0 && firstInSeg && col == s) {
-                        vertices_.back() = v;
-                        firstInSeg = false;
-                    }
-                    vertices_.push_back(v);
-                }
-            }
-        }
-    }
-
-    // -----------------------------------------------------------
-    // Fan: tip を頂点とした扇形断面
-    //      tip から root 方向に widthDir で広げる
-    //
-    //  断面イメージ (segs=3 の場合):
-    //
-    //       tip (固定)
-    //      /  |  \
-    //   r0   r1   r2   r3   ← root 側を分割
-    // -----------------------------------------------------------
-    void TrailMesh::RebuildFan()
-    {
-        const size_t n = points_.size();
-        if (n < 2) return;
-
-        const int   segs = std::max(1, widthSegments_);
-        const float halfRad = (arcAngleDeg_ * 3.14159265f / 180.f) * 0.5f;
+        const int   segs    = std::max(1, widthSegments_);
+        const float halfRad = (arcAngleDeg_ * kPi / 180.f) * 0.5f;
 
         for (int s = 0; s < segs; ++s)
         {
@@ -218723,41 +218695,53 @@ namespace YoRigine {
 
             bool firstInSeg = true;
 
-            for (size_t i = 0; i < n; ++i)
+            for (size_t i = 0; i < sn; ++i)
             {
-                const TrailPoint& p = points_[i];
-                const float tY = static_cast<float>(i) / static_cast<float>(n - 1);
+                const TrailPoint& p = smoothed[i];
+                const float tY            = static_cast<float>(i) / static_cast<float>(sn - 1);
                 const float normalizedAge = NormalizeAge(p.age);
-                const Vector4 vColor = CalcFadeColor(normalizedAge);
-                const float uvY = tY + time_ * param_.uvScrollSpeed;
+                const Vector4 vColor      = CalcFadeColor(normalizedAge);
+                const float uvY           = tY + time_ * param_.uvScrollSpeed;
+                const float widthScale    = CalcWidthScale(normalizedAge, tY);
 
-                // root 方向の単位ベクトル
-                const Vector3 toRoot = {
+                // tip-root ベクトル
+                Vector3 toRoot = {
                     p.root.x - p.tip.x,
                     p.root.y - p.tip.y,
                     p.root.z - p.tip.z
                 };
-                const float len = std::sqrt(
-                    toRoot.x * toRoot.x + toRoot.y * toRoot.y + toRoot.z * toRoot.z) + 1e-6f;
-                const Vector3 rootDir = { toRoot.x / len, toRoot.y / len, toRoot.z / len };
+                const float tipRootLen = std::sqrt(
+                    toRoot.x*toRoot.x + toRoot.y*toRoot.y + toRoot.z*toRoot.z) + 1e-6f;
+                const Vector3 rootDir = {
+                    toRoot.x / tipRootLen,
+                    toRoot.y / tipRootLen,
+                    toRoot.z / tipRootLen
+                };
+
+                const Vector3 midPoint = {
+                    (p.tip.x + p.root.x) * 0.5f,
+                    (p.tip.y + p.root.y) * 0.5f,
+                    (p.tip.z + p.root.z) * 0.5f
+                };
 
                 for (int col = s; col <= s + 1; ++col)
                 {
-                    const float t = static_cast<float>(col) / static_cast<float>(segs);
-                    const float ang = -halfRad + t * (arcAngleDeg_ * 3.14159265f / 180.f);
+                    const float tX  = static_cast<float>(col) / static_cast<float>(segs);
+                    const float ang = -halfRad + tX * (arcAngleDeg_ * kPi / 180.f);
 
                     const float cosA = std::cos(ang);
                     const float sinA = std::sin(ang);
+                    const float r    = tipRootLen * 0.5f * widthScale;
 
                     ProceduralMeshVertex v;
                     v.position = {
-                        p.tip.x + (rootDir.x * cosA + p.widthDir.x * sinA) * len,
-                        p.tip.y + (rootDir.y * cosA + p.widthDir.y * sinA) * len,
-                        p.tip.z + (rootDir.z * cosA + p.widthDir.z * sinA) * len
+                        midPoint.x + (rootDir.x * cosA + p.widthDir.x * sinA) * r,
+                        midPoint.y + (rootDir.y * cosA + p.widthDir.y * sinA) * r,
+                        midPoint.z + (rootDir.z * cosA + p.widthDir.z * sinA) * r
                     };
-                    v.texcoord = { t, uvY };
-                    v.color = vColor;
-                    v.age = normalizedAge;
+                    v.texcoord = { tX, uvY };
+                    v.color    = vColor;
+                    v.age      = normalizedAge;
 
                     if (s > 0 && firstInSeg && col == s) {
                         vertices_.back() = v;
@@ -218769,19 +218753,94 @@ namespace YoRigine {
         }
     }
 
+    // -----------------------------------------------------------
+    // ★ Fan (Catmull-Rom スムージング追加)
+    // -----------------------------------------------------------
+    void TrailMesh::RebuildFan()
+    {
+        const size_t n = points_.size();
+        if (n < 2) return;
+
+        auto smoothed = SmoothPoints(points_, std::max(1, param_.splineSubdivisions));
+        const size_t sn = smoothed.size();
+        if (sn < 2) return;
+
+        const int   segs    = std::max(1, widthSegments_);
+        const float halfRad = (arcAngleDeg_ * kPi / 180.f) * 0.5f;
+
+        for (int s = 0; s < segs; ++s)
+        {
+            if (s > 0 && !vertices_.empty()) {
+                vertices_.push_back(vertices_.back());
+                vertices_.push_back({});
+            }
+
+            bool firstInSeg = true;
+
+            for (size_t i = 0; i < sn; ++i)
+            {
+                const TrailPoint& p = smoothed[i];
+                const float tY            = static_cast<float>(i) / static_cast<float>(sn - 1);
+                const float normalizedAge = NormalizeAge(p.age);
+                const Vector4 vColor      = CalcFadeColor(normalizedAge);
+                const float uvY           = tY + time_ * param_.uvScrollSpeed;
+                const float widthScale    = CalcWidthScale(normalizedAge, tY);
+
+                const Vector3 toRoot = {
+                    p.root.x - p.tip.x,
+                    p.root.y - p.tip.y,
+                    p.root.z - p.tip.z
+                };
+                const float len = std::sqrt(
+                    toRoot.x*toRoot.x + toRoot.y*toRoot.y + toRoot.z*toRoot.z) + 1e-6f;
+                const Vector3 rootDir = {
+                    toRoot.x / len,
+                    toRoot.y / len,
+                    toRoot.z / len
+                };
+
+                for (int col = s; col <= s + 1; ++col)
+                {
+                    const float tX  = static_cast<float>(col) / static_cast<float>(segs);
+                    const float ang = -halfRad + tX * (arcAngleDeg_ * kPi / 180.f);
+
+                    const float cosA = std::cos(ang);
+                    const float sinA = std::sin(ang);
+
+                    ProceduralMeshVertex v;
+                    v.position = {
+                        p.tip.x + (rootDir.x * cosA + p.widthDir.x * sinA) * len * widthScale,
+                        p.tip.y + (rootDir.y * cosA + p.widthDir.y * sinA) * len * widthScale,
+                        p.tip.z + (rootDir.z * cosA + p.widthDir.z * sinA) * len * widthScale
+                    };
+                    v.texcoord = { tX, uvY };
+                    v.color    = vColor;
+                    v.age      = normalizedAge;
+
+                    if (s > 0 && firstInSeg && col == s) {
+                        vertices_.back() = v;
+                        firstInSeg = false;
+                    }
+                    vertices_.push_back(v);
+                }
+            }
+        }
+    }
+
+    // -----------------------------------------------------------
+    // Custom (変更なし)
+    // -----------------------------------------------------------
     void TrailMesh::RebuildCustom()
     {
         const auto& outline = param_.customVertices;
-        if (outline.size() < 3) return; // 3点未満は面を作れない
+        if (outline.size() < 3) return;
 
-        // 厚み（Z値の幅）
         float halfThick = param_.thickness * 0.5f;
-        if (halfThick <= 0.001f) halfThick = 0.05f; // 最低限の厚み
+        if (halfThick <= 0.001f) halfThick = 0.05f;
 
-        // 1. Ear Clipping（耳切り法）による 2Dポリゴンの三角形分割
         std::vector<int> indices;
         std::vector<int> remainingList;
-        for (int i = 0; i < outline.size(); ++i) remainingList.push_back(i);
+        for (int i = 0; i < (int)outline.size(); ++i) remainingList.push_back(i);
 
         int safety = 1000;
         while (remainingList.size() > 3 && safety-- > 0)
@@ -218792,24 +218851,15 @@ namespace YoRigine {
                 int curr = remainingList[i];
                 int next = remainingList[(i + 1) % remainingList.size()];
 
-                Vector2 a = outline[prev];
-                Vector2 b = outline[curr];
-                Vector2 c = outline[next];
+                Vector2 a = outline[prev], b = outline[curr], c = outline[next];
+                float cross = (b.x-a.x)*(c.y-b.y) - (b.y-a.y)*(c.x-b.x);
+                if (cross <= 0.0f) continue;
 
-                // 外積で凸(Convex)か判定 (時計回り/反時計回りで符号が変わる)
-                float cross = (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x);
-                if (cross <= 0.0f) continue; // 凹んでいる部分はスキップ
-
-                // 他の点がこの三角形の中に含まれていないかチェック
                 bool isEar = true;
                 for (int idx : remainingList) {
                     if (idx == prev || idx == curr || idx == next) continue;
-                    if (IsPointInTriangle(outline[idx], a, b, c)) {
-                        isEar = false;
-                        break;
-                    }
+                    if (IsPointInTriangle(outline[idx], a, b, c)) { isEar = false; break; }
                 }
-
                 if (isEar) {
                     indices.push_back(prev);
                     indices.push_back(curr);
@@ -218819,88 +218869,66 @@ namespace YoRigine {
                     break;
                 }
             }
-            if (!earFound) break; // 複雑すぎる交差などがあれば強制終了
+            if (!earFound) break;
         }
-        // 最後の3点
         if (remainingList.size() == 3) {
             indices.push_back(remainingList[0]);
             indices.push_back(remainingList[1]);
             indices.push_back(remainingList[2]);
         }
 
-        // 2. 頂点を GPU 用のフォーマットに変換し、Z方向の厚みをつける
-        // ※今回は TriangleStrip ではなく、TriangleList として描画するため、
-        // 頂点配列にそのまま三角形をポンポン入れていきます（後でTopologyの変更が必要）
         auto addTriangle = [&](const Vector3& p1, const Vector3& p2, const Vector3& p3, float uvX) {
             ProceduralMeshVertex v;
             v.color = { 1.f, 1.f, 1.f, 1.f };
-            v.age = 0.f;
+            v.age   = 0.f;
+            v.position = p1; v.texcoord = { uvX, 0.f };   vertices_.push_back(v);
+            v.position = p2; v.texcoord = { uvX, 1.f };   vertices_.push_back(v);
+            v.position = p3; v.texcoord = { uvX, 0.5f };  vertices_.push_back(v);
+        };
 
-            v.position = p1; v.texcoord = { uvX, 0.f }; vertices_.push_back(v);
-            v.position = p2; v.texcoord = { uvX, 1.f }; vertices_.push_back(v);
-            v.position = p3; v.texcoord = { uvX, 0.5f }; vertices_.push_back(v);
-            };
-
-        // 表面 (+Z) と 裏面 (-Z)
         for (size_t i = 0; i < indices.size(); i += 3) {
-            int i1 = indices[i], i2 = indices[i + 1], i3 = indices[i + 2];
-
-            // 表面
-            addTriangle(
-                { outline[i1].x, outline[i1].y, halfThick },
-                { outline[i2].x, outline[i2].y, halfThick },
-                { outline[i3].x, outline[i3].y, halfThick }, 0.0f
-            );
-            // 裏面 (カリングされないように頂点順を逆にする)
-            addTriangle(
-                { outline[i1].x, outline[i1].y, -halfThick },
-                { outline[i3].x, outline[i3].y, -halfThick },
-                { outline[i2].x, outline[i2].y, -halfThick }, 1.0f
-            );
+            int i1 = indices[i], i2 = indices[i+1], i3 = indices[i+2];
+            addTriangle({ outline[i1].x, outline[i1].y,  halfThick },
+                        { outline[i2].x, outline[i2].y,  halfThick },
+                        { outline[i3].x, outline[i3].y,  halfThick }, 0.0f);
+            addTriangle({ outline[i1].x, outline[i1].y, -halfThick },
+                        { outline[i3].x, outline[i3].y, -halfThick },
+                        { outline[i2].x, outline[i2].y, -halfThick }, 1.0f);
         }
-
-        // 側面 (フチの部分を四角形で繋ぐ)
         for (size_t i = 0; i < outline.size(); ++i) {
             int next = static_cast<int>((i + 1) % outline.size());
-            Vector3 p1_f = { outline[i].x, outline[i].y, halfThick };
-            Vector3 p2_f = { outline[next].x, outline[next].y, halfThick };
-            Vector3 p1_b = { outline[i].x, outline[i].y, -halfThick };
-            Vector3 p2_b = { outline[next].x, outline[next].y, -halfThick };
-
-            // 四角形は2つの三角形
-            addTriangle(p1_f, p2_f, p1_b, 0.5f);
-            addTriangle(p1_b, p2_f, p2_b, 0.5f);
+            addTriangle({ outline[i].x,    outline[i].y,     halfThick },
+                        { outline[next].x, outline[next].y,  halfThick },
+                        { outline[i].x,    outline[i].y,    -halfThick }, 0.5f);
+            addTriangle({ outline[i].x,    outline[i].y,    -halfThick },
+                        { outline[next].x, outline[next].y,  halfThick },
+                        { outline[next].x, outline[next].y, -halfThick }, 0.5f);
         }
     }
 
-    bool TrailMesh::IsPointInTriangle(const Vector2& p, const Vector2& a, const Vector2& b, const Vector2& c) const
+    // -----------------------------------------------------------
+    bool TrailMesh::IsPointInTriangle(const Vector2& p, const Vector2& a,
+                                       const Vector2& b, const Vector2& c) const
     {
-        auto crossProduct = [](const Vector2& v1, const Vector2& v2) { return v1.x * v2.y - v1.y * v2.x; };
-        Vector2 ab = { b.x - a.x, b.y - a.y };
-        Vector2 bc = { c.x - b.x, c.y - b.y };
-        Vector2 ca = { a.x - c.x, a.y - c.y };
-        Vector2 ap = { p.x - a.x, p.y - a.y };
-        Vector2 bp = { p.x - b.x, p.y - b.y };
-        Vector2 cp = { p.x - c.x, p.y - c.y };
-        float c1 = crossProduct(ab, ap);
-        float c2 = crossProduct(bc, bp);
-        float c3 = crossProduct(ca, cp);
-        return ((c1 >= 0.0f && c2 >= 0.0f && c3 >= 0.0f) || (c1 <= 0.0f && c2 <= 0.0f && c3 <= 0.0f));
+        auto cross = [](const Vector2& v1, const Vector2& v2) {
+            return v1.x * v2.y - v1.y * v2.x;
+        };
+        Vector2 ab{b.x-a.x, b.y-a.y}, bc{c.x-b.x, c.y-b.y}, ca{a.x-c.x, a.y-c.y};
+        Vector2 ap{p.x-a.x, p.y-a.y}, bp{p.x-b.x, p.y-b.y}, cp{p.x-c.x, p.y-c.y};
+        float c1 = cross(ab,ap), c2 = cross(bc,bp), c3 = cross(ca,cp);
+        return ((c1>=0&&c2>=0&&c3>=0)||(c1<=0&&c2<=0&&c3<=0));
     }
 
     // -----------------------------------------------------------
     void TrailMesh::Draw(ID3D12GraphicsCommandList* cmdList)
     {
         if (!isVisible_) return;
-
         const uint32_t vertCount = GetVertexCount();
-        if (vertCount < 4) return; // 最低 2 ポイント = 4 頂点必要
+        if (vertCount < 4) return;
 
-        // PSO / ルートシグネチャ / CBV は呼び出し元でセット済みを前提
         if (shapeType_ == TrailShapeType::Custom) {
             cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-        }
-        else {
+        } else {
             cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
         }
         BindVertexBuffer(cmdList);
@@ -218909,159 +218937,116 @@ namespace YoRigine {
 
 } // namespace YoRigine
 
+
 ============================================================
 File Path: YEngine/Generators/Vfx/VfxMesh/TrailMesh.h
 ============================================================
 #pragma once
 // ===========================================================
 // TrailMesh.h
-//
-// 剣閃・残像トレイルを板ポリゴン列で表現する
-//
-// 使い方:
-//   // 初期化
-//   trail_ = std::make_unique<TrailMesh>();
-//   trail_->Initialize(editor_->GetAsset().trail);
-//
-//   // 毎フレーム: 先端と根元のワールド座標を渡す
-//   trail_->AddPoint(tipPos, rootPos);
-//   trail_->Update(deltaTime);       // 寿命管理・頂点生成
-//   trail_->Draw(cmdList);           // GPU 描画
+// ★ UE Niagara Ribbon 参考拡張
+//   - CalcWidthScale (crescentShape + widthWave 統合)
+//   - Arc/Fan でも Catmull-Rom スムージング
 // ===========================================================
 #include "ProceduralMeshBase.h"
 #include "VfxEffectAsset.h"
 #include <deque>
 
 namespace YoRigine {
-    // -----------------------------------------------------------
-    // トレイル1点分の履歴
-    // -----------------------------------------------------------
+
     struct TrailPoint
     {
-        Vector3 tip;      // 刃先ワールド座標
-        Vector3 root;     // 根本ワールド座標
-        Vector3 widthDir; // 幅方向の単位ベクトル (Arc/Fan 用)
-        float   age;      // 経過時間 (秒)
+        Vector3 tip;
+        Vector3 root;
+        Vector3 widthDir;
+        float   age;
     };
 
-    // -----------------------------------------------------------
     class TrailMesh : public ProceduralMeshBase
     {
     public:
-        TrailMesh() = default;
+        TrailMesh()  = default;
         ~TrailMesh() override = default;
 
         // --------------------------------------------------------
-        // 初期化 / リセット
-        // --------------------------------------------------------
-
-        /// VfxEffectAsset の TrailEffectParam を使って初期化する
         void Initialize(const TrailEffectParam& param);
-
-        /// パラメータだけ差し替える (ホットリロード対応)
         void ApplyParam(const TrailEffectParam& param);
-
-        /// ポイント履歴をすべてクリア
         void Clear();
 
         // --------------------------------------------------------
-        // 毎フレーム
-        // --------------------------------------------------------
-
-        /// ポイントを先頭に追加する (Flat 形状向け)
-        /// @param tip   刃先ワールド座標
-        /// @param root  根本ワールド座標
         void AddPoint(const Vector3& tip, const Vector3& root);
-
-        /// ポイントを先頭に追加する (Arc / Fan 形状向け)
-        /// @param tip      刃先ワールド座標
-        /// @param root     根本ワールド座標
-        /// @param widthDir 幅方向の単位ベクトル (剣の横向きなど)
         void AddPoint(const Vector3& tip, const Vector3& root, const Vector3& widthDir);
 
-        /// 寿命切れポイントの削除 + 頂点バッファ再構築
         void Update(float deltaTime) override;
-
-        /// 描画コマンド発行
-        /// b0=Camera CBV, b1=MeshTrailParams CBV は呼び出し元でセット済みを想定
         void Draw(ID3D12GraphicsCommandList* cmdList) override;
 
         // --------------------------------------------------------
-        // アクセサ
-        // --------------------------------------------------------
-        size_t GetPointCount() const { return points_.size(); }
+        size_t         GetPointCount()  const { return points_.size(); }
         const TrailEffectParam& GetParam() const { return param_; }
 
-        /// 断面形状タイプを設定する
-        void SetShapeType(TrailShapeType type) { shapeType_ = type; }
+        void           SetShapeType(TrailShapeType type)  { shapeType_ = type; }
         TrailShapeType GetShapeType() const { return shapeType_; }
 
-        /// 幅方向の分割数を設定する (Flat の場合は無視, Arc/Fan は 2 以上推奨)
-        void SetWidthSegments(int segments) { widthSegments_ = std::max(1, segments); }
-        int GetWidthSegments() const { return widthSegments_; }
+        void  SetWidthSegments(int segments) { widthSegments_ = std::max(1, segments); }
+        int   GetWidthSegments() const { return widthSegments_; }
 
-        /// Arc 形状の弧の角度 (度数法, 両側なので 180 = 半円)
-        void SetArcAngleDeg(float deg) { arcAngleDeg_ = deg; }
+        void  SetArcAngleDeg(float deg) { arcAngleDeg_ = deg; }
         float GetArcAngleDeg() const { return arcAngleDeg_; }
 
     private:
-        // --------------------------------------------------------
-        // 内部処理
-        // --------------------------------------------------------
-
-        /// points_ から ProceduralMeshVertex のストリップを生成
         void RebuildVertices();
-
-        /// Flat (平板) 形状のストリップ生成
         void RebuildFlat();
-
-        /// Arc (円弧断面) 形状のストリップ生成
         void RebuildArc();
-
-        /// Fan (扇形断面) 形状のストリップ生成
         void RebuildFan();
-
-        ///
         void RebuildCustom();
 
-        bool IsPointInTriangle(const Vector2& p, const Vector2& a, const Vector2& b, const Vector2& c) const;
+        bool IsPointInTriangle(const Vector2& p,
+                               const Vector2& a,
+                               const Vector2& b,
+                               const Vector2& c) const;
 
-        /// age を [0,1] に正規化 (0=新しい端, 1=古い端)
+        // ★ 統合された幅スケール計算
+        // normalizedAge: 0=新しい端, 1=古い端
+        // tY           : [0,1] トレイル上の位置
+        float CalcWidthScale(float normalizedAge, float tY) const;
+
         float NormalizeAge(float age) const
         {
-            return (param_.lifetime > 0.f) ? std::min(age / param_.lifetime, 1.f) : 1.f;
+            return (param_.lifetime > 0.f)
+                ? std::min(age / param_.lifetime, 1.f)
+                : 1.f;
         }
 
-        /// フェードカラーを計算
         Vector4 CalcFadeColor(float normalizedAge) const
         {
-            const float fade = 1.f - normalizedAge;
-            return { 1.f, 1.f, 1.f, fade };
+            return { 1.f, 1.f, 1.f, 1.f - normalizedAge };
         }
+
+        // lerp ヘルパー (MathFunc.h に無い場合の保険)
+        static float lerp(float a, float b, float t) { return a + (b - a) * t; }
 
     private:
         TrailEffectParam param_;
 
-        // 断面形状
-        TrailShapeType shapeType_ = TrailShapeType::Flat;
-        int            widthSegments_ = 1;   // 幅方向の分割数 (Flat=1固定, Arc/Fan は可変)
-        float          arcAngleDeg_ = 120.f; // Arc 形状の弧の角度 (度数法)
+        TrailShapeType shapeType_     = TrailShapeType::Flat;
+        int            widthSegments_ = 1;
+        float          arcAngleDeg_   = 120.f;
 
-        // ポイント履歴 (front = 最新, back = 最古)
-        std::deque<TrailPoint> points_;
-
-        // 頂点バッファの CPU 側コピー
+        std::deque<TrailPoint>            points_;
         std::vector<ProceduralMeshVertex> vertices_;
 
-        // 累積時間 (UV スクロール用)
         float time_ = 0.f;
     };
 
 } // namespace YoRigine
 
+
 ============================================================
 File Path: YEngine/Generators/Vfx/VfxMesh/TrailMeshEmitter.cpp
 ============================================================
+// ===========================================================
+// TrailMeshEmitter.cpp
+// ===========================================================
 #include "TrailMeshEmitter.h"
 
 #include "DirectXCommon.h"
@@ -219074,7 +219059,6 @@ namespace YoRigine {
     namespace {
         const std::string kFallbackWhite = "Resources/Textures/white.png";
 
-        // CBVの256バイトアライメント計算用
         static constexpr size_t kCBVAlignment = 256;
         template<typename T>
         static constexpr size_t AlignedSize() {
@@ -219097,26 +219081,58 @@ namespace YoRigine {
         trailCBResource_->Map(0, nullptr, reinterpret_cast<void**>(&trailCBMapped_));
     }
 
+    // -------------------------------------------------------
+    // HLSL MeshTrailParams と完全に 1:1 対応させてマッピング
+    // -------------------------------------------------------
     void TrailMeshEmitter::UpdateCB() {
         if (!trailCBMapped_) return;
 
         const auto& t = asset_.trail;
+
+        // Row0: colorInner ← trail.colorEnd (先端 / x=0 側)
         trailCBMapped_->colorInner[0] = t.colorEnd.x;
         trailCBMapped_->colorInner[1] = t.colorEnd.y;
         trailCBMapped_->colorInner[2] = t.colorEnd.z;
         trailCBMapped_->colorInner[3] = t.colorEnd.w;
 
+        // Row1: colorOuter ← trail.colorStart (根本 / x=1 側)
         trailCBMapped_->colorOuter[0] = t.colorStart.x;
         trailCBMapped_->colorOuter[1] = t.colorStart.y;
         trailCBMapped_->colorOuter[2] = t.colorStart.z;
         trailCBMapped_->colorOuter[3] = t.colorStart.w;
 
-        trailCBMapped_->softness = 0.15f;
-        trailCBMapped_->glowPower = 1.5f;
-        trailCBMapped_->distortion = 0.0f;
-        trailCBMapped_->time = time_;
+        // Row2: rimColor ★NEW
+        trailCBMapped_->rimColor[0] = t.rimColor.x;
+        trailCBMapped_->rimColor[1] = t.rimColor.y;
+        trailCBMapped_->rimColor[2] = t.rimColor.z;
+        trailCBMapped_->rimColor[3] = t.rimColor.w;
+
+        // Row3: 基本制御
+        trailCBMapped_->softness   = t.softness;
+        trailCBMapped_->glowPower  = t.glowPower;
+        trailCBMapped_->distortion = t.distortion;
+        trailCBMapped_->time       = time_;
+
+        // Row4: エネルギーライン / スパークル ★NEW
+        trailCBMapped_->energyIntensity = t.energyIntensity;
+        trailCBMapped_->energySpeed     = t.energySpeed;
+        trailCBMapped_->sparkleAmount   = t.sparkleAmount;
+        trailCBMapped_->sparkleSpeed    = t.sparkleSpeed;
+
+        // Row5: フレネル / ウェーブ ★NEW
+        trailCBMapped_->fresnelStrength = t.fresnelStrength;
+        trailCBMapped_->trailSharpness  = t.trailSharpness;
+        trailCBMapped_->colorWaveFreq   = t.colorWaveFreq;
+        trailCBMapped_->colorWaveAmp    = t.colorWaveAmp;
+
+        // Row6: UV / ノイズ ★NEW
+        trailCBMapped_->uvScrollSpeed = t.uvScrollSpeed;
+        trailCBMapped_->noiseOctaves  = t.noiseOctaves;
+        trailCBMapped_->_pad0         = 0.f;
+        trailCBMapped_->_pad1         = 0.f;
     }
 
+    // -------------------------------------------------------
     bool TrailMeshEmitter::LoadAsset(const std::string& filePath) {
         if (!asset_.LoadFromJson(filePath)) return false;
 
@@ -219124,7 +219140,6 @@ namespace YoRigine {
         trailMesh_->Initialize(asset_.trail);
         trailMesh_->Clear();
 
-        // テクスチャロードの保証
         auto* texMgr = TextureManager::GetInstance();
         texMgr->LoadTexture(kFallbackWhite);
 
@@ -219137,10 +219152,10 @@ namespace YoRigine {
 
         EnsureCB();
         UpdateCB();
-
         return true;
     }
 
+    // -------------------------------------------------------
     void TrailMeshEmitter::SetAsset(const YoRigine::VfxEffectAsset& asset) {
         asset_ = asset;
         if (trailMesh_) {
@@ -219150,6 +219165,7 @@ namespace YoRigine {
         UpdateCB();
     }
 
+    // -------------------------------------------------------
     void TrailMeshEmitter::AddPoint(const Vector3& tip, const Vector3& root) {
         if (!isPlaying_ || !trailMesh_) return;
         trailMesh_->AddPoint(tip, root);
@@ -219160,6 +219176,7 @@ namespace YoRigine {
         trailMesh_->AddPoint(tip, root, widthDir);
     }
 
+    // -------------------------------------------------------
     void TrailMeshEmitter::Update(float deltaTime) {
         if (!isPlaying_ || !trailMesh_) return;
         time_ += deltaTime;
@@ -219167,6 +219184,7 @@ namespace YoRigine {
         UpdateCB();
     }
 
+    // -------------------------------------------------------
     void TrailMeshEmitter::Draw() {
         auto* cmd = YoRigine::DirectXCommon::GetInstance()->GetCommandList().Get();
         Draw(cmd);
@@ -219174,17 +219192,16 @@ namespace YoRigine {
 
     void TrailMeshEmitter::Draw(ID3D12GraphicsCommandList* cmdList) {
         if (!isPlaying_ || !trailMesh_) return;
-        if (!camera_) return;
-        if (!trailCBResource_) return;
+        if (!camera_)           return;
+        if (!trailCBResource_)  return;
 
-        // ===== 重要：SRV DescriptorHeap を必ずセット =====
         SrvManager::GetInstance()->PreDraw();
 
-        auto* pm = YPipelineManager::GetInstance();
-        const auto& idx = pm->GetParameterIndices("VfxMeshTrail");
+        auto* pm     = YPipelineManager::GetInstance();
         auto* texMgr = TextureManager::GetInstance();
+        const auto& idx = pm->GetParameterIndices("VfxMeshTrail");
 
-        // SRVハンドル取得
+        // ===== SRV ハンドル取得 (白テクスチャをデフォルトにして GPU Validation を回避) =====
         D3D12_GPU_DESCRIPTOR_HANDLE hNoise =
             (!asset_.trail.noiseTexturePath.empty())
             ? texMgr->GetsrvHandleGPU(asset_.trail.noiseTexturePath)
@@ -219195,25 +219212,35 @@ namespace YoRigine {
             ? texMgr->GetsrvHandleGPU(asset_.trail.texturePath)
             : texMgr->GetsrvHandleGPU(kFallbackWhite);
 
-        // PSO / RootSignature / RootParams
-        cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshTrail"));
-        cmdList->SetPipelineState(pm->GetBlendModePSO("VfxMeshTrail", asset_.trail.blendMode));
+        // ===== パイプライン設定 =====
+        cmdList->SetGraphicsRootSignature(
+            pm->GetRootSignature("VfxMeshTrail"));
+        cmdList->SetPipelineState(
+            pm->GetBlendModePSO("VfxMeshTrail", asset_.trail.blendMode));
 
+        // b0: Camera CBV
         cmdList->SetGraphicsRootConstantBufferView(
             idx.at("gCamera"),
-            camera_->GetCameraResource()->GetGPUVirtualAddress()
-        );
+            camera_->GetCameraResource()->GetGPUVirtualAddress());
+
+        // b1: MeshTrailParams CBV
         cmdList->SetGraphicsRootConstantBufferView(
             idx.at("gMeshParam"),
-            trailCBResource_->GetGPUVirtualAddress()
-        );
-        cmdList->SetGraphicsRootDescriptorTable(idx.at("gTexNoise"), hNoise); // t0
-        cmdList->SetGraphicsRootDescriptorTable(idx.at("gTexRamp"), hRamp);   // t1
+            trailCBResource_->GetGPUVirtualAddress());
 
-        // 描画
+        // t0: ノイズテクスチャ (未設定時は白テクスチャで GPU Validation エラー回避)
+        cmdList->SetGraphicsRootDescriptorTable(
+            idx.at("gTexNoise"), hNoise);
+
+        // t1: ランプテクスチャ (同上)
+        cmdList->SetGraphicsRootDescriptorTable(
+            idx.at("gTexRamp"), hRamp);
+
+        // ===== 描画 =====
         trailMesh_->Draw(cmdList);
     }
 
+    // -------------------------------------------------------
     void TrailMeshEmitter::Play() {
         isPlaying_ = true;
         time_ = 0.0f;
@@ -219227,10 +219254,14 @@ namespace YoRigine {
 
 } // namespace YoRigine
 
+
 ============================================================
 File Path: YEngine/Generators/Vfx/VfxMesh/TrailMeshEmitter.h
 ============================================================
 #pragma once
+// ===========================================================
+// TrailMeshEmitter.h
+// ===========================================================
 #include <memory>
 #include <string>
 #include <wrl.h>
@@ -219242,15 +219273,41 @@ File Path: YEngine/Generators/Vfx/VfxMesh/TrailMeshEmitter.h
 
 namespace YoRigine {
 
-    // Emitterが自前で管理する定数バッファの構造体
+    // ★ HLSL MeshTrailParams と 1:1 で一致させること
+    // レイアウト (16バイト境界):
+    //   Row0 : colorInner[4]
+    //   Row1 : colorOuter[4]
+    //   Row2 : rimColor[4]
+    //   Row3 : softness, glowPower, distortion, time
+    //   Row4 : energyIntensity, energySpeed, sparkleAmount, sparkleSpeed
+    //   Row5 : fresnelStrength, trailSharpness, colorWaveFreq, colorWaveAmp
+    //   Row6 : uvScrollSpeed, noiseOctaves, _pad0, _pad1
+    // 合計 112 bytes < 256 (1 CBV スロット内に収まる)
     struct MeshTrailParamsCB
     {
-        float colorInner[4];
-        float colorOuter[4];
-        float softness;
+        float colorInner[4];      // Row0
+        float colorOuter[4];      // Row1
+        float rimColor[4];        // Row2 ★NEW
+
+        float softness;           // Row3
         float glowPower;
         float distortion;
         float time;
+
+        float energyIntensity;    // Row4 ★NEW
+        float energySpeed;
+        float sparkleAmount;
+        float sparkleSpeed;
+
+        float fresnelStrength;    // Row5 ★NEW
+        float trailSharpness;
+        float colorWaveFreq;
+        float colorWaveAmp;
+
+        float uvScrollSpeed;      // Row6 ★NEW
+        float noiseOctaves;
+        float _pad0;
+        float _pad1;
     };
 
     class TrailMeshEmitter
@@ -219259,30 +219316,22 @@ namespace YoRigine {
         TrailMeshEmitter() = default;
         ~TrailMeshEmitter();
 
-        // アセットのロードと反映
         bool LoadAsset(const std::string& filePath);
-
-        // Editorからのリアルタイム反映用
         void SetAsset(const YoRigine::VfxEffectAsset& asset);
 
-        // ポイント追加
         void AddPoint(const Vector3& tip, const Vector3& root);
         void AddPoint(const Vector3& tip, const Vector3& root, const Vector3& widthDir);
 
         void Update(float deltaTime);
-
-        // Draw を完結させる：呼び出し側は cmdList を渡さなくて良い
         void Draw();
-        // 既存互換
         void Draw(ID3D12GraphicsCommandList* cmdList);
 
-        // 再生・停止
         void Play();
         void Stop();
 
     public:
-        YoRigine::TrailMesh* GetTrailMesh() const { return trailMesh_.get(); }
-        const YoRigine::VfxEffectAsset& GetAsset() const { return asset_; }
+        YoRigine::TrailMesh*              GetTrailMesh() const { return trailMesh_.get(); }
+        const YoRigine::VfxEffectAsset&   GetAsset()     const { return asset_; }
         void SetCamera(Camera* camera) { camera_ = camera; }
 
     private:
@@ -219290,26 +219339,25 @@ namespace YoRigine {
         void UpdateCB();
 
     private:
-        YoRigine::VfxEffectAsset asset_;
+        YoRigine::VfxEffectAsset             asset_;
         std::unique_ptr<YoRigine::TrailMesh> trailMesh_;
         bool isPlaying_ = false;
 
         Camera* camera_ = nullptr;
-        float time_ = 0.0f; // シェーダーに渡す時間
+        float   time_   = 0.0f;
 
-        // 定数バッファ
         Microsoft::WRL::ComPtr<ID3D12Resource> trailCBResource_;
         MeshTrailParamsCB* trailCBMapped_ = nullptr;
     };
 
 } // namespace YoRigine
 
+
 ============================================================
 File Path: YEngine/Generators/Vfx/VfxMesh/VfxEffectAsset.cpp
 ============================================================
 // ===========================================================
 // VfxEffectAsset.cpp
-// nlohmann/json を使用 (既存のJsonローダーに合わせて変更可)
 // ===========================================================
 #include "VfxEffectAsset.h"
 #include <fstream>
@@ -219323,35 +219371,67 @@ namespace YoRigine {
     // -------------------------------------------------------
     void VfxEffectAsset::SaveToJson(const std::string& filePath) const {
         json j;
-        j["name"] = name;
-        j["useTrail"] = useTrail;
+        j["name"]           = name;
+        j["useTrail"]       = useTrail;
         j["useLightVolume"] = useLightVolume;
 
         // --- Trail ---
         auto& t = j["trail"];
-        t["widthStart"] = trail.widthStart;
-        t["widthEnd"] = trail.widthEnd;
-        t["lifetime"] = trail.lifetime;
-        t["maxPoints"] = trail.maxPoints;
-        t["colorStart"] = Vector4ToJson(trail.colorStart);
-        t["colorEnd"] = Vector4ToJson(trail.colorEnd);
-        t["blendMode"] = static_cast<int>(trail.blendMode);
-        t["uvScrollSpeed"] = trail.uvScrollSpeed;
-        t["texturePath"] = trail.texturePath;
-        t["noiseTexturePath"] = trail.noiseTexturePath;
-		t["shapeType"] = static_cast<int>(trail.shapeType);
-		t["widthSegments"] = trail.widthSegments;
+        // 基本
+        t["widthStart"]        = trail.widthStart;
+        t["widthEnd"]          = trail.widthEnd;
+        t["lifetime"]          = trail.lifetime;
+        t["maxPoints"]         = trail.maxPoints;
+        t["colorStart"]        = Vector4ToJson(trail.colorStart);
+        t["colorEnd"]          = Vector4ToJson(trail.colorEnd);
+        t["blendMode"]         = static_cast<int>(trail.blendMode);
+        t["uvScrollSpeed"]     = trail.uvScrollSpeed;
+        t["texturePath"]       = trail.texturePath;
+        t["noiseTexturePath"]  = trail.noiseTexturePath;
+        t["shapeType"]         = static_cast<int>(trail.shapeType);
+        t["widthSegments"]     = trail.widthSegments;
+        t["arcAngleDeg"]       = trail.arcAngleDeg;
+        t["crescentShape"]     = trail.crescentShape;
+        t["thickness"]         = trail.thickness;
+        t["splineSubdivisions"] = trail.splineSubdivisions;
         for (const auto& v : trail.customVertices) {
-            t["trail"]["customVertices"].push_back({ v.x, v.y });
+            t["customVertices"].push_back({ v.x, v.y });
         }
-		t["splineSubdivisions"] = trail.splineSubdivisions;
+
+        // ★★ 拡張パラメータ ★★
+        // グロー / エッジ
+        t["softness"]        = trail.softness;
+        t["glowPower"]       = trail.glowPower;
+        t["fresnelStrength"] = trail.fresnelStrength;
+        t["trailSharpness"]  = trail.trailSharpness;
+        t["rimColor"]        = Vector4ToJson(trail.rimColor);
+
+        // ノイズ歪み
+        t["distortion"]   = trail.distortion;
+        t["noiseOctaves"] = trail.noiseOctaves;
+
+        // エネルギーライン
+        t["energyIntensity"] = trail.energyIntensity;
+        t["energySpeed"]     = trail.energySpeed;
+
+        // スパークル
+        t["sparkleAmount"] = trail.sparkleAmount;
+        t["sparkleSpeed"]  = trail.sparkleSpeed;
+
+        // カラーウェーブ
+        t["colorWaveFreq"] = trail.colorWaveFreq;
+        t["colorWaveAmp"]  = trail.colorWaveAmp;
+
+        // 幅ウェーブ
+        t["widthWaveAmp"]  = trail.widthWaveAmp;
+        t["widthWaveFreq"] = trail.widthWaveFreq;
 
         // --- LightVolume ---
         auto& lv = j["lightVolume"];
         lv["halfExtents"] = Vector3ToJson(lightVolume.halfExtents);
-        lv["color"] = Vector4ToJson(lightVolume.color);
-        lv["intensity"] = lightVolume.intensity;
-        lv["isEnable"] = lightVolume.isEnable;
+        lv["color"]       = Vector4ToJson(lightVolume.color);
+        lv["intensity"]   = lightVolume.intensity;
+        lv["isEnable"]    = lightVolume.isEnable;
 
         std::ofstream ofs(filePath);
         ofs << j.dump(4);
@@ -219368,43 +219448,80 @@ namespace YoRigine {
         try { ifs >> j; }
         catch (...) { Logger("VfxEffectAsset: JSON parse error: " + filePath); return false; }
 
-        name = j.value("name", name);
-        useTrail = j.value("useTrail", useTrail);
+        name           = j.value("name",           name);
+        useTrail       = j.value("useTrail",       useTrail);
         useLightVolume = j.value("useLightVolume", useLightVolume);
 
         if (j.contains("trail")) {
             auto& t = j["trail"];
-            trail.widthStart = t.value("widthStart", trail.widthStart);
-            trail.widthEnd = t.value("widthEnd", trail.widthEnd);
-            trail.lifetime = t.value("lifetime", trail.lifetime);
-            trail.maxPoints = t.value("maxPoints", trail.maxPoints);
-            trail.uvScrollSpeed = t.value("uvScrollSpeed", trail.uvScrollSpeed);
-            trail.texturePath = t.value("texturePath", trail.texturePath);
+
+            // 基本
+            trail.widthStart       = t.value("widthStart",       trail.widthStart);
+            trail.widthEnd         = t.value("widthEnd",         trail.widthEnd);
+            trail.lifetime         = t.value("lifetime",         trail.lifetime);
+            trail.maxPoints        = t.value("maxPoints",        trail.maxPoints);
+            trail.uvScrollSpeed    = t.value("uvScrollSpeed",    trail.uvScrollSpeed);
+            trail.texturePath      = t.value("texturePath",      trail.texturePath);
             trail.noiseTexturePath = t.value("noiseTexturePath", trail.noiseTexturePath);
-            trail.blendMode = static_cast<BlendMode>(t.value("blendMode", static_cast<int>(trail.blendMode)));
+            trail.blendMode        = static_cast<BlendMode>(t.value("blendMode", static_cast<int>(trail.blendMode)));
+            trail.shapeType        = static_cast<TrailShapeType>(t.value("shapeType", static_cast<int>(trail.shapeType)));
+            trail.widthSegments    = t.value("widthSegments",    trail.widthSegments);
+            trail.arcAngleDeg      = t.value("arcAngleDeg",      trail.arcAngleDeg);
+            trail.crescentShape    = t.value("crescentShape",    trail.crescentShape);
+            trail.thickness        = t.value("thickness",        trail.thickness);
+            trail.splineSubdivisions = t.value("splineSubdivisions", trail.splineSubdivisions);
+
             if (t.contains("colorStart")) trail.colorStart = JsonToVector4(t["colorStart"]);
-            if (t.contains("colorEnd"))   trail.colorEnd = JsonToVector4(t["colorEnd"]);
-			trail.shapeType = static_cast<TrailShapeType>(t.value("shapeType", static_cast<int>(trail.shapeType)));
-            trail.widthSegments = t.value("widthSegments", trail.widthSegments);
-            if (t["trail"].contains("customVertices")) {
+            if (t.contains("colorEnd"))   trail.colorEnd   = JsonToVector4(t["colorEnd"]);
+
+            if (t.contains("customVertices")) {
                 trail.customVertices.clear();
-                for (const auto& v : t["trail"]["customVertices"]) {
+                for (const auto& v : t["customVertices"]) {
                     trail.customVertices.push_back({ v[0].get<float>(), v[1].get<float>() });
                 }
             }
-			trail.splineSubdivisions = t.value("splineSubdivisions", trail.splineSubdivisions);
+
+            // ★★ 拡張パラメータ (既存 JSON との後方互換: value() でデフォルト値を持つ) ★★
+            // グロー / エッジ
+            trail.softness        = t.value("softness",        trail.softness);
+            trail.glowPower       = t.value("glowPower",       trail.glowPower);
+            trail.fresnelStrength = t.value("fresnelStrength", trail.fresnelStrength);
+            trail.trailSharpness  = t.value("trailSharpness",  trail.trailSharpness);
+            if (t.contains("rimColor")) trail.rimColor = JsonToVector4(t["rimColor"]);
+
+            // ノイズ歪み
+            trail.distortion  = t.value("distortion",  trail.distortion);
+            trail.noiseOctaves = t.value("noiseOctaves", trail.noiseOctaves);
+
+            // エネルギーライン
+            trail.energyIntensity = t.value("energyIntensity", trail.energyIntensity);
+            trail.energySpeed     = t.value("energySpeed",     trail.energySpeed);
+
+            // スパークル
+            trail.sparkleAmount = t.value("sparkleAmount", trail.sparkleAmount);
+            trail.sparkleSpeed  = t.value("sparkleSpeed",  trail.sparkleSpeed);
+
+            // カラーウェーブ
+            trail.colorWaveFreq = t.value("colorWaveFreq", trail.colorWaveFreq);
+            trail.colorWaveAmp  = t.value("colorWaveAmp",  trail.colorWaveAmp);
+
+            // 幅ウェーブ
+            trail.widthWaveAmp  = t.value("widthWaveAmp",  trail.widthWaveAmp);
+            trail.widthWaveFreq = t.value("widthWaveFreq", trail.widthWaveFreq);
         }
+
         if (j.contains("lightVolume")) {
             auto& lv = j["lightVolume"];
             lightVolume.intensity = lv.value("intensity", lightVolume.intensity);
-            lightVolume.isEnable = lv.value("isEnable", lightVolume.isEnable);
+            lightVolume.isEnable  = lv.value("isEnable",  lightVolume.isEnable);
             if (lv.contains("halfExtents")) lightVolume.halfExtents = JsonToVector3(lv["halfExtents"]);
-            if (lv.contains("color"))       lightVolume.color = JsonToVector4(lv["color"]);
+            if (lv.contains("color"))       lightVolume.color       = JsonToVector4(lv["color"]);
         }
         return true;
     }
 
 } // namespace YoRigine
+
 
 ============================================================
 File Path: YEngine/Generators/Vfx/VfxMesh/VfxEffectAsset.h
@@ -219415,6 +219532,8 @@ File Path: YEngine/Generators/Vfx/VfxMesh/VfxEffectAsset.h
 //
 // Trail と LightVolume のパラメータをまとめるデータ構造
 // JSON にシリアライズして保存・ホットリロードに対応
+//
+// ★ UE Niagara Ribbon Trail 参考の拡張パラメータ追加済み
 // ===========================================================
 #include "MathFunc.h"
 #include <string>
@@ -219428,67 +219547,98 @@ namespace YoRigine {
 
     enum class TrailShapeType : int
     {
-        Flat = 0,  // 従来の平板 (tip-root 2点)
-        Arc = 1,   // 円弧断面 (widthSegments 分割)
-        Fan = 2,   // 扇形断面 (tip を中心に root 側を広げる)
+        Flat   = 0,
+        Arc    = 1,
+        Fan    = 2,
         Custom = 3,
     };
 
 
     struct TrailEffectParam
     {
-        float widthStart = 0.3f;    // 根元の幅
-        float widthEnd = 0.0f;      // 先端の幅
-        float lifetime = 0.5f;      // トレイル1点の寿命(秒)
-        int   maxPoints = 512;      // 最大保持ポイント数
+        // --- 基本 ---
+        float widthStart   = 0.3f;
+        float widthEnd     = 0.0f;
+        float lifetime     = 0.5f;
+        int   maxPoints    = 512;
 
-        Vector4 colorStart = { 1.f, 0.8f, 0.f, 1.f };   // 根元カラー(RGBA)
-        Vector4 colorEnd = { 1.f, 0.3f, 0.f, 0.f };     // 先端カラー(RGBA)
+        Vector4 colorStart = { 1.f, 0.8f, 0.f, 1.f };
+        Vector4 colorEnd   = { 1.f, 0.3f, 0.f, 0.f };
 
-        BlendMode blendMode = BlendMode::kBlendModeAdd; // ブレンドモード
+        BlendMode blendMode      = BlendMode::kBlendModeAdd;
+        float     uvScrollSpeed  = 0.5f;
 
-        float uvScrollSpeed = 0.5f;         // UV スクロール速度
-        std::string texturePath = "";       // テクスチャパス (空なら白)
-        std::string noiseTexturePath = "";  // 歪みノイズ
+        std::string texturePath      = "";
+        std::string noiseTexturePath = "";
 
-        TrailShapeType shapeType = TrailShapeType::Flat;
-        int widthSegments = 1;
-        float arcAngleDeg = 120.0f;
+        // --- 断面形状 ---
+        TrailShapeType shapeType     = TrailShapeType::Flat;
+        int            widthSegments = 1;
+        float          arcAngleDeg   = 120.0f;
 
-        bool  crescentShape = true;  // 三日月型（中間を太く、両端を細くする）
-        float thickness = 0.1f;      // 厚み（立体感）
+        bool  crescentShape = true;
+        float thickness     = 0.1f;
         std::vector<Vector2> customVertices;
-		int splineSubdivisions = 4; // Custom 形状のスプライン補間数
+        int splineSubdivisions = 4;
+
+        // ★★ UE Niagara 参考の拡張パラメータ ★★
+
+        // --- グロー / エッジ ---
+        float   softness       = 0.15f;    // エッジソフトフェード幅
+        float   glowPower      = 1.5f;     // 中心コアグロー強度
+        float   fresnelStrength = 1.0f;    // エッジフレネルグロー強度
+        float   trailSharpness  = 2.0f;    // エッジシャープネス
+        Vector4 rimColor       = { 0.4f, 0.7f, 1.f, 1.f }; // エッジリムカラー
+
+        // --- ノイズ歪み ---
+        float distortion    = 0.0f;     // UV 歪み強度 (0=OFF)
+        float noiseOctaves  = 2.0f;     // FBM オクターブ数 (1-4)
+
+        // --- エネルギーライン (UE の電気/魔力ライン) ---
+        float energyIntensity = 1.5f;   // エネルギーライン輝度
+        float energySpeed     = 2.5f;   // エネルギーラインスクロール速度
+
+        // --- スパークル ---
+        float sparkleAmount = 0.4f;     // スパークル輝度 (0=OFF)
+        float sparkleSpeed  = 4.0f;     // スパークルアニメ速度
+
+        // --- カラーウェーブ ---
+        float colorWaveFreq = 3.0f;     // 色波の周波数
+        float colorWaveAmp  = 0.15f;    // 色波の振幅 (0=OFF)
+
+        // --- 幅ウェーブ (慣性感) ---
+        float widthWaveAmp  = 0.05f;    // 幅のサイン波振幅 (0=OFF)
+        float widthWaveFreq = 8.0f;     // 幅のサイン波周波数
     };
 
     // -------------------------------------------------------
-    // LightVolume パラメータ
+    // LightVolume パラメータ (変更なし)
     // -------------------------------------------------------
     struct LightVolumeEffectParam
     {
-        Vector3 halfExtents = { 2.f, 1.5f, 5.f }; // OBB 半辺長 (X/Y/Z)
-        Vector4 color = { 1.f, 0.9f, 0.f, 0.15f }; // RGB + アルファ強度
-        float intensity = 1.0f;
-        bool  isEnable = true;
+        Vector3 halfExtents  = { 2.f, 1.5f, 5.f };
+        Vector4 color        = { 1.f, 0.9f, 0.f, 0.15f };
+        float   intensity    = 1.0f;
+        bool    isEnable     = true;
     };
 
     // -------------------------------------------------------
-    // まとめアセット（1ファイル = 1エフェクト定義）
+    // まとめアセット
     // -------------------------------------------------------
     struct VfxEffectAsset
     {
         std::string       name = "NewEffect";
         TrailEffectParam  trail;
         LightVolumeEffectParam lightVolume;
-        bool useTrail = true;
+        bool useTrail       = true;
         bool useLightVolume = true;
 
-        // JSON 入出力
         void SaveToJson(const std::string& filePath) const;
         bool LoadFromJson(const std::string& filePath);
     };
 
 } // namespace YoRigine
+
 
 ============================================================
 File Path: YEngine/Generators/Vfx/VfxMesh/VfxMeshEditor.cpp
@@ -230054,12 +230204,23 @@ void Motion::SaveBinary(const Motion& motion, const std::string& animationName, 
 {
 	std::string safeName = animationName;
 	std::replace(safeName.begin(), safeName.end(), ' ', '_');
-	std::string fullPath = path + "_" + safeName + ".anim";
+	std::string fullPath = path;
+	if (fullPath.size() < 5 || fullPath.substr(fullPath.size() - 5) != ".anim") {
+		// 拡張子がない場合のみ animName を付加
+		std::string safeName2 = animationName;
+		std::replace(safeName2.begin(), safeName2.end(), ' ', '_');
+		fullPath += "_" + safeName2 + ".anim";
+	}
+
+	// ディレクトリが存在しなければ作成
+	std::filesystem::path filePath(fullPath);
+	if (filePath.has_parent_path()) {
+		std::filesystem::create_directories(filePath.parent_path());
+	}
 
 	std::ofstream ofs(fullPath, std::ios::binary);
 	if (!ofs) {
-		std::cerr << "[ERROR] 書き込みできない: " << fullPath << std::endl;
-		return;
+		throw std::runtime_error("書き込みできない: " + fullPath);
 	}
 
 	// ------------------------------------------------------------
@@ -230361,6 +230522,8 @@ File Path: YEngine/Model/Motion/Core/Motion.h
 #include <map>
 #include <vector>
 #include <string>
+#include <algorithm>
+#include <cmath>
 
 #include "../../Skeleton/Joint.h"
 #include "../../Node/Node.h"
@@ -230392,8 +230555,8 @@ public:
 		tValue value;
 	};
 
-	using KeyframeVector3 = Keyframe<Vector3>;
-	using KeyframeFloat = Keyframe<float>;
+	using KeyframeVector3    = Keyframe<Vector3>;
+	using KeyframeFloat      = Keyframe<float>;
 	using KeyframeQuaternion = Keyframe<Quaternion>;
 
 	template<typename tValue>
@@ -230402,19 +230565,51 @@ public:
 	};
 
 	struct NodeAnimation {
-		AnimationCurve<Vector3> translate;
+		AnimationCurve<Vector3>    translate;
 		AnimationCurve<Quaternion> rotate;
-		AnimationCurve<Vector3> scale;
-		InterpolationType interpolationType;
+		AnimationCurve<Vector3>    scale;
+		InterpolationType          interpolationType;
 	};
 
+	// ---------------------------------------------------------------
+	// タイムスケールカーブ
+	// X = 正規化アニメーション時間 [0, 1]
+	// Y = 再生速度倍率 (1.0 = 等速、2.0 = 2倍速、0.5 = 半速)
+	// ---------------------------------------------------------------
 	struct SpeedCurve {
-		AnimationCurve<float> playbackSpeed;
+		AnimationCurve<float> curve;   // keyframes: time=normalized_t, value=speed_multiplier
+
+		bool IsEmpty() const { return curve.keyframes.empty(); }
+
+		/// 正規化時間 t [0,1] での速度倍率を線形補間で返す。
+		/// カーブが空の場合は 1.0f を返す。
+		float Evaluate(float normalizedT) const
+		{
+			const auto& kfs = curve.keyframes;
+			if (kfs.empty()) return 1.0f;
+			if (normalizedT <= kfs.front().time) return kfs.front().value;
+			if (normalizedT >= kfs.back().time)  return kfs.back().value;
+
+			// 二分探索で区間を特定
+			auto it = std::lower_bound(kfs.begin(), kfs.end(), normalizedT,
+				[](const Keyframe<float>& kf, float t) { return kf.time < t; });
+
+			if (it == kfs.begin()) return kfs.front().value;
+			auto prev = std::prev(it);
+
+			float range = it->time - prev->time;
+			if (range < 1e-6f) return prev->value;
+			float alpha = (normalizedT - prev->time) / range;
+			return prev->value + alpha * (it->value - prev->value);
+		}
 	};
 
 	struct AnimationModel {
 		float duration_;
 		std::map<std::string, NodeAnimation> nodeAnimations_;
+
+		// タイムスケールカーブ（省略可能）
+		SpeedCurve speedCurve;
 	};
 
 public:
@@ -230433,25 +230628,43 @@ public:
 	// ============================================================
 	// キーフレーム計算
 	// ============================================================
-	float CalculateValue(const std::vector<KeyframeFloat>& keyframes, float time, InterpolationType interpolationType);
-	Vector3 CalculateValue(const std::vector<KeyframeVector3>& keyframes, float time, InterpolationType interpolationType);
+	float      CalculateValue(const std::vector<KeyframeFloat>&      keyframes, float time, InterpolationType interpolationType);
+	Vector3    CalculateValue(const std::vector<KeyframeVector3>&    keyframes, float time, InterpolationType interpolationType);
 	Quaternion CalculateValue(const std::vector<KeyframeQuaternion>& keyframes, float time, InterpolationType interpolationType);
 
-public:
+	// ============================================================
+	// タイムスケールカーブ
+	// ============================================================
+
+	/// 正規化時間 t [0,1] での速度倍率を返す（カーブが空なら 1.0f）
+	float EvaluateSpeedCurve(float normalizedT) const
+	{
+		return animation_.speedCurve.Evaluate(normalizedT);
+	}
+
+	bool HasSpeedCurve() const { return !animation_.speedCurve.IsEmpty(); }
+
+	SpeedCurve&       GetSpeedCurve()       { return animation_.speedCurve; }
+	const SpeedCurve& GetSpeedCurve() const { return animation_.speedCurve; }
+
+	/// スピードカーブをクリアして等速に戻す
+	void ClearSpeedCurve() { animation_.speedCurve.curve.keyframes.clear(); }
+
 	// ============================================================
 	// アクセッサ
 	// ============================================================
-	float GetDuration() const { return animation_.duration_; }
-	void SetDuration(float duration) { animation_.duration_ = duration; }
+	float GetDuration() const              { return animation_.duration_; }
+	void  SetDuration(float duration)      { animation_.duration_ = duration; }
 
 public:
 	// ============================================================
 	// メンバ変数
 	// ============================================================
 	AnimationModel animation_;
-	Matrix4x4 localMatrix_;
-	float animationTime_ = 0.0f;
+	Matrix4x4      localMatrix_;
+	float          animationTime_ = 0.0f;
 };
+
 
 ============================================================
 File Path: YEngine/Model/Motion/Core/MotionSystem.cpp
@@ -230515,15 +230728,31 @@ void MotionSystem::Update(float deltaTime)
 	// 通常のアニメーション再生処理
 	// ------------------------------------------------------------
 	bool wasFinished = isFinished_;
-	animationTime_ += deltaTime * GetEffectiveSpeed();
 
+	// タイムスケールカーブが設定されている場合は正規化時間で速度倍率を取得
 	float duration = animation_->GetDuration();
+	float speedMul = 1.0f;
+	if (animation_->HasSpeedCurve() && duration > 0.0f) {
+		float normalizedT = std::clamp(animationTime_ / duration, 0.0f, 1.0f);
+		speedMul = animation_->EvaluateSpeedCurve(normalizedT);
+	}
+	animationTime_ += deltaTime * GetEffectiveSpeed() * speedMul;
+
 	if (animationTime_ >= duration) {
 		if (playMode_ == MotionPlayMode::Loop) {
 			animationTime_ = 0.0f;
 		}
 		else {
 			animationTime_ = duration;
+			isFinished_ = true;
+		}
+	}
+	else if (animationTime_ < 0.0f) {
+		if (playMode_ == MotionPlayMode::Loop) {
+			animationTime_ = duration;
+		}
+		else {
+			animationTime_ = 0.0f;
 			isFinished_ = true;
 		}
 	}
@@ -230808,6 +231037,7 @@ public:
 	float GetDuration() const { return animation_ ? animation_->GetDuration() : 0.0f; }
 
 	Motion* GetAnimation() const { return animation_; }
+	void SetAnimation(Motion* anim) { animation_ = anim; }
 
 private:
 	// ============================================================
@@ -230908,6 +231138,7 @@ File Path: YEngine/Model/Motion/Editor/MotionEditor.cpp
 // Standard
 #include <algorithm>
 #include <cmath>
+#include "Panels/SpeedCurvePanel.h"
 
 // ============================================================
 // コンテキストヘルパーの実装
@@ -231029,6 +231260,7 @@ void MotionEditor::Initialize(Camera* camera)
 	RegisterPanel(std::make_unique<PropertyPanel>());
 	RegisterPanel(std::make_unique<TimelinePanel>());
 	RegisterPanel(std::make_unique<StatusBarPanel>());
+	RegisterPanel(std::make_unique<SpeedCurvePanel>());
 }
 
 // ============================================================
@@ -231059,6 +231291,19 @@ void MotionEditor::Update()
 		if (std::abs(msTime - context_.scrubTime) > 1e-4f) {
 			context_.scrubTime = msTime;
 		}
+
+		// ピンポン再生: 端に達したら方向反転
+		if (context_.isPingPong && context_.isPlaying) {
+			float duration = ms->GetDuration();
+			if (context_.pingPongForward && msTime >= duration - 0.01f) {
+				context_.pingPongForward = false;
+				ms->SetMotionSpeed(-context_.playbackSpeed);
+			}
+			else if (!context_.pingPongForward && msTime <= 0.01f) {
+				context_.pingPongForward = true;
+				ms->SetMotionSpeed(context_.playbackSpeed);
+			}
+		}
 	}
 
 	//------------------------------------------------------------
@@ -231066,22 +231311,25 @@ void MotionEditor::Update()
 	//------------------------------------------------------------
 	if (m && m->GetSkeleton()) {
 		// 非再生中の場合、スクラブ時間に合わせたポーズを強制適用
+		// ※スクラブ時間が変化した時のみ適用し、ユーザーの手動編集を保護する
 		if (ms && !context_.isPlaying && context_.currentMotion) {
-			context_.currentMotion->ApplyAnimation(m->GetSkeleton()->GetJoints(), context_.scrubTime);
+			bool scrubChanged = std::abs(context_.scrubTime - context_.lastAppliedScrubTime) > 1e-5f;
+			if (scrubChanged) {
+				context_.currentMotion->ApplyAnimation(m->GetSkeleton()->GetJoints(), context_.scrubTime);
+				context_.lastAppliedScrubTime = context_.scrubTime;
 
-			if (!context_.selBone.empty()) {
+				if (!context_.selBone.empty()) {
+					SyncJointToBuffer(context_.selBone);
+				}
+			}
 #ifdef USE_IMGUI
-				// 操作中の場合はジョイントへ同期、それ以外はジョイントから取得
+			else if (!context_.selBone.empty()) {
+				// スクラブ時間が変わっていない場合、ギズモ操作中はバッファ→ジョイントへ同期
 				if (draggingBone_ || gizmoCtrl_.IsUsing()) {
 					SyncBufferToJoint();
 				}
-				else {
-					SyncJointToBuffer(context_.selBone);
-				}
-#else
-				SyncJointToBuffer(context_.selBone);
-#endif
 			}
+#endif
 		}
 
 		// 行列計算とスキニング用パレットの更新
@@ -231167,14 +231415,19 @@ void MotionEditor::ShowEditor()
 			if (context_.isPlaying) {
 				if (target->GetModel() && target->GetModel()->GetMotionSystem()) target->GetModel()->GetMotionSystem()->Stop();
 				context_.isPlaying = false;
+				context_.lastAppliedScrubTime = -1.0f;
 				context_.statusMsg = "[ Space ] 一時停止";
 			}
 			else {
 				if (target->GetModel() && target->GetModel()->GetMotionSystem()) {
 					auto* ms = target->GetModel()->GetMotionSystem();
+					// エディタで読み込んだモーションをMotionSystemに同期
+					if (context_.currentMotion && ms->GetAnimation() != context_.currentMotion) {
+						ms->SetAnimation(context_.currentMotion);
+					}
 					float savedTime = ms->GetAnimationTime();
 					if (savedTime >= ms->GetDuration() || ms->IsFinished()) savedTime = 0.0f;
-					if (context_.isLoop) target->PlayLoop(); else target->PlayOnce();
+					if (context_.isLoop) ms->PlayLoop(); else ms->PlayOnce();
 					ms->SetAnimationTime(savedTime);
 				}
 				context_.isPlaying = true;
@@ -231192,6 +231445,51 @@ void MotionEditor::ShowEditor()
 			}
 			context_.selKF.Clear();
 			context_.statusMsg = "[ Del ] キーフレーム削除";
+		}
+
+		// キーフレーム追加
+		if (ImGui::IsKeyPressed(ImGuiKey_I) && context_.currentMotion) {
+			if (!context_.selBone.empty()) {
+				// 選択中のボーンに対してキーフレーム追加
+				SyncJointToBuffer(context_.selBone); // 追加前に最新の値をバッファに反映
+				if (context_.AddKeyframe) {
+					context_.AddKeyframe(context_.selBone, context_.scrubTime);
+				}
+				context_.statusMsg = "[ I ] キーフレーム追加" + context_.selBone;
+			}
+			else {
+				// ボーンが選択されていない場合、全ボーンのポーズを保存
+				SavePose(context_.scrubTime);
+				context_.statusMsg = "[ I ] ポーズ保存 (全ボーン)" 
+					+ std::to_string(context_.scrubTime) + "s";
+			}
+		}
+
+		// コピー (Ctrl+C)
+		if (ImGui::GetIO().KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_C) && !context_.selBone.empty()) {
+			auto& cb = context_.clipboard;
+			cb.hasData = true;
+			cb.translate = { context_.editT[0], context_.editT[1], context_.editT[2] };
+			cb.rotate = EulerToQuaternion({ context_.editR[0] * (kPi / 180), context_.editR[1] * (kPi / 180), context_.editR[2] * (kPi / 180) });
+			cb.scale = { context_.editS[0], context_.editS[1], context_.editS[2] };
+			cb.sourceBone = context_.selBone;
+			cb.sourceTime = context_.scrubTime;
+			context_.statusMsg = "[ Ctrl+C ] コピー: " + context_.selBone;
+		}
+
+		// ペースト (Ctrl+V)
+		if (ImGui::GetIO().KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_V) && !context_.selBone.empty() && context_.clipboard.hasData) {
+			auto& cb = context_.clipboard;
+			context_.editT[0] = cb.translate.x; context_.editT[1] = cb.translate.y; context_.editT[2] = cb.translate.z;
+			Vector3 euler = QuaternionToEuler(cb.rotate);
+			context_.editR[0] = euler.x * (180 / kPi); context_.editR[1] = euler.y * (180 / kPi); context_.editR[2] = euler.z * (180 / kPi);
+			context_.editS[0] = cb.scale.x; context_.editS[1] = cb.scale.y; context_.editS[2] = cb.scale.z;
+			if (context_.SyncBufferToJoint) context_.SyncBufferToJoint();
+			// ペースト時にキーフレームも自動挿入
+			if (context_.AddKeyframe && context_.currentMotion) {
+				context_.AddKeyframe(context_.selBone, context_.scrubTime);
+			}
+			context_.statusMsg = "[ Ctrl+V ] ペースト + KF挿入: " + context_.selBone;
 		}
 	}
 
@@ -231216,6 +231514,7 @@ void MotionEditor::ShowEditor()
 	panels_[0]->DrawImGui(); // MenuBar
 	panels_[1]->DrawImGui(); // SaveLoad
 	panels_[2]->DrawImGui(); // Toolbar
+	panels_[7]->DrawImGui(); // SpeedCurve
 	ImGui::Separator();
 
 	float contentW = ImGui::GetContentRegionAvail().x;
@@ -231716,6 +232015,8 @@ File Path: YEngine/Model/Motion/Editor/MotionEditorContext.h
 #include <Editor/Command/CommandHistory.h>
 // App
 #include "KeyFrame.h"
+#include "Quaternion.h"
+#include "Vector3.h"
 
 // ============================================================
 // 前方宣言
@@ -231723,6 +232024,20 @@ File Path: YEngine/Model/Motion/Editor/MotionEditorContext.h
 class Motion;
 class Camera;
 class Object3d;
+
+// ============================================================
+// キーフレームクリップボード
+// ============================================================
+struct KeyframeClipboard
+{
+	bool hasData = false;
+	Vector3 translate = { 0, 0, 0 };
+	Quaternion rotate = { 0, 0, 0, 1 };
+	Vector3 scale = { 1, 1, 1 };
+	// コピー元情報（表示用）
+	std::string sourceBone = "";
+	float sourceTime = 0.0f;
+};
 
 // ============================================================
 // モーションエディタの共有コンテキスト
@@ -231741,9 +232056,19 @@ struct MotionEditorContext
 
 	// 再生状態
 	float scrubTime = 0.0f;
+	float lastAppliedScrubTime = -1.0f;
 	bool isPlaying = true;
 	bool isLoop = true;
+	bool isReverse = false;
+	bool isPingPong = false;
+	bool pingPongForward = true;
+	float playbackSpeed = 1.0f;
 	float timelineZoom = 80.0f;
+
+	// トリム範囲 (0 = 無効)
+	float trimStart = 0.0f;
+	float trimEnd = 0.0f;
+	bool useTrim = false;
 
 	// 選択状態
 	std::string selBone = "";
@@ -231753,6 +232078,9 @@ struct MotionEditorContext
 	float editT[3] = { 0, 0, 0 };
 	float editR[3] = { 0, 0, 0 };
 	float editS[3] = { 1, 1, 1 };
+
+	// キーフレームクリップボード
+	KeyframeClipboard clipboard;
 
 	// UIフラグとレイアウト
 	bool isDrawBone = false;
@@ -231866,9 +232194,9 @@ void BoneListPanel::DrawImGui()
 #endif
 }
 
+#ifdef USE_IMGUI
 void BoneListPanel::DrawBoneNode(const std::vector<Joint>& joints, int jointIndex, const std::vector<std::vector<int>>& childrenMap)
 {
-#ifdef USE_IMGUI
 	const auto& joint = joints[jointIndex];
 	const std::string& name = joint.GetName();
 	bool isSel = (context_->selBone == name);
@@ -231918,8 +232246,8 @@ void BoneListPanel::DrawBoneNode(const std::vector<Joint>& joints, int jointInde
 		}
 		ImGui::TreePop(); // ツリーのインデントを戻す
 	}
-#endif
 }
+#endif
 
 
 ============================================================
@@ -231938,7 +232266,9 @@ public:
 	void DrawImGui() override;
 
 private:
+#ifdef USE_IMGUI
 	void DrawBoneNode(const std::vector<Joint>& joints, int jointIndex, const std::vector<std::vector<int>>& childrenMap);
+#endif
 private:
 	MotionEditorContext* context_ = nullptr;
 };
@@ -232057,6 +232387,8 @@ File Path: YEngine/Model/Motion/Editor/Panels/PropertyPanel.cpp
 #include <imgui.h>
 #endif
 
+static constexpr float kPi = 3.14159265f;
+
 void PropertyPanel::DrawImGui()
 {
 #ifdef USE_IMGUI
@@ -232084,17 +232416,74 @@ void PropertyPanel::DrawImGui()
 			if (context_->currentMotion) {
 				ImGui::Text("現在時刻: %.4f 秒", context_->scrubTime);
 				if (ImGui::Button("[ KF ] 選択ボーンのキーフレームを打つ", ImVec2(-1, 0))) {
-					// （※実際にはここに InsertKeyframe の呼び出し処理を書く）
 					if (context_->AddKeyframe) {
 						context_->AddKeyframe(context_->selBone, context_->scrubTime);
 					}
 					context_->statusMsg = "KF 挿入: " + context_->selBone;
+				}
+
+				ImGui::Spacing();
+				ImGui::Separator();
+
+				// ============================================================
+				// コピー & ペースト
+				// ============================================================
+				if (ImGui::Button("コピー (Ctrl+C)", ImVec2(ImGui::GetContentRegionAvail().x * 0.5f - 4, 0))) {
+					auto& cb = context_->clipboard;
+					cb.hasData = true;
+					cb.translate = { context_->editT[0], context_->editT[1], context_->editT[2] };
+					cb.rotate = EulerToQuaternion({ context_->editR[0] * (kPi / 180), context_->editR[1] * (kPi / 180), context_->editR[2] * (kPi / 180) });
+					cb.scale = { context_->editS[0], context_->editS[1], context_->editS[2] };
+					cb.sourceBone = context_->selBone;
+					cb.sourceTime = context_->scrubTime;
+					context_->statusMsg = "コピー: " + context_->selBone + " @ " + std::to_string(context_->scrubTime) + "s";
+				}
+				ImGui::SameLine(0, 8);
+				{
+					bool canPaste = context_->clipboard.hasData;
+					if (!canPaste) ImGui::BeginDisabled();
+					if (ImGui::Button("ペースト (Ctrl+V)", ImVec2(-1, 0))) {
+						auto& cb = context_->clipboard;
+						// クリップボードの値を編集バッファに展開
+						context_->editT[0] = cb.translate.x; context_->editT[1] = cb.translate.y; context_->editT[2] = cb.translate.z;
+						Vector3 euler = QuaternionToEuler(cb.rotate);
+						context_->editR[0] = euler.x * (180 / kPi); context_->editR[1] = euler.y * (180 / kPi); context_->editR[2] = euler.z * (180 / kPi);
+						context_->editS[0] = cb.scale.x; context_->editS[1] = cb.scale.y; context_->editS[2] = cb.scale.z;
+						// ジョイントに反映
+						if (context_->SyncBufferToJoint) context_->SyncBufferToJoint();
+						context_->statusMsg = "ペースト: " + cb.sourceBone + " -> " + context_->selBone;
+					}
+					if (!canPaste) ImGui::EndDisabled();
+				}
+
+				// ペースト＋KF挿入のワンボタン
+				{
+					bool canPaste = context_->clipboard.hasData;
+					if (!canPaste) ImGui::BeginDisabled();
+					if (ImGui::Button("ペースト + KF挿入", ImVec2(-1, 0))) {
+						auto& cb = context_->clipboard;
+						context_->editT[0] = cb.translate.x; context_->editT[1] = cb.translate.y; context_->editT[2] = cb.translate.z;
+						Vector3 euler = QuaternionToEuler(cb.rotate);
+						context_->editR[0] = euler.x * (180 / kPi); context_->editR[1] = euler.y * (180 / kPi); context_->editR[2] = euler.z * (180 / kPi);
+						context_->editS[0] = cb.scale.x; context_->editS[1] = cb.scale.y; context_->editS[2] = cb.scale.z;
+						if (context_->SyncBufferToJoint) context_->SyncBufferToJoint();
+						if (context_->AddKeyframe) context_->AddKeyframe(context_->selBone, context_->scrubTime);
+						context_->statusMsg = "ペースト + KF挿入: " + context_->selBone;
+					}
+					if (!canPaste) ImGui::EndDisabled();
+				}
+
+				// クリップボード状態表示
+				if (context_->clipboard.hasData) {
+					ImGui::TextDisabled("クリップボード: %s @ %.3fs",
+						context_->clipboard.sourceBone.c_str(), context_->clipboard.sourceTime);
 				}
 			}
 		}
 	}
 #endif
 }
+
 
 ============================================================
 File Path: YEngine/Model/Motion/Editor/Panels/PropertyPanel.h
@@ -232131,6 +232520,7 @@ File Path: YEngine/Model/Motion/Editor/Panels/SavePanel.cpp
 #include "Model.h"
 #include "Object3D/ObjectManager.h"
 #include "../../Core/Motion.h"
+#include "../../Core/MotionSystem.h"
 
 #ifdef USE_IMGUI
 #include <imgui.h>
@@ -232138,26 +232528,97 @@ File Path: YEngine/Model/Motion/Editor/Panels/SavePanel.cpp
 
 namespace fs = std::filesystem;
 
+// -----------------------------------------------------------------------
+// Initialize
+// -----------------------------------------------------------------------
 void SavePanel::Initialize(MotionEditorContext* context)
 {
 	context_ = context;
-	binaryBrowser_.currentDirectory = "Resources/Binary";
-	binaryBrowser_.filterExtension = ".anim";
+
+#ifdef USE_IMGUI
+	// FileBrowser を .anim フィルタ・リストモードで初期化
+	fileBrowser_ = YoRigine::FileBrowser(
+		"Resources/Binary",
+		{ ".anim" },
+		YoRigine::FileBrowser::DisplayMode::List
+	);
+
+	// ファイル選択時: パスを反映 → 即読み込み → ブラウザを閉じる
+	fileBrowser_.SetOnFileSelected([this](const std::string& fullPath) {
+		savePath_ = fullPath;
+		browserOpen_ = false;
+		LoadBinary(fullPath);
+		});
+#endif
 }
 
+// -----------------------------------------------------------------------
+// DrawImGui
+// -----------------------------------------------------------------------
 void SavePanel::DrawImGui()
 {
 #ifdef USE_IMGUI
-	if (binaryBrowser_.isOpen) {
-		DrawFileBrowser(binaryBrowser_, "バイナリファイルを選択");
-		if (!binaryBrowser_.isOpen && !binaryBrowser_.selectedFilePath.empty())
-			savePath_ = binaryBrowser_.selectedFilePath;
+	// ブラウザウィンドウが開いている間だけ描画
+	if (browserOpen_) {
+		DrawBrowserWindow();
 	}
 
 	DrawSaveLoadPopup();
 #endif
 }
 
+// -----------------------------------------------------------------------
+// DrawBrowserWindow  (FileBrowser を独立ウィンドウとして表示)
+// -----------------------------------------------------------------------
+#ifdef USE_IMGUI
+void SavePanel::DrawBrowserWindow()
+{
+	ImGui::SetNextWindowSize(ImVec2(540, 420), ImGuiCond_FirstUseEver);
+	bool open = true;
+	if (!ImGui::Begin("バイナリファイルを選択##browser", &open)) {
+		ImGui::End();
+		if (!open) browserOpen_ = false;
+		return;
+	}
+
+	// FileBrowser 本体を描画（Child 枠付き、高さを残してボタン分を確保）
+	fileBrowser_.Draw("##animBrowser", ImVec2(0, -50));
+
+	ImGui::Separator();
+
+	// 現在の選択パスを表示
+	const std::string& sel = fileBrowser_.GetSelectedPath();
+	ImGui::TextUnformatted(sel.empty() ? "(ファイルが未選択です)" : sel.c_str());
+
+	float btnX = ImGui::GetContentRegionAvail().x - 120.0f;
+	ImGui::SameLine(btnX);
+
+	bool canOK = !sel.empty();
+	if (!canOK) ImGui::BeginDisabled();
+	if (ImGui::Button("OK", ImVec2(55, 0))) {
+		// OnFileSelected コールバックが既に savePath_ を更新しているが、
+		// ダブルクリックではなく OK ボタンで確定する場合はここで同期する
+		if (!sel.empty()) {
+			savePath_ = sel;
+			browserOpen_ = false;
+		}
+	}
+	if (!canOK) ImGui::EndDisabled();
+
+	ImGui::SameLine();
+	if (ImGui::Button("キャンセル", ImVec2(60, 0))) {
+		fileBrowser_.SetSelectedPath("");
+		browserOpen_ = false;
+	}
+
+	if (!open) browserOpen_ = false;
+	ImGui::End();
+}
+#endif
+
+// -----------------------------------------------------------------------
+// DrawSaveLoadPopup
+// -----------------------------------------------------------------------
 void SavePanel::DrawSaveLoadPopup()
 {
 #ifdef USE_IMGUI
@@ -232168,13 +232629,16 @@ void SavePanel::DrawSaveLoadPopup()
 
 		ImGui::Text("バイナリファイル (.anim):");
 		{
-			char buf[512]; strncpy_s(buf, sizeof(buf), savePath_.c_str(), _TRUNCATE);
+			char buf[512];
+			strncpy_s(buf, sizeof(buf), savePath_.c_str(), _TRUNCATE);
 			ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 90);
 			if (ImGui::InputText("##savepath", buf, sizeof(buf))) savePath_ = buf;
 			ImGui::SameLine();
 			if (ImGui::Button("参照##b")) {
-				binaryBrowser_.isOpen = true;
-				binaryBrowser_.selectedFilePath = "";
+				// ブラウザを開く前に最新スキャン & 選択状態をリセット
+				fileBrowser_.Scan();
+				fileBrowser_.SetSelectedPath("");
+				browserOpen_ = true;
 				context_->showSavePopup = false;
 				ImGui::CloseCurrentPopup();
 			}
@@ -232187,8 +232651,29 @@ void SavePanel::DrawSaveLoadPopup()
 		if (ImGui::Button("バイナリ保存", ImVec2(130, 0))) {
 			try {
 				if (context_->currentMotion) {
-					context_->currentMotion->SaveBinary(*context_->currentMotion, AnimDisplayName(context_->selectedAnimKey), savePath_);
-					saveMsg_ = "保存成功: " + savePath_;
+					if (context_->isReverse) {
+						// 逆再生モード: キーフレームの時間を反転したコピーを保存
+						Motion reversed = *context_->currentMotion;
+						float duration = reversed.GetDuration();
+						for (auto& [name, na] : reversed.animation_.nodeAnimations_) {
+							for (auto& kf : na.translate.keyframes) kf.time = duration - kf.time;
+							for (auto& kf : na.rotate.keyframes)    kf.time = duration - kf.time;
+							for (auto& kf : na.scale.keyframes)     kf.time = duration - kf.time;
+							std::sort(na.translate.keyframes.begin(), na.translate.keyframes.end(), [](const auto& a, const auto& b) { return a.time < b.time; });
+							std::sort(na.rotate.keyframes.begin(), na.rotate.keyframes.end(), [](const auto& a, const auto& b) { return a.time < b.time; });
+							std::sort(na.scale.keyframes.begin(), na.scale.keyframes.end(), [](const auto& a, const auto& b) { return a.time < b.time; });
+						}
+						reversed.SaveBinary(reversed, AnimDisplayName(context_->selectedAnimKey), savePath_);
+						saveMsg_ = "保存成功 (逆再生): " + savePath_;
+					}
+					else {
+						context_->currentMotion->SaveBinary(
+							*context_->currentMotion,
+							AnimDisplayName(context_->selectedAnimKey),
+							savePath_
+						);
+						saveMsg_ = "保存成功: " + savePath_;
+					}
 					context_->statusMsg = saveMsg_;
 				}
 			}
@@ -232199,31 +232684,19 @@ void SavePanel::DrawSaveLoadPopup()
 		if (!canSave) ImGui::EndDisabled();
 
 		ImGui::SameLine(0, 10);
-		Object3d* target = context_->GetTargetObject();
 
 		if (ImGui::Button("バイナリ読み込み", ImVec2(140, 0))) {
-			try {
-				Motion loaded = Motion().LoadBinary(savePath_);
-				const std::string key = "Binary:" + savePath_;
-				Model::animationCache_[key] = std::move(loaded);
-				context_->selectedAnimKey = key;
-				context_->currentMotion = &Model::animationCache_[key];
-				if (target) {
-					target->SetChangeMotion(context_->loadFileName, MotionPlayMode::Loop, AnimDisplayName(key));
-				}
-				saveMsg_ = "読み込み成功: " + savePath_;
-				context_->statusMsg = saveMsg_;
-				context_->requireTimelineRebuild = true;
-			}
-			catch (const std::exception& e) {
-				saveMsg_ = std::string("読み込み失敗: ") + e.what();
-			}
+			LoadBinary(savePath_);
 		}
+
 
 		if (!saveMsg_.empty()) {
 			ImGui::Spacing();
 			bool isError = saveMsg_.find("失敗") != std::string::npos;
-			ImGui::TextColored(isError ? ImVec4(1, 0.3f, 0.3f, 1) : ImVec4(0.3f, 1, 0.3f, 1), "%s", saveMsg_.c_str());
+			ImGui::TextColored(
+				isError ? ImVec4(1, 0.3f, 0.3f, 1) : ImVec4(0.3f, 1, 0.3f, 1),
+				"%s", saveMsg_.c_str()
+			);
 		}
 
 		ImGui::Spacing(); ImGui::Separator();
@@ -232239,101 +232712,45 @@ void SavePanel::DrawSaveLoadPopup()
 #endif
 }
 
-void SavePanel::DrawFileBrowser(FileBrowserState& state, const char* title)
-{
-#ifdef USE_IMGUI
-	ImGui::SetNextWindowSize(ImVec2(540, 420), ImGuiCond_FirstUseEver);
-	bool open = true;
-	if (!ImGui::Begin(title, &open)) { ImGui::End(); if (!open) state.isOpen = false; return; }
-
-	ImGui::TextColored(ImVec4(0.7f, 0.9f, 1, 1), "%s", state.currentDirectory.c_str());
-	ImGui::Separator();
-
-	bool canUp = !state.directoryHistory.empty();
-	if (!canUp) ImGui::BeginDisabled();
-	if (ImGui::Button("[ .. ] 上へ")) {
-		state.currentDirectory = state.directoryHistory.back();
-		state.directoryHistory.pop_back();
-		state.selectedFilePath = "";
-	}
-	if (!canUp) ImGui::EndDisabled();
-	ImGui::SameLine();
-	ImGui::TextDisabled("| ダブルクリックでフォルダを開く / ファイルを選択");
-	ImGui::Separator();
-
-	auto entries = GetDirectoryEntries(state.currentDirectory, state.filterExtension);
-	ImGui::BeginChild("##fblist", ImVec2(0, -50), true);
-	for (const auto& e : entries) {
-		std::string name = e.path().filename().string();
-		if (e.is_directory()) {
-			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.9f, 1, 1));
-			std::string lbl = "[DIR] " + name;
-			if (ImGui::Selectable(lbl.c_str(), false, ImGuiSelectableFlags_AllowDoubleClick)) {
-				if (ImGui::IsMouseDoubleClicked(0)) {
-					state.directoryHistory.push_back(state.currentDirectory);
-					state.currentDirectory = e.path().string();
-					std::replace(state.currentDirectory.begin(), state.currentDirectory.end(), '\\', '/');
-					state.selectedFilePath = "";
-				}
-			}
-			ImGui::PopStyleColor();
-		}
-		else {
-			bool isSel = (state.selectedFilePath == e.path().string());
-			if (ImGui::Selectable(name.c_str(), isSel, ImGuiSelectableFlags_AllowDoubleClick)) {
-				state.selectedFilePath = e.path().string();
-				std::replace(state.selectedFilePath.begin(), state.selectedFilePath.end(), '\\', '/');
-				if (ImGui::IsMouseDoubleClicked(0)) { state.isOpen = false; ImGui::EndChild(); ImGui::End(); return; }
-			}
-		}
-	}
-	ImGui::EndChild();
-
-	ImGui::Separator();
-	ImGui::TextUnformatted(state.selectedFilePath.empty() ? "(ファイルが未選択です)" : state.selectedFilePath.c_str());
-	float btnX = ImGui::GetContentRegionAvail().x - 120;
-	ImGui::SameLine(btnX);
-	bool canOK = !state.selectedFilePath.empty();
-	if (!canOK) ImGui::BeginDisabled();
-	if (ImGui::Button("OK", ImVec2(55, 0))) state.isOpen = false;
-	if (!canOK) ImGui::EndDisabled();
-	ImGui::SameLine();
-	if (ImGui::Button("キャンセル", ImVec2(60, 0))) { state.selectedFilePath = ""; state.isOpen = false; }
-
-	if (!open) state.isOpen = false;
-	ImGui::End();
-#endif
-}
-
+// -----------------------------------------------------------------------
+// AnimDisplayName
+// -----------------------------------------------------------------------
 std::string SavePanel::AnimDisplayName(const std::string& key)
 {
 	auto pos = key.find('#');
 	return (pos != std::string::npos) ? key.substr(pos + 1) : key;
 }
 
-std::vector<std::filesystem::directory_entry> SavePanel::GetDirectoryEntries(const std::string& dir, const std::string& ext) const
+// -----------------------------------------------------------------------
+// LoadBinary  (ファイル選択・ボタン共通の読み込み処理)
+// -----------------------------------------------------------------------
+void SavePanel::LoadBinary(const std::string& path)
 {
-	std::vector<fs::directory_entry> dirs, files;
-	std::error_code ec;
-	for (const auto& e : fs::directory_iterator(dir, ec)) {
-		if (ec) break;
-		if (e.is_directory()) { dirs.push_back(e); }
-		else if (e.is_regular_file()) {
-			std::string ex = e.path().extension().string();
-			if (ext.empty()) {
-				if (ex == ".gltf" || ex == ".obj" || ex == ".anim") files.push_back(e);
-			}
-			else {
-				if (ex == ext) files.push_back(e);
-			}
+	try {
+		Motion loaded = Motion().LoadBinary(path);
+		const std::string key = "Binary:" + path;
+		Model::animationCache_[key] = std::move(loaded);
+		context_->selectedAnimKey = key;
+		context_->currentMotion = &Model::animationCache_[key];
+
+		// MotionSystem のアニメーションポインタも同期
+		Object3d* target = context_->GetTargetObject();
+		if (target && target->GetModel() && target->GetModel()->GetMotionSystem()) {
+			auto* ms = target->GetModel()->GetMotionSystem();
+			ms->SetAnimation(context_->currentMotion);
+			ms->SetAnimationTime(0.0f);
+			ms->SetPlayMode(MotionPlayMode::Loop);
 		}
+
+		saveMsg_ = "読み込み成功: " + path;
+		context_->statusMsg = saveMsg_;
+		context_->requireTimelineRebuild = true;
+		context_->lastAppliedScrubTime = -1.0f;
+		context_->scrubTime = 0.0f;
 	}
-	auto byName = [](const fs::directory_entry& a, const fs::directory_entry& b) {
-		return a.path().filename().string() < b.path().filename().string(); };
-	std::sort(dirs.begin(), dirs.end(), byName);
-	std::sort(files.begin(), files.end(), byName);
-	dirs.insert(dirs.end(), files.begin(), files.end());
-	return dirs;
+	catch (const std::exception& e) {
+		saveMsg_ = std::string("読み込み失敗: ") + e.what();
+	}
 }
 
 ============================================================
@@ -232343,15 +232760,9 @@ File Path: YEngine/Model/Motion/Editor/Panels/SavePanel.h
 #include "IMotionEditorPanel.h"
 #include <filesystem>
 
-// 元々MotionEditor.hにあった構造体をこちらに移動
-struct FileBrowserState
-{
-	std::string currentDirectory = "Resources/Models";
-	std::string selectedFilePath = "";
-	std::vector<std::string> directoryHistory;
-	bool isOpen = false;
-	std::string filterExtension = "";
-};
+#ifdef USE_IMGUI
+#include <FileOperations/FileBrowser.h>
+#endif
 
 class SavePanel : public IMotionEditorPanel
 {
@@ -232361,19 +232772,805 @@ public:
 
 private:
 	void DrawSaveLoadPopup();
-	void DrawFileBrowser(FileBrowserState& state, const char* title);
+
+#ifdef USE_IMGUI
+	void DrawBrowserWindow();
+#endif
 
 	// ユーティリティ
 	static std::string AnimDisplayName(const std::string& key);
-	std::vector<std::filesystem::directory_entry> GetDirectoryEntries(const std::string& dir, const std::string& ext) const;
+
+	void LoadBinary(const std::string& path);
 
 	MotionEditorContext* context_ = nullptr;
 
 	std::string savePath_ = "Resources/TestBinary/edited_motion.anim";
 	std::string saveMsg_ = "";
-	FileBrowserState binaryBrowser_;
+
+#ifdef USE_IMGUI
+	YoRigine::FileBrowser fileBrowser_;
+	bool browserOpen_ = false;
+#endif
 };
 
+============================================================
+File Path: YEngine/Model/Motion/Editor/Panels/SpeedCurvePanel.cpp
+============================================================
+#include "SpeedCurvePanel.h"
+
+#ifdef USE_IMGUI
+#include <imgui.h>
+#include <imgui_internal.h>
+#endif
+
+#include "../MotionEditorContext.h"
+#include "../../Core/Motion.h"
+
+// -----------------------------------------------------------------------
+// Initialize
+// -----------------------------------------------------------------------
+void SpeedCurvePanel::Initialize(MotionEditorContext* context)
+{
+    context_ = context;
+}
+
+// -----------------------------------------------------------------------
+// DrawCurveEditor  カスタムカーブエディタ（戻り値: dirty になったか）
+//
+// 操作:
+//   ・左ドラッグ     : 点を移動（端点は X 固定）
+//   ・右クリック(空白): 点を追加
+//   ・右クリック(点上): コンテキストメニュー → 削除
+// -----------------------------------------------------------------------
+#ifdef USE_IMGUI
+bool SpeedCurvePanel::DrawCurveEditor(ImVec2 size)
+{
+    bool dirty = false;
+
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    ImVec2      rMin = ImGui::GetCursorScreenPos();
+    ImVec2      rMax = { rMin.x + size.x, rMin.y + size.y };
+    float       w = size.x;
+    float       h = size.y;
+
+    // 不可視のヒットエリア（マウスイベント取得用）
+    ImGui::InvisibleButton("##curve_area", size,
+        ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
+    const bool hovered = ImGui::IsItemHovered();
+    const bool leftDown = ImGui::IsMouseDown(ImGuiMouseButton_Left);
+    const bool leftClick = ImGui::IsMouseClicked(ImGuiMouseButton_Left);
+    ImVec2 mousePos = ImGui::GetMousePos();
+
+    // ================================================================
+    // 背景
+    // ================================================================
+    dl->AddRectFilled(rMin, rMax, IM_COL32(28, 28, 32, 255), 4.0f);
+    dl->AddRect(rMin, rMax, IM_COL32(80, 80, 90, 200), 4.0f);
+
+    float yMin = delegate_.boundsMinY;
+    float yMax = delegate_.boundsMaxY;
+    float yRange = yMax - yMin;
+
+    // ================================================================
+    // グリッド描画
+    // ================================================================
+    {
+        // --- 縦グリッド（X軸方向: 0.25刻み） ---
+        const float xSteps[] = { 0.25f, 0.5f, 0.75f };
+        for (float xs : xSteps) {
+            float px = rMin.x + xs * w;
+            dl->AddLine({ px, rMin.y }, { px, rMax.y },
+                (xs == 0.5f) ? IM_COL32(90, 90, 110, 180)
+                : IM_COL32(60, 60, 70, 140),
+                (xs == 0.5f) ? 1.0f : 0.8f);
+        }
+
+        // --- 横グリッド（Y軸方向: 0.5 刻み, 1.0 は強調） ---
+        float yStep = 0.5f;
+        for (float y = yMin; y <= yMax + 1e-4f; y += yStep) {
+            float py = rMax.y - (y - yMin) / yRange * h;
+            bool  is1 = (std::abs(y - 1.0f) < 0.01f);
+            dl->AddLine({ rMin.x, py }, { rMax.x, py },
+                is1 ? IM_COL32(120, 220, 120, 160)   // Y=1.0 は緑で強調
+                : IM_COL32(60, 60, 70, 130),
+                is1 ? 1.2f : 0.8f);
+
+            // Y軸ラベル
+            char buf[8];
+            snprintf(buf, sizeof(buf), "%.1f", y);
+            dl->AddText({ rMin.x + 3.f, py - 10.f },
+                is1 ? IM_COL32(140, 230, 140, 200)
+                : IM_COL32(120, 120, 140, 160),
+                buf);
+        }
+    }
+
+    // ================================================================
+    // 現在のスクラブ位置の縦線
+    // ================================================================
+    Motion* motion = context_ ? context_->currentMotion : nullptr;
+    if (motion && motion->GetDuration() > 0.0f) {
+        float nt = std::clamp(context_->scrubTime / motion->GetDuration(), 0.0f, 1.0f);
+        float spx = rMin.x + nt * w;
+        dl->AddLine({ spx, rMin.y }, { spx, rMax.y },
+            IM_COL32(80, 200, 255, 100), 1.0f);
+    }
+
+    // ================================================================
+    // カーブ描画（折れ線）
+    // ================================================================
+    {
+        const int segs = static_cast<int>(w);  // ピクセル単位で補間
+        if (delegate_.points.size() >= 2) {
+            ImVec2 prev = delegate_.ToScreen(delegate_.points.front(), rMin, rMax);
+            for (int i = 1; i <= segs; ++i) {
+                float x = static_cast<float>(i) / segs;
+                float y = delegate_.Evaluate(x);
+                ImVec2 cur = delegate_.ToScreen({ x, y }, rMin, rMax);
+                dl->AddLine(prev, cur, IM_COL32(68, 210, 255, 230), 2.0f);
+                prev = cur;
+            }
+        }
+    }
+
+    // ================================================================
+    // 焼き込み前スナップショットオーバーレイ
+    // ================================================================
+    if (hasBakedSnapshot_ && showBakedPreview_) {
+        DrawBakedPreviewOverlay(rMin, rMax);
+    }
+
+    // ================================================================
+    // ドラッグ操作（左ボタン）
+    // ================================================================
+    if (hovered && leftClick && !ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+        int hit = delegate_.HitTest(mousePos, rMin, rMax);
+        if (hit >= 0) {
+            dragIndex_ = hit;
+            dragging_ = true;
+        }
+    }
+    if (dragging_) {
+        if (leftDown) {
+            ImVec2 local = delegate_.ToLocal(mousePos, rMin, rMax);
+            local = delegate_.Clamp(local);
+
+            // 端点は X を固定
+            if (dragIndex_ == 0)
+                local.x = 0.0f;
+            else if (dragIndex_ == static_cast<int>(delegate_.points.size()) - 1)
+                local.x = 1.0f;
+            else {
+                // 隣接点を追い越さないよう X をクランプ
+                float xPrev = delegate_.points[dragIndex_ - 1].x + 0.001f;
+                float xNext = delegate_.points[dragIndex_ + 1].x - 0.001f;
+                local.x = std::clamp(local.x, xPrev, xNext);
+            }
+            delegate_.points[dragIndex_] = local;
+            dirty = true;
+        }
+        else {
+            dragging_ = false;
+            dragIndex_ = -1;
+        }
+    }
+
+    // ================================================================
+    // 右クリック処理
+    // ================================================================
+    if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+        rightClickIdx_ = delegate_.HitTest(mousePos, rMin, rMax);
+        rightClickLocalPos_ = delegate_.ToLocal(mousePos, rMin, rMax);
+
+        // 点の上ならコンテキストメニュー、空白なら即追加
+        if (rightClickIdx_ >= 0) {
+            ImGui::OpenPopup("##CurveCtx");
+        }
+        else {
+            // 空白クリック → 点を追加
+            if (delegate_.AddPoint(rightClickLocalPos_)) {
+                dirty = true;
+            }
+        }
+    }
+
+    if (ImGui::BeginPopup("##CurveCtx")) {
+        // 端点は削除不可
+        bool isEndpoint = (rightClickIdx_ == 0 ||
+            rightClickIdx_ == static_cast<int>(delegate_.points.size()) - 1);
+
+        if (isEndpoint) {
+            ImGui::TextDisabled("端点は削除できません");
+        }
+        else {
+            if (ImGui::MenuItem("\uf00d  この点を削除")) {
+                delegate_.RemovePoint(rightClickIdx_);
+                dirty = true;
+                rightClickIdx_ = -1;
+            }
+        }
+
+        // 値の手動入力欄
+        if (rightClickIdx_ >= 0 && rightClickIdx_ < static_cast<int>(delegate_.points.size())) {
+            ImGui::Separator();
+            ImGui::Text("X = %.3f", delegate_.points[rightClickIdx_].x);
+            ImGui::SetNextItemWidth(100.f);
+            float editY = delegate_.points[rightClickIdx_].y;
+            if (ImGui::DragFloat("倍率##ctxY", &editY, 0.01f,
+                delegate_.boundsMinY, delegate_.boundsMaxY, "%.2fx")) {
+                delegate_.points[rightClickIdx_].y = editY;
+                dirty = true;
+            }
+        }
+        ImGui::EndPopup();
+    }
+
+    // ================================================================
+    // 制御点描画
+    // ================================================================
+    for (int i = 0; i < static_cast<int>(delegate_.points.size()); ++i) {
+        ImVec2 sp = delegate_.ToScreen(delegate_.points[i], rMin, rMax);
+        bool   isEnd = (i == 0 || i == static_cast<int>(delegate_.points.size()) - 1);
+        bool   isDrag = (dragging_ && dragIndex_ == i);
+
+        // 影（立体感）
+        dl->AddCircleFilled(sp, 7.5f, IM_COL32(0, 0, 0, 120));
+
+        // 本体
+        ImU32 fillCol = isDrag ? IM_COL32(255, 230, 80, 255) :
+            isEnd ? IM_COL32(80, 200, 255, 255) :
+            IM_COL32(240, 240, 240, 255);
+        dl->AddCircleFilled(sp, 6.0f, fillCol);
+
+        // 枠線
+        dl->AddCircle(sp, 6.0f,
+            isDrag ? IM_COL32(255, 255, 100, 255)
+            : IM_COL32(60, 160, 220, 200),
+            0, 1.5f);
+
+        // ホバー時の値ツールチップ
+        if (hovered) {
+            float dx = mousePos.x - sp.x, dy = mousePos.y - sp.y;
+            if (dx * dx + dy * dy < 10.f * 10.f) {
+                ImGui::SetTooltip("t=%.3f  speed=%.3f x",
+                    delegate_.points[i].x, delegate_.points[i].y);
+            }
+        }
+    }
+
+    // ================================================================
+    // X軸ラベル（下端）
+    // ================================================================
+    {
+        const float yLabelY = rMax.y + 3.0f;
+        const ImU32 lblCol = IM_COL32(160, 160, 180, 200);
+        dl->AddText({ rMin.x,              yLabelY }, lblCol, "0");
+        dl->AddText({ rMin.x + w * 0.25f - 4,  yLabelY }, lblCol, "0.25");
+        dl->AddText({ rMin.x + w * 0.5f - 6, yLabelY }, lblCol, "0.5");
+        dl->AddText({ rMin.x + w * 0.75f - 4,  yLabelY }, lblCol, "0.75");
+        dl->AddText({ rMin.x + w - 8,      yLabelY }, lblCol, "1");
+    }
+
+    // X軸ラベル分のスペース確保
+    ImGui::Dummy({ 0, 14.0f });
+
+    return dirty;
+}
+#endif
+
+// -----------------------------------------------------------------------
+// DrawImGui
+// -----------------------------------------------------------------------
+void SpeedCurvePanel::DrawImGui()
+{
+#ifdef USE_IMGUI
+    if (!context_) return;
+
+    Motion* motion = context_->currentMotion;
+
+    // モーションが切り替わったら制御点を再取得
+    if (motion != lastMotion_) {
+        lastMotion_ = motion;
+        hasBakedSnapshot_ = false;
+        showBakedPreview_ = false;
+        PullFromMotion();
+        isDirty_ = false;
+    }
+
+    ImGui::PushID("SpeedCurvePanel");
+
+    // ============================================================
+    // CollapsingHeader
+    // ============================================================
+    char headerLabel[128];
+    if (hasBakedSnapshot_)
+        snprintf(headerLabel, sizeof(headerLabel),
+            "\uf0e7 タイムスケールカーブ  [焼込済]###SpeedCurveHeader");
+    else if (isDirty_)
+        snprintf(headerLabel, sizeof(headerLabel),
+            "\uf0e7 タイムスケールカーブ  *###SpeedCurveHeader");
+    else
+        snprintf(headerLabel, sizeof(headerLabel),
+            "\uf0e7 タイムスケールカーブ###SpeedCurveHeader");
+
+    bool open = ImGui::CollapsingHeader(headerLabel, ImGuiTreeNodeFlags_DefaultOpen);
+
+    if (!open) {
+        if (motion && motion->GetDuration() > 0.0f && ImGui::IsItemHovered()) {
+            float nt = std::clamp(context_->scrubTime / motion->GetDuration(), 0.0f, 1.0f);
+            float spd = motion->EvaluateSpeedCurve(nt);
+            ImGui::SetTooltip("現在速度倍率: %.2f x", spd);
+        }
+        ImGui::PopID();
+        return;
+    }
+
+    // ============================================================
+    // モーション未選択
+    // ============================================================
+    if (!motion) {
+        ImGui::TextDisabled("モーションが選択されていません");
+        ImGui::PopID();
+        return;
+    }
+
+    // ============================================================
+    // 速度上限スライダ
+    // ============================================================
+    ImGui::SetNextItemWidth(160.0f);
+    if (ImGui::SliderFloat("速度上限##maxspd", &maxSpeedEdit_, 1.0f, 8.0f, "%.1fx")) {
+        delegate_.SetMaxSpeed(maxSpeedEdit_);
+    }
+    ImGui::SameLine();
+    ImGui::TextDisabled("(1.0=等速)");
+
+    if (hasBakedSnapshot_) {
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(ImGui::GetContentRegionMax().x - 130.0f);
+        ImGui::Checkbox("\uf0c7 焼込前を表示##bkprev", &showBakedPreview_);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("焼き込む前のカーブをオレンジ色で重ねて表示します");
+    }
+
+    // ============================================================
+    // 操作ヒント（エディタ上部に1行）
+    // ============================================================
+    ImGui::TextDisabled("右クリック(空白):点を追加  右クリック(点上):削除メニュー  左ドラッグ:移動");
+
+    // ============================================================
+    // カスタムカーブエディタ本体
+    // ============================================================
+    ImVec2 curveSize = { ImGui::GetContentRegionAvail().x, 180.0f };
+    if (DrawCurveEditor(curveSize)) {
+        isDirty_ = true;
+    }
+
+    ImGui::Separator();
+
+    // ============================================================
+    // ボタン行
+    // ============================================================
+
+    // --- ランタイム適用 ---
+    {
+        const bool dis = !isDirty_;
+        if (dis) ImGui::BeginDisabled();
+        if (ImGui::Button("\uf0e7 適用##apply", ImVec2(80, 0))) {
+            PushToMotion();
+            isDirty_ = false;
+            context_->statusMsg = "スピードカーブをランタイム適用しました";
+        }
+        if (dis) ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            ImGui::SetTooltip("カーブをMotionに反映します（キーフレームは変更しません）");
+    }
+
+    ImGui::SameLine(0, 6);
+
+    // --- 焼き込み ---
+    if (ImGui::Button("\uf0c7 Bake##bake", ImVec2(80, 0))) {
+        bakeConfirmPending_ = true;
+    }
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("カーブをキーフレーム時間軸に積分して焼き込みます\n（不可逆操作）");
+
+    if (bakeConfirmPending_) {
+        ImGui::OpenPopup("##BakeConfirm");
+        bakeConfirmPending_ = false;
+    }
+    if (ImGui::BeginPopupModal("##BakeConfirm", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextUnformatted("カーブをキーフレームに焼き込みます。");
+        ImGui::TextColored(ImVec4(1.f, 0.6f, 0.2f, 1.f), "この操作は元に戻せません。");
+        ImGui::Spacing();
+        if (ImGui::Button("実行##bakeok", ImVec2(80, 0))) {
+            bakedSnapshot_ = delegate_.points;
+            hasBakedSnapshot_ = true;
+            showBakedPreview_ = true;
+
+            PushToMotion();
+            BakeSpeedCurve();
+            PullFromMotion();
+            isDirty_ = false;
+            context_->statusMsg = "スピードカーブを焼き込みました";
+            context_->requireTimelineRebuild = true;
+            context_->lastAppliedScrubTime = -1.0f;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine(0, 8);
+        if (ImGui::Button("キャンセル##bakecancel", ImVec2(80, 0)))
+            ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+    }
+
+    ImGui::SameLine(0, 6);
+
+    // --- リセット ---
+    if (ImGui::Button("\uf0e2 リセット##reset", ImVec2(80, 0))) {
+        motion->ClearSpeedCurve();
+        PullFromMotion();
+        isDirty_ = false;
+        hasBakedSnapshot_ = false;
+        showBakedPreview_ = false;
+        context_->statusMsg = "スピードカーブをリセットしました";
+    }
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("カーブを等速（直線）に戻します");
+
+    // ============================================================
+    // 現在位置の速度プレビュー（右寄せ）
+    // ============================================================
+    if (motion->GetDuration() > 0.0f) {
+        float nt = std::clamp(context_->scrubTime / motion->GetDuration(), 0.0f, 1.0f);
+        float spd = motion->EvaluateSpeedCurve(nt);
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(ImGui::GetContentRegionMax().x - 140.0f);
+        ImGui::TextColored(ImVec4(0.3f, 0.9f, 1.0f, 1.0f),
+            "現在: %.2fx  (t=%.2f)", spd, nt);
+    }
+
+    ImGui::PopID();
+#endif
+}
+
+// -----------------------------------------------------------------------
+// DrawBakedPreviewOverlay
+// -----------------------------------------------------------------------
+#ifdef USE_IMGUI
+void SpeedCurvePanel::DrawBakedPreviewOverlay(ImVec2 rMin, ImVec2 rMax) const
+{
+    if (bakedSnapshot_.size() < 2) return;
+
+    float w = rMax.x - rMin.x;
+    float h = rMax.y - rMin.y;
+    float yMin = delegate_.boundsMinY;
+    float yMax = delegate_.boundsMaxY;
+    float yRange = yMax - yMin;
+    if (yRange < 1e-6f || w < 1.0f || h < 1.0f) return;
+
+    auto toScreen = [&](ImVec2 p) -> ImVec2 {
+        return {
+            rMin.x + std::clamp(p.x, 0.0f, 1.0f) * w,
+            rMax.y - (std::clamp(p.y, yMin, yMax) - yMin) / yRange * h
+        };
+        };
+
+    auto* dl = ImGui::GetWindowDrawList();
+    const ImU32 lineCol = IM_COL32(255, 160, 40, 200);
+    const ImU32 dotCol = IM_COL32(255, 200, 80, 220);
+
+    // スナップショットを線形補間で描画
+    const int segs = static_cast<int>(w);
+    auto evalSnap = [&](float x) -> float {
+        if (bakedSnapshot_.size() < 2) return 1.0f;
+        if (x <= bakedSnapshot_.front().x) return bakedSnapshot_.front().y;
+        if (x >= bakedSnapshot_.back().x)  return bakedSnapshot_.back().y;
+        for (int i = 0; i + 1 < static_cast<int>(bakedSnapshot_.size()); ++i) {
+            if (x <= bakedSnapshot_[i + 1].x) {
+                float t = (x - bakedSnapshot_[i].x) /
+                    (bakedSnapshot_[i + 1].x - bakedSnapshot_[i].x);
+                return bakedSnapshot_[i].y + t * (bakedSnapshot_[i + 1].y - bakedSnapshot_[i].y);
+            }
+        }
+        return 1.0f;
+        };
+
+    ImVec2 prev = toScreen({ 0.0f, evalSnap(0.0f) });
+    for (int i = 1; i <= segs; ++i) {
+        float x = static_cast<float>(i) / segs;
+        ImVec2 cur = toScreen({ x, evalSnap(x) });
+        dl->AddLine(prev, cur, lineCol, 1.5f);
+        prev = cur;
+    }
+
+    // 制御点マーカー
+    for (const auto& p : bakedSnapshot_)
+        dl->AddCircleFilled(toScreen(p), 3.5f, dotCol);
+
+    // 凡例
+    dl->AddRectFilled({ rMin.x + 6, rMax.y - 20 },
+        { rMin.x + 90, rMax.y - 6 },
+        IM_COL32(30, 30, 30, 180), 3.f);
+    dl->AddText({ rMin.x + 8, rMax.y - 18 }, dotCol, "Bake\xe5\x89\x8d"); // "Bake前"
+}
+#endif
+
+// -----------------------------------------------------------------------
+// PullFromMotion
+// -----------------------------------------------------------------------
+#ifdef USE_IMGUI
+void SpeedCurvePanel::PullFromMotion()
+{
+    delegate_.points.clear();
+    Motion* motion = context_ ? context_->currentMotion : nullptr;
+    if (!motion) return;
+
+    const auto& kfs = motion->GetSpeedCurve().curve.keyframes;
+    if (kfs.empty()) {
+        delegate_.points = { { 0.0f, 1.0f }, { 1.0f, 1.0f } };
+    }
+    else {
+        for (const auto& kf : kfs)
+            delegate_.points.push_back({ kf.time, kf.value });
+        delegate_.Sort();
+    }
+    delegate_.EnsureEndpoints();
+}
+#endif
+
+// -----------------------------------------------------------------------
+// PushToMotion
+// -----------------------------------------------------------------------
+#ifdef USE_IMGUI
+void SpeedCurvePanel::PushToMotion()
+{
+    Motion* motion = context_ ? context_->currentMotion : nullptr;
+    if (!motion) return;
+
+    auto& kfs = motion->GetSpeedCurve().curve.keyframes;
+    kfs.clear();
+    for (const auto& p : delegate_.points)
+        kfs.push_back({ p.x, p.y });
+
+    std::sort(kfs.begin(), kfs.end(),
+        [](const Motion::Keyframe<float>& a, const Motion::Keyframe<float>& b) {
+            return a.time < b.time;
+        });
+}
+#endif
+
+// -----------------------------------------------------------------------
+// BakeSpeedCurve  (元の実装を維持)
+// -----------------------------------------------------------------------
+void SpeedCurvePanel::BakeSpeedCurve()
+{
+    Motion* motion = context_ ? context_->currentMotion : nullptr;
+    if (!motion || !motion->HasSpeedCurve()) return;
+
+    const float duration = motion->GetDuration();
+    if (duration <= 0.0f) return;
+
+    constexpr int   kSamples = 512;
+    constexpr float kMinSpeed = 0.05f;
+
+    std::vector<float> invLut(kSamples + 1);
+    invLut[0] = 0.0f;
+    for (int i = 1; i <= kSamples; ++i) {
+        float t0 = static_cast<float>(i - 1) / kSamples;
+        float t1 = static_cast<float>(i) / kSamples;
+        float s0 = std::max(motion->EvaluateSpeedCurve(t0), kMinSpeed);
+        float s1 = std::max(motion->EvaluateSpeedCurve(t1), kMinSpeed);
+        invLut[i] = invLut[i - 1] + (1.0f / s0 + 1.0f / s1) * 0.5f / kSamples;
+    }
+
+    const float newDurationNorm = invLut[kSamples];
+    if (newDurationNorm < 1e-6f) return;
+    const float newDuration = newDurationNorm * duration;
+
+    auto remapTime = [&](float T) -> float {
+        float normT = std::clamp(T / duration, 0.0f, 1.0f);
+        float fIdx = normT * static_cast<float>(kSamples);
+        int   lo = static_cast<int>(fIdx);
+        int   hi = std::min(lo + 1, kSamples);
+        float frac = fIdx - static_cast<float>(lo);
+        float newNormT = invLut[lo] + frac * (invLut[hi] - invLut[lo]);
+        return newNormT * duration;
+        };
+
+    for (auto& [boneName, nodeAnim] : motion->animation_.nodeAnimations_) {
+        auto remap = [&](auto& track) {
+            for (auto& kf : track.keyframes)
+                kf.time = remapTime(kf.time);
+            };
+        remap(nodeAnim.translate);
+        remap(nodeAnim.rotate);
+        remap(nodeAnim.scale);
+    }
+
+    motion->SetDuration(newDuration);
+    motion->ClearSpeedCurve();
+}
+
+============================================================
+File Path: YEngine/Model/Motion/Editor/Panels/SpeedCurvePanel.h
+============================================================
+#pragma once
+#include "IMotionEditorPanel.h"
+
+#ifdef USE_IMGUI
+#include <imgui.h>
+#include <vector>
+#include <algorithm>
+#include <cmath>
+
+// ============================================================
+// SpeedCurveDelegate
+// ImCurveEdit は使わず、独自カーブエディタで点を管理する
+// ============================================================
+struct SpeedCurveDelegate
+{
+    std::vector<ImVec2> points;
+
+    float boundsMinX = 0.0f;
+    float boundsMaxX = 1.0f;
+    float boundsMinY = 0.0f;
+    float boundsMaxY = 4.0f;
+
+    void SetMaxSpeed(float v)
+    {
+        maxSpeed_ = std::max(v, 1.0f);
+        boundsMaxY = maxSpeed_;
+    }
+    float GetMaxSpeed() const { return maxSpeed_; }
+
+    // 点を追加（X重複チェック付き）
+    bool AddPoint(ImVec2 value, float dupThresh = 0.03f)
+    {
+        value = Clamp(value);
+        for (const auto& p : points)
+            if (std::abs(p.x - value.x) < dupThresh) return false;
+        points.push_back(value);
+        Sort();
+        return true;
+    }
+
+    // 点を削除（インデックス指定）
+    void RemovePoint(int idx)
+    {
+        if (idx < 0 || idx >= static_cast<int>(points.size())) return;
+        // 端点（index 0, last）は削除させない
+        if (idx == 0 || idx == static_cast<int>(points.size()) - 1) return;
+        points.erase(points.begin() + idx);
+    }
+
+    // 端点を強制配置（X=0, X=1 は常に存在）
+    void EnsureEndpoints()
+    {
+        if (points.empty()) { points = { { 0.f, 1.f }, { 1.f, 1.f } }; return; }
+        // X=0 がなければ先頭を補正
+        points.front().x = 0.0f;
+        points.back().x = 1.0f;
+    }
+
+    void Sort()
+    {
+        std::sort(points.begin(), points.end(),
+            [](const ImVec2& a, const ImVec2& b) { return a.x < b.x; });
+    }
+
+    // 指定スクリーン座標に最も近い点のインデックスを返す
+    int HitTest(ImVec2 screenPos, ImVec2 rMin, ImVec2 rMax, float radius = 8.0f) const
+    {
+        int   best = -1;
+        float bestD = radius * radius;
+        for (int i = 0; i < static_cast<int>(points.size()); ++i) {
+            ImVec2 sp = ToScreen(points[i], rMin, rMax);
+            float dx = sp.x - screenPos.x;
+            float dy = sp.y - screenPos.y;
+            float d2 = dx * dx + dy * dy;
+            if (d2 < bestD) { bestD = d2; best = i; }
+        }
+        return best;
+    }
+
+    // スクリーン座標 → カーブ空間
+    ImVec2 ToLocal(ImVec2 sp, ImVec2 rMin, ImVec2 rMax) const
+    {
+        float w = rMax.x - rMin.x;
+        float h = rMax.y - rMin.y;
+        return {
+            (sp.x - rMin.x) / w,
+            boundsMaxY - (sp.y - rMin.y) / h * (boundsMaxY - boundsMinY)
+        };
+    }
+
+    // カーブ空間 → スクリーン座標
+    ImVec2 ToScreen(ImVec2 p, ImVec2 rMin, ImVec2 rMax) const
+    {
+        float w = rMax.x - rMin.x;
+        float h = rMax.y - rMin.y;
+        float yRange = boundsMaxY - boundsMinY;
+        return {
+            rMin.x + std::clamp(p.x, 0.f, 1.f) * w,
+            rMax.y - (std::clamp(p.y, boundsMinY, boundsMaxY) - boundsMinY) / yRange * h
+        };
+    }
+
+    ImVec2 Clamp(ImVec2 v) const
+    {
+        v.x = std::clamp(v.x, 0.0f, 1.0f);
+        v.y = std::clamp(v.y, boundsMinY, boundsMaxY);
+        return v;
+    }
+
+    // 線形補間でY値を取得（EvaluateSpeedCurve の簡易版、プレビュー用）
+    float Evaluate(float x) const
+    {
+        if (points.size() < 2) return 1.0f;
+        if (x <= points.front().x) return points.front().y;
+        if (x >= points.back().x)  return points.back().y;
+        for (int i = 0; i + 1 < static_cast<int>(points.size()); ++i) {
+            if (x <= points[i + 1].x) {
+                float t = (x - points[i].x) / (points[i + 1].x - points[i].x);
+                return points[i].y + t * (points[i + 1].y - points[i].y);
+            }
+        }
+        return 1.0f;
+    }
+
+private:
+    float maxSpeed_ = 4.0f;
+};
+
+#endif // USE_IMGUI
+
+// ============================================================
+// SpeedCurvePanel
+// ============================================================
+class SpeedCurvePanel : public IMotionEditorPanel
+{
+public:
+    void Initialize(MotionEditorContext* context) override;
+    void DrawImGui() override;
+
+private:
+    void PullFromMotion();
+    void PushToMotion();
+    void BakeSpeedCurve();
+
+#ifdef USE_IMGUI
+
+
+    // カスタムカーブエディタ描画（戻り値: dirty になったか）
+    bool DrawCurveEditor(ImVec2 size);
+
+    // 焼き込み前スナップショットオーバーレイ
+    void DrawBakedPreviewOverlay(ImVec2 rectMin, ImVec2 rectMax) const;
+#endif // USE_IMGUI
+
+    MotionEditorContext* context_ = nullptr;
+
+#ifdef USE_IMGUI
+    SpeedCurveDelegate  delegate_;
+    float               maxSpeedEdit_ = 4.0f;
+
+    // ドラッグ状態
+    int   dragIndex_ = -1;   // ドラッグ中の点インデックス
+    bool  dragging_ = false;
+
+    // 右クリックメニュー用
+    int   rightClickIdx_ = -1;   // 右クリックした点インデックス（-1=空白）
+    ImVec2 rightClickLocalPos_{};// 右クリック位置のカーブ空間座標
+
+    // 焼き込みプレビュー
+    std::vector<ImVec2> bakedSnapshot_;
+    bool                hasBakedSnapshot_ = false;
+    bool                showBakedPreview_ = true;
+#endif
+
+    bool    isDirty_ = false;
+    bool    bakeConfirmPending_ = false;
+    Motion* lastMotion_ = nullptr;
+};
 
 ============================================================
 File Path: YEngine/Model/Motion/Editor/Panels/StatusBarPanel.cpp
@@ -232392,10 +233589,10 @@ void StatusBarPanel::DrawImGui() {
 	ImGui::SetCursorPosY(3);
 	ImGui::TextColored(ImVec4(0.6f, 0.9f, 0.6f, 1.0f), "  %s", context_->statusMsg.c_str());
 
-	float hints_x = ImGui::GetContentRegionAvail().x - 400;
+	float hints_x = ImGui::GetContentRegionAvail().x - 600;
 	if (hints_x > 200) {
 		ImGui::SameLine(hints_x);
-		ImGui::TextDisabled("Space=再生  Del=KF削除  Ctrl+Z=元に戻す  Ctrl+Y=やり直す");
+		ImGui::TextDisabled("Space=再生  I=KF追加  Del=KF削除  Ctrl+C/V=コピー/ペースト  Ctrl+Z/Y=元に戻す/やり直す");
 	}
 
 	ImGui::EndChild();
@@ -232506,12 +233703,11 @@ void TimelinePanel::DrawImGui()
 			context_->requireTimelineRebuild = false;
 		}
 
-		// フラグが立っていたらトラック（ドープシートの行とキーフレーム）を作り直す
-		if (tracksDirty_) {
+		// DrawImGui 内の if(tracksDirty_) を全て以下に変更
+		if (tracksDirty_ && !pendingApply_ && !pendingSummaryApply_) {
 			RebuildTracks();
 			tracksDirty_ = false;
 		}
-
 		float duration = context_->currentMotion->GetDuration();
 		const int totalFrames = std::max(1, static_cast<int>(duration * fps_));
 		float canvasW = ImGui::GetContentRegionAvail().x;
@@ -232555,7 +233751,7 @@ void TimelinePanel::DrawImGui()
 
 		ImGui::Separator();
 
-		if (tracksDirty_) {
+		if (tracksDirty_ && !pendingApply_ && !pendingSummaryApply_) {
 			RebuildTracks();
 			tracksDirty_ = false;
 		}
@@ -232585,14 +233781,60 @@ void TimelinePanel::DrawImGui()
 			context_->statusMsg = "KF 削除";
 			});
 
+		summaryMovedThisFrame_ = false;  // Draw前にリセット
+
+		bool mouseDown = ImGui::IsMouseDown(0);
 		bool changed = dopeSheet_.Draw("MotionTimeline", tracks_, totalFrames, fps_);
 
 		if (changed) {
-			ApplyTracksToMotion();
-			tracksDirty_ = true;
+			if (summaryMovedThisFrame_) {
+				// ── 概要KFドラッグ ──
+				if (mouseDown) {
+					pendingSummaryApply_ = true;
+					// tracksDirty_ に触らない → RebuildTracks を抑制
+				}
+				else {
+					// 即リリース（クリック単発移動）
+					RegisterSummaryMoveCommand();
+					pendingSummaryApply_ = false;
+					prevSummaryFromFrame_ = -1;
+					tracksDirty_ = true;
+				}
+			}
+			else {
+				// ── 個別KFドラッグ ──
+				if (changed && !pendingApply_) {
+					preApplySnapshot_ = context_->currentMotion->animation_.nodeAnimations_;
+				}
+				if (!mouseDown) {
+					ApplyTracksToMotion();
+					RegisterMoveCommand();
+					tracksDirty_ = true;
+				}
+				else {
+					pendingApply_ = true;
+				}
+			}
 			context_->statusMsg = "KF 移動完了";
 		}
 
+		// 個別KF: マウスリリース確定
+		if (pendingApply_ && wasMouseDown_ && !mouseDown) {
+			ApplyTracksToMotion();
+			RegisterMoveCommand();
+			pendingApply_ = false;
+			tracksDirty_ = true;
+		}
+
+		// 概要KF: マウスリリース確定
+		if (pendingSummaryApply_ && wasMouseDown_ && !mouseDown) {
+			RegisterSummaryMoveCommand();
+			pendingSummaryApply_ = false;
+			prevSummaryFromFrame_ = -1;
+			tracksDirty_ = true;
+		}
+
+		wasMouseDown_ = mouseDown;
 		{
 			int seekFrame = dopeSheet_.GetSeekFrame();
 			float newTime = seekFrame / static_cast<float>(fps_);
@@ -232680,36 +233922,63 @@ void TimelinePanel::ApplyTracksToMotion()
 {
 	if (!context_->currentMotion) return;
 
-	for (int ti = 0; ti < static_cast<int>(tracks_.size()); ++ti)
-	{
-		if (ti >= static_cast<int>(trackBoneMap_.size())) break;
-		const auto& [boneName, channel] = trackBoneMap_[ti];
+	auto& nodeAnims = context_->currentMotion->animation_.nodeAnimations_;
 
-		// channel == -2: 概要トラック（スキップ）
-		// channel == -1: グループヘッダー（スキップ）
-		if (channel < 0) continue;
+	for (size_t i = 0; i < tracks_.size(); ++i) {
+		const auto& track = tracks_[i];
 
-		if (!context_->currentMotion->animation_.nodeAnimations_.count(boneName)) continue;
+		// サマリー・グループヘッダはスキップ
+		if (track.isGroupHeader || track.isSummary) continue;
 
-		auto& na = context_->currentMotion->animation_.nodeAnimations_[boneName];
-		const auto& keys = tracks_[ti].keys;
+		const auto& mapping = trackBoneMap_[i];
+		const std::string& boneName = mapping.first;
+		int channelType = mapping.second;
 
-		auto applyTimes = [&](auto& keyframes) {
-			if (keys.size() != keyframes.size()) return;
-			for (int ki = 0; ki < static_cast<int>(keys.size()); ++ki)
-				keyframes[ki].time = keys[ki].frame / static_cast<float>(fps_);
-			std::sort(keyframes.begin(), keyframes.end(),
-				[](const auto& a, const auto& b) { return a.time < b.time; });
+		if (channelType < 0) continue;
+
+		auto it = nodeAnims.find(boneName);
+		if (it == nodeAnims.end()) continue;
+		auto& nodeAnim = it->second;
+
+		// -----------------------------------------------------------
+		// syncKeys:
+		//   curveKeys  … Motion 側の実データ（value を持つ）
+		//   track.keys … UI 側のドープシートデータ（frame のみ）
+		//
+		//   両者をそれぞれ昇順ソートしてから k 番目同士を対応付け、
+		//   curveKeys[k].time = uiKeys[k].frame / fps_ と書き換える。
+		//   value には一切触れない。
+		// -----------------------------------------------------------
+		auto syncKeys = [&](auto& curveKeys)
+			{
+				if (track.keys.size() != curveKeys.size()) return;
+
+				// ── UI側キーをフレーム昇順にソートしたコピーを作る ──
+				auto sortedUIKeys = track.keys;
+				std::sort(sortedUIKeys.begin(), sortedUIKeys.end(),
+					[](const auto& a, const auto& b) { return a.frame < b.frame; });
+
+				// ── Motion側キーを time 昇順にソート（value ごと移動する）──
+				std::sort(curveKeys.begin(), curveKeys.end(),
+					[](const auto& a, const auto& b) { return a.time < b.time; });
+
+				// ── k 番目同士を対応付けて time だけ上書き ──
+				// （両者ともソート済みなのでインデックス順に1:1対応）
+				for (size_t k = 0; k < sortedUIKeys.size(); ++k) {
+					curveKeys[k].time =
+						sortedUIKeys[k].frame / static_cast<float>(fps_);
+				}
+
+				// ── time 書き換え後に再ソート（万一の保険）──
+				std::sort(curveKeys.begin(), curveKeys.end(),
+					[](const auto& a, const auto& b) { return a.time < b.time; });
 			};
 
-		switch (channel) {
-		case 0: applyTimes(na.translate.keyframes); break;
-		case 1: applyTimes(na.rotate.keyframes);    break;
-		case 2: applyTimes(na.scale.keyframes);     break;
-		}
+		if (channelType == 0) syncKeys(nodeAnim.translate.keyframes);
+		else if (channelType == 1) syncKeys(nodeAnim.rotate.keyframes);
+		else if (channelType == 2) syncKeys(nodeAnim.scale.keyframes);
 	}
 }
-
 // ============================================================
 // 概要トラック生成
 //   全ボーン・全チャンネルのKF時刻を収集して重複排除し、
@@ -232751,35 +234020,53 @@ void TimelinePanel::OnSummaryKeyMoved(int fromFrame, int delta)
 {
 	if (!context_->currentMotion || delta == 0) return;
 
-	// Undo用スナップショット
-	auto oldAnims = context_->currentMotion->animation_.nodeAnimations_;
+	// ドラッグ開始（fromFrame が変わった）時だけスナップショットを取得
+	if (prevSummaryFromFrame_ != fromFrame) {
+		summaryDragSnapshot_ = context_->currentMotion->animation_.nodeAnimations_;
+		prevSummaryFromFrame_ = fromFrame;
+	}
 
-	// 全ボーン・全チャンネルを走査して fromFrame のKFを移動
+	// ★毎フレームスナップショットに戻してから累積deltaを適用する
+	//   こうすることで「fromFrameにキーが見つからない」問題を回避
+	context_->currentMotion->animation_.nodeAnimations_ = summaryDragSnapshot_;
+
 	for (auto& [boneName, na] : context_->currentMotion->animation_.nodeAnimations_) {
-
 		auto moveInTrack = [&](auto& keyframes) {
 			for (auto& kf : keyframes) {
 				int kfFrame = static_cast<int>(kf.time * fps_ + 0.5f);
 				if (kfFrame == fromFrame) {
-					float newTime = (fromFrame + delta) / static_cast<float>(fps_);
-					kf.time = std::max(0.0f, newTime);
+					kf.time = std::max(0.0f, (fromFrame + delta) / static_cast<float>(fps_));
 				}
 			}
-			// 移動後に時刻順ソートを保証
 			std::sort(keyframes.begin(), keyframes.end(),
 				[](const auto& a, const auto& b) { return a.time < b.time; });
 			};
-
 		moveInTrack(na.translate.keyframes);
 		moveInTrack(na.rotate.keyframes);
 		moveInTrack(na.scale.keyframes);
 	}
 
+	// ★ここでは history と tracksDirty_ に触らない
+	//   ドラッグ中に RebuildTracks が走るのを防ぐため
+	//   Undo登録とtracksDirty_はマウスリリース時にDrawImGui側で行う
+	summaryMovedThisFrame_ = true;
+
+	context_->statusMsg = "概要: frame " + std::to_string(fromFrame)
+		+ (delta > 0 ? " +" : " ") + std::to_string(delta) + " 移動";
+}
+
+void TimelinePanel::RegisterMoveCommand()
+{
+	if (!context_->currentMotion) return;
+
+	// ApplyTracksToMotion 実行後の状態をスナップショット
 	auto newAnims = context_->currentMotion->animation_.nodeAnimations_;
 
-	// CommandHistory にUndoable コマンドとして登録
-	context_->history.Execute(MakeLambdaCommand(
-		"概要KF移動: " + std::to_string(fromFrame) + " → " + std::to_string(fromFrame + delta),
+	// oldAnims は RebuildTracks の直前に保存しておく必要があるため、
+	// メンバ変数 preApplySnapshot_ を使う（下記参照）
+	auto oldAnims = preApplySnapshot_;
+
+	context_->history.Execute(MakeLambdaCommand("KF移動",
 		[this, newAnims]() {
 			if (context_->currentMotion)
 				context_->currentMotion->animation_.nodeAnimations_ = newAnims;
@@ -232791,10 +234078,27 @@ void TimelinePanel::OnSummaryKeyMoved(int fromFrame, int delta)
 			tracksDirty_ = true;
 		}
 	));
+}
 
-	tracksDirty_ = true;
-	context_->statusMsg = "概要: frame " + std::to_string(fromFrame)
-		+ (delta > 0 ? " +" : " ") + std::to_string(delta) + " 移動";
+void TimelinePanel::RegisterSummaryMoveCommand()
+{
+	if (!context_->currentMotion) return;
+
+	auto oldAnims = summaryDragSnapshot_;
+	auto newAnims = context_->currentMotion->animation_.nodeAnimations_;
+
+	context_->history.Execute(MakeLambdaCommand("概要KF移動",
+		[this, newAnims]() {
+			if (context_->currentMotion)
+				context_->currentMotion->animation_.nodeAnimations_ = newAnims;
+			tracksDirty_ = true;
+		},
+		[this, oldAnims]() {
+			if (context_->currentMotion)
+				context_->currentMotion->animation_.nodeAnimations_ = oldAnims;
+			tracksDirty_ = true;
+		}
+	));
 }
 
 ============================================================
@@ -232805,6 +234109,7 @@ File Path: YEngine/Model/Motion/Editor/Panels/TimelinePanel.h
 #include "../MotionEditorContext.h"
 #include "Debugger/DopeSheet/DopeSheetEditor.h"
 #include <vector>
+#include <Motion/Core/Motion.h>
 
 /// <summary>
 /// アニメーションのタイムライン（ドープシート）を描画・管理するパネル
@@ -232825,6 +234130,10 @@ private:
 	void BuildSummaryTrack();           // 全KFを集約した概要トラックを生成
 	void OnSummaryKeyMoved(int fromFrame, int delta); // 概要KF一括移動ハンドラ
 
+	void RegisterMoveCommand();
+
+	void RegisterSummaryMoveCommand();
+
 private:
 	MotionEditorContext* context_ = nullptr;
 
@@ -232840,6 +234149,18 @@ private:
 	// KF ドラッグ移動
 	bool  draggingKF_ = false;
 
+	// 概要KFドラッグ用
+	bool summaryMovedThisFrame_ = false;
+	int  prevSummaryFromFrame_ = -1;
+	std::map<std::string, Motion::NodeAnimation> summaryDragSnapshot_;
+
+	// ドラッグ判定用
+	// 前フレームのマウス状態を保持
+	bool wasMouseDown_ = false;
+	// マウスリリース時にApplyTracksを走らせる
+	bool pendingApply_ = false;
+	bool pendingSummaryApply_ = false; // 概要KF移動の確定待ちフラグ
+	std::map<std::string, Motion::NodeAnimation> preApplySnapshot_;
 	Motion* editingMotion_ = nullptr; // ドープシートで現在編集しているモーション（変更検知用）
 };
 
@@ -232851,6 +234172,7 @@ File Path: YEngine/Model/Motion/Editor/Panels/ToolbarPanel.cpp
 #include "Object3D/ObjectManager.h"
 #include "Model.h"
 #include "../../Core/MotionSystem.h"
+#include "../../Core/Motion.h"
 #include <Editor/Icon/EditorIcon.h>
 
 #ifdef USE_IMGUI
@@ -232868,9 +234190,9 @@ void ToolbarPanel::DrawImGui()
 		ImGui::SameLine(0, 12);
 	}
 
-	// ------------------------------------------------------------
-	// 再生コントロール
-	// ------------------------------------------------------------
+	// ============================================================
+	// 再生コントロール (1行目)
+	// ============================================================
 	if (context_->isPlaying) {
 		if (ImGui::Button((std::string(Icon::Pause) + " 一時停止").c_str())) {
 			if (model && model->GetMotionSystem()) model->GetMotionSystem()->Stop();
@@ -232882,10 +234204,13 @@ void ToolbarPanel::DrawImGui()
 		if (ImGui::Button((std::string(Icon::Play) + " 再生").c_str())) {
 			if (model && model->GetMotionSystem()) {
 				auto* ms = model->GetMotionSystem();
+				if (context_->currentMotion && ms->GetAnimation() != context_->currentMotion) {
+					ms->SetAnimation(context_->currentMotion);
+				}
 				float savedTime = ms->GetAnimationTime();
 				if (savedTime >= ms->GetDuration() || ms->IsFinished()) savedTime = 0.0f;
 
-				if (context_->isLoop) target->PlayLoop(); else target->PlayOnce();
+				if (context_->isLoop) ms->PlayLoop(); else ms->PlayOnce();
 				ms->SetAnimationTime(savedTime);
 			}
 			context_->isPlaying = true;
@@ -232904,15 +234229,272 @@ void ToolbarPanel::DrawImGui()
 		context_->statusMsg = "停止 (先頭に戻る)";
 	}
 
+	ImGui::SameLine(0, 8);
+	{
+		bool isRev = context_->isReverse;
+		if (isRev) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.7f, 0.2f, 0.2f, 1.0f));
+		if (ImGui::Button(isRev ? (std::string(Icon::SyncAlt) + " 逆再生 ON").c_str()
+		                        : (std::string(Icon::SyncAlt) + " 逆再生").c_str())) {
+			context_->isReverse = !context_->isReverse;
+			if (model && model->GetMotionSystem()) {
+				auto* ms = model->GetMotionSystem();
+				float spd = ms->GetMotionSpeed();
+				ms->SetMotionSpeed(-spd);
+				if (context_->isReverse && ms->GetAnimationTime() <= 0.01f) {
+					ms->SetAnimationTime(ms->GetDuration());
+					context_->scrubTime = ms->GetDuration();
+				}
+				if (!context_->isReverse && ms->GetAnimationTime() >= ms->GetDuration() - 0.01f) {
+					ms->SetAnimationTime(0.0f);
+					context_->scrubTime = 0.0f;
+				}
+			}
+			context_->statusMsg = context_->isReverse ? "逆再生モード ON" : "逆再生モード OFF";
+		}
+		if (isRev) ImGui::PopStyleColor();
+	}
+
+	ImGui::SameLine(0, 8);
+	{
+		bool pp = context_->isPingPong;
+		if (pp) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.5f, 0.7f, 1.0f));
+		if (ImGui::Button(pp ? "PingPong ON" : "PingPong")) {
+			context_->isPingPong = !context_->isPingPong;
+			context_->pingPongForward = true;
+			context_->statusMsg = context_->isPingPong ? "ピンポン再生 ON" : "ピンポン再生 OFF";
+		}
+		if (pp) ImGui::PopStyleColor();
+	}
+
 	ImGui::SameLine(0, 20);
 	ImGui::Checkbox("ボーン表示", &context_->isDrawBone);
 
 	ImGui::SameLine(0, 20);
 	if (ImGui::Button("Save/Load...")) {
-		context_->showSavePopup = true; // ポップアップ管理パネルへ伝達
+		context_->showSavePopup = true;
+	}
+
+	// ============================================================
+	// 2行目: 速度 / トリム / ユーティリティ
+	// ============================================================
+	ImGui::SetNextItemWidth(120);
+	if (ImGui::SliderFloat("再生速度", &context_->playbackSpeed, 0.1f, 3.0f, "x%.2f")) {
+		if (model && model->GetMotionSystem()) {
+			float sign = context_->isReverse ? -1.0f : 1.0f;
+			model->GetMotionSystem()->SetMotionSpeed(sign * context_->playbackSpeed);
+		}
+	}
+
+	ImGui::SameLine(0, 20);
+	ImGui::Checkbox("トリム", &context_->useTrim);
+	if (context_->useTrim && context_->currentMotion) {
+		float duration = context_->currentMotion->GetDuration();
+		if (context_->trimEnd <= 0.0f) context_->trimEnd = duration;
+		ImGui::SameLine(0, 8);
+		ImGui::SetNextItemWidth(200);
+		ImGui::DragFloatRange2("範囲", &context_->trimStart, &context_->trimEnd, 0.01f, 0.0f, duration, "%.3f s", "%.3f s");
+	}
+
+	// ============================================================
+	// ユーティリティボタン (ミラー / トリム保存)
+	// ============================================================
+	if (context_->currentMotion) {
+		if (ImGui::Button("ミラー生成 (左右反転)")) {
+			GenerateMirrorMotion();
+		}
+		if (ImGui::IsItemHovered()) ImGui::SetTooltip("X軸の位置とY/Z回転を反転した\nミラーモーションを生成します");
+
+		if (context_->useTrim) {
+			ImGui::SameLine(0, 8);
+			if (ImGui::Button("トリム範囲を別モーションとして切り出し")) {
+				TrimMotion();
+			}
+		}
+
+		ImGui::SameLine(0, 8);
+		if (ImGui::Button("ピンポン結合して保存")) {
+			GeneratePingPongMotion();
+		}
+		if (ImGui::IsItemHovered()) ImGui::SetTooltip("正再生+逆再生を結合した\n1つのモーションを生成します");
 	}
 #endif
 }
+
+void ToolbarPanel::GenerateMirrorMotion()
+{
+	if (!context_->currentMotion) return;
+
+	Motion mirrored = *context_->currentMotion;
+	for (auto& [name, na] : mirrored.animation_.nodeAnimations_) {
+		// 位置のX成分を反転
+		for (auto& kf : na.translate.keyframes) {
+			kf.value.x = -kf.value.x;
+		}
+		// 回転のY/Z成分を反転 (左右ミラー)
+		for (auto& kf : na.rotate.keyframes) {
+			kf.value.y = -kf.value.y;
+			kf.value.z = -kf.value.z;
+		}
+	}
+
+	// ボーン名の左右入れ替え (Left<->Right, L<->R)
+	std::map<std::string, Motion::NodeAnimation> swapped;
+	for (auto& [name, na] : mirrored.animation_.nodeAnimations_) {
+		std::string newName = name;
+		// Left <-> Right
+		auto replaceAll = [](std::string& s, const std::string& from, const std::string& to) {
+			size_t pos = 0;
+			while ((pos = s.find(from, pos)) != std::string::npos) {
+				s.replace(pos, from.length(), to);
+				pos += to.length();
+			}
+		};
+		// 一時的なプレースホルダーを使って相互入れ替え
+		std::string temp = newName;
+		// Left/Right パターン
+		if (temp.find("Left") != std::string::npos || temp.find("Right") != std::string::npos) {
+			replaceAll(temp, "Left", "__TEMP_R__");
+			replaceAll(temp, "Right", "Left");
+			replaceAll(temp, "__TEMP_R__", "Right");
+			newName = temp;
+		}
+		else if (temp.find(".L") != std::string::npos || temp.find(".R") != std::string::npos) {
+			replaceAll(temp, ".L", "__TEMP_R__");
+			replaceAll(temp, ".R", ".L");
+			replaceAll(temp, "__TEMP_R__", ".R");
+			newName = temp;
+		}
+		else if (temp.find("_L_") != std::string::npos || temp.find("_R_") != std::string::npos) {
+			replaceAll(temp, "_L_", "__TEMP_R__");
+			replaceAll(temp, "_R_", "_L_");
+			replaceAll(temp, "__TEMP_R__", "_R_");
+			newName = temp;
+		}
+		swapped[newName] = std::move(na);
+	}
+	mirrored.animation_.nodeAnimations_ = std::move(swapped);
+
+	const std::string key = "Mirror:" + context_->selectedAnimKey;
+	Model::animationCache_[key] = std::move(mirrored);
+	context_->selectedAnimKey = key;
+	context_->currentMotion = &Model::animationCache_[key];
+
+	// MotionSystemにも同期
+	Object3d* target = context_->GetTargetObject();
+	if (target && target->GetModel() && target->GetModel()->GetMotionSystem()) {
+		target->GetModel()->GetMotionSystem()->SetAnimation(context_->currentMotion);
+	}
+
+	context_->requireTimelineRebuild = true;
+	context_->lastAppliedScrubTime = -1.0f;
+	context_->statusMsg = "ミラーモーション生成完了";
+}
+
+void ToolbarPanel::TrimMotion()
+{
+	if (!context_->currentMotion || !context_->useTrim) return;
+	float tStart = context_->trimStart;
+	float tEnd = context_->trimEnd;
+	if (tEnd <= tStart) return;
+
+	Motion trimmed;
+	float newDuration = tEnd - tStart;
+	trimmed.SetDuration(newDuration);
+
+	for (const auto& [name, na] : context_->currentMotion->animation_.nodeAnimations_) {
+		Motion::NodeAnimation newNA;
+		newNA.interpolationType = na.interpolationType;
+
+		auto trimCurve = [&](const auto& src, auto& dst) {
+			for (const auto& kf : src) {
+				if (kf.time >= tStart && kf.time <= tEnd) {
+					auto newKf = kf;
+					newKf.time -= tStart;
+					dst.push_back(newKf);
+				}
+			}
+		};
+
+		trimCurve(na.translate.keyframes, newNA.translate.keyframes);
+		trimCurve(na.rotate.keyframes, newNA.rotate.keyframes);
+		trimCurve(na.scale.keyframes, newNA.scale.keyframes);
+
+		trimmed.animation_.nodeAnimations_[name] = std::move(newNA);
+	}
+
+	const std::string key = "Trim:" + context_->selectedAnimKey + "[" +
+		std::to_string(tStart) + "-" + std::to_string(tEnd) + "]";
+	Model::animationCache_[key] = std::move(trimmed);
+	context_->selectedAnimKey = key;
+	context_->currentMotion = &Model::animationCache_[key];
+
+	Object3d* target = context_->GetTargetObject();
+	if (target && target->GetModel() && target->GetModel()->GetMotionSystem()) {
+		auto* ms = target->GetModel()->GetMotionSystem();
+		ms->SetAnimation(context_->currentMotion);
+		ms->SetAnimationTime(0.0f);
+	}
+
+	context_->requireTimelineRebuild = true;
+	context_->lastAppliedScrubTime = -1.0f;
+	context_->scrubTime = 0.0f;
+	context_->useTrim = false;
+	context_->statusMsg = "トリムモーション生成: " + std::to_string(newDuration) + "s";
+}
+
+void ToolbarPanel::GeneratePingPongMotion()
+{
+	if (!context_->currentMotion) return;
+
+	Motion pingpong;
+	float originalDuration = context_->currentMotion->GetDuration();
+	float newDuration = originalDuration * 2.0f;
+	pingpong.SetDuration(newDuration);
+
+	for (const auto& [name, na] : context_->currentMotion->animation_.nodeAnimations_) {
+		Motion::NodeAnimation newNA;
+		newNA.interpolationType = na.interpolationType;
+
+		auto buildPingPong = [&](const auto& src, auto& dst) {
+			// 正方向のキーフレーム
+			for (const auto& kf : src) {
+				dst.push_back(kf);
+			}
+			// 逆方向のキーフレーム (時間を反転してオフセット)
+			for (auto it = src.rbegin(); it != src.rend(); ++it) {
+				auto newKf = *it;
+				newKf.time = originalDuration + (originalDuration - it->time);
+				// 重複回避: ちょうどoriginalDurationのKFはスキップ
+				if (!dst.empty() && std::abs(newKf.time - dst.back().time) < 1e-4f) continue;
+				dst.push_back(newKf);
+			}
+		};
+
+		buildPingPong(na.translate.keyframes, newNA.translate.keyframes);
+		buildPingPong(na.rotate.keyframes, newNA.rotate.keyframes);
+		buildPingPong(na.scale.keyframes, newNA.scale.keyframes);
+
+		pingpong.animation_.nodeAnimations_[name] = std::move(newNA);
+	}
+
+	const std::string key = "PingPong:" + context_->selectedAnimKey;
+	Model::animationCache_[key] = std::move(pingpong);
+	context_->selectedAnimKey = key;
+	context_->currentMotion = &Model::animationCache_[key];
+
+	Object3d* target = context_->GetTargetObject();
+	if (target && target->GetModel() && target->GetModel()->GetMotionSystem()) {
+		auto* ms = target->GetModel()->GetMotionSystem();
+		ms->SetAnimation(context_->currentMotion);
+		ms->SetAnimationTime(0.0f);
+	}
+
+	context_->requireTimelineRebuild = true;
+	context_->lastAppliedScrubTime = -1.0f;
+	context_->scrubTime = 0.0f;
+	context_->statusMsg = "ピンポンモーション生成完了 (" + std::to_string(newDuration) + "s)";
+}
+
 
 ============================================================
 File Path: YEngine/Model/Motion/Editor/Panels/ToolbarPanel.h
@@ -232922,7 +234504,7 @@ File Path: YEngine/Model/Motion/Editor/Panels/ToolbarPanel.h
 #include "../MotionEditorContext.h"
 
 /// <summary>
-/// 再生制御やアニメーション選択を行うツールバー
+/// 再生制御やアニメーション選択、ゲーム向けモーションユーティリティを行うツールバー
 /// </summary>
 class ToolbarPanel : public IMotionEditorPanel
 {
@@ -232932,8 +234514,13 @@ public:
 	void DrawImGui() override;
 
 private:
+	void GenerateMirrorMotion();
+	void TrimMotion();
+	void GeneratePingPongMotion();
+
 	MotionEditorContext* context_ = nullptr;
 };
+
 
 ============================================================
 File Path: YEngine/Model/Node/Node.cpp
@@ -264786,6 +266373,13 @@ AttackingCombatState::AttackingCombatState(PlayerCombat* combat) : combat_(comba
 		obj->SetMotionSpeed(attack.motionSpeed);
 		obj->SetChangeMotion("Player.gltf", MotionPlayMode::Once, attack.animationName);
 
+		// 攻撃タイプに応じたエフェクトの読み込み
+		if (attack.type == AttackType::A_Arte) {
+			player->GetSword()->LoadVfxAssets("Resources/Vfx/NewEffect.json");
+		}else if(attack.type == AttackType::B_Arte) {
+			player->GetSword()->LoadVfxAssets("Resources/Vfx/NewEffect2.json");
+		}
+
 		player->GetSword()->PlayTrail();
 		combat->NotifyAction("コンボ開始: " + attack.animationName);
 		});
@@ -264804,6 +266398,13 @@ AttackingCombatState::AttackingCombatState(PlayerCombat* combat) : combat_(comba
 		obj->SetMotionSpeed(attack.motionSpeed);
 		obj->SetChangeMotion("Player.gltf", MotionPlayMode::Once, attack.animationName);
 
+		// 攻撃タイプに応じたエフェクトの読み込み
+		if (attack.type == AttackType::A_Arte) {
+			player->GetSword()->LoadVfxAssets("Resources/Vfx/NewEffect.json");
+		}
+		else if (attack.type == AttackType::B_Arte) {
+			player->GetSword()->LoadVfxAssets("Resources/Vfx/NewEffect2.json");
+		}
 		player->GetSword()->PlayTrail();
 		combat->NotifyAction("コンボ継続: " + attack.animationName);
 		});
@@ -265616,6 +267217,14 @@ void AttackDataEditor::DrawAttackList()
 	if (ImGui::Button("複製")) { DuplicateAttack(); if (autoReload_) TriggerReload(); }
 	ImGui::SameLine();
 	if (ImGui::Button("削除")) { DeleteAttack();    if (autoReload_) TriggerReload(); }
+
+	ImGui::SameLine();
+	ImGui::Text(" | ");
+	ImGui::SameLine();
+
+	if (ImGui::Button("↑")) { MoveUp();   if (autoReload_) TriggerReload(); }
+	ImGui::SameLine();
+	if (ImGui::Button("↓")) { MoveDown(); if (autoReload_) TriggerReload(); }
 #endif
 }
 
@@ -269404,12 +271013,12 @@ void Player::HandleCombatInput() {
 	if (!combat_->IsIdle()) return;
 
 	// A（軽攻撃）
-	if (input_->IsPadTriggered(0, GamePadButton::A) || input_->GetInstance()->TriggerKey(DIK_Q)) {
+	if (input_->IsPadTriggered(0, GamePadButton::A) /*|| input_->GetInstance()->TriggerKey(DIK_Q)*/) {
 		combat_->TryAttack(AttackType::A_Arte);
 	}
 
 	// B（重攻撃）
-	if (input_->IsPadTriggered(0, GamePadButton::B) || input_->GetInstance()->TriggerKey(DIK_E)) {
+	if (input_->IsPadTriggered(0, GamePadButton::B) /*|| input_->GetInstance()->TriggerKey(DIK_E)*/) {
 		combat_->TryAttack(AttackType::B_Arte);
 	}
 
@@ -269441,6 +271050,7 @@ void Player::Update() {
 	if (YoRigine::GameTime::IsPause()) {
 		return;
 	}
+
 	// 入力処理
 	HandleCombatInput();
 
@@ -269468,7 +271078,8 @@ void Player::Update() {
 	// 盾のコライダーON/OFF制御
 	if (combat_->GetCurrentState() == CombatState::Guarding) {
 		playerShield_->SetEnableCollider(true);
-	} else {
+	}
+	else {
 		playerShield_->SetEnableCollider(false);
 	}
 
@@ -269777,7 +271388,7 @@ void Player::LookAtDirection(const Vector3& direction)
 	dir = Vector3::Normalize(dir);
 	float targetYaw = std::atan2f(dir.x, dir.z); // ラジアンで計算
 	wt_.rotate_.y = targetYaw;
-	followCamera_->SetRotate({ followCamera_->GetRotate().x, targetYaw,followCamera_->GetRotate().z});
+	followCamera_->SetRotate({ followCamera_->GetRotate().x, targetYaw,followCamera_->GetRotate().z });
 }
 
 
@@ -270646,12 +272257,12 @@ void PlayerSword::Update() {
 		UpdateColliderWorldTransform();
 	}
 
-	Vector3 rootW = Transform(localRoot, finalMatrix_);
-	Vector3 tipW = Transform(localTip, finalMatrix_);
+	Vector3 rootW = Transform(localRoot, wt_.matWorld_);
+	Vector3 tipW = Transform(localTip, wt_.matWorld_);
 	trailEmitter_->AddPoint(tipW, rootW);
 	trailEmitter_->Update(YoRigine::GameTime::GetDeltaTime());
 
-	Vector3 handPos = GetHandPosition();
+	// Vector3 handPos = GetHandPosition(); // 使っていなければ削除でOK
 	obbCollider_->Update();
 }
 
@@ -270840,16 +272451,24 @@ void PlayerSword::OnDirectionCollision([[maybe_unused]] BaseCollider* self, [[ma
 void PlayerSword::OnEnterDirectionCollision([[maybe_unused]] BaseCollider* self, [[maybe_unused]] BaseCollider* other, [[maybe_unused]] HitDirection dir)
 {
 }
+// ============================================================
+// VFXアセットの読み込み
+// ============================================================
+void PlayerSword::LoadVfxAssets(const std::string vfxAssetPath)
+{
+	trailEmitter_->LoadAsset(vfxAssetPath);
+}
 
 // ============================================================
 // コライダー初期化
 // ============================================================
 void PlayerSword::InitCollision() {
 	obbCollider_ = ColliderFactory::Create<OBBCollider>(
-		this, &colliderWT_, camera_,
+		this, &wt_, camera_,
 		static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon)
 	);
 
+	obbCollider_->SetMass(0.0f);
 	obbCollider_->SetCollisionEnabled(false);
 	obbCollider_->SetEnablePenetration(false);
 }
@@ -270946,6 +272565,7 @@ public:
 	// ============================================================
 	// VFXの操作
 	// ============================================================
+	void LoadVfxAssets(const std::string vfxAssetPath);
 	void PlayTrail() { if (trailEmitter_) trailEmitter_->Play(); }
 	void StopTrail() { if (trailEmitter_) trailEmitter_->Stop(); }
 
