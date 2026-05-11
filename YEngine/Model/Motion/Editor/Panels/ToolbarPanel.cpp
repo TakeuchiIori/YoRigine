@@ -65,7 +65,7 @@ void ToolbarPanel::DrawImGui()
 		bool isRev = context_->isReverse;
 		if (isRev) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.7f, 0.2f, 0.2f, 1.0f));
 		if (ImGui::Button(isRev ? (std::string(Icon::SyncAlt) + " 逆再生 ON").c_str()
-		                        : (std::string(Icon::SyncAlt) + " 逆再生").c_str())) {
+			: (std::string(Icon::SyncAlt) + " 逆再生").c_str())) {
 			context_->isReverse = !context_->isReverse;
 			if (model && model->GetMotionSystem()) {
 				auto* ms = model->GetMotionSystem();
@@ -179,7 +179,7 @@ void ToolbarPanel::GenerateMirrorMotion()
 				s.replace(pos, from.length(), to);
 				pos += to.length();
 			}
-		};
+			};
 		// 一時的なプレースホルダーを使って相互入れ替え
 		std::string temp = newName;
 		// Left/Right パターン
@@ -229,26 +229,37 @@ void ToolbarPanel::TrimMotion()
 	if (tEnd <= tStart) return;
 
 	Motion trimmed;
+	Motion* srcMotion = context_->currentMotion;
 	float newDuration = tEnd - tStart;
 	trimmed.SetDuration(newDuration);
 
-	for (const auto& [name, na] : context_->currentMotion->animation_.nodeAnimations_) {
+	auto processChannel = [&](const auto& srcKeyframes, auto& dstKeyframes, Motion::InterpolationType interp) {
+		if (srcKeyframes.empty()) return;
+
+		// 開始地点の値を計算して追加
+		dstKeyframes.push_back({ 0.0f, srcMotion->CalculateValue(srcKeyframes, tStart, interp) });
+
+		for (const auto& kf : srcKeyframes) {
+			// トリム範囲内のキーフレームを追加 (時間をトリム開始からのオフセットに変換)
+			if (kf.time > tStart && kf.time < tEnd) {
+				dstKeyframes.push_back({ kf.time - tStart, kf.value });
+			}
+		}
+
+		if (newDuration > 0.0f) {
+			// 終了地点の値を計算して追加
+			dstKeyframes.push_back({ newDuration, srcMotion->CalculateValue(srcKeyframes, tEnd, interp) });
+		}
+		};
+
+	for (const auto& [name, na] : srcMotion->animation_.nodeAnimations_) {
 		Motion::NodeAnimation newNA;
 		newNA.interpolationType = na.interpolationType;
 
-		auto trimCurve = [&](const auto& src, auto& dst) {
-			for (const auto& kf : src) {
-				if (kf.time >= tStart && kf.time <= tEnd) {
-					auto newKf = kf;
-					newKf.time -= tStart;
-					dst.push_back(newKf);
-				}
-			}
-		};
-
-		trimCurve(na.translate.keyframes, newNA.translate.keyframes);
-		trimCurve(na.rotate.keyframes, newNA.rotate.keyframes);
-		trimCurve(na.scale.keyframes, newNA.scale.keyframes);
+		// 各SRTのチャンネルごとに処理を回す
+		processChannel(na.translate.keyframes, newNA.translate.keyframes, na.interpolationType);
+		processChannel(na.rotate.keyframes, newNA.rotate.keyframes, na.interpolationType);
+		processChannel(na.scale.keyframes, newNA.scale.keyframes, na.interpolationType);
 
 		trimmed.animation_.nodeAnimations_[name] = std::move(newNA);
 	}
@@ -299,7 +310,7 @@ void ToolbarPanel::GeneratePingPongMotion()
 				if (!dst.empty() && std::abs(newKf.time - dst.back().time) < 1e-4f) continue;
 				dst.push_back(newKf);
 			}
-		};
+			};
 
 		buildPingPong(na.translate.keyframes, newNA.translate.keyframes);
 		buildPingPong(na.rotate.keyframes, newNA.rotate.keyframes);
