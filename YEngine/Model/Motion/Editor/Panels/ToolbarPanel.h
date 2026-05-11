@@ -13,8 +13,13 @@ public:
 	void DrawImGui() override;
 
 private:
+	// ミラーモーションの生成
 	void GenerateMirrorMotion();
+	
+	// トリム範囲を切り出して新しいモーションを生成
 	void TrimMotion();
+
+	// ピンポン再生用のモーションを生成
 	void GeneratePingPongMotion();
 
 	MotionEditorContext* context_ = nullptr;

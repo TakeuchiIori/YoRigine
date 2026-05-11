@@ -541,7 +541,7 @@ void SpeedCurvePanel::PushToMotion()
 #endif
 
 // -----------------------------------------------------------------------
-// BakeSpeedCurve  (元の実装を維持)
+// BakeSpeedCurve
 // -----------------------------------------------------------------------
 void SpeedCurvePanel::BakeSpeedCurve()
 {
@@ -561,6 +561,8 @@ void SpeedCurvePanel::BakeSpeedCurve()
         float t1 = static_cast<float>(i) / kSamples;
         float s0 = std::max(motion->EvaluateSpeedCurve(t0), kMinSpeed);
         float s1 = std::max(motion->EvaluateSpeedCurve(t1), kMinSpeed);
+
+		// 速度の逆数を台形積分して時間を再マッピングするためのルックアップテーブルを作成
         invLut[i] = invLut[i - 1] + (1.0f / s0 + 1.0f / s1) * 0.5f / kSamples;
     }
 
