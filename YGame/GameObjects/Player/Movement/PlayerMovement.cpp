@@ -461,6 +461,39 @@ void PlayerMovement::ForceStop() {
 }
 
 // ============================================================
+// 戦闘アクション終了時のアニメーション再同期
+// 現在のMovementステートと入力状態に基づき、適切なアニメーションを再生する
+// ============================================================
+void PlayerMovement::SyncAnimationToCurrentState() {
+	if (!owner_) return;
+
+	auto* obj = owner_->GetObject3d();
+	if (!obj) return;
+
+	MovementState currentState = GetCurrentState();
+
+	if (currentState == MovementState::Moving) {
+		// 移動中：入力状態から歩行/走行を判定してアニメーション再生
+		InputState input = GetInputState();
+		bool isRunning = input.runPressed && config_.enableRun;
+
+		obj->SetMotionSpeed(owner_->GetMotionSpeed(0));
+
+		if (isRunning) {
+			obj->SetChangeMotion("Player.gltf", MotionPlayMode::Loop, "Run1");
+		}
+		else {
+			obj->SetChangeMotion("Player.gltf", MotionPlayMode::Loop, "Walk1");
+		}
+	}
+	else {
+		// 待機中：Idleアニメーションを再生
+		obj->SetMotionSpeed(owner_->GetMotionSpeed(0));
+		obj->SetChangeMotion("Player.gltf", MotionPlayMode::Loop, "Idle4");
+	}
+}
+
+// ============================================================
 // 状態名の文字列取得
 // ============================================================
 const char* PlayerMovement::GetStateString(MovementState state) const {

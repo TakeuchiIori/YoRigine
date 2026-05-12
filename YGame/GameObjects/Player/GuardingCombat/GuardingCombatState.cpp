@@ -73,6 +73,9 @@ void GuardingCombatState::OnExit() {
 	auto* player = combat_->GetOwner();
 	player->GetMovement()->SetCanMove(true);
 	player->GetMovement()->SetCanRotate(true);
+
+	// Movementステートに現在の状態に応じたアニメーション再生を委譲
+	player->GetMovement()->SyncAnimationToCurrentState();
 }
 
 // ============================================================

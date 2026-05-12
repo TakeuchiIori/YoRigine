@@ -108,6 +108,9 @@ void AttackingCombatState::OnExit() {
 	player->GetObject3d()->SetMotionSpeed(player->GetMotionSpeed(0));
 
 	combat_->GetCombo()->OnAttackFinished();
+
+	// Movementステートに現在の状態に応じたアニメーション再生を委譲
+	player->GetMovement()->SyncAnimationToCurrentState();
 }
 
 // ============================================================

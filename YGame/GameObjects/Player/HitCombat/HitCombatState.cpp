@@ -61,6 +61,9 @@ void HitCombatState::OnExit()
 
     movement->SetCanMove(true);
     movement->SetCanRotate(true);
+
+    // Movementステートに現在の状態に応じたアニメーション再生を委譲
+    movement->SyncAnimationToCurrentState();
 }
 
 // ============================================================

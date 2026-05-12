@@ -38,6 +38,9 @@ public:
 	MovementState GetPreviousState() const { return stateMachine_.GetPreviousState(); }
 	bool StateChanged() const { return stateMachine_.StateChanged(); }
 
+	// 戦闘アクション終了時に呼ばれる。現在の移動ステートに応じたアニメーションを再生する
+	void SyncAnimationToCurrentState();
+
 	// ============================================================
 	// コールバック設定
 	// ============================================================

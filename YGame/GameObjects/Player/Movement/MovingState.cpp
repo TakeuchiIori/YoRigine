@@ -19,11 +19,11 @@ void MovingState::OnEnter() {
 	auto* player = movement_->GetOwner();
 	auto* combat = player->GetCombat();
 
-	// 死亡中ならアニメーション変更しない
+	// 全身を占有するアクション中（死亡・被弾・ガード・スタン）はスキップ
 	if (combat && combat->GetCurrentState() == CombatState::Dead) return;
 
-	// コンボ中でなければ歩行モーションを再生
-	if (combat && combat->IsIdle()) {
+	// 全身占有アクション中でなければ歩行モーションを再生
+	if (!combat || !combat->IsFullBodyAction()) {
 		auto* obj = player->GetObject3d();
 		obj->SetMotionSpeed(player->GetMotionSpeed(0));
 		obj->SetChangeMotion("Player.gltf", MotionPlayMode::Loop, "Walk1");
@@ -85,7 +85,8 @@ void MovingState::Update(float deltaTime) {
 			return;
 		}
 
-		if (combat && combat->IsIdle()) {
+		// 全身占有アクション中でなければアニメーション切り替え
+		if (!combat || !combat->IsFullBodyAction()) {
 			auto* obj = player->GetObject3d();
 			obj->SetMotionSpeed(player->GetMotionSpeed(0));
 

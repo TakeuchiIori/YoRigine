@@ -11,16 +11,16 @@ IdleCombatState::IdleCombatState(PlayerCombat* combat) : combat_(combat) {
 
 // ============================================================
 // 待機ステート開始処理
+// アニメーション再生はMovementステートに委譲する
 // ============================================================
 void IdleCombatState::OnEnter() {
 	auto* player = combat_->GetOwner();
-	auto* obj = player->GetObject3d();
 
 	// ------------------------------------------------------------
-	// アイドルモーションを再生
+	// Movementステートの現在の状態に応じたアニメーションを再生させる
+	// 移動中なら歩行/走行、停止中ならIdleが自動的に選択される
 	// ------------------------------------------------------------
-	obj->SetMotionSpeed(player->GetMotionSpeed(0));
-	obj->SetChangeMotion("Player.gltf", MotionPlayMode::Loop, "Idle4");
+	player->GetMovement()->SyncAnimationToCurrentState();
 }
 
 // ============================================================
