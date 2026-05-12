@@ -69,6 +69,9 @@ public:
 	// アニメーションを切り替える
 	void SetChangeMotion(const std::string& filePath, MotionPlayMode playMode, const std::string& animationName = "");
 
+	// 上半身のアニメーションを再生する
+	void PlayUpperMotion(const std::string& filePath, MotionPlayMode playMode, const std::string& animationName = "");
+
 	// 今のアニメーション速度を切り替え
 	void SetMotionSpeed(float speed);
 	// モーションの再生方法

@@ -7,6 +7,7 @@
 
 #include <functional>
 #include <unordered_map>
+#include <unordered_set>
 
 // ============================================================
 // アニメーション再生モード
@@ -39,6 +40,12 @@ public:
 	void Stop();
 	void Resume();
 	void StartBlend(Motion& toAnimation, float blendDuration);
+
+	// ------------------------------------------------------------
+	// アクションレイヤー（上半身用）の再生制御とマスク
+	// ------------------------------------------------------------
+	void PlayUpperAnimation(Motion* animation, MotionPlayMode mode = MotionPlayMode::Once);
+	void StopUpperAnimation();
 
 	// ============================================================
 	// コールバック
@@ -73,6 +80,16 @@ public:
 	Motion* GetAnimation() const { return animation_; }
 	void SetAnimation(Motion* anim) { animation_ = anim; }
 
+	// ============================================================
+	// 上半身用のアクセッサたち
+	// ============================================================
+	void SetUpperBodyMask(const std::unordered_set<std::string>& mask) { upperBodyBoneMask_ = mask; }
+	const std::unordered_set<std::string>& GetUpperBodyMask() const { return upperBodyBoneMask_; }
+
+	bool IsUpperAnimationFinished() const { return isUpperFinished_; }
+	float GetUpperAnimationTime() const { return upperAnimationTime_; }
+	Motion* GetUpperAnimation() const { return upperAnimation_; }
+
 private:
 	// ============================================================
 	// 内部処理
@@ -88,8 +105,7 @@ private:
 	SkinCluster* skinCluster_ = nullptr;
 	Node* node_ = nullptr;
 
-	float animationTime_ = 0.0f;
-
+	// アニメーションブレンド状態
 	struct AnimationBlendState {
 		Motion from;
 		Motion to;
@@ -101,13 +117,25 @@ private:
 	};
 
 	AnimationBlendState animationBlendState_;
-
 	std::unordered_map<std::string, std::string> normalizedNameCache_;
 
 	MotionPlayMode playMode_ = MotionPlayMode::Loop;
 	MotionPlayMode prevPlayMode_ = MotionPlayMode::Loop;
 	bool isFinished_ = false;
 
+	float animationTime_ = 0.0f;
 	float motionSpeed_ = 1.0f;
 	float currentAnimationSpeed_ = 1.0f;
+
+
+	// ============================================================
+	// 上半身用のアニメーションブレンド
+	// ============================================================
+
+	Motion* upperAnimation_ = nullptr;
+	float upperAnimationTime_ = 0.0f;
+	MotionPlayMode upperPlayMode_ = MotionPlayMode::Stop;
+	bool isUpperFinished_ = false;
+	// 上半身アニメーションの影響を受けるボーン名のセット
+	std::unordered_set<std::string> upperBodyBoneMask_;
 };

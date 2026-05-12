@@ -52,6 +52,9 @@ public:
 	// 親ジョイント取得
 	std::optional<int32_t>& GetParent() { return parent_; }
 
+	// ★追加: 子ジョイントのインデックスリスト取得
+	const std::vector<int32_t>& GetChildren() const { return children_; }
+
 	// ワールドトランスフォーム取得
 	WorldTransform& GetWorldTransform() { return wt_; }
 

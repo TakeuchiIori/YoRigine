@@ -72,6 +72,15 @@ void Player::Initialize(Camera* camera) {
 
 	InitCollision();
 	InitJson();
+
+	if (obj_ && obj_->GetModel()) {
+		auto* ms = obj_->GetModel()->GetMotionSystem();
+		auto* skeleton = obj_->GetModel()->GetSkeleton();
+		if (ms && skeleton) {
+			// ここで確実に上半身のマスクをセットする
+			ms->SetUpperBodyMask(skeleton->GetDescendantBones("mixamorig:Hips"));
+		}
+	}
 }
 
 // ============================================================

@@ -4,6 +4,7 @@
 #include <optional>
 #include <map>
 #include <vector>
+#include <unordered_set> // ★追加
 
 // Engine
 #include "Joint.h"
@@ -29,6 +30,9 @@ public:
 
 	// スケルトン描画
 	void Draw(Line& line, const Matrix4x4& worldMatrix);
+
+	// ★追加: 指定したボーンを起点として、その全ての子ボーン（子孫）の名前リストを取得する
+	std::unordered_set<std::string> GetDescendantBones(const std::string& rootBoneName) const;
 
 public:
 	///************************* アクセッサ *************************///

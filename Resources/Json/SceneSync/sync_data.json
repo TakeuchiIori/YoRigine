@@ -4,7 +4,7 @@
             "currentEnemyGroup": "GreenSpikyBlob",
             "playerHpRatio": 1.0,
             "stats": {
-                "battleDuration": 20.72007179260254,
+                "battleDuration": 16.098031997680664,
                 "droppedItems": [],
                 "enemiesDefeated": 1,
                 "expGained": 0,
@@ -12,6 +12,6 @@
             }
         },
         "sceneName": "Battle",
-        "timestamp": 1777384775
+        "timestamp": 1778612903
     }
 }

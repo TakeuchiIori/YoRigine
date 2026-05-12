@@ -1,13 +1,14 @@
 #include "Skeleton.h"
 #include "Drawer/LineManager/Line.h"
+#include <queue> // ★追加
 
 void Skeleton::Create(const Node& rootNode)
 {
 	root_ = Joint::CreateJoint(rootNode, {}, joints_);
 
 	// 名前とindexのマッピングを行いアクセスしやすくなる
-	for ( Joint& joint : joints_) {
-		jointMap_.emplace(joint.GetName() , joint.GetIndex());
+	for (Joint& joint : joints_) {
+		jointMap_.emplace(joint.GetName(), joint.GetIndex());
 
 		joint.Initialize();
 
@@ -22,7 +23,7 @@ void Skeleton::Update()
 {
 	// すべてのJointを更新。親が若いので通常ループで処理が可能になっている
 	for (Joint& joint : joints_) {
-	
+
 		joint.Update(joints_);
 	}
 }
@@ -47,12 +48,13 @@ void Skeleton::Draw(Line& line, const Matrix4x4& worldMatrix)
 
 		// 方向と長さを計算
 		Vector3 dir = cWorld - pWorld;
-		float length = Length(dir); // ※長さを取得する関数（無ければ独自実装）
+		float length = Length(dir);
 
 		// 長さが短すぎる場合は描画をスキップ
 		if (length < 0.0001f) continue;
 
-		Vector3 forward = Normalize(dir); // ※正規化関数
+		// 進行方向を正規化
+		Vector3 forward = Normalize(dir);
 
 		// 進行方向に直交する2つの軸（right と up）を求める
 		Vector3 upGuide = { 0.0f, 1.0f, 0.0f };
@@ -63,7 +65,7 @@ void Skeleton::Draw(Line& line, const Matrix4x4& worldMatrix)
 		Vector3 right = Normalize(Cross(upGuide, forward)); // ※外積関数
 		Vector3 up = Normalize(Cross(forward, right));
 
-		// ボーンの太さと、一番太くなる位置の割合（Blender風に根元から10%の位置を太くする）
+		// ボーンの太さと、一番太くなる位置の割合（根元から10%の位置を太くする）
 		float headRatio = 0.1f;
 		float radius = length * 0.08f; // ボーンの長さの8%を太さ（半径）とする
 		Vector3 mid = pWorld + (forward * (length * headRatio));
@@ -74,23 +76,58 @@ void Skeleton::Draw(Line& line, const Matrix4x4& worldMatrix)
 		Vector3 vUp = mid + (up * radius);
 		Vector3 vDown = mid - (up * radius);
 
-		// 1. 根元(Head) から 中間の4頂点へ（4本）
+		// 根元(Head) から 中間の4頂点へ（4本）
 		line.RegisterLine(pWorld, vRight);
 		line.RegisterLine(pWorld, vLeft);
 		line.RegisterLine(pWorld, vUp);
 		line.RegisterLine(pWorld, vDown);
 
-		// 2. 中間の4頂点 から 先端(Tail)へ（4本）
+		// 中間の4頂点 から 先端(Tail)へ（4本）
 		line.RegisterLine(vRight, cWorld);
 		line.RegisterLine(vLeft, cWorld);
 		line.RegisterLine(vUp, cWorld);
 		line.RegisterLine(vDown, cWorld);
 
-		// 3. 中間の4頂点同士を結ぶ（断面のひし形・4本）
+		// 中間の4頂点同士を結ぶ（断面のひし形・4本）
 		line.RegisterLine(vRight, vUp);
 		line.RegisterLine(vUp, vLeft);
 		line.RegisterLine(vLeft, vDown);
 		line.RegisterLine(vDown, vRight);
 	}
 	line.DrawLine();
+}
+
+// ============================================================
+//  指定したボーンとその全ての子ボーン（子孫）の名前リストを取得
+// （幅優先探索 / BFS を使用）
+// ============================================================
+std::unordered_set<std::string> Skeleton::GetDescendantBones(const std::string& rootBoneName) const
+{
+	std::unordered_set<std::string> descendants;
+
+	auto it = jointMap_.find(rootBoneName);
+	if (it == jointMap_.end()) {
+		return descendants; // 見つからない場合は空のセットを返す
+	}
+
+	// 幅優先探索 (BFS) で起点ボーンとその子孫を全て収集
+	std::queue<int32_t> queue;
+	queue.push(it->second);
+
+	while (!queue.empty()) {
+		int32_t currentIndex = queue.front();
+		queue.pop();
+
+		const Joint& currentJoint = joints_[currentIndex];
+
+		// 自身の名前をマスク用リストに追加
+		descendants.insert(currentJoint.GetName());
+
+		// 子ジョイントをキューに追加して探索を続ける
+		for (int32_t childIndex : currentJoint.GetChildren()) {
+			queue.push(childIndex);
+		}
+	}
+
+	return descendants;
 }

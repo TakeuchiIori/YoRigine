@@ -50,6 +50,9 @@ public:
 	// モーション変更
 	void SetChangeMotion(const std::string& directoryPath, const std::string& filename, MotionPlayMode playMode, const std::string& animationName = "");
 
+	// 上半身専用モーションの再生
+	void PlayUpperMotion(const std::string& directoryPath, const std::string& filename, MotionPlayMode playMode, const std::string& animationName = "");
+	
 	// 描画
 	void Draw();
 	// 影描画
