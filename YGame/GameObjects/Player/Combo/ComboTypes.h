@@ -54,7 +54,9 @@ struct AttackData {
 	int hitStart = 0;
 	int hitEnd = 10;
 	int comboWindowStart = 0;
-	int comboWindowEnd = 0;
+	int comboWindowEnd = 20;
+
+
 
 	// ------------------------------------------------------------
 	// タイミング設定（ゲームロジック用・秒単位）
@@ -150,6 +152,9 @@ SERIALIZE_FIELD(AttackData, hitStart)
 SERIALIZE_FIELD(AttackData, hitEnd)
 SERIALIZE_FIELD(AttackData, comboWindowStart)
 SERIALIZE_FIELD(AttackData, comboWindowEnd)
+
+//SERIALIZE_ENUM_FIELD(AttackData, comboInputWindowStart)
+//SERIALIZE_ENUM_FIELD(AttackData, comboInputWindowEnd)
 
 SERIALIZE_FIELD(AttackData, duration)
 SERIALIZE_FIELD(AttackData, recovery)

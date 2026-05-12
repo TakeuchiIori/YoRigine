@@ -475,6 +475,12 @@ void Player::SetInitialPosition()
 }
 
 // ============================================================
+// 攻撃入力の判定
+// ============================================================
+bool Player::IsAttackPressedA() const { return input_->IsPadTriggered(0, GamePadButton::A); }
+bool Player::IsAttackPressedB() const { return input_->IsPadTriggered(0, GamePadButton::B); }
+
+// ============================================================
 // 指定方向を向く
 // ============================================================
 void Player::LookAtDirection(const Vector3& direction)

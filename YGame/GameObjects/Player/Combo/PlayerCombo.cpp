@@ -162,7 +162,14 @@ void PlayerCombo::ExecuteAttack(const AttackData& attack) {
 	currentAttack_ = const_cast<AttackData*>(&attack);
 	comboChain_.push_back(attack);
 	comboDamageMultiplier_ = CalculateDamageMultiplier();
-	ChangeState(ComboState::Attacking);
+
+	if (currentState_ == ComboState::Attacking) {
+		stateTimer_ = 0.0f; // 同じステートでも強制的にタイマーをリセット
+		ccRegenTimer_ = 0.0f;
+	}
+	else {
+		ChangeState(ComboState::Attacking);
+	}
 	comboTimer_ = 0.0f;
 
 	// ------------------------------------------------------------
@@ -182,29 +189,42 @@ void PlayerCombo::ExecuteAttack(const AttackData& attack) {
 void PlayerCombo::UpdateAttacking() {
 	if (!currentAttack_) { ChangeState(ComboState::Idle); return; }
 
-	// ------------------------------------------------------------
-	// 剣の当たり判定（Hitbox）の有効/無効タイミングの制御
-	// ------------------------------------------------------------
+	// 1. 現在のフレーム(int)を計算
 	const float frameDuration = (currentAttack_->fps > 0)
 		? 1.0f / static_cast<float>(currentAttack_->fps)
 		: 1.0f / 60.0f;
-
 	const int currentFrame = static_cast<int>(stateTimer_ / frameDuration);
 
+	// 2. 当たり判定（Hitbox）の有効/無効
 	const bool inHitWindow = (currentAttack_->hitEnd > currentAttack_->hitStart)
 		&& (currentFrame >= currentAttack_->hitStart)
 		&& (currentFrame < currentAttack_->hitEnd);
-
 	if (onSwordColliderChanged_) onSwordColliderChanged_(inHitWindow);
 
 	// ------------------------------------------------------------
-	// 状態終了による次の受付ステートへの遷移
+	// ★追加：攻撃中のキャンセル（コンボ継続）判定
+	// comboWindow のフレーム内なら、ボタンを押した瞬間に次の攻撃へ移行！
+	// ------------------------------------------------------------
+	if (currentFrame >= currentAttack_->comboWindowStart &&
+		currentFrame <= currentAttack_->comboWindowEnd)
+	{
+		if (owner_) {
+			// TryAttack が成功した時点で、ExecuteAttack が呼ばれてステートもタイマーもリセットされる
+			if (owner_->IsAttackPressedA()) {
+				if (TryAttack(AttackType::A_Arte)) return;
+			}
+			else if (owner_->IsAttackPressedB()) {
+				if (TryAttack(AttackType::B_Arte)) return;
+			}
+		}
+	}
+
+	// ------------------------------------------------------------
+	// 3. アニメーションが最後まで終わった場合の処理
 	// ------------------------------------------------------------
 	if (stateTimer_ >= currentAttack_->duration) {
-		if (currentAttack_->canChainToAny && currentCC_ > 0)
-			ChangeState(ComboState::CanContinue);
-		else
-			ChangeState(ComboState::Recovery);
+		// すでに入力受付期間を過ぎているので、硬直(Recovery)へ移行する
+		ChangeState(ComboState::Finished);
 	}
 }
 
@@ -214,10 +234,34 @@ void PlayerCombo::UpdateAttacking() {
 void PlayerCombo::UpdateCanContinue() {
 	if (!currentAttack_) { ChangeState(ComboState::Idle); return; }
 
-	if (stateTimer_ >= currentAttack_->continueWindow)
-		ChangeState(ComboState::Recovery);
-}
+	// 1フレームあたりの時間（秒）を計算
+	const float frameDuration = (currentAttack_->fps > 0)
+		? 1.0f / static_cast<float>(currentAttack_->fps)
+		: 1.0f / 60.0f;
 
+	// 経過時間（stateTimer_）から「現在は何フレーム目か」を割り出す
+	const int currentFrame = static_cast<int>(stateTimer_ / frameDuration);
+
+	// フレーム数(int)同士で比較
+	if (currentFrame >= currentAttack_->comboWindowStart &&
+		currentFrame <= currentAttack_->comboWindowEnd)
+	{
+		if (owner_) {
+			if (owner_->IsAttackPressedA()) {
+				if (TryAttack(AttackType::A_Arte)) return;
+			}
+			else if (owner_->IsAttackPressedB()) {
+				if (TryAttack(AttackType::B_Arte)) return;
+			}
+		}
+	}
+
+	// 終了フレームを過ぎたら硬直(Recovery)へ
+	if (currentFrame > currentAttack_->comboWindowEnd) {
+		ChangeState(ComboState::Recovery);
+		return;
+	}
+}
 // ============================================================
 // 攻撃硬直中の更新処理
 // ============================================================
@@ -274,7 +318,12 @@ void PlayerCombo::EnterState(ComboState newState) {
 	case ComboState::Attacking:
 		ccRegenTimer_ = 0.0f;
 		break;
-
+	case ComboState::Finished:
+		ChangeState(ComboState::Idle);
+		if (onComboEnd_) {
+			onComboEnd_(GetComboCount());
+		}
+		break;
 	default:
 		break;
 	}
