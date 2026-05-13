@@ -201435,6 +201435,20 @@ void Object3d::SetChangeMotion(const std::string& filePath, MotionPlayMode playM
 	);
 }
 
+void Object3d::PlayUpperMotion(const std::string& filePath, MotionPlayMode playMode, const std::string& animationName)
+{
+	if (!model_) { return; }
+
+	auto [basePath, fileName] = ModelManager::GetInstance()->ParseModelPath(filePath);
+
+	model_->PlayUpperMotion(
+		defaultModelPath_ + basePath,
+		fileName,
+		playMode,
+		animationName
+	);
+}
+
 /// <summary>
 //モーション速度の切り替え
 /// </summary>
@@ -201444,6 +201458,18 @@ void Object3d::SetMotionSpeed(float speed)
 	if (model_) {
 		if (model_->GetMotionSystem()) {
 			model_->GetMotionSystem()->SetCurrentAnimationSpeed(speed);
+		}
+	}
+}
+
+/// <summary>
+/// 上半身モーション速度の独立した切り替え
+/// </summary>
+void Object3d::SetUpperMotionSpeed(float speed)
+{
+	if (model_) {
+		if (model_->GetMotionSystem()) {
+			model_->GetMotionSystem()->SetUpperMotionSpeed(speed);
 		}
 	}
 }
@@ -201543,8 +201569,13 @@ public:
 	// アニメーションを切り替える
 	void SetChangeMotion(const std::string& filePath, MotionPlayMode playMode, const std::string& animationName = "");
 
+	// 上半身のアニメーションを再生する
+	void PlayUpperMotion(const std::string& filePath, MotionPlayMode playMode, const std::string& animationName = "");
+
 	// 今のアニメーション速度を切り替え
 	void SetMotionSpeed(float speed);
+	// 上半身アニメーション速度を独立して切り替え
+	void SetUpperMotionSpeed(float speed);
 	// モーションの再生方法
 	void PlayOnce() { model_->PlayOnce(); }
 	void PlayLoop() { model_->PlayLoop(); }
@@ -229374,6 +229405,20 @@ void Model::SetChangeMotion(const std::string& directoryPath, const std::string&
 	}
 }
 
+void Model::PlayUpperMotion(const std::string& directoryPath, const std::string& filename, MotionPlayMode playMode, const std::string& animationName)
+{
+	if (!motionSystem_) return;
+
+	// アニメーションデータをロード（すでにキャッシュにあればそれを取得）
+	LoadMotionFile(directoryPath, filename, animationName);
+
+	std::string cacheKey = directoryPath + "/" + filename + "#" + animationName;
+	auto it = animationCache_.find(cacheKey);
+	if (it != animationCache_.end()) {
+		motionSystem_->PlayUpperAnimation(&(it->second), playMode);
+	}
+}
+
 void Model::DrawBone(Line& line, const Matrix4x4& worldMatrix)
 {
 	if (skeleton_) {
@@ -229645,6 +229690,9 @@ public:
 	// モーション変更
 	void SetChangeMotion(const std::string& directoryPath, const std::string& filename, MotionPlayMode playMode, const std::string& animationName = "");
 
+	// 上半身専用モーションの再生
+	void PlayUpperMotion(const std::string& directoryPath, const std::string& filename, MotionPlayMode playMode, const std::string& animationName = "");
+	
 	// 描画
 	void Draw();
 	// 影描画
@@ -230685,8 +230733,7 @@ File Path: YEngine/Model/Motion/Core/MotionSystem.cpp
 // ============================================================
 // 初期化（スケルトンあり）
 // ============================================================
-void MotionSystem::Initialize(Motion& Motion, Skeleton& skeleton, SkinCluster& skinCluster, Node* node)
-{
+void MotionSystem::Initialize(Motion& Motion, Skeleton& skeleton, SkinCluster& skinCluster, Node* node){
 	animation_ = &Motion;
 	skeleton_ = &skeleton;
 	skinCluster_ = &skinCluster;
@@ -230697,8 +230744,7 @@ void MotionSystem::Initialize(Motion& Motion, Skeleton& skeleton, SkinCluster& s
 // ============================================================
 // 初期化（ノードのみ）
 // ============================================================
-void MotionSystem::Initialize(Motion& Motion, Node* rootNode)
-{
+void MotionSystem::Initialize(Motion& Motion, Node* rootNode){
 	animation_ = &Motion;
 	node_ = rootNode;
 	animationTime_ = 0.0f;
@@ -230707,12 +230753,37 @@ void MotionSystem::Initialize(Motion& Motion, Node* rootNode)
 // ============================================================
 // 更新処理
 // ============================================================
-void MotionSystem::Update(float deltaTime)
-{
+void MotionSystem::Update(float deltaTime){
 	if (!animation_ || playMode_ == MotionPlayMode::Stop || isFinished_) return;
 
+	float effectiveSpeed = GetEffectiveSpeed();
+
 	// ------------------------------------------------------------
-	// ブレンド中の処理
+	// 上半身（アクション）レイヤーの更新
+	// ------------------------------------------------------------
+	if (upperAnimation_ && upperPlayMode_ != MotionPlayMode::Stop && !isUpperFinished_) {
+		float upDuration = upperAnimation_->GetDuration();
+		float upSpeedMul = 1.0f;
+		if (upperAnimation_->HasSpeedCurve() && upDuration > 0.0f) {
+			upSpeedMul = upperAnimation_->EvaluateSpeedCurve(std::clamp(upperAnimationTime_ / upDuration, 0.0f, 1.0f));
+		}
+
+		upperAnimationTime_ += deltaTime * upperMotionSpeed_ * upSpeedMul;
+
+		if (upperAnimationTime_ >= upDuration) {
+			if (upperPlayMode_ == MotionPlayMode::Loop) {
+				upperAnimationTime_ = 0.0f;
+			}
+			else {
+				upperAnimationTime_ = upDuration;
+				isUpperFinished_ = true;
+				StopUpperAnimation(); // 終わったら自動でストップ（下半身の動きに同期させるため）
+			}
+		}
+	}
+
+	// ------------------------------------------------------------
+	// ベースとなるブレンド中の処理
 	// ------------------------------------------------------------
 	if (animationBlendState_.isBlending) {
 		animationBlendState_.currentTime += deltaTime;
@@ -230725,84 +230796,83 @@ void MotionSystem::Update(float deltaTime)
 	}
 
 	// ------------------------------------------------------------
-	// 通常のアニメーション再生処理
+	// ベースレイヤーの通常更新
 	// ------------------------------------------------------------
-	bool wasFinished = isFinished_;
+	if (!animation_ || playMode_ == MotionPlayMode::Stop || isFinished_) return;
 
-	// タイムスケールカーブが設定されている場合は正規化時間で速度倍率を取得
+	bool wasFinished = isFinished_;
 	float duration = animation_->GetDuration();
 	float speedMul = 1.0f;
 	if (animation_->HasSpeedCurve() && duration > 0.0f) {
-		float normalizedT = std::clamp(animationTime_ / duration, 0.0f, 1.0f);
-		speedMul = animation_->EvaluateSpeedCurve(normalizedT);
+		speedMul = animation_->EvaluateSpeedCurve(std::clamp(animationTime_ / duration, 0.0f, 1.0f));
 	}
-	animationTime_ += deltaTime * GetEffectiveSpeed() * speedMul;
+	animationTime_ += deltaTime * effectiveSpeed * speedMul;
 
 	if (animationTime_ >= duration) {
-		if (playMode_ == MotionPlayMode::Loop) {
-			animationTime_ = 0.0f;
-		}
-		else {
-			animationTime_ = duration;
-			isFinished_ = true;
-		}
+		if (playMode_ == MotionPlayMode::Loop) animationTime_ = 0.0f;
+		else { animationTime_ = duration; isFinished_ = true; }
 	}
 	else if (animationTime_ < 0.0f) {
-		if (playMode_ == MotionPlayMode::Loop) {
-			animationTime_ = duration;
-		}
-		else {
-			animationTime_ = 0.0f;
-			isFinished_ = true;
-		}
+		if (playMode_ == MotionPlayMode::Loop) animationTime_ = duration;
+		else { animationTime_ = 0.0f; isFinished_ = true; }
 	}
 
-	// ------------------------------------------------------------
-	// 終了検知とコールバック実行
-	// ------------------------------------------------------------
-	if (!wasFinished && isFinished_) {
-		if (onMotionFinished_) {
-			onMotionFinished_();
-		}
+	if (!wasFinished && isFinished_ && onMotionFinished_) {
+		onMotionFinished_();
 	}
 }
 
 // ============================================================
-// アニメーションの適用
+// アニメーションの適用（合成する場所）
 // ============================================================
+// MotionSystem.cpp の Apply() 関数をこれで丸ごと上書き！
+
 void MotionSystem::Apply()
 {
-	if (!animation_ || playMode_ == MotionPlayMode::Stop) return;
+	if (skeleton_) {
+		for (Joint& joint : skeleton_->GetJoints()) {
+			std::string normName = GetNormalizedName(joint.GetName());
 
-	// ------------------------------------------------------------
-	// ブレンド中の適用
-	// ------------------------------------------------------------
-	if (animationBlendState_.isBlending && skeleton_) {
-		float t = animationBlendState_.currentTime / animationBlendState_.blendTime;
-		t = std::clamp(t, 0.0f, 1.0f);
-		BlendAndApplyAnimation(animationBlendState_.from, animationBlendState_.to, t);
+			// マスクに登録されているか（上半身かどうか）の判定
+			bool isUpperBody = (upperBodyBoneMask_.count(joint.GetName()) > 0);
+
+			QuaternionTransform appliedTransform;
+			bool transformSet = false;
+
+			// ★ここが一番重要！ 上半身であり、かつ攻撃アニメが再生中なら、上半身を攻撃モーションにする！
+			if (isUpperBody && upperAnimation_ && upperPlayMode_ != MotionPlayMode::Stop && !isUpperFinished_) {
+				appliedTransform = GetTransformAnimation(*upperAnimation_, normName, upperAnimationTime_);
+				transformSet = true;
+			}
+			// それ以外（下半身、または攻撃していない時の上半身）は、ベースの移動モーション（歩き・走り）にする！
+			else {
+				if (animationBlendState_.isBlending) {
+					float t = std::clamp(animationBlendState_.currentTime / animationBlendState_.blendTime, 0.0f, 1.0f);
+					QuaternionTransform fromTr = GetTransformAnimation(animationBlendState_.from, normName, animationBlendState_.fromTime + animationBlendState_.currentTime);
+					QuaternionTransform toTr = GetTransformAnimation(animationBlendState_.to, normName, animationBlendState_.toTime + animationBlendState_.currentTime);
+
+					appliedTransform.translate = Lerp(fromTr.translate, toTr.translate, t);
+					appliedTransform.rotate = Slerp(fromTr.rotate, toTr.rotate, t);
+					appliedTransform.scale = Lerp(fromTr.scale, toTr.scale, t);
+					transformSet = true;
+				}
+				else if (animation_ && playMode_ != MotionPlayMode::Stop) {
+					appliedTransform = GetTransformAnimation(*animation_, normName, animationTime_);
+					transformSet = true;
+				}
+			}
+
+			if (transformSet) {
+				joint.SetTransform(appliedTransform);
+			}
+		}
 
 		skeleton_->Update();
 		if (skinCluster_) {
 			skinCluster_->UpdateMatrixPalette(skeleton_->GetJoints());
 		}
-
-		// ------------------------------------------------------------
-		// 通常のスケルトン適用
-		// ------------------------------------------------------------
 	}
-	else if (skeleton_) {
-		animation_->ApplyAnimation(skeleton_->GetJoints(), animationTime_);
-		skeleton_->Update();
-		if (skinCluster_) {
-			skinCluster_->UpdateMatrixPalette(skeleton_->GetJoints());
-		}
-
-		// ------------------------------------------------------------
-		// ノード単体への適用
-		// ------------------------------------------------------------
-	}
-	else if (node_) {
+	else if (node_ && animation_ && playMode_ != MotionPlayMode::Stop) {
 		animation_->PlayerAnimation(animationTime_, *node_);
 	}
 }
@@ -230875,6 +230945,33 @@ void MotionSystem::StartBlend(Motion& toAnimation, float blendDuration) {
 	animationBlendState_.currentTime = 0.0f;
 	animationBlendState_.isBlending = true;
 	animation_ = &animationBlendState_.to;
+}
+
+// ============================================================
+// 上半身用アニメーションの再生制御
+// ============================================================
+void MotionSystem::PlayUpperAnimation(Motion* animation, MotionPlayMode mode){
+	upperAnimation_ = animation;
+	upperPlayMode_ = mode;
+	upperAnimationTime_ = 0.0f;
+	isUpperFinished_ = false;
+	upperMotionSpeed_ = 1.0f;  // デフォルト速度にリセット（呼び出し側でSetUpperMotionSpeedを使って設定）
+}
+
+// ============================================================
+// 上半身用アニメーションの停止
+// ============================================================
+void MotionSystem::StopUpperAnimation(){
+	upperPlayMode_ = MotionPlayMode::Stop;
+	upperAnimation_ = nullptr;
+	isUpperFinished_ = false;
+	// ★追加: マスクされたボーンの数をコンソールに出力する
+	std::string msg = "[MotionSystem] 上半身マスクの登録数: " + std::to_string(upperBodyBoneMask_.size()) + "\n";
+	OutputDebugStringA(msg.c_str());
+
+	if (upperBodyBoneMask_.empty()) {
+		OutputDebugStringA("[MotionSystem] 警告: 上半身マスクが空です！起点ボーンの名前が間違っている可能性があります。\n");
+	}
 }
 
 // ============================================================
@@ -230973,6 +231070,7 @@ File Path: YEngine/Model/Motion/Core/MotionSystem.h
 
 #include <functional>
 #include <unordered_map>
+#include <unordered_set>
 
 // ============================================================
 // アニメーション再生モード
@@ -231005,6 +231103,12 @@ public:
 	void Stop();
 	void Resume();
 	void StartBlend(Motion& toAnimation, float blendDuration);
+
+	// ------------------------------------------------------------
+	// アクションレイヤー（上半身用）の再生制御とマスク
+	// ------------------------------------------------------------
+	void PlayUpperAnimation(Motion* animation, MotionPlayMode mode = MotionPlayMode::Once);
+	void StopUpperAnimation();
 
 	// ============================================================
 	// コールバック
@@ -231039,6 +231143,20 @@ public:
 	Motion* GetAnimation() const { return animation_; }
 	void SetAnimation(Motion* anim) { animation_ = anim; }
 
+	// ============================================================
+	// 上半身用のアクセッサたち
+	// ============================================================
+	void SetUpperBodyMask(const std::unordered_set<std::string>& mask) { upperBodyBoneMask_ = mask; }
+	const std::unordered_set<std::string>& GetUpperBodyMask() const { return upperBodyBoneMask_; }
+
+	bool IsUpperAnimationFinished() const { return isUpperFinished_; }
+	float GetUpperAnimationTime() const { return upperAnimationTime_; }
+	Motion* GetUpperAnimation() const { return upperAnimation_; }
+
+	// 上半身アニメーション用の独立したモーション速度
+	void SetUpperMotionSpeed(float speed) { upperMotionSpeed_ = speed; }
+	float GetUpperMotionSpeed() const { return upperMotionSpeed_; }
+
 private:
 	// ============================================================
 	// 内部処理
@@ -231054,8 +231172,7 @@ private:
 	SkinCluster* skinCluster_ = nullptr;
 	Node* node_ = nullptr;
 
-	float animationTime_ = 0.0f;
-
+	// アニメーションブレンド状態
 	struct AnimationBlendState {
 		Motion from;
 		Motion to;
@@ -231067,15 +231184,28 @@ private:
 	};
 
 	AnimationBlendState animationBlendState_;
-
 	std::unordered_map<std::string, std::string> normalizedNameCache_;
 
 	MotionPlayMode playMode_ = MotionPlayMode::Loop;
 	MotionPlayMode prevPlayMode_ = MotionPlayMode::Loop;
 	bool isFinished_ = false;
 
+	float animationTime_ = 0.0f;
 	float motionSpeed_ = 1.0f;
 	float currentAnimationSpeed_ = 1.0f;
+
+
+	// ============================================================
+	// 上半身用のアニメーションブレンド
+	// ============================================================
+
+	Motion* upperAnimation_ = nullptr;
+	float upperAnimationTime_ = 0.0f;
+	MotionPlayMode upperPlayMode_ = MotionPlayMode::Stop;
+	bool isUpperFinished_ = false;
+	// 上半身アニメーションの影響を受けるボーン名のセット
+	std::unordered_set<std::string> upperBodyBoneMask_;
+	float upperMotionSpeed_ = 1.0f;  // 上半身アニメーション用の独立したモーション速度
 };
 
 ============================================================
@@ -234856,6 +234986,9 @@ public:
 	// 親ジョイント取得
 	std::optional<int32_t>& GetParent() { return parent_; }
 
+	// ★追加: 子ジョイントのインデックスリスト取得
+	const std::vector<int32_t>& GetChildren() const { return children_; }
+
 	// ワールドトランスフォーム取得
 	WorldTransform& GetWorldTransform() { return wt_; }
 
@@ -234892,14 +235025,15 @@ File Path: YEngine/Model/Skeleton/Skeleton.cpp
 ============================================================
 #include "Skeleton.h"
 #include "Drawer/LineManager/Line.h"
+#include <queue> // ★追加
 
 void Skeleton::Create(const Node& rootNode)
 {
 	root_ = Joint::CreateJoint(rootNode, {}, joints_);
 
 	// 名前とindexのマッピングを行いアクセスしやすくなる
-	for ( Joint& joint : joints_) {
-		jointMap_.emplace(joint.GetName() , joint.GetIndex());
+	for (Joint& joint : joints_) {
+		jointMap_.emplace(joint.GetName(), joint.GetIndex());
 
 		joint.Initialize();
 
@@ -234914,7 +235048,7 @@ void Skeleton::Update()
 {
 	// すべてのJointを更新。親が若いので通常ループで処理が可能になっている
 	for (Joint& joint : joints_) {
-	
+
 		joint.Update(joints_);
 	}
 }
@@ -234939,12 +235073,13 @@ void Skeleton::Draw(Line& line, const Matrix4x4& worldMatrix)
 
 		// 方向と長さを計算
 		Vector3 dir = cWorld - pWorld;
-		float length = Length(dir); // ※長さを取得する関数（無ければ独自実装）
+		float length = Length(dir);
 
 		// 長さが短すぎる場合は描画をスキップ
 		if (length < 0.0001f) continue;
 
-		Vector3 forward = Normalize(dir); // ※正規化関数
+		// 進行方向を正規化
+		Vector3 forward = Normalize(dir);
 
 		// 進行方向に直交する2つの軸（right と up）を求める
 		Vector3 upGuide = { 0.0f, 1.0f, 0.0f };
@@ -234955,7 +235090,7 @@ void Skeleton::Draw(Line& line, const Matrix4x4& worldMatrix)
 		Vector3 right = Normalize(Cross(upGuide, forward)); // ※外積関数
 		Vector3 up = Normalize(Cross(forward, right));
 
-		// ボーンの太さと、一番太くなる位置の割合（Blender風に根元から10%の位置を太くする）
+		// ボーンの太さと、一番太くなる位置の割合（根元から10%の位置を太くする）
 		float headRatio = 0.1f;
 		float radius = length * 0.08f; // ボーンの長さの8%を太さ（半径）とする
 		Vector3 mid = pWorld + (forward * (length * headRatio));
@@ -234966,19 +235101,19 @@ void Skeleton::Draw(Line& line, const Matrix4x4& worldMatrix)
 		Vector3 vUp = mid + (up * radius);
 		Vector3 vDown = mid - (up * radius);
 
-		// 1. 根元(Head) から 中間の4頂点へ（4本）
+		// 根元(Head) から 中間の4頂点へ（4本）
 		line.RegisterLine(pWorld, vRight);
 		line.RegisterLine(pWorld, vLeft);
 		line.RegisterLine(pWorld, vUp);
 		line.RegisterLine(pWorld, vDown);
 
-		// 2. 中間の4頂点 から 先端(Tail)へ（4本）
+		// 中間の4頂点 から 先端(Tail)へ（4本）
 		line.RegisterLine(vRight, cWorld);
 		line.RegisterLine(vLeft, cWorld);
 		line.RegisterLine(vUp, cWorld);
 		line.RegisterLine(vDown, cWorld);
 
-		// 3. 中間の4頂点同士を結ぶ（断面のひし形・4本）
+		// 中間の4頂点同士を結ぶ（断面のひし形・4本）
 		line.RegisterLine(vRight, vUp);
 		line.RegisterLine(vUp, vLeft);
 		line.RegisterLine(vLeft, vDown);
@@ -234987,6 +235122,40 @@ void Skeleton::Draw(Line& line, const Matrix4x4& worldMatrix)
 	line.DrawLine();
 }
 
+// ============================================================
+//  指定したボーンとその全ての子ボーン（子孫）の名前リストを取得
+// （幅優先探索 / BFS を使用）
+// ============================================================
+std::unordered_set<std::string> Skeleton::GetDescendantBones(const std::string& rootBoneName) const
+{
+	std::unordered_set<std::string> descendants;
+
+	auto it = jointMap_.find(rootBoneName);
+	if (it == jointMap_.end()) {
+		return descendants; // 見つからない場合は空のセットを返す
+	}
+
+	// 幅優先探索 (BFS) で起点ボーンとその子孫を全て収集
+	std::queue<int32_t> queue;
+	queue.push(it->second);
+
+	while (!queue.empty()) {
+		int32_t currentIndex = queue.front();
+		queue.pop();
+
+		const Joint& currentJoint = joints_[currentIndex];
+
+		// 自身の名前をマスク用リストに追加
+		descendants.insert(currentJoint.GetName());
+
+		// 子ジョイントをキューに追加して探索を続ける
+		for (int32_t childIndex : currentJoint.GetChildren()) {
+			queue.push(childIndex);
+		}
+	}
+
+	return descendants;
+}
 
 ============================================================
 File Path: YEngine/Model/Skeleton/Skeleton.h
@@ -234997,6 +235166,7 @@ File Path: YEngine/Model/Skeleton/Skeleton.h
 #include <optional>
 #include <map>
 #include <vector>
+#include <unordered_set> // ★追加
 
 // Engine
 #include "Joint.h"
@@ -235022,6 +235192,9 @@ public:
 
 	// スケルトン描画
 	void Draw(Line& line, const Matrix4x4& worldMatrix);
+
+	// ★追加: 指定したボーンを起点として、その全ての子ボーン（子孫）の名前リストを取得する
+	std::unordered_set<std::string> GetDescendantBones(const std::string& rootBoneName) const;
 
 public:
 	///************************* アクセッサ *************************///
@@ -235074,7 +235247,6 @@ private:
 	// 接続情報
 	std::vector<std::pair<int32_t, int32_t>> connections_;
 };
-
 
 ============================================================
 File Path: YEngine/Model/Skeleton/SkinCluster.cpp
@@ -259071,7 +259243,7 @@ void MyGame::Initialize() {
 	// 初期シーン設定
 	//------------------------------------------------------------
 #ifdef _DEBUG
-	SceneManager::GetInstance()->ChangeScene("Develop");   // デバッグ時はゲームシーン
+	SceneManager::GetInstance()->ChangeScene("Game");   // デバッグ時はゲームシーン
 #else 
 	SceneManager::GetInstance()->ChangeScene("Title");  // 製品版はタイトルシーン
 #endif
@@ -266367,6 +266539,7 @@ File Path: YGame/GameObjects/Player/AttackingCombat/AttackingCombatState.cpp
 #include "AttackingCombatState.h"
 #include "../Player.h"
 #include "../Movement/PlayerMovement.h"
+#include "Model.h" 
 
 // ============================================================
 // コンストラクタ
@@ -266379,22 +266552,25 @@ AttackingCombatState::AttackingCombatState(PlayerCombat* combat) : combat_(comba
 	// ------------------------------------------------------------
 	// 攻撃開始時のコールバック設定
 	// ------------------------------------------------------------
-	combo->SetAttackStartCallback([combat, player](const AttackData& attack) {
+	combo->SetAttackStartCallback([combat, player, this](const AttackData& attack) {
 		if (combat->GetCurrentState() == CombatState::Dead) return;
 
-		auto* movement = player->GetMovement();
-		movement->SetCanMove(false);
-		movement->SetCanRotate(false);
-		movement->ForceStop();
+		stateTimer_ = 0.0f;
+
+		// ★移動制限(SetCanMove(false)など)は行わず、PlayerMovementの下半身の動きを活かす
 
 		auto* obj = player->GetObject3d();
-		obj->SetMotionSpeed(attack.motionSpeed);
-		obj->SetChangeMotion("Player.gltf", MotionPlayMode::Once, attack.animationName);
+
+
+		// ★追加した関数で上半身だけ攻撃アニメーションを再生
+		obj->PlayUpperMotion("Player.gltf", MotionPlayMode::Once, attack.animationName);
+		obj->SetUpperMotionSpeed(attack.motionSpeed);
 
 		// 攻撃タイプに応じたエフェクトの読み込み
 		if (attack.type == AttackType::A_Arte) {
 			player->GetSword()->LoadVfxAssets("Resources/Vfx/NewEffect.json");
-		}else if(attack.type == AttackType::B_Arte) {
+		}
+		else if (attack.type == AttackType::B_Arte) {
 			player->GetSword()->LoadVfxAssets("Resources/Vfx/NewEffect2.json");
 		}
 
@@ -266405,18 +266581,17 @@ AttackingCombatState::AttackingCombatState(PlayerCombat* combat) : combat_(comba
 	// ------------------------------------------------------------
 	// コンボ継続時のコールバック設定
 	// ------------------------------------------------------------
-	combo->SetAttackContinueCallback([combat, player](const AttackData& attack) {
+	combo->SetAttackContinueCallback([combat, player, this](const AttackData& attack) {
 		if (combat->GetCurrentState() == CombatState::Dead) return;
 
-		auto* movement = player->GetMovement();
-		movement->SetCanMove(false);
-		movement->SetCanRotate(false);
+		stateTimer_ = 0.0f;
 
 		auto* obj = player->GetObject3d();
-		obj->SetMotionSpeed(attack.motionSpeed);
-		obj->SetChangeMotion("Player.gltf", MotionPlayMode::Once, attack.animationName);
 
-		// 攻撃タイプに応じたエフェクトの読み込み
+		// 上半身アニメーションの再生
+		obj->PlayUpperMotion("Player.gltf", MotionPlayMode::Once, attack.animationName);
+		obj->SetUpperMotionSpeed(attack.motionSpeed);
+
 		if (attack.type == AttackType::A_Arte) {
 			player->GetSword()->LoadVfxAssets("Resources/Vfx/NewEffect.json");
 		}
@@ -266432,36 +266607,16 @@ AttackingCombatState::AttackingCombatState(PlayerCombat* combat) : combat_(comba
 	// ------------------------------------------------------------
 	combo->SetComboEndCallback([combat, player]([[maybe_unused]] int finalCount) {
 		if (combat->GetCurrentState() == CombatState::Dead) return;
-
-		player->GetMovement()->SetCanMove(true);
-		player->GetMovement()->SetCanRotate(true);
-
-		auto* obj = player->GetObject3d();
-		obj->SetMotionSpeed(player->GetMotionSpeed(0));
-
-		player->GetSword()->StopTrail();
-
 		combat->NotifyAction("コンボ終了");
-		combat->ChangeState(CombatState::Idle);
 		});
 
-	// ------------------------------------------------------------
-	// コンボリセット時のコールバック設定
-	// ------------------------------------------------------------
 	combo->SetComboResetCallback([combat]() {
 		if (combat->GetCurrentState() == CombatState::Dead) return;
 		combat->NotifyAction("コンボリセット");
 		});
 
-	// ------------------------------------------------------------
-	// CC変化時のコールバック設定
-	// ------------------------------------------------------------
-	combo->SetCCChangeCallback([]([[maybe_unused]] int oldCC, [[maybe_unused]] int newCC) {
-		});
+	combo->SetCCChangeCallback([]([[maybe_unused]] int oldCC, [[maybe_unused]] int newCC) {});
 
-	// ------------------------------------------------------------
-	// 剣コライダー制御のコールバック
-	// ------------------------------------------------------------
 	combo->SetSwordColliderCallback([player](bool isActive) {
 		player->GetSword()->SetEnableCollider(isActive);
 		});
@@ -266471,12 +266626,7 @@ AttackingCombatState::AttackingCombatState(PlayerCombat* combat) : combat_(comba
 // ステート開始処理
 // ============================================================
 void AttackingCombatState::OnEnter() {
-	auto* player = combat_->GetOwner();
-	auto* movement = player->GetMovement();
-
-	movement->SetCanMove(false);
-	movement->SetCanRotate(false);
-	movement->ForceStop();
+	stateTimer_ = 0.0f;
 }
 
 // ============================================================
@@ -266484,19 +266634,62 @@ void AttackingCombatState::OnEnter() {
 // ============================================================
 void AttackingCombatState::OnExit() {
 	auto* player = combat_->GetOwner();
-	auto* movement = player->GetMovement();
 
-	movement->SetCanMove(true);
-	movement->SetCanRotate(true);
+	// 状態終了時に上半身の攻撃アニメーションを確実に停止する
+	auto* model = player->GetObject3d()->GetModel();
+	if (model && model->GetMotionSystem()) {
+		model->GetMotionSystem()->StopUpperAnimation();
+	}
 
 	player->GetSword()->StopTrail();
+	player->GetSword()->SetEnableCollider(false);
+	player->GetObject3d()->SetMotionSpeed(player->GetMotionSpeed(0));
+
+	combat_->GetCombo()->OnAttackFinished();
+
+	// Movementステートに現在の状態に応じたアニメーション再生を委譲
+	player->GetMovement()->SyncAnimationToCurrentState();
 }
 
 // ============================================================
 // 更新処理
 // ============================================================
 void AttackingCombatState::Update([[maybe_unused]] float deltaTime) {
+	auto* combo = combat_->GetCombo();
+	auto* player = combat_->GetOwner();
+	const AttackData* currentAttack = combo->GetCurrentAttack();
 
+	if (!currentAttack) {
+		combat_->ChangeState(CombatState::Idle);
+		return;
+	}
+
+	stateTimer_ += deltaTime;
+
+	// 1. フレームの計算
+	const float frameDuration = (currentAttack->fps > 0) ? 1.0f / static_cast<float>(currentAttack->fps) : 1.0f / 60.0f;
+	const int currentFrame = static_cast<int>(stateTimer_ / frameDuration);
+
+	// 2. 当たり判定(Hitbox)のON/OFF
+	const bool inHitWindow = (currentAttack->hitEnd > currentAttack->hitStart) &&
+		(currentFrame >= currentAttack->hitStart) &&
+		(currentFrame < currentAttack->hitEnd);
+	player->GetSword()->SetEnableCollider(inHitWindow);
+
+	// 3. 次の攻撃の先行入力（キャンセル）受付
+	if (currentFrame >= currentAttack->comboWindowStart && currentFrame <= currentAttack->comboWindowEnd) {
+		if (player->IsAttackPressedA()) {
+			if (combat_->TryAttack(AttackType::A_Arte)) return;
+		}
+		else if (player->IsAttackPressedB()) {
+			if (combat_->TryAttack(AttackType::B_Arte)) return;
+		}
+	}
+
+	// 4. アニメーション終了判定
+	if (stateTimer_ >= currentAttack->duration) {
+		combat_->ChangeState(CombatState::Idle);
+	}
 }
 
 ============================================================
@@ -266509,7 +266702,8 @@ File Path: YGame/GameObjects/Player/AttackingCombat/AttackingCombatState.h
 
 // ============================================================
 // 攻撃ステートクラス
-// 攻撃中における移動制限やエフェクト制御を担当する
+// 攻撃中における移動制限、アニメーションの進行、当たり判定、
+// およびプレイヤーの先行入力（キャンセル）を管理する
 // ============================================================
 class AttackingCombatState : public IState<CombatState> {
 public:
@@ -266523,6 +266717,7 @@ public:
 
 private:
 	PlayerCombat* combat_;
+	float stateTimer_ = 0.0f; // 攻撃アニメーションの経過時間
 };
 
 ============================================================
@@ -266689,10 +266884,12 @@ bool PlayerCombat::IsDead() const { return GetCurrentState() == CombatState::Dea
 bool PlayerCombat::IsGuarding() const { return GetCurrentState() == CombatState::Guarding; }
 bool PlayerCombat::IsHit() const { return GetCurrentState() == CombatState::Hit; }
 
+bool PlayerCombat::IsFullBodyAction() const {
+	return IsGuarding() || IsHit() || IsStunned() || IsDead();
+}
+
 bool PlayerCombat::CanMove() const {
-	ComboState state = combo_->GetCurrentState();
-	return GetCurrentState() == CombatState::Idle ||
-		(state == ComboState::CanContinue && !IsStunned());
+	return !IsStunned() && !IsDead() && !IsHit();
 }
 
 bool PlayerCombat::CanAct() const {
@@ -266832,6 +267029,10 @@ public:
 	bool CanAct() const;
 	bool IsGuarding() const;
 	bool IsHit() const;
+
+	// 全身を占有するアクション中か（被弾・死亡・ガード・スタンなど）
+	// Movementステートがこのフラグをチェックしてアニメーション再生を制御する
+	bool IsFullBodyAction() const;
 
 	void OnDodgeSuccess() { combo_->OnDodgeSuccess(); }
 	void OnCounterHit() { combo_->OnCounterHit(); }
@@ -267299,11 +267500,12 @@ void AttackDataEditor::DrawAttackDetail()
 	// ------------------------------------------------------------
 	if (ImGui::CollapsingHeader("タイミング（秒単位・参照用）"))
 	{
-		ImGui::TextDisabled("ドープシートで編集すると自動更新されます");
 		changed |= ImGui::InputFloat("持続時間", &atk.duration, 0.01f, 0.1f, "%.2f");
-		changed |= ImGui::InputFloat("硬直時間", &atk.recovery, 0.01f, 0.1f, "%.2f");
-		changed |= ImGui::InputFloat("継続受付時間", &atk.continueWindow, 0.01f, 0.1f, "%.2f");
 		changed |= ImGui::InputFloat("モーション速度", &atk.motionSpeed, 0.01f, 0.1f, "%.2f");
+		changed |= ImGui::InputInt("ヒット開始フレーム", &atk.hitStart);
+		changed |= ImGui::InputInt("ヒット終了フレーム", &atk.hitEnd);
+		changed |= ImGui::InputInt("コンボ開始フレーム", &atk.comboWindowStart);
+		changed |= ImGui::InputInt("コンボ終了フレーム", &atk.comboWindowEnd);
 	}
 
 	// ------------------------------------------------------------
@@ -267823,15 +268025,15 @@ struct AttackData {
 	int hitStart = 0;
 	int hitEnd = 10;
 	int comboWindowStart = 0;
-	int comboWindowEnd = 0;
+	int comboWindowEnd = 20;
+
+
 
 	// ------------------------------------------------------------
 	// タイミング設定（ゲームロジック用・秒単位）
 	// フレーム設定から同期・自動計算される値
 	// ------------------------------------------------------------
 	float duration = 0.0f;
-	float recovery = 0.0f;
-	float continueWindow = 0.0f;
 
 	// ------------------------------------------------------------
 	// ダメージと物理効果設定
@@ -267921,8 +268123,6 @@ SERIALIZE_FIELD(AttackData, comboWindowStart)
 SERIALIZE_FIELD(AttackData, comboWindowEnd)
 
 SERIALIZE_FIELD(AttackData, duration)
-SERIALIZE_FIELD(AttackData, recovery)
-SERIALIZE_FIELD(AttackData, continueWindow)
 
 SERIALIZE_FIELD(AttackData, baseDamage)
 SERIALIZE_FIELD(AttackData, knockback)
@@ -267980,7 +268180,7 @@ PlayerCombo::PlayerCombo(Player* owner)
 	InitializeAttacks();
 
 	// ------------------------------------------------------------
-	// インゲームエディターの生成とコールバック登録（初回のみ）
+	// インゲームエディターの生成とコールバック登録
 	// ------------------------------------------------------------
 	if (!g_AttackEditor) {
 		g_AttackEditor = std::make_unique<AttackDataEditor>();
@@ -267992,49 +268192,14 @@ PlayerCombo::PlayerCombo(Player* owner)
 
 // ============================================================
 // メイン更新処理
-// 状態遷移やCC回復の監視を行う
+// UI用のタイマーや、CCの自然回復などを管理する
 // ============================================================
 void PlayerCombo::Update(float deltaTime) {
 	previousState_ = currentState_;
-
-	// ------------------------------------------------------------
-	// CC回復とコンボ受付タイマーの更新
-	// ------------------------------------------------------------
-	UpdateCC(deltaTime);
-	UpdateComboTimer(deltaTime);
 	stateTimer_ += deltaTime;
 
-	// ------------------------------------------------------------
-	// 状態ごとの個別更新処理に分岐
-	// ------------------------------------------------------------
-	switch (currentState_) {
-
-	case ComboState::Attacking:
-		UpdateAttacking();
-		break;
-
-	case ComboState::CanContinue:
-		UpdateCanContinue();
-		break;
-
-	case ComboState::Recovery:
-		UpdateRecovery();
-		break;
-
-	case ComboState::Idle:
-		if (GetComboCount() > 0 && comboTimer_ >= config_.comboResetTime) {
-			ResetCombo();
-		}
-		break;
-
-	case ComboState::Finished:
-		ChangeState(ComboState::Idle);
-
-		if (onComboEnd_) {
-			onComboEnd_(GetComboCount());
-		}
-		break;
-	}
+	UpdateCC(deltaTime);
+	UpdateComboTimer(deltaTime);
 }
 
 // ============================================================
@@ -268054,6 +268219,7 @@ bool PlayerCombo::TryAttack(AttackType attackType) {
 	// ------------------------------------------------------------
 	if (!HasSufficientCC(attack->ccCost)) return false;
 
+	//ConsumeCC(attack->ccCost); // 先にCCを消費する
 	ExecuteAttack(*attack);
 	return true;
 }
@@ -268062,17 +268228,11 @@ bool PlayerCombo::TryAttack(AttackType attackType) {
 // 攻撃可能かどうかの判定処理
 // ============================================================
 bool PlayerCombo::CanAttack([[maybe_unused]] AttackType attackType) const {
-	switch (currentState_) {
-	case ComboState::Idle:
-	case ComboState::CanContinue:
+	// 待機中なら攻撃可能、攻撃中ならキャンセル可能フラグを見る
+	if (currentAttack_ == nullptr) {
 		return true;
-
-	case ComboState::Attacking:
-		return currentAttack_ && currentAttack_->canCancel;
-
-	default:
-		return false;
 	}
+	return currentAttack_->canCancel;
 }
 
 // ============================================================
@@ -268111,7 +268271,7 @@ AttackData* PlayerCombo::FindBestAttack(AttackType type) {
 
 // ============================================================
 // 攻撃実行処理
-// 必要な情報のセットアップと攻撃用状態への遷移を行う
+// 必要な情報のセットアップとデータ更新を行う
 // ============================================================
 void PlayerCombo::ExecuteAttack(const AttackData& attack) {
 	// ------------------------------------------------------------
@@ -268120,11 +268280,16 @@ void PlayerCombo::ExecuteAttack(const AttackData& attack) {
 	currentAttack_ = const_cast<AttackData*>(&attack);
 	comboChain_.push_back(attack);
 	comboDamageMultiplier_ = CalculateDamageMultiplier();
-	ChangeState(ComboState::Attacking);
+
+	previousState_ = currentState_;
+	currentState_ = ComboState::Attacking;
+
+	stateTimer_ = 0.0f;
 	comboTimer_ = 0.0f;
 
 	// ------------------------------------------------------------
 	// 攻撃開始/継続コールバックの発火
+	// （これにより AttackingCombatState 側の処理が更新される）
 	// ------------------------------------------------------------
 	if (GetComboCount() == 1) {
 		if (onAttackStart_) onAttackStart_(attack);
@@ -268135,145 +268300,62 @@ void PlayerCombo::ExecuteAttack(const AttackData& attack) {
 }
 
 // ============================================================
-// 攻撃状態中の更新処理
+// 攻撃アニメーション終了通知（AttackingCombatStateから呼ばれる）
 // ============================================================
-void PlayerCombo::UpdateAttacking() {
-	if (!currentAttack_) { ChangeState(ComboState::Idle); return; }
-
-	// ------------------------------------------------------------
-	// 剣の当たり判定（Hitbox）の有効/無効タイミングの制御
-	// ------------------------------------------------------------
-	const float frameDuration = (currentAttack_->fps > 0)
-		? 1.0f / static_cast<float>(currentAttack_->fps)
-		: 1.0f / 60.0f;
-
-	const int currentFrame = static_cast<int>(stateTimer_ / frameDuration);
-
-	const bool inHitWindow = (currentAttack_->hitEnd > currentAttack_->hitStart)
-		&& (currentFrame >= currentAttack_->hitStart)
-		&& (currentFrame < currentAttack_->hitEnd);
-
-	if (onSwordColliderChanged_) onSwordColliderChanged_(inHitWindow);
-
-	// ------------------------------------------------------------
-	// 状態終了による次の受付ステートへの遷移
-	// ------------------------------------------------------------
-	if (stateTimer_ >= currentAttack_->duration) {
-		if (currentAttack_->canChainToAny && currentCC_ > 0)
-			ChangeState(ComboState::CanContinue);
-		else
-			ChangeState(ComboState::Recovery);
-	}
-}
-
-// ============================================================
-// コンボ追加入力受付中の更新処理
-// ============================================================
-void PlayerCombo::UpdateCanContinue() {
-	if (!currentAttack_) { ChangeState(ComboState::Idle); return; }
-
-	if (stateTimer_ >= currentAttack_->continueWindow)
-		ChangeState(ComboState::Recovery);
-}
-
-// ============================================================
-// 攻撃硬直中の更新処理
-// ============================================================
-void PlayerCombo::UpdateRecovery() {
-	if (!currentAttack_) { ChangeState(ComboState::Idle); return; }
-
-	if (stateTimer_ >= currentAttack_->recovery)
-		ChangeState(ComboState::Finished);
+void PlayerCombo::OnAttackFinished() {
+	currentAttack_ = nullptr;
+	previousState_ = currentState_;
+	currentState_ = ComboState::Idle;
+	stateTimer_ = 0.0f;
+	// ※ comboTimer_ はここでリセットせず、コンボが途切れるまで計測を続ける
 }
 
 // ============================================================
 // CC（コスト）の自然回復処理
 // ============================================================
 void PlayerCombo::UpdateCC(float deltaTime) {
-	switch (currentState_) {
-	case ComboState::Idle:
+	// 攻撃中でなければ（待機中なら）回復タイマーを進める
+	if (currentAttack_ == nullptr) {
 		ccRegenTimer_ += deltaTime;
 		if (ccRegenTimer_ >= ccConfig_.regenDelay) {
 			RecoverCC(static_cast<int>(ccConfig_.regenRate * deltaTime));
+			// 必要に応じて ccRegenTimer_ = 0.0f; とする設計もありますが、
+			// 元のロジックに従いタイマーは累積し続ける形にしています。
 		}
-		break;
-
-	default:
+	}
+	else {
 		ccRegenTimer_ = 0.0f;
-		break;
 	}
 }
 
 // ============================================================
-// コンボ時間計測
+// コンボ時間計測と自動リセット
 // ============================================================
 void PlayerCombo::UpdateComboTimer(float deltaTime) {
-	comboTimer_ += deltaTime;
-}
-
-// ============================================================
-// 状態の変更処理
-// ============================================================
-void PlayerCombo::ChangeState(ComboState newState) {
-	if (currentState_ == newState) return;
-
-	ExitState(currentState_);
-	currentState_ = newState;
-	EnterState(newState);
-}
-
-// ============================================================
-// 各状態への遷移時処理
-// ============================================================
-void PlayerCombo::EnterState(ComboState newState) {
-	stateTimer_ = 0.0f;
-
-	switch (newState) {
-	case ComboState::Attacking:
-		ccRegenTimer_ = 0.0f;
-		break;
-
-	default:
-		break;
+	// 待機中かつコンボ履歴が残っている場合のみ計測
+	if (currentAttack_ == nullptr && !comboChain_.empty()) {
+		comboTimer_ += deltaTime;
+		if (comboTimer_ >= config_.comboResetTime) {
+			ResetCombo();
+		}
 	}
-}
-
-// ============================================================
-// 各状態からの退出時処理
-// ============================================================
-void PlayerCombo::ExitState(ComboState oldState) {
-	switch (oldState) {
-	case ComboState::Attacking:
-		if (onSwordColliderChanged_) onSwordColliderChanged_(false);
-		break;
-	case ComboState::CanContinue:
-		break;
-	case ComboState::Recovery:
-		break;
-	case ComboState::Idle:
-		break;
-	case ComboState::Finished:
-		break;
+	else if (currentAttack_ != nullptr) {
+		comboTimer_ = 0.0f;
 	}
 }
 
 // ============================================================
 // コンボ中のダメージ倍率計算
-// 段数による増加とチェインボーナス・減衰の適用を行う
 // ============================================================
 float PlayerCombo::CalculateDamageMultiplier() const {
 	if (GetComboCount() <= 1) return 1.0f;
 
 	float multiplier = 1.0f;
 
-	// ------------------------------------------------------------
 	// 基本倍率増加（1コンボにつき +10%）
-	// ------------------------------------------------------------
 	multiplier += (GetComboCount() - 1) * 0.1f;
 
-	// ------------------------------------------------------------
 	// 連携アクションによるボーナス加算
-	// ------------------------------------------------------------
 	if (GetComboCount() >= 2) {
 		const AttackData& prev = comboChain_[comboChain_.size() - 2];
 		const AttackData& curr = comboChain_[comboChain_.size() - 1];
@@ -268283,9 +268365,7 @@ float PlayerCombo::CalculateDamageMultiplier() const {
 		}
 	}
 
-	// ------------------------------------------------------------
 	// 連続回数によるダメージ減衰ペナルティ
-	// ------------------------------------------------------------
 	for (int i = 3; i < GetComboCount(); ++i) {
 		multiplier *= config_.damageDecay;
 	}
@@ -268353,14 +268433,18 @@ void PlayerCombo::OnHitStep(const Vector3& enemyPosition) {
 // コンボ状態の初期化・中断
 // ============================================================
 void PlayerCombo::ResetCombo() {
+	if (!comboChain_.empty() && onComboEnd_) {
+		onComboEnd_(GetComboCount());
+	}
+
 	comboChain_.clear();
 	currentAttack_ = nullptr;
 	comboDamageMultiplier_ = 1.0f;
 	comboTimer_ = 0.0f;
 
-	if (currentState_ != ComboState::Idle) {
-		ChangeState(ComboState::Idle);
-	}
+	previousState_ = currentState_;
+	currentState_ = ComboState::Idle;
+	stateTimer_ = 0.0f;
 
 	if (onComboReset_) {
 		onComboReset_();
@@ -268374,11 +268458,7 @@ void PlayerCombo::CancelCombo() {
 }
 
 void PlayerCombo::ForceEndCombo() {
-	ChangeState(ComboState::Finished);
-}
-
-float PlayerCombo::GetComboDamageMultiplier() const {
-	return comboDamageMultiplier_;
+	ResetCombo();
 }
 
 // ============================================================
@@ -268437,7 +268517,6 @@ void PlayerCombo::ReloadAttacks() {
 
 // ============================================================
 // デバッグ用UI描画処理
-// 現在のCC・コンボチェーン・各種パラメータを表示・操作する
 // ============================================================
 void PlayerCombo::ShowDebugImGui() {
 #ifdef USE_IMGUI
@@ -268472,7 +268551,7 @@ void PlayerCombo::ShowDebugImGui() {
 
 	if (StateChanged()) {
 		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 0.0f, 1.0f));
-		ImGui::Text("状態が変化し���した"); // 絵文字排除
+		ImGui::Text("状態が変化しました");
 		ImGui::PopStyleColor();
 	}
 
@@ -268608,7 +268687,6 @@ File Path: YGame/GameObjects/Player/Combo/PlayerCombo.h
 #include <functional>
 #include <memory>
 #include <vector>
-#include <map>
 #include <unordered_map>
 
 // App
@@ -268621,7 +268699,8 @@ class Player;
 
 // ============================================================
 // プレイヤーコンボ管理クラス
-// CCの消費・回復や、連続攻撃の遷移状態、ダメージ倍率などを制御する
+// CCの消費・回復や、連続攻撃のデータ（ダメージ倍率や履歴）を管理する。
+// ※アニメーションの進行や入力受付等のロジックは AttackingCombatState が担当する。
 // ============================================================
 class PlayerCombo {
 public:
@@ -268644,6 +268723,9 @@ public:
 	void ResetCombo();
 	void ForceEndCombo();
 	void ReloadAttacks();
+
+	// ステート側から「攻撃アニメーションが終了した」ことを受け取る通知関数
+	void OnAttackFinished();
 
 	// ============================================================
 	// CC（チェインキャパシティ）管理
@@ -268668,9 +268750,9 @@ public:
 
 	int GetComboCount() const { return static_cast<int>(comboChain_.size()); }
 	int GetMaxComboCount() const { return config_.maxLength; }
-	bool IsComboActive() const { return currentState_ != ComboState::Idle; }
+	bool IsComboActive() const { return currentAttack_ != nullptr; }
 
-	float GetComboDamageMultiplier() const;
+	float GetComboDamageMultiplier() const { return comboDamageMultiplier_; }
 	const AttackData* GetCurrentAttack() const { return currentAttack_; }
 	const std::vector<AttackData>& GetComboChain() const { return comboChain_; }
 
@@ -268678,23 +268760,17 @@ public:
 	float GetStateTimer() const { return stateTimer_; }
 
 	float GetCurrentDamage() const {
-		if (currentAttack_) {
-			return currentAttack_->baseDamage * comboDamageMultiplier_;
-		}
+		if (currentAttack_) return currentAttack_->baseDamage * comboDamageMultiplier_;
 		return 0.0f;
 	}
 
 	float GetCurrentKnockback() const {
-		if (currentAttack_) {
-			return currentAttack_->knockback;
-		}
+		if (currentAttack_) return currentAttack_->knockback;
 		return 0.0f;
 	}
 
 	float GetCurrentKnockbackDuration() const {
-		if (currentAttack_) {
-			return currentAttack_->knockbackDuration;
-		}
+		if (currentAttack_) return currentAttack_->knockbackDuration;
 		return 0.0f;
 	}
 
@@ -268707,33 +268783,20 @@ public:
 	// ============================================================
 	// コールバック設定（演出やUIとの連携用）
 	// ============================================================
-	void SetAttackStartCallback(std::function<void(const AttackData&)> callback) {
-		onAttackStart_ = callback;
-	}
-	void SetAttackContinueCallback(std::function<void(const AttackData&)> callback) {
-		onAttackContinue_ = callback;
-	}
-	void SetComboEndCallback(std::function<void(int)> callback) {
-		onComboEnd_ = callback;
-	}
-	void SetComboResetCallback(std::function<void()> callback) {
-		onComboReset_ = callback;
-	}
-	void SetCCChangeCallback(std::function<void(int, int)> callback) {
-		onCCChanged_ = callback;
-	}
+	void SetAttackStartCallback(std::function<void(const AttackData&)> callback) { onAttackStart_ = callback; }
+	void SetAttackContinueCallback(std::function<void(const AttackData&)> callback) { onAttackContinue_ = callback; }
+	void SetComboEndCallback(std::function<void(int)> callback) { onComboEnd_ = callback; }
+	void SetComboResetCallback(std::function<void()> callback) { onComboReset_ = callback; }
+	void SetCCChangeCallback(std::function<void(int, int)> callback) { onCCChanged_ = callback; }
 
 	using SwordColliderCallback = std::function<void(bool isActive)>;
 	void SetSwordColliderCallback(SwordColliderCallback cb) { onSwordColliderChanged_ = cb; }
 
 private:
 	// ============================================================
-	// 内部状態遷移・処理
+	// 内部処理
 	// ============================================================
 	void InitializeAttacks();
-	void ChangeState(ComboState newState);
-	void EnterState(ComboState newState);
-	void ExitState(ComboState oldState);
 	void ExecuteAttack(const AttackData& attack);
 
 	void UpdateCC(float deltaTime);
@@ -268742,10 +268805,6 @@ private:
 	AttackData* FindBestAttack(AttackType type);
 	float CalculateDamageMultiplier() const;
 	bool IsChainPreferred(AttackType from, AttackType to) const;
-
-	void UpdateAttacking();
-	void UpdateCanContinue();
-	void UpdateRecovery();
 
 private:
 	// ============================================================
@@ -268759,11 +268818,11 @@ private:
 	std::unique_ptr<YoRigine::JsonManager> attackJson_;     // 攻撃パラメータ等のJSON管理オブジェクト
 
 	// ------------------------------------------------------------
-	// 状態管理 (State Management)
+	// 状態管理 (UIやPlayerCombatのCanMove用データとしてのみ機能)
 	// ------------------------------------------------------------
-	ComboState currentState_ = ComboState::Idle;            // 現在のコンボフェーズ（攻撃中、硬直中など）
+	ComboState currentState_ = ComboState::Idle;            // 現在のコンボフェーズ（UI表示用）
 	ComboState previousState_ = ComboState::Idle;           // 1フレーム前のコンボフェーズ
-	float stateTimer_ = 0.0f;                               // 現在のフェーズに入ってからの経過時間
+	float stateTimer_ = 0.0f;                               // UI表示用の経過時間タイマー
 	float comboTimer_ = 0.0f;                               // コンボが途切れるまでの猶予を計測するタイマー
 
 	// ------------------------------------------------------------
@@ -268784,18 +268843,17 @@ private:
 	// ------------------------------------------------------------
 	// 攻撃データベース
 	// ------------------------------------------------------------
-	// JSONから読み込んだ全攻撃データを、攻撃タイプ（A術、B術など）ごとに分類して保持するマップ
 	std::unordered_map<AttackType, std::vector<AttackData>> attackDatabase_;
 
 	// ------------------------------------------------------------
 	// イベントコールバック群 (他システムへの通知用)
 	// ------------------------------------------------------------
-	std::function<void(const AttackData&)> onAttackStart_;      // コンボ初撃が開始されたときに呼ばれる
-	std::function<void(const AttackData&)> onAttackContinue_;   // コンボが2段目以降に繋がったときに呼ばれる
-	std::function<void(int)> onComboEnd_;                       // コンボが正常に終了したときに呼ばれる（引数は総ヒット数）
-	std::function<void()> onComboReset_;                        // コンボが途切れたり強制終了されたときに呼ばれる
-	std::function<void(int, int)> onCCChanged_;                 // CCが増減したときに呼ばれる（引数は 変更前CC, 変更後CC）
-	SwordColliderCallback onSwordColliderChanged_;              // 攻撃判定（剣の当たり判定）の有効/無効を切り替えるためのコールバック
+	std::function<void(const AttackData&)> onAttackStart_;      // コンボ初撃開始時
+	std::function<void(const AttackData&)> onAttackContinue_;   // コンボ継続時
+	std::function<void(int)> onComboEnd_;                       // コンボ正常終了時
+	std::function<void()> onComboReset_;                        // コンボ途切れ・強制終了時
+	std::function<void(int, int)> onCCChanged_;                 // CC増減時
+	SwordColliderCallback onSwordColliderChanged_;              // 攻撃判定切り替え用
 };
 
 ============================================================
@@ -269661,6 +269719,9 @@ void GuardingCombatState::OnExit() {
 	auto* player = combat_->GetOwner();
 	player->GetMovement()->SetCanMove(true);
 	player->GetMovement()->SetCanRotate(true);
+
+	// Movementステートに現在の状態に応じたアニメーション再生を委譲
+	player->GetMovement()->SyncAnimationToCurrentState();
 }
 
 // ============================================================
@@ -269765,6 +269826,9 @@ void HitCombatState::OnExit()
 
     movement->SetCanMove(true);
     movement->SetCanRotate(true);
+
+    // Movementステートに現在の状態に応じたアニメーション再生を委譲
+    movement->SyncAnimationToCurrentState();
 }
 
 // ============================================================
@@ -269826,16 +269890,16 @@ IdleCombatState::IdleCombatState(PlayerCombat* combat) : combat_(combat) {
 
 // ============================================================
 // 待機ステート開始処理
+// アニメーション再生はMovementステートに委譲する
 // ============================================================
 void IdleCombatState::OnEnter() {
 	auto* player = combat_->GetOwner();
-	auto* obj = player->GetObject3d();
 
 	// ------------------------------------------------------------
-	// アイドルモーションを再生
+	// Movementステートの現在の状態に応じたアニメーションを再生させる
+	// 移動中なら歩行/走行、停止中ならIdleが自動的に選択される
 	// ------------------------------------------------------------
-	obj->SetMotionSpeed(player->GetMotionSpeed(0));
-	obj->SetChangeMotion("Player.gltf", MotionPlayMode::Loop, "Idle4");
+	player->GetMovement()->SyncAnimationToCurrentState();
 }
 
 // ============================================================
@@ -269900,13 +269964,16 @@ void IdleMovementState::OnEnter() {
 	auto* combat = player->GetCombat();
 
 	// ------------------------------------------------------------
-	// 死亡中・非戦闘時のアニメーション設定
+	// 全身を占有するアクション中（死亡・被弾・ガード・スタン）はスキップ
+	// それ以外（攻撃中含む）はIdle下半身アニメーションを再生する
 	// ------------------------------------------------------------
 	if (combat && combat->GetCurrentState() == CombatState::Dead) {
+		// 速度リセットのみ行う
+		movement_->GetVelocityRef() = Vector3(0.0f, 0.0f, 0.0f);
 		return;
 	}
 
-	if (combat && combat->IsIdle()) {
+	if (!combat || !combat->IsFullBodyAction()) {
 		auto* obj = player->GetObject3d();
 		obj->SetMotionSpeed(player->GetMotionSpeed(0));
 		obj->SetChangeMotion("Player.gltf", MotionPlayMode::Loop, "Idle4");
@@ -270078,11 +270145,11 @@ void MovingState::OnEnter() {
 	auto* player = movement_->GetOwner();
 	auto* combat = player->GetCombat();
 
-	// 死亡中ならアニメーション変更しない
+	// 全身を占有するアクション中（死亡・被弾・ガード・スタン）はスキップ
 	if (combat && combat->GetCurrentState() == CombatState::Dead) return;
 
-	// コンボ中でなければ歩行モーションを再生
-	if (combat && combat->IsIdle()) {
+	// 全身占有アクション中でなければ歩行モーションを再生
+	if (!combat || !combat->IsFullBodyAction()) {
 		auto* obj = player->GetObject3d();
 		obj->SetMotionSpeed(player->GetMotionSpeed(0));
 		obj->SetChangeMotion("Player.gltf", MotionPlayMode::Loop, "Walk1");
@@ -270144,7 +270211,8 @@ void MovingState::Update(float deltaTime) {
 			return;
 		}
 
-		if (combat && combat->IsIdle()) {
+		// 全身占有アクション中でなければアニメーション切り替え
+		if (!combat || !combat->IsFullBodyAction()) {
 			auto* obj = player->GetObject3d();
 			obj->SetMotionSpeed(player->GetMotionSpeed(0));
 
@@ -270687,6 +270755,39 @@ void PlayerMovement::ForceStop() {
 }
 
 // ============================================================
+// 戦闘アクション終了時のアニメーション再同期
+// 現在のMovementステートと入力状態に基づき、適切なアニメーションを再生する
+// ============================================================
+void PlayerMovement::SyncAnimationToCurrentState() {
+	if (!owner_) return;
+
+	auto* obj = owner_->GetObject3d();
+	if (!obj) return;
+
+	MovementState currentState = GetCurrentState();
+
+	if (currentState == MovementState::Moving) {
+		// 移動中：入力状態から歩行/走行を判定してアニメーション再生
+		InputState input = GetInputState();
+		bool isRunning = input.runPressed && config_.enableRun;
+
+		obj->SetMotionSpeed(owner_->GetMotionSpeed(0));
+
+		if (isRunning) {
+			obj->SetChangeMotion("Player.gltf", MotionPlayMode::Loop, "Run1");
+		}
+		else {
+			obj->SetChangeMotion("Player.gltf", MotionPlayMode::Loop, "Walk1");
+		}
+	}
+	else {
+		// 待機中：Idleアニメーションを再生
+		obj->SetMotionSpeed(owner_->GetMotionSpeed(0));
+		obj->SetChangeMotion("Player.gltf", MotionPlayMode::Loop, "Idle4");
+	}
+}
+
+// ============================================================
 // 状態名の文字列取得
 // ============================================================
 const char* PlayerMovement::GetStateString(MovementState state) const {
@@ -270781,6 +270882,9 @@ public:
 	MovementState GetCurrentState() const { return stateMachine_.GetCurrentState(); }
 	MovementState GetPreviousState() const { return stateMachine_.GetPreviousState(); }
 	bool StateChanged() const { return stateMachine_.StateChanged(); }
+
+	// 戦闘アクション終了時に呼ばれる。現在の移動ステートに応じたアニメーションを再生する
+	void SyncAnimationToCurrentState();
 
 	// ============================================================
 	// コールバック設定
@@ -270994,6 +271098,15 @@ void Player::Initialize(Camera* camera) {
 
 	InitCollision();
 	InitJson();
+
+	if (obj_ && obj_->GetModel()) {
+		auto* ms = obj_->GetModel()->GetMotionSystem();
+		auto* skeleton = obj_->GetModel()->GetSkeleton();
+		if (ms && skeleton) {
+			// ここで確実に上半身のマスクをセットする
+			ms->SetUpperBodyMask(skeleton->GetDescendantBones("mixamorig:Hips"));
+		}
+	}
 }
 
 // ============================================================
@@ -271397,6 +271510,12 @@ void Player::SetInitialPosition()
 }
 
 // ============================================================
+// 攻撃入力の判定
+// ============================================================
+bool Player::IsAttackPressedA() const { return input_->IsPadTriggered(0, GamePadButton::A); }
+bool Player::IsAttackPressedB() const { return input_->IsPadTriggered(0, GamePadButton::B); }
+
+// ============================================================
 // 指定方向を向く
 // ============================================================
 void Player::LookAtDirection(const Vector3& direction)
@@ -271469,6 +271588,9 @@ public:
 	void TakeDamage(int damage);
 	void Revive(int reviveHP);
 	void SetInitialPosition();
+
+	bool IsAttackPressedA() const;
+	bool IsAttackPressedB() const;
 
 public:
 	// ============================================================
