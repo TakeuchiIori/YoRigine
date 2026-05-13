@@ -159,10 +159,12 @@ bool PlayerCombat::IsDead() const { return GetCurrentState() == CombatState::Dea
 bool PlayerCombat::IsGuarding() const { return GetCurrentState() == CombatState::Guarding; }
 bool PlayerCombat::IsHit() const { return GetCurrentState() == CombatState::Hit; }
 
+bool PlayerCombat::IsFullBodyAction() const {
+	return IsGuarding() || IsHit() || IsStunned() || IsDead();
+}
+
 bool PlayerCombat::CanMove() const {
-	ComboState state = combo_->GetCurrentState();
-	return GetCurrentState() == CombatState::Idle ||
-		(state == ComboState::CanContinue && !IsStunned());
+	return !IsStunned() && !IsDead() && !IsHit();
 }
 
 bool PlayerCombat::CanAct() const {

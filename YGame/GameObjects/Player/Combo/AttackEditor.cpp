@@ -225,11 +225,12 @@ void AttackDataEditor::DrawAttackDetail()
 	// ------------------------------------------------------------
 	if (ImGui::CollapsingHeader("タイミング（秒単位・参照用）"))
 	{
-		ImGui::TextDisabled("ドープシートで編集すると自動更新されます");
 		changed |= ImGui::InputFloat("持続時間", &atk.duration, 0.01f, 0.1f, "%.2f");
-		changed |= ImGui::InputFloat("硬直時間", &atk.recovery, 0.01f, 0.1f, "%.2f");
-		changed |= ImGui::InputFloat("継続受付時間", &atk.continueWindow, 0.01f, 0.1f, "%.2f");
 		changed |= ImGui::InputFloat("モーション速度", &atk.motionSpeed, 0.01f, 0.1f, "%.2f");
+		changed |= ImGui::InputInt("ヒット開始フレーム", &atk.hitStart);
+		changed |= ImGui::InputInt("ヒット終了フレーム", &atk.hitEnd);
+		changed |= ImGui::InputInt("コンボ開始フレーム", &atk.comboWindowStart);
+		changed |= ImGui::InputInt("コンボ終了フレーム", &atk.comboWindowEnd);
 	}
 
 	// ------------------------------------------------------------

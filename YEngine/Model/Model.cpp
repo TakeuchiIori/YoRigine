@@ -347,6 +347,20 @@ void Model::SetChangeMotion(const std::string& directoryPath, const std::string&
 	}
 }
 
+void Model::PlayUpperMotion(const std::string& directoryPath, const std::string& filename, MotionPlayMode playMode, const std::string& animationName)
+{
+	if (!motionSystem_) return;
+
+	// アニメーションデータをロード（すでにキャッシュにあればそれを取得）
+	LoadMotionFile(directoryPath, filename, animationName);
+
+	std::string cacheKey = directoryPath + "/" + filename + "#" + animationName;
+	auto it = animationCache_.find(cacheKey);
+	if (it != animationCache_.end()) {
+		motionSystem_->PlayUpperAnimation(&(it->second), playMode);
+	}
+}
+
 void Model::DrawBone(Line& line, const Matrix4x4& worldMatrix)
 {
 	if (skeleton_) {

@@ -72,6 +72,15 @@ void Player::Initialize(Camera* camera) {
 
 	InitCollision();
 	InitJson();
+
+	if (obj_ && obj_->GetModel()) {
+		auto* ms = obj_->GetModel()->GetMotionSystem();
+		auto* skeleton = obj_->GetModel()->GetSkeleton();
+		if (ms && skeleton) {
+			// ここで確実に上半身のマスクをセットする
+			ms->SetUpperBodyMask(skeleton->GetDescendantBones("mixamorig:Hips"));
+		}
+	}
 }
 
 // ============================================================
@@ -473,6 +482,12 @@ void Player::SetInitialPosition()
 	SetPosition({ 23.4f, 0.0f, 4.4f });
 	wt_.UpdateMatrix();
 }
+
+// ============================================================
+// 攻撃入力の判定
+// ============================================================
+bool Player::IsAttackPressedA() const { return input_->IsPadTriggered(0, GamePadButton::A); }
+bool Player::IsAttackPressedB() const { return input_->IsPadTriggered(0, GamePadButton::B); }
 
 // ============================================================
 // 指定方向を向く

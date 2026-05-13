@@ -15,13 +15,16 @@ void IdleMovementState::OnEnter() {
 	auto* combat = player->GetCombat();
 
 	// ------------------------------------------------------------
-	// 死亡中・非戦闘時のアニメーション設定
+	// 全身を占有するアクション中（死亡・被弾・ガード・スタン）はスキップ
+	// それ以外（攻撃中含む）はIdle下半身アニメーションを再生する
 	// ------------------------------------------------------------
 	if (combat && combat->GetCurrentState() == CombatState::Dead) {
+		// 速度リセットのみ行う
+		movement_->GetVelocityRef() = Vector3(0.0f, 0.0f, 0.0f);
 		return;
 	}
 
-	if (combat && combat->IsIdle()) {
+	if (!combat || !combat->IsFullBodyAction()) {
 		auto* obj = player->GetObject3d();
 		obj->SetMotionSpeed(player->GetMotionSpeed(0));
 		obj->SetChangeMotion("Player.gltf", MotionPlayMode::Loop, "Idle4");

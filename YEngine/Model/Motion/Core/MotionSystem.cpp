@@ -14,8 +14,7 @@
 // ============================================================
 // 初期化（スケルトンあり）
 // ============================================================
-void MotionSystem::Initialize(Motion& Motion, Skeleton& skeleton, SkinCluster& skinCluster, Node* node)
-{
+void MotionSystem::Initialize(Motion& Motion, Skeleton& skeleton, SkinCluster& skinCluster, Node* node){
 	animation_ = &Motion;
 	skeleton_ = &skeleton;
 	skinCluster_ = &skinCluster;
@@ -26,8 +25,7 @@ void MotionSystem::Initialize(Motion& Motion, Skeleton& skeleton, SkinCluster& s
 // ============================================================
 // 初期化（ノードのみ）
 // ============================================================
-void MotionSystem::Initialize(Motion& Motion, Node* rootNode)
-{
+void MotionSystem::Initialize(Motion& Motion, Node* rootNode){
 	animation_ = &Motion;
 	node_ = rootNode;
 	animationTime_ = 0.0f;
@@ -36,12 +34,37 @@ void MotionSystem::Initialize(Motion& Motion, Node* rootNode)
 // ============================================================
 // 更新処理
 // ============================================================
-void MotionSystem::Update(float deltaTime)
-{
+void MotionSystem::Update(float deltaTime){
 	if (!animation_ || playMode_ == MotionPlayMode::Stop || isFinished_) return;
 
+	float effectiveSpeed = GetEffectiveSpeed();
+
 	// ------------------------------------------------------------
-	// ブレンド中の処理
+	// 上半身（アクション）レイヤーの更新
+	// ------------------------------------------------------------
+	if (upperAnimation_ && upperPlayMode_ != MotionPlayMode::Stop && !isUpperFinished_) {
+		float upDuration = upperAnimation_->GetDuration();
+		float upSpeedMul = 1.0f;
+		if (upperAnimation_->HasSpeedCurve() && upDuration > 0.0f) {
+			upSpeedMul = upperAnimation_->EvaluateSpeedCurve(std::clamp(upperAnimationTime_ / upDuration, 0.0f, 1.0f));
+		}
+
+		upperAnimationTime_ += deltaTime * upperMotionSpeed_ * upSpeedMul;
+
+		if (upperAnimationTime_ >= upDuration) {
+			if (upperPlayMode_ == MotionPlayMode::Loop) {
+				upperAnimationTime_ = 0.0f;
+			}
+			else {
+				upperAnimationTime_ = upDuration;
+				isUpperFinished_ = true;
+				StopUpperAnimation(); // 終わったら自動でストップ（下半身の動きに同期させるため）
+			}
+		}
+	}
+
+	// ------------------------------------------------------------
+	// ベースとなるブレンド中の処理
 	// ------------------------------------------------------------
 	if (animationBlendState_.isBlending) {
 		animationBlendState_.currentTime += deltaTime;
@@ -54,84 +77,83 @@ void MotionSystem::Update(float deltaTime)
 	}
 
 	// ------------------------------------------------------------
-	// 通常のアニメーション再生処理
+	// ベースレイヤーの通常更新
 	// ------------------------------------------------------------
-	bool wasFinished = isFinished_;
+	if (!animation_ || playMode_ == MotionPlayMode::Stop || isFinished_) return;
 
-	// タイムスケールカーブが設定されている場合は正規化時間で速度倍率を取得
+	bool wasFinished = isFinished_;
 	float duration = animation_->GetDuration();
 	float speedMul = 1.0f;
 	if (animation_->HasSpeedCurve() && duration > 0.0f) {
-		float normalizedT = std::clamp(animationTime_ / duration, 0.0f, 1.0f);
-		speedMul = animation_->EvaluateSpeedCurve(normalizedT);
+		speedMul = animation_->EvaluateSpeedCurve(std::clamp(animationTime_ / duration, 0.0f, 1.0f));
 	}
-	animationTime_ += deltaTime * GetEffectiveSpeed() * speedMul;
+	animationTime_ += deltaTime * effectiveSpeed * speedMul;
 
 	if (animationTime_ >= duration) {
-		if (playMode_ == MotionPlayMode::Loop) {
-			animationTime_ = 0.0f;
-		}
-		else {
-			animationTime_ = duration;
-			isFinished_ = true;
-		}
+		if (playMode_ == MotionPlayMode::Loop) animationTime_ = 0.0f;
+		else { animationTime_ = duration; isFinished_ = true; }
 	}
 	else if (animationTime_ < 0.0f) {
-		if (playMode_ == MotionPlayMode::Loop) {
-			animationTime_ = duration;
-		}
-		else {
-			animationTime_ = 0.0f;
-			isFinished_ = true;
-		}
+		if (playMode_ == MotionPlayMode::Loop) animationTime_ = duration;
+		else { animationTime_ = 0.0f; isFinished_ = true; }
 	}
 
-	// ------------------------------------------------------------
-	// 終了検知とコールバック実行
-	// ------------------------------------------------------------
-	if (!wasFinished && isFinished_) {
-		if (onMotionFinished_) {
-			onMotionFinished_();
-		}
+	if (!wasFinished && isFinished_ && onMotionFinished_) {
+		onMotionFinished_();
 	}
 }
 
 // ============================================================
-// アニメーションの適用
+// アニメーションの適用（合成する場所）
 // ============================================================
+// MotionSystem.cpp の Apply() 関数をこれで丸ごと上書き！
+
 void MotionSystem::Apply()
 {
-	if (!animation_ || playMode_ == MotionPlayMode::Stop) return;
+	if (skeleton_) {
+		for (Joint& joint : skeleton_->GetJoints()) {
+			std::string normName = GetNormalizedName(joint.GetName());
 
-	// ------------------------------------------------------------
-	// ブレンド中の適用
-	// ------------------------------------------------------------
-	if (animationBlendState_.isBlending && skeleton_) {
-		float t = animationBlendState_.currentTime / animationBlendState_.blendTime;
-		t = std::clamp(t, 0.0f, 1.0f);
-		BlendAndApplyAnimation(animationBlendState_.from, animationBlendState_.to, t);
+			// マスクに登録されているか（上半身かどうか）の判定
+			bool isUpperBody = (upperBodyBoneMask_.count(joint.GetName()) > 0);
+
+			QuaternionTransform appliedTransform;
+			bool transformSet = false;
+
+			// ★ここが一番重要！ 上半身であり、かつ攻撃アニメが再生中なら、上半身を攻撃モーションにする！
+			if (isUpperBody && upperAnimation_ && upperPlayMode_ != MotionPlayMode::Stop && !isUpperFinished_) {
+				appliedTransform = GetTransformAnimation(*upperAnimation_, normName, upperAnimationTime_);
+				transformSet = true;
+			}
+			// それ以外（下半身、または攻撃していない時の上半身）は、ベースの移動モーション（歩き・走り）にする！
+			else {
+				if (animationBlendState_.isBlending) {
+					float t = std::clamp(animationBlendState_.currentTime / animationBlendState_.blendTime, 0.0f, 1.0f);
+					QuaternionTransform fromTr = GetTransformAnimation(animationBlendState_.from, normName, animationBlendState_.fromTime + animationBlendState_.currentTime);
+					QuaternionTransform toTr = GetTransformAnimation(animationBlendState_.to, normName, animationBlendState_.toTime + animationBlendState_.currentTime);
+
+					appliedTransform.translate = Lerp(fromTr.translate, toTr.translate, t);
+					appliedTransform.rotate = Slerp(fromTr.rotate, toTr.rotate, t);
+					appliedTransform.scale = Lerp(fromTr.scale, toTr.scale, t);
+					transformSet = true;
+				}
+				else if (animation_ && playMode_ != MotionPlayMode::Stop) {
+					appliedTransform = GetTransformAnimation(*animation_, normName, animationTime_);
+					transformSet = true;
+				}
+			}
+
+			if (transformSet) {
+				joint.SetTransform(appliedTransform);
+			}
+		}
 
 		skeleton_->Update();
 		if (skinCluster_) {
 			skinCluster_->UpdateMatrixPalette(skeleton_->GetJoints());
 		}
-
-		// ------------------------------------------------------------
-		// 通常のスケルトン適用
-		// ------------------------------------------------------------
 	}
-	else if (skeleton_) {
-		animation_->ApplyAnimation(skeleton_->GetJoints(), animationTime_);
-		skeleton_->Update();
-		if (skinCluster_) {
-			skinCluster_->UpdateMatrixPalette(skeleton_->GetJoints());
-		}
-
-		// ------------------------------------------------------------
-		// ノード単体への適用
-		// ------------------------------------------------------------
-	}
-	else if (node_) {
+	else if (node_ && animation_ && playMode_ != MotionPlayMode::Stop) {
 		animation_->PlayerAnimation(animationTime_, *node_);
 	}
 }
@@ -204,6 +226,33 @@ void MotionSystem::StartBlend(Motion& toAnimation, float blendDuration) {
 	animationBlendState_.currentTime = 0.0f;
 	animationBlendState_.isBlending = true;
 	animation_ = &animationBlendState_.to;
+}
+
+// ============================================================
+// 上半身用アニメーションの再生制御
+// ============================================================
+void MotionSystem::PlayUpperAnimation(Motion* animation, MotionPlayMode mode){
+	upperAnimation_ = animation;
+	upperPlayMode_ = mode;
+	upperAnimationTime_ = 0.0f;
+	isUpperFinished_ = false;
+	upperMotionSpeed_ = 1.0f;  // デフォルト速度にリセット（呼び出し側でSetUpperMotionSpeedを使って設定）
+}
+
+// ============================================================
+// 上半身用アニメーションの停止
+// ============================================================
+void MotionSystem::StopUpperAnimation(){
+	upperPlayMode_ = MotionPlayMode::Stop;
+	upperAnimation_ = nullptr;
+	isUpperFinished_ = false;
+	// ★追加: マスクされたボーンの数をコンソールに出力する
+	std::string msg = "[MotionSystem] 上半身マスクの登録数: " + std::to_string(upperBodyBoneMask_.size()) + "\n";
+	OutputDebugStringA(msg.c_str());
+
+	if (upperBodyBoneMask_.empty()) {
+		OutputDebugStringA("[MotionSystem] 警告: 上半身マスクが空です！起点ボーンの名前が間違っている可能性があります。\n");
+	}
 }
 
 // ============================================================

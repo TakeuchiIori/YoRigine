@@ -4,7 +4,6 @@
 #include <functional>
 #include <memory>
 #include <vector>
-#include <map>
 #include <unordered_map>
 
 // App
@@ -17,7 +16,8 @@ class Player;
 
 // ============================================================
 // プレイヤーコンボ管理クラス
-// CCの消費・回復や、連続攻撃の遷移状態、ダメージ倍率などを制御する
+// CCの消費・回復や、連続攻撃のデータ（ダメージ倍率や履歴）を管理する。
+// ※アニメーションの進行や入力受付等のロジックは AttackingCombatState が担当する。
 // ============================================================
 class PlayerCombo {
 public:
@@ -40,6 +40,9 @@ public:
 	void ResetCombo();
 	void ForceEndCombo();
 	void ReloadAttacks();
+
+	// ステート側から「攻撃アニメーションが終了した」ことを受け取る通知関数
+	void OnAttackFinished();
 
 	// ============================================================
 	// CC（チェインキャパシティ）管理
@@ -64,9 +67,9 @@ public:
 
 	int GetComboCount() const { return static_cast<int>(comboChain_.size()); }
 	int GetMaxComboCount() const { return config_.maxLength; }
-	bool IsComboActive() const { return currentState_ != ComboState::Idle; }
+	bool IsComboActive() const { return currentAttack_ != nullptr; }
 
-	float GetComboDamageMultiplier() const;
+	float GetComboDamageMultiplier() const { return comboDamageMultiplier_; }
 	const AttackData* GetCurrentAttack() const { return currentAttack_; }
 	const std::vector<AttackData>& GetComboChain() const { return comboChain_; }
 
@@ -74,23 +77,17 @@ public:
 	float GetStateTimer() const { return stateTimer_; }
 
 	float GetCurrentDamage() const {
-		if (currentAttack_) {
-			return currentAttack_->baseDamage * comboDamageMultiplier_;
-		}
+		if (currentAttack_) return currentAttack_->baseDamage * comboDamageMultiplier_;
 		return 0.0f;
 	}
 
 	float GetCurrentKnockback() const {
-		if (currentAttack_) {
-			return currentAttack_->knockback;
-		}
+		if (currentAttack_) return currentAttack_->knockback;
 		return 0.0f;
 	}
 
 	float GetCurrentKnockbackDuration() const {
-		if (currentAttack_) {
-			return currentAttack_->knockbackDuration;
-		}
+		if (currentAttack_) return currentAttack_->knockbackDuration;
 		return 0.0f;
 	}
 
@@ -103,33 +100,20 @@ public:
 	// ============================================================
 	// コールバック設定（演出やUIとの連携用）
 	// ============================================================
-	void SetAttackStartCallback(std::function<void(const AttackData&)> callback) {
-		onAttackStart_ = callback;
-	}
-	void SetAttackContinueCallback(std::function<void(const AttackData&)> callback) {
-		onAttackContinue_ = callback;
-	}
-	void SetComboEndCallback(std::function<void(int)> callback) {
-		onComboEnd_ = callback;
-	}
-	void SetComboResetCallback(std::function<void()> callback) {
-		onComboReset_ = callback;
-	}
-	void SetCCChangeCallback(std::function<void(int, int)> callback) {
-		onCCChanged_ = callback;
-	}
+	void SetAttackStartCallback(std::function<void(const AttackData&)> callback) { onAttackStart_ = callback; }
+	void SetAttackContinueCallback(std::function<void(const AttackData&)> callback) { onAttackContinue_ = callback; }
+	void SetComboEndCallback(std::function<void(int)> callback) { onComboEnd_ = callback; }
+	void SetComboResetCallback(std::function<void()> callback) { onComboReset_ = callback; }
+	void SetCCChangeCallback(std::function<void(int, int)> callback) { onCCChanged_ = callback; }
 
 	using SwordColliderCallback = std::function<void(bool isActive)>;
 	void SetSwordColliderCallback(SwordColliderCallback cb) { onSwordColliderChanged_ = cb; }
 
 private:
 	// ============================================================
-	// 内部状態遷移・処理
+	// 内部処理
 	// ============================================================
 	void InitializeAttacks();
-	void ChangeState(ComboState newState);
-	void EnterState(ComboState newState);
-	void ExitState(ComboState oldState);
 	void ExecuteAttack(const AttackData& attack);
 
 	void UpdateCC(float deltaTime);
@@ -138,10 +122,6 @@ private:
 	AttackData* FindBestAttack(AttackType type);
 	float CalculateDamageMultiplier() const;
 	bool IsChainPreferred(AttackType from, AttackType to) const;
-
-	void UpdateAttacking();
-	void UpdateCanContinue();
-	void UpdateRecovery();
 
 private:
 	// ============================================================
@@ -155,11 +135,11 @@ private:
 	std::unique_ptr<YoRigine::JsonManager> attackJson_;     // 攻撃パラメータ等のJSON管理オブジェクト
 
 	// ------------------------------------------------------------
-	// 状態管理 (State Management)
+	// 状態管理 (UIやPlayerCombatのCanMove用データとしてのみ機能)
 	// ------------------------------------------------------------
-	ComboState currentState_ = ComboState::Idle;            // 現在のコンボフェーズ（攻撃中、硬直中など）
+	ComboState currentState_ = ComboState::Idle;            // 現在のコンボフェーズ（UI表示用）
 	ComboState previousState_ = ComboState::Idle;           // 1フレーム前のコンボフェーズ
-	float stateTimer_ = 0.0f;                               // 現在のフェーズに入ってからの経過時間
+	float stateTimer_ = 0.0f;                               // UI表示用の経過時間タイマー
 	float comboTimer_ = 0.0f;                               // コンボが途切れるまでの猶予を計測するタイマー
 
 	// ------------------------------------------------------------
@@ -180,16 +160,15 @@ private:
 	// ------------------------------------------------------------
 	// 攻撃データベース
 	// ------------------------------------------------------------
-	// JSONから読み込んだ全攻撃データを、攻撃タイプ（A術、B術など）ごとに分類して保持するマップ
 	std::unordered_map<AttackType, std::vector<AttackData>> attackDatabase_;
 
 	// ------------------------------------------------------------
 	// イベントコールバック群 (他システムへの通知用)
 	// ------------------------------------------------------------
-	std::function<void(const AttackData&)> onAttackStart_;      // コンボ初撃が開始されたときに呼ばれる
-	std::function<void(const AttackData&)> onAttackContinue_;   // コンボが2段目以降に繋がったときに呼ばれる
-	std::function<void(int)> onComboEnd_;                       // コンボが正常に終了したときに呼ばれる（引数は総ヒット数）
-	std::function<void()> onComboReset_;                        // コンボが途切れたり強制終了されたときに呼ばれる
-	std::function<void(int, int)> onCCChanged_;                 // CCが増減したときに呼ばれる（引数は 変更前CC, 変更後CC）
-	SwordColliderCallback onSwordColliderChanged_;              // 攻撃判定（剣の当たり判定）の有効/無効を切り替えるためのコールバック
+	std::function<void(const AttackData&)> onAttackStart_;      // コンボ初撃開始時
+	std::function<void(const AttackData&)> onAttackContinue_;   // コンボ継続時
+	std::function<void(int)> onComboEnd_;                       // コンボ正常終了時
+	std::function<void()> onComboReset_;                        // コンボ途切れ・強制終了時
+	std::function<void(int, int)> onCCChanged_;                 // CC増減時
+	SwordColliderCallback onSwordColliderChanged_;              // 攻撃判定切り替え用
 };

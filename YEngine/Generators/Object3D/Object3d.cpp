@@ -208,6 +208,20 @@ void Object3d::SetChangeMotion(const std::string& filePath, MotionPlayMode playM
 	);
 }
 
+void Object3d::PlayUpperMotion(const std::string& filePath, MotionPlayMode playMode, const std::string& animationName)
+{
+	if (!model_) { return; }
+
+	auto [basePath, fileName] = ModelManager::GetInstance()->ParseModelPath(filePath);
+
+	model_->PlayUpperMotion(
+		defaultModelPath_ + basePath,
+		fileName,
+		playMode,
+		animationName
+	);
+}
+
 /// <summary>
 //モーション速度の切り替え
 /// </summary>
@@ -217,6 +231,18 @@ void Object3d::SetMotionSpeed(float speed)
 	if (model_) {
 		if (model_->GetMotionSystem()) {
 			model_->GetMotionSystem()->SetCurrentAnimationSpeed(speed);
+		}
+	}
+}
+
+/// <summary>
+/// 上半身モーション速度の独立した切り替え
+/// </summary>
+void Object3d::SetUpperMotionSpeed(float speed)
+{
+	if (model_) {
+		if (model_->GetMotionSystem()) {
+			model_->GetMotionSystem()->SetUpperMotionSpeed(speed);
 		}
 	}
 }

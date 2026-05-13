@@ -65,6 +65,10 @@ public:
 	bool IsGuarding() const;
 	bool IsHit() const;
 
+	// 全身を占有するアクション中か（被弾・死亡・ガード・スタンなど）
+	// Movementステートがこのフラグをチェックしてアニメーション再生を制御する
+	bool IsFullBodyAction() const;
+
 	void OnDodgeSuccess() { combo_->OnDodgeSuccess(); }
 	void OnCounterHit() { combo_->OnCounterHit(); }
 

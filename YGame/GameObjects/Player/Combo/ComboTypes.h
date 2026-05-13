@@ -54,15 +54,15 @@ struct AttackData {
 	int hitStart = 0;
 	int hitEnd = 10;
 	int comboWindowStart = 0;
-	int comboWindowEnd = 0;
+	int comboWindowEnd = 20;
+
+
 
 	// ------------------------------------------------------------
 	// タイミング設定（ゲームロジック用・秒単位）
 	// フレーム設定から同期・自動計算される値
 	// ------------------------------------------------------------
 	float duration = 0.0f;
-	float recovery = 0.0f;
-	float continueWindow = 0.0f;
 
 	// ------------------------------------------------------------
 	// ダメージと物理効果設定
@@ -152,8 +152,6 @@ SERIALIZE_FIELD(AttackData, comboWindowStart)
 SERIALIZE_FIELD(AttackData, comboWindowEnd)
 
 SERIALIZE_FIELD(AttackData, duration)
-SERIALIZE_FIELD(AttackData, recovery)
-SERIALIZE_FIELD(AttackData, continueWindow)
 
 SERIALIZE_FIELD(AttackData, baseDamage)
 SERIALIZE_FIELD(AttackData, knockback)

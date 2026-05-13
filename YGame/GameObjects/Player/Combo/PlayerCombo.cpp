@@ -22,7 +22,7 @@ PlayerCombo::PlayerCombo(Player* owner)
 	InitializeAttacks();
 
 	// ------------------------------------------------------------
-	// インゲームエディターの生成とコールバック登録（初回のみ）
+	// インゲームエディターの生成とコールバック登録
 	// ------------------------------------------------------------
 	if (!g_AttackEditor) {
 		g_AttackEditor = std::make_unique<AttackDataEditor>();
@@ -34,49 +34,14 @@ PlayerCombo::PlayerCombo(Player* owner)
 
 // ============================================================
 // メイン更新処理
-// 状態遷移やCC回復の監視を行う
+// UI用のタイマーや、CCの自然回復などを管理する
 // ============================================================
 void PlayerCombo::Update(float deltaTime) {
 	previousState_ = currentState_;
-
-	// ------------------------------------------------------------
-	// CC回復とコンボ受付タイマーの更新
-	// ------------------------------------------------------------
-	UpdateCC(deltaTime);
-	UpdateComboTimer(deltaTime);
 	stateTimer_ += deltaTime;
 
-	// ------------------------------------------------------------
-	// 状態ごとの個別更新処理に分岐
-	// ------------------------------------------------------------
-	switch (currentState_) {
-
-	case ComboState::Attacking:
-		UpdateAttacking();
-		break;
-
-	case ComboState::CanContinue:
-		UpdateCanContinue();
-		break;
-
-	case ComboState::Recovery:
-		UpdateRecovery();
-		break;
-
-	case ComboState::Idle:
-		if (GetComboCount() > 0 && comboTimer_ >= config_.comboResetTime) {
-			ResetCombo();
-		}
-		break;
-
-	case ComboState::Finished:
-		ChangeState(ComboState::Idle);
-
-		if (onComboEnd_) {
-			onComboEnd_(GetComboCount());
-		}
-		break;
-	}
+	UpdateCC(deltaTime);
+	UpdateComboTimer(deltaTime);
 }
 
 // ============================================================
@@ -96,6 +61,7 @@ bool PlayerCombo::TryAttack(AttackType attackType) {
 	// ------------------------------------------------------------
 	if (!HasSufficientCC(attack->ccCost)) return false;
 
+	//ConsumeCC(attack->ccCost); // 先にCCを消費する
 	ExecuteAttack(*attack);
 	return true;
 }
@@ -104,17 +70,11 @@ bool PlayerCombo::TryAttack(AttackType attackType) {
 // 攻撃可能かどうかの判定処理
 // ============================================================
 bool PlayerCombo::CanAttack([[maybe_unused]] AttackType attackType) const {
-	switch (currentState_) {
-	case ComboState::Idle:
-	case ComboState::CanContinue:
+	// 待機中なら攻撃可能、攻撃中ならキャンセル可能フラグを見る
+	if (currentAttack_ == nullptr) {
 		return true;
-
-	case ComboState::Attacking:
-		return currentAttack_ && currentAttack_->canCancel;
-
-	default:
-		return false;
 	}
+	return currentAttack_->canCancel;
 }
 
 // ============================================================
@@ -153,7 +113,7 @@ AttackData* PlayerCombo::FindBestAttack(AttackType type) {
 
 // ============================================================
 // 攻撃実行処理
-// 必要な情報のセットアップと攻撃用状態への遷移を行う
+// 必要な情報のセットアップとデータ更新を行う
 // ============================================================
 void PlayerCombo::ExecuteAttack(const AttackData& attack) {
 	// ------------------------------------------------------------
@@ -162,11 +122,16 @@ void PlayerCombo::ExecuteAttack(const AttackData& attack) {
 	currentAttack_ = const_cast<AttackData*>(&attack);
 	comboChain_.push_back(attack);
 	comboDamageMultiplier_ = CalculateDamageMultiplier();
-	ChangeState(ComboState::Attacking);
+
+	previousState_ = currentState_;
+	currentState_ = ComboState::Attacking;
+
+	stateTimer_ = 0.0f;
 	comboTimer_ = 0.0f;
 
 	// ------------------------------------------------------------
 	// 攻撃開始/継続コールバックの発火
+	// （これにより AttackingCombatState 側の処理が更新される）
 	// ------------------------------------------------------------
 	if (GetComboCount() == 1) {
 		if (onAttackStart_) onAttackStart_(attack);
@@ -177,145 +142,62 @@ void PlayerCombo::ExecuteAttack(const AttackData& attack) {
 }
 
 // ============================================================
-// 攻撃状態中の更新処理
+// 攻撃アニメーション終了通知（AttackingCombatStateから呼ばれる）
 // ============================================================
-void PlayerCombo::UpdateAttacking() {
-	if (!currentAttack_) { ChangeState(ComboState::Idle); return; }
-
-	// ------------------------------------------------------------
-	// 剣の当たり判定（Hitbox）の有効/無効タイミングの制御
-	// ------------------------------------------------------------
-	const float frameDuration = (currentAttack_->fps > 0)
-		? 1.0f / static_cast<float>(currentAttack_->fps)
-		: 1.0f / 60.0f;
-
-	const int currentFrame = static_cast<int>(stateTimer_ / frameDuration);
-
-	const bool inHitWindow = (currentAttack_->hitEnd > currentAttack_->hitStart)
-		&& (currentFrame >= currentAttack_->hitStart)
-		&& (currentFrame < currentAttack_->hitEnd);
-
-	if (onSwordColliderChanged_) onSwordColliderChanged_(inHitWindow);
-
-	// ------------------------------------------------------------
-	// 状態終了による次の受付ステートへの遷移
-	// ------------------------------------------------------------
-	if (stateTimer_ >= currentAttack_->duration) {
-		if (currentAttack_->canChainToAny && currentCC_ > 0)
-			ChangeState(ComboState::CanContinue);
-		else
-			ChangeState(ComboState::Recovery);
-	}
-}
-
-// ============================================================
-// コンボ追加入力受付中の更新処理
-// ============================================================
-void PlayerCombo::UpdateCanContinue() {
-	if (!currentAttack_) { ChangeState(ComboState::Idle); return; }
-
-	if (stateTimer_ >= currentAttack_->continueWindow)
-		ChangeState(ComboState::Recovery);
-}
-
-// ============================================================
-// 攻撃硬直中の更新処理
-// ============================================================
-void PlayerCombo::UpdateRecovery() {
-	if (!currentAttack_) { ChangeState(ComboState::Idle); return; }
-
-	if (stateTimer_ >= currentAttack_->recovery)
-		ChangeState(ComboState::Finished);
+void PlayerCombo::OnAttackFinished() {
+	currentAttack_ = nullptr;
+	previousState_ = currentState_;
+	currentState_ = ComboState::Idle;
+	stateTimer_ = 0.0f;
+	// ※ comboTimer_ はここでリセットせず、コンボが途切れるまで計測を続ける
 }
 
 // ============================================================
 // CC（コスト）の自然回復処理
 // ============================================================
 void PlayerCombo::UpdateCC(float deltaTime) {
-	switch (currentState_) {
-	case ComboState::Idle:
+	// 攻撃中でなければ（待機中なら）回復タイマーを進める
+	if (currentAttack_ == nullptr) {
 		ccRegenTimer_ += deltaTime;
 		if (ccRegenTimer_ >= ccConfig_.regenDelay) {
 			RecoverCC(static_cast<int>(ccConfig_.regenRate * deltaTime));
+			// 必要に応じて ccRegenTimer_ = 0.0f; とする設計もありますが、
+			// 元のロジックに従いタイマーは累積し続ける形にしています。
 		}
-		break;
-
-	default:
+	}
+	else {
 		ccRegenTimer_ = 0.0f;
-		break;
 	}
 }
 
 // ============================================================
-// コンボ時間計測
+// コンボ時間計測と自動リセット
 // ============================================================
 void PlayerCombo::UpdateComboTimer(float deltaTime) {
-	comboTimer_ += deltaTime;
-}
-
-// ============================================================
-// 状態の変更処理
-// ============================================================
-void PlayerCombo::ChangeState(ComboState newState) {
-	if (currentState_ == newState) return;
-
-	ExitState(currentState_);
-	currentState_ = newState;
-	EnterState(newState);
-}
-
-// ============================================================
-// 各状態への遷移時処理
-// ============================================================
-void PlayerCombo::EnterState(ComboState newState) {
-	stateTimer_ = 0.0f;
-
-	switch (newState) {
-	case ComboState::Attacking:
-		ccRegenTimer_ = 0.0f;
-		break;
-
-	default:
-		break;
+	// 待機中かつコンボ履歴が残っている場合のみ計測
+	if (currentAttack_ == nullptr && !comboChain_.empty()) {
+		comboTimer_ += deltaTime;
+		if (comboTimer_ >= config_.comboResetTime) {
+			ResetCombo();
+		}
 	}
-}
-
-// ============================================================
-// 各状態からの退出時処理
-// ============================================================
-void PlayerCombo::ExitState(ComboState oldState) {
-	switch (oldState) {
-	case ComboState::Attacking:
-		if (onSwordColliderChanged_) onSwordColliderChanged_(false);
-		break;
-	case ComboState::CanContinue:
-		break;
-	case ComboState::Recovery:
-		break;
-	case ComboState::Idle:
-		break;
-	case ComboState::Finished:
-		break;
+	else if (currentAttack_ != nullptr) {
+		comboTimer_ = 0.0f;
 	}
 }
 
 // ============================================================
 // コンボ中のダメージ倍率計算
-// 段数による増加とチェインボーナス・減衰の適用を行う
 // ============================================================
 float PlayerCombo::CalculateDamageMultiplier() const {
 	if (GetComboCount() <= 1) return 1.0f;
 
 	float multiplier = 1.0f;
 
-	// ------------------------------------------------------------
 	// 基本倍率増加（1コンボにつき +10%）
-	// ------------------------------------------------------------
 	multiplier += (GetComboCount() - 1) * 0.1f;
 
-	// ------------------------------------------------------------
 	// 連携アクションによるボーナス加算
-	// ------------------------------------------------------------
 	if (GetComboCount() >= 2) {
 		const AttackData& prev = comboChain_[comboChain_.size() - 2];
 		const AttackData& curr = comboChain_[comboChain_.size() - 1];
@@ -325,9 +207,7 @@ float PlayerCombo::CalculateDamageMultiplier() const {
 		}
 	}
 
-	// ------------------------------------------------------------
 	// 連続回数によるダメージ減衰ペナルティ
-	// ------------------------------------------------------------
 	for (int i = 3; i < GetComboCount(); ++i) {
 		multiplier *= config_.damageDecay;
 	}
@@ -395,14 +275,18 @@ void PlayerCombo::OnHitStep(const Vector3& enemyPosition) {
 // コンボ状態の初期化・中断
 // ============================================================
 void PlayerCombo::ResetCombo() {
+	if (!comboChain_.empty() && onComboEnd_) {
+		onComboEnd_(GetComboCount());
+	}
+
 	comboChain_.clear();
 	currentAttack_ = nullptr;
 	comboDamageMultiplier_ = 1.0f;
 	comboTimer_ = 0.0f;
 
-	if (currentState_ != ComboState::Idle) {
-		ChangeState(ComboState::Idle);
-	}
+	previousState_ = currentState_;
+	currentState_ = ComboState::Idle;
+	stateTimer_ = 0.0f;
 
 	if (onComboReset_) {
 		onComboReset_();
@@ -416,11 +300,7 @@ void PlayerCombo::CancelCombo() {
 }
 
 void PlayerCombo::ForceEndCombo() {
-	ChangeState(ComboState::Finished);
-}
-
-float PlayerCombo::GetComboDamageMultiplier() const {
-	return comboDamageMultiplier_;
+	ResetCombo();
 }
 
 // ============================================================
@@ -479,7 +359,6 @@ void PlayerCombo::ReloadAttacks() {
 
 // ============================================================
 // デバッグ用UI描画処理
-// 現在のCC・コンボチェーン・各種パラメータを表示・操作する
 // ============================================================
 void PlayerCombo::ShowDebugImGui() {
 #ifdef USE_IMGUI
@@ -514,7 +393,7 @@ void PlayerCombo::ShowDebugImGui() {
 
 	if (StateChanged()) {
 		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 0.0f, 1.0f));
-		ImGui::Text("状態が変化し���した"); // 絵文字排除
+		ImGui::Text("状態が変化しました");
 		ImGui::PopStyleColor();
 	}
 

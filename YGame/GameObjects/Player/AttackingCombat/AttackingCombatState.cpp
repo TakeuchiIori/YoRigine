@@ -1,6 +1,7 @@
 #include "AttackingCombatState.h"
 #include "../Player.h"
 #include "../Movement/PlayerMovement.h"
+#include "Model.h" 
 
 // ============================================================
 // コンストラクタ
@@ -13,22 +14,25 @@ AttackingCombatState::AttackingCombatState(PlayerCombat* combat) : combat_(comba
 	// ------------------------------------------------------------
 	// 攻撃開始時のコールバック設定
 	// ------------------------------------------------------------
-	combo->SetAttackStartCallback([combat, player](const AttackData& attack) {
+	combo->SetAttackStartCallback([combat, player, this](const AttackData& attack) {
 		if (combat->GetCurrentState() == CombatState::Dead) return;
 
-		auto* movement = player->GetMovement();
-		movement->SetCanMove(false);
-		movement->SetCanRotate(false);
-		movement->ForceStop();
+		stateTimer_ = 0.0f;
+
+		// ★移動制限(SetCanMove(false)など)は行わず、PlayerMovementの下半身の動きを活かす
 
 		auto* obj = player->GetObject3d();
-		obj->SetMotionSpeed(attack.motionSpeed);
-		obj->SetChangeMotion("Player.gltf", MotionPlayMode::Once, attack.animationName);
+
+
+		// ★追加した関数で上半身だけ攻撃アニメーションを再生
+		obj->PlayUpperMotion("Player.gltf", MotionPlayMode::Once, attack.animationName);
+		obj->SetUpperMotionSpeed(attack.motionSpeed);
 
 		// 攻撃タイプに応じたエフェクトの読み込み
 		if (attack.type == AttackType::A_Arte) {
 			player->GetSword()->LoadVfxAssets("Resources/Vfx/NewEffect.json");
-		}else if(attack.type == AttackType::B_Arte) {
+		}
+		else if (attack.type == AttackType::B_Arte) {
 			player->GetSword()->LoadVfxAssets("Resources/Vfx/NewEffect2.json");
 		}
 
@@ -39,18 +43,17 @@ AttackingCombatState::AttackingCombatState(PlayerCombat* combat) : combat_(comba
 	// ------------------------------------------------------------
 	// コンボ継続時のコールバック設定
 	// ------------------------------------------------------------
-	combo->SetAttackContinueCallback([combat, player](const AttackData& attack) {
+	combo->SetAttackContinueCallback([combat, player, this](const AttackData& attack) {
 		if (combat->GetCurrentState() == CombatState::Dead) return;
 
-		auto* movement = player->GetMovement();
-		movement->SetCanMove(false);
-		movement->SetCanRotate(false);
+		stateTimer_ = 0.0f;
 
 		auto* obj = player->GetObject3d();
-		obj->SetMotionSpeed(attack.motionSpeed);
-		obj->SetChangeMotion("Player.gltf", MotionPlayMode::Once, attack.animationName);
 
-		// 攻撃タイプに応じたエフェクトの読み込み
+		// 上半身アニメーションの再生
+		obj->PlayUpperMotion("Player.gltf", MotionPlayMode::Once, attack.animationName);
+		obj->SetUpperMotionSpeed(attack.motionSpeed);
+
 		if (attack.type == AttackType::A_Arte) {
 			player->GetSword()->LoadVfxAssets("Resources/Vfx/NewEffect.json");
 		}
@@ -66,36 +69,16 @@ AttackingCombatState::AttackingCombatState(PlayerCombat* combat) : combat_(comba
 	// ------------------------------------------------------------
 	combo->SetComboEndCallback([combat, player]([[maybe_unused]] int finalCount) {
 		if (combat->GetCurrentState() == CombatState::Dead) return;
-
-		player->GetMovement()->SetCanMove(true);
-		player->GetMovement()->SetCanRotate(true);
-
-		auto* obj = player->GetObject3d();
-		obj->SetMotionSpeed(player->GetMotionSpeed(0));
-
-		player->GetSword()->StopTrail();
-
 		combat->NotifyAction("コンボ終了");
-		combat->ChangeState(CombatState::Idle);
 		});
 
-	// ------------------------------------------------------------
-	// コンボリセット時のコールバック設定
-	// ------------------------------------------------------------
 	combo->SetComboResetCallback([combat]() {
 		if (combat->GetCurrentState() == CombatState::Dead) return;
 		combat->NotifyAction("コンボリセット");
 		});
 
-	// ------------------------------------------------------------
-	// CC変化時のコールバック設定
-	// ------------------------------------------------------------
-	combo->SetCCChangeCallback([]([[maybe_unused]] int oldCC, [[maybe_unused]] int newCC) {
-		});
+	combo->SetCCChangeCallback([]([[maybe_unused]] int oldCC, [[maybe_unused]] int newCC) {});
 
-	// ------------------------------------------------------------
-	// 剣コライダー制御のコールバック
-	// ------------------------------------------------------------
 	combo->SetSwordColliderCallback([player](bool isActive) {
 		player->GetSword()->SetEnableCollider(isActive);
 		});
@@ -105,12 +88,7 @@ AttackingCombatState::AttackingCombatState(PlayerCombat* combat) : combat_(comba
 // ステート開始処理
 // ============================================================
 void AttackingCombatState::OnEnter() {
-	auto* player = combat_->GetOwner();
-	auto* movement = player->GetMovement();
-
-	movement->SetCanMove(false);
-	movement->SetCanRotate(false);
-	movement->ForceStop();
+	stateTimer_ = 0.0f;
 }
 
 // ============================================================
@@ -118,17 +96,60 @@ void AttackingCombatState::OnEnter() {
 // ============================================================
 void AttackingCombatState::OnExit() {
 	auto* player = combat_->GetOwner();
-	auto* movement = player->GetMovement();
 
-	movement->SetCanMove(true);
-	movement->SetCanRotate(true);
+	// 状態終了時に上半身の攻撃アニメーションを確実に停止する
+	auto* model = player->GetObject3d()->GetModel();
+	if (model && model->GetMotionSystem()) {
+		model->GetMotionSystem()->StopUpperAnimation();
+	}
 
 	player->GetSword()->StopTrail();
+	player->GetSword()->SetEnableCollider(false);
+	player->GetObject3d()->SetMotionSpeed(player->GetMotionSpeed(0));
+
+	combat_->GetCombo()->OnAttackFinished();
+
+	// Movementステートに現在の状態に応じたアニメーション再生を委譲
+	player->GetMovement()->SyncAnimationToCurrentState();
 }
 
 // ============================================================
 // 更新処理
 // ============================================================
 void AttackingCombatState::Update([[maybe_unused]] float deltaTime) {
+	auto* combo = combat_->GetCombo();
+	auto* player = combat_->GetOwner();
+	const AttackData* currentAttack = combo->GetCurrentAttack();
 
+	if (!currentAttack) {
+		combat_->ChangeState(CombatState::Idle);
+		return;
+	}
+
+	stateTimer_ += deltaTime;
+
+	// 1. フレームの計算
+	const float frameDuration = (currentAttack->fps > 0) ? 1.0f / static_cast<float>(currentAttack->fps) : 1.0f / 60.0f;
+	const int currentFrame = static_cast<int>(stateTimer_ / frameDuration);
+
+	// 2. 当たり判定(Hitbox)のON/OFF
+	const bool inHitWindow = (currentAttack->hitEnd > currentAttack->hitStart) &&
+		(currentFrame >= currentAttack->hitStart) &&
+		(currentFrame < currentAttack->hitEnd);
+	player->GetSword()->SetEnableCollider(inHitWindow);
+
+	// 3. 次の攻撃の先行入力（キャンセル）受付
+	if (currentFrame >= currentAttack->comboWindowStart && currentFrame <= currentAttack->comboWindowEnd) {
+		if (player->IsAttackPressedA()) {
+			if (combat_->TryAttack(AttackType::A_Arte)) return;
+		}
+		else if (player->IsAttackPressedB()) {
+			if (combat_->TryAttack(AttackType::B_Arte)) return;
+		}
+	}
+
+	// 4. アニメーション終了判定
+	if (stateTimer_ >= currentAttack->duration) {
+		combat_->ChangeState(CombatState::Idle);
+	}
 }

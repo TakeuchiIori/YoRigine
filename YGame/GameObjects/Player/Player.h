@@ -55,6 +55,9 @@ public:
 	void Revive(int reviveHP);
 	void SetInitialPosition();
 
+	bool IsAttackPressedA() const;
+	bool IsAttackPressedB() const;
+
 public:
 	// ============================================================
 	// アクセッサ
