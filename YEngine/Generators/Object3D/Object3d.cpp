@@ -234,6 +234,18 @@ void Object3d::SetMotionSpeed(float speed)
 		}
 	}
 }
+
+/// <summary>
+/// 上半身モーション速度の独立した切り替え
+/// </summary>
+void Object3d::SetUpperMotionSpeed(float speed)
+{
+	if (model_) {
+		if (model_->GetMotionSystem()) {
+			model_->GetMotionSystem()->SetUpperMotionSpeed(speed);
+		}
+	}
+}
 /// <summary>
 /// ファイル名から Object3d を生成
 /// </summary>

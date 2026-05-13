@@ -90,6 +90,10 @@ public:
 	float GetUpperAnimationTime() const { return upperAnimationTime_; }
 	Motion* GetUpperAnimation() const { return upperAnimation_; }
 
+	// 上半身アニメーション用の独立したモーション速度
+	void SetUpperMotionSpeed(float speed) { upperMotionSpeed_ = speed; }
+	float GetUpperMotionSpeed() const { return upperMotionSpeed_; }
+
 private:
 	// ============================================================
 	// 内部処理
@@ -138,4 +142,5 @@ private:
 	bool isUpperFinished_ = false;
 	// 上半身アニメーションの影響を受けるボーン名のセット
 	std::unordered_set<std::string> upperBodyBoneMask_;
+	float upperMotionSpeed_ = 1.0f;  // 上半身アニメーション用の独立したモーション速度
 };

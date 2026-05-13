@@ -74,6 +74,8 @@ public:
 
 	// 今のアニメーション速度を切り替え
 	void SetMotionSpeed(float speed);
+	// 上半身アニメーション速度を独立して切り替え
+	void SetUpperMotionSpeed(float speed);
 	// モーションの再生方法
 	void PlayOnce() { model_->PlayOnce(); }
 	void PlayLoop() { model_->PlayLoop(); }

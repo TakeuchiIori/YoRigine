@@ -49,7 +49,7 @@ void MotionSystem::Update(float deltaTime){
 			upSpeedMul = upperAnimation_->EvaluateSpeedCurve(std::clamp(upperAnimationTime_ / upDuration, 0.0f, 1.0f));
 		}
 
-		upperAnimationTime_ += deltaTime * effectiveSpeed * upSpeedMul;
+		upperAnimationTime_ += deltaTime * upperMotionSpeed_ * upSpeedMul;
 
 		if (upperAnimationTime_ >= upDuration) {
 			if (upperPlayMode_ == MotionPlayMode::Loop) {
@@ -236,6 +236,7 @@ void MotionSystem::PlayUpperAnimation(Motion* animation, MotionPlayMode mode){
 	upperPlayMode_ = mode;
 	upperAnimationTime_ = 0.0f;
 	isUpperFinished_ = false;
+	upperMotionSpeed_ = 1.0f;  // デフォルト速度にリセット（呼び出し側でSetUpperMotionSpeedを使って設定）
 }
 
 // ============================================================

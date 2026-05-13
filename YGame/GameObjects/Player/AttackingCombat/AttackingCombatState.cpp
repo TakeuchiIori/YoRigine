@@ -26,7 +26,7 @@ AttackingCombatState::AttackingCombatState(PlayerCombat* combat) : combat_(comba
 
 		// ★追加した関数で上半身だけ攻撃アニメーションを再生
 		obj->PlayUpperMotion("Player.gltf", MotionPlayMode::Once, attack.animationName);
-		obj->SetMotionSpeed(attack.motionSpeed);
+		obj->SetUpperMotionSpeed(attack.motionSpeed);
 
 		// 攻撃タイプに応じたエフェクトの読み込み
 		if (attack.type == AttackType::A_Arte) {
@@ -52,7 +52,7 @@ AttackingCombatState::AttackingCombatState(PlayerCombat* combat) : combat_(comba
 
 		// 上半身アニメーションの再生
 		obj->PlayUpperMotion("Player.gltf", MotionPlayMode::Once, attack.animationName);
-		obj->SetMotionSpeed(attack.motionSpeed);
+		obj->SetUpperMotionSpeed(attack.motionSpeed);
 
 		if (attack.type == AttackType::A_Arte) {
 			player->GetSword()->LoadVfxAssets("Resources/Vfx/NewEffect.json");
