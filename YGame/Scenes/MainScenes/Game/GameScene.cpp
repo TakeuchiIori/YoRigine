@@ -113,8 +113,6 @@ void GameScene::Initialize() {
 	// 共通オブジェクト
 	//------------------------------------------------------------
 
-
-
 	player_ = std::make_unique<Player>();
 	player_->Initialize(sceneCamera_.get()); 
 	auto playerCam = std::dynamic_pointer_cast<FollowCamera>(director->GetCamera("PlayerFollow"));
