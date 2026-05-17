@@ -90,19 +90,5 @@ namespace YoRigine {
 		static bool stepOneFrame_;
 	};
 
-	///************************* FPS関連（内部スコープ） *************************///
-	namespace {
-
-		float averageFps_ = 0.0f;
-		float fpsCounter_ = 0.0f;
-		int frameCount_ = 0;
-
-		constexpr float fpsInterval_ = 1.0f;
-
-		float hitStopTimer_ = 0.0f;
-		float hitStopDuration_ = 0.0f;
-
-		float slowMotionTimer_ = 0.0f;
-		float slowMotionSpeed_ = 1.0f;
-	}
+	///************************* FPS・時間関連の変数は GameTime.cpp 内の無名名前空間へ移動しました *************************///
 }

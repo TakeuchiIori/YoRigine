@@ -58,7 +58,7 @@ void MotionSystem::Update(float deltaTime){
 			else {
 				upperAnimationTime_ = upDuration;
 				isUpperFinished_ = true;
-				StopUpperAnimation(); // 終わったら自動でストップ（下半身の動きに同期させるため）
+				StopUpperAnimation(0.15f); // ブレンドアウトで自然に下半身の動きに同期させる
 			}
 		}
 	}
@@ -74,6 +74,17 @@ void MotionSystem::Update(float deltaTime){
 			animationTime_ = animationBlendState_.toTime + animationBlendState_.currentTime;
 		}
 		return;
+	}
+
+	// ------------------------------------------------------------
+	// 上半身ブレンドアウトの進行
+	// ------------------------------------------------------------
+	if (isUpperBlendingOut_) {
+		upperBlendOutTimer_ += deltaTime;
+		if (upperBlendOutTimer_ >= upperBlendOutDuration_) {
+			isUpperBlendingOut_ = false;
+			blendOutUpperAnimation_ = nullptr;
+		}
 	}
 
 	// ------------------------------------------------------------
@@ -123,6 +134,35 @@ void MotionSystem::Apply()
 			// ★ここが一番重要！ 上半身であり、かつ攻撃アニメが再生中なら、上半身を攻撃モーションにする！
 			if (isUpperBody && upperAnimation_ && upperPlayMode_ != MotionPlayMode::Stop && !isUpperFinished_) {
 				appliedTransform = GetTransformAnimation(*upperAnimation_, normName, upperAnimationTime_);
+				transformSet = true;
+			}
+			// ★ブレンドアウト中：上半身アニメーションからベースアニメーションへ徐々に遷移
+			else if (isUpperBody && isUpperBlendingOut_ && blendOutUpperAnimation_) {
+				float t = std::clamp(upperBlendOutTimer_ / upperBlendOutDuration_, 0.0f, 1.0f);
+				QuaternionTransform upperTr = GetTransformAnimation(*blendOutUpperAnimation_, normName, blendOutUpperAnimTime_);
+
+				// ベースレイヤーのトランスフォームを取得
+				QuaternionTransform baseTr{};
+				baseTr.translate = { 0.0f, 0.0f, 0.0f };
+				baseTr.rotate = { 0.0f, 0.0f, 0.0f, 1.0f };
+				baseTr.scale = { 1.0f, 1.0f, 1.0f };
+
+				if (animationBlendState_.isBlending) {
+					float bt = std::clamp(animationBlendState_.currentTime / animationBlendState_.blendTime, 0.0f, 1.0f);
+					QuaternionTransform fromTr = GetTransformAnimation(animationBlendState_.from, normName, animationBlendState_.fromTime + animationBlendState_.currentTime);
+					QuaternionTransform toTr = GetTransformAnimation(animationBlendState_.to, normName, animationBlendState_.toTime + animationBlendState_.currentTime);
+					baseTr.translate = Lerp(fromTr.translate, toTr.translate, bt);
+					baseTr.rotate = Slerp(fromTr.rotate, toTr.rotate, bt);
+					baseTr.scale = Lerp(fromTr.scale, toTr.scale, bt);
+				}
+				else if (animation_ && playMode_ != MotionPlayMode::Stop) {
+					baseTr = GetTransformAnimation(*animation_, normName, animationTime_);
+				}
+
+				// 攻撃ポーズからベースポーズへ補間（t: 0→1）
+				appliedTransform.translate = Lerp(upperTr.translate, baseTr.translate, t);
+				appliedTransform.rotate = Slerp(upperTr.rotate, baseTr.rotate, t);
+				appliedTransform.scale = Lerp(upperTr.scale, baseTr.scale, t);
 				transformSet = true;
 			}
 			// それ以外（下半身、または攻撃していない時の上半身）は、ベースの移動モーション（歩き・走り）にする！
@@ -242,17 +282,23 @@ void MotionSystem::PlayUpperAnimation(Motion* animation, MotionPlayMode mode){
 // ============================================================
 // 上半身用アニメーションの停止
 // ============================================================
-void MotionSystem::StopUpperAnimation(){
+void MotionSystem::StopUpperAnimation(float blendOutDuration){
+	// 既にブレンドアウト中の場合は何もしない（進行中のブレンドアウトを継続）
+	if (isUpperBlendingOut_) return;
+
+	if (blendOutDuration > 0.0f && upperAnimation_) {
+		// ブレンドアウト開始：上半身アニメーションからベースアニメーションへ徐々に遷移
+		isUpperBlendingOut_ = true;
+		upperBlendOutTimer_ = 0.0f;
+		upperBlendOutDuration_ = blendOutDuration;
+		blendOutUpperAnimation_ = upperAnimation_;
+		blendOutUpperAnimTime_ = upperAnimationTime_;
+	}
+
+	// 通常の上半身アニメーションは停止
 	upperPlayMode_ = MotionPlayMode::Stop;
 	upperAnimation_ = nullptr;
 	isUpperFinished_ = false;
-	// ★追加: マスクされたボーンの数をコンソールに出力する
-	std::string msg = "[MotionSystem] 上半身マスクの登録数: " + std::to_string(upperBodyBoneMask_.size()) + "\n";
-	OutputDebugStringA(msg.c_str());
-
-	if (upperBodyBoneMask_.empty()) {
-		OutputDebugStringA("[MotionSystem] 警告: 上半身マスクが空です！起点ボーンの名前が間違っている可能性があります。\n");
-	}
 }
 
 // ============================================================

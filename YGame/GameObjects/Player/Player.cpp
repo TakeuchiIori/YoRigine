@@ -413,6 +413,23 @@ void Player::OnEnterDirectionCollision([[maybe_unused]] BaseCollider* self, Base
 		//	0.2f,
 		//	YoRigine::SoundCategory::SE
 		//);
+
+		//------------------------------------------------------------
+		// カメラシェイク（被弾方向で強度を変える）
+		//------------------------------------------------------------
+		if (followCamera_) {
+			float shakeIntensity = 0.4f;
+			float shakeDuration = 0.2f;
+
+			// 背後からの攻撃はより強い揺れ
+			if (dir == HitDirection::Back) {
+				shakeIntensity = 0.6f;
+				shakeDuration = 0.25f;
+			}
+
+			followCamera_->StartShake(shakeIntensity, shakeDuration);
+		}
+
 		// 方向ヒット状態へ遷移
 		combat_->SetHitDirection(dir);
 		combat_->ChangeState(CombatState::Hit);

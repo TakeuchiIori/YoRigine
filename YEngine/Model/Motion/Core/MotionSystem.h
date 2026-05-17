@@ -45,7 +45,7 @@ public:
 	// アクションレイヤー（上半身用）の再生制御とマスク
 	// ------------------------------------------------------------
 	void PlayUpperAnimation(Motion* animation, MotionPlayMode mode = MotionPlayMode::Once);
-	void StopUpperAnimation();
+	void StopUpperAnimation(float blendOutDuration = 0.0f);
 
 	// ============================================================
 	// コールバック
@@ -87,6 +87,7 @@ public:
 	const std::unordered_set<std::string>& GetUpperBodyMask() const { return upperBodyBoneMask_; }
 
 	bool IsUpperAnimationFinished() const { return isUpperFinished_; }
+	bool IsUpperBlendingOut() const { return isUpperBlendingOut_; }
 	float GetUpperAnimationTime() const { return upperAnimationTime_; }
 	Motion* GetUpperAnimation() const { return upperAnimation_; }
 
@@ -143,4 +144,11 @@ private:
 	// 上半身アニメーションの影響を受けるボーン名のセット
 	std::unordered_set<std::string> upperBodyBoneMask_;
 	float upperMotionSpeed_ = 1.0f;  // 上半身アニメーション用の独立したモーション速度
+
+	// 上半身アニメーションのブレンドアウト用
+	bool isUpperBlendingOut_ = false;
+	float upperBlendOutTimer_ = 0.0f;
+	float upperBlendOutDuration_ = 0.0f;
+	Motion* blendOutUpperAnimation_ = nullptr;  // ブレンドアウト中に保持するアニメーション
+	float blendOutUpperAnimTime_ = 0.0f;        // ブレンドアウト開始時のアニメーション時間
 };

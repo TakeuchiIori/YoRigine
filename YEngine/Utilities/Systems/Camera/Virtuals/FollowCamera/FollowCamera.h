@@ -40,6 +40,9 @@ public:
 	void ChangeState(std::unique_ptr<CameraState> newState);
 	void GetDefaultCameraParams(Vector3& outPos, Vector3& outRot, float& outFov) const;
 
+	// カメラシェイクを開始する
+	void StartShake(float intensity, float duration);
+
 	void UpdateInput();
 	void FollowProcess();
 
@@ -95,6 +98,8 @@ private:
 	// ============================================================
 	// カメラシェイク
 	// ============================================================
+	void UpdateShake();
+
 	Vector3 shakeOffset_ = { 0.0f, 0.0f, 0.0f };
 	float shakeIntensity_ = 0.0f;
 	float shakeDuration_ = 0.0f;

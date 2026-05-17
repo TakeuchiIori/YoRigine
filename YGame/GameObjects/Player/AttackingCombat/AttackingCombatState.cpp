@@ -100,7 +100,7 @@ void AttackingCombatState::OnExit() {
 	// 状態終了時に上半身の攻撃アニメーションを確実に停止する
 	auto* model = player->GetObject3d()->GetModel();
 	if (model && model->GetMotionSystem()) {
-		model->GetMotionSystem()->StopUpperAnimation();
+		model->GetMotionSystem()->StopUpperAnimation(0.15f);
 	}
 
 	player->GetSword()->StopTrail();

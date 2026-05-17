@@ -13,6 +13,7 @@
 #include <Systems/GameTime/GameTime.h>
 #include <Systems/Camera/CameraDirector.h>
 #include <Collision/Core/CollisionTypeIdDef.h>
+#include <cstdlib>
 
 // ============================================================
 // 初期化処理
@@ -134,8 +135,9 @@ void FollowCamera::FollowProcess() {
 	Vector3 safePos = collisionResolver_.Resolve(idealCameraPos, targetPivot);
 
 	// ------------------------------------------------------------
-	// 最終的な座標の適用（最後にカメラシェイクの揺れを足す）
+	// シェイクの更新と最終座標の適用
 	// ------------------------------------------------------------
+	UpdateShake();
 	transform_.translate = safePos + shakeOffset_;
 }
 
@@ -340,5 +342,40 @@ void FollowCamera::Load(const nlohmann::json& j) {
 			battleStartState_ = std::make_shared<BattleStartCameraState>();
 		}
 		battleStartState_->Load(j["battleStartState"]);
+	}
+}
+
+// ============================================================
+// カメラシェイク開始
+// ============================================================
+void FollowCamera::StartShake(float intensity, float duration) {
+	shakeIntensity_ = intensity;
+	shakeDuration_ = duration;
+	shakeTimer_ = 0.0f;
+}
+
+// ============================================================
+// カメラシェイク更新（減衰するランダム揺れ）
+// ============================================================
+void FollowCamera::UpdateShake() {
+	if (shakeTimer_ < shakeDuration_) {
+		shakeTimer_ += YoRigine::GameTime::GetUnscaledDeltaTime();
+
+		// 時間経過で揺れが弱まる減衰係数
+		float decay = 1.0f - (shakeTimer_ / shakeDuration_);
+		if (decay < 0.0f) decay = 0.0f;
+
+		// -1.0 〜 1.0 のランダム値
+		float rx = ((std::rand() % 2001) - 1000) / 1000.0f;
+		float ry = ((std::rand() % 2001) - 1000) / 1000.0f;
+
+		shakeOffset_ = {
+			rx * shakeIntensity_ * decay,
+			ry * shakeIntensity_ * decay,
+			0.0f
+		};
+	}
+	else {
+		shakeOffset_ = { 0.0f, 0.0f, 0.0f };
 	}
 }
