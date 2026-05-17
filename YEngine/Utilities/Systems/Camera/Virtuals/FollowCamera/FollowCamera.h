@@ -5,6 +5,8 @@
 #include "BattleStartCameraState.h"
 #include "../../CameraCollisionResolver.h"
 
+
+class BaseCollider;
 // ============================================================
 // デバッグカメラクラス(ターゲットを追従するカメラ)
 // ============================================================
@@ -43,8 +45,19 @@ public:
 	// カメラシェイクを開始する
 	void StartShake(float intensity, float duration);
 
+	// ズーム（FOV変更）演出
+	void StartZoom(float targetFov, float duration);
+	void UpdateZoom();
+
 	void UpdateInput();
 	void FollowProcess();
+
+	// ============================================================
+	// マルチロックオンシステム
+	// ============================================================
+	void UpdateLockOn();
+	void SwitchLockOnTarget(int direction);
+	BaseCollider* GetLockedTarget() const { return lockedTarget_; }
 
 	// ============================================================
 	// 戦闘開始演出
@@ -106,12 +119,26 @@ private:
 	float shakeTimer_ = 0.0f;
 
 	// ============================================================
+	// ズーム演出
+	// ============================================================
+	float baseFovY_ = 0.45f;
+	float targetZoomFov_ = 0.45f;
+	float zoomDuration_ = 0.0f;
+	float zoomTimer_ = 0.0f;
+
+	// ============================================================
 	// カメラの回転制限（ラジアン）
 	// ============================================================
 	float minPitch_ = -0.2f; // 見上げの限界
 	float maxPitch_ = 1.2f; // 見下ろしの限界
 
 	// ============================================================
+	// ロックオン
+	// ============================================================
+	BaseCollider* lockedTarget_ = nullptr;
+	bool isLockOn_ = false;
+	float lockOnSwitchCooldown_ = 0.0f;
+
 	// その他
 	// ============================================================
 	bool isPreviewMode_ = false;

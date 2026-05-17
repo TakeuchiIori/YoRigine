@@ -67,6 +67,7 @@ namespace YoRigine {
 			PadType type_;
 			State state_;
 			State statePre_;
+			float vibrationTimer_ = 0.0f;
 		};
 
 	public:
@@ -112,6 +113,7 @@ namespace YoRigine {
 		bool GetJoystickStatePrevious(int32_t stickNo, XINPUT_STATE& out) const;
 		void SetJoystickDeadZone(int32_t stickNo, int32_t deadZoneL, int32_t deadZoneR);
 		void SetJoystickVibration(int32_t stickNo, uint16_t leftMotorSpeed, uint16_t rightMotorSpeed);
+		void StartVibration(int32_t stickNo, uint16_t leftMotorSpeed, uint16_t rightMotorSpeed, float duration);
 		float GetJoystickAngle(int32_t stickNo);
 		size_t GetNumberOfJoysticks();
 		void CalibrateJoystick(int32_t stickNo);

@@ -1,17 +1,53 @@
 {
     "currentSceneState": {
         "customData": {
-            "currentEnemyGroup": "Mushnub_Evolved",
-            "playerHpRatio": 1.0,
-            "stats": {
-                "battleDuration": 13.656991958618164,
-                "droppedItems": [],
-                "enemiesDefeated": 1,
-                "expGained": 0,
-                "goldGained": 0
+            "activeEnemies": [
+                {
+                    "id": "Alien",
+                    "position": {
+                        "x": -8.441164016723633,
+                        "y": 0.0,
+                        "z": -35.904354095458984
+                    }
+                },
+                {
+                    "id": "GreenSpikyBlob",
+                    "position": {
+                        "x": 12.958175659179688,
+                        "y": 0.0,
+                        "z": -24.48630714416504
+                    }
+                },
+                {
+                    "id": "Alien",
+                    "position": {
+                        "x": -30.309978485107422,
+                        "y": 0.0,
+                        "z": 0.5925652384757996
+                    }
+                },
+                {
+                    "id": "NewEnemy_2",
+                    "position": {
+                        "x": -19.672040939331055,
+                        "y": 0.0,
+                        "z": 24.154598236083984
+                    }
+                }
+            ],
+            "cameraMode": 3,
+            "cameraPosition": {
+                "x": 2.4906864166259766,
+                "y": 18.71775245666504,
+                "z": 0.6860618591308594
+            },
+            "playerPosition": {
+                "x": -18.707582473754883,
+                "y": 3.460384423448204e-09,
+                "z": 22.342086791992188
             }
         },
-        "sceneName": "Battle",
-        "timestamp": 1779033933
+        "sceneName": "Field",
+        "timestamp": 1779037143
     }
 }

@@ -1,4 +1,5 @@
 #include "Input.h"
+#include <Systems/GameTime/GameTime.h>
 
 static const BYTE TRIGGER_THRESHOLD = 0;
 
@@ -99,6 +100,15 @@ namespace YoRigine {
 					// トリガーのデッドゾーン処理
 					gamepad.bLeftTrigger = (gamepad.bLeftTrigger < XINPUT_GAMEPAD_TRIGGER_THRESHOLD) ? 0 : gamepad.bLeftTrigger;
 					gamepad.bRightTrigger = (gamepad.bRightTrigger < XINPUT_GAMEPAD_TRIGGER_THRESHOLD) ? 0 : gamepad.bRightTrigger;
+				}
+				
+				// 振動タイマー更新
+				if (joystick.vibrationTimer_ > 0.0f) {
+					joystick.vibrationTimer_ -= YoRigine::GameTime::GetUnscaledDeltaTime();
+					if (joystick.vibrationTimer_ <= 0.0f) {
+						joystick.vibrationTimer_ = 0.0f;
+						SetJoystickVibration(i, 0, 0);
+					}
 				}
 			}
 		}
@@ -305,6 +315,16 @@ namespace YoRigine {
 			vibration.wRightMotorSpeed = rightMotorSpeed;
 			XInputSetState(stickNo, &vibration);
 		}
+	}
+
+	/// <summary>
+	/// ジョイスティックの振動を指定時間実行する
+	/// </summary>
+	void Input::StartVibration(int32_t stickNo, uint16_t leftMotorSpeed, uint16_t rightMotorSpeed, float duration)
+	{
+		if (stickNo < 0 || stickNo >= devJoysticks_.size()) return;
+		SetJoystickVibration(stickNo, leftMotorSpeed, rightMotorSpeed);
+		devJoysticks_[stickNo].vibrationTimer_ = duration;
 	}
 
 	/// <summary>

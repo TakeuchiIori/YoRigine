@@ -339,7 +339,29 @@ void BattleEnemy::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 ヒット中
 //========================================================================*/
 void BattleEnemy::OnCollision([[maybe_unused]] BaseCollider* self, [[maybe_unused]] BaseCollider* other) {
+	if (!isAlive_) return;
 
+	// 敵同士の押し出し処理（重なり防止）
+	if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kBattleEnemy)) {
+		Vector3 otherPos = other->GetWorldTransform().translate_;
+		Vector3 myPos = wt_.translate_;
+
+		Vector3 pushDir = myPos - otherPos;
+		pushDir.y = 0.0f; // 水平方向のみ
+
+		float dist = Length(pushDir);
+		if (dist < 0.001f) {
+			// 完全に重なっている場合はランダムな方向にずらす
+			pushDir = { ((rand() % 100) - 50) * 0.01f, 0.0f, ((rand() % 100) - 50) * 0.01f };
+			if (Length(pushDir) < 0.001f) pushDir = {1.0f, 0.0f, 0.0f};
+		}
+		
+		pushDir = Normalize(pushDir);
+		
+		// 押し出し係数
+		float pushForce = 2.5f * YoRigine::GameTime::GetDeltaTime(); 
+		wt_.translate_ += pushDir * pushForce;
+	}
 }
 
 /*==========================================================================
