@@ -51,6 +51,9 @@ void FieldEnemy::Initialize(Camera* camera) {
 	// Json初期化
 	InitJson();
 
+	alertUI_ = std::make_unique<EnemyAlert>(this, camera_);
+	alertUI_->Initialize();
+
 }
 
 /// <summary>
@@ -185,6 +188,10 @@ void FieldEnemy::Update() {
 			light->distance = enemyData_.viewDistance;
 		}
 	}
+
+		alertUI_->Update();
+	//if (logicalState_ == FieldEnemyState::Alert) {
+	//}
 }
 
 /// <summary>
@@ -381,6 +388,15 @@ void FieldEnemy::DrawLine(Line* line) {
 		enemyData_.viewDistance,
 		enemyData_.viewAngle
 	);
+}
+
+
+void FieldEnemy::DrawUI(){
+	if (logicalState_ != FieldEnemyState::Despawn) {
+		if(obj_) {
+			alertUI_->Draw();
+		}
+	}
 }
 
 void FieldEnemy::SetLightActive(bool isActive)

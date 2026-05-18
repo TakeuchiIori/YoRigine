@@ -74,6 +74,9 @@ public:
 	void DrawCollision();
 	void DrawLine(Line* line);
 
+	// UI描画
+	void DrawUI();
+
 	// 終了処理
 	void Finalize();
 

@@ -974,6 +974,15 @@ void FieldEnemyManager::DrawLine(Line* line)
 	}
 }
 
+void FieldEnemyManager::DrawUI()
+{
+	for (auto& enemy : fieldEnemies_) {
+		if (enemy && enemy->IsActive()) {
+			enemy->DrawUI();
+		}
+	}
+}
+
 /// <summary>
 /// 終了処理（全データのクリア）
 /// </summary>

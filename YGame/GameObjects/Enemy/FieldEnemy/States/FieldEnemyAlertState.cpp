@@ -9,7 +9,7 @@
 void FieldEnemyAlertState::Enter(FieldEnemy& enemy) {
 	enemy.SetLogicalState(FieldEnemyState::Alert);
 	timer_ = 0.0f;
-
+	
 	// ここに「！」エフェクト・SE 再生などを追加できます
 	Logger("[FieldEnemy] ！ プレイヤーを発見！\n");
 }

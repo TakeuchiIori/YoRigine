@@ -1,10 +1,12 @@
 #pragma once
 #include "../Generators/Object3D/BaseObject.h"
 #include "../IEnemyState.h"
+#include "Graphics/Drawer/LineManager/Line.h"
+#include <UI/Alert/EnemyAlert.h>
+
+#include <vector>
 #include <string>
 #include <memory>
-#include <vector>
-#include "Graphics/Drawer/LineManager/Line.h"
 
 // 状態
 enum class FieldEnemyState {
@@ -109,6 +111,7 @@ public:
 	void DrawShadow();
 	void DrawCollision() override;
 	void DrawLine(Line* line);
+	void DrawUI();
 
 	// ライトの有効/無効を強制的に切り替える
 	void SetLightActive(bool isActive);
@@ -210,6 +213,7 @@ private:
 	std::unique_ptr<IEnemyState<FieldEnemy>> currentState_;
 	float stateTimer_ = 0.0f;
 	FieldEnemyState logicalState_ = FieldEnemyState::Patrol;
+	std::unique_ptr<EnemyAlert> alertUI_;
 
 	FieldEnemyData enemyData_;
 	std::string spawnId_;
