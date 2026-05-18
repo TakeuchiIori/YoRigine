@@ -492,7 +492,17 @@ void FollowCamera::UpdateLockOn() {
 
 	// イージングで滑らかに向かせる
 	float t = std::clamp(10.0f * YoRigine::GameTime::GetUnscaledDeltaTime(), 0.0f, 1.0f);
-	transform_.rotate.y = Lerp(transform_.rotate.y, targetYaw, t);
+	
+	// 最短角度でのLerp (y軸回転のラップアラウンド対応)
+	float diffY = targetYaw - transform_.rotate.y;
+	while (diffY <= -3.14159265f) diffY += 6.2831853f;
+	while (diffY > 3.14159265f) diffY -= 6.2831853f;
+	transform_.rotate.y += diffY * t;
+	
+	// -π ～ π の範囲に収める
+	while (transform_.rotate.y <= -3.14159265f) transform_.rotate.y += 6.2831853f;
+	while (transform_.rotate.y > 3.14159265f) transform_.rotate.y -= 6.2831853f;
+
 	transform_.rotate.x = Lerp(transform_.rotate.x, targetPitch, t);
 }
 
