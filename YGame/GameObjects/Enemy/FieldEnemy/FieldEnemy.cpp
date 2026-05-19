@@ -405,7 +405,7 @@ void FieldEnemy::DrawLine(Line* line) {
 void FieldEnemy::DrawUI(){
 	if (logicalState_ != FieldEnemyState::Despawn) {
 		if(obj_) {
-			alertUI_->Draw();
+			//alertUI_->Draw();
 		}
 	}
 }
