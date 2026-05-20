@@ -63,6 +63,13 @@ void BattleScene::Initialize(Camera* camera, Player* player) {
 	battleField->SetCamera(sceneCamera_);
 	manager->AddArea("BattleField", battleField);
 
+
+	//------------------------------------------------------------
+	// UI初期化
+	//------------------------------------------------------------
+	lockOnUI_ = std::make_unique<LockOnUI>();
+	lockOnUI_->Initialize(player_);
+
 	//------------------------------------------------------------
 	// プレイヤーをエリア制限対象として登録
 	//------------------------------------------------------------
@@ -108,6 +115,10 @@ void BattleScene::Update() {
 	// 視覚効果・オブジェクト更新
 	sprite_->Update();
 	ground_->Update();
+
+	// UI更新
+	lockOnUI_->Update();
+
 	// エリア制限補正
 	AreaManager::GetInstance()->UpdateSingleObject(&player_->GetWT());
 }
@@ -149,6 +160,7 @@ void BattleScene::DrawUI() {
 	//sprite_->Draw();
 	if (battleEnemyManager_) {
 		battleEnemyManager_->DrawUI();
+		lockOnUI_->Draw();
 	}
 }
 
