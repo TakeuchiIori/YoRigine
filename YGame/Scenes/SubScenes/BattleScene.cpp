@@ -288,7 +288,8 @@ void BattleScene::OnExit() {
 	battleState["playerHpRatio"] = 1.0f;
 	syncData->SaveCurrentSceneState("Battle", battleState);
 
-
+	// ロックオンUIを非表示にする
+	lockOnUI_->SetIsVisible(false);
 	// シーンから抜ける時に、強制的に敵を全削除する
 	if (battleEnemyManager_) {
 		battleEnemyManager_->RemoveAllBattleEnemies();
