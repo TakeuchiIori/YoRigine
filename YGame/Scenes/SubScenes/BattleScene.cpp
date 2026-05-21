@@ -10,6 +10,7 @@
 #include <Editor/Editor.h>
 #include "Particle/ParticleManager.h"
 
+#include <UI/Damage/DamageNumberManager.h>
 #ifdef USE_IMGUI
 #include "imgui.h"
 #endif
@@ -70,6 +71,8 @@ void BattleScene::Initialize(Camera* camera, Player* player) {
 	lockOnUI_ = std::make_unique<LockOnUI>();
 	lockOnUI_->Initialize(player_);
 
+	DamageNumberManager::GetInstance()->Initialize();
+
 	//------------------------------------------------------------
 	// プレイヤーをエリア制限対象として登録
 	//------------------------------------------------------------
@@ -118,6 +121,7 @@ void BattleScene::Update() {
 
 	// UI更新
 	lockOnUI_->Update();
+	DamageNumberManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime(),sceneCamera_->GetViewProjectionMatrix());
 
 	// エリア制限補正
 	AreaManager::GetInstance()->UpdateSingleObject(&player_->GetWT());
@@ -160,6 +164,7 @@ void BattleScene::DrawUI() {
 	//sprite_->Draw();
 	if (battleEnemyManager_) {
 		battleEnemyManager_->DrawUI();
+		DamageNumberManager::GetInstance()->Draw();
 		lockOnUI_->Draw();
 	}
 }

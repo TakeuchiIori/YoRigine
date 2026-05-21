@@ -18,6 +18,8 @@
 #include "States/BattleRecoveryState.h"
 #include "Particle/YEmitterGroupManager.h"
 
+#include <UI/Damage/DamageNumberManager.h>
+
 /*==========================================================================
 デストラクタ
 //========================================================================*/
@@ -277,8 +279,18 @@ void BattleEnemy::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 	if (isAlive_ && !isInvincible_) {
 		// 攻撃を食らった時
 		if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon)) {
-			TakeDamage(static_cast<int>(player_->GetCombat()->GetCombo()->GetCurrentDamage()));
+			// --------------------- ダメージの処理 --------------------- //
+			int damage = static_cast<int>(player_->GetCombat()->GetCombo()->GetCurrentDamage());
+			TakeDamage(damage);
 
+			// ダメージ数値UIをスポーン 
+			// ヒット位置は敵の腰〜胸あたり（+1.0f）に表示
+			Vector3 hitPos = wt_.translate_;
+			hitPos.y += 1.0f;
+
+			bool isSine = (player_->GetCombat()->GetComboDamageMultiplier() > 1.0f);
+
+			DamageNumberManager::GetInstance()->SpawnDamage(damage, hitPos, isSine);
 			// --------------------- ヒットエフェクトの処理 --------------------- //
 			//auto* enemyHitEmitterGroup_ = YEmitterGroupManager::GetInstance().GetGroup("EnemyHit");
 			//if (enemyHitEmitterGroup_) {
@@ -289,7 +301,6 @@ void BattleEnemy::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 			//}
 
 			// --------------------- ヒットカウントの処理 --------------------- //
-			// 連続ヒットカウント増加
 			consecutiveHitCount_++;
 			hitCountResetTimer_ = 0.0f;
 			// 連続ヒット数が限界を超えたら回復状態へ
