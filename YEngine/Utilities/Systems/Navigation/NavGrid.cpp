@@ -43,7 +43,7 @@ void NavGrid::Bake(ObjectManager* objectManager)
 
     // kNavObstacle コライダーが付いたオブジェクトを障害物としてマーク
     for (const auto* obj : objectManager->GetAllActiveObjects()) {
-        if (!obj || !obj->collider || !obj->colliderEnabled) continue;
+        if (!obj) continue;
 
         // テンプレートの typeId を確認
         const auto* tmpl = objectManager->FindTemplate(obj->modelName);

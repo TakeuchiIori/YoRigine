@@ -38,13 +38,6 @@ void FieldScene::Initialize(Camera* camera, Player* player) {
 	line_->Initialize();
 	line_->SetCamera(sceneCamera_);
 
-	//------------------------------------------------------------
-	// フィールド敵管理システム初期化
-	//------------------------------------------------------------
-	fieldEnemyManager_ = std::make_unique<FieldEnemyManager>();
-	fieldEnemyManager_->Initialize(sceneCamera_);
-	fieldEnemyManager_->SetPlayer(player_);
-
 	// NavGridConfig をJSONから読み込み（なければデフォルト値を使用）
 	navGridConfig_.aj_.LoadFromFile(navGridConfig_.kDefaultPath); // AutoJson の SaveToFile/LoadFromFile を直接利用
 
@@ -56,9 +49,25 @@ void FieldScene::Initialize(Camera* camera, Player* player) {
 	navGrid_.SetAgentRadius(navGridConfig_.agentRadius);
 	navGrid_.Bake(ObjectManager::GetInstance());
 	navPathfinder_.SetNavGrid(&navGrid_);
-
+	int blockedCount = 0;
+	for (const auto& cell : navGrid_.GetCells()) {
+		if (!cell.walkable) ++blockedCount;
+	}
+	char buf[128];
+	sprintf_s(buf, "[NavGrid] 通行不可セル: %d / %d\n",
+		blockedCount,
+		navGrid_.GetWidthCells() * navGrid_.GetDepthCells());
+	Logger(buf);
+	//------------------------------------------------------------
+	// フィールド敵管理システム初期化
+	//------------------------------------------------------------
+	fieldEnemyManager_ = std::make_unique<FieldEnemyManager>();
 	// FieldEnemyManager に NavPathfinder を渡す
 	fieldEnemyManager_->SetNavPathfinder(&navPathfinder_);
+	fieldEnemyManager_->Initialize(sceneCamera_);
+	fieldEnemyManager_->SetPlayer(player_);
+
+
 
 	// 敵エンカウント時の詳細コールバック登録
 	fieldEnemyManager_->SetEncounterDetailCallback([this](const EncountInfo& encounterInfo) {
@@ -479,5 +488,14 @@ bool FieldScene::AreAllEnemiesDefeated() const {
 void FieldScene::Finalize() {
 	if (fieldEnemyManager_) {
 		fieldEnemyManager_->Finalize();
+	}
+}
+
+void FieldScene::RebakeNavGrid()
+{
+	navGrid_.Bake(ObjectManager::GetInstance());
+	// 全敵の経路をクリア（次フレームで再計算される）
+	for (auto* enemy : fieldEnemyManager_->GetActiveFieldEnemies()) {
+		enemy->ClearNavPath();
 	}
 }

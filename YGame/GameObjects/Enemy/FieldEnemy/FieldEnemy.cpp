@@ -226,6 +226,14 @@ void FieldEnemy::ApplyUpdatedData(const FieldEnemyData& data)
 	}
 }
 
+Vector3 FieldEnemy::GetCurrentWaypoint() const
+{
+	if (navPathIndex_ < static_cast<int>(navPath_.size())) {
+		return navPath_[navPathIndex_];
+	}
+	// パスが空またはインデックス超過時はその場にとどまる
+	return wt_.translate_;
+}
 // ============================================================
 // プレイヤーの位置を取得するユーティリティ
 // ============================================================

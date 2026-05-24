@@ -1,7 +1,23 @@
 {
+    "colliderTemplates": {
+        "Bell_Tower.obj": {
+            "offset": [
+                0.0,
+                9.199999809265137,
+                0.0
+            ],
+            "size": [
+                10.100000381469727,
+                18.600000381469727,
+                9.449999809265137
+            ],
+            "typeId": 8
+        }
+    },
     "objects": [
         {
             "animationName": "",
+            "colliderEnabled": false,
             "filePath": "Blacksmith\\Blacksmith.obj",
             "id": 0,
             "isAnimation": false,
@@ -25,6 +41,7 @@
         },
         {
             "animationName": "",
+            "colliderEnabled": false,
             "filePath": "House_2\\House_2.obj",
             "id": 1,
             "isAnimation": false,
@@ -48,6 +65,7 @@
         },
         {
             "animationName": "",
+            "colliderEnabled": false,
             "filePath": "Bell_Tower\\Bell_Tower.obj",
             "id": 2,
             "isAnimation": false,
@@ -71,6 +89,7 @@
         },
         {
             "animationName": "",
+            "colliderEnabled": false,
             "filePath": "House_1\\House_1.obj",
             "id": 3,
             "isAnimation": false,
@@ -94,6 +113,7 @@
         },
         {
             "animationName": "",
+            "colliderEnabled": false,
             "filePath": "Blacksmith\\Blacksmith.obj",
             "id": 4,
             "isAnimation": false,
@@ -117,6 +137,7 @@
         },
         {
             "animationName": "",
+            "colliderEnabled": false,
             "filePath": "House_2\\House_2.obj",
             "id": 5,
             "isAnimation": false,
@@ -140,6 +161,7 @@
         },
         {
             "animationName": "",
+            "colliderEnabled": false,
             "filePath": "Ground\\Ground.obj",
             "id": 6,
             "isAnimation": false,
@@ -160,7 +182,31 @@
                 0.05000000074505806,
                 0.10000000149011612
             ]
+        },
+        {
+            "animationName": "",
+            "colliderEnabled": true,
+            "filePath": "Bell_Tower\\Bell_Tower.obj",
+            "id": 7,
+            "isAnimation": false,
+            "modelName": "Bell_Tower.obj",
+            "parentID": -1,
+            "position": [
+                -20.5,
+                0.0,
+                0.0
+            ],
+            "rotate": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                5.110000133514404,
+                5.570000171661377,
+                6.610000133514404
+            ]
         }
     ],
-    "version": 1
+    "version": 2
 }

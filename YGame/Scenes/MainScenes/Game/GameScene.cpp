@@ -350,6 +350,8 @@ void GameScene::DrawObject() {
 /// サブシーンのライン描画
 /// </summary>
 void GameScene::DrawLine() {
+
+	YoRigine::ModelManipulator::GetInstance()->DrawLine();
 	if (subSceneManager_) {
 		subSceneManager_->DrawLine();
 	}
