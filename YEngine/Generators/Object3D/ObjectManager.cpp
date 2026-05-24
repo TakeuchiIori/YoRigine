@@ -381,3 +381,77 @@ void ObjectManager::InitializePlacedObject(
 	}
 	UpdateObjectTransform(obj);
 }
+
+//=============================================================================
+// コライダーテンプレート管理
+//=============================================================================
+
+ObjectManager::ColliderTemplate& ObjectManager::GetOrCreateTemplate(const std::string& modelName)
+{
+	// 存在しなければデフォルト値で新規作成して返す
+	return colliderTemplates_[modelName];
+}
+
+ObjectManager::ColliderTemplate* ObjectManager::FindTemplate(const std::string& modelName)
+{
+	auto it = colliderTemplates_.find(modelName);
+	return (it != colliderTemplates_.end()) ? &it->second : nullptr;
+}
+
+const ObjectManager::ColliderTemplate* ObjectManager::FindTemplate(const std::string& modelName) const
+{
+	auto it = colliderTemplates_.find(modelName);
+	return (it != colliderTemplates_.end()) ? &it->second : nullptr;
+}
+
+void ObjectManager::ApplyColliderTemplate(PlacedObject& obj)
+{
+	if (!obj.collider) return;
+
+	// コライダーが無効なら判定を切って終わり
+	if (!obj.colliderEnabled) {
+		obj.collider->SetCollisionEnabled(false);
+		return;
+	}
+
+	// テンプレートが未登録ならデフォルト設定のまま有効化
+	const ColliderTemplate* tmpl = FindTemplate(obj.modelName);
+	if (!tmpl) {
+		obj.collider->SetCollisionEnabled(true);
+		obj.collider->SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kNone));
+		return;
+	}
+
+	// テンプレートの設定を反映
+	obj.collider->SetCollisionEnabled(true);
+	obj.collider->SetIsStatic(true); // 配置オブジェクトは静的扱い
+	obj.collider->SetTypeID(static_cast<uint32_t>(tmpl->typeId));
+
+	// AABBサイズをテンプレートの size / offset で更新
+	// aabbOffset_ の min/max で中心オフセット付きのAABBを表現する
+	if (auto* aabb = dynamic_cast<AABBCollider*>(obj.collider.get())) {
+		const Vector3 half = tmpl->size * 0.5f;
+		aabb->aabbOffset_.min = tmpl->offset - half;
+		aabb->aabbOffset_.max = tmpl->offset + half;
+	}
+}
+
+void ObjectManager::ApplyTemplateToAll(const std::string& modelName)
+{
+	// 同名モデルの全オブジェクトにテンプレートを反映
+	for (auto& [id, obj] : idToObject_) {
+		if (obj && obj->modelName == modelName) {
+			ApplyColliderTemplate(*obj);
+		}
+	}
+}
+
+void ObjectManager::SetColliderEnabledAll(const std::string& modelName, bool enabled)
+{
+	for (auto& [id, obj] : idToObject_) {
+		if (obj && obj->modelName == modelName) {
+			obj->colliderEnabled = enabled;
+			ApplyColliderTemplate(*obj);
+		}
+	}
+}
