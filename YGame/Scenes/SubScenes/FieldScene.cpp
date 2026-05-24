@@ -10,6 +10,7 @@
 #include "Systems/GameTime/GameTime.h"
 #include <Editor/Editor.h>
 #include "Debugger/Logger.h"
+#include <Object3D/ObjectManager.h>
 #include "Collision/AreaCollision/Base/AreaManager.h"
 
 #ifdef USE_IMGUI
@@ -44,6 +45,21 @@ void FieldScene::Initialize(Camera* camera, Player* player) {
 	fieldEnemyManager_->Initialize(sceneCamera_);
 	fieldEnemyManager_->SetPlayer(player_);
 
+	// NavGridConfig をJSONから読み込み（なければデフォルト値を使用）
+	navGridConfig_.aj_.LoadFromFile(navGridConfig_.kDefaultPath); // AutoJson の SaveToFile/LoadFromFile を直接利用
+
+	// NavGrid 初期化＆ベイク（全設定値がJSONから取得される）
+	navGrid_.Initialize(
+		navGridConfig_.worldMinX, navGridConfig_.worldMaxX,
+		navGridConfig_.worldMinZ, navGridConfig_.worldMaxZ,
+		navGridConfig_.cellSize);
+	navGrid_.SetAgentRadius(navGridConfig_.agentRadius);
+	navGrid_.Bake(ObjectManager::GetInstance());
+	navPathfinder_.SetNavGrid(&navGrid_);
+
+	// FieldEnemyManager に NavPathfinder を渡す
+	fieldEnemyManager_->SetNavPathfinder(&navPathfinder_);
+
 	// 敵エンカウント時の詳細コールバック登録
 	fieldEnemyManager_->SetEncounterDetailCallback([this](const EncountInfo& encounterInfo) {
 		HandleDetailedEncounter(encounterInfo);
@@ -62,6 +78,31 @@ void FieldScene::Initialize(Camera* camera, Player* player) {
 #ifdef USE_IMGUI
 	Editor::GetInstance()->RegisterGameUI("フィールドモード:デバッグ情報",
 		[this]() { fieldEnemyManager_->ShowDebugInfo(); }, "Game");
+
+	// NavGridConfig エディター（Editor::RegisterGameUI で登録）
+	Editor::GetInstance()->RegisterGameUI("NavGrid Config", [this]() {
+		ImGui::Checkbox("NavGrid デバッグ表示", &showNavGridDebug_);
+		ImGui::SameLine();
+		ImGui::TextDisabled("赤=通行不可  白=範囲境界");
+		ImGui::Separator();
+		if (ImGui::CollapsingHeader("NavGrid Config")) {
+			navGridConfig_.aj_.ShowImGui("NavGridConfig");
+			ImGui::Separator();
+			if (ImGui::Button("Rebake NavGrid")) {
+				// 設定を変更したらここでベイクし直す
+				navGrid_.Initialize(
+					navGridConfig_.worldMinX, navGridConfig_.worldMaxX,
+					navGridConfig_.worldMinZ, navGridConfig_.worldMaxZ,
+					navGridConfig_.cellSize);
+				navGrid_.SetAgentRadius(navGridConfig_.agentRadius);
+				navGrid_.Bake(ObjectManager::GetInstance());
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Save Config")) {
+				navGridConfig_.aj_.SaveToFile(navGridConfig_.kDefaultPath);
+			}
+		}
+		}, "Game");
 #endif
 }
 
@@ -90,7 +131,8 @@ void FieldScene::Update() {
 	if (isFinalBattle != prevFinalBattle) {
 		if (isFinalBattle) {
 			Logger("[FieldScene] これは最後のバトルです！\n");
-		} else {
+		}
+		else {
 			Logger("[FieldScene] まだ最後のバトルではありません。\n");
 		}
 	}
@@ -118,6 +160,40 @@ void FieldScene::DrawLine() {
 	fieldEnemyManager_->DrawLine(line_.get());
 	player_->DrawBone(*line_.get());
 	battleFieldArea_->Draw(line_.get());
+
+	// ── NavGrid デバッグ描画 ─────────────────────────────────────────────
+	// showNavGridDebug_ が true のときだけグリッドを可視化する。
+	// 通行不可セル（障害物）は赤の薄いAABB、通行可能は緑の薄い点で描く。
+	if (showNavGridDebug_ && navGrid_.IsInitialized()) {
+		const int W = navGrid_.GetWidthCells();
+		const int D = navGrid_.GetDepthCells();
+		const float cs = navGrid_.GetCellSize();
+		const float yBase = 0.0f; // 地面のY座標
+
+		for (int gz = 0; gz < D; ++gz) {
+			for (int gx = 0; gx < W; ++gx) {
+				if (!navGrid_.IsWalkable(gx, gz)) {
+					// 通行不可セル → 赤のAABB
+					NavGrid::GridPos gp{ gx, gz };
+					Vector3 center = navGrid_.GridToWorld(gp);
+					Vector3 mn = { center.x - cs * 0.5f, yBase,        center.z - cs * 0.5f };
+					Vector3 mx = { center.x + cs * 0.5f, yBase + 0.1f, center.z + cs * 0.5f };
+					line_->SetColor({ 1.0f, 0.15f, 0.15f, 0.7f });
+					line_->DrawAABB(mn, mx);
+					line_->DrawLine();
+				}
+			}
+		}
+
+		// グリッド全体の外枠（白）
+		const float minX = navGrid_.GetWorldMinX();
+		const float minZ = navGrid_.GetWorldMinZ();
+		const float maxX = minX + W * cs;
+		const float maxZ = minZ + D * cs;
+		line_->SetColor({ 1.0f, 1.0f, 1.0f, 0.4f });
+		line_->DrawAABB({ minX, yBase, minZ }, { maxX, yBase + 0.05f, maxZ });
+		line_->DrawLine();
+	}
 #endif
 }
 
@@ -169,7 +245,8 @@ void FieldScene::OnEnter() {
 		HandleBattleReturn(returnData);
 		syncData->ClearFieldReturnData();
 		Logger("[FieldScene] Field return data applied and cleared\n");
-	} else {
+	}
+	else {
 		Logger("[FieldScene] No field return data (first time or fresh start)\n");
 	}
 
@@ -268,11 +345,13 @@ void FieldScene::HandleDetailedEncounter(const EncountInfo& encounterInfo) {
 		if (remainingGroups <= 1) {
 			isFinalBattle = true;
 			Logger("[FieldScene] ★★★ 最終エンカウントグループです！ ★★★\n");
-		} else {
+		}
+		else {
 			sprintf_s(debugBuffer, "[FieldScene] まだ最終戦ではありません。残りグループ数: %zu\n", remainingGroups - 1);
 			Logger(debugBuffer);
 		}
-	} else {
+	}
+	else {
 		Logger("[FieldScene] エラー: fieldEnemyManager_ が null です！\n");
 	}
 
@@ -334,7 +413,8 @@ void FieldScene::HandleBattleReturn(const FieldReturnData& data) {
 		char buffer[256];
 		sprintf_s(buffer, "[FieldScene] Victory! Defeated enemy: %s\n", data.defeatedEnemyGroup.c_str());
 		Logger(buffer);
-	} else {
+	}
+	else {
 		returnPos += Vector3(0, 0, -2.0f);
 		Logger("[FieldScene] Defeat! Player moved back\n");
 	}

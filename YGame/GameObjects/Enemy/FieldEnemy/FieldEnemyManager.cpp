@@ -3,6 +3,7 @@
 #include "MathFunc.h"
 #include "Systems/GameTime/GameTime.h"
 #include <Loaders/Json/JsonManager.h>
+#include <Loaders/Json/Use/AutoJson.h>
 #include <Debugger/Logger.h>
 #include <fstream>
 #include <filesystem>
@@ -97,7 +98,8 @@ void FieldEnemyManager::UpdateRespawnTimers() {
 		if (it->timer <= 0.0f) {
 			SpawnFieldEnemy(it->spawnData);
 			it = respawnQueue_.erase(it);
-		} else {
+		}
+		else {
 			++it;
 		}
 	}
@@ -135,7 +137,8 @@ void FieldEnemyManager::OnEnemyEncounter(FieldEnemy* enemy) {
 
 	if (!lastEncounterInfo_.battleEnemyIds.empty()) {
 		lastEncounterInfo_.battleEnemyId = lastEncounterInfo_.battleEnemyIds[0];
-	} else {
+	}
+	else {
 		lastEncounterInfo_.battleEnemyId = enemy->GetBattleEnemyId();
 	}
 
@@ -148,7 +151,8 @@ void FieldEnemyManager::OnEnemyEncounter(FieldEnemy* enemy) {
 		for (size_t i = 0; i < lastEncounterInfo_.battleEnemyIds.size(); ++i) {
 			battleInfo += "\n  [" + std::to_string(i + 1) + "] " + lastEncounterInfo_.battleEnemyIds[i];
 		}
-	} else {
+	}
+	else {
 		battleInfo = "単体バトル: " + lastEncounterInfo_.battleEnemyId;
 	}
 
@@ -207,6 +211,7 @@ void FieldEnemyManager::SpawnFieldEnemy(const FieldEnemySpawnData& spawnData) {
 	newEnemy->SetPlayer(player_);
 	newEnemy->SetSpawnId(spawnData.id);
 	newEnemy->SetFieldEnemyManager(this);
+	newEnemy->SetNavPathfinder(navPathfinder_); // NavPathfinder を注入
 	newEnemy->InitializeFieldData(enemyData, spawnData.position);
 
 	//-----------------------------------------
@@ -316,7 +321,8 @@ void FieldEnemyManager::HandleBattleEnd(const std::string& enemyGroup, bool play
 				break;
 			}
 		}
-	} else {
+	}
+	else {
 		for (auto& enemy : fieldEnemies_) {
 			if (enemy && enemy->GetEnemyGroupName() == enemyGroup) {
 				enemy->ResetEncounterState();
@@ -471,100 +477,93 @@ bool FieldEnemyManager::IsLastEncounterGroup(const std::string& enemyGroup) cons
 /// 敵データをJSONファイルに保存
 /// </summary>
 /// <param name="filePath">保存先のファイルパス</param>
+
+// =============================================================================
+// BuildFieldEnemyDataAj
+// FieldEnemyData の全フィールドを AutoJson に登録して返す。
+//
+// FieldEnemyData は unordered_map に格納されたり FieldEnemy::enemyData_ に
+// コピーされたりするためコピー可能である必要がある。
+// AutoJson は unique_ptr を内包するためコピー不可。
+// → FieldEnemyData のメンバに持たせず、I/O 時に一時生成する方式を採用。
+//
+// 注意: 返した AutoJson は第一引数の data の生存期間内に使うこと
+//      （AddGroup のポインタが data のメンバを指しているため）。
+// =============================================================================
+static AutoJson BuildFieldEnemyDataAj(FieldEnemyData& d)
+{
+	AutoJson aj;
+	aj.Add("enemyId", &d.enemyId)
+		.Add("modelPath", &d.modelPath)
+		.Add("battleEnemyId", &d.battleEnemyId)
+		.Add("battleFormation", &d.battleFormation)
+		.Add("battleTypeStr", &d.battleTypeStr)
+		.Add("scale", &d.scale)
+		.Add("patrolRadius", &d.patrolRadius)
+		.Add("patrolSpeed", &d.patrolSpeed)
+		.Add("chaseSpeed", &d.chaseSpeed)
+		.Add("chaseRange", &d.chaseRange)
+		.Add("returnDistance", &d.returnDistance)
+		.Add("pathRefreshInterval", &d.pathRefreshInterval)
+		.Add("viewDistance", &d.viewDistance)
+		.Add("viewAngle", &d.viewAngle)
+		.Add("noiseDetectionRange", &d.noiseDetectionRange)
+		.Add("rotationSpeed", &d.rotationSpeed)
+		.Add("alertDuration", &d.alertDuration)
+		.Add("searchDuration", &d.searchDuration)
+		.Add("searchSweepAngle", &d.searchSweepAngle)
+		.Add("useCustomColor", &d.useCustomColor)
+		.Add("modelColor", &d.modelColor)
+		.Add("useSpotLight", &d.useSpotLight)
+		.Add("spotLightColor", &d.spotLightColor)
+		.Add("spotLightIntensity", &d.spotLightIntensity)
+		.Add("spotLightDecay", &d.spotLightDecay)
+		.Add("spotLightOffset", &d.spotLightOffset)
+		.Add("spotLightPitch", &d.spotLightPitch);
+	return aj;
+}
+
 void FieldEnemyManager::SaveEnemyData(const std::string& filePath) {
 	try {
-		nlohmann::json json;
-		json["fieldEnemies"] = nlohmann::json::array();
-
-		for (const auto& pair : enemyDataMap_) {
-			const auto& data = pair.second;
-			nlohmann::json enemyJson;
-
-			enemyJson["enemyId"] = data.enemyId;
-			enemyJson["modelPath"] = data.modelPath;
-
-			// バトルタイプ
-			std::string typeStr = "Single";
+		// ① enum を文字列に同期
+		for (auto& [id, data] : enemyDataMap_) {
 			switch (data.battleType) {
-			case BattleType::Group: typeStr = "Group"; break;
-			case BattleType::Boss: typeStr = "Boss"; break;
-			default: break;
+			case BattleType::Group: data.battleTypeStr = "Group"; break;
+			case BattleType::Boss:  data.battleTypeStr = "Boss";  break;
+			default:                data.battleTypeStr = "Single"; break;
 			}
-			enemyJson["battleType"] = typeStr;
-
-			// バトル敵ID
-			if (!data.battleEnemyIds.empty()) {
-				enemyJson["battleEnemyIds"] = nlohmann::json::array();
-				for (const auto& id : data.battleEnemyIds) {
-					enemyJson["battleEnemyIds"].push_back(id);
-				}
-			} else {
-				enemyJson["battleEnemyId"] = data.battleEnemyId;
-			}
-
-			enemyJson["battleFormation"] = data.battleFormation;
-
-			// スケール
-			enemyJson["scale"]["x"] = data.scale.x;
-			enemyJson["scale"]["y"] = data.scale.y;
-			enemyJson["scale"]["z"] = data.scale.z;
-
-			// パラメータ
-			enemyJson["patrolRadius"] = data.patrolRadius;
-			enemyJson["patrolSpeed"] = data.patrolSpeed;
-			enemyJson["chaseSpeed"] = data.chaseSpeed;
-			enemyJson["chaseRange"] = data.chaseRange;
-			enemyJson["returnDistance"] = data.returnDistance;
-
-			// 移動パラメータ
-			enemyJson["patrolRadius"] = data.patrolRadius;
-			enemyJson["patrolSpeed"] = data.patrolSpeed;
-			enemyJson["chaseSpeed"] = data.chaseSpeed;
-			enemyJson["chaseRange"] = data.chaseRange;
-			enemyJson["returnDistance"] = data.returnDistance;
-
-			// 視界パラメータ
-			enemyJson["viewDistance"] = data.viewDistance;
-			enemyJson["viewAngle"] = data.viewAngle;
-			enemyJson["noiseDetectionRange"] = data.noiseDetectionRange;
-
-			// 回転・リアクションパラメータ
-			enemyJson["rotationSpeed"] = data.rotationSpeed;
-			enemyJson["alertDuration"] = data.alertDuration;
-			enemyJson["searchDuration"] = data.searchDuration;
-			enemyJson["searchSweepAngle"] = data.searchSweepAngle;
-
-			// カスタムカラー
-			enemyJson["useCustomColor"] = data.useCustomColor;
-			if (data.useCustomColor) {
-				enemyJson["modelColor"]["r"] = data.modelColor.x;
-				enemyJson["modelColor"]["g"] = data.modelColor.y;
-				enemyJson["modelColor"]["b"] = data.modelColor.z;
-				enemyJson["modelColor"]["a"] = data.modelColor.w;
-			}
-
-			// スポットライト
-			enemyJson["useSpotLight"] = data.useSpotLight;
-			enemyJson["spotLightColor"]["r"] = data.spotLightColor.x;
-			enemyJson["spotLightColor"]["g"] = data.spotLightColor.y;
-			enemyJson["spotLightColor"]["b"] = data.spotLightColor.z;
-			enemyJson["spotLightColor"]["a"] = data.spotLightColor.w;
-			enemyJson["spotLightIntensity"] = data.spotLightIntensity;
-			enemyJson["spotLightDecay"] = data.spotLightDecay;
-			enemyJson["spotLightOffset"]["x"] = data.spotLightOffset.x;
-			enemyJson["spotLightOffset"]["y"] = data.spotLightOffset.y;
-			enemyJson["spotLightOffset"]["z"] = data.spotLightOffset.z;
-			enemyJson["spotLightPitch"] = data.spotLightPitch;
-
-
-			json["fieldEnemies"].push_back(enemyJson);
 		}
 
-		// ファイルに保存
-		std::filesystem::create_directories(std::filesystem::path(filePath).parent_path());
-		std::ofstream file(filePath);
-		file << json.dump(4);
-		file.close();
+		// ② 各敵に対して一時AutoJsonを作り AddGroup でネスト登録
+		//    ajList を root より先に宣言することで、root の SaveToFile 中も
+		//    ポインタが有効（ajList は root より後に破棄される）
+		std::vector<AutoJson> ajList;
+		ajList.reserve(enemyDataMap_.size());
+
+		AutoJson root;
+		for (auto& [id, data] : enemyDataMap_) {
+			auto& aj = ajList.emplace_back(BuildFieldEnemyDataAj(data));
+			root.AddGroup(id, aj);
+		}
+
+		std::filesystem::create_directories(
+			std::filesystem::path(filePath).parent_path());
+		root.SaveToFile(filePath);
+
+		// ③ battleEnemyIds を追記（vector<string> は AutoJson 未対応）
+		if (!enemyDataMap_.empty()) {
+			std::ifstream ifs(filePath);
+			nlohmann::json j;
+			ifs >> j;
+			ifs.close();
+			for (const auto& [id, data] : enemyDataMap_) {
+				if (!data.battleEnemyIds.empty()) {
+					j[id]["battleEnemyIds"] = data.battleEnemyIds;
+				}
+			}
+			std::ofstream ofs(filePath);
+			ofs << j.dump(4);
+		}
 
 		Logger("[EnemyEditor] 敵データをファイルに保存: " + filePath + "\n");
 	}
@@ -573,136 +572,117 @@ void FieldEnemyManager::SaveEnemyData(const std::string& filePath) {
 	}
 }
 
+// ============================================================
+// 敵データファイルを読み込み（全エントリ正しく反映）
+// ============================================================
 
-/// <summary>
-/// 敵データファイルを読み込み（未使用・拡張用）
-/// </summary>
-/// <param name="filePath">ファイルパス</param>
 void FieldEnemyManager::LoadEnemyData(const std::string& filePath) {
 	try {
 		std::filesystem::path path(filePath);
-		// ファイルが無かったら終了
+		// ファイル存在チェック
 		if (!std::filesystem::exists(path)) {
 			ThrowError("[FieldEnemyManager] エラー: 敵データファイルが存在しません: " + filePath + "\n");
 			return;
 		}
 
 		std::ifstream file(filePath);
-		// ファイルが開けなかったときも終了
 		if (!file.is_open()) {
 			ThrowError("[FieldEnemyManager] エラー: 敵データファイルを開けません: " + filePath + "\n");
 			return;
 		}
 
 		nlohmann::json json;
-		file >> json;
+		file >> json; // JSONロード
 		file.close();
 
-		// JsonファイルにfiledEnemiesが無い場合も終了
-		if (!json.contains("fieldEnemies") || !json["fieldEnemies"].is_array()) {
-			Logger("[FieldEnemyManager] 無効な敵データ形式: fieldEnemies が見つかりません\n");
+		if (json.empty()) {
+			Logger("[FieldEnemyManager] 敵データが空です\n");
 			return;
 		}
 
-		// 綺麗にしてから読み込み
+		// 一旦クリア
 		enemyDataMap_.clear();
+		enemyDataMap_.reserve(json.size() + 4);
 
-
-		//------------------------------------------------------------
-		//					ここから読み込み開始
-		//------------------------------------------------------------
-
-		for (auto& enemyJson : json["fieldEnemies"]) {
+		// 1エネミーごとに処理
+		for (const auto& [id, jval] : json.items()) {
 			FieldEnemyData data;
-			data.enemyId = enemyJson.value("enemyId", "");
-			data.modelPath = enemyJson.value("modelPath", "");
-			data.battleFormation = enemyJson.value("battleFormation", "");
 
-			// バトルタイプ
-			std::string typeStr = enemyJson.value("battleType", "Single");
-			if (typeStr == "Single") data.battleType = BattleType::Single;
-			else if (typeStr == "Group") data.battleType = BattleType::Group;
-			else if (typeStr == "Boss")  data.battleType = BattleType::Boss;
+			// 文字列・float・bool型など基本パラメータ
+			data.enemyId = jval.value("enemyId", id);
+			data.modelPath = jval.value("modelPath", "");
+			data.battleEnemyId = jval.value("battleEnemyId", "");
+			data.battleFormation = jval.value("battleFormation", "");
+			data.battleTypeStr = jval.value("battleTypeStr", "Single");
+			data.patrolRadius = jval.value("patrolRadius", 1.0f);
+			data.patrolSpeed = jval.value("patrolSpeed", 1.0f);
+			data.chaseSpeed = jval.value("chaseSpeed", 1.0f);
+			data.chaseRange = jval.value("chaseRange", 1.0f);
+			data.returnDistance = jval.value("returnDistance", 10.0f);
+			data.viewDistance = jval.value("viewDistance", 10.0f);
+			data.viewAngle = jval.value("viewAngle", 60.0f);
+			data.noiseDetectionRange = jval.value("noiseDetectionRange", 8.0f);
+			data.rotationSpeed = jval.value("rotationSpeed", 5.0f);
+			data.alertDuration = jval.value("alertDuration", 0.8f);
+			data.searchDuration = jval.value("searchDuration", 3.0f);
+			data.searchSweepAngle = jval.value("searchSweepAngle", 70.0f);
+			data.useCustomColor = jval.value("useCustomColor", false);
+			data.useSpotLight = jval.value("useSpotLight", true);
+			data.spotLightIntensity = jval.value("spotLightIntensity", 1000.0f);
+			data.spotLightDecay = jval.value("spotLightDecay", 0.1f);
+			data.spotLightPitch = jval.value("spotLightPitch", 0.0f);
 
-			// バトル敵ID
-			if (enemyJson.contains("battleEnemyIds")) {
-				data.battleEnemyIds = enemyJson["battleEnemyIds"].get<std::vector<std::string>>();
-			} else {
-				data.battleEnemyId = enemyJson.value("battleEnemyId", "");
+			// スケール/色などJSONオブジェクト型は中のキーごとに
+			if (jval.contains("scale")) {
+				data.scale.x = jval["scale"].value("x", 1.0f);
+				data.scale.y = jval["scale"].value("y", 1.0f);
+				data.scale.z = jval["scale"].value("z", 1.0f);
+			}
+			else {
+				data.scale = Vector3(1.f, 1.f, 1.f);
 			}
 
-			// スケール
-			if (enemyJson.contains("scale")) {
-				auto s = enemyJson["scale"];
-				data.scale.x = s.value("x", 1.0f);
-				data.scale.y = s.value("y", 1.0f);
-				data.scale.z = s.value("z", 1.0f);
+			if (jval.contains("spotLightColor")) {
+				data.spotLightColor.x = jval["spotLightColor"].value("r", 1.0f);
+				data.spotLightColor.y = jval["spotLightColor"].value("g", 1.0f);
+				data.spotLightColor.z = jval["spotLightColor"].value("b", 1.0f);
+				data.spotLightColor.w = jval["spotLightColor"].value("a", 1.0f);
 			}
 
-			// 移動パラメータ
-			data.patrolRadius = enemyJson.value("patrolRadius", 10.0f);
-			data.patrolSpeed = enemyJson.value("patrolSpeed", 1.0f);
-			data.chaseSpeed = enemyJson.value("chaseSpeed", 2.0f);
-			data.chaseRange = enemyJson.value("chaseRange", 20.0f);
-			data.returnDistance = enemyJson.value("returnDistance", 30.0f);
-
-			// 視界パラメータ（既存 JSON に無い場合はデフォルト値を使用）
-			data.viewDistance = enemyJson.value("viewDistance", 15.0f);
-			data.viewAngle = enemyJson.value("viewAngle", 60.0f);
-			data.noiseDetectionRange = enemyJson.value("noiseDetectionRange", 8.0f);
-
-			// 回転・リアクションパラメータ（既存 JSON に無い場合はデフォルト値を使用）
-			data.rotationSpeed = enemyJson.value("rotationSpeed", 5.0f);
-			data.alertDuration = enemyJson.value("alertDuration", 0.8f);
-			data.searchDuration = enemyJson.value("searchDuration", 3.0f);
-			data.searchSweepAngle = enemyJson.value("searchSweepAngle", 70.0f);
-
-
-			// カスタムカラー
-			data.useCustomColor = enemyJson.value("useCustomColor", false);
-			if (data.useCustomColor && enemyJson.contains("modelColor")) {
-				auto c = enemyJson["modelColor"];
-				data.modelColor.x = c.value("r", 1.0f);
-				data.modelColor.y = c.value("g", 1.0f);
-				data.modelColor.z = c.value("b", 1.0f);
-				data.modelColor.w = c.value("a", 1.0f);
-
+			if (jval.contains("spotLightOffset")) {
+				data.spotLightOffset.x = jval["spotLightOffset"].value("x", 0.0f);
+				data.spotLightOffset.y = jval["spotLightOffset"].value("y", 0.0f);
+				data.spotLightOffset.z = jval["spotLightOffset"].value("z", 0.0f);
+			}
+			else {
+				data.spotLightOffset = Vector3(0.0f, 0.0f, 0.0f);
 			}
 
-			// スポットライトパラメータ
-			data.useSpotLight = enemyJson.value("useSpotLight", true);
-			if (enemyJson.contains("spotLightColor")) {
-				auto c = enemyJson["spotLightColor"];
-				data.spotLightColor.x = c.value("r", 1.0f);
-				data.spotLightColor.y = c.value("g", 0.2f);
-				data.spotLightColor.z = c.value("b", 0.2f);
-				data.spotLightColor.w = c.value("a", 1.0f);
+			// vector<string>（複数バトルエネミーIDs）
+			if (jval.contains("battleEnemyIds")) {
+				data.battleEnemyIds = jval["battleEnemyIds"].get<std::vector<std::string>>();
 			}
-			data.spotLightIntensity = enemyJson.value("spotLightIntensity", 5.0f);
-			data.spotLightDecay = enemyJson.value("spotLightDecay", 2.0f);
-			if (enemyJson.contains("spotLightOffset")) {
-				auto o = enemyJson["spotLightOffset"];
-				data.spotLightOffset.x = o.value("x", 0.0f);
-				data.spotLightOffset.y = o.value("y", 1.0f);
-				data.spotLightOffset.z = o.value("z", 0.0f);
+			else {
+				data.battleEnemyIds.clear();
 			}
-			data.spotLightPitch = enemyJson.value("spotLightPitch", -0.2f);
 
-			// map に登録
-			if (!data.enemyId.empty()) {
-				enemyDataMap_[data.enemyId] = data;
-			}
+			// battleTypeStr → enum変換
+			if (data.battleTypeStr == "Group") data.battleType = BattleType::Group;
+			else if (data.battleTypeStr == "Boss") data.battleType = BattleType::Boss;
+			else data.battleType = BattleType::Single;
+
+			// ... 他のパラメータ項目も必要に応じて追加してください ...
+
+			// 最後にMapへ格納
+			enemyDataMap_[id] = data;
 		}
 
-
-		Logger("[FieldEnemyManager] 敵データを読み込みました: " +
-			std::to_string(enemyDataMap_.size()) + " 件\n");
+		Logger("[FieldEnemyManager] 敵データを" + std::to_string(enemyDataMap_.size()) + "件読み込みました\n");
 	}
 	catch (const std::exception& e) {
 		Logger("[FieldEnemyManager] エラー: 敵データ読み込み失敗: " + std::string(e.what()) + "\n");
 	}
 }
-
 /// <summary>
 /// 敵スポーンデータを保存
 /// </summary>
@@ -1031,7 +1011,8 @@ void FieldEnemyManager::ShowEnemyEditor() {
 					for (const auto& id : data.battleEnemyIds) {
 						ImGui::Text("    - %s", id.c_str());
 					}
-				} else {
+				}
+				else {
 					ImGui::Text("  バトル敵: %s", data.battleEnemyId.c_str());
 				}
 				ImGui::Separator();
@@ -1109,7 +1090,8 @@ void FieldEnemyManager::ShowEnemyDataEditor() {
 				editorEnemyData_.battleEnemyId = battleIdBuffer;
 				changed = true;
 			}
-		} else {
+		}
+		else {
 			ImGui::Text("バトル敵IDリスト:");
 			for (size_t i = 0; i < editorEnemyData_.battleEnemyIds.size(); ++i) {
 				ImGui::PushID(static_cast<int>(i));

@@ -3,6 +3,7 @@
 #include "../IEnemyState.h"
 #include "Graphics/Drawer/LineManager/Line.h"
 #include <UI/Alert/EnemyAlert.h>
+#include <Systems/Navigation/NavPathfinder.h>
 
 #include <vector>
 #include <string>
@@ -35,6 +36,7 @@ struct FieldEnemyData {
 
 	// バトルフォーメーション名
 	std::string battleFormation = "default";
+	std::string battleTypeStr = "Single";  // battleType の文字列版（AutoJsonで管理）
 
 	BattleType battleType = BattleType::Single;
 
@@ -50,6 +52,7 @@ struct FieldEnemyData {
 	float returnDistance = 15.0f;
 
 	// ステルス用パラメータ
+	float pathRefreshInterval = 0.3f; // NavMesh経路再計算間隔（秒）。Chase中にプレイヤーが動いたとき
 	float viewDistance = 15.0f;      // 視界の長さ
 	float viewAngle = 60.0f;         // 視野角（中心から左右に30度、計60度）
 	float noiseDetectionRange = 8.0f; // 走っている時に見つかる距離
@@ -176,6 +179,25 @@ public:
 	Vector3 GetPatrolTarget() const { return patrolTarget_; }
 	void SetPatrolTarget(const Vector3& target) { patrolTarget_ = target; }
 
+	// ── Navigation ───────────────────────────────────────────────────────
+	void SetNavPathfinder(NavPathfinder* pf) { navPathfinder_ = pf; }
+	NavPathfinder* GetNavPathfinder() const { return navPathfinder_; }
+
+	// 現在の経路ウェイポイントリストを取得・設定
+	const std::vector<Vector3>& GetNavPath() const { return navPath_; }
+	void SetNavPath(const std::vector<Vector3>& path) { navPath_ = path; navPathIndex_ = 0; }
+	void ClearNavPath() { navPath_.clear(); navPathIndex_ = 0; }
+
+	// 現在のウェイポイントを取得して進める
+	bool HasNavPath() const { return navPathIndex_ < static_cast<int>(navPath_.size()); }
+	Vector3 GetCurrentWaypoint() const;
+	void AdvanceWaypoint() { if (HasNavPath()) ++navPathIndex_; }
+
+	// 経路再計算タイマー
+	void UpdatePathRefreshTimer(float dt) { pathRefreshTimer_ += dt; }
+	bool ShouldRefreshPath(float interval = 0.3f) const { return pathRefreshTimer_ >= interval; }
+	void ResetPathRefreshTimer() { pathRefreshTimer_ = 0.0f; }
+
 	void SetRotationY(float y) { wt_.rotate_.y = y; }
 	float GetRotationY() const { return wt_.rotate_.y; }
 
@@ -232,4 +254,10 @@ private:
 
 	// スポットライト管理用
 	std::string spotLightName_;
+
+	// ── Navigation メンバ ────────────────────────────────────────────────
+	NavPathfinder* navPathfinder_ = nullptr;
+	std::vector<Vector3> navPath_;    // 現在の経路ウェイポイント列
+	int   navPathIndex_ = 0;         // 次に向かうウェイポイントのインデックス
+	float pathRefreshTimer_ = 0.0f;   // 経路再計算タイマー
 };

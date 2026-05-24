@@ -1,5 +1,6 @@
 #pragma once
 #include "FieldEnemy.h"
+#include <Systems/Navigation/NavPathfinder.h>
 #include <memory>
 #include <vector>
 #include <unordered_map>
@@ -121,6 +122,10 @@ public:
 	// プレイヤーを設定
 	void SetPlayer(Player* player);
 
+	// NavPathfinderを設定（FieldSceneから注入）
+	void SetNavPathfinder(NavPathfinder* pf) { navPathfinder_ = pf; }
+	NavPathfinder* GetNavPathfinder() const { return navPathfinder_; }
+
 	// エンカウント発生時の処理（FiledScene内で処理）
 	void SetEncounterDetailCallback(EncounterDetailCallback callback) {
 		encounterDetailCallback_ = callback;
@@ -238,6 +243,9 @@ private:
 	};
 	std::vector<RespawnInfo> respawnQueue_;
 	std::unordered_set<std::string> defeatedEnemyIds_; // 撃破済み敵ID
+
+	// Navigation
+	NavPathfinder* navPathfinder_ = nullptr; // FieldSceneから注入
 
 	// 設定
 	bool isActive_ = true;
