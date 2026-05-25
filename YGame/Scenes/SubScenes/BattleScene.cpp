@@ -165,7 +165,10 @@ void BattleScene::DrawUI() {
 	if (battleEnemyManager_) {
 		battleEnemyManager_->DrawUI();
 		DamageNumberManager::GetInstance()->Draw();
-		lockOnUI_->Draw();
+		
+		if (player_->IsAlive()) {
+			lockOnUI_->Draw();
+		}
 	}
 }
 

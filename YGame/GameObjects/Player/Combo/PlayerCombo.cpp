@@ -90,9 +90,10 @@ AttackData* PlayerCombo::FindBestAttack(AttackType type) {
 	// 現在の段数 = いまから行う攻撃が何段目か
 	int comboStep = GetComboCount();
 
-	// 段数が攻撃データ数以上なら最後のデータ（フィニッシュ）を返す
+	// 段数が攻撃データ数以上なら最初に戻る
 	if (comboStep >= static_cast<int>(attacks.size())) {
-		return const_cast<AttackData*>(&attacks.back());
+		comboChain_.clear();
+		return const_cast<AttackData*>(&attacks[0]);
 	}
 	else {
 		return const_cast<AttackData*>(&attacks[comboStep]);
