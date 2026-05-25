@@ -6,6 +6,40 @@
 #include <numbers>
 #include "Player/Player.h"
 #include <Debugger/Logger.h>
+#include <Object3D/ObjectManager.h>
+#include <Collision/AABB/AABBCollider.h>
+#include <Collision/Core/CollisionTypeIdDef.h>
+
+namespace {
+
+	bool RayIntersectsAABB2D(const Vector3& from, const Vector3& to, const AABB& aabb) {
+		float dx = to.x - from.x;
+		float dz = to.z - from.z;
+		float maxDist = sqrtf(dx * dx + dz * dz);
+		if (maxDist < 1e-6f) return false;
+		dx /= maxDist; dz /= maxDist;
+		float tmin = 0.0f, tmax = maxDist;
+		if (fabsf(dx) < 1e-6f) { if (from.x < aabb.min.x || from.x > aabb.max.x) return false; } else { float t1 = (aabb.min.x - from.x) / dx, t2 = (aabb.max.x - from.x) / dx; if (t1 > t2)std::swap(t1, t2); tmin = std::max(tmin, t1); tmax = std::min(tmax, t2); if (tmin > tmax)return false; }
+		if (fabsf(dz) < 1e-6f) { if (from.z < aabb.min.z || from.z > aabb.max.z) return false; } else { float t1 = (aabb.min.z - from.z) / dz, t2 = (aabb.max.z - from.z) / dz; if (t1 > t2)std::swap(t1, t2); tmin = std::max(tmin, t1); tmax = std::min(tmax, t2); if (tmin > tmax)return false; }
+		return tmax >= 0.0f;
+	}
+
+	bool IsBlockedByObstacle(const Vector3& from, const Vector3& to) {
+		ObjectManager* om = ObjectManager::GetInstance();
+		if (!om) return false;
+		for (const auto* obj : om->GetAllActiveObjects()) {
+			if (!obj || !obj->collider || !obj->colliderEnabled) continue;
+			const auto* tmpl = om->FindTemplate(obj->modelName);
+			if (!tmpl) continue;
+			if (tmpl->typeId != CollisionTypeIdDef::kNavObstacle &&
+				tmpl->typeId != CollisionTypeIdDef::kStaticWall) continue;
+			const auto* aabb = dynamic_cast<const AABBCollider*>(obj->collider.get());
+			if (aabb && RayIntersectsAABB2D(from, to, aabb->GetAABB())) return true;
+		}
+		return false;
+	}
+
+} // anonymous namespace
 
 /// <summary>
 /// 巡回状態に入った際の初期化処理
@@ -36,8 +70,7 @@ void FieldEnemyPatrolState::Update(FieldEnemy& enemy, float dt) {
 /// </summary>
 void FieldEnemyPatrolState::Exit([[maybe_unused]] FieldEnemy& enemy) {}
 
-void FieldEnemyPatrolState::GenerateNewPatrolTarget(FieldEnemy& enemy)
-{
+void FieldEnemyPatrolState::GenerateNewPatrolTarget(FieldEnemy& enemy) {
 	// 既存のランダム生成ロジックで目標座標を決める
 	std::random_device rd;
 	std::mt19937 gen(rd());
@@ -69,8 +102,7 @@ void FieldEnemyPatrolState::GenerateNewPatrolTarget(FieldEnemy& enemy)
 /// <summary>
 /// 現在の目標地点に到達したかを判定する
 /// </summary>
-bool FieldEnemyPatrolState::HasReachedTarget(const FieldEnemy& enemy) const
-{
+bool FieldEnemyPatrolState::HasReachedTarget(const FieldEnemy& enemy) const {
 	// NavPath が残っている間はウェイポイント側で管理するので false
 	if (enemy.HasNavPath()) return false;
 
@@ -79,8 +111,7 @@ bool FieldEnemyPatrolState::HasReachedTarget(const FieldEnemy& enemy) const
 	return Length(dir) < 0.5f;
 }
 
-void FieldEnemyPatrolState::MoveTowardsTarget(FieldEnemy& enemy, float dt)
-{
+void FieldEnemyPatrolState::MoveTowardsTarget(FieldEnemy& enemy, float dt) {
 	const auto& data = enemy.GetEnemyData();
 
 	// NavPath がある → ウェイポイント追従
@@ -141,13 +172,7 @@ void FieldEnemyPatrolState::CheckForPlayer(FieldEnemy& enemy) {
 				* (180.0f / std::numbers::pi_v<float>);
 
 			if (angle <= enemy.GetEnemyData().viewAngle * 0.5f) {
-				// ── 視線チェック追加 ──────────────────────────────
-				const NavPathfinder* pf = enemy.GetNavPathfinder();
-				if (pf && pf->GetNavGrid()) {
-					isDetected = pf->GetNavGrid()->HasLineOfSight(enemyPos, playerPos);
-				} else {
-					isDetected = true; // NavGrid未設定なら従来通り
-				}
+				isDetected = !IsBlockedByObstacle(enemyPos, playerPos);
 			}
 		}
 	}
