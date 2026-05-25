@@ -176,9 +176,6 @@ std::vector<Vector3> NavPathfinder::FindPath(const NavGrid::GridPos& fromGrid,
 //
 // 現在地点から直線が通るウェイポイントをスキップしていく。
 // これにより「障害物を避けつつ最短に近い直線ルート」になる。
-//
-// Unrealの本格的なFunnel Algorithmは凸多角形ポータルを使うが、
-// グリッドNavMeshではこの簡易版で十分実用に耐える。
 // ============================================================================
 
 std::vector<Vector3> NavPathfinder::SmoothPath(const std::vector<Vector3>& rawPath) const
