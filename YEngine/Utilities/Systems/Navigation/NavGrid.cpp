@@ -34,8 +34,7 @@ void NavGrid::Initialize(float worldMinX, float worldMaxX,
 // ベイク
 // ============================================================================
 
-void NavGrid::Bake(ObjectManager* objectManager)
-{
+void NavGrid::Bake(ObjectManager* objectManager) {
     if (!objectManager || !IsInitialized()) return;
 
     // 全セルをまず歩行可能にリセット
@@ -44,25 +43,21 @@ void NavGrid::Bake(ObjectManager* objectManager)
     // kNavObstacle コライダーが付いたオブジェクトを障害物としてマーク
     for (const auto* obj : objectManager->GetAllActiveObjects()) {
         if (!obj) continue;
-
-        // テンプレートの typeId を確認
+        // typeId は引き続きテンプレートで判定、形状はコライダーから取得
         const auto* tmpl = objectManager->FindTemplate(obj->modelName);
         if (!tmpl) continue;
         if (tmpl->typeId != CollisionTypeIdDef::kNavObstacle &&
             tmpl->typeId != CollisionTypeIdDef::kStaticWall) continue;
+        if (!obj->collider || !obj->colliderEnabled) continue;
 
-        // ワールドAABBを計算してグリッドに投影
-        const Vector3 half   = tmpl->size * 0.5f;
-        const Vector3 center = obj->position + tmpl->offset;
-        AABB worldAABB;
-        worldAABB.min = center - half;
-        worldAABB.max = center + half;
+        auto* aabb = dynamic_cast<AABBCollider*>(obj->collider.get());
+        if (!aabb) continue;
 
-        MarkObstacle(worldAABB, true);
+        // AABBCollider::Update() で計算済みのワールド AABB をそのまま使う
+        MarkObstacle(aabb->GetAABB(), true);
     }
 
     // Erosion：エージェント半径分だけ障害物セルを膨張させる
-    // こうすることで壁ギリギリを通らなくなる（UnityのAgent Radiusと同等）
     ApplyErosion();
 }
 

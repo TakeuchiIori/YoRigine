@@ -16,8 +16,7 @@ namespace YoRigine {
     //=============================================================================
     // メニューバー拡張
     //=============================================================================
-    void SceneEditorUI::DrawMenuBar()
-    {
+    void SceneEditorUI::DrawMenuBar() {
         if (!ImGui::BeginMenu("シーンオブジェクト")) return;
 
         if (ImGui::BeginMenu("ビュー")) {
@@ -48,8 +47,7 @@ namespace YoRigine {
     //=============================================================================
     // オブジェクト一覧
     //=============================================================================
-    void SceneEditorUI::DrawObjectList()
-    {
+    void SceneEditorUI::DrawObjectList() {
         if (!objectManager_ || !selector_) return;
 
         auto objects = objectManager_->GetAllActiveObjects();
@@ -109,8 +107,7 @@ namespace YoRigine {
     //=============================================================================
     // トランスフォーム編集
     //=============================================================================
-    void SceneEditorUI::DrawTransformControls()
-    {
+    void SceneEditorUI::DrawTransformControls() {
         if (!objectManager_ || !selector_) return;
 
         auto* obj = objectManager_->GetObjectById(selector_->GetPrimaryId());
@@ -169,8 +166,7 @@ namespace YoRigine {
                         ImGui::Selectable(
                             ("Object " + std::to_string(cand->id) + " (循環参照)").c_str(), false);
                         ImGui::EndDisabled();
-                    }
-                    else {
+                    } else {
                         std::string lbl = "Object " + std::to_string(cand->id);
                         if (ImGui::Selectable(lbl.c_str(), cand->id == parentId))
                             objectManager_->SetParent(obj->id, cand->id);
@@ -224,20 +220,27 @@ namespace YoRigine {
                     ImGui::EndCombo();
                 }
 
-                if (ImGui::DragFloat3("Size", &tmpl.size.x, 0.05f, 0.01f, 50.0f)) tmplChanged = true;
-                if (ImGui::DragFloat3("Offset", &tmpl.offset.x, 0.05f))               tmplChanged = true;
-
-                // テンプレートが変わったら同名全員に反映
+                // typeId が変わったら同名全員に反映
                 if (tmplChanged) {
                     objectManager_->ApplyTemplateToAll(obj->modelName);
+                }
+
+                // ── AABB 形状はコライダーインスタンスを直接編集 ──────────────
+                // テンプレートは typeId のみ共有。サイズ・オフセットは各インスタンス固有。
+                if (obj->collider) {
+                    if (auto* aabb = dynamic_cast<AABBCollider*>(obj->collider.get())) {
+                        ImGui::Separator();
+                        ImGui::TextDisabled("AABB オフセット（このオブジェクトのみ）");
+                        ImGui::DragFloat3("AABB Max", &aabb->aabbOffset_.max.x, 0.05f);
+                        ImGui::DragFloat3("AABB Min", &aabb->aabbOffset_.min.x, 0.05f);
+                    }
                 }
 
                 ImGui::EndChild();
                 ImGui::PopStyleColor();
             }
 
-        }
-        else {
+        } else {
             ImGui::Text("オブジェクトが選択されてません");
         }
 
@@ -248,8 +251,7 @@ namespace YoRigine {
     //=============================================================================
     // 複製ウィンドウ
     //=============================================================================
-    void SceneEditorUI::DrawDuplicateWindow()
-    {
+    void SceneEditorUI::DrawDuplicateWindow() {
         if (!objectManager_ || !selector_) return;
 
         ImGui::Text("オブジェクト複製");
@@ -270,8 +272,7 @@ namespace YoRigine {
                         objectManager_->ClearParent(dup->id);
                 }
             }
-        }
-        else {
+        } else {
             ImGui::Text("オブジェクトを選択してください");
         }
 
@@ -283,8 +284,7 @@ namespace YoRigine {
     // コライダーテンプレート一覧ウィンドウ
     // モデル単位でまとめて設定を確認・変更できる
     //=============================================================================
-    void SceneEditorUI::DrawColliderTemplates()
-    {
+    void SceneEditorUI::DrawColliderTemplates() {
         if (!objectManager_) return;
 
         ImGui::Text("コライダーテンプレート一覧");
@@ -298,15 +298,13 @@ namespace YoRigine {
         }
 
         // テーブルヘッダー
-        if (ImGui::BeginTable("##TmplTable", 5,
+        if (ImGui::BeginTable("##TmplTable", 4,
             ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
             ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingStretchProp,
-            ImVec2(0, 0)))
-        {
+            ImVec2(0, 0))) {
             ImGui::TableSetupScrollFreeze(0, 1);
             ImGui::TableSetupColumn("モデル名", ImGuiTableColumnFlags_WidthStretch, 2.0f);
             ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthStretch, 1.5f);
-            ImGui::TableSetupColumn("Size", ImGuiTableColumnFlags_WidthStretch, 2.0f);
             ImGui::TableSetupColumn("全ON", ImGuiTableColumnFlags_WidthFixed, 44.0f);
             ImGui::TableSetupColumn("全OFF", ImGuiTableColumnFlags_WidthFixed, 44.0f);
             ImGui::TableHeadersRow();
@@ -334,21 +332,14 @@ namespace YoRigine {
                     ImGui::EndCombo();
                 }
 
-                // Size（X/Y/Z をコンパクトに）
-                ImGui::TableSetColumnIndex(2);
-                ImGui::SetNextItemWidth(-1);
-                if (ImGui::DragFloat3("##size", &tmpl.size.x, 0.05f, 0.01f, 50.0f)) {
-                    objectManager_->ApplyTemplateToAll(modelName);
-                }
-
                 // 全ON
-                ImGui::TableSetColumnIndex(3);
+                ImGui::TableSetColumnIndex(2);
                 if (ImGui::SmallButton("全ON")) {
                     objectManager_->SetColliderEnabledAll(modelName, true);
                 }
 
                 // 全OFF
-                ImGui::TableSetColumnIndex(4);
+                ImGui::TableSetColumnIndex(3);
                 if (ImGui::SmallButton("全OFF")) {
                     objectManager_->SetColliderEnabledAll(modelName, false);
                 }
@@ -365,8 +356,7 @@ namespace YoRigine {
     //=============================================================================
     // プレファブウィンドウ
     //=============================================================================
-    void SceneEditorUI::DrawPrefabWindow()
-    {
+    void SceneEditorUI::DrawPrefabWindow() {
         if (!prefabMgr_ || !selector_) return;
 
         ImGui::Text("プレファブシステム");

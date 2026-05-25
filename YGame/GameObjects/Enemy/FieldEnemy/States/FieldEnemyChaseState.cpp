@@ -10,9 +10,11 @@
 void FieldEnemyChaseState::Enter(FieldEnemy& enemy) {
 	enemy.SetLogicalState(FieldEnemyState::Chase);
 	chaseTimer_ = 0.0f;
+	losLostTimer_ = 0.0f;
 	enemy.ResetPathRefreshTimer();
 	enemy.ClearNavPath();
 	RequestNewPath(enemy);
+	Logger("[FieldEnemyChaseState] 追跡状態に入りました。\n");
 }
 
 /// <summary>
@@ -23,24 +25,18 @@ void FieldEnemyChaseState::Update(FieldEnemy& enemy, float dt)
     chaseTimer_ += dt;
 
     // ── 視線チェック ──────────────────────────────────────────────
-    const NavPathfinder* pf = enemy.GetNavPathfinder();
-    if (pf && pf->GetNavGrid()) {
-        bool hasLOS = pf->GetNavGrid()->HasLineOfSight(
-            enemy.GetPosition(), enemy.GetPlayerPosition());
-
-        if (!hasLOS) {
-            losLostTimer_ += dt;
-        } else {
-            losLostTimer_ = 0.0f;
-        }
-    }
+	if(CanSeePlayer(enemy)) {
+		losLostTimer_ = 0.0f; // 視線がある → タイマーリセット
+	}
+	else {
+		losLostTimer_ += dt;   // 視線なし → タイマー加算
+	}
 
     // ── 諦め判定 ──────────────────────────────────────────────────
     bool lostByLOS  = (losLostTimer_ >= kLosLostThreshold);
     bool lostByDist = (chaseTimer_ > kMinChaseTime && ShouldGiveUpChase(enemy));
 
     if (lostByLOS || lostByDist) {
-        //ogger("[Chase] 追跡終了（%s）\n", lostByLOS ? "視線断絶" : "距離超過");
         enemy.ClearNavPath();
         enemy.ChangeState(std::make_unique<FieldEnemySearchState>());
         return;
@@ -139,4 +135,45 @@ bool FieldEnemyChaseState::ShouldGiveUpChase(const FieldEnemy& enemy) const
 	if (distToPlayer > data.chaseRange * 2.0f) return true;
 	if (distToSpawn > data.returnDistance)    return true;
 	return false;
+}
+
+bool FieldEnemyChaseState::CanSeePlayer(const FieldEnemy& enemy) const {
+	if (!enemy.HasPlayer()) return false;
+
+	const auto& data = enemy.GetEnemyData();
+	Vector3 enemyPos = enemy.GetPosition();
+	Vector3 playerPos = enemy.GetPlayerPosition();
+	Vector3 toPlayer = playerPos - enemyPos;
+
+	// 簡易的なのでY軸は考慮しない（地面にいる前提）
+	toPlayer.y = 0.0f;
+	float distToPlayer = toPlayer.x * toPlayer.x + toPlayer.z * toPlayer.z;
+
+	// ・視界距離チェック
+	if(distToPlayer> data.viewDistance * data.viewDistance) {
+		return false; // 視界距離外
+	}
+
+	// ・視野角チェック
+	float dist = sqrtf(distToPlayer);
+	if(dist < 0.001f) return false; // プレイヤーが非常に近い場合は視野角チェックをスキップ
+
+	float rotY = enemy.GetRotationY();
+	Vector3 forward = { sinf(rotY), 0.0f, cosf(rotY) };
+	Vector3 dirToPlayer = toPlayer / dist;
+
+	float dot = Dot(forward, dirToPlayer);
+	float angle = acosf(std::clamp(dot, -1.0f, 1.0f)) * (180.0f / std::numbers::pi_v<float>);
+	
+	if (angle > data.viewAngle * 0.5f) {
+		return false; // 視野角外
+	}
+
+	// ・視線チェック（NavGridのHasLineOfSightを使用）
+	const NavPathfinder* pf = enemy.GetNavPathfinder();
+	if (pf && pf->GetNavGrid()) {
+		return pf->GetNavGrid()->HasLineOfSight(enemyPos, playerPos);
+	}
+
+	return true; // 視界内
 }

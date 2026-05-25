@@ -25,8 +25,6 @@ public:
 	// サイズ・タイプはここで管理し、有効フラグだけ PlacedObject が個別に持つ。
 	struct ColliderTemplate {
 		CollisionTypeIdDef typeId = CollisionTypeIdDef::kNone;
-		Vector3            size = { 1.0f, 1.0f, 1.0f }; // AABBのフルサイズ
-		Vector3            offset = { 0.0f, 0.0f, 0.0f }; // モデル原点からのオフセット
 	};
 
 	// 配置済みオブジェクトの情報
@@ -114,10 +112,11 @@ public:
 	// オブジェクトとその子を再帰的に収集
 	void CollectObjectHierarchy(int rootId, std::vector<PlacedObject*>& collection);
 
-	///************************* ゲッター *************************///
+	///************************* アクセッサ *************************///
 
 	int GetObjectCount() const { return static_cast<int>(idToObject_.size()); }
 	int GetNextObjectId() const { return nextObjectId_; }
+	void SetCamera(Camera* camera) { camera_ = camera; }
 
 	///************************* コライダーテンプレート管理 *************************///
 
@@ -147,6 +146,8 @@ private:
 	~ObjectManager() = default;
 	ObjectManager(const ObjectManager&) = delete;
 	ObjectManager& operator=(const ObjectManager&) = delete;
+
+	Camera* camera_ = nullptr;
 
 	static ObjectManager* instance_;
 

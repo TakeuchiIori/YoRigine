@@ -144,7 +144,7 @@ void Player::InitCollision() {
 		static_cast<uint32_t>(CollisionTypeIdDef::kPlayer)
 	);
 	obbCollider_->SetIsStatic(false);
-	obbCollider_->SetMass(1000.0f);
+	obbCollider_->SetMass(100.0f);
 
 }
 

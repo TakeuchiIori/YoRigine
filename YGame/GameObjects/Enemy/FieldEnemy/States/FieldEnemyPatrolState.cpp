@@ -141,7 +141,13 @@ void FieldEnemyPatrolState::CheckForPlayer(FieldEnemy& enemy) {
 				* (180.0f / std::numbers::pi_v<float>);
 
 			if (angle <= enemy.GetEnemyData().viewAngle * 0.5f) {
-				isDetected = true;
+				// ── 視線チェック追加 ──────────────────────────────
+				const NavPathfinder* pf = enemy.GetNavPathfinder();
+				if (pf && pf->GetNavGrid()) {
+					isDetected = pf->GetNavGrid()->HasLineOfSight(enemyPos, playerPos);
+				} else {
+					isDetected = true; // NavGrid未設定なら従来通り
+				}
 			}
 		}
 	}

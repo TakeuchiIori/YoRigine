@@ -174,12 +174,13 @@ namespace YoRigine {
 
 			colliderLine_.SetColor(color);
 
-			// ワールド座標でAABBを計算
-			const Vector3& pos = obj->position;
-			const Vector3 half = tmpl ? tmpl->size * 0.5f : Vector3{ 0.5f, 0.5f, 0.5f };
-			const Vector3 offset = tmpl ? tmpl->offset : Vector3{ 0.0f, 0.0f, 0.0f };
-			const Vector3 worldCenter = pos + offset;
-			colliderLine_.DrawAABB(worldCenter - half, worldCenter + half);
+			// AABBCollider::Update() で計算済みのワールド AABB をそのまま使う
+			if (!obj->colliderEnabled) continue; // 無効なら描画スキップ
+			auto* aabb = dynamic_cast<AABBCollider*>(obj->collider.get());
+			if (!aabb) continue;
+
+			const AABB& worldAABB = aabb->GetAABB();
+			colliderLine_.DrawAABB(worldAABB.min, worldAABB.max);
 			colliderLine_.DrawLine();
 		}
 #endif

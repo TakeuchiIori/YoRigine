@@ -96,6 +96,7 @@ namespace YoRigine {
 				bool staticB = b->GetIsStatic();
 
 				if (wtA && wtB) {
+					// ── 両方動的 ────────────────────────────────────────────
 					if (!staticA && !staticB) {
 						Vector3 velA = a->GetVelocity();
 						Vector3 velB = b->GetVelocity();
@@ -108,8 +109,7 @@ namespace YoRigine {
 						if (speedSqA > 0.00001f || speedSqB > 0.00001f) {
 							ratioA = speedSqA / (speedSqA + speedSqB);
 							ratioB = speedSqB / (speedSqA + speedSqB);
-						}
-						else {
+						} else {
 							float massA = a->GetMass();
 							float massB = b->GetMass();
 							float totalMass = massA + massB;
@@ -121,16 +121,28 @@ namespace YoRigine {
 
 						wtA->translate_ += res.normal * (res.penetrationDepth * ratioA);
 						wtB->translate_ -= res.normal * (res.penetrationDepth * ratioB);
-
 						wtA->UpdateMatrix();
 						wtB->UpdateMatrix();
 						a->Update();
 						b->Update();
 					}
+					// ── A が動的、B が静的（壁）→ A だけ押し戻す ──────────
+					else if (!staticA && staticB) {
+						wtA->translate_ += res.normal * res.penetrationDepth;
+						wtA->UpdateMatrix();
+						a->Update();
+					}
+					// ── A が静的（壁）、B が動的 → B だけ押し戻す ──────────
+					else if (staticA && !staticB) {
+						wtB->translate_ -= res.normal * res.penetrationDepth;
+						wtB->UpdateMatrix();
+						b->Update();
+					}
+					// ── 両方静的 → 押し戻しなし ─────────────────────────────
+					// else { /* 何もしない */ }
 				}
 			}
 		}
-
 		// ============================================================
 		// イベント呼び出し
 		// ============================================================

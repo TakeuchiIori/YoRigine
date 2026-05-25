@@ -43,37 +43,34 @@ void AABBCollider::Initialize()
 	aabbOffset_.max = { 1.0f,1.0f,1.0f };
 }
 
-void AABBCollider::Update()
-{
-	Vector3 scale = GetWorldTransform().scale_;
-	Vector3 center = GetCenterPosition();
+// ✅ 修正後：offset をローカル空間のバウンドとして直接適用
+void AABBCollider::Update() {
+    const Vector3 scale = GetWorldTransform().scale_;
+    const Vector3 center = GetCenterPosition();
 
-	Vector3 size = {
-		(aabbOffset_.max.x - aabbOffset_.min.x) * scale.x,
-		(aabbOffset_.max.y - aabbOffset_.min.y) * scale.y,
-		(aabbOffset_.max.z - aabbOffset_.min.z) * scale.z,
-	};
+    // aabbOffset_ はローカル空間の min/max。スケールを乗じてワールド空間へ変換
+    const Vector3 localMin = {
+        aabbOffset_.min.x * scale.x,
+        aabbOffset_.min.y * scale.y,
+        aabbOffset_.min.z * scale.z,
+    };
+    const Vector3 localMax = {
+        aabbOffset_.max.x * scale.x,
+        aabbOffset_.max.y * scale.y,
+        aabbOffset_.max.z * scale.z,
+    };
 
-	Vector3 halfSize = {
-		size.x * 0.5f,
-		size.y * 0.5f,
-		size.z * 0.5f,
-	};
-
-	Vector3 min = center - halfSize;
-	Vector3 max = center + halfSize;
-
-	// min/maxを正規化（負スケールでも対応）
-	aabb_.min = {
-		(std::min)(min.x, max.x),
-		(std::min)(min.y, max.y),
-		(std::min)(min.z, max.z),
-	};
-	aabb_.max = {
-		(std::max)(min.x, max.x),
-		(std::max)(min.y, max.y),
-		(std::max)(min.z, max.z),
-	};
+    // center にオフセットを加算（負スケール対応で min/max を正規化）
+    aabb_.min = {
+        center.x + (std::min)(localMin.x, localMax.x),
+        center.y + (std::min)(localMin.y, localMax.y),
+        center.z + (std::min)(localMin.z, localMax.z),
+    };
+    aabb_.max = {
+        center.x + (std::max)(localMin.x, localMax.x),
+        center.y + (std::max)(localMin.y, localMax.y),
+        center.z + (std::max)(localMin.z, localMax.z),
+    };
 }
 
 void AABBCollider::Draw()

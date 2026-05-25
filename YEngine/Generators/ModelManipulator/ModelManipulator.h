@@ -70,6 +70,7 @@ namespace YoRigine {
             selector_.SetCamera(camera);
             motionEditor_.SetCamera(camera);
             colliderLine_.SetCamera(camera_);
+			objectManager_->SetCamera(camera);
         }
 
         //=========================================================================

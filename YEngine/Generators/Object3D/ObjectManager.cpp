@@ -3,6 +3,8 @@
 #include <iostream>
 #include <algorithm>
 
+#include <Collision/Core/CollisionManager.h>
+#include <Collision/Core/ColliderFactory.h>
 ObjectManager* ObjectManager::instance_ = nullptr;
 
 
@@ -35,6 +37,9 @@ void ObjectManager::Update() {
 		if (obj && obj->isActive && obj->object) {
 			obj->object->UpdateAnimation();
 		}
+		if (obj->collider && obj->colliderEnabled) {
+			obj->collider->Update();
+		}
 	}
 }
 
@@ -55,8 +60,7 @@ void ObjectManager::Finalize() {
 ObjectManager::PlacedObject* ObjectManager::CreateObject(
 	const std::string& modelPath,
 	bool isAnimation,
-	const std::string& animationName)
-{
+	const std::string& animationName) {
 	PlacedObject* newObj = objectPool_.Alloc();
 	if (!newObj) {
 		std::cout << "オブジェクトプールが満杯です。" << std::endl;
@@ -126,8 +130,7 @@ void ObjectManager::ClearAllObjects() {
 /// </summary>
 ObjectManager::PlacedObject* ObjectManager::DuplicateObject(
 	int objectId,
-	const Vector3& positionOffset)
-{
+	const Vector3& positionOffset) {
 	PlacedObject* original = GetObjectById(objectId);
 	if (!original) return nullptr;
 
@@ -238,8 +241,7 @@ void ObjectManager::UpdateObjectTransform(PlacedObject& obj) {
 		obj.worldTransform->parent_ =
 			(parent && parent->worldTransform) ? parent->worldTransform.get() : nullptr;
 		if (!parent) obj.parentID = -1;
-	}
-	else {
+	} else {
 		obj.worldTransform->parent_ = nullptr;
 	}
 
@@ -323,8 +325,7 @@ bool ObjectManager::HasCircularReference(int objectId, int parentId) const {
 /// </summary>
 void ObjectManager::CollectObjectHierarchy(
 	int rootId,
-	std::vector<PlacedObject*>& collection)
-{
+	std::vector<PlacedObject*>& collection) {
 	PlacedObject* root = GetObjectById(rootId);
 	if (!root) return;
 
@@ -343,8 +344,7 @@ void ObjectManager::InitializePlacedObject(
 	PlacedObject& obj,
 	const std::string& modelPath,
 	bool isAnimation,
-	const std::string& animationName)
-{
+	const std::string& animationName) {
 	// モデル情報
 	obj.modelPath = modelPath;
 
@@ -371,14 +371,9 @@ void ObjectManager::InitializePlacedObject(
 	obj.parentID = -1;
 	obj.isActive = true;
 
-	// 当たり判定
-	obj.collider = ColliderPool::GetInstance()->GetCollider<AABBCollider>();
-	if (obj.collider) {
-		obj.collider->Initialize();
-		obj.collider->SetWT(obj.worldTransform.get());
-		obj.collider->SetIsStatic(true);			// 壁なので動かない
-		obj.collider->SetEnablePenetration(true);	// 押し戻し有効
-	}
+	// 当たり判定（初期状態では無効）
+	obj.collider = nullptr;
+
 	UpdateObjectTransform(obj);
 }
 
@@ -386,26 +381,28 @@ void ObjectManager::InitializePlacedObject(
 // コライダーテンプレート管理
 //=============================================================================
 
-ObjectManager::ColliderTemplate& ObjectManager::GetOrCreateTemplate(const std::string& modelName)
-{
+ObjectManager::ColliderTemplate& ObjectManager::GetOrCreateTemplate(const std::string& modelName) {
 	// 存在しなければデフォルト値で新規作成して返す
 	return colliderTemplates_[modelName];
 }
 
-ObjectManager::ColliderTemplate* ObjectManager::FindTemplate(const std::string& modelName)
-{
+ObjectManager::ColliderTemplate* ObjectManager::FindTemplate(const std::string& modelName) {
 	auto it = colliderTemplates_.find(modelName);
 	return (it != colliderTemplates_.end()) ? &it->second : nullptr;
 }
 
-const ObjectManager::ColliderTemplate* ObjectManager::FindTemplate(const std::string& modelName) const
-{
+const ObjectManager::ColliderTemplate* ObjectManager::FindTemplate(const std::string& modelName) const {
 	auto it = colliderTemplates_.find(modelName);
 	return (it != colliderTemplates_.end()) ? &it->second : nullptr;
 }
 
-void ObjectManager::ApplyColliderTemplate(PlacedObject& obj)
-{
+void ObjectManager::ApplyColliderTemplate(PlacedObject& obj) {
+	if (!obj.collider) {
+		obj.collider = ColliderFactory::CreateStatic<AABBCollider>(
+			obj.worldTransform.get(),
+			static_cast<uint32_t>(CollisionTypeIdDef::kStaticWall));
+	}
+
 	if (!obj.collider) return;
 
 	// コライダーが無効なら判定を切って終わり
@@ -413,31 +410,23 @@ void ObjectManager::ApplyColliderTemplate(PlacedObject& obj)
 		obj.collider->SetCollisionEnabled(false);
 		return;
 	}
-
 	// テンプレートが未登録ならデフォルト設定のまま有効化
 	const ColliderTemplate* tmpl = FindTemplate(obj.modelName);
 	if (!tmpl) {
 		obj.collider->SetCollisionEnabled(true);
-		obj.collider->SetTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kNone));
+		obj.collider->SetEnablePenetration(true);
+		obj.collider->SetIsStatic(true); // 配置オブジェクトは静的扱い
 		return;
 	}
 
-	// テンプレートの設定を反映
+	// テンプレートの設定を反映（typeId のみ。AABB 形状はコライダー自身が保持）
 	obj.collider->SetCollisionEnabled(true);
+	obj.collider->SetEnablePenetration(true);
 	obj.collider->SetIsStatic(true); // 配置オブジェクトは静的扱い
 	obj.collider->SetTypeID(static_cast<uint32_t>(tmpl->typeId));
-
-	// AABBサイズをテンプレートの size / offset で更新
-	// aabbOffset_ の min/max で中心オフセット付きのAABBを表現する
-	if (auto* aabb = dynamic_cast<AABBCollider*>(obj.collider.get())) {
-		const Vector3 half = tmpl->size * 0.5f;
-		aabb->aabbOffset_.min = tmpl->offset - half;
-		aabb->aabbOffset_.max = tmpl->offset + half;
-	}
 }
 
-void ObjectManager::ApplyTemplateToAll(const std::string& modelName)
-{
+void ObjectManager::ApplyTemplateToAll(const std::string& modelName) {
 	// 同名モデルの全オブジェクトにテンプレートを反映
 	for (auto& [id, obj] : idToObject_) {
 		if (obj && obj->modelName == modelName) {
@@ -446,8 +435,7 @@ void ObjectManager::ApplyTemplateToAll(const std::string& modelName)
 	}
 }
 
-void ObjectManager::SetColliderEnabledAll(const std::string& modelName, bool enabled)
-{
+void ObjectManager::SetColliderEnabledAll(const std::string& modelName, bool enabled) {
 	for (auto& [id, obj] : idToObject_) {
 		if (obj && obj->modelName == modelName) {
 			obj->colliderEnabled = enabled;
