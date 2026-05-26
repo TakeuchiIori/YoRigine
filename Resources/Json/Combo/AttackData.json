@@ -126,27 +126,6 @@
         "type": 1
     },
     {
-        "animationName": "Attack2testMirrorReverse",
-        "baseDamage": 35.0,
-        "canCancel": true,
-        "canChainToAny": true,
-        "ccCost": 1,
-        "ccOnHit": 0,
-        "comboWindowEnd": 20,
-        "comboWindowStart": 10,
-        "duration": 0.6000000238418579,
-        "fps": 60,
-        "hitEnd": 24,
-        "hitStart": 0,
-        "knockback": 4.0,
-        "knockbackDuration": 1.0,
-        "motionSpeed": 1.25,
-        "name": "B4",
-        "stepDistance": 0.5,
-        "totalFrames": 60,
-        "type": 1
-    },
-    {
         "animationName": "Slash2",
         "baseDamage": 40.0,
         "canCancel": true,

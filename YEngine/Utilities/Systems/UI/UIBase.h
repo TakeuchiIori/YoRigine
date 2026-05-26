@@ -169,6 +169,7 @@ protected:
 	///************************* メンバ変数 *************************///
 
 	std::unique_ptr<Sprite> sprite_;
+	Camera* camera_ = nullptr;
 	std::string configPath_;
 	std::filesystem::file_time_type lastModTime_;
 	std::string name_;

@@ -60,6 +60,7 @@ namespace YoRigine {
 		bool IsColliderInView(const Vector3& position, const Camera* camera);
 		void AddCollider(BaseCollider* collider);
 		void RemoveCollider(BaseCollider* collider);
+		const std::list<BaseCollider*>& GetColliders() const { return colliders_; }
 
 		// ============================================================
 		// レイキャスト判定

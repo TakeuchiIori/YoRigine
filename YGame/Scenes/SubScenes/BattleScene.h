@@ -19,6 +19,7 @@
 #include "SceneDataStructures.h"
 #include "BaseSubScene.h"
 #include "Ground/Ground.h"
+#include <UI/LockOn/LockOnUI.h>
 
 ///************************* バトルシーン *************************///
 class BattleScene : public BaseSubScene {
@@ -118,6 +119,8 @@ private:
 	std::unique_ptr<Sprite> sprite_;
 	std::unique_ptr<Ground> ground_;
 	std::unique_ptr<BaseObject> enemy_;
+	std::unique_ptr<LockOnUI> lockOnUI_;
+
 	std::string currentEnemyGroup_;
 	BattleTransitionData originalTransitionData_;
 	BattleEndCallback battleEndCallback_;

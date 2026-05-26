@@ -10,6 +10,7 @@
 #include <Editor/Editor.h>
 #include "Particle/ParticleManager.h"
 
+#include <UI/Damage/DamageNumberManager.h>
 #ifdef USE_IMGUI
 #include "imgui.h"
 #endif
@@ -63,6 +64,15 @@ void BattleScene::Initialize(Camera* camera, Player* player) {
 	battleField->SetCamera(sceneCamera_);
 	manager->AddArea("BattleField", battleField);
 
+
+	//------------------------------------------------------------
+	// UI初期化
+	//------------------------------------------------------------
+	lockOnUI_ = std::make_unique<LockOnUI>();
+	lockOnUI_->Initialize(player_);
+
+	DamageNumberManager::GetInstance()->Initialize();
+
 	//------------------------------------------------------------
 	// プレイヤーをエリア制限対象として登録
 	//------------------------------------------------------------
@@ -108,6 +118,11 @@ void BattleScene::Update() {
 	// 視覚効果・オブジェクト更新
 	sprite_->Update();
 	ground_->Update();
+
+	// UI更新
+	lockOnUI_->Update();
+	DamageNumberManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime(),sceneCamera_->GetViewProjectionMatrix());
+
 	// エリア制限補正
 	AreaManager::GetInstance()->UpdateSingleObject(&player_->GetWT());
 }
@@ -149,6 +164,11 @@ void BattleScene::DrawUI() {
 	//sprite_->Draw();
 	if (battleEnemyManager_) {
 		battleEnemyManager_->DrawUI();
+		DamageNumberManager::GetInstance()->Draw();
+		
+		if (player_->IsAlive()) {
+			lockOnUI_->Draw();
+		}
 	}
 }
 
@@ -276,7 +296,8 @@ void BattleScene::OnExit() {
 	battleState["playerHpRatio"] = 1.0f;
 	syncData->SaveCurrentSceneState("Battle", battleState);
 
-
+	// ロックオンUIを非表示にする
+	lockOnUI_->SetIsVisible(false);
 	// シーンから抜ける時に、強制的に敵を全削除する
 	if (battleEnemyManager_) {
 		battleEnemyManager_->RemoveAllBattleEnemies();

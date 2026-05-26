@@ -14,14 +14,14 @@
 #include "States/FieldEnemyChaseState.h"
 #include <Collision/AreaCollision/Base/AreaManager.h>
 
-/// <summary>
-/// コンストラクタ
-/// </summary>
+// ============================================================
+// コンストラクタ
+// ============================================================
 FieldEnemy::FieldEnemy() = default;
 
-/// <summary>
-/// デストラクタ（OBBコライダー破棄）
-/// </summary>
+// ============================================================
+// デストラクタ
+// ============================================================
 FieldEnemy::~FieldEnemy() {
 	if (obbCollider_) {
 		obbCollider_->~OBBCollider();
@@ -32,10 +32,9 @@ FieldEnemy::~FieldEnemy() {
 	}
 }
 
-/// <summary>
-/// 敵の初期化処理（Object3d・WorldTransform・Collision）
-/// </summary>
-/// <param name="camera">描画に使用するカメラ</param>
+// ============================================================
+// 初期化
+// ============================================================
 void FieldEnemy::Initialize(Camera* camera) {
 	camera_ = camera;
 
@@ -51,13 +50,14 @@ void FieldEnemy::Initialize(Camera* camera) {
 	// Json初期化
 	InitJson();
 
+	alertUI_ = std::make_unique<EnemyAlert>(this, camera_);
+	alertUI_->Initialize();
+
 }
 
-/// <summary>
-/// JSONから読み込まれたフィールド敵データで初期化
-/// </summary>
-/// <param name="data">フィールド敵のデータ構造体</param>
-/// <param name="spawnPosition">出現位置</param>
+// ============================================================
+// JSONから読み込まれたフィールド敵データで初期化
+// ============================================================
 void FieldEnemy::InitializeFieldData(const FieldEnemyData& data, const Vector3& spawnPosition) {
 	enemyData_ = data;
 	spawnPosition_ = spawnPosition;
@@ -105,9 +105,9 @@ void FieldEnemy::InitializeFieldData(const FieldEnemyData& data, const Vector3& 
 		", タイプ: " + data.GetBattleTypeString() + "\n");
 }
 
-/// <summary>
-/// 当たり判定（OBBコライダー）の初期化
-/// </summary>
+// ============================================================
+// 当たり判定の初期化
+// ============================================================
 void FieldEnemy::InitCollision() {
 	obbCollider_ = ColliderFactory::Create<OBBCollider>(
 		this,
@@ -118,9 +118,9 @@ void FieldEnemy::InitCollision() {
 	obbCollider_->SetIsStatic(false);
 }
 
-/// <summary>
-/// JsonManagerの初期化
-/// </summary>
+// ============================================================
+// Jsonの初期化
+// ============================================================
 void FieldEnemy::InitJson() {
 	std::string identifier = enemyData_.enemyId;
 	if (identifier.empty()) identifier = "UnknownEnemy";
@@ -130,9 +130,9 @@ void FieldEnemy::InitJson() {
 	obbCollider_->InitJson(jsonManager_.get());
 }
 
-/// <summary>
-/// フィールド敵の毎フレーム更新処理
-/// </summary>
+// ============================================================
+// 更新
+// ============================================================
 void FieldEnemy::Update() {
 	if (logicalState_ == FieldEnemyState::Despawn) {
 		// 消滅時はライトを無効化
@@ -185,12 +185,15 @@ void FieldEnemy::Update() {
 			light->distance = enemyData_.viewDistance;
 		}
 	}
+
+		alertUI_->Update();
+	//if (logicalState_ == FieldEnemyState::Alert) {
+	//}
 }
 
-/// <summary>
-/// ステートを切り替える
-/// </summary>
-/// <param name="newState">切り替え先のステート</param>
+// ============================================================
+//　Stateの切り替え
+// ============================================================
 void FieldEnemy::ChangeState(std::unique_ptr<IEnemyState<FieldEnemy>> newState) {
 	if (currentState_) {
 		currentState_->Exit(*this);
@@ -205,6 +208,9 @@ void FieldEnemy::ChangeState(std::unique_ptr<IEnemyState<FieldEnemy>> newState) 
 	stateTimer_ = 0.0f;
 }
 
+// ============================================================
+// フィールド敵のデータを更新して反映する（スケールや色など）
+// ============================================================
 void FieldEnemy::ApplyUpdatedData(const FieldEnemyData& data)
 {
 	enemyData_ = data;
@@ -220,10 +226,17 @@ void FieldEnemy::ApplyUpdatedData(const FieldEnemyData& data)
 	}
 }
 
-/// <summary>
-/// プレイヤーのワールド座標を取得
-/// </summary>
-/// <returns>プレイヤー座標。存在しない場合は(0,0,0)</returns>
+Vector3 FieldEnemy::GetCurrentWaypoint() const
+{
+	if (navPathIndex_ < static_cast<int>(navPath_.size())) {
+		return navPath_[navPathIndex_];
+	}
+	// パスが空またはインデックス超過時はその場にとどまる
+	return wt_.translate_;
+}
+// ============================================================
+// プレイヤーの位置を取得するユーティリティ
+// ============================================================
 Vector3 FieldEnemy::GetPlayerPosition() const {
 	if (player_) {
 		return player_->GetWorldPosition();
@@ -231,10 +244,9 @@ Vector3 FieldEnemy::GetPlayerPosition() const {
 	return Vector3(0.0f, 0.0f, 0.0f);
 }
 
-/// <summary>
-/// エンカウントクールダウンの更新処理
-/// </summary>
-/// <param name="dt">経過時間（デルタタイム）</param>
+// ============================================================
+// エンカウントクールダウンの更新と管理
+// ============================================================
 void FieldEnemy::UpdateEncounterCooldown(float dt) {
 	if (encounterCooldown_ > 0.0f) {
 		encounterCooldown_ -= dt;
@@ -246,9 +258,9 @@ void FieldEnemy::UpdateEncounterCooldown(float dt) {
 	}
 }
 
-/// <summary>
-/// 他コライダーと接触した瞬間の処理
-/// </summary>
+// ============================================================
+// 当たり判定の開始処理
+// ============================================================
 void FieldEnemy::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other) {
 	uint32_t typeID = other->GetTypeID();
 
@@ -259,9 +271,9 @@ void FieldEnemy::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColli
 	}
 }
 
-/// <summary>
-/// 他コライダーとの接触中処理
-/// </summary>
+// ============================================================
+// 当たり判定中の継続処理
+// ============================================================
 void FieldEnemy::OnCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other) {
 	uint32_t typeID = other->GetTypeID();
 
@@ -272,21 +284,21 @@ void FieldEnemy::OnCollision([[maybe_unused]] BaseCollider* self, BaseCollider* 
 	}
 }
 
-/// <summary>
-/// 他コライダーとの離脱処理
-/// </summary>
+// ============================================================
+// 当たり判定の離脱処理
+// ============================================================
 void FieldEnemy::OnExitCollision([[maybe_unused]] BaseCollider* self, [[maybe_unused]] BaseCollider* other) {
 	// 必要に応じて実装
 }
 
-/// <summary>
-/// 方向付き衝突処理（接触方向に応じたコールバック）
-/// </summary>
+// ============================================================
+// 方向付きの当たり判定処理
+// ============================================================
 void FieldEnemy::OnDirectionCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other, [[maybe_unused]] HitDirection dir) {
-	// 1. 相手がプレイヤーの武器かチェック
+	// 相手がプレイヤーの武器かチェック
 	if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon)) {
 
-		// 3. 背後(Back)からの攻撃のみに絞る
+		// 背後(Back)からの攻撃のみに絞る
 		if (dir == HitDirection::Back) {
 			if (CanTriggerEncounter()) {
 				Logger("[FieldEnemy] GetSelfLocalHitDirectionによる背後判定成功\n");
@@ -301,13 +313,16 @@ void FieldEnemy::OnDirectionCollision([[maybe_unused]] BaseCollider* self, BaseC
 	}
 }
 
+// ============================================================
+//　方向付きの当たり判定開始処理
+// ============================================================
 void FieldEnemy::OnEnterDirectionCollision([[maybe_unused]] BaseCollider* self, [[maybe_unused]] BaseCollider* other, [[maybe_unused]] HitDirection dir) {
 
 }
 
-/// <summary>
-/// バトルへのエンカウントを発生させる
-/// </summary>
+// ============================================================
+//　エンカウントを発生させる処理
+// ============================================================
 void FieldEnemy::TriggerEncounter() {
 	if (fieldEnemyManager_ && !hasTriggeredEncounter_) {
 		hasTriggeredEncounter_ = true;
@@ -327,14 +342,17 @@ void FieldEnemy::TriggerEncounter() {
 	}
 }
 
+// ============================================================
+//　ダメージを受ける処理
+// ============================================================
 void FieldEnemy::TakeDamage(const float damage)
 {
 	takeDamage_ = damage;
 }
 
-/// <summary>
-/// エンカウント状態をリセットする
-/// </summary>
+// ============================================================
+// エンカウント状態をリセットする処理
+// ============================================================
 void FieldEnemy::ResetEncounterState() {
 	hasTriggeredEncounter_ = false;
 	encounterCooldown_ = 0.0f;
@@ -342,9 +360,9 @@ void FieldEnemy::ResetEncounterState() {
 	Logger("[FieldEnemy] エンカウント状態をリセット: " + enemyData_.enemyId + "\n");
 }
 
-/// <summary>
-/// 敵モデルの描画処理
-/// </summary>
+// ============================================================
+// フィールド敵の描画処理
+// ============================================================
 void FieldEnemy::Draw() {
 	if (logicalState_ != FieldEnemyState::Despawn) {
 		if (obj_) {
@@ -353,6 +371,9 @@ void FieldEnemy::Draw() {
 	}
 }
 
+// ============================================================
+// 影の描画
+// ============================================================
 void FieldEnemy::DrawShadow()
 {
 	if (logicalState_ != FieldEnemyState::Despawn) {
@@ -362,15 +383,18 @@ void FieldEnemy::DrawShadow()
 	}
 }
 
-/// <summary>
-/// 当たり判定のデバッグ描画
-/// </summary>
+// ============================================================
+// 当たり判定の描画（デバッグ用）
+// ============================================================
 void FieldEnemy::DrawCollision() {
 	if (obbCollider_) {
 		obbCollider_->Draw();
 	}
 }
 
+// ============================================================
+// 線の描画
+// ============================================================
 void FieldEnemy::DrawLine(Line* line) {
 	if(!line || logicalState_ == FieldEnemyState::Despawn) {
 		return;
@@ -383,6 +407,20 @@ void FieldEnemy::DrawLine(Line* line) {
 	);
 }
 
+// ============================================================
+//　UIの描画
+// ============================================================
+void FieldEnemy::DrawUI(){
+	if (logicalState_ != FieldEnemyState::Despawn) {
+		if(obj_) {
+			//alertUI_->Draw();
+		}
+	}
+}
+
+// ============================================================
+// ライトの有効化処理
+// ============================================================
 void FieldEnemy::SetLightActive(bool isActive)
 {
 	if (!spotLightName_.empty()) {
@@ -393,9 +431,9 @@ void FieldEnemy::SetLightActive(bool isActive)
 	}
 }
 
-/// <summary>
-/// 目標角度に向かって補間回転する
-/// </summary>
+// ============================================================
+// 指定した角度に補間回転する処理
+// ============================================================
 void FieldEnemy::RotateTowards(float targetAngle, float speed, float dt) {
 	float current = wt_.rotate_.y;
 
@@ -413,9 +451,9 @@ void FieldEnemy::RotateTowards(float targetAngle, float speed, float dt) {
 	}
 }
 
-/// <summary>
-/// プレイヤー方向へ補間回転する
-/// </summary>
+// ============================================================
+// プレイヤーの方向に補間回転する処理
+// ============================================================
 void FieldEnemy::RotateTowardsPlayer(float speed, float dt) {
 	if (!HasPlayer()) return;
 
@@ -428,9 +466,9 @@ void FieldEnemy::RotateTowardsPlayer(float speed, float dt) {
 	RotateTowards(targetAngle, speed, dt);
 }
 
-/// <summary>
-/// 移動方向へ補間回転する
-/// </summary>
+// ============================================================
+// 移動方向に補間回転する処理
+// ============================================================
 void FieldEnemy::RotateTowardsDirection(const Vector3& direction, float speed, float dt) {
 	float dist = Length(direction);
 	if (dist < 0.1f) return;

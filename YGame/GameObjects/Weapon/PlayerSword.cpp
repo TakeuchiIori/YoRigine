@@ -5,6 +5,7 @@
 #include "MathFunc.h"
 #include "Systems/GameTime/GameTime.h"
 #include "Particle/YEmitterGroupManager.h"
+#include <algorithm>
 
 #ifdef USE_IMGUI
 #include "imgui.h"
@@ -225,7 +226,7 @@ void PlayerSword::DrawVfx() {
 void PlayerSword::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other) {
 	if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kBattleEnemy)) {
 		// ------------------------------------------------------------
-		// 敵にヒット時:エフェクト発生 + CC回復処理 + カメラシェイク
+		// 敵にヒット時:エフェクト発生 + CC回復処理
 		// ------------------------------------------------------------
 		Vector3 hitPos = other->GetWorldTransform().translate_;
 		hitPos.y += 1.5f;
@@ -238,6 +239,50 @@ void PlayerSword::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 			enemyHitEmitterGroup_->EmitAll(10);
 		}
 		player_->GetCombat()->GetCombo()->RecoverCC(2);
+
+		// ------------------------------------------------------------
+		// ヒットストップ＆カメラシェイク（賢い発動条件）
+		// 毎回発動すると鬱陶しいので、以下の条件でのみ発動：
+		//   - B_Arte（重攻撃）は常にヒットストップ
+		//   - A_Arte（軽攻撃）はコンボ3段目以降でのみ発動
+		//   - コンボ段数が多いほど演出が強くなる
+		// ------------------------------------------------------------
+		auto* combo = player_->GetCombat()->GetCombo();
+		if (combo) {
+			const AttackData* currentAttack = combo->GetCurrentAttack();
+			int comboCount = combo->GetComboCount();
+
+			if (currentAttack) {
+				bool shouldHitStop = false;
+				float hitStopDuration = 0.0f;
+				float shakeIntensity = 0.0f;
+				float shakeDuration = 0.0f;
+
+				if (currentAttack->type == AttackType::B_Arte) {
+					// 重攻撃：常にヒットストップ（強め）
+					shouldHitStop = true;
+					hitStopDuration = 0.06f;
+					shakeIntensity = 0.35f;
+					shakeDuration = 0.12f;
+				}
+				else if (comboCount >= 3) {
+					// 軽攻撃のコンボ3段目以降：ヒットストップ（コンボ段数で強化）
+					shouldHitStop = true;
+					float comboBonus = static_cast<float>(comboCount - 2) * 0.01f;
+					hitStopDuration = 0.03f + std::min(comboBonus, 0.05f);
+					shakeIntensity = 0.15f + std::min(comboBonus * 5.0f, 0.25f);
+					shakeDuration = 0.08f + std::min(comboBonus * 2.0f, 0.1f);
+				}
+
+				if (shouldHitStop) {
+					YoRigine::GameTime::SetHitStop(hitStopDuration);
+
+					if (player_->GetFollowCamera()) {
+						player_->GetFollowCamera()->StartShake(shakeIntensity, shakeDuration);
+					}
+				}
+			}
+		}
 
 	}
 }

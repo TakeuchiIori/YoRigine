@@ -5,7 +5,7 @@
 #include <fstream>
 #include <json.hpp>
 #include "Debugger/Logger.h"
-#include "Loaders/Json/JsonConverters.h"
+#include "Loaders/Json/ConversionJson.h"
 using json = nlohmann::json;
 
 namespace YoRigine {
@@ -24,8 +24,8 @@ namespace YoRigine {
         t["widthEnd"]          = trail.widthEnd;
         t["lifetime"]          = trail.lifetime;
         t["maxPoints"]         = trail.maxPoints;
-        t["colorStart"]        = Vector4ToJson(trail.colorStart);
-        t["colorEnd"]          = Vector4ToJson(trail.colorEnd);
+        t["colorStart"]        = trail.colorStart;
+        t["colorEnd"]          = trail.colorEnd;
         t["blendMode"]         = static_cast<int>(trail.blendMode);
         t["uvScrollSpeed"]     = trail.uvScrollSpeed;
         t["texturePath"]       = trail.texturePath;
@@ -46,7 +46,7 @@ namespace YoRigine {
         t["glowPower"]       = trail.glowPower;
         t["fresnelStrength"] = trail.fresnelStrength;
         t["trailSharpness"]  = trail.trailSharpness;
-        t["rimColor"]        = Vector4ToJson(trail.rimColor);
+        t["rimColor"]        = trail.rimColor;
 
         // ノイズ歪み
         t["distortion"]   = trail.distortion;
@@ -70,8 +70,8 @@ namespace YoRigine {
 
         // --- LightVolume ---
         auto& lv = j["lightVolume"];
-        lv["halfExtents"] = Vector3ToJson(lightVolume.halfExtents);
-        lv["color"]       = Vector4ToJson(lightVolume.color);
+        lv["halfExtents"] = lightVolume.halfExtents;
+        lv["color"]       = lightVolume.color;
         lv["intensity"]   = lightVolume.intensity;
         lv["isEnable"]    = lightVolume.isEnable;
 
@@ -113,8 +113,8 @@ namespace YoRigine {
             trail.thickness        = t.value("thickness",        trail.thickness);
             trail.splineSubdivisions = t.value("splineSubdivisions", trail.splineSubdivisions);
 
-            if (t.contains("colorStart")) trail.colorStart = JsonToVector4(t["colorStart"]);
-            if (t.contains("colorEnd"))   trail.colorEnd   = JsonToVector4(t["colorEnd"]);
+            if (t.contains("colorStart")) trail.colorStart = t["colorStart"];
+            if (t.contains("colorEnd"))   trail.colorEnd   = t["colorEnd"];
 
             if (t.contains("customVertices")) {
                 trail.customVertices.clear();
@@ -129,7 +129,7 @@ namespace YoRigine {
             trail.glowPower       = t.value("glowPower",       trail.glowPower);
             trail.fresnelStrength = t.value("fresnelStrength", trail.fresnelStrength);
             trail.trailSharpness  = t.value("trailSharpness",  trail.trailSharpness);
-            if (t.contains("rimColor")) trail.rimColor = JsonToVector4(t["rimColor"]);
+            if (t.contains("rimColor")) trail.rimColor = t["rimColor"];
 
             // ノイズ歪み
             trail.distortion  = t.value("distortion",  trail.distortion);
@@ -156,8 +156,8 @@ namespace YoRigine {
             auto& lv = j["lightVolume"];
             lightVolume.intensity = lv.value("intensity", lightVolume.intensity);
             lightVolume.isEnable  = lv.value("isEnable",  lightVolume.isEnable);
-            if (lv.contains("halfExtents")) lightVolume.halfExtents = JsonToVector3(lv["halfExtents"]);
-            if (lv.contains("color"))       lightVolume.color       = JsonToVector4(lv["color"]);
+            if (lv.contains("halfExtents")) lightVolume.halfExtents = lv["halfExtents"];
+            if (lv.contains("color"))       lightVolume.color       = lv["color"];
         }
         return true;
     }
