@@ -18,6 +18,7 @@ void NavGrid::Initialize(float worldMinX, float worldMaxX,
                          float worldMinZ, float worldMaxZ,
                          float cellSize)
 {
+	// 範囲とセルサイズを設定する
     worldMinX_ = worldMinX;
     worldMaxX_ = worldMaxX;
     worldMinZ_ = worldMinZ;
@@ -76,6 +77,7 @@ void NavGrid::Reset()
 
 void NavGrid::MarkObstacle(const AABB& worldAABB, bool obstacle)
 {
+    // AABBの四隅からグリッド座標を計算して全セルをfalseに
     ForEachOverlappingCell(worldAABB, [&](int gx, int gz) {
         cells_[CellIndex(gx, gz)].walkable = !obstacle;
     });
@@ -126,9 +128,6 @@ bool NavGrid::IsWalkableWorld(const Vector3& worldPos) const
 //
 // from → to の直線がグリッド上で通行不可セルを通過するかを判定する。
 // 「通過しない＝視線が通る」なら true を返す。
-//
-// Unity の Physics.Raycast に相当するが、3Dフィジックスより軽量で
-// 平坦なフィールドには十分。
 // ============================================================================
 
 bool NavGrid::HasLineOfSight(const Vector3& from, const Vector3& to) const
