@@ -1,7 +1,23 @@
 {
+    "colliderTemplates": {
+        "Player.gltf": {
+            "typeId": 0
+        }
+    },
     "objects": [
         {
+            "aabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "aabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
             "animationName": "",
+            "colliderEnabled": false,
             "filePath": "Player\\Player.gltf",
             "id": 0,
             "isAnimation": true,
@@ -22,7 +38,151 @@
                 1.0,
                 1.0
             ]
+        },
+        {
+            "animationName": "",
+            "colliderEnabled": false,
+            "filePath": "House_1\\House_1.obj",
+            "id": 1,
+            "isAnimation": false,
+            "modelName": "House_1.obj",
+            "parentID": -1,
+            "position": [
+                -1.6030000448226929,
+                0.0,
+                42.20000076293945
+            ],
+            "rotate": [
+                0.0,
+                -4.43311882019043,
+                0.0
+            ],
+            "scale": [
+                4.0,
+                4.0,
+                4.0
+            ]
+        },
+        {
+            "animationName": "",
+            "colliderEnabled": false,
+            "filePath": "House_2\\House_2.obj",
+            "id": 2,
+            "isAnimation": false,
+            "modelName": "House_2.obj",
+            "parentID": -1,
+            "position": [
+                24.200000762939453,
+                0.0,
+                35.19300079345703
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                1.2740896940231323,
+                -3.1415908336639404
+            ],
+            "scale": [
+                3.999999761581421,
+                4.0,
+                3.999999761581421
+            ]
+        },
+        {
+            "animationName": "",
+            "colliderEnabled": false,
+            "filePath": "Bell_Tower\\Bell_Tower.obj",
+            "id": 3,
+            "isAnimation": false,
+            "modelName": "Bell_Tower.obj",
+            "parentID": -1,
+            "position": [
+                13.300000190734863,
+                0.0,
+                51.29999923706055
+            ],
+            "rotate": [
+                0.0,
+                0.2617993950843811,
+                0.0
+            ],
+            "scale": [
+                4.0,
+                4.0,
+                4.0
+            ]
+        },
+        {
+            "animationName": "",
+            "colliderEnabled": false,
+            "filePath": "Blacksmith\\Blacksmith.obj",
+            "id": 4,
+            "isAnimation": false,
+            "modelName": "Blacksmith.obj",
+            "parentID": -1,
+            "position": [
+                7.0,
+                0.0,
+                -43.20000076293945
+            ],
+            "rotate": [
+                0.0,
+                -2.879793167114258,
+                0.0
+            ],
+            "scale": [
+                4.0,
+                4.0,
+                4.0
+            ]
+        },
+        {
+            "animationName": "",
+            "colliderEnabled": false,
+            "filePath": "Blacksmith\\Blacksmith.obj",
+            "id": 5,
+            "isAnimation": false,
+            "modelName": "Blacksmith.obj",
+            "parentID": -1,
+            "position": [
+                -26.299999237060547,
+                0.0,
+                -35.20000076293945
+            ],
+            "rotate": [
+                0.0,
+                0.22689279913902283,
+                0.0
+            ],
+            "scale": [
+                4.0,
+                4.0,
+                4.0
+            ]
+        },
+        {
+            "animationName": "",
+            "colliderEnabled": false,
+            "filePath": "Ground\\Ground.obj",
+            "id": 6,
+            "isAnimation": false,
+            "modelName": "Ground.obj",
+            "parentID": -1,
+            "position": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "rotate": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.10999999940395355,
+                1.0,
+                0.11999999731779099
+            ]
         }
     ],
-    "version": 1
+    "version": 3
 }

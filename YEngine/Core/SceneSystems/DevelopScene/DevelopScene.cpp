@@ -13,7 +13,7 @@
 
 #include "Object3D/Object3dCommon.h"
 #include "LightManager/LightManager.h"
-#include <Systems/GameTime/GameTime.h>
+#include "Collision/AreaCollision/Base/AreaManager.h"
 
 #include "Particle./ParticleManager.h"
 #include "Particle/YParticleManager.h"
@@ -29,6 +29,8 @@
 // C++
 #include <cstdlib>
 #include <ctime>
+#include <Collision/AreaCollision/CircleArea.h>
+#include <Collision/AreaCollision/Base/AreaEditor.h>
 
 // ============================================================
 // シーンの初期化
@@ -53,13 +55,20 @@ void DevelopScene::Initialize() {
 	// デバッグモード
 	cameraMode_ = CameraMode::DEBUG;
 
+
+	// ライン
+	line_ = std::make_unique<Line>();
+	line_->Initialize();
+	line_->SetCamera(sceneCamera_.get());
+
 	//------------------------------------------------------------
 	// システム初期化
 	//------------------------------------------------------------
 	YoRigine::GameTime::Initialize();
 	YoRigine::JsonManager::SetCurrentScene("DevelopScene");
 	YParticleManager::GetInstance().SetCamera(sceneCamera_.get());
-
+	AreaManager::GetInstance()->Initialize();
+	YoRigine::CollisionManager::GetInstance()->Initialize();
 #ifdef USE_IMGUI
 	YEmitterGroupEditor::GetInstance().SetCamera(sceneCamera_.get());
 	YoRigine::VfxMeshEditor::GetInstance()->Initialize();
@@ -72,8 +81,15 @@ void DevelopScene::Initialize() {
 	YoRigine::GpuEmitManager::GetInstance()->SetCamera(sceneCamera_.get());
 
 
-	//motionEditor_ = std::make_unique<MotionEditor>();
-	//motionEditor_->Initialize(sceneCamera_.get());
+	// エリア設定
+	auto battleFieldArea = std::make_shared<CircleArea>();
+	battleFieldArea->Initialize(Vector3(0, 0, 0), 50.0f);
+	battleFieldArea->SetPurpose(AreaPurpose::Boundary);  // 明示
+	battleFieldArea->SetCamera(sceneCamera_.get());
+
+	auto* mgr = AreaManager::GetInstance();
+	mgr->AddArea("FieldArea", battleFieldArea);
+	mgr->SetDebugDrawEnabled(true);
 
 	//------------------------------------------------------------
 	// エディター用GUI登録
@@ -96,6 +112,9 @@ void DevelopScene::Update() {
 	YoRigine::GameTime::Update();
 	UpdateCamera();
 
+
+	AreaEditor::GetInstance()->Update();
+	YoRigine::CollisionManager::GetInstance()->Update();
 	YoRigine::ModelManipulator::GetInstance()->Update();
 	YoRigine::ParticleManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
 	YParticleManager::GetInstance().Update(YoRigine::GameTime::GetDeltaTime());
@@ -162,6 +181,8 @@ void DevelopScene::DrawObject() {
 // ============================================================
 void DevelopScene::DrawLine() {
 	YoRigine::ModelManipulator::GetInstance()->DrawLine();
+	AreaManager::GetInstance()->DrawArea("FieldArea", line_.get());
+	line_->DrawLine();
 }
 
 

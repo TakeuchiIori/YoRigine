@@ -107,7 +107,6 @@ private:
 	std::unique_ptr<GPUEmitter> gpuEmitter_;
 	std::unique_ptr<Line> line_;
 	std::unique_ptr<Sprite> sprite_;
-	std::shared_ptr<CircleArea> battleFieldArea_;
 
 	// Navigation
 	NavGridConfig navGridConfig_;  // データドリブン設定（JSON管理）

@@ -17,6 +17,7 @@
 #include <Systems/UI/UIManager.h>
 #include "GPUParticle/GpuEmitManager.h"
 #include "Collision/AreaCollision/Base/AreaManager.h"
+#include "Collision/AreaCollision/Base/AreaEditor.h"
 #include <Systems/Audio/Audio.h>
 
 #include "Particle/YParticleManager.h"
@@ -274,7 +275,7 @@ void GameScene::Update() {
 	skyBox_->Update();
 	gameUI_->Update();
 
-
+	AreaEditor::GetInstance()->Update();
 	YoRigine::ModelManipulator::GetInstance()->Update();
 	YoRigine::CollisionManager::GetInstance()->Update();
 	YoRigine::ParticleManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());

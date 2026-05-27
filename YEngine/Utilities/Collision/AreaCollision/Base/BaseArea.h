@@ -8,9 +8,13 @@
 
 // System
 #include "Systems/Camera/Camera.h"
+#include <Loaders/Json/Use/AutoJson.h>
 
 // C++
 #include <functional>
+#include <string>
+#include <json.hpp>
+
 
 // エリアの種類を定義
 enum class AreaType
@@ -19,6 +23,7 @@ enum class AreaType
 	Rectangle,   // 矩形エリア
 	Sphere,      // 球体エリア
 	Box,         // 直方体エリア
+	Polygon,     // 任意多角形エリア
 };
 
 // エリアの用途を定義
@@ -29,15 +34,14 @@ enum class AreaPurpose
 };
 
 // エリア判定の基底クラス
-// 円形バトルフィールド、矩形エリア、トリガーゾーンなどの基盤となるクラス
 class BaseArea
 {
 public:
 	///************************* コールバック定義 *************************///
 
 	using AreaEnterCallback = std::function<void(const Vector3& position)>;
-	using AreaExitCallback = std::function<void(const Vector3& position)>;
-	using AreaStayCallback = std::function<void(const Vector3& position)>;
+	using AreaExitCallback  = std::function<void(const Vector3& position)>;
+	using AreaStayCallback  = std::function<void(const Vector3& position)>;
 
 public:
 	///************************* デストラクタ *************************///
@@ -65,6 +69,9 @@ public:
 	// エリアタイプを取得
 	virtual AreaType GetAreaType() const = 0;
 
+	// タイプ文字列を取得（JSON保存・ファクトリ用）
+	virtual std::string GetTypeString() const = 0;
+
 public:
 	///************************* 共通機能 *************************///
 
@@ -85,55 +92,53 @@ public:
 public:
 	///************************* コールバック設定 *************************///
 
-	// エリアに入った時のコールバック登録
 	void SetOnEnterArea(AreaEnterCallback cb) { enterCallback_ = cb; }
-
-	// エリアから出た時のコールバック登録
-	void SetOnExitArea(AreaExitCallback cb) { exitCallback_ = cb; }
-
-	// エリア内にいる間のコールバック登録
-	void SetOnStayArea(AreaStayCallback cb) { stayCallback_ = cb; }
+	void SetOnExitArea(AreaExitCallback cb)   { exitCallback_  = cb; }
+	void SetOnStayArea(AreaStayCallback cb)   { stayCallback_  = cb; }
 
 public:
 	///************************* アクセッサ *************************///
 
-	// エリアの有効/無効設定
-	void SetActive(bool active) { isActive_ = active; }
-	bool IsActive() const { return isActive_; }
+	void SetActive(bool active)             { isActive_ = active; }
+	bool IsActive() const                   { return isActive_; }
 
-	// エリアの用途設定
-	void SetPurpose(AreaPurpose purpose) { purpose_ = purpose; }
-	AreaPurpose GetPurpose() const { return purpose_; }
+	void SetPurpose(AreaPurpose purpose)    { purpose_ = purpose; }
+	AreaPurpose GetPurpose() const          { return purpose_; }
 
-	// デバッグ描画の有効/無効
-	void SetDebugDrawEnabled(bool enabled) { isDebugDrawEnabled_ = enabled; }
-	bool IsDebugDrawEnabled() const { return isDebugDrawEnabled_; }
+	void SetDebugDrawEnabled(bool enabled)  { isDebugDrawEnabled_ = enabled; }
+	bool IsDebugDrawEnabled() const         { return isDebugDrawEnabled_; }
 
-	// カメラ設定（デバッグ描画用）
-	void SetCamera(Camera* camera) { camera_ = camera; }
+	void SetCamera(Camera* camera)          { camera_ = camera; }
+
+	// AutoJson アクセッサ
+	AutoJson& GetAutoJson()                 { return aj_; }
+	const AutoJson& GetAutoJson() const     { return aj_; }
+
+protected:
+	///************************* AutoJson 登録（派生クラスで override して拡張） *************************///
+
+	// コンストラクタの末尾で必ず呼ぶこと
+	virtual void SetupAutoJson()
+	{
+		aj_.Add("active",    &isActive_)
+		   .Add("debugDraw", &isDebugDrawEnabled_);
+	}
 
 protected:
 	///************************* 内部状態管理 *************************///
 
-	// 前フレームでエリア内にいたか
-	bool wasInside_ = false;
+	bool        wasInside_          = false;
+	bool        isActive_           = true;
+	AreaPurpose purpose_            = AreaPurpose::Boundary;
+	bool        isDebugDrawEnabled_ = true;
+	Camera*     camera_             = nullptr;
 
-	// エリアが有効かどうか
-	bool isActive_ = true;
-
-	// エリアの用途
-	AreaPurpose purpose_ = AreaPurpose::Boundary;
-
-	// デバッグ描画フラグ
-	bool isDebugDrawEnabled_ = true;
-
-	// カメラ参照（デバッグ描画用）
-	Camera* camera_ = nullptr;
+	AutoJson    aj_;
 
 private:
 	///************************* コールバック保持 *************************///
 
 	AreaEnterCallback enterCallback_;
-	AreaExitCallback exitCallback_;
-	AreaStayCallback stayCallback_;
+	AreaExitCallback  exitCallback_;
+	AreaStayCallback  stayCallback_;
 };

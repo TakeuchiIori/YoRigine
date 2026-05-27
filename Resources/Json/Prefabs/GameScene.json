@@ -1,0 +1,189 @@
+{
+    "objects": [
+        {
+            "animationName": "",
+            "filePath": "Blacksmith\\Blacksmith.obj",
+            "id": 0,
+            "isAnimation": false,
+            "modelName": "Blacksmith.obj",
+            "parentID": -1,
+            "position": [
+                5.594755172729492,
+                7.561564416391775e-05,
+                55.53199005126953
+            ],
+            "rotate": [
+                3.1415927410125732,
+                -0.039278194308280945,
+                3.1415884494781494
+            ],
+            "scale": [
+                5.354616165161133,
+                4.077547073364258,
+                3.382692575454712
+            ]
+        },
+        {
+            "animationName": "",
+            "filePath": "House_2\\House_2.obj",
+            "id": 1,
+            "isAnimation": false,
+            "modelName": "House_2.obj",
+            "parentID": -1,
+            "position": [
+                58.533721923828125,
+                0.0,
+                0.2567877769470215
+            ],
+            "rotate": [
+                0.0,
+                1.5046788454055786,
+                0.0
+            ],
+            "scale": [
+                4.84910249710083,
+                4.6269941329956055,
+                4.782597064971924
+            ]
+        },
+        {
+            "animationName": "",
+            "filePath": "Bell_Tower\\Bell_Tower.obj",
+            "id": 2,
+            "isAnimation": false,
+            "modelName": "Bell_Tower.obj",
+            "parentID": -1,
+            "position": [
+                39.78806686401367,
+                0.0,
+                36.09065246582031
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -0.8639569282531738,
+                3.1415908336639404
+            ],
+            "scale": [
+                2.027540922164917,
+                4.562047004699707,
+                3.2538936138153076
+            ]
+        },
+        {
+            "animationName": "",
+            "filePath": "House_1\\House_1.obj",
+            "id": 3,
+            "isAnimation": false,
+            "modelName": "House_1.obj",
+            "parentID": -1,
+            "position": [
+                52.46268844604492,
+                0.0,
+                13.094325065612793
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.3018920421600342,
+                -3.1415724754333496
+            ],
+            "scale": [
+                3.5798819065093994,
+                3.3078629970550537,
+                3.61610746383667
+            ]
+        },
+        {
+            "animationName": "",
+            "filePath": "Blacksmith\\Blacksmith.obj",
+            "id": 4,
+            "isAnimation": false,
+            "modelName": "Blacksmith.obj",
+            "parentID": -1,
+            "position": [
+                26.436691284179688,
+                0.0,
+                48.77960205078125
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -0.51050865650177,
+                3.1415884494781494
+            ],
+            "scale": [
+                5.354616641998291,
+                4.077547073364258,
+                3.382692575454712
+            ]
+        },
+        {
+            "animationName": "",
+            "filePath": "House_2\\House_2.obj",
+            "id": 5,
+            "isAnimation": false,
+            "modelName": "House_2.obj",
+            "parentID": -1,
+            "position": [
+                51.57145690917969,
+                0.0,
+                28.602386474609375
+            ],
+            "rotate": [
+                0.0,
+                1.048319697380066,
+                0.0
+            ],
+            "scale": [
+                4.849102973937988,
+                4.6269941329956055,
+                4.782596111297607
+            ]
+        },
+        {
+            "animationName": "",
+            "filePath": "Ground\\Ground.obj",
+            "id": 6,
+            "isAnimation": false,
+            "modelName": "Ground.obj",
+            "parentID": -1,
+            "position": [
+                0.0,
+                0.10000000149011612,
+                0.0
+            ],
+            "rotate": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.10000000149011612,
+                0.05000000074505806,
+                0.10000000149011612
+            ]
+        },
+        {
+            "animationName": "",
+            "filePath": "Bell_Tower\\Bell_Tower.obj",
+            "id": 7,
+            "isAnimation": false,
+            "modelName": "Bell_Tower.obj",
+            "parentID": -1,
+            "position": [
+                -20.600000381469727,
+                0.0,
+                0.0
+            ],
+            "rotate": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                7.619999885559082,
+                5.570000171661377,
+                7.510000228881836
+            ]
+        }
+    ],
+    "version": 1
+}

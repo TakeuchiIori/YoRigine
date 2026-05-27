@@ -79,10 +79,15 @@ void FieldScene::Initialize(Camera* camera, Player* player) {
 
 
 
-	battleFieldArea_ = std::make_unique<CircleArea>();
-	battleFieldArea_->Initialize(Vector3(0, 0, 0), 50.0f);
-	battleFieldArea_->SetCamera(sceneCamera_);
-	AreaManager::GetInstance()->AddArea("BattleArea", battleFieldArea_);
+	// エリア設定
+	auto battleFieldArea = std::make_shared<CircleArea>();
+	battleFieldArea->Initialize(Vector3(0, 0, 0), 50.0f);
+	battleFieldArea->SetPurpose(AreaPurpose::Boundary);  // 明示
+	battleFieldArea->SetCamera(sceneCamera_);
+
+	auto* mgr = AreaManager::GetInstance();
+	mgr->AddArea("FieldArea", battleFieldArea);
+	mgr->SetDebugDrawEnabled(true);
 
 #ifdef USE_IMGUI
 	Editor::GetInstance()->RegisterGameUI("フィールドモード:デバッグ情報",
@@ -168,7 +173,8 @@ void FieldScene::DrawLine() {
 	fieldEnemyManager_->DrawCollision();
 	fieldEnemyManager_->DrawLine(line_.get());
 	player_->DrawBone(*line_.get());
-	battleFieldArea_->Draw(line_.get());
+	AreaManager::GetInstance()->DrawArea("FieldArea", line_.get());
+	AreaManager::GetInstance()->Draw(line_.get(), { "FieldArea" });
 
 	// ── NavGrid デバッグ描画 ─────────────────────────────────────────────
 	// showNavGridDebug_ が true のときだけグリッドを可視化する。
@@ -267,6 +273,7 @@ void FieldScene::OnEnter() {
 //========================================================================*/
 void FieldScene::OnExit() {
 	BaseSubScene::OnExit();
+	AreaManager::GetInstance()->RemoveArea("FieldArea");
 
 	Logger("[FieldScene] ===== OnExit() START =====\n");
 

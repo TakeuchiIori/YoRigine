@@ -45,6 +45,6 @@ private:
 	bool isDebugCamera_ = false;
 
 	std::unique_ptr<MotionEditor> motionEditor_ = nullptr;
-
+	std::unique_ptr<Line> line_;
 };
 
