@@ -1,5 +1,11 @@
 {
     "colliderTemplates": {
+        "Bell_Tower.obj": {
+            "typeId": 8
+        },
+        "Ground.obj": {
+            "typeId": 0
+        },
         "Player.gltf": {
             "typeId": 0
         }
@@ -18,100 +24,140 @@
             ],
             "animationName": "",
             "colliderEnabled": false,
-            "filePath": "Player\\Player.gltf",
+            "filePath": "Blacksmith\\Blacksmith.obj",
             "id": 0,
-            "isAnimation": true,
-            "modelName": "Player.gltf",
+            "isAnimation": false,
+            "modelName": "Blacksmith.obj",
             "parentID": -1,
             "position": [
-                -10.979893684387207,
-                1.0011787414550781,
-                -13.027837753295898
+                5.594755172729492,
+                7.561564416391775e-05,
+                55.53199005126953
             ],
             "rotate": [
-                0.0,
-                -0.0,
-                0.0
+                3.1415927410125732,
+                -0.039278194308280945,
+                3.1415884494781494
             ],
             "scale": [
+                5.354616165161133,
+                4.077547073364258,
+                3.382692575454712
+            ]
+        },
+        {
+            "aabbMax": [
                 1.0,
                 1.0,
                 1.0
-            ]
-        },
-        {
-            "animationName": "",
-            "colliderEnabled": false,
-            "filePath": "House_1\\House_1.obj",
-            "id": 1,
-            "isAnimation": false,
-            "modelName": "House_1.obj",
-            "parentID": -1,
-            "position": [
-                -1.6030000448226929,
-                0.0,
-                42.20000076293945
             ],
-            "rotate": [
-                0.0,
-                -4.43311882019043,
-                0.0
+            "aabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
             ],
-            "scale": [
-                4.0,
-                4.0,
-                4.0
-            ]
-        },
-        {
             "animationName": "",
             "colliderEnabled": false,
             "filePath": "House_2\\House_2.obj",
-            "id": 2,
+            "id": 1,
             "isAnimation": false,
             "modelName": "House_2.obj",
             "parentID": -1,
             "position": [
-                24.200000762939453,
+                58.533721923828125,
                 0.0,
-                35.19300079345703
+                0.2567877769470215
             ],
             "rotate": [
-                -3.1415908336639404,
-                1.2740896940231323,
-                -3.1415908336639404
+                0.0,
+                1.5046788454055786,
+                0.0
             ],
             "scale": [
-                3.999999761581421,
-                4.0,
-                3.999999761581421
+                4.84910249710083,
+                4.6269941329956055,
+                4.782597064971924
             ]
         },
         {
+            "aabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "aabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
             "animationName": "",
             "colliderEnabled": false,
             "filePath": "Bell_Tower\\Bell_Tower.obj",
-            "id": 3,
+            "id": 2,
             "isAnimation": false,
             "modelName": "Bell_Tower.obj",
             "parentID": -1,
             "position": [
-                13.300000190734863,
+                39.78806686401367,
                 0.0,
-                51.29999923706055
+                36.09065246582031
             ],
             "rotate": [
-                0.0,
-                0.2617993950843811,
-                0.0
+                -3.1415908336639404,
+                -0.8639569282531738,
+                3.1415908336639404
             ],
             "scale": [
-                4.0,
-                4.0,
-                4.0
+                2.027540922164917,
+                4.562047004699707,
+                3.2538936138153076
             ]
         },
         {
+            "aabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "aabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "animationName": "",
+            "colliderEnabled": false,
+            "filePath": "House_1\\House_1.obj",
+            "id": 3,
+            "isAnimation": false,
+            "modelName": "House_1.obj",
+            "parentID": -1,
+            "position": [
+                52.46268844604492,
+                0.0,
+                13.094325065612793
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.3018920421600342,
+                -3.1415724754333496
+            ],
+            "scale": [
+                3.5798819065093994,
+                3.3078629970550537,
+                3.61610746383667
+            ]
+        },
+        {
+            "aabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "aabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
             "animationName": "",
             "colliderEnabled": false,
             "filePath": "Blacksmith\\Blacksmith.obj",
@@ -120,46 +166,66 @@
             "modelName": "Blacksmith.obj",
             "parentID": -1,
             "position": [
-                7.0,
+                26.436691284179688,
                 0.0,
-                -43.20000076293945
+                48.77960205078125
             ],
             "rotate": [
-                0.0,
-                -2.879793167114258,
-                0.0
+                -3.1415908336639404,
+                -0.51050865650177,
+                3.1415884494781494
             ],
             "scale": [
-                4.0,
-                4.0,
-                4.0
+                5.354616641998291,
+                4.077547073364258,
+                3.382692575454712
             ]
         },
         {
+            "aabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "aabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
             "animationName": "",
             "colliderEnabled": false,
-            "filePath": "Blacksmith\\Blacksmith.obj",
+            "filePath": "House_2\\House_2.obj",
             "id": 5,
             "isAnimation": false,
-            "modelName": "Blacksmith.obj",
+            "modelName": "House_2.obj",
             "parentID": -1,
             "position": [
-                -26.299999237060547,
+                51.57145690917969,
                 0.0,
-                -35.20000076293945
+                28.602386474609375
             ],
             "rotate": [
                 0.0,
-                0.22689279913902283,
+                1.048319697380066,
                 0.0
             ],
             "scale": [
-                4.0,
-                4.0,
-                4.0
+                4.849102973937988,
+                4.6269941329956055,
+                4.782596111297607
             ]
         },
         {
+            "aabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "aabbMin": [
+                -5.400000095367432,
+                -1.0,
+                -1.0
+            ],
             "animationName": "",
             "colliderEnabled": false,
             "filePath": "Ground\\Ground.obj",
@@ -169,6 +235,40 @@
             "parentID": -1,
             "position": [
                 0.0,
+                0.10000000149011612,
+                0.0
+            ],
+            "rotate": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.10000000149011612,
+                0.05000000074505806,
+                0.10000000149011612
+            ]
+        },
+        {
+            "aabbMax": [
+                0.800000011920929,
+                4.0,
+                0.8500000238418579
+            ],
+            "aabbMin": [
+                -0.800000011920929,
+                0.0,
+                -0.8500000238418579
+            ],
+            "animationName": "",
+            "colliderEnabled": true,
+            "filePath": "Bell_Tower\\Bell_Tower.obj",
+            "id": 7,
+            "isAnimation": false,
+            "modelName": "Bell_Tower.obj",
+            "parentID": -1,
+            "position": [
+                -20.600000381469727,
                 0.0,
                 0.0
             ],
@@ -178,9 +278,9 @@
                 0.0
             ],
             "scale": [
-                0.10999999940395355,
-                1.0,
-                0.11999999731779099
+                7.619999885559082,
+                5.570000171661377,
+                7.510000228881836
             ]
         }
     ],
