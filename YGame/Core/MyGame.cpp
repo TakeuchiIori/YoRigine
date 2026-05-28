@@ -1,6 +1,5 @@
 #include "MyGame.h"
-#include "Particle./ParticleManager.h"
-#include "Particle/ParticleEditor.h"
+// ParticleManager は削除済み。YParticleManager + EffectHandle を使用。
 #include "Mesh/MeshPrimitive.h"
 #include "Editor/Editor.h"
 #include "Systems/GameTime/GameTime.h"
@@ -45,39 +44,10 @@ void MyGame::Initialize() {
 	YEmitterGroupManager::GetInstance().LoadAllFromFile("Resources/Json/YEmitterGroups/EnemyHit.json");
 
 	//------------------------------------------------------------
-	// パーティクル関連の初期化
+	// パーティクル関連の初期化（YParticle に完全移行済み）
+	// 旧 ParticleManager は削除。エフェクト定義は JSON で管理。
 	//------------------------------------------------------------
-	ParticleEditor::GetInstance().Initialize();
-	YoRigine::ParticleManager::GetInstance()->Initialize(dxCommon_->GetSrvManager());
 	YoRigine::GpuEmitManager::GetInstance()->Initialize();
-
-
-	// パーティクルグループ作成
-	YoRigine::ParticleManager::GetInstance()->CreateParticleGroup("PlayerParticle", "Resources/images/circle.png");
-	YoRigine::ParticleManager::GetInstance()->CreateParticleGroup("TestParticle", "Resources/images/circle.png");
-	YoRigine::ParticleManager::GetInstance()->CreateParticleGroup("PlayerHitParticle", "Resources/images/gradationLine.png");
-	YoRigine::ParticleManager::GetInstance()->CreateParticleGroup("GuardParticle", "Resources/images/gradationLine.png");
-	YoRigine::ParticleManager::GetInstance()->CreateParticleGroup("ParryParticle", "Resources/Effects/star.png");
-	YoRigine::ParticleManager::GetInstance()->CreateParticleGroup("TitleParticle", "Resources/Effects/star.png");
-	YoRigine::ParticleManager::GetInstance()->CreateParticleGroup("ClearParticle", "Resources/Effects/starSmall.png");
-	YoRigine::ParticleManager::GetInstance()->CreateParticleGroup("AreaParticle", "Resources/images/gradationLine.png");
-
-	// メッシュ設定
-	auto planeMesh = MeshPrimitive::CreatePlane(1.0f, 1.0f);
-	auto cylinderMesh = MeshPrimitive::CreateCylinder(1.0f, 0.0f, 32, 1.0f);
-	auto ringMesh = MeshPrimitive::CreateRing(1.0f, 0.5f, 256);
-
-	YoRigine::ParticleManager::GetInstance()->SetPrimitiveMesh("PlayerParticle", planeMesh);
-	YoRigine::ParticleManager::GetInstance()->SetPrimitiveMesh("TestParticle", planeMesh);
-	YoRigine::ParticleManager::GetInstance()->SetPrimitiveMesh("PlayerHitParticle", ringMesh);
-	YoRigine::ParticleManager::GetInstance()->SetPrimitiveMesh("GuardParticle", ringMesh);
-	YoRigine::ParticleManager::GetInstance()->SetPrimitiveMesh("AreaParticle", ringMesh);
-	YoRigine::ParticleManager::GetInstance()->SetPrimitiveMesh("ParryParticle", planeMesh);
-	YoRigine::ParticleManager::GetInstance()->SetPrimitiveMesh("TitleParticle", planeMesh);
-	YoRigine::ParticleManager::GetInstance()->SetPrimitiveMesh("ClearParticle", planeMesh);
-
-	// 保存済みパーティクルの読み込み
-	ParticleEditor::GetInstance().LoadAllSystems();
 
 	// モデル操作関連の初期化
 	YoRigine::ModelManipulator::GetInstance()->Initialize();
@@ -103,7 +73,7 @@ void MyGame::Initialize() {
 
 	// 各種ImGuiツール登録
 	Editor::GetInstance()->RegisterGameUI("ゲーム時間管理", &YoRigine::GameTime::ImGui);
-	Editor::GetInstance()->RegisterGameUI("パーティクルエディター", []() { ParticleEditor::GetInstance().ShowEditor(); });
+	// ParticleEditor は旧システム専用のため削除済み。YParticleEditor を使用。
 	Editor::GetInstance()->RegisterGameUI("モデル操作", []() { YoRigine::ModelManipulator::GetInstance()->DrawImGui(); });
 	Editor::GetInstance()->RegisterGameUI("ポストエフェクト", []() { PostEffectManager::GetInstance()->ImGui(); });
 	Editor::GetInstance()->RegisterGameUI("JSON管理", &YoRigine::JsonManager::ImGuiManager);
@@ -128,7 +98,6 @@ void MyGame::Initialize() {
 /// </summary>
 void MyGame::Finalize() {
 	SceneManager::GetInstance()->Finalize();
-	YoRigine::ParticleManager::GetInstance()->Finalize();
 	YoRigine::ModelManipulator::GetInstance()->Finalize();
 
 #ifdef USE_IMGUI

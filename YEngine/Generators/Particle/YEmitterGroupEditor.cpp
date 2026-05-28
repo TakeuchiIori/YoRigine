@@ -583,31 +583,28 @@ void YEmitterGroupEditor::ShowSelectedEmitterDetail(YParticleEmitter& emitter) {
         default:                          currentType = 0; break;
         }
     }
-    const char* shapeNames[] = { "点", "球", "ボックス" };
-    ImGui::SetNextItemWidth(100);
-    if (ImGui::Combo("##EShape", &currentType, shapeNames, 3)) {
-        switch (currentType) {
-        case 0: emitter.SetShapePoint();          break;
-        case 1: emitter.SetShapeSphere(1.0f);     break;
-        case 2: emitter.SetShapeBox({ 1, 1, 1 }); break;
+    const char* shapeNames[] = { "点", "球", "ボックス", "コーン" };
+    if (auto* shape = emitter.GetShape()) {
+        switch (shape->GetType()) {
+        case YEmitterShape::Type::Sphere: currentType = 1; break;
+        case YEmitterShape::Type::Box:    currentType = 2; break;
+        case YEmitterShape::Type::Cone:   currentType = 3; break;
+        default:                          currentType = 0; break;
         }
     }
+    ImGui::SetNextItemWidth(120);
+    if (ImGui::Combo("##EShape", &currentType, shapeNames, 4)) {
+        switch (currentType) {
+        case 0: emitter.SetShapePoint();           break;
+        case 1: emitter.SetShapeSphere(1.0f);      break;
+        case 2: emitter.SetShapeBox({ 1, 1, 1 });  break;
+        case 3: emitter.SetShapeCone(25.0f, 2.0f); break;
+        }
+    }
+    // 形状パラメーター（DrawEditor() に委譲）
     if (auto* shape = emitter.GetShape()) {
         ImGui::Indent();
-        switch (shape->GetType()) {
-        case YEmitterShape::Type::Sphere: {
-            auto* s = static_cast<YEmitterSphere*>(shape);
-            ImGui::DragFloat("半径##ES", &s->radius, 0.05f, 0.0f, 1000.0f);
-            ImGui::Checkbox("シェルのみ##ES", &s->shellOnly);
-            break;
-        }
-        case YEmitterShape::Type::Box: {
-            auto* b = static_cast<YEmitterBox*>(shape);
-            ImGui::DragFloat3("サイズ##EB", &b->size.x, 0.05f, 0.0f, 1000.0f);
-            break;
-        }
-        default: break;
-        }
+        shape->DrawEditor();
         ImGui::Unindent();
     }
 

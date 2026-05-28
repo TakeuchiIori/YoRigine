@@ -50,11 +50,10 @@ void PlayerSword::Initialize(Camera* camera) {
 
 
 	// ------------------------------------------------------------
-	// エフェクト関連の初期化
+	// エフェクト関連の初期化（YParticle）
+	// エフェクト定義は JSON で管理。ここでは宣言のみ。
+	// 実際の放出は OnHit() や OnAttack() で EffectHandle::PlayOneShot() を使う。
 	// ------------------------------------------------------------
-	particleEmitter_ = std::make_unique<ParticleEmitter>("PlayerParticle", wt_.translate_, 5);
-	hitParticleEmitter_ = std::make_unique<ParticleEmitter>("PlayerHitParticle", wt_.translate_, 5);
-	testEmitter_ = std::make_unique<ParticleEmitter>("TestParticle", wt_.translate_, 10);
 
 	trailEmitter_ = std::make_unique<YoRigine::TrailMeshEmitter>();
 	trailEmitter_->SetCamera(camera_);

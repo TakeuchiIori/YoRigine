@@ -1,4 +1,4 @@
-#include "ClearScene.h"
+﻿#include "ClearScene.h"
 
 // Engine
 #include <SceneSystems/SceneManager.h>
@@ -59,6 +59,7 @@ void ClearScene::Initialize() {
 	YoRigine::ModelManipulator::GetInstance()->SetCamera(sceneCamera_.get());
 	YParticleManager::GetInstance().SetCamera(sceneCamera_.get());
 	
+	YParticleManager::GetInstance().LoadSystemsFromFile("Resources/Json/YEmitterGroups/Clear.json");
 
 	//------------------------------------------------------------
 	// クリア画面スプライトの生成と設定
@@ -109,7 +110,6 @@ void ClearScene::Update() {
 	player_->Update();
 	skyBox_->Update();
 	ground_->Update();
-
 
 
 	YoRigine::ParticleManager::GetInstance()->Emit("ClearParticle", Vector3(0, 0, 0), 10);

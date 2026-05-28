@@ -1,10 +1,26 @@
 #pragma once
 
+// ============================================================
+// [DEPRECATED]
+// ParticleManager / ParticleEmitter は旧来の非モジュール型パーティクルシステムです。
+// 新規コードでは YParticleManager + YParticleEmitter + EffectHandle を使用してください。
+//
+// 移行方法:
+//   旧: ParticleEmitter e("Spark", pos, 10); e.Emit();
+//   新: EffectHandle::PlayOneShot("Spark", pos, 10);
+//
+//   旧: ParticleManager::GetInstance()->CreateParticleGroup("name", "tex.png");
+//   新: YParticleSystem* sys = YParticleManager::GetInstance().CreateSystem("name");
+//       sys->SetTexture("tex.png");
+//       // モジュールを追加してエフェクトを設定
+// ============================================================
+
 #include "ParticleRenderer.h"
 #include "ParticleSystem.h"
 
 /// <summary>
 /// CPUパーティクルの管理クラス
+/// [非推奨] 新規コードでは YParticleManager + EffectHandle を使用してください
 /// </summary>
 namespace YoRigine {
 	class ParticleManager {

@@ -74,4 +74,3 @@ private:
 	std::unique_ptr<DemoPlayer> player_;
 	std::unique_ptr<ClearUI> clearUI_;
 };
-
