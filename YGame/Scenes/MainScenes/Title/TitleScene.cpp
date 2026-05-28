@@ -16,6 +16,8 @@
 #include <ModelManipulator/ModelManipulator.h>
 #include "OffScreen/PostEffectManager.h"
 #include "Systems/Camera/Virtuals/TitleCamera/TitleCamera.h"
+#include "Systems/Camera/CameraDirector.h"
+#include "OffScreen/PostEffectManager.h"
 
 #ifdef USE_IMGUI
 #include "imgui.h"
@@ -44,6 +46,11 @@ void TitleScene::Initialize() {
 	// カメラの登録
 	auto titleCamera = director->GetCamera("TitleCamera");
 	auto debug = director->GetCamera("MainDebug");
+
+	// タイトル用のポストエフェクトの追加
+	auto postEffectManager = PostEffectManager::GetInstance();
+	postEffectManager->LoadPreset("TitleBloom");
+
 	//------------------------------------------------------------
 	// システム初期化
 	//------------------------------------------------------------
@@ -137,17 +144,19 @@ void TitleScene::Draw() {
 	//------------------------------------------------------------
 	YoRigine::ParticleManager::GetInstance()->Draw();
 
+
+}
+
+/// <summary>
+/// オフスクリーン外の描画処理（現状未使用）
+/// </summary>
+void TitleScene::DrawNonOffscreen() {
 	//------------------------------------------------------------
 	// 2D UI描画
 	//------------------------------------------------------------
 	SpriteCommon::GetInstance()->DrawPreference();
 	titleUI_->Draw();
 }
-
-/// <summary>
-/// オフスクリーン外の描画処理（現状未使用）
-/// </summary>
-void TitleScene::DrawNonOffscreen() {}
 
 /// <summary>
 /// 影の描画
