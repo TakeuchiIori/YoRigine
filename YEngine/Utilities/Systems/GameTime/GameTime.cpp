@@ -27,6 +27,18 @@ namespace YoRigine {
 		float   g_AvgFpsHist[kAvgFpsHistSize] = {};
 		size_t  g_AvgFpsWrite = 0;
 		bool    g_AvgFpsFilled = false;
+		
+		float averageFps_ = 0.0f;
+		float fpsCounter_ = 0.0f;
+		int frameCount_ = 0;
+
+		constexpr float fpsInterval_ = 1.0f;
+
+		float hitStopTimer_ = 0.0f;
+		float hitStopDuration_ = 0.0f;
+
+		float slowMotionTimer_ = 0.0f;
+		float slowMotionSpeed_ = 1.0f;
 	}
 
 
@@ -92,6 +104,11 @@ namespace YoRigine {
 			timeScale_ = 0.0f;
 			if (hitStopTimer_ <= 0.0f) {
 				hitStopTimer_ = 0.0f;
+				if (slowMotionTimer_ > 0.0f) {
+					timeScale_ = slowMotionSpeed_;
+				} else {
+					timeScale_ = 1.0f;
+				}
 			}
 		} else if (slowMotionTimer_ > 0.0f) {
 			slowMotionTimer_ -= unscaledDeltaTime_;

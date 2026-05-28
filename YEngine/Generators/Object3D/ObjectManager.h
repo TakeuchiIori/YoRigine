@@ -12,6 +12,7 @@
 
 #include <Collision/AABB/AABBCollider.h>
 #include <Collision/Core/ColliderPool.h>
+#include <Collision/Core/CollisionTypeIdDef.h>
 
 /// <summary>
 /// オブジェクトの管理クラス
@@ -19,6 +20,13 @@
 class ObjectManager
 {
 public:
+	// ── コライダーテンプレート ────────────────────────────────────────────
+	// モデル名をキーに共有される設定。同じモデルを何個置いても設定は1つ。
+	// サイズ・タイプはここで管理し、有効フラグだけ PlacedObject が個別に持つ。
+	struct ColliderTemplate {
+		CollisionTypeIdDef typeId = CollisionTypeIdDef::kNone;
+	};
+
 	// 配置済みオブジェクトの情報
 	struct PlacedObject {
 		std::unique_ptr<Object3d> object;
@@ -38,6 +46,10 @@ public:
 		bool isAnimation = false;
 		std::string animationName = "";
 		std::shared_ptr<AABBCollider> collider; // コリジョン用のAABBコライダー
+
+		// ── コライダー個別設定 ────────────────────────────────────────────
+		// サイズ・タイプは ColliderTemplate を参照する。このフラグだけインスタンス個別。
+		bool colliderEnabled = false;
 
 		PlacedObject() = default;
 		~PlacedObject() = default;
@@ -100,16 +112,42 @@ public:
 	// オブジェクトとその子を再帰的に収集
 	void CollectObjectHierarchy(int rootId, std::vector<PlacedObject*>& collection);
 
-	///************************* ゲッター *************************///
+	///************************* アクセッサ *************************///
 
 	int GetObjectCount() const { return static_cast<int>(idToObject_.size()); }
 	int GetNextObjectId() const { return nextObjectId_; }
+	void SetCamera(Camera* camera) { camera_ = camera; }
+
+	///************************* コライダーテンプレート管理 *************************///
+
+	// モデル名でテンプレートを取得（なければ新規作成して返す）
+	ColliderTemplate& GetOrCreateTemplate(const std::string& modelName);
+
+	// モデル名でテンプレートを取得（なければ nullptr）
+	ColliderTemplate* FindTemplate(const std::string& modelName);
+	const ColliderTemplate* FindTemplate(const std::string& modelName) const;
+
+	// テンプレートを対象オブジェクトのAABBコライダーに反映する
+	// colliderEnabled が false のときは collider を無効化するだけ
+	void ApplyColliderTemplate(PlacedObject& obj);
+
+	// 同名モデルの全オブジェクトにテンプレートを一括反映する
+	void ApplyTemplateToAll(const std::string& modelName);
+
+	// 同名モデルの全オブジェクトの colliderEnabled を一括設定する
+	void SetColliderEnabledAll(const std::string& modelName, bool enabled);
+
+	// テンプレートマップ全体を取得（SceneEditorUI の一覧表示用）
+	std::unordered_map<std::string, ColliderTemplate>& GetColliderTemplates() { return colliderTemplates_; }
+	const std::unordered_map<std::string, ColliderTemplate>& GetColliderTemplates() const { return colliderTemplates_; }
 
 private:
 	ObjectManager() = default;
 	~ObjectManager() = default;
 	ObjectManager(const ObjectManager&) = delete;
 	ObjectManager& operator=(const ObjectManager&) = delete;
+
+	Camera* camera_ = nullptr;
 
 	static ObjectManager* instance_;
 
@@ -121,6 +159,9 @@ private:
 
 	// 次に割り当てるID
 	int nextObjectId_ = 0;
+
+	// モデル名 → コライダーテンプレート
+	std::unordered_map<std::string, ColliderTemplate> colliderTemplates_;
 
 	// オブジェクトの初期化ヘルパー
 	void InitializePlacedObject(PlacedObject& obj, const std::string& modelPath,

@@ -17,6 +17,11 @@
 
 // App
 #include "Enemy/FieldEnemy/FieldEnemyManager.h"
+
+// Navigation
+#include <Systems/Navigation/NavGrid.h>
+#include <Systems/Navigation/NavPathfinder.h>
+#include <Systems/Navigation/NavGridConfig.h>
 #include "SceneDataStructures.h"
 #include "BaseSubScene.h"
 
@@ -51,6 +56,8 @@ public:
 
 	// 終了処理
 	void Finalize() override;
+
+	void RebakeNavGrid();
 
 	///************************* ライフサイクル *************************///
 
@@ -100,5 +107,10 @@ private:
 	std::unique_ptr<GPUEmitter> gpuEmitter_;
 	std::unique_ptr<Line> line_;
 	std::unique_ptr<Sprite> sprite_;
-	std::shared_ptr<CircleArea> battleFieldArea_;
+
+	// Navigation
+	NavGridConfig navGridConfig_;  // データドリブン設定（JSON管理）
+	NavGrid navGrid_;
+	NavPathfinder navPathfinder_;
+	bool showNavGridDebug_ = false; // NavGridデバッグ描画ON/OFF
 };

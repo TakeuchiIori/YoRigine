@@ -15,5 +15,13 @@ public:
 
 private:
 	void ChasePlayer(FieldEnemy& enemy, float dt);
+	void RequestNewPath(FieldEnemy& enemy);
 	bool ShouldGiveUpChase(const FieldEnemy& enemy) const;
+
+	bool CanSeePlayer(const FieldEnemy& enemy) const;
+
+	float chaseTimer_ = 0.0f;
+	float losLostTimer_ = 0.0f;            // ← 追加
+	static constexpr float kMinChaseTime = 0.0f;
+	static constexpr float kLosLostThreshold = 1.0f; // 1.5秒視線断絶で諦める
 };

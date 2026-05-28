@@ -2,10 +2,16 @@
 #include "../FieldEnemy.h"
 #include "FieldEnemyAlertState.h"
 #include "MathFunc.h"
-#include <random>
-#include <numbers>
 #include "Player/Player.h"
 #include <Debugger/Logger.h>
+#include <Object3D/ObjectManager.h>
+#include <Collision/AABB/AABBCollider.h>
+#include <Collision/Core/CollisionTypeIdDef.h>
+#include <Systems/Navigation/VisionSystem.h>
+
+
+#include <random>
+#include <numbers>
 
 /// <summary>
 /// 巡回状態に入った際の初期化処理
@@ -36,57 +42,74 @@ void FieldEnemyPatrolState::Update(FieldEnemy& enemy, float dt) {
 /// </summary>
 void FieldEnemyPatrolState::Exit([[maybe_unused]] FieldEnemy& enemy) {}
 
-/// <summary>
-/// 新しい巡回目標地点を生成する
-/// </summary>
 void FieldEnemyPatrolState::GenerateNewPatrolTarget(FieldEnemy& enemy) {
+	// 既存のランダム生成ロジックで目標座標を決める
 	std::random_device rd;
 	std::mt19937 gen(rd());
-
 	const auto& data = enemy.GetEnemyData();
 	std::uniform_real_distribution<float> angleDist(0.0f, 2.0f * std::numbers::pi_v<float>);
 	std::uniform_real_distribution<float> radiusDist(2.0f, data.patrolRadius);
 
 	float angle = angleDist(gen);
 	float radius = radiusDist(gen);
-
 	Vector3 spawnPos = enemy.GetSpawnPosition();
 	Vector3 newTarget = spawnPos + Vector3(
-		radius * std::cos(angle),
-		0.0f,
-		radius * std::sin(angle)
-	);
+		radius * std::cosf(angle), 0.0f, radius * std::sinf(angle));
 
 	enemy.SetPatrolTarget(newTarget);
+
+	// ── ここで NavPath を計算 ──────────────────────────────────────────
+	NavPathfinder* pf = enemy.GetNavPathfinder();
+	if (pf) {
+		auto path = pf->FindPath(enemy.GetPosition(), newTarget);
+		if (!path.empty()) {
+			enemy.SetNavPath(path);
+			return;
+		}
+	}
+	// NavPath 取れなかった場合は直線移動にフォールバック
+	enemy.ClearNavPath();
 }
 
 /// <summary>
 /// 現在の目標地点に到達したかを判定する
 /// </summary>
 bool FieldEnemyPatrolState::HasReachedTarget(const FieldEnemy& enemy) const {
+	// NavPath が残っている間はウェイポイント側で管理するので false
+	if (enemy.HasNavPath()) return false;
+
 	Vector3 dir = enemy.GetPatrolTarget() - enemy.GetPosition();
 	dir.y = 0.0f;
 	return Length(dir) < 0.5f;
 }
 
-/// <summary>
-/// 目標地点に向かって移動する処理（補間回転を使用）
-/// </summary>
 void FieldEnemyPatrolState::MoveTowardsTarget(FieldEnemy& enemy, float dt) {
-	Vector3 currentPos = enemy.GetPosition();
-	Vector3 target = enemy.GetPatrolTarget();
+	const auto& data = enemy.GetEnemyData();
 
-	Vector3 direction = target - currentPos;
-	direction.y = 0.0f;
+	// NavPath がある → ウェイポイント追従
+	if (enemy.HasNavPath()) {
+		Vector3 waypoint = enemy.GetCurrentWaypoint();
+		Vector3 direction = waypoint - enemy.GetPosition();
+		direction.y = 0.0f;
+		float dist = Length(direction);
 
-	float distance = Length(direction);
-	if (distance > 0.1f) {
-		direction = direction / distance;
-
-		const auto& data = enemy.GetEnemyData();
+		if (dist < 0.6f) {
+			enemy.AdvanceWaypoint();
+			return;
+		}
+		direction = direction / dist;
 		enemy.AddTranslate(direction * data.patrolSpeed * dt);
+		enemy.RotateTowardsDirection(direction, data.rotationSpeed, dt);
+		return;
+	}
 
-		// 補間回転：移動方向へなめらかに向く
+	// フォールバック：既存の直線移動
+	Vector3 direction = enemy.GetPatrolTarget() - enemy.GetPosition();
+	direction.y = 0.0f;
+	float dist = Length(direction);
+	if (dist > 0.1f) {
+		direction = direction / dist;
+		enemy.AddTranslate(direction * data.patrolSpeed * dt);
 		enemy.RotateTowardsDirection(direction, data.rotationSpeed, dt);
 	}
 }
@@ -121,7 +144,7 @@ void FieldEnemyPatrolState::CheckForPlayer(FieldEnemy& enemy) {
 				* (180.0f / std::numbers::pi_v<float>);
 
 			if (angle <= enemy.GetEnemyData().viewAngle * 0.5f) {
-				isDetected = true;
+				isDetected = VisionSystem::HasLineOfSight(enemyPos, playerPos);
 			}
 		}
 	}

@@ -6,6 +6,10 @@
 #include <numbers>
 #include <cmath>
 #include <Debugger/Logger.h>
+#include <Object3D/ObjectManager.h>
+#include <Collision/AABB/AABBCollider.h>
+#include <Collision/Core/CollisionTypeIdDef.h>
+#include <Systems/Navigation/VisionSystem.h>
 
 /// <summary>
 /// 索敵開始：現在の向きを記録してスウィープ周期を計算する
@@ -67,9 +71,11 @@ void FieldEnemySearchState::Update(FieldEnemy& enemy, float dt) {
 					* (180.0f / std::numbers::pi_v<float>);
 
 				if (angle <= data.viewAngle * 0.5f) {
-					Logger("[FieldEnemy] 索敵中に再発見！追跡再開\n");
-					enemy.ChangeState(std::make_unique<FieldEnemyChaseState>());
-					return;
+					if (VisionSystem::HasLineOfSight(enemyPos, playerPos)) {
+						Logger("[FieldEnemy] 索敵中に再発見！追跡再開\n");
+						enemy.ChangeState(std::make_unique<FieldEnemyChaseState>());
+						return;
+					}
 				}
 			}
 		}

@@ -75,4 +75,25 @@ public:
 
 		return collider;
 	}
+
+
+	template<typename T>
+	static std::shared_ptr<T> CreateStatic(
+		WorldTransform* worldTransform,
+		uint32_t typeID)
+	{
+		static_assert(std::is_base_of<BaseCollider, T>::value,
+			"T must be derived from BaseCollider");
+
+		// コライダープールから取得（カスタムデリータ付きshared_ptrで返される）
+		auto collider = ColliderPool::GetInstance()->GetCollider<T>();
+		if (!collider) {
+			return nullptr; // プールが枯渇している場合
+		}
+		collider->SetWT(worldTransform);
+		collider->Initialize();
+		collider->SetTypeID(typeID);
+
+		return collider;
+	}
 };

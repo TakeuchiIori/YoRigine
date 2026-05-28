@@ -5,6 +5,7 @@
 #include <numbers>
 #include <stdexcept>
 #include <algorithm>
+#include <optional>
 
 // Math
 #include "Vector2.h"
@@ -27,6 +28,10 @@ struct Triangle {
 	Vector3 vertex[3];
 };
 
+struct ScreenProjectionResult {
+	Vector3 screenPos;     // スクリーン座標 (X, Y, Z=0)
+	float distanceScale;   // 距離に応じた縮小率
+};
 
 // ベクトルの内積を計算する関数
 float Dot(const Vector3& a, const Vector3& b);
@@ -65,3 +70,13 @@ float RadToDeg(float radius);
 
 // スプライン補間（float型）
 float CubicSplineInterpolate(float p0, float p1, float p2, float p3, float t);
+
+// ワールド→スクリーン座標変換
+namespace Coordinate {
+	std::optional<ScreenProjectionResult> WorldToScreen(
+		const Vector3& worldPos,
+		const Matrix4x4& viewProjectionMatrix,
+		float referenceDistance = 20.0f,
+		float maxScale = 2.0f
+	);
+}

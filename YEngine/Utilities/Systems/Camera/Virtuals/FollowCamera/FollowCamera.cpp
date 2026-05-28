@@ -13,6 +13,8 @@
 #include <Systems/GameTime/GameTime.h>
 #include <Systems/Camera/CameraDirector.h>
 #include <Collision/Core/CollisionTypeIdDef.h>
+#include <Collision/Core/CollisionManager.h>
+#include <cstdlib>
 
 // ============================================================
 // 初期化処理
@@ -20,6 +22,7 @@
 void FollowCamera::Initialize() {
 	VirtualCamera::Initialize();
 	currentScale_ = 1.0f;
+	baseFovY_ = fovY_;
 
 	// ------------------------------------------------------------
 	// デフォルトステートの設定
@@ -62,6 +65,8 @@ void FollowCamera::Update() {
 			ChangeState(std::make_unique<DefaultCameraState>());
 		}
 	}
+
+	UpdateZoom();
 }
 
 // ============================================================
@@ -69,8 +74,10 @@ void FollowCamera::Update() {
 // ============================================================
 void FollowCamera::UpdateInput() {
 	if (isCloseUp_) return;
+	
+	UpdateLockOn();
 
-	if (YoRigine::Input::GetInstance()->IsControllerConnected()) {
+	if (YoRigine::Input::GetInstance()->IsControllerConnected() && !isLockOn_) {
 		XINPUT_STATE joyState;
 		if (YoRigine::Input::GetInstance()->GetJoystickState(0, joyState)) {
 			Vector3 move{ 0.0f, 0.0f, 0.0f };
@@ -134,8 +141,9 @@ void FollowCamera::FollowProcess() {
 	Vector3 safePos = collisionResolver_.Resolve(idealCameraPos, targetPivot);
 
 	// ------------------------------------------------------------
-	// 最終的な座標の適用（最後にカメラシェイクの揺れを足す）
+	// シェイクの更新と最終座標の適用
 	// ------------------------------------------------------------
+	UpdateShake();
 	transform_.translate = safePos + shakeOffset_;
 }
 
@@ -340,5 +348,236 @@ void FollowCamera::Load(const nlohmann::json& j) {
 			battleStartState_ = std::make_shared<BattleStartCameraState>();
 		}
 		battleStartState_->Load(j["battleStartState"]);
+	}
+}
+
+// ============================================================
+// カメラシェイク開始
+// ============================================================
+void FollowCamera::StartShake(float intensity, float duration) {
+	shakeIntensity_ = intensity;
+	shakeDuration_ = duration;
+	shakeTimer_ = 0.0f;
+}
+
+// ============================================================
+// カメラシェイク更新（減衰するランダム揺れ）
+// ============================================================
+void FollowCamera::UpdateShake() {
+	if (shakeTimer_ < shakeDuration_) {
+		shakeTimer_ += YoRigine::GameTime::GetUnscaledDeltaTime();
+
+		// 時間経過で揺れが弱まる減衰係数
+		float decay = 1.0f - (shakeTimer_ / shakeDuration_);
+		if (decay < 0.0f) decay = 0.0f;
+
+		// -1.0 〜 1.0 のランダム値
+		float rx = ((std::rand() % 2001) - 1000) / 1000.0f;
+		float ry = ((std::rand() % 2001) - 1000) / 1000.0f;
+
+		shakeOffset_ = {
+			rx * shakeIntensity_ * decay,
+			ry * shakeIntensity_ * decay,
+			0.0f
+		};
+	}
+	else {
+		shakeOffset_ = { 0.0f, 0.0f, 0.0f };
+	}
+}
+
+// ============================================================
+// FOVズーム開始
+// ============================================================
+void FollowCamera::StartZoom(float targetFov, float duration) {
+	baseFovY_ = 0.45f; // 必要に応じて固定、あるいは呼び出し時の fovY_ を記憶
+	targetZoomFov_ = targetFov;
+	zoomDuration_ = duration;
+	zoomTimer_ = duration;
+}
+
+// ============================================================
+// FOVズーム更新
+// ============================================================
+void FollowCamera::UpdateZoom() {
+	if (zoomTimer_ > 0.0f) {
+		zoomTimer_ -= YoRigine::GameTime::GetUnscaledDeltaTime();
+		
+		float t = 1.0f - (zoomTimer_ / zoomDuration_);
+		if (t < 0.0f) t = 0.0f;
+		if (t > 1.0f) t = 1.0f;
+		
+		// イージングで滑らかに戻るように (t*t)
+		float easeT = t * t; 
+		fovY_ = targetZoomFov_ + (baseFovY_ - targetZoomFov_) * easeT;
+
+		if (zoomTimer_ <= 0.0f) {
+			zoomTimer_ = 0.0f;
+			fovY_ = baseFovY_;
+		}
+	} else {
+		fovY_ = baseFovY_;
+	}
+}
+
+// ============================================================
+// マルチロックオン更新
+// ============================================================
+void FollowCamera::UpdateLockOn() {
+	auto input = YoRigine::Input::GetInstance();
+	
+	// R3押し込みでロックオン切り替え
+	if (input->IsPadTriggered(0, GamePadButton::R_Stick)) {
+		isLockOn_ = !isLockOn_;
+		if (isLockOn_) {
+			lockedTarget_ = nullptr;
+			SwitchLockOnTarget(0); // 0は「一番近い敵」を探す
+			if (!lockedTarget_) {
+				isLockOn_ = false; // 敵がいなければキャンセル
+			}
+		} else {
+			lockedTarget_ = nullptr;
+		}
+	}
+
+	if (!isLockOn_ || !lockedTarget_ || !target_) {
+		isLockOn_ = false;
+		lockedTarget_ = nullptr;
+		return;
+	}
+
+	// ターゲットが有効か確認
+	bool isTargetValid = false;
+	const auto& colliders = YoRigine::CollisionManager::GetInstance()->GetColliders();
+	for (auto* col : colliders) {
+		if (col == lockedTarget_ && col->GetIsActive()) {
+			isTargetValid = true;
+			break;
+		}
+	}
+	
+	if (!isTargetValid) {
+		// 死んだら一番近い敵に切り替える
+		lockedTarget_ = nullptr;
+		SwitchLockOnTarget(0);
+		if (!lockedTarget_) {
+			isLockOn_ = false;
+			return;
+		}
+	}
+
+	// スティック左右で切り替え
+	if (lockOnSwitchCooldown_ > 0.0f) {
+		lockOnSwitchCooldown_ -= YoRigine::GameTime::GetUnscaledDeltaTime();
+	} else {
+		float rx = input->GetRightStickX(0);
+		if (std::abs(rx) > 0.6f) {
+			SwitchLockOnTarget(rx > 0.0f ? 1 : -1);
+			lockOnSwitchCooldown_ = 0.3f;
+		}
+	}
+
+	// ------------------------------------------------------------
+	// カメラをターゲットに向ける処理
+	// ------------------------------------------------------------
+	Vector3 targetPivot = target_->translate_ + Vector3(0.0f, targetPivot_Height_, 0.0f);
+	Vector3 enemyPos = lockedTarget_->GetCenterPosition();
+	
+	Vector3 dir = enemyPos - targetPivot;
+	dir = Normalize(dir);
+
+	float targetYaw = atan2f(dir.x, dir.z);
+	float targetPitch = asinf(-dir.y) + 0.15f; // 少し見下ろす
+	targetPitch = std::clamp(targetPitch, minPitch_, maxPitch_);
+
+	// イージングで滑らかに向かせる
+	float t = std::clamp(10.0f * YoRigine::GameTime::GetUnscaledDeltaTime(), 0.0f, 1.0f);
+	
+	// 最短角度でのLerp (y軸回転のラップアラウンド対応)
+	float diffY = targetYaw - transform_.rotate.y;
+	while (diffY <= -3.14159265f) diffY += 6.2831853f;
+	while (diffY > 3.14159265f) diffY -= 6.2831853f;
+	transform_.rotate.y += diffY * t;
+	
+	// -π ～ π の範囲に収める
+	while (transform_.rotate.y <= -3.14159265f) transform_.rotate.y += 6.2831853f;
+	while (transform_.rotate.y > 3.14159265f) transform_.rotate.y -= 6.2831853f;
+
+	transform_.rotate.x = Lerp(transform_.rotate.x, targetPitch, t);
+}
+
+// ============================================================
+// ロックオンターゲットの切り替え (dir = -1: 左, 1: 右, 0: 一番近い敵)
+// ============================================================
+void FollowCamera::SwitchLockOnTarget(int direction) {
+	if (!target_) return;
+
+	const auto& colliders = YoRigine::CollisionManager::GetInstance()->GetColliders();
+	std::vector<BaseCollider*> enemies;
+
+	// アクティブな敵を収集
+	for (auto* col : colliders) {
+		if (col->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kBattleEnemy) && col->GetIsActive()) {
+			enemies.push_back(col);
+		}
+	}
+
+	if (enemies.empty()) {
+		lockedTarget_ = nullptr;
+		return;
+	}
+
+	Vector3 playerPos = target_->translate_;
+
+	if (direction == 0 || !lockedTarget_) {
+		// 一番近い敵を探す
+		BaseCollider* closest = nullptr;
+		float minDist = (std::numeric_limits<float>::max)();
+		for (auto* e : enemies) {
+			float dist = Length(e->GetCenterPosition() - playerPos);
+			if (dist < minDist) {
+				minDist = dist;
+				closest = e;
+			}
+		}
+		lockedTarget_ = closest;
+	} else {
+		// 左右の切り替え
+		Vector3 currentEnemyPos = lockedTarget_->GetCenterPosition();
+		Vector3 playerToCurrent = Normalize(currentEnemyPos - playerPos);
+		float currentYaw = atan2f(playerToCurrent.x, playerToCurrent.z);
+
+		BaseCollider* bestCandidate = nullptr;
+		float minAngleDiff = (std::numeric_limits<float>::max)();
+
+		for (auto* e : enemies) {
+			if (e == lockedTarget_) continue;
+			
+			Vector3 playerToE = Normalize(e->GetCenterPosition() - playerPos);
+			float eYaw = atan2f(playerToE.x, playerToE.z);
+
+			// 角度差を計算 (-π ～ π)
+			float diff = eYaw - currentYaw;
+			while (diff <= -3.14159265f) diff += 6.2831853f;
+			while (diff > 3.14159265f) diff -= 6.2831853f;
+
+			// 右に倒した (direction == 1) なら diff > 0 の中で最小を探す
+			// 左に倒した (direction == -1) なら diff < 0 の中で最大を探す（絶対値が最小）
+			if (direction == 1 && diff > 0.05f) {
+				if (diff < minAngleDiff) {
+					minAngleDiff = diff;
+					bestCandidate = e;
+				}
+			} else if (direction == -1 && diff < -0.05f) {
+				if (std::abs(diff) < minAngleDiff) {
+					minAngleDiff = std::abs(diff);
+					bestCandidate = e;
+				}
+			}
+		}
+
+		if (bestCandidate) {
+			lockedTarget_ = bestCandidate;
+		}
 	}
 }

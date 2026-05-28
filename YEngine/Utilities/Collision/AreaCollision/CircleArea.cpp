@@ -1,15 +1,22 @@
 #include "CircleArea.h"
 #include "MathFunc.h"
 #include <cmath>
+#include <algorithm>
 
 // ============================================================
 // コンストラクタ
 // ============================================================
+CircleArea::CircleArea()
+{
+	SetupAutoJson();
+}
+
 CircleArea::CircleArea(const Vector3& center, float radius)
 	: center_(center)
 	, radius_(radius)
 	, debugSegments_(64)
 {
+	SetupAutoJson();
 }
 
 // ============================================================
@@ -17,11 +24,14 @@ CircleArea::CircleArea(const Vector3& center, float radius)
 // ============================================================
 void CircleArea::Initialize(const Vector3& center, float radius)
 {
-	center_ = center;
-	radius_ = radius;
-	debugSegments_ = 64;
-	isActive_ = true;
-	wasInside_ = false;
+	center_         = center;
+	radius_         = radius;
+	debugSegments_  = 64;
+	isActive_       = true;
+	wasInside_      = false;
+	ground_.bottom  = 0.0f;
+	ground_.top     = 100.0f;
+	// SetupAutoJson はコンストラクタ済みのためここでは不要
 }
 
 // ============================================================
@@ -48,10 +58,11 @@ bool CircleArea::IsInside(const Vector3& position) const
 Vector3 CircleArea::ClampPosition(const Vector3& position) const
 {
 	Vector3 result = position;
-	// 床より下に行こうとしたら床の高さで止める
+
+	// Y方向のクランプ
 	if (result.y < ground_.bottom) {
 		result.y = ground_.bottom;
-	}else if(result.y > ground_.top) {
+	} else if (result.y > ground_.top) {
 		result.y = ground_.top;
 	}
 
@@ -66,7 +77,6 @@ Vector3 CircleArea::ClampPosition(const Vector3& position) const
 		result.z = clampedXZ.z;
 	}
 
-
 	return result;
 }
 
@@ -79,16 +89,13 @@ float CircleArea::GetDistanceFromBoundary(const Vector3& position) const
 	Vector3 toPosition = position - center_;
 	toPosition.y = 0.0f;
 	float horizontalDistance = Length(toPosition);
-	float distToSide = radius_ - horizontalDistance;
+	float distToSide    = radius_ - horizontalDistance;
 
-	// 床までの距離
-	float distToFloor = position.y - ground_.bottom;
-
-	// 天井までの距離
+	// 床・天井までの距離
+	float distToFloor   = position.y - ground_.bottom;
 	float distToCeiling = ground_.top - position.y;
 
-	// 側面、床、天井のうち、「一番近い距離」を返す
-	// ※どれか1つでもマイナス（範囲外）になっていれば、その一番深いマイナス値が返る
+	// 最も近い境界までの距離を返す（負の値 = 範囲外）
 	return std::min({ distToSide, distToFloor, distToCeiling });
 }
 

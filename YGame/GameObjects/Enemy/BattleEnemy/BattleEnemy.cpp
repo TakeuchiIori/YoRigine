@@ -18,6 +18,8 @@
 #include "States/BattleRecoveryState.h"
 #include "Particle/YEmitterGroupManager.h"
 
+#include <UI/Damage/DamageNumberManager.h>
+
 /*==========================================================================
 デストラクタ
 //========================================================================*/
@@ -277,8 +279,18 @@ void BattleEnemy::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 	if (isAlive_ && !isInvincible_) {
 		// 攻撃を食らった時
 		if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon)) {
-			TakeDamage(static_cast<int>(player_->GetCombat()->GetCombo()->GetCurrentDamage()));
+			// --------------------- ダメージの処理 --------------------- //
+			int damage = static_cast<int>(player_->GetCombat()->GetCombo()->GetCurrentDamage());
+			TakeDamage(damage);
 
+			// ダメージ数値UIをスポーン 
+			// ヒット位置は敵の腰〜胸あたり（+1.0f）に表示
+			Vector3 hitPos = wt_.translate_;
+			hitPos.y += 1.0f;
+
+			bool isSine = (player_->GetCombat()->GetComboDamageMultiplier() > 1.0f);
+
+			DamageNumberManager::GetInstance()->SpawnDamage(damage, hitPos, isSine);
 			// --------------------- ヒットエフェクトの処理 --------------------- //
 			//auto* enemyHitEmitterGroup_ = YEmitterGroupManager::GetInstance().GetGroup("EnemyHit");
 			//if (enemyHitEmitterGroup_) {
@@ -289,7 +301,6 @@ void BattleEnemy::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 			//}
 
 			// --------------------- ヒットカウントの処理 --------------------- //
-			// 連続ヒットカウント増加
 			consecutiveHitCount_++;
 			hitCountResetTimer_ = 0.0f;
 			// 連続ヒット数が限界を超えたら回復状態へ
@@ -339,7 +350,29 @@ void BattleEnemy::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 ヒット中
 //========================================================================*/
 void BattleEnemy::OnCollision([[maybe_unused]] BaseCollider* self, [[maybe_unused]] BaseCollider* other) {
+	if (!isAlive_) return;
 
+	// 敵同士の押し出し処理（重なり防止）
+	if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kBattleEnemy)) {
+		Vector3 otherPos = other->GetWorldTransform().translate_;
+		Vector3 myPos = wt_.translate_;
+
+		Vector3 pushDir = myPos - otherPos;
+		pushDir.y = 0.0f; // 水平方向のみ
+
+		float dist = Length(pushDir);
+		if (dist < 0.001f) {
+			// 完全に重なっている場合はランダムな方向にずらす
+			pushDir = { ((rand() % 100) - 50) * 0.01f, 0.0f, ((rand() % 100) - 50) * 0.01f };
+			if (Length(pushDir) < 0.001f) pushDir = {1.0f, 0.0f, 0.0f};
+		}
+		
+		pushDir = Normalize(pushDir);
+		
+		// 押し出し係数
+		float pushForce = 2.5f * YoRigine::GameTime::GetDeltaTime(); 
+		wt_.translate_ += pushDir * pushForce;
+	}
 }
 
 /*==========================================================================

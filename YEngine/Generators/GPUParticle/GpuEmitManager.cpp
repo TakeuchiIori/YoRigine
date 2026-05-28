@@ -6,7 +6,7 @@
 #include <iostream>
 
 // Engine
-#include "Loaders/Json/JsonConverters.h"
+#include <Loaders/Json/ConversionJson.h>
 #include <Loaders/Texture/TextureManager.h>
 #include <ModelManager.h>
 #include <Debugger/Logger.h>
@@ -1706,7 +1706,7 @@ namespace YoRigine {
 			groupJson["isPlaying"] = groupPtr->isPlaying;
 			groupJson["currentTime"] = groupPtr->currentTime;
 			groupJson["systemDuration"] = groupPtr->systemDuration;
-			groupJson["translate"] = Vector3ToJson(groupPtr->translate);
+			groupJson["translate"] = groupPtr->translate;
 			groupJson["emitters"] = nlohmann::json::array(); // グループ内のエミッター配列
 
 			for (const auto& [emitterName, e] : groupPtr->emitters)
@@ -1724,30 +1724,30 @@ namespace YoRigine {
 				// エミッターの形状
 				//------------------------------------------------------------
 				j["sphereParams"] = {
-					{"translate", Vector3ToJson(e->sphereParams.translate)},
+					{"translate", e->sphereParams.translate},
 					{"radius",    e->sphereParams.radius},
 					{"count",     e->sphereParams.count},
 					{"emitInterval", e->sphereParams.emitInterval}
 				};
 
 				j["boxParams"] = {
-					{"translate", Vector3ToJson(e->boxParams.translate)},
-					{"size",      Vector3ToJson(e->boxParams.size)},
+					{"translate", e->boxParams.translate},
+					{"size",      e->boxParams.size},
 					{"count",     e->boxParams.count},
 					{"emitInterval", e->boxParams.emitInterval}
 				};
 
 				j["triangleParams"] = {
-					{"v1", Vector3ToJson(e->triangleParams.v1)},
-					{"v2", Vector3ToJson(e->triangleParams.v2)},
-					{"v3", Vector3ToJson(e->triangleParams.v3)},
+					{"v1", e->triangleParams.v1},
+					{"v2", e->triangleParams.v2},
+					{"v3", e->triangleParams.v3},
 					{"count", e->triangleParams.count},
 					{"emitInterval", e->triangleParams.emitInterval}
 				};
 
 				j["coneParams"] = {
-					{"translate", Vector3ToJson(e->coneParams.translate)},
-					{"direction", Vector3ToJson(e->coneParams.direction)},
+					{"translate", e->coneParams.translate},
+					{"direction", e->coneParams.direction},
 					{"radius",    e->coneParams.radius},
 					{"height",    e->coneParams.height},
 					{"count",     e->coneParams.count},
@@ -1755,9 +1755,9 @@ namespace YoRigine {
 				};
 				j["meshParams"] = {
 					{"modelName", e->meshParams.model ? e->meshParams.model->GetName() : ""},
-					{"translate", Vector3ToJson(e->meshParams.translate)},
-					{"scale", Vector3ToJson(e->meshParams.scale)},
-					{"rotation", Vector4ToJson({e->meshParams.rotation.x,e->meshParams.rotation.y,e->meshParams.rotation.z,e->meshParams.rotation.w})},
+					{"translate", e->meshParams.translate},
+					{"scale", e->meshParams.scale},
+					{"rotation", e->meshParams.rotation.x,e->meshParams.rotation.y,e->meshParams.rotation.z,e->meshParams.rotation.w},
 					{"count", e->meshParams.count},
 					{"emitInterval", e->meshParams.emitInterval},
 					{"emitMode", static_cast<int>(e->meshParams.emitMode)}
@@ -1772,23 +1772,23 @@ namespace YoRigine {
 					{"lifeTime",    e->particleParams.lifeTime},
 					{"lifeTimeVariance", e->particleParams.lifeTimeVariance},
 
-					{"startScale",          Vector3ToJson(e->particleParams.startScale)},
-					{"startScaleVariance",  Vector3ToJson(e->particleParams.startScaleVariance)},
-					{"endScale",            Vector3ToJson(e->particleParams.endScale)},
-					{"endScaleVariance",    Vector3ToJson(e->particleParams.endScaleVariance)},
+					{"startScale",          e->particleParams.startScale},
+					{"startScaleVariance",  e->particleParams.startScaleVariance},
+					{"endScale",            e->particleParams.endScale},
+					{"endScaleVariance",    e->particleParams.endScaleVariance},
 
 					{"rotation",               e->particleParams.rotation},
 					{"rotationVariance",       e->particleParams.rotationVariance},
 					{"rotationSpeed",          e->particleParams.rotationSpeed},
 					{"rotationSpeedVariance",  e->particleParams.rotationSpeedVariance},
 
-					{"velocity",         Vector3ToJson(e->particleParams.velocity)},
-					{"velocityVariance", Vector3ToJson(e->particleParams.velocityVariance)},
+					{"velocity",         e->particleParams.velocity},
+					{"velocityVariance", e->particleParams.velocityVariance},
 
-					{"startColor",         Vector4ToJson(e->particleParams.startColor)},
-					{"startColorVariance", Vector4ToJson(e->particleParams.startColorVariance)},
-					{"endColor",           Vector4ToJson(e->particleParams.endColor)},
-					{"endColorVariance",   Vector4ToJson(e->particleParams.endColorVariance)},
+					{"startColor",         e->particleParams.startColor},
+					{"startColorVariance", e->particleParams.startColorVariance},
+					{"endColor",           e->particleParams.endColor},
+					{"endColorVariance",   e->particleParams.endColorVariance},
 
 					{"gravity",					e->particleParams.gravity},
 
@@ -1851,7 +1851,7 @@ namespace YoRigine {
 					group->systemDuration = groupJson.value("systemDuration", 0.0f);
 
 					if (groupJson.contains("translate")) {
-						group->translate = JsonToVector3(groupJson["translate"]);
+						group->translate = groupJson["translate"];
 					}
 
 					if (groupJson.contains("emitters")) // エミッター配列があればループ
@@ -1902,7 +1902,7 @@ namespace YoRigine {
 			// Sphere
 			if (j.contains("sphereParams")) {
 				const auto& p = j["sphereParams"];
-				e->sphereParams.translate = JsonToVector3(p["translate"]);
+				e->sphereParams.translate = p["translate"];
 				e->sphereParams.radius = p["radius"];
 				e->sphereParams.count = p["count"];
 				e->sphereParams.emitInterval = p["emitInterval"];
@@ -1911,8 +1911,8 @@ namespace YoRigine {
 			// Box
 			if (j.contains("boxParams")) {
 				const auto& p = j["boxParams"];
-				e->boxParams.translate = JsonToVector3(p["translate"]);
-				e->boxParams.size = JsonToVector3(p["size"]);
+				e->boxParams.translate = p["translate"];
+				e->boxParams.size = p["size"];
 				e->boxParams.count = p["count"];
 				e->boxParams.emitInterval = p["emitInterval"];
 			}
@@ -1920,9 +1920,9 @@ namespace YoRigine {
 			// Triangle
 			if (j.contains("triangleParams")) {
 				const auto& p = j["triangleParams"];
-				e->triangleParams.v1 = JsonToVector3(p["v1"]);
-				e->triangleParams.v2 = JsonToVector3(p["v2"]);
-				e->triangleParams.v3 = JsonToVector3(p["v3"]);
+				e->triangleParams.v1 = p["v1"];
+				e->triangleParams.v2 = p["v2"];
+				e->triangleParams.v3 = p["v3"];
 				e->triangleParams.count = p["count"];
 				e->triangleParams.emitInterval = p["emitInterval"];
 			}
@@ -1930,8 +1930,8 @@ namespace YoRigine {
 			// Cone
 			if (j.contains("coneParams")) {
 				const auto& p = j["coneParams"];
-				e->coneParams.translate = JsonToVector3(p["translate"]);
-				e->coneParams.direction = JsonToVector3(p["direction"]);
+				e->coneParams.translate = p["translate"];
+				e->coneParams.direction = p["direction"];
 				e->coneParams.radius = p["radius"];
 				e->coneParams.height = p["height"];
 				e->coneParams.count = p["count"];
@@ -1946,9 +1946,9 @@ namespace YoRigine {
 					e->meshParams.model = ModelManager::GetInstance()->FindModel(modelName);
 				}
 
-				e->meshParams.translate = JsonToVector3(mp["translate"]);
-				e->meshParams.scale = JsonToVector3(mp["scale"]);
-				Vector4 r = JsonToVector4(mp["rotation"]);
+				e->meshParams.translate = mp["translate"];
+				e->meshParams.scale = mp["scale"];
+				Vector4 r = mp["rotation"];
 				e->meshParams.rotation = Quaternion(r.x, r.y, r.z, r.w);
 
 				e->meshParams.count = mp["count"];
@@ -1967,23 +1967,23 @@ namespace YoRigine {
 				e->particleParams.lifeTimeVariance = pp["lifeTimeVariance"];
 				e->particleParams.isBillboard = pp["isBillboard"];
 
-				e->particleParams.startScale = JsonToVector3(pp["startScale"]);
-				e->particleParams.startScaleVariance = JsonToVector3(pp["startScaleVariance"]);
-				e->particleParams.endScale = JsonToVector3(pp["endScale"]);
-				e->particleParams.endScaleVariance = JsonToVector3(pp["endScaleVariance"]);
+				e->particleParams.startScale = pp["startScale"];
+				e->particleParams.startScaleVariance = pp["startScaleVariance"];
+				e->particleParams.endScale = pp["endScale"];
+				e->particleParams.endScaleVariance = pp["endScaleVariance"];
 
 				e->particleParams.rotation = pp["rotation"];
 				e->particleParams.rotationVariance = pp["rotationVariance"];
 				e->particleParams.rotationSpeed = pp["rotationSpeed"];
 				e->particleParams.rotationSpeedVariance = pp["rotationSpeedVariance"];
 
-				e->particleParams.velocity = JsonToVector3(pp["velocity"]);
-				e->particleParams.velocityVariance = JsonToVector3(pp["velocityVariance"]);
+				e->particleParams.velocity = pp["velocity"];
+				e->particleParams.velocityVariance = pp["velocityVariance"];
 
-				e->particleParams.startColor = JsonToVector4(pp["startColor"]);
-				e->particleParams.startColorVariance = JsonToVector4(pp["startColorVariance"]);
-				e->particleParams.endColor = JsonToVector4(pp["endColor"]);
-				e->particleParams.endColorVariance = JsonToVector4(pp["endColorVariance"]);
+				e->particleParams.startColor = pp["startColor"];
+				e->particleParams.startColorVariance = pp["startColorVariance"];
+				e->particleParams.endColor = pp["endColor"];
+				e->particleParams.endColorVariance = pp["endColorVariance"];
 
 				e->particleParams.gravity = pp["gravity"];
 

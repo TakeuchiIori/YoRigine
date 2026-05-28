@@ -48,7 +48,7 @@ void BattleJumpAttackState::Update(BattleEnemy& enemy, float dt) {
 		const float crouchProgress = std::sin(progress * 1.5708f); // 0→1の曲線（π/2まで）
 
 		Vector3 pos = startPos_;
-		pos.y = startY_ - (params.anticipationCrouchDepth * crouchProgress);
+		pos.y = std::max(0.0f, startY_ - (params.anticipationCrouchDepth * crouchProgress));
 		enemy.SetTranslate(pos);
 
 		// 色を点滅させて警告
@@ -64,7 +64,7 @@ void BattleJumpAttackState::Update(BattleEnemy& enemy, float dt) {
 
 		// さらに沈み込む
 		Vector3 pos = startPos_;
-		pos.y = startY_ - params.anticipationCrouchDepth - (params.crouchDepth * chargeProgress);
+		pos.y = std::max(0.0f, startY_ - params.anticipationCrouchDepth - (params.crouchDepth * chargeProgress));
 		enemy.SetTranslate(pos);
 
 		// 色を変化させる
@@ -92,7 +92,7 @@ void BattleJumpAttackState::Update(BattleEnemy& enemy, float dt) {
 
 		// 垂直方向の計算（放物線）
 		const float heightOffset = params.jumpHeight * (4.0f * jumpProgress * (1.0f - jumpProgress));
-		pos.y = startY_ + heightOffset;
+		pos.y = std::max(0.0f, startY_ + heightOffset);
 
 		enemy.SetTranslate(pos);
 
@@ -113,7 +113,7 @@ void BattleJumpAttackState::Update(BattleEnemy& enemy, float dt) {
 
 		// 着地位置で硬直
 		Vector3 pos = targetPos_;
-		pos.y = startY_;
+		pos.y = std::max(0.0f, startY_);
 		enemy.SetTranslate(pos);
 
 		// 徐々に色を戻す

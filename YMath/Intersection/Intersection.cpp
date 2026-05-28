@@ -214,6 +214,82 @@ bool Intersection::IsCollision(const Ray& ray, const Plane& plane, RaycastHit* o
 }
 
 // ============================================================
+// XZ平面限定の線分-AABB判定（視線遮蔽・NavMesh用）
+// ============================================================
+bool Intersection::IsCollisionSegmentAABB2D(const Vector3& from, const Vector3& to, const AABB& aabb)
+{
+	// 始点から終点へのベクトル（方向と長さの元）を計算
+	float dx = to.x - from.x;
+	float dz = to.z - from.z;
+
+	// 線分の長さを計算
+	float len = std::sqrt(dx * dx + dz * dz);
+
+	// 線分の長さがほぼゼロ（点である）場合は、衝突なしとして早期リターン（ゼロ除算防止）
+	if (len < 1e-6f) return false;
+
+	// 方向ベクトルを正規化（長さを1にする）
+	dx /= len;
+	dz /= len;
+
+	// レイ（直線）がAABBと交差する範囲を表すパラメータ t 
+	// 初期値は線分の範囲（0.0 から len まで）に設定
+	float tmin = 0.0f;
+	float tmax = len;
+
+	// -----------------------------------------------------------------
+	// X軸方向の判定
+	// -----------------------------------------------------------------
+	if (fabsf(dx) < 1e-6f) {
+		// 線分がX軸に対して垂直（真縦）な場合：
+		// 始点のX座標がAABBのX範囲外にあれば、絶対に衝突しない
+		if (from.x < aabb.min.x || from.x > aabb.max.x) return false;
+	}
+	else {
+		// AABBの左右の壁（面）に衝突するタイミング（t1, t2）を計算
+		float t1 = (aabb.min.x - from.x) / dx;
+		float t2 = (aabb.max.x - from.x) / dx;
+
+		// 常に t1（進入） < t2（退出） になるように順序を揃える
+		if (t1 > t2) std::swap(t1, t2);
+
+		// 衝突範囲（区間）を更新
+		tmin = std::max(tmin, t1); // 最も遅い進入タイミング
+		tmax = std::min(tmax, t2); // 最も早い退出タイミング
+
+		// 進入が退出より遅くなった場合は、X軸の壁に当たる前に通り過ぎている（衝突なし）
+		if (tmin > tmax) return false;
+	}
+
+	// -----------------------------------------------------------------
+	// Z軸方向の判定
+	// -----------------------------------------------------------------
+	if (fabsf(dz) < 1e-6f) {
+		// 線分がZ軸に対して垂直（真横）な場合：
+		// 始点のZ座標がAABBのZ範囲外にあれば、絶対に衝突しない
+		if (from.z < aabb.min.z || from.z > aabb.max.z) return false;
+	}
+	else {
+		// AABBの手前と奥の壁（面）に衝突するタイミング（t1, t2）を計算
+		float t1 = (aabb.min.z - from.z) / dz;
+		float t2 = (aabb.max.z - from.z) / dz;
+
+		// 常に t1（進入） < t2（退出） になるように順序を揃える
+		if (t1 > t2) std::swap(t1, t2);
+
+		// 衝突範囲（区間）を更新（X軸の結果と重ね合わせる）
+		tmin = std::max(tmin, t1);
+		tmax = std::min(tmax, t2);
+
+		// X軸とZ軸の共通する衝突区間が存在しない場合は衝突なし
+		if (tmin > tmax) return false;
+	}
+
+	// 最終的に有効な衝突区間（tmax >= 0）が残っていれば衝突していると判定
+	return tmax >= 0.0f;
+}
+
+// ============================================================
 // Sphere vs Sphere
 // ============================================================
 bool Intersection::IsCollision(const Sphere& sphereA, const Sphere& sphereB, CollisionResult* outResult) {

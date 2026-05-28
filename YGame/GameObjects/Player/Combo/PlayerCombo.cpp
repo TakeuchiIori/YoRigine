@@ -87,27 +87,16 @@ AttackData* PlayerCombo::FindBestAttack(AttackType type) {
 
 	const auto& attacks = it->second;
 
-	// ------------------------------------------------------------
-	// 初撃と継続中での取得パターンの切り替え
-	// ------------------------------------------------------------
-	if (GetComboCount() == 0) {
+	// 現在の段数 = いまから行う攻撃が何段目か
+	int comboStep = GetComboCount();
+
+	// 段数が攻撃データ数以上なら最初に戻る
+	if (comboStep >= static_cast<int>(attacks.size())) {
+		comboChain_.clear();
 		return const_cast<AttackData*>(&attacks[0]);
 	}
 	else {
-		AttackType lastType = comboChain_.back().type;
-
-		if (lastType == type) {
-			int sameTypeCount = 0;
-			for (auto combo = comboChain_.rbegin(); combo != comboChain_.rend(); ++combo) {
-				if (combo->type == type) sameTypeCount++;
-				else break;
-			}
-			int index = sameTypeCount % static_cast<int>(attacks.size());
-			return const_cast<AttackData*>(&attacks[index]);
-		}
-		else {
-			return const_cast<AttackData*>(&attacks[0]);
-		}
+		return const_cast<AttackData*>(&attacks[comboStep]);
 	}
 }
 

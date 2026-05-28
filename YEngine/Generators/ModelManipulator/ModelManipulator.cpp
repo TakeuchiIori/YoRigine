@@ -5,6 +5,7 @@
 #include <iostream>
 
 #include "ModelManager.h"
+#include <Collision/Core/CollisionTypeIdDef.h>
 
 #ifdef USE_IMGUI
 #include "imgui.h"
@@ -39,6 +40,7 @@ namespace YoRigine {
 
 		selector_.SetObjectManager(objectManager_);
 		motionEditor_.Initialize(camera_);
+		colliderLine_.Initialize();
 
 #ifdef USE_IMGUI
 		pickBuffer_ = PickBuffer::GetInstance();
@@ -57,6 +59,7 @@ namespace YoRigine {
 		editorUI_.SetPlaceCallback([this](const std::string& path) { PlaceObject(path); });
 		editorUI_.SetSaveCallback([this]() { serializer_.SaveScene(jsonPath_); });
 		editorUI_.SetLoadCallback([this]() { serializer_.LoadScene(jsonPath_); });
+		editorUI_.SetColliderDebugFlag(&showColliderDebug_); // コライダー可視化フラグを渡す
 
 		gizmoCtrl_.Initialize();
 
@@ -143,6 +146,44 @@ namespace YoRigine {
 	void ModelManipulator::DrawLine() {
 		if (!isInitialized_ || !camera_) return;
 		motionEditor_.DrawBone();
+
+		// コライダーAABBのデバッグ描画
+#ifdef USE_IMGUI
+		if (!showColliderDebug_) return;
+		for (auto* obj : objectManager_->GetAllActiveObjects()) {
+			if (!obj || !obj->collider) continue;
+
+			// 種別ごとに色を変える
+			auto* tmpl = objectManager_->FindTemplate(obj->modelName);
+			CollisionTypeIdDef typeId = tmpl ? tmpl->typeId : CollisionTypeIdDef::kNone;
+
+			Vector4 color;
+			switch (typeId) {
+			case CollisionTypeIdDef::kStaticWall:  color = { 1.0f, 0.2f, 0.2f, 1.0f }; break; // 赤
+			case CollisionTypeIdDef::kNavObstacle: color = { 1.0f, 0.8f, 0.0f, 1.0f }; break; // 黄
+			case CollisionTypeIdDef::kNavTrigger:  color = { 0.2f, 0.5f, 1.0f, 1.0f }; break; // 青
+			case CollisionTypeIdDef::kWaypoint:    color = { 0.2f, 1.0f, 0.3f, 1.0f }; break; // 緑
+			default:                               color = { 0.6f, 0.6f, 0.6f, 1.0f }; break; // グレー
+			}
+
+			// 無効なコライダーは暗く半透明で表示（設定中でもサイズ確認できる）
+			if (!obj->colliderEnabled) {
+				color.x *= 0.4f; color.y *= 0.4f; color.z *= 0.4f;
+				color.w = 0.3f;
+			}
+
+			colliderLine_.SetColor(color);
+
+			// AABBCollider::Update() で計算済みのワールド AABB をそのまま使う
+			if (!obj->colliderEnabled) continue; // 無効なら描画スキップ
+			auto* aabb = dynamic_cast<AABBCollider*>(obj->collider.get());
+			if (!aabb) continue;
+
+			const AABB& worldAABB = aabb->GetAABB();
+			colliderLine_.DrawAABB(worldAABB.min, worldAABB.max);
+			colliderLine_.DrawLine();
+		}
+#endif
 	}
 
 	// ============================================================
