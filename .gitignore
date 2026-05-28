@@ -381,5 +381,4 @@ FodyWeavers.xsd
 !Externals/DirectXTex/*.filters
 # INI configuration files
 *.ini
-
-
+/CLAUDE.md

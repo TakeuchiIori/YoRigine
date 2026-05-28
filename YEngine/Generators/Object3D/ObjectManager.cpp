@@ -147,6 +147,10 @@ ObjectManager::PlacedObject* ObjectManager::DuplicateObject(
 	duplicate->scale = original->scale;
 	duplicate->parentID = original->parentID;
 
+	// コライダー設定を複製（typeId・AABBはテンプレート経由で引き継がれる）
+	duplicate->colliderEnabled = original->colliderEnabled;
+	ApplyColliderTemplate(*duplicate);
+
 	UpdateObjectTransform(*duplicate);
 
 	std::cout << "複製: 元ID=" << objectId << " 新ID=" << duplicate->id << std::endl;
@@ -410,20 +414,21 @@ void ObjectManager::ApplyColliderTemplate(PlacedObject& obj) {
 		obj.collider->SetCollisionEnabled(false);
 		return;
 	}
-	// テンプレートが未登録ならデフォルト設定のまま有効化
+	// テンプレートが未登録ならデフォルト設定のまま有効化（AABBは初期値を維持）
 	const ColliderTemplate* tmpl = FindTemplate(obj.modelName);
 	if (!tmpl) {
 		obj.collider->SetCollisionEnabled(true);
 		obj.collider->SetEnablePenetration(true);
-		obj.collider->SetIsStatic(true); // 配置オブジェクトは静的扱い
+		obj.collider->SetIsStatic(true);
 		return;
 	}
 
-	// テンプレートの設定を反映（typeId のみ。AABB 形状はコライダー自身が保持）
+	// テンプレートの設定を反映（typeId + AABB オフセット）
 	obj.collider->SetCollisionEnabled(true);
 	obj.collider->SetEnablePenetration(true);
 	obj.collider->SetIsStatic(true); // 配置オブジェクトは静的扱い
 	obj.collider->SetTypeID(static_cast<uint32_t>(tmpl->typeId));
+	obj.collider->aabbOffset_ = tmpl->aabbOffset;
 }
 
 void ObjectManager::ApplyTemplateToAll(const std::string& modelName) {

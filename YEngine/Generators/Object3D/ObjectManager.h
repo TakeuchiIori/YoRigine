@@ -22,9 +22,10 @@ class ObjectManager
 public:
 	// ── コライダーテンプレート ────────────────────────────────────────────
 	// モデル名をキーに共有される設定。同じモデルを何個置いても設定は1つ。
-	// サイズ・タイプはここで管理し、有効フラグだけ PlacedObject が個別に持つ。
+	// typeId・AABBサイズはここで管理し、有効フラグだけ PlacedObject が個別に持つ。
 	struct ColliderTemplate {
 		CollisionTypeIdDef typeId = CollisionTypeIdDef::kNone;
+		AABB aabbOffset = { {-1.0f,-1.0f,-1.0f}, {1.0f,1.0f,1.0f} };
 	};
 
 	// 配置済みオブジェクトの情報
