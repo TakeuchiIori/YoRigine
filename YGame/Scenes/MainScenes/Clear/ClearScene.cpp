@@ -162,6 +162,7 @@ void ClearScene::DrawNonOffscreen() {
 /// </summary>
 void ClearScene::DrawShadow()
 {
+	DrawCommonShadow();
 	YoRigine::ModelManipulator::GetInstance()->DrawShadow();
 }
 

@@ -160,6 +160,7 @@ void DevelopScene::DrawNonOffscreen() {
 // 影の描画
 // ============================================================
 void DevelopScene::DrawShadow() {
+	DrawCommonShadow();
 	YoRigine::ModelManipulator::GetInstance()->DrawShadow();
 }
 

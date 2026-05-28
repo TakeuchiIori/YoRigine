@@ -28,6 +28,11 @@ void BaseScene::DrawCommonObject()
 	Object3dCommon::GetInstance()->DrawPreference();
 }
 
+void BaseScene::DrawCommonShadow()
+{
+	Object3dCommon::GetInstance()->ShadowDrawPreference();
+}
+
 void BaseScene::DrawCommonParticles()
 {
 	YoRigine::ParticleManager::GetInstance()->Draw();

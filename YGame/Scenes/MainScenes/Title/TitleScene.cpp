@@ -154,6 +154,7 @@ void TitleScene::DrawNonOffscreen() {}
 /// </summary>
 void TitleScene::DrawShadow()
 {
+	DrawCommonShadow();
 	player_->DrawShadow();
 	YoRigine::ModelManipulator::GetInstance()->DrawShadow();
 }

@@ -31,9 +31,15 @@ public: // メンバ関数
 	void Initialize(YoRigine::DirectXCommon* dxCommon);
 
 	/// <summary>
-	/// 共通部描画設定
+	/// 共通部描画設定（メインパス）
 	/// </summary>
 	void DrawPreference();
+
+	/// <summary>
+	/// シャドウパス共通設定（PSO・RS・topology・gLight を1回だけセット）
+	/// DrawShadow() の前に必ず呼ぶこと
+	/// </summary>
+	void ShadowDrawPreference();
 
 public: // アクセッサ
 	// getter

@@ -172,14 +172,12 @@ namespace YoRigine {
 				color.w = 0.3f;
 			}
 
-			colliderLine_.SetColor(color);
-
-			// AABBCollider::Update() で計算済みのワールド AABB をそのまま使う
-			if (!obj->colliderEnabled) continue; // 無効なら描画スキップ
 			auto* aabb = dynamic_cast<AABBCollider*>(obj->collider.get());
 			if (!aabb) continue;
 
+			// ObjectManager::Update() で常にワールド AABB が計算済みなのでそのまま使う
 			const AABB& worldAABB = aabb->GetAABB();
+			colliderLine_.SetColor(color);
 			colliderLine_.DrawAABB(worldAABB.min, worldAABB.max);
 			colliderLine_.DrawLine();
 		}
