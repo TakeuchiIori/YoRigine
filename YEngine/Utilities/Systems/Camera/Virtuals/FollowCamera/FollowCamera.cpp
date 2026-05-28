@@ -27,6 +27,8 @@ void FollowCamera::Initialize() {
 
     collisionResolver_.Initialize();
     collisionResolver_.AddIgnoreTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayer));
+    collisionResolver_.AddIgnoreTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kNavObstacle));
+    collisionResolver_.AddIgnoreTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kStaticWall));
     collisionResolver_.AddIgnoreTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayerShield));
     collisionResolver_.AddIgnoreTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon));
     collisionResolver_.AddIgnoreTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kBattleEnemy));

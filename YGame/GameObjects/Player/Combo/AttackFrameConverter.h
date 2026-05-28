@@ -37,6 +37,16 @@ public:
 			DopeSheet::TrackType::ComboWindow,
 			attack.comboWindowStart, attack.comboWindowEnd));
 
+		// ------------------------------------------------------------
+		// 先行入力受付区間 (Input Buffer)
+		// inputBufferStart から comboWindowEnd までを「バッファ受付帯」として可視化する
+		// ※ 書き戻し時は start のみが inputBufferStart に反映される
+		// ------------------------------------------------------------
+		tracks.push_back(MakeBarTrack(
+			DopeSheet::TrackType::CancelWindow,
+			attack.inputBufferStart, attack.comboWindowEnd,
+			"Input Buffer"));
+
 		return tracks;
 	}
 
@@ -58,6 +68,14 @@ public:
 
 			case DopeSheet::TrackType::ComboWindow:
 				ReadBarTrack(track, attack.comboWindowStart, attack.comboWindowEnd);
+				break;
+
+			case DopeSheet::TrackType::CancelWindow:
+				// 先行入力受付帯：開始フレームのみを inputBufferStart に反映する
+				// （終了は ComboWindow 側の comboWindowEnd と連動させているため触らない）
+				if (!track.keys.empty()) {
+					attack.inputBufferStart = track.keys.front().frame;
+				}
 				break;
 
 			default:

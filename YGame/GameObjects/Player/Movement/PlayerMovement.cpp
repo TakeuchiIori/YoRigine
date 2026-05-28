@@ -76,6 +76,33 @@ void PlayerMovement::Update(float deltaTime) {
 		Vector3 pos = stepStartPos_ + (stepTargetPos_ - stepStartPos_) * t;
 		owner_->SetPosition(pos);
 	}
+
+	// ------------------------------------------------------------
+	// オートホーミング（位置 + Yaw の補間）
+	// ------------------------------------------------------------
+	if (isHoming_ && owner_) {
+		homingTimer_ += deltaTime;
+		float t = (homingDuration_ > 0.0f) ? std::min(homingTimer_ / homingDuration_, 1.0f) : 1.0f;
+		// SmoothStep
+		float s = t * t * (3.0f - 2.0f * t);
+
+		// 位置補間
+		Vector3 pos = homingStartPos_ + (homingTargetPos_ - homingStartPos_) * s;
+		owner_->SetPosition(pos);
+
+		// Yaw補間（最短経路で）
+		float diff = homingTargetYaw_ - homingStartYaw_;
+		while (diff <= -std::numbers::pi_v<float>) diff += 2.0f * std::numbers::pi_v<float>;
+		while (diff >   std::numbers::pi_v<float>) diff -= 2.0f * std::numbers::pi_v<float>;
+		currentRotateY_ = homingStartYaw_ + diff * s;
+		targetRotateY_ = currentRotateY_;
+		ApplyRotate();
+
+		if (t >= 1.0f) {
+			isHoming_ = false;
+			homingTimer_ = 0.0f;
+		}
+	}
 }
 
 // ============================================================
@@ -381,6 +408,35 @@ void PlayerMovement::RequestAttackStep(const Vector3& targetPosition, float step
 	stepTargetPos_ = target;
 	stepProgress_ = 0.0f;
 	isAttackStepping_ = true;
+}
+
+// ============================================================
+// オートホーミングの要求
+// 攻撃発動時に呼ばれ、指定ターゲット方向へ位置と向きを補正する
+// ============================================================
+void PlayerMovement::RequestAutoHoming(const Vector3& targetPosition, float duration, float maxStep) {
+	if (!owner_ || duration <= 0.0f) return;
+
+	Vector3 currentPos = owner_->GetWorldPosition();
+	Vector3 toEnemy = targetPosition - currentPos;
+	toEnemy.y = 0.0f;
+	float dist = toEnemy.Length();
+	if (dist < 0.01f) return;
+
+	Vector3 direction = toEnemy * (1.0f / dist);
+
+	// 前進距離は maxStep 以内、かつターゲットを通り過ぎないように制限
+	float stepLen = std::min(maxStep, dist);
+
+	homingStartPos_ = currentPos;
+	homingTargetPos_ = currentPos + direction * stepLen;
+
+	homingStartYaw_ = currentRotateY_;
+	homingTargetYaw_ = std::atan2f(direction.x, direction.z);
+
+	homingDuration_ = duration;
+	homingTimer_ = 0.0f;
+	isHoming_ = true;
 }
 
 // ============================================================

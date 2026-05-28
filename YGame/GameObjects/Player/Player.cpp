@@ -115,15 +115,27 @@ void Player::InitCombatSystem() {
 void Player::HandleCombatInput() {
 
 	if (playerCamera_ && playerCamera_->IsInPerformance()) return;
+
+	const bool pressedA = input_->IsPadTriggered(0, GamePadButton::A);
+	const bool pressedB = input_->IsPadTriggered(0, GamePadButton::B);
+
+	// 攻撃中は AttackingCombatState 側で先行入力をバッファ／消費するため、
+	// ここでは入力をバッファに積むだけにする（直接 TryAttack はしない）
+	if (combat_->IsAttacking()) {
+		if (pressedA) combat_->BufferAttack(AttackType::A_Arte);
+		else if (pressedB) combat_->BufferAttack(AttackType::B_Arte);
+		return;
+	}
+
 	if (!combat_->IsIdle()) return;
 
 	// A（軽攻撃）
-	if (input_->IsPadTriggered(0, GamePadButton::A) /*|| input_->GetInstance()->TriggerKey(DIK_Q)*/) {
+	if (pressedA) {
 		combat_->TryAttack(AttackType::A_Arte);
 	}
 
 	// B（重攻撃）
-	if (input_->IsPadTriggered(0, GamePadButton::B) /*|| input_->GetInstance()->TriggerKey(DIK_E)*/) {
+	if (pressedB) {
 		combat_->TryAttack(AttackType::B_Arte);
 	}
 

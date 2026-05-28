@@ -73,9 +73,43 @@ void PlayerCombat::Update(float deltaTime) {
 	// ------------------------------------------------------------
 	// ステートマシンおよび下層システムの更新
 	// ------------------------------------------------------------
+	UpdateInputBuffer(deltaTime);
 	stateMachine_.Update(deltaTime);
 	combo_->Update(deltaTime);
 	guard_->Update(deltaTime);
+}
+
+// ============================================================
+// 先行入力（バッファ）に攻撃を積む
+// 既に同種のバッファが存在する場合は最新で上書き
+// ============================================================
+void PlayerCombat::BufferAttack(AttackType type) {
+	bufferedAttackType_ = type;
+	hasBufferedInput_ = true;
+	bufferedInputAge_ = 0.0f;
+}
+
+// ============================================================
+// 先行入力を取り出して消費する
+// ============================================================
+AttackType PlayerCombat::PopBufferedAttack() {
+	AttackType t = bufferedAttackType_;
+	hasBufferedInput_ = false;
+	bufferedInputAge_ = 0.0f;
+	return t;
+}
+
+// ============================================================
+// 先行入力バッファの寿命管理
+// 一定時間消費されなかったバッファは破棄する
+// ============================================================
+void PlayerCombat::UpdateInputBuffer(float deltaTime) {
+	if (!hasBufferedInput_) return;
+	bufferedInputAge_ += deltaTime;
+	if (bufferedInputAge_ >= inputBufferLifetime_) {
+		hasBufferedInput_ = false;
+		bufferedInputAge_ = 0.0f;
+	}
 }
 
 // ============================================================

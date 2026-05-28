@@ -89,6 +89,13 @@ public:
 	bool IsAttackStepping() const { return isAttackStepping_; }
 
 	// ============================================================
+	// オートホーミング（位置 + 向き Slerp）
+	// 攻撃発動時に、指定ターゲット方向へ向きと位置をなめらかに補正する
+	// ============================================================
+	void RequestAutoHoming(const Vector3& targetPosition, float duration, float maxStep);
+	bool IsHoming() const { return isHoming_; }
+
+	// ============================================================
 	// 内部データへの参照取得（State更新用）
 	// ============================================================
 	Vector3& GetVelocityRef() { return velocity_; }
@@ -174,4 +181,16 @@ private:
 	Vector3 stepTargetPos_{ 0.0f, 0.0f, 0.0f };   // ステップで到達する目標位置
 	float stepProgress_ = 0.0f;                   // ステップの進行度（0.0 ～ 1.0）
 	bool isAttackStepping_ = false;               // 現在攻撃ステップ中かどうか
+
+	// ------------------------------------------------------------
+	// オートホーミング用パラメータ
+	// 攻撃発動時にターゲット方向へ向きと位置を Slerp / SmoothStep で補正する
+	// ------------------------------------------------------------
+	bool  isHoming_ = false;
+	float homingDuration_ = 0.12f;
+	float homingTimer_ = 0.0f;
+	Vector3 homingStartPos_{};
+	Vector3 homingTargetPos_{};
+	float homingStartYaw_ = 0.0f;
+	float homingTargetYaw_ = 0.0f;
 };

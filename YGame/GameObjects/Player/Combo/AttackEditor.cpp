@@ -229,6 +229,10 @@ void AttackDataEditor::DrawAttackDetail()
 		changed |= ImGui::InputFloat("モーション速度", &atk.motionSpeed, 0.01f, 0.1f, "%.2f");
 		changed |= ImGui::InputInt("ヒット開始フレーム", &atk.hitStart);
 		changed |= ImGui::InputInt("ヒット終了フレーム", &atk.hitEnd);
+		changed |= ImGui::InputInt("先行入力受付フレーム", &atk.inputBufferStart);
+		if (ImGui::IsItemHovered()) {
+			ImGui::SetTooltip("このフレーム以降に押されたボタンを記憶し、\nコンボ開始フレーム到達時に発火する");
+		}
 		changed |= ImGui::InputInt("コンボ開始フレーム", &atk.comboWindowStart);
 		changed |= ImGui::InputInt("コンボ終了フレーム", &atk.comboWindowEnd);
 	}
@@ -242,6 +246,43 @@ void AttackDataEditor::DrawAttackDetail()
 		changed |= ImGui::InputFloat("ノックバック", &atk.knockback, 0.1f, 1.0f, "%.1f");
 		changed |= ImGui::InputFloat("ノックバック持続時間", &atk.knockbackDuration, 0.1f, 1.0f, "%.2f");
 		changed |= ImGui::InputFloat("踏み込み距離", &atk.stepDistance, 0.1f, 1.0f, "%.2f");
+	}
+
+	// ------------------------------------------------------------
+	// ヒット時の手応え演出（ヒットストップ・画面揺れ）
+	// ------------------------------------------------------------
+	if (ImGui::CollapsingHeader("ヒット演出"))
+	{
+		changed |= ImGui::SliderFloat("ヒットストップ秒数", &atk.hitStopDuration, 0.0f, 0.30f, "%.3f s");
+		if (ImGui::IsItemHovered()) ImGui::SetTooltip("0 でヒットストップ無し。0.05〜0.10 が手応え強め");
+		changed |= ImGui::SliderFloat("シェイク強度", &atk.shakeIntensity, 0.0f, 1.0f, "%.2f");
+		changed |= ImGui::SliderFloat("シェイク継続秒数", &atk.shakeDuration, 0.0f, 0.5f, "%.2f s");
+		if (ImGui::SmallButton("軽攻撃プリセット")) {
+			atk.hitStopDuration = 0.03f; atk.shakeIntensity = 0.15f; atk.shakeDuration = 0.08f;
+			changed = true;
+		}
+		ImGui::SameLine();
+		if (ImGui::SmallButton("重攻撃プリセット")) {
+			atk.hitStopDuration = 0.06f; atk.shakeIntensity = 0.35f; atk.shakeDuration = 0.12f;
+			changed = true;
+		}
+		ImGui::SameLine();
+		if (ImGui::SmallButton("演出オフ")) {
+			atk.hitStopDuration = 0.0f; atk.shakeIntensity = 0.0f; atk.shakeDuration = 0.0f;
+			changed = true;
+		}
+	}
+
+	// ------------------------------------------------------------
+	// オートホーミング（吸い付き）設定
+	// ------------------------------------------------------------
+	if (ImGui::CollapsingHeader("オートホーミング"))
+	{
+		changed |= ImGui::Checkbox("ホーミング有効", &atk.enableHoming);
+		changed |= ImGui::SliderFloat("検索距離 (m)", &atk.homingRange, 0.0f, 20.0f, "%.1f");
+		changed |= ImGui::SliderFloat("扇半角 (度)", &atk.homingAngleDeg, 0.0f, 180.0f, "%.0f");
+		changed |= ImGui::SliderFloat("補正時間 (秒)", &atk.homingDuration, 0.0f, 0.5f, "%.2f");
+		changed |= ImGui::SliderFloat("最大前進距離 (m)", &atk.homingMaxStep, 0.0f, 10.0f, "%.2f");
 	}
 
 	// ------------------------------------------------------------
@@ -367,6 +408,15 @@ void AttackDataEditor::NewAttack()
 	data.canCancel = true;
 	data.canChainToAny = true;
 	data.motionSpeed = 1.0f;
+	data.inputBufferStart = 5;
+	data.hitStopDuration = 0.04f;
+	data.shakeIntensity = 0.2f;
+	data.shakeDuration = 0.10f;
+	data.enableHoming = false;
+	data.homingRange = 6.0f;
+	data.homingAngleDeg = 60.0f;
+	data.homingDuration = 0.12f;
+	data.homingMaxStep = 3.0f;
 
 	attacks_->push_back(data);
 	currentIndex_ = static_cast<int>(attacks_->size()) - 1;

@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(msbuild YoRigine.sln /p:Platform=x64,Configuration=Debug /v:minimal /nologo /m 2>&1 | Select-Object -Last 200)",
+      "PowerShell($vs = Get-ChildItem \"C:\\\\Program Files\\\\Microsoft Visual Studio\" -Filter \"MSBuild.exe\" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1; $vs.FullName)",
+      "PowerShell(& \"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\18\\\\Community\\\\MSBuild\\\\Current\\\\Bin\\\\MSBuild.exe\" YoRigine.sln /p:Platform=x64,Configuration=Debug /v:minimal /nologo /m 2>&1 | Select-Object -Last 300)",
+      "PowerShell(git status --short 2>&1 | Select-Object -First 20; \"---\"; git diff --stat HEAD 2>&1 | Select-Object -First 30)",
+      "PowerShell(Get-Command *)"
+    ]
+  }
+}

@@ -1,7 +1,16 @@
 #include "PlayerCombo.h"
 #include "../Player.h"
+#include "../Movement/PlayerMovement.h"
 #include "AttackDatabase.h"
 #include "AttackEditor.h"
+
+#include "Collision/Core/CollisionManager.h"
+#include "Collision/Core/CollisionTypeIdDef.h"
+#include "MathFunc.h"
+
+#include <cmath>
+#include <limits>
+#include <numbers>
 
 #ifdef USE_IMGUI
 #include "imgui.h"
@@ -119,6 +128,14 @@ void PlayerCombo::ExecuteAttack(const AttackData& attack) {
 	comboTimer_ = 0.0f;
 
 	// ------------------------------------------------------------
+	// オートホーミング（吸い付き）
+	// 攻撃発動の瞬間に視界扇内の最も近い敵を検索し、向きと位置をなめらかに補正する
+	// ------------------------------------------------------------
+	if (attack.enableHoming) {
+		TryAutoHoming(attack);
+	}
+
+	// ------------------------------------------------------------
 	// 攻撃開始/継続コールバックの発火
 	// （これにより AttackingCombatState 側の処理が更新される）
 	// ------------------------------------------------------------
@@ -128,6 +145,56 @@ void PlayerCombo::ExecuteAttack(const AttackData& attack) {
 	else {
 		if (onAttackContinue_) onAttackContinue_(attack);
 	}
+}
+
+// ============================================================
+// オートホーミング処理（攻撃発動時）
+// プレイヤーの正面を中心とした扇状の範囲（内積と距離）で
+// 最も近い敵を検索し、PlayerMovement にホーミング要求を発行する
+// ============================================================
+void PlayerCombo::TryAutoHoming(const AttackData& attack) {
+	if (!owner_ || !owner_->GetMovement()) return;
+
+	Vector3 playerPos = owner_->GetWorldPosition();
+	float yaw = owner_->GetWT().rotate_.y;
+	Vector3 forward = { std::sinf(yaw), 0.0f, std::cosf(yaw) };
+
+	const float maxAngleRad = attack.homingAngleDeg * (std::numbers::pi_v<float> / 180.0f);
+	const float cosThreshold = std::cosf(maxAngleRad);
+	const float maxRangeSq = attack.homingRange * attack.homingRange;
+
+	BaseCollider* bestTarget = nullptr;
+	float bestDistSq = (std::numeric_limits<float>::max)();
+
+	auto* cm = YoRigine::CollisionManager::GetInstance();
+	if (!cm) return;
+
+	for (auto* col : cm->GetColliders()) {
+		if (!col) continue;
+		if (col->GetTypeID() != static_cast<uint32_t>(CollisionTypeIdDef::kBattleEnemy)) continue;
+		if (!col->GetIsActive()) continue;
+
+		Vector3 to = col->GetCenterPosition() - playerPos;
+		to.y = 0.0f;
+		float distSq = to.x * to.x + to.z * to.z;
+		if (distSq > maxRangeSq || distSq < 1e-6f) continue;
+
+		Vector3 toNorm = to * (1.0f / std::sqrtf(distSq));
+		float dot = forward.x * toNorm.x + forward.z * toNorm.z;
+		if (dot < cosThreshold) continue; // 扇の外側
+
+		if (distSq < bestDistSq) {
+			bestDistSq = distSq;
+			bestTarget = col;
+		}
+	}
+
+	if (!bestTarget) return;
+
+	Vector3 targetPos = bestTarget->GetCenterPosition();
+	targetPos.y = playerPos.y; // Y軸は固定
+
+	owner_->GetMovement()->RequestAutoHoming(targetPos, attack.homingDuration, attack.homingMaxStep);
 }
 
 // ============================================================

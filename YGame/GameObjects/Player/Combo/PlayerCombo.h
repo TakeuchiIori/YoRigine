@@ -115,6 +115,7 @@ private:
 	// ============================================================
 	void InitializeAttacks();
 	void ExecuteAttack(const AttackData& attack);
+	void TryAutoHoming(const AttackData& attack);
 
 	void UpdateCC(float deltaTime);
 	void UpdateComboTimer(float deltaTime);
