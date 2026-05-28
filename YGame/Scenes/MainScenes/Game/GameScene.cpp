@@ -131,9 +131,9 @@ void GameScene::Initialize() {
 	auto debug = director->GetCamera("MainDebug");
 	director->SnapToActiveCamera();
 
-	// プレイヤーにフォローカメラを設定
+	// PlayerCamera を初期化（FollowCamera を内包するコンポーネント構成）
 	if (followPtr) {
-		player_->SetFollowCamera(followPtr.get());
+		player_->InitializeCamera(followPtr.get());
 	}
 	skyBox_ = std::make_unique<SkyBox>();
 	skyBox_->Initialize(sceneCamera_.get(), "Resources/DDS/vz_classic_cubemap_ue.dds");
@@ -194,6 +194,9 @@ void GameScene::Initialize() {
 	Editor::GetInstance()->RegisterGameUI("カメラエディター", [this]() {cameraEditor_->Update(); }, "Game");
 	Editor::GetInstance()->RegisterGameUI("カメラモード切り替え", [this]() {UpdateCameraMode(); }, "Game");
 	Editor::GetInstance()->RegisterGameUI("プレイヤーの状態情報", [this]() {player_->DrawImGui(); }, "Game");
+	Editor::GetInstance()->RegisterGameUI("プレイヤーカメラ",     [this]() {
+		if (player_->GetPlayerCamera()) player_->GetPlayerCamera()->DrawImGui();
+	}, "Game");
 	Editor::GetInstance()->RegisterGameUI("ライティング", [this]() { YoRigine::LightManager::GetInstance()->ShowLightingEditor(); }, "Game");
 	Editor::GetInstance()->RegisterGameUI("GpuParticle", [this]() { YoRigine::GpuEmitManager::GetInstance()->DrawImGui(); }, "Game");
 	Editor::GetInstance()->RegisterGameUI("プレイヤー攻撃エディター", [this]() {attackEditor_->DrawImGui(); }, "Game");
@@ -230,6 +233,14 @@ void GameScene::Update() {
 #endif
 
 	UpdateCamera();
+
+	// PlayerCamera フェーズ2: 攻撃カメラオフセットを sceneCamera に後付けで適用
+	// ★ UpdateCamera() の後に呼ぶことで CameraDirector が確定した位置に積み増しできる
+	if (player_->GetPlayerCamera()) {
+		player_->GetPlayerCamera()->ApplyPostDirector(
+			sceneCamera_.get(), YoRigine::GameTime::GetDeltaTime());
+	}
+
 	bool isPlayerDead = player->GetCombat()->IsDead();
 	auto director = CameraDirector::GetInstance();
 	auto follow = director->GetCamera("PlayerFollow");
@@ -248,7 +259,7 @@ void GameScene::Update() {
 		}
 		wasPlayerDead_ = isPlayerDead;
 	}
-	followPtr->SetIsCloseUp(isPlayerDead);
+	if (player_->GetPlayerCamera()) player_->GetPlayerCamera()->SetIsCloseUp(isPlayerDead);
 	// リトライ処理
 	if (gameUI_->IsRetryRequested()) {
 		HandleRetry();
@@ -264,6 +275,12 @@ void GameScene::Update() {
 	// カメラモード同期
 	if (subSceneManager_) {
 		cameraMode_ = subSceneManager_->GetCameraMode();
+	}
+
+	// PlayerCamera フェーズ1: スティック/ロックオン → FollowCamera の回転を確定
+	// ★ UpdateCamera() の前に呼ぶことで CameraDirector が正しい回転で FollowProcess を実行する
+	if (player_->GetPlayerCamera()) {
+		player_->GetPlayerCamera()->UpdatePreDirector();
 	}
 
 	// サブシーン更新

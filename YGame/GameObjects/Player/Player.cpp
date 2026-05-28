@@ -114,7 +114,7 @@ void Player::InitCombatSystem() {
 // ============================================================
 void Player::HandleCombatInput() {
 
-	if (followCamera_->IsInPerformance()) return;
+	if (playerCamera_ && playerCamera_->IsInPerformance()) return;
 	if (!combat_->IsIdle()) return;
 
 	// A（軽攻撃）
@@ -293,9 +293,7 @@ Vector3 Player::GetWorldPosition() {
 // 現在のカメラの回転を取得
 // ============================================================
 Vector3 Player::GetCameraRotation() const {
-	if (camera_ && followCamera_) {
-		return followCamera_->GetRotate();
-	}
+	if (playerCamera_) return playerCamera_->GetRotate();
 	return Vector3(0.0f, 0.0f, 0.0f);
 }
 
@@ -417,17 +415,10 @@ void Player::OnEnterDirectionCollision([[maybe_unused]] BaseCollider* self, Base
 		//------------------------------------------------------------
 		// カメラシェイク（被弾方向で強度を変える）
 		//------------------------------------------------------------
-		if (followCamera_) {
-			float shakeIntensity = 0.4f;
-			float shakeDuration = 0.2f;
-
-			// 背後からの攻撃はより強い揺れ
-			if (dir == HitDirection::Back) {
-				shakeIntensity = 0.6f;
-				shakeDuration = 0.25f;
-			}
-
-			followCamera_->StartShake(shakeIntensity, shakeDuration);
+		if (playerCamera_) {
+			float intensity = (dir == HitDirection::Back) ? 0.6f : 0.4f;
+			float duration  = (dir == HitDirection::Back) ? 0.25f : 0.2f;
+			playerCamera_->StartShake(intensity, duration);
 		}
 
 		// 方向ヒット状態へ遷移
@@ -516,5 +507,8 @@ void Player::LookAtDirection(const Vector3& direction)
 	dir = Vector3::Normalize(dir);
 	float targetYaw = std::atan2f(dir.x, dir.z); // ラジアンで計算
 	wt_.rotate_.y = targetYaw;
-	followCamera_->SetRotate({ followCamera_->GetRotate().x, targetYaw,followCamera_->GetRotate().z });
+	if (playerCamera_) {
+		Vector3 rot = playerCamera_->GetRotate();
+		playerCamera_->SetRotate({ rot.x, targetYaw, rot.z });
+	}
 }
