@@ -32,8 +32,8 @@ Vector3 CameraCollisionResolver::Resolve(const Vector3& idealPos, const Vector3&
 		// 物理コライダー（壁、岩、敵など）とのRaycast判定
 		// ------------------------------------------------------------
 		Ray cameraRay;
-		cameraRay.origin - targetPivot;
-		cameraRay.direction - rayDir;
+		cameraRay.origin = targetPivot;
+		cameraRay.direction = rayDir;
 
 		RaycastHit hitInfo;
 		// Raycastで衝突した場合、ヒット距離をカメラ半径分だけ手前にする
