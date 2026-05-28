@@ -9,6 +9,37 @@
 #include <Object3D/ObjectManager.h>
 #include <Collision/Core/CollisionTypeIdDef.h>
 #include <Collision/AABB/AABBCollider.h>
+#include <Collision/OBB/OBBCollider.h>
+
+// Math
+#include "Matrix4x4.h"
+
+// ============================================================================
+// OBBのAABBを計算するヘルパー（NavGridベイク専用）
+// OBBの各ローカル軸をワールド軸に射影した和がAABBの半サイズになる
+// ============================================================================
+static AABB ComputeAABBFromOBB(const OBB& obb)
+{
+    // OBBの回転行列を再構築（列ベクトル規約: 列i = ローカル軸i のワールド方向）
+    Matrix4x4 R = MakeRotateMatrixXYZ(obb.rotation);
+
+    // ワールド各軸方向へのAABB半サイズ = Σ |ローカル軸i × 半サイズi| の射影
+    // 行0の各要素 = ローカル軸のワールドX成分
+    float extX = obb.size.x * std::abs(R.m[0][0])
+               + obb.size.y * std::abs(R.m[0][1])
+               + obb.size.z * std::abs(R.m[0][2]);
+    float extY = obb.size.x * std::abs(R.m[1][0])
+               + obb.size.y * std::abs(R.m[1][1])
+               + obb.size.z * std::abs(R.m[1][2]);
+    float extZ = obb.size.x * std::abs(R.m[2][0])
+               + obb.size.y * std::abs(R.m[2][1])
+               + obb.size.z * std::abs(R.m[2][2]);
+
+    return AABB{
+        { obb.center.x - extX, obb.center.y - extY, obb.center.z - extZ },
+        { obb.center.x + extX, obb.center.y + extY, obb.center.z + extZ }
+    };
+}
 
 // ============================================================================
 // 初期化
@@ -51,11 +82,16 @@ void NavGrid::Bake(ObjectManager* objectManager) {
             tmpl->typeId != CollisionTypeIdDef::kStaticWall) continue;
         if (!obj->collider || !obj->colliderEnabled) continue;
 
-        auto* aabb = dynamic_cast<AABBCollider*>(obj->collider.get());
-        if (!aabb) continue;
-
-        // AABBCollider::Update() で計算済みのワールド AABB をそのまま使う
-        MarkObstacle(aabb->GetAABB(), true);
+        // AABBCollider
+        if (auto* aabb = dynamic_cast<AABBCollider*>(obj->collider.get())) {
+            MarkObstacle(aabb->GetAABB(), true);
+            continue;
+        }
+        // OBBCollider — 回転を考慮してバウンディングAABBを計算してマーク
+        if (auto* obb = dynamic_cast<OBBCollider*>(obj->collider.get())) {
+            MarkObstacle(ComputeAABBFromOBB(obb->GetOBB()), true);
+            continue;
+        }
     }
 
     // Erosion：エージェント半径分だけ障害物セルを膨張させる
@@ -167,16 +203,22 @@ bool NavGrid::HasLineOfSight(const Vector3& from, const Vector3& to) const
 template<typename Fn>
 void NavGrid::ForEachOverlappingCell(const AABB& worldAABB, Fn fn) const
 {
-    // ワールド座標 → グリッド座標に変換（AABBの四隅）
-    int gxMin = static_cast<int>((worldAABB.min.x - worldMinX_) / cellSize_);
-    int gxMax = static_cast<int>((worldAABB.max.x - worldMinX_) / cellSize_);
-    int gzMin = static_cast<int>((worldAABB.min.z - worldMinZ_) / cellSize_);
-    int gzMax = static_cast<int>((worldAABB.max.z - worldMinZ_) / cellSize_);
+    // ワールド座標 → グリッド浮動小数点座標に変換
+    float rawXMin = (worldAABB.min.x - worldMinX_) / cellSize_;
+    float rawXMax = (worldAABB.max.x - worldMinX_) / cellSize_;
+    float rawZMin = (worldAABB.min.z - worldMinZ_) / cellSize_;
+    float rawZMax = (worldAABB.max.z - worldMinZ_) / cellSize_;
 
-    gxMin = std::clamp(gxMin, 0, widthCells_ - 1);
-    gxMax = std::clamp(gxMax, 0, widthCells_ - 1);
-    gzMin = std::clamp(gzMin, 0, depthCells_ - 1);
-    gzMax = std::clamp(gzMax, 0, depthCells_ - 1);
+    // AABBがグリッド範囲外ならスキップ（クランプでの誤マーク防止）
+    if (rawXMax < 0.0f || rawXMin >= static_cast<float>(widthCells_) ||
+        rawZMax < 0.0f || rawZMin >= static_cast<float>(depthCells_)) {
+        return;
+    }
+
+    int gxMin = std::max(static_cast<int>(rawXMin), 0);
+    int gxMax = std::min(static_cast<int>(rawXMax), widthCells_ - 1);
+    int gzMin = std::max(static_cast<int>(rawZMin), 0);
+    int gzMax = std::min(static_cast<int>(rawZMax), depthCells_ - 1);
 
     for (int gz = gzMin; gz <= gzMax; ++gz) {
         for (int gx = gxMin; gx <= gxMax; ++gx) {

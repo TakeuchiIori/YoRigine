@@ -1,0 +1,94 @@
+{
+  "version": "1.0",
+  "effectCount": 4,
+  "effects": [
+    {
+      "type": 14,
+      "name": "Kuwahara 1",
+      "enabled": true,
+      "parameters": {
+        "exposure": 1.000000,
+        "sigma": 2.000000,
+        "kernelSize": 3,
+        "outlineColor": [0.000000,0.000000,0.000000,1.000000],
+        "radialBlur": { "direction": [0,0], "center": [0.5,0.5], "width": 0.001, "sampleCount": 10, "isRadial": true },
+        "dissolve": { "threshold": 0.5, "edgeWidth": 0.1, "edgeColor": [1,1,1], "invert": 0 },
+        "chromatic": { "aberrationStrength": 0, "screenSize": [0,0], "edgeStrength": 0 },
+        "colorAdjust": { "brightness": 0, "contrast": 1, "saturation": 1, "hue": 0 },
+        "tone": { "gamma": 2.200000, "exposure": 1.000000 },
+        "shatter": { "progress": 0, "resolution": [0,0], "time": 0 },
+        "bloom": { "threshold": 0.6, "intensity": 0.5, "spread": 6, "colorTemperature": 0.3 },
+        "posterize": { "steps": 5, "saturationBoost": 1.2 },
+        "kuwahara": { "radius": 4, "sharpness": 4.000000 },
+        "halftone": { "dotSize": 6, "angle": 45, "strength": 0.85, "threshold": 0.75 },
+        "crossHatch": { "lineSpacing": 8, "lineWidth": 1, "strength": 0.7 }
+      }
+    },
+    {
+      "type": 10,
+      "name": "ColorAdjust 1",
+      "enabled": true,
+      "parameters": {
+        "exposure": 1.000000,
+        "sigma": 2.000000,
+        "kernelSize": 3,
+        "outlineColor": [0.000000,0.000000,0.000000,1.000000],
+        "radialBlur": { "direction": [0,0], "center": [0.5,0.5], "width": 0.001, "sampleCount": 10, "isRadial": true },
+        "dissolve": { "threshold": 0.5, "edgeWidth": 0.1, "edgeColor": [1,1,1], "invert": 0 },
+        "chromatic": { "aberrationStrength": 0, "screenSize": [0,0], "edgeStrength": 0 },
+        "colorAdjust": { "brightness": 0.050000, "contrast": 1.150000, "saturation": 1.400000, "hue": 0 },
+        "tone": { "gamma": 2.200000, "exposure": 1.050000 },
+        "shatter": { "progress": 0, "resolution": [0,0], "time": 0 },
+        "bloom": { "threshold": 0.6, "intensity": 0.5, "spread": 6, "colorTemperature": 0.3 },
+        "posterize": { "steps": 5, "saturationBoost": 1.2 },
+        "kuwahara": { "radius": 4, "sharpness": 4 },
+        "halftone": { "dotSize": 6, "angle": 45, "strength": 0.85, "threshold": 0.75 },
+        "crossHatch": { "lineSpacing": 8, "lineWidth": 1, "strength": 0.7 }
+      }
+    },
+    {
+      "type": 15,
+      "name": "Halftone 1",
+      "enabled": true,
+      "parameters": {
+        "exposure": 1.000000,
+        "sigma": 2.000000,
+        "kernelSize": 3,
+        "outlineColor": [0.000000,0.000000,0.000000,1.000000],
+        "radialBlur": { "direction": [0,0], "center": [0.5,0.5], "width": 0.001, "sampleCount": 10, "isRadial": true },
+        "dissolve": { "threshold": 0.5, "edgeWidth": 0.1, "edgeColor": [1,1,1], "invert": 0 },
+        "chromatic": { "aberrationStrength": 0, "screenSize": [0,0], "edgeStrength": 0 },
+        "colorAdjust": { "brightness": 0, "contrast": 1, "saturation": 1, "hue": 0 },
+        "tone": { "gamma": 2.200000, "exposure": 1.000000 },
+        "shatter": { "progress": 0, "resolution": [0,0], "time": 0 },
+        "bloom": { "threshold": 0.6, "intensity": 0.5, "spread": 6, "colorTemperature": 0.3 },
+        "posterize": { "steps": 5, "saturationBoost": 1.2 },
+        "kuwahara": { "radius": 4, "sharpness": 4 },
+        "halftone": { "dotSize": 5.000000, "angle": 45.000000, "strength": 0.750000, "threshold": 0.650000 },
+        "crossHatch": { "lineSpacing": 8, "lineWidth": 1, "strength": 0.7 }
+      }
+    },
+    {
+      "type": 2,
+      "name": "DepthOutline 1",
+      "enabled": true,
+      "parameters": {
+        "exposure": 1.000000,
+        "sigma": 2.000000,
+        "kernelSize": 3,
+        "outlineColor": [0.000000,0.000000,0.000000,1.000000],
+        "radialBlur": { "direction": [0,0], "center": [0.5,0.5], "width": 0.001, "sampleCount": 10, "isRadial": true },
+        "dissolve": { "threshold": 0.5, "edgeWidth": 0.1, "edgeColor": [1,1,1], "invert": 0 },
+        "chromatic": { "aberrationStrength": 0, "screenSize": [0,0], "edgeStrength": 0 },
+        "colorAdjust": { "brightness": 0, "contrast": 1, "saturation": 1, "hue": 0 },
+        "tone": { "gamma": 2.200000, "exposure": 1.000000 },
+        "shatter": { "progress": 0, "resolution": [0,0], "time": 0 },
+        "bloom": { "threshold": 0.6, "intensity": 0.5, "spread": 6, "colorTemperature": 0.3 },
+        "posterize": { "steps": 5, "saturationBoost": 1.2 },
+        "kuwahara": { "radius": 4, "sharpness": 4 },
+        "halftone": { "dotSize": 6, "angle": 45, "strength": 0.85, "threshold": 0.75 },
+        "crossHatch": { "lineSpacing": 8, "lineWidth": 1, "strength": 0.7 }
+      }
+    }
+  ]
+}

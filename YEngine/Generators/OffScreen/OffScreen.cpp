@@ -32,6 +32,12 @@ void OffScreen::Initialize()
 	RegisterPipeline(OffScreenEffectType::Chromatic, "Chromatic");
 	RegisterPipeline(OffScreenEffectType::ColorAdjust, "ColorAdjust");
 	RegisterPipeline(OffScreenEffectType::ShatterTransition, "ShatterTransition");
+	RegisterPipeline(OffScreenEffectType::Bloom, "Bloom");
+	RegisterPipeline(OffScreenEffectType::Posterize, "Posterize");
+	RegisterPipeline(OffScreenEffectType::Kuwahara, "Kuwahara");
+	RegisterPipeline(OffScreenEffectType::Halftone, "Halftone");
+	RegisterPipeline(OffScreenEffectType::CrossHatch, "CrossHatch");
+	RegisterPipeline(OffScreenEffectType::ColorGrade, "ColorGrade");
 
 	// マスク・破片テクスチャの読み込み
 	TextureManager::GetInstance()->LoadTexture(maskTexturePath_);
@@ -62,6 +68,12 @@ void OffScreen::RenderEffect(OffScreenEffectType type, D3D12_GPU_DESCRIPTOR_HAND
 	case OffScreenEffectType::Chromatic:         ExecuteChromaticEffect(inputSRV); break;
 	case OffScreenEffectType::ColorAdjust:       ExecuteColorAdjustEffect(inputSRV); break;
 	case OffScreenEffectType::ShatterTransition: ExecuteShatterTransitionEffect(inputSRV); break;
+	case OffScreenEffectType::Bloom:             ExecuteBloomEffect(inputSRV); break;
+	case OffScreenEffectType::Posterize:         ExecutePosterizeEffect(inputSRV); break;
+	case OffScreenEffectType::Kuwahara:          ExecuteKuwaharaEffect(inputSRV); break;
+	case OffScreenEffectType::Halftone:          ExecuteHalftoneEffect(inputSRV); break;
+	case OffScreenEffectType::CrossHatch:        ExecuteCrossHatchEffect(inputSRV); break;
+	case OffScreenEffectType::ColorGrade:        ExecuteColorGradeEffect(inputSRV); break;
 	}
 
 	// フルスクリーン三角形描画
@@ -83,6 +95,12 @@ void OffScreen::ReleaseResources()
 	colorAdjustResource_.Reset();
 	toneParamsResource_.Reset();
 	shatterTransitionResource_.Reset();
+	bloomResource_.Reset();
+	posterizeResource_.Reset();
+	kuwaharaResource_.Reset();
+	halftoneResource_.Reset();
+	crossHatchResource_.Reset();
+	colorGradeResource_.Reset();
 
 	boxData_ = nullptr;
 	gaussData_ = nullptr;
@@ -94,6 +112,12 @@ void OffScreen::ReleaseResources()
 	colorAdjustData_ = nullptr;
 	toneParamsData_ = nullptr;
 	shatterTransitionData_ = nullptr;
+	bloomData_ = nullptr;
+	posterizeData_ = nullptr;
+	kuwaharaData_ = nullptr;
+	halftoneData_ = nullptr;
+	crossHatchData_ = nullptr;
+	colorGradeData_ = nullptr;
 }
 
 // =======================
@@ -185,6 +209,70 @@ void OffScreen::SetShatterTransitionParams(const ShatterTransitionParams& params
 	}
 }
 
+/// <summary>ブルーム設定</summary>
+void OffScreen::SetBloomParams(const BloomParams& params)
+{
+	if (bloomData_) {
+		bloomData_->threshold = params.threshold;
+		bloomData_->intensity = params.intensity;
+		bloomData_->spread = params.spread;
+		bloomData_->colorTemperature = params.colorTemperature;
+	}
+}
+
+/// <summary>ポスタリゼーション設定</summary>
+void OffScreen::SetPosterizeParams(const PosterizeParams& params)
+{
+	if (posterizeData_) {
+		posterizeData_->steps = params.steps;
+		posterizeData_->saturationBoost = params.saturationBoost;
+	}
+}
+
+/// <summary>クワハラ（油絵）フィルター設定</summary>
+void OffScreen::SetKuwaharaParams(const KuwaharaParams& params)
+{
+	if (kuwaharaData_) {
+		kuwaharaData_->radius = params.radius;
+		kuwaharaData_->sharpness = params.sharpness;
+	}
+}
+
+/// <summary>ハーフトーン設定</summary>
+void OffScreen::SetHalftoneParams(const HalftoneParams& params)
+{
+	if (halftoneData_) {
+		halftoneData_->dotSize = params.dotSize;
+		halftoneData_->angle = params.angle;
+		halftoneData_->strength = params.strength;
+		halftoneData_->threshold = params.threshold;
+	}
+}
+
+/// <summary>クロスハッチング設定</summary>
+void OffScreen::SetCrossHatchParams(const CrossHatchParams& params)
+{
+	if (crossHatchData_) {
+		crossHatchData_->lineSpacing = params.lineSpacing;
+		crossHatchData_->lineWidth = params.lineWidth;
+		crossHatchData_->strength = params.strength;
+	}
+}
+
+/// <summary>カラーグレーディング設定</summary>
+void OffScreen::SetColorGradeParams(const ColorGradeParams& params)
+{
+	if (colorGradeData_) {
+		colorGradeData_->shadowColor    = params.shadowColor;
+		colorGradeData_->splitBalance   = params.splitBalance;
+		colorGradeData_->highlightColor = params.highlightColor;
+		colorGradeData_->splitStrength  = params.splitStrength;
+		colorGradeData_->vibrance       = params.vibrance;
+		colorGradeData_->colorTemp      = params.colorTemp;
+		colorGradeData_->colorTint      = params.colorTint;
+	}
+}
+
 // ===========================
 // ブラーアニメーション制御
 // ===========================
@@ -247,6 +335,12 @@ void OffScreen::CreateAllResources()
 	CreateChromaticResource();
 	CreateColorAdjustResource();
 	CreateShatterTransitionResource();
+	CreateBloomResource();
+	CreatePosterizeResource();
+	CreateKuwaharaResource();
+	CreateHalftoneResource();
+	CreateCrossHatchResource();
+	CreateColorGradeResource();
 }
 
 /// <summary>ボックスフィルタ用バッファ</summary>
@@ -345,6 +439,72 @@ void OffScreen::CreateShatterTransitionResource()
 	shatterTransitionData_->progress = 0.0f;
 	shatterTransitionData_->resolution = { WinApp::kClientWidth, WinApp::kClientHeight };
 	shatterTransitionData_->time = 0.0f;
+}
+
+/// <summary>ブルーム用バッファ</summary>
+void OffScreen::CreateBloomResource()
+{
+	bloomResource_ = dxCommon_->CreateBufferResource(sizeof(BloomForGPU));
+	bloomResource_->Map(0, nullptr, reinterpret_cast<void**>(&bloomData_));
+	bloomData_->threshold = 0.6f;
+	bloomData_->intensity = 0.5f;
+	bloomData_->spread = 6.0f;
+	bloomData_->colorTemperature = 0.3f;
+}
+
+/// <summary>ポスタリゼーション用バッファ</summary>
+void OffScreen::CreatePosterizeResource()
+{
+	posterizeResource_ = dxCommon_->CreateBufferResource(sizeof(PosterizeForGPU));
+	posterizeResource_->Map(0, nullptr, reinterpret_cast<void**>(&posterizeData_));
+	posterizeData_->steps = 5;
+	posterizeData_->saturationBoost = 1.2f;
+}
+
+/// <summary>クワハラフィルター用バッファ</summary>
+void OffScreen::CreateKuwaharaResource()
+{
+	kuwaharaResource_ = dxCommon_->CreateBufferResource(sizeof(KuwaharaForGPU));
+	kuwaharaResource_->Map(0, nullptr, reinterpret_cast<void**>(&kuwaharaData_));
+	kuwaharaData_->radius = 4;
+	kuwaharaData_->sharpness = 4.0f;
+}
+
+/// <summary>ハーフトーン用バッファ</summary>
+void OffScreen::CreateHalftoneResource()
+{
+	halftoneResource_ = dxCommon_->CreateBufferResource(sizeof(HalftoneForGPU));
+	halftoneResource_->Map(0, nullptr, reinterpret_cast<void**>(&halftoneData_));
+	halftoneData_->dotSize = 6.0f;
+	halftoneData_->angle = 45.0f;
+	halftoneData_->strength = 0.85f;
+	halftoneData_->threshold = 0.75f;
+}
+
+/// <summary>クロスハッチング用バッファ</summary>
+void OffScreen::CreateCrossHatchResource()
+{
+	crossHatchResource_ = dxCommon_->CreateBufferResource(sizeof(CrossHatchForGPU));
+	crossHatchResource_->Map(0, nullptr, reinterpret_cast<void**>(&crossHatchData_));
+	crossHatchData_->lineSpacing = 8.0f;
+	crossHatchData_->lineWidth = 1.0f;
+	crossHatchData_->strength = 0.7f;
+	crossHatchData_->padding = 0.0f;
+}
+
+/// <summary>カラーグレーディング用バッファ</summary>
+void OffScreen::CreateColorGradeResource()
+{
+	colorGradeResource_ = dxCommon_->CreateBufferResource(sizeof(ColorGradeForGPU));
+	colorGradeResource_->Map(0, nullptr, reinterpret_cast<void**>(&colorGradeData_));
+	colorGradeData_->shadowColor    = { 0.0f, 0.02f, 0.08f };
+	colorGradeData_->splitBalance   = 0.45f;
+	colorGradeData_->highlightColor = { 0.10f, 0.06f, -0.02f };
+	colorGradeData_->splitStrength  = 0.25f;
+	colorGradeData_->vibrance       = 0.30f;
+	colorGradeData_->colorTemp      = 0.08f;
+	colorGradeData_->colorTint      = 0.0f;
+	colorGradeData_->padding        = 0.0f;
 }
 
 // ===============================
@@ -473,4 +633,58 @@ void OffScreen::ExecuteShatterTransitionEffect(D3D12_GPU_DESCRIPTOR_HANDLE input
 	cmd->SetGraphicsRootDescriptorTable(indices.at("sceneTex"), inputSRV);
 	cmd->SetGraphicsRootDescriptorTable(indices.at("crackTex"), TextureManager::GetInstance()->GetsrvHandleGPU(shatterTexturePath_));
 	cmd->SetGraphicsRootConstantBufferView(indices.at("cbPostEffect"), shatterTransitionResource_->GetGPUVirtualAddress());
+}
+
+void OffScreen::ExecuteBloomEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV)
+{
+	auto cmd = dxCommon_->GetCommandList();
+	auto pm = YPipelineManager::GetInstance();
+	const auto& indices = pm->GetParameterIndices("Bloom");
+	cmd->SetGraphicsRootDescriptorTable(indices.at("gTexture"), inputSRV);
+	cmd->SetGraphicsRootConstantBufferView(indices.at("BloomParams"), bloomResource_->GetGPUVirtualAddress());
+}
+
+void OffScreen::ExecutePosterizeEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV)
+{
+	auto cmd = dxCommon_->GetCommandList();
+	auto pm = YPipelineManager::GetInstance();
+	const auto& indices = pm->GetParameterIndices("Posterize");
+	cmd->SetGraphicsRootDescriptorTable(indices.at("gTexture"), inputSRV);
+	cmd->SetGraphicsRootConstantBufferView(indices.at("PosterizeParams"), posterizeResource_->GetGPUVirtualAddress());
+}
+
+void OffScreen::ExecuteKuwaharaEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV)
+{
+	auto cmd = dxCommon_->GetCommandList();
+	auto pm = YPipelineManager::GetInstance();
+	const auto& indices = pm->GetParameterIndices("Kuwahara");
+	cmd->SetGraphicsRootDescriptorTable(indices.at("gTexture"), inputSRV);
+	cmd->SetGraphicsRootConstantBufferView(indices.at("KuwaharaParams"), kuwaharaResource_->GetGPUVirtualAddress());
+}
+
+void OffScreen::ExecuteHalftoneEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV)
+{
+	auto cmd = dxCommon_->GetCommandList();
+	auto pm = YPipelineManager::GetInstance();
+	const auto& indices = pm->GetParameterIndices("Halftone");
+	cmd->SetGraphicsRootDescriptorTable(indices.at("gTexture"), inputSRV);
+	cmd->SetGraphicsRootConstantBufferView(indices.at("HalftoneParams"), halftoneResource_->GetGPUVirtualAddress());
+}
+
+void OffScreen::ExecuteCrossHatchEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV)
+{
+	auto cmd = dxCommon_->GetCommandList();
+	auto pm = YPipelineManager::GetInstance();
+	const auto& indices = pm->GetParameterIndices("CrossHatch");
+	cmd->SetGraphicsRootDescriptorTable(indices.at("gTexture"), inputSRV);
+	cmd->SetGraphicsRootConstantBufferView(indices.at("CrossHatchParams"), crossHatchResource_->GetGPUVirtualAddress());
+}
+
+void OffScreen::ExecuteColorGradeEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV)
+{
+	auto cmd = dxCommon_->GetCommandList();
+	auto pm = YPipelineManager::GetInstance();
+	const auto& indices = pm->GetParameterIndices("ColorGrade");
+	cmd->SetGraphicsRootDescriptorTable(indices.at("gTexture"), inputSRV);
+	cmd->SetGraphicsRootConstantBufferView(indices.at("ColorGradeParams"), colorGradeResource_->GetGPUVirtualAddress());
 }

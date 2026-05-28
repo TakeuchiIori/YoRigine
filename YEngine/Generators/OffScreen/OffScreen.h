@@ -38,6 +38,12 @@ public:
 		Chromatic,
 		ColorAdjust,
 		ShatterTransition,
+		Bloom,
+		Posterize,
+		Kuwahara,
+		Halftone,
+		CrossHatch,
+		ColorGrade,
 	};
 	///************************* パラメータ調整 *************************///
 	struct RadialBlurPrams
@@ -85,6 +91,46 @@ public:
 		float time = 0.0f;
 	};
 
+	struct BloomParams {
+		float threshold = 0.6f;          // 輝度しきい値
+		float intensity = 0.5f;          // ブルームの強さ
+		float spread = 6.0f;             // サンプリング半径 [texels]
+		float colorTemperature = 0.3f;   // 暖色(+) / 寒色(-)
+	};
+
+	struct PosterizeParams {
+		int   steps = 5;                 // カラーバンド数
+		float saturationBoost = 1.2f;    // 彩度ブースト
+	};
+
+	struct KuwaharaParams {
+		int   radius = 4;                // フィルター半径 (1〜8)
+		float sharpness = 4.0f;          // エッジのシャープさ
+	};
+
+	struct HalftoneParams {
+		float dotSize = 6.0f;            // ドットセルサイズ [pixels]
+		float angle = 45.0f;             // グリッド回転角 [degrees]
+		float strength = 0.85f;          // エフェクト強度
+		float threshold = 0.75f;         // 適用する輝度しきい値
+	};
+
+	struct CrossHatchParams {
+		float lineSpacing = 8.0f;        // ハッチング間隔 [pixels]
+		float lineWidth = 1.0f;          // 線の太さ
+		float strength = 0.7f;           // 強度
+	};
+
+	struct ColorGradeParams {
+		Vector3 shadowColor = { 0.0f, 0.02f, 0.08f };    // 影の色オフセット (デフォルト: 青緑)
+		float   splitBalance = 0.45f;                      // 影/ハイライト境界
+		Vector3 highlightColor = { 0.10f, 0.06f, -0.02f }; // ハイライトの色オフセット (デフォルト: 暖色)
+		float   splitStrength = 0.25f;                     // スプリット強度
+		float   vibrance = 0.30f;                          // バイブランス
+		float   colorTemp = 0.08f;                         // 色温度 (+暖色/-寒色)
+		float   colorTint = 0.0f;                          // ティント (+紫/-緑)
+	};
+
 	///************************* 基本関数 *************************///
 
 	// 初期化
@@ -124,6 +170,24 @@ public:
 
 	// 破壊シーン遷移のパラメータを設定
 	void SetShatterTransitionParams(const ShatterTransitionParams& params);
+
+	// ブルームのパラメータを設定
+	void SetBloomParams(const BloomParams& params);
+
+	// ポスタリゼーションのパラメータを設定
+	void SetPosterizeParams(const PosterizeParams& params);
+
+	// 油絵フィルターのパラメータを設定
+	void SetKuwaharaParams(const KuwaharaParams& params);
+
+	// ハーフトーンのパラメータを設定
+	void SetHalftoneParams(const HalftoneParams& params);
+
+	// クロスハッチングのパラメータを設定
+	void SetCrossHatchParams(const CrossHatchParams& params);
+
+	// カラーグレーディングのパラメータを設定
+	void SetColorGradeParams(const ColorGradeParams& params);
 	///************************* ゲーム用機能（時間経過ブラー） *************************///
 
 	// ブラーの更新（時間経過による減衰）
@@ -157,6 +221,12 @@ private:
 	void CreateChromaticResource();
 	void CreateColorAdjustResource();
 	void CreateShatterTransitionResource();
+	void CreateBloomResource();
+	void CreatePosterizeResource();
+	void CreateKuwaharaResource();
+	void CreateHalftoneResource();
+	void CreateCrossHatchResource();
+	void CreateColorGradeResource();
 
 	// エフェクト別の描画処理
 	void ExecuteCopyEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
@@ -171,6 +241,12 @@ private:
 	void ExecuteChromaticEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
 	void ExecuteColorAdjustEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
 	void ExecuteShatterTransitionEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
+	void ExecuteBloomEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
+	void ExecutePosterizeEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
+	void ExecuteKuwaharaEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
+	void ExecuteHalftoneEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
+	void ExecuteCrossHatchEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
+	void ExecuteColorGradeEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
 
 	// 共通描画処理
 	void SetupPipelineAndDraw(OffScreenEffectType type);
@@ -248,6 +324,50 @@ private:
 		float padding;
 	};
 
+	struct BloomForGPU {
+		float threshold;
+		float intensity;
+		float spread;
+		float colorTemperature;
+	};
+
+	struct PosterizeForGPU {
+		int   steps;
+		float saturationBoost;
+		float padding[2];
+	};
+
+	struct KuwaharaForGPU {
+		int   radius;
+		float sharpness;
+		float padding[2];
+	};
+
+	struct HalftoneForGPU {
+		float dotSize;
+		float angle;
+		float strength;
+		float threshold;
+	};
+
+	struct CrossHatchForGPU {
+		float lineSpacing;
+		float lineWidth;
+		float strength;
+		float padding;
+	};
+
+	struct ColorGradeForGPU {
+		Vector3 shadowColor;
+		float   splitBalance;
+		Vector3 highlightColor;
+		float   splitStrength;
+		float   vibrance;
+		float   colorTemp;
+		float   colorTint;
+		float   padding;
+	};
+
 
 	///************************* パイプライン管理 *************************///
 
@@ -299,6 +419,30 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> shatterTransitionResource_;
 	ShatterTransitionForGPU* shatterTransitionData_ = nullptr;
 	std::string shatterTexturePath_ = "Resources/images/break.png";
+
+	// ブルーム用
+	Microsoft::WRL::ComPtr<ID3D12Resource> bloomResource_;
+	BloomForGPU* bloomData_ = nullptr;
+
+	// ポスタリゼーション用
+	Microsoft::WRL::ComPtr<ID3D12Resource> posterizeResource_;
+	PosterizeForGPU* posterizeData_ = nullptr;
+
+	// 油絵フィルター用
+	Microsoft::WRL::ComPtr<ID3D12Resource> kuwaharaResource_;
+	KuwaharaForGPU* kuwaharaData_ = nullptr;
+
+	// ハーフトーン用
+	Microsoft::WRL::ComPtr<ID3D12Resource> halftoneResource_;
+	HalftoneForGPU* halftoneData_ = nullptr;
+
+	// クロスハッチング用
+	Microsoft::WRL::ComPtr<ID3D12Resource> crossHatchResource_;
+	CrossHatchForGPU* crossHatchData_ = nullptr;
+
+	// カラーグレーディング用
+	Microsoft::WRL::ComPtr<ID3D12Resource> colorGradeResource_;
+	ColorGradeForGPU* colorGradeData_ = nullptr;
 
 	///************************* ブラー演出用 *************************///
 
