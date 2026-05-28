@@ -382,3 +382,4 @@ FodyWeavers.xsd
 # INI configuration files
 *.ini
 /CLAUDE.md
+.claude
