@@ -1,15 +1,4 @@
 {
-    "colliderTemplates": {
-        "Bell_Tower.obj": {
-            "typeId": 8
-        },
-        "Ground.obj": {
-            "typeId": 0
-        },
-        "Player.gltf": {
-            "typeId": 0
-        }
-    },
     "objects": [
         {
             "aabbMax": [

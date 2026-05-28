@@ -3,84 +3,12 @@
 #include "FieldEnemySearchState.h"
 #include "MathFunc.h"
 #include <Debugger/Logger.h>
+#include <Systems/Navigation/VisionSystem.h>
 
 // ObjectManager / AABBCollider（障害物AABB直接参照用）
 #include <Object3D/ObjectManager.h>
 #include <Collision/AABB/AABBCollider.h>
 #include <Collision/Core/CollisionTypeIdDef.h>
-
-namespace {
-
-	/// <summary>
-	/// スラブ法による XZ 平面レイ-AABB 交差判定
-	/// from→to の線分が aabb に当たる場合 true を返す
-	/// Y 軸は無視（地面移動の敵を想定）
-	/// </summary>
-	bool RayIntersectsAABB2D(const Vector3& from, const Vector3& to, const AABB& aabb) {
-		float dx = to.x - from.x;
-		float dz = to.z - from.z;
-		float maxDist = sqrtf(dx * dx + dz * dz);
-		if (maxDist < 1e-6f) return false;
-		dx /= maxDist;
-		dz /= maxDist;
-
-		float tmin = 0.0f;
-		float tmax = maxDist;
-
-		// ── X 軸スラブ ───────────────────────────────────────────────
-		if (fabsf(dx) < 1e-6f) {
-			if (from.x < aabb.min.x || from.x > aabb.max.x) return false;
-		} else {
-			float t1 = (aabb.min.x - from.x) / dx;
-			float t2 = (aabb.max.x - from.x) / dx;
-			if (t1 > t2) std::swap(t1, t2);
-			tmin = std::max(tmin, t1);
-			tmax = std::min(tmax, t2);
-			if (tmin > tmax) return false;
-		}
-
-		// ── Z 軸スラブ ───────────────────────────────────────────────
-		if (fabsf(dz) < 1e-6f) {
-			if (from.z < aabb.min.z || from.z > aabb.max.z) return false;
-		} else {
-			float t1 = (aabb.min.z - from.z) / dz;
-			float t2 = (aabb.max.z - from.z) / dz;
-			if (t1 > t2) std::swap(t1, t2);
-			tmin = std::max(tmin, t1);
-			tmax = std::min(tmax, t2);
-			if (tmin > tmax) return false;
-		}
-
-		return tmax >= 0.0f;
-	}
-
-	/// <summary>
-	/// from → to の視線を障害物 AABB が遮っているか判定する。
-	/// kNavObstacle / kStaticWall が設定されたオブジェクトを対象にする。
-	/// </summary>
-	bool IsBlockedByObstacle(const Vector3& from, const Vector3& to) {
-		ObjectManager* om = ObjectManager::GetInstance();
-		if (!om) return false;
-
-		for (const auto* obj : om->GetAllActiveObjects()) {
-			if (!obj || !obj->collider || !obj->colliderEnabled) continue;
-
-			const auto* tmpl = om->FindTemplate(obj->modelName);
-			if (!tmpl) continue;
-			if (tmpl->typeId != CollisionTypeIdDef::kNavObstacle &&
-				tmpl->typeId != CollisionTypeIdDef::kStaticWall) continue;
-
-			const auto* aabb = dynamic_cast<const AABBCollider*>(obj->collider.get());
-			if (!aabb) continue;
-
-			if (RayIntersectsAABB2D(from, to, aabb->GetAABB())) {
-				return true; // 遮蔽あり
-			}
-		}
-		return false;
-	}
-
-} // anonymous namespace
 
 /// <summary>
 /// 追跡状態に入ったときの初期化処理
@@ -240,13 +168,8 @@ bool FieldEnemyChaseState::CanSeePlayer(const FieldEnemy& enemy) const {
 	if (angle > data.viewAngle * 0.5f) {
 		return false; // 視野角外
 	}
-
 	// ── 視線チェック（障害物 AABB への直接レイキャスト）──────────────
 	// NavGrid のグリッドセル判定は粗いため、壁が薄い・セル境界にかかる
 	// 場合に視線が通り抜けてしまう。AABB スラブ法で正確に遮蔽判定する。
-	if (IsBlockedByObstacle(enemyPos, playerPos)) {
-		return false; // 遮蔽あり → 視認不可
-	}
-
-	return true; // 視界内
+	return VisionSystem::HasLineOfSight(enemyPos, playerPos);
 }

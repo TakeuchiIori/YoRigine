@@ -2,44 +2,16 @@
 #include "../FieldEnemy.h"
 #include "FieldEnemyAlertState.h"
 #include "MathFunc.h"
-#include <random>
-#include <numbers>
 #include "Player/Player.h"
 #include <Debugger/Logger.h>
 #include <Object3D/ObjectManager.h>
 #include <Collision/AABB/AABBCollider.h>
 #include <Collision/Core/CollisionTypeIdDef.h>
+#include <Systems/Navigation/VisionSystem.h>
 
-namespace {
 
-	bool RayIntersectsAABB2D(const Vector3& from, const Vector3& to, const AABB& aabb) {
-		float dx = to.x - from.x;
-		float dz = to.z - from.z;
-		float maxDist = sqrtf(dx * dx + dz * dz);
-		if (maxDist < 1e-6f) return false;
-		dx /= maxDist; dz /= maxDist;
-		float tmin = 0.0f, tmax = maxDist;
-		if (fabsf(dx) < 1e-6f) { if (from.x < aabb.min.x || from.x > aabb.max.x) return false; } else { float t1 = (aabb.min.x - from.x) / dx, t2 = (aabb.max.x - from.x) / dx; if (t1 > t2)std::swap(t1, t2); tmin = std::max(tmin, t1); tmax = std::min(tmax, t2); if (tmin > tmax)return false; }
-		if (fabsf(dz) < 1e-6f) { if (from.z < aabb.min.z || from.z > aabb.max.z) return false; } else { float t1 = (aabb.min.z - from.z) / dz, t2 = (aabb.max.z - from.z) / dz; if (t1 > t2)std::swap(t1, t2); tmin = std::max(tmin, t1); tmax = std::min(tmax, t2); if (tmin > tmax)return false; }
-		return tmax >= 0.0f;
-	}
-
-	bool IsBlockedByObstacle(const Vector3& from, const Vector3& to) {
-		ObjectManager* om = ObjectManager::GetInstance();
-		if (!om) return false;
-		for (const auto* obj : om->GetAllActiveObjects()) {
-			if (!obj || !obj->collider || !obj->colliderEnabled) continue;
-			const auto* tmpl = om->FindTemplate(obj->modelName);
-			if (!tmpl) continue;
-			if (tmpl->typeId != CollisionTypeIdDef::kNavObstacle &&
-				tmpl->typeId != CollisionTypeIdDef::kStaticWall) continue;
-			const auto* aabb = dynamic_cast<const AABBCollider*>(obj->collider.get());
-			if (aabb && RayIntersectsAABB2D(from, to, aabb->GetAABB())) return true;
-		}
-		return false;
-	}
-
-} // anonymous namespace
+#include <random>
+#include <numbers>
 
 /// <summary>
 /// 巡回状態に入った際の初期化処理
@@ -172,7 +144,7 @@ void FieldEnemyPatrolState::CheckForPlayer(FieldEnemy& enemy) {
 				* (180.0f / std::numbers::pi_v<float>);
 
 			if (angle <= enemy.GetEnemyData().viewAngle * 0.5f) {
-				isDetected = !IsBlockedByObstacle(enemyPos, playerPos);
+				isDetected = VisionSystem::HasLineOfSight(enemyPos, playerPos);
 			}
 		}
 	}

@@ -62,7 +62,7 @@ void BattleScene::Initialize(Camera* camera, Player* player) {
 	battleField->Initialize(Vector3(0, 0, 0), 50.0f);
 	battleField->SetPurpose(AreaPurpose::Boundary);  // 境界制限として設定
 	battleField->SetCamera(sceneCamera_);
-	manager->AddArea("BattleField", battleField);
+	manager->AddArea("BattleArea", battleField);
 
 
 	//------------------------------------------------------------
@@ -153,7 +153,7 @@ void BattleScene::DrawLine() {
 
 	player_->DrawCollision();
 	player_->DrawBone(*line_.get());
-	//AreaManager::GetInstance()->Draw(line_.get());
+	AreaManager::GetInstance()->DrawArea("BattleArea", line_.get());
 #endif
 }
 

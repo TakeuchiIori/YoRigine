@@ -28,6 +28,16 @@ public:
 	static bool IsCollision(const Ray& ray, const OBB& obb, RaycastHit* outHit = nullptr);
 	static bool IsCollision(const Ray& ray, const Plane& plane, RaycastHit* outHit = nullptr);
 
+
+	// ============================================================
+	// XZ平面限定の線分-AABB判定（視線遮蔽・NavMesh用）
+	// ============================================================
+	// Y軸を無視した2D判定。地面移動キャラクターの視線判定に使う。
+	// from → to の線分が aabb の XZ 投影と交差する場合 true を返す。
+	static bool IsCollisionSegmentAABB2D(const Vector3& from, const Vector3& to,
+		const AABB& aabb);
+
+
 	// ============================================================
 	// 形状同士の交差判定（押し戻し情報付き）
 	// ============================================================

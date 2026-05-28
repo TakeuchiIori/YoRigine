@@ -116,7 +116,8 @@ namespace YoRigine {
                             // version 3: インスタンスごとの値を直接復元
                             aabb->aabbOffset_.min = { o["aabbMin"][0], o["aabbMin"][1], o["aabbMin"][2] };
                             aabb->aabbOffset_.max = { o["aabbMax"][0], o["aabbMax"][1], o["aabbMax"][2] };
-                        } else if (version == 2 && j.contains("colliderTemplates")
+                        }
+                        else if (version == 2 && j.contains("colliderTemplates")
                             && j["colliderTemplates"].contains(obj->modelName)) {
                             // version 2 後方互換: テンプレートの値をインスタンスへ移送
                             const auto& tmplJson = j["colliderTemplates"][obj->modelName];
@@ -157,22 +158,34 @@ namespace YoRigine {
     {
         try {
             json j;
-            j["version"] = 1;
+            j["version"] = 3;  // SaveScene と同じバージョンに統一
             j["objects"] = json::array();
 
             for (const auto* obj : objects) {
                 if (!obj) continue;
-                j["objects"].push_back({
-                    {"id",            obj->id},
-                    {"filePath",      obj->modelPath},
-                    {"modelName",     obj->modelName},
-                    {"position",      {obj->position.x, obj->position.y, obj->position.z}},
-                    {"rotate",        {obj->rotation.x, obj->rotation.y, obj->rotation.z}},
-                    {"scale",         {obj->scale.x,    obj->scale.y,    obj->scale.z}},
-                    {"parentID",      obj->parentID},
-                    {"isAnimation",   obj->isAnimation},
-                    {"animationName", obj->animationName},
-                    });
+
+                json objJson = {
+                    {"id",              obj->id},
+                    {"filePath",        obj->modelPath},
+                    {"modelName",       obj->modelName},
+                    {"position",        {obj->position.x, obj->position.y, obj->position.z}},
+                    {"rotate",          {obj->rotation.x, obj->rotation.y, obj->rotation.z}},
+                    {"scale",           {obj->scale.x,    obj->scale.y,    obj->scale.z}},
+                    {"parentID",        obj->parentID},
+                    {"isAnimation",     obj->isAnimation},
+                    {"animationName",   obj->animationName},
+                    {"colliderEnabled", obj->colliderEnabled},  // 追加
+                };
+
+                // AABB オフセットを保存（SaveScene と同じ処理）
+                if (obj->collider) {
+                    if (const auto* aabb = dynamic_cast<const AABBCollider*>(obj->collider.get())) {
+                        objJson["aabbMin"] = { aabb->aabbOffset_.min.x, aabb->aabbOffset_.min.y, aabb->aabbOffset_.min.z };
+                        objJson["aabbMax"] = { aabb->aabbOffset_.max.x, aabb->aabbOffset_.max.y, aabb->aabbOffset_.max.z };
+                    }
+                }
+
+                j["objects"].push_back(objJson);
             }
 
             std::filesystem::create_directories(
@@ -204,6 +217,8 @@ namespace YoRigine {
             json j;
             file >> j;
 
+            const int version = j.value("version", 1);
+
             std::unordered_map<int, int> oldToNewId;
 
             for (const auto& o : j["objects"]) {
@@ -222,6 +237,23 @@ namespace YoRigine {
 
                 if (o.contains("parentID"))
                     obj->parentID = o["parentID"].get<int>();
+
+                // version 3: コライダーデータを復元（LoadScene と同じ処理）
+                if (version >= 3) {
+                    obj->colliderEnabled = o.value("colliderEnabled", false);
+
+                    // コライダーテンプレートを適用（なければ自動生成）
+                    objectManager_->ApplyColliderTemplate(*obj);
+
+                    // AABB オフセットをインスタンスへ直接復元
+                    if (obj->collider) {
+                        auto* aabb = dynamic_cast<AABBCollider*>(obj->collider.get());
+                        if (aabb && o.contains("aabbMin") && o.contains("aabbMax")) {
+                            aabb->aabbOffset_.min = { o["aabbMin"][0], o["aabbMin"][1], o["aabbMin"][2] };
+                            aabb->aabbOffset_.max = { o["aabbMax"][0], o["aabbMax"][1], o["aabbMax"][2] };
+                        }
+                    }
+                }
             }
 
             for (auto* obj : objectManager_->GetAllActiveObjects()) {

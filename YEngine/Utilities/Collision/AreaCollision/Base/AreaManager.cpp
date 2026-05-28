@@ -1,5 +1,16 @@
 #include "AreaManager.h"
+#include "../CircleArea.h"
+#include "../PolygonArea.h"
 
+// ============================================================
+// コンストラクタ（indexAj_ の登録は一度だけ行う）
+// ============================================================
+AreaManager::AreaManager()
+{
+	indexAj_.Add("names",    &savedNames_)
+	         .Add("types",    &savedTypes_)
+	         .Add("purposes", &savedPurposes_);
+}
 
 AreaManager* AreaManager::GetInstance()
 {
@@ -23,16 +34,30 @@ void AreaManager::Update(const Vector3& targetPosition)
 	}
 }
 
-void AreaManager::Draw(Line* line)
+void AreaManager::Draw(Line* line,
+	const std::initializer_list<std::string>& excludes)
 {
-	if (!isDebugDrawEnabled_ || !line) {
-		return;
-	}
+	if (!isDebugDrawEnabled_ || !line) return;
 
 	for (auto& [name, area] : areas_) {
+		// 除外リストに含まれていたらスキップ
+		bool excluded = false;
+		for (const auto& ex : excludes) {
+			if (name == ex) { excluded = true; break; }
+		}
+		if (excluded) continue;
+
 		if (area && area->IsActive() && area->IsDebugDrawEnabled()) {
 			area->Draw(line);
 		}
+	}
+}
+
+void AreaManager::DrawArea(const std::string& name, Line* line)
+{
+	auto area = GetArea(name);
+	if (area) {
+		area->Draw(line);
 	}
 }
 
@@ -43,10 +68,7 @@ void AreaManager::Reset()
 
 void AreaManager::AddArea(const std::string& name, std::shared_ptr<BaseArea> area)
 {
-	if (!area) {
-		return;
-	}
-
+	if (!area) return;
 	areas_[name] = area;
 }
 
@@ -111,12 +133,10 @@ Vector3 AreaManager::ClampToNearestArea(const Vector3& position) const
 	std::shared_ptr<BaseArea> nearestArea = nullptr;
 	float minDistance = FLT_MAX;
 
-	// 最も近いエリアを見つける
 	for (const auto& [name, area] : areas_) {
 		if (area && area->IsActive()) {
-			Vector3 center = area->GetCenter();
-			float distance = Length(position - center);
-
+			Vector3 center   = area->GetCenter();
+			float   distance = Length(position - center);
 			if (distance < minDistance) {
 				minDistance = distance;
 				nearestArea = area;
@@ -124,49 +144,109 @@ Vector3 AreaManager::ClampToNearestArea(const Vector3& position) const
 		}
 	}
 
-	// 最も近いエリアにクランプ
 	if (nearestArea) {
 		return nearestArea->ClampPosition(position);
 	}
-
-	// エリアが見つからない場合は元の位置を返す
 	return position;
 }
+
+///************************* JSON 保存・読み込み *************************///
+
+// ============================================================
+// タイプ文字列からエリアを生成するファクトリ
+// 新しい形状を追加する場合はここに1行追加する
+// ============================================================
+std::shared_ptr<BaseArea> AreaManager::CreateArea(const std::string& typeString)
+{
+	if (typeString == "Circle")  return std::make_shared<CircleArea>();
+	if (typeString == "Polygon") return std::make_shared<PolygonArea>();
+	return nullptr;
+}
+
+// ============================================================
+// 全エリアを1ファイルに保存
+// ============================================================
+void AreaManager::SaveAllToFile(const std::string& filepath)
+{
+	// インデックスを現在の areas_ から再構築
+	savedNames_.clear();
+	savedTypes_.clear();
+	savedPurposes_.clear();
+
+	for (const auto& [name, area] : areas_) {
+		savedNames_.push_back(name);
+		savedTypes_.push_back(area->GetTypeString());
+		savedPurposes_.push_back(
+			area->GetPurpose() == AreaPurpose::Boundary ? "Boundary" : "Trigger");
+	}
+
+	// root AutoJson にすべてをグループとして登録して一括保存
+	AutoJson root;
+	root.AddGroup("_index", indexAj_);
+
+	for (auto& [name, area] : areas_) {
+		root.AddGroup(name, area->GetAutoJson());
+	}
+
+	root.SaveToFile(filepath);
+}
+
+// ============================================================
+// ファイルから全エリアを復元（2パス方式）
+//
+// パス1: _index だけ読んで名前・タイプ・Purpose を取得
+// パス2: エリアを生成してから各パラメータを読み込む
+// ============================================================
+void AreaManager::LoadAllFromFile(const std::string& filepath)
+{
+	// ── パス1：_index のみ読み込む ──────────────────
+	{
+		AutoJson pass1;
+		pass1.AddGroup("_index", indexAj_);
+		pass1.LoadFromFile(filepath);   // _index 以外のキーは無視される
+	}
+
+	// インデックスを元にエリアを生成
+	areas_.clear();
+	for (size_t i = 0; i < savedNames_.size(); ++i) {
+		auto area = CreateArea(savedTypes_[i]);
+		if (!area) continue;
+
+		area->SetPurpose(savedPurposes_[i] == "Trigger"
+			? AreaPurpose::Trigger : AreaPurpose::Boundary);
+
+		areas_[savedNames_[i]] = area;
+	}
+
+	// ── パス2：各エリアのパラメータを読み込む ──────
+	{
+		AutoJson pass2;
+		pass2.AddGroup("_index", indexAj_); // 存在しても上書きされるだけで無害
+
+		for (auto& [name, area] : areas_) {
+			pass2.AddGroup(name, area->GetAutoJson());
+		}
+		pass2.LoadFromFile(filepath);
+	}
+}
+
 ///************************* オブジェクト登録管理 *************************///
 
-/// <summary>
-/// オブジェクトをエリア制限対象として登録
-/// </summary>
-/// <param name="wt">登録するワールドトランスフォーム</param>
-/// <param name="tag">識別用タグ(デバッグ用)</param>
 void AreaManager::RegisterObject(WorldTransform* wt, const std::string& tag)
 {
-	if (!wt) {
-		return;
-	}
+	if (!wt) return;
 
-	// 既に登録されていないかチェック
 	for (const auto& obj : restrictedObjects_) {
-		if (obj.worldTransform == wt) {
-			return; // 既に登録済み
-		}
+		if (obj.worldTransform == wt) return; // 既に登録済み
 	}
 
-	// 新規登録
 	restrictedObjects_.emplace_back(wt, tag);
 }
 
-/// <summary>
-/// オブジェクトの登録を解除
-/// </summary>
-/// <param name="wt">解除するワールドトランスフォーム</param>
 void AreaManager::UnregisterObject(WorldTransform* wt)
 {
-	if (!wt) {
-		return;
-	}
+	if (!wt) return;
 
-	// 該当するオブジェクトを削除
 	restrictedObjects_.erase(
 		std::remove_if(
 			restrictedObjects_.begin(),
@@ -181,7 +261,6 @@ void AreaManager::UnregisterObject(WorldTransform* wt)
 
 void AreaManager::UpdateSingleObject(WorldTransform* wt)
 {
-	// Boundary用途のエリアが存在するかチェック
 	bool hasBoundaryArea = false;
 	for (const auto& [name, area] : areas_) {
 		if (area && area->IsActive() && area->GetPurpose() == AreaPurpose::Boundary) {
@@ -190,38 +269,25 @@ void AreaManager::UpdateSingleObject(WorldTransform* wt)
 		}
 	}
 
-	// Boundaryエリアがなければ何もしない
-	if (!hasBoundaryArea) {
-		return;
-	}
+	if (!hasBoundaryArea) return;
 
-	// 現在の計算済み行列からワールド座標を抽出（4行目）
 	Vector3 currentPos = {
 		wt->matWorld_.m[3][0],
 		wt->matWorld_.m[3][1],
 		wt->matWorld_.m[3][2]
 	};
-	// エリア内かチェック
+
 	if (!IsInsideAreaByPurpose(currentPos, AreaPurpose::Boundary)) {
-		// エリア外なら境界内にクランプ
 		Vector3 clampedPos = ClampToNearestArea(currentPos);
 		wt->translate_ = clampedPos;
-		// 行列の 4行目 (m[3][0]〜[3][2]) が平行移動成分
 		wt->matWorld_.m[3][0] = clampedPos.x;
 		wt->matWorld_.m[3][1] = clampedPos.y;
 		wt->matWorld_.m[3][2] = clampedPos.z;
 	}
-
-
 }
 
-/// <summary>
-/// 登録されているすべてのオブジェクトの位置をエリア内に補正
-/// 毎フレーム呼ぶことでエリア外に出られないようにする
-/// </summary>
 void AreaManager::UpdateRestrictedObjects()
 {
-	// Boundary用途のエリアが存在するかチェック
 	bool hasBoundaryArea = false;
 	for (const auto& [name, area] : areas_) {
 		if (area && area->IsActive() && area->GetPurpose() == AreaPurpose::Boundary) {
@@ -230,39 +296,23 @@ void AreaManager::UpdateRestrictedObjects()
 		}
 	}
 
-	// Boundaryエリアがなければ何もしない
-	if (!hasBoundaryArea) {
-		return;
-	}
+	if (!hasBoundaryArea) return;
 
-	// 登録されているオブジェクトをチェック&補正
 	for (auto& obj : restrictedObjects_) {
-		// 無効化されているオブジェクトはスキップ
-		if (!obj.enabled || !obj.worldTransform) {
-			continue;
-		}
+		if (!obj.enabled || !obj.worldTransform) continue;
 
 		Vector3 currentPos = obj.worldTransform->translate_;
 
-		// エリア内かチェック
 		if (!IsInsideAreaByPurpose(currentPos, AreaPurpose::Boundary)) {
-			// エリア外なら境界内にクランプ
 			Vector3 clampedPos = ClampToNearestArea(currentPos);
 			obj.worldTransform->translate_ = clampedPos;
 		}
 	}
 }
 
-/// <summary>
-/// 特定のオブジェクトの制限を有効/無効化
-/// </summary>
-/// <param name="wt">対象のワールドトランスフォーム</param>
-/// <param name="enabled">有効化するか</param>
 void AreaManager::SetObjectRestrictionEnabled(WorldTransform* wt, bool enabled)
 {
-	if (!wt) {
-		return;
-	}
+	if (!wt) return;
 
 	for (auto& obj : restrictedObjects_) {
 		if (obj.worldTransform == wt) {
@@ -272,9 +322,6 @@ void AreaManager::SetObjectRestrictionEnabled(WorldTransform* wt, bool enabled)
 	}
 }
 
-/// <summary>
-/// すべてのオブジェクトをクリア
-/// </summary>
 void AreaManager::ClearAllObjects()
 {
 	restrictedObjects_.clear();
