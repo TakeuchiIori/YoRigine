@@ -11,8 +11,15 @@
 #include "Vector3.h"
 
 #include <Collision/AABB/AABBCollider.h>
+#include <Collision/Core/BaseCollider.h>
 #include <Collision/Core/ColliderPool.h>
 #include <Collision/Core/CollisionTypeIdDef.h>
+
+enum class ColliderShapeType : uint32_t {
+	kAABB = 0,
+	kOBB,
+	kSphere,
+};
 
 /// <summary>
 /// オブジェクトの管理クラス
@@ -46,12 +53,24 @@ public:
 		// アニメーション関連
 		bool isAnimation = false;
 		std::string animationName = "";
-		std::shared_ptr<AABBCollider> collider; // コリジョン用のAABBコライダー
+		std::shared_ptr<BaseCollider> collider; // コリジョン用コライダー
 
 		// ── コライダー個別設定 ────────────────────────────────────────────
 		bool colliderEnabled = false;
 		CollisionTypeIdDef colliderTypeId = CollisionTypeIdDef::kNone;
+		ColliderShapeType colliderShapeType = ColliderShapeType::kAABB;
+
+		// AABB
 		AABB colliderAabbOffset = { {-1.0f,-1.0f,-1.0f}, {1.0f,1.0f,1.0f} };
+
+		// OBB
+		Vector3 colliderObbCenter = {};
+		Vector3 colliderObbSize = { 1.0f, 1.0f, 1.0f };
+		Vector3 colliderObbEuler = {};
+
+		// Sphere
+		Vector3 colliderSphereCenter = {};
+		float colliderSphereRadius = 1.0f;
 
 		PlacedObject() = default;
 		~PlacedObject() = default;

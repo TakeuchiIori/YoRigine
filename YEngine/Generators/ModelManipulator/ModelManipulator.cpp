@@ -6,6 +6,8 @@
 
 #include "ModelManager.h"
 #include <Collision/Core/CollisionTypeIdDef.h>
+#include <Collision/OBB/OBBCollider.h>
+#include <Collision/Sphere/SphereCollider.h>
 
 #ifdef USE_IMGUI
 #include "imgui.h"
@@ -188,8 +190,8 @@ namespace YoRigine {
 			info.line->SetColor(info.color);
 		}
 
-		// オブジェクトのAABBを対応するLineインスタンスに登録
-		static constexpr uint32_t kMaxAabbsPerFlush = 600;
+		// コライダーを対応するLineインスタンスに登録
+		static constexpr uint32_t kMaxCollidersPerFlush = 600;
 		uint32_t counts[5] = {};
 
 		for (auto* obj : objectManager_->GetAllActiveObjects()) {
@@ -199,16 +201,21 @@ namespace YoRigine {
 			if (!obj->colliderEnabled) continue;
 			if (showColliderSelectedOnly_ && !selector_.IsSelected(obj->id)) continue;
 
-			auto* aabbCol = dynamic_cast<AABBCollider*>(obj->collider.get());
-			if (!aabbCol) continue;
-
 			const uint32_t typeKey = obj->collider->GetTypeID();
 			const int idx = getTableIndex(typeKey);
 			Line* line = typeTable[idx].line;
 
-			line->DrawAABB(aabbCol->GetAABB().min, aabbCol->GetAABB().max);
+			if (auto* a = dynamic_cast<AABBCollider*>(obj->collider.get())) {
+				line->DrawAABB(a->GetAABB().min, a->GetAABB().max);
+			} else if (auto* o = dynamic_cast<OBBCollider*>(obj->collider.get())) {
+				line->DrawOBB(o->GetOBB().center, o->GetOBB().rotation, o->GetOBB().size);
+			} else if (auto* s = dynamic_cast<SphereCollider*>(obj->collider.get())) {
+				line->DrawSphere(s->GetSphere().center, s->GetSphere().radius, 32);
+			} else {
+				continue;
+			}
 
-			if (++counts[idx] >= kMaxAabbsPerFlush) {
+			if (++counts[idx] >= kMaxCollidersPerFlush) {
 				line->DrawLine();
 				counts[idx] = 0;
 			}
@@ -464,9 +471,15 @@ namespace YoRigine {
 			newObj->scale = srcObj->scale;
 
 			// コライダー設定をオブジェクト個別にコピー
-			newObj->colliderEnabled    = srcObj->colliderEnabled;
-			newObj->colliderTypeId     = srcObj->colliderTypeId;
-			newObj->colliderAabbOffset = srcObj->colliderAabbOffset;
+			newObj->colliderEnabled      = srcObj->colliderEnabled;
+			newObj->colliderTypeId       = srcObj->colliderTypeId;
+			newObj->colliderShapeType    = srcObj->colliderShapeType;
+			newObj->colliderAabbOffset   = srcObj->colliderAabbOffset;
+			newObj->colliderObbCenter    = srcObj->colliderObbCenter;
+			newObj->colliderObbSize      = srcObj->colliderObbSize;
+			newObj->colliderObbEuler     = srcObj->colliderObbEuler;
+			newObj->colliderSphereCenter = srcObj->colliderSphereCenter;
+			newObj->colliderSphereRadius = srcObj->colliderSphereRadius;
 			objectManager_->ApplyColliderTemplate(*newObj);
 
 			// 選択状態に追加

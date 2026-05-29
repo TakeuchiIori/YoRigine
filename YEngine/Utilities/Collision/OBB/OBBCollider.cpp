@@ -53,37 +53,50 @@ void OBBCollider::Update()
 		return;
 	}
 
-	// 親子関係を考慮したワールド行列から値を取得
 	Matrix4x4 worldMatrix = wt_->matWorld_;
 
-	// ワールド行列から位置、回転、スケールを抽出
+	// 位置抽出
 	Vector3 worldPosition = {
 		worldMatrix.m[3][0],
 		worldMatrix.m[3][1],
 		worldMatrix.m[3][2]
 	};
 
-	Vector3 worldRotation = MatrixToEuler(worldMatrix);
-
-	// スケールを抽出（各軸のベクトルの長さ）
+	// スケール抽出（各軸ベクトルの長さ）
 	Vector3 worldScale = {
 		Length(Vector3(worldMatrix.m[0][0], worldMatrix.m[0][1], worldMatrix.m[0][2])),
 		Length(Vector3(worldMatrix.m[1][0], worldMatrix.m[1][1], worldMatrix.m[1][2])),
 		Length(Vector3(worldMatrix.m[2][0], worldMatrix.m[2][1], worldMatrix.m[2][2]))
 	};
 
-	// オフセットを適用したOBBの中心位置を計算
+	// スケールを除いた純粋な回転行列を直接抽出する。
+	// MatrixToEuler → MakeRotateMatrixXYZ の往復を避けることで
+	// ジンバルロックとスケール混入による誤計算を防ぐ。
+	Matrix4x4 worldRotMatrix = {};
+	worldRotMatrix.m[3][3] = 1.0f;
+	if (worldScale.x > 0.0f) {
+		worldRotMatrix.m[0][0] = worldMatrix.m[0][0] / worldScale.x;
+		worldRotMatrix.m[0][1] = worldMatrix.m[0][1] / worldScale.x;
+		worldRotMatrix.m[0][2] = worldMatrix.m[0][2] / worldScale.x;
+	}
+	if (worldScale.y > 0.0f) {
+		worldRotMatrix.m[1][0] = worldMatrix.m[1][0] / worldScale.y;
+		worldRotMatrix.m[1][1] = worldMatrix.m[1][1] / worldScale.y;
+		worldRotMatrix.m[1][2] = worldMatrix.m[1][2] / worldScale.y;
+	}
+	if (worldScale.z > 0.0f) {
+		worldRotMatrix.m[2][0] = worldMatrix.m[2][0] / worldScale.z;
+		worldRotMatrix.m[2][1] = worldMatrix.m[2][1] / worldScale.z;
+		worldRotMatrix.m[2][2] = worldMatrix.m[2][2] / worldScale.z;
+	}
+
+	// オフセット回転行列
 	Vector3 offsetEulerRad = {
 		DegToRad(obbEulerOffset_.x),
 		DegToRad(obbEulerOffset_.y),
 		DegToRad(obbEulerOffset_.z)
 	};
-
-	// オフセット回転行列を作成
 	Matrix4x4 offsetRotMatrix = MakeRotateMatrixXYZ(offsetEulerRad);
-
-	// ワールド回転行列を作成
-	Matrix4x4 worldRotMatrix = MakeRotateMatrixXYZ(worldRotation);
 
 	// 回転を合成（ワールド回転 * オフセット回転）
 	Matrix4x4 combinedRotMatrix = Multiply(worldRotMatrix, offsetRotMatrix);
@@ -91,17 +104,15 @@ void OBBCollider::Update()
 	// オフセット位置をワールド回転で変換
 	Vector3 rotatedOffset = Transform(obbOffset_.center, worldRotMatrix);
 
-	// 最終的なOBBの中心位置
 	obb_.center = worldPosition + rotatedOffset;
 
-	// サイズをスケールに応じて調整
 	obb_.size = {
 		obbOffset_.size.x * std::abs(worldScale.x),
 		obbOffset_.size.y * std::abs(worldScale.y),
 		obbOffset_.size.z * std::abs(worldScale.z)
 	};
 
-	// 最終的な回転
+	// Euler変換は描画用に1回だけ（純粋な回転行列に対して行う）
 	obb_.rotation = MatrixToEuler(combinedRotMatrix);
 
 }

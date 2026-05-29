@@ -20,26 +20,32 @@ namespace YoRigine {
         if (!objectManager_) return false;
         try {
             json j;
-            j["version"] = 5;
+            j["version"] = 6;
             j["objects"] = json::array();
 
             for (const auto* obj : objectManager_->GetAllActiveObjects()) {
                 if (!obj || !obj->object) continue;
 
                 j["objects"].push_back({
-                    {"id",              obj->id},
-                    {"filePath",        obj->modelPath},
-                    {"modelName",       obj->modelName},
-                    {"position",        {obj->position.x, obj->position.y, obj->position.z}},
-                    {"rotate",          {obj->rotation.x, obj->rotation.y, obj->rotation.z}},
-                    {"scale",           {obj->scale.x,    obj->scale.y,    obj->scale.z}},
-                    {"parentID",        obj->parentID},
-                    {"isAnimation",     obj->isAnimation},
-                    {"animationName",   obj->animationName},
-                    {"colliderEnabled", obj->colliderEnabled},
-                    {"colliderTypeId",  static_cast<uint32_t>(obj->colliderTypeId)},
-                    {"colliderAabbMin", {obj->colliderAabbOffset.min.x, obj->colliderAabbOffset.min.y, obj->colliderAabbOffset.min.z}},
-                    {"colliderAabbMax", {obj->colliderAabbOffset.max.x, obj->colliderAabbOffset.max.y, obj->colliderAabbOffset.max.z}},
+                    {"id",                  obj->id},
+                    {"filePath",            obj->modelPath},
+                    {"modelName",           obj->modelName},
+                    {"position",            {obj->position.x, obj->position.y, obj->position.z}},
+                    {"rotate",              {obj->rotation.x, obj->rotation.y, obj->rotation.z}},
+                    {"scale",               {obj->scale.x,    obj->scale.y,    obj->scale.z}},
+                    {"parentID",            obj->parentID},
+                    {"isAnimation",         obj->isAnimation},
+                    {"animationName",       obj->animationName},
+                    {"colliderEnabled",     obj->colliderEnabled},
+                    {"colliderTypeId",      static_cast<uint32_t>(obj->colliderTypeId)},
+                    {"colliderShapeType",   static_cast<uint32_t>(obj->colliderShapeType)},
+                    {"colliderAabbMin",     {obj->colliderAabbOffset.min.x, obj->colliderAabbOffset.min.y, obj->colliderAabbOffset.min.z}},
+                    {"colliderAabbMax",     {obj->colliderAabbOffset.max.x, obj->colliderAabbOffset.max.y, obj->colliderAabbOffset.max.z}},
+                    {"colliderObbCenter",   {obj->colliderObbCenter.x,    obj->colliderObbCenter.y,    obj->colliderObbCenter.z}},
+                    {"colliderObbSize",     {obj->colliderObbSize.x,      obj->colliderObbSize.y,      obj->colliderObbSize.z}},
+                    {"colliderObbEuler",    {obj->colliderObbEuler.x,     obj->colliderObbEuler.y,     obj->colliderObbEuler.z}},
+                    {"colliderSphCenter",   {obj->colliderSphereCenter.x, obj->colliderSphereCenter.y, obj->colliderSphereCenter.z}},
+                    {"colliderSphRadius",   obj->colliderSphereRadius},
                 });
             }
 
@@ -63,7 +69,7 @@ namespace YoRigine {
             json j;
             file >> j;
             const int version = j.value("version", 1);
-            if (version < 1 || version > 5) return false;
+            if (version < 1 || version > 6) return false;
 
             objectManager_->ClearAllObjects();
 
@@ -103,15 +109,28 @@ namespace YoRigine {
                 obj->colliderEnabled = o.value("colliderEnabled", false);
                 if (o.contains("parentID")) obj->parentID = o["parentID"].get<int>();
 
-                if (version == 5) {
-                    // version 5: per-object コライダー設定を直接読む
+                if (version >= 5) {
+                    // version 5+: per-object コライダー設定を直接読む
                     obj->colliderTypeId = static_cast<CollisionTypeIdDef>(o.value("colliderTypeId", 0u));
                     if (o.contains("colliderAabbMin"))
                         obj->colliderAabbOffset.min = { o["colliderAabbMin"][0], o["colliderAabbMin"][1], o["colliderAabbMin"][2] };
                     if (o.contains("colliderAabbMax"))
                         obj->colliderAabbOffset.max = { o["colliderAabbMax"][0], o["colliderAabbMax"][1], o["colliderAabbMax"][2] };
                 }
-                else {
+                if (version >= 6) {
+                    obj->colliderShapeType = static_cast<ColliderShapeType>(o.value("colliderShapeType", 0u));
+                    if (o.contains("colliderObbCenter"))
+                        obj->colliderObbCenter = { o["colliderObbCenter"][0], o["colliderObbCenter"][1], o["colliderObbCenter"][2] };
+                    if (o.contains("colliderObbSize"))
+                        obj->colliderObbSize = { o["colliderObbSize"][0], o["colliderObbSize"][1], o["colliderObbSize"][2] };
+                    if (o.contains("colliderObbEuler"))
+                        obj->colliderObbEuler = { o["colliderObbEuler"][0], o["colliderObbEuler"][1], o["colliderObbEuler"][2] };
+                    if (o.contains("colliderSphCenter"))
+                        obj->colliderSphereCenter = { o["colliderSphCenter"][0], o["colliderSphCenter"][1], o["colliderSphCenter"][2] };
+                    if (o.contains("colliderSphRadius"))
+                        obj->colliderSphereRadius = o["colliderSphRadius"].get<float>();
+                }
+                if (version < 5) {
                     // version 1-4 後方互換: テンプレートの設定を個別オブジェクトに適用
                     auto it = legacyTemplates.find(obj->modelName);
                     if (it != legacyTemplates.end()) {
@@ -155,26 +174,32 @@ namespace YoRigine {
     {
         try {
             json j;
-            j["version"] = 5;
+            j["version"] = 6;
             j["objects"] = json::array();
 
             for (const auto* obj : objects) {
                 if (!obj) continue;
 
                 j["objects"].push_back({
-                    {"id",              obj->id},
-                    {"filePath",        obj->modelPath},
-                    {"modelName",       obj->modelName},
-                    {"position",        {obj->position.x, obj->position.y, obj->position.z}},
-                    {"rotate",          {obj->rotation.x, obj->rotation.y, obj->rotation.z}},
-                    {"scale",           {obj->scale.x,    obj->scale.y,    obj->scale.z}},
-                    {"parentID",        obj->parentID},
-                    {"isAnimation",     obj->isAnimation},
-                    {"animationName",   obj->animationName},
-                    {"colliderEnabled", obj->colliderEnabled},
-                    {"colliderTypeId",  static_cast<uint32_t>(obj->colliderTypeId)},
-                    {"colliderAabbMin", {obj->colliderAabbOffset.min.x, obj->colliderAabbOffset.min.y, obj->colliderAabbOffset.min.z}},
-                    {"colliderAabbMax", {obj->colliderAabbOffset.max.x, obj->colliderAabbOffset.max.y, obj->colliderAabbOffset.max.z}},
+                    {"id",                  obj->id},
+                    {"filePath",            obj->modelPath},
+                    {"modelName",           obj->modelName},
+                    {"position",            {obj->position.x, obj->position.y, obj->position.z}},
+                    {"rotate",              {obj->rotation.x, obj->rotation.y, obj->rotation.z}},
+                    {"scale",               {obj->scale.x,    obj->scale.y,    obj->scale.z}},
+                    {"parentID",            obj->parentID},
+                    {"isAnimation",         obj->isAnimation},
+                    {"animationName",       obj->animationName},
+                    {"colliderEnabled",     obj->colliderEnabled},
+                    {"colliderTypeId",      static_cast<uint32_t>(obj->colliderTypeId)},
+                    {"colliderShapeType",   static_cast<uint32_t>(obj->colliderShapeType)},
+                    {"colliderAabbMin",     {obj->colliderAabbOffset.min.x, obj->colliderAabbOffset.min.y, obj->colliderAabbOffset.min.z}},
+                    {"colliderAabbMax",     {obj->colliderAabbOffset.max.x, obj->colliderAabbOffset.max.y, obj->colliderAabbOffset.max.z}},
+                    {"colliderObbCenter",   {obj->colliderObbCenter.x,    obj->colliderObbCenter.y,    obj->colliderObbCenter.z}},
+                    {"colliderObbSize",     {obj->colliderObbSize.x,      obj->colliderObbSize.y,      obj->colliderObbSize.z}},
+                    {"colliderObbEuler",    {obj->colliderObbEuler.x,     obj->colliderObbEuler.y,     obj->colliderObbEuler.z}},
+                    {"colliderSphCenter",   {obj->colliderSphereCenter.x, obj->colliderSphereCenter.y, obj->colliderSphereCenter.z}},
+                    {"colliderSphRadius",   obj->colliderSphereRadius},
                 });
             }
 
@@ -245,14 +270,27 @@ namespace YoRigine {
 
                 obj->colliderEnabled = o.value("colliderEnabled", false);
 
-                if (version == 5) {
+                if (version >= 5) {
                     obj->colliderTypeId = static_cast<CollisionTypeIdDef>(o.value("colliderTypeId", 0u));
                     if (o.contains("colliderAabbMin"))
                         obj->colliderAabbOffset.min = { o["colliderAabbMin"][0], o["colliderAabbMin"][1], o["colliderAabbMin"][2] };
                     if (o.contains("colliderAabbMax"))
                         obj->colliderAabbOffset.max = { o["colliderAabbMax"][0], o["colliderAabbMax"][1], o["colliderAabbMax"][2] };
                 }
-                else {
+                if (version >= 6) {
+                    obj->colliderShapeType = static_cast<ColliderShapeType>(o.value("colliderShapeType", 0u));
+                    if (o.contains("colliderObbCenter"))
+                        obj->colliderObbCenter = { o["colliderObbCenter"][0], o["colliderObbCenter"][1], o["colliderObbCenter"][2] };
+                    if (o.contains("colliderObbSize"))
+                        obj->colliderObbSize = { o["colliderObbSize"][0], o["colliderObbSize"][1], o["colliderObbSize"][2] };
+                    if (o.contains("colliderObbEuler"))
+                        obj->colliderObbEuler = { o["colliderObbEuler"][0], o["colliderObbEuler"][1], o["colliderObbEuler"][2] };
+                    if (o.contains("colliderSphCenter"))
+                        obj->colliderSphereCenter = { o["colliderSphCenter"][0], o["colliderSphCenter"][1], o["colliderSphCenter"][2] };
+                    if (o.contains("colliderSphRadius"))
+                        obj->colliderSphereRadius = o["colliderSphRadius"].get<float>();
+                }
+                if (version < 5) {
                     auto it = legacyTemplates.find(obj->modelName);
                     if (it != legacyTemplates.end()) {
                         obj->colliderTypeId     = it->second.typeId;

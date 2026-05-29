@@ -212,7 +212,7 @@ namespace YoRigine {
                 // ── このオブジェクト固有の設定 ──
                 ImGui::PushStyleColor(ImGuiCol_ChildBg,
                     ImGui::GetStyleColorVec4(ImGuiCol_FrameBg));
-                ImGui::BeginChild("##ColliderPerObj", ImVec2(0, 190), true);
+                ImGui::BeginChild("##ColliderPerObj", ImVec2(0, 230), true);
                 ImGui::TextDisabled("個別設定 (ID: %d)", obj->id);
                 ImGui::Separator();
 
@@ -230,11 +230,30 @@ namespace YoRigine {
                     ImGui::EndCombo();
                 }
 
-                // AABB オフセット（per-object）
+                // Shape ドロップダウン（per-object）
+                const char* shapeNames[] = { "AABB", "OBB", "Sphere" };
+                int currentShape = static_cast<int>(obj->colliderShapeType);
+                if (ImGui::Combo("Shape", &currentShape, shapeNames, 3)) {
+                    obj->colliderShapeType = static_cast<ColliderShapeType>(currentShape);
+                    changed = true;
+                }
+
+                // シェイプ別オフセット
                 ImGui::Separator();
-                ImGui::TextDisabled("AABB オフセット");
-                if (ImGui::DragFloat3("AABB Max", &obj->colliderAabbOffset.max.x, 0.05f)) changed = true;
-                if (ImGui::DragFloat3("AABB Min", &obj->colliderAabbOffset.min.x, 0.05f)) changed = true;
+                if (obj->colliderShapeType == ColliderShapeType::kAABB) {
+                    ImGui::TextDisabled("AABB オフセット");
+                    if (ImGui::DragFloat3("AABB Max", &obj->colliderAabbOffset.max.x, 0.05f)) changed = true;
+                    if (ImGui::DragFloat3("AABB Min", &obj->colliderAabbOffset.min.x, 0.05f)) changed = true;
+                } else if (obj->colliderShapeType == ColliderShapeType::kOBB) {
+                    ImGui::TextDisabled("OBB オフセット");
+                    if (ImGui::DragFloat3("Center##obb", &obj->colliderObbCenter.x, 0.05f)) changed = true;
+                    if (ImGui::DragFloat3("Size##obb",   &obj->colliderObbSize.x,   0.05f, 0.01f, 100.0f)) changed = true;
+                    if (ImGui::DragFloat3("Euler(deg)",  &obj->colliderObbEuler.x,  1.0f)) changed = true;
+                } else {
+                    ImGui::TextDisabled("Sphere オフセット");
+                    if (ImGui::DragFloat3("Center##sph",  &obj->colliderSphereCenter.x, 0.05f)) changed = true;
+                    if (ImGui::DragFloat("Radius", &obj->colliderSphereRadius, 0.05f, 0.01f, 100.0f)) changed = true;
+                }
 
                 if (changed) {
                     objectManager_->ApplyColliderTemplate(*obj);

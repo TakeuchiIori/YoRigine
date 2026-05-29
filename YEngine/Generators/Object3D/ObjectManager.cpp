@@ -5,6 +5,8 @@
 
 #include <Collision/Core/CollisionManager.h>
 #include <Collision/Core/ColliderFactory.h>
+#include <Collision/OBB/OBBCollider.h>
+#include <Collision/Sphere/SphereCollider.h>
 ObjectManager* ObjectManager::instance_ = nullptr;
 
 
@@ -150,9 +152,15 @@ ObjectManager::PlacedObject* ObjectManager::DuplicateObject(
 	duplicate->parentID = original->parentID;
 
 	// コライダー設定を複製（各オブジェクト固有の設定をそのままコピー）
-	duplicate->colliderEnabled   = original->colliderEnabled;
-	duplicate->colliderTypeId    = original->colliderTypeId;
-	duplicate->colliderAabbOffset = original->colliderAabbOffset;
+	duplicate->colliderEnabled      = original->colliderEnabled;
+	duplicate->colliderTypeId       = original->colliderTypeId;
+	duplicate->colliderShapeType    = original->colliderShapeType;
+	duplicate->colliderAabbOffset   = original->colliderAabbOffset;
+	duplicate->colliderObbCenter    = original->colliderObbCenter;
+	duplicate->colliderObbSize      = original->colliderObbSize;
+	duplicate->colliderObbEuler     = original->colliderObbEuler;
+	duplicate->colliderSphereCenter = original->colliderSphereCenter;
+	duplicate->colliderSphereRadius = original->colliderSphereRadius;
 	ApplyColliderTemplate(*duplicate);
 
 	UpdateObjectTransform(*duplicate);
@@ -386,23 +394,62 @@ void ObjectManager::InitializePlacedObject(
 }
 
 void ObjectManager::ApplyColliderTemplate(PlacedObject& obj) {
-	if (!obj.collider) {
-		obj.collider = ColliderFactory::CreateStatic<AABBCollider>(
-			obj.worldTransform.get(),
-			static_cast<uint32_t>(CollisionTypeIdDef::kNone));
+	// シェイプが変わった場合はコライダーを作り直す
+	bool needRebuild = !obj.collider;
+	if (!needRebuild) {
+		switch (obj.colliderShapeType) {
+		case ColliderShapeType::kAABB:   needRebuild = !dynamic_cast<AABBCollider*>(obj.collider.get());   break;
+		case ColliderShapeType::kOBB:    needRebuild = !dynamic_cast<OBBCollider*>(obj.collider.get());    break;
+		case ColliderShapeType::kSphere: needRebuild = !dynamic_cast<SphereCollider*>(obj.collider.get()); break;
+		}
+	}
+
+	if (needRebuild) {
+		obj.collider = nullptr;
+		switch (obj.colliderShapeType) {
+		case ColliderShapeType::kAABB:
+			obj.collider = ColliderFactory::CreateStatic<AABBCollider>(
+				obj.worldTransform.get(), static_cast<uint32_t>(CollisionTypeIdDef::kNone));
+			break;
+		case ColliderShapeType::kOBB:
+			obj.collider = ColliderFactory::CreateStatic<OBBCollider>(
+				obj.worldTransform.get(), static_cast<uint32_t>(CollisionTypeIdDef::kNone));
+			break;
+		case ColliderShapeType::kSphere:
+			obj.collider = ColliderFactory::CreateStatic<SphereCollider>(
+				obj.worldTransform.get(), static_cast<uint32_t>(CollisionTypeIdDef::kNone));
+			break;
+		}
 	}
 
 	if (!obj.collider) return;
 
-	// 各オブジェクト固有の設定を使う（モデル名共有ではない）
 	obj.collider->SetTypeID(static_cast<uint32_t>(obj.colliderTypeId));
-	obj.collider->aabbOffset_ = obj.colliderAabbOffset;
-
 	obj.collider->SetEnablePenetration(true);
 	obj.collider->SetIsStatic(true);
 	obj.collider->SetCollisionEnabled(obj.colliderEnabled);
 
-	// ワールドAABBをこのフレームで即時反映させる（次フレーム待ちにしない）
+	// シェイプ別のオフセットを反映
+	switch (obj.colliderShapeType) {
+	case ColliderShapeType::kAABB:
+		if (auto* c = dynamic_cast<AABBCollider*>(obj.collider.get()))
+			c->aabbOffset_ = obj.colliderAabbOffset;
+		break;
+	case ColliderShapeType::kOBB:
+		if (auto* c = dynamic_cast<OBBCollider*>(obj.collider.get())) {
+			c->obbOffset_.center = obj.colliderObbCenter;
+			c->obbOffset_.size   = obj.colliderObbSize;
+			c->obbEulerOffset_   = obj.colliderObbEuler;
+		}
+		break;
+	case ColliderShapeType::kSphere:
+		if (auto* c = dynamic_cast<SphereCollider*>(obj.collider.get())) {
+			c->sphereOffset_.center = obj.colliderSphereCenter;
+			c->SetRadius(obj.colliderSphereRadius);
+		}
+		break;
+	}
+
 	obj.collider->Update();
 }
 
@@ -410,8 +457,14 @@ void ObjectManager::CopyColliderSettingsToAll(const PlacedObject& src) {
 	// ソースオブジェクトの個別設定を同名オブジェクト全員にコピーして反映する
 	for (auto& [id, obj] : idToObject_) {
 		if (obj && obj->modelName == src.modelName && obj->id != src.id) {
-			obj->colliderTypeId     = src.colliderTypeId;
-			obj->colliderAabbOffset = src.colliderAabbOffset;
+			obj->colliderTypeId       = src.colliderTypeId;
+			obj->colliderShapeType    = src.colliderShapeType;
+			obj->colliderAabbOffset   = src.colliderAabbOffset;
+			obj->colliderObbCenter    = src.colliderObbCenter;
+			obj->colliderObbSize      = src.colliderObbSize;
+			obj->colliderObbEuler     = src.colliderObbEuler;
+			obj->colliderSphereCenter = src.colliderSphereCenter;
+			obj->colliderSphereRadius = src.colliderSphereRadius;
 			ApplyColliderTemplate(*obj);
 		}
 	}
