@@ -217,6 +217,60 @@ void PostEffectChain::SetShatterTransitionParams(int index, const OffScreen::Sha
 	}
 }
 
+/// <summary>
+/// ブルームパラメータ設定
+/// </summary>
+void PostEffectChain::SetBloomParams(int index, const OffScreen::BloomParams& params)
+{
+	auto* effect = GetPostEffectData(index);
+	if (effect && effect->type == OffScreen::OffScreenEffectType::Bloom) {
+		effect->params.bloom = params;
+	}
+}
+
+/// <summary>
+/// ポスタリゼーションパラメータ設定
+/// </summary>
+void PostEffectChain::SetPosterizeParams(int index, const OffScreen::PosterizeParams& params)
+{
+	auto* effect = GetPostEffectData(index);
+	if (effect && effect->type == OffScreen::OffScreenEffectType::Posterize) {
+		effect->params.posterize = params;
+	}
+}
+
+void PostEffectChain::SetKuwaharaParams(int index, const OffScreen::KuwaharaParams& params)
+{
+	auto* effect = GetPostEffectData(index);
+	if (effect && effect->type == OffScreen::OffScreenEffectType::Kuwahara) {
+		effect->params.kuwahara = params;
+	}
+}
+
+void PostEffectChain::SetHalftoneParams(int index, const OffScreen::HalftoneParams& params)
+{
+	auto* effect = GetPostEffectData(index);
+	if (effect && effect->type == OffScreen::OffScreenEffectType::Halftone) {
+		effect->params.halftone = params;
+	}
+}
+
+void PostEffectChain::SetCrossHatchParams(int index, const OffScreen::CrossHatchParams& params)
+{
+	auto* effect = GetPostEffectData(index);
+	if (effect && effect->type == OffScreen::OffScreenEffectType::CrossHatch) {
+		effect->params.crossHatch = params;
+	}
+}
+
+void PostEffectChain::SetColorGradeParams(int index, const OffScreen::ColorGradeParams& params)
+{
+	auto* effect = GetPostEffectData(index);
+	if (effect && effect->type == OffScreen::OffScreenEffectType::ColorGrade) {
+		effect->params.colorGrade = params;
+	}
+}
+
 
 //==================================================================
 // ImGui
@@ -452,6 +506,117 @@ bool PostEffectChain::DrawEffectParametersImGui([[maybe_unused]] int selectedInd
 		}
 		break;
 
+		// --------------------------------------------------------
+		// ブルーム
+		// --------------------------------------------------------
+	case OffScreen::OffScreenEffectType::Bloom:
+		if (ImGui::SliderFloat("Threshold", &effect->params.bloom.threshold, 0.0f, 1.0f)) {
+			changed = true;
+		}
+		if (ImGui::SliderFloat("Intensity", &effect->params.bloom.intensity, 0.0f, 3.0f)) {
+			changed = true;
+		}
+		if (ImGui::SliderFloat("Spread", &effect->params.bloom.spread, 1.0f, 20.0f)) {
+			changed = true;
+		}
+		if (ImGui::SliderFloat("Color Temp (warm +)", &effect->params.bloom.colorTemperature, -1.0f, 1.0f)) {
+			changed = true;
+		}
+		break;
+
+		// --------------------------------------------------------
+		// ポスタリゼーション
+		// --------------------------------------------------------
+	case OffScreen::OffScreenEffectType::Posterize:
+		if (ImGui::SliderInt("Steps", &effect->params.posterize.steps, 2, 16)) {
+			changed = true;
+		}
+		if (ImGui::SliderFloat("Saturation Boost", &effect->params.posterize.saturationBoost, 0.0f, 2.0f)) {
+			changed = true;
+		}
+		break;
+
+		// --------------------------------------------------------
+		// クワハラ（油絵）フィルター
+		// --------------------------------------------------------
+	case OffScreen::OffScreenEffectType::Kuwahara:
+		if (ImGui::SliderInt("Radius", &effect->params.kuwahara.radius, 1, 8)) {
+			changed = true;
+		}
+		if (ImGui::SliderFloat("Sharpness", &effect->params.kuwahara.sharpness, 1.0f, 16.0f)) {
+			changed = true;
+		}
+		break;
+
+		// --------------------------------------------------------
+		// ハーフトーン
+		// --------------------------------------------------------
+	case OffScreen::OffScreenEffectType::Halftone:
+		if (ImGui::SliderFloat("Dot Size", &effect->params.halftone.dotSize, 2.0f, 16.0f)) {
+			changed = true;
+		}
+		if (ImGui::SliderFloat("Angle", &effect->params.halftone.angle, 0.0f, 90.0f)) {
+			changed = true;
+		}
+		if (ImGui::SliderFloat("Strength##halftone", &effect->params.halftone.strength, 0.0f, 1.0f)) {
+			changed = true;
+		}
+		if (ImGui::SliderFloat("Shadow Threshold", &effect->params.halftone.threshold, 0.0f, 1.0f)) {
+			changed = true;
+		}
+		break;
+
+		// --------------------------------------------------------
+		// カラーグレーディング
+		// --------------------------------------------------------
+	case OffScreen::OffScreenEffectType::ColorGrade:
+	{
+		ImGui::TextDisabled("--- Split Toning ---");
+		float sc[3] = { effect->params.colorGrade.shadowColor.x, effect->params.colorGrade.shadowColor.y, effect->params.colorGrade.shadowColor.z };
+		if (ImGui::ColorEdit3("Shadow Color", sc)) {
+			effect->params.colorGrade.shadowColor = { sc[0], sc[1], sc[2] };
+			changed = true;
+		}
+		float hc[3] = { effect->params.colorGrade.highlightColor.x, effect->params.colorGrade.highlightColor.y, effect->params.colorGrade.highlightColor.z };
+		if (ImGui::ColorEdit3("Highlight Color", hc)) {
+			effect->params.colorGrade.highlightColor = { hc[0], hc[1], hc[2] };
+			changed = true;
+		}
+		if (ImGui::SliderFloat("Balance", &effect->params.colorGrade.splitBalance, 0.0f, 1.0f)) {
+			changed = true;
+		}
+		if (ImGui::SliderFloat("Split Strength", &effect->params.colorGrade.splitStrength, 0.0f, 1.0f)) {
+			changed = true;
+		}
+		ImGui::Separator();
+		ImGui::TextDisabled("--- Vibrance / Temperature ---");
+		if (ImGui::SliderFloat("Vibrance", &effect->params.colorGrade.vibrance, -1.0f, 1.0f)) {
+			changed = true;
+		}
+		if (ImGui::SliderFloat("Color Temp (warm +)", &effect->params.colorGrade.colorTemp, -1.0f, 1.0f)) {
+			changed = true;
+		}
+		if (ImGui::SliderFloat("Tint (magenta +)", &effect->params.colorGrade.colorTint, -1.0f, 1.0f)) {
+			changed = true;
+		}
+		break;
+	}
+
+		// --------------------------------------------------------
+		// クロスハッチング
+		// --------------------------------------------------------
+	case OffScreen::OffScreenEffectType::CrossHatch:
+		if (ImGui::SliderFloat("Line Spacing", &effect->params.crossHatch.lineSpacing, 2.0f, 20.0f)) {
+			changed = true;
+		}
+		if (ImGui::SliderFloat("Line Width", &effect->params.crossHatch.lineWidth, 0.3f, 4.0f)) {
+			changed = true;
+		}
+		if (ImGui::SliderFloat("Strength##crosshatch", &effect->params.crossHatch.strength, 0.0f, 1.0f)) {
+			changed = true;
+		}
+		break;
+
 	default:
 		ImGui::Text("No editable parameters for this effect.");
 		break;
@@ -496,6 +661,12 @@ const char* PostEffectChain::GetEffectTypeName(OffScreen::OffScreenEffectType ty
 	case OffScreen::OffScreenEffectType::Chromatic:         return "Chromatic";
 	case OffScreen::OffScreenEffectType::ColorAdjust:       return "ColorAdjust";
 	case OffScreen::OffScreenEffectType::ShatterTransition: return "ShatterTransition";
+	case OffScreen::OffScreenEffectType::Bloom:             return "Bloom";
+	case OffScreen::OffScreenEffectType::Posterize:         return "Posterize";
+	case OffScreen::OffScreenEffectType::Kuwahara:          return "Kuwahara";
+	case OffScreen::OffScreenEffectType::Halftone:          return "Halftone";
+	case OffScreen::OffScreenEffectType::CrossHatch:        return "CrossHatch";
+	case OffScreen::OffScreenEffectType::ColorGrade:        return "ColorGrade";
 	default:                                                return "Unknown";
 	}
 }
@@ -553,6 +724,52 @@ void PostEffectChain::SetDefaultParameters(PostEffectData& effect)
 		// ----------------------------- 画面割れトランジション　-----------------------------//
 	case OffScreen::OffScreenEffectType::ShatterTransition:
 		effect.params.shatter = { 0.0f, { WinApp::kClientWidth, WinApp::kClientHeight }, 1.0f };
+		break;
+
+		// ----------------------------- ブルーム　-----------------------------//
+	case OffScreen::OffScreenEffectType::Bloom:
+		effect.params.bloom.threshold = 0.6f;
+		effect.params.bloom.intensity = 0.5f;
+		effect.params.bloom.spread = 6.0f;
+		effect.params.bloom.colorTemperature = 0.3f;
+		break;
+
+		// ----------------------------- ポスタリゼーション　-----------------------------//
+	case OffScreen::OffScreenEffectType::Posterize:
+		effect.params.posterize.steps = 5;
+		effect.params.posterize.saturationBoost = 1.2f;
+		break;
+
+		// ----------------------------- クワハラ（油絵）フィルター　-----------------------------//
+	case OffScreen::OffScreenEffectType::Kuwahara:
+		effect.params.kuwahara.radius = 4;
+		effect.params.kuwahara.sharpness = 4.0f;
+		break;
+
+		// ----------------------------- ハーフトーン　-----------------------------//
+	case OffScreen::OffScreenEffectType::Halftone:
+		effect.params.halftone.dotSize = 6.0f;
+		effect.params.halftone.angle = 45.0f;
+		effect.params.halftone.strength = 0.85f;
+		effect.params.halftone.threshold = 0.75f;
+		break;
+
+		// ----------------------------- クロスハッチング　-----------------------------//
+	case OffScreen::OffScreenEffectType::CrossHatch:
+		effect.params.crossHatch.lineSpacing = 8.0f;
+		effect.params.crossHatch.lineWidth = 1.0f;
+		effect.params.crossHatch.strength = 0.7f;
+		break;
+
+		// ----------------------------- カラーグレーディング　-----------------------------//
+	case OffScreen::OffScreenEffectType::ColorGrade:
+		effect.params.colorGrade.shadowColor    = { 0.0f, 0.02f, 0.08f };
+		effect.params.colorGrade.splitBalance   = 0.45f;
+		effect.params.colorGrade.highlightColor = { 0.10f, 0.06f, -0.02f };
+		effect.params.colorGrade.splitStrength  = 0.25f;
+		effect.params.colorGrade.vibrance       = 0.30f;
+		effect.params.colorGrade.colorTemp      = 0.08f;
+		effect.params.colorGrade.colorTint      = 0.0f;
 		break;
 
 	default:

@@ -23,8 +23,11 @@ public:
 public:
 
 	///************************* アクセッサ *************************///
-	Microsoft::WRL::ComPtr<ID3D12Device> GetDevice() { return device_; }
+	Microsoft::WRL::ComPtr<ID3D12Device>  GetDevice()      { return device_; }
 	Microsoft::WRL::ComPtr<IDXGIFactory7> GetDXGIFactory() { return dxgiFactory_; }
+
+	// Mesh Shader (SM6.5) のハードウェアサポート確認
+	bool SupportsMeshShaders() const { return meshShaderSupported_; }
 
 private:
 
@@ -34,6 +37,6 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12Device> device_;
 	// DXGIファクトリ
 	Microsoft::WRL::ComPtr<IDXGIFactory7> dxgiFactory_;
-
+	// Mesh Shader サポートフラグ（Initialize() 後に有効）
+	bool meshShaderSupported_ = false;
 };
-

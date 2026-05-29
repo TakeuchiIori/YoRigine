@@ -138,17 +138,31 @@ void AttackingCombatState::Update([[maybe_unused]] float deltaTime) {
 		(currentFrame < currentAttack->hitEnd);
 	player->GetSword()->SetEnableCollider(inHitWindow);
 
-	// 3. 次の攻撃の先行入力（キャンセル）受付
-	if (currentFrame >= currentAttack->comboWindowStart && currentFrame <= currentAttack->comboWindowEnd) {
+	// 3. 先行入力（バッファ）受付
+	// inputBufferStart に到達したら、押されたボタンを記憶する
+	if (currentFrame >= currentAttack->inputBufferStart) {
 		if (player->IsAttackPressedA()) {
-			if (combat_->TryAttack(AttackType::A_Arte)) return;
+			combat_->BufferAttack(AttackType::A_Arte);
 		}
 		else if (player->IsAttackPressedB()) {
-			if (combat_->TryAttack(AttackType::B_Arte)) return;
+			combat_->BufferAttack(AttackType::B_Arte);
 		}
 	}
 
-	// 4. アニメーション終了判定
+	// 4. キャンセル可能フレームに入ったら、バッファされた入力をTryAttackで発火する
+	if (currentFrame >= currentAttack->comboWindowStart && currentFrame <= currentAttack->comboWindowEnd) {
+		if (combat_->HasBufferedAttack()) {
+			AttackType next = combat_->PopBufferedAttack();
+			if (combat_->TryAttack(next)) return;
+		}
+	}
+
+	// 5. キャンセル可能フレームを越えたらバッファ破棄（古い入力で次が暴発しないように）
+	if (currentFrame > currentAttack->comboWindowEnd) {
+		combat_->ClearBufferedAttack();
+	}
+
+	// 6. アニメーション終了判定
 	if (stateTimer_ >= currentAttack->duration) {
 		combat_->ChangeState(CombatState::Idle);
 	}

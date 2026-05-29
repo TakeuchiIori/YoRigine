@@ -67,6 +67,7 @@ private:
 	std::unique_ptr<CameraEditor> cameraEditor_;
 	bool isDebugCamera_ = false;
 
+	int bloomEffectIndex_;
 	// サウンド
 	YoRigine::Audio::SoundData soundData;
 	IXAudio2SourceVoice* sourceVoice;

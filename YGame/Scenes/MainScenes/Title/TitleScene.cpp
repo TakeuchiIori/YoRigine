@@ -16,7 +16,8 @@
 #include <ModelManipulator/ModelManipulator.h>
 #include "OffScreen/PostEffectManager.h"
 #include "Systems/Camera/Virtuals/TitleCamera/TitleCamera.h"
-
+#include "Systems/Camera/CameraDirector.h"
+#include "Particle/YEmitterGroupManager.h"
 #ifdef USE_IMGUI
 #include "imgui.h"
 #endif
@@ -44,16 +45,21 @@ void TitleScene::Initialize() {
 	// カメラの登録
 	auto titleCamera = director->GetCamera("TitleCamera");
 	auto debug = director->GetCamera("MainDebug");
+
+	// タイトル用のポストエフェクトの追加
+	auto postEffectManager = PostEffectManager::GetInstance();
+	postEffectManager->LoadPreset("TitleBloom");
+
 	//------------------------------------------------------------
 	// システム初期化
 	//------------------------------------------------------------
 	YoRigine::GameTime::Initialize();
 	YoRigine::JsonManager::SetCurrentScene("TitleScene");
 	YoRigine::CollisionManager::GetInstance()->Initialize();
-	YoRigine::ParticleManager::GetInstance()->SetCamera(sceneCamera_.get());
 	YoRigine::ModelManipulator::GetInstance()->LoadScene("TitleScene");
 	YoRigine::ModelManipulator::GetInstance()->SetCamera(sceneCamera_.get());
 
+	YParticleManager::GetInstance().SetCamera(sceneCamera_.get());
 	//------------------------------------------------------------
 	// タイトル専用要素の初期化
 	//------------------------------------------------------------
@@ -110,12 +116,12 @@ void TitleScene::Update() {
 	skyBox_->Update();
 	ground_->Update();
 
-	// タイトル用パーティクル発生
-	YoRigine::ParticleManager::GetInstance()->Emit("TitleParticle", Vector3(0, 3, 0), 10);
+	auto* enemyHitEmitterGroup_ = YEmitterGroupManager::GetInstance().GetGroup("Title");
+	enemyHitEmitterGroup_->EmitAll();
 
 	YoRigine::ModelManipulator::GetInstance()->Update();
 	YoRigine::CollisionManager::GetInstance()->Update();
-	YoRigine::ParticleManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
+	YParticleManager::GetInstance().Update(YoRigine::GameTime::GetDeltaTime());
 	YoRigine::LightManager::GetInstance()->UpdateShadowMatrix(sceneCamera_.get());
 	titleUI_->Update();
 }
@@ -135,8 +141,15 @@ void TitleScene::Draw() {
 	//------------------------------------------------------------
 	// パーティクル描画
 	//------------------------------------------------------------
-	YoRigine::ParticleManager::GetInstance()->Draw();
+	YParticleManager::GetInstance().Draw();
 
+
+}
+
+/// <summary>
+/// オフスクリーン外の描画処理（現状未使用）
+/// </summary>
+void TitleScene::DrawNonOffscreen() {
 	//------------------------------------------------------------
 	// 2D UI描画
 	//------------------------------------------------------------
@@ -145,15 +158,11 @@ void TitleScene::Draw() {
 }
 
 /// <summary>
-/// オフスクリーン外の描画処理（現状未使用）
-/// </summary>
-void TitleScene::DrawNonOffscreen() {}
-
-/// <summary>
 /// 影の描画
 /// </summary>
 void TitleScene::DrawShadow()
 {
+	DrawCommonShadow();
 	player_->DrawShadow();
 	YoRigine::ModelManipulator::GetInstance()->DrawShadow();
 }

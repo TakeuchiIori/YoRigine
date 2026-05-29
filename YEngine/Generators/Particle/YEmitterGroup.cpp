@@ -102,21 +102,37 @@ nlohmann::json YEmitterGroup::SaveToJson() const {
         ej["offsetZ"] = pos.z - position_.z;
         ej["emissionRate"] = emitter->GetEmissionRate();
         ej["emitCount"] = emitter->GetEmitCount();
-        ej["autoEmit"] = emitter->GetAutoEmit();
+        ej["autoEmit"] = false; // ロード時に自動射出しないよう常にfalseで保存
 
-        // 形状
+        // 形状（min/max フィールドに対応）
         if (auto* shape = emitter->GetShape()) {
             ej["shapeType"] = static_cast<int>(shape->GetType());
             switch (shape->GetType()) {
             case YEmitterShape::Type::Sphere: {
                 auto* s = static_cast<YEmitterSphere*>(shape);
-                ej["shapeRadius"] = s->radius;
-                ej["shapeShellOnly"] = s->shellOnly;
+                ej["shapeMinRadius"]  = s->minRadius;
+                ej["shapeMaxRadius"]  = s->maxRadius;
+                ej["shapeShellOnly"]  = s->shellOnly;
+                // 後方互換のため旧フィールドも保存
+                ej["shapeRadius"]     = s->maxRadius;
                 break;
             }
             case YEmitterShape::Type::Box: {
                 auto* b = static_cast<YEmitterBox*>(shape);
-                ej["shapeSize"] = { b->size.x, b->size.y, b->size.z };
+                ej["shapeMinSize"] = { b->minSize.x, b->minSize.y, b->minSize.z };
+                ej["shapeMaxSize"] = { b->maxSize.x, b->maxSize.y, b->maxSize.z };
+                // 後方互換
+                ej["shapeSize"]    = { b->maxSize.x, b->maxSize.y, b->maxSize.z };
+                break;
+            }
+            case YEmitterShape::Type::Cone: {
+                auto* c = static_cast<YEmitterCone*>(shape);
+                ej["shapeInnerAngle"] = c->innerAngle;
+                ej["shapeOuterAngle"] = c->outerAngle;
+                ej["shapeMinRadius"]  = c->minRadius;
+                ej["shapeMaxRadius"]  = c->maxRadius;
+                ej["shapeHeight"]     = c->height;
+                ej["shapeDir"]        = { c->direction.x, c->direction.y, c->direction.z };
                 break;
             }
             default: break;
@@ -151,24 +167,55 @@ void YEmitterGroup::LoadFromJson(const nlohmann::json& j) {
         emitter.SetEmitCount(ej.value("emitCount", 1));
         emitter.SetAutoEmit(ej.value("autoEmit", false));
 
-        // 形状復元
+        // 形状復元（min/max 対応 + 後方互換）
         int shapeType = ej.value("shapeType", 0);
         switch (shapeType) {
         case static_cast<int>(YEmitterShape::Type::Point):
             emitter.SetShapePoint();
             break;
         case static_cast<int>(YEmitterShape::Type::Sphere): {
-            float r = (float)ej.value("shapeRadius", 1.0);
-            bool shell = ej.value("shapeShellOnly", false);
-            emitter.SetShapeSphere(r, shell);
+            // 新形式（minRadius/maxRadius）を優先、なければ旧形式にフォールバック
+            if (ej.contains("shapeMinRadius") || ej.contains("shapeMaxRadius")) {
+                float minR = (float)ej.value("shapeMinRadius", 0.0);
+                float maxR = (float)ej.value("shapeMaxRadius", 1.0);
+                emitter.SetShapeSphereRange(minR, maxR);
+            } else {
+                float r    = (float)ej.value("shapeRadius", 1.0);
+                bool shell = ej.value("shapeShellOnly", false);
+                emitter.SetShapeSphere(r, shell);
+            }
             break;
         }
         case static_cast<int>(YEmitterShape::Type::Box): {
-            Vector3 sz = { 1,1,1 };
-            if (ej.contains("shapeSize")) {
-                sz = { ej["shapeSize"][0], ej["shapeSize"][1], ej["shapeSize"][2] };
+            if (ej.contains("shapeMinSize") || ej.contains("shapeMaxSize")) {
+                Vector3 minSz = { 0,0,0 }, maxSz = { 1,1,1 };
+                if (ej.contains("shapeMinSize")) {
+                    minSz = { ej["shapeMinSize"][0], ej["shapeMinSize"][1], ej["shapeMinSize"][2] };
+                }
+                if (ej.contains("shapeMaxSize")) {
+                    maxSz = { ej["shapeMaxSize"][0], ej["shapeMaxSize"][1], ej["shapeMaxSize"][2] };
+                }
+                emitter.SetShapeBoxRange(minSz, maxSz);
+            } else {
+                Vector3 sz = { 1,1,1 };
+                if (ej.contains("shapeSize")) {
+                    sz = { ej["shapeSize"][0], ej["shapeSize"][1], ej["shapeSize"][2] };
+                }
+                emitter.SetShapeBox(sz);
             }
-            emitter.SetShapeBox(sz);
+            break;
+        }
+        case static_cast<int>(YEmitterShape::Type::Cone): {
+            float innerAngle = (float)ej.value("shapeInnerAngle", 0.0);
+            float outerAngle = (float)ej.value("shapeOuterAngle", 25.0);
+            float minR       = (float)ej.value("shapeMinRadius",  0.0);
+            float maxR       = (float)ej.value("shapeMaxRadius",  1.0);
+            float h          = (float)ej.value("shapeHeight",     2.0);
+            Vector3 dir      = { 0,1,0 };
+            if (ej.contains("shapeDir")) {
+                dir = { ej["shapeDir"][0], ej["shapeDir"][1], ej["shapeDir"][2] };
+            }
+            emitter.SetShapeConeRange(innerAngle, outerAngle, h, minR, maxR, dir);
             break;
         }
         default: break;

@@ -1,0 +1,36 @@
+{
+    "emitters": [
+        {
+            "autoEmit": false,
+            "emissionRate": 10.0,
+            "emitCount": 26,
+            "offsetX": 0.0,
+            "offsetY": 0.0,
+            "offsetZ": 0.0,
+            "shapeMaxSize": [
+                50.0,
+                50.0,
+                50.0
+            ],
+            "shapeMinSize": [
+                -50.0,
+                -50.0,
+                -50.0
+            ],
+            "shapeSize": [
+                50.0,
+                50.0,
+                50.0
+            ],
+            "shapeType": 2,
+            "systemName": "Title"
+        }
+    ],
+    "groupName": "Title",
+    "isActive": true,
+    "position": [
+        0.0,
+        0.0,
+        0.0
+    ]
+}

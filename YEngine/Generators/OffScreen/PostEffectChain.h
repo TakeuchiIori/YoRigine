@@ -27,6 +27,12 @@ struct PostEffectData {
 		OffScreen::ColorAdjustParams colorAdjust;   // ColorAdjust用
 		OffScreen::ToneParams tone;
 		OffScreen::ShatterTransitionParams shatter; // ShatterTransition用
+		OffScreen::BloomParams bloom;               // Bloom用
+		OffScreen::PosterizeParams posterize;       // Posterize用
+		OffScreen::KuwaharaParams kuwahara;         // Kuwahara用
+		OffScreen::HalftoneParams halftone;         // Halftone用
+		OffScreen::CrossHatchParams crossHatch;     // CrossHatch用
+		OffScreen::ColorGradeParams colorGrade;    // ColorGrade用
 	} params;
 };
 
@@ -97,6 +103,24 @@ public:
 
 	// 破壊シーン遷移のパラメータを設定
 	void SetShatterTransitionParams(int index, const OffScreen::ShatterTransitionParams& params);
+
+	// ブルームのパラメータを設定
+	void SetBloomParams(int index, const OffScreen::BloomParams& params);
+
+	// ポスタリゼーションのパラメータを設定
+	void SetPosterizeParams(int index, const OffScreen::PosterizeParams& params);
+
+	// 油絵フィルターのパラメータを設定
+	void SetKuwaharaParams(int index, const OffScreen::KuwaharaParams& params);
+
+	// ハーフトーンのパラメータを設定
+	void SetHalftoneParams(int index, const OffScreen::HalftoneParams& params);
+
+	// クロスハッチングのパラメータを設定
+	void SetCrossHatchParams(int index, const OffScreen::CrossHatchParams& params);
+
+	// カラーグレーディングのパラメータを設定
+	void SetColorGradeParams(int index, const OffScreen::ColorGradeParams& params);
 	///************************* ImGui表示 *************************///
 
 	// エフェクトリストのImGui表示

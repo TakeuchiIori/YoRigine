@@ -249,7 +249,7 @@ void BattleScene::OnEnter() {
 		}
 
 		// バトル開始時のスタート演出カメラの再生
-		player_->GetFollowCamera()->PlayBattleStart();
+		player_->GetPlayerCamera()->PlayBattleStart();
 		// 戦闘開始
 		if (battleEnemyManager_) {
 			// BattleEnemyManagerに最終バトル情報を渡す

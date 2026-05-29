@@ -1,0 +1,93 @@
+{
+    "BlendMode": 2,
+    "Lighting": false,
+    "billboardType": 1,
+    "isRelative": false,
+    "maxParticles": 1000,
+    "mesh": {
+        "params": [
+            1.0,
+            1.0,
+            1.0,
+            16.0
+        ],
+        "type": 0
+    },
+    "name": "Title",
+    "spawnModules": [
+        {
+            "data": {
+                "maxColor": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0
+                ],
+                "minColor": [
+                    1.0,
+                    0.9867256879806519,
+                    0.9734513163566589,
+                    1.0
+                ]
+            },
+            "name": "ランダム色",
+            "type": "SpawnRandomColor"
+        },
+        {
+            "data": {
+                "speed": 2.0,
+                "speedVariation": 2.299999952316284,
+                "use3D": true
+            },
+            "name": "放射状速度",
+            "type": "SpawnRadialVelocity"
+        },
+        {
+            "data": {
+                "maxLifeTime": 3.5,
+                "minLifeTime": 1.0
+            },
+            "name": "生存時間",
+            "type": "SpawnLifeTime"
+        },
+        {
+            "data": {
+                "maxScale": {
+                    "x": 1.0,
+                    "y": 1.0,
+                    "z": 1.0
+                },
+                "minScale": {
+                    "x": 0.5,
+                    "y": 0.5,
+                    "z": 0.5
+                }
+            },
+            "name": "Spawn Random Scale",
+            "type": "SpawnRandomScale"
+        }
+    ],
+    "texture": "Resources/Effects/star.png",
+    "updateModules": [
+        {
+            "data": {
+                "isRandom": true,
+                "velocity": {
+                    "x": 5.099999904632568,
+                    "y": 1.0,
+                    "z": 0.0
+                }
+            },
+            "name": "速度",
+            "type": "UpdateVelocity"
+        },
+        {
+            "data": {
+                "fadeEnd": 1.0,
+                "fadeStart": 0.28700000047683716
+            },
+            "name": "フェードアウト",
+            "type": "UpdateFadeOut"
+        }
+    ]
+}

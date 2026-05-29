@@ -1,0 +1,162 @@
+{
+  "version": "1.0",
+  "effectCount": 2,
+  "effects": [
+    {
+      "type": 0,
+      "name": "Default",
+      "enabled": true,
+      "parameters": {
+        "exposure": 1.000000,
+        "sigma": 2.000000,
+        "kernelSize": 3,
+        "outlineColor": [0.000000,0.000000,0.000000,1.000000],
+        "radialBlur": {
+          "direction": [0.000000,0.000000],
+          "center": [0.500000,0.500000],
+          "width": 0.001000,
+          "sampleCount": 10,
+          "isRadial": true
+        },
+        "dissolve": {
+          "threshold": 0.000000,
+          "edgeWidth": 0.000000,
+          "edgeColor": [0.000000,0.000000,0.000000],
+          "invert": 0.000000
+        },
+        "chromatic": {
+          "aberrationStrength": 0.000000,
+          "screenSize": [0.000000,0.000000],
+          "edgeStrength": 0.000000
+        },
+        "colorAdjust": {
+          "brightness": 0.000000,
+          "contrast": 1.000000,
+          "saturation": 1.000000,
+          "hue": 0.000000
+        },
+        "tone": {
+          "gamma": 2.200000,
+          "exposure": 1.000000
+        },
+        "shatter": {
+          "progress": 0.000000,
+          "resolution": [0.000000,0.000000],
+          "time": 0.000000
+        },
+        "bloom": {
+          "threshold": 0.600000,
+          "intensity": 0.500000,
+          "spread": 6.000000,
+          "colorTemperature": 0.300000
+        },
+        "posterize": {
+          "steps": 5,
+          "saturationBoost": 1.200000
+        },
+        "kuwahara": {
+          "radius": 4,
+          "sharpness": 4.000000
+        },
+        "halftone": {
+          "dotSize": 6.000000,
+          "angle": 45.000000,
+          "strength": 0.850000,
+          "threshold": 0.750000
+        },
+        "crossHatch": {
+          "lineSpacing": 8.000000,
+          "lineWidth": 1.000000,
+          "strength": 0.700000
+        },
+        "colorGrade": {
+          "shadowColor": [0.000000,0.020000,0.080000],
+          "splitBalance": 0.450000,
+          "highlightColor": [0.100000,0.060000,-0.020000],
+          "splitStrength": 0.250000,
+          "vibrance": 0.300000,
+          "colorTemp": 0.080000,
+          "colorTint": 0.000000
+        }
+      }
+    },
+    {
+      "type": 12,
+      "name": "Bloom 1",
+      "enabled": true,
+      "parameters": {
+        "exposure": 1.000000,
+        "sigma": 2.000000,
+        "kernelSize": 3,
+        "outlineColor": [0.000000,0.000000,0.000000,1.000000],
+        "radialBlur": {
+          "direction": [0.000000,0.000000],
+          "center": [0.500000,0.500000],
+          "width": 0.001000,
+          "sampleCount": 10,
+          "isRadial": true
+        },
+        "dissolve": {
+          "threshold": 0.000000,
+          "edgeWidth": 0.000000,
+          "edgeColor": [0.000000,0.000000,0.000000],
+          "invert": 0.000000
+        },
+        "chromatic": {
+          "aberrationStrength": 0.000000,
+          "screenSize": [0.000000,0.000000],
+          "edgeStrength": 0.000000
+        },
+        "colorAdjust": {
+          "brightness": 0.000000,
+          "contrast": 1.000000,
+          "saturation": 1.000000,
+          "hue": 0.000000
+        },
+        "tone": {
+          "gamma": 2.200000,
+          "exposure": 1.000000
+        },
+        "shatter": {
+          "progress": 0.000000,
+          "resolution": [0.000000,0.000000],
+          "time": 0.000000
+        },
+        "bloom": {
+          "threshold": 0.220000,
+          "intensity": 0.978000,
+          "spread": 7.425000,
+          "colorTemperature": -0.135000
+        },
+        "posterize": {
+          "steps": 5,
+          "saturationBoost": 1.200000
+        },
+        "kuwahara": {
+          "radius": 4,
+          "sharpness": 4.000000
+        },
+        "halftone": {
+          "dotSize": 6.000000,
+          "angle": 45.000000,
+          "strength": 0.850000,
+          "threshold": 0.750000
+        },
+        "crossHatch": {
+          "lineSpacing": 8.000000,
+          "lineWidth": 1.000000,
+          "strength": 0.700000
+        },
+        "colorGrade": {
+          "shadowColor": [0.000000,0.020000,0.080000],
+          "splitBalance": 0.450000,
+          "highlightColor": [0.100000,0.060000,-0.020000],
+          "splitStrength": 0.250000,
+          "vibrance": 0.300000,
+          "colorTemp": 0.080000,
+          "colorTint": 0.000000
+        }
+      }
+    }
+  ]
+}

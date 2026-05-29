@@ -50,11 +50,10 @@ void PlayerSword::Initialize(Camera* camera) {
 
 
 	// ------------------------------------------------------------
-	// エフェクト関連の初期化
+	// エフェクト関連の初期化（YParticle）
+	// エフェクト定義は JSON で管理。ここでは宣言のみ。
+	// 実際の放出は OnHit() や OnAttack() で EffectHandle::PlayOneShot() を使う。
 	// ------------------------------------------------------------
-	particleEmitter_ = std::make_unique<ParticleEmitter>("PlayerParticle", wt_.translate_, 5);
-	hitParticleEmitter_ = std::make_unique<ParticleEmitter>("PlayerHitParticle", wt_.translate_, 5);
-	testEmitter_ = std::make_unique<ParticleEmitter>("TestParticle", wt_.translate_, 10);
 
 	trailEmitter_ = std::make_unique<YoRigine::TrailMeshEmitter>();
 	trailEmitter_->SetCamera(camera_);
@@ -241,44 +240,23 @@ void PlayerSword::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 		player_->GetCombat()->GetCombo()->RecoverCC(2);
 
 		// ------------------------------------------------------------
-		// ヒットストップ＆カメラシェイク（賢い発動条件）
-		// 毎回発動すると鬱陶しいので、以下の条件でのみ発動：
-		//   - B_Arte（重攻撃）は常にヒットストップ
-		//   - A_Arte（軽攻撃）はコンボ3段目以降でのみ発動
-		//   - コンボ段数が多いほど演出が強くなる
+		// ヒットストップ＆カメラシェイク（AttackData 駆動）
+		// 各攻撃が個別に hitStopDuration / shakeIntensity / shakeDuration を持つので、
+		// 値が 0 の場合はその演出をスキップする。
+		// エディタからリアルタイムに値を調整できる前提の設計。
 		// ------------------------------------------------------------
 		auto* combo = player_->GetCombat()->GetCombo();
 		if (combo) {
 			const AttackData* currentAttack = combo->GetCurrentAttack();
-			int comboCount = combo->GetComboCount();
-
 			if (currentAttack) {
-				bool shouldHitStop = false;
-				float hitStopDuration = 0.0f;
-				float shakeIntensity = 0.0f;
-				float shakeDuration = 0.0f;
-
-				if (currentAttack->type == AttackType::B_Arte) {
-					// 重攻撃：常にヒットストップ（強め）
-					shouldHitStop = true;
-					hitStopDuration = 0.06f;
-					shakeIntensity = 0.35f;
-					shakeDuration = 0.12f;
+				if (currentAttack->hitStopDuration > 0.0f) {
+					YoRigine::GameTime::SetHitStop(currentAttack->hitStopDuration);
 				}
-				else if (comboCount >= 3) {
-					// 軽攻撃のコンボ3段目以降：ヒットストップ（コンボ段数で強化）
-					shouldHitStop = true;
-					float comboBonus = static_cast<float>(comboCount - 2) * 0.01f;
-					hitStopDuration = 0.03f + std::min(comboBonus, 0.05f);
-					shakeIntensity = 0.15f + std::min(comboBonus * 5.0f, 0.25f);
-					shakeDuration = 0.08f + std::min(comboBonus * 2.0f, 0.1f);
-				}
-
-				if (shouldHitStop) {
-					YoRigine::GameTime::SetHitStop(hitStopDuration);
-
+				if (currentAttack->shakeIntensity > 0.0f && currentAttack->shakeDuration > 0.0f) {
 					if (player_->GetFollowCamera()) {
-						player_->GetFollowCamera()->StartShake(shakeIntensity, shakeDuration);
+						player_->GetFollowCamera()->StartShake(
+							currentAttack->shakeIntensity,
+							currentAttack->shakeDuration);
 					}
 				}
 			}

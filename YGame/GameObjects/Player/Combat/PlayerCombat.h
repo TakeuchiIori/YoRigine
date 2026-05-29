@@ -53,6 +53,16 @@ public:
 	bool TryCancel();
 
 	// ============================================================
+	// 先行入力（入力バッファ）
+	// 攻撃中に押された次の攻撃ボタンを記憶し、キャンセル可能フレームで消費する
+	// ============================================================
+	void BufferAttack(AttackType type);
+	bool HasBufferedAttack() const { return hasBufferedInput_; }
+	AttackType PopBufferedAttack();
+	void ClearBufferedAttack() { hasBufferedInput_ = false; }
+	void UpdateInputBuffer(float deltaTime);
+
+	// ============================================================
 	// 状態確認
 	// ============================================================
 	bool IsIdle() const;
@@ -153,4 +163,12 @@ private:
 	// 戦闘のパラメータ状態
 	// ------------------------------------------------------------
 	HitDirection lastHitDirection_ = HitDirection::Front;     // 直前に受けた攻撃の方向（ダメージモーションの分岐用）
+
+	// ------------------------------------------------------------
+	// 先行入力バッファ
+	// ------------------------------------------------------------
+	bool hasBufferedInput_ = false;                // 有効な先行入力が積まれているか
+	AttackType bufferedAttackType_ = AttackType::A_Arte;
+	float bufferedInputAge_ = 0.0f;                // バッファに積まれてからの経過秒
+	float inputBufferLifetime_ = 0.4f;             // バッファの寿命（秒）。経過後は破棄
 };

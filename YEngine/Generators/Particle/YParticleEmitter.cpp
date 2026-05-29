@@ -115,14 +115,48 @@ void YParticleEmitter::EmitInternal(const Vector3& position, int count)
 }
 
 //=================================================================
-// Meshのセット
+// 形状設定メソッド
 //=================================================================
+
 void YParticleEmitter::SetShapePoint() {
 	shape_ = std::make_unique<YEmitterPoint>();
 }
+
+// ── 球体 ──
 void YParticleEmitter::SetShapeSphere(float radius, bool shellOnly) {
 	shape_ = std::make_unique<YEmitterSphere>(radius, shellOnly);
 }
+
+void YParticleEmitter::SetShapeSphereRange(float minRadius, float maxRadius) {
+	shape_ = std::make_unique<YEmitterSphere>(minRadius, maxRadius);
+}
+
+// ── 箱型 ──
 void YParticleEmitter::SetShapeBox(const Vector3& size) {
 	shape_ = std::make_unique<YEmitterBox>(size);
+}
+
+void YParticleEmitter::SetShapeBoxRange(const Vector3& minSize, const Vector3& maxSize) {
+	shape_ = std::make_unique<YEmitterBox>(minSize, maxSize);
+}
+
+// ── コーン ──
+void YParticleEmitter::SetShapeCone(float outerAngleDeg, float height,
+                                    const Vector3& direction) {
+	auto cone = std::make_unique<YEmitterCone>(outerAngleDeg, height, direction);
+	shape_ = std::move(cone);
+}
+
+void YParticleEmitter::SetShapeConeRange(float innerAngleDeg, float outerAngleDeg,
+                                         float height,
+                                         float minRadius, float maxRadius,
+                                         const Vector3& direction) {
+	auto cone = std::make_unique<YEmitterCone>();
+	cone->innerAngle = innerAngleDeg;
+	cone->outerAngle = outerAngleDeg;
+	cone->height     = height;
+	cone->minRadius  = minRadius;
+	cone->maxRadius  = maxRadius;
+	cone->direction  = direction;
+	shape_ = std::move(cone);
 }

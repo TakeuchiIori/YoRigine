@@ -267,7 +267,8 @@ void PostEffectManager::ImGui()
 		const char* effectNames[] = {
 			"Copy", "GaussSmoothing", "DepthOutline", "Sepia",
 			"Grayscale", "Vignette", "RadialBlur", "ToneMapping",
-			"Dissolve", "Chromatic", "ColorAdjust", "ShatterTransition"
+			"Dissolve", "Chromatic", "ColorAdjust", "ShatterTransition",
+			"Bloom", "Posterize", "Kuwahara", "Halftone", "CrossHatch", "ColorGrade"
 		};
 
 		for (int i = 0; i < IM_ARRAYSIZE(effectNames); ++i) {
@@ -658,8 +659,31 @@ void PostEffectManager::ApplyEffectParametersToOffScreen(const PostEffectData& e
 		break;
 
 	case OffScreen::OffScreenEffectType::ShatterTransition:
-		// 画面割れの進行度など
 		offScreen_->SetShatterTransitionParams(effect.params.shatter);
+		break;
+
+	case OffScreen::OffScreenEffectType::Bloom:
+		offScreen_->SetBloomParams(effect.params.bloom);
+		break;
+
+	case OffScreen::OffScreenEffectType::Posterize:
+		offScreen_->SetPosterizeParams(effect.params.posterize);
+		break;
+
+	case OffScreen::OffScreenEffectType::Kuwahara:
+		offScreen_->SetKuwaharaParams(effect.params.kuwahara);
+		break;
+
+	case OffScreen::OffScreenEffectType::Halftone:
+		offScreen_->SetHalftoneParams(effect.params.halftone);
+		break;
+
+	case OffScreen::OffScreenEffectType::CrossHatch:
+		offScreen_->SetCrossHatchParams(effect.params.crossHatch);
+		break;
+
+	case OffScreen::OffScreenEffectType::ColorGrade:
+		offScreen_->SetColorGradeParams(effect.params.colorGrade);
 		break;
 
 	default:
@@ -994,6 +1018,58 @@ std::string PostEffectManager::EffectChainToJson() const
 			<< effect->params.shatter.resolution.x << ","
 			<< effect->params.shatter.resolution.y << "],\n";
 		json << "          \"time\": " << effect->params.shatter.time << "\n";
+		json << "        },\n";
+
+		// ブルーム
+		json << "        \"bloom\": {\n";
+		json << "          \"threshold\": " << effect->params.bloom.threshold << ",\n";
+		json << "          \"intensity\": " << effect->params.bloom.intensity << ",\n";
+		json << "          \"spread\": " << effect->params.bloom.spread << ",\n";
+		json << "          \"colorTemperature\": " << effect->params.bloom.colorTemperature << "\n";
+		json << "        },\n";
+
+		// ポスタリゼーション
+		json << "        \"posterize\": {\n";
+		json << "          \"steps\": " << effect->params.posterize.steps << ",\n";
+		json << "          \"saturationBoost\": " << effect->params.posterize.saturationBoost << "\n";
+		json << "        },\n";
+
+		// クワハラ
+		json << "        \"kuwahara\": {\n";
+		json << "          \"radius\": " << effect->params.kuwahara.radius << ",\n";
+		json << "          \"sharpness\": " << effect->params.kuwahara.sharpness << "\n";
+		json << "        },\n";
+
+		// ハーフトーン
+		json << "        \"halftone\": {\n";
+		json << "          \"dotSize\": " << effect->params.halftone.dotSize << ",\n";
+		json << "          \"angle\": " << effect->params.halftone.angle << ",\n";
+		json << "          \"strength\": " << effect->params.halftone.strength << ",\n";
+		json << "          \"threshold\": " << effect->params.halftone.threshold << "\n";
+		json << "        },\n";
+
+		// クロスハッチング
+		json << "        \"crossHatch\": {\n";
+		json << "          \"lineSpacing\": " << effect->params.crossHatch.lineSpacing << ",\n";
+		json << "          \"lineWidth\": " << effect->params.crossHatch.lineWidth << ",\n";
+		json << "          \"strength\": " << effect->params.crossHatch.strength << "\n";
+		json << "        },\n";
+
+		// カラーグレーディング
+		json << "        \"colorGrade\": {\n";
+		json << "          \"shadowColor\": ["
+			<< effect->params.colorGrade.shadowColor.x << ","
+			<< effect->params.colorGrade.shadowColor.y << ","
+			<< effect->params.colorGrade.shadowColor.z << "],\n";
+		json << "          \"splitBalance\": " << effect->params.colorGrade.splitBalance << ",\n";
+		json << "          \"highlightColor\": ["
+			<< effect->params.colorGrade.highlightColor.x << ","
+			<< effect->params.colorGrade.highlightColor.y << ","
+			<< effect->params.colorGrade.highlightColor.z << "],\n";
+		json << "          \"splitStrength\": " << effect->params.colorGrade.splitStrength << ",\n";
+		json << "          \"vibrance\": " << effect->params.colorGrade.vibrance << ",\n";
+		json << "          \"colorTemp\": " << effect->params.colorGrade.colorTemp << ",\n";
+		json << "          \"colorTint\": " << effect->params.colorGrade.colorTint << "\n";
 		json << "        }\n";
 
 		json << "      }\n";  // parameters
@@ -1192,6 +1268,85 @@ bool PostEffectManager::JsonToEffectChain(const std::string& jsonStr)
 
 				effect->params.shatter.time =
 					JsonUtil::GetNumberValue<float>(shatterJson, "time", 0.0f);
+			}
+
+			// ----- bloom -----
+			std::string bloomJson = JsonUtil::GetObjectValue(paramsJson, "bloom");
+			if (!bloomJson.empty()) {
+				effect->params.bloom.threshold =
+					JsonUtil::GetNumberValue<float>(bloomJson, "threshold", 0.6f);
+				effect->params.bloom.intensity =
+					JsonUtil::GetNumberValue<float>(bloomJson, "intensity", 0.5f);
+				effect->params.bloom.spread =
+					JsonUtil::GetNumberValue<float>(bloomJson, "spread", 6.0f);
+				effect->params.bloom.colorTemperature =
+					JsonUtil::GetNumberValue<float>(bloomJson, "colorTemperature", 0.3f);
+			}
+
+			// ----- posterize -----
+			std::string posterizeJson = JsonUtil::GetObjectValue(paramsJson, "posterize");
+			if (!posterizeJson.empty()) {
+				effect->params.posterize.steps =
+					JsonUtil::GetNumberValue<int>(posterizeJson, "steps", 5);
+				effect->params.posterize.saturationBoost =
+					JsonUtil::GetNumberValue<float>(posterizeJson, "saturationBoost", 1.2f);
+			}
+
+			// ----- kuwahara -----
+			std::string kuwaharaJson = JsonUtil::GetObjectValue(paramsJson, "kuwahara");
+			if (!kuwaharaJson.empty()) {
+				effect->params.kuwahara.radius =
+					JsonUtil::GetNumberValue<int>(kuwaharaJson, "radius", 4);
+				effect->params.kuwahara.sharpness =
+					JsonUtil::GetNumberValue<float>(kuwaharaJson, "sharpness", 4.0f);
+			}
+
+			// ----- halftone -----
+			std::string halftoneJson = JsonUtil::GetObjectValue(paramsJson, "halftone");
+			if (!halftoneJson.empty()) {
+				effect->params.halftone.dotSize =
+					JsonUtil::GetNumberValue<float>(halftoneJson, "dotSize", 6.0f);
+				effect->params.halftone.angle =
+					JsonUtil::GetNumberValue<float>(halftoneJson, "angle", 45.0f);
+				effect->params.halftone.strength =
+					JsonUtil::GetNumberValue<float>(halftoneJson, "strength", 0.85f);
+				effect->params.halftone.threshold =
+					JsonUtil::GetNumberValue<float>(halftoneJson, "threshold", 0.75f);
+			}
+
+			// ----- crossHatch -----
+			std::string crossHatchJson = JsonUtil::GetObjectValue(paramsJson, "crossHatch");
+			if (!crossHatchJson.empty()) {
+				effect->params.crossHatch.lineSpacing =
+					JsonUtil::GetNumberValue<float>(crossHatchJson, "lineSpacing", 8.0f);
+				effect->params.crossHatch.lineWidth =
+					JsonUtil::GetNumberValue<float>(crossHatchJson, "lineWidth", 1.0f);
+				effect->params.crossHatch.strength =
+					JsonUtil::GetNumberValue<float>(crossHatchJson, "strength", 0.7f);
+			}
+
+			// ----- colorGrade -----
+			std::string colorGradeJson = JsonUtil::GetObjectValue(paramsJson, "colorGrade");
+			if (!colorGradeJson.empty()) {
+				auto sc = JsonUtil::GetArrayValue(colorGradeJson, "shadowColor");
+				if (sc.size() >= 3)
+					effect->params.colorGrade.shadowColor = { sc[0], sc[1], sc[2] };
+
+				effect->params.colorGrade.splitBalance =
+					JsonUtil::GetNumberValue<float>(colorGradeJson, "splitBalance", 0.45f);
+
+				auto hc = JsonUtil::GetArrayValue(colorGradeJson, "highlightColor");
+				if (hc.size() >= 3)
+					effect->params.colorGrade.highlightColor = { hc[0], hc[1], hc[2] };
+
+				effect->params.colorGrade.splitStrength =
+					JsonUtil::GetNumberValue<float>(colorGradeJson, "splitStrength", 0.25f);
+				effect->params.colorGrade.vibrance =
+					JsonUtil::GetNumberValue<float>(colorGradeJson, "vibrance", 0.3f);
+				effect->params.colorGrade.colorTemp =
+					JsonUtil::GetNumberValue<float>(colorGradeJson, "colorTemp", 0.08f);
+				effect->params.colorGrade.colorTint =
+					JsonUtil::GetNumberValue<float>(colorGradeJson, "colorTint", 0.0f);
 			}
 		}
 

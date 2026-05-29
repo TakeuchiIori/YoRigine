@@ -56,7 +56,10 @@ struct AttackData {
 	int comboWindowStart = 0;
 	int comboWindowEnd = 20;
 
-
+	// 先行入力（バッファ）受付開始フレーム
+	// この値以降の入力は、comboWindowStart 到達時にまとめて発火する
+	// comboWindowStart より小さい値を指定する（例: 5 で受付開始 → 15 で実発火）
+	int inputBufferStart = 0;
 
 	// ------------------------------------------------------------
 	// タイミング設定（ゲームロジック用・秒単位）
@@ -71,6 +74,23 @@ struct AttackData {
 	float knockback = 0.0f;
 	float knockbackDuration = 0.0f;
 	float stepDistance = 0.0f;
+
+	// ------------------------------------------------------------
+	// ヒット時の手応え演出（攻撃ごとに上書き可能）
+	// すべて 0 のときは発動しない
+	// ------------------------------------------------------------
+	float hitStopDuration = 0.0f;    // ヒットストップ秒数（攻撃ヒット時に時間を止める）
+	float shakeIntensity = 0.0f;     // カメラシェイク強度
+	float shakeDuration = 0.0f;      // カメラシェイク継続秒数
+
+	// ------------------------------------------------------------
+	// オートホーミング（攻撃開始時に最も近い敵へ吸い付く）
+	// ------------------------------------------------------------
+	bool  enableHoming = false;      // ホーミングを有効化するか
+	float homingRange = 6.0f;        // 検索距離（プレイヤーからの最大距離）
+	float homingAngleDeg = 60.0f;    // 視野円錐の半角（度）
+	float homingDuration = 0.12f;    // 補正にかける時間（秒）
+	float homingMaxStep = 3.0f;      // ホーミングで前進する最大距離
 
 	// ------------------------------------------------------------
 	// コンバットコスト（CC）設定
@@ -150,6 +170,7 @@ SERIALIZE_FIELD(AttackData, hitStart)
 SERIALIZE_FIELD(AttackData, hitEnd)
 SERIALIZE_FIELD(AttackData, comboWindowStart)
 SERIALIZE_FIELD(AttackData, comboWindowEnd)
+SERIALIZE_FIELD(AttackData, inputBufferStart)
 
 SERIALIZE_FIELD(AttackData, duration)
 
@@ -157,6 +178,16 @@ SERIALIZE_FIELD(AttackData, baseDamage)
 SERIALIZE_FIELD(AttackData, knockback)
 SERIALIZE_FIELD(AttackData, knockbackDuration)
 SERIALIZE_FIELD(AttackData, stepDistance)
+
+SERIALIZE_FIELD(AttackData, hitStopDuration)
+SERIALIZE_FIELD(AttackData, shakeIntensity)
+SERIALIZE_FIELD(AttackData, shakeDuration)
+
+SERIALIZE_FIELD(AttackData, enableHoming)
+SERIALIZE_FIELD(AttackData, homingRange)
+SERIALIZE_FIELD(AttackData, homingAngleDeg)
+SERIALIZE_FIELD(AttackData, homingDuration)
+SERIALIZE_FIELD(AttackData, homingMaxStep)
 
 SERIALIZE_FIELD(AttackData, ccCost)
 SERIALIZE_FIELD(AttackData, ccOnHit)

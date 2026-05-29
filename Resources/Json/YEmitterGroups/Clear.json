@@ -1,0 +1,36 @@
+{
+    "emitters": [
+        {
+            "autoEmit": false,
+            "emissionRate": 0.0,
+            "emitCount": 1,
+            "offsetX": 0.0,
+            "offsetY": 7.400000095367432,
+            "offsetZ": 0.0,
+            "shapeMaxSize": [
+                20.0,
+                20.0,
+                10.0
+            ],
+            "shapeMinSize": [
+                -20.0,
+                -20.0,
+                -10.0
+            ],
+            "shapeSize": [
+                20.0,
+                20.0,
+                10.0
+            ],
+            "shapeType": 2,
+            "systemName": "Clear"
+        }
+    ],
+    "groupName": "ClearScene",
+    "isActive": true,
+    "position": [
+        0.0,
+        0.0,
+        0.0
+    ]
+}

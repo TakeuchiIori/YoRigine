@@ -37,7 +37,9 @@ void ObjectManager::Update() {
 		if (obj && obj->isActive && obj->object) {
 			obj->object->UpdateAnimation();
 		}
-		if (obj->collider && obj->colliderEnabled) {
+		// colliderEnabled に関わらず Update() してワールドAABBを常に最新に保つ。
+		// 衝突判定への参加は collider->IsCollisionEnabled() で制御される。
+		if (obj->collider) {
 			obj->collider->Update();
 		}
 	}
@@ -146,6 +148,10 @@ ObjectManager::PlacedObject* ObjectManager::DuplicateObject(
 	duplicate->rotation = original->rotation;
 	duplicate->scale = original->scale;
 	duplicate->parentID = original->parentID;
+
+	// コライダー設定を複製（typeId・AABBはテンプレート経由で引き継がれる）
+	duplicate->colliderEnabled = original->colliderEnabled;
+	ApplyColliderTemplate(*duplicate);
 
 	UpdateObjectTransform(*duplicate);
 
@@ -405,25 +411,17 @@ void ObjectManager::ApplyColliderTemplate(PlacedObject& obj) {
 
 	if (!obj.collider) return;
 
-	// コライダーが無効なら判定を切って終わり
-	if (!obj.colliderEnabled) {
-		obj.collider->SetCollisionEnabled(false);
-		return;
-	}
-	// テンプレートが未登録ならデフォルト設定のまま有効化
+	// 形状（aabbOffset）とtypeIdはテンプレートから設定する。
+	// colliderEnabled は衝突判定の有効フラグのみを制御し、形状には影響しない。
 	const ColliderTemplate* tmpl = FindTemplate(obj.modelName);
-	if (!tmpl) {
-		obj.collider->SetCollisionEnabled(true);
-		obj.collider->SetEnablePenetration(true);
-		obj.collider->SetIsStatic(true); // 配置オブジェクトは静的扱い
-		return;
+	if (tmpl) {
+		obj.collider->SetTypeID(static_cast<uint32_t>(tmpl->typeId));
+		obj.collider->aabbOffset_ = tmpl->aabbOffset;
 	}
 
-	// テンプレートの設定を反映（typeId のみ。AABB 形状はコライダー自身が保持）
-	obj.collider->SetCollisionEnabled(true);
 	obj.collider->SetEnablePenetration(true);
-	obj.collider->SetIsStatic(true); // 配置オブジェクトは静的扱い
-	obj.collider->SetTypeID(static_cast<uint32_t>(tmpl->typeId));
+	obj.collider->SetIsStatic(true);
+	obj.collider->SetCollisionEnabled(obj.colliderEnabled);
 }
 
 void ObjectManager::ApplyTemplateToAll(const std::string& modelName) {

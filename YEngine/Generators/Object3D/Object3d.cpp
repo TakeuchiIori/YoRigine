@@ -119,26 +119,21 @@ void Object3d::DrawBone(Line& line, const Matrix4x4& worldMatrix)
 
 void Object3d::DrawShadow(WorldTransform& worldTransform)
 {
+	if (!model_) return;
+
+	// PSO・RS・topology・gLight は Object3dCommon::ShadowDrawPreference() で設定済み。
+	// ここではオブジェクト固有のワールド行列のみ更新してセットする。
 	auto pm = YPipelineManager::GetInstance();
 	const auto& indices = pm->GetParameterIndices("ShadowMap");
-
 	auto commandList = object3dCommon_->GetDxCommon()->GetCommandList().Get();
-	// シャドウ用パイプライン
-	commandList->SetPipelineState(pm->GetPipeLineStateObject("ShadowMap"));
-	commandList->SetGraphicsRootSignature(pm->GetRootSignature("ShadowMap"));
 
-	// DrawShadow 内
 	if (!model_->GetHasBones()) {
-		objectData_->world =
-			worldTransform.GetMatWorld() * model_->GetRootNode().GetLocalMatrix();
+		objectData_->world = worldTransform.GetMatWorld() * model_->GetRootNode().GetLocalMatrix();
 	} else {
 		objectData_->world = worldTransform.GetMatWorld();
 	}
 	commandList->SetGraphicsRootConstantBufferView(indices.at("gObject"), objectCB_->GetGPUVirtualAddress());
-	// b1: lightViewProj
-	commandList->SetGraphicsRootConstantBufferView(indices.at("gLight"), YoRigine::LightManager::GetInstance()->GetShadowResource()->GetGPUVirtualAddress());
 
-	// モデル描画（Shadow用）
 	model_->DrawShadow();
 }
 

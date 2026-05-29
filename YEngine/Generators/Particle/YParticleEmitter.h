@@ -115,9 +115,35 @@ public:
 	// 形状設定メソッド
 	//=================================================================
 
+	/// 点（全パーティクルが同一点から放出）
 	void SetShapePoint();
+
+	/// 球体（半径固定 / 後方互換）
 	void SetShapeSphere(float radius, bool shellOnly = false);
+
+	/// 球体 min〜max 範囲（内側半径〜外側半径）
+	/// minRadius = maxRadius で球殻になる
+	void SetShapeSphereRange(float minRadius, float maxRadius);
+
+	/// 箱型（サイズ固定 / 後方互換）
 	void SetShapeBox(const Vector3& size);
+
+	/// 箱型 min〜max 範囲（内側サイズ〜外側サイズ）
+	/// minSize > {0,0,0} で中空ボックスになる
+	void SetShapeBoxRange(const Vector3& minSize, const Vector3& maxSize);
+
+	/// コーン（方向付き円錐台）
+	/// @param outerAngleDeg 外側の半頂角（度）
+	/// @param height        コーン高さ
+	/// @param direction     コーン軸方向（正規化不要）
+	void SetShapeCone(float outerAngleDeg, float height,
+	                  const Vector3& direction = { 0,1,0 });
+
+	/// コーン min〜max 角度範囲（内側〜外側の半頂角）
+	void SetShapeConeRange(float innerAngleDeg, float outerAngleDeg,
+	                       float height, float minRadius = 0.0f, float maxRadius = 1.0f,
+	                       const Vector3& direction = { 0,1,0 });
+
 	YEmitterShape* GetShape() const { return shape_.get(); }
 
 	//=================================================================

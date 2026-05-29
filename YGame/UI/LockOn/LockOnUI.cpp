@@ -38,7 +38,7 @@ void LockOnUI::Update()
 		return;
 	}
 
-	BaseCollider* target = followCamera->GetLockedTarget();
+	BaseCollider* target = player_->GetPlayerCamera()->GetLockedTarget();
 	if (!target) {
 		isVisible_ = false;
 		return;
@@ -72,7 +72,7 @@ void LockOnUI::UpdateScreenPosition()
 {
 	// ─── カメラと対象を取得 ──────────────────────────────────
 	FollowCamera* followCamera = player_->GetFollowCamera();
-	BaseCollider* target = followCamera->GetLockedTarget();
+	BaseCollider* target = player_->GetPlayerCamera()->GetLockedTarget();
 
 	// 対象のワールド座標 + 頭上オフセット
 	Vector3 worldPos = target->GetWT()->translate_ + offset_;

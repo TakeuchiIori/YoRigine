@@ -16,6 +16,7 @@
 #include <Debugger/Logger.h>
 #include "Particle/YParticleManager.h"
 #include "Particle/YParticleEditor.h"
+#include "Particle/YEmitterGroupManager.h"
 
 // Camera
 #include "Systems/Camera/Virtuals/DebugCamera/DebugCamera.h"
@@ -36,6 +37,8 @@ void ClearScene::Initialize() {
 	auto director = CameraDirector::GetInstance();
 	director->Initialize();
 
+	auto postEffectManager = PostEffectManager::GetInstance();
+	postEffectManager->LoadPreset("ClearScene");
 
 	cameraEditor_ = std::make_unique<CameraEditor>();
 	cameraEditor_->Initialize();
@@ -59,6 +62,7 @@ void ClearScene::Initialize() {
 	YoRigine::ModelManipulator::GetInstance()->SetCamera(sceneCamera_.get());
 	YParticleManager::GetInstance().SetCamera(sceneCamera_.get());
 	
+
 
 	//------------------------------------------------------------
 	// クリア画面スプライトの生成と設定
@@ -110,7 +114,8 @@ void ClearScene::Update() {
 	skyBox_->Update();
 	ground_->Update();
 
-
+	auto* enemyHitEmitterGroup_ = YEmitterGroupManager::GetInstance().GetGroup("ClearScene");
+	enemyHitEmitterGroup_->EmitAll();
 
 	YoRigine::ParticleManager::GetInstance()->Emit("ClearParticle", Vector3(0, 0, 0), 10);
 	YoRigine::ModelManipulator::GetInstance()->Update();
@@ -134,8 +139,6 @@ void ClearScene::Draw() {
 	//------------------------------------------------------------
 	// 演出関連の描画（パーティクルなど）
 	//------------------------------------------------------------
-	YoRigine::ParticleManager::GetInstance()->Draw();
-
 	YParticleManager::GetInstance().Draw();
 
 	//------------------------------------------------------------
@@ -162,6 +165,7 @@ void ClearScene::DrawNonOffscreen() {
 /// </summary>
 void ClearScene::DrawShadow()
 {
+	DrawCommonShadow();
 	YoRigine::ModelManipulator::GetInstance()->DrawShadow();
 }
 

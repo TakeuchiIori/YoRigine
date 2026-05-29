@@ -147,6 +147,24 @@ void YPipelineManager::Initialize()
     CreatePSO_ShatterTransition(
         L"Resources/Shaders/PostEffect/Transition/ShatterTransition.PS.hlsl",
         "ShatterTransition");
+    CreatePSO_BaseOffScreen(
+        L"Resources/Shaders/PostEffect/Bloom/Bloom.PS.hlsl",
+        "Bloom");
+    CreatePSO_BaseOffScreen(
+        L"Resources/Shaders/PostEffect/Posterize/Posterize.PS.hlsl",
+        "Posterize");
+    CreatePSO_BaseOffScreen(
+        L"Resources/Shaders/PostEffect/Kuwahara/Kuwahara.PS.hlsl",
+        "Kuwahara");
+    CreatePSO_BaseOffScreen(
+        L"Resources/Shaders/PostEffect/Halftone/Halftone.PS.hlsl",
+        "Halftone");
+    CreatePSO_BaseOffScreen(
+        L"Resources/Shaders/PostEffect/CrossHatch/CrossHatch.PS.hlsl",
+        "CrossHatch");
+    CreatePSO_BaseOffScreen(
+        L"Resources/Shaders/PostEffect/ColorGrade/ColorGrade.PS.hlsl",
+        "ColorGrade");
 
 	// Meshを使用したVFX用パイプライン
     CreatePSO_VfxMeshTrail();

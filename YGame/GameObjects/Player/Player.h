@@ -6,6 +6,9 @@
 #include <Particle/ParticleEmitter.h>
 #include "Systems/Camera/Virtuals/FollowCamera/FollowCamera.h"
 
+// App (Camera)
+#include "Camera/PlayerCamera.h"
+
 // Math
 #include "MathFunc.h"
 #include "Vector3.h"
@@ -74,8 +77,17 @@ public:
 	PlayerSword* GetSword() const { return playerSword_.get(); }
 	PlayerShield* GetShield() const { return playerShield_.get(); }
 
-	void SetFollowCamera(FollowCamera* camera) { followCamera_ = camera; }
-	FollowCamera* GetFollowCamera() const { return followCamera_; }
+	// カメラ初期化（GameScene から FollowCamera ポインタを渡す）
+	void InitializeCamera(FollowCamera* followCamera) {
+		playerCamera_ = std::make_unique<PlayerCamera>();
+		playerCamera_->Initialize(followCamera, &wt_);
+	}
+
+	PlayerCamera*  GetPlayerCamera()  const { return playerCamera_.get(); }
+	// 後方互換：FollowCamera ポインタが必要な呼び出し元向け
+	FollowCamera*  GetFollowCamera()  const {
+		return playerCamera_ ? playerCamera_->GetFollowCamera() : nullptr;
+	}
 
 	float GetMotionSpeed() const { return motionSpeed_; }
 	void SetMotionSpeed(float speed) { motionSpeed_ = speed; }
@@ -112,7 +124,7 @@ private:
 	// メンバ変数
 	// ============================================================
 	YoRigine::Input* input_ = nullptr;
-	FollowCamera* followCamera_ = nullptr;
+	std::unique_ptr<PlayerCamera> playerCamera_;
 
 	std::unique_ptr<ParticleEmitter> particleEmitter_;
 	std::unique_ptr<PlayerSword> playerSword_;

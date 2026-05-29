@@ -99,9 +99,11 @@ void SceneManager::PerformSceneTransition() {
 	//------------------------------------------------------------
 	// 新しいシーンに切り替え
 	//------------------------------------------------------------
+
+	// ポストエフェクト初期化
+	PostEffectManager::GetInstance()->Reset(); 
 	scene_ = std::move(nextScene_);
 	nextScene_ = nullptr;
-
 	if (scene_) {
 		scene_->SetSceneManager(this);
 		scene_->Initialize();
@@ -147,8 +149,6 @@ void SceneManager::DrawShadow() {
 /// </summary>
 void SceneManager::ChangeScene(const std::string& sceneName) {
 	assert(sceneFactory_);
-	PostEffectManager::GetInstance()->Reset(); // ポストエフェクト初期化
-
 	// 既に遷移中、または次シーン予約済みなら無視
 	if (transitionState_ != TransitionState::None || nextScene_) {
 		return;
@@ -172,12 +172,15 @@ void SceneManager::ChangeScene(const std::string& sceneName) {
 	}
 }
 
+/// <summary>
+///	瞬時にシーン遷移（フェードなし）
+/// </summary>
+/// <param name="sceneName"></param>
 void SceneManager::ChangeSceneImmediate(const std::string& sceneName) {
 	assert(sceneFactory_);
 
 	// ポストエフェクトのリセット
 	PostEffectManager::GetInstance()->Reset();
-
 	// 現在のシーンを終了
 	if (scene_) {
 		scene_->Finalize();

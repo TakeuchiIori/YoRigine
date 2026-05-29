@@ -94,3 +94,41 @@ bool YEmitterGroupManager::LoadAllFromFile(const std::string& filePath) {
 	}
 	catch (...) { return false; }
 }
+
+// 指定グループを単独ファイルに保存
+bool YEmitterGroupManager::SaveGroupToFile(const std::string& groupName, const std::string& filePath) const {
+	auto it = groups_.find(groupName);
+	if (it == groups_.end()) return false;
+	try {
+		std::ofstream ofs(filePath);
+		if (!ofs.is_open()) return false;
+		ofs << it->second->SaveToJson().dump(4);
+		return true;
+	}
+	catch (...) { return false; }
+}
+
+// JSON から単独グループを読み込み
+void YEmitterGroupManager::LoadGroupFromJson(const nlohmann::json& j) {
+	std::string name = j.value("groupName", "unnamed");
+	auto* group = CreateGroup(name);
+	group->LoadFromJson(j);
+}
+
+// ファイルから単独グループを読み込み（形式を自動判別）
+bool YEmitterGroupManager::LoadGroupFromFile(const std::string& filePath) {
+	try {
+		std::ifstream ifs(filePath);
+		if (!ifs.is_open()) return false;
+		nlohmann::json j;
+		ifs >> j;
+		if (j.contains("groupName")) {
+			LoadGroupFromJson(j);
+		}
+		else if (j.contains("groups")) {
+			LoadAllFromJson(j);
+		}
+		return true;
+	}
+	catch (...) { return false; }
+}

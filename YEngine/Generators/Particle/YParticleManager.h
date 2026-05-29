@@ -106,6 +106,17 @@ public:
     /// </summary>
     bool SaveSystemsToFile(const std::string& filePath) const;
 
+    /// <summary>
+    /// システムとグループを1つのバンドルJSONからまとめてロード
+    /// フォーマット: {"systems":[...], "groups":[...]}
+    /// </summary>
+    bool LoadEffectBundle(const std::string& filePath);
+
+    /// <summary>
+    /// 指定グループと参照システムをバンドルJSONとして保存
+    /// </summary>
+    bool SaveEffectBundle(const std::string& groupName, const std::string& filePath);
+
     //=================================================================
     // 更新・描画
     //=================================================================

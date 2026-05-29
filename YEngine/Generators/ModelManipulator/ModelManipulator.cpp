@@ -172,14 +172,12 @@ namespace YoRigine {
 				color.w = 0.3f;
 			}
 
-			colliderLine_.SetColor(color);
-
-			// AABBCollider::Update() で計算済みのワールド AABB をそのまま使う
-			if (!obj->colliderEnabled) continue; // 無効なら描画スキップ
 			auto* aabb = dynamic_cast<AABBCollider*>(obj->collider.get());
 			if (!aabb) continue;
 
+			// ObjectManager::Update() で常にワールド AABB が計算済みなのでそのまま使う
 			const AABB& worldAABB = aabb->GetAABB();
+			colliderLine_.SetColor(color);
 			colliderLine_.DrawAABB(worldAABB.min, worldAABB.max);
 			colliderLine_.DrawLine();
 		}
@@ -423,10 +421,14 @@ namespace YoRigine {
 			if (!srcObj) continue;
 
 			// 生成元のオブジェクト情報を参照してコピーを作成
-			auto* newObj = objectManager_->CreateObject(srcObj->modelName, srcObj->isAnimation);
-			newObj->position = { srcObj->position + offsetCopyPos_ };
+			auto* newObj = objectManager_->CreateObject(srcObj->modelPath, srcObj->isAnimation, srcObj->animationName);
+			newObj->position = srcObj->position + offsetCopyPos_;
 			newObj->rotation = srcObj->rotation;
 			newObj->scale = srcObj->scale;
+
+			// コライダー設定をコピー（typeId・AABBはテンプレート経由で引き継がれる）
+			newObj->colliderEnabled = srcObj->colliderEnabled;
+			objectManager_->ApplyColliderTemplate(*newObj);
 
 			// 選択状態に追加
 			selector_.AddToSelection(newObj->id);

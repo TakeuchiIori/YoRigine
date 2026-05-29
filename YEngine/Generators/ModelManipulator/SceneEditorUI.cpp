@@ -199,7 +199,7 @@ namespace YoRigine {
                 // ── 共有設定（ここを変えると同名モデル全部に効く） ──
                 ImGui::PushStyleColor(ImGuiCol_ChildBg,
                     ImGui::GetStyleColorVec4(ImGuiCol_FrameBg));
-                ImGui::BeginChild("##ColliderShared", ImVec2(0, 120), true);
+                ImGui::BeginChild("##ColliderShared", ImVec2(0, 190), true);
                 ImGui::TextDisabled("共有設定 --- 変更すると同名モデル(%s)全てに反映", obj->modelName.c_str());
                 ImGui::Separator();
 
@@ -220,20 +220,15 @@ namespace YoRigine {
                     ImGui::EndCombo();
                 }
 
-                // typeId が変わったら同名全員に反映
+                // AABB オフセット（テンプレート経由で同名モデル全てに反映）
+                ImGui::Separator();
+                ImGui::TextDisabled("AABB オフセット（同名モデル全てに反映）");
+                if (ImGui::DragFloat3("AABB Max", &tmpl.aabbOffset.max.x, 0.05f)) tmplChanged = true;
+                if (ImGui::DragFloat3("AABB Min", &tmpl.aabbOffset.min.x, 0.05f)) tmplChanged = true;
+
+                // typeId または AABB が変わったら同名全員に反映
                 if (tmplChanged) {
                     objectManager_->ApplyTemplateToAll(obj->modelName);
-                }
-
-                // ── AABB 形状はコライダーインスタンスを直接編集 ──────────────
-                // テンプレートは typeId のみ共有。サイズ・オフセットは各インスタンス固有。
-                if (obj->collider) {
-                    if (auto* aabb = dynamic_cast<AABBCollider*>(obj->collider.get())) {
-                        ImGui::Separator();
-                        ImGui::TextDisabled("AABB オフセット（このオブジェクトのみ）");
-                        ImGui::DragFloat3("AABB Max", &aabb->aabbOffset_.max.x, 0.05f);
-                        ImGui::DragFloat3("AABB Min", &aabb->aabbOffset_.min.x, 0.05f);
-                    }
                 }
 
                 ImGui::EndChild();

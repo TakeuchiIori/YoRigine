@@ -6,6 +6,7 @@
 #include <Editor/Editor.h>
 #include <algorithm>
 #include <cmath>
+#include <filesystem>
 #include "imgui.h"
 
 
@@ -28,17 +29,47 @@ static void Splitter(float thickness, float* size1, float min_size1, float min_s
 
 YEmitterGroupEditor::YEmitterGroupEditor()
     : saveBrowser_(emitterDirectory_, { ".json" }, YoRigine::FileBrowser::DisplayMode::List)
-    , loadBrowser_(emitterDirectory_, { ".json" }, YoRigine::FileBrowser::DisplayMode::List) {
+    , loadBrowser_(emitterDirectory_, { ".json" }, YoRigine::FileBrowser::DisplayMode::List)
+    , saveSingleBrowser_(emitterDirectory_, { ".json" }, YoRigine::FileBrowser::DisplayMode::List)
+    , loadSingleBrowser_(emitterDirectory_, { ".json" }, YoRigine::FileBrowser::DisplayMode::List)
+    , saveBundleBrowser_("Resources/Json/YEffects/", { ".json" }, YoRigine::FileBrowser::DisplayMode::List) {
     gizmoCtrl_.Initialize();
+
+    // 全グループ保存
     saveBrowser_.SetOnFileSelected([this](const std::string& path) {
         bool ok = YEmitterGroupManager::GetInstance().SaveAllToFile(path);
         showSavePopup_ = false;
         SetNotification(ok, ok ? "保存完了: " + path : "保存失敗: " + path);
         });
+    // 全グループ読み込み
     loadBrowser_.SetOnFileSelected([this](const std::string& path) {
         bool ok = YEmitterGroupManager::GetInstance().LoadAllFromFile(path);
         showLoadPopup_ = false;
         SetNotification(ok, ok ? "読み込み完了: " + path : "読み込み失敗: " + path);
+        });
+
+    // 個別グループ保存
+    saveSingleBrowser_.SetOnFileSelected([this](const std::string& path) {
+        if (!selectedGroupName_.empty()) {
+            bool ok = YEmitterGroupManager::GetInstance().SaveGroupToFile(selectedGroupName_, path);
+            SetNotification(ok, ok ? "グループ保存完了: " + path : "保存失敗: " + path);
+        }
+        showSaveSinglePopup_ = false;
+        });
+    // 個別グループ読み込み
+    loadSingleBrowser_.SetOnFileSelected([this](const std::string& path) {
+        bool ok = YEmitterGroupManager::GetInstance().LoadGroupFromFile(path);
+        showLoadSinglePopup_ = false;
+        SetNotification(ok, ok ? "グループ読み込み完了: " + path : "読み込み失敗: " + path);
+        });
+
+    // バンドル保存（グループ+参照システムを1ファイルに）
+    saveBundleBrowser_.SetOnFileSelected([this](const std::string& path) {
+        if (!selectedGroupName_.empty()) {
+            bool ok = YParticleManager::GetInstance().SaveEffectBundle(selectedGroupName_, path);
+            SetNotification(ok, ok ? "バンドル保存完了: " + path : "保存失敗: " + path);
+        }
+        showSaveBundlePopup_ = false;
         });
 }
 
@@ -583,31 +614,28 @@ void YEmitterGroupEditor::ShowSelectedEmitterDetail(YParticleEmitter& emitter) {
         default:                          currentType = 0; break;
         }
     }
-    const char* shapeNames[] = { "点", "球", "ボックス" };
-    ImGui::SetNextItemWidth(100);
-    if (ImGui::Combo("##EShape", &currentType, shapeNames, 3)) {
-        switch (currentType) {
-        case 0: emitter.SetShapePoint();          break;
-        case 1: emitter.SetShapeSphere(1.0f);     break;
-        case 2: emitter.SetShapeBox({ 1, 1, 1 }); break;
+    const char* shapeNames[] = { "点", "球", "ボックス", "コーン" };
+    if (auto* shape = emitter.GetShape()) {
+        switch (shape->GetType()) {
+        case YEmitterShape::Type::Sphere: currentType = 1; break;
+        case YEmitterShape::Type::Box:    currentType = 2; break;
+        case YEmitterShape::Type::Cone:   currentType = 3; break;
+        default:                          currentType = 0; break;
         }
     }
+    ImGui::SetNextItemWidth(120);
+    if (ImGui::Combo("##EShape", &currentType, shapeNames, 4)) {
+        switch (currentType) {
+        case 0: emitter.SetShapePoint();           break;
+        case 1: emitter.SetShapeSphere(1.0f);      break;
+        case 2: emitter.SetShapeBox({ 1, 1, 1 });  break;
+        case 3: emitter.SetShapeCone(25.0f, 2.0f); break;
+        }
+    }
+    // 形状パラメーター（DrawEditor() に委譲）
     if (auto* shape = emitter.GetShape()) {
         ImGui::Indent();
-        switch (shape->GetType()) {
-        case YEmitterShape::Type::Sphere: {
-            auto* s = static_cast<YEmitterSphere*>(shape);
-            ImGui::DragFloat("半径##ES", &s->radius, 0.05f, 0.0f, 1000.0f);
-            ImGui::Checkbox("シェルのみ##ES", &s->shellOnly);
-            break;
-        }
-        case YEmitterShape::Type::Box: {
-            auto* b = static_cast<YEmitterBox*>(shape);
-            ImGui::DragFloat3("サイズ##EB", &b->size.x, 0.05f, 0.0f, 1000.0f);
-            break;
-        }
-        default: break;
-        }
+        shape->DrawEditor();
         ImGui::Unindent();
     }
 
@@ -647,6 +675,8 @@ void YEmitterGroupEditor::ShowSelectedEmitterDetail(YParticleEmitter& emitter) {
 
 void YEmitterGroupEditor::ShowFileButtons() {
     ImGui::Text("ファイル");
+
+    // ── 全グループ保存 ──────────────────────────────────────
     if (ImGui::Button((std::string(Icon::FloppyDisk) + "すべて保存##FG").c_str(), ImVec2(-1, 0))) {
         saveBrowser_.Scan();
         showSavePopup_ = true;
@@ -659,16 +689,15 @@ void YEmitterGroupEditor::ShowFileButtons() {
         ImGui::Separator();
         saveBrowser_.Draw("##SaveBrowserChild", ImVec2(0, 260));
         ImGui::Separator();
-        static char saveAsName[256] = "";
         ImGui::SetNextItemWidth(-80);
-        ImGui::InputTextWithHint("##SaveAsName", "新規ファイル.json", saveAsName, sizeof(saveAsName));
+        ImGui::InputTextWithHint("##SaveAsName", "新規ファイル.json", saveAsNameBuf_, sizeof(saveAsNameBuf_));
         ImGui::SameLine();
         if (ImGui::Button("名前を付けて保存")) {
-            if (saveAsName[0] != '\0') {
-                std::string path = saveBrowser_.GetCurrentDir() + saveAsName;
+            if (saveAsNameBuf_[0] != '\0') {
+                std::string path = saveBrowser_.GetCurrentDir() + saveAsNameBuf_;
                 bool ok = YEmitterGroupManager::GetInstance().SaveAllToFile(path);
                 SetNotification(ok, ok ? "保存完了: " + path : "保存失敗: " + path);
-                saveAsName[0] = '\0';
+                saveAsNameBuf_[0] = '\0';
                 showSavePopup_ = false;
                 ImGui::CloseCurrentPopup();
             }
@@ -680,6 +709,7 @@ void YEmitterGroupEditor::ShowFileButtons() {
         ImGui::EndPopup();
     }
 
+    // ── 全グループ読み込み ──────────────────────────────────
     if (ImGui::Button((std::string(Icon::FolderOpen) + "すべて読み込み##FG").c_str(), ImVec2(-1, 0))) {
         loadBrowser_.Scan();
         showLoadPopup_ = true;
@@ -694,6 +724,114 @@ void YEmitterGroupEditor::ShowFileButtons() {
         ImGui::Separator();
         if (ImGui::Button("キャンセル", ImVec2(-1, 0))) {
             showLoadPopup_ = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
+    ImGui::Separator();
+
+    // ── 選択中グループ 個別保存 ────────────────────────────
+    bool hasSelection = !selectedGroupName_.empty();
+    ImGui::BeginDisabled(!hasSelection);
+    if (ImGui::Button((std::string(Icon::FloppyDisk) + "選択グループを保存##FGS").c_str(), ImVec2(-1, 0))) {
+        saveSingleBrowser_.Scan();
+        std::string defaultName = selectedGroupName_ + ".json";
+        strncpy_s(saveAsNameBuf_, defaultName.c_str(), sizeof(saveAsNameBuf_));
+        showSaveSinglePopup_ = true;
+    }
+    ImGui::EndDisabled();
+    if (!hasSelection && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+        ImGui::SetTooltip("グループを選択してください");
+
+    if (showSaveSinglePopup_) ImGui::OpenPopup("##SaveSingleGroup");
+    ImGui::SetNextWindowSize(ImVec2(480, 380), ImGuiCond_Appearing);
+    if (ImGui::BeginPopupModal("##SaveSingleGroup", &showSaveSinglePopup_,
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize)) {
+        ImGui::Text((std::string(Icon::FloppyDisk) + " グループ単独保存: %s").c_str(), selectedGroupName_.c_str());
+        ImGui::Separator();
+        saveSingleBrowser_.Draw("##SaveSingleBrowser", ImVec2(0, 260));
+        ImGui::Separator();
+        ImGui::SetNextItemWidth(-80);
+        ImGui::InputTextWithHint("##SaveSingleName", "グループ名.json", saveAsNameBuf_, sizeof(saveAsNameBuf_));
+        ImGui::SameLine();
+        if (ImGui::Button("保存##SS")) {
+            if (saveAsNameBuf_[0] != '\0') {
+                std::string path = saveSingleBrowser_.GetCurrentDir() + saveAsNameBuf_;
+                bool ok = YEmitterGroupManager::GetInstance().SaveGroupToFile(selectedGroupName_, path);
+                SetNotification(ok, ok ? "保存完了: " + path : "保存失敗: " + path);
+                saveAsNameBuf_[0] = '\0';
+                showSaveSinglePopup_ = false;
+                ImGui::CloseCurrentPopup();
+            }
+        }
+        if (ImGui::Button("キャンセル", ImVec2(-1, 0))) {
+            showSaveSinglePopup_ = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
+    // ── グループ単独読み込み ────────────────────────────────
+    if (ImGui::Button((std::string(Icon::FolderOpen) + "グループを読み込み##FGL").c_str(), ImVec2(-1, 0))) {
+        loadSingleBrowser_.Scan();
+        showLoadSinglePopup_ = true;
+    }
+    if (showLoadSinglePopup_) ImGui::OpenPopup("##LoadSingleGroup");
+    ImGui::SetNextWindowSize(ImVec2(480, 360), ImGuiCond_Appearing);
+    if (ImGui::BeginPopupModal("##LoadSingleGroup", &showLoadSinglePopup_,
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize)) {
+        ImGui::Text((std::string(Icon::FolderOpen) + "グループ読み込み — JSONファイルを選択").c_str());
+        ImGui::Separator();
+        loadSingleBrowser_.Draw("##LoadSingleBrowser", ImVec2(0, 280));
+        ImGui::Separator();
+        if (ImGui::Button("キャンセル", ImVec2(-1, 0))) {
+            showLoadSinglePopup_ = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
+    ImGui::Separator();
+
+    // ── バンドル保存（グループ + 参照システムを1ファイル）────
+    ImGui::BeginDisabled(!hasSelection);
+    if (ImGui::Button((std::string(Icon::FloppyDisk) + "バンドル保存##FGB").c_str(), ImVec2(-1, 0))) {
+        // YEffects ディレクトリを自動生成
+        std::filesystem::create_directories("Resources/Json/YEffects");
+        saveBundleBrowser_.Scan();
+        std::string defaultName = selectedGroupName_ + ".json";
+        strncpy_s(saveAsNameBuf_, defaultName.c_str(), sizeof(saveAsNameBuf_));
+        showSaveBundlePopup_ = true;
+    }
+    ImGui::EndDisabled();
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+        ImGui::SetTooltip("選択グループと参照システムをまとめてYEffects/に保存\nLoadEffectBundle() で一括ロード可能");
+
+    if (showSaveBundlePopup_) ImGui::OpenPopup("##SaveBundle");
+    ImGui::SetNextWindowSize(ImVec2(480, 380), ImGuiCond_Appearing);
+    if (ImGui::BeginPopupModal("##SaveBundle", &showSaveBundlePopup_,
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize)) {
+        ImGui::Text((std::string(Icon::FloppyDisk) + " バンドル保存: %s").c_str(), selectedGroupName_.c_str());
+        ImGui::TextDisabled("(グループ + 参照システムを1ファイルにまとめます)");
+        ImGui::Separator();
+        saveBundleBrowser_.Draw("##SaveBundleBrowser", ImVec2(0, 240));
+        ImGui::Separator();
+        ImGui::SetNextItemWidth(-80);
+        ImGui::InputTextWithHint("##SaveBundleName", "エフェクト名.json", saveAsNameBuf_, sizeof(saveAsNameBuf_));
+        ImGui::SameLine();
+        if (ImGui::Button("保存##SB")) {
+            if (saveAsNameBuf_[0] != '\0') {
+                std::string path = saveBundleBrowser_.GetCurrentDir() + saveAsNameBuf_;
+                bool ok = YParticleManager::GetInstance().SaveEffectBundle(selectedGroupName_, path);
+                SetNotification(ok, ok ? "バンドル保存完了: " + path : "保存失敗: " + path);
+                saveAsNameBuf_[0] = '\0';
+                showSaveBundlePopup_ = false;
+                ImGui::CloseCurrentPopup();
+            }
+        }
+        if (ImGui::Button("キャンセル", ImVec2(-1, 0))) {
+            showSaveBundlePopup_ = false;
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();

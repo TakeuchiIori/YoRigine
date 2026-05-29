@@ -122,20 +122,36 @@ void YParticleSystem::Emit(const Vector3& position, int count)
 		int index = FindEmptyIndex();
 		if (index < 0) break;
 
-		// 状態のリセット
-		attributes_[index].isActive = true;
-		attributes_[index].position = position;
-		attributes_[index].currentTime = 0.0f;
-		attributes_[index].velocity = Vector3(0.0f, 0.0f, 0.0f);
-		attributes_[index].scale = Vector3(1.0f, 1.0f, 1.0f);
-		attributes_[index].rotation = Vector3(0.0f, 0.0f, 0.0f);
-		attributes_[index].color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+		// ── 全フィールドをデフォルト値にリセット ──────────────────────
+		// ※ lifeTime も必ずリセット（前回使用値が残るバグ防止）
+		auto& a = attributes_[index];
+		a.isActive       = true;
+		a.position       = position;
+		a.currentTime    = 0.0f;
+		a.lifeTime       = 1.0f;  // SpawnLifeTime モジュールが上書きする
+		a.velocity       = {};
+		a.scale          = { 1.0f, 1.0f, 1.0f };
+		a.rotation       = {};
+		a.color          = { 1.0f, 1.0f, 1.0f, 1.0f };
+		a.uvOffset       = {};
+		a.uvScale        = { 1.0f, 1.0f };
+		// 拡張フィールド
+		a.origin         = position;          // 生成位置を記録
+		a.initialScale   = { 1.0f, 1.0f, 1.0f };
+		a.initialColor   = { 1.0f, 1.0f, 1.0f, 1.0f };
+		a.angularVelocity= {};
+		a.phase          = 0.0f;
+		a.flipbookFrame  = 0.0f;
 
-
-		// 登録された Spawn モジュールを適用して初期状態を決定
+		// ── Spawn モジュールを適用して初期状態を確定 ─────────────────
 		for (auto& module : spawnModules_) {
 			module->OnSpawn(attributes_.data(), index);
 		}
+
+		// Spawn モジュール適用後に initialScale/initialColor を確定
+		// （UpdateSizeOverLifetime / UpdateColorOverLifetime の補間起点）
+		a.initialScale = a.scale;
+		a.initialColor = a.color;
 	}
 }
 

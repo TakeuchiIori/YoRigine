@@ -5,9 +5,8 @@
 #include "Loaders/Json/JsonManager.h"
 #include "Collision/Core/CollisionDirection.h"
 #include "Collision/OBB/OBBCollider.h"
-#include <Particle/ParticleEmitter.h>
 #include "Object3d/BaseObject.h"
-
+#include "Particle/EffectHandle.h"      // YParticle 統合ヘルパー
 #include "Particle/YEmitterGroup.h"
 #include <Vfx/VfxMesh/TrailMeshEmitter.h>
 class Player;
@@ -92,9 +91,9 @@ private:
 	// コライダー・パーティクル
 	// ------------------------------------------------------------
 	WorldTransform colliderWT_;                                 // コライダー用の独立したワールド変換
-	std::unique_ptr<ParticleEmitter> hitParticleEmitter_;       // ヒット時エフェクト
-	std::unique_ptr<ParticleEmitter> particleEmitter_;          // 通常パーティクル
-	std::unique_ptr<ParticleEmitter> testEmitter_;
+	// エフェクトハンドル（YParticle 統合）
+	EffectHandle hitEffect_;     // ヒット時エフェクト
+	EffectHandle trailEffect_;   // 通常スラッシュエフェクト
 
 	// ------------------------------------------------------------
 	// ジョイントアタッチ関連

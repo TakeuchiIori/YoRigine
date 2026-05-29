@@ -49,6 +49,7 @@ protected:
 	void InitializeCommon();
 	void UpdateCommon();
 	void DrawCommonObject();
+	void DrawCommonShadow();   // シャドウパス開始前に必ず呼ぶ（PSO・RS・topology・gLight 一括設定）
 	void DrawCommonParticles();
 private:
 	///************************* メンバ変数 *************************///
