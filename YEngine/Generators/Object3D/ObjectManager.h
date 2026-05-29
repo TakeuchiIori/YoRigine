@@ -49,8 +49,9 @@ public:
 		std::shared_ptr<AABBCollider> collider; // コリジョン用のAABBコライダー
 
 		// ── コライダー個別設定 ────────────────────────────────────────────
-		// サイズ・タイプは ColliderTemplate を参照する。このフラグだけインスタンス個別。
 		bool colliderEnabled = false;
+		CollisionTypeIdDef colliderTypeId = CollisionTypeIdDef::kNone;
+		AABB colliderAabbOffset = { {-1.0f,-1.0f,-1.0f}, {1.0f,1.0f,1.0f} };
 
 		PlacedObject() = default;
 		~PlacedObject() = default;
@@ -119,28 +120,16 @@ public:
 	int GetNextObjectId() const { return nextObjectId_; }
 	void SetCamera(Camera* camera) { camera_ = camera; }
 
-	///************************* コライダーテンプレート管理 *************************///
+	///************************* コライダー操作 *************************///
 
-	// モデル名でテンプレートを取得（なければ新規作成して返す）
-	ColliderTemplate& GetOrCreateTemplate(const std::string& modelName);
-
-	// モデル名でテンプレートを取得（なければ nullptr）
-	ColliderTemplate* FindTemplate(const std::string& modelName);
-	const ColliderTemplate* FindTemplate(const std::string& modelName) const;
-
-	// テンプレートを対象オブジェクトのAABBコライダーに反映する
-	// colliderEnabled が false のときは collider を無効化するだけ
+	// オブジェクト固有の設定をAABBコライダーに反映する
 	void ApplyColliderTemplate(PlacedObject& obj);
 
-	// 同名モデルの全オブジェクトにテンプレートを一括反映する
-	void ApplyTemplateToAll(const std::string& modelName);
+	// 指定オブジェクトの colliderTypeId/colliderAabbOffset を同名オブジェクト全員にコピーして反映する（明示的な一括適用用）
+	void CopyColliderSettingsToAll(const PlacedObject& src);
 
-	// 同名モデルの全オブジェクトの colliderEnabled を一括設定する
+	// 同名モデルの colliderEnabled を一括設定する
 	void SetColliderEnabledAll(const std::string& modelName, bool enabled);
-
-	// テンプレートマップ全体を取得（SceneEditorUI の一覧表示用）
-	std::unordered_map<std::string, ColliderTemplate>& GetColliderTemplates() { return colliderTemplates_; }
-	const std::unordered_map<std::string, ColliderTemplate>& GetColliderTemplates() const { return colliderTemplates_; }
 
 private:
 	ObjectManager() = default;
@@ -160,9 +149,6 @@ private:
 
 	// 次に割り当てるID
 	int nextObjectId_ = 0;
-
-	// モデル名 → コライダーテンプレート
-	std::unordered_map<std::string, ColliderTemplate> colliderTemplates_;
 
 	// オブジェクトの初期化ヘルパー
 	void InitializePlacedObject(PlacedObject& obj, const std::string& modelPath,

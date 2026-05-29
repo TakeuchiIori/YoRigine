@@ -40,7 +40,11 @@ namespace YoRigine {
 
 		selector_.SetObjectManager(objectManager_);
 		motionEditor_.Initialize(camera_);
-		colliderLine_.Initialize();
+		colliderLineStaticWall_.Initialize();
+		colliderLineNavObstacle_.Initialize();
+		colliderLineNavTrigger_.Initialize();
+		colliderLineWaypoint_.Initialize();
+		colliderLineDefault_.Initialize();
 
 #ifdef USE_IMGUI
 		pickBuffer_ = PickBuffer::GetInstance();
@@ -59,7 +63,8 @@ namespace YoRigine {
 		editorUI_.SetPlaceCallback([this](const std::string& path) { PlaceObject(path); });
 		editorUI_.SetSaveCallback([this]() { serializer_.SaveScene(jsonPath_); });
 		editorUI_.SetLoadCallback([this]() { serializer_.LoadScene(jsonPath_); });
-		editorUI_.SetColliderDebugFlag(&showColliderDebug_); // コライダー可視化フラグを渡す
+		editorUI_.SetColliderDebugFlag(&showColliderDebug_);
+		editorUI_.SetColliderSelectedOnlyFlag(&showColliderSelectedOnly_);
 
 		gizmoCtrl_.Initialize();
 
@@ -147,39 +152,71 @@ namespace YoRigine {
 		if (!isInitialized_ || !camera_) return;
 		motionEditor_.DrawBone();
 
-		// コライダーAABBのデバッグ描画
 #ifdef USE_IMGUI
 		if (!showColliderDebug_) return;
+
+		// ---------------------------------------------------------
+		// タイプごとに専用の Line インスタンスを使って描画する。
+		// 単一バッファを複数の DrawLine() で共有すると、GPU 実行時に
+		// CPU 側の上書き（Upload Heap 競合）で後のタイプデータしか読めなくなる。
+		// ---------------------------------------------------------
+		struct TypeDrawInfo {
+			Line* line;
+			Vector4 color;
+		};
+		const TypeDrawInfo typeTable[] = {
+			{ &colliderLineStaticWall_,  { 1.0f, 0.2f, 0.2f, 1.0f } }, // 赤
+			{ &colliderLineNavObstacle_, { 1.0f, 0.8f, 0.0f, 1.0f } }, // 黄
+			{ &colliderLineNavTrigger_,  { 0.2f, 0.5f, 1.0f, 1.0f } }, // 青
+			{ &colliderLineWaypoint_,    { 0.2f, 1.0f, 0.3f, 1.0f } }, // 緑
+			{ &colliderLineDefault_,     { 0.6f, 0.6f, 0.6f, 1.0f } }, // グレー
+		};
+
+		// タイプIDからtypeTableのインデックスを返すラムダ
+		auto getTableIndex = [](uint32_t typeKey) -> int {
+			switch (static_cast<CollisionTypeIdDef>(typeKey)) {
+			case CollisionTypeIdDef::kStaticWall:  return 0;
+			case CollisionTypeIdDef::kNavObstacle: return 1;
+			case CollisionTypeIdDef::kNavTrigger:  return 2;
+			case CollisionTypeIdDef::kWaypoint:    return 3;
+			default:                               return 4;
+			}
+		};
+
+		// 各Lineインスタンスに色を設定
+		for (const auto& info : typeTable) {
+			info.line->SetColor(info.color);
+		}
+
+		// オブジェクトのAABBを対応するLineインスタンスに登録
+		static constexpr uint32_t kMaxAabbsPerFlush = 600;
+		uint32_t counts[5] = {};
+
 		for (auto* obj : objectManager_->GetAllActiveObjects()) {
 			if (!obj || !obj->collider) continue;
 
-			// 種別ごとに色を変える
-			auto* tmpl = objectManager_->FindTemplate(obj->modelName);
-			CollisionTypeIdDef typeId = tmpl ? tmpl->typeId : CollisionTypeIdDef::kNone;
+			// 表示フィルタ
+			if (!obj->colliderEnabled) continue;
+			if (showColliderSelectedOnly_ && !selector_.IsSelected(obj->id)) continue;
 
-			Vector4 color;
-			switch (typeId) {
-			case CollisionTypeIdDef::kStaticWall:  color = { 1.0f, 0.2f, 0.2f, 1.0f }; break; // 赤
-			case CollisionTypeIdDef::kNavObstacle: color = { 1.0f, 0.8f, 0.0f, 1.0f }; break; // 黄
-			case CollisionTypeIdDef::kNavTrigger:  color = { 0.2f, 0.5f, 1.0f, 1.0f }; break; // 青
-			case CollisionTypeIdDef::kWaypoint:    color = { 0.2f, 1.0f, 0.3f, 1.0f }; break; // 緑
-			default:                               color = { 0.6f, 0.6f, 0.6f, 1.0f }; break; // グレー
+			auto* aabbCol = dynamic_cast<AABBCollider*>(obj->collider.get());
+			if (!aabbCol) continue;
+
+			const uint32_t typeKey = obj->collider->GetTypeID();
+			const int idx = getTableIndex(typeKey);
+			Line* line = typeTable[idx].line;
+
+			line->DrawAABB(aabbCol->GetAABB().min, aabbCol->GetAABB().max);
+
+			if (++counts[idx] >= kMaxAabbsPerFlush) {
+				line->DrawLine();
+				counts[idx] = 0;
 			}
+		}
 
-			// 無効なコライダーは暗く半透明で表示（設定中でもサイズ確認できる）
-			if (!obj->colliderEnabled) {
-				color.x *= 0.4f; color.y *= 0.4f; color.z *= 0.4f;
-				color.w = 0.3f;
-			}
-
-			auto* aabb = dynamic_cast<AABBCollider*>(obj->collider.get());
-			if (!aabb) continue;
-
-			// ObjectManager::Update() で常にワールド AABB が計算済みなのでそのまま使う
-			const AABB& worldAABB = aabb->GetAABB();
-			colliderLine_.SetColor(color);
-			colliderLine_.DrawAABB(worldAABB.min, worldAABB.max);
-			colliderLine_.DrawLine();
+		// 各Lineインスタンスをフラッシュ
+		for (const auto& info : typeTable) {
+			info.line->DrawLine();
 		}
 #endif
 	}
@@ -426,8 +463,10 @@ namespace YoRigine {
 			newObj->rotation = srcObj->rotation;
 			newObj->scale = srcObj->scale;
 
-			// コライダー設定をコピー（typeId・AABBはテンプレート経由で引き継がれる）
-			newObj->colliderEnabled = srcObj->colliderEnabled;
+			// コライダー設定をオブジェクト個別にコピー
+			newObj->colliderEnabled    = srcObj->colliderEnabled;
+			newObj->colliderTypeId     = srcObj->colliderTypeId;
+			newObj->colliderAabbOffset = srcObj->colliderAabbOffset;
 			objectManager_->ApplyColliderTemplate(*newObj);
 
 			// 選択状態に追加

@@ -22,9 +22,21 @@ namespace YoRigine {
         if (ImGui::BeginMenu("ビュー")) {
             ImGui::MenuItem("オブジェクト一覧", nullptr, &showObjectList_);
             ImGui::MenuItem("トランスフォーム操作", nullptr, &showTransformControls_);
+
+            // ---------------------------------------------------------
+            // コライダーAABBデバッグ表示
+            //  - 全体ON/OFF
+            //  - 有効なコライダーのみ
+            //  - 選択中のみ
+            // ---------------------------------------------------------
             if (showColliderDebug_ != nullptr) {
                 ImGui::MenuItem("コライダーAABBを表示", nullptr, showColliderDebug_);
+
+                if (showColliderSelectedOnly_ != nullptr) {
+                    ImGui::MenuItem("  選択中のみ表示", nullptr, showColliderSelectedOnly_);
+                }
             }
+
             ImGui::EndMenu();
         }
 
@@ -37,12 +49,13 @@ namespace YoRigine {
         if (ImGui::BeginMenu("Tools")) {
             ImGui::MenuItem("複製ツール", nullptr, &showDuplicateWindow_);
             ImGui::MenuItem("プレファブ", nullptr, &showPrefabWindow_);
-            ImGui::MenuItem("コライダー設定", nullptr, &showColliderTemplates_); // テンプレート一覧
+            ImGui::MenuItem("コライダー設定", nullptr, &showColliderTemplates_);
             ImGui::EndMenu();
         }
 
         ImGui::EndMenu();
     }
+
 
     //=============================================================================
     // オブジェクト一覧
@@ -179,14 +192,14 @@ namespace YoRigine {
             ImGui::Separator();
             if (ImGui::CollapsingHeader("Collider")) {
 
-                // 個別フラグ：このオブジェクトだけON/OFF
+                // Enable フラグ（このオブジェクト個別）
                 bool enabled = obj->colliderEnabled;
-                if (ImGui::Checkbox("Enable (このオブジェクトのみ)", &enabled)) {
+                if (ImGui::Checkbox("Enable", &enabled)) {
                     obj->colliderEnabled = enabled;
                     objectManager_->ApplyColliderTemplate(*obj);
                 }
 
-                // 一括ボタン：同名モデル全体をON/OFF
+                // 同名一括 ON/OFF
                 ImGui::SameLine();
                 if (ImGui::SmallButton("同名を全ON")) {
                     objectManager_->SetColliderEnabledAll(obj->modelName, true);
@@ -196,43 +209,44 @@ namespace YoRigine {
                     objectManager_->SetColliderEnabledAll(obj->modelName, false);
                 }
 
-                // ── 共有設定（ここを変えると同名モデル全部に効く） ──
+                // ── このオブジェクト固有の設定 ──
                 ImGui::PushStyleColor(ImGuiCol_ChildBg,
                     ImGui::GetStyleColorVec4(ImGuiCol_FrameBg));
-                ImGui::BeginChild("##ColliderShared", ImVec2(0, 190), true);
-                ImGui::TextDisabled("共有設定 --- 変更すると同名モデル(%s)全てに反映", obj->modelName.c_str());
+                ImGui::BeginChild("##ColliderPerObj", ImVec2(0, 190), true);
+                ImGui::TextDisabled("個別設定 (ID: %d)", obj->id);
                 ImGui::Separator();
 
-                auto& tmpl = objectManager_->GetOrCreateTemplate(obj->modelName);
-                bool tmplChanged = false;
-
-                // Type ドロップダウン
-                const char* currentTypeName = CollisionTypeIdToString(tmpl.typeId);
+                // Type ドロップダウン（per-object）
+                const char* currentTypeName = CollisionTypeIdToString(obj->colliderTypeId);
                 if (ImGui::BeginCombo("Type", currentTypeName)) {
                     for (const auto typeId : kPlacedObjectColliderTypes) {
-                        bool selected = (tmpl.typeId == typeId);
+                        bool selected = (obj->colliderTypeId == typeId);
                         if (ImGui::Selectable(CollisionTypeIdToString(typeId), selected)) {
-                            tmpl.typeId = typeId;
-                            tmplChanged = true;
+                            obj->colliderTypeId = typeId;
+                            changed = true;
                         }
                         if (selected) ImGui::SetItemDefaultFocus();
                     }
                     ImGui::EndCombo();
                 }
 
-                // AABB オフセット（テンプレート経由で同名モデル全てに反映）
+                // AABB オフセット（per-object）
                 ImGui::Separator();
-                ImGui::TextDisabled("AABB オフセット（同名モデル全てに反映）");
-                if (ImGui::DragFloat3("AABB Max", &tmpl.aabbOffset.max.x, 0.05f)) tmplChanged = true;
-                if (ImGui::DragFloat3("AABB Min", &tmpl.aabbOffset.min.x, 0.05f)) tmplChanged = true;
+                ImGui::TextDisabled("AABB オフセット");
+                if (ImGui::DragFloat3("AABB Max", &obj->colliderAabbOffset.max.x, 0.05f)) changed = true;
+                if (ImGui::DragFloat3("AABB Min", &obj->colliderAabbOffset.min.x, 0.05f)) changed = true;
 
-                // typeId または AABB が変わったら同名全員に反映
-                if (tmplChanged) {
-                    objectManager_->ApplyTemplateToAll(obj->modelName);
+                if (changed) {
+                    objectManager_->ApplyColliderTemplate(*obj);
                 }
 
                 ImGui::EndChild();
                 ImGui::PopStyleColor();
+
+                // 明示的な一括コピーボタン
+                if (ImGui::SmallButton("この設定を同名オブジェクト全てにコピー")) {
+                    objectManager_->CopyColliderSettingsToAll(*obj);
+                }
             }
 
         } else {
@@ -276,67 +290,68 @@ namespace YoRigine {
     }
 
     //=============================================================================
-    // コライダーテンプレート一覧ウィンドウ
-    // モデル単位でまとめて設定を確認・変更できる
+    // コライダー一覧ウィンドウ（オブジェクト個別設定）
     //=============================================================================
     void SceneEditorUI::DrawColliderTemplates() {
         if (!objectManager_) return;
 
-        ImGui::Text("コライダーテンプレート一覧");
-        ImGui::TextDisabled("モデル単位の共有設定。変更は同名オブジェクト全体に即時反映されます。");
+        ImGui::Text("コライダー一覧（オブジェクト個別設定）");
         ImGui::Separator();
 
-        auto& templates = objectManager_->GetColliderTemplates();
-        if (templates.empty()) {
-            ImGui::TextDisabled("テンプレートがありません。オブジェクトを選択してColliderセクションを開くと自動生成されます。");
+        auto objects = objectManager_->GetAllActiveObjects();
+        if (objects.empty()) {
+            ImGui::TextDisabled("オブジェクトがありません。");
+            if (ImGui::Button("閉じる")) showColliderTemplates_ = false;
             return;
         }
 
-        // テーブルヘッダー
-        if (ImGui::BeginTable("##TmplTable", 4,
+        if (ImGui::BeginTable("##ColliderTable", 5,
             ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
             ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingStretchProp,
             ImVec2(0, 0))) {
             ImGui::TableSetupScrollFreeze(0, 1);
-            ImGui::TableSetupColumn("モデル名", ImGuiTableColumnFlags_WidthStretch, 2.0f);
-            ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthStretch, 1.5f);
-            ImGui::TableSetupColumn("全ON", ImGuiTableColumnFlags_WidthFixed, 44.0f);
-            ImGui::TableSetupColumn("全OFF", ImGuiTableColumnFlags_WidthFixed, 44.0f);
+            ImGui::TableSetupColumn("ID",    ImGuiTableColumnFlags_WidthFixed,   30.0f);
+            ImGui::TableSetupColumn("モデル", ImGuiTableColumnFlags_WidthStretch, 2.0f);
+            ImGui::TableSetupColumn("Type",  ImGuiTableColumnFlags_WidthStretch, 1.5f);
+            ImGui::TableSetupColumn("ON",    ImGuiTableColumnFlags_WidthFixed,   30.0f);
+            ImGui::TableSetupColumn("全コピー", ImGuiTableColumnFlags_WidthFixed, 60.0f);
             ImGui::TableHeadersRow();
 
-            for (auto& [modelName, tmpl] : templates) {
+            for (auto* obj : objects) {
+                if (!obj) continue;
                 ImGui::TableNextRow();
-                ImGui::PushID(modelName.c_str());
+                ImGui::PushID(obj->id);
 
-                // モデル名
                 ImGui::TableSetColumnIndex(0);
-                ImGui::TextUnformatted(modelName.c_str());
+                ImGui::Text("%d", obj->id);
 
-                // Type ドロップダウン（行内）
                 ImGui::TableSetColumnIndex(1);
+                ImGui::TextUnformatted(obj->modelName.c_str());
+
+                ImGui::TableSetColumnIndex(2);
                 ImGui::SetNextItemWidth(-1);
-                if (ImGui::BeginCombo("##type", CollisionTypeIdToString(tmpl.typeId))) {
+                if (ImGui::BeginCombo("##type", CollisionTypeIdToString(obj->colliderTypeId))) {
                     for (const auto typeId : kPlacedObjectColliderTypes) {
-                        bool sel = (tmpl.typeId == typeId);
+                        bool sel = (obj->colliderTypeId == typeId);
                         if (ImGui::Selectable(CollisionTypeIdToString(typeId), sel)) {
-                            tmpl.typeId = typeId;
-                            objectManager_->ApplyTemplateToAll(modelName);
+                            obj->colliderTypeId = typeId;
+                            objectManager_->ApplyColliderTemplate(*obj);
                         }
                         if (sel) ImGui::SetItemDefaultFocus();
                     }
                     ImGui::EndCombo();
                 }
 
-                // 全ON
-                ImGui::TableSetColumnIndex(2);
-                if (ImGui::SmallButton("全ON")) {
-                    objectManager_->SetColliderEnabledAll(modelName, true);
+                ImGui::TableSetColumnIndex(3);
+                bool en = obj->colliderEnabled;
+                if (ImGui::Checkbox("##en", &en)) {
+                    obj->colliderEnabled = en;
+                    objectManager_->ApplyColliderTemplate(*obj);
                 }
 
-                // 全OFF
-                ImGui::TableSetColumnIndex(3);
-                if (ImGui::SmallButton("全OFF")) {
-                    objectManager_->SetColliderEnabledAll(modelName, false);
+                ImGui::TableSetColumnIndex(4);
+                if (ImGui::SmallButton("同名コピー")) {
+                    objectManager_->CopyColliderSettingsToAll(*obj);
                 }
 
                 ImGui::PopID();

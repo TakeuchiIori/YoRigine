@@ -67,7 +67,7 @@ void Line::DrawLine()
 /// </summary>
 void Line::RegisterLine(const Vector3& start, const Vector3& end)
 {
-	assert(index < kMaxNum);
+	assert(index + 1 < kMaxNum);
 
 	vertexData_[index++].position = { start.x, start.y, start.z, 1.0f };
 	vertexData_[index++].position = { end.x,   end.y,   end.z,   1.0f };

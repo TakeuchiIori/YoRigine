@@ -25,20 +25,6 @@
 
 namespace YoRigine {
 
-    /// <summary>
-    /// シーンエディター統括クラス。
-    /// 各サブシステムを保持し、外部には
-    ///   Initialize / Update / Draw / DrawShadow / DrawImGui / DrawGizmo / Finalize
-    /// の7本のみを公開する。
-    ///
-    ///  サブシステム構成
-    ///   SceneSerializer … JSON Save/Load（外部からも GetSerializer() で取得可能）
-    ///   PrefabManager   … プレファブ管理
-    ///   ObjectSelector  … 選択状態・レイキャスト（外部から GetSelector() で取得可能）
-    ///   ModelBrowser    … モデルフォルダ UI        [USE_IMGUI]
-    ///   SceneEditorUI   … Inspector / ObjectList  [USE_IMGUI]
-    ///   GizmoController … ギズモ描画・Undo/Redo    [USE_IMGUI]
-    /// </summary>
     class ModelManipulator
     {
     public:
@@ -58,19 +44,19 @@ namespace YoRigine {
         void DrawForPick();
         void Finalize();
 
-        // シーンにオブジェクトを配置
         void PlaceObject(const std::string& modelPath);
-
-        // シーンの読み込み
         void LoadScene(const std::string& sceneName);
 
-        // カメラのセット
         void SetCamera(Camera* camera) {
             camera_ = camera;
             selector_.SetCamera(camera);
             motionEditor_.SetCamera(camera);
-            colliderLine_.SetCamera(camera_);
-			objectManager_->SetCamera(camera);
+            colliderLineStaticWall_.SetCamera(camera_);
+            colliderLineNavObstacle_.SetCamera(camera_);
+            colliderLineNavTrigger_.SetCamera(camera_);
+            colliderLineWaypoint_.SetCamera(camera_);
+            colliderLineDefault_.SetCamera(camera_);
+            objectManager_->SetCamera(camera);
         }
 
         //=========================================================================
@@ -79,8 +65,13 @@ namespace YoRigine {
         SceneSerializer& GetSerializer() { return serializer_; }
         ObjectSelector& GetSelector() { return selector_; }
         MotionEditor& GetMotionEditor() { return motionEditor_; }
+
 #ifdef USE_IMGUI
-        //GizmoController& GetGizmoController() { return gizmoCtrl_; }
+        //=========================================================================
+        // デバッグ描画設定（SceneEditorUI から操作）
+        //=========================================================================
+        bool* GetShowColliderDebugPtr() { return &showColliderDebug_; }
+        bool* GetShowColliderSelectedOnlyPtr() { return &showColliderSelectedOnly_; }
 #endif
 
     private:
@@ -90,6 +81,7 @@ namespace YoRigine {
         void ShortcutKey();
         void CopyObject();
         void PasteObject();
+
         //=========================================================================
         // シングルトン
         //=========================================================================
@@ -113,13 +105,22 @@ namespace YoRigine {
         std::string    modelFolderPath_ = "Resources/Models/";
         MotionEditor motionEditor_;
 
-        Line   colliderLine_;           // コライダーAABB可視化用
+        // タイプごとに独立したLineインスタンスを持つ
+        // (単一バッファを複数Draw間で共有するとGPU実行時にCPU上書きが起きるため)
+        Line   colliderLineStaticWall_;   // 赤
+        Line   colliderLineNavObstacle_;  // 黄
+        Line   colliderLineNavTrigger_;   // 青
+        Line   colliderLineWaypoint_;     // 緑
+        Line   colliderLineDefault_;      // グレー
         bool   showColliderDebug_ = true; // コライダー表示フラグ
 
-        // コピーしたオブジェクトのIDを保持
+#ifdef USE_IMGUI
+        bool   showColliderSelectedOnly_ = false; // 選択中のみ描画
+#endif
+
         std::vector<int> copyObjectIDs_;
         Vector3 offsetCopyPos_ = { 1.0f,0.0f,0.0f };
-        // ── サブシステム ─────────────────────────────────────────
+
         SceneSerializer serializer_;
         PrefabManager   prefabMgr_;
         ObjectSelector  selector_;

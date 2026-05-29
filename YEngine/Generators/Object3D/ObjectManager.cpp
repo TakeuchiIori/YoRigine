@@ -149,8 +149,10 @@ ObjectManager::PlacedObject* ObjectManager::DuplicateObject(
 	duplicate->scale = original->scale;
 	duplicate->parentID = original->parentID;
 
-	// コライダー設定を複製（typeId・AABBはテンプレート経由で引き継がれる）
-	duplicate->colliderEnabled = original->colliderEnabled;
+	// コライダー設定を複製（各オブジェクト固有の設定をそのままコピー）
+	duplicate->colliderEnabled   = original->colliderEnabled;
+	duplicate->colliderTypeId    = original->colliderTypeId;
+	duplicate->colliderAabbOffset = original->colliderAabbOffset;
 	ApplyColliderTemplate(*duplicate);
 
 	UpdateObjectTransform(*duplicate);
@@ -383,51 +385,33 @@ void ObjectManager::InitializePlacedObject(
 	UpdateObjectTransform(obj);
 }
 
-//=============================================================================
-// コライダーテンプレート管理
-//=============================================================================
-
-ObjectManager::ColliderTemplate& ObjectManager::GetOrCreateTemplate(const std::string& modelName) {
-	// 存在しなければデフォルト値で新規作成して返す
-	return colliderTemplates_[modelName];
-}
-
-ObjectManager::ColliderTemplate* ObjectManager::FindTemplate(const std::string& modelName) {
-	auto it = colliderTemplates_.find(modelName);
-	return (it != colliderTemplates_.end()) ? &it->second : nullptr;
-}
-
-const ObjectManager::ColliderTemplate* ObjectManager::FindTemplate(const std::string& modelName) const {
-	auto it = colliderTemplates_.find(modelName);
-	return (it != colliderTemplates_.end()) ? &it->second : nullptr;
-}
-
 void ObjectManager::ApplyColliderTemplate(PlacedObject& obj) {
 	if (!obj.collider) {
 		obj.collider = ColliderFactory::CreateStatic<AABBCollider>(
 			obj.worldTransform.get(),
-			static_cast<uint32_t>(CollisionTypeIdDef::kStaticWall));
+			static_cast<uint32_t>(CollisionTypeIdDef::kNone));
 	}
 
 	if (!obj.collider) return;
 
-	// 形状（aabbOffset）とtypeIdはテンプレートから設定する。
-	// colliderEnabled は衝突判定の有効フラグのみを制御し、形状には影響しない。
-	const ColliderTemplate* tmpl = FindTemplate(obj.modelName);
-	if (tmpl) {
-		obj.collider->SetTypeID(static_cast<uint32_t>(tmpl->typeId));
-		obj.collider->aabbOffset_ = tmpl->aabbOffset;
-	}
+	// 各オブジェクト固有の設定を使う（モデル名共有ではない）
+	obj.collider->SetTypeID(static_cast<uint32_t>(obj.colliderTypeId));
+	obj.collider->aabbOffset_ = obj.colliderAabbOffset;
 
 	obj.collider->SetEnablePenetration(true);
 	obj.collider->SetIsStatic(true);
 	obj.collider->SetCollisionEnabled(obj.colliderEnabled);
+
+	// ワールドAABBをこのフレームで即時反映させる（次フレーム待ちにしない）
+	obj.collider->Update();
 }
 
-void ObjectManager::ApplyTemplateToAll(const std::string& modelName) {
-	// 同名モデルの全オブジェクトにテンプレートを反映
+void ObjectManager::CopyColliderSettingsToAll(const PlacedObject& src) {
+	// ソースオブジェクトの個別設定を同名オブジェクト全員にコピーして反映する
 	for (auto& [id, obj] : idToObject_) {
-		if (obj && obj->modelName == modelName) {
+		if (obj && obj->modelName == src.modelName && obj->id != src.id) {
+			obj->colliderTypeId     = src.colliderTypeId;
+			obj->colliderAabbOffset = src.colliderAabbOffset;
 			ApplyColliderTemplate(*obj);
 		}
 	}
