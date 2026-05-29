@@ -60,6 +60,7 @@ namespace YoRigine {
 		editorUI_.SetSaveCallback([this]() { serializer_.SaveScene(jsonPath_); });
 		editorUI_.SetLoadCallback([this]() { serializer_.LoadScene(jsonPath_); });
 		editorUI_.SetColliderDebugFlag(&showColliderDebug_); // コライダー可視化フラグを渡す
+		editorUI_.SetColliderDebugViewMode(&colliderDebugViewMode_); // コライダー可視化の表示対象モードを渡す
 
 		gizmoCtrl_.Initialize();
 
@@ -152,6 +153,14 @@ namespace YoRigine {
 		if (!showColliderDebug_) return;
 		for (auto* obj : objectManager_->GetAllActiveObjects()) {
 			if (!obj || !obj->collider) continue;
+
+			// 表示対象フィルタ
+			if (colliderDebugViewMode_ == ColliderDebugViewMode::kEnabledOnly && !obj->colliderEnabled) {
+				continue;
+			}
+			if (colliderDebugViewMode_ == ColliderDebugViewMode::kSelectedOnly && !selector_.IsSelected(obj->id)) {
+				continue;
+			}
 
 			// 種別ごとに色を変える
 			auto* tmpl = objectManager_->FindTemplate(obj->modelName);

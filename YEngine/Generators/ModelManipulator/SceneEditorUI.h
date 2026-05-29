@@ -19,6 +19,12 @@ namespace YoRigine {
 
 namespace YoRigine {
 
+    enum class ColliderDebugViewMode {
+        kAll = 0,          // 全オブジェクトを表示
+        kEnabledOnly,      // colliderEnabled == true のみ表示
+        kSelectedOnly,     // 選択中オブジェクトのみ表示
+    };
+
     /// <summary>
     /// ObjectList / TransformControls / DuplicateWindow / PrefabWindow の
     /// ImGui 描画をまとめたクラス。
@@ -37,6 +43,7 @@ namespace YoRigine {
         void SetSerializer(SceneSerializer* s) { serializer_ = s; }
         void SetGizmoController(GizmoController* gc) { gizmoCtrl_ = gc; }
         void SetColliderDebugFlag(bool* flag) { showColliderDebug_ = flag; } // ModelManipulatorのフラグを参照
+        void SetColliderDebugViewMode(ColliderDebugViewMode* mode) { colliderDebugViewMode_ = mode; } // ModelManipulatorの表示モードを参照
 
         /// オブジェクト配置要求（ModelManipulator::PlaceObject を渡す）
         void SetPlaceCallback(std::function<void(const std::string&)> cb) { placeCallback_ = cb; }
@@ -89,6 +96,7 @@ namespace YoRigine {
         bool showPrefabWindow_ = false;
         bool showColliderTemplates_ = false; // コライダーテンプレート一覧
         bool* showColliderDebug_ = nullptr; // ModelManipulator::showColliderDebug_ への参照
+        ColliderDebugViewMode* colliderDebugViewMode_ = nullptr; // ModelManipulator::colliderDebugViewMode_ への参照
 
         // 複製ウィンドウ用
         Vector3 duplicateOffset_ = { 1.0f, 0.0f, 0.0f };

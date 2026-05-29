@@ -24,6 +24,31 @@ namespace YoRigine {
             ImGui::MenuItem("トランスフォーム操作", nullptr, &showTransformControls_);
             if (showColliderDebug_ != nullptr) {
                 ImGui::MenuItem("コライダーAABBを表示", nullptr, showColliderDebug_);
+                if (colliderDebugViewMode_ != nullptr) {
+                    if (!(*showColliderDebug_)) {
+                        ImGui::BeginDisabled();
+                    }
+                    if (ImGui::BeginMenu("コライダーAABB表示対象")) {
+                        const bool isAll = (*colliderDebugViewMode_ == ColliderDebugViewMode::kAll);
+                        const bool isEnabledOnly = (*colliderDebugViewMode_ == ColliderDebugViewMode::kEnabledOnly);
+                        const bool isSelectedOnly = (*colliderDebugViewMode_ == ColliderDebugViewMode::kSelectedOnly);
+
+                        // 表示対象切替（優先順位は単一選択）
+                        if (ImGui::MenuItem("すべて表示", nullptr, isAll)) {
+                            *colliderDebugViewMode_ = ColliderDebugViewMode::kAll;
+                        }
+                        if (ImGui::MenuItem("有効なコライダーのみ", nullptr, isEnabledOnly)) {
+                            *colliderDebugViewMode_ = ColliderDebugViewMode::kEnabledOnly;
+                        }
+                        if (ImGui::MenuItem("選択中オブジェクトのみ", nullptr, isSelectedOnly)) {
+                            *colliderDebugViewMode_ = ColliderDebugViewMode::kSelectedOnly;
+                        }
+                        ImGui::EndMenu();
+                    }
+                    if (!(*showColliderDebug_)) {
+                        ImGui::EndDisabled();
+                    }
+                }
             }
             ImGui::EndMenu();
         }

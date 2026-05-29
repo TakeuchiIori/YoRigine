@@ -115,6 +115,9 @@ namespace YoRigine {
 
         Line   colliderLine_;           // コライダーAABB可視化用
         bool   showColliderDebug_ = true; // コライダー表示フラグ
+#ifdef USE_IMGUI
+        ColliderDebugViewMode colliderDebugViewMode_ = ColliderDebugViewMode::kAll; // コライダー表示対象フィルタ
+#endif
 
         // コピーしたオブジェクトのIDを保持
         std::vector<int> copyObjectIDs_;
