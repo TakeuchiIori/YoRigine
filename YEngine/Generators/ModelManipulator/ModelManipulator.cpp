@@ -154,7 +154,9 @@ namespace YoRigine {
 		for (auto* obj : objectManager_->GetAllActiveObjects()) {
 			if (!obj || !obj->collider) continue;
 
+			//------------------------------------------------------------
 			// 表示対象フィルタ
+			//------------------------------------------------------------
 			if (colliderDebugViewMode_ == ColliderDebugViewMode::kEnabledOnly && !obj->colliderEnabled) {
 				continue;
 			}

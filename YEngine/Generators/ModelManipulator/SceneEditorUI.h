@@ -19,6 +19,9 @@ namespace YoRigine {
 
 namespace YoRigine {
 
+    // ============================================================
+    // コライダーデバッグ表示モード
+    // ============================================================
     enum class ColliderDebugViewMode {
         kAll = 0,          // 全オブジェクトを表示
         kEnabledOnly,      // colliderEnabled == true のみ表示

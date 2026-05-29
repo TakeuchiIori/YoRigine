@@ -33,7 +33,9 @@ namespace YoRigine {
                         const bool isEnabledOnly = (*colliderDebugViewMode_ == ColliderDebugViewMode::kEnabledOnly);
                         const bool isSelectedOnly = (*colliderDebugViewMode_ == ColliderDebugViewMode::kSelectedOnly);
 
+                        //------------------------------------------------------------
                         // 表示対象切替（優先順位は単一選択）
+                        //------------------------------------------------------------
                         if (ImGui::MenuItem("すべて表示", nullptr, isAll)) {
                             *colliderDebugViewMode_ = ColliderDebugViewMode::kAll;
                         }
