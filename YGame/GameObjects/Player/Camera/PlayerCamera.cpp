@@ -73,6 +73,18 @@ void PlayerCamera::UpdatePreDirector() {
     bool  inPerformance = IsInPerformance();
 
     if (!inPerformance) {
+        // R3 でロックオン切り替え（isLockOn_ の状態に関わらず常にチェックする）
+        if (YoRigine::Input::GetInstance()->IsPadTriggered(0, GamePadButton::R_Stick)) {
+            isLockOn_ = !isLockOn_;
+            if (isLockOn_) {
+                lockedTarget_ = nullptr;
+                SwitchLockOnTarget(0);
+                if (!lockedTarget_) isLockOn_ = false;
+            } else {
+                lockedTarget_ = nullptr;
+            }
+        }
+
         if (isLockOn_) {
             UpdateLockOn();
         } else {
@@ -170,18 +182,6 @@ void PlayerCamera::UpdateLockOn() {
     if (!playerWT_ || !followCamera_) return;
 
     auto* input = YoRigine::Input::GetInstance();
-
-    // R3 でロックオン切り替え
-    if (input->IsPadTriggered(0, GamePadButton::R_Stick)) {
-        isLockOn_ = !isLockOn_;
-        if (isLockOn_) {
-            lockedTarget_ = nullptr;
-            SwitchLockOnTarget(0);
-            if (!lockedTarget_) isLockOn_ = false;
-        } else {
-            lockedTarget_ = nullptr;
-        }
-    }
 
     if (!isLockOn_ || !lockedTarget_) {
         isLockOn_     = false;
