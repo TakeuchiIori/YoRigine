@@ -39,10 +39,21 @@ void MyGame::Initialize() {
 
 	YParticleManager::GetInstance().Initialize(dxCommon_->GetSrvManager(), 50000);
 
-	YParticleManager::GetInstance().LoadSystemsFromFile("Resources/Json/YParticleSystems/EnemyHit1.json");
-	YParticleManager::GetInstance().LoadSystemsFromFile("Resources/Json/YParticleSystems/EnemyHit2.json");	
-	YEmitterGroupManager::GetInstance().LoadAllFromFile("Resources/Json/YEmitterGroups/EnemyHit.json");
+	// エフェクトのロード
+	// バンドルファイル（Resources/Json/YEffects/*.json）に移行済みのものは
+	// LoadEffectBundle() で System と Group をまとめてロードできる:
+	// YParticleManager::GetInstance().LoadEffectBundle("Resources/Json/YEffects/EnemyHit.json");
+	// バンドルファイルはエディタの「エミッタグループ → バンドル保存」ボタンで作成する。
 
+	YParticleManager::GetInstance().LoadSystemsFromFile("Resources/Json/YParticleSystems/EnemyHit1.json");
+	YParticleManager::GetInstance().LoadSystemsFromFile("Resources/Json/YParticleSystems/EnemyHit2.json");
+	YEmitterGroupManager::GetInstance().LoadGroupFromFile("Resources/Json/YEmitterGroups/EnemyHit.json");
+
+	YParticleManager::GetInstance().LoadSystemsFromFile("Resources/Json/YParticleSystems/Clear.json");
+	YEmitterGroupManager::GetInstance().LoadGroupFromFile("Resources/Json/YEmitterGroups/Clear.json");
+
+	YParticleManager::GetInstance().LoadSystemsFromFile("Resources/Json/YParticleSystems/Title.json");
+	YEmitterGroupManager::GetInstance().LoadGroupFromFile("Resources/Json/YEmitterGroups/Title.json");
 	//------------------------------------------------------------
 	// パーティクル関連の初期化（YParticle に完全移行済み）
 	// 旧 ParticleManager は削除。エフェクト定義は JSON で管理。
@@ -87,7 +98,7 @@ void MyGame::Initialize() {
 	// 初期シーン設定
 	//------------------------------------------------------------
 #ifdef _DEBUG
-	SceneManager::GetInstance()->ChangeScene("Game");   // デバッグ時はゲームシーン
+	SceneManager::GetInstance()->ChangeScene("Clear");   // デバッグ時はゲームシーン
 #else 
 	SceneManager::GetInstance()->ChangeScene("Title");  // 製品版はタイトルシーン
 #endif

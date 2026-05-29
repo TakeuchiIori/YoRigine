@@ -113,7 +113,6 @@ void DevelopScene::Update() {
 	UpdateCamera();
 
 
-	AreaEditor::GetInstance()->Update();
 	YoRigine::CollisionManager::GetInstance()->Update();
 	YoRigine::ModelManipulator::GetInstance()->Update();
 	YoRigine::ParticleManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
@@ -122,6 +121,7 @@ void DevelopScene::Update() {
 	YoRigine::GpuEmitManager::GetInstance()->Update();
 
 #ifdef USE_IMGUI
+	AreaEditor::GetInstance()->Update();
 	YoRigine::VfxMeshEditor::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
 #endif
 }

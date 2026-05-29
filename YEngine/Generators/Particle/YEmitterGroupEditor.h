@@ -146,6 +146,18 @@ private:
     bool showSavePopup_ = false;
     bool showLoadPopup_ = false;
 
+    // 個別グループ保存/ロード
+    YoRigine::FileBrowser saveSingleBrowser_;
+    YoRigine::FileBrowser loadSingleBrowser_;
+    bool showSaveSinglePopup_ = false;
+    bool showLoadSinglePopup_ = false;
+
+    // バンドル保存
+    YoRigine::FileBrowser saveBundleBrowser_;
+    bool showSaveBundlePopup_ = false;
+
+    char saveAsNameBuf_[256] = "";
+
     //=================================================================
     // 保存完了トースト通知
     //=================================================================

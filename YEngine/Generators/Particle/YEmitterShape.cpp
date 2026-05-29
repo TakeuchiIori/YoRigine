@@ -39,8 +39,8 @@ Vector3 YEmitterSphere::GeneratePoint()
 void YEmitterSphere::DrawEditor()
 {
 #ifdef USE_IMGUI
-    ImGui::DragFloat("内側半径 (min)", &minRadius, 0.01f, 0.0f, 100.0f);
-    ImGui::DragFloat("外側半径 (max)", &maxRadius, 0.01f, 0.0f, 100.0f);
+    ImGui::DragFloat("内側半径 (min)", &minRadius, 0.01f, -1000.0f, 1000.0f);
+    ImGui::DragFloat("外側半径 (max)", &maxRadius, 0.01f, -1000.0f, 1000.0f);
     // minRadius > maxRadius を防ぐ
     if (minRadius > maxRadius) minRadius = maxRadius;
 
@@ -76,8 +76,8 @@ Vector3 YEmitterBox::GeneratePoint()
 void YEmitterBox::DrawEditor()
 {
 #ifdef USE_IMGUI
-    ImGui::DragFloat3("内側サイズ (min)", &minSize.x, 0.01f, 0.0f, 100.0f);
-    ImGui::DragFloat3("外側サイズ (max)", &maxSize.x, 0.01f, 0.0f, 100.0f);
+    ImGui::DragFloat3("内側サイズ (min)", &minSize.x, 0.01f, -1000.0f, 1000.0f);
+    ImGui::DragFloat3("外側サイズ (max)", &maxSize.x, 0.01f, -1000.0f, 1000.0f);
     // 各軸で min > max を防ぐ
     if (minSize.x > maxSize.x) minSize.x = maxSize.x;
     if (minSize.y > maxSize.y) minSize.y = maxSize.y;

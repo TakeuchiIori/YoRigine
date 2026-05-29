@@ -292,7 +292,6 @@ void GameScene::Update() {
 	skyBox_->Update();
 	gameUI_->Update();
 
-	AreaEditor::GetInstance()->Update();
 	YoRigine::ModelManipulator::GetInstance()->Update();
 	YoRigine::CollisionManager::GetInstance()->Update();
 	YoRigine::ParticleManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
@@ -300,6 +299,11 @@ void GameScene::Update() {
 	YoRigine::LightManager::GetInstance()->UpdateShadowMatrix(sceneCamera_.get());
 	YoRigine::LightManager::GetInstance()->TransferData();
 	YoRigine::GpuEmitManager::GetInstance()->Update();
+
+#ifdef USE_IMGUI
+	AreaEditor::GetInstance()->Update();
+#endif // USE_IMGUI
+
 }
 
 /// <summary>

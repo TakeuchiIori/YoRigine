@@ -74,6 +74,15 @@ public:
 
 	// 実際の読み込み処理
 	bool LoadAllFromFile(const std::string& filePath);
+
+	/// 指定グループを単独ファイルに保存（groupName キーを持つ単一JSON）
+	bool SaveGroupToFile(const std::string& groupName, const std::string& filePath) const;
+
+	/// ファイルから単独グループを読み込み（単独形式・複数形式どちらも自動判別）
+	bool LoadGroupFromFile(const std::string& filePath);
+
+	/// JSON から単独グループを読み込み
+	void LoadGroupFromJson(const nlohmann::json& j);
 private:
 	YEmitterGroupManager() = default;
 	~YEmitterGroupManager() = default;

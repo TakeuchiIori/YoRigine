@@ -106,6 +106,7 @@ std::vector<std::string> YParticleManager::GetAllSystemNames() const {
 }
 
 #include <fstream>
+#include <set>
 
 bool YParticleManager::LoadSystemsFromFile(const std::string& filePath) {
 	try {
@@ -324,4 +325,94 @@ void YParticleManager::EmitBurst(const std::string& systemName, const Vector3& p
 	if (system) {
 		system->Emit(position, count);
 	}
+}
+
+//=================================================================
+// バンドルロード・セーブ
+//=================================================================
+
+bool YParticleManager::LoadEffectBundle(const std::string& filePath) {
+	try {
+		std::ifstream file(filePath);
+		if (!file.is_open()) return false;
+		nlohmann::json j;
+		file >> j;
+
+		if (j.contains("systems")) {
+			for (const auto& sysJson : j["systems"]) {
+				LoadSystemsFromJson(sysJson);
+			}
+		}
+		if (j.contains("groups")) {
+			YEmitterGroupManager::GetInstance().LoadAllFromJson(j);
+		}
+		return true;
+	}
+	catch (...) { return false; }
+}
+
+bool YParticleManager::SaveEffectBundle(const std::string& groupName, const std::string& filePath) {
+	auto& groupMgr = YEmitterGroupManager::GetInstance();
+	auto* group = groupMgr.GetGroup(groupName);
+	if (!group) return false;
+
+	try {
+		nlohmann::json j;
+		j["systems"] = nlohmann::json::array();
+		j["groups"] = nlohmann::json::array();
+
+		// グループが参照するシステム名を収集
+		std::set<std::string> systemNames;
+		for (size_t i = 0; i < group->GetEmitterCount(); ++i) {
+			auto* emitter = group->GetEmitter(i);
+			if (emitter) systemNames.insert(emitter->GetSystemName());
+		}
+
+		// 参照システムをシリアライズ
+		for (const auto& sysName : systemNames) {
+			auto* system = GetSystem(sysName);
+			if (!system) continue;
+
+			nlohmann::json sysJson;
+			sysJson["name"] = system->GetName();
+			sysJson["maxParticles"] = system->GetMaxParticles();
+			sysJson["texture"] = system->GetTextureFilePath();
+			sysJson["isRelative"] = system->IsRelative();
+			sysJson["billboardType"] = system->GetBillboardTypeAsUInt();
+			sysJson["BlendMode"] = static_cast<int>(system->GetBlendMode());
+			sysJson["Lighting"] = system->IsEnableLight();
+			sysJson["mesh"]["type"] = system->GetCurrentMeshType();
+			sysJson["mesh"]["params"] = nlohmann::json::array();
+			const float* params = system->GetMeshParams();
+			for (int pi = 0; pi < 4; ++pi) sysJson["mesh"]["params"].push_back(params[pi]);
+
+			sysJson["spawnModules"] = nlohmann::json::array();
+			for (const auto& mod : system->GetSpawnModules()) {
+				nlohmann::json mj;
+				mj["type"] = mod->GetTypeName();
+				mj["name"] = mod->GetName();
+				mod->SaveToJson(mj["data"]);
+				sysJson["spawnModules"].push_back(mj);
+			}
+
+			sysJson["updateModules"] = nlohmann::json::array();
+			for (const auto& mod : system->GetUpdateModules()) {
+				nlohmann::json mj;
+				mj["type"] = mod->GetTypeName();
+				mj["name"] = mod->GetName();
+				mod->SaveToJson(mj["data"]);
+				sysJson["updateModules"].push_back(mj);
+			}
+
+			j["systems"].push_back(sysJson);
+		}
+
+		j["groups"].push_back(group->SaveToJson());
+
+		std::ofstream file(filePath);
+		if (!file.is_open()) return false;
+		file << j.dump(4);
+		return true;
+	}
+	catch (...) { return false; }
 }

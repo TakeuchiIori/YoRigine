@@ -102,7 +102,7 @@ nlohmann::json YEmitterGroup::SaveToJson() const {
         ej["offsetZ"] = pos.z - position_.z;
         ej["emissionRate"] = emitter->GetEmissionRate();
         ej["emitCount"] = emitter->GetEmitCount();
-        ej["autoEmit"] = emitter->GetAutoEmit();
+        ej["autoEmit"] = false; // ロード時に自動射出しないよう常にfalseで保存
 
         // 形状（min/max フィールドに対応）
         if (auto* shape = emitter->GetShape()) {
