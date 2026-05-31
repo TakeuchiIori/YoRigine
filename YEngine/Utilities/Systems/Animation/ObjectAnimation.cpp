@@ -39,6 +39,26 @@ void ObjectAnimation::StartColorAnimation(
     currentColor_ = fromColor;
 }
 
+void ObjectAnimation::StartRelativeScaleAnimation(
+    Vector3 fromRelative,
+    Vector3 toRelative,
+    float duration,
+    Easing::Function easeFunc,
+    std::function<void()> onComplete
+) {
+    const Vector3 from = {
+        baseScale_.x * fromRelative.x,
+        baseScale_.y * fromRelative.y,
+        baseScale_.z * fromRelative.z
+    };
+    const Vector3 to = {
+        baseScale_.x * toRelative.x,
+        baseScale_.y * toRelative.y,
+        baseScale_.z * toRelative.z
+    };
+    StartScaleAnimation(from, to, duration, easeFunc, onComplete);
+}
+
 void ObjectAnimation::PlayPunchAnimation(float strength, float duration) {
     Vector3 punchScale = baseScale_ * (1.0f + strength);
     StartScaleAnimation(

@@ -7,7 +7,7 @@ void BattleComboAttackState::Enter(BattleEnemy& enemy) {
 
 	if (auto anim = enemy.GetAnimation()) {
 		anim->StartColorAnimation({ 1, 1, 1, 1 }, { 1.0f, 0.0f, 1.0f, 1.0f }, 0.2f);
-		anim->StartScaleAnimation({ 1, 1, 1 }, { 0.8f, 1.2f, 0.8f }, enemy.GetEnemyData().attackParams.combo.anticipationTime);
+		anim->StartRelativeScaleAnimation({ 1, 1, 1 }, { 0.8f, 1.2f, 0.8f }, enemy.GetEnemyData().attackParams.combo.anticipationTime);
 	}
 	else {
 		enemy.SetColor({ 1, 0.0f, 1, 1 });
@@ -63,7 +63,7 @@ void BattleComboAttackState::Update(BattleEnemy& enemy, float dt) {
 			// 各ヒットの溜め開始時
 			if (previousTimeInPhase < 0.0f && timeInPhase >= 0.0f) {
 				if (auto anim = enemy.GetAnimation()) {
-					anim->StartScaleAnimation({ 0.8f, 1.2f, 0.8f }, { 1.0f, 0.9f, 0.9f }, params.subChargeTime);
+					anim->StartRelativeScaleAnimation({ 0.8f, 1.2f, 0.8f }, { 1.0f, 0.9f, 0.9f }, params.subChargeTime);
 				}
 			}
 
@@ -76,7 +76,7 @@ void BattleComboAttackState::Update(BattleEnemy& enemy, float dt) {
 			// 各ヒットの突進開始時
 			if (previousTimeInPhase < params.subChargeTime && timeInPhase >= params.subChargeTime) {
 				if (auto anim = enemy.GetAnimation()) {
-					anim->StartScaleAnimation({ 1.0f, 0.9f, 0.9f }, { 0.8f, 0.8f, 1.2f }, params.subRushTime);
+					anim->StartRelativeScaleAnimation({ 1.0f, 0.9f, 0.9f }, { 0.8f, 0.8f, 1.2f }, params.subRushTime);
 				}
 			}
 
@@ -95,7 +95,7 @@ void BattleComboAttackState::Exit(BattleEnemy& enemy) {
 	enemy.SetCanAct(true);
 	if (auto anim = enemy.GetAnimation()) {
 		anim->StopAll();
-		anim->StartScaleAnimation(anim->GetCurrentScale(), { 1, 1, 1 }, 0.2f);
+		anim->StartScaleAnimation(anim->GetCurrentScale(), anim->GetBaseScale(), 0.2f);
 		anim->StartColorAnimation(anim->GetCurrentColor(), { 1, 1, 1, 1 }, 0.2f);
 	}
 	else {

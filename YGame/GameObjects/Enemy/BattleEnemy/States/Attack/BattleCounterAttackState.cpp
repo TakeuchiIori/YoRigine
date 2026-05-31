@@ -94,7 +94,7 @@ void BattleCounterAttackState::Exit(BattleEnemy& enemy) {
 
     if (auto anim = enemy.GetAnimation()) {
         anim->StopAll();
-        anim->StartScaleAnimation(anim->GetCurrentScale(), { 1.0f, 1.0f, 1.0f }, 0.2f);
+        anim->StartScaleAnimation(anim->GetCurrentScale(), anim->GetBaseScale(), 0.2f);
         anim->StartColorAnimation(anim->GetCurrentColor(), { 1.0f, 1.0f, 1.0f, 1.0f }, 0.2f);
     }
     else {
