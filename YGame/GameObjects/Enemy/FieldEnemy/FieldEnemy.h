@@ -119,6 +119,9 @@ public:
 	// ライトの有効/無効を強制的に切り替える
 	void SetLightActive(bool isActive);
 
+	// コライダーの有効/無効を切り替える（シーン非アクティブ時に他シーンの衝突判定へ漏れないようにする）
+	void SetCollisionActive(bool isActive);
+
 	///************************* 当たり判定 *************************///
 
 	void OnEnterCollision(BaseCollider* self, BaseCollider* other) override;

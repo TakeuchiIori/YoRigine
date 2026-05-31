@@ -36,6 +36,9 @@ struct EncountInfo {
 	// バトル追加情報
 	std::string battleFormation;
 	BattleType battleType;
+
+	// フィールド敵の見た目スケール（バトル敵へ引き継ぐ）
+	Vector3 encounterScale = Vector3(1.0f, 1.0f, 1.0f);
 };
 
 // エンカウント発生時のコールバック

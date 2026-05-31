@@ -155,33 +155,10 @@ void GameScene::Initialize() {
 	subSceneManager_->RegisterSubScene("Field", std::move(fieldScene));
 
 	// バトルシーン登録
+	// フィールドへの復帰は BattleScene::HandleBattleEnd 内で
+	// RequestFieldTransition(returnData) を直接呼ぶので、ここではコールバック不要。
 	auto battleScene = std::make_unique<BattleScene>();
 	battleScene->Initialize(sceneCamera_.get(), player_.get());
-
-	//------------------------------------------------------------
-	// バトル終了後にフィールドへ戻すコールバック
-	//------------------------------------------------------------
-	battleScene->SetBattleEndCallback([this](FieldReturnData fieldData, BattleResult result, const BattleStats& stats) {
-		FieldReturnData returnData;
-		returnData.playerWon = (result == BattleResult::Victory);
-		returnData.expGained = stats.totalExpGained;
-		returnData.goldGained = stats.totalGaldGained;
-		returnData.itemsGained = stats.droppedItems;
-		returnData.defeatedEnemyGroup = fieldData.defeatedEnemyGroup;
-
-		// フィールド復帰処理
-		auto* field = dynamic_cast<FieldScene*>(subSceneManager_->GetScene("Field"));
-		if (field) {
-			SubSceneTransitionRequest request;
-			request.type = SubSceneTransitionType::TO_FIELD;
-			request.transitionData = new FieldReturnData(returnData);
-
-			subSceneManager_->HandleTransitionRequest(request);
-			subSceneManager_->SwitchToSceneWithFade("Field");
-			field->HandleBattleReturn(returnData);
-		}
-		});
-
 	subSceneManager_->RegisterSubScene("Battle", std::move(battleScene));
 
 	// 初期サブシーンをフィールドに設定
@@ -277,8 +254,6 @@ void GameScene::Update() {
 		cameraMode_ = subSceneManager_->GetCameraMode();
 	}
 
-	// PlayerCamera フェーズ1: スティック/ロックオン → FollowCamera の回転を確定
-	// ★ UpdateCamera() の前に呼ぶことで CameraDirector が正しい回転で FollowProcess を実行する
 	if (player_->GetPlayerCamera()) {
 		player_->GetPlayerCamera()->UpdatePreDirector();
 	}

@@ -432,6 +432,18 @@ void FieldEnemy::SetLightActive(bool isActive)
 }
 
 // ============================================================
+// コライダーの有効/無効を切り替える
+// ============================================================
+void FieldEnemy::SetCollisionActive(bool isActive)
+{
+	// FieldEnemy は OBB のみ使用。グローバル CollisionManager は GetIsActive() を見て
+	// false ならスキップするので、これで BattleScene 中に衝突判定へ漏れなくなる。
+	if (obbCollider_)    obbCollider_->SetActive(isActive);
+	if (aabbCollider_)   aabbCollider_->SetActive(isActive);
+	if (sphereCollider_) sphereCollider_->SetActive(isActive);
+}
+
+// ============================================================
 // 指定した角度に補間回転する処理
 // ============================================================
 void FieldEnemy::RotateTowards(float targetAngle, float speed, float dt) {

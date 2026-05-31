@@ -27,8 +27,9 @@ public:
 	// 初期化処理
 	void Initialize(Camera* camera) override;
 
-	// 戦闘データをもとに初期化
-	void InitializeBattleData(const BattleEnemyData& data, Vector3 position);
+	// 戦闘データをもとに初期化（scale はフィールド敵から引き継ぐ見た目スケール）
+	void InitializeBattleData(const BattleEnemyData& data, Vector3 position,
+		const Vector3& scale = Vector3(1.0f, 1.0f, 1.0f));
 
 	// 当たり判定初期化
 	void InitCollision() override;

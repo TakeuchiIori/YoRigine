@@ -1,5 +1,4 @@
 #include "FieldScene.h"
-#include "SceneSyncData.h"
 
 // Engine
 #include "Systems./Input./Input.h"
@@ -244,27 +243,15 @@ void FieldScene::OnEnter() {
 
 	Logger("[FieldScene] ===== OnEnter() START =====\n");
 
-	// フィールドの敵を再開
+	// フィールドの敵を再開（OBB コライダーもまとめて有効化される）
 	if (fieldEnemyManager_) {
 		fieldEnemyManager_->SetAllEnemiesActive(true);
 		fieldEnemyManager_->ResetEnCount();
 		currentCameraMode_ = CameraMode::FOLLOW;
 	}
 
-	//------------------------------------------------------------
-	// バトル終了後の復帰処理
-	//------------------------------------------------------------
-	auto* syncData = SceneSyncData::GetInstance();
-	if (syncData->HasFieldReturnData()) {
-		FieldReturnData returnData = syncData->LoadFieldReturnData();
-		HandleBattleReturn(returnData);
-		syncData->ClearFieldReturnData();
-		Logger("[FieldScene] Field return data applied and cleared\n");
-	}
-	else {
-		Logger("[FieldScene] No field return data (first time or fresh start)\n");
-	}
-
+	// バトルからの復帰データは SubSceneManager::ApplyTransitionData →
+	// HandleBattleReturn(data) で型付きに渡されるので、ここでは読まない。
 	Logger("[FieldScene] ===== OnEnter() END =====\n");
 }
 
@@ -277,43 +264,12 @@ void FieldScene::OnExit() {
 
 	Logger("[FieldScene] ===== OnExit() START =====\n");
 
-	auto* syncData = SceneSyncData::GetInstance();
-	nlohmann::json fieldState;
-
-	//------------------------------------------------------------
-	// プレイヤー・カメラ状態の保存
-	//------------------------------------------------------------
-	if (player_) {
-		Vector3 playerPos = player_->GetWorldPosition();
-		fieldState["playerPosition"] = { {"x", playerPos.x}, {"y", playerPos.y}, {"z", playerPos.z} };
-	}
-
-	if (sceneCamera_) {
-		Vector3 cameraPos = sceneCamera_->transform_.translate;
-		fieldState["cameraPosition"] = { {"x", cameraPos.x}, {"y", cameraPos.y}, {"z", cameraPos.z} };
-	}
-
-	fieldState["cameraMode"] = static_cast<int>(currentCameraMode_);
-
-	//------------------------------------------------------------
-	// 現在アクティブな敵情報を保存
-	//------------------------------------------------------------
+	// 敵の更新とコライダーをまとめて停止。これで BattleScene 中に
+	// FieldEnemy の OBB がグローバル CollisionManager で当たり判定されなくなる。
 	if (fieldEnemyManager_) {
-		auto activeEnemies = fieldEnemyManager_->GetActiveFieldEnemies();
-		nlohmann::json enemyList = nlohmann::json::array();
-		for (auto* enemy : activeEnemies) {
-			Vector3 pos = enemy->GetPosition();
-			enemyList.push_back({
-				{"id", enemy->GetEnemyGroupName()},
-				{"position", {{"x", pos.x}, {"y", pos.y}, {"z", pos.z}}}
-				});
-		}
-		fieldState["activeEnemies"] = enemyList;
 		fieldEnemyManager_->SetAllEnemiesActive(false);
 	}
 
-	syncData->SaveCurrentSceneState("Field", fieldState);
-	Logger("[FieldScene] Field state saved to JSON\n");
 	Logger("[FieldScene] ===== OnExit() END =====\n");
 }
 
@@ -340,6 +296,7 @@ void FieldScene::HandleDetailedEncounter(const EncountInfo& encounterInfo) {
 	transitionData.enemyGroup = encounterInfo.enemyGroup;
 	transitionData.battleEnemyId = encounterInfo.battleEnemyId;
 	transitionData.battleEnemyIds = encounterInfo.battleEnemyIds;
+	transitionData.battleEnemyScale = encounterInfo.encounterScale;
 	transitionData.playerPosition = GetPlayerPosition();
 	transitionData.playerHitDamage = encounterInfo.encounteredEnemy->GetTakeDamage();
 	SaveCameraState(transitionData);
@@ -373,9 +330,6 @@ void FieldScene::HandleDetailedEncounter(const EncountInfo& encounterInfo) {
 
 	transitionData.isFinalBattle = isFinalBattle;
 	transitionData.totalRemainingFieldEnemies = remainingGroups;
-
-	auto* syncData = SceneSyncData::GetInstance();
-	syncData->SaveBattleTransitionData(transitionData);
 
 #ifdef _DEBUG
 	char buffer[512];

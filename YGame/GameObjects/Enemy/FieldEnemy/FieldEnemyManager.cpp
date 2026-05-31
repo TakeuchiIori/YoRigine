@@ -134,6 +134,7 @@ void FieldEnemyManager::OnEnemyEncounter(FieldEnemy* enemy) {
 	lastEncounterInfo_.battleType = enemy->GetBattleType();
 	lastEncounterInfo_.battleFormation = enemyData.battleFormation;
 	lastEncounterInfo_.battleEnemyIds = enemy->GetBattleEnemyIds();
+	lastEncounterInfo_.encounterScale = enemy->GetScale();
 
 	if (!lastEncounterInfo_.battleEnemyIds.empty()) {
 		lastEncounterInfo_.battleEnemyId = lastEncounterInfo_.battleEnemyIds[0];
@@ -278,10 +279,13 @@ void FieldEnemyManager::ClearDefeatedEnemies() {
 /// </summary>
 void FieldEnemyManager::SetAllEnemiesActive(bool isActive) {
 	isActive_ = isActive;
-	// アクティブ状態に応じて全敵のライトを切り替える
+	// アクティブ状態に応じて全敵のライトとコライダーを切り替える。
+	// コライダーを落とさないと BattleScene 中も FieldEnemy の OBB が
+	// グローバル CollisionManager にヒットしてプレイヤーの移動を塞ぐ。
 	for (auto& enemy : fieldEnemies_) {
 		if (enemy && enemy->IsActive()) {
 			enemy->SetLightActive(isActive);
+			enemy->SetCollisionActive(isActive);
 		}
 	}
 }

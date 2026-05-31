@@ -24,8 +24,6 @@
 ///************************* バトルシーン *************************///
 class BattleScene : public BaseSubScene {
 public:
-	using BattleEndCallback = std::function<void(FieldReturnData, BattleResult, const BattleStats&)>;
-
 	///************************* 基本関数 *************************///
 
 	// コンストラクタ
@@ -65,10 +63,7 @@ public:
 
 	///************************* シーン固有処理 *************************///
 
-	// 戦闘終了時コールバックを設定
-	void SetBattleEndCallback(BattleEndCallback callback) { battleEndCallback_ = callback; }
-
-	// 戦闘を開始
+	// 戦闘を開始（SubSceneManager からフェード演出途中で型付き呼び出し）
 	void StartBattle(const BattleTransitionData& data);
 
 	// 戦闘を強制終了
@@ -123,7 +118,6 @@ private:
 
 	std::string currentEnemyGroup_;
 	BattleTransitionData originalTransitionData_;
-	BattleEndCallback battleEndCallback_;
 	bool battleCameraFinished_ = false;
 	bool shouldResetBattleCamera_ = false;
 	bool isFinalBattle_ = false;  // 最終バトルかどうか

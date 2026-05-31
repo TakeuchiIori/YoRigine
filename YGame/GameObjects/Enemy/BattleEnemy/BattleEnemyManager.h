@@ -29,6 +29,8 @@ struct EnemyEncounterData {
 	float encounterRate = 1.0f;
 	bool isOnlyOnce = false;
 	std::string requiredFlag;
+	// フィールド敵から引き継ぐ見た目スケール（全敵に適用）
+	Vector3 enemyScale = Vector3(1.0f, 1.0f, 1.0f);
 };
 
 ///************************* 戦闘結果列挙 *************************///
@@ -100,10 +102,12 @@ public:
 	void ForceBattleEnd();
 
 	// 敵を生成
-	void SpawnBattleEnemy(const std::string& enemyId, const Vector3& position);
+	void SpawnBattleEnemy(const std::string& enemyId, const Vector3& position,
+		const Vector3& scale = Vector3(1.0f, 1.0f, 1.0f));
 
 	// 敵グループを生成
-	void SpawnEnemyGroup(const std::vector<std::string>& enemyIds, const std::vector<Vector3>& positions);
+	void SpawnEnemyGroup(const std::vector<std::string>& enemyIds, const std::vector<Vector3>& positions,
+		const Vector3& scale = Vector3(1.0f, 1.0f, 1.0f));
 
 	// すべての敵を削除
 	void RemoveAllBattleEnemies();

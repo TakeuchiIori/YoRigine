@@ -52,7 +52,7 @@ void BattleEnemy::Initialize(Camera* camera) {
 /*==========================================================================
 戦闘用データを使用して初期化
 //========================================================================*/
-void BattleEnemy::InitializeBattleData(const BattleEnemyData& data, Vector3 position)
+void BattleEnemy::InitializeBattleData(const BattleEnemyData& data, Vector3 position, const Vector3& scale)
 {
 	// データ適用
 	enemyData_ = data;
@@ -64,8 +64,14 @@ void BattleEnemy::InitializeBattleData(const BattleEnemyData& data, Vector3 posi
 		obj_->SetModel(data.modelPath);
 	}
 
-	// 初期位置設定
+	// 初期位置・スケール設定（フィールド敵の見た目を引き継ぐ）
 	wt_.translate_ = position;
+	wt_.scale_ = scale;
+	// 攻撃時の punch/bounce アニメーションは baseScale_ を起点に補間するので、
+	// ここで揃えないと攻撃の瞬間にスケールが (1,1,1) へスナップしてしまう。
+	if (animation_) {
+		animation_->SetBaseScale(scale);
+	}
 	isAlive_ = true;
 
 	this->InitJson();
