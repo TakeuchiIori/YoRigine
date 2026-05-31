@@ -54,6 +54,9 @@ public:
 	const WorldTransform& GetWT() const { return wt_; }
 	WorldTransform& GetWT() { return wt_; }
 
+	// 内部 Object3d への参照（マテリアル/ディゾルブ等を State 側から操作するため）
+	Object3d* GetObject3d() const { return obj_.get(); }
+
 
 protected:
 	WorldTransform wt_;

@@ -95,6 +95,14 @@ void BattleEnemy::InitJson() {
 	jsonManager_ = std::make_unique<YoRigine::JsonManager>(identifier, "Resources/Json/Objects/BattleEnemies");
 	jsonManager_->SetCategory(identifier);
 	obbCollider_->InitJson(jsonManager_.get());
+
+	// 死亡演出（ディゾルブ）パラメータをエディタへ公開
+	jsonManager_->SetTreePrefix("ディゾルブ");
+	jsonManager_->Register("継続時間(秒)", &dissolveDuration_);
+	jsonManager_->Register("エッジ幅", &dissolveEdgeWidth_);
+	jsonManager_->Register("エッジ発光色", &dissolveEdgeColor_);
+	jsonManager_->Register("ノイズスケール", &dissolveNoiseScale_);
+	jsonManager_->ClearTreePrefix();
 }
 
 /*==========================================================================
@@ -105,10 +113,13 @@ void BattleEnemy::Update() {
 	if (player_->GetCombat()->IsDead())
 		return;
 
-	// 死亡チェック
-	if (enemyData_.currentHp_ == 0) {
-		ChangeState(std::make_unique<BattleDeadState>());
+	// 死亡チェック（1度だけ遷移させる。毎フレーム走ると PlayDeathEffect で
+	// 有効化したディゾルブが直後の Exit() で無効化されてしまい、threshold も
+	// deathTimer もリセットされ続けるため、見た目には何も起きなくなる）
+	if (enemyData_.currentHp_ == 0 && logicalState_ != BattleEnemyState::Dead) {
+		logicalState_ = BattleEnemyState::Dead;
 		PlayDeathEffect();
+		ChangeState(std::make_unique<BattleDeadState>());
 	}
 
 	float dt = YoRigine::GameTime::GetDeltaTime();
@@ -198,10 +209,15 @@ void BattleEnemy::PerformBasicAttack() {
 }
 
 /*==========================================================================
-死亡時の演出
+死亡時の演出 — ディゾルブ開始（threshold は BattleDeadState が時間で進める）
 //========================================================================*/
 void BattleEnemy::PlayDeathEffect() {
-	if (obj_) obj_->SetMaterialColor({ 0.0f,0.0f,0.0f,1.0f });
+	if (!obj_) return;
+	obj_->SetDissolveEnabled(true);
+	obj_->SetDissolveThreshold(0.0f);
+	obj_->SetDissolveEdgeWidth(dissolveEdgeWidth_);
+	obj_->SetDissolveEdgeColor(dissolveEdgeColor_);
+	obj_->SetDissolveNoiseScale(dissolveNoiseScale_);
 }
 
 /*==========================================================================

@@ -25,6 +25,17 @@ struct MaterialConstant
     float3 Kd; // 拡散反射色（Materialから渡す）
 };
 
+// ディゾルブ用パラメータ。enabled = 0 のとき完全にコストゼロ（discard も lerp も走らない）
+struct MaterialDissolve
+{
+    float  threshold;   // 0.0(全表示) ～ 1.0(完全消去)
+    float  edgeWidth;   // threshold の上 edgeWidth ぶんがエッジ発光帯
+    int    enabled;     // 0=無効
+    float  noiseScale;  // ノイズの空間スケール
+    float3 edgeColor;   // エッジ発光色
+    float  _pad0;
+};
+
 ConstantBuffer<Material> gMaterial : register(b0);
 ConstantBuffer<DirectionalLightData> gDirectionalLight : register(b2);
 ConstantBuffer<Camera> gCamera : register(b3);
@@ -33,6 +44,7 @@ ConstantBuffer<SpotLights> gSpotLights : register(b5);
 ConstantBuffer<MaterialColor> gMaterialColor : register(b6);
 ConstantBuffer<MaterialLight> gMaterialLight : register(b7);
 ConstantBuffer<MaterialConstant> gMaterialConstant : register(b8);
+ConstantBuffer<MaterialDissolve> gMaterialDissolve : register(b9);
 
 
 Texture2D<float4> gTexture : register(t0);
@@ -46,12 +58,62 @@ SamplerComparisonState gShadowSampler : register(s1);
 struct PixelShaderOutput
 {
     float4 color : SV_TARGET0;
-   
+
 };
+
+// プロシージャル 3D ハッシュ（テクスチャ不要のディゾルブマスク用）
+float DissolveHash3D(float3 p)
+{
+    p = frac(p * 0.1031);
+    p += dot(p, p.yzx + 33.33);
+    return frac((p.x + p.y) * p.z);
+}
+
+// 補間付き 3D Value Noise（8 頂点のハッシュを smoothstep 補間）
+float DissolveValueNoise3D(float3 p)
+{
+    float3 i = floor(p);
+    float3 f = frac(p);
+    float3 u = f * f * (3.0 - 2.0 * f);
+
+    float n000 = DissolveHash3D(i + float3(0, 0, 0));
+    float n100 = DissolveHash3D(i + float3(1, 0, 0));
+    float n010 = DissolveHash3D(i + float3(0, 1, 0));
+    float n110 = DissolveHash3D(i + float3(1, 1, 0));
+    float n001 = DissolveHash3D(i + float3(0, 0, 1));
+    float n101 = DissolveHash3D(i + float3(1, 0, 1));
+    float n011 = DissolveHash3D(i + float3(0, 1, 1));
+    float n111 = DissolveHash3D(i + float3(1, 1, 1));
+
+    float nx00 = lerp(n000, n100, u.x);
+    float nx10 = lerp(n010, n110, u.x);
+    float nx01 = lerp(n001, n101, u.x);
+    float nx11 = lerp(n011, n111, u.x);
+    float nxy0 = lerp(nx00, nx10, u.y);
+    float nxy1 = lerp(nx01, nx11, u.y);
+    return lerp(nxy0, nxy1, u.z);
+}
 
 PixelShaderOutput main(VertexShaderOutput input)
 {
     PixelShaderOutput output;
+
+    // === ディゾルブ：discard 判定 と エッジ判定フラグ ===
+    float dissolveMask = 1.0f;
+    bool  isInDissolveEdge = false;
+    if (gMaterialDissolve.enabled != 0)
+    {
+        float scale = (gMaterialDissolve.noiseScale > 0.0001f) ? gMaterialDissolve.noiseScale : 1.0f;
+        dissolveMask = DissolveValueNoise3D(input.worldPosition * scale);
+
+        // threshold を下回ったピクセルは描画しない
+        if (dissolveMask < gMaterialDissolve.threshold)
+        {
+            discard;
+        }
+        // エッジ帯（threshold ～ threshold + edgeWidth）にいるか
+        isInDissolveEdge = dissolveMask < (gMaterialDissolve.threshold + gMaterialDissolve.edgeWidth);
+    }
 
     // UV座標変換とテクスチャサンプリング
     float4 transformedUV = mul(float4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
@@ -224,6 +286,17 @@ PixelShaderOutput main(VertexShaderOutput input)
     
     // アルファ値の設定
     output.color.a = gMaterialColor.color.a * baseColor.a;
+
+    // === ディゾルブのエッジ発光（discard を生き残ったピクセルのうちエッジ帯のみ） ===
+    if (gMaterialDissolve.enabled != 0 && isInDissolveEdge)
+    {
+        // しきい値直上 = 0、エッジ帯の外側 = 1 となる正規化
+        float t = saturate((dissolveMask - gMaterialDissolve.threshold) /
+                           max(gMaterialDissolve.edgeWidth, 0.0001f));
+        // しきい値に近いほど強く発光色を乗せる
+        float edgeStrength = 1.0f - t;
+        output.color.rgb = lerp(output.color.rgb, gMaterialDissolve.edgeColor, edgeStrength);
+    }
 
     return output;
 }
