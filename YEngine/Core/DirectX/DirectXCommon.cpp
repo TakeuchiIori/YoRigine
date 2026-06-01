@@ -202,6 +202,50 @@ namespace YoRigine {
 		cmd->RSSetScissorRects(1, &scissorRect_);
 	}
 
+	/// PiP オフスクリーンパス：指定 RT + 専用 DSV をクリアして 2nd 描画用に bind
+	void DirectXCommon::PreDrawPip(const std::string& rtName, const std::string& dsvName,
+		uint32_t width, uint32_t height)
+	{
+		auto cmd = commandManager_->GetCommandList();
+
+		// PiP RT を RENDER_TARGET へ (初期/前フレームから GENERIC_READ を前提)
+		rtvManager_->TransitionBarrier(cmd.Get(), rtName,
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			D3D12_RESOURCE_STATE_RENDER_TARGET);
+
+		// PiP DSV は常に DEPTH_WRITE 運用 (SRV 化しないため遷移不要)
+
+		D3D12_CPU_DESCRIPTOR_HANDLE dsvH = dsvManager_->GetHandle(dsvName);
+		rtvManager_->SetRenderTargets(cmd.Get(), { rtName }, &dsvH);
+		rtvManager_->Clear(rtName, cmd.Get());
+		dsvManager_->Clear(dsvName, cmd.Get());
+
+		D3D12_VIEWPORT vp{};
+		vp.TopLeftX = 0.0f;
+		vp.TopLeftY = 0.0f;
+		vp.Width    = static_cast<float>(width);
+		vp.Height   = static_cast<float>(height);
+		vp.MinDepth = 0.0f;
+		vp.MaxDepth = 1.0f;
+		cmd->RSSetViewports(1, &vp);
+
+		D3D12_RECT rect{};
+		rect.left   = 0;
+		rect.top    = 0;
+		rect.right  = static_cast<LONG>(width);
+		rect.bottom = static_cast<LONG>(height);
+		cmd->RSSetScissorRects(1, &rect);
+	}
+
+	/// PiP パス終了：RT を GENERIC_READ に戻して ImGui::Image で見れるようにする
+	void DirectXCommon::EndPipPass(const std::string& rtName)
+	{
+		auto cmd = commandManager_->GetCommandList();
+		rtvManager_->TransitionBarrier(cmd.Get(), rtName,
+			D3D12_RESOURCE_STATE_RENDER_TARGET,
+			D3D12_RESOURCE_STATE_GENERIC_READ);
+	}
+
 	/// バックバッファパス：OffScreen / Depth を SRV 化 → BackBuffer RTV
 	void DirectXCommon::PreDraw()
 	{
@@ -387,6 +431,22 @@ namespace YoRigine {
 	void DirectXCommon::ResetCommandList()
 	{
 		commandManager_->Reset(commandManager_->GetCurrentFrameIndex());
+	}
+
+	/// フレーム途中で本当に GPU を待たせて完了させる。
+	/// ExecuteCommandList のみだと fence の signal が無く、ResetCommandList が
+	/// 内部で待つ fenceValue は前フレーム値のままで実質ノーシンクになる。
+	/// EndFrame() で新しい値を signal してから WaitForCurrentFrame することで真に待つ。
+	void DirectXCommon::FlushAndWait()
+	{
+		ExecuteCommandList();
+		commandManager_->EndFrame();           // 新 fenceValue を signal
+		commandManager_->WaitForCurrentFrame(); // 上で signal した値を待つ
+		ResetCommandList();
+		// 新コマンドリストには descriptor heap が bind されていないので再 bind
+		if (srvManager_) {
+			srvManager_->PreDraw();
+		}
 	}
 
 	// =========================================================================

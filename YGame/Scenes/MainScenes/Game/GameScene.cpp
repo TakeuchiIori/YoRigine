@@ -284,7 +284,6 @@ void GameScene::Draw() {
 	skyBox_->Draw();
 	Object3dCommon::GetInstance()->DrawPreference();
 	DrawObject();
-	YoRigine::ModelManipulator::GetInstance()->Draw();
 
 	//------------------------------------------------------------
 	// パーティクル描画
@@ -303,6 +302,18 @@ void GameScene::Draw() {
 	//------------------------------------------------------------
 	SpriteCommon::GetInstance()->DrawPreference();
 	DrawUI();
+}
+
+/// <summary>
+/// PiP 用の 3D-only 描画 (スカイ + シーンオブジェクトのみ)。
+/// PipCameraSystem がシーンカメラの行列を PiP カメラの値に書き換えた状態で呼び出されるので、
+/// ここでは普段の DrawObject 経路と同じものを呼べば PiP 視点で再描画される。
+/// UI / ライン / ポストエフェクト / シャドウは含めない。
+/// </summary>
+void GameScene::DrawScene3DOnly() {
+	skyBox_->Draw();
+	Object3dCommon::GetInstance()->DrawPreference();
+	DrawObject();
 }
 
 /// <summary>
@@ -336,6 +347,7 @@ void GameScene::DrawObject() {
 	if (subSceneManager_) {
 		subSceneManager_->DrawObject();
 	}
+	YoRigine::ModelManipulator::GetInstance()->Draw();
 }
 
 /// <summary>
@@ -378,18 +390,15 @@ void GameScene::UpdateCamera() {
 		// フォローカメラ優先
 		director->SetPriority("PlayerFollow", 10);
 		director->SetPriority("MainDebug", 0);
-		//director->SetPriority("BattleStartCamera", 0);
 		break;
 	case CameraMode::BATTLE_START:
 		// バトル開始カメラ優先
-		//director->SetPriority("BattleStartCamera", 10);
 		director->SetPriority("PlayerFollow", 0);
 		director->SetPriority("MainDebug", 0);
 		break;
 	case CameraMode::DEBUG:
 		director->SetPriority("MainDebug", 10);
 		director->SetPriority("PlayerFollow", 0);
-		//director->SetPriority("BattleStartCamera", 0);
 		break;
 	}
 

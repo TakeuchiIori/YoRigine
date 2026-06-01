@@ -25,6 +25,10 @@ public:
 	// BaseSceneインターフェース
 	Matrix4x4 GetViewProjection() override { return sceneCamera_->viewProjectionMatrix_; }
 
+	// PiP 用: シーンカメラ公開 + 3D オンリー描画パス
+	Camera* GetSceneCamera() override { return sceneCamera_.get(); }
+	void DrawScene3DOnly() override;
+
 private:
 	///************************* 内部処理 *************************///
 

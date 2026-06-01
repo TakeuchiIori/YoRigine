@@ -149,6 +149,16 @@ void DevelopScene::Draw() {
 }
 
 // ============================================================
+// PiP 用の 3D-only 描画 (ModelManipulator の配置オブジェクトのみ)。
+// PipCameraSystem がシーンカメラ行列を PiP のものに差し替えた状態で呼ばれる。
+// UI / ライン / ポストエフェクト / シャドウは含めない。
+// ============================================================
+void DevelopScene::DrawScene3DOnly() {
+	Object3dCommon::GetInstance()->DrawPreference();
+	DrawObject();
+}
+
+// ============================================================
 // PostEffectを掛けたくないものを描画
 // ============================================================
 void DevelopScene::DrawNonOffscreen() {
@@ -166,6 +176,8 @@ void DevelopScene::DrawShadow() {
 // 終了の処理
 // ============================================================
 void DevelopScene::Finalize() {
+
+	YoRigine::JsonManager::ClearSceneInstances("DevelopScene");
 }
 
 // ============================================================
