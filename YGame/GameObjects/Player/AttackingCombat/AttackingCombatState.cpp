@@ -24,7 +24,7 @@ AttackingCombatState::AttackingCombatState(PlayerCombat* combat) : combat_(comba
 		auto* obj = player->GetObject3d();
 
 
-		// ★追加した関数で上半身だけ攻撃アニメーションを再生
+		// 追加した関数で上半身だけ攻撃アニメーションを再生
 		obj->PlayUpperMotion("Player.gltf", MotionPlayMode::Once, attack.animationName);
 		obj->SetUpperMotionSpeed(attack.motionSpeed);
 
@@ -36,6 +36,7 @@ AttackingCombatState::AttackingCombatState(PlayerCombat* combat) : combat_(comba
 			player->GetSword()->LoadVfxAssets("Resources/Vfx/NewEffect2.json");
 		}
 
+		player->GetPlayerCamera()->PlayAttackCameraWork(attack.playCameraWorkName);
 		player->GetSword()->PlayTrail();
 		combat->NotifyAction("コンボ開始: " + attack.animationName);
 		});

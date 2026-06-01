@@ -232,6 +232,19 @@ void AttackCameraComponent::ResetValues() {
 }
 
 // ============================================================
+// 現在読み込まれているすべてのカメラワーク名の一覧を取得する
+// ============================================================
+std::vector<std::string> AttackCameraComponent::GetWorkNames() const
+{
+    std::vector<std::string> names;
+    names.reserve(works_.size());
+    for (const auto& work : works_) {
+        names.push_back(work.name);
+    }
+    return names;
+}
+
+// ============================================================
 // キーフレーム線形補間
 // ============================================================
 void AttackCameraComponent::SampleKeyframes(const AttackCameraWork& work, float t) {

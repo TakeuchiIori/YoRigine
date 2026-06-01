@@ -71,6 +71,8 @@ public:
 
     void  SetSavedBaseFov(float fov) { savedBaseFov_ = fov; }
     float GetSavedBaseFov()    const { return savedBaseFov_; }
+    // 現在読み込まれているすべてのカメラワーク名の一覧を取得する
+    std::vector<std::string> GetWorkNames() const;
 
 private:
     // ============================================================

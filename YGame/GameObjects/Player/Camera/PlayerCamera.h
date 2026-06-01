@@ -64,7 +64,7 @@ public:
     bool          IsLockOn()        const { return isLockOn_; }
 
     // ============================================================
-    // FollowCamera への委譲 API（後方互換）
+    // FollowCamera への委譲
     // ============================================================
     FollowCamera* GetFollowCamera() const { return followCamera_; }
 
@@ -78,6 +78,10 @@ public:
     // コンポーネントアクセッサ
     // ============================================================
     AttackCameraComponent& GetAttackCameraComponent() { return attackCamera_; }
+
+    std::vector<std::string> GetAttackCameraNames() const {
+        return attackCamera_.GetWorkNames();
+    }
 
 private:
     // ============================================================

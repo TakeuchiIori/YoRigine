@@ -86,30 +86,6 @@ void GameScene::Initialize() {
 	gameUI_ = std::make_unique<GameUI>();
 	gameUI_->Initialize();
 
-
-	//------------------------------------------------------------
-	// 共通システム初期化
-	//------------------------------------------------------------
-
-	// AttackData の JSON を読み込む
-	AttackDatabase::LoadFromFile("Resources/Json/Combo/AttackData.json");
-#ifdef USE_IMGUI
-	// エディターを初期化
-	attackEditor_ = std::make_unique<AttackDataEditor>();
-	attackEditor_->SetFilePath("Resources/Json/Combo/AttackData.json");
-	attackEditor_->SetAutoReload(true);  // 自動リロード有効
-	attackEditor_->SetOpen(true);
-
-	// リロードコールバックを設定
-	attackEditor_->SetReloadCallback([this]() {
-		// プレイヤーのコンボシステムをリロード
-		if (player_) {
-			player_->GetCombat()->GetCombo()->ReloadAttacks();
-		}
-		Logger("[GameScene] Attack data reloaded from editor!\n");
-		});
-#endif
-
 	//------------------------------------------------------------
 	// 共通オブジェクト
 	//------------------------------------------------------------
@@ -167,7 +143,24 @@ void GameScene::Initialize() {
 	//------------------------------------------------------------
 	// エディター用GUI登録
 	//------------------------------------------------------------
+	AttackDatabase::LoadFromFile("Resources/Json/Combo/AttackData.json");
 #ifdef USE_IMGUI
+	// エディターを初期化
+	attackEditor_ = std::make_unique<AttackDataEditor>();
+	attackEditor_->SetFilePath("Resources/Json/Combo/AttackData.json");
+	attackEditor_->SetPlayer(player_.get());
+	attackEditor_->SetAutoReload(true);  // 自動リロード有効
+	attackEditor_->SetOpen(true);
+
+	// リロードコールバックを設定
+	attackEditor_->SetReloadCallback([this]() {
+		// プレイヤーのコンボシステムをリロード
+		if (player_) {
+			player_->GetCombat()->GetCombo()->ReloadAttacks();
+		}
+		Logger("[GameScene] Attack data reloaded from editor!\n");
+		});
+
 	Editor::GetInstance()->RegisterGameUI("カメラエディター", [this]() {cameraEditor_->Update(); }, "Game");
 	Editor::GetInstance()->RegisterGameUI("カメラモード切り替え", [this]() {UpdateCameraMode(); }, "Game");
 	Editor::GetInstance()->RegisterGameUI("プレイヤーの状態情報", [this]() {player_->DrawImGui(); }, "Game");

@@ -218,6 +218,45 @@ void AttackDataEditor::DrawAttackDetail()
 		{
 			atk.type = static_cast<AttackType>(t); changed = true;
 		}
+
+		
+		// 攻撃エディター側で Player や PlayerCamera へのポインタを持っていると仮定します
+		if (player_->GetPlayerCamera()) {
+			// 1. 現在有効なカメラ名の一覧を取得
+			std::vector<std::string> cameraNames = player_->GetPlayerCamera()->GetAttackCameraNames();
+
+			// 選択肢が空の場合のケア
+			if (cameraNames.empty()) {
+				cameraNames.push_back("None");
+			}
+
+			// 2. 現在の攻撃データに設定されているカメラ名が、リストの何番目にあるか探す
+			// ※ attackData.cameraWorkName は現在編集中の AttackData のメンバ変数と仮定
+			int currentIdx = 0;
+			for (int i = 0; i < static_cast<int>(cameraNames.size()); ++i) {
+				if (cameraNames[i] == atk.playCameraWorkName) {
+					currentIdx = i;
+					break;
+				}
+			}
+
+			// 3. ImGui のコンボボックスを表示
+			if (ImGui::BeginCombo("使用するカメラワーク", cameraNames[currentIdx].c_str())) {
+				for (int i = 0; i < static_cast<int>(cameraNames.size()); ++i) {
+					const bool isSelected = (currentIdx == i);
+					if (ImGui::Selectable(cameraNames[i].c_str(), isSelected)) {
+						// 選択されたら攻撃データのカメラ名を更新
+						atk.playCameraWorkName = cameraNames[i];
+					}
+
+					// 初期フォーカスを設定
+					if (isSelected) {
+						ImGui::SetItemDefaultFocus();
+					}
+				}
+				ImGui::EndCombo();
+			}
+		}
 	}
 
 	// ------------------------------------------------------------
@@ -397,6 +436,7 @@ void AttackDataEditor::NewAttack()
 	data.name = "NewAttack_" + std::to_string(attacks_->size());
 	data.animationName = "Idle";
 	data.type = AttackType::A_Arte;
+	data.playCameraWorkName = "";
 	data.totalFrames = 60;
 	data.fps = 60;
 	data.baseDamage = 30.0f;
