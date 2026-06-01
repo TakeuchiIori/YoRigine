@@ -196,6 +196,7 @@ namespace YoRigine {
 
 		for (auto* obj : objectManager_->GetAllActiveObjects()) {
 			if (!obj || !obj->collider) continue;
+  
 
 			// 表示フィルタ
 			if (!obj->colliderEnabled) continue;
@@ -303,12 +304,13 @@ namespace YoRigine {
 			targets.push_back(&g);
 		}
 
-		if (targets.empty()) return;
-		gizmoCtrl_.Draw(
-			camera_,
-			targets,
-			Editor::GetInstance()->GetGameViewPos(),
-			Editor::GetInstance()->GetGameViewSize());
+		if (!targets.empty()) {
+			gizmoCtrl_.Draw(
+				camera_,
+				targets,
+				Editor::GetInstance()->GetGameViewPos(),
+				Editor::GetInstance()->GetGameViewSize());
+		}
 
 		motionEditor_.DrawGizmo();
 #endif

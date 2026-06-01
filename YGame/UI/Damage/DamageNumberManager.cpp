@@ -22,6 +22,7 @@ DamageNumberManager* DamageNumberManager::GetInstance() {
 void DamageNumberManager::Initialize() {
     InitPool(normalPool_, kNormalSheet, false);
     InitPool(sinePool_, kSineSheet, true);
+    InitJson();
 }
 
 // ============================================================
@@ -112,11 +113,22 @@ void DamageNumberManager::UpdatePool(
 
         // ── UINumber へ反映 ─────────────────────────────────────
         entry.number->SetPosition({ screenPos.x + entry.xJitter,
-                                    screenPos.y + entry.yOffset, 0.0f });
+                                    screenPos.y + entry.yOffset + offsetY_, 0.0f });
         entry.number->SetAlpha(alpha);
         entry.number->SetVisible(true);
         entry.number->Update();
     }
+}
+
+// ============================================================
+// JSON初期化
+// ============================================================
+void DamageNumberManager::InitJson()
+{
+	jsonManager_ = std::make_unique<YoRigine::JsonManager>("DamageUI", "Resources/Json/UI/Damage");
+    jsonManager_->SetCategory("UI");
+	jsonManager_->SetSubCategory("Damage");
+	jsonManager_->Register("offsetY", &offsetY_);
 }
 
 // ============================================================

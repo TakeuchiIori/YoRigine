@@ -12,6 +12,7 @@
 #include "Vector3.h"
 #include "Vector4.h"
 #include <Systems/UI/UINumber.h>
+#include <Loaders/Json/JsonManager.h>
 
 // ============================================================
 // 単一のダメージポップアップエントリ（プール用）
@@ -53,22 +54,27 @@ private:
     DamageNumberManager(const DamageNumberManager&) = delete;
     DamageNumberManager& operator=(const DamageNumberManager&) = delete;
 
-    void              InitPool(std::vector<DamagePopupEntry>& pool,
+
+    void InitPool(std::vector<DamagePopupEntry>& pool,
         const std::string& texturePath, bool isSine);
+
     DamagePopupEntry* FindFreeEntry(std::vector<DamagePopupEntry>& pool);
-    void              SpawnIntoPool(std::vector<DamagePopupEntry>& pool,
+    void SpawnIntoPool(std::vector<DamagePopupEntry>& pool,
         int damage, const Vector3& worldPos, bool isSine);
-    void              UpdatePool(std::vector<DamagePopupEntry>& pool,
+
+    void UpdatePool(std::vector<DamagePopupEntry>& pool,
         float deltaTime, const Matrix4x4& viewProj);
+
+    void InitJson();
 
     // ============================================================
     // アニメーション定数
     // ============================================================
     static constexpr int   kPoolSize = 16;
-    static constexpr float kMaxLifetime = 1.0f;   // ポップアップの総寿命（秒）
-    static constexpr float kFloatDistance = 100.0f;  // 浮き上がる総距離（px）
-    static constexpr float kPopSettle = 0.15f;  // ポップインが終わる時刻（正規化）
-    static constexpr float kFadeStart = 0.70f;  // フェードアウト開始時刻（正規化）
+    static constexpr float kMaxLifetime = 1.0f;         // ポップアップの総寿命（秒）
+    static constexpr float kFloatDistance = 100.0f;     // 浮き上がる総距離（px）
+    static constexpr float kPopSettle = 0.15f;          // ポップインが終わる時刻（正規化）
+    static constexpr float kFadeStart = 0.70f;          // フェードアウト開始時刻（正規化）
 
     // ── 表示サイズ ──────────────────────────────────────────────
     // テクスチャの1桁サイズに合わせて調整する。
@@ -91,4 +97,7 @@ private:
     // ============================================================
     std::vector<DamagePopupEntry> normalPool_;
     std::vector<DamagePopupEntry> sinePool_;
+	std::unique_ptr<YoRigine::JsonManager> jsonManager_;
+
+	float offsetY_ = 5.0f; // ワールド→スクリーン変換後のYオフセット（px）
 };

@@ -36,10 +36,10 @@ public:
     /// @param playerWT      プレイヤーの WorldTransform（ロックオン基準位置用）
     void Initialize(FollowCamera* followCamera, const WorldTransform* playerWT);
 
-    /// フェーズ1: スティック入力・ロックオン更新（CameraDirector::Update の前に呼ぶ）
+    // スティック入力・ロックオン更新（CameraDirector::Update の前に呼ぶ）
     void UpdatePreDirector();
 
-    /// フェーズ2: 攻撃カメラオフセットを sceneCamera に適用（CameraDirector::Update の後に呼ぶ）
+    // 攻撃カメラオフセットを sceneCamera に適用（CameraDirector::Update の後に呼ぶ）
     void ApplyPostDirector(Camera* sceneCamera, float dt);
 
     void DrawImGui();
