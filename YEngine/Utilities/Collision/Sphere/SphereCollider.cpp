@@ -33,6 +33,7 @@ Vector3 SphereCollider::GetEulerRotation() const
 
 void SphereCollider::Initialize()
 {
+	shape_ = ColliderShape::Sphere;
 	BaseCollider::Initialize();
 
 	sphere_.center = { 0.0f,0.0f,0.0f };

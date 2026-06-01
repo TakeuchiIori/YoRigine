@@ -37,6 +37,7 @@ Vector3 OBBCollider::GetEulerRotation() const
 
 void OBBCollider::Initialize()
 {
+	shape_ = ColliderShape::OBB;
 	BaseCollider::Initialize();
 
 	obbOffset_.center = { 0.0f, 0.0f, 0.0f };

@@ -37,6 +37,20 @@ namespace YoRigine {
                 }
             }
 
+            if (showBroadPhaseGrid_ != nullptr) {
+                ImGui::Separator();
+                ImGui::MenuItem("BroadPhase グリッドを表示", nullptr, showBroadPhaseGrid_);
+                if (broadPhaseGridDrawRadius_ != nullptr) {
+                    ImGui::SetNextItemWidth(120.0f);
+                    ImGui::DragFloat("  描画半径", broadPhaseGridDrawRadius_, 1.0f, 5.0f, 500.0f, "%.1f");
+                }
+            }
+
+            if (drawFrustumCulling_ != nullptr) {
+                ImGui::Separator();
+                ImGui::MenuItem("描画 Frustum カリングを有効化", nullptr, drawFrustumCulling_);
+            }
+
             ImGui::EndMenu();
         }
 

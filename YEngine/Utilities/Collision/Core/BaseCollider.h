@@ -13,8 +13,19 @@
 #include "Vector3.h"
 #include "Matrix4x4.h"
 
+// コライダー形状の種別。
+// dynamic_cast を使わず static_cast で安全にダウンキャストするための識別子。
+// 値は配列インデックスとして使うので 0 から連番。
+enum class ColliderShape : uint8_t {
+	Sphere  = 0,
+	AABB    = 1,
+	OBB     = 2,
+	Capsule = 3,
+	Count
+};
+
 // コライダーの基底クラス（共通処理とコールバック管理を行う）
-// SphereCollider / AABBCollider / OBBCollider などの基盤となるクラス
+// SphereCollider / AABBCollider / OBBCollider / CapsuleCollider の基盤となるクラス
 class BaseCollider {
 protected:
 	///************************* 基本処理 *************************///
@@ -98,6 +109,9 @@ public:
 	// コライダータイプID設定
 	void SetTypeID(uint32_t typeID) { typeID_ = typeID; }
 
+	// 形状種別取得 (CollisionManager のディスパッチで使用)
+	ColliderShape GetShape() const { return shape_; }
+
 	// カメラ設定（デバッグ表示などで使用）
 	void SetCamera(Camera* camera) { camera_ = camera; }
 
@@ -135,6 +149,30 @@ public:
 	// 速度の設定
 	void SetVelocity(const Vector3& velocity) { velocity_ = velocity; }
 	Vector3 GetVelocity() const { return velocity_; }
+
+	// ─── レイヤーマスク (Unity 風) ──────────────────────────────
+	// layerBits_     : このコライダー自身がどの層に属するか (通常は1ビット, 複数ビット可)
+	// collisionMask_ : どの層と当たるか (ビット ON で反応)
+	// 衝突条件: (a.layer & b.mask) != 0 && (b.layer & a.mask) != 0
+	void SetLayerBits(uint32_t bits)        { layerBits_     = bits; }
+	void SetLayerBitIndex(uint32_t bit)     { layerBits_     = (1u << bit); }
+	void SetCollisionMask(uint32_t mask)    { collisionMask_ = mask; }
+	void AddCollisionLayerBit(uint32_t bit) { collisionMask_ |= (1u << bit); }
+	void RemoveCollisionLayerBit(uint32_t bit){ collisionMask_ &= ~(1u << bit); }
+	uint32_t GetLayerBits() const     { return layerBits_; }
+	uint32_t GetCollisionMask() const { return collisionMask_; }
+
+	// 連続衝突判定 (CCD) のオン/オフ
+	// 高速移動して薄壁をすり抜ける可能性のあるオブジェクトでオンにする。
+	// 既定 false (パフォーマンス優先)。
+	void SetCCDEnabled(bool enable) { enableCCD_ = enable; }
+	bool IsCCDEnabled() const       { return enableCCD_; }
+
+	// CCD 用 前フレーム中心位置 (CollisionManager が管理)
+	void           SetPreviousCenter(const Vector3& p) { previousCenter_ = p; hasPreviousCenter_ = true; }
+	const Vector3& GetPreviousCenter() const           { return previousCenter_; }
+	bool           HasPreviousCenter() const           { return hasPreviousCenter_; }
+	void           ClearPreviousCenter()               { hasPreviousCenter_ = false; }
 protected:
 	///************************* 継承クラス用変数 *************************///
 
@@ -146,6 +184,9 @@ protected:
 
 	// 衝突タイプ識別ID（CollisionTypeIdDefで定義）
 	uint32_t typeID_ = 0u;
+
+	// 形状種別 (派生クラスで Initialize() 時にセット)
+	ColliderShape shape_ = ColliderShape::Sphere;
 
 	///************************* 設定フラグ *************************///
 
@@ -168,6 +209,15 @@ protected:
 	float mass_ = 1.0f;
 
 	Vector3 velocity_ {};
+
+	// レイヤーマスク (既定: 全層に属し、全層と当たる → 後方互換)
+	uint32_t layerBits_     = 0xFFFFFFFFu;
+	uint32_t collisionMask_ = 0xFFFFFFFFu;
+
+	// CCD (連続衝突判定) 関連
+	bool    enableCCD_         = false;
+	bool    hasPreviousCenter_ = false;
+	Vector3 previousCenter_    = {};
 
 private:
 	///************************* 内部管理変数 *************************///

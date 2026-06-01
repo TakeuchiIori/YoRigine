@@ -437,3 +437,277 @@ bool Intersection::IsCollision(const OBB& obbA, const OBB& obbB, CollisionResult
 bool Intersection::IsCollision(const AABB& aabb, const OBB& obb, CollisionResult* outResult) {
 	return IsCollision(ConvertAABBToOBB(aabb), obb, outResult);
 }
+
+// ============================================================
+// 線分上で point に最も近い点
+// ============================================================
+Vector3 Intersection::ClosestPointOnSegment(
+	const Vector3& point, const Vector3& a, const Vector3& b)
+{
+	Vector3 ab = b - a;
+	float denom = LengthSquared(ab);
+	if (denom < 1e-8f) {
+		return a; // 退化線分 → 端点
+	}
+	float t = Dot(point - a, ab) / denom;
+	if (t < 0.0f) t = 0.0f;
+	else if (t > 1.0f) t = 1.0f;
+	return a + ab * t;
+}
+
+// ============================================================
+// 2線分の最近接点ペア (Real-Time Collision Detection 5.1.9 に基づく)
+// ============================================================
+void Intersection::ClosestPointsSegmentSegment(
+	const Vector3& p1, const Vector3& q1,
+	const Vector3& p2, const Vector3& q2,
+	Vector3* closestA, Vector3* closestB)
+{
+	Vector3 d1 = q1 - p1;
+	Vector3 d2 = q2 - p2;
+	Vector3 r = p1 - p2;
+
+	float a = LengthSquared(d1);
+	float e = LengthSquared(d2);
+	float f = Dot(d2, r);
+
+	float s = 0.0f, t = 0.0f;
+	const float EPS = 1e-8f;
+
+	if (a <= EPS && e <= EPS) {
+		// 両方が点
+		if (closestA) *closestA = p1;
+		if (closestB) *closestB = p2;
+		return;
+	}
+	if (a <= EPS) {
+		// 線分1が点
+		s = 0.0f;
+		t = f / e;
+		if (t < 0.0f) t = 0.0f; else if (t > 1.0f) t = 1.0f;
+	} else {
+		float c = Dot(d1, r);
+		if (e <= EPS) {
+			// 線分2が点
+			t = 0.0f;
+			s = -c / a;
+			if (s < 0.0f) s = 0.0f; else if (s > 1.0f) s = 1.0f;
+		} else {
+			float b = Dot(d1, d2);
+			float denom = a * e - b * b;
+
+			if (denom != 0.0f) {
+				s = (b * f - c * e) / denom;
+				if (s < 0.0f) s = 0.0f; else if (s > 1.0f) s = 1.0f;
+			} else {
+				s = 0.0f;
+			}
+
+			t = (b * s + f) / e;
+			if (t < 0.0f) {
+				t = 0.0f;
+				s = -c / a;
+				if (s < 0.0f) s = 0.0f; else if (s > 1.0f) s = 1.0f;
+			} else if (t > 1.0f) {
+				t = 1.0f;
+				s = (b - c) / a;
+				if (s < 0.0f) s = 0.0f; else if (s > 1.0f) s = 1.0f;
+			}
+		}
+	}
+
+	if (closestA) *closestA = p1 + d1 * s;
+	if (closestB) *closestB = p2 + d2 * t;
+}
+
+// ============================================================
+// Ray vs Capsule
+//  - レイの原点が radius 内なら distance=0 で当たり扱い
+//  - そうでなければスフィアスイープ(無限長)で円柱部を解いた後、両端の球チェック
+// ============================================================
+bool Intersection::IsCollision(const Ray& ray, const Capsule& capsule, RaycastHit* outHit)
+{
+	// 円柱軸 d 上を回転投影せず、軸方向の最も近い点を解析的に求める。
+	Vector3 axis = capsule.end - capsule.start;
+	float axisLenSq = LengthSquared(axis);
+	if (axisLenSq < 1e-8f) {
+		// 退化 → 球として扱う
+		Sphere s{ capsule.start, capsule.radius };
+		return IsCollision(ray, s, outHit);
+	}
+
+	// 原点 - start を分解
+	Vector3 m = ray.origin - capsule.start;
+	float md = Dot(m, axis);
+	float nd = Dot(ray.direction, axis);
+	float mm = Dot(m, m);
+	float nn = Dot(ray.direction, ray.direction);
+	float mn = Dot(m, ray.direction);
+	float a = axisLenSq * nn - nd * nd;
+	float k = mm - capsule.radius * capsule.radius;
+	float c = axisLenSq * k - md * md;
+
+	float bestT = FLT_MAX;
+	bool hit = false;
+	Vector3 hitPos;
+	Vector3 hitNormal;
+
+	if (std::fabs(a) > 1e-8f) {
+		float b = axisLenSq * mn - nd * md;
+		float disc = b * b - a * c;
+		if (disc >= 0.0f) {
+			float sqrtDisc = std::sqrt(disc);
+			float t = (-b - sqrtDisc) / a;
+			if (t >= 0.0f) {
+				float s = md + t * nd;
+				if (s >= 0.0f && s <= axisLenSq) {
+					bestT = t;
+					hitPos = ray.origin + ray.direction * t;
+					Vector3 onAxis = capsule.start + axis * (s / axisLenSq);
+					hitNormal = Normalize(hitPos - onAxis);
+					hit = true;
+				}
+			}
+		}
+	}
+
+	// 両端の球も判定 (キャップ部分)
+	auto checkSphere = [&](const Vector3& center) {
+		RaycastHit tmp;
+		Sphere sph{ center, capsule.radius };
+		if (IsCollision(ray, sph, &tmp)) {
+			if (tmp.distance < bestT) {
+				bestT = tmp.distance;
+				hitPos = tmp.hitPoint;
+				hitNormal = tmp.normal;
+				hit = true;
+			}
+		}
+	};
+	checkSphere(capsule.start);
+	checkSphere(capsule.end);
+
+	if (hit && outHit) {
+		outHit->isHit = true;
+		outHit->distance = bestT;
+		outHit->hitPoint = hitPos;
+		outHit->normal = hitNormal;
+	}
+	return hit;
+}
+
+// ============================================================
+// Capsule vs Sphere
+// ============================================================
+bool Intersection::IsCollision(const Capsule& cap, const Sphere& sphere, CollisionResult* outResult)
+{
+	Vector3 closestOnCap = ClosestPointOnSegment(sphere.center, cap.start, cap.end);
+	Vector3 diff = closestOnCap - sphere.center;
+	float distSq = LengthSquared(diff);
+	float radiusSum = cap.radius + sphere.radius;
+
+	if (distSq > radiusSum * radiusSum) return false;
+
+	if (outResult) {
+		outResult->isHit = true;
+		float dist = std::sqrt(distSq);
+		if (dist > 1e-4f) {
+			outResult->normal = diff * (1.0f / dist); // Sphere → Capsule (capsuleAをSphereBから押し戻す向き)
+			outResult->penetrationDepth = radiusSum - dist;
+		} else {
+			outResult->normal = { 0.0f, 1.0f, 0.0f };
+			outResult->penetrationDepth = radiusSum;
+		}
+	}
+	return true;
+}
+
+// ============================================================
+// Capsule vs Capsule
+// ============================================================
+bool Intersection::IsCollision(const Capsule& capA, const Capsule& capB, CollisionResult* outResult)
+{
+	Vector3 closestA, closestB;
+	ClosestPointsSegmentSegment(capA.start, capA.end, capB.start, capB.end, &closestA, &closestB);
+
+	Vector3 diff = closestB - closestA;
+	float distSq = LengthSquared(diff);
+	float radiusSum = capA.radius + capB.radius;
+
+	if (distSq > radiusSum * radiusSum) return false;
+
+	if (outResult) {
+		outResult->isHit = true;
+		float dist = std::sqrt(distSq);
+		if (dist > 1e-4f) {
+			outResult->normal = diff * (1.0f / dist); // A→B方向（Aを押す向き）
+			outResult->penetrationDepth = radiusSum - dist;
+		} else {
+			outResult->normal = { 0.0f, 1.0f, 0.0f };
+			outResult->penetrationDepth = radiusSum;
+		}
+	}
+	return true;
+}
+
+// ============================================================
+// Capsule vs OBB (OBBのローカル空間に変換してから解析)
+// ============================================================
+bool Intersection::IsCollision(const Capsule& cap, const OBB& obb, CollisionResult* outResult)
+{
+	// OBBローカル空間にキャプセル軸を変換
+	Matrix4x4 rotMat = MakeRotateMatrixXYZ(obb.rotation);
+	Matrix4x4 invRot = TransPose(rotMat);
+
+	Vector3 localStart = Transform(cap.start - obb.center, invRot);
+	Vector3 localEnd   = Transform(cap.end   - obb.center, invRot);
+
+	// ローカル空間で「線分 vs AABB(±obb.size)」の最近接点を求める。
+	// 解析的に厳密解は重いので、線分を細かくサンプリングして最小距離を取る近似で代用。
+	// 反復で精度を上げる。
+	const int kSamples = 16;
+	Vector3 bestOnSeg = localStart;
+	Vector3 bestOnBox = Clamp(localStart, -obb.size, obb.size);
+	float bestDistSq = LengthSquared(bestOnSeg - bestOnBox);
+
+	for (int i = 1; i <= kSamples; ++i) {
+		float t = static_cast<float>(i) / static_cast<float>(kSamples);
+		Vector3 onSeg = localStart + (localEnd - localStart) * t;
+		Vector3 onBox = Clamp(onSeg, -obb.size, obb.size);
+		float d2 = LengthSquared(onSeg - onBox);
+		if (d2 < bestDistSq) {
+			bestDistSq = d2;
+			bestOnSeg = onSeg;
+			bestOnBox = onBox;
+		}
+	}
+
+	// 局所最近接点をワールドに戻し、Sphere-AABB 風の判定で詰める
+	Vector3 worldOnSeg = obb.center + Transform(bestOnSeg, rotMat);
+	Vector3 worldOnBox = obb.center + Transform(bestOnBox, rotMat);
+	Vector3 diff = worldOnSeg - worldOnBox;
+	float distSq = LengthSquared(diff);
+
+	if (distSq > cap.radius * cap.radius) return false;
+
+	if (outResult) {
+		outResult->isHit = true;
+		float dist = std::sqrt(distSq);
+		if (dist > 1e-4f) {
+			outResult->normal = diff * (1.0f / dist); // OBB→Capsule（Capsuleを押す向き）
+			outResult->penetrationDepth = cap.radius - dist;
+		} else {
+			outResult->normal = { 0.0f, 1.0f, 0.0f };
+			outResult->penetrationDepth = cap.radius;
+		}
+	}
+	return true;
+}
+
+// ============================================================
+// Capsule vs AABB
+// ============================================================
+bool Intersection::IsCollision(const Capsule& cap, const AABB& aabb, CollisionResult* outResult)
+{
+	return IsCollision(cap, ConvertAABBToOBB(aabb), outResult);
+}

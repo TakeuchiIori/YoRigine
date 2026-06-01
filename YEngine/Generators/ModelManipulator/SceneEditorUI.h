@@ -35,6 +35,9 @@ namespace YoRigine {
         // ModelManipulator 側のフラグ参照
         void SetColliderDebugFlag(bool* flag) { showColliderDebug_ = flag; }
         void SetColliderSelectedOnlyFlag(bool* flag) { showColliderSelectedOnly_ = flag; }
+        void SetBroadPhaseGridFlag(bool* flag) { showBroadPhaseGrid_ = flag; }
+        void SetBroadPhaseGridRadius(float* val) { broadPhaseGridDrawRadius_ = val; }
+        void SetDrawFrustumCullingFlag(bool* flag) { drawFrustumCulling_ = flag; }
 
         void SetPlaceCallback(std::function<void(const std::string&)> cb) { placeCallback_ = cb; }
         void SetSaveCallback(std::function<void()> cb) { saveCallback_ = cb; }
@@ -83,8 +86,11 @@ namespace YoRigine {
         bool showColliderTemplates_ = false;
 
         // コライダーデバッグ描画（ModelManipulator のフラグ参照）
-        bool* showColliderDebug_ = nullptr;
-        bool* showColliderSelectedOnly_ = nullptr;
+        bool*  showColliderDebug_ = nullptr;
+        bool*  showColliderSelectedOnly_ = nullptr;
+        bool*  showBroadPhaseGrid_ = nullptr;
+        float* broadPhaseGridDrawRadius_ = nullptr;
+        bool*  drawFrustumCulling_ = nullptr;
 
         Vector3 duplicateOffset_ = { 1.0f, 0.0f, 0.0f };
         int     duplicateCount_ = 1;

@@ -27,7 +27,7 @@ void PolygonArea::Initialize(const std::vector<Vector3>& vertices)
 	groundBottom_ = 0.0f;
 	groundTop_    = 100.0f;
 	isActive_     = true;
-	wasInside_    = false;
+	insideTargets_.clear();
 	// SetupAutoJson はコンストラクタ済みのためここでは不要
 }
 

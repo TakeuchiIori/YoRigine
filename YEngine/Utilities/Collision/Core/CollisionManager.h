@@ -6,17 +6,20 @@
 #include "WorldTransform/WorldTransform.h"
 
 // C++
-#include <list>
+#include <vector>
 #include <memory>
-#include <set>
+#include <unordered_set>
 
 // Math
 #include "MathFunc.h"
 #include "../Sphere/SphereCollider.h"
 #include "../AABB/AABBCollider.h"
 #include "../OBB/OBBCollider.h"
+#include "../Capsule/CapsuleCollider.h"
+#include "../Broad/UniformGrid.h"
 #include "CollisionDirection.h"
 #include "Intersection/Intersection.h"
+#include "Frustum/Frustum.h"
 
 namespace YoRigine {
 
@@ -60,12 +63,46 @@ namespace YoRigine {
 		bool IsColliderInView(const Vector3& position, const Camera* camera);
 		void AddCollider(BaseCollider* collider);
 		void RemoveCollider(BaseCollider* collider);
-		const std::list<BaseCollider*>& GetColliders() const { return colliders_; }
+
+		// ── Frustum culling 設定 ──────────────────────────
+		// 視錐台外のコライダーを BroadPhase Insert からスキップする。
+		// checkOutsideCamera=true のコライダーに対して効く (BaseCollider::IsCheckOutsideCamera())。
+		// 既定 false。
+		void SetEnableFrustumCulling(bool enable) { enableFrustumCulling_ = enable; }
+		bool GetEnableFrustumCulling() const      { return enableFrustumCulling_; }
+
+		// 視錐台の元になる Camera を設定。SetCamera をしていれば自動的に毎フレーム VP から抽出する。
+		void SetCullingCamera(Camera* cam) { cullingCamera_ = cam; }
+		const std::vector<BaseCollider*>& GetColliders() const { return colliders_; }
 
 		// ============================================================
 		// レイキャスト判定
+		//   ignoreTypeIDs: 旧来用、typeID 一致でスキップ
+		//   layerMask:    レイがどの層に反応するか。0xFFFFFFFFu で全層
 		// ============================================================
 		bool Raycast(const Ray& ray, float maxDistance, RaycastHit* outHit, const std::vector<uint32_t>& ignoreTypeIDs = {});
+		bool RaycastMasked(const Ray& ray, float maxDistance, uint32_t layerMask, RaycastHit* outHit);
+
+		// ============================================================
+		// Broad Phase 設定
+		// ============================================================
+		void SetBroadPhaseCellSize(float size) { grid_.SetCellSize(size); }
+		float GetBroadPhaseCellSize() const    { return grid_.GetCellSize(); }
+
+		// Broad Phase グリッドへのアクセサ (デバッグ描画用)
+		UniformGrid&       GetBroadPhaseGrid()       { return grid_; }
+		const UniformGrid& GetBroadPhaseGrid() const { return grid_; }
+
+		// ============================================================
+		// 反復押し戻し回数 (3-4 推奨。1 は単純解決、0 で押し戻し無効)
+		// ============================================================
+		void SetResolveIterations(int n) { resolveIterations_ = (n < 0 ? 0 : n); }
+		int  GetResolveIterations() const { return resolveIterations_; }
+
+		// ============================================================
+		// 形状からワールドAABBを計算
+		// ============================================================
+		static AABB ComputeWorldAABB(BaseCollider* c);
 
 		// ============================================================
 		// ヒット方向判定用ユーティリティ
@@ -81,8 +118,50 @@ namespace YoRigine {
 		CollisionManager& operator=(const CollisionManager&) = delete;
 
 	private:
-		std::list<BaseCollider*> colliders_;
-		std::set<std::pair<BaseCollider*, BaseCollider*>> collidingPairs_;
+		// 形状ベースのディスパッチ。dynamic_cast を経由しない。
+		// (a, b) は事前に (a.shape <= b.shape) になるよう CheckCollisionPair で並び替える。
+		// この関数は「形状的にAがBを押し戻すべき法線」を返す前提で書く。
+		bool DispatchShapePair(BaseCollider* a, BaseCollider* b, CollisionResult* outResult);
+		bool DispatchRay(const Ray& ray, BaseCollider* c, RaycastHit* outHit);
+
+		// Broad Phase 候補ペアに対して反復押し戻しを行う (質量比 + 2段累積)
+		void ResolveContacts(const std::vector<std::pair<BaseCollider*, BaseCollider*>>& pairs,
+			int iterations);
+
+		// CCD: 前フレーム位置→現在位置を Raycast でスイープしてトンネリングを防ぐ
+		void SweepCCDColliders();
+
+		std::vector<BaseCollider*> colliders_;
+
+		// ペアキーをハッシュ化して O(1) 平均で検索する
+		struct PairHash {
+			size_t operator()(const std::pair<BaseCollider*, BaseCollider*>& p) const noexcept {
+				auto h1 = std::hash<BaseCollider*>{}(p.first);
+				auto h2 = std::hash<BaseCollider*>{}(p.second);
+				return h1 ^ (h2 + 0x9e3779b9 + (h1 << 6) + (h1 >> 2));
+			}
+		};
+		std::unordered_set<std::pair<BaseCollider*, BaseCollider*>, PairHash> collidingPairs_;
+
+		// Broad Phase 用 Uniform Grid
+		UniformGrid grid_;
+		std::vector<std::pair<BaseCollider*, BaseCollider*>> broadPhasePairsScratch_;
+
+		// 反復押し戻し回数 (0 で無効)
+		int resolveIterations_ = 3;
+
+		// Frustum culling
+		bool    enableFrustumCulling_ = false;
+		Camera* cullingCamera_        = nullptr;
+
+		// 走査中 (CheckAllCollisions 中) に Add/Remove が来た場合に保留する
+		bool isIterating_ = false;
+		std::vector<BaseCollider*> pendingAdds_;
+		std::vector<BaseCollider*> pendingRemoves_;
+
+		void FlushPending();
+		void DoRemove(BaseCollider* c);
+
 		bool isDrawCollider_ = false;
 	};
 }

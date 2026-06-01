@@ -100,6 +100,7 @@ void YPipelineManager::Initialize()
     CreatePSO_Object();
     CreatePSO_ShadowMap();
     CreatePSO_Line();
+    CreatePSO_InstancedCube();
     CreatePSO_Particle();
     CreatePSO_YParticle();
     CreatePSO_YParticleAllBlendModes();
@@ -632,6 +633,31 @@ void YPipelineManager::CreatePSO_Line()
     rootSignatures_["Line"] = result.rootSignature;
     pipelineStates_["Line"] = result.pipelineState;
     parameterIndices_["Line"] = result.parameterIndices;
+}
+
+// ============================================================
+// InstancedCube: 1 DrawInstanced で複数ワイヤー形状を描画する
+// ============================================================
+void YPipelineManager::CreatePSO_InstancedCube()
+{
+    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Primitive/InstancedCube/InstancedCube.VS.hlsl", L"vs_6_0");
+    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Primitive/InstancedCube/InstancedCube.PS.hlsl", L"ps_6_0");
+
+    ReflectionBasedPipelineBuilder builder;
+    auto result = builder
+        .SetPrimitiveTopologyType(PrimitiveTopologyPresets::Line())
+        .SetBlendState(BlendPresets::CreateAlphaBlend())
+        .SetRasterizerState(RasterizerPresets::CreateNoCull())
+        .SetDepthStencilState(DepthStencilPresets::CreateWriteOnly())
+        .BuildFromCompiledShaders(
+            dxCommon_->GetDevice().Get(),
+            vsBlob.Get(),
+            psBlob.Get()
+        );
+
+    rootSignatures_["InstancedCube"] = result.rootSignature;
+    pipelineStates_["InstancedCube"] = result.pipelineState;
+    parameterIndices_["InstancedCube"] = result.parameterIndices;
 }
 
 void YPipelineManager::CreatePSO_CubeMap()

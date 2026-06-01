@@ -4,6 +4,7 @@
 #include "../Shape/Sphere.h"
 #include "../Shape/AABB.h"
 #include "../Shape/OBB.h"
+#include "../Shape/Capsule.h"
 #include "../MathFunc.h"
 
 // ============================================================
@@ -27,6 +28,7 @@ public:
 	static bool IsCollision(const Ray& ray, const AABB& aabb, RaycastHit* outHit = nullptr);
 	static bool IsCollision(const Ray& ray, const OBB& obb, RaycastHit* outHit = nullptr);
 	static bool IsCollision(const Ray& ray, const Plane& plane, RaycastHit* outHit = nullptr);
+	static bool IsCollision(const Ray& ray, const Capsule& capsule, RaycastHit* outHit = nullptr);
 
 
 	// ============================================================
@@ -48,10 +50,28 @@ public:
 	static bool IsCollision(const OBB& obbA, const OBB& obbB, CollisionResult* outResult = nullptr);
 	static bool IsCollision(const AABB& aabb, const OBB& obb, CollisionResult* outResult = nullptr);
 
+	// ── Capsule ────────────────────────────────────────────────
+	// 法線・侵入深度は基本「A→Bを押し戻す向き」で返す。
+	// Sphereと組ませる時はSphereをA扱いし、CollisionManager側で反転処理が必要なら反転する。
+	static bool IsCollision(const Capsule& capA,  const Capsule& capB,  CollisionResult* outResult = nullptr);
+	static bool IsCollision(const Capsule& cap,   const Sphere&  sphere,CollisionResult* outResult = nullptr);
+	static bool IsCollision(const Capsule& cap,   const AABB&    aabb,  CollisionResult* outResult = nullptr);
+	static bool IsCollision(const Capsule& cap,   const OBB&     obb,   CollisionResult* outResult = nullptr);
+
 	// ============================================================
 	// ユーティリティ
 	// ============================================================
 	static OBB ConvertAABBToOBB(const AABB& aabb);
+
+	// 2線分の最近接点ペアを返す。closestA/closestB はそれぞれの線分上の最近接点。
+	static void ClosestPointsSegmentSegment(
+		const Vector3& p1, const Vector3& q1,
+		const Vector3& p2, const Vector3& q2,
+		Vector3* closestA, Vector3* closestB);
+
+	// 線分上で point に最も近い点を返す。
+	static Vector3 ClosestPointOnSegment(
+		const Vector3& point, const Vector3& a, const Vector3& b);
 
 private:
 	// ============================================================

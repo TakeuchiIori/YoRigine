@@ -140,6 +140,11 @@ private:
     void CreatePSO_Line();
 
     /// <summary>
+    /// InstancedCube (ライン形状を StructuredBuffer + 行列で描画) 用パイプライン
+    /// </summary>
+    void CreatePSO_InstancedCube();
+
+    /// <summary>
     /// キューブマップ（スカイボックス）描画用パイプライン
     /// </summary>
     void CreatePSO_CubeMap();

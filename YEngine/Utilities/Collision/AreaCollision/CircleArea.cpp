@@ -28,7 +28,7 @@ void CircleArea::Initialize(const Vector3& center, float radius)
 	radius_         = radius;
 	debugSegments_  = 64;
 	isActive_       = true;
-	wasInside_      = false;
+	insideTargets_.clear();
 	ground_.bottom  = 0.0f;
 	ground_.top     = 100.0f;
 	// SetupAutoJson はコンストラクタ済みのためここでは不要

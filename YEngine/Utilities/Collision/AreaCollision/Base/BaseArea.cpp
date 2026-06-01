@@ -1,34 +1,27 @@
 #include "BaseArea.h"
 #include "MathFunc.h"
 
-void BaseArea::Update(const Vector3& targetPosition)
+void BaseArea::Update(const Vector3& targetPosition, void* targetKey)
 {
 	if (!isActive_) {
 		return;
 	}
 
-	bool currentlyInside = IsInside(targetPosition);
+	const bool currentlyInside = IsInside(targetPosition);
+	const auto it = insideTargets_.find(targetKey);
+	const bool wasInside = (it != insideTargets_.end());
 
-	// エリアに入った瞬間
-	if (currentlyInside && !wasInside_) {
-		if (enterCallback_) {
-			enterCallback_(targetPosition);
-		}
+	if (currentlyInside && !wasInside) {
+		insideTargets_.insert(targetKey);
+		if (enterCallback_) enterCallback_(targetPosition);
 	}
-	// エリアから出た瞬間
-	else if (!currentlyInside && wasInside_) {
-		if (exitCallback_) {
-			exitCallback_(targetPosition);
-		}
+	else if (!currentlyInside && wasInside) {
+		insideTargets_.erase(it);
+		if (exitCallback_) exitCallback_(targetPosition);
 	}
-	// エリア内にいる間
-	else if (currentlyInside && wasInside_) {
-		if (stayCallback_) {
-			stayCallback_(targetPosition);
-		}
+	else if (currentlyInside && wasInside) {
+		if (stayCallback_) stayCallback_(targetPosition);
 	}
-
-	wasInside_ = currentlyInside;
 }
 
 bool BaseArea::IsTouchingBoundary(const Vector3& position, float margin) const

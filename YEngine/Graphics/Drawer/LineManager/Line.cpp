@@ -187,6 +187,74 @@ void Line::DrawOBB(const Vector3& center, const Vector3& rotationEuler, const Ve
 	}
 }
 
+/// <summary>
+/// カプセル(両端が半球の円柱)のワイヤーフレームを描画登録
+/// </summary>
+void Line::DrawCapsule(const Vector3& start, const Vector3& end, float radius, int resolution)
+{
+	// 軸ベクトル
+	Vector3 axis = end - start;
+	float axisLen = Length(axis);
+	if (axisLen < 1e-6f) {
+		// 退化 → 球扱い
+		DrawSphere(start, radius, resolution);
+		return;
+	}
+
+	Vector3 dir = axis * (1.0f / axisLen); // 正規化軸
+
+	// 軸に直交する任意ベクトル u を求める。
+	// dir に依存しない安定な選び方: dir と最も平行でない世界軸を選ぶ
+	Vector3 helper = (std::fabs(dir.y) < 0.9f) ? Vector3{ 0, 1, 0 } : Vector3{ 1, 0, 0 };
+	Vector3 u = Normalize(Cross(helper, dir));
+	Vector3 v = Cross(dir, u);
+
+	// 端面の円(2つ) + 円柱側面リブ
+	const float twoPi = 2.0f * std::numbers::pi_v<float>;
+
+	for (int i = 0; i < resolution; ++i) {
+		float t1 = float(i)     / resolution * twoPi;
+		float t2 = float(i + 1) / resolution * twoPi;
+
+		Vector3 r1 = u * (radius * cosf(t1)) + v * (radius * sinf(t1));
+		Vector3 r2 = u * (radius * cosf(t2)) + v * (radius * sinf(t2));
+
+		// start側 円 (軸に直交)
+		RegisterLine(start + r1, start + r2);
+		// end側 円 (軸に直交)
+		RegisterLine(end + r1, end + r2);
+	}
+
+	// 円柱の側面リブ (4本)
+	for (int i = 0; i < 4; ++i) {
+		float t = float(i) / 4.0f * twoPi;
+		Vector3 r = u * (radius * cosf(t)) + v * (radius * sinf(t));
+		RegisterLine(start + r, end + r);
+	}
+
+	// 半球(両端) - 軸面ループを2平面分
+	for (int i = 0; i < resolution; ++i) {
+		float t1 = float(i)     / resolution * std::numbers::pi_v<float>; // 0..π (半球)
+		float t2 = float(i + 1) / resolution * std::numbers::pi_v<float>;
+
+		// start側 半球: -dir 方向に膨らむ
+		Vector3 sa1 = start + (u * radius) * cosf(t1) + (dir * -radius) * sinf(t1);
+		Vector3 sa2 = start + (u * radius) * cosf(t2) + (dir * -radius) * sinf(t2);
+		Vector3 sb1 = start + (v * radius) * cosf(t1) + (dir * -radius) * sinf(t1);
+		Vector3 sb2 = start + (v * radius) * cosf(t2) + (dir * -radius) * sinf(t2);
+		RegisterLine(sa1, sa2);
+		RegisterLine(sb1, sb2);
+
+		// end側 半球: +dir 方向に膨らむ
+		Vector3 ea1 = end + (u * radius) * cosf(t1) + (dir * radius) * sinf(t1);
+		Vector3 ea2 = end + (u * radius) * cosf(t2) + (dir * radius) * sinf(t2);
+		Vector3 eb1 = end + (v * radius) * cosf(t1) + (dir * radius) * sinf(t1);
+		Vector3 eb2 = end + (v * radius) * cosf(t2) + (dir * radius) * sinf(t2);
+		RegisterLine(ea1, ea2);
+		RegisterLine(eb1, eb2);
+	}
+}
+
 void Line::DrawCone(const Vector3& position, float rotationY, float viewDistance, float viewAngleDeg, int resolution) {
 
 	float halfAngle = viewAngleDeg * 0.5f * (std::numbers::pi_v<float> / 180.0f);

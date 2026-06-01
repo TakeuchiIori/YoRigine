@@ -27,7 +27,20 @@ public:
 	///************************* 基本関数 *************************///
 
 	void Initialize();
-	void Update(const Vector3& targetPosition);
+
+	// 単一ターゲットの更新 (Enter/Exit を targetKey で識別)
+	void Update(const Vector3& targetPosition, void* targetKey = nullptr);
+
+	// 複数ターゲットの一括更新。各ターゲットに対し全エリアの Enter/Exit を判定する。
+	struct AreaTarget {
+		void*   key;
+		Vector3 position;
+	};
+	void UpdateTargets(const std::vector<AreaTarget>& targets);
+
+	// あるターゲットを忘却 (キャラクタ破棄時に呼ぶ)
+	void ForgetTarget(void* targetKey);
+
 	void Draw(Line* line,
 		const std::initializer_list<std::string>& excludes = {});
 	void DrawArea(const std::string& name, Line* line);

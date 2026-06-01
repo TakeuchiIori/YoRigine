@@ -34,6 +34,7 @@ Vector3 AABBCollider::GetEulerRotation() const
 
 void AABBCollider::Initialize()
 {
+	shape_ = ColliderShape::AABB;
 	BaseCollider::Initialize();
 
 	aabb_.min = { 0.0f,0.0f,0.0f };

@@ -17,6 +17,7 @@
 #include <DirectX/DirectXCommon.h>
 #endif
 #include <Debugger/Logger.h>
+#include <Collision/Core/CollisionManager.h>
 
 namespace YoRigine {
 
@@ -42,11 +43,9 @@ namespace YoRigine {
 
 		selector_.SetObjectManager(objectManager_);
 		motionEditor_.Initialize(camera_);
-		colliderLineStaticWall_.Initialize();
-		colliderLineNavObstacle_.Initialize();
-		colliderLineNavTrigger_.Initialize();
-		colliderLineWaypoint_.Initialize();
-		colliderLineDefault_.Initialize();
+		colliderCubes_.Initialize();
+		colliderSpheres_.Initialize();
+		colliderLineCapsule_.Initialize();
 
 #ifdef USE_IMGUI
 		pickBuffer_ = PickBuffer::GetInstance();
@@ -67,6 +66,9 @@ namespace YoRigine {
 		editorUI_.SetLoadCallback([this]() { serializer_.LoadScene(jsonPath_); });
 		editorUI_.SetColliderDebugFlag(&showColliderDebug_);
 		editorUI_.SetColliderSelectedOnlyFlag(&showColliderSelectedOnly_);
+		editorUI_.SetBroadPhaseGridFlag(&showBroadPhaseGrid_);
+		editorUI_.SetBroadPhaseGridRadius(&broadPhaseGridDrawRadius_);
+		editorUI_.SetDrawFrustumCullingFlag(&enableDrawFrustumCulling_);
 
 		gizmoCtrl_.Initialize();
 
@@ -122,25 +124,52 @@ namespace YoRigine {
 	// ============================================================
 	void ModelManipulator::Draw() {
 		if (!isInitialized_ || !camera_) return;
+
+		// Frustum culling: 視錐台を抽出 (有効時のみ)
+		Frustum frustum{};
+		const bool useCulling = enableDrawFrustumCulling_;
+		if (useCulling) {
+			frustum = FrustumUtil::ExtractFromViewProjection(
+				camera_->GetViewProjectionMatrix());
+		}
+
+		auto boundsFor = [&](const auto* obj) -> AABB {
+			// コライダー有効時はそのワールドAABB を流用
+			if (obj->collider && obj->colliderEnabled) {
+				return YoRigine::CollisionManager::ComputeWorldAABB(obj->collider.get());
+			}
+			// 無いときは position ± (scale * factor) で大雑把に
+			float ex = std::fabs(obj->scale.x) * drawBoundsScaleFactor_;
+			float ey = std::fabs(obj->scale.y) * drawBoundsScaleFactor_;
+			float ez = std::fabs(obj->scale.z) * drawBoundsScaleFactor_;
+			return AABB{
+				{ obj->position.x - ex, obj->position.y - ey, obj->position.z - ez },
+				{ obj->position.x + ex, obj->position.y + ey, obj->position.z + ez }
+			};
+		};
+
 		for (auto* obj : objectManager_->GetAllActiveObjects()) {
-			if (obj && obj->object && obj->worldTransform) {
+			if (!obj || !obj->object || !obj->worldTransform) continue;
 
-				// 選択状態に応じた色の変更処理
-				bool isSelected = selector_.IsSelected(obj->id);
-				if (isSelected) {
-					obj->object->SetMaterialColor({ 1.0f, 0.2f, 0.2f, 1.0f });
-				}
-				else {
-					obj->object->SetMaterialColor({ 1.0f, 1.0f, 1.0f, 1.0f });
-				}
-				// ------------------------------------------
+			// Frustum 外ならスキップ
+			if (useCulling) {
+				AABB bounds = boundsFor(obj);
+				if (!FrustumUtil::IsAABBVisible(frustum, bounds)) continue;
+			}
 
-				// ★追加: ボーン表示がONで、かつモーションエディタの対象オブジェクトならメッシュを描画しない
-				bool isTargetAndBoneDraw = (motionEditor_.IsDrawBone() && obj->id == motionEditor_.GetTargetObjectId());
+			// 選択状態に応じた色の変更処理
+			bool isSelected = selector_.IsSelected(obj->id);
+			if (isSelected) {
+				obj->object->SetMaterialColor({ 1.0f, 0.2f, 0.2f, 1.0f });
+			}
+			else {
+				obj->object->SetMaterialColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+			}
 
-				if (!isTargetAndBoneDraw) {
-					obj->object->Draw(camera_, *obj->worldTransform);
-				}
+			// ボーン表示がONで対象オブジェクトならメッシュは描画しない
+			bool isTargetAndBoneDraw = (motionEditor_.IsDrawBone() && obj->id == motionEditor_.GetTargetObjectId());
+			if (!isTargetAndBoneDraw) {
+				obj->object->Draw(camera_, *obj->worldTransform);
 			}
 		}
 		motionEditor_.Draw();
@@ -157,74 +186,57 @@ namespace YoRigine {
 #ifdef USE_IMGUI
 		if (!showColliderDebug_) return;
 
-		// ---------------------------------------------------------
-		// タイプごとに専用の Line インスタンスを使って描画する。
-		// 単一バッファを複数の DrawLine() で共有すると、GPU 実行時に
-		// CPU 側の上書き（Upload Heap 競合）で後のタイプデータしか読めなくなる。
-		// ---------------------------------------------------------
-		struct TypeDrawInfo {
-			Line* line;
-			Vector4 color;
-		};
-		const TypeDrawInfo typeTable[] = {
-			{ &colliderLineStaticWall_,  { 1.0f, 0.2f, 0.2f, 1.0f } }, // 赤
-			{ &colliderLineNavObstacle_, { 1.0f, 0.8f, 0.0f, 1.0f } }, // 黄
-			{ &colliderLineNavTrigger_,  { 0.2f, 0.5f, 1.0f, 1.0f } }, // 青
-			{ &colliderLineWaypoint_,    { 0.2f, 1.0f, 0.3f, 1.0f } }, // 緑
-			{ &colliderLineDefault_,     { 0.6f, 0.6f, 0.6f, 1.0f } }, // グレー
-		};
-
-		// タイプIDからtypeTableのインデックスを返すラムダ
-		auto getTableIndex = [](uint32_t typeKey) -> int {
+		// タイプID → 色
+		auto colorForType = [](uint32_t typeKey) -> Vector4 {
 			switch (static_cast<CollisionTypeIdDef>(typeKey)) {
-			case CollisionTypeIdDef::kStaticWall:  return 0;
-			case CollisionTypeIdDef::kNavObstacle: return 1;
-			case CollisionTypeIdDef::kNavTrigger:  return 2;
-			case CollisionTypeIdDef::kWaypoint:    return 3;
-			default:                               return 4;
+			case CollisionTypeIdDef::kStaticWall:  return { 1.0f, 0.2f, 0.2f, 1.0f }; // 赤
+			case CollisionTypeIdDef::kNavObstacle: return { 1.0f, 0.8f, 0.0f, 1.0f }; // 黄
+			case CollisionTypeIdDef::kNavTrigger:  return { 0.2f, 0.5f, 1.0f, 1.0f }; // 青
+			case CollisionTypeIdDef::kWaypoint:    return { 0.2f, 1.0f, 0.3f, 1.0f }; // 緑
+			default:                               return { 0.6f, 0.6f, 0.6f, 1.0f }; // グレー
 			}
 		};
 
-		// 各Lineインスタンスに色を設定
-		for (const auto& info : typeTable) {
-			info.line->SetColor(info.color);
-		}
-
-		// コライダーを対応するLineインスタンスに登録
-		static constexpr uint32_t kMaxCollidersPerFlush = 600;
-		uint32_t counts[5] = {};
+		// AABB/OBB は InstancedCube に、Sphere は InstancedSphere に集約
+		colliderCubes_.Begin();
+		colliderSpheres_.Begin();
+		colliderLineCapsule_.SetColor({ 0.6f, 0.6f, 0.6f, 1.0f });
 
 		for (auto* obj : objectManager_->GetAllActiveObjects()) {
 			if (!obj || !obj->collider) continue;
-  
-
-			// 表示フィルタ
 			if (!obj->colliderEnabled) continue;
 			if (showColliderSelectedOnly_ && !selector_.IsSelected(obj->id)) continue;
 
 			const uint32_t typeKey = obj->collider->GetTypeID();
-			const int idx = getTableIndex(typeKey);
-			Line* line = typeTable[idx].line;
+			const Vector4 col = colorForType(typeKey);
 
 			if (auto* a = dynamic_cast<AABBCollider*>(obj->collider.get())) {
-				line->DrawAABB(a->GetAABB().min, a->GetAABB().max);
+				colliderCubes_.AddAABB(a->GetAABB().min, a->GetAABB().max, col);
 			} else if (auto* o = dynamic_cast<OBBCollider*>(obj->collider.get())) {
-				line->DrawOBB(o->GetOBB().center, o->GetOBB().rotation, o->GetOBB().size);
+				colliderCubes_.AddOBB(o->GetOBB().center, o->GetOBB().rotation, o->GetOBB().size, col);
 			} else if (auto* s = dynamic_cast<SphereCollider*>(obj->collider.get())) {
-				line->DrawSphere(s->GetSphere().center, s->GetSphere().radius, 32);
-			} else {
-				continue;
-			}
-
-			if (++counts[idx] >= kMaxCollidersPerFlush) {
-				line->DrawLine();
-				counts[idx] = 0;
+				colliderSpheres_.AddSphere(s->GetSphere().center, s->GetSphere().radius, col);
+			} else if (auto* cap = dynamic_cast<CapsuleCollider*>(obj->collider.get())) {
+				// Capsule のみ Line (低解像度)
+				const auto& c = cap->GetCapsule();
+				colliderLineCapsule_.DrawCapsule(c.start, c.end, c.radius, 12);
 			}
 		}
 
-		// 各Lineインスタンスをフラッシュ
-		for (const auto& info : typeTable) {
-			info.line->DrawLine();
+		// 1 DrawInstanced (Cube), 1 DrawInstanced (Sphere), 1 DrawCall (Capsule Line)
+		colliderCubes_.Flush();
+		colliderSpheres_.Flush();
+		colliderLineCapsule_.DrawLine();
+
+		// BroadPhase グリッド可視化 (カメラ周辺のみ) - 別 Flush で2回目の DrawInstanced
+		if (showBroadPhaseGrid_ && camera_) {
+			colliderCubes_.Begin();
+			Vector3 camPos = camera_->GetTranslate();
+			YoRigine::CollisionManager::GetInstance()
+				->GetBroadPhaseGrid()
+				.DrawDebugAroundCamera(&colliderCubes_, camPos, broadPhaseGridDrawRadius_,
+					Vector4{ 0.3f, 0.8f, 0.3f, 0.4f });
+			colliderCubes_.Flush();
 		}
 #endif
 	}
