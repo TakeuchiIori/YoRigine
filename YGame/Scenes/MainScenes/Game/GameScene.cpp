@@ -66,6 +66,9 @@ void GameScene::Initialize() {
 	YoRigine::GameTime::Initialize();
 	YoRigine::JsonManager::SetCurrentScene("GameScene");
 	YoRigine::CollisionManager::GetInstance()->Initialize();
+	// 視錐台外コライダーは BroadPhase 登録をスキップする (個別オプトアウトは BaseCollider::SetCheckOutsideCamera(false))
+	YoRigine::CollisionManager::GetInstance()->SetCullingCamera(sceneCamera_.get());
+	YoRigine::CollisionManager::GetInstance()->SetEnableFrustumCulling(true);
 	YoRigine::ModelManipulator::GetInstance()->LoadScene("GameScene");
 	AreaManager::GetInstance()->Initialize();
 	YParticleManager::GetInstance().SetCamera(sceneCamera_.get());

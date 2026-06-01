@@ -270,6 +270,13 @@ namespace YoRigine {
 	// ============================================================
 	// 形状からワールドAABBを計算
 	// ============================================================
+	bool CollisionManager::IsAABBOutsideCullingFrustum(const AABB& aabb) {
+		if (!IsCullingActive()) return false;
+		const Frustum fr = FrustumUtil::ExtractFromViewProjection(
+			cullingCamera_->GetViewProjectionMatrix());
+		return !FrustumUtil::IsAABBVisible(fr, aabb);
+	}
+
 	AABB CollisionManager::ComputeWorldAABB(BaseCollider* c) {
 		switch (c->GetShape()) {
 		case ColliderShape::Sphere: {

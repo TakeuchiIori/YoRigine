@@ -7,6 +7,8 @@
 
 // Engine
 #include <Collision/Core/CollisionTypeIdDef.h>
+#include <Collision/Core/CollisionManager.h>
+#include "Object3D/ObjectManager.h"
 
 // ImGui
 #include "imgui.h"
@@ -49,6 +51,21 @@ namespace YoRigine {
             if (drawFrustumCulling_ != nullptr) {
                 ImGui::Separator();
                 ImGui::MenuItem("描画 Frustum カリングを有効化", nullptr, drawFrustumCulling_);
+            }
+
+            // コリジョン Frustum カリング (CollisionManager 直結)
+            // 描画用とは別配線。ON/OFF を切り替えると BroadPhase Insert と
+            // ObjectManager::Update の collider->Update() が両方スキップされる。
+            {
+                ImGui::Separator();
+                auto* cm = YoRigine::CollisionManager::GetInstance();
+                bool collisionCulling = cm->GetEnableFrustumCulling();
+                if (ImGui::MenuItem("コリジョン Frustum カリングを有効化", nullptr, &collisionCulling)) {
+                    cm->SetEnableFrustumCulling(collisionCulling);
+                }
+                // culling 統計 (直前フレーム): 視錐台外で Update をスキップした数 / 総オブジェクト数
+                auto* om = ObjectManager::GetInstance();
+                ImGui::Text("  culled %d / %d", om->GetLastFrameCulledCount(), om->GetLastFrameTotalCount());
             }
 
             ImGui::EndMenu();

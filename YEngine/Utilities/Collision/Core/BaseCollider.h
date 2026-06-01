@@ -128,6 +128,11 @@ public:
 	// カメラ外チェックフラグ取得
 	bool IsCheckOutsideCamera() const { return checkOutsideCamera; }
 
+	// カメラ外チェックフラグ設定
+	// true  : 視錐台外に出たら CollisionManager の BroadPhase 登録をスキップ (既定)
+	// false : 視錐台外でも常に当たり判定を回す (Player / ボス / 落下死トリガーなど)
+	void SetCheckOutsideCamera(bool enable) { checkOutsideCamera = enable; }
+
 	// コライダー全体の有効状態取得
 	bool GetIsActive() const { return isActive_; }
 

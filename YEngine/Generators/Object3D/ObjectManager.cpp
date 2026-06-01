@@ -35,8 +35,29 @@ void ObjectManager::Initialize() {
 /// アクティブオブジェクトのアニメーション更新
 /// </summary>
 void ObjectManager::Update() {
+	auto* cm = YoRigine::CollisionManager::GetInstance();
+	const bool cullingActive = cm->IsCullingActive();
+
+	int total = 0;
+	int culled = 0;
+
 	for (auto& [id, obj] : idToObject_) {
-		if (obj && obj->isActive && obj->object) {
+		if (!obj) continue;
+		++total;
+
+		// Frustum culling: コライダー個別フラグ checkOutsideCamera=true で
+		// 前フレームの世界 AABB が視錐台外なら、アニメーションも collider Update も丸ごとスキップ。
+		// 静的オブジェクトでは AABB が前フレームと同じなので劣化なし。
+		// 動かしたいものは BaseCollider::SetCheckOutsideCamera(false) でオプトアウトする。
+		if (cullingActive && obj->collider && obj->collider->IsCheckOutsideCamera()) {
+			AABB aabb = YoRigine::CollisionManager::ComputeWorldAABB(obj->collider.get());
+			if (cm->IsAABBOutsideCullingFrustum(aabb)) {
+				++culled;
+				continue;
+			}
+		}
+
+		if (obj->isActive && obj->object) {
 			obj->object->UpdateAnimation();
 		}
 		// colliderEnabled に関わらず Update() してワールドAABBを常に最新に保つ。
@@ -45,6 +66,9 @@ void ObjectManager::Update() {
 			obj->collider->Update();
 		}
 	}
+
+	lastFrameTotalCount_ = total;
+	lastFrameCulledCount_ = culled;
 }
 
 

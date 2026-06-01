@@ -77,7 +77,9 @@ void DevelopScene::Initialize() {
 	YoRigine::ModelManipulator::GetInstance()->LoadScene("DevelopScene");
 
 	YoRigine::GpuEmitManager::GetInstance()->SetCamera(sceneCamera_.get());
-
+	// 視錐台外コライダーは BroadPhase 登録をスキップする (個別オプトアウトは BaseCollider::SetCheckOutsideCamera(false))
+	YoRigine::CollisionManager::GetInstance()->SetCullingCamera(sceneCamera_.get());
+	YoRigine::CollisionManager::GetInstance()->SetEnableFrustumCulling(true);
 
 	// エリア設定
 	auto battleFieldArea = std::make_shared<CircleArea>();

@@ -75,6 +75,14 @@ namespace YoRigine {
 		void SetCullingCamera(Camera* cam) { cullingCamera_ = cam; }
 		const std::vector<BaseCollider*>& GetColliders() const { return colliders_; }
 
+		// 視錐台 culling が有効か (enable フラグ + カメラ両方がそろっているか)
+		bool IsCullingActive() const { return enableFrustumCulling_ && cullingCamera_; }
+
+		// 指定 AABB が culling 視錐台の外側なら true。culling 無効なら常に false。
+		// 個別コライダーの IsCheckOutsideCamera は見ないので呼び出し側でチェックすること。
+		// (ObjectManager 等、CollisionManager より早い段階で per-object スキップ判定するために使う)
+		bool IsAABBOutsideCullingFrustum(const AABB& aabb);
+
 		// ============================================================
 		// レイキャスト判定
 		//   ignoreTypeIDs: 旧来用、typeID 一致でスキップ

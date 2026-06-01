@@ -139,6 +139,10 @@ public:
 	int GetNextObjectId() const { return nextObjectId_; }
 	void SetCamera(Camera* camera) { camera_ = camera; }
 
+	// 直前フレームの Frustum culling 統計 (シーンエディタで確認用)
+	int GetLastFrameCulledCount() const { return lastFrameCulledCount_; }
+	int GetLastFrameTotalCount() const { return lastFrameTotalCount_; }
+
 	///************************* コライダー操作 *************************///
 
 	// オブジェクト固有の設定をAABBコライダーに反映する
@@ -168,6 +172,10 @@ private:
 
 	// 次に割り当てるID
 	int nextObjectId_ = 0;
+
+	// Frustum culling 統計 (直前フレーム)
+	int lastFrameCulledCount_ = 0;
+	int lastFrameTotalCount_ = 0;
 
 	// オブジェクトの初期化ヘルパー
 	void InitializePlacedObject(PlacedObject& obj, const std::string& modelPath,
