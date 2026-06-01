@@ -109,9 +109,10 @@ namespace YoRigine {
 		motionEditor_.SetTargetObjectId(selector_.GetPrimaryId());
 		motionEditor_.Update();
 		// ── selector_.Update() だけここで行う（GPU命令は積まない）──
+		// シーンエディタが非アクティブ (オブジェクト一覧が閉じてる) ならクリック選択を無効化
 		selector_.SetCamera(camera_);
 		selector_.Update(
-			true,
+			IsSceneEditorActive(),
 			Editor::GetInstance()->GetGameViewPos(),
 			Editor::GetInstance()->GetGameViewSize());
 #endif
@@ -287,11 +288,27 @@ namespace YoRigine {
 	}
 
 	// ============================================================
+	// シーンエディタが有効か (オブジェクト一覧ウィンドウ + Editor 全体の表示)
+	// ============================================================
+	bool ModelManipulator::IsSceneEditorActive() const {
+#ifdef USE_IMGUI
+		// 「モデル操作」ウィンドウ (MyGame で RegisterGameUI 登録された名前) が
+		// 開かれているときのみ、選択・ギズモを有効化する。
+		return Editor::GetInstance()->GetShowEditor()
+			&& Editor::GetInstance()->IsGameUIVisible("モデル操作");
+#else
+		return false;
+#endif
+	}
+
+	// ============================================================
 	// ギズモの描画
 	// ============================================================
 	void ModelManipulator::DrawGizmo() {
 #ifdef USE_IMGUI
 		if (!camera_ || !selector_.HasSelection()) return;
+		// オブジェクト一覧ウィンドウが閉じてるときはギズモも非表示
+		if (!IsSceneEditorActive()) return;
 
 		gizmables_.clear();
 		std::vector<IGizmable*> targets;

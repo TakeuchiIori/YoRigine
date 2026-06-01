@@ -169,6 +169,7 @@ void FieldScene::DrawLine() {
 	player_->DrawCollision();
 	fieldEnemyManager_->DrawCollision();
 	fieldEnemyManager_->DrawLine(line_.get());
+	fieldEnemyManager_->DrawEditorMarkers(line_.get());
 	player_->DrawBone(*line_.get());
 	AreaManager::GetInstance()->DrawArea("FieldArea", line_.get());
 	AreaManager::GetInstance()->Draw(line_.get(), { "FieldArea" });

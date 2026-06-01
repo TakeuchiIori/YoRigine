@@ -50,6 +50,7 @@ namespace YoRigine {
         void SetShowPrefabWindow(bool v) { showPrefabWindow_ = v; }
 
         bool* GetShowObjectListPtr() { return &showObjectList_; }
+        bool  IsObjectListShown() const { return showObjectList_; }
         bool* GetShowTransformControlsPtr() { return &showTransformControls_; }
         bool* GetShowDuplicateWindowPtr() { return &showDuplicateWindow_; }
         bool* GetShowPrefabWindowPtr() { return &showPrefabWindow_; }

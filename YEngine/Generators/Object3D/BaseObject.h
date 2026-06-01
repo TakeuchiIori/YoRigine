@@ -12,6 +12,7 @@
 #include "Collision/OBB/OBBCollider.h"
 #include "Collision/AABB/AABBCollider.h"
 #include "Collision/Sphere/SphereCollider.h"
+#include "Collision/Capsule/CapsuleCollider.h"
 
 /// <summary>
 /// オブジェクトの基底クラス
@@ -67,4 +68,5 @@ protected:
 	std::shared_ptr<OBBCollider> obbCollider_;
 	std::shared_ptr<AABBCollider> aabbCollider_;
 	std::shared_ptr<SphereCollider> sphereCollider_;
+	std::shared_ptr<CapsuleCollider> capsuleCollider_;
 };

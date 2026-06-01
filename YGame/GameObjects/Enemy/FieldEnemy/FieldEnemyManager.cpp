@@ -12,12 +12,20 @@
 
 #ifdef USE_IMGUI
 #include "imgui.h"
+#include "SpawnPointGizmable.h"
+#include "Drawer/LineManager/Line.h"
 #endif
 #include <Editor/Editor.h>
 
 FieldEnemyManager::FieldEnemyManager() = default;
 
 FieldEnemyManager::~FieldEnemyManager() {
+#ifdef USE_IMGUI
+	if (gizmoCallbackId_ != 0) {
+		Editor::GetInstance()->RemoveGizmoDrawCallback(gizmoCallbackId_);
+		gizmoCallbackId_ = 0;
+	}
+#endif
 	fieldEnemies_.clear();
 	spawnDataMap_.clear();
 	enemyDataMap_.clear();
@@ -46,6 +54,27 @@ void FieldEnemyManager::Initialize(Camera* camera) {
 			ShowEnemyEditor();
 		}, "Game"
 	);
+	spawnGizmoCtrl_.Initialize();
+	// ImGuizmo はゲームビュー ImGui ウィンドウのコンテキスト内で描画する必要があるため、
+	// Editor のギズモコールバックに登録する (FieldScene の DrawLine ではダメ)。
+	gizmoCallbackId_ = Editor::GetInstance()->AddGizmoDrawCallback([this]() {
+		DrawSpawnPointGizmoHandles();
+	});
+
+	// スポーンマーカー用 Line インスタンス (状態別に 4 本)。
+	// 各々が独立した GPU バッファを持つので、DrawLine 1 回ずつで stomp が起きない。
+	markerLineSelected_ = std::make_unique<Line>();
+	markerLineActive_   = std::make_unique<Line>();
+	markerLineInactive_ = std::make_unique<Line>();
+	markerLinePole_     = std::make_unique<Line>();
+	markerLineSelected_->Initialize();
+	markerLineActive_  ->Initialize();
+	markerLineInactive_->Initialize();
+	markerLinePole_    ->Initialize();
+	markerLineSelected_->SetCamera(camera_);
+	markerLineActive_  ->SetCamera(camera_);
+	markerLineInactive_->SetCamera(camera_);
+	markerLinePole_    ->SetCamera(camera_);
 #endif // _DEBUG
 	// 敵のデータを読み込み
 	LoadEnemyData(FieldEnemyPaths::EnemyData);
@@ -764,6 +793,10 @@ void FieldEnemyManager::LoadEnemySpawnData(const std::string& filePath) {
 			spawnData.respawnAfterBattle = spawnJson.value("respawnAfterBattle", true);
 			spawnData.respawnDelay = spawnJson.value("respawnDelay", 30.0f);
 
+			// 先にスポーンマップへ登録 (敵データ未定義でもマーカーは見えるようにするため)。
+			// SpawnFieldEnemy は enemyDataMap_ に該当データが無いと早期 return するが、
+			// その場合でもエディタ用に位置を可視化したいので spawnDataMap_ には残す。
+			spawnDataMap_[spawnData.id] = spawnData;
 			SpawnFieldEnemy(spawnData);
 		}
 
@@ -922,6 +955,9 @@ void FieldEnemyManager::ShowDebugInfo() {
 /// 全敵の描画
 /// </summary>
 void FieldEnemyManager::Draw() {
+#ifdef USE_IMGUI
+	if (editorHideEnemies_) return;
+#endif
 	for (auto& enemy : fieldEnemies_) {
 		if (enemy && enemy->IsActive()) {
 			enemy->Draw();
@@ -931,6 +967,9 @@ void FieldEnemyManager::Draw() {
 
 void FieldEnemyManager::DrawShadow()
 {
+#ifdef USE_IMGUI
+	if (editorHideEnemies_) return;
+#endif
 	for (auto& enemy : fieldEnemies_) {
 		if (enemy && enemy->IsActive()) {
 			enemy->DrawShadow();
@@ -942,6 +981,9 @@ void FieldEnemyManager::DrawShadow()
 /// 敵コリジョンの描画
 /// </summary>
 void FieldEnemyManager::DrawCollision() {
+#ifdef USE_IMGUI
+	if (editorHideEnemies_) return;
+#endif
 	for (auto& enemy : fieldEnemies_) {
 		if (enemy && enemy->IsActive()) {
 			enemy->DrawCollision();
@@ -951,6 +993,9 @@ void FieldEnemyManager::DrawCollision() {
 
 void FieldEnemyManager::DrawLine(Line* line)
 {
+#ifdef USE_IMGUI
+	if (editorHideEnemies_) return;
+#endif
 	for (auto& enemy : fieldEnemies_) {
 		if (enemy && enemy->IsActive()) {
 			enemy->DrawLine(line);
@@ -960,6 +1005,9 @@ void FieldEnemyManager::DrawLine(Line* line)
 
 void FieldEnemyManager::DrawUI()
 {
+#ifdef USE_IMGUI
+	if (editorHideEnemies_) return;
+#endif
 	for (auto& enemy : fieldEnemies_) {
 		if (enemy && enemy->IsActive()) {
 			enemy->DrawUI();
@@ -1228,6 +1276,14 @@ void FieldEnemyManager::ShowSpawnPointEditor() {
 		CreateNewSpawnPoint();
 	}
 
+	ImGui::SameLine();
+	if (ImGui::Checkbox("敵を隠してスポーン点だけ表示", &editorHideEnemies_)) {
+		// 切替時にコライダーも有効/無効を揃える (バトル中の挙動と同じ理由で必要)
+		for (auto& enemy : fieldEnemies_) {
+			if (enemy) enemy->SetCollisionActive(!editorHideEnemies_);
+		}
+	}
+
 	ImGui::Separator();
 	ImGui::Text("スポーンポイント一覧:");
 
@@ -1260,9 +1316,18 @@ void FieldEnemyManager::ShowSpawnPointEditor() {
 			ImGui::EndCombo();
 		}
 
-		ImGui::DragFloat3("位置", &editorSpawnData_.position.x, 0.5f);
+		bool posChanged = ImGui::DragFloat3("位置", &editorSpawnData_.position.x, 0.5f);
 		if (player_ && ImGui::Button("プレイヤーの位置に配置")) {
 			editorSpawnData_.position = player_->GetWorldPosition();
+			posChanged = true;
+		}
+		// 位置編集はマーカー/ギズモが見える位置にあるべきなので即座にライブ反映
+		// (変更を保存ボタンは respawn / その他フィールドの永続化のために残す)
+		if (posChanged) {
+			auto it = spawnDataMap_.find(selectedSpawnId_);
+			if (it != spawnDataMap_.end()) {
+				it->second.position = editorSpawnData_.position;
+			}
 		}
 
 		ImGui::Separator();
@@ -1369,7 +1434,8 @@ void FieldEnemyManager::CreateNewSpawnPoint() {
 	FieldEnemySpawnData newSpawn;
 	newSpawn.id = newId;
 	newSpawn.enemyId = enemyDataMap_.empty() ? "alien" : enemyDataMap_.begin()->first;
-	newSpawn.position = Vector3(0.0f, 0.0f, 0.0f);
+	// 既定位置はプレイヤーの足元。原点 (0,0,0) だと地面に埋まる + 遠くて目視できないため。
+	newSpawn.position = player_ ? player_->GetWorldPosition() : Vector3(0.0f, 0.0f, 0.0f);
 	newSpawn.isActive = true;
 
 	spawnDataMap_[newId] = newSpawn;
@@ -1407,11 +1473,62 @@ void FieldEnemyManager::DeleteSpawnPoint(const std::string& spawnId) {
 }
 
 /// <summary>
-/// スポーンポイントのギズモ描画
+/// スポーンポイントの視覚マーカー (球+縦線) を描画する。
+/// FieldScene の DrawLine 経由で呼ばれる (DX12 コマンドリスト発行段階)。
 /// </summary>
-void FieldEnemyManager::DrawEditorGizmos() {
+void FieldEnemyManager::DrawEditorMarkers(Line* /*sharedLine*/) {
 #ifdef USE_IMGUI
-	if (!isEditorMode_) return;
-	// TODO: ギズモ可視化処理（ライン描画など）
+	if (!markerLineSelected_ || !markerLineActive_ || !markerLineInactive_ || !markerLinePole_) return;
+
+	// 色は各 Line インスタンスに固定で割り当てる (DrawLine は 1 回しか呼ばないため安定)。
+	// 色分け: 選択中=赤 / アクティブ=黄 / 無効=灰 / 縦線=白
+	markerLineSelected_->SetColor({ 1.0f, 0.15f, 0.15f, 1.0f });
+	markerLineActive_  ->SetColor({ 1.0f, 0.85f, 0.15f, 1.0f });
+	markerLineInactive_->SetColor({ 0.5f, 0.5f, 0.5f,  0.6f });
+	markerLinePole_    ->SetColor({ 1.0f, 1.0f, 1.0f,  0.6f });
+
+	for (const auto& [id, data] : spawnDataMap_) {
+		Line* target = nullptr;
+		if (id == selectedSpawnId_) target = markerLineSelected_.get();
+		else if (data.isActive)     target = markerLineActive_.get();
+		else                        target = markerLineInactive_.get();
+
+		target->DrawSphere(data.position, 1.0f, 128);
+		markerLinePole_->RegisterLine(data.position, Vector3{ data.position.x, 0.0f, data.position.z });
+	}
+
+	// 全頂点を 1 回ずつフラッシュ (GPU バッファ stomp を回避)
+	markerLineSelected_->DrawLine();
+	markerLineActive_  ->DrawLine();
+	markerLineInactive_->DrawLine();
+	markerLinePole_    ->DrawLine();
 #endif
 }
+
+#ifdef USE_IMGUI
+/// <summary>
+/// 選択中スポーンポイントに ImGuizmo Translate ハンドルを描画する。
+/// Editor のギズモコールバック経由で呼ばれる必要がある
+/// (ImGuizmo::SetDrawlist がゲームビューのドローリストを掴むため)。
+/// </summary>
+void FieldEnemyManager::DrawSpawnPointGizmoHandles() {
+	if (!camera_ || selectedSpawnId_.empty()) return;
+
+	auto it = spawnDataMap_.find(selectedSpawnId_);
+	if (it == spawnDataMap_.end()) return;
+
+	SpawnPointGizmable gz(&it->second, [this]() {
+		// 操作終了時: JSON 保存 + 編集中バッファ同期
+		SaveEnemySpawnData(FieldEnemyPaths::Spawn);
+		auto it2 = spawnDataMap_.find(selectedSpawnId_);
+		if (it2 != spawnDataMap_.end()) {
+			editorSpawnData_ = it2->second;
+		}
+	});
+
+	std::vector<IGizmable*> targets = { &gz };
+	spawnGizmoCtrl_.Draw(camera_, targets,
+		Editor::GetInstance()->GetGameViewPos(),
+		Editor::GetInstance()->GetGameViewSize());
+}
+#endif

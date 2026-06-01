@@ -7,8 +7,14 @@
 #include <string>
 #include <functional>
 
+#ifdef USE_IMGUI
+#include <Debugger/Gizmo/GizmoController.h>
+#include <Graphics/Drawer/LineManager/Line.h>
+#endif
+
 class Player;
 class Camera;
+class Line;
 
 ///************************* フィールド敵スポーンデータ構造体 *************************///
 struct FieldEnemySpawnData {
@@ -77,6 +83,10 @@ public:
 	// 当たり判定の描画
 	void DrawCollision();
 	void DrawLine(Line* line);
+
+	// スポーンポイントの視覚マーカー (球+縦線) を描画する。
+	// 通常の Line 描画パスから呼ぶ。ImGuizmo ハンドルは Editor のギズモコールバック側で描画する。
+	void DrawEditorMarkers(Line* line);
 
 	// UI描画
 	void DrawUI();
@@ -216,9 +226,6 @@ private:
 	// スポーンポイントを削除
 	void DeleteSpawnPoint(const std::string& spawnId);
 
-	// エディター用ギズモを描画
-	void DrawEditorGizmos();
-
 private:
 	///************************* メンバ変数 *************************///
 
@@ -266,4 +273,25 @@ private:
 	std::string selectedSpawnId_;
 	FieldEnemyData editorEnemyData_;  // 編集中の敵データ
 	FieldEnemySpawnData editorSpawnData_;  // 編集中のスポーンデータ
+
+#ifdef USE_IMGUI
+	// スポーンポイント編集用のギズモコントローラ (ImGuizmo を内包)
+	GizmoController spawnGizmoCtrl_;
+	// Editor::AddGizmoDrawCallback で取得したコールバックID (Finalize で解除する用)
+	int gizmoCallbackId_ = 0;
+
+	// エディタプレビュー用: フィールド敵の描画/コリジョン/UI を全て抑制してスポーン点だけ見せる
+	bool editorHideEnemies_ = false;
+
+	// スポーンマーカー用に状態ごとの専用 Line インスタンスを持つ。
+	// 単一インスタンスで DrawLine を複数回呼ぶと GPU バッファが上書きされて
+	// 最後の 1 回分しか描画されないため、色 (状態) ごとに別バッファに分ける。
+	std::unique_ptr<Line> markerLineSelected_;
+	std::unique_ptr<Line> markerLineActive_;
+	std::unique_ptr<Line> markerLineInactive_;
+	std::unique_ptr<Line> markerLinePole_; // 縦線 (地面まで) 用
+
+	// ImGuizmo ハンドル描画 (Editor のゲームビューウィンドウ内コンテキストから呼ばれる)
+	void DrawSpawnPointGizmoHandles();
+#endif
 };

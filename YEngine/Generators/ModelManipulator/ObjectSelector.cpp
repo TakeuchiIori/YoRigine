@@ -61,6 +61,9 @@ namespace YoRigine {
         if (!isMouseSelecting || !camera_ || !objectManager_) return;
         if (!Editor::GetInstance()->GetShowEditor())           return;
         if (ImGuizmo::IsUsing() || ImGuizmo::IsOver())         return;
+        // ImGui (ImGuizmo ハンドル含む) がマウスを掴みたがってる間は選択を一切無効化。
+        // 「ギズモを最優先」を実現するため、ピック登録より前にここで弾く。
+        if (ImGui::GetIO().WantCaptureMouse)                   return;
 
         ImVec2 mouse = ImGui::GetMousePos();
 
@@ -98,8 +101,12 @@ namespace YoRigine {
         if (hasPendingRead_ && pickBuffer_) {
             int pickedId = pickBuffer_->ReadPickResult();
             if (pickedId != -1) {
-                // ReadPickResult が -1 でなければ有効な結果
-                SelectObject(pickedId, pendingMultiSelect_);
+                // 読み取り時点でギズモが Hover/Using ならピック結果を破棄。
+                // フェーズ1のクリック登録 → 結果到着までの 1 フレーム間に
+                // ユーザがギズモにマウスを乗せた/掴んだケースをここで救う。
+                if (!ImGuizmo::IsUsing() && !ImGuizmo::IsOver()) {
+                    SelectObject(pickedId, pendingMultiSelect_);
+                }
                 hasPendingRead_ = false;
             }
             else if (!clicked) {

@@ -70,6 +70,11 @@ namespace YoRigine {
         MotionEditor& GetMotionEditor() { return motionEditor_; }
 
 #ifdef USE_IMGUI
+        // シーンエディタ (オブジェクト選択・ギズモ) が有効かどうか。
+        // オブジェクト一覧ウィンドウが閉じている、または Editor 全体が非表示なら false。
+        // この返り値で ObjectSelector::Update / DrawGizmo を抑制する。
+        bool IsSceneEditorActive() const;
+
         //=========================================================================
         // デバッグ描画設定（SceneEditorUI から操作）
         //=========================================================================
