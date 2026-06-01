@@ -50,6 +50,9 @@ struct AttackCameraKeyframe {
 struct AttackCameraWork {
     std::string name;
     float       totalDuration  = 0.5f;
+    bool        useStartInterpolation      = false; // 再生開始時に Idle -> Playing を補間するか
+    float       startInterpolationDuration = 0.1f;  // 開始時補間時間（0 = 瞬間切り替え）
+    bool        useReturnInterpolation     = true;  // 再生終了時に補間で戻るか
     float       returnDuration = 0.2f;   // 演出終了後に元の状態へ補間で戻る時間（0 = 瞬間切り替え）
     bool        resetOnFinish  = true;   // 終了後にオフセットをリセットするか
     std::vector<AttackCameraKeyframe> keyframes;
@@ -57,6 +60,9 @@ struct AttackCameraWork {
     void Save(nlohmann::json& j) const {
         j["name"]           = name;
         j["totalDuration"]  = totalDuration;
+        j["useStartInterpolation"]      = useStartInterpolation;
+        j["startInterpolationDuration"] = startInterpolationDuration;
+        j["useReturnInterpolation"]     = useReturnInterpolation;
         j["returnDuration"] = returnDuration;
         j["resetOnFinish"]  = resetOnFinish;
         j["keyframes"]     = nlohmann::json::array();
@@ -69,6 +75,9 @@ struct AttackCameraWork {
     void Load(const nlohmann::json& j) {
         name           = j.value("name",           "");
         totalDuration  = j.value("totalDuration",  0.5f);
+        useStartInterpolation      = j.value("useStartInterpolation",      false);
+        startInterpolationDuration = j.value("startInterpolationDuration", 0.1f);
+        useReturnInterpolation     = j.value("useReturnInterpolation",     true);
         returnDuration = j.value("returnDuration", 0.2f);
         resetOnFinish  = j.value("resetOnFinish",  true);
         keyframes.clear();

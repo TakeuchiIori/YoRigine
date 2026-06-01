@@ -78,6 +78,13 @@ private:
     // ============================================================
     void SampleKeyframes(const AttackCameraWork& work, float t);
     void EnterReturning(const AttackCameraWork& work);
+    static Vector3 Lerp(const Vector3& a, const Vector3& b, float t);
+    static float   Lerp(float a, float b, float t);
+    void ApplyInterpolatedState(const Vector3& fromPos, const Vector3& toPos,
+                                const Vector3& fromRot, const Vector3& toRot,
+                                float fromFov, float toFov,
+                                float fromTs, float toTs,
+                                float t);
     void ResetValues();
 
     // ============================================================
@@ -100,6 +107,15 @@ private:
     Vector3 returnFromRot_  = {};
     float   returnFromFov_  = 0.0f;
     float   returnFromTs_   = 1.0f;
+
+    // ---- Playing 開始時補間用 ----
+    bool    useStartInterpolation_   = false;
+    float   startInterpolationTimer_ = 0.0f;
+    float   startInterpolationDuration_ = 0.0f;
+    Vector3 startFromPos_ = {};
+    Vector3 startFromRot_ = {};
+    float   startFromFov_ = 0.0f;
+    float   startFromTs_  = 1.0f;
 
     // ============================================================
     // 補間済みの現在値

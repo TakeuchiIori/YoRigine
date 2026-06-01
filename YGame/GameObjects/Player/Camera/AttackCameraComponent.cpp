@@ -14,6 +14,9 @@ void AttackCameraComponent::Initialize() {
     playTimer_        = 0.0f;
     returnTimer_      = 0.0f;
     returnDuration_   = 0.2f;
+    useStartInterpolation_ = false;
+    startInterpolationTimer_ = 0.0f;
+    startInterpolationDuration_ = 0.0f;
     ResetValues();
 }
 
@@ -54,15 +57,31 @@ void AttackCameraComponent::UpdatePost(float dt) {
     // ----------------------------------------------------------
     case Phase::Playing: {
         const AttackCameraWork* work = FindWork(currentWorkName_);
-        if (!work) { phase_ = Phase::Idle; ResetValues(); break; }
+        if (!work) { phase_ = Phase::Idle; useStartInterpolation_ = false; ResetValues(); break; }
 
         SampleKeyframes(*work, playTimer_);
+
+        if (useStartInterpolation_) {
+            startInterpolationTimer_ += dt;
+            float t = (startInterpolationDuration_ > 0.0f)
+                      ? std::clamp(startInterpolationTimer_ / startInterpolationDuration_, 0.0f, 1.0f)
+                      : 1.0f;
+            ApplyInterpolatedState(startFromPos_, currentPosOffset_,
+                                   startFromRot_, currentRotOffset_,
+                                   startFromFov_, currentFovDelta_,
+                                   startFromTs_, currentTimeScale_,
+                                   t);
+            if (t >= 1.0f) {
+                useStartInterpolation_ = false;
+            }
+        }
 
         if (playTimer_ >= work->totalDuration) {
             if (work->resetOnFinish) {
                 EnterReturning(*work);
             } else {
                 phase_ = Phase::Idle;
+                useStartInterpolation_ = false;
             }
         }
         break;
@@ -77,16 +96,11 @@ void AttackCameraComponent::UpdatePost(float dt) {
 
         // イーズアウト（減速しながら戻る）
         float ease = 1.0f - (1.0f - t) * (1.0f - t);
-
-        auto lerp3 = [](const Vector3& a, const Vector3& b, float f) {
-            return a + (b - a) * f;
-        };
-        auto lerp1 = [](float a, float b, float f) { return a + (b - a) * f; };
-
-        currentPosOffset_  = lerp3(returnFromPos_, {},   ease);
-        currentRotOffset_  = lerp3(returnFromRot_, {},   ease);
-        currentFovDelta_   = lerp1(returnFromFov_,  0.0f, ease);
-        currentTimeScale_  = lerp1(returnFromTs_,   1.0f, ease);
+        ApplyInterpolatedState(returnFromPos_, {},
+                               returnFromRot_, {},
+                               returnFromFov_, 0.0f,
+                               returnFromTs_, 1.0f,
+                               ease);
 
         if (t >= 1.0f) {
             phase_ = Phase::Idle;
@@ -109,6 +123,14 @@ void AttackCameraComponent::Play(const std::string& workName) {
     currentWorkName_ = workName;
     shakeTriggered_.assign(work->keyframes.size(), false);
     ResetValues();
+
+    useStartInterpolation_ = work->useStartInterpolation && work->startInterpolationDuration > 0.0f;
+    startInterpolationTimer_ = 0.0f;
+    startInterpolationDuration_ = work->startInterpolationDuration;
+    startFromPos_ = currentPosOffset_;
+    startFromRot_ = currentRotOffset_;
+    startFromFov_ = currentFovDelta_;
+    startFromTs_  = currentTimeScale_;
 }
 
 // ============================================================
@@ -116,6 +138,7 @@ void AttackCameraComponent::Play(const std::string& workName) {
 // ============================================================
 void AttackCameraComponent::Stop(FollowCamera* /*camera*/) {
     phase_ = Phase::Idle;
+    useStartInterpolation_ = false;
     ResetValues();
 }
 
@@ -205,7 +228,8 @@ void AttackCameraComponent::LoadFromFile(const std::string& filePath) {
 // Returning フェーズへ移行
 // ============================================================
 void AttackCameraComponent::EnterReturning(const AttackCameraWork& work) {
-    if (work.returnDuration <= 0.0f) {
+    useStartInterpolation_ = false;
+    if (!work.useReturnInterpolation || work.returnDuration <= 0.0f) {
         // 瞬間切り替え
         phase_ = Phase::Idle;
         ResetValues();
@@ -219,6 +243,28 @@ void AttackCameraComponent::EnterReturning(const AttackCameraWork& work) {
     returnTimer_    = 0.0f;
     returnDuration_ = work.returnDuration;
     phase_          = Phase::Returning;
+}
+
+// ============================================================
+// 共通補間
+// ============================================================
+Vector3 AttackCameraComponent::Lerp(const Vector3& a, const Vector3& b, float t) {
+    return a + (b - a) * t;
+}
+
+float AttackCameraComponent::Lerp(float a, float b, float t) {
+    return a + (b - a) * t;
+}
+
+void AttackCameraComponent::ApplyInterpolatedState(const Vector3& fromPos, const Vector3& toPos,
+                                                   const Vector3& fromRot, const Vector3& toRot,
+                                                   float fromFov, float toFov,
+                                                   float fromTs, float toTs,
+                                                   float t) {
+    currentPosOffset_ = Lerp(fromPos, toPos, t);
+    currentRotOffset_ = Lerp(fromRot, toRot, t);
+    currentFovDelta_ = Lerp(fromFov, toFov, t);
+    currentTimeScale_ = Lerp(fromTs, toTs, t);
 }
 
 // ============================================================
@@ -237,10 +283,6 @@ void AttackCameraComponent::ResetValues() {
 void AttackCameraComponent::SampleKeyframes(const AttackCameraWork& work, float t) {
     const auto& kfs = work.keyframes;
     if (kfs.empty()) { ResetValues(); return; }
-
-    auto lerp3 = [](const Vector3& a, const Vector3& b, float alpha) {
-        return a + (b - a) * alpha;
-    };
 
     if (t <= kfs.front().time) {
         currentPosOffset_ = kfs.front().posOffset;
@@ -262,10 +304,10 @@ void AttackCameraComponent::SampleKeyframes(const AttackCameraWork& work, float 
             float span  = kfs[i + 1].time - kfs[i].time;
             float alpha = (span > 0.0f) ? (t - kfs[i].time) / span : 0.0f;
 
-            currentPosOffset_  = lerp3(kfs[i].posOffset, kfs[i + 1].posOffset, alpha);
-            currentRotOffset_  = lerp3(kfs[i].rotOffset, kfs[i + 1].rotOffset, alpha);
-            currentFovDelta_   = kfs[i].fovDelta  + (kfs[i + 1].fovDelta  - kfs[i].fovDelta)  * alpha;
-            currentTimeScale_  = kfs[i].timeScale + (kfs[i + 1].timeScale - kfs[i].timeScale) * alpha;
+            currentPosOffset_  = Lerp(kfs[i].posOffset, kfs[i + 1].posOffset, alpha);
+            currentRotOffset_  = Lerp(kfs[i].rotOffset, kfs[i + 1].rotOffset, alpha);
+            currentFovDelta_   = Lerp(kfs[i].fovDelta, kfs[i + 1].fovDelta, alpha);
+            currentTimeScale_  = Lerp(kfs[i].timeScale, kfs[i + 1].timeScale, alpha);
             return;
         }
     }
