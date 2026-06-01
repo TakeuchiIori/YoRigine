@@ -64,6 +64,10 @@ namespace YoRigine {
 
         void DrawMenuBar();
 
+        // ── 配置補助 (メニューから呼ばれる) ──────────────────────────
+        // 選択中オブジェクトを真下方向に Raycast して地面/物体表面に吸着させる
+        void SnapSelectedToSurface();
+
     private:
         float DegToRad(float d) const { return d * (3.14159265359f / 180.0f); }
         float RadToDeg(float r) const { return r * (180.0f / 3.14159265359f); }

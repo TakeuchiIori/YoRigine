@@ -60,10 +60,12 @@ namespace YoRigine {
     {
         if (!isMouseSelecting || !camera_ || !objectManager_) return;
         if (!Editor::GetInstance()->GetShowEditor())           return;
+        // ImGuizmo のハンドルにホバー/操作中はクリックを通さない。
+        // 入口での WantCaptureMouse チェックはゲームビュー自体が ImGui ウィンドウ内のため
+        // 常に true になってしまい、オブジェクトクリックが全部弾かれてしまうので使えない。
+        // 代わりに「フェーズ2 の pick 結果適用時」に再度 IsUsing/IsOver を見ることで、
+        // クリック→結果到着の 1 フレーム間にギズモへ移動したケースを救う (下を参照)。
         if (ImGuizmo::IsUsing() || ImGuizmo::IsOver())         return;
-        // ImGui (ImGuizmo ハンドル含む) がマウスを掴みたがってる間は選択を一切無効化。
-        // 「ギズモを最優先」を実現するため、ピック登録より前にここで弾く。
-        if (ImGui::GetIO().WantCaptureMouse)                   return;
 
         ImVec2 mouse = ImGui::GetMousePos();
 

@@ -314,6 +314,8 @@ void GameScene::DrawScene3DOnly() {
 	skyBox_->Draw();
 	Object3dCommon::GetInstance()->DrawPreference();
 	DrawObject();
+
+	DrawLine();
 }
 
 /// <summary>

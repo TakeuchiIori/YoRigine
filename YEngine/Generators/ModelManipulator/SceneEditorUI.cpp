@@ -9,6 +9,8 @@
 #include <Collision/Core/CollisionTypeIdDef.h>
 #include <Collision/Core/CollisionManager.h>
 #include "Object3D/ObjectManager.h"
+#include "ObjectSelector.h"
+#include "Ray/Raycast.h"
 
 // ImGui
 #include "imgui.h"
@@ -17,74 +19,134 @@ namespace YoRigine {
 
     //=============================================================================
     // メニューバー拡張
+    //
+    // カテゴリ分け:
+    //   ファイル    : 配置データの永続化
+    //   ウィンドウ  : ImGui の各サブウィンドウの表示切替 (ツール窓もここに集約)
+    //   編集        : 配置を楽にするアクション/設定 (スナップ系)
+    //   デバッグ表示: 3D ビューポート上の可視化トグル (コライダー / BroadPhase)
+    //   カリング    : 描画/コリジョンの視錐台カリング設定 (統計表示)
     //=============================================================================
     void SceneEditorUI::DrawMenuBar() {
         if (!ImGui::BeginMenu("シーンオブジェクト")) return;
 
-        if (ImGui::BeginMenu("ビュー")) {
-            ImGui::MenuItem("オブジェクト一覧", nullptr, &showObjectList_);
-            ImGui::MenuItem("トランスフォーム操作", nullptr, &showTransformControls_);
-
-            // ---------------------------------------------------------
-            // コライダーAABBデバッグ表示
-            //  - 全体ON/OFF
-            //  - 有効なコライダーのみ
-            //  - 選択中のみ
-            // ---------------------------------------------------------
-            if (showColliderDebug_ != nullptr) {
-                ImGui::MenuItem("コライダーAABBを表示", nullptr, showColliderDebug_);
-
-                if (showColliderSelectedOnly_ != nullptr) {
-                    ImGui::MenuItem("  選択中のみ表示", nullptr, showColliderSelectedOnly_);
-                }
-            }
-
-            if (showBroadPhaseGrid_ != nullptr) {
-                ImGui::Separator();
-                ImGui::MenuItem("BroadPhase グリッドを表示", nullptr, showBroadPhaseGrid_);
-                if (broadPhaseGridDrawRadius_ != nullptr) {
-                    ImGui::SetNextItemWidth(120.0f);
-                    ImGui::DragFloat("  描画半径", broadPhaseGridDrawRadius_, 1.0f, 5.0f, 500.0f, "%.1f");
-                }
-            }
-
-            if (drawFrustumCulling_ != nullptr) {
-                ImGui::Separator();
-                ImGui::MenuItem("描画 Frustum カリングを有効化", nullptr, drawFrustumCulling_);
-            }
-
-            // コリジョン Frustum カリング (CollisionManager 直結)
-            // 描画用とは別配線。ON/OFF を切り替えると BroadPhase Insert と
-            // ObjectManager::Update の collider->Update() が両方スキップされる。
-            {
-                ImGui::Separator();
-                auto* cm = YoRigine::CollisionManager::GetInstance();
-                bool collisionCulling = cm->GetEnableFrustumCulling();
-                if (ImGui::MenuItem("コリジョン Frustum カリングを有効化", nullptr, &collisionCulling)) {
-                    cm->SetEnableFrustumCulling(collisionCulling);
-                }
-                // culling 統計 (直前フレーム): 視錐台外で Update をスキップした数 / 総オブジェクト数
-                auto* om = ObjectManager::GetInstance();
-                ImGui::Text("  culled %d / %d", om->GetLastFrameCulledCount(), om->GetLastFrameTotalCount());
-            }
-
-            ImGui::EndMenu();
-        }
-
+        // ── ファイル ────────────────────────────────────────────
         if (ImGui::BeginMenu("ファイル")) {
             if (ImGui::MenuItem("配置を保存") && saveCallback_) saveCallback_();
             if (ImGui::MenuItem("配置を読み込み") && loadCallback_) loadCallback_();
             ImGui::EndMenu();
         }
 
-        if (ImGui::BeginMenu("Tools")) {
+        // ── ウィンドウ ───────────────────────────────────────────
+        if (ImGui::BeginMenu("ウィンドウ")) {
+            ImGui::MenuItem("オブジェクト一覧", nullptr, &showObjectList_);
+            ImGui::MenuItem("トランスフォーム操作", nullptr, &showTransformControls_);
+            ImGui::Separator();
             ImGui::MenuItem("複製ツール", nullptr, &showDuplicateWindow_);
             ImGui::MenuItem("プレファブ", nullptr, &showPrefabWindow_);
             ImGui::MenuItem("コライダー設定", nullptr, &showColliderTemplates_);
             ImGui::EndMenu();
         }
 
+        // ── 編集 (配置補助系) ───────────────────────────────────
+        if (ImGui::BeginMenu("編集")) {
+            // サーフェススナップ (選択中を真下に Raycast して表面に吸着)
+            const bool hasSel = (selector_ && selector_->HasSelection());
+            if (!hasSel) ImGui::BeginDisabled();
+            if (ImGui::MenuItem("選択中を地面に吸着", "Ctrl+G")) {
+                SnapSelectedToSurface();
+            }
+            if (!hasSel) ImGui::EndDisabled();
+
+            // グリッドスナップ (GizmoController の useSnap/snapValues を直接操作)
+            if (gizmoCtrl_) {
+                ImGui::Separator();
+                bool useSnap = gizmoCtrl_->IsUsingSnap();
+                if (ImGui::MenuItem("グリッドスナップ", nullptr, useSnap)) {
+                    gizmoCtrl_->SetUseSnap(!useSnap);
+                }
+                Vector3 snap = gizmoCtrl_->GetSnapValues();
+                ImGui::SetNextItemWidth(160.0f);
+                if (ImGui::DragFloat3("  グリッド間隔", &snap.x, 0.1f, 0.1f, 100.0f, "%.2f")) {
+                    gizmoCtrl_->SetSnapValues(snap);
+                }
+                float rotSnap = gizmoCtrl_->GetRotationSnap();
+                ImGui::SetNextItemWidth(160.0f);
+                if (ImGui::DragFloat("  回転スナップ (deg)", &rotSnap, 0.5f, 0.5f, 90.0f, "%.1f")) {
+                    gizmoCtrl_->SetRotationSnap(rotSnap);
+                }
+            }
+            ImGui::EndMenu();
+        }
+
+        // ── デバッグ表示 (3D ビューポートのオーバーレイ) ─────────
+        if (ImGui::BeginMenu("デバッグ表示")) {
+            if (showColliderDebug_) {
+                ImGui::MenuItem("コライダーAABBを表示", nullptr, showColliderDebug_);
+                if (showColliderSelectedOnly_) {
+                    ImGui::MenuItem("  選択中のみ表示", nullptr, showColliderSelectedOnly_);
+                }
+            }
+            if (showBroadPhaseGrid_) {
+                ImGui::Separator();
+                ImGui::MenuItem("BroadPhase グリッドを表示", nullptr, showBroadPhaseGrid_);
+                if (broadPhaseGridDrawRadius_) {
+                    ImGui::SetNextItemWidth(120.0f);
+                    ImGui::DragFloat("  描画半径", broadPhaseGridDrawRadius_, 1.0f, 5.0f, 500.0f, "%.1f");
+                }
+            }
+            ImGui::EndMenu();
+        }
+
+        // ── カリング (描画 + コリジョンを並列表示) ───────────────
+        if (ImGui::BeginMenu("カリング")) {
+            if (drawFrustumCulling_) {
+                ImGui::MenuItem("描画 Frustum カリング", nullptr, drawFrustumCulling_);
+            }
+            {
+                auto* cm = YoRigine::CollisionManager::GetInstance();
+                bool collisionCulling = cm->GetEnableFrustumCulling();
+                if (ImGui::MenuItem("コリジョン Frustum カリング", nullptr, &collisionCulling)) {
+                    cm->SetEnableFrustumCulling(collisionCulling);
+                }
+                auto* om = ObjectManager::GetInstance();
+                ImGui::Text("  culled %d / %d", om->GetLastFrameCulledCount(), om->GetLastFrameTotalCount());
+            }
+            ImGui::EndMenu();
+        }
+
         ImGui::EndMenu();
+    }
+
+
+    //=============================================================================
+    // 配置補助: 選択中オブジェクトを真下方向に Raycast して表面に吸着させる
+    //=============================================================================
+    void SceneEditorUI::SnapSelectedToSurface() {
+        if (!selector_ || !objectManager_) return;
+        auto* cm = YoRigine::CollisionManager::GetInstance();
+        if (!cm) return;
+
+        for (int id : selector_->GetSelectedIds()) {
+            auto* obj = objectManager_->GetObjectById(id);
+            if (!obj) continue;
+
+            // 自オブジェクトのコライダーを一時的に無効化 (自分自身に当たらないように)
+            const bool wasEnabled = obj->collider && obj->collider->IsCollisionEnabled();
+            if (wasEnabled) obj->collider->SetCollisionEnabled(false);
+
+            Ray ray{};
+            ray.origin    = { obj->position.x, obj->position.y + 100.0f, obj->position.z };
+            ray.direction = { 0.0f, -1.0f, 0.0f };
+
+            RaycastHit hit;
+            if (cm->Raycast(ray, 500.0f, &hit, {})) {
+                obj->position = hit.hitPoint;
+                objectManager_->UpdateObjectTransform(*obj);
+            }
+
+            if (wasEnabled) obj->collider->SetCollisionEnabled(true);
+        }
     }
 
 

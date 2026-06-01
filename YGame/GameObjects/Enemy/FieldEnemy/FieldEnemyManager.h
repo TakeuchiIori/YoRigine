@@ -29,6 +29,11 @@ struct FieldEnemySpawnData {
 	// ★エディター用追加フィールド
 	std::string comment;  // スポーンポイントのメモ
 	bool isEditorOnly = false;  // エディター専用フラグ
+
+	// 起動時 (LoadEnemySpawnData) で自動スポーンするか。
+	// false にすると配置だけ登録されて敵は生成されず、エディタの
+	// 「全スポーンを実行」やリスポーンキュー経由で後から出現させられる。
+	bool spawnOnLoad = true;
 };
 
 ///************************* エンカウント情報構造体 *************************///
@@ -108,6 +113,14 @@ public:
 
 	// 敵エンカウント時の処理
 	void OnEnemyEncounter(FieldEnemy* enemy);
+
+	// spawnDataMap_ に登録されているすべてのスポーンポイントについて、
+	// まだ実体が出ていないものを一気にスポーンさせる (バッチ起動用)。
+	void SpawnAllPending();
+
+	// 現在フィールドにいる敵をすべてデスポーン (リスポーンキューも空にする)。
+	// spawnDataMap_ の登録自体は残るので、再度 SpawnAllPending で出現可能。
+	void DespawnAll();
 private:
 	///************************* 内部処理 *************************///
 	// 非アクティブな敵を削除

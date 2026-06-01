@@ -430,6 +430,11 @@ namespace YoRigine {
 	// ============================================================
 	void ModelManipulator::ShortcutKey() {
 #ifdef USE_IMGUI
+		// テキスト入力中は誤発火させない
+		if (ImGui::GetIO().WantCaptureKeyboard) return;
+		// シーンエディタ非アクティブ中は無効
+		if (!IsSceneEditorActive()) return;
+
 		ImGuiIO& io = ImGui::GetIO();
 		if (io.KeyCtrl) {
 			if (ImGui::IsKeyPressed(ImGuiKey_C)) {
@@ -437,6 +442,10 @@ namespace YoRigine {
 			}
 			if (ImGui::IsKeyPressed(ImGuiKey_V)) {
 				PasteObject();
+			}
+			// Ctrl+G : 選択中を地面に吸着 (Snap to surface)
+			if (ImGui::IsKeyPressed(ImGuiKey_G)) {
+				editorUI_.SnapSelectedToSurface();
 			}
 		}
 #endif

@@ -204,6 +204,46 @@ void FieldEnemyManager::ResetEnCount()
 	}
 }
 
+/// <summary>
+/// 登録済みスポーンポイントのうち、まだ実体が出ていないものを一気にスポーン
+/// </summary>
+void FieldEnemyManager::SpawnAllPending() {
+	int spawned = 0;
+	int skipped = 0;
+	// SpawnFieldEnemy は内部で spawnDataMap_ を書き換える可能性があるため、
+	// イテレーションする前にスナップショットを取る。
+	std::vector<FieldEnemySpawnData> snapshot;
+	snapshot.reserve(spawnDataMap_.size());
+	for (const auto& [id, data] : spawnDataMap_) {
+		snapshot.push_back(data);
+	}
+	for (const auto& data : snapshot) {
+		// すでに実体が出ているスポーンはスキップ
+		if (GetFieldEnemyById(data.id) != nullptr) {
+			++skipped;
+			continue;
+		}
+		// SpawnFieldEnemy は撃破済 / enemyData 未定義などの場合 early return する
+		SpawnFieldEnemy(data);
+		// 上の呼び出しで実体が増えていれば成功
+		if (GetFieldEnemyById(data.id) != nullptr) ++spawned;
+	}
+	Logger("[FieldEnemyManager] SpawnAllPending: spawned=" + std::to_string(spawned)
+		+ " skipped(already alive)=" + std::to_string(skipped) + "\n");
+}
+
+/// <summary>
+/// 現在フィールドにいる敵を全部消す (spawnDataMap_ は維持)
+/// </summary>
+void FieldEnemyManager::DespawnAll() {
+	const int killed = static_cast<int>(fieldEnemies_.size());
+	fieldEnemies_.clear();
+	respawnQueue_.clear();
+	encounterOccurred_ = false;
+	encounterCooldown_ = 0.0f;
+	Logger("[FieldEnemyManager] DespawnAll: removed " + std::to_string(killed) + " enemies\n");
+}
+
 /// 敵をスポーンさせる
 /// </summary>
 /// <param name="spawnData">スポーンデータ</param>
@@ -735,6 +775,7 @@ void FieldEnemyManager::SaveEnemySpawnData(const std::string& filePath) {
 			spawnJson["spawnCondition"] = data.spawnCondition;
 			spawnJson["respawnAfterBattle"] = data.respawnAfterBattle;
 			spawnJson["respawnDelay"] = data.respawnDelay;
+			spawnJson["spawnOnLoad"] = data.spawnOnLoad;
 
 			json["spawnPoints"].push_back(spawnJson);
 		}
@@ -796,8 +837,13 @@ void FieldEnemyManager::LoadEnemySpawnData(const std::string& filePath) {
 			// 先にスポーンマップへ登録 (敵データ未定義でもマーカーは見えるようにするため)。
 			// SpawnFieldEnemy は enemyDataMap_ に該当データが無いと早期 return するが、
 			// その場合でもエディタ用に位置を可視化したいので spawnDataMap_ には残す。
+			spawnData.spawnOnLoad = spawnJson.value("spawnOnLoad", true);
 			spawnDataMap_[spawnData.id] = spawnData;
-			SpawnFieldEnemy(spawnData);
+			// spawnOnLoad=false なら自動スポーンせず配置だけ登録する。
+			// 後でエディタの「全スポーンを実行」やリスポーン経由で出現させられる。
+			if (spawnData.spawnOnLoad) {
+				SpawnFieldEnemy(spawnData);
+			}
 		}
 
 		Logger("[FieldEnemyManager] JSONから" + std::to_string(json["spawnPoints"].size()) +
@@ -1277,6 +1323,14 @@ void FieldEnemyManager::ShowSpawnPointEditor() {
 	}
 
 	ImGui::SameLine();
+	if (ImGui::Button("全スポーンを実行", ImVec2(140, 30))) {
+		SpawnAllPending();
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("全敵をデスポーン", ImVec2(140, 30))) {
+		DespawnAll();
+	}
+	ImGui::SameLine();
 	if (ImGui::Checkbox("敵を隠してスポーン点だけ表示", &editorHideEnemies_)) {
 		// 切替時にコライダーも有効/無効を揃える (バトル中の挙動と同じ理由で必要)
 		for (auto& enemy : fieldEnemies_) {
@@ -1328,6 +1382,14 @@ void FieldEnemyManager::ShowSpawnPointEditor() {
 			if (it != spawnDataMap_.end()) {
 				it->second.position = editorSpawnData_.position;
 			}
+		}
+
+		ImGui::Separator();
+		ImGui::Text("=== スポーン制御 ===");
+		ImGui::Checkbox("起動時にスポーン", &editorSpawnData_.spawnOnLoad);
+		if (!editorSpawnData_.spawnOnLoad) {
+			ImGui::SameLine();
+			ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f), " (バッチスポーン待機)");
 		}
 
 		ImGui::Separator();
