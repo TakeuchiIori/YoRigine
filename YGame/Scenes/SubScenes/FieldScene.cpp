@@ -2,7 +2,6 @@
 
 // Engine
 #include "Systems./Input./Input.h"
-#include "Particle./ParticleManager.h"
 #include "Object3D/Object3dCommon.h"
 #include "LightManager/LightManager.h"
 #include "Collision/Core/CollisionManager.h"
@@ -31,7 +30,6 @@ void FieldScene::Initialize(Camera* camera, Player* player) {
 	ground_ = std::make_unique<Ground>();
 	ground_->Initialize(sceneCamera_);
 
-	emitter_ = std::make_unique<ParticleEmitter>("TestParticle", Vector3{ 0.0f, 0.0f, 0.0f }, 5);
 
 	line_ = std::make_unique<Line>();
 	line_->Initialize();

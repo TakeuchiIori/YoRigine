@@ -13,6 +13,7 @@
 #include "States/FieldEnemyPatrolState.h"
 #include "States/FieldEnemyChaseState.h"
 #include <Collision/AreaCollision/Base/AreaManager.h>
+#include <LightManager/LightManager.h>
 
 // ============================================================
 // コンストラクタ

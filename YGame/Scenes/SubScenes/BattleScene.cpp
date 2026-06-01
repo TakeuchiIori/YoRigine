@@ -7,7 +7,6 @@
 #include "LightManager/LightManager.h"
 #include "Systems/GameTime/GameTime.h"
 #include <Editor/Editor.h>
-#include "Particle/ParticleManager.h"
 
 #include <UI/Damage/DamageNumberManager.h>
 #ifdef USE_IMGUI

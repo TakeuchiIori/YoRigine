@@ -7,7 +7,6 @@
 // Engine
 #include <SceneSystems/BaseScene.h>
 #include "Systems/Audio/Audio.h"
-#include "Particle/ParticleManager.h"
 #include "CubeMap/CubeMap.h"
 #include "GPUParticle/GPUEmitter.h"
 

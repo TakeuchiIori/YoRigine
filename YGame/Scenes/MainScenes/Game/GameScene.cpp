@@ -2,7 +2,6 @@
 
 // Engine
 #include <SceneSystems/SceneManager.h>
-#include "Particle./ParticleManager.h"
 #include "Object3D/Object3dCommon.h"
 #include "LightManager/LightManager.h"
 #include "Collision/Core/CollisionManager.h"
@@ -115,7 +114,6 @@ void GameScene::Initialize() {
 	skyBox_->Initialize(sceneCamera_.get(), "Resources/DDS/vz_classic_cubemap_ue.dds");
 
 
-	YoRigine::ParticleManager::GetInstance()->SetCamera(sceneCamera_.get());
 	YoRigine::ModelManipulator::GetInstance()->SetCamera(sceneCamera_.get());
 	YoRigine::GpuEmitManager::GetInstance()->SetCamera(sceneCamera_.get());
 
@@ -262,7 +260,6 @@ void GameScene::Update() {
 
 	YoRigine::ModelManipulator::GetInstance()->Update();
 	YoRigine::CollisionManager::GetInstance()->Update();
-	YoRigine::ParticleManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
 	YParticleManager::GetInstance().Update(YoRigine::GameTime::GetDeltaTime());
 	YoRigine::LightManager::GetInstance()->UpdateShadowMatrix(sceneCamera_.get());
 	YoRigine::LightManager::GetInstance()->TransferData();
@@ -289,7 +286,6 @@ void GameScene::Draw() {
 	//------------------------------------------------------------
 	// パーティクル描画
 	//------------------------------------------------------------
-	YoRigine::ParticleManager::GetInstance()->Draw();
 	YParticleManager::GetInstance().Draw();
 	DrawLine();
 	YoRigine::GpuEmitManager::GetInstance()->Draw();

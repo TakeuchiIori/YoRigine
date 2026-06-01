@@ -5,7 +5,6 @@
 #include <Systems/Camera/Camera.h>
 #include <Systems/GameTime/GameTime.h>
 #include <Collision/Core/CollisionManager.h>
-#include <Particle/ParticleManager.h>
 #include <ModelManipulator/ModelManipulator.h>
 #include <LightManager/LightManager.h>
 

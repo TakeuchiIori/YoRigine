@@ -3,7 +3,6 @@
 // Engine
 #include "Sprite/Sprite.h"
 #include "Systems/Input./Input.h"
-#include <Particle/ParticleEmitter.h>
 #include "Systems/Camera/Virtuals/FollowCamera/FollowCamera.h"
 
 // Math
@@ -83,7 +82,6 @@ private:
 	YoRigine::Input* input_ = nullptr;
 	FollowCamera* followCamera_ = nullptr;
 
-	std::unique_ptr<ParticleEmitter> particleEmitter_;
 	std::unique_ptr<PlayerSword> playerSword_;
 	std::unique_ptr<PlayerShield> playerShield_;
 	std::unique_ptr<Line> boneLine_;

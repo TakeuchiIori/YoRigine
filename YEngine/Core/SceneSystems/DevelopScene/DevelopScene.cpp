@@ -15,7 +15,6 @@
 #include "LightManager/LightManager.h"
 #include "Collision/AreaCollision/Base/AreaManager.h"
 
-#include "Particle./ParticleManager.h"
 #include "Particle/YParticleManager.h"
 #include "Particle/YParticleEditor.h"
 #include "Particle/YEmitterGroupEditor.h"
@@ -74,7 +73,6 @@ void DevelopScene::Initialize() {
 	YoRigine::VfxMeshEditor::GetInstance()->Initialize();
 	YoRigine::VfxMeshEditor::GetInstance()->SetCamera(sceneCamera_.get());
 #endif
-	YoRigine::ParticleManager::GetInstance()->SetCamera(sceneCamera_.get());
 	YoRigine::ModelManipulator::GetInstance()->SetCamera(sceneCamera_.get());
 	YoRigine::ModelManipulator::GetInstance()->LoadScene("DevelopScene");
 
@@ -115,7 +113,6 @@ void DevelopScene::Update() {
 
 	YoRigine::CollisionManager::GetInstance()->Update();
 	YoRigine::ModelManipulator::GetInstance()->Update();
-	YoRigine::ParticleManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
 	YParticleManager::GetInstance().Update(YoRigine::GameTime::GetDeltaTime());
 	YoRigine::LightManager::GetInstance()->UpdateShadowMatrix(sceneCamera_.get());
 	YoRigine::GpuEmitManager::GetInstance()->Update();
@@ -139,7 +136,6 @@ void DevelopScene::Draw() {
 	//------------------------------------------------------------
 	// パーティクル描画
 	//------------------------------------------------------------
-	YoRigine::ParticleManager::GetInstance()->Draw();
 	YParticleManager::GetInstance().Draw();
 	DrawLine();
 	YoRigine::GpuEmitManager::GetInstance()->Draw();
