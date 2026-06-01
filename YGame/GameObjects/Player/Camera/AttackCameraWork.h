@@ -8,35 +8,35 @@
 // 1 キーフレーム
 // ============================================================
 struct AttackCameraKeyframe {
-    float   time            = 0.0f;  // 発火時刻（秒）
+    float   time = 0.0f;  // 発火時刻（秒）
 
     // ---- 位置 / 方向 ----
-    Vector3 posOffset       = {};    // カメラローカル空間での位置追加オフセット
-    Vector3 rotOffset       = {};    // 回転追加量（pitch, yaw, roll）ラジアン
-    float   fovDelta        = 0.0f;  // 基準 FOV からの差分（ラジアン）
+    Vector3 posOffset = {};    // カメラローカル空間での位置追加オフセット
+    Vector3 rotOffset = {};    // 回転追加量（pitch, yaw, roll）ラジアン
+    float   fovDelta = 0.0f;  // 基準 FOV からの差分（ラジアン）
 
     // ---- シェイク ----
-    float   shakeIntensity  = 0.0f;  // シェイク強さ（0 = なし）
-    float   shakeDuration   = 0.0f;  // シェイク長さ（秒）
+    float   shakeIntensity = 0.0f;  // シェイク強さ（0 = なし）
+    float   shakeDuration = 0.0f;  // シェイク長さ（秒）
 
     // ---- タイムスケール ----
-    float   timeScale       = 1.0f;  // ゲーム速度倍率（1.0 = 通常、0.3 = スロー）
+    float   timeScale = 1.0f;  // ゲーム速度倍率（1.0 = 通常、0.3 = スロー）
 
     void Save(nlohmann::json& j) const {
-        j["time"]           = time;
-        j["posOffset"]      = { posOffset.x, posOffset.y, posOffset.z };
-        j["rotOffset"]      = { rotOffset.x, rotOffset.y, rotOffset.z };
-        j["fovDelta"]       = fovDelta;
+        j["time"] = time;
+        j["posOffset"] = { posOffset.x, posOffset.y, posOffset.z };
+        j["rotOffset"] = { rotOffset.x, rotOffset.y, rotOffset.z };
+        j["fovDelta"] = fovDelta;
         j["shakeIntensity"] = shakeIntensity;
-        j["shakeDuration"]  = shakeDuration;
-        j["timeScale"]      = timeScale;
+        j["shakeDuration"] = shakeDuration;
+        j["timeScale"] = timeScale;
     }
     void Load(const nlohmann::json& j) {
-        time           = j.value("time",           0.0f);
-        fovDelta       = j.value("fovDelta",       0.0f);
+        time = j.value("time", 0.0f);
+        fovDelta = j.value("fovDelta", 0.0f);
         shakeIntensity = j.value("shakeIntensity", 0.0f);
-        shakeDuration  = j.value("shakeDuration",  0.0f);
-        timeScale      = j.value("timeScale",      1.0f);
+        shakeDuration = j.value("shakeDuration", 0.0f);
+        timeScale = j.value("timeScale", 1.0f);
         if (j.contains("posOffset"))
             posOffset = { j["posOffset"][0], j["posOffset"][1], j["posOffset"][2] };
         if (j.contains("rotOffset"))
@@ -49,17 +49,28 @@ struct AttackCameraKeyframe {
 // ============================================================
 struct AttackCameraWork {
     std::string name;
-    float       totalDuration  = 0.5f;
-    float       returnDuration = 0.2f;   // 演出終了後に元の状態へ補間で戻る時間（0 = 瞬間切り替え）
-    bool        resetOnFinish  = true;   // 終了後にオフセットをリセットするか
+    float       totalDuration = 0.5f;
+    float       returnDuration = 0.2f;     // 演出終了後に元の状態へ補間で戻る時間（0 = 瞬間切り替え）
+    bool        resetOnFinish = true;     // 終了後にオフセットをリセットするか
+
+    // ============================================================
+    // 補間設定
+    // ============================================================
+    bool        useStartInterpolation = true;   // 開始時の補間を使用するか
+    float       startInterpolationDuration = 0.2f;  // 開始時補間の時間
+    bool        useReturnInterpolation = true;    // 終了時の補間を使用するか
+
     std::vector<AttackCameraKeyframe> keyframes;
 
     void Save(nlohmann::json& j) const {
-        j["name"]           = name;
-        j["totalDuration"]  = totalDuration;
+        j["name"] = name;
+        j["totalDuration"] = totalDuration;
         j["returnDuration"] = returnDuration;
-        j["resetOnFinish"]  = resetOnFinish;
-        j["keyframes"]     = nlohmann::json::array();
+        j["resetOnFinish"] = resetOnFinish;
+        j["useStartInterpolation"] = useStartInterpolation;
+        j["startInterpolationDuration"] = startInterpolationDuration;
+        j["useReturnInterpolation"] = useReturnInterpolation;
+        j["keyframes"] = nlohmann::json::array();
         for (const auto& kf : keyframes) {
             nlohmann::json kfj;
             kf.Save(kfj);
@@ -67,10 +78,13 @@ struct AttackCameraWork {
         }
     }
     void Load(const nlohmann::json& j) {
-        name           = j.value("name",           "");
-        totalDuration  = j.value("totalDuration",  0.5f);
+        name = j.value("name", "");
+        totalDuration = j.value("totalDuration", 0.5f);
         returnDuration = j.value("returnDuration", 0.2f);
-        resetOnFinish  = j.value("resetOnFinish",  true);
+        resetOnFinish = j.value("resetOnFinish", true);
+        useStartInterpolation = j.value("useStartInterpolation", false);
+        startInterpolationDuration = j.value("startInterpolationDuration", 0.2f);
+        useReturnInterpolation = j.value("useReturnInterpolation", true);
         keyframes.clear();
         if (j.contains("keyframes")) {
             for (const auto& kfj : j["keyframes"]) {

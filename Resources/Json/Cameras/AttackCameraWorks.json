@@ -1,0 +1,32 @@
+{
+    "works": [
+        {
+            "keyframes": [
+                {
+                    "fovDelta": -0.014999999664723873,
+                    "posOffset": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "rotOffset": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "shakeDuration": 0.0,
+                    "shakeIntensity": 0.0,
+                    "time": 0.25,
+                    "timeScale": 1.0
+                }
+            ],
+            "name": "A1",
+            "resetOnFinish": true,
+            "returnDuration": 0.20000000298023224,
+            "startInterpolationDuration": 0.20000000298023224,
+            "totalDuration": 0.5,
+            "useReturnInterpolation": true,
+            "useStartInterpolation": true
+        }
+    ]
+}

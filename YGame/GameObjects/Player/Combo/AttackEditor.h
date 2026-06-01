@@ -73,7 +73,7 @@ private:
 	// メンバ変数
 	// ============================================================
 	std::vector<AttackData>* attacks_ = nullptr;
-	Player* player_ = nullptr; // カメラワークの選択肢を取得するためのプレイヤーへのポインタ
+	Player* player_ = nullptr;
 	int currentIndex_ = -1;
 	int prevIndex_ = -1;
 

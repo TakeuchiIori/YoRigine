@@ -231,8 +231,7 @@ void AttackDataEditor::DrawAttackDetail()
 			}
 
 			// 2. 現在の攻撃データに設定されているカメラ名が、リストの何番目にあるか探す
-			// ※ attackData.cameraWorkName は現在編集中の AttackData のメンバ変数と仮定
-			int currentIdx = 0;
+			int currentIdx = -1;
 			for (int i = 0; i < static_cast<int>(cameraNames.size()); ++i) {
 				if (cameraNames[i] == atk.playCameraWorkName) {
 					currentIdx = i;
@@ -240,16 +239,22 @@ void AttackDataEditor::DrawAttackDetail()
 				}
 			}
 
+			// 未設定の場合は "(未設定)" を表示
+			const char* previewLabel = (currentIdx >= 0) ? cameraNames[currentIdx].c_str() : "(未設定)";
+
 			// 3. ImGui のコンボボックスを表示
-			if (ImGui::BeginCombo("使用するカメラワーク", cameraNames[currentIdx].c_str())) {
+			if (ImGui::BeginCombo("使用するカメラワーク", previewLabel)) {
+				// 未設定に戻す選択肢
+				if (ImGui::Selectable("(未設定)", currentIdx < 0)) {
+					atk.playCameraWorkName = "";
+					changed = true;
+				}
 				for (int i = 0; i < static_cast<int>(cameraNames.size()); ++i) {
 					const bool isSelected = (currentIdx == i);
 					if (ImGui::Selectable(cameraNames[i].c_str(), isSelected)) {
-						// 選択されたら攻撃データのカメラ名を更新
 						atk.playCameraWorkName = cameraNames[i];
+						changed = true;
 					}
-
-					// 初期フォーカスを設定
 					if (isSelected) {
 						ImGui::SetItemDefaultFocus();
 					}

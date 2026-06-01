@@ -42,7 +42,7 @@ void PlayerCamera::Initialize(FollowCamera* followCamera, const WorldTransform* 
     attackCamera_.Initialize();
 
     // デフォルトのカメラワークファイルを読み込む（あれば）
-    const std::string defaultPath = "Resources/Json/Camera/AttackCameraWorks.json";
+    const std::string defaultPath = "Resources/Json/Cameras/AttackCameraWorks.json";
     if (std::filesystem::exists(defaultPath)) {
         attackCamera_.LoadFromFile(defaultPath);
     }
@@ -110,8 +110,8 @@ void PlayerCamera::ApplyPostDirector(Camera* sceneCamera, float dt) {
     // キーフレーム補間値を更新
     attackCamera_.UpdatePost(dt);
 
-    if (!attackCamera_.IsPlaying()) {
-        // 演出が Idle になったフレームでタイムスケールをリセット
+    if (!attackCamera_.IsActive()) {
+        // 演出が完全に終了したフレームでタイムスケールをリセット
         YoRigine::GameTime::SetTimeScale(1.0f);
         return;
     }
