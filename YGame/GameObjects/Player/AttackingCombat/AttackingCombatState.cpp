@@ -133,6 +133,9 @@ void AttackingCombatState::OnExit() {
 	player->GetSword()->SetEnableCollider(false);
 	player->GetObject3d()->SetMotionSpeed(player->GetMotionSpeed(0));
 
+	// 被弾・スタンなどで攻撃が中断された場合に古い入力で次が暴発しないよう破棄
+	combat_->ClearBufferedAttack();
+
 	combat_->GetCombo()->OnAttackFinished();
 
 	// Movementステートに現在の状態に応じたアニメーション再生を委譲
@@ -164,9 +167,13 @@ void AttackingCombatState::Update([[maybe_unused]] float deltaTime) {
 		(currentFrame < currentAttack->hitEnd);
 	player->GetSword()->SetEnableCollider(inHitWindow);
 
-	// 3. 先行入力（バッファ）受付
-	// inputBufferStart に到達したら、押されたボタンを記憶する
-	if (currentFrame >= currentAttack->inputBufferStart) {
+	// 3. 先行入力受付：inputBufferStart 〜 comboWindowEnd の間に押された入力をバッファに積む
+	//    （ここでは発火しない。現在の攻撃モーションは最後まで再生する）
+	const bool inInputWindow =
+		currentFrame >= currentAttack->inputBufferStart &&
+		currentFrame <= currentAttack->comboWindowEnd;
+
+	if (inInputWindow) {
 		if (player->IsAttackPressedA()) {
 			combat_->BufferAttack(AttackType::A_Arte);
 		}
@@ -175,21 +182,12 @@ void AttackingCombatState::Update([[maybe_unused]] float deltaTime) {
 		}
 	}
 
-	// 4. キャンセル可能フレームに入ったら、バッファされた入力をTryAttackで発火する
-	if (currentFrame >= currentAttack->comboWindowStart && currentFrame <= currentAttack->comboWindowEnd) {
+	// 4. アニメーション終了：バッファされた先行入力があれば即時に次の攻撃へ、なければ Idle に戻る
+	if (stateTimer_ >= currentAttack->duration) {
 		if (combat_->HasBufferedAttack()) {
 			AttackType next = combat_->PopBufferedAttack();
 			if (combat_->TryAttack(next)) return;
 		}
-	}
-
-	// 5. キャンセル可能フレームを越えたらバッファ破棄（古い入力で次が暴発しないように）
-	if (currentFrame > currentAttack->comboWindowEnd) {
-		combat_->ClearBufferedAttack();
-	}
-
-	// 6. アニメーション終了判定
-	if (stateTimer_ >= currentAttack->duration) {
 		combat_->ChangeState(CombatState::Idle);
 	}
 }

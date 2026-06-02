@@ -76,14 +76,6 @@ private:
     static constexpr float kPopSettle = 0.15f;          // ポップインが終わる時刻（正規化）
     static constexpr float kFadeStart = 0.70f;          // フェードアウト開始時刻（正規化）
 
-    // ── 表示サイズ ──────────────────────────────────────────────
-    // テクスチャの1桁サイズに合わせて調整する。
-    // UINumber::Initialize() 内で digitTexWidth_ = textureWidth/10 が計算されるが、
-    // ここで指定した値が Sprite::SetSize() の表示ピクセルサイズになる。
-    // 見た目が大きすぎる/小さすぎる場合はこの値を変える。
-    static constexpr float kDigitHeight = 50.0f;  // 通常ダメージの1桁表示サイズ（px）
-    static constexpr float kSineScaleMult = 1.3f;   // sine（倍率攻撃）はやや大きく
-
     // ============================================================
     // テクスチャパス
     // ============================================================
@@ -99,5 +91,9 @@ private:
     std::vector<DamagePopupEntry> sinePool_;
 	std::unique_ptr<YoRigine::JsonManager> jsonManager_;
 
-	float offsetY_ = 5.0f; // ワールド→スクリーン変換後のYオフセット（px）
+	// JSON調整可能なパラメータ群
+	float offsetY_       = 5.0f;   // ワールド→スクリーン変換後のYオフセット（px）
+	float worldOffsetY_  = 3.0f;   // SpawnDamage に渡されたワールド座標へ加算するY（敵の頭上）
+	float digitHeight_   = 50.0f;  // 通常ダメージの1桁表示サイズ（px）
+	float sineScaleMult_ = 1.3f;   // sine（倍率攻撃）のサイズ倍率
 };

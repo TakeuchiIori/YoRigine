@@ -1,3 +1,6 @@
 {
-    "offsetY": 5.0
+    "digitHeight": 69.5999984741211,
+    "offsetY": 0.10000000149011612,
+    "sineScaleMult": 2.299999952316284,
+    "worldOffsetY": 6.0
 }

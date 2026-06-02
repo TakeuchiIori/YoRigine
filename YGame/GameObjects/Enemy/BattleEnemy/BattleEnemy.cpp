@@ -305,14 +305,9 @@ void BattleEnemy::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 			int damage = static_cast<int>(player_->GetCombat()->GetCombo()->GetCurrentDamage());
 			TakeDamage(damage);
 
-			// ダメージ数値UIをスポーン 
-			// ヒット位置は敵の腰〜胸あたり（+1.0f）に表示
-			Vector3 hitPos = wt_.translate_;
-			hitPos.y += 1.0f;
-
+			// ダメージ数値UIをスポーン（頭上Yオフセットは DamageNumberManager 側でJSON調整）
 			bool isSine = (player_->GetCombat()->GetComboDamageMultiplier() > 1.0f);
-
-			DamageNumberManager::GetInstance()->SpawnDamage(damage, hitPos, isSine);
+			DamageNumberManager::GetInstance()->SpawnDamage(damage, wt_.translate_, isSine);
 			// --------------------- ヒットエフェクトの処理 --------------------- //
 			//auto* enemyHitEmitterGroup_ = YEmitterGroupManager::GetInstance().GetGroup("EnemyHit");
 			//if (enemyHitEmitterGroup_) {

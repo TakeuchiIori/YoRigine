@@ -117,22 +117,15 @@ void Player::HandleCombatInput() {
 	const bool pressedA = input_->IsPadTriggered(0, GamePadButton::A);
 	const bool pressedB = input_->IsPadTriggered(0, GamePadButton::B);
 
-	// 攻撃中は AttackingCombatState 側で先行入力をバッファ／消費するため、
-	// ここでは入力をバッファに積むだけにする（直接 TryAttack はしない）
-	if (combat_->IsAttacking()) {
-		if (pressedA) combat_->BufferAttack(AttackType::A_Arte);
-		else if (pressedB) combat_->BufferAttack(AttackType::B_Arte);
-		return;
-	}
-
+	// 攻撃中の入力は AttackingCombatState が AttackData の inputBufferStart に従ってバッファ管理する
 	if (!combat_->IsIdle()) return;
 
-	// A（軽攻撃）
+	// A（軽攻撃）コンボ開始
 	if (pressedA) {
 		combat_->TryAttack(AttackType::A_Arte);
 	}
 
-	// B（重攻撃）
+	// B（重攻撃）コンボ開始
 	if (pressedB) {
 		combat_->TryAttack(AttackType::B_Arte);
 	}
