@@ -72,6 +72,15 @@ namespace YoRigine {
 		/// バックバッファパス開始（OffScreen / Depth を SRV 化 → BackBuffer RTV）
 		void PreDraw();
 
+		/// PiP (Picture-in-Picture) 2nd オフスクリーンパス開始。
+		/// 指定 RT を RENDER_TARGET にバインドし、専用 DSV をクリアして
+		/// 指定解像度のビューポート/シザーを設定する。
+		void PreDrawPip(const std::string& rtName, const std::string& dsvName,
+			uint32_t width, uint32_t height);
+
+		/// PiP パス終了 (RT を GENERIC_READ に戻し ImGui::Image で表示可能にする)。
+		void EndPipPass(const std::string& rtName);
+
 		/// フレーム終了（Present → Signal → Wait → Reset）
 		void PostDraw();
 
@@ -109,6 +118,10 @@ namespace YoRigine {
 
 		/// コマンドアロケータ＋コマンドリストをリセットする
 		void ResetCommandList();
+
+		/// 現在のコマンドリストを Execute → 新しい fence 値を signal → 完了待ち → Reset → SRV heap 再 bind。
+		/// フレーム途中で本当に GPU 完了を待ちたい場合 (例: PiP の 2nd 描画前に CB stomp を回避) に使う。
+		void FlushAndWait();
 
 		// =========================================================================
 		// リソース生成ヘルパー

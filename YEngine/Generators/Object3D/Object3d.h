@@ -12,6 +12,7 @@
 #include "Material/MaterialColor.h"
 #include "Material/MaterialLighting.h"
 #include "Material/MaterialUV.h"
+#include "Material/MaterialDissolve.h"
 #include "Motion/Core/MotionSystem.h"
 #include <Loaders/Json/JsonManager.h>
 
@@ -107,6 +108,16 @@ public:
 	void SetAlpha(float alpha) { materialColor_->SetAlpha(alpha); }
 	void SetUvTransform(const Matrix4x4& uvTransform) { materialUV_->SetUVTransform(uvTransform); }
 
+	///************************* ディゾルブ *************************///
+	MaterialDissolve* GetMaterialDissolve() const { return materialDissolve_.get(); }
+	void  SetDissolveEnabled(bool enable) { materialDissolve_->SetEnabled(enable); }
+	void  SetDissolveThreshold(float t) { materialDissolve_->SetThreshold(t); }
+	void  SetDissolveEdgeWidth(float w) { materialDissolve_->SetEdgeWidth(w); }
+	void  SetDissolveEdgeColor(const Vector3& c) { materialDissolve_->SetEdgeColor(c); }
+	void  SetDissolveNoiseScale(float s) { materialDissolve_->SetNoiseScale(s); }
+	bool  IsDissolveEnabled() const { return materialDissolve_->IsEnabled(); }
+	float GetDissolveThreshold() const { return materialDissolve_->GetThreshold(); }
+
 	void SetEnableLighting(bool enable) { materialLighting_->SetEnableLighting(enable); }
 	void SetEnableSpecular(bool enable) { materialLighting_->SetEnableSpecular(enable); }
 	void SetEnableEnvironment(bool enable) { materialLighting_->SetEnableEnvironment(enable); }
@@ -132,6 +143,7 @@ private:
 	std::unique_ptr<MaterialColor> materialColor_;
 	std::unique_ptr<MaterialLighting> materialLighting_;
 	std::unique_ptr<MaterialUV> materialUV_;
+	std::unique_ptr<MaterialDissolve> materialDissolve_;
 
 	// デフォルトのモデルパス
 	static const std::string defaultModelPath_;

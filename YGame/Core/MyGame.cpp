@@ -4,6 +4,7 @@
 #include "Editor/Editor.h"
 #include "Systems/GameTime/GameTime.h"
 #include <ModelManipulator/ModelManipulator.h>
+#include <PipCamera/PipCameraSystem.h>
 #include "OffScreen/PostEffectManager.h"
 #include <Systems/UI/UIManager.h>
 #include "GPUParticle/GpuEmitManager.h"
@@ -63,6 +64,9 @@ void MyGame::Initialize() {
 	// モデル操作関連の初期化
 	YoRigine::ModelManipulator::GetInstance()->Initialize();
 
+	// PiP カメラサブシステム
+	PipCameraSystem::GetInstance()->Initialize();
+
 #ifdef USE_IMGUI
 	//------------------------------------------------------------
 	// エディター初期化とUI登録
@@ -92,13 +96,14 @@ void MyGame::Initialize() {
 	Editor::GetInstance()->RegisterGameUI("ログ", []() { Editor::GetInstance()->DrawLog(); });
 	Editor::GetInstance()->RegisterGameUI("オーディオ詳細", [this]() { audio_->ShowDebugWindow(); });
 	Editor::GetInstance()->RegisterGameUI("オーディオ設定", [this]() { audio_->ShowSettingsWindow(); });
+	Editor::GetInstance()->RegisterGameUI("PiP カメラ", []() { PipCameraSystem::GetInstance()->DrawImGuiWindow(); });
 #endif
 
 	//------------------------------------------------------------
 	// 初期シーン設定
 	//------------------------------------------------------------
 #ifdef _DEBUG
-	SceneManager::GetInstance()->ChangeScene("Clear");   // デバッグ時はゲームシーン
+	SceneManager::GetInstance()->ChangeScene("Develop");   // デバッグ時はゲームシーン
 #else 
 	SceneManager::GetInstance()->ChangeScene("Title");  // 製品版はタイトルシーン
 #endif
@@ -141,6 +146,7 @@ void MyGame::Update() {
 	//------------------------------------------------------------
 	Framework::Update();
 	SceneManager::GetInstance()->Update();
+	PipCameraSystem::GetInstance()->Update();
 
 	//------------------------------------------------------------
 	// ImGui受付終了
@@ -166,6 +172,40 @@ void MyGame::Draw() {
 
 	// シーン描画
 	SceneManager::GetInstance()->Draw();
+
+	//------------------------------------------------------------
+	// PiP (Picture-in-Picture) 2nd 描画パス
+	// 有効時のみ: シーンカメラの行列を PiP カメラに差し替えて 3D だけ再描画。
+	// per-object 定数バッファ (WorldTransform::WVP) は GPU 上に 1 本しかなく、
+	// メインパスと PiP パスの両方で同じ CB を書き換えるとコマンドリスト末尾実行時に
+	// 最後の書き込みだけが残って両パスとも同じ角度になる (CB stomp)。
+	// そのため、メインパスをここで一度 GPU に流し切ってから PiP を組む。
+	//------------------------------------------------------------
+	{
+		auto* pip = PipCameraSystem::GetInstance();
+		auto* scene = SceneManager::GetInstance()->GetScene();
+		Camera* sceneCam = scene ? scene->GetSceneCamera() : nullptr;
+		if (pip->IsEnabled() && sceneCam) {
+			// 1) メインパスを真に GPU 完了まで待つ (シェーダは gCamera.viewProjection を
+			//    使うので、メイン draw が GPU で CB を読み終える前に PiP の値で上書きしてはいけない)
+			dxCommon_->FlushAndWait();
+
+			// 2) PiP パス本体: Camera CB を PiP の値に書き換えて専用 RT へ 3D 再描画
+			pip->ApplyToCamera(sceneCam);
+			dxCommon_->PreDrawPip(pip->GetRTName(), pip->GetDSVName(),
+				pip->GetWidth(), pip->GetHeight());
+			scene->DrawScene3DOnly();
+			dxCommon_->EndPipPass(pip->GetRTName());
+
+			// 3) ★ Restore より先に FlushAndWait。
+			//    PiP draws の GPU 実行が完了する前に Restore で CB を上書きすると
+			//    PiP も Scene VP で描画されてしまう (アングルが変わらない)。
+			dxCommon_->FlushAndWait();
+
+			// 4) ここで初めて Scene の値に戻す (後続 PostEffect/UI が読む CB を復元)
+			pip->RestoreCamera(sceneCam);
+		}
+	}
 
 	//------------------------------------------------------------
 	// ポストエフェクト描画

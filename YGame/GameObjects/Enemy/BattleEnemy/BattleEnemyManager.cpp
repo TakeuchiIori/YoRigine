@@ -245,8 +245,8 @@ void BattleEnemyManager::StartBattle(const EnemyEncounterData& encounterData) {
 	Logger("[BattleEnemyManager] 戦闘開始: " + encounterData.encounterName +
 		" 敵数: " + std::to_string(encounterData.enemyIds.size()) + "\n");
 
-	// 敵を生成
-	SpawnEnemyGroup(encounterData.enemyIds, encounterData.formations);
+	// 敵を生成（フィールド敵から引き継いだスケールを全敵に適用）
+	SpawnEnemyGroup(encounterData.enemyIds, encounterData.formations, encounterData.enemyScale);
 
 	Logger("[BattleEnemyManager] " + std::to_string(battleEnemies_.size()) + "体の敵を生成\n");
 
@@ -308,7 +308,7 @@ void BattleEnemyManager::ForceBattleEnd() {
 /// </summary>
 /// <param name="enemyId">敵ID</param>
 /// <param name="position">生成位置</param>
-void BattleEnemyManager::SpawnBattleEnemy(const std::string& enemyId, const Vector3& position) {
+void BattleEnemyManager::SpawnBattleEnemy(const std::string& enemyId, const Vector3& position, const Vector3& scale) {
 	if (!camera_) {
 		ThrowError("[BattleEnemyManager] エラー: カメラが設定されていません\n");
 		return;
@@ -331,8 +331,8 @@ void BattleEnemyManager::SpawnBattleEnemy(const std::string& enemyId, const Vect
 	newEnemy->Initialize(camera_);
 	newEnemy->SetPlayer(player_);
 
-	// キャッシュから取得したデータと位置情報で初期化
-	newEnemy->InitializeBattleData(enemyData, position);
+	// キャッシュから取得したデータと位置情報で初期化（フィールド敵の見た目スケールを引き継ぐ）
+	newEnemy->InitializeBattleData(enemyData, position, scale);
 
 	// エリアマネージャーに登録
 	AreaManager::GetInstance()->RegisterObject(&newEnemy->GetWT(), ("Enemy_" + enemyId).c_str());
@@ -347,7 +347,7 @@ void BattleEnemyManager::SpawnBattleEnemy(const std::string& enemyId, const Vect
 /// </summary>
 /// <param name="enemyIds">生成する敵IDのリスト</param>
 /// <param name="positions">配置位置リスト</param>
-void BattleEnemyManager::SpawnEnemyGroup(const std::vector<std::string>& enemyIds, const std::vector<Vector3>& positions) {
+void BattleEnemyManager::SpawnEnemyGroup(const std::vector<std::string>& enemyIds, const std::vector<Vector3>& positions, const Vector3& scale) {
 	size_t enemyCount = enemyIds.size();
 
 	Logger("[BattleEnemyManager] 敵グループ生成開始: " + std::to_string(enemyCount) + "体\n");
@@ -361,7 +361,7 @@ void BattleEnemyManager::SpawnEnemyGroup(const std::vector<std::string>& enemyId
 			spawnPos = GetDefaultFormationPosition(i, enemyCount);
 		}
 
-		SpawnBattleEnemy(enemyIds[i], spawnPos);
+		SpawnBattleEnemy(enemyIds[i], spawnPos, scale);
 	}
 }
 

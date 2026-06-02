@@ -5,7 +5,6 @@
 #include <Systems/Camera/Camera.h>
 #include <Systems/GameTime/GameTime.h>
 #include <Collision/Core/CollisionManager.h>
-#include <Particle/ParticleManager.h>
 #include <ModelManipulator/ModelManipulator.h>
 #include <LightManager/LightManager.h>
 
@@ -36,6 +35,15 @@ public:
 	virtual ~BaseScene() = default;
 	// ビュープロジェクション行列を取得
 	virtual Matrix4x4 GetViewProjection() = 0;
+
+	// PiP (Picture-in-Picture) サポート: シーンが持つカメラを返す。
+	// PipCameraSystem からこのポインタの transform/fov を一時的に書き換えて 2nd 描画する。
+	// 未対応シーンは nullptr を返す既定実装でよい (PiP パスがスキップされるだけ)。
+	virtual Camera* GetSceneCamera() { return nullptr; }
+
+	// PiP 用の 3D オンリー描画。スカイボックスとシーンオブジェクトを描く程度に絞る。
+	// UI / ポストエフェクト / シャドウパスは含めない。
+	virtual void DrawScene3DOnly() {}
 public:
 	///************************* アクセッサ *************************///
 	virtual void SetSceneManager(SceneManager* sceneManager) { sceneManager_ = sceneManager; }
