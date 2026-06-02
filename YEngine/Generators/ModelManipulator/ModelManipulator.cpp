@@ -287,19 +287,19 @@ namespace YoRigine {
 #endif
 	}
 
+#ifdef USE_IMGUI
 	// ============================================================
 	// シーンエディタが有効か (オブジェクト一覧ウィンドウ + Editor 全体の表示)
+	// 宣言 (ヘッダ) と呼び出し元はすべて USE_IMGUI ガード内に閉じているため、
+	// Release ビルド (USE_IMGUI 未定義) ではこの関数は存在しない。
 	// ============================================================
 	bool ModelManipulator::IsSceneEditorActive() const {
-#ifdef USE_IMGUI
 		// 「モデル操作」ウィンドウ (MyGame で RegisterGameUI 登録された名前) が
 		// 開かれているときのみ、選択・ギズモを有効化する。
 		return Editor::GetInstance()->GetShowEditor()
 			&& Editor::GetInstance()->IsGameUIVisible("モデル操作");
-#else
-		return false;
-#endif
 	}
+#endif
 
 	// ============================================================
 	// ギズモの描画
