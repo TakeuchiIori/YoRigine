@@ -5,7 +5,6 @@
 #include "Loaders/Json/JsonManager.h"
 #include "Collision/Core/CollisionDirection.h"
 #include "Collision/OBB/OBBCollider.h"
-#include <Particle/ParticleEmitter.h>
 #include "Object3d/BaseObject.h"
 
 class Player;
@@ -75,7 +74,6 @@ private:
 	// ------------------------------------------------------------
 	// パーティクル
 	// ------------------------------------------------------------
-	std::unique_ptr<ParticleEmitter> testEmitter_; // ガード成功時などのエフェクト
 
 	// ------------------------------------------------------------
 	// ジョイントアタッチ関連

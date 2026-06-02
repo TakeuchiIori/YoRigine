@@ -136,8 +136,8 @@ private:
 	float switchThreshold_ = 0.6f;
 	bool hasSceneSwitched_ = false;
 
-	void* pendingTransitionData_ = nullptr;
-	SubSceneTransitionType pendingTransitionType_;
+	SubScenePayload pendingPayload_;
+	SubSceneTransitionType pendingTransitionType_ = SubSceneTransitionType::TO_FIELD;
 
 	Camera* camera_ = nullptr;
 	Player* player_ = nullptr;

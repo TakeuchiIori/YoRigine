@@ -10,7 +10,6 @@
 #include <memory>
 
 // Engine
-#include <Particle/ParticleEmitter.h>
 #include "Collision/Core/CollisionDirection.h"
 
 // ============================================================
@@ -151,8 +150,6 @@ private:
 	// ------------------------------------------------------------
 	// エフェクト・パーティクル
 	// ------------------------------------------------------------
-	std::unique_ptr<ParticleEmitter> guardEmitter_;   // ガード時のエフェクト生成
-	std::unique_ptr<ParticleEmitter> parryEmitter_;   // パリィ成功時のエフェクト生成
 
 	// ------------------------------------------------------------
 	// コールバック・イベント通信

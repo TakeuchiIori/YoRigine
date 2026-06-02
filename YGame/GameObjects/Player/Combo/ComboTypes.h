@@ -43,6 +43,7 @@ struct AttackData {
 	std::string name;
 	std::string animationName;
 	AttackType  type = AttackType::A_Arte;
+	std::string playCameraWorkName;
 
 	// ------------------------------------------------------------
 	// タイムライン設定（エディタ用・フレーム単位）
@@ -162,6 +163,7 @@ struct ComboConfig {
 BEGIN_STRUCT_SERIALIZER(AttackData)
 SERIALIZE_FIELD(AttackData, name)
 SERIALIZE_FIELD(AttackData, animationName)
+SERIALIZE_FIELD(AttackData, playCameraWorkName)
 SERIALIZE_ENUM_FIELD(AttackData, type)
 
 SERIALIZE_FIELD(AttackData, totalFrames)

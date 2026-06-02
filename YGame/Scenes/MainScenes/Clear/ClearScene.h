@@ -6,7 +6,6 @@
 // Engine
 #include <SceneSystems/BaseScene.h>
 #include "Systems/Audio/Audio.h"
-#include "Particle/ParticleEmitter.h"
 #include "Object3D/Object3d.h"
 #include "Sprite/Sprite.h"
 #include "Player/Player.h"

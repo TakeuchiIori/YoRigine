@@ -36,10 +36,7 @@ void SubSceneManager::Initialize(Camera* camera, Player* player) {
 /// 終了処理
 /// </summary>
 void SubSceneManager::Finalize() {
-	if (pendingTransitionData_) {
-		delete pendingTransitionData_;
-		pendingTransitionData_ = nullptr;
-	}
+	pendingPayload_ = std::monostate{};
 
 	for (auto& [name, scene] : subScenes_) {
 		if (scene) scene->Finalize();
@@ -174,10 +171,7 @@ void SubSceneManager::UpdateTransition() {
 
 		if (currentScene_) currentScene_->OnResume();
 
-		if (pendingTransitionData_) {
-			delete pendingTransitionData_;
-			pendingTransitionData_ = nullptr;
-		}
+		pendingPayload_ = std::monostate{};
 	}
 }
 
@@ -226,12 +220,7 @@ void SubSceneManager::DrawShadow()
 /// 遷移リクエストの受付処理
 /// </summary>
 void SubSceneManager::HandleTransitionRequest(const SubSceneTransitionRequest& request) {
-	if (pendingTransitionData_) {
-		delete pendingTransitionData_;
-		pendingTransitionData_ = nullptr;
-	}
-
-	pendingTransitionData_ = request.transitionData;
+	pendingPayload_ = request.payload;
 	pendingTransitionType_ = request.type;
 
 	switch (request.type) {
@@ -265,21 +254,19 @@ BaseSubScene* SubSceneManager::GetScene(const std::string& name) const {
 
 /// <summary>
 /// シーン遷移データの適用（バトル／フィールド間）
+/// payload は variant なので、型と中身が一致しなければ何もしない。
 /// </summary>
 void SubSceneManager::ApplyTransitionData() {
-	if (!pendingTransitionData_ || !currentScene_) return;
+	if (!currentScene_) return;
 
-	if (pendingTransitionType_ == SubSceneTransitionType::TO_BATTLE) {
-		auto* battleScene = dynamic_cast<BattleScene*>(currentScene_);
-		if (battleScene) {
-			//auto* data = static_cast<BattleTransitionData*>(pendingTransitionData_);
-			////battleScene->StartBattle(*data);
+	if (auto* battleData = std::get_if<BattleTransitionData>(&pendingPayload_)) {
+		if (auto* battleScene = dynamic_cast<BattleScene*>(currentScene_)) {
+			battleScene->StartBattle(*battleData);
 		}
-	} else if (pendingTransitionType_ == SubSceneTransitionType::TO_FIELD) {
-		auto* fieldScene = dynamic_cast<FieldScene*>(currentScene_);
-		if (fieldScene) {
-			auto* data = static_cast<FieldReturnData*>(pendingTransitionData_);
-			fieldScene->HandleBattleReturn(*data);
+	}
+	else if (auto* fieldData = std::get_if<FieldReturnData>(&pendingPayload_)) {
+		if (auto* fieldScene = dynamic_cast<FieldScene*>(currentScene_)) {
+			fieldScene->HandleBattleReturn(*fieldData);
 		}
 	}
 }

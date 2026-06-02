@@ -49,3 +49,48 @@ inline constexpr CollisionTypeIdDef kPlacedObjectColliderTypes[] = {
 	CollisionTypeIdDef::kNavTrigger,
 	CollisionTypeIdDef::kWaypoint,
 };
+
+// ============================================================
+// レイヤービット定義
+//   BaseCollider の layerBits_ / collisionMask_ で使うビット位置。
+//   uint32_t なので最大 32 層。
+// ============================================================
+enum class CollisionLayer : uint32_t {
+	Default      = 0,  // 既定 (どこにも属さないものはここ)
+	Player       = 1,
+	Enemy        = 2,
+	PlayerWeapon = 3,
+	PlayerShield = 4,
+	EnemyWeapon  = 5,
+	StaticWall   = 6,
+	NavObstacle  = 7,
+	NavTrigger   = 8,
+	Waypoint     = 9,
+	Pickup       = 10,
+	Trigger      = 11,
+	// 12-31 はユーザー拡張用
+};
+
+inline constexpr uint32_t CollisionLayerBit(CollisionLayer layer) {
+	return 1u << static_cast<uint32_t>(layer);
+}
+
+// すべてに反応するマスク (旧来の挙動)
+inline constexpr uint32_t kCollisionMaskAll = 0xFFFFFFFFu;
+
+// CollisionTypeIdDef → CollisionLayer の自動対応 (Initialize から呼ぶと便利)
+inline CollisionLayer LayerFromTypeId(CollisionTypeIdDef id) {
+	switch (id) {
+	case CollisionTypeIdDef::kPlayer:       return CollisionLayer::Player;
+	case CollisionTypeIdDef::kEnemy:        return CollisionLayer::Enemy;
+	case CollisionTypeIdDef::kFieldEnemy:   return CollisionLayer::Enemy;
+	case CollisionTypeIdDef::kBattleEnemy:  return CollisionLayer::Enemy;
+	case CollisionTypeIdDef::kPlayerWeapon: return CollisionLayer::PlayerWeapon;
+	case CollisionTypeIdDef::kPlayerShield: return CollisionLayer::PlayerShield;
+	case CollisionTypeIdDef::kStaticWall:   return CollisionLayer::StaticWall;
+	case CollisionTypeIdDef::kNavObstacle:  return CollisionLayer::NavObstacle;
+	case CollisionTypeIdDef::kNavTrigger:   return CollisionLayer::NavTrigger;
+	case CollisionTypeIdDef::kWaypoint:     return CollisionLayer::Waypoint;
+	default:                                return CollisionLayer::Default;
+	}
+}

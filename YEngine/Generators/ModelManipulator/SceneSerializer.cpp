@@ -20,36 +20,33 @@ namespace YoRigine {
         if (!objectManager_) return false;
         try {
             json j;
-            j["version"] = 4;
+            j["version"] = 6;
             j["objects"] = json::array();
-
-            j["colliderTemplates"] = json::object();
-            for (const auto& [modelName, tmpl] : objectManager_->GetColliderTemplates()) {
-                j["colliderTemplates"][modelName] = {
-                    {"typeId",  static_cast<uint32_t>(tmpl.typeId)},
-                    {"aabbMin", {tmpl.aabbOffset.min.x, tmpl.aabbOffset.min.y, tmpl.aabbOffset.min.z}},
-                    {"aabbMax", {tmpl.aabbOffset.max.x, tmpl.aabbOffset.max.y, tmpl.aabbOffset.max.z}},
-                };
-            }
 
             for (const auto* obj : objectManager_->GetAllActiveObjects()) {
                 if (!obj || !obj->object) continue;
 
-                json objJson = {
-                    {"id",              obj->id},
-                    {"filePath",        obj->modelPath},
-                    {"modelName",       obj->modelName},
-                    {"position",        {obj->position.x, obj->position.y, obj->position.z}},
-                    {"rotate",          {obj->rotation.x, obj->rotation.y, obj->rotation.z}},
-                    {"scale",           {obj->scale.x,    obj->scale.y,    obj->scale.z}},
-                    {"parentID",        obj->parentID},
-                    {"isAnimation",     obj->isAnimation},
-                    {"animationName",   obj->animationName},
-                    {"colliderEnabled", obj->colliderEnabled},
-                    // aabbMin/aabbMax は version 4 以降 colliderTemplates に移動
-                };
-
-                j["objects"].push_back(objJson);
+                j["objects"].push_back({
+                    {"id",                  obj->id},
+                    {"filePath",            obj->modelPath},
+                    {"modelName",           obj->modelName},
+                    {"position",            {obj->position.x, obj->position.y, obj->position.z}},
+                    {"rotate",              {obj->rotation.x, obj->rotation.y, obj->rotation.z}},
+                    {"scale",               {obj->scale.x,    obj->scale.y,    obj->scale.z}},
+                    {"parentID",            obj->parentID},
+                    {"isAnimation",         obj->isAnimation},
+                    {"animationName",       obj->animationName},
+                    {"colliderEnabled",     obj->colliderEnabled},
+                    {"colliderTypeId",      static_cast<uint32_t>(obj->colliderTypeId)},
+                    {"colliderShapeType",   static_cast<uint32_t>(obj->colliderShapeType)},
+                    {"colliderAabbMin",     {obj->colliderAabbOffset.min.x, obj->colliderAabbOffset.min.y, obj->colliderAabbOffset.min.z}},
+                    {"colliderAabbMax",     {obj->colliderAabbOffset.max.x, obj->colliderAabbOffset.max.y, obj->colliderAabbOffset.max.z}},
+                    {"colliderObbCenter",   {obj->colliderObbCenter.x,    obj->colliderObbCenter.y,    obj->colliderObbCenter.z}},
+                    {"colliderObbSize",     {obj->colliderObbSize.x,      obj->colliderObbSize.y,      obj->colliderObbSize.z}},
+                    {"colliderObbEuler",    {obj->colliderObbEuler.x,     obj->colliderObbEuler.y,     obj->colliderObbEuler.z}},
+                    {"colliderSphCenter",   {obj->colliderSphereCenter.x, obj->colliderSphereCenter.y, obj->colliderSphereCenter.z}},
+                    {"colliderSphRadius",   obj->colliderSphereRadius},
+                });
             }
 
             std::ofstream file(filePath);
@@ -72,27 +69,31 @@ namespace YoRigine {
             json j;
             file >> j;
             const int version = j.value("version", 1);
-            if (version < 1 || version > 4) return false;
+            if (version < 1 || version > 6) return false;
 
             objectManager_->ClearAllObjects();
 
-            // colliderTemplates 復元（version 4: typeId + aabbOffset。version 1-3: typeId のみ）
-            if (j.contains("colliderTemplates")) {
+            // version 1-4 の後方互換用: colliderTemplates から typeId/aabb をモデル名ごとに保持
+            // version 5 以降は per-object フィールドを直接読む
+            struct LegacyTmpl { CollisionTypeIdDef typeId; AABB aabb; };
+            std::unordered_map<std::string, LegacyTmpl> legacyTemplates;
+
+            if (version <= 4 && j.contains("colliderTemplates")) {
                 for (const auto& [modelName, tmplJson] : j["colliderTemplates"].items()) {
-                    auto& tmpl = objectManager_->GetOrCreateTemplate(modelName);
-                    tmpl.typeId = static_cast<CollisionTypeIdDef>(tmplJson.value("typeId", 0u));
-                    if (tmplJson.contains("aabbMin")) {
-                        tmpl.aabbOffset.min = { tmplJson["aabbMin"][0], tmplJson["aabbMin"][1], tmplJson["aabbMin"][2] };
-                    }
-                    if (tmplJson.contains("aabbMax")) {
-                        tmpl.aabbOffset.max = { tmplJson["aabbMax"][0], tmplJson["aabbMax"][1], tmplJson["aabbMax"][2] };
-                    }
+                    LegacyTmpl lt;
+                    lt.typeId = static_cast<CollisionTypeIdDef>(tmplJson.value("typeId", 0u));
+                    lt.aabb.min = { -1.0f, -1.0f, -1.0f };
+                    lt.aabb.max = {  1.0f,  1.0f,  1.0f };
+                    if (tmplJson.contains("aabbMin"))
+                        lt.aabb.min = { tmplJson["aabbMin"][0], tmplJson["aabbMin"][1], tmplJson["aabbMin"][2] };
+                    if (tmplJson.contains("aabbMax"))
+                        lt.aabb.max = { tmplJson["aabbMax"][0], tmplJson["aabbMax"][1], tmplJson["aabbMax"][2] };
+                    legacyTemplates[modelName] = lt;
                 }
             }
 
             std::unordered_map<int, int> oldToNewId;
 
-            // オブジェクト生成 ＋ aabbOffset_ 復元を同一ループで処理
             for (const auto& o : j["objects"]) {
                 auto* obj = objectManager_->CreateObject(
                     o["filePath"].get<std::string>(),
@@ -104,26 +105,43 @@ namespace YoRigine {
 
                 obj->position = { o["position"][0], o["position"][1], o["position"][2] };
                 obj->rotation = { o["rotate"][0],   o["rotate"][1],   o["rotate"][2] };
-                obj->scale = { o["scale"][0],    o["scale"][1],    o["scale"][2] };
+                obj->scale    = { o["scale"][0],    o["scale"][1],    o["scale"][2] };
                 obj->colliderEnabled = o.value("colliderEnabled", false);
                 if (o.contains("parentID")) obj->parentID = o["parentID"].get<int>();
 
-                // version 3 後方互換: per-object AABB をテンプレートに昇格してから適用
-                // （同名モデルは最後に読んだ値がテンプレートになる）
-                if (version == 3 && o.contains("aabbMin") && o.contains("aabbMax")) {
-                    auto& tmpl = objectManager_->GetOrCreateTemplate(obj->modelName);
-                    tmpl.aabbOffset.min = { o["aabbMin"][0], o["aabbMin"][1], o["aabbMin"][2] };
-                    tmpl.aabbOffset.max = { o["aabbMax"][0], o["aabbMax"][1], o["aabbMax"][2] };
+                if (version >= 5) {
+                    // version 5+: per-object コライダー設定を直接読む
+                    obj->colliderTypeId = static_cast<CollisionTypeIdDef>(o.value("colliderTypeId", 0u));
+                    if (o.contains("colliderAabbMin"))
+                        obj->colliderAabbOffset.min = { o["colliderAabbMin"][0], o["colliderAabbMin"][1], o["colliderAabbMin"][2] };
+                    if (o.contains("colliderAabbMax"))
+                        obj->colliderAabbOffset.max = { o["colliderAabbMax"][0], o["colliderAabbMax"][1], o["colliderAabbMax"][2] };
                 }
-                else if (version == 2 && j.contains("colliderTemplates")
-                    && j["colliderTemplates"].contains(obj->modelName)) {
-                    // version 2 後方互換: テンプレートの minScale/maxScale をテンプレートに昇格
-                    const auto& tmplJson = j["colliderTemplates"][obj->modelName];
-                    auto& tmpl = objectManager_->GetOrCreateTemplate(obj->modelName);
-                    if (tmplJson.contains("minScale"))
-                        tmpl.aabbOffset.min = { tmplJson["minScale"][0], tmplJson["minScale"][1], tmplJson["minScale"][2] };
-                    if (tmplJson.contains("maxScale"))
-                        tmpl.aabbOffset.max = { tmplJson["maxScale"][0], tmplJson["maxScale"][1], tmplJson["maxScale"][2] };
+                if (version >= 6) {
+                    obj->colliderShapeType = static_cast<ColliderShapeType>(o.value("colliderShapeType", 0u));
+                    if (o.contains("colliderObbCenter"))
+                        obj->colliderObbCenter = { o["colliderObbCenter"][0], o["colliderObbCenter"][1], o["colliderObbCenter"][2] };
+                    if (o.contains("colliderObbSize"))
+                        obj->colliderObbSize = { o["colliderObbSize"][0], o["colliderObbSize"][1], o["colliderObbSize"][2] };
+                    if (o.contains("colliderObbEuler"))
+                        obj->colliderObbEuler = { o["colliderObbEuler"][0], o["colliderObbEuler"][1], o["colliderObbEuler"][2] };
+                    if (o.contains("colliderSphCenter"))
+                        obj->colliderSphereCenter = { o["colliderSphCenter"][0], o["colliderSphCenter"][1], o["colliderSphCenter"][2] };
+                    if (o.contains("colliderSphRadius"))
+                        obj->colliderSphereRadius = o["colliderSphRadius"].get<float>();
+                }
+                if (version < 5) {
+                    // version 1-4 後方互換: テンプレートの設定を個別オブジェクトに適用
+                    auto it = legacyTemplates.find(obj->modelName);
+                    if (it != legacyTemplates.end()) {
+                        obj->colliderTypeId     = it->second.typeId;
+                        obj->colliderAabbOffset = it->second.aabb;
+                    }
+                    // version 3: per-object AABB が個別に保存されている場合はそちらを優先
+                    if (version == 3 && o.contains("aabbMin") && o.contains("aabbMax")) {
+                        obj->colliderAabbOffset.min = { o["aabbMin"][0], o["aabbMin"][1], o["aabbMin"][2] };
+                        obj->colliderAabbOffset.max = { o["aabbMax"][0], o["aabbMax"][1], o["aabbMax"][2] };
+                    }
                 }
 
                 objectManager_->ApplyColliderTemplate(*obj);
@@ -156,41 +174,33 @@ namespace YoRigine {
     {
         try {
             json j;
-            j["version"] = 4;
+            j["version"] = 6;
             j["objects"] = json::array();
 
-            // このプレファブに含まれるモデルのテンプレートを保存
-            j["colliderTemplates"] = json::object();
-            for (const auto* obj : objects) {
-                if (!obj) continue;
-                if (j["colliderTemplates"].contains(obj->modelName)) continue;
-                const auto* tmpl = objectManager_->FindTemplate(obj->modelName);
-                if (!tmpl) continue;
-                j["colliderTemplates"][obj->modelName] = {
-                    {"typeId",  static_cast<uint32_t>(tmpl->typeId)},
-                    {"aabbMin", {tmpl->aabbOffset.min.x, tmpl->aabbOffset.min.y, tmpl->aabbOffset.min.z}},
-                    {"aabbMax", {tmpl->aabbOffset.max.x, tmpl->aabbOffset.max.y, tmpl->aabbOffset.max.z}},
-                };
-            }
-
             for (const auto* obj : objects) {
                 if (!obj) continue;
 
-                json objJson = {
-                    {"id",              obj->id},
-                    {"filePath",        obj->modelPath},
-                    {"modelName",       obj->modelName},
-                    {"position",        {obj->position.x, obj->position.y, obj->position.z}},
-                    {"rotate",          {obj->rotation.x, obj->rotation.y, obj->rotation.z}},
-                    {"scale",           {obj->scale.x,    obj->scale.y,    obj->scale.z}},
-                    {"parentID",        obj->parentID},
-                    {"isAnimation",     obj->isAnimation},
-                    {"animationName",   obj->animationName},
-                    {"colliderEnabled", obj->colliderEnabled},
-                    // aabbMin/aabbMax は version 4 以降 colliderTemplates に移動
-                };
-
-                j["objects"].push_back(objJson);
+                j["objects"].push_back({
+                    {"id",                  obj->id},
+                    {"filePath",            obj->modelPath},
+                    {"modelName",           obj->modelName},
+                    {"position",            {obj->position.x, obj->position.y, obj->position.z}},
+                    {"rotate",              {obj->rotation.x, obj->rotation.y, obj->rotation.z}},
+                    {"scale",               {obj->scale.x,    obj->scale.y,    obj->scale.z}},
+                    {"parentID",            obj->parentID},
+                    {"isAnimation",         obj->isAnimation},
+                    {"animationName",       obj->animationName},
+                    {"colliderEnabled",     obj->colliderEnabled},
+                    {"colliderTypeId",      static_cast<uint32_t>(obj->colliderTypeId)},
+                    {"colliderShapeType",   static_cast<uint32_t>(obj->colliderShapeType)},
+                    {"colliderAabbMin",     {obj->colliderAabbOffset.min.x, obj->colliderAabbOffset.min.y, obj->colliderAabbOffset.min.z}},
+                    {"colliderAabbMax",     {obj->colliderAabbOffset.max.x, obj->colliderAabbOffset.max.y, obj->colliderAabbOffset.max.z}},
+                    {"colliderObbCenter",   {obj->colliderObbCenter.x,    obj->colliderObbCenter.y,    obj->colliderObbCenter.z}},
+                    {"colliderObbSize",     {obj->colliderObbSize.x,      obj->colliderObbSize.y,      obj->colliderObbSize.z}},
+                    {"colliderObbEuler",    {obj->colliderObbEuler.x,     obj->colliderObbEuler.y,     obj->colliderObbEuler.z}},
+                    {"colliderSphCenter",   {obj->colliderSphereCenter.x, obj->colliderSphereCenter.y, obj->colliderSphereCenter.z}},
+                    {"colliderSphRadius",   obj->colliderSphereRadius},
+                });
             }
 
             std::filesystem::create_directories(
@@ -224,51 +234,75 @@ namespace YoRigine {
 
             const int version = j.value("version", 1);
 
-            // colliderTemplates 復元（version 4: typeId + aabbOffset）
-            if (j.contains("colliderTemplates")) {
+            // version 1-4 後方互換: colliderTemplates から読む
+            struct LegacyTmpl { CollisionTypeIdDef typeId; AABB aabb; };
+            std::unordered_map<std::string, LegacyTmpl> legacyTemplates;
+
+            if (version <= 4 && j.contains("colliderTemplates")) {
                 for (const auto& [modelName, tmplJson] : j["colliderTemplates"].items()) {
-                    auto& tmpl = objectManager_->GetOrCreateTemplate(modelName);
-                    tmpl.typeId = static_cast<CollisionTypeIdDef>(tmplJson.value("typeId", 0u));
-                    if (tmplJson.contains("aabbMin")) {
-                        tmpl.aabbOffset.min = { tmplJson["aabbMin"][0], tmplJson["aabbMin"][1], tmplJson["aabbMin"][2] };
-                    }
-                    if (tmplJson.contains("aabbMax")) {
-                        tmpl.aabbOffset.max = { tmplJson["aabbMax"][0], tmplJson["aabbMax"][1], tmplJson["aabbMax"][2] };
-                    }
+                    LegacyTmpl lt;
+                    lt.typeId = static_cast<CollisionTypeIdDef>(tmplJson.value("typeId", 0u));
+                    lt.aabb.min = { -1.0f, -1.0f, -1.0f };
+                    lt.aabb.max = {  1.0f,  1.0f,  1.0f };
+                    if (tmplJson.contains("aabbMin"))
+                        lt.aabb.min = { tmplJson["aabbMin"][0], tmplJson["aabbMin"][1], tmplJson["aabbMin"][2] };
+                    if (tmplJson.contains("aabbMax"))
+                        lt.aabb.max = { tmplJson["aabbMax"][0], tmplJson["aabbMax"][1], tmplJson["aabbMax"][2] };
+                    legacyTemplates[modelName] = lt;
                 }
             }
 
             std::unordered_map<int, int> oldToNewId;
 
             for (const auto& o : j["objects"]) {
-                bool        isAnim = o.value("isAnimation", false);
-                std::string animName = o.value("animationName", "");
-
                 auto* obj = objectManager_->CreateObject(
-                    o["filePath"].get<std::string>(), isAnim, animName);
+                    o["filePath"].get<std::string>(),
+                    o.value("isAnimation", false),
+                    o.value("animationName", ""));
                 if (!obj) continue;
 
                 oldToNewId[o["id"].get<int>()] = obj->id;
 
                 obj->position = { o["position"][0], o["position"][1], o["position"][2] };
                 obj->rotation = { o["rotate"][0],   o["rotate"][1],   o["rotate"][2] };
-                obj->scale = { o["scale"][0],     o["scale"][1],    o["scale"][2] };
+                obj->scale    = { o["scale"][0],    o["scale"][1],    o["scale"][2] };
+                if (o.contains("parentID")) obj->parentID = o["parentID"].get<int>();
 
-                if (o.contains("parentID"))
-                    obj->parentID = o["parentID"].get<int>();
+                obj->colliderEnabled = o.value("colliderEnabled", false);
 
-                if (version >= 3) {
-                    obj->colliderEnabled = o.value("colliderEnabled", false);
-
-                    // version 3 後方互換: per-object AABB をテンプレートに昇格
-                    if (version == 3 && o.contains("aabbMin") && o.contains("aabbMax")) {
-                        auto& tmpl = objectManager_->GetOrCreateTemplate(obj->modelName);
-                        tmpl.aabbOffset.min = { o["aabbMin"][0], o["aabbMin"][1], o["aabbMin"][2] };
-                        tmpl.aabbOffset.max = { o["aabbMax"][0], o["aabbMax"][1], o["aabbMax"][2] };
-                    }
-
-                    objectManager_->ApplyColliderTemplate(*obj);
+                if (version >= 5) {
+                    obj->colliderTypeId = static_cast<CollisionTypeIdDef>(o.value("colliderTypeId", 0u));
+                    if (o.contains("colliderAabbMin"))
+                        obj->colliderAabbOffset.min = { o["colliderAabbMin"][0], o["colliderAabbMin"][1], o["colliderAabbMin"][2] };
+                    if (o.contains("colliderAabbMax"))
+                        obj->colliderAabbOffset.max = { o["colliderAabbMax"][0], o["colliderAabbMax"][1], o["colliderAabbMax"][2] };
                 }
+                if (version >= 6) {
+                    obj->colliderShapeType = static_cast<ColliderShapeType>(o.value("colliderShapeType", 0u));
+                    if (o.contains("colliderObbCenter"))
+                        obj->colliderObbCenter = { o["colliderObbCenter"][0], o["colliderObbCenter"][1], o["colliderObbCenter"][2] };
+                    if (o.contains("colliderObbSize"))
+                        obj->colliderObbSize = { o["colliderObbSize"][0], o["colliderObbSize"][1], o["colliderObbSize"][2] };
+                    if (o.contains("colliderObbEuler"))
+                        obj->colliderObbEuler = { o["colliderObbEuler"][0], o["colliderObbEuler"][1], o["colliderObbEuler"][2] };
+                    if (o.contains("colliderSphCenter"))
+                        obj->colliderSphereCenter = { o["colliderSphCenter"][0], o["colliderSphCenter"][1], o["colliderSphCenter"][2] };
+                    if (o.contains("colliderSphRadius"))
+                        obj->colliderSphereRadius = o["colliderSphRadius"].get<float>();
+                }
+                if (version < 5) {
+                    auto it = legacyTemplates.find(obj->modelName);
+                    if (it != legacyTemplates.end()) {
+                        obj->colliderTypeId     = it->second.typeId;
+                        obj->colliderAabbOffset = it->second.aabb;
+                    }
+                    if (version == 3 && o.contains("aabbMin") && o.contains("aabbMax")) {
+                        obj->colliderAabbOffset.min = { o["aabbMin"][0], o["aabbMin"][1], o["aabbMin"][2] };
+                        obj->colliderAabbOffset.max = { o["aabbMax"][0], o["aabbMax"][1], o["aabbMax"][2] };
+                    }
+                }
+
+                objectManager_->ApplyColliderTemplate(*obj);
             }
 
             for (auto* obj : objectManager_->GetAllActiveObjects()) {

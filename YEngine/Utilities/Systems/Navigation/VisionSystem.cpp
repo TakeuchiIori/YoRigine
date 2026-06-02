@@ -17,12 +17,9 @@ bool VisionSystem::HasLineOfSight(const Vector3& from, const Vector3& to)
 	for (const auto* obj : om->GetAllActiveObjects()) {
 		if (!obj || !obj->collider) continue;
 
-		const auto* tmpl = om->FindTemplate(obj->modelName);
-		if (!tmpl) continue;
-
 		// 【フィルタリング】視線を遮る特性を持つオブジェクト（壁・ナビ障害物）のみを対象とする
-		if (tmpl->typeId != CollisionTypeIdDef::kNavObstacle &&
-			tmpl->typeId != CollisionTypeIdDef::kStaticWall) continue;
+		if (obj->colliderTypeId != CollisionTypeIdDef::kNavObstacle &&
+			obj->colliderTypeId != CollisionTypeIdDef::kStaticWall) continue;
 
 		// 【型チェック】現状の視線判定はAABBコライダーのみサポート
 		const auto* aabb = dynamic_cast<const AABBCollider*>(obj->collider.get());

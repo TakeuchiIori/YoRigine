@@ -8,6 +8,7 @@
 #include <functional>
 #include <unordered_map>
 #include <fstream>
+#include <algorithm>
 
 // =============================================================================
 //  Editor
@@ -57,11 +58,35 @@ public:
 		gizmoDrawCallback_ = cb;
 	}
 
+	// 追加のギズモコールバック (複数システムが同時に登録できる)。
+	// 返り値の id を RemoveGizmoDrawCallback に渡して解除する。
+	int AddGizmoDrawCallback(std::function<void()> cb)
+	{
+		int id = nextExtraGizmoCbId_++;
+		extraGizmoDrawCallbacks_.push_back({ id, std::move(cb) });
+		return id;
+	}
+	void RemoveGizmoDrawCallback(int id)
+	{
+		extraGizmoDrawCallbacks_.erase(
+			std::remove_if(extraGizmoDrawCallbacks_.begin(), extraGizmoDrawCallbacks_.end(),
+				[id](const ExtraGizmoCb& c) { return c.id == id; }),
+			extraGizmoDrawCallbacks_.end());
+	}
+
 	// --- ゲームビュー情報 ---
 	ImVec2 GetGameViewSize()   const { return gameViewSize_; }
 	ImVec2 GetGameViewPos()    const { return gameViewPos_; }
 	ImVec2 GetGameWindowAvail()const { return gameWindowAvail_; }
 	bool   GetShowEditor()     const { return showEditor_; }
+
+	// RegisterGameUI で登録した ImGui ウィンドウが現在開かれているか。
+	// ImGui::Begin(..., &visible) で × クリックされると visible=false になる。
+	// 未登録名なら false。
+	bool   IsGameUIVisible(const std::string& name) const {
+		auto it = gameUIs_.find(name);
+		return it != gameUIs_.end() && it->second.visible;
+	}
 
 	// =========================================================================
 	//  スタイルヘルパー
@@ -139,6 +164,10 @@ private:
 	ImVec2  gameWindowAvail_ = { 0, 0 };
 
 	std::function<void()> gizmoDrawCallback_;
+
+	struct ExtraGizmoCb { int id; std::function<void()> fn; };
+	std::vector<ExtraGizmoCb> extraGizmoDrawCallbacks_;
+	int nextExtraGizmoCbId_ = 1;
 };
 
 #endif // USE_IMGUI

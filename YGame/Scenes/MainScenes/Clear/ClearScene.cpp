@@ -3,7 +3,6 @@
 // Engine
 #include <SceneSystems/SceneManager.h>
 #include "Systems./Input./Input.h"
-#include "Particle./ParticleManager.h"
 #include "Object3D/Object3dCommon.h"
 #include "LightManager/LightManager.h"
 #include "Collision/Core/CollisionManager.h"
@@ -57,7 +56,6 @@ void ClearScene::Initialize() {
 	YoRigine::GameTime::Initialize();
 	YoRigine::JsonManager::SetCurrentScene("ClearScene");
 	YoRigine::CollisionManager::GetInstance()->Initialize();
-	YoRigine::ParticleManager::GetInstance()->SetCamera(sceneCamera_.get());
 	YoRigine::ModelManipulator::GetInstance()->LoadScene("ClearScene");
 	YoRigine::ModelManipulator::GetInstance()->SetCamera(sceneCamera_.get());
 	YParticleManager::GetInstance().SetCamera(sceneCamera_.get());
@@ -116,11 +114,8 @@ void ClearScene::Update() {
 
 	auto* enemyHitEmitterGroup_ = YEmitterGroupManager::GetInstance().GetGroup("ClearScene");
 	enemyHitEmitterGroup_->EmitAll();
-
-	YoRigine::ParticleManager::GetInstance()->Emit("ClearParticle", Vector3(0, 0, 0), 10);
 	YoRigine::ModelManipulator::GetInstance()->Update();
 	YoRigine::CollisionManager::GetInstance()->Update();
-	YoRigine::ParticleManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
 	YParticleManager::GetInstance().Update(YoRigine::GameTime::GetDeltaTime());
 }
 

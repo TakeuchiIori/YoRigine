@@ -42,7 +42,7 @@ void PlayerCamera::Initialize(FollowCamera* followCamera, const WorldTransform* 
     attackCamera_.Initialize();
 
     // デフォルトのカメラワークファイルを読み込む（あれば）
-    const std::string defaultPath = "Resources/Json/Camera/AttackCameraWorks.json";
+    const std::string defaultPath = "Resources/Json/Cameras/AttackCameraWorks.json";
     if (std::filesystem::exists(defaultPath)) {
         attackCamera_.LoadFromFile(defaultPath);
     }
@@ -73,6 +73,18 @@ void PlayerCamera::UpdatePreDirector() {
     bool  inPerformance = IsInPerformance();
 
     if (!inPerformance) {
+        // R3 でロックオン切り替え（isLockOn_ の状態に関わらず常にチェックする）
+        if (YoRigine::Input::GetInstance()->IsPadTriggered(0, GamePadButton::R_Stick)) {
+            isLockOn_ = !isLockOn_;
+            if (isLockOn_) {
+                lockedTarget_ = nullptr;
+                SwitchLockOnTarget(0);
+                if (!lockedTarget_) isLockOn_ = false;
+            } else {
+                lockedTarget_ = nullptr;
+            }
+        }
+
         if (isLockOn_) {
             UpdateLockOn();
         } else {
@@ -98,8 +110,8 @@ void PlayerCamera::ApplyPostDirector(Camera* sceneCamera, float dt) {
     // キーフレーム補間値を更新
     attackCamera_.UpdatePost(dt);
 
-    if (!attackCamera_.IsPlaying()) {
-        // 演出が Idle になったフレームでタイムスケールをリセット
+    if (!attackCamera_.IsActive()) {
+        // 演出が完全に終了したフレームでタイムスケールをリセット
         YoRigine::GameTime::SetTimeScale(1.0f);
         return;
     }
@@ -170,18 +182,6 @@ void PlayerCamera::UpdateLockOn() {
     if (!playerWT_ || !followCamera_) return;
 
     auto* input = YoRigine::Input::GetInstance();
-
-    // R3 でロックオン切り替え
-    if (input->IsPadTriggered(0, GamePadButton::R_Stick)) {
-        isLockOn_ = !isLockOn_;
-        if (isLockOn_) {
-            lockedTarget_ = nullptr;
-            SwitchLockOnTarget(0);
-            if (!lockedTarget_) isLockOn_ = false;
-        } else {
-            lockedTarget_ = nullptr;
-        }
-    }
 
     if (!isLockOn_ || !lockedTarget_) {
         isLockOn_     = false;

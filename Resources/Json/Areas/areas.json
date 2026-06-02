@@ -1,16 +1,4 @@
 {
-    "BattleArea": {
-        "active": true,
-        "center": {
-            "x": 0.0,
-            "y": 0.0,
-            "z": 0.0
-        },
-        "debugDraw": true,
-        "groundBottom": 0.0,
-        "groundTop": 100.0,
-        "radius": 50.0
-    },
     "FieldArea": {
         "active": true,
         "center": {
@@ -21,51 +9,17 @@
         "debugDraw": true,
         "groundBottom": 0.0,
         "groundTop": 100.0,
-        "radius": 50.0
-    },
-    "NewArea": {
-        "active": true,
-        "debugDraw": true,
-        "groundBottom": 0.0,
-        "groundTop": 100.0,
-        "vertices": [
-            {
-                "x": 33.400001525878906,
-                "y": 0.0,
-                "z": -3.5999999046325684
-            },
-            {
-                "x": -25.399999618530273,
-                "y": 0.0,
-                "z": -33.70000076293945
-            },
-            {
-                "x": -1.2999999523162842,
-                "y": 0.0,
-                "z": 71.0
-            },
-            {
-                "x": 15.100000381469727,
-                "y": 0.0,
-                "z": 58.599998474121094
-            }
-        ]
+        "radius": 150.0
     },
     "_index": {
         "names": [
-            "BattleArea",
-            "FieldArea",
-            "NewArea"
+            "FieldArea"
         ],
         "purposes": [
-            "Boundary",
-            "Boundary",
             "Boundary"
         ],
         "types": [
-            "Circle",
-            "Circle",
-            "Polygon"
+            "Circle"
         ]
     }
 }

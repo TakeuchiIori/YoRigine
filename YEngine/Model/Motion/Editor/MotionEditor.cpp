@@ -279,19 +279,6 @@ void MotionEditor::ShowEditor()
 			}
 		}
 
-		// 選択中ボーンに対するトランスフォームギズモの表示
-		if (!context_.selBone.empty()) {
-			static BoneGizmable currentSelectedGizmo(this, "");
-			if (currentSelectedGizmo.GetBoneName() != context_.selBone) {
-				currentSelectedGizmo = BoneGizmable(this, context_.selBone);
-			}
-			currentSelectedGizmo.UpdateFromJoint();
-
-			std::vector<IGizmable*> gizmoTargets = { &currentSelectedGizmo };
-			ImVec2 viewPos = Editor::GetInstance()->GetGameViewPos();
-			ImVec2 viewSize = Editor::GetInstance()->GetGameViewSize();
-			gizmoCtrl_.Draw(context_.camera, gizmoTargets, viewPos, viewSize);
-		}
 	}
 
 	//------------------------------------------------------------

@@ -37,6 +37,7 @@ void Object3d::Initialize()
 	materialColor_ = std::make_unique<MaterialColor>();    materialColor_->Initialize();
 	materialLighting_ = std::make_unique<MaterialLighting>(); materialLighting_->Initialize();
 	materialUV_ = std::make_unique<MaterialUV>();       materialUV_->Initialize();
+	materialDissolve_ = std::make_unique<MaterialDissolve>(); materialDissolve_->Initialize();
 }
 
 /// <summary>
@@ -100,6 +101,10 @@ void Object3d::Draw(Camera* camera, WorldTransform& worldTransform)
 	materialUV_->RecordDrawCommands(commandList.Get(), indices.at("gMaterial"));
 	materialColor_->RecordDrawCommands(commandList.Get(), indices.at("gMaterialColor"));
 	materialLighting_->RecordDrawCommands(commandList.Get(), indices.at("gMaterialLight"));
+	// ディゾルブ（旧シェーダとの互換のため find チェック）
+	if (auto it = indices.find("gMaterialDissolve"); it != indices.end()) {
+		materialDissolve_->RecordDrawCommands(commandList.Get(), it->second);
+	}
 
 	// モデル描画
 	if (model_) {

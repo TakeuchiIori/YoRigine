@@ -6,7 +6,7 @@ void BattleSpinAttackState::Enter(BattleEnemy& enemy) {
 
 	if (auto anim = enemy.GetAnimation()) {
 		anim->StartColorAnimation({ 1, 1, 1, 1 }, { 1.0f, 0.5f, 1.0f, 1.0f }, 0.3f);
-		anim->StartScaleAnimation({ 1, 1, 1 }, { 1.3f, 0.8f, 1.3f }, enemy.GetEnemyData().attackParams.spin.anticipationTime);
+		anim->StartRelativeScaleAnimation({ 1, 1, 1 }, { 1.3f, 0.8f, 1.3f }, enemy.GetEnemyData().attackParams.spin.anticipationTime);
 	}
 	else {
 		enemy.SetColor({ 1, 0.5f, 1, 1 });
@@ -90,7 +90,7 @@ void BattleSpinAttackState::Exit(BattleEnemy& enemy) {
 
 	if (auto anim = enemy.GetAnimation()) {
 		anim->StopAll();
-		anim->StartScaleAnimation(anim->GetCurrentScale(), { 1, 1, 1 }, 0.2f);
+		anim->StartScaleAnimation(anim->GetCurrentScale(), anim->GetBaseScale(), 0.2f);
 		anim->StartColorAnimation(anim->GetCurrentColor(), { 1, 1, 1, 1 }, 0.2f);
 	}
 	else {

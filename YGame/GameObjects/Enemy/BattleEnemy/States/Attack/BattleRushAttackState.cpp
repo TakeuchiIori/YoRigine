@@ -9,7 +9,7 @@ void BattleRushAttackState::Enter(BattleEnemy& enemy) {
 
 	if (auto anim = enemy.GetAnimation()) {
 		anim->StartColorAnimation({ 1, 1, 1, 1 }, { 1.0f, 1.0f, 0.0f, 1.0f }, 0.2f);
-		anim->StartScaleAnimation({ 1, 1, 1 }, { 1.1f, 0.9f, 0.7f }, enemy.GetEnemyData().attackParams.rush.anticipationTime, Easing::Function::EaseOutQuad);
+		anim->StartRelativeScaleAnimation({ 1, 1, 1 }, { 1.1f, 0.9f, 0.7f }, enemy.GetEnemyData().attackParams.rush.anticipationTime, Easing::Function::EaseOutQuad);
 	}
 	else {
 		enemy.SetColor({ 1, 1, 0.0f, 1 });
@@ -62,8 +62,10 @@ void BattleRushAttackState::Update(BattleEnemy& enemy, float dt) {
 	else if (currentTime < rushEndTime) {
 		if (previousTime < chargeEndTime && currentTime >= chargeEndTime) {
 			if (auto anim = enemy.GetAnimation()) {
-				// 突進時に細長くなる
-				anim->StartScaleAnimation(anim->GetCurrentScale(), { 0.8f, 0.8f, 1.3f }, 0.1f);
+				// 突進時に細長くなる（base 比 0.8/0.8/1.3 倍）
+				const Vector3 base = anim->GetBaseScale();
+				anim->StartScaleAnimation(anim->GetCurrentScale(),
+					{ base.x * 0.8f, base.y * 0.8f, base.z * 1.3f }, 0.1f);
 			}
 		}
 		enemy.SetColor({ 1, 0.0f, 0.0f, 1 });
@@ -80,7 +82,7 @@ void BattleRushAttackState::Exit(BattleEnemy& enemy) {
 
 	if (auto anim = enemy.GetAnimation()) {
 		anim->StopAll();
-		anim->StartScaleAnimation(anim->GetCurrentScale(), { 1, 1, 1 }, 0.2f);
+		anim->StartScaleAnimation(anim->GetCurrentScale(), anim->GetBaseScale(), 0.2f);
 		anim->StartColorAnimation(anim->GetCurrentColor(), { 1, 1, 1, 1 }, 0.2f);
 	}
 	else {

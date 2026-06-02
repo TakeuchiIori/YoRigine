@@ -75,11 +75,8 @@ void NavGrid::Bake(ObjectManager* objectManager) {
     // kNavObstacle コライダーが付いたオブジェクトを障害物としてマーク
     for (const auto* obj : objectManager->GetAllActiveObjects()) {
         if (!obj) continue;
-        // typeId は引き続きテンプレートで判定、形状はコライダーから取得
-        const auto* tmpl = objectManager->FindTemplate(obj->modelName);
-        if (!tmpl) continue;
-        if (tmpl->typeId != CollisionTypeIdDef::kNavObstacle &&
-            tmpl->typeId != CollisionTypeIdDef::kStaticWall) continue;
+        if (obj->colliderTypeId != CollisionTypeIdDef::kNavObstacle &&
+            obj->colliderTypeId != CollisionTypeIdDef::kStaticWall) continue;
         if (!obj->collider || !obj->colliderEnabled) continue;
 
         // AABBCollider

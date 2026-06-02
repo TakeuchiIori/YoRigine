@@ -50,7 +50,6 @@ void PlayerShield::Initialize(Camera* camera) {
 	// ------------------------------------------------------------
 	InitCollision();
 	InitJson();
-	testEmitter_ = std::make_unique<ParticleEmitter>("GuardParticle", wt_.translate_, 10);
 }
 
 // ============================================================
@@ -155,7 +154,6 @@ void PlayerShield::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseCol
 			break;
 
 		case PlayerGuard::GuardResult::GuardSuccess:
-			testEmitter_->FollowEmit(wt_.translate_, 10);
 			break;
 
 		case PlayerGuard::GuardResult::GuardFail:
@@ -176,7 +174,6 @@ void PlayerShield::OnCollision([[maybe_unused]] BaseCollider* self, BaseCollider
 			break;
 
 		case PlayerGuard::GuardResult::GuardSuccess:
-			testEmitter_->FollowEmit(wt_.translate_, 10);
 			break;
 
 		case PlayerGuard::GuardResult::GuardFail:

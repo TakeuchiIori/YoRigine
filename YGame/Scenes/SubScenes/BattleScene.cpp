@@ -1,5 +1,4 @@
 #include "BattleScene.h"
-#include "SceneSyncData.h"
 
 // Engine
 #include <SceneSystems/SceneManager.h>
@@ -8,7 +7,6 @@
 #include "LightManager/LightManager.h"
 #include "Systems/GameTime/GameTime.h"
 #include <Editor/Editor.h>
-#include "Particle/ParticleManager.h"
 
 #include <UI/Damage/DamageNumberManager.h>
 #ifdef USE_IMGUI
@@ -183,7 +181,9 @@ void BattleScene::DrawShadow()
 }
 
 /// <summary>
-/// シーン遷移時に呼ばれる：バトル開始処理
+/// シーン遷移時に呼ばれる：状態リセットだけ行う。
+/// バトル開始本体は SubSceneManager::ApplyTransitionData → StartBattle(data) で
+/// 型付きデータと共に呼ばれるので、ここではデータを触らない。
 /// </summary>
 void BattleScene::OnEnter() {
 	BaseSubScene::OnEnter();
@@ -191,7 +191,6 @@ void BattleScene::OnEnter() {
 	Logger("[BattleScene] ===== OnEnter() START =====\n");
 
 	// カメラリセット
-	//currentCameraMode_ = CameraMode::BATTLE_START;
 	currentCameraMode_ = CameraMode::FOLLOW;
 	battleCameraFinished_ = true;
 	shouldResetBattleCamera_ = true;
@@ -199,102 +198,17 @@ void BattleScene::OnEnter() {
 	// プレイヤー位置リセット
 	player_->SetInitialPosition();
 
-	//------------------------------------------------------------
-	// バトル遷移データの読み込み
-	//------------------------------------------------------------
-	auto* syncData = SceneSyncData::GetInstance();
-	if (syncData->HasBattleTransitionData()) {
-		BattleTransitionData transitionData = syncData->LoadBattleTransitionData();
-		originalTransitionData_ = transitionData;
-		currentEnemyGroup_ = transitionData.enemyGroup;
-
-		// 最終バトルフラグを設定
-		isFinalBattle_ = transitionData.isFinalBattle;
-		totalRemainingFieldEnemies_ = transitionData.totalRemainingFieldEnemies;  // ★追加
-
-		char debugBuffer[256];
-		sprintf_s(debugBuffer, "[BattleScene] isFinalBattle: %s, Remaining groups: %zu\n",
-			isFinalBattle_ ? "TRUE" : "FALSE", totalRemainingFieldEnemies_);
-		Logger(debugBuffer);
-
-		if (isFinalBattle_) {
-			Logger("[BattleScene] ★★★ FINAL BATTLE FLAG SET! ★★★\n");
-		}
-
-		// 敵出現設定
-		EnemyEncounterData encounter;
-		encounter.encounterName = transitionData.enemyGroup + "_Battle";
-
-		// 複数体対応
-		if (!transitionData.battleEnemyIds.empty()) {
-			encounter.enemyIds = transitionData.battleEnemyIds;
-			Logger("[BattleScene] 複数体バトル開始\n");
-		}
-		else {
-			encounter.enemyIds = { transitionData.battleEnemyId };
-			Logger("[BattleScene] 単体バトル開始\n");
-		}
-
-		// フォーメーション設定
-		if (!transitionData.battleFormation.empty() && battleEnemyManager_) {
-			auto formation = battleEnemyManager_->GetFormation(transitionData.battleFormation);
-			if (!formation.positions.empty()) {
-				encounter.formations = formation.positions;
-			}
-		}
-
-		// デフォルト配置
-		if (encounter.formations.empty()) {
-			encounter.formations = battleEnemyManager_->GetFormationPositions(encounter.enemyIds.size());
-		}
-
-		// バトル開始時のスタート演出カメラの再生
-		player_->GetPlayerCamera()->PlayBattleStart();
-		// 戦闘開始
-		if (battleEnemyManager_) {
-			// BattleEnemyManagerに最終バトル情報を渡す
-			battleEnemyManager_->SetFinalBattleMode(isFinalBattle_);
-			battleEnemyManager_->StartBattle(encounter);
-		}
-
-		syncData->ClearBattleTransitionData();
-		Logger("[BattleScene] バトルデータ設定完了\n");
-	}
-	else {
-		Logger("[BattleScene] エラー: バトル遷移データが存在しません\n");
-	}
-
 	Logger("[BattleScene] ===== OnEnter() END =====\n");
 }
 
 /// <summary>
-/// シーンを抜ける時に呼ばれる：結果の保存処理
+/// シーンを抜ける時に呼ばれる：敵削除と UI 後始末のみ。
+/// FieldReturnData は HandleBattleEnd() が SubSceneManager 経由で直接渡す。
 /// </summary>
 void BattleScene::OnExit() {
 	BaseSubScene::OnExit();
 
 	Logger("[BattleScene] ===== OnExit() START =====\n");
-
-	auto* syncData = SceneSyncData::GetInstance();
-	nlohmann::json battleState;
-
-	battleState["currentEnemyGroup"] = currentEnemyGroup_;
-
-	if (battleEnemyManager_) {
-		const BattleStats& stats = battleEnemyManager_->GetBattleStats();
-		battleState["stats"]["expGained"] = stats.totalExpGained;
-		battleState["stats"]["goldGained"] = stats.totalGaldGained;
-		battleState["stats"]["enemiesDefeated"] = stats.enemiesDefeated;
-		battleState["stats"]["battleDuration"] = stats.battleDuration;
-
-		nlohmann::json itemsArray = nlohmann::json::array();
-		for (const auto& item : stats.droppedItems) {
-			itemsArray.push_back(item);
-		}
-		battleState["stats"]["droppedItems"] = itemsArray;
-	}
-	battleState["playerHpRatio"] = 1.0f;
-	syncData->SaveCurrentSceneState("Battle", battleState);
 
 	// ロックオンUIを非表示にする
 	lockOnUI_->SetIsVisible(false);
@@ -308,21 +222,58 @@ void BattleScene::OnExit() {
 }
 
 /// <summary>
-/// 即時バトル開始（外部から直接呼ばれる）
+/// バトル開始エントリポイント。
+/// SubSceneManager がフェード演出の途中でこの関数に BattleTransitionData を渡す。
 /// </summary>
 void BattleScene::StartBattle(const BattleTransitionData& data) {
 	Logger("[BattleScene] ===== StartBattle() START =====\n");
 
 	originalTransitionData_ = data;
 	currentEnemyGroup_ = data.enemyGroup;
-	SavePlayerState(data);
+	isFinalBattle_ = data.isFinalBattle;
+	totalRemainingFieldEnemies_ = data.totalRemainingFieldEnemies;
 
+	char debugBuffer[256];
+	sprintf_s(debugBuffer, "[BattleScene] isFinalBattle: %s, Remaining groups: %zu\n",
+		isFinalBattle_ ? "TRUE" : "FALSE", totalRemainingFieldEnemies_);
+	Logger(debugBuffer);
+
+	if (isFinalBattle_) {
+		Logger("[BattleScene] ★★★ FINAL BATTLE FLAG SET! ★★★\n");
+	}
+
+	// エンカウントデータ構築
 	EnemyEncounterData encounter;
-	encounter.encounterName = data.enemyGroup + "_Individual";
-	encounter.enemyIds = { data.battleEnemyId };
-	encounter.formations = { Vector3(0.0f, 0.0f, 5.0f) };
+	encounter.encounterName = data.enemyGroup + "_Battle";
+	encounter.enemyScale = data.battleEnemyScale;
+
+	if (!data.battleEnemyIds.empty()) {
+		encounter.enemyIds = data.battleEnemyIds;
+		Logger("[BattleScene] 複数体バトル開始\n");
+	}
+	else {
+		encounter.enemyIds = { data.battleEnemyId };
+		Logger("[BattleScene] 単体バトル開始\n");
+	}
+
+	// フォーメーション設定
+	if (!data.battleFormation.empty() && battleEnemyManager_) {
+		auto formation = battleEnemyManager_->GetFormation(data.battleFormation);
+		if (!formation.positions.empty()) {
+			encounter.formations = formation.positions;
+		}
+	}
+
+	// デフォルト配置
+	if (encounter.formations.empty() && battleEnemyManager_) {
+		encounter.formations = battleEnemyManager_->GetFormationPositions(encounter.enemyIds.size());
+	}
+
+	// バトル開始演出
+	player_->GetPlayerCamera()->PlayBattleStart();
 
 	if (battleEnemyManager_) {
+		battleEnemyManager_->SetFinalBattleMode(isFinalBattle_);
 		battleEnemyManager_->StartBattle(encounter);
 	}
 
@@ -368,8 +319,6 @@ void BattleScene::HandleBattleEnd(BattleResult result, const BattleStats& stats)
 	FieldReturnData returnData;
 	CreateBattleReturnData(returnData, result, stats);
 
-	SceneSyncData::GetInstance()->SaveFieldReturnData(returnData);
-
 	const char* resultStr =
 		(result == BattleResult::Victory) ? "Victory" :
 		(result == BattleResult::Defeat) ? "Defeat" : "Other";
@@ -379,11 +328,10 @@ void BattleScene::HandleBattleEnd(BattleResult result, const BattleStats& stats)
 		resultStr, stats.totalExpGained, stats.totalGaldGained);
 	Logger(buffer);
 
-	if (battleEndCallback_) {
-		battleEndCallback_(returnData, result, stats);
-	}
-
 	battleEnemyManager_->ForceBattleEnd();
+
+	// SubSceneManager 経由でフィールドへ戻る（in-memory コピーで FieldReturnData を渡す）
+	RequestFieldTransition(returnData);
 
 	Logger("[BattleScene] ===== HandleBattleEnd() END =====\n");
 }

@@ -126,6 +126,7 @@ void PlayerCombo::ExecuteAttack(const AttackData& attack) {
 
 	stateTimer_ = 0.0f;
 	comboTimer_ = 0.0f;
+	hitIndexInCurrentAttack_ = 0;
 
 	// ------------------------------------------------------------
 	// オートホーミング（吸い付き）
@@ -205,7 +206,26 @@ void PlayerCombo::OnAttackFinished() {
 	previousState_ = currentState_;
 	currentState_ = ComboState::Idle;
 	stateTimer_ = 0.0f;
+	hitIndexInCurrentAttack_ = 0;
 	// ※ comboTimer_ はここでリセットせず、コンボが途切れるまで計測を続ける
+}
+
+// ============================================================
+// 武器側からのヒット通知（PlayerSword::OnEnterCollisionから呼ばれる）
+// 振りごとに1始まりで番号を振り、コールバックに転送する
+// ============================================================
+void PlayerCombo::NotifyAttackHit(BaseCollider* victim, const Vector3& hitPosition) {
+	if (!currentAttack_) return;
+
+	++hitIndexInCurrentAttack_;
+
+	if (onAttackHit_) {
+		AttackHitContext ctx{};
+		ctx.victim = victim;
+		ctx.hitPosition = hitPosition;
+		ctx.hitIndex = hitIndexInCurrentAttack_;
+		onAttackHit_(*currentAttack_, ctx);
+	}
 }
 
 // ============================================================
@@ -339,6 +359,7 @@ void PlayerCombo::ResetCombo() {
 	currentAttack_ = nullptr;
 	comboDamageMultiplier_ = 1.0f;
 	comboTimer_ = 0.0f;
+	hitIndexInCurrentAttack_ = 0;
 
 	previousState_ = currentState_;
 	currentState_ = ComboState::Idle;

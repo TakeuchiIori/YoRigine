@@ -301,6 +301,9 @@ void Editor::DrawGameWindow()
 			if (gizmoDrawCallback_) {
 				gizmoDrawCallback_();
 			}
+			for (auto& cb : extraGizmoDrawCallbacks_) {
+				if (cb.fn) cb.fn();
+			}
 
 			// モデルをドラッグアンドドロップで配置するためのドロップターゲット
 			if (ImGui::BeginDragDropTarget()) {

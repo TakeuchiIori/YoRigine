@@ -21,24 +21,12 @@
 #include <Graphics/Drawer/LineManager/Line.h>
 #include "PrefabManager.h"
 #include "ObjectSelector.h"
-#include "PickBuffer.h"   
+#include "PickBuffer.h"
+#include <Graphics/Drawer/InstancedShape/InstancedCube.h>
+#include <Graphics/Drawer/InstancedShape/InstancedSphere.h>
 
 namespace YoRigine {
 
-    /// <summary>
-    /// シーンエディター統括クラス。
-    /// 各サブシステムを保持し、外部には
-    ///   Initialize / Update / Draw / DrawShadow / DrawImGui / DrawGizmo / Finalize
-    /// の7本のみを公開する。
-    ///
-    ///  サブシステム構成
-    ///   SceneSerializer … JSON Save/Load（外部からも GetSerializer() で取得可能）
-    ///   PrefabManager   … プレファブ管理
-    ///   ObjectSelector  … 選択状態・レイキャスト（外部から GetSelector() で取得可能）
-    ///   ModelBrowser    … モデルフォルダ UI        [USE_IMGUI]
-    ///   SceneEditorUI   … Inspector / ObjectList  [USE_IMGUI]
-    ///   GizmoController … ギズモ描画・Undo/Redo    [USE_IMGUI]
-    /// </summary>
     class ModelManipulator
     {
     public:
@@ -58,19 +46,20 @@ namespace YoRigine {
         void DrawForPick();
         void Finalize();
 
-        // シーンにオブジェクトを配置
         void PlaceObject(const std::string& modelPath);
-
-        // シーンの読み込み
         void LoadScene(const std::string& sceneName);
 
-        // カメラのセット
         void SetCamera(Camera* camera) {
             camera_ = camera;
             selector_.SetCamera(camera);
             motionEditor_.SetCamera(camera);
-            colliderLine_.SetCamera(camera_);
-			objectManager_->SetCamera(camera);
+            // AABB/OBB は InstancedCube 集約描画
+            colliderCubes_.SetCamera(camera_);
+            // Sphere は InstancedSphere 集約描画
+            colliderSpheres_.SetCamera(camera_);
+            // Capsule は Line で描画
+            colliderLineCapsule_.SetCamera(camera_);
+            objectManager_->SetCamera(camera);
         }
 
         //=========================================================================
@@ -79,8 +68,21 @@ namespace YoRigine {
         SceneSerializer& GetSerializer() { return serializer_; }
         ObjectSelector& GetSelector() { return selector_; }
         MotionEditor& GetMotionEditor() { return motionEditor_; }
+
 #ifdef USE_IMGUI
-        //GizmoController& GetGizmoController() { return gizmoCtrl_; }
+        // シーンエディタ (オブジェクト選択・ギズモ) が有効かどうか。
+        // オブジェクト一覧ウィンドウが閉じている、または Editor 全体が非表示なら false。
+        // この返り値で ObjectSelector::Update / DrawGizmo を抑制する。
+        bool IsSceneEditorActive() const;
+
+        //=========================================================================
+        // デバッグ描画設定（SceneEditorUI から操作）
+        //=========================================================================
+        bool* GetShowColliderDebugPtr() { return &showColliderDebug_; }
+        bool* GetShowColliderSelectedOnlyPtr() { return &showColliderSelectedOnly_; }
+        bool* GetShowBroadPhaseGridPtr() { return &showBroadPhaseGrid_; }
+        float* GetBroadPhaseGridDrawRadiusPtr() { return &broadPhaseGridDrawRadius_; }
+        bool* GetEnableDrawFrustumCullingPtr() { return &enableDrawFrustumCulling_; }
 #endif
 
     private:
@@ -90,6 +92,7 @@ namespace YoRigine {
         void ShortcutKey();
         void CopyObject();
         void PasteObject();
+
         //=========================================================================
         // シングルトン
         //=========================================================================
@@ -113,13 +116,27 @@ namespace YoRigine {
         std::string    modelFolderPath_ = "Resources/Models/";
         MotionEditor motionEditor_;
 
-        Line   colliderLine_;           // コライダーAABB可視化用
-        bool   showColliderDebug_ = true; // コライダー表示フラグ
+        // AABB/OBB はインスタンス描画(1 DrawInstanced)。色はインスタンス毎。
+        InstancedCube colliderCubes_;
+        // Sphere もインスタンス描画 (worldMat = scale(r) * translate(c))
+        InstancedSphere colliderSpheres_;
+        // Capsule は単位形状化が複雑 (start/end が可変) なので既存 Line を継続。
+        Line colliderLineCapsule_;
+        bool showColliderDebug_ = true; // コライダー表示フラグ
 
-        // コピーしたオブジェクトのIDを保持
+#ifdef USE_IMGUI
+        bool   showColliderSelectedOnly_ = false; // 選択中のみ描画
+        bool   showBroadPhaseGrid_       = false; // BroadPhase グリッド可視化
+        float  broadPhaseGridDrawRadius_ = 30.0f; // カメラからの可視化半径
+#endif
+
+        // ── Frustum culling ──────────────────────────────
+        bool  enableDrawFrustumCulling_ = false;  // 描画でカリングするか
+        float drawBoundsScaleFactor_    = 2.0f;   // スケール → 半サイズ係数 (コライダー無いとき)
+
         std::vector<int> copyObjectIDs_;
         Vector3 offsetCopyPos_ = { 1.0f,0.0f,0.0f };
-        // ── サブシステム ─────────────────────────────────────────
+
         SceneSerializer serializer_;
         PrefabManager   prefabMgr_;
         ObjectSelector  selector_;

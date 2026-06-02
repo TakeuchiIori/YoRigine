@@ -7,7 +7,7 @@ void BattleJumpAttackState::Enter(BattleEnemy& enemy) {
 	if (auto anim = enemy.GetAnimation()) {
 		// ジャンプ前はシアン色に変化しつつ、横に平べったく（縦に潰れる）なる
 		anim->StartColorAnimation({ 1, 1, 1, 1 }, { 0.0f, 1.0f, 1.0f, 1.0f }, 0.3f);
-		anim->StartScaleAnimation({ 1, 1, 1 }, { 1.3f, 0.6f, 1.3f }, 0.3f, Easing::Function::EaseOutQuad);
+		anim->StartRelativeScaleAnimation({ 1, 1, 1 }, { 1.3f, 0.6f, 1.3f }, 0.3f, Easing::Function::EaseOutQuad);
 	}
 	else {
 		enemy.SetColor({ 0.0f, 1, 1, 1 });
@@ -78,7 +78,7 @@ void BattleJumpAttackState::Update(BattleEnemy& enemy, float dt) {
 		// ジャンプ開始の瞬間に縦長に引き伸ばすアニメーション
 		if (previousTime < chargeEndTime && currentTime >= chargeEndTime) {
 			if (auto anim = enemy.GetAnimation()) {
-				anim->StartScaleAnimation({ 1.3f, 0.6f, 1.3f }, { 0.8f, 1.4f, 0.8f }, 0.15f, Easing::Function::EaseOutQuad);
+				anim->StartRelativeScaleAnimation({ 1.3f, 0.6f, 1.3f }, { 0.8f, 1.4f, 0.8f }, 0.15f, Easing::Function::EaseOutQuad);
 			}
 		}
 
@@ -103,9 +103,9 @@ void BattleJumpAttackState::Update(BattleEnemy& enemy, float dt) {
 		// 着地した瞬間に少し潰れるアニメーション（バウンド感）
 		if (previousTime < jumpEndTime && currentTime >= jumpEndTime) {
 			if (auto anim = enemy.GetAnimation()) {
-				anim->StartScaleAnimation({ 0.8f, 1.4f, 0.8f }, { 1.2f, 0.8f, 1.2f }, 0.1f, Easing::Function::EaseOutQuad, [enemyPtr = &enemy]() {
+				anim->StartRelativeScaleAnimation({ 0.8f, 1.4f, 0.8f }, { 1.2f, 0.8f, 1.2f }, 0.1f, Easing::Function::EaseOutQuad, [enemyPtr = &enemy]() {
 					if (auto a = enemyPtr->GetAnimation()) {
-						a->StartScaleAnimation({ 1.2f, 0.8f, 1.2f }, { 1.0f, 1.0f, 1.0f }, 0.2f);
+						a->StartRelativeScaleAnimation({ 1.2f, 0.8f, 1.2f }, { 1.0f, 1.0f, 1.0f }, 0.2f);
 					}
 					});
 			}
@@ -140,7 +140,7 @@ void BattleJumpAttackState::Exit(BattleEnemy& enemy) {
 
 	if (auto anim = enemy.GetAnimation()) {
 		anim->StopAll();
-		anim->StartScaleAnimation(anim->GetCurrentScale(), { 1, 1, 1 }, 0.2f);
+		anim->StartScaleAnimation(anim->GetCurrentScale(), anim->GetBaseScale(), 0.2f);
 		anim->StartColorAnimation(anim->GetCurrentColor(), { 1, 1, 1, 1 }, 0.2f);
 	}
 	else {

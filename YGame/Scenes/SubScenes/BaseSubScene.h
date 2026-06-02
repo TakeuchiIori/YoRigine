@@ -63,18 +63,18 @@ public:
 		}
 	}
 
-	// よく使う遷移のヘルパー関数
+	// よく使う遷移のヘルパー関数（in-memory コピーで受け渡し。ファイル I/O も new/delete もなし）
 	void RequestBattleTransition(const BattleTransitionData& data) {
 		SubSceneTransitionRequest request;
 		request.type = SubSceneTransitionType::TO_BATTLE;
-		request.transitionData = new BattleTransitionData(data);
+		request.payload = data;
 		RequestTransition(request);
 	}
 
 	void RequestFieldTransition(const FieldReturnData& data) {
 		SubSceneTransitionRequest request;
 		request.type = SubSceneTransitionType::TO_FIELD;
-		request.transitionData = new FieldReturnData(data);
+		request.payload = data;
 		RequestTransition(request);
 	}
 

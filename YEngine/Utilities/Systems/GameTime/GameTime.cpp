@@ -27,7 +27,7 @@ namespace YoRigine {
 		float   g_AvgFpsHist[kAvgFpsHistSize] = {};
 		size_t  g_AvgFpsWrite = 0;
 		bool    g_AvgFpsFilled = false;
-		
+
 		float averageFps_ = 0.0f;
 		float fpsCounter_ = 0.0f;
 		int frameCount_ = 0;
