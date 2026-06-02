@@ -100,6 +100,96 @@
             "totalDuration": 0.5,
             "useReturnInterpolation": true,
             "useStartInterpolation": true
+        },
+        {
+            "keyframes": [
+                {
+                    "fovDelta": 0.0,
+                    "posOffset": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "rotOffset": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "shakeDuration": 0.23000000417232513,
+                    "shakeIntensity": 1.1100000143051147,
+                    "time": 0.0022123362869024277,
+                    "timeScale": 1.0
+                },
+                {
+                    "fovDelta": -0.1850000023841858,
+                    "posOffset": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "rotOffset": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "shakeDuration": 0.0,
+                    "shakeIntensity": 0.0,
+                    "time": 0.136725515127182,
+                    "timeScale": 1.0
+                },
+                {
+                    "fovDelta": -0.1850000023841858,
+                    "posOffset": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "rotOffset": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "shakeDuration": 0.0,
+                    "shakeIntensity": 0.0,
+                    "time": 0.2659292221069336,
+                    "timeScale": 0.699999988079071
+                }
+            ],
+            "name": "A4",
+            "resetOnFinish": true,
+            "returnDuration": 0.20000000298023224,
+            "startInterpolationDuration": 0.20000000298023224,
+            "totalDuration": 0.5,
+            "useReturnInterpolation": true,
+            "useStartInterpolation": true
+        },
+        {
+            "keyframes": [
+                {
+                    "fovDelta": 0.0,
+                    "posOffset": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "rotOffset": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "shakeDuration": 0.25999999046325684,
+                    "shakeIntensity": 1.5199999809265137,
+                    "time": 0.0004601748660206795,
+                    "timeScale": 0.23999999463558197
+                }
+            ],
+            "name": "A5",
+            "resetOnFinish": true,
+            "returnDuration": 0.20000000298023224,
+            "startInterpolationDuration": 0.20000000298023224,
+            "totalDuration": 0.12999999523162842,
+            "useReturnInterpolation": true,
+            "useStartInterpolation": true
         }
     ]
 }
