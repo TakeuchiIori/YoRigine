@@ -190,6 +190,118 @@
             "totalDuration": 0.12999999523162842,
             "useReturnInterpolation": true,
             "useStartInterpolation": true
+        },
+        {
+            "keyframes": [
+                {
+                    "fovDelta": 0.0,
+                    "posOffset": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "rotOffset": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "shakeDuration": 0.20999999344348907,
+                    "shakeIntensity": 0.20000000298023224,
+                    "time": 0.0,
+                    "timeScale": 1.0
+                }
+            ],
+            "name": "B1",
+            "resetOnFinish": true,
+            "returnDuration": 0.20000000298023224,
+            "startInterpolationDuration": 0.20000000298023224,
+            "totalDuration": 0.5,
+            "useReturnInterpolation": true,
+            "useStartInterpolation": true
+        },
+        {
+            "keyframes": [
+                {
+                    "fovDelta": -0.03999999910593033,
+                    "posOffset": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "rotOffset": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "shakeDuration": 0.30000001192092896,
+                    "shakeIntensity": 0.30000001192092896,
+                    "time": 0.0,
+                    "timeScale": 0.8999999761581421
+                }
+            ],
+            "name": "B2",
+            "resetOnFinish": true,
+            "returnDuration": 0.20000000298023224,
+            "startInterpolationDuration": 0.20000000298023224,
+            "totalDuration": 0.5,
+            "useReturnInterpolation": true,
+            "useStartInterpolation": true
+        },
+        {
+            "keyframes": [
+                {
+                    "fovDelta": -0.05999999865889549,
+                    "posOffset": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "rotOffset": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "shakeDuration": 0.3499999940395355,
+                    "shakeIntensity": 0.8999999761581421,
+                    "time": 0.0,
+                    "timeScale": 1.0
+                }
+            ],
+            "name": "B3",
+            "resetOnFinish": true,
+            "returnDuration": 0.20000000298023224,
+            "startInterpolationDuration": 0.20000000298023224,
+            "totalDuration": 0.5,
+            "useReturnInterpolation": true,
+            "useStartInterpolation": true
+        },
+        {
+            "keyframes": [
+                {
+                    "fovDelta": -0.20000000298023224,
+                    "posOffset": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "rotOffset": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "shakeDuration": 0.0,
+                    "shakeIntensity": 0.0,
+                    "time": 0.0003629778802860528,
+                    "timeScale": 0.3100000023841858
+                }
+            ],
+            "name": "B4",
+            "resetOnFinish": true,
+            "returnDuration": 0.20000000298023224,
+            "startInterpolationDuration": 0.20000000298023224,
+            "totalDuration": 0.10000000149011612,
+            "useReturnInterpolation": true,
+            "useStartInterpolation": true
         }
     ]
 }
