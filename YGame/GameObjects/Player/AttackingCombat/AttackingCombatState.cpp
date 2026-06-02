@@ -1,7 +1,8 @@
 #include "AttackingCombatState.h"
 #include "../Player.h"
 #include "../Movement/PlayerMovement.h"
-#include "Model.h" 
+#include "Model.h"
+#include "Systems/GameTime/GameTime.h"
 
 // ============================================================
 // コンストラクタ
@@ -36,9 +37,33 @@ AttackingCombatState::AttackingCombatState(PlayerCombat* combat) : combat_(comba
 			player->GetSword()->LoadVfxAssets("Resources/Vfx/NewEffect2.json");
 		}
 
-		player->GetPlayerCamera()->PlayAttackCameraWork(attack.playCameraWorkName);
 		player->GetSword()->PlayTrail();
 		combat->NotifyAction("コンボ開始: " + attack.animationName);
+		});
+
+	// ------------------------------------------------------------
+	// 攻撃ヒット時のコールバック設定
+	// AttackData 駆動でカメラワーク・ヒットストップ・シェイクを発火する。
+	// PlayerSword はヒット検出と通知だけを担当し、演出はすべてここで集約する。
+	// ------------------------------------------------------------
+	combo->SetAttackHitCallback([combat, player](const AttackData& attack, const AttackHitContext& ctx) {
+		if (combat->GetCurrentState() == CombatState::Dead) return;
+
+		// カメラワークは振りごとに最初のヒットでだけ発火する。
+		// （複数敵を貫いた場合や同一振り内の再ヒットで暴発させない）
+		if (ctx.hitIndex == 1 && !attack.playCameraWorkName.empty()) {
+			player->GetPlayerCamera()->PlayAttackCameraWork(attack.playCameraWorkName);
+		}
+
+		// ヒットストップとシェイクは AttackData の値が 0 のときはスキップ。
+		if (attack.hitStopDuration > 0.0f) {
+			YoRigine::GameTime::SetHitStop(attack.hitStopDuration);
+		}
+		if (attack.shakeIntensity > 0.0f && attack.shakeDuration > 0.0f) {
+			if (player->GetFollowCamera()) {
+				player->GetFollowCamera()->StartShake(attack.shakeIntensity, attack.shakeDuration);
+			}
+		}
 		});
 
 	// ------------------------------------------------------------

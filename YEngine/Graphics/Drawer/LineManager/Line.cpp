@@ -67,7 +67,13 @@ void Line::DrawLine()
 /// </summary>
 void Line::RegisterLine(const Vector3& start, const Vector3& end)
 {
-	assert(index + 1 < kMaxNum);
+	// 頂点バッファが満杯のときは描画を諦めて静かにスキップする。
+	// 死亡時など大量のコライダー・視界コーンが同時に登録されるケースで
+	// assert で止まらないようにするための防御。デバッグ描画が一部欠けるだけで
+	// ゲーム進行には影響しない。
+	if (index + 2 > kMaxNum) {
+		return;
+	}
 
 	vertexData_[index++].position = { start.x, start.y, start.z, 1.0f };
 	vertexData_[index++].position = { end.x,   end.y,   end.z,   1.0f };

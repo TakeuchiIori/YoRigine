@@ -3,7 +3,7 @@
         {
             "keyframes": [
                 {
-                    "fovDelta": -0.014999999664723873,
+                    "fovDelta": -0.03999999910593033,
                     "posOffset": [
                         0.0,
                         0.0,
@@ -21,6 +21,79 @@
                 }
             ],
             "name": "A1",
+            "resetOnFinish": true,
+            "returnDuration": 0.20000000298023224,
+            "startInterpolationDuration": 0.20000000298023224,
+            "totalDuration": 0.5,
+            "useReturnInterpolation": true,
+            "useStartInterpolation": true
+        },
+        {
+            "keyframes": [
+                {
+                    "fovDelta": -0.07999999821186066,
+                    "posOffset": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "rotOffset": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "shakeDuration": 0.0,
+                    "shakeIntensity": 0.0,
+                    "time": 0.25,
+                    "timeScale": 1.0
+                }
+            ],
+            "name": "A2",
+            "resetOnFinish": true,
+            "returnDuration": 0.20000000298023224,
+            "startInterpolationDuration": 0.20000000298023224,
+            "totalDuration": 0.5,
+            "useReturnInterpolation": true,
+            "useStartInterpolation": true
+        },
+        {
+            "keyframes": [
+                {
+                    "fovDelta": -0.11999999731779099,
+                    "posOffset": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "rotOffset": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "shakeDuration": 0.0,
+                    "shakeIntensity": 0.0,
+                    "time": 0.12345131486654282,
+                    "timeScale": 1.0
+                },
+                {
+                    "fovDelta": -0.11999999731779099,
+                    "posOffset": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "rotOffset": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "shakeDuration": 0.0,
+                    "shakeIntensity": 0.0,
+                    "time": 0.3438054621219635,
+                    "timeScale": 0.800000011920929
+                }
+            ],
+            "name": "A3",
             "resetOnFinish": true,
             "returnDuration": 0.20000000298023224,
             "startInterpolationDuration": 0.20000000298023224,
