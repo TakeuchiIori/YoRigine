@@ -1,10 +1,13 @@
 {
-    "Capsule AxisLocal X": 0.0,
-    "Capsule AxisLocal Y": 1.0,
-    "Capsule AxisLocal Z": 0.0,
-    "Capsule HalfHeight": 0.699999988079071,
-    "Capsule Offset X": 0.10000000149011612,
-    "Capsule Offset Y": 1.2999999523162842,
-    "Capsule Offset Z": 0.0,
-    "Capsule Radius": 0.8999999761581421
+    "OBB Offset Center X": 0.0,
+    "OBB Offset Center Y": 1.5,
+    "OBB Offset Center Z": 0.0,
+    "OBB Offset Euler (degrees)": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+    },
+    "OBB Offset Size X": 0.8999999761581421,
+    "OBB Offset Size Y": 1.0,
+    "OBB Offset Size Z": 1.0
 }

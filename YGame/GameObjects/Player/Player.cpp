@@ -149,14 +149,14 @@ void Player::HandleCombatInput() {
 // コライダー初期化
 // ============================================================
 void Player::InitCollision() {
-	capsuleCollider_ = ColliderFactory::Create<CapsuleCollider>(
+	obbCollider_ = ColliderFactory::Create<OBBCollider>(
 		this, &wt_, camera_,
 		static_cast<uint32_t>(CollisionTypeIdDef::kPlayer)
 	);
-	capsuleCollider_->SetIsStatic(false);
-	capsuleCollider_->SetMass(100.0f);
+	obbCollider_->SetIsStatic(false);
+	obbCollider_->SetMass(100.0f);
 	// Player は画面外でも常に当たり判定を回す (落下・カメラ越し攻撃などで invariably 必要)
-	capsuleCollider_->SetCheckOutsideCamera(false);
+	obbCollider_->SetCheckOutsideCamera(false);
 
 }
 
@@ -212,8 +212,8 @@ void Player::Update() {
 	wt_.UpdateMatrix();
 	playerSword_->Update();
 	playerShield_->Update();
-	capsuleCollider_->Update();
-	capsuleCollider_->SetVelocity(movement_->GetVelocity());
+	obbCollider_->Update();
+	obbCollider_->SetVelocity(movement_->GetVelocity());
 	healthUI_->Update();
 }
 
@@ -239,7 +239,7 @@ void Player::DrawCollision() {
 	if (isAlive_) {
 		playerSword_->DrawCollision();
 		playerShield_->DrawCollision();
-		capsuleCollider_->Draw();
+		obbCollider_->Draw();
 	}
 }
 
@@ -368,7 +368,7 @@ void Player::InitJson() {
 	combat_->GetGuard()->InitJson(jsonManager_.get());
 
 	jsonCollider_ = std::make_unique<YoRigine::JsonManager>("PlayerCollider", "Resources/Json/Colliders");
-	capsuleCollider_->InitJson(jsonCollider_.get());
+	obbCollider_->InitJson(jsonCollider_.get());
 }
 
 // ============================================================
