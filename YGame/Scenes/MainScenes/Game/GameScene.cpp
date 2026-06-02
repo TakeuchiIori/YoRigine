@@ -107,6 +107,13 @@ void GameScene::Initialize() {
 
 	// デバッグカメラを取得または作成
 	auto debug = director->GetCamera("MainDebug");
+
+	// JSON保存値で MainDebug が高優先のまま残っていると、SnapToActiveCamera が
+	// MainDebug にスナップ → 次フレームの UpdateCamera で PlayerFollow へ切替が
+	// 発生し、巨大累積角度（例: 99236rad）から Euler 線形補間でグルグル回る。
+	// 初期モードに合わせて優先度を確定してからスナップする。
+	director->SetPriority("PlayerFollow", 10);
+	director->SetPriority("MainDebug", 0);
 	director->SnapToActiveCamera();
 
 	// PlayerCamera を初期化（FollowCamera を内包するコンポーネント構成）
