@@ -13,7 +13,7 @@ public:
     void Exit(BattleEnemy& enemy) override;
 
 private:
-    float recoveryDuration_ = 1.5f;  // 回復時間
+    // recoveryDuration は enemy.GetEnemyData().attackParams.counter.recoveryDuration から取得する
     bool canCounter_ = false;        // カウンター可能フラグ
-	bool hasPlayedAnimation_ = false; // アニメーション再生フラグ
+    bool hasPlayedAnimation_ = false; // アニメーション再生フラグ
 };

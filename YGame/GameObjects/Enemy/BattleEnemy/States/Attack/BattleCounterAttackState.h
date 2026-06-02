@@ -20,22 +20,6 @@ private:
     Vector3 attackDir_{ 0, 0, 0 };
     Vector3 anticipationStartPos_{ 0, 0, 0 };
 
-    // ========== 反撃専用パラメータ ==========
-
-    // フェーズ1: カウンター起動（この間は無敵）
-    const float counterStartupTime_ = 0.2f;
-
-    // フェーズ2: 予備動作（短くキビキビ）
-    const float anticipationTime_ = 0.5f;
-    const float anticipationDistance_ = 10.8f;   // 後退距離）
-
-    // フェーズ3: チャージ（プレイヤーをロックオン追尾）
-    const float chargeTime_ = 0.25f;
-
-    // フェーズ4: 突進（超高速 & 突進中もプレイヤーを追従）
-    const float rushTime_ = 0.55f;
-    const float rushSpeedMultiplier_ = 15.0f;
-
-    // フェーズ5: クールダウン
-    const float cooldownTime_ = 0.8f;
+    // ※ パラメータはすべて enemy.GetEnemyData().attackParams.counter から取得する
+    //   (Phase: startup → anticipation → charge → rush → cooldown)
 };
