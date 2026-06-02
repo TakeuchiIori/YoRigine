@@ -1,6 +1,9 @@
 #include "AreaManager.h"
 #include "../CircleArea.h"
 #include "../PolygonArea.h"
+#include <cfloat>
+#include <cmath>
+#include <algorithm>
 
 // ============================================================
 // コンストラクタ（indexAj_ の登録は一度だけ行う）
@@ -25,12 +28,29 @@ void AreaManager::Initialize()
 	isDebugDrawEnabled_ = false;
 }
 
-void AreaManager::Update(const Vector3& targetPosition)
+void AreaManager::Update(const Vector3& targetPosition, void* targetKey)
 {
 	for (auto& [name, area] : areas_) {
 		if (area && area->IsActive()) {
-			area->Update(targetPosition);
+			area->Update(targetPosition, targetKey);
 		}
+	}
+}
+
+void AreaManager::UpdateTargets(const std::vector<AreaTarget>& targets)
+{
+	for (auto& [name, area] : areas_) {
+		if (!area || !area->IsActive()) continue;
+		for (const auto& t : targets) {
+			area->Update(t.position, t.key);
+		}
+	}
+}
+
+void AreaManager::ForgetTarget(void* targetKey)
+{
+	for (auto& [name, area] : areas_) {
+		if (area) area->ForgetTarget(targetKey);
 	}
 }
 
@@ -130,17 +150,26 @@ bool AreaManager::IsInsideAreaByPurpose(const Vector3& position, AreaPurpose pur
 
 Vector3 AreaManager::ClampToNearestArea(const Vector3& position) const
 {
+	// 1) いずれかのエリアの内側にいるなら、そのまま返す。
+	//    旧実装は「中心距離が最も近いエリア」にクランプしていたため、
+	//    別エリアの内側にいる位置が遠いエリア境界に飛ぶバグがあった。
+	for (const auto& [name, area] : areas_) {
+		if (area && area->IsActive() && area->IsInside(position)) {
+			return position;
+		}
+	}
+
+	// 2) 外側にいる場合は「境界が最も近いエリア」を選んでクランプする。
+	//    GetDistanceFromBoundary は外側で負、絶対値が境界までの距離。
 	std::shared_ptr<BaseArea> nearestArea = nullptr;
-	float minDistance = FLT_MAX;
+	float minAbs = FLT_MAX;
 
 	for (const auto& [name, area] : areas_) {
-		if (area && area->IsActive()) {
-			Vector3 center   = area->GetCenter();
-			float   distance = Length(position - center);
-			if (distance < minDistance) {
-				minDistance = distance;
-				nearestArea = area;
-			}
+		if (!area || !area->IsActive()) continue;
+		float d = std::fabs(area->GetDistanceFromBoundary(position));
+		if (d < minAbs) {
+			minAbs = d;
+			nearestArea = area;
 		}
 	}
 

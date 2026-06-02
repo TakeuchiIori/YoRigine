@@ -2,7 +2,6 @@
 
 // Engine
 #include <SceneSystems/SceneManager.h>
-#include "Particle./ParticleManager.h"
 #include "Object3D/Object3dCommon.h"
 #include "LightManager/LightManager.h"
 #include "Collision/Core/CollisionManager.h"
@@ -67,6 +66,9 @@ void GameScene::Initialize() {
 	YoRigine::GameTime::Initialize();
 	YoRigine::JsonManager::SetCurrentScene("GameScene");
 	YoRigine::CollisionManager::GetInstance()->Initialize();
+	// 視錐台外コライダーは BroadPhase 登録をスキップする (個別オプトアウトは BaseCollider::SetCheckOutsideCamera(false))
+	YoRigine::CollisionManager::GetInstance()->SetCullingCamera(sceneCamera_.get());
+	YoRigine::CollisionManager::GetInstance()->SetEnableFrustumCulling(true);
 	YoRigine::ModelManipulator::GetInstance()->LoadScene("GameScene");
 	AreaManager::GetInstance()->Initialize();
 	YParticleManager::GetInstance().SetCamera(sceneCamera_.get());
@@ -85,30 +87,6 @@ void GameScene::Initialize() {
 	//------------------------------------------------------------
 	gameUI_ = std::make_unique<GameUI>();
 	gameUI_->Initialize();
-
-
-	//------------------------------------------------------------
-	// 共通システム初期化
-	//------------------------------------------------------------
-
-	// AttackData の JSON を読み込む
-	AttackDatabase::LoadFromFile("Resources/Json/Combo/AttackData.json");
-#ifdef USE_IMGUI
-	// エディターを初期化
-	attackEditor_ = std::make_unique<AttackDataEditor>();
-	attackEditor_->SetFilePath("Resources/Json/Combo/AttackData.json");
-	attackEditor_->SetAutoReload(true);  // 自動リロード有効
-	attackEditor_->SetOpen(true);
-
-	// リロードコールバックを設定
-	attackEditor_->SetReloadCallback([this]() {
-		// プレイヤーのコンボシステムをリロード
-		if (player_) {
-			player_->GetCombat()->GetCombo()->ReloadAttacks();
-		}
-		Logger("[GameScene] Attack data reloaded from editor!\n");
-		});
-#endif
 
 	//------------------------------------------------------------
 	// 共通オブジェクト
@@ -139,7 +117,6 @@ void GameScene::Initialize() {
 	skyBox_->Initialize(sceneCamera_.get(), "Resources/DDS/vz_classic_cubemap_ue.dds");
 
 
-	YoRigine::ParticleManager::GetInstance()->SetCamera(sceneCamera_.get());
 	YoRigine::ModelManipulator::GetInstance()->SetCamera(sceneCamera_.get());
 	YoRigine::GpuEmitManager::GetInstance()->SetCamera(sceneCamera_.get());
 
@@ -155,33 +132,10 @@ void GameScene::Initialize() {
 	subSceneManager_->RegisterSubScene("Field", std::move(fieldScene));
 
 	// バトルシーン登録
+	// フィールドへの復帰は BattleScene::HandleBattleEnd 内で
+	// RequestFieldTransition(returnData) を直接呼ぶので、ここではコールバック不要。
 	auto battleScene = std::make_unique<BattleScene>();
 	battleScene->Initialize(sceneCamera_.get(), player_.get());
-
-	//------------------------------------------------------------
-	// バトル終了後にフィールドへ戻すコールバック
-	//------------------------------------------------------------
-	battleScene->SetBattleEndCallback([this](FieldReturnData fieldData, BattleResult result, const BattleStats& stats) {
-		FieldReturnData returnData;
-		returnData.playerWon = (result == BattleResult::Victory);
-		returnData.expGained = stats.totalExpGained;
-		returnData.goldGained = stats.totalGaldGained;
-		returnData.itemsGained = stats.droppedItems;
-		returnData.defeatedEnemyGroup = fieldData.defeatedEnemyGroup;
-
-		// フィールド復帰処理
-		auto* field = dynamic_cast<FieldScene*>(subSceneManager_->GetScene("Field"));
-		if (field) {
-			SubSceneTransitionRequest request;
-			request.type = SubSceneTransitionType::TO_FIELD;
-			request.transitionData = new FieldReturnData(returnData);
-
-			subSceneManager_->HandleTransitionRequest(request);
-			subSceneManager_->SwitchToSceneWithFade("Field");
-			field->HandleBattleReturn(returnData);
-		}
-		});
-
 	subSceneManager_->RegisterSubScene("Battle", std::move(battleScene));
 
 	// 初期サブシーンをフィールドに設定
@@ -190,7 +144,24 @@ void GameScene::Initialize() {
 	//------------------------------------------------------------
 	// エディター用GUI登録
 	//------------------------------------------------------------
+	AttackDatabase::LoadFromFile("Resources/Json/Combo/AttackData.json");
 #ifdef USE_IMGUI
+	// エディターを初期化
+	attackEditor_ = std::make_unique<AttackDataEditor>();
+	attackEditor_->SetFilePath("Resources/Json/Combo/AttackData.json");
+	attackEditor_->SetPlayer(player_.get());
+	attackEditor_->SetAutoReload(true);  // 自動リロード有効
+	attackEditor_->SetOpen(true);
+
+	// リロードコールバックを設定
+	attackEditor_->SetReloadCallback([this]() {
+		// プレイヤーのコンボシステムをリロード
+		if (player_) {
+			player_->GetCombat()->GetCombo()->ReloadAttacks();
+		}
+		Logger("[GameScene] Attack data reloaded from editor!\n");
+		});
+
 	Editor::GetInstance()->RegisterGameUI("カメラエディター", [this]() {cameraEditor_->Update(); }, "Game");
 	Editor::GetInstance()->RegisterGameUI("カメラモード切り替え", [this]() {UpdateCameraMode(); }, "Game");
 	Editor::GetInstance()->RegisterGameUI("プレイヤーの状態情報", [this]() {player_->DrawImGui(); }, "Game");
@@ -277,8 +248,6 @@ void GameScene::Update() {
 		cameraMode_ = subSceneManager_->GetCameraMode();
 	}
 
-	// PlayerCamera フェーズ1: スティック/ロックオン → FollowCamera の回転を確定
-	// ★ UpdateCamera() の前に呼ぶことで CameraDirector が正しい回転で FollowProcess を実行する
 	if (player_->GetPlayerCamera()) {
 		player_->GetPlayerCamera()->UpdatePreDirector();
 	}
@@ -294,7 +263,6 @@ void GameScene::Update() {
 
 	YoRigine::ModelManipulator::GetInstance()->Update();
 	YoRigine::CollisionManager::GetInstance()->Update();
-	YoRigine::ParticleManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
 	YParticleManager::GetInstance().Update(YoRigine::GameTime::GetDeltaTime());
 	YoRigine::LightManager::GetInstance()->UpdateShadowMatrix(sceneCamera_.get());
 	YoRigine::LightManager::GetInstance()->TransferData();
@@ -316,12 +284,10 @@ void GameScene::Draw() {
 	skyBox_->Draw();
 	Object3dCommon::GetInstance()->DrawPreference();
 	DrawObject();
-	YoRigine::ModelManipulator::GetInstance()->Draw();
 
 	//------------------------------------------------------------
 	// パーティクル描画
 	//------------------------------------------------------------
-	YoRigine::ParticleManager::GetInstance()->Draw();
 	YParticleManager::GetInstance().Draw();
 	DrawLine();
 	YoRigine::GpuEmitManager::GetInstance()->Draw();
@@ -336,6 +302,20 @@ void GameScene::Draw() {
 	//------------------------------------------------------------
 	SpriteCommon::GetInstance()->DrawPreference();
 	DrawUI();
+}
+
+/// <summary>
+/// PiP 用の 3D-only 描画 (スカイ + シーンオブジェクトのみ)。
+/// PipCameraSystem がシーンカメラの行列を PiP カメラの値に書き換えた状態で呼び出されるので、
+/// ここでは普段の DrawObject 経路と同じものを呼べば PiP 視点で再描画される。
+/// UI / ライン / ポストエフェクト / シャドウは含めない。
+/// </summary>
+void GameScene::DrawScene3DOnly() {
+	skyBox_->Draw();
+	Object3dCommon::GetInstance()->DrawPreference();
+	DrawObject();
+
+	DrawLine();
 }
 
 /// <summary>
@@ -369,6 +349,7 @@ void GameScene::DrawObject() {
 	if (subSceneManager_) {
 		subSceneManager_->DrawObject();
 	}
+	YoRigine::ModelManipulator::GetInstance()->Draw();
 }
 
 /// <summary>
@@ -411,18 +392,15 @@ void GameScene::UpdateCamera() {
 		// フォローカメラ優先
 		director->SetPriority("PlayerFollow", 10);
 		director->SetPriority("MainDebug", 0);
-		//director->SetPriority("BattleStartCamera", 0);
 		break;
 	case CameraMode::BATTLE_START:
 		// バトル開始カメラ優先
-		//director->SetPriority("BattleStartCamera", 10);
 		director->SetPriority("PlayerFollow", 0);
 		director->SetPriority("MainDebug", 0);
 		break;
 	case CameraMode::DEBUG:
 		director->SetPriority("MainDebug", 10);
 		director->SetPriority("PlayerFollow", 0);
-		//director->SetPriority("BattleStartCamera", 0);
 		break;
 	}
 

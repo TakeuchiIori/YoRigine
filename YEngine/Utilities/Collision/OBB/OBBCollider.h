@@ -44,10 +44,10 @@ public:
 	///************************* 調整用 *************************///
 
 	OBB obbOffset_;
+	Vector3 obbEulerOffset_; // 度数法
 
 private:
 	///************************* メンバ変数 *************************///
 
 	OBB obb_;
-	Vector3 obbEulerOffset_;
 };

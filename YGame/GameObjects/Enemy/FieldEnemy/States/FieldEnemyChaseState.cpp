@@ -1,6 +1,7 @@
 #include "FieldEnemyChaseState.h"
 #include "../FieldEnemy.h"
 #include "FieldEnemySearchState.h"
+#include "FieldEnemyPatrolState.h"
 #include "MathFunc.h"
 #include <Debugger/Logger.h>
 #include <Systems/Navigation/VisionSystem.h>
@@ -30,17 +31,29 @@ void FieldEnemyChaseState::Update(FieldEnemy& enemy, float dt) {
 	chaseTimer_ += dt;
 
 	// ── 視線チェック ──────────────────────────────────────────────
-	if (CanSeePlayer(enemy)) {
+	const bool playerVisible = CanSeePlayer(enemy);
+	if (playerVisible) {
 		losLostTimer_ = 0.0f; // 視線がある → タイマーリセット
 	} else {
 		losLostTimer_ += dt;   // 視線なし → タイマー加算
 	}
 
 	// ── 諦め判定 ──────────────────────────────────────────────────
-	bool lostByLOS = (losLostTimer_ >= kLosLostThreshold);
-	bool lostByDist = (chaseTimer_ > kMinChaseTime && ShouldGiveUpChase(enemy));
+	// 視界内にプレイヤーがいる間は距離だけで諦めない（無限ループ防止）。
+	// 既にスポーンから離れた位置で Search → Chase に遷移したとき、
+	// distToSpawn > returnDistance が常に true になって即 Search に戻り、
+	// Search.Enter() でスウィープが先頭からやり直される現象を防ぐ。
+	const bool lostByLOS  = (losLostTimer_ >= kLosLostThreshold);
+	const bool lostByDist = !playerVisible && ShouldGiveUpChase(enemy);
 
-	if (lostByLOS || lostByDist) {
+	if (lostByDist) {
+		// 領土から離れすぎ＋視界外 → 索敵せず巡回へ戻して帰巣させる
+		enemy.ClearNavPath();
+		enemy.ChangeState(std::make_unique<FieldEnemyPatrolState>());
+		return;
+	}
+	if (lostByLOS) {
+		// 視界が一時的に切れただけ → その場でスウィープ（Search）
 		enemy.ClearNavPath();
 		enemy.ChangeState(std::make_unique<FieldEnemySearchState>());
 		return;

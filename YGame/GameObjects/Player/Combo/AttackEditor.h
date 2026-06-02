@@ -7,7 +7,7 @@
 #include "AttackDatabase.h"
 #include "AttackFrameConverter.h"
 #include <Debugger/DopeSheet/DopeSheetEditor.h>
-
+#include "../Player.h"
 // ============================================================
 // 攻撃データエディタクラス
 // AttackData の一覧を ImGui で編集するための機能を提供する
@@ -40,6 +40,8 @@ public:
 	void SetAutoReload(bool enable) { autoReload_ = enable; }
 	bool IsAutoReload() const { return autoReload_; }
 
+	void SetPlayer(Player* player) { player_ = player; }
+
 private:
 	// ============================================================
 	// 各種UIの描画処理
@@ -71,6 +73,7 @@ private:
 	// メンバ変数
 	// ============================================================
 	std::vector<AttackData>* attacks_ = nullptr;
+	Player* player_ = nullptr;
 	int currentIndex_ = -1;
 	int prevIndex_ = -1;
 

@@ -27,8 +27,9 @@ public:
 	// 初期化処理
 	void Initialize(Camera* camera) override;
 
-	// 戦闘データをもとに初期化
-	void InitializeBattleData(const BattleEnemyData& data, Vector3 position);
+	// 戦闘データをもとに初期化（scale はフィールド敵から引き継ぐ見た目スケール）
+	void InitializeBattleData(const BattleEnemyData& data, Vector3 position,
+		const Vector3& scale = Vector3(1.0f, 1.0f, 1.0f));
 
 	// 当たり判定初期化
 	void InitCollision() override;
@@ -188,6 +189,9 @@ public:
 	// 死亡エフェクトを再生
 	void PlayDeathEffect();
 
+	// 死亡演出（ディゾルブ）パラメータ
+	float GetDissolveDuration() const { return dissolveDuration_; }
+
 	// ダメージ点滅更新
 	void UpdateBlinking(float dt);
 
@@ -247,6 +251,12 @@ private:
 
 	// フェードスピード
 	float fadeSpeed_ = 3.0f;
+
+	// 死亡演出（ディゾルブ）。エディタから JsonManager 経由で調整
+	float   dissolveDuration_  = 1.2f;                     // 0→1 まで何秒かけて消えるか
+	float   dissolveEdgeWidth_ = 0.08f;                    // エッジ発光帯の幅
+	Vector3 dissolveEdgeColor_ = { 1.8f, 0.7f, 0.15f };    // エッジ発光色（オレンジ系）
+	float   dissolveNoiseScale_ = 6.0f;                    // ノイズの空間スケール
 
 	//	ノックバックデータ
 	KnockbackData knockbackData_;

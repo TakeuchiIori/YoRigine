@@ -7,7 +7,6 @@
 // Engine
 #include "Systems/GameTime/GameTime.h"
 #include <Debugger/Logger.h>
-#include <Particle/ParticleManager.h>
 #include "Collision/AreaCollision/Base/AreaManager.h"
 
 #ifdef USE_IMGUI
@@ -55,7 +54,6 @@ void Player::Initialize(Camera* camera) {
 	playerShield_->Initialize(camera_);
 
 
-	testEmitter_ = std::make_unique<ParticleEmitter>("GuardParticle", wt_.translate_, 10);
 	healthUI_ = std::make_unique<PlayerHealthBarUI>(this);
 	healthUI_->Initialize();
 
@@ -157,6 +155,8 @@ void Player::InitCollision() {
 	);
 	obbCollider_->SetIsStatic(false);
 	obbCollider_->SetMass(100.0f);
+	// Player は画面外でも常に当たり判定を回す (落下・カメラ越し攻撃などで invariably 必要)
+	obbCollider_->SetCheckOutsideCamera(false);
 
 }
 
@@ -377,8 +377,6 @@ void Player::InitJson() {
 void Player::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other) {
 	if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kBattleEnemy)) {
 		Vector3 emitPos = wt_.translate_;
-		emitPos.y += 1.5f; // 少し上にずら
-		YoRigine::ParticleManager::GetInstance()->Emit("GuardParticle", emitPos, 20);
 	}
 }
 

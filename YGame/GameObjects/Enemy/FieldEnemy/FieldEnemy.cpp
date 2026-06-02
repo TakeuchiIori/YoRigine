@@ -13,6 +13,7 @@
 #include "States/FieldEnemyPatrolState.h"
 #include "States/FieldEnemyChaseState.h"
 #include <Collision/AreaCollision/Base/AreaManager.h>
+#include <LightManager/LightManager.h>
 
 // ============================================================
 // コンストラクタ
@@ -429,6 +430,18 @@ void FieldEnemy::SetLightActive(bool isActive)
 			light->isEnableSpotLight = isActive ? enemyData_.useSpotLight : false;
 		}
 	}
+}
+
+// ============================================================
+// コライダーの有効/無効を切り替える
+// ============================================================
+void FieldEnemy::SetCollisionActive(bool isActive)
+{
+	// FieldEnemy は OBB のみ使用。グローバル CollisionManager は GetIsActive() を見て
+	// false ならスキップするので、これで BattleScene 中に衝突判定へ漏れなくなる。
+	if (obbCollider_)    obbCollider_->SetActive(isActive);
+	if (aabbCollider_)   aabbCollider_->SetActive(isActive);
+	if (sphereCollider_) sphereCollider_->SetActive(isActive);
 }
 
 // ============================================================

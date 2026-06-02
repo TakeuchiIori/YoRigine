@@ -12,6 +12,7 @@
 #include "Collision/OBB/OBBCollider.h"
 #include "Collision/AABB/AABBCollider.h"
 #include "Collision/Sphere/SphereCollider.h"
+#include "Collision/Capsule/CapsuleCollider.h"
 
 /// <summary>
 /// オブジェクトの基底クラス
@@ -54,6 +55,9 @@ public:
 	const WorldTransform& GetWT() const { return wt_; }
 	WorldTransform& GetWT() { return wt_; }
 
+	// 内部 Object3d への参照（マテリアル/ディゾルブ等を State 側から操作するため）
+	Object3d* GetObject3d() const { return obj_.get(); }
+
 
 protected:
 	WorldTransform wt_;
@@ -64,4 +68,5 @@ protected:
 	std::shared_ptr<OBBCollider> obbCollider_;
 	std::shared_ptr<AABBCollider> aabbCollider_;
 	std::shared_ptr<SphereCollider> sphereCollider_;
+	std::shared_ptr<CapsuleCollider> capsuleCollider_;
 };

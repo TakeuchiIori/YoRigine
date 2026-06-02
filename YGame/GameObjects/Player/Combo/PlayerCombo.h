@@ -13,6 +13,17 @@
 #include "Loaders/Json/JsonManager.h"
 
 class Player;
+class BaseCollider;
+
+// ============================================================
+// 攻撃ヒット時の情報
+// ヒット位置、被弾コライダー、この振りで何回目のヒットかを含む
+// ============================================================
+struct AttackHitContext {
+	BaseCollider* victim = nullptr; // 当たった相手のコライダー
+	Vector3       hitPosition{};    // ヒット位置（演出基準）
+	int           hitIndex = 0;     // この振りで何回目のヒットか（1始まり）
+};
 
 // ============================================================
 // プレイヤーコンボ管理クラス
@@ -43,6 +54,10 @@ public:
 
 	// ステート側から「攻撃アニメーションが終了した」ことを受け取る通知関数
 	void OnAttackFinished();
+
+	// PlayerSword 側から「敵にヒットした」ことを受け取る通知関数
+	// 現在の攻撃が無ければ無視する（ヒット回数は内部でカウント）
+	void NotifyAttackHit(BaseCollider* victim, const Vector3& hitPosition);
 
 	// ============================================================
 	// CC（チェインキャパシティ）管理
@@ -102,6 +117,7 @@ public:
 	// ============================================================
 	void SetAttackStartCallback(std::function<void(const AttackData&)> callback) { onAttackStart_ = callback; }
 	void SetAttackContinueCallback(std::function<void(const AttackData&)> callback) { onAttackContinue_ = callback; }
+	void SetAttackHitCallback(std::function<void(const AttackData&, const AttackHitContext&)> callback) { onAttackHit_ = callback; }
 	void SetComboEndCallback(std::function<void(int)> callback) { onComboEnd_ = callback; }
 	void SetComboResetCallback(std::function<void()> callback) { onComboReset_ = callback; }
 	void SetCCChangeCallback(std::function<void(int, int)> callback) { onCCChanged_ = callback; }
@@ -167,8 +183,16 @@ private:
 	// ------------------------------------------------------------
 	std::function<void(const AttackData&)> onAttackStart_;      // コンボ初撃開始時
 	std::function<void(const AttackData&)> onAttackContinue_;   // コンボ継続時
+	std::function<void(const AttackData&, const AttackHitContext&)> onAttackHit_; // 敵にヒットした時
 	std::function<void(int)> onComboEnd_;                       // コンボ正常終了時
 	std::function<void()> onComboReset_;                        // コンボ途切れ・強制終了時
 	std::function<void(int, int)> onCCChanged_;                 // CC増減時
 	SwordColliderCallback onSwordColliderChanged_;              // 攻撃判定切り替え用
+
+	// ------------------------------------------------------------
+	// 振りごとのヒットカウンタ
+	// ExecuteAttack / OnAttackFinished / ResetCombo で 0 にリセットされる
+	// NotifyAttackHit のたびに前置インクリメントし 1 始まりで通知する
+	// ------------------------------------------------------------
+	int hitIndexInCurrentAttack_ = 0;
 };

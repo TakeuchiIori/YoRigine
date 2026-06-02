@@ -3,7 +3,6 @@
 // Engine
 #include "Sprite/Sprite.h"
 #include "Systems/Input./Input.h"
-#include <Particle/ParticleEmitter.h>
 #include "Systems/Camera/Virtuals/FollowCamera/FollowCamera.h"
 
 // App (Camera)
@@ -126,13 +125,11 @@ private:
 	YoRigine::Input* input_ = nullptr;
 	std::unique_ptr<PlayerCamera> playerCamera_;
 
-	std::unique_ptr<ParticleEmitter> particleEmitter_;
 	std::unique_ptr<PlayerSword> playerSword_;
 	std::unique_ptr<PlayerShield> playerShield_;
 	std::unique_ptr<Line> boneLine_;
 	std::unique_ptr<PlayerMovement> movement_;
 	std::unique_ptr<PlayerCombat> combat_;
-	std::unique_ptr<ParticleEmitter> testEmitter_;
 	std::unique_ptr<PlayerHealthBarUI> healthUI_;
 
 	Vector3 anchorPoint_ = { 0.0f, -1.0f, 0.0f };

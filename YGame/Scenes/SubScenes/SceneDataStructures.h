@@ -2,6 +2,7 @@
 #include "Vector3.h"
 #include <vector>
 #include <string>
+#include <variant>
 #include "Systems/Camera/CameraMode.h"
 
 ///************************* バトル遷移データ *************************///
@@ -16,6 +17,8 @@ struct BattleTransitionData {
 	bool isFinalBattle = false;
 	size_t totalRemainingFieldEnemies = 0;
 	float playerHitDamage = 0.0f;
+	// フィールド敵の見た目スケール（バトル敵へ引き継ぐ）
+	Vector3 battleEnemyScale = Vector3(1.0f, 1.0f, 1.0f);
 };
 
 ///************************* フィールド復帰データ *************************///
@@ -39,9 +42,14 @@ enum class SubSceneTransitionType {
 	CUSTOM
 };
 
+///************************* サブシーン遷移ペイロード *************************///
+// シーン間の受け渡しデータは型付きの variant で保持する。
+// std::monostate はデータ不要な遷移（メニュー遷移など）用。
+using SubScenePayload = std::variant<std::monostate, BattleTransitionData, FieldReturnData>;
+
 ///************************* サブシーン遷移リクエスト *************************///
 struct SubSceneTransitionRequest {
-	SubSceneTransitionType type;
-	void* transitionData = nullptr;
+	SubSceneTransitionType type = SubSceneTransitionType::TO_FIELD;
+	SubScenePayload payload;
 	std::string targetSceneName;
 };

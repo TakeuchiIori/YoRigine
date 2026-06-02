@@ -50,6 +50,15 @@ public:
         std::function<void()> onComplete = nullptr
     );
 
+    // baseScale_ を基準にした相対倍率でスケールアニメーション。
+    // 例: {1.1, 0.9, 0.7} は baseScale_ を各軸に対して 1.1/0.9/0.7 倍した値。
+    // フィールドから引き継がれたスケールを保持したまま変形させたいときに使う。
+    void StartRelativeScaleAnimation(
+        Vector3 fromRelative, Vector3 toRelative, float duration,
+        Easing::Function easeFunc = Easing::Function::EaseOutQuad,
+        std::function<void()> onComplete = nullptr
+    );
+
     void StartColorAnimation(
         Vector4 fromColor, Vector4 toColor, float duration,
         Easing::Function easeFunc = Easing::Function::Linear,
@@ -81,6 +90,8 @@ public:
     Vector4 GetCurrentColor() const { return currentColor_; }
     Vector3 GetCurrentRotation() const { return currentRotation_; }
     Vector3 GetCurrentPosition() const { return currentPosition_; }
+
+    Vector3 GetBaseScale() const { return baseScale_; }
 
     void SetBaseScale(const Vector3& scale) { baseScale_ = scale; currentScale_ = scale; }
     void SetBaseColor(const Vector4& color) { baseColor_ = color; currentColor_ = color; }

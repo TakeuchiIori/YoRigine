@@ -5,15 +5,19 @@
 #include <iostream>
 #include <algorithm>
 #include <json.hpp>
+#include <Easing.h>
+#include <Debugger/Logger.h>
 
 // ============================================================
 // 初期化
 // ============================================================
 void AttackCameraComponent::Initialize() {
-    phase_            = Phase::Idle;
-    playTimer_        = 0.0f;
-    returnTimer_      = 0.0f;
-    returnDuration_   = 0.2f;
+    phase_ = Phase::Idle;
+    playTimer_ = 0.0f;
+    returnTimer_ = 0.0f;
+    returnDuration_ = 0.2f;
+    startInterpolationTimer_ = 0.0f;
+    startInterpolationDuration_ = 0.2f;
     ResetValues();
 }
 
@@ -34,24 +38,51 @@ void AttackCameraComponent::UpdatePre(FollowCamera* followCamera, float dt) {
             shakeTriggered_[i] = true;
             if (followCamera && work->keyframes[i].shakeIntensity > 0.0f) {
                 followCamera->StartShake(work->keyframes[i].shakeIntensity,
-                                         work->keyframes[i].shakeDuration);
+                    work->keyframes[i].shakeDuration);
             }
         }
     }
 }
 
 // ============================================================
-// フェーズ2: キーフレーム補間値をサンプリング
+// フェーズ2: 補間値をサンプリング＆フェーズ進行
 // ============================================================
 void AttackCameraComponent::UpdatePost(float dt) {
     switch (phase_) {
 
-    // ----------------------------------------------------------
+        // ----------------------------------------------------------
     case Phase::Idle:
         ResetValues();
         break;
 
-    // ----------------------------------------------------------
+        // ----------------------------------------------------------
+    case Phase::StartInterpolating: {
+        startInterpolationTimer_ += dt;
+        float t = (startInterpolationDuration_ > 0.0f)
+            ? std::clamp(startInterpolationTimer_ / startInterpolationDuration_, 0.0f, 1.0f)
+            : 1.0f;
+
+        const AttackCameraWork* work = FindWork(currentWorkName_);
+        if (!work) { phase_ = Phase::Idle; ResetValues(); break; }
+
+        // 開始時補間の目標値をサンプリング
+        SampleKeyframes(*work, 0.0f);
+
+        // イーズアウトで補間
+		float ease = Easing::EaseOutQuad(t);
+        currentPosOffset_ = Lerp({}, currentPosOffset_, ease);
+        currentRotOffset_ = Lerp({}, currentRotOffset_, ease);
+        currentFovDelta_ =  Lerp(0.0f, currentFovDelta_, ease);
+        currentTimeScale_ = Lerp(1.0f, currentTimeScale_, ease);
+
+        if (t >= 1.0f) {
+            phase_ = Phase::Playing;
+            playTimer_ = 0.0f;
+        }
+        break;
+    }
+
+                                  // ----------------------------------------------------------
     case Phase::Playing: {
         const AttackCameraWork* work = FindWork(currentWorkName_);
         if (!work) { phase_ = Phase::Idle; ResetValues(); break; }
@@ -61,32 +92,28 @@ void AttackCameraComponent::UpdatePost(float dt) {
         if (playTimer_ >= work->totalDuration) {
             if (work->resetOnFinish) {
                 EnterReturning(*work);
-            } else {
+            }
+            else {
                 phase_ = Phase::Idle;
             }
         }
         break;
     }
 
-    // ----------------------------------------------------------
+                       // ----------------------------------------------------------
     case Phase::Returning: {
         returnTimer_ += dt;
         float t = (returnDuration_ > 0.0f)
-                  ? std::clamp(returnTimer_ / returnDuration_, 0.0f, 1.0f)
-                  : 1.0f;
+            ? std::clamp(returnTimer_ / returnDuration_, 0.0f, 1.0f)
+            : 1.0f;
 
         // イーズアウト（減速しながら戻る）
-        float ease = 1.0f - (1.0f - t) * (1.0f - t);
+        float ease = Easing::EaseOutQuad(t);
 
-        auto lerp3 = [](const Vector3& a, const Vector3& b, float f) {
-            return a + (b - a) * f;
-        };
-        auto lerp1 = [](float a, float b, float f) { return a + (b - a) * f; };
-
-        currentPosOffset_  = lerp3(returnFromPos_, {},   ease);
-        currentRotOffset_  = lerp3(returnFromRot_, {},   ease);
-        currentFovDelta_   = lerp1(returnFromFov_,  0.0f, ease);
-        currentTimeScale_  = lerp1(returnFromTs_,   1.0f, ease);
+        currentPosOffset_ = Lerp(returnFromPos_, {}, ease);
+        currentRotOffset_ = Lerp(returnFromRot_, {}, ease);
+        currentFovDelta_ =  Lerp(returnFromFov_, 0.0f, ease);
+        currentTimeScale_ = Lerp(returnFromTs_, 1.0f, ease);
 
         if (t >= 1.0f) {
             phase_ = Phase::Idle;
@@ -104,15 +131,22 @@ void AttackCameraComponent::Play(const std::string& workName) {
     const AttackCameraWork* work = FindWork(workName);
     if (!work) return;
 
-    phase_           = Phase::Playing;
-    playTimer_       = 0.0f;
     currentWorkName_ = workName;
     shakeTriggered_.assign(work->keyframes.size(), false);
     ResetValues();
+
+    // 開始時補間を使用するかで分岐
+    if (work->useStartInterpolation) {
+        EnterStartInterpolation(*work);
+    }
+    else {
+        phase_ = Phase::Playing;
+        playTimer_ = 0.0f;
+    }
 }
 
 // ============================================================
-// 即時停止（Returning をスキップ）
+// 即時停止
 // ============================================================
 void AttackCameraComponent::Stop(FollowCamera* /*camera*/) {
     phase_ = Phase::Idle;
@@ -124,9 +158,12 @@ void AttackCameraComponent::Stop(FollowCamera* /*camera*/) {
 // ============================================================
 float AttackCameraComponent::GetPlayRatio() const {
     if (phase_ == Phase::Returning) return 1.0f;
-    const AttackCameraWork* work = FindWork(currentWorkName_);
-    if (!work || work->totalDuration <= 0.0f) return 0.0f;
-    return std::clamp(playTimer_ / work->totalDuration, 0.0f, 1.0f);
+    if (phase_ == Phase::Playing) {
+        const AttackCameraWork* work = FindWork(currentWorkName_);
+        if (!work || work->totalDuration <= 0.0f) return 0.0f;
+        return std::clamp(playTimer_ / work->totalDuration, 0.0f, 1.0f);
+    }
+    return 0.0f;
 }
 
 // ============================================================
@@ -170,9 +207,11 @@ void AttackCameraComponent::SaveToFile(const std::string& filePath) const {
         }
         std::ofstream ofs(filePath);
         ofs << j.dump(4);
-        std::cout << "[AttackCameraComponent] Saved: " << filePath << "\n";
-    } catch (const std::exception& e) {
-        std::cout << "[AttackCameraComponent] SaveToFile error: " << e.what() << "\n";
+        std::string msg = "[AttackCameraComponent] Saved: " + filePath + "\n";
+		Logger(msg);
+    }
+    catch (const std::exception& e) {
+        Logger("[AttackCameraComponent] SaveToFile error: " + std::string(e.what()) + "\n");
     }
 }
 
@@ -195,30 +234,40 @@ void AttackCameraComponent::LoadFromFile(const std::string& filePath) {
             }
         }
         std::cout << "[AttackCameraComponent] Loaded: " << filePath
-                  << " (" << works_.size() << " works)\n";
-    } catch (const std::exception& e) {
+            << " (" << works_.size() << " works)\n";
+    }
+    catch (const std::exception& e) {
         std::cout << "[AttackCameraComponent] LoadFromFile error: " << e.what() << "\n";
     }
 }
 
 // ============================================================
-// Returning フェーズへ移行
+// 開始時補間フェーズへ移行
+// ============================================================
+void AttackCameraComponent::EnterStartInterpolation(const AttackCameraWork& work) {
+    startInterpolationTimer_ = 0.0f;
+    startInterpolationDuration_ = work.startInterpolationDuration;
+    phase_ = Phase::StartInterpolating;
+}
+
+// ============================================================
+// 終了時補間フェーズへ移行
 // ============================================================
 void AttackCameraComponent::EnterReturning(const AttackCameraWork& work) {
-    if (work.returnDuration <= 0.0f) {
-        // 瞬間切り替え
+    if (!work.useReturnInterpolation || work.returnDuration <= 0.0f) {
+        // 瞬間切り替え or 補間なし
         phase_ = Phase::Idle;
         ResetValues();
         return;
     }
 
-    returnFromPos_  = currentPosOffset_;
-    returnFromRot_  = currentRotOffset_;
-    returnFromFov_  = currentFovDelta_;
-    returnFromTs_   = currentTimeScale_;
-    returnTimer_    = 0.0f;
+    returnFromPos_ = currentPosOffset_;
+    returnFromRot_ = currentRotOffset_;
+    returnFromFov_ = currentFovDelta_;
+    returnFromTs_ = currentTimeScale_;
+    returnTimer_ = 0.0f;
     returnDuration_ = work.returnDuration;
-    phase_          = Phase::Returning;
+    phase_ = Phase::Returning;
 }
 
 // ============================================================
@@ -227,10 +276,21 @@ void AttackCameraComponent::EnterReturning(const AttackCameraWork& work) {
 void AttackCameraComponent::ResetValues() {
     currentPosOffset_ = {};
     currentRotOffset_ = {};
-    currentFovDelta_  = 0.0f;
+    currentFovDelta_ = 0.0f;
     currentTimeScale_ = 1.0f;
 }
 
+// ============================================================
+// ワーク名一覧取得
+// ============================================================
+std::vector<std::string> AttackCameraComponent::GetWorkNames() const {
+    std::vector<std::string> names;
+    names.reserve(works_.size());
+    for (const auto& work : works_) {
+        names.push_back(work.name);
+    }
+    return names;
+}
 // ============================================================
 // キーフレーム線形補間
 // ============================================================
@@ -238,34 +298,30 @@ void AttackCameraComponent::SampleKeyframes(const AttackCameraWork& work, float 
     const auto& kfs = work.keyframes;
     if (kfs.empty()) { ResetValues(); return; }
 
-    auto lerp3 = [](const Vector3& a, const Vector3& b, float alpha) {
-        return a + (b - a) * alpha;
-    };
-
     if (t <= kfs.front().time) {
         currentPosOffset_ = kfs.front().posOffset;
         currentRotOffset_ = kfs.front().rotOffset;
-        currentFovDelta_  = kfs.front().fovDelta;
+        currentFovDelta_ = kfs.front().fovDelta;
         currentTimeScale_ = kfs.front().timeScale;
         return;
     }
     if (t >= kfs.back().time) {
         currentPosOffset_ = kfs.back().posOffset;
         currentRotOffset_ = kfs.back().rotOffset;
-        currentFovDelta_  = kfs.back().fovDelta;
+        currentFovDelta_ = kfs.back().fovDelta;
         currentTimeScale_ = kfs.back().timeScale;
         return;
     }
 
     for (size_t i = 0; i + 1 < kfs.size(); ++i) {
         if (t >= kfs[i].time && t < kfs[i + 1].time) {
-            float span  = kfs[i + 1].time - kfs[i].time;
+            float span = kfs[i + 1].time - kfs[i].time;
             float alpha = (span > 0.0f) ? (t - kfs[i].time) / span : 0.0f;
 
-            currentPosOffset_  = lerp3(kfs[i].posOffset, kfs[i + 1].posOffset, alpha);
-            currentRotOffset_  = lerp3(kfs[i].rotOffset, kfs[i + 1].rotOffset, alpha);
-            currentFovDelta_   = kfs[i].fovDelta  + (kfs[i + 1].fovDelta  - kfs[i].fovDelta)  * alpha;
-            currentTimeScale_  = kfs[i].timeScale + (kfs[i + 1].timeScale - kfs[i].timeScale) * alpha;
+            currentPosOffset_ = Lerp(kfs[i].posOffset, kfs[i + 1].posOffset, alpha);
+            currentRotOffset_ = Lerp(kfs[i].rotOffset, kfs[i + 1].rotOffset, alpha);
+            currentFovDelta_ = kfs[i].fovDelta + (kfs[i + 1].fovDelta - kfs[i].fovDelta) * alpha;
+            currentTimeScale_ = kfs[i].timeScale + (kfs[i + 1].timeScale - kfs[i].timeScale) * alpha;
             return;
         }
     }

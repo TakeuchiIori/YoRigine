@@ -6,6 +6,8 @@
 
 #include "ModelManager.h"
 #include <Collision/Core/CollisionTypeIdDef.h>
+#include <Collision/OBB/OBBCollider.h>
+#include <Collision/Sphere/SphereCollider.h>
 
 #ifdef USE_IMGUI
 #include "imgui.h"
@@ -15,6 +17,7 @@
 #include <DirectX/DirectXCommon.h>
 #endif
 #include <Debugger/Logger.h>
+#include <Collision/Core/CollisionManager.h>
 
 namespace YoRigine {
 
@@ -40,7 +43,9 @@ namespace YoRigine {
 
 		selector_.SetObjectManager(objectManager_);
 		motionEditor_.Initialize(camera_);
-		colliderLine_.Initialize();
+		colliderCubes_.Initialize();
+		colliderSpheres_.Initialize();
+		colliderLineCapsule_.Initialize();
 
 #ifdef USE_IMGUI
 		pickBuffer_ = PickBuffer::GetInstance();
@@ -59,7 +64,11 @@ namespace YoRigine {
 		editorUI_.SetPlaceCallback([this](const std::string& path) { PlaceObject(path); });
 		editorUI_.SetSaveCallback([this]() { serializer_.SaveScene(jsonPath_); });
 		editorUI_.SetLoadCallback([this]() { serializer_.LoadScene(jsonPath_); });
-		editorUI_.SetColliderDebugFlag(&showColliderDebug_); // コライダー可視化フラグを渡す
+		editorUI_.SetColliderDebugFlag(&showColliderDebug_);
+		editorUI_.SetColliderSelectedOnlyFlag(&showColliderSelectedOnly_);
+		editorUI_.SetBroadPhaseGridFlag(&showBroadPhaseGrid_);
+		editorUI_.SetBroadPhaseGridRadius(&broadPhaseGridDrawRadius_);
+		editorUI_.SetDrawFrustumCullingFlag(&enableDrawFrustumCulling_);
 
 		gizmoCtrl_.Initialize();
 
@@ -100,9 +109,10 @@ namespace YoRigine {
 		motionEditor_.SetTargetObjectId(selector_.GetPrimaryId());
 		motionEditor_.Update();
 		// ── selector_.Update() だけここで行う（GPU命令は積まない）──
+		// シーンエディタが非アクティブ (オブジェクト一覧が閉じてる) ならクリック選択を無効化
 		selector_.SetCamera(camera_);
 		selector_.Update(
-			true,
+			IsSceneEditorActive(),
 			Editor::GetInstance()->GetGameViewPos(),
 			Editor::GetInstance()->GetGameViewSize());
 #endif
@@ -115,25 +125,52 @@ namespace YoRigine {
 	// ============================================================
 	void ModelManipulator::Draw() {
 		if (!isInitialized_ || !camera_) return;
+
+		// Frustum culling: 視錐台を抽出 (有効時のみ)
+		Frustum frustum{};
+		const bool useCulling = enableDrawFrustumCulling_;
+		if (useCulling) {
+			frustum = FrustumUtil::ExtractFromViewProjection(
+				camera_->GetViewProjectionMatrix());
+		}
+
+		auto boundsFor = [&](const auto* obj) -> AABB {
+			// コライダー有効時はそのワールドAABB を流用
+			if (obj->collider && obj->colliderEnabled) {
+				return YoRigine::CollisionManager::ComputeWorldAABB(obj->collider.get());
+			}
+			// 無いときは position ± (scale * factor) で大雑把に
+			float ex = std::fabs(obj->scale.x) * drawBoundsScaleFactor_;
+			float ey = std::fabs(obj->scale.y) * drawBoundsScaleFactor_;
+			float ez = std::fabs(obj->scale.z) * drawBoundsScaleFactor_;
+			return AABB{
+				{ obj->position.x - ex, obj->position.y - ey, obj->position.z - ez },
+				{ obj->position.x + ex, obj->position.y + ey, obj->position.z + ez }
+			};
+		};
+
 		for (auto* obj : objectManager_->GetAllActiveObjects()) {
-			if (obj && obj->object && obj->worldTransform) {
+			if (!obj || !obj->object || !obj->worldTransform) continue;
 
-				// 選択状態に応じた色の変更処理
-				bool isSelected = selector_.IsSelected(obj->id);
-				if (isSelected) {
-					obj->object->SetMaterialColor({ 1.0f, 0.2f, 0.2f, 1.0f });
-				}
-				else {
-					obj->object->SetMaterialColor({ 1.0f, 1.0f, 1.0f, 1.0f });
-				}
-				// ------------------------------------------
+			// Frustum 外ならスキップ
+			if (useCulling) {
+				AABB bounds = boundsFor(obj);
+				if (!FrustumUtil::IsAABBVisible(frustum, bounds)) continue;
+			}
 
-				// ★追加: ボーン表示がONで、かつモーションエディタの対象オブジェクトならメッシュを描画しない
-				bool isTargetAndBoneDraw = (motionEditor_.IsDrawBone() && obj->id == motionEditor_.GetTargetObjectId());
+			// 選択状態に応じた色の変更処理
+			bool isSelected = selector_.IsSelected(obj->id);
+			if (isSelected) {
+				obj->object->SetMaterialColor({ 1.0f, 0.2f, 0.2f, 1.0f });
+			}
+			else {
+				obj->object->SetMaterialColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+			}
 
-				if (!isTargetAndBoneDraw) {
-					obj->object->Draw(camera_, *obj->worldTransform);
-				}
+			// ボーン表示がONで対象オブジェクトならメッシュは描画しない
+			bool isTargetAndBoneDraw = (motionEditor_.IsDrawBone() && obj->id == motionEditor_.GetTargetObjectId());
+			if (!isTargetAndBoneDraw) {
+				obj->object->Draw(camera_, *obj->worldTransform);
 			}
 		}
 		motionEditor_.Draw();
@@ -147,39 +184,60 @@ namespace YoRigine {
 		if (!isInitialized_ || !camera_) return;
 		motionEditor_.DrawBone();
 
-		// コライダーAABBのデバッグ描画
 #ifdef USE_IMGUI
 		if (!showColliderDebug_) return;
+
+		// タイプID → 色
+		auto colorForType = [](uint32_t typeKey) -> Vector4 {
+			switch (static_cast<CollisionTypeIdDef>(typeKey)) {
+			case CollisionTypeIdDef::kStaticWall:  return { 1.0f, 0.2f, 0.2f, 1.0f }; // 赤
+			case CollisionTypeIdDef::kNavObstacle: return { 1.0f, 0.8f, 0.0f, 1.0f }; // 黄
+			case CollisionTypeIdDef::kNavTrigger:  return { 0.2f, 0.5f, 1.0f, 1.0f }; // 青
+			case CollisionTypeIdDef::kWaypoint:    return { 0.2f, 1.0f, 0.3f, 1.0f }; // 緑
+			default:                               return { 0.6f, 0.6f, 0.6f, 1.0f }; // グレー
+			}
+		};
+
+		// AABB/OBB は InstancedCube に、Sphere は InstancedSphere に集約
+		colliderCubes_.Begin();
+		colliderSpheres_.Begin();
+		colliderLineCapsule_.SetColor({ 0.6f, 0.6f, 0.6f, 1.0f });
+
 		for (auto* obj : objectManager_->GetAllActiveObjects()) {
 			if (!obj || !obj->collider) continue;
+			if (!obj->colliderEnabled) continue;
+			if (showColliderSelectedOnly_ && !selector_.IsSelected(obj->id)) continue;
 
-			// 種別ごとに色を変える
-			auto* tmpl = objectManager_->FindTemplate(obj->modelName);
-			CollisionTypeIdDef typeId = tmpl ? tmpl->typeId : CollisionTypeIdDef::kNone;
+			const uint32_t typeKey = obj->collider->GetTypeID();
+			const Vector4 col = colorForType(typeKey);
 
-			Vector4 color;
-			switch (typeId) {
-			case CollisionTypeIdDef::kStaticWall:  color = { 1.0f, 0.2f, 0.2f, 1.0f }; break; // 赤
-			case CollisionTypeIdDef::kNavObstacle: color = { 1.0f, 0.8f, 0.0f, 1.0f }; break; // 黄
-			case CollisionTypeIdDef::kNavTrigger:  color = { 0.2f, 0.5f, 1.0f, 1.0f }; break; // 青
-			case CollisionTypeIdDef::kWaypoint:    color = { 0.2f, 1.0f, 0.3f, 1.0f }; break; // 緑
-			default:                               color = { 0.6f, 0.6f, 0.6f, 1.0f }; break; // グレー
+			if (auto* a = dynamic_cast<AABBCollider*>(obj->collider.get())) {
+				colliderCubes_.AddAABB(a->GetAABB().min, a->GetAABB().max, col);
+			} else if (auto* o = dynamic_cast<OBBCollider*>(obj->collider.get())) {
+				colliderCubes_.AddOBB(o->GetOBB().center, o->GetOBB().rotation, o->GetOBB().size, col);
+			} else if (auto* s = dynamic_cast<SphereCollider*>(obj->collider.get())) {
+				colliderSpheres_.AddSphere(s->GetSphere().center, s->GetSphere().radius, col);
+			} else if (auto* cap = dynamic_cast<CapsuleCollider*>(obj->collider.get())) {
+				// Capsule のみ Line (低解像度)
+				const auto& c = cap->GetCapsule();
+				colliderLineCapsule_.DrawCapsule(c.start, c.end, c.radius, 12);
 			}
+		}
 
-			// 無効なコライダーは暗く半透明で表示（設定中でもサイズ確認できる）
-			if (!obj->colliderEnabled) {
-				color.x *= 0.4f; color.y *= 0.4f; color.z *= 0.4f;
-				color.w = 0.3f;
-			}
+		// 1 DrawInstanced (Cube), 1 DrawInstanced (Sphere), 1 DrawCall (Capsule Line)
+		colliderCubes_.Flush();
+		colliderSpheres_.Flush();
+		colliderLineCapsule_.DrawLine();
 
-			auto* aabb = dynamic_cast<AABBCollider*>(obj->collider.get());
-			if (!aabb) continue;
-
-			// ObjectManager::Update() で常にワールド AABB が計算済みなのでそのまま使う
-			const AABB& worldAABB = aabb->GetAABB();
-			colliderLine_.SetColor(color);
-			colliderLine_.DrawAABB(worldAABB.min, worldAABB.max);
-			colliderLine_.DrawLine();
+		// BroadPhase グリッド可視化 (カメラ周辺のみ) - 別 Flush で2回目の DrawInstanced
+		if (showBroadPhaseGrid_ && camera_) {
+			colliderCubes_.Begin();
+			Vector3 camPos = camera_->GetTranslate();
+			YoRigine::CollisionManager::GetInstance()
+				->GetBroadPhaseGrid()
+				.DrawDebugAroundCamera(&colliderCubes_, camPos, broadPhaseGridDrawRadius_,
+					Vector4{ 0.3f, 0.8f, 0.3f, 0.4f });
+			colliderCubes_.Flush();
 		}
 #endif
 	}
@@ -229,12 +287,28 @@ namespace YoRigine {
 #endif
 	}
 
+#ifdef USE_IMGUI
+	// ============================================================
+	// シーンエディタが有効か (オブジェクト一覧ウィンドウ + Editor 全体の表示)
+	// 宣言 (ヘッダ) と呼び出し元はすべて USE_IMGUI ガード内に閉じているため、
+	// Release ビルド (USE_IMGUI 未定義) ではこの関数は存在しない。
+	// ============================================================
+	bool ModelManipulator::IsSceneEditorActive() const {
+		// 「モデル操作」ウィンドウ (MyGame で RegisterGameUI 登録された名前) が
+		// 開かれているときのみ、選択・ギズモを有効化する。
+		return Editor::GetInstance()->GetShowEditor()
+			&& Editor::GetInstance()->IsGameUIVisible("モデル操作");
+	}
+#endif
+
 	// ============================================================
 	// ギズモの描画
 	// ============================================================
 	void ModelManipulator::DrawGizmo() {
 #ifdef USE_IMGUI
 		if (!camera_ || !selector_.HasSelection()) return;
+		// オブジェクト一覧ウィンドウが閉じてるときはギズモも非表示
+		if (!IsSceneEditorActive()) return;
 
 		gizmables_.clear();
 		std::vector<IGizmable*> targets;
@@ -259,12 +333,13 @@ namespace YoRigine {
 			targets.push_back(&g);
 		}
 
-		if (targets.empty()) return;
-		gizmoCtrl_.Draw(
-			camera_,
-			targets,
-			Editor::GetInstance()->GetGameViewPos(),
-			Editor::GetInstance()->GetGameViewSize());
+		if (!targets.empty()) {
+			gizmoCtrl_.Draw(
+				camera_,
+				targets,
+				Editor::GetInstance()->GetGameViewPos(),
+				Editor::GetInstance()->GetGameViewSize());
+		}
 
 		motionEditor_.DrawGizmo();
 #endif
@@ -355,6 +430,11 @@ namespace YoRigine {
 	// ============================================================
 	void ModelManipulator::ShortcutKey() {
 #ifdef USE_IMGUI
+		// テキスト入力中は誤発火させない
+		if (ImGui::GetIO().WantCaptureKeyboard) return;
+		// シーンエディタ非アクティブ中は無効
+		if (!IsSceneEditorActive()) return;
+
 		ImGuiIO& io = ImGui::GetIO();
 		if (io.KeyCtrl) {
 			if (ImGui::IsKeyPressed(ImGuiKey_C)) {
@@ -362,6 +442,10 @@ namespace YoRigine {
 			}
 			if (ImGui::IsKeyPressed(ImGuiKey_V)) {
 				PasteObject();
+			}
+			// Ctrl+G : 選択中を地面に吸着 (Snap to surface)
+			if (ImGui::IsKeyPressed(ImGuiKey_G)) {
+				editorUI_.SnapSelectedToSurface();
 			}
 		}
 #endif
@@ -426,8 +510,16 @@ namespace YoRigine {
 			newObj->rotation = srcObj->rotation;
 			newObj->scale = srcObj->scale;
 
-			// コライダー設定をコピー（typeId・AABBはテンプレート経由で引き継がれる）
-			newObj->colliderEnabled = srcObj->colliderEnabled;
+			// コライダー設定をオブジェクト個別にコピー
+			newObj->colliderEnabled      = srcObj->colliderEnabled;
+			newObj->colliderTypeId       = srcObj->colliderTypeId;
+			newObj->colliderShapeType    = srcObj->colliderShapeType;
+			newObj->colliderAabbOffset   = srcObj->colliderAabbOffset;
+			newObj->colliderObbCenter    = srcObj->colliderObbCenter;
+			newObj->colliderObbSize      = srcObj->colliderObbSize;
+			newObj->colliderObbEuler     = srcObj->colliderObbEuler;
+			newObj->colliderSphereCenter = srcObj->colliderSphereCenter;
+			newObj->colliderSphereRadius = srcObj->colliderSphereRadius;
 			objectManager_->ApplyColliderTemplate(*newObj);
 
 			// 選択状態に追加

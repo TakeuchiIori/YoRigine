@@ -19,11 +19,6 @@ namespace YoRigine {
 
 namespace YoRigine {
 
-    /// <summary>
-    /// ObjectList / TransformControls / DuplicateWindow / PrefabWindow の
-    /// ImGui 描画をまとめたクラス。
-    /// ロジックは各サブシステムへ委譲し、UI の組み立てのみを担う。
-    /// </summary>
     class SceneEditorUI
     {
     public:
@@ -36,13 +31,16 @@ namespace YoRigine {
         void SetPrefabManager(PrefabManager* pm) { prefabMgr_ = pm; }
         void SetSerializer(SceneSerializer* s) { serializer_ = s; }
         void SetGizmoController(GizmoController* gc) { gizmoCtrl_ = gc; }
-        void SetColliderDebugFlag(bool* flag) { showColliderDebug_ = flag; } // ModelManipulatorのフラグを参照
 
-        /// オブジェクト配置要求（ModelManipulator::PlaceObject を渡す）
+        // ModelManipulator 側のフラグ参照
+        void SetColliderDebugFlag(bool* flag) { showColliderDebug_ = flag; }
+        void SetColliderSelectedOnlyFlag(bool* flag) { showColliderSelectedOnly_ = flag; }
+        void SetBroadPhaseGridFlag(bool* flag) { showBroadPhaseGrid_ = flag; }
+        void SetBroadPhaseGridRadius(float* val) { broadPhaseGridDrawRadius_ = val; }
+        void SetDrawFrustumCullingFlag(bool* flag) { drawFrustumCulling_ = flag; }
+
         void SetPlaceCallback(std::function<void(const std::string&)> cb) { placeCallback_ = cb; }
-        /// シーン保存要求
         void SetSaveCallback(std::function<void()> cb) { saveCallback_ = cb; }
-        /// シーン読み込み要求
         void SetLoadCallback(std::function<void()> cb) { loadCallback_ = cb; }
 
         // ── ウィンドウ表示フラグ ──────────────────────────────────
@@ -52,20 +50,23 @@ namespace YoRigine {
         void SetShowPrefabWindow(bool v) { showPrefabWindow_ = v; }
 
         bool* GetShowObjectListPtr() { return &showObjectList_; }
+        bool  IsObjectListShown() const { return showObjectList_; }
         bool* GetShowTransformControlsPtr() { return &showTransformControls_; }
         bool* GetShowDuplicateWindowPtr() { return &showDuplicateWindow_; }
         bool* GetShowPrefabWindowPtr() { return &showPrefabWindow_; }
         bool* GetShowColliderTemplatesPtr() { return &showColliderTemplates_; }
 
-        // ── ImGui 描画（DrawImGui() から呼ぶ） ───────────────────
         void DrawObjectList();
         void DrawTransformControls();
         void DrawDuplicateWindow();
         void DrawPrefabWindow();
-        void DrawColliderTemplates(); // コライダーテンプレート一覧ウィンドウ
+        void DrawColliderTemplates();
 
-        // ── メニューバー拡張 ──────────────────────────────────────
         void DrawMenuBar();
+
+        // ── 配置補助 (メニューから呼ばれる) ──────────────────────────
+        // 選択中オブジェクトを真下方向に Raycast して地面/物体表面に吸着させる
+        void SnapSelectedToSurface();
 
     private:
         float DegToRad(float d) const { return d * (3.14159265359f / 180.0f); }
@@ -87,15 +88,19 @@ namespace YoRigine {
         bool showTransformControls_ = true;
         bool showDuplicateWindow_ = false;
         bool showPrefabWindow_ = false;
-        bool showColliderTemplates_ = false; // コライダーテンプレート一覧
-        bool* showColliderDebug_ = nullptr; // ModelManipulator::showColliderDebug_ への参照
+        bool showColliderTemplates_ = false;
 
-        // 複製ウィンドウ用
+        // コライダーデバッグ描画（ModelManipulator のフラグ参照）
+        bool*  showColliderDebug_ = nullptr;
+        bool*  showColliderSelectedOnly_ = nullptr;
+        bool*  showBroadPhaseGrid_ = nullptr;
+        float* broadPhaseGridDrawRadius_ = nullptr;
+        bool*  drawFrustumCulling_ = nullptr;
+
         Vector3 duplicateOffset_ = { 1.0f, 0.0f, 0.0f };
         int     duplicateCount_ = 1;
         bool    duplicateKeepParent_ = false;
 
-        // プレファブウィンドウ用
         std::string selectedPrefabName_;
         char        prefabNameBuf_[64] = {};
     };

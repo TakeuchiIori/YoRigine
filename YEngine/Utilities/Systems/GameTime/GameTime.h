@@ -69,7 +69,7 @@ namespace YoRigine {
 
 	private:
 		using Clock = std::chrono::steady_clock;
-		
+
 		// 60FPSという比率を定義
 		using TargetFPS = std::ratio<1, 60>;
 

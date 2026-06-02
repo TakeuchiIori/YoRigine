@@ -4,7 +4,6 @@
 #include <SceneSystems/SceneManager.h>
 #include "Systems./Input./Input.h"
 #include "Loaders./Texture./TextureManager.h"
-#include "Particle./ParticleManager.h"
 #include "Object3D/Object3dCommon.h"
 #include "LightManager/LightManager.h"
 #include "Sprite/SpriteCommon.h"

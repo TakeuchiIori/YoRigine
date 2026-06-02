@@ -13,6 +13,7 @@
 // C++
 #include <functional>
 #include <string>
+#include <unordered_set>
 #include <json.hpp>
 
 
@@ -76,7 +77,19 @@ public:
 	///************************* 共通機能 *************************///
 
 	// 更新処理（位置トラッキングやコールバック判定）
-	void Update(const Vector3& targetPosition);
+	//   targetKey: ターゲットを識別するキー (例: WorldTransform* やキャラクタポインタ)。
+	//              省略時は legacy 単一ターゲットモード (キーは nullptr)。
+	//              異なるターゲットそれぞれの Enter/Exit を独立して追跡する。
+	void Update(const Vector3& targetPosition, void* targetKey = nullptr);
+
+	// あるターゲットが現在エリア内に居るか
+	bool IsTargetInside(void* targetKey) const {
+		return insideTargets_.find(targetKey) != insideTargets_.end();
+	}
+	size_t GetInsideTargetCount() const { return insideTargets_.size(); }
+
+	// ターゲット忘却 (例: キャラクタが破棄されたときに呼ぶ)
+	void ForgetTarget(void* targetKey) { insideTargets_.erase(targetKey); }
 
 	// 境界に接触しているかチェック（マージン付き）
 	bool IsTouchingBoundary(const Vector3& position, float margin = 0.1f) const;
@@ -127,7 +140,10 @@ protected:
 protected:
 	///************************* 内部状態管理 *************************///
 
-	bool        wasInside_          = false;
+	// ターゲットごとの「現在エリア内」状態を独立管理。
+	// 旧 wasInside_ は単一 bool で複数ターゲット時に状態破壊が起きていたため廃止。
+	std::unordered_set<void*> insideTargets_;
+
 	bool        isActive_           = true;
 	AreaPurpose purpose_            = AreaPurpose::Boundary;
 	bool        isDebugDrawEnabled_ = true;

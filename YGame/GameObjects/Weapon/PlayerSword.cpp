@@ -240,27 +240,12 @@ void PlayerSword::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 		player_->GetCombat()->GetCombo()->RecoverCC(2);
 
 		// ------------------------------------------------------------
-		// ヒットストップ＆カメラシェイク（AttackData 駆動）
-		// 各攻撃が個別に hitStopDuration / shakeIntensity / shakeDuration を持つので、
-		// 値が 0 の場合はその演出をスキップする。
-		// エディタからリアルタイムに値を調整できる前提の設計。
+		// ヒットイベントを PlayerCombo に通知する。
+		// カメラワーク・ヒットストップ・シェイクは AttackingCombatState の
+		// SetAttackHitCallback で AttackData 駆動で発火される。
+		// 武器クラスはヒット検出と通知だけを担当する。
 		// ------------------------------------------------------------
-		auto* combo = player_->GetCombat()->GetCombo();
-		if (combo) {
-			const AttackData* currentAttack = combo->GetCurrentAttack();
-			if (currentAttack) {
-				if (currentAttack->hitStopDuration > 0.0f) {
-					YoRigine::GameTime::SetHitStop(currentAttack->hitStopDuration);
-				}
-				if (currentAttack->shakeIntensity > 0.0f && currentAttack->shakeDuration > 0.0f) {
-					if (player_->GetFollowCamera()) {
-						player_->GetFollowCamera()->StartShake(
-							currentAttack->shakeIntensity,
-							currentAttack->shakeDuration);
-					}
-				}
-			}
-		}
+		player_->GetCombat()->GetCombo()->NotifyAttackHit(other, hitPos);
 
 	}
 }

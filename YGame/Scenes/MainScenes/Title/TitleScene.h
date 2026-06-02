@@ -12,7 +12,6 @@
 #include "Systems/Camera/CameraMode.h"
 
 #include "Systems/Audio/Audio.h"
-#include "Particle/ParticleEmitter.h"
 #include "Object3D/Object3d.h"
 #include "Player/Player.h"
 #include "WorldTransform./WorldTransform.h"

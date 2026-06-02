@@ -6,7 +6,6 @@
 
 // Engine
 #include "Systems/Camera/Camera.h"
-#include "Particle/ParticleEmitter.h"
 #include "Object3D/Object3d.h"
 #include "Player/Player.h"
 #include "WorldTransform./WorldTransform.h"
@@ -103,7 +102,6 @@ private:
 
 	std::unique_ptr<Ground> ground_;
 	std::unique_ptr<FieldEnemyManager> fieldEnemyManager_;
-	std::unique_ptr<ParticleEmitter> emitter_;
 	std::unique_ptr<GPUEmitter> gpuEmitter_;
 	std::unique_ptr<Line> line_;
 	std::unique_ptr<Sprite> sprite_;

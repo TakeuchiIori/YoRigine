@@ -32,6 +32,7 @@ private:
     // UI パネル
     // ============================================================
     void DrawWorkList();
+    void DrawWorkSettings();
     void DrawKeyframeTimeline();
     void DrawKeyframeInspector();
     void DrawPreviewControls();

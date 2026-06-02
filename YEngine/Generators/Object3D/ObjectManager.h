@@ -11,8 +11,15 @@
 #include "Vector3.h"
 
 #include <Collision/AABB/AABBCollider.h>
+#include <Collision/Core/BaseCollider.h>
 #include <Collision/Core/ColliderPool.h>
 #include <Collision/Core/CollisionTypeIdDef.h>
+
+enum class ColliderShapeType : uint32_t {
+	kAABB = 0,
+	kOBB,
+	kSphere,
+};
 
 /// <summary>
 /// オブジェクトの管理クラス
@@ -46,11 +53,24 @@ public:
 		// アニメーション関連
 		bool isAnimation = false;
 		std::string animationName = "";
-		std::shared_ptr<AABBCollider> collider; // コリジョン用のAABBコライダー
+		std::shared_ptr<BaseCollider> collider; // コリジョン用コライダー
 
 		// ── コライダー個別設定 ────────────────────────────────────────────
-		// サイズ・タイプは ColliderTemplate を参照する。このフラグだけインスタンス個別。
 		bool colliderEnabled = false;
+		CollisionTypeIdDef colliderTypeId = CollisionTypeIdDef::kNone;
+		ColliderShapeType colliderShapeType = ColliderShapeType::kAABB;
+
+		// AABB
+		AABB colliderAabbOffset = { {-1.0f,-1.0f,-1.0f}, {1.0f,1.0f,1.0f} };
+
+		// OBB
+		Vector3 colliderObbCenter = {};
+		Vector3 colliderObbSize = { 1.0f, 1.0f, 1.0f };
+		Vector3 colliderObbEuler = {};
+
+		// Sphere
+		Vector3 colliderSphereCenter = {};
+		float colliderSphereRadius = 1.0f;
 
 		PlacedObject() = default;
 		~PlacedObject() = default;
@@ -119,28 +139,20 @@ public:
 	int GetNextObjectId() const { return nextObjectId_; }
 	void SetCamera(Camera* camera) { camera_ = camera; }
 
-	///************************* コライダーテンプレート管理 *************************///
+	// 直前フレームの Frustum culling 統計 (シーンエディタで確認用)
+	int GetLastFrameCulledCount() const { return lastFrameCulledCount_; }
+	int GetLastFrameTotalCount() const { return lastFrameTotalCount_; }
 
-	// モデル名でテンプレートを取得（なければ新規作成して返す）
-	ColliderTemplate& GetOrCreateTemplate(const std::string& modelName);
+	///************************* コライダー操作 *************************///
 
-	// モデル名でテンプレートを取得（なければ nullptr）
-	ColliderTemplate* FindTemplate(const std::string& modelName);
-	const ColliderTemplate* FindTemplate(const std::string& modelName) const;
-
-	// テンプレートを対象オブジェクトのAABBコライダーに反映する
-	// colliderEnabled が false のときは collider を無効化するだけ
+	// オブジェクト固有の設定をAABBコライダーに反映する
 	void ApplyColliderTemplate(PlacedObject& obj);
 
-	// 同名モデルの全オブジェクトにテンプレートを一括反映する
-	void ApplyTemplateToAll(const std::string& modelName);
+	// 指定オブジェクトの colliderTypeId/colliderAabbOffset を同名オブジェクト全員にコピーして反映する（明示的な一括適用用）
+	void CopyColliderSettingsToAll(const PlacedObject& src);
 
-	// 同名モデルの全オブジェクトの colliderEnabled を一括設定する
+	// 同名モデルの colliderEnabled を一括設定する
 	void SetColliderEnabledAll(const std::string& modelName, bool enabled);
-
-	// テンプレートマップ全体を取得（SceneEditorUI の一覧表示用）
-	std::unordered_map<std::string, ColliderTemplate>& GetColliderTemplates() { return colliderTemplates_; }
-	const std::unordered_map<std::string, ColliderTemplate>& GetColliderTemplates() const { return colliderTemplates_; }
 
 private:
 	ObjectManager() = default;
@@ -161,8 +173,9 @@ private:
 	// 次に割り当てるID
 	int nextObjectId_ = 0;
 
-	// モデル名 → コライダーテンプレート
-	std::unordered_map<std::string, ColliderTemplate> colliderTemplates_;
+	// Frustum culling 統計 (直前フレーム)
+	int lastFrameCulledCount_ = 0;
+	int lastFrameTotalCount_ = 0;
 
 	// オブジェクトの初期化ヘルパー
 	void InitializePlacedObject(PlacedObject& obj, const std::string& modelPath,
