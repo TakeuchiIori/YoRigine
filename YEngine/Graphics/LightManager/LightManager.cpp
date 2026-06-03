@@ -9,6 +9,7 @@
 #include "Object3D/Object3dCommon.h"
 #include "DsvManager.h"
 #include "Loaders/Json/JsonManager.h"
+#include "OffScreen/OffScreen.h"
 // Math
 #include "MathFunc.h"
 
@@ -242,6 +243,43 @@ namespace YoRigine {
 
 		// 最終的なライトビュー射影行列
 		shadow_->lightViewProjection = lightView * lightProj;
+
+		// Fog / God Rays ポストエフェクト用にもカメラ・ライト情報を流し込む。
+		// シーン毎に UpdateShadowMatrix は呼ばれるので、ここで一括更新するのが確実。
+		{
+			Matrix4x4 viewProj = camera_->GetViewProjectionMatrix();
+			Matrix4x4 invVP    = Inverse(viewProj);
+			OffScreen::GetInstance()->SetFogCameraAndLight(invVP, cameraPos, lightDir);
+
+			// --- God Rays 用の太陽スクリーン UV / 可視度 ---
+			// 太陽は光源方向の逆 (= -lightDir) に十分離れた場所にいると見なす
+			Vector3 sunWorld = cameraPos + (-lightDir) * 1000.0f;
+			// World → Clip
+			Vector3 c;
+			c.x = sunWorld.x * viewProj.m[0][0] + sunWorld.y * viewProj.m[1][0]
+				+ sunWorld.z * viewProj.m[2][0] + viewProj.m[3][0];
+			c.y = sunWorld.x * viewProj.m[0][1] + sunWorld.y * viewProj.m[1][1]
+				+ sunWorld.z * viewProj.m[2][1] + viewProj.m[3][1];
+			c.z = sunWorld.x * viewProj.m[0][2] + sunWorld.y * viewProj.m[1][2]
+				+ sunWorld.z * viewProj.m[2][2] + viewProj.m[3][2];
+			float w = sunWorld.x * viewProj.m[0][3] + sunWorld.y * viewProj.m[1][3]
+				+ sunWorld.z * viewProj.m[2][3] + viewProj.m[3][3];
+
+			Vector2 sunUV{ 0.5f, 0.5f };
+			float visibility = 0.0f;
+			if (w > 0.0f) {
+				float ndcX = c.x / w;
+				float ndcY = c.y / w;
+				sunUV.x = ndcX * 0.5f + 0.5f;
+				sunUV.y = -ndcY * 0.5f + 0.5f; // Y 反転 (D3D の UV)
+
+				// 画面中央に近いほど強く、画面外に出ると 0 へ滑らかにフェード
+				float maxD = std::max(std::abs(ndcX), std::abs(ndcY));
+				// 0(中央)〜1(端) → そこから先 1〜1.5 でフェードアウト
+				visibility = 1.0f - std::clamp((maxD - 1.0f) / 0.5f, 0.0f, 1.0f);
+			}
+			OffScreen::GetInstance()->SetGodRaysSun(sunUV, visibility);
+		}
 	}
 
 	//===========================================================================

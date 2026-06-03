@@ -1,6 +1,6 @@
 {
-    "farZ": 200.0,
-    "nearZ": 0.0,
+    "farZ": 212.0,
+    "nearZ": 800.0,
     "orthoHeight": 170.0,
     "orthoWidth": 213.0,
     "shadowDistance": 5.0
