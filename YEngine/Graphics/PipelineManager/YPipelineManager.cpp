@@ -307,6 +307,7 @@ void YPipelineManager::CreatePSO_ShadowMap()
     ReflectionBasedPipelineBuilder builder;
     auto result = builder
 		.SetDepthStencilFormat(DXGI_FORMAT_D32_FLOAT)
+        .SetRasterizerState(YoRigine::RasterizerPresets::CreateShadow())
         .BuildFromCompiledShaders(
             dxCommon_->GetDevice().Get(),
             vsBlob.Get()
