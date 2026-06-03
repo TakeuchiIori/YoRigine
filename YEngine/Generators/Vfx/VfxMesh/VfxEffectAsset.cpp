@@ -68,6 +68,24 @@ namespace YoRigine {
         t["widthWaveAmp"]  = trail.widthWaveAmp;
         t["widthWaveFreq"] = trail.widthWaveFreq;
 
+        // 3D プリミティブ ★NEW
+        {
+            auto& pr = t["primitive"];
+            const auto& sp = trail.primitive;
+            pr["type"]         = static_cast<int>(sp.type);
+            pr["placement"]    = static_cast<int>(sp.placement);
+            pr["halfExtents"]  = sp.halfExtents;
+            pr["radius"]       = sp.radius;
+            pr["height"]       = sp.height;
+            pr["tubeRadius"]   = sp.tubeRadius;
+            pr["latSegments"]  = sp.latSegments;
+            pr["lonSegments"]  = sp.lonSegments;
+            pr["ringSegments"] = sp.ringSegments;
+            pr["stampScale"]   = sp.stampScale;
+            pr["stampSpacing"] = sp.stampSpacing;
+            pr["scaleByAge"]   = sp.scaleByAge;
+        }
+
         // --- LightVolume ---
         auto& lv = j["lightVolume"];
         lv["halfExtents"] = lightVolume.halfExtents;
@@ -150,6 +168,24 @@ namespace YoRigine {
             // 幅ウェーブ
             trail.widthWaveAmp  = t.value("widthWaveAmp",  trail.widthWaveAmp);
             trail.widthWaveFreq = t.value("widthWaveFreq", trail.widthWaveFreq);
+
+            // 3D プリミティブ ★NEW (旧 JSON 互換: primitive キーがなければデフォルト)
+            if (t.contains("primitive") && t["primitive"].is_object()) {
+                const auto& pr = t["primitive"];
+                auto& sp = trail.primitive;
+                sp.type         = static_cast<PrimitiveType>(pr.value("type",         static_cast<int>(sp.type)));
+                sp.placement    = static_cast<PrimitivePlacement>(pr.value("placement", static_cast<int>(sp.placement)));
+                if (pr.contains("halfExtents")) sp.halfExtents = pr["halfExtents"];
+                sp.radius       = pr.value("radius",       sp.radius);
+                sp.height       = pr.value("height",       sp.height);
+                sp.tubeRadius   = pr.value("tubeRadius",   sp.tubeRadius);
+                sp.latSegments  = pr.value("latSegments",  sp.latSegments);
+                sp.lonSegments  = pr.value("lonSegments",  sp.lonSegments);
+                sp.ringSegments = pr.value("ringSegments", sp.ringSegments);
+                sp.stampScale   = pr.value("stampScale",   sp.stampScale);
+                sp.stampSpacing = pr.value("stampSpacing", sp.stampSpacing);
+                sp.scaleByAge   = pr.value("scaleByAge",   sp.scaleByAge);
+            }
         }
 
         if (j.contains("lightVolume")) {
