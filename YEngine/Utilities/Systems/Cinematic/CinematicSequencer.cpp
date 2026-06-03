@@ -42,6 +42,17 @@ namespace YoRigine {
 			activePriority, restorePriority));
 	}
 
+	void CinematicSequencer::Camera(const std::string& cameraName,
+		float startTime, float endTime,
+		int activePriority)
+	{
+		// restoreCameraName を空文字にすることで CameraTrackAction::OnFinish は復帰処理をスキップ
+		AddAction(std::make_unique<CameraTrackAction>(
+			cameraName, /*restoreCameraName*/ std::string{},
+			startTime, endTime,
+			activePriority, /*restorePriority*/ 0));
+	}
+
 	void CinematicSequencer::Update(float dt)
 	{
 		if (finished_) return;
@@ -82,6 +93,16 @@ namespace YoRigine {
 		// シーケンス全体終了判定
 		if (currentTime_ >= duration_) {
 			finished_ = true;
+			// 未完了で開始済みの Action を強制 finalize
+			// endTime が duration_ を超えていても、letterbox の SetProgress(0) や
+			// CameraTrack の優先度復帰がきちんと走るようにする安全網
+			for (auto& entry : entries_) {
+				if (entry.started && !entry.finished) {
+					entry.action->OnUpdate(1.0f);
+					entry.action->OnFinish();
+					entry.finished = true;
+				}
+			}
 			if (onFinish_) onFinish_();
 		}
 	}

@@ -9,15 +9,31 @@
 #include "Systems/Cinematic/CinematicManager.h"
 #include "Systems/Cinematic/CinematicSequencer.h"
 #include "Systems/Camera/CameraDirector.h"
+#include "Systems/Camera/Virtuals/KeyframeCamera/KeyframeCamera.h"
 #include "OffScreen/PostEffectManager.h"
 #include "OffScreen/PostEffectChain.h"
 #include <Editor/Editor.h>
 
 #include <UI/Damage/DamageNumberManager.h>
+#include <algorithm>
 #ifdef USE_IMGUI
 #include "imgui.h"
 #endif
 #include <Debugger/Logger.h>
+
+namespace {
+	// ===== 霧晴れカットシーン演出のタイムライン定数 =====
+	// 時間はすべて秒。Sequencer の全体時間 (duration) は KeyframeCamera のパス長から自動取得。
+	constexpr float kLetterboxInDuration       = 1.0f;     // 黒帯がスライドインする時間
+	constexpr float kLetterboxOutDuration      = 1.0f;     // 黒帯がスライドアウトする時間
+	constexpr float kPostEffectFadeDelay       = 0.5f;     // 黒帯 IN 完了後にエフェクト開始までの余白
+	constexpr float kPostEffectFadeEndMargin   = 0.5f;     // 黒帯 OUT 開始前にエフェクトを終わらせる余白
+	constexpr float kGodRaysExposureMul        = 1.5f;     // 演出中の GodRays 露光倍率
+	constexpr int   kCinematicCamPriority      = 1000;     // 演出中のカメラ優先度
+	constexpr float kFallbackDuration          = 5.0f;     // ClearCinematic 不在時の保険
+	constexpr const char* kCinematicCamName    = "ClearCinematic";
+	constexpr const char* kClearSceneName      = "Clear";
+}
 
 /// <summary>
 /// バトルシーン初期化
@@ -111,43 +127,55 @@ void BattleScene::Update() {
 		auto* fog     = chain ? chain->GetFirstEffectByType(OffScreen::OffScreenEffectType::Fog)     : nullptr;
 		auto* godRays = chain ? chain->GetFirstEffectByType(OffScreen::OffScreenEffectType::GodRays) : nullptr;
 
-		// 5 秒の演出シーケンス
-		auto seq = std::make_unique<YoRigine::CinematicSequencer>(5.0f);
+		// シーケンス全体時間 = KeyframeCamera "ClearCinematic" のパス長
+		// 編集で長さを変えるだけで letterbox / エフェクトの時刻が自動で追従する
+		auto cinemaCam = std::dynamic_pointer_cast<KeyframeCamera>(
+			CameraDirector::GetInstance()->GetCamera(kCinematicCamName));
+		const float duration = (cinemaCam && cinemaCam->GetMaxTime() > 0.0f)
+			? cinemaCam->GetMaxTime()
+			: kFallbackDuration;
 
-		// レターボックス IN (0.0-1.0) / OUT (3.5-4.5)
-		seq->Letterbox(true,  0.0f, 1.0f, Easing::Function::EaseOutCubic);
-		seq->Letterbox(false, 3.5f, 4.5f, Easing::Function::EaseInCubic);
+		// エフェクトフェード時刻（黒帯 OUT 開始前に余白を確保して終わらせる）
+		const float fadeStart = kPostEffectFadeDelay;
+		const float fadeEnd   = std::max(
+			fadeStart + 0.1f,
+			duration - kLetterboxOutDuration - kPostEffectFadeEndMargin);
 
-		// Fog を 0 に補間（density / heightDensity / sunInscatter）
+		auto seq = std::make_unique<YoRigine::CinematicSequencer>(duration);
+
+		// --- レターボックス ---
+		seq->Letterbox(true,  0.0f, kLetterboxInDuration,
+			Easing::Function::EaseOutCubic);
+		seq->Letterbox(false, duration - kLetterboxOutDuration, duration,
+			Easing::Function::EaseInCubic);
+
+		// --- Fog を 0 に補間（density / heightDensity / sunInscatter）---
 		if (fog) {
-			auto& f = fog->params.fog;
-			float curDensity       = f.fogDensity;
-			float curHeightDensity = f.heightFogDensity;
-			float curInscatter     = f.sunInscatterStrength;
-
+			const auto& f = fog->params.fog;
 			seq->Tween([fog](float v){ fog->params.fog.fogDensity = v; },
-				curDensity, 0.0f, 0.5f, 3.5f, Easing::Function::EaseOutCubic);
+				f.fogDensity, 0.0f, fadeStart, fadeEnd, Easing::Function::EaseOutCubic);
 
 			seq->Tween([fog](float v){ fog->params.fog.heightFogDensity = v; },
-				curHeightDensity, 0.0f, 0.5f, 3.5f, Easing::Function::EaseOutCubic);
+				f.heightFogDensity, 0.0f, fadeStart, fadeEnd, Easing::Function::EaseOutCubic);
 
 			seq->Tween([fog](float v){ fog->params.fog.sunInscatterStrength = v; },
-				curInscatter, 0.0f, 0.5f, 3.5f, Easing::Function::EaseOutCubic);
+				f.sunInscatterStrength, 0.0f, fadeStart, fadeEnd, Easing::Function::EaseOutCubic);
 		}
 
-		// GodRays exposure を 1.5 倍へ（光が射す印象を強化）
+		// --- GodRays exposure を倍率倍へ（光が射す印象を強化）---
 		if (godRays) {
-			float curExposure = godRays->params.godRays.exposure;
+			const float curExposure = godRays->params.godRays.exposure;
 			seq->Tween([godRays](float v){ godRays->params.godRays.exposure = v; },
-				curExposure, curExposure * 1.5f, 0.5f, 3.5f, Easing::Function::EaseInOutSine);
+				curExposure, curExposure * kGodRaysExposureMul,
+				fadeStart, fadeEnd, Easing::Function::EaseInOutSine);
 		}
 
-		// KeyframeCamera "ClearCinematic" を演出中アクティブに
-		// 終了後は PlayerFollow に復帰
-		seq->Camera("ClearCinematic", "PlayerFollow", 0.0f, 4.5f);
+		// --- KeyframeCamera をシーン全体で再生 ---
+		// 演出後は Clear シーンへ遷移するので、復帰先カメラは指定しない
+		seq->Camera(kCinematicCamName, 0.0f, duration, kCinematicCamPriority);
 
 		// 演出終了 → Clear へ遷移
-		seq->OnFinish([](){ SceneManager::GetInstance()->ChangeScene("Clear"); });
+		seq->OnFinish([](){ SceneManager::GetInstance()->ChangeScene(kClearSceneName); });
 
 		YoRigine::CinematicManager::GetInstance()->Play(std::move(seq));
 		return;

@@ -116,6 +116,7 @@ void GameScene::Initialize() {
 	// 初期モードに合わせて優先度を確定してからスナップする。
 	director->SetPriority("PlayerFollow", 10);
 	director->SetPriority("MainDebug", 0);
+	director->SetPriority("ClearCinematic", 0);
 	director->SnapToActiveCamera();
 
 	// PlayerCamera を初期化（FollowCamera を内包するコンポーネント構成）
@@ -410,6 +411,11 @@ void GameScene::UpdateCamera() {
 	case CameraMode::DEBUG:
 		director->SetPriority("MainDebug", 10);
 		director->SetPriority("PlayerFollow", 0);
+		break;
+	case CameraMode::CLEAR_CINEMATIC:
+		// シネマティックカメラ優先（例: BattleScene 内で切り替える）
+		director->SetPriority("ClearCinematic", 0);
+		director->SetPriority("MainDebug", 0);
 		break;
 	}
 

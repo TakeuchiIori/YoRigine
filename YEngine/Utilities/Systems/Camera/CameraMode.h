@@ -9,5 +9,6 @@ enum class CameraMode {
 	TITLE,
 	FOLLOW,
 	DEBUG,
-	BATTLE_START
+	BATTLE_START,
+	CLEAR_CINEMATIC,
 };

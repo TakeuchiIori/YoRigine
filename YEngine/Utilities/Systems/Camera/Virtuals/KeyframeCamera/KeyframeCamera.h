@@ -55,6 +55,13 @@ public:
 	void AddKeyframe(float time, const Vector3& pos, const Vector3& rot, float fov, Easing::Function easing);
 	void SortKeyframes();
 
+	// 指定 index と index+1 のキーの間に、現在の曲線上をサンプリングした新キーを追加
+	void InsertKeyBetween(int beforeIndex);
+
+	// すべての隣接キー間に、現在の曲線をサンプリングした N 個の中間キーを一括追加
+	// 元のキーは保持される。N が大きいほど曲線がより細かい制御点で再構成される
+	void SubdivideAllSegments(int n);
+
 	// ============================================================
 	// 再生制御（外部からの演出駆動用）
 	// ============================================================
@@ -76,6 +83,13 @@ private:
 	bool isLooping_ = true;
 	float playbackSpeed_ = 1.0f;
 	InterpolationMode interpolationMode_ = InterpolationMode::CatmullRom;
+
+	// スムーズ移動モード:
+	//   true  → 各キーの easing は無視、globalEasing_ を全体時間に適用 + 各セグメントは Linear
+	//           (CatmullRom 曲線が滑らかなので等速で通過し「止まる」現象がなくなる)
+	//   false → 各キーの easing を per-segment 適用（従来挙動、ポイントで pause かかる）
+	bool useSmoothMotion_ = true;
+	Easing::Function globalEasing_ = Easing::Function::EaseInOutQuad;
 
 	// 編集 UX 用
 	int selectedKeyIndex_ = -1;     // ImGui で選択中のキー（3D ハイライト用）

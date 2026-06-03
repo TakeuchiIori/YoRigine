@@ -55,19 +55,21 @@ namespace YoRigine {
 		auto director = CameraDirector::GetInstance();
 		if (!director) return;
 
-		// 元のカメラに戻す
 		auto cur = director->GetCamera(cameraName_);
 		if (cur) {
+			// KeyframeCamera なら再生停止（最後の評価位置で固定）
 			if (auto kf = std::dynamic_pointer_cast<KeyframeCamera>(cur)) {
 				kf->Stop();
 			}
-			// アクティブを降格
-			director->SetPriority(cameraName_, 0);
-		}
-
-		// 戻り先カメラに高優先度を再付与（指定があれば）
-		if (!restoreCameraName_.empty()) {
-			director->SetPriority(restoreCameraName_, restorePriority_);
+			// 復帰先指定がある場合のみ priority を下げて切替を発生させる。
+			// 指定が無い場合は cinematic camera を active のまま維持し、
+			// シーン遷移などで自然に解消することを期待する
+			// （priority を下げると PlayerFollow 等が即座に active になり、
+			//   シーン切替のフェード中に背景カメラが見えてしまうため）。
+			if (!restoreCameraName_.empty()) {
+				director->SetPriority(cameraName_, 0);
+				director->SetPriority(restoreCameraName_, restorePriority_);
+			}
 		}
 	}
 

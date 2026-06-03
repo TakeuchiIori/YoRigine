@@ -38,6 +38,13 @@ namespace YoRigine {
 			int activePriority = 1000,
 			int restorePriority = 10);
 
+		// 復帰先カメラ指定なし版
+		//   - 演出後にシーン遷移する等で復帰が不要な場合に使う
+		//   - 終了時はカメラ優先度を 0 に下げるだけ
+		void Camera(const std::string& cameraName,
+			float startTime, float endTime,
+			int activePriority = 1000);
+
 		// 終了時コールバック
 		void OnFinish(std::function<void()> cb) { onFinish_ = std::move(cb); }
 

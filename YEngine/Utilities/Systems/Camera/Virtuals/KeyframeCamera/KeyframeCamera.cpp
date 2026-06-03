@@ -50,6 +50,15 @@ void KeyframeCamera::EvaluateAt(float time) {
 	float t1 = keyframes_.back().time;
 	float clampedTime = std::clamp(time, t0, t1);
 
+	// スムーズ移動モード: 全体時間にイージングをかけて
+	// effectiveTime を再計算する（per-segment 停止を回避）
+	if (useSmoothMotion_) {
+		float totalSpan = std::max(t1 - t0, 1e-6f);
+		float globalT = (clampedTime - t0) / totalSpan;
+		float easedGlobal = Easing::Ease(globalEasing_, globalT);
+		clampedTime = t0 + easedGlobal * totalSpan;
+	}
+
 	// 現在時刻を含むセグメントを検索
 	for (size_t i = 0; i < keyframes_.size() - 1; ++i) {
 		auto& kStart = keyframes_[i];
@@ -58,7 +67,8 @@ void KeyframeCamera::EvaluateAt(float time) {
 		if (clampedTime >= kStart.time && clampedTime <= kEnd.time) {
 			float segSpan = std::max(kEnd.time - kStart.time, 1e-6f);
 			float t = (clampedTime - kStart.time) / segSpan;
-			float easedT = Easing::Ease(kStart.easing, t);
+			// スムーズ時はセグメント内は Linear（曲線の滑らかさは Catmull-Rom が担保）
+			float easedT = useSmoothMotion_ ? t : Easing::Ease(kStart.easing, t);
 
 			if (interpolationMode_ == InterpolationMode::CatmullRom
 				&& keyframes_.size() >= 3) {
@@ -189,6 +199,22 @@ void KeyframeCamera::DrawDebug3D(Line& line) {
 // ============================================================
 void KeyframeCamera::DrawDebugGui() {
 #ifdef USE_IMGUI
+	// 全 Easing の選択肢（enum 並び順と一致させる）
+	static const char* kEasingNames[] = {
+		"Linear",
+		"EaseInSine", "EaseOutSine", "EaseInOutSine",
+		"EaseInQuad", "EaseOutQuad", "EaseInOutQuad",
+		"EaseInCubic", "EaseOutCubic", "EaseInOutCubic",
+		"EaseInQuart", "EaseOutQuart", "EaseInOutQuart",
+		"EaseInQuint", "EaseOutQuint", "EaseInOutQuint",
+		"EaseInExpo", "EaseOutExpo", "EaseInOutExpo",
+		"EaseInCirc", "EaseOutCirc", "EaseInOutCirc",
+		"EaseInBack", "EaseOutBack", "EaseInOutBack",
+		"EaseInElastic", "EaseOutElastic", "EaseInOutElastic",
+		"EaseInBounce", "EaseOutBounce", "EaseInOutBounce",
+		"EaseOutGrowBounce"
+	};
+
 	ImGui::Text("--- キーフレームアニメーション ---");
 
 	// ------------------------------------------------------------
@@ -224,6 +250,27 @@ void KeyframeCamera::DrawDebugGui() {
 	}
 
 	ImGui::Checkbox("3D パスを描画", &showPath_);
+	if (showPath_) {
+		ImGui::SliderInt("ライン分割数 (見た目)", &pathSegmentSamples_, 4, 128);
+		ImGui::TextDisabled("  ↑ パス線の描画密度。動作には影響しません");
+	}
+
+	ImGui::Separator();
+
+	// ------------------------------------------------------------
+	// 一括サブディビジョン: 隣接キー間に N 個の中間キーを生成
+	//   ※ より制御点が増え、後で個別に位置を動かして曲線を変形しやすくなる
+	// ------------------------------------------------------------
+	{
+		ImGui::TextDisabled("== 中間キーを一括追加 ==");
+		static int subdivN = 2;
+		ImGui::SliderInt("各セグメントに追加する数", &subdivN, 1, 10);
+		if (ImGui::Button("全セグメントに中間キーを挿入")) {
+			SubdivideAllSegments(subdivN);
+		}
+		ImGui::TextDisabled("  曲線形状はそのまま、制御点だけ増やす");
+		ImGui::TextDisabled("  例: 4 キーに 2 挿入 → 計 10 キーで曲線を制御");
+	}
 
 	ImGui::Separator();
 
@@ -252,35 +299,41 @@ void KeyframeCamera::DrawDebugGui() {
 		ImGui::TextDisabled("  CatmullRom はキーを滑らかに通る曲線（推奨）");
 	}
 
+	// スムーズ移動モード（キーで止まらない）
+	{
+		ImGui::Checkbox("スムーズ移動 (キーで止まらない)", &useSmoothMotion_);
+		ImGui::TextDisabled("  ON: 全体時間にイージングをかけて各キーを等速通過");
+		ImGui::TextDisabled("  OFF: 各キーの Easing を個別適用（キー毎に減速・加速）");
+
+		if (useSmoothMotion_) {
+			int gIdx = static_cast<int>(globalEasing_);
+			if (ImGui::Combo("全体イージング", &gIdx,
+				kEasingNames, IM_ARRAYSIZE(kEasingNames))) {
+				globalEasing_ = static_cast<Easing::Function>(gIdx);
+			}
+		}
+	}
+
 	ImGui::Separator();
 
 	// ------------------------------------------------------------
 	// キーフレームの追加
 	// ------------------------------------------------------------
-	if (ImGui::Button("現在のアングルをキーとして追加")) {
+	if (ImGui::Button("現在のアングルをキーとして追加 (末尾)")) {
 		auto director = CameraDirector::GetInstance();
 		float nextTime = keyframes_.empty() ? 0.0f : keyframes_.back().time + 2.0f;
 
 		AddKeyframe(nextTime, director->GetActiveCameraPos(),
 			director->GetActiveCameraRot(), director->GetFovY(),
-			Easing::Function::EaseInOutQuad);
+			Easing::Function::Linear); // スムーズ移動向けに Linear をデフォルト
 	}
-
-	// 全 Easing の選択肢（enum 並び順と一致させる）
-	static const char* kEasingNames[] = {
-		"Linear",
-		"EaseInSine", "EaseOutSine", "EaseInOutSine",
-		"EaseInQuad", "EaseOutQuad", "EaseInOutQuad",
-		"EaseInCubic", "EaseOutCubic", "EaseInOutCubic",
-		"EaseInQuart", "EaseOutQuart", "EaseInOutQuart",
-		"EaseInQuint", "EaseOutQuint", "EaseInOutQuint",
-		"EaseInExpo", "EaseOutExpo", "EaseInOutExpo",
-		"EaseInCirc", "EaseOutCirc", "EaseInOutCirc",
-		"EaseInBack", "EaseOutBack", "EaseInOutBack",
-		"EaseInElastic", "EaseOutElastic", "EaseInOutElastic",
-		"EaseInBounce", "EaseOutBounce", "EaseInOutBounce",
-		"EaseOutGrowBounce"
-	};
+	if (ImGui::Button("現在時刻にキー追加 (スクラブ位置)")) {
+		auto director = CameraDirector::GetInstance();
+		AddKeyframe(timer_, director->GetActiveCameraPos(),
+			director->GetActiveCameraRot(), director->GetFovY(),
+			Easing::Function::Linear);
+	}
+	ImGui::TextDisabled("  スクラブで時刻を決めて視点を変えてからボタンを押すと挿入");
 
 	// ------------------------------------------------------------
 	// キーフレーム一覧（編集 + 削除 + 上書き + 選択）
@@ -338,6 +391,15 @@ void KeyframeCamera::DrawDebugGui() {
 					removeIndex = i;
 				}
 
+				// 次のキーがあれば「間に挿入」を表示
+				if (i + 1 < static_cast<int>(keyframes_.size())) {
+					if (ImGui::Button("↓ 次のキーとの間に補間キーを挿入")) {
+						InsertKeyBetween(i);
+						selectedKeyIndex_ = i + 1; // 挿入したキーを選択
+					}
+					ImGui::TextDisabled("  曲線上の中間点で新規キーを作成、後で位置調整可");
+				}
+
 				ImGui::TreePop();
 			}
 			if (isSel) ImGui::PopStyleColor();
@@ -367,6 +429,8 @@ void KeyframeCamera::Save(nlohmann::json& j) const {
 	j["isLooping"] = isLooping_;
 	j["playbackSpeed"] = playbackSpeed_;
 	j["interpolationMode"] = static_cast<int>(interpolationMode_);
+	j["useSmoothMotion"] = useSmoothMotion_;
+	j["globalEasing"] = static_cast<int>(globalEasing_);
 
 	j["keyframes"] = nlohmann::json::array();
 	for (const auto& kf : keyframes_) {
@@ -391,6 +455,9 @@ void KeyframeCamera::Load(const nlohmann::json& j) {
 	playbackSpeed_ = j.value("playbackSpeed", 1.0f);
 	interpolationMode_ = static_cast<InterpolationMode>(
 		j.value("interpolationMode", static_cast<int>(InterpolationMode::CatmullRom)));
+	useSmoothMotion_ = j.value("useSmoothMotion", true);
+	globalEasing_ = static_cast<Easing::Function>(
+		j.value("globalEasing", static_cast<int>(Easing::Function::EaseInOutQuad)));
 
 	if (j.contains("keyframes") && j["keyframes"].is_array()) {
 		keyframes_.clear();
@@ -423,4 +490,89 @@ void KeyframeCamera::SortKeyframes() {
 	std::sort(keyframes_.begin(), keyframes_.end(), [](const Keyframe& a, const Keyframe& b) {
 		return a.time < b.time;
 		});
+}
+
+// ============================================================
+// すべての隣接キー間に N 個の中間キーを一括挿入
+//   - 各セグメントを N+1 等分する時刻で曲線をサンプリング
+//   - 元のキーは全部保持される（挿入のみ）
+// ============================================================
+void KeyframeCamera::SubdivideAllSegments(int n) {
+	if (n <= 0 || keyframes_.size() < 2) return;
+
+	// 状態の退避
+	const Vector3 savedTrans = transform_.translate;
+	const Vector3 savedRot   = transform_.rotate;
+	const float   savedFov   = fovY_;
+
+	// 既存キーをコピーして、サンプリングは現曲線で行う
+	std::vector<Keyframe> result;
+	result.reserve(keyframes_.size() + (keyframes_.size() - 1) * n);
+
+	for (size_t i = 0; i < keyframes_.size() - 1; ++i) {
+		const auto& a = keyframes_[i];
+		const auto& b = keyframes_[i + 1];
+
+		result.push_back(a);
+
+		float t0 = a.time;
+		float t1 = b.time;
+		float span = t1 - t0;
+		for (int s = 1; s <= n; ++s) {
+			float u = static_cast<float>(s) / static_cast<float>(n + 1);
+			float midTime = t0 + span * u;
+			EvaluateAt(midTime);
+			Keyframe kf{
+				midTime,
+				transform_.translate,
+				transform_.rotate,
+				fovY_,
+				Easing::Function::Linear,
+			};
+			result.push_back(kf);
+		}
+	}
+	result.push_back(keyframes_.back()); // 末尾を忘れずに
+
+	keyframes_ = std::move(result);
+
+	// 退避した表示状態を戻す
+	transform_.translate = savedTrans;
+	transform_.rotate    = savedRot;
+	fovY_                = savedFov;
+
+	selectedKeyIndex_ = -1; // インデックスが変わるので選択解除
+}
+
+// ============================================================
+// 指定 index と index+1 の間に中間キーを挿入する
+//   - 時刻は中間 (a.time + b.time) / 2
+//   - 位置・回転・FOV は現在の曲線をサンプリングして取得
+// ============================================================
+void KeyframeCamera::InsertKeyBetween(int beforeIndex) {
+	if (beforeIndex < 0 || beforeIndex >= static_cast<int>(keyframes_.size()) - 1) return;
+
+	const auto& a = keyframes_[beforeIndex];
+	const auto& b = keyframes_[beforeIndex + 1];
+	const float midTime = (a.time + b.time) * 0.5f;
+
+	// 一旦現在の状態を退避
+	const Vector3 savedTrans = transform_.translate;
+	const Vector3 savedRot   = transform_.rotate;
+	const float   savedFov   = fovY_;
+
+	// 中間時刻における曲線上の位置/回転/FOV を取得
+	EvaluateAt(midTime);
+	const Vector3 newPos = transform_.translate;
+	const Vector3 newRot = transform_.rotate;
+	const float   newFov = fovY_;
+
+	// 現在の表示状態を元に戻す
+	transform_.translate = savedTrans;
+	transform_.rotate    = savedRot;
+	fovY_                = savedFov;
+
+	// 挿入
+	Keyframe kf{ midTime, newPos, newRot, newFov, Easing::Function::Linear };
+	keyframes_.insert(keyframes_.begin() + beforeIndex + 1, kf);
 }
