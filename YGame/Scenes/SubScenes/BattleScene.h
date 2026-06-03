@@ -122,4 +122,7 @@ private:
 	bool shouldResetBattleCamera_ = false;
 	bool isFinalBattle_ = false;  // 最終バトルかどうか
 	size_t totalRemainingFieldEnemies_ = 0;  // ★追加: フィールドに残っているエンカウントグループ数
+
+	// 最終バトルクリア演出が起動済みかどうか（毎フレーム再発火するのを防ぐ）
+	bool clearCinematicStarted_ = false;
 };

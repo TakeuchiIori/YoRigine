@@ -58,6 +58,8 @@ void GameScene::Initialize() {
 	cameraEditor_->SetFilePath("Resources/Json/VirtualCameraData/GameScene.json");
 	cameraEditor_->LoadFileOrDefault(cameraEditor_->GetFilePath(), "Game");
 
+	// ゲーム用のポストエフェクト（TestGame: Fog + GodRays 等）
+	PostEffectManager::GetInstance()->LoadPreset("TestGame");
 
 	cameraMode_ = CameraMode::FOLLOW;
 	//------------------------------------------------------------

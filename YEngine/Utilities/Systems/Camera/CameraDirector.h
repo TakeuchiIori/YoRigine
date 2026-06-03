@@ -7,6 +7,8 @@
 #include "Virtuals/VirtualCamera.h"
 #include <WorldTransform/WorldTransform.h>
 
+class Line;
+
 // ============================================================
 // カメラディレクタークラス
 // 全ての仮想カメラを管理し、切り替えや補間（ブレンド）を行う
@@ -41,6 +43,9 @@ public:
 
 	// 補間をせずに現在のカメラに強制スナップする
 	void SnapToActiveCamera();
+
+	// 各 VirtualCamera のデバッグ 3D 描画を一括呼び出し
+	void DrawDebug3D(Line& line);
 
 	// ============================================================
 	// ターゲット管理（プレイヤーや敵の座標をカメラが探せるようにする）

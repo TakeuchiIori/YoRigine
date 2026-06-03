@@ -6,6 +6,7 @@
 #include "LightManager/LightManager.h"
 #include "Collision/Core/CollisionManager.h"
 #include "Systems/GameTime/GameTime.h"
+#include "Systems/Camera/CameraDirector.h"
 #include <Editor/Editor.h>
 #include "Debugger/Logger.h"
 #include <Object3D/ObjectManager.h>
@@ -173,6 +174,9 @@ void FieldScene::DrawLine() {
 	player_->DrawBone(*line_.get());
 	AreaManager::GetInstance()->DrawArea("FieldArea", line_.get());
 	AreaManager::GetInstance()->Draw(line_.get(), { "FieldArea" });
+
+	// 全 KeyframeCamera のパス/球マーカーを描画
+	CameraDirector::GetInstance()->DrawDebug3D(*line_.get());
 
 	// ── NavGrid デバッグ描画 ─────────────────────────────────────────────
 	// showNavGridDebug_ が true のときだけグリッドを可視化する。

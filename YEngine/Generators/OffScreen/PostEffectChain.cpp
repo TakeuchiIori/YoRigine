@@ -86,6 +86,14 @@ const PostEffectData* PostEffectChain::GetPostEffectData(int index) const
 	return nullptr;
 }
 
+PostEffectData* PostEffectChain::GetFirstEffectByType(OffScreen::OffScreenEffectType type)
+{
+	for (auto& e : effects_) {
+		if (e && e->type == type) return e.get();
+	}
+	return nullptr;
+}
+
 
 /// <summary>
 /// 有効なエフェクトのみのインデックス一覧を返す

@@ -6,6 +6,7 @@
 
 // Engine
 #include "Systems/GameTime/GameTime.h"
+#include "Systems/Cinematic/CinematicManager.h"
 #include <Debugger/Logger.h>
 #include "Collision/AreaCollision/Base/AreaManager.h"
 
@@ -158,6 +159,11 @@ void Player::InitCollision() {
 // ============================================================
 void Player::Update() {
 	if (YoRigine::GameTime::IsPause()) {
+		return;
+	}
+
+	// カットシーン演出中はプレイヤー操作・状態更新を全停止
+	if (YoRigine::CinematicManager::GetInstance()->IsActive()) {
 		return;
 	}
 

@@ -71,6 +71,9 @@ public:
 	PostEffectData* GetPostEffectData(int index);
 	const PostEffectData* GetPostEffectData(int index) const;
 
+	// 指定型の最初のエフェクトを取得（演出スクリプトから Fog/GodRays などを直接触る用）
+	PostEffectData* GetFirstEffectByType(OffScreen::OffScreenEffectType type);
+
 	// 有効なエフェクトのインデックス一覧を取得
 	std::vector<int> GetEnabledEffectIndices() const;
 

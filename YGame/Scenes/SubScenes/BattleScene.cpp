@@ -6,6 +6,11 @@
 #include "Object3D/Object3dCommon.h"
 #include "LightManager/LightManager.h"
 #include "Systems/GameTime/GameTime.h"
+#include "Systems/Cinematic/CinematicManager.h"
+#include "Systems/Cinematic/CinematicSequencer.h"
+#include "Systems/Camera/CameraDirector.h"
+#include "OffScreen/PostEffectManager.h"
+#include "OffScreen/PostEffectChain.h"
 #include <Editor/Editor.h>
 
 #include <UI/Damage/DamageNumberManager.h>
@@ -96,9 +101,60 @@ void BattleScene::Update() {
 	bool isBattleCameraActive = (currentCameraMode_ == CameraMode::BATTLE_START && !battleCameraFinished_);
 
 	// 最終バトルクリア検知（BattleScene側で遷移したいならここ）
-	if (!isBattleCameraActive && battleEnemyManager_->IsFinalBattleCleared()) {
-		SceneManager::GetInstance()->ChangeScene("Clear");
+	// 直接 ChangeScene せず、霧晴れ＋光芒のカットシーン演出を挟んでから遷移
+	if (!isBattleCameraActive && battleEnemyManager_->IsFinalBattleCleared() && !clearCinematicStarted_) {
+		clearCinematicStarted_ = true;
 		battleEnemyManager_->ResetFinalBattleClearFlag();
+
+		// チェーンから Fog / GodRays を引っ張る（無ければ tween をスキップ）
+		auto* chain = PostEffectManager::GetInstance()->GetEffectChain();
+		auto* fog     = chain ? chain->GetFirstEffectByType(OffScreen::OffScreenEffectType::Fog)     : nullptr;
+		auto* godRays = chain ? chain->GetFirstEffectByType(OffScreen::OffScreenEffectType::GodRays) : nullptr;
+
+		// 5 秒の演出シーケンス
+		auto seq = std::make_unique<YoRigine::CinematicSequencer>(5.0f);
+
+		// レターボックス IN (0.0-1.0) / OUT (3.5-4.5)
+		seq->Letterbox(true,  0.0f, 1.0f, Easing::Function::EaseOutCubic);
+		seq->Letterbox(false, 3.5f, 4.5f, Easing::Function::EaseInCubic);
+
+		// Fog を 0 に補間（density / heightDensity / sunInscatter）
+		if (fog) {
+			auto& f = fog->params.fog;
+			float curDensity       = f.fogDensity;
+			float curHeightDensity = f.heightFogDensity;
+			float curInscatter     = f.sunInscatterStrength;
+
+			seq->Tween([fog](float v){ fog->params.fog.fogDensity = v; },
+				curDensity, 0.0f, 0.5f, 3.5f, Easing::Function::EaseOutCubic);
+
+			seq->Tween([fog](float v){ fog->params.fog.heightFogDensity = v; },
+				curHeightDensity, 0.0f, 0.5f, 3.5f, Easing::Function::EaseOutCubic);
+
+			seq->Tween([fog](float v){ fog->params.fog.sunInscatterStrength = v; },
+				curInscatter, 0.0f, 0.5f, 3.5f, Easing::Function::EaseOutCubic);
+		}
+
+		// GodRays exposure を 1.5 倍へ（光が射す印象を強化）
+		if (godRays) {
+			float curExposure = godRays->params.godRays.exposure;
+			seq->Tween([godRays](float v){ godRays->params.godRays.exposure = v; },
+				curExposure, curExposure * 1.5f, 0.5f, 3.5f, Easing::Function::EaseInOutSine);
+		}
+
+		// KeyframeCamera "ClearCinematic" を演出中アクティブに
+		// 終了後は PlayerFollow に復帰
+		seq->Camera("ClearCinematic", "PlayerFollow", 0.0f, 4.5f);
+
+		// 演出終了 → Clear へ遷移
+		seq->OnFinish([](){ SceneManager::GetInstance()->ChangeScene("Clear"); });
+
+		YoRigine::CinematicManager::GetInstance()->Play(std::move(seq));
+		return;
+	}
+
+	// 演出中は他のロジックを止める（プレイヤー操作・カメラ・敵更新ロック）
+	if (clearCinematicStarted_) {
 		return;
 	}
 
@@ -152,6 +208,9 @@ void BattleScene::DrawLine() {
 	player_->DrawCollision();
 	player_->DrawBone(*line_.get());
 	AreaManager::GetInstance()->DrawArea("BattleArea", line_.get());
+
+	// 全 KeyframeCamera のパス/球マーカーを描画（編集中の可視化）
+	CameraDirector::GetInstance()->DrawDebug3D(*line_.get());
 #endif
 }
 
@@ -194,6 +253,9 @@ void BattleScene::OnEnter() {
 	currentCameraMode_ = CameraMode::FOLLOW;
 	battleCameraFinished_ = true;
 	shouldResetBattleCamera_ = true;
+
+	// クリア演出フラグをリセット（再戦・別バトル開始時のため）
+	clearCinematicStarted_ = false;
 
 	// プレイヤー位置リセット
 	player_->SetInitialPosition();

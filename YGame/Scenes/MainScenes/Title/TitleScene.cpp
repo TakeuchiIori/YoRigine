@@ -45,9 +45,9 @@ void TitleScene::Initialize() {
 	auto titleCamera = director->GetCamera("TitleCamera");
 	auto debug = director->GetCamera("MainDebug");
 
-	// タイトル用のポストエフェクトの追加
+	// タイトル用のポストエフェクトの追加（TestGame: Fog + GodRays + Bloom 等）
 	auto postEffectManager = PostEffectManager::GetInstance();
-	postEffectManager->LoadPreset("TitleBloom");
+	postEffectManager->LoadPreset("TestGame");
 
 	//------------------------------------------------------------
 	// システム初期化

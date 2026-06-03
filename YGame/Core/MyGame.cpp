@@ -3,6 +3,7 @@
 #include "Mesh/MeshPrimitive.h"
 #include "Editor/Editor.h"
 #include "Systems/GameTime/GameTime.h"
+#include "Systems/Cinematic/CinematicManager.h"
 #include <ModelManipulator/ModelManipulator.h>
 #include <PipCamera/PipCameraSystem.h>
 #include "OffScreen/PostEffectManager.h"
@@ -66,6 +67,9 @@ void MyGame::Initialize() {
 
 	// PiP カメラサブシステム
 	PipCameraSystem::GetInstance()->Initialize();
+
+	// 演出マネージャ（letterbox UI + Sequencer 駆動）
+	YoRigine::CinematicManager::GetInstance()->Initialize();
 
 #ifdef USE_IMGUI
 	//------------------------------------------------------------
@@ -147,6 +151,7 @@ void MyGame::Update() {
 	Framework::Update();
 	SceneManager::GetInstance()->Update();
 	PipCameraSystem::GetInstance()->Update();
+	YoRigine::CinematicManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
 
 	//------------------------------------------------------------
 	// ImGui受付終了
@@ -219,6 +224,8 @@ void MyGame::Draw() {
 	//------------------------------------------------------------
 	dxCommon_->DepthBarrier();
 	SceneManager::GetInstance()->DrawNonOffscreen();
+	// 映画風レターボックスは全シーン共通で最後（ImGui の手前）に描画
+	YoRigine::CinematicManager::GetInstance()->Draw();
 	dxCommon_->CopyBackBufferToFinalResult();
 	imguiManager_->Draw();
 

@@ -7,6 +7,8 @@
 
 #include "json.hpp"
 
+class Line;
+
 class VirtualCamera
 {
 public:
@@ -16,6 +18,8 @@ public:
 	virtual void Update() = 0;
 	virtual void UpdateMatrix();
 	virtual void DrawDebugGui() {}
+	// シーン空間に Line でデバッグ描画する用（パス可視化など）
+	virtual void DrawDebug3D(Line& /*line*/) {}
 	virtual void Save(nlohmann::json& j) const;
 	virtual void Load(const nlohmann::json& j);
 public:
