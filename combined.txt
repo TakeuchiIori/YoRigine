@@ -217,6 +217,7 @@
 └── └── ├── FieldEnemies/
 └── └── ├── GpuEmitters/
 └── └── ├── LevelData/
+└── └── ├── Lighting/
 └── └── ├── Objects/
 └── └── └── ├── BattleEnemies/
 └── └── └── ├── DemoPlayer/
@@ -275,7 +276,9 @@
 └── └── └── ├── CopyImage/
 └── └── └── ├── CrossHatch/
 └── └── └── ├── Dissolve/
+└── └── └── ├── Fog/
 └── └── └── ├── FullScreen/
+└── └── └── ├── GodRays/
 └── └── └── ├── Grayscale/
 └── └── └── ├── Halftone/
 └── └── └── ├── Kuwahara/
@@ -824,6 +827,15 @@
 └──         └──     └── └── TitleCamera.h
 └──         └──     ├── VirtualCamera.cpp
 └──         └──     └── VirtualCamera.h
+└──         ├── Cinematic/
+└──         └── ├── CinematicAction.cpp
+└──         └── ├── CinematicAction.h
+└──         └── ├── CinematicLetterbox.cpp
+└──         └── ├── CinematicLetterbox.h
+└──         └── ├── CinematicManager.cpp
+└──         └── ├── CinematicManager.h
+└──         └── ├── CinematicSequencer.cpp
+└──         └── └── CinematicSequencer.h
 └──         ├── Convert/
 └──         └── └── EnumConverter.h
 └──         ├── GameTime/
@@ -199162,6 +199174,7 @@ void DevelopScene::DrawLine() {
 	YoRigine::ModelManipulator::GetInstance()->DrawLine();
 	AreaManager::GetInstance()->DrawArea("FieldArea", line_.get());
 	line_->DrawLine();
+	CameraDirector::GetInstance()->DrawDebug3D(*line_);
 }
 
 
@@ -209150,6 +209163,8 @@ void OffScreen::Initialize()
 	RegisterPipeline(OffScreenEffectType::Halftone, "Halftone");
 	RegisterPipeline(OffScreenEffectType::CrossHatch, "CrossHatch");
 	RegisterPipeline(OffScreenEffectType::ColorGrade, "ColorGrade");
+	RegisterPipeline(OffScreenEffectType::Fog, "Fog");
+	RegisterPipeline(OffScreenEffectType::GodRays, "GodRays");
 
 	// マスク・破片テクスチャの読み込み
 	TextureManager::GetInstance()->LoadTexture(maskTexturePath_);
@@ -209186,6 +209201,8 @@ void OffScreen::RenderEffect(OffScreenEffectType type, D3D12_GPU_DESCRIPTOR_HAND
 	case OffScreenEffectType::Halftone:          ExecuteHalftoneEffect(inputSRV); break;
 	case OffScreenEffectType::CrossHatch:        ExecuteCrossHatchEffect(inputSRV); break;
 	case OffScreenEffectType::ColorGrade:        ExecuteColorGradeEffect(inputSRV); break;
+	case OffScreenEffectType::Fog:               ExecuteFogEffect(inputSRV); break;
+	case OffScreenEffectType::GodRays:           ExecuteGodRaysEffect(inputSRV); break;
 	}
 
 	// フルスクリーン三角形描画
@@ -209213,6 +209230,8 @@ void OffScreen::ReleaseResources()
 	halftoneResource_.Reset();
 	crossHatchResource_.Reset();
 	colorGradeResource_.Reset();
+	fogResource_.Reset();
+	godRaysResource_.Reset();
 
 	boxData_ = nullptr;
 	gaussData_ = nullptr;
@@ -209230,6 +209249,8 @@ void OffScreen::ReleaseResources()
 	halftoneData_ = nullptr;
 	crossHatchData_ = nullptr;
 	colorGradeData_ = nullptr;
+	fogData_ = nullptr;
+	godRaysData_ = nullptr;
 }
 
 // =======================
@@ -209385,6 +209406,53 @@ void OffScreen::SetColorGradeParams(const ColorGradeParams& params)
 	}
 }
 
+/// <summary>フォグ パラメータ設定 (色・密度などチェーン側で編集する値)</summary>
+void OffScreen::SetFogParams(const FogParams& params)
+{
+	if (!fogData_) return;
+	fogData_->fogColor                = params.fogColor;
+	fogData_->fogDensity              = params.fogDensity;
+	fogData_->fogStart                = params.fogStart;
+	fogData_->skyFogClamp             = params.skyFogClamp;
+	fogData_->sunInscatterStrength    = params.sunInscatterStrength;
+	fogData_->sunColor                = params.sunColor;
+	fogData_->heightFogTop            = params.heightFogTop;
+	fogData_->heightFogBottom         = params.heightFogBottom;
+	fogData_->heightFogDensity        = params.heightFogDensity;
+	fogData_->heightFogDistanceScale  = params.heightFogDistanceScale;
+}
+
+/// <summary>フォグ カメラ・ライト情報設定 (毎フレーム シーン側から渡す)</summary>
+void OffScreen::SetFogCameraAndLight(const Matrix4x4& viewProjectionInverse,
+	const Vector3& cameraPos, const Vector3& lightDir)
+{
+	if (!fogData_) return;
+	fogData_->viewProjectionInverse = viewProjectionInverse;
+	fogData_->cameraPos             = cameraPos;
+	fogData_->sunDirection          = lightDir;
+}
+
+/// <summary>GodRays パラメータ設定 (チェーン側で編集する値)</summary>
+void OffScreen::SetGodRaysParams(const GodRaysParams& params)
+{
+	if (!godRaysData_) return;
+	godRaysData_->sunColor     = params.sunColor;
+	godRaysData_->density      = params.density;
+	godRaysData_->weight       = params.weight;
+	godRaysData_->decay        = params.decay;
+	godRaysData_->exposure     = params.exposure;
+	godRaysData_->numSamples   = params.numSamples;
+	godRaysData_->skyThreshold = params.skyThreshold;
+}
+
+/// <summary>GodRays の太陽スクリーン位置・可視度設定 (毎フレーム)</summary>
+void OffScreen::SetGodRaysSun(const Vector2& sunUV, float sunVisibility)
+{
+	if (!godRaysData_) return;
+	godRaysData_->sunUV         = sunUV;
+	godRaysData_->sunVisibility = sunVisibility;
+}
+
 // ===========================
 // ブラーアニメーション制御
 // ===========================
@@ -209453,6 +209521,8 @@ void OffScreen::CreateAllResources()
 	CreateHalftoneResource();
 	CreateCrossHatchResource();
 	CreateColorGradeResource();
+	CreateFogResource();
+	CreateGodRaysResource();
 }
 
 /// <summary>ボックスフィルタ用バッファ</summary>
@@ -209619,6 +209689,43 @@ void OffScreen::CreateColorGradeResource()
 	colorGradeData_->padding        = 0.0f;
 }
 
+/// <summary>フォグ用バッファ</summary>
+void OffScreen::CreateFogResource()
+{
+	fogResource_ = dxCommon_->CreateBufferResource(sizeof(FogForGPU));
+	fogResource_->Map(0, nullptr, reinterpret_cast<void**>(&fogData_));
+	// デフォルト値はシーンから上書きされる前提だが、安全に単位行列+ゼロベクトルで初期化
+	fogData_->viewProjectionInverse = MakeIdentity4x4();
+	fogData_->cameraPos             = { 0.0f, 0.0f, 0.0f };
+	fogData_->sunDirection          = { 0.0f, -1.0f, 0.0f };
+	fogData_->fogColor              = { 0.55f, 0.65f, 0.75f };
+	fogData_->fogDensity            = 0.005f;
+	fogData_->fogStart              = 10.0f;
+	fogData_->skyFogClamp           = 0.7f;
+	fogData_->sunInscatterStrength  = 0.5f;
+	fogData_->sunColor              = { 1.0f, 0.85f, 0.6f };
+	fogData_->heightFogTop          = 20.0f;
+	fogData_->heightFogBottom       = -5.0f;
+	fogData_->heightFogDensity      = 0.3f;
+	fogData_->heightFogDistanceScale = 0.01f;
+}
+
+/// <summary>GodRays 用バッファ</summary>
+void OffScreen::CreateGodRaysResource()
+{
+	godRaysResource_ = dxCommon_->CreateBufferResource(sizeof(GodRaysForGPU));
+	godRaysResource_->Map(0, nullptr, reinterpret_cast<void**>(&godRaysData_));
+	godRaysData_->sunUV         = { 0.5f, 0.5f };
+	godRaysData_->sunVisibility = 0.0f;
+	godRaysData_->density       = 1.0f;
+	godRaysData_->sunColor      = { 1.0f, 0.85f, 0.6f };
+	godRaysData_->weight        = 0.25f;
+	godRaysData_->decay         = 0.95f;
+	godRaysData_->exposure      = 0.12f;
+	godRaysData_->numSamples    = 48;
+	godRaysData_->skyThreshold  = 0.999f;
+}
+
 // ===============================
 // 各エフェクトの GPU コマンド設定
 // ===============================
@@ -209667,6 +209774,26 @@ void OffScreen::ExecuteDepthOutlineEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV)
 	cmd->SetGraphicsRootDescriptorTable(indices.at("gTexture"), inputSRV);
 	cmd->SetGraphicsRootDescriptorTable(indices.at("gDepthTexture"), dxCommon_->GetDepthGPUHandle());
 	cmd->SetGraphicsRootConstantBufferView(indices.at("gMaterial"), materialResource_->GetGPUVirtualAddress());
+}
+
+void OffScreen::ExecuteFogEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV)
+{
+	auto cmd = dxCommon_->GetCommandList();
+	auto pm = YPipelineManager::GetInstance();
+	const auto& indices = pm->GetParameterIndices("Fog");
+	cmd->SetGraphicsRootDescriptorTable(indices.at("gTexture"), inputSRV);
+	cmd->SetGraphicsRootDescriptorTable(indices.at("gDepthTexture"), dxCommon_->GetDepthGPUHandle());
+	cmd->SetGraphicsRootConstantBufferView(indices.at("gFog"), fogResource_->GetGPUVirtualAddress());
+}
+
+void OffScreen::ExecuteGodRaysEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV)
+{
+	auto cmd = dxCommon_->GetCommandList();
+	auto pm = YPipelineManager::GetInstance();
+	const auto& indices = pm->GetParameterIndices("GodRays");
+	cmd->SetGraphicsRootDescriptorTable(indices.at("gTexture"), inputSRV);
+	cmd->SetGraphicsRootDescriptorTable(indices.at("gDepthTexture"), dxCommon_->GetDepthGPUHandle());
+	cmd->SetGraphicsRootConstantBufferView(indices.at("gGodRays"), godRaysResource_->GetGPUVirtualAddress());
 }
 
 void OffScreen::ExecuteSepiaEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV)
@@ -209851,6 +209978,8 @@ public:
 		Halftone,
 		CrossHatch,
 		ColorGrade,
+		Fog,
+		GodRays,
 	};
 	///************************* パラメータ調整 *************************///
 	struct RadialBlurPrams
@@ -209938,6 +210067,31 @@ public:
 		float   colorTint = 0.0f;                          // ティント (+紫/-緑)
 	};
 
+	struct FogParams {
+		Vector3 fogColor = { 0.55f, 0.65f, 0.75f };       // フォグの色 (青みがかった灰)
+		float   fogDensity = 0.005f;                       // 指数フォグの係数 (1/単位)
+		float   fogStart = 10.0f;                          // この距離からフォグ開始
+		float   skyFogClamp = 0.7f;                        // 空のフォグ最大量 (1.0でホワイトアウト)
+
+		float   sunInscatterStrength = 0.5f;               // 太陽方向のグロー強度 (0で無効)
+		Vector3 sunColor = { 1.0f, 0.85f, 0.6f };          // インスキャッタの色
+
+		float   heightFogTop = 20.0f;                      // 上端 (これより上は heightFog 寄与なし)
+		float   heightFogBottom = -5.0f;                   // 下端 (これより下で最大)
+		float   heightFogDensity = 0.3f;                   // 高さフォグの強さ
+		float   heightFogDistanceScale = 0.01f;            // 距離スケール
+	};
+
+	struct GodRaysParams {
+		Vector3 sunColor = { 1.0f, 0.85f, 0.6f };          // 光の色 (暖色がドラマ)
+		float   density = 1.0f;                            // 各サンプル間隔のスケール
+		float   weight = 0.25f;                            // 1サンプル寄与
+		float   decay = 0.95f;                             // 1サンプルごとの減衰倍率
+		float   exposure = 0.12f;                          // 最終強度倍率（高いと白飛び）
+		int     numSamples = 48;                           // サンプル数 (32〜64推奨, max 64)
+		float   skyThreshold = 0.999f;                     // 深度がこれ以上で「空」扱い
+	};
+
 	///************************* 基本関数 *************************///
 
 	// 初期化
@@ -209995,6 +210149,22 @@ public:
 
 	// カラーグレーディングのパラメータを設定
 	void SetColorGradeParams(const ColorGradeParams& params);
+
+	// フォグのパラメータを設定（PostEffectChain 経由で毎フレーム呼ばれる想定）
+	void SetFogParams(const FogParams& params);
+
+	// フォグに必要なカメラ・ライト情報を渡す（シーン側から毎フレーム呼ぶ）
+	void SetFogCameraAndLight(const Matrix4x4& viewProjectionInverse,
+		const Vector3& cameraPos,
+		const Vector3& lightDir);
+
+	// GodRays パラメータ設定（PostEffectChain 経由）
+	void SetGodRaysParams(const GodRaysParams& params);
+
+	// GodRays に必要な太陽スクリーン位置と可視度を渡す（シーン側から毎フレーム呼ぶ）
+	//   sunUV : 太陽の方向を画面 UV に投影した点
+	//   sunVisibility : 0 (カメラの後ろ等で不可視) ～ 1 (正面)
+	void SetGodRaysSun(const Vector2& sunUV, float sunVisibility);
 	///************************* ゲーム用機能（時間経過ブラー） *************************///
 
 	// ブラーの更新（時間経過による減衰）
@@ -210034,6 +210204,8 @@ private:
 	void CreateHalftoneResource();
 	void CreateCrossHatchResource();
 	void CreateColorGradeResource();
+	void CreateFogResource();
+	void CreateGodRaysResource();
 
 	// エフェクト別の描画処理
 	void ExecuteCopyEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
@@ -210054,6 +210226,8 @@ private:
 	void ExecuteHalftoneEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
 	void ExecuteCrossHatchEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
 	void ExecuteColorGradeEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
+	void ExecuteFogEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
+	void ExecuteGodRaysEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
 
 	// 共通描画処理
 	void SetupPipelineAndDraw(OffScreenEffectType type);
@@ -210175,6 +210349,43 @@ private:
 		float   padding;
 	};
 
+	// Fog の CB。HLSL 側 (FogParams) と完全一致させること
+	struct FogForGPU {
+		Matrix4x4 viewProjectionInverse;       // 64
+
+		Vector3   cameraPos;                   // 12
+		float     fogDensity;                  //  4
+
+		Vector3   fogColor;                    // 12
+		float     fogStart;                    //  4
+
+		Vector3   sunDirection;                // 12
+		float     sunInscatterStrength;        //  4
+
+		Vector3   sunColor;                    // 12
+		float     skyFogClamp;                 //  4
+
+		float     heightFogTop;                //  4
+		float     heightFogBottom;             //  4
+		float     heightFogDensity;            //  4
+		float     heightFogDistanceScale;      //  4
+	};
+
+	// GodRays の CB。HLSL 側 (GodRaysParams) と完全一致
+	struct GodRaysForGPU {
+		Vector2 sunUV;                         //  8
+		float   sunVisibility;                 //  4
+		float   density;                       //  4
+
+		Vector3 sunColor;                      // 12
+		float   weight;                        //  4
+
+		float   decay;                         //  4
+		float   exposure;                      //  4
+		int32_t numSamples;                    //  4
+		float   skyThreshold;                  //  4
+	};
+
 
 	///************************* パイプライン管理 *************************///
 
@@ -210250,6 +210461,14 @@ private:
 	// カラーグレーディング用
 	Microsoft::WRL::ComPtr<ID3D12Resource> colorGradeResource_;
 	ColorGradeForGPU* colorGradeData_ = nullptr;
+
+	// フォグ用
+	Microsoft::WRL::ComPtr<ID3D12Resource> fogResource_;
+	FogForGPU* fogData_ = nullptr;
+
+	// GodRays 用
+	Microsoft::WRL::ComPtr<ID3D12Resource> godRaysResource_;
+	GodRaysForGPU* godRaysData_ = nullptr;
 
 	///************************* ブラー演出用 *************************///
 
@@ -210353,6 +210572,14 @@ PostEffectData* PostEffectChain::GetPostEffectData(int index)
 const PostEffectData* PostEffectChain::GetPostEffectData(int index) const
 {
 	if (IsValidIndex(index)) return effects_[index].get();
+	return nullptr;
+}
+
+PostEffectData* PostEffectChain::GetFirstEffectByType(OffScreen::OffScreenEffectType type)
+{
+	for (auto& e : effects_) {
+		if (e && e->type == type) return e.get();
+	}
 	return nullptr;
 }
 
@@ -210530,6 +210757,22 @@ void PostEffectChain::SetCrossHatchParams(int index, const OffScreen::CrossHatch
 	auto* effect = GetPostEffectData(index);
 	if (effect && effect->type == OffScreen::OffScreenEffectType::CrossHatch) {
 		effect->params.crossHatch = params;
+	}
+}
+
+void PostEffectChain::SetFogParams(int index, const OffScreen::FogParams& params)
+{
+	auto* effect = GetPostEffectData(index);
+	if (effect && effect->type == OffScreen::OffScreenEffectType::Fog) {
+		effect->params.fog = params;
+	}
+}
+
+void PostEffectChain::SetGodRaysParams(int index, const OffScreen::GodRaysParams& params)
+{
+	auto* effect = GetPostEffectData(index);
+	if (effect && effect->type == OffScreen::OffScreenEffectType::GodRays) {
+		effect->params.godRays = params;
 	}
 }
 
@@ -210887,6 +211130,80 @@ bool PostEffectChain::DrawEffectParametersImGui([[maybe_unused]] int selectedInd
 		}
 		break;
 
+		// --------------------------------------------------------
+		// 大気フォグ
+		// --------------------------------------------------------
+	case OffScreen::OffScreenEffectType::Fog:
+	{
+		auto& f = effect->params.fog;
+		ImGui::TextDisabled("--- Distance Fog ---");
+		float fc[3] = { f.fogColor.x, f.fogColor.y, f.fogColor.z };
+		if (ImGui::ColorEdit3("Fog Color", fc)) {
+			f.fogColor = { fc[0], fc[1], fc[2] };
+			changed = true;
+		}
+		if (ImGui::DragFloat("Density", &f.fogDensity, 0.0005f, 0.0f, 0.5f, "%.4f")) changed = true;
+		if (ImGui::DragFloat("Start Distance", &f.fogStart, 0.5f, 0.0f, 500.0f)) changed = true;
+		if (ImGui::SliderFloat("Sky Fog Max", &f.skyFogClamp, 0.0f, 1.0f)) changed = true;
+
+		ImGui::Separator();
+		ImGui::TextDisabled("--- Sun Inscatter ---");
+		if (ImGui::SliderFloat("Sun Strength", &f.sunInscatterStrength, 0.0f, 4.0f)) changed = true;
+		float sc[3] = { f.sunColor.x, f.sunColor.y, f.sunColor.z };
+		if (ImGui::ColorEdit3("Sun Color", sc)) {
+			f.sunColor = { sc[0], sc[1], sc[2] };
+			changed = true;
+		}
+
+		ImGui::Separator();
+		ImGui::TextDisabled("--- Height Fog ---");
+		if (ImGui::DragFloat("Top Y", &f.heightFogTop, 0.5f, -100.0f, 500.0f)) changed = true;
+		if (ImGui::DragFloat("Bottom Y", &f.heightFogBottom, 0.5f, -500.0f, 500.0f)) changed = true;
+		if (ImGui::SliderFloat("Height Density", &f.heightFogDensity, 0.0f, 5.0f)) changed = true;
+		if (ImGui::DragFloat("Distance Scale", &f.heightFogDistanceScale, 0.001f, 0.0f, 1.0f, "%.4f")) changed = true;
+		break;
+	}
+
+		// --------------------------------------------------------
+		// God Rays
+		// --------------------------------------------------------
+	case OffScreen::OffScreenEffectType::GodRays:
+	{
+		auto& g = effect->params.godRays;
+		ImGui::TextDisabled("加算合成。空(=深度1.0)の方向に光が伸びる。");
+		ImGui::TextDisabled("Exposure を下げると色変化が見えやすい。");
+
+		float sc[3] = { g.sunColor.x, g.sunColor.y, g.sunColor.z };
+		if (ImGui::ColorEdit3("Sun Color##gr", sc)) {
+			g.sunColor = { sc[0], sc[1], sc[2] };
+			changed = true;
+		}
+		ImGui::TextDisabled("  ※スカイボックス内の「太陽の絵」は変わりません");
+		ImGui::TextDisabled("  ※DirectionalLight (LightingEditor) とも別物");
+
+		if (ImGui::SliderFloat("Exposure", &g.exposure, 0.0f, 1.0f)) changed = true;
+		ImGui::TextDisabled("  全体強度。> 0.3 で白飛びしがち");
+
+		if (ImGui::SliderFloat("Weight##gr", &g.weight, 0.0f, 0.6f)) changed = true;
+		ImGui::TextDisabled("  1サンプル寄与。0.2〜0.3 が無難");
+
+		if (ImGui::SliderFloat("Decay##gr", &g.decay, 0.8f, 1.0f)) changed = true;
+		ImGui::TextDisabled("  距離減衰。高いほど遠くまで光が伸びる");
+
+		if (ImGui::SliderFloat("Density##gr", &g.density, 0.0f, 4.0f)) changed = true;
+		ImGui::TextDisabled("  サンプル間隔。大きいほど太い光芒");
+
+		if (ImGui::SliderInt("Samples##gr", &g.numSamples, 8, 64)) changed = true;
+		if (ImGui::SliderFloat("Sky Threshold", &g.skyThreshold, 0.99f, 1.0f, "%.5f")) changed = true;
+
+		ImGui::Separator();
+		if (ImGui::Button("Reset GodRays Defaults")) {
+			g = OffScreen::GodRaysParams{};
+			changed = true;
+		}
+		break;
+	}
+
 	default:
 		ImGui::Text("No editable parameters for this effect.");
 		break;
@@ -210937,6 +211254,8 @@ const char* PostEffectChain::GetEffectTypeName(OffScreen::OffScreenEffectType ty
 	case OffScreen::OffScreenEffectType::Halftone:          return "Halftone";
 	case OffScreen::OffScreenEffectType::CrossHatch:        return "CrossHatch";
 	case OffScreen::OffScreenEffectType::ColorGrade:        return "ColorGrade";
+	case OffScreen::OffScreenEffectType::Fog:               return "Fog";
+	case OffScreen::OffScreenEffectType::GodRays:           return "GodRays";
 	default:                                                return "Unknown";
 	}
 }
@@ -211042,6 +211361,16 @@ void PostEffectChain::SetDefaultParameters(PostEffectData& effect)
 		effect.params.colorGrade.colorTint      = 0.0f;
 		break;
 
+		// ----------------------------- 大気フォグ　-----------------------------//
+	case OffScreen::OffScreenEffectType::Fog:
+		effect.params.fog = OffScreen::FogParams{}; // FogParams のメンバ既定値
+		break;
+
+		// ----------------------------- God Rays　-----------------------------//
+	case OffScreen::OffScreenEffectType::GodRays:
+		effect.params.godRays = OffScreen::GodRaysParams{};
+		break;
+
 	default:
 		// 特に設定するものが無いタイプはスルー
 		break;
@@ -211096,6 +211425,8 @@ struct PostEffectData {
 		OffScreen::HalftoneParams halftone;         // Halftone用
 		OffScreen::CrossHatchParams crossHatch;     // CrossHatch用
 		OffScreen::ColorGradeParams colorGrade;    // ColorGrade用
+		OffScreen::FogParams fog;                  // Fog用
+		OffScreen::GodRaysParams godRays;          // GodRays用
 	} params;
 };
 
@@ -211131,6 +211462,9 @@ public:
 	// エフェクトデータを取得
 	PostEffectData* GetPostEffectData(int index);
 	const PostEffectData* GetPostEffectData(int index) const;
+
+	// 指定型の最初のエフェクトを取得（演出スクリプトから Fog/GodRays などを直接触る用）
+	PostEffectData* GetFirstEffectByType(OffScreen::OffScreenEffectType type);
 
 	// 有効なエフェクトのインデックス一覧を取得
 	std::vector<int> GetEnabledEffectIndices() const;
@@ -211184,6 +211518,12 @@ public:
 
 	// カラーグレーディングのパラメータを設定
 	void SetColorGradeParams(int index, const OffScreen::ColorGradeParams& params);
+
+	// フォグのパラメータを設定
+	void SetFogParams(int index, const OffScreen::FogParams& params);
+
+	// GodRays のパラメータを設定
+	void SetGodRaysParams(int index, const OffScreen::GodRaysParams& params);
 	///************************* ImGui表示 *************************///
 
 	// エフェクトリストのImGui表示
@@ -211492,7 +211832,8 @@ void PostEffectManager::ImGui()
 			"Copy", "GaussSmoothing", "DepthOutline", "Sepia",
 			"Grayscale", "Vignette", "RadialBlur", "ToneMapping",
 			"Dissolve", "Chromatic", "ColorAdjust", "ShatterTransition",
-			"Bloom", "Posterize", "Kuwahara", "Halftone", "CrossHatch", "ColorGrade"
+			"Bloom", "Posterize", "Kuwahara", "Halftone", "CrossHatch", "ColorGrade",
+			"Fog", "GodRays"
 		};
 
 		for (int i = 0; i < IM_ARRAYSIZE(effectNames); ++i) {
@@ -211910,6 +212251,17 @@ void PostEffectManager::ApplyEffectParametersToOffScreen(const PostEffectData& e
 		offScreen_->SetColorGradeParams(effect.params.colorGrade);
 		break;
 
+	case OffScreen::OffScreenEffectType::Fog:
+		// 色・密度等は毎フレーム流し込む。
+		// CameraPos/InvVP/LightDir は別経路 (BaseScene::UpdateCommon) で既に書き込み済み。
+		offScreen_->SetFogParams(effect.params.fog);
+		break;
+
+	case OffScreen::OffScreenEffectType::GodRays:
+		// sunUV / sunVisibility は LightManager::UpdateShadowMatrix で書き込み済み
+		offScreen_->SetGodRaysParams(effect.params.godRays);
+		break;
+
 	default:
 		// パラメータ不要のエフェクトは何も更新しない
 		break;
@@ -212294,6 +212646,40 @@ std::string PostEffectManager::EffectChainToJson() const
 		json << "          \"vibrance\": " << effect->params.colorGrade.vibrance << ",\n";
 		json << "          \"colorTemp\": " << effect->params.colorGrade.colorTemp << ",\n";
 		json << "          \"colorTint\": " << effect->params.colorGrade.colorTint << "\n";
+		json << "        },\n";
+
+		// 大気フォグ
+		json << "        \"fog\": {\n";
+		json << "          \"fogColor\": ["
+			<< effect->params.fog.fogColor.x << ","
+			<< effect->params.fog.fogColor.y << ","
+			<< effect->params.fog.fogColor.z << "],\n";
+		json << "          \"fogDensity\": " << effect->params.fog.fogDensity << ",\n";
+		json << "          \"fogStart\": " << effect->params.fog.fogStart << ",\n";
+		json << "          \"skyFogClamp\": " << effect->params.fog.skyFogClamp << ",\n";
+		json << "          \"sunInscatterStrength\": " << effect->params.fog.sunInscatterStrength << ",\n";
+		json << "          \"sunColor\": ["
+			<< effect->params.fog.sunColor.x << ","
+			<< effect->params.fog.sunColor.y << ","
+			<< effect->params.fog.sunColor.z << "],\n";
+		json << "          \"heightFogTop\": " << effect->params.fog.heightFogTop << ",\n";
+		json << "          \"heightFogBottom\": " << effect->params.fog.heightFogBottom << ",\n";
+		json << "          \"heightFogDensity\": " << effect->params.fog.heightFogDensity << ",\n";
+		json << "          \"heightFogDistanceScale\": " << effect->params.fog.heightFogDistanceScale << "\n";
+		json << "        },\n";
+
+		// God Rays
+		json << "        \"godRays\": {\n";
+		json << "          \"sunColor\": ["
+			<< effect->params.godRays.sunColor.x << ","
+			<< effect->params.godRays.sunColor.y << ","
+			<< effect->params.godRays.sunColor.z << "],\n";
+		json << "          \"density\": " << effect->params.godRays.density << ",\n";
+		json << "          \"weight\": " << effect->params.godRays.weight << ",\n";
+		json << "          \"decay\": " << effect->params.godRays.decay << ",\n";
+		json << "          \"exposure\": " << effect->params.godRays.exposure << ",\n";
+		json << "          \"numSamples\": " << effect->params.godRays.numSamples << ",\n";
+		json << "          \"skyThreshold\": " << effect->params.godRays.skyThreshold << "\n";
 		json << "        }\n";
 
 		json << "      }\n";  // parameters
@@ -212571,6 +212957,57 @@ bool PostEffectManager::JsonToEffectChain(const std::string& jsonStr)
 					JsonUtil::GetNumberValue<float>(colorGradeJson, "colorTemp", 0.08f);
 				effect->params.colorGrade.colorTint =
 					JsonUtil::GetNumberValue<float>(colorGradeJson, "colorTint", 0.0f);
+			}
+
+			// ----- fog -----
+			std::string fogJson = JsonUtil::GetObjectValue(paramsJson, "fog");
+			if (!fogJson.empty()) {
+				auto fc = JsonUtil::GetArrayValue(fogJson, "fogColor");
+				if (fc.size() >= 3)
+					effect->params.fog.fogColor = { fc[0], fc[1], fc[2] };
+
+				effect->params.fog.fogDensity =
+					JsonUtil::GetNumberValue<float>(fogJson, "fogDensity", 0.005f);
+				effect->params.fog.fogStart =
+					JsonUtil::GetNumberValue<float>(fogJson, "fogStart", 10.0f);
+				effect->params.fog.skyFogClamp =
+					JsonUtil::GetNumberValue<float>(fogJson, "skyFogClamp", 0.7f);
+				effect->params.fog.sunInscatterStrength =
+					JsonUtil::GetNumberValue<float>(fogJson, "sunInscatterStrength", 0.5f);
+
+				auto sunc = JsonUtil::GetArrayValue(fogJson, "sunColor");
+				if (sunc.size() >= 3)
+					effect->params.fog.sunColor = { sunc[0], sunc[1], sunc[2] };
+
+				effect->params.fog.heightFogTop =
+					JsonUtil::GetNumberValue<float>(fogJson, "heightFogTop", 20.0f);
+				effect->params.fog.heightFogBottom =
+					JsonUtil::GetNumberValue<float>(fogJson, "heightFogBottom", -5.0f);
+				effect->params.fog.heightFogDensity =
+					JsonUtil::GetNumberValue<float>(fogJson, "heightFogDensity", 0.3f);
+				effect->params.fog.heightFogDistanceScale =
+					JsonUtil::GetNumberValue<float>(fogJson, "heightFogDistanceScale", 0.01f);
+			}
+
+			// ----- godRays -----
+			std::string grJson = JsonUtil::GetObjectValue(paramsJson, "godRays");
+			if (!grJson.empty()) {
+				auto sc = JsonUtil::GetArrayValue(grJson, "sunColor");
+				if (sc.size() >= 3)
+					effect->params.godRays.sunColor = { sc[0], sc[1], sc[2] };
+
+				effect->params.godRays.density =
+					JsonUtil::GetNumberValue<float>(grJson, "density", 1.0f);
+				effect->params.godRays.weight =
+					JsonUtil::GetNumberValue<float>(grJson, "weight", 0.25f);
+				effect->params.godRays.decay =
+					JsonUtil::GetNumberValue<float>(grJson, "decay", 0.95f);
+				effect->params.godRays.exposure =
+					JsonUtil::GetNumberValue<float>(grJson, "exposure", 0.12f);
+				effect->params.godRays.numSamples =
+					JsonUtil::GetNumberValue<int>(grJson, "numSamples", 48);
+				effect->params.godRays.skyThreshold =
+					JsonUtil::GetNumberValue<float>(grJson, "skyThreshold", 0.999f);
 			}
 		}
 
@@ -223430,6 +223867,300 @@ namespace YoRigine {
     }
 
     // -----------------------------------------------------------
+    // 3D プリミティブ生成ヘルパ (file-local)
+    //   全て triangle list で ProceduralMeshVertex を吐く。
+    //   center: 配置中心。scale: ベース寸法に掛ける倍率 (Bead モードの age フェード用)。
+    //   color / age: 各頂点に書き込む。Static は (white, 0)、Bead は寿命で計算する。
+    // -----------------------------------------------------------
+    namespace {
+
+        static inline void EmitTri(std::vector<ProceduralMeshVertex>& out,
+            const Vector3& p0, const Vector2& uv0,
+            const Vector3& p1, const Vector2& uv1,
+            const Vector3& p2, const Vector2& uv2,
+            const Vector4& color, float age)
+        {
+            ProceduralMeshVertex v;
+            v.color = color; v.age = age;
+            v.position = p0; v.texcoord = uv0; out.push_back(v);
+            v.position = p1; v.texcoord = uv1; out.push_back(v);
+            v.position = p2; v.texcoord = uv2; out.push_back(v);
+        }
+
+        // -------- Box --------
+        static void GenBox(const PrimitiveSpec& s, std::vector<ProceduralMeshVertex>& out,
+            const Vector3& center, float scale, const Vector4& color, float age)
+        {
+            const Vector3 he = {
+                s.halfExtents.x * scale,
+                s.halfExtents.y * scale,
+                s.halfExtents.z * scale };
+            const Vector3 c[8] = {
+                {center.x - he.x, center.y - he.y, center.z - he.z},
+                {center.x + he.x, center.y - he.y, center.z - he.z},
+                {center.x + he.x, center.y + he.y, center.z - he.z},
+                {center.x - he.x, center.y + he.y, center.z - he.z},
+                {center.x - he.x, center.y - he.y, center.z + he.z},
+                {center.x + he.x, center.y - he.y, center.z + he.z},
+                {center.x + he.x, center.y + he.y, center.z + he.z},
+                {center.x - he.x, center.y + he.y, center.z + he.z},
+            };
+            const Vector2 uv00{ 0,0 }, uv10{ 1,0 }, uv11{ 1,1 }, uv01{ 0,1 };
+            auto Quad = [&](int a, int b, int cc, int d) {
+                EmitTri(out, c[a], uv00, c[b], uv10, c[cc], uv11, color, age);
+                EmitTri(out, c[a], uv00, c[cc], uv11, c[d], uv01, color, age);
+            };
+            Quad(0, 1, 2, 3); // -Z
+            Quad(5, 4, 7, 6); // +Z
+            Quad(4, 0, 3, 7); // -X
+            Quad(1, 5, 6, 2); // +X
+            Quad(4, 5, 1, 0); // -Y
+            Quad(3, 2, 6, 7); // +Y
+        }
+
+        // -------- Sphere (UV-sphere) --------
+        static void GenSphere(const PrimitiveSpec& s, std::vector<ProceduralMeshVertex>& out,
+            const Vector3& center, float scale, const Vector4& color, float age)
+        {
+            const int lat = std::max(2, s.latSegments);
+            const int lon = std::max(3, s.lonSegments);
+            const float r = s.radius * scale;
+
+            auto pt = [&](int i, int j) {
+                const float theta = static_cast<float>(i) / lat * kPi;
+                const float phi   = static_cast<float>(j) / lon * kPi * 2.0f;
+                const float sinT  = std::sin(theta);
+                Vector3 p = {
+                    center.x + sinT * std::cos(phi) * r,
+                    center.y + std::cos(theta) * r,
+                    center.z + sinT * std::sin(phi) * r
+                };
+                Vector2 uv = {
+                    static_cast<float>(j) / lon,
+                    static_cast<float>(i) / lat
+                };
+                return std::make_pair(p, uv);
+            };
+            for (int i = 0; i < lat; ++i) {
+                for (int j = 0; j < lon; ++j) {
+                    auto [p00, uv00] = pt(i,     j);
+                    auto [p01, uv01] = pt(i,     j + 1);
+                    auto [p10, uv10] = pt(i + 1, j);
+                    auto [p11, uv11] = pt(i + 1, j + 1);
+                    EmitTri(out, p00, uv00, p10, uv10, p11, uv11, color, age);
+                    EmitTri(out, p00, uv00, p11, uv11, p01, uv01, color, age);
+                }
+            }
+        }
+
+        // -------- Cylinder (side + top/bottom caps) --------
+        static void GenCylinder(const PrimitiveSpec& s, std::vector<ProceduralMeshVertex>& out,
+            const Vector3& center, float scale, const Vector4& color, float age)
+        {
+            const int lon  = std::max(3, s.lonSegments);
+            const float r  = s.radius * scale;
+            const float h  = s.height * scale;
+            const float hH = h * 0.5f;
+            auto ring = [&](int j, bool top) {
+                const float phi = static_cast<float>(j) / lon * kPi * 2.0f;
+                Vector3 p = {
+                    center.x + std::cos(phi) * r,
+                    center.y + (top ? hH : -hH),
+                    center.z + std::sin(phi) * r
+                };
+                Vector2 uv = { static_cast<float>(j) / lon, top ? 0.0f : 1.0f };
+                return std::make_pair(p, uv);
+            };
+            // 側面
+            for (int j = 0; j < lon; ++j) {
+                auto [pb0, uvb0] = ring(j,     false);
+                auto [pt0, uvt0] = ring(j,     true);
+                auto [pb1, uvb1] = ring(j + 1, false);
+                auto [pt1, uvt1] = ring(j + 1, true);
+                EmitTri(out, pb0, uvb0, pt0, uvt0, pt1, uvt1, color, age);
+                EmitTri(out, pb0, uvb0, pt1, uvt1, pb1, uvb1, color, age);
+            }
+            // キャップ
+            const Vector3 capTop = { center.x, center.y + hH, center.z };
+            const Vector3 capBot = { center.x, center.y - hH, center.z };
+            const Vector2 capUV  = { 0.5f, 0.5f };
+            for (int j = 0; j < lon; ++j) {
+                auto [pt0, uvt0] = ring(j,     true);
+                auto [pt1, uvt1] = ring(j + 1, true);
+                auto [pb0, uvb0] = ring(j,     false);
+                auto [pb1, uvb1] = ring(j + 1, false);
+                EmitTri(out, capTop, capUV, pt1, uvt1, pt0, uvt0, color, age);
+                EmitTri(out, capBot, capUV, pb0, uvb0, pb1, uvb1, color, age);
+            }
+        }
+
+        // -------- Cone --------
+        static void GenCone(const PrimitiveSpec& s, std::vector<ProceduralMeshVertex>& out,
+            const Vector3& center, float scale, const Vector4& color, float age)
+        {
+            const int lon  = std::max(3, s.lonSegments);
+            const float r  = s.radius * scale;
+            const float h  = s.height * scale;
+            const float hH = h * 0.5f;
+            const Vector3 apex   = { center.x, center.y + hH, center.z };
+            const Vector3 capBot = { center.x, center.y - hH, center.z };
+
+            auto ring = [&](int j) {
+                const float phi = static_cast<float>(j) / lon * kPi * 2.0f;
+                Vector3 p = {
+                    center.x + std::cos(phi) * r,
+                    center.y - hH,
+                    center.z + std::sin(phi) * r
+                };
+                Vector2 uv = { static_cast<float>(j) / lon, 1.0f };
+                return std::make_pair(p, uv);
+            };
+            // 側面
+            for (int j = 0; j < lon; ++j) {
+                auto [p0, uv0] = ring(j);
+                auto [p1, uv1] = ring(j + 1);
+                const Vector2 apexUV = { (static_cast<float>(j) + 0.5f) / lon, 0.0f };
+                EmitTri(out, apex, apexUV, p1, uv1, p0, uv0, color, age);
+            }
+            // 底面
+            const Vector2 capUV = { 0.5f, 0.5f };
+            for (int j = 0; j < lon; ++j) {
+                auto [p0, uv0] = ring(j);
+                auto [p1, uv1] = ring(j + 1);
+                EmitTri(out, capBot, capUV, p0, uv0, p1, uv1, color, age);
+            }
+        }
+
+        // -------- Capsule (top hemisphere + cylinder + bottom hemisphere) --------
+        static void GenCapsule(const PrimitiveSpec& s, std::vector<ProceduralMeshVertex>& out,
+            const Vector3& center, float scale, const Vector4& color, float age)
+        {
+            const int halfLat = std::max(2, s.latSegments / 2);
+            const int lon     = std::max(3, s.lonSegments);
+            const float r     = s.radius * scale;
+            const float h     = s.height * scale;
+            // 円筒部の半長 (高さが直径以下なら円筒部は0で実質球体)
+            const float cylHalfH = std::max(0.0f, h * 0.5f - r);
+
+            // hemiPt(i, j, top): i=0 が赤道 (円筒の上端 or 下端)、i=halfLat が極点
+            auto hemiPt = [&](int i, int j, bool top) {
+                const float theta = static_cast<float>(i) / halfLat * (kPi * 0.5f);
+                const float phi   = static_cast<float>(j) / lon * kPi * 2.0f;
+                const float horiz = std::cos(theta) * r;
+                const float vert  = std::sin(theta) * r;
+                const float yC    = top ? cylHalfH : -cylHalfH;
+                Vector3 p = {
+                    center.x + horiz * std::cos(phi),
+                    center.y + yC + (top ? vert : -vert),
+                    center.z + horiz * std::sin(phi)
+                };
+                const float vUV = top
+                    ? 0.4f - static_cast<float>(i) / halfLat * 0.4f
+                    : 0.6f + static_cast<float>(i) / halfLat * 0.4f;
+                Vector2 uv = { static_cast<float>(j) / lon, vUV };
+                return std::make_pair(p, uv);
+            };
+
+            auto cylPt = [&](int j, bool top) {
+                const float phi = static_cast<float>(j) / lon * kPi * 2.0f;
+                Vector3 p = {
+                    center.x + std::cos(phi) * r,
+                    center.y + (top ? cylHalfH : -cylHalfH),
+                    center.z + std::sin(phi) * r
+                };
+                Vector2 uv = { static_cast<float>(j) / lon, top ? 0.4f : 0.6f };
+                return std::make_pair(p, uv);
+            };
+
+            // 上半球
+            for (int i = 0; i < halfLat; ++i) {
+                for (int j = 0; j < lon; ++j) {
+                    auto [p00, uv00] = hemiPt(i,     j,     true);
+                    auto [p01, uv01] = hemiPt(i,     j + 1, true);
+                    auto [p10, uv10] = hemiPt(i + 1, j,     true);
+                    auto [p11, uv11] = hemiPt(i + 1, j + 1, true);
+                    // i+1 が極点側 (より上)。外向き面が見えるように
+                    EmitTri(out, p00, uv00, p11, uv11, p10, uv10, color, age);
+                    EmitTri(out, p00, uv00, p01, uv01, p11, uv11, color, age);
+                }
+            }
+            // 円筒部
+            if (cylHalfH > 1e-5f) {
+                for (int j = 0; j < lon; ++j) {
+                    auto [pt0, uvt0] = cylPt(j,     true);
+                    auto [pt1, uvt1] = cylPt(j + 1, true);
+                    auto [pb0, uvb0] = cylPt(j,     false);
+                    auto [pb1, uvb1] = cylPt(j + 1, false);
+                    EmitTri(out, pb0, uvb0, pt0, uvt0, pt1, uvt1, color, age);
+                    EmitTri(out, pb0, uvb0, pt1, uvt1, pb1, uvb1, color, age);
+                }
+            }
+            // 下半球
+            for (int i = 0; i < halfLat; ++i) {
+                for (int j = 0; j < lon; ++j) {
+                    auto [p00, uv00] = hemiPt(i,     j,     false);
+                    auto [p01, uv01] = hemiPt(i,     j + 1, false);
+                    auto [p10, uv10] = hemiPt(i + 1, j,     false);
+                    auto [p11, uv11] = hemiPt(i + 1, j + 1, false);
+                    // 下側はワインディング逆
+                    EmitTri(out, p00, uv00, p10, uv10, p11, uv11, color, age);
+                    EmitTri(out, p00, uv00, p11, uv11, p01, uv01, color, age);
+                }
+            }
+        }
+
+        // -------- Torus --------
+        static void GenTorus(const PrimitiveSpec& s, std::vector<ProceduralMeshVertex>& out,
+            const Vector3& center, float scale, const Vector4& color, float age)
+        {
+            const int major = std::max(3, s.lonSegments);
+            const int minor = std::max(3, s.ringSegments);
+            const float R   = s.radius * scale;
+            const float r   = s.tubeRadius * scale;
+            auto pt = [&](int i, int j) {
+                const float u = static_cast<float>(i) / major * kPi * 2.0f;
+                const float v = static_cast<float>(j) / minor * kPi * 2.0f;
+                const float cu = std::cos(u), su = std::sin(u);
+                const float cv = std::cos(v), sv = std::sin(v);
+                Vector3 p = {
+                    center.x + (R + r * cv) * cu,
+                    center.y + r * sv,
+                    center.z + (R + r * cv) * su
+                };
+                Vector2 uv = {
+                    static_cast<float>(i) / major,
+                    static_cast<float>(j) / minor
+                };
+                return std::make_pair(p, uv);
+            };
+            for (int i = 0; i < major; ++i) {
+                for (int j = 0; j < minor; ++j) {
+                    auto [p00, uv00] = pt(i,     j);
+                    auto [p01, uv01] = pt(i,     j + 1);
+                    auto [p10, uv10] = pt(i + 1, j);
+                    auto [p11, uv11] = pt(i + 1, j + 1);
+                    EmitTri(out, p00, uv00, p10, uv10, p11, uv11, color, age);
+                    EmitTri(out, p00, uv00, p11, uv11, p01, uv01, color, age);
+                }
+            }
+        }
+
+        // -------- ディスパッチャ --------
+        static void GenPrimitive(const PrimitiveSpec& s, std::vector<ProceduralMeshVertex>& out,
+            const Vector3& center, float scale, const Vector4& color, float age)
+        {
+            switch (s.type) {
+            case PrimitiveType::Box:      GenBox     (s, out, center, scale, color, age); break;
+            case PrimitiveType::Sphere:   GenSphere  (s, out, center, scale, color, age); break;
+            case PrimitiveType::Capsule:  GenCapsule (s, out, center, scale, color, age); break;
+            case PrimitiveType::Cone:     GenCone    (s, out, center, scale, color, age); break;
+            case PrimitiveType::Cylinder: GenCylinder(s, out, center, scale, color, age); break;
+            case PrimitiveType::Torus:    GenTorus   (s, out, center, scale, color, age); break;
+            }
+        }
+    } // namespace (file-local)
+
+    // -----------------------------------------------------------
     void TrailMesh::Initialize(const TrailEffectParam& param)
     {
         param_         = param;
@@ -223497,11 +224228,12 @@ namespace YoRigine {
     {
         vertices_.clear();
         switch (shapeType_) {
-        case TrailShapeType::Arc:    RebuildArc();    break;
-        case TrailShapeType::Fan:    RebuildFan();    break;
-        case TrailShapeType::Custom: RebuildCustom(); break;
+        case TrailShapeType::Arc:       RebuildArc();       break;
+        case TrailShapeType::Fan:       RebuildFan();       break;
+        case TrailShapeType::Custom:    RebuildCustom();    break;
+        case TrailShapeType::Primitive: RebuildPrimitive(); break;   // ★NEW
         case TrailShapeType::Flat:
-        default:                     RebuildFlat();   break;
+        default:                        RebuildFlat();      break;
         }
         UploadVertices(vertices_);
     }
@@ -223832,6 +224564,65 @@ namespace YoRigine {
     }
 
     // -----------------------------------------------------------
+    // ★NEW Primitive (Box / Sphere / Capsule / Cone / Cylinder / Torus)
+    //   Static       : 1個固定で原点に配置 (装飾静的メッシュ用途)
+    //   BeadAlongTrail: 軌跡の平滑化後の各点にスタンプ。
+    //                   寿命でスケール縮小 / 色フェードを適用。
+    // -----------------------------------------------------------
+    void TrailMesh::RebuildPrimitive()
+    {
+        const auto& sp = param_.primitive;
+
+        if (sp.placement == PrimitivePlacement::Static) {
+            // 1個固定。原点に置く (オーナー側の WorldTransform 等で動かす想定)
+            const Vector4 color = { 1.f, 1.f, 1.f, 1.f };
+            GenPrimitive(sp, vertices_, Vector3{ 0,0,0 }, sp.stampScale, color, 0.0f);
+            return;
+        }
+
+        // -------- BeadAlongTrail --------
+        const size_t n = points_.size();
+        if (n < 2) return;
+
+        auto smoothed = SmoothPoints(points_, std::max(1, param_.splineSubdivisions));
+        const size_t sn = smoothed.size();
+        if (sn < 1) return;
+
+        const float spacingSq = sp.stampSpacing * sp.stampSpacing;
+        // 直近スタンプ位置 (距離間引きに使用)
+        Vector3 lastStamp = {};
+        bool    hasLast   = false;
+
+        for (size_t i = 0; i < sn; ++i) {
+            const TrailPoint& p = smoothed[i];
+
+            // 距離間引き
+            if (sp.stampSpacing > 1e-5f && hasLast) {
+                const float dx = p.tip.x - lastStamp.x;
+                const float dy = p.tip.y - lastStamp.y;
+                const float dz = p.tip.z - lastStamp.z;
+                if (dx * dx + dy * dy + dz * dz < spacingSq) continue;
+            }
+
+            const float        normalizedAge = NormalizeAge(p.age);
+            const Vector4      color = CalcFadeColor(normalizedAge);
+            const float        scale = sp.stampScale * (sp.scaleByAge ? (1.0f - normalizedAge) : 1.0f);
+            if (scale <= 1e-4f) continue;
+
+            // スタンプ中心は tip / root の中点
+            const Vector3 stampCenter = {
+                (p.tip.x + p.root.x) * 0.5f,
+                (p.tip.y + p.root.y) * 0.5f,
+                (p.tip.z + p.root.z) * 0.5f
+            };
+            GenPrimitive(sp, vertices_, stampCenter, scale, color, normalizedAge);
+
+            lastStamp = p.tip;
+            hasLast   = true;
+        }
+    }
+
+    // -----------------------------------------------------------
     bool TrailMesh::IsPointInTriangle(const Vector2& p, const Vector2& a,
                                        const Vector2& b, const Vector2& c) const
     {
@@ -223851,7 +224642,8 @@ namespace YoRigine {
         const uint32_t vertCount = GetVertexCount();
         if (vertCount < 4) return;
 
-        if (shapeType_ == TrailShapeType::Custom) {
+        if (shapeType_ == TrailShapeType::Custom ||
+            shapeType_ == TrailShapeType::Primitive) {
             cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         } else {
             cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
@@ -223924,6 +224716,7 @@ namespace YoRigine {
         void RebuildArc();
         void RebuildFan();
         void RebuildCustom();
+        void RebuildPrimitive();   // ★NEW 3D プリミティブ
 
         bool IsPointInTriangle(const Vector2& p,
                                const Vector2& a,
@@ -224351,6 +225144,24 @@ namespace YoRigine {
         t["widthWaveAmp"]  = trail.widthWaveAmp;
         t["widthWaveFreq"] = trail.widthWaveFreq;
 
+        // 3D プリミティブ ★NEW
+        {
+            auto& pr = t["primitive"];
+            const auto& sp = trail.primitive;
+            pr["type"]         = static_cast<int>(sp.type);
+            pr["placement"]    = static_cast<int>(sp.placement);
+            pr["halfExtents"]  = sp.halfExtents;
+            pr["radius"]       = sp.radius;
+            pr["height"]       = sp.height;
+            pr["tubeRadius"]   = sp.tubeRadius;
+            pr["latSegments"]  = sp.latSegments;
+            pr["lonSegments"]  = sp.lonSegments;
+            pr["ringSegments"] = sp.ringSegments;
+            pr["stampScale"]   = sp.stampScale;
+            pr["stampSpacing"] = sp.stampSpacing;
+            pr["scaleByAge"]   = sp.scaleByAge;
+        }
+
         // --- LightVolume ---
         auto& lv = j["lightVolume"];
         lv["halfExtents"] = lightVolume.halfExtents;
@@ -224433,6 +225244,24 @@ namespace YoRigine {
             // 幅ウェーブ
             trail.widthWaveAmp  = t.value("widthWaveAmp",  trail.widthWaveAmp);
             trail.widthWaveFreq = t.value("widthWaveFreq", trail.widthWaveFreq);
+
+            // 3D プリミティブ ★NEW (旧 JSON 互換: primitive キーがなければデフォルト)
+            if (t.contains("primitive") && t["primitive"].is_object()) {
+                const auto& pr = t["primitive"];
+                auto& sp = trail.primitive;
+                sp.type         = static_cast<PrimitiveType>(pr.value("type",         static_cast<int>(sp.type)));
+                sp.placement    = static_cast<PrimitivePlacement>(pr.value("placement", static_cast<int>(sp.placement)));
+                if (pr.contains("halfExtents")) sp.halfExtents = pr["halfExtents"];
+                sp.radius       = pr.value("radius",       sp.radius);
+                sp.height       = pr.value("height",       sp.height);
+                sp.tubeRadius   = pr.value("tubeRadius",   sp.tubeRadius);
+                sp.latSegments  = pr.value("latSegments",  sp.latSegments);
+                sp.lonSegments  = pr.value("lonSegments",  sp.lonSegments);
+                sp.ringSegments = pr.value("ringSegments", sp.ringSegments);
+                sp.stampScale   = pr.value("stampScale",   sp.stampScale);
+                sp.stampSpacing = pr.value("stampSpacing", sp.stampSpacing);
+                sp.scaleByAge   = pr.value("scaleByAge",   sp.scaleByAge);
+            }
         }
 
         if (j.contains("lightVolume")) {
@@ -224472,10 +225301,52 @@ namespace YoRigine {
 
     enum class TrailShapeType : int
     {
-        Flat   = 0,
-        Arc    = 1,
-        Fan    = 2,
-        Custom = 3,
+        Flat      = 0,
+        Arc       = 1,
+        Fan       = 2,
+        Custom    = 3,
+        Primitive = 4,   // 3D プリミティブ (Box/Sphere/...) ★NEW
+    };
+
+    // 3D プリミティブ種別
+    enum class PrimitiveType : int
+    {
+        Box      = 0,
+        Sphere   = 1,
+        Capsule  = 2,
+        Cone     = 3,
+        Cylinder = 4,
+        Torus    = 5,
+    };
+
+    // プリミティブの配置モード
+    enum class PrimitivePlacement : int
+    {
+        Static          = 0,   // 1個固定 (装飾メッシュ用途)
+        BeadAlongTrail  = 1,   // 軌跡の各点にスタンプ (ビーズ状)
+    };
+
+    // 3D プリミティブの形状/配置パラメータ
+    struct PrimitiveSpec
+    {
+        PrimitiveType      type      = PrimitiveType::Box;
+        PrimitivePlacement placement = PrimitivePlacement::Static;
+
+        // ---- 共通サイズ ----
+        Vector3 halfExtents = { 0.5f, 0.5f, 0.5f };  // Box の半辺長
+        float   radius      = 0.5f;                   // Sphere/Capsule/Cone/Cylinder/Torus
+        float   height      = 1.0f;                   // Capsule/Cone/Cylinder
+        float   tubeRadius  = 0.15f;                  // Torus
+
+        // ---- 分割数 ----
+        int     latSegments  = 16;   // Sphere/Capsule の縦
+        int     lonSegments  = 16;   // Sphere/Capsule/Cone/Cylinder の横
+        int     ringSegments = 12;   // Torus の細い側の分割
+
+        // ---- BeadAlongTrail モード用 ----
+        float   stampScale   = 1.0f;
+        float   stampSpacing = 0.0f;   // 0 = 平滑化後の全点に置く
+        bool    scaleByAge   = true;   // 寿命で縮小フェード
     };
 
 
@@ -224534,6 +225405,9 @@ namespace YoRigine {
         // --- 幅ウェーブ (慣性感) ---
         float widthWaveAmp  = 0.05f;    // 幅のサイン波振幅 (0=OFF)
         float widthWaveFreq = 8.0f;     // 幅のサイン波周波数
+
+        // --- 3D プリミティブ (shapeType == Primitive の時に参照) ★NEW ---
+        PrimitiveSpec primitive;
     };
 
     // -------------------------------------------------------
@@ -224963,7 +225837,10 @@ namespace YoRigine {
             VfxEffectAsset b = sel->asset;
             bool c = false;
 
-            const char* shapeNames[] = { "Flat (平板)", "Arc (円弧)", "Fan (扇形)" ,"Custom (カスタム)" };
+            const char* shapeNames[] = {
+                "Flat (平板)", "Arc (円弧)", "Fan (扇形)",
+                "Custom (2D ポリゴン押し出し)", "Primitive (3D メッシュ)"
+            };
             int shapeIdx = static_cast<int>(t.shapeType);
             ImGui::SetNextItemWidth(-1);
             if (ImGui::Combo("##shape", &shapeIdx, shapeNames, IM_ARRAYSIZE(shapeNames))) {
@@ -224972,13 +225849,93 @@ namespace YoRigine {
             }
             ImGui::SameLine(0, 4); ImGui::TextDisabled("断面形状");
 
-            if (t.shapeType != TrailShapeType::Flat) {
+            // Arc / Fan のみ widthSegments + 円弧角を出す (Flat/Custom/Primitive は不要)
+            if (t.shapeType == TrailShapeType::Arc || t.shapeType == TrailShapeType::Fan) {
                 c |= ImGui::SliderInt("幅の分割数##wseg", &t.widthSegments, 1, 16);
                 c |= ImGui::SliderFloat("円弧の角度(度)##arcang", &t.arcAngleDeg, 10.f, 360.f, "%.1f");
             }
             c |= ImGui::DragInt("滑らかさ(補間分割数)##spline", &t.splineSubdivisions, 1, 512);
 
             if (c) CommitChange(b, "Trail 形状設定");
+        }
+
+        // ★ Primitive (3D) 専用セクション
+        if (t.shapeType == TrailShapeType::Primitive) {
+            ImGui::SeparatorText("3D プリミティブ");
+            VfxEffectAsset b = sel->asset;
+            bool c = false;
+            auto& sp = t.primitive;
+
+            // Type
+            const char* typeNames[] = { "Box", "Sphere", "Capsule", "Cone", "Cylinder", "Torus" };
+            int typeIdx = static_cast<int>(sp.type);
+            ImGui::SetNextItemWidth(180);
+            if (ImGui::Combo("Type##prim", &typeIdx, typeNames, IM_ARRAYSIZE(typeNames))) {
+                sp.type = static_cast<PrimitiveType>(typeIdx);
+                c = true;
+            }
+
+            // Placement
+            const char* placeNames[] = { "Static (1個固定)", "BeadAlongTrail (軌跡に連続配置)" };
+            int placeIdx = static_cast<int>(sp.placement);
+            ImGui::SetNextItemWidth(260);
+            if (ImGui::Combo("配置##prim", &placeIdx, placeNames, IM_ARRAYSIZE(placeNames))) {
+                sp.placement = static_cast<PrimitivePlacement>(placeIdx);
+                c = true;
+            }
+
+            // 共通スケール
+            c |= ImGui::DragFloat("スタンプスケール##prim", &sp.stampScale,
+                                  0.01f, 0.001f, 100.f, "%.3f");
+
+            // Type 別パラメータ
+            ImGui::Spacing();
+            switch (sp.type) {
+            case PrimitiveType::Box:
+                c |= ImGui::DragFloat3("半辺長##bx", &sp.halfExtents.x, 0.01f, 0.001f, 10.f, "%.3f");
+                break;
+            case PrimitiveType::Sphere:
+                c |= ImGui::DragFloat("半径##sp", &sp.radius, 0.01f, 0.001f, 10.f, "%.3f");
+                c |= ImGui::SliderInt("緯度分割##sp", &sp.latSegments, 2, 64);
+                c |= ImGui::SliderInt("経度分割##sp", &sp.lonSegments, 3, 64);
+                break;
+            case PrimitiveType::Capsule:
+                c |= ImGui::DragFloat("半径##cap", &sp.radius, 0.01f, 0.001f, 10.f, "%.3f");
+                c |= ImGui::DragFloat("全高##cap", &sp.height, 0.01f, 0.001f, 20.f, "%.3f");
+                c |= ImGui::SliderInt("緯度分割##cap", &sp.latSegments, 2, 32);
+                c |= ImGui::SliderInt("経度分割##cap", &sp.lonSegments, 3, 32);
+                break;
+            case PrimitiveType::Cone:
+                c |= ImGui::DragFloat("底面半径##cn", &sp.radius, 0.01f, 0.001f, 10.f, "%.3f");
+                c |= ImGui::DragFloat("高さ##cn", &sp.height, 0.01f, 0.001f, 20.f, "%.3f");
+                c |= ImGui::SliderInt("分割##cn", &sp.lonSegments, 3, 64);
+                break;
+            case PrimitiveType::Cylinder:
+                c |= ImGui::DragFloat("半径##cy", &sp.radius, 0.01f, 0.001f, 10.f, "%.3f");
+                c |= ImGui::DragFloat("高さ##cy", &sp.height, 0.01f, 0.001f, 20.f, "%.3f");
+                c |= ImGui::SliderInt("分割##cy", &sp.lonSegments, 3, 64);
+                break;
+            case PrimitiveType::Torus:
+                c |= ImGui::DragFloat("主半径 R##to", &sp.radius, 0.01f, 0.001f, 10.f, "%.3f");
+                c |= ImGui::DragFloat("管半径 r##to", &sp.tubeRadius, 0.01f, 0.001f, 10.f, "%.3f");
+                c |= ImGui::SliderInt("主分割##to", &sp.lonSegments, 3, 64);
+                c |= ImGui::SliderInt("管分割##to", &sp.ringSegments, 3, 32);
+                break;
+            }
+
+            // Bead モード固有
+            if (sp.placement == PrimitivePlacement::BeadAlongTrail) {
+                ImGui::Spacing();
+                ImGui::TextDisabled("Bead モード設定");
+                c |= ImGui::DragFloat("間引き間隔##bead", &sp.stampSpacing,
+                                      0.01f, 0.0f, 10.0f, "%.3f");
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("0 = 平滑化後の全点に配置 / >0 = 直線距離で間引き");
+                }
+                c |= ImGui::Checkbox("寿命でスケール縮小##bead", &sp.scaleByAge);
+            }
+
+            if (c) CommitChange(b, "Primitive 設定");
         }
 
         ImGui::SeparatorText("立体感・三日月化");
@@ -227409,6 +228366,8 @@ File Path: YEngine/Graphics/LightManager/LightManager.cpp
 #include "DirectXCommon.h"
 #include "Object3D/Object3dCommon.h"
 #include "DsvManager.h"
+#include "Loaders/Json/JsonManager.h"
+#include "OffScreen/OffScreen.h"
 // Math
 #include "MathFunc.h"
 
@@ -227428,6 +228387,11 @@ namespace YoRigine {
 	}
 
 	//=====================================================================
+	// デストラクタ（unique_ptr<JsonManager> 用に cpp 側で定義）
+	//=====================================================================
+	LightManager::~LightManager() = default;
+
+	//=====================================================================
 	// 初期化
 	//=====================================================================
 	void LightManager::Initialize()
@@ -227443,6 +228407,15 @@ namespace YoRigine {
 		CreatePointLightResource();
 		CreateSpotLightResource();
 		CreateShadowResource();
+
+		// シャドウマップ設定の JSON 永続化
+		// Register が自動 LoadAll するので、ファイルがあれば起動時に値が復元される
+		shadowJson_ = std::make_unique<JsonManager>("ShadowMap", "Resources/Json/Lighting/");
+		shadowJson_->Register("shadowDistance", &shadowMapSettings_.shadowDistance);
+		shadowJson_->Register("orthoWidth", &shadowMapSettings_.orthoWidth);
+		shadowJson_->Register("orthoHeight", &shadowMapSettings_.orthoHeight);
+		shadowJson_->Register("nearZ", &shadowMapSettings_.nearZ);
+		shadowJson_->Register("farZ", &shadowMapSettings_.farZ);
 	}
 
 	//=====================================================================
@@ -227514,6 +228487,13 @@ namespace YoRigine {
 	//===========================================================================
 	// 影の計算処理（現状平行光源のみ）
 	//===========================================================================
+	// shadowMapSettings_ の意味:
+	//   shadowDistance : 仮想ライト位置をターゲットから何単位後ろに置くか
+	//                    （= lightView 空間での target.z）。
+	//                    0 なら 200.0f をフォールバックで使用。
+	//   nearZ          : ターゲットから「ライト方向（手前）」へどこまで影に入れるか
+	//   farZ           : ターゲットから「ライト反対方向（奥）」へどこまで影に入れるか
+	//   orthoWidth/Height : XY 方向の覆い範囲
 	void LightManager::UpdateShadowMatrix(Camera* camera)
 	{
 		camera_ = camera;
@@ -227521,13 +228501,39 @@ namespace YoRigine {
 		// ライト方向は必ず正規化
 		Vector3 lightDir = Normalize(directionalLight_->direction);
 
-		// シャドウマップの生成中心（カメラ位置）
-		Vector3 target = camera_->transform_.translate;
+		// シャドウマップの「中心」を決める。
+		// 単純に camera 位置にすると、カメラを上(光源方向)へ振ったときに
+		// 画面に映っているのは「カメラ前方の地面」なのに、シャドウフラスタムは
+		// カメラ位置中心のまま動かないので前方の地面が外れて影が一気に消える。
+		// → カメラ前方を水平面に投影し、その方向へ少し進めた点を中心にする。
+		Vector3 cameraPos = camera_->transform_.translate;
+		Matrix4x4 camRot = MakeRotateMatrixXYZ(camera_->transform_.rotate);
+		Vector3 camForward = TransformNormal(Vector3{ 0.0f, 0.0f, 1.0f }, camRot);
 
-		// ライトの位置設定
-		// カメラ位置からライト方向に大きく離した場所に「仮想的なライト位置」を置く
-		float distanceResults = 200.0f;
-		Vector3 lightPos = target - lightDir * distanceResults;
+		// 水平成分のみで前方を決める（ピッチでフォーカスが上下に飛ばないように）
+		Vector3 forwardHoriz{ camForward.x, 0.0f, camForward.z };
+		float horizLen = std::sqrt(forwardHoriz.x * forwardHoriz.x + forwardHoriz.z * forwardHoriz.z);
+		if (horizLen > 1.0e-3f) {
+			forwardHoriz.x /= horizLen;
+			forwardHoriz.z /= horizLen;
+		}
+		else {
+			// カメラ真上/真下向きの縮退ケース。カメラ位置をそのまま使う
+			forwardHoriz = Vector3{ 0.0f, 0.0f, 0.0f };
+		}
+
+		// フォーカス距離（典型的な三人称カメラと target の距離 ~35 を想定）
+		constexpr float kFocusDistance = 30.0f;
+		Vector3 target = cameraPos + forwardHoriz * kFocusDistance;
+
+		// 仮想ライトをターゲットからどれだけ後ろに置くか
+		// JSON で 0 の場合はフォールバック値を使う（旧挙動互換 + 安全側）
+		float lightBackDistance = shadowMapSettings_.shadowDistance > 0.1f
+			? shadowMapSettings_.shadowDistance
+			: 200.0f;
+
+		// 仮想ライト位置
+		Vector3 lightPos = target - lightDir * lightBackDistance;
 
 		// 垂直方向の対策：ライトが真上/真下に近い場合、Upベクトルを調整
 		Vector3 up = Vector3(0.0f, 1.0f, 0.0f);
@@ -227550,7 +228556,7 @@ namespace YoRigine {
 		float halfHeight = height * 0.5f;
 
 		// テクセルサイズ
-		const float shadowMapSize = DsvManager::kShadowmapHeight;
+		const float shadowMapSize = static_cast<float>(DsvManager::kShadowmapHeight);
 		float unitX = width / shadowMapSize;
 		float unitY = height / shadowMapSize;
 
@@ -227576,9 +228582,16 @@ namespace YoRigine {
 		float minY = worldOriginInLight.y + snappedDistY;
 		float maxY = minY + height;
 
-		// Z軸の範囲設定（ShadowmapSettingsの値を使用）
-		float minZ = shadowMapSettings_.nearZ;
-		float maxZ = targetInLight.z + shadowMapSettings_.farZ;
+		// Z 軸の範囲設定:
+		// target は lightView 空間で z = lightBackDistance に来る。
+		// そこから手前(nearZ)/奥(farZ) のオフセットで前後を広げる。
+		float minZ = lightBackDistance - shadowMapSettings_.nearZ;
+		float maxZ = lightBackDistance + shadowMapSettings_.farZ;
+
+		// 安全策: 近接面はクリップ空間 z >= 0 を満たすため微小正値で下限を切る
+		if (minZ < 0.1f) minZ = 0.1f;
+		// 退化したフラスタムを防ぐ
+		if (maxZ < minZ + 0.1f) maxZ = minZ + 0.1f;
 
 		// ライトの正射影行列を作成
 		Matrix4x4 lightProj = MakeOrthographicMatrix(
@@ -227588,6 +228601,43 @@ namespace YoRigine {
 
 		// 最終的なライトビュー射影行列
 		shadow_->lightViewProjection = lightView * lightProj;
+
+		// Fog / God Rays ポストエフェクト用にもカメラ・ライト情報を流し込む。
+		// シーン毎に UpdateShadowMatrix は呼ばれるので、ここで一括更新するのが確実。
+		{
+			Matrix4x4 viewProj = camera_->GetViewProjectionMatrix();
+			Matrix4x4 invVP    = Inverse(viewProj);
+			OffScreen::GetInstance()->SetFogCameraAndLight(invVP, cameraPos, lightDir);
+
+			// --- God Rays 用の太陽スクリーン UV / 可視度 ---
+			// 太陽は光源方向の逆 (= -lightDir) に十分離れた場所にいると見なす
+			Vector3 sunWorld = cameraPos + (-lightDir) * 1000.0f;
+			// World → Clip
+			Vector3 c;
+			c.x = sunWorld.x * viewProj.m[0][0] + sunWorld.y * viewProj.m[1][0]
+				+ sunWorld.z * viewProj.m[2][0] + viewProj.m[3][0];
+			c.y = sunWorld.x * viewProj.m[0][1] + sunWorld.y * viewProj.m[1][1]
+				+ sunWorld.z * viewProj.m[2][1] + viewProj.m[3][1];
+			c.z = sunWorld.x * viewProj.m[0][2] + sunWorld.y * viewProj.m[1][2]
+				+ sunWorld.z * viewProj.m[2][2] + viewProj.m[3][2];
+			float w = sunWorld.x * viewProj.m[0][3] + sunWorld.y * viewProj.m[1][3]
+				+ sunWorld.z * viewProj.m[2][3] + viewProj.m[3][3];
+
+			Vector2 sunUV{ 0.5f, 0.5f };
+			float visibility = 0.0f;
+			if (w > 0.0f) {
+				float ndcX = c.x / w;
+				float ndcY = c.y / w;
+				sunUV.x = ndcX * 0.5f + 0.5f;
+				sunUV.y = -ndcY * 0.5f + 0.5f; // Y 反転 (D3D の UV)
+
+				// 画面中央に近いほど強く、画面外に出ると 0 へ滑らかにフェード
+				float maxD = std::max(std::abs(ndcX), std::abs(ndcY));
+				// 0(中央)〜1(端) → そこから先 1〜1.5 でフェードアウト
+				visibility = 1.0f - std::clamp((maxD - 1.0f) / 0.5f, 0.0f, 1.0f);
+			}
+			OffScreen::GetInstance()->SetGodRaysSun(sunUV, visibility);
+		}
 	}
 
 	//===========================================================================
@@ -227923,11 +228973,23 @@ namespace YoRigine {
 		// シャドウマップ
 		//------------------------------------------------------------
 		if (ImGui::CollapsingHeader("Shadowmap Settings")) {
-			ImGui::DragFloat("Shadow Distance", &shadowMapSettings_.shadowDistance, 1.0f, 0.0f, 500.0f);
-			ImGui::DragFloat("Ortho Width", &shadowMapSettings_.orthoWidth, 1.0f, 0.0f, 500.0f);
-			ImGui::DragFloat("Ortho Height", &shadowMapSettings_.orthoHeight, 1.0f, 0.0f, 500.0f);
-			ImGui::DragFloat("Near Z", &shadowMapSettings_.nearZ, 1.0f, 0.0f, 500.0f);
-			ImGui::DragFloat("Far Z", &shadowMapSettings_.farZ, 1.0f, 0.0f, 500.0f);
+			ImGui::DragFloat("Light Back Distance (shadowDistance)", &shadowMapSettings_.shadowDistance, 1.0f, 0.0f, 1000.0f);
+			ImGui::TextDisabled("  ターゲットから仮想ライト位置までの距離。0 なら 200 を使用");
+
+			ImGui::DragFloat("Ortho Width", &shadowMapSettings_.orthoWidth, 1.0f, 0.0f, 1000.0f);
+			ImGui::DragFloat("Ortho Height", &shadowMapSettings_.orthoHeight, 1.0f, 0.0f, 1000.0f);
+			ImGui::TextDisabled("  影が覆う XY 範囲（光から見た幅・高さ）");
+
+			ImGui::DragFloat("Near Range (nearZ)", &shadowMapSettings_.nearZ, 1.0f, 0.0f, 1000.0f);
+			ImGui::TextDisabled("  ターゲットからライト方向（手前）に何単位ぶん影に入れるか");
+
+			ImGui::DragFloat("Far Range (farZ)", &shadowMapSettings_.farZ, 1.0f, 0.0f, 1000.0f);
+			ImGui::TextDisabled("  ターゲットからライト反対方向（奥）に何単位ぶん影に入れるか");
+
+			ImGui::Separator();
+			if (ImGui::Button("Save Shadowmap Settings") && shadowJson_) {
+				shadowJson_->Save();
+			}
 		}
 
 #endif // USE_IMGUI
@@ -227942,6 +229004,7 @@ File Path: YEngine/Graphics/LightManager/LightManager.h
 #include <d3d12.h>
 #include <string>
 #include <vector>
+#include <memory>
 #include <cassert>
 
 #include "Systems./Camera/Camera.h"
@@ -227953,6 +229016,7 @@ File Path: YEngine/Graphics/LightManager/LightManager.h
 class Object3dCommon;
 
 namespace YoRigine {
+    class JsonManager;
     class LightManager final
     {
     public:
@@ -228095,7 +229159,7 @@ namespace YoRigine {
         void CreateShadowResource();
 
         LightManager() = default;
-        ~LightManager() = default;
+        ~LightManager();
         LightManager(const LightManager&) = delete;
         LightManager& operator=(const LightManager&) = delete;
         LightManager(LightManager&&) = delete;
@@ -228124,6 +229188,9 @@ namespace YoRigine {
         Object3dCommon* object3dCommon_ = nullptr;
         Camera* camera_ = nullptr;
         ShadowMapSettings shadowMapSettings_;
+
+        // ShadowMapSettings の JSON 永続化用
+        std::unique_ptr<JsonManager> shadowJson_;
     };
 }
 
@@ -231806,6 +232873,14 @@ void YPipelineManager::Initialize()
     CreatePSO_BaseOffScreen(
         L"Resources/Shaders/PostEffect/ColorGrade/ColorGrade.PS.hlsl",
         "ColorGrade");
+    // Fog は depth SRV を使うので DepthOutLine と同じビルダで作る
+    CreatePSO_DepthOutLine(
+        L"Resources/Shaders/PostEffect/Fog/Fog.PS.hlsl",
+        "Fog");
+    // God Rays も depth SRV を使うので DepthOutLine ビルダ流用
+    CreatePSO_DepthOutLine(
+        L"Resources/Shaders/PostEffect/GodRays/GodRays.PS.hlsl",
+        "GodRays");
 
 	// Meshを使用したVFX用パイプライン
     CreatePSO_VfxMeshTrail();
@@ -231947,6 +233022,7 @@ void YPipelineManager::CreatePSO_ShadowMap()
     ReflectionBasedPipelineBuilder builder;
     auto result = builder
 		.SetDepthStencilFormat(DXGI_FORMAT_D32_FLOAT)
+        .SetRasterizerState(YoRigine::RasterizerPresets::CreateShadow())
         .BuildFromCompiledShaders(
             dxCommon_->GetDevice().Get(),
             vsBlob.Get()
@@ -257238,6 +258314,15 @@ void CameraDirector::SnapToActiveCamera() {
 	}
 }
 
+// ============================================================
+// 全 VirtualCamera にデバッグ 3D 描画を委譲
+// ============================================================
+void CameraDirector::DrawDebug3D(Line& line) {
+	for (auto& [name, cam] : cameras_) {
+		if (cam) cam->DrawDebug3D(line);
+	}
+}
+
 ============================================================
 File Path: YEngine/Utilities/Systems/Camera/CameraDirector.h
 ============================================================
@@ -257249,6 +258334,8 @@ File Path: YEngine/Utilities/Systems/Camera/CameraDirector.h
 #include <unordered_map> // ターゲット登録用に必要
 #include "Virtuals/VirtualCamera.h"
 #include <WorldTransform/WorldTransform.h>
+
+class Line;
 
 // ============================================================
 // カメラディレクタークラス
@@ -257284,6 +258371,9 @@ public:
 
 	// 補間をせずに現在のカメラに強制スナップする
 	void SnapToActiveCamera();
+
+	// 各 VirtualCamera のデバッグ 3D 描画を一括呼び出し
+	void DrawDebug3D(Line& line);
 
 	// ============================================================
 	// ターゲット管理（プレイヤーや敵の座標をカメラが探せるようにする）
@@ -257613,6 +258703,7 @@ File Path: YEngine/Utilities/Systems/Camera/CameraFactory.h
 #include "Virtuals/FollowCamera/FollowCamera.h"
 #include "Virtuals/ClearCamera/ClearCamera.h"
 #include "Virtuals/TitleCamera/TitleCamera.h"
+#include "Virtuals/KeyframeCamera/KeyframeCamera.h"
 
 // ============================================================
 // カメラファクトリークラス
@@ -257625,10 +258716,11 @@ public:
 	// インスタンスの生成
 	// ============================================================
 	static std::shared_ptr<VirtualCamera> Create(const std::string& type) {
-		if (type == "Debug") return std::make_shared<DebugCamera>();
-		if (type == "Follow") return std::make_shared<FollowCamera>();
-		if (type == "Clear") return std::make_shared<ClearCamera>();
-		if (type == "Title") return std::make_shared<TitleCamera>();
+		if (type == "Debug")    return std::make_shared<DebugCamera>();
+		if (type == "Follow")   return std::make_shared<FollowCamera>();
+		if (type == "Clear")    return std::make_shared<ClearCamera>();
+		if (type == "Title")    return std::make_shared<TitleCamera>();
+		if (type == "Keyframe") return std::make_shared<KeyframeCamera>();
 		return nullptr;
 	}
 
@@ -257636,17 +258728,18 @@ public:
 	// エディタの選択肢用のリスト取得
 	// ============================================================
 	static std::vector<std::string> GetTypeList() {
-		return { "Debug", "Follow" ,"Clear","Title" };
+		return { "Debug", "Follow", "Clear", "Title", "Keyframe" };
 	}
 
 	// ============================================================
 	// カメラインスタンスからの型名取得（保存時に使用）
 	// ============================================================
 	static std::string GetTypeName(std::shared_ptr<VirtualCamera> cam) {
-		if (std::dynamic_pointer_cast<DebugCamera>(cam))  return "Debug";
-		if (std::dynamic_pointer_cast<FollowCamera>(cam)) return "Follow";
-		if (std::dynamic_pointer_cast<ClearCamera>(cam)) return "Clear";
-		if (std::dynamic_pointer_cast<TitleCamera>(cam)) return "Title";
+		if (std::dynamic_pointer_cast<DebugCamera>(cam))    return "Debug";
+		if (std::dynamic_pointer_cast<FollowCamera>(cam))   return "Follow";
+		if (std::dynamic_pointer_cast<ClearCamera>(cam))    return "Clear";
+		if (std::dynamic_pointer_cast<TitleCamera>(cam))    return "Title";
+		if (std::dynamic_pointer_cast<KeyframeCamera>(cam)) return "Keyframe";
 		return "Unknown";
 	}
 };
@@ -257665,7 +258758,8 @@ enum class CameraMode {
 	TITLE,
 	FOLLOW,
 	DEBUG,
-	BATTLE_START
+	BATTLE_START,
+	CLEAR_CINEMATIC,
 };
 
 ============================================================
@@ -258059,6 +259153,12 @@ public:
 	// ============================================================
 	void Save(nlohmann::json& j) const override;
 	void Load(const nlohmann::json& j) override;
+
+	// ============================================================
+	// 有効化制御（演出/編集モードからの切替用）
+	// ============================================================
+	void SetEnabled(bool v) { isMoving_ = v; }
+	bool IsEnabled() const { return isMoving_; }
 
 private:
 	// ============================================================
@@ -259550,6 +260650,61 @@ void FollowCamera::FollowProcess() {
 
     UpdateShake();
     transform_.translate = safePos + shakeOffset_;
+
+    // フレーミング補正：追従対象が画角外に出そうな時だけ rotation を引き戻す
+    EnsureTargetInView(pivot, YoRigine::GameTime::GetDeltaTime());
+}
+
+// ============================================================
+// フレーミング補正
+// pivot がカメラ視界マージン外（framing*Margin_）に出そうなときだけ、
+// はみ出した分を framingSpeed_ * dt 上限で rotation に加算して引き戻す。
+// 演出中（IsInPerformance）は介入しない。
+// ============================================================
+void FollowCamera::EnsureTargetInView(const Vector3& pivot, float dt) {
+    if (!framingEnabled_) return;
+    if (IsInPerformance()) return;
+
+    Vector3 toPivot = pivot - transform_.translate;
+    float   dist    = Length(toPivot);
+    if (dist < 0.01f) return;
+
+    Vector3 dir = toPivot / dist;
+
+    // pivot を中央に置くための理想 yaw / pitch
+    float desiredYaw   = atan2f(dir.x, dir.z);
+    float clampedY     = std::clamp(-dir.y, -1.0f, 1.0f);
+    float desiredPitch = asinf(clampedY);
+
+    // 現在角との差分（yaw は ±π にラップ）
+    float deltaYaw   = desiredYaw   - transform_.rotate.y;
+    float deltaPitch = desiredPitch - transform_.rotate.x;
+
+    constexpr float kPi    = 3.14159265358979f;
+    constexpr float kTwoPi = 6.28318530717958f;
+    while (deltaYaw >  kPi) deltaYaw -= kTwoPi;
+    while (deltaYaw < -kPi) deltaYaw += kTwoPi;
+
+    const float maxStep = framingSpeed_ * dt;
+
+    // ── Yaw ：マージンを越えた分だけ補正 ──────────────────────
+    if (std::abs(deltaYaw) > framingYawMargin_) {
+        float overshoot = (deltaYaw > 0.0f)
+            ? deltaYaw - framingYawMargin_
+            : deltaYaw + framingYawMargin_;
+        float step = std::clamp(overshoot, -maxStep, maxStep);
+        transform_.rotate.y += step;
+    }
+
+    // ── Pitch ：マージンを越えた分だけ補正 ────────────────────
+    if (std::abs(deltaPitch) > framingPitchMargin_) {
+        float overshoot = (deltaPitch > 0.0f)
+            ? deltaPitch - framingPitchMargin_
+            : deltaPitch + framingPitchMargin_;
+        float step = std::clamp(overshoot, -maxStep, maxStep);
+        transform_.rotate.x = std::clamp(
+            transform_.rotate.x + step, minPitch_, maxPitch_);
+    }
 }
 
 // ============================================================
@@ -259607,6 +260762,18 @@ void FollowCamera::DrawDebugGui() {
     }
     ImGui::Separator();
 
+    if (ImGui::TreeNode("フレーミング補正（画角外引き戻し）")) {
+        ImGui::Checkbox("有効",                 &framingEnabled_);
+        ImGui::DragFloat("Yaw マージン (rad)",  &framingYawMargin_,   0.01f, 0.0f, 1.5f, "%.2f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("カメラ前方とpivot方向の差がこれを越えたら横方向補正開始");
+        ImGui::DragFloat("Pitch マージン (rad)", &framingPitchMargin_, 0.01f, 0.0f, 1.5f, "%.2f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("同じく縦方向の補正開始しきい値");
+        ImGui::DragFloat("補正速度 (rad/秒)",    &framingSpeed_,       0.1f,  0.0f, 30.0f, "%.1f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("はみ出した分に対する最大変化量。大きいほどキビキビ戻る");
+        ImGui::TreePop();
+    }
+    ImGui::Separator();
+
     collisionResolver_.DrawDebugGui();
     ImGui::Separator();
 
@@ -259630,6 +260797,12 @@ void FollowCamera::Save(nlohmann::json& j) const {
     j["targetPivot_Height"] = targetPivot_Height_;
     j["minPitch"]           = minPitch_;
     j["maxPitch"]           = maxPitch_;
+
+    // フレーミング補正
+    j["framingEnabled"]     = framingEnabled_;
+    j["framingYawMargin"]   = framingYawMargin_;
+    j["framingPitchMargin"] = framingPitchMargin_;
+    j["framingSpeed"]       = framingSpeed_;
 
     nlohmann::json resolverJson;
     collisionResolver_.Save(resolverJson);
@@ -259657,6 +260830,11 @@ void FollowCamera::Load(const nlohmann::json& j) {
     targetPivot_Height_  = j.value("targetPivot_Height", 1.0f);
     minPitch_            = j.value("minPitch",          -0.2f);
     maxPitch_            = j.value("maxPitch",           1.2f);
+
+    framingEnabled_      = j.value("framingEnabled",      true);
+    framingYawMargin_    = j.value("framingYawMargin",    0.45f);
+    framingPitchMargin_  = j.value("framingPitchMargin",  0.30f);
+    framingSpeed_        = j.value("framingSpeed",        4.0f);
     if (j.contains("collisionResolver"))
         collisionResolver_.Load(j["collisionResolver"]);
 
@@ -259786,6 +260964,13 @@ public:
     void FollowProcess();
 
     // ============================================================
+    // フレーミング補正（追従対象が画角外に出そうな時だけ、
+    // はみ出した分を rotation で穏やかに pivot へ引き戻す）
+    // ============================================================
+    void SetFramingEnabled(bool e)  { framingEnabled_ = e; }
+    bool IsFramingEnabled() const   { return framingEnabled_; }
+
+    // ============================================================
     // パラメータ読み取り (PlayerCamera が再利用するために公開)
     // ============================================================
     float GetBaseFovY()          const { return baseFovY_; }
@@ -259865,6 +261050,16 @@ private:
     // ============================================================
     CameraCollisionResolver collisionResolver_;
     float targetPivot_Height_ = 1.5f;
+
+    // ============================================================
+    // フレーミング補正（画角外に出そうな時だけ pivot を引き戻す）
+    // ============================================================
+    void EnsureTargetInView(const Vector3& pivot, float dt);
+
+    bool  framingEnabled_      = true;
+    float framingYawMargin_    = 0.45f;  // この角度差(rad)を越えたら yaw 補正開始（≒26°）
+    float framingPitchMargin_  = 0.30f;  // 同 pitch 補正開始（≒17°）
+    float framingSpeed_        = 4.0f;   // 補正速度（rad/秒・はみ出し分に対する最大変化量）
 };
 
 
@@ -260062,6 +261257,8 @@ File Path: YEngine/Utilities/Systems/Camera/Virtuals/KeyframeCamera/KeyframeCame
 #include <algorithm>
 #include <imgui.h>
 #include <Systems/Camera/CameraDirector.h>
+#include "Systems/Camera/Virtuals/DebugCamera/DebugCamera.h"
+#include "Drawer/LineManager/Line.h"
 
 // ============================================================
 // 初期化
@@ -260074,41 +261271,181 @@ void KeyframeCamera::Initialize() {
 
 // ============================================================
 // 更新処理
+//   - 再生中なら時間進行
+//   - 常に EvaluateAt(timer_) でカメラへ反映（スクラブ対応のため非再生時も評価）
 // ============================================================
 void KeyframeCamera::Update() {
-	if (!isPlaying_ || keyframes_.size() < 2) return;
+	if (keyframes_.size() < 2) return;
 
-	// ------------------------------------------------------------
-	// 時間の進行とループ制御
-	// ------------------------------------------------------------
-	timer_ += (YoRigine::GameTime::GetDeltaTime()) * playbackSpeed_;
+	if (isPlaying_) {
+		timer_ += (YoRigine::GameTime::GetDeltaTime()) * playbackSpeed_;
 
-	float maxTime = keyframes_.back().time;
-	if (timer_ > maxTime) {
-		if (isLooping_) timer_ = fmod(timer_, maxTime);
-		else {
-			timer_ = maxTime;
-			isPlaying_ = false;
+		float maxTime = keyframes_.back().time;
+		if (timer_ > maxTime) {
+			if (isLooping_) timer_ = fmod(timer_, maxTime);
+			else {
+				timer_ = maxTime;
+				isPlaying_ = false;
+			}
 		}
 	}
 
-	// ------------------------------------------------------------
-	// 現在時刻のキーフレームの検索と補間計算
-	// ------------------------------------------------------------
+	EvaluateAt(timer_);
+}
+
+// ============================================================
+// 指定時刻のキー補間を即時評価し、transform_ / fovY_ を更新する
+// ============================================================
+void KeyframeCamera::EvaluateAt(float time) {
+	if (keyframes_.size() < 2) return;
+
+	// 範囲外は端点クランプ
+	float t0 = keyframes_.front().time;
+	float t1 = keyframes_.back().time;
+	float clampedTime = std::clamp(time, t0, t1);
+
+	// スムーズ移動モード: 全体時間にイージングをかけて
+	// effectiveTime を再計算する（per-segment 停止を回避）
+	if (useSmoothMotion_) {
+		float totalSpan = std::max(t1 - t0, 1e-6f);
+		float globalT = (clampedTime - t0) / totalSpan;
+		float easedGlobal = Easing::Ease(globalEasing_, globalT);
+		clampedTime = t0 + easedGlobal * totalSpan;
+	}
+
+	// 現在時刻を含むセグメントを検索
 	for (size_t i = 0; i < keyframes_.size() - 1; ++i) {
 		auto& kStart = keyframes_[i];
-		auto& kEnd = keyframes_[i + 1];
+		auto& kEnd   = keyframes_[i + 1];
 
-		if (timer_ >= kStart.time && timer_ <= kEnd.time) {
-			float t = (timer_ - kStart.time) / (kEnd.time - kStart.time);
-			float easedT = Easing::Ease(kStart.easing, t);
+		if (clampedTime >= kStart.time && clampedTime <= kEnd.time) {
+			float segSpan = std::max(kEnd.time - kStart.time, 1e-6f);
+			float t = (clampedTime - kStart.time) / segSpan;
+			// スムーズ時はセグメント内は Linear（曲線の滑らかさは Catmull-Rom が担保）
+			float easedT = useSmoothMotion_ ? t : Easing::Ease(kStart.easing, t);
 
-			transform_.translate = Lerp(kStart.translate, kEnd.translate, easedT);
-			transform_.rotate = Lerp(kStart.rotate, kEnd.rotate, easedT);
-			fovY_ = Lerp(kStart.fov, kEnd.fov, easedT);
-			break;
+			if (interpolationMode_ == InterpolationMode::CatmullRom
+				&& keyframes_.size() >= 3) {
+				const size_t last = keyframes_.size() - 1;
+				const Vector3& p1 = kStart.translate;
+				const Vector3& p2 = kEnd.translate;
+				const Vector3 p0 = (i == 0)        ? (2.0f * p1 - p2) : keyframes_[i - 1].translate;
+				const Vector3 p3 = (i + 1 == last) ? (2.0f * p2 - p1) : keyframes_[i + 2].translate;
+				transform_.translate = CatmullRomInterpolation(p0, p1, p2, p3, easedT);
+
+				const Vector3& r1 = kStart.rotate;
+				const Vector3& r2 = kEnd.rotate;
+				const Vector3 r0 = (i == 0)        ? (2.0f * r1 - r2) : keyframes_[i - 1].rotate;
+				const Vector3 r3 = (i + 1 == last) ? (2.0f * r2 - r1) : keyframes_[i + 2].rotate;
+				transform_.rotate = CatmullRomInterpolation(r0, r1, r2, r3, easedT);
+
+				const Vector3 f1{ kStart.fov, 0.0f, 0.0f };
+				const Vector3 f2{ kEnd.fov,   0.0f, 0.0f };
+				const Vector3 f0 = (i == 0)        ? (2.0f * f1 - f2)
+				                                   : Vector3{ keyframes_[i - 1].fov, 0.0f, 0.0f };
+				const Vector3 f3 = (i + 1 == last) ? (2.0f * f2 - f1)
+				                                   : Vector3{ keyframes_[i + 2].fov, 0.0f, 0.0f };
+				fovY_ = CatmullRomInterpolation(f0, f1, f2, f3, easedT).x;
+			}
+			else {
+				transform_.translate = Lerp(kStart.translate, kEnd.translate, easedT);
+				transform_.rotate    = Lerp(kStart.rotate,    kEnd.rotate,    easedT);
+				fovY_                = Lerp(kStart.fov,       kEnd.fov,       easedT);
+			}
+			return;
 		}
 	}
+}
+
+// ============================================================
+// 3D デバッグ描画 (パスと球マーカー)
+// ============================================================
+void KeyframeCamera::DrawDebug3D(Line& line) {
+	if (!showPath_ || keyframes_.size() < 2) return;
+
+	// ----------------------------------------
+	// パス描画: 隣接 2 キーの間を pathSegmentSamples_ 分割でサンプリング
+	//          線を引いて Catmull-Rom 曲線を可視化
+	// ----------------------------------------
+	auto sampleAt = [&](float globalTime) -> Vector3 {
+		// セグメント検索 + 補間（EvaluateAt と同じロジックの位置だけ版）
+		float t0 = keyframes_.front().time;
+		float t1 = keyframes_.back().time;
+		float clampedTime = std::clamp(globalTime, t0, t1);
+
+		for (size_t i = 0; i < keyframes_.size() - 1; ++i) {
+			auto& kStart = keyframes_[i];
+			auto& kEnd   = keyframes_[i + 1];
+			if (clampedTime >= kStart.time && clampedTime <= kEnd.time) {
+				float segSpan = std::max(kEnd.time - kStart.time, 1e-6f);
+				float t = (clampedTime - kStart.time) / segSpan;
+				float easedT = Easing::Ease(kStart.easing, t);
+
+				if (interpolationMode_ == InterpolationMode::CatmullRom
+					&& keyframes_.size() >= 3) {
+					const size_t last = keyframes_.size() - 1;
+					const Vector3& p1 = kStart.translate;
+					const Vector3& p2 = kEnd.translate;
+					const Vector3 p0 = (i == 0)        ? (2.0f * p1 - p2) : keyframes_[i - 1].translate;
+					const Vector3 p3 = (i + 1 == last) ? (2.0f * p2 - p1) : keyframes_[i + 2].translate;
+					return CatmullRomInterpolation(p0, p1, p2, p3, easedT);
+				}
+				return Lerp(kStart.translate, kEnd.translate, easedT);
+			}
+		}
+		return keyframes_.front().translate;
+	};
+
+	// Line は SetColor → 登録 → DrawLine() でフラッシュ、の繰り返しで
+	// 色別バッチを描画する。色が変わるたびにフラッシュが必要。
+
+	// ----------------------------------------
+	// (1) パス線: 黄色
+	// ----------------------------------------
+	line.SetColor(Vector4{ 0.9f, 0.7f, 0.2f, 1.0f });
+	const int samples = std::max(2, pathSegmentSamples_);
+	for (size_t i = 0; i < keyframes_.size() - 1; ++i) {
+		float t0 = keyframes_[i].time;
+		float t1 = keyframes_[i + 1].time;
+		Vector3 prev = sampleAt(t0);
+		for (int s = 1; s <= samples; ++s) {
+			float u = static_cast<float>(s) / samples;
+			float t = t0 + (t1 - t0) * u;
+			Vector3 cur = sampleAt(t);
+			line.RegisterLine(prev, cur);
+			prev = cur;
+		}
+	}
+	line.DrawLine();
+
+	// ----------------------------------------
+	// (2) 非選択キー: 薄水色
+	// ----------------------------------------
+	line.SetColor(Vector4{ 0.4f, 0.8f, 1.0f, 1.0f });
+	bool anyUnselected = false;
+	for (int i = 0; i < static_cast<int>(keyframes_.size()); ++i) {
+		if (i == selectedKeyIndex_) continue;
+		line.DrawSphere(keyframes_[i].translate, 0.4f, 10);
+		anyUnselected = true;
+	}
+	if (anyUnselected) line.DrawLine();
+
+	// ----------------------------------------
+	// (3) 選択中キー: 赤・大きめ
+	// ----------------------------------------
+	if (selectedKeyIndex_ >= 0
+		&& selectedKeyIndex_ < static_cast<int>(keyframes_.size())) {
+		line.SetColor(Vector4{ 1.0f, 0.2f, 0.2f, 1.0f });
+		line.DrawSphere(keyframes_[selectedKeyIndex_].translate, 0.7f, 12);
+		line.DrawLine();
+	}
+
+	// ----------------------------------------
+	// (4) 現在再生位置 (timer_): 緑
+	// ----------------------------------------
+	line.SetColor(Vector4{ 0.2f, 1.0f, 0.4f, 1.0f });
+	line.DrawSphere(transform_.translate, 0.5f, 12);
+	line.DrawLine();
 }
 
 // ============================================================
@@ -260116,7 +261453,80 @@ void KeyframeCamera::Update() {
 // ============================================================
 void KeyframeCamera::DrawDebugGui() {
 #ifdef USE_IMGUI
+	// 全 Easing の選択肢（enum 並び順と一致させる）
+	static const char* kEasingNames[] = {
+		"Linear",
+		"EaseInSine", "EaseOutSine", "EaseInOutSine",
+		"EaseInQuad", "EaseOutQuad", "EaseInOutQuad",
+		"EaseInCubic", "EaseOutCubic", "EaseInOutCubic",
+		"EaseInQuart", "EaseOutQuart", "EaseInOutQuart",
+		"EaseInQuint", "EaseOutQuint", "EaseInOutQuint",
+		"EaseInExpo", "EaseOutExpo", "EaseInOutExpo",
+		"EaseInCirc", "EaseOutCirc", "EaseInOutCirc",
+		"EaseInBack", "EaseOutBack", "EaseInOutBack",
+		"EaseInElastic", "EaseOutElastic", "EaseInOutElastic",
+		"EaseInBounce", "EaseOutBounce", "EaseInOutBounce",
+		"EaseOutGrowBounce"
+	};
+
 	ImGui::Text("--- キーフレームアニメーション ---");
+
+	// ------------------------------------------------------------
+	// 編集モード切替（UE Sequencer 風: プレビュー / 自由視点）
+	// ------------------------------------------------------------
+	{
+		auto director = CameraDirector::GetInstance();
+		ImGui::TextDisabled("== 編集モード ==");
+
+		// MainDebug カメラを取得して DebugCamera にキャスト
+		auto dbgVCam = director->GetCamera("MainDebug");
+		auto dbgCam  = std::dynamic_pointer_cast<DebugCamera>(dbgVCam);
+
+		if (ImGui::Button("Preview (このカメラで見る)")) {
+			director->SetPriority(name_, 1000);
+			director->SetPriority("MainDebug", 0);
+			if (dbgCam) dbgCam->SetEnabled(false);
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Fly (自由視点)")) {
+			director->SetPriority(name_, 0);
+			director->SetPriority("MainDebug", 1000);
+			if (dbgCam) dbgCam->SetEnabled(true);
+		}
+		ImGui::TextDisabled("  Fly で構図決め → 「現在の視点で上書き」でキー反映");
+		ImGui::TextDisabled("  Fly: WASD 移動 / Q E 上下 / 右ドラッグで回転");
+		if (dbgCam) {
+			bool enabled = dbgCam->IsEnabled();
+			if (ImGui::Checkbox("DebugCamera 入力有効", &enabled)) {
+				dbgCam->SetEnabled(enabled);
+			}
+		}
+	}
+
+	ImGui::Checkbox("3D パスを描画", &showPath_);
+	if (showPath_) {
+		ImGui::SliderInt("ライン分割数 (見た目)", &pathSegmentSamples_, 4, 128);
+		ImGui::TextDisabled("  ↑ パス線の描画密度。動作には影響しません");
+	}
+
+	ImGui::Separator();
+
+	// ------------------------------------------------------------
+	// 一括サブディビジョン: 隣接キー間に N 個の中間キーを生成
+	//   ※ より制御点が増え、後で個別に位置を動かして曲線を変形しやすくなる
+	// ------------------------------------------------------------
+	{
+		ImGui::TextDisabled("== 中間キーを一括追加 ==");
+		static int subdivN = 2;
+		ImGui::SliderInt("各セグメントに追加する数", &subdivN, 1, 10);
+		if (ImGui::Button("全セグメントに中間キーを挿入")) {
+			SubdivideAllSegments(subdivN);
+		}
+		ImGui::TextDisabled("  曲線形状はそのまま、制御点だけ増やす");
+		ImGui::TextDisabled("  例: 4 キーに 2 挿入 → 計 10 キーで曲線を制御");
+	}
+
+	ImGui::Separator();
 
 	// ------------------------------------------------------------
 	// 再生コントロール
@@ -260125,40 +261535,141 @@ void KeyframeCamera::DrawDebugGui() {
 	ImGui::SameLine();
 	if (ImGui::Button("リセット")) timer_ = 0.0f;
 
-	ImGui::SliderFloat("再生時間", &timer_, 0.0f, keyframes_.empty() ? 0.0f : keyframes_.back().time);
+	// スクラブ: スライダ動かすと即時 EvaluateAt で描画反映
+	if (ImGui::SliderFloat("再生時間", &timer_, 0.0f,
+		keyframes_.empty() ? 0.0f : keyframes_.back().time)) {
+		EvaluateAt(timer_);
+	}
 	ImGui::Checkbox("ループ再生", &isLooping_);
 	ImGui::DragFloat("再生速度", &playbackSpeed_, 0.1f, 0.0f, 5.0f);
+
+	// 補間モード切替
+	{
+		const char* modeNames[] = { "Linear (直線)", "CatmullRom (曲線)" };
+		int modeIdx = static_cast<int>(interpolationMode_);
+		if (ImGui::Combo("補間モード", &modeIdx, modeNames, IM_ARRAYSIZE(modeNames))) {
+			interpolationMode_ = static_cast<InterpolationMode>(modeIdx);
+		}
+		ImGui::TextDisabled("  CatmullRom はキーを滑らかに通る曲線（推奨）");
+	}
+
+	// スムーズ移動モード（キーで止まらない）
+	{
+		ImGui::Checkbox("スムーズ移動 (キーで止まらない)", &useSmoothMotion_);
+		ImGui::TextDisabled("  ON: 全体時間にイージングをかけて各キーを等速通過");
+		ImGui::TextDisabled("  OFF: 各キーの Easing を個別適用（キー毎に減速・加速）");
+
+		if (useSmoothMotion_) {
+			int gIdx = static_cast<int>(globalEasing_);
+			if (ImGui::Combo("全体イージング", &gIdx,
+				kEasingNames, IM_ARRAYSIZE(kEasingNames))) {
+				globalEasing_ = static_cast<Easing::Function>(gIdx);
+			}
+		}
+	}
 
 	ImGui::Separator();
 
 	// ------------------------------------------------------------
 	// キーフレームの追加
 	// ------------------------------------------------------------
-	if (ImGui::Button("現在のアングルをキーとして追加")) {
+	if (ImGui::Button("現在のアングルをキーとして追加 (末尾)")) {
 		auto director = CameraDirector::GetInstance();
 		float nextTime = keyframes_.empty() ? 0.0f : keyframes_.back().time + 2.0f;
 
-		AddKeyframe(nextTime, director->GetActiveCameraPos(), director->GetActiveCameraRot(), director->GetFovY(), Easing::Function::EaseInOutQuad);
+		AddKeyframe(nextTime, director->GetActiveCameraPos(),
+			director->GetActiveCameraRot(), director->GetFovY(),
+			Easing::Function::Linear); // スムーズ移動向けに Linear をデフォルト
 	}
+	if (ImGui::Button("現在時刻にキー追加 (スクラブ位置)")) {
+		auto director = CameraDirector::GetInstance();
+		AddKeyframe(timer_, director->GetActiveCameraPos(),
+			director->GetActiveCameraRot(), director->GetFovY(),
+			Easing::Function::Linear);
+	}
+	ImGui::TextDisabled("  スクラブで時刻を決めて視点を変えてからボタンを押すと挿入");
 
 	// ------------------------------------------------------------
-	// キーフレームリストの表示と削除
+	// キーフレーム一覧（編集 + 削除 + 上書き + 選択）
 	// ------------------------------------------------------------
+	bool needSort = false;
+	int  removeIndex = -1;
+
+	ImGui::Text("選択中: %s", (selectedKeyIndex_ >= 0)
+		? ("Key " + std::to_string(selectedKeyIndex_)).c_str() : "なし");
+	if (ImGui::Button("選択解除")) selectedKeyIndex_ = -1;
+
 	if (ImGui::TreeNode("キーフレーム一覧")) {
-		for (int i = 0; i < keyframes_.size(); i++) {
+		for (int i = 0; i < static_cast<int>(keyframes_.size()); ++i) {
 			ImGui::PushID(i);
-			ImGui::Text("Key %d:", i);
-			ImGui::SameLine();
-			ImGui::DragFloat("時間", &keyframes_[i].time, 0.1f);
+			auto& kf = keyframes_[i];
 
-			if (ImGui::Button("削除")) {
-				keyframes_.erase(keyframes_.begin() + i);
-				ImGui::PopID();
-				break;
+			// 選択中の Header を強調
+			bool isSel = (i == selectedKeyIndex_);
+			if (isSel) ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.7f, 0.2f, 0.2f, 0.5f));
+
+			if (ImGui::TreeNode("Header", "%sKey %d  (t=%.2f)", isSel ? "★ " : "  ", i, kf.time)) {
+				if (ImGui::Button(isSel ? "選択解除##sel" : "このキーを選択")) {
+					selectedKeyIndex_ = isSel ? -1 : i;
+					timer_ = kf.time;
+					EvaluateAt(timer_);
+				}
+
+				if (ImGui::DragFloat("時間", &kf.time, 0.05f, 0.0f, 600.0f)) {}
+				if (ImGui::IsItemDeactivatedAfterEdit()) needSort = true;
+
+				ImGui::DragFloat3("位置", &kf.translate.x, 0.1f);
+				ImGui::DragFloat3("回転 (rad)", &kf.rotate.x, 0.01f);
+				ImGui::DragFloat("FOV", &kf.fov, 0.5f, 10.0f, 120.0f);
+
+				int easingIdx = static_cast<int>(kf.easing);
+				if (ImGui::Combo("Easing", &easingIdx,
+					kEasingNames, IM_ARRAYSIZE(kEasingNames))) {
+					kf.easing = static_cast<Easing::Function>(easingIdx);
+				}
+
+				if (ImGui::Button("現在の視点で上書き")) {
+					auto director = CameraDirector::GetInstance();
+					kf.translate = director->GetActiveCameraPos();
+					kf.rotate    = director->GetActiveCameraRot();
+					kf.fov       = director->GetFovY();
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("ジャンプ")) {
+					// このキーの時刻に再生位置をスナップ（プレビュー用）
+					timer_ = kf.time;
+					EvaluateAt(timer_);
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("削除")) {
+					removeIndex = i;
+				}
+
+				// 次のキーがあれば「間に挿入」を表示
+				if (i + 1 < static_cast<int>(keyframes_.size())) {
+					if (ImGui::Button("↓ 次のキーとの間に補間キーを挿入")) {
+						InsertKeyBetween(i);
+						selectedKeyIndex_ = i + 1; // 挿入したキーを選択
+					}
+					ImGui::TextDisabled("  曲線上の中間点で新規キーを作成、後で位置調整可");
+				}
+
+				ImGui::TreePop();
 			}
+			if (isSel) ImGui::PopStyleColor();
 			ImGui::PopID();
 		}
 		ImGui::TreePop();
+	}
+
+	if (removeIndex >= 0) {
+		keyframes_.erase(keyframes_.begin() + removeIndex);
+		if (selectedKeyIndex_ == removeIndex) selectedKeyIndex_ = -1;
+		else if (selectedKeyIndex_ > removeIndex) --selectedKeyIndex_;
+	}
+	if (needSort) {
+		SortKeyframes();
+		selectedKeyIndex_ = -1; // ソートでインデックスが変わるので無効化
 	}
 #endif
 }
@@ -260171,6 +261682,9 @@ void KeyframeCamera::Save(nlohmann::json& j) const {
 
 	j["isLooping"] = isLooping_;
 	j["playbackSpeed"] = playbackSpeed_;
+	j["interpolationMode"] = static_cast<int>(interpolationMode_);
+	j["useSmoothMotion"] = useSmoothMotion_;
+	j["globalEasing"] = static_cast<int>(globalEasing_);
 
 	j["keyframes"] = nlohmann::json::array();
 	for (const auto& kf : keyframes_) {
@@ -260193,6 +261707,11 @@ void KeyframeCamera::Load(const nlohmann::json& j) {
 
 	isLooping_ = j.value("isLooping", true);
 	playbackSpeed_ = j.value("playbackSpeed", 1.0f);
+	interpolationMode_ = static_cast<InterpolationMode>(
+		j.value("interpolationMode", static_cast<int>(InterpolationMode::CatmullRom)));
+	useSmoothMotion_ = j.value("useSmoothMotion", true);
+	globalEasing_ = static_cast<Easing::Function>(
+		j.value("globalEasing", static_cast<int>(Easing::Function::EaseInOutQuad)));
 
 	if (j.contains("keyframes") && j["keyframes"].is_array()) {
 		keyframes_.clear();
@@ -260227,6 +261746,91 @@ void KeyframeCamera::SortKeyframes() {
 		});
 }
 
+// ============================================================
+// すべての隣接キー間に N 個の中間キーを一括挿入
+//   - 各セグメントを N+1 等分する時刻で曲線をサンプリング
+//   - 元のキーは全部保持される（挿入のみ）
+// ============================================================
+void KeyframeCamera::SubdivideAllSegments(int n) {
+	if (n <= 0 || keyframes_.size() < 2) return;
+
+	// 状態の退避
+	const Vector3 savedTrans = transform_.translate;
+	const Vector3 savedRot   = transform_.rotate;
+	const float   savedFov   = fovY_;
+
+	// 既存キーをコピーして、サンプリングは現曲線で行う
+	std::vector<Keyframe> result;
+	result.reserve(keyframes_.size() + (keyframes_.size() - 1) * n);
+
+	for (size_t i = 0; i < keyframes_.size() - 1; ++i) {
+		const auto& a = keyframes_[i];
+		const auto& b = keyframes_[i + 1];
+
+		result.push_back(a);
+
+		float t0 = a.time;
+		float t1 = b.time;
+		float span = t1 - t0;
+		for (int s = 1; s <= n; ++s) {
+			float u = static_cast<float>(s) / static_cast<float>(n + 1);
+			float midTime = t0 + span * u;
+			EvaluateAt(midTime);
+			Keyframe kf{
+				midTime,
+				transform_.translate,
+				transform_.rotate,
+				fovY_,
+				Easing::Function::Linear,
+			};
+			result.push_back(kf);
+		}
+	}
+	result.push_back(keyframes_.back()); // 末尾を忘れずに
+
+	keyframes_ = std::move(result);
+
+	// 退避した表示状態を戻す
+	transform_.translate = savedTrans;
+	transform_.rotate    = savedRot;
+	fovY_                = savedFov;
+
+	selectedKeyIndex_ = -1; // インデックスが変わるので選択解除
+}
+
+// ============================================================
+// 指定 index と index+1 の間に中間キーを挿入する
+//   - 時刻は中間 (a.time + b.time) / 2
+//   - 位置・回転・FOV は現在の曲線をサンプリングして取得
+// ============================================================
+void KeyframeCamera::InsertKeyBetween(int beforeIndex) {
+	if (beforeIndex < 0 || beforeIndex >= static_cast<int>(keyframes_.size()) - 1) return;
+
+	const auto& a = keyframes_[beforeIndex];
+	const auto& b = keyframes_[beforeIndex + 1];
+	const float midTime = (a.time + b.time) * 0.5f;
+
+	// 一旦現在の状態を退避
+	const Vector3 savedTrans = transform_.translate;
+	const Vector3 savedRot   = transform_.rotate;
+	const float   savedFov   = fovY_;
+
+	// 中間時刻における曲線上の位置/回転/FOV を取得
+	EvaluateAt(midTime);
+	const Vector3 newPos = transform_.translate;
+	const Vector3 newRot = transform_.rotate;
+	const float   newFov = fovY_;
+
+	// 現在の表示状態を元に戻す
+	transform_.translate = savedTrans;
+	transform_.rotate    = savedRot;
+	fovY_                = savedFov;
+
+	// 挿入
+	Keyframe kf{ midTime, newPos, newRot, newFov, Easing::Function::Linear };
+	keyframes_.insert(keyframes_.begin() + beforeIndex + 1, kf);
+}
+
 ============================================================
 File Path: YEngine/Utilities/Systems/Camera/Virtuals/KeyframeCamera/KeyframeCamera.h
 ============================================================
@@ -260241,6 +261845,16 @@ File Path: YEngine/Utilities/Systems/Camera/Virtuals/KeyframeCamera/KeyframeCame
 // ============================================================
 class KeyframeCamera : public VirtualCamera {
 public:
+	// ============================================================
+	// 補間モード
+	//   Linear     : 隣接2キーで直線補間（Easing 適用）
+	//   CatmullRom : 隣接4キーで Catmull-Rom 曲線補間（スプライン経路）
+	// ============================================================
+	enum class InterpolationMode {
+		Linear,
+		CatmullRom,
+	};
+
 	// ============================================================
 	// 構造体定義
 	// ============================================================
@@ -260259,6 +261873,11 @@ public:
 	void Initialize() override;
 	void Update() override;
 	void DrawDebugGui() override;
+	void DrawDebug3D(Line& line) override;
+
+	// 指定時刻のキー補間を即時評価して transform_ / fovY_ に反映する
+	// （プレビューや外部スクラブから利用）
+	void EvaluateAt(float time);
 
 	// ============================================================
 	// セーブ・ロード
@@ -260272,6 +261891,24 @@ public:
 	void AddKeyframe(float time, const Vector3& pos, const Vector3& rot, float fov, Easing::Function easing);
 	void SortKeyframes();
 
+	// 指定 index と index+1 のキーの間に、現在の曲線上をサンプリングした新キーを追加
+	void InsertKeyBetween(int beforeIndex);
+
+	// すべての隣接キー間に、現在の曲線をサンプリングした N 個の中間キーを一括追加
+	// 元のキーは保持される。N が大きいほど曲線がより細かい制御点で再構成される
+	void SubdivideAllSegments(int n);
+
+	// ============================================================
+	// 再生制御（外部からの演出駆動用）
+	// ============================================================
+	void Play()    { isPlaying_ = true; }
+	void Stop()    { isPlaying_ = false; }
+	void Reset()   { timer_ = 0.0f; }
+	bool IsPlaying() const { return isPlaying_; }
+	void SetLooping(bool loop) { isLooping_ = loop; }
+	float GetTimer() const { return timer_; }
+	float GetMaxTime() const { return keyframes_.empty() ? 0.0f : keyframes_.back().time; }
+
 private:
 	// ============================================================
 	// メンバ変数
@@ -260281,6 +261918,19 @@ private:
 	bool isPlaying_ = false;
 	bool isLooping_ = true;
 	float playbackSpeed_ = 1.0f;
+	InterpolationMode interpolationMode_ = InterpolationMode::CatmullRom;
+
+	// スムーズ移動モード:
+	//   true  → 各キーの easing は無視、globalEasing_ を全体時間に適用 + 各セグメントは Linear
+	//           (CatmullRom 曲線が滑らかなので等速で通過し「止まる」現象がなくなる)
+	//   false → 各キーの easing を per-segment 適用（従来挙動、ポイントで pause かかる）
+	bool useSmoothMotion_ = true;
+	Easing::Function globalEasing_ = Easing::Function::EaseInOutQuad;
+
+	// 編集 UX 用
+	int selectedKeyIndex_ = -1;     // ImGui で選択中のキー（3D ハイライト用）
+	bool showPath_ = true;          // 3D デバッグ描画を出すか
+	int pathSegmentSamples_ = 32;   // 1 セグメントあたりのライン描画分割数
 };
 
 ============================================================
@@ -260504,6 +262154,8 @@ File Path: YEngine/Utilities/Systems/Camera/Virtuals/VirtualCamera.h
 
 #include "json.hpp"
 
+class Line;
+
 class VirtualCamera
 {
 public:
@@ -260513,6 +262165,8 @@ public:
 	virtual void Update() = 0;
 	virtual void UpdateMatrix();
 	virtual void DrawDebugGui() {}
+	// シーン空間に Line でデバッグ描画する用（パス可視化など）
+	virtual void DrawDebug3D(Line& /*line*/) {}
 	virtual void Save(nlohmann::json& j) const;
 	virtual void Load(const nlohmann::json& j);
 public:
@@ -260560,6 +262214,633 @@ public:
 
 	std::string name_;
 };
+
+============================================================
+File Path: YEngine/Utilities/Systems/Cinematic/CinematicAction.cpp
+============================================================
+#include "CinematicAction.h"
+#include "CinematicManager.h"
+#include "CinematicLetterbox.h"
+#include "Systems/Camera/CameraDirector.h"
+#include "Systems/Camera/Virtuals/KeyframeCamera/KeyframeCamera.h"
+
+namespace YoRigine {
+
+	void LetterboxAction::OnUpdate(float localT)
+	{
+		auto* mgr = CinematicManager::GetInstance();
+		auto* lb = mgr ? mgr->GetLetterbox() : nullptr;
+		if (!lb) return;
+
+		float eased = Easing::Ease(easing_, localT);
+		float target = show_ ? eased : (1.0f - eased);
+		lb->SetProgress(target);
+	}
+
+	void LetterboxAction::OnFinish()
+	{
+		auto* mgr = CinematicManager::GetInstance();
+		auto* lb = mgr ? mgr->GetLetterbox() : nullptr;
+		if (!lb) return;
+
+		// 確実に終端値にスナップ
+		lb->SetProgress(show_ ? 1.0f : 0.0f);
+	}
+
+	// -----------------------------------------------------------------
+	// CameraTrackAction
+	// -----------------------------------------------------------------
+	void CameraTrackAction::OnStart()
+	{
+		auto director = CameraDirector::GetInstance();
+		if (!director) return;
+
+		// 指定カメラを取り出し
+		auto cam = director->GetCamera(cameraName_);
+		if (!cam) return;
+
+		// KeyframeCamera なら Reset + Play
+		if (auto kf = std::dynamic_pointer_cast<KeyframeCamera>(cam)) {
+			kf->Reset();
+			kf->SetLooping(false); // 演出中はループしない
+			kf->Play();
+		}
+
+		// 優先度を上げてアクティブカメラに
+		director->SetPriority(cameraName_, activePriority_);
+	}
+
+	void CameraTrackAction::OnFinish()
+	{
+		auto director = CameraDirector::GetInstance();
+		if (!director) return;
+
+		auto cur = director->GetCamera(cameraName_);
+		if (cur) {
+			// KeyframeCamera なら再生停止（最後の評価位置で固定）
+			if (auto kf = std::dynamic_pointer_cast<KeyframeCamera>(cur)) {
+				kf->Stop();
+			}
+			// 復帰先指定がある場合のみ priority を下げて切替を発生させる。
+			// 指定が無い場合は cinematic camera を active のまま維持し、
+			// シーン遷移などで自然に解消することを期待する
+			// （priority を下げると PlayerFollow 等が即座に active になり、
+			//   シーン切替のフェード中に背景カメラが見えてしまうため）。
+			if (!restoreCameraName_.empty()) {
+				director->SetPriority(cameraName_, 0);
+				director->SetPriority(restoreCameraName_, restorePriority_);
+			}
+		}
+	}
+
+}
+
+
+============================================================
+File Path: YEngine/Utilities/Systems/Cinematic/CinematicAction.h
+============================================================
+#pragma once
+#include <functional>
+#include <string>
+#include "Easing.h"
+
+namespace YoRigine {
+
+	// =====================================================================
+	// ICinematicAction: 演出 1 単位の共通インターフェース
+	//   - startTime / endTime はシーケンス全体時間内の発動時刻
+	//   - OnStart は startTime 到達時に 1 回
+	//   - OnUpdate は localT (0..1) 引数で範囲内毎フレーム
+	//   - OnFinish は endTime 経過時に 1 回
+	// =====================================================================
+	class ICinematicAction {
+	public:
+		virtual ~ICinematicAction() = default;
+		virtual void OnStart() {}
+		virtual void OnUpdate(float /*localT*/) {}
+		virtual void OnFinish() {}
+
+		float GetStart() const { return startTime_; }
+		float GetEnd()   const { return endTime_; }
+
+	protected:
+		ICinematicAction(float startTime, float endTime)
+			: startTime_(startTime), endTime_(endTime) {}
+
+		float startTime_;
+		float endTime_;
+	};
+
+	// =====================================================================
+	// TweenFloatAction: 任意の float を補間する
+	//   - getter は OnStart 時に評価しない（呼び出し側で from 指定する想定）
+	//   - setter は毎フレーム書き込む
+	// =====================================================================
+	class TweenFloatAction : public ICinematicAction {
+	public:
+		using Setter = std::function<void(float)>;
+
+		TweenFloatAction(Setter setter, float from, float to,
+			float startTime, float endTime,
+			Easing::Function easing = Easing::Function::Linear)
+			: ICinematicAction(startTime, endTime),
+			setter_(std::move(setter)), from_(from), to_(to), easing_(easing) {}
+
+		void OnUpdate(float localT) override {
+			float eased = Easing::Ease(easing_, localT);
+			setter_(from_ + (to_ - from_) * eased);
+		}
+		void OnFinish() override {
+			setter_(to_);
+		}
+
+	private:
+		Setter setter_;
+		float from_;
+		float to_;
+		Easing::Function easing_;
+	};
+
+	// =====================================================================
+	// LetterboxAction: 上下黒帯のスライドイン/アウト
+	//   show=true で 0→1 へ、show=false で 1→0 へ
+	// =====================================================================
+	class LetterboxAction : public ICinematicAction {
+	public:
+		LetterboxAction(bool show, float startTime, float endTime,
+			Easing::Function easing = Easing::Function::EaseOutCubic)
+			: ICinematicAction(startTime, endTime),
+			show_(show), easing_(easing) {}
+
+		void OnUpdate(float localT) override;
+		void OnFinish() override;
+
+	private:
+		bool show_;
+		Easing::Function easing_;
+	};
+
+	// =====================================================================
+	// CallbackAction: 指定時刻に lambda を 1 回発火（SE 再生・エフェクト起動など）
+	// =====================================================================
+	class CallbackAction : public ICinematicAction {
+	public:
+		CallbackAction(float time, std::function<void()> callback)
+			: ICinematicAction(time, time),
+			callback_(std::move(callback)) {}
+
+		void OnStart() override {
+			if (callback_) callback_();
+		}
+
+	private:
+		std::function<void()> callback_;
+	};
+
+	// =====================================================================
+	// CameraTrackAction: 指定名の KeyframeCamera を演出中アクティブにする
+	//   - OnStart  : cameraName を高優先度に切り替え + Reset + Play
+	//   - OnFinish : restoreCameraName を高優先度に戻す + Stop
+	//   ※ JSON で事前に登録された KeyframeCamera を再生する設計
+	// =====================================================================
+	class CameraTrackAction : public ICinematicAction {
+	public:
+		CameraTrackAction(const std::string& cameraName,
+			const std::string& restoreCameraName,
+			float startTime, float endTime,
+			int activePriority = 1000,
+			int restorePriority = 10)
+			: ICinematicAction(startTime, endTime),
+			cameraName_(cameraName),
+			restoreCameraName_(restoreCameraName),
+			activePriority_(activePriority),
+			restorePriority_(restorePriority) {}
+
+		void OnStart() override;
+		void OnFinish() override;
+
+	private:
+		std::string cameraName_;
+		std::string restoreCameraName_;
+		int activePriority_;
+		int restorePriority_;
+	};
+
+}
+
+
+============================================================
+File Path: YEngine/Utilities/Systems/Cinematic/CinematicLetterbox.cpp
+============================================================
+#include "CinematicLetterbox.h"
+#include "Sprite/Sprite.h"
+#include "WinApp/WinApp.h"
+#include "Vector3.h"
+#include "Vector4.h"
+#include "Vector2.h"
+#include <algorithm>
+
+namespace YoRigine {
+
+	CinematicLetterbox::CinematicLetterbox() = default;
+	CinematicLetterbox::~CinematicLetterbox() = default;
+
+	void CinematicLetterbox::Initialize()
+	{
+		// 真っ黒の Sprite × 2 を作る（white.png を tint）
+		topBar_ = std::make_unique<Sprite>();
+		topBar_->Initialize("Resources/Textures/white.png");
+		topBar_->SetColor(Vector4{ 0.0f, 0.0f, 0.0f, 1.0f });
+		topBar_->SetAnchorPoint(Vector2{ 0.0f, 0.0f });
+
+		bottomBar_ = std::make_unique<Sprite>();
+		bottomBar_->Initialize("Resources/Textures/white.png");
+		bottomBar_->SetColor(Vector4{ 0.0f, 0.0f, 0.0f, 1.0f });
+		bottomBar_->SetAnchorPoint(Vector2{ 0.0f, 0.0f });
+
+		SetProgress(0.0f);
+	}
+
+	void CinematicLetterbox::Update()
+	{
+		if (topBar_)    topBar_->Update();
+		if (bottomBar_) bottomBar_->Update();
+	}
+
+	void CinematicLetterbox::Draw()
+	{
+		// progress=0 のときは描画しない（完全に画面外なので無駄）
+		if (progress_ <= 0.0f) return;
+
+		if (topBar_)    topBar_->Draw();
+		if (bottomBar_) bottomBar_->Draw();
+	}
+
+	void CinematicLetterbox::SetProgress(float progress)
+	{
+		progress_ = std::clamp(progress, 0.0f, 1.0f);
+
+		const float screenW = static_cast<float>(WinApp::kClientWidth);
+		const float screenH = static_cast<float>(WinApp::kClientHeight);
+		const float barH    = screenH * barHeightRatio_;
+
+		// 上下の Sprite サイズを画面幅×黒帯高に設定
+		if (topBar_) {
+			topBar_->SetSize(Vector2{ screenW, barH });
+			// progress 0: y = -barH (画面外)
+			// progress 1: y = 0     (画面上端)
+			float y = -barH + barH * progress_;
+			topBar_->SetTranslate(Vector3{ 0.0f, y, 0.0f });
+		}
+		if (bottomBar_) {
+			bottomBar_->SetSize(Vector2{ screenW, barH });
+			// progress 0: y = screenH        (画面外)
+			// progress 1: y = screenH - barH (画面下端)
+			float y = screenH - barH * progress_;
+			bottomBar_->SetTranslate(Vector3{ 0.0f, y, 0.0f });
+		}
+	}
+
+}
+
+
+============================================================
+File Path: YEngine/Utilities/Systems/Cinematic/CinematicLetterbox.h
+============================================================
+#pragma once
+#include <memory>
+
+class Sprite;
+
+namespace YoRigine {
+
+	/// <summary>
+	/// 映画風レターボックス（上下黒帯）
+	/// SetProgress(0=完全隠れ / 1=完全表示) でスライドイン/アウト
+	/// </summary>
+	class CinematicLetterbox {
+	public:
+		CinematicLetterbox();
+		~CinematicLetterbox();
+
+		void Initialize();
+		void Update();
+		void Draw();
+
+		// 0=完全隠れ（画面外）、1=完全表示
+		void SetProgress(float progress);
+		float GetProgress() const { return progress_; }
+
+		// 画面高に対する黒帯の比率（上下それぞれ）。デフォルト 12%
+		void SetBarHeightRatio(float ratio) { barHeightRatio_ = ratio; }
+
+	private:
+		std::unique_ptr<Sprite> topBar_;
+		std::unique_ptr<Sprite> bottomBar_;
+		float progress_ = 0.0f;
+		float barHeightRatio_ = 0.12f;
+	};
+
+}
+
+
+============================================================
+File Path: YEngine/Utilities/Systems/Cinematic/CinematicManager.cpp
+============================================================
+#include "CinematicManager.h"
+#include "CinematicLetterbox.h"
+#include "CinematicSequencer.h"
+
+namespace YoRigine {
+
+	CinematicManager::~CinematicManager() = default;
+
+	CinematicManager* CinematicManager::GetInstance()
+	{
+		static CinematicManager instance;
+		return &instance;
+	}
+
+	void CinematicManager::Initialize()
+	{
+		letterbox_ = std::make_unique<CinematicLetterbox>();
+		letterbox_->Initialize();
+		activeSeq_.reset();
+	}
+
+	void CinematicManager::Play(std::unique_ptr<CinematicSequencer> seq)
+	{
+		activeSeq_ = std::move(seq);
+	}
+
+	void CinematicManager::Stop()
+	{
+		activeSeq_.reset();
+		if (letterbox_) letterbox_->SetProgress(0.0f);
+	}
+
+	void CinematicManager::Update(float deltaTime)
+	{
+		if (activeSeq_) {
+			activeSeq_->Update(deltaTime);
+			// 終了したら破棄
+			if (activeSeq_->IsFinished()) {
+				activeSeq_.reset();
+			}
+		}
+
+		if (letterbox_) letterbox_->Update();
+	}
+
+	void CinematicManager::Draw()
+	{
+		if (letterbox_) letterbox_->Draw();
+	}
+
+}
+
+
+============================================================
+File Path: YEngine/Utilities/Systems/Cinematic/CinematicManager.h
+============================================================
+#pragma once
+#include <memory>
+
+namespace YoRigine {
+
+	class CinematicLetterbox;
+	class CinematicSequencer;
+
+	/// <summary>
+	/// 演出マネージャ（シングルトン）
+	///   - アクティブな Sequencer を 1 本保持
+	///   - 上下黒帯（Letterbox）の表示窓口
+	///   - 各シーン共通の演出ハブ
+	/// </summary>
+	class CinematicManager {
+	public:
+		static CinematicManager* GetInstance();
+
+		void Initialize();
+
+		// 既存の演出があれば即停止して上書き
+		void Play(std::unique_ptr<CinematicSequencer> seq);
+
+		// 強制停止（Letterbox は隠す）
+		void Stop();
+
+		void Update(float deltaTime);
+		void Draw();
+
+		bool IsActive() const { return activeSeq_ != nullptr; }
+
+		CinematicLetterbox* GetLetterbox() { return letterbox_.get(); }
+
+	private:
+		CinematicManager() = default;
+		~CinematicManager();
+		CinematicManager(const CinematicManager&) = delete;
+		CinematicManager& operator=(const CinematicManager&) = delete;
+
+		std::unique_ptr<CinematicLetterbox> letterbox_;
+		std::unique_ptr<CinematicSequencer> activeSeq_;
+	};
+
+}
+
+
+============================================================
+File Path: YEngine/Utilities/Systems/Cinematic/CinematicSequencer.cpp
+============================================================
+#include "CinematicSequencer.h"
+#include <algorithm>
+
+namespace YoRigine {
+
+	void CinematicSequencer::AddAction(std::unique_ptr<ICinematicAction> action)
+	{
+		if (!action) return;
+		ActionEntry entry;
+		entry.action = std::move(action);
+		entries_.push_back(std::move(entry));
+	}
+
+	void CinematicSequencer::Tween(TweenFloatAction::Setter setter,
+		float from, float to,
+		float startTime, float endTime,
+		Easing::Function easing)
+	{
+		AddAction(std::make_unique<TweenFloatAction>(
+			std::move(setter), from, to, startTime, endTime, easing));
+	}
+
+	void CinematicSequencer::Letterbox(bool show, float startTime, float endTime,
+		Easing::Function easing)
+	{
+		AddAction(std::make_unique<LetterboxAction>(show, startTime, endTime, easing));
+	}
+
+	void CinematicSequencer::Callback(float time, std::function<void()> cb)
+	{
+		AddAction(std::make_unique<CallbackAction>(time, std::move(cb)));
+	}
+
+	void CinematicSequencer::Camera(const std::string& cameraName,
+		const std::string& restoreCameraName,
+		float startTime, float endTime,
+		int activePriority, int restorePriority)
+	{
+		AddAction(std::make_unique<CameraTrackAction>(
+			cameraName, restoreCameraName,
+			startTime, endTime,
+			activePriority, restorePriority));
+	}
+
+	void CinematicSequencer::Camera(const std::string& cameraName,
+		float startTime, float endTime,
+		int activePriority)
+	{
+		// restoreCameraName を空文字にすることで CameraTrackAction::OnFinish は復帰処理をスキップ
+		AddAction(std::make_unique<CameraTrackAction>(
+			cameraName, /*restoreCameraName*/ std::string{},
+			startTime, endTime,
+			activePriority, /*restorePriority*/ 0));
+	}
+
+	void CinematicSequencer::Update(float dt)
+	{
+		if (finished_) return;
+
+		currentTime_ += dt;
+
+		// 各 Action の状態に応じて Start / Update / Finish を発火
+		for (auto& entry : entries_) {
+			if (entry.finished) continue;
+
+			float s = entry.action->GetStart();
+			float e = entry.action->GetEnd();
+
+			// まだ範囲前なら何もしない
+			if (currentTime_ < s) continue;
+
+			// 初回 Start
+			if (!entry.started) {
+				entry.action->OnStart();
+				entry.started = true;
+			}
+
+			// Update（localT 0..1）
+			if (currentTime_ < e) {
+				float span = std::max(e - s, 1e-6f);
+				float localT = (currentTime_ - s) / span;
+				localT = std::clamp(localT, 0.0f, 1.0f);
+				entry.action->OnUpdate(localT);
+			}
+			else {
+				// 終端到達: 最後に localT=1.0 で更新 → Finish
+				entry.action->OnUpdate(1.0f);
+				entry.action->OnFinish();
+				entry.finished = true;
+			}
+		}
+
+		// シーケンス全体終了判定
+		if (currentTime_ >= duration_) {
+			finished_ = true;
+			// 未完了で開始済みの Action を強制 finalize
+			// endTime が duration_ を超えていても、letterbox の SetProgress(0) や
+			// CameraTrack の優先度復帰がきちんと走るようにする安全網
+			for (auto& entry : entries_) {
+				if (entry.started && !entry.finished) {
+					entry.action->OnUpdate(1.0f);
+					entry.action->OnFinish();
+					entry.finished = true;
+				}
+			}
+			if (onFinish_) onFinish_();
+		}
+	}
+
+}
+
+
+============================================================
+File Path: YEngine/Utilities/Systems/Cinematic/CinematicSequencer.h
+============================================================
+#pragma once
+#include <vector>
+#include <memory>
+#include <functional>
+#include "CinematicAction.h"
+
+namespace YoRigine {
+
+	// =====================================================================
+	// CinematicSequencer: 演出 1 本のタイムライン
+	//   - Duration を持ち、Action を並列に積み上げる
+	//   - Update(dt) で進行、終了時に OnFinish コールバックを発火
+	//   - CinematicManager 経由で Play する想定
+	// =====================================================================
+	class CinematicSequencer {
+	public:
+		explicit CinematicSequencer(float duration) : duration_(duration) {}
+
+		// 任意の Action を直接追加
+		void AddAction(std::unique_ptr<ICinematicAction> action);
+
+		// ----- 利便メソッド (内部で Action を作って AddAction) -----
+		void Tween(TweenFloatAction::Setter setter,
+			float from, float to,
+			float startTime, float endTime,
+			Easing::Function easing = Easing::Function::Linear);
+
+		void Letterbox(bool show, float startTime, float endTime,
+			Easing::Function easing = Easing::Function::EaseOutCubic);
+
+		void Callback(float time, std::function<void()> cb);
+
+		// 指定名 KeyframeCamera を演出時間中アクティブにし、終了時に
+		// restoreCameraName のカメラへ戻す（restorePriority で復帰）
+		void Camera(const std::string& cameraName,
+			const std::string& restoreCameraName,
+			float startTime, float endTime,
+			int activePriority = 1000,
+			int restorePriority = 10);
+
+		// 復帰先カメラ指定なし版
+		//   - 演出後にシーン遷移する等で復帰が不要な場合に使う
+		//   - 終了時はカメラ優先度を 0 に下げるだけ
+		void Camera(const std::string& cameraName,
+			float startTime, float endTime,
+			int activePriority = 1000);
+
+		// 終了時コールバック
+		void OnFinish(std::function<void()> cb) { onFinish_ = std::move(cb); }
+
+		// シーケンス時間進行
+		void Update(float dt);
+
+		bool IsFinished() const { return finished_; }
+		float GetCurrentTime() const { return currentTime_; }
+		float GetDuration()    const { return duration_; }
+
+	private:
+		struct ActionEntry {
+			std::unique_ptr<ICinematicAction> action;
+			bool started  = false;
+			bool finished = false;
+		};
+
+		float duration_;
+		float currentTime_ = 0.0f;
+		bool  finished_    = false;
+
+		std::vector<ActionEntry> entries_;
+		std::function<void()> onFinish_;
+	};
+
+}
+
 
 ============================================================
 File Path: YEngine/Utilities/Systems/Convert/EnumConverter.h
@@ -267904,6 +270185,7 @@ File Path: YGame/Core/MyGame.cpp
 #include "Mesh/MeshPrimitive.h"
 #include "Editor/Editor.h"
 #include "Systems/GameTime/GameTime.h"
+#include "Systems/Cinematic/CinematicManager.h"
 #include <ModelManipulator/ModelManipulator.h>
 #include <PipCamera/PipCameraSystem.h>
 #include "OffScreen/PostEffectManager.h"
@@ -267968,6 +270250,9 @@ void MyGame::Initialize() {
 	// PiP カメラサブシステム
 	PipCameraSystem::GetInstance()->Initialize();
 
+	// 演出マネージャ（letterbox UI + Sequencer 駆動）
+	YoRigine::CinematicManager::GetInstance()->Initialize();
+
 #ifdef USE_IMGUI
 	//------------------------------------------------------------
 	// エディター初期化とUI登録
@@ -268004,7 +270289,7 @@ void MyGame::Initialize() {
 	// 初期シーン設定
 	//------------------------------------------------------------
 #ifdef _DEBUG
-	SceneManager::GetInstance()->ChangeScene("Develop");   // デバッグ時はゲームシーン
+	SceneManager::GetInstance()->ChangeScene("Game");   // デバッグ時はゲームシーン
 #else 
 	SceneManager::GetInstance()->ChangeScene("Title");  // 製品版はタイトルシーン
 #endif
@@ -268048,6 +270333,7 @@ void MyGame::Update() {
 	Framework::Update();
 	SceneManager::GetInstance()->Update();
 	PipCameraSystem::GetInstance()->Update();
+	YoRigine::CinematicManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
 
 	//------------------------------------------------------------
 	// ImGui受付終了
@@ -268087,23 +270373,23 @@ void MyGame::Draw() {
 		auto* scene = SceneManager::GetInstance()->GetScene();
 		Camera* sceneCam = scene ? scene->GetSceneCamera() : nullptr;
 		if (pip->IsEnabled() && sceneCam) {
-			// 1) メインパスを真に GPU 完了まで待つ (シェーダは gCamera.viewProjection を
-			//    使うので、メイン draw が GPU で CB を読み終える前に PiP の値で上書きしてはいけない)
+			// メインパスを真に GPU 完了まで待つ (シェーダは gCamera.viewProjection を
+			// 使うので、メイン draw が GPU で CB を読み終える前に PiP の値で上書きしてはいけない)
 			dxCommon_->FlushAndWait();
 
-			// 2) PiP パス本体: Camera CB を PiP の値に書き換えて専用 RT へ 3D 再描画
+			// PiP パス本体: Camera CB を PiP の値に書き換えて専用 RT へ 3D 再描画
 			pip->ApplyToCamera(sceneCam);
 			dxCommon_->PreDrawPip(pip->GetRTName(), pip->GetDSVName(),
 				pip->GetWidth(), pip->GetHeight());
 			scene->DrawScene3DOnly();
 			dxCommon_->EndPipPass(pip->GetRTName());
 
-			// 3) ★ Restore より先に FlushAndWait。
-			//    PiP draws の GPU 実行が完了する前に Restore で CB を上書きすると
-			//    PiP も Scene VP で描画されてしまう (アングルが変わらない)。
+			// Restore より先に FlushAndWait。
+			// PiP draws の GPU 実行が完了する前に Restore で CB を上書きすると
+			// PiP も Scene VP で描画されてしまう (アングルが変わらない)。
 			dxCommon_->FlushAndWait();
 
-			// 4) ここで初めて Scene の値に戻す (後続 PostEffect/UI が読む CB を復元)
+			// ここで初めて Scene の値に戻す (後続 PostEffect/UI が読む CB を復元)
 			pip->RestoreCamera(sceneCam);
 		}
 	}
@@ -268120,6 +270406,8 @@ void MyGame::Draw() {
 	//------------------------------------------------------------
 	dxCommon_->DepthBarrier();
 	SceneManager::GetInstance()->DrawNonOffscreen();
+	// 映画風レターボックスは全シーン共通で最後（ImGui の手前）に描画
+	YoRigine::CinematicManager::GetInstance()->Draw();
 	dxCommon_->CopyBackBufferToFinalResult();
 	imguiManager_->Draw();
 
@@ -268388,10 +270676,10 @@ void BattleEnemy::Update() {
 		}
 	}
 
-	// ヒットカウントのリセット処理
+	// ヒットカウントのリセット処理（しきい値は CounterAttackParams 経由）
 	if (consecutiveHitCount_ > 0 && !isInvincible_) {
 		hitCountResetTimer_ += dt;
-		if (hitCountResetTimer_ > hitCountResetTime_) {
+		if (hitCountResetTimer_ > enemyData_.attackParams.counter.hitCountResetTime) {
 			consecutiveHitCount_ = 0;
 			hitCountResetTimer_ = 0.0f;
 		}
@@ -268544,14 +270832,9 @@ void BattleEnemy::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 			int damage = static_cast<int>(player_->GetCombat()->GetCombo()->GetCurrentDamage());
 			TakeDamage(damage);
 
-			// ダメージ数値UIをスポーン 
-			// ヒット位置は敵の腰〜胸あたり（+1.0f）に表示
-			Vector3 hitPos = wt_.translate_;
-			hitPos.y += 1.0f;
-
+			// ダメージ数値UIをスポーン（頭上Yオフセットは DamageNumberManager 側でJSON調整）
 			bool isSine = (player_->GetCombat()->GetComboDamageMultiplier() > 1.0f);
-
-			DamageNumberManager::GetInstance()->SpawnDamage(damage, hitPos, isSine);
+			DamageNumberManager::GetInstance()->SpawnDamage(damage, wt_.translate_, isSine);
 			// --------------------- ヒットエフェクトの処理 --------------------- //
 			//auto* enemyHitEmitterGroup_ = YEmitterGroupManager::GetInstance().GetGroup("EnemyHit");
 			//if (enemyHitEmitterGroup_) {
@@ -268562,10 +270845,12 @@ void BattleEnemy::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 			//}
 
 			// --------------------- ヒットカウントの処理 --------------------- //
+			// しきい値・有効フラグは CounterAttackParams (JSON 経由) で調整可能
+			const auto& counterParams = enemyData_.attackParams.counter;
 			consecutiveHitCount_++;
 			hitCountResetTimer_ = 0.0f;
-			// 連続ヒット数が限界を超えたら回復状態へ
-			if (consecutiveHitCount_ >= maxConsecutiveHits_) {
+			// 連続ヒット数が限界を超え、かつカウンター挙動が有効なら Recovery 状態へ
+			if (counterParams.enabled && consecutiveHitCount_ >= counterParams.triggerHitCount) {
 				ChangeState(std::make_unique<BattleRecoveryState>());
 				consecutiveHitCount_ = 0;  // リセット
 			}
@@ -268972,11 +271257,9 @@ private:
 	// アニメーション管理
 	std::unique_ptr<ObjectAnimation> animation_;
 
-	// 連続ヒット管理
-	int consecutiveHitCount_ = 0;           // 連続ヒット数
-	float hitCountResetTimer_ = 0.0f;       // ヒットカウントリセットタイマー
-	const int maxConsecutiveHits_ = 4;      // 最大連続ヒット数（これを超えたらRecovery状態へ）
-	const float hitCountResetTime_ = 2.5f;  // この時間攻撃を受けなければカウントリセット
+	// 連続ヒット管理（しきい値・リセット時間は enemyData_.attackParams.counter から取得）
+	int   consecutiveHitCount_ = 0;
+	float hitCountResetTimer_  = 0.0f;
 };
 
 
@@ -269065,6 +271348,28 @@ struct ComboAttackParams {
 	float cooldownTime = 0.8f;
 };
 
+// 反撃（カウンター）
+// プレイヤーから一定回数連続で被弾した後、Recovery → CounterAttack の流れで発動
+struct CounterAttackParams {
+	// ── トリガー条件 ──
+	bool  enabled = true;             // false でカウンター挙動完全無効化（被弾しっぱなしになる点に注意）
+	int   triggerHitCount = 4;        // 連続被弾がこの数に達した瞬間に Recovery へ
+	float hitCountResetTime = 2.5f;   // この秒数攻撃を食らわなければ被弾カウントを 0 へリセット
+
+	// ── Recovery（気合溜め・無敵）フェーズ ──
+	float recoveryDuration = 1.5f;    // Recovery の長さ。終了で CounterAttack へ
+
+	// ── CounterAttack 内部フェーズ ──
+	float startupTime = 0.2f;          // 起動（この間も無敵 + プレイヤー方向追尾）
+	float anticipationTime = 0.5f;     // 後退
+	float anticipationDistance = 5.0f; // 後退距離（10.8 から控えめに調整推奨）
+	float chargeTime = 0.25f;          // 溜め（ここで無敵解除）
+	float rushTime = 0.55f;            // 突進
+	float rushSpeedMultiplier = 15.0f; // 突進速度倍率
+	float rushHomingStrength = 1.5f;   // 突進中のホーミング強度（旧 4.0 → 1.5 で読み避け可能に）
+	float cooldownTime = 0.8f;         // クールダウン
+};
+
 // 各状態の攻撃パラメータをまとめた構造体
 struct EnemyAttackParams {
 	RushAttackParams rush;
@@ -269072,6 +271377,7 @@ struct EnemyAttackParams {
 	SpinAttackParams spin;
 	JumpAttackParams jump;
 	ComboAttackParams combo;
+	CounterAttackParams counter;
 };
 
 ///************************* 基本データ *************************///
@@ -269853,6 +272159,22 @@ bool BattleEnemyManager::SaveEnemyData(const std::string& filePath) const {
 			{"cooldownTime", data.attackParams.combo.cooldownTime}
 		};
 
+		// カウンター攻撃 (Counter) — 連続被弾→気合溜め→突進反撃
+		ap["counter"] = {
+			{"enabled", data.attackParams.counter.enabled},
+			{"triggerHitCount", data.attackParams.counter.triggerHitCount},
+			{"hitCountResetTime", data.attackParams.counter.hitCountResetTime},
+			{"recoveryDuration", data.attackParams.counter.recoveryDuration},
+			{"startupTime", data.attackParams.counter.startupTime},
+			{"anticipationTime", data.attackParams.counter.anticipationTime},
+			{"anticipationDistance", data.attackParams.counter.anticipationDistance},
+			{"chargeTime", data.attackParams.counter.chargeTime},
+			{"rushTime", data.attackParams.counter.rushTime},
+			{"rushSpeedMultiplier", data.attackParams.counter.rushSpeedMultiplier},
+			{"rushHomingStrength", data.attackParams.counter.rushHomingStrength},
+			{"cooldownTime", data.attackParams.counter.cooldownTime}
+		};
+
 		// メインのJSONに攻撃パラメータを追加
 		enemyJson["attackParams"] = ap;
 		enemyArray.push_back(enemyJson);
@@ -269996,6 +272318,24 @@ bool BattleEnemyManager::LoadEnemyData(const std::string& filePath) {
 					target.subRushTime = cb.value("subRushTime", 0.2f);
 					target.rushSpeedMultiplier = cb.value("rushSpeedMultiplier", 8.0f);
 					target.cooldownTime = cb.value("cooldownTime", 0.8f);
+				}
+
+				// カウンター攻撃 (Counter)
+				if (ap.contains("counter")) {
+					const auto& ct = ap["counter"];
+					auto& target = data.attackParams.counter;
+					target.enabled              = ct.value("enabled", true);
+					target.triggerHitCount      = ct.value("triggerHitCount", 4);
+					target.hitCountResetTime    = ct.value("hitCountResetTime", 2.5f);
+					target.recoveryDuration     = ct.value("recoveryDuration", 1.5f);
+					target.startupTime          = ct.value("startupTime", 0.2f);
+					target.anticipationTime     = ct.value("anticipationTime", 0.5f);
+					target.anticipationDistance = ct.value("anticipationDistance", 5.0f);
+					target.chargeTime           = ct.value("chargeTime", 0.25f);
+					target.rushTime             = ct.value("rushTime", 0.55f);
+					target.rushSpeedMultiplier  = ct.value("rushSpeedMultiplier", 15.0f);
+					target.rushHomingStrength   = ct.value("rushHomingStrength", 1.5f);
+					target.cooldownTime         = ct.value("cooldownTime", 0.8f);
 				}
 			}
 
@@ -270237,6 +272577,31 @@ void BattleEnemyManager::ShowDebugInfo() {
 						ImGui::DragFloat("段内突進", &cb.subRushTime, 0.05f, 0.0f, 2.0f, "%.2f秒");
 						ImGui::DragFloat("加速倍率", &cb.rushSpeedMultiplier, 0.1f, 0.0f, 20.0f, "x%.1f");
 						ImGui::DragFloat("全体後隙", &cb.cooldownTime, 0.05f, 0.0f, 5.0f, "%.2f秒");
+						ImGui::TreePop();
+					}
+
+					// --- Counter ---
+					if (ImGui::TreeNode("Counter (反撃)")) {
+						auto& ct = data.attackParams.counter;
+						ImGui::Checkbox("反撃有効", &ct.enabled);
+						ImGui::Separator();
+						ImGui::TextDisabled("トリガー条件");
+						ImGui::DragInt(" 連続被弾しきい値", &ct.triggerHitCount, 1, 1, 20);
+						ImGui::DragFloat(" カウントリセット秒数", &ct.hitCountResetTime, 0.1f, 0.1f, 10.0f, "%.1f秒");
+						ImGui::Separator();
+						ImGui::TextDisabled("Recovery（気合溜め・無敵）");
+						ImGui::DragFloat(" 回復時間", &ct.recoveryDuration, 0.05f, 0.1f, 5.0f, "%.2f秒");
+						ImGui::Separator();
+						ImGui::TextDisabled("CounterAttack 内部フェーズ");
+						ImGui::DragFloat(" 起動時間", &ct.startupTime, 0.05f, 0.0f, 2.0f, "%.2f秒");
+						ImGui::DragFloat(" 後退時間", &ct.anticipationTime, 0.05f, 0.0f, 3.0f, "%.2f秒");
+						ImGui::DragFloat(" 後退距離", &ct.anticipationDistance, 0.1f, 0.0f, 20.0f, "%.1fm");
+						ImGui::DragFloat(" 溜め時間", &ct.chargeTime, 0.05f, 0.0f, 3.0f, "%.2f秒");
+						ImGui::DragFloat(" 突進時間", &ct.rushTime, 0.05f, 0.0f, 3.0f, "%.2f秒");
+						ImGui::DragFloat(" 突進速度倍率", &ct.rushSpeedMultiplier, 0.5f, 0.0f, 50.0f, "x%.1f");
+						ImGui::DragFloat(" 突進ホーミング強度", &ct.rushHomingStrength, 0.1f, 0.0f, 10.0f, "%.1f");
+						if (ImGui::IsItemHovered()) ImGui::SetTooltip("大きいほどプレイヤーを追尾する。1.5前後で読み避け可能");
+						ImGui::DragFloat(" クールダウン", &ct.cooldownTime, 0.05f, 0.0f, 3.0f, "%.2f秒");
 						ImGui::TreePop();
 					}
 				}
@@ -271471,10 +273836,11 @@ void BattleCounterAttackState::Enter(BattleEnemy& enemy) {
     }
 
     if (auto anim = enemy.GetAnimation()) {
+        const float startupTime = enemy.GetEnemyData().attackParams.counter.startupTime;
         anim->StartColorAnimation(
             { 0.3f, 0.7f, 2.0f, 1.0f },
             { 1.0f, 0.1f, 0.0f, 1.0f },
-            counterStartupTime_,
+            startupTime,
             Easing::Function::EaseInQuad
         );
         anim->PlayBounceScaleAnimation(1.3f, 0.85f);
@@ -271482,13 +273848,14 @@ void BattleCounterAttackState::Enter(BattleEnemy& enemy) {
 }
 
 void BattleCounterAttackState::Update(BattleEnemy& enemy, float dt) {
+    const auto& p = enemy.GetEnemyData().attackParams.counter;
     const float currentTime = enemy.GetStateTimer();
 
-    const float startupEnd = counterStartupTime_;
-    const float anticipationEnd = startupEnd + anticipationTime_;
-    const float chargeEnd = anticipationEnd + chargeTime_;
-    const float rushEnd = chargeEnd + rushTime_;
-    const float totalDuration = rushEnd + cooldownTime_;
+    const float startupEnd       = p.startupTime;
+    const float anticipationEnd  = startupEnd + p.anticipationTime;
+    const float chargeEnd        = anticipationEnd + p.chargeTime;
+    const float rushEnd          = chargeEnd + p.rushTime;
+    const float totalDuration    = rushEnd + p.cooldownTime;
 
     if (currentTime < startupEnd) {
         if (enemy.GetPlayer()) {
@@ -271503,9 +273870,9 @@ void BattleCounterAttackState::Update(BattleEnemy& enemy, float dt) {
 
     if (currentTime < anticipationEnd) {
         const float localTime = currentTime - startupEnd;
-        const float progress = localTime / anticipationTime_;
+        const float progress  = (p.anticipationTime > 0.0f) ? localTime / p.anticipationTime : 1.0f;
         const float easeProgress = 1.0f - std::pow(1.0f - progress, 3.0f);
-        const Vector3 backwardOffset = -attackDir_ * anticipationDistance_ * easeProgress;
+        const Vector3 backwardOffset = -attackDir_ * p.anticipationDistance * easeProgress;
         enemy.SetTranslate(anticipationStartPos_ + backwardOffset);
     }
     else if (currentTime < chargeEnd) {
@@ -271519,8 +273886,8 @@ void BattleCounterAttackState::Update(BattleEnemy& enemy, float dt) {
                 enemy.SetRotationY(std::atan2(attackDir_.x, attackDir_.z));
             }
         }
-        if (!enemy.GetAnimation()) {
-            const float chargeProgress = (currentTime - anticipationEnd) / chargeTime_;
+        if (!enemy.GetAnimation() && p.chargeTime > 0.0f) {
+            const float chargeProgress = (currentTime - anticipationEnd) / p.chargeTime;
             enemy.SetColor({ 1.0f, chargeProgress * 0.15f, 0.0f, 1.0f });
         }
     }
@@ -271530,11 +273897,11 @@ void BattleCounterAttackState::Update(BattleEnemy& enemy, float dt) {
             Vector3 toPlayer = enemy.GetPlayerPosition() - enemy.GetTranslate();
             if (Length(toPlayer) > 0.01f) {
                 Vector3 newDir = Normalize(toPlayer);
-                attackDir_ = Normalize(attackDir_ + newDir * 4.0f * dt);
+                attackDir_ = Normalize(attackDir_ + newDir * p.rushHomingStrength * dt);
                 enemy.SetRotationY(std::atan2(attackDir_.x, attackDir_.z));
             }
         }
-        enemy.AddTranslate(attackDir_ * enemy.GetEnemyData().moveSpeed * rushSpeedMultiplier_ * dt);
+        enemy.AddTranslate(attackDir_ * enemy.GetEnemyData().moveSpeed * p.rushSpeedMultiplier * dt);
     }
     else if (currentTime >= totalDuration) {
         enemy.ChangeState(std::make_unique<BattleIdleState>());
@@ -271580,24 +273947,8 @@ private:
     Vector3 attackDir_{ 0, 0, 0 };
     Vector3 anticipationStartPos_{ 0, 0, 0 };
 
-    // ========== 反撃専用パラメータ ==========
-
-    // フェーズ1: カウンター起動（この間は無敵）
-    const float counterStartupTime_ = 0.2f;
-
-    // フェーズ2: 予備動作（短くキビキビ）
-    const float anticipationTime_ = 0.5f;
-    const float anticipationDistance_ = 10.8f;   // 後退距離）
-
-    // フェーズ3: チャージ（プレイヤーをロックオン追尾）
-    const float chargeTime_ = 0.25f;
-
-    // フェーズ4: 突進（超高速 & 突進中もプレイヤーを追従）
-    const float rushTime_ = 0.55f;
-    const float rushSpeedMultiplier_ = 15.0f;
-
-    // フェーズ5: クールダウン
-    const float cooldownTime_ = 0.8f;
+    // ※ パラメータはすべて enemy.GetEnemyData().attackParams.counter から取得する
+    //   (Phase: startup → anticipation → charge → rush → cooldown)
 };
 
 ============================================================
@@ -272437,11 +274788,12 @@ void BattleRecoveryState::Enter(BattleEnemy& enemy) {
 }
 
 void BattleRecoveryState::Update(BattleEnemy& enemy, float dt) {
-	(void)dt; // dtは今のところ使用しない
+    (void)dt; // dtは今のところ使用しない
     float timer = enemy.GetStateTimer();
+    const float recoveryDuration = enemy.GetEnemyData().attackParams.counter.recoveryDuration;
 
     // 回復時間の70%経過したら色を戻し始める
-    if (timer > recoveryDuration_ * 0.7f && !hasPlayedAnimation_) {
+    if (timer > recoveryDuration * 0.7f && !hasPlayedAnimation_) {
         hasPlayedAnimation_ = true;
         if (enemy.GetAnimation()) {
             enemy.GetAnimation()->StartColorAnimation(
@@ -272454,7 +274806,7 @@ void BattleRecoveryState::Update(BattleEnemy& enemy, float dt) {
     }
 
     // 回復時間終了で攻撃状態へ
-    if (timer > recoveryDuration_) {
+    if (timer > recoveryDuration) {
         // 反撃
         enemy.ChangeState(std::make_unique<BattleCounterAttackState>());
     }
@@ -272486,9 +274838,9 @@ public:
     void Exit(BattleEnemy& enemy) override;
 
 private:
-    float recoveryDuration_ = 1.5f;  // 回復時間
+    // recoveryDuration は enemy.GetEnemyData().attackParams.counter.recoveryDuration から取得する
     bool canCounter_ = false;        // カウンター可能フラグ
-	bool hasPlayedAnimation_ = false; // アニメーション再生フラグ
+    bool hasPlayedAnimation_ = false; // アニメーション再生フラグ
 };
 
 ============================================================
@@ -276081,6 +278433,9 @@ void AttackingCombatState::OnExit() {
 	player->GetSword()->SetEnableCollider(false);
 	player->GetObject3d()->SetMotionSpeed(player->GetMotionSpeed(0));
 
+	// 被弾・スタンなどで攻撃が中断された場合に古い入力で次が暴発しないよう破棄
+	combat_->ClearBufferedAttack();
+
 	combat_->GetCombo()->OnAttackFinished();
 
 	// Movementステートに現在の状態に応じたアニメーション再生を委譲
@@ -276112,9 +278467,13 @@ void AttackingCombatState::Update([[maybe_unused]] float deltaTime) {
 		(currentFrame < currentAttack->hitEnd);
 	player->GetSword()->SetEnableCollider(inHitWindow);
 
-	// 3. 先行入力（バッファ）受付
-	// inputBufferStart に到達したら、押されたボタンを記憶する
-	if (currentFrame >= currentAttack->inputBufferStart) {
+	// 3. 先行入力受付：inputBufferStart 〜 comboWindowEnd の間に押された入力をバッファに積む
+	//    （ここでは発火しない。現在の攻撃モーションは最後まで再生する）
+	const bool inInputWindow =
+		currentFrame >= currentAttack->inputBufferStart &&
+		currentFrame <= currentAttack->comboWindowEnd;
+
+	if (inInputWindow) {
 		if (player->IsAttackPressedA()) {
 			combat_->BufferAttack(AttackType::A_Arte);
 		}
@@ -276123,21 +278482,12 @@ void AttackingCombatState::Update([[maybe_unused]] float deltaTime) {
 		}
 	}
 
-	// 4. キャンセル可能フレームに入ったら、バッファされた入力をTryAttackで発火する
-	if (currentFrame >= currentAttack->comboWindowStart && currentFrame <= currentAttack->comboWindowEnd) {
+	// 4. アニメーション終了：バッファされた先行入力があれば即時に次の攻撃へ、なければ Idle に戻る
+	if (stateTimer_ >= currentAttack->duration) {
 		if (combat_->HasBufferedAttack()) {
 			AttackType next = combat_->PopBufferedAttack();
 			if (combat_->TryAttack(next)) return;
 		}
-	}
-
-	// 5. キャンセル可能フレームを越えたらバッファ破棄（古い入力で次が暴発しないように）
-	if (currentFrame > currentAttack->comboWindowEnd) {
-		combat_->ClearBufferedAttack();
-	}
-
-	// 6. アニメーション終了判定
-	if (stateTimer_ >= currentAttack->duration) {
 		combat_->ChangeState(CombatState::Idle);
 	}
 }
@@ -278107,7 +280457,8 @@ private:
 	bool hasBufferedInput_ = false;                // 有効な先行入力が積まれているか
 	AttackType bufferedAttackType_ = AttackType::A_Arte;
 	float bufferedInputAge_ = 0.0f;                // バッファに積まれてからの経過秒
-	float inputBufferLifetime_ = 0.4f;             // バッファの寿命（秒）。経過後は破棄
+	// バッファの寿命（秒）。攻撃モーション終了時にまとめて消費されるため、最長攻撃 duration を上回る値にする
+	float inputBufferLifetime_ = 2.0f;
 };
 
 ============================================================
@@ -278538,12 +280889,14 @@ void AttackDataEditor::DrawAttackDetail()
 		changed |= ImGui::InputFloat("モーション速度", &atk.motionSpeed, 0.01f, 0.1f, "%.2f");
 		changed |= ImGui::InputInt("ヒット開始フレーム", &atk.hitStart);
 		changed |= ImGui::InputInt("ヒット終了フレーム", &atk.hitEnd);
-		changed |= ImGui::InputInt("先行入力受付フレーム", &atk.inputBufferStart);
+		changed |= ImGui::InputInt("先行入力受付開始フレーム", &atk.inputBufferStart);
 		if (ImGui::IsItemHovered()) {
-			ImGui::SetTooltip("このフレーム以降に押されたボタンを記憶し、\nコンボ開始フレーム到達時に発火する");
+			ImGui::SetTooltip("このフレーム以降に押された入力をバッファし、同フレーム以降で即時に次の攻撃へ発火する");
 		}
-		changed |= ImGui::InputInt("コンボ開始フレーム", &atk.comboWindowStart);
-		changed |= ImGui::InputInt("コンボ終了フレーム", &atk.comboWindowEnd);
+		changed |= ImGui::InputInt("先行入力受付終了フレーム", &atk.comboWindowEnd);
+		if (ImGui::IsItemHovered()) {
+			ImGui::SetTooltip("このフレームを越えるとバッファは破棄される");
+		}
 	}
 
 	// ------------------------------------------------------------
@@ -278963,16 +281316,9 @@ public:
 			attack.hitStart, attack.hitEnd));
 
 		// ------------------------------------------------------------
-		// コンボ入力受付区間 (Combo Window)
-		// ------------------------------------------------------------
-		tracks.push_back(MakeBarTrack(
-			DopeSheet::TrackType::ComboWindow,
-			attack.comboWindowStart, attack.comboWindowEnd));
-
-		// ------------------------------------------------------------
 		// 先行入力受付区間 (Input Buffer)
-		// inputBufferStart から comboWindowEnd までを「バッファ受付帯」として可視化する
-		// ※ 書き戻し時は start のみが inputBufferStart に反映される
+		// inputBufferStart 〜 comboWindowEnd を「受付帯」として可視化する。
+		// この帯内で押された入力が次の攻撃にチェインする唯一の経路。
 		// ------------------------------------------------------------
 		tracks.push_back(MakeBarTrack(
 			DopeSheet::TrackType::CancelWindow,
@@ -278998,16 +281344,9 @@ public:
 				ReadBarTrack(track, attack.hitStart, attack.hitEnd);
 				break;
 
-			case DopeSheet::TrackType::ComboWindow:
-				ReadBarTrack(track, attack.comboWindowStart, attack.comboWindowEnd);
-				break;
-
 			case DopeSheet::TrackType::CancelWindow:
-				// 先行入力受付帯：開始フレームのみを inputBufferStart に反映する
-				// （終了は ComboWindow 側の comboWindowEnd と連動させているため触らない）
-				if (!track.keys.empty()) {
-					attack.inputBufferStart = track.keys.front().frame;
-				}
+				// 先行入力受付帯：開始 → inputBufferStart、終了 → comboWindowEnd
+				ReadBarTrack(track, attack.inputBufferStart, attack.comboWindowEnd);
 				break;
 
 			default:
@@ -279131,13 +281470,12 @@ struct AttackData {
 
 	int hitStart = 0;
 	int hitEnd = 10;
-	int comboWindowStart = 0;
-	int comboWindowEnd = 20;
 
-	// 先行入力（バッファ）受付開始フレーム
-	// この値以降の入力は、comboWindowStart 到達時にまとめて発火する
-	// comboWindowStart より小さい値を指定する（例: 5 で受付開始 → 15 で実発火）
+	// 先行入力（バッファ）受付開始フレーム。
+	// この値以降に押された入力をバッファに記憶し、同フレーム以降に次の攻撃へ即時発火する。
 	int inputBufferStart = 0;
+	// 先行入力受付の終了フレーム。これを越えるとバッファは破棄される。
+	int comboWindowEnd = 20;
 
 	// ------------------------------------------------------------
 	// タイミング設定（ゲームロジック用・秒単位）
@@ -279247,7 +281585,6 @@ SERIALIZE_FIELD(AttackData, totalFrames)
 SERIALIZE_FIELD(AttackData, fps)
 SERIALIZE_FIELD(AttackData, hitStart)
 SERIALIZE_FIELD(AttackData, hitEnd)
-SERIALIZE_FIELD(AttackData, comboWindowStart)
 SERIALIZE_FIELD(AttackData, comboWindowEnd)
 SERIALIZE_FIELD(AttackData, inputBufferStart)
 
@@ -282345,6 +284682,7 @@ File Path: YGame/GameObjects/Player/Player.cpp
 
 // Engine
 #include "Systems/GameTime/GameTime.h"
+#include "Systems/Cinematic/CinematicManager.h"
 #include <Debugger/Logger.h>
 #include "Collision/AreaCollision/Base/AreaManager.h"
 
@@ -282456,22 +284794,15 @@ void Player::HandleCombatInput() {
 	const bool pressedA = input_->IsPadTriggered(0, GamePadButton::A);
 	const bool pressedB = input_->IsPadTriggered(0, GamePadButton::B);
 
-	// 攻撃中は AttackingCombatState 側で先行入力をバッファ／消費するため、
-	// ここでは入力をバッファに積むだけにする（直接 TryAttack はしない）
-	if (combat_->IsAttacking()) {
-		if (pressedA) combat_->BufferAttack(AttackType::A_Arte);
-		else if (pressedB) combat_->BufferAttack(AttackType::B_Arte);
-		return;
-	}
-
+	// 攻撃中の入力は AttackingCombatState が AttackData の inputBufferStart に従ってバッファ管理する
 	if (!combat_->IsIdle()) return;
 
-	// A（軽攻撃）
+	// A（軽攻撃）コンボ開始
 	if (pressedA) {
 		combat_->TryAttack(AttackType::A_Arte);
 	}
 
-	// B（重攻撃）
+	// B（重攻撃）コンボ開始
 	if (pressedB) {
 		combat_->TryAttack(AttackType::B_Arte);
 	}
@@ -282504,6 +284835,11 @@ void Player::InitCollision() {
 // ============================================================
 void Player::Update() {
 	if (YoRigine::GameTime::IsPause()) {
+		return;
+	}
+
+	// カットシーン演出中はプレイヤー操作・状態更新を全停止
+	if (YoRigine::CinematicManager::GetInstance()->IsActive()) {
 		return;
 	}
 
@@ -284592,6 +286928,8 @@ void GameScene::Initialize() {
 	cameraEditor_->SetFilePath("Resources/Json/VirtualCameraData/GameScene.json");
 	cameraEditor_->LoadFileOrDefault(cameraEditor_->GetFilePath(), "Game");
 
+	// ゲーム用のポストエフェクト（TestGame: Fog + GodRays 等）
+	PostEffectManager::GetInstance()->LoadPreset("TestGame");
 
 	cameraMode_ = CameraMode::FOLLOW;
 	//------------------------------------------------------------
@@ -284641,6 +286979,14 @@ void GameScene::Initialize() {
 
 	// デバッグカメラを取得または作成
 	auto debug = director->GetCamera("MainDebug");
+
+	// JSON保存値で MainDebug が高優先のまま残っていると、SnapToActiveCamera が
+	// MainDebug にスナップ → 次フレームの UpdateCamera で PlayerFollow へ切替が
+	// 発生し、巨大累積角度（例: 99236rad）から Euler 線形補間でグルグル回る。
+	// 初期モードに合わせて優先度を確定してからスナップする。
+	director->SetPriority("PlayerFollow", 10);
+	director->SetPriority("MainDebug", 0);
+	director->SetPriority("ClearCinematic", 0);
 	director->SnapToActiveCamera();
 
 	// PlayerCamera を初期化（FollowCamera を内包するコンポーネント構成）
@@ -284936,6 +287282,11 @@ void GameScene::UpdateCamera() {
 		director->SetPriority("MainDebug", 10);
 		director->SetPriority("PlayerFollow", 0);
 		break;
+	case CameraMode::CLEAR_CINEMATIC:
+		// シネマティックカメラ優先（例: BattleScene 内で切り替える）
+		director->SetPriority("ClearCinematic", 0);
+		director->SetPriority("MainDebug", 0);
+		break;
 	}
 
 
@@ -285227,9 +287578,9 @@ void TitleScene::Initialize() {
 	auto titleCamera = director->GetCamera("TitleCamera");
 	auto debug = director->GetCamera("MainDebug");
 
-	// タイトル用のポストエフェクトの追加
+	// タイトル用のポストエフェクトの追加（TestGame: Fog + GodRays + Bloom 等）
 	auto postEffectManager = PostEffectManager::GetInstance();
-	postEffectManager->LoadPreset("TitleBloom");
+	postEffectManager->LoadPreset("TestGame");
 
 	//------------------------------------------------------------
 	// システム初期化
@@ -285297,8 +287648,8 @@ void TitleScene::Update() {
 	skyBox_->Update();
 	ground_->Update();
 
-	auto* enemyHitEmitterGroup_ = YEmitterGroupManager::GetInstance().GetGroup("Title");
-	enemyHitEmitterGroup_->EmitAll();
+	//auto* enemyHitEmitterGroup_ = YEmitterGroupManager::GetInstance().GetGroup("Title");
+	//enemyHitEmitterGroup_->EmitAll();
 
 	YoRigine::ModelManipulator::GetInstance()->Update();
 	YoRigine::CollisionManager::GetInstance()->Update();
@@ -285664,13 +288015,34 @@ File Path: YGame/Scenes/SubScenes/BattleScene.cpp
 #include "Object3D/Object3dCommon.h"
 #include "LightManager/LightManager.h"
 #include "Systems/GameTime/GameTime.h"
+#include "Systems/Cinematic/CinematicManager.h"
+#include "Systems/Cinematic/CinematicSequencer.h"
+#include "Systems/Camera/CameraDirector.h"
+#include "Systems/Camera/Virtuals/KeyframeCamera/KeyframeCamera.h"
+#include "OffScreen/PostEffectManager.h"
+#include "OffScreen/PostEffectChain.h"
 #include <Editor/Editor.h>
 
 #include <UI/Damage/DamageNumberManager.h>
+#include <algorithm>
 #ifdef USE_IMGUI
 #include "imgui.h"
 #endif
 #include <Debugger/Logger.h>
+
+namespace {
+	// ===== 霧晴れカットシーン演出のタイムライン定数 =====
+	// 時間はすべて秒。Sequencer の全体時間 (duration) は KeyframeCamera のパス長から自動取得。
+	constexpr float kLetterboxInDuration       = 1.0f;     // 黒帯がスライドインする時間
+	constexpr float kLetterboxOutDuration      = 1.0f;     // 黒帯がスライドアウトする時間
+	constexpr float kPostEffectFadeDelay       = 0.5f;     // 黒帯 IN 完了後にエフェクト開始までの余白
+	constexpr float kPostEffectFadeEndMargin   = 0.5f;     // 黒帯 OUT 開始前にエフェクトを終わらせる余白
+	constexpr float kGodRaysExposureMul        = 1.5f;     // 演出中の GodRays 露光倍率
+	constexpr int   kCinematicCamPriority      = 1000;     // 演出中のカメラ優先度
+	constexpr float kFallbackDuration          = 5.0f;     // ClearCinematic 不在時の保険
+	constexpr const char* kCinematicCamName    = "ClearCinematic";
+	constexpr const char* kClearSceneName      = "Clear";
+}
 
 /// <summary>
 /// バトルシーン初期化
@@ -285754,9 +288126,72 @@ void BattleScene::Update() {
 	bool isBattleCameraActive = (currentCameraMode_ == CameraMode::BATTLE_START && !battleCameraFinished_);
 
 	// 最終バトルクリア検知（BattleScene側で遷移したいならここ）
-	if (!isBattleCameraActive && battleEnemyManager_->IsFinalBattleCleared()) {
-		SceneManager::GetInstance()->ChangeScene("Clear");
+	// 直接 ChangeScene せず、霧晴れ＋光芒のカットシーン演出を挟んでから遷移
+	if (!isBattleCameraActive && battleEnemyManager_->IsFinalBattleCleared() && !clearCinematicStarted_) {
+		clearCinematicStarted_ = true;
 		battleEnemyManager_->ResetFinalBattleClearFlag();
+
+		// チェーンから Fog / GodRays を引っ張る（無ければ tween をスキップ）
+		auto* chain = PostEffectManager::GetInstance()->GetEffectChain();
+		auto* fog     = chain ? chain->GetFirstEffectByType(OffScreen::OffScreenEffectType::Fog)     : nullptr;
+		auto* godRays = chain ? chain->GetFirstEffectByType(OffScreen::OffScreenEffectType::GodRays) : nullptr;
+
+		// シーケンス全体時間 = KeyframeCamera "ClearCinematic" のパス長
+		// 編集で長さを変えるだけで letterbox / エフェクトの時刻が自動で追従する
+		auto cinemaCam = std::dynamic_pointer_cast<KeyframeCamera>(
+			CameraDirector::GetInstance()->GetCamera(kCinematicCamName));
+		const float duration = (cinemaCam && cinemaCam->GetMaxTime() > 0.0f)
+			? cinemaCam->GetMaxTime()
+			: kFallbackDuration;
+
+		// エフェクトフェード時刻（黒帯 OUT 開始前に余白を確保して終わらせる）
+		const float fadeStart = kPostEffectFadeDelay;
+		const float fadeEnd   = std::max(
+			fadeStart + 0.1f,
+			duration - kLetterboxOutDuration - kPostEffectFadeEndMargin);
+
+		auto seq = std::make_unique<YoRigine::CinematicSequencer>(duration);
+
+		// --- レターボックス ---
+		seq->Letterbox(true,  0.0f, kLetterboxInDuration,
+			Easing::Function::EaseOutCubic);
+		seq->Letterbox(false, duration - kLetterboxOutDuration, duration,
+			Easing::Function::EaseInCubic);
+
+		// --- Fog を 0 に補間（density / heightDensity / sunInscatter）---
+		if (fog) {
+			const auto& f = fog->params.fog;
+			seq->Tween([fog](float v){ fog->params.fog.fogDensity = v; },
+				f.fogDensity, 0.0f, fadeStart, fadeEnd, Easing::Function::EaseOutCubic);
+
+			seq->Tween([fog](float v){ fog->params.fog.heightFogDensity = v; },
+				f.heightFogDensity, 0.0f, fadeStart, fadeEnd, Easing::Function::EaseOutCubic);
+
+			seq->Tween([fog](float v){ fog->params.fog.sunInscatterStrength = v; },
+				f.sunInscatterStrength, 0.0f, fadeStart, fadeEnd, Easing::Function::EaseOutCubic);
+		}
+
+		// --- GodRays exposure を倍率倍へ（光が射す印象を強化）---
+		if (godRays) {
+			const float curExposure = godRays->params.godRays.exposure;
+			seq->Tween([godRays](float v){ godRays->params.godRays.exposure = v; },
+				curExposure, curExposure * kGodRaysExposureMul,
+				fadeStart, fadeEnd, Easing::Function::EaseInOutSine);
+		}
+
+		// --- KeyframeCamera をシーン全体で再生 ---
+		// 演出後は Clear シーンへ遷移するので、復帰先カメラは指定しない
+		seq->Camera(kCinematicCamName, 0.0f, duration, kCinematicCamPriority);
+
+		// 演出終了 → Clear へ遷移
+		seq->OnFinish([](){ SceneManager::GetInstance()->ChangeScene(kClearSceneName); });
+
+		YoRigine::CinematicManager::GetInstance()->Play(std::move(seq));
+		return;
+	}
+
+	// 演出中は他のロジックを止める（プレイヤー操作・カメラ・敵更新ロック）
+	if (clearCinematicStarted_) {
 		return;
 	}
 
@@ -285810,6 +288245,9 @@ void BattleScene::DrawLine() {
 	player_->DrawCollision();
 	player_->DrawBone(*line_.get());
 	AreaManager::GetInstance()->DrawArea("BattleArea", line_.get());
+
+	// 全 KeyframeCamera のパス/球マーカーを描画（編集中の可視化）
+	CameraDirector::GetInstance()->DrawDebug3D(*line_.get());
 #endif
 }
 
@@ -285852,6 +288290,9 @@ void BattleScene::OnEnter() {
 	currentCameraMode_ = CameraMode::FOLLOW;
 	battleCameraFinished_ = true;
 	shouldResetBattleCamera_ = true;
+
+	// クリア演出フラグをリセット（再戦・別バトル開始時のため）
+	clearCinematicStarted_ = false;
 
 	// プレイヤー位置リセット
 	player_->SetInitialPosition();
@@ -286180,6 +288621,9 @@ private:
 	bool shouldResetBattleCamera_ = false;
 	bool isFinalBattle_ = false;  // 最終バトルかどうか
 	size_t totalRemainingFieldEnemies_ = 0;  // ★追加: フィールドに残っているエンカウントグループ数
+
+	// 最終バトルクリア演出が起動済みかどうか（毎フレーム再発火するのを防ぐ）
+	bool clearCinematicStarted_ = false;
 };
 
 ============================================================
@@ -286193,6 +288637,7 @@ File Path: YGame/Scenes/SubScenes/FieldScene.cpp
 #include "LightManager/LightManager.h"
 #include "Collision/Core/CollisionManager.h"
 #include "Systems/GameTime/GameTime.h"
+#include "Systems/Camera/CameraDirector.h"
 #include <Editor/Editor.h>
 #include "Debugger/Logger.h"
 #include <Object3D/ObjectManager.h>
@@ -286360,6 +288805,9 @@ void FieldScene::DrawLine() {
 	player_->DrawBone(*line_.get());
 	AreaManager::GetInstance()->DrawArea("FieldArea", line_.get());
 	AreaManager::GetInstance()->Draw(line_.get(), { "FieldArea" });
+
+	// 全 KeyframeCamera のパス/球マーカーを描画
+	CameraDirector::GetInstance()->DrawDebug3D(*line_.get());
 
 	// ── NavGrid デバッグ描画 ─────────────────────────────────────────────
 	// showNavGridDebug_ が true のときだけグリッドを可視化する。
@@ -287813,6 +290261,9 @@ void DamageNumberManager::InitJson()
     jsonManager_->SetCategory("UI");
 	jsonManager_->SetSubCategory("Damage");
 	jsonManager_->Register("offsetY", &offsetY_);
+	jsonManager_->Register("worldOffsetY", &worldOffsetY_);
+	jsonManager_->Register("digitHeight", &digitHeight_);
+	jsonManager_->Register("sineScaleMult", &sineScaleMult_);
 }
 
 // ============================================================
@@ -287864,10 +290315,11 @@ void DamageNumberManager::SpawnIntoPool(
     entry->timer = 0.0f;
     entry->yOffset = 0.0f;
     entry->worldPos = worldPos;
+    entry->worldPos.y += worldOffsetY_; // 渡された座標（敵の足元等）から頭上へ
     entry->xJitter = static_cast<float>((std::rand() % 49) - 24);
 
     // [1] 表示サイズを設定（sineは通常より大きく）
-    const float displaySize = isSine ? kDigitHeight * kSineScaleMult : kDigitHeight;
+    const float displaySize = isSine ? digitHeight_ * sineScaleMult_ : digitHeight_;
     entry->number->SetDigitSize({ displaySize, displaySize });
 
     // [2] 数値設定 → RebuildDigits → ApplyDigitUV で UV を正しく再設定
@@ -287973,14 +290425,6 @@ private:
     static constexpr float kPopSettle = 0.15f;          // ポップインが終わる時刻（正規化）
     static constexpr float kFadeStart = 0.70f;          // フェードアウト開始時刻（正規化）
 
-    // ── 表示サイズ ──────────────────────────────────────────────
-    // テクスチャの1桁サイズに合わせて調整する。
-    // UINumber::Initialize() 内で digitTexWidth_ = textureWidth/10 が計算されるが、
-    // ここで指定した値が Sprite::SetSize() の表示ピクセルサイズになる。
-    // 見た目が大きすぎる/小さすぎる場合はこの値を変える。
-    static constexpr float kDigitHeight = 50.0f;  // 通常ダメージの1桁表示サイズ（px）
-    static constexpr float kSineScaleMult = 1.3f;   // sine（倍率攻撃）はやや大きく
-
     // ============================================================
     // テクスチャパス
     // ============================================================
@@ -287996,7 +290440,11 @@ private:
     std::vector<DamagePopupEntry> sinePool_;
 	std::unique_ptr<YoRigine::JsonManager> jsonManager_;
 
-	float offsetY_ = 5.0f; // ワールド→スクリーン変換後のYオフセット（px）
+	// JSON調整可能なパラメータ群
+	float offsetY_       = 5.0f;   // ワールド→スクリーン変換後のYオフセット（px）
+	float worldOffsetY_  = 3.0f;   // SpawnDamage に渡されたワールド座標へ加算するY（敵の頭上）
+	float digitHeight_   = 50.0f;  // 通常ダメージの1桁表示サイズ（px）
+	float sineScaleMult_ = 1.3f;   // sine（倍率攻撃）のサイズ倍率
 };
 
 ============================================================
