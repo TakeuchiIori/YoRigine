@@ -1,5 +1,4 @@
 #include "YWebApiManager.h"
-#include <curl/curl.h>
 #include <iostream>
 
 #ifdef USE_IMGUI
@@ -15,13 +14,17 @@ bool YWebApiManager::Initialize() {
     if (initialized_) return true;
 
     // アプリケーション全体で一生に一度のcURLグローバル初期化
-    if (curl_global_init(CURL_GLOBAL_DEFAULT) != CURLE_OK) {
+    if (curl_global_init(CURL_GLOBAL_ALL) != CURLE_OK) {
          AddLog("[YWebApiManager] cURLのグローバル初期化に失敗しました。");
         return false;
     }
-
-    initialized_ = true;
-    AddLog( "[YWebApiManager] 初期化に成功しました。");
+    curl_ = curl_easy_init();
+    if (curl_) {
+        initialized_ = true;
+        AddLog( "[YWebApiManager] 初期化に成功しました。");
+		curl_easy_cleanup(curl_);
+    }
+	curl_global_cleanup();
     return true;
 }
 

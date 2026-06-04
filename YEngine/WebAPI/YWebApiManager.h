@@ -2,7 +2,7 @@
 #include <string>
 #include <vector>
 #include <json.hpp>
-
+#include <curl/curl.h>
 
 //=========================================================================
 // C++とWrbAPIをつなぐクラス
@@ -59,5 +59,8 @@ private:
 
     // ログの保存
     std::vector<std::string> logs_;
+
+	// cURLのハンドル
+	CURL* curl_ = nullptr;
 };
 
