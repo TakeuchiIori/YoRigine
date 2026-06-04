@@ -44,6 +44,8 @@ public:
 		Halftone,
 		CrossHatch,
 		ColorGrade,
+		Fog,
+		GodRays,
 	};
 	///************************* パラメータ調整 *************************///
 	struct RadialBlurPrams
@@ -131,6 +133,31 @@ public:
 		float   colorTint = 0.0f;                          // ティント (+紫/-緑)
 	};
 
+	struct FogParams {
+		Vector3 fogColor = { 0.55f, 0.65f, 0.75f };       // フォグの色 (青みがかった灰)
+		float   fogDensity = 0.005f;                       // 指数フォグの係数 (1/単位)
+		float   fogStart = 10.0f;                          // この距離からフォグ開始
+		float   skyFogClamp = 0.7f;                        // 空のフォグ最大量 (1.0でホワイトアウト)
+
+		float   sunInscatterStrength = 0.5f;               // 太陽方向のグロー強度 (0で無効)
+		Vector3 sunColor = { 1.0f, 0.85f, 0.6f };          // インスキャッタの色
+
+		float   heightFogTop = 20.0f;                      // 上端 (これより上は heightFog 寄与なし)
+		float   heightFogBottom = -5.0f;                   // 下端 (これより下で最大)
+		float   heightFogDensity = 0.3f;                   // 高さフォグの強さ
+		float   heightFogDistanceScale = 0.01f;            // 距離スケール
+	};
+
+	struct GodRaysParams {
+		Vector3 sunColor = { 1.0f, 0.85f, 0.6f };          // 光の色 (暖色がドラマ)
+		float   density = 1.0f;                            // 各サンプル間隔のスケール
+		float   weight = 0.25f;                            // 1サンプル寄与
+		float   decay = 0.95f;                             // 1サンプルごとの減衰倍率
+		float   exposure = 0.12f;                          // 最終強度倍率（高いと白飛び）
+		int     numSamples = 48;                           // サンプル数 (32〜64推奨, max 64)
+		float   skyThreshold = 0.999f;                     // 深度がこれ以上で「空」扱い
+	};
+
 	///************************* 基本関数 *************************///
 
 	// 初期化
@@ -188,6 +215,22 @@ public:
 
 	// カラーグレーディングのパラメータを設定
 	void SetColorGradeParams(const ColorGradeParams& params);
+
+	// フォグのパラメータを設定（PostEffectChain 経由で毎フレーム呼ばれる想定）
+	void SetFogParams(const FogParams& params);
+
+	// フォグに必要なカメラ・ライト情報を渡す（シーン側から毎フレーム呼ぶ）
+	void SetFogCameraAndLight(const Matrix4x4& viewProjectionInverse,
+		const Vector3& cameraPos,
+		const Vector3& lightDir);
+
+	// GodRays パラメータ設定（PostEffectChain 経由）
+	void SetGodRaysParams(const GodRaysParams& params);
+
+	// GodRays に必要な太陽スクリーン位置と可視度を渡す（シーン側から毎フレーム呼ぶ）
+	//   sunUV : 太陽の方向を画面 UV に投影した点
+	//   sunVisibility : 0 (カメラの後ろ等で不可視) ～ 1 (正面)
+	void SetGodRaysSun(const Vector2& sunUV, float sunVisibility);
 	///************************* ゲーム用機能（時間経過ブラー） *************************///
 
 	// ブラーの更新（時間経過による減衰）
@@ -227,6 +270,8 @@ private:
 	void CreateHalftoneResource();
 	void CreateCrossHatchResource();
 	void CreateColorGradeResource();
+	void CreateFogResource();
+	void CreateGodRaysResource();
 
 	// エフェクト別の描画処理
 	void ExecuteCopyEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
@@ -247,6 +292,8 @@ private:
 	void ExecuteHalftoneEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
 	void ExecuteCrossHatchEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
 	void ExecuteColorGradeEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
+	void ExecuteFogEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
+	void ExecuteGodRaysEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
 
 	// 共通描画処理
 	void SetupPipelineAndDraw(OffScreenEffectType type);
@@ -368,6 +415,43 @@ private:
 		float   padding;
 	};
 
+	// Fog の CB。HLSL 側 (FogParams) と完全一致させること
+	struct FogForGPU {
+		Matrix4x4 viewProjectionInverse;       // 64
+
+		Vector3   cameraPos;                   // 12
+		float     fogDensity;                  //  4
+
+		Vector3   fogColor;                    // 12
+		float     fogStart;                    //  4
+
+		Vector3   sunDirection;                // 12
+		float     sunInscatterStrength;        //  4
+
+		Vector3   sunColor;                    // 12
+		float     skyFogClamp;                 //  4
+
+		float     heightFogTop;                //  4
+		float     heightFogBottom;             //  4
+		float     heightFogDensity;            //  4
+		float     heightFogDistanceScale;      //  4
+	};
+
+	// GodRays の CB。HLSL 側 (GodRaysParams) と完全一致
+	struct GodRaysForGPU {
+		Vector2 sunUV;                         //  8
+		float   sunVisibility;                 //  4
+		float   density;                       //  4
+
+		Vector3 sunColor;                      // 12
+		float   weight;                        //  4
+
+		float   decay;                         //  4
+		float   exposure;                      //  4
+		int32_t numSamples;                    //  4
+		float   skyThreshold;                  //  4
+	};
+
 
 	///************************* パイプライン管理 *************************///
 
@@ -443,6 +527,14 @@ private:
 	// カラーグレーディング用
 	Microsoft::WRL::ComPtr<ID3D12Resource> colorGradeResource_;
 	ColorGradeForGPU* colorGradeData_ = nullptr;
+
+	// フォグ用
+	Microsoft::WRL::ComPtr<ID3D12Resource> fogResource_;
+	FogForGPU* fogData_ = nullptr;
+
+	// GodRays 用
+	Microsoft::WRL::ComPtr<ID3D12Resource> godRaysResource_;
+	GodRaysForGPU* godRaysData_ = nullptr;
 
 	///************************* ブラー演出用 *************************///
 

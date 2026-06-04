@@ -162,3 +162,12 @@ void CameraDirector::SnapToActiveCamera() {
 		currentFovY_ = activeCamera_->GetFovY();
 	}
 }
+
+// ============================================================
+// 全 VirtualCamera にデバッグ 3D 描画を委譲
+// ============================================================
+void CameraDirector::DrawDebug3D(Line& line) {
+	for (auto& [name, cam] : cameras_) {
+		if (cam) cam->DrawDebug3D(line);
+	}
+}

@@ -65,6 +65,300 @@ namespace YoRigine {
     }
 
     // -----------------------------------------------------------
+    // 3D プリミティブ生成ヘルパ (file-local)
+    //   全て triangle list で ProceduralMeshVertex を吐く。
+    //   center: 配置中心。scale: ベース寸法に掛ける倍率 (Bead モードの age フェード用)。
+    //   color / age: 各頂点に書き込む。Static は (white, 0)、Bead は寿命で計算する。
+    // -----------------------------------------------------------
+    namespace {
+
+        static inline void EmitTri(std::vector<ProceduralMeshVertex>& out,
+            const Vector3& p0, const Vector2& uv0,
+            const Vector3& p1, const Vector2& uv1,
+            const Vector3& p2, const Vector2& uv2,
+            const Vector4& color, float age)
+        {
+            ProceduralMeshVertex v;
+            v.color = color; v.age = age;
+            v.position = p0; v.texcoord = uv0; out.push_back(v);
+            v.position = p1; v.texcoord = uv1; out.push_back(v);
+            v.position = p2; v.texcoord = uv2; out.push_back(v);
+        }
+
+        // -------- Box --------
+        static void GenBox(const PrimitiveSpec& s, std::vector<ProceduralMeshVertex>& out,
+            const Vector3& center, float scale, const Vector4& color, float age)
+        {
+            const Vector3 he = {
+                s.halfExtents.x * scale,
+                s.halfExtents.y * scale,
+                s.halfExtents.z * scale };
+            const Vector3 c[8] = {
+                {center.x - he.x, center.y - he.y, center.z - he.z},
+                {center.x + he.x, center.y - he.y, center.z - he.z},
+                {center.x + he.x, center.y + he.y, center.z - he.z},
+                {center.x - he.x, center.y + he.y, center.z - he.z},
+                {center.x - he.x, center.y - he.y, center.z + he.z},
+                {center.x + he.x, center.y - he.y, center.z + he.z},
+                {center.x + he.x, center.y + he.y, center.z + he.z},
+                {center.x - he.x, center.y + he.y, center.z + he.z},
+            };
+            const Vector2 uv00{ 0,0 }, uv10{ 1,0 }, uv11{ 1,1 }, uv01{ 0,1 };
+            auto Quad = [&](int a, int b, int cc, int d) {
+                EmitTri(out, c[a], uv00, c[b], uv10, c[cc], uv11, color, age);
+                EmitTri(out, c[a], uv00, c[cc], uv11, c[d], uv01, color, age);
+            };
+            Quad(0, 1, 2, 3); // -Z
+            Quad(5, 4, 7, 6); // +Z
+            Quad(4, 0, 3, 7); // -X
+            Quad(1, 5, 6, 2); // +X
+            Quad(4, 5, 1, 0); // -Y
+            Quad(3, 2, 6, 7); // +Y
+        }
+
+        // -------- Sphere (UV-sphere) --------
+        static void GenSphere(const PrimitiveSpec& s, std::vector<ProceduralMeshVertex>& out,
+            const Vector3& center, float scale, const Vector4& color, float age)
+        {
+            const int lat = std::max(2, s.latSegments);
+            const int lon = std::max(3, s.lonSegments);
+            const float r = s.radius * scale;
+
+            auto pt = [&](int i, int j) {
+                const float theta = static_cast<float>(i) / lat * kPi;
+                const float phi   = static_cast<float>(j) / lon * kPi * 2.0f;
+                const float sinT  = std::sin(theta);
+                Vector3 p = {
+                    center.x + sinT * std::cos(phi) * r,
+                    center.y + std::cos(theta) * r,
+                    center.z + sinT * std::sin(phi) * r
+                };
+                Vector2 uv = {
+                    static_cast<float>(j) / lon,
+                    static_cast<float>(i) / lat
+                };
+                return std::make_pair(p, uv);
+            };
+            for (int i = 0; i < lat; ++i) {
+                for (int j = 0; j < lon; ++j) {
+                    auto [p00, uv00] = pt(i,     j);
+                    auto [p01, uv01] = pt(i,     j + 1);
+                    auto [p10, uv10] = pt(i + 1, j);
+                    auto [p11, uv11] = pt(i + 1, j + 1);
+                    EmitTri(out, p00, uv00, p10, uv10, p11, uv11, color, age);
+                    EmitTri(out, p00, uv00, p11, uv11, p01, uv01, color, age);
+                }
+            }
+        }
+
+        // -------- Cylinder (side + top/bottom caps) --------
+        static void GenCylinder(const PrimitiveSpec& s, std::vector<ProceduralMeshVertex>& out,
+            const Vector3& center, float scale, const Vector4& color, float age)
+        {
+            const int lon  = std::max(3, s.lonSegments);
+            const float r  = s.radius * scale;
+            const float h  = s.height * scale;
+            const float hH = h * 0.5f;
+            auto ring = [&](int j, bool top) {
+                const float phi = static_cast<float>(j) / lon * kPi * 2.0f;
+                Vector3 p = {
+                    center.x + std::cos(phi) * r,
+                    center.y + (top ? hH : -hH),
+                    center.z + std::sin(phi) * r
+                };
+                Vector2 uv = { static_cast<float>(j) / lon, top ? 0.0f : 1.0f };
+                return std::make_pair(p, uv);
+            };
+            // 側面
+            for (int j = 0; j < lon; ++j) {
+                auto [pb0, uvb0] = ring(j,     false);
+                auto [pt0, uvt0] = ring(j,     true);
+                auto [pb1, uvb1] = ring(j + 1, false);
+                auto [pt1, uvt1] = ring(j + 1, true);
+                EmitTri(out, pb0, uvb0, pt0, uvt0, pt1, uvt1, color, age);
+                EmitTri(out, pb0, uvb0, pt1, uvt1, pb1, uvb1, color, age);
+            }
+            // キャップ
+            const Vector3 capTop = { center.x, center.y + hH, center.z };
+            const Vector3 capBot = { center.x, center.y - hH, center.z };
+            const Vector2 capUV  = { 0.5f, 0.5f };
+            for (int j = 0; j < lon; ++j) {
+                auto [pt0, uvt0] = ring(j,     true);
+                auto [pt1, uvt1] = ring(j + 1, true);
+                auto [pb0, uvb0] = ring(j,     false);
+                auto [pb1, uvb1] = ring(j + 1, false);
+                EmitTri(out, capTop, capUV, pt1, uvt1, pt0, uvt0, color, age);
+                EmitTri(out, capBot, capUV, pb0, uvb0, pb1, uvb1, color, age);
+            }
+        }
+
+        // -------- Cone --------
+        static void GenCone(const PrimitiveSpec& s, std::vector<ProceduralMeshVertex>& out,
+            const Vector3& center, float scale, const Vector4& color, float age)
+        {
+            const int lon  = std::max(3, s.lonSegments);
+            const float r  = s.radius * scale;
+            const float h  = s.height * scale;
+            const float hH = h * 0.5f;
+            const Vector3 apex   = { center.x, center.y + hH, center.z };
+            const Vector3 capBot = { center.x, center.y - hH, center.z };
+
+            auto ring = [&](int j) {
+                const float phi = static_cast<float>(j) / lon * kPi * 2.0f;
+                Vector3 p = {
+                    center.x + std::cos(phi) * r,
+                    center.y - hH,
+                    center.z + std::sin(phi) * r
+                };
+                Vector2 uv = { static_cast<float>(j) / lon, 1.0f };
+                return std::make_pair(p, uv);
+            };
+            // 側面
+            for (int j = 0; j < lon; ++j) {
+                auto [p0, uv0] = ring(j);
+                auto [p1, uv1] = ring(j + 1);
+                const Vector2 apexUV = { (static_cast<float>(j) + 0.5f) / lon, 0.0f };
+                EmitTri(out, apex, apexUV, p1, uv1, p0, uv0, color, age);
+            }
+            // 底面
+            const Vector2 capUV = { 0.5f, 0.5f };
+            for (int j = 0; j < lon; ++j) {
+                auto [p0, uv0] = ring(j);
+                auto [p1, uv1] = ring(j + 1);
+                EmitTri(out, capBot, capUV, p0, uv0, p1, uv1, color, age);
+            }
+        }
+
+        // -------- Capsule (top hemisphere + cylinder + bottom hemisphere) --------
+        static void GenCapsule(const PrimitiveSpec& s, std::vector<ProceduralMeshVertex>& out,
+            const Vector3& center, float scale, const Vector4& color, float age)
+        {
+            const int halfLat = std::max(2, s.latSegments / 2);
+            const int lon     = std::max(3, s.lonSegments);
+            const float r     = s.radius * scale;
+            const float h     = s.height * scale;
+            // 円筒部の半長 (高さが直径以下なら円筒部は0で実質球体)
+            const float cylHalfH = std::max(0.0f, h * 0.5f - r);
+
+            // hemiPt(i, j, top): i=0 が赤道 (円筒の上端 or 下端)、i=halfLat が極点
+            auto hemiPt = [&](int i, int j, bool top) {
+                const float theta = static_cast<float>(i) / halfLat * (kPi * 0.5f);
+                const float phi   = static_cast<float>(j) / lon * kPi * 2.0f;
+                const float horiz = std::cos(theta) * r;
+                const float vert  = std::sin(theta) * r;
+                const float yC    = top ? cylHalfH : -cylHalfH;
+                Vector3 p = {
+                    center.x + horiz * std::cos(phi),
+                    center.y + yC + (top ? vert : -vert),
+                    center.z + horiz * std::sin(phi)
+                };
+                const float vUV = top
+                    ? 0.4f - static_cast<float>(i) / halfLat * 0.4f
+                    : 0.6f + static_cast<float>(i) / halfLat * 0.4f;
+                Vector2 uv = { static_cast<float>(j) / lon, vUV };
+                return std::make_pair(p, uv);
+            };
+
+            auto cylPt = [&](int j, bool top) {
+                const float phi = static_cast<float>(j) / lon * kPi * 2.0f;
+                Vector3 p = {
+                    center.x + std::cos(phi) * r,
+                    center.y + (top ? cylHalfH : -cylHalfH),
+                    center.z + std::sin(phi) * r
+                };
+                Vector2 uv = { static_cast<float>(j) / lon, top ? 0.4f : 0.6f };
+                return std::make_pair(p, uv);
+            };
+
+            // 上半球
+            for (int i = 0; i < halfLat; ++i) {
+                for (int j = 0; j < lon; ++j) {
+                    auto [p00, uv00] = hemiPt(i,     j,     true);
+                    auto [p01, uv01] = hemiPt(i,     j + 1, true);
+                    auto [p10, uv10] = hemiPt(i + 1, j,     true);
+                    auto [p11, uv11] = hemiPt(i + 1, j + 1, true);
+                    // i+1 が極点側 (より上)。外向き面が見えるように
+                    EmitTri(out, p00, uv00, p11, uv11, p10, uv10, color, age);
+                    EmitTri(out, p00, uv00, p01, uv01, p11, uv11, color, age);
+                }
+            }
+            // 円筒部
+            if (cylHalfH > 1e-5f) {
+                for (int j = 0; j < lon; ++j) {
+                    auto [pt0, uvt0] = cylPt(j,     true);
+                    auto [pt1, uvt1] = cylPt(j + 1, true);
+                    auto [pb0, uvb0] = cylPt(j,     false);
+                    auto [pb1, uvb1] = cylPt(j + 1, false);
+                    EmitTri(out, pb0, uvb0, pt0, uvt0, pt1, uvt1, color, age);
+                    EmitTri(out, pb0, uvb0, pt1, uvt1, pb1, uvb1, color, age);
+                }
+            }
+            // 下半球
+            for (int i = 0; i < halfLat; ++i) {
+                for (int j = 0; j < lon; ++j) {
+                    auto [p00, uv00] = hemiPt(i,     j,     false);
+                    auto [p01, uv01] = hemiPt(i,     j + 1, false);
+                    auto [p10, uv10] = hemiPt(i + 1, j,     false);
+                    auto [p11, uv11] = hemiPt(i + 1, j + 1, false);
+                    // 下側はワインディング逆
+                    EmitTri(out, p00, uv00, p10, uv10, p11, uv11, color, age);
+                    EmitTri(out, p00, uv00, p11, uv11, p01, uv01, color, age);
+                }
+            }
+        }
+
+        // -------- Torus --------
+        static void GenTorus(const PrimitiveSpec& s, std::vector<ProceduralMeshVertex>& out,
+            const Vector3& center, float scale, const Vector4& color, float age)
+        {
+            const int major = std::max(3, s.lonSegments);
+            const int minor = std::max(3, s.ringSegments);
+            const float R   = s.radius * scale;
+            const float r   = s.tubeRadius * scale;
+            auto pt = [&](int i, int j) {
+                const float u = static_cast<float>(i) / major * kPi * 2.0f;
+                const float v = static_cast<float>(j) / minor * kPi * 2.0f;
+                const float cu = std::cos(u), su = std::sin(u);
+                const float cv = std::cos(v), sv = std::sin(v);
+                Vector3 p = {
+                    center.x + (R + r * cv) * cu,
+                    center.y + r * sv,
+                    center.z + (R + r * cv) * su
+                };
+                Vector2 uv = {
+                    static_cast<float>(i) / major,
+                    static_cast<float>(j) / minor
+                };
+                return std::make_pair(p, uv);
+            };
+            for (int i = 0; i < major; ++i) {
+                for (int j = 0; j < minor; ++j) {
+                    auto [p00, uv00] = pt(i,     j);
+                    auto [p01, uv01] = pt(i,     j + 1);
+                    auto [p10, uv10] = pt(i + 1, j);
+                    auto [p11, uv11] = pt(i + 1, j + 1);
+                    EmitTri(out, p00, uv00, p10, uv10, p11, uv11, color, age);
+                    EmitTri(out, p00, uv00, p11, uv11, p01, uv01, color, age);
+                }
+            }
+        }
+
+        // -------- ディスパッチャ --------
+        static void GenPrimitive(const PrimitiveSpec& s, std::vector<ProceduralMeshVertex>& out,
+            const Vector3& center, float scale, const Vector4& color, float age)
+        {
+            switch (s.type) {
+            case PrimitiveType::Box:      GenBox     (s, out, center, scale, color, age); break;
+            case PrimitiveType::Sphere:   GenSphere  (s, out, center, scale, color, age); break;
+            case PrimitiveType::Capsule:  GenCapsule (s, out, center, scale, color, age); break;
+            case PrimitiveType::Cone:     GenCone    (s, out, center, scale, color, age); break;
+            case PrimitiveType::Cylinder: GenCylinder(s, out, center, scale, color, age); break;
+            case PrimitiveType::Torus:    GenTorus   (s, out, center, scale, color, age); break;
+            }
+        }
+    } // namespace (file-local)
+
+    // -----------------------------------------------------------
     void TrailMesh::Initialize(const TrailEffectParam& param)
     {
         param_         = param;
@@ -132,11 +426,12 @@ namespace YoRigine {
     {
         vertices_.clear();
         switch (shapeType_) {
-        case TrailShapeType::Arc:    RebuildArc();    break;
-        case TrailShapeType::Fan:    RebuildFan();    break;
-        case TrailShapeType::Custom: RebuildCustom(); break;
+        case TrailShapeType::Arc:       RebuildArc();       break;
+        case TrailShapeType::Fan:       RebuildFan();       break;
+        case TrailShapeType::Custom:    RebuildCustom();    break;
+        case TrailShapeType::Primitive: RebuildPrimitive(); break;   // ★NEW
         case TrailShapeType::Flat:
-        default:                     RebuildFlat();   break;
+        default:                        RebuildFlat();      break;
         }
         UploadVertices(vertices_);
     }
@@ -467,6 +762,65 @@ namespace YoRigine {
     }
 
     // -----------------------------------------------------------
+    // ★NEW Primitive (Box / Sphere / Capsule / Cone / Cylinder / Torus)
+    //   Static       : 1個固定で原点に配置 (装飾静的メッシュ用途)
+    //   BeadAlongTrail: 軌跡の平滑化後の各点にスタンプ。
+    //                   寿命でスケール縮小 / 色フェードを適用。
+    // -----------------------------------------------------------
+    void TrailMesh::RebuildPrimitive()
+    {
+        const auto& sp = param_.primitive;
+
+        if (sp.placement == PrimitivePlacement::Static) {
+            // 1個固定。原点に置く (オーナー側の WorldTransform 等で動かす想定)
+            const Vector4 color = { 1.f, 1.f, 1.f, 1.f };
+            GenPrimitive(sp, vertices_, Vector3{ 0,0,0 }, sp.stampScale, color, 0.0f);
+            return;
+        }
+
+        // -------- BeadAlongTrail --------
+        const size_t n = points_.size();
+        if (n < 2) return;
+
+        auto smoothed = SmoothPoints(points_, std::max(1, param_.splineSubdivisions));
+        const size_t sn = smoothed.size();
+        if (sn < 1) return;
+
+        const float spacingSq = sp.stampSpacing * sp.stampSpacing;
+        // 直近スタンプ位置 (距離間引きに使用)
+        Vector3 lastStamp = {};
+        bool    hasLast   = false;
+
+        for (size_t i = 0; i < sn; ++i) {
+            const TrailPoint& p = smoothed[i];
+
+            // 距離間引き
+            if (sp.stampSpacing > 1e-5f && hasLast) {
+                const float dx = p.tip.x - lastStamp.x;
+                const float dy = p.tip.y - lastStamp.y;
+                const float dz = p.tip.z - lastStamp.z;
+                if (dx * dx + dy * dy + dz * dz < spacingSq) continue;
+            }
+
+            const float        normalizedAge = NormalizeAge(p.age);
+            const Vector4      color = CalcFadeColor(normalizedAge);
+            const float        scale = sp.stampScale * (sp.scaleByAge ? (1.0f - normalizedAge) : 1.0f);
+            if (scale <= 1e-4f) continue;
+
+            // スタンプ中心は tip / root の中点
+            const Vector3 stampCenter = {
+                (p.tip.x + p.root.x) * 0.5f,
+                (p.tip.y + p.root.y) * 0.5f,
+                (p.tip.z + p.root.z) * 0.5f
+            };
+            GenPrimitive(sp, vertices_, stampCenter, scale, color, normalizedAge);
+
+            lastStamp = p.tip;
+            hasLast   = true;
+        }
+    }
+
+    // -----------------------------------------------------------
     bool TrailMesh::IsPointInTriangle(const Vector2& p, const Vector2& a,
                                        const Vector2& b, const Vector2& c) const
     {
@@ -486,7 +840,8 @@ namespace YoRigine {
         const uint32_t vertCount = GetVertexCount();
         if (vertCount < 4) return;
 
-        if (shapeType_ == TrailShapeType::Custom) {
+        if (shapeType_ == TrailShapeType::Custom ||
+            shapeType_ == TrailShapeType::Primitive) {
             cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         } else {
             cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);

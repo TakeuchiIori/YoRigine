@@ -740,6 +740,22 @@ bool BattleEnemyManager::SaveEnemyData(const std::string& filePath) const {
 			{"cooldownTime", data.attackParams.combo.cooldownTime}
 		};
 
+		// カウンター攻撃 (Counter) — 連続被弾→気合溜め→突進反撃
+		ap["counter"] = {
+			{"enabled", data.attackParams.counter.enabled},
+			{"triggerHitCount", data.attackParams.counter.triggerHitCount},
+			{"hitCountResetTime", data.attackParams.counter.hitCountResetTime},
+			{"recoveryDuration", data.attackParams.counter.recoveryDuration},
+			{"startupTime", data.attackParams.counter.startupTime},
+			{"anticipationTime", data.attackParams.counter.anticipationTime},
+			{"anticipationDistance", data.attackParams.counter.anticipationDistance},
+			{"chargeTime", data.attackParams.counter.chargeTime},
+			{"rushTime", data.attackParams.counter.rushTime},
+			{"rushSpeedMultiplier", data.attackParams.counter.rushSpeedMultiplier},
+			{"rushHomingStrength", data.attackParams.counter.rushHomingStrength},
+			{"cooldownTime", data.attackParams.counter.cooldownTime}
+		};
+
 		// メインのJSONに攻撃パラメータを追加
 		enemyJson["attackParams"] = ap;
 		enemyArray.push_back(enemyJson);
@@ -883,6 +899,24 @@ bool BattleEnemyManager::LoadEnemyData(const std::string& filePath) {
 					target.subRushTime = cb.value("subRushTime", 0.2f);
 					target.rushSpeedMultiplier = cb.value("rushSpeedMultiplier", 8.0f);
 					target.cooldownTime = cb.value("cooldownTime", 0.8f);
+				}
+
+				// カウンター攻撃 (Counter)
+				if (ap.contains("counter")) {
+					const auto& ct = ap["counter"];
+					auto& target = data.attackParams.counter;
+					target.enabled              = ct.value("enabled", true);
+					target.triggerHitCount      = ct.value("triggerHitCount", 4);
+					target.hitCountResetTime    = ct.value("hitCountResetTime", 2.5f);
+					target.recoveryDuration     = ct.value("recoveryDuration", 1.5f);
+					target.startupTime          = ct.value("startupTime", 0.2f);
+					target.anticipationTime     = ct.value("anticipationTime", 0.5f);
+					target.anticipationDistance = ct.value("anticipationDistance", 5.0f);
+					target.chargeTime           = ct.value("chargeTime", 0.25f);
+					target.rushTime             = ct.value("rushTime", 0.55f);
+					target.rushSpeedMultiplier  = ct.value("rushSpeedMultiplier", 15.0f);
+					target.rushHomingStrength   = ct.value("rushHomingStrength", 1.5f);
+					target.cooldownTime         = ct.value("cooldownTime", 0.8f);
 				}
 			}
 
@@ -1124,6 +1158,31 @@ void BattleEnemyManager::ShowDebugInfo() {
 						ImGui::DragFloat("段内突進", &cb.subRushTime, 0.05f, 0.0f, 2.0f, "%.2f秒");
 						ImGui::DragFloat("加速倍率", &cb.rushSpeedMultiplier, 0.1f, 0.0f, 20.0f, "x%.1f");
 						ImGui::DragFloat("全体後隙", &cb.cooldownTime, 0.05f, 0.0f, 5.0f, "%.2f秒");
+						ImGui::TreePop();
+					}
+
+					// --- Counter ---
+					if (ImGui::TreeNode("Counter (反撃)")) {
+						auto& ct = data.attackParams.counter;
+						ImGui::Checkbox("反撃有効", &ct.enabled);
+						ImGui::Separator();
+						ImGui::TextDisabled("トリガー条件");
+						ImGui::DragInt(" 連続被弾しきい値", &ct.triggerHitCount, 1, 1, 20);
+						ImGui::DragFloat(" カウントリセット秒数", &ct.hitCountResetTime, 0.1f, 0.1f, 10.0f, "%.1f秒");
+						ImGui::Separator();
+						ImGui::TextDisabled("Recovery（気合溜め・無敵）");
+						ImGui::DragFloat(" 回復時間", &ct.recoveryDuration, 0.05f, 0.1f, 5.0f, "%.2f秒");
+						ImGui::Separator();
+						ImGui::TextDisabled("CounterAttack 内部フェーズ");
+						ImGui::DragFloat(" 起動時間", &ct.startupTime, 0.05f, 0.0f, 2.0f, "%.2f秒");
+						ImGui::DragFloat(" 後退時間", &ct.anticipationTime, 0.05f, 0.0f, 3.0f, "%.2f秒");
+						ImGui::DragFloat(" 後退距離", &ct.anticipationDistance, 0.1f, 0.0f, 20.0f, "%.1fm");
+						ImGui::DragFloat(" 溜め時間", &ct.chargeTime, 0.05f, 0.0f, 3.0f, "%.2f秒");
+						ImGui::DragFloat(" 突進時間", &ct.rushTime, 0.05f, 0.0f, 3.0f, "%.2f秒");
+						ImGui::DragFloat(" 突進速度倍率", &ct.rushSpeedMultiplier, 0.5f, 0.0f, 50.0f, "x%.1f");
+						ImGui::DragFloat(" 突進ホーミング強度", &ct.rushHomingStrength, 0.1f, 0.0f, 10.0f, "%.1f");
+						if (ImGui::IsItemHovered()) ImGui::SetTooltip("大きいほどプレイヤーを追尾する。1.5前後で読み避け可能");
+						ImGui::DragFloat(" クールダウン", &ct.cooldownTime, 0.05f, 0.0f, 3.0f, "%.2f秒");
 						ImGui::TreePop();
 					}
 				}

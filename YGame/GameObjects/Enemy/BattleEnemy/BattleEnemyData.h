@@ -80,6 +80,28 @@ struct ComboAttackParams {
 	float cooldownTime = 0.8f;
 };
 
+// 反撃（カウンター）
+// プレイヤーから一定回数連続で被弾した後、Recovery → CounterAttack の流れで発動
+struct CounterAttackParams {
+	// ── トリガー条件 ──
+	bool  enabled = true;             // false でカウンター挙動完全無効化（被弾しっぱなしになる点に注意）
+	int   triggerHitCount = 4;        // 連続被弾がこの数に達した瞬間に Recovery へ
+	float hitCountResetTime = 2.5f;   // この秒数攻撃を食らわなければ被弾カウントを 0 へリセット
+
+	// ── Recovery（気合溜め・無敵）フェーズ ──
+	float recoveryDuration = 1.5f;    // Recovery の長さ。終了で CounterAttack へ
+
+	// ── CounterAttack 内部フェーズ ──
+	float startupTime = 0.2f;          // 起動（この間も無敵 + プレイヤー方向追尾）
+	float anticipationTime = 0.5f;     // 後退
+	float anticipationDistance = 5.0f; // 後退距離（10.8 から控えめに調整推奨）
+	float chargeTime = 0.25f;          // 溜め（ここで無敵解除）
+	float rushTime = 0.55f;            // 突進
+	float rushSpeedMultiplier = 15.0f; // 突進速度倍率
+	float rushHomingStrength = 1.5f;   // 突進中のホーミング強度（旧 4.0 → 1.5 で読み避け可能に）
+	float cooldownTime = 0.8f;         // クールダウン
+};
+
 // 各状態の攻撃パラメータをまとめた構造体
 struct EnemyAttackParams {
 	RushAttackParams rush;
@@ -87,6 +109,7 @@ struct EnemyAttackParams {
 	SpinAttackParams spin;
 	JumpAttackParams jump;
 	ComboAttackParams combo;
+	CounterAttackParams counter;
 };
 
 ///************************* 基本データ *************************///

@@ -62,6 +62,13 @@ public:
     void FollowProcess();
 
     // ============================================================
+    // フレーミング補正（追従対象が画角外に出そうな時だけ、
+    // はみ出した分を rotation で穏やかに pivot へ引き戻す）
+    // ============================================================
+    void SetFramingEnabled(bool e)  { framingEnabled_ = e; }
+    bool IsFramingEnabled() const   { return framingEnabled_; }
+
+    // ============================================================
     // パラメータ読み取り (PlayerCamera が再利用するために公開)
     // ============================================================
     float GetBaseFovY()          const { return baseFovY_; }
@@ -141,4 +148,14 @@ private:
     // ============================================================
     CameraCollisionResolver collisionResolver_;
     float targetPivot_Height_ = 1.5f;
+
+    // ============================================================
+    // フレーミング補正（画角外に出そうな時だけ pivot を引き戻す）
+    // ============================================================
+    void EnsureTargetInView(const Vector3& pivot, float dt);
+
+    bool  framingEnabled_      = true;
+    float framingYawMargin_    = 0.45f;  // この角度差(rad)を越えたら yaw 補正開始（≒26°）
+    float framingPitchMargin_  = 0.30f;  // 同 pitch 補正開始（≒17°）
+    float framingSpeed_        = 4.0f;   // 補正速度（rad/秒・はみ出し分に対する最大変化量）
 };

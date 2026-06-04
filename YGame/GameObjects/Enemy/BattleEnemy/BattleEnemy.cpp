@@ -149,10 +149,10 @@ void BattleEnemy::Update() {
 		}
 	}
 
-	// ヒットカウントのリセット処理
+	// ヒットカウントのリセット処理（しきい値は CounterAttackParams 経由）
 	if (consecutiveHitCount_ > 0 && !isInvincible_) {
 		hitCountResetTimer_ += dt;
-		if (hitCountResetTimer_ > hitCountResetTime_) {
+		if (hitCountResetTimer_ > enemyData_.attackParams.counter.hitCountResetTime) {
 			consecutiveHitCount_ = 0;
 			hitCountResetTimer_ = 0.0f;
 		}
@@ -305,14 +305,9 @@ void BattleEnemy::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 			int damage = static_cast<int>(player_->GetCombat()->GetCombo()->GetCurrentDamage());
 			TakeDamage(damage);
 
-			// ダメージ数値UIをスポーン 
-			// ヒット位置は敵の腰〜胸あたり（+1.0f）に表示
-			Vector3 hitPos = wt_.translate_;
-			hitPos.y += 1.0f;
-
+			// ダメージ数値UIをスポーン（頭上Yオフセットは DamageNumberManager 側でJSON調整）
 			bool isSine = (player_->GetCombat()->GetComboDamageMultiplier() > 1.0f);
-
-			DamageNumberManager::GetInstance()->SpawnDamage(damage, hitPos, isSine);
+			DamageNumberManager::GetInstance()->SpawnDamage(damage, wt_.translate_, isSine);
 			// --------------------- ヒットエフェクトの処理 --------------------- //
 			//auto* enemyHitEmitterGroup_ = YEmitterGroupManager::GetInstance().GetGroup("EnemyHit");
 			//if (enemyHitEmitterGroup_) {
@@ -323,10 +318,12 @@ void BattleEnemy::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 			//}
 
 			// --------------------- ヒットカウントの処理 --------------------- //
+			// しきい値・有効フラグは CounterAttackParams (JSON 経由) で調整可能
+			const auto& counterParams = enemyData_.attackParams.counter;
 			consecutiveHitCount_++;
 			hitCountResetTimer_ = 0.0f;
-			// 連続ヒット数が限界を超えたら回復状態へ
-			if (consecutiveHitCount_ >= maxConsecutiveHits_) {
+			// 連続ヒット数が限界を超え、かつカウンター挙動が有効なら Recovery 状態へ
+			if (counterParams.enabled && consecutiveHitCount_ >= counterParams.triggerHitCount) {
 				ChangeState(std::make_unique<BattleRecoveryState>());
 				consecutiveHitCount_ = 0;  // リセット
 			}

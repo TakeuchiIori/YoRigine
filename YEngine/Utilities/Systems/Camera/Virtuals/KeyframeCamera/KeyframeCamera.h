@@ -10,6 +10,16 @@
 class KeyframeCamera : public VirtualCamera {
 public:
 	// ============================================================
+	// 補間モード
+	//   Linear     : 隣接2キーで直線補間（Easing 適用）
+	//   CatmullRom : 隣接4キーで Catmull-Rom 曲線補間（スプライン経路）
+	// ============================================================
+	enum class InterpolationMode {
+		Linear,
+		CatmullRom,
+	};
+
+	// ============================================================
 	// 構造体定義
 	// ============================================================
 	struct Keyframe {
@@ -27,6 +37,11 @@ public:
 	void Initialize() override;
 	void Update() override;
 	void DrawDebugGui() override;
+	void DrawDebug3D(Line& line) override;
+
+	// 指定時刻のキー補間を即時評価して transform_ / fovY_ に反映する
+	// （プレビューや外部スクラブから利用）
+	void EvaluateAt(float time);
 
 	// ============================================================
 	// セーブ・ロード
@@ -40,6 +55,24 @@ public:
 	void AddKeyframe(float time, const Vector3& pos, const Vector3& rot, float fov, Easing::Function easing);
 	void SortKeyframes();
 
+	// 指定 index と index+1 のキーの間に、現在の曲線上をサンプリングした新キーを追加
+	void InsertKeyBetween(int beforeIndex);
+
+	// すべての隣接キー間に、現在の曲線をサンプリングした N 個の中間キーを一括追加
+	// 元のキーは保持される。N が大きいほど曲線がより細かい制御点で再構成される
+	void SubdivideAllSegments(int n);
+
+	// ============================================================
+	// 再生制御（外部からの演出駆動用）
+	// ============================================================
+	void Play()    { isPlaying_ = true; }
+	void Stop()    { isPlaying_ = false; }
+	void Reset()   { timer_ = 0.0f; }
+	bool IsPlaying() const { return isPlaying_; }
+	void SetLooping(bool loop) { isLooping_ = loop; }
+	float GetTimer() const { return timer_; }
+	float GetMaxTime() const { return keyframes_.empty() ? 0.0f : keyframes_.back().time; }
+
 private:
 	// ============================================================
 	// メンバ変数
@@ -49,4 +82,17 @@ private:
 	bool isPlaying_ = false;
 	bool isLooping_ = true;
 	float playbackSpeed_ = 1.0f;
+	InterpolationMode interpolationMode_ = InterpolationMode::CatmullRom;
+
+	// スムーズ移動モード:
+	//   true  → 各キーの easing は無視、globalEasing_ を全体時間に適用 + 各セグメントは Linear
+	//           (CatmullRom 曲線が滑らかなので等速で通過し「止まる」現象がなくなる)
+	//   false → 各キーの easing を per-segment 適用（従来挙動、ポイントで pause かかる）
+	bool useSmoothMotion_ = true;
+	Easing::Function globalEasing_ = Easing::Function::EaseInOutQuad;
+
+	// 編集 UX 用
+	int selectedKeyIndex_ = -1;     // ImGui で選択中のキー（3D ハイライト用）
+	bool showPath_ = true;          // 3D デバッグ描画を出すか
+	int pathSegmentSamples_ = 32;   // 1 セグメントあたりのライン描画分割数
 };

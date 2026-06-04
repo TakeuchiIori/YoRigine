@@ -20,6 +20,12 @@ public:
 	void Save(nlohmann::json& j) const override;
 	void Load(const nlohmann::json& j) override;
 
+	// ============================================================
+	// 有効化制御（演出/編集モードからの切替用）
+	// ============================================================
+	void SetEnabled(bool v) { isMoving_ = v; }
+	bool IsEnabled() const { return isMoving_; }
+
 private:
 	// ============================================================
 	// 内部処理

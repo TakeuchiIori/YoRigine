@@ -31,16 +31,9 @@ public:
 			attack.hitStart, attack.hitEnd));
 
 		// ------------------------------------------------------------
-		// コンボ入力受付区間 (Combo Window)
-		// ------------------------------------------------------------
-		tracks.push_back(MakeBarTrack(
-			DopeSheet::TrackType::ComboWindow,
-			attack.comboWindowStart, attack.comboWindowEnd));
-
-		// ------------------------------------------------------------
 		// 先行入力受付区間 (Input Buffer)
-		// inputBufferStart から comboWindowEnd までを「バッファ受付帯」として可視化する
-		// ※ 書き戻し時は start のみが inputBufferStart に反映される
+		// inputBufferStart 〜 comboWindowEnd を「受付帯」として可視化する。
+		// この帯内で押された入力が次の攻撃にチェインする唯一の経路。
 		// ------------------------------------------------------------
 		tracks.push_back(MakeBarTrack(
 			DopeSheet::TrackType::CancelWindow,
@@ -66,16 +59,9 @@ public:
 				ReadBarTrack(track, attack.hitStart, attack.hitEnd);
 				break;
 
-			case DopeSheet::TrackType::ComboWindow:
-				ReadBarTrack(track, attack.comboWindowStart, attack.comboWindowEnd);
-				break;
-
 			case DopeSheet::TrackType::CancelWindow:
-				// 先行入力受付帯：開始フレームのみを inputBufferStart に反映する
-				// （終了は ComboWindow 側の comboWindowEnd と連動させているため触らない）
-				if (!track.keys.empty()) {
-					attack.inputBufferStart = track.keys.front().frame;
-				}
+				// 先行入力受付帯：開始 → inputBufferStart、終了 → comboWindowEnd
+				ReadBarTrack(track, attack.inputBufferStart, attack.comboWindowEnd);
 				break;
 
 			default:

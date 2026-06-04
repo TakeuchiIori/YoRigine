@@ -8,6 +8,8 @@
 #include "DirectXCommon.h"
 #include "Object3D/Object3dCommon.h"
 #include "DsvManager.h"
+#include "Loaders/Json/JsonManager.h"
+#include "OffScreen/OffScreen.h"
 // Math
 #include "MathFunc.h"
 
@@ -27,6 +29,11 @@ namespace YoRigine {
 	}
 
 	//=====================================================================
+	// デストラクタ（unique_ptr<JsonManager> 用に cpp 側で定義）
+	//=====================================================================
+	LightManager::~LightManager() = default;
+
+	//=====================================================================
 	// 初期化
 	//=====================================================================
 	void LightManager::Initialize()
@@ -42,6 +49,15 @@ namespace YoRigine {
 		CreatePointLightResource();
 		CreateSpotLightResource();
 		CreateShadowResource();
+
+		// シャドウマップ設定の JSON 永続化
+		// Register が自動 LoadAll するので、ファイルがあれば起動時に値が復元される
+		shadowJson_ = std::make_unique<JsonManager>("ShadowMap", "Resources/Json/Lighting/");
+		shadowJson_->Register("shadowDistance", &shadowMapSettings_.shadowDistance);
+		shadowJson_->Register("orthoWidth", &shadowMapSettings_.orthoWidth);
+		shadowJson_->Register("orthoHeight", &shadowMapSettings_.orthoHeight);
+		shadowJson_->Register("nearZ", &shadowMapSettings_.nearZ);
+		shadowJson_->Register("farZ", &shadowMapSettings_.farZ);
 	}
 
 	//=====================================================================
@@ -113,6 +129,13 @@ namespace YoRigine {
 	//===========================================================================
 	// 影の計算処理（現状平行光源のみ）
 	//===========================================================================
+	// shadowMapSettings_ の意味:
+	//   shadowDistance : 仮想ライト位置をターゲットから何単位後ろに置くか
+	//                    （= lightView 空間での target.z）。
+	//                    0 なら 200.0f をフォールバックで使用。
+	//   nearZ          : ターゲットから「ライト方向（手前）」へどこまで影に入れるか
+	//   farZ           : ターゲットから「ライト反対方向（奥）」へどこまで影に入れるか
+	//   orthoWidth/Height : XY 方向の覆い範囲
 	void LightManager::UpdateShadowMatrix(Camera* camera)
 	{
 		camera_ = camera;
@@ -120,13 +143,39 @@ namespace YoRigine {
 		// ライト方向は必ず正規化
 		Vector3 lightDir = Normalize(directionalLight_->direction);
 
-		// シャドウマップの生成中心（カメラ位置）
-		Vector3 target = camera_->transform_.translate;
+		// シャドウマップの「中心」を決める。
+		// 単純に camera 位置にすると、カメラを上(光源方向)へ振ったときに
+		// 画面に映っているのは「カメラ前方の地面」なのに、シャドウフラスタムは
+		// カメラ位置中心のまま動かないので前方の地面が外れて影が一気に消える。
+		// → カメラ前方を水平面に投影し、その方向へ少し進めた点を中心にする。
+		Vector3 cameraPos = camera_->transform_.translate;
+		Matrix4x4 camRot = MakeRotateMatrixXYZ(camera_->transform_.rotate);
+		Vector3 camForward = TransformNormal(Vector3{ 0.0f, 0.0f, 1.0f }, camRot);
 
-		// ライトの位置設定
-		// カメラ位置からライト方向に大きく離した場所に「仮想的なライト位置」を置く
-		float distanceResults = 200.0f;
-		Vector3 lightPos = target - lightDir * distanceResults;
+		// 水平成分のみで前方を決める（ピッチでフォーカスが上下に飛ばないように）
+		Vector3 forwardHoriz{ camForward.x, 0.0f, camForward.z };
+		float horizLen = std::sqrt(forwardHoriz.x * forwardHoriz.x + forwardHoriz.z * forwardHoriz.z);
+		if (horizLen > 1.0e-3f) {
+			forwardHoriz.x /= horizLen;
+			forwardHoriz.z /= horizLen;
+		}
+		else {
+			// カメラ真上/真下向きの縮退ケース。カメラ位置をそのまま使う
+			forwardHoriz = Vector3{ 0.0f, 0.0f, 0.0f };
+		}
+
+		// フォーカス距離（典型的な三人称カメラと target の距離 ~35 を想定）
+		constexpr float kFocusDistance = 30.0f;
+		Vector3 target = cameraPos + forwardHoriz * kFocusDistance;
+
+		// 仮想ライトをターゲットからどれだけ後ろに置くか
+		// JSON で 0 の場合はフォールバック値を使う（旧挙動互換 + 安全側）
+		float lightBackDistance = shadowMapSettings_.shadowDistance > 0.1f
+			? shadowMapSettings_.shadowDistance
+			: 200.0f;
+
+		// 仮想ライト位置
+		Vector3 lightPos = target - lightDir * lightBackDistance;
 
 		// 垂直方向の対策：ライトが真上/真下に近い場合、Upベクトルを調整
 		Vector3 up = Vector3(0.0f, 1.0f, 0.0f);
@@ -149,7 +198,7 @@ namespace YoRigine {
 		float halfHeight = height * 0.5f;
 
 		// テクセルサイズ
-		const float shadowMapSize = DsvManager::kShadowmapHeight;
+		const float shadowMapSize = static_cast<float>(DsvManager::kShadowmapHeight);
 		float unitX = width / shadowMapSize;
 		float unitY = height / shadowMapSize;
 
@@ -175,9 +224,16 @@ namespace YoRigine {
 		float minY = worldOriginInLight.y + snappedDistY;
 		float maxY = minY + height;
 
-		// Z軸の範囲設定（ShadowmapSettingsの値を使用）
-		float minZ = shadowMapSettings_.nearZ;
-		float maxZ = targetInLight.z + shadowMapSettings_.farZ;
+		// Z 軸の範囲設定:
+		// target は lightView 空間で z = lightBackDistance に来る。
+		// そこから手前(nearZ)/奥(farZ) のオフセットで前後を広げる。
+		float minZ = lightBackDistance - shadowMapSettings_.nearZ;
+		float maxZ = lightBackDistance + shadowMapSettings_.farZ;
+
+		// 安全策: 近接面はクリップ空間 z >= 0 を満たすため微小正値で下限を切る
+		if (minZ < 0.1f) minZ = 0.1f;
+		// 退化したフラスタムを防ぐ
+		if (maxZ < minZ + 0.1f) maxZ = minZ + 0.1f;
 
 		// ライトの正射影行列を作成
 		Matrix4x4 lightProj = MakeOrthographicMatrix(
@@ -187,6 +243,43 @@ namespace YoRigine {
 
 		// 最終的なライトビュー射影行列
 		shadow_->lightViewProjection = lightView * lightProj;
+
+		// Fog / God Rays ポストエフェクト用にもカメラ・ライト情報を流し込む。
+		// シーン毎に UpdateShadowMatrix は呼ばれるので、ここで一括更新するのが確実。
+		{
+			Matrix4x4 viewProj = camera_->GetViewProjectionMatrix();
+			Matrix4x4 invVP    = Inverse(viewProj);
+			OffScreen::GetInstance()->SetFogCameraAndLight(invVP, cameraPos, lightDir);
+
+			// --- God Rays 用の太陽スクリーン UV / 可視度 ---
+			// 太陽は光源方向の逆 (= -lightDir) に十分離れた場所にいると見なす
+			Vector3 sunWorld = cameraPos + (-lightDir) * 1000.0f;
+			// World → Clip
+			Vector3 c;
+			c.x = sunWorld.x * viewProj.m[0][0] + sunWorld.y * viewProj.m[1][0]
+				+ sunWorld.z * viewProj.m[2][0] + viewProj.m[3][0];
+			c.y = sunWorld.x * viewProj.m[0][1] + sunWorld.y * viewProj.m[1][1]
+				+ sunWorld.z * viewProj.m[2][1] + viewProj.m[3][1];
+			c.z = sunWorld.x * viewProj.m[0][2] + sunWorld.y * viewProj.m[1][2]
+				+ sunWorld.z * viewProj.m[2][2] + viewProj.m[3][2];
+			float w = sunWorld.x * viewProj.m[0][3] + sunWorld.y * viewProj.m[1][3]
+				+ sunWorld.z * viewProj.m[2][3] + viewProj.m[3][3];
+
+			Vector2 sunUV{ 0.5f, 0.5f };
+			float visibility = 0.0f;
+			if (w > 0.0f) {
+				float ndcX = c.x / w;
+				float ndcY = c.y / w;
+				sunUV.x = ndcX * 0.5f + 0.5f;
+				sunUV.y = -ndcY * 0.5f + 0.5f; // Y 反転 (D3D の UV)
+
+				// 画面中央に近いほど強く、画面外に出ると 0 へ滑らかにフェード
+				float maxD = std::max(std::abs(ndcX), std::abs(ndcY));
+				// 0(中央)〜1(端) → そこから先 1〜1.5 でフェードアウト
+				visibility = 1.0f - std::clamp((maxD - 1.0f) / 0.5f, 0.0f, 1.0f);
+			}
+			OffScreen::GetInstance()->SetGodRaysSun(sunUV, visibility);
+		}
 	}
 
 	//===========================================================================
@@ -522,11 +615,23 @@ namespace YoRigine {
 		// シャドウマップ
 		//------------------------------------------------------------
 		if (ImGui::CollapsingHeader("Shadowmap Settings")) {
-			ImGui::DragFloat("Shadow Distance", &shadowMapSettings_.shadowDistance, 1.0f, 0.0f, 500.0f);
-			ImGui::DragFloat("Ortho Width", &shadowMapSettings_.orthoWidth, 1.0f, 0.0f, 500.0f);
-			ImGui::DragFloat("Ortho Height", &shadowMapSettings_.orthoHeight, 1.0f, 0.0f, 500.0f);
-			ImGui::DragFloat("Near Z", &shadowMapSettings_.nearZ, 1.0f, 0.0f, 500.0f);
-			ImGui::DragFloat("Far Z", &shadowMapSettings_.farZ, 1.0f, 0.0f, 500.0f);
+			ImGui::DragFloat("Light Back Distance (shadowDistance)", &shadowMapSettings_.shadowDistance, 1.0f, 0.0f, 1000.0f);
+			ImGui::TextDisabled("  ターゲットから仮想ライト位置までの距離。0 なら 200 を使用");
+
+			ImGui::DragFloat("Ortho Width", &shadowMapSettings_.orthoWidth, 1.0f, 0.0f, 1000.0f);
+			ImGui::DragFloat("Ortho Height", &shadowMapSettings_.orthoHeight, 1.0f, 0.0f, 1000.0f);
+			ImGui::TextDisabled("  影が覆う XY 範囲（光から見た幅・高さ）");
+
+			ImGui::DragFloat("Near Range (nearZ)", &shadowMapSettings_.nearZ, 1.0f, 0.0f, 1000.0f);
+			ImGui::TextDisabled("  ターゲットからライト方向（手前）に何単位ぶん影に入れるか");
+
+			ImGui::DragFloat("Far Range (farZ)", &shadowMapSettings_.farZ, 1.0f, 0.0f, 1000.0f);
+			ImGui::TextDisabled("  ターゲットからライト反対方向（奥）に何単位ぶん影に入れるか");
+
+			ImGui::Separator();
+			if (ImGui::Button("Save Shadowmap Settings") && shadowJson_) {
+				shadowJson_->Save();
+			}
 		}
 
 #endif // USE_IMGUI

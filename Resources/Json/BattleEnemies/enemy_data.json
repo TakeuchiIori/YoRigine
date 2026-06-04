@@ -17,6 +17,20 @@
                     "subChargeTime": 0.4000000059604645,
                     "subRushTime": 0.20000000298023224
                 },
+                "counter": {
+                    "anticipationDistance": 5.0,
+                    "anticipationTime": 0.5,
+                    "chargeTime": 0.25,
+                    "cooldownTime": 0.800000011920929,
+                    "enabled": true,
+                    "hitCountResetTime": 2.5,
+                    "recoveryDuration": 1.5,
+                    "rushHomingStrength": 10.0,
+                    "rushSpeedMultiplier": 6.0,
+                    "rushTime": 0.550000011920929,
+                    "startupTime": 0.20000000298023224,
+                    "triggerHitCount": 4
+                },
                 "jump": {
                     "chargeTime": 0.30000001192092896,
                     "cooldownTime": 0.699999988079071,
@@ -52,7 +66,7 @@
         },
         {
             "approachStateRange": 15.0,
-            "attack": 15,
+            "attack": 13,
             "attackParams": {
                 "chargeRush": {
                     "chargeTime": 1.5,
@@ -66,6 +80,20 @@
                     "rushSpeedMultiplier": 8.0,
                     "subChargeTime": 0.4000000059604645,
                     "subRushTime": 0.20000000298023224
+                },
+                "counter": {
+                    "anticipationDistance": 5.0,
+                    "anticipationTime": 0.5,
+                    "chargeTime": 0.25,
+                    "cooldownTime": 0.800000011920929,
+                    "enabled": true,
+                    "hitCountResetTime": 2.5,
+                    "recoveryDuration": 1.5,
+                    "rushHomingStrength": 1.5,
+                    "rushSpeedMultiplier": 14.0,
+                    "rushTime": 0.550000011920929,
+                    "startupTime": 0.20000000298023224,
+                    "triggerHitCount": 4
                 },
                 "jump": {
                     "chargeTime": 0.5,
@@ -83,9 +111,9 @@
                 "spin": {
                     "chargeTime": 0.44999998807907104,
                     "cooldownTime": 0.699999988079071,
-                    "moveSpeedMultiplier": 5.0,
-                    "rotationCount": 5.0,
-                    "spinTime": 0.6499999761581421
+                    "moveSpeedMultiplier": 4.0,
+                    "rotationCount": 3.0,
+                    "spinTime": 0.800000011920929
                 }
             },
             "attackPatterns": [
@@ -117,6 +145,20 @@
                     "rushSpeedMultiplier": 6.5,
                     "subChargeTime": 0.4000000059604645,
                     "subRushTime": 0.25
+                },
+                "counter": {
+                    "anticipationDistance": 5.0,
+                    "anticipationTime": 0.5,
+                    "chargeTime": 0.25,
+                    "cooldownTime": 0.800000011920929,
+                    "enabled": true,
+                    "hitCountResetTime": 2.5,
+                    "recoveryDuration": 1.5,
+                    "rushHomingStrength": 1.5,
+                    "rushSpeedMultiplier": 15.0,
+                    "rushTime": 0.550000011920929,
+                    "startupTime": 0.20000000298023224,
+                    "triggerHitCount": 4
                 },
                 "jump": {
                     "chargeTime": 0.5,

@@ -268,7 +268,8 @@ void PostEffectManager::ImGui()
 			"Copy", "GaussSmoothing", "DepthOutline", "Sepia",
 			"Grayscale", "Vignette", "RadialBlur", "ToneMapping",
 			"Dissolve", "Chromatic", "ColorAdjust", "ShatterTransition",
-			"Bloom", "Posterize", "Kuwahara", "Halftone", "CrossHatch", "ColorGrade"
+			"Bloom", "Posterize", "Kuwahara", "Halftone", "CrossHatch", "ColorGrade",
+			"Fog", "GodRays"
 		};
 
 		for (int i = 0; i < IM_ARRAYSIZE(effectNames); ++i) {
@@ -686,6 +687,17 @@ void PostEffectManager::ApplyEffectParametersToOffScreen(const PostEffectData& e
 		offScreen_->SetColorGradeParams(effect.params.colorGrade);
 		break;
 
+	case OffScreen::OffScreenEffectType::Fog:
+		// 色・密度等は毎フレーム流し込む。
+		// CameraPos/InvVP/LightDir は別経路 (BaseScene::UpdateCommon) で既に書き込み済み。
+		offScreen_->SetFogParams(effect.params.fog);
+		break;
+
+	case OffScreen::OffScreenEffectType::GodRays:
+		// sunUV / sunVisibility は LightManager::UpdateShadowMatrix で書き込み済み
+		offScreen_->SetGodRaysParams(effect.params.godRays);
+		break;
+
 	default:
 		// パラメータ不要のエフェクトは何も更新しない
 		break;
@@ -1070,6 +1082,40 @@ std::string PostEffectManager::EffectChainToJson() const
 		json << "          \"vibrance\": " << effect->params.colorGrade.vibrance << ",\n";
 		json << "          \"colorTemp\": " << effect->params.colorGrade.colorTemp << ",\n";
 		json << "          \"colorTint\": " << effect->params.colorGrade.colorTint << "\n";
+		json << "        },\n";
+
+		// 大気フォグ
+		json << "        \"fog\": {\n";
+		json << "          \"fogColor\": ["
+			<< effect->params.fog.fogColor.x << ","
+			<< effect->params.fog.fogColor.y << ","
+			<< effect->params.fog.fogColor.z << "],\n";
+		json << "          \"fogDensity\": " << effect->params.fog.fogDensity << ",\n";
+		json << "          \"fogStart\": " << effect->params.fog.fogStart << ",\n";
+		json << "          \"skyFogClamp\": " << effect->params.fog.skyFogClamp << ",\n";
+		json << "          \"sunInscatterStrength\": " << effect->params.fog.sunInscatterStrength << ",\n";
+		json << "          \"sunColor\": ["
+			<< effect->params.fog.sunColor.x << ","
+			<< effect->params.fog.sunColor.y << ","
+			<< effect->params.fog.sunColor.z << "],\n";
+		json << "          \"heightFogTop\": " << effect->params.fog.heightFogTop << ",\n";
+		json << "          \"heightFogBottom\": " << effect->params.fog.heightFogBottom << ",\n";
+		json << "          \"heightFogDensity\": " << effect->params.fog.heightFogDensity << ",\n";
+		json << "          \"heightFogDistanceScale\": " << effect->params.fog.heightFogDistanceScale << "\n";
+		json << "        },\n";
+
+		// God Rays
+		json << "        \"godRays\": {\n";
+		json << "          \"sunColor\": ["
+			<< effect->params.godRays.sunColor.x << ","
+			<< effect->params.godRays.sunColor.y << ","
+			<< effect->params.godRays.sunColor.z << "],\n";
+		json << "          \"density\": " << effect->params.godRays.density << ",\n";
+		json << "          \"weight\": " << effect->params.godRays.weight << ",\n";
+		json << "          \"decay\": " << effect->params.godRays.decay << ",\n";
+		json << "          \"exposure\": " << effect->params.godRays.exposure << ",\n";
+		json << "          \"numSamples\": " << effect->params.godRays.numSamples << ",\n";
+		json << "          \"skyThreshold\": " << effect->params.godRays.skyThreshold << "\n";
 		json << "        }\n";
 
 		json << "      }\n";  // parameters
@@ -1347,6 +1393,57 @@ bool PostEffectManager::JsonToEffectChain(const std::string& jsonStr)
 					JsonUtil::GetNumberValue<float>(colorGradeJson, "colorTemp", 0.08f);
 				effect->params.colorGrade.colorTint =
 					JsonUtil::GetNumberValue<float>(colorGradeJson, "colorTint", 0.0f);
+			}
+
+			// ----- fog -----
+			std::string fogJson = JsonUtil::GetObjectValue(paramsJson, "fog");
+			if (!fogJson.empty()) {
+				auto fc = JsonUtil::GetArrayValue(fogJson, "fogColor");
+				if (fc.size() >= 3)
+					effect->params.fog.fogColor = { fc[0], fc[1], fc[2] };
+
+				effect->params.fog.fogDensity =
+					JsonUtil::GetNumberValue<float>(fogJson, "fogDensity", 0.005f);
+				effect->params.fog.fogStart =
+					JsonUtil::GetNumberValue<float>(fogJson, "fogStart", 10.0f);
+				effect->params.fog.skyFogClamp =
+					JsonUtil::GetNumberValue<float>(fogJson, "skyFogClamp", 0.7f);
+				effect->params.fog.sunInscatterStrength =
+					JsonUtil::GetNumberValue<float>(fogJson, "sunInscatterStrength", 0.5f);
+
+				auto sunc = JsonUtil::GetArrayValue(fogJson, "sunColor");
+				if (sunc.size() >= 3)
+					effect->params.fog.sunColor = { sunc[0], sunc[1], sunc[2] };
+
+				effect->params.fog.heightFogTop =
+					JsonUtil::GetNumberValue<float>(fogJson, "heightFogTop", 20.0f);
+				effect->params.fog.heightFogBottom =
+					JsonUtil::GetNumberValue<float>(fogJson, "heightFogBottom", -5.0f);
+				effect->params.fog.heightFogDensity =
+					JsonUtil::GetNumberValue<float>(fogJson, "heightFogDensity", 0.3f);
+				effect->params.fog.heightFogDistanceScale =
+					JsonUtil::GetNumberValue<float>(fogJson, "heightFogDistanceScale", 0.01f);
+			}
+
+			// ----- godRays -----
+			std::string grJson = JsonUtil::GetObjectValue(paramsJson, "godRays");
+			if (!grJson.empty()) {
+				auto sc = JsonUtil::GetArrayValue(grJson, "sunColor");
+				if (sc.size() >= 3)
+					effect->params.godRays.sunColor = { sc[0], sc[1], sc[2] };
+
+				effect->params.godRays.density =
+					JsonUtil::GetNumberValue<float>(grJson, "density", 1.0f);
+				effect->params.godRays.weight =
+					JsonUtil::GetNumberValue<float>(grJson, "weight", 0.25f);
+				effect->params.godRays.decay =
+					JsonUtil::GetNumberValue<float>(grJson, "decay", 0.95f);
+				effect->params.godRays.exposure =
+					JsonUtil::GetNumberValue<float>(grJson, "exposure", 0.12f);
+				effect->params.godRays.numSamples =
+					JsonUtil::GetNumberValue<int>(grJson, "numSamples", 48);
+				effect->params.godRays.skyThreshold =
+					JsonUtil::GetNumberValue<float>(grJson, "skyThreshold", 0.999f);
 			}
 		}
 

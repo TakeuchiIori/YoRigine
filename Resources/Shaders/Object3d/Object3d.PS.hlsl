@@ -127,22 +127,37 @@ PixelShaderOutput main(VertexShaderOutput input)
     if (gMaterialLight.enableLighting)
     {
         //===========================================================//
-        //                   シャドウマップの計算               
+        //                   シャドウマップの計算
         //===========================================================//
         float3 proj = input.shadowPos.xyz / input.shadowPos.w;
         float2 shadowUV;
         shadowUV.x = proj.x * 0.5f + 0.5f;
         shadowUV.y = -proj.y * 0.5f + 0.5f; // Y軸反転
 
-        float shadowDepth = proj.z - 0.002; // バイアス追加
+        // 主バイアスは PSO の SlopeScaledDepthBias 側で吸収する想定。
+        // 残った D32_FLOAT 精度由来のチラつき対策に微小な定数だけ引く。
+        float shadowDepth = proj.z - 0.0005f;
 
         float shadow = 1.0f; // デフォルトは影なし
         if (shadowUV.x >= 0.0f && shadowUV.x <= 1.0f &&
         shadowUV.y >= 0.0f && shadowUV.y <= 1.0f &&
         shadowDepth <= 1.0f)
         {
-            // SampleCmpLevelZero は 0～1 の値を返す
-            shadow = gShadowMap.SampleCmpLevelZero(gShadowSampler, shadowUV, shadowDepth);
+            // 3x3 PCF: HW 比較サンプラの 2x2 バイリニア × 9 タップでソフトシャドウ
+            const float shadowMapSize = 4096.0f; // DsvManager::kShadowmapWidth と一致
+            const float texel = 1.0f / shadowMapSize;
+            float sum = 0.0f;
+            [unroll]
+            for (int sy = -1; sy <= 1; ++sy)
+            {
+                [unroll]
+                for (int sx = -1; sx <= 1; ++sx)
+                {
+                    float2 off = float2(sx, sy) * texel;
+                    sum += gShadowMap.SampleCmpLevelZero(gShadowSampler, shadowUV + off, shadowDepth);
+                }
+            }
+            shadow = sum / 9.0f;
         }
 
         // 影の濃さを調整

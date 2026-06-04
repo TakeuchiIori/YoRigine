@@ -393,7 +393,10 @@ namespace YoRigine {
             VfxEffectAsset b = sel->asset;
             bool c = false;
 
-            const char* shapeNames[] = { "Flat (平板)", "Arc (円弧)", "Fan (扇形)" ,"Custom (カスタム)" };
+            const char* shapeNames[] = {
+                "Flat (平板)", "Arc (円弧)", "Fan (扇形)",
+                "Custom (2D ポリゴン押し出し)", "Primitive (3D メッシュ)"
+            };
             int shapeIdx = static_cast<int>(t.shapeType);
             ImGui::SetNextItemWidth(-1);
             if (ImGui::Combo("##shape", &shapeIdx, shapeNames, IM_ARRAYSIZE(shapeNames))) {
@@ -402,13 +405,93 @@ namespace YoRigine {
             }
             ImGui::SameLine(0, 4); ImGui::TextDisabled("断面形状");
 
-            if (t.shapeType != TrailShapeType::Flat) {
+            // Arc / Fan のみ widthSegments + 円弧角を出す (Flat/Custom/Primitive は不要)
+            if (t.shapeType == TrailShapeType::Arc || t.shapeType == TrailShapeType::Fan) {
                 c |= ImGui::SliderInt("幅の分割数##wseg", &t.widthSegments, 1, 16);
                 c |= ImGui::SliderFloat("円弧の角度(度)##arcang", &t.arcAngleDeg, 10.f, 360.f, "%.1f");
             }
             c |= ImGui::DragInt("滑らかさ(補間分割数)##spline", &t.splineSubdivisions, 1, 512);
 
             if (c) CommitChange(b, "Trail 形状設定");
+        }
+
+        // ★ Primitive (3D) 専用セクション
+        if (t.shapeType == TrailShapeType::Primitive) {
+            ImGui::SeparatorText("3D プリミティブ");
+            VfxEffectAsset b = sel->asset;
+            bool c = false;
+            auto& sp = t.primitive;
+
+            // Type
+            const char* typeNames[] = { "Box", "Sphere", "Capsule", "Cone", "Cylinder", "Torus" };
+            int typeIdx = static_cast<int>(sp.type);
+            ImGui::SetNextItemWidth(180);
+            if (ImGui::Combo("Type##prim", &typeIdx, typeNames, IM_ARRAYSIZE(typeNames))) {
+                sp.type = static_cast<PrimitiveType>(typeIdx);
+                c = true;
+            }
+
+            // Placement
+            const char* placeNames[] = { "Static (1個固定)", "BeadAlongTrail (軌跡に連続配置)" };
+            int placeIdx = static_cast<int>(sp.placement);
+            ImGui::SetNextItemWidth(260);
+            if (ImGui::Combo("配置##prim", &placeIdx, placeNames, IM_ARRAYSIZE(placeNames))) {
+                sp.placement = static_cast<PrimitivePlacement>(placeIdx);
+                c = true;
+            }
+
+            // 共通スケール
+            c |= ImGui::DragFloat("スタンプスケール##prim", &sp.stampScale,
+                                  0.01f, 0.001f, 100.f, "%.3f");
+
+            // Type 別パラメータ
+            ImGui::Spacing();
+            switch (sp.type) {
+            case PrimitiveType::Box:
+                c |= ImGui::DragFloat3("半辺長##bx", &sp.halfExtents.x, 0.01f, 0.001f, 10.f, "%.3f");
+                break;
+            case PrimitiveType::Sphere:
+                c |= ImGui::DragFloat("半径##sp", &sp.radius, 0.01f, 0.001f, 10.f, "%.3f");
+                c |= ImGui::SliderInt("緯度分割##sp", &sp.latSegments, 2, 64);
+                c |= ImGui::SliderInt("経度分割##sp", &sp.lonSegments, 3, 64);
+                break;
+            case PrimitiveType::Capsule:
+                c |= ImGui::DragFloat("半径##cap", &sp.radius, 0.01f, 0.001f, 10.f, "%.3f");
+                c |= ImGui::DragFloat("全高##cap", &sp.height, 0.01f, 0.001f, 20.f, "%.3f");
+                c |= ImGui::SliderInt("緯度分割##cap", &sp.latSegments, 2, 32);
+                c |= ImGui::SliderInt("経度分割##cap", &sp.lonSegments, 3, 32);
+                break;
+            case PrimitiveType::Cone:
+                c |= ImGui::DragFloat("底面半径##cn", &sp.radius, 0.01f, 0.001f, 10.f, "%.3f");
+                c |= ImGui::DragFloat("高さ##cn", &sp.height, 0.01f, 0.001f, 20.f, "%.3f");
+                c |= ImGui::SliderInt("分割##cn", &sp.lonSegments, 3, 64);
+                break;
+            case PrimitiveType::Cylinder:
+                c |= ImGui::DragFloat("半径##cy", &sp.radius, 0.01f, 0.001f, 10.f, "%.3f");
+                c |= ImGui::DragFloat("高さ##cy", &sp.height, 0.01f, 0.001f, 20.f, "%.3f");
+                c |= ImGui::SliderInt("分割##cy", &sp.lonSegments, 3, 64);
+                break;
+            case PrimitiveType::Torus:
+                c |= ImGui::DragFloat("主半径 R##to", &sp.radius, 0.01f, 0.001f, 10.f, "%.3f");
+                c |= ImGui::DragFloat("管半径 r##to", &sp.tubeRadius, 0.01f, 0.001f, 10.f, "%.3f");
+                c |= ImGui::SliderInt("主分割##to", &sp.lonSegments, 3, 64);
+                c |= ImGui::SliderInt("管分割##to", &sp.ringSegments, 3, 32);
+                break;
+            }
+
+            // Bead モード固有
+            if (sp.placement == PrimitivePlacement::BeadAlongTrail) {
+                ImGui::Spacing();
+                ImGui::TextDisabled("Bead モード設定");
+                c |= ImGui::DragFloat("間引き間隔##bead", &sp.stampSpacing,
+                                      0.01f, 0.0f, 10.0f, "%.3f");
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("0 = 平滑化後の全点に配置 / >0 = 直線距離で間引き");
+                }
+                c |= ImGui::Checkbox("寿命でスケール縮小##bead", &sp.scaleByAge);
+            }
+
+            if (c) CommitChange(b, "Primitive 設定");
         }
 
         ImGui::SeparatorText("立体感・三日月化");

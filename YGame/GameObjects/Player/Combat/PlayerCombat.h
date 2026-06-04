@@ -167,5 +167,6 @@ private:
 	bool hasBufferedInput_ = false;                // 有効な先行入力が積まれているか
 	AttackType bufferedAttackType_ = AttackType::A_Arte;
 	float bufferedInputAge_ = 0.0f;                // バッファに積まれてからの経過秒
-	float inputBufferLifetime_ = 0.4f;             // バッファの寿命（秒）。経過後は破棄
+	// バッファの寿命（秒）。攻撃モーション終了時にまとめて消費されるため、最長攻撃 duration を上回る値にする
+	float inputBufferLifetime_ = 2.0f;
 };

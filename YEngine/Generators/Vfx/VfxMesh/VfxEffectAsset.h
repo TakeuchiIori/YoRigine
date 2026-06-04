@@ -19,10 +19,52 @@ namespace YoRigine {
 
     enum class TrailShapeType : int
     {
-        Flat   = 0,
-        Arc    = 1,
-        Fan    = 2,
-        Custom = 3,
+        Flat      = 0,
+        Arc       = 1,
+        Fan       = 2,
+        Custom    = 3,
+        Primitive = 4,   // 3D プリミティブ (Box/Sphere/...) ★NEW
+    };
+
+    // 3D プリミティブ種別
+    enum class PrimitiveType : int
+    {
+        Box      = 0,
+        Sphere   = 1,
+        Capsule  = 2,
+        Cone     = 3,
+        Cylinder = 4,
+        Torus    = 5,
+    };
+
+    // プリミティブの配置モード
+    enum class PrimitivePlacement : int
+    {
+        Static          = 0,   // 1個固定 (装飾メッシュ用途)
+        BeadAlongTrail  = 1,   // 軌跡の各点にスタンプ (ビーズ状)
+    };
+
+    // 3D プリミティブの形状/配置パラメータ
+    struct PrimitiveSpec
+    {
+        PrimitiveType      type      = PrimitiveType::Box;
+        PrimitivePlacement placement = PrimitivePlacement::Static;
+
+        // ---- 共通サイズ ----
+        Vector3 halfExtents = { 0.5f, 0.5f, 0.5f };  // Box の半辺長
+        float   radius      = 0.5f;                   // Sphere/Capsule/Cone/Cylinder/Torus
+        float   height      = 1.0f;                   // Capsule/Cone/Cylinder
+        float   tubeRadius  = 0.15f;                  // Torus
+
+        // ---- 分割数 ----
+        int     latSegments  = 16;   // Sphere/Capsule の縦
+        int     lonSegments  = 16;   // Sphere/Capsule/Cone/Cylinder の横
+        int     ringSegments = 12;   // Torus の細い側の分割
+
+        // ---- BeadAlongTrail モード用 ----
+        float   stampScale   = 1.0f;
+        float   stampSpacing = 0.0f;   // 0 = 平滑化後の全点に置く
+        bool    scaleByAge   = true;   // 寿命で縮小フェード
     };
 
 
@@ -81,6 +123,9 @@ namespace YoRigine {
         // --- 幅ウェーブ (慣性感) ---
         float widthWaveAmp  = 0.05f;    // 幅のサイン波振幅 (0=OFF)
         float widthWaveFreq = 8.0f;     // 幅のサイン波周波数
+
+        // --- 3D プリミティブ (shapeType == Primitive の時に参照) ★NEW ---
+        PrimitiveSpec primitive;
     };
 
     // -------------------------------------------------------
