@@ -121,11 +121,12 @@ group "Engine"
             ["*"] = "YMath/**"
         }
 
-    --------------------- YEngine (Static Library) ---------------------
+   --------------------- YEngine (Static Library) ---------------------
     project "YEngine"
         kind "StaticLib"
         location "%{wks.basedir}/YEngine"
-        defines { "GAME_BUILD_DLL" }
+        -- ※ GAME_BUILD_DLL は不要なら削除してください
+	defines { "GAME_BUILD_DLL" }
 
         fatalwarnings { "All" }
         linkoptions { "/ignore:4099" }
@@ -139,21 +140,28 @@ group "Engine"
             ["YEngine/*"] = "YEngine/**",
         }
 
-        includedirs(engine_includes)
+        -- インクルードパス（cURLを追加）
+        includedirs {
+            engine_includes,
+            "Externals/curl/include"
+        }
         
+        -- ライブラリとリンク設定（cURLを追加）
+        libdirs { "Externals/curl/lib" }
+        links { "YMath", "DirectXTex.lib", "libcurl" }
+
         dependson { "YMath","DirectXTex" }
-        links { "YMath", "DirectXTex.lib" }
 
         postbuildcommands {
-            -- DXC/DXIL DLLのコピーは引き続き行う
+            -- DXC/DXIL DLLのコピー（タイポ修正済み）
             'xcopy /Q /Y /I "$(WindowsSdkDir)bin\\$(TargetPlatformVersion)\\x64\\dxcompiler.dll" "%{cfg.targetdir}"',
-            'xcopy /Q /Y /I "$(WindowsSdkDir)bin\\$(TargetPlatformVersion)\\x64\\dxil.dll" "%{cfg.targetdir}"',
+            'xcopy /Q /Y /I "$(WindowsSdkDir)bin\\$(TargetPlatformVersion)\\x64\\dxil.dll" "%{cfg.targetdir}"'
         }
 
         filter "configurations:Debug"
             defines { "USE_IMGUI" }
             dependson { "ImGui"}
-            links { "ImGui" } -- 外部プロジェクト名と合わせる
+            links { "ImGui" }
             libdirs { 
                 "Externals/assimp/lib/Debug",
                 outputDir
@@ -238,11 +246,14 @@ group "Game"
         includedirs(engine_includes)
         includedirs(game_includes)
 
-        -- 【追加】YGame.lib（インポートライブラリ）を暗黙的リンク
+        -- YGame.lib（インポートライブラリ）を暗黙的リンク
         libdirs { outputDir }
         links { "YGame" }
 
-        postbuildcommands { } 
+        -- 共通のビルド後コマンドとしてここに記述
+        postbuildcommands {
+            'xcopy /Q /Y /I "%{wks.basedir}\\Externals\\curl\\bin\\libcurl.dll" "%{cfg.targetdir}"'
+        }
 
         filter "configurations:Debug"
             defines { "_DEBUG" }
