@@ -61,7 +61,7 @@ void PlayerCamera::Initialize(FollowCamera* followCamera, const WorldTransform* 
 }
 
 // ============================================================
-// フェーズ1: スティック入力・ロックオン更新
+// スティック入力・ロックオン更新
 // CameraDirector::Update() の前に GameScene::Update() から呼ぶ。
 // FollowCamera の回転を確定させることで、後続の FollowProcess() が
 // 正しい位置を計算できるようにする。
@@ -97,7 +97,7 @@ void PlayerCamera::UpdatePreDirector() {
 }
 
 // ============================================================
-// フェーズ2: 攻撃カメラオフセットを sceneCamera に後付けで適用
+// 攻撃カメラオフセットを sceneCamera に後付けで適用
 // CameraDirector::Update() + UpdateCamera() の後に呼ぶ。
 // CameraDirector が sceneCamera に転送した後なので、
 // ここで加算すると確実に描画に反映される。
