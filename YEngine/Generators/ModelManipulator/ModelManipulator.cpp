@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <algorithm>
 #include <iostream>
+#include <cfloat>
 
 #include "ModelManager.h"
 #include <Collision/Core/CollisionTypeIdDef.h>
@@ -158,15 +159,9 @@ namespace YoRigine {
 				if (!FrustumUtil::IsAABBVisible(frustum, bounds)) continue;
 			}
 
-			// 選択状態に応じた色の変更処理
-			// 非選択: ユーザ設定色 (obj->color) をそのまま、選択中: 赤強調 (元色のアルファは維持)
-			bool isSelected = selector_.IsSelected(obj->id);
-			if (isSelected) {
-				obj->object->SetMaterialColor({ 1.0f, 0.2f, 0.2f, obj->color.w });
-			}
-			else {
-				obj->object->SetMaterialColor(obj->color);
-			}
+			// マテリアル色は常にユーザ設定 (obj->color) を使用する。
+			// 選択中の視覚的フィードバックは DrawLine 側の世界 AABB 枠で行う。
+			obj->object->SetMaterialColor(obj->color);
 
 			// ボーン表示がONで対象オブジェクトならメッシュは描画しない
 			bool isTargetAndBoneDraw = (motionEditor_.IsDrawBone() && obj->id == motionEditor_.GetTargetObjectId());
@@ -186,6 +181,43 @@ namespace YoRigine {
 		motionEditor_.DrawBone();
 
 #ifdef USE_IMGUI
+		// ── 選択中ハイライト（モデル外接の世界 AABB をオレンジ枠で表示） ──
+		// 色のマテリアル上書きを避け、ここでビジュアルな選択フィードバックを与える。
+		// コライダーデバッグ表示の ON/OFF に関係なく常時描画。
+		if (selector_.HasSelection()) {
+			const Vector4 kSelectionColor{ 1.0f, 0.55f, 0.0f, 1.0f }; // Blender 風オレンジ
+			colliderCubes_.Begin();
+			for (auto* obj : objectManager_->GetAllActiveObjects()) {
+				if (!obj || !obj->object || !obj->worldTransform) continue;
+				if (!selector_.IsSelected(obj->id)) continue;
+
+				AABB local{};
+				if (!objectManager_->ComputeModelLocalAABB(*obj, local)) continue;
+
+				// ローカル AABB の 8 隅をワールド変換して、その AABB を求める
+				const Vector3 corners[8] = {
+					{ local.min.x, local.min.y, local.min.z },
+					{ local.max.x, local.min.y, local.min.z },
+					{ local.min.x, local.max.y, local.min.z },
+					{ local.max.x, local.max.y, local.min.z },
+					{ local.min.x, local.min.y, local.max.z },
+					{ local.max.x, local.min.y, local.max.z },
+					{ local.min.x, local.max.y, local.max.z },
+					{ local.max.x, local.max.y, local.max.z },
+				};
+				const Matrix4x4& mw = obj->worldTransform->GetMatWorld();
+				Vector3 wmn = {  FLT_MAX,  FLT_MAX,  FLT_MAX };
+				Vector3 wmx = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
+				for (const auto& c : corners) {
+					Vector3 wp = Transform(c, mw);
+					wmn.x = std::min(wmn.x, wp.x); wmn.y = std::min(wmn.y, wp.y); wmn.z = std::min(wmn.z, wp.z);
+					wmx.x = std::max(wmx.x, wp.x); wmx.y = std::max(wmx.y, wp.y); wmx.z = std::max(wmx.z, wp.z);
+				}
+				colliderCubes_.AddAABB(wmn, wmx, kSelectionColor);
+			}
+			colliderCubes_.Flush();
+		}
+
 		if (!showColliderDebug_) return;
 
 		// タイプID → 色
