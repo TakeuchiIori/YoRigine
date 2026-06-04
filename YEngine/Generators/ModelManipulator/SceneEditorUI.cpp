@@ -239,6 +239,18 @@ namespace YoRigine {
 
             if (changed) objectManager_->UpdateObjectTransform(*obj);
 
+            // ── マテリアル色 ────────────────────────────────────────
+            ImGui::Separator();
+            if (ImGui::ColorEdit4("色", &obj->color.x,
+                ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_AlphaPreviewHalf)) {
+                objectManager_->ApplyObjectColor(*obj);
+            }
+            ImGui::SameLine();
+            if (ImGui::SmallButton("白に戻す")) {
+                obj->color = { 1.0f, 1.0f, 1.0f, 1.0f };
+                objectManager_->ApplyObjectColor(*obj);
+            }
+
             ImGui::Separator();
 
             if (ImGui::Button("位置リセット")) {
@@ -350,6 +362,22 @@ namespace YoRigine {
 
                 if (changed) {
                     objectManager_->ApplyColliderTemplate(*obj);
+                }
+
+                // ── モデル形状への自動フィット ──
+                ImGui::Separator();
+                ImGui::TextDisabled("自動フィット");
+                ImGui::SetNextItemWidth(120.0f);
+                ImGui::DragFloat("マージン", &colliderFitMargin_, 0.01f, 1.0f, 2.0f, "x %.2f");
+                ImGui::SameLine();
+                if (ImGui::Button("モデルに合わせる")) {
+                    if (!objectManager_->FitColliderToModel(*obj, colliderFitMargin_)) {
+                        ImGui::OpenPopup("FitColliderFailed");
+                    }
+                }
+                if (ImGui::BeginPopup("FitColliderFailed")) {
+                    ImGui::TextUnformatted("モデルの頂点を取得できませんでした。");
+                    ImGui::EndPopup();
                 }
 
                 ImGui::EndChild();

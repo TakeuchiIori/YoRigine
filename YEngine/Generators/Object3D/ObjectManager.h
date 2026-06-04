@@ -9,6 +9,7 @@
 #include "WorldTransform/WorldTransform.h"
 #include <Memory/PoolAllocator.h>
 #include "Vector3.h"
+#include "Vector4.h"
 
 #include <Collision/AABB/AABBCollider.h>
 #include <Collision/Core/BaseCollider.h>
@@ -45,6 +46,9 @@ public:
 		Vector3 position = { 0.0f, 0.0f, 0.0f };
 		Vector3 rotation = { 0.0f, 0.0f, 0.0f };
 		Vector3 scale = { 1.0f, 1.0f, 1.0f };
+
+		// マテリアル色 (rgba)。エディタから編集 / JSON 保存対象
+		Vector4 color = { 1.0f, 1.0f, 1.0f, 1.0f };
 
 		int id = 0;
 		int parentID = -1;
@@ -153,6 +157,21 @@ public:
 
 	// 同名モデルの colliderEnabled を一括設定する
 	void SetColliderEnabledAll(const std::string& modelName, bool enabled);
+
+	///************************* マテリアル色操作 *************************///
+
+	// PlacedObject の color を内部 Object3d のマテリアルに反映する
+	void ApplyObjectColor(PlacedObject& obj);
+
+	///************************* コライダー自動フィット *************************///
+
+	// モデルの全頂点からローカル AABB を計算（描画と同じ root ノード行列を反映済み）。
+	// 頂点が無い／モデル未ロード時は false。
+	bool ComputeModelLocalAABB(const PlacedObject& obj, AABB& outAabb) const;
+
+	// 計算した AABB を margin (1.0 で等倍, 1.05 で 5% 拡大) で膨らませて、
+	// 現在の colliderShapeType に応じて AABB/OBB/Sphere の各オフセットに書き込み、適用する。
+	bool FitColliderToModel(PlacedObject& obj, float margin);
 
 private:
 	ObjectManager() = default;

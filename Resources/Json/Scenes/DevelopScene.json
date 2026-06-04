@@ -36,6 +36,12 @@
             ],
             "colliderSphRadius": 1.0,
             "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
             "filePath": "Blacksmith\\Blacksmith.obj",
             "id": 0,
             "isAnimation": false,
@@ -93,6 +99,12 @@
             ],
             "colliderSphRadius": 1.0,
             "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
             "filePath": "House_2\\House_2.obj",
             "id": 1,
             "isAnimation": false,
@@ -150,6 +162,12 @@
             ],
             "colliderSphRadius": 1.0,
             "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
             "filePath": "Bell_Tower\\Bell_Tower.obj",
             "id": 2,
             "isAnimation": false,
@@ -174,20 +192,20 @@
         {
             "animationName": "",
             "colliderAabbMax": [
-                1.0,
-                1.0,
-                1.0
+                1.1255600452423096,
+                3.474648952484131,
+                1.3828206062316895
             ],
             "colliderAabbMin": [
-                -1.0,
-                -1.0,
-                -1.0
+                -1.1255600452423096,
+                -0.0848538875579834,
+                -1.4089465141296387
             ],
-            "colliderEnabled": false,
+            "colliderEnabled": true,
             "colliderObbCenter": [
                 0.0,
-                0.0,
-                0.0
+                4.994999885559082,
+                -0.013063013553619385
             ],
             "colliderObbEuler": [
                 0.0,
@@ -195,11 +213,11 @@
                 0.0
             ],
             "colliderObbSize": [
-                1.0,
-                1.0,
-                1.0
+                1.1255600452423096,
+                1.7797514200210571,
+                1.395883560180664
             ],
-            "colliderShapeType": 0,
+            "colliderShapeType": 1,
             "colliderSphCenter": [
                 0.0,
                 0.0,
@@ -207,6 +225,12 @@
             ],
             "colliderSphRadius": 1.0,
             "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
             "filePath": "House_1\\House_1.obj",
             "id": 3,
             "isAnimation": false,
@@ -264,6 +288,12 @@
             ],
             "colliderSphRadius": 1.0,
             "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
             "filePath": "Blacksmith\\Blacksmith.obj",
             "id": 4,
             "isAnimation": false,
@@ -321,6 +351,12 @@
             ],
             "colliderSphRadius": 1.0,
             "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
             "filePath": "House_2\\House_2.obj",
             "id": 5,
             "isAnimation": false,
@@ -378,6 +414,12 @@
             ],
             "colliderSphRadius": 1.0,
             "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
             "filePath": "Ground\\Ground.obj",
             "id": 6,
             "isAnimation": false,
@@ -435,6 +477,12 @@
             ],
             "colliderSphRadius": 1.0,
             "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
             "filePath": "Bell_Tower\\Bell_Tower.obj",
             "id": 7,
             "isAnimation": false,
@@ -457,5 +505,5 @@
             ]
         }
     ],
-    "version": 6
+    "version": 7
 }

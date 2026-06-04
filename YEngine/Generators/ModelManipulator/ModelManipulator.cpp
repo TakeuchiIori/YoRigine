@@ -159,12 +159,13 @@ namespace YoRigine {
 			}
 
 			// 選択状態に応じた色の変更処理
+			// 非選択: ユーザ設定色 (obj->color) をそのまま、選択中: 赤強調 (元色のアルファは維持)
 			bool isSelected = selector_.IsSelected(obj->id);
 			if (isSelected) {
-				obj->object->SetMaterialColor({ 1.0f, 0.2f, 0.2f, 1.0f });
+				obj->object->SetMaterialColor({ 1.0f, 0.2f, 0.2f, obj->color.w });
 			}
 			else {
-				obj->object->SetMaterialColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+				obj->object->SetMaterialColor(obj->color);
 			}
 
 			// ボーン表示がONで対象オブジェクトならメッシュは描画しない

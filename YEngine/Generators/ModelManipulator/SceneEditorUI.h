@@ -101,6 +101,9 @@ namespace YoRigine {
         int     duplicateCount_ = 1;
         bool    duplicateKeepParent_ = false;
 
+        // コライダー自動フィット時のマージン (1.0 等倍 / 1.05 5%拡大)
+        float   colliderFitMargin_ = 1.05f;
+
         std::string selectedPrefabName_;
         char        prefabNameBuf_[64] = {};
     };

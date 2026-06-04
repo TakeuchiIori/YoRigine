@@ -187,6 +187,10 @@ ObjectManager::PlacedObject* ObjectManager::DuplicateObject(
 	duplicate->colliderSphereRadius = original->colliderSphereRadius;
 	ApplyColliderTemplate(*duplicate);
 
+	// マテリアル色を複製
+	duplicate->color = original->color;
+	ApplyObjectColor(*duplicate);
+
 	UpdateObjectTransform(*duplicate);
 
 	std::cout << "複製: 元ID=" << objectId << " 新ID=" << duplicate->id << std::endl;
@@ -414,7 +418,86 @@ void ObjectManager::InitializePlacedObject(
 	// 当たり判定（初期状態では無効）
 	obj.collider = nullptr;
 
+	// マテリアル色（プール再利用時の残骸を防ぐため明示的にリセット）
+	obj.color = { 1.0f, 1.0f, 1.0f, 1.0f };
+	ApplyObjectColor(obj);
+
 	UpdateObjectTransform(obj);
+}
+
+void ObjectManager::ApplyObjectColor(PlacedObject& obj) {
+	if (!obj.object) return;
+	obj.object->SetMaterialColor(obj.color);
+}
+
+bool ObjectManager::ComputeModelLocalAABB(const PlacedObject& obj, AABB& outAabb) const {
+	if (!obj.object) return false;
+	Model* model = obj.object->GetModel();
+	if (!model) return false;
+	const auto& meshes = model->GetMeshes();
+	if (meshes.empty()) return false;
+
+	// 描画パス（ボーンなし）では Root ノードのローカル行列が適用されるため、ここでも反映する
+	const Matrix4x4 rootMtx = model->GetHasBones()
+		? MakeIdentity4x4()
+		: model->GetRootNode().GetLocalMatrix();
+
+	bool any = false;
+	Vector3 mn = {  FLT_MAX,  FLT_MAX,  FLT_MAX };
+	Vector3 mx = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
+
+	for (const auto& m : meshes) {
+		if (!m) continue;
+		const auto& md = m->GetMeshData();
+		for (const auto& v : md.vertices) {
+			Vector3 p = Transform({ v.position.x, v.position.y, v.position.z }, rootMtx);
+			mn.x = std::min(mn.x, p.x); mn.y = std::min(mn.y, p.y); mn.z = std::min(mn.z, p.z);
+			mx.x = std::max(mx.x, p.x); mx.y = std::max(mx.y, p.y); mx.z = std::max(mx.z, p.z);
+			any = true;
+		}
+	}
+
+	if (!any) return false;
+	outAabb.min = mn;
+	outAabb.max = mx;
+	return true;
+}
+
+bool ObjectManager::FitColliderToModel(PlacedObject& obj, float margin) {
+	AABB local{};
+	if (!ComputeModelLocalAABB(obj, local)) return false;
+
+	// margin で中心まわりに均等拡大
+	const Vector3 center = (local.min + local.max) * 0.5f;
+	const Vector3 halfExtent = {
+		(local.max.x - local.min.x) * 0.5f * margin,
+		(local.max.y - local.min.y) * 0.5f * margin,
+		(local.max.z - local.min.z) * 0.5f * margin,
+	};
+
+	switch (obj.colliderShapeType) {
+	case ColliderShapeType::kAABB:
+		obj.colliderAabbOffset.min = { center.x - halfExtent.x, center.y - halfExtent.y, center.z - halfExtent.z };
+		obj.colliderAabbOffset.max = { center.x + halfExtent.x, center.y + halfExtent.y, center.z + halfExtent.z };
+		break;
+	case ColliderShapeType::kOBB:
+		// OBB.size は半サイズ (YMath/Shape/OBB.h コメント参照) なので halfExtent をそのまま入れる
+		obj.colliderObbCenter = center;
+		obj.colliderObbSize   = halfExtent;
+		obj.colliderObbEuler  = { 0.0f, 0.0f, 0.0f };
+		break;
+	case ColliderShapeType::kSphere: {
+		obj.colliderSphereCenter = center;
+		const float r = std::sqrt(halfExtent.x * halfExtent.x +
+		                          halfExtent.y * halfExtent.y +
+		                          halfExtent.z * halfExtent.z);
+		obj.colliderSphereRadius = r;
+		break;
+	}
+	}
+
+	ApplyColliderTemplate(obj);
+	return true;
 }
 
 void ObjectManager::ApplyColliderTemplate(PlacedObject& obj) {
