@@ -191,8 +191,9 @@ ObjectManager::PlacedObject* ObjectManager::DuplicateObject(
 	duplicate->color = original->color;
 	ApplyObjectColor(*duplicate);
 
-	// UV スケールを複製
-	duplicate->uvScale = original->uvScale;
+	// UV スケール・ステキャスティック強度を複製
+	duplicate->uvScale     = original->uvScale;
+	duplicate->uvStochastic = original->uvStochastic;
 	ApplyObjectUV(*duplicate);
 
 	UpdateObjectTransform(*duplicate);
@@ -426,8 +427,9 @@ void ObjectManager::InitializePlacedObject(
 	obj.color = { 1.0f, 1.0f, 1.0f, 1.0f };
 	ApplyObjectColor(obj);
 
-	// UV スケールも同様にリセット
+	// UV スケール・ステキャスティック強度も同様にリセット
 	obj.uvScale = { 1.0f, 1.0f };
+	obj.uvStochastic = 0.0f;
 	ApplyObjectUV(obj);
 
 	UpdateObjectTransform(obj);
@@ -442,6 +444,7 @@ void ObjectManager::ApplyObjectUV(PlacedObject& obj) {
 	if (!obj.object) return;
 	// Object3d::uvScale は public メンバ。Draw() 内の UpdateUV() が拾って CB に書き込む。
 	obj.object->uvScale = obj.uvScale;
+	obj.object->SetStochasticStrength(obj.uvStochastic);
 }
 
 bool ObjectManager::ComputeModelLocalAABB(const PlacedObject& obj, AABB& outAabb) const {

@@ -20,7 +20,7 @@ namespace YoRigine {
         if (!objectManager_) return false;
         try {
             json j;
-            j["version"] = 8;
+            j["version"] = 9;
             j["objects"] = json::array();
 
             for (const auto* obj : objectManager_->GetAllActiveObjects()) {
@@ -35,6 +35,7 @@ namespace YoRigine {
                     {"scale",               {obj->scale.x,    obj->scale.y,    obj->scale.z}},
                     {"color",               {obj->color.x,    obj->color.y,    obj->color.z,    obj->color.w}},
                     {"uvScale",             {obj->uvScale.x,  obj->uvScale.y}},
+                    {"uvStochastic",        obj->uvStochastic},
                     {"parentID",            obj->parentID},
                     {"isAnimation",         obj->isAnimation},
                     {"animationName",       obj->animationName},
@@ -71,7 +72,7 @@ namespace YoRigine {
             json j;
             file >> j;
             const int version = j.value("version", 1);
-            if (version < 1 || version > 8) return false;
+            if (version < 1 || version > 9) return false;
 
             objectManager_->ClearAllObjects();
 
@@ -120,6 +121,10 @@ namespace YoRigine {
                 // version 8+: UV スケール
                 if (version >= 8 && o.contains("uvScale")) {
                     obj->uvScale = { o["uvScale"][0], o["uvScale"][1] };
+                }
+                // version 9+: タイル単位ハッシュランダム化の強度
+                if (version >= 9 && o.contains("uvStochastic")) {
+                    obj->uvStochastic = o["uvStochastic"].get<float>();
                 }
                 objectManager_->ApplyObjectUV(*obj);
 
@@ -188,7 +193,7 @@ namespace YoRigine {
     {
         try {
             json j;
-            j["version"] = 8;
+            j["version"] = 9;
             j["objects"] = json::array();
 
             for (const auto* obj : objects) {
@@ -203,6 +208,7 @@ namespace YoRigine {
                     {"scale",               {obj->scale.x,    obj->scale.y,    obj->scale.z}},
                     {"color",               {obj->color.x,    obj->color.y,    obj->color.z,    obj->color.w}},
                     {"uvScale",             {obj->uvScale.x,  obj->uvScale.y}},
+                    {"uvStochastic",        obj->uvStochastic},
                     {"parentID",            obj->parentID},
                     {"isAnimation",         obj->isAnimation},
                     {"animationName",       obj->animationName},
@@ -295,6 +301,10 @@ namespace YoRigine {
                 // version 8+: UV スケール
                 if (version >= 8 && o.contains("uvScale")) {
                     obj->uvScale = { o["uvScale"][0], o["uvScale"][1] };
+                }
+                // version 9+: タイル単位ハッシュランダム化の強度
+                if (version >= 9 && o.contains("uvStochastic")) {
+                    obj->uvStochastic = o["uvStochastic"].get<float>();
                 }
                 objectManager_->ApplyObjectUV(*obj);
 

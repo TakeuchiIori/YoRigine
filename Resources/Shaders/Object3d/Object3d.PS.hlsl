@@ -3,6 +3,10 @@
 struct Material
 {
     float4x4 uvTransform;
+    float    stochasticStrength; // 0 = 通常タイル / 1 = タイル単位ランダムを最大適用
+    float    _pad0;
+    float    _pad1;
+    float    _pad2;
 };
 
 struct MaterialColor
@@ -61,6 +65,56 @@ struct PixelShaderOutput
 
 };
 
+//-----------------------------------------------------------------------------
+// タイル単位ハッシュランダム化サンプル
+//   Inigo Quilez "Texture Repetition" の軽量版 (4-tap)。
+//   各セル毎に乱数オフセットでサンプルし、bilinear で隣接 4 セルをブレンド。
+//-----------------------------------------------------------------------------
+float2 StochasticHash2(float2 p)
+{
+    p = float2(dot(p, float2(127.1f, 311.7f)),
+               dot(p, float2(269.5f, 183.3f)));
+    return frac(sin(p) * 43758.5453f);
+}
+
+// セルごとの「絵柄向き」を消すため、セル中心を軸に UV を回転させてからサンプルする
+float4 SampleCellRotated(Texture2D tex, SamplerState sam, float2 uv, float2 cellId, float strength)
+{
+    float2 rnd = StochasticHash2(cellId);
+
+    // 0..2π * strength のランダム回転（strength=0 で回転なし）
+    float angle = rnd.x * 6.2831853f * strength;
+    float ca = cos(angle), sa = sin(angle);
+
+    // セル中心を原点に持ってきて回転
+    float2 cellCenter = cellId + 0.5f;
+    float2 local      = uv - cellCenter;
+    float2 rotated    = float2(ca * local.x - sa * local.y,
+                               sa * local.x + ca * local.y);
+
+    // セル中心まわりに少しオフセット（strength で減衰）
+    float2 offset = (rnd - 0.5f) * strength;
+
+    return tex.Sample(sam, rotated + cellCenter + offset);
+}
+
+float4 SampleStochastic(Texture2D tex, SamplerState sam, float2 uv, float strength)
+{
+    // タイル格子 (uv が 1 進むごとに 1 セル)
+    float2 iuv = floor(uv);
+    float2 fuv = frac(uv);
+
+    // 隣接 4 セルそれぞれを「セル毎の回転＋オフセット」でサンプル
+    float4 ca = SampleCellRotated(tex, sam, uv, iuv + float2(0.0f, 0.0f), strength);
+    float4 cb = SampleCellRotated(tex, sam, uv, iuv + float2(1.0f, 0.0f), strength);
+    float4 cc = SampleCellRotated(tex, sam, uv, iuv + float2(0.0f, 1.0f), strength);
+    float4 cd = SampleCellRotated(tex, sam, uv, iuv + float2(1.0f, 1.0f), strength);
+
+    // bilinear で 4 セルをブレンドして接合部の段差を消す
+    float2 b = smoothstep(0.0f, 1.0f, fuv);
+    return lerp(lerp(ca, cb, b.x), lerp(cc, cd, b.x), b.y);
+}
+
 // プロシージャル 3D ハッシュ（テクスチャ不要のディゾルブマスク用）
 float DissolveHash3D(float3 p)
 {
@@ -117,7 +171,15 @@ PixelShaderOutput main(VertexShaderOutput input)
 
     // UV座標変換とテクスチャサンプリング
     float4 transformedUV = mul(float4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
-    float4 textureColor = gTexture.Sample(gSampler, transformedUV.xy);
+    float4 textureColor;
+    [branch] if (gMaterial.stochasticStrength > 0.001f)
+    {
+        textureColor = SampleStochastic(gTexture, gSampler, transformedUV.xy, gMaterial.stochasticStrength);
+    }
+    else
+    {
+        textureColor = gTexture.Sample(gSampler, transformedUV.xy);
+    }
     float4 baseColor = float4(gMaterialConstant.Kd, 1.0f) * textureColor;
 
     // 初期化

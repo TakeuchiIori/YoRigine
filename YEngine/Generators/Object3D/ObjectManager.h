@@ -54,6 +54,9 @@ public:
 		// UV スケール。エディタから編集 / JSON 保存対象
 		Vector2 uvScale = { 1.0f, 1.0f };
 
+		// タイル単位ランダム化の強度 (0=オフ / 1=最大)。エディタから編集 / JSON 保存対象
+		float uvStochastic = 0.0f;
+
 		int id = 0;
 		int parentID = -1;
 		bool isActive = true;

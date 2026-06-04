@@ -14,9 +14,11 @@ class MaterialUV
 {
 public:
 	///************************* GPU用の構造体 *************************///
+	// HLSL 側 Object3d.PS.hlsl の Material 構造体と一致させること
 	struct MaterialUVData {
 		Matrix4x4 uvTransform;
-		//float padding[3];
+		float     stochasticStrength; // 0 = 通常タイル / 1 = タイル単位ランダムを最大適用
+		float     _pad[3];            // 16 byte アライメント
 	};
 
 	///************************* 基本関数 *************************///
@@ -29,6 +31,7 @@ public:
 public:
 	///************************* アクセッサ *************************///
 	void SetUVTransform(const Matrix4x4& uvTransform) { materialUV_->uvTransform = uvTransform; }
+	void SetStochasticStrength(float s) { materialUV_->stochasticStrength = s; }
 
 private:
 

@@ -258,6 +258,11 @@ namespace YoRigine {
             ImGui::SameLine();
             if (ImGui::SmallButton("UV リセット")) {
                 obj->uvScale = { 1.0f, 1.0f };
+                obj->uvStochastic = 0.0f;
+                objectManager_->ApplyObjectUV(*obj);
+            }
+            // タイル単位ハッシュランダム化 (タイリングの“絨毯感”を消す)
+            if (ImGui::SliderFloat("UV ランダム化", &obj->uvStochastic, 0.0f, 1.0f, "%.2f")) {
                 objectManager_->ApplyObjectUV(*obj);
             }
 
