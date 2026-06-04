@@ -251,6 +251,16 @@ namespace YoRigine {
                 objectManager_->ApplyObjectColor(*obj);
             }
 
+            // ── UV スケール ─────────────────────────────────────────
+            if (ImGui::DragFloat2("UV スケール", &obj->uvScale.x, 0.01f, 0.0f, 100.0f, "%.3f")) {
+                objectManager_->ApplyObjectUV(*obj);
+            }
+            ImGui::SameLine();
+            if (ImGui::SmallButton("UV リセット")) {
+                obj->uvScale = { 1.0f, 1.0f };
+                objectManager_->ApplyObjectUV(*obj);
+            }
+
             ImGui::Separator();
 
             if (ImGui::Button("位置リセット")) {

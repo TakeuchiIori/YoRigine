@@ -8,6 +8,7 @@
 #include "Object3D/Object3d.h"
 #include "WorldTransform/WorldTransform.h"
 #include <Memory/PoolAllocator.h>
+#include "Vector2.h"
 #include "Vector3.h"
 #include "Vector4.h"
 
@@ -49,6 +50,9 @@ public:
 
 		// マテリアル色 (rgba)。エディタから編集 / JSON 保存対象
 		Vector4 color = { 1.0f, 1.0f, 1.0f, 1.0f };
+
+		// UV スケール。エディタから編集 / JSON 保存対象
+		Vector2 uvScale = { 1.0f, 1.0f };
 
 		int id = 0;
 		int parentID = -1;
@@ -162,6 +166,9 @@ public:
 
 	// PlacedObject の color を内部 Object3d のマテリアルに反映する
 	void ApplyObjectColor(PlacedObject& obj);
+
+	// PlacedObject の uvScale を内部 Object3d に反映する
+	void ApplyObjectUV(PlacedObject& obj);
 
 	///************************* コライダー自動フィット *************************///
 

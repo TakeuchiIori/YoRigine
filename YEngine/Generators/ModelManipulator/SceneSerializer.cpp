@@ -20,7 +20,7 @@ namespace YoRigine {
         if (!objectManager_) return false;
         try {
             json j;
-            j["version"] = 7;
+            j["version"] = 8;
             j["objects"] = json::array();
 
             for (const auto* obj : objectManager_->GetAllActiveObjects()) {
@@ -34,6 +34,7 @@ namespace YoRigine {
                     {"rotate",              {obj->rotation.x, obj->rotation.y, obj->rotation.z}},
                     {"scale",               {obj->scale.x,    obj->scale.y,    obj->scale.z}},
                     {"color",               {obj->color.x,    obj->color.y,    obj->color.z,    obj->color.w}},
+                    {"uvScale",             {obj->uvScale.x,  obj->uvScale.y}},
                     {"parentID",            obj->parentID},
                     {"isAnimation",         obj->isAnimation},
                     {"animationName",       obj->animationName},
@@ -70,7 +71,7 @@ namespace YoRigine {
             json j;
             file >> j;
             const int version = j.value("version", 1);
-            if (version < 1 || version > 7) return false;
+            if (version < 1 || version > 8) return false;
 
             objectManager_->ClearAllObjects();
 
@@ -115,6 +116,12 @@ namespace YoRigine {
                     obj->color = { o["color"][0], o["color"][1], o["color"][2], o["color"][3] };
                 }
                 objectManager_->ApplyObjectColor(*obj);
+
+                // version 8+: UV スケール
+                if (version >= 8 && o.contains("uvScale")) {
+                    obj->uvScale = { o["uvScale"][0], o["uvScale"][1] };
+                }
+                objectManager_->ApplyObjectUV(*obj);
 
                 if (version >= 5) {
                     // version 5+: per-object コライダー設定を直接読む
@@ -181,7 +188,7 @@ namespace YoRigine {
     {
         try {
             json j;
-            j["version"] = 7;
+            j["version"] = 8;
             j["objects"] = json::array();
 
             for (const auto* obj : objects) {
@@ -195,6 +202,7 @@ namespace YoRigine {
                     {"rotate",              {obj->rotation.x, obj->rotation.y, obj->rotation.z}},
                     {"scale",               {obj->scale.x,    obj->scale.y,    obj->scale.z}},
                     {"color",               {obj->color.x,    obj->color.y,    obj->color.z,    obj->color.w}},
+                    {"uvScale",             {obj->uvScale.x,  obj->uvScale.y}},
                     {"parentID",            obj->parentID},
                     {"isAnimation",         obj->isAnimation},
                     {"animationName",       obj->animationName},
@@ -283,6 +291,12 @@ namespace YoRigine {
                     obj->color = { o["color"][0], o["color"][1], o["color"][2], o["color"][3] };
                 }
                 objectManager_->ApplyObjectColor(*obj);
+
+                // version 8+: UV スケール
+                if (version >= 8 && o.contains("uvScale")) {
+                    obj->uvScale = { o["uvScale"][0], o["uvScale"][1] };
+                }
+                objectManager_->ApplyObjectUV(*obj);
 
                 if (version >= 5) {
                     obj->colliderTypeId = static_cast<CollisionTypeIdDef>(o.value("colliderTypeId", 0u));

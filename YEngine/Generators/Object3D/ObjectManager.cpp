@@ -191,6 +191,10 @@ ObjectManager::PlacedObject* ObjectManager::DuplicateObject(
 	duplicate->color = original->color;
 	ApplyObjectColor(*duplicate);
 
+	// UV スケールを複製
+	duplicate->uvScale = original->uvScale;
+	ApplyObjectUV(*duplicate);
+
 	UpdateObjectTransform(*duplicate);
 
 	std::cout << "複製: 元ID=" << objectId << " 新ID=" << duplicate->id << std::endl;
@@ -422,12 +426,22 @@ void ObjectManager::InitializePlacedObject(
 	obj.color = { 1.0f, 1.0f, 1.0f, 1.0f };
 	ApplyObjectColor(obj);
 
+	// UV スケールも同様にリセット
+	obj.uvScale = { 1.0f, 1.0f };
+	ApplyObjectUV(obj);
+
 	UpdateObjectTransform(obj);
 }
 
 void ObjectManager::ApplyObjectColor(PlacedObject& obj) {
 	if (!obj.object) return;
 	obj.object->SetMaterialColor(obj.color);
+}
+
+void ObjectManager::ApplyObjectUV(PlacedObject& obj) {
+	if (!obj.object) return;
+	// Object3d::uvScale は public メンバ。Draw() 内の UpdateUV() が拾って CB に書き込む。
+	obj.object->uvScale = obj.uvScale;
 }
 
 bool ObjectManager::ComputeModelLocalAABB(const PlacedObject& obj, AABB& outAabb) const {
