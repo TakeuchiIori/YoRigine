@@ -20,9 +20,6 @@ AreaEditor* AreaEditor::GetInstance()
 // ============================================================
 void AreaEditor::Update()
 {
-	ImGui::SetNextWindowSize(ImVec2(750, 520), ImGuiCond_FirstUseEver);
-	if (!ImGui::Begin("Area Editor")) { ImGui::End(); return; }
-
 	// ── 左ペイン：エリアリスト ──────────────────────────
 	ImGui::BeginChild("##list", ImVec2(200.0f, -42.0f), true);
 	DrawAreaList();
@@ -40,8 +37,6 @@ void AreaEditor::Update()
 
 	// ── モーダル ────────────────────────────────────────
 	DrawAddModal();
-
-	ImGui::End();
 }
 
 // ============================================================

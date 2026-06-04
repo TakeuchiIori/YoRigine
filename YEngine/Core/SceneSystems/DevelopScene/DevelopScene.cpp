@@ -21,6 +21,8 @@
 #include "GPUParticle/GpuEmitManager.h"
 #include <Vfx/VfxMesh/VfxMeshEditor.h>
 
+// WebAPI
+#include <WebAPI/YWebApiManager.h>
 
 // Camera
 #include "Systems/Camera/Virtuals/DebugCamera/DebugCamera.h"
@@ -63,6 +65,7 @@ void DevelopScene::Initialize() {
 	//------------------------------------------------------------
 	// システム初期化
 	//------------------------------------------------------------
+	YWebApiManager::GetInstance().Initialize();
 	YoRigine::GameTime::Initialize();
 	YoRigine::JsonManager::SetCurrentScene("DevelopScene");
 	YParticleManager::GetInstance().SetCamera(sceneCamera_.get());
@@ -101,6 +104,9 @@ void DevelopScene::Initialize() {
 	Editor::GetInstance()->RegisterGameUI("YoRigine:パーティクルエディター", [this]() {YParticleEditor::GetInstance().ShowEditorWindow(); }, "Develop");
 	//Editor::GetInstance()->RegisterGameUI("モーションエディタ", [this]() {motionEditor_->ShowEditor(); }, "Develop");
 	Editor::GetInstance()->RegisterGameUI("VFX", [this]() { YoRigine::VfxMeshEditor::GetInstance()->DrawImGui(); }, "Develop");
+	Editor::GetInstance()->RegisterGameUI("YWebAPI", [this]() { YWebApiManager::GetInstance().DrawLogWindow(); }, "Develop");
+	Editor::GetInstance()->RegisterGameUI("AreaEditor", [this]() { AreaEditor::GetInstance()->Update();; }, "Develop");
+
 
 #endif
 }
@@ -120,7 +126,7 @@ void DevelopScene::Update() {
 	YoRigine::GpuEmitManager::GetInstance()->Update();
 
 #ifdef USE_IMGUI
-	AreaEditor::GetInstance()->Update();
+	
 	YoRigine::VfxMeshEditor::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
 #endif
 }
@@ -178,6 +184,7 @@ void DevelopScene::DrawShadow() {
 void DevelopScene::Finalize() {
 
 	YoRigine::JsonManager::ClearSceneInstances("DevelopScene");
+	YWebApiManager::GetInstance().Finalize();
 }
 
 // ============================================================
