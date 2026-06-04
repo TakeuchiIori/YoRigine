@@ -198,8 +198,14 @@ void DevelopScene::DrawObject() {
 // 線の描画
 // ============================================================
 void DevelopScene::DrawLine() {
+	// フレーム冒頭の頂点・マテリアル CB スロットのリセット。
+	// 複数の DrawLine() を 1 フレームで呼ぶ場合に必須。
+	line_->Reset();
+
 	YoRigine::ModelManipulator::GetInstance()->DrawLine();
-	AreaManager::GetInstance()->DrawArea("FieldArea", line_.get());
+	// AreaEditor で追加したエリアも含めて全て描画。
+	// isDebugDrawEnabled_ / IsActive() / IsDebugDrawEnabled() を尊重する。
+	AreaManager::GetInstance()->Draw(line_.get());
 	line_->DrawLine();
 	CameraDirector::GetInstance()->DrawDebug3D(*line_);
 }

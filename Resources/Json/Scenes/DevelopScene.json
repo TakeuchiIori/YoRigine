@@ -58,72 +58,9 @@
                 3.1415884494781494
             ],
             "scale": [
-                5.354616165161133,
-                4.077547073364258,
-                3.382692575454712
-            ]
-        },
-        {
-            "animationName": "",
-            "colliderAabbMax": [
-                1.0,
-                1.0,
-                1.0
-            ],
-            "colliderAabbMin": [
-                -1.0,
-                -1.0,
-                -1.0
-            ],
-            "colliderEnabled": false,
-            "colliderObbCenter": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "colliderObbEuler": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "colliderObbSize": [
-                1.0,
-                1.0,
-                1.0
-            ],
-            "colliderShapeType": 0,
-            "colliderSphCenter": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "colliderSphRadius": 1.0,
-            "colliderTypeId": 0,
-            "color": [
-                1.0,
-                1.0,
-                1.0,
-                1.0
-            ],
-            "filePath": "House_2\\House_2.obj",
-            "id": 1,
-            "isAnimation": false,
-            "modelName": "House_2.obj",
-            "parentID": -1,
-            "position": [
-                58.533721923828125,
-                0.0,
-                0.2567877769470215
-            ],
-            "rotate": [
-                0.0,
-                1.5046788454055786,
-                0.0
-            ],
-            "scale": [
-                4.84910249710083,
-                4.6269941329956055,
-                4.782597064971924
+                4.0,
+                4.0,
+                4.0
             ]
         },
         {
@@ -169,7 +106,7 @@
                 1.0
             ],
             "filePath": "Bell_Tower\\Bell_Tower.obj",
-            "id": 2,
+            "id": 1,
             "isAnimation": false,
             "modelName": "Bell_Tower.obj",
             "parentID": -1,
@@ -184,9 +121,9 @@
                 3.1415908336639404
             ],
             "scale": [
-                2.027540922164917,
-                4.562047004699707,
-                3.2538936138153076
+                4.0,
+                4.0,
+                4.0
             ]
         },
         {
@@ -204,7 +141,7 @@
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.0,
-                4.994999885559082,
+                6.09499979019165,
                 -0.013063013553619385
             ],
             "colliderObbEuler": [
@@ -232,14 +169,14 @@
                 1.0
             ],
             "filePath": "House_1\\House_1.obj",
-            "id": 3,
+            "id": 2,
             "isAnimation": false,
             "modelName": "House_1.obj",
             "parentID": -1,
             "position": [
-                52.46268844604492,
+                18.14040184020996,
                 0.0,
-                13.094325065612793
+                24.853351593017578
             ],
             "rotate": [
                 -3.1415908336639404,
@@ -247,135 +184,9 @@
                 -3.1415724754333496
             ],
             "scale": [
-                3.5798819065093994,
-                3.3078629970550537,
-                3.61610746383667
-            ]
-        },
-        {
-            "animationName": "",
-            "colliderAabbMax": [
-                1.0,
-                1.0,
-                1.0
-            ],
-            "colliderAabbMin": [
-                -1.0,
-                -1.0,
-                -1.0
-            ],
-            "colliderEnabled": false,
-            "colliderObbCenter": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "colliderObbEuler": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "colliderObbSize": [
-                1.0,
-                1.0,
-                1.0
-            ],
-            "colliderShapeType": 0,
-            "colliderSphCenter": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "colliderSphRadius": 1.0,
-            "colliderTypeId": 0,
-            "color": [
-                1.0,
-                1.0,
-                1.0,
-                1.0
-            ],
-            "filePath": "Blacksmith\\Blacksmith.obj",
-            "id": 4,
-            "isAnimation": false,
-            "modelName": "Blacksmith.obj",
-            "parentID": -1,
-            "position": [
-                26.436691284179688,
-                0.0,
-                48.77960205078125
-            ],
-            "rotate": [
-                -3.1415908336639404,
-                -0.51050865650177,
-                3.1415884494781494
-            ],
-            "scale": [
-                5.354616641998291,
-                4.077547073364258,
-                3.382692575454712
-            ]
-        },
-        {
-            "animationName": "",
-            "colliderAabbMax": [
-                1.0,
-                1.0,
-                1.0
-            ],
-            "colliderAabbMin": [
-                -1.0,
-                -1.0,
-                -1.0
-            ],
-            "colliderEnabled": false,
-            "colliderObbCenter": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "colliderObbEuler": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "colliderObbSize": [
-                1.0,
-                1.0,
-                1.0
-            ],
-            "colliderShapeType": 0,
-            "colliderSphCenter": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "colliderSphRadius": 1.0,
-            "colliderTypeId": 0,
-            "color": [
-                1.0,
-                1.0,
-                1.0,
-                1.0
-            ],
-            "filePath": "House_2\\House_2.obj",
-            "id": 5,
-            "isAnimation": false,
-            "modelName": "House_2.obj",
-            "parentID": -1,
-            "position": [
-                51.57145690917969,
-                0.0,
-                28.602386474609375
-            ],
-            "rotate": [
-                0.0,
-                1.048319697380066,
-                0.0
-            ],
-            "scale": [
-                4.849102973937988,
-                4.6269941329956055,
-                4.782596111297607
+                4.0,
+                4.0,
+                4.0
             ]
         },
         {
@@ -421,18 +232,18 @@
                 1.0
             ],
             "filePath": "Ground\\Ground.obj",
-            "id": 6,
+            "id": 3,
             "isAnimation": false,
             "modelName": "Ground.obj",
             "parentID": -1,
             "position": [
-                0.0,
+                55.64846420288086,
                 0.10000000149011612,
                 0.0
             ],
             "rotate": [
                 0.0,
-                0.0,
+                -0.0,
                 0.0
             ],
             "scale": [
@@ -456,7 +267,7 @@
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.0,
-                13.149999618530273,
+                9.699999809265137,
                 0.0
             ],
             "colliderObbEuler": [
@@ -484,7 +295,7 @@
                 1.0
             ],
             "filePath": "Bell_Tower\\Bell_Tower.obj",
-            "id": 7,
+            "id": 4,
             "isAnimation": false,
             "modelName": "Bell_Tower.obj",
             "parentID": -1,
@@ -499,9 +310,450 @@
                 0.0
             ],
             "scale": [
-                7.619999885559082,
-                5.570000171661377,
-                7.510000228881836
+                4.0,
+                4.0,
+                4.0
+            ]
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "House_3\\House_3.obj",
+            "id": 5,
+            "isAnimation": false,
+            "modelName": "House_3.obj",
+            "parentID": -1,
+            "position": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "rotate": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                4.0,
+                4.0,
+                4.0
+            ]
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "House_4\\House_4.obj",
+            "id": 6,
+            "isAnimation": false,
+            "modelName": "House_4.obj",
+            "parentID": -1,
+            "position": [
+                13.398201942443848,
+                0.0007455348968505859,
+                0.0
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -0.13962629437446594,
+                -3.1415908336639404
+            ],
+            "scale": [
+                3.9999890327453613,
+                4.0,
+                3.9999890327453613
+            ]
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Tree1\\Tree1.obj",
+            "id": 7,
+            "isAnimation": false,
+            "modelName": "Tree1.obj",
+            "parentID": -1,
+            "position": [
+                0.0,
+                0.0,
+                -39.099998474121094
+            ],
+            "rotate": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ]
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Tree2\\Tree2.obj",
+            "id": 8,
+            "isAnimation": false,
+            "modelName": "Tree2.obj",
+            "parentID": -1,
+            "position": [
+                0.0,
+                0.0,
+                -19.600000381469727
+            ],
+            "rotate": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ]
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Floor_Brick\\Floor_Brick.obj",
+            "id": 9,
+            "isAnimation": false,
+            "modelName": "Floor_Brick.obj",
+            "parentID": -1,
+            "position": [
+                0.0,
+                6.0,
+                -47.79999923706055
+            ],
+            "rotate": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                4.0,
+                1.0,
+                4.0
+            ]
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Floor_UnevenBrick\\Floor_UnevenBrick.obj",
+            "id": 10,
+            "isAnimation": false,
+            "modelName": "Floor_UnevenBrick.obj",
+            "parentID": -1,
+            "position": [
+                -8.0,
+                6.0,
+                -48.29999923706055
+            ],
+            "rotate": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                4.0,
+                1.0,
+                4.0
+            ]
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Floor_RedBrick\\Floor_RedBrick.obj",
+            "id": 11,
+            "isAnimation": false,
+            "modelName": "Floor_RedBrick.obj",
+            "parentID": -1,
+            "position": [
+                7.900000095367432,
+                6.0,
+                -48.400001525878906
+            ],
+            "rotate": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                4.0,
+                1.0,
+                4.0
             ]
         }
     ],

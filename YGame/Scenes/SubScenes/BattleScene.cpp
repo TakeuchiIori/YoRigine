@@ -229,6 +229,9 @@ void BattleScene::DrawObject() {
 /// </summary>
 void BattleScene::DrawLine() {
 #ifdef USE_IMGUI
+	// フレーム冒頭の頂点・マテリアル CB スロットのリセット (複数の DrawLine() 呼出の干渉を避ける)
+	line_->Reset();
+
 	if (battleEnemyManager_) {
 		battleEnemyManager_->DrawCollision();
 	}

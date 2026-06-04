@@ -167,6 +167,9 @@ void FieldScene::DrawObject() {
 //========================================================================*/
 void FieldScene::DrawLine() {
 #ifdef USE_IMGUI
+	// フレーム冒頭の頂点・マテリアル CB スロットのリセット (複数の DrawLine() 呼出の干渉を避ける)
+	line_->Reset();
+
 	player_->DrawCollision();
 	fieldEnemyManager_->DrawCollision();
 	fieldEnemyManager_->DrawLine(line_.get());
