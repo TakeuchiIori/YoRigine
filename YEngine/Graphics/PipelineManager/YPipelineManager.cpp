@@ -166,6 +166,14 @@ void YPipelineManager::Initialize()
     CreatePSO_BaseOffScreen(
         L"Resources/Shaders/PostEffect/ColorGrade/ColorGrade.PS.hlsl",
         "ColorGrade");
+    // Fog は depth SRV を使うので DepthOutLine と同じビルダで作る
+    CreatePSO_DepthOutLine(
+        L"Resources/Shaders/PostEffect/Fog/Fog.PS.hlsl",
+        "Fog");
+    // God Rays も depth SRV を使うので DepthOutLine ビルダ流用
+    CreatePSO_DepthOutLine(
+        L"Resources/Shaders/PostEffect/GodRays/GodRays.PS.hlsl",
+        "GodRays");
 
 	// Meshを使用したVFX用パイプライン
     CreatePSO_VfxMeshTrail();
@@ -307,6 +315,7 @@ void YPipelineManager::CreatePSO_ShadowMap()
     ReflectionBasedPipelineBuilder builder;
     auto result = builder
 		.SetDepthStencilFormat(DXGI_FORMAT_D32_FLOAT)
+        .SetRasterizerState(YoRigine::RasterizerPresets::CreateShadow())
         .BuildFromCompiledShaders(
             dxCommon_->GetDevice().Get(),
             vsBlob.Get()

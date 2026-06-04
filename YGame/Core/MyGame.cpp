@@ -3,6 +3,7 @@
 #include "Mesh/MeshPrimitive.h"
 #include "Editor/Editor.h"
 #include "Systems/GameTime/GameTime.h"
+#include "Systems/Cinematic/CinematicManager.h"
 #include <ModelManipulator/ModelManipulator.h>
 #include <PipCamera/PipCameraSystem.h>
 #include "OffScreen/PostEffectManager.h"
@@ -67,6 +68,9 @@ void MyGame::Initialize() {
 	// PiP カメラサブシステム
 	PipCameraSystem::GetInstance()->Initialize();
 
+	// 演出マネージャ（letterbox UI + Sequencer 駆動）
+	YoRigine::CinematicManager::GetInstance()->Initialize();
+
 #ifdef USE_IMGUI
 	//------------------------------------------------------------
 	// エディター初期化とUI登録
@@ -103,7 +107,7 @@ void MyGame::Initialize() {
 	// 初期シーン設定
 	//------------------------------------------------------------
 #ifdef _DEBUG
-	SceneManager::GetInstance()->ChangeScene("Develop");   // デバッグ時はゲームシーン
+	SceneManager::GetInstance()->ChangeScene("Game");   // デバッグ時はゲームシーン
 #else 
 	SceneManager::GetInstance()->ChangeScene("Title");  // 製品版はタイトルシーン
 #endif
@@ -147,6 +151,7 @@ void MyGame::Update() {
 	Framework::Update();
 	SceneManager::GetInstance()->Update();
 	PipCameraSystem::GetInstance()->Update();
+	YoRigine::CinematicManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
 
 	//------------------------------------------------------------
 	// ImGui受付終了
@@ -186,23 +191,23 @@ void MyGame::Draw() {
 		auto* scene = SceneManager::GetInstance()->GetScene();
 		Camera* sceneCam = scene ? scene->GetSceneCamera() : nullptr;
 		if (pip->IsEnabled() && sceneCam) {
-			// 1) メインパスを真に GPU 完了まで待つ (シェーダは gCamera.viewProjection を
-			//    使うので、メイン draw が GPU で CB を読み終える前に PiP の値で上書きしてはいけない)
+			// メインパスを真に GPU 完了まで待つ (シェーダは gCamera.viewProjection を
+			// 使うので、メイン draw が GPU で CB を読み終える前に PiP の値で上書きしてはいけない)
 			dxCommon_->FlushAndWait();
 
-			// 2) PiP パス本体: Camera CB を PiP の値に書き換えて専用 RT へ 3D 再描画
+			// PiP パス本体: Camera CB を PiP の値に書き換えて専用 RT へ 3D 再描画
 			pip->ApplyToCamera(sceneCam);
 			dxCommon_->PreDrawPip(pip->GetRTName(), pip->GetDSVName(),
 				pip->GetWidth(), pip->GetHeight());
 			scene->DrawScene3DOnly();
 			dxCommon_->EndPipPass(pip->GetRTName());
 
-			// 3) ★ Restore より先に FlushAndWait。
-			//    PiP draws の GPU 実行が完了する前に Restore で CB を上書きすると
-			//    PiP も Scene VP で描画されてしまう (アングルが変わらない)。
+			// Restore より先に FlushAndWait。
+			// PiP draws の GPU 実行が完了する前に Restore で CB を上書きすると
+			// PiP も Scene VP で描画されてしまう (アングルが変わらない)。
 			dxCommon_->FlushAndWait();
 
-			// 4) ここで初めて Scene の値に戻す (後続 PostEffect/UI が読む CB を復元)
+			// ここで初めて Scene の値に戻す (後続 PostEffect/UI が読む CB を復元)
 			pip->RestoreCamera(sceneCam);
 		}
 	}
@@ -219,6 +224,8 @@ void MyGame::Draw() {
 	//------------------------------------------------------------
 	dxCommon_->DepthBarrier();
 	SceneManager::GetInstance()->DrawNonOffscreen();
+	// 映画風レターボックスは全シーン共通で最後（ImGui の手前）に描画
+	YoRigine::CinematicManager::GetInstance()->Draw();
 	dxCommon_->CopyBackBufferToFinalResult();
 	imguiManager_->Draw();
 

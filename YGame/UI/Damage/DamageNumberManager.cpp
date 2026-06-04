@@ -129,6 +129,9 @@ void DamageNumberManager::InitJson()
     jsonManager_->SetCategory("UI");
 	jsonManager_->SetSubCategory("Damage");
 	jsonManager_->Register("offsetY", &offsetY_);
+	jsonManager_->Register("worldOffsetY", &worldOffsetY_);
+	jsonManager_->Register("digitHeight", &digitHeight_);
+	jsonManager_->Register("sineScaleMult", &sineScaleMult_);
 }
 
 // ============================================================
@@ -180,10 +183,11 @@ void DamageNumberManager::SpawnIntoPool(
     entry->timer = 0.0f;
     entry->yOffset = 0.0f;
     entry->worldPos = worldPos;
+    entry->worldPos.y += worldOffsetY_; // 渡された座標（敵の足元等）から頭上へ
     entry->xJitter = static_cast<float>((std::rand() % 49) - 24);
 
     // [1] 表示サイズを設定（sineは通常より大きく）
-    const float displaySize = isSine ? kDigitHeight * kSineScaleMult : kDigitHeight;
+    const float displaySize = isSine ? digitHeight_ * sineScaleMult_ : digitHeight_;
     entry->number->SetDigitSize({ displaySize, displaySize });
 
     // [2] 数値設定 → RebuildDigits → ApplyDigitUV で UV を正しく再設定

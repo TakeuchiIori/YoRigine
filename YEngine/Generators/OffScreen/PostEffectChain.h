@@ -33,6 +33,8 @@ struct PostEffectData {
 		OffScreen::HalftoneParams halftone;         // Halftone用
 		OffScreen::CrossHatchParams crossHatch;     // CrossHatch用
 		OffScreen::ColorGradeParams colorGrade;    // ColorGrade用
+		OffScreen::FogParams fog;                  // Fog用
+		OffScreen::GodRaysParams godRays;          // GodRays用
 	} params;
 };
 
@@ -68,6 +70,9 @@ public:
 	// エフェクトデータを取得
 	PostEffectData* GetPostEffectData(int index);
 	const PostEffectData* GetPostEffectData(int index) const;
+
+	// 指定型の最初のエフェクトを取得（演出スクリプトから Fog/GodRays などを直接触る用）
+	PostEffectData* GetFirstEffectByType(OffScreen::OffScreenEffectType type);
 
 	// 有効なエフェクトのインデックス一覧を取得
 	std::vector<int> GetEnabledEffectIndices() const;
@@ -121,6 +126,12 @@ public:
 
 	// カラーグレーディングのパラメータを設定
 	void SetColorGradeParams(int index, const OffScreen::ColorGradeParams& params);
+
+	// フォグのパラメータを設定
+	void SetFogParams(int index, const OffScreen::FogParams& params);
+
+	// GodRays のパラメータを設定
+	void SetGodRaysParams(int index, const OffScreen::GodRaysParams& params);
 	///************************* ImGui表示 *************************///
 
 	// エフェクトリストのImGui表示

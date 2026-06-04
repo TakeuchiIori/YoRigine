@@ -86,6 +86,14 @@ const PostEffectData* PostEffectChain::GetPostEffectData(int index) const
 	return nullptr;
 }
 
+PostEffectData* PostEffectChain::GetFirstEffectByType(OffScreen::OffScreenEffectType type)
+{
+	for (auto& e : effects_) {
+		if (e && e->type == type) return e.get();
+	}
+	return nullptr;
+}
+
 
 /// <summary>
 /// 有効なエフェクトのみのインデックス一覧を返す
@@ -260,6 +268,22 @@ void PostEffectChain::SetCrossHatchParams(int index, const OffScreen::CrossHatch
 	auto* effect = GetPostEffectData(index);
 	if (effect && effect->type == OffScreen::OffScreenEffectType::CrossHatch) {
 		effect->params.crossHatch = params;
+	}
+}
+
+void PostEffectChain::SetFogParams(int index, const OffScreen::FogParams& params)
+{
+	auto* effect = GetPostEffectData(index);
+	if (effect && effect->type == OffScreen::OffScreenEffectType::Fog) {
+		effect->params.fog = params;
+	}
+}
+
+void PostEffectChain::SetGodRaysParams(int index, const OffScreen::GodRaysParams& params)
+{
+	auto* effect = GetPostEffectData(index);
+	if (effect && effect->type == OffScreen::OffScreenEffectType::GodRays) {
+		effect->params.godRays = params;
 	}
 }
 
@@ -617,6 +641,80 @@ bool PostEffectChain::DrawEffectParametersImGui([[maybe_unused]] int selectedInd
 		}
 		break;
 
+		// --------------------------------------------------------
+		// 大気フォグ
+		// --------------------------------------------------------
+	case OffScreen::OffScreenEffectType::Fog:
+	{
+		auto& f = effect->params.fog;
+		ImGui::TextDisabled("--- Distance Fog ---");
+		float fc[3] = { f.fogColor.x, f.fogColor.y, f.fogColor.z };
+		if (ImGui::ColorEdit3("Fog Color", fc)) {
+			f.fogColor = { fc[0], fc[1], fc[2] };
+			changed = true;
+		}
+		if (ImGui::DragFloat("Density", &f.fogDensity, 0.0005f, 0.0f, 0.5f, "%.4f")) changed = true;
+		if (ImGui::DragFloat("Start Distance", &f.fogStart, 0.5f, 0.0f, 500.0f)) changed = true;
+		if (ImGui::SliderFloat("Sky Fog Max", &f.skyFogClamp, 0.0f, 1.0f)) changed = true;
+
+		ImGui::Separator();
+		ImGui::TextDisabled("--- Sun Inscatter ---");
+		if (ImGui::SliderFloat("Sun Strength", &f.sunInscatterStrength, 0.0f, 4.0f)) changed = true;
+		float sc[3] = { f.sunColor.x, f.sunColor.y, f.sunColor.z };
+		if (ImGui::ColorEdit3("Sun Color", sc)) {
+			f.sunColor = { sc[0], sc[1], sc[2] };
+			changed = true;
+		}
+
+		ImGui::Separator();
+		ImGui::TextDisabled("--- Height Fog ---");
+		if (ImGui::DragFloat("Top Y", &f.heightFogTop, 0.5f, -100.0f, 500.0f)) changed = true;
+		if (ImGui::DragFloat("Bottom Y", &f.heightFogBottom, 0.5f, -500.0f, 500.0f)) changed = true;
+		if (ImGui::SliderFloat("Height Density", &f.heightFogDensity, 0.0f, 5.0f)) changed = true;
+		if (ImGui::DragFloat("Distance Scale", &f.heightFogDistanceScale, 0.001f, 0.0f, 1.0f, "%.4f")) changed = true;
+		break;
+	}
+
+		// --------------------------------------------------------
+		// God Rays
+		// --------------------------------------------------------
+	case OffScreen::OffScreenEffectType::GodRays:
+	{
+		auto& g = effect->params.godRays;
+		ImGui::TextDisabled("加算合成。空(=深度1.0)の方向に光が伸びる。");
+		ImGui::TextDisabled("Exposure を下げると色変化が見えやすい。");
+
+		float sc[3] = { g.sunColor.x, g.sunColor.y, g.sunColor.z };
+		if (ImGui::ColorEdit3("Sun Color##gr", sc)) {
+			g.sunColor = { sc[0], sc[1], sc[2] };
+			changed = true;
+		}
+		ImGui::TextDisabled("  ※スカイボックス内の「太陽の絵」は変わりません");
+		ImGui::TextDisabled("  ※DirectionalLight (LightingEditor) とも別物");
+
+		if (ImGui::SliderFloat("Exposure", &g.exposure, 0.0f, 1.0f)) changed = true;
+		ImGui::TextDisabled("  全体強度。> 0.3 で白飛びしがち");
+
+		if (ImGui::SliderFloat("Weight##gr", &g.weight, 0.0f, 0.6f)) changed = true;
+		ImGui::TextDisabled("  1サンプル寄与。0.2〜0.3 が無難");
+
+		if (ImGui::SliderFloat("Decay##gr", &g.decay, 0.8f, 1.0f)) changed = true;
+		ImGui::TextDisabled("  距離減衰。高いほど遠くまで光が伸びる");
+
+		if (ImGui::SliderFloat("Density##gr", &g.density, 0.0f, 4.0f)) changed = true;
+		ImGui::TextDisabled("  サンプル間隔。大きいほど太い光芒");
+
+		if (ImGui::SliderInt("Samples##gr", &g.numSamples, 8, 64)) changed = true;
+		if (ImGui::SliderFloat("Sky Threshold", &g.skyThreshold, 0.99f, 1.0f, "%.5f")) changed = true;
+
+		ImGui::Separator();
+		if (ImGui::Button("Reset GodRays Defaults")) {
+			g = OffScreen::GodRaysParams{};
+			changed = true;
+		}
+		break;
+	}
+
 	default:
 		ImGui::Text("No editable parameters for this effect.");
 		break;
@@ -667,6 +765,8 @@ const char* PostEffectChain::GetEffectTypeName(OffScreen::OffScreenEffectType ty
 	case OffScreen::OffScreenEffectType::Halftone:          return "Halftone";
 	case OffScreen::OffScreenEffectType::CrossHatch:        return "CrossHatch";
 	case OffScreen::OffScreenEffectType::ColorGrade:        return "ColorGrade";
+	case OffScreen::OffScreenEffectType::Fog:               return "Fog";
+	case OffScreen::OffScreenEffectType::GodRays:           return "GodRays";
 	default:                                                return "Unknown";
 	}
 }
@@ -770,6 +870,16 @@ void PostEffectChain::SetDefaultParameters(PostEffectData& effect)
 		effect.params.colorGrade.vibrance       = 0.30f;
 		effect.params.colorGrade.colorTemp      = 0.08f;
 		effect.params.colorGrade.colorTint      = 0.0f;
+		break;
+
+		// ----------------------------- 大気フォグ　-----------------------------//
+	case OffScreen::OffScreenEffectType::Fog:
+		effect.params.fog = OffScreen::FogParams{}; // FogParams のメンバ既定値
+		break;
+
+		// ----------------------------- God Rays　-----------------------------//
+	case OffScreen::OffScreenEffectType::GodRays:
+		effect.params.godRays = OffScreen::GodRaysParams{};
 		break;
 
 	default:

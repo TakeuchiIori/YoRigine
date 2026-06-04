@@ -266,9 +266,7 @@ private:
 	// アニメーション管理
 	std::unique_ptr<ObjectAnimation> animation_;
 
-	// 連続ヒット管理
-	int consecutiveHitCount_ = 0;           // 連続ヒット数
-	float hitCountResetTimer_ = 0.0f;       // ヒットカウントリセットタイマー
-	const int maxConsecutiveHits_ = 4;      // 最大連続ヒット数（これを超えたらRecovery状態へ）
-	const float hitCountResetTime_ = 2.5f;  // この時間攻撃を受けなければカウントリセット
+	// 連続ヒット管理（しきい値・リセット時間は enemyData_.attackParams.counter から取得）
+	int   consecutiveHitCount_ = 0;
+	float hitCountResetTimer_  = 0.0f;
 };

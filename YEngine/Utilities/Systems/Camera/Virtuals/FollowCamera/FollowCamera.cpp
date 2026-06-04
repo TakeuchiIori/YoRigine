@@ -99,6 +99,61 @@ void FollowCamera::FollowProcess() {
 
     UpdateShake();
     transform_.translate = safePos + shakeOffset_;
+
+    // フレーミング補正：追従対象が画角外に出そうな時だけ rotation を引き戻す
+    EnsureTargetInView(pivot, YoRigine::GameTime::GetDeltaTime());
+}
+
+// ============================================================
+// フレーミング補正
+// pivot がカメラ視界マージン外（framing*Margin_）に出そうなときだけ、
+// はみ出した分を framingSpeed_ * dt 上限で rotation に加算して引き戻す。
+// 演出中（IsInPerformance）は介入しない。
+// ============================================================
+void FollowCamera::EnsureTargetInView(const Vector3& pivot, float dt) {
+    if (!framingEnabled_) return;
+    if (IsInPerformance()) return;
+
+    Vector3 toPivot = pivot - transform_.translate;
+    float   dist    = Length(toPivot);
+    if (dist < 0.01f) return;
+
+    Vector3 dir = toPivot / dist;
+
+    // pivot を中央に置くための理想 yaw / pitch
+    float desiredYaw   = atan2f(dir.x, dir.z);
+    float clampedY     = std::clamp(-dir.y, -1.0f, 1.0f);
+    float desiredPitch = asinf(clampedY);
+
+    // 現在角との差分（yaw は ±π にラップ）
+    float deltaYaw   = desiredYaw   - transform_.rotate.y;
+    float deltaPitch = desiredPitch - transform_.rotate.x;
+
+    constexpr float kPi    = 3.14159265358979f;
+    constexpr float kTwoPi = 6.28318530717958f;
+    while (deltaYaw >  kPi) deltaYaw -= kTwoPi;
+    while (deltaYaw < -kPi) deltaYaw += kTwoPi;
+
+    const float maxStep = framingSpeed_ * dt;
+
+    // ── Yaw ：マージンを越えた分だけ補正 ──────────────────────
+    if (std::abs(deltaYaw) > framingYawMargin_) {
+        float overshoot = (deltaYaw > 0.0f)
+            ? deltaYaw - framingYawMargin_
+            : deltaYaw + framingYawMargin_;
+        float step = std::clamp(overshoot, -maxStep, maxStep);
+        transform_.rotate.y += step;
+    }
+
+    // ── Pitch ：マージンを越えた分だけ補正 ────────────────────
+    if (std::abs(deltaPitch) > framingPitchMargin_) {
+        float overshoot = (deltaPitch > 0.0f)
+            ? deltaPitch - framingPitchMargin_
+            : deltaPitch + framingPitchMargin_;
+        float step = std::clamp(overshoot, -maxStep, maxStep);
+        transform_.rotate.x = std::clamp(
+            transform_.rotate.x + step, minPitch_, maxPitch_);
+    }
 }
 
 // ============================================================
@@ -156,6 +211,18 @@ void FollowCamera::DrawDebugGui() {
     }
     ImGui::Separator();
 
+    if (ImGui::TreeNode("フレーミング補正（画角外引き戻し）")) {
+        ImGui::Checkbox("有効",                 &framingEnabled_);
+        ImGui::DragFloat("Yaw マージン (rad)",  &framingYawMargin_,   0.01f, 0.0f, 1.5f, "%.2f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("カメラ前方とpivot方向の差がこれを越えたら横方向補正開始");
+        ImGui::DragFloat("Pitch マージン (rad)", &framingPitchMargin_, 0.01f, 0.0f, 1.5f, "%.2f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("同じく縦方向の補正開始しきい値");
+        ImGui::DragFloat("補正速度 (rad/秒)",    &framingSpeed_,       0.1f,  0.0f, 30.0f, "%.1f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("はみ出した分に対する最大変化量。大きいほどキビキビ戻る");
+        ImGui::TreePop();
+    }
+    ImGui::Separator();
+
     collisionResolver_.DrawDebugGui();
     ImGui::Separator();
 
@@ -179,6 +246,12 @@ void FollowCamera::Save(nlohmann::json& j) const {
     j["targetPivot_Height"] = targetPivot_Height_;
     j["minPitch"]           = minPitch_;
     j["maxPitch"]           = maxPitch_;
+
+    // フレーミング補正
+    j["framingEnabled"]     = framingEnabled_;
+    j["framingYawMargin"]   = framingYawMargin_;
+    j["framingPitchMargin"] = framingPitchMargin_;
+    j["framingSpeed"]       = framingSpeed_;
 
     nlohmann::json resolverJson;
     collisionResolver_.Save(resolverJson);
@@ -206,6 +279,11 @@ void FollowCamera::Load(const nlohmann::json& j) {
     targetPivot_Height_  = j.value("targetPivot_Height", 1.0f);
     minPitch_            = j.value("minPitch",          -0.2f);
     maxPitch_            = j.value("maxPitch",           1.2f);
+
+    framingEnabled_      = j.value("framingEnabled",      true);
+    framingYawMargin_    = j.value("framingYawMargin",    0.45f);
+    framingPitchMargin_  = j.value("framingPitchMargin",  0.30f);
+    framingSpeed_        = j.value("framingSpeed",        4.0f);
     if (j.contains("collisionResolver"))
         collisionResolver_.Load(j["collisionResolver"]);
 

@@ -38,6 +38,8 @@ void OffScreen::Initialize()
 	RegisterPipeline(OffScreenEffectType::Halftone, "Halftone");
 	RegisterPipeline(OffScreenEffectType::CrossHatch, "CrossHatch");
 	RegisterPipeline(OffScreenEffectType::ColorGrade, "ColorGrade");
+	RegisterPipeline(OffScreenEffectType::Fog, "Fog");
+	RegisterPipeline(OffScreenEffectType::GodRays, "GodRays");
 
 	// マスク・破片テクスチャの読み込み
 	TextureManager::GetInstance()->LoadTexture(maskTexturePath_);
@@ -74,6 +76,8 @@ void OffScreen::RenderEffect(OffScreenEffectType type, D3D12_GPU_DESCRIPTOR_HAND
 	case OffScreenEffectType::Halftone:          ExecuteHalftoneEffect(inputSRV); break;
 	case OffScreenEffectType::CrossHatch:        ExecuteCrossHatchEffect(inputSRV); break;
 	case OffScreenEffectType::ColorGrade:        ExecuteColorGradeEffect(inputSRV); break;
+	case OffScreenEffectType::Fog:               ExecuteFogEffect(inputSRV); break;
+	case OffScreenEffectType::GodRays:           ExecuteGodRaysEffect(inputSRV); break;
 	}
 
 	// フルスクリーン三角形描画
@@ -101,6 +105,8 @@ void OffScreen::ReleaseResources()
 	halftoneResource_.Reset();
 	crossHatchResource_.Reset();
 	colorGradeResource_.Reset();
+	fogResource_.Reset();
+	godRaysResource_.Reset();
 
 	boxData_ = nullptr;
 	gaussData_ = nullptr;
@@ -118,6 +124,8 @@ void OffScreen::ReleaseResources()
 	halftoneData_ = nullptr;
 	crossHatchData_ = nullptr;
 	colorGradeData_ = nullptr;
+	fogData_ = nullptr;
+	godRaysData_ = nullptr;
 }
 
 // =======================
@@ -273,6 +281,53 @@ void OffScreen::SetColorGradeParams(const ColorGradeParams& params)
 	}
 }
 
+/// <summary>フォグ パラメータ設定 (色・密度などチェーン側で編集する値)</summary>
+void OffScreen::SetFogParams(const FogParams& params)
+{
+	if (!fogData_) return;
+	fogData_->fogColor                = params.fogColor;
+	fogData_->fogDensity              = params.fogDensity;
+	fogData_->fogStart                = params.fogStart;
+	fogData_->skyFogClamp             = params.skyFogClamp;
+	fogData_->sunInscatterStrength    = params.sunInscatterStrength;
+	fogData_->sunColor                = params.sunColor;
+	fogData_->heightFogTop            = params.heightFogTop;
+	fogData_->heightFogBottom         = params.heightFogBottom;
+	fogData_->heightFogDensity        = params.heightFogDensity;
+	fogData_->heightFogDistanceScale  = params.heightFogDistanceScale;
+}
+
+/// <summary>フォグ カメラ・ライト情報設定 (毎フレーム シーン側から渡す)</summary>
+void OffScreen::SetFogCameraAndLight(const Matrix4x4& viewProjectionInverse,
+	const Vector3& cameraPos, const Vector3& lightDir)
+{
+	if (!fogData_) return;
+	fogData_->viewProjectionInverse = viewProjectionInverse;
+	fogData_->cameraPos             = cameraPos;
+	fogData_->sunDirection          = lightDir;
+}
+
+/// <summary>GodRays パラメータ設定 (チェーン側で編集する値)</summary>
+void OffScreen::SetGodRaysParams(const GodRaysParams& params)
+{
+	if (!godRaysData_) return;
+	godRaysData_->sunColor     = params.sunColor;
+	godRaysData_->density      = params.density;
+	godRaysData_->weight       = params.weight;
+	godRaysData_->decay        = params.decay;
+	godRaysData_->exposure     = params.exposure;
+	godRaysData_->numSamples   = params.numSamples;
+	godRaysData_->skyThreshold = params.skyThreshold;
+}
+
+/// <summary>GodRays の太陽スクリーン位置・可視度設定 (毎フレーム)</summary>
+void OffScreen::SetGodRaysSun(const Vector2& sunUV, float sunVisibility)
+{
+	if (!godRaysData_) return;
+	godRaysData_->sunUV         = sunUV;
+	godRaysData_->sunVisibility = sunVisibility;
+}
+
 // ===========================
 // ブラーアニメーション制御
 // ===========================
@@ -341,6 +396,8 @@ void OffScreen::CreateAllResources()
 	CreateHalftoneResource();
 	CreateCrossHatchResource();
 	CreateColorGradeResource();
+	CreateFogResource();
+	CreateGodRaysResource();
 }
 
 /// <summary>ボックスフィルタ用バッファ</summary>
@@ -507,6 +564,43 @@ void OffScreen::CreateColorGradeResource()
 	colorGradeData_->padding        = 0.0f;
 }
 
+/// <summary>フォグ用バッファ</summary>
+void OffScreen::CreateFogResource()
+{
+	fogResource_ = dxCommon_->CreateBufferResource(sizeof(FogForGPU));
+	fogResource_->Map(0, nullptr, reinterpret_cast<void**>(&fogData_));
+	// デフォルト値はシーンから上書きされる前提だが、安全に単位行列+ゼロベクトルで初期化
+	fogData_->viewProjectionInverse = MakeIdentity4x4();
+	fogData_->cameraPos             = { 0.0f, 0.0f, 0.0f };
+	fogData_->sunDirection          = { 0.0f, -1.0f, 0.0f };
+	fogData_->fogColor              = { 0.55f, 0.65f, 0.75f };
+	fogData_->fogDensity            = 0.005f;
+	fogData_->fogStart              = 10.0f;
+	fogData_->skyFogClamp           = 0.7f;
+	fogData_->sunInscatterStrength  = 0.5f;
+	fogData_->sunColor              = { 1.0f, 0.85f, 0.6f };
+	fogData_->heightFogTop          = 20.0f;
+	fogData_->heightFogBottom       = -5.0f;
+	fogData_->heightFogDensity      = 0.3f;
+	fogData_->heightFogDistanceScale = 0.01f;
+}
+
+/// <summary>GodRays 用バッファ</summary>
+void OffScreen::CreateGodRaysResource()
+{
+	godRaysResource_ = dxCommon_->CreateBufferResource(sizeof(GodRaysForGPU));
+	godRaysResource_->Map(0, nullptr, reinterpret_cast<void**>(&godRaysData_));
+	godRaysData_->sunUV         = { 0.5f, 0.5f };
+	godRaysData_->sunVisibility = 0.0f;
+	godRaysData_->density       = 1.0f;
+	godRaysData_->sunColor      = { 1.0f, 0.85f, 0.6f };
+	godRaysData_->weight        = 0.25f;
+	godRaysData_->decay         = 0.95f;
+	godRaysData_->exposure      = 0.12f;
+	godRaysData_->numSamples    = 48;
+	godRaysData_->skyThreshold  = 0.999f;
+}
+
 // ===============================
 // 各エフェクトの GPU コマンド設定
 // ===============================
@@ -555,6 +649,26 @@ void OffScreen::ExecuteDepthOutlineEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV)
 	cmd->SetGraphicsRootDescriptorTable(indices.at("gTexture"), inputSRV);
 	cmd->SetGraphicsRootDescriptorTable(indices.at("gDepthTexture"), dxCommon_->GetDepthGPUHandle());
 	cmd->SetGraphicsRootConstantBufferView(indices.at("gMaterial"), materialResource_->GetGPUVirtualAddress());
+}
+
+void OffScreen::ExecuteFogEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV)
+{
+	auto cmd = dxCommon_->GetCommandList();
+	auto pm = YPipelineManager::GetInstance();
+	const auto& indices = pm->GetParameterIndices("Fog");
+	cmd->SetGraphicsRootDescriptorTable(indices.at("gTexture"), inputSRV);
+	cmd->SetGraphicsRootDescriptorTable(indices.at("gDepthTexture"), dxCommon_->GetDepthGPUHandle());
+	cmd->SetGraphicsRootConstantBufferView(indices.at("gFog"), fogResource_->GetGPUVirtualAddress());
+}
+
+void OffScreen::ExecuteGodRaysEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV)
+{
+	auto cmd = dxCommon_->GetCommandList();
+	auto pm = YPipelineManager::GetInstance();
+	const auto& indices = pm->GetParameterIndices("GodRays");
+	cmd->SetGraphicsRootDescriptorTable(indices.at("gTexture"), inputSRV);
+	cmd->SetGraphicsRootDescriptorTable(indices.at("gDepthTexture"), dxCommon_->GetDepthGPUHandle());
+	cmd->SetGraphicsRootConstantBufferView(indices.at("gGodRays"), godRaysResource_->GetGPUVirtualAddress());
 }
 
 void OffScreen::ExecuteSepiaEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV)

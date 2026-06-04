@@ -1,9 +1,45 @@
 {
     "objects": [
         {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
             "filePath": "House_1\\House_1.obj",
             "id": 0,
-            "modelName": "House_1",
+            "isAnimation": false,
+            "modelName": "House_1.obj",
             "parentID": -1,
             "position": [
                 -1.6030000448226929,
@@ -22,9 +58,45 @@
             ]
         },
         {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
             "filePath": "House_2\\House_2.obj",
             "id": 1,
-            "modelName": "House_2",
+            "isAnimation": false,
+            "modelName": "House_2.obj",
             "parentID": -1,
             "position": [
                 24.200000762939453,
@@ -43,9 +115,45 @@
             ]
         },
         {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
             "filePath": "Bell_Tower\\Bell_Tower.obj",
             "id": 2,
-            "modelName": "Bell_Tower",
+            "isAnimation": false,
+            "modelName": "Bell_Tower.obj",
             "parentID": -1,
             "position": [
                 13.300000190734863,
@@ -64,9 +172,45 @@
             ]
         },
         {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
             "filePath": "Blacksmith\\Blacksmith.obj",
-            "id": 4,
-            "modelName": "Blacksmith",
+            "id": 3,
+            "isAnimation": false,
+            "modelName": "Blacksmith.obj",
             "parentID": -1,
             "position": [
                 7.0,
@@ -85,9 +229,45 @@
             ]
         },
         {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
             "filePath": "Blacksmith\\Blacksmith.obj",
-            "id": 5,
-            "modelName": "Blacksmith",
+            "id": 4,
+            "isAnimation": false,
+            "modelName": "Blacksmith.obj",
             "parentID": -1,
             "position": [
                 -26.299999237060547,
@@ -104,7 +284,235 @@
                 4.0,
                 4.0
             ]
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "filePath": "Blacksmith\\Blacksmith.obj",
+            "id": 5,
+            "isAnimation": false,
+            "modelName": "Blacksmith.obj",
+            "parentID": -1,
+            "position": [
+                72.48100280761719,
+                0.0,
+                -2.194999933242798
+            ],
+            "rotate": [
+                0.0,
+                -0.3708823621273041,
+                0.0
+            ],
+            "scale": [
+                4.0,
+                4.0,
+                4.0
+            ]
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "filePath": "House_1\\House_1.obj",
+            "id": 6,
+            "isAnimation": false,
+            "modelName": "House_1.obj",
+            "parentID": -1,
+            "position": [
+                61.28099822998047,
+                0.0,
+                -30.238000869750977
+            ],
+            "rotate": [
+                0.0,
+                -3.5010082721710205,
+                0.0
+            ],
+            "scale": [
+                4.0,
+                4.0,
+                4.0
+            ]
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "filePath": "House_2\\House_2.obj",
+            "id": 7,
+            "isAnimation": false,
+            "modelName": "House_2.obj",
+            "parentID": -1,
+            "position": [
+                -39.8380012512207,
+                0.0,
+                28.602386474609375
+            ],
+            "rotate": [
+                0.0,
+                0.24209460616111755,
+                0.0
+            ],
+            "scale": [
+                4.0,
+                4.0,
+                4.0
+            ]
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "filePath": "Bell_Tower\\Bell_Tower.obj",
+            "id": 8,
+            "isAnimation": false,
+            "modelName": "Bell_Tower.obj",
+            "parentID": -1,
+            "position": [
+                -47.9119987487793,
+                0.0,
+                -6.419000148773193
+            ],
+            "rotate": [
+                0.0,
+                -1.326450228691101,
+                0.0
+            ],
+            "scale": [
+                4.0,
+                4.0,
+                4.0
+            ]
         }
     ],
-    "version": 1
+    "version": 6
 }

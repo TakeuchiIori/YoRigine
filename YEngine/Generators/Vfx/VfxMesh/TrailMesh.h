@@ -56,6 +56,7 @@ namespace YoRigine {
         void RebuildArc();
         void RebuildFan();
         void RebuildCustom();
+        void RebuildPrimitive();   // ★NEW 3D プリミティブ
 
         bool IsPointInTriangle(const Vector2& p,
                                const Vector2& a,

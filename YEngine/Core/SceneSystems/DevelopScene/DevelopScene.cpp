@@ -194,6 +194,7 @@ void DevelopScene::DrawLine() {
 	YoRigine::ModelManipulator::GetInstance()->DrawLine();
 	AreaManager::GetInstance()->DrawArea("FieldArea", line_.get());
 	line_->DrawLine();
+	CameraDirector::GetInstance()->DrawDebug3D(*line_);
 }
 
 

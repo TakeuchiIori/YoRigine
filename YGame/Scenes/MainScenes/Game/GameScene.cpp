@@ -58,6 +58,8 @@ void GameScene::Initialize() {
 	cameraEditor_->SetFilePath("Resources/Json/VirtualCameraData/GameScene.json");
 	cameraEditor_->LoadFileOrDefault(cameraEditor_->GetFilePath(), "Game");
 
+	// ゲーム用のポストエフェクト（TestGame: Fog + GodRays 等）
+	PostEffectManager::GetInstance()->LoadPreset("TestGame");
 
 	cameraMode_ = CameraMode::FOLLOW;
 	//------------------------------------------------------------
@@ -107,6 +109,14 @@ void GameScene::Initialize() {
 
 	// デバッグカメラを取得または作成
 	auto debug = director->GetCamera("MainDebug");
+
+	// JSON保存値で MainDebug が高優先のまま残っていると、SnapToActiveCamera が
+	// MainDebug にスナップ → 次フレームの UpdateCamera で PlayerFollow へ切替が
+	// 発生し、巨大累積角度（例: 99236rad）から Euler 線形補間でグルグル回る。
+	// 初期モードに合わせて優先度を確定してからスナップする。
+	director->SetPriority("PlayerFollow", 10);
+	director->SetPriority("MainDebug", 0);
+	director->SetPriority("ClearCinematic", 0);
 	director->SnapToActiveCamera();
 
 	// PlayerCamera を初期化（FollowCamera を内包するコンポーネント構成）
@@ -401,6 +411,11 @@ void GameScene::UpdateCamera() {
 	case CameraMode::DEBUG:
 		director->SetPriority("MainDebug", 10);
 		director->SetPriority("PlayerFollow", 0);
+		break;
+	case CameraMode::CLEAR_CINEMATIC:
+		// シネマティックカメラ優先（例: BattleScene 内で切り替える）
+		director->SetPriority("ClearCinematic", 0);
+		director->SetPriority("MainDebug", 0);
 		break;
 	}
 

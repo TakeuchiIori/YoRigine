@@ -27,11 +27,12 @@ void BattleRecoveryState::Enter(BattleEnemy& enemy) {
 }
 
 void BattleRecoveryState::Update(BattleEnemy& enemy, float dt) {
-	(void)dt; // dtは今のところ使用しない
+    (void)dt; // dtは今のところ使用しない
     float timer = enemy.GetStateTimer();
+    const float recoveryDuration = enemy.GetEnemyData().attackParams.counter.recoveryDuration;
 
     // 回復時間の70%経過したら色を戻し始める
-    if (timer > recoveryDuration_ * 0.7f && !hasPlayedAnimation_) {
+    if (timer > recoveryDuration * 0.7f && !hasPlayedAnimation_) {
         hasPlayedAnimation_ = true;
         if (enemy.GetAnimation()) {
             enemy.GetAnimation()->StartColorAnimation(
@@ -44,7 +45,7 @@ void BattleRecoveryState::Update(BattleEnemy& enemy, float dt) {
     }
 
     // 回復時間終了で攻撃状態へ
-    if (timer > recoveryDuration_) {
+    if (timer > recoveryDuration) {
         // 反撃
         enemy.ChangeState(std::make_unique<BattleCounterAttackState>());
     }

@@ -3,6 +3,7 @@
 #include <d3d12.h>
 #include <string>
 #include <vector>
+#include <memory>
 #include <cassert>
 
 #include "Systems./Camera/Camera.h"
@@ -14,6 +15,7 @@
 class Object3dCommon;
 
 namespace YoRigine {
+    class JsonManager;
     class LightManager final
     {
     public:
@@ -156,7 +158,7 @@ namespace YoRigine {
         void CreateShadowResource();
 
         LightManager() = default;
-        ~LightManager() = default;
+        ~LightManager();
         LightManager(const LightManager&) = delete;
         LightManager& operator=(const LightManager&) = delete;
         LightManager(LightManager&&) = delete;
@@ -185,5 +187,8 @@ namespace YoRigine {
         Object3dCommon* object3dCommon_ = nullptr;
         Camera* camera_ = nullptr;
         ShadowMapSettings shadowMapSettings_;
+
+        // ShadowMapSettings の JSON 永続化用
+        std::unique_ptr<JsonManager> shadowJson_;
     };
 }

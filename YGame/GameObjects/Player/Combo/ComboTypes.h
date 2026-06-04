@@ -54,13 +54,12 @@ struct AttackData {
 
 	int hitStart = 0;
 	int hitEnd = 10;
-	int comboWindowStart = 0;
-	int comboWindowEnd = 20;
 
-	// 先行入力（バッファ）受付開始フレーム
-	// この値以降の入力は、comboWindowStart 到達時にまとめて発火する
-	// comboWindowStart より小さい値を指定する（例: 5 で受付開始 → 15 で実発火）
+	// 先行入力（バッファ）受付開始フレーム。
+	// この値以降に押された入力をバッファに記憶し、同フレーム以降に次の攻撃へ即時発火する。
 	int inputBufferStart = 0;
+	// 先行入力受付の終了フレーム。これを越えるとバッファは破棄される。
+	int comboWindowEnd = 20;
 
 	// ------------------------------------------------------------
 	// タイミング設定（ゲームロジック用・秒単位）
@@ -170,7 +169,6 @@ SERIALIZE_FIELD(AttackData, totalFrames)
 SERIALIZE_FIELD(AttackData, fps)
 SERIALIZE_FIELD(AttackData, hitStart)
 SERIALIZE_FIELD(AttackData, hitEnd)
-SERIALIZE_FIELD(AttackData, comboWindowStart)
 SERIALIZE_FIELD(AttackData, comboWindowEnd)
 SERIALIZE_FIELD(AttackData, inputBufferStart)
 

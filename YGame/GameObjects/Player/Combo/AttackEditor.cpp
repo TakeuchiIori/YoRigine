@@ -273,12 +273,14 @@ void AttackDataEditor::DrawAttackDetail()
 		changed |= ImGui::InputFloat("モーション速度", &atk.motionSpeed, 0.01f, 0.1f, "%.2f");
 		changed |= ImGui::InputInt("ヒット開始フレーム", &atk.hitStart);
 		changed |= ImGui::InputInt("ヒット終了フレーム", &atk.hitEnd);
-		changed |= ImGui::InputInt("先行入力受付フレーム", &atk.inputBufferStart);
+		changed |= ImGui::InputInt("先行入力受付開始フレーム", &atk.inputBufferStart);
 		if (ImGui::IsItemHovered()) {
-			ImGui::SetTooltip("このフレーム以降に押されたボタンを記憶し、\nコンボ開始フレーム到達時に発火する");
+			ImGui::SetTooltip("このフレーム以降に押された入力をバッファし、同フレーム以降で即時に次の攻撃へ発火する");
 		}
-		changed |= ImGui::InputInt("コンボ開始フレーム", &atk.comboWindowStart);
-		changed |= ImGui::InputInt("コンボ終了フレーム", &atk.comboWindowEnd);
+		changed |= ImGui::InputInt("先行入力受付終了フレーム", &atk.comboWindowEnd);
+		if (ImGui::IsItemHovered()) {
+			ImGui::SetTooltip("このフレームを越えるとバッファは破棄される");
+		}
 	}
 
 	// ------------------------------------------------------------
