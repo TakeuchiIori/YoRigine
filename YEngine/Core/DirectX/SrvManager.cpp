@@ -250,3 +250,24 @@ void SrvManager::CreateUAVForStructuredBuffer(uint32_t uavIndex, ID3D12Resource*
 		GetCPUDescriptorHandle(uavIndex)
 	);
 }
+
+/// <summary>
+/// レンダーテクスチャ用 UAV の作成 (Texture2D / CS書き込み先)
+/// SRGBフォーマットでは UAV を作れないため、format には UNORM 等の対応フォーマットを指定する。
+/// 呼び出し側は TYPELESS リソースを用意し、RTV/SRV/UAV それぞれに適切な型付きビューを張る想定。
+/// </summary>
+void SrvManager::CreateUAVforRenderTexture(uint32_t uavIndex, ID3D12Resource* pResource, DXGI_FORMAT format)
+{
+	D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
+	uavDesc.Format = format;
+	uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+	uavDesc.Texture2D.MipSlice = 0;
+	uavDesc.Texture2D.PlaneSlice = 0;
+
+	dxCommon_->GetDevice()->CreateUnorderedAccessView(
+		pResource,
+		nullptr,
+		&uavDesc,
+		GetCPUDescriptorHandle(uavIndex)
+	);
+}

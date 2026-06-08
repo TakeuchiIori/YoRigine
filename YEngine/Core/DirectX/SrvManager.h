@@ -48,6 +48,10 @@ public:
 	// UAV生成 (StructureBuffer用)
 	void CreateUAVForStructuredBuffer(uint32_t uavIndex, ID3D12Resource* pResource, UINT numElements, UINT structureByteStride);
 
+	// UAV生成 (RenderTexture用) — CS書き込み先として使う
+	// format は UNORM/FLOAT 等のUAV可能フォーマット (SRGB不可)
+	void CreateUAVforRenderTexture(uint32_t uavIndex, ID3D12Resource* pResource, DXGI_FORMAT format);
+
 
 public:
 	///************************* アクセッサ *************************///

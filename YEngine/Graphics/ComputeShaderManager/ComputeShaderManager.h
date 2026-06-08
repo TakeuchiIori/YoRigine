@@ -37,6 +37,8 @@ private:
 	void CreateEmitCS();
 	// パーティクル更新
 	void CreateParticleUpdateCS();
+	// ポストエフェクト: 5種類の共通RootSignatureと、各エフェクトのCompute PSOを生成
+	void CreatePostEffectCS();
 
 private:
 	// シングルトン

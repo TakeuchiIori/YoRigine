@@ -38,6 +38,7 @@ void YWebApiManager::Finalize() {
 }
 
 void YWebApiManager::DrawLogWindow() {
+#ifdef USE_IMGUI
     // 上部に便利な操作ボタンを配置
     if (ImGui::Button("Clear")) {
         ClearLogs();
@@ -76,6 +77,7 @@ void YWebApiManager::DrawLogWindow() {
     }
 
     ImGui::EndChild();
+#endif // USE_IMGUI
 }
 
 // cURLがWEBサーバーからデータを少しずつ受信するたびに呼び出される関数

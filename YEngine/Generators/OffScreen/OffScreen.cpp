@@ -2,6 +2,7 @@
 #include "DirectXCommon.h"
 #include "PipelineManager/YPipelineManager.h"
 #include "Loaders/Texture/TextureManager.h"
+#include "ComputeShaderManager/ComputeShaderManager.h"
 
 /// <summary>
 /// オフスクリーンエフェクト共通初期化
@@ -12,34 +13,14 @@ void OffScreen::Initialize()
 
 	auto pipelineManager = YPipelineManager::GetInstance();
 
-	// 各エフェクトに対応する PSO / RootSignature を登録
-	auto RegisterPipeline = [&](OffScreenEffectType type, const std::string& name) {
+	// PS版が残っているのは Copy (バックバッファへの最終 blit 専用) のみ。
+	// 他のエフェクトは全て Compute Shader 経路で処理される。
+	{
 		OffScreenPipeline p;
-		p.rootSignature = pipelineManager->GetRootSignature(name);
-		p.pipelineState = pipelineManager->GetPipeLineStateObject(name);
-		pipelineMap_[type] = p;
-		};
-
-	RegisterPipeline(OffScreenEffectType::Copy, "BaseOffScreen");
-	RegisterPipeline(OffScreenEffectType::GaussSmoothing, "GaussSmoothing");
-	RegisterPipeline(OffScreenEffectType::DepthOutline, "DepthOutLine");
-	RegisterPipeline(OffScreenEffectType::Sepia, "Sepia");
-	RegisterPipeline(OffScreenEffectType::Grayscale, "Grayscale");
-	RegisterPipeline(OffScreenEffectType::Vignette, "Vignette");
-	RegisterPipeline(OffScreenEffectType::RadialBlur, "RadialBlur");
-	RegisterPipeline(OffScreenEffectType::ToneMapping, "ToneMapping");
-	RegisterPipeline(OffScreenEffectType::Dissolve, "Dissolve");
-	RegisterPipeline(OffScreenEffectType::Chromatic, "Chromatic");
-	RegisterPipeline(OffScreenEffectType::ColorAdjust, "ColorAdjust");
-	RegisterPipeline(OffScreenEffectType::ShatterTransition, "ShatterTransition");
-	RegisterPipeline(OffScreenEffectType::Bloom, "Bloom");
-	RegisterPipeline(OffScreenEffectType::Posterize, "Posterize");
-	RegisterPipeline(OffScreenEffectType::Kuwahara, "Kuwahara");
-	RegisterPipeline(OffScreenEffectType::Halftone, "Halftone");
-	RegisterPipeline(OffScreenEffectType::CrossHatch, "CrossHatch");
-	RegisterPipeline(OffScreenEffectType::ColorGrade, "ColorGrade");
-	RegisterPipeline(OffScreenEffectType::Fog, "Fog");
-	RegisterPipeline(OffScreenEffectType::GodRays, "GodRays");
+		p.rootSignature = pipelineManager->GetRootSignature("BaseOffScreen");
+		p.pipelineState = pipelineManager->GetPipeLineStateObject("BaseOffScreen");
+		pipelineMap_[OffScreenEffectType::Copy] = p;
+	}
 
 	// マスク・破片テクスチャの読み込み
 	TextureManager::GetInstance()->LoadTexture(maskTexturePath_);
@@ -53,35 +34,190 @@ void OffScreen::Initialize()
 /// </summary>
 void OffScreen::RenderEffect(OffScreenEffectType type, D3D12_GPU_DESCRIPTOR_HANDLE inputSRV)
 {
-	// パイプラインセット
-	SetupPipelineAndDraw(type);
+	// 現在 PS 経路は Copy (最終 blit) のみ。他のエフェクトは RenderEffectCompute を使うこと。
+	assert(type == OffScreenEffectType::Copy);
+	(void)type;
 
-	// エフェクトごとの GPU パラメータ設定
+	SetupPipelineAndDraw(OffScreenEffectType::Copy);
+	ExecuteCopyEffect(inputSRV);
+	dxCommon_->GetCommandList()->DrawInstanced(3, 1, 0, 0);
+}
+
+/// <summary>
+/// 指定エフェクトがCompute Shader実装を持つかどうか
+/// </summary>
+bool OffScreen::HasComputeImplementation(OffScreenEffectType type) const
+{
+	// 全エフェクトに CS実装が揃ったので無条件 true
+	(void)type;
+	return true;
+}
+
+/// <summary>
+/// Compute Shader経由でエフェクトを実行する。
+/// 出力先はUAVなので、呼び出し側が UNORDERED_ACCESS 状態に遷移済みであること。
+/// </summary>
+void OffScreen::RenderEffectCompute(
+	OffScreenEffectType type,
+	D3D12_GPU_DESCRIPTOR_HANDLE inputSRV,
+	D3D12_GPU_DESCRIPTOR_HANDLE outputUAV,
+	uint32_t width,
+	uint32_t height)
+{
+	auto cmd = dxCommon_->GetCommandList();
+	auto cs = ComputeShaderManager::GetInstance();
+
+	// 共通: PSOキーとRSキーをエフェクト毎に決定
+	const char* psoKey = nullptr;
+	const char* rsKey = nullptr;
 	switch (type) {
-	case OffScreenEffectType::Copy:              ExecuteCopyEffect(inputSRV); break;
-	case OffScreenEffectType::GaussSmoothing:    ExecuteGaussSmoothingEffect(inputSRV); break;
-	case OffScreenEffectType::DepthOutline:      ExecuteDepthOutlineEffect(inputSRV); break;
-	case OffScreenEffectType::Sepia:             ExecuteSepiaEffect(inputSRV); break;
-	case OffScreenEffectType::Grayscale:         ExecuteGrayscaleEffect(inputSRV); break;
-	case OffScreenEffectType::Vignette:          ExecuteVignetteEffect(inputSRV); break;
-	case OffScreenEffectType::RadialBlur:        ExecuteRadialBlurEffect(inputSRV); break;
-	case OffScreenEffectType::ToneMapping:       ExecuteToneMappingEffect(inputSRV); break;
-	case OffScreenEffectType::Dissolve:          ExecuteDissolveEffect(inputSRV); break;
-	case OffScreenEffectType::Chromatic:         ExecuteChromaticEffect(inputSRV); break;
-	case OffScreenEffectType::ColorAdjust:       ExecuteColorAdjustEffect(inputSRV); break;
-	case OffScreenEffectType::ShatterTransition: ExecuteShatterTransitionEffect(inputSRV); break;
-	case OffScreenEffectType::Bloom:             ExecuteBloomEffect(inputSRV); break;
-	case OffScreenEffectType::Posterize:         ExecutePosterizeEffect(inputSRV); break;
-	case OffScreenEffectType::Kuwahara:          ExecuteKuwaharaEffect(inputSRV); break;
-	case OffScreenEffectType::Halftone:          ExecuteHalftoneEffect(inputSRV); break;
-	case OffScreenEffectType::CrossHatch:        ExecuteCrossHatchEffect(inputSRV); break;
-	case OffScreenEffectType::ColorGrade:        ExecuteColorGradeEffect(inputSRV); break;
-	case OffScreenEffectType::Fog:               ExecuteFogEffect(inputSRV); break;
-	case OffScreenEffectType::GodRays:           ExecuteGodRaysEffect(inputSRV); break;
+	case OffScreenEffectType::Copy:               psoKey = "PostEffectCopyCS";        rsKey = "PostEffectRS_Simple"; break;
+	case OffScreenEffectType::Sepia:              psoKey = "PostEffectSepiaCS";       rsKey = "PostEffectRS_Simple"; break;
+	case OffScreenEffectType::Grayscale:          psoKey = "PostEffectGrayscaleCS";   rsKey = "PostEffectRS_Simple"; break;
+	case OffScreenEffectType::Vignette:           psoKey = "PostEffectVignetteCS";    rsKey = "PostEffectRS_Simple"; break;
+	case OffScreenEffectType::GaussSmoothing:     psoKey = "PostEffectGaussCS";       rsKey = "PostEffectRS_CB"; break;
+	case OffScreenEffectType::RadialBlur:         psoKey = "PostEffectRadialBlurCS";  rsKey = "PostEffectRS_CB"; break;
+	case OffScreenEffectType::ToneMapping:        psoKey = "PostEffectToneMapCS";     rsKey = "PostEffectRS_CB"; break;
+	case OffScreenEffectType::Chromatic:          psoKey = "PostEffectChromaticCS";   rsKey = "PostEffectRS_CB"; break;
+	case OffScreenEffectType::Bloom:              psoKey = "PostEffectBloomCS";       rsKey = "PostEffectRS_CB"; break;
+	case OffScreenEffectType::Posterize:          psoKey = "PostEffectPosterizeCS";   rsKey = "PostEffectRS_CB"; break;
+	case OffScreenEffectType::Kuwahara:           psoKey = "PostEffectKuwaharaCS";    rsKey = "PostEffectRS_CB"; break;
+	case OffScreenEffectType::Halftone:           psoKey = "PostEffectHalftoneCS";    rsKey = "PostEffectRS_CB"; break;
+	case OffScreenEffectType::CrossHatch:         psoKey = "PostEffectCrossHatchCS";  rsKey = "PostEffectRS_CB"; break;
+	case OffScreenEffectType::ColorGrade:         psoKey = "PostEffectColorGradeCS";  rsKey = "PostEffectRS_CB"; break;
+	case OffScreenEffectType::ColorAdjust:        psoKey = "PostEffectColorAdjustCS"; rsKey = "PostEffectRS_CB2"; break;
+	case OffScreenEffectType::DepthOutline:       psoKey = "PostEffectDepthOutlineCS"; rsKey = "PostEffectRS_Depth"; break;
+	case OffScreenEffectType::Fog:                psoKey = "PostEffectFogCS";          rsKey = "PostEffectRS_Depth"; break;
+	case OffScreenEffectType::GodRays:            psoKey = "PostEffectGodRaysCS";      rsKey = "PostEffectRS_Depth"; break;
+	case OffScreenEffectType::Dissolve:           psoKey = "PostEffectDissolveCS";     rsKey = "PostEffectRS_Tex"; break;
+	case OffScreenEffectType::ShatterTransition:  psoKey = "PostEffectShatterCS";      rsKey = "PostEffectRS_Tex"; break;
+	default:
+		assert(false && "Unknown effect type");
+		return;
 	}
 
-	// フルスクリーン三角形描画
-	dxCommon_->GetCommandList()->DrawInstanced(3, 1, 0, 0);
+	cmd->SetPipelineState(cs->GetComputePipelineState(psoKey));
+	cmd->SetComputeRootSignature(cs->GetRootSignature(rsKey));
+
+	// DepthOutline のみ projectionInverse 行列を毎フレーム更新 (SetupPipelineAndDraw 相当)
+	if (type == OffScreenEffectType::DepthOutline && materialData_) {
+		materialData_->Inverse = Inverse(projectionInverse_);
+	}
+
+	// RS毎にバインドが異なる: パラメータ番号は CreatePostEffectCS の RS 定義と一致させる
+	switch (type) {
+	// === RS_Simple: SRV(0), UAV(1) ===
+	case OffScreenEffectType::Copy:
+	case OffScreenEffectType::Sepia:
+	case OffScreenEffectType::Grayscale:
+	case OffScreenEffectType::Vignette:
+		cmd->SetComputeRootDescriptorTable(0, inputSRV);
+		cmd->SetComputeRootDescriptorTable(1, outputUAV);
+		break;
+
+	// === RS_CB: SRV(0), UAV(1), CBV(2) ===
+	case OffScreenEffectType::GaussSmoothing:
+		cmd->SetComputeRootDescriptorTable(0, inputSRV);
+		cmd->SetComputeRootDescriptorTable(1, outputUAV);
+		cmd->SetComputeRootConstantBufferView(2, gaussResource_->GetGPUVirtualAddress());
+		break;
+	case OffScreenEffectType::RadialBlur:
+		cmd->SetComputeRootDescriptorTable(0, inputSRV);
+		cmd->SetComputeRootDescriptorTable(1, outputUAV);
+		cmd->SetComputeRootConstantBufferView(2, radialBlurResource_->GetGPUVirtualAddress());
+		break;
+	case OffScreenEffectType::ToneMapping:
+		cmd->SetComputeRootDescriptorTable(0, inputSRV);
+		cmd->SetComputeRootDescriptorTable(1, outputUAV);
+		cmd->SetComputeRootConstantBufferView(2, toneMappingResource_->GetGPUVirtualAddress());
+		break;
+	case OffScreenEffectType::Chromatic:
+		cmd->SetComputeRootDescriptorTable(0, inputSRV);
+		cmd->SetComputeRootDescriptorTable(1, outputUAV);
+		cmd->SetComputeRootConstantBufferView(2, chromaticResource_->GetGPUVirtualAddress());
+		break;
+	case OffScreenEffectType::Bloom:
+		cmd->SetComputeRootDescriptorTable(0, inputSRV);
+		cmd->SetComputeRootDescriptorTable(1, outputUAV);
+		cmd->SetComputeRootConstantBufferView(2, bloomResource_->GetGPUVirtualAddress());
+		break;
+	case OffScreenEffectType::Posterize:
+		cmd->SetComputeRootDescriptorTable(0, inputSRV);
+		cmd->SetComputeRootDescriptorTable(1, outputUAV);
+		cmd->SetComputeRootConstantBufferView(2, posterizeResource_->GetGPUVirtualAddress());
+		break;
+	case OffScreenEffectType::Kuwahara:
+		cmd->SetComputeRootDescriptorTable(0, inputSRV);
+		cmd->SetComputeRootDescriptorTable(1, outputUAV);
+		cmd->SetComputeRootConstantBufferView(2, kuwaharaResource_->GetGPUVirtualAddress());
+		break;
+	case OffScreenEffectType::Halftone:
+		cmd->SetComputeRootDescriptorTable(0, inputSRV);
+		cmd->SetComputeRootDescriptorTable(1, outputUAV);
+		cmd->SetComputeRootConstantBufferView(2, halftoneResource_->GetGPUVirtualAddress());
+		break;
+	case OffScreenEffectType::CrossHatch:
+		cmd->SetComputeRootDescriptorTable(0, inputSRV);
+		cmd->SetComputeRootDescriptorTable(1, outputUAV);
+		cmd->SetComputeRootConstantBufferView(2, crossHatchResource_->GetGPUVirtualAddress());
+		break;
+	case OffScreenEffectType::ColorGrade:
+		cmd->SetComputeRootDescriptorTable(0, inputSRV);
+		cmd->SetComputeRootDescriptorTable(1, outputUAV);
+		cmd->SetComputeRootConstantBufferView(2, colorGradeResource_->GetGPUVirtualAddress());
+		break;
+
+	// === RS_CB2: SRV(0), UAV(1), CBV(2), CBV(3) ===
+	case OffScreenEffectType::ColorAdjust:
+		cmd->SetComputeRootDescriptorTable(0, inputSRV);
+		cmd->SetComputeRootDescriptorTable(1, outputUAV);
+		cmd->SetComputeRootConstantBufferView(2, colorAdjustResource_->GetGPUVirtualAddress());
+		cmd->SetComputeRootConstantBufferView(3, toneParamsResource_->GetGPUVirtualAddress());
+		break;
+
+	// === RS_Depth: SRV(0)=color, SRV(1)=depth, UAV(2), CBV(3) ===
+	case OffScreenEffectType::DepthOutline:
+		cmd->SetComputeRootDescriptorTable(0, inputSRV);
+		cmd->SetComputeRootDescriptorTable(1, dxCommon_->GetDepthGPUHandle());
+		cmd->SetComputeRootDescriptorTable(2, outputUAV);
+		cmd->SetComputeRootConstantBufferView(3, materialResource_->GetGPUVirtualAddress());
+		break;
+	case OffScreenEffectType::Fog:
+		cmd->SetComputeRootDescriptorTable(0, inputSRV);
+		cmd->SetComputeRootDescriptorTable(1, dxCommon_->GetDepthGPUHandle());
+		cmd->SetComputeRootDescriptorTable(2, outputUAV);
+		cmd->SetComputeRootConstantBufferView(3, fogResource_->GetGPUVirtualAddress());
+		break;
+	case OffScreenEffectType::GodRays:
+		cmd->SetComputeRootDescriptorTable(0, inputSRV);
+		cmd->SetComputeRootDescriptorTable(1, dxCommon_->GetDepthGPUHandle());
+		cmd->SetComputeRootDescriptorTable(2, outputUAV);
+		cmd->SetComputeRootConstantBufferView(3, godRaysResource_->GetGPUVirtualAddress());
+		break;
+
+	// === RS_Tex: SRV(0)=color, SRV(1)=secondary, UAV(2), CBV(3) ===
+	case OffScreenEffectType::Dissolve:
+		cmd->SetComputeRootDescriptorTable(0, inputSRV);
+		cmd->SetComputeRootDescriptorTable(1, TextureManager::GetInstance()->GetsrvHandleGPU(maskTexturePath_));
+		cmd->SetComputeRootDescriptorTable(2, outputUAV);
+		cmd->SetComputeRootConstantBufferView(3, dissolveResource_->GetGPUVirtualAddress());
+		break;
+	case OffScreenEffectType::ShatterTransition:
+		cmd->SetComputeRootDescriptorTable(0, inputSRV);
+		cmd->SetComputeRootDescriptorTable(1, TextureManager::GetInstance()->GetsrvHandleGPU(shatterTexturePath_));
+		cmd->SetComputeRootDescriptorTable(2, outputUAV);
+		cmd->SetComputeRootConstantBufferView(3, shatterTransitionResource_->GetGPUVirtualAddress());
+		break;
+
+	default:
+		assert(false);
+		return;
+	}
+
+	// threadgroup size (8,8,1)
+	const uint32_t groupsX = (width + 7) / 8;
+	const uint32_t groupsY = (height + 7) / 8;
+	cmd->Dispatch(groupsX, groupsY, 1);
 }
 
 /// <summary>
@@ -606,8 +742,7 @@ void OffScreen::CreateGodRaysResource()
 // ===============================
 
 /// <summary>
-/// PSO・RS・トポロジのセットアップ  
-/// DepthOutline だけは逆行列更新も行う
+/// PSO・RS・トポロジのセットアップ (最終 blit Copy 用)
 /// </summary>
 void OffScreen::SetupPipelineAndDraw(OffScreenEffectType type)
 {
@@ -617,10 +752,6 @@ void OffScreen::SetupPipelineAndDraw(OffScreenEffectType type)
 	commandList->SetPipelineState(pipeline.pipelineState.Get());
 	commandList->SetGraphicsRootSignature(pipeline.rootSignature.Get());
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-
-	if (type == OffScreenEffectType::DepthOutline && materialData_) {
-		materialData_->Inverse = Inverse(projectionInverse_);
-	}
 }
 
 // ---- 各エフェクトのルートパラメータ設定 ----
@@ -632,173 +763,3 @@ void OffScreen::ExecuteCopyEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV)
 	dxCommon_->GetCommandList()->SetGraphicsRootDescriptorTable(indices.at("gTexture"), inputSRV);
 }
 
-void OffScreen::ExecuteGaussSmoothingEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV)
-{
-	auto cmd = dxCommon_->GetCommandList();
-	auto pm = YPipelineManager::GetInstance();
-	const auto& indices = pm->GetParameterIndices("GaussSmoothing");
-	cmd->SetGraphicsRootDescriptorTable(indices.at("gTexture"), inputSRV);
-	cmd->SetGraphicsRootConstantBufferView(indices.at("KernelSettings"), gaussResource_->GetGPUVirtualAddress());
-}
-
-void OffScreen::ExecuteDepthOutlineEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV)
-{
-	auto cmd = dxCommon_->GetCommandList();
-	auto pm = YPipelineManager::GetInstance();
-	const auto& indices = pm->GetParameterIndices("DepthOutLine");
-	cmd->SetGraphicsRootDescriptorTable(indices.at("gTexture"), inputSRV);
-	cmd->SetGraphicsRootDescriptorTable(indices.at("gDepthTexture"), dxCommon_->GetDepthGPUHandle());
-	cmd->SetGraphicsRootConstantBufferView(indices.at("gMaterial"), materialResource_->GetGPUVirtualAddress());
-}
-
-void OffScreen::ExecuteFogEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV)
-{
-	auto cmd = dxCommon_->GetCommandList();
-	auto pm = YPipelineManager::GetInstance();
-	const auto& indices = pm->GetParameterIndices("Fog");
-	cmd->SetGraphicsRootDescriptorTable(indices.at("gTexture"), inputSRV);
-	cmd->SetGraphicsRootDescriptorTable(indices.at("gDepthTexture"), dxCommon_->GetDepthGPUHandle());
-	cmd->SetGraphicsRootConstantBufferView(indices.at("gFog"), fogResource_->GetGPUVirtualAddress());
-}
-
-void OffScreen::ExecuteGodRaysEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV)
-{
-	auto cmd = dxCommon_->GetCommandList();
-	auto pm = YPipelineManager::GetInstance();
-	const auto& indices = pm->GetParameterIndices("GodRays");
-	cmd->SetGraphicsRootDescriptorTable(indices.at("gTexture"), inputSRV);
-	cmd->SetGraphicsRootDescriptorTable(indices.at("gDepthTexture"), dxCommon_->GetDepthGPUHandle());
-	cmd->SetGraphicsRootConstantBufferView(indices.at("gGodRays"), godRaysResource_->GetGPUVirtualAddress());
-}
-
-void OffScreen::ExecuteSepiaEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV)
-{
-	auto pm = YPipelineManager::GetInstance();
-	const auto& indices = pm->GetParameterIndices("Sepia");
-	dxCommon_->GetCommandList()->SetGraphicsRootDescriptorTable(indices.at("gTexture"), inputSRV);
-}
-
-void OffScreen::ExecuteGrayscaleEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV)
-{
-	auto pm = YPipelineManager::GetInstance();
-	const auto& indices = pm->GetParameterIndices("Grayscale");
-	dxCommon_->GetCommandList()->SetGraphicsRootDescriptorTable(indices.at("gTexture"), inputSRV);
-}
-
-void OffScreen::ExecuteVignetteEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV)
-{
-	auto pm = YPipelineManager::GetInstance();
-	const auto& indices = pm->GetParameterIndices("Vignette");
-	dxCommon_->GetCommandList()->SetGraphicsRootDescriptorTable(indices.at("gTexture"), inputSRV);
-}
-
-void OffScreen::ExecuteRadialBlurEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV)
-{
-	auto cmd = dxCommon_->GetCommandList();
-	auto pm = YPipelineManager::GetInstance();
-	const auto& indices = pm->GetParameterIndices("RadialBlur");
-	cmd->SetGraphicsRootDescriptorTable(indices.at("gTexture"), inputSRV);
-	cmd->SetGraphicsRootConstantBufferView(indices.at("gBlurParams"), radialBlurResource_->GetGPUVirtualAddress());
-}
-
-void OffScreen::ExecuteToneMappingEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV)
-{
-	auto cmd = dxCommon_->GetCommandList();
-	auto pm = YPipelineManager::GetInstance();
-	const auto& indices = pm->GetParameterIndices("ToneMapping");
-	cmd->SetGraphicsRootDescriptorTable(indices.at("gTexture"), inputSRV);
-	cmd->SetGraphicsRootConstantBufferView(indices.at("ExposureBuffer"), toneMappingResource_->GetGPUVirtualAddress());
-}
-
-void OffScreen::ExecuteDissolveEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV)
-{
-	auto cmd = dxCommon_->GetCommandList();
-	auto pm = YPipelineManager::GetInstance();
-	const auto& indices = pm->GetParameterIndices("Dissolve");
-	cmd->SetGraphicsRootDescriptorTable(indices.at("gTexture"), inputSRV);
-	cmd->SetGraphicsRootDescriptorTable(indices.at("gMaskTexture"), TextureManager::GetInstance()->GetsrvHandleGPU(maskTexturePath_));
-	cmd->SetGraphicsRootConstantBufferView(indices.at("DissolveParams"), dissolveResource_->GetGPUVirtualAddress());
-}
-
-void OffScreen::ExecuteChromaticEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV)
-{
-	auto cmd = dxCommon_->GetCommandList();
-	auto pm = YPipelineManager::GetInstance();
-	const auto& indices = pm->GetParameterIndices("Chromatic");
-	cmd->SetGraphicsRootDescriptorTable(indices.at("gTexture"), inputSRV);
-	cmd->SetGraphicsRootConstantBufferView(indices.at("ChromaticParams"), chromaticResource_->GetGPUVirtualAddress());
-}
-
-void OffScreen::ExecuteColorAdjustEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV)
-{
-	auto pm = YPipelineManager::GetInstance();
-	const auto& indices = pm->GetParameterIndices("ColorAdjust");
-	auto cmd = dxCommon_->GetCommandList();
-	cmd->SetGraphicsRootDescriptorTable(indices.at("gTexture"), inputSRV);
-	cmd->SetGraphicsRootConstantBufferView(indices.at("ColorAdjustParams"), colorAdjustResource_->GetGPUVirtualAddress());
-	cmd->SetGraphicsRootConstantBufferView(indices.at("ToneParams"), toneParamsResource_->GetGPUVirtualAddress());
-}
-
-void OffScreen::ExecuteShatterTransitionEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV)
-{
-	auto cmd = dxCommon_->GetCommandList();
-	auto pm = YPipelineManager::GetInstance();
-	const auto& indices = pm->GetParameterIndices("ShatterTransition");
-	cmd->SetGraphicsRootDescriptorTable(indices.at("sceneTex"), inputSRV);
-	cmd->SetGraphicsRootDescriptorTable(indices.at("crackTex"), TextureManager::GetInstance()->GetsrvHandleGPU(shatterTexturePath_));
-	cmd->SetGraphicsRootConstantBufferView(indices.at("cbPostEffect"), shatterTransitionResource_->GetGPUVirtualAddress());
-}
-
-void OffScreen::ExecuteBloomEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV)
-{
-	auto cmd = dxCommon_->GetCommandList();
-	auto pm = YPipelineManager::GetInstance();
-	const auto& indices = pm->GetParameterIndices("Bloom");
-	cmd->SetGraphicsRootDescriptorTable(indices.at("gTexture"), inputSRV);
-	cmd->SetGraphicsRootConstantBufferView(indices.at("BloomParams"), bloomResource_->GetGPUVirtualAddress());
-}
-
-void OffScreen::ExecutePosterizeEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV)
-{
-	auto cmd = dxCommon_->GetCommandList();
-	auto pm = YPipelineManager::GetInstance();
-	const auto& indices = pm->GetParameterIndices("Posterize");
-	cmd->SetGraphicsRootDescriptorTable(indices.at("gTexture"), inputSRV);
-	cmd->SetGraphicsRootConstantBufferView(indices.at("PosterizeParams"), posterizeResource_->GetGPUVirtualAddress());
-}
-
-void OffScreen::ExecuteKuwaharaEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV)
-{
-	auto cmd = dxCommon_->GetCommandList();
-	auto pm = YPipelineManager::GetInstance();
-	const auto& indices = pm->GetParameterIndices("Kuwahara");
-	cmd->SetGraphicsRootDescriptorTable(indices.at("gTexture"), inputSRV);
-	cmd->SetGraphicsRootConstantBufferView(indices.at("KuwaharaParams"), kuwaharaResource_->GetGPUVirtualAddress());
-}
-
-void OffScreen::ExecuteHalftoneEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV)
-{
-	auto cmd = dxCommon_->GetCommandList();
-	auto pm = YPipelineManager::GetInstance();
-	const auto& indices = pm->GetParameterIndices("Halftone");
-	cmd->SetGraphicsRootDescriptorTable(indices.at("gTexture"), inputSRV);
-	cmd->SetGraphicsRootConstantBufferView(indices.at("HalftoneParams"), halftoneResource_->GetGPUVirtualAddress());
-}
-
-void OffScreen::ExecuteCrossHatchEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV)
-{
-	auto cmd = dxCommon_->GetCommandList();
-	auto pm = YPipelineManager::GetInstance();
-	const auto& indices = pm->GetParameterIndices("CrossHatch");
-	cmd->SetGraphicsRootDescriptorTable(indices.at("gTexture"), inputSRV);
-	cmd->SetGraphicsRootConstantBufferView(indices.at("CrossHatchParams"), crossHatchResource_->GetGPUVirtualAddress());
-}
-
-void OffScreen::ExecuteColorGradeEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV)
-{
-	auto cmd = dxCommon_->GetCommandList();
-	auto pm = YPipelineManager::GetInstance();
-	const auto& indices = pm->GetParameterIndices("ColorGrade");
-	cmd->SetGraphicsRootDescriptorTable(indices.at("gTexture"), inputSRV);
-	cmd->SetGraphicsRootConstantBufferView(indices.at("ColorGradeParams"), colorGradeResource_->GetGPUVirtualAddress());
-}

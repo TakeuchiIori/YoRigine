@@ -110,70 +110,9 @@ void YPipelineManager::Initialize()
     CreatePSO_GPUParticleInit();
     CreatePSO_EffectObject();
 
-    // ポストエフェクト系パイプライン
+    // ポストエフェクト系PSパイプライン: 全エフェクトCS化に伴い、
+    // 最終 blit 用の BaseOffScreen (CopyImage.PS.hlsl) のみ残す
     CreatePSO_BaseOffScreen();
-    CreatePSO_BaseOffScreen(
-        L"Resources/Shaders/PostEffect/Grayscale/Grayscale.PS.hlsl",
-        "Grayscale");
-    CreatePSO_BaseOffScreen(
-        L"Resources/Shaders/PostEffect/Sepia/Sepia.PS.hlsl",
-        "Sepia");
-    CreatePSO_BaseOffScreen(
-        L"Resources/Shaders/PostEffect/Vignette/Vignette.PS.hlsl",
-        "Vignette");
-    CreatePSO_Smoothing(
-        L"Resources/Shaders/PostEffect/Smoothing/BoxFilter.PS.hlsl",
-        "OffScreen_BoxSmoothing");
-    CreatePSO_Smoothing(
-        L"Resources/Shaders/PostEffect/Smoothing/GaussianFilter.PS.hlsl",
-        "GaussSmoothing");
-    CreatePSO_DepthOutLine(
-        L"Resources/Shaders/PostEffect/OutLine/DepthBasedOutLine.PS.hlsl",
-        "DepthOutLine");
-    CreatePSO_RadialBlur(
-        L"Resources/Shaders/PostEffect/Blur/RadialBlur.PS.hlsl",
-        "RadialBlur");
-    CreatePSO_ToneMapping(
-        L"Resources/Shaders/PostEffect/ColorRemapping/ToneMapping.PS.hlsl",
-        "ToneMapping");
-    CreatePSO_Dissolve(
-        L"Resources/Shaders/PostEffect/Dissolve/Dissolve.PS.hlsl",
-        "Dissolve");
-    CreatePSO_Chromatic(
-        L"Resources/Shaders/PostEffect/ColorRemapping/Chromatic.PS.hlsl",
-        "Chromatic");
-    CreatePSO_ColorAdjust(
-        L"Resources/Shaders/PostEffect/ColorRemapping/ColorAdjust.PS.hlsl",
-        "ColorAdjust");
-    CreatePSO_ShatterTransition(
-        L"Resources/Shaders/PostEffect/Transition/ShatterTransition.PS.hlsl",
-        "ShatterTransition");
-    CreatePSO_BaseOffScreen(
-        L"Resources/Shaders/PostEffect/Bloom/Bloom.PS.hlsl",
-        "Bloom");
-    CreatePSO_BaseOffScreen(
-        L"Resources/Shaders/PostEffect/Posterize/Posterize.PS.hlsl",
-        "Posterize");
-    CreatePSO_BaseOffScreen(
-        L"Resources/Shaders/PostEffect/Kuwahara/Kuwahara.PS.hlsl",
-        "Kuwahara");
-    CreatePSO_BaseOffScreen(
-        L"Resources/Shaders/PostEffect/Halftone/Halftone.PS.hlsl",
-        "Halftone");
-    CreatePSO_BaseOffScreen(
-        L"Resources/Shaders/PostEffect/CrossHatch/CrossHatch.PS.hlsl",
-        "CrossHatch");
-    CreatePSO_BaseOffScreen(
-        L"Resources/Shaders/PostEffect/ColorGrade/ColorGrade.PS.hlsl",
-        "ColorGrade");
-    // Fog は depth SRV を使うので DepthOutLine と同じビルダで作る
-    CreatePSO_DepthOutLine(
-        L"Resources/Shaders/PostEffect/Fog/Fog.PS.hlsl",
-        "Fog");
-    // God Rays も depth SRV を使うので DepthOutLine ビルダ流用
-    CreatePSO_DepthOutLine(
-        L"Resources/Shaders/PostEffect/GodRays/GodRays.PS.hlsl",
-        "GodRays");
 
 	// Meshを使用したVFX用パイプライン
     CreatePSO_VfxMeshTrail();

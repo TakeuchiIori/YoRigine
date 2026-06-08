@@ -166,6 +166,18 @@ public:
 	// 指定されたエフェクトで描画（新しいメインインターフェース）
 	void RenderEffect(OffScreenEffectType type, D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
 
+	// Compute Shader 経路でエフェクトを実行する (出力はUAV)。
+	// 対応していないエフェクト型は HasComputeImplementation() で事前に確認すること。
+	void RenderEffectCompute(
+		OffScreenEffectType type,
+		D3D12_GPU_DESCRIPTOR_HANDLE inputSRV,
+		D3D12_GPU_DESCRIPTOR_HANDLE outputUAV,
+		uint32_t width,
+		uint32_t height);
+
+	// 指定エフェクトがCS実装を持つかどうか (段階移行期間中のルーティング判定用)
+	bool HasComputeImplementation(OffScreenEffectType type) const;
+
 	///************************* パラメータ設定 *************************///
 
 	// プロジェクション行列のセット
@@ -273,27 +285,8 @@ private:
 	void CreateFogResource();
 	void CreateGodRaysResource();
 
-	// エフェクト別の描画処理
+	// 最終 blit (バックバッファへの Copy) のみ PS 経路で残す
 	void ExecuteCopyEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
-	void ExecuteGaussSmoothingEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
-	void ExecuteDepthOutlineEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
-	void ExecuteSepiaEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
-	void ExecuteGrayscaleEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
-	void ExecuteVignetteEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
-	void ExecuteRadialBlurEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
-	void ExecuteToneMappingEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
-	void ExecuteDissolveEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
-	void ExecuteChromaticEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
-	void ExecuteColorAdjustEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
-	void ExecuteShatterTransitionEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
-	void ExecuteBloomEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
-	void ExecutePosterizeEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
-	void ExecuteKuwaharaEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
-	void ExecuteHalftoneEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
-	void ExecuteCrossHatchEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
-	void ExecuteColorGradeEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
-	void ExecuteFogEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
-	void ExecuteGodRaysEffect(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV);
 
 	// 共通描画処理
 	void SetupPipelineAndDraw(OffScreenEffectType type);

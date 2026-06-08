@@ -22,6 +22,7 @@ void ComputeShaderManager::Initialize()
 	CreatePaticleInitCS();
 	CreateEmitCS();
 	CreateParticleUpdateCS();
+	CreatePostEffectCS();
 }
 
 /// <summary>
@@ -487,4 +488,288 @@ void ComputeShaderManager::CreateParticleUpdateCS()
 		&computePipelineStateDesc,
 		IID_PPV_ARGS(&computePipelineStates_["ParticleUpdateCS"])
 	);
+}
+
+// =====================================================================
+// PostEffect CS の RootSignature + PSO 一括生成
+// 5種類の共通RS と 19個のPSO を作成する。OffScreen::RenderEffectCompute から参照される。
+// =====================================================================
+namespace {
+
+	// 1個分の descriptor range を作る
+	D3D12_DESCRIPTOR_RANGE MakeRange(D3D12_DESCRIPTOR_RANGE_TYPE type, UINT baseReg, UINT count = 1)
+	{
+		D3D12_DESCRIPTOR_RANGE r{};
+		r.RangeType = type;
+		r.BaseShaderRegister = baseReg;
+		r.NumDescriptors = count;
+		r.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+		return r;
+	}
+
+	// 線形サンプラ
+	D3D12_STATIC_SAMPLER_DESC MakeStaticSampler(UINT shaderReg, D3D12_FILTER filter)
+	{
+		D3D12_STATIC_SAMPLER_DESC s{};
+		s.Filter = filter;
+		s.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+		s.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+		s.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+		s.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+		s.MaxLOD = D3D12_FLOAT32_MAX;
+		s.ShaderRegister = shaderReg;
+		s.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		return s;
+	}
+
+	void SerializeAndCreateRS(
+		ID3D12Device* device,
+		const D3D12_ROOT_SIGNATURE_DESC& desc,
+		Microsoft::WRL::ComPtr<ID3D12RootSignature>& outRS)
+	{
+		Microsoft::WRL::ComPtr<ID3DBlob> sig;
+		Microsoft::WRL::ComPtr<ID3DBlob> err;
+		HRESULT hr = D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1, &sig, &err);
+		if (FAILED(hr)) {
+			Logger(reinterpret_cast<char*>(err->GetBufferPointer()));
+			assert(false);
+		}
+		hr = device->CreateRootSignature(0, sig->GetBufferPointer(), sig->GetBufferSize(), IID_PPV_ARGS(&outRS));
+		assert(SUCCEEDED(hr));
+		(void)hr;
+	}
+}
+
+void ComputeShaderManager::CreatePostEffectCS()
+{
+	auto device = dxCommon_->GetDevice().Get();
+
+	// ===========================================================
+	// RS_Simple : SRV(t0) + UAV(u0) + Sampler(s0)
+	// Copy/Sepia/Grayscale/Vignette 用
+	// ===========================================================
+	{
+		D3D12_DESCRIPTOR_RANGE srv = MakeRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0);
+		D3D12_DESCRIPTOR_RANGE uav = MakeRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0);
+
+		D3D12_ROOT_PARAMETER params[2] = {};
+		params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		params[0].DescriptorTable.pDescriptorRanges = &srv;
+		params[0].DescriptorTable.NumDescriptorRanges = 1;
+
+		params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		params[1].DescriptorTable.pDescriptorRanges = &uav;
+		params[1].DescriptorTable.NumDescriptorRanges = 1;
+
+		D3D12_STATIC_SAMPLER_DESC samps[1] = { MakeStaticSampler(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR) };
+
+		D3D12_ROOT_SIGNATURE_DESC desc{};
+		desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
+		desc.NumParameters = _countof(params);
+		desc.pParameters = params;
+		desc.NumStaticSamplers = _countof(samps);
+		desc.pStaticSamplers = samps;
+		SerializeAndCreateRS(device, desc, rootSignatures_["PostEffectRS_Simple"]);
+	}
+
+	// ===========================================================
+	// RS_CB : SRV(t0) + UAV(u0) + CBV(b0) + Sampler(s0)
+	// Gauss/Box/Radial/Tone/Chromatic/Bloom/Posterize/Kuwahara/Halftone/CrossHatch/ColorGrade 用
+	// ===========================================================
+	{
+		D3D12_DESCRIPTOR_RANGE srv = MakeRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0);
+		D3D12_DESCRIPTOR_RANGE uav = MakeRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0);
+
+		D3D12_ROOT_PARAMETER params[3] = {};
+		params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		params[0].DescriptorTable.pDescriptorRanges = &srv;
+		params[0].DescriptorTable.NumDescriptorRanges = 1;
+
+		params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		params[1].DescriptorTable.pDescriptorRanges = &uav;
+		params[1].DescriptorTable.NumDescriptorRanges = 1;
+
+		params[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+		params[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		params[2].Descriptor.ShaderRegister = 0;
+
+		D3D12_STATIC_SAMPLER_DESC samps[1] = { MakeStaticSampler(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR) };
+
+		D3D12_ROOT_SIGNATURE_DESC desc{};
+		desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
+		desc.NumParameters = _countof(params);
+		desc.pParameters = params;
+		desc.NumStaticSamplers = _countof(samps);
+		desc.pStaticSamplers = samps;
+		SerializeAndCreateRS(device, desc, rootSignatures_["PostEffectRS_CB"]);
+	}
+
+	// ===========================================================
+	// RS_CB2 : SRV(t0) + UAV(u0) + CBV(b0) + CBV(b1) + Sampler(s0)
+	// ColorAdjust 用
+	// ===========================================================
+	{
+		D3D12_DESCRIPTOR_RANGE srv = MakeRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0);
+		D3D12_DESCRIPTOR_RANGE uav = MakeRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0);
+
+		D3D12_ROOT_PARAMETER params[4] = {};
+		params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		params[0].DescriptorTable.pDescriptorRanges = &srv;
+		params[0].DescriptorTable.NumDescriptorRanges = 1;
+
+		params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		params[1].DescriptorTable.pDescriptorRanges = &uav;
+		params[1].DescriptorTable.NumDescriptorRanges = 1;
+
+		params[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+		params[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		params[2].Descriptor.ShaderRegister = 0;
+
+		params[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+		params[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		params[3].Descriptor.ShaderRegister = 1;
+
+		D3D12_STATIC_SAMPLER_DESC samps[1] = { MakeStaticSampler(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR) };
+
+		D3D12_ROOT_SIGNATURE_DESC desc{};
+		desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
+		desc.NumParameters = _countof(params);
+		desc.pParameters = params;
+		desc.NumStaticSamplers = _countof(samps);
+		desc.pStaticSamplers = samps;
+		SerializeAndCreateRS(device, desc, rootSignatures_["PostEffectRS_CB2"]);
+	}
+
+	// ===========================================================
+	// RS_Depth : SRV(t0)+SRV(t1=depth) + UAV(u0) + CBV(b0) + Sampler(s0,s1)
+	// DepthOutline / Fog / GodRays 用
+	// ===========================================================
+	{
+		D3D12_DESCRIPTOR_RANGE srv0 = MakeRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0);
+		D3D12_DESCRIPTOR_RANGE srv1 = MakeRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1);
+		D3D12_DESCRIPTOR_RANGE uav  = MakeRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0);
+
+		D3D12_ROOT_PARAMETER params[4] = {};
+		params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		params[0].DescriptorTable.pDescriptorRanges = &srv0;
+		params[0].DescriptorTable.NumDescriptorRanges = 1;
+
+		params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		params[1].DescriptorTable.pDescriptorRanges = &srv1;
+		params[1].DescriptorTable.NumDescriptorRanges = 1;
+
+		params[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		params[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		params[2].DescriptorTable.pDescriptorRanges = &uav;
+		params[2].DescriptorTable.NumDescriptorRanges = 1;
+
+		params[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+		params[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		params[3].Descriptor.ShaderRegister = 0;
+
+		D3D12_STATIC_SAMPLER_DESC samps[2] = {
+			MakeStaticSampler(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR),
+			MakeStaticSampler(1, D3D12_FILTER_MIN_MAG_MIP_POINT),
+		};
+
+		D3D12_ROOT_SIGNATURE_DESC desc{};
+		desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
+		desc.NumParameters = _countof(params);
+		desc.pParameters = params;
+		desc.NumStaticSamplers = _countof(samps);
+		desc.pStaticSamplers = samps;
+		SerializeAndCreateRS(device, desc, rootSignatures_["PostEffectRS_Depth"]);
+	}
+
+	// ===========================================================
+	// RS_Tex : SRV(t0)+SRV(t1) + UAV(u0) + CBV(b0) + Sampler(s0)
+	// Dissolve / ShatterTransition 用
+	// ===========================================================
+	{
+		D3D12_DESCRIPTOR_RANGE srv0 = MakeRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0);
+		D3D12_DESCRIPTOR_RANGE srv1 = MakeRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1);
+		D3D12_DESCRIPTOR_RANGE uav  = MakeRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0);
+
+		D3D12_ROOT_PARAMETER params[4] = {};
+		params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		params[0].DescriptorTable.pDescriptorRanges = &srv0;
+		params[0].DescriptorTable.NumDescriptorRanges = 1;
+
+		params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		params[1].DescriptorTable.pDescriptorRanges = &srv1;
+		params[1].DescriptorTable.NumDescriptorRanges = 1;
+
+		params[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		params[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		params[2].DescriptorTable.pDescriptorRanges = &uav;
+		params[2].DescriptorTable.NumDescriptorRanges = 1;
+
+		params[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+		params[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		params[3].Descriptor.ShaderRegister = 0;
+
+		D3D12_STATIC_SAMPLER_DESC samps[1] = { MakeStaticSampler(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR) };
+
+		D3D12_ROOT_SIGNATURE_DESC desc{};
+		desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
+		desc.NumParameters = _countof(params);
+		desc.pParameters = params;
+		desc.NumStaticSamplers = _countof(samps);
+		desc.pStaticSamplers = samps;
+		SerializeAndCreateRS(device, desc, rootSignatures_["PostEffectRS_Tex"]);
+	}
+
+	// ===========================================================
+	// 各エフェクト PSO の作成 (PSOキー, シェーダーパス, RSキー)
+	// ===========================================================
+	struct PsoSpec { const char* key; const wchar_t* path; const char* rsKey; };
+	const PsoSpec specs[] = {
+		// Simple
+		{ "PostEffectCopyCS",      L"Resources/Shaders/PostEffect/CopyImage/CopyImage.CS.hlsl",        "PostEffectRS_Simple" },
+		{ "PostEffectSepiaCS",     L"Resources/Shaders/PostEffect/Sepia/Sepia.CS.hlsl",                "PostEffectRS_Simple" },
+		{ "PostEffectGrayscaleCS", L"Resources/Shaders/PostEffect/Grayscale/Grayscale.CS.hlsl",        "PostEffectRS_Simple" },
+		{ "PostEffectVignetteCS",  L"Resources/Shaders/PostEffect/Vignette/Vignette.CS.hlsl",          "PostEffectRS_Simple" },
+		// CB
+		{ "PostEffectGaussCS",       L"Resources/Shaders/PostEffect/Smoothing/GaussianFilter.CS.hlsl",   "PostEffectRS_CB" },
+		{ "PostEffectBoxFilterCS",   L"Resources/Shaders/PostEffect/Smoothing/BoxFilter.CS.hlsl",        "PostEffectRS_CB" },
+		{ "PostEffectRadialBlurCS",  L"Resources/Shaders/PostEffect/Blur/RadialBlur.CS.hlsl",            "PostEffectRS_CB" },
+		{ "PostEffectToneMapCS",     L"Resources/Shaders/PostEffect/ColorRemapping/ToneMapping.CS.hlsl", "PostEffectRS_CB" },
+		{ "PostEffectChromaticCS",   L"Resources/Shaders/PostEffect/ColorRemapping/Chromatic.CS.hlsl",   "PostEffectRS_CB" },
+		{ "PostEffectBloomCS",       L"Resources/Shaders/PostEffect/Bloom/Bloom.CS.hlsl",                "PostEffectRS_CB" },
+		{ "PostEffectPosterizeCS",   L"Resources/Shaders/PostEffect/Posterize/Posterize.CS.hlsl",        "PostEffectRS_CB" },
+		{ "PostEffectKuwaharaCS",    L"Resources/Shaders/PostEffect/Kuwahara/Kuwahara.CS.hlsl",          "PostEffectRS_CB" },
+		{ "PostEffectHalftoneCS",    L"Resources/Shaders/PostEffect/Halftone/Halftone.CS.hlsl",          "PostEffectRS_CB" },
+		{ "PostEffectCrossHatchCS",  L"Resources/Shaders/PostEffect/CrossHatch/CrossHatch.CS.hlsl",      "PostEffectRS_CB" },
+		{ "PostEffectColorGradeCS",  L"Resources/Shaders/PostEffect/ColorGrade/ColorGrade.CS.hlsl",      "PostEffectRS_CB" },
+		// CB2
+		{ "PostEffectColorAdjustCS", L"Resources/Shaders/PostEffect/ColorRemapping/ColorAdjust.CS.hlsl", "PostEffectRS_CB2" },
+		// Depth
+		{ "PostEffectDepthOutlineCS", L"Resources/Shaders/PostEffect/OutLine/DepthBasedOutLine.CS.hlsl", "PostEffectRS_Depth" },
+		{ "PostEffectFogCS",          L"Resources/Shaders/PostEffect/Fog/Fog.CS.hlsl",                   "PostEffectRS_Depth" },
+		{ "PostEffectGodRaysCS",      L"Resources/Shaders/PostEffect/GodRays/GodRays.CS.hlsl",           "PostEffectRS_Depth" },
+		// Tex
+		{ "PostEffectDissolveCS",  L"Resources/Shaders/PostEffect/Dissolve/Dissolve.CS.hlsl",                 "PostEffectRS_Tex" },
+		{ "PostEffectShatterCS",   L"Resources/Shaders/PostEffect/Transition/ShatterTransition.CS.hlsl",     "PostEffectRS_Tex" },
+	};
+
+	for (const auto& s : specs) {
+		Microsoft::WRL::ComPtr<IDxcBlob> blob = dxCommon_->CompileShader(s.path, L"cs_6_0");
+		D3D12_COMPUTE_PIPELINE_STATE_DESC psoDesc{};
+		psoDesc.pRootSignature = rootSignatures_[s.rsKey].Get();
+		psoDesc.CS = { blob->GetBufferPointer(), blob->GetBufferSize() };
+
+		HRESULT hr = device->CreateComputePipelineState(&psoDesc, IID_PPV_ARGS(&computePipelineStates_[s.key]));
+		assert(SUCCEEDED(hr));
+		(void)hr;
+	}
 }
