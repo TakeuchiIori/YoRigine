@@ -60,6 +60,12 @@ public:
 	// ボーン描画
 	void DrawBone(Line& line, const Matrix4x4& worldMatrix);
 
+	// インスタンシング描画 (ObjectInstanced PSO 使用、skinning未対応)
+	// instanceSRV: StructuredBuffer<InstanceData> の GPU descriptor handle
+	void DrawInstanced(uint32_t instanceCount, D3D12_GPU_DESCRIPTOR_HANDLE instanceSRV);
+	// インスタンシング影描画 (ShadowMapInstanced PSO 使用)
+	void DrawShadowInstanced(uint32_t instanceCount, D3D12_GPU_DESCRIPTOR_HANDLE instanceSRV);
+
 	// モーション制御
 	void PlayOnce();
 	void PlayLoop();

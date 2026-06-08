@@ -99,6 +99,8 @@ void YPipelineManager::Initialize()
     CreatePSO_Sprite();
     CreatePSO_Object();
     CreatePSO_ShadowMap();
+    CreatePSO_ObjectInstanced();
+    CreatePSO_ShadowMapInstanced();
     CreatePSO_Line();
     CreatePSO_InstancedCube();
     CreatePSO_Particle();
@@ -266,17 +268,14 @@ void YPipelineManager::CreatePSO_ShadowMap()
     parameterIndices_["ShadowMap"] = result.parameterIndices;
 }
 
-void YPipelineManager::CreatePSO_ObjectInstance()
+void YPipelineManager::CreatePSO_ObjectInstanced()
 {
-
     Logger("\n==============================================================\n\n\n");
-    Logger("         Creating Pipeline: ObjectInstance              \n\n\n");
+    Logger("         Creating Pipeline: ObjectInstanced              \n\n\n");
     Logger("==============================================================\n");
-    // シェーダーをコンパイル
-    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3DInstance.VS.hlsl", L"vs_6_0");
-    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3D.PS.hlsl", L"ps_6_0");
+    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3d/Object3dInstanced.VS.hlsl", L"vs_6_0");
+    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3d/Object3dInstanced.PS.hlsl", L"ps_6_0");
 
-    // リフレクションベースで完全自動生成
     ReflectionBasedPipelineBuilder builder;
     auto result = builder.BuildFromCompiledShaders(
         dxCommon_->GetDevice().Get(),
@@ -284,10 +283,30 @@ void YPipelineManager::CreatePSO_ObjectInstance()
         psBlob.Get()
     );
 
-    // 結果を保存
-    rootSignatures_["ObjectInstance"] = result.rootSignature;
-    pipelineStates_["ObjectInstance"] = result.pipelineState;
-    parameterIndices_["ObjectInstance"] = result.parameterIndices;
+    rootSignatures_["ObjectInstanced"] = result.rootSignature;
+    pipelineStates_["ObjectInstanced"] = result.pipelineState;
+    parameterIndices_["ObjectInstanced"] = result.parameterIndices;
+}
+
+void YPipelineManager::CreatePSO_ShadowMapInstanced()
+{
+    Logger("\n==============================================================\n\n\n");
+    Logger("         Creating Pipeline: ShadowMapInstanced              \n\n\n");
+    Logger("==============================================================\n");
+    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Shadow/ShadowmapInstanced.VS.hlsl", L"vs_6_0");
+
+    ReflectionBasedPipelineBuilder builder;
+    auto result = builder
+        .SetDepthStencilFormat(DXGI_FORMAT_D32_FLOAT)
+        .SetRasterizerState(YoRigine::RasterizerPresets::CreateShadow())
+        .BuildFromCompiledShaders(
+            dxCommon_->GetDevice().Get(),
+            vsBlob.Get()
+        );
+
+    rootSignatures_["ShadowMapInstanced"] = result.rootSignature;
+    pipelineStates_["ShadowMapInstanced"] = result.pipelineState;
+    parameterIndices_["ShadowMapInstanced"] = result.parameterIndices;
 }
 
 void YPipelineManager::CreatePSO_Particle()

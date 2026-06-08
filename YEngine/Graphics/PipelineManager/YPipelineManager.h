@@ -104,9 +104,14 @@ private:
     void CreatePSO_ShadowMap();
 
     /// <summary>
-    /// インスタンシング描画用パイプライン
+    /// インスタンシング描画用パイプライン (Object3dInstanced.VS/PS.hlsl)
     /// </summary>
-    void CreatePSO_ObjectInstance();
+    void CreatePSO_ObjectInstanced();
+
+    /// <summary>
+    /// インスタンシング影描画用パイプライン (ShadowmapInstanced.VS.hlsl)
+    /// </summary>
+    void CreatePSO_ShadowMapInstanced();
 
     /// <summary>
     /// パーティクル描画用パイプライン（通常版）
