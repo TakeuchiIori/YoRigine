@@ -815,6 +815,74 @@
                 1.0
             ],
             "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                0.6318408250808716,
+                0.616123378276825,
+                0.616123378276825,
+                1.0
+            ],
+            "filePath": "Rock_2\\Rock_2.obj",
+            "id": 13,
+            "isAnimation": false,
+            "modelName": "Rock_2.obj",
+            "parentID": -1,
+            "position": [
+                5.599999904632568,
+                0.0,
+                -47.400001525878906
+            ],
+            "rotate": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                4.360000133514404,
+                6.53000020980835,
+                6.110000133514404
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
         }
     ],
     "version": 9
