@@ -240,8 +240,6 @@ void BattleScene::DrawLine() {
 	player_->DrawBone(*line_.get());
 	AreaManager::GetInstance()->DrawArea("BattleArea", line_.get());
 
-	// 全 KeyframeCamera のパス/球マーカーを描画（編集中の可視化）
-	CameraDirector::GetInstance()->DrawDebug3D(*line_.get());
 #endif
 }
 

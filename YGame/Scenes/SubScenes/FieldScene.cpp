@@ -178,9 +178,6 @@ void FieldScene::DrawLine() {
 	AreaManager::GetInstance()->DrawArea("FieldArea", line_.get());
 	AreaManager::GetInstance()->Draw(line_.get(), { "FieldArea" });
 
-	// 全 KeyframeCamera のパス/球マーカーを描画
-	CameraDirector::GetInstance()->DrawDebug3D(*line_.get());
-
 	// ── NavGrid デバッグ描画 ─────────────────────────────────────────────
 	// showNavGridDebug_ が true のときだけグリッドを可視化する。
 	// 通行不可セル（障害物）は赤の薄いAABB、通行可能は緑の薄い点で描く。

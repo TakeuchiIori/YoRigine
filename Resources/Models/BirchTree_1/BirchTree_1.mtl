@@ -1,20 +1,20 @@
-# Blender MTL File: 'BirchTree_1.blend'
-# Material Count: 2
+# Blender 5.1.2 MTL File: 'None'
+# www.blender.org
 
-newmtl BirchTree_Bark
-Ns 96.078431
+newmtl BirchTree_Bark.005
+Ns 96.078453
 Ka 1.000000 1.000000 1.000000
-Kd 0.640000 0.640000 0.640000
+Kd 0.238413 0.106796 0.073363
 Ks 0.500000 0.500000 0.500000
 Ke 0.000000 0.000000 0.000000
 Ni 1.000000
 d 1.000000
 illum 2
 
-newmtl BirchTree_Leaves
-Ns 96.078431
+newmtl BirchTree_Leaves.005
+Ns 96.078453
 Ka 1.000000 1.000000 1.000000
-Kd 0.640000 0.640000 0.640000
+Kd 0.000561 0.640013 0.000000
 Ks 0.000000 0.000000 0.000000
 Ke 0.000000 0.000000 0.000000
 Ni 1.000000
