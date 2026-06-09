@@ -79,6 +79,12 @@ void NavGrid::Bake(ObjectManager* objectManager) {
             obj->colliderTypeId != CollisionTypeIdDef::kStaticWall) continue;
         if (!obj->collider || !obj->colliderEnabled) continue;
 
+        // 障害物が視錐台外にあると ObjectManager::Update() で
+        // collider->Update() が culling によりスキップされ、AABB が古い matWorld の値で
+        // 残っている可能性がある。Bake では正しい位置のセルをマークしたいので、
+        // 読み取り前に強制的に Update を呼んで最新の matWorld を反映させる。
+        obj->collider->Update();
+
         // AABBCollider
         if (auto* aabb = dynamic_cast<AABBCollider*>(obj->collider.get())) {
             MarkObstacle(aabb->GetAABB(), true);

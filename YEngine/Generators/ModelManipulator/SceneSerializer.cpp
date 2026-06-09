@@ -175,6 +175,14 @@ namespace YoRigine {
                     obj->parentID = (it != oldToNewId.end()) ? it->second : -1;
                 }
                 objectManager_->UpdateObjectTransform(*obj);
+                // matWorld が確定したあとにコライダー内部 AABB を作り直す。
+                // ApplyColliderTemplate は読み込みループ内で先に走るが、
+                // その時点では UpdateMatrix 前なので matWorld_ が原点のままで
+                // AABB が原点付近に張り付いてしまう (= NavGrid::Bake が障害物を
+                // 認識せず敵が貫通する原因)。ここで再度 Update して位置を反映させる。
+                if (obj->collider) {
+                    obj->collider->Update();
+                }
             }
 
             std::cout << "[SceneSerializer] Scene loaded: " << filePath << "\n";
@@ -354,6 +362,10 @@ namespace YoRigine {
                         objectManager_->SetParent(obj->id, it->second);
                 }
                 objectManager_->UpdateObjectTransform(*obj);
+                // LoadScene と同じ理由でコライダー AABB を最新 matWorld で更新する。
+                if (obj->collider) {
+                    obj->collider->Update();
+                }
             }
 
             std::cout << "[SceneSerializer] Prefab loaded: " << filePath << "\n";

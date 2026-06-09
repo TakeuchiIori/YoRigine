@@ -38,11 +38,14 @@ private:
 
 	bool isEnabled_ = true;							// 衝突判定を有効にするか
 	float cameraRadius_ = 0.5f;						// カメラの球体判定の半径（壁からどれくらい離すか）
-	float avoidSpeed_ = 0.3f;						// 壁が迫った時に手前に寄る素早さ (0.0~1.0)
-	float returnSpeed_ = 0.05f;						// 壁がなくなった時に元の距離に戻る素早さ (0.0~1.0)
+	float avoidSpeed_ = 0.3f;						// 壁が迫った時に手前に寄る素早さ (旧 60fps Lerp 係数。内部で /sec に換算)
+	float returnSpeed_ = 0.05f;						// 壁がなくなった時に元の距離に戻る素早さ (同上)
+	float minDistanceRatio_ = 0.15f;				// カメラ最小距離率。これ以下にはピボットに寄せない (ターゲットが画面いっぱいになるのを防ぐ)
 
 	// --- ハイアングル演出パラメータ ---
-	bool enableHighAngle_ = true;					// 接近時のハイアングル化を有効にするか
+	// rotation 補正なしで Y だけ持ち上げると look-at が pivot を外し、
+	// 追従ターゲットが画面外に出る。基本的に off にしておくこと。
+	bool enableHighAngle_ = false;					// 接近時のハイアングル化を有効にするか
 	float highAngleThreshold_ = 0.5f;				// 距離が本来の何割未満になったら持ち上げ始めるか
 	float maxPushUpHeight_ = 3.0f;					// 最大でどれくらい上に持ち上げるか
 

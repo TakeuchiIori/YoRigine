@@ -1,0 +1,10 @@
+{
+    "agentRadius": 0.5,
+    "cellSize": 2.0,
+    "maxSearchNodes": 2000,
+    "pathRefreshInterval": 0.30000001192092896,
+    "worldMaxX": 100.0,
+    "worldMaxZ": 100.0,
+    "worldMinX": -100.0,
+    "worldMinZ": -100.0
+}
