@@ -1,5 +1,17 @@
 {
     "FieldArea": {
+        "active": false,
+        "center": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "debugDraw": true,
+        "groundBottom": 0.0,
+        "groundTop": 100.0,
+        "radius": 50.0
+    },
+    "TestArea": {
         "active": true,
         "center": {
             "x": 0.0,
@@ -9,16 +21,19 @@
         "debugDraw": true,
         "groundBottom": 0.0,
         "groundTop": 100.0,
-        "radius": 150.0
+        "radius": 100.0
     },
     "_index": {
         "names": [
-            "FieldArea"
+            "FieldArea",
+            "TestArea"
         ],
         "purposes": [
+            "Boundary",
             "Boundary"
         ],
         "types": [
+            "Circle",
             "Circle"
         ]
     }

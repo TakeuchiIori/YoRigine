@@ -167,6 +167,21 @@ namespace YoRigine {
             auto* obj = objects[i];
             if (!obj) continue;
 
+            ImGui::PushID(obj->id);
+
+            // 行頭の鍵トグル: false にすると Pick パスに描画されず、
+            // ビューポートのクリックで選択候補から外れる (地面・スカイ等の固定背景用)。
+            const char* lockLabel = obj->pickable ? "[ ]" : "[L]";
+            if (ImGui::SmallButton(lockLabel)) {
+                obj->pickable = !obj->pickable;
+            }
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip(obj->pickable
+                    ? "クリックで選択ロック (Pick から除外)"
+                    : "ロック中: ビューポートクリックで選ばれない");
+            }
+            ImGui::SameLine();
+
             bool isSel = selector_->IsSelected(obj->id);
             std::string label = "オブジェクト " + std::to_string(obj->id)
                 + " (" + obj->modelName + ")";
@@ -181,6 +196,8 @@ namespace YoRigine {
                 }
                 ImGui::EndPopup();
             }
+
+            ImGui::PopID();
         }
 
         ImGui::Separator();

@@ -411,6 +411,17 @@ namespace YoRigine {
 		// 候補ペア列挙
 		grid_.QueryPairs(broadPhasePairsScratch_);
 
+		// 静的×静的のペアは narrow-phase もコールバックも実質意味がないので
+		// この時点で一括除去する。同一場所に多数の static collider を置いた場合の
+		// O(N²) コストを劇的に減らす最重要フィルタ。
+		broadPhasePairsScratch_.erase(
+			std::remove_if(broadPhasePairsScratch_.begin(), broadPhasePairsScratch_.end(),
+				[](const std::pair<BaseCollider*, BaseCollider*>& p) {
+					return p.first && p.second &&
+						p.first->GetIsStatic() && p.second->GetIsStatic();
+				}),
+			broadPhasePairsScratch_.end());
+
 		// 反復押し戻し
 		ResolveContacts(broadPhasePairsScratch_, resolveIterations_);
 

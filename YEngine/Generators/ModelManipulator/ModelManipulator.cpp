@@ -462,6 +462,9 @@ namespace YoRigine {
 
 		for (auto* obj : objectManager_->GetAllActiveObjects()) {
 			if (!obj || !obj->object || !obj->worldTransform) continue;
+			// pickable=false の背景オブジェクト (地面など) は Pick バッファに描かない。
+			// クリックは裏の手前オブジェクトか空 (-1) に抜ける。
+			if (!obj->pickable) continue;
 
 			auto* model = obj->object->GetModel();
 			if (!model) continue;

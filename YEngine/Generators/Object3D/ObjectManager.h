@@ -61,6 +61,11 @@ public:
 		int parentID = -1;
 		bool isActive = true;
 
+		// シーンエディタのクリック選択対象にするか。
+		// 地面・スカイ等の背景要素を false にすると、ピックバッファ描画から除外され
+		// マウスクリックがその裏(=本来選択したい手前のオブジェクト or 空)に届く。
+		bool pickable = true;
+
 		// アニメーション関連
 		bool isAnimation = false;
 		std::string animationName = "";

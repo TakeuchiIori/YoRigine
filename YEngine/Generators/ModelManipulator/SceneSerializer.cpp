@@ -39,6 +39,7 @@ namespace YoRigine {
                     {"parentID",            obj->parentID},
                     {"isAnimation",         obj->isAnimation},
                     {"animationName",       obj->animationName},
+                    {"pickable",            obj->pickable},
                     {"colliderEnabled",     obj->colliderEnabled},
                     {"colliderTypeId",      static_cast<uint32_t>(obj->colliderTypeId)},
                     {"colliderShapeType",   static_cast<uint32_t>(obj->colliderShapeType)},
@@ -110,6 +111,7 @@ namespace YoRigine {
                 obj->rotation = { o["rotate"][0],   o["rotate"][1],   o["rotate"][2] };
                 obj->scale    = { o["scale"][0],    o["scale"][1],    o["scale"][2] };
                 obj->colliderEnabled = o.value("colliderEnabled", false);
+                obj->pickable = o.value("pickable", true);
                 if (o.contains("parentID")) obj->parentID = o["parentID"].get<int>();
 
                 // version 7+: マテリアル色
@@ -212,6 +214,7 @@ namespace YoRigine {
                     {"parentID",            obj->parentID},
                     {"isAnimation",         obj->isAnimation},
                     {"animationName",       obj->animationName},
+                    {"pickable",            obj->pickable},
                     {"colliderEnabled",     obj->colliderEnabled},
                     {"colliderTypeId",      static_cast<uint32_t>(obj->colliderTypeId)},
                     {"colliderShapeType",   static_cast<uint32_t>(obj->colliderShapeType)},
@@ -291,6 +294,7 @@ namespace YoRigine {
                 if (o.contains("parentID")) obj->parentID = o["parentID"].get<int>();
 
                 obj->colliderEnabled = o.value("colliderEnabled", false);
+                obj->pickable = o.value("pickable", true);
 
                 // version 7+: マテリアル色
                 if (version >= 7 && o.contains("color")) {
