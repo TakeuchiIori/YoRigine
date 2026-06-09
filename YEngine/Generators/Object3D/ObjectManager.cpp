@@ -553,6 +553,15 @@ void ObjectManager::ApplyColliderTemplate(PlacedObject& obj) {
 	obj.collider->SetIsStatic(true);
 	obj.collider->SetCollisionEnabled(obj.colliderEnabled);
 
+	// NavGrid::Bake / VisionSystem::HasLineOfSight が AABB を読むため、
+	// 静的障害物は frustum culling から除外して常に最新の AABB を持たせる。
+	// (デフォルトは checkOutsideCamera=true で視野外スキップ → AABB が古くなり、
+	//  視野外オブジェクトを挟んでも視線判定が抜ける / Bake 位置がズレる原因になる)
+	const bool isNavBlocker =
+		(obj.colliderTypeId == CollisionTypeIdDef::kNavObstacle ||
+		 obj.colliderTypeId == CollisionTypeIdDef::kStaticWall);
+	obj.collider->SetCheckOutsideCamera(!isNavBlocker);
+
 	// シェイプ別のオフセットを反映
 	switch (obj.colliderShapeType) {
 	case ColliderShapeType::kAABB:

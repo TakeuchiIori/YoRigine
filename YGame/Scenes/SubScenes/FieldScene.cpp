@@ -271,18 +271,30 @@ void FieldScene::DrawLine() {
 		const float cs = navGrid_.GetCellSize();
 		const float yBase = 0.0f; // 地面のY座標
 
+		// 配置オブジェクトの footprint と erosion を色分けして描画。
+		// 赤 = オブジェクト本体に重なる "raw" セル (配置物の位置・サイズと一致)
+		// 橙 = それ以外の通行不可 = erosion (エージェント半径ぶんの安全マージン)
+		// 厚さ 0.6m / Y=0.1 から立ち上げて OBB ワイヤフレームと重ならないようにする
+		const auto& cells = navGrid_.GetCells();
+		const float yLo = yBase + 0.1f;
+		const float yHi = yBase + 0.7f;
 		for (int gz = 0; gz < D; ++gz) {
 			for (int gx = 0; gx < W; ++gx) {
-				if (!navGrid_.IsWalkable(gx, gz)) {
-					// 通行不可セル → 赤のAABB
-					NavGrid::GridPos gp{ gx, gz };
-					Vector3 center = navGrid_.GridToWorld(gp);
-					Vector3 mn = { center.x - cs * 0.5f, yBase,        center.z - cs * 0.5f };
-					Vector3 mx = { center.x + cs * 0.5f, yBase + 0.1f, center.z + cs * 0.5f };
-					line_->SetColor({ 1.0f, 0.15f, 0.15f, 0.7f });
-					line_->DrawAABB(mn, mx);
-					line_->DrawLine();
+				const auto& c = cells[gz * W + gx];
+				if (c.walkable) continue;
+
+				NavGrid::GridPos gp{ gx, gz };
+				Vector3 center = navGrid_.GridToWorld(gp);
+				Vector3 mn = { center.x - cs * 0.5f, yLo, center.z - cs * 0.5f };
+				Vector3 mx = { center.x + cs * 0.5f, yHi, center.z + cs * 0.5f };
+
+				if (c.rawObstacle) {
+					line_->SetColor({ 1.0f, 0.15f, 0.15f, 0.95f }); // 赤: obstacle footprint
+				} else {
+					line_->SetColor({ 1.0f, 0.55f, 0.10f, 0.45f }); // 橙: erosion margin
 				}
+				line_->DrawAABB(mn, mx);
+				line_->DrawLine();
 			}
 		}
 
