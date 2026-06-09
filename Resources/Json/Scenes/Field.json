@@ -1,0 +1,1868 @@
+{
+    "objects": [
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                2.1710000038146973,
+                5.8480000495910645,
+                -0.016132473945617676
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                2.0422630310058594,
+                1.5767922401428223,
+                1.7238359451293945
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Blacksmith\\Blacksmith.obj",
+            "id": 0,
+            "isAnimation": false,
+            "modelName": "Blacksmith.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -49.47660827636719,
+                7.561564416391775e-05,
+                -60.76611328125
+            ],
+            "rotate": [
+                4.448315849003848e-06,
+                -0.0,
+                5.362820047594141e-06
+            ],
+            "scale": [
+                3.999993324279785,
+                4.0,
+                3.999993324279785
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Bell_Tower\\Bell_Tower.obj",
+            "id": 1,
+            "isAnimation": false,
+            "modelName": "Bell_Tower.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                39.78806686401367,
+                0.0,
+                36.09065246582031
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -0.8639569282531738,
+                3.1415908336639404
+            ],
+            "scale": [
+                4.0,
+                4.0,
+                4.0
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.1255600452423096,
+                3.474648952484131,
+                1.3828206062316895
+            ],
+            "colliderAabbMin": [
+                -1.1255600452423096,
+                -0.0848538875579834,
+                -1.4089465141296387
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.0,
+                6.09499979019165,
+                -0.013063013553619385
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.1255600452423096,
+                1.7797514200210571,
+                1.395883560180664
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "House_1\\House_1.obj",
+            "id": 2,
+            "isAnimation": false,
+            "modelName": "House_1.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                18.14040184020996,
+                0.0,
+                24.853351593017578
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.3018920421600342,
+                -3.1415724754333496
+            ],
+            "scale": [
+                4.0,
+                4.0,
+                4.0
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                0.800000011920929,
+                4.0,
+                0.8500000238418579
+            ],
+            "colliderAabbMin": [
+                -0.800000011920929,
+                0.0,
+                -0.8500000238418579
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.0,
+                9.699999809265137,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                2.4000000953674316,
+                1.0
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Bell_Tower\\Bell_Tower.obj",
+            "id": 3,
+            "isAnimation": false,
+            "modelName": "Bell_Tower.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -64.90800476074219,
+                0.0,
+                -22.093616485595703
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -8.74227694680485e-08,
+                -3.1415908336639404
+            ],
+            "scale": [
+                4.0,
+                4.0,
+                4.0
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0255683660507202,
+                2.141460657119751,
+                1.1192142963409424
+            ],
+            "colliderAabbMin": [
+                -1.0082143545150757,
+                -0.051976680755615234,
+                -1.1105310916900635
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.008677005767822266,
+                4.0,
+                0.004341542720794678
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.016891360282898,
+                1.096718668937683,
+                1.114872694015503
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 7,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "House_3\\House_3.obj",
+            "id": 4,
+            "isAnimation": false,
+            "modelName": "House_3.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -28.336204528808594,
+                0.0,
+                -31.85314178466797
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.5707954168319702,
+                -3.1415908336639404
+            ],
+            "scale": [
+                3.9999942779541016,
+                4.0,
+                3.9999942779541016
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.016891360282898,
+                1.1000304222106934,
+                1.1192142963409424
+            ],
+            "colliderAabbMin": [
+                -1.016891360282898,
+                -0.026936471462249756,
+                -1.1105310916900635
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.0,
+                2.0369999408721924,
+                0.004341542720794678
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.016891360282898,
+                0.563483476638794,
+                1.114872694015503
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 7,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "House_4\\House_4.obj",
+            "id": 5,
+            "isAnimation": false,
+            "modelName": "House_4.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -11.040048599243164,
+                0.0007455348968505859,
+                -48.221744537353516
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.5707954168319702,
+                -3.1415908336639404
+            ],
+            "scale": [
+                3.9999876022338867,
+                4.0,
+                3.9999876022338867
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Floor_UnevenBrick\\Floor_UnevenBrick.obj",
+            "id": 6,
+            "isAnimation": false,
+            "modelName": "Floor_UnevenBrick.obj",
+            "parentID": -1,
+            "pickable": false,
+            "position": [
+                -8.0,
+                0.0,
+                0.01699542999267578
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                500.0,
+                1.0,
+                500.0
+            ],
+            "uvScale": [
+                500.0,
+                500.0
+            ],
+            "uvStochastic": 1.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.7339999675750732,
+                7.349999904632568,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.878999948501587,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 7,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "MapleTree_1\\MapleTree_1.obj",
+            "id": 7,
+            "isAnimation": false,
+            "modelName": "MapleTree_1.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -36.57022476196289,
+                0.0,
+                -52.807525634765625
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                1.5,
+                1.5,
+                1.5
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.2759999930858612,
+                3.0878751277923584,
+                -0.08625897765159607
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                0.9980000257492065,
+                3.252779006958008,
+                0.7590450048446655
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                0.125490203499794,
+                0.06666667014360428,
+                0.06666667014360428,
+                1.0
+            ],
+            "filePath": "DeadTree_2\\DeadTree_2.obj",
+            "id": 8,
+            "isAnimation": false,
+            "modelName": "DeadTree_2.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -0.15004754066467285,
+                0.0,
+                -67.58174133300781
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                1.5,
+                1.5,
+                1.5
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                0.800000011920929,
+                4.0,
+                0.8500000238418579
+            ],
+            "colliderAabbMin": [
+                -0.800000011920929,
+                0.0,
+                -0.8500000238418579
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.0,
+                9.699999809265137,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                2.4000000953674316,
+                1.0
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Bell_Tower\\Bell_Tower.obj",
+            "id": 9,
+            "isAnimation": false,
+            "modelName": "Bell_Tower.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -64.90799713134766,
+                0.0,
+                -56.80699157714844
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                4.0,
+                4.0,
+                4.0
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.7339999675750732,
+                7.462645530700684,
+                1.2230000495910645
+            ],
+            "colliderAabbMin": [
+                -1.878999948501587,
+                -0.181304931640625,
+                -1.3569999933242798
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 7,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "MapleTree_1\\MapleTree_1.obj",
+            "id": 10,
+            "isAnimation": false,
+            "modelName": "MapleTree_1.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -58.157135009765625,
+                0.0,
+                -51.88465881347656
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                1.5,
+                1.5,
+                1.5
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                2.1710000038146973,
+                5.8480000495910645,
+                -0.016132473945617676
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                2.0422630310058594,
+                1.5767922401428223,
+                1.7238359451293945
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Blacksmith\\Blacksmith.obj",
+            "id": 11,
+            "isAnimation": false,
+            "modelName": "Blacksmith.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -44.49422073364258,
+                0.0,
+                -19.10000991821289
+            ],
+            "rotate": [
+                -3.1415882110595703,
+                -8.74227694680485e-08,
+                -3.1415863037109375
+            ],
+            "scale": [
+                3.999993324279785,
+                4.0,
+                3.999993324279785
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.14300000667572021,
+                2.1459999084472656,
+                -0.10156500339508057
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0959999561309814,
+                2.420504570007324,
+                0.8763834834098816
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                0.125490203499794,
+                0.06666667014360428,
+                0.06666667014360428,
+                1.0
+            ],
+            "filePath": "DeadTree_4\\DeadTree_4.obj",
+            "id": 12,
+            "isAnimation": false,
+            "modelName": "DeadTree_4.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -15.556798934936523,
+                0.0,
+                -71.47854614257813
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                1.5533430576324463,
+                -3.1415908336639404
+            ],
+            "scale": [
+                1.5,
+                1.5,
+                1.5
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0255683660507202,
+                2.141460657119751,
+                1.1192142963409424
+            ],
+            "colliderAabbMin": [
+                -1.0082143545150757,
+                -0.051976680755615234,
+                -1.1105310916900635
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.008677005767822266,
+                4.0,
+                0.004341542720794678
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.016891360282898,
+                1.096718668937683,
+                1.114872694015503
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 7,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "House_3\\House_3.obj",
+            "id": 13,
+            "isAnimation": false,
+            "modelName": "House_3.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -19.16899871826172,
+                0.0,
+                -39.94329833984375
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.5707954168319702,
+                -3.1415908336639404
+            ],
+            "scale": [
+                3.9999942779541016,
+                4.0,
+                3.9999942779541016
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.7339999675750732,
+                7.462645530700684,
+                1.2230000495910645
+            ],
+            "colliderAabbMin": [
+                -1.878999948501587,
+                -0.181304931640625,
+                -1.3569999933242798
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 7,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "MapleTree_1\\MapleTree_1.obj",
+            "id": 14,
+            "isAnimation": false,
+            "modelName": "MapleTree_1.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -57.84138870239258,
+                0.0,
+                -27.956058502197266
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                1.5,
+                1.5,
+                1.5
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.7339999675750732,
+                7.349999904632568,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.878999948501587,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 7,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "MapleTree_1\\MapleTree_1.obj",
+            "id": 15,
+            "isAnimation": false,
+            "modelName": "MapleTree_1.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -35.82037353515625,
+                0.0,
+                -26.01364517211914
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                1.5,
+                1.5,
+                1.5
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                3.7844903469085693,
+                7.462645530700684,
+                2.7726104259490967
+            ],
+            "colliderAabbMin": [
+                -3.5785152912139893,
+                -0.181304931640625,
+                -2.5570905208587646
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 7,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "MapleTree_1\\MapleTree_1.obj",
+            "id": 16,
+            "isAnimation": false,
+            "modelName": "MapleTree_1.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -29.552356719970703,
+                0.0,
+                -57.77165222167969
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                1.5,
+                1.5,
+                1.5
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                3.7844903469085693,
+                7.462645530700684,
+                2.7726104259490967
+            ],
+            "colliderAabbMin": [
+                -3.5785152912139893,
+                -0.181304931640625,
+                -2.5570905208587646
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 7,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "MapleTree_1\\MapleTree_1.obj",
+            "id": 17,
+            "isAnimation": false,
+            "modelName": "MapleTree_1.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -20.740692138671875,
+                0.0,
+                -66.09598541259766
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                1.5,
+                1.5,
+                1.5
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.2759999930858612,
+                3.0878751277923584,
+                -0.08625897765159607
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                0.9980000257492065,
+                3.252779006958008,
+                0.7590450048446655
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                0.125490203499794,
+                0.06666667014360428,
+                0.06666667014360428,
+                1.0
+            ],
+            "filePath": "DeadTree_2\\DeadTree_2.obj",
+            "id": 18,
+            "isAnimation": false,
+            "modelName": "DeadTree_2.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                6.627623558044434,
+                0.0,
+                -67.58174133300781
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                1.5,
+                1.5,
+                1.5
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.2759999930858612,
+                3.0878751277923584,
+                -0.08625897765159607
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                0.9980000257492065,
+                3.252779006958008,
+                0.7590450048446655
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                0.125490203499794,
+                0.06666667014360428,
+                0.06666667014360428,
+                1.0
+            ],
+            "filePath": "DeadTree_2\\DeadTree_2.obj",
+            "id": 19,
+            "isAnimation": false,
+            "modelName": "DeadTree_2.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                11.495420455932617,
+                0.0,
+                -88.9811782836914
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                1.5,
+                1.5,
+                1.5
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.14300000667572021,
+                2.1459999084472656,
+                -0.10156500339508057
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0959999561309814,
+                2.420504570007324,
+                0.8763834834098816
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                0.125490203499794,
+                0.06666667014360428,
+                0.06666667014360428,
+                1.0
+            ],
+            "filePath": "DeadTree_4\\DeadTree_4.obj",
+            "id": 20,
+            "isAnimation": false,
+            "modelName": "DeadTree_4.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                3.4105491638183594,
+                0.0,
+                -87.05196380615234
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                1.5,
+                1.5,
+                1.5
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.2759999930858612,
+                3.0878751277923584,
+                -0.08625897765159607
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                0.9980000257492065,
+                3.252779006958008,
+                0.7590450048446655
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                0.125490203499794,
+                0.06666667014360428,
+                0.06666667014360428,
+                1.0
+            ],
+            "filePath": "DeadTree_2\\DeadTree_2.obj",
+            "id": 21,
+            "isAnimation": false,
+            "modelName": "DeadTree_2.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                17.939109802246094,
+                0.0,
+                -81.53028106689453
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                1.5,
+                1.5,
+                1.5
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.0430000014603138,
+                2.7960000038146973,
+                -0.10156500339508057
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.3459999561309814,
+                2.420504570007324,
+                0.8763834834098816
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                0.125490203499794,
+                0.06666667014360428,
+                0.06666667014360428,
+                1.0
+            ],
+            "filePath": "DeadTree_4\\DeadTree_4.obj",
+            "id": 22,
+            "isAnimation": false,
+            "modelName": "DeadTree_4.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -14.556798934936523,
+                0.0,
+                -76.86003875732422
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                1.5533430576324463,
+                -3.1415908336639404
+            ],
+            "scale": [
+                1.5,
+                1.5,
+                1.5
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                -0.007000000216066837,
+                2.296029567718506,
+                -0.10156500339508057
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.2960000038146973,
+                2.420504570007324,
+                0.8763834834098816
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                0.125490203499794,
+                0.06666667014360428,
+                0.06666667014360428,
+                1.0
+            ],
+            "filePath": "DeadTree_4\\DeadTree_4.obj",
+            "id": 23,
+            "isAnimation": false,
+            "modelName": "DeadTree_4.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -14.87081241607666,
+                0.0,
+                -81.66297149658203
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                1.5533430576324463,
+                -3.1415908336639404
+            ],
+            "scale": [
+                1.5,
+                1.5,
+                1.5
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.09300000220537186,
+                2.296029567718506,
+                -0.10156500339508057
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.2960000038146973,
+                2.420504570007324,
+                0.8763834834098816
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                0.125490203499794,
+                0.06666667014360428,
+                0.06666667014360428,
+                1.0
+            ],
+            "filePath": "DeadTree_4\\DeadTree_4.obj",
+            "id": 24,
+            "isAnimation": false,
+            "modelName": "DeadTree_4.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -14.750574111938477,
+                0.0,
+                -86.40518951416016
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                1.5533430576324463,
+                -3.1415908336639404
+            ],
+            "scale": [
+                1.5,
+                1.5,
+                1.5
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.14300000667572021,
+                2.296029567718506,
+                -0.10156500339508057
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.4459999799728394,
+                2.420504570007324,
+                0.8763834834098816
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                0.125490203499794,
+                0.06666667014360428,
+                0.06666667014360428,
+                1.0
+            ],
+            "filePath": "DeadTree_4\\DeadTree_4.obj",
+            "id": 25,
+            "isAnimation": false,
+            "modelName": "DeadTree_4.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -14.569962501525879,
+                0.0,
+                -91.59687042236328
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                1.5533430576324463,
+                -3.1415908336639404
+            ],
+            "scale": [
+                1.5,
+                1.5,
+                1.5
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.19300000369548798,
+                2.296029567718506,
+                -0.10156500339508057
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.2960000038146973,
+                2.420504570007324,
+                0.8763834834098816
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                0.125490203499794,
+                0.06666667014360428,
+                0.06666667014360428,
+                1.0
+            ],
+            "filePath": "DeadTree_4\\DeadTree_4.obj",
+            "id": 26,
+            "isAnimation": false,
+            "modelName": "DeadTree_4.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -14.580938339233398,
+                0.0,
+                -96.79141235351563
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                1.5533430576324463,
+                -3.1415908336639404
+            ],
+            "scale": [
+                1.5,
+                1.5,
+                1.5
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        }
+    ],
+    "version": 9
+}

@@ -11,6 +11,7 @@
 #include "Debugger/Logger.h"
 #include <Object3D/ObjectManager.h>
 #include "Collision/AreaCollision/Base/AreaManager.h"
+#include <ModelManipulator/ModelManipulator.h>
 
 #ifdef USE_IMGUI
 #include "imgui.h"
@@ -100,13 +101,17 @@ void FieldScene::Initialize(Camera* camera, Player* player) {
 
 
 	// エリア設定
+	// 登録名は "FieldArea" で統一。OnExit の RemoveArea("FieldArea") と一致させ、
+	// バトル遷移時にフィールド側のエリアが残らないようにする
+	// (以前は "TestArea" として登録されていたため OnExit で消えず、
+	//  BattleScene の "BattleArea" と二重に描画されて "100 のまま" に見えていた)。
 	auto battleFieldArea = std::make_shared<CircleArea>();
 	battleFieldArea->Initialize(Vector3(0, 0, 0), 100.0f);
 	battleFieldArea->SetPurpose(AreaPurpose::Boundary);  // 明示
 	battleFieldArea->SetCamera(sceneCamera_);
 
 	auto* mgr = AreaManager::GetInstance();
-	mgr->AddArea("TestArea", battleFieldArea);
+	mgr->AddArea("FieldArea", battleFieldArea);
 	mgr->SetDebugDrawEnabled(true);
 
 #ifdef USE_IMGUI
@@ -314,6 +319,13 @@ void FieldScene::OnEnter() {
 	BaseSubScene::OnEnter();
 
 	Logger("[FieldScene] ===== OnEnter() START =====\n");
+
+	// フィールド用 ModelManipulator シーンへ切替。
+	// Field.json が無い場合は空シーンになるので、初回は GameScene.json から
+	// 必要なものだけ残して保存して Field.json を作る運用にする。
+	// (LoadScene 内で ObjectManager をクリアするため NavGrid も貼り直す)
+	YoRigine::ModelManipulator::GetInstance()->LoadScene("Field");
+	RebakeNavGrid();
 
 	// フィールドの敵を再開（OBB コライダーもまとめて有効化される）
 	if (fieldEnemyManager_) {

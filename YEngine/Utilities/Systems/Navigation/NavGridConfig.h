@@ -25,10 +25,10 @@
 struct NavGridConfig
 {
     // ── グリッド範囲（フィールドの歩行可能エリア） ──────────────────────
-    float worldMinX = -50.0f;
-    float worldMaxX = 50.0f;
-    float worldMinZ = -50.0f;
-    float worldMaxZ = 50.0f;
+    float worldMinX = -100.0f;
+    float worldMaxX = 100.0f;
+    float worldMinZ = -100.0f;
+    float worldMaxZ = 100.0f;
 
     // ── セルサイズ（小さいほど精度が上がるがメモリ・ベイク時間が増える） ──
     // 推奨: 0.5f〜2.0f。建物の幅(2m前後)に対して1m以下が望ましい

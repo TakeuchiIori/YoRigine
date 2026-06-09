@@ -71,7 +71,10 @@ void GameScene::Initialize() {
 	// 視錐台外コライダーは BroadPhase 登録をスキップする (個別オプトアウトは BaseCollider::SetCheckOutsideCamera(false))
 	YoRigine::CollisionManager::GetInstance()->SetCullingCamera(sceneCamera_.get());
 	YoRigine::CollisionManager::GetInstance()->SetEnableFrustumCulling(true);
-	YoRigine::ModelManipulator::GetInstance()->LoadScene("GameScene");
+	// ModelManipulator のシーン読み込みは FieldScene / BattleScene の OnEnter で
+	// 各サブシーン用の JSON ("Field.json" / "Battle.json") を読む方式に統一した。
+	// ここで GameScene.json を読むと直後の SwitchToScene → OnEnter で上書きされる
+	// だけなので、ロードはしない。
 	AreaManager::GetInstance()->Initialize();
 	YParticleManager::GetInstance().SetCamera(sceneCamera_.get());
 

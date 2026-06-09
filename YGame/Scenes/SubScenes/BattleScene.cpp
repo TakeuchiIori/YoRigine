@@ -15,6 +15,7 @@
 #include <Editor/Editor.h>
 
 #include <UI/Damage/DamageNumberManager.h>
+#include <ModelManipulator/ModelManipulator.h>
 #include <algorithm>
 #ifdef USE_IMGUI
 #include "imgui.h"
@@ -277,6 +278,11 @@ void BattleScene::OnEnter() {
 	BaseSubScene::OnEnter();
 
 	Logger("[BattleScene] ===== OnEnter() START =====\n");
+
+	// バトル用 ModelManipulator シーンへ切替。
+	// Battle.json が無い場合は空シーンになる。初回は GameScene.json から
+	// バトル用に置くものだけ残して保存して Battle.json を作る。
+	YoRigine::ModelManipulator::GetInstance()->LoadScene("Battle");
 
 	// カメラリセット
 	currentCameraMode_ = CameraMode::FOLLOW;

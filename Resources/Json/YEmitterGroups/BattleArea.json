@@ -1,0 +1,20 @@
+{
+    "emitters": [
+        {
+            "autoEmit": false,
+            "emissionRate": 10.0,
+            "emitCount": 1,
+            "offsetX": 0.0,
+            "offsetY": 0.0,
+            "offsetZ": 0.0,
+            "systemName": "BattleArea"
+        }
+    ],
+    "groupName": "BattleArea",
+    "isActive": true,
+    "position": [
+        0.0,
+        0.0,
+        0.0
+    ]
+}
