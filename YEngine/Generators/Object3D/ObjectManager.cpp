@@ -578,9 +578,12 @@ void ObjectManager::ApplyColliderTemplate(PlacedObject& obj) {
 }
 
 void ObjectManager::CopyColliderSettingsToAll(const PlacedObject& src) {
-	// ソースオブジェクトの個別設定を同名オブジェクト全員にコピーして反映する
+	// ソースオブジェクトの個別設定を同名オブジェクト全員にコピーして反映する。
+	// colliderEnabled も含める: 含めないとコピー先が無効のまま (デバッグ描画も判定もオフ)
+	// 残り、「コピーしたのに同じに見えない」原因になる。
 	for (auto& [id, obj] : idToObject_) {
 		if (obj && obj->modelName == src.modelName && obj->id != src.id) {
+			obj->colliderEnabled      = src.colliderEnabled;
 			obj->colliderTypeId       = src.colliderTypeId;
 			obj->colliderShapeType    = src.colliderShapeType;
 			obj->colliderAabbOffset   = src.colliderAabbOffset;

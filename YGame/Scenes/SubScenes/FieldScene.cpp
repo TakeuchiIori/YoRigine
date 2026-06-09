@@ -79,12 +79,12 @@ void FieldScene::Initialize(Camera* camera, Player* player) {
 
 	// エリア設定
 	auto battleFieldArea = std::make_shared<CircleArea>();
-	battleFieldArea->Initialize(Vector3(0, 0, 0), 50.0f);
+	battleFieldArea->Initialize(Vector3(0, 0, 0), 100.0f);
 	battleFieldArea->SetPurpose(AreaPurpose::Boundary);  // 明示
 	battleFieldArea->SetCamera(sceneCamera_);
 
 	auto* mgr = AreaManager::GetInstance();
-	mgr->AddArea("FieldArea", battleFieldArea);
+	mgr->AddArea("TestArea", battleFieldArea);
 	mgr->SetDebugDrawEnabled(true);
 
 #ifdef USE_IMGUI
