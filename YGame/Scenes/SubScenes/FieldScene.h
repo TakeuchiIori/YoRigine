@@ -24,6 +24,9 @@
 #include "SceneDataStructures.h"
 #include "BaseSubScene.h"
 
+// JSON
+#include "Loaders/Json/JsonManager.h"
+
 ///************************* フィールドシーン *************************///
 class FieldScene : public BaseSubScene {
 public:
@@ -111,4 +114,12 @@ private:
 	NavGrid navGrid_;
 	NavPathfinder navPathfinder_;
 	bool showNavGridDebug_ = false; // NavGridデバッグ描画ON/OFF
+
+	// プレイヤー初期スポーン (フィールドに最初に降り立つ位置 / 向き)。JSON 保存対象。
+	// バトル復帰時の位置 (HandleBattleReturn) とは別物。
+	Vector3 spawnPos_ = { 0.0f, 0.0f, 0.0f };
+	float   spawnYawDeg_ = 0.0f;
+	// フォローカメラの初期 Euler (deg)。x=pitch / y=yaw / z=roll。
+	Vector3 spawnCameraRotDeg_ = { 0.0f, 0.0f, 0.0f };
+	std::unique_ptr<YoRigine::JsonManager> spawnJson_;
 };

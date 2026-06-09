@@ -26,6 +26,28 @@ void FieldScene::Initialize(Camera* camera, Player* player) {
 	player_->Reset();
 
 	//------------------------------------------------------------
+	// プレイヤースポーン設定 (JSON ロード → プレイヤー / カメラに適用)
+	//------------------------------------------------------------
+	spawnJson_ = std::make_unique<YoRigine::JsonManager>("FieldSpawn", "Resources/Json/Scenes");
+	spawnJson_->Register("位置",            &spawnPos_);
+	spawnJson_->Register("向き (deg)",      &spawnYawDeg_);
+	spawnJson_->Register("カメラ向き (deg)", &spawnCameraRotDeg_);
+
+	constexpr float kDegToRad = 3.14159265358979323846f / 180.0f;
+
+	player_->SetPosition(spawnPos_);
+	player_->GetWT().rotate_.y = spawnYawDeg_ * kDegToRad;
+	player_->GetWT().UpdateMatrix();
+
+	// PlayerCamera は GameScene::Initialize で先にセットアップ済み(なければ無視)。
+	if (auto* pc = player_->GetPlayerCamera()) {
+		pc->SetRotate({
+			spawnCameraRotDeg_.x * kDegToRad,
+			spawnCameraRotDeg_.y * kDegToRad,
+			spawnCameraRotDeg_.z * kDegToRad });
+	}
+
+	//------------------------------------------------------------
 	// オブジェクト初期化
 	//------------------------------------------------------------
 	ground_ = std::make_unique<Ground>();
@@ -90,6 +112,53 @@ void FieldScene::Initialize(Camera* camera, Player* player) {
 #ifdef USE_IMGUI
 	Editor::GetInstance()->RegisterGameUI("フィールドモード:デバッグ情報",
 		[this]() { fieldEnemyManager_->ShowDebugInfo(); }, "Game");
+
+	// プレイヤースポーン地点エディタ
+	Editor::GetInstance()->RegisterGameUI("プレイヤースポーン", [this]() {
+		constexpr float kDegToRad = 3.14159265358979323846f / 180.0f;
+		constexpr float kRadToDeg = 180.0f / 3.14159265358979323846f;
+
+		ImGui::TextDisabled("ゲーム開始時のプレイヤー / カメラの初期状態");
+		ImGui::Separator();
+
+		ImGui::TextUnformatted("プレイヤー");
+		ImGui::DragFloat3("位置##spawn", &spawnPos_.x, 0.1f);
+		ImGui::DragFloat("向き (deg)##spawn", &spawnYawDeg_, 1.0f, -180.0f, 180.0f, "%.1f");
+
+		ImGui::Separator();
+		ImGui::TextUnformatted("フォローカメラ");
+		ImGui::DragFloat3("カメラ向き (deg)##spawn", &spawnCameraRotDeg_.x, 1.0f, -180.0f, 180.0f, "%.1f");
+		ImGui::TextDisabled("x=Pitch / y=Yaw / z=Roll");
+
+		ImGui::Separator();
+		if (ImGui::Button("現在の状態を取得")) {
+			spawnPos_ = player_->GetWT().translate_;
+			spawnYawDeg_ = player_->GetWT().rotate_.y * kRadToDeg;
+			if (auto* pc = player_->GetPlayerCamera()) {
+				const Vector3 r = pc->GetRotate();
+				spawnCameraRotDeg_ = { r.x * kRadToDeg, r.y * kRadToDeg, r.z * kRadToDeg };
+			}
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("ここにワープ")) {
+			player_->SetPosition(spawnPos_);
+			player_->GetWT().rotate_.y = spawnYawDeg_ * kDegToRad;
+			player_->GetWT().UpdateMatrix();
+			if (auto* pc = player_->GetPlayerCamera()) {
+				pc->SetRotate({
+					spawnCameraRotDeg_.x * kDegToRad,
+					spawnCameraRotDeg_.y * kDegToRad,
+					spawnCameraRotDeg_.z * kDegToRad });
+			}
+		}
+
+		ImGui::Separator();
+		if (ImGui::Button("保存")) {
+			spawnJson_->Save();
+		}
+		ImGui::SameLine();
+		ImGui::TextDisabled("(編集値はワープ or 起動時に反映)");
+	}, "Game");
 
 	// NavGridConfig エディター（Editor::RegisterGameUI で登録）
 	Editor::GetInstance()->RegisterGameUI("NavGrid Config", [this]() {
