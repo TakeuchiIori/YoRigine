@@ -12,6 +12,7 @@
 #include <Object3D/ObjectManager.h>
 #include "Collision/AreaCollision/Base/AreaManager.h"
 #include <ModelManipulator/ModelManipulator.h>
+#include "Collision/AreaCollision/Base/AreaEditor.h"
 
 #ifdef USE_IMGUI
 #include "imgui.h"
@@ -117,6 +118,11 @@ void FieldScene::Initialize(Camera* camera, Player* player) {
 #ifdef USE_IMGUI
 	Editor::GetInstance()->RegisterGameUI("フィールドモード:デバッグ情報",
 		[this]() { fieldEnemyManager_->ShowDebugInfo(); }, "Game");
+
+	// AreaEditor は Game シーン全体(Field/Battle 両サブシーン)で開けるよう一度だけ登録。
+	// AreaEditor / AreaManager はシングルトンなのでサブシーンを跨いでも同じ状態を共有する。
+	Editor::GetInstance()->RegisterGameUI("AreaEditor",
+		[]() { AreaEditor::GetInstance()->Update(); }, "Game");
 
 	// プレイヤースポーン地点エディタ
 	Editor::GetInstance()->RegisterGameUI("プレイヤースポーン", [this]() {
@@ -251,6 +257,10 @@ void FieldScene::DrawLine() {
 	player_->DrawBone(*line_.get());
 	AreaManager::GetInstance()->DrawArea("FieldArea", line_.get());
 	AreaManager::GetInstance()->Draw(line_.get(), { "FieldArea" });
+	// LineManager にキューイングされた頂点をここで GPU 提出。
+	// 後段の NavGrid デバッグ分岐は自前で DrawLine しているが、
+	// それが無効なケースだとエリア線が出ないので明示的にフラッシュする。
+	line_->DrawLine();
 
 	// ── NavGrid デバッグ描画 ─────────────────────────────────────────────
 	// showNavGridDebug_ が true のときだけグリッドを可視化する。

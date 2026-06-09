@@ -240,6 +240,12 @@ void BattleScene::DrawLine() {
 	player_->DrawCollision();
 	player_->DrawBone(*line_.get());
 	AreaManager::GetInstance()->DrawArea("BattleArea", line_.get());
+	// AreaEditor で追加した他エリアもまとめて描画(BattleArea は重複描画を避けて除外)
+	AreaManager::GetInstance()->Draw(line_.get(), { "BattleArea" });
+
+	// LineManager にキューイングされた頂点をここで GPU 提出。
+	// これを呼ばないと AreaManager の Draw 系はバッファに溜まったまま画面に出ない。
+	line_->DrawLine();
 
 #endif
 }
