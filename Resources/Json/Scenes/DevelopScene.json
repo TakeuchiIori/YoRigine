@@ -14,8 +14,8 @@
             ],
             "colliderEnabled": true,
             "colliderObbCenter": [
-                2.1710000038146973,
-                5.8480000495910645,
+                0.6212015151977539,
+                1.4977599382400513,
                 -0.016132473945617676
             ],
             "colliderObbEuler": [
@@ -222,8 +222,8 @@
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.0,
-                9.699999809265137,
-                0.0
+                2.3802006244659424,
+                -0.010932505130767822
             ],
             "colliderObbEuler": [
                 0.0,
@@ -231,9 +231,9 @@
                 0.0
             ],
             "colliderObbSize": [
-                1.0,
-                2.4000000953674316,
-                1.0
+                1.016891360282898,
+                2.4993197917938232,
+                1.1699724197387695
             ],
             "colliderShapeType": 1,
             "colliderSphCenter": [
@@ -291,7 +291,7 @@
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.008677005767822266,
-                4.0,
+                1.0447419881820679,
                 0.004341542720794678
             ],
             "colliderObbEuler": [
@@ -360,7 +360,7 @@
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.0,
-                2.0369999408721924,
+                0.5365470051765442,
                 0.004341542720794678
             ],
             "colliderObbEuler": [
@@ -526,7 +526,7 @@
                 1.0
             ],
             "filePath": "MapleTree_1\\MapleTree_1.obj",
-            "id": 8,
+            "id": 7,
             "isAnimation": false,
             "modelName": "MapleTree_1.obj",
             "parentID": -1,
@@ -595,7 +595,7 @@
                 1.0
             ],
             "filePath": "DeadTree_2\\DeadTree_2.obj",
-            "id": 10,
+            "id": 8,
             "isAnimation": false,
             "modelName": "DeadTree_2.obj",
             "parentID": -1,
@@ -636,8 +636,8 @@
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.0,
-                9.699999809265137,
-                0.0
+                2.3802006244659424,
+                -0.010932505130767822
             ],
             "colliderObbEuler": [
                 0.0,
@@ -645,9 +645,9 @@
                 0.0
             ],
             "colliderObbSize": [
-                1.0,
-                2.4000000953674316,
-                1.0
+                1.016891360282898,
+                2.4993197917938232,
+                1.1699724197387695
             ],
             "colliderShapeType": 1,
             "colliderSphCenter": [
@@ -664,7 +664,7 @@
                 1.0
             ],
             "filePath": "Bell_Tower\\Bell_Tower.obj",
-            "id": 13,
+            "id": 9,
             "isAnimation": false,
             "modelName": "Bell_Tower.obj",
             "parentID": -1,
@@ -733,7 +733,7 @@
                 1.0
             ],
             "filePath": "MapleTree_1\\MapleTree_1.obj",
-            "id": 14,
+            "id": 10,
             "isAnimation": false,
             "modelName": "MapleTree_1.obj",
             "parentID": -1,
@@ -773,8 +773,8 @@
             ],
             "colliderEnabled": true,
             "colliderObbCenter": [
-                2.1710000038146973,
-                5.8480000495910645,
+                0.6212015151977539,
+                1.4977599382400513,
                 -0.016132473945617676
             ],
             "colliderObbEuler": [
@@ -802,7 +802,7 @@
                 1.0
             ],
             "filePath": "Blacksmith\\Blacksmith.obj",
-            "id": 15,
+            "id": 11,
             "isAnimation": false,
             "modelName": "Blacksmith.obj",
             "parentID": -1,
@@ -871,7 +871,7 @@
                 1.0
             ],
             "filePath": "DeadTree_4\\DeadTree_4.obj",
-            "id": 18,
+            "id": 12,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "parentID": -1,
@@ -912,7 +912,7 @@
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.008677005767822266,
-                4.0,
+                1.0447419881820679,
                 0.004341542720794678
             ],
             "colliderObbEuler": [
@@ -940,7 +940,7 @@
                 1.0
             ],
             "filePath": "House_3\\House_3.obj",
-            "id": 19,
+            "id": 13,
             "isAnimation": false,
             "modelName": "House_3.obj",
             "parentID": -1,
@@ -1009,7 +1009,7 @@
                 1.0
             ],
             "filePath": "MapleTree_1\\MapleTree_1.obj",
-            "id": 20,
+            "id": 14,
             "isAnimation": false,
             "modelName": "MapleTree_1.obj",
             "parentID": -1,
@@ -1078,7 +1078,7 @@
                 1.0
             ],
             "filePath": "MapleTree_1\\MapleTree_1.obj",
-            "id": 21,
+            "id": 15,
             "isAnimation": false,
             "modelName": "MapleTree_1.obj",
             "parentID": -1,
@@ -1147,7 +1147,7 @@
                 1.0
             ],
             "filePath": "MapleTree_1\\MapleTree_1.obj",
-            "id": 23,
+            "id": 16,
             "isAnimation": false,
             "modelName": "MapleTree_1.obj",
             "parentID": -1,
@@ -1216,7 +1216,7 @@
                 1.0
             ],
             "filePath": "MapleTree_1\\MapleTree_1.obj",
-            "id": 24,
+            "id": 17,
             "isAnimation": false,
             "modelName": "MapleTree_1.obj",
             "parentID": -1,
@@ -1285,7 +1285,7 @@
                 1.0
             ],
             "filePath": "DeadTree_2\\DeadTree_2.obj",
-            "id": 25,
+            "id": 18,
             "isAnimation": false,
             "modelName": "DeadTree_2.obj",
             "parentID": -1,
@@ -1354,7 +1354,7 @@
                 1.0
             ],
             "filePath": "DeadTree_2\\DeadTree_2.obj",
-            "id": 26,
+            "id": 19,
             "isAnimation": false,
             "modelName": "DeadTree_2.obj",
             "parentID": -1,
@@ -1423,7 +1423,7 @@
                 1.0
             ],
             "filePath": "DeadTree_4\\DeadTree_4.obj",
-            "id": 27,
+            "id": 20,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "parentID": -1,
@@ -1492,7 +1492,7 @@
                 1.0
             ],
             "filePath": "DeadTree_2\\DeadTree_2.obj",
-            "id": 28,
+            "id": 21,
             "isAnimation": false,
             "modelName": "DeadTree_2.obj",
             "parentID": -1,
@@ -1561,7 +1561,7 @@
                 1.0
             ],
             "filePath": "DeadTree_4\\DeadTree_4.obj",
-            "id": 29,
+            "id": 22,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "parentID": -1,
@@ -1630,7 +1630,7 @@
                 1.0
             ],
             "filePath": "DeadTree_4\\DeadTree_4.obj",
-            "id": 30,
+            "id": 23,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "parentID": -1,
@@ -1699,7 +1699,7 @@
                 1.0
             ],
             "filePath": "DeadTree_4\\DeadTree_4.obj",
-            "id": 31,
+            "id": 24,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "parentID": -1,
@@ -1768,7 +1768,7 @@
                 1.0
             ],
             "filePath": "DeadTree_4\\DeadTree_4.obj",
-            "id": 32,
+            "id": 25,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "parentID": -1,
@@ -1837,7 +1837,7 @@
                 1.0
             ],
             "filePath": "DeadTree_4\\DeadTree_4.obj",
-            "id": 33,
+            "id": 26,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "parentID": -1,
@@ -1856,6 +1856,489 @@
                 1.5,
                 1.5,
                 1.5
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                -0.0005990266799926758,
+                0.3908019959926605,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0836524963378906,
+                0.440007746219635,
+                0.06290549784898758
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "WoodFence\\WoodFence.obj",
+            "id": 27,
+            "isAnimation": false,
+            "modelName": "WoodFence.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -72.453369140625,
+                0.0,
+                -56.769622802734375
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                3.0,
+                2.049999952316284,
+                1.649999976158142
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                -0.0005990266799926758,
+                0.3908019959926605,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0836524963378906,
+                0.440007746219635,
+                0.06290549784898758
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "WoodFence\\WoodFence.obj",
+            "id": 28,
+            "isAnimation": false,
+            "modelName": "WoodFence.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -78.82946014404297,
+                0.0,
+                -56.769622802734375
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                3.0,
+                2.049999952316284,
+                1.649999976158142
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                -0.0005990266799926758,
+                0.3908019959926605,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0836524963378906,
+                0.440007746219635,
+                0.06290549784898758
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "WoodFence\\WoodFence.obj",
+            "id": 29,
+            "isAnimation": false,
+            "modelName": "WoodFence.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -72.21001434326172,
+                0.0,
+                -22.494333267211914
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                3.0,
+                2.049999952316284,
+                1.649999976158142
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                -0.0005990266799926758,
+                0.3908019959926605,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0836524963378906,
+                0.440007746219635,
+                0.06290549784898758
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "WoodFence\\WoodFence.obj",
+            "id": 30,
+            "isAnimation": false,
+            "modelName": "WoodFence.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -78.58610534667969,
+                0.0,
+                -22.494333267211914
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                3.0,
+                2.049999952316284,
+                1.649999976158142
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                -0.0005990266799926758,
+                0.3908019959926605,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0836524963378906,
+                0.440007746219635,
+                0.06290549784898758
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "WoodFence\\WoodFence.obj",
+            "id": 31,
+            "isAnimation": false,
+            "modelName": "WoodFence.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -84.93315887451172,
+                0.0,
+                -22.494333267211914
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                3.0,
+                2.049999952316284,
+                1.649999976158142
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                -0.0005990266799926758,
+                0.3908019959926605,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0836524963378906,
+                0.440007746219635,
+                0.06290549784898758
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "WoodFence\\WoodFence.obj",
+            "id": 32,
+            "isAnimation": false,
+            "modelName": "WoodFence.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -91.30924987792969,
+                0.0,
+                -22.494333267211914
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                3.0,
+                2.049999952316284,
+                1.649999976158142
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                -0.0005990266799926758,
+                0.3908019959926605,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0836524963378906,
+                0.440007746219635,
+                0.06290549784898758
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "WoodFence\\WoodFence.obj",
+            "id": 33,
+            "isAnimation": false,
+            "modelName": "WoodFence.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -94.43629455566406,
+                0.0,
+                -22.494333267211914
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                3.0,
+                2.049999952316284,
+                1.649999976158142
             ],
             "uvScale": [
                 1.0,
