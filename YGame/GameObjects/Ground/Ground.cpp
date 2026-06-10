@@ -1,5 +1,8 @@
 #include "Ground.h"
 
+#include "Collision/Core/ColliderFactory.h"
+#include "Collision/Core/CollisionTypeIdDef.h"
+
 // ============================================================
 // 地面オブジェクトを初期化
 // ============================================================
@@ -19,6 +22,18 @@ void Ground::Initialize(Camera* camera) {
 	// ワールドトランスフォームの初期化
 	//------------------------------------------------------------
 	wt_.Initialize();
+
+	//------------------------------------------------------------
+	// スタンプ配置等の Raycast 受け用に薄く広い AABB を作成。
+	// collisionMask_ = 0 で narrow-phase の押し戻しには関与しない。
+	//------------------------------------------------------------
+	collider_ = ColliderFactory::CreateStatic<AABBCollider>(
+		&wt_, static_cast<uint32_t>(CollisionTypeIdDef::kGroundSurface));
+	if (collider_) {
+		collider_->aabbOffset_.min = { -500.0f, -1.0f, -500.0f };
+		collider_->aabbOffset_.max = {  500.0f,  0.0f,  500.0f };
+		collider_->SetCollisionMask(0u);
+	}
 }
 
 // ============================================================
@@ -29,6 +44,8 @@ void Ground::Update() {
 	// ワールド行列の更新
 	//------------------------------------------------------------
 	wt_.UpdateMatrix();
+
+	if (collider_) collider_->Update();
 }
 
 // ============================================================

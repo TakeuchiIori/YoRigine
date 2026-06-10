@@ -18,6 +18,7 @@ enum class CollisionTypeIdDef : uint32_t
 	kNavObstacle,				// NavMesh障害物: 経路探索で通行不可として扱う
 	kNavTrigger,				// エリアトリガー: 部屋の入口など進入検知に使う
 	kWaypoint,					// 巡回ウェイポイント: 敵のPatrolルートの目標点
+	kGroundSurface,				// 地面表面: スタンプ配置等のRaycast対象 (narrow-phase衝突不参加)
 };
 
 // ── CollisionTypeIdDef ユーティリティ ──────────────────────────────────────
@@ -33,11 +34,12 @@ inline const char* CollisionTypeIdToString(CollisionTypeIdDef id)
 	case CollisionTypeIdDef::kBattleEnemy:  return "BattleEnemy";
 	case CollisionTypeIdDef::kPlayerWeapon: return "PlayerWeapon";
 	case CollisionTypeIdDef::kPlayerShield: return "PlayerShield";
-	case CollisionTypeIdDef::kStaticWall:   return "StaticWall";
-	case CollisionTypeIdDef::kNavObstacle:  return "NavObstacle";
-	case CollisionTypeIdDef::kNavTrigger:   return "NavTrigger";
-	case CollisionTypeIdDef::kWaypoint:     return "Waypoint";
-	default:                                return "Unknown";
+	case CollisionTypeIdDef::kStaticWall:    return "StaticWall";
+	case CollisionTypeIdDef::kNavObstacle:   return "NavObstacle";
+	case CollisionTypeIdDef::kNavTrigger:    return "NavTrigger";
+	case CollisionTypeIdDef::kWaypoint:      return "Waypoint";
+	case CollisionTypeIdDef::kGroundSurface: return "GroundSurface";
+	default:                                 return "Unknown";
 	}
 }
 

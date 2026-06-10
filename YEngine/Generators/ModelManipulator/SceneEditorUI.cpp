@@ -58,6 +58,20 @@ namespace YoRigine {
             }
             if (!hasSel) ImGui::EndDisabled();
 
+            // スタンプモード: 選択中オブジェクトをクリック連打で連続配置
+            const bool stamping = stampActiveQuery_ && stampActiveQuery_();
+            if (stamping) {
+                if (ImGui::MenuItem("スタンプ配置を終了", "Esc / 右クリック")) {
+                    if (exitStampCallback_) exitStampCallback_();
+                }
+            } else {
+                if (!hasSel) ImGui::BeginDisabled();
+                if (ImGui::MenuItem("スタンプ配置を開始", "B")) {
+                    if (startStampCallback_) startStampCallback_();
+                }
+                if (!hasSel) ImGui::EndDisabled();
+            }
+
             // グリッドスナップ (GizmoController の useSnap/snapValues を直接操作)
             if (gizmoCtrl_) {
                 ImGui::Separator();

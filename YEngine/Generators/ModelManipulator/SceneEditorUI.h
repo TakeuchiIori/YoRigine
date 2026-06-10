@@ -42,6 +42,10 @@ namespace YoRigine {
         void SetPlaceCallback(std::function<void(const std::string&)> cb) { placeCallback_ = cb; }
         void SetSaveCallback(std::function<void()> cb) { saveCallback_ = cb; }
         void SetLoadCallback(std::function<void()> cb) { loadCallback_ = cb; }
+        // スタンプモード: 起動 / 状態確認 / 終了 (ModelManipulator が StampMode を所有)
+        void SetStartStampCallback(std::function<void()> cb) { startStampCallback_ = cb; }
+        void SetStampActiveQuery(std::function<bool()> cb)   { stampActiveQuery_   = cb; }
+        void SetExitStampCallback(std::function<void()> cb)  { exitStampCallback_  = cb; }
 
         // ── ウィンドウ表示フラグ ──────────────────────────────────
         void SetShowObjectList(bool v) { showObjectList_ = v; }
@@ -82,6 +86,9 @@ namespace YoRigine {
         std::function<void(const std::string&)> placeCallback_;
         std::function<void()> saveCallback_;
         std::function<void()> loadCallback_;
+        std::function<void()> startStampCallback_;
+        std::function<void()> exitStampCallback_;
+        std::function<bool()> stampActiveQuery_;
 
         // ── UI 状態 ───────────────────────────────────────────────
         bool showObjectList_ = true;

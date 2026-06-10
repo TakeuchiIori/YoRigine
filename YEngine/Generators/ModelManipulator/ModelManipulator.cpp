@@ -75,6 +75,14 @@ namespace YoRigine {
 		editorUI_.SetBroadPhaseGridRadius(&broadPhaseGridDrawRadius_);
 		editorUI_.SetDrawFrustumCullingFlag(&enableDrawFrustumCulling_);
 
+		// スタンプモードのセットアップ + メニュー / ショートカットからの起動経路
+		stampMode_.SetObjectManager(objectManager_);
+		editorUI_.SetStartStampCallback([this]() {
+			stampMode_.Enter(selector_.GetPrimaryId());
+		});
+		editorUI_.SetStampActiveQuery([this]() { return stampMode_.IsActive(); });
+		editorUI_.SetExitStampCallback([this]() { stampMode_.Exit(); });
+
 		gizmoCtrl_.Initialize();
 
 		// Editor へのメニュー登録もここで一度だけ行う
@@ -113,13 +121,20 @@ namespace YoRigine {
 
 		motionEditor_.SetTargetObjectId(selector_.GetPrimaryId());
 		motionEditor_.Update();
-		// ── selector_.Update() だけここで行う（GPU命令は積まない）──
-		// シーンエディタが非アクティブ (オブジェクト一覧が閉じてる) ならクリック選択を無効化
+
+		const ImVec2 viewPos  = Editor::GetInstance()->GetGameViewPos();
+		const ImVec2 viewSize = Editor::GetInstance()->GetGameViewSize();
+
+		// スタンプモード中はクリックを StampMode が消費するので selector_ の選択処理は抑制
+		const bool stamping = stampMode_.IsActive();
 		selector_.SetCamera(camera_);
 		selector_.Update(
-			IsSceneEditorActive(),
-			Editor::GetInstance()->GetGameViewPos(),
-			Editor::GetInstance()->GetGameViewSize());
+			IsSceneEditorActive() && !stamping,
+			viewPos,
+			viewSize);
+
+		// スタンプモードの更新 (マウス位置 → ヒット計算 → 左クリックで実体化)
+		stampMode_.Update(viewPos, viewSize);
 #endif
 
 		objectManager_->Update();
@@ -209,6 +224,11 @@ namespace YoRigine {
 		instRenderer->Flush(camera_);
 
 		motionEditor_.Draw();
+
+#ifdef USE_IMGUI
+		// スタンプモード中はカーソル下にゴーストを描画
+		stampMode_.DrawGhost();
+#endif
 	}
 
 
@@ -554,6 +574,14 @@ namespace YoRigine {
 			// Ctrl+G : 選択中を地面に吸着 (Snap to surface)
 			if (ImGui::IsKeyPressed(ImGuiKey_G)) {
 				editorUI_.SnapSelectedToSurface();
+			}
+		}
+		else {
+			// B キー単独: 選択中オブジェクトをスタンプ元にしてスタンプモード開始
+			//   モード中は左クリック連打で連続配置、Esc/右クリックで終了
+			if (ImGui::IsKeyPressed(ImGuiKey_B) && selector_.HasSelection()
+				&& !stampMode_.IsActive()) {
+				stampMode_.Enter(selector_.GetPrimaryId());
 			}
 		}
 #endif

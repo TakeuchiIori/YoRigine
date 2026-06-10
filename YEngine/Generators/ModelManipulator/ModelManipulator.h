@@ -12,6 +12,7 @@
 #ifdef USE_IMGUI
 #include "ModelBrowser.h"
 #include "SceneEditorUI.h"
+#include "StampMode.h"
 #include <Debugger/Gizmo/GizmoController.h>
 #include "PlacedObjectGizmable.h"
 #endif
@@ -60,6 +61,9 @@ namespace YoRigine {
             // Capsule は Line で描画
             colliderLineCapsule_.SetCamera(camera_);
             objectManager_->SetCamera(camera);
+#ifdef USE_IMGUI
+            stampMode_.SetCamera(camera);
+#endif
         }
 
         //=========================================================================
@@ -144,6 +148,7 @@ namespace YoRigine {
 #ifdef USE_IMGUI
         ModelBrowser  browser_;
         SceneEditorUI editorUI_;
+        StampMode stampMode_;
         GizmoController gizmoCtrl_;
         std::vector<PlacedObjectGizmable> gizmables_;
 #endif
