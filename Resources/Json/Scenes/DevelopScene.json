@@ -153,7 +153,7 @@
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.0,
-                6.09499979019165,
+                1.6948975324630737,
                 -0.013063013553619385
             ],
             "colliderObbEuler": [
@@ -173,7 +173,7 @@
                 0.0
             ],
             "colliderSphRadius": 1.0,
-            "colliderTypeId": 0,
+            "colliderTypeId": 8,
             "color": [
                 1.0,
                 1.0,
