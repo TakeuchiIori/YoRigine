@@ -153,7 +153,7 @@
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.0,
-                6.09499979019165,
+                1.6948975324630737,
                 -0.013063013553619385
             ],
             "colliderObbEuler": [
@@ -173,7 +173,7 @@
                 0.0
             ],
             "colliderSphRadius": 1.0,
-            "colliderTypeId": 0,
+            "colliderTypeId": 8,
             "color": [
                 1.0,
                 1.0,
@@ -256,7 +256,7 @@
             "parentID": -1,
             "pickable": true,
             "position": [
-                -64.90800476074219,
+                -64.96641540527344,
                 0.0,
                 -22.093616485595703
             ],
@@ -269,144 +269,6 @@
                 4.0,
                 4.0,
                 4.0
-            ],
-            "uvScale": [
-                1.0,
-                1.0
-            ],
-            "uvStochastic": 0.0
-        },
-        {
-            "animationName": "",
-            "colliderAabbMax": [
-                1.0255683660507202,
-                2.141460657119751,
-                1.1192142963409424
-            ],
-            "colliderAabbMin": [
-                -1.0082143545150757,
-                -0.051976680755615234,
-                -1.1105310916900635
-            ],
-            "colliderEnabled": true,
-            "colliderObbCenter": [
-                0.008677005767822266,
-                1.0447419881820679,
-                0.004341542720794678
-            ],
-            "colliderObbEuler": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "colliderObbSize": [
-                1.016891360282898,
-                1.096718668937683,
-                1.114872694015503
-            ],
-            "colliderShapeType": 1,
-            "colliderSphCenter": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "colliderSphRadius": 1.0,
-            "colliderTypeId": 7,
-            "color": [
-                1.0,
-                1.0,
-                1.0,
-                1.0
-            ],
-            "filePath": "House_3\\House_3.obj",
-            "id": 4,
-            "isAnimation": false,
-            "modelName": "House_3.obj",
-            "parentID": -1,
-            "pickable": true,
-            "position": [
-                -28.336204528808594,
-                0.0,
-                -31.85314178466797
-            ],
-            "rotate": [
-                -3.1415908336639404,
-                -1.5707954168319702,
-                -3.1415908336639404
-            ],
-            "scale": [
-                3.9999942779541016,
-                4.0,
-                3.9999942779541016
-            ],
-            "uvScale": [
-                1.0,
-                1.0
-            ],
-            "uvStochastic": 0.0
-        },
-        {
-            "animationName": "",
-            "colliderAabbMax": [
-                1.016891360282898,
-                1.1000304222106934,
-                1.1192142963409424
-            ],
-            "colliderAabbMin": [
-                -1.016891360282898,
-                -0.026936471462249756,
-                -1.1105310916900635
-            ],
-            "colliderEnabled": true,
-            "colliderObbCenter": [
-                0.0,
-                0.5365470051765442,
-                0.004341542720794678
-            ],
-            "colliderObbEuler": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "colliderObbSize": [
-                1.016891360282898,
-                0.563483476638794,
-                1.114872694015503
-            ],
-            "colliderShapeType": 1,
-            "colliderSphCenter": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "colliderSphRadius": 1.0,
-            "colliderTypeId": 7,
-            "color": [
-                1.0,
-                1.0,
-                1.0,
-                1.0
-            ],
-            "filePath": "House_4\\House_4.obj",
-            "id": 5,
-            "isAnimation": false,
-            "modelName": "House_4.obj",
-            "parentID": -1,
-            "pickable": true,
-            "position": [
-                -11.040048599243164,
-                0.0007455348968505859,
-                -48.221744537353516
-            ],
-            "rotate": [
-                -3.1415908336639404,
-                -1.5707954168319702,
-                -3.1415908336639404
-            ],
-            "scale": [
-                3.9999876022338867,
-                4.0,
-                3.9999876022338867
             ],
             "uvScale": [
                 1.0,
@@ -457,7 +319,7 @@
                 1.0
             ],
             "filePath": "Floor_UnevenBrick\\Floor_UnevenBrick.obj",
-            "id": 6,
+            "id": 4,
             "isAnimation": false,
             "modelName": "Floor_UnevenBrick.obj",
             "parentID": -1,
@@ -526,7 +388,7 @@
                 1.0
             ],
             "filePath": "MapleTree_1\\MapleTree_1.obj",
-            "id": 7,
+            "id": 5,
             "isAnimation": false,
             "modelName": "MapleTree_1.obj",
             "parentID": -1,
@@ -535,75 +397,6 @@
                 -36.57022476196289,
                 0.0,
                 -52.807525634765625
-            ],
-            "rotate": [
-                0.0,
-                -0.0,
-                0.0
-            ],
-            "scale": [
-                1.5,
-                1.5,
-                1.5
-            ],
-            "uvScale": [
-                1.0,
-                1.0
-            ],
-            "uvStochastic": 0.0
-        },
-        {
-            "animationName": "",
-            "colliderAabbMax": [
-                1.0,
-                1.0,
-                1.0
-            ],
-            "colliderAabbMin": [
-                -1.0,
-                -1.0,
-                -1.0
-            ],
-            "colliderEnabled": true,
-            "colliderObbCenter": [
-                0.2759999930858612,
-                3.0878751277923584,
-                -0.08625897765159607
-            ],
-            "colliderObbEuler": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "colliderObbSize": [
-                0.9980000257492065,
-                3.252779006958008,
-                0.7590450048446655
-            ],
-            "colliderShapeType": 1,
-            "colliderSphCenter": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "colliderSphRadius": 1.0,
-            "colliderTypeId": 8,
-            "color": [
-                0.125490203499794,
-                0.06666667014360428,
-                0.06666667014360428,
-                1.0
-            ],
-            "filePath": "DeadTree_2\\DeadTree_2.obj",
-            "id": 8,
-            "isAnimation": false,
-            "modelName": "DeadTree_2.obj",
-            "parentID": -1,
-            "pickable": true,
-            "position": [
-                -0.15004754066467285,
-                0.0,
-                -67.58174133300781
             ],
             "rotate": [
                 0.0,
@@ -664,7 +457,7 @@
                 1.0
             ],
             "filePath": "Bell_Tower\\Bell_Tower.obj",
-            "id": 9,
+            "id": 6,
             "isAnimation": false,
             "modelName": "Bell_Tower.obj",
             "parentID": -1,
@@ -733,7 +526,7 @@
                 1.0
             ],
             "filePath": "MapleTree_1\\MapleTree_1.obj",
-            "id": 10,
+            "id": 7,
             "isAnimation": false,
             "modelName": "MapleTree_1.obj",
             "parentID": -1,
@@ -802,7 +595,7 @@
                 1.0
             ],
             "filePath": "Blacksmith\\Blacksmith.obj",
-            "id": 11,
+            "id": 8,
             "isAnimation": false,
             "modelName": "Blacksmith.obj",
             "parentID": -1,
@@ -871,13 +664,13 @@
                 1.0
             ],
             "filePath": "DeadTree_4\\DeadTree_4.obj",
-            "id": 12,
+            "id": 9,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "parentID": -1,
             "pickable": true,
             "position": [
-                -15.556798934936523,
+                -14.605062484741211,
                 0.0,
                 -71.47854614257813
             ],
@@ -890,75 +683,6 @@
                 1.5,
                 1.5,
                 1.5
-            ],
-            "uvScale": [
-                1.0,
-                1.0
-            ],
-            "uvStochastic": 0.0
-        },
-        {
-            "animationName": "",
-            "colliderAabbMax": [
-                1.0255683660507202,
-                2.141460657119751,
-                1.1192142963409424
-            ],
-            "colliderAabbMin": [
-                -1.0082143545150757,
-                -0.051976680755615234,
-                -1.1105310916900635
-            ],
-            "colliderEnabled": true,
-            "colliderObbCenter": [
-                0.008677005767822266,
-                1.0447419881820679,
-                0.004341542720794678
-            ],
-            "colliderObbEuler": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "colliderObbSize": [
-                1.016891360282898,
-                1.096718668937683,
-                1.114872694015503
-            ],
-            "colliderShapeType": 1,
-            "colliderSphCenter": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "colliderSphRadius": 1.0,
-            "colliderTypeId": 7,
-            "color": [
-                1.0,
-                1.0,
-                1.0,
-                1.0
-            ],
-            "filePath": "House_3\\House_3.obj",
-            "id": 13,
-            "isAnimation": false,
-            "modelName": "House_3.obj",
-            "parentID": -1,
-            "pickable": true,
-            "position": [
-                -19.16899871826172,
-                0.0,
-                -39.94329833984375
-            ],
-            "rotate": [
-                -3.1415908336639404,
-                -1.5707954168319702,
-                -3.1415908336639404
-            ],
-            "scale": [
-                3.9999942779541016,
-                4.0,
-                3.9999942779541016
             ],
             "uvScale": [
                 1.0,
@@ -1009,7 +733,7 @@
                 1.0
             ],
             "filePath": "MapleTree_1\\MapleTree_1.obj",
-            "id": 14,
+            "id": 10,
             "isAnimation": false,
             "modelName": "MapleTree_1.obj",
             "parentID": -1,
@@ -1078,7 +802,7 @@
                 1.0
             ],
             "filePath": "MapleTree_1\\MapleTree_1.obj",
-            "id": 15,
+            "id": 11,
             "isAnimation": false,
             "modelName": "MapleTree_1.obj",
             "parentID": -1,
@@ -1147,7 +871,7 @@
                 1.0
             ],
             "filePath": "MapleTree_1\\MapleTree_1.obj",
-            "id": 16,
+            "id": 12,
             "isAnimation": false,
             "modelName": "MapleTree_1.obj",
             "parentID": -1,
@@ -1216,7 +940,7 @@
                 1.0
             ],
             "filePath": "MapleTree_1\\MapleTree_1.obj",
-            "id": 17,
+            "id": 13,
             "isAnimation": false,
             "modelName": "MapleTree_1.obj",
             "parentID": -1,
@@ -1225,282 +949,6 @@
                 -20.740692138671875,
                 0.0,
                 -66.09598541259766
-            ],
-            "rotate": [
-                0.0,
-                -0.0,
-                0.0
-            ],
-            "scale": [
-                1.5,
-                1.5,
-                1.5
-            ],
-            "uvScale": [
-                1.0,
-                1.0
-            ],
-            "uvStochastic": 0.0
-        },
-        {
-            "animationName": "",
-            "colliderAabbMax": [
-                1.0,
-                1.0,
-                1.0
-            ],
-            "colliderAabbMin": [
-                -1.0,
-                -1.0,
-                -1.0
-            ],
-            "colliderEnabled": true,
-            "colliderObbCenter": [
-                0.2759999930858612,
-                3.0878751277923584,
-                -0.08625897765159607
-            ],
-            "colliderObbEuler": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "colliderObbSize": [
-                0.9980000257492065,
-                3.252779006958008,
-                0.7590450048446655
-            ],
-            "colliderShapeType": 1,
-            "colliderSphCenter": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "colliderSphRadius": 1.0,
-            "colliderTypeId": 8,
-            "color": [
-                0.125490203499794,
-                0.06666667014360428,
-                0.06666667014360428,
-                1.0
-            ],
-            "filePath": "DeadTree_2\\DeadTree_2.obj",
-            "id": 18,
-            "isAnimation": false,
-            "modelName": "DeadTree_2.obj",
-            "parentID": -1,
-            "pickable": true,
-            "position": [
-                6.627623558044434,
-                0.0,
-                -67.58174133300781
-            ],
-            "rotate": [
-                0.0,
-                -0.0,
-                0.0
-            ],
-            "scale": [
-                1.5,
-                1.5,
-                1.5
-            ],
-            "uvScale": [
-                1.0,
-                1.0
-            ],
-            "uvStochastic": 0.0
-        },
-        {
-            "animationName": "",
-            "colliderAabbMax": [
-                1.0,
-                1.0,
-                1.0
-            ],
-            "colliderAabbMin": [
-                -1.0,
-                -1.0,
-                -1.0
-            ],
-            "colliderEnabled": true,
-            "colliderObbCenter": [
-                0.2759999930858612,
-                3.0878751277923584,
-                -0.08625897765159607
-            ],
-            "colliderObbEuler": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "colliderObbSize": [
-                0.9980000257492065,
-                3.252779006958008,
-                0.7590450048446655
-            ],
-            "colliderShapeType": 1,
-            "colliderSphCenter": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "colliderSphRadius": 1.0,
-            "colliderTypeId": 8,
-            "color": [
-                0.125490203499794,
-                0.06666667014360428,
-                0.06666667014360428,
-                1.0
-            ],
-            "filePath": "DeadTree_2\\DeadTree_2.obj",
-            "id": 19,
-            "isAnimation": false,
-            "modelName": "DeadTree_2.obj",
-            "parentID": -1,
-            "pickable": true,
-            "position": [
-                11.495420455932617,
-                0.0,
-                -88.9811782836914
-            ],
-            "rotate": [
-                0.0,
-                -0.0,
-                0.0
-            ],
-            "scale": [
-                1.5,
-                1.5,
-                1.5
-            ],
-            "uvScale": [
-                1.0,
-                1.0
-            ],
-            "uvStochastic": 0.0
-        },
-        {
-            "animationName": "",
-            "colliderAabbMax": [
-                1.0,
-                1.0,
-                1.0
-            ],
-            "colliderAabbMin": [
-                -1.0,
-                -1.0,
-                -1.0
-            ],
-            "colliderEnabled": true,
-            "colliderObbCenter": [
-                0.14300000667572021,
-                2.1459999084472656,
-                -0.10156500339508057
-            ],
-            "colliderObbEuler": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "colliderObbSize": [
-                1.0959999561309814,
-                2.420504570007324,
-                0.8763834834098816
-            ],
-            "colliderShapeType": 1,
-            "colliderSphCenter": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "colliderSphRadius": 1.0,
-            "colliderTypeId": 8,
-            "color": [
-                0.125490203499794,
-                0.06666667014360428,
-                0.06666667014360428,
-                1.0
-            ],
-            "filePath": "DeadTree_4\\DeadTree_4.obj",
-            "id": 20,
-            "isAnimation": false,
-            "modelName": "DeadTree_4.obj",
-            "parentID": -1,
-            "pickable": true,
-            "position": [
-                3.4105491638183594,
-                0.0,
-                -87.05196380615234
-            ],
-            "rotate": [
-                0.0,
-                -0.0,
-                0.0
-            ],
-            "scale": [
-                1.5,
-                1.5,
-                1.5
-            ],
-            "uvScale": [
-                1.0,
-                1.0
-            ],
-            "uvStochastic": 0.0
-        },
-        {
-            "animationName": "",
-            "colliderAabbMax": [
-                1.0,
-                1.0,
-                1.0
-            ],
-            "colliderAabbMin": [
-                -1.0,
-                -1.0,
-                -1.0
-            ],
-            "colliderEnabled": true,
-            "colliderObbCenter": [
-                0.2759999930858612,
-                3.0878751277923584,
-                -0.08625897765159607
-            ],
-            "colliderObbEuler": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "colliderObbSize": [
-                0.9980000257492065,
-                3.252779006958008,
-                0.7590450048446655
-            ],
-            "colliderShapeType": 1,
-            "colliderSphCenter": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "colliderSphRadius": 1.0,
-            "colliderTypeId": 8,
-            "color": [
-                0.125490203499794,
-                0.06666667014360428,
-                0.06666667014360428,
-                1.0
-            ],
-            "filePath": "DeadTree_2\\DeadTree_2.obj",
-            "id": 21,
-            "isAnimation": false,
-            "modelName": "DeadTree_2.obj",
-            "parentID": -1,
-            "pickable": true,
-            "position": [
-                17.939109802246094,
-                0.0,
-                -81.53028106689453
             ],
             "rotate": [
                 0.0,
@@ -1561,13 +1009,13 @@
                 1.0
             ],
             "filePath": "DeadTree_4\\DeadTree_4.obj",
-            "id": 22,
+            "id": 14,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "parentID": -1,
             "pickable": true,
             "position": [
-                -14.556798934936523,
+                -14.143872261047363,
                 0.0,
                 -76.86003875732422
             ],
@@ -1630,7 +1078,7 @@
                 1.0
             ],
             "filePath": "DeadTree_4\\DeadTree_4.obj",
-            "id": 23,
+            "id": 15,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "parentID": -1,
@@ -1699,7 +1147,7 @@
                 1.0
             ],
             "filePath": "DeadTree_4\\DeadTree_4.obj",
-            "id": 24,
+            "id": 16,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "parentID": -1,
@@ -1768,7 +1216,7 @@
                 1.0
             ],
             "filePath": "DeadTree_4\\DeadTree_4.obj",
-            "id": 25,
+            "id": 17,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "parentID": -1,
@@ -1837,14 +1285,14 @@
                 1.0
             ],
             "filePath": "DeadTree_4\\DeadTree_4.obj",
-            "id": 26,
+            "id": 18,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "parentID": -1,
             "pickable": true,
             "position": [
                 -14.580938339233398,
-                0.0,
+                0.05196094512939453,
                 -96.79141235351563
             ],
             "rotate": [
@@ -1856,6 +1304,1869 @@
                 1.5,
                 1.5,
                 1.5
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                -0.0005990266799926758,
+                0.3908019959926605,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0836524963378906,
+                0.440007746219635,
+                0.06290549784898758
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "WoodFence\\WoodFence.obj",
+            "id": 19,
+            "isAnimation": false,
+            "modelName": "WoodFence.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -72.453369140625,
+                0.0,
+                -56.769622802734375
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                3.0,
+                2.049999952316284,
+                1.649999976158142
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                -0.0005990266799926758,
+                0.3908019959926605,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0836524963378906,
+                0.440007746219635,
+                0.06290549784898758
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "WoodFence\\WoodFence.obj",
+            "id": 20,
+            "isAnimation": false,
+            "modelName": "WoodFence.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -78.82946014404297,
+                0.0,
+                -56.769622802734375
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                3.0,
+                2.049999952316284,
+                1.649999976158142
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                -0.0005990266799926758,
+                0.3908019959926605,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0836524963378906,
+                0.440007746219635,
+                0.06290549784898758
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 9,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "WoodFence\\WoodFence.obj",
+            "id": 21,
+            "isAnimation": false,
+            "modelName": "WoodFence.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                9.962141036987305,
+                0.0,
+                -60.42017364501953
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                1.5707954168319702,
+                -3.1415908336639404
+            ],
+            "scale": [
+                3.0,
+                2.049999952316284,
+                1.649999976158142
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                -0.0005990266799926758,
+                0.3908019959926605,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0836524963378906,
+                0.440007746219635,
+                0.06290549784898758
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "WoodFence\\WoodFence.obj",
+            "id": 22,
+            "isAnimation": false,
+            "modelName": "WoodFence.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -78.58610534667969,
+                0.0,
+                -22.494333267211914
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                3.0,
+                2.049999952316284,
+                1.649999976158142
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                -0.0005990266799926758,
+                0.3908019959926605,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0836524963378906,
+                0.440007746219635,
+                0.06290549784898758
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "WoodFence\\WoodFence.obj",
+            "id": 23,
+            "isAnimation": false,
+            "modelName": "WoodFence.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -84.93315887451172,
+                0.0,
+                -22.494333267211914
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                3.0,
+                2.049999952316284,
+                1.649999976158142
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                -0.0005990266799926758,
+                0.3908019959926605,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0836524963378906,
+                0.440007746219635,
+                0.06290549784898758
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "WoodFence\\WoodFence.obj",
+            "id": 24,
+            "isAnimation": false,
+            "modelName": "WoodFence.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -91.30924987792969,
+                0.0,
+                -22.494333267211914
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                3.0,
+                2.049999952316284,
+                1.649999976158142
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                -0.0005990266799926758,
+                0.3908019959926605,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0836524963378906,
+                0.440007746219635,
+                0.06290549784898758
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "WoodFence\\WoodFence.obj",
+            "id": 25,
+            "isAnimation": false,
+            "modelName": "WoodFence.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -94.43629455566406,
+                0.0,
+                -22.494333267211914
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                3.0,
+                2.049999952316284,
+                1.649999976158142
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.19300000369548798,
+                2.296029567718506,
+                -0.10156500339508057
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.2960000038146973,
+                2.420504570007324,
+                0.8763834834098816
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                0.125490203499794,
+                0.06666667014360428,
+                0.06666667014360428,
+                1.0
+            ],
+            "filePath": "DeadTree_4\\DeadTree_4.obj",
+            "id": 26,
+            "isAnimation": false,
+            "modelName": "DeadTree_4.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -9.784957885742188,
+                0.0,
+                -97.62043762207031
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -0.0,
+                -3.1415908336639404
+            ],
+            "scale": [
+                1.5,
+                1.5,
+                1.5
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.19300000369548798,
+                2.296029567718506,
+                -0.10156500339508057
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.2960000038146973,
+                2.420504570007324,
+                0.8763834834098816
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                0.125490203499794,
+                0.06666667014360428,
+                0.06666667014360428,
+                1.0
+            ],
+            "filePath": "DeadTree_4\\DeadTree_4.obj",
+            "id": 27,
+            "isAnimation": false,
+            "modelName": "DeadTree_4.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -4.490933418273926,
+                0.0,
+                -97.67253875732422
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -0.0,
+                -3.1415908336639404
+            ],
+            "scale": [
+                1.5,
+                1.5,
+                1.5
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.19300000369548798,
+                2.296029567718506,
+                -0.10156500339508057
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.2960000038146973,
+                2.420504570007324,
+                0.8763834834098816
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                0.125490203499794,
+                0.06666667014360428,
+                0.06666667014360428,
+                1.0
+            ],
+            "filePath": "DeadTree_4\\DeadTree_4.obj",
+            "id": 28,
+            "isAnimation": false,
+            "modelName": "DeadTree_4.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                1.0122658014297485,
+                0.0,
+                -97.75425720214844
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -0.0,
+                -3.1415908336639404
+            ],
+            "scale": [
+                1.5,
+                1.5,
+                1.5
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.19300000369548798,
+                2.296029567718506,
+                -0.10156500339508057
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.2960000038146973,
+                2.420504570007324,
+                0.8763834834098816
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                0.125490203499794,
+                0.06666667014360428,
+                0.06666667014360428,
+                1.0
+            ],
+            "filePath": "DeadTree_4\\DeadTree_4.obj",
+            "id": 29,
+            "isAnimation": false,
+            "modelName": "DeadTree_4.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                6.257538795471191,
+                0.0,
+                -97.86721801757813
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -0.0,
+                -3.1415908336639404
+            ],
+            "scale": [
+                1.5,
+                1.5,
+                1.5
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.14300000667572021,
+                2.1459999084472656,
+                -0.10156500339508057
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.3459999561309814,
+                2.420504570007324,
+                0.8763834834098816
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                0.125490203499794,
+                0.06666667014360428,
+                0.06666667014360428,
+                1.0
+            ],
+            "filePath": "DeadTree_4\\DeadTree_4.obj",
+            "id": 30,
+            "isAnimation": false,
+            "modelName": "DeadTree_4.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                9.786101341247559,
+                0.0,
+                -77.7613296508789
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                1.5707954168319702,
+                -3.1415908336639404
+            ],
+            "scale": [
+                1.5,
+                1.5,
+                1.5
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                -0.0005990266799926758,
+                0.3908019959926605,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0836524963378906,
+                0.440007746219635,
+                0.06290549784898758
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "WoodFence\\WoodFence.obj",
+            "id": 31,
+            "isAnimation": false,
+            "modelName": "WoodFence.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -72.04159545898438,
+                0.0,
+                -22.494333267211914
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                3.0,
+                2.049999952316284,
+                1.649999976158142
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                -0.0005990266799926758,
+                0.3908019959926605,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0836524963378906,
+                0.440007746219635,
+                0.06290549784898758
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "WoodFence\\WoodFence.obj",
+            "id": 32,
+            "isAnimation": false,
+            "modelName": "WoodFence.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                10.00365924835205,
+                0.0,
+                -54.267311096191406
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                1.5707954168319702,
+                -3.1415908336639404
+            ],
+            "scale": [
+                3.0,
+                2.049999952316284,
+                1.649999976158142
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                -0.0005990266799926758,
+                0.3908019959926605,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0836524963378906,
+                0.440007746219635,
+                0.06290549784898758
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 9,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "WoodFence\\WoodFence.obj",
+            "id": 33,
+            "isAnimation": false,
+            "modelName": "WoodFence.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                9.93663215637207,
+                0.0,
+                -66.2348403930664
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                1.5707954168319702,
+                -3.1415908336639404
+            ],
+            "scale": [
+                3.0,
+                2.049999952316284,
+                1.649999976158142
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                -0.0005990266799926758,
+                0.3908019959926605,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0836524963378906,
+                0.440007746219635,
+                0.06290549784898758
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "WoodFence\\WoodFence.obj",
+            "id": 34,
+            "isAnimation": false,
+            "modelName": "WoodFence.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                9.934327125549316,
+                0.0,
+                -72.38356018066406
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                1.5707954168319702,
+                -3.1415908336639404
+            ],
+            "scale": [
+                3.0,
+                2.049999952316284,
+                1.649999976158142
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.14300000667572021,
+                2.1459999084472656,
+                -0.10156500339508057
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.3459999561309814,
+                2.420504570007324,
+                0.8763834834098816
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                0.125490203499794,
+                0.06666667014360428,
+                0.06666667014360428,
+                1.0
+            ],
+            "filePath": "DeadTree_4\\DeadTree_4.obj",
+            "id": 35,
+            "isAnimation": false,
+            "modelName": "DeadTree_4.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                9.810428619384766,
+                0.0,
+                -83.69061279296875
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                1.5707954168319702,
+                -3.1415908336639404
+            ],
+            "scale": [
+                1.5,
+                1.5,
+                1.5
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.14300000667572021,
+                2.1459999084472656,
+                -0.10156500339508057
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.3459999561309814,
+                2.420504570007324,
+                0.8763834834098816
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                0.125490203499794,
+                0.06666667014360428,
+                0.06666667014360428,
+                1.0
+            ],
+            "filePath": "DeadTree_4\\DeadTree_4.obj",
+            "id": 36,
+            "isAnimation": false,
+            "modelName": "DeadTree_4.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                9.83875846862793,
+                0.0,
+                -89.3212890625
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                1.5707954168319702,
+                -3.1415908336639404
+            ],
+            "scale": [
+                1.5,
+                1.5,
+                1.5
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.14300000667572021,
+                2.1459999084472656,
+                -0.10156500339508057
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.3459999561309814,
+                2.420504570007324,
+                0.8763834834098816
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                0.125490203499794,
+                0.06666667014360428,
+                0.06666667014360428,
+                1.0
+            ],
+            "filePath": "DeadTree_4\\DeadTree_4.obj",
+            "id": 37,
+            "isAnimation": false,
+            "modelName": "DeadTree_4.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                9.914556503295898,
+                0.0,
+                -94.65353393554688
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                1.5707954168319702,
+                -3.1415908336639404
+            ],
+            "scale": [
+                1.5,
+                1.5,
+                1.5
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0255683660507202,
+                2.141460657119751,
+                1.1192142963409424
+            ],
+            "colliderAabbMin": [
+                -1.0082143545150757,
+                -0.051976680755615234,
+                -1.1105310916900635
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.008677005767822266,
+                1.0447419881820679,
+                0.004341542720794678
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.016891360282898,
+                1.096718668937683,
+                1.114872694015503
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 7,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "House_3\\House_3.obj",
+            "id": 38,
+            "isAnimation": false,
+            "modelName": "House_3.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                4.531370162963867,
+                0.0,
+                -47.58708572387695
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -0.0,
+                -3.1415908336639404
+            ],
+            "scale": [
+                5.909999847412109,
+                7.380000114440918,
+                5.300000190734863
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0255683660507202,
+                2.141460657119751,
+                1.1192142963409424
+            ],
+            "colliderAabbMin": [
+                -1.0082143545150757,
+                -0.051976680755615234,
+                -1.1105310916900635
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.008677005767822266,
+                1.0447419881820679,
+                0.004341542720794678
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.016891360282898,
+                1.096718668937683,
+                1.114872694015503
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 7,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "House_3\\House_3.obj",
+            "id": 39,
+            "isAnimation": false,
+            "modelName": "House_3.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -7.617378234863281,
+                0.0,
+                -47.58708572387695
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -0.0,
+                -3.1415908336639404
+            ],
+            "scale": [
+                5.909999847412109,
+                7.380000114440918,
+                5.300000190734863
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.7339999675750732,
+                7.349999904632568,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.878999948501587,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 7,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "MapleTree_1\\MapleTree_1.obj",
+            "id": 40,
+            "isAnimation": false,
+            "modelName": "MapleTree_1.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -29.272464752197266,
+                0.0,
+                -26.01364517211914
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                1.5,
+                1.5,
+                1.5
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.7339999675750732,
+                7.349999904632568,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.878999948501587,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 7,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "MapleTree_1\\MapleTree_1.obj",
+            "id": 41,
+            "isAnimation": false,
+            "modelName": "MapleTree_1.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -22.997512817382813,
+                0.0,
+                -26.01364517211914
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                1.5,
+                1.5,
+                1.5
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                -0.0005990266799926758,
+                0.3908019959926605,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0836524963378906,
+                0.440007746219635,
+                0.06290549784898758
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "WoodFence\\WoodFence.obj",
+            "id": 42,
+            "isAnimation": false,
+            "modelName": "WoodFence.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -19.22360610961914,
+                0.0,
+                -26.06187629699707
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -0.0,
+                -3.1415908336639404
+            ],
+            "scale": [
+                3.0,
+                2.049999952316284,
+                1.649999976158142
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                -0.0005990266799926758,
+                0.3908019959926605,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0836524963378906,
+                0.440007746219635,
+                0.06290549784898758
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "WoodFence\\WoodFence.obj",
+            "id": 43,
+            "isAnimation": false,
+            "modelName": "WoodFence.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -9.28349494934082,
+                0.0,
+                -30.068557739257813
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                1.5707954168319702,
+                -3.1415908336639404
+            ],
+            "scale": [
+                3.7799999713897705,
+                2.049999952316284,
+                1.649999976158142
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                -0.0005990266799926758,
+                0.3908019959926605,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0836524963378906,
+                0.440007746219635,
+                0.06290549784898758
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "WoodFence\\WoodFence.obj",
+            "id": 44,
+            "isAnimation": false,
+            "modelName": "WoodFence.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -12.457242965698242,
+                0.0,
+                -26.06187629699707
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -0.0,
+                -3.1415908336639404
+            ],
+            "scale": [
+                3.0,
+                2.049999952316284,
+                1.649999976158142
+            ],
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                -0.0005990266799926758,
+                0.3908019959926605,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0836524963378906,
+                0.440007746219635,
+                0.06290549784898758
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "WoodFence\\WoodFence.obj",
+            "id": 45,
+            "isAnimation": false,
+            "modelName": "WoodFence.obj",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -9.289400100708008,
+                0.0,
+                -38.624786376953125
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                1.5707954168319702,
+                -3.1415908336639404
+            ],
+            "scale": [
+                4.690000057220459,
+                2.049999952316284,
+                1.649999976158142
             ],
             "uvScale": [
                 1.0,

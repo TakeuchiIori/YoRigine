@@ -5,12 +5,26 @@
             "id": "g_01",
             "isActive": true,
             "position": {
-                "x": 8.0,
-                "y": 0.8296584486961365,
-                "z": -78.49909973144531
+                "x": -7.145979404449463,
+                "y": 0.0,
+                "z": -86.7491683959961
             },
             "respawnAfterBattle": true,
             "respawnDelay": 35.0,
+            "spawnCondition": "",
+            "spawnOnLoad": true
+        },
+        {
+            "enemyId": "Alien",
+            "id": "Spawn_3",
+            "isActive": true,
+            "position": {
+                "x": 3.2370498180389404,
+                "y": 0.0,
+                "z": -90.8657455444336
+            },
+            "respawnAfterBattle": true,
+            "respawnDelay": 30.0,
             "spawnCondition": "",
             "spawnOnLoad": true
         },
@@ -22,20 +36,6 @@
                 "x": 0.666813850402832,
                 "y": 0.0,
                 "z": -76.29816436767578
-            },
-            "respawnAfterBattle": true,
-            "respawnDelay": 30.0,
-            "spawnCondition": "",
-            "spawnOnLoad": true
-        },
-        {
-            "enemyId": "Alien",
-            "id": "Spawn_3",
-            "isActive": true,
-            "position": {
-                "x": 17.069969177246094,
-                "y": 0.0,
-                "z": -87.26052856445313
             },
             "respawnAfterBattle": true,
             "respawnDelay": 30.0,
