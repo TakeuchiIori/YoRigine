@@ -3,6 +3,7 @@
 // C++
 #include <memory>
 #include <functional>
+#include <vector>
 
 // Engine
 #include "Systems/Camera/Camera.h"
@@ -16,6 +17,8 @@
 
 // App
 #include "Enemy/FieldEnemy/FieldEnemyManager.h"
+#include "Trigger/EventTrigger.h"
+#include "Trigger/Actions/OpenGateAction.h"
 
 // Navigation
 #include <Systems/Navigation/NavGrid.h>
@@ -108,6 +111,11 @@ private:
 	std::unique_ptr<GPUEmitter> gpuEmitter_;
 	std::unique_ptr<Line> line_;
 	std::unique_ptr<Sprite> sprite_;
+
+	// イベントトリガー (討伐数→扉開放など)。Action は EventTrigger 所有。
+	std::vector<std::unique_ptr<EventTrigger>> eventTriggers_;
+	// FieldEnemyManager の撃破コールバックから dispatch するための弱参照リスト。
+	std::vector<OpenGateAction*> openGateActions_;
 
 	// Navigation
 	NavGridConfig navGridConfig_;  // データドリブン設定（JSON管理）

@@ -19,6 +19,7 @@ enum class CollisionTypeIdDef : uint32_t
 	kNavTrigger,				// エリアトリガー: 部屋の入口など進入検知に使う
 	kWaypoint,					// 巡回ウェイポイント: 敵のPatrolルートの目標点
 	kGroundSurface,				// 地面表面: スタンプ配置等のRaycast対象 (narrow-phase衝突不参加)
+	kEventTrigger,				// 汎用イベントトリガー: TriggerAction を介して任意のイベントを発火
 };
 
 // ── CollisionTypeIdDef ユーティリティ ──────────────────────────────────────
@@ -39,6 +40,7 @@ inline const char* CollisionTypeIdToString(CollisionTypeIdDef id)
 	case CollisionTypeIdDef::kNavTrigger:    return "NavTrigger";
 	case CollisionTypeIdDef::kWaypoint:      return "Waypoint";
 	case CollisionTypeIdDef::kGroundSurface: return "GroundSurface";
+	case CollisionTypeIdDef::kEventTrigger:  return "EventTrigger";
 	default:                                 return "Unknown";
 	}
 }
@@ -50,6 +52,7 @@ inline constexpr CollisionTypeIdDef kPlacedObjectColliderTypes[] = {
 	CollisionTypeIdDef::kNavObstacle,
 	CollisionTypeIdDef::kNavTrigger,
 	CollisionTypeIdDef::kWaypoint,
+	CollisionTypeIdDef::kEventTrigger,
 };
 
 // ============================================================
@@ -70,7 +73,8 @@ enum class CollisionLayer : uint32_t {
 	Waypoint     = 9,
 	Pickup       = 10,
 	Trigger      = 11,
-	// 12-31 はユーザー拡張用
+	EventTrigger = 12,
+	// 13-31 はユーザー拡張用
 };
 
 inline constexpr uint32_t CollisionLayerBit(CollisionLayer layer) {
@@ -93,6 +97,7 @@ inline CollisionLayer LayerFromTypeId(CollisionTypeIdDef id) {
 	case CollisionTypeIdDef::kNavObstacle:  return CollisionLayer::NavObstacle;
 	case CollisionTypeIdDef::kNavTrigger:   return CollisionLayer::NavTrigger;
 	case CollisionTypeIdDef::kWaypoint:     return CollisionLayer::Waypoint;
+	case CollisionTypeIdDef::kEventTrigger: return CollisionLayer::EventTrigger;
 	default:                                return CollisionLayer::Default;
 	}
 }

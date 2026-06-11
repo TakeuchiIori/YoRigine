@@ -96,6 +96,33 @@ void FieldScene::Initialize(Camera* camera, Player* player) {
 		HandleDetailedEncounter(encounterInfo);
 		});
 
+	//------------------------------------------------------------
+	// EventTrigger (MVP配線): 撃破→扉開放の最小ケース1個
+	//   targetName / requiredGroup は実シーン側の nameTag / 敵グループ名に合わせて調整する。
+	//   Action が ObjectManager::GetObjectByName でターゲットを解決する。
+	//------------------------------------------------------------
+	{
+		auto trigger = std::make_unique<EventTrigger>();
+		trigger->Initialize(sceneCamera_);
+		trigger->SetName("OpenGateTrigger_TestGate");
+
+		auto action = std::make_unique<OpenGateAction>(
+			std::string("TestGate"),     // PlacedObject.nameTag に合わせる
+			std::string("TestEnemy"));   // FieldEnemy のグループ名に合わせる
+		action->SetOnGateOpened([this]() { RebakeNavGrid(); });
+
+		openGateActions_.push_back(action.get());
+		trigger->SetAction(std::move(action));
+		eventTriggers_.push_back(std::move(trigger));
+	}
+
+	// FieldEnemyManager の撃破コールバックを全 OpenGateAction にディスパッチ
+	fieldEnemyManager_->SetOnEnemyDefeatedCallback([this](const std::string& group) {
+		for (auto* act : openGateActions_) {
+			if (act) act->NotifyEnemyDefeated(group);
+		}
+	});
+
 	sprite_ = std::make_unique<Sprite>();
 	sprite_->Initialize("Resources/Textures/GameScene/FieldScene.png");
 
@@ -206,6 +233,9 @@ void FieldScene::Update() {
 	player_->Update();
 	ground_->Update();
 	fieldEnemyManager_->Update();
+	for (auto& trig : eventTriggers_) {
+		if (trig) trig->Update();
+	}
 	//sprite_->Update();
 	AreaManager::GetInstance()->UpdateSingleObject(&player_->GetWT());
 
@@ -252,6 +282,9 @@ void FieldScene::DrawLine() {
 
 	player_->DrawCollision();
 	fieldEnemyManager_->DrawCollision();
+	for (auto& trig : eventTriggers_) {
+		if (trig) trig->DrawCollision();
+	}
 	fieldEnemyManager_->DrawLine(line_.get());
 	fieldEnemyManager_->DrawEditorMarkers(line_.get());
 	player_->DrawBone(*line_.get());
@@ -556,6 +589,8 @@ void FieldScene::Finalize() {
 	if (fieldEnemyManager_) {
 		fieldEnemyManager_->Finalize();
 	}
+	openGateActions_.clear();
+	eventTriggers_.clear();
 }
 
 void FieldScene::RebakeNavGrid()

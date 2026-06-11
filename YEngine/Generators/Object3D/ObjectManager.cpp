@@ -221,6 +221,22 @@ const ObjectManager::PlacedObject* ObjectManager::GetObjectById(int id) const {
 	return (it != idToObject_.end()) ? it->second : nullptr;
 }
 
+ObjectManager::PlacedObject* ObjectManager::GetObjectByName(const std::string& name) {
+	if (name.empty()) return nullptr;
+	for (auto& [id, obj] : idToObject_) {
+		if (obj && obj->nameTag == name) return obj;
+	}
+	return nullptr;
+}
+
+const ObjectManager::PlacedObject* ObjectManager::GetObjectByName(const std::string& name) const {
+	if (name.empty()) return nullptr;
+	for (const auto& [id, obj] : idToObject_) {
+		if (obj && obj->nameTag == name) return obj;
+	}
+	return nullptr;
+}
+
 
 /// <summary>
 /// アクティブなオブジェクト一覧を取得

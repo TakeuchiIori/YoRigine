@@ -286,6 +286,7 @@ namespace YoRigine {
 			case CollisionTypeIdDef::kNavObstacle: return { 1.0f, 0.8f, 0.0f, 1.0f }; // 黄
 			case CollisionTypeIdDef::kNavTrigger:  return { 0.2f, 0.5f, 1.0f, 1.0f }; // 青
 			case CollisionTypeIdDef::kWaypoint:    return { 0.2f, 1.0f, 0.3f, 1.0f }; // 緑
+			case CollisionTypeIdDef::kEventTrigger:return { 0.9f, 0.3f, 0.9f, 1.0f }; // マゼンタ
 			default:                               return { 0.6f, 0.6f, 0.6f, 1.0f }; // グレー
 			}
 		};

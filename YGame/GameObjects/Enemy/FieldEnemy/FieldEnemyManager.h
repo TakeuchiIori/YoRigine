@@ -157,6 +157,12 @@ public:
 		encounterDetailCallback_ = callback;
 	}
 
+	// 敵 (グループ) 撃破時に発火するコールバック。EventTrigger / OpenGateAction から購読する用途。
+	using EnemyDefeatedCallback = std::function<void(const std::string& enemyGroup)>;
+	void SetOnEnemyDefeatedCallback(EnemyDefeatedCallback cb) {
+		onEnemyDefeatedCallback_ = std::move(cb);
+	}
+
 	// 敵IDからフィールド敵を取得
 	FieldEnemy* GetFieldEnemyById(const std::string& id);
 
@@ -246,6 +252,7 @@ private:
 	Camera* camera_ = nullptr;
 	Player* player_ = nullptr;
 	EncounterDetailCallback encounterDetailCallback_;
+	EnemyDefeatedCallback onEnemyDefeatedCallback_;
 
 	// フィールド敵管理
 	std::vector<std::unique_ptr<FieldEnemy>> fieldEnemies_;

@@ -417,6 +417,9 @@ void FieldEnemyManager::HandleBattleEnd(const std::string& enemyGroup, bool play
 /// <param name="id">敵ID</param>
 void FieldEnemyManager::RegisterDefeatedEnemy(const std::string& id) {
 	defeatedEnemyIds_.insert(id);
+	if (onEnemyDefeatedCallback_) {
+		onEnemyDefeatedCallback_(id);
+	}
 }
 
 /// <summary>

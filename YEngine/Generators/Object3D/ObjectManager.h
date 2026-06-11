@@ -43,6 +43,9 @@ public:
 		std::unique_ptr<WorldTransform> worldTransform;
 		std::string modelName;
 		std::string modelPath;
+		// シーン内で一意な識別子 (TriggerAction 等がターゲットを名前参照する用途)。
+		// 空文字なら未命名。重複登録はチェックしないが、参照側が見つからなければ無視される。
+		std::string nameTag;
 
 		Vector3 position = { 0.0f, 0.0f, 0.0f };
 		Vector3 rotation = { 0.0f, 0.0f, 0.0f };
@@ -124,6 +127,10 @@ public:
 	Object3d* GetObject3dById(int id);
 	PlacedObject* GetObjectById(int id);
 	const PlacedObject* GetObjectById(int id) const;
+
+	// nameTag による検索。最初に一致したものを返す。空文字や見つからなければ nullptr。
+	PlacedObject* GetObjectByName(const std::string& name);
+	const PlacedObject* GetObjectByName(const std::string& name) const;
 
 	std::vector<PlacedObject*> GetAllActiveObjects();
 	std::vector<const PlacedObject*> GetAllActiveObjects() const;
