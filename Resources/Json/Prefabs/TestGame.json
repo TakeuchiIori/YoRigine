@@ -8,6 +8,82 @@
             ],
             "animationName": "",
             "colliderAabbMax": [
+                1.1743909120559692,
+                3.3299107551574707,
+                1.4344403743743896
+            ],
+            "colliderAabbMin": [
+                -1.1567779779434204,
+                -0.08295989036560059,
+                -2.1565845012664795
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.008806467056274414,
+                1.623475432395935,
+                -0.36107200384140015
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.1655844449996948,
+                1.7064353227615356,
+                1.7955124378204346
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "House_2\\House_2.obj",
+            "id": 64,
+            "isAnimation": false,
+            "modelName": "House_2.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                35.67640686035156,
+                0.0,
+                -36.89329528808594
+            ],
+            "rotate": [
+                0.0,
+                0.017453286796808243,
+                0.0
+            ],
+            "scale": [
+                5.0,
+                4.0,
+                3.999974012374878
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
                 1.0,
                 1.0,
                 1.0
@@ -93,10 +169,10 @@
                 -1.0,
                 -1.0
             ],
-            "colliderEnabled": false,
+            "colliderEnabled": true,
             "colliderObbCenter": [
-                0.0,
-                0.0,
+                -0.0005990266799926758,
+                0.3908019959926605,
                 0.0
             ],
             "colliderObbEuler": [
@@ -105,11 +181,11 @@
                 0.0
             ],
             "colliderObbSize": [
-                1.0,
-                1.0,
-                1.0
+                1.0836524963378906,
+                0.440007746219635,
+                0.06290549784898758
             ],
-            "colliderShapeType": 0,
+            "colliderShapeType": 1,
             "colliderSphCenter": [
                 0.0,
                 0.0,
@@ -123,27 +199,27 @@
                 1.0,
                 1.0
             ],
-            "filePath": "Bell_Tower\\Bell_Tower.obj",
-            "id": 1,
+            "filePath": "WoodFence\\WoodFence.obj",
+            "id": 65,
             "isAnimation": false,
-            "modelName": "Bell_Tower.obj",
+            "modelName": "WoodFence.obj",
             "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
-                39.78806686401367,
+                64.8297119140625,
                 0.0,
-                36.09065246582031
+                -71.01313018798828
             ],
             "rotate": [
-                -3.1415908336639404,
-                -0.8639569282531738,
-                3.1415908336639404
+                1.8199233409177396e-06,
+                1.5707954168319702,
+                1.8199233409177396e-06
             ],
             "scale": [
-                4.0,
-                4.0,
-                4.0
+                3.7799999713897705,
+                2.049999952316284,
+                1.649999976158142
             ],
             "useAnchorPoint": false,
             "uvScale": [
@@ -160,20 +236,20 @@
             ],
             "animationName": "",
             "colliderAabbMax": [
-                1.1255600452423096,
-                3.474648952484131,
-                1.3828206062316895
+                1.0,
+                1.0,
+                1.0
             ],
             "colliderAabbMin": [
-                -1.1255600452423096,
-                -0.0848538875579834,
-                -1.4089465141296387
+                -1.0,
+                -1.0,
+                -1.0
             ],
             "colliderEnabled": true,
             "colliderObbCenter": [
-                0.0,
-                1.6948975324630737,
-                -0.013063013553619385
+                -0.0005990266799926758,
+                0.3908019959926605,
+                0.0
             ],
             "colliderObbEuler": [
                 0.0,
@@ -181,9 +257,9 @@
                 0.0
             ],
             "colliderObbSize": [
-                1.1255600452423096,
-                1.7797514200210571,
-                1.395883560180664
+                1.0836524963378906,
+                0.440007746219635,
+                0.06290549784898758
             ],
             "colliderShapeType": 1,
             "colliderSphCenter": [
@@ -199,27 +275,103 @@
                 1.0,
                 1.0
             ],
-            "filePath": "House_1\\House_1.obj",
-            "id": 2,
+            "filePath": "WoodFence\\WoodFence.obj",
+            "id": 66,
             "isAnimation": false,
-            "modelName": "House_1.obj",
+            "modelName": "WoodFence.obj",
             "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
-                18.14040184020996,
+                64.83769989013672,
                 0.0,
-                24.853351593017578
+                -63.25593185424805
             ],
             "rotate": [
-                -3.1415908336639404,
-                -1.3018920421600342,
-                -3.1415724754333496
+                1.8199233409177396e-06,
+                1.5707954168319702,
+                1.8199233409177396e-06
             ],
             "scale": [
-                4.0,
-                4.0,
-                4.0
+                3.7799999713897705,
+                2.049999952316284,
+                1.649999976158142
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                -0.0005990266799926758,
+                0.3908019959926605,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0836524963378906,
+                0.440007746219635,
+                0.06290549784898758
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "WoodFence\\WoodFence.obj",
+            "id": 67,
+            "isAnimation": false,
+            "modelName": "WoodFence.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                64.80950164794922,
+                0.0,
+                -55.37434768676758
+            ],
+            "rotate": [
+                1.8199233409177396e-06,
+                1.5707954168319702,
+                1.8199233409177396e-06
+            ],
+            "scale": [
+                3.7799999713897705,
+                2.049999952316284,
+                1.649999976158142
             ],
             "useAnchorPoint": false,
             "uvScale": [
@@ -388,14 +540,14 @@
             ],
             "animationName": "",
             "colliderAabbMax": [
-                1.5839999914169312,
-                7.462645530700684,
-                1.5729999542236328
+                1.7339999675750732,
+                7.349999904632568,
+                1.0
             ],
             "colliderAabbMin": [
-                -1.9290000200271606,
-                -0.181304931640625,
-                -1.3569999933242798
+                -1.878999948501587,
+                -1.0,
+                -1.0
             ],
             "colliderEnabled": true,
             "colliderObbCenter": [
@@ -435,9 +587,9 @@
             "parentID": -1,
             "pickable": true,
             "position": [
-                -38.318058013916016,
+                -36.57022476196289,
                 0.0,
-                -55.24872970581055
+                -52.807525634765625
             ],
             "rotate": [
                 0.0,
@@ -540,12 +692,12 @@
             ],
             "animationName": "",
             "colliderAabbMax": [
-                1.5839999914169312,
+                1.7339999675750732,
                 7.462645530700684,
-                1.5729999542236328
+                1.2230000495910645
             ],
             "colliderAabbMin": [
-                -1.9290000200271606,
+                -1.878999948501587,
                 -0.181304931640625,
                 -1.3569999933242798
             ],
@@ -768,12 +920,12 @@
             ],
             "animationName": "",
             "colliderAabbMax": [
-                1.5839999914169312,
+                1.7339999675750732,
                 7.462645530700684,
-                1.5729999542236328
+                1.2230000495910645
             ],
             "colliderAabbMin": [
-                -1.9290000200271606,
+                -1.878999948501587,
                 -0.181304931640625,
                 -1.3569999933242798
             ],
@@ -844,14 +996,14 @@
             ],
             "animationName": "",
             "colliderAabbMax": [
-                1.5839999914169312,
-                7.462645530700684,
-                1.5729999542236328
+                1.7339999675750732,
+                7.349999904632568,
+                1.0
             ],
             "colliderAabbMin": [
-                -1.9290000200271606,
-                -0.181304931640625,
-                -1.3569999933242798
+                -1.878999948501587,
+                -1.0,
+                -1.0
             ],
             "colliderEnabled": true,
             "colliderObbCenter": [
@@ -920,14 +1072,14 @@
             ],
             "animationName": "",
             "colliderAabbMax": [
-                1.5839999914169312,
+                3.7844903469085693,
                 7.462645530700684,
-                1.5729999542236328
+                2.7726104259490967
             ],
             "colliderAabbMin": [
-                -1.9290000200271606,
+                -3.5785152912139893,
                 -0.181304931640625,
-                -1.3569999933242798
+                -2.5570905208587646
             ],
             "colliderEnabled": true,
             "colliderObbCenter": [
@@ -967,9 +1119,9 @@
             "parentID": -1,
             "pickable": true,
             "position": [
-                -32.97573471069336,
+                -29.552356719970703,
                 0.0,
-                -59.441864013671875
+                -57.77165222167969
             ],
             "rotate": [
                 0.0,
@@ -996,14 +1148,14 @@
             ],
             "animationName": "",
             "colliderAabbMax": [
-                1.5839999914169312,
+                3.7844903469085693,
                 7.462645530700684,
-                1.5729999542236328
+                2.7726104259490967
             ],
             "colliderAabbMin": [
-                -1.9290000200271606,
+                -3.5785152912139893,
                 -0.181304931640625,
-                -1.3569999933242798
+                -2.5570905208587646
             ],
             "colliderEnabled": true,
             "colliderObbCenter": [
@@ -1043,9 +1195,9 @@
             "parentID": -1,
             "pickable": true,
             "position": [
-                -19.265790939331055,
+                -20.740692138671875,
                 0.0,
-                -67.20271301269531
+                -66.09598541259766
             ],
             "rotate": [
                 0.0,
@@ -3025,7 +3177,7 @@
             ],
             "rotate": [
                 -3.1415908336639404,
-                0.0,
+                -0.0,
                 -3.1415908336639404
             ],
             "scale": [
@@ -3048,14 +3200,14 @@
             ],
             "animationName": "",
             "colliderAabbMax": [
-                1.5839999914169312,
-                7.462645530700684,
-                1.5729999542236328
+                1.7339999675750732,
+                7.349999904632568,
+                1.0
             ],
             "colliderAabbMin": [
-                -1.9290000200271606,
-                -0.181304931640625,
-                -1.3569999933242798
+                -1.878999948501587,
+                -1.0,
+                -1.0
             ],
             "colliderEnabled": true,
             "colliderObbCenter": [
@@ -3124,14 +3276,14 @@
             ],
             "animationName": "",
             "colliderAabbMax": [
-                1.5839999914169312,
-                7.462645530700684,
-                1.5729999542236328
+                1.7339999675750732,
+                7.349999904632568,
+                1.0
             ],
             "colliderAabbMin": [
-                -1.9290000200271606,
-                -0.181304931640625,
-                -1.3569999933242798
+                -1.878999948501587,
+                -1.0,
+                -1.0
             ],
             "colliderEnabled": true,
             "colliderObbCenter": [
@@ -3504,19 +3656,19 @@
             ],
             "animationName": "",
             "colliderAabbMax": [
-                1.5839999914169312,
-                7.462645530700684,
-                1.5729999542236328
+                1.0,
+                1.0,
+                1.0
             ],
             "colliderAabbMin": [
-                -1.9290000200271606,
-                -0.181304931640625,
-                -1.3569999933242798
+                -1.0,
+                -1.0,
+                -1.0
             ],
             "colliderEnabled": true,
             "colliderObbCenter": [
-                0.0,
-                0.0,
+                -0.0005990266799926758,
+                0.3908019959926605,
                 0.0
             ],
             "colliderObbEuler": [
@@ -3525,45 +3677,45 @@
                 0.0
             ],
             "colliderObbSize": [
-                1.0,
-                1.0,
-                1.0
+                1.0836524963378906,
+                0.440007746219635,
+                0.06290549784898758
             ],
-            "colliderShapeType": 0,
+            "colliderShapeType": 1,
             "colliderSphCenter": [
                 0.0,
                 0.0,
                 0.0
             ],
             "colliderSphRadius": 1.0,
-            "colliderTypeId": 7,
+            "colliderTypeId": 8,
             "color": [
                 1.0,
                 1.0,
                 1.0,
                 1.0
             ],
-            "filePath": "MapleTree_1\\MapleTree_1.obj",
+            "filePath": "WoodFence\\WoodFence.obj",
             "id": 46,
             "isAnimation": false,
-            "modelName": "MapleTree_1.obj",
+            "modelName": "WoodFence.obj",
             "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
-                -25.454423904418945,
+                14.219261169433594,
                 0.0,
-                -66.99541473388672
+                -75.33865356445313
             ],
             "rotate": [
-                0.0,
-                -0.017453094944357872,
-                0.0
+                -3.1415908336639404,
+                -0.0,
+                -3.1415908336639404
             ],
             "scale": [
-                1.5000001192092896,
-                1.5,
-                1.5000001192092896
+                3.7799999713897705,
+                2.049999952316284,
+                1.649999976158142
             ],
             "useAnchorPoint": false,
             "uvScale": [
@@ -3580,14 +3732,622 @@
             ],
             "animationName": "",
             "colliderAabbMax": [
-                1.5839999914169312,
-                7.462645530700684,
-                1.5729999542236328
+                1.0,
+                1.0,
+                1.0
             ],
             "colliderAabbMin": [
-                -1.9290000200271606,
-                -0.181304931640625,
-                -1.3569999933242798
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                -0.0005990266799926758,
+                0.3908019959926605,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0836524963378906,
+                0.440007746219635,
+                0.06290549784898758
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "WoodFence\\WoodFence.obj",
+            "id": 47,
+            "isAnimation": false,
+            "modelName": "WoodFence.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                22.01805305480957,
+                0.0,
+                -75.31084442138672
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -0.0,
+                -3.1415908336639404
+            ],
+            "scale": [
+                3.7799999713897705,
+                2.049999952316284,
+                1.649999976158142
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                -0.0005990266799926758,
+                0.3908019959926605,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0836524963378906,
+                0.440007746219635,
+                0.06290549784898758
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "WoodFence\\WoodFence.obj",
+            "id": 48,
+            "isAnimation": false,
+            "modelName": "WoodFence.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                29.710786819458008,
+                0.0,
+                -75.2593765258789
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -0.0,
+                -3.1415908336639404
+            ],
+            "scale": [
+                3.7799999713897705,
+                2.049999952316284,
+                1.649999976158142
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                -0.0005990266799926758,
+                0.3908019959926605,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0836524963378906,
+                0.440007746219635,
+                0.06290549784898758
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "WoodFence\\WoodFence.obj",
+            "id": 49,
+            "isAnimation": false,
+            "modelName": "WoodFence.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                37.45075225830078,
+                0.0,
+                -75.18708801269531
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -0.0,
+                -3.1415908336639404
+            ],
+            "scale": [
+                3.7799999713897705,
+                2.049999952316284,
+                1.649999976158142
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                -0.0005990266799926758,
+                0.3908019959926605,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0836524963378906,
+                0.440007746219635,
+                0.06290549784898758
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "WoodFence\\WoodFence.obj",
+            "id": 50,
+            "isAnimation": false,
+            "modelName": "WoodFence.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                45.116912841796875,
+                0.0,
+                -75.14337921142578
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -0.0,
+                -3.1415908336639404
+            ],
+            "scale": [
+                3.7799999713897705,
+                2.049999952316284,
+                1.649999976158142
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                -0.0005990266799926758,
+                0.3908019959926605,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0836524963378906,
+                0.440007746219635,
+                0.06290549784898758
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "WoodFence\\WoodFence.obj",
+            "id": 51,
+            "isAnimation": false,
+            "modelName": "WoodFence.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                52.87858581542969,
+                0.0,
+                -75.05279541015625
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -0.0,
+                -3.1415908336639404
+            ],
+            "scale": [
+                3.7799999713897705,
+                2.049999952316284,
+                1.649999976158142
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                -0.0005990266799926758,
+                0.3908019959926605,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0836524963378906,
+                0.440007746219635,
+                0.06290549784898758
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "WoodFence\\WoodFence.obj",
+            "id": 52,
+            "isAnimation": false,
+            "modelName": "WoodFence.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                60.66985321044922,
+                0.0,
+                -75.00328826904297
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -0.0,
+                -3.1415908336639404
+            ],
+            "scale": [
+                3.7799999713897705,
+                2.049999952316284,
+                1.649999976158142
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.1743909120559692,
+                3.3299107551574707,
+                1.4344403743743896
+            ],
+            "colliderAabbMin": [
+                -1.1567779779434204,
+                -0.08295989036560059,
+                -2.1565845012664795
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.008806467056274414,
+                1.623475432395935,
+                -0.36107200384140015
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.1655844449996948,
+                1.7064353227615356,
+                1.7955124378204346
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "House_2\\House_2.obj",
+            "id": 54,
+            "isAnimation": false,
+            "modelName": "House_2.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                19.56656837463379,
+                0.0,
+                -36.89329528808594
+            ],
+            "rotate": [
+                0.0,
+                0.017453286796808243,
+                0.0
+            ],
+            "scale": [
+                5.0,
+                4.0,
+                3.999974012374878
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.1743909120559692,
+                3.3299107551574707,
+                1.4344403743743896
+            ],
+            "colliderAabbMin": [
+                -1.1567779779434204,
+                -0.08295989036560059,
+                -2.1565845012664795
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.008806467056274414,
+                1.623475432395935,
+                -0.36107200384140015
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.1655844449996948,
+                1.7064353227615356,
+                1.7955124378204346
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "House_2\\House_2.obj",
+            "id": 55,
+            "isAnimation": false,
+            "modelName": "House_2.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                60.84382629394531,
+                0.0,
+                -36.89329528808594
+            ],
+            "rotate": [
+                0.0,
+                0.017453286796808243,
+                0.0
+            ],
+            "scale": [
+                5.0,
+                4.0,
+                3.999974012374878
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                0.7273037433624268,
+                1.0315446853637695,
+                0.5939220786094666
+            ],
+            "colliderAabbMin": [
+                -0.3792577087879181,
+                -0.1495257019996643,
+                -0.5354641079902649
             ],
             "colliderEnabled": true,
             "colliderObbCenter": [
@@ -3612,24 +4372,24 @@
                 0.0
             ],
             "colliderSphRadius": 1.0,
-            "colliderTypeId": 7,
+            "colliderTypeId": 8,
             "color": [
                 1.0,
                 1.0,
                 1.0,
                 1.0
             ],
-            "filePath": "MapleTree_1\\MapleTree_1.obj",
-            "id": 47,
+            "filePath": "Rock_2\\Rock_2.obj",
+            "id": 59,
             "isAnimation": false,
-            "modelName": "MapleTree_1.obj",
+            "modelName": "Rock_2.obj",
             "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
-                -29.20464515686035,
+                26.358535766601563,
                 0.0,
-                -63.15222930908203
+                -41.55805587768555
             ],
             "rotate": [
                 0.0,
@@ -3637,9 +4397,2517 @@
                 0.0
             ],
             "scale": [
-                1.5,
-                1.5,
-                1.5
+                4.0,
+                4.0,
+                4.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                0.7273037433624268,
+                1.0315446853637695,
+                0.5939220786094666
+            ],
+            "colliderAabbMin": [
+                -0.3792577087879181,
+                -0.1495257019996643,
+                -0.5354641079902649
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Rock_2\\Rock_2.obj",
+            "id": 60,
+            "isAnimation": false,
+            "modelName": "Rock_2.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                11.254362106323242,
+                0.0,
+                -42.56806182861328
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                4.0,
+                4.0,
+                4.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                0.7273037433624268,
+                1.0315446853637695,
+                0.5939220786094666
+            ],
+            "colliderAabbMin": [
+                -0.3792577087879181,
+                -0.1495257019996643,
+                -0.5354641079902649
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Rock_2\\Rock_2.obj",
+            "id": 61,
+            "isAnimation": false,
+            "modelName": "Rock_2.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                11.258269309997559,
+                0.0,
+                -33.552764892578125
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                4.0,
+                4.0,
+                4.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                0.7273037433624268,
+                1.0315446853637695,
+                0.5939220786094666
+            ],
+            "colliderAabbMin": [
+                -0.3792577087879181,
+                -0.1495257019996643,
+                -0.5354641079902649
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Rock_2\\Rock_2.obj",
+            "id": 62,
+            "isAnimation": false,
+            "modelName": "Rock_2.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                26.485750198364258,
+                0.0,
+                -33.1588020324707
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                4.0,
+                4.0,
+                4.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                0.7273037433624268,
+                1.0315446853637695,
+                0.5939220786094666
+            ],
+            "colliderAabbMin": [
+                -0.3792577087879181,
+                -0.1495257019996643,
+                -0.5354641079902649
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Rock_2\\Rock_2.obj",
+            "id": 63,
+            "isAnimation": false,
+            "modelName": "Rock_2.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                11.209175109863281,
+                0.0,
+                -37.682777404785156
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                4.0,
+                4.0,
+                4.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                -0.0005990266799926758,
+                0.3908019959926605,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0836524963378906,
+                0.440007746219635,
+                0.06290549784898758
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "WoodFence\\WoodFence.obj",
+            "id": 68,
+            "isAnimation": false,
+            "modelName": "WoodFence.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                60.48099899291992,
+                0.0,
+                -50.90040588378906
+            ],
+            "rotate": [
+                1.8199233409177396e-06,
+                -0.0,
+                1.8199233409177396e-06
+            ],
+            "scale": [
+                4.309999942779541,
+                2.049999952316284,
+                1.649999976158142
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                -0.0005990266799926758,
+                0.3908019959926605,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0836524963378906,
+                0.440007746219635,
+                0.06290549784898758
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "WoodFence\\WoodFence.obj",
+            "id": 69,
+            "isAnimation": false,
+            "modelName": "WoodFence.obj",
+            "nameTag": "TestGate4",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                55.15999984741211,
+                0.0,
+                -50.90040588378906
+            ],
+            "rotate": [
+                1.8199233409177396e-06,
+                0.0,
+                1.8199233409177396e-06
+            ],
+            "scale": [
+                3.7799999713897705,
+                2.049999952316284,
+                1.649999976158142
+            ],
+            "useAnchorPoint": true,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                -1.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                -0.0005990266799926758,
+                0.3908019959926605,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0836524963378906,
+                0.440007746219635,
+                0.06290549784898758
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "WoodFence\\WoodFence.obj",
+            "id": 70,
+            "isAnimation": false,
+            "modelName": "WoodFence.obj",
+            "nameTag": "TestGate3",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                41.70800018310547,
+                0.0,
+                -50.90040588378906
+            ],
+            "rotate": [
+                1.8199233409177396e-06,
+                0.0,
+                1.8199233409177396e-06
+            ],
+            "scale": [
+                3.7799999713897705,
+                2.049999952316284,
+                1.649999976158142
+            ],
+            "useAnchorPoint": true,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                -0.0005990266799926758,
+                0.3908019959926605,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0836524963378906,
+                0.440007746219635,
+                0.06290549784898758
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "WoodFence\\WoodFence.obj",
+            "id": 71,
+            "isAnimation": false,
+            "modelName": "WoodFence.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                36.62871551513672,
+                0.0,
+                -50.90040588378906
+            ],
+            "rotate": [
+                1.8199233409177396e-06,
+                -0.0,
+                1.8199233409177396e-06
+            ],
+            "scale": [
+                3.7799999713897705,
+                2.049999952316284,
+                1.649999976158142
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                -0.0005990266799926758,
+                0.3908019959926605,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0836524963378906,
+                0.440007746219635,
+                0.06290549784898758
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "WoodFence\\WoodFence.obj",
+            "id": 72,
+            "isAnimation": false,
+            "modelName": "WoodFence.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                28.904891967773438,
+                0.0,
+                -50.90040588378906
+            ],
+            "rotate": [
+                1.8199233409177396e-06,
+                -0.0,
+                1.8199233409177396e-06
+            ],
+            "scale": [
+                3.7799999713897705,
+                2.049999952316284,
+                1.649999976158142
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                -0.0005990266799926758,
+                0.3908019959926605,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0836524963378906,
+                0.440007746219635,
+                0.06290549784898758
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "WoodFence\\WoodFence.obj",
+            "id": 73,
+            "isAnimation": false,
+            "modelName": "WoodFence.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                21.04817008972168,
+                0.0,
+                -50.90040588378906
+            ],
+            "rotate": [
+                1.8199233409177396e-06,
+                -0.0,
+                1.8199233409177396e-06
+            ],
+            "scale": [
+                3.7799999713897705,
+                2.049999952316284,
+                1.649999976158142
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                -0.0005990266799926758,
+                0.3908019959926605,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0836524963378906,
+                0.440007746219635,
+                0.06290549784898758
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "WoodFence\\WoodFence.obj",
+            "id": 74,
+            "isAnimation": false,
+            "modelName": "WoodFence.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                13.542771339416504,
+                0.0,
+                -50.90040588378906
+            ],
+            "rotate": [
+                1.8199233409177396e-06,
+                -0.0,
+                1.8199233409177396e-06
+            ],
+            "scale": [
+                3.7799999713897705,
+                2.049999952316284,
+                1.649999976158142
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                0.7273037433624268,
+                1.0315446853637695,
+                0.5939220786094666
+            ],
+            "colliderAabbMin": [
+                -0.3792577087879181,
+                -0.1495257019996643,
+                -0.5354641079902649
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Rock_2\\Rock_2.obj",
+            "id": 75,
+            "isAnimation": false,
+            "modelName": "Rock_2.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                65.37162780761719,
+                0.0,
+                -48.15730667114258
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                4.0,
+                4.0,
+                4.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                0.8907464146614075,
+                1.6352660655975342,
+                0.7273889183998108
+            ],
+            "colliderAabbMin": [
+                -0.4644853472709656,
+                -0.1440250277519226,
+                -0.6557949185371399
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.21313051879405975,
+                0.7456204891204834,
+                0.03579699993133545
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                0.6776158809661865,
+                0.889645516872406,
+                0.6915919184684753
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Rock_5\\Rock_5.obj",
+            "id": 76,
+            "isAnimation": false,
+            "modelName": "Rock_5.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                28.192527770996094,
+                0.0,
+                -18.295757293701172
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                5.0,
+                5.0,
+                5.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                0.4876425862312317,
+                1.9971859455108643,
+                0.2695443630218506
+            ],
+            "colliderAabbMin": [
+                -0.414542555809021,
+                -0.2634239196777344,
+                -0.583491325378418
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.03655000030994415,
+                0.8668810129165649,
+                -0.1569734811782837
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                0.45109257102012634,
+                1.1303049325942993,
+                0.4265178442001343
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Rock_4\\Rock_4.obj",
+            "id": 77,
+            "isAnimation": false,
+            "modelName": "Rock_4.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                21.0290470123291,
+                0.0,
+                18.868558883666992
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                5.0,
+                5.0,
+                5.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.05641500651836395,
+                0.5307419896125793,
+                -0.002656504511833191
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                0.44290152192115784,
+                0.6893669366836548,
+                0.47101476788520813
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Rock_3\\Rock_3.obj",
+            "id": 78,
+            "isAnimation": false,
+            "modelName": "Rock_3.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                14.398197174072266,
+                0.0,
+                10.533049583435059
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                5.0,
+                5.0,
+                5.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.09638550877571106,
+                0.43585899472236633,
+                0.1572684943675995
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                0.37310436367988586,
+                0.5683061480522156,
+                0.4658823311328888
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Rock_1\\Rock_1.obj",
+            "id": 79,
+            "isAnimation": false,
+            "modelName": "Rock_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                14.543853759765625,
+                0.0,
+                17.513999938964844
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                5.0,
+                5.0,
+                5.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                0.8907464146614075,
+                1.6352660655975342,
+                0.7273889183998108
+            ],
+            "colliderAabbMin": [
+                -0.4644853472709656,
+                -0.1440250277519226,
+                -0.6557949185371399
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.21313051879405975,
+                0.7456204891204834,
+                0.03579699993133545
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                0.6776158809661865,
+                0.889645516872406,
+                0.6915919184684753
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Rock_5\\Rock_5.obj",
+            "id": 80,
+            "isAnimation": false,
+            "modelName": "Rock_5.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                32.459259033203125,
+                0.0,
+                -25.6209659576416
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                5.0,
+                5.0,
+                5.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                0.8907464146614075,
+                1.6352660655975342,
+                0.7273889183998108
+            ],
+            "colliderAabbMin": [
+                -0.4644853472709656,
+                -0.1440250277519226,
+                -0.6557949185371399
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.21313051879405975,
+                0.7456204891204834,
+                0.03579699993133545
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                0.6776158809661865,
+                0.889645516872406,
+                0.6915919184684753
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Rock_5\\Rock_5.obj",
+            "id": 81,
+            "isAnimation": false,
+            "modelName": "Rock_5.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                23.47336196899414,
+                0.0,
+                -10.837008476257324
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                5.0,
+                5.0,
+                5.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                0.8907464146614075,
+                1.6352660655975342,
+                0.7273889183998108
+            ],
+            "colliderAabbMin": [
+                -0.4644853472709656,
+                -0.1440250277519226,
+                -0.6557949185371399
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.21313051879405975,
+                0.7456204891204834,
+                0.03579699993133545
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                0.6776158809661865,
+                0.889645516872406,
+                0.6915919184684753
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Rock_5\\Rock_5.obj",
+            "id": 83,
+            "isAnimation": false,
+            "modelName": "Rock_5.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                21.6369571685791,
+                0.0,
+                -1.994363784790039
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                5.0,
+                5.0,
+                5.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                0.8907464146614075,
+                1.6352660655975342,
+                0.7273889183998108
+            ],
+            "colliderAabbMin": [
+                -0.4644853472709656,
+                -0.1440250277519226,
+                -0.6557949185371399
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.21313051879405975,
+                0.7456204891204834,
+                0.03579699993133545
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                0.6776158809661865,
+                0.889645516872406,
+                0.6915919184684753
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Rock_5\\Rock_5.obj",
+            "id": 84,
+            "isAnimation": false,
+            "modelName": "Rock_5.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                22.644975662231445,
+                0.0,
+                5.942626953125
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                5.0,
+                5.0,
+                5.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                0.8907464146614075,
+                1.6352660655975342,
+                0.7273889183998108
+            ],
+            "colliderAabbMin": [
+                -0.4644853472709656,
+                -0.1440250277519226,
+                -0.6557949185371399
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.21313051879405975,
+                0.7456204891204834,
+                0.03579699993133545
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                0.6776158809661865,
+                0.889645516872406,
+                0.6915919184684753
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Rock_5\\Rock_5.obj",
+            "id": 85,
+            "isAnimation": false,
+            "modelName": "Rock_5.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                27.04552459716797,
+                0.0,
+                12.80966567993164
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                5.0,
+                5.0,
+                5.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                0.8907464146614075,
+                1.6352660655975342,
+                0.7273889183998108
+            ],
+            "colliderAabbMin": [
+                -0.4644853472709656,
+                -0.1440250277519226,
+                -0.6557949185371399
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.21313051879405975,
+                0.7456204891204834,
+                0.03579699993133545
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                0.6776158809661865,
+                0.889645516872406,
+                0.6915919184684753
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Rock_5\\Rock_5.obj",
+            "id": 86,
+            "isAnimation": false,
+            "modelName": "Rock_5.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                32.553306579589844,
+                0.0,
+                20.352462768554688
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                5.0,
+                5.0,
+                5.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                0.8907464146614075,
+                1.6352660655975342,
+                0.7273889183998108
+            ],
+            "colliderAabbMin": [
+                -0.4644853472709656,
+                -0.1440250277519226,
+                -0.6557949185371399
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.21313051879405975,
+                0.7456204891204834,
+                0.03579699993133545
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                0.6776158809661865,
+                0.889645516872406,
+                0.6915919184684753
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Rock_5\\Rock_5.obj",
+            "id": 87,
+            "isAnimation": false,
+            "modelName": "Rock_5.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                71.3028793334961,
+                0.0,
+                9.51819896697998
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                5.0,
+                5.0,
+                5.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                0.8907464146614075,
+                1.6352660655975342,
+                0.7273889183998108
+            ],
+            "colliderAabbMin": [
+                -0.4644853472709656,
+                -0.1440250277519226,
+                -0.6557949185371399
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.21313051879405975,
+                0.7456204891204834,
+                0.03579699993133545
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                0.6776158809661865,
+                0.889645516872406,
+                0.6915919184684753
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Rock_5\\Rock_5.obj",
+            "id": 88,
+            "isAnimation": false,
+            "modelName": "Rock_5.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                61.161678314208984,
+                0.0,
+                -26.110607147216797
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                5.0,
+                5.0,
+                5.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                0.8907464146614075,
+                1.6352660655975342,
+                0.7273889183998108
+            ],
+            "colliderAabbMin": [
+                -0.4644853472709656,
+                -0.1440250277519226,
+                -0.6557949185371399
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.21313051879405975,
+                0.7456204891204834,
+                0.03579699993133545
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                0.6776158809661865,
+                0.889645516872406,
+                0.6915919184684753
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Rock_5\\Rock_5.obj",
+            "id": 89,
+            "isAnimation": false,
+            "modelName": "Rock_5.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                65.38912963867188,
+                0.0,
+                -18.616294860839844
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                5.0,
+                5.0,
+                5.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                0.8907464146614075,
+                1.6352660655975342,
+                0.7273889183998108
+            ],
+            "colliderAabbMin": [
+                -0.4644853472709656,
+                -0.1440250277519226,
+                -0.6557949185371399
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.21313051879405975,
+                0.7456204891204834,
+                0.03579699993133545
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                0.6776158809661865,
+                0.889645516872406,
+                0.6915919184684753
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Rock_5\\Rock_5.obj",
+            "id": 90,
+            "isAnimation": false,
+            "modelName": "Rock_5.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                68.48749542236328,
+                0.0,
+                -11.83865737915039
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                5.0,
+                5.0,
+                5.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                0.8907464146614075,
+                1.6352660655975342,
+                0.7273889183998108
+            ],
+            "colliderAabbMin": [
+                -0.4644853472709656,
+                -0.1440250277519226,
+                -0.6557949185371399
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.21313051879405975,
+                0.7456204891204834,
+                0.03579699993133545
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                0.6776158809661865,
+                0.889645516872406,
+                0.6915919184684753
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Rock_5\\Rock_5.obj",
+            "id": 91,
+            "isAnimation": false,
+            "modelName": "Rock_5.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                71.31208801269531,
+                0.0,
+                -4.970109462738037
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                5.0,
+                5.0,
+                5.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                0.8907464146614075,
+                1.6352660655975342,
+                0.7273889183998108
+            ],
+            "colliderAabbMin": [
+                -0.4644853472709656,
+                -0.1440250277519226,
+                -0.6557949185371399
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.21313051879405975,
+                0.7456204891204834,
+                0.03579699993133545
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                0.6776158809661865,
+                0.889645516872406,
+                0.6915919184684753
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Rock_5\\Rock_5.obj",
+            "id": 92,
+            "isAnimation": false,
+            "modelName": "Rock_5.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                73.38389587402344,
+                0.0,
+                2.307785987854004
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                5.0,
+                5.0,
+                5.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                0.8907464146614075,
+                1.6352660655975342,
+                0.7273889183998108
+            ],
+            "colliderAabbMin": [
+                -0.4644853472709656,
+                -0.1440250277519226,
+                -0.6557949185371399
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.21313051879405975,
+                0.7456204891204834,
+                0.03579699993133545
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                0.6776158809661865,
+                0.889645516872406,
+                0.6915919184684753
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Rock_5\\Rock_5.obj",
+            "id": 93,
+            "isAnimation": false,
+            "modelName": "Rock_5.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                46.20619201660156,
+                0.0,
+                25.29703140258789
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                5.0,
+                5.0,
+                5.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                0.8907464146614075,
+                1.6352660655975342,
+                0.7273889183998108
+            ],
+            "colliderAabbMin": [
+                -0.4644853472709656,
+                -0.1440250277519226,
+                -0.6557949185371399
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.21313051879405975,
+                0.7456204891204834,
+                0.03579699993133545
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                0.6776158809661865,
+                0.889645516872406,
+                0.6915919184684753
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Rock_5\\Rock_5.obj",
+            "id": 94,
+            "isAnimation": false,
+            "modelName": "Rock_5.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                53.12178039550781,
+                0.0,
+                25.29703140258789
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                5.0,
+                5.0,
+                5.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                0.8907464146614075,
+                1.6352660655975342,
+                0.7273889183998108
+            ],
+            "colliderAabbMin": [
+                -0.4644853472709656,
+                -0.1440250277519226,
+                -0.6557949185371399
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.21313051879405975,
+                0.7456204891204834,
+                0.03579699993133545
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                0.6776158809661865,
+                0.889645516872406,
+                0.6915919184684753
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Rock_5\\Rock_5.obj",
+            "id": 95,
+            "isAnimation": false,
+            "modelName": "Rock_5.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                38.96341323852539,
+                0.0,
+                25.29703140258789
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                5.0,
+                5.0,
+                5.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                0.8907464146614075,
+                1.6352660655975342,
+                0.7273889183998108
+            ],
+            "colliderAabbMin": [
+                -0.4644853472709656,
+                -0.1440250277519226,
+                -0.6557949185371399
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.21313051879405975,
+                0.7456204891204834,
+                0.03579699993133545
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                0.6776158809661865,
+                0.889645516872406,
+                0.6915919184684753
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Rock_5\\Rock_5.obj",
+            "id": 96,
+            "isAnimation": false,
+            "modelName": "Rock_5.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                60.44358444213867,
+                0.0,
+                21.36711311340332
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                5.0,
+                5.0,
+                5.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                0.8907464146614075,
+                1.6352660655975342,
+                0.7273889183998108
+            ],
+            "colliderAabbMin": [
+                -0.4644853472709656,
+                -0.1440250277519226,
+                -0.6557949185371399
+            ],
+            "colliderEnabled": true,
+            "colliderObbCenter": [
+                0.21313051879405975,
+                0.7456204891204834,
+                0.03579699993133545
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                0.6776158809661865,
+                0.889645516872406,
+                0.6915919184684753
+            ],
+            "colliderShapeType": 1,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Rock_5\\Rock_5.obj",
+            "id": 97,
+            "isAnimation": false,
+            "modelName": "Rock_5.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                66.6106185913086,
+                0.0,
+                16.90167236328125
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                5.0,
+                5.0,
+                5.0
             ],
             "useAnchorPoint": false,
             "uvScale": [

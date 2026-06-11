@@ -34,7 +34,7 @@
           0.0,
           0.0
         ],
-        "requiredCount": 1,
+        "requiredCount": 3,
         "requiredGroup": "",
         "targetName": "TestGate1",
         "type": "OpenGate"
@@ -90,12 +90,124 @@
           0.0,
           0.0
         ],
-        "requiredCount": 1,
+        "requiredCount": 3,
         "requiredGroup": "",
         "targetName": "TestGate2",
         "type": "OpenGate"
       },
       "name": "Fence2",
+      "position": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "action": {
+        "closedCaptured": true,
+        "closedPosition": [
+          41.70800018310547,
+          0.0,
+          -50.90040588378906
+        ],
+        "closedRotation": [
+          1.8199233409177396e-06,
+          0.0,
+          1.8199233409177396e-06
+        ],
+        "closedScale": [
+          3.7799999713897705,
+          2.049999952316284,
+          1.649999976158142
+        ],
+        "openDuration": 5.0,
+        "openOffsetPosition": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "openOffsetRotationDeg": [
+          0.0,
+          -90.0,
+          0.0
+        ],
+        "openOffsetScale": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "requiredCount": 5,
+        "requiredGroup": "",
+        "targetName": "TestGate3",
+        "type": "OpenGate"
+      },
+      "name": "Fence3",
+      "position": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "action": {
+        "closedCaptured": true,
+        "closedPosition": [
+          55.15999984741211,
+          0.0,
+          -50.90040588378906
+        ],
+        "closedRotation": [
+          1.8199233409177396e-06,
+          0.0,
+          1.8199233409177396e-06
+        ],
+        "closedScale": [
+          3.7799999713897705,
+          2.049999952316284,
+          1.649999976158142
+        ],
+        "openDuration": 5.0,
+        "openOffsetPosition": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "openOffsetRotationDeg": [
+          0.0,
+          90.0,
+          0.0
+        ],
+        "openOffsetScale": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "requiredCount": 5,
+        "requiredGroup": "",
+        "targetName": "TestGate4",
+        "type": "OpenGate"
+      },
+      "name": "Fence4",
       "position": [
         0.0,
         0.0,

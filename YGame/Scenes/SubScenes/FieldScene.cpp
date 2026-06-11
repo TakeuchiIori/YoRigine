@@ -797,7 +797,7 @@ void FieldScene::DrawEventTriggerEditor() {
 					static_cast<int>(gate->GetPhase()));
 
 				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.5f, 0.2f, 1.0f));
-				if (ImGui::Button("▶ プレビュー (即発火)")) {
+				if (ImGui::Button(" プレビュー (即発火)")) {
 					gate->TriggerPreview();
 				}
 				ImGui::PopStyleColor();
