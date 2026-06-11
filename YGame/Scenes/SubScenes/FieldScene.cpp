@@ -16,6 +16,8 @@
 
 #ifdef USE_IMGUI
 #include "imgui.h"
+#include <algorithm>
+#include <cstdio>
 #endif
 
 /*==========================================================================
@@ -96,32 +98,16 @@ void FieldScene::Initialize(Camera* camera, Player* player) {
 		HandleDetailedEncounter(encounterInfo);
 		});
 
-	//------------------------------------------------------------
-	// EventTrigger (MVP配線): 撃破→扉開放の最小ケース1個
-	//   targetName / requiredGroup は実シーン側の nameTag / 敵グループ名に合わせて調整する。
-	//   Action が ObjectManager::GetObjectByName でターゲットを解決する。
-	//------------------------------------------------------------
-	{
-		auto trigger = std::make_unique<EventTrigger>();
-		trigger->Initialize(sceneCamera_);
-		trigger->SetName("OpenGateTrigger_TestGate");
-
-		auto action = std::make_unique<OpenGateAction>(
-			std::string("TestGate"),     // PlacedObject.nameTag に合わせる
-			std::string("TestEnemy"));   // FieldEnemy のグループ名に合わせる
-		action->SetOnGateOpened([this]() { RebakeNavGrid(); });
-
-		openGateActions_.push_back(action.get());
-		trigger->SetAction(std::move(action));
-		eventTriggers_.push_back(std::move(trigger));
-	}
-
 	// FieldEnemyManager の撃破コールバックを全 OpenGateAction にディスパッチ
 	fieldEnemyManager_->SetOnEnemyDefeatedCallback([this](const std::string& group) {
 		for (auto* act : openGateActions_) {
 			if (act) act->NotifyEnemyDefeated(group);
 		}
 	});
+
+	// EventTrigger のロードはシーン入場のたびに必要なため、OnEnter 側で実行する
+	// (ModelManipulator::LoadScene が ObjectManager をクリアして PlacedObject を作り直すので、
+	//  EventTrigger も同タイミングで作り直さないとターゲット参照がずれる)。
 
 	sprite_ = std::make_unique<Sprite>();
 	sprite_->Initialize("Resources/Textures/GameScene/FieldScene.png");
@@ -222,6 +208,10 @@ void FieldScene::Initialize(Camera* camera, Player* player) {
 			}
 		}
 		}, "Game");
+
+	Editor::GetInstance()->RegisterGameUI("EventTrigger", [this]() {
+		DrawEventTriggerEditor();
+	}, "Game");
 #endif
 }
 
@@ -380,7 +370,33 @@ void FieldScene::OnEnter() {
 	// 必要なものだけ残して保存して Field.json を作る運用にする。
 	// (LoadScene 内で ObjectManager をクリアするため NavGrid も貼り直す)
 	YoRigine::ModelManipulator::GetInstance()->LoadScene("Field");
+
+	// EventTrigger を再ロード。LoadScene で PlacedObject が作り直されるため、
+	// 古い Action がキャッシュした ID が無効化される。ここで状態ごと作り直す。
+	eventTriggers_.clear();
+	openGateActions_.clear();
+	EventTriggerLoader::Load(
+		EventTriggerPaths::Field,
+		sceneCamera_,
+		[this]() { RebakeNavGrid(); },
+		eventTriggers_,
+		openGateActions_);
+
 	RebakeNavGrid();
+
+	// バトル復帰時に BattleArea(半径50) が残って FieldArea(半径100) が消えるバグを修正。
+	// BattleScene::OnExit が BattleArea を削除していないので、ここで掃除する。
+	// FieldArea も OnExit で消されているので、入場のたびに登録し直す。
+	{
+		auto* mgr = AreaManager::GetInstance();
+		mgr->RemoveArea("BattleArea");
+		mgr->RemoveArea("FieldArea");
+		auto fieldArea = std::make_shared<CircleArea>();
+		fieldArea->Initialize(Vector3(0, 0, 0), 100.0f);
+		fieldArea->SetPurpose(AreaPurpose::Boundary);
+		fieldArea->SetCamera(sceneCamera_);
+		mgr->AddArea("FieldArea", fieldArea);
+	}
 
 	// フィールドの敵を再開（OBB コライダーもまとめて有効化される）
 	if (fieldEnemyManager_) {
@@ -515,17 +531,17 @@ void FieldScene::HandleBattleReturn(const FieldReturnData& data) {
 
 	// 念のためここでもエンカウントリセット関数を呼ぶ
 	fieldEnemyManager_->ResetEnCount();
+
+	// 勝敗に関わらずエンカウント位置 (バトル開始時のプレイヤー座標) に戻す。
 	Vector3 returnPos = data.playerPosition;
 
 	if (data.playerWon) {
-		fieldEnemyManager_->RegisterDefeatedEnemy(data.defeatedEnemyGroup);
 		char buffer[256];
 		sprintf_s(buffer, "[FieldScene] Victory! Defeated enemy: %s\n", data.defeatedEnemyGroup.c_str());
 		Logger(buffer);
 	}
 	else {
-		returnPos += Vector3(0, 0, -2.0f);
-		Logger("[FieldScene] Defeat! Player moved back\n");
+		Logger("[FieldScene] Defeat!\n");
 	}
 
 	player_->SetPosition(returnPos);
@@ -601,3 +617,193 @@ void FieldScene::RebakeNavGrid()
 		enemy->ClearNavPath();
 	}
 }
+
+#ifdef USE_IMGUI
+/*==========================================================================
+	EventTrigger エディタ
+//========================================================================*/
+void FieldScene::DrawEventTriggerEditor() {
+	ImGui::TextDisabled("Resources/Json/EventTriggers/field_triggers.json");
+	ImGui::Separator();
+
+	// ── ツールバー ───────────────────────────────────────────
+	if (ImGui::Button("＋ OpenGate トリガー追加")) {
+		auto trigger = std::make_unique<EventTrigger>();
+		trigger->Initialize(sceneCamera_);
+		trigger->SetName("NewTrigger");
+
+		auto action = std::make_unique<OpenGateAction>(
+			std::string(""), std::string(""), 1);
+		action->SetOnGateOpened([this]() { RebakeNavGrid(); });
+
+		openGateActions_.push_back(action.get());
+		trigger->SetAction(std::move(action));
+		eventTriggers_.push_back(std::move(trigger));
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("保存")) {
+		EventTriggerLoader::Save(EventTriggerPaths::Field, eventTriggers_);
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("再ロード")) {
+		eventTriggers_.clear();
+		openGateActions_.clear();
+		EventTriggerLoader::Load(
+			EventTriggerPaths::Field,
+			sceneCamera_,
+			[this]() { RebakeNavGrid(); },
+			eventTriggers_,
+			openGateActions_);
+	}
+
+	ImGui::Separator();
+	ImGui::Text("登録数: %d", static_cast<int>(eventTriggers_.size()));
+	ImGui::Separator();
+
+	// ── トリガー一覧 ──────────────────────────────────────────
+	int deleteIndex = -1;
+	for (size_t i = 0; i < eventTriggers_.size(); ++i) {
+		auto& trig = eventTriggers_[i];
+		if (!trig) continue;
+
+		ImGui::PushID(static_cast<int>(i));
+
+		const std::string header = "[" + std::to_string(i) + "] " +
+			(trig->GetName().empty() ? "(無名)" : trig->GetName());
+
+		if (ImGui::CollapsingHeader(header.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+			// 名前
+			{
+				char buf[128];
+				std::snprintf(buf, sizeof(buf), "%s", trig->GetName().c_str());
+				if (ImGui::InputText("名前", buf, sizeof(buf))) {
+					trig->SetName(buf);
+				}
+			}
+
+			// トランスフォーム (アクションが空間情報を使う時だけ表示)
+			TriggerAction* curAction = trig->GetAction();
+			const bool needsSpatial = curAction ? curAction->NeedsSpatialPlacement() : true;
+			if (needsSpatial) {
+				auto& wt = trig->GetWT();
+				bool xformChanged = false;
+				if (ImGui::DragFloat3("位置",     &wt.translate_.x, 0.1f)) xformChanged = true;
+				if (ImGui::DragFloat3("回転(rad)", &wt.rotate_.x,    0.05f)) xformChanged = true;
+				if (ImGui::DragFloat3("スケール",  &wt.scale_.x,     0.1f, 0.1f, 100.0f)) xformChanged = true;
+				if (xformChanged) wt.UpdateMatrix();
+			} else {
+				ImGui::TextDisabled("(このアクションは位置情報を使いません)");
+			}
+
+			// Action 編集 (OpenGateAction のみ対応)
+			if (auto* gate = dynamic_cast<OpenGateAction*>(trig->GetAction())) {
+				ImGui::Separator();
+				ImGui::TextDisabled("Action: OpenGate");
+
+				{
+					char buf[128];
+					std::snprintf(buf, sizeof(buf), "%s", gate->GetTargetName().c_str());
+					if (ImGui::InputText("ターゲット nameTag", buf, sizeof(buf))) {
+						gate->SetTargetName(buf);
+					}
+				}
+				{
+					char buf[128];
+					std::snprintf(buf, sizeof(buf), "%s", gate->GetRequiredGroup().c_str());
+					if (ImGui::InputText("必要敵グループ (enemyId)", buf, sizeof(buf))) {
+						gate->SetRequiredGroup(buf);
+					}
+					if (gate->GetRequiredGroup().empty()) {
+						ImGui::SameLine();
+						ImGui::TextDisabled("(空欄 = どの敵でもカウント)");
+					}
+				}
+				{
+					int n = gate->GetRequiredCount();
+					if (ImGui::DragInt("必要撃破数", &n, 1.0f, 1, 999)) {
+						gate->SetRequiredCount(n);
+					}
+				}
+
+				// ── 開放モーション (コード補間) ────────────────────────
+				// 元の transform に対する差分を duration 秒で線形補間。
+				ImGui::Separator();
+				ImGui::TextDisabled("開放モーション (元 transform に対する差分)");
+				{
+					Vector3 v = gate->GetOpenOffsetPosition();
+					if (ImGui::DragFloat3("オフセット位置", &v.x, 0.1f)) gate->SetOpenOffsetPosition(v);
+				}
+				{
+					Vector3 v = gate->GetOpenOffsetRotationDeg();
+					if (ImGui::DragFloat3("オフセット回転(deg)", &v.x, 1.0f)) gate->SetOpenOffsetRotationDeg(v);
+				}
+				{
+					Vector3 v = gate->GetOpenOffsetScale();
+					if (ImGui::DragFloat3("オフセットスケール", &v.x, 0.05f)) gate->SetOpenOffsetScale(v);
+				}
+				{
+					float d = gate->GetOpenDuration();
+					if (ImGui::DragFloat("補間時間 (秒)", &d, 0.05f, 0.05f, 60.0f)) gate->SetOpenDuration(d);
+				}
+
+				ImGui::Separator();
+				ImGui::TextDisabled("ヒンジ式の扉なら、ターゲット PlacedObject 側でアンカーを設定してください (シーンエディタ → アンカー使用)");
+
+				// ── 閉位置の管理 ───────────────────────────────────
+				ImGui::Separator();
+				ImGui::TextDisabled("閉 (初期) 位置: %s",
+					gate->HasClosedPose() ? "記録済み" : "未記録 (初回起動時に target 現在位置を捕捉)");
+				if (gate->HasClosedPose()) {
+					ImGui::TextDisabled("  pos (%.2f, %.2f, %.2f)",
+						gate->GetClosedPosition().x, gate->GetClosedPosition().y, gate->GetClosedPosition().z);
+				}
+				if (ImGui::Button("現在の target 位置を「閉」として記録")) {
+					if (auto* om = ObjectManager::GetInstance()) {
+						if (auto* tgt = om->GetObjectByName(gate->GetTargetName())) {
+							gate->SetClosedPose(tgt->position, tgt->rotation, tgt->scale);
+						}
+					}
+				}
+
+				ImGui::Separator();
+				ImGui::Text("進捗: %d / %d (Phase: %d)",
+					gate->GetCurrentCount(), gate->GetRequiredCount(),
+					static_cast<int>(gate->GetPhase()));
+
+				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.5f, 0.2f, 1.0f));
+				if (ImGui::Button("▶ プレビュー (即発火)")) {
+					gate->TriggerPreview();
+				}
+				ImGui::PopStyleColor();
+				ImGui::SameLine();
+				if (ImGui::Button("状態リセット")) {
+					gate->Reset();
+				}
+			}
+			else if (trig->GetAction()) {
+				ImGui::TextDisabled("Action: %s (未対応のエディタ)",
+					trig->GetAction()->GetTypeName().c_str());
+			}
+
+			ImGui::Separator();
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6f, 0.2f, 0.2f, 1.0f));
+			if (ImGui::Button("このトリガーを削除")) {
+				deleteIndex = static_cast<int>(i);
+			}
+			ImGui::PopStyleColor();
+		}
+
+		ImGui::PopID();
+	}
+
+	// 削除を遅延適用 (ループ終了後)
+	if (deleteIndex >= 0) {
+		// openGateActions_ から該当ポインタを除外
+		auto* doomedAction = eventTriggers_[deleteIndex]->GetAction();
+		openGateActions_.erase(
+			std::remove(openGateActions_.begin(), openGateActions_.end(), doomedAction),
+			openGateActions_.end());
+		eventTriggers_.erase(eventTriggers_.begin() + deleteIndex);
+	}
+}
+#endif

@@ -18,6 +18,7 @@
 // App
 #include "Enemy/FieldEnemy/FieldEnemyManager.h"
 #include "Trigger/EventTrigger.h"
+#include "Trigger/EventTriggerLoader.h"
 #include "Trigger/Actions/OpenGateAction.h"
 
 // Navigation
@@ -76,6 +77,11 @@ public:
 
 	// バトルシーンから戻った際の処理
 	void HandleBattleReturn(const FieldReturnData& data);
+
+#ifdef USE_IMGUI
+	// EventTrigger エディタ (Editor::RegisterGameUI から呼ばれる)
+	void DrawEventTriggerEditor();
+#endif
 
 	///************************* アクセッサ *************************///
 

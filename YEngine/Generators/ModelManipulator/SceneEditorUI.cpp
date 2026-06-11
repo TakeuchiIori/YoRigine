@@ -12,6 +12,9 @@
 #include "ObjectSelector.h"
 #include "Ray/Raycast.h"
 
+// C++
+#include <cstdio>
+
 // ImGui
 #include "imgui.h"
 
@@ -250,6 +253,20 @@ namespace YoRigine {
         auto* obj = objectManager_->GetObjectById(selector_->GetPrimaryId());
         if (obj) {
             ImGui::Text("オブジェクトID %d: %s", obj->id, obj->modelName.c_str());
+
+            // ── nameTag (シーン内一意名 / TriggerAction のターゲット参照用) ────────
+            {
+                char buf[128];
+                std::snprintf(buf, sizeof(buf), "%s", obj->nameTag.c_str());
+                if (ImGui::InputText("名前(nameTag)", buf, sizeof(buf))) {
+                    obj->nameTag = buf;
+                }
+                if (obj->nameTag.empty()) {
+                    ImGui::SameLine();
+                    ImGui::TextDisabled("(未命名)");
+                }
+            }
+
             ImGui::Separator();
 
             bool changed = false;
@@ -267,6 +284,13 @@ namespace YoRigine {
             }
 
             if (ImGui::DragFloat3("スケール", &obj->scale.x, 0.01f, 0.01f, 10.0f)) changed = true;
+
+            // ── アンカーポイント (回転の旋回中心) ──────────────────
+            if (ImGui::Checkbox("アンカー使用", &obj->useAnchorPoint)) changed = true;
+            if (obj->useAnchorPoint) {
+                if (ImGui::DragFloat3("アンカー位置 (ローカル)", &obj->anchorPoint.x, 0.05f)) changed = true;
+                ImGui::TextDisabled("ヒンジ扉なら端の位置を入れる (例: (0.5, 0, 0))");
+            }
 
             if (changed) objectManager_->UpdateObjectTransform(*obj);
 

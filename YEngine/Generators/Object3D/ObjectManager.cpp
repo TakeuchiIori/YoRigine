@@ -314,6 +314,8 @@ void ObjectManager::UpdateObjectTransform(PlacedObject& obj) {
 	obj.worldTransform->translate_ = obj.position;
 	obj.worldTransform->rotate_ = obj.rotation;
 	obj.worldTransform->scale_ = obj.scale;
+	obj.worldTransform->useAnchorPoint_ = obj.useAnchorPoint;
+	obj.worldTransform->anchorPoint_    = obj.anchorPoint;
 
 	obj.worldTransform->UpdateMatrix();
 

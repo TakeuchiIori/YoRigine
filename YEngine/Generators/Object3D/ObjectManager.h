@@ -51,6 +51,11 @@ public:
 		Vector3 rotation = { 0.0f, 0.0f, 0.0f };
 		Vector3 scale = { 1.0f, 1.0f, 1.0f };
 
+		// 回転の旋回中心 (ローカル空間)。useAnchorPoint=true の時のみ WT に書き込まれる。
+		// ヒンジ式の扉などで端を pivot にしたい時に使う。
+		bool useAnchorPoint = false;
+		Vector3 anchorPoint = { 0.0f, 0.0f, 0.0f };
+
 		// マテリアル色 (rgba)。エディタから編集 / JSON 保存対象
 		Vector4 color = { 1.0f, 1.0f, 1.0f, 1.0f };
 

@@ -98,7 +98,10 @@ Vector3 WorldTransform::ScaleRotateToAnchor(const Vector3& point, const Vector3&
 {
 	Matrix4x4 scaleM = MakeScaleMatrix(scale);
 	Matrix4x4 rotateM = MakeRotateMatrixXYZ(rotation);
-	Matrix4x4 transform = rotateM * scaleM;
+	// matWorld_ は scaleM * rotM * translate の順で頂点に作用するので、
+	// オフセット計算もスケール → 回転の順に合わせる。逆順だと非ユニフォーム
+	// スケール時にアンカーが回転で動いてしまう。
+	Matrix4x4 transform = scaleM * rotateM;
 
 	return Transform(point, transform);
 }
@@ -110,6 +113,7 @@ Vector3 WorldTransform::ScaleRotateToAnchor(const Vector3& point, const Vector3&
 {
 	Matrix4x4 scaleM = MakeScaleMatrix(scale);
 	Matrix4x4 rotateM = MakeRotateMatrix(quaternion_);
-	Matrix4x4 transform = rotateM * scaleM;
+	// オイラー版と同じ理由でスケール → 回転の順
+	Matrix4x4 transform = scaleM * rotateM;
 	return Transform(point, transform);
 }

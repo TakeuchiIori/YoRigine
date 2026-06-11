@@ -31,6 +31,9 @@ public:
 	// Action を後から差し込む。OnAttach が呼ばれる。
 	void SetAction(std::unique_ptr<TriggerAction> action);
 
+	// 内部 Action への弱参照アクセサ (シリアライズ・エディタ編集用)。所有権は EventTrigger 側。
+	TriggerAction* GetAction() const { return action_.get(); }
+
 	// シーン上で識別するための名前 (デバッグ・参照用)。コライダー有効化等とは無関係。
 	void SetName(const std::string& name) { name_ = name; }
 	const std::string& GetName() const { return name_; }

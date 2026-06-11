@@ -20,7 +20,7 @@ namespace YoRigine {
         if (!objectManager_) return false;
         try {
             json j;
-            j["version"] = 9;
+            j["version"] = 11;
             j["objects"] = json::array();
 
             for (const auto* obj : objectManager_->GetAllActiveObjects()) {
@@ -30,9 +30,12 @@ namespace YoRigine {
                     {"id",                  obj->id},
                     {"filePath",            obj->modelPath},
                     {"modelName",           obj->modelName},
+                    {"nameTag",             obj->nameTag},
                     {"position",            {obj->position.x, obj->position.y, obj->position.z}},
                     {"rotate",              {obj->rotation.x, obj->rotation.y, obj->rotation.z}},
                     {"scale",               {obj->scale.x,    obj->scale.y,    obj->scale.z}},
+                    {"useAnchorPoint",      obj->useAnchorPoint},
+                    {"anchorPoint",         {obj->anchorPoint.x, obj->anchorPoint.y, obj->anchorPoint.z}},
                     {"color",               {obj->color.x,    obj->color.y,    obj->color.z,    obj->color.w}},
                     {"uvScale",             {obj->uvScale.x,  obj->uvScale.y}},
                     {"uvStochastic",        obj->uvStochastic},
@@ -73,7 +76,7 @@ namespace YoRigine {
             json j;
             file >> j;
             const int version = j.value("version", 1);
-            if (version < 1 || version > 9) return false;
+            if (version < 1 || version > 11) return false;
 
             objectManager_->ClearAllObjects();
 
@@ -129,6 +132,23 @@ namespace YoRigine {
                     obj->uvStochastic = o["uvStochastic"].get<float>();
                 }
                 objectManager_->ApplyObjectUV(*obj);
+
+                // version 10+: シーン内一意名 (TriggerAction のターゲット参照用)
+                if (version >= 10 && o.contains("nameTag")) {
+                    obj->nameTag = o["nameTag"].get<std::string>();
+                }
+
+                // version 11+: アンカーポイント (回転の旋回中心)
+                if (version >= 11) {
+                    obj->useAnchorPoint = o.value("useAnchorPoint", false);
+                    if (o.contains("anchorPoint")) {
+                        obj->anchorPoint = {
+                            o["anchorPoint"][0].get<float>(),
+                            o["anchorPoint"][1].get<float>(),
+                            o["anchorPoint"][2].get<float>()
+                        };
+                    }
+                }
 
                 if (version >= 5) {
                     // version 5+: per-object コライダー設定を直接読む
@@ -203,7 +223,7 @@ namespace YoRigine {
     {
         try {
             json j;
-            j["version"] = 9;
+            j["version"] = 11;
             j["objects"] = json::array();
 
             for (const auto* obj : objects) {
@@ -213,9 +233,12 @@ namespace YoRigine {
                     {"id",                  obj->id},
                     {"filePath",            obj->modelPath},
                     {"modelName",           obj->modelName},
+                    {"nameTag",             obj->nameTag},
                     {"position",            {obj->position.x, obj->position.y, obj->position.z}},
                     {"rotate",              {obj->rotation.x, obj->rotation.y, obj->rotation.z}},
                     {"scale",               {obj->scale.x,    obj->scale.y,    obj->scale.z}},
+                    {"useAnchorPoint",      obj->useAnchorPoint},
+                    {"anchorPoint",         {obj->anchorPoint.x, obj->anchorPoint.y, obj->anchorPoint.z}},
                     {"color",               {obj->color.x,    obj->color.y,    obj->color.z,    obj->color.w}},
                     {"uvScale",             {obj->uvScale.x,  obj->uvScale.y}},
                     {"uvStochastic",        obj->uvStochastic},
@@ -319,6 +342,23 @@ namespace YoRigine {
                     obj->uvStochastic = o["uvStochastic"].get<float>();
                 }
                 objectManager_->ApplyObjectUV(*obj);
+
+                // version 10+: シーン内一意名
+                if (version >= 10 && o.contains("nameTag")) {
+                    obj->nameTag = o["nameTag"].get<std::string>();
+                }
+
+                // version 11+: アンカーポイント (回転の旋回中心)
+                if (version >= 11) {
+                    obj->useAnchorPoint = o.value("useAnchorPoint", false);
+                    if (o.contains("anchorPoint")) {
+                        obj->anchorPoint = {
+                            o["anchorPoint"][0].get<float>(),
+                            o["anchorPoint"][1].get<float>(),
+                            o["anchorPoint"][2].get<float>()
+                        };
+                    }
+                }
 
                 if (version >= 5) {
                     obj->colliderTypeId = static_cast<CollisionTypeIdDef>(o.value("colliderTypeId", 0u));

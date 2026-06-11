@@ -6,6 +6,10 @@
 
 void EventTrigger::Initialize(Camera* camera) {
 	camera_ = camera;
+	// WorldTransform は D3D12 マップポインタ (transformData_) を内部で持つため、
+	// 必ず Initialize を通さないと UpdateMatrix で nullptr deref する。
+	wt_.Initialize();
+	wt_.UpdateMatrix();
 	InitCollision();
 	InitJson();
 }
@@ -15,8 +19,11 @@ void EventTrigger::InitCollision() {
 		this, &wt_, camera_,
 		static_cast<uint32_t>(CollisionTypeIdDef::kEventTrigger)
 	);
-	// トリガーは通り抜け扱い
-	obbCollider_->SetEnablePenetration(true);
+	if (!obbCollider_) return; // プール枯渇等で null の場合は無効状態のまま続行
+
+	// トリガーはプレイヤー/敵を物理的に押し戻さない (penetration 解決から除外する)
+	// CollisionManager::ResolvePenetration では片側でも false なら resolve をスキップする。
+	obbCollider_->SetEnablePenetration(false);
 }
 
 void EventTrigger::Update() {

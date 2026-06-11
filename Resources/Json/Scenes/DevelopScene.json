@@ -1,6 +1,11 @@
 {
     "objects": [
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.0,
@@ -46,6 +51,7 @@
             "id": 0,
             "isAnimation": false,
             "modelName": "Blacksmith.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -63,6 +69,7 @@
                 4.0,
                 3.999993324279785
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -70,6 +77,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.0,
@@ -115,6 +127,7 @@
             "id": 1,
             "isAnimation": false,
             "modelName": "Bell_Tower.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -132,6 +145,7 @@
                 4.0,
                 4.0
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -139,6 +153,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.1255600452423096,
@@ -184,6 +203,7 @@
             "id": 2,
             "isAnimation": false,
             "modelName": "House_1.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -201,6 +221,7 @@
                 4.0,
                 4.0
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -208,6 +229,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 0.800000011920929,
@@ -253,6 +279,7 @@
             "id": 3,
             "isAnimation": false,
             "modelName": "Bell_Tower.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -270,6 +297,7 @@
                 4.0,
                 4.0
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -277,6 +305,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.0,
@@ -322,6 +355,7 @@
             "id": 4,
             "isAnimation": false,
             "modelName": "Floor_UnevenBrick.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": false,
             "position": [
@@ -339,6 +373,7 @@
                 1.0,
                 500.0
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 500.0,
                 500.0
@@ -346,6 +381,11 @@
             "uvStochastic": 1.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.7339999675750732,
@@ -391,6 +431,7 @@
             "id": 5,
             "isAnimation": false,
             "modelName": "MapleTree_1.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -408,6 +449,7 @@
                 1.5,
                 1.5
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -415,6 +457,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 0.800000011920929,
@@ -460,6 +507,7 @@
             "id": 6,
             "isAnimation": false,
             "modelName": "Bell_Tower.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -477,6 +525,7 @@
                 4.0,
                 4.0
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -484,6 +533,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.7339999675750732,
@@ -529,6 +583,7 @@
             "id": 7,
             "isAnimation": false,
             "modelName": "MapleTree_1.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -546,6 +601,7 @@
                 1.5,
                 1.5
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -553,6 +609,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.0,
@@ -598,6 +659,7 @@
             "id": 8,
             "isAnimation": false,
             "modelName": "Blacksmith.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -615,6 +677,7 @@
                 4.0,
                 3.999993324279785
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -622,6 +685,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.0,
@@ -667,6 +735,7 @@
             "id": 9,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -684,6 +753,7 @@
                 1.5,
                 1.5
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -691,6 +761,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.7339999675750732,
@@ -736,6 +811,7 @@
             "id": 10,
             "isAnimation": false,
             "modelName": "MapleTree_1.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -753,6 +829,7 @@
                 1.5,
                 1.5
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -760,6 +837,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.7339999675750732,
@@ -805,6 +887,7 @@
             "id": 11,
             "isAnimation": false,
             "modelName": "MapleTree_1.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -822,6 +905,7 @@
                 1.5,
                 1.5
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -829,6 +913,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 3.7844903469085693,
@@ -874,6 +963,7 @@
             "id": 12,
             "isAnimation": false,
             "modelName": "MapleTree_1.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -891,6 +981,7 @@
                 1.5,
                 1.5
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -898,6 +989,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 3.7844903469085693,
@@ -943,6 +1039,7 @@
             "id": 13,
             "isAnimation": false,
             "modelName": "MapleTree_1.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -960,6 +1057,7 @@
                 1.5,
                 1.5
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -967,6 +1065,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.0,
@@ -1012,6 +1115,7 @@
             "id": 14,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -1029,6 +1133,7 @@
                 1.5,
                 1.5
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -1036,6 +1141,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.0,
@@ -1081,6 +1191,7 @@
             "id": 15,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -1098,6 +1209,7 @@
                 1.5,
                 1.5
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -1105,6 +1217,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.0,
@@ -1150,6 +1267,7 @@
             "id": 16,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -1167,6 +1285,7 @@
                 1.5,
                 1.5
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -1174,6 +1293,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.0,
@@ -1219,6 +1343,7 @@
             "id": 17,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -1236,6 +1361,7 @@
                 1.5,
                 1.5
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -1243,6 +1369,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.0,
@@ -1288,6 +1419,7 @@
             "id": 18,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -1305,6 +1437,7 @@
                 1.5,
                 1.5
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -1312,6 +1445,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.0,
@@ -1357,6 +1495,7 @@
             "id": 19,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -1374,6 +1513,7 @@
                 2.049999952316284,
                 1.649999976158142
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -1381,6 +1521,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.0,
@@ -1426,6 +1571,7 @@
             "id": 20,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -1443,6 +1589,7 @@
                 2.049999952316284,
                 1.649999976158142
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -1450,6 +1597,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                -1.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.0,
@@ -1484,7 +1636,7 @@
                 0.0
             ],
             "colliderSphRadius": 1.0,
-            "colliderTypeId": 12,
+            "colliderTypeId": 8,
             "color": [
                 1.0,
                 1.0,
@@ -1495,16 +1647,17 @@
             "id": 21,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
+            "nameTag": "TestGate1",
             "parentID": -1,
             "pickable": true,
             "position": [
-                9.962141036987305,
+                11.003999710083008,
                 0.0,
-                -60.42017364501953
+                -57.41999816894531
             ],
             "rotate": [
                 -3.1415908336639404,
-                1.5707954168319702,
+                1.5707963705062866,
                 -3.1415908336639404
             ],
             "scale": [
@@ -1512,6 +1665,7 @@
                 2.049999952316284,
                 1.649999976158142
             ],
+            "useAnchorPoint": true,
             "uvScale": [
                 1.0,
                 1.0
@@ -1519,6 +1673,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.0,
@@ -1564,6 +1723,7 @@
             "id": 22,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -1581,6 +1741,7 @@
                 2.049999952316284,
                 1.649999976158142
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -1588,6 +1749,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.0,
@@ -1633,6 +1799,7 @@
             "id": 23,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -1650,6 +1817,7 @@
                 2.049999952316284,
                 1.649999976158142
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -1657,6 +1825,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.0,
@@ -1702,6 +1875,7 @@
             "id": 24,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -1719,6 +1893,7 @@
                 2.049999952316284,
                 1.649999976158142
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -1726,6 +1901,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.0,
@@ -1771,6 +1951,7 @@
             "id": 25,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -1788,6 +1969,7 @@
                 2.049999952316284,
                 1.649999976158142
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -1795,6 +1977,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.0,
@@ -1840,6 +2027,7 @@
             "id": 26,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -1857,6 +2045,7 @@
                 1.5,
                 1.5
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -1864,6 +2053,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.0,
@@ -1909,6 +2103,7 @@
             "id": 27,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -1926,6 +2121,7 @@
                 1.5,
                 1.5
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -1933,6 +2129,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.0,
@@ -1978,6 +2179,7 @@
             "id": 28,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -1995,6 +2197,7 @@
                 1.5,
                 1.5
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -2002,6 +2205,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.0,
@@ -2047,6 +2255,7 @@
             "id": 29,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -2064,6 +2273,7 @@
                 1.5,
                 1.5
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -2071,6 +2281,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.0,
@@ -2116,6 +2331,7 @@
             "id": 30,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -2133,6 +2349,7 @@
                 1.5,
                 1.5
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -2140,6 +2357,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.0,
@@ -2185,6 +2407,7 @@
             "id": 31,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -2202,6 +2425,7 @@
                 2.049999952316284,
                 1.649999976158142
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -2209,6 +2433,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.0,
@@ -2254,6 +2483,7 @@
             "id": 32,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -2271,6 +2501,7 @@
                 2.049999952316284,
                 1.649999976158142
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -2278,6 +2509,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                1.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.0,
@@ -2312,7 +2548,7 @@
                 0.0
             ],
             "colliderSphRadius": 1.0,
-            "colliderTypeId": 12,
+            "colliderTypeId": 8,
             "color": [
                 1.0,
                 1.0,
@@ -2323,16 +2559,17 @@
             "id": 33,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
+            "nameTag": "TestGate2",
             "parentID": -1,
             "pickable": true,
             "position": [
-                9.93663215637207,
+                8.937000274658203,
                 0.0,
-                -66.2348403930664
+                -69.53500366210938
             ],
             "rotate": [
                 -3.1415908336639404,
-                1.5707954168319702,
+                1.5707963705062866,
                 -3.1415908336639404
             ],
             "scale": [
@@ -2340,6 +2577,7 @@
                 2.049999952316284,
                 1.649999976158142
             ],
+            "useAnchorPoint": true,
             "uvScale": [
                 1.0,
                 1.0
@@ -2347,6 +2585,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.0,
@@ -2392,6 +2635,7 @@
             "id": 34,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -2409,6 +2653,7 @@
                 2.049999952316284,
                 1.649999976158142
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -2416,6 +2661,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.0,
@@ -2461,6 +2711,7 @@
             "id": 35,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -2478,6 +2729,7 @@
                 1.5,
                 1.5
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -2485,6 +2737,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.0,
@@ -2530,6 +2787,7 @@
             "id": 36,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -2547,6 +2805,7 @@
                 1.5,
                 1.5
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -2554,6 +2813,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.0,
@@ -2599,6 +2863,7 @@
             "id": 37,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -2616,6 +2881,7 @@
                 1.5,
                 1.5
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -2623,6 +2889,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.0255683660507202,
@@ -2668,6 +2939,7 @@
             "id": 38,
             "isAnimation": false,
             "modelName": "House_3.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -2685,6 +2957,7 @@
                 7.380000114440918,
                 5.300000190734863
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -2692,6 +2965,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.0255683660507202,
@@ -2737,6 +3015,7 @@
             "id": 39,
             "isAnimation": false,
             "modelName": "House_3.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -2754,6 +3033,7 @@
                 7.380000114440918,
                 5.300000190734863
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -2761,6 +3041,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.7339999675750732,
@@ -2806,6 +3091,7 @@
             "id": 40,
             "isAnimation": false,
             "modelName": "MapleTree_1.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -2823,6 +3109,7 @@
                 1.5,
                 1.5
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -2830,6 +3117,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.7339999675750732,
@@ -2875,6 +3167,7 @@
             "id": 41,
             "isAnimation": false,
             "modelName": "MapleTree_1.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -2892,6 +3185,7 @@
                 1.5,
                 1.5
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -2899,6 +3193,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.0,
@@ -2944,6 +3243,7 @@
             "id": 42,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -2961,6 +3261,7 @@
                 2.049999952316284,
                 1.649999976158142
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -2968,6 +3269,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.0,
@@ -3013,6 +3319,7 @@
             "id": 43,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -3030,6 +3337,7 @@
                 2.049999952316284,
                 1.649999976158142
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -3037,6 +3345,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.0,
@@ -3082,6 +3395,7 @@
             "id": 44,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -3099,6 +3413,7 @@
                 2.049999952316284,
                 1.649999976158142
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -3106,6 +3421,11 @@
             "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.0,
@@ -3151,6 +3471,7 @@
             "id": 45,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
+            "nameTag": "",
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -3168,6 +3489,7 @@
                 2.049999952316284,
                 1.649999976158142
             ],
+            "useAnchorPoint": false,
             "uvScale": [
                 1.0,
                 1.0
@@ -3175,5 +3497,5 @@
             "uvStochastic": 0.0
         }
     ],
-    "version": 9
+    "version": 11
 }

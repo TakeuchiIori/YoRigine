@@ -15,13 +15,13 @@
             "spawnOnLoad": true
         },
         {
-            "enemyId": "Alien",
-            "id": "Spawn_3",
+            "enemyId": "Mushnub_Evolved",
+            "id": "m_01",
             "isActive": true,
             "position": {
-                "x": 3.2370498180389404,
+                "x": 0.666813850402832,
                 "y": 0.0,
-                "z": -90.8657455444336
+                "z": -77.45240783691406
             },
             "respawnAfterBattle": true,
             "respawnDelay": 30.0,
@@ -29,13 +29,13 @@
             "spawnOnLoad": true
         },
         {
-            "enemyId": "Mushnub_Evolved",
-            "id": "m_01",
+            "enemyId": "Alien",
+            "id": "Spawn_3",
             "isActive": true,
             "position": {
-                "x": 0.666813850402832,
+                "x": 1.2313265800476074,
                 "y": 0.0,
-                "z": -76.29816436767578
+                "z": -90.8657455444336
             },
             "respawnAfterBattle": true,
             "respawnDelay": 30.0,
