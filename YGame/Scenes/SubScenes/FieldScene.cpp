@@ -456,6 +456,17 @@ void FieldScene::HandleDetailedEncounter(const EncountInfo& encounterInfo) {
 	transitionData.playerHitDamage = encounterInfo.encounteredEnemy->GetTakeDamage();
 	SaveCameraState(transitionData);
 
+	// エンカウント位置を自前で保存しておく。BattleScene を経由する FieldReturnData
+	// と二重化することで、復帰経路のどこかでデータが落ちても戻れるようにする。
+	savedEncounterPos_    = transitionData.playerPosition;
+	hasSavedEncounterPos_ = true;
+	{
+		char dbg[160];
+		sprintf_s(dbg, "[FieldScene] エンカウント位置を保存: (%.2f, %.2f, %.2f)\n",
+			savedEncounterPos_.x, savedEncounterPos_.y, savedEncounterPos_.z);
+		Logger(dbg);
+	}
+
 	// これが最後の敵かどうかをチェック
 	bool isFinalBattle = false;
 	size_t remainingGroups = 0;
@@ -532,8 +543,20 @@ void FieldScene::HandleBattleReturn(const FieldReturnData& data) {
 	// 念のためここでもエンカウントリセット関数を呼ぶ
 	fieldEnemyManager_->ResetEnCount();
 
-	// 勝敗に関わらずエンカウント位置 (バトル開始時のプレイヤー座標) に戻す。
-	Vector3 returnPos = data.playerPosition;
+	// エンカウント位置の復元は自前 (savedEncounterPos_) を優先する。
+	// 経由データ (data.playerPosition) はパイプライン上で上書きされたり消えたりする
+	// 余地があるため、信頼できる側を採用する。両方無ければ data.playerPosition fallback。
+	Vector3 returnPos = hasSavedEncounterPos_ ? savedEncounterPos_ : data.playerPosition;
+
+	{
+		char dbg[256];
+		sprintf_s(dbg,
+			"[FieldScene] 復帰位置: (%.2f, %.2f, %.2f)  [saved=%s, win=%s]\n",
+			returnPos.x, returnPos.y, returnPos.z,
+			hasSavedEncounterPos_ ? "yes" : "no",
+			data.playerWon ? "yes" : "no");
+		Logger(dbg);
+	}
 
 	if (data.playerWon) {
 		char buffer[256];
@@ -545,6 +568,9 @@ void FieldScene::HandleBattleReturn(const FieldReturnData& data) {
 	}
 
 	player_->SetPosition(returnPos);
+
+	// 使い終わったらクリア (次のエンカウントで上書きされる前の保険)
+	hasSavedEncounterPos_ = false;
 
 	if (data.expGained > 0 || data.goldGained > 0) {
 		char buffer[256];

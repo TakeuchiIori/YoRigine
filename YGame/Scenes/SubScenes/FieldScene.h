@@ -129,6 +129,12 @@ private:
 	NavPathfinder navPathfinder_;
 	bool showNavGridDebug_ = false; // NavGridデバッグ描画ON/OFF
 
+	// エンカウント時に保存するプレイヤー座標。バトル復帰時に SetPosition で復元する。
+	// データパイプライン (BattleTransitionData → FieldReturnData) と二重化することで、
+	// 中継経路でデータが落ちても確実にエンカウント位置に戻れるようにする。
+	Vector3 savedEncounterPos_ = { 0.0f, 0.0f, 0.0f };
+	bool    hasSavedEncounterPos_ = false;
+
 	// プレイヤー初期スポーン (フィールドに最初に降り立つ位置 / 向き)。JSON 保存対象。
 	// バトル復帰時の位置 (HandleBattleReturn) とは別物。
 	Vector3 spawnPos_ = { 0.0f, 0.0f, 0.0f };
