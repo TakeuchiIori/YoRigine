@@ -570,7 +570,18 @@ void FieldScene::HandleBattleReturn(const FieldReturnData& data) {
 		Logger("[FieldScene] Defeat!\n");
 	}
 
-	player_->SetPosition(returnPos);
+	// 復帰位置が原点近傍かつ savedEncounterPos_ も無い場合、データパイプラインが
+	// 壊れている可能性が高い。プレイヤーが意図せず (0,0,0) にワープしないよう、
+	// SetPosition をスキップして現在位置を維持する (= バトル直前のフィールド位置)。
+	constexpr float kOriginEps = 1e-3f;
+	const bool isOriginish =
+		returnPos.x > -kOriginEps && returnPos.x < kOriginEps &&
+		returnPos.z > -kOriginEps && returnPos.z < kOriginEps;
+	if (isOriginish && !hasSavedEncounterPos_) {
+		Logger("[FieldScene] WARN: 復帰位置が原点 & savedEncounterPos_ 無効 - SetPosition skip\n");
+	} else {
+		player_->SetPosition(returnPos);
+	}
 
 	// 使い終わったらクリア (次のエンカウントで上書きされる前の保険)
 	hasSavedEncounterPos_ = false;
