@@ -255,11 +255,17 @@ void BattleScene::DrawLine() {
 /// </summary>
 void BattleScene::DrawUI() {
 	//sprite_->Draw();
+
+	// 演出中（クリアカットシーン等）はゲームプレイ用UIを一切描画しない
+	if (YoRigine::CinematicManager::GetInstance()->IsActive()) return;
+
 	if (battleEnemyManager_) {
 		battleEnemyManager_->DrawUI();
 		DamageNumberManager::GetInstance()->Draw();
-		
-		if (player_->IsAlive()) {
+
+		// ポーズ中はロックオンUIだけ隠す
+		// （ポーズUIは GameUI 側でこの後に描画されるため、ここで出すと前面に被ってしまう）
+		if (player_->IsAlive() && !YoRigine::GameTime::IsPause()) {
 			lockOnUI_->Draw();
 		}
 	}
