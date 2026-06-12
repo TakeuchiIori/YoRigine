@@ -371,16 +371,19 @@ void FieldScene::OnEnter() {
 	// (LoadScene 内で ObjectManager をクリアするため NavGrid も貼り直す)
 	YoRigine::ModelManipulator::GetInstance()->LoadScene("Field");
 
-	// EventTrigger を再ロード。LoadScene で PlacedObject が作り直されるため、
-	// 古い Action がキャッシュした ID が無効化される。ここで状態ごと作り直す。
-	eventTriggers_.clear();
-	openGateActions_.clear();
-	EventTriggerLoader::Load(
-		EventTriggerPaths::Field,
-		sceneCamera_,
-		[this]() { RebakeNavGrid(); },
-		eventTriggers_,
-		openGateActions_);
+	// EventTrigger は初回入場時のみロードする。
+	// バトル復帰時の再入場でも作り直すと OpenGateAction の currentCount_ が 0 に戻り、
+	// 倒すたびにカウントがリセットされてトリガーが永遠に発火しない。
+	// PlacedObject が LoadScene で作り直されても、cachedTargetId_ は BeginOpening 時に
+	// targetName_ から取り直すので問題ない。
+	if (eventTriggers_.empty()) {
+		EventTriggerLoader::Load(
+			EventTriggerPaths::Field,
+			sceneCamera_,
+			[this]() { RebakeNavGrid(); },
+			eventTriggers_,
+			openGateActions_);
+	}
 
 	RebakeNavGrid();
 
