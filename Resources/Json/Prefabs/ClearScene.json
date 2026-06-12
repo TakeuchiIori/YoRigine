@@ -1,6 +1,11 @@
 {
     "objects": [
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.0,
@@ -36,28 +41,47 @@
             ],
             "colliderSphRadius": 1.0,
             "colliderTypeId": 0,
-            "filePath": "House_1\\House_1.obj",
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Blacksmith\\Blacksmith.obj",
             "id": 0,
             "isAnimation": false,
-            "modelName": "House_1.obj",
+            "modelName": "Blacksmith.obj",
+            "nameTag": "",
             "parentID": -1,
+            "pickable": true,
             "position": [
-                -1.6030000448226929,
+                -14.308460235595703,
                 0.0,
-                42.20000076293945
+                28.601999282836914
             ],
             "rotate": [
-                0.0,
-                -4.43311882019043,
-                0.0
+                3.1415839195251465,
+                -0.039278194308280945,
+                3.1415884494781494
             ],
             "scale": [
-                4.0,
-                4.0,
-                4.0
-            ]
+                5.304999828338623,
+                4.077547073364258,
+                3.382692575454712
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.0,
@@ -93,28 +117,47 @@
             ],
             "colliderSphRadius": 1.0,
             "colliderTypeId": 0,
-            "filePath": "House_2\\House_2.obj",
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "House_1\\House_1.obj",
             "id": 1,
             "isAnimation": false,
-            "modelName": "House_2.obj",
+            "modelName": "House_1.obj",
+            "nameTag": "",
             "parentID": -1,
+            "pickable": true,
             "position": [
-                24.200000762939453,
+                5.5339436531066895,
                 0.0,
-                35.19300079345703
+                28.601999282836914
             ],
             "rotate": [
-                -3.1415908336639404,
-                1.2740896940231323,
-                -3.1415908336639404
+                -3.1415770053863525,
+                -0.0,
+                -3.1415793895721436
             ],
             "scale": [
-                3.999999761581421,
-                4.0,
-                3.999999761581421
-            ]
+                3.5798823833465576,
+                3.3078629970550537,
+                3.61610746383667
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.0,
@@ -150,313 +193,47 @@
             ],
             "colliderSphRadius": 1.0,
             "colliderTypeId": 0,
-            "filePath": "Bell_Tower\\Bell_Tower.obj",
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "House_2\\House_2.obj",
             "id": 2,
             "isAnimation": false,
-            "modelName": "Bell_Tower.obj",
-            "parentID": -1,
-            "position": [
-                13.300000190734863,
-                0.0,
-                51.29999923706055
-            ],
-            "rotate": [
-                0.0,
-                0.2617993950843811,
-                0.0
-            ],
-            "scale": [
-                4.0,
-                4.0,
-                4.0
-            ]
-        },
-        {
-            "animationName": "",
-            "colliderAabbMax": [
-                1.0,
-                1.0,
-                1.0
-            ],
-            "colliderAabbMin": [
-                -1.0,
-                -1.0,
-                -1.0
-            ],
-            "colliderEnabled": false,
-            "colliderObbCenter": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "colliderObbEuler": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "colliderObbSize": [
-                1.0,
-                1.0,
-                1.0
-            ],
-            "colliderShapeType": 0,
-            "colliderSphCenter": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "colliderSphRadius": 1.0,
-            "colliderTypeId": 0,
-            "filePath": "Blacksmith\\Blacksmith.obj",
-            "id": 3,
-            "isAnimation": false,
-            "modelName": "Blacksmith.obj",
-            "parentID": -1,
-            "position": [
-                7.0,
-                0.0,
-                -43.20000076293945
-            ],
-            "rotate": [
-                0.0,
-                -2.879793167114258,
-                0.0
-            ],
-            "scale": [
-                4.0,
-                4.0,
-                4.0
-            ]
-        },
-        {
-            "animationName": "",
-            "colliderAabbMax": [
-                1.0,
-                1.0,
-                1.0
-            ],
-            "colliderAabbMin": [
-                -1.0,
-                -1.0,
-                -1.0
-            ],
-            "colliderEnabled": false,
-            "colliderObbCenter": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "colliderObbEuler": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "colliderObbSize": [
-                1.0,
-                1.0,
-                1.0
-            ],
-            "colliderShapeType": 0,
-            "colliderSphCenter": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "colliderSphRadius": 1.0,
-            "colliderTypeId": 0,
-            "filePath": "Blacksmith\\Blacksmith.obj",
-            "id": 4,
-            "isAnimation": false,
-            "modelName": "Blacksmith.obj",
-            "parentID": -1,
-            "position": [
-                -26.299999237060547,
-                0.0,
-                -35.20000076293945
-            ],
-            "rotate": [
-                0.0,
-                0.22689279913902283,
-                0.0
-            ],
-            "scale": [
-                4.0,
-                4.0,
-                4.0
-            ]
-        },
-        {
-            "animationName": "",
-            "colliderAabbMax": [
-                1.0,
-                1.0,
-                1.0
-            ],
-            "colliderAabbMin": [
-                -1.0,
-                -1.0,
-                -1.0
-            ],
-            "colliderEnabled": false,
-            "colliderObbCenter": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "colliderObbEuler": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "colliderObbSize": [
-                1.0,
-                1.0,
-                1.0
-            ],
-            "colliderShapeType": 0,
-            "colliderSphCenter": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "colliderSphRadius": 1.0,
-            "colliderTypeId": 0,
-            "filePath": "Blacksmith\\Blacksmith.obj",
-            "id": 5,
-            "isAnimation": false,
-            "modelName": "Blacksmith.obj",
-            "parentID": -1,
-            "position": [
-                72.48100280761719,
-                0.0,
-                -2.194999933242798
-            ],
-            "rotate": [
-                0.0,
-                -0.3708823621273041,
-                0.0
-            ],
-            "scale": [
-                4.0,
-                4.0,
-                4.0
-            ]
-        },
-        {
-            "animationName": "",
-            "colliderAabbMax": [
-                1.0,
-                1.0,
-                1.0
-            ],
-            "colliderAabbMin": [
-                -1.0,
-                -1.0,
-                -1.0
-            ],
-            "colliderEnabled": false,
-            "colliderObbCenter": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "colliderObbEuler": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "colliderObbSize": [
-                1.0,
-                1.0,
-                1.0
-            ],
-            "colliderShapeType": 0,
-            "colliderSphCenter": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "colliderSphRadius": 1.0,
-            "colliderTypeId": 0,
-            "filePath": "House_1\\House_1.obj",
-            "id": 6,
-            "isAnimation": false,
-            "modelName": "House_1.obj",
-            "parentID": -1,
-            "position": [
-                61.28099822998047,
-                0.0,
-                -30.238000869750977
-            ],
-            "rotate": [
-                0.0,
-                -3.5010082721710205,
-                0.0
-            ],
-            "scale": [
-                4.0,
-                4.0,
-                4.0
-            ]
-        },
-        {
-            "animationName": "",
-            "colliderAabbMax": [
-                1.0,
-                1.0,
-                1.0
-            ],
-            "colliderAabbMin": [
-                -1.0,
-                -1.0,
-                -1.0
-            ],
-            "colliderEnabled": false,
-            "colliderObbCenter": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "colliderObbEuler": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "colliderObbSize": [
-                1.0,
-                1.0,
-                1.0
-            ],
-            "colliderShapeType": 0,
-            "colliderSphCenter": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "colliderSphRadius": 1.0,
-            "colliderTypeId": 0,
-            "filePath": "House_2\\House_2.obj",
-            "id": 7,
-            "isAnimation": false,
             "modelName": "House_2.obj",
+            "nameTag": "",
             "parentID": -1,
+            "pickable": true,
             "position": [
-                -39.8380012512207,
+                17.526750564575195,
                 0.0,
                 28.602386474609375
             ],
             "rotate": [
-                0.0,
-                0.24209460616111755,
-                0.0
+                0.0346091128885746,
+                -0.0,
+                -1.390955617353029e-06
             ],
             "scale": [
-                4.0,
-                4.0,
-                4.0
-            ]
+                4.849099636077881,
+                4.6269941329956055,
+                4.782597541809082
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
         },
         {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
             "animationName": "",
             "colliderAabbMax": [
                 1.0,
@@ -492,27 +269,345 @@
             ],
             "colliderSphRadius": 1.0,
             "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
             "filePath": "Bell_Tower\\Bell_Tower.obj",
-            "id": 8,
+            "id": 3,
             "isAnimation": false,
             "modelName": "Bell_Tower.obj",
+            "nameTag": "",
             "parentID": -1,
+            "pickable": true,
             "position": [
-                -47.9119987487793,
+                -3.066999912261963,
                 0.0,
-                -6.419000148773193
+                28.601999282836914
+            ],
+            "rotate": [
+                3.1415927410125732,
+                -8.74227694680485e-08,
+                3.1415927410125732
+            ],
+            "scale": [
+                3.6579999923706055,
+                4.562047004699707,
+                4.464000225067139
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Floor_Brick\\Floor_Brick.obj",
+            "id": 4,
+            "isAnimation": false,
+            "modelName": "Floor_Brick.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": false,
+            "position": [
+                0.0,
+                0.0,
+                0.0
             ],
             "rotate": [
                 0.0,
-                -1.326450228691101,
+                0.0,
                 0.0
             ],
             "scale": [
-                4.0,
-                4.0,
-                4.0
-            ]
+                500.0,
+                1.0,
+                500.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                500.0,
+                500.0
+            ],
+            "uvStochastic": 1.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Rock_5\\Rock_5.obj",
+            "id": 6,
+            "isAnimation": false,
+            "modelName": "Rock_5.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                10.640079498291016,
+                0.0,
+                42.57212829589844
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                5.0,
+                5.0,
+                5.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Rock_5\\Rock_5.obj",
+            "id": 7,
+            "isAnimation": false,
+            "modelName": "Rock_5.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -5.999123573303223,
+                0.0,
+                42.57212829589844
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                5.0,
+                5.0,
+                5.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Rock_5\\Rock_5.obj",
+            "id": 8,
+            "isAnimation": false,
+            "modelName": "Rock_5.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                0.3304905891418457,
+                0.0,
+                42.57212829589844
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                5.0,
+                5.0,
+                5.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
         }
     ],
-    "version": 6
+    "version": 11
 }
