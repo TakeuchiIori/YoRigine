@@ -118,6 +118,8 @@ namespace YoRigine {
         bool           isInitialized_ = false;
         std::string    jsonPath_;
         std::string    modelFolderPath_ = "Resources/Models/";
+        // 現在ロード中のシーン名 (LoadScene 切替で前シーンを ObjectManager に退避するキーに使う)
+        std::string    currentSceneName_;
         MotionEditor motionEditor_;
 
         // AABB/OBB はインスタンス描画(1 DrawInstanced)。色はインスタンス毎。

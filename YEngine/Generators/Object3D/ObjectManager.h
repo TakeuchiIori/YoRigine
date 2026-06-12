@@ -124,6 +124,18 @@ public:
 	// すべてのオブジェクトをクリア
 	void ClearAllObjects();
 
+	// シーン切替用: 現在の idToObject_ を sceneName 付きで退避する。
+	// PlacedObject は pool に残したまま (Free しない) で map だけ移すので、
+	// 同じ sceneName で TryRestore すれば D3D12 リソース再確保なしに復元できる。
+	// 退避中は各 collider を CollisionManager から外して判定対象から消す。
+	void StashCurrentAs(const std::string& sceneName);
+
+	// 退避していたシーンがあれば復元して true を返す。なければ false。
+	bool TryRestore(const std::string& sceneName);
+
+	// 指定 sceneName の退避があるか
+	bool HasStashedScene(const std::string& sceneName) const;
+
 	// オブジェクトの複製
 	PlacedObject* DuplicateObject(int objectId, const Vector3& positionOffset = { 0,0,0 });
 
@@ -222,6 +234,13 @@ private:
 	// Frustum culling 統計 (直前フレーム)
 	int lastFrameCulledCount_ = 0;
 	int lastFrameTotalCount_ = 0;
+
+	// シーンキャッシュ: シーン切替時に idToObject_ をここに退避する
+	struct StashedScene {
+		std::unordered_map<int, PlacedObject*> objects;
+		int nextObjectId = 0;
+	};
+	std::unordered_map<std::string, StashedScene> stashedScenes_;
 
 	// オブジェクトの初期化ヘルパー
 	void InitializePlacedObject(PlacedObject& obj, const std::string& modelPath,

@@ -542,13 +542,33 @@ namespace YoRigine {
 		}
 #endif
 		jsonPath_ = "Resources/Json/Scenes/" + sceneName + ".json";
-		// 前のシーンのオブジェクトを安全にクリア
+
+		// 同じシーンの再ロード要求は何もしない (退避→復元で空になるのを避ける)
+		if (currentSceneName_ == sceneName) {
+			selector_.ClearSelection();
+			Logger("[ModelManipulator] Scene (already active): " + sceneName);
+			return;
+		}
+
+		// 現在のシーンを ObjectManager に退避 (PlacedObject は pool に残したまま、
+		// collider だけ CollisionManager から外す。D3D12 リソース再確保を回避する)。
+		if (!currentSceneName_.empty()) {
+			objectManager_->StashCurrentAs(currentSceneName_);
+		}
+
+		// 退避していたシーンがあれば、JSON 再パース + CreateObject ループをまるごと省略して復元
+		if (objectManager_->TryRestore(sceneName)) {
+			selector_.ClearSelection();
+			currentSceneName_ = sceneName;
+			Logger("[ModelManipulator] Scene Restored from cache: " + sceneName);
+			return;
+		}
+
+		// 初回ロード: 通常の JSON 読み込み経路
 		objectManager_->ClearAllObjects();
-		// 新しいシーンデータをロード
 		serializer_.LoadScene(jsonPath_);
-		// 選択状態をリセット
 		selector_.ClearSelection();
-		// ログの出力
+		currentSceneName_ = sceneName;
 		Logger("[ModelManipulator] Scene Loaded: " + sceneName);
 	}
 

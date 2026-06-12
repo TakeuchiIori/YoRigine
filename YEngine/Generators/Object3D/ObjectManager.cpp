@@ -76,6 +76,18 @@ void ObjectManager::Update() {
 /// 全オブジェクト削除して終了
 /// </summary>
 void ObjectManager::Finalize() {
+	// 退避中シーンを掃除 (PlacedObject を pool に戻し、collider を Manager から外す)
+	if (!stashedScenes_.empty()) {
+		auto* cm = YoRigine::CollisionManager::GetInstance();
+		for (auto& [name, stashed] : stashedScenes_) {
+			for (auto& [id, obj] : stashed.objects) {
+				if (!obj) continue;
+				if (obj->collider) cm->RemoveCollider(obj->collider.get());
+				objectPool_.Free(obj);
+			}
+		}
+		stashedScenes_.clear();
+	}
 	ClearAllObjects();
 	delete instance_;
 	instance_ = nullptr;
@@ -145,11 +157,69 @@ void ObjectManager::DeleteObjectByPointer(PlacedObject* obj) {
 /// 全オブジェクト削除
 /// </summary>
 void ObjectManager::ClearAllObjects() {
+	// 現在シーン分の PlacedObject だけ pool に戻す。
+	// objectPool_.Clear() を呼ぶと StashCurrentAs 経由で退避中のシーンの PlacedObject も
+	// destruct してしまい、TryRestore したときに dangling になるため使わない。
+	auto* cm = YoRigine::CollisionManager::GetInstance();
+	for (auto& [id, obj] : idToObject_) {
+		if (!obj) continue;
+		if (obj->collider) cm->RemoveCollider(obj->collider.get());
+		objectPool_.Free(obj);
+	}
 	idToObject_.clear();
-	objectPool_.Clear();
 	nextObjectId_ = 0;
 
-	std::cout << "すべてのオブジェクトを削除しました。" << std::endl;
+	std::cout << "現在シーンのオブジェクトを削除しました。" << std::endl;
+}
+
+
+void ObjectManager::StashCurrentAs(const std::string& sceneName) {
+	auto* cm = YoRigine::CollisionManager::GetInstance();
+
+	// 同名の退避が既にある場合は古い方を破棄 (pool に戻す + collider を Manager から外す)。
+	auto existing = stashedScenes_.find(sceneName);
+	if (existing != stashedScenes_.end()) {
+		for (auto& [id, obj] : existing->second.objects) {
+			if (!obj) continue;
+			if (obj->collider) cm->RemoveCollider(obj->collider.get());
+			objectPool_.Free(obj);
+		}
+		stashedScenes_.erase(existing);
+	}
+
+	// 現在のシーンの collider を判定対象から外す
+	for (auto& [id, obj] : idToObject_) {
+		if (obj && obj->collider) cm->RemoveCollider(obj->collider.get());
+	}
+
+	StashedScene s;
+	s.objects = std::move(idToObject_);
+	s.nextObjectId = nextObjectId_;
+	stashedScenes_[sceneName] = std::move(s);
+
+	idToObject_.clear();
+	nextObjectId_ = 0;
+}
+
+
+bool ObjectManager::TryRestore(const std::string& sceneName) {
+	auto it = stashedScenes_.find(sceneName);
+	if (it == stashedScenes_.end()) return false;
+
+	idToObject_ = std::move(it->second.objects);
+	nextObjectId_ = it->second.nextObjectId;
+	stashedScenes_.erase(it);
+
+	auto* cm = YoRigine::CollisionManager::GetInstance();
+	for (auto& [id, obj] : idToObject_) {
+		if (obj && obj->collider) cm->AddCollider(obj->collider.get());
+	}
+	return true;
+}
+
+
+bool ObjectManager::HasStashedScene(const std::string& sceneName) const {
+	return stashedScenes_.find(sceneName) != stashedScenes_.end();
 }
 
 
