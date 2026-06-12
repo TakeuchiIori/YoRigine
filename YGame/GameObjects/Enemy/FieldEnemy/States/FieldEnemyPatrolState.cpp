@@ -43,31 +43,42 @@ void FieldEnemyPatrolState::Update(FieldEnemy& enemy, float dt) {
 void FieldEnemyPatrolState::Exit([[maybe_unused]] FieldEnemy& enemy) {}
 
 void FieldEnemyPatrolState::GenerateNewPatrolTarget(FieldEnemy& enemy) {
-	// 既存のランダム生成ロジックで目標座標を決める
 	std::random_device rd;
 	std::mt19937 gen(rd());
 	const auto& data = enemy.GetEnemyData();
 	std::uniform_real_distribution<float> angleDist(0.0f, 2.0f * std::numbers::pi_v<float>);
 	std::uniform_real_distribution<float> radiusDist(2.0f, data.patrolRadius);
 
-	float angle = angleDist(gen);
-	float radius = radiusDist(gen);
 	Vector3 spawnPos = enemy.GetSpawnPosition();
-	Vector3 newTarget = spawnPos + Vector3(
-		radius * std::cosf(angle), 0.0f, radius * std::sinf(angle));
-
-	enemy.SetPatrolTarget(newTarget);
-
-	// ── ここで NavPath を計算 ──────────────────────────────────────────
 	NavPathfinder* pf = enemy.GetNavPathfinder();
-	if (pf) {
-		auto path = pf->FindPath(enemy.GetPosition(), newTarget);
-		if (!path.empty()) {
-			enemy.SetNavPath(path);
+
+	// 壁の中など unreachable な target を引いたら直線フォールバックで壁に突っ込んでしまう。
+	// (= 「敵が他のシーンエディタで配置したオブジェクトにめり込む」現象の主犯)
+	// reachable な target が見つかるまで何度かリトライする。
+	constexpr int kMaxRetry = 6;
+	for (int i = 0; i < kMaxRetry; ++i) {
+		float angle  = angleDist(gen);
+		float radius = radiusDist(gen);
+		Vector3 candidate = spawnPos + Vector3(
+			radius * std::cosf(angle), 0.0f, radius * std::sinf(angle));
+
+		if (pf) {
+			auto path = pf->FindPath(enemy.GetPosition(), candidate);
+			if (!path.empty()) {
+				enemy.SetPatrolTarget(candidate);
+				enemy.SetNavPath(path);
+				return;
+			}
+		} else {
+			// NavPathfinder が無い構成では retry しても変わらないので 1 回で抜ける
+			enemy.SetPatrolTarget(candidate);
+			enemy.ClearNavPath();
 			return;
 		}
 	}
-	// NavPath 取れなかった場合は直線移動にフォールバック
+
+	// 全 retry が unreachable: 壁めり込みを避けるためスポーン位置に留まる
+	enemy.SetPatrolTarget(spawnPos);
 	enemy.ClearNavPath();
 }
 

@@ -30,8 +30,8 @@
         "spotLightColor": {
             "w": 1.0,
             "x": 1.0,
-            "y": -1.0,
-            "z": -1.0
+            "y": 1.0,
+            "z": 1.0
         },
         "spotLightDecay": 0.10000000149011612,
         "spotLightIntensity": 1000.0,
@@ -52,7 +52,7 @@
         "battleFormation": "default",
         "battleTypeStr": "Single",
         "chaseRange": 8.0,
-        "chaseSpeed": 3.0,
+        "chaseSpeed": 5.0,
         "enemyId": "GreenSpikyBlob",
         "modelColor": {
             "w": 1.0,
@@ -77,8 +77,8 @@
         "spotLightColor": {
             "w": 1.0,
             "x": 1.0,
-            "y": -1.0,
-            "z": -1.0
+            "y": 1.0,
+            "z": 1.0
         },
         "spotLightDecay": 0.10000000149011612,
         "spotLightIntensity": 1000.0,
@@ -124,8 +124,8 @@
         "spotLightColor": {
             "w": 1.0,
             "x": 1.0,
-            "y": -1.0,
-            "z": -1.0
+            "y": 1.0,
+            "z": 1.0
         },
         "spotLightDecay": 0.10000000149011612,
         "spotLightIntensity": 1000.0,
@@ -174,8 +174,8 @@
         "spotLightColor": {
             "w": 1.0,
             "x": 1.0,
-            "y": -1.0,
-            "z": -1.0
+            "y": 1.0,
+            "z": 1.0
         },
         "spotLightDecay": 1.0,
         "spotLightIntensity": 1000.0,
@@ -225,8 +225,8 @@
         "spotLightColor": {
             "w": 1.0,
             "x": 1.0,
-            "y": -1.0,
-            "z": -1.0
+            "y": 1.0,
+            "z": 1.0
         },
         "spotLightDecay": 0.10000000149011612,
         "spotLightIntensity": 1000.0,
