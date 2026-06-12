@@ -309,12 +309,6 @@ void GameScene::Draw() {
 	// VFX描画
 	//------------------------------------------------------------
 	player_->DrawVfx();
-
-	//------------------------------------------------------------
-	// UI描画
-	//------------------------------------------------------------
-	SpriteCommon::GetInstance()->DrawPreference();
-	DrawUI();
 }
 
 /// <summary>
@@ -336,9 +330,15 @@ void GameScene::DrawScene3DOnly() {
 /// </summary>
 void GameScene::DrawNonOffscreen() {
 	SpriteCommon::GetInstance()->DrawPreference();
+	//------------------------------------------------------------
+	// UI描画
+	//------------------------------------------------------------
+	SpriteCommon::GetInstance()->DrawPreference();
+	DrawUI();
 	if (subSceneManager_) {
 		subSceneManager_->DrawNonOffscreen();
 	}
+
 }
 
 /// <summary>
