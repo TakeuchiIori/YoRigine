@@ -33,6 +33,8 @@ public:
 	// 無視するコライダーのTypeIDを設定する
 	void AddIgnoreTypeID(uint32_t typeID) { ignoreTypeIDs_.push_back(typeID); }
 	void ClearIgnoreTypeIDs() { ignoreTypeIDs_.clear(); }
+
+	float GetCurrentDistanceRatio() const { return currentDistanceRatio_; }
 private:
 	///************************* メンバ関数 *************************///
 

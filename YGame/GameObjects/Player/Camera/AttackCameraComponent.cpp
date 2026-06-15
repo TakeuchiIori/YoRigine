@@ -22,7 +22,7 @@ void AttackCameraComponent::Initialize() {
 }
 
 // ============================================================
-// フェーズ1: タイマー前進 + シェイクトリガー
+// タイマー前進 + シェイクトリガー
 // ============================================================
 void AttackCameraComponent::UpdatePre(FollowCamera* followCamera, float dt) {
     if (phase_ != Phase::Playing) return;
@@ -45,7 +45,7 @@ void AttackCameraComponent::UpdatePre(FollowCamera* followCamera, float dt) {
 }
 
 // ============================================================
-// フェーズ2: 補間値をサンプリング＆フェーズ進行
+// 補間値をサンプリング＆フェーズ進行
 // ============================================================
 void AttackCameraComponent::UpdatePost(float dt) {
     switch (phase_) {
