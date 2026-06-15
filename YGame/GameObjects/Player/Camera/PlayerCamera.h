@@ -14,7 +14,7 @@
 #include <string>
 
 /// <summary>
-/// プレイヤー専用カメラ管理クラス（Game 層のアグリゲーター）。
+/// プレイヤー専用カメラ管理クラス
 ///
 /// 保有コンポーネント:
 ///   FollowCamera*            … Engine 側の追従カメラ本体
@@ -99,7 +99,7 @@ private:
 
     AttackCameraComponent  attackCamera_;
 
-    // BattleStart 演出：Debug / Release どちらでも動作する
+    // 戦闘開始時のカメラステート
     std::shared_ptr<BattleStartCameraState> battleStartState_;
     bool isPreviewMode_ = false;
 

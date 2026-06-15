@@ -4,11 +4,13 @@
 #include "Matrix4x4.h"
 #include "Quaternion.h"
 
-
-#include "json.hpp"
+#include <Loaders/Json/Use/AutoJson.h>
 
 class Line;
 
+/// <summary>
+/// 各コンポーネントの基底クラス
+/// </summary>
 class VirtualCamera
 {
 public:
@@ -22,6 +24,9 @@ public:
 	virtual void DrawDebug3D(Line& /*line*/) {}
 	virtual void Save(nlohmann::json& j) const;
 	virtual void Load(const nlohmann::json& j);
+
+	// 基底クラス用のJsonの登録
+	virtual void RegisterJsonFields();
 public:
 	///************************* アクセッサ *************************///
 
@@ -36,9 +41,11 @@ public:
 	const Matrix4x4& GetViewMatrix() const { return viewMatrix_; }
 	const Matrix4x4& GetProjectionMatrix() const { return projectionMatrix_; }
 	const Matrix4x4& GetViewProjectionMatrix() const { return viewProjectionMatrix_; }
+
 	Vector3 GetRotate() const { return transform_.rotate; }
 	Vector3 GetTranslate() const { return transform_.translate; }
 	Vector3 GetScale() const { return transform_.scale; }
+
 	float GetFovY() const { return fovY_; }
 	float GetAspectRatio() const { return aspectRatio_; }
 	float GetNearClip() const { return nearClip_; }
@@ -57,6 +64,7 @@ public:
 	Matrix4x4 viewMatrix_;
 	Matrix4x4 projectionMatrix_;
 	Matrix4x4 viewProjectionMatrix_;
+	AutoJson aj_;
 
 	float fovY_ = 0.45f;
 	float aspectRatio_;
