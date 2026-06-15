@@ -98,9 +98,7 @@ void PlayerCamera::UpdatePreDirector() {
 
 // ============================================================
 // 攻撃カメラオフセットを sceneCamera に後付けで適用
-// CameraDirector::Update() + UpdateCamera() の後に呼ぶ。
-// CameraDirector が sceneCamera に転送した後なので、
-// ここで加算すると確実に描画に反映される。
+// CameraDirector::Update() + UpdateCamera() の後に呼ぶ
 // ============================================================
 void PlayerCamera::ApplyPostDirector(Camera* sceneCamera, float dt) {
     if (!sceneCamera) return;
