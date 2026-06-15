@@ -155,6 +155,16 @@ void AttackCameraEditor::DrawWorkSettings() {
                 ImGui::SetTooltip("演出終了後、元の状態へ補間で戻る時間\n0 = 瞬間切り替え");
         }
     }
+
+    ImGui::Separator();
+
+    // ============================================================
+    // フレーミング設定
+    // ============================================================
+    ImGui::TextDisabled("フレーミング");
+    ImGui::Checkbox("プレイヤーをフレーム内に保持##keepInFrame", &work.keepPlayerInFrame);
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("再生中、プレイヤーが画角外へ出ないよう引き戻す\nOFF = カットシーン的に画角外を許可");
 }
 
 // ============================================================

@@ -145,6 +145,112 @@ void PlayerCamera::ApplyPostDirector(Camera* sceneCamera, float dt) {
 
     // オフセット適用後に行列を再計算
     sceneCamera->UpdateMatrix();
+
+    //------------------------------------------------------------
+    // 最終フレーミングガード
+    // オフセット適用後の view-projection でプレイヤーを投影し、
+    // 画角外へはみ出していたら引き戻す（ワーク側で許可されている場合のみ）。
+    //------------------------------------------------------------
+    if (framingGuardEnabled_ && attackCamera_.ShouldKeepPlayerInFrame()) {
+        EnsurePlayerInFrame(sceneCamera, dt);
+    }
+}
+
+// ============================================================
+// 最終フレーミングガード
+// プレイヤーのピボットを最終 view-projection で NDC に投影し、
+// ハードリミットを越えた分だけ yaw / pitch を引き戻してフレーム内へ収める。
+// ============================================================
+void PlayerCamera::EnsurePlayerInFrame(Camera* sceneCamera, float dt) {
+    if (!sceneCamera || !playerWT_) return;
+
+    //------------------------------------------------------------
+    // プレイヤーのピボット位置（ワールド空間）を求める
+    //------------------------------------------------------------
+    // matWorld_ の平行移動成分がプレイヤーのワールド原点
+    Vector3 playerPivot = Transform(Vector3{ 0.0f, 0.0f, 0.0f }, playerWT_->matWorld_);
+    playerPivot.y += pivotHeight_;
+
+    //------------------------------------------------------------
+    // NDC への投影（透視除算前の w で前後判定）
+    //------------------------------------------------------------
+    Vector4 clip = Transform(
+        Vector4{ playerPivot.x, playerPivot.y, playerPivot.z, 1.0f },
+        sceneCamera->GetViewProjectionMatrix());
+
+    // カメラの背後（w <= 0）なら NDC が破綻するので、向きを直接プレイヤーへ向ける
+    bool behindCamera = (clip.w <= 0.0001f);
+
+    float ndcX = 0.0f;
+    float ndcY = 0.0f;
+    if (!behindCamera) {
+        ndcX = clip.x / clip.w;
+        ndcY = clip.y / clip.w;
+        // ハードリミット内に完全に収まっていれば何もしない（小刻みな揺れ防止）
+        if (std::abs(ndcX) <= framingHardLimitX_ &&
+            std::abs(ndcY) <= framingHardLimitY_) {
+            return;
+        }
+    }
+
+    //------------------------------------------------------------
+    // プレイヤーを中央に置くための理想 yaw / pitch を計算
+    //------------------------------------------------------------
+    Vector3 toPivot = playerPivot - sceneCamera->transform_.translate;
+    float   dist    = Length(toPivot);
+    if (dist < 0.01f) return;
+    Vector3 dir = toPivot / dist;
+
+    float desiredYaw   = atan2f(dir.x, dir.z);
+    float clampedY     = std::clamp(-dir.y, -1.0f, 1.0f);
+    float desiredPitch = asinf(clampedY);
+
+    float deltaYaw   = desiredYaw   - sceneCamera->transform_.rotate.y;
+    float deltaPitch = desiredPitch - sceneCamera->transform_.rotate.x;
+
+    constexpr float kPi    = 3.14159265358979f;
+    constexpr float kTwoPi = 6.28318530717958f;
+    while (deltaYaw >  kPi) deltaYaw -= kTwoPi;
+    while (deltaYaw < -kPi) deltaYaw += kTwoPi;
+
+    //------------------------------------------------------------
+    // NDC ハードリミットを「中央からの角度許容量」に変換
+    // 縦半画角 = fovY / 2、横半画角 = atan(tan(縦半画角) * アスペクト比)
+    //------------------------------------------------------------
+    float halfFovY = sceneCamera->fovY_ * 0.5f;
+    float halfFovX = atanf(tanf(halfFovY) * sceneCamera->aspectRatio_);
+    float yawTol   = atanf(framingHardLimitX_ * tanf(halfFovX));
+    float pitchTol = atanf(framingHardLimitY_ * tanf(halfFovY));
+
+    const float maxStep = framingGuardSpeed_ * dt;
+
+    //------------------------------------------------------------
+    // Yaw：許容量を越えた分だけ引き戻す（背後ならフルに向ける）
+    //------------------------------------------------------------
+    if (behindCamera || std::abs(deltaYaw) > yawTol) {
+        float overshoot = behindCamera
+            ? deltaYaw
+            : (deltaYaw > 0.0f ? deltaYaw - yawTol : deltaYaw + yawTol);
+        float step = std::clamp(overshoot, -maxStep, maxStep);
+        sceneCamera->transform_.rotate.y += step;
+    }
+
+    //------------------------------------------------------------
+    // Pitch：同様に引き戻す（pitch 制限内にクランプ）
+    //------------------------------------------------------------
+    if (behindCamera || std::abs(deltaPitch) > pitchTol) {
+        float overshoot = behindCamera
+            ? deltaPitch
+            : (deltaPitch > 0.0f ? deltaPitch - pitchTol : deltaPitch + pitchTol);
+        float step = std::clamp(overshoot, -maxStep, maxStep);
+        sceneCamera->transform_.rotate.x = std::clamp(
+            sceneCamera->transform_.rotate.x + step, minPitch_, maxPitch_);
+    }
+
+    //------------------------------------------------------------
+    // 引き戻した回転を反映
+    //------------------------------------------------------------
+    sceneCamera->UpdateMatrix();
 }
 
 

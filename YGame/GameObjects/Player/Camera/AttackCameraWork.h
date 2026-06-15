@@ -52,6 +52,7 @@ struct AttackCameraWork {
     float       totalDuration = 0.5f;
     float       returnDuration = 0.2f;     // 演出終了後に元の状態へ補間で戻る時間（0 = 瞬間切り替え）
     bool        resetOnFinish = true;     // 終了後にオフセットをリセットするか
+    bool        keepPlayerInFrame = true;     // 再生中、プレイヤーが画角外へ出ないよう最終ガードで引き戻すか（false = カットシーン的に画角外を許可）
 
     // ============================================================
     // 補間設定
@@ -67,6 +68,7 @@ struct AttackCameraWork {
         j["totalDuration"] = totalDuration;
         j["returnDuration"] = returnDuration;
         j["resetOnFinish"] = resetOnFinish;
+        j["keepPlayerInFrame"] = keepPlayerInFrame;
         j["useStartInterpolation"] = useStartInterpolation;
         j["startInterpolationDuration"] = startInterpolationDuration;
         j["useReturnInterpolation"] = useReturnInterpolation;
@@ -82,6 +84,7 @@ struct AttackCameraWork {
         totalDuration = j.value("totalDuration", 0.5f);
         returnDuration = j.value("returnDuration", 0.2f);
         resetOnFinish = j.value("resetOnFinish", true);
+        keepPlayerInFrame = j.value("keepPlayerInFrame", true);
         useStartInterpolation = j.value("useStartInterpolation", false);
         startInterpolationDuration = j.value("startInterpolationDuration", 0.2f);
         useReturnInterpolation = j.value("useReturnInterpolation", true);

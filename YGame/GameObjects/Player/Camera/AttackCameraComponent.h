@@ -45,6 +45,9 @@ public:
     float GetPlayRatio() const;
     const std::string& GetCurrentWorkName() const { return currentWorkName_; }
 
+    /// 現在再生中のワークが「プレイヤーをフレーム内に保持」設定か（該当ワークが無ければ true）
+    bool ShouldKeepPlayerInFrame() const;
+
     // ============================================================
     // データ管理
     // ============================================================

@@ -92,6 +92,14 @@ private:
     void SwitchLockOnTarget(int direction);  // 0=最近傍, 1=右, -1=左
 
     // ============================================================
+    // 最終フレーミングガード
+    // 攻撃カメラワークのオフセット適用後に呼び、プレイヤーが
+    // 画角のハードリミットを越えていたら yaw / pitch を引き戻して
+    // 確実にフレーム内へ収める（オフセットを見落とす EnsureTargetInView の後段ガード）。
+    // ============================================================
+    void EnsurePlayerInFrame(Camera* sceneCamera, float dt);
+
+    // ============================================================
     // メンバ
     // ============================================================
     FollowCamera*          followCamera_ = nullptr;
@@ -117,4 +125,12 @@ private:
     float maxPitch_     =  1.2f;
     float rotateSpeed_  = 0.1f;
     float pivotHeight_  = 1.5f;
+
+    // ============================================================
+    // 最終フレーミングガード用パラメータ
+    // ============================================================
+    bool  framingGuardEnabled_ = true;   // ガード自体の ON / OFF
+    float framingHardLimitX_   = 0.85f;  // 横方向ハードリミット（NDC -1〜1、これを越えたら引き戻す）
+    float framingHardLimitY_   = 0.80f;  // 縦方向ハードリミット（NDC -1〜1）
+    float framingGuardSpeed_   = 12.0f;  // 引き戻し速度（rad/秒・はみ出し分に対する最大変化量）
 };

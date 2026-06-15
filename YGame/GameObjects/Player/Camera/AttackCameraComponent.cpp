@@ -167,6 +167,15 @@ float AttackCameraComponent::GetPlayRatio() const {
 }
 
 // ============================================================
+// 現在ワークのフレーム保持設定
+// ============================================================
+bool AttackCameraComponent::ShouldKeepPlayerInFrame() const {
+    const AttackCameraWork* work = FindWork(currentWorkName_);
+    // 該当ワークが見つからない場合は安全側（保持する）に倒す
+    return work ? work->keepPlayerInFrame : true;
+}
+
+// ============================================================
 // データ管理
 // ============================================================
 void AttackCameraComponent::AddWork(const AttackCameraWork& work) {
