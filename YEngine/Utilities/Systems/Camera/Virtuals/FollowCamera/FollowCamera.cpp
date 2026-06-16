@@ -79,29 +79,120 @@ void FollowCamera::UpdateInput() {
 }
 
 // ============================================================
+// 臨界減衰スプリング（Unity SmoothDamp 相当）
+//   current → target へオーバーシュートせず滑らかに寄せる。
+//   vel は呼び出し側が保持する速度アキュムレータ（参照で更新）。
+// ============================================================
+static float SmoothDampScalar(float current, float target, float& vel,
+    float smoothTime, float dt, float maxSpeed) {
+    smoothTime = std::max(0.0001f, smoothTime);
+    const float omega = 2.0f / smoothTime;
+    const float x = omega * dt;
+    const float expo = 1.0f / (1.0f + x + 0.48f * x * x + 0.235f * x * x * x);
+
+    float change = current - target;
+    const float originalTo = target;
+
+    const float maxChange = maxSpeed * smoothTime;
+    change = std::clamp(change, -maxChange, maxChange);
+    target = current - change;
+
+    const float temp = (vel + omega * change) * dt;
+    vel = (vel - omega * temp) * expo;
+    float output = target + (change + temp) * expo;
+
+    // オーバーシュート防止
+    if ((originalTo - current > 0.0f) == (output > originalTo)) {
+        output = originalTo;
+        vel = (output - originalTo) / dt;
+    }
+    return output;
+}
+
+static Vector3 SmoothDampVec3(const Vector3& current, const Vector3& target, Vector3& vel,
+    float smoothTime, float dt, float maxSpeed) {
+    return {
+        SmoothDampScalar(current.x, target.x, vel.x, smoothTime, dt, maxSpeed),
+        SmoothDampScalar(current.y, target.y, vel.y, smoothTime, dt, maxSpeed),
+        SmoothDampScalar(current.z, target.z, vel.z, smoothTime, dt, maxSpeed),
+    };
+}
+
+// ============================================================
 // 追従位置の計算
 // ============================================================
 void FollowCamera::FollowProcess() {
     if (!target_) return;
 
+    const float dt = YoRigine::GameTime::GetDeltaTime();
+
+    // ── クローズアップ倍率の補間 ──
     float targetScale = isCloseUp_ ? closeUpScale_ : 1.0f;
     currentScale_ += (targetScale - currentScale_)
-        * std::clamp(interpSpeed_ * YoRigine::GameTime::GetDeltaTime(), 0.0f, 1.0f);
+        * std::clamp(interpSpeed_ * dt, 0.0f, 1.0f);
+
+    // ── ターゲット速度から先読みオフセットを算出 ──
+    const Vector3 targetPos = target_->translate_;
+    bool teleported = false;
+    Vector3 targetVel{};
+    if (hasPrevTargetPos_ && dt > 1e-6f) {
+        Vector3 delta = targetPos - prevTargetPos_;
+        // 1フレームで followSnapDistance_ 以上動いたらテレポート扱い（速度は無効化）
+        if (Length(delta) > followSnapDistance_) {
+            teleported = true;
+        } else {
+            targetVel = delta / dt;
+        }
+    }
+    prevTargetPos_ = targetPos;
+    hasPrevTargetPos_ = true;
+
+    Vector3 desiredLookAhead{};
+    if (lookAheadEnabled_ && !teleported) {
+        Vector3 flatVel = { targetVel.x,
+                            lookAheadVertical_ ? targetVel.y : 0.0f,
+                            targetVel.z };
+        desiredLookAhead = flatVel * lookAheadTime_;
+        float la = Length(desiredLookAhead);
+        if (la > lookAheadMaxDist_ && la > 1e-6f) {
+            desiredLookAhead = desiredLookAhead / la * lookAheadMaxDist_;
+        }
+    }
+    // 先読みは急変させずイーズイン/アウト
+    smoothedLookAhead_ += (desiredLookAhead - smoothedLookAhead_)
+        * std::clamp(lookAheadSmooth_ * dt, 0.0f, 1.0f);
+
+    // ── 注視点（先読み込み）と理想カメラ位置 ──
+    Vector3 pivot = targetPos + Vector3(0.0f, targetPivot_Height_, 0.0f) + smoothedLookAhead_;
 
     Vector3 offset = offset_ * currentScale_;
     Matrix4x4 rotateMat = MakeRotateMatrixXYZ(transform_.rotate);
     Vector3 rotatedOffset = TransformNormal(offset, rotateMat);
-
-    Vector3 pivot   = target_->translate_ + Vector3(0.0f, targetPivot_Height_, 0.0f);
     Vector3 idealPos = pivot + rotatedOffset;
 
-    Vector3 safePos = collisionResolver_.Resolve(idealPos, pivot);
+    // ── 位置ダンピング（臨界減衰スプリング）──
+    if (!followInitialized_) {
+        followPos_ = idealPos;
+        followVel_ = {};
+        followInitialized_ = true;
+    } else if (teleported || !positionSmoothing_
+        || Length(idealPos - followPos_) > followSnapDistance_) {
+        // テレポート / スムージング無効 / 大きくズレた場合は瞬間スナップ
+        followPos_ = idealPos;
+        followVel_ = {};
+    } else {
+        followPos_ = SmoothDampVec3(followPos_, idealPos, followVel_,
+            positionSmoothTime_, dt, maxFollowSpeed_);
+    }
+
+    // ── 壁めり込み回避は最後にハード補正（平滑化後の位置に対して）──
+    Vector3 safePos = collisionResolver_.Resolve(followPos_, pivot);
 
     UpdateShake();
     transform_.translate = safePos + shakeOffset_;
 
     // フレーミング補正：追従対象が画角外に出そうな時だけ rotation を引き戻す
-    EnsureTargetInView(pivot, YoRigine::GameTime::GetDeltaTime());
+    EnsureTargetInView(pivot, dt);
 }
 
 // ============================================================
@@ -203,6 +294,24 @@ void FollowCamera::DrawDebugGui() {
     }
     ImGui::Separator();
 
+    if (ImGui::TreeNode("追従スムージング＆先読み")) {
+        ImGui::Checkbox("位置ダンピング有効", &positionSmoothing_);
+        ImGui::DragFloat("追従遅れ時間 (秒)", &positionSmoothTime_, 0.005f, 0.0f, 1.0f, "%.3f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("小さいほどキビキビ、大きいほどフワッと遅れて追従");
+        ImGui::DragFloat("追従速度上限",       &maxFollowSpeed_,     1.0f,   1.0f, 2000.0f);
+        ImGui::DragFloat("スナップ距離",       &followSnapDistance_, 0.5f,   1.0f, 200.0f);
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("この距離以上ズレたら瞬間移動（テレポート対策）");
+        ImGui::Spacing();
+        ImGui::Checkbox("先読み有効",          &lookAheadEnabled_);
+        ImGui::Checkbox("Y方向も先読み",       &lookAheadVertical_);
+        ImGui::DragFloat("先読み時間 (秒)",    &lookAheadTime_,      0.01f,  0.0f, 1.0f, "%.2f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("移動速度×この秒数だけ進行方向の先を見る");
+        ImGui::DragFloat("先読み距離上限",     &lookAheadMaxDist_,   0.1f,   0.0f, 30.0f);
+        ImGui::DragFloat("先読みイーズ速度",   &lookAheadSmooth_,    0.1f,   0.1f, 30.0f);
+        ImGui::TreePop();
+    }
+    ImGui::Separator();
+
     if (ImGui::TreeNode("演出設定")) {
         ImGui::Checkbox("クローズアップ",       &isCloseUp_);
         ImGui::DragFloat("クローズアップ倍率",  &closeUpScale_, 0.01f, 0.1f,  1.0f);
@@ -247,6 +356,19 @@ void FollowCamera::Save(nlohmann::json& j) const {
     j["minPitch"]           = minPitch_;
     j["maxPitch"]           = maxPitch_;
 
+    // 追従スムージング
+    j["positionSmoothing"]  = positionSmoothing_;
+    j["positionSmoothTime"] = positionSmoothTime_;
+    j["maxFollowSpeed"]     = maxFollowSpeed_;
+    j["followSnapDistance"] = followSnapDistance_;
+
+    // 速度先読み
+    j["lookAheadEnabled"]   = lookAheadEnabled_;
+    j["lookAheadVertical"]  = lookAheadVertical_;
+    j["lookAheadTime"]      = lookAheadTime_;
+    j["lookAheadMaxDist"]   = lookAheadMaxDist_;
+    j["lookAheadSmooth"]    = lookAheadSmooth_;
+
     // フレーミング補正
     j["framingEnabled"]     = framingEnabled_;
     j["framingYawMargin"]   = framingYawMargin_;
@@ -279,6 +401,19 @@ void FollowCamera::Load(const nlohmann::json& j) {
     targetPivot_Height_  = j.value("targetPivot_Height", 1.0f);
     minPitch_            = j.value("minPitch",          -0.2f);
     maxPitch_            = j.value("maxPitch",           1.2f);
+
+    // 追従スムージング
+    positionSmoothing_   = j.value("positionSmoothing",  true);
+    positionSmoothTime_  = j.value("positionSmoothTime", 0.12f);
+    maxFollowSpeed_      = j.value("maxFollowSpeed",      300.0f);
+    followSnapDistance_  = j.value("followSnapDistance",  30.0f);
+
+    // 速度先読み
+    lookAheadEnabled_    = j.value("lookAheadEnabled",   true);
+    lookAheadVertical_   = j.value("lookAheadVertical",  false);
+    lookAheadTime_       = j.value("lookAheadTime",      0.25f);
+    lookAheadMaxDist_    = j.value("lookAheadMaxDist",   6.0f);
+    lookAheadSmooth_     = j.value("lookAheadSmooth",    6.0f);
 
     framingEnabled_      = j.value("framingEnabled",      true);
     framingYawMargin_    = j.value("framingYawMargin",    0.45f);

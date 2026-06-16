@@ -96,6 +96,33 @@ private:
     float kRotateSpeed_  = 0.1f;
 
     // ============================================================
+    // 追従スムージング（位置ダンピング）
+    //   理想位置へ瞬間スナップせず、臨界減衰スプリングで滑らかに寄せる。
+    //   smoothTime が小さいほどキビキビ、大きいほどフワッと遅れて追従する。
+    // ============================================================
+    bool    positionSmoothing_  = true;
+    float   positionSmoothTime_ = 0.12f;   // 秒。追従の遅れ時間
+    float   maxFollowSpeed_     = 300.0f;  // 追従速度上限（暴れ防止）
+    float   followSnapDistance_ = 30.0f;   // この距離以上ズレたら瞬間スナップ（テレポート対策）
+    Vector3 followPos_          = {};      // 平滑化後のカメラ位置（内部状態）
+    Vector3 followVel_          = {};      // SmoothDamp 用の速度アキュムレータ
+    bool    followInitialized_  = false;
+
+    // ============================================================
+    // 速度先読み（look-ahead）
+    //   ターゲットの移動速度に応じて注視点を進行方向へ先行させ、
+    //   走行中に前方が見える「予測カメラ」にする。
+    // ============================================================
+    bool    lookAheadEnabled_  = true;
+    bool    lookAheadVertical_ = false;   // Y方向（落下/ジャンプ）も先読みするか
+    float   lookAheadTime_     = 0.25f;   // 速度×この秒数だけ先を見る
+    float   lookAheadMaxDist_  = 6.0f;    // 先読み距離の上限
+    float   lookAheadSmooth_   = 6.0f;    // 先読みのイーズ速度（大きいほど即応）
+    Vector3 smoothedLookAhead_ = {};      // 平滑化後の先読みオフセット（内部状態）
+    Vector3 prevTargetPos_     = {};      // 速度算出用の前フレーム位置
+    bool    hasPrevTargetPos_  = false;
+
+    // ============================================================
     // クローズアップ
     // ============================================================
     bool  isCloseUp_     = false;

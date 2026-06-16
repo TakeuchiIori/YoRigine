@@ -363,6 +363,11 @@ void FieldScene::DrawShadow()
 void FieldScene::OnEnter() {
 	BaseSubScene::OnEnter();
 
+	// フィールドでは脅威察知を無効化（背景・マップを自由に見渡せるようにする）
+	if (player_ && player_->GetPlayerCamera()) {
+		player_->GetPlayerCamera()->SetThreatAwarenessAllowed(false);
+	}
+
 	Logger("[FieldScene] ===== OnEnter() START =====\n");
 
 	// フィールド用 ModelManipulator シーンへ切替。

@@ -297,6 +297,11 @@ void BattleScene::DrawShadow()
 void BattleScene::OnEnter() {
 	BaseSubScene::OnEnter();
 
+	// 脅威察知（気配）はバトル中だけ有効化（フィールドでは背景・マップ見渡しを優先）
+	if (player_ && player_->GetPlayerCamera()) {
+		player_->GetPlayerCamera()->SetThreatAwarenessAllowed(true);
+	}
+
 	Logger("[BattleScene] ===== OnEnter() START =====\n");
 
 	// バトル用 ModelManipulator シーンへ切替。
