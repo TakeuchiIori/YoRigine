@@ -149,7 +149,7 @@ void Player::InitCollision() {
 	);
 	obbCollider_->SetIsStatic(false);
 	obbCollider_->SetMass(100.0f);
-	// Player は画面外でも常に当たり判定を回す (落下・カメラ越し攻撃などで invariably 必要)
+	// Player は画面外でも常に当たり判定を回す
 	obbCollider_->SetCheckOutsideCamera(false);
 
 }

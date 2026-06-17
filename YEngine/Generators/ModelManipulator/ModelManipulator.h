@@ -137,7 +137,7 @@ namespace YoRigine {
 #endif
 
         // ── Frustum culling ──────────────────────────────
-        bool  enableDrawFrustumCulling_ = false;  // 描画でカリングするか
+        bool  enableDrawFrustumCulling_ = true;  // 描画でカリングするか
         float drawBoundsScaleFactor_    = 2.0f;   // スケール → 半サイズ係数 (コライダー無いとき)
 
         std::vector<int> copyObjectIDs_;

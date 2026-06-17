@@ -15,7 +15,13 @@ void DeviceManager::Initialize()
 	Microsoft::WRL::ComPtr<ID3D12Debug1> debugController = nullptr;
 	if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController)))) {
 		debugController->EnableDebugLayer();				// CPU 側のデバッグレイヤー
-		debugController->SetEnableGPUBasedValidation(true); // GPU 側検証も有効化
+
+		// GPU Based Validation はシェーダーをパッチして検証するため非常に重い。
+		// Compute Shader を使うポストエフェクトでフレームレートが大きく落ちる原因になるので、
+		// 必要な時（メモリ破壊やUAVの不正アクセスを疑う時）だけ手動でtrueにする。
+#if 0
+		debugController->SetEnableGPUBasedValidation(true);
+#endif
 	}
 #endif
 
