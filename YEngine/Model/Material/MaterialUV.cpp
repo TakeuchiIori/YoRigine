@@ -7,7 +7,8 @@ void MaterialUV::Initialize()
 	resource_->Map(0, nullptr, reinterpret_cast<void**>(&materialUV_));
 
 	materialUV_->uvTransform = MakeIdentity4x4();
-
+	materialUV_->stochasticStrength = 0.0f;
+	materialUV_->_pad[0] = materialUV_->_pad[1] = materialUV_->_pad[2] = 0.0f;
 }
 
 void MaterialUV::RecordDrawCommands(ID3D12GraphicsCommandList* commandList, UINT rootParameterIndexCBV)

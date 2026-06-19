@@ -370,8 +370,10 @@ void FieldEnemyManager::HandleBattleEnd(const std::string& enemyGroup, bool play
 	if (playerWon) {
 		for (auto& enemy : fieldEnemies_) {
 			if (enemy && enemy->GetEnemyGroupName() == enemyGroup) {
-				RegisterDefeatedEnemy(enemyGroup);
-
+				// リスポーン対象の敵は defeatedEnemyIds_ に登録しない。
+				// 登録すると SpawnFieldEnemy 冒頭の IsEnemyDefeated チェックで
+				// 再スポーンが永久ブロックされ、EventTrigger のカウントが 1 で止まる。
+				bool willRespawn = false;
 				for (const auto& pair : spawnDataMap_) {
 					if (pair.second.enemyId == enemyGroup &&
 						pair.second.respawnAfterBattle) {
@@ -383,8 +385,17 @@ void FieldEnemyManager::HandleBattleEnd(const std::string& enemyGroup, bool play
 
 						Logger("[FieldEnemyManager] リスポーンキューに追加: " + enemyGroup +
 							" 待機時間: " + std::to_string(pair.second.respawnDelay) + "秒\n");
+						willRespawn = true;
 						break;
 					}
+				}
+
+				if (willRespawn) {
+					if (onEnemyDefeatedCallback_) {
+						onEnemyDefeatedCallback_(enemyGroup);
+					}
+				} else {
+					RegisterDefeatedEnemy(enemyGroup);
 				}
 
 				enemy->ResetEncounterState();
@@ -417,6 +428,9 @@ void FieldEnemyManager::HandleBattleEnd(const std::string& enemyGroup, bool play
 /// <param name="id">敵ID</param>
 void FieldEnemyManager::RegisterDefeatedEnemy(const std::string& id) {
 	defeatedEnemyIds_.insert(id);
+	if (onEnemyDefeatedCallback_) {
+		onEnemyDefeatedCallback_(id);
+	}
 }
 
 /// <summary>

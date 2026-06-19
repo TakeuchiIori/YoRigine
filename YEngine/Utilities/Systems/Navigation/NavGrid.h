@@ -36,7 +36,8 @@ public:
     // セル情報
     // ====================================================================
     struct Cell {
-        bool walkable = true; // 通行可能か
+        bool walkable    = true;   // 通行可能か (erosion 適用後の最終結果)
+        bool rawObstacle = false;  // 障害物 AABB 本体に重なるセル (erosion 前)
     };
 
     // グリッド座標（整数）
@@ -70,8 +71,9 @@ public:
     // シーンロード後・オブジェクト配置変更後に呼ぶ（毎フレーム不要）。
     void Bake(ObjectManager* objectManager);
 
-    // 単一のAABBを障害物としてグリッドに追加する（Bake の部分更新用）
-    void MarkObstacle(const AABB& worldAABB, bool obstacle = true);
+    // 単一のAABBを障害物としてグリッドに追加する（Bake の部分更新用）。
+    // 戻り値: 実際にマークしたセル数 (0 の場合 = グリッド範囲外で全くマークできなかった)
+    int MarkObstacle(const AABB& worldAABB, bool obstacle = true);
 
     // グリッドを全セル歩行可能にリセットする
     void Reset();

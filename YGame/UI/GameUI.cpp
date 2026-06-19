@@ -2,6 +2,7 @@
 #include <Systems/GameTime/GameTime.h>
 #include <Systems/Input/Input.h>
 #include <Systems/GameTime/GameTime.h>
+#include <Systems/Cinematic/CinematicManager.h>
 
 /// <summary>
 /// 初期化処理
@@ -296,6 +297,8 @@ void GameUI::Draw()
 		ui->Draw();
 	}
 	if (goVisible_)return;
+	// 演出中（クリアカットシーン等）は操作ヒントUIも隠す
+	if (YoRigine::CinematicManager::GetInstance()->IsActive()) return;
 	controlUI_->Draw();
 }
 

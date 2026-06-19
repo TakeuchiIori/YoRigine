@@ -20,7 +20,7 @@ namespace YoRigine {
         if (!objectManager_) return false;
         try {
             json j;
-            j["version"] = 6;
+            j["version"] = 11;
             j["objects"] = json::array();
 
             for (const auto* obj : objectManager_->GetAllActiveObjects()) {
@@ -30,12 +30,19 @@ namespace YoRigine {
                     {"id",                  obj->id},
                     {"filePath",            obj->modelPath},
                     {"modelName",           obj->modelName},
+                    {"nameTag",             obj->nameTag},
                     {"position",            {obj->position.x, obj->position.y, obj->position.z}},
                     {"rotate",              {obj->rotation.x, obj->rotation.y, obj->rotation.z}},
                     {"scale",               {obj->scale.x,    obj->scale.y,    obj->scale.z}},
+                    {"useAnchorPoint",      obj->useAnchorPoint},
+                    {"anchorPoint",         {obj->anchorPoint.x, obj->anchorPoint.y, obj->anchorPoint.z}},
+                    {"color",               {obj->color.x,    obj->color.y,    obj->color.z,    obj->color.w}},
+                    {"uvScale",             {obj->uvScale.x,  obj->uvScale.y}},
+                    {"uvStochastic",        obj->uvStochastic},
                     {"parentID",            obj->parentID},
                     {"isAnimation",         obj->isAnimation},
                     {"animationName",       obj->animationName},
+                    {"pickable",            obj->pickable},
                     {"colliderEnabled",     obj->colliderEnabled},
                     {"colliderTypeId",      static_cast<uint32_t>(obj->colliderTypeId)},
                     {"colliderShapeType",   static_cast<uint32_t>(obj->colliderShapeType)},
@@ -69,7 +76,7 @@ namespace YoRigine {
             json j;
             file >> j;
             const int version = j.value("version", 1);
-            if (version < 1 || version > 6) return false;
+            if (version < 1 || version > 11) return false;
 
             objectManager_->ClearAllObjects();
 
@@ -107,7 +114,41 @@ namespace YoRigine {
                 obj->rotation = { o["rotate"][0],   o["rotate"][1],   o["rotate"][2] };
                 obj->scale    = { o["scale"][0],    o["scale"][1],    o["scale"][2] };
                 obj->colliderEnabled = o.value("colliderEnabled", false);
+                obj->pickable = o.value("pickable", true);
                 if (o.contains("parentID")) obj->parentID = o["parentID"].get<int>();
+
+                // version 7+: マテリアル色
+                if (version >= 7 && o.contains("color")) {
+                    obj->color = { o["color"][0], o["color"][1], o["color"][2], o["color"][3] };
+                }
+                objectManager_->ApplyObjectColor(*obj);
+
+                // version 8+: UV スケール
+                if (version >= 8 && o.contains("uvScale")) {
+                    obj->uvScale = { o["uvScale"][0], o["uvScale"][1] };
+                }
+                // version 9+: タイル単位ハッシュランダム化の強度
+                if (version >= 9 && o.contains("uvStochastic")) {
+                    obj->uvStochastic = o["uvStochastic"].get<float>();
+                }
+                objectManager_->ApplyObjectUV(*obj);
+
+                // version 10+: シーン内一意名 (TriggerAction のターゲット参照用)
+                if (version >= 10 && o.contains("nameTag")) {
+                    obj->nameTag = o["nameTag"].get<std::string>();
+                }
+
+                // version 11+: アンカーポイント (回転の旋回中心)
+                if (version >= 11) {
+                    obj->useAnchorPoint = o.value("useAnchorPoint", false);
+                    if (o.contains("anchorPoint")) {
+                        obj->anchorPoint = {
+                            o["anchorPoint"][0].get<float>(),
+                            o["anchorPoint"][1].get<float>(),
+                            o["anchorPoint"][2].get<float>()
+                        };
+                    }
+                }
 
                 if (version >= 5) {
                     // version 5+: per-object コライダー設定を直接読む
@@ -154,6 +195,14 @@ namespace YoRigine {
                     obj->parentID = (it != oldToNewId.end()) ? it->second : -1;
                 }
                 objectManager_->UpdateObjectTransform(*obj);
+                // matWorld が確定したあとにコライダー内部 AABB を作り直す。
+                // ApplyColliderTemplate は読み込みループ内で先に走るが、
+                // その時点では UpdateMatrix 前なので matWorld_ が原点のままで
+                // AABB が原点付近に張り付いてしまう (= NavGrid::Bake が障害物を
+                // 認識せず敵が貫通する原因)。ここで再度 Update して位置を反映させる。
+                if (obj->collider) {
+                    obj->collider->Update();
+                }
             }
 
             std::cout << "[SceneSerializer] Scene loaded: " << filePath << "\n";
@@ -174,7 +223,7 @@ namespace YoRigine {
     {
         try {
             json j;
-            j["version"] = 6;
+            j["version"] = 11;
             j["objects"] = json::array();
 
             for (const auto* obj : objects) {
@@ -184,12 +233,19 @@ namespace YoRigine {
                     {"id",                  obj->id},
                     {"filePath",            obj->modelPath},
                     {"modelName",           obj->modelName},
+                    {"nameTag",             obj->nameTag},
                     {"position",            {obj->position.x, obj->position.y, obj->position.z}},
                     {"rotate",              {obj->rotation.x, obj->rotation.y, obj->rotation.z}},
                     {"scale",               {obj->scale.x,    obj->scale.y,    obj->scale.z}},
+                    {"useAnchorPoint",      obj->useAnchorPoint},
+                    {"anchorPoint",         {obj->anchorPoint.x, obj->anchorPoint.y, obj->anchorPoint.z}},
+                    {"color",               {obj->color.x,    obj->color.y,    obj->color.z,    obj->color.w}},
+                    {"uvScale",             {obj->uvScale.x,  obj->uvScale.y}},
+                    {"uvStochastic",        obj->uvStochastic},
                     {"parentID",            obj->parentID},
                     {"isAnimation",         obj->isAnimation},
                     {"animationName",       obj->animationName},
+                    {"pickable",            obj->pickable},
                     {"colliderEnabled",     obj->colliderEnabled},
                     {"colliderTypeId",      static_cast<uint32_t>(obj->colliderTypeId)},
                     {"colliderShapeType",   static_cast<uint32_t>(obj->colliderShapeType)},
@@ -269,6 +325,40 @@ namespace YoRigine {
                 if (o.contains("parentID")) obj->parentID = o["parentID"].get<int>();
 
                 obj->colliderEnabled = o.value("colliderEnabled", false);
+                obj->pickable = o.value("pickable", true);
+
+                // version 7+: マテリアル色
+                if (version >= 7 && o.contains("color")) {
+                    obj->color = { o["color"][0], o["color"][1], o["color"][2], o["color"][3] };
+                }
+                objectManager_->ApplyObjectColor(*obj);
+
+                // version 8+: UV スケール
+                if (version >= 8 && o.contains("uvScale")) {
+                    obj->uvScale = { o["uvScale"][0], o["uvScale"][1] };
+                }
+                // version 9+: タイル単位ハッシュランダム化の強度
+                if (version >= 9 && o.contains("uvStochastic")) {
+                    obj->uvStochastic = o["uvStochastic"].get<float>();
+                }
+                objectManager_->ApplyObjectUV(*obj);
+
+                // version 10+: シーン内一意名
+                if (version >= 10 && o.contains("nameTag")) {
+                    obj->nameTag = o["nameTag"].get<std::string>();
+                }
+
+                // version 11+: アンカーポイント (回転の旋回中心)
+                if (version >= 11) {
+                    obj->useAnchorPoint = o.value("useAnchorPoint", false);
+                    if (o.contains("anchorPoint")) {
+                        obj->anchorPoint = {
+                            o["anchorPoint"][0].get<float>(),
+                            o["anchorPoint"][1].get<float>(),
+                            o["anchorPoint"][2].get<float>()
+                        };
+                    }
+                }
 
                 if (version >= 5) {
                     obj->colliderTypeId = static_cast<CollisionTypeIdDef>(o.value("colliderTypeId", 0u));
@@ -312,6 +402,10 @@ namespace YoRigine {
                         objectManager_->SetParent(obj->id, it->second);
                 }
                 objectManager_->UpdateObjectTransform(*obj);
+                // LoadScene と同じ理由でコライダー AABB を最新 matWorld で更新する。
+                if (obj->collider) {
+                    obj->collider->Update();
+                }
             }
 
             std::cout << "[SceneSerializer] Prefab loaded: " << filePath << "\n";

@@ -107,6 +107,8 @@ public:
 	void SetMaterialColor(const Vector4& color) { materialColor_->SetColor(color); }
 	void SetAlpha(float alpha) { materialColor_->SetAlpha(alpha); }
 	void SetUvTransform(const Matrix4x4& uvTransform) { materialUV_->SetUVTransform(uvTransform); }
+	// 0 = 通常タイル / 1 = タイルごとのハッシュ回転＆オフセットを最大適用
+	void SetStochasticStrength(float s) { materialUV_->SetStochasticStrength(s); }
 
 	///************************* ディゾルブ *************************///
 	MaterialDissolve* GetMaterialDissolve() const { return materialDissolve_.get(); }

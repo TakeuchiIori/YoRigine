@@ -12,6 +12,7 @@
 #ifdef USE_IMGUI
 #include "ModelBrowser.h"
 #include "SceneEditorUI.h"
+#include "StampMode.h"
 #include <Debugger/Gizmo/GizmoController.h>
 #include "PlacedObjectGizmable.h"
 #endif
@@ -60,6 +61,9 @@ namespace YoRigine {
             // Capsule は Line で描画
             colliderLineCapsule_.SetCamera(camera_);
             objectManager_->SetCamera(camera);
+#ifdef USE_IMGUI
+            stampMode_.SetCamera(camera);
+#endif
         }
 
         //=========================================================================
@@ -114,6 +118,8 @@ namespace YoRigine {
         bool           isInitialized_ = false;
         std::string    jsonPath_;
         std::string    modelFolderPath_ = "Resources/Models/";
+        // 現在ロード中のシーン名 (LoadScene 切替で前シーンを ObjectManager に退避するキーに使う)
+        std::string    currentSceneName_;
         MotionEditor motionEditor_;
 
         // AABB/OBB はインスタンス描画(1 DrawInstanced)。色はインスタンス毎。
@@ -131,7 +137,7 @@ namespace YoRigine {
 #endif
 
         // ── Frustum culling ──────────────────────────────
-        bool  enableDrawFrustumCulling_ = false;  // 描画でカリングするか
+        bool  enableDrawFrustumCulling_ = true;  // 描画でカリングするか
         float drawBoundsScaleFactor_    = 2.0f;   // スケール → 半サイズ係数 (コライダー無いとき)
 
         std::vector<int> copyObjectIDs_;
@@ -144,6 +150,7 @@ namespace YoRigine {
 #ifdef USE_IMGUI
         ModelBrowser  browser_;
         SceneEditorUI editorUI_;
+        StampMode stampMode_;
         GizmoController gizmoCtrl_;
         std::vector<PlacedObjectGizmable> gizmables_;
 #endif

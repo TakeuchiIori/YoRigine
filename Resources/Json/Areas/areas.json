@@ -9,7 +9,7 @@
         "debugDraw": true,
         "groundBottom": 0.0,
         "groundTop": 100.0,
-        "radius": 150.0
+        "radius": 100.0
     },
     "_index": {
         "names": [

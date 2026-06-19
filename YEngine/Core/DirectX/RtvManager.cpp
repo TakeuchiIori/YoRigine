@@ -9,6 +9,39 @@
 #include "d3dx12.h"
 #include <cassert>
 
+namespace {
+	// SRGB等の型付きフォーマットから対応するTYPELESS族フォーマットを返す
+	DXGI_FORMAT GetTypelessFormat(DXGI_FORMAT fmt) {
+		switch (fmt) {
+		case DXGI_FORMAT_R8G8B8A8_UNORM:
+		case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
+			return DXGI_FORMAT_R8G8B8A8_TYPELESS;
+		case DXGI_FORMAT_B8G8R8A8_UNORM:
+		case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB:
+			return DXGI_FORMAT_B8G8R8A8_TYPELESS;
+		case DXGI_FORMAT_R16G16B16A16_FLOAT:
+			return DXGI_FORMAT_R16G16B16A16_TYPELESS;
+		case DXGI_FORMAT_R32G32B32A32_FLOAT:
+			return DXGI_FORMAT_R32G32B32A32_TYPELESS;
+		default:
+			// 既にTYPELESSやUAV直接可なフォーマット
+			return fmt;
+		}
+	}
+
+	// SRGBフォーマットを対応する非SRGB変種にマップ (UAV用)
+	DXGI_FORMAT GetUAVCompatibleFormat(DXGI_FORMAT fmt) {
+		switch (fmt) {
+		case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
+			return DXGI_FORMAT_R8G8B8A8_UNORM;
+		case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB:
+			return DXGI_FORMAT_B8G8R8A8_UNORM;
+		default:
+			return fmt;
+		}
+	}
+}
+
 /// <summary>
 /// RTV マネージャーの初期化（ディスクリプタヒープ作成）
 /// </summary>
@@ -39,7 +72,8 @@ uint32_t RtvManager::Create(
 	uint32_t height,
 	DXGI_FORMAT format,
 	const Vector4& clearColor,
-	bool createSRV)
+	bool createSRV,
+	bool createUAV)
 {
 	// 同名チェック
 	assert(nameToIndex_.find(name) == nameToIndex_.end());
@@ -52,7 +86,7 @@ uint32_t RtvManager::Create(
 	rt->height = height;
 	rt->format = format;
 
-	// クリア値
+	// クリア値 (RTVと同じ型付きフォーマット)
 	rt->clearValue.Format = format;
 	rt->clearValue.Color[0] = clearColor.x;
 	rt->clearValue.Color[1] = clearColor.y;
@@ -60,7 +94,9 @@ uint32_t RtvManager::Create(
 	rt->clearValue.Color[3] = clearColor.w;
 
 	//-------------------- リソース作成 --------------------//
-	rt->resource = CreateRenderTextureResource(width, height, rt->clearValue);
+	// UAVが必要なら TYPELESS リソース + UAVフラグで作成。
+	// SRGB等の型付き挙動は RTV/SRV/UAV それぞれのビューで指定する。
+	rt->resource = CreateRenderTextureResource(width, height, rt->clearValue, createUAV);
 
 	//-------------------- RTV 作成 --------------------//
 	D3D12_RENDER_TARGET_VIEW_DESC rtvDesc{};
@@ -83,13 +119,44 @@ uint32_t RtvManager::Create(
 	if (createSRV) {
 		rt->srvIndex = SrvManager::GetInstance()->Allocate();
 
-		SrvManager::GetInstance()->CreateSRVforRenderTexture(
-			rt->srvIndex,
-			rt->resource.Get()
-		);
+		if (createUAV) {
+			// TYPELESS リソースには明示的にフォーマットを指定する
+			D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+			srvDesc.Format = format;
+			srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+			srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+			srvDesc.Texture2D.MipLevels = 1;
+
+			deviceManager_->GetDevice()->CreateShaderResourceView(
+				rt->resource.Get(),
+				&srvDesc,
+				SrvManager::GetInstance()->GetCPUDescriptorHandle(rt->srvIndex)
+			);
+		} else {
+			SrvManager::GetInstance()->CreateSRVforRenderTexture(
+				rt->srvIndex,
+				rt->resource.Get()
+			);
+		}
 
 		rt->srvHandleCPU = SrvManager::GetInstance()->GetCPUDescriptorHandle(rt->srvIndex);
 		rt->srvHandleGPU = SrvManager::GetInstance()->GetGPUDescriptorHandle(rt->srvIndex);
+	}
+
+	//-------------------- UAV 作成（必要な場合） --------------------//
+	if (createUAV) {
+		rt->uavIndex = SrvManager::GetInstance()->Allocate();
+
+		// SRGBはUAV不可なので、対応する非SRGBフォーマットでビューを作成
+		const DXGI_FORMAT uavFormat = GetUAVCompatibleFormat(format);
+		SrvManager::GetInstance()->CreateUAVforRenderTexture(
+			rt->uavIndex,
+			rt->resource.Get(),
+			uavFormat
+		);
+
+		rt->uavHandleCPU = SrvManager::GetInstance()->GetCPUDescriptorHandle(rt->uavIndex);
+		rt->uavHandleGPU = SrvManager::GetInstance()->GetGPUDescriptorHandle(rt->uavIndex);
 	}
 
 	//-------------------- 登録 --------------------//
@@ -311,20 +378,25 @@ void RtvManager::CreateHeap(uint32_t maxCount)
 
 /// <summary>
 /// RenderTarget用のTexture2D リソース作成
+/// allowUAV=true の場合はTYPELESSリソースを生成してUAVフラグを付与する。
 /// </summary>
 Microsoft::WRL::ComPtr<ID3D12Resource>
-RtvManager::CreateRenderTextureResource(uint32_t width, uint32_t height, const D3D12_CLEAR_VALUE& clearValue)
+RtvManager::CreateRenderTextureResource(uint32_t width, uint32_t height, const D3D12_CLEAR_VALUE& clearValue, bool allowUAV)
 {
 	D3D12_RESOURCE_DESC desc{};
 	desc.Width = width;
 	desc.Height = height;
 	desc.MipLevels = 1;
 	desc.DepthOrArraySize = 1;
-	desc.Format = clearValue.Format;
+	// UAV対応時は TYPELESS にして、ビュー側で型付け (SRGB RTV/SRV + UNORM UAV)
+	desc.Format = allowUAV ? GetTypelessFormat(clearValue.Format) : clearValue.Format;
 	desc.SampleDesc.Count = 1;
 	desc.SampleDesc.Quality = 0;
 	desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
 	desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+	if (allowUAV) {
+		desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+	}
 	desc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 
 	D3D12_HEAP_PROPERTIES heapProps{};

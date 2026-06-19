@@ -102,8 +102,17 @@ void OBBCollider::Update()
 	// 回転を合成（ワールド回転 * オフセット回転）
 	Matrix4x4 combinedRotMatrix = Multiply(worldRotMatrix, offsetRotMatrix);
 
-	// オフセット位置をワールド回転で変換
-	Vector3 rotatedOffset = Transform(obbOffset_.center, worldRotMatrix);
+	// オフセット中心をワールドスケールで拡大してからワールド回転で変換する。
+	// obbOffset_.center はモデルローカル空間（スケール適用前）の値なので、
+	// worldScale を乗じないとスケールされたオブジェクトでセンターがズレる。
+	//   誤: Transform(center, rotOnly)        ← スケール未考慮
+	//   正: Transform(center * scale, rotOnly) ← スケール → 回転の順に適用
+	Vector3 scaledCenter = {
+		obbOffset_.center.x * worldScale.x,
+		obbOffset_.center.y * worldScale.y,
+		obbOffset_.center.z * worldScale.z,
+	};
+	Vector3 rotatedOffset = Transform(scaledCenter, worldRotMatrix);
 
 	obb_.center = worldPosition + rotatedOffset;
 

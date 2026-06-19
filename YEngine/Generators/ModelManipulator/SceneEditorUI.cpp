@@ -12,6 +12,9 @@
 #include "ObjectSelector.h"
 #include "Ray/Raycast.h"
 
+// C++
+#include <cstdio>
+
 // ImGui
 #include "imgui.h"
 
@@ -57,6 +60,20 @@ namespace YoRigine {
                 SnapSelectedToSurface();
             }
             if (!hasSel) ImGui::EndDisabled();
+
+            // スタンプモード: 選択中オブジェクトをクリック連打で連続配置
+            const bool stamping = stampActiveQuery_ && stampActiveQuery_();
+            if (stamping) {
+                if (ImGui::MenuItem("スタンプ配置を終了", "Esc / 右クリック")) {
+                    if (exitStampCallback_) exitStampCallback_();
+                }
+            } else {
+                if (!hasSel) ImGui::BeginDisabled();
+                if (ImGui::MenuItem("スタンプ配置を開始", "B")) {
+                    if (startStampCallback_) startStampCallback_();
+                }
+                if (!hasSel) ImGui::EndDisabled();
+            }
 
             // グリッドスナップ (GizmoController の useSnap/snapValues を直接操作)
             if (gizmoCtrl_) {
@@ -167,6 +184,21 @@ namespace YoRigine {
             auto* obj = objects[i];
             if (!obj) continue;
 
+            ImGui::PushID(obj->id);
+
+            // 行頭の鍵トグル: false にすると Pick パスに描画されず、
+            // ビューポートのクリックで選択候補から外れる (地面・スカイ等の固定背景用)。
+            const char* lockLabel = obj->pickable ? "[ ]" : "[L]";
+            if (ImGui::SmallButton(lockLabel)) {
+                obj->pickable = !obj->pickable;
+            }
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip(obj->pickable
+                    ? "クリックで選択ロック (Pick から除外)"
+                    : "ロック中: ビューポートクリックで選ばれない");
+            }
+            ImGui::SameLine();
+
             bool isSel = selector_->IsSelected(obj->id);
             std::string label = "オブジェクト " + std::to_string(obj->id)
                 + " (" + obj->modelName + ")";
@@ -181,6 +213,8 @@ namespace YoRigine {
                 }
                 ImGui::EndPopup();
             }
+
+            ImGui::PopID();
         }
 
         ImGui::Separator();
@@ -219,6 +253,20 @@ namespace YoRigine {
         auto* obj = objectManager_->GetObjectById(selector_->GetPrimaryId());
         if (obj) {
             ImGui::Text("オブジェクトID %d: %s", obj->id, obj->modelName.c_str());
+
+            // ── nameTag (シーン内一意名 / TriggerAction のターゲット参照用) ────────
+            {
+                char buf[128];
+                std::snprintf(buf, sizeof(buf), "%s", obj->nameTag.c_str());
+                if (ImGui::InputText("名前(nameTag)", buf, sizeof(buf))) {
+                    obj->nameTag = buf;
+                }
+                if (obj->nameTag.empty()) {
+                    ImGui::SameLine();
+                    ImGui::TextDisabled("(未命名)");
+                }
+            }
+
             ImGui::Separator();
 
             bool changed = false;
@@ -237,7 +285,41 @@ namespace YoRigine {
 
             if (ImGui::DragFloat3("スケール", &obj->scale.x, 0.01f, 0.01f, 10.0f)) changed = true;
 
+            // ── アンカーポイント (回転の旋回中心) ──────────────────
+            if (ImGui::Checkbox("アンカー使用", &obj->useAnchorPoint)) changed = true;
+            if (obj->useAnchorPoint) {
+                if (ImGui::DragFloat3("アンカー位置 (ローカル)", &obj->anchorPoint.x, 0.05f)) changed = true;
+                ImGui::TextDisabled("ヒンジ扉なら端の位置を入れる (例: (0.5, 0, 0))");
+            }
+
             if (changed) objectManager_->UpdateObjectTransform(*obj);
+
+            // ── マテリアル色 ────────────────────────────────────────
+            ImGui::Separator();
+            if (ImGui::ColorEdit4("色", &obj->color.x,
+                ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_AlphaPreviewHalf)) {
+                objectManager_->ApplyObjectColor(*obj);
+            }
+            ImGui::SameLine();
+            if (ImGui::SmallButton("白に戻す")) {
+                obj->color = { 1.0f, 1.0f, 1.0f, 1.0f };
+                objectManager_->ApplyObjectColor(*obj);
+            }
+
+            // ── UV スケール ─────────────────────────────────────────
+            if (ImGui::DragFloat2("UV スケール", &obj->uvScale.x, 0.01f, 0.0f, 100.0f, "%.3f")) {
+                objectManager_->ApplyObjectUV(*obj);
+            }
+            ImGui::SameLine();
+            if (ImGui::SmallButton("UV リセット")) {
+                obj->uvScale = { 1.0f, 1.0f };
+                obj->uvStochastic = 0.0f;
+                objectManager_->ApplyObjectUV(*obj);
+            }
+            // タイル単位ハッシュランダム化 (タイリングの“絨毯感”を消す)
+            if (ImGui::SliderFloat("UV ランダム化", &obj->uvStochastic, 0.0f, 1.0f, "%.2f")) {
+                objectManager_->ApplyObjectUV(*obj);
+            }
 
             ImGui::Separator();
 
@@ -350,6 +432,22 @@ namespace YoRigine {
 
                 if (changed) {
                     objectManager_->ApplyColliderTemplate(*obj);
+                }
+
+                // ── モデル形状への自動フィット ──
+                ImGui::Separator();
+                ImGui::TextDisabled("自動フィット");
+                ImGui::SetNextItemWidth(120.0f);
+                ImGui::DragFloat("マージン", &colliderFitMargin_, 0.01f, 1.0f, 2.0f, "x %.2f");
+                ImGui::SameLine();
+                if (ImGui::Button("モデルに合わせる")) {
+                    if (!objectManager_->FitColliderToModel(*obj, colliderFitMargin_)) {
+                        ImGui::OpenPopup("FitColliderFailed");
+                    }
+                }
+                if (ImGui::BeginPopup("FitColliderFailed")) {
+                    ImGui::TextUnformatted("モデルの頂点を取得できませんでした。");
+                    ImGui::EndPopup();
                 }
 
                 ImGui::EndChild();

@@ -1,84 +1,4 @@
 {
-    "Mushnub_Evolved": {
-        "alertDuration": 0.800000011920929,
-        "battleEnemyId": "mushnub",
-        "battleFormation": "default",
-        "battleTypeStr": "Single",
-        "chaseRange": 12.0,
-        "chaseSpeed": 5.0,
-        "enemyId": "Mushnub_Evolved",
-        "modelPath": "Mushnub_Evolved.obj",
-        "noiseDetectionRange": 8.0,
-        "patrolRadius": 4.0,
-        "patrolSpeed": 2.5,
-        "returnDistance": 18.0,
-        "rotationSpeed": 5.0,
-        "scale": {
-            "x": 0.800000011920929,
-            "y": 0.800000011920929,
-            "z": 0.800000011920929
-        },
-        "searchDuration": 3.0,
-        "searchSweepAngle": 70.0,
-        "spotLightColor": {
-            "a": 1.0,
-            "b": -1.0,
-            "g": -1.0,
-            "r": 1.0
-        },
-        "spotLightDecay": 0.10000000149011612,
-        "spotLightIntensity": 1000.0,
-        "spotLightOffset": {
-            "x": 0.0,
-            "y": 0.800000011920929,
-            "z": 0.0
-        },
-        "spotLightPitch": -0.4099999964237213,
-        "useCustomColor": false,
-        "useSpotLight": true,
-        "viewAngle": 60.0,
-        "viewDistance": 15.0
-    },
-    "GreenSpikyBlob": {
-        "alertDuration": 0.800000011920929,
-        "battleEnemyId": "green_blob",
-        "battleFormation": "default",
-        "battleTypeStr": "Single",
-        "chaseRange": 8.0,
-        "chaseSpeed": 3.0,
-        "enemyId": "GreenSpikyBlob",
-        "modelPath": "GreenSpikyBlob.obj",
-        "noiseDetectionRange": 8.0,
-        "patrolRadius": 7.0,
-        "patrolSpeed": 1.5,
-        "returnDistance": 12.0,
-        "rotationSpeed": 5.0,
-        "scale": {
-            "x": 1.5,
-            "y": 1.5,
-            "z": 1.5
-        },
-        "searchDuration": 3.0,
-        "searchSweepAngle": 70.0,
-        "spotLightColor": {
-            "a": 1.0,
-            "b": -1.0,
-            "g": -1.0,
-            "r": 1.0
-        },
-        "spotLightDecay": 0.10000000149011612,
-        "spotLightIntensity": 1000.0,
-        "spotLightOffset": {
-            "x": 0.0,
-            "y": 0.800000011920929,
-            "z": 0.0
-        },
-        "spotLightPitch": -0.4300000071525574,
-        "useCustomColor": false,
-        "useSpotLight": true,
-        "viewAngle": 60.0,
-        "viewDistance": 15.0
-    },
     "Alien": {
         "alertDuration": 0.800000011920929,
         "battleEnemyId": "alien",
@@ -87,8 +7,15 @@
         "chaseRange": 10.0,
         "chaseSpeed": 4.0,
         "enemyId": "Alien",
+        "modelColor": {
+            "w": 1.0,
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
         "modelPath": "Alien.obj",
         "noiseDetectionRange": 8.0,
+        "pathRefreshInterval": 0.30000001192092896,
         "patrolRadius": 5.0,
         "patrolSpeed": 2.0,
         "returnDistance": 15.0,
@@ -101,10 +28,10 @@
         "searchDuration": 3.0,
         "searchSweepAngle": 70.0,
         "spotLightColor": {
-            "a": 1.0,
-            "b": -1.0,
-            "g": -1.0,
-            "r": 1.0
+            "w": 1.0,
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
         },
         "spotLightDecay": 0.10000000149011612,
         "spotLightIntensity": 1000.0,
@@ -119,16 +46,120 @@
         "viewAngle": 60.0,
         "viewDistance": 15.0
     },
+    "GreenSpikyBlob": {
+        "alertDuration": 0.800000011920929,
+        "battleEnemyId": "green_blob",
+        "battleFormation": "default",
+        "battleTypeStr": "Single",
+        "chaseRange": 8.0,
+        "chaseSpeed": 5.0,
+        "enemyId": "GreenSpikyBlob",
+        "modelColor": {
+            "w": 1.0,
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "modelPath": "GreenSpikyBlob.obj",
+        "noiseDetectionRange": 8.0,
+        "pathRefreshInterval": 0.30000001192092896,
+        "patrolRadius": 7.0,
+        "patrolSpeed": 1.5,
+        "returnDistance": 12.0,
+        "rotationSpeed": 5.0,
+        "scale": {
+            "x": 1.5,
+            "y": 1.5,
+            "z": 1.5
+        },
+        "searchDuration": 3.0,
+        "searchSweepAngle": 70.0,
+        "spotLightColor": {
+            "w": 1.0,
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "spotLightDecay": 0.10000000149011612,
+        "spotLightIntensity": 1000.0,
+        "spotLightOffset": {
+            "x": 0.0,
+            "y": 0.800000011920929,
+            "z": 0.0
+        },
+        "spotLightPitch": -0.4300000071525574,
+        "useCustomColor": false,
+        "useSpotLight": true,
+        "viewAngle": 60.0,
+        "viewDistance": 15.0
+    },
+    "Mushnub_Evolved": {
+        "alertDuration": 0.800000011920929,
+        "battleEnemyId": "mushnub",
+        "battleFormation": "default",
+        "battleTypeStr": "Single",
+        "chaseRange": 12.0,
+        "chaseSpeed": 5.0,
+        "enemyId": "Mushnub_Evolved",
+        "modelColor": {
+            "w": 1.0,
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "modelPath": "Mushnub_Evolved.obj",
+        "noiseDetectionRange": 8.0,
+        "pathRefreshInterval": 0.30000001192092896,
+        "patrolRadius": 4.0,
+        "patrolSpeed": 2.5,
+        "returnDistance": 18.0,
+        "rotationSpeed": 5.0,
+        "scale": {
+            "x": 0.800000011920929,
+            "y": 0.800000011920929,
+            "z": 0.800000011920929
+        },
+        "searchDuration": 3.0,
+        "searchSweepAngle": 70.0,
+        "spotLightColor": {
+            "w": 1.0,
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "spotLightDecay": 0.10000000149011612,
+        "spotLightIntensity": 1000.0,
+        "spotLightOffset": {
+            "x": 0.0,
+            "y": 0.800000011920929,
+            "z": 0.0
+        },
+        "spotLightPitch": -0.4099999964237213,
+        "useCustomColor": false,
+        "useSpotLight": true,
+        "viewAngle": 60.0,
+        "viewDistance": 15.0
+    },
     "NewEnemy_1": {
         "alertDuration": 0.800000011920929,
         "battleEnemyId": "alien",
-        "battleFormation": "default",
-        "battleTypeStr": "Single",
+        "battleEnemyIds": [
+            "mushnub"
+        ],
+        "battleFormation": "dual",
+        "battleTypeStr": "Group",
         "chaseRange": 10.0,
         "chaseSpeed": 4.0,
         "enemyId": "NewEnemy_1",
-        "modelPath": "Alien.obj",
+        "modelColor": {
+            "w": 1.0,
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "modelPath": "Mushnub_Evolved.obj",
         "noiseDetectionRange": 8.0,
+        "pathRefreshInterval": 0.30000001192092896,
         "patrolRadius": 5.0,
         "patrolSpeed": 2.0,
         "returnDistance": 15.0,
@@ -141,19 +172,19 @@
         "searchDuration": 3.0,
         "searchSweepAngle": 70.0,
         "spotLightColor": {
-            "a": 1.0,
-            "b": 0.0,
-            "g": 0.0,
-            "r": 1.0
+            "w": 1.0,
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
         },
-        "spotLightDecay": 0.30000001192092896,
+        "spotLightDecay": 1.0,
         "spotLightIntensity": 1000.0,
         "spotLightOffset": {
             "x": 0.0,
             "y": 0.800000011920929,
             "z": 0.0
         },
-        "spotLightPitch": -0.20000000298023224,
+        "spotLightPitch": -0.4399999976158142,
         "useCustomColor": false,
         "useSpotLight": true,
         "viewAngle": 60.0,
@@ -161,6 +192,7 @@
     },
     "NewEnemy_2": {
         "alertDuration": 0.800000011920929,
+        "battleEnemyId": "",
         "battleEnemyIds": [
             "green_blob",
             "green_blob"
@@ -170,8 +202,15 @@
         "chaseRange": 10.0,
         "chaseSpeed": 4.0,
         "enemyId": "NewEnemy_2",
+        "modelColor": {
+            "w": 1.0,
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
         "modelPath": "GreenSpikyBlob.obj",
         "noiseDetectionRange": 8.0,
+        "pathRefreshInterval": 0.30000001192092896,
         "patrolRadius": 5.0,
         "patrolSpeed": 2.0,
         "returnDistance": 15.0,
@@ -184,10 +223,10 @@
         "searchDuration": 3.0,
         "searchSweepAngle": 70.0,
         "spotLightColor": {
-            "a": 1.0,
-            "b": -1.0,
-            "g": -1.0,
-            "r": 1.0
+            "w": 1.0,
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
         },
         "spotLightDecay": 0.10000000149011612,
         "spotLightIntensity": 1000.0,

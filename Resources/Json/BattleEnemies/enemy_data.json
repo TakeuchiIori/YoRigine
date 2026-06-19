@@ -2,7 +2,7 @@
     "battleEnemies": [
         {
             "approachStateRange": 15.0,
-            "attack": 18,
+            "attack": 15,
             "attackParams": {
                 "chargeRush": {
                     "chargeTime": 1.75,
@@ -131,7 +131,7 @@
         },
         {
             "approachStateRange": 15.0,
-            "attack": 22,
+            "attack": 16,
             "attackParams": {
                 "chargeRush": {
                     "chargeTime": 1.5,

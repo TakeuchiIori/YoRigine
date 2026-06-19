@@ -3,6 +3,10 @@
 struct Material
 {
     float4x4 uvTransform;
+    float    stochasticStrength; // 0 = 通常タイル / 1 = タイル単位ランダムを最大適用
+    float    _pad0;
+    float    _pad1;
+    float    _pad2;
 };
 
 struct MaterialColor
@@ -61,6 +65,39 @@ struct PixelShaderOutput
 
 };
 
+//-----------------------------------------------------------------------------
+// タイル単位ハッシュランダム化サンプル
+//   Inigo Quilez "Texture Repetition" の軽量版 (4-tap)。
+//   各セル毎に乱数オフセットでサンプルし、bilinear で隣接 4 セルをブレンド。
+//-----------------------------------------------------------------------------
+float2 StochasticHash2(float2 p)
+{
+    p = float2(dot(p, float2(127.1f, 311.7f)),
+               dot(p, float2(269.5f, 183.3f)));
+    return frac(sin(p) * 43758.5453f);
+}
+
+float4 SampleStochastic(Texture2D tex, SamplerState sam, float2 uv, float strength)
+{
+    // タイル格子 (uv が 1 進むごとに 1 セル)
+    float2 iuv = floor(uv);
+    float2 fuv = frac(uv);
+
+    // 隣接 4 セルそれぞれの乱数オフセット ([-0.5, 0.5] スケール後)
+    float2 oa = (StochasticHash2(iuv + float2(0.0f, 0.0f)) - 0.5f) * strength;
+    float2 ob = (StochasticHash2(iuv + float2(1.0f, 0.0f)) - 0.5f) * strength;
+    float2 oc = (StochasticHash2(iuv + float2(0.0f, 1.0f)) - 0.5f) * strength;
+    float2 od = (StochasticHash2(iuv + float2(1.0f, 1.0f)) - 0.5f) * strength;
+
+    float4 ca = tex.Sample(sam, uv + oa);
+    float4 cb = tex.Sample(sam, uv + ob);
+    float4 cc = tex.Sample(sam, uv + oc);
+    float4 cd = tex.Sample(sam, uv + od);
+
+    float2 b = smoothstep(0.0f, 1.0f, fuv);
+    return lerp(lerp(ca, cb, b.x), lerp(cc, cd, b.x), b.y);
+}
+
 // プロシージャル 3D ハッシュ（テクスチャ不要のディゾルブマスク用）
 float DissolveHash3D(float3 p)
 {
@@ -117,7 +154,15 @@ PixelShaderOutput main(VertexShaderOutput input)
 
     // UV座標変換とテクスチャサンプリング
     float4 transformedUV = mul(float4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
-    float4 textureColor = gTexture.Sample(gSampler, transformedUV.xy);
+    float4 textureColor;
+    [branch] if (gMaterial.stochasticStrength > 0.001f)
+    {
+        textureColor = SampleStochastic(gTexture, gSampler, transformedUV.xy, gMaterial.stochasticStrength);
+    }
+    else
+    {
+        textureColor = gTexture.Sample(gSampler, transformedUV.xy);
+    }
     float4 baseColor = float4(gMaterialConstant.Kd, 1.0f) * textureColor;
 
     // 初期化

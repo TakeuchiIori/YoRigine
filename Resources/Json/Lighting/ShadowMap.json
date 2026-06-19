@@ -1,7 +1,7 @@
 {
-    "farZ": 212.0,
-    "nearZ": 0.0,
-    "orthoHeight": 214.0,
-    "orthoWidth": 318.0,
-    "shadowDistance": 100.0
+    "farZ": 119.0,
+    "nearZ": 50.0,
+    "orthoHeight": 607.0,
+    "orthoWidth": 454.0,
+    "shadowDistance": 0.0
 }

@@ -3,6 +3,7 @@
 // C++
 #include <memory>
 #include <functional>
+#include <vector>
 
 // Engine
 #include "Systems/Camera/Camera.h"
@@ -16,6 +17,9 @@
 
 // App
 #include "Enemy/FieldEnemy/FieldEnemyManager.h"
+#include "Trigger/EventTrigger.h"
+#include "Trigger/EventTriggerLoader.h"
+#include "Trigger/Actions/OpenGateAction.h"
 
 // Navigation
 #include <Systems/Navigation/NavGrid.h>
@@ -23,6 +27,9 @@
 #include <Systems/Navigation/NavGridConfig.h>
 #include "SceneDataStructures.h"
 #include "BaseSubScene.h"
+
+// JSON
+#include "Loaders/Json/JsonManager.h"
 
 ///************************* フィールドシーン *************************///
 class FieldScene : public BaseSubScene {
@@ -71,6 +78,11 @@ public:
 	// バトルシーンから戻った際の処理
 	void HandleBattleReturn(const FieldReturnData& data);
 
+#ifdef USE_IMGUI
+	// EventTrigger エディタ (Editor::RegisterGameUI から呼ばれる)
+	void DrawEventTriggerEditor();
+#endif
+
 	///************************* アクセッサ *************************///
 
 	// プレイヤーの現在位置を取得
@@ -106,9 +118,28 @@ private:
 	std::unique_ptr<Line> line_;
 	std::unique_ptr<Sprite> sprite_;
 
+	// イベントトリガー (討伐数→扉開放など)。Action は EventTrigger 所有。
+	std::vector<std::unique_ptr<EventTrigger>> eventTriggers_;
+	// FieldEnemyManager の撃破コールバックから dispatch するための弱参照リスト。
+	std::vector<OpenGateAction*> openGateActions_;
+
 	// Navigation
 	NavGridConfig navGridConfig_;  // データドリブン設定（JSON管理）
 	NavGrid navGrid_;
 	NavPathfinder navPathfinder_;
 	bool showNavGridDebug_ = false; // NavGridデバッグ描画ON/OFF
+
+	// エンカウント時に保存するプレイヤー座標。バトル復帰時に SetPosition で復元する。
+	// データパイプライン (BattleTransitionData → FieldReturnData) と二重化することで、
+	// 中継経路でデータが落ちても確実にエンカウント位置に戻れるようにする。
+	Vector3 savedEncounterPos_ = { 0.0f, 0.0f, 0.0f };
+	bool    hasSavedEncounterPos_ = false;
+
+	// プレイヤー初期スポーン (フィールドに最初に降り立つ位置 / 向き)。JSON 保存対象。
+	// バトル復帰時の位置 (HandleBattleReturn) とは別物。
+	Vector3 spawnPos_ = { 0.0f, 0.0f, 0.0f };
+	float   spawnYawDeg_ = 0.0f;
+	// フォローカメラの初期 Euler (deg)。x=pitch / y=yaw / z=roll。
+	Vector3 spawnCameraRotDeg_ = { 0.0f, 0.0f, 0.0f };
+	std::unique_ptr<YoRigine::JsonManager> spawnJson_;
 };

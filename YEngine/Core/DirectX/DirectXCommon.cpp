@@ -259,12 +259,17 @@ namespace YoRigine {
 			D3D12_RESOURCE_STATE_RENDER_TARGET,
 			D3D12_RESOURCE_STATE_GENERIC_READ);
 
-		// MainDepth → SRV
+		// MainDepth → SRV (PS / CS どちらからも読めるように複合状態)
+		// 旧来は PIXEL_SHADER_RESOURCE のみだったが、Fog/GodRays/DepthOutline が
+		// Compute Shader 化されたため NON_PIXEL_SHADER_RESOURCE も要求される。
+		constexpr D3D12_RESOURCE_STATES kDepthReadState =
+			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE |
+			D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 		dsvManager_->TransitionBarrier(
 			cmd.Get(), "MainDepth",
 			depthCurrentState_,
-			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		depthCurrentState_ = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+			kDepthReadState);
+		depthCurrentState_ = kDepthReadState;
 
 		// BackBuffer → RTV
 		rtvManager_->TransitionBarrier(

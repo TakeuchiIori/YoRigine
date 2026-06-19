@@ -211,6 +211,62 @@ void Model::DrawShadow()
 
 }
 
+void Model::DrawInstanced(uint32_t instanceCount, D3D12_GPU_DESCRIPTOR_HANDLE instanceSRV)
+{
+	// Skinning付きはインスタンス対応外 (CSスキニングが per-object 前提のため)
+	assert(!hasBones_ && "Model::DrawInstanced does not support skinned meshes");
+
+	auto pm = YPipelineManager::GetInstance();
+	const auto& indices = pm->GetParameterIndices("ObjectInstanced");
+	auto commandList = modelCommon_->GetDxCommon()->GetCommandList().Get();
+
+	// PSO + RS は呼び出し側 (InstancedObject3d::Flush) でセット済み
+
+	// Per-instance SRV
+	commandList->SetGraphicsRootDescriptorTable(indices.at("gInstances"), instanceSRV);
+
+	// シャドウマップ
+	auto shadowHandle = YoRigine::DirectXCommon::GetInstance()->GetShadowDepthGPUHandle();
+	commandList->SetGraphicsRootDescriptorTable(indices.at("gShadowMap"), shadowHandle);
+
+	// メッシュごとのマテリアル + DrawIndexedInstanced
+	for (size_t i = 0; i < meshes_.size(); ++i) {
+		auto& mesh = meshes_[i];
+		materials_[mesh->GetMaterialIndex()]->RecordDrawCommands(
+			commandList, indices.at("gMaterialConstant"), indices.at("gTexture"));
+
+		if (EnvironmentMap::GetInstance()->GetSrvIndex() != UINT32_MAX) {
+			auto envHandle = EnvironmentMap::GetInstance()->GetSrvHandle();
+			commandList->SetGraphicsRootDescriptorTable(indices.at("gEnvironmentTexture"), envHandle);
+		}
+
+		mesh->RecordDrawCommands(commandList);
+		commandList->DrawIndexedInstanced(mesh->GetIndexCount(), instanceCount, 0, 0, 0);
+
+#ifdef USE_IMGUI
+		DebugConsole::GetInstance()->RecordDrawCall(mesh->GetIndexCount(), instanceCount);
+#endif
+	}
+}
+
+void Model::DrawShadowInstanced(uint32_t instanceCount, D3D12_GPU_DESCRIPTOR_HANDLE instanceSRV)
+{
+	assert(!hasBones_ && "Model::DrawShadowInstanced does not support skinned meshes");
+
+	auto pm = YPipelineManager::GetInstance();
+	const auto& indices = pm->GetParameterIndices("ShadowMapInstanced");
+	auto commandList = modelCommon_->GetDxCommon()->GetCommandList().Get();
+
+	// PSO + RS + gLight は呼び出し側でセット済み
+	commandList->SetGraphicsRootDescriptorTable(indices.at("gInstances"), instanceSRV);
+
+	for (size_t i = 0; i < meshes_.size(); ++i) {
+		auto& mesh = meshes_[i];
+		mesh->RecordDrawCommands(commandList);
+		commandList->DrawIndexedInstanced(mesh->GetIndexCount(), instanceCount, 0, 0, 0);
+	}
+}
+
 
 
 void Model::LoadModelIndexFile(const std::string& directoryPath, const std::string& filename)

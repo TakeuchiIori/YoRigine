@@ -12,6 +12,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 /// <summary>
 /// プレイヤー専用カメラ管理クラス（Game 層のアグリゲーター）。
@@ -64,6 +65,14 @@ public:
     bool          IsLockOn()        const { return isLockOn_; }
 
     // ============================================================
+    // 脅威察知のシーン許可
+    // フィールドでは背景・マップ見渡しを優先して OFF、バトル中だけ ON にする。
+    // 各サブシーンの OnEnter から呼ぶ。
+    // ============================================================
+    void SetThreatAwarenessAllowed(bool v) { threatAwarenessSceneAllowed_ = v; }
+    bool IsThreatAwarenessAllowed() const   { return threatAwarenessSceneAllowed_; }
+
+    // ============================================================
     // FollowCamera への委譲
     // ============================================================
     FollowCamera* GetFollowCamera() const { return followCamera_; }
@@ -92,6 +101,31 @@ private:
     void SwitchLockOnTarget(int direction);  // 0=最近傍, 1=右, -1=左
 
     // ============================================================
+    // 脅威察知（気配）
+    // ロックオンのように特定の敵を中央へ固定するのではなく、周囲の敵の
+    // 「気配」をそれとなく伝える。フリーカメラ時のみ動作する。
+    //   ① 周辺視グランス：視界外/背後に敵がいたら、その方向へごく軽く
+    //      （awarenessMaxYaw_ まで）カメラを傾ける。完全には振り向かない。
+    //   ② 囲まれFOV：近くの敵が増えるほどFOVを少し広げて状況を見渡せるようにする。
+    // ============================================================
+    void  UpdateThreatAwareness(float dt);                    // pre-director：周辺視グランス
+    void  ApplyThreatFovWiden(Camera* sceneCamera, float dt); // post-director：囲まれFOV拡大
+    int   GatherNearbyEnemies(std::vector<BaseCollider*>& out) const;
+    float ComputeGlanceBias() const;
+
+    // 脅威察知パラメータの永続化（FollowCamera の extension JSON に相乗りさせる）
+    void  SaveThreatAwareness(nlohmann::json& j) const;
+    void  LoadThreatAwareness(const nlohmann::json& j);
+
+    // ============================================================
+    // 最終フレーミングガード
+    // 攻撃カメラワークのオフセット適用後に呼び、プレイヤーが
+    // 画角のハードリミットを越えていたら yaw / pitch を引き戻して
+    // 確実にフレーム内へ収める（オフセットを見落とす EnsureTargetInView の後段ガード）。
+    // ============================================================
+    void EnsurePlayerInFrame(Camera* sceneCamera, float dt);
+
+    // ============================================================
     // メンバ
     // ============================================================
     FollowCamera*          followCamera_ = nullptr;
@@ -117,4 +151,35 @@ private:
     float maxPitch_     =  1.2f;
     float rotateSpeed_  = 0.1f;
     float pivotHeight_  = 1.5f;
+
+    // ============================================================
+    // 最終フレーミングガード用パラメータ
+    // ============================================================
+    bool  framingGuardEnabled_ = true;   // ガード自体の ON / OFF
+    float framingHardLimitX_   = 0.85f;  // 横方向ハードリミット（NDC -1〜1、これを越えたら引き戻す）
+    float framingHardLimitY_   = 0.80f;  // 縦方向ハードリミット（NDC -1〜1）
+    float framingGuardSpeed_   = 12.0f;  // 引き戻し速度（rad/秒・はみ出し分に対する最大変化量）
+
+    // ============================================================
+    // 脅威察知（気配）用パラメータ
+    // ============================================================
+    bool  threatAwarenessEnabled_      = true;   // 機能マスタースイッチ（デザイナ調整用）
+    bool  threatAwarenessSceneAllowed_ = false;  // 現在のシーンで許可されているか（バトル中のみ true）
+    float awarenessRange_      = 25.0f;  // この距離内の敵を「気配」対象にする
+
+    // ① 周辺視グランス
+    float awarenessTriggerYaw_ = 0.70f;  // カメラ前方からこの角(rad)以上外れた敵を対象に(≒40°)
+    float awarenessMaxYaw_     = 0.18f;  // グランスの最大ヨー量(rad)(≒10°)。これ以上は向かない＝固定しない
+    float awarenessYawSpeed_   = 4.0f;   // グランスの追従速度
+    float awarenessYawBias_     = 0.0f;  // 現在のグランス量（内部状態）
+    float awarenessAppliedBias_ = 0.0f;  // 前フレームに yaw へ加算した量（テレスコープ適用用）
+
+    // ② 囲まれFOV
+    int   awarenessFovMinCount_ = 2;      // この体数以上で広げ始める
+    float awarenessFovPerEnemy_ = 0.03f;  // 敵1体ごとに広げるFOV(rad)
+    float awarenessFovMax_      = 0.12f;  // FOV拡大の上限(rad)
+    float awarenessFovSpeed_    = 3.0f;   // FOV補間速度
+    float awarenessFovBias_     = 0.0f;   // 現在のFOV拡大量（内部状態）
+
+    bool  stickActiveThisFrame_ = false;  // 今フレーム右スティック操作があったか
 };

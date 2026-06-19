@@ -1,0 +1,20 @@
+{
+    "BlendMode": 1,
+    "Lighting": false,
+    "billboardType": 0,
+    "isRelative": false,
+    "maxParticles": 1000,
+    "mesh": {
+        "params": [
+            50.0,
+            1.0,
+            128.0,
+            16.0
+        ],
+        "type": 5
+    },
+    "name": "BattleArea",
+    "spawnModules": [],
+    "texture": "Resources/Effects/fire_blue.png",
+    "updateModules": []
+}

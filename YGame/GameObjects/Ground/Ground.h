@@ -4,6 +4,9 @@
 #include "Object3D/Object3d.h"
 #include "WorldTransform/WorldTransform.h"
 #include "Systems/Camera/Camera.h"
+#include "Collision/AABB/AABBCollider.h"
+
+#include <memory>
 
 // ============================================================
 // 地面クラス
@@ -45,4 +48,7 @@ private:
 
 	// 地面のワールド座標、回転、スケールを管理するトランスフォーム
 	WorldTransform wt_;
+
+	// スタンプ配置等の Raycast 受け用 AABB (narrow-phase 衝突には参加しない)
+	std::shared_ptr<AABBCollider> collider_;
 };

@@ -15,6 +15,7 @@
 #include <Editor/Editor.h>
 
 #include <UI/Damage/DamageNumberManager.h>
+#include <ModelManipulator/ModelManipulator.h>
 #include <algorithm>
 #ifdef USE_IMGUI
 #include "imgui.h"
@@ -24,15 +25,15 @@
 namespace {
 	// ===== 霧晴れカットシーン演出のタイムライン定数 =====
 	// 時間はすべて秒。Sequencer の全体時間 (duration) は KeyframeCamera のパス長から自動取得。
-	constexpr float kLetterboxInDuration       = 1.0f;     // 黒帯がスライドインする時間
-	constexpr float kLetterboxOutDuration      = 1.0f;     // 黒帯がスライドアウトする時間
-	constexpr float kPostEffectFadeDelay       = 0.5f;     // 黒帯 IN 完了後にエフェクト開始までの余白
-	constexpr float kPostEffectFadeEndMargin   = 0.5f;     // 黒帯 OUT 開始前にエフェクトを終わらせる余白
-	constexpr float kGodRaysExposureMul        = 1.5f;     // 演出中の GodRays 露光倍率
-	constexpr int   kCinematicCamPriority      = 1000;     // 演出中のカメラ優先度
-	constexpr float kFallbackDuration          = 5.0f;     // ClearCinematic 不在時の保険
-	constexpr const char* kCinematicCamName    = "ClearCinematic";
-	constexpr const char* kClearSceneName      = "Clear";
+	constexpr float kLetterboxInDuration = 1.0f;     // 黒帯がスライドインする時間
+	constexpr float kLetterboxOutDuration = 1.0f;     // 黒帯がスライドアウトする時間
+	constexpr float kPostEffectFadeDelay = 0.5f;     // 黒帯 IN 完了後にエフェクト開始までの余白
+	constexpr float kPostEffectFadeEndMargin = 0.5f;     // 黒帯 OUT 開始前にエフェクトを終わらせる余白
+	constexpr float kGodRaysExposureMul = 1.5f;     // 演出中の GodRays 露光倍率
+	constexpr int   kCinematicCamPriority = 1000;     // 演出中のカメラ優先度
+	constexpr float kFallbackDuration = 5.0f;     // ClearCinematic 不在時の保険
+	constexpr const char* kCinematicCamName = "ClearCinematic";
+	constexpr const char* kClearSceneName = "Clear";
 }
 
 /// <summary>
@@ -103,6 +104,14 @@ void BattleScene::Initialize(Camera* camera, Player* player) {
 #ifdef USE_IMGUI
 	Editor::GetInstance()->RegisterGameUI("バトルモード:デバッグ情報", [this]() { battleEnemyManager_->ShowDebugInfo(); }, "Game");
 #endif
+
+	//------------------------------------------------------------
+	// オブジェクトの先行ロード
+	//------------------------------------------------------------
+	// OnEnter での初回 LoadScene("Battle") は JSON パース＋モデルロードが走り、
+	// シーン遷移時にヒッチが出る。先に Stash に積んでおくと、直後の
+	// SwitchToScene("Field") で自動 Stash → 初回バトル突入時は TryRestore で復元される。
+	YoRigine::ModelManipulator::GetInstance()->LoadScene("Battle");
 }
 
 /// <summary>
@@ -124,7 +133,7 @@ void BattleScene::Update() {
 
 		// チェーンから Fog / GodRays を引っ張る（無ければ tween をスキップ）
 		auto* chain = PostEffectManager::GetInstance()->GetEffectChain();
-		auto* fog     = chain ? chain->GetFirstEffectByType(OffScreen::OffScreenEffectType::Fog)     : nullptr;
+		auto* fog = chain ? chain->GetFirstEffectByType(OffScreen::OffScreenEffectType::Fog) : nullptr;
 		auto* godRays = chain ? chain->GetFirstEffectByType(OffScreen::OffScreenEffectType::GodRays) : nullptr;
 
 		// シーケンス全体時間 = KeyframeCamera "ClearCinematic" のパス長
@@ -137,14 +146,14 @@ void BattleScene::Update() {
 
 		// エフェクトフェード時刻（黒帯 OUT 開始前に余白を確保して終わらせる）
 		const float fadeStart = kPostEffectFadeDelay;
-		const float fadeEnd   = std::max(
+		const float fadeEnd = std::max(
 			fadeStart + 0.1f,
 			duration - kLetterboxOutDuration - kPostEffectFadeEndMargin);
 
 		auto seq = std::make_unique<YoRigine::CinematicSequencer>(duration);
 
 		// --- レターボックス ---
-		seq->Letterbox(true,  0.0f, kLetterboxInDuration,
+		seq->Letterbox(true, 0.0f, kLetterboxInDuration,
 			Easing::Function::EaseOutCubic);
 		seq->Letterbox(false, duration - kLetterboxOutDuration, duration,
 			Easing::Function::EaseInCubic);
@@ -152,20 +161,20 @@ void BattleScene::Update() {
 		// --- Fog を 0 に補間（density / heightDensity / sunInscatter）---
 		if (fog) {
 			const auto& f = fog->params.fog;
-			seq->Tween([fog](float v){ fog->params.fog.fogDensity = v; },
+			seq->Tween([fog](float v) { fog->params.fog.fogDensity = v; },
 				f.fogDensity, 0.0f, fadeStart, fadeEnd, Easing::Function::EaseOutCubic);
 
-			seq->Tween([fog](float v){ fog->params.fog.heightFogDensity = v; },
+			seq->Tween([fog](float v) { fog->params.fog.heightFogDensity = v; },
 				f.heightFogDensity, 0.0f, fadeStart, fadeEnd, Easing::Function::EaseOutCubic);
 
-			seq->Tween([fog](float v){ fog->params.fog.sunInscatterStrength = v; },
+			seq->Tween([fog](float v) { fog->params.fog.sunInscatterStrength = v; },
 				f.sunInscatterStrength, 0.0f, fadeStart, fadeEnd, Easing::Function::EaseOutCubic);
 		}
 
 		// --- GodRays exposure を倍率倍へ（光が射す印象を強化）---
 		if (godRays) {
 			const float curExposure = godRays->params.godRays.exposure;
-			seq->Tween([godRays](float v){ godRays->params.godRays.exposure = v; },
+			seq->Tween([godRays](float v) { godRays->params.godRays.exposure = v; },
 				curExposure, curExposure * kGodRaysExposureMul,
 				fadeStart, fadeEnd, Easing::Function::EaseInOutSine);
 		}
@@ -175,7 +184,7 @@ void BattleScene::Update() {
 		seq->Camera(kCinematicCamName, 0.0f, duration, kCinematicCamPriority);
 
 		// 演出終了 → Clear へ遷移
-		seq->OnFinish([](){ SceneManager::GetInstance()->ChangeScene(kClearSceneName); });
+		seq->OnFinish([]() { SceneManager::GetInstance()->ChangeScene(kClearSceneName); });
 
 		YoRigine::CinematicManager::GetInstance()->Play(std::move(seq));
 		return;
@@ -203,7 +212,7 @@ void BattleScene::Update() {
 
 	// UI更新
 	lockOnUI_->Update();
-	DamageNumberManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime(),sceneCamera_->GetViewProjectionMatrix());
+	DamageNumberManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime(), sceneCamera_->GetViewProjectionMatrix());
 
 	// エリア制限補正
 	AreaManager::GetInstance()->UpdateSingleObject(&player_->GetWT());
@@ -229,6 +238,9 @@ void BattleScene::DrawObject() {
 /// </summary>
 void BattleScene::DrawLine() {
 #ifdef USE_IMGUI
+	// フレーム冒頭の頂点・マテリアル CB スロットのリセット (複数の DrawLine() 呼出の干渉を避ける)
+	line_->Reset();
+
 	if (battleEnemyManager_) {
 		battleEnemyManager_->DrawCollision();
 	}
@@ -236,9 +248,13 @@ void BattleScene::DrawLine() {
 	player_->DrawCollision();
 	player_->DrawBone(*line_.get());
 	AreaManager::GetInstance()->DrawArea("BattleArea", line_.get());
+	// AreaEditor で追加した他エリアもまとめて描画(BattleArea は重複描画を避けて除外)
+	AreaManager::GetInstance()->Draw(line_.get(), { "BattleArea" });
 
-	// 全 KeyframeCamera のパス/球マーカーを描画（編集中の可視化）
-	CameraDirector::GetInstance()->DrawDebug3D(*line_.get());
+	// LineManager にキューイングされた頂点をここで GPU 提出。
+	// これを呼ばないと AreaManager の Draw 系はバッファに溜まったまま画面に出ない。
+	line_->DrawLine();
+
 #endif
 }
 
@@ -247,11 +263,17 @@ void BattleScene::DrawLine() {
 /// </summary>
 void BattleScene::DrawUI() {
 	//sprite_->Draw();
+
+	// 演出中（クリアカットシーン等）はゲームプレイ用UIを一切描画しない
+	if (YoRigine::CinematicManager::GetInstance()->IsActive()) return;
+
 	if (battleEnemyManager_) {
 		battleEnemyManager_->DrawUI();
 		DamageNumberManager::GetInstance()->Draw();
-		
-		if (player_->IsAlive()) {
+
+		// ポーズ中はロックオンUIだけ隠す
+		// （ポーズUIは GameUI 側でこの後に描画されるため、ここで出すと前面に被ってしまう）
+		if (player_->IsAlive() && !YoRigine::GameTime::IsPause()) {
 			lockOnUI_->Draw();
 		}
 	}
@@ -275,7 +297,17 @@ void BattleScene::DrawShadow()
 void BattleScene::OnEnter() {
 	BaseSubScene::OnEnter();
 
+	// 脅威察知（気配）はバトル中だけ有効化（フィールドでは背景・マップ見渡しを優先）
+	if (player_ && player_->GetPlayerCamera()) {
+		player_->GetPlayerCamera()->SetThreatAwarenessAllowed(true);
+	}
+
 	Logger("[BattleScene] ===== OnEnter() START =====\n");
+
+	// バトル用 ModelManipulator シーンへ切替。
+	// Battle.json が無い場合は空シーンになる。初回は GameScene.json から
+	// バトル用に置くものだけ残して保存して Battle.json を作る。
+	YoRigine::ModelManipulator::GetInstance()->LoadScene("Battle");
 
 	// カメラリセット
 	currentCameraMode_ = CameraMode::FOLLOW;

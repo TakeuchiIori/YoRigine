@@ -76,6 +76,18 @@ void ObjectManager::Update() {
 /// 全オブジェクト削除して終了
 /// </summary>
 void ObjectManager::Finalize() {
+	// 退避中シーンを掃除 (PlacedObject を pool に戻し、collider を Manager から外す)
+	if (!stashedScenes_.empty()) {
+		auto* cm = YoRigine::CollisionManager::GetInstance();
+		for (auto& [name, stashed] : stashedScenes_) {
+			for (auto& [id, obj] : stashed.objects) {
+				if (!obj) continue;
+				if (obj->collider) cm->RemoveCollider(obj->collider.get());
+				objectPool_.Free(obj);
+			}
+		}
+		stashedScenes_.clear();
+	}
 	ClearAllObjects();
 	delete instance_;
 	instance_ = nullptr;
@@ -145,11 +157,69 @@ void ObjectManager::DeleteObjectByPointer(PlacedObject* obj) {
 /// 全オブジェクト削除
 /// </summary>
 void ObjectManager::ClearAllObjects() {
+	// 現在シーン分の PlacedObject だけ pool に戻す。
+	// objectPool_.Clear() を呼ぶと StashCurrentAs 経由で退避中のシーンの PlacedObject も
+	// destruct してしまい、TryRestore したときに dangling になるため使わない。
+	auto* cm = YoRigine::CollisionManager::GetInstance();
+	for (auto& [id, obj] : idToObject_) {
+		if (!obj) continue;
+		if (obj->collider) cm->RemoveCollider(obj->collider.get());
+		objectPool_.Free(obj);
+	}
 	idToObject_.clear();
-	objectPool_.Clear();
 	nextObjectId_ = 0;
 
-	std::cout << "すべてのオブジェクトを削除しました。" << std::endl;
+	std::cout << "現在シーンのオブジェクトを削除しました。" << std::endl;
+}
+
+
+void ObjectManager::StashCurrentAs(const std::string& sceneName) {
+	auto* cm = YoRigine::CollisionManager::GetInstance();
+
+	// 同名の退避が既にある場合は古い方を破棄 (pool に戻す + collider を Manager から外す)。
+	auto existing = stashedScenes_.find(sceneName);
+	if (existing != stashedScenes_.end()) {
+		for (auto& [id, obj] : existing->second.objects) {
+			if (!obj) continue;
+			if (obj->collider) cm->RemoveCollider(obj->collider.get());
+			objectPool_.Free(obj);
+		}
+		stashedScenes_.erase(existing);
+	}
+
+	// 現在のシーンの collider を判定対象から外す
+	for (auto& [id, obj] : idToObject_) {
+		if (obj && obj->collider) cm->RemoveCollider(obj->collider.get());
+	}
+
+	StashedScene s;
+	s.objects = std::move(idToObject_);
+	s.nextObjectId = nextObjectId_;
+	stashedScenes_[sceneName] = std::move(s);
+
+	idToObject_.clear();
+	nextObjectId_ = 0;
+}
+
+
+bool ObjectManager::TryRestore(const std::string& sceneName) {
+	auto it = stashedScenes_.find(sceneName);
+	if (it == stashedScenes_.end()) return false;
+
+	idToObject_ = std::move(it->second.objects);
+	nextObjectId_ = it->second.nextObjectId;
+	stashedScenes_.erase(it);
+
+	auto* cm = YoRigine::CollisionManager::GetInstance();
+	for (auto& [id, obj] : idToObject_) {
+		if (obj && obj->collider) cm->AddCollider(obj->collider.get());
+	}
+	return true;
+}
+
+
+bool ObjectManager::HasStashedScene(const std::string& sceneName) const {
+	return stashedScenes_.find(sceneName) != stashedScenes_.end();
 }
 
 
@@ -187,6 +257,15 @@ ObjectManager::PlacedObject* ObjectManager::DuplicateObject(
 	duplicate->colliderSphereRadius = original->colliderSphereRadius;
 	ApplyColliderTemplate(*duplicate);
 
+	// マテリアル色を複製
+	duplicate->color = original->color;
+	ApplyObjectColor(*duplicate);
+
+	// UV スケール・ステキャスティック強度を複製
+	duplicate->uvScale     = original->uvScale;
+	duplicate->uvStochastic = original->uvStochastic;
+	ApplyObjectUV(*duplicate);
+
 	UpdateObjectTransform(*duplicate);
 
 	std::cout << "複製: 元ID=" << objectId << " 新ID=" << duplicate->id << std::endl;
@@ -210,6 +289,22 @@ ObjectManager::PlacedObject* ObjectManager::GetObjectById(int id) {
 const ObjectManager::PlacedObject* ObjectManager::GetObjectById(int id) const {
 	auto it = idToObject_.find(id);
 	return (it != idToObject_.end()) ? it->second : nullptr;
+}
+
+ObjectManager::PlacedObject* ObjectManager::GetObjectByName(const std::string& name) {
+	if (name.empty()) return nullptr;
+	for (auto& [id, obj] : idToObject_) {
+		if (obj && obj->nameTag == name) return obj;
+	}
+	return nullptr;
+}
+
+const ObjectManager::PlacedObject* ObjectManager::GetObjectByName(const std::string& name) const {
+	if (name.empty()) return nullptr;
+	for (const auto& [id, obj] : idToObject_) {
+		if (obj && obj->nameTag == name) return obj;
+	}
+	return nullptr;
 }
 
 
@@ -289,6 +384,8 @@ void ObjectManager::UpdateObjectTransform(PlacedObject& obj) {
 	obj.worldTransform->translate_ = obj.position;
 	obj.worldTransform->rotate_ = obj.rotation;
 	obj.worldTransform->scale_ = obj.scale;
+	obj.worldTransform->useAnchorPoint_ = obj.useAnchorPoint;
+	obj.worldTransform->anchorPoint_    = obj.anchorPoint;
 
 	obj.worldTransform->UpdateMatrix();
 
@@ -414,7 +511,98 @@ void ObjectManager::InitializePlacedObject(
 	// 当たり判定（初期状態では無効）
 	obj.collider = nullptr;
 
+	// マテリアル色（プール再利用時の残骸を防ぐため明示的にリセット）
+	obj.color = { 1.0f, 1.0f, 1.0f, 1.0f };
+	ApplyObjectColor(obj);
+
+	// UV スケール・ステキャスティック強度も同様にリセット
+	obj.uvScale = { 1.0f, 1.0f };
+	obj.uvStochastic = 0.0f;
+	ApplyObjectUV(obj);
+
 	UpdateObjectTransform(obj);
+}
+
+void ObjectManager::ApplyObjectColor(PlacedObject& obj) {
+	if (!obj.object) return;
+	obj.object->SetMaterialColor(obj.color);
+}
+
+void ObjectManager::ApplyObjectUV(PlacedObject& obj) {
+	if (!obj.object) return;
+	// Object3d::uvScale は public メンバ。Draw() 内の UpdateUV() が拾って CB に書き込む。
+	obj.object->uvScale = obj.uvScale;
+	obj.object->SetStochasticStrength(obj.uvStochastic);
+}
+
+bool ObjectManager::ComputeModelLocalAABB(const PlacedObject& obj, AABB& outAabb) const {
+	if (!obj.object) return false;
+	Model* model = obj.object->GetModel();
+	if (!model) return false;
+	const auto& meshes = model->GetMeshes();
+	if (meshes.empty()) return false;
+
+	// 描画パス（ボーンなし）では Root ノードのローカル行列が適用されるため、ここでも反映する
+	const Matrix4x4 rootMtx = model->GetHasBones()
+		? MakeIdentity4x4()
+		: model->GetRootNode().GetLocalMatrix();
+
+	bool any = false;
+	Vector3 mn = {  FLT_MAX,  FLT_MAX,  FLT_MAX };
+	Vector3 mx = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
+
+	for (const auto& m : meshes) {
+		if (!m) continue;
+		const auto& md = m->GetMeshData();
+		for (const auto& v : md.vertices) {
+			Vector3 p = Transform({ v.position.x, v.position.y, v.position.z }, rootMtx);
+			mn.x = std::min(mn.x, p.x); mn.y = std::min(mn.y, p.y); mn.z = std::min(mn.z, p.z);
+			mx.x = std::max(mx.x, p.x); mx.y = std::max(mx.y, p.y); mx.z = std::max(mx.z, p.z);
+			any = true;
+		}
+	}
+
+	if (!any) return false;
+	outAabb.min = mn;
+	outAabb.max = mx;
+	return true;
+}
+
+bool ObjectManager::FitColliderToModel(PlacedObject& obj, float margin) {
+	AABB local{};
+	if (!ComputeModelLocalAABB(obj, local)) return false;
+
+	// margin で中心まわりに均等拡大
+	const Vector3 center = (local.min + local.max) * 0.5f;
+	const Vector3 halfExtent = {
+		(local.max.x - local.min.x) * 0.5f * margin,
+		(local.max.y - local.min.y) * 0.5f * margin,
+		(local.max.z - local.min.z) * 0.5f * margin,
+	};
+
+	switch (obj.colliderShapeType) {
+	case ColliderShapeType::kAABB:
+		obj.colliderAabbOffset.min = { center.x - halfExtent.x, center.y - halfExtent.y, center.z - halfExtent.z };
+		obj.colliderAabbOffset.max = { center.x + halfExtent.x, center.y + halfExtent.y, center.z + halfExtent.z };
+		break;
+	case ColliderShapeType::kOBB:
+		// OBB.size は半サイズ (YMath/Shape/OBB.h コメント参照) なので halfExtent をそのまま入れる
+		obj.colliderObbCenter = center;
+		obj.colliderObbSize   = halfExtent;
+		obj.colliderObbEuler  = { 0.0f, 0.0f, 0.0f };
+		break;
+	case ColliderShapeType::kSphere: {
+		obj.colliderSphereCenter = center;
+		const float r = std::sqrt(halfExtent.x * halfExtent.x +
+		                          halfExtent.y * halfExtent.y +
+		                          halfExtent.z * halfExtent.z);
+		obj.colliderSphereRadius = r;
+		break;
+	}
+	}
+
+	ApplyColliderTemplate(obj);
+	return true;
 }
 
 void ObjectManager::ApplyColliderTemplate(PlacedObject& obj) {
@@ -453,6 +641,15 @@ void ObjectManager::ApplyColliderTemplate(PlacedObject& obj) {
 	obj.collider->SetIsStatic(true);
 	obj.collider->SetCollisionEnabled(obj.colliderEnabled);
 
+	// NavGrid::Bake / VisionSystem::HasLineOfSight が AABB を読むため、
+	// 静的障害物は frustum culling から除外して常に最新の AABB を持たせる。
+	// (デフォルトは checkOutsideCamera=true で視野外スキップ → AABB が古くなり、
+	//  視野外オブジェクトを挟んでも視線判定が抜ける / Bake 位置がズレる原因になる)
+	const bool isNavBlocker =
+		(obj.colliderTypeId == CollisionTypeIdDef::kNavObstacle ||
+		 obj.colliderTypeId == CollisionTypeIdDef::kStaticWall);
+	obj.collider->SetCheckOutsideCamera(!isNavBlocker);
+
 	// シェイプ別のオフセットを反映
 	switch (obj.colliderShapeType) {
 	case ColliderShapeType::kAABB:
@@ -478,9 +675,12 @@ void ObjectManager::ApplyColliderTemplate(PlacedObject& obj) {
 }
 
 void ObjectManager::CopyColliderSettingsToAll(const PlacedObject& src) {
-	// ソースオブジェクトの個別設定を同名オブジェクト全員にコピーして反映する
+	// ソースオブジェクトの個別設定を同名オブジェクト全員にコピーして反映する。
+	// colliderEnabled も含める: 含めないとコピー先が無効のまま (デバッグ描画も判定もオフ)
+	// 残り、「コピーしたのに同じに見えない」原因になる。
 	for (auto& [id, obj] : idToObject_) {
 		if (obj && obj->modelName == src.modelName && obj->id != src.id) {
+			obj->colliderEnabled      = src.colliderEnabled;
 			obj->colliderTypeId       = src.colliderTypeId;
 			obj->colliderShapeType    = src.colliderShapeType;
 			obj->colliderAabbOffset   = src.colliderAabbOffset;

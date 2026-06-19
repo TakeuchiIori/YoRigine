@@ -22,7 +22,7 @@ void AttackCameraComponent::Initialize() {
 }
 
 // ============================================================
-// フェーズ1: タイマー前進 + シェイクトリガー
+// タイマー前進 + シェイクトリガー
 // ============================================================
 void AttackCameraComponent::UpdatePre(FollowCamera* followCamera, float dt) {
     if (phase_ != Phase::Playing) return;
@@ -45,7 +45,7 @@ void AttackCameraComponent::UpdatePre(FollowCamera* followCamera, float dt) {
 }
 
 // ============================================================
-// フェーズ2: 補間値をサンプリング＆フェーズ進行
+// 補間値をサンプリング＆フェーズ進行
 // ============================================================
 void AttackCameraComponent::UpdatePost(float dt) {
     switch (phase_) {
@@ -164,6 +164,15 @@ float AttackCameraComponent::GetPlayRatio() const {
         return std::clamp(playTimer_ / work->totalDuration, 0.0f, 1.0f);
     }
     return 0.0f;
+}
+
+// ============================================================
+// 現在ワークのフレーム保持設定
+// ============================================================
+bool AttackCameraComponent::ShouldKeepPlayerInFrame() const {
+    const AttackCameraWork* work = FindWork(currentWorkName_);
+    // 該当ワークが見つからない場合は安全側（保持する）に倒す
+    return work ? work->keepPlayerInFrame : true;
 }
 
 // ============================================================

@@ -21,6 +21,8 @@
 #include "GPUParticle/GpuEmitManager.h"
 #include <Vfx/VfxMesh/VfxMeshEditor.h>
 
+// WebAPI
+#include <WebAPI/YWebApiManager.h>
 
 // Camera
 #include "Systems/Camera/Virtuals/DebugCamera/DebugCamera.h"
@@ -63,6 +65,7 @@ void DevelopScene::Initialize() {
 	//------------------------------------------------------------
 	// システム初期化
 	//------------------------------------------------------------
+	YWebApiManager::GetInstance().Initialize();
 	YoRigine::GameTime::Initialize();
 	YoRigine::JsonManager::SetCurrentScene("DevelopScene");
 	YParticleManager::GetInstance().SetCamera(sceneCamera_.get());
@@ -101,6 +104,9 @@ void DevelopScene::Initialize() {
 	Editor::GetInstance()->RegisterGameUI("YoRigine:パーティクルエディター", [this]() {YParticleEditor::GetInstance().ShowEditorWindow(); }, "Develop");
 	//Editor::GetInstance()->RegisterGameUI("モーションエディタ", [this]() {motionEditor_->ShowEditor(); }, "Develop");
 	Editor::GetInstance()->RegisterGameUI("VFX", [this]() { YoRigine::VfxMeshEditor::GetInstance()->DrawImGui(); }, "Develop");
+	Editor::GetInstance()->RegisterGameUI("YWebAPI", [this]() { YWebApiManager::GetInstance().DrawLogWindow(); }, "Develop");
+	Editor::GetInstance()->RegisterGameUI("AreaEditor", [this]() { AreaEditor::GetInstance()->Update();; }, "Develop");
+
 
 #endif
 }
@@ -120,7 +126,7 @@ void DevelopScene::Update() {
 	YoRigine::GpuEmitManager::GetInstance()->Update();
 
 #ifdef USE_IMGUI
-	AreaEditor::GetInstance()->Update();
+	
 	YoRigine::VfxMeshEditor::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
 #endif
 }
@@ -178,6 +184,7 @@ void DevelopScene::DrawShadow() {
 void DevelopScene::Finalize() {
 
 	YoRigine::JsonManager::ClearSceneInstances("DevelopScene");
+	YWebApiManager::GetInstance().Finalize();
 }
 
 // ============================================================
@@ -191,8 +198,14 @@ void DevelopScene::DrawObject() {
 // 線の描画
 // ============================================================
 void DevelopScene::DrawLine() {
+	// フレーム冒頭の頂点・マテリアル CB スロットのリセット。
+	// 複数の DrawLine() を 1 フレームで呼ぶ場合に必須。
+	line_->Reset();
+
 	YoRigine::ModelManipulator::GetInstance()->DrawLine();
-	AreaManager::GetInstance()->DrawArea("FieldArea", line_.get());
+	// AreaEditor で追加したエリアも含めて全て描画。
+	// isDebugDrawEnabled_ / IsActive() / IsDebugDrawEnabled() を尊重する。
+	AreaManager::GetInstance()->Draw(line_.get());
 	line_->DrawLine();
 	CameraDirector::GetInstance()->DrawDebug3D(*line_);
 }

@@ -54,6 +54,11 @@ void PlayerCamera::Initialize(FollowCamera* followCamera, const WorldTransform* 
         battleStartState_->Load(ext["battleStartState"]);
     }
 
+    // 脅威察知パラメータを extension JSON から復元
+    if (ext.contains("threatAwareness")) {
+        LoadThreatAwareness(ext["threatAwareness"]);
+    }
+
 #ifdef USE_IMGUI
     editor_.Initialize(&attackCamera_, this);
     editor_.SetFilePath(defaultPath);
@@ -61,7 +66,7 @@ void PlayerCamera::Initialize(FollowCamera* followCamera, const WorldTransform* 
 }
 
 // ============================================================
-// フェーズ1: スティック入力・ロックオン更新
+// スティック入力・ロックオン更新
 // CameraDirector::Update() の前に GameScene::Update() から呼ぶ。
 // FollowCamera の回転を確定させることで、後続の FollowProcess() が
 // 正しい位置を計算できるようにする。
@@ -86,9 +91,14 @@ void PlayerCamera::UpdatePreDirector() {
         }
 
         if (isLockOn_) {
+            // ロックオン中はグランスを使わない。蓄積をリセットして次回フリー時の段差を防ぐ。
+            awarenessYawBias_ = 0.0f;
+            awarenessAppliedBias_ = 0.0f;
             UpdateLockOn();
         } else {
             UpdateStickInput();
+            // 脅威察知（気配）：周辺視グランス（右スティック未操作時のみ介入）
+            UpdateThreatAwareness(dt);
         }
 
         // 攻撃カメラのシェイクトリガーも先に処理（次フレームの FollowProcess で適用）
@@ -97,15 +107,16 @@ void PlayerCamera::UpdatePreDirector() {
 }
 
 // ============================================================
-// フェーズ2: 攻撃カメラオフセットを sceneCamera に後付けで適用
-// CameraDirector::Update() + UpdateCamera() の後に呼ぶ。
-// CameraDirector が sceneCamera に転送した後なので、
-// ここで加算すると確実に描画に反映される。
+// 攻撃カメラオフセットを sceneCamera に後付けで適用
+// CameraDirector::Update() + UpdateCamera() の後に呼ぶ
 // ============================================================
 void PlayerCamera::ApplyPostDirector(Camera* sceneCamera, float dt) {
     if (!sceneCamera) return;
     bool inPerformance = IsInPerformance();
     if (inPerformance) return;
+
+    // 脅威察知：囲まれFOV拡大（攻撃カメラより先に適用。攻撃中は後段が上書きする）
+    ApplyThreatFovWiden(sceneCamera, dt);
 
     // キーフレーム補間値を更新
     attackCamera_.UpdatePost(dt);
@@ -147,6 +158,112 @@ void PlayerCamera::ApplyPostDirector(Camera* sceneCamera, float dt) {
 
     // オフセット適用後に行列を再計算
     sceneCamera->UpdateMatrix();
+
+    //------------------------------------------------------------
+    // 最終フレーミングガード
+    // オフセット適用後の view-projection でプレイヤーを投影し、
+    // 画角外へはみ出していたら引き戻す（ワーク側で許可されている場合のみ）。
+    //------------------------------------------------------------
+    if (framingGuardEnabled_ && attackCamera_.ShouldKeepPlayerInFrame()) {
+        EnsurePlayerInFrame(sceneCamera, dt);
+    }
+}
+
+// ============================================================
+// 最終フレーミングガード
+// プレイヤーのピボットを最終 view-projection で NDC に投影し、
+// ハードリミットを越えた分だけ yaw / pitch を引き戻してフレーム内へ収める。
+// ============================================================
+void PlayerCamera::EnsurePlayerInFrame(Camera* sceneCamera, float dt) {
+    if (!sceneCamera || !playerWT_) return;
+
+    //------------------------------------------------------------
+    // プレイヤーのピボット位置（ワールド空間）を求める
+    //------------------------------------------------------------
+    // matWorld_ の平行移動成分がプレイヤーのワールド原点
+    Vector3 playerPivot = Transform(Vector3{ 0.0f, 0.0f, 0.0f }, playerWT_->matWorld_);
+    playerPivot.y += pivotHeight_;
+
+    //------------------------------------------------------------
+    // NDC への投影（透視除算前の w で前後判定）
+    //------------------------------------------------------------
+    Vector4 clip = Transform(
+        Vector4{ playerPivot.x, playerPivot.y, playerPivot.z, 1.0f },
+        sceneCamera->GetViewProjectionMatrix());
+
+    // カメラの背後（w <= 0）なら NDC が破綻するので、向きを直接プレイヤーへ向ける
+    bool behindCamera = (clip.w <= 0.0001f);
+
+    float ndcX = 0.0f;
+    float ndcY = 0.0f;
+    if (!behindCamera) {
+        ndcX = clip.x / clip.w;
+        ndcY = clip.y / clip.w;
+        // ハードリミット内に完全に収まっていれば何もしない（小刻みな揺れ防止）
+        if (std::abs(ndcX) <= framingHardLimitX_ &&
+            std::abs(ndcY) <= framingHardLimitY_) {
+            return;
+        }
+    }
+
+    //------------------------------------------------------------
+    // プレイヤーを中央に置くための理想 yaw / pitch を計算
+    //------------------------------------------------------------
+    Vector3 toPivot = playerPivot - sceneCamera->transform_.translate;
+    float   dist    = Length(toPivot);
+    if (dist < 0.01f) return;
+    Vector3 dir = toPivot / dist;
+
+    float desiredYaw   = atan2f(dir.x, dir.z);
+    float clampedY     = std::clamp(-dir.y, -1.0f, 1.0f);
+    float desiredPitch = asinf(clampedY);
+
+    float deltaYaw   = desiredYaw   - sceneCamera->transform_.rotate.y;
+    float deltaPitch = desiredPitch - sceneCamera->transform_.rotate.x;
+
+    constexpr float kPi    = 3.14159265358979f;
+    constexpr float kTwoPi = 6.28318530717958f;
+    while (deltaYaw >  kPi) deltaYaw -= kTwoPi;
+    while (deltaYaw < -kPi) deltaYaw += kTwoPi;
+
+    //------------------------------------------------------------
+    // NDC ハードリミットを「中央からの角度許容量」に変換
+    // 縦半画角 = fovY / 2、横半画角 = atan(tan(縦半画角) * アスペクト比)
+    //------------------------------------------------------------
+    float halfFovY = sceneCamera->fovY_ * 0.5f;
+    float halfFovX = atanf(tanf(halfFovY) * sceneCamera->aspectRatio_);
+    float yawTol   = atanf(framingHardLimitX_ * tanf(halfFovX));
+    float pitchTol = atanf(framingHardLimitY_ * tanf(halfFovY));
+
+    const float maxStep = framingGuardSpeed_ * dt;
+
+    //------------------------------------------------------------
+    // Yaw：許容量を越えた分だけ引き戻す（背後ならフルに向ける）
+    //------------------------------------------------------------
+    if (behindCamera || std::abs(deltaYaw) > yawTol) {
+        float overshoot = behindCamera
+            ? deltaYaw
+            : (deltaYaw > 0.0f ? deltaYaw - yawTol : deltaYaw + yawTol);
+        float step = std::clamp(overshoot, -maxStep, maxStep);
+        sceneCamera->transform_.rotate.y += step;
+    }
+
+    //------------------------------------------------------------
+    // Pitch：同様に引き戻す（pitch 制限内にクランプ）
+    //------------------------------------------------------------
+    if (behindCamera || std::abs(deltaPitch) > pitchTol) {
+        float overshoot = behindCamera
+            ? deltaPitch
+            : (deltaPitch > 0.0f ? deltaPitch - pitchTol : deltaPitch + pitchTol);
+        float step = std::clamp(overshoot, -maxStep, maxStep);
+        sceneCamera->transform_.rotate.x = std::clamp(
+            sceneCamera->transform_.rotate.x + step, minPitch_, maxPitch_);
+    }
+
+    //------------------------------------------------------------
+    // 引き戻した回転を反映
+    //------------------------------------------------------------
+    sceneCamera->UpdateMatrix();
 }
 
 
@@ -154,6 +271,7 @@ void PlayerCamera::ApplyPostDirector(Camera* sceneCamera, float dt) {
 // スティック入力で FollowCamera の回転を更新
 // ============================================================
 void PlayerCamera::UpdateStickInput() {
+    stickActiveThisFrame_ = false;
     if (!followCamera_) return;
     if (followCamera_->GetIsCloseUp()) return;
 
@@ -165,6 +283,7 @@ void PlayerCamera::UpdateStickInput() {
             move.x -= static_cast<float>(js.Gamepad.sThumbRY);
 
             if (Length(move) > 5000.0f) {
+                stickActiveThisFrame_ = true;
                 move = Normalize(move) * rotateSpeed_;
                 Vector3 rot = followCamera_->GetRotate();
                 rot += move;
@@ -173,6 +292,158 @@ void PlayerCamera::UpdateStickInput() {
             }
         }
     }
+}
+
+// ── ヨー角を ±π に正規化 ──
+static float WrapPi(float a) {
+    constexpr float kPi = 3.14159265358979f, kTwoPi = 6.28318530717958f;
+    while (a <= -kPi) a += kTwoPi;
+    while (a >   kPi) a -= kTwoPi;
+    return a;
+}
+
+// ============================================================
+// 周辺視グランス（pre-director）
+//   視界外/背後の敵がいたら、その方向へ awarenessMaxYaw_ までだけカメラを
+//   軽く傾ける。ロックオンのように敵を中央へ固定はしない＝「気配」を伝える。
+//   バイアスはテレスコープ方式で yaw に加減算し、脅威が消えたら自然に戻す。
+// ============================================================
+void PlayerCamera::UpdateThreatAwareness(float dt) {
+    if (!followCamera_) return;
+
+    // 目標グランス量を決める（無効・操作中・対象なしなら 0 へ戻す）
+    float targetBias = 0.0f;
+    if (threatAwarenessEnabled_ && threatAwarenessSceneAllowed_
+        && !stickActiveThisFrame_ && playerWT_ && !followCamera_->GetIsCloseUp()) {
+        targetBias = ComputeGlanceBias();
+    }
+
+    // バイアスを滑らかに目標へ寄せる
+    float t = std::clamp(awarenessYawSpeed_ * dt, 0.0f, 1.0f);
+    awarenessYawBias_ += (targetBias - awarenessYawBias_) * t;
+
+    // テレスコープ適用：前回適用分との差分だけ yaw を動かす
+    //   （プレイヤーの右スティック操作とは独立に、awareness の寄与は常に
+    //    awarenessYawBias_ 分だけになる。脅威が消えれば 0 に戻り原状回復する）
+    float delta = awarenessYawBias_ - awarenessAppliedBias_;
+    if (std::abs(delta) > 1e-7f) {
+        Vector3 rot = followCamera_->GetRotate();
+        rot.y = WrapPi(rot.y + delta);
+        followCamera_->SetRotate(rot);
+        awarenessAppliedBias_ = awarenessYawBias_;
+    }
+}
+
+// ============================================================
+// グランス目標量を算出
+//   カメラ前方から awarenessTriggerYaw_ 以上外れた（視界外寄りの）敵のうち
+//   プレイヤーに最も近いものへ、符号付きで awarenessMaxYaw_ までの傾きを返す。
+// ============================================================
+float PlayerCamera::ComputeGlanceBias() const {
+    std::vector<BaseCollider*> enemies;
+    if (GatherNearbyEnemies(enemies) == 0) return 0.0f;
+
+    Vector3 camPos  = followCamera_->GetTranslate();
+    float   baseYaw = followCamera_->GetRotate().y - awarenessAppliedBias_; // プレイヤー由来の素の yaw
+    Vector3 playerPos = playerWT_->translate_;
+
+    BaseCollider* pick = nullptr;
+    float pickDist   = awarenessRange_;
+    float pickSigned = 0.0f;
+    for (auto* e : enemies) {
+        Vector3 d = e->GetCenterPosition() - camPos; d.y = 0.0f;
+        if (Length(d) < 0.01f) continue;
+        float signedYaw = WrapPi(atan2f(d.x, d.z) - baseYaw);
+        if (std::abs(signedYaw) < awarenessTriggerYaw_) continue; // 視界内寄り＝気配対象外
+
+        float pd = Length(e->GetCenterPosition() - playerPos);
+        if (pd < pickDist) { pickDist = pd; pick = e; pickSigned = signedYaw; }
+    }
+    if (!pick) return 0.0f;
+
+    return std::clamp(pickSigned, -awarenessMaxYaw_, awarenessMaxYaw_);
+}
+
+// ============================================================
+// 囲まれFOV拡大（post-director）
+//   近くの敵が awarenessFovMinCount_ 体以上いるほど FOV を少し広げ、
+//   「囲まれている」状況を見渡せるようにする。攻撃カメラ等が FOV を
+//   上書きするフレームでは自然にそちらが優先される。
+// ============================================================
+void PlayerCamera::ApplyThreatFovWiden(Camera* sceneCamera, float dt) {
+    if (!sceneCamera) return;
+
+    float target = 0.0f;
+    if (threatAwarenessEnabled_ && threatAwarenessSceneAllowed_) {
+        std::vector<BaseCollider*> enemies;
+        int n = GatherNearbyEnemies(enemies);
+        if (n >= awarenessFovMinCount_) {
+            target = std::min(
+                (n - awarenessFovMinCount_ + 1) * awarenessFovPerEnemy_,
+                awarenessFovMax_);
+        }
+    }
+
+    float t = std::clamp(awarenessFovSpeed_ * dt, 0.0f, 1.0f);
+    awarenessFovBias_ += (target - awarenessFovBias_) * t;
+
+    if (awarenessFovBias_ > 1e-5f) {
+        sceneCamera->fovY_ += awarenessFovBias_;
+        sceneCamera->UpdateMatrix();
+    }
+}
+
+// ============================================================
+// 近傍の敵を収集（プレイヤーから awarenessRange_ 内のアクティブな敵）
+// ============================================================
+int PlayerCamera::GatherNearbyEnemies(std::vector<BaseCollider*>& out) const {
+    out.clear();
+    if (!playerWT_) return 0;
+
+    Vector3 playerPos = playerWT_->translate_;
+    for (auto* col : YoRigine::CollisionManager::GetInstance()->GetColliders()) {
+        if (!col->GetIsActive()) continue;
+        uint32_t id = col->GetTypeID();
+        if (id != static_cast<uint32_t>(CollisionTypeIdDef::kBattleEnemy) &&
+            id != static_cast<uint32_t>(CollisionTypeIdDef::kFieldEnemy)) {
+            continue;
+        }
+        if (Length(col->GetCenterPosition() - playerPos) <= awarenessRange_) {
+            out.push_back(col);
+        }
+    }
+    return static_cast<int>(out.size());
+}
+
+// ============================================================
+// 脅威察知パラメータの保存（FollowCamera の extension JSON へ書き込む内容）
+//   シーン許可フラグ・内部状態（bias 等）は実行時のものなので保存しない。
+// ============================================================
+void PlayerCamera::SaveThreatAwareness(nlohmann::json& j) const {
+    j["enabled"]        = threatAwarenessEnabled_;
+    j["range"]          = awarenessRange_;
+    j["triggerYaw"]     = awarenessTriggerYaw_;
+    j["maxYaw"]         = awarenessMaxYaw_;
+    j["yawSpeed"]       = awarenessYawSpeed_;
+    j["fovMinCount"]    = awarenessFovMinCount_;
+    j["fovPerEnemy"]    = awarenessFovPerEnemy_;
+    j["fovMax"]         = awarenessFovMax_;
+    j["fovSpeed"]       = awarenessFovSpeed_;
+}
+
+// ============================================================
+// 脅威察知パラメータの復元
+// ============================================================
+void PlayerCamera::LoadThreatAwareness(const nlohmann::json& j) {
+    threatAwarenessEnabled_ = j.value("enabled",      true);
+    awarenessRange_         = j.value("range",        25.0f);
+    awarenessTriggerYaw_    = j.value("triggerYaw",   0.70f);
+    awarenessMaxYaw_        = j.value("maxYaw",        0.18f);
+    awarenessYawSpeed_      = j.value("yawSpeed",      4.0f);
+    awarenessFovMinCount_   = j.value("fovMinCount",   2);
+    awarenessFovPerEnemy_   = j.value("fovPerEnemy",   0.03f);
+    awarenessFovMax_        = j.value("fovMax",        0.12f);
+    awarenessFovSpeed_      = j.value("fovSpeed",      3.0f);
 }
 
 // ============================================================
@@ -392,6 +663,38 @@ void PlayerCamera::DrawImGui() {
                 isPreviewMode_ = false;
             }
         }
+    }
+
+    ImGui::Separator();
+
+    if (ImGui::CollapsingHeader("脅威察知（気配）")) {
+        ImGui::Checkbox("有効", &threatAwarenessEnabled_);
+        ImGui::DragFloat("対象範囲", &awarenessRange_, 0.5f, 1.0f, 100.0f);
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("この距離内の敵を『気配』対象にする");
+
+        ImGui::SeparatorText("周辺視グランス");
+        ImGui::DragFloat("発動角(rad)",   &awarenessTriggerYaw_, 0.01f, 0.1f, 3.14f, "%.2f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("カメラ前方からこの角度以上外れた敵に反応（小さいほど敏感）");
+        ImGui::DragFloat("最大グランス量(rad)", &awarenessMaxYaw_, 0.01f, 0.0f, 0.8f, "%.2f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("傾ける最大ヨー量。小さいほど『チラ見』。大きくしすぎるとロックオン的になる");
+        ImGui::DragFloat("グランス速度", &awarenessYawSpeed_, 0.1f, 0.5f, 20.0f);
+
+        ImGui::SeparatorText("囲まれFOV");
+        ImGui::DragInt("発動体数", &awarenessFovMinCount_, 1, 1, 10);
+        ImGui::DragFloat("1体あたり拡大(rad)", &awarenessFovPerEnemy_, 0.005f, 0.0f, 0.2f, "%.3f");
+        ImGui::DragFloat("拡大上限(rad)", &awarenessFovMax_, 0.01f, 0.0f, 0.5f, "%.2f");
+        ImGui::DragFloat("FOV補間速度", &awarenessFovSpeed_, 0.1f, 0.5f, 20.0f);
+
+        ImGui::Separator();
+        ImGui::Text("シーン許可: %s", threatAwarenessSceneAllowed_ ? "ON(バトル)" : "OFF(フィールド等)");
+        ImGui::Text("現在グランス: %.2f rad / FOV拡大: %.3f", awarenessYawBias_, awarenessFovBias_);
+
+        // 編集値を extension JSON に反映（カメラ設定保存時に一緒に永続化される）
+        nlohmann::json taJson;
+        SaveThreatAwareness(taJson);
+        nlohmann::json ext = followCamera_->GetExtensionJson();
+        ext["threatAwareness"] = taJson;
+        followCamera_->SetExtensionJson(ext);
     }
 
     ImGui::Separator();

@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include <Graphics/Drawer/InstancedShape/InstancedCube.h>
+#include <Debugger/Logger.h>
 
 namespace YoRigine {
 
@@ -36,8 +37,23 @@ namespace YoRigine {
 		if ((cmax.x - cmin.x) > kMaxCellSpan ||
 			(cmax.y - cmin.y) > kMaxCellSpan ||
 			(cmax.z - cmin.z) > kMaxCellSpan) {
-			// 大き過ぎる → 「常に当たる候補」リストとして特別なセル(0,0,0)に詰める。
-			// O(N) に劣化するが安全側。今後は static 専用 BVH を別系統で持つのが筋。
+
+			// デバッグ用: フォールバック発生を1秒おきにまとめてログ出力
+			static int fallbackCount = 0;
+			static int frameCounter = 0;
+			++fallbackCount;
+			if (++frameCounter >= 60) {
+				char buf[256];
+				sprintf_s(buf,
+					"[UniformGrid] (0,0,0)フォールバック: 60フレームで%d回 直近AABB=(%.1f..%.1f, %.1f..%.1f, %.1f..%.1f) span=(%d,%d,%d)\n",
+					fallbackCount,
+					aabb.min.x, aabb.max.x, aabb.min.y, aabb.max.y, aabb.min.z, aabb.max.z,
+					cmax.x - cmin.x, cmax.y - cmin.y, cmax.z - cmin.z);
+				Logger(buf);
+				fallbackCount = 0;
+				frameCounter = 0;
+			}
+
 			cells_[{0, 0, 0}].push_back(c);
 			return;
 		}

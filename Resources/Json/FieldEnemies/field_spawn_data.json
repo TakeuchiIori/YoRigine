@@ -5,39 +5,70 @@
             "id": "g_01",
             "isActive": true,
             "position": {
-                "x": 14.999845504760742,
+                "x": -7.757887840270996,
                 "y": 0.0,
-                "z": -25.882801055908203
+                "z": -87.00019073486328
             },
             "respawnAfterBattle": true,
             "respawnDelay": 35.0,
-            "spawnCondition": ""
+            "spawnCondition": "",
+            "spawnOnLoad": true
         },
         {
             "enemyId": "Alien",
             "id": "Spawn_3",
             "isActive": true,
             "position": {
-                "x": -16.35692596435547,
+                "x": 1.2313265800476074,
                 "y": 0.0,
-                "z": 21.124963760375977
+                "z": -86.78729248046875
             },
             "respawnAfterBattle": true,
             "respawnDelay": 30.0,
-            "spawnCondition": ""
+            "spawnCondition": "",
+            "spawnOnLoad": true
         },
         {
             "enemyId": "Mushnub_Evolved",
             "id": "m_01",
             "isActive": true,
             "position": {
-                "x": 23.0,
+                "x": -2.6559946537017822,
                 "y": 0.0,
-                "z": 22.5
+                "z": -68.87421417236328
             },
             "respawnAfterBattle": true,
             "respawnDelay": 30.0,
-            "spawnCondition": ""
+            "spawnCondition": "",
+            "spawnOnLoad": true
+        },
+        {
+            "enemyId": "NewEnemy_2",
+            "id": "Spawn_1",
+            "isActive": true,
+            "position": {
+                "x": 46.61008071899414,
+                "y": 3.098160232184455e-05,
+                "z": -58.958282470703125
+            },
+            "respawnAfterBattle": true,
+            "respawnDelay": 30.0,
+            "spawnCondition": "",
+            "spawnOnLoad": true
+        },
+        {
+            "enemyId": "NewEnemy_1",
+            "id": "Spawn_2",
+            "isActive": true,
+            "position": {
+                "x": 22.136920928955078,
+                "y": 3.098160232184455e-05,
+                "z": -59.20934295654297
+            },
+            "respawnAfterBattle": true,
+            "respawnDelay": 30.0,
+            "spawnCondition": "",
+            "spawnOnLoad": true
         }
     ]
 }

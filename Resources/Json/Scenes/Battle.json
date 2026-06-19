@@ -1,0 +1,5021 @@
+{
+    "objects": [
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 0,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                7.539280891418457,
+                0.0,
+                50.07633972167969
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 1,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                11.751978874206543,
+                0.0,
+                49.73748779296875
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 2,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                15.3826322555542,
+                0.0,
+                48.39763259887695
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 3,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                19.43406867980957,
+                0.0,
+                46.57130432128906
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 4,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                23.76190757751465,
+                0.0,
+                44.48275375366211
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 5,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                3.3540985584259033,
+                0.0,
+                50.07633972167969
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 6,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -0.09097087383270264,
+                0.0,
+                51.160804748535156
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 7,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -3.9462671279907227,
+                0.0,
+                51.160804748535156
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 8,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -7.656133651733398,
+                0.0,
+                51.160804748535156
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 9,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -11.538166999816895,
+                0.0,
+                49.78327178955078
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 10,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -15.735635757446289,
+                0.0,
+                48.363189697265625
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 11,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -19.455581665039063,
+                0.0,
+                47.2359733581543
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 12,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -23.579757690429688,
+                0.0,
+                44.93757247924805
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 13,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -27.719886779785156,
+                0.0,
+                42.517757415771484
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 14,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -31.698196411132813,
+                0.0,
+                39.84498596191406
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 15,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -35.186763763427734,
+                0.0,
+                36.6328125
+            ],
+            "rotate": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 16,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -38.772796630859375,
+                0.0,
+                32.949363708496094
+            ],
+            "rotate": [
+                0.0,
+                -0.27925267815589905,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 17,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -42.35563659667969,
+                0.0,
+                28.805679321289063
+            ],
+            "rotate": [
+                0.0,
+                -0.19198621809482574,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 18,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -44.71892547607422,
+                0.0,
+                23.896800994873047
+            ],
+            "rotate": [
+                0.0,
+                -0.48869219422340393,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 19,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -46.831207275390625,
+                0.0,
+                18.804141998291016
+            ],
+            "rotate": [
+                0.0,
+                -0.6806784272193909,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 20,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -48.67155838012695,
+                0.0,
+                13.615622520446777
+            ],
+            "rotate": [
+                0.0,
+                -0.45378559827804565,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 21,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -49.342193603515625,
+                0.0,
+                8.238924980163574
+            ],
+            "rotate": [
+                0.0,
+                -0.5235987901687622,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 22,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -50.55229568481445,
+                0.0,
+                4.31803560256958
+            ],
+            "rotate": [
+                0.0,
+                -0.8377580642700195,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 23,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -50.967403411865234,
+                0.0,
+                -0.7982832193374634
+            ],
+            "rotate": [
+                0.0,
+                -0.8552113175392151,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 24,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -50.34160614013672,
+                0.0,
+                -5.4988789558410645
+            ],
+            "rotate": [
+                0.0,
+                -0.9773841500282288,
+                0.0
+            ],
+            "scale": [
+                0.9999998211860657,
+                1.0,
+                0.9999998211860657
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 25,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -49.53467559814453,
+                0.0,
+                -10.915919303894043
+            ],
+            "rotate": [
+                0.0,
+                -1.1170103549957275,
+                0.0
+            ],
+            "scale": [
+                0.9999997019767761,
+                1.0,
+                0.9999997019767761
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 26,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -48.04629898071289,
+                0.0,
+                -15.42343807220459
+            ],
+            "rotate": [
+                0.0,
+                -1.221730351448059,
+                0.0
+            ],
+            "scale": [
+                0.999999463558197,
+                1.0,
+                0.999999463558197
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 27,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -47.04629898071289,
+                0.0,
+                -19.967300415039063
+            ],
+            "rotate": [
+                0.0,
+                -1.431169867515564,
+                0.0
+            ],
+            "scale": [
+                0.9999994039535522,
+                1.0,
+                0.9999994039535522
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 28,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -44.68943786621094,
+                0.0,
+                -23.90022087097168
+            ],
+            "rotate": [
+                0.0,
+                -1.5882495641708374,
+                0.0
+            ],
+            "scale": [
+                0.9999994039535522,
+                1.0,
+                0.9999994039535522
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 29,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -41.811824798583984,
+                0.0,
+                -28.000974655151367
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.5533430576324463,
+                -3.1415908336639404
+            ],
+            "scale": [
+                0.9999994039535522,
+                1.0,
+                0.9999994039535522
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 30,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -39.23708724975586,
+                0.0,
+                -31.91298484802246
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.5533430576324463,
+                -3.1415908336639404
+            ],
+            "scale": [
+                0.9999994039535522,
+                1.0,
+                0.9999994039535522
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 31,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -36.11253356933594,
+                0.0,
+                -35.5858154296875
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.5533430576324463,
+                -3.1415908336639404
+            ],
+            "scale": [
+                0.9999994039535522,
+                1.0,
+                0.9999994039535522
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 32,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -32.37042999267578,
+                0.0,
+                -38.38302993774414
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.431169867515564,
+                -3.1415908336639404
+            ],
+            "scale": [
+                0.9999993443489075,
+                1.0,
+                0.9999993443489075
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 33,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -28.237863540649414,
+                0.0,
+                -41.59789276123047
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.431169867515564,
+                -3.1415908336639404
+            ],
+            "scale": [
+                0.9999993443489075,
+                1.0,
+                0.9999993443489075
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 34,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -24.148006439208984,
+                0.0,
+                -44.08649444580078
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.3089969158172607,
+                -3.1415908336639404
+            ],
+            "scale": [
+                0.9999993443489075,
+                1.0,
+                0.9999993443489075
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 35,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -20.030670166015625,
+                0.0,
+                -46.434173583984375
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.308996558189392,
+                -3.1415908336639404
+            ],
+            "scale": [
+                0.9999992251396179,
+                1.0,
+                0.9999992251396179
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 36,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -15.77239990234375,
+                0.0,
+                -48.1966667175293
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.308996558189392,
+                -3.1415908336639404
+            ],
+            "scale": [
+                0.9999992251396179,
+                1.0,
+                0.9999992251396179
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 37,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -11.28542709350586,
+                0.0,
+                -49.44696807861328
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.1170107126235962,
+                -3.1415908336639404
+            ],
+            "scale": [
+                0.9999992251396179,
+                1.0,
+                0.9999992251396179
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 38,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -6.683422565460205,
+                0.0,
+                -49.89398193359375
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.1170107126235962,
+                -3.1415908336639404
+            ],
+            "scale": [
+                0.9999992251396179,
+                1.0,
+                0.9999992251396179
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 39,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -1.5192586183547974,
+                0.0,
+                -50.49919509887695
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.1170103549957275,
+                -3.1415908336639404
+            ],
+            "scale": [
+                0.9999991059303284,
+                1.0,
+                0.9999991059303284
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 40,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                3.056342124938965,
+                0.0,
+                -50.49919509887695
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.1170103549957275,
+                -3.1415908336639404
+            ],
+            "scale": [
+                0.9999991059303284,
+                1.0,
+                0.9999991059303284
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 41,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                7.989013195037842,
+                0.0,
+                -49.87131881713867
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.1170103549957275,
+                -3.1415908336639404
+            ],
+            "scale": [
+                0.9999991059303284,
+                1.0,
+                0.9999991059303284
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 42,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                12.249674797058105,
+                0.0,
+                -48.936500549316406
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.1170103549957275,
+                -3.1415908336639404
+            ],
+            "scale": [
+                0.9999991059303284,
+                1.0,
+                0.9999991059303284
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 43,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                16.723798751831055,
+                0.0,
+                -47.171329498291016
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.1170103549957275,
+                -3.1415908336639404
+            ],
+            "scale": [
+                0.9999991059303284,
+                1.0,
+                0.9999991059303284
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 44,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                21.256668090820313,
+                0.0,
+                -45.54304504394531
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.1170103549957275,
+                -3.1415908336639404
+            ],
+            "scale": [
+                0.9999991059303284,
+                1.0,
+                0.9999991059303284
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 45,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                26.325952529907227,
+                0.0,
+                -43.24277877807617
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.1170103549957275,
+                -3.1415908336639404
+            ],
+            "scale": [
+                0.9999991059303284,
+                1.0,
+                0.9999991059303284
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 46,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                30.261083602905273,
+                0.0,
+                -40.29087829589844
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.1170103549957275,
+                -3.1415908336639404
+            ],
+            "scale": [
+                0.9999991059303284,
+                1.0,
+                0.9999991059303284
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 47,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                33.0942497253418,
+                0.0,
+                -37.364776611328125
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.1170103549957275,
+                -3.1415908336639404
+            ],
+            "scale": [
+                0.9999991059303284,
+                1.0,
+                0.9999991059303284
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 48,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                36.71000671386719,
+                0.0,
+                -34.79916763305664
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.1170103549957275,
+                -3.1415908336639404
+            ],
+            "scale": [
+                0.9999991059303284,
+                1.0,
+                0.9999991059303284
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 49,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                39.714412689208984,
+                0.0,
+                -31.078048706054688
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.1170103549957275,
+                -3.1415908336639404
+            ],
+            "scale": [
+                0.9999991059303284,
+                1.0,
+                0.9999991059303284
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 50,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                42.453514099121094,
+                0.0,
+                -27.3988094329834
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.1170103549957275,
+                -3.1415908336639404
+            ],
+            "scale": [
+                0.9999991059303284,
+                1.0,
+                0.9999991059303284
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 51,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                44.88979721069336,
+                0.0,
+                -23.299394607543945
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.1170103549957275,
+                -3.1415908336639404
+            ],
+            "scale": [
+                0.9999991059303284,
+                1.0,
+                0.9999991059303284
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 52,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                47.12753677368164,
+                0.0,
+                -18.5280818939209
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.1170103549957275,
+                -3.1415908336639404
+            ],
+            "scale": [
+                0.9999991059303284,
+                1.0,
+                0.9999991059303284
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 53,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                49.145687103271484,
+                0.0,
+                -13.941485404968262
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.1170103549957275,
+                -3.1415908336639404
+            ],
+            "scale": [
+                0.9999991059303284,
+                1.0,
+                0.9999991059303284
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 54,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                49.90047073364258,
+                0.0,
+                -9.024528503417969
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.1170103549957275,
+                -3.1415908336639404
+            ],
+            "scale": [
+                0.9999991059303284,
+                1.0,
+                0.9999991059303284
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 55,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                50.593170166015625,
+                0.0,
+                -3.754377841949463
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.1170103549957275,
+                -3.1415908336639404
+            ],
+            "scale": [
+                0.9999991059303284,
+                1.0,
+                0.9999991059303284
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 56,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                50.499507904052734,
+                0.0,
+                2.541513442993164
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.1170103549957275,
+                -3.1415908336639404
+            ],
+            "scale": [
+                0.9999991059303284,
+                1.0,
+                0.9999991059303284
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 57,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                49.80104064941406,
+                0.0,
+                8.85427188873291
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.1170103549957275,
+                -3.1415908336639404
+            ],
+            "scale": [
+                0.9999991059303284,
+                1.0,
+                0.9999991059303284
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 58,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                48.32804870605469,
+                0.0,
+                15.14334774017334
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.1170103549957275,
+                -3.1415908336639404
+            ],
+            "scale": [
+                0.9999991059303284,
+                1.0,
+                0.9999991059303284
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 59,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                46.15637969970703,
+                0.0,
+                20.463363647460938
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.1170103549957275,
+                -3.1415908336639404
+            ],
+            "scale": [
+                0.9999991059303284,
+                1.0,
+                0.9999991059303284
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 60,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                43.17702865600586,
+                0.0,
+                25.930194854736328
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.1170103549957275,
+                -3.1415908336639404
+            ],
+            "scale": [
+                0.9999991059303284,
+                1.0,
+                0.9999991059303284
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 61,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                40.04579544067383,
+                0.0,
+                30.649171829223633
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.1170103549957275,
+                -3.1415908336639404
+            ],
+            "scale": [
+                0.9999991059303284,
+                1.0,
+                0.9999991059303284
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 62,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                36.04335403442383,
+                0.0,
+                35.16856384277344
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.1170103549957275,
+                -3.1415908336639404
+            ],
+            "scale": [
+                0.9999991059303284,
+                1.0,
+                0.9999991059303284
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 63,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                32.124080657958984,
+                0.0,
+                39.10847091674805
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.1170103549957275,
+                -3.1415908336639404
+            ],
+            "scale": [
+                0.9999991059303284,
+                1.0,
+                0.9999991059303284
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "BirchTree_1\\BirchTree_1.obj",
+            "id": 64,
+            "isAnimation": false,
+            "modelName": "BirchTree_1.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                27.770954132080078,
+                0.0,
+                42.07425308227539
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -1.1170103549957275,
+                -3.1415908336639404
+            ],
+            "scale": [
+                0.9999991059303284,
+                1.0,
+                0.9999991059303284
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Ground\\Ground.obj",
+            "id": 65,
+            "isAnimation": false,
+            "modelName": "Ground.obj",
+            "nameTag": "",
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "rotate": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
+        }
+    ],
+    "version": 11
+}

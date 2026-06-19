@@ -15,6 +15,8 @@
 void Line::Initialize()
 {
 	index = 0u;
+	drawStartIndex_ = 0u;
+	currentMaterialIndex_ = 0u;
 
 	lineManager_ = LineManager::GetInstance();
 	dxCommon_ = YoRigine::DirectXCommon::GetInstance();
@@ -26,13 +28,24 @@ void Line::Initialize()
 }
 
 /// <summary>
+/// フレーム冒頭で呼び、頂点・マテリアル CB スロットの使用状態をリセットする
+/// </summary>
+void Line::Reset()
+{
+	index = 0u;
+	drawStartIndex_ = 0u;
+	currentMaterialIndex_ = 0u;
+}
+
+/// <summary>
 /// 蓄積されたラインリストをまとめて描画する
 /// </summary>
 void Line::DrawLine()
 {
 
-	// 描画する頂点数が 0 なら早期リターン
-	if (index == 0) {
+	// 前回 DrawLine 以降に追加された頂点数 (まだ描いてない分)
+	const uint32_t pendingVertCount = index - drawStartIndex_;
+	if (pendingVertCount == 0) {
 		return;
 	}
 
@@ -42,6 +55,15 @@ void Line::DrawLine()
 	} else {
 		transformationMatrix_->WVP = MakeIdentity4x4();
 	}
+
+	// マテリアルスロットを 1 つ確保して現在色を書き込む。
+	// バッチごとに別 CB を使うことで、コマンド実行時に各 DrawInstanced が
+	// 自分のバッチの色を読めるようにする (詳細は Line.h のコメント参照)。
+	const uint32_t slotIdx = currentMaterialIndex_ % kMaterialSlotCount;
+	MaterialSlot& slot = materialSlots_[slotIdx];
+	slot.mapped->color = currentColor_;
+	++currentMaterialIndex_;
+
 	auto pm = YPipelineManager::GetInstance();
 	const auto& indices = pm->GetParameterIndices("Line");
 
@@ -52,14 +74,14 @@ void Line::DrawLine()
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
 	commandList->IASetVertexBuffers(0, 1, &vertexBufferView_);
 
-	commandList->SetGraphicsRootConstantBufferView(indices.at("gMaterial"), materialResource_->GetGPUVirtualAddress());
+	commandList->SetGraphicsRootConstantBufferView(indices.at("gMaterial"), slot.resource->GetGPUVirtualAddress());
 	commandList->SetGraphicsRootConstantBufferView(indices.at("gTransformationMatrix"), transformationResource_->GetGPUVirtualAddress());
 
-	// index / 2 本のライン（2 頂点 = 1 ライン）
-	commandList->DrawInstanced(index, 1, 0, 0);
+	// 自バッチの頂点範囲だけ DrawInstanced。StartVertexLocation で先頭ずらし。
+	// ※ index はリセットしない。フレーム末まで頂点バッファを上書きしない設計。
+	commandList->DrawInstanced(pendingVertCount, 1, drawStartIndex_, 0);
 
-	// 描画後にクリア
-	index = 0u;
+	drawStartIndex_ = index;
 }
 
 /// <summary>
@@ -312,12 +334,15 @@ void Line::CrateVetexResource()
 
 /// <summary>
 /// ライン描画用マテリアル（色情報）リソースの生成
+/// バッチごとに別 CB が必要なので kMaterialSlotCount 個まとめて作る
 /// </summary>
 void Line::CrateMaterialResource()
 {
-	materialResource_ = dxCommon_->CreateBufferResource(sizeof(Vector4));
-	materialResource_->Map(0, nullptr, reinterpret_cast<void**>(&materialData_));
-	materialData_->color = { 1.0f, 1.0f, 1.0f, 1.0f };
+	for (auto& slot : materialSlots_) {
+		slot.resource = dxCommon_->CreateBufferResource(sizeof(MaterialData));
+		slot.resource->Map(0, nullptr, reinterpret_cast<void**>(&slot.mapped));
+		slot.mapped->color = { 1.0f, 1.0f, 1.0f, 1.0f };
+	}
 }
 
 /// <summary>

@@ -3,11 +3,16 @@
 #include <filesystem>
 #include <algorithm>
 #include <iostream>
+#include <cfloat>
 
 #include "ModelManager.h"
 #include <Collision/Core/CollisionTypeIdDef.h>
 #include <Collision/OBB/OBBCollider.h>
 #include <Collision/Sphere/SphereCollider.h>
+#include <Drawer/InstancedObject3d.h>
+#include "WorldTransform/WorldTransform.h"
+#include "Model.h"
+#include "MathFunc.h"
 
 #ifdef USE_IMGUI
 #include "imgui.h"
@@ -70,6 +75,14 @@ namespace YoRigine {
 		editorUI_.SetBroadPhaseGridRadius(&broadPhaseGridDrawRadius_);
 		editorUI_.SetDrawFrustumCullingFlag(&enableDrawFrustumCulling_);
 
+		// スタンプモードのセットアップ + メニュー / ショートカットからの起動経路
+		stampMode_.SetObjectManager(objectManager_);
+		editorUI_.SetStartStampCallback([this]() {
+			stampMode_.Enter(selector_.GetPrimaryId());
+		});
+		editorUI_.SetStampActiveQuery([this]() { return stampMode_.IsActive(); });
+		editorUI_.SetExitStampCallback([this]() { stampMode_.Exit(); });
+
 		gizmoCtrl_.Initialize();
 
 		// Editor へのメニュー登録もここで一度だけ行う
@@ -97,7 +110,7 @@ namespace YoRigine {
 		if (!isInitialized_) return;
 
 #ifdef USE_IMGUI
-		if (!ImGui::GetIO().WantCaptureKeyboard) {
+		if (!ImGui::GetIO().WantTextInput) {
 			if (ImGui::GetIO().KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S)) {
 				serializer_.SaveScene(jsonPath_);
 				std::cout << "[ModelManipulator] Saved (Ctrl+S)\n";
@@ -108,13 +121,20 @@ namespace YoRigine {
 
 		motionEditor_.SetTargetObjectId(selector_.GetPrimaryId());
 		motionEditor_.Update();
-		// ── selector_.Update() だけここで行う（GPU命令は積まない）──
-		// シーンエディタが非アクティブ (オブジェクト一覧が閉じてる) ならクリック選択を無効化
+
+		const ImVec2 viewPos  = Editor::GetInstance()->GetGameViewPos();
+		const ImVec2 viewSize = Editor::GetInstance()->GetGameViewSize();
+
+		// スタンプモード中はクリックを StampMode が消費するので selector_ の選択処理は抑制
+		const bool stamping = stampMode_.IsActive();
 		selector_.SetCamera(camera_);
 		selector_.Update(
-			IsSceneEditorActive(),
-			Editor::GetInstance()->GetGameViewPos(),
-			Editor::GetInstance()->GetGameViewSize());
+			IsSceneEditorActive() && !stamping,
+			viewPos,
+			viewSize);
+
+		// スタンプモードの更新 (マウス位置 → ヒット計算 → 左クリックで実体化)
+		stampMode_.Update(viewPos, viewSize);
 #endif
 
 		objectManager_->Update();
@@ -149,6 +169,11 @@ namespace YoRigine {
 			};
 		};
 
+		// インスタンシング: 非アニメオブジェクトをモデル単位でまとめて描画
+		auto* instRenderer = ::InstancedObject3d::GetInstance();
+		instRenderer->Begin();
+		const Matrix4x4& vp = camera_->GetViewProjectionMatrix();
+
 		for (auto* obj : objectManager_->GetAllActiveObjects()) {
 			if (!obj || !obj->object || !obj->worldTransform) continue;
 
@@ -158,22 +183,52 @@ namespace YoRigine {
 				if (!FrustumUtil::IsAABBVisible(frustum, bounds)) continue;
 			}
 
-			// 選択状態に応じた色の変更処理
-			bool isSelected = selector_.IsSelected(obj->id);
-			if (isSelected) {
-				obj->object->SetMaterialColor({ 1.0f, 0.2f, 0.2f, 1.0f });
-			}
-			else {
-				obj->object->SetMaterialColor({ 1.0f, 1.0f, 1.0f, 1.0f });
-			}
-
-			// ボーン表示がONで対象オブジェクトならメッシュは描画しない
+			// ボーン表示中の対象はスキップ
 			bool isTargetAndBoneDraw = (motionEditor_.IsDrawBone() && obj->id == motionEditor_.GetTargetObjectId());
-			if (!isTargetAndBoneDraw) {
+			if (isTargetAndBoneDraw) continue;
+
+			Model* model = obj->object->GetModel();
+			const bool canInstance = (model && !obj->isAnimation && !model->GetHasBones());
+
+			if (canInstance) {
+				// インスタンスバッファに積む
+				::InstancedObject3d::InstanceData inst{};
+				const Matrix4x4& world = obj->worldTransform->GetMatWorld();
+				inst.World = world;
+				inst.WVP = world * vp;
+				// WIT = Transpose(Inverse(World)) を手計算
+				{
+					Matrix4x4 inv = Inverse(world);
+					Matrix4x4& wit = inst.WorldInverseTranspose;
+					for (int r = 0; r < 4; ++r)
+						for (int c = 0; c < 4; ++c)
+							wit.m[r][c] = inv.m[c][r];
+				}
+				inst.color = obj->color;
+				inst.uvTransform = MakeScaleMatrix({ obj->uvScale.x, obj->uvScale.y, 1.0f });
+				inst.stochasticStrength = obj->uvStochastic;
+				instRenderer->AddInstance(model, inst);
+
+				// PickBuffer や他システムが worldTransform の CB を参照するため、
+				// Object3d::Draw を経由しなくても CB を最新行列で同期する
+				obj->worldTransform->SetMapWVP(inst.WVP);
+				obj->worldTransform->SetMapWorld(world);
+			} else {
+				// アニメ付き / 特殊エフェクト: 従来の個別 Draw 経路
+				obj->object->SetMaterialColor(obj->color);
 				obj->object->Draw(camera_, *obj->worldTransform);
 			}
 		}
+
+		// インスタンス分を1ドローコール/モデルでまとめて描画
+		instRenderer->Flush(camera_);
+
 		motionEditor_.Draw();
+
+#ifdef USE_IMGUI
+		// スタンプモード中はカーソル下にゴーストを描画
+		stampMode_.DrawGhost();
+#endif
 	}
 
 
@@ -185,6 +240,43 @@ namespace YoRigine {
 		motionEditor_.DrawBone();
 
 #ifdef USE_IMGUI
+		// ── 選択中ハイライト（モデル外接の世界 AABB をオレンジ枠で表示） ──
+		// 色のマテリアル上書きを避け、ここでビジュアルな選択フィードバックを与える。
+		// コライダーデバッグ表示の ON/OFF に関係なく常時描画。
+		if (selector_.HasSelection()) {
+			const Vector4 kSelectionColor{ 1.0f, 0.55f, 0.0f, 1.0f }; // Blender 風オレンジ
+			colliderCubes_.Begin();
+			for (auto* obj : objectManager_->GetAllActiveObjects()) {
+				if (!obj || !obj->object || !obj->worldTransform) continue;
+				if (!selector_.IsSelected(obj->id)) continue;
+
+				AABB local{};
+				if (!objectManager_->ComputeModelLocalAABB(*obj, local)) continue;
+
+				// ローカル AABB の 8 隅をワールド変換して、その AABB を求める
+				const Vector3 corners[8] = {
+					{ local.min.x, local.min.y, local.min.z },
+					{ local.max.x, local.min.y, local.min.z },
+					{ local.min.x, local.max.y, local.min.z },
+					{ local.max.x, local.max.y, local.min.z },
+					{ local.min.x, local.min.y, local.max.z },
+					{ local.max.x, local.min.y, local.max.z },
+					{ local.min.x, local.max.y, local.max.z },
+					{ local.max.x, local.max.y, local.max.z },
+				};
+				const Matrix4x4& mw = obj->worldTransform->GetMatWorld();
+				Vector3 wmn = {  FLT_MAX,  FLT_MAX,  FLT_MAX };
+				Vector3 wmx = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
+				for (const auto& c : corners) {
+					Vector3 wp = Transform(c, mw);
+					wmn.x = std::min(wmn.x, wp.x); wmn.y = std::min(wmn.y, wp.y); wmn.z = std::min(wmn.z, wp.z);
+					wmx.x = std::max(wmx.x, wp.x); wmx.y = std::max(wmx.y, wp.y); wmx.z = std::max(wmx.z, wp.z);
+				}
+				colliderCubes_.AddAABB(wmn, wmx, kSelectionColor);
+			}
+			colliderCubes_.Flush();
+		}
+
 		if (!showColliderDebug_) return;
 
 		// タイプID → 色
@@ -194,6 +286,7 @@ namespace YoRigine {
 			case CollisionTypeIdDef::kNavObstacle: return { 1.0f, 0.8f, 0.0f, 1.0f }; // 黄
 			case CollisionTypeIdDef::kNavTrigger:  return { 0.2f, 0.5f, 1.0f, 1.0f }; // 青
 			case CollisionTypeIdDef::kWaypoint:    return { 0.2f, 1.0f, 0.3f, 1.0f }; // 緑
+			case CollisionTypeIdDef::kEventTrigger:return { 0.9f, 0.3f, 0.9f, 1.0f }; // マゼンタ
 			default:                               return { 0.6f, 0.6f, 0.6f, 1.0f }; // グレー
 			}
 		};
@@ -261,10 +354,41 @@ namespace YoRigine {
 	// ============================================================
 	void ModelManipulator::DrawShadow() {
 		if (!isInitialized_) return;
+
+		auto* instRenderer = ::InstancedObject3d::GetInstance();
+		instRenderer->Begin();
+		const bool hasCamera = (camera_ != nullptr);
+		const Matrix4x4 vp = hasCamera ? camera_->GetViewProjectionMatrix() : MakeIdentity4x4();
+
 		for (auto* obj : objectManager_->GetAllActiveObjects()) {
-			if (obj && obj->object && obj->worldTransform)
+			if (!obj || !obj->object || !obj->worldTransform) continue;
+
+			Model* model = obj->object->GetModel();
+			const bool canInstance = (model && !obj->isAnimation && !model->GetHasBones());
+
+			if (canInstance) {
+				::InstancedObject3d::InstanceData inst{};
+				const Matrix4x4& world = obj->worldTransform->GetMatWorld();
+				inst.World = world;
+				inst.WVP = world * vp;
+				// WIT = Transpose(Inverse(World)) を手計算
+				{
+					Matrix4x4 inv = Inverse(world);
+					Matrix4x4& wit = inst.WorldInverseTranspose;
+					for (int r = 0; r < 4; ++r)
+						for (int c = 0; c < 4; ++c)
+							wit.m[r][c] = inv.m[c][r];
+				}
+				inst.color = obj->color;
+				inst.uvTransform = MakeScaleMatrix({ obj->uvScale.x, obj->uvScale.y, 1.0f });
+				inst.stochasticStrength = obj->uvStochastic;
+				instRenderer->AddInstance(model, inst);
+			} else {
 				obj->object->DrawShadow(*obj->worldTransform);
+			}
 		}
+
+		instRenderer->FlushShadow();
 	}
 
 	// ============================================================
@@ -359,6 +483,9 @@ namespace YoRigine {
 
 		for (auto* obj : objectManager_->GetAllActiveObjects()) {
 			if (!obj || !obj->object || !obj->worldTransform) continue;
+			// pickable=false の背景オブジェクト (地面など) は Pick バッファに描かない。
+			// クリックは裏の手前オブジェクトか空 (-1) に抜ける。
+			if (!obj->pickable) continue;
 
 			auto* model = obj->object->GetModel();
 			if (!model) continue;
@@ -415,13 +542,33 @@ namespace YoRigine {
 		}
 #endif
 		jsonPath_ = "Resources/Json/Scenes/" + sceneName + ".json";
-		// 前のシーンのオブジェクトを安全にクリア
+
+		// 同じシーンの再ロード要求は何もしない (退避→復元で空になるのを避ける)
+		if (currentSceneName_ == sceneName) {
+			selector_.ClearSelection();
+			Logger("[ModelManipulator] Scene (already active): " + sceneName);
+			return;
+		}
+
+		// 現在のシーンを ObjectManager に退避 (PlacedObject は pool に残したまま、
+		// collider だけ CollisionManager から外す。D3D12 リソース再確保を回避する)。
+		if (!currentSceneName_.empty()) {
+			objectManager_->StashCurrentAs(currentSceneName_);
+		}
+
+		// 退避していたシーンがあれば、JSON 再パース + CreateObject ループをまるごと省略して復元
+		if (objectManager_->TryRestore(sceneName)) {
+			selector_.ClearSelection();
+			currentSceneName_ = sceneName;
+			Logger("[ModelManipulator] Scene Restored from cache: " + sceneName);
+			return;
+		}
+
+		// 初回ロード: 通常の JSON 読み込み経路
 		objectManager_->ClearAllObjects();
-		// 新しいシーンデータをロード
 		serializer_.LoadScene(jsonPath_);
-		// 選択状態をリセット
 		selector_.ClearSelection();
-		// ログの出力
+		currentSceneName_ = sceneName;
 		Logger("[ModelManipulator] Scene Loaded: " + sceneName);
 	}
 
@@ -430,12 +577,14 @@ namespace YoRigine {
 	// ============================================================
 	void ModelManipulator::ShortcutKey() {
 #ifdef USE_IMGUI
-		// テキスト入力中は誤発火させない
-		if (ImGui::GetIO().WantCaptureKeyboard) return;
-		// シーンエディタ非アクティブ中は無効
+		ImGuiIO& io = ImGui::GetIO();
+
+		// 「実際にテキスト入力中の時だけ」ブロックしたいので WantTextInput を使う。
+		// WantCaptureKeyboard は ImGui ウィンドウにフォーカスがあるだけで true になり、
+		// シーンエディタ表示中はほぼ常に true になって誤って全ショートカットを潰してしまう。
+		if (io.WantTextInput) return;
 		if (!IsSceneEditorActive()) return;
 
-		ImGuiIO& io = ImGui::GetIO();
 		if (io.KeyCtrl) {
 			if (ImGui::IsKeyPressed(ImGuiKey_C)) {
 				CopyObject();
@@ -446,6 +595,14 @@ namespace YoRigine {
 			// Ctrl+G : 選択中を地面に吸着 (Snap to surface)
 			if (ImGui::IsKeyPressed(ImGuiKey_G)) {
 				editorUI_.SnapSelectedToSurface();
+			}
+		}
+		else {
+			// B キー単独: 選択中オブジェクトをスタンプ元にしてスタンプモード開始
+			//   モード中は左クリック連打で連続配置、Esc/右クリックで終了
+			if (ImGui::IsKeyPressed(ImGuiKey_B) && selector_.HasSelection()
+				&& !stampMode_.IsActive()) {
+				stampMode_.Enter(selector_.GetPrimaryId());
 			}
 		}
 #endif
@@ -487,16 +644,23 @@ namespace YoRigine {
 	// ============================================================
 	void ModelManipulator::CopyObject() {
 		auto& selectID = selector_.GetSelectedIds();
-		if (selectID.empty())return;
+		if (selectID.empty()) {
+			std::cout << "[ModelManipulator] CopyObject: 選択なし、コピー対象なし\n";
+			return;
+		}
 
 		copyObjectIDs_.assign(selectID.begin(), selectID.end());
+		std::cout << "[ModelManipulator] CopyObject: " << copyObjectIDs_.size() << "件 コピー\n";
 	}
 
 	// ============================================================
 	// コピーしたオブジェクトを貼り付け
 	// ============================================================
 	void ModelManipulator::PasteObject() {
-		if (copyObjectIDs_.empty()) return;
+		if (copyObjectIDs_.empty()) {
+			std::cout << "[ModelManipulator] PasteObject: コピーバッファ空\n";
+			return;
+		}
 		// 貼り付けたものを新しく選択状態にするためにクリアする
 		selector_.ClearSelection();
 
@@ -506,6 +670,10 @@ namespace YoRigine {
 
 			// 生成元のオブジェクト情報を参照してコピーを作成
 			auto* newObj = objectManager_->CreateObject(srcObj->modelPath, srcObj->isAnimation, srcObj->animationName);
+			if (!newObj) {
+				std::cout << "[ModelManipulator] PasteObject: CreateObject失敗 (src ID=" << id << ")\n";
+				continue;
+			}
 			newObj->position = srcObj->position + offsetCopyPos_;
 			newObj->rotation = srcObj->rotation;
 			newObj->scale = srcObj->scale;
@@ -522,9 +690,20 @@ namespace YoRigine {
 			newObj->colliderSphereRadius = srcObj->colliderSphereRadius;
 			objectManager_->ApplyColliderTemplate(*newObj);
 
+			// マテリアル色・UV (旧コードは抜けていたので明示的にコピー)
+			newObj->color = srcObj->color;
+			objectManager_->ApplyObjectColor(*newObj);
+			newObj->uvScale = srcObj->uvScale;
+			newObj->uvStochastic = srcObj->uvStochastic;
+			objectManager_->ApplyObjectUV(*newObj);
+
+			// 親子関係も維持
+			newObj->parentID = srcObj->parentID;
+
 			// 選択状態に追加
 			selector_.AddToSelection(newObj->id);
 			objectManager_->UpdateObjectTransform(*newObj);
 		}
+		std::cout << "[ModelManipulator] PasteObject: " << copyObjectIDs_.size() << "件 貼り付け\n";
 	}
 } // namespace YoRigine

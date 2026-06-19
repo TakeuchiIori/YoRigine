@@ -99,6 +99,8 @@ void YPipelineManager::Initialize()
     CreatePSO_Sprite();
     CreatePSO_Object();
     CreatePSO_ShadowMap();
+    CreatePSO_ObjectInstanced();
+    CreatePSO_ShadowMapInstanced();
     CreatePSO_Line();
     CreatePSO_InstancedCube();
     CreatePSO_Particle();
@@ -110,70 +112,9 @@ void YPipelineManager::Initialize()
     CreatePSO_GPUParticleInit();
     CreatePSO_EffectObject();
 
-    // ポストエフェクト系パイプライン
+    // ポストエフェクト系PSパイプライン: 全エフェクトCS化に伴い、
+    // 最終 blit 用の BaseOffScreen (CopyImage.PS.hlsl) のみ残す
     CreatePSO_BaseOffScreen();
-    CreatePSO_BaseOffScreen(
-        L"Resources/Shaders/PostEffect/Grayscale/Grayscale.PS.hlsl",
-        "Grayscale");
-    CreatePSO_BaseOffScreen(
-        L"Resources/Shaders/PostEffect/Sepia/Sepia.PS.hlsl",
-        "Sepia");
-    CreatePSO_BaseOffScreen(
-        L"Resources/Shaders/PostEffect/Vignette/Vignette.PS.hlsl",
-        "Vignette");
-    CreatePSO_Smoothing(
-        L"Resources/Shaders/PostEffect/Smoothing/BoxFilter.PS.hlsl",
-        "OffScreen_BoxSmoothing");
-    CreatePSO_Smoothing(
-        L"Resources/Shaders/PostEffect/Smoothing/GaussianFilter.PS.hlsl",
-        "GaussSmoothing");
-    CreatePSO_DepthOutLine(
-        L"Resources/Shaders/PostEffect/OutLine/DepthBasedOutLine.PS.hlsl",
-        "DepthOutLine");
-    CreatePSO_RadialBlur(
-        L"Resources/Shaders/PostEffect/Blur/RadialBlur.PS.hlsl",
-        "RadialBlur");
-    CreatePSO_ToneMapping(
-        L"Resources/Shaders/PostEffect/ColorRemapping/ToneMapping.PS.hlsl",
-        "ToneMapping");
-    CreatePSO_Dissolve(
-        L"Resources/Shaders/PostEffect/Dissolve/Dissolve.PS.hlsl",
-        "Dissolve");
-    CreatePSO_Chromatic(
-        L"Resources/Shaders/PostEffect/ColorRemapping/Chromatic.PS.hlsl",
-        "Chromatic");
-    CreatePSO_ColorAdjust(
-        L"Resources/Shaders/PostEffect/ColorRemapping/ColorAdjust.PS.hlsl",
-        "ColorAdjust");
-    CreatePSO_ShatterTransition(
-        L"Resources/Shaders/PostEffect/Transition/ShatterTransition.PS.hlsl",
-        "ShatterTransition");
-    CreatePSO_BaseOffScreen(
-        L"Resources/Shaders/PostEffect/Bloom/Bloom.PS.hlsl",
-        "Bloom");
-    CreatePSO_BaseOffScreen(
-        L"Resources/Shaders/PostEffect/Posterize/Posterize.PS.hlsl",
-        "Posterize");
-    CreatePSO_BaseOffScreen(
-        L"Resources/Shaders/PostEffect/Kuwahara/Kuwahara.PS.hlsl",
-        "Kuwahara");
-    CreatePSO_BaseOffScreen(
-        L"Resources/Shaders/PostEffect/Halftone/Halftone.PS.hlsl",
-        "Halftone");
-    CreatePSO_BaseOffScreen(
-        L"Resources/Shaders/PostEffect/CrossHatch/CrossHatch.PS.hlsl",
-        "CrossHatch");
-    CreatePSO_BaseOffScreen(
-        L"Resources/Shaders/PostEffect/ColorGrade/ColorGrade.PS.hlsl",
-        "ColorGrade");
-    // Fog は depth SRV を使うので DepthOutLine と同じビルダで作る
-    CreatePSO_DepthOutLine(
-        L"Resources/Shaders/PostEffect/Fog/Fog.PS.hlsl",
-        "Fog");
-    // God Rays も depth SRV を使うので DepthOutLine ビルダ流用
-    CreatePSO_DepthOutLine(
-        L"Resources/Shaders/PostEffect/GodRays/GodRays.PS.hlsl",
-        "GodRays");
 
 	// Meshを使用したVFX用パイプライン
     CreatePSO_VfxMeshTrail();
@@ -327,17 +268,14 @@ void YPipelineManager::CreatePSO_ShadowMap()
     parameterIndices_["ShadowMap"] = result.parameterIndices;
 }
 
-void YPipelineManager::CreatePSO_ObjectInstance()
+void YPipelineManager::CreatePSO_ObjectInstanced()
 {
-
     Logger("\n==============================================================\n\n\n");
-    Logger("         Creating Pipeline: ObjectInstance              \n\n\n");
+    Logger("         Creating Pipeline: ObjectInstanced              \n\n\n");
     Logger("==============================================================\n");
-    // シェーダーをコンパイル
-    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3DInstance.VS.hlsl", L"vs_6_0");
-    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3D.PS.hlsl", L"ps_6_0");
+    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3d/Object3dInstanced.VS.hlsl", L"vs_6_0");
+    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3d/Object3dInstanced.PS.hlsl", L"ps_6_0");
 
-    // リフレクションベースで完全自動生成
     ReflectionBasedPipelineBuilder builder;
     auto result = builder.BuildFromCompiledShaders(
         dxCommon_->GetDevice().Get(),
@@ -345,10 +283,30 @@ void YPipelineManager::CreatePSO_ObjectInstance()
         psBlob.Get()
     );
 
-    // 結果を保存
-    rootSignatures_["ObjectInstance"] = result.rootSignature;
-    pipelineStates_["ObjectInstance"] = result.pipelineState;
-    parameterIndices_["ObjectInstance"] = result.parameterIndices;
+    rootSignatures_["ObjectInstanced"] = result.rootSignature;
+    pipelineStates_["ObjectInstanced"] = result.pipelineState;
+    parameterIndices_["ObjectInstanced"] = result.parameterIndices;
+}
+
+void YPipelineManager::CreatePSO_ShadowMapInstanced()
+{
+    Logger("\n==============================================================\n\n\n");
+    Logger("         Creating Pipeline: ShadowMapInstanced              \n\n\n");
+    Logger("==============================================================\n");
+    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Shadow/ShadowmapInstanced.VS.hlsl", L"vs_6_0");
+
+    ReflectionBasedPipelineBuilder builder;
+    auto result = builder
+        .SetDepthStencilFormat(DXGI_FORMAT_D32_FLOAT)
+        .SetRasterizerState(YoRigine::RasterizerPresets::CreateShadow())
+        .BuildFromCompiledShaders(
+            dxCommon_->GetDevice().Get(),
+            vsBlob.Get()
+        );
+
+    rootSignatures_["ShadowMapInstanced"] = result.rootSignature;
+    pipelineStates_["ShadowMapInstanced"] = result.pipelineState;
+    parameterIndices_["ShadowMapInstanced"] = result.parameterIndices;
 }
 
 void YPipelineManager::CreatePSO_Particle()

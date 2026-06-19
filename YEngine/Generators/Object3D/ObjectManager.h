@@ -8,7 +8,9 @@
 #include "Object3D/Object3d.h"
 #include "WorldTransform/WorldTransform.h"
 #include <Memory/PoolAllocator.h>
+#include "Vector2.h"
 #include "Vector3.h"
+#include "Vector4.h"
 
 #include <Collision/AABB/AABBCollider.h>
 #include <Collision/Core/BaseCollider.h>
@@ -41,14 +43,36 @@ public:
 		std::unique_ptr<WorldTransform> worldTransform;
 		std::string modelName;
 		std::string modelPath;
+		// シーン内で一意な識別子 (TriggerAction 等がターゲットを名前参照する用途)。
+		// 空文字なら未命名。重複登録はチェックしないが、参照側が見つからなければ無視される。
+		std::string nameTag;
 
 		Vector3 position = { 0.0f, 0.0f, 0.0f };
 		Vector3 rotation = { 0.0f, 0.0f, 0.0f };
 		Vector3 scale = { 1.0f, 1.0f, 1.0f };
 
+		// 回転の旋回中心 (ローカル空間)。useAnchorPoint=true の時のみ WT に書き込まれる。
+		// ヒンジ式の扉などで端を pivot にしたい時に使う。
+		bool useAnchorPoint = false;
+		Vector3 anchorPoint = { 0.0f, 0.0f, 0.0f };
+
+		// マテリアル色 (rgba)。エディタから編集 / JSON 保存対象
+		Vector4 color = { 1.0f, 1.0f, 1.0f, 1.0f };
+
+		// UV スケール。エディタから編集 / JSON 保存対象
+		Vector2 uvScale = { 1.0f, 1.0f };
+
+		// タイル単位ランダム化の強度 (0=オフ / 1=最大)。エディタから編集 / JSON 保存対象
+		float uvStochastic = 0.0f;
+
 		int id = 0;
 		int parentID = -1;
 		bool isActive = true;
+
+		// シーンエディタのクリック選択対象にするか。
+		// 地面・スカイ等の背景要素を false にすると、ピックバッファ描画から除外され
+		// マウスクリックがその裏(=本来選択したい手前のオブジェクト or 空)に届く。
+		bool pickable = true;
 
 		// アニメーション関連
 		bool isAnimation = false;
@@ -100,6 +124,18 @@ public:
 	// すべてのオブジェクトをクリア
 	void ClearAllObjects();
 
+	// シーン切替用: 現在の idToObject_ を sceneName 付きで退避する。
+	// PlacedObject は pool に残したまま (Free しない) で map だけ移すので、
+	// 同じ sceneName で TryRestore すれば D3D12 リソース再確保なしに復元できる。
+	// 退避中は各 collider を CollisionManager から外して判定対象から消す。
+	void StashCurrentAs(const std::string& sceneName);
+
+	// 退避していたシーンがあれば復元して true を返す。なければ false。
+	bool TryRestore(const std::string& sceneName);
+
+	// 指定 sceneName の退避があるか
+	bool HasStashedScene(const std::string& sceneName) const;
+
 	// オブジェクトの複製
 	PlacedObject* DuplicateObject(int objectId, const Vector3& positionOffset = { 0,0,0 });
 
@@ -108,6 +144,10 @@ public:
 	Object3d* GetObject3dById(int id);
 	PlacedObject* GetObjectById(int id);
 	const PlacedObject* GetObjectById(int id) const;
+
+	// nameTag による検索。最初に一致したものを返す。空文字や見つからなければ nullptr。
+	PlacedObject* GetObjectByName(const std::string& name);
+	const PlacedObject* GetObjectByName(const std::string& name) const;
 
 	std::vector<PlacedObject*> GetAllActiveObjects();
 	std::vector<const PlacedObject*> GetAllActiveObjects() const;
@@ -154,6 +194,24 @@ public:
 	// 同名モデルの colliderEnabled を一括設定する
 	void SetColliderEnabledAll(const std::string& modelName, bool enabled);
 
+	///************************* マテリアル色操作 *************************///
+
+	// PlacedObject の color を内部 Object3d のマテリアルに反映する
+	void ApplyObjectColor(PlacedObject& obj);
+
+	// PlacedObject の uvScale を内部 Object3d に反映する
+	void ApplyObjectUV(PlacedObject& obj);
+
+	///************************* コライダー自動フィット *************************///
+
+	// モデルの全頂点からローカル AABB を計算（描画と同じ root ノード行列を反映済み）。
+	// 頂点が無い／モデル未ロード時は false。
+	bool ComputeModelLocalAABB(const PlacedObject& obj, AABB& outAabb) const;
+
+	// 計算した AABB を margin (1.0 で等倍, 1.05 で 5% 拡大) で膨らませて、
+	// 現在の colliderShapeType に応じて AABB/OBB/Sphere の各オフセットに書き込み、適用する。
+	bool FitColliderToModel(PlacedObject& obj, float margin);
+
 private:
 	ObjectManager() = default;
 	~ObjectManager() = default;
@@ -176,6 +234,13 @@ private:
 	// Frustum culling 統計 (直前フレーム)
 	int lastFrameCulledCount_ = 0;
 	int lastFrameTotalCount_ = 0;
+
+	// シーンキャッシュ: シーン切替時に idToObject_ をここに退避する
+	struct StashedScene {
+		std::unordered_map<int, PlacedObject*> objects;
+		int nextObjectId = 0;
+	};
+	std::unordered_map<std::string, StashedScene> stashedScenes_;
 
 	// オブジェクトの初期化ヘルパー
 	void InitializePlacedObject(PlacedObject& obj, const std::string& modelPath,

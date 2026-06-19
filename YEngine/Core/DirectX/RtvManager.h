@@ -28,6 +28,10 @@ public:
 		uint32_t srvIndex = UINT32_MAX;
 		D3D12_CPU_DESCRIPTOR_HANDLE srvHandleCPU;
 		D3D12_GPU_DESCRIPTOR_HANDLE srvHandleGPU;
+		// CS 書き込み用 UAV (createUAV=true で生成)
+		uint32_t uavIndex = UINT32_MAX;
+		D3D12_CPU_DESCRIPTOR_HANDLE uavHandleCPU{};
+		D3D12_GPU_DESCRIPTOR_HANDLE uavHandleGPU{};
 		D3D12_CLEAR_VALUE clearValue;
 		std::string name;
 		uint32_t width = 0;
@@ -42,13 +46,16 @@ public:
 	void Finalize();
 
 	// レンダーターゲットの作成
+	// createUAV=true にすると TYPELESS リソースを生成し、RTV/SRV は指定フォーマット (例: SRGB)、
+	// UAV は非SRGB変種で作成する。CS から書き込めるようになる。
 	uint32_t Create(
 		const std::string& name,
 		uint32_t width,
 		uint32_t height,
 		DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
 		const Vector4& clearColor = { 0.1f, 0.1f, 0.2f, 1.0f },
-		bool createSRV = true
+		bool createSRV = true,
+		bool createUAV = false
 	);
 
 	// 既存リソースの登録（スワップチェーン用）
@@ -123,7 +130,8 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> CreateRenderTextureResource(
 		uint32_t width,
 		uint32_t height,
-		const D3D12_CLEAR_VALUE& clearValue
+		const D3D12_CLEAR_VALUE& clearValue,
+		bool allowUAV = false
 	);
 
 private:

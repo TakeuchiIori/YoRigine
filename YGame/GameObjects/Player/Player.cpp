@@ -149,7 +149,7 @@ void Player::InitCollision() {
 	);
 	obbCollider_->SetIsStatic(false);
 	obbCollider_->SetMass(100.0f);
-	// Player は画面外でも常に当たり判定を回す (落下・カメラ越し攻撃などで invariably 必要)
+	// Player は画面外でも常に当たり判定を回す
 	obbCollider_->SetCheckOutsideCamera(false);
 
 }
@@ -293,11 +293,13 @@ void Player::UpdateMotionTime() {
 // ワールド座標の取得
 // ============================================================
 Vector3 Player::GetWorldPosition() {
-	return {
-		wt_.matWorld_.m[3][0],
-		wt_.matWorld_.m[3][1],
-		wt_.matWorld_.m[3][2]
-	};
+	// wt_.matWorld_ は wt_.UpdateMatrix() が走らないと更新されない。
+	// バトル中は BattleScene::Update が isBattleCameraActive=true の間
+	// player_->Update() を呼ばないため、matWorld_ が単位行列のまま放置されて
+	// この関数が (0,0,0) を返してしまうケースが発生する (エンカウント時の
+	// playerPosition 取得 → バトル復帰位置が原点になる原因)。
+	// Player は親を持たない root なので translate_ を直接返すのが安全。
+	return wt_.translate_;
 }
 
 // ============================================================

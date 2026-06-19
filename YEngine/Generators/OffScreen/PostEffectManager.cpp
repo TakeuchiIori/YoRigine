@@ -212,18 +212,19 @@ void PostEffectManager::Reset()
 void PostEffectManager::InitializeRenderTargets()
 {
 	// 中間バッファを複数枚確保（ping-pong 的に使用）
+	// CS書き込み対応のため、TYPELESS実体 + SRGB(RTV/SRV) + UNORM(UAV) の三系統ビューで生成
 	for (int i = 0; i < MAX_INTERMEDIATE_BUFFERS; ++i) {
 
 		std::string rtName = "PostEffect_Intermediate" + std::to_string(i);
 
-		// SRGB のカラーRTを作成
 		rtvManager_->Create(
 			rtName,
 			WinApp::kClientWidth,
 			WinApp::kClientHeight,
 			DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
 			{ 0.0f, 0.0f, 0.0f, 1.0f },
-			true
+			/*createSRV*/ true,
+			/*createUAV*/ true
 		);
 
 		intermediateRTNames_.push_back(rtName);
@@ -554,57 +555,46 @@ void PostEffectManager::RenderEffectChain()
 	}
 
 	// -------------------------------
-	// エフェクトを順番に処理する
+	// 全エフェクトをCSで中間バッファにチェーン処理
+	// 最後に1回 PS Copy でバックバッファへ blit (バックバッファはUAV非対応のため)
 	// -------------------------------
 	for (size_t idx = 0; idx < enabledIndices.size(); ++idx) {
 
-		const bool isLast = (idx == enabledIndices.size() - 1);
 		const int effectIndex = enabledIndices[idx];
 		auto* effectData = effectChain_->GetPostEffectData(effectIndex);
 		if (!effectData) continue;
 
-		// 入力テクスチャを READ に
+		std::string outputRT =
+			intermediateRTNames_[idx % intermediateRTNames_.size()];
+
 		TransitionResource(inputRT, D3D12_RESOURCE_STATE_GENERIC_READ);
+		TransitionResource(outputRT, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
-		if (!isLast) {
-			// 中間RTに描画する
-			std::string outputRT =
-				intermediateRTNames_[idx % intermediateRTNames_.size()];
+		ApplyEffectParametersToOffScreen(*effectData);
 
-			// RTとして使用可能に
-			TransitionResource(outputRT, D3D12_RESOURCE_STATE_RENDER_TARGET);
-			rtvManager_->SetRenderTargets(commandList.Get(), { outputRT }, nullptr);
-			rtvManager_->Clear(outputRT, commandList.Get());
-			SetViewportAndScissor();
+		const auto* outRT = rtvManager_->Get(outputRT);
+		offScreen_->RenderEffectCompute(
+			effectData->type,
+			rtvManager_->Get(inputRT)->srvHandleGPU,
+			outRT->uavHandleGPU,
+			outRT->width,
+			outRT->height
+		);
 
-			// エフェクトのパラメータを反映
-			ApplyEffectParametersToOffScreen(*effectData);
-
-			// エフェクト適用
-			offScreen_->RenderEffect(
-				effectData->type,
-				rtvManager_->Get(inputRT)->srvHandleGPU
-			);
-
-			// 出力を READ に戻す
-			TransitionResource(outputRT, D3D12_RESOURCE_STATE_GENERIC_READ);
-
-			// 次のエフェクトの入力を更新
-			inputRT = outputRT;
-		} else {
-			// 最後のエフェクトはバックバッファへ
-			TransitionResource(bbName, D3D12_RESOURCE_STATE_RENDER_TARGET);
-			rtvManager_->SetRenderTargets(commandList.Get(), { bbName }, nullptr);
-			SetViewportAndScissor();
-
-			ApplyEffectParametersToOffScreen(*effectData);
-
-			offScreen_->RenderEffect(
-				effectData->type,
-				rtvManager_->Get(inputRT)->srvHandleGPU
-			);
-		}
+		TransitionResource(outputRT, D3D12_RESOURCE_STATE_GENERIC_READ);
+		inputRT = outputRT;
 	}
+
+	// 最終 blit: 最後の中間バッファ → バックバッファ (PS Copyで)
+	TransitionResource(inputRT, D3D12_RESOURCE_STATE_GENERIC_READ);
+	TransitionResource(bbName, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	rtvManager_->SetRenderTargets(commandList.Get(), { bbName }, nullptr);
+	SetViewportAndScissor();
+
+	offScreen_->RenderEffect(
+		OffScreen::OffScreenEffectType::Copy,
+		rtvManager_->Get(inputRT)->srvHandleGPU
+	);
 }
 
 /// <summary>
