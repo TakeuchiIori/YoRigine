@@ -5005,9 +5005,9 @@
                 0.0
             ],
             "scale": [
+                50.0,
                 1.0,
-                1.0,
-                1.0
+                50.0
             ],
             "useAnchorPoint": false,
             "uvScale": [

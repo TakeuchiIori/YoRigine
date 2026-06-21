@@ -75,15 +75,10 @@ void BattleScene::Initialize(Camera* camera, Player* player) {
 
 	auto manager = AreaManager::GetInstance();
 
-	//------------------------------------------------------------
-	// フィールドの設定
-	//------------------------------------------------------------
-	auto battleField = std::make_shared<CircleArea>();
-	battleField->Initialize(Vector3(0, 0, 0), 50.0f);
-	battleField->SetPurpose(AreaPurpose::Boundary);  // 境界制限として設定
-	battleField->SetCamera(sceneCamera_);
-	manager->AddArea("BattleArea", battleField);
-
+	// 注意: BattleArea(境界エリア) は OnEnter で登録する。
+	// FieldScene::OnEnter が RemoveArea("BattleArea") で掃除するため、
+	// Initialize で一度だけ追加するとフィールド入場時に消えて二度と復活せず、
+	// バトル中の境界制限が効かなくなる (FieldArea と対称に入退場で再登録する)。
 
 	//------------------------------------------------------------
 	// UI初期化
@@ -309,6 +304,19 @@ void BattleScene::OnEnter() {
 	// バトル用に置くものだけ残して保存して Battle.json を作る。
 	YoRigine::ModelManipulator::GetInstance()->LoadScene("Battle");
 
+	// 境界エリア(BattleArea) を入場のたびに登録し直す。
+	// FieldScene::OnEnter が RemoveArea("BattleArea") するため、ここで再生成しないと
+	// バトル中の境界制限 (UpdateSingleObject) が効かなくなる。
+	{
+		auto* mgr = AreaManager::GetInstance();
+		mgr->RemoveArea("BattleArea");  // 念のため重複除去
+		auto battleField = std::make_shared<CircleArea>();
+		battleField->Initialize(Vector3(0, 0, 0), 50.0f);
+		battleField->SetPurpose(AreaPurpose::Boundary);  // 境界制限として設定
+		battleField->SetCamera(sceneCamera_);
+		mgr->AddArea("BattleArea", battleField);
+	}
+
 	// カメラリセット
 	currentCameraMode_ = CameraMode::FOLLOW;
 	battleCameraFinished_ = true;
@@ -331,6 +339,9 @@ void BattleScene::OnExit() {
 	BaseSubScene::OnExit();
 
 	Logger("[BattleScene] ===== OnExit() START =====\n");
+
+	// 境界エリアを掃除（FieldScene 側でも除去しているが対称性のため明示）
+	AreaManager::GetInstance()->RemoveArea("BattleArea");
 
 	// ロックオンUIを非表示にする
 	lockOnUI_->SetIsVisible(false);

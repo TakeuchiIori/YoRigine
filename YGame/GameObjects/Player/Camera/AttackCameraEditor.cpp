@@ -165,6 +165,37 @@ void AttackCameraEditor::DrawWorkSettings() {
     ImGui::Checkbox("プレイヤーをフレーム内に保持##keepInFrame", &work.keepPlayerInFrame);
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip("再生中、プレイヤーが画角外へ出ないよう引き戻す\nOFF = カットシーン的に画角外を許可");
+
+    ImGui::Separator();
+
+    // ============================================================
+    // 参照フレーム / 注視
+    // ============================================================
+    ImGui::TextDisabled("参照フレーム / 注視");
+
+    static const char* kSpaceNames[] = {
+        "カメラローカル", "プレイヤーローカル", "ワールド", "対象方向(TargetRelative)"
+    };
+    int spaceIdx = static_cast<int>(work.posSpace);
+    ImGui::SetNextItemWidth(220.0f);
+    if (ImGui::Combo("位置の基準##posSpace", &spaceIdx, kSpaceNames, IM_ARRAYSIZE(kSpaceNames))) {
+        work.posSpace = static_cast<CameraSpace>(spaceIdx);
+    }
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("位置オフセットをどの空間の軸で解釈するか\n"
+            "対象方向 = プレイヤー→ロックオン対象/アンカー を奥(+Z)とした基準");
+
+    static const char* kLookNames[] = {
+        "なし", "ロックオン対象", "プレイヤー", "中点", "アンカー(Hit点)"
+    };
+    int lookIdx = static_cast<int>(work.lookAt);
+    ImGui::SetNextItemWidth(220.0f);
+    if (ImGui::Combo("注視対象##lookAt", &lookIdx, kLookNames, IM_ARRAYSIZE(kLookNames))) {
+        work.lookAt = static_cast<LookAtTarget>(lookIdx);
+    }
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("各キーフレームの「注視強さ」が向く対象\n"
+            "強さ>0 のとき、カメラ回転をこの対象へ混ぜる");
 }
 
 // ============================================================
@@ -280,11 +311,20 @@ void AttackCameraEditor::DrawKeyframeInspector() {
     ImGui::DragFloat("時刻 (s)", &kf.time, 0.005f, 0.0f, work.totalDuration);
 
     ImGui::Separator();
-    ImGui::TextDisabled("位置 / 方向（カメラローカル空間）");
+    ImGui::TextDisabled("位置 / 方向（基準はワーク設定の参照フレーム）");
     ImGui::DragFloat3("位置オフセット", &kf.posOffset.x, 0.05f);
     ImGui::DragFloat3("回転オフセット", &kf.rotOffset.x, 0.005f, -1.57f, 1.57f,
         "P:%.3f Y:%.3f R:%.3f");
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("注視適用後に加算される微調整。注視なしなら従来通りの加算回転");
     ImGui::DragFloat("FOV 差分 (rad)", &kf.fovDelta, 0.005f, -0.5f, 0.5f);
+
+    ImGui::Separator();
+    ImGui::TextDisabled("注視（ワークの注視対象へ向ける強さ）");
+    ImGui::SliderFloat("注視強さ", &kf.lookAtWeight, 0.0f, 1.0f, "%.2f");
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("0 = 向けない / 1 = 完全に対象を向く\n"
+            "ワーク設定の「注視対象」が None だと無効");
 
     ImGui::Separator();
     ImGui::TextDisabled("シェイク（0 = なし）");

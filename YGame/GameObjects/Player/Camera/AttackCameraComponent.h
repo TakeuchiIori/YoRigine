@@ -73,6 +73,11 @@ public:
     Vector3 GetCurrentRotOffset() const { return currentRotOffset_; }
     float   GetCurrentFovDelta()  const { return currentFovDelta_; }
     float   GetCurrentTimeScale() const { return currentTimeScale_; }
+    float   GetCurrentLookAtWeight() const { return currentLookAtWeight_; }
+
+    /// 再生中ワークの参照フレーム / 注視対象（無ければ既定値）
+    CameraSpace  GetCurrentPosSpace() const;
+    LookAtTarget GetCurrentLookAt()   const;
 
     void  SetSavedBaseFov(float fov) { savedBaseFov_ = fov; }
     float GetSavedBaseFov()    const { return savedBaseFov_; }
@@ -114,6 +119,7 @@ private:
     Vector3 returnFromRot_ = {};
     float   returnFromFov_ = 0.0f;
     float   returnFromTs_ = 1.0f;
+    float   returnFromLookAt_ = 0.0f;
 
     // ============================================================
     // 補間済みの現在値
@@ -122,6 +128,7 @@ private:
     Vector3 currentRotOffset_ = {};
     float   currentFovDelta_ = 0.0f;
     float   currentTimeScale_ = 1.0f;
+    float   currentLookAtWeight_ = 0.0f;
 
     float savedBaseFov_ = 0.45f;
 };

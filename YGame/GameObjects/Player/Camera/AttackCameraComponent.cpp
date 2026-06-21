@@ -74,6 +74,7 @@ void AttackCameraComponent::UpdatePost(float dt) {
         currentRotOffset_ = Lerp({}, currentRotOffset_, ease);
         currentFovDelta_ =  Lerp(0.0f, currentFovDelta_, ease);
         currentTimeScale_ = Lerp(1.0f, currentTimeScale_, ease);
+        currentLookAtWeight_ = Lerp(0.0f, currentLookAtWeight_, ease);
 
         if (t >= 1.0f) {
             phase_ = Phase::Playing;
@@ -114,6 +115,7 @@ void AttackCameraComponent::UpdatePost(float dt) {
         currentRotOffset_ = Lerp(returnFromRot_, {}, ease);
         currentFovDelta_ =  Lerp(returnFromFov_, 0.0f, ease);
         currentTimeScale_ = Lerp(returnFromTs_, 1.0f, ease);
+        currentLookAtWeight_ = Lerp(returnFromLookAt_, 0.0f, ease);
 
         if (t >= 1.0f) {
             phase_ = Phase::Idle;
@@ -274,6 +276,7 @@ void AttackCameraComponent::EnterReturning(const AttackCameraWork& work) {
     returnFromRot_ = currentRotOffset_;
     returnFromFov_ = currentFovDelta_;
     returnFromTs_ = currentTimeScale_;
+    returnFromLookAt_ = currentLookAtWeight_;
     returnTimer_ = 0.0f;
     returnDuration_ = work.returnDuration;
     phase_ = Phase::Returning;
@@ -287,6 +290,20 @@ void AttackCameraComponent::ResetValues() {
     currentRotOffset_ = {};
     currentFovDelta_ = 0.0f;
     currentTimeScale_ = 1.0f;
+    currentLookAtWeight_ = 0.0f;
+}
+
+// ============================================================
+// 再生中ワークの参照フレーム / 注視対象
+// ============================================================
+CameraSpace AttackCameraComponent::GetCurrentPosSpace() const {
+    const AttackCameraWork* work = FindWork(currentWorkName_);
+    return work ? work->posSpace : CameraSpace::CameraLocal;
+}
+
+LookAtTarget AttackCameraComponent::GetCurrentLookAt() const {
+    const AttackCameraWork* work = FindWork(currentWorkName_);
+    return work ? work->lookAt : LookAtTarget::None;
 }
 
 // ============================================================
@@ -312,6 +329,7 @@ void AttackCameraComponent::SampleKeyframes(const AttackCameraWork& work, float 
         currentRotOffset_ = kfs.front().rotOffset;
         currentFovDelta_ = kfs.front().fovDelta;
         currentTimeScale_ = kfs.front().timeScale;
+        currentLookAtWeight_ = kfs.front().lookAtWeight;
         return;
     }
     if (t >= kfs.back().time) {
@@ -319,6 +337,7 @@ void AttackCameraComponent::SampleKeyframes(const AttackCameraWork& work, float 
         currentRotOffset_ = kfs.back().rotOffset;
         currentFovDelta_ = kfs.back().fovDelta;
         currentTimeScale_ = kfs.back().timeScale;
+        currentLookAtWeight_ = kfs.back().lookAtWeight;
         return;
     }
 
@@ -331,6 +350,7 @@ void AttackCameraComponent::SampleKeyframes(const AttackCameraWork& work, float 
             currentRotOffset_ = Lerp(kfs[i].rotOffset, kfs[i + 1].rotOffset, alpha);
             currentFovDelta_ = kfs[i].fovDelta + (kfs[i + 1].fovDelta - kfs[i].fovDelta) * alpha;
             currentTimeScale_ = kfs[i].timeScale + (kfs[i + 1].timeScale - kfs[i].timeScale) * alpha;
+            currentLookAtWeight_ = kfs[i].lookAtWeight + (kfs[i + 1].lookAtWeight - kfs[i].lookAtWeight) * alpha;
             return;
         }
     }

@@ -1643,18 +1643,21 @@
             "positionSmoothTime": 0.07999999821186066,
             "positionSmoothing": false,
             "priority": 10,
+            "recenterDuration": 0.800000011920929,
+            "recenterPitch": 0.30000001192092896,
+            "recenterResetPitch": true,
             "rotate": [
-                0.8000000715255737,
-                9.263359069824219,
+                0.30000001192092896,
+                1.5590367317199707,
                 0.0
             ],
             "rotateSpeed": 0.019999999552965164,
             "targetName": "Player",
             "targetPivot_Height": 1.0,
             "translate": [
-                -30.98295021057129,
-                18.287887573242188,
-                -33.03614044189453
+                -55.80351257324219,
+                9.933130264282227,
+                -38.26033401489258
             ],
             "type": "Follow"
         }
