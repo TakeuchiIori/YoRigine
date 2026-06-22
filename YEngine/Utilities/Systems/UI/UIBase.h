@@ -9,8 +9,9 @@
 #include "Vector2.h"
 #include "Vector3.h"
 #include "Vector4.h"
-#include "json.hpp" 
+#include "json.hpp"
 #include "UIAnimation.h"
+#include "UIAnimator.h"
 
 // 前方宣言
 class SpriteCommon;
@@ -45,6 +46,11 @@ public:
 	void SetRotation(const Vector3& rotation);
 	Vector3 GetRotation() const;
 
+	// 基準表示サイズ(px)。レイアウト用。
+	void SetSize(const Vector2& size);
+	Vector2 GetSize() const;
+
+	// 拡縮倍率(1.0=等倍)。アニメーション/演出用。表示サイズ = Size(px) × Scale。
 	void SetScale(const Vector2& scale);
 	Vector2 GetScale() const;
 
@@ -144,15 +150,19 @@ public:
 	void StopAllAnimations();  // 全アニメーション停止
 	void PauseAnimation();
 	void ResumeAnimation();
-	bool IsAnimating() const { return !animations_.empty(); }
-	bool IsPaused() const { return isPaused_; }
+	bool IsAnimating() const { return animator_.IsAnimating(); }
+	bool IsPaused() const { return animator_.IsPaused(); }
+
+	// アニメーションエンジンへの直接アクセス（インスペクタ等が中身を参照する用途）
+	UIAnimator& GetAnimator() { return animator_; }
+	const UIAnimator& GetAnimator() const { return animator_; }
 
 	// コールバック設定（最後に追加されたアニメーションに設定）
 	void SetAnimationCompleteCallback(std::function<void()> callback);
 	void SetAnimationUpdateCallback(std::function<void()> callback);
 
 	// 遅延設定（最後に追加されたアニメーションに設定）
-	void SetAnimationDelay(float delay) { if (IsAnimating() && !animations_.empty()) animations_.back().delay = delay; }
+	void SetAnimationDelay(float delay) { animator_.SetDelay(delay); }
 	///************************* プリセット機能 *************************///
 
 	bool SaveAsPreset(const std::string& presetName);
@@ -182,9 +192,8 @@ protected:
 	bool gridEnabled_ = false;
 	float gridSize_ = 10.0f;
 
-	// アニメーション管理 - 複数のアニメーションを同時再生可能
-	std::vector<UIAnimation> animations_;
-	bool isPaused_ = false;
+	// アニメーション管理（再生ロジックは UIAnimator に分離）
+	UIAnimator animator_;
 
 	// UV SRT
 	Vector2 uvTranslation_ = { 0.0f, 0.0f };
@@ -195,20 +204,6 @@ protected:
 
 	nlohmann::json CreateJSONFromCurrentState();
 	void ApplyJSONToState(const nlohmann::json& json);
-	void UpdateAnimation(float deltaTime);
-
-	// アニメーションタイプ別の更新処理
-	void UpdateBasicAnimation(UIAnimation& anim, float t);
-	void UpdateShakeAnimation(UIAnimation& anim, float t);
-	void UpdatePulseAnimation(UIAnimation& anim, float t);
-	void UpdateBounceAnimation(UIAnimation& anim, float t);
-	void UpdateSwingAnimation(UIAnimation& anim, float t);
-	void UpdateFlashAnimation(UIAnimation& anim, float t);
-	void UpdateBlinkAnimation(UIAnimation& anim, float t);
-	void UpdateWobbleAnimation(UIAnimation& anim, float t);
-	void UpdateSlideAnimation(UIAnimation& anim, float t);
-	void UpdateZoomAnimation(UIAnimation& anim, float t);
-	void UpdateRotateInOutAnimation(UIAnimation& anim, float t);
 
 	///************************* ImGui関連 *************************///
 
