@@ -126,6 +126,9 @@ void FollowCamera::FollowProcess() {
 
     const float dt = YoRigine::GameTime::GetDeltaTime();
 
+    // ── リセンター（対象 facing 背後へ寄せる）を先に進める ──
+    UpdateRecenter(dt);
+
     // ── クローズアップ倍率の補間 ──
     float targetScale = isCloseUp_ ? closeUpScale_ : 1.0f;
     currentScale_ += (targetScale - currentScale_)
@@ -248,6 +251,62 @@ void FollowCamera::EnsureTargetInView(const Vector3& pivot, float dt) {
 }
 
 // ============================================================
+// リセンター開始：対象 facing の背後へ回す目標角を確定する
+//   yaw は ±π 最短角で寄せ、pitch は既定値へ戻す（設定時）。
+//   recenterDuration_ が 0 なら即時スナップ。
+// ============================================================
+void FollowCamera::RecenterBehindTarget() {
+    if (!target_) return;
+
+    constexpr float kPi    = 3.14159265358979f;
+    constexpr float kTwoPi = 6.28318530717958f;
+
+    recenterFromYaw_ = transform_.rotate.y;
+
+    // 目標 yaw = 対象の向き。現在角から最短回転になるよう正規化
+    float delta = target_->rotate_.y - recenterFromYaw_;
+    while (delta >  kPi) delta -= kTwoPi;
+    while (delta < -kPi) delta += kTwoPi;
+    recenterToYaw_ = recenterFromYaw_ + delta;
+
+    recenterFromPitch_ = transform_.rotate.x;
+    recenterToPitch_   = recenterResetPitch_
+        ? std::clamp(recenterPitch_, minPitch_, maxPitch_)
+        : transform_.rotate.x;
+
+    recenterTimer_ = 0.0f;
+    recentering_   = true;
+
+    // 即時スナップ
+    if (recenterDuration_ <= 0.0f) {
+        transform_.rotate.y = recenterToYaw_;
+        transform_.rotate.x = recenterToPitch_;
+        recentering_ = false;
+    }
+}
+
+// ============================================================
+// リセンター更新：目標角へイーズアウトで寄せる
+// ============================================================
+void FollowCamera::UpdateRecenter(float dt) {
+    if (!recentering_) return;
+
+    recenterTimer_ += dt;
+    float t = (recenterDuration_ > 0.0f)
+        ? std::clamp(recenterTimer_ / recenterDuration_, 0.0f, 1.0f)
+        : 1.0f;
+
+    // イーズアウト（1-(1-t)^3）：最初キビキビ動いて減速しながら収まる
+    float inv  = 1.0f - t;
+    float ease = 1.0f - inv * inv * inv;
+
+    transform_.rotate.y = recenterFromYaw_   + (recenterToYaw_   - recenterFromYaw_)   * ease;
+    transform_.rotate.x = recenterFromPitch_ + (recenterToPitch_ - recenterFromPitch_) * ease;
+
+    if (t >= 1.0f) recentering_ = false;
+}
+
+// ============================================================
 // ステート変更
 // ============================================================
 void FollowCamera::ChangeState(std::unique_ptr<CameraState> newState) {
@@ -332,6 +391,20 @@ void FollowCamera::DrawDebugGui() {
     }
     ImGui::Separator();
 
+    if (ImGui::TreeNode("リセンター（RB/LB で対象背後へ）")) {
+        ImGui::DragFloat("寄せ時間 (秒)", &recenterDuration_, 0.01f, 0.0f, 1.0f, "%.2f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("対象の向きへ寄せる時間。0 で即時スナップ");
+        ImGui::Checkbox("pitch も既定へ戻す", &recenterResetPitch_);
+        if (recenterResetPitch_) {
+            ImGui::DragFloat("pitch リセット先 (rad)", &recenterPitch_, 0.01f, minPitch_, maxPitch_, "%.2f");
+        }
+        if (ImGui::Button("テスト発火")) RecenterBehindTarget();
+        ImGui::SameLine();
+        ImGui::Text(recentering_ ? "寄せ中..." : "待機");
+        ImGui::TreePop();
+    }
+    ImGui::Separator();
+
     collisionResolver_.DrawDebugGui();
     ImGui::Separator();
 
@@ -374,6 +447,11 @@ void FollowCamera::Save(nlohmann::json& j) const {
     j["framingYawMargin"]   = framingYawMargin_;
     j["framingPitchMargin"] = framingPitchMargin_;
     j["framingSpeed"]       = framingSpeed_;
+
+    // リセンター
+    j["recenterDuration"]   = recenterDuration_;
+    j["recenterResetPitch"] = recenterResetPitch_;
+    j["recenterPitch"]      = recenterPitch_;
 
     nlohmann::json resolverJson;
     collisionResolver_.Save(resolverJson);
@@ -419,6 +497,11 @@ void FollowCamera::Load(const nlohmann::json& j) {
     framingYawMargin_    = j.value("framingYawMargin",    0.45f);
     framingPitchMargin_  = j.value("framingPitchMargin",  0.30f);
     framingSpeed_        = j.value("framingSpeed",        4.0f);
+
+    // リセンター
+    recenterDuration_    = j.value("recenterDuration",   0.18f);
+    recenterResetPitch_  = j.value("recenterResetPitch", true);
+    recenterPitch_       = j.value("recenterPitch",      0.30f);
     if (j.contains("collisionResolver"))
         collisionResolver_.Load(j["collisionResolver"]);
 

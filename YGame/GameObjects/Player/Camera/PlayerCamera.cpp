@@ -90,6 +90,13 @@ void PlayerCamera::UpdatePreDirector() {
             }
         }
 
+        // RB / LB で自機の向いている方向の背後へ素早くリセンター（フリーカメラ時のみ）
+        if (!isLockOn_ &&
+            (YoRigine::Input::GetInstance()->IsPadTriggered(0, GamePadButton::RB) ||
+             YoRigine::Input::GetInstance()->IsPadTriggered(0, GamePadButton::LB))) {
+            followCamera_->RecenterBehindTarget();
+        }
+
         if (isLockOn_) {
             // ロックオン中はグランスを使わない。蓄積をリセットして次回フリー時の段差を防ぐ。
             awarenessYawBias_ = 0.0f;
@@ -127,12 +134,18 @@ void PlayerCamera::ApplyPostDirector(Camera* sceneCamera, float dt) {
         return;
     }
 
-    // ---- 位置オフセット（カメラローカル空間 → ワールド空間に変換して加算） ----
+    // ---- 位置オフセット（参照フレーム空間 → ワールド空間に変換して加算） ----
     Vector3 posOff = attackCamera_.GetCurrentPosOffset();
     if (posOff.x != 0.0f || posOff.y != 0.0f || posOff.z != 0.0f) {
-        Matrix4x4 rotMat = MakeRotateMatrixXYZ(sceneCamera->transform_.rotate);
-        Vector3   worldOff = TransformNormal(posOff, rotMat);
+        Matrix4x4 frame    = BuildOffsetFrame(attackCamera_.GetCurrentPosSpace(), sceneCamera);
+        Vector3   worldOff = TransformNormal(posOff, frame);
         sceneCamera->transform_.translate = sceneCamera->transform_.translate + worldOff;
+    }
+
+    // ---- 注視ブレンド（rotOffset 加算より先に。対象へ向けてから微調整を足す） ----
+    float lookWeight = attackCamera_.GetCurrentLookAtWeight();
+    if (lookWeight > 0.0f) {
+        ApplyLookAt(sceneCamera, attackCamera_.GetCurrentLookAt(), lookWeight);
     }
 
     // ---- 回転オフセット（pitch, yaw, roll 追加） ----
@@ -284,6 +297,8 @@ void PlayerCamera::UpdateStickInput() {
 
             if (Length(move) > 5000.0f) {
                 stickActiveThisFrame_ = true;
+                // 手動操作が入ったらリセンターを中断（プレイヤー操作を優先）
+                followCamera_->CancelRecenter();
                 move = Normalize(move) * rotateSpeed_;
                 Vector3 rot = followCamera_->GetRotate();
                 rot += move;
@@ -562,7 +577,21 @@ void PlayerCamera::SwitchLockOnTarget(int direction) {
 void PlayerCamera::PlayAttackCameraWork(const std::string& attackName) {
     if (!followCamera_) return;
 
+    // アンカー未指定 → ロックオン対象があればそれを既定アンカーにする
+    hasCameraWorkAnchor_ = false;
+
     // 再生前 FOV を保存 → Play → savedBaseFov に渡す順で呼ぶ
+    const float baseFov = followCamera_->GetBaseFovY();
+    attackCamera_.Play(attackName);
+    attackCamera_.SetSavedBaseFov(baseFov);
+}
+
+void PlayerCamera::PlayAttackCameraWork(const std::string& attackName, const Vector3& anchor) {
+    if (!followCamera_) return;
+
+    cameraWorkAnchor_    = anchor;
+    hasCameraWorkAnchor_ = true;
+
     const float baseFov = followCamera_->GetBaseFovY();
     attackCamera_.Play(attackName);
     attackCamera_.SetSavedBaseFov(baseFov);
@@ -573,7 +602,117 @@ void PlayerCamera::PlayAttackCameraWork(const std::string& attackName) {
 // ============================================================
 void PlayerCamera::StopAttackCameraWork() {
     attackCamera_.Stop(followCamera_);
+    hasCameraWorkAnchor_ = false;
     YoRigine::GameTime::SetTimeScale(1.0f);
+}
+
+// ============================================================
+// プレイヤーピボット（pivotHeight 込み）のワールド座標
+// ============================================================
+Vector3 PlayerCamera::PlayerPivotWorld() const {
+    if (!playerWT_) return {};
+    Vector3 p = Transform(Vector3{ 0.0f, 0.0f, 0.0f }, playerWT_->matWorld_);
+    p.y += pivotHeight_;
+    return p;
+}
+
+// ============================================================
+// 注視対象のワールド座標を解決（対象が無ければ false）
+// ============================================================
+bool PlayerCamera::ResolveLookAtPos(LookAtTarget target, Vector3& outPos) const {
+    switch (target) {
+    case LookAtTarget::None:
+        return false;
+
+    case LookAtTarget::Player:
+        outPos = PlayerPivotWorld();
+        return true;
+
+    case LookAtTarget::LockedEnemy:
+        if (lockedTarget_)        { outPos = lockedTarget_->GetCenterPosition(); return true; }
+        if (hasCameraWorkAnchor_) { outPos = cameraWorkAnchor_;                  return true; }
+        return false;
+
+    case LookAtTarget::Midpoint: {
+        Vector3 b;
+        if      (lockedTarget_)        b = lockedTarget_->GetCenterPosition();
+        else if (hasCameraWorkAnchor_) b = cameraWorkAnchor_;
+        else                           return false;
+        outPos = (PlayerPivotWorld() + b) * 0.5f;
+        return true;
+    }
+
+    case LookAtTarget::Anchor:
+        if (hasCameraWorkAnchor_) { outPos = cameraWorkAnchor_; return true; }
+        return false;
+    }
+    return false;
+}
+
+// ============================================================
+// posOffset を解釈する参照フレーム（回転行列）を組む
+// ============================================================
+Matrix4x4 PlayerCamera::BuildOffsetFrame(CameraSpace space, const Camera* sceneCamera) const {
+    switch (space) {
+    case CameraSpace::CameraLocal:
+        return MakeRotateMatrixXYZ(sceneCamera->transform_.rotate);
+
+    case CameraSpace::World:
+        return MakeIdentity4x4();
+
+    case CameraSpace::PlayerLocal: {
+        float yaw = playerWT_ ? playerWT_->rotate_.y : 0.0f;
+        return MakeRotateMatrixXYZ(Vector3{ 0.0f, yaw, 0.0f });
+    }
+
+    case CameraSpace::TargetRelative: {
+        // プレイヤー→対象 の水平方向を +Z とした yaw のみの基底
+        Vector3 target{};
+        bool    ok = false;
+        if      (lockedTarget_)        { target = lockedTarget_->GetCenterPosition(); ok = true; }
+        else if (hasCameraWorkAnchor_) { target = cameraWorkAnchor_;                  ok = true; }
+
+        if (ok && playerWT_) {
+            Vector3 d = target - PlayerPivotWorld();
+            d.y = 0.0f;
+            if (Length(d) > 0.001f) {
+                float yaw = atan2f(d.x, d.z);
+                return MakeRotateMatrixXYZ(Vector3{ 0.0f, yaw, 0.0f });
+            }
+        }
+        // 退避：プレイヤー基準
+        float yaw = playerWT_ ? playerWT_->rotate_.y : 0.0f;
+        return MakeRotateMatrixXYZ(Vector3{ 0.0f, yaw, 0.0f });
+    }
+    }
+    return MakeIdentity4x4();
+}
+
+// ============================================================
+// 注視ブレンド：カメラ回転を対象へ weight だけ寄せる
+// （weight=1 で完全に対象を向く。yaw は最短角で補間）
+// ============================================================
+void PlayerCamera::ApplyLookAt(Camera* sceneCamera, LookAtTarget target, float weight) const {
+    if (!sceneCamera) return;
+
+    Vector3 lookPos{};
+    if (!ResolveLookAtPos(target, lookPos)) return;
+
+    Vector3 toTarget = lookPos - sceneCamera->transform_.translate;
+    float   dist     = Length(toTarget);
+    if (dist < 0.01f) return;
+    Vector3 dir = toTarget / dist;
+
+    float desiredYaw   = atan2f(dir.x, dir.z);
+    float clampedY     = std::clamp(-dir.y, -1.0f, 1.0f);
+    float desiredPitch = asinf(clampedY);
+
+    float w = std::clamp(weight, 0.0f, 1.0f);
+
+    // yaw は ±π 最短角で補間（巻き戻り防止）
+    float deltaYaw = WrapPi(desiredYaw - sceneCamera->transform_.rotate.y);
+    sceneCamera->transform_.rotate.y += deltaYaw * w;
+    sceneCamera->transform_.rotate.x += (desiredPitch - sceneCamera->transform_.rotate.x) * w;
 }
 
 // ============================================================

@@ -62,6 +62,16 @@ public:
     void FollowProcess();
 
     // ============================================================
+    // リセンター（追従対象の向いている方向の背後へ素早く回す）
+    //   RB / LB などのトリガーで呼ぶ。recenterDuration_ をかけて
+    //   yaw を対象 facing へ最短角で寄せ、pitch を既定値へ戻す。
+    //   0 秒設定なら即時スナップ。
+    // ============================================================
+    void RecenterBehindTarget();
+    bool IsRecentering() const { return recentering_; }
+    void CancelRecenter()      { recentering_ = false; }
+
+    // ============================================================
     // フレーミング補正（追従対象が画角外に出そうな時だけ、
     // はみ出した分を rotation で穏やかに pivot へ引き戻す）
     // ============================================================
@@ -157,6 +167,20 @@ private:
     // 入力制御フラグ
     // ============================================================
     bool inputEnabled_ = true;
+
+    // ============================================================
+    // リセンター（対象 facing 背後へ素早く回す）
+    // ============================================================
+    void  UpdateRecenter(float dt);
+    bool  recentering_        = false;
+    float recenterTimer_      = 0.0f;
+    float recenterDuration_   = 0.18f;  // 寄せにかける時間（秒）。0 で即時
+    float recenterFromYaw_    = 0.0f;
+    float recenterToYaw_      = 0.0f;
+    float recenterFromPitch_  = 0.0f;
+    float recenterToPitch_    = 0.0f;
+    bool  recenterResetPitch_ = true;   // pitch も既定値へ戻すか
+    float recenterPitch_      = 0.30f;  // pitch リセット先（rad）
 
     // ============================================================
     // Game 拡張用の不透明 JSON ストレージ

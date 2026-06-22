@@ -49,6 +49,11 @@ public:
     // 攻撃カメラワーク
     // ============================================================
     void PlayAttackCameraWork(const std::string& attackName);
+
+    /// Anchor 注視（LookAtTarget::Anchor）や TargetRelative の基準に使う
+    /// 任意のワールド座標（攻撃ヒット点など）を渡して再生する。
+    void PlayAttackCameraWork(const std::string& attackName, const Vector3& anchor);
+
     void StopAttackCameraWork();
     bool IsAttackCameraPlaying() const { return attackCamera_.IsPlaying(); }
 
@@ -126,12 +131,27 @@ private:
     void EnsurePlayerInFrame(Camera* sceneCamera, float dt);
 
     // ============================================================
+    // 攻撃カメラワーク：参照フレーム / 注視
+    //   BuildOffsetFrame … posOffset を解釈する基底（回転行列）を組む
+    //   ResolveLookAtPos … 注視対象のワールド座標を返す（対象なしなら false）
+    //   PlayerPivotWorld … プレイヤーピボット（pivotHeight 込み）のワールド座標
+    // ============================================================
+    Matrix4x4 BuildOffsetFrame(CameraSpace space, const Camera* sceneCamera) const;
+    bool      ResolveLookAtPos(LookAtTarget target, Vector3& outPos) const;
+    Vector3   PlayerPivotWorld() const;
+    void      ApplyLookAt(Camera* sceneCamera, LookAtTarget target, float weight) const;
+
+    // ============================================================
     // メンバ
     // ============================================================
     FollowCamera*          followCamera_ = nullptr;
     const WorldTransform*  playerWT_     = nullptr;
 
     AttackCameraComponent  attackCamera_;
+
+    // 攻撃カメラワークの注視/参照基準アンカー（Play 時に渡された任意座標）
+    Vector3 cameraWorkAnchor_   = {};
+    bool    hasCameraWorkAnchor_ = false;
 
     // BattleStart 演出：Debug / Release どちらでも動作する
     std::shared_ptr<BattleStartCameraState> battleStartState_;
