@@ -17,6 +17,7 @@
 #include "Systems/Camera/Virtuals/TitleCamera/TitleCamera.h"
 #include "Systems/Camera/CameraDirector.h"
 #include "Particle/YEmitterGroupManager.h"
+#include <Object3D/BaseObjectManager.h>
 #ifdef USE_IMGUI
 #include "imgui.h"
 #endif
@@ -59,6 +60,9 @@ void TitleScene::Initialize() {
 	YoRigine::ModelManipulator::GetInstance()->SetCamera(sceneCamera_.get());
 
 	YParticleManager::GetInstance().SetCamera(sceneCamera_.get());
+
+	// BaseObjectManager にカメラを 1 回だけ渡しておく（以降の一括駆動で使用）
+	BaseObjectManager::GetInstance()->SetCamera(sceneCamera_.get());
 	//------------------------------------------------------------
 	// タイトル専用要素の初期化
 	//------------------------------------------------------------
@@ -68,14 +72,18 @@ void TitleScene::Initialize() {
 	player_ = std::make_unique<DemoPlayer>();
 	player_->Initialize(sceneCamera_.get());
 	player_->SetMotion("Idle1");
+	// 一括 Update/Draw/Shadow の対象に登録（所有は TitleScene のまま）
+	BaseObjectManager::GetInstance()->Register(player_.get(), "Player");
 
 	auto playerCam = std::dynamic_pointer_cast<TitleCamera>(titleCamera);
 	playerCam->SetTarget(player_->GetWT());
 	playerCam->enableOrbit_ = true; // カメラ回転有効
 
+	// スカイボックスは最初に描く特殊オブジェクトのため、マネージャには登録せず個別描画する
 	skyBox_ = std::make_unique<SkyBox>();
 	skyBox_->Initialize(sceneCamera_.get(), "Resources/DDS/vz_sinister_land_cubemap_ue.dds");
 
+	// Ground は BaseObject 非継承の独立クラスのため、マネージャには登録せず個別に扱う
 	ground_ = std::make_unique<Ground>();
 	ground_->Initialize(sceneCamera_.get());
 
@@ -110,8 +118,8 @@ void TitleScene::Update() {
 		sceneManager_->ChangeScene("Game");
 	}
 
-	// 各種更新
-	player_->Update();
+	// 各種更新（登録オブジェクトは一括 Update。スカイボックス / Ground は個別）
+	UpdateObjects();
 	skyBox_->Update();
 	ground_->Update();
 
@@ -161,8 +169,8 @@ void TitleScene::DrawNonOffscreen() {
 /// </summary>
 void TitleScene::DrawShadow()
 {
+	// DrawCommonShadow 内で登録オブジェクト（player_ 等）の影も一括描画される
 	DrawCommonShadow();
-	player_->DrawShadow();
 	YoRigine::ModelManipulator::GetInstance()->DrawShadow();
 }
 
@@ -177,9 +185,9 @@ void TitleScene::Finalize() {
 /// オブジェクト描画（地面・プレイヤー）
 /// </summary>
 void TitleScene::DrawObject() {
+	// Ground は個別描画、登録オブジェクト（player_）は一括描画
 	ground_->Draw();
-	player_->Draw();
-	player_->DrawAnimation();
+	DrawObjects();
 }
 
 /// <summary>

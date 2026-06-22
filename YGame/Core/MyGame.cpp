@@ -9,6 +9,7 @@
 #include "OffScreen/PostEffectManager.h"
 #include <Systems/UI/UIManager.h>
 #include "GPUParticle/GpuEmitManager.h"
+#include <Object3D/BaseObjectManager.h>
 
 #include "Particle/YParticleManager.h"
 #include "Particle/YEmitterGroupEditor.h"
@@ -64,6 +65,9 @@ void MyGame::Initialize() {
 
 	// モデル操作関連の初期化
 	YoRigine::ModelManipulator::GetInstance()->Initialize();
+
+	// BaseObject 一括管理マネージャ（インスペクタパネルの登録もここで行う）
+	BaseObjectManager::GetInstance()->Initialize();
 
 	// PiP カメラサブシステム
 	PipCameraSystem::GetInstance()->Initialize();

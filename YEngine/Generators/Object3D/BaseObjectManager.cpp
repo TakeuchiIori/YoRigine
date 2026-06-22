@@ -32,11 +32,14 @@ void BaseObjectManager::Initialize() {
 
 #ifdef USE_IMGUI
 	//------------------------------------------------------------
-	// インスペクタパネルを Editor に登録 (Debug のみ)
+	// インスペクタパネルを Editor に登録 (Debug のみ・一度きり)
 	//------------------------------------------------------------
-	Editor::GetInstance()->RegisterGameUI(
-		"オブジェクト一覧",
-		[this]() { this->DrawInspector(); });
+	if (!inspectorRegistered_) {
+		Editor::GetInstance()->RegisterGameUI(
+			"オブジェクト一覧",
+			[this]() { this->DrawInspector(); });
+		inspectorRegistered_ = true;
+	}
 #endif
 }
 

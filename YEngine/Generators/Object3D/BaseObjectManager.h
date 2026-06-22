@@ -127,6 +127,7 @@ private:
 	Camera* camera_ = nullptr;            // Add 時に各オブジェクトへ注入するカメラ
 	std::vector<Entry> entries_;          // 管理中の全エントリ
 	int selectedIndex_ = -1;              // インスペクタで選択中の行 (-1 で未選択)
+	bool inspectorRegistered_ = false;    // インスペクタパネルを Editor に登録済みか
 };
 
 // ============================================================

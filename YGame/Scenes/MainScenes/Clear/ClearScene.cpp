@@ -16,6 +16,7 @@
 #include "Particle/YParticleManager.h"
 #include "Particle/YParticleEditor.h"
 #include "Particle/YEmitterGroupManager.h"
+#include <Object3D/BaseObjectManager.h>
 
 // Camera
 #include "Systems/Camera/Virtuals/DebugCamera/DebugCamera.h"
@@ -59,7 +60,10 @@ void ClearScene::Initialize() {
 	YoRigine::ModelManipulator::GetInstance()->LoadScene("ClearScene");
 	YoRigine::ModelManipulator::GetInstance()->SetCamera(sceneCamera_.get());
 	YParticleManager::GetInstance().SetCamera(sceneCamera_.get());
-	
+
+	// BaseObjectManager にカメラを 1 回だけ渡しておく（以降の一括駆動で使用）
+	BaseObjectManager::GetInstance()->SetCamera(sceneCamera_.get());
+
 
 
 	//------------------------------------------------------------
@@ -75,7 +79,10 @@ void ClearScene::Initialize() {
 	player_ = std::make_unique<DemoPlayer>();
 	player_->Initialize(sceneCamera_.get());
 	player_->SetMotion("Idle2");
+	// 一括 Update/Draw/Shadow の対象に登録（所有は ClearScene のまま）
+	BaseObjectManager::GetInstance()->Register(player_.get(), "Player");
 
+	// スカイボックス / Ground は個別描画のためマネージャには登録しない
 	skyBox_ = std::make_unique<SkyBox>();
 	skyBox_->Initialize(sceneCamera_.get(), "Resources/DDS/vz_sinister_land_cubemap_ue.dds");
 
@@ -108,7 +115,8 @@ void ClearScene::Update() {
 	UpdateCamera();
 	clearUI_->Update();
 
-	player_->Update();
+	// 登録オブジェクトは一括 Update。スカイボックス / Ground は個別
+	UpdateObjects();
 	skyBox_->Update();
 	ground_->Update();
 
@@ -168,9 +176,9 @@ void ClearScene::DrawShadow()
 /// オブジェクト描画（地面・プレイヤー）
 /// </summary>
 void ClearScene::DrawObject() {
+	// Ground は個別描画、登録オブジェクト（player_）は一括描画
 	ground_->Draw();
-	player_->Draw();
-	player_->DrawAnimation();
+	DrawObjects();
 	YoRigine::ModelManipulator::GetInstance()->Draw();
 }
 
