@@ -262523,6 +262523,9 @@ void FollowCamera::FollowProcess() {
 
     const float dt = YoRigine::GameTime::GetDeltaTime();
 
+    // ── リセンター（対象 facing 背後へ寄せる）を先に進める ──
+    UpdateRecenter(dt);
+
     // ── クローズアップ倍率の補間 ──
     float targetScale = isCloseUp_ ? closeUpScale_ : 1.0f;
     currentScale_ += (targetScale - currentScale_)
@@ -262645,6 +262648,62 @@ void FollowCamera::EnsureTargetInView(const Vector3& pivot, float dt) {
 }
 
 // ============================================================
+// リセンター開始：対象 facing の背後へ回す目標角を確定する
+//   yaw は ±π 最短角で寄せ、pitch は既定値へ戻す（設定時）。
+//   recenterDuration_ が 0 なら即時スナップ。
+// ============================================================
+void FollowCamera::RecenterBehindTarget() {
+    if (!target_) return;
+
+    constexpr float kPi    = 3.14159265358979f;
+    constexpr float kTwoPi = 6.28318530717958f;
+
+    recenterFromYaw_ = transform_.rotate.y;
+
+    // 目標 yaw = 対象の向き。現在角から最短回転になるよう正規化
+    float delta = target_->rotate_.y - recenterFromYaw_;
+    while (delta >  kPi) delta -= kTwoPi;
+    while (delta < -kPi) delta += kTwoPi;
+    recenterToYaw_ = recenterFromYaw_ + delta;
+
+    recenterFromPitch_ = transform_.rotate.x;
+    recenterToPitch_   = recenterResetPitch_
+        ? std::clamp(recenterPitch_, minPitch_, maxPitch_)
+        : transform_.rotate.x;
+
+    recenterTimer_ = 0.0f;
+    recentering_   = true;
+
+    // 即時スナップ
+    if (recenterDuration_ <= 0.0f) {
+        transform_.rotate.y = recenterToYaw_;
+        transform_.rotate.x = recenterToPitch_;
+        recentering_ = false;
+    }
+}
+
+// ============================================================
+// リセンター更新：目標角へイーズアウトで寄せる
+// ============================================================
+void FollowCamera::UpdateRecenter(float dt) {
+    if (!recentering_) return;
+
+    recenterTimer_ += dt;
+    float t = (recenterDuration_ > 0.0f)
+        ? std::clamp(recenterTimer_ / recenterDuration_, 0.0f, 1.0f)
+        : 1.0f;
+
+    // イーズアウト（1-(1-t)^3）：最初キビキビ動いて減速しながら収まる
+    float inv  = 1.0f - t;
+    float ease = 1.0f - inv * inv * inv;
+
+    transform_.rotate.y = recenterFromYaw_   + (recenterToYaw_   - recenterFromYaw_)   * ease;
+    transform_.rotate.x = recenterFromPitch_ + (recenterToPitch_ - recenterFromPitch_) * ease;
+
+    if (t >= 1.0f) recentering_ = false;
+}
+
+// ============================================================
 // ステート変更
 // ============================================================
 void FollowCamera::ChangeState(std::unique_ptr<CameraState> newState) {
@@ -262729,6 +262788,20 @@ void FollowCamera::DrawDebugGui() {
     }
     ImGui::Separator();
 
+    if (ImGui::TreeNode("リセンター（RB/LB で対象背後へ）")) {
+        ImGui::DragFloat("寄せ時間 (秒)", &recenterDuration_, 0.01f, 0.0f, 1.0f, "%.2f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("対象の向きへ寄せる時間。0 で即時スナップ");
+        ImGui::Checkbox("pitch も既定へ戻す", &recenterResetPitch_);
+        if (recenterResetPitch_) {
+            ImGui::DragFloat("pitch リセット先 (rad)", &recenterPitch_, 0.01f, minPitch_, maxPitch_, "%.2f");
+        }
+        if (ImGui::Button("テスト発火")) RecenterBehindTarget();
+        ImGui::SameLine();
+        ImGui::Text(recentering_ ? "寄せ中..." : "待機");
+        ImGui::TreePop();
+    }
+    ImGui::Separator();
+
     collisionResolver_.DrawDebugGui();
     ImGui::Separator();
 
@@ -262771,6 +262844,11 @@ void FollowCamera::Save(nlohmann::json& j) const {
     j["framingYawMargin"]   = framingYawMargin_;
     j["framingPitchMargin"] = framingPitchMargin_;
     j["framingSpeed"]       = framingSpeed_;
+
+    // リセンター
+    j["recenterDuration"]   = recenterDuration_;
+    j["recenterResetPitch"] = recenterResetPitch_;
+    j["recenterPitch"]      = recenterPitch_;
 
     nlohmann::json resolverJson;
     collisionResolver_.Save(resolverJson);
@@ -262816,6 +262894,11 @@ void FollowCamera::Load(const nlohmann::json& j) {
     framingYawMargin_    = j.value("framingYawMargin",    0.45f);
     framingPitchMargin_  = j.value("framingPitchMargin",  0.30f);
     framingSpeed_        = j.value("framingSpeed",        4.0f);
+
+    // リセンター
+    recenterDuration_    = j.value("recenterDuration",   0.18f);
+    recenterResetPitch_  = j.value("recenterResetPitch", true);
+    recenterPitch_       = j.value("recenterPitch",      0.30f);
     if (j.contains("collisionResolver"))
         collisionResolver_.Load(j["collisionResolver"]);
 
@@ -262945,6 +263028,16 @@ public:
     void FollowProcess();
 
     // ============================================================
+    // リセンター（追従対象の向いている方向の背後へ素早く回す）
+    //   RB / LB などのトリガーで呼ぶ。recenterDuration_ をかけて
+    //   yaw を対象 facing へ最短角で寄せ、pitch を既定値へ戻す。
+    //   0 秒設定なら即時スナップ。
+    // ============================================================
+    void RecenterBehindTarget();
+    bool IsRecentering() const { return recentering_; }
+    void CancelRecenter()      { recentering_ = false; }
+
+    // ============================================================
     // フレーミング補正（追従対象が画角外に出そうな時だけ、
     // はみ出した分を rotation で穏やかに pivot へ引き戻す）
     // ============================================================
@@ -263040,6 +263133,20 @@ private:
     // 入力制御フラグ
     // ============================================================
     bool inputEnabled_ = true;
+
+    // ============================================================
+    // リセンター（対象 facing 背後へ素早く回す）
+    // ============================================================
+    void  UpdateRecenter(float dt);
+    bool  recentering_        = false;
+    float recenterTimer_      = 0.0f;
+    float recenterDuration_   = 0.18f;  // 寄せにかける時間（秒）。0 で即時
+    float recenterFromYaw_    = 0.0f;
+    float recenterToYaw_      = 0.0f;
+    float recenterFromPitch_  = 0.0f;
+    float recenterToPitch_    = 0.0f;
+    bool  recenterResetPitch_ = true;   // pitch も既定値へ戻すか
+    float recenterPitch_      = 0.30f;  // pitch リセット先（rad）
 
     // ============================================================
     // Game 拡張用の不透明 JSON ストレージ
@@ -280999,6 +281106,7 @@ void AttackCameraComponent::UpdatePost(float dt) {
         currentRotOffset_ = Lerp({}, currentRotOffset_, ease);
         currentFovDelta_ =  Lerp(0.0f, currentFovDelta_, ease);
         currentTimeScale_ = Lerp(1.0f, currentTimeScale_, ease);
+        currentLookAtWeight_ = Lerp(0.0f, currentLookAtWeight_, ease);
 
         if (t >= 1.0f) {
             phase_ = Phase::Playing;
@@ -281039,6 +281147,7 @@ void AttackCameraComponent::UpdatePost(float dt) {
         currentRotOffset_ = Lerp(returnFromRot_, {}, ease);
         currentFovDelta_ =  Lerp(returnFromFov_, 0.0f, ease);
         currentTimeScale_ = Lerp(returnFromTs_, 1.0f, ease);
+        currentLookAtWeight_ = Lerp(returnFromLookAt_, 0.0f, ease);
 
         if (t >= 1.0f) {
             phase_ = Phase::Idle;
@@ -281199,6 +281308,7 @@ void AttackCameraComponent::EnterReturning(const AttackCameraWork& work) {
     returnFromRot_ = currentRotOffset_;
     returnFromFov_ = currentFovDelta_;
     returnFromTs_ = currentTimeScale_;
+    returnFromLookAt_ = currentLookAtWeight_;
     returnTimer_ = 0.0f;
     returnDuration_ = work.returnDuration;
     phase_ = Phase::Returning;
@@ -281212,6 +281322,20 @@ void AttackCameraComponent::ResetValues() {
     currentRotOffset_ = {};
     currentFovDelta_ = 0.0f;
     currentTimeScale_ = 1.0f;
+    currentLookAtWeight_ = 0.0f;
+}
+
+// ============================================================
+// 再生中ワークの参照フレーム / 注視対象
+// ============================================================
+CameraSpace AttackCameraComponent::GetCurrentPosSpace() const {
+    const AttackCameraWork* work = FindWork(currentWorkName_);
+    return work ? work->posSpace : CameraSpace::CameraLocal;
+}
+
+LookAtTarget AttackCameraComponent::GetCurrentLookAt() const {
+    const AttackCameraWork* work = FindWork(currentWorkName_);
+    return work ? work->lookAt : LookAtTarget::None;
 }
 
 // ============================================================
@@ -281237,6 +281361,7 @@ void AttackCameraComponent::SampleKeyframes(const AttackCameraWork& work, float 
         currentRotOffset_ = kfs.front().rotOffset;
         currentFovDelta_ = kfs.front().fovDelta;
         currentTimeScale_ = kfs.front().timeScale;
+        currentLookAtWeight_ = kfs.front().lookAtWeight;
         return;
     }
     if (t >= kfs.back().time) {
@@ -281244,6 +281369,7 @@ void AttackCameraComponent::SampleKeyframes(const AttackCameraWork& work, float 
         currentRotOffset_ = kfs.back().rotOffset;
         currentFovDelta_ = kfs.back().fovDelta;
         currentTimeScale_ = kfs.back().timeScale;
+        currentLookAtWeight_ = kfs.back().lookAtWeight;
         return;
     }
 
@@ -281256,6 +281382,7 @@ void AttackCameraComponent::SampleKeyframes(const AttackCameraWork& work, float 
             currentRotOffset_ = Lerp(kfs[i].rotOffset, kfs[i + 1].rotOffset, alpha);
             currentFovDelta_ = kfs[i].fovDelta + (kfs[i + 1].fovDelta - kfs[i].fovDelta) * alpha;
             currentTimeScale_ = kfs[i].timeScale + (kfs[i + 1].timeScale - kfs[i].timeScale) * alpha;
+            currentLookAtWeight_ = kfs[i].lookAtWeight + (kfs[i + 1].lookAtWeight - kfs[i].lookAtWeight) * alpha;
             return;
         }
     }
@@ -281339,6 +281466,11 @@ public:
     Vector3 GetCurrentRotOffset() const { return currentRotOffset_; }
     float   GetCurrentFovDelta()  const { return currentFovDelta_; }
     float   GetCurrentTimeScale() const { return currentTimeScale_; }
+    float   GetCurrentLookAtWeight() const { return currentLookAtWeight_; }
+
+    /// 再生中ワークの参照フレーム / 注視対象（無ければ既定値）
+    CameraSpace  GetCurrentPosSpace() const;
+    LookAtTarget GetCurrentLookAt()   const;
 
     void  SetSavedBaseFov(float fov) { savedBaseFov_ = fov; }
     float GetSavedBaseFov()    const { return savedBaseFov_; }
@@ -281380,6 +281512,7 @@ private:
     Vector3 returnFromRot_ = {};
     float   returnFromFov_ = 0.0f;
     float   returnFromTs_ = 1.0f;
+    float   returnFromLookAt_ = 0.0f;
 
     // ============================================================
     // 補間済みの現在値
@@ -281388,6 +281521,7 @@ private:
     Vector3 currentRotOffset_ = {};
     float   currentFovDelta_ = 0.0f;
     float   currentTimeScale_ = 1.0f;
+    float   currentLookAtWeight_ = 0.0f;
 
     float savedBaseFov_ = 0.45f;
 };
@@ -281562,6 +281696,37 @@ void AttackCameraEditor::DrawWorkSettings() {
     ImGui::Checkbox("プレイヤーをフレーム内に保持##keepInFrame", &work.keepPlayerInFrame);
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip("再生中、プレイヤーが画角外へ出ないよう引き戻す\nOFF = カットシーン的に画角外を許可");
+
+    ImGui::Separator();
+
+    // ============================================================
+    // 参照フレーム / 注視
+    // ============================================================
+    ImGui::TextDisabled("参照フレーム / 注視");
+
+    static const char* kSpaceNames[] = {
+        "カメラローカル", "プレイヤーローカル", "ワールド", "対象方向(TargetRelative)"
+    };
+    int spaceIdx = static_cast<int>(work.posSpace);
+    ImGui::SetNextItemWidth(220.0f);
+    if (ImGui::Combo("位置の基準##posSpace", &spaceIdx, kSpaceNames, IM_ARRAYSIZE(kSpaceNames))) {
+        work.posSpace = static_cast<CameraSpace>(spaceIdx);
+    }
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("位置オフセットをどの空間の軸で解釈するか\n"
+            "対象方向 = プレイヤー→ロックオン対象/アンカー を奥(+Z)とした基準");
+
+    static const char* kLookNames[] = {
+        "なし", "ロックオン対象", "プレイヤー", "中点", "アンカー(Hit点)"
+    };
+    int lookIdx = static_cast<int>(work.lookAt);
+    ImGui::SetNextItemWidth(220.0f);
+    if (ImGui::Combo("注視対象##lookAt", &lookIdx, kLookNames, IM_ARRAYSIZE(kLookNames))) {
+        work.lookAt = static_cast<LookAtTarget>(lookIdx);
+    }
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("各キーフレームの「注視強さ」が向く対象\n"
+            "強さ>0 のとき、カメラ回転をこの対象へ混ぜる");
 }
 
 // ============================================================
@@ -281677,11 +281842,20 @@ void AttackCameraEditor::DrawKeyframeInspector() {
     ImGui::DragFloat("時刻 (s)", &kf.time, 0.005f, 0.0f, work.totalDuration);
 
     ImGui::Separator();
-    ImGui::TextDisabled("位置 / 方向（カメラローカル空間）");
+    ImGui::TextDisabled("位置 / 方向（基準はワーク設定の参照フレーム）");
     ImGui::DragFloat3("位置オフセット", &kf.posOffset.x, 0.05f);
     ImGui::DragFloat3("回転オフセット", &kf.rotOffset.x, 0.005f, -1.57f, 1.57f,
         "P:%.3f Y:%.3f R:%.3f");
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("注視適用後に加算される微調整。注視なしなら従来通りの加算回転");
     ImGui::DragFloat("FOV 差分 (rad)", &kf.fovDelta, 0.005f, -0.5f, 0.5f);
+
+    ImGui::Separator();
+    ImGui::TextDisabled("注視（ワークの注視対象へ向ける強さ）");
+    ImGui::SliderFloat("注視強さ", &kf.lookAtWeight, 0.0f, 1.0f, "%.2f");
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("0 = 向けない / 1 = 完全に対象を向く\n"
+            "ワーク設定の「注視対象」が None だと無効");
 
     ImGui::Separator();
     ImGui::TextDisabled("シェイク（0 = なし）");
@@ -281807,15 +281981,38 @@ File Path: YGame/GameObjects/Player/Camera/AttackCameraWork.h
 #include <json.hpp>
 
 // ============================================================
+// 参照フレーム：posOffset をどの空間の軸で解釈するか
+//   CameraLocal    … カメラの向き基準（従来の挙動・既定）
+//   PlayerLocal    … プレイヤーの向き基準（背中側に引く 等）
+//   World          … ワールド絶対軸（+X 右 / +Y 上 / +Z 奥）
+//   TargetRelative … プレイヤー→注視対象 の方向を奥(+Z)とした基準
+//                     （攻撃方向／対象方向に回り込む。対象が無ければ PlayerLocal に退避）
+// ============================================================
+enum class CameraSpace { CameraLocal, PlayerLocal, World, TargetRelative };
+
+// ============================================================
+// 注視対象：lookAtWeight>0 のとき、カメラ回転をこの対象へ向けて混ぜる
+//   None        … 注視しない（rotOffset 加算のみ・従来の挙動）
+//   LockedEnemy … ロックオン対象（無ければ Anchor→無効）
+//   Player      … プレイヤーピボット
+//   Midpoint    … プレイヤーと対象の中点
+//   Anchor      … Play 時に渡した任意座標（ヒット点など）
+// ============================================================
+enum class LookAtTarget { None, LockedEnemy, Player, Midpoint, Anchor };
+
+// ============================================================
 // 1 キーフレーム
 // ============================================================
 struct AttackCameraKeyframe {
     float   time = 0.0f;  // 発火時刻（秒）
 
     // ---- 位置 / 方向 ----
-    Vector3 posOffset = {};    // カメラローカル空間での位置追加オフセット
-    Vector3 rotOffset = {};    // 回転追加量（pitch, yaw, roll）ラジアン
+    Vector3 posOffset = {};    // 参照フレーム空間での位置追加オフセット
+    Vector3 rotOffset = {};    // 回転追加量（pitch, yaw, roll）ラジアン。注視適用後に加算
     float   fovDelta = 0.0f;  // 基準 FOV からの差分（ラジアン）
+
+    // ---- 注視ブレンド ----
+    float   lookAtWeight = 0.0f;  // 注視対象へ向ける強さ（0=向けない / 1=完全に対象へ）
 
     // ---- シェイク ----
     float   shakeIntensity = 0.0f;  // シェイク強さ（0 = なし）
@@ -281829,6 +282026,7 @@ struct AttackCameraKeyframe {
         j["posOffset"] = { posOffset.x, posOffset.y, posOffset.z };
         j["rotOffset"] = { rotOffset.x, rotOffset.y, rotOffset.z };
         j["fovDelta"] = fovDelta;
+        j["lookAtWeight"] = lookAtWeight;
         j["shakeIntensity"] = shakeIntensity;
         j["shakeDuration"] = shakeDuration;
         j["timeScale"] = timeScale;
@@ -281836,6 +282034,7 @@ struct AttackCameraKeyframe {
     void Load(const nlohmann::json& j) {
         time = j.value("time", 0.0f);
         fovDelta = j.value("fovDelta", 0.0f);
+        lookAtWeight = j.value("lookAtWeight", 0.0f);
         shakeIntensity = j.value("shakeIntensity", 0.0f);
         shakeDuration = j.value("shakeDuration", 0.0f);
         timeScale = j.value("timeScale", 1.0f);
@@ -281857,6 +282056,12 @@ struct AttackCameraWork {
     bool        keepPlayerInFrame = true;     // 再生中、プレイヤーが画角外へ出ないよう最終ガードで引き戻すか（false = カットシーン的に画角外を許可）
 
     // ============================================================
+    // 参照フレーム / 注視（このワーク全体に適用）
+    // ============================================================
+    CameraSpace  posSpace = CameraSpace::CameraLocal;   // posOffset の解釈空間
+    LookAtTarget lookAt   = LookAtTarget::None;         // キーフレームの lookAtWeight が向く対象
+
+    // ============================================================
     // 補間設定
     // ============================================================
     bool        useStartInterpolation = true;   // 開始時の補間を使用するか
@@ -281871,6 +282076,8 @@ struct AttackCameraWork {
         j["returnDuration"] = returnDuration;
         j["resetOnFinish"] = resetOnFinish;
         j["keepPlayerInFrame"] = keepPlayerInFrame;
+        j["posSpace"] = static_cast<int>(posSpace);
+        j["lookAt"] = static_cast<int>(lookAt);
         j["useStartInterpolation"] = useStartInterpolation;
         j["startInterpolationDuration"] = startInterpolationDuration;
         j["useReturnInterpolation"] = useReturnInterpolation;
@@ -281887,6 +282094,8 @@ struct AttackCameraWork {
         returnDuration = j.value("returnDuration", 0.2f);
         resetOnFinish = j.value("resetOnFinish", true);
         keepPlayerInFrame = j.value("keepPlayerInFrame", true);
+        posSpace = static_cast<CameraSpace>(j.value("posSpace", static_cast<int>(CameraSpace::CameraLocal)));
+        lookAt   = static_cast<LookAtTarget>(j.value("lookAt", static_cast<int>(LookAtTarget::None)));
         useStartInterpolation = j.value("useStartInterpolation", false);
         startInterpolationDuration = j.value("startInterpolationDuration", 0.2f);
         useReturnInterpolation = j.value("useReturnInterpolation", true);
@@ -281996,6 +282205,13 @@ void PlayerCamera::UpdatePreDirector() {
             }
         }
 
+        // RB / LB で自機の向いている方向の背後へ素早くリセンター（フリーカメラ時のみ）
+        if (!isLockOn_ &&
+            (YoRigine::Input::GetInstance()->IsPadTriggered(0, GamePadButton::RB) ||
+             YoRigine::Input::GetInstance()->IsPadTriggered(0, GamePadButton::LB))) {
+            followCamera_->RecenterBehindTarget();
+        }
+
         if (isLockOn_) {
             // ロックオン中はグランスを使わない。蓄積をリセットして次回フリー時の段差を防ぐ。
             awarenessYawBias_ = 0.0f;
@@ -282033,12 +282249,18 @@ void PlayerCamera::ApplyPostDirector(Camera* sceneCamera, float dt) {
         return;
     }
 
-    // ---- 位置オフセット（カメラローカル空間 → ワールド空間に変換して加算） ----
+    // ---- 位置オフセット（参照フレーム空間 → ワールド空間に変換して加算） ----
     Vector3 posOff = attackCamera_.GetCurrentPosOffset();
     if (posOff.x != 0.0f || posOff.y != 0.0f || posOff.z != 0.0f) {
-        Matrix4x4 rotMat = MakeRotateMatrixXYZ(sceneCamera->transform_.rotate);
-        Vector3   worldOff = TransformNormal(posOff, rotMat);
+        Matrix4x4 frame    = BuildOffsetFrame(attackCamera_.GetCurrentPosSpace(), sceneCamera);
+        Vector3   worldOff = TransformNormal(posOff, frame);
         sceneCamera->transform_.translate = sceneCamera->transform_.translate + worldOff;
+    }
+
+    // ---- 注視ブレンド（rotOffset 加算より先に。対象へ向けてから微調整を足す） ----
+    float lookWeight = attackCamera_.GetCurrentLookAtWeight();
+    if (lookWeight > 0.0f) {
+        ApplyLookAt(sceneCamera, attackCamera_.GetCurrentLookAt(), lookWeight);
     }
 
     // ---- 回転オフセット（pitch, yaw, roll 追加） ----
@@ -282190,6 +282412,8 @@ void PlayerCamera::UpdateStickInput() {
 
             if (Length(move) > 5000.0f) {
                 stickActiveThisFrame_ = true;
+                // 手動操作が入ったらリセンターを中断（プレイヤー操作を優先）
+                followCamera_->CancelRecenter();
                 move = Normalize(move) * rotateSpeed_;
                 Vector3 rot = followCamera_->GetRotate();
                 rot += move;
@@ -282468,7 +282692,21 @@ void PlayerCamera::SwitchLockOnTarget(int direction) {
 void PlayerCamera::PlayAttackCameraWork(const std::string& attackName) {
     if (!followCamera_) return;
 
+    // アンカー未指定 → ロックオン対象があればそれを既定アンカーにする
+    hasCameraWorkAnchor_ = false;
+
     // 再生前 FOV を保存 → Play → savedBaseFov に渡す順で呼ぶ
+    const float baseFov = followCamera_->GetBaseFovY();
+    attackCamera_.Play(attackName);
+    attackCamera_.SetSavedBaseFov(baseFov);
+}
+
+void PlayerCamera::PlayAttackCameraWork(const std::string& attackName, const Vector3& anchor) {
+    if (!followCamera_) return;
+
+    cameraWorkAnchor_    = anchor;
+    hasCameraWorkAnchor_ = true;
+
     const float baseFov = followCamera_->GetBaseFovY();
     attackCamera_.Play(attackName);
     attackCamera_.SetSavedBaseFov(baseFov);
@@ -282479,7 +282717,117 @@ void PlayerCamera::PlayAttackCameraWork(const std::string& attackName) {
 // ============================================================
 void PlayerCamera::StopAttackCameraWork() {
     attackCamera_.Stop(followCamera_);
+    hasCameraWorkAnchor_ = false;
     YoRigine::GameTime::SetTimeScale(1.0f);
+}
+
+// ============================================================
+// プレイヤーピボット（pivotHeight 込み）のワールド座標
+// ============================================================
+Vector3 PlayerCamera::PlayerPivotWorld() const {
+    if (!playerWT_) return {};
+    Vector3 p = Transform(Vector3{ 0.0f, 0.0f, 0.0f }, playerWT_->matWorld_);
+    p.y += pivotHeight_;
+    return p;
+}
+
+// ============================================================
+// 注視対象のワールド座標を解決（対象が無ければ false）
+// ============================================================
+bool PlayerCamera::ResolveLookAtPos(LookAtTarget target, Vector3& outPos) const {
+    switch (target) {
+    case LookAtTarget::None:
+        return false;
+
+    case LookAtTarget::Player:
+        outPos = PlayerPivotWorld();
+        return true;
+
+    case LookAtTarget::LockedEnemy:
+        if (lockedTarget_)        { outPos = lockedTarget_->GetCenterPosition(); return true; }
+        if (hasCameraWorkAnchor_) { outPos = cameraWorkAnchor_;                  return true; }
+        return false;
+
+    case LookAtTarget::Midpoint: {
+        Vector3 b;
+        if      (lockedTarget_)        b = lockedTarget_->GetCenterPosition();
+        else if (hasCameraWorkAnchor_) b = cameraWorkAnchor_;
+        else                           return false;
+        outPos = (PlayerPivotWorld() + b) * 0.5f;
+        return true;
+    }
+
+    case LookAtTarget::Anchor:
+        if (hasCameraWorkAnchor_) { outPos = cameraWorkAnchor_; return true; }
+        return false;
+    }
+    return false;
+}
+
+// ============================================================
+// posOffset を解釈する参照フレーム（回転行列）を組む
+// ============================================================
+Matrix4x4 PlayerCamera::BuildOffsetFrame(CameraSpace space, const Camera* sceneCamera) const {
+    switch (space) {
+    case CameraSpace::CameraLocal:
+        return MakeRotateMatrixXYZ(sceneCamera->transform_.rotate);
+
+    case CameraSpace::World:
+        return MakeIdentity4x4();
+
+    case CameraSpace::PlayerLocal: {
+        float yaw = playerWT_ ? playerWT_->rotate_.y : 0.0f;
+        return MakeRotateMatrixXYZ(Vector3{ 0.0f, yaw, 0.0f });
+    }
+
+    case CameraSpace::TargetRelative: {
+        // プレイヤー→対象 の水平方向を +Z とした yaw のみの基底
+        Vector3 target{};
+        bool    ok = false;
+        if      (lockedTarget_)        { target = lockedTarget_->GetCenterPosition(); ok = true; }
+        else if (hasCameraWorkAnchor_) { target = cameraWorkAnchor_;                  ok = true; }
+
+        if (ok && playerWT_) {
+            Vector3 d = target - PlayerPivotWorld();
+            d.y = 0.0f;
+            if (Length(d) > 0.001f) {
+                float yaw = atan2f(d.x, d.z);
+                return MakeRotateMatrixXYZ(Vector3{ 0.0f, yaw, 0.0f });
+            }
+        }
+        // 退避：プレイヤー基準
+        float yaw = playerWT_ ? playerWT_->rotate_.y : 0.0f;
+        return MakeRotateMatrixXYZ(Vector3{ 0.0f, yaw, 0.0f });
+    }
+    }
+    return MakeIdentity4x4();
+}
+
+// ============================================================
+// 注視ブレンド：カメラ回転を対象へ weight だけ寄せる
+// （weight=1 で完全に対象を向く。yaw は最短角で補間）
+// ============================================================
+void PlayerCamera::ApplyLookAt(Camera* sceneCamera, LookAtTarget target, float weight) const {
+    if (!sceneCamera) return;
+
+    Vector3 lookPos{};
+    if (!ResolveLookAtPos(target, lookPos)) return;
+
+    Vector3 toTarget = lookPos - sceneCamera->transform_.translate;
+    float   dist     = Length(toTarget);
+    if (dist < 0.01f) return;
+    Vector3 dir = toTarget / dist;
+
+    float desiredYaw   = atan2f(dir.x, dir.z);
+    float clampedY     = std::clamp(-dir.y, -1.0f, 1.0f);
+    float desiredPitch = asinf(clampedY);
+
+    float w = std::clamp(weight, 0.0f, 1.0f);
+
+    // yaw は ±π 最短角で補間（巻き戻り防止）
+    float deltaYaw = WrapPi(desiredYaw - sceneCamera->transform_.rotate.y);
+    sceneCamera->transform_.rotate.y += deltaYaw * w;
+    sceneCamera->transform_.rotate.x += (desiredPitch - sceneCamera->transform_.rotate.x) * w;
 }
 
 // ============================================================
@@ -282668,6 +283016,11 @@ public:
     // 攻撃カメラワーク
     // ============================================================
     void PlayAttackCameraWork(const std::string& attackName);
+
+    /// Anchor 注視（LookAtTarget::Anchor）や TargetRelative の基準に使う
+    /// 任意のワールド座標（攻撃ヒット点など）を渡して再生する。
+    void PlayAttackCameraWork(const std::string& attackName, const Vector3& anchor);
+
     void StopAttackCameraWork();
     bool IsAttackCameraPlaying() const { return attackCamera_.IsPlaying(); }
 
@@ -282745,12 +283098,27 @@ private:
     void EnsurePlayerInFrame(Camera* sceneCamera, float dt);
 
     // ============================================================
+    // 攻撃カメラワーク：参照フレーム / 注視
+    //   BuildOffsetFrame … posOffset を解釈する基底（回転行列）を組む
+    //   ResolveLookAtPos … 注視対象のワールド座標を返す（対象なしなら false）
+    //   PlayerPivotWorld … プレイヤーピボット（pivotHeight 込み）のワールド座標
+    // ============================================================
+    Matrix4x4 BuildOffsetFrame(CameraSpace space, const Camera* sceneCamera) const;
+    bool      ResolveLookAtPos(LookAtTarget target, Vector3& outPos) const;
+    Vector3   PlayerPivotWorld() const;
+    void      ApplyLookAt(Camera* sceneCamera, LookAtTarget target, float weight) const;
+
+    // ============================================================
     // メンバ
     // ============================================================
     FollowCamera*          followCamera_ = nullptr;
     const WorldTransform*  playerWT_     = nullptr;
 
     AttackCameraComponent  attackCamera_;
+
+    // 攻撃カメラワークの注視/参照基準アンカー（Play 時に渡された任意座標）
+    Vector3 cameraWorkAnchor_   = {};
+    bool    hasCameraWorkAnchor_ = false;
 
     // BattleStart 演出：Debug / Release どちらでも動作する
     std::shared_ptr<BattleStartCameraState> battleStartState_;
@@ -291637,15 +292005,10 @@ void BattleScene::Initialize(Camera* camera, Player* player) {
 
 	auto manager = AreaManager::GetInstance();
 
-	//------------------------------------------------------------
-	// フィールドの設定
-	//------------------------------------------------------------
-	auto battleField = std::make_shared<CircleArea>();
-	battleField->Initialize(Vector3(0, 0, 0), 50.0f);
-	battleField->SetPurpose(AreaPurpose::Boundary);  // 境界制限として設定
-	battleField->SetCamera(sceneCamera_);
-	manager->AddArea("BattleArea", battleField);
-
+	// 注意: BattleArea(境界エリア) は OnEnter で登録する。
+	// FieldScene::OnEnter が RemoveArea("BattleArea") で掃除するため、
+	// Initialize で一度だけ追加するとフィールド入場時に消えて二度と復活せず、
+	// バトル中の境界制限が効かなくなる (FieldArea と対称に入退場で再登録する)。
 
 	//------------------------------------------------------------
 	// UI初期化
@@ -291871,6 +292234,19 @@ void BattleScene::OnEnter() {
 	// バトル用に置くものだけ残して保存して Battle.json を作る。
 	YoRigine::ModelManipulator::GetInstance()->LoadScene("Battle");
 
+	// 境界エリア(BattleArea) を入場のたびに登録し直す。
+	// FieldScene::OnEnter が RemoveArea("BattleArea") するため、ここで再生成しないと
+	// バトル中の境界制限 (UpdateSingleObject) が効かなくなる。
+	{
+		auto* mgr = AreaManager::GetInstance();
+		mgr->RemoveArea("BattleArea");  // 念のため重複除去
+		auto battleField = std::make_shared<CircleArea>();
+		battleField->Initialize(Vector3(0, 0, 0), 50.0f);
+		battleField->SetPurpose(AreaPurpose::Boundary);  // 境界制限として設定
+		battleField->SetCamera(sceneCamera_);
+		mgr->AddArea("BattleArea", battleField);
+	}
+
 	// カメラリセット
 	currentCameraMode_ = CameraMode::FOLLOW;
 	battleCameraFinished_ = true;
@@ -291893,6 +292269,9 @@ void BattleScene::OnExit() {
 	BaseSubScene::OnExit();
 
 	Logger("[BattleScene] ===== OnExit() START =====\n");
+
+	// 境界エリアを掃除（FieldScene 側でも除去しているが対称性のため明示）
+	AreaManager::GetInstance()->RemoveArea("BattleArea");
 
 	// ロックオンUIを非表示にする
 	lockOnUI_->SetIsVisible(false);
