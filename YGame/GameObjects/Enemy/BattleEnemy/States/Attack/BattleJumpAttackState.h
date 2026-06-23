@@ -14,6 +14,8 @@ public:
 
 	void Exit(BattleEnemy& enemy) override;
 
+	bool IsAttacking() const override { return true; }
+
 private:
 	Vector3 startPos_{ 0, 0, 0 };
 	Vector3 targetPos_{ 0, 0, 0 };

@@ -358,9 +358,11 @@ void BattleEnemy::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 			}
 		}
 
-		// プレイヤー本体に当たった時
+		// プレイヤー本体に当たった時。攻撃実行中のStateの時だけダメージを与える
 		if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayer)) {
-			PerformBasicAttack();
+			if (currentState_ && currentState_->IsAttacking()) {
+				PerformBasicAttack();
+			}
 		}
 	}
 }

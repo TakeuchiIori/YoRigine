@@ -9,6 +9,7 @@
 #include <vector>
 #include <memory>
 #include <unordered_set>
+#include <unordered_map>
 
 // Math
 #include "MathFunc.h"
@@ -108,6 +109,16 @@ namespace YoRigine {
 		int  GetResolveIterations() const { return resolveIterations_; }
 
 		// ============================================================
+		// 接触の Exit 猶予フレーム数 (スティッキー接触)
+		//   一度接触したペアは、連続でこのフレーム数を超えて離れない限り
+		//   Exit を発火しない。押し戻し(ResolveContacts)が narrow 判定を
+		//   1フレームだけ no-hit に揺らして Enter が多重発火する問題を防ぐ。
+		//   0 で従来通り (猶予なし)。既定 2。
+		// ============================================================
+		void SetContactExitGraceFrames(int n) { contactExitGraceFrames_ = (n < 0 ? 0 : n); }
+		int  GetContactExitGraceFrames() const { return contactExitGraceFrames_; }
+
+		// ============================================================
 		// 形状からワールドAABBを計算
 		// ============================================================
 		static AABB ComputeWorldAABB(BaseCollider* c);
@@ -149,7 +160,10 @@ namespace YoRigine {
 				return h1 ^ (h2 + 0x9e3779b9 + (h1 << 6) + (h1 >> 2));
 			}
 		};
-		std::unordered_set<std::pair<BaseCollider*, BaseCollider*>, PairHash> collidingPairs_;
+		// 接触中ペア → 連続で no-hit だったフレーム数 (missStreak)。
+		// hit のたびに 0 リセット、no-hit のたびに +1。
+		// missStreak が contactExitGraceFrames_ を超えた時点で Exit を発火し除去する。
+		std::unordered_map<std::pair<BaseCollider*, BaseCollider*>, int, PairHash> collidingPairs_;
 
 		// Broad Phase 用 Uniform Grid
 		UniformGrid grid_;
@@ -157,6 +171,9 @@ namespace YoRigine {
 
 		// 反復押し戻し回数 (0 で無効)
 		int resolveIterations_ = 3;
+
+		// 接触の Exit 猶予フレーム数 (スティッキー接触。0 で従来通り)
+		int contactExitGraceFrames_ = 2;
 
 		// Frustum culling
 		bool    enableFrustumCulling_ = false;

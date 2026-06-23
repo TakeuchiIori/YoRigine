@@ -16,6 +16,8 @@ public:
     void Update(BattleEnemy& enemy, float dt) override;
     void Exit(BattleEnemy& enemy) override;
 
+    bool IsAttacking() const override { return true; }
+
 private:
     Vector3 attackDir_{ 0, 0, 0 };
     Vector3 anticipationStartPos_{ 0, 0, 0 };

@@ -15,6 +15,8 @@ public:
 
 	void Exit(BattleEnemy& enemy) override;
 
+	bool IsAttacking() const override { return true; }
+
 private:
 	Vector3 attackDir_{ 0, 0, 0 };
 	float startY_ = 0.0f;
