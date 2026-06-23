@@ -59,6 +59,11 @@ void PlayerCamera::Initialize(FollowCamera* followCamera, const WorldTransform* 
         LoadThreatAwareness(ext["threatAwareness"]);
     }
 
+    // ロックオン2ショット・フレーミングを extension JSON から復元
+    if (ext.contains("lockOnFraming")) {
+        LoadLockOnFraming(ext["lockOnFraming"]);
+    }
+
 #ifdef USE_IMGUI
     editor_.Initialize(&attackCamera_, this);
     editor_.SetFilePath(defaultPath);
@@ -462,6 +467,21 @@ void PlayerCamera::LoadThreatAwareness(const nlohmann::json& j) {
 }
 
 // ============================================================
+// ロックオン2ショット・フレーミングパラメータの保存 / 復元
+// ============================================================
+void PlayerCamera::SaveLockOnFraming(nlohmann::json& j) const {
+    j["shoulderYaw"] = lockOnShoulderYaw_;
+    j["pitchBias"]   = lockOnPitchBias_;
+    j["lerpSpeed"]   = lockOnLerpSpeed_;
+}
+
+void PlayerCamera::LoadLockOnFraming(const nlohmann::json& j) {
+    lockOnShoulderYaw_ = j.value("shoulderYaw", 0.25f);
+    lockOnPitchBias_   = j.value("pitchBias",   0.20f);
+    lockOnLerpSpeed_   = j.value("lerpSpeed",   10.0f);
+}
+
+// ============================================================
 // ロックオン更新
 // ============================================================
 void PlayerCamera::UpdateLockOn() {
@@ -497,15 +517,21 @@ void PlayerCamera::UpdateLockOn() {
         }
     }
 
-    // カメラをターゲット方向に向ける
+    // ── 2ショット・フレーミング ──────────────────────────────
+    // カメラを player→enemy 軸の真後ろに置くと、プレイヤーの背中が敵を隠して
+    // 攻撃が当てづらくなる。そこで:
+    //   ・ヨーに肩オフセット(lockOnShoulderYaw_)を足して軸からずらす
+    //     （offset_ に X 成分が無いためプレイヤーは中央のまま、敵が片側へ寄る）
+    //   ・見下ろし(lockOnPitchBias_)を足して2体を縦に分離する
+    // ことで、プレイヤーと敵が重ならない斜め2ショットにする。
     Vector3 pivot    = playerWT_->translate_ + Vector3(0.0f, pivotHeight_, 0.0f);
     Vector3 enemyPos = lockedTarget_->GetCenterPosition();
     Vector3 dir      = Normalize(enemyPos - pivot);
 
-    float targetYaw   = atan2f(dir.x, dir.z);
-    float targetPitch = std::clamp(asinf(-dir.y) + 0.15f, minPitch_, maxPitch_);
+    float targetYaw   = atan2f(dir.x, dir.z) + lockOnShoulderYaw_;
+    float targetPitch = std::clamp(asinf(-dir.y) + lockOnPitchBias_, minPitch_, maxPitch_);
 
-    float t = std::clamp(10.0f * YoRigine::GameTime::GetUnscaledDeltaTime(), 0.0f, 1.0f);
+    float t = std::clamp(lockOnLerpSpeed_ * YoRigine::GameTime::GetUnscaledDeltaTime(), 0.0f, 1.0f);
     Vector3 rot = followCamera_->GetRotate();
 
     float diffY = targetYaw - rot.y;
@@ -833,6 +859,23 @@ void PlayerCamera::DrawImGui() {
         SaveThreatAwareness(taJson);
         nlohmann::json ext = followCamera_->GetExtensionJson();
         ext["threatAwareness"] = taJson;
+        followCamera_->SetExtensionJson(ext);
+    }
+
+    ImGui::Separator();
+
+    if (ImGui::CollapsingHeader("ロックオン2ショット")) {
+        ImGui::DragFloat("肩オフセット(rad)", &lockOnShoulderYaw_, 0.01f, -0.8f, 0.8f, "%.2f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("player→enemy 軸からヨーをずらす量。0=真後ろ(被る)。±で左右の肩");
+        ImGui::DragFloat("見下ろし加算(rad)", &lockOnPitchBias_, 0.01f, -0.3f, 0.8f, "%.2f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("プレイヤーと敵を縦に分離する見下ろし量");
+        ImGui::DragFloat("追従速度", &lockOnLerpSpeed_, 0.1f, 1.0f, 30.0f);
+
+        // 編集値を extension JSON に反映（カメラ設定保存時に一緒に永続化される）
+        nlohmann::json loJson;
+        SaveLockOnFraming(loJson);
+        nlohmann::json ext = followCamera_->GetExtensionJson();
+        ext["lockOnFraming"] = loJson;
         followCamera_->SetExtensionJson(ext);
     }
 
