@@ -12,6 +12,7 @@
 #include "json.hpp"
 #include "UIAnimation.h"
 #include "UIAnimator.h"
+#include "Loaders/Json/Use/AutoJson.h"
 
 // 前方宣言
 class SpriteCommon;
@@ -157,6 +158,17 @@ public:
 	UIAnimator& GetAnimator() { return animator_; }
 	const UIAnimator& GetAnimator() const { return animator_; }
 
+	///************************* アニメーションクリップ（データ駆動） *************************///
+
+	// 保存済みクリップを1つ再生
+	void PlayClip(const UIAnimationClip& clip);
+	// 指定トリガを持つクリップをまとめて再生（OnInit / OnShow の自動再生に使用）
+	void PlayClipsByTrigger(UIAnimTrigger trigger);
+
+	// エディタ等がクリップ一覧を編集する用途
+	std::vector<UIAnimationClip>& GetClips() { return clips_; }
+	const std::vector<UIAnimationClip>& GetClips() const { return clips_; }
+
 	// コールバック設定（最後に追加されたアニメーションに設定）
 	void SetAnimationCompleteCallback(std::function<void()> callback);
 	void SetAnimationUpdateCallback(std::function<void()> callback);
@@ -192,8 +204,31 @@ protected:
 	bool gridEnabled_ = false;
 	float gridSize_ = 10.0f;
 
+	// ============================================================
+	// JSON 永続化用の値（AutoJson に登録するソース・オブ・トゥルース）
+	// 実描画値は sprite_ が保持するため、保存直前に sprite_→ここへ、
+	// 読み込み直後にここ→sprite_ へ同期する（SyncSpriteToData / ApplyDataToSprite）。
+	// ============================================================
+	Vector3 position_ = { 0.0f, 0.0f, 0.0f };
+	Vector3 rotation_ = { 0.0f, 0.0f, 0.0f };
+	Vector2 size_ = { 100.0f, 100.0f };   // 基準サイズ(px)
+	Vector2 scale_ = { 1.0f, 1.0f };      // 拡縮倍率(1.0=等倍)
+	Vector4 color_ = { 1.0f, 1.0f, 1.0f, 1.0f };
+	bool flipX_ = false;
+	bool flipY_ = false;
+	Vector2 textureLeftTop_ = { 0.0f, 0.0f };
+	Vector2 anchorPoint_ = { 0.0f, 0.0f };
+	Vector2 textureSize_ = { 100.0f, 100.0f };
+
+	// 変数登録だけで Save/Load を自動化する（CreateJSON/ApplyJSON のボイラープレート削減）
+	AutoJson aj_;
+
 	// アニメーション管理（再生ロジックは UIAnimator に分離）
 	UIAnimator animator_;
+
+	// データ駆動アニメーションクリップ（JSON 永続化・トリガ自動再生用）
+	std::vector<UIAnimationClip> clips_;
+	bool prevVisible_ = true;   // OnShow トリガ検知用（前フレームの可視状態）
 
 	// UV SRT
 	Vector2 uvTranslation_ = { 0.0f, 0.0f };
@@ -204,6 +239,13 @@ protected:
 
 	nlohmann::json CreateJSONFromCurrentState();
 	void ApplyJSONToState(const nlohmann::json& json);
+
+	// AutoJson への変数登録（コンストラクタで一度だけ呼ぶ）
+	void SetupJsonBindings();
+	// sprite_ の現在値 → 永続化用メンバへ（保存直前）
+	void SyncSpriteToData();
+	// 永続化用メンバ → sprite_ へ反映（読み込み直後）
+	void ApplyDataToSprite();
 
 	///************************* ImGui関連 *************************///
 

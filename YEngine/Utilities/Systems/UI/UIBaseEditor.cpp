@@ -348,6 +348,139 @@ void UIBase::ImGuiAnimationSettings() {
 
 			ImGui::TreePop();
 		}
+
+		ImGui::Spacing();
+		ImGui::Separator();
+		ImGui::Spacing();
+
+		// ============================================================
+		// アニメクリップ（JSON に保存され、トリガで自動再生される）
+		// ============================================================
+
+		// combo の並び（animTypes）→ UIAnimationType の対応表
+		static const UIAnimationType kAnimTypeByIndex[] = {
+			UIAnimationType::Position, UIAnimationType::Scale, UIAnimationType::Rotation,
+			UIAnimationType::Alpha, UIAnimationType::Color,
+			UIAnimationType::FadeIn, UIAnimationType::FadeOut,
+			UIAnimationType::SlideIn, UIAnimationType::SlideOut,
+			UIAnimationType::ZoomIn, UIAnimationType::ZoomOut,
+			UIAnimationType::Shake, UIAnimationType::Pulse, UIAnimationType::Bounce,
+			UIAnimationType::Swing, UIAnimationType::Flash, UIAnimationType::Blink,
+			UIAnimationType::Wobble, UIAnimationType::Flip,
+			UIAnimationType::RotateIn, UIAnimationType::RotateOut
+		};
+
+		auto AnimTypeName = [](UIAnimationType t) -> const char* {
+			switch (t) {
+			case UIAnimationType::Position: return "位置";
+			case UIAnimationType::Scale: return "スケール";
+			case UIAnimationType::Rotation: return "回転";
+			case UIAnimationType::Alpha: return "アルファ";
+			case UIAnimationType::Color: return "色";
+			case UIAnimationType::FadeIn: return "フェードイン";
+			case UIAnimationType::FadeOut: return "フェードアウト";
+			case UIAnimationType::SlideIn: return "スライドイン";
+			case UIAnimationType::SlideOut: return "スライドアウト";
+			case UIAnimationType::ZoomIn: return "ズームイン";
+			case UIAnimationType::ZoomOut: return "ズームアウト";
+			case UIAnimationType::Shake: return "シェイク";
+			case UIAnimationType::Pulse: return "パルス";
+			case UIAnimationType::Bounce: return "バウンス";
+			case UIAnimationType::Swing: return "スイング";
+			case UIAnimationType::Flash: return "フラッシュ";
+			case UIAnimationType::Blink: return "ブリンク";
+			case UIAnimationType::Wobble: return "ウォブル";
+			case UIAnimationType::Flip: return "フリップ";
+			case UIAnimationType::RotateIn: return "回転イン";
+			case UIAnimationType::RotateOut: return "回転アウト";
+			default: return "不明";
+			}
+		};
+
+		const char* triggerNames[] = { "手動", "表示開始時(OnInit)", "表示切替時(OnShow)" };
+
+		if (ImGui::TreeNodeEx("💾 アニメクリップ（保存対象）", ImGuiTreeNodeFlags_DefaultOpen)) {
+
+			// --- 既存クリップの一覧 ---
+			if (clips_.empty()) {
+				ImGui::TextDisabled("クリップがありません。下で追加してください。");
+			}
+
+			int removeIndex = -1;
+			for (size_t i = 0; i < clips_.size(); ++i) {
+				UIAnimationClip& clip = clips_[i];
+				ImGui::PushID(static_cast<int>(i));
+
+				ImGui::Text("%zu: %s [%s]", i + 1, AnimTypeName(clip.type),
+					triggerNames[static_cast<int>(clip.trigger)]);
+
+				// 名前
+				char nameBuf[128];
+				strncpy_s(nameBuf, clip.name.c_str(), sizeof(nameBuf) - 1);
+				nameBuf[sizeof(nameBuf) - 1] = '\0';
+				if (ImGui::InputText("名前", nameBuf, sizeof(nameBuf))) {
+					clip.name = nameBuf;
+				}
+
+				// トリガ
+				int trig = static_cast<int>(clip.trigger);
+				if (ImGui::Combo("トリガ", &trig, triggerNames, IM_ARRAYSIZE(triggerNames))) {
+					clip.trigger = static_cast<UIAnimTrigger>(trig);
+				}
+
+				ImGui::DragFloat("時間(秒)", &clip.duration, 0.05f, 0.05f, 10.0f);
+				ImGui::DragFloat("遅延(秒)", &clip.delay, 0.05f, 0.0f, 10.0f);
+				ImGui::Checkbox("ループ", &clip.loop);
+
+				if (ImGui::Button("▶ 再生")) {
+					PlayClip(clip);
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("削除")) {
+					removeIndex = static_cast<int>(i);
+				}
+
+				ImGui::Separator();
+				ImGui::PopID();
+			}
+
+			if (removeIndex >= 0) {
+				clips_.erase(clips_.begin() + removeIndex);
+			}
+
+			// --- 現在の設定をクリップとして追加 ---
+			ImGui::Spacing();
+			ImGui::Text("➕ 現在の設定をクリップとして追加");
+
+			static int newClipTrigger = 0;
+			static char newClipName[128] = "NewClip";
+			ImGui::Combo("追加時トリガ", &newClipTrigger, triggerNames, IM_ARRAYSIZE(triggerNames));
+			ImGui::InputText("クリップ名", newClipName, sizeof(newClipName));
+
+			if (ImGui::Button("クリップを追加", ImVec2(-1, 0))) {
+				UIAnimationClip clip;
+				clip.name = (strlen(newClipName) > 0) ? newClipName : "Clip";
+				clip.type = kAnimTypeByIndex[selectedAnimType];
+				clip.trigger = static_cast<UIAnimTrigger>(newClipTrigger);
+				clip.easing = static_cast<Easing::Function>(selectedEasing);
+				clip.duration = duration;
+				clip.loop = loop;
+				// 上の試し再生と同じ係数でパラメータを埋める
+				clip.intensity = intensity * 10.0f;
+				clip.scaleAmt = 1.0f + intensity * 0.2f;
+				clip.height = intensity * 50.0f;
+				clip.angle = intensity * 15.0f;
+				clip.times = static_cast<int>(intensity * 3.0f);
+				clip.distance = 200.0f;
+				clip.direction = SlideDirection::Right;
+				clips_.push_back(clip);
+			}
+
+			ImGui::TextDisabled("※「アニメーション設定」のタイプ/イージング/時間/強度を使います");
+			ImGui::TextDisabled("※ 追加後は「変更を保存」で JSON に永続化されます");
+
+			ImGui::TreePop();
+		}
 	}
 #endif
 }

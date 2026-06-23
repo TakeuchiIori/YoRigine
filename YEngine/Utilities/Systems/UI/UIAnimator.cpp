@@ -134,6 +134,71 @@ void UIAnimator::PlayAnimation(const UIAnimation& anim) {
 }
 
 // ============================================================
+// データ駆動クリップ : type → 既存 Play〜 へディスパッチ
+// ============================================================
+// クリップは start/end を持たないため、各 Play〜 が対象の現在状態を
+// 基準にアニメを組み立てる方式に乗せる。基本タイプ(位置/拡縮/回転/色/アルファ)は
+// エディタの試し再生と同じく「現在値からの相対変化」として扱う。
+void UIAnimator::PlayClip(const UIAnimationClip& clip) {
+	if (!target_) return;
+
+	const Easing::Function easing = clip.easing;
+	const float dur = clip.duration;
+	const bool loop = clip.loop;
+
+	switch (clip.type) {
+	case UIAnimationType::Position: {
+		Vector3 cur = target_->GetPosition();
+		PlayPositionAnimation(cur,
+			Vector3{ cur.x + clip.distance, cur.y, cur.z }, dur, easing, loop);
+		break;
+	}
+	case UIAnimationType::Scale: {
+		Vector2 cur = target_->GetScale();
+		PlayScaleAnimation(cur,
+			Vector2{ cur.x * clip.scaleAmt, cur.y * clip.scaleAmt }, dur, easing, loop);
+		break;
+	}
+	case UIAnimationType::Rotation: {
+		Vector3 cur = target_->GetRotation();
+		PlayRotationAnimation(cur,
+			Vector3{ cur.x, cur.y, cur.z + clip.angle }, dur, easing, loop);
+		break;
+	}
+	case UIAnimationType::Color:
+		PlayColorAnimation(target_->GetColor(),
+			Vector4{ 1.0f, 0.0f, 0.0f, target_->GetColor().w }, dur, easing, loop);
+		break;
+	case UIAnimationType::Alpha:
+		PlayAlphaAnimation(target_->GetAlpha(), 0.0f, dur, easing, loop);
+		break;
+
+	case UIAnimationType::FadeIn:    PlayFadeIn(dur, easing); break;
+	case UIAnimationType::FadeOut:   PlayFadeOut(dur, easing); break;
+	case UIAnimationType::SlideIn:   PlaySlideIn(clip.direction, clip.distance, dur); break;
+	case UIAnimationType::SlideOut:  PlaySlideOut(clip.direction, clip.distance, dur); break;
+	case UIAnimationType::ZoomIn:    PlayZoomIn(dur); break;
+	case UIAnimationType::ZoomOut:   PlayZoomOut(dur); break;
+	case UIAnimationType::Shake:     PlayShake(clip.intensity, dur); break;
+	case UIAnimationType::Pulse:     PlayPulse(clip.scaleAmt, dur, loop); break;
+	case UIAnimationType::Bounce:    PlayBounce(clip.height, dur); break;
+	case UIAnimationType::Swing:     PlaySwing(clip.angle, dur, loop); break;
+	case UIAnimationType::Flash:     PlayFlash(dur, clip.times); break;
+	case UIAnimationType::Blink:     PlayBlink(dur, loop); break;
+	case UIAnimationType::Wobble:    PlayWobble(clip.intensity, dur); break;
+	case UIAnimationType::Flip:      PlayFlip(true, dur); break;
+	case UIAnimationType::RotateIn:  PlayRotateIn(dur); break;
+	case UIAnimationType::RotateOut: PlayRotateOut(dur); break;
+	default: return;
+	}
+
+	// 直近に積んだアニメーションへ遅延を適用
+	if (clip.delay > 0.0f) {
+		SetDelay(clip.delay);
+	}
+}
+
+// ============================================================
 // プリセット : フェードイン
 // ============================================================
 void UIAnimator::PlayFadeIn(float duration, Easing::Function easing) {

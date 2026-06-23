@@ -46,6 +46,8 @@ public:
 	// プリセットアニメーション
 	// ============================================================
 	void PlayAnimation(const UIAnimation& anim);
+	// データ駆動クリップを現在状態を基準に再生（type → 既存 Play〜 へディスパッチ）
+	void PlayClip(const UIAnimationClip& clip);
 	void PlayFadeIn(float duration, Easing::Function easing);
 	void PlayFadeOut(float duration, Easing::Function easing);
 	void PlaySlideIn(SlideDirection dir, float distance, float duration);

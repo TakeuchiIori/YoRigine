@@ -7,6 +7,8 @@
 #include <functional>
 #include <vector>
 #include <memory>
+#include <string>
+#include <json.hpp>
 
 ///************************* アニメーションタイプ *************************///
 enum class UIAnimationType {
@@ -75,6 +77,76 @@ struct UIAnimation {
     std::function<void()> onComplete;
     std::function<void()> onUpdate;
 };
+
+///************************* アニメーション再生トリガ *************************///
+enum class UIAnimTrigger {
+    Manual,   // 手動再生のみ（コード/エディタから明示的に再生）
+    OnInit,   // Initialize 完了時に自動再生
+    OnShow    // 非表示→表示に切り替わった時に自動再生
+};
+
+///************************* アニメーションクリップ(データ保存用) *************************///
+// プリセット方式: start/end をフル保存せず、タイプ＋パラメータだけを保存する。
+// 再生時に UIAnimator が対象 UIBase の「現在の状態」を基準にアニメを構築するため、
+// JSON は軽量で、配置を動かしてもクリップを作り直す必要がない。
+struct UIAnimationClip {
+    std::string name = "Clip";
+    UIAnimationType type = UIAnimationType::FadeIn;
+    UIAnimTrigger trigger = UIAnimTrigger::Manual;
+    Easing::Function easing = Easing::Function::Linear;
+
+    float duration = 0.5f;
+    float delay = 0.0f;
+    bool loop = false;
+
+    // タイプ別パラメータ（対応するタイプでのみ意味を持つ）
+    float intensity = 10.0f;   // Shake / Wobble
+    float distance = 200.0f;   // SlideIn / SlideOut
+    float height = 50.0f;      // Bounce
+    float angle = 15.0f;       // Swing / Rotation
+    float scaleAmt = 1.2f;     // Pulse / Scale
+    int   times = 3;           // Flash
+    SlideDirection direction = SlideDirection::Right; // SlideIn / SlideOut
+};
+
+///************************* UIAnimationClip <-> JSON *************************///
+// AutoJson / nlohmann から std::vector<UIAnimationClip> をそのまま読み書きできるようにする。
+// enum は nlohmann 既定で整数として直列化される。
+inline void to_json(nlohmann::json& j, const UIAnimationClip& c) {
+    j = nlohmann::json{
+        {"name", c.name},
+        {"type", c.type},
+        {"trigger", c.trigger},
+        {"easing", c.easing},
+        {"duration", c.duration},
+        {"delay", c.delay},
+        {"loop", c.loop},
+        {"intensity", c.intensity},
+        {"distance", c.distance},
+        {"height", c.height},
+        {"angle", c.angle},
+        {"scaleAmt", c.scaleAmt},
+        {"times", c.times},
+        {"direction", c.direction},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, UIAnimationClip& c) {
+    if (j.contains("name"))      j.at("name").get_to(c.name);
+    if (j.contains("type"))      j.at("type").get_to(c.type);
+    if (j.contains("trigger"))   j.at("trigger").get_to(c.trigger);
+    if (j.contains("easing"))    j.at("easing").get_to(c.easing);
+    if (j.contains("duration"))  j.at("duration").get_to(c.duration);
+    if (j.contains("delay"))     j.at("delay").get_to(c.delay);
+    if (j.contains("loop"))      j.at("loop").get_to(c.loop);
+    if (j.contains("intensity")) j.at("intensity").get_to(c.intensity);
+    if (j.contains("distance"))  j.at("distance").get_to(c.distance);
+    if (j.contains("height"))    j.at("height").get_to(c.height);
+    if (j.contains("angle"))     j.at("angle").get_to(c.angle);
+    if (j.contains("scaleAmt"))  j.at("scaleAmt").get_to(c.scaleAmt);
+    if (j.contains("times"))     j.at("times").get_to(c.times);
+    if (j.contains("direction")) j.at("direction").get_to(c.direction);
+}
 
 ///************************* プリセットアニメーション設定 *************************///
 namespace UIAnimationPresets {

@@ -16,6 +16,7 @@ UIBase::UIBase(const std::string& name) :
 	sprite_(nullptr),
 	hotReloadEnabled_(false),
 	name_(name) {
+	SetupJsonBindings();
 }
 
 UIBase::~UIBase() {
@@ -43,11 +44,21 @@ void UIBase::Initialize(const std::string& jsonConfigPath) {
 	if (std::filesystem::exists(configPath_)) {
 		lastModTime_ = std::filesystem::last_write_time(configPath_);
 	}
+
+	// 初期可視状態を記録し、OnInit トリガのクリップを自動再生する。
+	prevVisible_ = visible_;
+	PlayClipsByTrigger(UIAnimTrigger::OnInit);
 }
 
 void UIBase::Update() {
 	// アニメーションの進行はエンジンに委譲
 	animator_.Update(YoRigine::GameTime::GetDeltaTime());
+
+	// 非表示→表示に切り替わったフレームで OnShow トリガを再生
+	if (!prevVisible_ && visible_) {
+		PlayClipsByTrigger(UIAnimTrigger::OnShow);
+	}
+	prevVisible_ = visible_;
 
 	if (hotReloadEnabled_) {
 		CheckForChanges();
@@ -190,6 +201,19 @@ void UIBase::SetAnimationCompleteCallback(std::function<void()> callback) {
 
 void UIBase::SetAnimationUpdateCallback(std::function<void()> callback) {
 	animator_.SetUpdateCallback(callback);
+}
+
+// データ駆動クリップの再生（実処理は UIAnimator に委譲）
+void UIBase::PlayClip(const UIAnimationClip& clip) {
+	animator_.PlayClip(clip);
+}
+
+void UIBase::PlayClipsByTrigger(UIAnimTrigger trigger) {
+	for (const auto& clip : clips_) {
+		if (clip.trigger == trigger) {
+			animator_.PlayClip(clip);
+		}
+	}
 }
 
 // アニメーションの更新処理は UIAnimator へ移動した（UIBase::Update が animator_.Update を呼ぶ）。
@@ -557,205 +581,115 @@ Vector2 UIBase::GetUVScale() const {
 	return uvScale_;
 }
 
-nlohmann::json UIBase::CreateJSONFromCurrentState() {
-	nlohmann::json data;
+// ============================================================
+// AutoJson への変数登録（コンストラクタで一度だけ）
+// ============================================================
+// 登録した変数は aj_.Save / aj_.Load で一括して読み書きされる。
+// color は既存JSONが r/g/b/a 形式（Vector4 既定の x/y/z/w とは別）なので
+// 後方互換のため AutoJson には載せず CreateJSON/ApplyJSON で個別に処理する。
+void UIBase::SetupJsonBindings() {
+	aj_.Add("name", &name_)
+		.Add("texturePath", &texturePath_)
+		.Add("position", &position_)
+		.Add("rotation", &rotation_)
+		.Add("size", &size_)
+		.Add("scale", &scale_)
+		.Add("flipX", &flipX_)
+		.Add("flipY", &flipY_)
+		.Add("textureLeftTop", &textureLeftTop_)
+		.Add("anchorPoint", &anchorPoint_)
+		.Add("textureSize", &textureSize_)
+		.Add("visible", &visible_)
+		.Add("layer", &layer_)
+		.Add("uvTranslation", &uvTranslation_)
+		.Add("uvRotation", &uvRotation_)
+		.Add("uvScale", &uvScale_)
+		.Add("animations", &clips_);
+}
 
-	data["name"] = name_;
-	data["texturePath"] = texturePath_;
+// ============================================================
+// sprite_ の現在値 → 永続化用メンバへ（保存直前）
+// ============================================================
+void UIBase::SyncSpriteToData() {
+	position_ = GetPosition();
+	rotation_ = GetRotation();
+	size_ = GetSize();
+	scale_ = GetScale();
+	color_ = GetColor();
+	flipX_ = GetFlipX();
+	flipY_ = GetFlipY();
+	textureLeftTop_ = GetTextureLeftTop();
+	anchorPoint_ = GetAnchorPoint();
+	textureSize_ = GetTextureSize();
+	// uvTranslation_/uvRotation_/uvScale_ は Setter でメンバ側も常に同期済み。
+	// name_/visible_/layer_/clips_ はメンバが直接ソース。
+}
 
-	data["position"] = {
-		{"x", GetPosition().x},
-		{"y", GetPosition().y},
-		{"z", GetPosition().z}
-	};
-
-	data["rotation"] = {
-		{"x", GetRotation().x},
-		{"y", GetRotation().y},
-		{"z", GetRotation().z}
-	};
-
-	// 基準サイズ(px) … レイアウト値。アニメ倍率(scale)とは別概念。
-	data["size"] = {
-		{"x", GetSize().x},
-		{"y", GetSize().y}
-	};
-
-	// 拡縮倍率(1.0=等倍)。基本は 1.0 で保存され、演出時のみ変化する。
-	data["scale"] = {
-		{"x", GetScale().x},
-		{"y", GetScale().y}
-	};
-
-	data["color"] = {
-		{"r", GetColor().x},
-		{"g", GetColor().y},
-		{"b", GetColor().z},
-		{"a", GetColor().w}
-	};
-
-	data["flipX"] = GetFlipX();
-	data["flipY"] = GetFlipY();
-
-	if (sprite_) {
-		data["textureLeftTop"] = {
-			{"x", sprite_->GetTextureLeftTop().x},
-			{"y", sprite_->GetTextureLeftTop().y}
-		};
-
-		data["anchorPoint"] = {
-			{"x", sprite_->GetAnchorPoint().x},
-			{"y", sprite_->GetAnchorPoint().y}
-		};
-
-		data["textureSize"] = {
-			{"x", sprite_->GetTextureSize().x},
-			{"y", sprite_->GetTextureSize().y}
-		};
+// ============================================================
+// 永続化用メンバ → sprite_ へ反映（読み込み直後）
+// ============================================================
+void UIBase::ApplyDataToSprite() {
+	if (texturePath_.empty()) {
+		texturePath_ = "./Resources/images/white.png";
 	}
+	if (!sprite_) {
+		sprite_ = std::make_unique<Sprite>();
+	}
+	sprite_->Initialize(texturePath_);
 
-	data["visible"] = visible_;
-	data["layer"] = layer_;
+	SetPosition(position_);
+	SetRotation(rotation_);
+	SetSize(size_);
+	SetScale(scale_);
+	SetColor(color_);
+	SetFlipX(flipX_);
+	SetFlipY(flipY_);
+	sprite_->SetTextureLeftTop(textureLeftTop_);
+	sprite_->SetAnchorPoint(anchorPoint_);
+	sprite_->SetTextureSize(textureSize_);
+	SetUVTranslation(uvTranslation_);
+	SetUVRotation(uvRotation_);
+	SetUVScale(uvScale_);
+}
 
-	// UV SRT
-	data["uvTranslation"] = {
-		{"x", uvTranslation_.x},
-		{"y", uvTranslation_.y}
-	};
-	data["uvRotation"] = uvRotation_;
-	data["uvScale"] = {
-		{"x", uvScale_.x},
-		{"y", uvScale_.y}
+nlohmann::json UIBase::CreateJSONFromCurrentState() {
+	// sprite_ が保持する実描画値をメンバへ吸い上げてから一括保存
+	SyncSpriteToData();
+
+	nlohmann::json data;
+	aj_.Save(data);
+
+	// 色は後方互換のため r/g/b/a で保存する（Vector4 既定の x/y/z/w にしない）
+	data["color"] = {
+		{"r", color_.x},
+		{"g", color_.y},
+		{"b", color_.z},
+		{"a", color_.w}
 	};
 
 	return data;
 }
 
 void UIBase::ApplyJSONToState(const nlohmann::json& data) {
-	if (data.contains("texturePath")) {
-		texturePath_ = data["texturePath"];
+	// 登録済みフィールド（color 以外）を一括ロード。未知キーは無視される。
+	aj_.Load(data);
 
-		if (!sprite_) {
-			sprite_ = std::make_unique<Sprite>();
-			sprite_->Initialize(texturePath_);
-		} else {
-			sprite_->Initialize(texturePath_);
-		}
-	} else if (!sprite_) {
-		sprite_ = std::make_unique<Sprite>();
-		sprite_->Initialize("./Resources/images/white.png");
-		texturePath_ = "./Resources/images/white.png";
-	}
-
-	if (data.contains("name")) {
-		name_ = data["name"];
-	}
-
-	if (data.contains("position")) {
-		Vector3 position;
-		position.x = data["position"]["x"];
-		position.y = data["position"]["y"];
-		position.z = data["position"]["z"];
-		SetPosition(position);
-	}
-
-	if (data.contains("rotation")) {
-		Vector3 rotation;
-		rotation.x = data["rotation"]["x"];
-		rotation.y = data["rotation"]["y"];
-		rotation.z = data["rotation"]["z"];
-		SetRotation(rotation);
-	}
-
-	// サイズ(px)と拡縮倍率(scale)の読み込み。
-	if (data.contains("size")) {
-		// 新フォーマット: size(px) と scale(倍率) を別々に持つ
-		Vector2 size;
-		size.x = data["size"]["x"];
-		size.y = data["size"]["y"];
-		SetSize(size);
-
-		if (data.contains("scale")) {
-			Vector2 scale;
-			scale.x = data["scale"]["x"];
-			scale.y = data["scale"]["y"];
-			SetScale(scale);
-		}
-	}
-	else if (data.contains("scale")) {
-		// 旧フォーマット: "scale" は実体としてピクセルサイズだった。
-		// 後方互換として基準サイズ(px)に読み込み、倍率は等倍にする。
-		Vector2 legacySize;
-		legacySize.x = data["scale"]["x"];
-		legacySize.y = data["scale"]["y"];
-		SetSize(legacySize);
-		SetScale({ 1.0f, 1.0f });
-	}
-
+	// 色（r/g/b/a 後方互換）
 	if (data.contains("color")) {
-		Vector4 color;
-		color.x = data["color"]["r"];
-		color.y = data["color"]["g"];
-		color.z = data["color"]["b"];
-		color.w = data["color"]["a"];
-		SetColor(color);
+		const auto& c = data["color"];
+		color_.x = c.value("r", 1.0f);
+		color_.y = c.value("g", 1.0f);
+		color_.z = c.value("b", 1.0f);
+		color_.w = c.value("a", 1.0f);
 	}
 
-	if (data.contains("flipX")) {
-		SetFlipX(data["flipX"]);
+	// 旧フォーマット: "size" が無く "scale" だけある場合、その "scale" は
+	// 実体としてピクセルサイズ。基準サイズ(px)へ読み替え、倍率は等倍に戻す。
+	if (!data.contains("size") && data.contains("scale")) {
+		size_ = scale_;
+		scale_ = { 1.0f, 1.0f };
 	}
 
-	if (data.contains("flipY")) {
-		SetFlipY(data["flipY"]);
-	}
-
-	if (sprite_) {
-		if (data.contains("textureLeftTop")) {
-			Vector2 leftTop;
-			leftTop.x = data["textureLeftTop"]["x"];
-			leftTop.y = data["textureLeftTop"]["y"];
-			sprite_->SetTextureLeftTop(leftTop);
-		}
-
-		if (data.contains("anchorPoint")) {
-			Vector2 anchor;
-			anchor.x = data["anchorPoint"]["x"];
-			anchor.y = data["anchorPoint"]["y"];
-			sprite_->SetAnchorPoint(anchor);
-		}
-
-		if (data.contains("textureSize")) {
-			Vector2 size;
-			size.x = data["textureSize"]["x"];
-			size.y = data["textureSize"]["y"];
-			sprite_->SetTextureSize(size);
-		}
-	}
-
-	if (data.contains("visible")) {
-		visible_ = data["visible"];
-	}
-
-	if (data.contains("layer")) {
-		layer_ = data["layer"];
-	}
-
-	// UV SRT
-	if (data.contains("uvTranslation")) {
-		Vector2 uvTranslation;
-		uvTranslation.x = data["uvTranslation"]["x"];
-		uvTranslation.y = data["uvTranslation"]["y"];
-		SetUVTranslation(uvTranslation);
-	}
-
-	if (data.contains("uvRotation")) {
-		SetUVRotation(data["uvRotation"]);
-	}
-
-	if (data.contains("uvScale")) {
-		Vector2 uvScale;
-		uvScale.x = data["uvScale"]["x"];
-		uvScale.y = data["uvScale"]["y"];
-		SetUVScale(uvScale);
-	}
+	// メンバ → sprite_ へ反映
+	ApplyDataToSprite();
 }
