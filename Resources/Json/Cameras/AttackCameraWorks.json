@@ -1,9 +1,11 @@
 {
     "works": [
         {
+            "keepPlayerInFrame": true,
             "keyframes": [
                 {
                     "fovDelta": -0.03999999910593033,
+                    "lookAtWeight": 1.0,
                     "posOffset": [
                         0.0,
                         0.0,
@@ -20,7 +22,9 @@
                     "timeScale": 1.0
                 }
             ],
+            "lookAt": 1,
             "name": "A1",
+            "posSpace": 1,
             "resetOnFinish": true,
             "returnDuration": 0.20000000298023224,
             "startInterpolationDuration": 0.20000000298023224,
@@ -29,9 +33,11 @@
             "useStartInterpolation": true
         },
         {
+            "keepPlayerInFrame": true,
             "keyframes": [
                 {
                     "fovDelta": -0.07999999821186066,
+                    "lookAtWeight": 1.0,
                     "posOffset": [
                         0.0,
                         0.0,
@@ -48,7 +54,9 @@
                     "timeScale": 1.0
                 }
             ],
+            "lookAt": 1,
             "name": "A2",
+            "posSpace": 0,
             "resetOnFinish": true,
             "returnDuration": 0.20000000298023224,
             "startInterpolationDuration": 0.20000000298023224,
@@ -57,9 +65,11 @@
             "useStartInterpolation": true
         },
         {
+            "keepPlayerInFrame": true,
             "keyframes": [
                 {
                     "fovDelta": -0.11999999731779099,
+                    "lookAtWeight": 0.0,
                     "posOffset": [
                         0.0,
                         0.0,
@@ -77,6 +87,7 @@
                 },
                 {
                     "fovDelta": -0.11999999731779099,
+                    "lookAtWeight": 0.0,
                     "posOffset": [
                         0.0,
                         0.0,
@@ -93,7 +104,9 @@
                     "timeScale": 0.800000011920929
                 }
             ],
+            "lookAt": 0,
             "name": "A3",
+            "posSpace": 0,
             "resetOnFinish": true,
             "returnDuration": 0.20000000298023224,
             "startInterpolationDuration": 0.20000000298023224,
@@ -102,9 +115,11 @@
             "useStartInterpolation": true
         },
         {
+            "keepPlayerInFrame": true,
             "keyframes": [
                 {
                     "fovDelta": 0.0,
+                    "lookAtWeight": 0.0,
                     "posOffset": [
                         0.0,
                         0.0,
@@ -122,6 +137,7 @@
                 },
                 {
                     "fovDelta": -0.1850000023841858,
+                    "lookAtWeight": 0.0,
                     "posOffset": [
                         0.0,
                         0.0,
@@ -139,6 +155,7 @@
                 },
                 {
                     "fovDelta": -0.1850000023841858,
+                    "lookAtWeight": 0.0,
                     "posOffset": [
                         0.0,
                         0.0,
@@ -155,7 +172,9 @@
                     "timeScale": 0.699999988079071
                 }
             ],
+            "lookAt": 0,
             "name": "A4",
+            "posSpace": 0,
             "resetOnFinish": true,
             "returnDuration": 0.20000000298023224,
             "startInterpolationDuration": 0.20000000298023224,
@@ -164,9 +183,11 @@
             "useStartInterpolation": true
         },
         {
+            "keepPlayerInFrame": true,
             "keyframes": [
                 {
                     "fovDelta": 0.0,
+                    "lookAtWeight": 0.0,
                     "posOffset": [
                         0.0,
                         0.0,
@@ -183,7 +204,9 @@
                     "timeScale": 0.23999999463558197
                 }
             ],
+            "lookAt": 0,
             "name": "A5",
+            "posSpace": 0,
             "resetOnFinish": true,
             "returnDuration": 0.20000000298023224,
             "startInterpolationDuration": 0.20000000298023224,
@@ -192,9 +215,11 @@
             "useStartInterpolation": true
         },
         {
+            "keepPlayerInFrame": true,
             "keyframes": [
                 {
                     "fovDelta": 0.0,
+                    "lookAtWeight": 0.0,
                     "posOffset": [
                         0.0,
                         0.0,
@@ -211,7 +236,9 @@
                     "timeScale": 1.0
                 }
             ],
+            "lookAt": 0,
             "name": "B1",
+            "posSpace": 0,
             "resetOnFinish": true,
             "returnDuration": 0.20000000298023224,
             "startInterpolationDuration": 0.20000000298023224,
@@ -220,9 +247,11 @@
             "useStartInterpolation": true
         },
         {
+            "keepPlayerInFrame": true,
             "keyframes": [
                 {
                     "fovDelta": -0.03999999910593033,
+                    "lookAtWeight": 0.0,
                     "posOffset": [
                         0.0,
                         0.0,
@@ -239,7 +268,9 @@
                     "timeScale": 0.8999999761581421
                 }
             ],
+            "lookAt": 0,
             "name": "B2",
+            "posSpace": 0,
             "resetOnFinish": true,
             "returnDuration": 0.20000000298023224,
             "startInterpolationDuration": 0.20000000298023224,
@@ -248,9 +279,11 @@
             "useStartInterpolation": true
         },
         {
+            "keepPlayerInFrame": true,
             "keyframes": [
                 {
                     "fovDelta": -0.05999999865889549,
+                    "lookAtWeight": 0.0,
                     "posOffset": [
                         0.0,
                         0.0,
@@ -267,7 +300,9 @@
                     "timeScale": 1.0
                 }
             ],
+            "lookAt": 0,
             "name": "B3",
+            "posSpace": 0,
             "resetOnFinish": true,
             "returnDuration": 0.20000000298023224,
             "startInterpolationDuration": 0.20000000298023224,
@@ -276,9 +311,11 @@
             "useStartInterpolation": true
         },
         {
+            "keepPlayerInFrame": true,
             "keyframes": [
                 {
                     "fovDelta": -0.20000000298023224,
+                    "lookAtWeight": 0.0,
                     "posOffset": [
                         0.0,
                         0.0,
@@ -295,7 +332,9 @@
                     "timeScale": 0.3100000023841858
                 }
             ],
+            "lookAt": 0,
             "name": "B4",
+            "posSpace": 0,
             "resetOnFinish": true,
             "returnDuration": 0.20000000298023224,
             "startInterpolationDuration": 0.20000000298023224,
