@@ -14,6 +14,8 @@ public:
 
 	void Exit(BattleEnemy& enemy) override;
 
+	bool IsAttacking() const override { return true; }
+
 private:
 	// --- 補助関数 (Helper Functions) ---
 	// プレイヤーの方向を向く

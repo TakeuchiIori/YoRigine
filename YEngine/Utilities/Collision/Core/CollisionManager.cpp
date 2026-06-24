@@ -162,7 +162,8 @@ namespace YoRigine {
 		if ((b->GetLayerBits() & a->GetCollisionMask()) == 0u) return;
 
 		auto key = std::minmax(a, b);
-		bool wasColliding = collidingPairs_.contains(key);
+		auto it = collidingPairs_.find(key);
+		bool wasColliding = (it != collidingPairs_.end());
 
 		CollisionResult res;
 		bool hit = DispatchShapePair(a, b, &res);
@@ -171,16 +172,24 @@ namespace YoRigine {
 			if (!wasColliding) {
 				a->CallOnEnterCollision(b);
 				b->CallOnEnterCollision(a);
-				collidingPairs_.insert(key);
+				collidingPairs_.emplace(key, 0);
+			}
+			else {
+				it->second = 0; // 接触継続: missStreak をリセット
 			}
 			a->CallOnCollision(b);
 			b->CallOnCollision(a);
 		}
 		else {
 			if (wasColliding) {
-				a->CallOnExitCollision(b);
-				b->CallOnExitCollision(a);
-				collidingPairs_.erase(key);
+				// 押し戻し等で 1 フレームだけ離れた揺らぎでは即 Exit させない。
+				// 連続 no-hit が猶予を超えて初めて Exit を発火する。
+				if (++it->second > contactExitGraceFrames_) {
+					a->CallOnExitCollision(b);
+					b->CallOnExitCollision(a);
+					collidingPairs_.erase(it);
+				}
+				// 猶予中は接触継続扱い (Enter も Exit も発火しない)
 			}
 		}
 	}
@@ -440,12 +449,16 @@ namespace YoRigine {
 
 		// Broad Phase で消えたペアの Exit を発火する。
 		// (押し戻しなどで距離が離れてセルが分かれた、片方が無効化された、削除された等)
+		// ここでも Exit 猶予を適用し、1 フレームの揺らぎで Enter が多重発火しないようにする。
 		for (auto it = collidingPairs_.begin(); it != collidingPairs_.end(); ) {
-			if (visited.find(*it) != visited.end()) {
+			if (visited.find(it->first) != visited.end()) {
 				++it; continue;
 			}
-			BaseCollider* a = it->first;
-			BaseCollider* b = it->second;
+			if (++it->second <= contactExitGraceFrames_) {
+				++it; continue; // 猶予中は接触継続扱い
+			}
+			BaseCollider* a = it->first.first;
+			BaseCollider* b = it->first.second;
 			if (a && b) {
 				a->CallOnExitCollision(b);
 				b->CallOnExitCollision(a);
@@ -499,7 +512,7 @@ namespace YoRigine {
 		}
 		// 削除されたコライダーに関わるペアを掃除
 		for (auto it2 = collidingPairs_.begin(); it2 != collidingPairs_.end(); ) {
-			if (it2->first == collider || it2->second == collider) {
+			if (it2->first.first == collider || it2->first.second == collider) {
 				it2 = collidingPairs_.erase(it2);
 			} else {
 				++it2;
