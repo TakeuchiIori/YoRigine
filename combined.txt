@@ -247582,7 +247582,8 @@ namespace YoRigine {
 		if ((b->GetLayerBits() & a->GetCollisionMask()) == 0u) return;
 
 		auto key = std::minmax(a, b);
-		bool wasColliding = collidingPairs_.contains(key);
+		auto it = collidingPairs_.find(key);
+		bool wasColliding = (it != collidingPairs_.end());
 
 		CollisionResult res;
 		bool hit = DispatchShapePair(a, b, &res);
@@ -247591,16 +247592,24 @@ namespace YoRigine {
 			if (!wasColliding) {
 				a->CallOnEnterCollision(b);
 				b->CallOnEnterCollision(a);
-				collidingPairs_.insert(key);
+				collidingPairs_.emplace(key, 0);
+			}
+			else {
+				it->second = 0; // 接触継続: missStreak をリセット
 			}
 			a->CallOnCollision(b);
 			b->CallOnCollision(a);
 		}
 		else {
 			if (wasColliding) {
-				a->CallOnExitCollision(b);
-				b->CallOnExitCollision(a);
-				collidingPairs_.erase(key);
+				// 押し戻し等で 1 フレームだけ離れた揺らぎでは即 Exit させない。
+				// 連続 no-hit が猶予を超えて初めて Exit を発火する。
+				if (++it->second > contactExitGraceFrames_) {
+					a->CallOnExitCollision(b);
+					b->CallOnExitCollision(a);
+					collidingPairs_.erase(it);
+				}
+				// 猶予中は接触継続扱い (Enter も Exit も発火しない)
 			}
 		}
 	}
@@ -247860,12 +247869,16 @@ namespace YoRigine {
 
 		// Broad Phase で消えたペアの Exit を発火する。
 		// (押し戻しなどで距離が離れてセルが分かれた、片方が無効化された、削除された等)
+		// ここでも Exit 猶予を適用し、1 フレームの揺らぎで Enter が多重発火しないようにする。
 		for (auto it = collidingPairs_.begin(); it != collidingPairs_.end(); ) {
-			if (visited.find(*it) != visited.end()) {
+			if (visited.find(it->first) != visited.end()) {
 				++it; continue;
 			}
-			BaseCollider* a = it->first;
-			BaseCollider* b = it->second;
+			if (++it->second <= contactExitGraceFrames_) {
+				++it; continue; // 猶予中は接触継続扱い
+			}
+			BaseCollider* a = it->first.first;
+			BaseCollider* b = it->first.second;
 			if (a && b) {
 				a->CallOnExitCollision(b);
 				b->CallOnExitCollision(a);
@@ -247919,7 +247932,7 @@ namespace YoRigine {
 		}
 		// 削除されたコライダーに関わるペアを掃除
 		for (auto it2 = collidingPairs_.begin(); it2 != collidingPairs_.end(); ) {
-			if (it2->first == collider || it2->second == collider) {
+			if (it2->first.first == collider || it2->first.second == collider) {
 				it2 = collidingPairs_.erase(it2);
 			} else {
 				++it2;
@@ -248094,6 +248107,7 @@ File Path: YEngine/Utilities/Collision/Core/CollisionManager.h
 #include <vector>
 #include <memory>
 #include <unordered_set>
+#include <unordered_map>
 
 // Math
 #include "MathFunc.h"
@@ -248193,6 +248207,16 @@ namespace YoRigine {
 		int  GetResolveIterations() const { return resolveIterations_; }
 
 		// ============================================================
+		// 接触の Exit 猶予フレーム数 (スティッキー接触)
+		//   一度接触したペアは、連続でこのフレーム数を超えて離れない限り
+		//   Exit を発火しない。押し戻し(ResolveContacts)が narrow 判定を
+		//   1フレームだけ no-hit に揺らして Enter が多重発火する問題を防ぐ。
+		//   0 で従来通り (猶予なし)。既定 2。
+		// ============================================================
+		void SetContactExitGraceFrames(int n) { contactExitGraceFrames_ = (n < 0 ? 0 : n); }
+		int  GetContactExitGraceFrames() const { return contactExitGraceFrames_; }
+
+		// ============================================================
 		// 形状からワールドAABBを計算
 		// ============================================================
 		static AABB ComputeWorldAABB(BaseCollider* c);
@@ -248234,7 +248258,10 @@ namespace YoRigine {
 				return h1 ^ (h2 + 0x9e3779b9 + (h1 << 6) + (h1 >> 2));
 			}
 		};
-		std::unordered_set<std::pair<BaseCollider*, BaseCollider*>, PairHash> collidingPairs_;
+		// 接触中ペア → 連続で no-hit だったフレーム数 (missStreak)。
+		// hit のたびに 0 リセット、no-hit のたびに +1。
+		// missStreak が contactExitGraceFrames_ を超えた時点で Exit を発火し除去する。
+		std::unordered_map<std::pair<BaseCollider*, BaseCollider*>, int, PairHash> collidingPairs_;
 
 		// Broad Phase 用 Uniform Grid
 		UniformGrid grid_;
@@ -248242,6 +248269,9 @@ namespace YoRigine {
 
 		// 反復押し戻し回数 (0 で無効)
 		int resolveIterations_ = 3;
+
+		// 接触の Exit 猶予フレーム数 (スティッキー接触。0 で従来通り)
+		int contactExitGraceFrames_ = 2;
 
 		// Frustum culling
 		bool    enableFrustumCulling_ = false;
@@ -274649,9 +274679,11 @@ void BattleEnemy::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 			}
 		}
 
-		// プレイヤー本体に当たった時
+		// プレイヤー本体に当たった時。攻撃実行中のStateの時だけダメージを与える
 		if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayer)) {
-			PerformBasicAttack();
+			if (currentState_ && currentState_->IsAttacking()) {
+				PerformBasicAttack();
+			}
 		}
 	}
 }
@@ -277412,6 +277444,8 @@ public:
 
 	void Exit(BattleEnemy& enemy) override;
 
+	bool IsAttacking() const override { return true; }
+
 private:
 	Vector3 attackDir_{ 0, 0, 0 };
 	float startY_ = 0.0f;
@@ -277565,6 +277599,8 @@ public:
 
 	void Exit(BattleEnemy& enemy) override;
 
+	bool IsAttacking() const override { return true; }
+
 private:
 	// --- 補助関数 (Helper Functions) ---
 	// プレイヤーの方向を向く
@@ -277706,6 +277742,8 @@ public:
     void Enter(BattleEnemy& enemy) override;
     void Update(BattleEnemy& enemy, float dt) override;
     void Exit(BattleEnemy& enemy) override;
+
+    bool IsAttacking() const override { return true; }
 
 private:
     Vector3 attackDir_{ 0, 0, 0 };
@@ -277887,6 +277925,8 @@ public:
 
 	void Exit(BattleEnemy& enemy) override;
 
+	bool IsAttacking() const override { return true; }
+
 private:
 	Vector3 startPos_{ 0, 0, 0 };
 	Vector3 targetPos_{ 0, 0, 0 };
@@ -278003,6 +278043,8 @@ public:
 	void Enter(BattleEnemy& enemy) override;
 	void Update(BattleEnemy& enemy, float dt) override;
 	void Exit(BattleEnemy& enemy) override;
+
+	bool IsAttacking() const override { return true; }
 
 private:
 	Vector3 attackDir_{ 0,0,0 };
@@ -278131,6 +278173,8 @@ public:
 	void Update(BattleEnemy& enemy, float dt) override;
 
 	void Exit(BattleEnemy& enemy) override;
+
+	bool IsAttacking() const override { return true; }
 
 private:
 	float startRotation_ = 0.0f;
@@ -281991,6 +282035,10 @@ public:
 	virtual void Enter(T& enemy) = 0;
 	virtual void Update(T& enemy, float dt) = 0;
 	virtual void Exit(T& enemy) = 0;
+
+	// 攻撃実行中の状態か（攻撃State側で true を返す）。
+	// プレイヤー本体への接触ダメージはこのフラグでゲートする。
+	virtual bool IsAttacking() const { return false; }
 };
 
 ============================================================
