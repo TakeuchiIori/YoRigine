@@ -72,14 +72,6 @@ void BattleScene::Initialize(Camera* camera, Player* player) {
 	sprite_->Initialize("Resources/Textures/GameScene/BattleScene.png");
 	sprite_->SetTranslate({ 200.0f, 0.0f, 0.0f });
 
-
-	auto manager = AreaManager::GetInstance();
-
-	// 注意: BattleArea(境界エリア) は OnEnter で登録する。
-	// FieldScene::OnEnter が RemoveArea("BattleArea") で掃除するため、
-	// Initialize で一度だけ追加するとフィールド入場時に消えて二度と復活せず、
-	// バトル中の境界制限が効かなくなる (FieldArea と対称に入退場で再登録する)。
-
 	//------------------------------------------------------------
 	// UI初期化
 	//------------------------------------------------------------
@@ -91,6 +83,7 @@ void BattleScene::Initialize(Camera* camera, Player* player) {
 	//------------------------------------------------------------
 	// プレイヤーをエリア制限対象として登録
 	//------------------------------------------------------------
+	auto manager = AreaManager::GetInstance();
 	manager->RegisterObject(&player_->GetWT(), "Player");
 
 	// デバッグ描画を有効化
@@ -103,9 +96,6 @@ void BattleScene::Initialize(Camera* camera, Player* player) {
 	//------------------------------------------------------------
 	// オブジェクトの先行ロード
 	//------------------------------------------------------------
-	// OnEnter での初回 LoadScene("Battle") は JSON パース＋モデルロードが走り、
-	// シーン遷移時にヒッチが出る。先に Stash に積んでおくと、直後の
-	// SwitchToScene("Field") で自動 Stash → 初回バトル突入時は TryRestore で復元される。
 	YoRigine::ModelManipulator::GetInstance()->LoadScene("Battle");
 }
 
@@ -245,9 +235,6 @@ void BattleScene::DrawLine() {
 	AreaManager::GetInstance()->DrawArea("BattleArea", line_.get());
 	// AreaEditor で追加した他エリアもまとめて描画(BattleArea は重複描画を避けて除外)
 	AreaManager::GetInstance()->Draw(line_.get(), { "BattleArea" });
-
-	// LineManager にキューイングされた頂点をここで GPU 提出。
-	// これを呼ばないと AreaManager の Draw 系はバッファに溜まったまま画面に出ない。
 	line_->DrawLine();
 
 #endif

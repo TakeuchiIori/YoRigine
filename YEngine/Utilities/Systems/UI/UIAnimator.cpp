@@ -139,62 +139,137 @@ void UIAnimator::PlayAnimation(const UIAnimation& anim) {
 // クリップは start/end を持たないため、各 Play〜 が対象の現在状態を
 // 基準にアニメを組み立てる方式に乗せる。基本タイプ(位置/拡縮/回転/色/アルファ)は
 // エディタの試し再生と同じく「現在値からの相対変化」として扱う。
+// ============================================================
+// データ駆動クリップ : 再生開始
+// ============================================================
+// 同名クリップが既に再生中なら elapsed をリセットして最初からやり直す。
+// クリップのコピーを activeClips_ に積み、UpdateClips() が毎フレーム評価する。
 void UIAnimator::PlayClip(const UIAnimationClip& clip) {
-	if (!target_) return;
+	if (!target_ || clip.tracks.empty()) return;
 
-	const Easing::Function easing = clip.easing;
-	const float dur = clip.duration;
-	const bool loop = clip.loop;
-
-	switch (clip.type) {
-	case UIAnimationType::Position: {
-		Vector3 cur = target_->GetPosition();
-		PlayPositionAnimation(cur,
-			Vector3{ cur.x + clip.distance, cur.y, cur.z }, dur, easing, loop);
-		break;
-	}
-	case UIAnimationType::Scale: {
-		Vector2 cur = target_->GetScale();
-		PlayScaleAnimation(cur,
-			Vector2{ cur.x * clip.scaleAmt, cur.y * clip.scaleAmt }, dur, easing, loop);
-		break;
-	}
-	case UIAnimationType::Rotation: {
-		Vector3 cur = target_->GetRotation();
-		PlayRotationAnimation(cur,
-			Vector3{ cur.x, cur.y, cur.z + clip.angle }, dur, easing, loop);
-		break;
-	}
-	case UIAnimationType::Color:
-		PlayColorAnimation(target_->GetColor(),
-			Vector4{ 1.0f, 0.0f, 0.0f, target_->GetColor().w }, dur, easing, loop);
-		break;
-	case UIAnimationType::Alpha:
-		PlayAlphaAnimation(target_->GetAlpha(), 0.0f, dur, easing, loop);
-		break;
-
-	case UIAnimationType::FadeIn:    PlayFadeIn(dur, easing); break;
-	case UIAnimationType::FadeOut:   PlayFadeOut(dur, easing); break;
-	case UIAnimationType::SlideIn:   PlaySlideIn(clip.direction, clip.distance, dur); break;
-	case UIAnimationType::SlideOut:  PlaySlideOut(clip.direction, clip.distance, dur); break;
-	case UIAnimationType::ZoomIn:    PlayZoomIn(dur); break;
-	case UIAnimationType::ZoomOut:   PlayZoomOut(dur); break;
-	case UIAnimationType::Shake:     PlayShake(clip.intensity, dur); break;
-	case UIAnimationType::Pulse:     PlayPulse(clip.scaleAmt, dur, loop); break;
-	case UIAnimationType::Bounce:    PlayBounce(clip.height, dur); break;
-	case UIAnimationType::Swing:     PlaySwing(clip.angle, dur, loop); break;
-	case UIAnimationType::Flash:     PlayFlash(dur, clip.times); break;
-	case UIAnimationType::Blink:     PlayBlink(dur, loop); break;
-	case UIAnimationType::Wobble:    PlayWobble(clip.intensity, dur); break;
-	case UIAnimationType::Flip:      PlayFlip(true, dur); break;
-	case UIAnimationType::RotateIn:  PlayRotateIn(dur); break;
-	case UIAnimationType::RotateOut: PlayRotateOut(dur); break;
-	default: return;
+	// 同名クリップが既に再生中なら elapsed リセット
+	for (auto& ac : activeClips_) {
+		if (ac.clip.name == clip.name) {
+			ac.elapsed = 0.0f;
+			return;
+		}
 	}
 
-	// 直近に積んだアニメーションへ遅延を適用
-	if (clip.delay > 0.0f) {
-		SetDelay(clip.delay);
+	ActiveClip ac;
+	ac.clip = clip;
+	ac.elapsed = 0.0f;
+	activeClips_.push_back(std::move(ac));
+	isPaused_ = false;
+}
+
+// ============================================================
+// データ駆動クリップ : 名前で停止
+// ============================================================
+void UIAnimator::StopClip(const std::string& clipName) {
+	activeClips_.erase(
+		std::remove_if(activeClips_.begin(), activeClips_.end(),
+			[&](const ActiveClip& ac) { return ac.clip.name == clipName; }),
+		activeClips_.end()
+	);
+}
+
+// ============================================================
+// データ駆動クリップ : 再生中か確認
+// ============================================================
+bool UIAnimator::IsClipPlaying(const std::string& clipName) const {
+	for (const auto& ac : activeClips_)
+		if (ac.clip.name == clipName) return true;
+	return false;
+}
+
+// ============================================================
+// データ駆動クリップ : 毎フレーム更新
+// ============================================================
+// 各 ActiveClip の elapsed を進め、全トラックを Evaluate して target_ へ反映。
+// duration 到達後はループなら elapsed をラップ、非ループなら完了コールバック後に削除。
+void UIAnimator::UpdateClips(float deltaTime) {
+	if (!target_ || activeClips_.empty()) return;
+
+	std::vector<size_t> finished;
+
+	for (size_t i = 0; i < activeClips_.size(); ++i) {
+		ActiveClip& ac = activeClips_[i];
+		const float dur = ac.clip.duration > 0.0f ? ac.clip.duration : 1.0f;
+
+		ac.elapsed += deltaTime;
+
+		// 正規化時間 [0, 1] を計算
+		float t = ac.elapsed / dur;
+
+		if (t >= 1.0f) {
+			if (ac.clip.loop) {
+				// ループ: 端数を次サイクルへ持ち越す
+				ac.elapsed = std::fmod(ac.elapsed, dur);
+				t = ac.elapsed / dur;
+			}
+			else {
+				// 非ループ: 終端にクランプして反映後に削除リストへ
+				t = 1.0f;
+			}
+		}
+
+		// 全トラックを評価して target_ へ書き込む
+		for (const auto& track : ac.clip.tracks) {
+			float value = track.Evaluate(t);
+			ApplyTrackValue(track.type, value);
+		}
+
+		if (t >= 1.0f && !ac.clip.loop) {
+			if (ac.onComplete) ac.onComplete();
+			finished.push_back(i);
+		}
+	}
+
+	// 後ろから削除（インデックスがずれないように）
+	for (auto it = finished.rbegin(); it != finished.rend(); ++it)
+		activeClips_.erase(activeClips_.begin() + *it);
+}
+
+// ============================================================
+// トラックタイプ → target_ の Setter へ書き込む
+// ============================================================
+void UIAnimator::ApplyTrackValue(UIAnimTrackType type, float value) {
+	switch (type) {
+	case UIAnimTrackType::Alpha:
+		target_->SetAlpha(value);
+		break;
+	case UIAnimTrackType::PosX: {
+		auto p = target_->GetPosition(); p.x = value; target_->SetPosition(p);
+		break;
+	}
+	case UIAnimTrackType::PosY: {
+		auto p = target_->GetPosition(); p.y = value; target_->SetPosition(p);
+		break;
+	}
+	case UIAnimTrackType::ScaleX: {
+		auto s = target_->GetScale(); s.x = value; target_->SetScale(s);
+		break;
+	}
+	case UIAnimTrackType::ScaleY: {
+		auto s = target_->GetScale(); s.y = value; target_->SetScale(s);
+		break;
+	}
+	case UIAnimTrackType::RotationZ: {
+		auto r = target_->GetRotation(); r.z = value; target_->SetRotation(r);
+		break;
+	}
+	case UIAnimTrackType::R: {
+		auto c = target_->GetColor(); c.x = value; target_->SetColor(c);
+		break;
+	}
+	case UIAnimTrackType::G: {
+		auto c = target_->GetColor(); c.y = value; target_->SetColor(c);
+		break;
+	}
+	case UIAnimTrackType::B: {
+		auto c = target_->GetColor(); c.z = value; target_->SetColor(c);
+		break;
+	}
 	}
 }
 
@@ -396,7 +471,8 @@ void UIAnimator::StopAnimation(UIAnimationType type) {
 	if (type == UIAnimationType::None) {
 		// すべてのアニメーションを停止
 		animations_.clear();
-	} else {
+	}
+	else {
 		// 指定されたタイプのアニメーションのみ停止
 		animations_.erase(
 			std::remove_if(animations_.begin(), animations_.end(),
@@ -412,6 +488,7 @@ void UIAnimator::StopAnimation(UIAnimationType type) {
 // ============================================================
 void UIAnimator::StopAllAnimations() {
 	animations_.clear();
+	activeClips_.clear();
 	isPaused_ = false;
 }
 
@@ -451,7 +528,12 @@ void UIAnimator::SetDelay(float delay) {
 // 更新（全アニメーションの進行）
 // ============================================================
 void UIAnimator::Update(float deltaTime) {
-	if (!target_ || animations_.empty() || isPaused_) return;
+	if (!target_ || isPaused_) return;
+
+	// データ駆動クリップ（新方式）を先に更新
+	UpdateClips(deltaTime);
+
+	if (animations_.empty()) return;
 
 	// 完了したアニメーションを追跡するためのリスト
 	std::vector<size_t> completedIndices;
@@ -545,14 +627,16 @@ void UIAnimator::Update(float deltaTime) {
 				anim.isReversing = true;
 				anim.elapsed = 0.0f;
 				t = 0.0f;
-			} else if (anim.loop) {
+			}
+			else if (anim.loop) {
 				// ループ
 				anim.elapsed = 0.0f;
 				if (anim.pingpong) {
 					anim.isReversing = !anim.isReversing;
 				}
 				t = 0.0f;
-			} else {
+			}
+			else {
 				// アニメーション終了
 				t = 1.0f;
 				isComplete = true;
@@ -735,7 +819,8 @@ void UIAnimator::UpdateSlideAnimation(UIAnimation& anim, float t) {
 	if (anim.type == UIAnimationType::SlideIn) {
 		offset.x = anim.startPos.x * (1.0f - easedT);
 		offset.y = anim.startPos.y * (1.0f - easedT);
-	} else {
+	}
+	else {
 		offset.x = anim.endPos.x * easedT;
 		offset.y = anim.endPos.y * easedT;
 	}

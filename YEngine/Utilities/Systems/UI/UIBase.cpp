@@ -35,7 +35,8 @@ void UIBase::Initialize(const std::string& jsonConfigPath) {
 
 	if (jsonExists) {
 		LoadFromJSON(jsonConfigPath);
-	} else {
+	}
+	else {
 		sprite_->Initialize("./Resources/images/white.png");
 		texturePath_ = "./Resources/images/white.png";
 		SaveToJSON();
@@ -206,6 +207,25 @@ void UIBase::SetAnimationUpdateCallback(std::function<void()> callback) {
 // データ駆動クリップの再生（実処理は UIAnimator に委譲）
 void UIBase::PlayClip(const UIAnimationClip& clip) {
 	animator_.PlayClip(clip);
+}
+
+// 名前でクリップを検索して再生する
+bool UIBase::PlayAnimation(const std::string& clipName) {
+	for (const auto& clip : clips_) {
+		if (clip.name == clipName) {
+			animator_.PlayClip(clip);
+			return true;
+		}
+	}
+	return false;  // クリップが見つからなかった
+}
+
+void UIBase::StopClip(const std::string& clipName) {
+	animator_.StopClip(clipName);
+}
+
+bool UIBase::IsClipPlaying(const std::string& clipName) const {
+	return animator_.IsClipPlaying(clipName);
 }
 
 void UIBase::PlayClipsByTrigger(UIAnimTrigger trigger) {

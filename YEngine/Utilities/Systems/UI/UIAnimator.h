@@ -46,8 +46,16 @@ public:
 	// プリセットアニメーション
 	// ============================================================
 	void PlayAnimation(const UIAnimation& anim);
-	// データ駆動クリップを現在状態を基準に再生（type → 既存 Play〜 へディスパッチ）
+
+	// ============================================================
+	// データ駆動クリップ再生（新キーフレーム方式）
+	// ============================================================
+	// クリップを再生開始する。同名クリップが再生中なら最初からやり直す。
 	void PlayClip(const UIAnimationClip& clip);
+	// 名前でクリップを停止する
+	void StopClip(const std::string& clipName);
+	// 指定名のクリップが再生中か
+	bool IsClipPlaying(const std::string& clipName) const;
 	void PlayFadeIn(float duration, Easing::Function easing);
 	void PlayFadeOut(float duration, Easing::Function easing);
 	void PlaySlideIn(SlideDirection dir, float distance, float duration);
@@ -78,7 +86,7 @@ public:
 	void SetUpdateCallback(std::function<void()> callback);
 	void SetDelay(float delay);
 
-	bool IsAnimating() const { return !animations_.empty(); }
+	bool IsAnimating() const { return !animations_.empty() || !activeClips_.empty(); }
 	bool IsPaused() const { return isPaused_; }
 
 	// ============================================================
@@ -91,6 +99,14 @@ public:
 	const std::vector<UIAnimation>& GetAnimations() const { return animations_; }
 
 private:
+	// ============================================================
+	// 再生中クリップの状態
+	// ============================================================
+	struct ActiveClip {
+		UIAnimationClip clip;      // クリップのコピー（再生中に参照）
+		float elapsed = 0.0f;      // 経過秒数
+		std::function<void()> onComplete;
+	};
 	// ============================================================
 	// タイプ別更新処理
 	// ============================================================
@@ -106,10 +122,16 @@ private:
 	void UpdateZoomAnimation(UIAnimation& anim, float t);
 	void UpdateRotateInOutAnimation(UIAnimation& anim, float t);
 
+	// クリップ更新（毎フレーム全トラックを Evaluate して target_ に書き込む）
+	void UpdateClips(float deltaTime);
+	// トラック値を target_ の対応 Setter に書き込む
+	void ApplyTrackValue(UIAnimTrackType type, float value);
+
 	// ============================================================
 	// メンバ変数
 	// ============================================================
-	UIBase* target_ = nullptr;                 // 駆動対象（非所有）
-	std::vector<UIAnimation> animations_;       // 再生中のアニメーション群
-	bool isPaused_ = false;                     // 一時停止中か
+	UIBase* target_ = nullptr;
+	std::vector<UIAnimation> animations_;       // プリセット系（旧方式）
+	std::vector<ActiveClip>  activeClips_;      // データ駆動クリップ（新方式）
+	bool isPaused_ = false;
 };

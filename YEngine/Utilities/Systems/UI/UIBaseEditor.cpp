@@ -3,6 +3,7 @@
 // Engine
 #ifdef USE_IMGUI
 #include <imgui.h>
+#include "Debugger/DopeSheet/DopeSheetEditor.h"
 #endif
 
 // C++
@@ -45,443 +46,283 @@ void UIBase::ImGuiGridSettings() {
 
 void UIBase::ImGuiAnimationSettings() {
 #ifdef USE_IMGUI
-	if (ImGui::CollapsingHeader("アニメーション", ImGuiTreeNodeFlags_DefaultOpen)) {
+	if (!ImGui::CollapsingHeader("アニメーション", ImGuiTreeNodeFlags_DefaultOpen)) return;
 
-		if (IsAnimating()) {
-			ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.2f, 1.0f), "▶ アニメーション再生中...");
-			ImGui::Text("アクティブなアニメーション数: %zu", animator_.GetAnimations().size());
-
-			ImGui::Spacing();
-
-			// 各アニメーションの進捗を表示
-			const auto& anims = animator_.GetAnimations();
-			for (size_t i = 0; i < anims.size(); ++i) {
-				const UIAnimation& anim = anims[i];
-
-				ImGui::PushID(static_cast<int>(i));
-
-				// アニメーションタイプを表示
-				const char* typeName = "Unknown";
-				switch (anim.type) {
-				case UIAnimationType::Position: typeName = "位置"; break;
-				case UIAnimationType::Scale: typeName = "スケール"; break;
-				case UIAnimationType::Rotation: typeName = "回転"; break;
-				case UIAnimationType::Alpha: typeName = "アルファ"; break;
-				case UIAnimationType::Color: typeName = "色"; break;
-				case UIAnimationType::FadeIn: typeName = "フェードイン"; break;
-				case UIAnimationType::FadeOut: typeName = "フェードアウト"; break;
-				case UIAnimationType::SlideIn: typeName = "スライドイン"; break;
-				case UIAnimationType::SlideOut: typeName = "スライドアウト"; break;
-				case UIAnimationType::ZoomIn: typeName = "ズームイン"; break;
-				case UIAnimationType::ZoomOut: typeName = "ズームアウト"; break;
-				case UIAnimationType::Shake: typeName = "シェイク"; break;
-				case UIAnimationType::Pulse: typeName = "パルス"; break;
-				case UIAnimationType::Bounce: typeName = "バウンス"; break;
-				case UIAnimationType::Swing: typeName = "スイング"; break;
-				case UIAnimationType::Flash: typeName = "フラッシュ"; break;
-				case UIAnimationType::Blink: typeName = "ブリンク"; break;
-				case UIAnimationType::Wobble: typeName = "ウォブル"; break;
-				case UIAnimationType::Flip: typeName = "フリップ"; break;
-				case UIAnimationType::RotateIn: typeName = "回転イン"; break;
-				case UIAnimationType::RotateOut: typeName = "回転アウト"; break;
-				}
-
-				ImGui::Text("%zu: %s", i + 1, typeName);
-
-				float progress = anim.elapsed / anim.duration;
-				ImGui::ProgressBar(progress, ImVec2(-1, 0));
-				ImGui::Text("%.2f / %.2f秒", anim.elapsed, anim.duration);
-
-				ImGui::PopID();
-				ImGui::Spacing();
-			}
-
-			// 制御ボタン
-			if (IsPaused()) {
-				if (ImGui::Button("▶ 再開", ImVec2(100, 0))) {
-					ResumeAnimation();
-				}
-			} else {
-				if (ImGui::Button("⏸ 一時停止", ImVec2(100, 0))) {
-					PauseAnimation();
-				}
-			}
-
-			ImGui::SameLine();
-
-			if (ImGui::Button("■ 全停止", ImVec2(100, 0))) {
-				StopAllAnimations();
-			}
-
-			ImGui::Separator();
-		} else {
-			ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "アニメーション停止中");
-			ImGui::Separator();
+	// ============================================================
+	// 再生状態ヘッダ
+	// ============================================================
+	if (IsAnimating()) {
+		ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.2f, 1.0f), "▶ 再生中");
+		ImGui::SameLine();
+		if (IsPaused()) {
+			if (ImGui::SmallButton("再開")) ResumeAnimation();
 		}
-
-		ImGui::Spacing();
-
-		// アニメーション設定
-		static int selectedAnimType = 0;
-		static int selectedEasing = 0;
-		static float duration = 1.0f;
-		static bool loop = false;
-		static float intensity = 1.0f;
-
-		ImGui::Text("📝 アニメーション設定");
-
-		// アニメーションタイプ選択
-		const char* animTypes[] = {
-			"位置", "スケール", "回転", "アルファ", "色",
-			"フェードイン", "フェードアウト",
-			"スライドイン", "スライドアウト",
-			"ズームイン", "ズームアウト",
-			"シェイク", "パルス", "バウンス", "スイング",
-			"フラッシュ", "ブリンク", "ウォブル", "フリップ",
-			"回転イン", "回転アウト"
-		};
-		ImGui::Combo("タイプ", &selectedAnimType, animTypes, IM_ARRAYSIZE(animTypes));
-
-		// イージング選択
-		const char* easingTypes[] = {
-			"Linear",
-			"EaseInSine", "EaseOutSine", "EaseInOutSine",
-			"EaseInQuad", "EaseOutQuad", "EaseInOutQuad",
-			"EaseInCubic", "EaseOutCubic", "EaseInOutCubic",
-			"EaseInQuart", "EaseOutQuart", "EaseInOutQuart",
-			"EaseInQuint", "EaseOutQuint", "EaseInOutQuint",
-			"EaseInExpo", "EaseOutExpo", "EaseInOutExpo",
-			"EaseInCirc", "EaseOutCirc", "EaseInOutCirc",
-			"EaseInBack", "EaseOutBack", "EaseInOutBack",
-			"EaseInElastic", "EaseOutElastic", "EaseInOutElastic",
-			"EaseInBounce", "EaseOutBounce", "EaseInOutBounce"
-		};
-		ImGui::Combo("イージング", &selectedEasing, easingTypes, IM_ARRAYSIZE(easingTypes));
-
-		ImGui::DragFloat("時間(秒)", &duration, 0.1f, 0.1f, 10.0f);
-		ImGui::Checkbox("ループ", &loop);
-
-		// タイプ別のパラメータ
-		if (selectedAnimType >= 11) { // エフェクト系
-			ImGui::DragFloat("強度", &intensity, 0.1f, 0.1f, 100.0f);
+		else {
+			if (ImGui::SmallButton("一時停止")) PauseAnimation();
 		}
+		ImGui::SameLine();
+		if (ImGui::SmallButton("全停止")) StopAllAnimations();
+	}
+	else {
+		ImGui::TextDisabled("停止中");
+	}
 
-		ImGui::Spacing();
+	ImGui::Separator();
+	ImGui::Spacing();
 
-		// 再生ボタン
-		if (ImGui::Button("▶ アニメーション再生", ImVec2(-1, 30))) {
-			Easing::Function easing = static_cast<Easing::Function>(selectedEasing);
+	// ============================================================
+	// イージング名テーブル（クリップ編集・キーフレーム編集で共用）
+	// ============================================================
+	static const char* kEasingNames[] = {
+		"Linear",
+		"EaseInSine",    "EaseOutSine",    "EaseInOutSine",
+		"EaseInQuad",    "EaseOutQuad",    "EaseInOutQuad",
+		"EaseInCubic",   "EaseOutCubic",   "EaseInOutCubic",
+		"EaseInQuart",   "EaseOutQuart",   "EaseInOutQuart",
+		"EaseInQuint",   "EaseOutQuint",   "EaseInOutQuint",
+		"EaseInExpo",    "EaseOutExpo",    "EaseInOutExpo",
+		"EaseInCirc",    "EaseOutCirc",    "EaseInOutCirc",
+		"EaseInBack",    "EaseOutBack",    "EaseInOutBack",
+		"EaseInElastic", "EaseOutElastic", "EaseInOutElastic",
+		"EaseInBounce",  "EaseOutBounce",  "EaseInOutBounce",
+	};
+	static const int kEasingCount = IM_ARRAYSIZE(kEasingNames);
 
-			Vector3 currentPos = GetPosition();
-			Vector2 currentScale = GetScale();
-			Vector3 currentRot = GetRotation();
-			Vector4 currentColor = GetColor();
-			float currentAlpha = GetAlpha();
+	static const char* kTriggerNames[] = { "手動", "OnInit（初期化時）", "OnShow（表示時）" };
 
-			switch (selectedAnimType) {
-			case 0: // 位置
-				PlayPositionAnimation(currentPos,
-					Vector3{ currentPos.x + 100.0f, currentPos.y + 50.0f, currentPos.z },
-					duration, easing, loop);
-				break;
+	// トラックタイプ名テーブル
+	static const char* kTrackTypeNames[] = {
+		"Alpha", "Position X", "Position Y", "Scale X", "Scale Y", "Rotation Z",
+		"Color R", "Color G", "Color B"
+	};
+	static const int kTrackTypeCount = IM_ARRAYSIZE(kTrackTypeNames);
 
-			case 1: // スケール
-				PlayScaleAnimation(currentScale,
-					Vector2{ currentScale.x * 1.5f, currentScale.y * 1.5f },
-					duration, easing, loop);
-				break;
+	// ============================================================
+	// クリップ一覧 + 選択
+	// ============================================================
+	// 選択中クリップインデックス（static で画面をまたいで保持）
+	static int selectedClipIdx = -1;
+	if (selectedClipIdx >= static_cast<int>(clips_.size())) selectedClipIdx = -1;
 
-			case 2: // 回転
-				PlayRotationAnimation(currentRot,
-					Vector3{ 0, 0, currentRot.z + 360.0f },
-					duration, easing, loop);
-				break;
+	ImGui::Text("💾 クリップ一覧");
 
-			case 3: // アルファ
-				PlayAlphaAnimation(currentAlpha, 0.0f, duration, easing, loop);
-				break;
-
-			case 4: // 色
-				PlayColorAnimation(currentColor,
-					Vector4{ 1.0f, 0.0f, 0.0f, 1.0f }, duration, easing, loop);
-				break;
-
-			case 5: // フェードイン
-				PlayFadeIn(duration, easing);
-				break;
-
-			case 6: // フェードアウト
-				PlayFadeOut(duration, easing);
-				break;
-
-			case 7: // スライドイン
-				PlaySlideIn(SlideDirection::Right, 200.0f, duration);
-				break;
-
-			case 8: // スライドアウト
-				PlaySlideOut(SlideDirection::Left, 200.0f, duration);
-				break;
-
-			case 9: // ズームイン
-				PlayZoomIn(duration);
-				break;
-
-			case 10: // ズームアウト
-				PlayZoomOut(duration);
-				break;
-
-			case 11: // シェイク
-				PlayShake(intensity * 10.0f, duration);
-				break;
-
-			case 12: // パルス
-				PlayPulse(1.0f + intensity * 0.2f, duration, loop);
-				break;
-
-			case 13: // バウンス
-				PlayBounce(intensity * 50.0f, duration);
-				break;
-
-			case 14: // スイング
-				PlaySwing(intensity * 15.0f, duration, loop);
-				break;
-
-			case 15: // フラッシュ
-				PlayFlash(duration, static_cast<int>(intensity * 3));
-				break;
-
-			case 16: // ブリンク
-				PlayBlink(duration, loop);
-				break;
-
-			case 17: // ウォブル
-				PlayWobble(intensity * 20.0f, duration);
-				break;
-
-			case 18: // フリップ
-				PlayFlip(true, duration);
-				break;
-
-			case 19: // 回転イン
-				PlayRotateIn(duration);
-				break;
-
-			case 20: // 回転アウト
-				PlayRotateOut(duration);
-				break;
-			}
+	// クリップリスト
+	{
+		float listH = std::min(static_cast<float>(clips_.size()) * 22.0f + 10.0f, 120.0f);
+		ImGui::BeginChild("##ClipList", ImVec2(-1, listH), true);
+		for (int i = 0; i < static_cast<int>(clips_.size()); ++i) {
+			const auto& c = clips_[i];
+			bool selected = (i == selectedClipIdx);
+			std::string label = c.name + "  [" + kTriggerNames[static_cast<int>(c.trigger)] + "]";
+			if (ImGui::Selectable(label.c_str(), selected))
+				selectedClipIdx = i;
 		}
+		ImGui::EndChild();
+	}
 
-		ImGui::Spacing();
-		ImGui::Separator();
-		ImGui::Spacing();
-
-		// プリセットボタン
-		if (ImGui::TreeNode("🎬 プリセット")) {
-			ImGui::Text("登場アニメーション:");
-
-			if (ImGui::Button("フェードイン", ImVec2(120, 0))) {
-				PlayFadeIn(0.8f, Easing::Function::EaseOutQuad);
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("ズームイン", ImVec2(120, 0))) {
-				PlayZoomIn(0.6f);
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("回転イン", ImVec2(120, 0))) {
-				PlayRotateIn(0.8f);
-			}
-
-			if (ImGui::Button("スライド←", ImVec2(120, 0))) {
-				PlaySlideIn(SlideDirection::Right, 300.0f);
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("スライド→", ImVec2(120, 0))) {
-				PlaySlideIn(SlideDirection::Left, 300.0f);
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("スライド↑", ImVec2(120, 0))) {
-				PlaySlideIn(SlideDirection::Down, 300.0f);
-			}
-
-			ImGui::Spacing();
-			ImGui::Text("退場アニメーション:");
-
-			if (ImGui::Button("フェードアウト", ImVec2(120, 0))) {
-				PlayFadeOut(0.8f, Easing::Function::EaseInQuad);
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("ズームアウト", ImVec2(120, 0))) {
-				PlayZoomOut(0.6f);
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("回転アウト", ImVec2(120, 0))) {
-				PlayRotateOut(0.8f);
-			}
-
-			ImGui::Spacing();
-			ImGui::Text("エフェクト:");
-
-			if (ImGui::Button("シェイク", ImVec2(120, 0))) {
-				PlayShake(15.0f, 0.5f);
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("バウンス", ImVec2(120, 0))) {
-				PlayBounce(80.0f, 1.2f);
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("フラッシュ", ImVec2(120, 0))) {
-				PlayFlash(0.6f, 4);
-			}
-
-			if (ImGui::Button("パルス", ImVec2(120, 0))) {
-				PlayPulse(1.3f, 0.6f, true);
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("スイング", ImVec2(120, 0))) {
-				PlaySwing(20.0f, 0.8f, true);
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("ウォブル", ImVec2(120, 0))) {
-				PlayWobble(25.0f, 1.0f);
-			}
-
-			ImGui::TreePop();
+	// 新規クリップ追加
+	{
+		static char newClipName[128] = "NewClip";
+		ImGui::SetNextItemWidth(180);
+		ImGui::InputText("##NewClipName", newClipName, sizeof(newClipName));
+		ImGui::SameLine();
+		if (ImGui::Button("＋ クリップ追加")) {
+			UIAnimationClip clip;
+			clip.name = (strlen(newClipName) > 0) ? newClipName : "Clip";
+			clips_.push_back(clip);
+			selectedClipIdx = static_cast<int>(clips_.size()) - 1;
 		}
-
-		ImGui::Spacing();
-		ImGui::Separator();
-		ImGui::Spacing();
-
-		// ============================================================
-		// アニメクリップ（JSON に保存され、トリガで自動再生される）
-		// ============================================================
-
-		// combo の並び（animTypes）→ UIAnimationType の対応表
-		static const UIAnimationType kAnimTypeByIndex[] = {
-			UIAnimationType::Position, UIAnimationType::Scale, UIAnimationType::Rotation,
-			UIAnimationType::Alpha, UIAnimationType::Color,
-			UIAnimationType::FadeIn, UIAnimationType::FadeOut,
-			UIAnimationType::SlideIn, UIAnimationType::SlideOut,
-			UIAnimationType::ZoomIn, UIAnimationType::ZoomOut,
-			UIAnimationType::Shake, UIAnimationType::Pulse, UIAnimationType::Bounce,
-			UIAnimationType::Swing, UIAnimationType::Flash, UIAnimationType::Blink,
-			UIAnimationType::Wobble, UIAnimationType::Flip,
-			UIAnimationType::RotateIn, UIAnimationType::RotateOut
-		};
-
-		auto AnimTypeName = [](UIAnimationType t) -> const char* {
-			switch (t) {
-			case UIAnimationType::Position: return "位置";
-			case UIAnimationType::Scale: return "スケール";
-			case UIAnimationType::Rotation: return "回転";
-			case UIAnimationType::Alpha: return "アルファ";
-			case UIAnimationType::Color: return "色";
-			case UIAnimationType::FadeIn: return "フェードイン";
-			case UIAnimationType::FadeOut: return "フェードアウト";
-			case UIAnimationType::SlideIn: return "スライドイン";
-			case UIAnimationType::SlideOut: return "スライドアウト";
-			case UIAnimationType::ZoomIn: return "ズームイン";
-			case UIAnimationType::ZoomOut: return "ズームアウト";
-			case UIAnimationType::Shake: return "シェイク";
-			case UIAnimationType::Pulse: return "パルス";
-			case UIAnimationType::Bounce: return "バウンス";
-			case UIAnimationType::Swing: return "スイング";
-			case UIAnimationType::Flash: return "フラッシュ";
-			case UIAnimationType::Blink: return "ブリンク";
-			case UIAnimationType::Wobble: return "ウォブル";
-			case UIAnimationType::Flip: return "フリップ";
-			case UIAnimationType::RotateIn: return "回転イン";
-			case UIAnimationType::RotateOut: return "回転アウト";
-			default: return "不明";
+		if (selectedClipIdx >= 0) {
+			ImGui::SameLine();
+			if (ImGui::Button("削除")) {
+				clips_.erase(clips_.begin() + selectedClipIdx);
+				selectedClipIdx = -1;
 			}
-		};
-
-		const char* triggerNames[] = { "手動", "表示開始時(OnInit)", "表示切替時(OnShow)" };
-
-		if (ImGui::TreeNodeEx("💾 アニメクリップ（保存対象）", ImGuiTreeNodeFlags_DefaultOpen)) {
-
-			// --- 既存クリップの一覧 ---
-			if (clips_.empty()) {
-				ImGui::TextDisabled("クリップがありません。下で追加してください。");
-			}
-
-			int removeIndex = -1;
-			for (size_t i = 0; i < clips_.size(); ++i) {
-				UIAnimationClip& clip = clips_[i];
-				ImGui::PushID(static_cast<int>(i));
-
-				ImGui::Text("%zu: %s [%s]", i + 1, AnimTypeName(clip.type),
-					triggerNames[static_cast<int>(clip.trigger)]);
-
-				// 名前
-				char nameBuf[128];
-				strncpy_s(nameBuf, clip.name.c_str(), sizeof(nameBuf) - 1);
-				nameBuf[sizeof(nameBuf) - 1] = '\0';
-				if (ImGui::InputText("名前", nameBuf, sizeof(nameBuf))) {
-					clip.name = nameBuf;
-				}
-
-				// トリガ
-				int trig = static_cast<int>(clip.trigger);
-				if (ImGui::Combo("トリガ", &trig, triggerNames, IM_ARRAYSIZE(triggerNames))) {
-					clip.trigger = static_cast<UIAnimTrigger>(trig);
-				}
-
-				ImGui::DragFloat("時間(秒)", &clip.duration, 0.05f, 0.05f, 10.0f);
-				ImGui::DragFloat("遅延(秒)", &clip.delay, 0.05f, 0.0f, 10.0f);
-				ImGui::Checkbox("ループ", &clip.loop);
-
-				if (ImGui::Button("▶ 再生")) {
-					PlayClip(clip);
-				}
-				ImGui::SameLine();
-				if (ImGui::Button("削除")) {
-					removeIndex = static_cast<int>(i);
-				}
-
-				ImGui::Separator();
-				ImGui::PopID();
-			}
-
-			if (removeIndex >= 0) {
-				clips_.erase(clips_.begin() + removeIndex);
-			}
-
-			// --- 現在の設定をクリップとして追加 ---
-			ImGui::Spacing();
-			ImGui::Text("➕ 現在の設定をクリップとして追加");
-
-			static int newClipTrigger = 0;
-			static char newClipName[128] = "NewClip";
-			ImGui::Combo("追加時トリガ", &newClipTrigger, triggerNames, IM_ARRAYSIZE(triggerNames));
-			ImGui::InputText("クリップ名", newClipName, sizeof(newClipName));
-
-			if (ImGui::Button("クリップを追加", ImVec2(-1, 0))) {
-				UIAnimationClip clip;
-				clip.name = (strlen(newClipName) > 0) ? newClipName : "Clip";
-				clip.type = kAnimTypeByIndex[selectedAnimType];
-				clip.trigger = static_cast<UIAnimTrigger>(newClipTrigger);
-				clip.easing = static_cast<Easing::Function>(selectedEasing);
-				clip.duration = duration;
-				clip.loop = loop;
-				// 上の試し再生と同じ係数でパラメータを埋める
-				clip.intensity = intensity * 10.0f;
-				clip.scaleAmt = 1.0f + intensity * 0.2f;
-				clip.height = intensity * 50.0f;
-				clip.angle = intensity * 15.0f;
-				clip.times = static_cast<int>(intensity * 3.0f);
-				clip.distance = 200.0f;
-				clip.direction = SlideDirection::Right;
-				clips_.push_back(clip);
-			}
-
-			ImGui::TextDisabled("※「アニメーション設定」のタイプ/イージング/時間/強度を使います");
-			ImGui::TextDisabled("※ 追加後は「変更を保存」で JSON に永続化されます");
-
-			ImGui::TreePop();
 		}
 	}
+
+	if (selectedClipIdx < 0 || selectedClipIdx >= static_cast<int>(clips_.size())) {
+		ImGui::TextDisabled("クリップを選択または追加してください");
+		return;
+	}
+
+	ImGui::Separator();
+	ImGui::Spacing();
+
+	// ============================================================
+	// 選択中クリップの編集
+	// ============================================================
+	UIAnimationClip& clip = clips_[selectedClipIdx];
+
+	ImGui::PushID(selectedClipIdx);
+
+	// --- 基本プロパティ ---
+	{
+		char nameBuf[128];
+		strncpy_s(nameBuf, clip.name.c_str(), sizeof(nameBuf) - 1);
+		nameBuf[sizeof(nameBuf) - 1] = '\0';
+		if (ImGui::InputText("名前", nameBuf, sizeof(nameBuf)))
+			clip.name = nameBuf;
+	}
+	ImGui::DragFloat("長さ(秒)", &clip.duration, 0.05f, 0.05f, 60.0f);
+	{
+		int trig = static_cast<int>(clip.trigger);
+		if (ImGui::Combo("トリガ", &trig, kTriggerNames, IM_ARRAYSIZE(kTriggerNames)))
+			clip.trigger = static_cast<UIAnimTrigger>(trig);
+	}
+	ImGui::Checkbox("ループ", &clip.loop);
+
+	// 再生ボタン
+	ImGui::SameLine();
+	if (ImGui::Button("▶ 再生")) PlayClip(clip);
+	ImGui::SameLine();
+	if (ImGui::Button("■ 停止")) StopClip(clip.name);
+
+	ImGui::Spacing();
+	ImGui::Separator();
+
+	// ============================================================
+	// トラック管理
+	// ============================================================
+	ImGui::Text("📊 トラック");
+
+	// トラック追加
+	{
+		static int newTrackType = 0;
+		ImGui::SetNextItemWidth(140);
+		ImGui::Combo("##NewTrackType", &newTrackType, kTrackTypeNames, kTrackTypeCount);
+		ImGui::SameLine();
+		if (ImGui::Button("＋ トラック追加")) {
+			auto type = static_cast<UIAnimTrackType>(newTrackType);
+			// 同タイプが既になければ追加
+			clip.AddTrack(type);
+		}
+	}
+
+	// トラック一覧
+	int removeTrackIdx = -1;
+	for (int ti = 0; ti < static_cast<int>(clip.tracks.size()); ++ti) {
+		UIAnimTrack& track = clip.tracks[ti];
+		ImGui::PushID(ti);
+
+		bool open = ImGui::TreeNodeEx(
+			UIAnimTrackTypeLabel(track.type),
+			ImGuiTreeNodeFlags_DefaultOpen
+		);
+
+		// トラック削除ボタン（同じ行右側）
+		ImGui::SameLine(ImGui::GetContentRegionAvail().x - 40);
+		if (ImGui::SmallButton("削除")) removeTrackIdx = ti;
+
+		if (open) {
+			// キーフレーム追加
+			{
+				static float newKeyTime = 0.0f;
+				static float newKeyval = 0.0f;
+				static int   newKeyEasing = 0;
+				ImGui::SetNextItemWidth(70); ImGui::DragFloat("t##nkt", &newKeyTime, 0.01f, 0.0f, 1.0f);
+				ImGui::SameLine();
+				ImGui::SetNextItemWidth(70); ImGui::DragFloat("v##nkv", &newKeyval, 0.01f);
+				ImGui::SameLine();
+				ImGui::SetNextItemWidth(110);
+				ImGui::Combo("##nke", &newKeyEasing, kEasingNames, kEasingCount);
+				ImGui::SameLine();
+				if (ImGui::SmallButton("＋キー追加")) {
+					track.AddKey(newKeyTime, newKeyval,
+						static_cast<Easing::Function>(newKeyEasing));
+				}
+			}
+
+			// キーフレームテーブル
+			if (!track.keyframes.empty()) {
+				ImGui::BeginChild(
+					ImGui::GetID("##keyframes"),
+					ImVec2(-1, std::min(static_cast<float>(track.keyframes.size()) * 22.0f + 8.0f, 110.0f)),
+					true
+				);
+
+				int removeKeyIdx = -1;
+				for (int ki = 0; ki < static_cast<int>(track.keyframes.size()); ++ki) {
+					UIAnimKeyframe& key = track.keyframes[ki];
+					ImGui::PushID(ki);
+
+					ImGui::SetNextItemWidth(70);
+					if (ImGui::DragFloat("##t", &key.time, 0.005f, 0.0f, 1.0f))
+						track.Sortkeyframes();  // 時間変更後ソート
+					ImGui::SameLine();
+					ImGui::SetNextItemWidth(70);
+					ImGui::DragFloat("##v", &key.val, 0.01f);
+					ImGui::SameLine();
+					ImGui::SetNextItemWidth(110);
+					int e = static_cast<int>(key.easing);
+					if (ImGui::Combo("##e", &e, kEasingNames, kEasingCount))
+						key.easing = static_cast<Easing::Function>(e);
+					ImGui::SameLine();
+					if (ImGui::SmallButton("✕")) removeKeyIdx = ki;
+
+					ImGui::PopID();
+				}
+				if (removeKeyIdx >= 0) track.RemoveKey(removeKeyIdx);
+
+				ImGui::EndChild();
+			}
+			else {
+				ImGui::TextDisabled("  キーフレームがありません");
+			}
+
+			// DopeSheetEditor でキーを視覚的に確認・移動
+			{
+				// UIAnimTrack → DopeTrack に変換して描画
+				static DopeSheet::DopeSheetEditor dopeEditor;
+				std::vector<DopeSheet::DopeTrack> dopeTracks(1);
+				dopeTracks[0].label = UIAnimTrackTypeLabel(track.type);
+				dopeTracks[0].color = DopeSheet::Color::Cyan();
+				// 正規化時間 [0,1] → フレーム換算（60fps想定）
+				const int kFps = 60;
+				const int totalFrames = static_cast<int>(clip.duration * kFps);
+				for (const auto& k : track.keyframes) {
+					int frame = static_cast<int>(k.time * totalFrames);
+					dopeTracks[0].AddKey(frame, k.val);
+				}
+
+				// DopeSheet の変更コールバックを設定して描画
+				bool moved = false;
+				dopeEditor.SetMoveKeyCallback([&](int /*trackIdx*/, int keyIdx, int newFrame) {
+					if (keyIdx >= 0 && keyIdx < static_cast<int>(track.keyframes.size())) {
+						track.keyframes[keyIdx].time = static_cast<float>(newFrame) / totalFrames;
+						track.Sortkeyframes();
+						moved = true;
+					}
+					});
+				dopeEditor.SetAddKeyCallback([&](int /*trackIdx*/, int frame, float val) {
+					float t = static_cast<float>(frame) / totalFrames;
+					track.AddKey(t, val);
+					});
+				dopeEditor.SetDeleteKeyCallback([&](int /*trackIdx*/, int keyIdx) {
+					track.RemoveKey(keyIdx);
+					});
+				dopeEditor.Draw(
+					"##dope",
+					dopeTracks,
+					totalFrames,
+					kFps,
+					60.0f
+				);
+				(void)moved;
+			}
+
+			ImGui::TreePop();
+		}
+		ImGui::PopID();
+	}
+
+	if (removeTrackIdx >= 0)
+		clip.tracks.erase(clip.tracks.begin() + removeTrackIdx);
+
+	ImGui::PopID();
+
+	ImGui::Spacing();
+	ImGui::TextDisabled("※ 「変更を保存」で JSON に永続化されます");
 #endif
 }
 
@@ -743,7 +584,8 @@ void UIBase::ImGUi() {
 							DrawFolderTree(entry.path());
 							ImGui::TreePop();
 						}
-					} else if (entry.is_regular_file()) {
+					}
+					else if (entry.is_regular_file()) {
 						auto ext = entry.path().extension().string();
 						std::transform(ext.begin(), ext.end(), ext.begin(),
 							[](unsigned char c) { return static_cast<char>(std::tolower(c)); });
@@ -782,7 +624,8 @@ void UIBase::ImGUi() {
 
 			if (std::filesystem::exists(baseDir)) {
 				DrawFolderTree(baseDir);
-			} else {
+			}
+			else {
 				ImGui::TextDisabled("Resources/images/ が存在しません。");
 			}
 
@@ -829,7 +672,8 @@ void UIBase::ImGUi() {
 	if (ImGui::Button("変更を保存")) {
 		if (SaveToJSON()) {
 			ImGui::OpenPopup("SaveSuccessPopup");
-		} else {
+		}
+		else {
 			ImGui::OpenPopup("SaveFailedPopup");
 		}
 	}

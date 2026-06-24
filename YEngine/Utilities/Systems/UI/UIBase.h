@@ -162,6 +162,12 @@ public:
 
 	// 保存済みクリップを1つ再生
 	void PlayClip(const UIAnimationClip& clip);
+	// 名前でクリップを再生（見つからなければ false を返す）
+	bool PlayAnimation(const std::string& clipName);
+	// 名前でクリップを停止
+	void StopClip(const std::string& clipName);
+	// 名前でクリップが再生中か確認
+	bool IsClipPlaying(const std::string& clipName) const;
 	// 指定トリガを持つクリップをまとめて再生（OnInit / OnShow の自動再生に使用）
 	void PlayClipsByTrigger(UIAnimTrigger trigger);
 
@@ -205,7 +211,6 @@ protected:
 	float gridSize_ = 10.0f;
 
 	// ============================================================
-	// JSON 永続化用の値（AutoJson に登録するソース・オブ・トゥルース）
 	// 実描画値は sprite_ が保持するため、保存直前に sprite_→ここへ、
 	// 読み込み直後にここ→sprite_ へ同期する（SyncSpriteToData / ApplyDataToSprite）。
 	// ============================================================
@@ -220,15 +225,15 @@ protected:
 	Vector2 anchorPoint_ = { 0.0f, 0.0f };
 	Vector2 textureSize_ = { 100.0f, 100.0f };
 
-	// 変数登録だけで Save/Load を自動化する（CreateJSON/ApplyJSON のボイラープレート削減）
+	// Json読み込み、保存
 	AutoJson aj_;
 
 	// アニメーション管理（再生ロジックは UIAnimator に分離）
 	UIAnimator animator_;
 
-	// データ駆動アニメーションクリップ（JSON 永続化・トリガ自動再生用）
+	// データ駆動アニメーションクリップ
 	std::vector<UIAnimationClip> clips_;
-	bool prevVisible_ = true;   // OnShow トリガ検知用（前フレームの可視状態）
+	bool prevVisible_ = true;
 
 	// UV SRT
 	Vector2 uvTranslation_ = { 0.0f, 0.0f };
@@ -240,7 +245,7 @@ protected:
 	nlohmann::json CreateJSONFromCurrentState();
 	void ApplyJSONToState(const nlohmann::json& json);
 
-	// AutoJson への変数登録（コンストラクタで一度だけ呼ぶ）
+	// AutoJson への変数登録
 	void SetupJsonBindings();
 	// sprite_ の現在値 → 永続化用メンバへ（保存直前）
 	void SyncSpriteToData();
