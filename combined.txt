@@ -428,6 +428,8 @@
 └── └── ├── Object3D/
 └── └── └── ├── BaseObject.cpp
 └── └── └── ├── BaseObject.h
+└── └── └── ├── BaseObjectManager.cpp
+└── └── └── ├── BaseObjectManager.h
 └── └── └── ├── Object3d.cpp
 └── └── └── ├── Object3d.h
 └── └── └── ├── Object3dCommon.cpp
@@ -888,10 +890,14 @@
 └── └──     └── └── VisionSystem.h
 └── └──     └── UI/
 └── └──         ├── UIAnimation.h
+└── └──         ├── UIAnimator.cpp
+└── └──         ├── UIAnimator.h
 └── └──         ├── UIBase.cpp
 └── └──         ├── UIBase.h
+└── └──         ├── UIBaseEditor.cpp
 └── └──         ├── UIManager.cpp
 └── └──         ├── UIManager.h
+└── └──         ├── UIManagerEditor.cpp
 └── └──         ├── UINumber.cpp
 └── └──         └── UINumber.h
 └── └── WebAPI/
@@ -199024,6 +199030,7 @@ File Path: YEngine/Core/SceneSystems/BaseScene.cpp
 ============================================================
 #include "BaseScene.h"
 #include <Object3D/Object3dCommon.h>
+#include <Object3D/BaseObjectManager.h>
 
 void BaseScene::InitializeCommon()
 {
@@ -199051,10 +199058,33 @@ void BaseScene::DrawCommonObject()
 void BaseScene::DrawCommonShadow()
 {
 	Object3dCommon::GetInstance()->ShadowDrawPreference();
+
+	//------------------------------------------------------------
+	// 登録オブジェクトの影描画もここで一括処理する。
+	// 全シーンが本関数を呼んでいるため、シーン側に影描画コードは不要になる。
+	//------------------------------------------------------------
+	BaseObjectManager::GetInstance()->DrawShadowAll();
 }
 
 void BaseScene::DrawCommonParticles()
 {
+}
+
+// ============================================================
+// 登録オブジェクトの一括更新
+// ============================================================
+void BaseScene::UpdateObjects()
+{
+	BaseObjectManager::GetInstance()->UpdateAll();
+}
+
+// ============================================================
+// 登録オブジェクトの一括描画
+// ============================================================
+void BaseScene::DrawObjects()
+{
+	BaseObjectManager::GetInstance()->DrawAll();
+	BaseObjectManager::GetInstance()->DrawAnimationAll();
 }
 
 
@@ -199120,8 +199150,14 @@ protected:
 	void InitializeCommon();
 	void UpdateCommon();
 	void DrawCommonObject();
-	void DrawCommonShadow();   // シャドウパス開始前に必ず呼ぶ（PSO・RS・topology・gLight 一括設定）
+	void DrawCommonShadow();   // シャドウパス開始前に必ず呼ぶ（PSO・RS・topology・gLight 一括設定 ＋ 登録オブジェクトの影描画）
 	void DrawCommonParticles();
+
+	///************************* BaseObject 一括駆動 *************************///
+	// BaseObjectManager に登録済みのオブジェクトをまとめて駆動するヘルパー。
+	// 衝突判定の前 / スカイボックスとの描画順を保つため、呼ぶ位置はシーン側で決める。
+	void UpdateObjects();   // 登録オブジェクトの一括 Update
+	void DrawObjects();     // 登録オブジェクトの一括 Draw + DrawAnimation
 private:
 	///************************* メンバ変数 *************************///
 	std::string sceneName_;
@@ -199451,6 +199487,7 @@ File Path: YEngine/Core/SceneSystems/SceneManager.cpp
 #include "SceneManager.h"
 #include "Sprite/SpriteCommon.h"
 #include "OffScreen/PostEffectManager.h"
+#include <Object3D/BaseObjectManager.h>
 #include <assert.h>
 
 std::unique_ptr<SceneManager> SceneManager::instance = nullptr;
@@ -199555,6 +199592,9 @@ void SceneManager::PerformSceneTransition() {
 	scene_ = std::move(nextScene_);
 	nextScene_ = nullptr;
 	if (scene_) {
+		// 前シーンの BaseObject 登録を一掃してから次シーンを初期化する。
+		// これで各シーン側に「登録解除」コードを書く必要がなくなる。
+		BaseObjectManager::GetInstance()->ClearAll();
 		scene_->SetSceneManager(this);
 		scene_->Initialize();
 	}
@@ -199611,6 +199651,8 @@ void SceneManager::ChangeScene(const std::string& sceneName) {
 	if (!scene_) {
 		scene_ = std::move(nextScene_);
 		nextScene_ = nullptr;
+		// 初回シーンも空の状態から始められるように一掃しておく。
+		BaseObjectManager::GetInstance()->ClearAll();
 		scene_->SetSceneManager(this);
 		scene_->Initialize();
 
@@ -208609,6 +208651,9 @@ File Path: YEngine/Generators/Object3D/BaseObject.h
 #include "Object3D/Object3d.h"
 #include "Loaders/Json/JsonManager.h"
 
+// C++
+#include <string>
+
 // Collision
 #include "Collision/Core/BaseCollider.h"
 #include "Collision/Core/ColliderFactory.h"
@@ -208635,6 +208680,9 @@ public:
 	virtual void Draw() = 0;
 	virtual void DrawAnimation() {}
 	virtual void DrawCollision() {}
+	// 影パス描画。BaseObjectManager から一括で呼べるよう基底に持たせる。
+	// 影を落とさないオブジェクトは未オーバーライドのまま (デフォルト空) で良い。
+	virtual void DrawShadow() {}
 
 
 	///************************* 当たり判定 *************************///
@@ -208663,6 +208711,21 @@ public:
 	Object3d* GetObject3d() const { return obj_.get(); }
 
 
+	///************************* マネージャ連携 *************************///
+
+	// シーン内での表示名。BaseObjectManager のインスペクタ表示 / 名前検索に使う。
+	const std::string& GetName() const { return name_; }
+	void SetName(const std::string& name) { name_ = name; }
+
+	// アクティブフラグ。false の間は BaseObjectManager の一括 Update/Draw でスキップされる。
+	bool IsActive() const { return active_; }
+	void SetActive(bool active) { active_ = active; }
+
+	// インスペクタの詳細欄に独自項目を出したいオブジェクトはこれをオーバーライドする。
+	// デフォルトは空 (名前 / アクティブ / SRT は BaseObjectManager 側が共通描画する)。
+	virtual void DrawInspector() {}
+
+
 protected:
 	WorldTransform wt_;
 	Camera* camera_ = nullptr;
@@ -208673,7 +208736,490 @@ protected:
 	std::shared_ptr<AABBCollider> aabbCollider_;
 	std::shared_ptr<SphereCollider> sphereCollider_;
 	std::shared_ptr<CapsuleCollider> capsuleCollider_;
+
+	std::string name_;       // 表示名 / 検索キー (BaseObjectManager 用)
+	bool active_ = true;     // false なら一括更新・描画の対象外
 };
+
+
+============================================================
+File Path: YEngine/Generators/Object3D/BaseObjectManager.cpp
+============================================================
+#include "BaseObjectManager.h"
+
+// Engine
+#include "Debugger/Logger.h"
+
+// C++
+#include <algorithm>
+
+#ifdef USE_IMGUI
+#include <Editor/Editor.h>
+#include "imgui.h"
+#endif
+
+BaseObjectManager* BaseObjectManager::instance_ = nullptr;
+
+// ============================================================
+// シングルトンインスタンス取得
+// ============================================================
+BaseObjectManager* BaseObjectManager::GetInstance() {
+	if (!instance_) {
+		instance_ = new BaseObjectManager;
+	}
+	return instance_;
+}
+
+// ============================================================
+// マネージャ初期化
+// ============================================================
+void BaseObjectManager::Initialize() {
+	entries_.clear();
+	selectedIndex_ = -1;
+
+#ifdef USE_IMGUI
+	//------------------------------------------------------------
+	// インスペクタパネルを Editor に登録 (Debug のみ・一度きり)
+	//------------------------------------------------------------
+	if (!inspectorRegistered_) {
+		Editor::GetInstance()->RegisterGameUI(
+			"オブジェクト一覧",
+			[this]() { this->DrawInspector(); });
+		inspectorRegistered_ = true;
+	}
+#endif
+}
+
+// ============================================================
+// 全オブジェクト破棄して終了
+// ============================================================
+void BaseObjectManager::Finalize() {
+	ClearAll();
+}
+
+// ============================================================
+// 生成済みオブジェクトを駆動対象に登録 (所有は移さない)
+// ============================================================
+void BaseObjectManager::Register(BaseObject* obj, const std::string& name) {
+	if (!obj) return;
+
+	//------------------------------------------------------------
+	// 二重登録チェック
+	//------------------------------------------------------------
+	for (const auto& entry : entries_) {
+		if (entry.ptr == obj) {
+			Logger("[BaseObjectManager] Register : 既に登録済みのオブジェクトです\n");
+			return;
+		}
+	}
+
+	//------------------------------------------------------------
+	// 名前を確定 (引数優先、空ならオブジェクト側の既存名を使う)
+	//------------------------------------------------------------
+	if (!name.empty()) {
+		obj->SetName(name);
+	}
+
+	Entry entry;
+	entry.ptr = obj;
+	entry.owned = nullptr;          // 外部所有なので実体は持たない
+	entry.name = obj->GetName();
+	entries_.push_back(std::move(entry));
+}
+
+// ============================================================
+// 駆動対象から外す
+// ============================================================
+void BaseObjectManager::Unregister(BaseObject* obj) {
+	if (!obj) return;
+
+	auto it = std::find_if(entries_.begin(), entries_.end(),
+		[obj](const Entry& e) { return e.ptr == obj; });
+
+	if (it != entries_.end()) {
+		// owned が非 null なら unique_ptr のデストラクタが実体を破棄する。
+		entries_.erase(it);
+		selectedIndex_ = -1;
+	}
+}
+
+// ============================================================
+// 遅延破棄の予約
+// ============================================================
+void BaseObjectManager::Destroy(BaseObject* obj) {
+	if (!obj) return;
+
+	for (auto& entry : entries_) {
+		if (entry.ptr == obj) {
+			entry.pendingDestroy = true;
+			return;
+		}
+	}
+}
+
+// ============================================================
+// 全オブジェクトをクリア
+// ============================================================
+void BaseObjectManager::ClearAll() {
+	// owned を持つエントリは erase 時に自動破棄される。
+	entries_.clear();
+	selectedIndex_ = -1;
+}
+
+// ============================================================
+// 一括更新
+// ============================================================
+void BaseObjectManager::UpdateAll() {
+	for (auto& entry : entries_) {
+		if (!entry.ptr || entry.pendingDestroy) continue;
+		if (!entry.ptr->IsActive()) continue;
+		entry.ptr->Update();
+	}
+
+	//------------------------------------------------------------
+	// フレーム末: 破棄予約をまとめて反映する
+	//------------------------------------------------------------
+	ProcessPendingDestroy();
+}
+
+// ============================================================
+// 一括描画
+// ============================================================
+void BaseObjectManager::DrawAll() {
+	for (auto& entry : entries_) {
+		if (!entry.ptr || entry.pendingDestroy) continue;
+		if (!entry.ptr->IsActive()) continue;
+		entry.ptr->Draw();
+	}
+}
+
+// ============================================================
+// 一括アニメーション描画
+// ============================================================
+void BaseObjectManager::DrawAnimationAll() {
+	for (auto& entry : entries_) {
+		if (!entry.ptr || entry.pendingDestroy) continue;
+		if (!entry.ptr->IsActive()) continue;
+		entry.ptr->DrawAnimation();
+	}
+}
+
+// ============================================================
+// 一括コリジョン描画
+// ============================================================
+void BaseObjectManager::DrawCollisionAll() {
+	for (auto& entry : entries_) {
+		if (!entry.ptr || entry.pendingDestroy) continue;
+		if (!entry.ptr->IsActive()) continue;
+		entry.ptr->DrawCollision();
+	}
+}
+
+// ============================================================
+// 一括影描画
+// ============================================================
+void BaseObjectManager::DrawShadowAll() {
+	for (auto& entry : entries_) {
+		if (!entry.ptr || entry.pendingDestroy) continue;
+		if (!entry.ptr->IsActive()) continue;
+		entry.ptr->DrawShadow();
+	}
+}
+
+// ============================================================
+// 名前で検索
+// ============================================================
+BaseObject* BaseObjectManager::FindByName(const std::string& name) {
+	if (name.empty()) return nullptr;
+
+	for (auto& entry : entries_) {
+		if (!entry.ptr || entry.pendingDestroy) continue;
+		if (entry.ptr->GetName() == name) {
+			return entry.ptr;
+		}
+	}
+	return nullptr;
+}
+
+// ============================================================
+// 破棄予約の実反映
+// ============================================================
+void BaseObjectManager::ProcessPendingDestroy() {
+	if (entries_.empty()) return;
+
+	const bool removed = std::any_of(entries_.begin(), entries_.end(),
+		[](const Entry& e) { return e.pendingDestroy; });
+	if (!removed) return;
+
+	//------------------------------------------------------------
+	// pendingDestroy を立てたエントリを除去 (owned は自動破棄)
+	//------------------------------------------------------------
+	entries_.erase(
+		std::remove_if(entries_.begin(), entries_.end(),
+			[](const Entry& e) { return e.pendingDestroy; }),
+		entries_.end());
+
+	// 選択中の行がずれる可能性があるためリセットする。
+	selectedIndex_ = -1;
+}
+
+// ============================================================
+// インスペクタ描画 (Debug のみ)
+// ============================================================
+void BaseObjectManager::DrawInspector() {
+#ifdef USE_IMGUI
+	//------------------------------------------------------------
+	// 左: 登録オブジェクト一覧
+	//------------------------------------------------------------
+	ImGui::Text("登録オブジェクト数: %d", GetObjectCount());
+	ImGui::Separator();
+
+	if (ImGui::BeginChild("ObjectList", ImVec2(220.0f, 0.0f), true)) {
+		for (int i = 0; i < static_cast<int>(entries_.size()); ++i) {
+			Entry& entry = entries_[i];
+			if (!entry.ptr) continue;
+
+			ImGui::PushID(i);
+
+			// アクティブトグル
+			bool active = entry.ptr->IsActive();
+			if (ImGui::Checkbox("##active", &active)) {
+				entry.ptr->SetActive(active);
+			}
+			ImGui::SameLine();
+
+			// 名前 (空なら型名でフォールバック表示)
+			const std::string& name = entry.ptr->GetName();
+			const char* label = !name.empty() ? name.c_str() : typeid(*entry.ptr).name();
+			if (ImGui::Selectable(label, selectedIndex_ == i)) {
+				selectedIndex_ = i;
+			}
+
+			ImGui::PopID();
+		}
+	}
+	ImGui::EndChild();
+
+	ImGui::SameLine();
+
+	//------------------------------------------------------------
+	// 右: 選択オブジェクトの詳細
+	//------------------------------------------------------------
+	if (ImGui::BeginChild("ObjectDetail", ImVec2(0.0f, 0.0f), true)) {
+		if (selectedIndex_ >= 0 && selectedIndex_ < static_cast<int>(entries_.size())
+			&& entries_[selectedIndex_].ptr) {
+
+			BaseObject* obj = entries_[selectedIndex_].ptr;
+
+			ImGui::Text("型: %s", typeid(*obj).name());
+			ImGui::Text("所有: %s",
+				entries_[selectedIndex_].owned ? "Manager (Add)" : "外部 (Register)");
+			ImGui::Separator();
+
+			// SRT (BaseObject の公開アクセサ経由で共通編集)
+			Vector3 translate = obj->GetTranslate();
+			if (ImGui::DragFloat3("Position", &translate.x, 0.01f)) {
+				obj->SetTranslate(translate);
+			}
+			Vector3 rotate = obj->GetRotae();
+			if (ImGui::DragFloat3("Rotation", &rotate.x, 0.01f)) {
+				obj->SetRotae(rotate);
+			}
+			Vector3 scale = obj->GetScale();
+			if (ImGui::DragFloat3("Scale", &scale.x, 0.01f)) {
+				obj->SetScale(scale);
+			}
+
+			ImGui::Separator();
+
+			// オブジェクト固有の詳細 (オーバーライドしていれば描画される)
+			obj->DrawInspector();
+		} else {
+			ImGui::TextDisabled("オブジェクトを選択してください");
+		}
+	}
+	ImGui::EndChild();
+#endif
+}
+
+
+============================================================
+File Path: YEngine/Generators/Object3D/BaseObjectManager.h
+============================================================
+#pragma once
+
+// Engine
+#include "Object3D/BaseObject.h"
+#include "Systems/Camera/Camera.h"
+
+// C++
+#include <memory>
+#include <vector>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <typeinfo>
+
+// ============================================================
+// BaseObjectManager
+// ============================================================
+// BaseObject を継承したゲームオブジェクト (Player / Enemy / Ground 等) を
+// まとめて管理するマネージャ。
+//
+// 目的:
+//   - カメラを 1 回だけ SetCamera しておけば、登録済みオブジェクト全体の
+//     Update / Draw を一括で回せるようにして、シーン側の配線を減らす。
+//   - 既存の Initialize(Camera*) シグネチャはそのまま使う (A 方式) ので、
+//     既存オブジェクトは無改修で乗せられる。
+//
+// 所有モデル (ハイブリッド):
+//   - Add<T>()    … マネージャが unique_ptr で所有する (生成 + camera 注入 + Initialize)。
+//   - Register()  … 所有は呼び出し側のまま、駆動 (Update/Draw) だけ委譲する。
+// ============================================================
+class BaseObjectManager {
+public:
+	// ============================================================
+	// 管理エントリ
+	// ============================================================
+	// 1 オブジェクト 1 エントリ。owned が非 null なら Add 由来 (マネージャ所有)、
+	// null なら Register 由来 (呼び出し側所有)。参照は常に ptr 経由で行う。
+	struct Entry {
+		BaseObject* ptr = nullptr;             // 参照用 (owned / 外部所有どちらでも有効)
+		std::unique_ptr<BaseObject> owned;     // Add 時のみ実体を持つ
+		std::string name;                      // 表示名 / 検索キー
+		bool pendingDestroy = false;           // フレーム末に除去する予約フラグ
+	};
+
+	// ============================================================
+	// 基本関数
+	// ============================================================
+	static BaseObjectManager* GetInstance();
+
+	void Initialize();
+	void Finalize();
+
+	// ============================================================
+	// カメラ
+	// ============================================================
+	// 一度セットすれば、以降の Add<T>() で生成するオブジェクトに自動注入される。
+	void SetCamera(Camera* camera) { camera_ = camera; }
+	Camera* GetCamera() const { return camera_; }
+
+	// ============================================================
+	// 登録 / 生成
+	// ============================================================
+	// オブジェクトを生成してマネージャ所有で登録する。
+	// camera 注入 → Initialize(camera) まで行い、生成した T* を返す。
+	template<class T, class... Args>
+	T* Add(const std::string& name = "", Args&&... args);
+
+	// 既に呼び出し側が所有しているオブジェクトを駆動対象に登録する (所有は移さない)。
+	// Initialize は呼び出し側で済ませておくこと。
+	void Register(BaseObject* obj, const std::string& name = "");
+
+	// 駆動対象から外す。Add 由来 (マネージャ所有) の場合は実体も破棄される。
+	// 反復処理中の呼び出しは避けること。
+	void Unregister(BaseObject* obj);
+
+	// 遅延破棄を予約する。実際の除去はフレーム末 (UpdateAll の最後) に行うため、
+	// 更新ループ中から安全に呼べる。
+	void Destroy(BaseObject* obj);
+
+	// すべてのオブジェクトを破棄してクリアする。
+	void ClearAll();
+
+	// ============================================================
+	// 一括駆動
+	// ============================================================
+	// active なオブジェクトのみ処理する。UpdateAll はフレーム末に遅延破棄を実行する。
+	void UpdateAll();
+	void DrawAll();
+	void DrawAnimationAll();
+	void DrawCollisionAll();
+	void DrawShadowAll();
+
+	// ============================================================
+	// 検索 / アクセッサ
+	// ============================================================
+	// 名前で最初に一致したオブジェクトを返す。空文字 / 未登録なら nullptr。
+	BaseObject* FindByName(const std::string& name);
+
+	// 指定型 (T 派生) の全オブジェクトを抽出して返す。
+	template<class T>
+	std::vector<T*> GetAllOfType();
+
+	const std::vector<Entry>& GetEntries() const { return entries_; }
+	int GetObjectCount() const { return static_cast<int>(entries_.size()); }
+
+	// ============================================================
+	// インスペクタ (Debug のみ)
+	// ============================================================
+	// 登録オブジェクト一覧 + 選択オブジェクトの詳細 (名前 / アクティブ / SRT) を描画する。
+	// Release ビルドでは中身が空になる。
+	void DrawInspector();
+
+private:
+	// ============================================================
+	// 内部
+	// ============================================================
+	BaseObjectManager() = default;
+	~BaseObjectManager() = default;
+	BaseObjectManager(const BaseObjectManager&) = delete;
+	BaseObjectManager& operator=(const BaseObjectManager&) = delete;
+
+	// pendingDestroy が立ったエントリをまとめて除去する。
+	void ProcessPendingDestroy();
+
+	static BaseObjectManager* instance_;
+
+	Camera* camera_ = nullptr;            // Add 時に各オブジェクトへ注入するカメラ
+	std::vector<Entry> entries_;          // 管理中の全エントリ
+	int selectedIndex_ = -1;              // インスペクタで選択中の行 (-1 で未選択)
+	bool inspectorRegistered_ = false;    // インスペクタパネルを Editor に登録済みか
+};
+
+// ============================================================
+// Add (テンプレート実装)
+// ============================================================
+template<class T, class... Args>
+T* BaseObjectManager::Add(const std::string& name, Args&&... args) {
+	static_assert(std::is_base_of_v<BaseObject, T>,
+		"BaseObjectManager::Add<T> : T は BaseObject を継承している必要があります");
+
+	//------------------------------------------------------------
+	// 生成 → 名前付け → camera 注入 & Initialize
+	//------------------------------------------------------------
+	std::unique_ptr<T> obj = std::make_unique<T>(std::forward<Args>(args)...);
+	T* raw = obj.get();
+	raw->SetName(name);
+	raw->Initialize(camera_);
+
+	//------------------------------------------------------------
+	// エントリとして所有を引き取る
+	//------------------------------------------------------------
+	Entry entry;
+	entry.ptr = raw;
+	entry.owned = std::move(obj);
+	entry.name = name;
+	entries_.push_back(std::move(entry));
+
+	return raw;
+}
+
+// ============================================================
+// GetAllOfType (テンプレート実装)
+// ============================================================
+template<class T>
+std::vector<T*> BaseObjectManager::GetAllOfType() {
+	std::vector<T*> result;
+	for (auto& entry : entries_) {
+		if (!entry.ptr || entry.pendingDestroy) continue;
+		if (T* casted = dynamic_cast<T*>(entry.ptr)) {
+			result.push_back(casted);
+		}
+	}
+	return result;
+}
 
 
 ============================================================
@@ -223978,7 +224524,8 @@ void Sprite::Update()
 	//────────────────────────────────
 	transform_.translate = screenPos;
 	transform_.rotate = rotate_;
-	transform_.scale = { size_.x, size_.y, 1.0f };
+	// 最終的な表示サイズ = 基準サイズ(px) × 拡縮倍率
+	transform_.scale = { size_.x * scale_.x, size_.y * scale_.y, 1.0f };
 
 	// 正射影行列で処理
 	Matrix4x4 worldMatrix = MakeAffineMatrix(transform_.scale, transform_.rotate, transform_.translate);
@@ -224290,10 +224837,19 @@ public:
 	void SetRotate(Vector3 rotate) { rotate_ = rotate; }
 
 	/*===============================================//
-						  拡縮
+					  サイズ(px)
 	//===============================================*/
-	const Vector2& GetSize() { return size_; }
-	void SetSize(const Vector2& scale) { size_ = scale; }
+	// スプライトの基準表示サイズ（ピクセル）。レイアウト用。
+	const Vector2& GetSize() const { return size_; }
+	void SetSize(const Vector2& size) { size_ = size; }
+
+	/*===============================================//
+					  拡縮(倍率)
+	//===============================================*/
+	// 拡縮倍率（1.0=等倍）。アニメーション/演出用。
+	// 最終的な表示サイズ = size_ × scale_。
+	const Vector2& GetScale() const { return scale_; }
+	void SetScale(const Vector2& scale) { scale_ = scale; }
 
 	/*===============================================//
 					　	 色を変更
@@ -224391,7 +224947,10 @@ private:
 	// スプライト
 	Vector3 translate_ = { 0.0f,0.0f ,0.0f };
 	Vector3 rotate_ = { 0.0f,0.0f,0.0f };
+	// 基準表示サイズ(px)
 	Vector2 size_ = { 100.0f,100.0f };
+	// 拡縮倍率(1.0=等倍)。表示サイズ = size_ × scale_
+	Vector2 scale_ = { 1.0f,1.0f };
 	const float numVertices_ = 6.0f;
 
 	// アンカーポイント
@@ -256310,9 +256869,8 @@ public:
     ///-----------------------------------------------------
     void Reset();
 
-private:
     ///-----------------------------------------------------
-    /// JSON へ保存
+    /// JSON へ保存（呼び出し側が独自にファイルIOする場合に使用）
     ///-----------------------------------------------------
     void Save(nlohmann::json& j) const;
 
@@ -267934,6 +268492,8 @@ File Path: YEngine/Utilities/Systems/UI/UIAnimation.h
 #include <functional>
 #include <vector>
 #include <memory>
+#include <string>
+#include <json.hpp>
 
 ///************************* アニメーションタイプ *************************///
 enum class UIAnimationType {
@@ -268002,6 +268562,76 @@ struct UIAnimation {
     std::function<void()> onComplete;
     std::function<void()> onUpdate;
 };
+
+///************************* アニメーション再生トリガ *************************///
+enum class UIAnimTrigger {
+    Manual,   // 手動再生のみ（コード/エディタから明示的に再生）
+    OnInit,   // Initialize 完了時に自動再生
+    OnShow    // 非表示→表示に切り替わった時に自動再生
+};
+
+///************************* アニメーションクリップ(データ保存用) *************************///
+// プリセット方式: start/end をフル保存せず、タイプ＋パラメータだけを保存する。
+// 再生時に UIAnimator が対象 UIBase の「現在の状態」を基準にアニメを構築するため、
+// JSON は軽量で、配置を動かしてもクリップを作り直す必要がない。
+struct UIAnimationClip {
+    std::string name = "Clip";
+    UIAnimationType type = UIAnimationType::FadeIn;
+    UIAnimTrigger trigger = UIAnimTrigger::Manual;
+    Easing::Function easing = Easing::Function::Linear;
+
+    float duration = 0.5f;
+    float delay = 0.0f;
+    bool loop = false;
+
+    // タイプ別パラメータ（対応するタイプでのみ意味を持つ）
+    float intensity = 10.0f;   // Shake / Wobble
+    float distance = 200.0f;   // SlideIn / SlideOut
+    float height = 50.0f;      // Bounce
+    float angle = 15.0f;       // Swing / Rotation
+    float scaleAmt = 1.2f;     // Pulse / Scale
+    int   times = 3;           // Flash
+    SlideDirection direction = SlideDirection::Right; // SlideIn / SlideOut
+};
+
+///************************* UIAnimationClip <-> JSON *************************///
+// AutoJson / nlohmann から std::vector<UIAnimationClip> をそのまま読み書きできるようにする。
+// enum は nlohmann 既定で整数として直列化される。
+inline void to_json(nlohmann::json& j, const UIAnimationClip& c) {
+    j = nlohmann::json{
+        {"name", c.name},
+        {"type", c.type},
+        {"trigger", c.trigger},
+        {"easing", c.easing},
+        {"duration", c.duration},
+        {"delay", c.delay},
+        {"loop", c.loop},
+        {"intensity", c.intensity},
+        {"distance", c.distance},
+        {"height", c.height},
+        {"angle", c.angle},
+        {"scaleAmt", c.scaleAmt},
+        {"times", c.times},
+        {"direction", c.direction},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, UIAnimationClip& c) {
+    if (j.contains("name"))      j.at("name").get_to(c.name);
+    if (j.contains("type"))      j.at("type").get_to(c.type);
+    if (j.contains("trigger"))   j.at("trigger").get_to(c.trigger);
+    if (j.contains("easing"))    j.at("easing").get_to(c.easing);
+    if (j.contains("duration"))  j.at("duration").get_to(c.duration);
+    if (j.contains("delay"))     j.at("delay").get_to(c.delay);
+    if (j.contains("loop"))      j.at("loop").get_to(c.loop);
+    if (j.contains("intensity")) j.at("intensity").get_to(c.intensity);
+    if (j.contains("distance"))  j.at("distance").get_to(c.distance);
+    if (j.contains("height"))    j.at("height").get_to(c.height);
+    if (j.contains("angle"))     j.at("angle").get_to(c.angle);
+    if (j.contains("scaleAmt"))  j.at("scaleAmt").get_to(c.scaleAmt);
+    if (j.contains("times"))     j.at("times").get_to(c.times);
+    if (j.contains("direction")) j.at("direction").get_to(c.direction);
+}
 
 ///************************* プリセットアニメーション設定 *************************///
 namespace UIAnimationPresets {
@@ -268219,82 +268849,21 @@ namespace UIAnimationPresets {
 }
 
 ============================================================
-File Path: YEngine/Utilities/Systems/UI/UIBase.cpp
+File Path: YEngine/Utilities/Systems/UI/UIAnimator.cpp
 ============================================================
+#include "UIAnimator.h"
+
+// Engine
 #include "UIBase.h"
-#include <fstream>
-#include <chrono>
-#include <thread>
+
+// C++
 #include <algorithm>
-#include "Sprite/SpriteCommon.h"
+#include <cmath>
 
-#ifdef USE_IMGUI
-#include <imgui.h>
-#endif
-#include <Systems/GameTime/GameTime.h>
-
-const std::string UIBase::PRESET_DIRECTORY = "./Resources/Json/UI/";
-
-UIBase::UIBase(const std::string& name) :
-	sprite_(nullptr),
-	hotReloadEnabled_(false),
-	name_(name) {
-}
-
-UIBase::~UIBase() {
-
-}
-
-void UIBase::Initialize(const std::string& jsonConfigPath) {
-	configPath_ = jsonConfigPath;
-
-	sprite_ = std::make_unique<Sprite>();
-
-	bool jsonExists = std::filesystem::exists(jsonConfigPath);
-
-	if (jsonExists) {
-		LoadFromJSON(jsonConfigPath);
-	} else {
-		sprite_->Initialize("./Resources/images/white.png");
-		texturePath_ = "./Resources/images/white.png";
-		SaveToJSON();
-	}
-
-	if (std::filesystem::exists(configPath_)) {
-		lastModTime_ = std::filesystem::last_write_time(configPath_);
-	}
-}
-
-void UIBase::Update() {
-	if (IsAnimating()) {
-		UpdateAnimation(YoRigine::GameTime::GetDeltaTime());
-	}
-
-	if (hotReloadEnabled_) {
-		CheckForChanges();
-	}
-
-	if (sprite_ && visible_) {
-		sprite_->Update();
-	}
-
-#ifdef USE_IMGUI
-	//ImGUi();
-#endif
-}
-
-void UIBase::Draw() {
-	if (sprite_ && visible_) {
-		sprite_->Draw();
-	}
-}
-
-/*==================================================================
-						アニメーション機能
-===================================================================*/
-
-// シンプルなアニメーション
-void UIBase::PlayPositionAnimation(const Vector3& from, const Vector3& to, float duration,
+// ============================================================
+// 基本アニメーション : 位置
+// ============================================================
+void UIAnimator::PlayPositionAnimation(const Vector3& from, const Vector3& to, float duration,
 	Easing::Function easing, bool loop) {
 	UIAnimation anim;
 	anim.type = UIAnimationType::Position;
@@ -268308,10 +268877,13 @@ void UIBase::PlayPositionAnimation(const Vector3& from, const Vector3& to, float
 
 	animations_.push_back(anim);
 	isPaused_ = false;
-	SetPosition(from);
+	target_->SetPosition(from);
 }
 
-void UIBase::PlayScaleAnimation(const Vector2& from, const Vector2& to, float duration,
+// ============================================================
+// 基本アニメーション : 拡縮
+// ============================================================
+void UIAnimator::PlayScaleAnimation(const Vector2& from, const Vector2& to, float duration,
 	Easing::Function easing, bool loop) {
 	UIAnimation anim;
 	anim.type = UIAnimationType::Scale;
@@ -268322,14 +268894,17 @@ void UIBase::PlayScaleAnimation(const Vector2& from, const Vector2& to, float du
 	anim.elapsed = 0.0f;
 	anim.loop = loop;
 	anim.delay = 0.0f;
-	anim.originalScale = GetScale();  // 現在のスケールを保存
+	anim.originalScale = target_->GetScale();  // 現在のスケールを保存
 
 	animations_.push_back(anim);
 	isPaused_ = false;
-	SetScale(from);
+	target_->SetScale(from);
 }
 
-void UIBase::PlayRotationAnimation(const Vector3& from, const Vector3& to, float duration,
+// ============================================================
+// 基本アニメーション : 回転
+// ============================================================
+void UIAnimator::PlayRotationAnimation(const Vector3& from, const Vector3& to, float duration,
 	Easing::Function easing, bool loop) {
 	UIAnimation anim;
 	anim.type = UIAnimationType::Rotation;
@@ -268343,10 +268918,13 @@ void UIBase::PlayRotationAnimation(const Vector3& from, const Vector3& to, float
 
 	animations_.push_back(anim);
 	isPaused_ = false;
-	SetRotation(from);
+	target_->SetRotation(from);
 }
 
-void UIBase::PlayAlphaAnimation(float from, float to, float duration,
+// ============================================================
+// 基本アニメーション : アルファ
+// ============================================================
+void UIAnimator::PlayAlphaAnimation(float from, float to, float duration,
 	Easing::Function easing, bool loop) {
 	UIAnimation anim;
 	anim.type = UIAnimationType::Alpha;
@@ -268360,10 +268938,13 @@ void UIBase::PlayAlphaAnimation(float from, float to, float duration,
 
 	animations_.push_back(anim);
 	isPaused_ = false;
-	SetAlpha(from);
+	target_->SetAlpha(from);
 }
 
-void UIBase::PlayColorAnimation(const Vector4& from, const Vector4& to, float duration,
+// ============================================================
+// 基本アニメーション : 色
+// ============================================================
+void UIAnimator::PlayColorAnimation(const Vector4& from, const Vector4& to, float duration,
 	Easing::Function easing, bool loop) {
 	UIAnimation anim;
 	anim.type = UIAnimationType::Color;
@@ -268377,11 +268958,13 @@ void UIBase::PlayColorAnimation(const Vector4& from, const Vector4& to, float du
 
 	animations_.push_back(anim);
 	isPaused_ = false;
-	SetColor(from);
+	target_->SetColor(from);
 }
 
-// プリセットアニメーション
-void UIBase::PlayAnimation(const UIAnimation& anim) {
+// ============================================================
+// プリセットアニメーション : 共通投入処理
+// ============================================================
+void UIAnimator::PlayAnimation(const UIAnimation& anim) {
 	UIAnimation newAnim = anim;
 	newAnim.elapsed = 0.0f;
 
@@ -268389,11 +268972,11 @@ void UIBase::PlayAnimation(const UIAnimation& anim) {
 	switch (anim.type) {
 	case UIAnimationType::Shake:
 	case UIAnimationType::Wobble:
-		newAnim.originalPos = GetPosition();
+		newAnim.originalPos = target_->GetPosition();
 		break;
 	case UIAnimationType::Pulse:
 	case UIAnimationType::Swing:
-		newAnim.originalScale = GetScale();
+		newAnim.originalScale = target_->GetScale();
 		break;
 	default:
 		break;
@@ -268403,88 +268986,183 @@ void UIBase::PlayAnimation(const UIAnimation& anim) {
 	isPaused_ = false;
 }
 
-void UIBase::PlayFadeIn(float duration, Easing::Function easing) {
+// ============================================================
+// データ駆動クリップ : type → 既存 Play〜 へディスパッチ
+// ============================================================
+// クリップは start/end を持たないため、各 Play〜 が対象の現在状態を
+// 基準にアニメを組み立てる方式に乗せる。基本タイプ(位置/拡縮/回転/色/アルファ)は
+// エディタの試し再生と同じく「現在値からの相対変化」として扱う。
+void UIAnimator::PlayClip(const UIAnimationClip& clip) {
+	if (!target_) return;
+
+	const Easing::Function easing = clip.easing;
+	const float dur = clip.duration;
+	const bool loop = clip.loop;
+
+	switch (clip.type) {
+	case UIAnimationType::Position: {
+		Vector3 cur = target_->GetPosition();
+		PlayPositionAnimation(cur,
+			Vector3{ cur.x + clip.distance, cur.y, cur.z }, dur, easing, loop);
+		break;
+	}
+	case UIAnimationType::Scale: {
+		Vector2 cur = target_->GetScale();
+		PlayScaleAnimation(cur,
+			Vector2{ cur.x * clip.scaleAmt, cur.y * clip.scaleAmt }, dur, easing, loop);
+		break;
+	}
+	case UIAnimationType::Rotation: {
+		Vector3 cur = target_->GetRotation();
+		PlayRotationAnimation(cur,
+			Vector3{ cur.x, cur.y, cur.z + clip.angle }, dur, easing, loop);
+		break;
+	}
+	case UIAnimationType::Color:
+		PlayColorAnimation(target_->GetColor(),
+			Vector4{ 1.0f, 0.0f, 0.0f, target_->GetColor().w }, dur, easing, loop);
+		break;
+	case UIAnimationType::Alpha:
+		PlayAlphaAnimation(target_->GetAlpha(), 0.0f, dur, easing, loop);
+		break;
+
+	case UIAnimationType::FadeIn:    PlayFadeIn(dur, easing); break;
+	case UIAnimationType::FadeOut:   PlayFadeOut(dur, easing); break;
+	case UIAnimationType::SlideIn:   PlaySlideIn(clip.direction, clip.distance, dur); break;
+	case UIAnimationType::SlideOut:  PlaySlideOut(clip.direction, clip.distance, dur); break;
+	case UIAnimationType::ZoomIn:    PlayZoomIn(dur); break;
+	case UIAnimationType::ZoomOut:   PlayZoomOut(dur); break;
+	case UIAnimationType::Shake:     PlayShake(clip.intensity, dur); break;
+	case UIAnimationType::Pulse:     PlayPulse(clip.scaleAmt, dur, loop); break;
+	case UIAnimationType::Bounce:    PlayBounce(clip.height, dur); break;
+	case UIAnimationType::Swing:     PlaySwing(clip.angle, dur, loop); break;
+	case UIAnimationType::Flash:     PlayFlash(dur, clip.times); break;
+	case UIAnimationType::Blink:     PlayBlink(dur, loop); break;
+	case UIAnimationType::Wobble:    PlayWobble(clip.intensity, dur); break;
+	case UIAnimationType::Flip:      PlayFlip(true, dur); break;
+	case UIAnimationType::RotateIn:  PlayRotateIn(dur); break;
+	case UIAnimationType::RotateOut: PlayRotateOut(dur); break;
+	default: return;
+	}
+
+	// 直近に積んだアニメーションへ遅延を適用
+	if (clip.delay > 0.0f) {
+		SetDelay(clip.delay);
+	}
+}
+
+// ============================================================
+// プリセット : フェードイン
+// ============================================================
+void UIAnimator::PlayFadeIn(float duration, Easing::Function easing) {
 	auto anim = UIAnimationPresets::FadeIn(duration, easing);
 	PlayAnimation(anim);
 }
 
-void UIBase::PlayFadeOut(float duration, Easing::Function easing) {
+// ============================================================
+// プリセット : フェードアウト
+// ============================================================
+void UIAnimator::PlayFadeOut(float duration, Easing::Function easing) {
 	auto anim = UIAnimationPresets::FadeOut(duration, easing);
 	PlayAnimation(anim);
 }
 
-void UIBase::PlaySlideIn(SlideDirection dir, float distance, float duration) {
+// ============================================================
+// プリセット : スライドイン
+// ============================================================
+void UIAnimator::PlaySlideIn(SlideDirection dir, float distance, float duration) {
 	auto anim = UIAnimationPresets::SlideIn(dir, distance, duration);
-	anim.originalPos = GetPosition();
+	anim.originalPos = target_->GetPosition();
 	anim.elapsed = 0.0f;
 
 	// 開始位置を設定
-	SetPosition(anim.originalPos + anim.startPos);
+	target_->SetPosition(anim.originalPos + anim.startPos);
 
 	animations_.push_back(anim);
 	isPaused_ = false;
 }
 
-void UIBase::PlaySlideOut(SlideDirection dir, float distance, float duration) {
+// ============================================================
+// プリセット : スライドアウト
+// ============================================================
+void UIAnimator::PlaySlideOut(SlideDirection dir, float distance, float duration) {
 	auto anim = UIAnimationPresets::SlideOut(dir, distance, duration);
-	anim.originalPos = GetPosition();
+	anim.originalPos = target_->GetPosition();
 	anim.elapsed = 0.0f;
 
 	animations_.push_back(anim);
 	isPaused_ = false;
 }
 
-void UIBase::PlayZoomIn(float duration) {
+// ============================================================
+// プリセット : ズームイン
+// ============================================================
+void UIAnimator::PlayZoomIn(float duration) {
 	auto anim = UIAnimationPresets::ZoomIn(duration);
 	anim.originalScale = Vector2{ 1.0f, 1.0f };
 	anim.elapsed = 0.0f;
 
-	SetScale(anim.startScale);
-	SetAlpha(anim.startAlpha);
+	target_->SetScale(anim.startScale);
+	target_->SetAlpha(anim.startAlpha);
 
 	animations_.push_back(anim);
 	isPaused_ = false;
 }
 
-void UIBase::PlayZoomOut(float duration) {
+// ============================================================
+// プリセット : ズームアウト
+// ============================================================
+void UIAnimator::PlayZoomOut(float duration) {
 	auto anim = UIAnimationPresets::ZoomOut(duration);
-	anim.originalScale = GetScale();
+	anim.originalScale = target_->GetScale();
 	anim.elapsed = 0.0f;
 
 	animations_.push_back(anim);
 	isPaused_ = false;
 }
 
-void UIBase::PlayShake(float intensity, float duration) {
+// ============================================================
+// プリセット : シェイク
+// ============================================================
+void UIAnimator::PlayShake(float intensity, float duration) {
 	auto anim = UIAnimationPresets::Shake(intensity, duration);
-	anim.originalPos = GetPosition();
+	anim.originalPos = target_->GetPosition();
 	anim.elapsed = 0.0f;
 
 	animations_.push_back(anim);
 	isPaused_ = false;
 }
 
-void UIBase::PlayPulse(float scale, float duration, bool loop) {
+// ============================================================
+// プリセット : パルス
+// ============================================================
+void UIAnimator::PlayPulse(float scale, float duration, bool loop) {
 	auto anim = UIAnimationPresets::Pulse(scale, duration, loop);
-	anim.originalScale = GetScale();
+	anim.originalScale = target_->GetScale();
 	anim.elapsed = 0.0f;
 
 	animations_.push_back(anim);
 	isPaused_ = false;
 }
 
-void UIBase::PlayBounce(float height, float duration) {
+// ============================================================
+// プリセット : バウンス
+// ============================================================
+void UIAnimator::PlayBounce(float height, float duration) {
 	auto anim = UIAnimationPresets::Bounce(height, duration);
-	anim.originalPos = GetPosition();
+	anim.originalPos = target_->GetPosition();
 	anim.elapsed = 0.0f;
 
-	SetPosition(anim.originalPos + anim.startPos);
+	target_->SetPosition(anim.originalPos + anim.startPos);
 
 	animations_.push_back(anim);
 	isPaused_ = false;
 }
 
-void UIBase::PlaySwing(float angle, float duration, bool loop) {
+// ============================================================
+// プリセット : スイング
+// ============================================================
+void UIAnimator::PlaySwing(float angle, float duration, bool loop) {
 	auto anim = UIAnimationPresets::Swing(angle, duration, loop);
 	anim.elapsed = 0.0f;
 
@@ -268492,7 +269170,10 @@ void UIBase::PlaySwing(float angle, float duration, bool loop) {
 	isPaused_ = false;
 }
 
-void UIBase::PlayFlash(float duration, int times) {
+// ============================================================
+// プリセット : フラッシュ
+// ============================================================
+void UIAnimator::PlayFlash(float duration, int times) {
 	auto anim = UIAnimationPresets::Flash(duration, times);
 	anim.elapsed = 0.0f;
 
@@ -268500,7 +269181,10 @@ void UIBase::PlayFlash(float duration, int times) {
 	isPaused_ = false;
 }
 
-void UIBase::PlayBlink(float duration, bool loop) {
+// ============================================================
+// プリセット : ブリンク
+// ============================================================
+void UIAnimator::PlayBlink(float duration, bool loop) {
 	auto anim = UIAnimationPresets::Blink(duration, loop);
 	anim.elapsed = 0.0f;
 
@@ -268508,37 +269192,49 @@ void UIBase::PlayBlink(float duration, bool loop) {
 	isPaused_ = false;
 }
 
-void UIBase::PlayWobble(float intensity, float duration) {
+// ============================================================
+// プリセット : ウォブル
+// ============================================================
+void UIAnimator::PlayWobble(float intensity, float duration) {
 	auto anim = UIAnimationPresets::Wobble(intensity, duration);
-	anim.originalPos = GetPosition();
+	anim.originalPos = target_->GetPosition();
 	anim.elapsed = 0.0f;
 
 	animations_.push_back(anim);
 	isPaused_ = false;
 }
 
-void UIBase::PlayFlip(bool horizontal, float duration) {
+// ============================================================
+// プリセット : フリップ
+// ============================================================
+void UIAnimator::PlayFlip(bool horizontal, float duration) {
 	auto anim = UIAnimationPresets::Flip(horizontal, duration);
-	anim.originalScale = GetScale();
+	anim.originalScale = target_->GetScale();
 	anim.elapsed = 0.0f;
 
 	animations_.push_back(anim);
 	isPaused_ = false;
 }
 
-void UIBase::PlayRotateIn(float duration) {
+// ============================================================
+// プリセット : 回転登場
+// ============================================================
+void UIAnimator::PlayRotateIn(float duration) {
 	auto anim = UIAnimationPresets::RotateIn(duration);
 	anim.elapsed = 0.0f;
 
-	SetRotation(anim.startRotation);
-	SetScale(anim.startScale);
-	SetAlpha(anim.startAlpha);
+	target_->SetRotation(anim.startRotation);
+	target_->SetScale(anim.startScale);
+	target_->SetAlpha(anim.startAlpha);
 
 	animations_.push_back(anim);
 	isPaused_ = false;
 }
 
-void UIBase::PlayRotateOut(float duration) {
+// ============================================================
+// プリセット : 回転退場
+// ============================================================
+void UIAnimator::PlayRotateOut(float duration) {
 	auto anim = UIAnimationPresets::RotateOut(duration);
 	anim.elapsed = 0.0f;
 
@@ -268546,8 +269242,10 @@ void UIBase::PlayRotateOut(float duration) {
 	isPaused_ = false;
 }
 
-// アニメーション制御
-void UIBase::StopAnimation(UIAnimationType type) {
+// ============================================================
+// 制御 : 停止
+// ============================================================
+void UIAnimator::StopAnimation(UIAnimationType type) {
 	if (type == UIAnimationType::None) {
 		// すべてのアニメーションを停止
 		animations_.clear();
@@ -268562,37 +269260,51 @@ void UIBase::StopAnimation(UIAnimationType type) {
 	isPaused_ = false;
 }
 
-void UIBase::StopAllAnimations() {
+// ============================================================
+// 制御 : 全停止
+// ============================================================
+void UIAnimator::StopAllAnimations() {
 	animations_.clear();
 	isPaused_ = false;
 }
 
-void UIBase::PauseAnimation() {
+// ============================================================
+// 制御 : 一時停止 / 再開
+// ============================================================
+void UIAnimator::PauseAnimation() {
 	isPaused_ = true;
 }
 
-void UIBase::ResumeAnimation() {
+void UIAnimator::ResumeAnimation() {
 	isPaused_ = false;
 }
 
-void UIBase::SetAnimationCompleteCallback(std::function<void()> callback) {
+// ============================================================
+// 制御 : コールバック / 遅延（直近に追加したものへ）
+// ============================================================
+void UIAnimator::SetCompleteCallback(std::function<void()> callback) {
 	if (!animations_.empty()) {
 		animations_.back().onComplete = callback;
 	}
 }
 
-void UIBase::SetAnimationUpdateCallback(std::function<void()> callback) {
+void UIAnimator::SetUpdateCallback(std::function<void()> callback) {
 	if (!animations_.empty()) {
 		animations_.back().onUpdate = callback;
 	}
 }
 
-/*==================================================================
-					アニメーション更新処理
-===================================================================*/
+void UIAnimator::SetDelay(float delay) {
+	if (!animations_.empty()) {
+		animations_.back().delay = delay;
+	}
+}
 
-void UIBase::UpdateAnimation(float deltaTime) {
-	if (!IsAnimating() || isPaused_) return;
+// ============================================================
+// 更新（全アニメーションの進行）
+// ============================================================
+void UIAnimator::Update(float deltaTime) {
+	if (!target_ || animations_.empty() || isPaused_) return;
 
 	// 完了したアニメーションを追跡するためのリスト
 	std::vector<size_t> completedIndices;
@@ -268699,7 +269411,7 @@ void UIBase::UpdateAnimation(float deltaTime) {
 				isComplete = true;
 
 				if (anim.type == UIAnimationType::Flash) {
-					this->SetAlpha(1.0f);
+					target_->SetAlpha(1.0f);
 				}
 			}
 		}
@@ -268724,7 +269436,10 @@ void UIBase::UpdateAnimation(float deltaTime) {
 	}
 }
 
-void UIBase::UpdateBasicAnimation(UIAnimation& anim, float t) {
+// ============================================================
+// タイプ別更新 : 基本（線形補間）
+// ============================================================
+void UIAnimator::UpdateBasicAnimation(UIAnimation& anim, float t) {
 	float easedT = Easing::Ease(anim.easingType, t);
 
 	switch (anim.type) {
@@ -268733,7 +269448,7 @@ void UIBase::UpdateBasicAnimation(UIAnimation& anim, float t) {
 		pos.x = anim.startPos.x + (anim.endPos.x - anim.startPos.x) * easedT;
 		pos.y = anim.startPos.y + (anim.endPos.y - anim.startPos.y) * easedT;
 		pos.z = anim.startPos.z + (anim.endPos.z - anim.startPos.z) * easedT;
-		SetPosition(pos);
+		target_->SetPosition(pos);
 		break;
 	}
 	case UIAnimationType::Scale:
@@ -268741,7 +269456,7 @@ void UIBase::UpdateBasicAnimation(UIAnimation& anim, float t) {
 		Vector2 scale;
 		scale.x = anim.startScale.x + (anim.endScale.x - anim.startScale.x) * easedT;
 		scale.y = anim.startScale.y + (anim.endScale.y - anim.startScale.y) * easedT;
-		SetScale(scale);
+		target_->SetScale(scale);
 		break;
 	}
 	case UIAnimationType::Rotation: {
@@ -268749,7 +269464,7 @@ void UIBase::UpdateBasicAnimation(UIAnimation& anim, float t) {
 		rot.x = anim.startRotation.x + (anim.endRotation.x - anim.startRotation.x) * easedT;
 		rot.y = anim.startRotation.y + (anim.endRotation.y - anim.startRotation.y) * easedT;
 		rot.z = anim.startRotation.z + (anim.endRotation.z - anim.startRotation.z) * easedT;
-		SetRotation(rot);
+		target_->SetRotation(rot);
 		break;
 	}
 	case UIAnimationType::Color: {
@@ -268758,14 +269473,14 @@ void UIBase::UpdateBasicAnimation(UIAnimation& anim, float t) {
 		color.y = anim.startColor.y + (anim.endColor.y - anim.startColor.y) * easedT;
 		color.z = anim.startColor.z + (anim.endColor.z - anim.startColor.z) * easedT;
 		color.w = anim.startColor.w + (anim.endColor.w - anim.startColor.w) * easedT;
-		SetColor(color);
+		target_->SetColor(color);
 		break;
 	}
 	case UIAnimationType::Alpha:
 	case UIAnimationType::FadeIn:
 	case UIAnimationType::FadeOut: {
 		float alpha = anim.startAlpha + (anim.endAlpha - anim.startAlpha) * easedT;
-		SetAlpha(alpha);
+		target_->SetAlpha(alpha);
 		break;
 	}
 	default:
@@ -268773,7 +269488,10 @@ void UIBase::UpdateBasicAnimation(UIAnimation& anim, float t) {
 	}
 }
 
-void UIBase::UpdateShakeAnimation(UIAnimation& anim, float t) {
+// ============================================================
+// タイプ別更新 : シェイク（減衰振動）
+// ============================================================
+void UIAnimator::UpdateShakeAnimation(UIAnimation& anim, float t) {
 	// 減衰振動
 	float damping = 1.0f - t;
 	float shake = sin(t * anim.frequency * 3.14159f * 2.0f) * anim.intensity * damping;
@@ -268783,53 +269501,71 @@ void UIBase::UpdateShakeAnimation(UIAnimation& anim, float t) {
 	offset.y = shake * sin(anim.elapsed * 5.0f);
 	offset.z = 0.0f;
 
-	SetPosition(anim.originalPos + offset);
+	target_->SetPosition(anim.originalPos + offset);
 }
 
-void UIBase::UpdatePulseAnimation(UIAnimation& anim, float t) {
+// ============================================================
+// タイプ別更新 : パルス
+// ============================================================
+void UIAnimator::UpdatePulseAnimation(UIAnimation& anim, float t) {
 	float easedT = Easing::Ease(anim.easingType, t);
 
 	Vector2 scale;
 	scale.x = anim.startScale.x + (anim.endScale.x - anim.startScale.x) * easedT;
 	scale.y = anim.startScale.y + (anim.endScale.y - anim.startScale.y) * easedT;
-	SetScale(scale);
+	target_->SetScale(scale);
 }
 
-void UIBase::UpdateBounceAnimation(UIAnimation& anim, float t) {
+// ============================================================
+// タイプ別更新 : バウンス
+// ============================================================
+void UIAnimator::UpdateBounceAnimation(UIAnimation& anim, float t) {
 	float easedT = Easing::Ease(anim.easingType, t);
 
 	Vector3 pos;
 	pos.x = anim.originalPos.x;
 	pos.y = anim.originalPos.y + anim.startPos.y * (1.0f - easedT);
 	pos.z = anim.originalPos.z;
-	SetPosition(pos);
+	target_->SetPosition(pos);
 }
 
-void UIBase::UpdateSwingAnimation(UIAnimation& anim, float t) {
+// ============================================================
+// タイプ別更新 : スイング
+// ============================================================
+void UIAnimator::UpdateSwingAnimation(UIAnimation& anim, float t) {
 	float easedT = Easing::Ease(anim.easingType, t);
 
 	Vector3 rot;
 	rot.x = 0.0f;
 	rot.y = 0.0f;
 	rot.z = anim.startRotation.z + (anim.endRotation.z - anim.startRotation.z) * easedT;
-	SetRotation(rot);
+	target_->SetRotation(rot);
 }
 
-void UIBase::UpdateFlashAnimation(UIAnimation& anim, float t) {
+// ============================================================
+// タイプ別更新 : フラッシュ（点滅）
+// ============================================================
+void UIAnimator::UpdateFlashAnimation(UIAnimation& anim, float t) {
 	// 点滅回数に基づいて明滅
 	float phase = t * anim.frequency;
 	float alpha = (sin(phase * 3.14159f * 2.0f) > 0.0f) ? 1.0f : 0.3f;
-	SetAlpha(alpha);
+	target_->SetAlpha(alpha);
 }
 
-void UIBase::UpdateBlinkAnimation(UIAnimation& anim, float t) {
+// ============================================================
+// タイプ別更新 : ブリンク（瞬き）
+// ============================================================
+void UIAnimator::UpdateBlinkAnimation(UIAnimation& anim, float t) {
 	float easedT = Easing::Ease(anim.easingType, t);
 
 	float alpha = anim.startAlpha + (anim.endAlpha - anim.startAlpha) * easedT;
-	SetAlpha(alpha);
+	target_->SetAlpha(alpha);
 }
 
-void UIBase::UpdateWobbleAnimation(UIAnimation& anim, float t) {
+// ============================================================
+// タイプ別更新 : ウォブル（ぐらぐら）
+// ============================================================
+void UIAnimator::UpdateWobbleAnimation(UIAnimation& anim, float t) {
 	// ウォブル効果(X方向の振動 + Y方向の小さな振動)
 	float wobbleX = sin(t * anim.frequency * 3.14159f * 2.0f) * anim.intensity * (1.0f - t);
 	float wobbleY = sin(t * anim.frequency * 3.14159f * 4.0f) * anim.intensity * 0.3f * (1.0f - t);
@@ -268839,10 +269575,13 @@ void UIBase::UpdateWobbleAnimation(UIAnimation& anim, float t) {
 	offset.y = wobbleY;
 	offset.z = 0.0f;
 
-	SetPosition(anim.originalPos + offset);
+	target_->SetPosition(anim.originalPos + offset);
 }
 
-void UIBase::UpdateSlideAnimation(UIAnimation& anim, float t) {
+// ============================================================
+// タイプ別更新 : スライド
+// ============================================================
+void UIAnimator::UpdateSlideAnimation(UIAnimation& anim, float t) {
 	float easedT = Easing::Ease(anim.easingType, t);
 
 	Vector3 offset;
@@ -268855,22 +269594,28 @@ void UIBase::UpdateSlideAnimation(UIAnimation& anim, float t) {
 	}
 	offset.z = 0.0f;
 
-	SetPosition(anim.originalPos + offset);
+	target_->SetPosition(anim.originalPos + offset);
 }
 
-void UIBase::UpdateZoomAnimation(UIAnimation& anim, float t) {
+// ============================================================
+// タイプ別更新 : ズーム
+// ============================================================
+void UIAnimator::UpdateZoomAnimation(UIAnimation& anim, float t) {
 	float easedT = Easing::Ease(anim.easingType, t);
 
 	Vector2 scale;
 	scale.x = anim.startScale.x + (anim.endScale.x - anim.startScale.x) * easedT;
 	scale.y = anim.startScale.y + (anim.endScale.y - anim.startScale.y) * easedT;
-	SetScale(scale);
+	target_->SetScale(scale);
 
 	float alpha = anim.startAlpha + (anim.endAlpha - anim.startAlpha) * easedT;
-	SetAlpha(alpha);
+	target_->SetAlpha(alpha);
 }
 
-void UIBase::UpdateRotateInOutAnimation(UIAnimation& anim, float t) {
+// ============================================================
+// タイプ別更新 : 回転登場 / 退場
+// ============================================================
+void UIAnimator::UpdateRotateInOutAnimation(UIAnimation& anim, float t) {
 	float easedT = Easing::Ease(anim.easingType, t);
 
 	// 回転
@@ -268878,18 +269623,362 @@ void UIBase::UpdateRotateInOutAnimation(UIAnimation& anim, float t) {
 	rot.x = anim.startRotation.x + (anim.endRotation.x - anim.startRotation.x) * easedT;
 	rot.y = anim.startRotation.y + (anim.endRotation.y - anim.startRotation.y) * easedT;
 	rot.z = anim.startRotation.z + (anim.endRotation.z - anim.startRotation.z) * easedT;
-	SetRotation(rot);
+	target_->SetRotation(rot);
 
 	// スケール
 	Vector2 scale;
 	scale.x = anim.startScale.x + (anim.endScale.x - anim.startScale.x) * easedT;
 	scale.y = anim.startScale.y + (anim.endScale.y - anim.startScale.y) * easedT;
-	SetScale(scale);
+	target_->SetScale(scale);
 
 	// アルファ
 	float alpha = anim.startAlpha + (anim.endAlpha - anim.startAlpha) * easedT;
-	SetAlpha(alpha);
+	target_->SetAlpha(alpha);
 }
+
+
+============================================================
+File Path: YEngine/Utilities/Systems/UI/UIAnimator.h
+============================================================
+#pragma once
+
+// Engine
+#include "UIAnimation.h"
+
+// C++
+#include <vector>
+#include <functional>
+
+// 前方宣言
+class UIBase;
+
+// ============================================================
+// UIAnimator
+// ============================================================
+// UIBase のアニメーション再生を担うエンジン。
+// 対象 UIBase の公開 Setter/Getter を通して
+// 位置・拡縮・回転・色・アルファを時間で動かす。
+//
+// UIBase は本クラスをメンバとして保持し、Play 系 API を転送する。
+// そのため UIBase を使う側のコードは従来どおりで動く。
+// ============================================================
+class UIAnimator {
+public:
+	// ============================================================
+	// 接続
+	// ============================================================
+	// 駆動対象の UIBase を設定する（UIBase 側の Initialize で自分を渡す）。
+	void SetTarget(UIBase* target) { target_ = target; }
+
+	// ============================================================
+	// 基本アニメーション
+	// ============================================================
+	void PlayPositionAnimation(const Vector3& from, const Vector3& to, float duration,
+		Easing::Function easing, bool loop);
+	void PlayScaleAnimation(const Vector2& from, const Vector2& to, float duration,
+		Easing::Function easing, bool loop);
+	void PlayRotationAnimation(const Vector3& from, const Vector3& to, float duration,
+		Easing::Function easing, bool loop);
+	void PlayAlphaAnimation(float from, float to, float duration,
+		Easing::Function easing, bool loop);
+	void PlayColorAnimation(const Vector4& from, const Vector4& to, float duration,
+		Easing::Function easing, bool loop);
+
+	// ============================================================
+	// プリセットアニメーション
+	// ============================================================
+	void PlayAnimation(const UIAnimation& anim);
+	// データ駆動クリップを現在状態を基準に再生（type → 既存 Play〜 へディスパッチ）
+	void PlayClip(const UIAnimationClip& clip);
+	void PlayFadeIn(float duration, Easing::Function easing);
+	void PlayFadeOut(float duration, Easing::Function easing);
+	void PlaySlideIn(SlideDirection dir, float distance, float duration);
+	void PlaySlideOut(SlideDirection dir, float distance, float duration);
+	void PlayZoomIn(float duration);
+	void PlayZoomOut(float duration);
+	void PlayShake(float intensity, float duration);
+	void PlayPulse(float scale, float duration, bool loop);
+	void PlayBounce(float height, float duration);
+	void PlaySwing(float angle, float duration, bool loop);
+	void PlayFlash(float duration, int times);
+	void PlayBlink(float duration, bool loop);
+	void PlayWobble(float intensity, float duration);
+	void PlayFlip(bool horizontal, float duration);
+	void PlayRotateIn(float duration);
+	void PlayRotateOut(float duration);
+
+	// ============================================================
+	// 制御
+	// ============================================================
+	void StopAnimation(UIAnimationType type = UIAnimationType::None);  // None で全停止
+	void StopAllAnimations();
+	void PauseAnimation();
+	void ResumeAnimation();
+
+	// 直近に追加したアニメーションへの設定
+	void SetCompleteCallback(std::function<void()> callback);
+	void SetUpdateCallback(std::function<void()> callback);
+	void SetDelay(float delay);
+
+	bool IsAnimating() const { return !animations_.empty(); }
+	bool IsPaused() const { return isPaused_; }
+
+	// ============================================================
+	// 更新
+	// ============================================================
+	void Update(float deltaTime);
+
+	// インスペクタ等から中身を参照するためのアクセサ
+	std::vector<UIAnimation>& GetAnimations() { return animations_; }
+	const std::vector<UIAnimation>& GetAnimations() const { return animations_; }
+
+private:
+	// ============================================================
+	// タイプ別更新処理
+	// ============================================================
+	void UpdateBasicAnimation(UIAnimation& anim, float t);
+	void UpdateShakeAnimation(UIAnimation& anim, float t);
+	void UpdatePulseAnimation(UIAnimation& anim, float t);
+	void UpdateBounceAnimation(UIAnimation& anim, float t);
+	void UpdateSwingAnimation(UIAnimation& anim, float t);
+	void UpdateFlashAnimation(UIAnimation& anim, float t);
+	void UpdateBlinkAnimation(UIAnimation& anim, float t);
+	void UpdateWobbleAnimation(UIAnimation& anim, float t);
+	void UpdateSlideAnimation(UIAnimation& anim, float t);
+	void UpdateZoomAnimation(UIAnimation& anim, float t);
+	void UpdateRotateInOutAnimation(UIAnimation& anim, float t);
+
+	// ============================================================
+	// メンバ変数
+	// ============================================================
+	UIBase* target_ = nullptr;                 // 駆動対象（非所有）
+	std::vector<UIAnimation> animations_;       // 再生中のアニメーション群
+	bool isPaused_ = false;                     // 一時停止中か
+};
+
+
+============================================================
+File Path: YEngine/Utilities/Systems/UI/UIBase.cpp
+============================================================
+#include "UIBase.h"
+#include <fstream>
+#include <chrono>
+#include <thread>
+#include <algorithm>
+#include "Sprite/SpriteCommon.h"
+
+#ifdef USE_IMGUI
+#include <imgui.h>
+#endif
+#include <Systems/GameTime/GameTime.h>
+
+const std::string UIBase::PRESET_DIRECTORY = "./Resources/Json/UI/";
+
+UIBase::UIBase(const std::string& name) :
+	sprite_(nullptr),
+	hotReloadEnabled_(false),
+	name_(name) {
+	SetupJsonBindings();
+}
+
+UIBase::~UIBase() {
+
+}
+
+void UIBase::Initialize(const std::string& jsonConfigPath) {
+	configPath_ = jsonConfigPath;
+
+	// アニメーションエンジンに自分を接続（Play 系 API はこの animator_ へ転送される）
+	animator_.SetTarget(this);
+
+	sprite_ = std::make_unique<Sprite>();
+
+	bool jsonExists = std::filesystem::exists(jsonConfigPath);
+
+	if (jsonExists) {
+		LoadFromJSON(jsonConfigPath);
+	} else {
+		sprite_->Initialize("./Resources/images/white.png");
+		texturePath_ = "./Resources/images/white.png";
+		SaveToJSON();
+	}
+
+	if (std::filesystem::exists(configPath_)) {
+		lastModTime_ = std::filesystem::last_write_time(configPath_);
+	}
+
+	// 初期可視状態を記録し、OnInit トリガのクリップを自動再生する。
+	prevVisible_ = visible_;
+	PlayClipsByTrigger(UIAnimTrigger::OnInit);
+}
+
+void UIBase::Update() {
+	// アニメーションの進行はエンジンに委譲
+	animator_.Update(YoRigine::GameTime::GetDeltaTime());
+
+	// 非表示→表示に切り替わったフレームで OnShow トリガを再生
+	if (!prevVisible_ && visible_) {
+		PlayClipsByTrigger(UIAnimTrigger::OnShow);
+	}
+	prevVisible_ = visible_;
+
+	if (hotReloadEnabled_) {
+		CheckForChanges();
+	}
+
+	if (sprite_ && visible_) {
+		sprite_->Update();
+	}
+
+#ifdef USE_IMGUI
+	//ImGUi();
+#endif
+}
+
+void UIBase::Draw() {
+	if (sprite_ && visible_) {
+		sprite_->Draw();
+	}
+}
+
+/*==================================================================
+						アニメーション機能
+===================================================================*/
+
+// シンプルなアニメーション（実処理は UIAnimator に委譲）
+void UIBase::PlayPositionAnimation(const Vector3& from, const Vector3& to, float duration,
+	Easing::Function easing, bool loop) {
+	animator_.PlayPositionAnimation(from, to, duration, easing, loop);
+}
+
+void UIBase::PlayScaleAnimation(const Vector2& from, const Vector2& to, float duration,
+	Easing::Function easing, bool loop) {
+	animator_.PlayScaleAnimation(from, to, duration, easing, loop);
+}
+
+void UIBase::PlayRotationAnimation(const Vector3& from, const Vector3& to, float duration,
+	Easing::Function easing, bool loop) {
+	animator_.PlayRotationAnimation(from, to, duration, easing, loop);
+}
+
+void UIBase::PlayAlphaAnimation(float from, float to, float duration,
+	Easing::Function easing, bool loop) {
+	animator_.PlayAlphaAnimation(from, to, duration, easing, loop);
+}
+
+void UIBase::PlayColorAnimation(const Vector4& from, const Vector4& to, float duration,
+	Easing::Function easing, bool loop) {
+	animator_.PlayColorAnimation(from, to, duration, easing, loop);
+}
+
+// プリセットアニメーション（実処理は UIAnimator に委譲）
+void UIBase::PlayAnimation(const UIAnimation& anim) {
+	animator_.PlayAnimation(anim);
+}
+
+void UIBase::PlayFadeIn(float duration, Easing::Function easing) {
+	animator_.PlayFadeIn(duration, easing);
+}
+
+void UIBase::PlayFadeOut(float duration, Easing::Function easing) {
+	animator_.PlayFadeOut(duration, easing);
+}
+
+void UIBase::PlaySlideIn(SlideDirection dir, float distance, float duration) {
+	animator_.PlaySlideIn(dir, distance, duration);
+}
+
+void UIBase::PlaySlideOut(SlideDirection dir, float distance, float duration) {
+	animator_.PlaySlideOut(dir, distance, duration);
+}
+
+void UIBase::PlayZoomIn(float duration) {
+	animator_.PlayZoomIn(duration);
+}
+
+void UIBase::PlayZoomOut(float duration) {
+	animator_.PlayZoomOut(duration);
+}
+
+void UIBase::PlayShake(float intensity, float duration) {
+	animator_.PlayShake(intensity, duration);
+}
+
+void UIBase::PlayPulse(float scale, float duration, bool loop) {
+	animator_.PlayPulse(scale, duration, loop);
+}
+
+void UIBase::PlayBounce(float height, float duration) {
+	animator_.PlayBounce(height, duration);
+}
+
+void UIBase::PlaySwing(float angle, float duration, bool loop) {
+	animator_.PlaySwing(angle, duration, loop);
+}
+
+void UIBase::PlayFlash(float duration, int times) {
+	animator_.PlayFlash(duration, times);
+}
+
+void UIBase::PlayBlink(float duration, bool loop) {
+	animator_.PlayBlink(duration, loop);
+}
+
+void UIBase::PlayWobble(float intensity, float duration) {
+	animator_.PlayWobble(intensity, duration);
+}
+
+void UIBase::PlayFlip(bool horizontal, float duration) {
+	animator_.PlayFlip(horizontal, duration);
+}
+
+void UIBase::PlayRotateIn(float duration) {
+	animator_.PlayRotateIn(duration);
+}
+
+void UIBase::PlayRotateOut(float duration) {
+	animator_.PlayRotateOut(duration);
+}
+
+// アニメーション制御（実処理は UIAnimator に委譲）
+void UIBase::StopAnimation(UIAnimationType type) {
+	animator_.StopAnimation(type);
+}
+
+void UIBase::StopAllAnimations() {
+	animator_.StopAllAnimations();
+}
+
+void UIBase::PauseAnimation() {
+	animator_.PauseAnimation();
+}
+
+void UIBase::ResumeAnimation() {
+	animator_.ResumeAnimation();
+}
+
+void UIBase::SetAnimationCompleteCallback(std::function<void()> callback) {
+	animator_.SetCompleteCallback(callback);
+}
+
+void UIBase::SetAnimationUpdateCallback(std::function<void()> callback) {
+	animator_.SetUpdateCallback(callback);
+}
+
+// データ駆動クリップの再生（実処理は UIAnimator に委譲）
+void UIBase::PlayClip(const UIAnimationClip& clip) {
+	animator_.PlayClip(clip);
+}
+
+void UIBase::PlayClipsByTrigger(UIAnimTrigger trigger) {
+	for (const auto& clip : clips_) {
+		if (clip.trigger == trigger) {
+			animator_.PlayClip(clip);
+		}
+	}
+}
+
+// アニメーションの更新処理は UIAnimator へ移動した（UIBase::Update が animator_.Update を呼ぶ）。
 
 /*==================================================================
 						グリッド・スナップ
@@ -268968,6 +270057,694 @@ void UIBase::CopyPropertiesFrom(const UIBase* other) {
 						ImGui拡張
 ===================================================================*/
 
+// ============================================================
+// ImGui パネル群（ImGuiGridSettings / ImGuiAnimationSettings /
+// ImGuiPresetSettings / ImGuiQuickAlignment / ImGuiUVSRTSettings / ImGUi）は
+// UIBaseEditor.cpp に分離した。
+// ============================================================
+
+// （ImGuiPresetSettings / ImGuiQuickAlignment / ImGuiUVSRTSettings / ImGUi の
+//  実装は UIBaseEditor.cpp に移動した）
+
+void UIBase::EnableHotReload(bool enable) {
+	hotReloadEnabled_ = enable;
+}
+
+void UIBase::CheckForChanges() {
+	if (configPath_.empty() || !std::filesystem::exists(configPath_)) {
+		return;
+	}
+
+	auto currentModTime = std::filesystem::last_write_time(configPath_);
+
+	if (currentModTime != lastModTime_) {
+		LoadFromJSON(configPath_);
+		lastModTime_ = currentModTime;
+	}
+}
+
+bool UIBase::LoadFromJSON(const std::string& jsonPath) {
+	try {
+		std::ifstream file(jsonPath);
+		if (!file.is_open()) {
+			return false;
+		}
+
+		nlohmann::json data;
+		file >> data;
+		file.close();
+
+		ApplyJSONToState(data);
+
+		return true;
+	}
+	catch (const std::exception& e) {
+		printf("JSONからUIの読み込み中にエラー発生: %s\n", e.what());
+		return false;
+	}
+}
+
+bool UIBase::SaveToJSON(const std::string& jsonPath) {
+	std::string savePath = jsonPath.empty() ? configPath_ : jsonPath;
+
+	if (savePath.empty()) {
+		return false;
+	}
+
+	try {
+		std::filesystem::path dirPath = std::filesystem::path(savePath).parent_path();
+
+		if (!dirPath.empty() && !std::filesystem::exists(dirPath)) {
+			std::filesystem::create_directories(dirPath);
+		}
+
+		nlohmann::json data = CreateJSONFromCurrentState();
+
+		std::ofstream file(savePath);
+		if (!file.is_open()) {
+			return false;
+		}
+
+		file << std::setw(4) << data << std::endl;
+		file.close();
+
+		return true;
+	}
+	catch (const std::exception& e) {
+		printf("JSONへのUI保存中にエラー発生: %s\n", e.what());
+		return false;
+	}
+}
+
+void UIBase::SetPosition(const Vector3& position) {
+	if (sprite_) {
+		sprite_->SetTranslate(position);
+	}
+}
+
+Vector3 UIBase::GetPosition() const {
+	if (sprite_) {
+		return sprite_->GetTranslate();
+	}
+	return { 0.0f, 0.0f, 0.0f };
+}
+
+void UIBase::SetRotation(const Vector3& rotation) {
+	if (sprite_) {
+		sprite_->SetRotate(rotation);
+	}
+}
+
+Vector3 UIBase::GetRotation() const {
+	if (sprite_) {
+		return sprite_->GetRotate();
+	}
+	return { 0.0f, 0.0f, 0.0f };
+}
+
+// 基準表示サイズ(px)。レイアウト用。
+void UIBase::SetSize(const Vector2& size) {
+	if (sprite_) {
+		sprite_->SetSize(size);
+	}
+}
+
+Vector2 UIBase::GetSize() const {
+	if (sprite_) {
+		return sprite_->GetSize();
+	}
+	return { 100.0f, 100.0f };
+}
+
+// 拡縮倍率(1.0=等倍)。アニメーション/演出用。表示サイズ = Size(px) × Scale。
+void UIBase::SetScale(const Vector2& scale) {
+	if (sprite_) {
+		sprite_->SetScale(scale);
+	}
+}
+
+Vector2 UIBase::GetScale() const {
+	if (sprite_) {
+		return sprite_->GetScale();
+	}
+	return { 1.0f, 1.0f };
+}
+
+void UIBase::SetColor(const Vector4& color) {
+	if (sprite_) {
+		sprite_->SetColor(color);
+	}
+}
+
+Vector4 UIBase::GetColor() const {
+	if (sprite_) {
+		return sprite_->GetColor();
+	}
+	return { 1.0f, 1.0f, 1.0f, 1.0f };
+}
+
+void UIBase::SetAlpha(float alpha) {
+	if (sprite_) {
+		sprite_->SetAlpha(alpha);
+	}
+}
+
+float UIBase::GetAlpha() const {
+	if (sprite_) {
+		return sprite_->GetColor().w;
+	}
+	return 1.0f;
+}
+
+void UIBase::SetTexture(const std::string& texturePath) {
+	if (sprite_) {
+		sprite_->ChangeTexture(texturePath);
+		texturePath_ = texturePath;
+	}
+}
+
+std::string UIBase::GetTexturePath() const {
+	return texturePath_;
+}
+
+void UIBase::SetCamera(Camera* camera) {
+	if (sprite_) {
+		sprite_->SetCamera(camera);
+	}
+}
+
+void UIBase::SetName(const std::string& name) {
+	name_ = name;
+}
+
+std::string UIBase::GetName() const {
+	return name_;
+}
+
+void UIBase::SetFlipX(bool flipX) {
+	if (sprite_) {
+		sprite_->SetIsFlipX(flipX);
+	}
+}
+
+void UIBase::SetFlipY(bool flipY) {
+	if (sprite_) {
+		sprite_->SetIsFlipY(flipY);
+	}
+}
+
+bool UIBase::GetFlipX() const {
+	if (sprite_) {
+		return sprite_->GetIsFlipX();
+	}
+	return false;
+}
+
+bool UIBase::GetFlipY() const {
+	if (sprite_) {
+		return sprite_->GetIsFlipY();
+	}
+	return false;
+}
+
+void UIBase::SetTextureLeftTop(const Vector2& leftTop) {
+	if (sprite_) {
+		sprite_->SetTextureLeftTop(leftTop);
+	}
+}
+
+Vector2 UIBase::GetTextureLeftTop() const {
+	if (sprite_) {
+		return sprite_->GetTextureLeftTop();
+	}
+	return { 0.0f, 0.0f };
+}
+
+void UIBase::SetTextureSize(const Vector2& size) {
+	if (sprite_) {
+		sprite_->SetTextureSize(size);
+	}
+}
+
+Vector2 UIBase::GetTextureSize() const {
+	if (sprite_) {
+		return sprite_->GetTextureSize();
+	}
+	return { 1.0f, 1.0f };
+}
+
+void UIBase::SetAnchorPoint(const Vector2& anchor) {
+	if (sprite_) {
+		sprite_->SetAnchorPoint(anchor);
+	}
+}
+
+Vector2 UIBase::GetAnchorPoint() const {
+	if (sprite_) {
+		return sprite_->GetAnchorPoint();
+	}
+	return { 0.0f, 0.0f };
+}
+
+/*==================================================================
+						UV SRT制御
+===================================================================*/
+
+void UIBase::SetUVTranslation(const Vector2& translation) {
+	uvTranslation_ = translation;
+	if (sprite_) {
+		sprite_->SetUVTranslation(translation);
+	}
+}
+
+Vector2 UIBase::GetUVTranslation() const {
+	return uvTranslation_;
+}
+
+void UIBase::SetUVRotation(float rotation) {
+	uvRotation_ = rotation;
+	if (sprite_) {
+		sprite_->SetUVRotation(rotation);
+	}
+}
+
+float UIBase::GetUVRotation() const {
+	return uvRotation_;
+}
+
+void UIBase::SetUVScale(const Vector2& scale) {
+	uvScale_ = scale;
+	if (sprite_) {
+		sprite_->SetUVScale(scale);
+	}
+}
+
+Vector2 UIBase::GetUVScale() const {
+	return uvScale_;
+}
+
+// ============================================================
+// AutoJson への変数登録（コンストラクタで一度だけ）
+// ============================================================
+// 登録した変数は aj_.Save / aj_.Load で一括して読み書きされる。
+// color は既存JSONが r/g/b/a 形式（Vector4 既定の x/y/z/w とは別）なので
+// 後方互換のため AutoJson には載せず CreateJSON/ApplyJSON で個別に処理する。
+void UIBase::SetupJsonBindings() {
+	aj_.Add("name", &name_)
+		.Add("texturePath", &texturePath_)
+		.Add("position", &position_)
+		.Add("rotation", &rotation_)
+		.Add("size", &size_)
+		.Add("scale", &scale_)
+		.Add("flipX", &flipX_)
+		.Add("flipY", &flipY_)
+		.Add("textureLeftTop", &textureLeftTop_)
+		.Add("anchorPoint", &anchorPoint_)
+		.Add("textureSize", &textureSize_)
+		.Add("visible", &visible_)
+		.Add("layer", &layer_)
+		.Add("uvTranslation", &uvTranslation_)
+		.Add("uvRotation", &uvRotation_)
+		.Add("uvScale", &uvScale_)
+		.Add("animations", &clips_);
+}
+
+// ============================================================
+// sprite_ の現在値 → 永続化用メンバへ（保存直前）
+// ============================================================
+void UIBase::SyncSpriteToData() {
+	position_ = GetPosition();
+	rotation_ = GetRotation();
+	size_ = GetSize();
+	scale_ = GetScale();
+	color_ = GetColor();
+	flipX_ = GetFlipX();
+	flipY_ = GetFlipY();
+	textureLeftTop_ = GetTextureLeftTop();
+	anchorPoint_ = GetAnchorPoint();
+	textureSize_ = GetTextureSize();
+	// uvTranslation_/uvRotation_/uvScale_ は Setter でメンバ側も常に同期済み。
+	// name_/visible_/layer_/clips_ はメンバが直接ソース。
+}
+
+// ============================================================
+// 永続化用メンバ → sprite_ へ反映（読み込み直後）
+// ============================================================
+void UIBase::ApplyDataToSprite() {
+	if (texturePath_.empty()) {
+		texturePath_ = "./Resources/images/white.png";
+	}
+	if (!sprite_) {
+		sprite_ = std::make_unique<Sprite>();
+	}
+	sprite_->Initialize(texturePath_);
+
+	SetPosition(position_);
+	SetRotation(rotation_);
+	SetSize(size_);
+	SetScale(scale_);
+	SetColor(color_);
+	SetFlipX(flipX_);
+	SetFlipY(flipY_);
+	sprite_->SetTextureLeftTop(textureLeftTop_);
+	sprite_->SetAnchorPoint(anchorPoint_);
+	sprite_->SetTextureSize(textureSize_);
+	SetUVTranslation(uvTranslation_);
+	SetUVRotation(uvRotation_);
+	SetUVScale(uvScale_);
+}
+
+nlohmann::json UIBase::CreateJSONFromCurrentState() {
+	// sprite_ が保持する実描画値をメンバへ吸い上げてから一括保存
+	SyncSpriteToData();
+
+	nlohmann::json data;
+	aj_.Save(data);
+
+	// 色は後方互換のため r/g/b/a で保存する（Vector4 既定の x/y/z/w にしない）
+	data["color"] = {
+		{"r", color_.x},
+		{"g", color_.y},
+		{"b", color_.z},
+		{"a", color_.w}
+	};
+
+	return data;
+}
+
+void UIBase::ApplyJSONToState(const nlohmann::json& data) {
+	// 登録済みフィールド（color 以外）を一括ロード。未知キーは無視される。
+	aj_.Load(data);
+
+	// 色（r/g/b/a 後方互換）
+	if (data.contains("color")) {
+		const auto& c = data["color"];
+		color_.x = c.value("r", 1.0f);
+		color_.y = c.value("g", 1.0f);
+		color_.z = c.value("b", 1.0f);
+		color_.w = c.value("a", 1.0f);
+	}
+
+	// 旧フォーマット: "size" が無く "scale" だけある場合、その "scale" は
+	// 実体としてピクセルサイズ。基準サイズ(px)へ読み替え、倍率は等倍に戻す。
+	if (!data.contains("size") && data.contains("scale")) {
+		size_ = scale_;
+		scale_ = { 1.0f, 1.0f };
+	}
+
+	// メンバ → sprite_ へ反映
+	ApplyDataToSprite();
+}
+
+============================================================
+File Path: YEngine/Utilities/Systems/UI/UIBase.h
+============================================================
+#pragma once
+#include <string>
+#include <memory>
+#include <vector>
+#include <unordered_map>
+#include <functional>
+#include <filesystem>
+#include "Sprite/Sprite.h"
+#include "Vector2.h"
+#include "Vector3.h"
+#include "Vector4.h"
+#include "json.hpp"
+#include "UIAnimation.h"
+#include "UIAnimator.h"
+#include "Loaders/Json/Use/AutoJson.h"
+
+// 前方宣言
+class SpriteCommon;
+class Camera;
+
+///************************* UI基本クラス *************************///
+class UIBase {
+public:
+	///************************* 基本関数 *************************///
+
+	UIBase(const std::string& name = "UIBase");
+	virtual ~UIBase();
+
+	void Initialize(const std::string& jsonConfigPath);
+	virtual void Update();
+	virtual void Draw();
+	void ImGUi();
+
+private:
+	void EnableHotReload(bool enable);
+	void CheckForChanges();
+	bool LoadFromJSON(const std::string& jsonPath);
+
+public:
+	///************************* 基本アクセッサ *************************///
+
+	bool SaveToJSON(const std::string& jsonPath = "");
+
+	void SetPosition(const Vector3& position);
+	Vector3 GetPosition() const;
+
+	void SetRotation(const Vector3& rotation);
+	Vector3 GetRotation() const;
+
+	// 基準表示サイズ(px)。レイアウト用。
+	void SetSize(const Vector2& size);
+	Vector2 GetSize() const;
+
+	// 拡縮倍率(1.0=等倍)。アニメーション/演出用。表示サイズ = Size(px) × Scale。
+	void SetScale(const Vector2& scale);
+	Vector2 GetScale() const;
+
+	void SetColor(const Vector4& color);
+	Vector4 GetColor() const;
+
+	void SetAlpha(float alpha);
+	float GetAlpha() const;
+
+	void SetTexture(const std::string& texturePath);
+	std::string GetTexturePath() const;
+
+	void SetCamera(Camera* camera);
+	void SetName(const std::string& name);
+	std::string GetName() const;
+
+	void SetFlipX(bool flipX);
+	void SetFlipY(bool flipY);
+	bool GetFlipX() const;
+	bool GetFlipY() const;
+
+	Sprite* GetSprite() { return sprite_.get(); }
+
+	void SetTextureLeftTop(const Vector2& leftTop);
+	Vector2 GetTextureLeftTop() const;
+
+	void SetTextureSize(const Vector2& size);
+	Vector2 GetTextureSize() const;
+
+	void SetAnchorPoint(const Vector2& anchor);
+	Vector2 GetAnchorPoint() const;
+
+	///************************* UV SRT制御 *************************///
+
+	void SetUVTranslation(const Vector2& translation);
+	Vector2 GetUVTranslation() const;
+
+	void SetUVRotation(float rotation);
+	float GetUVRotation() const;
+
+	void SetUVScale(const Vector2& scale);
+	Vector2 GetUVScale() const;
+
+	///************************* グリッド・スナップ機能 *************************///
+
+	void SetGridEnabled(bool enabled) { gridEnabled_ = enabled; }
+	bool IsGridEnabled() const { return gridEnabled_; }
+
+	void SetGridSize(float size) { gridSize_ = size; }
+	float GetGridSize() const { return gridSize_; }
+
+	Vector3 SnapToGrid(const Vector3& position) const;
+
+	///************************* 表示制御 *************************///
+
+	void SetVisible(bool visible) { visible_ = visible; }
+	bool IsVisible() const { return visible_; }
+
+	void SetLayer(int layer) { layer_ = layer; }
+	int GetLayer() const { return layer_; }
+
+	///************************* 基本アニメーション制御 *************************///
+
+	// シンプルなアニメーション
+	void PlayPositionAnimation(const Vector3& from, const Vector3& to, float duration,
+		Easing::Function easing = Easing::Function::Linear, bool loop = false);
+	void PlayScaleAnimation(const Vector2& from, const Vector2& to, float duration,
+		Easing::Function easing = Easing::Function::Linear, bool loop = false);
+	void PlayRotationAnimation(const Vector3& from, const Vector3& to, float duration,
+		Easing::Function easing = Easing::Function::Linear, bool loop = false);
+	void PlayAlphaAnimation(float from, float to, float duration,
+		Easing::Function easing = Easing::Function::Linear, bool loop = false);
+	void PlayColorAnimation(const Vector4& from, const Vector4& to, float duration,
+		Easing::Function easing = Easing::Function::Linear, bool loop = false);
+
+	// プリセットアニメーション
+	void PlayAnimation(const UIAnimation& anim);
+	void PlayFadeIn(float duration = 1.0f, Easing::Function easing = Easing::Function::EaseOutQuad);
+	void PlayFadeOut(float duration = 1.0f, Easing::Function easing = Easing::Function::EaseInQuad);
+	void PlaySlideIn(SlideDirection dir, float distance, float duration = 0.5f);
+	void PlaySlideOut(SlideDirection dir, float distance, float duration = 0.5f);
+	void PlayZoomIn(float duration = 0.5f);
+	void PlayZoomOut(float duration = 0.5f);
+	void PlayShake(float intensity = 10.0f, float duration = 0.5f);
+	void PlayPulse(float scale = 1.2f, float duration = 0.5f, bool loop = true);
+	void PlayBounce(float height = 50.0f, float duration = 1.0f);
+	void PlaySwing(float angle = 15.0f, float duration = 0.5f, bool loop = true);
+	void PlayFlash(float duration = 0.5f, int times = 3);
+	void PlayBlink(float duration = 2.0f, bool loop = true);
+	void PlayWobble(float intensity = 20.0f, float duration = 1.0f);
+	void PlayFlip(bool horizontal = true, float duration = 0.6f);
+	void PlayRotateIn(float duration = 0.8f);
+	void PlayRotateOut(float duration = 0.8f);
+
+	// アニメーション制御
+	void StopAnimation(UIAnimationType type = UIAnimationType::None);  // None指定で全停止
+	void StopAllAnimations();  // 全アニメーション停止
+	void PauseAnimation();
+	void ResumeAnimation();
+	bool IsAnimating() const { return animator_.IsAnimating(); }
+	bool IsPaused() const { return animator_.IsPaused(); }
+
+	// アニメーションエンジンへの直接アクセス（インスペクタ等が中身を参照する用途）
+	UIAnimator& GetAnimator() { return animator_; }
+	const UIAnimator& GetAnimator() const { return animator_; }
+
+	///************************* アニメーションクリップ（データ駆動） *************************///
+
+	// 保存済みクリップを1つ再生
+	void PlayClip(const UIAnimationClip& clip);
+	// 指定トリガを持つクリップをまとめて再生（OnInit / OnShow の自動再生に使用）
+	void PlayClipsByTrigger(UIAnimTrigger trigger);
+
+	// エディタ等がクリップ一覧を編集する用途
+	std::vector<UIAnimationClip>& GetClips() { return clips_; }
+	const std::vector<UIAnimationClip>& GetClips() const { return clips_; }
+
+	// コールバック設定（最後に追加されたアニメーションに設定）
+	void SetAnimationCompleteCallback(std::function<void()> callback);
+	void SetAnimationUpdateCallback(std::function<void()> callback);
+
+	// 遅延設定（最後に追加されたアニメーションに設定）
+	void SetAnimationDelay(float delay) { animator_.SetDelay(delay); }
+	///************************* プリセット機能 *************************///
+
+	bool SaveAsPreset(const std::string& presetName);
+	bool LoadPreset(const std::string& presetName);
+	std::vector<std::string> GetAvailablePresets() const;
+
+	///************************* 複製機能 *************************///
+
+	void CopyPropertiesFrom(const UIBase* other);
+
+	static const std::string PRESET_DIRECTORY;
+
+protected:
+	///************************* メンバ変数 *************************///
+
+	std::unique_ptr<Sprite> sprite_;
+	Camera* camera_ = nullptr;
+	std::string configPath_;
+	std::filesystem::file_time_type lastModTime_;
+	std::string name_;
+	std::string texturePath_;
+	bool hotReloadEnabled_;
+
+	bool visible_ = true;
+	int layer_ = 0;
+
+	bool gridEnabled_ = false;
+	float gridSize_ = 10.0f;
+
+	// ============================================================
+	// JSON 永続化用の値（AutoJson に登録するソース・オブ・トゥルース）
+	// 実描画値は sprite_ が保持するため、保存直前に sprite_→ここへ、
+	// 読み込み直後にここ→sprite_ へ同期する（SyncSpriteToData / ApplyDataToSprite）。
+	// ============================================================
+	Vector3 position_ = { 0.0f, 0.0f, 0.0f };
+	Vector3 rotation_ = { 0.0f, 0.0f, 0.0f };
+	Vector2 size_ = { 100.0f, 100.0f };   // 基準サイズ(px)
+	Vector2 scale_ = { 1.0f, 1.0f };      // 拡縮倍率(1.0=等倍)
+	Vector4 color_ = { 1.0f, 1.0f, 1.0f, 1.0f };
+	bool flipX_ = false;
+	bool flipY_ = false;
+	Vector2 textureLeftTop_ = { 0.0f, 0.0f };
+	Vector2 anchorPoint_ = { 0.0f, 0.0f };
+	Vector2 textureSize_ = { 100.0f, 100.0f };
+
+	// 変数登録だけで Save/Load を自動化する（CreateJSON/ApplyJSON のボイラープレート削減）
+	AutoJson aj_;
+
+	// アニメーション管理（再生ロジックは UIAnimator に分離）
+	UIAnimator animator_;
+
+	// データ駆動アニメーションクリップ（JSON 永続化・トリガ自動再生用）
+	std::vector<UIAnimationClip> clips_;
+	bool prevVisible_ = true;   // OnShow トリガ検知用（前フレームの可視状態）
+
+	// UV SRT
+	Vector2 uvTranslation_ = { 0.0f, 0.0f };
+	float uvRotation_ = 0.0f;
+	Vector2 uvScale_ = { 1.0f, 1.0f };
+
+	///************************* 内部関数 *************************///
+
+	nlohmann::json CreateJSONFromCurrentState();
+	void ApplyJSONToState(const nlohmann::json& json);
+
+	// AutoJson への変数登録（コンストラクタで一度だけ呼ぶ）
+	void SetupJsonBindings();
+	// sprite_ の現在値 → 永続化用メンバへ（保存直前）
+	void SyncSpriteToData();
+	// 永続化用メンバ → sprite_ へ反映（読み込み直後）
+	void ApplyDataToSprite();
+
+	///************************* ImGui関連 *************************///
+
+	void ImGuiGridSettings();
+	void ImGuiAnimationSettings();
+	void ImGuiPresetSettings();
+	void ImGuiQuickAlignment();
+	void ImGuiUVSRTSettings();
+};
+
+============================================================
+File Path: YEngine/Utilities/Systems/UI/UIBaseEditor.cpp
+============================================================
+#include "UIBase.h"
+
+// Engine
+#ifdef USE_IMGUI
+#include <imgui.h>
+#endif
+
+// C++
+#include <filesystem>
+#include <functional>
+#include <algorithm>
+#include <cctype>
+#include <cstring>
+
+// ============================================================
+// UIBase の ImGui エディタ部
+// ============================================================
+// UIBase 本体（実行時ロジック）から ImGui パネル群を分離したファイル。
+// 各関数は UIBase のメンバ定義のままなので private へ自由にアクセスできる。
+// 本体は内部 #ifdef USE_IMGUI でガードしているため Release では空関数になる。
+// ============================================================
+
+// ============================================================
+// グリッド設定パネル
+// ============================================================
 void UIBase::ImGuiGridSettings() {
 #ifdef USE_IMGUI
 	if (ImGui::CollapsingHeader("グリッド設定")) {
@@ -268994,13 +270771,14 @@ void UIBase::ImGuiAnimationSettings() {
 
 		if (IsAnimating()) {
 			ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.2f, 1.0f), "▶ アニメーション再生中...");
-			ImGui::Text("アクティブなアニメーション数: %zu", animations_.size());
+			ImGui::Text("アクティブなアニメーション数: %zu", animator_.GetAnimations().size());
 
 			ImGui::Spacing();
 
 			// 各アニメーションの進捗を表示
-			for (size_t i = 0; i < animations_.size(); ++i) {
-				const UIAnimation& anim = animations_[i];
+			const auto& anims = animator_.GetAnimations();
+			for (size_t i = 0; i < anims.size(); ++i) {
+				const UIAnimation& anim = anims[i];
 
 				ImGui::PushID(static_cast<int>(i));
 
@@ -269041,7 +270819,7 @@ void UIBase::ImGuiAnimationSettings() {
 			}
 
 			// 制御ボタン
-			if (isPaused_) {
+			if (IsPaused()) {
 				if (ImGui::Button("▶ 再開", ImVec2(100, 0))) {
 					ResumeAnimation();
 				}
@@ -269292,10 +271070,146 @@ void UIBase::ImGuiAnimationSettings() {
 
 			ImGui::TreePop();
 		}
+
+		ImGui::Spacing();
+		ImGui::Separator();
+		ImGui::Spacing();
+
+		// ============================================================
+		// アニメクリップ（JSON に保存され、トリガで自動再生される）
+		// ============================================================
+
+		// combo の並び（animTypes）→ UIAnimationType の対応表
+		static const UIAnimationType kAnimTypeByIndex[] = {
+			UIAnimationType::Position, UIAnimationType::Scale, UIAnimationType::Rotation,
+			UIAnimationType::Alpha, UIAnimationType::Color,
+			UIAnimationType::FadeIn, UIAnimationType::FadeOut,
+			UIAnimationType::SlideIn, UIAnimationType::SlideOut,
+			UIAnimationType::ZoomIn, UIAnimationType::ZoomOut,
+			UIAnimationType::Shake, UIAnimationType::Pulse, UIAnimationType::Bounce,
+			UIAnimationType::Swing, UIAnimationType::Flash, UIAnimationType::Blink,
+			UIAnimationType::Wobble, UIAnimationType::Flip,
+			UIAnimationType::RotateIn, UIAnimationType::RotateOut
+		};
+
+		auto AnimTypeName = [](UIAnimationType t) -> const char* {
+			switch (t) {
+			case UIAnimationType::Position: return "位置";
+			case UIAnimationType::Scale: return "スケール";
+			case UIAnimationType::Rotation: return "回転";
+			case UIAnimationType::Alpha: return "アルファ";
+			case UIAnimationType::Color: return "色";
+			case UIAnimationType::FadeIn: return "フェードイン";
+			case UIAnimationType::FadeOut: return "フェードアウト";
+			case UIAnimationType::SlideIn: return "スライドイン";
+			case UIAnimationType::SlideOut: return "スライドアウト";
+			case UIAnimationType::ZoomIn: return "ズームイン";
+			case UIAnimationType::ZoomOut: return "ズームアウト";
+			case UIAnimationType::Shake: return "シェイク";
+			case UIAnimationType::Pulse: return "パルス";
+			case UIAnimationType::Bounce: return "バウンス";
+			case UIAnimationType::Swing: return "スイング";
+			case UIAnimationType::Flash: return "フラッシュ";
+			case UIAnimationType::Blink: return "ブリンク";
+			case UIAnimationType::Wobble: return "ウォブル";
+			case UIAnimationType::Flip: return "フリップ";
+			case UIAnimationType::RotateIn: return "回転イン";
+			case UIAnimationType::RotateOut: return "回転アウト";
+			default: return "不明";
+			}
+		};
+
+		const char* triggerNames[] = { "手動", "表示開始時(OnInit)", "表示切替時(OnShow)" };
+
+		if (ImGui::TreeNodeEx("💾 アニメクリップ（保存対象）", ImGuiTreeNodeFlags_DefaultOpen)) {
+
+			// --- 既存クリップの一覧 ---
+			if (clips_.empty()) {
+				ImGui::TextDisabled("クリップがありません。下で追加してください。");
+			}
+
+			int removeIndex = -1;
+			for (size_t i = 0; i < clips_.size(); ++i) {
+				UIAnimationClip& clip = clips_[i];
+				ImGui::PushID(static_cast<int>(i));
+
+				ImGui::Text("%zu: %s [%s]", i + 1, AnimTypeName(clip.type),
+					triggerNames[static_cast<int>(clip.trigger)]);
+
+				// 名前
+				char nameBuf[128];
+				strncpy_s(nameBuf, clip.name.c_str(), sizeof(nameBuf) - 1);
+				nameBuf[sizeof(nameBuf) - 1] = '\0';
+				if (ImGui::InputText("名前", nameBuf, sizeof(nameBuf))) {
+					clip.name = nameBuf;
+				}
+
+				// トリガ
+				int trig = static_cast<int>(clip.trigger);
+				if (ImGui::Combo("トリガ", &trig, triggerNames, IM_ARRAYSIZE(triggerNames))) {
+					clip.trigger = static_cast<UIAnimTrigger>(trig);
+				}
+
+				ImGui::DragFloat("時間(秒)", &clip.duration, 0.05f, 0.05f, 10.0f);
+				ImGui::DragFloat("遅延(秒)", &clip.delay, 0.05f, 0.0f, 10.0f);
+				ImGui::Checkbox("ループ", &clip.loop);
+
+				if (ImGui::Button("▶ 再生")) {
+					PlayClip(clip);
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("削除")) {
+					removeIndex = static_cast<int>(i);
+				}
+
+				ImGui::Separator();
+				ImGui::PopID();
+			}
+
+			if (removeIndex >= 0) {
+				clips_.erase(clips_.begin() + removeIndex);
+			}
+
+			// --- 現在の設定をクリップとして追加 ---
+			ImGui::Spacing();
+			ImGui::Text("➕ 現在の設定をクリップとして追加");
+
+			static int newClipTrigger = 0;
+			static char newClipName[128] = "NewClip";
+			ImGui::Combo("追加時トリガ", &newClipTrigger, triggerNames, IM_ARRAYSIZE(triggerNames));
+			ImGui::InputText("クリップ名", newClipName, sizeof(newClipName));
+
+			if (ImGui::Button("クリップを追加", ImVec2(-1, 0))) {
+				UIAnimationClip clip;
+				clip.name = (strlen(newClipName) > 0) ? newClipName : "Clip";
+				clip.type = kAnimTypeByIndex[selectedAnimType];
+				clip.trigger = static_cast<UIAnimTrigger>(newClipTrigger);
+				clip.easing = static_cast<Easing::Function>(selectedEasing);
+				clip.duration = duration;
+				clip.loop = loop;
+				// 上の試し再生と同じ係数でパラメータを埋める
+				clip.intensity = intensity * 10.0f;
+				clip.scaleAmt = 1.0f + intensity * 0.2f;
+				clip.height = intensity * 50.0f;
+				clip.angle = intensity * 15.0f;
+				clip.times = static_cast<int>(intensity * 3.0f);
+				clip.distance = 200.0f;
+				clip.direction = SlideDirection::Right;
+				clips_.push_back(clip);
+			}
+
+			ImGui::TextDisabled("※「アニメーション設定」のタイプ/イージング/時間/強度を使います");
+			ImGui::TextDisabled("※ 追加後は「変更を保存」で JSON に永続化されます");
+
+			ImGui::TreePop();
+		}
 	}
 #endif
 }
 
+// ============================================================
+// プリセット保存/読込パネル
+// ============================================================
 void UIBase::ImGuiPresetSettings() {
 #ifdef USE_IMGUI
 	if (ImGui::CollapsingHeader("プリセット")) {
@@ -269346,6 +271260,9 @@ void UIBase::ImGuiPresetSettings() {
 #endif
 }
 
+// ============================================================
+// クイック配置パネル
+// ============================================================
 void UIBase::ImGuiQuickAlignment() {
 #ifdef USE_IMGUI
 	if (ImGui::CollapsingHeader("クイック配置")) {
@@ -269390,6 +271307,9 @@ void UIBase::ImGuiQuickAlignment() {
 #endif
 }
 
+// ============================================================
+// UV SRT パネル
+// ============================================================
 void UIBase::ImGuiUVSRTSettings() {
 #ifdef USE_IMGUI
 	if (ImGui::CollapsingHeader("UV SRT")) {
@@ -269450,6 +271370,9 @@ void UIBase::ImGuiUVSRTSettings() {
 #endif
 }
 
+// ============================================================
+// UI 1個分の総合インスペクタ
+// ============================================================
 void UIBase::ImGUi() {
 #ifdef USE_IMGUI
 	if (!sprite_) return;
@@ -269466,8 +271389,16 @@ void UIBase::ImGUi() {
 	}
 
 	if (ImGui::CollapsingHeader("トランスフォーム", ImGuiTreeNodeFlags_DefaultOpen)) {
+		// 基準サイズ(px) … レイアウト用
+		Vector2 size = GetSize();
+		if (ImGui::DragFloat2("サイズ(px)", &size.x, 0.5f)) {
+			SetSize(size);
+			modified = true;
+		}
+
+		// 拡縮倍率(1.0=等倍) … アニメーション/演出用
 		Vector2 scale = GetScale();
-		if (ImGui::DragFloat2("拡大縮小", &scale.x, 0.5f)) {
+		if (ImGui::DragFloat2("拡大縮小(倍率)", &scale.x, 0.01f)) {
 			SetScale(scale);
 			modified = true;
 		}
@@ -269649,669 +271580,6 @@ void UIBase::ImGUi() {
 #endif
 }
 
-void UIBase::EnableHotReload(bool enable) {
-	hotReloadEnabled_ = enable;
-}
-
-void UIBase::CheckForChanges() {
-	if (configPath_.empty() || !std::filesystem::exists(configPath_)) {
-		return;
-	}
-
-	auto currentModTime = std::filesystem::last_write_time(configPath_);
-
-	if (currentModTime != lastModTime_) {
-		LoadFromJSON(configPath_);
-		lastModTime_ = currentModTime;
-	}
-}
-
-bool UIBase::LoadFromJSON(const std::string& jsonPath) {
-	try {
-		std::ifstream file(jsonPath);
-		if (!file.is_open()) {
-			return false;
-		}
-
-		nlohmann::json data;
-		file >> data;
-		file.close();
-
-		ApplyJSONToState(data);
-
-		return true;
-	}
-	catch (const std::exception& e) {
-		printf("JSONからUIの読み込み中にエラー発生: %s\n", e.what());
-		return false;
-	}
-}
-
-bool UIBase::SaveToJSON(const std::string& jsonPath) {
-	std::string savePath = jsonPath.empty() ? configPath_ : jsonPath;
-
-	if (savePath.empty()) {
-		return false;
-	}
-
-	try {
-		std::filesystem::path dirPath = std::filesystem::path(savePath).parent_path();
-
-		if (!dirPath.empty() && !std::filesystem::exists(dirPath)) {
-			std::filesystem::create_directories(dirPath);
-		}
-
-		nlohmann::json data = CreateJSONFromCurrentState();
-
-		std::ofstream file(savePath);
-		if (!file.is_open()) {
-			return false;
-		}
-
-		file << std::setw(4) << data << std::endl;
-		file.close();
-
-		return true;
-	}
-	catch (const std::exception& e) {
-		printf("JSONへのUI保存中にエラー発生: %s\n", e.what());
-		return false;
-	}
-}
-
-void UIBase::SetPosition(const Vector3& position) {
-	if (sprite_) {
-		sprite_->SetTranslate(position);
-	}
-}
-
-Vector3 UIBase::GetPosition() const {
-	if (sprite_) {
-		return sprite_->GetTranslate();
-	}
-	return { 0.0f, 0.0f, 0.0f };
-}
-
-void UIBase::SetRotation(const Vector3& rotation) {
-	if (sprite_) {
-		sprite_->SetRotate(rotation);
-	}
-}
-
-Vector3 UIBase::GetRotation() const {
-	if (sprite_) {
-		return sprite_->GetRotate();
-	}
-	return { 0.0f, 0.0f, 0.0f };
-}
-
-void UIBase::SetScale(const Vector2& scale) {
-	if (sprite_) {
-		sprite_->SetSize(scale);
-	}
-}
-
-Vector2 UIBase::GetScale() const {
-	if (sprite_) {
-		return sprite_->GetSize();
-	}
-	return { 1.0f, 1.0f };
-}
-
-void UIBase::SetColor(const Vector4& color) {
-	if (sprite_) {
-		sprite_->SetColor(color);
-	}
-}
-
-Vector4 UIBase::GetColor() const {
-	if (sprite_) {
-		return sprite_->GetColor();
-	}
-	return { 1.0f, 1.0f, 1.0f, 1.0f };
-}
-
-void UIBase::SetAlpha(float alpha) {
-	if (sprite_) {
-		sprite_->SetAlpha(alpha);
-	}
-}
-
-float UIBase::GetAlpha() const {
-	if (sprite_) {
-		return sprite_->GetColor().w;
-	}
-	return 1.0f;
-}
-
-void UIBase::SetTexture(const std::string& texturePath) {
-	if (sprite_) {
-		sprite_->ChangeTexture(texturePath);
-		texturePath_ = texturePath;
-	}
-}
-
-std::string UIBase::GetTexturePath() const {
-	return texturePath_;
-}
-
-void UIBase::SetCamera(Camera* camera) {
-	if (sprite_) {
-		sprite_->SetCamera(camera);
-	}
-}
-
-void UIBase::SetName(const std::string& name) {
-	name_ = name;
-}
-
-std::string UIBase::GetName() const {
-	return name_;
-}
-
-void UIBase::SetFlipX(bool flipX) {
-	if (sprite_) {
-		sprite_->SetIsFlipX(flipX);
-	}
-}
-
-void UIBase::SetFlipY(bool flipY) {
-	if (sprite_) {
-		sprite_->SetIsFlipY(flipY);
-	}
-}
-
-bool UIBase::GetFlipX() const {
-	if (sprite_) {
-		return sprite_->GetIsFlipX();
-	}
-	return false;
-}
-
-bool UIBase::GetFlipY() const {
-	if (sprite_) {
-		return sprite_->GetIsFlipY();
-	}
-	return false;
-}
-
-void UIBase::SetTextureLeftTop(const Vector2& leftTop) {
-	if (sprite_) {
-		sprite_->SetTextureLeftTop(leftTop);
-	}
-}
-
-Vector2 UIBase::GetTextureLeftTop() const {
-	if (sprite_) {
-		return sprite_->GetTextureLeftTop();
-	}
-	return { 0.0f, 0.0f };
-}
-
-void UIBase::SetTextureSize(const Vector2& size) {
-	if (sprite_) {
-		sprite_->SetTextureSize(size);
-	}
-}
-
-Vector2 UIBase::GetTextureSize() const {
-	if (sprite_) {
-		return sprite_->GetTextureSize();
-	}
-	return { 1.0f, 1.0f };
-}
-
-void UIBase::SetAnchorPoint(const Vector2& anchor) {
-	if (sprite_) {
-		sprite_->SetAnchorPoint(anchor);
-	}
-}
-
-Vector2 UIBase::GetAnchorPoint() const {
-	if (sprite_) {
-		return sprite_->GetAnchorPoint();
-	}
-	return { 0.0f, 0.0f };
-}
-
-/*==================================================================
-						UV SRT制御
-===================================================================*/
-
-void UIBase::SetUVTranslation(const Vector2& translation) {
-	uvTranslation_ = translation;
-	if (sprite_) {
-		sprite_->SetUVTranslation(translation);
-	}
-}
-
-Vector2 UIBase::GetUVTranslation() const {
-	return uvTranslation_;
-}
-
-void UIBase::SetUVRotation(float rotation) {
-	uvRotation_ = rotation;
-	if (sprite_) {
-		sprite_->SetUVRotation(rotation);
-	}
-}
-
-float UIBase::GetUVRotation() const {
-	return uvRotation_;
-}
-
-void UIBase::SetUVScale(const Vector2& scale) {
-	uvScale_ = scale;
-	if (sprite_) {
-		sprite_->SetUVScale(scale);
-	}
-}
-
-Vector2 UIBase::GetUVScale() const {
-	return uvScale_;
-}
-
-nlohmann::json UIBase::CreateJSONFromCurrentState() {
-	nlohmann::json data;
-
-	data["name"] = name_;
-	data["texturePath"] = texturePath_;
-
-	data["position"] = {
-		{"x", GetPosition().x},
-		{"y", GetPosition().y},
-		{"z", GetPosition().z}
-	};
-
-	data["rotation"] = {
-		{"x", GetRotation().x},
-		{"y", GetRotation().y},
-		{"z", GetRotation().z}
-	};
-
-	data["scale"] = {
-		{"x", GetScale().x},
-		{"y", GetScale().y}
-	};
-
-	data["color"] = {
-		{"r", GetColor().x},
-		{"g", GetColor().y},
-		{"b", GetColor().z},
-		{"a", GetColor().w}
-	};
-
-	data["flipX"] = GetFlipX();
-	data["flipY"] = GetFlipY();
-
-	if (sprite_) {
-		data["textureLeftTop"] = {
-			{"x", sprite_->GetTextureLeftTop().x},
-			{"y", sprite_->GetTextureLeftTop().y}
-		};
-
-		data["anchorPoint"] = {
-			{"x", sprite_->GetAnchorPoint().x},
-			{"y", sprite_->GetAnchorPoint().y}
-		};
-
-		data["textureSize"] = {
-			{"x", sprite_->GetTextureSize().x},
-			{"y", sprite_->GetTextureSize().y}
-		};
-	}
-
-	data["visible"] = visible_;
-	data["layer"] = layer_;
-
-	// UV SRT
-	data["uvTranslation"] = {
-		{"x", uvTranslation_.x},
-		{"y", uvTranslation_.y}
-	};
-	data["uvRotation"] = uvRotation_;
-	data["uvScale"] = {
-		{"x", uvScale_.x},
-		{"y", uvScale_.y}
-	};
-
-	return data;
-}
-
-void UIBase::ApplyJSONToState(const nlohmann::json& data) {
-	if (data.contains("texturePath")) {
-		texturePath_ = data["texturePath"];
-
-		if (!sprite_) {
-			sprite_ = std::make_unique<Sprite>();
-			sprite_->Initialize(texturePath_);
-		} else {
-			sprite_->Initialize(texturePath_);
-		}
-	} else if (!sprite_) {
-		sprite_ = std::make_unique<Sprite>();
-		sprite_->Initialize("./Resources/images/white.png");
-		texturePath_ = "./Resources/images/white.png";
-	}
-
-	if (data.contains("name")) {
-		name_ = data["name"];
-	}
-
-	if (data.contains("position")) {
-		Vector3 position;
-		position.x = data["position"]["x"];
-		position.y = data["position"]["y"];
-		position.z = data["position"]["z"];
-		SetPosition(position);
-	}
-
-	if (data.contains("rotation")) {
-		Vector3 rotation;
-		rotation.x = data["rotation"]["x"];
-		rotation.y = data["rotation"]["y"];
-		rotation.z = data["rotation"]["z"];
-		SetRotation(rotation);
-	}
-
-	if (data.contains("scale")) {
-		Vector2 scale;
-		scale.x = data["scale"]["x"];
-		scale.y = data["scale"]["y"];
-		SetScale(scale);
-	}
-
-	if (data.contains("color")) {
-		Vector4 color;
-		color.x = data["color"]["r"];
-		color.y = data["color"]["g"];
-		color.z = data["color"]["b"];
-		color.w = data["color"]["a"];
-		SetColor(color);
-	}
-
-	if (data.contains("flipX")) {
-		SetFlipX(data["flipX"]);
-	}
-
-	if (data.contains("flipY")) {
-		SetFlipY(data["flipY"]);
-	}
-
-	if (sprite_) {
-		if (data.contains("textureLeftTop")) {
-			Vector2 leftTop;
-			leftTop.x = data["textureLeftTop"]["x"];
-			leftTop.y = data["textureLeftTop"]["y"];
-			sprite_->SetTextureLeftTop(leftTop);
-		}
-
-		if (data.contains("anchorPoint")) {
-			Vector2 anchor;
-			anchor.x = data["anchorPoint"]["x"];
-			anchor.y = data["anchorPoint"]["y"];
-			sprite_->SetAnchorPoint(anchor);
-		}
-
-		if (data.contains("textureSize")) {
-			Vector2 size;
-			size.x = data["textureSize"]["x"];
-			size.y = data["textureSize"]["y"];
-			sprite_->SetTextureSize(size);
-		}
-	}
-
-	if (data.contains("visible")) {
-		visible_ = data["visible"];
-	}
-
-	if (data.contains("layer")) {
-		layer_ = data["layer"];
-	}
-
-	// UV SRT
-	if (data.contains("uvTranslation")) {
-		Vector2 uvTranslation;
-		uvTranslation.x = data["uvTranslation"]["x"];
-		uvTranslation.y = data["uvTranslation"]["y"];
-		SetUVTranslation(uvTranslation);
-	}
-
-	if (data.contains("uvRotation")) {
-		SetUVRotation(data["uvRotation"]);
-	}
-
-	if (data.contains("uvScale")) {
-		Vector2 uvScale;
-		uvScale.x = data["uvScale"]["x"];
-		uvScale.y = data["uvScale"]["y"];
-		SetUVScale(uvScale);
-	}
-}
-
-============================================================
-File Path: YEngine/Utilities/Systems/UI/UIBase.h
-============================================================
-#pragma once
-#include <string>
-#include <memory>
-#include <vector>
-#include <unordered_map>
-#include <functional>
-#include <filesystem>
-#include "Sprite/Sprite.h"
-#include "Vector2.h"
-#include "Vector3.h"
-#include "Vector4.h"
-#include "json.hpp" 
-#include "UIAnimation.h"
-
-// 前方宣言
-class SpriteCommon;
-class Camera;
-
-///************************* UI基本クラス *************************///
-class UIBase {
-public:
-	///************************* 基本関数 *************************///
-
-	UIBase(const std::string& name = "UIBase");
-	virtual ~UIBase();
-
-	void Initialize(const std::string& jsonConfigPath);
-	virtual void Update();
-	virtual void Draw();
-	void ImGUi();
-
-private:
-	void EnableHotReload(bool enable);
-	void CheckForChanges();
-	bool LoadFromJSON(const std::string& jsonPath);
-
-public:
-	///************************* 基本アクセッサ *************************///
-
-	bool SaveToJSON(const std::string& jsonPath = "");
-
-	void SetPosition(const Vector3& position);
-	Vector3 GetPosition() const;
-
-	void SetRotation(const Vector3& rotation);
-	Vector3 GetRotation() const;
-
-	void SetScale(const Vector2& scale);
-	Vector2 GetScale() const;
-
-	void SetColor(const Vector4& color);
-	Vector4 GetColor() const;
-
-	void SetAlpha(float alpha);
-	float GetAlpha() const;
-
-	void SetTexture(const std::string& texturePath);
-	std::string GetTexturePath() const;
-
-	void SetCamera(Camera* camera);
-	void SetName(const std::string& name);
-	std::string GetName() const;
-
-	void SetFlipX(bool flipX);
-	void SetFlipY(bool flipY);
-	bool GetFlipX() const;
-	bool GetFlipY() const;
-
-	Sprite* GetSprite() { return sprite_.get(); }
-
-	void SetTextureLeftTop(const Vector2& leftTop);
-	Vector2 GetTextureLeftTop() const;
-
-	void SetTextureSize(const Vector2& size);
-	Vector2 GetTextureSize() const;
-
-	void SetAnchorPoint(const Vector2& anchor);
-	Vector2 GetAnchorPoint() const;
-
-	///************************* UV SRT制御 *************************///
-
-	void SetUVTranslation(const Vector2& translation);
-	Vector2 GetUVTranslation() const;
-
-	void SetUVRotation(float rotation);
-	float GetUVRotation() const;
-
-	void SetUVScale(const Vector2& scale);
-	Vector2 GetUVScale() const;
-
-	///************************* グリッド・スナップ機能 *************************///
-
-	void SetGridEnabled(bool enabled) { gridEnabled_ = enabled; }
-	bool IsGridEnabled() const { return gridEnabled_; }
-
-	void SetGridSize(float size) { gridSize_ = size; }
-	float GetGridSize() const { return gridSize_; }
-
-	Vector3 SnapToGrid(const Vector3& position) const;
-
-	///************************* 表示制御 *************************///
-
-	void SetVisible(bool visible) { visible_ = visible; }
-	bool IsVisible() const { return visible_; }
-
-	void SetLayer(int layer) { layer_ = layer; }
-	int GetLayer() const { return layer_; }
-
-	///************************* 基本アニメーション制御 *************************///
-
-	// シンプルなアニメーション
-	void PlayPositionAnimation(const Vector3& from, const Vector3& to, float duration,
-		Easing::Function easing = Easing::Function::Linear, bool loop = false);
-	void PlayScaleAnimation(const Vector2& from, const Vector2& to, float duration,
-		Easing::Function easing = Easing::Function::Linear, bool loop = false);
-	void PlayRotationAnimation(const Vector3& from, const Vector3& to, float duration,
-		Easing::Function easing = Easing::Function::Linear, bool loop = false);
-	void PlayAlphaAnimation(float from, float to, float duration,
-		Easing::Function easing = Easing::Function::Linear, bool loop = false);
-	void PlayColorAnimation(const Vector4& from, const Vector4& to, float duration,
-		Easing::Function easing = Easing::Function::Linear, bool loop = false);
-
-	// プリセットアニメーション
-	void PlayAnimation(const UIAnimation& anim);
-	void PlayFadeIn(float duration = 1.0f, Easing::Function easing = Easing::Function::EaseOutQuad);
-	void PlayFadeOut(float duration = 1.0f, Easing::Function easing = Easing::Function::EaseInQuad);
-	void PlaySlideIn(SlideDirection dir, float distance, float duration = 0.5f);
-	void PlaySlideOut(SlideDirection dir, float distance, float duration = 0.5f);
-	void PlayZoomIn(float duration = 0.5f);
-	void PlayZoomOut(float duration = 0.5f);
-	void PlayShake(float intensity = 10.0f, float duration = 0.5f);
-	void PlayPulse(float scale = 1.2f, float duration = 0.5f, bool loop = true);
-	void PlayBounce(float height = 50.0f, float duration = 1.0f);
-	void PlaySwing(float angle = 15.0f, float duration = 0.5f, bool loop = true);
-	void PlayFlash(float duration = 0.5f, int times = 3);
-	void PlayBlink(float duration = 2.0f, bool loop = true);
-	void PlayWobble(float intensity = 20.0f, float duration = 1.0f);
-	void PlayFlip(bool horizontal = true, float duration = 0.6f);
-	void PlayRotateIn(float duration = 0.8f);
-	void PlayRotateOut(float duration = 0.8f);
-
-	// アニメーション制御
-	void StopAnimation(UIAnimationType type = UIAnimationType::None);  // None指定で全停止
-	void StopAllAnimations();  // 全アニメーション停止
-	void PauseAnimation();
-	void ResumeAnimation();
-	bool IsAnimating() const { return !animations_.empty(); }
-	bool IsPaused() const { return isPaused_; }
-
-	// コールバック設定（最後に追加されたアニメーションに設定）
-	void SetAnimationCompleteCallback(std::function<void()> callback);
-	void SetAnimationUpdateCallback(std::function<void()> callback);
-
-	// 遅延設定（最後に追加されたアニメーションに設定）
-	void SetAnimationDelay(float delay) { if (IsAnimating() && !animations_.empty()) animations_.back().delay = delay; }
-	///************************* プリセット機能 *************************///
-
-	bool SaveAsPreset(const std::string& presetName);
-	bool LoadPreset(const std::string& presetName);
-	std::vector<std::string> GetAvailablePresets() const;
-
-	///************************* 複製機能 *************************///
-
-	void CopyPropertiesFrom(const UIBase* other);
-
-	static const std::string PRESET_DIRECTORY;
-
-protected:
-	///************************* メンバ変数 *************************///
-
-	std::unique_ptr<Sprite> sprite_;
-	Camera* camera_ = nullptr;
-	std::string configPath_;
-	std::filesystem::file_time_type lastModTime_;
-	std::string name_;
-	std::string texturePath_;
-	bool hotReloadEnabled_;
-
-	bool visible_ = true;
-	int layer_ = 0;
-
-	bool gridEnabled_ = false;
-	float gridSize_ = 10.0f;
-
-	// アニメーション管理 - 複数のアニメーションを同時再生可能
-	std::vector<UIAnimation> animations_;
-	bool isPaused_ = false;
-
-	// UV SRT
-	Vector2 uvTranslation_ = { 0.0f, 0.0f };
-	float uvRotation_ = 0.0f;
-	Vector2 uvScale_ = { 1.0f, 1.0f };
-
-	///************************* 内部関数 *************************///
-
-	nlohmann::json CreateJSONFromCurrentState();
-	void ApplyJSONToState(const nlohmann::json& json);
-	void UpdateAnimation(float deltaTime);
-
-	// アニメーションタイプ別の更新処理
-	void UpdateBasicAnimation(UIAnimation& anim, float t);
-	void UpdateShakeAnimation(UIAnimation& anim, float t);
-	void UpdatePulseAnimation(UIAnimation& anim, float t);
-	void UpdateBounceAnimation(UIAnimation& anim, float t);
-	void UpdateSwingAnimation(UIAnimation& anim, float t);
-	void UpdateFlashAnimation(UIAnimation& anim, float t);
-	void UpdateBlinkAnimation(UIAnimation& anim, float t);
-	void UpdateWobbleAnimation(UIAnimation& anim, float t);
-	void UpdateSlideAnimation(UIAnimation& anim, float t);
-	void UpdateZoomAnimation(UIAnimation& anim, float t);
-	void UpdateRotateInOutAnimation(UIAnimation& anim, float t);
-
-	///************************* ImGui関連 *************************///
-
-	void ImGuiGridSettings();
-	void ImGuiAnimationSettings();
-	void ImGuiPresetSettings();
-	void ImGuiQuickAlignment();
-	void ImGuiUVSRTSettings();
-};
 
 ============================================================
 File Path: YEngine/Utilities/Systems/UI/UIManager.cpp
@@ -270784,6 +272052,306 @@ namespace YoRigine {
 		return stats;
 	}
 
+	// ============================================================
+	// ImGui エディタ (ImGuiDebug / DisplayImprovedTextureSelector /
+	// DisplayTextureDirectory) は UIManagerEditor.cpp に分離した。
+	// ============================================================
+
+
+	void UIManager::RebuildDrawOrder() {
+		// 1. uiElements_にあってdrawOrder_にないIDを追加(新規UI対応)
+		for (const auto& [id, ui] : uiElements_) {
+			if (std::find(drawOrder_.begin(), drawOrder_.end(), id) == drawOrder_.end()) {
+				drawOrder_.push_back(id);
+			}
+		}
+
+		// 2. drawOrder_にあってuiElements_にないIDを削除(削除済みUI対応)
+		drawOrder_.erase(std::remove_if(drawOrder_.begin(), drawOrder_.end(),
+			[this](const std::string& id) { return uiElements_.find(id) == uiElements_.end(); }),
+			drawOrder_.end());
+
+		// 3. レイヤー順でstable_sort(同一レイヤー内の相対順序=drawOrder_内の順序を維持)
+		std::stable_sort(drawOrder_.begin(), drawOrder_.end(),
+			[this](const std::string& a, const std::string& b) {
+				auto itA = uiElements_.find(a);
+				auto itB = uiElements_.find(b);
+				if (itA == uiElements_.end() || itB == uiElements_.end()) return false;
+
+				int layerA = itA->second->GetLayer();
+				int layerB = itB->second->GetLayer();
+				return layerA < layerB;
+			});
+	}
+
+	void UIManager::MoveDrawOrderForward(const std::string& uiId) {
+		auto it = std::find(drawOrder_.begin(), drawOrder_.end(), uiId);
+		if (it != drawOrder_.end() && it != drawOrder_.begin()) {
+			// 同じレイヤー内でのみ移動を許可
+			auto prevIt = it - 1;
+			auto curUi = uiElements_.find(*it);
+			auto prevUi = uiElements_.find(*prevIt);
+
+			if (curUi != uiElements_.end() && prevUi != uiElements_.end() &&
+				curUi->second && prevUi->second &&
+				curUi->second->GetLayer() == prevUi->second->GetLayer()) {
+				std::iter_swap(it, prevIt);
+			}
+		}
+	}
+
+	void UIManager::MoveDrawOrderBackward(const std::string& uiId) {
+		auto it = std::find(drawOrder_.begin(), drawOrder_.end(), uiId);
+		if (it != drawOrder_.end() && it + 1 != drawOrder_.end()) {
+			// 同じレイヤー内でのみ移動を許可
+			auto nextIt = it + 1;
+			auto curUi = uiElements_.find(*it);
+			auto nextUi = uiElements_.find(*nextIt);
+
+			if (curUi != uiElements_.end() && nextUi != uiElements_.end() &&
+				curUi->second && nextUi->second &&
+				curUi->second->GetLayer() == nextUi->second->GetLayer()) {
+				std::iter_swap(it, nextIt);
+			}
+		}
+	}
+
+	std::string UIManager::GenerateUniqueID(const std::string& baseName) {
+		std::string id = baseName;
+		int counter = 1;
+
+		while (HasUI(id)) {
+			id = baseName + "_" + std::to_string(counter);
+			counter++;
+		}
+
+		return id;
+	}
+
+	std::string UIManager::GetSceneConfigDir(const std::string& sceneName)
+	{
+		return UI_CONFIG_DIRECTORY + sceneName + "/";
+	}
+}
+
+
+============================================================
+File Path: YEngine/Utilities/Systems/UI/UIManager.h
+============================================================
+#pragma once
+
+#include <memory>
+#include <vector>
+#include <unordered_map>
+#include <string>
+#include <algorithm>
+#include "UIBase.h"
+
+///************************* UI管理クラス *************************///
+namespace YoRigine {
+	class UIManager {
+	public:
+		///************************* シングルトン *************************///
+
+		// インスタンス取得
+		static UIManager* GetInstance();
+
+		///************************* UI基本管理 *************************///
+
+		// UIを追加
+		void AddUI(const std::string& id, std::unique_ptr<UIBase> ui);
+
+		// UIを削除
+		void RemoveUI(const std::string& id);
+
+		// UIを取得
+		UIBase* GetUI(const std::string& id);
+
+		// すべてのUIを取得
+		const std::unordered_map<std::string, std::unique_ptr<UIBase>>& GetAllUIs() const {
+			return uiElements_;
+		}
+
+		// UIが存在するか確認
+		bool HasUI(const std::string& id) const;
+
+		// すべてのUIをクリア
+		void Clear();
+
+		// UIのIDを変更
+		bool RenameUI(const std::string& oldId, const std::string& newId);
+
+		///************************* 一括更新・描画 *************************///
+
+		// すべてのUIを更新
+		void UpdateAll();
+
+		// すべてのUIを描画（レイヤー順）
+		void DrawAll();
+
+		// 個別に描画
+		void Draw(const std::string& id);
+
+		///************************* レイヤー管理 *************************///
+
+		// レイヤーでソート（描画順を更新）
+		void SortByLayer();
+
+		// 特定レイヤーの表示/非表示
+		void ShowLayer(int layer, bool show);
+
+		// すべてのUIの表示/非表示
+		void ShowAll(bool show);
+
+		// 特定レイヤーのUIリストを取得
+		std::vector<UIBase*> GetUIsByLayer(int layer);
+
+		///************************* シーン管理 *************************///
+
+		// 現在のUIレイアウトをシーンとして保存
+		bool SaveScene(const std::string& sceneName);
+
+		// シーンを読み込み（現在のUIは削除される）
+		bool LoadScene(const std::string& sceneName);
+
+		// 利用可能なシーン一覧を取得
+		std::vector<std::string> GetAvailableScenes() const;
+
+		// シーンを削除
+		bool DeleteScene(const std::string& sceneName);
+
+		///************************* グループ管理 *************************///
+
+		// UIをグループに追加
+		void AddToGroup(const std::string& groupName, const std::string& uiId);
+
+		// グループからUIを削除
+		void RemoveFromGroup(const std::string& groupName, const std::string& uiId);
+
+		// グループのUIを一括表示/非表示
+		void ShowGroup(const std::string& groupName, bool show);
+
+		// グループのUIリストを取得
+		std::vector<UIBase*> GetGroup(const std::string& groupName);
+
+		///************************* 検索・フィルタ *************************///
+
+		// 名前で検索
+		std::vector<UIBase*> FindByName(const std::string& name);
+
+		// テクスチャパスで検索
+		std::vector<UIBase*> FindByTexture(const std::string& texturePath);
+
+		///************************* デバッグ・エディタ *************************///
+
+		// ImGuiデバッグウィンドウ
+		void ImGuiDebug();
+
+		// 統計情報構造体
+		struct Statistics {
+			int totalUIs = 0;
+			int visibleUIs = 0;
+			int hiddenUIs = 0;
+			std::unordered_map<int, int> uisByLayer;
+		};
+
+		// 統計情報を取得
+		Statistics GetStatistics() const;
+
+	private:
+		///************************* 基本構造 *************************///
+
+		UIManager() = default;
+		~UIManager() = default;
+		UIManager(const UIManager&) = delete;
+		UIManager& operator=(const UIManager&) = delete;
+
+		///************************* 管理マップ *************************///
+
+		// UI要素のマップ（ID -> UIBase）
+		std::unordered_map<std::string, std::unique_ptr<UIBase>> uiElements_;
+
+		// 描画順序リスト（レイヤーソート後）
+		std::vector<std::string> drawOrder_;
+
+		// グループ管理（グループ名 -> UIのIDリスト）
+		std::unordered_map<std::string, std::vector<std::string>> groups_;
+
+		// シーン保存ディレクトリ
+		static const std::string SCENE_DIRECTORY;
+
+		// UI設定保存ディレクトリ
+		static const std::string UI_CONFIG_DIRECTORY;
+		///************************* ImGui補助関数 *************************///
+
+		// 改良版テクスチャセレクターを表示
+		void DisplayImprovedTextureSelector(UIBase* ui);
+
+		// ディレクトリ内のテクスチャ一覧を表示
+		void DisplayTextureDirectory(const std::string& path, const std::string& baseDir, UIBase* ui, const char* filter);
+
+		///************************* ヘルパー関数 *************************///
+
+		// 描画順序を再構築
+		void RebuildDrawOrder();
+
+		// 描画順序で前面へ移動（1つ前に）
+		void MoveDrawOrderForward(const std::string& uiId);
+
+		// 描画順序で背面へ移動（1つ後ろに）
+		void MoveDrawOrderBackward(const std::string& uiId);
+
+		// 一意なIDを生成
+		std::string GenerateUniqueID(const std::string& baseName);
+
+		// シーン名からUIConfig保存先ディレクトリを返す
+		static std::string GetSceneConfigDir(const std::string& sceneName);
+
+
+		///************************* ImGui状態管理 *************************///
+
+		// 選択中のUI ID
+		std::string selectedUIId_;
+
+		// 全UIリスト表示フラグ
+		bool showAllUIsList_ = true;
+
+		// 現在のシーン名
+		std::string currentSceneName_;
+	};
+}
+
+============================================================
+File Path: YEngine/Utilities/Systems/UI/UIManagerEditor.cpp
+============================================================
+#include "UIManager.h"
+#include "UIBase.h"
+
+#ifdef USE_IMGUI
+#include <imgui.h>
+#include <imgui_internal.h>
+#endif
+#include <Loaders/Texture/TextureManager.h>
+
+// C++
+#include <algorithm>
+#include <set>
+#include <map>
+#include <vector>
+#include <string>
+#include <filesystem>
+#include <climits>
+#include <cstring>
+
+// ============================================================
+// UIManager の ImGui エディタ部
+// ============================================================
+// UIManager 本体（管理ロジック）から ImGui エディタUIを分離したファイル。
+// 各関数は UIManager のメンバ定義のままなので private へ自由にアクセスできる。
+// 本体は内部 #ifdef USE_IMGUI でガードしているため Release では空関数になる。
+// ============================================================
+
+namespace YoRigine {
 	/*==================================================================
 							ImGuiデバッグ
 	===================================================================*/
@@ -271781,268 +273349,8 @@ namespace YoRigine {
 		(void)filter;
 #endif
 	}
-
-	void UIManager::RebuildDrawOrder() {
-		// 1. uiElements_にあってdrawOrder_にないIDを追加(新規UI対応)
-		for (const auto& [id, ui] : uiElements_) {
-			if (std::find(drawOrder_.begin(), drawOrder_.end(), id) == drawOrder_.end()) {
-				drawOrder_.push_back(id);
-			}
-		}
-
-		// 2. drawOrder_にあってuiElements_にないIDを削除(削除済みUI対応)
-		drawOrder_.erase(std::remove_if(drawOrder_.begin(), drawOrder_.end(),
-			[this](const std::string& id) { return uiElements_.find(id) == uiElements_.end(); }),
-			drawOrder_.end());
-
-		// 3. レイヤー順でstable_sort(同一レイヤー内の相対順序=drawOrder_内の順序を維持)
-		std::stable_sort(drawOrder_.begin(), drawOrder_.end(),
-			[this](const std::string& a, const std::string& b) {
-				auto itA = uiElements_.find(a);
-				auto itB = uiElements_.find(b);
-				if (itA == uiElements_.end() || itB == uiElements_.end()) return false;
-
-				int layerA = itA->second->GetLayer();
-				int layerB = itB->second->GetLayer();
-				return layerA < layerB;
-			});
-	}
-
-	void UIManager::MoveDrawOrderForward(const std::string& uiId) {
-		auto it = std::find(drawOrder_.begin(), drawOrder_.end(), uiId);
-		if (it != drawOrder_.end() && it != drawOrder_.begin()) {
-			// 同じレイヤー内でのみ移動を許可
-			auto prevIt = it - 1;
-			auto curUi = uiElements_.find(*it);
-			auto prevUi = uiElements_.find(*prevIt);
-
-			if (curUi != uiElements_.end() && prevUi != uiElements_.end() &&
-				curUi->second && prevUi->second &&
-				curUi->second->GetLayer() == prevUi->second->GetLayer()) {
-				std::iter_swap(it, prevIt);
-			}
-		}
-	}
-
-	void UIManager::MoveDrawOrderBackward(const std::string& uiId) {
-		auto it = std::find(drawOrder_.begin(), drawOrder_.end(), uiId);
-		if (it != drawOrder_.end() && it + 1 != drawOrder_.end()) {
-			// 同じレイヤー内でのみ移動を許可
-			auto nextIt = it + 1;
-			auto curUi = uiElements_.find(*it);
-			auto nextUi = uiElements_.find(*nextIt);
-
-			if (curUi != uiElements_.end() && nextUi != uiElements_.end() &&
-				curUi->second && nextUi->second &&
-				curUi->second->GetLayer() == nextUi->second->GetLayer()) {
-				std::iter_swap(it, nextIt);
-			}
-		}
-	}
-
-	std::string UIManager::GenerateUniqueID(const std::string& baseName) {
-		std::string id = baseName;
-		int counter = 1;
-
-		while (HasUI(id)) {
-			id = baseName + "_" + std::to_string(counter);
-			counter++;
-		}
-
-		return id;
-	}
-
-	std::string UIManager::GetSceneConfigDir(const std::string& sceneName)
-	{
-		return UI_CONFIG_DIRECTORY + sceneName + "/";
-	}
 }
 
-============================================================
-File Path: YEngine/Utilities/Systems/UI/UIManager.h
-============================================================
-#pragma once
-
-#include <memory>
-#include <vector>
-#include <unordered_map>
-#include <string>
-#include <algorithm>
-#include "UIBase.h"
-
-///************************* UI管理クラス *************************///
-namespace YoRigine {
-	class UIManager {
-	public:
-		///************************* シングルトン *************************///
-
-		// インスタンス取得
-		static UIManager* GetInstance();
-
-		///************************* UI基本管理 *************************///
-
-		// UIを追加
-		void AddUI(const std::string& id, std::unique_ptr<UIBase> ui);
-
-		// UIを削除
-		void RemoveUI(const std::string& id);
-
-		// UIを取得
-		UIBase* GetUI(const std::string& id);
-
-		// すべてのUIを取得
-		const std::unordered_map<std::string, std::unique_ptr<UIBase>>& GetAllUIs() const {
-			return uiElements_;
-		}
-
-		// UIが存在するか確認
-		bool HasUI(const std::string& id) const;
-
-		// すべてのUIをクリア
-		void Clear();
-
-		// UIのIDを変更
-		bool RenameUI(const std::string& oldId, const std::string& newId);
-
-		///************************* 一括更新・描画 *************************///
-
-		// すべてのUIを更新
-		void UpdateAll();
-
-		// すべてのUIを描画（レイヤー順）
-		void DrawAll();
-
-		// 個別に描画
-		void Draw(const std::string& id);
-
-		///************************* レイヤー管理 *************************///
-
-		// レイヤーでソート（描画順を更新）
-		void SortByLayer();
-
-		// 特定レイヤーの表示/非表示
-		void ShowLayer(int layer, bool show);
-
-		// すべてのUIの表示/非表示
-		void ShowAll(bool show);
-
-		// 特定レイヤーのUIリストを取得
-		std::vector<UIBase*> GetUIsByLayer(int layer);
-
-		///************************* シーン管理 *************************///
-
-		// 現在のUIレイアウトをシーンとして保存
-		bool SaveScene(const std::string& sceneName);
-
-		// シーンを読み込み（現在のUIは削除される）
-		bool LoadScene(const std::string& sceneName);
-
-		// 利用可能なシーン一覧を取得
-		std::vector<std::string> GetAvailableScenes() const;
-
-		// シーンを削除
-		bool DeleteScene(const std::string& sceneName);
-
-		///************************* グループ管理 *************************///
-
-		// UIをグループに追加
-		void AddToGroup(const std::string& groupName, const std::string& uiId);
-
-		// グループからUIを削除
-		void RemoveFromGroup(const std::string& groupName, const std::string& uiId);
-
-		// グループのUIを一括表示/非表示
-		void ShowGroup(const std::string& groupName, bool show);
-
-		// グループのUIリストを取得
-		std::vector<UIBase*> GetGroup(const std::string& groupName);
-
-		///************************* 検索・フィルタ *************************///
-
-		// 名前で検索
-		std::vector<UIBase*> FindByName(const std::string& name);
-
-		// テクスチャパスで検索
-		std::vector<UIBase*> FindByTexture(const std::string& texturePath);
-
-		///************************* デバッグ・エディタ *************************///
-
-		// ImGuiデバッグウィンドウ
-		void ImGuiDebug();
-
-		// 統計情報構造体
-		struct Statistics {
-			int totalUIs = 0;
-			int visibleUIs = 0;
-			int hiddenUIs = 0;
-			std::unordered_map<int, int> uisByLayer;
-		};
-
-		// 統計情報を取得
-		Statistics GetStatistics() const;
-
-	private:
-		///************************* 基本構造 *************************///
-
-		UIManager() = default;
-		~UIManager() = default;
-		UIManager(const UIManager&) = delete;
-		UIManager& operator=(const UIManager&) = delete;
-
-		///************************* 管理マップ *************************///
-
-		// UI要素のマップ（ID -> UIBase）
-		std::unordered_map<std::string, std::unique_ptr<UIBase>> uiElements_;
-
-		// 描画順序リスト（レイヤーソート後）
-		std::vector<std::string> drawOrder_;
-
-		// グループ管理（グループ名 -> UIのIDリスト）
-		std::unordered_map<std::string, std::vector<std::string>> groups_;
-
-		// シーン保存ディレクトリ
-		static const std::string SCENE_DIRECTORY;
-
-		// UI設定保存ディレクトリ
-		static const std::string UI_CONFIG_DIRECTORY;
-		///************************* ImGui補助関数 *************************///
-
-		// 改良版テクスチャセレクターを表示
-		void DisplayImprovedTextureSelector(UIBase* ui);
-
-		// ディレクトリ内のテクスチャ一覧を表示
-		void DisplayTextureDirectory(const std::string& path, const std::string& baseDir, UIBase* ui, const char* filter);
-
-		///************************* ヘルパー関数 *************************///
-
-		// 描画順序を再構築
-		void RebuildDrawOrder();
-
-		// 描画順序で前面へ移動（1つ前に）
-		void MoveDrawOrderForward(const std::string& uiId);
-
-		// 描画順序で背面へ移動（1つ後ろに）
-		void MoveDrawOrderBackward(const std::string& uiId);
-
-		// 一意なIDを生成
-		std::string GenerateUniqueID(const std::string& baseName);
-
-		// シーン名からUIConfig保存先ディレクトリを返す
-		static std::string GetSceneConfigDir(const std::string& sceneName);
-
-
-		///************************* ImGui状態管理 *************************///
-
-		// 選択中のUI ID
-		std::string selectedUIId_;
-
-		// 全UIリスト表示フラグ
-		bool showAllUIsList_ = true;
-
-		// 現在のシーン名
-		std::string currentSceneName_;
-	};
-}
 
 ============================================================
 File Path: YEngine/Utilities/Systems/UI/UINumber.cpp
@@ -272643,6 +273951,7 @@ File Path: YGame/Core/MyGame.cpp
 #include "OffScreen/PostEffectManager.h"
 #include <Systems/UI/UIManager.h>
 #include "GPUParticle/GpuEmitManager.h"
+#include <Object3D/BaseObjectManager.h>
 
 #include "Particle/YParticleManager.h"
 #include "Particle/YEmitterGroupEditor.h"
@@ -272698,6 +274007,9 @@ void MyGame::Initialize() {
 
 	// モデル操作関連の初期化
 	YoRigine::ModelManipulator::GetInstance()->Initialize();
+
+	// BaseObject 一括管理マネージャ（インスペクタパネルの登録もここで行う）
+	BaseObjectManager::GetInstance()->Initialize();
 
 	// PiP カメラサブシステム
 	PipCameraSystem::GetInstance()->Initialize();
@@ -282174,6 +283486,11 @@ void PlayerCamera::Initialize(FollowCamera* followCamera, const WorldTransform* 
         LoadThreatAwareness(ext["threatAwareness"]);
     }
 
+    // ロックオン2ショット・フレーミングを extension JSON から復元
+    if (ext.contains("lockOnFraming")) {
+        LoadLockOnFraming(ext["lockOnFraming"]);
+    }
+
 #ifdef USE_IMGUI
     editor_.Initialize(&attackCamera_, this);
     editor_.SetFilePath(defaultPath);
@@ -282577,6 +283894,21 @@ void PlayerCamera::LoadThreatAwareness(const nlohmann::json& j) {
 }
 
 // ============================================================
+// ロックオン2ショット・フレーミングパラメータの保存 / 復元
+// ============================================================
+void PlayerCamera::SaveLockOnFraming(nlohmann::json& j) const {
+    j["shoulderYaw"] = lockOnShoulderYaw_;
+    j["pitchBias"]   = lockOnPitchBias_;
+    j["lerpSpeed"]   = lockOnLerpSpeed_;
+}
+
+void PlayerCamera::LoadLockOnFraming(const nlohmann::json& j) {
+    lockOnShoulderYaw_ = j.value("shoulderYaw", 0.25f);
+    lockOnPitchBias_   = j.value("pitchBias",   0.20f);
+    lockOnLerpSpeed_   = j.value("lerpSpeed",   10.0f);
+}
+
+// ============================================================
 // ロックオン更新
 // ============================================================
 void PlayerCamera::UpdateLockOn() {
@@ -282612,15 +283944,21 @@ void PlayerCamera::UpdateLockOn() {
         }
     }
 
-    // カメラをターゲット方向に向ける
+    // ── 2ショット・フレーミング ──────────────────────────────
+    // カメラを player→enemy 軸の真後ろに置くと、プレイヤーの背中が敵を隠して
+    // 攻撃が当てづらくなる。そこで:
+    //   ・ヨーに肩オフセット(lockOnShoulderYaw_)を足して軸からずらす
+    //     （offset_ に X 成分が無いためプレイヤーは中央のまま、敵が片側へ寄る）
+    //   ・見下ろし(lockOnPitchBias_)を足して2体を縦に分離する
+    // ことで、プレイヤーと敵が重ならない斜め2ショットにする。
     Vector3 pivot    = playerWT_->translate_ + Vector3(0.0f, pivotHeight_, 0.0f);
     Vector3 enemyPos = lockedTarget_->GetCenterPosition();
     Vector3 dir      = Normalize(enemyPos - pivot);
 
-    float targetYaw   = atan2f(dir.x, dir.z);
-    float targetPitch = std::clamp(asinf(-dir.y) + 0.15f, minPitch_, maxPitch_);
+    float targetYaw   = atan2f(dir.x, dir.z) + lockOnShoulderYaw_;
+    float targetPitch = std::clamp(asinf(-dir.y) + lockOnPitchBias_, minPitch_, maxPitch_);
 
-    float t = std::clamp(10.0f * YoRigine::GameTime::GetUnscaledDeltaTime(), 0.0f, 1.0f);
+    float t = std::clamp(lockOnLerpSpeed_ * YoRigine::GameTime::GetUnscaledDeltaTime(), 0.0f, 1.0f);
     Vector3 rot = followCamera_->GetRotate();
 
     float diffY = targetYaw - rot.y;
@@ -282953,6 +284291,23 @@ void PlayerCamera::DrawImGui() {
 
     ImGui::Separator();
 
+    if (ImGui::CollapsingHeader("ロックオン2ショット")) {
+        ImGui::DragFloat("肩オフセット(rad)", &lockOnShoulderYaw_, 0.01f, -0.8f, 0.8f, "%.2f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("player→enemy 軸からヨーをずらす量。0=真後ろ(被る)。±で左右の肩");
+        ImGui::DragFloat("見下ろし加算(rad)", &lockOnPitchBias_, 0.01f, -0.3f, 0.8f, "%.2f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("プレイヤーと敵を縦に分離する見下ろし量");
+        ImGui::DragFloat("追従速度", &lockOnLerpSpeed_, 0.1f, 1.0f, 30.0f);
+
+        // 編集値を extension JSON に反映（カメラ設定保存時に一緒に永続化される）
+        nlohmann::json loJson;
+        SaveLockOnFraming(loJson);
+        nlohmann::json ext = followCamera_->GetExtensionJson();
+        ext["lockOnFraming"] = loJson;
+        followCamera_->SetExtensionJson(ext);
+    }
+
+    ImGui::Separator();
+
     // ロックオン状態
     ImGui::Text("ロックオン: %s", isLockOn_ ? "ON" : "OFF");
     if (lockedTarget_) {
@@ -283089,6 +284444,10 @@ private:
     void  SaveThreatAwareness(nlohmann::json& j) const;
     void  LoadThreatAwareness(const nlohmann::json& j);
 
+    // ロックオン2ショット・フレーミングの永続化（同じく extension JSON に相乗り）
+    void  SaveLockOnFraming(nlohmann::json& j) const;
+    void  LoadLockOnFraming(const nlohmann::json& j);
+
     // ============================================================
     // 最終フレーミングガード
     // 攻撃カメラワークのオフセット適用後に呼び、プレイヤーが
@@ -283132,6 +284491,13 @@ private:
     BaseCollider* lockedTarget_          = nullptr;
     bool          isLockOn_              = false;
     float         lockOnSwitchCooldown_  = 0.0f;
+
+    // ---- ロックオン2ショット・フレーミング ----
+    // カメラを player→enemy 軸の真後ろに置くとプレイヤーが敵を隠す（被り）。
+    // ヨーに肩オフセットを足して軸からずらし、見下ろしで2体を縦に分離する。
+    float lockOnShoulderYaw_ = 0.25f;  // 肩オフセット(rad)。0=真後ろ(被る)、±で左右の肩(≒14°)
+    float lockOnPitchBias_   = 0.20f;  // 見下ろし加算(rad)。2体を縦に分離(≒11°)
+    float lockOnLerpSpeed_   = 10.0f;  // ロックオン追従の補間速度
 
     // スティック入力で使う pitch 制限（FollowCamera から同期）
     float minPitch_     = -0.2f;
@@ -290459,6 +291825,7 @@ File Path: YGame/Scenes/MainScenes/Clear/ClearScene.cpp
 #include "Particle/YParticleManager.h"
 #include "Particle/YParticleEditor.h"
 #include "Particle/YEmitterGroupManager.h"
+#include <Object3D/BaseObjectManager.h>
 
 // Camera
 #include "Systems/Camera/Virtuals/DebugCamera/DebugCamera.h"
@@ -290502,7 +291869,10 @@ void ClearScene::Initialize() {
 	YoRigine::ModelManipulator::GetInstance()->LoadScene("ClearScene");
 	YoRigine::ModelManipulator::GetInstance()->SetCamera(sceneCamera_.get());
 	YParticleManager::GetInstance().SetCamera(sceneCamera_.get());
-	
+
+	// BaseObjectManager にカメラを 1 回だけ渡しておく（以降の一括駆動で使用）
+	BaseObjectManager::GetInstance()->SetCamera(sceneCamera_.get());
+
 
 
 	//------------------------------------------------------------
@@ -290518,7 +291888,10 @@ void ClearScene::Initialize() {
 	player_ = std::make_unique<DemoPlayer>();
 	player_->Initialize(sceneCamera_.get());
 	player_->SetMotion("Idle2");
+	// 一括 Update/Draw/Shadow の対象に登録（所有は ClearScene のまま）
+	BaseObjectManager::GetInstance()->Register(player_.get(), "Player");
 
+	// スカイボックス / Ground は個別描画のためマネージャには登録しない
 	skyBox_ = std::make_unique<SkyBox>();
 	skyBox_->Initialize(sceneCamera_.get(), "Resources/DDS/vz_sinister_land_cubemap_ue.dds");
 
@@ -290551,7 +291924,8 @@ void ClearScene::Update() {
 	UpdateCamera();
 	clearUI_->Update();
 
-	player_->Update();
+	// 登録オブジェクトは一括 Update。スカイボックス / Ground は個別
+	UpdateObjects();
 	skyBox_->Update();
 	ground_->Update();
 
@@ -290611,9 +291985,9 @@ void ClearScene::DrawShadow()
 /// オブジェクト描画（地面・プレイヤー）
 /// </summary>
 void ClearScene::DrawObject() {
+	// Ground は個別描画、登録オブジェクト（player_）は一括描画
 	ground_->Draw();
-	player_->Draw();
-	player_->DrawAnimation();
+	DrawObjects();
 	YoRigine::ModelManipulator::GetInstance()->Draw();
 }
 
@@ -291471,6 +292845,7 @@ File Path: YGame/Scenes/MainScenes/Title/TitleScene.cpp
 #include "Systems/Camera/Virtuals/TitleCamera/TitleCamera.h"
 #include "Systems/Camera/CameraDirector.h"
 #include "Particle/YEmitterGroupManager.h"
+#include <Object3D/BaseObjectManager.h>
 #ifdef USE_IMGUI
 #include "imgui.h"
 #endif
@@ -291513,6 +292888,9 @@ void TitleScene::Initialize() {
 	YoRigine::ModelManipulator::GetInstance()->SetCamera(sceneCamera_.get());
 
 	YParticleManager::GetInstance().SetCamera(sceneCamera_.get());
+
+	// BaseObjectManager にカメラを 1 回だけ渡しておく（以降の一括駆動で使用）
+	BaseObjectManager::GetInstance()->SetCamera(sceneCamera_.get());
 	//------------------------------------------------------------
 	// タイトル専用要素の初期化
 	//------------------------------------------------------------
@@ -291522,14 +292900,18 @@ void TitleScene::Initialize() {
 	player_ = std::make_unique<DemoPlayer>();
 	player_->Initialize(sceneCamera_.get());
 	player_->SetMotion("Idle1");
+	// 一括 Update/Draw/Shadow の対象に登録（所有は TitleScene のまま）
+	BaseObjectManager::GetInstance()->Register(player_.get(), "Player");
 
 	auto playerCam = std::dynamic_pointer_cast<TitleCamera>(titleCamera);
 	playerCam->SetTarget(player_->GetWT());
 	playerCam->enableOrbit_ = true; // カメラ回転有効
 
+	// スカイボックスは最初に描く特殊オブジェクトのため、マネージャには登録せず個別描画する
 	skyBox_ = std::make_unique<SkyBox>();
 	skyBox_->Initialize(sceneCamera_.get(), "Resources/DDS/vz_sinister_land_cubemap_ue.dds");
 
+	// Ground は BaseObject 非継承の独立クラスのため、マネージャには登録せず個別に扱う
 	ground_ = std::make_unique<Ground>();
 	ground_->Initialize(sceneCamera_.get());
 
@@ -291564,8 +292946,8 @@ void TitleScene::Update() {
 		sceneManager_->ChangeScene("Game");
 	}
 
-	// 各種更新
-	player_->Update();
+	// 各種更新（登録オブジェクトは一括 Update。スカイボックス / Ground は個別）
+	UpdateObjects();
 	skyBox_->Update();
 	ground_->Update();
 
@@ -291615,8 +292997,8 @@ void TitleScene::DrawNonOffscreen() {
 /// </summary>
 void TitleScene::DrawShadow()
 {
+	// DrawCommonShadow 内で登録オブジェクト（player_ 等）の影も一括描画される
 	DrawCommonShadow();
-	player_->DrawShadow();
 	YoRigine::ModelManipulator::GetInstance()->DrawShadow();
 }
 
@@ -291631,9 +293013,9 @@ void TitleScene::Finalize() {
 /// オブジェクト描画（地面・プレイヤー）
 /// </summary>
 void TitleScene::DrawObject() {
+	// Ground は個別描画、登録オブジェクト（player_）は一括描画
 	ground_->Draw();
-	player_->Draw();
-	player_->DrawAnimation();
+	DrawObjects();
 }
 
 /// <summary>
@@ -292632,19 +294014,11 @@ void FieldScene::Initialize(Camera* camera, Player* player) {
 	spawnJson_->Register("向き (deg)",      &spawnYawDeg_);
 	spawnJson_->Register("カメラ向き (deg)", &spawnCameraRotDeg_);
 
-	constexpr float kDegToRad = 3.14159265358979323846f / 180.0f;
-
-	player_->SetPosition(spawnPos_);
-	player_->GetWT().rotate_.y = spawnYawDeg_ * kDegToRad;
-	player_->GetWT().UpdateMatrix();
-
-	// PlayerCamera は GameScene::Initialize で先にセットアップ済み(なければ無視)。
-	if (auto* pc = player_->GetPlayerCamera()) {
-		pc->SetRotate({
-			spawnCameraRotDeg_.x * kDegToRad,
-			spawnCameraRotDeg_.y * kDegToRad,
-			spawnCameraRotDeg_.z * kDegToRad });
-	}
+	// スポーン姿勢を適用。リトライ(HandleRetry→Initialize)でも初回と同じ位置から
+	// 始められるよう、ここで適用しつつ、フェード遷移後の OnEnter でも再適用する
+	// （遷移途中で位置が書き換わるケースを打ち消すため）。
+	ApplySpawnPose();
+	pendingSpawnReset_ = true;
 
 	//------------------------------------------------------------
 	// オブジェクト初期化
@@ -292955,6 +294329,27 @@ void FieldScene::DrawShadow()
 /*==========================================================================
 	シーンに入った時の処理
 //========================================================================*/
+/*==========================================================================
+	スポーン姿勢をプレイヤー・カメラへ適用
+//========================================================================*/
+void FieldScene::ApplySpawnPose() {
+	if (!player_) return;
+
+	constexpr float kDegToRad = 3.14159265358979323846f / 180.0f;
+
+	player_->SetPosition(spawnPos_);
+	player_->GetWT().rotate_.y = spawnYawDeg_ * kDegToRad;
+	player_->GetWT().UpdateMatrix();
+
+	// PlayerCamera は GameScene::Initialize で先にセットアップ済み(なければ無視)。
+	if (auto* pc = player_->GetPlayerCamera()) {
+		pc->SetRotate({
+			spawnCameraRotDeg_.x * kDegToRad,
+			spawnCameraRotDeg_.y * kDegToRad,
+			spawnCameraRotDeg_.z * kDegToRad });
+	}
+}
+
 void FieldScene::OnEnter() {
 	BaseSubScene::OnEnter();
 
@@ -293006,6 +294401,15 @@ void FieldScene::OnEnter() {
 		fieldEnemyManager_->SetAllEnemiesActive(true);
 		fieldEnemyManager_->ResetEnCount();
 		currentCameraMode_ = CameraMode::FOLLOW;
+	}
+
+	// リトライ/初回スポーン：フェード遷移の途中でプレイヤー位置が書き換わっても、
+	// シーン有効化時に確実にスポーン姿勢を再適用して「初期化時と同じ位置」を保証する。
+	// バトル復帰時は pendingSpawnReset_ が立たないので干渉せず、この後の
+	// ApplyTransitionData→HandleBattleReturn が復帰位置を上書きする。
+	if (pendingSpawnReset_) {
+		ApplySpawnPose();
+		pendingSpawnReset_ = false;
 	}
 
 	// バトルからの復帰データは SubSceneManager::ApplyTransitionData →
@@ -293595,6 +294999,13 @@ private:
 	// フォローカメラの初期 Euler (deg)。x=pitch / y=yaw / z=roll。
 	Vector3 spawnCameraRotDeg_ = { 0.0f, 0.0f, 0.0f };
 	std::unique_ptr<YoRigine::JsonManager> spawnJson_;
+
+	// リトライ/初回時、フェード遷移後の OnEnter でスポーン姿勢を再適用するためのフラグ。
+	// バトル復帰では立てない（HandleBattleReturn が復帰位置を上書きするため）。
+	bool pendingSpawnReset_ = false;
+
+	// spawnPos_ / spawnYawDeg_ / spawnCameraRotDeg_ をプレイヤー・カメラへ適用する。
+	void ApplySpawnPose();
 };
 
 ============================================================
@@ -294386,7 +295797,9 @@ void ControlUI::Update()
     if (YoRigine::Input::GetInstance()->IsPadTriggered(0, GamePadButton::A)) {
         if (!isVisble_)return;
         TriggerRipple(button_[0]);
-		button_[0]->PlayScaleAnimation(pushSize_, originalSize_, duration_, Easing::Function::EaseInCubic, false);
+        // 絶対px指定を基準サイズ基準の倍率に変換（表示は従来どおり）
+        Vector2 baseA = button_[0]->GetSize();
+        button_[0]->PlayScaleAnimation(pushSize_ / baseA, originalSize_ / baseA, duration_, Easing::Function::EaseInCubic, false);
         button_[0]->PlayFlash(duration_, 9);
     }
 
@@ -294394,7 +295807,8 @@ void ControlUI::Update()
     if (YoRigine::Input::GetInstance()->IsPadTriggered(0, GamePadButton::B)) {
         if (!isVisble_)return;
         TriggerRipple(button_[1]);
-        button_[1]->PlayScaleAnimation(pushSize_, originalSize_, duration_, Easing::Function::EaseInCubic, false);
+        Vector2 baseB = button_[1]->GetSize();
+        button_[1]->PlayScaleAnimation(pushSize_ / baseB, originalSize_ / baseB, duration_, Easing::Function::EaseInCubic, false);
         button_[1]->PlayFlash(duration_, 9);
     }
 
@@ -294402,7 +295816,8 @@ void ControlUI::Update()
     if (YoRigine::Input::GetInstance()->IsPadTriggered(0, GamePadButton::X)) {
         if (!isVisble_)return;
         TriggerRipple(button_[2]);
-        button_[2]->PlayScaleAnimation({ 100.0f ,100.0f }, Vector2{120.0f,120.0f}, duration_, Easing::Function::EaseInCubic, false);
+        Vector2 baseX = button_[2]->GetSize();
+        button_[2]->PlayScaleAnimation(Vector2{ 100.0f,100.0f } / baseX, Vector2{ 120.0f,120.0f } / baseX, duration_, Easing::Function::EaseInCubic, false);
         button_[2]->PlayFlash(duration_, 9);
     }
 
@@ -294461,7 +295876,9 @@ void ControlUI::TriggerRipple(UIBase* targetButton)
 
 
     // アニメーション設定：拡大しながらフェードアウト
-    newRipple->PlayScaleAnimation({ 120.0f, 120.0f }, { 200.0f, 200.0f }, duration_, Easing::Function::EaseInCubic, false);
+    // 絶対px指定を基準サイズ基準の倍率に変換（表示は従来どおり）
+    Vector2 baseRipple = newRipple->GetSize();
+    newRipple->PlayScaleAnimation(Vector2{ 120.0f, 120.0f } / baseRipple, Vector2{ 200.0f, 200.0f } / baseRipple, duration_, Easing::Function::EaseInCubic, false);
     newRipple->PlayAlphaAnimation(1.0f, 0.0f, duration_, Easing::Function::Linear, false);
 
     // 管理リストに追加
