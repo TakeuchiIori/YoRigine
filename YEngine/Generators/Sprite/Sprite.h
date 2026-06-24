@@ -90,10 +90,19 @@ public:
 	void SetRotate(Vector3 rotate) { rotate_ = rotate; }
 
 	/*===============================================//
-						  拡縮
+					  サイズ(px)
 	//===============================================*/
-	const Vector2& GetSize() { return size_; }
-	void SetSize(const Vector2& scale) { size_ = scale; }
+	// スプライトの基準表示サイズ（ピクセル）。レイアウト用。
+	const Vector2& GetSize() const { return size_; }
+	void SetSize(const Vector2& size) { size_ = size; }
+
+	/*===============================================//
+					  拡縮(倍率)
+	//===============================================*/
+	// 拡縮倍率（1.0=等倍）。アニメーション/演出用。
+	// 最終的な表示サイズ = size_ × scale_。
+	const Vector2& GetScale() const { return scale_; }
+	void SetScale(const Vector2& scale) { scale_ = scale; }
 
 	/*===============================================//
 					　	 色を変更
@@ -191,7 +200,10 @@ private:
 	// スプライト
 	Vector3 translate_ = { 0.0f,0.0f ,0.0f };
 	Vector3 rotate_ = { 0.0f,0.0f,0.0f };
+	// 基準表示サイズ(px)
 	Vector2 size_ = { 100.0f,100.0f };
+	// 拡縮倍率(1.0=等倍)。表示サイズ = size_ × scale_
+	Vector2 scale_ = { 1.0f,1.0f };
 	const float numVertices_ = 6.0f;
 
 	// アンカーポイント

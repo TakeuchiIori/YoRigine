@@ -122,6 +122,10 @@ private:
     void  SaveThreatAwareness(nlohmann::json& j) const;
     void  LoadThreatAwareness(const nlohmann::json& j);
 
+    // ロックオン2ショット・フレーミングの永続化（同じく extension JSON に相乗り）
+    void  SaveLockOnFraming(nlohmann::json& j) const;
+    void  LoadLockOnFraming(const nlohmann::json& j);
+
     // ============================================================
     // 最終フレーミングガード
     // 攻撃カメラワークのオフセット適用後に呼び、プレイヤーが
@@ -165,6 +169,13 @@ private:
     BaseCollider* lockedTarget_          = nullptr;
     bool          isLockOn_              = false;
     float         lockOnSwitchCooldown_  = 0.0f;
+
+    // ---- ロックオン2ショット・フレーミング ----
+    // カメラを player→enemy 軸の真後ろに置くとプレイヤーが敵を隠す（被り）。
+    // ヨーに肩オフセットを足して軸からずらし、見下ろしで2体を縦に分離する。
+    float lockOnShoulderYaw_ = 0.25f;  // 肩オフセット(rad)。0=真後ろ(被る)、±で左右の肩(≒14°)
+    float lockOnPitchBias_   = 0.20f;  // 見下ろし加算(rad)。2体を縦に分離(≒11°)
+    float lockOnLerpSpeed_   = 10.0f;  // ロックオン追従の補間速度
 
     // スティック入力で使う pitch 制限（FollowCamera から同期）
     float minPitch_     = -0.2f;

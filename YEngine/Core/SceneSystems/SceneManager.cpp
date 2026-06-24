@@ -1,6 +1,7 @@
 #include "SceneManager.h"
 #include "Sprite/SpriteCommon.h"
 #include "OffScreen/PostEffectManager.h"
+#include <Object3D/BaseObjectManager.h>
 #include <assert.h>
 
 std::unique_ptr<SceneManager> SceneManager::instance = nullptr;
@@ -105,6 +106,9 @@ void SceneManager::PerformSceneTransition() {
 	scene_ = std::move(nextScene_);
 	nextScene_ = nullptr;
 	if (scene_) {
+		// 前シーンの BaseObject 登録を一掃してから次シーンを初期化する。
+		// これで各シーン側に「登録解除」コードを書く必要がなくなる。
+		BaseObjectManager::GetInstance()->ClearAll();
 		scene_->SetSceneManager(this);
 		scene_->Initialize();
 	}
@@ -161,6 +165,8 @@ void SceneManager::ChangeScene(const std::string& sceneName) {
 	if (!scene_) {
 		scene_ = std::move(nextScene_);
 		nextScene_ = nullptr;
+		// 初回シーンも空の状態から始められるように一掃しておく。
+		BaseObjectManager::GetInstance()->ClearAll();
 		scene_->SetSceneManager(this);
 		scene_->Initialize();
 

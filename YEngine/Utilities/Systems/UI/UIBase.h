@@ -9,8 +9,10 @@
 #include "Vector2.h"
 #include "Vector3.h"
 #include "Vector4.h"
-#include "json.hpp" 
+#include "json.hpp"
 #include "UIAnimation.h"
+#include "UIAnimator.h"
+#include "Loaders/Json/Use/AutoJson.h"
 
 // 前方宣言
 class SpriteCommon;
@@ -45,6 +47,11 @@ public:
 	void SetRotation(const Vector3& rotation);
 	Vector3 GetRotation() const;
 
+	// 基準表示サイズ(px)。レイアウト用。
+	void SetSize(const Vector2& size);
+	Vector2 GetSize() const;
+
+	// 拡縮倍率(1.0=等倍)。アニメーション/演出用。表示サイズ = Size(px) × Scale。
 	void SetScale(const Vector2& scale);
 	Vector2 GetScale() const;
 
@@ -144,15 +151,30 @@ public:
 	void StopAllAnimations();  // 全アニメーション停止
 	void PauseAnimation();
 	void ResumeAnimation();
-	bool IsAnimating() const { return !animations_.empty(); }
-	bool IsPaused() const { return isPaused_; }
+	bool IsAnimating() const { return animator_.IsAnimating(); }
+	bool IsPaused() const { return animator_.IsPaused(); }
+
+	// アニメーションエンジンへの直接アクセス（インスペクタ等が中身を参照する用途）
+	UIAnimator& GetAnimator() { return animator_; }
+	const UIAnimator& GetAnimator() const { return animator_; }
+
+	///************************* アニメーションクリップ（データ駆動） *************************///
+
+	// 保存済みクリップを1つ再生
+	void PlayClip(const UIAnimationClip& clip);
+	// 指定トリガを持つクリップをまとめて再生（OnInit / OnShow の自動再生に使用）
+	void PlayClipsByTrigger(UIAnimTrigger trigger);
+
+	// エディタ等がクリップ一覧を編集する用途
+	std::vector<UIAnimationClip>& GetClips() { return clips_; }
+	const std::vector<UIAnimationClip>& GetClips() const { return clips_; }
 
 	// コールバック設定（最後に追加されたアニメーションに設定）
 	void SetAnimationCompleteCallback(std::function<void()> callback);
 	void SetAnimationUpdateCallback(std::function<void()> callback);
 
 	// 遅延設定（最後に追加されたアニメーションに設定）
-	void SetAnimationDelay(float delay) { if (IsAnimating() && !animations_.empty()) animations_.back().delay = delay; }
+	void SetAnimationDelay(float delay) { animator_.SetDelay(delay); }
 	///************************* プリセット機能 *************************///
 
 	bool SaveAsPreset(const std::string& presetName);
@@ -182,9 +204,31 @@ protected:
 	bool gridEnabled_ = false;
 	float gridSize_ = 10.0f;
 
-	// アニメーション管理 - 複数のアニメーションを同時再生可能
-	std::vector<UIAnimation> animations_;
-	bool isPaused_ = false;
+	// ============================================================
+	// JSON 永続化用の値（AutoJson に登録するソース・オブ・トゥルース）
+	// 実描画値は sprite_ が保持するため、保存直前に sprite_→ここへ、
+	// 読み込み直後にここ→sprite_ へ同期する（SyncSpriteToData / ApplyDataToSprite）。
+	// ============================================================
+	Vector3 position_ = { 0.0f, 0.0f, 0.0f };
+	Vector3 rotation_ = { 0.0f, 0.0f, 0.0f };
+	Vector2 size_ = { 100.0f, 100.0f };   // 基準サイズ(px)
+	Vector2 scale_ = { 1.0f, 1.0f };      // 拡縮倍率(1.0=等倍)
+	Vector4 color_ = { 1.0f, 1.0f, 1.0f, 1.0f };
+	bool flipX_ = false;
+	bool flipY_ = false;
+	Vector2 textureLeftTop_ = { 0.0f, 0.0f };
+	Vector2 anchorPoint_ = { 0.0f, 0.0f };
+	Vector2 textureSize_ = { 100.0f, 100.0f };
+
+	// 変数登録だけで Save/Load を自動化する（CreateJSON/ApplyJSON のボイラープレート削減）
+	AutoJson aj_;
+
+	// アニメーション管理（再生ロジックは UIAnimator に分離）
+	UIAnimator animator_;
+
+	// データ駆動アニメーションクリップ（JSON 永続化・トリガ自動再生用）
+	std::vector<UIAnimationClip> clips_;
+	bool prevVisible_ = true;   // OnShow トリガ検知用（前フレームの可視状態）
 
 	// UV SRT
 	Vector2 uvTranslation_ = { 0.0f, 0.0f };
@@ -195,20 +239,13 @@ protected:
 
 	nlohmann::json CreateJSONFromCurrentState();
 	void ApplyJSONToState(const nlohmann::json& json);
-	void UpdateAnimation(float deltaTime);
 
-	// アニメーションタイプ別の更新処理
-	void UpdateBasicAnimation(UIAnimation& anim, float t);
-	void UpdateShakeAnimation(UIAnimation& anim, float t);
-	void UpdatePulseAnimation(UIAnimation& anim, float t);
-	void UpdateBounceAnimation(UIAnimation& anim, float t);
-	void UpdateSwingAnimation(UIAnimation& anim, float t);
-	void UpdateFlashAnimation(UIAnimation& anim, float t);
-	void UpdateBlinkAnimation(UIAnimation& anim, float t);
-	void UpdateWobbleAnimation(UIAnimation& anim, float t);
-	void UpdateSlideAnimation(UIAnimation& anim, float t);
-	void UpdateZoomAnimation(UIAnimation& anim, float t);
-	void UpdateRotateInOutAnimation(UIAnimation& anim, float t);
+	// AutoJson への変数登録（コンストラクタで一度だけ呼ぶ）
+	void SetupJsonBindings();
+	// sprite_ の現在値 → 永続化用メンバへ（保存直前）
+	void SyncSpriteToData();
+	// 永続化用メンバ → sprite_ へ反映（読み込み直後）
+	void ApplyDataToSprite();
 
 	///************************* ImGui関連 *************************///
 

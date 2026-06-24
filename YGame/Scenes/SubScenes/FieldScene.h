@@ -142,4 +142,11 @@ private:
 	// フォローカメラの初期 Euler (deg)。x=pitch / y=yaw / z=roll。
 	Vector3 spawnCameraRotDeg_ = { 0.0f, 0.0f, 0.0f };
 	std::unique_ptr<YoRigine::JsonManager> spawnJson_;
+
+	// リトライ/初回時、フェード遷移後の OnEnter でスポーン姿勢を再適用するためのフラグ。
+	// バトル復帰では立てない（HandleBattleReturn が復帰位置を上書きするため）。
+	bool pendingSpawnReset_ = false;
+
+	// spawnPos_ / spawnYawDeg_ / spawnCameraRotDeg_ をプレイヤー・カメラへ適用する。
+	void ApplySpawnPose();
 };

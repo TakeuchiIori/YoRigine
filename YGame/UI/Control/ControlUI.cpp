@@ -33,7 +33,9 @@ void ControlUI::Update()
     if (YoRigine::Input::GetInstance()->IsPadTriggered(0, GamePadButton::A)) {
         if (!isVisble_)return;
         TriggerRipple(button_[0]);
-		button_[0]->PlayScaleAnimation(pushSize_, originalSize_, duration_, Easing::Function::EaseInCubic, false);
+        // 絶対px指定を基準サイズ基準の倍率に変換（表示は従来どおり）
+        Vector2 baseA = button_[0]->GetSize();
+        button_[0]->PlayScaleAnimation(pushSize_ / baseA, originalSize_ / baseA, duration_, Easing::Function::EaseInCubic, false);
         button_[0]->PlayFlash(duration_, 9);
     }
 
@@ -41,7 +43,8 @@ void ControlUI::Update()
     if (YoRigine::Input::GetInstance()->IsPadTriggered(0, GamePadButton::B)) {
         if (!isVisble_)return;
         TriggerRipple(button_[1]);
-        button_[1]->PlayScaleAnimation(pushSize_, originalSize_, duration_, Easing::Function::EaseInCubic, false);
+        Vector2 baseB = button_[1]->GetSize();
+        button_[1]->PlayScaleAnimation(pushSize_ / baseB, originalSize_ / baseB, duration_, Easing::Function::EaseInCubic, false);
         button_[1]->PlayFlash(duration_, 9);
     }
 
@@ -49,7 +52,8 @@ void ControlUI::Update()
     if (YoRigine::Input::GetInstance()->IsPadTriggered(0, GamePadButton::X)) {
         if (!isVisble_)return;
         TriggerRipple(button_[2]);
-        button_[2]->PlayScaleAnimation({ 100.0f ,100.0f }, Vector2{120.0f,120.0f}, duration_, Easing::Function::EaseInCubic, false);
+        Vector2 baseX = button_[2]->GetSize();
+        button_[2]->PlayScaleAnimation(Vector2{ 100.0f,100.0f } / baseX, Vector2{ 120.0f,120.0f } / baseX, duration_, Easing::Function::EaseInCubic, false);
         button_[2]->PlayFlash(duration_, 9);
     }
 
@@ -108,7 +112,9 @@ void ControlUI::TriggerRipple(UIBase* targetButton)
 
 
     // アニメーション設定：拡大しながらフェードアウト
-    newRipple->PlayScaleAnimation({ 120.0f, 120.0f }, { 200.0f, 200.0f }, duration_, Easing::Function::EaseInCubic, false);
+    // 絶対px指定を基準サイズ基準の倍率に変換（表示は従来どおり）
+    Vector2 baseRipple = newRipple->GetSize();
+    newRipple->PlayScaleAnimation(Vector2{ 120.0f, 120.0f } / baseRipple, Vector2{ 200.0f, 200.0f } / baseRipple, duration_, Easing::Function::EaseInCubic, false);
     newRipple->PlayAlphaAnimation(1.0f, 0.0f, duration_, Easing::Function::Linear, false);
 
     // 管理リストに追加

@@ -57,8 +57,14 @@ protected:
 	void InitializeCommon();
 	void UpdateCommon();
 	void DrawCommonObject();
-	void DrawCommonShadow();   // シャドウパス開始前に必ず呼ぶ（PSO・RS・topology・gLight 一括設定）
+	void DrawCommonShadow();   // シャドウパス開始前に必ず呼ぶ（PSO・RS・topology・gLight 一括設定 ＋ 登録オブジェクトの影描画）
 	void DrawCommonParticles();
+
+	///************************* BaseObject 一括駆動 *************************///
+	// BaseObjectManager に登録済みのオブジェクトをまとめて駆動するヘルパー。
+	// 衝突判定の前 / スカイボックスとの描画順を保つため、呼ぶ位置はシーン側で決める。
+	void UpdateObjects();   // 登録オブジェクトの一括 Update
+	void DrawObjects();     // 登録オブジェクトの一括 Draw + DrawAnimation
 private:
 	///************************* メンバ変数 *************************///
 	std::string sceneName_;

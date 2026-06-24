@@ -77,7 +77,8 @@ void Sprite::Update()
 	//────────────────────────────────
 	transform_.translate = screenPos;
 	transform_.rotate = rotate_;
-	transform_.scale = { size_.x, size_.y, 1.0f };
+	// 最終的な表示サイズ = 基準サイズ(px) × 拡縮倍率
+	transform_.scale = { size_.x * scale_.x, size_.y * scale_.y, 1.0f };
 
 	// 正射影行列で処理
 	Matrix4x4 worldMatrix = MakeAffineMatrix(transform_.scale, transform_.rotate, transform_.translate);

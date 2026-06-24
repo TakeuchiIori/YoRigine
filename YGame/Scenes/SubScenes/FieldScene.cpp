@@ -37,19 +37,11 @@ void FieldScene::Initialize(Camera* camera, Player* player) {
 	spawnJson_->Register("向き (deg)",      &spawnYawDeg_);
 	spawnJson_->Register("カメラ向き (deg)", &spawnCameraRotDeg_);
 
-	constexpr float kDegToRad = 3.14159265358979323846f / 180.0f;
-
-	player_->SetPosition(spawnPos_);
-	player_->GetWT().rotate_.y = spawnYawDeg_ * kDegToRad;
-	player_->GetWT().UpdateMatrix();
-
-	// PlayerCamera は GameScene::Initialize で先にセットアップ済み(なければ無視)。
-	if (auto* pc = player_->GetPlayerCamera()) {
-		pc->SetRotate({
-			spawnCameraRotDeg_.x * kDegToRad,
-			spawnCameraRotDeg_.y * kDegToRad,
-			spawnCameraRotDeg_.z * kDegToRad });
-	}
+	// スポーン姿勢を適用。リトライ(HandleRetry→Initialize)でも初回と同じ位置から
+	// 始められるよう、ここで適用しつつ、フェード遷移後の OnEnter でも再適用する
+	// （遷移途中で位置が書き換わるケースを打ち消すため）。
+	ApplySpawnPose();
+	pendingSpawnReset_ = true;
 
 	//------------------------------------------------------------
 	// オブジェクト初期化
@@ -360,6 +352,27 @@ void FieldScene::DrawShadow()
 /*==========================================================================
 	シーンに入った時の処理
 //========================================================================*/
+/*==========================================================================
+	スポーン姿勢をプレイヤー・カメラへ適用
+//========================================================================*/
+void FieldScene::ApplySpawnPose() {
+	if (!player_) return;
+
+	constexpr float kDegToRad = 3.14159265358979323846f / 180.0f;
+
+	player_->SetPosition(spawnPos_);
+	player_->GetWT().rotate_.y = spawnYawDeg_ * kDegToRad;
+	player_->GetWT().UpdateMatrix();
+
+	// PlayerCamera は GameScene::Initialize で先にセットアップ済み(なければ無視)。
+	if (auto* pc = player_->GetPlayerCamera()) {
+		pc->SetRotate({
+			spawnCameraRotDeg_.x * kDegToRad,
+			spawnCameraRotDeg_.y * kDegToRad,
+			spawnCameraRotDeg_.z * kDegToRad });
+	}
+}
+
 void FieldScene::OnEnter() {
 	BaseSubScene::OnEnter();
 
@@ -411,6 +424,15 @@ void FieldScene::OnEnter() {
 		fieldEnemyManager_->SetAllEnemiesActive(true);
 		fieldEnemyManager_->ResetEnCount();
 		currentCameraMode_ = CameraMode::FOLLOW;
+	}
+
+	// リトライ/初回スポーン：フェード遷移の途中でプレイヤー位置が書き換わっても、
+	// シーン有効化時に確実にスポーン姿勢を再適用して「初期化時と同じ位置」を保証する。
+	// バトル復帰時は pendingSpawnReset_ が立たないので干渉せず、この後の
+	// ApplyTransitionData→HandleBattleReturn が復帰位置を上書きする。
+	if (pendingSpawnReset_) {
+		ApplySpawnPose();
+		pendingSpawnReset_ = false;
 	}
 
 	// バトルからの復帰データは SubSceneManager::ApplyTransitionData →

@@ -5,6 +5,9 @@
 #include "Object3D/Object3d.h"
 #include "Loaders/Json/JsonManager.h"
 
+// C++
+#include <string>
+
 // Collision
 #include "Collision/Core/BaseCollider.h"
 #include "Collision/Core/ColliderFactory.h"
@@ -31,6 +34,9 @@ public:
 	virtual void Draw() = 0;
 	virtual void DrawAnimation() {}
 	virtual void DrawCollision() {}
+	// 影パス描画。BaseObjectManager から一括で呼べるよう基底に持たせる。
+	// 影を落とさないオブジェクトは未オーバーライドのまま (デフォルト空) で良い。
+	virtual void DrawShadow() {}
 
 
 	///************************* 当たり判定 *************************///
@@ -59,6 +65,21 @@ public:
 	Object3d* GetObject3d() const { return obj_.get(); }
 
 
+	///************************* マネージャ連携 *************************///
+
+	// シーン内での表示名。BaseObjectManager のインスペクタ表示 / 名前検索に使う。
+	const std::string& GetName() const { return name_; }
+	void SetName(const std::string& name) { name_ = name; }
+
+	// アクティブフラグ。false の間は BaseObjectManager の一括 Update/Draw でスキップされる。
+	bool IsActive() const { return active_; }
+	void SetActive(bool active) { active_ = active; }
+
+	// インスペクタの詳細欄に独自項目を出したいオブジェクトはこれをオーバーライドする。
+	// デフォルトは空 (名前 / アクティブ / SRT は BaseObjectManager 側が共通描画する)。
+	virtual void DrawInspector() {}
+
+
 protected:
 	WorldTransform wt_;
 	Camera* camera_ = nullptr;
@@ -69,4 +90,7 @@ protected:
 	std::shared_ptr<AABBCollider> aabbCollider_;
 	std::shared_ptr<SphereCollider> sphereCollider_;
 	std::shared_ptr<CapsuleCollider> capsuleCollider_;
+
+	std::string name_;       // 表示名 / 検索キー (BaseObjectManager 用)
+	bool active_ = true;     // false なら一括更新・描画の対象外
 };
