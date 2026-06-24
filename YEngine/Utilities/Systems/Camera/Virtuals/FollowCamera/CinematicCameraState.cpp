@@ -3,6 +3,7 @@
 #include "MathFunc.h"
 #include <algorithm>
 
+#include <Systems/GameTime/GameTime.h>
 #ifdef USE_IMGUI
 #include <imgui.h>
 #endif
@@ -33,7 +34,7 @@ void CinematicCameraState::Update(FollowCamera* camera) {
 	// デフォルト状態に戻る補間処理
 	// ------------------------------------------------------------
 	if (isReturning_) {
-		returnTimer_ += 0.016f;
+		returnTimer_ += YoRigine::GameTime::GetDeltaTime();
 		float t = std::clamp(returnTimer_ / returnInterpTime_, 0.0f, 1.0f);
 
 		t = 1.0f - (1.0f - t) * (1.0f - t);
@@ -87,7 +88,7 @@ void CinematicCameraState::InterpolateControlPoints(FollowCamera* camera) {
 	if (controlPoints_.empty()) return;
 
 	const CameraControlPoint& currentPoint = controlPoints_[currentPointIndex_];
-	pointTimer_ += 0.016f;
+	pointTimer_ += YoRigine::GameTime::GetDeltaTime();
 
 	Vector3 startPos, startRot;
 	float startFov;

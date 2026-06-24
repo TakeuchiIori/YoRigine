@@ -190,16 +190,19 @@ void BattleScene::Update() {
 		return;
 	}
 
-	// 敵更新
-	if (!isBattleCameraActive) {
-		battleEnemyManager_->Update();
-	}
-
 	// プレイヤー更新
+	// ★ 敵より先に動かすことで、敵AIが今フレームのプレイヤー位置を参照できる
 	if (!isBattleCameraActive && !battleEnemyManager_->IsFinalBattleCleared()) {
 		player_->Update();
 	}
 
+	// エリア制限補正（プレイヤー移動直後に境界クランプ → 敵がクランプ済みの位置を参照）
+	AreaManager::GetInstance()->UpdateSingleObject(&player_->GetWT());
+
+	// 敵更新（今フレームのプレイヤー位置・状態を参照してAIが反応）
+	if (!isBattleCameraActive) {
+		battleEnemyManager_->Update();
+	}
 
 	// 視覚効果・オブジェクト更新
 	sprite_->Update();
@@ -208,9 +211,6 @@ void BattleScene::Update() {
 	// UI更新
 	lockOnUI_->Update();
 	DamageNumberManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime(), sceneCamera_->GetViewProjectionMatrix());
-
-	// エリア制限補正
-	AreaManager::GetInstance()->UpdateSingleObject(&player_->GetWT());
 }
 
 
@@ -275,8 +275,7 @@ void BattleScene::DrawUI() {
 }
 
 void BattleScene::DrawNonOffscreen()
-{
-}
+{}
 
 void BattleScene::DrawShadow()
 {

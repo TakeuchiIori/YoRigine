@@ -1,7 +1,7 @@
 #include "DefaultCameraState.h"
 #include "FollowCamera.h"
 #include <Systems/Input/Input.h>
-
+#include <Systems/GameTime/GameTime.h>
 // ============================================================
 // ステート開始時
 // ============================================================
@@ -16,7 +16,7 @@ void DefaultCameraState::Update(FollowCamera* camera) {
 	// ------------------------------------------------------------
 	// タイマーの更新
 	// ------------------------------------------------------------
-	stateTimer_ += 0.016f;
+	stateTimer_ += YoRigine::GameTime::GetDeltaTime();
 
 	// ------------------------------------------------------------
 	// 通常の追従処理と入力受付
