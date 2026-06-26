@@ -1,0 +1,3 @@
+[submodule "YEngine"]
+	path = YEngine
+	url = https://github.com/TakeuchiIori/YoRigineEngine.git
