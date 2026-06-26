@@ -8,17 +8,15 @@
         "ccOnHit": 0,
         "comboWindowEnd": 15,
         "duration": 0.4000000059604645,
-        "enableHoming": false,
-        "fovPunchAmount": 0.11999999731779099,
-        "fovPunchDuration": 3.0,
+        "enableHoming": true,
         "fps": 60,
         "hitEnd": 15,
         "hitStart": 0,
         "hitStopDuration": 0.30000001192092896,
         "homingAngleDeg": 60.0,
         "homingDuration": 0.11999999731779099,
-        "homingMaxStep": 3.0,
-        "homingRange": 6.0,
+        "homingMaxStep": 5.0,
+        "homingRange": 14.899999618530273,
         "inputBufferStart": 7,
         "knockback": 0.0,
         "knockbackDuration": 1.0,
@@ -28,11 +26,6 @@
         "shakeDuration": 0.27000001072883606,
         "shakeIntensity": 1.0,
         "stepDistance": 0.5,
-        "swingTilt": {
-            "x": -431595520.0,
-            "y": 6.0,
-            "z": 60.0
-        },
         "totalFrames": 60,
         "type": 0
     },
@@ -46,8 +39,6 @@
         "comboWindowEnd": 15,
         "duration": 0.5,
         "enableHoming": false,
-        "fovPunchAmount": 0.11999999731779099,
-        "fovPunchDuration": 3.0,
         "fps": 60,
         "hitEnd": 15,
         "hitStart": 0,
@@ -65,11 +56,6 @@
         "shakeDuration": 0.0,
         "shakeIntensity": 0.0,
         "stepDistance": 0.5,
-        "swingTilt": {
-            "x": -431595520.0,
-            "y": 6.0,
-            "z": 60.0
-        },
         "totalFrames": 60,
         "type": 0
     },
@@ -83,8 +69,6 @@
         "comboWindowEnd": 17,
         "duration": 0.5,
         "enableHoming": false,
-        "fovPunchAmount": 0.11999999731779099,
-        "fovPunchDuration": 3.0,
         "fps": 60,
         "hitEnd": 15,
         "hitStart": 0,
@@ -102,11 +86,6 @@
         "shakeDuration": 0.0,
         "shakeIntensity": 0.0,
         "stepDistance": 0.0,
-        "swingTilt": {
-            "x": -431595520.0,
-            "y": 6.0,
-            "z": 60.0
-        },
         "totalFrames": 60,
         "type": 0
     },
@@ -119,17 +98,15 @@
         "ccOnHit": 0,
         "comboWindowEnd": 20,
         "duration": 0.4000000059604645,
-        "enableHoming": false,
-        "fovPunchAmount": 0.11999999731779099,
-        "fovPunchDuration": 3.0,
+        "enableHoming": true,
         "fps": 60,
         "hitEnd": 25,
         "hitStart": 0,
         "hitStopDuration": 0.0,
         "homingAngleDeg": 60.0,
         "homingDuration": 0.11999999731779099,
-        "homingMaxStep": 3.0,
-        "homingRange": 6.0,
+        "homingMaxStep": 10.0,
+        "homingRange": 20.0,
         "inputBufferStart": 10,
         "knockback": 1.0,
         "knockbackDuration": 1.0,
@@ -139,11 +116,6 @@
         "shakeDuration": 0.0,
         "shakeIntensity": 0.0,
         "stepDistance": 0.5,
-        "swingTilt": {
-            "x": -431595520.0,
-            "y": 6.0,
-            "z": 60.0
-        },
         "totalFrames": 60,
         "type": 1
     },
@@ -157,8 +129,6 @@
         "comboWindowEnd": 21,
         "duration": 0.4000000059604645,
         "enableHoming": false,
-        "fovPunchAmount": 0.11999999731779099,
-        "fovPunchDuration": 3.0,
         "fps": 60,
         "hitEnd": 25,
         "hitStart": 0,
@@ -176,11 +146,6 @@
         "shakeDuration": 0.0,
         "shakeIntensity": 0.0,
         "stepDistance": 0.5,
-        "swingTilt": {
-            "x": -431595520.0,
-            "y": 6.0,
-            "z": 60.0
-        },
         "totalFrames": 60,
         "type": 1
     },
@@ -194,8 +159,6 @@
         "comboWindowEnd": 21,
         "duration": 0.5,
         "enableHoming": false,
-        "fovPunchAmount": 0.11999999731779099,
-        "fovPunchDuration": 3.0,
         "fps": 60,
         "hitEnd": 25,
         "hitStart": 0,
@@ -213,11 +176,6 @@
         "shakeDuration": 0.0,
         "shakeIntensity": 0.0,
         "stepDistance": 0.5,
-        "swingTilt": {
-            "x": -431595520.0,
-            "y": 6.0,
-            "z": 60.0
-        },
         "totalFrames": 60,
         "type": 1
     },
@@ -231,8 +189,6 @@
         "comboWindowEnd": 0,
         "duration": 1.25,
         "enableHoming": false,
-        "fovPunchAmount": 0.11999999731779099,
-        "fovPunchDuration": 3.0,
         "fps": 60,
         "hitEnd": 37,
         "hitStart": 0,
@@ -250,11 +206,6 @@
         "shakeDuration": 0.0,
         "shakeIntensity": 0.0,
         "stepDistance": 0.5,
-        "swingTilt": {
-            "x": -431595520.0,
-            "y": 6.0,
-            "z": 60.0
-        },
         "totalFrames": 60,
         "type": 1
     },
@@ -268,8 +219,6 @@
         "comboWindowEnd": 19,
         "duration": 0.5,
         "enableHoming": false,
-        "fovPunchAmount": 0.11999999731779099,
-        "fovPunchDuration": 3.0,
         "fps": 60,
         "hitEnd": 15,
         "hitStart": 0,
@@ -287,11 +236,6 @@
         "shakeDuration": 0.0,
         "shakeIntensity": 0.0,
         "stepDistance": 0.0,
-        "swingTilt": {
-            "x": -431595520.0,
-            "y": 6.0,
-            "z": 60.0
-        },
         "totalFrames": 60,
         "type": 0
     },
@@ -305,8 +249,6 @@
         "comboWindowEnd": 18,
         "duration": 0.4000000059604645,
         "enableHoming": false,
-        "fovPunchAmount": 0.11999999731779099,
-        "fovPunchDuration": 3.0,
         "fps": 60,
         "hitEnd": 15,
         "hitStart": 0,
@@ -324,11 +266,6 @@
         "shakeDuration": 0.0,
         "shakeIntensity": 0.0,
         "stepDistance": 0.0,
-        "swingTilt": {
-            "x": -431595520.0,
-            "y": 6.0,
-            "z": 60.0
-        },
         "totalFrames": 60,
         "type": 0
     }
