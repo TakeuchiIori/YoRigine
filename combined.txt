@@ -212151,7 +212151,7 @@ void GameScene::Initialize() {
 	//------------------------------------------------------------
 
 	player_ = std::make_unique<Player>();
-	player_->Initialize(sceneCamera_.get()); 
+	player_->Initialize(sceneCamera_.get());
 	auto playerCam = std::dynamic_pointer_cast<FollowCamera>(director->GetCamera("PlayerFollow"));
 	director->RegisterTarget("Player", &player_->GetWT());
 
@@ -212231,9 +212231,9 @@ void GameScene::Initialize() {
 	Editor::GetInstance()->RegisterGameUI("カメラエディター", [this]() {cameraEditor_->Update(); }, "Game");
 	Editor::GetInstance()->RegisterGameUI("カメラモード切り替え", [this]() {UpdateCameraMode(); }, "Game");
 	Editor::GetInstance()->RegisterGameUI("プレイヤーの状態情報", [this]() {player_->DrawImGui(); }, "Game");
-	Editor::GetInstance()->RegisterGameUI("プレイヤーカメラ",     [this]() {
+	Editor::GetInstance()->RegisterGameUI("プレイヤーカメラ", [this]() {
 		if (player_->GetPlayerCamera()) player_->GetPlayerCamera()->DrawImGui();
-	}, "Game");
+		}, "Game");
 	Editor::GetInstance()->RegisterGameUI("ライティング", [this]() { YoRigine::LightManager::GetInstance()->ShowLightingEditor(); }, "Game");
 	Editor::GetInstance()->RegisterGameUI("GpuParticle", [this]() { YoRigine::GpuEmitManager::GetInstance()->DrawImGui(); }, "Game");
 	Editor::GetInstance()->RegisterGameUI("プレイヤー攻撃エディター", [this]() {attackEditor_->DrawImGui(); }, "Game");
@@ -212269,28 +212269,20 @@ void GameScene::Update() {
 	//explosionEmitter_->ShowDebugInfo();
 #endif
 
-	UpdateCamera();
-
-	// PlayerCamera フェーズ2: 攻撃カメラオフセットを sceneCamera に後付けで適用
-	// ★ UpdateCamera() の後に呼ぶことで CameraDirector が確定した位置に積み増しできる
-	if (player_->GetPlayerCamera()) {
-		player_->GetPlayerCamera()->ApplyPostDirector(
-			sceneCamera_.get(), YoRigine::GameTime::GetDeltaTime());
-	}
-
+	//------------------------------------------------------------
+	// ゲームオーバー時の選択処理
+	//------------------------------------------------------------
 	bool isPlayerDead = player->GetCombat()->IsDead();
 	auto director = CameraDirector::GetInstance();
 	auto follow = director->GetCamera("PlayerFollow");
 	auto followPtr = std::static_pointer_cast<FollowCamera>(follow);
 
-	//------------------------------------------------------------
-	// ゲームオーバー時の選択処理
-	//------------------------------------------------------------
 	if (isPlayerDead != wasPlayerDead_) {
 		if (isPlayerDead) {
 			// 死亡した瞬間:フェード開始
 			gameUI_->ShowGameOverWithFade(3.0f);
-		} else {
+		}
+		else {
 			// 復活した瞬間:リセット
 			gameUI_->ResetGameOver();
 		}
@@ -212308,19 +212300,36 @@ void GameScene::Update() {
 		gameUI_->ClearRequests();
 	}
 
-
 	// カメラモード同期
 	if (subSceneManager_) {
 		cameraMode_ = subSceneManager_->GetCameraMode();
 	}
 
+	//------------------------------------------------------------
+	// スティック入力・ロックオンを確定
+	//------------------------------------------------------------
 	if (player_->GetPlayerCamera()) {
 		player_->GetPlayerCamera()->UpdatePreDirector();
 	}
 
-	// サブシーン更新
+	//------------------------------------------------------------
+	// サブシーン更新（プレイヤー・敵など全オブジェクトを動かす）
+	//------------------------------------------------------------
 	if (subSceneManager_) {
 		subSceneManager_->Update();
+	}
+
+	//------------------------------------------------------------
+	// 動いたプレイヤー位置をもとにカメラ計算
+	//------------------------------------------------------------
+	UpdateCamera();
+
+	//------------------------------------------------------------
+	//  攻撃カメラオフセットを sceneCamera に後付けで適用
+	//------------------------------------------------------------
+	if (player_->GetPlayerCamera()) {
+		player_->GetPlayerCamera()->ApplyPostDirector(
+			sceneCamera_.get(), YoRigine::GameTime::GetDeltaTime());
 	}
 
 	// 空と共通システム更新
@@ -212487,7 +212496,8 @@ void GameScene::UpdateCamera() {
 			// デバッグカメラを最優先に
 			cameraMode_ = CameraMode::DEBUG;
 			CameraDirector::GetInstance()->SetEnableBlending(false);
-		} else {
+		}
+		else {
 			// 通常のフォローカメラを優先に
 			cameraMode_ = CameraMode::FOLLOW;
 			CameraDirector::GetInstance()->SetEnableBlending(false);
@@ -213275,14 +213285,6 @@ void BattleScene::Initialize(Camera* camera, Player* player) {
 	sprite_->Initialize("Resources/Textures/GameScene/BattleScene.png");
 	sprite_->SetTranslate({ 200.0f, 0.0f, 0.0f });
 
-
-	auto manager = AreaManager::GetInstance();
-
-	// 注意: BattleArea(境界エリア) は OnEnter で登録する。
-	// FieldScene::OnEnter が RemoveArea("BattleArea") で掃除するため、
-	// Initialize で一度だけ追加するとフィールド入場時に消えて二度と復活せず、
-	// バトル中の境界制限が効かなくなる (FieldArea と対称に入退場で再登録する)。
-
 	//------------------------------------------------------------
 	// UI初期化
 	//------------------------------------------------------------
@@ -213294,6 +213296,7 @@ void BattleScene::Initialize(Camera* camera, Player* player) {
 	//------------------------------------------------------------
 	// プレイヤーをエリア制限対象として登録
 	//------------------------------------------------------------
+	auto manager = AreaManager::GetInstance();
 	manager->RegisterObject(&player_->GetWT(), "Player");
 
 	// デバッグ描画を有効化
@@ -213306,9 +213309,6 @@ void BattleScene::Initialize(Camera* camera, Player* player) {
 	//------------------------------------------------------------
 	// オブジェクトの先行ロード
 	//------------------------------------------------------------
-	// OnEnter での初回 LoadScene("Battle") は JSON パース＋モデルロードが走り、
-	// シーン遷移時にヒッチが出る。先に Stash に積んでおくと、直後の
-	// SwitchToScene("Field") で自動 Stash → 初回バトル突入時は TryRestore で復元される。
 	YoRigine::ModelManipulator::GetInstance()->LoadScene("Battle");
 }
 
@@ -213393,16 +213393,19 @@ void BattleScene::Update() {
 		return;
 	}
 
-	// 敵更新
-	if (!isBattleCameraActive) {
-		battleEnemyManager_->Update();
-	}
-
 	// プレイヤー更新
+	// ★ 敵より先に動かすことで、敵AIが今フレームのプレイヤー位置を参照できる
 	if (!isBattleCameraActive && !battleEnemyManager_->IsFinalBattleCleared()) {
 		player_->Update();
 	}
 
+	// エリア制限補正（プレイヤー移動直後に境界クランプ → 敵がクランプ済みの位置を参照）
+	AreaManager::GetInstance()->UpdateSingleObject(&player_->GetWT());
+
+	// 敵更新（今フレームのプレイヤー位置・状態を参照してAIが反応）
+	if (!isBattleCameraActive) {
+		battleEnemyManager_->Update();
+	}
 
 	// 視覚効果・オブジェクト更新
 	sprite_->Update();
@@ -213411,9 +213414,6 @@ void BattleScene::Update() {
 	// UI更新
 	lockOnUI_->Update();
 	DamageNumberManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime(), sceneCamera_->GetViewProjectionMatrix());
-
-	// エリア制限補正
-	AreaManager::GetInstance()->UpdateSingleObject(&player_->GetWT());
 }
 
 
@@ -213448,9 +213448,6 @@ void BattleScene::DrawLine() {
 	AreaManager::GetInstance()->DrawArea("BattleArea", line_.get());
 	// AreaEditor で追加した他エリアもまとめて描画(BattleArea は重複描画を避けて除外)
 	AreaManager::GetInstance()->Draw(line_.get(), { "BattleArea" });
-
-	// LineManager にキューイングされた頂点をここで GPU 提出。
-	// これを呼ばないと AreaManager の Draw 系はバッファに溜まったまま画面に出ない。
 	line_->DrawLine();
 
 #endif
@@ -213478,8 +213475,7 @@ void BattleScene::DrawUI() {
 }
 
 void BattleScene::DrawNonOffscreen()
-{
-}
+{}
 
 void BattleScene::DrawShadow()
 {
