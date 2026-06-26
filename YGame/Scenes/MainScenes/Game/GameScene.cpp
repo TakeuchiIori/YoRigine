@@ -98,7 +98,7 @@ void GameScene::Initialize() {
 	//------------------------------------------------------------
 
 	player_ = std::make_unique<Player>();
-	player_->Initialize(sceneCamera_.get()); 
+	player_->Initialize(sceneCamera_.get());
 	auto playerCam = std::dynamic_pointer_cast<FollowCamera>(director->GetCamera("PlayerFollow"));
 	director->RegisterTarget("Player", &player_->GetWT());
 
@@ -178,9 +178,9 @@ void GameScene::Initialize() {
 	Editor::GetInstance()->RegisterGameUI("カメラエディター", [this]() {cameraEditor_->Update(); }, "Game");
 	Editor::GetInstance()->RegisterGameUI("カメラモード切り替え", [this]() {UpdateCameraMode(); }, "Game");
 	Editor::GetInstance()->RegisterGameUI("プレイヤーの状態情報", [this]() {player_->DrawImGui(); }, "Game");
-	Editor::GetInstance()->RegisterGameUI("プレイヤーカメラ",     [this]() {
+	Editor::GetInstance()->RegisterGameUI("プレイヤーカメラ", [this]() {
 		if (player_->GetPlayerCamera()) player_->GetPlayerCamera()->DrawImGui();
-	}, "Game");
+		}, "Game");
 	Editor::GetInstance()->RegisterGameUI("ライティング", [this]() { YoRigine::LightManager::GetInstance()->ShowLightingEditor(); }, "Game");
 	Editor::GetInstance()->RegisterGameUI("GpuParticle", [this]() { YoRigine::GpuEmitManager::GetInstance()->DrawImGui(); }, "Game");
 	Editor::GetInstance()->RegisterGameUI("プレイヤー攻撃エディター", [this]() {attackEditor_->DrawImGui(); }, "Game");
@@ -216,28 +216,20 @@ void GameScene::Update() {
 	//explosionEmitter_->ShowDebugInfo();
 #endif
 
-	UpdateCamera();
-
-	// PlayerCamera フェーズ2: 攻撃カメラオフセットを sceneCamera に後付けで適用
-	// ★ UpdateCamera() の後に呼ぶことで CameraDirector が確定した位置に積み増しできる
-	if (player_->GetPlayerCamera()) {
-		player_->GetPlayerCamera()->ApplyPostDirector(
-			sceneCamera_.get(), YoRigine::GameTime::GetDeltaTime());
-	}
-
+	//------------------------------------------------------------
+	// ゲームオーバー時の選択処理
+	//------------------------------------------------------------
 	bool isPlayerDead = player->GetCombat()->IsDead();
 	auto director = CameraDirector::GetInstance();
 	auto follow = director->GetCamera("PlayerFollow");
 	auto followPtr = std::static_pointer_cast<FollowCamera>(follow);
 
-	//------------------------------------------------------------
-	// ゲームオーバー時の選択処理
-	//------------------------------------------------------------
 	if (isPlayerDead != wasPlayerDead_) {
 		if (isPlayerDead) {
 			// 死亡した瞬間:フェード開始
 			gameUI_->ShowGameOverWithFade(3.0f);
-		} else {
+		}
+		else {
 			// 復活した瞬間:リセット
 			gameUI_->ResetGameOver();
 		}
@@ -255,19 +247,36 @@ void GameScene::Update() {
 		gameUI_->ClearRequests();
 	}
 
-
 	// カメラモード同期
 	if (subSceneManager_) {
 		cameraMode_ = subSceneManager_->GetCameraMode();
 	}
 
+	//------------------------------------------------------------
+	// スティック入力・ロックオンを確定
+	//------------------------------------------------------------
 	if (player_->GetPlayerCamera()) {
 		player_->GetPlayerCamera()->UpdatePreDirector();
 	}
 
-	// サブシーン更新
+	//------------------------------------------------------------
+	// サブシーン更新（プレイヤー・敵など全オブジェクトを動かす）
+	//------------------------------------------------------------
 	if (subSceneManager_) {
 		subSceneManager_->Update();
+	}
+
+	//------------------------------------------------------------
+	// 動いたプレイヤー位置をもとにカメラ計算
+	//------------------------------------------------------------
+	UpdateCamera();
+
+	//------------------------------------------------------------
+	//  攻撃カメラオフセットを sceneCamera に後付けで適用
+	//------------------------------------------------------------
+	if (player_->GetPlayerCamera()) {
+		player_->GetPlayerCamera()->ApplyPostDirector(
+			sceneCamera_.get(), YoRigine::GameTime::GetDeltaTime());
 	}
 
 	// 空と共通システム更新
@@ -434,7 +443,8 @@ void GameScene::UpdateCamera() {
 			// デバッグカメラを最優先に
 			cameraMode_ = CameraMode::DEBUG;
 			CameraDirector::GetInstance()->SetEnableBlending(false);
-		} else {
+		}
+		else {
 			// 通常のフォローカメラを優先に
 			cameraMode_ = CameraMode::FOLLOW;
 			CameraDirector::GetInstance()->SetEnableBlending(false);

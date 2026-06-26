@@ -72,14 +72,6 @@ void BattleScene::Initialize(Camera* camera, Player* player) {
 	sprite_->Initialize("Resources/Textures/GameScene/BattleScene.png");
 	sprite_->SetTranslate({ 200.0f, 0.0f, 0.0f });
 
-
-	auto manager = AreaManager::GetInstance();
-
-	// 注意: BattleArea(境界エリア) は OnEnter で登録する。
-	// FieldScene::OnEnter が RemoveArea("BattleArea") で掃除するため、
-	// Initialize で一度だけ追加するとフィールド入場時に消えて二度と復活せず、
-	// バトル中の境界制限が効かなくなる (FieldArea と対称に入退場で再登録する)。
-
 	//------------------------------------------------------------
 	// UI初期化
 	//------------------------------------------------------------
@@ -91,6 +83,7 @@ void BattleScene::Initialize(Camera* camera, Player* player) {
 	//------------------------------------------------------------
 	// プレイヤーをエリア制限対象として登録
 	//------------------------------------------------------------
+	auto manager = AreaManager::GetInstance();
 	manager->RegisterObject(&player_->GetWT(), "Player");
 
 	// デバッグ描画を有効化
@@ -103,9 +96,6 @@ void BattleScene::Initialize(Camera* camera, Player* player) {
 	//------------------------------------------------------------
 	// オブジェクトの先行ロード
 	//------------------------------------------------------------
-	// OnEnter での初回 LoadScene("Battle") は JSON パース＋モデルロードが走り、
-	// シーン遷移時にヒッチが出る。先に Stash に積んでおくと、直後の
-	// SwitchToScene("Field") で自動 Stash → 初回バトル突入時は TryRestore で復元される。
 	YoRigine::ModelManipulator::GetInstance()->LoadScene("Battle");
 }
 
@@ -190,16 +180,19 @@ void BattleScene::Update() {
 		return;
 	}
 
-	// 敵更新
-	if (!isBattleCameraActive) {
-		battleEnemyManager_->Update();
-	}
-
 	// プレイヤー更新
+	// ★ 敵より先に動かすことで、敵AIが今フレームのプレイヤー位置を参照できる
 	if (!isBattleCameraActive && !battleEnemyManager_->IsFinalBattleCleared()) {
 		player_->Update();
 	}
 
+	// エリア制限補正（プレイヤー移動直後に境界クランプ → 敵がクランプ済みの位置を参照）
+	AreaManager::GetInstance()->UpdateSingleObject(&player_->GetWT());
+
+	// 敵更新（今フレームのプレイヤー位置・状態を参照してAIが反応）
+	if (!isBattleCameraActive) {
+		battleEnemyManager_->Update();
+	}
 
 	// 視覚効果・オブジェクト更新
 	sprite_->Update();
@@ -208,9 +201,6 @@ void BattleScene::Update() {
 	// UI更新
 	lockOnUI_->Update();
 	DamageNumberManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime(), sceneCamera_->GetViewProjectionMatrix());
-
-	// エリア制限補正
-	AreaManager::GetInstance()->UpdateSingleObject(&player_->GetWT());
 }
 
 
@@ -245,9 +235,6 @@ void BattleScene::DrawLine() {
 	AreaManager::GetInstance()->DrawArea("BattleArea", line_.get());
 	// AreaEditor で追加した他エリアもまとめて描画(BattleArea は重複描画を避けて除外)
 	AreaManager::GetInstance()->Draw(line_.get(), { "BattleArea" });
-
-	// LineManager にキューイングされた頂点をここで GPU 提出。
-	// これを呼ばないと AreaManager の Draw 系はバッファに溜まったまま画面に出ない。
 	line_->DrawLine();
 
 #endif
@@ -275,8 +262,7 @@ void BattleScene::DrawUI() {
 }
 
 void BattleScene::DrawNonOffscreen()
-{
-}
+{}
 
 void BattleScene::DrawShadow()
 {
