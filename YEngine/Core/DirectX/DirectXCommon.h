@@ -91,6 +91,15 @@ namespace YoRigine {
 		/// MainDepth を DEPTH_WRITE に戻してバックバッファと再バインド
 		void DepthBarrier();
 
+		/// ソフトパーティクル用：オフスクリーンパス中に MainDepth をシェーダ読み取り状態へ遷移し、
+		/// OffScreen RT を「深度なし」で再バインドする。粒 PS が深度をサンプルして
+		/// 遮蔽判定とソフトフェードを行うための準備。粒描画の直前に呼ぶ。
+		void BeginParticleSoftDepth();
+
+		/// ソフトパーティクル描画後の後始末：MainDepth を DEPTH_WRITE に戻し、
+		/// OffScreen RT + MainDepth DSV を再バインドする。粒描画の直後に呼ぶ。
+		void EndParticleSoftDepth();
+
 		/// バックバッファの内容を FinalResult テクスチャにコピー
 		void CopyBackBufferToFinalResult();
 

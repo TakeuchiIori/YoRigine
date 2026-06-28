@@ -10,6 +10,9 @@
 #include <string>
 #include <vector>
 
+// EffectHandle が生成する実行中エミッタ（循環インクルード回避のため前方宣言）
+class YParticleEmitter;
+
 /// <summary>
 /// YParticleSystem を統合管理するマネージャー
 /// システムの作成、更新、描画を一元管理
@@ -147,6 +150,12 @@ public:
     /// </summary>
     void EmitBurst(const std::string& systemName, const Vector3& position, int count);
 
+    /// <summary>
+    /// 実行中エミッタ（EffectHandle::Play のループ/追従）を登録する。
+    /// Update() で毎フレーム tick され、Stop()（非アクティブ）になると自動的に除去される。
+    /// </summary>
+    void RegisterEmitter(const std::shared_ptr<YParticleEmitter>& emitter);
+
     //=================================================================
     // カメラ設定
     //=================================================================
@@ -186,6 +195,8 @@ private:
         ParticleLightSetting lightSetting;
         std::vector<YParticleSystem*> systems;
 		BlendMode blendMode;
+        bool  softParticle = false;       // ソフトパーティクル（深度フェード）
+        float softFadeDistance = 0.5f;
     };
 
     void CreateRenderBatches(std::vector<RenderBatch>& batches);
@@ -208,6 +219,9 @@ private:
 
     // レンダラー
     std::unique_ptr<YParticleRenderer> renderer_;
+
+    // EffectHandle::Play(loop) 等が生成した実行中エミッタ。毎フレーム tick する。
+    std::vector<std::shared_ptr<YParticleEmitter>> activeEmitters_;
 
     // 統計情報
     Statistics stats_;

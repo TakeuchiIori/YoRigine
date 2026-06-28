@@ -12,6 +12,7 @@
 #include <d3d12.h>
 #include "VfxEffectAsset.h"
 #include "LightVolumeMesh.h"
+#include "VolumeSmokeMesh.h"
 #include <Core/Editor/Command/CommandHistory.h>
 #include "FileOperations/FileBrowser.h"
 
@@ -78,6 +79,7 @@ namespace YoRigine {
         void DrawEditPanel();
         void DrawTrailSection();
         void DrawLightVolumeSection();
+        void DrawSmokeSection();
         void DrawPreviewSection();
         void DrawNewEffectDialog();
         void DrawTextureSelectPopup();
@@ -96,6 +98,7 @@ namespace YoRigine {
         void RebuildPreviewMeshes();
         void InitCBVs();
         void UpdateVolumeCBV(float time);
+        void UpdateSmokeCBV(float time);
 
         static VfxEffectAsset MakePreset(VfxPreset preset);
 
@@ -117,6 +120,7 @@ namespace YoRigine {
         // ★ プレビュー（TrailはEmitterに完全委譲）
         std::unique_ptr<TrailMeshEmitter> previewTrailEmitter_;
         std::unique_ptr<LightVolumeMesh>  previewVolume_;
+        std::unique_ptr<VolumeSmokeMesh>  previewSmoke_;
 
         PreviewAnimMode previewAnim_ = PreviewAnimMode::SlashHorizontal;
         float swordLength_ = 2.0f;
@@ -129,6 +133,9 @@ namespace YoRigine {
         // ★ CBVは Volume のみ保持（TrailのCBVはEmitterが持っているため削除）
         Microsoft::WRL::ComPtr<ID3D12Resource> volumeCBResource_;
         LightVolumeParamsCB* volumeCBMapped_ = nullptr;
+
+        Microsoft::WRL::ComPtr<ID3D12Resource> smokeCBResource_;
+        SmokeParamsCB* smokeCBMapped_ = nullptr;
 
         bool showNewDialog_ = false;
         char newNameBuffer_[128] = "NewEffect";

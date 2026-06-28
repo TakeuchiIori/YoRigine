@@ -140,6 +140,23 @@ namespace YoRigine {
     };
 
     // -------------------------------------------------------
+    // Volume Smoke パラメータ (Omen 風めらめらスモーク)
+    // -------------------------------------------------------
+    struct SmokeEffectParam
+    {
+        Vector4 color        = { 0.6f, 0.4f, 1.2f, 1.0f }; // rgb(>1でBloom), a=濃度基準
+        float   radius       = 1.5f;
+        float   noiseScale   = 4.0f;
+        float   noiseStrength = 0.9f;
+        float   scrollSpeed  = 0.3f;
+        float   fresnelPower = 2.5f;
+        float   density      = 1.0f;
+        float   noiseOctaves = 4.0f;
+        float   rimIntensity = 2.0f;   // リム発光（太陽フレア風 / Bloom 用）
+        bool    isEnable     = true;
+    };
+
+    // -------------------------------------------------------
     // まとめアセット
     // -------------------------------------------------------
     struct VfxEffectAsset
@@ -147,8 +164,10 @@ namespace YoRigine {
         std::string       name = "NewEffect";
         TrailEffectParam  trail;
         LightVolumeEffectParam lightVolume;
+        SmokeEffectParam  smoke;
         bool useTrail       = true;
         bool useLightVolume = true;
+        bool useSmoke       = false;   // 既定OFF（既存アセットは従来通り）
 
         void SaveToJson(const std::string& filePath) const;
         bool LoadFromJson(const std::string& filePath);

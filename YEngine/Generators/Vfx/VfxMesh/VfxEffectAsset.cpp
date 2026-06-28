@@ -16,6 +16,7 @@ namespace YoRigine {
         j["name"]           = name;
         j["useTrail"]       = useTrail;
         j["useLightVolume"] = useLightVolume;
+        j["useSmoke"]       = useSmoke;
 
         // --- Trail ---
         auto& t = j["trail"];
@@ -93,6 +94,19 @@ namespace YoRigine {
         lv["intensity"]   = lightVolume.intensity;
         lv["isEnable"]    = lightVolume.isEnable;
 
+        // --- Volume Smoke ---
+        auto& sm = j["smoke"];
+        sm["color"]         = smoke.color;
+        sm["radius"]        = smoke.radius;
+        sm["noiseScale"]    = smoke.noiseScale;
+        sm["noiseStrength"] = smoke.noiseStrength;
+        sm["scrollSpeed"]   = smoke.scrollSpeed;
+        sm["fresnelPower"]  = smoke.fresnelPower;
+        sm["density"]       = smoke.density;
+        sm["noiseOctaves"]  = smoke.noiseOctaves;
+        sm["rimIntensity"]  = smoke.rimIntensity;
+        sm["isEnable"]      = smoke.isEnable;
+
         std::ofstream ofs(filePath);
         ofs << j.dump(4);
     }
@@ -111,6 +125,7 @@ namespace YoRigine {
         name           = j.value("name",           name);
         useTrail       = j.value("useTrail",       useTrail);
         useLightVolume = j.value("useLightVolume", useLightVolume);
+        useSmoke       = j.value("useSmoke",       useSmoke);
 
         if (j.contains("trail")) {
             auto& t = j["trail"];
@@ -194,6 +209,20 @@ namespace YoRigine {
             lightVolume.isEnable  = lv.value("isEnable",  lightVolume.isEnable);
             if (lv.contains("halfExtents")) lightVolume.halfExtents = lv["halfExtents"];
             if (lv.contains("color"))       lightVolume.color       = lv["color"];
+        }
+
+        if (j.contains("smoke")) {
+            auto& sm = j["smoke"];
+            if (sm.contains("color")) smoke.color = sm["color"];
+            smoke.radius        = sm.value("radius",        smoke.radius);
+            smoke.noiseScale    = sm.value("noiseScale",    smoke.noiseScale);
+            smoke.noiseStrength = sm.value("noiseStrength", smoke.noiseStrength);
+            smoke.scrollSpeed   = sm.value("scrollSpeed",   smoke.scrollSpeed);
+            smoke.fresnelPower  = sm.value("fresnelPower",  smoke.fresnelPower);
+            smoke.density       = sm.value("density",       smoke.density);
+            smoke.noiseOctaves  = sm.value("noiseOctaves",  smoke.noiseOctaves);
+            smoke.rimIntensity  = sm.value("rimIntensity",  smoke.rimIntensity);
+            smoke.isEnable      = sm.value("isEnable",      smoke.isEnable);
         }
         return true;
     }

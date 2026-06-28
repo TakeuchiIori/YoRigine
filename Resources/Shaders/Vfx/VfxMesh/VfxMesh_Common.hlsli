@@ -97,6 +97,25 @@ struct LightVolumeParams
 };
 
 //--------------------------------------------------
+// Smoke パラメータ (VolumeSmokeMesh — Omen 風ボリュームスモーク)
+//   C++ 側 SmokeParamsCB と一致させること
+//--------------------------------------------------
+struct SmokeParams
+{
+    float4 color;          // rgb=色(>1でBloom), a=密度基準
+    float3 center;         // 球中心(ワールド)
+    float  radius;         // 球半径
+    float  time;           // アニメ時間
+    float  noiseScale;     // FBM タイリング
+    float  noiseStrength;  // 渦巻きの強さ 0..1
+    float  scrollSpeed;    // ノイズスクロール速度
+    float  fresnelPower;   // 縁の柔らかさ
+    float  density;        // 全体不透明度倍率
+    float  noiseOctaves;   // FBM オクターブ(1-4)
+    float  rimIntensity;   // リム発光強度（太陽フレア風 / Bloom 用）
+};
+
+//--------------------------------------------------
 // テクスチャ / サンプラー
 //--------------------------------------------------
 Texture2D    gTexNoise     : register(t0);

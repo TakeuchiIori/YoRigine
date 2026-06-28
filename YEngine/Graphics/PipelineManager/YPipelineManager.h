@@ -164,6 +164,7 @@ private:
     /// </summary>
     void CreatePSO_VfxMeshTrail();
     void CreatePSO_VfxMeshVolume();
+    void CreatePSO_VfxMeshSmoke();
     // ===== ポストエフェクト系パイプライン作成関数群 =====
 
     /// <summary>

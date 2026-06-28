@@ -83,6 +83,8 @@ namespace YoRigine {
         // ★ Trail用のプレビューはEmitterに委譲
         previewTrailEmitter_ = std::make_unique<TrailMeshEmitter>();
         previewVolume_ = std::make_unique<LightVolumeMesh>();
+        previewSmoke_ = std::make_unique<VolumeSmokeMesh>();
+        previewSmoke_->Initialize();
 
         InitCBVs();
         ScanDirectory(scanRoot_);
@@ -97,6 +99,10 @@ namespace YoRigine {
         if (volumeCBMapped_ && volumeCBResource_) {
             volumeCBResource_->Unmap(0, nullptr);
             volumeCBMapped_ = nullptr;
+        }
+        if (smokeCBMapped_ && smokeCBResource_) {
+            smokeCBResource_->Unmap(0, nullptr);
+            smokeCBMapped_ = nullptr;
         }
         entries_.clear();
         selectedIndex_ = -1;
@@ -209,6 +215,11 @@ namespace YoRigine {
             previewVolume_->SetTransform(previewCenter_, previewYaw_);
             previewVolume_->Update(deltaTime);
         }
+
+        if (asset.useSmoke && previewSmoke_) {
+            previewSmoke_->SetTransform(previewCenter_, asset.smoke.radius);
+            previewSmoke_->Update(deltaTime);
+        }
     }
 
     // ===========================================================
@@ -240,6 +251,21 @@ namespace YoRigine {
             cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), volumeCBResource_->GetGPUVirtualAddress());
 
             previewVolume_->Draw(cmdList);
+        }
+
+        // Volume Smoke (Omen 風)
+        if (asset.useSmoke && asset.smoke.isEnable && camera_ && previewSmoke_) {
+            auto* pm = YPipelineManager::GetInstance();
+            const auto& idx = pm->GetParameterIndices("VfxMeshSmoke");
+            UpdateSmokeCBV(previewTimer_);
+
+            auto* cmdList = DirectXCommon::GetInstance()->GetCommandList().Get();
+            cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshSmoke"));
+            cmdList->SetPipelineState(pm->GetPipeLineStateObject("VfxMeshSmoke"));
+            cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"), camera_->GetCameraResource()->GetGPUVirtualAddress());
+            cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), smokeCBResource_->GetGPUVirtualAddress());
+
+            previewSmoke_->Draw(cmdList);
         }
     }
 
@@ -376,6 +402,21 @@ namespace YoRigine {
                 ImGui::TreePop();
             }
             if (changed) CommitChange(b, "Volume 有効切替");
+        }
+        ImGui::Separator();
+
+        {
+            VfxEffectAsset b = asset;
+            ImGui::PushID("UseSmoke");
+            bool changed = ImGui::Checkbox("##UseSmoke", &asset.useSmoke);
+            ImGui::PopID();
+            ImGui::SameLine();
+            if (ImGui::TreeNodeEx("Volume Smoke (Omen風)", ImGuiTreeNodeFlags_DefaultOpen)) {
+                if (asset.useSmoke) DrawSmokeSection();
+                else                ImGui::TextDisabled("  (disabled)");
+                ImGui::TreePop();
+            }
+            if (changed) CommitChange(b, "Smoke 有効切替");
         }
         ImGui::Separator();
 
@@ -750,6 +791,42 @@ namespace YoRigine {
         if (showVolumeDebug_) ImGui::TextColored(ImVec4(1, 1, 0, 1), "  > OBB ワイヤーフレーム ON");
     }
 
+    void VfxMeshEditor::DrawSmokeSection()
+    {
+        auto* sel = Selected();
+        if (!sel) return;
+        auto& sm = sel->asset.smoke;
+
+        ImGui::SeparatorText("カラー  (rgb>1 で Bloom / a=濃度)");
+        {
+            VfxEffectAsset b = sel->asset;
+            if (ImGui::DragFloat4("色##sm", &sm.color.x, 0.02f, 0.0f, 10.0f, "%.2f"))
+                CommitChange(b, "Smoke 色");
+        }
+
+        ImGui::SeparatorText("形状 / 渦巻き");
+        {
+            VfxEffectAsset b = sel->asset;
+            bool c = false;
+            c |= ImGui::DragFloat("半径##smr",          &sm.radius,        0.05f, 0.1f, 20.0f, "%.2f");
+            c |= ImGui::DragFloat("ノイズスケール##sms", &sm.noiseScale,    0.05f, 0.1f, 16.0f, "%.2f");
+            c |= ImGui::SliderFloat("渦巻きの強さ##smn", &sm.noiseStrength, 0.0f, 1.0f);
+            c |= ImGui::DragFloat("スクロール速度##smc", &sm.scrollSpeed,   0.01f, 0.0f, 3.0f, "%.2f");
+            c |= ImGui::DragFloat("縁の柔らかさ##smf",   &sm.fresnelPower,  0.05f, 0.1f, 8.0f, "%.2f");
+            c |= ImGui::DragFloat("密度##smd",           &sm.density,       0.01f, 0.0f, 3.0f, "%.2f");
+            c |= ImGui::DragFloat("オクターブ##smo",     &sm.noiseOctaves,  0.1f,  1.0f, 5.0f, "%.1f");
+            c |= ImGui::DragFloat("リム発光(フレア)##smrim", &sm.rimIntensity, 0.05f, 0.0f, 10.0f, "%.2f");
+            if (c) CommitChange(b, "Smoke パラメータ");
+        }
+
+        ImGui::Spacing();
+        {
+            VfxEffectAsset b = sel->asset;
+            if (ImGui::Checkbox("スモーク有効##smen", &sm.isEnable))
+                CommitChange(b, "Smoke 有効切替");
+        }
+    }
+
     void VfxMeshEditor::DrawPreviewSection()
     {
         ImGui::SeparatorText("プレビュー");
@@ -964,6 +1041,9 @@ namespace YoRigine {
     {
         volumeCBResource_ = dxCommon_->CreateBufferResource(AlignedSize<LightVolumeParamsCB>());
         volumeCBResource_->Map(0, nullptr, reinterpret_cast<void**>(&volumeCBMapped_));
+
+        smokeCBResource_ = dxCommon_->CreateBufferResource(AlignedSize<SmokeParamsCB>());
+        smokeCBResource_->Map(0, nullptr, reinterpret_cast<void**>(&smokeCBMapped_));
     }
 
     void VfxMeshEditor::UpdateVolumeCBV(float time)
@@ -981,6 +1061,25 @@ namespace YoRigine {
         volumeCBMapped_->noiseTiling = 2.0f;
         volumeCBMapped_->noiseStrength = 0.0f;
         volumeCBMapped_->time = time;
+    }
+
+    void VfxMeshEditor::UpdateSmokeCBV(float time)
+    {
+        auto* sel = Selected();
+        if (!sel || !smokeCBMapped_) return;
+        const auto& sm = sel->asset.smoke;
+
+        smokeCBMapped_->color         = sm.color;
+        smokeCBMapped_->center        = previewCenter_;
+        smokeCBMapped_->radius        = sm.radius;
+        smokeCBMapped_->time          = time;
+        smokeCBMapped_->noiseScale    = sm.noiseScale;
+        smokeCBMapped_->noiseStrength = sm.noiseStrength;
+        smokeCBMapped_->scrollSpeed   = sm.scrollSpeed;
+        smokeCBMapped_->fresnelPower  = sm.fresnelPower;
+        smokeCBMapped_->density       = sm.density;
+        smokeCBMapped_->noiseOctaves  = sm.noiseOctaves;
+        smokeCBMapped_->rimIntensity  = sm.rimIntensity;
     }
 
     VfxEffectAsset VfxMeshEditor::MakePreset(VfxPreset preset)

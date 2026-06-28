@@ -103,8 +103,11 @@ void YParticleSystem::Update(float deltaTime)
 		// 個別の経過時間を進める
 		attr.currentTime += deltaTime;
 
-		// 寿命チェック
+		// 寿命チェック（死亡の瞬間に OnDeath フックを発火 → サブエミッタ等）
 		if (attr.currentTime >= attr.lifeTime) {
+			for (auto& module : updateModules_) {
+				module->OnDeath(attributes_.data(), i);
+			}
 			attr.isActive = false;
 			continue;
 		}
@@ -384,6 +387,17 @@ void YParticleSystem::ShowEditor()
 	if (ImGui::Combo("ブレンドモード", &currentMode, blendNames, IM_ARRAYSIZE(blendNames))) {
 		SetBlendMode((BlendMode)currentMode);
 	}
+
+	// ソフトパーティクル（深度フェード）
+	ImGui::Checkbox("ソフトパーティクル", &softParticle_);
+	if (softParticle_) {
+		ImGui::SliderFloat("フェード距離", &softFadeDistance_, 0.01f, 5.0f);
+		ImGui::TextDisabled("地形・壁・敵に近づくほど薄くなり接地感が出ます。");
+	}
+
+	// エミッシブ強度（明るさ → Bloom の乗り）
+	ImGui::DragFloat("エミッシブ強度", &emissiveIntensity_, 0.05f, 0.0f, 20.0f);
+	ImGui::TextDisabled("rgbを明るくして Bloom を強く乗せます（ド派手用）。要 Bloom 有効。");
 
 	// === Spawn Modules ===
 	if (ImGui::TreeNode("スポーンモジュール")) {

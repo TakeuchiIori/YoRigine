@@ -119,6 +119,7 @@ void YPipelineManager::Initialize()
 	// Meshを使用したVFX用パイプライン
     CreatePSO_VfxMeshTrail();
     CreatePSO_VfxMeshVolume();
+    CreatePSO_VfxMeshSmoke();
 
     // 統計情報を出力
     auto stats = psoCache_->GetStats();
@@ -435,11 +436,7 @@ void YPipelineManager::CreatePSO_GPUParticleALLBlendModes()
 }
 
 void YPipelineManager::CreatePSO_YParticleAllBlendModes()
-{   
-    // シェーダーコンパイル
-    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Particle/YParticle.VS.hlsl", L"vs_6_0");
-    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Particle/YParticle.PS.hlsl", L"ps_6_0");
-
+{
     // ブレンドモード設定
     struct BlendConfig {
         BlendMode mode;
@@ -456,29 +453,44 @@ void YPipelineManager::CreatePSO_YParticleAllBlendModes()
         { BlendMode::kBlendModeScreen, "Screen", BlendPresets::CreateScreen() },
     };
 
-    // 各ブレンドモードごとにPSOを生成
-    for (const auto& config : configs) {
-        ReflectionBasedPipelineBuilder builder;
-        auto result = builder
-            .SetBlendState(config.blendDesc)
-            .SetRasterizerState(RasterizerPresets::CreateNoCull())
-            .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
-            .BuildFromCompiledShaders(
+    // 共通の VS を使い、PS だけ差し替えて「通常」「ソフトパーティクル」2系統の
+    // 全ブレンドモード PSO を生成する。リフレクションで root sig / index も自動生成。
+    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Particle/YParticle.VS.hlsl", L"vs_6_0");
+
+    // isSoft=true のソフト版は「深度なしRT」で描くため、深度テスト無効＋DSVフォーマット UNKNOWN。
+    // （null DSV をバインドするには PSO の深度フォーマットも UNKNOWN である必要がある）
+    auto buildSet = [&](const std::string& logicalName, const std::wstring& psPath, bool isSoft) {
+        auto psBlob = dxCommon_->CompileShader(psPath.c_str(), L"ps_6_0");
+        for (const auto& config : configs) {
+            ReflectionBasedPipelineBuilder builder;
+            builder
+                .SetBlendState(config.blendDesc)
+                .SetRasterizerState(RasterizerPresets::CreateNoCull());
+            if (isSoft) {
+                builder.SetDepthStencilState(DepthStencilPresets::CreateDisabled())
+                       .SetDepthStencilFormat(DXGI_FORMAT_UNKNOWN);
+            } else {
+                builder.SetDepthStencilState(DepthStencilPresets::CreateReadOnly());
+            }
+            auto result = builder.BuildFromCompiledShaders(
                 dxCommon_->GetDevice().Get(),
                 vsBlob.Get(),
                 psBlob.Get()
             );
 
-        std::string psoName = "YParticle_" + config.name;
-        pipelineStates_[psoName] = result.pipelineState;
-        blendModePipelineStates_["YParticle"][config.mode] = result.pipelineState;
+            pipelineStates_[logicalName + "_" + config.name] = result.pipelineState;
+            blendModePipelineStates_[logicalName][config.mode] = result.pipelineState;
 
-        // 最初のモードだけルートシグネチャとインデックスを保存
-        if (config.mode == BlendMode::kBlendModeNormal) {
-            rootSignatures_["YParticle"] = result.rootSignature;
-            parameterIndices_["YParticle"] = result.parameterIndices;
+            // 最初のモードだけ root sig / index を代表として保存
+            if (config.mode == BlendMode::kBlendModeNormal) {
+                rootSignatures_[logicalName] = result.rootSignature;
+                parameterIndices_[logicalName] = result.parameterIndices;
+            }
         }
-    }
+    };
+
+    buildSet("YParticle",     L"Resources/Shaders/Particle/YParticle.PS.hlsl",     false);
+    buildSet("YParticleSoft", L"Resources/Shaders/Particle/YParticleSoft.PS.hlsl", true);
 }
 
 void YPipelineManager::CreatePSO_Object_Manual()
@@ -746,6 +758,27 @@ void YPipelineManager::CreatePSO_VfxMeshVolume() {
     rootSignatures_["VfxMeshVolume"] = result.rootSignature;
     pipelineStates_["VfxMeshVolume"] = result.pipelineState;
     parameterIndices_["VfxMeshVolume"] = result.parameterIndices;
+}
+
+void YPipelineManager::CreatePSO_VfxMeshSmoke() {
+    // Omen 風ボリュームスモーク。半透明スモークなのでアルファブレンド。
+    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Vfx/VfxMesh/VfxMesh.VS.hlsl", L"vs_6_0");
+    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Vfx/VfxMesh/VfxMesh_Smoke.PS.hlsl", L"ps_6_0");
+
+    ReflectionBasedPipelineBuilder builder;
+    auto result = builder
+        .SetRasterizerState(RasterizerPresets::CreateNoCull())
+        .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
+        .SetBlendState(BlendPresets::CreateAlphaBlend())
+        .BuildFromCompiledShaders(
+            dxCommon_->GetDevice().Get(),
+            vsBlob.Get(),
+            psBlob.Get()
+        );
+
+    rootSignatures_["VfxMeshSmoke"] = result.rootSignature;
+    pipelineStates_["VfxMeshSmoke"] = result.pipelineState;
+    parameterIndices_["VfxMeshSmoke"] = result.parameterIndices;
 }
 
 
