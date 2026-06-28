@@ -1,0 +1,7 @@
+# premake5 が生成する VS プロジェクトファイル（コミットしない）
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+
+# Visual Studio 一時ファイル
+.vs/
