@@ -166,6 +166,7 @@ private:
     void CreatePSO_VfxMeshVolume();
     void CreatePSO_VfxMeshSmoke();
     void CreatePSO_VfxMeshLightning();
+    void CreatePSO_VfxMeshShockwave();
     // ===== ポストエフェクト系パイプライン作成関数群 =====
 
     /// <summary>

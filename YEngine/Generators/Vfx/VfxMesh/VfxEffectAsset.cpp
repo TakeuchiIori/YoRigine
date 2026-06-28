@@ -18,6 +18,7 @@ namespace YoRigine {
         j["useLightVolume"] = useLightVolume;
         j["useSmoke"]       = useSmoke;
         j["useLightning"]   = useLightning;
+        j["useShockwave"]   = useShockwave;
 
         // --- Trail ---
         auto& t = j["trail"];
@@ -98,6 +99,8 @@ namespace YoRigine {
         // --- Volume Smoke ---
         auto& sm = j["smoke"];
         sm["color"]         = smoke.color;
+        sm["smokeColor"]    = smoke.smokeColor;
+        sm["riseSpeed"]     = smoke.riseSpeed;
         sm["radius"]        = smoke.radius;
         sm["noiseScale"]    = smoke.noiseScale;
         sm["noiseStrength"] = smoke.noiseStrength;
@@ -121,6 +124,14 @@ namespace YoRigine {
         lt["glowPower"]    = lightning.glowPower;
         lt["isEnable"]     = lightning.isEnable;
 
+        // --- Shockwave ---
+        auto& sw = j["shockwave"];
+        sw["color"]     = shockwave.color;
+        sw["radius"]    = shockwave.radius;
+        sw["duration"]  = shockwave.duration;
+        sw["thickness"] = shockwave.thickness;
+        sw["isEnable"]  = shockwave.isEnable;
+
         std::ofstream ofs(filePath);
         ofs << j.dump(4);
     }
@@ -141,6 +152,7 @@ namespace YoRigine {
         useLightVolume = j.value("useLightVolume", useLightVolume);
         useSmoke       = j.value("useSmoke",       useSmoke);
         useLightning   = j.value("useLightning",   useLightning);
+        useShockwave   = j.value("useShockwave",   useShockwave);
 
         if (j.contains("trail")) {
             auto& t = j["trail"];
@@ -229,6 +241,8 @@ namespace YoRigine {
         if (j.contains("smoke")) {
             auto& sm = j["smoke"];
             if (sm.contains("color")) smoke.color = sm["color"];
+            if (sm.contains("smokeColor")) smoke.smokeColor = sm["smokeColor"];
+            smoke.riseSpeed     = sm.value("riseSpeed",     smoke.riseSpeed);
             smoke.radius        = sm.value("radius",        smoke.radius);
             smoke.noiseScale    = sm.value("noiseScale",    smoke.noiseScale);
             smoke.noiseStrength = sm.value("noiseStrength", smoke.noiseStrength);
@@ -252,6 +266,15 @@ namespace YoRigine {
             lightning.flickerRate  = lt.value("flickerRate",  lightning.flickerRate);
             lightning.glowPower    = lt.value("glowPower",    lightning.glowPower);
             lightning.isEnable     = lt.value("isEnable",     lightning.isEnable);
+        }
+
+        if (j.contains("shockwave")) {
+            auto& sw = j["shockwave"];
+            if (sw.contains("color")) shockwave.color = sw["color"];
+            shockwave.radius    = sw.value("radius",    shockwave.radius);
+            shockwave.duration  = sw.value("duration",  shockwave.duration);
+            shockwave.thickness = sw.value("thickness", shockwave.thickness);
+            shockwave.isEnable  = sw.value("isEnable",  shockwave.isEnable);
         }
         return true;
     }

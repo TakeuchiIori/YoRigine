@@ -255,5 +255,46 @@ UEの爆発の肝＝レイヤリングを、手持ちスプライトだけで組
 - `VfxEffectAsset`: `LightningEffectParam`＋`useLightning`＋JSON。`VfxMeshEditor` に正式統合（previewLightning_/CB/Update/DrawPreview/UpdateLightningCBV/DrawLightningSection/チェックボックス/Finalize）。
 - premake再生成＋Develop ビルド0/0。dxc(ps_6_0)検証OK。C++＋新ファイル→再起動。
 - 使い方: VFXエディタ→useLightning ON→Play→青白い稲妻が明滅＋枝分かれ。幅/ジグザグ/分割/枝/明滅レート/芯グロー/色を調整。
-- 次: 雷の手応え確認後、ロードマップ④「爆発（合成）」へ。部品(火球=スモーク/火花=サブエミッタ/閃光=Bloom)は揃いつつあり、残るは衝撃波リング＋オーケストレーション。
+- 雷に「長さ(length)」パラメータ追加（編集可・JSON対応、preview端点が length 連動）。
+
+## 2026-06-29 — VFXエディタ タブ化（見やすさ改善）
+DrawEditPanel の Trail/LightVolume/Smoke/Lightning 縦積み(checkbox+TreeNode)を **TabBar** に変更。一度に1効果のみ表示でスッキリ。有効な効果のタブ名に ● 表示。タブIDは "###tab_xxx" で固定（●付け外しで選択リセット防止）。各タブ先頭に「この効果を有効化」チェック。汎用ラムダ effectTab() で4種を生成。ビルド0/0。
+
+## 2026-06-29 — 新4: 爆発の部品「Shockwave（衝撃波リング）」
+ロードマップ④爆発の signature。スモーク/雷と同じVfxMesh統合パターン。
+- 新規 `Vfx/VfxMesh/ShockwaveMesh.{h,cpp}`: カメラ向きクワッド1枚。シェーダで中心→外へ広がり消えるリングをアニメ。
+- 新規 `Resources/Shaders/Vfx/VfxMesh/VfxMesh_Shockwave.PS.hlsl`: `frac(time/duration)`で膨張phase、リング先端を強調、膨張に伴いフェード。加算HDR。`VfxMesh_Common.hlsli`に`ShockwaveParams`。
+- `YPipelineManager`: `CreatePSO_VfxMeshShockwave`(NoCull/ReadOnly/Additive)。
+- `VfxEffectAsset`: `ShockwaveEffectParam`+`useShockwave`+JSON。`VfxMeshEditor`にタブ統合(preview/CB/Update/DrawPreview/UpdateShockwaveCBV/DrawShockwaveSection/Finalize)。
+- premake再生成＋ビルド0/0、dxc検証OK。
+
+### 大爆発の作り方 / 残課題
+- エディタで Shockwave + Smoke(炎色) + Lightning + Bloom(自動) を1エフェクトに重ねれば大爆発の絵。
+- ⚠️ 現状エディタは**ループ再生**(調整用)。実ゲーム用の**ワンショット発火**(`EffectHandle::Explosion(pos)`的にドカンと1回再生して消える)は未実装＝次の仕上げ。各メッシュに再生進捗(0..1)を外部駆動する仕組み＋ワールド配置トリガが必要。
+
+## 2026-06-29 — 爆発感ゼロ→ワンショット破裂エンベロープ追加 / プレビューUI整理
+ユーザー: 「全然爆発感が無い」「プレビューの軌道アニメはTrailだけに出すべき」「破裂＋煙＋衝撃波が欲しい」。
+- **爆発感の本質**: ループ継続だと持続球に見える。爆発は"一発膨張して消える"ワンショットのタイミングが命。
+- **ワンショット破裂エンベロープ実装**:
+  - 編集側: `oneShot_`/`burstDuration_`/`burstProgress_` 追加。プレビューに「爆発ワンショット再生」チェック＋破裂時間＋「もう一度」。Update で進捗0→1を自動リピート（-1=継続モード）。
+  - Smoke: 進捗で半径を素早く膨張（ポップ）＋シェーダでエンベロープ `saturate(p/0.12)*(1-smoothstep(0.35,1,p))` で立ち上がり速→フェード。CB/hlsli に `burst` 追加。
+  - Shockwave: phase をワンショット時は外部進捗(0→1で1回)、継続時は frac ループ。CB/hlsli に `burst`（旧_pad）。
+  - SmokeParamsCB に burst+_pad2[3] 追加（5行目）。
+- **#2 プレビューUI**: 「軌道アニメ」「剣の長さ」を `useTrail` 時のみ表示。
+- ビルド0/0、dxc検証OK（Smoke/Shockwave）。
+- レシピ: Smoke(炎色HDR)+Shockwave(暖色HDR,半径大)+Lightning(枝多)+爆発ワンショットON。
+- 次の盛り: 火花パーティクルのワンショット同期、閃光フラッシュ、実ゲームのワールド発火トリガ。
+
+## 2026-06-29 — UE5風「爆発後の煙」: 火→煙遷移＋上昇＋長い余韻
+ユーザー: UE5の爆発を再現したい、特に爆発後の煙。
+- **タイムライン化**（ワンショット時）:
+  - Smoke `burst` 進捗で **火球色→煙色** へ lerp（smoothstep 0.04→0.30）。シェーダ: stepCol/rim を baseRGB に。
+  - エンベロープを「破裂(pop, p/0.07)→長い余韻(linger, pow(1-p,0.7))」に。火球は一瞬、煙は長く残る。
+  - 煙の**上昇(浮力)**: editor で center.y += riseSpeed*previewTimer_。半径も p で膨張継続。CB center/radius を上昇・膨張後の値に一致(smokeCenter_/smokeRadius_ メンバ)。
+  - **衝撃波のタイムスケール分離**: shockwave burst = previewTimer_/sw.duration（煙の burstProgress_ とは別。速く膨張して終わる）。
+- 新パラメータ: SmokeEffectParam に `smokeColor`(煙色) `riseSpeed`。CB/hlsli に `smokeColor`。editorに火球色/煙色/上昇速度スライダ＋serialize。
+- 既定 burstDuration_ 0.8→**2.0**（煙の漂う時間）。
+- ビルド0/0、dxc検証OK。
+- UE5風レシピ: Smoke(火球色=明オレンジHDR/煙色=暗灰/上昇1.5/密度高)+Shockwave(暖色HDR/半径大/膨張0.4)+Lightning(任意)+ワンショットON/破裂時間2.5。
+- 残: 火花パーティクル同期・画面フラッシュ・熱揺らぎ・ワールド発火トリガ。
 

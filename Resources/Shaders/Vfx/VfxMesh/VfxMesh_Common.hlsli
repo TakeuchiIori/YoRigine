@@ -113,6 +113,9 @@ struct SmokeParams
     float  density;        // 全体不透明度倍率
     float  noiseOctaves;   // FBM オクターブ(1-4)
     float  rimIntensity;   // リム発光強度（太陽フレア風 / Bloom 用）
+    float  burst;          // -1=継続, 0..1=爆発ワンショット進捗
+    float3 _pad2;
+    float4 smokeColor;     // 爆発後に遷移する煙色
 };
 
 //--------------------------------------------------
@@ -125,6 +128,18 @@ struct LightningParams
     float  glowPower;   // 中心グロー強度
     float  coreWidthN;  // 予約
     float  _pad;
+};
+
+//--------------------------------------------------
+// Shockwave パラメータ (ShockwaveMesh — 爆発の衝撃波リング)
+//--------------------------------------------------
+struct ShockwaveParams
+{
+    float4 color;     // rgb>1 で Bloom
+    float  time;      // アニメ時間
+    float  duration;  // 1サイクル秒
+    float  thickness; // リング太さ
+    float  burst;     // -1=継続ループ, 0..1=爆発ワンショット進捗
 };
 
 //--------------------------------------------------

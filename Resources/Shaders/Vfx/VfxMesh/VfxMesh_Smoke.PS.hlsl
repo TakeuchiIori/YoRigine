@@ -76,6 +76,14 @@ PixelShaderOutput main(VertexShaderOutput input)
     float  alpha = 0.0f;
     float3 col   = float3(0.0f, 0.0f, 0.0f);
 
+    // 爆発時は 火球色 → 煙色 へ遷移（前半オレンジ、後半は暗いグレーの煙）
+    float3 baseRGB = gMeshParam.color.rgb;
+    if (gMeshParam.burst >= 0.0f)
+    {
+        baseRGB = lerp(gMeshParam.color.rgb, gMeshParam.smokeColor.rgb,
+                       smoothstep(0.04f, 0.30f, gMeshParam.burst));
+    }
+
     [loop]
     for (int i = 0; i < STEPS; ++i)
     {
@@ -99,7 +107,7 @@ PixelShaderOutput main(VertexShaderOutput input)
 
         // 1 ステップ分の不透明度（front-to-back 合成）
         float a = saturate(dens * gMeshParam.density * dt * 1.6f);
-        float3 stepCol = gMeshParam.color.rgb * (0.6f + 0.8f * n);
+        float3 stepCol = baseRGB * (0.6f + 0.8f * n);
 
         col   += (1.0f - alpha) * a * stepCol;
         alpha += (1.0f - alpha) * a;
@@ -112,8 +120,17 @@ PixelShaderOutput main(VertexShaderOutput input)
     float closest = length(oc - rd * b);             // レイと中心の最接近距離
     float graze   = saturate(closest / radius);      // 0=中心貫通, 1=縁
     float rim     = pow(graze, 4.0f) * gMeshParam.rimIntensity;
-    col   += gMeshParam.color.rgb * rim;
+    col   += baseRGB * rim;
     alpha  = saturate(alpha + rim * 0.35f);
+
+    // 爆発ワンショット: 立ち上がり速く（破裂）→ 長く尾を引いて消える（爆発後の煙）
+    if (gMeshParam.burst >= 0.0f)
+    {
+        float p   = gMeshParam.burst;
+        float pop = saturate(p / 0.07f);          // 一瞬で立ち上がる破裂
+        float linger = pow(saturate(1.0f - p), 0.7f); // ゆっくり尾を引いて消える
+        alpha *= pop * linger;
+    }
 
     if (alpha < 0.004f) { discard; }
 

@@ -35,6 +35,9 @@ struct SmokeParamsCB
     float   density;        // 全体の不透明度倍率
     float   noiseOctaves;   // FBM オクターブ数(1-4, float で渡す)
     float   rimIntensity;   // リム発光強度（太陽フレア風 / Bloom 用）
+    float   burst;          // -1=継続, 0..1=爆発ワンショット進捗
+    float   _pad2[3];
+    Vector4 smokeColor;     // 爆発後に遷移する煙色
 };
 
 class VolumeSmokeMesh : public ProceduralMeshBase

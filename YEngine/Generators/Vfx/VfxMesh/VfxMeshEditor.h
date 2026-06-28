@@ -14,6 +14,7 @@
 #include "LightVolumeMesh.h"
 #include "VolumeSmokeMesh.h"
 #include "LightningMesh.h"
+#include "ShockwaveMesh.h"
 #include <Core/Editor/Command/CommandHistory.h>
 #include "FileOperations/FileBrowser.h"
 
@@ -82,6 +83,7 @@ namespace YoRigine {
         void DrawLightVolumeSection();
         void DrawSmokeSection();
         void DrawLightningSection();
+        void DrawShockwaveSection();
         void DrawPreviewSection();
         void DrawNewEffectDialog();
         void DrawTextureSelectPopup();
@@ -106,6 +108,7 @@ namespace YoRigine {
         void UpdateVolumeCBV(float time);
         void UpdateSmokeCBV(float time);
         void UpdateLightningCBV(float time);
+        void UpdateShockwaveCBV(float time);
 
         static VfxEffectAsset MakePreset(VfxPreset preset);
 
@@ -129,12 +132,20 @@ namespace YoRigine {
         std::unique_ptr<LightVolumeMesh>  previewVolume_;
         std::unique_ptr<VolumeSmokeMesh>  previewSmoke_;
         std::unique_ptr<LightningMesh>    previewLightning_;
+        std::unique_ptr<ShockwaveMesh>    previewShockwave_;
 
         PreviewAnimMode previewAnim_ = PreviewAnimMode::SlashHorizontal;
         float swordLength_ = 2.0f;
 
         bool    previewPlaying_ = false;
         float   previewTimer_ = 0.f;
+
+        // 爆発ワンショット再生（破裂→膨張→消滅を1回。自動リピート）
+        bool    oneShot_       = false;
+        float   burstDuration_ = 2.0f; // 煙が漂う時間（爆発全体の長さ）
+        float   burstProgress_ = -1.f; // -1=継続モード, 0..1=ワンショット進捗
+        Vector3 smokeCenter_   = { 0.f, 0.f, 0.f }; // 上昇を反映した煙の中心
+        float   smokeRadius_   = 1.5f;              // 膨張を反映した煙の半径（メッシュと一致）
         Vector3 previewCenter_ = { 0.f, 0.f, 0.f };
         float   previewYaw_ = 0.f;
 
@@ -147,6 +158,9 @@ namespace YoRigine {
 
         Microsoft::WRL::ComPtr<ID3D12Resource> lightningCBResource_;
         LightningParamsCB* lightningCBMapped_ = nullptr;
+
+        Microsoft::WRL::ComPtr<ID3D12Resource> shockwaveCBResource_;
+        ShockwaveParamsCB* shockwaveCBMapped_ = nullptr;
 
         bool showNewDialog_ = false;
         char newNameBuffer_[128] = "NewEffect";

@@ -121,6 +121,7 @@ void YPipelineManager::Initialize()
     CreatePSO_VfxMeshVolume();
     CreatePSO_VfxMeshSmoke();
     CreatePSO_VfxMeshLightning();
+    CreatePSO_VfxMeshShockwave();
 
     // 統計情報を出力
     auto stats = psoCache_->GetStats();
@@ -801,6 +802,27 @@ void YPipelineManager::CreatePSO_VfxMeshLightning() {
     rootSignatures_["VfxMeshLightning"] = result.rootSignature;
     pipelineStates_["VfxMeshLightning"] = result.pipelineState;
     parameterIndices_["VfxMeshLightning"] = result.parameterIndices;
+}
+
+void YPipelineManager::CreatePSO_VfxMeshShockwave() {
+    // 爆発の衝撃波リング。加算ブレンド。
+    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Vfx/VfxMesh/VfxMesh.VS.hlsl", L"vs_6_0");
+    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Vfx/VfxMesh/VfxMesh_Shockwave.PS.hlsl", L"ps_6_0");
+
+    ReflectionBasedPipelineBuilder builder;
+    auto result = builder
+        .SetRasterizerState(RasterizerPresets::CreateNoCull())
+        .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
+        .SetBlendState(BlendPresets::CreateAdditive())
+        .BuildFromCompiledShaders(
+            dxCommon_->GetDevice().Get(),
+            vsBlob.Get(),
+            psBlob.Get()
+        );
+
+    rootSignatures_["VfxMeshShockwave"] = result.rootSignature;
+    pipelineStates_["VfxMeshShockwave"] = result.pipelineState;
+    parameterIndices_["VfxMeshShockwave"] = result.parameterIndices;
 }
 
 
