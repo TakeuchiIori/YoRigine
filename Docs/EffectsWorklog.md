@@ -238,3 +238,22 @@ UEの爆発の肝＝レイヤリングを、手持ちスプライトだけで組
 - 注意: 24ステップ×octをピクセル毎＝球が画面を覆うと重い(3060)。要観察→ステップ削減/品質ノブ。遮蔽は奥側深度の近似。
 - 密度の効き方が積分式で変わるのでエディタで再調整想定。
 
+---
+
+## 2026-06-29 — VFXエディタ整理（3点）
+ユーザー要望で `VfxMeshEditor` を整理：
+- **頂点配置/三日月のメッシュ作成UIを削除**（DrawTrailSection の「立体感・三日月化」＋「カスタムメッシュ形状エディター」canvasを除去。`crescentShape`/`customVertices` データ構造は温存＝TrailMesh等のコンパイル不変）。
+- **新規エフェクトダイアログのサイズ固定**: `AlwaysAutoResize`→`NoResize`＋固定420x300。入力でサイズが変わらない。
+- **新規Effect名の自動採番**: `MakeUniqueEffectName(base)` 追加（base→base1→base2…空き番号）。「+」押下時に初期名セット＋`CreateNew`でも採番（手入力衝突も吸収）。
+- Develop ビルド0/0。
+
+## 2026-06-29 — 新3: 雷（Lightning）プロシージャル稲妻
+新ロードマップ③。スモークと同じ VfxMesh 統合パターンで実装。
+- 新規 `Vfx/VfxMesh/LightningMesh.{h,cpp}`: start→end を **midpoint displacement** でジグザグ折れ線化（決定的Hash乱数）、**カメラ向きリボン**として描画。`flickerRate` 回/秒で経路再生成＝パチパチ明滅。枝分かれ対応。CB `LightningParamsCB`。
+- 新規 `Resources/Shaders/Vfx/VfxMesh/VfxMesh_Lightning.PS.hlsl`: リボン断面中心を細い高輝度の芯に＋`EnergyLines`でチラつき。加算HDR→Bloom。`VfxMesh_Common.hlsli` に `LightningParams`。
+- `YPipelineManager`: `CreatePSO_VfxMeshLightning`（NoCull/ReadOnly/Additive）。
+- `VfxEffectAsset`: `LightningEffectParam`＋`useLightning`＋JSON。`VfxMeshEditor` に正式統合（previewLightning_/CB/Update/DrawPreview/UpdateLightningCBV/DrawLightningSection/チェックボックス/Finalize）。
+- premake再生成＋Develop ビルド0/0。dxc(ps_6_0)検証OK。C++＋新ファイル→再起動。
+- 使い方: VFXエディタ→useLightning ON→Play→青白い稲妻が明滅＋枝分かれ。幅/ジグザグ/分割/枝/明滅レート/芯グロー/色を調整。
+- 次: 雷の手応え確認後、ロードマップ④「爆発（合成）」へ。部品(火球=スモーク/火花=サブエミッタ/閃光=Bloom)は揃いつつあり、残るは衝撃波リング＋オーケストレーション。
+

@@ -17,6 +17,7 @@ namespace YoRigine {
         j["useTrail"]       = useTrail;
         j["useLightVolume"] = useLightVolume;
         j["useSmoke"]       = useSmoke;
+        j["useLightning"]   = useLightning;
 
         // --- Trail ---
         auto& t = j["trail"];
@@ -107,6 +108,19 @@ namespace YoRigine {
         sm["rimIntensity"]  = smoke.rimIntensity;
         sm["isEnable"]      = smoke.isEnable;
 
+        // --- Lightning ---
+        auto& lt = j["lightning"];
+        lt["color"]        = lightning.color;
+        lt["length"]       = lightning.length;
+        lt["width"]        = lightning.width;
+        lt["jitter"]       = lightning.jitter;
+        lt["segments"]     = lightning.segments;
+        lt["branches"]     = lightning.branches;
+        lt["branchJitter"] = lightning.branchJitter;
+        lt["flickerRate"]  = lightning.flickerRate;
+        lt["glowPower"]    = lightning.glowPower;
+        lt["isEnable"]     = lightning.isEnable;
+
         std::ofstream ofs(filePath);
         ofs << j.dump(4);
     }
@@ -126,6 +140,7 @@ namespace YoRigine {
         useTrail       = j.value("useTrail",       useTrail);
         useLightVolume = j.value("useLightVolume", useLightVolume);
         useSmoke       = j.value("useSmoke",       useSmoke);
+        useLightning   = j.value("useLightning",   useLightning);
 
         if (j.contains("trail")) {
             auto& t = j["trail"];
@@ -223,6 +238,20 @@ namespace YoRigine {
             smoke.noiseOctaves  = sm.value("noiseOctaves",  smoke.noiseOctaves);
             smoke.rimIntensity  = sm.value("rimIntensity",  smoke.rimIntensity);
             smoke.isEnable      = sm.value("isEnable",      smoke.isEnable);
+        }
+
+        if (j.contains("lightning")) {
+            auto& lt = j["lightning"];
+            if (lt.contains("color")) lightning.color = lt["color"];
+            lightning.length       = lt.value("length",       lightning.length);
+            lightning.width        = lt.value("width",        lightning.width);
+            lightning.jitter       = lt.value("jitter",       lightning.jitter);
+            lightning.segments     = lt.value("segments",     lightning.segments);
+            lightning.branches     = lt.value("branches",     lightning.branches);
+            lightning.branchJitter = lt.value("branchJitter", lightning.branchJitter);
+            lightning.flickerRate  = lt.value("flickerRate",  lightning.flickerRate);
+            lightning.glowPower    = lt.value("glowPower",    lightning.glowPower);
+            lightning.isEnable     = lt.value("isEnable",     lightning.isEnable);
         }
         return true;
     }

@@ -120,6 +120,7 @@ void YPipelineManager::Initialize()
     CreatePSO_VfxMeshTrail();
     CreatePSO_VfxMeshVolume();
     CreatePSO_VfxMeshSmoke();
+    CreatePSO_VfxMeshLightning();
 
     // 統計情報を出力
     auto stats = psoCache_->GetStats();
@@ -779,6 +780,27 @@ void YPipelineManager::CreatePSO_VfxMeshSmoke() {
     rootSignatures_["VfxMeshSmoke"] = result.rootSignature;
     pipelineStates_["VfxMeshSmoke"] = result.pipelineState;
     parameterIndices_["VfxMeshSmoke"] = result.parameterIndices;
+}
+
+void YPipelineManager::CreatePSO_VfxMeshLightning() {
+    // プロシージャル稲妻。加算ブレンドで芯が光る。
+    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Vfx/VfxMesh/VfxMesh.VS.hlsl", L"vs_6_0");
+    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Vfx/VfxMesh/VfxMesh_Lightning.PS.hlsl", L"ps_6_0");
+
+    ReflectionBasedPipelineBuilder builder;
+    auto result = builder
+        .SetRasterizerState(RasterizerPresets::CreateNoCull())
+        .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
+        .SetBlendState(BlendPresets::CreateAdditive())
+        .BuildFromCompiledShaders(
+            dxCommon_->GetDevice().Get(),
+            vsBlob.Get(),
+            psBlob.Get()
+        );
+
+    rootSignatures_["VfxMeshLightning"] = result.rootSignature;
+    pipelineStates_["VfxMeshLightning"] = result.pipelineState;
+    parameterIndices_["VfxMeshLightning"] = result.parameterIndices;
 }
 
 

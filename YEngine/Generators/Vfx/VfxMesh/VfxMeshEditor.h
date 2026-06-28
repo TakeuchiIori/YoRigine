@@ -13,6 +13,7 @@
 #include "VfxEffectAsset.h"
 #include "LightVolumeMesh.h"
 #include "VolumeSmokeMesh.h"
+#include "LightningMesh.h"
 #include <Core/Editor/Command/CommandHistory.h>
 #include "FileOperations/FileBrowser.h"
 
@@ -80,6 +81,7 @@ namespace YoRigine {
         void DrawTrailSection();
         void DrawLightVolumeSection();
         void DrawSmokeSection();
+        void DrawLightningSection();
         void DrawPreviewSection();
         void DrawNewEffectDialog();
         void DrawTextureSelectPopup();
@@ -93,12 +95,17 @@ namespace YoRigine {
             const std::string& filePath,
             VfxPreset          preset);
 
+        // 既存エフェクト名と衝突しない名前を返す。
+        // base が空いていれば base、使われていれば base+"1", base+"2"... と空き番号を探す。
+        std::string MakeUniqueEffectName(const std::string& base) const;
+
         void CommitChange(const VfxEffectAsset& before, const char* label);
 
         void RebuildPreviewMeshes();
         void InitCBVs();
         void UpdateVolumeCBV(float time);
         void UpdateSmokeCBV(float time);
+        void UpdateLightningCBV(float time);
 
         static VfxEffectAsset MakePreset(VfxPreset preset);
 
@@ -121,6 +128,7 @@ namespace YoRigine {
         std::unique_ptr<TrailMeshEmitter> previewTrailEmitter_;
         std::unique_ptr<LightVolumeMesh>  previewVolume_;
         std::unique_ptr<VolumeSmokeMesh>  previewSmoke_;
+        std::unique_ptr<LightningMesh>    previewLightning_;
 
         PreviewAnimMode previewAnim_ = PreviewAnimMode::SlashHorizontal;
         float swordLength_ = 2.0f;
@@ -136,6 +144,9 @@ namespace YoRigine {
 
         Microsoft::WRL::ComPtr<ID3D12Resource> smokeCBResource_;
         SmokeParamsCB* smokeCBMapped_ = nullptr;
+
+        Microsoft::WRL::ComPtr<ID3D12Resource> lightningCBResource_;
+        LightningParamsCB* lightningCBMapped_ = nullptr;
 
         bool showNewDialog_ = false;
         char newNameBuffer_[128] = "NewEffect";

@@ -116,6 +116,18 @@ struct SmokeParams
 };
 
 //--------------------------------------------------
+// Lightning パラメータ (LightningMesh — プロシージャル稲妻)
+//--------------------------------------------------
+struct LightningParams
+{
+    float4 color;       // 芯の色(rgb>1 で Bloom)
+    float  time;        // アニメ時間
+    float  glowPower;   // 中心グロー強度
+    float  coreWidthN;  // 予約
+    float  _pad;
+};
+
+//--------------------------------------------------
 // テクスチャ / サンプラー
 //--------------------------------------------------
 Texture2D    gTexNoise     : register(t0);

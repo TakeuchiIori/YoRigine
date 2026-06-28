@@ -157,6 +157,23 @@ namespace YoRigine {
     };
 
     // -------------------------------------------------------
+    // Lightning パラメータ (プロシージャル稲妻)
+    // -------------------------------------------------------
+    struct LightningEffectParam
+    {
+        Vector4 color        = { 0.6f, 0.8f, 1.5f, 1.0f }; // 青白（HDR）
+        float   length       = 4.0f;   // 稲妻の全長
+        float   width        = 0.18f;  // リボン幅
+        float   jitter       = 0.6f;   // ジグザグの振れ幅
+        int     segments     = 24;     // 折れ線の分割数
+        int     branches     = 3;      // 枝分かれ本数
+        float   branchJitter = 0.5f;   // 枝の振れ幅
+        float   flickerRate  = 18.0f;  // 1秒あたりの形変化回数（明滅）
+        float   glowPower    = 2.0f;   // 中心グロー
+        bool    isEnable     = true;
+    };
+
+    // -------------------------------------------------------
     // まとめアセット
     // -------------------------------------------------------
     struct VfxEffectAsset
@@ -165,9 +182,11 @@ namespace YoRigine {
         TrailEffectParam  trail;
         LightVolumeEffectParam lightVolume;
         SmokeEffectParam  smoke;
+        LightningEffectParam lightning;
         bool useTrail       = true;
         bool useLightVolume = true;
         bool useSmoke       = false;   // 既定OFF（既存アセットは従来通り）
+        bool useLightning   = false;   // 既定OFF
 
         void SaveToJson(const std::string& filePath) const;
         bool LoadFromJson(const std::string& filePath);
