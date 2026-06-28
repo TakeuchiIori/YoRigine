@@ -97,6 +97,52 @@ struct LightVolumeParams
 };
 
 //--------------------------------------------------
+// Smoke パラメータ (VolumeSmokeMesh — Omen 風ボリュームスモーク)
+//   C++ 側 SmokeParamsCB と一致させること
+//--------------------------------------------------
+struct SmokeParams
+{
+    float4 color;          // rgb=色(>1でBloom), a=密度基準
+    float3 center;         // 球中心(ワールド)
+    float  radius;         // 球半径
+    float  time;           // アニメ時間
+    float  noiseScale;     // FBM タイリング
+    float  noiseStrength;  // 渦巻きの強さ 0..1
+    float  scrollSpeed;    // ノイズスクロール速度
+    float  fresnelPower;   // 縁の柔らかさ
+    float  density;        // 全体不透明度倍率
+    float  noiseOctaves;   // FBM オクターブ(1-4)
+    float  rimIntensity;   // リム発光強度（太陽フレア風 / Bloom 用）
+    float  burst;          // -1=継続, 0..1=爆発ワンショット進捗
+    float3 _pad2;
+    float4 smokeColor;     // 爆発後に遷移する煙色
+};
+
+//--------------------------------------------------
+// Lightning パラメータ (LightningMesh — プロシージャル稲妻)
+//--------------------------------------------------
+struct LightningParams
+{
+    float4 color;       // 芯の色(rgb>1 で Bloom)
+    float  time;        // アニメ時間
+    float  glowPower;   // 中心グロー強度
+    float  coreWidthN;  // 予約
+    float  _pad;
+};
+
+//--------------------------------------------------
+// Shockwave パラメータ (ShockwaveMesh — 爆発の衝撃波リング)
+//--------------------------------------------------
+struct ShockwaveParams
+{
+    float4 color;     // rgb>1 で Bloom
+    float  time;      // アニメ時間
+    float  duration;  // 1サイクル秒
+    float  thickness; // リング太さ
+    float  burst;     // -1=継続ループ, 0..1=爆発ワンショット進捗
+};
+
+//--------------------------------------------------
 // テクスチャ / サンプラー
 //--------------------------------------------------
 Texture2D    gTexNoise     : register(t0);

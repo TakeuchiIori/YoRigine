@@ -53,6 +53,9 @@ public:
 	void SetNearClip(float nearClip) { nearClip_ = nearClip; }
 	void SetFarClip(float farClip) { farClip_ = farClip; }
 
+	float GetNearClip() const { return nearClip_; }
+	float GetFarClip() const { return farClip_; }
+
 	const Matrix4x4& GetViewProjectionMatrix() const { return viewProjectionMatrix_; }
 	const Matrix4x4& GetViewMatrix() const { return viewMatrix_; }
 	const Matrix4x4& GetProjectionMatrix() const { return projectionMatrix_; }

@@ -16,6 +16,9 @@ namespace YoRigine {
         j["name"]           = name;
         j["useTrail"]       = useTrail;
         j["useLightVolume"] = useLightVolume;
+        j["useSmoke"]       = useSmoke;
+        j["useLightning"]   = useLightning;
+        j["useShockwave"]   = useShockwave;
 
         // --- Trail ---
         auto& t = j["trail"];
@@ -93,6 +96,42 @@ namespace YoRigine {
         lv["intensity"]   = lightVolume.intensity;
         lv["isEnable"]    = lightVolume.isEnable;
 
+        // --- Volume Smoke ---
+        auto& sm = j["smoke"];
+        sm["color"]         = smoke.color;
+        sm["smokeColor"]    = smoke.smokeColor;
+        sm["riseSpeed"]     = smoke.riseSpeed;
+        sm["radius"]        = smoke.radius;
+        sm["noiseScale"]    = smoke.noiseScale;
+        sm["noiseStrength"] = smoke.noiseStrength;
+        sm["scrollSpeed"]   = smoke.scrollSpeed;
+        sm["fresnelPower"]  = smoke.fresnelPower;
+        sm["density"]       = smoke.density;
+        sm["noiseOctaves"]  = smoke.noiseOctaves;
+        sm["rimIntensity"]  = smoke.rimIntensity;
+        sm["isEnable"]      = smoke.isEnable;
+
+        // --- Lightning ---
+        auto& lt = j["lightning"];
+        lt["color"]        = lightning.color;
+        lt["length"]       = lightning.length;
+        lt["width"]        = lightning.width;
+        lt["jitter"]       = lightning.jitter;
+        lt["segments"]     = lightning.segments;
+        lt["branches"]     = lightning.branches;
+        lt["branchJitter"] = lightning.branchJitter;
+        lt["flickerRate"]  = lightning.flickerRate;
+        lt["glowPower"]    = lightning.glowPower;
+        lt["isEnable"]     = lightning.isEnable;
+
+        // --- Shockwave ---
+        auto& sw = j["shockwave"];
+        sw["color"]     = shockwave.color;
+        sw["radius"]    = shockwave.radius;
+        sw["duration"]  = shockwave.duration;
+        sw["thickness"] = shockwave.thickness;
+        sw["isEnable"]  = shockwave.isEnable;
+
         std::ofstream ofs(filePath);
         ofs << j.dump(4);
     }
@@ -111,6 +150,9 @@ namespace YoRigine {
         name           = j.value("name",           name);
         useTrail       = j.value("useTrail",       useTrail);
         useLightVolume = j.value("useLightVolume", useLightVolume);
+        useSmoke       = j.value("useSmoke",       useSmoke);
+        useLightning   = j.value("useLightning",   useLightning);
+        useShockwave   = j.value("useShockwave",   useShockwave);
 
         if (j.contains("trail")) {
             auto& t = j["trail"];
@@ -194,6 +236,45 @@ namespace YoRigine {
             lightVolume.isEnable  = lv.value("isEnable",  lightVolume.isEnable);
             if (lv.contains("halfExtents")) lightVolume.halfExtents = lv["halfExtents"];
             if (lv.contains("color"))       lightVolume.color       = lv["color"];
+        }
+
+        if (j.contains("smoke")) {
+            auto& sm = j["smoke"];
+            if (sm.contains("color")) smoke.color = sm["color"];
+            if (sm.contains("smokeColor")) smoke.smokeColor = sm["smokeColor"];
+            smoke.riseSpeed     = sm.value("riseSpeed",     smoke.riseSpeed);
+            smoke.radius        = sm.value("radius",        smoke.radius);
+            smoke.noiseScale    = sm.value("noiseScale",    smoke.noiseScale);
+            smoke.noiseStrength = sm.value("noiseStrength", smoke.noiseStrength);
+            smoke.scrollSpeed   = sm.value("scrollSpeed",   smoke.scrollSpeed);
+            smoke.fresnelPower  = sm.value("fresnelPower",  smoke.fresnelPower);
+            smoke.density       = sm.value("density",       smoke.density);
+            smoke.noiseOctaves  = sm.value("noiseOctaves",  smoke.noiseOctaves);
+            smoke.rimIntensity  = sm.value("rimIntensity",  smoke.rimIntensity);
+            smoke.isEnable      = sm.value("isEnable",      smoke.isEnable);
+        }
+
+        if (j.contains("lightning")) {
+            auto& lt = j["lightning"];
+            if (lt.contains("color")) lightning.color = lt["color"];
+            lightning.length       = lt.value("length",       lightning.length);
+            lightning.width        = lt.value("width",        lightning.width);
+            lightning.jitter       = lt.value("jitter",       lightning.jitter);
+            lightning.segments     = lt.value("segments",     lightning.segments);
+            lightning.branches     = lt.value("branches",     lightning.branches);
+            lightning.branchJitter = lt.value("branchJitter", lightning.branchJitter);
+            lightning.flickerRate  = lt.value("flickerRate",  lightning.flickerRate);
+            lightning.glowPower    = lt.value("glowPower",    lightning.glowPower);
+            lightning.isEnable     = lt.value("isEnable",     lightning.isEnable);
+        }
+
+        if (j.contains("shockwave")) {
+            auto& sw = j["shockwave"];
+            if (sw.contains("color")) shockwave.color = sw["color"];
+            shockwave.radius    = sw.value("radius",    shockwave.radius);
+            shockwave.duration  = sw.value("duration",  shockwave.duration);
+            shockwave.thickness = sw.value("thickness", shockwave.thickness);
+            shockwave.isEnable  = sw.value("isEnable",  shockwave.isEnable);
         }
         return true;
     }

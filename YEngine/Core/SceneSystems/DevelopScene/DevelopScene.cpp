@@ -71,6 +71,10 @@ void DevelopScene::Initialize() {
 	YParticleManager::GetInstance().SetCamera(sceneCamera_.get());
 	AreaManager::GetInstance()->Initialize();
 	YoRigine::CollisionManager::GetInstance()->Initialize();
+
+	// VFX テスト用：Bloom 入りのポストエフェクトを読み込む（エミッシブ強度→Bloom の確認用）。
+	// エディタ「ポストエフェクト」でしきい値/強度を調整できる。
+	PostEffectManager::GetInstance()->LoadPreset("TitleBloom");
 #ifdef USE_IMGUI
 	YEmitterGroupEditor::GetInstance().SetCamera(sceneCamera_.get());
 	YoRigine::VfxMeshEditor::GetInstance()->Initialize();

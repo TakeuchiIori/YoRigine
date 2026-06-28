@@ -202,6 +202,41 @@ namespace YoRigine {
 		cmd->RSSetScissorRects(1, &scissorRect_);
 	}
 
+	/// ソフトパーティクル：MainDepth を PS で読める状態へ遷移し、OffScreen を深度なしで再バインド。
+	/// 粒は加算半透明で深度書き込み不要なので、深度を SRV として読めるようにして
+	/// PS 側で手動遮蔽＋ソフトフェードを行う（読み取り専用 DSV を作らずに済む低リスク方式）。
+	void DirectXCommon::BeginParticleSoftDepth()
+	{
+		auto cmd = commandManager_->GetCommandList();
+
+		constexpr D3D12_RESOURCE_STATES kRead = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+		if (depthCurrentState_ != kRead) {
+			dsvManager_->TransitionBarrier(cmd.Get(), "MainDepth", depthCurrentState_, kRead);
+			depthCurrentState_ = kRead;
+		}
+
+		// 深度なしで OffScreen を再バインド（書き込み中の深度を同時に SRV 読みする衝突を回避）
+		rtvManager_->SetRenderTargets(cmd.Get(), { "OffScreen" }, nullptr);
+		cmd->RSSetViewports(1, &viewport_);
+		cmd->RSSetScissorRects(1, &scissorRect_);
+	}
+
+	/// ソフトパーティクル後始末：MainDepth を DEPTH_WRITE に戻して OffScreen + DSV を再バインド。
+	void DirectXCommon::EndParticleSoftDepth()
+	{
+		auto cmd = commandManager_->GetCommandList();
+
+		if (depthCurrentState_ != D3D12_RESOURCE_STATE_DEPTH_WRITE) {
+			dsvManager_->TransitionBarrier(cmd.Get(), "MainDepth", depthCurrentState_, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+			depthCurrentState_ = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+		}
+
+		D3D12_CPU_DESCRIPTOR_HANDLE dsvH = dsvManager_->GetHandle("MainDepth");
+		rtvManager_->SetRenderTargets(cmd.Get(), { "OffScreen" }, &dsvH);
+		cmd->RSSetViewports(1, &viewport_);
+		cmd->RSSetScissorRects(1, &scissorRect_);
+	}
+
 	/// PiP オフスクリーンパス：指定 RT + 専用 DSV をクリアして 2nd 描画用に bind
 	void DirectXCommon::PreDrawPip(const std::string& rtName, const std::string& dsvName,
 		uint32_t width, uint32_t height)

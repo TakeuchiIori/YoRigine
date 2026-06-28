@@ -25,6 +25,10 @@ public:
 
     void ApplyLightSetting(const ParticleLightSetting& setting);
 
+    // 次に EndFrame するバッチのソフトパーティクル設定を指定する。
+    // enabled=true のバッチは深度フェード用の専用 PSO（YParticleSoft）で描画される。
+    void ApplySoftParticle(bool enabled, float fadeDistance);
+
     // システムをバッチに追加（まだ描画しない）
     void AddSystem(const YParticleSystem& system, Camera* camera);
 
@@ -54,6 +58,20 @@ private:
 
     // 現在のバッチに適用するライト設定
     ParticleLightSetting currentLightSetting_;
+
+    // 現在のバッチに適用するソフトパーティクル設定
+    bool  currentSoftEnabled_ = false;
+    float currentSoftFade_ = 0.5f;
+
+    // ソフトパーティクル用 定数バッファ（バッチごとに 256B スロット）
+    Microsoft::WRL::ComPtr<ID3D12Resource> softParticleCB_;
+    struct SoftParticleCBData {
+        float nearZ;
+        float farZ;
+        float fadeDistance;
+        float padding;
+    };
+    uint8_t* mappedSoftCBBase_ = nullptr;
 
     std::unique_ptr<MaterialLighting> materialLighting_;
 
