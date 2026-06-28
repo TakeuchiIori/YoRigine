@@ -140,6 +140,54 @@ namespace YoRigine {
     };
 
     // -------------------------------------------------------
+    // Volume Smoke パラメータ (Omen 風めらめらスモーク)
+    // -------------------------------------------------------
+    struct SmokeEffectParam
+    {
+        Vector4 color        = { 0.6f, 0.4f, 1.2f, 1.0f }; // rgb(>1でBloom), a=濃度基準
+        Vector4 smokeColor   = { 0.08f, 0.08f, 0.09f, 1.0f }; // 爆発後に遷移する煙色(暗いグレー)
+        float   riseSpeed    = 1.2f;   // 爆発後に煙が上昇する速さ
+        float   radius       = 1.5f;
+        float   noiseScale   = 4.0f;
+        float   noiseStrength = 0.9f;
+        float   scrollSpeed  = 0.3f;
+        float   fresnelPower = 2.5f;
+        float   density      = 1.0f;
+        float   noiseOctaves = 4.0f;
+        float   rimIntensity = 2.0f;   // リム発光（太陽フレア風 / Bloom 用）
+        bool    isEnable     = true;
+    };
+
+    // -------------------------------------------------------
+    // Lightning パラメータ (プロシージャル稲妻)
+    // -------------------------------------------------------
+    struct LightningEffectParam
+    {
+        Vector4 color        = { 0.6f, 0.8f, 1.5f, 1.0f }; // 青白（HDR）
+        float   length       = 4.0f;   // 稲妻の全長
+        float   width        = 0.18f;  // リボン幅
+        float   jitter       = 0.6f;   // ジグザグの振れ幅
+        int     segments     = 24;     // 折れ線の分割数
+        int     branches     = 3;      // 枝分かれ本数
+        float   branchJitter = 0.5f;   // 枝の振れ幅
+        float   flickerRate  = 18.0f;  // 1秒あたりの形変化回数（明滅）
+        float   glowPower    = 2.0f;   // 中心グロー
+        bool    isEnable     = true;
+    };
+
+    // -------------------------------------------------------
+    // Shockwave パラメータ (爆発の衝撃波リング)
+    // -------------------------------------------------------
+    struct ShockwaveEffectParam
+    {
+        Vector4 color     = { 1.5f, 0.9f, 0.4f, 1.0f }; // 暖色 HDR
+        float   radius    = 3.0f;   // 最大半径
+        float   duration  = 0.6f;   // 1サイクルの秒数（膨張→消滅）
+        float   thickness = 0.15f;  // リングの太さ
+        bool    isEnable  = true;
+    };
+
+    // -------------------------------------------------------
     // まとめアセット
     // -------------------------------------------------------
     struct VfxEffectAsset
@@ -147,8 +195,14 @@ namespace YoRigine {
         std::string       name = "NewEffect";
         TrailEffectParam  trail;
         LightVolumeEffectParam lightVolume;
+        SmokeEffectParam  smoke;
+        LightningEffectParam lightning;
+        ShockwaveEffectParam shockwave;
         bool useTrail       = true;
         bool useLightVolume = true;
+        bool useSmoke       = false;   // 既定OFF（既存アセットは従来通り）
+        bool useLightning   = false;   // 既定OFF
+        bool useShockwave   = false;   // 既定OFF
 
         void SaveToJson(const std::string& filePath) const;
         bool LoadFromJson(const std::string& filePath);

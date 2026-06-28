@@ -19,8 +19,12 @@ EffectHandle EffectHandle::Play(const std::string& systemName,
     h.emitter_->SetAutoEmit(loop);
     if (emitCount > 0) h.emitter_->SetEmitCount(emitCount);
 
-    if (!loop) {
-        // 非ループ: 1 フレームだけ放出して自動停止
+    if (loop) {
+        // ループ: マネージャに登録して毎フレーム tick させる。
+        // これで継続発生・SetPosition() による追従・Stop() による停止が機能する。
+        mgr->RegisterEmitter(h.emitter_);
+    } else {
+        // 非ループ: 1 フレームだけ放出して終了（tick 不要の撃ちっぱなし）
         int n = (emitCount > 0) ? emitCount : h.emitter_->GetEmitCount();
         sys->Emit(position, n);
     }

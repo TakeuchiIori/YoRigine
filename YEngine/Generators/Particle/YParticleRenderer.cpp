@@ -1,5 +1,6 @@
 #include "YParticleRenderer.h"
 #include "DirectXCommon.h"
+#include "DirectX/DsvManager.h"
 #include "Matrix4x4.h"
 #include "PipelineManager/YPipelineManager.h"
 #include "Graphics/LightManager/LightManager.h"
@@ -25,6 +26,15 @@ void YParticleRenderer::Initialize(SrvManager* srvManager, uint32_t maxTotalPart
 
     instanceOffsetCB_ = dxCommon_->CreateBufferResource(256 * MAX_BATCHES);
     instanceOffsetCB_->Map(0, nullptr, reinterpret_cast<void**>(&mappedOffsetBase_));
+
+    // ソフトパーティクル用 CB（バッチごとに 256B スロット）
+    softParticleCB_ = dxCommon_->CreateBufferResource(256 * MAX_BATCHES);
+    softParticleCB_->Map(0, nullptr, reinterpret_cast<void**>(&mappedSoftCBBase_));
+}
+
+void YParticleRenderer::ApplySoftParticle(bool enabled, float fadeDistance) {
+    currentSoftEnabled_ = enabled;
+    currentSoftFade_ = fadeDistance;
 }
 
 void YParticleRenderer::BeginFrame() {
@@ -105,6 +115,9 @@ void YParticleRenderer::AddSystem(const YParticleSystem& system, Camera* camera)
     Matrix4x4 viewProj = camera_->GetViewProjectionMatrix();
     Vector3 cameraPos = camera_->GetTranslate();
 
+    // エミッシブ強度：粒の rgb に掛けて明るくする（Bloom を強く乗せる）。a はそのまま。
+    const float emissive = system.GetEmissiveIntensity();
+
     Matrix4x4 viewMat = camera_->GetViewMatrix();
     Matrix4x4 billboardRotation = viewMat;
     billboardRotation.m[3][0] = 0.0f;
@@ -161,7 +174,8 @@ void YParticleRenderer::AddSystem(const YParticleSystem& system, Camera* camera)
         // インスタンシングデータに設定
         mappedData_[currentInstanceOffset_].World = localWorld;
         mappedData_[currentInstanceOffset_].WVP = Multiply(localWorld, viewProj);
-        mappedData_[currentInstanceOffset_].color = attr.color;
+        mappedData_[currentInstanceOffset_].color =
+            { attr.color.x * emissive, attr.color.y * emissive, attr.color.z * emissive, attr.color.w };
 		mappedData_[currentInstanceOffset_].uvTransform = MakeUVTransform(attr.uvOffset, attr.uvScale);
         currentInstanceOffset_++;
         writtenCount++;
@@ -181,8 +195,11 @@ void YParticleRenderer::EndFrame(const std::shared_ptr<Mesh>& mesh, uint32_t tex
     auto& meshRes = mesh->GetMeshResource();
 
     auto pm = YPipelineManager::GetInstance();
-    const auto& indices = pm->GetParameterIndices("YParticle");
-    commandList->SetPipelineState(pm->GetBlendModePSO("YParticle", blendMode));
+    // ソフト指定バッチは専用 PSO（YParticleSoft）で描画。非ソフトは従来の YParticle。
+    const std::string psoName = currentSoftEnabled_ ? "YParticleSoft" : "YParticle";
+    const auto& indices = pm->GetParameterIndices(psoName);
+    commandList->SetGraphicsRootSignature(pm->GetRootSignature(psoName));
+    commandList->SetPipelineState(pm->GetBlendModePSO(psoName, blendMode));
 
     commandList->IASetVertexBuffers(0, 1, &meshRes.vertexBufferView);
     commandList->IASetIndexBuffer(&meshRes.indexBufferView);
@@ -198,6 +215,25 @@ void YParticleRenderer::EndFrame(const std::shared_ptr<Mesh>& mesh, uint32_t tex
     materialLighting_->RecordDrawCommands(commandList.Get(), indices.at("gMaterialLight"));
     commandList->SetGraphicsRootConstantBufferView(indices.at("gCamera"), camera_->GetCameraResource()->GetGPUVirtualAddress());
     commandList->SetGraphicsRootConstantBufferView(indices.at("InstanceOffsetCB"), instanceOffsetCB_->GetGPUVirtualAddress() + 256 * currentBatchIndex_);
+
+    // ソフトパーティクル：深度SRV + near/far/fade の CB をバインド
+    if (currentSoftEnabled_) {
+        uint8_t* softSlot = mappedSoftCBBase_ + 256 * currentBatchIndex_;
+        auto* soft = reinterpret_cast<SoftParticleCBData*>(softSlot);
+        soft->nearZ = camera_->GetNearClip();
+        soft->farZ = camera_->GetFarClip();
+        soft->fadeDistance = currentSoftFade_;
+        soft->padding = 0.0f;
+
+        const auto* mainDepth = dxCommon_->GetDSVManager()->Get("MainDepth");
+        if (mainDepth && mainDepth->srvIndex != UINT32_MAX) {
+            srvManager_->SetGraphicsRootDescriptorTable(indices.at("gSceneDepth"), mainDepth->srvIndex);
+        }
+        commandList->SetGraphicsRootConstantBufferView(
+            indices.at("gSoftParticle"),
+            softParticleCB_->GetGPUVirtualAddress() + 256 * currentBatchIndex_);
+    }
+
     commandList->DrawIndexedInstanced(
         static_cast<UINT>(mesh->GetIndexCount()),
         instanceCount,

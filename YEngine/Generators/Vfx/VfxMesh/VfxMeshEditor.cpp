@@ -83,6 +83,12 @@ namespace YoRigine {
         // ★ Trail用のプレビューはEmitterに委譲
         previewTrailEmitter_ = std::make_unique<TrailMeshEmitter>();
         previewVolume_ = std::make_unique<LightVolumeMesh>();
+        previewSmoke_ = std::make_unique<VolumeSmokeMesh>();
+        previewSmoke_->Initialize();
+        previewLightning_ = std::make_unique<LightningMesh>();
+        previewLightning_->Initialize();
+        previewShockwave_ = std::make_unique<ShockwaveMesh>();
+        previewShockwave_->Initialize();
 
         InitCBVs();
         ScanDirectory(scanRoot_);
@@ -97,6 +103,18 @@ namespace YoRigine {
         if (volumeCBMapped_ && volumeCBResource_) {
             volumeCBResource_->Unmap(0, nullptr);
             volumeCBMapped_ = nullptr;
+        }
+        if (smokeCBMapped_ && smokeCBResource_) {
+            smokeCBResource_->Unmap(0, nullptr);
+            smokeCBMapped_ = nullptr;
+        }
+        if (lightningCBMapped_ && lightningCBResource_) {
+            lightningCBResource_->Unmap(0, nullptr);
+            lightningCBMapped_ = nullptr;
+        }
+        if (shockwaveCBMapped_ && shockwaveCBResource_) {
+            shockwaveCBResource_->Unmap(0, nullptr);
+            shockwaveCBMapped_ = nullptr;
         }
         entries_.clear();
         selectedIndex_ = -1;
@@ -157,6 +175,14 @@ namespace YoRigine {
         previewTimer_ += deltaTime;
         const auto& asset = sel->asset;
 
+        // 爆発ワンショット: 進捗 0→1。終端で自動リピート。継続モードは -1。
+        if (oneShot_ && burstDuration_ > 0.01f) {
+            if (previewTimer_ >= burstDuration_) previewTimer_ = 0.f;
+            burstProgress_ = std::min(previewTimer_ / burstDuration_, 1.0f);
+        } else {
+            burstProgress_ = -1.0f;
+        }
+
         // ★ Emitterを使って頂点を更新
         if (asset.useTrail && previewTrailEmitter_) {
             Vector3 tip = previewCenter_;
@@ -209,6 +235,38 @@ namespace YoRigine {
             previewVolume_->SetTransform(previewCenter_, previewYaw_);
             previewVolume_->Update(deltaTime);
         }
+
+        if (asset.useSmoke && previewSmoke_) {
+            float rad = asset.smoke.radius;
+            smokeCenter_ = previewCenter_;
+            if (burstProgress_ >= 0.0f) {
+                // 破裂: 最初に素早く膨張（ポップ）→ 煙でゆっくり広がり続ける
+                float grow = std::min(burstProgress_ / 0.18f, 1.0f);
+                rad *= (0.2f + 0.8f * grow + 0.4f * burstProgress_);
+                // 浮力で上昇（爆発後の煙が立ち上る）
+                smokeCenter_.y += asset.smoke.riseSpeed * previewTimer_;
+            }
+            smokeRadius_ = rad;
+            previewSmoke_->SetTransform(smokeCenter_, rad);
+            previewSmoke_->Update(deltaTime);
+        }
+
+        if (asset.useLightning && previewLightning_) {
+            previewLightning_->SetCamera(camera_);
+            previewLightning_->ApplyParam(asset.lightning);
+            // プレビュー: 中心を挟んで上下に length の長さで伸ばす
+            float half = asset.lightning.length * 0.5f;
+            previewLightning_->SetEndpoints(previewCenter_ + Vector3{ 0, -half, 0 },
+                                            previewCenter_ + Vector3{ 0,  half, 0 });
+            previewLightning_->Update(deltaTime);
+        }
+
+        if (asset.useShockwave && previewShockwave_) {
+            previewShockwave_->SetCamera(camera_);
+            previewShockwave_->ApplyParam(asset.shockwave);
+            previewShockwave_->SetTransform(previewCenter_, asset.shockwave.radius);
+            previewShockwave_->Update(deltaTime);
+        }
     }
 
     // ===========================================================
@@ -241,6 +299,51 @@ namespace YoRigine {
 
             previewVolume_->Draw(cmdList);
         }
+
+        // Volume Smoke (Omen 風)
+        if (asset.useSmoke && asset.smoke.isEnable && camera_ && previewSmoke_) {
+            auto* pm = YPipelineManager::GetInstance();
+            const auto& idx = pm->GetParameterIndices("VfxMeshSmoke");
+            UpdateSmokeCBV(previewTimer_);
+
+            auto* cmdList = DirectXCommon::GetInstance()->GetCommandList().Get();
+            cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshSmoke"));
+            cmdList->SetPipelineState(pm->GetPipeLineStateObject("VfxMeshSmoke"));
+            cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"), camera_->GetCameraResource()->GetGPUVirtualAddress());
+            cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), smokeCBResource_->GetGPUVirtualAddress());
+
+            previewSmoke_->Draw(cmdList);
+        }
+
+        // Lightning (プロシージャル稲妻)
+        if (asset.useLightning && asset.lightning.isEnable && camera_ && previewLightning_) {
+            auto* pm = YPipelineManager::GetInstance();
+            const auto& idx = pm->GetParameterIndices("VfxMeshLightning");
+            UpdateLightningCBV(previewTimer_);
+
+            auto* cmdList = DirectXCommon::GetInstance()->GetCommandList().Get();
+            cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshLightning"));
+            cmdList->SetPipelineState(pm->GetPipeLineStateObject("VfxMeshLightning"));
+            cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"), camera_->GetCameraResource()->GetGPUVirtualAddress());
+            cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), lightningCBResource_->GetGPUVirtualAddress());
+
+            previewLightning_->Draw(cmdList);
+        }
+
+        // Shockwave (爆発の衝撃波リング)
+        if (asset.useShockwave && asset.shockwave.isEnable && camera_ && previewShockwave_) {
+            auto* pm = YPipelineManager::GetInstance();
+            const auto& idx = pm->GetParameterIndices("VfxMeshShockwave");
+            UpdateShockwaveCBV(previewTimer_);
+
+            auto* cmdList = DirectXCommon::GetInstance()->GetCommandList().Get();
+            cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshShockwave"));
+            cmdList->SetPipelineState(pm->GetPipeLineStateObject("VfxMeshShockwave"));
+            cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"), camera_->GetCameraResource()->GetGPUVirtualAddress());
+            cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), shockwaveCBResource_->GetGPUVirtualAddress());
+
+            previewShockwave_->Draw(cmdList);
+        }
     }
 
     void VfxMeshEditor::DrawImGui()
@@ -266,7 +369,13 @@ namespace YoRigine {
     {
         ImGui::TextDisabled("エフェクト一覧");
         ImGui::SameLine();
-        if (ImGui::SmallButton("+")) { showNewDialog_ = true; }
+        if (ImGui::SmallButton("+")) {
+            // 既存名と衝突しない初期名をセット（NewEffect / NewEffect1 / NewEffect2 ...）
+            std::string uniq = MakeUniqueEffectName("NewEffect");
+            strncpy_s(newNameBuffer_, sizeof(newNameBuffer_), uniq.c_str(), _TRUNCATE);
+            newPathBuffer_[0] = '\0';
+            showNewDialog_ = true;
+        }
         ImGui::SameLine();
         if (ImGui::SmallButton("R")) {
             int prevSel = selectedIndex_;
@@ -349,33 +458,27 @@ namespace YoRigine {
         ImGui::SameLine(0, 4); ImGui::TextDisabled("名前");
         ImGui::Separator();
 
-        {
-            VfxEffectAsset b = asset;
-            ImGui::PushID("UseTrail");
-            bool changed = ImGui::Checkbox("##UseTrail", &asset.useTrail);
-            ImGui::PopID();
-            ImGui::SameLine();
-            if (ImGui::TreeNodeEx("Trail", ImGuiTreeNodeFlags_DefaultOpen)) {
-                if (asset.useTrail) DrawTrailSection();
-                else                ImGui::TextDisabled("  (disabled)");
-                ImGui::TreePop();
-            }
-            if (changed) CommitChange(b, "Trail 有効切替");
-        }
-        ImGui::Separator();
-
-        {
-            VfxEffectAsset b = asset;
-            ImGui::PushID("UseLightVolume");
-            bool changed = ImGui::Checkbox("##UseLightVolume", &asset.useLightVolume);
-            ImGui::PopID();
-            ImGui::SameLine();
-            if (ImGui::TreeNodeEx("Light Volume", ImGuiTreeNodeFlags_DefaultOpen)) {
-                if (asset.useLightVolume) DrawLightVolumeSection();
-                else                      ImGui::TextDisabled("  (disabled)");
-                ImGui::TreePop();
-            }
-            if (changed) CommitChange(b, "Volume 有効切替");
+        // 効果タイプはタブで切替（縦に積むと長くて見づらいため）。
+        // 有効な効果のタブ名には ● を付けて一目で分かるようにする。
+        if (ImGui::BeginTabBar("##vfxTabs")) {
+            auto effectTab = [&](const char* name, bool& useFlag, const char* changeLabel, auto&& drawFn) {
+                // "###tab_xxx" でタブ ID を固定（● の付け外しで選択がリセットされないように）
+                std::string label = std::string(useFlag ? "● " : "   ") + name + "###tab_" + name;
+                if (ImGui::BeginTabItem(label.c_str())) {
+                    VfxEffectAsset b = asset;
+                    if (ImGui::Checkbox("この効果を有効化", &useFlag)) CommitChange(b, changeLabel);
+                    ImGui::Separator();
+                    if (useFlag) drawFn();
+                    else         ImGui::TextDisabled("(無効) — 上のチェックで有効化");
+                    ImGui::EndTabItem();
+                }
+            };
+            effectTab("Trail",        asset.useTrail,       "Trail 有効切替",     [&] { DrawTrailSection(); });
+            effectTab("Light Volume", asset.useLightVolume, "Volume 有効切替",    [&] { DrawLightVolumeSection(); });
+            effectTab("Smoke",        asset.useSmoke,       "Smoke 有効切替",     [&] { DrawSmokeSection(); });
+            effectTab("Lightning",    asset.useLightning,   "Lightning 有効切替", [&] { DrawLightningSection(); });
+            effectTab("Shockwave",    asset.useShockwave,   "Shockwave 有効切替", [&] { DrawShockwaveSection(); });
+            ImGui::EndTabBar();
         }
         ImGui::Separator();
 
@@ -494,104 +597,6 @@ namespace YoRigine {
             if (c) CommitChange(b, "Primitive 設定");
         }
 
-        ImGui::SeparatorText("立体感・三日月化");
-        {
-            VfxEffectAsset b = sel->asset;
-            bool c = false;
-            c |= ImGui::Checkbox("三日月カーブにする##crescent", &t.crescentShape);
-            c |= ImGui::SliderFloat("厚み (Thickness)##thick", &t.thickness, 0.0f, 2.0f, "%.3f");
-            if (c) CommitChange(b, "Trail 形状モディファイア");
-        }
-
-        ImGui::SeparatorText("カスタムメッシュ形状エディター");
-        if (sel) {
-            VfxEffectAsset b = sel->asset;
-            bool changed = false;
-
-            if (ImGui::Button("頂点をすべてクリア")) {
-                t.customVertices.clear();
-                changed = true;
-            }
-            ImGui::SameLine();
-            ImGui::TextDisabled("左クリック: 追加/移動 | 右クリック: 削除");
-
-            ImVec2 canvas_p0 = ImGui::GetCursorScreenPos();
-            ImVec2 canvas_sz = ImVec2(ImGui::GetContentRegionAvail().x, 300.0f);
-            ImVec2 canvas_p1 = ImVec2(canvas_p0.x + canvas_sz.x, canvas_p0.y + canvas_sz.y);
-
-            ImDrawList* draw_list = ImGui::GetWindowDrawList();
-            draw_list->AddRectFilled(canvas_p0, canvas_p1, IM_COL32(30, 30, 30, 255));
-            draw_list->AddRect(canvas_p0, canvas_p1, IM_COL32(100, 100, 100, 255));
-
-            ImGui::InvisibleButton("canvas", canvas_sz, ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
-            const bool is_hovered = ImGui::IsItemHovered();
-            const bool is_active = ImGui::IsItemActive();
-            const ImVec2 mouse_pos_in_canvas = ImVec2(ImGui::GetIO().MousePos.x - canvas_p0.x, ImGui::GetIO().MousePos.y - canvas_p0.y);
-
-            ImVec2 origin(canvas_p0.x + canvas_sz.x * 0.5f, canvas_p0.y + canvas_sz.y * 0.5f);
-            const float zoom = 50.0f;
-            static int dragging_idx = -1;
-
-            if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-                dragging_idx = -1;
-                for (int i = 0; i < t.customVertices.size(); ++i) {
-                    ImVec2 p(origin.x + t.customVertices[i].x * zoom, origin.y - t.customVertices[i].y * zoom);
-                    float dx = ImGui::GetIO().MousePos.x - p.x;
-                    float dy = ImGui::GetIO().MousePos.y - p.y;
-                    if (dx * dx + dy * dy < 100.0f) {
-                        dragging_idx = i;
-                        break;
-                    }
-                }
-                if (dragging_idx == -1) {
-                    t.customVertices.push_back({ (mouse_pos_in_canvas.x - canvas_sz.x * 0.5f) / zoom,
-                                                -(mouse_pos_in_canvas.y - canvas_sz.y * 0.5f) / zoom });
-                    dragging_idx = static_cast<int>(t.customVertices.size()) - 1;
-                    changed = true;
-                }
-            }
-
-            if (is_active && ImGui::IsMouseDragging(ImGuiMouseButton_Left) && dragging_idx >= 0) {
-                t.customVertices[dragging_idx].x += ImGui::GetIO().MouseDelta.x / zoom;
-                t.customVertices[dragging_idx].y -= ImGui::GetIO().MouseDelta.y / zoom;
-                changed = true;
-            }
-            else if (!is_active) {
-                dragging_idx = -1;
-            }
-
-            if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
-                for (int i = 0; i < t.customVertices.size(); ++i) {
-                    ImVec2 p(origin.x + t.customVertices[i].x * zoom, origin.y - t.customVertices[i].y * zoom);
-                    float dx = ImGui::GetIO().MousePos.x - p.x;
-                    float dy = ImGui::GetIO().MousePos.y - p.y;
-                    if (dx * dx + dy * dy < 100.0f) {
-                        t.customVertices.erase(t.customVertices.begin() + i);
-                        changed = true;
-                        break;
-                    }
-                }
-            }
-
-            draw_list->AddLine(ImVec2(origin.x, canvas_p0.y), ImVec2(origin.x, canvas_p1.y), IM_COL32(100, 100, 100, 150));
-            draw_list->AddLine(ImVec2(canvas_p0.x, origin.y), ImVec2(canvas_p1.x, origin.y), IM_COL32(100, 100, 100, 150));
-
-            if (t.customVertices.size() >= 2) {
-                for (int i = 0; i < t.customVertices.size(); ++i) {
-                    int next_i = (i + 1) % t.customVertices.size();
-                    ImVec2 p1(origin.x + t.customVertices[i].x * zoom, origin.y - t.customVertices[i].y * zoom);
-                    ImVec2 p2(origin.x + t.customVertices[next_i].x * zoom, origin.y - t.customVertices[next_i].y * zoom);
-                    draw_list->AddLine(p1, p2, IM_COL32(0, 255, 255, 255), 2.0f);
-                }
-            }
-
-            for (int i = 0; i < t.customVertices.size(); ++i) {
-                ImVec2 p(origin.x + t.customVertices[i].x * zoom, origin.y - t.customVertices[i].y * zoom);
-                draw_list->AddCircleFilled(p, 5.0f, (i == dragging_idx) ? IM_COL32(255, 0, 0, 255) : IM_COL32(255, 255, 0, 255));
-            }
-
-            if (changed) CommitChange(b, "カスタムメッシュ編集");
-        }
 
         ImGui::SeparatorText("幅");
         {
@@ -750,19 +755,130 @@ namespace YoRigine {
         if (showVolumeDebug_) ImGui::TextColored(ImVec4(1, 1, 0, 1), "  > OBB ワイヤーフレーム ON");
     }
 
+    void VfxMeshEditor::DrawSmokeSection()
+    {
+        auto* sel = Selected();
+        if (!sel) return;
+        auto& sm = sel->asset.smoke;
+
+        ImGui::SeparatorText("カラー  (rgb>1 で Bloom / a=濃度)");
+        {
+            VfxEffectAsset b = sel->asset;
+            bool c = false;
+            c |= ImGui::DragFloat4("火球色##sm", &sm.color.x, 0.02f, 0.0f, 10.0f, "%.2f");
+            c |= ImGui::DragFloat4("煙色(爆発後)##smk", &sm.smokeColor.x, 0.01f, 0.0f, 4.0f, "%.2f");
+            c |= ImGui::DragFloat("上昇速度(爆発後)##smrise", &sm.riseSpeed, 0.02f, 0.0f, 8.0f, "%.2f");
+            if (c) CommitChange(b, "Smoke 色");
+            ImGui::TextDisabled("爆発ワンショット時: 火球色→煙色へ遷移し、上昇しながら漂って消えます");
+        }
+
+        ImGui::SeparatorText("形状 / 渦巻き");
+        {
+            VfxEffectAsset b = sel->asset;
+            bool c = false;
+            c |= ImGui::DragFloat("半径##smr",          &sm.radius,        0.05f, 0.1f, 20.0f, "%.2f");
+            c |= ImGui::DragFloat("ノイズスケール##sms", &sm.noiseScale,    0.05f, 0.1f, 16.0f, "%.2f");
+            c |= ImGui::SliderFloat("渦巻きの強さ##smn", &sm.noiseStrength, 0.0f, 1.0f);
+            c |= ImGui::DragFloat("スクロール速度##smc", &sm.scrollSpeed,   0.01f, 0.0f, 3.0f, "%.2f");
+            c |= ImGui::DragFloat("縁の柔らかさ##smf",   &sm.fresnelPower,  0.05f, 0.1f, 8.0f, "%.2f");
+            c |= ImGui::DragFloat("密度##smd",           &sm.density,       0.01f, 0.0f, 3.0f, "%.2f");
+            c |= ImGui::DragFloat("オクターブ##smo",     &sm.noiseOctaves,  0.1f,  1.0f, 5.0f, "%.1f");
+            c |= ImGui::DragFloat("リム発光(フレア)##smrim", &sm.rimIntensity, 0.05f, 0.0f, 10.0f, "%.2f");
+            if (c) CommitChange(b, "Smoke パラメータ");
+        }
+
+        ImGui::Spacing();
+        {
+            VfxEffectAsset b = sel->asset;
+            if (ImGui::Checkbox("スモーク有効##smen", &sm.isEnable))
+                CommitChange(b, "Smoke 有効切替");
+        }
+    }
+
+    void VfxMeshEditor::DrawLightningSection()
+    {
+        auto* sel = Selected();
+        if (!sel) return;
+        auto& lt = sel->asset.lightning;
+
+        ImGui::SeparatorText("カラー (rgb>1 で Bloom)");
+        {
+            VfxEffectAsset b = sel->asset;
+            if (ImGui::DragFloat4("色##lt", &lt.color.x, 0.02f, 0.0f, 10.0f, "%.2f"))
+                CommitChange(b, "Lightning 色");
+        }
+
+        ImGui::SeparatorText("形状 / 明滅");
+        {
+            VfxEffectAsset b = sel->asset;
+            bool c = false;
+            c |= ImGui::DragFloat("長さ##ltlen",      &lt.length,       0.05f, 0.1f, 50.0f, "%.2f");
+            c |= ImGui::DragFloat("幅##ltw",          &lt.width,        0.005f, 0.01f, 2.0f, "%.3f");
+            c |= ImGui::DragFloat("ジグザグ振れ##ltj", &lt.jitter,       0.02f, 0.0f, 5.0f, "%.2f");
+            c |= ImGui::SliderInt("分割数##lts",       &lt.segments,     4, 64);
+            c |= ImGui::SliderInt("枝の数##ltb",       &lt.branches,     0, 8);
+            c |= ImGui::DragFloat("枝の振れ##ltbj",    &lt.branchJitter, 0.02f, 0.0f, 5.0f, "%.2f");
+            c |= ImGui::DragFloat("明滅レート(回/秒)##ltf", &lt.flickerRate, 0.5f, 0.0f, 60.0f, "%.1f");
+            c |= ImGui::DragFloat("芯のグロー##ltg",   &lt.glowPower,    0.05f, 0.1f, 8.0f, "%.2f");
+            if (c) CommitChange(b, "Lightning パラメータ");
+        }
+
+        ImGui::Spacing();
+        {
+            VfxEffectAsset b = sel->asset;
+            if (ImGui::Checkbox("稲妻有効##lten", &lt.isEnable))
+                CommitChange(b, "Lightning 有効切替");
+        }
+    }
+
+    void VfxMeshEditor::DrawShockwaveSection()
+    {
+        auto* sel = Selected();
+        if (!sel) return;
+        auto& sw = sel->asset.shockwave;
+
+        ImGui::SeparatorText("カラー (rgb>1 で Bloom)");
+        {
+            VfxEffectAsset b = sel->asset;
+            if (ImGui::DragFloat4("色##sw", &sw.color.x, 0.02f, 0.0f, 10.0f, "%.2f"))
+                CommitChange(b, "Shockwave 色");
+        }
+
+        ImGui::SeparatorText("形状 / 速度");
+        {
+            VfxEffectAsset b = sel->asset;
+            bool c = false;
+            c |= ImGui::DragFloat("最大半径##swr",  &sw.radius,    0.05f, 0.1f, 50.0f, "%.2f");
+            c |= ImGui::DragFloat("膨張時間(秒)##swd", &sw.duration, 0.01f, 0.05f, 5.0f, "%.2f");
+            c |= ImGui::SliderFloat("リング太さ##swt", &sw.thickness, 0.01f, 1.0f);
+            if (c) CommitChange(b, "Shockwave パラメータ");
+        }
+
+        ImGui::Spacing();
+        {
+            VfxEffectAsset b = sel->asset;
+            if (ImGui::Checkbox("衝撃波有効##swen", &sw.isEnable))
+                CommitChange(b, "Shockwave 有効切替");
+        }
+    }
+
     void VfxMeshEditor::DrawPreviewSection()
     {
         ImGui::SeparatorText("プレビュー");
-        const char* animNames[] = { "Wobble (往復)", "Slash (横なぎ)", "Slash (縦斬り)", "Spin (回転)" };
-        int animIdx = static_cast<int>(previewAnim_);
-        ImGui::SetNextItemWidth(150);
-        if (ImGui::Combo("軌道アニメ", &animIdx, animNames, IM_ARRAYSIZE(animNames))) {
-            previewAnim_ = static_cast<PreviewAnimMode>(animIdx);
-            if (previewTrailEmitter_) previewTrailEmitter_->Play(); // アニメ変更時にリセットして再生
+
+        // 軌道アニメ / 剣の長さは Trail 専用 → Trail 有効時のみ表示
+        if (auto* selT = Selected(); selT && selT->asset.useTrail) {
+            const char* animNames[] = { "Wobble (往復)", "Slash (横なぎ)", "Slash (縦斬り)", "Spin (回転)" };
+            int animIdx = static_cast<int>(previewAnim_);
+            ImGui::SetNextItemWidth(150);
+            if (ImGui::Combo("軌道アニメ", &animIdx, animNames, IM_ARRAYSIZE(animNames))) {
+                previewAnim_ = static_cast<PreviewAnimMode>(animIdx);
+                if (previewTrailEmitter_) previewTrailEmitter_->Play(); // アニメ変更時にリセットして再生
+            }
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(100);
+            ImGui::DragFloat("剣の長さ", &swordLength_, 0.1f, 0.5f, 10.f, "%.1f");
         }
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(100);
-        ImGui::DragFloat("剣の長さ", &swordLength_, 0.1f, 0.5f, 10.f, "%.1f");
 
         if (previewPlaying_) {
             // ★ 停止ボタン
@@ -784,6 +900,15 @@ namespace YoRigine {
         if (ImGui::Button((std::string(Icon::Refresh) + "リセット").c_str())) {
             previewTimer_ = 0.f;
             if (previewTrailEmitter_) previewTrailEmitter_->Play(); // リセットして最初から再生
+        }
+
+        // 爆発ワンショット再生（Smoke/Shockwave が一発膨張して消える。自動リピート）
+        ImGui::Checkbox("爆発ワンショット再生 (破裂→膨張→消滅)", &oneShot_);
+        if (oneShot_) {
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(120);
+            ImGui::DragFloat("破裂時間(s)", &burstDuration_, 0.02f, 0.1f, 5.0f, "%.2f");
+            if (ImGui::Button("もう一度")) previewTimer_ = 0.f;
         }
 
         ImGui::DragFloat3("プレビュー位置", &previewCenter_.x, 0.05f, -20.f, 20.f);
@@ -812,9 +937,10 @@ namespace YoRigine {
         ImGui::OpenPopup("新規エフェクト作成");
         ImVec2 center = ImGui::GetMainViewport()->GetCenter();
         ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-        ImGui::SetNextWindowSize(ImVec2(420, 0), ImGuiCond_Appearing);
+        ImGui::SetNextWindowSize(ImVec2(420, 300), ImGuiCond_Appearing);
 
-        if (!ImGui::BeginPopupModal("新規エフェクト作成", &showNewDialog_, ImGuiWindowFlags_AlwaysAutoResize)) return;
+        // 固定サイズ。AlwaysAutoResize だと入力に応じてウィンドウサイズが変わってしまうため NoResize に。
+        if (!ImGui::BeginPopupModal("新規エフェクト作成", &showNewDialog_, ImGuiWindowFlags_NoResize)) return;
 
         ImGui::Text("エフェクト名");
         ImGui::SetNextItemWidth(-1);
@@ -899,21 +1025,42 @@ namespace YoRigine {
         }
     }
 
+    std::string VfxMeshEditor::MakeUniqueEffectName(const std::string& base) const
+    {
+        auto used = [&](const std::string& n) {
+            for (const auto& e : entries_) {
+                if (e.asset.name == n) return true;
+            }
+            return false;
+        };
+        if (!used(base)) return base;
+        for (int i = 1; i < 100000; ++i) {
+            std::string cand = base + std::to_string(i);
+            if (!used(cand)) return cand;
+        }
+        return base;
+    }
+
     void VfxMeshEditor::CreateNew(const std::string& name,
         const std::string& filePath,
         VfxPreset          preset)
     {
+        // 名前が既存と衝突する場合は採番（手入力で被ったケースも吸収）。パスも追従させる。
+        std::string uniqueName = MakeUniqueEffectName(name);
+        std::string finalPath  = filePath;
+        if (uniqueName != name) finalPath = scanRoot_ + uniqueName + ".json";
+
         VfxEffectEntry e;
         e.asset = MakePreset(preset);
-        e.asset.name = name;
-        e.filePath = filePath;
+        e.asset.name = uniqueName;
+        e.filePath = finalPath;
         e.isDirty = true;
         entries_.push_back(std::move(e));
 
         SelectEffect(static_cast<int>(entries_.size()) - 1);
         SaveCurrent();
 
-        Logger("VfxMeshEditor: 新規作成 -> " + filePath);
+        Logger("VfxMeshEditor: 新規作成 -> " + finalPath);
     }
 
     // ★ 編集を即時プレビューに反映
@@ -964,6 +1111,15 @@ namespace YoRigine {
     {
         volumeCBResource_ = dxCommon_->CreateBufferResource(AlignedSize<LightVolumeParamsCB>());
         volumeCBResource_->Map(0, nullptr, reinterpret_cast<void**>(&volumeCBMapped_));
+
+        smokeCBResource_ = dxCommon_->CreateBufferResource(AlignedSize<SmokeParamsCB>());
+        smokeCBResource_->Map(0, nullptr, reinterpret_cast<void**>(&smokeCBMapped_));
+
+        lightningCBResource_ = dxCommon_->CreateBufferResource(AlignedSize<LightningParamsCB>());
+        lightningCBResource_->Map(0, nullptr, reinterpret_cast<void**>(&lightningCBMapped_));
+
+        shockwaveCBResource_ = dxCommon_->CreateBufferResource(AlignedSize<ShockwaveParamsCB>());
+        shockwaveCBResource_->Map(0, nullptr, reinterpret_cast<void**>(&shockwaveCBMapped_));
     }
 
     void VfxMeshEditor::UpdateVolumeCBV(float time)
@@ -981,6 +1137,55 @@ namespace YoRigine {
         volumeCBMapped_->noiseTiling = 2.0f;
         volumeCBMapped_->noiseStrength = 0.0f;
         volumeCBMapped_->time = time;
+    }
+
+    void VfxMeshEditor::UpdateSmokeCBV(float time)
+    {
+        auto* sel = Selected();
+        if (!sel || !smokeCBMapped_) return;
+        const auto& sm = sel->asset.smoke;
+
+        smokeCBMapped_->color         = sm.color;
+        smokeCBMapped_->smokeColor    = sm.smokeColor;
+        smokeCBMapped_->center        = smokeCenter_; // 上昇を反映（フレネル法線の中心と一致させる）
+        smokeCBMapped_->radius        = smokeRadius_; // 膨張を反映（メッシュと一致）
+        smokeCBMapped_->time          = time;
+        smokeCBMapped_->noiseScale    = sm.noiseScale;
+        smokeCBMapped_->noiseStrength = sm.noiseStrength;
+        smokeCBMapped_->scrollSpeed   = sm.scrollSpeed;
+        smokeCBMapped_->fresnelPower  = sm.fresnelPower;
+        smokeCBMapped_->density       = sm.density;
+        smokeCBMapped_->noiseOctaves  = sm.noiseOctaves;
+        smokeCBMapped_->rimIntensity  = sm.rimIntensity;
+        smokeCBMapped_->burst         = burstProgress_;
+    }
+
+    void VfxMeshEditor::UpdateLightningCBV(float time)
+    {
+        auto* sel = Selected();
+        if (!sel || !lightningCBMapped_) return;
+        const auto& lt = sel->asset.lightning;
+
+        lightningCBMapped_->color      = lt.color;
+        lightningCBMapped_->time       = time;
+        lightningCBMapped_->glowPower  = lt.glowPower;
+        lightningCBMapped_->coreWidthN = 0.0f;
+        lightningCBMapped_->_pad       = 0.0f;
+    }
+
+    void VfxMeshEditor::UpdateShockwaveCBV(float time)
+    {
+        auto* sel = Selected();
+        if (!sel || !shockwaveCBMapped_) return;
+        const auto& sw = sel->asset.shockwave;
+
+        shockwaveCBMapped_->color     = sw.color;
+        shockwaveCBMapped_->time      = time;
+        shockwaveCBMapped_->duration  = sw.duration;
+        shockwaveCBMapped_->thickness = sw.thickness;
+        // 衝撃波は煙より速い独自タイムスケール（sw.duration で1回膨張して終わる）
+        shockwaveCBMapped_->burst =
+            (burstProgress_ >= 0.0f) ? std::min(previewTimer_ / std::max(sw.duration, 0.01f), 1.0f) : -1.0f;
     }
 
     VfxEffectAsset VfxMeshEditor::MakePreset(VfxPreset preset)

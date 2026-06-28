@@ -276,6 +276,9 @@ nlohmann::json YParticleEditor::SaveSystemToJson(const std::string& systemName) 
 	json["billboardType"] = system->GetBillboardTypeAsUInt();
 	json["BlendMode"] = static_cast<int>(system->GetBlendMode());
 	json["Lighting"] = system->IsEnableLight();
+	json["softParticle"] = system->IsSoftParticle();
+	json["softFadeDistance"] = system->GetSoftFadeDistance();
+	json["emissiveIntensity"] = system->GetEmissiveIntensity();
 	json["mesh"]["type"] = system->GetCurrentMeshType();
 	json["mesh"]["params"] = nlohmann::json::array();
 	const float* params = system->GetMeshParams();
@@ -320,6 +323,9 @@ void YParticleEditor::LoadSystemFromJson(const nlohmann::json& json) {
 		system->SetBlendMode(static_cast<BlendMode>(json["BlendMode"].get<int>()));
 	if (json.contains("Lighting"))
 		system->SetLightSetting(json["Lighting"].get<bool>() ? ParticleLightSetting{ true, true, true } : ParticleLightSetting{ false, false, false });
+	if (json.contains("softParticle"))     system->SetSoftParticle(json["softParticle"].get<bool>());
+	if (json.contains("softFadeDistance")) system->SetSoftFadeDistance(json["softFadeDistance"].get<float>());
+	if (json.contains("emissiveIntensity")) system->SetEmissiveIntensity(json["emissiveIntensity"].get<float>());
 
 	if (json.contains("mesh")) {
 		const auto& meshJson = json["mesh"];

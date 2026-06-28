@@ -101,6 +101,20 @@ public:
 	void SetBlendMode(BlendMode mode) { blendMode_ = mode; }
 	BlendMode GetBlendMode() const { return blendMode_; }
 
+	// ソフトパーティクル（深度フェード）設定
+	// 有効にすると、シーンの深度と比較して地形・壁・敵に近づくほどαを減衰させ、
+	// 板ポリの硬い切り口を消して接地感を出す。fadeDistance は減衰しきる距離（ワールド単位）。
+	void SetSoftParticle(bool enable) { softParticle_ = enable; }
+	bool IsSoftParticle() const { return softParticle_; }
+	void SetSoftFadeDistance(float d) { softFadeDistance_ = d; }
+	float GetSoftFadeDistance() const { return softFadeDistance_; }
+
+	// エミッシブ強度：粒のカラー(rgb)に掛ける明るさ倍率。
+	// 1.0 で通常、>1 で明るく＝Bloom が強く乗って“ド派手”になる。
+	// （現状 RT は LDR なので芯は白飛びするが Bloom のしきい値は十分越える）
+	void SetEmissiveIntensity(float i) { emissiveIntensity_ = i; }
+	float GetEmissiveIntensity() const { return emissiveIntensity_; }
+
 #ifdef USE_IMGUI
 	///************************* エディタ関数 *************************///
 	void ShowEditor();
@@ -145,4 +159,11 @@ private:
 	BillboardType billboardType_ = BillboardType::Full;   // ビルボードタイプ
 
 	BlendMode blendMode_ = BlendMode::kBlendModeNormal; // ブレンドモード
+
+	// ソフトパーティクル（深度フェード）
+	bool  softParticle_     = false;  // 既定OFF（既存エフェクトは従来通り）
+	float softFadeDistance_ = 0.5f;   // 接地面で減衰しきる距離（ワールド単位）
+
+	// エミッシブ強度（rgb 倍率）。1.0 で従来通り。
+	float emissiveIntensity_ = 1.0f;
 };

@@ -1,8 +1,10 @@
 #include "YParticleManager.h"
 #include <chrono>
+#include <algorithm>
 #include "Graphics/LightManager/LightManager.h"
 #include <PipelineManager/YPipelineManager.h>
 #include "YEmitterGroupManager.h"
+#include "YParticleEmitter.h"
 #include "DirectXCommon.h"
 #include "YParticleModuleFactory.h"
 
@@ -231,6 +233,15 @@ void YParticleManager::Update(float deltaTime) {
 	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
 	stats_.updateTimeMs = duration.count() / 1000.0f;
 
+	// EffectHandle::Play(loop) で登録された実行中エミッタを tick（継続発生・追従）。
+	// Stop() 済み（非アクティブ）になったものはここで除去する。
+	for (auto& e : activeEmitters_) {
+		if (e) e->Update(deltaTime);
+	}
+	activeEmitters_.erase(
+		std::remove_if(activeEmitters_.begin(), activeEmitters_.end(),
+			[](const std::shared_ptr<YParticleEmitter>& e) { return !e || !e->IsActive(); }),
+		activeEmitters_.end());
 
 	YEmitterGroupManager::GetInstance().Update(deltaTime);
 }
@@ -260,13 +271,15 @@ void YParticleManager::CreateRenderBatches(std::vector<RenderBatch>& batches) {
 
 		if (!hasActiveParticles) continue;
 
-		// 既存のバッチを検索（同じメッシュ＋テクスチャ＋ライト設定）
+		// 既存のバッチを検索（同じメッシュ＋テクスチャ＋ライト＋ブレンド＋ソフト設定）
 		bool foundBatch = false;
 		for (auto& batch : batches) {
-			if (batch.mesh == mesh 
+			if (batch.mesh == mesh
 				&& batch.textureIndex == texIndex
 				&& batch.lightSetting == system->GetLightSetting()
-				&& batch.blendMode == system->GetBlendMode()) {
+				&& batch.blendMode == system->GetBlendMode()
+				&& batch.softParticle == system->IsSoftParticle()
+				&& batch.softFadeDistance == system->GetSoftFadeDistance()) {
 				batch.systems.push_back(system.get());
 				foundBatch = true;
 				break;
@@ -280,6 +293,8 @@ void YParticleManager::CreateRenderBatches(std::vector<RenderBatch>& batches) {
 			newBatch.textureIndex = texIndex;
 			newBatch.lightSetting = system->GetLightSetting();
 			newBatch.blendMode = system->GetBlendMode();
+			newBatch.softParticle = system->IsSoftParticle();
+			newBatch.softFadeDistance = system->GetSoftFadeDistance();
 			newBatch.systems.push_back(system.get());
 			batches.push_back(newBatch);
 		}
@@ -296,17 +311,39 @@ void YParticleManager::Draw() {
 	commandList->SetGraphicsRootSignature(rootSignature_.Get());
 
 
-	renderer_->BeginFrame();
+	// ソフトバッチが1つでもあるか
+	bool anySoft = false;
 	for (const auto& batch : batches) {
-		renderer_->ApplyLightSetting(batch.lightSetting);
+		if (batch.softParticle) { anySoft = true; break; }
+	}
 
-		// バッチ内の全システムをまずバッファに書く
+	renderer_->BeginFrame();
+
+	// --- フェーズ1: 非ソフトバッチ（従来通りハードウェア深度テストで描画） ---
+	for (const auto& batch : batches) {
+		if (batch.softParticle) continue;
+		renderer_->ApplyLightSetting(batch.lightSetting);
+		renderer_->ApplySoftParticle(false, 0.0f);
 		for (auto* system : batch.systems) {
 			renderer_->AddSystem(*system, camera_);
 		}
-
-		// 書き終わったら1回だけDrawする（バッチ統合の本来の姿）
 		renderer_->EndFrame(batch.mesh, batch.textureIndex, batch.blendMode);
+	}
+
+	// --- フェーズ2: ソフトバッチ（深度を読める状態にして PS で接地フェード） ---
+	if (anySoft) {
+		auto* dx = YoRigine::DirectXCommon::GetInstance();
+		dx->BeginParticleSoftDepth();   // MainDepth を SRV 読み取り状態へ＋深度なしで RT 再バインド
+		for (const auto& batch : batches) {
+			if (!batch.softParticle) continue;
+			renderer_->ApplyLightSetting(batch.lightSetting);
+			renderer_->ApplySoftParticle(true, batch.softFadeDistance);
+			for (auto* system : batch.systems) {
+				renderer_->AddSystem(*system, camera_);
+			}
+			renderer_->EndFrame(batch.mesh, batch.textureIndex, batch.blendMode);
+		}
+		dx->EndParticleSoftDepth();     // MainDepth を DEPTH_WRITE に戻して再バインド
 	}
 }
 //=================================================================
@@ -324,6 +361,12 @@ void YParticleManager::EmitBurst(const std::string& systemName, const Vector3& p
 	auto* system = GetSystem(systemName);
 	if (system) {
 		system->Emit(position, count);
+	}
+}
+
+void YParticleManager::RegisterEmitter(const std::shared_ptr<YParticleEmitter>& emitter) {
+	if (emitter) {
+		activeEmitters_.push_back(emitter);
 	}
 }
 
