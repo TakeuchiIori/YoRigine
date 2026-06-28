@@ -7,7 +7,7 @@ local intDir    = "$(SolutionDir)../generated/intermediates/%{prj.name}/%{cfg.bu
 -- =============================================================================
 workspace "YoRigine"
     architecture "x64"
-    configurations { "Debug", "Release" }
+    configurations { "Debug", "Develop", "Release" }
     platforms { "x64" }
 
     startproject "YMain" -- EXEプロジェクトを開始プロジェクトに設定
@@ -28,9 +28,16 @@ workspace "YoRigine"
     targetdir (outputDir)
     objdir    (intDir)
 
-    filter "configurations:Debug"
+    -- Debug と Develop は同じデバッグ設定 (symbols / _DEBUG)
+    filter "configurations:Debug or Develop"
         defines { "_DEBUG" }
         symbols "On"
+
+    -- Develop: Debug と同等のエディタ構成 + 起動シーンを DevelopScene にする。
+    -- エンジン機能 (パーティクル/当たり判定/VFX) のテスト専用。
+    -- Player を生成しないのでゲーム側のセーブは一切走らない。
+    filter "configurations:Develop"
+        defines { "DEVELOP_BUILD" }
 
     filter "configurations:Release"
         defines { "NDEBUG" }
@@ -86,6 +93,8 @@ group "Externals"
         kind "StaticLib"
         language "C++"
         warnings "Default"
+        -- 外部 vcxproj は Debug/Release しか持たないため Develop は Debug にマップ
+        configmap { ["Develop"] = "Debug" }
 
     --------------------- DirectXTex (既存のvcxprojを参照) ---------------------
     externalproject "DirectXTex"
@@ -94,6 +103,8 @@ group "Externals"
         kind "StaticLib"
         language "C++"
         toolset "v143"
+        -- 外部 vcxproj は Debug/Release しか持たないため Develop は Debug にマップ
+        configmap { ["Develop"] = "Debug" }
 
 --------------------------------------------------------------------------------
 -- グループ: Engine (エンジン・コア)
@@ -158,15 +169,20 @@ group "Engine"
             'xcopy /Q /Y /I "$(WindowsSdkDir)bin\\$(TargetPlatformVersion)\\x64\\dxil.dll" "%{cfg.targetdir}"'
         }
 
-        filter "configurations:Debug"
+        filter "configurations:Debug or Develop"
             defines { "USE_IMGUI" }
             dependson { "ImGui"}
             links { "ImGui" }
-            libdirs { 
+            libdirs {
                 "Externals/assimp/lib/Debug",
                 outputDir
             }
             links { "assimp-vc143-mtd" }
+
+        -- Develop: 外部lib(DirectXTex/ImGui)は configmap で Debug に出力されるため
+        -- Debug 出力フォルダも lib 検索パスに追加する
+        filter "configurations:Develop"
+            libdirs { "$(SolutionDir)../generated/outputs/Debug" }
 
         filter "configurations:Release"
             undefines { "USE_IMGUI" }
@@ -208,14 +224,19 @@ group "Game"
         links { "YMath", "YEngine", "DirectXTex.lib" }
         links(directx_libs)
 
-        -- Debug: DLL として配布・暗黙的リンク
-        filter "configurations:Debug"
+        -- Debug / Develop: DLL として配布・暗黙的リンク
+        filter "configurations:Debug or Develop"
             kind "SharedLib"
             defines { "GAME_BUILD_DLL" }  -- dllexport が有効
             defines { "USE_IMGUI" }
             dependson { "ImGui" }
             links { "ImGui" }
             libdirs { outputDir }
+
+        -- Develop: 外部lib(DirectXTex/ImGui)は configmap で Debug に出力されるため
+        -- Debug 出力フォルダも lib 検索パスに追加する
+        filter "configurations:Develop"
+            libdirs { "$(SolutionDir)../generated/outputs/Debug" }
 
         -- Release: StaticLib として EXE に直接埋め込む
         -- GAME_BUILD_DLL 未定義 → GAME_API が空 → dllexport/import が消える
@@ -255,7 +276,7 @@ group "Game"
             'xcopy /Q /Y /I "%{wks.basedir}\\Externals\\curl\\bin\\libcurl.dll" "%{cfg.targetdir}"'
         }
 
-        filter "configurations:Debug"
+        filter "configurations:Debug or Develop"
             defines { "_DEBUG" }
             defines { "GAME_IMPORT_DLL" }  -- YGame.dll のインポート宣言を有効化
         
