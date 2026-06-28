@@ -1,5 +1,6 @@
 ### 🌳 Codebase File Tree (Excluding ignored directories)
 
+├── Docs/
 ├── Externals/
 └── ├── DirectXTex/
 └── └── ├── BC.cpp
@@ -506,6 +507,9 @@
 └── └── └── └──     └── ├── UpdateColorOverLifetime.h
 └── └── └── └──     └── ├── UpdateFadeOut.cpp
 └── └── └── └──     └── └── UpdateFadeOut.h
+└── └── └── └──     ├── Emit/
+└── └── └── └──     └── ├── UpdateSubEmitter.cpp
+└── └── └── └──     └── └── UpdateSubEmitter.h
 └── └── └── └──     ├── Movement/
 └── └── └── └──     └── ├── UpdateFollowTarget.cpp
 └── └── └── └──     └── ├── UpdateFollowTarget.h
@@ -593,7 +597,11 @@
 └── └──     └── VfxMesh/
 └── └──         ├── LightVolumeMesh.cpp
 └── └──         ├── LightVolumeMesh.h
+└── └──         ├── LightningMesh.cpp
+└── └──         ├── LightningMesh.h
 └── └──         ├── ProceduralMeshBase.h
+└── └──         ├── ShockwaveMesh.cpp
+└── └──         ├── ShockwaveMesh.h
 └── └──         ├── TrailMesh.cpp
 └── └──         ├── TrailMesh.h
 └── └──         ├── TrailMeshEmitter.cpp
@@ -601,7 +609,9 @@
 └── └──         ├── VfxEffectAsset.cpp
 └── └──         ├── VfxEffectAsset.h
 └── └──         ├── VfxMeshEditor.cpp
-└── └──         └── VfxMeshEditor.h
+└── └──         ├── VfxMeshEditor.h
+└── └──         ├── VolumeSmokeMesh.cpp
+└── └──         └── VolumeSmokeMesh.h
 └── ├── Graphics/
 └── └── ├── Buffers/
 └── └── └── ├── DynamicVertexBuffer.cpp
@@ -195256,6 +195266,41 @@ namespace YoRigine {
 		cmd->RSSetScissorRects(1, &scissorRect_);
 	}
 
+	/// ソフトパーティクル：MainDepth を PS で読める状態へ遷移し、OffScreen を深度なしで再バインド。
+	/// 粒は加算半透明で深度書き込み不要なので、深度を SRV として読めるようにして
+	/// PS 側で手動遮蔽＋ソフトフェードを行う（読み取り専用 DSV を作らずに済む低リスク方式）。
+	void DirectXCommon::BeginParticleSoftDepth()
+	{
+		auto cmd = commandManager_->GetCommandList();
+
+		constexpr D3D12_RESOURCE_STATES kRead = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+		if (depthCurrentState_ != kRead) {
+			dsvManager_->TransitionBarrier(cmd.Get(), "MainDepth", depthCurrentState_, kRead);
+			depthCurrentState_ = kRead;
+		}
+
+		// 深度なしで OffScreen を再バインド（書き込み中の深度を同時に SRV 読みする衝突を回避）
+		rtvManager_->SetRenderTargets(cmd.Get(), { "OffScreen" }, nullptr);
+		cmd->RSSetViewports(1, &viewport_);
+		cmd->RSSetScissorRects(1, &scissorRect_);
+	}
+
+	/// ソフトパーティクル後始末：MainDepth を DEPTH_WRITE に戻して OffScreen + DSV を再バインド。
+	void DirectXCommon::EndParticleSoftDepth()
+	{
+		auto cmd = commandManager_->GetCommandList();
+
+		if (depthCurrentState_ != D3D12_RESOURCE_STATE_DEPTH_WRITE) {
+			dsvManager_->TransitionBarrier(cmd.Get(), "MainDepth", depthCurrentState_, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+			depthCurrentState_ = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+		}
+
+		D3D12_CPU_DESCRIPTOR_HANDLE dsvH = dsvManager_->GetHandle("MainDepth");
+		rtvManager_->SetRenderTargets(cmd.Get(), { "OffScreen" }, &dsvH);
+		cmd->RSSetViewports(1, &viewport_);
+		cmd->RSSetScissorRects(1, &scissorRect_);
+	}
+
 	/// PiP オフスクリーンパス：指定 RT + 専用 DSV をクリアして 2nd 描画用に bind
 	void DirectXCommon::PreDrawPip(const std::string& rtName, const std::string& dsvName,
 		uint32_t width, uint32_t height)
@@ -195809,6 +195854,15 @@ namespace YoRigine {
 	public:
 		/// MainDepth を DEPTH_WRITE に戻してバックバッファと再バインド
 		void DepthBarrier();
+
+		/// ソフトパーティクル用：オフスクリーンパス中に MainDepth をシェーダ読み取り状態へ遷移し、
+		/// OffScreen RT を「深度なし」で再バインドする。粒 PS が深度をサンプルして
+		/// 遮蔽判定とソフトフェードを行うための準備。粒描画の直前に呼ぶ。
+		void BeginParticleSoftDepth();
+
+		/// ソフトパーティクル描画後の後始末：MainDepth を DEPTH_WRITE に戻し、
+		/// OffScreen RT + MainDepth DSV を再バインドする。粒描画の直後に呼ぶ。
+		void EndParticleSoftDepth();
 
 		/// バックバッファの内容を FinalResult テクスチャにコピー
 		void CopyBackBufferToFinalResult();
@@ -199244,6 +199298,10 @@ void DevelopScene::Initialize() {
 	YParticleManager::GetInstance().SetCamera(sceneCamera_.get());
 	AreaManager::GetInstance()->Initialize();
 	YoRigine::CollisionManager::GetInstance()->Initialize();
+
+	// VFX テスト用：Bloom 入りのポストエフェクトを読み込む（エミッシブ強度→Bloom の確認用）。
+	// エディタ「ポストエフェクト」でしきい値/強度を調整できる。
+	PostEffectManager::GetInstance()->LoadPreset("TitleBloom");
 #ifdef USE_IMGUI
 	YEmitterGroupEditor::GetInstance().SetCamera(sceneCamera_.get());
 	YoRigine::VfxMeshEditor::GetInstance()->Initialize();
@@ -214859,8 +214917,12 @@ EffectHandle EffectHandle::Play(const std::string& systemName,
     h.emitter_->SetAutoEmit(loop);
     if (emitCount > 0) h.emitter_->SetEmitCount(emitCount);
 
-    if (!loop) {
-        // 非ループ: 1 フレームだけ放出して自動停止
+    if (loop) {
+        // ループ: マネージャに登録して毎フレーム tick させる。
+        // これで継続発生・SetPosition() による追従・Stop() による停止が機能する。
+        mgr->RegisterEmitter(h.emitter_);
+    } else {
+        // 非ループ: 1 フレームだけ放出して終了（tick 不要の撃ちっぱなし）
         int n = (emitCount > 0) ? emitCount : h.emitter_->GetEmitCount();
         sys->Emit(position, n);
     }
@@ -215045,6 +215107,13 @@ public:
 class IUpdateModule : public IParticleModule {
 public:
     virtual void OnUpdate(ParticleAttribute* attrs, uint32_t index, float dt) = 0;
+
+    /// <summary>
+    /// 粒が寿命で死ぬ瞬間に1回だけ呼ばれる（デフォルトは何もしない）。
+    /// サブエミッタ（死亡時に子エフェクトを出す等）で使用する。
+    /// </summary>
+    virtual void OnDeath([[maybe_unused]] ParticleAttribute* attrs,
+                         [[maybe_unused]] uint32_t index) {}
 };
 
 ============================================================
@@ -217297,6 +217366,162 @@ private:
 };
 
 REGISTER_UPDATE_MODULE(UpdateFadeOut)
+
+============================================================
+File Path: YEngine/Generators/Particle/Modules/Update/Emit/UpdateSubEmitter.cpp
+============================================================
+#include "UpdateSubEmitter.h"
+#include "../../ParticleAttribute.h"
+#include "../../../ParticleMath.h"
+#include "../../../YParticleManager.h"
+
+#ifdef USE_IMGUI
+#include "imgui.h"
+#include <vector>
+#endif
+
+void UpdateSubEmitter::OnUpdate(ParticleAttribute* attrs, uint32_t index, float dt)
+{
+    if (trigger_ != Trigger::Continuous) return;
+    if (childSystem_.empty()) return;
+
+    // per-particle・ステートレスな確率発生で、おおよそ rate_ 個/秒 を撒く。
+    float chance = rate_ * dt * probability_;
+    if (ParticleMath::Random01() < chance) {
+        EmitChild(attrs[index].position);
+    }
+}
+
+void UpdateSubEmitter::OnDeath(ParticleAttribute* attrs, uint32_t index)
+{
+    if (trigger_ != Trigger::OnDeath) return;
+    if (childSystem_.empty()) return;
+
+    // 発生確率の抽選
+    if (probability_ < 1.0f && ParticleMath::Random01() > probability_) return;
+
+    EmitChild(attrs[index].position);
+}
+
+void UpdateSubEmitter::EmitChild(const Vector3& position)
+{
+    // 子システムが無ければ Emit 側で無視される（安全）
+    YParticleManager::GetInstance().Emit(childSystem_, position, count_);
+}
+
+void UpdateSubEmitter::DrawEditor()
+{
+#ifdef USE_IMGUI
+    // --- トリガ種別 ---
+    const char* triggerLabels[] = { "死亡時 (OnDeath)", "継続 (Continuous)" };
+    int trig = static_cast<int>(trigger_);
+    if (ImGui::Combo("トリガ", &trig, triggerLabels, IM_ARRAYSIZE(triggerLabels))) {
+        trigger_ = static_cast<Trigger>(trig);
+    }
+
+    // --- 子システム選択（登録済みシステムから選ぶ） ---
+    std::vector<std::string> names = YParticleManager::GetInstance().GetAllSystemNames();
+    const char* preview = childSystem_.empty() ? "(未選択)" : childSystem_.c_str();
+    if (ImGui::BeginCombo("子システム", preview)) {
+        for (const auto& n : names) {
+            bool selected = (n == childSystem_);
+            if (ImGui::Selectable(n.c_str(), selected)) {
+                childSystem_ = n;
+            }
+            if (selected) ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+
+    // --- 発生パラメータ ---
+    ImGui::DragInt("発生数", &count_, 1.0f, 1, 256);
+    if (trigger_ == Trigger::Continuous) {
+        ImGui::SliderFloat("発生レート(個/秒)", &rate_, 0.0f, 200.0f);
+    }
+    ImGui::SliderFloat("発生確率", &probability_, 0.0f, 1.0f);
+
+    ImGui::TextWrapped("親の粒から子システムを発生させます。OnDeath=死亡時に1回 / Continuous=生存中に継続。"
+                       "子の同時数は子システムの maxParticles で頭打ちになります。");
+#endif
+}
+
+void UpdateSubEmitter::SaveToJson(nlohmann::json& json) const
+{
+    json = {
+        {"childSystem", childSystem_},
+        {"trigger",     static_cast<int>(trigger_)},
+        {"count",       count_},
+        {"rate",        rate_},
+        {"probability", probability_}
+    };
+}
+
+void UpdateSubEmitter::LoadFromJson(const nlohmann::json& json)
+{
+    if (json.contains("childSystem")) childSystem_ = json["childSystem"].get<std::string>();
+    if (json.contains("trigger"))     trigger_     = static_cast<Trigger>(json["trigger"].get<int>());
+    if (json.contains("count"))       count_       = json["count"].get<int>();
+    if (json.contains("rate"))        rate_        = json["rate"].get<float>();
+    if (json.contains("probability")) probability_ = json["probability"].get<float>();
+}
+
+
+============================================================
+File Path: YEngine/Generators/Particle/Modules/Update/Emit/UpdateSubEmitter.h
+============================================================
+#pragma once
+#include "../../IParticleModule.h"
+#include "../../../YParticleModuleFactory.h"
+#include <string>
+
+/// <summary>
+/// サブエミッタ：ある粒（親）から別の YParticleSystem（子）を発生させる。
+///
+/// ■ トリガ
+///   OnDeath    : 親が寿命で消える瞬間に子を出す（火花→小煙、弾→着弾爆発 など）
+///   Continuous : 親が生きている間、一定レートで子を撒く（飛翔体の煙トレイル など）
+///
+/// レイヤリング（安いパーツを重ねる）で複合エフェクトを組むための土台。
+/// 子の発生位置は親粒の position（ワールド空間運用が前提）。
+/// 暴走防止：子の同時数は子システムの maxParticles で頭打ちになる。
+/// </summary>
+class UpdateSubEmitter : public IUpdateModule {
+public:
+    enum class Trigger : uint8_t {
+        OnDeath = 0,     // 死亡時に1回
+        Continuous = 1   // 生存中に継続
+    };
+
+    //===== IUpdateModule =====
+    void OnUpdate(ParticleAttribute* attrs, uint32_t index, float dt) override;
+    void OnDeath(ParticleAttribute* attrs, uint32_t index)           override;
+    void DrawEditor()                                                 override;
+    std::string GetName()     const override { return "サブエミッタ"; }
+    std::string GetTypeName() const override { return "UpdateSubEmitter"; }
+
+    //===== シリアライズ =====
+    void SaveToJson(nlohmann::json& json)        const override;
+    void LoadFromJson(const nlohmann::json& json)      override;
+
+    //===== アクセス =====
+    void SetChildSystem(const std::string& name) { childSystem_ = name; }
+    const std::string& GetChildSystem() const { return childSystem_; }
+    void SetTrigger(Trigger t) { trigger_ = t; }
+    Trigger GetTrigger() const { return trigger_; }
+
+private:
+    /// 子システムを発生させる（子システム未登録なら何もしない）
+    void EmitChild(const Vector3& position);
+
+    std::string childSystem_;             // 発生させる子システム名
+    Trigger     trigger_   = Trigger::OnDeath;
+    int         count_     = 8;           // 1回の発生数
+    float       rate_      = 20.0f;       // Continuous: 親1粒あたりの秒間発生数
+    float       probability_ = 1.0f;      // 発生確率（0〜1）。OnDeath で抽選にも使える
+};
+
+REGISTER_UPDATE_MODULE(UpdateSubEmitter)
+
 
 ============================================================
 File Path: YEngine/Generators/Particle/Modules/Update/Movement/UpdateFollowTarget.cpp
@@ -221456,6 +221681,9 @@ nlohmann::json YParticleEditor::SaveSystemToJson(const std::string& systemName) 
 	json["billboardType"] = system->GetBillboardTypeAsUInt();
 	json["BlendMode"] = static_cast<int>(system->GetBlendMode());
 	json["Lighting"] = system->IsEnableLight();
+	json["softParticle"] = system->IsSoftParticle();
+	json["softFadeDistance"] = system->GetSoftFadeDistance();
+	json["emissiveIntensity"] = system->GetEmissiveIntensity();
 	json["mesh"]["type"] = system->GetCurrentMeshType();
 	json["mesh"]["params"] = nlohmann::json::array();
 	const float* params = system->GetMeshParams();
@@ -221500,6 +221728,9 @@ void YParticleEditor::LoadSystemFromJson(const nlohmann::json& json) {
 		system->SetBlendMode(static_cast<BlendMode>(json["BlendMode"].get<int>()));
 	if (json.contains("Lighting"))
 		system->SetLightSetting(json["Lighting"].get<bool>() ? ParticleLightSetting{ true, true, true } : ParticleLightSetting{ false, false, false });
+	if (json.contains("softParticle"))     system->SetSoftParticle(json["softParticle"].get<bool>());
+	if (json.contains("softFadeDistance")) system->SetSoftFadeDistance(json["softFadeDistance"].get<float>());
+	if (json.contains("emissiveIntensity")) system->SetEmissiveIntensity(json["emissiveIntensity"].get<float>());
 
 	if (json.contains("mesh")) {
 		const auto& meshJson = json["mesh"];
@@ -222213,9 +222444,11 @@ File Path: YEngine/Generators/Particle/YParticleManager.cpp
 ============================================================
 #include "YParticleManager.h"
 #include <chrono>
+#include <algorithm>
 #include "Graphics/LightManager/LightManager.h"
 #include <PipelineManager/YPipelineManager.h>
 #include "YEmitterGroupManager.h"
+#include "YParticleEmitter.h"
 #include "DirectXCommon.h"
 #include "YParticleModuleFactory.h"
 
@@ -222444,6 +222677,15 @@ void YParticleManager::Update(float deltaTime) {
 	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
 	stats_.updateTimeMs = duration.count() / 1000.0f;
 
+	// EffectHandle::Play(loop) で登録された実行中エミッタを tick（継続発生・追従）。
+	// Stop() 済み（非アクティブ）になったものはここで除去する。
+	for (auto& e : activeEmitters_) {
+		if (e) e->Update(deltaTime);
+	}
+	activeEmitters_.erase(
+		std::remove_if(activeEmitters_.begin(), activeEmitters_.end(),
+			[](const std::shared_ptr<YParticleEmitter>& e) { return !e || !e->IsActive(); }),
+		activeEmitters_.end());
 
 	YEmitterGroupManager::GetInstance().Update(deltaTime);
 }
@@ -222473,13 +222715,15 @@ void YParticleManager::CreateRenderBatches(std::vector<RenderBatch>& batches) {
 
 		if (!hasActiveParticles) continue;
 
-		// 既存のバッチを検索（同じメッシュ＋テクスチャ＋ライト設定）
+		// 既存のバッチを検索（同じメッシュ＋テクスチャ＋ライト＋ブレンド＋ソフト設定）
 		bool foundBatch = false;
 		for (auto& batch : batches) {
-			if (batch.mesh == mesh 
+			if (batch.mesh == mesh
 				&& batch.textureIndex == texIndex
 				&& batch.lightSetting == system->GetLightSetting()
-				&& batch.blendMode == system->GetBlendMode()) {
+				&& batch.blendMode == system->GetBlendMode()
+				&& batch.softParticle == system->IsSoftParticle()
+				&& batch.softFadeDistance == system->GetSoftFadeDistance()) {
 				batch.systems.push_back(system.get());
 				foundBatch = true;
 				break;
@@ -222493,6 +222737,8 @@ void YParticleManager::CreateRenderBatches(std::vector<RenderBatch>& batches) {
 			newBatch.textureIndex = texIndex;
 			newBatch.lightSetting = system->GetLightSetting();
 			newBatch.blendMode = system->GetBlendMode();
+			newBatch.softParticle = system->IsSoftParticle();
+			newBatch.softFadeDistance = system->GetSoftFadeDistance();
 			newBatch.systems.push_back(system.get());
 			batches.push_back(newBatch);
 		}
@@ -222509,17 +222755,39 @@ void YParticleManager::Draw() {
 	commandList->SetGraphicsRootSignature(rootSignature_.Get());
 
 
-	renderer_->BeginFrame();
+	// ソフトバッチが1つでもあるか
+	bool anySoft = false;
 	for (const auto& batch : batches) {
-		renderer_->ApplyLightSetting(batch.lightSetting);
+		if (batch.softParticle) { anySoft = true; break; }
+	}
 
-		// バッチ内の全システムをまずバッファに書く
+	renderer_->BeginFrame();
+
+	// --- フェーズ1: 非ソフトバッチ（従来通りハードウェア深度テストで描画） ---
+	for (const auto& batch : batches) {
+		if (batch.softParticle) continue;
+		renderer_->ApplyLightSetting(batch.lightSetting);
+		renderer_->ApplySoftParticle(false, 0.0f);
 		for (auto* system : batch.systems) {
 			renderer_->AddSystem(*system, camera_);
 		}
-
-		// 書き終わったら1回だけDrawする（バッチ統合の本来の姿）
 		renderer_->EndFrame(batch.mesh, batch.textureIndex, batch.blendMode);
+	}
+
+	// --- フェーズ2: ソフトバッチ（深度を読める状態にして PS で接地フェード） ---
+	if (anySoft) {
+		auto* dx = YoRigine::DirectXCommon::GetInstance();
+		dx->BeginParticleSoftDepth();   // MainDepth を SRV 読み取り状態へ＋深度なしで RT 再バインド
+		for (const auto& batch : batches) {
+			if (!batch.softParticle) continue;
+			renderer_->ApplyLightSetting(batch.lightSetting);
+			renderer_->ApplySoftParticle(true, batch.softFadeDistance);
+			for (auto* system : batch.systems) {
+				renderer_->AddSystem(*system, camera_);
+			}
+			renderer_->EndFrame(batch.mesh, batch.textureIndex, batch.blendMode);
+		}
+		dx->EndParticleSoftDepth();     // MainDepth を DEPTH_WRITE に戻して再バインド
 	}
 }
 //=================================================================
@@ -222537,6 +222805,12 @@ void YParticleManager::EmitBurst(const std::string& systemName, const Vector3& p
 	auto* system = GetSystem(systemName);
 	if (system) {
 		system->Emit(position, count);
+	}
+}
+
+void YParticleManager::RegisterEmitter(const std::shared_ptr<YParticleEmitter>& emitter) {
+	if (emitter) {
+		activeEmitters_.push_back(emitter);
 	}
 }
 
@@ -222644,6 +222918,9 @@ File Path: YEngine/Generators/Particle/YParticleManager.h
 #include <memory>
 #include <string>
 #include <vector>
+
+// EffectHandle が生成する実行中エミッタ（循環インクルード回避のため前方宣言）
+class YParticleEmitter;
 
 /// <summary>
 /// YParticleSystem を統合管理するマネージャー
@@ -222782,6 +223059,12 @@ public:
     /// </summary>
     void EmitBurst(const std::string& systemName, const Vector3& position, int count);
 
+    /// <summary>
+    /// 実行中エミッタ（EffectHandle::Play のループ/追従）を登録する。
+    /// Update() で毎フレーム tick され、Stop()（非アクティブ）になると自動的に除去される。
+    /// </summary>
+    void RegisterEmitter(const std::shared_ptr<YParticleEmitter>& emitter);
+
     //=================================================================
     // カメラ設定
     //=================================================================
@@ -222821,6 +223104,8 @@ private:
         ParticleLightSetting lightSetting;
         std::vector<YParticleSystem*> systems;
 		BlendMode blendMode;
+        bool  softParticle = false;       // ソフトパーティクル（深度フェード）
+        float softFadeDistance = 0.5f;
     };
 
     void CreateRenderBatches(std::vector<RenderBatch>& batches);
@@ -222843,6 +223128,9 @@ private:
 
     // レンダラー
     std::unique_ptr<YParticleRenderer> renderer_;
+
+    // EffectHandle::Play(loop) 等が生成した実行中エミッタ。毎フレーム tick する。
+    std::vector<std::shared_ptr<YParticleEmitter>> activeEmitters_;
 
     // 統計情報
     Statistics stats_;
@@ -223020,6 +223308,7 @@ File Path: YEngine/Generators/Particle/YParticleRenderer.cpp
 ============================================================
 #include "YParticleRenderer.h"
 #include "DirectXCommon.h"
+#include "DirectX/DsvManager.h"
 #include "Matrix4x4.h"
 #include "PipelineManager/YPipelineManager.h"
 #include "Graphics/LightManager/LightManager.h"
@@ -223045,6 +223334,15 @@ void YParticleRenderer::Initialize(SrvManager* srvManager, uint32_t maxTotalPart
 
     instanceOffsetCB_ = dxCommon_->CreateBufferResource(256 * MAX_BATCHES);
     instanceOffsetCB_->Map(0, nullptr, reinterpret_cast<void**>(&mappedOffsetBase_));
+
+    // ソフトパーティクル用 CB（バッチごとに 256B スロット）
+    softParticleCB_ = dxCommon_->CreateBufferResource(256 * MAX_BATCHES);
+    softParticleCB_->Map(0, nullptr, reinterpret_cast<void**>(&mappedSoftCBBase_));
+}
+
+void YParticleRenderer::ApplySoftParticle(bool enabled, float fadeDistance) {
+    currentSoftEnabled_ = enabled;
+    currentSoftFade_ = fadeDistance;
 }
 
 void YParticleRenderer::BeginFrame() {
@@ -223125,6 +223423,9 @@ void YParticleRenderer::AddSystem(const YParticleSystem& system, Camera* camera)
     Matrix4x4 viewProj = camera_->GetViewProjectionMatrix();
     Vector3 cameraPos = camera_->GetTranslate();
 
+    // エミッシブ強度：粒の rgb に掛けて明るくする（Bloom を強く乗せる）。a はそのまま。
+    const float emissive = system.GetEmissiveIntensity();
+
     Matrix4x4 viewMat = camera_->GetViewMatrix();
     Matrix4x4 billboardRotation = viewMat;
     billboardRotation.m[3][0] = 0.0f;
@@ -223181,7 +223482,8 @@ void YParticleRenderer::AddSystem(const YParticleSystem& system, Camera* camera)
         // インスタンシングデータに設定
         mappedData_[currentInstanceOffset_].World = localWorld;
         mappedData_[currentInstanceOffset_].WVP = Multiply(localWorld, viewProj);
-        mappedData_[currentInstanceOffset_].color = attr.color;
+        mappedData_[currentInstanceOffset_].color =
+            { attr.color.x * emissive, attr.color.y * emissive, attr.color.z * emissive, attr.color.w };
 		mappedData_[currentInstanceOffset_].uvTransform = MakeUVTransform(attr.uvOffset, attr.uvScale);
         currentInstanceOffset_++;
         writtenCount++;
@@ -223201,8 +223503,11 @@ void YParticleRenderer::EndFrame(const std::shared_ptr<Mesh>& mesh, uint32_t tex
     auto& meshRes = mesh->GetMeshResource();
 
     auto pm = YPipelineManager::GetInstance();
-    const auto& indices = pm->GetParameterIndices("YParticle");
-    commandList->SetPipelineState(pm->GetBlendModePSO("YParticle", blendMode));
+    // ソフト指定バッチは専用 PSO（YParticleSoft）で描画。非ソフトは従来の YParticle。
+    const std::string psoName = currentSoftEnabled_ ? "YParticleSoft" : "YParticle";
+    const auto& indices = pm->GetParameterIndices(psoName);
+    commandList->SetGraphicsRootSignature(pm->GetRootSignature(psoName));
+    commandList->SetPipelineState(pm->GetBlendModePSO(psoName, blendMode));
 
     commandList->IASetVertexBuffers(0, 1, &meshRes.vertexBufferView);
     commandList->IASetIndexBuffer(&meshRes.indexBufferView);
@@ -223218,6 +223523,25 @@ void YParticleRenderer::EndFrame(const std::shared_ptr<Mesh>& mesh, uint32_t tex
     materialLighting_->RecordDrawCommands(commandList.Get(), indices.at("gMaterialLight"));
     commandList->SetGraphicsRootConstantBufferView(indices.at("gCamera"), camera_->GetCameraResource()->GetGPUVirtualAddress());
     commandList->SetGraphicsRootConstantBufferView(indices.at("InstanceOffsetCB"), instanceOffsetCB_->GetGPUVirtualAddress() + 256 * currentBatchIndex_);
+
+    // ソフトパーティクル：深度SRV + near/far/fade の CB をバインド
+    if (currentSoftEnabled_) {
+        uint8_t* softSlot = mappedSoftCBBase_ + 256 * currentBatchIndex_;
+        auto* soft = reinterpret_cast<SoftParticleCBData*>(softSlot);
+        soft->nearZ = camera_->GetNearClip();
+        soft->farZ = camera_->GetFarClip();
+        soft->fadeDistance = currentSoftFade_;
+        soft->padding = 0.0f;
+
+        const auto* mainDepth = dxCommon_->GetDSVManager()->Get("MainDepth");
+        if (mainDepth && mainDepth->srvIndex != UINT32_MAX) {
+            srvManager_->SetGraphicsRootDescriptorTable(indices.at("gSceneDepth"), mainDepth->srvIndex);
+        }
+        commandList->SetGraphicsRootConstantBufferView(
+            indices.at("gSoftParticle"),
+            softParticleCB_->GetGPUVirtualAddress() + 256 * currentBatchIndex_);
+    }
+
     commandList->DrawIndexedInstanced(
         static_cast<UINT>(mesh->GetIndexCount()),
         instanceCount,
@@ -223271,6 +223595,10 @@ public:
 
     void ApplyLightSetting(const ParticleLightSetting& setting);
 
+    // 次に EndFrame するバッチのソフトパーティクル設定を指定する。
+    // enabled=true のバッチは深度フェード用の専用 PSO（YParticleSoft）で描画される。
+    void ApplySoftParticle(bool enabled, float fadeDistance);
+
     // システムをバッチに追加（まだ描画しない）
     void AddSystem(const YParticleSystem& system, Camera* camera);
 
@@ -223300,6 +223628,20 @@ private:
 
     // 現在のバッチに適用するライト設定
     ParticleLightSetting currentLightSetting_;
+
+    // 現在のバッチに適用するソフトパーティクル設定
+    bool  currentSoftEnabled_ = false;
+    float currentSoftFade_ = 0.5f;
+
+    // ソフトパーティクル用 定数バッファ（バッチごとに 256B スロット）
+    Microsoft::WRL::ComPtr<ID3D12Resource> softParticleCB_;
+    struct SoftParticleCBData {
+        float nearZ;
+        float farZ;
+        float fadeDistance;
+        float padding;
+    };
+    uint8_t* mappedSoftCBBase_ = nullptr;
 
     std::unique_ptr<MaterialLighting> materialLighting_;
 
@@ -223477,8 +223819,11 @@ void YParticleSystem::Update(float deltaTime)
 		// 個別の経過時間を進める
 		attr.currentTime += deltaTime;
 
-		// 寿命チェック
+		// 寿命チェック（死亡の瞬間に OnDeath フックを発火 → サブエミッタ等）
 		if (attr.currentTime >= attr.lifeTime) {
+			for (auto& module : updateModules_) {
+				module->OnDeath(attributes_.data(), i);
+			}
 			attr.isActive = false;
 			continue;
 		}
@@ -223758,6 +224103,17 @@ void YParticleSystem::ShowEditor()
 	if (ImGui::Combo("ブレンドモード", &currentMode, blendNames, IM_ARRAYSIZE(blendNames))) {
 		SetBlendMode((BlendMode)currentMode);
 	}
+
+	// ソフトパーティクル（深度フェード）
+	ImGui::Checkbox("ソフトパーティクル", &softParticle_);
+	if (softParticle_) {
+		ImGui::SliderFloat("フェード距離", &softFadeDistance_, 0.01f, 5.0f);
+		ImGui::TextDisabled("地形・壁・敵に近づくほど薄くなり接地感が出ます。");
+	}
+
+	// エミッシブ強度（明るさ → Bloom の乗り）
+	ImGui::DragFloat("エミッシブ強度", &emissiveIntensity_, 0.05f, 0.0f, 20.0f);
+	ImGui::TextDisabled("rgbを明るくして Bloom を強く乗せます（ド派手用）。要 Bloom 有効。");
 
 	// === Spawn Modules ===
 	if (ImGui::TreeNode("スポーンモジュール")) {
@@ -224075,6 +224431,20 @@ public:
 	void SetBlendMode(BlendMode mode) { blendMode_ = mode; }
 	BlendMode GetBlendMode() const { return blendMode_; }
 
+	// ソフトパーティクル（深度フェード）設定
+	// 有効にすると、シーンの深度と比較して地形・壁・敵に近づくほどαを減衰させ、
+	// 板ポリの硬い切り口を消して接地感を出す。fadeDistance は減衰しきる距離（ワールド単位）。
+	void SetSoftParticle(bool enable) { softParticle_ = enable; }
+	bool IsSoftParticle() const { return softParticle_; }
+	void SetSoftFadeDistance(float d) { softFadeDistance_ = d; }
+	float GetSoftFadeDistance() const { return softFadeDistance_; }
+
+	// エミッシブ強度：粒のカラー(rgb)に掛ける明るさ倍率。
+	// 1.0 で通常、>1 で明るく＝Bloom が強く乗って“ド派手”になる。
+	// （現状 RT は LDR なので芯は白飛びするが Bloom のしきい値は十分越える）
+	void SetEmissiveIntensity(float i) { emissiveIntensity_ = i; }
+	float GetEmissiveIntensity() const { return emissiveIntensity_; }
+
 #ifdef USE_IMGUI
 	///************************* エディタ関数 *************************///
 	void ShowEditor();
@@ -224119,6 +224489,13 @@ private:
 	BillboardType billboardType_ = BillboardType::Full;   // ビルボードタイプ
 
 	BlendMode blendMode_ = BlendMode::kBlendModeNormal; // ブレンドモード
+
+	// ソフトパーティクル（深度フェード）
+	bool  softParticle_     = false;  // 既定OFF（既存エフェクトは従来通り）
+	float softFadeDistance_ = 0.5f;   // 接地面で減衰しきる距離（ワールド単位）
+
+	// エミッシブ強度（rgb 倍率）。1.0 で従来通り。
+	float emissiveIntensity_ = 1.0f;
 };
 
 ============================================================
@@ -225362,6 +225739,260 @@ private:
 
 
 ============================================================
+File Path: YEngine/Generators/Vfx/VfxMesh/LightningMesh.cpp
+============================================================
+// ===========================================================
+// LightningMesh.cpp
+// ===========================================================
+#include "LightningMesh.h"
+#include "Systems/Camera/Camera.h"
+#include <cmath>
+
+namespace YoRigine {
+
+static constexpr float kPi = 3.14159265358979323846f;
+
+// seed から 0..1 の決定的乱数
+static float Hash01(uint32_t n)
+{
+    n = (n << 13) ^ n;
+    n = n * (n * n * 15731u + 789221u) + 1376312589u;
+    return (n & 0x7fffffffu) / static_cast<float>(0x7fffffff);
+}
+
+void LightningMesh::Initialize()
+{
+    // 本線 + 枝 + リボン頂点。多めに確保。
+    InitBuffer(4096);
+    vertices_.reserve(4096);
+}
+
+void LightningMesh::SetEndpoints(const Vector3& start, const Vector3& end)
+{
+    start_ = start;
+    end_   = end;
+}
+
+void LightningMesh::Update(float deltaTime)
+{
+    if (!param_.isEnable) return;
+    time_ += deltaTime;
+
+    // flickerRate 回/秒で形を変える（パチパチ感）
+    flickerTimer_ += deltaTime;
+    float interval = (param_.flickerRate > 0.01f) ? (1.0f / param_.flickerRate) : 1.0f;
+    bool reshaped = false;
+    while (flickerTimer_ >= interval) {
+        flickerTimer_ -= interval;
+        seed_ += 9173u;
+        reshaped = true;
+    }
+
+    // 形が変わった時 or 毎フレーム（カメラ向きリボンのため）再構築
+    RebuildVertices();
+    (void)reshaped;
+}
+
+// a→b を中点変位で折る。点は a を含めず、中点と b 手前までを out に積む。
+void LightningMesh::Subdivide(const Vector3& a, const Vector3& b, float amp, int depth, std::vector<Vector3>& out)
+{
+    if (depth <= 0) {
+        out.push_back(b);
+        return;
+    }
+
+    Vector3 axis = Normalize(b - a);
+    Vector3 ref = (std::fabs(axis.y) < 0.99f) ? Vector3{ 0,1,0 } : Vector3{ 1,0,0 };
+    Vector3 u = Normalize(Cross(axis, ref));
+    Vector3 v = Cross(axis, u);
+
+    seed_ += 2654435761u;
+    float a0 = Hash01(seed_) * 2.0f * kPi;
+    float r0 = (0.4f + 0.6f * Hash01(seed_ * 7u + 3u)) * amp;
+    Vector3 disp = (u * std::cos(a0) + v * std::sin(a0)) * r0;
+
+    Vector3 mid = (a + b) * 0.5f + disp;
+
+    Subdivide(a, mid, amp * 0.5f, depth - 1, out);
+    Subdivide(mid, b, amp * 0.5f, depth - 1, out);
+}
+
+void LightningMesh::AppendBoltRibbon(const std::vector<Vector3>& pts, float width, const Vector4& color)
+{
+    if (pts.size() < 2 || !camera_) return;
+
+    const Vector3 camPos = camera_->GetTranslate();
+    const float half = width * 0.5f;
+    const int n = static_cast<int>(pts.size());
+
+    // 各点のリボン左右を求める
+    std::vector<Vector3> left(n), right(n);
+    for (int i = 0; i < n; ++i) {
+        Vector3 prev = pts[(i > 0) ? i - 1 : i];
+        Vector3 next = pts[(i < n - 1) ? i + 1 : i];
+        Vector3 segDir = Normalize(next - prev);
+        Vector3 toCam  = Normalize(camPos - pts[i]);
+        Vector3 side   = Cross(segDir, toCam);
+        float len = std::sqrt(side.x * side.x + side.y * side.y + side.z * side.z);
+        if (len < 1e-4f) side = { 1,0,0 }; else side = side * (1.0f / len);
+        left[i]  = pts[i] + side * half;
+        right[i] = pts[i] - side * half;
+    }
+
+    // セグメントごとに 2 三角形（TRIANGLELIST）
+    for (int i = 0; i < n - 1; ++i) {
+        float t0 = static_cast<float>(i)     / static_cast<float>(n - 1);
+        float t1 = static_cast<float>(i + 1) / static_cast<float>(n - 1);
+
+        auto mk = [&](const Vector3& p, float u, float vCoord) {
+            ProceduralMeshVertex out;
+            out.position = p;
+            out.texcoord = { u, vCoord };
+            out.color    = color;
+            out.age      = u;
+            return out;
+        };
+
+        ProceduralMeshVertex L0 = mk(left[i],  t0, 0.0f);
+        ProceduralMeshVertex R0 = mk(right[i], t0, 1.0f);
+        ProceduralMeshVertex L1 = mk(left[i + 1],  t1, 0.0f);
+        ProceduralMeshVertex R1 = mk(right[i + 1], t1, 1.0f);
+
+        vertices_.push_back(L0); vertices_.push_back(R0); vertices_.push_back(R1);
+        vertices_.push_back(L0); vertices_.push_back(R1); vertices_.push_back(L1);
+    }
+}
+
+void LightningMesh::RebuildVertices()
+{
+    vertices_.clear();
+    if (!camera_) return;
+
+    int levels = 1;
+    while ((1 << levels) < param_.segments && levels < 7) ++levels;
+
+    // --- 本線 ---
+    std::vector<Vector3> main;
+    main.push_back(start_);
+    Subdivide(start_, end_, param_.jitter, levels, main);
+    AppendBoltRibbon(main, param_.width, param_.color);
+
+    // --- 枝 ---
+    for (int bIdx = 0; bIdx < param_.branches; ++bIdx) {
+        seed_ += 40503u;
+        // 本線上のランダムな点から分岐
+        int idx = 1 + static_cast<int>(Hash01(seed_) * (main.size() - 2));
+        idx = (idx < 1) ? 1 : ((idx > static_cast<int>(main.size()) - 1) ? static_cast<int>(main.size()) - 1 : idx);
+        Vector3 origin = main[idx];
+
+        // 分岐方向：本線方向から少しずらす
+        Vector3 dir = Normalize(end_ - start_);
+        Vector3 ref = (std::fabs(dir.y) < 0.99f) ? Vector3{ 0,1,0 } : Vector3{ 1,0,0 };
+        Vector3 u = Normalize(Cross(dir, ref));
+        Vector3 v = Cross(dir, u);
+        float ang = Hash01(seed_ * 3u + 1u) * 2.0f * kPi;
+        Vector3 off = (u * std::cos(ang) + v * std::sin(ang));
+        float blen = (0.3f + 0.4f * Hash01(seed_ * 11u)) * Length(end_ - start_);
+        Vector3 bend = origin + (dir * 0.4f + off * 0.9f) * blen;
+
+        std::vector<Vector3> branch;
+        branch.push_back(origin);
+        Subdivide(origin, bend, param_.branchJitter, levels - 1, branch);
+        AppendBoltRibbon(branch, param_.width * 0.6f, param_.color);
+    }
+
+    UploadVertices(vertices_);
+}
+
+void LightningMesh::Draw(ID3D12GraphicsCommandList* cmdList)
+{
+    if (!isVisible_ || !param_.isEnable) return;
+    const uint32_t vertCount = GetVertexCount();
+    if (vertCount < 3) return;
+
+    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    BindVertexBuffer(cmdList);
+    cmdList->DrawInstanced(vertCount, 1, 0, 0);
+}
+
+} // namespace YoRigine
+
+
+============================================================
+File Path: YEngine/Generators/Vfx/VfxMesh/LightningMesh.h
+============================================================
+#pragma once
+// ===========================================================
+// LightningMesh.h
+//
+// プロシージャルな稲妻（雷）。始点→終点を midpoint displacement で
+// ジグザグに折り、カメラを向くリボンとして描画する。
+// 一定間隔で経路を再生成して明滅・パチパチ感を出す。加算ブレンド前提。
+//
+// 使い方:
+//   bolt_ = std::make_unique<LightningMesh>();
+//   bolt_->Initialize();
+//   bolt_->SetCamera(camera);
+//   bolt_->SetEndpoints(start, end);
+//   bolt_->Update(dt);
+//   // 呼び出し元で PSO("VfxMeshLightning") + gCamera + gMeshParam(LightningParamsCB) を bind
+//   bolt_->Draw(cmdList);
+// ===========================================================
+#include "ProceduralMeshBase.h"
+#include "VfxEffectAsset.h"   // LightningEffectParam
+
+class Camera;
+
+namespace YoRigine {
+
+// シェーダ b1: gMeshParam（VfxMesh_Common.hlsli の LightningParams と一致）
+struct LightningParamsCB
+{
+    Vector4 color;       // 芯の色（rgb>1 で Bloom）
+    float   time;        // アニメ時間
+    float   glowPower;   // 中心グロー強度
+    float   coreWidthN;  // 予約
+    float   _pad;
+};
+
+class LightningMesh : public ProceduralMeshBase
+{
+public:
+    LightningMesh()  = default;
+    ~LightningMesh() override = default;
+
+    void Initialize();
+
+    void SetCamera(Camera* camera) { camera_ = camera; }
+    void SetEndpoints(const Vector3& start, const Vector3& end);
+    void ApplyParam(const LightningEffectParam& param) { param_ = param; }
+
+    void Update(float deltaTime) override;
+    void Draw(ID3D12GraphicsCommandList* cmdList) override;
+
+private:
+    void RebuildVertices();
+    // start→end を midpoint displacement で折る（再帰）。点列を out へ追加。
+    void Subdivide(const Vector3& a, const Vector3& b, float amp, int depth, std::vector<Vector3>& out);
+    // 1 本のジグザグ折れ線をカメラ向きリボンとして vertices_ に積む
+    void AppendBoltRibbon(const std::vector<Vector3>& pts, float width, const Vector4& color);
+
+    LightningEffectParam param_;
+    Camera* camera_ = nullptr;
+
+    Vector3 start_ = { 0.f, 0.f, 0.f };
+    Vector3 end_   = { 0.f, 3.f, 0.f };
+
+    std::vector<ProceduralMeshVertex> vertices_;
+    float time_        = 0.f;
+    float flickerTimer_ = 0.f;
+    uint32_t seed_     = 1; // 形のランダムシード（flickerで更新）
+};
+
+} // namespace YoRigine
+
+
+============================================================
 File Path: YEngine/Generators/Vfx/VfxMesh/ProceduralMeshBase.h
 ============================================================
 #pragma once
@@ -225440,6 +226071,155 @@ namespace YoRigine {
     };
 
 } // namespace YoRigine
+
+============================================================
+File Path: YEngine/Generators/Vfx/VfxMesh/ShockwaveMesh.cpp
+============================================================
+// ===========================================================
+// ShockwaveMesh.cpp
+// ===========================================================
+#include "ShockwaveMesh.h"
+#include "Systems/Camera/Camera.h"
+#include <cmath>
+
+namespace YoRigine {
+
+void ShockwaveMesh::Initialize()
+{
+    InitBuffer(8);
+    vertices_.reserve(8);
+}
+
+void ShockwaveMesh::SetTransform(const Vector3& center, float radius)
+{
+    center_ = center;
+    radius_ = radius;
+}
+
+void ShockwaveMesh::Update(float deltaTime)
+{
+    if (!param_.isEnable) return;
+    time_ += deltaTime;
+    RebuildVertices(); // カメラ向きのため毎フレーム再構築
+}
+
+// カメラを向くクワッド（半径 radius_）を生成
+void ShockwaveMesh::RebuildVertices()
+{
+    vertices_.clear();
+    if (!camera_) return;
+
+    const Vector3 camPos = camera_->GetTranslate();
+    Vector3 toCam = Normalize(camPos - center_);
+    Vector3 worldUp = (std::fabs(toCam.y) < 0.99f) ? Vector3{ 0,1,0 } : Vector3{ 1,0,0 };
+    Vector3 right = Normalize(Cross(worldUp, toCam));
+    Vector3 up    = Cross(toCam, right);
+
+    const float h = radius_;
+    Vector3 r = right * h;
+    Vector3 u = up * h;
+
+    auto mk = [&](const Vector3& pos, float tu, float tv) {
+        ProceduralMeshVertex v;
+        v.position = pos;
+        v.texcoord = { tu, tv };
+        v.color    = param_.color;
+        v.age      = 0.0f;
+        return v;
+    };
+
+    Vector3 c = center_;
+    ProceduralMeshVertex bl = mk(c - r - u, 0.0f, 0.0f);
+    ProceduralMeshVertex br = mk(c + r - u, 1.0f, 0.0f);
+    ProceduralMeshVertex tl = mk(c - r + u, 0.0f, 1.0f);
+    ProceduralMeshVertex tr = mk(c + r + u, 1.0f, 1.0f);
+
+    vertices_.push_back(bl); vertices_.push_back(br); vertices_.push_back(tr);
+    vertices_.push_back(bl); vertices_.push_back(tr); vertices_.push_back(tl);
+
+    UploadVertices(vertices_);
+}
+
+void ShockwaveMesh::Draw(ID3D12GraphicsCommandList* cmdList)
+{
+    if (!isVisible_ || !param_.isEnable) return;
+    const uint32_t vertCount = GetVertexCount();
+    if (vertCount < 3) return;
+
+    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    BindVertexBuffer(cmdList);
+    cmdList->DrawInstanced(vertCount, 1, 0, 0);
+}
+
+} // namespace YoRigine
+
+
+============================================================
+File Path: YEngine/Generators/Vfx/VfxMesh/ShockwaveMesh.h
+============================================================
+#pragma once
+// ===========================================================
+// ShockwaveMesh.h
+//
+// 爆発の衝撃波リング。カメラを向くクワッドを 1 枚生成し、
+// シェーダ側で「中心から外へ広がって消えるリング」をアニメする。
+// 加算ブレンドで HDR → Bloom が乗る。
+//
+//   shock_ = std::make_unique<ShockwaveMesh>();
+//   shock_->Initialize();
+//   shock_->SetCamera(camera);
+//   shock_->SetTransform(center, radius);
+//   shock_->Update(dt);
+//   // 呼び出し元で PSO("VfxMeshShockwave") + gCamera + gMeshParam(ShockwaveParamsCB)
+//   shock_->Draw(cmdList);
+// ===========================================================
+#include "ProceduralMeshBase.h"
+#include "VfxEffectAsset.h"   // ShockwaveEffectParam
+
+class Camera;
+
+namespace YoRigine {
+
+// シェーダ b1: gMeshParam（VfxMesh_Common.hlsli の ShockwaveParams と一致）
+struct ShockwaveParamsCB
+{
+    Vector4 color;     // 色（rgb>1 で Bloom）
+    float   time;      // アニメ時間
+    float   duration;  // 1サイクルの秒数（膨張→消滅）
+    float   thickness; // リングの太さ(0..1)
+    float   burst;     // -1=継続ループ, 0..1=爆発ワンショット進捗
+};
+
+class ShockwaveMesh : public ProceduralMeshBase
+{
+public:
+    ShockwaveMesh()  = default;
+    ~ShockwaveMesh() override = default;
+
+    void Initialize();
+
+    void SetCamera(Camera* camera) { camera_ = camera; }
+    void SetTransform(const Vector3& center, float radius);
+    void ApplyParam(const ShockwaveEffectParam& param) { param_ = param; }
+
+    void Update(float deltaTime) override;
+    void Draw(ID3D12GraphicsCommandList* cmdList) override;
+
+private:
+    void RebuildVertices();
+
+    ShockwaveEffectParam param_;
+    Camera* camera_ = nullptr;
+
+    Vector3 center_ = { 0.f, 0.f, 0.f };
+    float   radius_ = 3.0f;
+
+    std::vector<ProceduralMeshVertex> vertices_;
+    float time_ = 0.f;
+};
+
+} // namespace YoRigine
+
 
 ============================================================
 File Path: YEngine/Generators/Vfx/VfxMesh/TrailMesh.cpp
@@ -226736,6 +227516,9 @@ namespace YoRigine {
         j["name"]           = name;
         j["useTrail"]       = useTrail;
         j["useLightVolume"] = useLightVolume;
+        j["useSmoke"]       = useSmoke;
+        j["useLightning"]   = useLightning;
+        j["useShockwave"]   = useShockwave;
 
         // --- Trail ---
         auto& t = j["trail"];
@@ -226813,6 +227596,42 @@ namespace YoRigine {
         lv["intensity"]   = lightVolume.intensity;
         lv["isEnable"]    = lightVolume.isEnable;
 
+        // --- Volume Smoke ---
+        auto& sm = j["smoke"];
+        sm["color"]         = smoke.color;
+        sm["smokeColor"]    = smoke.smokeColor;
+        sm["riseSpeed"]     = smoke.riseSpeed;
+        sm["radius"]        = smoke.radius;
+        sm["noiseScale"]    = smoke.noiseScale;
+        sm["noiseStrength"] = smoke.noiseStrength;
+        sm["scrollSpeed"]   = smoke.scrollSpeed;
+        sm["fresnelPower"]  = smoke.fresnelPower;
+        sm["density"]       = smoke.density;
+        sm["noiseOctaves"]  = smoke.noiseOctaves;
+        sm["rimIntensity"]  = smoke.rimIntensity;
+        sm["isEnable"]      = smoke.isEnable;
+
+        // --- Lightning ---
+        auto& lt = j["lightning"];
+        lt["color"]        = lightning.color;
+        lt["length"]       = lightning.length;
+        lt["width"]        = lightning.width;
+        lt["jitter"]       = lightning.jitter;
+        lt["segments"]     = lightning.segments;
+        lt["branches"]     = lightning.branches;
+        lt["branchJitter"] = lightning.branchJitter;
+        lt["flickerRate"]  = lightning.flickerRate;
+        lt["glowPower"]    = lightning.glowPower;
+        lt["isEnable"]     = lightning.isEnable;
+
+        // --- Shockwave ---
+        auto& sw = j["shockwave"];
+        sw["color"]     = shockwave.color;
+        sw["radius"]    = shockwave.radius;
+        sw["duration"]  = shockwave.duration;
+        sw["thickness"] = shockwave.thickness;
+        sw["isEnable"]  = shockwave.isEnable;
+
         std::ofstream ofs(filePath);
         ofs << j.dump(4);
     }
@@ -226831,6 +227650,9 @@ namespace YoRigine {
         name           = j.value("name",           name);
         useTrail       = j.value("useTrail",       useTrail);
         useLightVolume = j.value("useLightVolume", useLightVolume);
+        useSmoke       = j.value("useSmoke",       useSmoke);
+        useLightning   = j.value("useLightning",   useLightning);
+        useShockwave   = j.value("useShockwave",   useShockwave);
 
         if (j.contains("trail")) {
             auto& t = j["trail"];
@@ -226914,6 +227736,45 @@ namespace YoRigine {
             lightVolume.isEnable  = lv.value("isEnable",  lightVolume.isEnable);
             if (lv.contains("halfExtents")) lightVolume.halfExtents = lv["halfExtents"];
             if (lv.contains("color"))       lightVolume.color       = lv["color"];
+        }
+
+        if (j.contains("smoke")) {
+            auto& sm = j["smoke"];
+            if (sm.contains("color")) smoke.color = sm["color"];
+            if (sm.contains("smokeColor")) smoke.smokeColor = sm["smokeColor"];
+            smoke.riseSpeed     = sm.value("riseSpeed",     smoke.riseSpeed);
+            smoke.radius        = sm.value("radius",        smoke.radius);
+            smoke.noiseScale    = sm.value("noiseScale",    smoke.noiseScale);
+            smoke.noiseStrength = sm.value("noiseStrength", smoke.noiseStrength);
+            smoke.scrollSpeed   = sm.value("scrollSpeed",   smoke.scrollSpeed);
+            smoke.fresnelPower  = sm.value("fresnelPower",  smoke.fresnelPower);
+            smoke.density       = sm.value("density",       smoke.density);
+            smoke.noiseOctaves  = sm.value("noiseOctaves",  smoke.noiseOctaves);
+            smoke.rimIntensity  = sm.value("rimIntensity",  smoke.rimIntensity);
+            smoke.isEnable      = sm.value("isEnable",      smoke.isEnable);
+        }
+
+        if (j.contains("lightning")) {
+            auto& lt = j["lightning"];
+            if (lt.contains("color")) lightning.color = lt["color"];
+            lightning.length       = lt.value("length",       lightning.length);
+            lightning.width        = lt.value("width",        lightning.width);
+            lightning.jitter       = lt.value("jitter",       lightning.jitter);
+            lightning.segments     = lt.value("segments",     lightning.segments);
+            lightning.branches     = lt.value("branches",     lightning.branches);
+            lightning.branchJitter = lt.value("branchJitter", lightning.branchJitter);
+            lightning.flickerRate  = lt.value("flickerRate",  lightning.flickerRate);
+            lightning.glowPower    = lt.value("glowPower",    lightning.glowPower);
+            lightning.isEnable     = lt.value("isEnable",     lightning.isEnable);
+        }
+
+        if (j.contains("shockwave")) {
+            auto& sw = j["shockwave"];
+            if (sw.contains("color")) shockwave.color = sw["color"];
+            shockwave.radius    = sw.value("radius",    shockwave.radius);
+            shockwave.duration  = sw.value("duration",  shockwave.duration);
+            shockwave.thickness = sw.value("thickness", shockwave.thickness);
+            shockwave.isEnable  = sw.value("isEnable",  shockwave.isEnable);
         }
         return true;
     }
@@ -227066,6 +227927,54 @@ namespace YoRigine {
     };
 
     // -------------------------------------------------------
+    // Volume Smoke パラメータ (Omen 風めらめらスモーク)
+    // -------------------------------------------------------
+    struct SmokeEffectParam
+    {
+        Vector4 color        = { 0.6f, 0.4f, 1.2f, 1.0f }; // rgb(>1でBloom), a=濃度基準
+        Vector4 smokeColor   = { 0.08f, 0.08f, 0.09f, 1.0f }; // 爆発後に遷移する煙色(暗いグレー)
+        float   riseSpeed    = 1.2f;   // 爆発後に煙が上昇する速さ
+        float   radius       = 1.5f;
+        float   noiseScale   = 4.0f;
+        float   noiseStrength = 0.9f;
+        float   scrollSpeed  = 0.3f;
+        float   fresnelPower = 2.5f;
+        float   density      = 1.0f;
+        float   noiseOctaves = 4.0f;
+        float   rimIntensity = 2.0f;   // リム発光（太陽フレア風 / Bloom 用）
+        bool    isEnable     = true;
+    };
+
+    // -------------------------------------------------------
+    // Lightning パラメータ (プロシージャル稲妻)
+    // -------------------------------------------------------
+    struct LightningEffectParam
+    {
+        Vector4 color        = { 0.6f, 0.8f, 1.5f, 1.0f }; // 青白（HDR）
+        float   length       = 4.0f;   // 稲妻の全長
+        float   width        = 0.18f;  // リボン幅
+        float   jitter       = 0.6f;   // ジグザグの振れ幅
+        int     segments     = 24;     // 折れ線の分割数
+        int     branches     = 3;      // 枝分かれ本数
+        float   branchJitter = 0.5f;   // 枝の振れ幅
+        float   flickerRate  = 18.0f;  // 1秒あたりの形変化回数（明滅）
+        float   glowPower    = 2.0f;   // 中心グロー
+        bool    isEnable     = true;
+    };
+
+    // -------------------------------------------------------
+    // Shockwave パラメータ (爆発の衝撃波リング)
+    // -------------------------------------------------------
+    struct ShockwaveEffectParam
+    {
+        Vector4 color     = { 1.5f, 0.9f, 0.4f, 1.0f }; // 暖色 HDR
+        float   radius    = 3.0f;   // 最大半径
+        float   duration  = 0.6f;   // 1サイクルの秒数（膨張→消滅）
+        float   thickness = 0.15f;  // リングの太さ
+        bool    isEnable  = true;
+    };
+
+    // -------------------------------------------------------
     // まとめアセット
     // -------------------------------------------------------
     struct VfxEffectAsset
@@ -227073,8 +227982,14 @@ namespace YoRigine {
         std::string       name = "NewEffect";
         TrailEffectParam  trail;
         LightVolumeEffectParam lightVolume;
+        SmokeEffectParam  smoke;
+        LightningEffectParam lightning;
+        ShockwaveEffectParam shockwave;
         bool useTrail       = true;
         bool useLightVolume = true;
+        bool useSmoke       = false;   // 既定OFF（既存アセットは従来通り）
+        bool useLightning   = false;   // 既定OFF
+        bool useShockwave   = false;   // 既定OFF
 
         void SaveToJson(const std::string& filePath) const;
         bool LoadFromJson(const std::string& filePath);
@@ -227171,6 +228086,12 @@ namespace YoRigine {
         // ★ Trail用のプレビューはEmitterに委譲
         previewTrailEmitter_ = std::make_unique<TrailMeshEmitter>();
         previewVolume_ = std::make_unique<LightVolumeMesh>();
+        previewSmoke_ = std::make_unique<VolumeSmokeMesh>();
+        previewSmoke_->Initialize();
+        previewLightning_ = std::make_unique<LightningMesh>();
+        previewLightning_->Initialize();
+        previewShockwave_ = std::make_unique<ShockwaveMesh>();
+        previewShockwave_->Initialize();
 
         InitCBVs();
         ScanDirectory(scanRoot_);
@@ -227185,6 +228106,18 @@ namespace YoRigine {
         if (volumeCBMapped_ && volumeCBResource_) {
             volumeCBResource_->Unmap(0, nullptr);
             volumeCBMapped_ = nullptr;
+        }
+        if (smokeCBMapped_ && smokeCBResource_) {
+            smokeCBResource_->Unmap(0, nullptr);
+            smokeCBMapped_ = nullptr;
+        }
+        if (lightningCBMapped_ && lightningCBResource_) {
+            lightningCBResource_->Unmap(0, nullptr);
+            lightningCBMapped_ = nullptr;
+        }
+        if (shockwaveCBMapped_ && shockwaveCBResource_) {
+            shockwaveCBResource_->Unmap(0, nullptr);
+            shockwaveCBMapped_ = nullptr;
         }
         entries_.clear();
         selectedIndex_ = -1;
@@ -227245,6 +228178,14 @@ namespace YoRigine {
         previewTimer_ += deltaTime;
         const auto& asset = sel->asset;
 
+        // 爆発ワンショット: 進捗 0→1。終端で自動リピート。継続モードは -1。
+        if (oneShot_ && burstDuration_ > 0.01f) {
+            if (previewTimer_ >= burstDuration_) previewTimer_ = 0.f;
+            burstProgress_ = std::min(previewTimer_ / burstDuration_, 1.0f);
+        } else {
+            burstProgress_ = -1.0f;
+        }
+
         // ★ Emitterを使って頂点を更新
         if (asset.useTrail && previewTrailEmitter_) {
             Vector3 tip = previewCenter_;
@@ -227297,6 +228238,38 @@ namespace YoRigine {
             previewVolume_->SetTransform(previewCenter_, previewYaw_);
             previewVolume_->Update(deltaTime);
         }
+
+        if (asset.useSmoke && previewSmoke_) {
+            float rad = asset.smoke.radius;
+            smokeCenter_ = previewCenter_;
+            if (burstProgress_ >= 0.0f) {
+                // 破裂: 最初に素早く膨張（ポップ）→ 煙でゆっくり広がり続ける
+                float grow = std::min(burstProgress_ / 0.18f, 1.0f);
+                rad *= (0.2f + 0.8f * grow + 0.4f * burstProgress_);
+                // 浮力で上昇（爆発後の煙が立ち上る）
+                smokeCenter_.y += asset.smoke.riseSpeed * previewTimer_;
+            }
+            smokeRadius_ = rad;
+            previewSmoke_->SetTransform(smokeCenter_, rad);
+            previewSmoke_->Update(deltaTime);
+        }
+
+        if (asset.useLightning && previewLightning_) {
+            previewLightning_->SetCamera(camera_);
+            previewLightning_->ApplyParam(asset.lightning);
+            // プレビュー: 中心を挟んで上下に length の長さで伸ばす
+            float half = asset.lightning.length * 0.5f;
+            previewLightning_->SetEndpoints(previewCenter_ + Vector3{ 0, -half, 0 },
+                                            previewCenter_ + Vector3{ 0,  half, 0 });
+            previewLightning_->Update(deltaTime);
+        }
+
+        if (asset.useShockwave && previewShockwave_) {
+            previewShockwave_->SetCamera(camera_);
+            previewShockwave_->ApplyParam(asset.shockwave);
+            previewShockwave_->SetTransform(previewCenter_, asset.shockwave.radius);
+            previewShockwave_->Update(deltaTime);
+        }
     }
 
     // ===========================================================
@@ -227329,6 +228302,51 @@ namespace YoRigine {
 
             previewVolume_->Draw(cmdList);
         }
+
+        // Volume Smoke (Omen 風)
+        if (asset.useSmoke && asset.smoke.isEnable && camera_ && previewSmoke_) {
+            auto* pm = YPipelineManager::GetInstance();
+            const auto& idx = pm->GetParameterIndices("VfxMeshSmoke");
+            UpdateSmokeCBV(previewTimer_);
+
+            auto* cmdList = DirectXCommon::GetInstance()->GetCommandList().Get();
+            cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshSmoke"));
+            cmdList->SetPipelineState(pm->GetPipeLineStateObject("VfxMeshSmoke"));
+            cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"), camera_->GetCameraResource()->GetGPUVirtualAddress());
+            cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), smokeCBResource_->GetGPUVirtualAddress());
+
+            previewSmoke_->Draw(cmdList);
+        }
+
+        // Lightning (プロシージャル稲妻)
+        if (asset.useLightning && asset.lightning.isEnable && camera_ && previewLightning_) {
+            auto* pm = YPipelineManager::GetInstance();
+            const auto& idx = pm->GetParameterIndices("VfxMeshLightning");
+            UpdateLightningCBV(previewTimer_);
+
+            auto* cmdList = DirectXCommon::GetInstance()->GetCommandList().Get();
+            cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshLightning"));
+            cmdList->SetPipelineState(pm->GetPipeLineStateObject("VfxMeshLightning"));
+            cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"), camera_->GetCameraResource()->GetGPUVirtualAddress());
+            cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), lightningCBResource_->GetGPUVirtualAddress());
+
+            previewLightning_->Draw(cmdList);
+        }
+
+        // Shockwave (爆発の衝撃波リング)
+        if (asset.useShockwave && asset.shockwave.isEnable && camera_ && previewShockwave_) {
+            auto* pm = YPipelineManager::GetInstance();
+            const auto& idx = pm->GetParameterIndices("VfxMeshShockwave");
+            UpdateShockwaveCBV(previewTimer_);
+
+            auto* cmdList = DirectXCommon::GetInstance()->GetCommandList().Get();
+            cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshShockwave"));
+            cmdList->SetPipelineState(pm->GetPipeLineStateObject("VfxMeshShockwave"));
+            cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"), camera_->GetCameraResource()->GetGPUVirtualAddress());
+            cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), shockwaveCBResource_->GetGPUVirtualAddress());
+
+            previewShockwave_->Draw(cmdList);
+        }
     }
 
     void VfxMeshEditor::DrawImGui()
@@ -227354,7 +228372,13 @@ namespace YoRigine {
     {
         ImGui::TextDisabled("エフェクト一覧");
         ImGui::SameLine();
-        if (ImGui::SmallButton("+")) { showNewDialog_ = true; }
+        if (ImGui::SmallButton("+")) {
+            // 既存名と衝突しない初期名をセット（NewEffect / NewEffect1 / NewEffect2 ...）
+            std::string uniq = MakeUniqueEffectName("NewEffect");
+            strncpy_s(newNameBuffer_, sizeof(newNameBuffer_), uniq.c_str(), _TRUNCATE);
+            newPathBuffer_[0] = '\0';
+            showNewDialog_ = true;
+        }
         ImGui::SameLine();
         if (ImGui::SmallButton("R")) {
             int prevSel = selectedIndex_;
@@ -227437,33 +228461,27 @@ namespace YoRigine {
         ImGui::SameLine(0, 4); ImGui::TextDisabled("名前");
         ImGui::Separator();
 
-        {
-            VfxEffectAsset b = asset;
-            ImGui::PushID("UseTrail");
-            bool changed = ImGui::Checkbox("##UseTrail", &asset.useTrail);
-            ImGui::PopID();
-            ImGui::SameLine();
-            if (ImGui::TreeNodeEx("Trail", ImGuiTreeNodeFlags_DefaultOpen)) {
-                if (asset.useTrail) DrawTrailSection();
-                else                ImGui::TextDisabled("  (disabled)");
-                ImGui::TreePop();
-            }
-            if (changed) CommitChange(b, "Trail 有効切替");
-        }
-        ImGui::Separator();
-
-        {
-            VfxEffectAsset b = asset;
-            ImGui::PushID("UseLightVolume");
-            bool changed = ImGui::Checkbox("##UseLightVolume", &asset.useLightVolume);
-            ImGui::PopID();
-            ImGui::SameLine();
-            if (ImGui::TreeNodeEx("Light Volume", ImGuiTreeNodeFlags_DefaultOpen)) {
-                if (asset.useLightVolume) DrawLightVolumeSection();
-                else                      ImGui::TextDisabled("  (disabled)");
-                ImGui::TreePop();
-            }
-            if (changed) CommitChange(b, "Volume 有効切替");
+        // 効果タイプはタブで切替（縦に積むと長くて見づらいため）。
+        // 有効な効果のタブ名には ● を付けて一目で分かるようにする。
+        if (ImGui::BeginTabBar("##vfxTabs")) {
+            auto effectTab = [&](const char* name, bool& useFlag, const char* changeLabel, auto&& drawFn) {
+                // "###tab_xxx" でタブ ID を固定（● の付け外しで選択がリセットされないように）
+                std::string label = std::string(useFlag ? "● " : "   ") + name + "###tab_" + name;
+                if (ImGui::BeginTabItem(label.c_str())) {
+                    VfxEffectAsset b = asset;
+                    if (ImGui::Checkbox("この効果を有効化", &useFlag)) CommitChange(b, changeLabel);
+                    ImGui::Separator();
+                    if (useFlag) drawFn();
+                    else         ImGui::TextDisabled("(無効) — 上のチェックで有効化");
+                    ImGui::EndTabItem();
+                }
+            };
+            effectTab("Trail",        asset.useTrail,       "Trail 有効切替",     [&] { DrawTrailSection(); });
+            effectTab("Light Volume", asset.useLightVolume, "Volume 有効切替",    [&] { DrawLightVolumeSection(); });
+            effectTab("Smoke",        asset.useSmoke,       "Smoke 有効切替",     [&] { DrawSmokeSection(); });
+            effectTab("Lightning",    asset.useLightning,   "Lightning 有効切替", [&] { DrawLightningSection(); });
+            effectTab("Shockwave",    asset.useShockwave,   "Shockwave 有効切替", [&] { DrawShockwaveSection(); });
+            ImGui::EndTabBar();
         }
         ImGui::Separator();
 
@@ -227582,104 +228600,6 @@ namespace YoRigine {
             if (c) CommitChange(b, "Primitive 設定");
         }
 
-        ImGui::SeparatorText("立体感・三日月化");
-        {
-            VfxEffectAsset b = sel->asset;
-            bool c = false;
-            c |= ImGui::Checkbox("三日月カーブにする##crescent", &t.crescentShape);
-            c |= ImGui::SliderFloat("厚み (Thickness)##thick", &t.thickness, 0.0f, 2.0f, "%.3f");
-            if (c) CommitChange(b, "Trail 形状モディファイア");
-        }
-
-        ImGui::SeparatorText("カスタムメッシュ形状エディター");
-        if (sel) {
-            VfxEffectAsset b = sel->asset;
-            bool changed = false;
-
-            if (ImGui::Button("頂点をすべてクリア")) {
-                t.customVertices.clear();
-                changed = true;
-            }
-            ImGui::SameLine();
-            ImGui::TextDisabled("左クリック: 追加/移動 | 右クリック: 削除");
-
-            ImVec2 canvas_p0 = ImGui::GetCursorScreenPos();
-            ImVec2 canvas_sz = ImVec2(ImGui::GetContentRegionAvail().x, 300.0f);
-            ImVec2 canvas_p1 = ImVec2(canvas_p0.x + canvas_sz.x, canvas_p0.y + canvas_sz.y);
-
-            ImDrawList* draw_list = ImGui::GetWindowDrawList();
-            draw_list->AddRectFilled(canvas_p0, canvas_p1, IM_COL32(30, 30, 30, 255));
-            draw_list->AddRect(canvas_p0, canvas_p1, IM_COL32(100, 100, 100, 255));
-
-            ImGui::InvisibleButton("canvas", canvas_sz, ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
-            const bool is_hovered = ImGui::IsItemHovered();
-            const bool is_active = ImGui::IsItemActive();
-            const ImVec2 mouse_pos_in_canvas = ImVec2(ImGui::GetIO().MousePos.x - canvas_p0.x, ImGui::GetIO().MousePos.y - canvas_p0.y);
-
-            ImVec2 origin(canvas_p0.x + canvas_sz.x * 0.5f, canvas_p0.y + canvas_sz.y * 0.5f);
-            const float zoom = 50.0f;
-            static int dragging_idx = -1;
-
-            if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-                dragging_idx = -1;
-                for (int i = 0; i < t.customVertices.size(); ++i) {
-                    ImVec2 p(origin.x + t.customVertices[i].x * zoom, origin.y - t.customVertices[i].y * zoom);
-                    float dx = ImGui::GetIO().MousePos.x - p.x;
-                    float dy = ImGui::GetIO().MousePos.y - p.y;
-                    if (dx * dx + dy * dy < 100.0f) {
-                        dragging_idx = i;
-                        break;
-                    }
-                }
-                if (dragging_idx == -1) {
-                    t.customVertices.push_back({ (mouse_pos_in_canvas.x - canvas_sz.x * 0.5f) / zoom,
-                                                -(mouse_pos_in_canvas.y - canvas_sz.y * 0.5f) / zoom });
-                    dragging_idx = static_cast<int>(t.customVertices.size()) - 1;
-                    changed = true;
-                }
-            }
-
-            if (is_active && ImGui::IsMouseDragging(ImGuiMouseButton_Left) && dragging_idx >= 0) {
-                t.customVertices[dragging_idx].x += ImGui::GetIO().MouseDelta.x / zoom;
-                t.customVertices[dragging_idx].y -= ImGui::GetIO().MouseDelta.y / zoom;
-                changed = true;
-            }
-            else if (!is_active) {
-                dragging_idx = -1;
-            }
-
-            if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
-                for (int i = 0; i < t.customVertices.size(); ++i) {
-                    ImVec2 p(origin.x + t.customVertices[i].x * zoom, origin.y - t.customVertices[i].y * zoom);
-                    float dx = ImGui::GetIO().MousePos.x - p.x;
-                    float dy = ImGui::GetIO().MousePos.y - p.y;
-                    if (dx * dx + dy * dy < 100.0f) {
-                        t.customVertices.erase(t.customVertices.begin() + i);
-                        changed = true;
-                        break;
-                    }
-                }
-            }
-
-            draw_list->AddLine(ImVec2(origin.x, canvas_p0.y), ImVec2(origin.x, canvas_p1.y), IM_COL32(100, 100, 100, 150));
-            draw_list->AddLine(ImVec2(canvas_p0.x, origin.y), ImVec2(canvas_p1.x, origin.y), IM_COL32(100, 100, 100, 150));
-
-            if (t.customVertices.size() >= 2) {
-                for (int i = 0; i < t.customVertices.size(); ++i) {
-                    int next_i = (i + 1) % t.customVertices.size();
-                    ImVec2 p1(origin.x + t.customVertices[i].x * zoom, origin.y - t.customVertices[i].y * zoom);
-                    ImVec2 p2(origin.x + t.customVertices[next_i].x * zoom, origin.y - t.customVertices[next_i].y * zoom);
-                    draw_list->AddLine(p1, p2, IM_COL32(0, 255, 255, 255), 2.0f);
-                }
-            }
-
-            for (int i = 0; i < t.customVertices.size(); ++i) {
-                ImVec2 p(origin.x + t.customVertices[i].x * zoom, origin.y - t.customVertices[i].y * zoom);
-                draw_list->AddCircleFilled(p, 5.0f, (i == dragging_idx) ? IM_COL32(255, 0, 0, 255) : IM_COL32(255, 255, 0, 255));
-            }
-
-            if (changed) CommitChange(b, "カスタムメッシュ編集");
-        }
 
         ImGui::SeparatorText("幅");
         {
@@ -227838,19 +228758,130 @@ namespace YoRigine {
         if (showVolumeDebug_) ImGui::TextColored(ImVec4(1, 1, 0, 1), "  > OBB ワイヤーフレーム ON");
     }
 
+    void VfxMeshEditor::DrawSmokeSection()
+    {
+        auto* sel = Selected();
+        if (!sel) return;
+        auto& sm = sel->asset.smoke;
+
+        ImGui::SeparatorText("カラー  (rgb>1 で Bloom / a=濃度)");
+        {
+            VfxEffectAsset b = sel->asset;
+            bool c = false;
+            c |= ImGui::DragFloat4("火球色##sm", &sm.color.x, 0.02f, 0.0f, 10.0f, "%.2f");
+            c |= ImGui::DragFloat4("煙色(爆発後)##smk", &sm.smokeColor.x, 0.01f, 0.0f, 4.0f, "%.2f");
+            c |= ImGui::DragFloat("上昇速度(爆発後)##smrise", &sm.riseSpeed, 0.02f, 0.0f, 8.0f, "%.2f");
+            if (c) CommitChange(b, "Smoke 色");
+            ImGui::TextDisabled("爆発ワンショット時: 火球色→煙色へ遷移し、上昇しながら漂って消えます");
+        }
+
+        ImGui::SeparatorText("形状 / 渦巻き");
+        {
+            VfxEffectAsset b = sel->asset;
+            bool c = false;
+            c |= ImGui::DragFloat("半径##smr",          &sm.radius,        0.05f, 0.1f, 20.0f, "%.2f");
+            c |= ImGui::DragFloat("ノイズスケール##sms", &sm.noiseScale,    0.05f, 0.1f, 16.0f, "%.2f");
+            c |= ImGui::SliderFloat("渦巻きの強さ##smn", &sm.noiseStrength, 0.0f, 1.0f);
+            c |= ImGui::DragFloat("スクロール速度##smc", &sm.scrollSpeed,   0.01f, 0.0f, 3.0f, "%.2f");
+            c |= ImGui::DragFloat("縁の柔らかさ##smf",   &sm.fresnelPower,  0.05f, 0.1f, 8.0f, "%.2f");
+            c |= ImGui::DragFloat("密度##smd",           &sm.density,       0.01f, 0.0f, 3.0f, "%.2f");
+            c |= ImGui::DragFloat("オクターブ##smo",     &sm.noiseOctaves,  0.1f,  1.0f, 5.0f, "%.1f");
+            c |= ImGui::DragFloat("リム発光(フレア)##smrim", &sm.rimIntensity, 0.05f, 0.0f, 10.0f, "%.2f");
+            if (c) CommitChange(b, "Smoke パラメータ");
+        }
+
+        ImGui::Spacing();
+        {
+            VfxEffectAsset b = sel->asset;
+            if (ImGui::Checkbox("スモーク有効##smen", &sm.isEnable))
+                CommitChange(b, "Smoke 有効切替");
+        }
+    }
+
+    void VfxMeshEditor::DrawLightningSection()
+    {
+        auto* sel = Selected();
+        if (!sel) return;
+        auto& lt = sel->asset.lightning;
+
+        ImGui::SeparatorText("カラー (rgb>1 で Bloom)");
+        {
+            VfxEffectAsset b = sel->asset;
+            if (ImGui::DragFloat4("色##lt", &lt.color.x, 0.02f, 0.0f, 10.0f, "%.2f"))
+                CommitChange(b, "Lightning 色");
+        }
+
+        ImGui::SeparatorText("形状 / 明滅");
+        {
+            VfxEffectAsset b = sel->asset;
+            bool c = false;
+            c |= ImGui::DragFloat("長さ##ltlen",      &lt.length,       0.05f, 0.1f, 50.0f, "%.2f");
+            c |= ImGui::DragFloat("幅##ltw",          &lt.width,        0.005f, 0.01f, 2.0f, "%.3f");
+            c |= ImGui::DragFloat("ジグザグ振れ##ltj", &lt.jitter,       0.02f, 0.0f, 5.0f, "%.2f");
+            c |= ImGui::SliderInt("分割数##lts",       &lt.segments,     4, 64);
+            c |= ImGui::SliderInt("枝の数##ltb",       &lt.branches,     0, 8);
+            c |= ImGui::DragFloat("枝の振れ##ltbj",    &lt.branchJitter, 0.02f, 0.0f, 5.0f, "%.2f");
+            c |= ImGui::DragFloat("明滅レート(回/秒)##ltf", &lt.flickerRate, 0.5f, 0.0f, 60.0f, "%.1f");
+            c |= ImGui::DragFloat("芯のグロー##ltg",   &lt.glowPower,    0.05f, 0.1f, 8.0f, "%.2f");
+            if (c) CommitChange(b, "Lightning パラメータ");
+        }
+
+        ImGui::Spacing();
+        {
+            VfxEffectAsset b = sel->asset;
+            if (ImGui::Checkbox("稲妻有効##lten", &lt.isEnable))
+                CommitChange(b, "Lightning 有効切替");
+        }
+    }
+
+    void VfxMeshEditor::DrawShockwaveSection()
+    {
+        auto* sel = Selected();
+        if (!sel) return;
+        auto& sw = sel->asset.shockwave;
+
+        ImGui::SeparatorText("カラー (rgb>1 で Bloom)");
+        {
+            VfxEffectAsset b = sel->asset;
+            if (ImGui::DragFloat4("色##sw", &sw.color.x, 0.02f, 0.0f, 10.0f, "%.2f"))
+                CommitChange(b, "Shockwave 色");
+        }
+
+        ImGui::SeparatorText("形状 / 速度");
+        {
+            VfxEffectAsset b = sel->asset;
+            bool c = false;
+            c |= ImGui::DragFloat("最大半径##swr",  &sw.radius,    0.05f, 0.1f, 50.0f, "%.2f");
+            c |= ImGui::DragFloat("膨張時間(秒)##swd", &sw.duration, 0.01f, 0.05f, 5.0f, "%.2f");
+            c |= ImGui::SliderFloat("リング太さ##swt", &sw.thickness, 0.01f, 1.0f);
+            if (c) CommitChange(b, "Shockwave パラメータ");
+        }
+
+        ImGui::Spacing();
+        {
+            VfxEffectAsset b = sel->asset;
+            if (ImGui::Checkbox("衝撃波有効##swen", &sw.isEnable))
+                CommitChange(b, "Shockwave 有効切替");
+        }
+    }
+
     void VfxMeshEditor::DrawPreviewSection()
     {
         ImGui::SeparatorText("プレビュー");
-        const char* animNames[] = { "Wobble (往復)", "Slash (横なぎ)", "Slash (縦斬り)", "Spin (回転)" };
-        int animIdx = static_cast<int>(previewAnim_);
-        ImGui::SetNextItemWidth(150);
-        if (ImGui::Combo("軌道アニメ", &animIdx, animNames, IM_ARRAYSIZE(animNames))) {
-            previewAnim_ = static_cast<PreviewAnimMode>(animIdx);
-            if (previewTrailEmitter_) previewTrailEmitter_->Play(); // アニメ変更時にリセットして再生
+
+        // 軌道アニメ / 剣の長さは Trail 専用 → Trail 有効時のみ表示
+        if (auto* selT = Selected(); selT && selT->asset.useTrail) {
+            const char* animNames[] = { "Wobble (往復)", "Slash (横なぎ)", "Slash (縦斬り)", "Spin (回転)" };
+            int animIdx = static_cast<int>(previewAnim_);
+            ImGui::SetNextItemWidth(150);
+            if (ImGui::Combo("軌道アニメ", &animIdx, animNames, IM_ARRAYSIZE(animNames))) {
+                previewAnim_ = static_cast<PreviewAnimMode>(animIdx);
+                if (previewTrailEmitter_) previewTrailEmitter_->Play(); // アニメ変更時にリセットして再生
+            }
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(100);
+            ImGui::DragFloat("剣の長さ", &swordLength_, 0.1f, 0.5f, 10.f, "%.1f");
         }
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(100);
-        ImGui::DragFloat("剣の長さ", &swordLength_, 0.1f, 0.5f, 10.f, "%.1f");
 
         if (previewPlaying_) {
             // ★ 停止ボタン
@@ -227872,6 +228903,15 @@ namespace YoRigine {
         if (ImGui::Button((std::string(Icon::Refresh) + "リセット").c_str())) {
             previewTimer_ = 0.f;
             if (previewTrailEmitter_) previewTrailEmitter_->Play(); // リセットして最初から再生
+        }
+
+        // 爆発ワンショット再生（Smoke/Shockwave が一発膨張して消える。自動リピート）
+        ImGui::Checkbox("爆発ワンショット再生 (破裂→膨張→消滅)", &oneShot_);
+        if (oneShot_) {
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(120);
+            ImGui::DragFloat("破裂時間(s)", &burstDuration_, 0.02f, 0.1f, 5.0f, "%.2f");
+            if (ImGui::Button("もう一度")) previewTimer_ = 0.f;
         }
 
         ImGui::DragFloat3("プレビュー位置", &previewCenter_.x, 0.05f, -20.f, 20.f);
@@ -227900,9 +228940,10 @@ namespace YoRigine {
         ImGui::OpenPopup("新規エフェクト作成");
         ImVec2 center = ImGui::GetMainViewport()->GetCenter();
         ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-        ImGui::SetNextWindowSize(ImVec2(420, 0), ImGuiCond_Appearing);
+        ImGui::SetNextWindowSize(ImVec2(420, 300), ImGuiCond_Appearing);
 
-        if (!ImGui::BeginPopupModal("新規エフェクト作成", &showNewDialog_, ImGuiWindowFlags_AlwaysAutoResize)) return;
+        // 固定サイズ。AlwaysAutoResize だと入力に応じてウィンドウサイズが変わってしまうため NoResize に。
+        if (!ImGui::BeginPopupModal("新規エフェクト作成", &showNewDialog_, ImGuiWindowFlags_NoResize)) return;
 
         ImGui::Text("エフェクト名");
         ImGui::SetNextItemWidth(-1);
@@ -227987,21 +229028,42 @@ namespace YoRigine {
         }
     }
 
+    std::string VfxMeshEditor::MakeUniqueEffectName(const std::string& base) const
+    {
+        auto used = [&](const std::string& n) {
+            for (const auto& e : entries_) {
+                if (e.asset.name == n) return true;
+            }
+            return false;
+        };
+        if (!used(base)) return base;
+        for (int i = 1; i < 100000; ++i) {
+            std::string cand = base + std::to_string(i);
+            if (!used(cand)) return cand;
+        }
+        return base;
+    }
+
     void VfxMeshEditor::CreateNew(const std::string& name,
         const std::string& filePath,
         VfxPreset          preset)
     {
+        // 名前が既存と衝突する場合は採番（手入力で被ったケースも吸収）。パスも追従させる。
+        std::string uniqueName = MakeUniqueEffectName(name);
+        std::string finalPath  = filePath;
+        if (uniqueName != name) finalPath = scanRoot_ + uniqueName + ".json";
+
         VfxEffectEntry e;
         e.asset = MakePreset(preset);
-        e.asset.name = name;
-        e.filePath = filePath;
+        e.asset.name = uniqueName;
+        e.filePath = finalPath;
         e.isDirty = true;
         entries_.push_back(std::move(e));
 
         SelectEffect(static_cast<int>(entries_.size()) - 1);
         SaveCurrent();
 
-        Logger("VfxMeshEditor: 新規作成 -> " + filePath);
+        Logger("VfxMeshEditor: 新規作成 -> " + finalPath);
     }
 
     // ★ 編集を即時プレビューに反映
@@ -228052,6 +229114,15 @@ namespace YoRigine {
     {
         volumeCBResource_ = dxCommon_->CreateBufferResource(AlignedSize<LightVolumeParamsCB>());
         volumeCBResource_->Map(0, nullptr, reinterpret_cast<void**>(&volumeCBMapped_));
+
+        smokeCBResource_ = dxCommon_->CreateBufferResource(AlignedSize<SmokeParamsCB>());
+        smokeCBResource_->Map(0, nullptr, reinterpret_cast<void**>(&smokeCBMapped_));
+
+        lightningCBResource_ = dxCommon_->CreateBufferResource(AlignedSize<LightningParamsCB>());
+        lightningCBResource_->Map(0, nullptr, reinterpret_cast<void**>(&lightningCBMapped_));
+
+        shockwaveCBResource_ = dxCommon_->CreateBufferResource(AlignedSize<ShockwaveParamsCB>());
+        shockwaveCBResource_->Map(0, nullptr, reinterpret_cast<void**>(&shockwaveCBMapped_));
     }
 
     void VfxMeshEditor::UpdateVolumeCBV(float time)
@@ -228069,6 +229140,55 @@ namespace YoRigine {
         volumeCBMapped_->noiseTiling = 2.0f;
         volumeCBMapped_->noiseStrength = 0.0f;
         volumeCBMapped_->time = time;
+    }
+
+    void VfxMeshEditor::UpdateSmokeCBV(float time)
+    {
+        auto* sel = Selected();
+        if (!sel || !smokeCBMapped_) return;
+        const auto& sm = sel->asset.smoke;
+
+        smokeCBMapped_->color         = sm.color;
+        smokeCBMapped_->smokeColor    = sm.smokeColor;
+        smokeCBMapped_->center        = smokeCenter_; // 上昇を反映（フレネル法線の中心と一致させる）
+        smokeCBMapped_->radius        = smokeRadius_; // 膨張を反映（メッシュと一致）
+        smokeCBMapped_->time          = time;
+        smokeCBMapped_->noiseScale    = sm.noiseScale;
+        smokeCBMapped_->noiseStrength = sm.noiseStrength;
+        smokeCBMapped_->scrollSpeed   = sm.scrollSpeed;
+        smokeCBMapped_->fresnelPower  = sm.fresnelPower;
+        smokeCBMapped_->density       = sm.density;
+        smokeCBMapped_->noiseOctaves  = sm.noiseOctaves;
+        smokeCBMapped_->rimIntensity  = sm.rimIntensity;
+        smokeCBMapped_->burst         = burstProgress_;
+    }
+
+    void VfxMeshEditor::UpdateLightningCBV(float time)
+    {
+        auto* sel = Selected();
+        if (!sel || !lightningCBMapped_) return;
+        const auto& lt = sel->asset.lightning;
+
+        lightningCBMapped_->color      = lt.color;
+        lightningCBMapped_->time       = time;
+        lightningCBMapped_->glowPower  = lt.glowPower;
+        lightningCBMapped_->coreWidthN = 0.0f;
+        lightningCBMapped_->_pad       = 0.0f;
+    }
+
+    void VfxMeshEditor::UpdateShockwaveCBV(float time)
+    {
+        auto* sel = Selected();
+        if (!sel || !shockwaveCBMapped_) return;
+        const auto& sw = sel->asset.shockwave;
+
+        shockwaveCBMapped_->color     = sw.color;
+        shockwaveCBMapped_->time      = time;
+        shockwaveCBMapped_->duration  = sw.duration;
+        shockwaveCBMapped_->thickness = sw.thickness;
+        // 衝撃波は煙より速い独自タイムスケール（sw.duration で1回膨張して終わる）
+        shockwaveCBMapped_->burst =
+            (burstProgress_ >= 0.0f) ? std::min(previewTimer_ / std::max(sw.duration, 0.01f), 1.0f) : -1.0f;
     }
 
     VfxEffectAsset VfxMeshEditor::MakePreset(VfxPreset preset)
@@ -228128,6 +229248,9 @@ File Path: YEngine/Generators/Vfx/VfxMesh/VfxMeshEditor.h
 #include <d3d12.h>
 #include "VfxEffectAsset.h"
 #include "LightVolumeMesh.h"
+#include "VolumeSmokeMesh.h"
+#include "LightningMesh.h"
+#include "ShockwaveMesh.h"
 #include <Core/Editor/Command/CommandHistory.h>
 #include "FileOperations/FileBrowser.h"
 
@@ -228194,6 +229317,9 @@ namespace YoRigine {
         void DrawEditPanel();
         void DrawTrailSection();
         void DrawLightVolumeSection();
+        void DrawSmokeSection();
+        void DrawLightningSection();
+        void DrawShockwaveSection();
         void DrawPreviewSection();
         void DrawNewEffectDialog();
         void DrawTextureSelectPopup();
@@ -228207,11 +229333,18 @@ namespace YoRigine {
             const std::string& filePath,
             VfxPreset          preset);
 
+        // 既存エフェクト名と衝突しない名前を返す。
+        // base が空いていれば base、使われていれば base+"1", base+"2"... と空き番号を探す。
+        std::string MakeUniqueEffectName(const std::string& base) const;
+
         void CommitChange(const VfxEffectAsset& before, const char* label);
 
         void RebuildPreviewMeshes();
         void InitCBVs();
         void UpdateVolumeCBV(float time);
+        void UpdateSmokeCBV(float time);
+        void UpdateLightningCBV(float time);
+        void UpdateShockwaveCBV(float time);
 
         static VfxEffectAsset MakePreset(VfxPreset preset);
 
@@ -228233,18 +229366,37 @@ namespace YoRigine {
         // ★ プレビュー（TrailはEmitterに完全委譲）
         std::unique_ptr<TrailMeshEmitter> previewTrailEmitter_;
         std::unique_ptr<LightVolumeMesh>  previewVolume_;
+        std::unique_ptr<VolumeSmokeMesh>  previewSmoke_;
+        std::unique_ptr<LightningMesh>    previewLightning_;
+        std::unique_ptr<ShockwaveMesh>    previewShockwave_;
 
         PreviewAnimMode previewAnim_ = PreviewAnimMode::SlashHorizontal;
         float swordLength_ = 2.0f;
 
         bool    previewPlaying_ = false;
         float   previewTimer_ = 0.f;
+
+        // 爆発ワンショット再生（破裂→膨張→消滅を1回。自動リピート）
+        bool    oneShot_       = false;
+        float   burstDuration_ = 2.0f; // 煙が漂う時間（爆発全体の長さ）
+        float   burstProgress_ = -1.f; // -1=継続モード, 0..1=ワンショット進捗
+        Vector3 smokeCenter_   = { 0.f, 0.f, 0.f }; // 上昇を反映した煙の中心
+        float   smokeRadius_   = 1.5f;              // 膨張を反映した煙の半径（メッシュと一致）
         Vector3 previewCenter_ = { 0.f, 0.f, 0.f };
         float   previewYaw_ = 0.f;
 
         // ★ CBVは Volume のみ保持（TrailのCBVはEmitterが持っているため削除）
         Microsoft::WRL::ComPtr<ID3D12Resource> volumeCBResource_;
         LightVolumeParamsCB* volumeCBMapped_ = nullptr;
+
+        Microsoft::WRL::ComPtr<ID3D12Resource> smokeCBResource_;
+        SmokeParamsCB* smokeCBMapped_ = nullptr;
+
+        Microsoft::WRL::ComPtr<ID3D12Resource> lightningCBResource_;
+        LightningParamsCB* lightningCBMapped_ = nullptr;
+
+        Microsoft::WRL::ComPtr<ID3D12Resource> shockwaveCBResource_;
+        ShockwaveParamsCB* shockwaveCBMapped_ = nullptr;
 
         bool showNewDialog_ = false;
         char newNameBuffer_[128] = "NewEffect";
@@ -228264,6 +229416,201 @@ namespace YoRigine {
 
 } // namespace YoRigine
 #endif
+
+============================================================
+File Path: YEngine/Generators/Vfx/VfxMesh/VolumeSmokeMesh.cpp
+============================================================
+// ===========================================================
+// VolumeSmokeMesh.cpp
+// ===========================================================
+#include "VolumeSmokeMesh.h"
+#include <cmath>
+
+namespace YoRigine {
+
+static constexpr float kPi = 3.14159265358979323846f;
+
+void VolumeSmokeMesh::Initialize(int rings, int sectors)
+{
+    rings_   = (rings   < 3) ? 3 : rings;
+    sectors_ = (sectors < 3) ? 3 : sectors;
+
+    // 頂点数の上限: rings * sectors * 6（TRIANGLELIST）
+    const size_t capacity = static_cast<size_t>(rings_) * sectors_ * 6 + 16;
+    InitBuffer(capacity);
+    vertices_.reserve(capacity);
+    dirty_ = true;
+}
+
+void VolumeSmokeMesh::SetTransform(const Vector3& center, float radius)
+{
+    if (center_.x != center.x || center_.y != center.y || center_.z != center.z ||
+        radius_ != radius) {
+        center_ = center;
+        radius_ = radius;
+        dirty_  = true;
+    }
+}
+
+void VolumeSmokeMesh::Update(float deltaTime)
+{
+    time_ += deltaTime;
+    if (dirty_) {
+        RebuildVertices();
+        dirty_ = false;
+    }
+}
+
+// UV 球をワールド空間で生成（VfxMesh.VS は World 行列を使わない）。
+// texcoord は (経度 u, 緯度 v)。ノイズの参照座標に使う。
+void VolumeSmokeMesh::RebuildVertices()
+{
+    vertices_.clear();
+
+    auto vertexAt = [&](int ring, int sector) -> ProceduralMeshVertex {
+        float v = static_cast<float>(ring)   / static_cast<float>(rings_);   // 0..1 (緯度)
+        float u = static_cast<float>(sector) / static_cast<float>(sectors_); // 0..1 (経度)
+
+        float theta = v * kPi;          // 0..π
+        float phi   = u * 2.0f * kPi;   // 0..2π
+
+        float sinT = std::sin(theta);
+        Vector3 dir = {
+            sinT * std::cos(phi),
+            std::cos(theta),
+            sinT * std::sin(phi)
+        };
+
+        ProceduralMeshVertex out;
+        out.position = {
+            center_.x + dir.x * radius_,
+            center_.y + dir.y * radius_,
+            center_.z + dir.z * radius_
+        };
+        out.texcoord = { u, v };
+        out.color    = color_;
+        out.age      = v; // 縦方向グラデ用（未使用でも可）
+        return out;
+    };
+
+    // 各クワッドを 2 三角形（TRIANGLELIST）で出力
+    for (int ring = 0; ring < rings_; ++ring) {
+        for (int sector = 0; sector < sectors_; ++sector) {
+            ProceduralMeshVertex v00 = vertexAt(ring,     sector);
+            ProceduralMeshVertex v01 = vertexAt(ring,     sector + 1);
+            ProceduralMeshVertex v10 = vertexAt(ring + 1, sector);
+            ProceduralMeshVertex v11 = vertexAt(ring + 1, sector + 1);
+
+            // 三角形1: v00, v10, v11
+            vertices_.push_back(v00);
+            vertices_.push_back(v10);
+            vertices_.push_back(v11);
+            // 三角形2: v00, v11, v01
+            vertices_.push_back(v00);
+            vertices_.push_back(v11);
+            vertices_.push_back(v01);
+        }
+    }
+
+    UploadVertices(vertices_);
+}
+
+void VolumeSmokeMesh::Draw(ID3D12GraphicsCommandList* cmdList)
+{
+    if (!isVisible_) return;
+
+    const uint32_t vertCount = GetVertexCount();
+    if (vertCount < 3) return;
+
+    // PSO / RootSig / CBV は呼び出し元でセット済みを前提
+    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    BindVertexBuffer(cmdList);
+    cmdList->DrawInstanced(vertCount, 1, 0, 0);
+}
+
+} // namespace YoRigine
+
+
+============================================================
+File Path: YEngine/Generators/Vfx/VfxMesh/VolumeSmokeMesh.h
+============================================================
+#pragma once
+// ===========================================================
+// VolumeSmokeMesh.h
+//
+// 球メッシュ＋ノイズ(FBM)アニメシェーダで、Valorant Omen のような
+// めらめら渦巻くボリューム風スモーク/エネルギー球を表現する。
+//
+// 形状はワールド空間の UV 球を動的生成（VfxMesh.VS はワールド頂点前提）。
+// 渦巻きアニメはシェーダ側 (time) で行うので、姿勢が変わらなければ
+// 頂点は再構築しない（LightVolumeMesh と同じ方針）。
+//
+// 使い方:
+//   smoke_ = std::make_unique<VolumeSmokeMesh>();
+//   smoke_->Initialize();
+//   smoke_->SetTransform(center, radius);  // 毎フレーム or 変化時
+//   smoke_->Update(dt);
+//   // 呼び出し元で PSO("VfxMeshSmoke") + gCamera + gMeshParam(SmokeParamsCB) を bind
+//   smoke_->Draw(cmdList);
+// ===========================================================
+#include "ProceduralMeshBase.h"
+
+namespace YoRigine {
+
+// シェーダ b1: gMeshParam に渡す CB レイアウト（VfxMesh_Common.hlsli の SmokeParams と一致）
+struct SmokeParamsCB
+{
+    Vector4 color;          // rgb=色(>1でBloom), a=密度の基準
+    Vector3 center;         // 球中心(ワールド) — PSでフレネル法線に使用
+    float   radius;         // 球半径
+    float   time;           // アニメ時間
+    float   noiseScale;     // FBM タイリング
+    float   noiseStrength;  // 渦巻き(揺らぎ)の強さ 0..1
+    float   scrollSpeed;    // ノイズスクロール速度
+    float   fresnelPower;   // 縁の柔らかさ（大きいほど縁が薄い）
+    float   density;        // 全体の不透明度倍率
+    float   noiseOctaves;   // FBM オクターブ数(1-4, float で渡す)
+    float   rimIntensity;   // リム発光強度（太陽フレア風 / Bloom 用）
+    float   burst;          // -1=継続, 0..1=爆発ワンショット進捗
+    float   _pad2[3];
+    Vector4 smokeColor;     // 爆発後に遷移する煙色
+};
+
+class VolumeSmokeMesh : public ProceduralMeshBase
+{
+public:
+    VolumeSmokeMesh()  = default;
+    ~VolumeSmokeMesh() override = default;
+
+    void Initialize(int rings = 18, int sectors = 28);
+
+    /// 球の中心と半径を設定（変化時のみ頂点再構築）
+    void SetTransform(const Vector3& center, float radius);
+
+    void SetColor(const Vector4& color) { color_ = color; dirty_ = true; }
+
+    void Update(float deltaTime) override;
+    void Draw(ID3D12GraphicsCommandList* cmdList) override;
+
+    const Vector3& GetCenter() const { return center_; }
+    float          GetRadius() const { return radius_; }
+
+private:
+    void RebuildVertices();
+
+    int     rings_   = 18;
+    int     sectors_ = 28;
+    Vector3 center_  = { 0.f, 0.f, 0.f };
+    float   radius_  = 1.5f;
+    Vector4 color_   = { 1.0f, 1.0f, 1.0f, 1.0f }; // 頂点色は白。実際の色は CB(SmokeParams.color) で駆動
+
+    std::vector<ProceduralMeshVertex> vertices_;
+    bool  dirty_ = true;
+    float time_  = 0.f;
+};
+
+} // namespace YoRigine
+
 
 ============================================================
 File Path: YEngine/Graphics/Buffers/DynamicVertexBuffer.cpp
@@ -235115,6 +236462,9 @@ void YPipelineManager::Initialize()
 	// Meshを使用したVFX用パイプライン
     CreatePSO_VfxMeshTrail();
     CreatePSO_VfxMeshVolume();
+    CreatePSO_VfxMeshSmoke();
+    CreatePSO_VfxMeshLightning();
+    CreatePSO_VfxMeshShockwave();
 
     // 統計情報を出力
     auto stats = psoCache_->GetStats();
@@ -235431,11 +236781,7 @@ void YPipelineManager::CreatePSO_GPUParticleALLBlendModes()
 }
 
 void YPipelineManager::CreatePSO_YParticleAllBlendModes()
-{   
-    // シェーダーコンパイル
-    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Particle/YParticle.VS.hlsl", L"vs_6_0");
-    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Particle/YParticle.PS.hlsl", L"ps_6_0");
-
+{
     // ブレンドモード設定
     struct BlendConfig {
         BlendMode mode;
@@ -235452,29 +236798,44 @@ void YPipelineManager::CreatePSO_YParticleAllBlendModes()
         { BlendMode::kBlendModeScreen, "Screen", BlendPresets::CreateScreen() },
     };
 
-    // 各ブレンドモードごとにPSOを生成
-    for (const auto& config : configs) {
-        ReflectionBasedPipelineBuilder builder;
-        auto result = builder
-            .SetBlendState(config.blendDesc)
-            .SetRasterizerState(RasterizerPresets::CreateNoCull())
-            .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
-            .BuildFromCompiledShaders(
+    // 共通の VS を使い、PS だけ差し替えて「通常」「ソフトパーティクル」2系統の
+    // 全ブレンドモード PSO を生成する。リフレクションで root sig / index も自動生成。
+    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Particle/YParticle.VS.hlsl", L"vs_6_0");
+
+    // isSoft=true のソフト版は「深度なしRT」で描くため、深度テスト無効＋DSVフォーマット UNKNOWN。
+    // （null DSV をバインドするには PSO の深度フォーマットも UNKNOWN である必要がある）
+    auto buildSet = [&](const std::string& logicalName, const std::wstring& psPath, bool isSoft) {
+        auto psBlob = dxCommon_->CompileShader(psPath.c_str(), L"ps_6_0");
+        for (const auto& config : configs) {
+            ReflectionBasedPipelineBuilder builder;
+            builder
+                .SetBlendState(config.blendDesc)
+                .SetRasterizerState(RasterizerPresets::CreateNoCull());
+            if (isSoft) {
+                builder.SetDepthStencilState(DepthStencilPresets::CreateDisabled())
+                       .SetDepthStencilFormat(DXGI_FORMAT_UNKNOWN);
+            } else {
+                builder.SetDepthStencilState(DepthStencilPresets::CreateReadOnly());
+            }
+            auto result = builder.BuildFromCompiledShaders(
                 dxCommon_->GetDevice().Get(),
                 vsBlob.Get(),
                 psBlob.Get()
             );
 
-        std::string psoName = "YParticle_" + config.name;
-        pipelineStates_[psoName] = result.pipelineState;
-        blendModePipelineStates_["YParticle"][config.mode] = result.pipelineState;
+            pipelineStates_[logicalName + "_" + config.name] = result.pipelineState;
+            blendModePipelineStates_[logicalName][config.mode] = result.pipelineState;
 
-        // 最初のモードだけルートシグネチャとインデックスを保存
-        if (config.mode == BlendMode::kBlendModeNormal) {
-            rootSignatures_["YParticle"] = result.rootSignature;
-            parameterIndices_["YParticle"] = result.parameterIndices;
+            // 最初のモードだけ root sig / index を代表として保存
+            if (config.mode == BlendMode::kBlendModeNormal) {
+                rootSignatures_[logicalName] = result.rootSignature;
+                parameterIndices_[logicalName] = result.parameterIndices;
+            }
         }
-    }
+    };
+
+    buildSet("YParticle",     L"Resources/Shaders/Particle/YParticle.PS.hlsl",     false);
+    buildSet("YParticleSoft", L"Resources/Shaders/Particle/YParticleSoft.PS.hlsl", true);
 }
 
 void YPipelineManager::CreatePSO_Object_Manual()
@@ -235742,6 +237103,69 @@ void YPipelineManager::CreatePSO_VfxMeshVolume() {
     rootSignatures_["VfxMeshVolume"] = result.rootSignature;
     pipelineStates_["VfxMeshVolume"] = result.pipelineState;
     parameterIndices_["VfxMeshVolume"] = result.parameterIndices;
+}
+
+void YPipelineManager::CreatePSO_VfxMeshSmoke() {
+    // Omen 風ボリュームスモーク。半透明スモークなのでアルファブレンド。
+    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Vfx/VfxMesh/VfxMesh.VS.hlsl", L"vs_6_0");
+    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Vfx/VfxMesh/VfxMesh_Smoke.PS.hlsl", L"ps_6_0");
+
+    ReflectionBasedPipelineBuilder builder;
+    auto result = builder
+        .SetRasterizerState(RasterizerPresets::CreateNoCull())
+        .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
+        .SetBlendState(BlendPresets::CreateAlphaBlend())
+        .BuildFromCompiledShaders(
+            dxCommon_->GetDevice().Get(),
+            vsBlob.Get(),
+            psBlob.Get()
+        );
+
+    rootSignatures_["VfxMeshSmoke"] = result.rootSignature;
+    pipelineStates_["VfxMeshSmoke"] = result.pipelineState;
+    parameterIndices_["VfxMeshSmoke"] = result.parameterIndices;
+}
+
+void YPipelineManager::CreatePSO_VfxMeshLightning() {
+    // プロシージャル稲妻。加算ブレンドで芯が光る。
+    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Vfx/VfxMesh/VfxMesh.VS.hlsl", L"vs_6_0");
+    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Vfx/VfxMesh/VfxMesh_Lightning.PS.hlsl", L"ps_6_0");
+
+    ReflectionBasedPipelineBuilder builder;
+    auto result = builder
+        .SetRasterizerState(RasterizerPresets::CreateNoCull())
+        .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
+        .SetBlendState(BlendPresets::CreateAdditive())
+        .BuildFromCompiledShaders(
+            dxCommon_->GetDevice().Get(),
+            vsBlob.Get(),
+            psBlob.Get()
+        );
+
+    rootSignatures_["VfxMeshLightning"] = result.rootSignature;
+    pipelineStates_["VfxMeshLightning"] = result.pipelineState;
+    parameterIndices_["VfxMeshLightning"] = result.parameterIndices;
+}
+
+void YPipelineManager::CreatePSO_VfxMeshShockwave() {
+    // 爆発の衝撃波リング。加算ブレンド。
+    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Vfx/VfxMesh/VfxMesh.VS.hlsl", L"vs_6_0");
+    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Vfx/VfxMesh/VfxMesh_Shockwave.PS.hlsl", L"ps_6_0");
+
+    ReflectionBasedPipelineBuilder builder;
+    auto result = builder
+        .SetRasterizerState(RasterizerPresets::CreateNoCull())
+        .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
+        .SetBlendState(BlendPresets::CreateAdditive())
+        .BuildFromCompiledShaders(
+            dxCommon_->GetDevice().Get(),
+            vsBlob.Get(),
+            psBlob.Get()
+        );
+
+    rootSignatures_["VfxMeshShockwave"] = result.rootSignature;
+    pipelineStates_["VfxMeshShockwave"] = result.pipelineState;
+    parameterIndices_["VfxMeshShockwave"] = result.parameterIndices;
 }
 
 
@@ -236194,6 +237618,9 @@ private:
     /// </summary>
     void CreatePSO_VfxMeshTrail();
     void CreatePSO_VfxMeshVolume();
+    void CreatePSO_VfxMeshSmoke();
+    void CreatePSO_VfxMeshLightning();
+    void CreatePSO_VfxMeshShockwave();
     // ===== ポストエフェクト系パイプライン作成関数群 =====
 
     /// <summary>
@@ -260300,6 +261727,9 @@ public:
 	void SetAspectRatio(float aspectRatio) { aspectRatio_ = aspectRatio; }
 	void SetNearClip(float nearClip) { nearClip_ = nearClip; }
 	void SetFarClip(float farClip) { farClip_ = farClip; }
+
+	float GetNearClip() const { return nearClip_; }
+	float GetFarClip() const { return farClip_; }
 
 	const Matrix4x4& GetViewProjectionMatrix() const { return viewProjectionMatrix_; }
 	const Matrix4x4& GetViewMatrix() const { return viewMatrix_; }
