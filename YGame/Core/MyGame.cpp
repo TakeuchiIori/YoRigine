@@ -110,9 +110,11 @@ void MyGame::Initialize() {
 	//------------------------------------------------------------
 	// 初期シーン設定
 	//------------------------------------------------------------
-#ifdef _DEBUG
+#if defined(DEVELOP_BUILD)
+	SceneManager::GetInstance()->ChangeScene("Develop"); // Develop構成: エンジン機能テスト用シーン。Playerを生成しないのでゲームデータは保存されない
+#elif defined(_DEBUG)
 	SceneManager::GetInstance()->ChangeScene("Game");   // デバッグ時はゲームシーン
-#else 
+#else
 	SceneManager::GetInstance()->ChangeScene("Title");  // 製品版はタイトルシーン
 #endif
 }
