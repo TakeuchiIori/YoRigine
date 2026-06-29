@@ -121,6 +121,15 @@ namespace YoRigine {
 			{ 0.1f, 0.1f, 0.2f, 1.0f },
 			true);   // SRV も同時に作成
 
+		// 法線 G-buffer RTV（MRT 用。ワールド空間法線を .xyz、.w=書き込みマスク 0/1）
+		// クリア値 0 → 法線未書き込み(背景)を .w==0 で判定できる
+		rtvManager_->Create(
+			"NormalBuffer",
+			WinApp::kClientWidth, WinApp::kClientHeight,
+			DXGI_FORMAT_R16G16B16A16_FLOAT,
+			{ 0.0f, 0.0f, 0.0f, 0.0f },
+			true);   // SRV も同時に作成（ポストエフェクトから読む）
+
 		// 最終出力 RTV（FinalResult）
 		rtvManager_->Create(
 			"FinalResult",
@@ -182,6 +191,12 @@ namespace YoRigine {
 			D3D12_RESOURCE_STATE_GENERIC_READ,
 			D3D12_RESOURCE_STATE_RENDER_TARGET);
 
+		// NormalBuffer を RenderTarget へ（MRT 第2ターゲット）
+		rtvManager_->TransitionBarrier(
+			cmd.Get(), "NormalBuffer",
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			D3D12_RESOURCE_STATE_RENDER_TARGET);
+
 		// MainDepth を DEPTH_WRITE へ
 		if (depthCurrentState_ != D3D12_RESOURCE_STATE_DEPTH_WRITE) {
 			dsvManager_->TransitionBarrier(
@@ -200,8 +215,9 @@ namespace YoRigine {
 		}
 
 		D3D12_CPU_DESCRIPTOR_HANDLE dsvH = dsvManager_->GetHandle("MainDepth");
-		rtvManager_->SetRenderTargets(cmd.Get(), { "OffScreen" }, &dsvH);
+		rtvManager_->SetRenderTargets(cmd.Get(), std::vector<std::string>{ "OffScreen", "NormalBuffer" },&dsvH);
 		rtvManager_->Clear("OffScreen", cmd.Get());
+		rtvManager_->Clear("NormalBuffer", cmd.Get());
 		dsvManager_->Clear("MainDepth", cmd.Get());
 
 		cmd->RSSetViewports(1, &viewport_);
@@ -222,7 +238,8 @@ namespace YoRigine {
 		}
 
 		// 深度なしで OffScreen を再バインド（書き込み中の深度を同時に SRV 読みする衝突を回避）
-		rtvManager_->SetRenderTargets(cmd.Get(), { "OffScreen" }, nullptr);
+		// MRT 構成を維持するため NormalBuffer も併せて bind する
+		rtvManager_->SetRenderTargets(cmd.Get(), std::vector<std::string>{ "OffScreen", "NormalBuffer" },nullptr);
 		cmd->RSSetViewports(1, &viewport_);
 		cmd->RSSetScissorRects(1, &scissorRect_);
 	}
@@ -238,7 +255,7 @@ namespace YoRigine {
 		}
 
 		D3D12_CPU_DESCRIPTOR_HANDLE dsvH = dsvManager_->GetHandle("MainDepth");
-		rtvManager_->SetRenderTargets(cmd.Get(), { "OffScreen" }, &dsvH);
+		rtvManager_->SetRenderTargets(cmd.Get(), std::vector<std::string>{ "OffScreen", "NormalBuffer" },&dsvH);
 		cmd->RSSetViewports(1, &viewport_);
 		cmd->RSSetScissorRects(1, &scissorRect_);
 	}
@@ -254,11 +271,18 @@ namespace YoRigine {
 			D3D12_RESOURCE_STATE_GENERIC_READ,
 			D3D12_RESOURCE_STATE_RENDER_TARGET);
 
+		// PiP 法線 RT も RENDER_TARGET へ（不透明 PSO が 2-RT のため bind 数を揃える）
+		const std::string pipNormal = rtName + "_Normal";
+		rtvManager_->TransitionBarrier(cmd.Get(), pipNormal,
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			D3D12_RESOURCE_STATE_RENDER_TARGET);
+
 		// PiP DSV は常に DEPTH_WRITE 運用 (SRV 化しないため遷移不要)
 
 		D3D12_CPU_DESCRIPTOR_HANDLE dsvH = dsvManager_->GetHandle(dsvName);
-		rtvManager_->SetRenderTargets(cmd.Get(), { rtName }, &dsvH);
+		rtvManager_->SetRenderTargets(cmd.Get(), { rtName, pipNormal }, &dsvH);
 		rtvManager_->Clear(rtName, cmd.Get());
+		rtvManager_->Clear(pipNormal, cmd.Get());
 		dsvManager_->Clear(dsvName, cmd.Get());
 
 		D3D12_VIEWPORT vp{};
@@ -285,6 +309,10 @@ namespace YoRigine {
 		rtvManager_->TransitionBarrier(cmd.Get(), rtName,
 			D3D12_RESOURCE_STATE_RENDER_TARGET,
 			D3D12_RESOURCE_STATE_GENERIC_READ);
+		// PiP 法線 RT も READ へ戻す（次フレームの PreDrawPip で再び RENDER_TARGET へ）
+		rtvManager_->TransitionBarrier(cmd.Get(), rtName + "_Normal",
+			D3D12_RESOURCE_STATE_RENDER_TARGET,
+			D3D12_RESOURCE_STATE_GENERIC_READ);
 	}
 
 	/// バックバッファパス：OffScreen / Depth を SRV 化 → BackBuffer RTV
@@ -297,6 +325,12 @@ namespace YoRigine {
 		// OffScreen → SRV
 		rtvManager_->TransitionBarrier(
 			cmd.Get(), "OffScreen",
+			D3D12_RESOURCE_STATE_RENDER_TARGET,
+			D3D12_RESOURCE_STATE_GENERIC_READ);
+
+		// NormalBuffer → SRV（ポストエフェクトから読む）
+		rtvManager_->TransitionBarrier(
+			cmd.Get(), "NormalBuffer",
 			D3D12_RESOURCE_STATE_RENDER_TARGET,
 			D3D12_RESOURCE_STATE_GENERIC_READ);
 

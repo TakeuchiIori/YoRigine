@@ -21,6 +21,7 @@ struct PostEffectData {
 		float sigma = 2.0f;                         // GaussSmoothing用
 		int kernelSize = 3;                         // 各種フィルタ用
 		Vector4 outlineColor = { 0,0,0,1 };         // DepthOutline用
+		OffScreen::DepthOutlineParams depthOutline; // DepthOutline用(深度/法線/輝度トグル)
 		OffScreen::RadialBlurPrams radialBlur;      // RadialBlur用
 		OffScreen::DissolveParams dissolve;         // Dissolve用
 		OffScreen::ChromaticParams chromatic;       // Chromatic用

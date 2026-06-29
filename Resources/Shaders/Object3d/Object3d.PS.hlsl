@@ -62,7 +62,7 @@ SamplerComparisonState gShadowSampler : register(s1);
 struct PixelShaderOutput
 {
     float4 color : SV_TARGET0;
-
+    float4 normal : SV_TARGET1; // G-buffer: ワールド空間法線(.xyz) + 書き込みマスク(.w)
 };
 
 //-----------------------------------------------------------------------------
@@ -134,6 +134,9 @@ float DissolveValueNoise3D(float3 p)
 PixelShaderOutput main(VertexShaderOutput input)
 {
     PixelShaderOutput output;
+
+    // G-buffer 法線出力（ワールド空間）。discard を生き残ったピクセルにのみ書かれる。
+    output.normal = float4(normalize(input.normal), 1.0f);
 
     // === ディゾルブ：discard 判定 と エッジ判定フラグ ===
     float dissolveMask = 1.0f;

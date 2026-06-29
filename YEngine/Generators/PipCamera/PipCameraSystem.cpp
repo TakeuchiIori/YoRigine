@@ -51,6 +51,18 @@ void PipCameraSystem::CreateRenderResources() {
 		true
 	);
 
+	// PiP 用 法線 RTV（MRT 第2ターゲット）。
+	// メインパスと同じく不透明オブジェクトは法線も出力するため、PiP でも
+	// 同サイズ・同フォーマットの法線 RT を bind する必要がある（PiP では内容は未使用）。
+	rtvMgr->Create(
+		rtName_ + "_Normal",
+		rtWidth_,
+		rtHeight_,
+		DXGI_FORMAT_R16G16B16A16_FLOAT,
+		Vector4{ 0.0f, 0.0f, 0.0f, 0.0f },
+		true
+	);
+
 	// PiP 用 DSV (Phase 1b の 2nd レンダーパスで使う)
 	dsvMgr->Create(
 		dsvName_,

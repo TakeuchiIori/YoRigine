@@ -438,6 +438,37 @@ bool PostEffectChain::DrawEffectParametersImGui([[maybe_unused]] int selectedInd
 		if (ImGui::ColorEdit4("Outline Color", &effect->params.outlineColor.x)) {
 			changed = true;
 		}
+		{
+			auto& d = effect->params.depthOutline;
+			ImGui::SeparatorText("エッジ要因");
+			if (ImGui::Checkbox("深度", &d.useDepth)) changed = true;
+			ImGui::SameLine();
+			if (ImGui::Checkbox("法線", &d.useNormal)) changed = true;
+			ImGui::SameLine();
+			if (ImGui::Checkbox("輝度", &d.useLuminance)) changed = true;
+
+			if (ImGui::DragFloat("全体強度", &d.edgeStrength, 0.01f, 0.0f, 10.0f)) changed = true;
+
+			if (d.useDepth) {
+				if (ImGui::DragFloat("深度 重み", &d.depthWeight, 0.01f, 0.0f, 10.0f)) changed = true;
+				if (ImGui::DragFloat("深度 閾値", &d.depthThreshold, 0.001f, 0.0001f, 10.0f)) changed = true;
+			}
+			if (d.useNormal) {
+				if (ImGui::DragFloat("法線 重み", &d.normalWeight, 0.01f, 0.0f, 10.0f)) changed = true;
+				if (ImGui::DragFloat("法線 閾値", &d.normalThreshold, 0.001f, 0.0001f, 10.0f)) changed = true;
+			}
+			if (d.useLuminance) {
+				if (ImGui::DragFloat("輝度 重み", &d.luminanceWeight, 0.01f, 0.0f, 10.0f)) changed = true;
+				if (ImGui::DragFloat("輝度 閾値", &d.luminanceThreshold, 0.001f, 0.0001f, 10.0f)) changed = true;
+			}
+		}
+		break;
+
+		// --------------------------------------------------------
+		// 法線可視化（パラメータなし）
+		// --------------------------------------------------------
+	case OffScreen::OffScreenEffectType::NormalVisualize:
+		ImGui::TextUnformatted("法線 G-buffer をそのまま色表示します（調整項目なし）");
 		break;
 
 		// --------------------------------------------------------
@@ -767,6 +798,7 @@ const char* PostEffectChain::GetEffectTypeName(OffScreen::OffScreenEffectType ty
 	case OffScreen::OffScreenEffectType::ColorGrade:        return "ColorGrade";
 	case OffScreen::OffScreenEffectType::Fog:               return "Fog";
 	case OffScreen::OffScreenEffectType::GodRays:           return "GodRays";
+	case OffScreen::OffScreenEffectType::NormalVisualize:   return "NormalVisualize";
 	default:                                                return "Unknown";
 	}
 }

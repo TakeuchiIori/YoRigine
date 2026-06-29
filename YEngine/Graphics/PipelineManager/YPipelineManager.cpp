@@ -270,8 +270,10 @@ void YPipelineManager::CreatePSO_Object()
     auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3d/Object3D.PS.hlsl", L"ps_6_0");
 
     // リフレクションベースで完全自動生成
+    // 不透明ジオメトリは法線 G-buffer(SV_TARGET1) へも出力する
     ReflectionBasedPipelineBuilder builder;
     auto result = builder
+        .SetGBufferNormal(true)
         .BuildFromCompiledShaders(
         dxCommon_->GetDevice().Get(),
         vsBlob.Get(),
@@ -326,8 +328,11 @@ void YPipelineManager::CreatePSO_ObjectInstanced()
     auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3d/Object3dInstanced.VS.hlsl", L"vs_6_0");
     auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3d/Object3dInstanced.PS.hlsl", L"ps_6_0");
 
+    // 不透明ジオメトリは法線 G-buffer(SV_TARGET1) へも出力する
     ReflectionBasedPipelineBuilder builder;
-    auto result = builder.BuildFromCompiledShaders(
+    auto result = builder
+        .SetGBufferNormal(true)
+        .BuildFromCompiledShaders(
         dxCommon_->GetDevice().Get(),
         vsBlob.Get(),
         psBlob.Get()

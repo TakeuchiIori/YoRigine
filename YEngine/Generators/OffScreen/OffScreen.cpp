@@ -86,7 +86,8 @@ void OffScreen::RenderEffectCompute(
 	case OffScreenEffectType::CrossHatch:         psoKey = "PostEffectCrossHatchCS";  rsKey = "PostEffectRS_CB"; break;
 	case OffScreenEffectType::ColorGrade:         psoKey = "PostEffectColorGradeCS";  rsKey = "PostEffectRS_CB"; break;
 	case OffScreenEffectType::ColorAdjust:        psoKey = "PostEffectColorAdjustCS"; rsKey = "PostEffectRS_CB2"; break;
-	case OffScreenEffectType::DepthOutline:       psoKey = "PostEffectDepthOutlineCS"; rsKey = "PostEffectRS_Depth"; break;
+	case OffScreenEffectType::DepthOutline:       psoKey = "PostEffectDepthOutlineCS"; rsKey = "PostEffectRS_DepthNormal"; break;
+	case OffScreenEffectType::NormalVisualize:    psoKey = "PostEffectNormalVisualizeCS"; rsKey = "PostEffectRS_DepthNormal"; break;
 	case OffScreenEffectType::Fog:                psoKey = "PostEffectFogCS";          rsKey = "PostEffectRS_Depth"; break;
 	case OffScreenEffectType::GodRays:            psoKey = "PostEffectGodRaysCS";      rsKey = "PostEffectRS_Depth"; break;
 	case OffScreenEffectType::Dissolve:           psoKey = "PostEffectDissolveCS";     rsKey = "PostEffectRS_Tex"; break;
@@ -175,13 +176,24 @@ void OffScreen::RenderEffectCompute(
 		cmd->SetComputeRootConstantBufferView(3, toneParamsResource_->GetGPUVirtualAddress());
 		break;
 
-	// === RS_Depth: SRV(0)=color, SRV(1)=depth, UAV(2), CBV(3) ===
+	// === RS_DepthNormal: SRV(0)=color, SRV(1)=depth, SRV(2)=normal, UAV(3), CBV(4) ===
 	case OffScreenEffectType::DepthOutline:
 		cmd->SetComputeRootDescriptorTable(0, inputSRV);
 		cmd->SetComputeRootDescriptorTable(1, dxCommon_->GetDepthGPUHandle());
-		cmd->SetComputeRootDescriptorTable(2, outputUAV);
-		cmd->SetComputeRootConstantBufferView(3, materialResource_->GetGPUVirtualAddress());
+		cmd->SetComputeRootDescriptorTable(2, dxCommon_->GetNormalGPUHandle());
+		cmd->SetComputeRootDescriptorTable(3, outputUAV);
+		cmd->SetComputeRootConstantBufferView(4, materialResource_->GetGPUVirtualAddress());
 		break;
+	case OffScreenEffectType::NormalVisualize:
+		cmd->SetComputeRootDescriptorTable(0, inputSRV);
+		cmd->SetComputeRootDescriptorTable(1, dxCommon_->GetDepthGPUHandle());
+		cmd->SetComputeRootDescriptorTable(2, dxCommon_->GetNormalGPUHandle());
+		cmd->SetComputeRootDescriptorTable(3, outputUAV);
+		// CBV は未使用だが RS が要求するためダミーで materialResource_ をバインド
+		cmd->SetComputeRootConstantBufferView(4, materialResource_->GetGPUVirtualAddress());
+		break;
+
+	// === RS_Depth: SRV(0)=color, SRV(1)=depth, UAV(2), CBV(3) ===
 	case OffScreenEffectType::Fog:
 		cmd->SetComputeRootDescriptorTable(0, inputSRV);
 		cmd->SetComputeRootDescriptorTable(1, dxCommon_->GetDepthGPUHandle());
@@ -286,11 +298,22 @@ void OffScreen::SetGaussianBlurParams(float sigma, int kernelSize)
 }
 
 /// <summary>深度アウトラインの描画設定</summary>
-void OffScreen::SetDepthOutlineParams(int kernelSize, const Vector4& color)
+void OffScreen::SetDepthOutlineParams(int kernelSize, const Vector4& color,
+	const DepthOutlineParams& params)
 {
 	if (materialData_) {
 		materialData_->kernelSize = kernelSize;
 		materialData_->outlineColor = color;
+		materialData_->useDepth = params.useDepth ? 1 : 0;
+		materialData_->useNormal = params.useNormal ? 1 : 0;
+		materialData_->useLuminance = params.useLuminance ? 1 : 0;
+		materialData_->depthWeight = params.depthWeight;
+		materialData_->normalWeight = params.normalWeight;
+		materialData_->luminanceWeight = params.luminanceWeight;
+		materialData_->edgeStrength = params.edgeStrength;
+		materialData_->depthThreshold = params.depthThreshold;
+		materialData_->normalThreshold = params.normalThreshold;
+		materialData_->luminanceThreshold = params.luminanceThreshold;
 	}
 }
 
@@ -563,6 +586,16 @@ void OffScreen::CreateDepthOutLineResource()
 	materialData_->Inverse = MakeIdentity4x4();
 	materialData_->kernelSize = 3;
 	materialData_->outlineColor = { 0.0f, 0.0f, 0.0f, 1.0f };
+	materialData_->useDepth = 1;
+	materialData_->useNormal = 0;
+	materialData_->useLuminance = 0;
+	materialData_->depthWeight = 1.0f;
+	materialData_->normalWeight = 1.0f;
+	materialData_->luminanceWeight = 1.0f;
+	materialData_->edgeStrength = 1.0f;
+	materialData_->depthThreshold = 1.0f;
+	materialData_->normalThreshold = 1.0f;
+	materialData_->luminanceThreshold = 1.0f;
 	materialResource_->Unmap(0, nullptr);
 }
 
