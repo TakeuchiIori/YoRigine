@@ -54,15 +54,6 @@ namespace YoRigine {
 	{
 		if (sceneInstances_.find(sceneName) != sceneInstances_.end())
 		{
-			// そのシーンのすべてのJsonManagerを保存してからクリア
-			auto& instances = sceneInstances_[sceneName];
-			for (auto& [key, manager] : instances)
-			{
-				if (manager)
-				{
-					manager->Save();
-				}
-			}
 			sceneInstances_.erase(sceneName);
 		}
 	}
