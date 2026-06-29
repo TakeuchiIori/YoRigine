@@ -5,9 +5,11 @@
 #include <cstdint>
 #include <unordered_map>
 #include <vector>
+#include <memory>
 
 #include "Vector4.h"
 #include "Matrix4x4.h"
+#include "Material/MaterialLighting.h"
 
 class Camera;
 class Model;
@@ -92,17 +94,15 @@ private:
 	// 指定batchが指定要素数を入れられるように容量確保 (足りなければ再作成)
 	void EnsureCapacity(Batch& batch, uint32_t needed);
 
-	// 共有 MaterialLight CB をデフォルト値で初期化
-	void CreateMaterialLightCB();
-
 private:
 	YoRigine::DirectXCommon* dxCommon_ = nullptr;
 	SrvManager* srvManager_ = nullptr;
 
 	std::unordered_map<Model*, Batch> batches_;
 
-	// 全インスタンス共有の MaterialLight CB (lighting有効, specular無効, env無効)
-	Microsoft::WRL::ComPtr<ID3D12Resource> materialLightCB_;
+	// 全インスタンス共有の MaterialLight (lighting有効, specular無効, env無効)。
+	// MaterialLighting 経由にすることで、トゥーン等のグローバル設定が自動反映される。
+	std::unique_ptr<MaterialLighting> materialLighting_;
 
 	uint32_t totalInstances_ = 0;
 };

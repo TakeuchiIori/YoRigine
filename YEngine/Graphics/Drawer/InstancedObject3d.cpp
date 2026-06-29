@@ -10,17 +10,6 @@
 #include <cassert>
 
 namespace {
-	// 共有 MaterialLight CB の GPU 構造体 (HLSL の MaterialLight と一致)
-	struct MaterialLightGPU {
-		int32_t enableLighting;
-		int32_t enableSpecular;
-		int32_t enableEnvironment;
-		int32_t isHalfVector;
-		float   shininess;
-		float   environmentCoefficient;
-		float   _pad[2];
-	};
-
 	// バッチ初期容量 (壁を想定して 64 から始める)
 	constexpr uint32_t kInitialCapacity = 64;
 }
@@ -40,7 +29,17 @@ void InstancedObject3d::Initialize()
 	if (dxCommon_) return; // 二重初期化防止
 	dxCommon_ = YoRigine::DirectXCommon::GetInstance();
 	srvManager_ = SrvManager::GetInstance();
-	CreateMaterialLightCB();
+
+	// 共有 MaterialLight（lighting有効, specular/env無効, shininess=8）。
+	// MaterialLighting 経由なのでトゥーン等のグローバル設定も自動で反映される。
+	materialLighting_ = std::make_unique<MaterialLighting>();
+	materialLighting_->Initialize();
+	materialLighting_->SetEnableLighting(true);
+	materialLighting_->SetEnableSpecular(false);
+	materialLighting_->SetEnableEnvironment(false);
+	materialLighting_->SetIsHalfVector(false);
+	materialLighting_->SetShininess(8.0f);
+	materialLighting_->SetEnvironmentCoefficient(0.0f);
 }
 
 void InstancedObject3d::Finalize()
@@ -51,22 +50,7 @@ void InstancedObject3d::Finalize()
 		}
 	}
 	batches_.clear();
-	materialLightCB_.Reset();
-}
-
-void InstancedObject3d::CreateMaterialLightCB()
-{
-	materialLightCB_ = dxCommon_->CreateBufferResource(sizeof(MaterialLightGPU));
-	MaterialLightGPU* m = nullptr;
-	materialLightCB_->Map(0, nullptr, reinterpret_cast<void**>(&m));
-	m->enableLighting = 1;
-	m->enableSpecular = 0;
-	m->enableEnvironment = 0;
-	m->isHalfVector = 0;
-	m->shininess = 8.0f;
-	m->environmentCoefficient = 0.0f;
-	m->_pad[0] = m->_pad[1] = 0.0f;
-	// Map したまま放置 (生存期間中ずっと有効)
+	materialLighting_.reset();
 }
 
 void InstancedObject3d::Begin()
@@ -143,10 +127,8 @@ void InstancedObject3d::Flush(Camera* camera)
 		indices.at("gCamera"),
 		camera->GetCameraResource()->GetGPUVirtualAddress());
 
-	// MaterialLight (共有CB)
-	cmd->SetGraphicsRootConstantBufferView(
-		indices.at("gMaterialLight"),
-		materialLightCB_->GetGPUVirtualAddress());
+	// MaterialLight (共有CB)。RecordDrawCommands 内でグローバルなトゥーン設定が反映される。
+	materialLighting_->RecordDrawCommands(cmd, indices.at("gMaterialLight"));
 
 	// 各バッチを描画
 	for (auto& [model, batch] : batches_) {
