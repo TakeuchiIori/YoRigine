@@ -94,6 +94,10 @@ private:
 	// シャドウマップ用リソース作成
 	void CreateShadowResources();
 
+	// インバートハル輪郭線の描画（OutlineSettings 有効時に Draw 内から呼ぶ）。
+	// 専用 PSO/RS へ切り替え、頂点ジオメトリを押し出しシェルとして描く。
+	void DrawOutlinePass(Camera* camera, WorldTransform& worldTransform);
+
 	// UVの更新
 	void UpdateUV();
 

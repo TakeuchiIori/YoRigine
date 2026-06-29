@@ -108,6 +108,7 @@ void YPipelineManager::Initialize()
     CreatePSO_ObjectInstanced();
     CreatePSO_ShadowMap();
     CreatePSO_ShadowMapInstanced();
+    CreatePSO_ObjectOutline();
     CreatePSO_Line();
     CreatePSO_InstancedCube();
     CreatePSO_YParticleAllBlendModes();
@@ -370,9 +371,42 @@ void YPipelineManager::CreatePSO_ShadowMapInstanced()
 }
 
 // ============================================================
-// 
+//
+// Object : Outline (Inverted Hull)
+//
+// ============================================================
+void YPipelineManager::CreatePSO_ObjectOutline()
+{
+    Logger("\n==============================================================\n\n\n");
+    Logger("         Creating Pipeline: ObjectOutline              \n\n\n");
+    Logger("==============================================================\n");
+    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3d/OutLine.VS.hlsl", L"vs_6_0");
+    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3d/OutLine.PS.hlsl", L"ps_6_0");
+
+    // 前面カリング(背面のみ描画)で、押し出したシェルのシルエットを得る。
+    D3D12_RASTERIZER_DESC raster = YoRigine::RasterizerPresets::CreateDefault();
+    raster.CullMode = D3D12_CULL_MODE_FRONT;
+
+    // オブジェクト本体パスと同じ 2RTV(color + 法線 G-buffer) 構成に合わせる。
+    ReflectionBasedPipelineBuilder builder;
+    auto result = builder
+        .SetGBufferNormal(true)
+        .SetRasterizerState(raster)
+        .BuildFromCompiledShaders(
+            dxCommon_->GetDevice().Get(),
+            vsBlob.Get(),
+            psBlob.Get()
+        );
+
+    rootSignatures_["ObjectOutline"] = result.rootSignature;
+    pipelineStates_["ObjectOutline"] = result.pipelineState;
+    parameterIndices_["ObjectOutline"] = result.parameterIndices;
+}
+
+// ============================================================
+//
 // GPUParticle : ALLBlendMode
-// 
+//
 // ============================================================
 void YPipelineManager::CreatePSO_GPUParticleALLBlendModes()
 {

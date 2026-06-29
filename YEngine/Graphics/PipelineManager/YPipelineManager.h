@@ -106,6 +106,12 @@ private:
     /// </summary>
     void CreatePSO_ShadowMapInstanced();
 
+    /// <summary>
+    /// インバートハル輪郭線用パイプライン (OutLine.VS/PS.hlsl)
+    /// 前面カリングで押し出しシェルの背面のみ描画し、シルエットを縁取る。
+    /// </summary>
+    void CreatePSO_ObjectOutline();
+
     void CreatePSO_GPUParticleALLBlendModes();
     void CreatePSO_YParticleAllBlendModes();
     /// <summary>
