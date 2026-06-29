@@ -321,6 +321,9 @@ namespace YoRigine {
                 objectManager_->ApplyObjectUV(*obj);
             }
 
+            // インバートハル輪郭線をこのオブジェクトに掛けるか（地面・空など背景は OFF）
+            ImGui::Checkbox("アウトライン", &obj->outlineEnabled);
+
             ImGui::Separator();
 
             if (ImGui::Button("位置リセット")) {

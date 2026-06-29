@@ -6,6 +6,7 @@
 #include "PipelineManager/YPipelineManager.h"
 #include "LightManager/LightManager.h"
 #include "Model.h"
+#include "Material/OutlineSettings.h"
 
 #include <cassert>
 
@@ -105,6 +106,32 @@ void InstancedObject3d::Flush(Camera* camera)
 
 	// CBV/SRV/UAV ヒープを確実にバインド (シャドウパス→カラーパスの境界で heap が外れているケース対策)
 	srvManager_->PreDraw();
+
+	// === インバートハル輪郭線（本体より先に描き、内側は本体で上書きする） ===
+	// 専用 PSO/RS へ切り替えてシェルを描く。直後に本体 PSO/RS を張り直すので復帰処理は不要。
+	if (OutlineSettings::GetInstance()->IsEnabled()) {
+		OutlineSettings::GetInstance()->UpdateCB();
+		const auto& oidx = pm->GetParameterIndices("ObjectOutlineInstanced");
+
+		cmd->SetPipelineState(pm->GetPipeLineStateObject("ObjectOutlineInstanced"));
+		cmd->SetGraphicsRootSignature(pm->GetRootSignature("ObjectOutlineInstanced"));
+		cmd->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+		cmd->SetGraphicsRootConstantBufferView(
+			oidx.at("gCamera"), camera->GetCameraResource()->GetGPUVirtualAddress());
+		cmd->SetGraphicsRootConstantBufferView(
+			oidx.at("gOutline"), OutlineSettings::GetInstance()->GetResource()->GetGPUVirtualAddress());
+
+		for (auto& [model, batch] : batches_) {
+			const uint32_t count = static_cast<uint32_t>(batch.cpuData.size());
+			if (count == 0) continue;
+
+			EnsureCapacity(batch, count);
+			std::memcpy(batch.mapped, batch.cpuData.data(), sizeof(InstanceData) * count);
+
+			model->DrawOutlineInstanced(count, batch.srvHandleGPU);
+		}
+	}
 
 	// PSO + RS + topology
 	cmd->SetPipelineState(pm->GetPipeLineStateObject("ObjectInstanced"));

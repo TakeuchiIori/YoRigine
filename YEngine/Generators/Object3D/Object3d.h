@@ -107,6 +107,11 @@ public:
 	Model* GetModel() { return model_; }
 	MaterialLighting* GetMaterialLighting() const { return materialLighting_.get(); }
 
+	// インバートハル輪郭線をこのオブジェクトに掛けるか（既定 true）。
+	// 地面など輪郭を出したくないオブジェクトは false にする。
+	void SetOutlineEnabled(bool enable) { outlineEnabled_ = enable; }
+	bool IsOutlineEnabled() const { return outlineEnabled_; }
+
 	Vector4& GetColor() { return materialColor_->GetColor(); }
 	void SetMaterialColor(const Vector4& color) { materialColor_->SetColor(color); }
 	void SetAlpha(float alpha) { materialColor_->SetAlpha(alpha); }
@@ -144,6 +149,9 @@ private:
 
 	Object3dCommon* object3dCommon_ = nullptr;
 	Model* model_ = nullptr;
+
+	// インバートハル輪郭線をこのオブジェクトに掛けるか（地面等は false）
+	bool outlineEnabled_ = true;
 
 	// マテリアル関連
 	std::unique_ptr<MaterialColor> materialColor_;

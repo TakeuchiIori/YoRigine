@@ -456,10 +456,19 @@ bool PostEffectChain::DrawEffectParametersImGui([[maybe_unused]] int selectedInd
 			if (d.useNormal) {
 				if (ImGui::DragFloat("法線 重み", &d.normalWeight, 0.01f, 0.0f, 10.0f)) changed = true;
 				if (ImGui::DragFloat("法線 閾値", &d.normalThreshold, 0.001f, 0.0001f, 10.0f)) changed = true;
+				if (ImGui::DragFloat("法線 太さ", &d.normalWidth, 0.05f, 1.0f, 16.0f)) changed = true;
 			}
 			if (d.useLuminance) {
 				if (ImGui::DragFloat("輝度 重み", &d.luminanceWeight, 0.01f, 0.0f, 10.0f)) changed = true;
 				if (ImGui::DragFloat("輝度 閾値", &d.luminanceThreshold, 0.001f, 0.0001f, 10.0f)) changed = true;
+				if (ImGui::DragFloat("輝度 太さ", &d.luminanceWidth, 0.05f, 1.0f, 16.0f)) changed = true;
+			}
+
+			ImGui::SeparatorText("距離フェード（遠景の真っ黒化防止）");
+			if (ImGui::Checkbox("距離フェード有効", &d.useDistanceFade)) changed = true;
+			if (d.useDistanceFade) {
+				if (ImGui::DragFloat("フェード開始", &d.distanceFadeStart, 0.5f, 0.0f, 1000.0f)) changed = true;
+				if (ImGui::DragFloat("フェード終了", &d.distanceFadeEnd, 0.5f, 0.0f, 1000.0f)) changed = true;
 			}
 		}
 		break;

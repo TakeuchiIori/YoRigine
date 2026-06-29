@@ -50,7 +50,7 @@ public:
 		Vector4   color = { 1.0f, 1.0f, 1.0f, 1.0f };
 		Matrix4x4 uvTransform;
 		float     stochasticStrength = 0.0f;
-		float     _pad0 = 0.0f;
+		float     outlineMask = 1.0f;   // インバートハル輪郭線の掛け率(1=線あり, 0=線なし)
 		float     _pad1 = 0.0f;
 		float     _pad2 = 0.0f;
 	};

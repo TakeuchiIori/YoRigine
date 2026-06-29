@@ -92,7 +92,7 @@ void Object3d::Draw(Camera* camera, WorldTransform& worldTransform)
 
 	// === インバートハル輪郭線（本体より先に描き、内側は本体で上書きする） ===
 	// 専用 PSO/RS へ切り替えるため、ここで描いてからオブジェクト本体パイプラインへ復帰する。
-	if (camera && model_ && OutlineSettings::GetInstance()->IsEnabled()) {
+	if (camera && model_ && outlineEnabled_ && OutlineSettings::GetInstance()->IsEnabled()) {
 		DrawOutlinePass(camera, worldTransform);
 
 		// 輪郭用 RS へ切り替えた時点で Object RS の root 引数は無効化される。

@@ -25,6 +25,9 @@ void OutlineSettings::Initialize()
 	json_->Register("輪郭線有効", &enable_);
 	json_->Register("太さ", &width_);
 	json_->Register("色", &color_);
+	json_->Register("距離フェード有効", &useDistanceFade_);
+	json_->Register("フェード開始", &fadeStart_);
+	json_->Register("フェード終了", &fadeEnd_);
 
 	UpdateCB();
 }
@@ -38,6 +41,9 @@ void OutlineSettings::UpdateCB()
 	mapped_->color[3] = 1.0f;
 	mapped_->width = width_;
 	mapped_->enable = enable_;
+	mapped_->useDistanceFade = useDistanceFade_;
+	mapped_->distanceFadeStart = fadeStart_;
+	mapped_->distanceFadeEnd = fadeEnd_;
 	mapped_->_pad[0] = mapped_->_pad[1] = 0.0f;
 }
 
@@ -52,6 +58,14 @@ void OutlineSettings::ImGui()
 
 	ImGui::SliderFloat("太さ", &width_, 0.0f, 0.05f, "%.4f");
 	ImGui::ColorEdit3("色", &color_.x);
+
+	ImGui::SeparatorText("距離フェード（遠景の真っ黒化防止）");
+	bool useFade = useDistanceFade_ != 0;
+	if (ImGui::Checkbox("距離フェード有効", &useFade)) useDistanceFade_ = useFade ? 1 : 0;
+	if (useDistanceFade_) {
+		ImGui::DragFloat("フェード開始", &fadeStart_, 0.5f, 0.0f, 1000.0f);
+		ImGui::DragFloat("フェード終了", &fadeEnd_, 0.5f, 0.0f, 1000.0f);
+	}
 
 	ImGui::Separator();
 	if (ImGui::Button("保存")) {

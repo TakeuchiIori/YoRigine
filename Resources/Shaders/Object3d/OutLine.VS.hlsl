@@ -22,9 +22,12 @@ struct Camera
 
 struct Outline
 {
-    float4 color;  // 線の色
-    float  width;  // 押し出し量(スクリーン基準)
-    int    enable; // 0=無効
+    float4 color;             // 線の色
+    float  width;             // 押し出し量(スクリーン基準)
+    int    enable;            // 0=無効
+    int    useDistanceFade;   // 距離フェード有効
+    float  distanceFadeStart; // フェード開始(ビュー空間距離)。ここから線が細くなり始める
+    float  distanceFadeEnd;   // フェード終了。これより遠いと太さ0(真っ黒化防止)
     float2 _pad;
 };
 
@@ -53,7 +56,18 @@ OutlineVSOutput main(VertexShaderInput input)
 
     // まずクリップ座標を求め、その w でスケール(距離に依らず一定太さ)。
     float4 clip = mul(worldPos, gCamera.viewProjection);
-    worldPos.xyz += worldNormal * gOutline.width * clip.w;
+
+    // 距離フェード：遠ざかると太さを徐々に 0 へ。
+    // スクリーン基準の一定太さのままだと、小さく映ったオブジェクトを線が覆って真っ黒になる。
+    // clip.w はビュー空間の深度(≒カメラからの距離)。
+    float distScale = 1.0f;
+    if (gOutline.useDistanceFade != 0 && gOutline.distanceFadeEnd > gOutline.distanceFadeStart)
+    {
+        distScale = saturate(1.0f - (clip.w - gOutline.distanceFadeStart)
+                                  / (gOutline.distanceFadeEnd - gOutline.distanceFadeStart));
+    }
+
+    worldPos.xyz += worldNormal * gOutline.width * clip.w * distScale;
 
     output.position = mul(worldPos, gCamera.viewProjection);
     return output;

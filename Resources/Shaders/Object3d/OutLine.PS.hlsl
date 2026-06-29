@@ -11,6 +11,9 @@ struct Outline
     float4 color;
     float  width;
     int    enable;
+    int    useDistanceFade;
+    float  distanceFadeStart;
+    float  distanceFadeEnd;
     float2 _pad;
 };
 

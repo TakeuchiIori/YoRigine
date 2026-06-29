@@ -112,6 +112,12 @@ private:
     /// </summary>
     void CreatePSO_ObjectOutline();
 
+    /// <summary>
+    /// インバートハル輪郭線用パイプライン（インスタンス描画版 / OutLineInstanced.VS）
+    /// per-instance のワールド行列でシェルを押し出し、静的インスタンスにも輪郭を付ける。
+    /// </summary>
+    void CreatePSO_ObjectOutlineInstanced();
+
     void CreatePSO_GPUParticleALLBlendModes();
     void CreatePSO_YParticleAllBlendModes();
     /// <summary>
