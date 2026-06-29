@@ -342,6 +342,7 @@ void Player::InitJson() {
 	jsonManager_->Register("ハーフベクトルを使用", &lighting->isHalfVector);
 	jsonManager_->Register("光沢度", &lighting->shininess);
 	jsonManager_->Register("環境光係数", &lighting->environmentCoefficient);
+	// トゥーンは ToonSettings（全オブジェクト共通／エディタの「トゥーン」パネル）で統一管理
 
 	//------------------------------------------------------------
 	// モーション・その他設定

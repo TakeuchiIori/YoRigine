@@ -22,6 +22,22 @@ struct MaterialLight
     int isHalfVector;
     float shininess;
     float environmentCoeffcient;
+    // --- トゥーン拡張（C++ MaterialLighting::MaterialLight と一致） ---
+    int   enableToon;
+    int   toonBands;
+    int   enableRim;
+    int   enableToonSpecular;
+    float rimPower;
+    float rimIntensity;
+    float toonSpecularThreshold;
+    float toonEdgeSoftness;
+    // --- 2D表現（アニメ塗り） ---
+    float  shadowStrength;
+    float  _pad0;
+    float3 shadowColor;
+    float  _pad1;
+    float3 highlightColor;
+    float  _pad2;
 };
 
 struct MaterialConstant
@@ -64,6 +80,28 @@ struct PixelShaderOutput
     float4 color : SV_TARGET0;
     float4 normal : SV_TARGET1; // G-buffer: ワールド空間法線(.xyz) + 書き込みマスク(.w)
 };
+
+// 拡散項を階調化する。enableToon=0 ならそのまま返す。
+// バンド境界に toonEdgeSoftness 幅の smoothstep を入れてジャギを抑える。
+float ToonQuantize(float x)
+{
+    if (gMaterialLight.enableToon == 0) return x;
+    float bands = max((float) gMaterialLight.toonBands, 1.0f);
+    x = saturate(x);
+    float s = x * bands;
+    float lower = floor(s);
+    float f = s - lower; // バンド内 [0,1)
+    float soft = saturate(gMaterialLight.toonEdgeSoftness * bands);
+    float blend = (soft > 1e-4f) ? smoothstep(1.0f - soft, 1.0f, f) : 0.0f;
+    return (lower + blend) / bands;
+}
+
+// スペキュラ項を階調化（トゥーンスペキュラ）。
+float ToonSpecular(float specValue)
+{
+    if (gMaterialLight.enableToonSpecular == 0) return specValue;
+    return step(gMaterialLight.toonSpecularThreshold, specValue);
+}
 
 //-----------------------------------------------------------------------------
 // タイル単位ハッシュランダム化サンプル
@@ -208,8 +246,9 @@ PixelShaderOutput main(VertexShaderOutput input)
             shadow = sum / 9.0f;
         }
 
-        // 影の濃さを調整
-        float shadowFactor = max(shadow, 0.3f);
+        // 落ち影。トゥーン有効時はくっきり2値化(ベタ影)、無効時は従来のソフト(PCF)を維持。
+        // step(0.5) で「日向(1) / 影(0)」の完全2階調 = Blender カラーランプ「一定」相当。
+        float shadowFactor = (gMaterialLight.enableToon != 0) ? step(0.5f, shadow) : max(shadow, 0.3f);
         
         
         // カメラ視線ベクトル
@@ -221,21 +260,41 @@ PixelShaderOutput main(VertexShaderOutput input)
         
         if (gDirectionalLight.isEnableDirectionalLighting)
         {
-            // 拡散反射
+            float3 albedo = gMaterialColor.color.rgb * baseColor.rgb;
             float NdotL = max(dot(normalize(input.normal), -gDirectionalLight.direction), 0.0f);
-            float cos = pow(NdotL * 0.5f + 0.5f, 2.0f);
-            float3 diffuseDirectional = gMaterialColor.color.rgb * baseColor.rgb * gDirectionalLight.color.rgb * cos * gDirectionalLight.intensity;
-            // 鏡面反射 (Blinn-Phong)
             float3 halfVector = normalize(-gDirectionalLight.direction + toEye);
             float NdotH = max(dot(normalize(input.normal), halfVector), 0.0f);
-            float3 specularDirectional = gDirectionalLight.color.rgb * gDirectionalLight.intensity * pow(saturate(NdotH), gMaterialLight.shininess);
 
-            // フラグで有効化
-            if (gMaterialLight.enableSpecular != 0)
+            if (gMaterialLight.enableToon != 0)
             {
-                finalSpecular += specularDirectional * shadowFactor;
+                // 2D アニメ塗り: 影は「暗く」ではなく shadowColor へ寄せる。
+                // 回り込み(ハーフランバート pow)は明暗境界を濁らせるため使わず、
+                // 素のランバート × 落ち影 を階調化。落ち影を「受光量」として畳み込むことで、
+                // キャストシャドウも shadowColor のベタ塗りになり境界がパキッと出る。
+                float lambert = saturate(NdotL) * shadowFactor;
+                float df = ToonQuantize(lambert); // 主光の明暗 (0=影, 1=光)
+                float3 effShadow = lerp(float3(1.0f, 1.0f, 1.0f), gMaterialLight.shadowColor, gMaterialLight.shadowStrength);
+                float3 shade = lerp(effShadow, float3(1.0f, 1.0f, 1.0f), df);
+                finalDiffuse += albedo * gDirectionalLight.color.rgb * gDirectionalLight.intensity * shade;
+
+                // 固定ハイライト（丸い塗りハイライト）
+                if (gMaterialLight.enableToonSpecular != 0)
+                {
+                    float blob = ToonSpecular(pow(saturate(NdotH), gMaterialLight.shininess));
+                    finalSpecular += blob * gMaterialLight.highlightColor * gDirectionalLight.intensity;
+                }
             }
-            finalDiffuse += diffuseDirectional * shadowFactor;
+            else
+            {
+                float cosv = pow(NdotL * 0.5f + 0.5f, 2.0f);
+                float3 diffuseDirectional = albedo * gDirectionalLight.color.rgb * cosv * gDirectionalLight.intensity;
+                float3 specularDirectional = gDirectionalLight.color.rgb * gDirectionalLight.intensity * pow(saturate(NdotH), gMaterialLight.shininess);
+                if (gMaterialLight.enableSpecular != 0)
+                {
+                    finalSpecular += specularDirectional * shadowFactor;
+                }
+                finalDiffuse += diffuseDirectional * shadowFactor;
+            }
         }
 
         //===========================================================//
@@ -256,13 +315,14 @@ PixelShaderOutput main(VertexShaderOutput input)
             float distance = length(pl.position - input.worldPosition); // ポイントライトへの距離
             float factor = pow(saturate(-distance / pl.radius + 1.0f), pl.decay); //指数によるコントロール
             
-            // 拡散反射
+            // 拡散反射（トゥーン時は階調化）
             float NdotLPoint = max(dot(normalize(input.normal), pointLightDirection), 0.0f);
+            NdotLPoint = ToonQuantize(NdotLPoint);
             float3 diffusePoint = gMaterialColor.color.rgb * baseColor.rgb * pl.color.rgb * NdotLPoint * pl.intensity * factor;
-            // 鏡面反射 (Blinn-Phong)
+            // 鏡面反射 (Blinn-Phong、トゥーン時はしきい値ステップ)
             float3 halfVectorPoint = normalize(pointLightDirection + toEye);
             float NdotHPoint = max(dot(normalize(input.normal), halfVectorPoint), 0.0f);
-            float3 specularPoint = pl.color.rgb * pl.intensity * pow(saturate(NdotHPoint), gMaterialLight.shininess) * factor;
+            float3 specularPoint = pl.color.rgb * pl.intensity * ToonSpecular(pow(saturate(NdotHPoint), gMaterialLight.shininess)) * factor;
         
             // フラグで有効化
             if (gMaterialLight.enableSpecular != 0)
@@ -296,14 +356,15 @@ PixelShaderOutput main(VertexShaderOutput input)
             // 総減衰係数
             float falloffFactor = angleFalloff * distanceDecay;
 
-            // 拡散反射 (NdotL)
+            // 拡散反射 (NdotL、トゥーン時は階調化)
             float NdotLPoint = max(dot(normalize(input.normal), -spotLightDirectionOnSurface), 0.0f);
+            NdotLPoint = ToonQuantize(NdotLPoint);
             float3 diffusePoint = gMaterialColor.color.rgb * baseColor.rgb * sl.color.rgb * NdotLPoint * sl.intensity * falloffFactor;
 
-            // 鏡面反射 (Blinn-Phong)
+            // 鏡面反射 (Blinn-Phong、トゥーン時はしきい値ステップ)
             float3 halfVectorPoint = normalize(-spotLightDirectionOnSurface + toEye);
             float NdotHPoint = max(dot(normalize(input.normal), halfVectorPoint), 0.0f);
-            float3 specularPoint = sl.color.rgb * sl.intensity * pow(saturate(NdotHPoint), gMaterialLight.shininess) * falloffFactor;
+            float3 specularPoint = sl.color.rgb * sl.intensity * ToonSpecular(pow(saturate(NdotHPoint), gMaterialLight.shininess)) * falloffFactor;
 
             // スペキュラー反射の有効化
             if (gMaterialLight.enableSpecular != 0)
@@ -329,10 +390,21 @@ PixelShaderOutput main(VertexShaderOutput input)
         }
 
         //===========================================================//
-        
-        //                     最終的な色を合成  
+
+        //                     リムライト（トゥーン用の逆光フチ）
         //===========================================================//
-        output.color.rgb = finalDiffuse + finalSpecular + environmentColor;
+        float3 rim = float3(0.0f, 0.0f, 0.0f);
+        if (gMaterialLight.enableRim != 0)
+        {
+            float rimFactor = pow(1.0f - saturate(dot(normalize(input.normal), toEye)), gMaterialLight.rimPower);
+            rim = rimFactor * gMaterialLight.rimIntensity * gDirectionalLight.color.rgb;
+        }
+
+        //===========================================================//
+
+        //                     最終的な色を合成
+        //===========================================================//
+        output.color.rgb = finalDiffuse + finalSpecular + environmentColor + rim;
     }
     else
     {
