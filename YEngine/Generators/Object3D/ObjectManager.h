@@ -65,6 +65,10 @@ public:
 		// タイル単位ランダム化の強度 (0=オフ / 1=最大)。エディタから編集 / JSON 保存対象
 		float uvStochastic = 0.0f;
 
+		// インバートハル輪郭線を掛けるか。地面・空など大きな背景は false にして
+		// 輪郭が出ないようにする。エディタから編集 / JSON 保存対象。
+		bool outlineEnabled = true;
+
 		int id = 0;
 		int parentID = -1;
 		bool isActive = true;

@@ -49,8 +49,6 @@ public: // アクセッサ
 	YoRigine::DirectXCommon* GetDxCommon() const { return dxCommon_; }
 	void SetDefaultCamera(Camera* camera) { this->defaultCamera_ = camera; }
 
-private:
-
 	/// <summary>
 	/// ルートシグネチャをセット
 	/// </summary>

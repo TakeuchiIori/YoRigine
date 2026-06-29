@@ -22,7 +22,9 @@ workspace "YoRigine"
     -- PlatformToolset
     toolset "v143"
     
-    buildoptions { "/utf-8", "/permissive-" }
+    -- /FS: /MP(MultiProcessorCompile) で複数 cl.exe が同じ vc143.pdb へ書く際の
+    --      書き込み競合(C1041)を防ぐ。並列ビルドや同時ビルドでも安全になる。
+    buildoptions { "/utf-8", "/permissive-", "/FS" }
     defines { "NOMINMAX", "_WINDOWS" }
 
     targetdir (outputDir)

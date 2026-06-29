@@ -65,6 +65,9 @@ public:
 	void DrawInstanced(uint32_t instanceCount, D3D12_GPU_DESCRIPTOR_HANDLE instanceSRV);
 	// インスタンシング影描画 (ShadowMapInstanced PSO 使用)
 	void DrawShadowInstanced(uint32_t instanceCount, D3D12_GPU_DESCRIPTOR_HANDLE instanceSRV);
+	// インスタンシング輪郭線描画 (ObjectOutlineInstanced PSO 使用)。
+	// PSO/RS/CB は呼び出し側で設定済み。per-instance バッファをバインドして描く。
+	void DrawOutlineInstanced(uint32_t instanceCount, D3D12_GPU_DESCRIPTOR_HANDLE instanceSRV);
 
 	// モーション制御
 	void PlayOnce();

@@ -267,6 +267,24 @@ void Model::DrawShadowInstanced(uint32_t instanceCount, D3D12_GPU_DESCRIPTOR_HAN
 	}
 }
 
+void Model::DrawOutlineInstanced(uint32_t instanceCount, D3D12_GPU_DESCRIPTOR_HANDLE instanceSRV)
+{
+	assert(!hasBones_ && "Model::DrawOutlineInstanced does not support skinned meshes");
+
+	auto pm = YPipelineManager::GetInstance();
+	const auto& indices = pm->GetParameterIndices("ObjectOutlineInstanced");
+	auto commandList = modelCommon_->GetDxCommon()->GetCommandList().Get();
+
+	// PSO + RS + gCamera/gOutline は呼び出し側 (InstancedObject3d::Flush) でセット済み
+	commandList->SetGraphicsRootDescriptorTable(indices.at("gInstances"), instanceSRV);
+
+	for (size_t i = 0; i < meshes_.size(); ++i) {
+		auto& mesh = meshes_[i];
+		mesh->RecordDrawCommands(commandList);
+		commandList->DrawIndexedInstanced(mesh->GetIndexCount(), instanceCount, 0, 0, 0);
+	}
+}
+
 
 
 void Model::LoadModelIndexFile(const std::string& directoryPath, const std::string& filename)

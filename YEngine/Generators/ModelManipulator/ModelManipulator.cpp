@@ -207,6 +207,7 @@ namespace YoRigine {
 				inst.color = obj->color;
 				inst.uvTransform = MakeScaleMatrix({ obj->uvScale.x, obj->uvScale.y, 1.0f });
 				inst.stochasticStrength = obj->uvStochastic;
+				inst.outlineMask = obj->outlineEnabled ? 1.0f : 0.0f;
 				instRenderer->AddInstance(model, inst);
 
 				// PickBuffer や他システムが worldTransform の CB を参照するため、
@@ -382,6 +383,7 @@ namespace YoRigine {
 				inst.color = obj->color;
 				inst.uvTransform = MakeScaleMatrix({ obj->uvScale.x, obj->uvScale.y, 1.0f });
 				inst.stochasticStrength = obj->uvStochastic;
+				inst.outlineMask = obj->outlineEnabled ? 1.0f : 0.0f;
 				instRenderer->AddInstance(model, inst);
 			} else {
 				obj->object->DrawShadow(*obj->worldTransform);
@@ -696,6 +698,7 @@ namespace YoRigine {
 			newObj->uvScale = srcObj->uvScale;
 			newObj->uvStochastic = srcObj->uvStochastic;
 			objectManager_->ApplyObjectUV(*newObj);
+			newObj->outlineEnabled = srcObj->outlineEnabled;
 
 			// 親子関係も維持
 			newObj->parentID = srcObj->parentID;

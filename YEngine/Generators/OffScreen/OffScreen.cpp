@@ -314,6 +314,11 @@ void OffScreen::SetDepthOutlineParams(int kernelSize, const Vector4& color,
 		materialData_->depthThreshold = params.depthThreshold;
 		materialData_->normalThreshold = params.normalThreshold;
 		materialData_->luminanceThreshold = params.luminanceThreshold;
+		materialData_->normalWidth = params.normalWidth;
+		materialData_->luminanceWidth = params.luminanceWidth;
+		materialData_->useDistanceFade = params.useDistanceFade ? 1 : 0;
+		materialData_->distanceFadeStart = params.distanceFadeStart;
+		materialData_->distanceFadeEnd = params.distanceFadeEnd;
 	}
 }
 
@@ -596,6 +601,11 @@ void OffScreen::CreateDepthOutLineResource()
 	materialData_->depthThreshold = 1.0f;
 	materialData_->normalThreshold = 1.0f;
 	materialData_->luminanceThreshold = 1.0f;
+	materialData_->normalWidth = 1.0f;
+	materialData_->luminanceWidth = 1.0f;
+	materialData_->useDistanceFade = 0;
+	materialData_->distanceFadeStart = 30.0f;
+	materialData_->distanceFadeEnd = 80.0f;
 	materialResource_->Unmap(0, nullptr);
 }
 
