@@ -202,7 +202,6 @@
 ├── Resources/
 └── ├── Audio/
 └── ├── Binary/
-└── └── ├── Pipeline/
 └── ├── DDS/
 └── ├── Data/
 └── ├── Effects/
@@ -306,6 +305,7 @@
 └── └── └── ├── Grayscale/
 └── └── └── ├── Halftone/
 └── └── └── ├── Kuwahara/
+└── └── └── ├── NormalVisualize/
 └── └── └── ├── OutLine/
 └── └── └── ├── Posterize/
 └── └── └── ├── Sepia/
@@ -320,7 +320,6 @@
 └── └── ├── Sprite/
 └── └── └── Vfx/
 └── └──     └── VfxMesh/
-└── ├── TestBinary/
 └── ├── Textures/
 └── └── ├── ClearScene/
 └── └── ├── GameScene/
@@ -195068,6 +195067,12 @@ File Path: YEngine/Core/DirectX/DirectXCommon.cpp
 #include <cassert>
 #include <thread>
 #include <format>
+#include <filesystem>
+#include <fstream>
+#include <vector>
+#include <string>
+#include <unordered_set>
+#include <cctype>
 #include "d3dx12.h"
 #include "Debugger/Logger.h"
 #include "Debugger/ConvertString.h"
@@ -195179,6 +195184,15 @@ namespace YoRigine {
 			{ 0.1f, 0.1f, 0.2f, 1.0f },
 			true);   // SRV も同時に作成
 
+		// 法線 G-buffer RTV（MRT 用。ワールド空間法線を .xyz、.w=書き込みマスク 0/1）
+		// クリア値 0 → 法線未書き込み(背景)を .w==0 で判定できる
+		rtvManager_->Create(
+			"NormalBuffer",
+			WinApp::kClientWidth, WinApp::kClientHeight,
+			DXGI_FORMAT_R16G16B16A16_FLOAT,
+			{ 0.0f, 0.0f, 0.0f, 0.0f },
+			true);   // SRV も同時に作成（ポストエフェクトから読む）
+
 		// 最終出力 RTV（FinalResult）
 		rtvManager_->Create(
 			"FinalResult",
@@ -195240,6 +195254,12 @@ namespace YoRigine {
 			D3D12_RESOURCE_STATE_GENERIC_READ,
 			D3D12_RESOURCE_STATE_RENDER_TARGET);
 
+		// NormalBuffer を RenderTarget へ（MRT 第2ターゲット）
+		rtvManager_->TransitionBarrier(
+			cmd.Get(), "NormalBuffer",
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			D3D12_RESOURCE_STATE_RENDER_TARGET);
+
 		// MainDepth を DEPTH_WRITE へ
 		if (depthCurrentState_ != D3D12_RESOURCE_STATE_DEPTH_WRITE) {
 			dsvManager_->TransitionBarrier(
@@ -195258,8 +195278,9 @@ namespace YoRigine {
 		}
 
 		D3D12_CPU_DESCRIPTOR_HANDLE dsvH = dsvManager_->GetHandle("MainDepth");
-		rtvManager_->SetRenderTargets(cmd.Get(), { "OffScreen" }, &dsvH);
+		rtvManager_->SetRenderTargets(cmd.Get(), std::vector<std::string>{ "OffScreen", "NormalBuffer" },&dsvH);
 		rtvManager_->Clear("OffScreen", cmd.Get());
+		rtvManager_->Clear("NormalBuffer", cmd.Get());
 		dsvManager_->Clear("MainDepth", cmd.Get());
 
 		cmd->RSSetViewports(1, &viewport_);
@@ -195280,7 +195301,8 @@ namespace YoRigine {
 		}
 
 		// 深度なしで OffScreen を再バインド（書き込み中の深度を同時に SRV 読みする衝突を回避）
-		rtvManager_->SetRenderTargets(cmd.Get(), { "OffScreen" }, nullptr);
+		// MRT 構成を維持するため NormalBuffer も併せて bind する
+		rtvManager_->SetRenderTargets(cmd.Get(), std::vector<std::string>{ "OffScreen", "NormalBuffer" },nullptr);
 		cmd->RSSetViewports(1, &viewport_);
 		cmd->RSSetScissorRects(1, &scissorRect_);
 	}
@@ -195296,7 +195318,7 @@ namespace YoRigine {
 		}
 
 		D3D12_CPU_DESCRIPTOR_HANDLE dsvH = dsvManager_->GetHandle("MainDepth");
-		rtvManager_->SetRenderTargets(cmd.Get(), { "OffScreen" }, &dsvH);
+		rtvManager_->SetRenderTargets(cmd.Get(), std::vector<std::string>{ "OffScreen", "NormalBuffer" },&dsvH);
 		cmd->RSSetViewports(1, &viewport_);
 		cmd->RSSetScissorRects(1, &scissorRect_);
 	}
@@ -195312,11 +195334,18 @@ namespace YoRigine {
 			D3D12_RESOURCE_STATE_GENERIC_READ,
 			D3D12_RESOURCE_STATE_RENDER_TARGET);
 
+		// PiP 法線 RT も RENDER_TARGET へ（不透明 PSO が 2-RT のため bind 数を揃える）
+		const std::string pipNormal = rtName + "_Normal";
+		rtvManager_->TransitionBarrier(cmd.Get(), pipNormal,
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			D3D12_RESOURCE_STATE_RENDER_TARGET);
+
 		// PiP DSV は常に DEPTH_WRITE 運用 (SRV 化しないため遷移不要)
 
 		D3D12_CPU_DESCRIPTOR_HANDLE dsvH = dsvManager_->GetHandle(dsvName);
-		rtvManager_->SetRenderTargets(cmd.Get(), { rtName }, &dsvH);
+		rtvManager_->SetRenderTargets(cmd.Get(), { rtName, pipNormal }, &dsvH);
 		rtvManager_->Clear(rtName, cmd.Get());
+		rtvManager_->Clear(pipNormal, cmd.Get());
 		dsvManager_->Clear(dsvName, cmd.Get());
 
 		D3D12_VIEWPORT vp{};
@@ -195343,6 +195372,10 @@ namespace YoRigine {
 		rtvManager_->TransitionBarrier(cmd.Get(), rtName,
 			D3D12_RESOURCE_STATE_RENDER_TARGET,
 			D3D12_RESOURCE_STATE_GENERIC_READ);
+		// PiP 法線 RT も READ へ戻す（次フレームの PreDrawPip で再び RENDER_TARGET へ）
+		rtvManager_->TransitionBarrier(cmd.Get(), rtName + "_Normal",
+			D3D12_RESOURCE_STATE_RENDER_TARGET,
+			D3D12_RESOURCE_STATE_GENERIC_READ);
 	}
 
 	/// バックバッファパス：OffScreen / Depth を SRV 化 → BackBuffer RTV
@@ -195355,6 +195388,12 @@ namespace YoRigine {
 		// OffScreen → SRV
 		rtvManager_->TransitionBarrier(
 			cmd.Get(), "OffScreen",
+			D3D12_RESOURCE_STATE_RENDER_TARGET,
+			D3D12_RESOURCE_STATE_GENERIC_READ);
+
+		// NormalBuffer → SRV（ポストエフェクトから読む）
+		rtvManager_->TransitionBarrier(
+			cmd.Get(), "NormalBuffer",
 			D3D12_RESOURCE_STATE_RENDER_TARGET,
 			D3D12_RESOURCE_STATE_GENERIC_READ);
 
@@ -195606,12 +195645,130 @@ namespace YoRigine {
 	}
 
 	// =========================================================================
+	// シェーダー DXIL ディスクキャッシュ用ヘルパー
+	// =========================================================================
+	namespace {
+		// キャッシュフォーマットのバージョン（フォーマットやコンパイル引数を変えたら +1）
+		constexpr uint32_t kShaderCacheVersion = 1;
+		// キャッシュ出力先 / インクルード解決のルート
+		const std::filesystem::path kShaderCacheDir = "Resources/Binary/Shader/";
+		const std::filesystem::path kShaderRoot     = "Resources/Shaders/";
+
+		// FNV-1a（seed を渡して複数バイト列を連結ハッシュできる）
+		uint64_t FnvHash(const void* data, size_t size, uint64_t seed = 0xcbf29ce484222325ULL) {
+			uint64_t h = seed;
+			const uint8_t* p = static_cast<const uint8_t*>(data);
+			for (size_t i = 0; i < size; ++i) { h ^= p[i]; h *= 0x100000001b3ULL; }
+			return h;
+		}
+
+		bool ReadFileBytes(const std::filesystem::path& path, std::string& out) {
+			std::ifstream ifs(path, std::ios::binary);
+			if (!ifs) return false;
+			out.assign((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+			return true;
+		}
+
+		// #include を再帰的に辿り、全ソース内容をハッシュに畳み込む。
+		// これにより共通 .hlsli を編集してもキャッシュが正しく無効化される。
+		void HashSourceRecursive(const std::filesystem::path& file,
+			std::unordered_set<std::string>& visited, uint64_t& hash) {
+			const std::string canonical = file.lexically_normal().string();
+			if (!visited.insert(canonical).second) return; // 既訪問
+
+			std::string content;
+			if (!ReadFileBytes(file, content)) {
+				// 読めない場合はパス文字列だけ畳み込んで継続（ベストエフォート）
+				hash = FnvHash(canonical.data(), canonical.size(), hash);
+				return;
+			}
+			hash = FnvHash(content.data(), content.size(), hash);
+
+			// #include "xxx" を素朴に抽出
+			size_t pos = 0;
+			while ((pos = content.find("#include", pos)) != std::string::npos) {
+				const size_t lineEnd = content.find('\n', pos);
+				const size_t q1 = content.find('"', pos);
+				if (q1 == std::string::npos || (lineEnd != std::string::npos && q1 > lineEnd)) {
+					pos += 8; continue;
+				}
+				const size_t q2 = content.find('"', q1 + 1);
+				if (q2 == std::string::npos) break;
+				const std::string inc = content.substr(q1 + 1, q2 - q1 - 1);
+				pos = q2 + 1;
+
+				// インクルード元ディレクトリ → シェーダールート の順で解決
+				std::filesystem::path incPath = file.parent_path() / inc;
+				if (!std::filesystem::exists(incPath)) incPath = kShaderRoot / inc;
+				if (std::filesystem::exists(incPath)) {
+					HashSourceRecursive(incPath, visited, hash);
+				} else {
+					// 解決できなくても include 文字列は畳み込む
+					hash = FnvHash(inc.data(), inc.size(), hash);
+				}
+			}
+		}
+
+		std::string SanitizeForFilename(const std::string& s) {
+			std::string out = s;
+			for (char& c : out) {
+				if (!std::isalnum(static_cast<unsigned char>(c))) c = '_';
+			}
+			return out;
+		}
+	} // namespace
+
+	// =========================================================================
 	// リソース生成ヘルパー
 	// =========================================================================
 	Microsoft::WRL::ComPtr<IDxcBlob> DirectXCommon::CompileShader(
 		const std::wstring& filePath,
 		const wchar_t* profile)
 	{
+		const std::string pathStr = ConvertString(filePath);
+		const std::string profileStr = ConvertString(std::wstring(profile));
+
+		// ---- キャッシュキー／パスの決定 ----
+		const std::string cacheName =
+			SanitizeForFilename(pathStr) + "__" + SanitizeForFilename(profileStr) + ".dxil";
+		const std::filesystem::path cachePath = kShaderCacheDir / cacheName;
+
+		// ---- ソースハッシュ（プロファイル + インクルード込みのソース内容）----
+		uint64_t sourceHash = FnvHash(profileStr.data(), profileStr.size());
+		{
+			std::unordered_set<std::string> visited;
+			HashSourceRecursive(filePath, visited, sourceHash);
+		}
+
+		// ---- キャッシュ命中なら DXC を呼ばずに DXIL を読み込んで返す ----
+		{
+			std::ifstream ifs(cachePath, std::ios::binary);
+			if (ifs) {
+				uint32_t ver = 0; uint64_t storedHash = 0; uint64_t dxilSize = 0;
+				ifs.read(reinterpret_cast<char*>(&ver), sizeof(ver));
+				ifs.read(reinterpret_cast<char*>(&storedHash), sizeof(storedHash));
+				ifs.read(reinterpret_cast<char*>(&dxilSize), sizeof(dxilSize));
+				if (ifs.good() && ver == kShaderCacheVersion && storedHash == sourceHash
+					&& dxilSize > 0 && dxilSize < 64ull * 1024 * 1024) {
+					std::vector<char> bytes(static_cast<size_t>(dxilSize));
+					ifs.read(bytes.data(), static_cast<std::streamsize>(dxilSize));
+					if (ifs.good()) {
+						Microsoft::WRL::ComPtr<IDxcBlobEncoding> enc;
+						if (SUCCEEDED(dxcUtils_->CreateBlob(bytes.data(),
+							static_cast<UINT32>(dxilSize), DXC_CP_ACP, &enc)) && enc) {
+							Microsoft::WRL::ComPtr<IDxcBlob> blob;
+							if (SUCCEEDED(enc.As(&blob))) {
+								Logger(ConvertString(std::format(
+									L"[ShaderCache] HIT: {} ({})\n", filePath, profile)));
+								return blob;
+							}
+						}
+					}
+				}
+			}
+		}
+
+		// ---- キャッシュミス → DXC でコンパイル ----
 		Logger(ConvertString(std::format(L"Begin CompileShader,path:{},profile:{}\n", filePath, profile)));
 
 		IDxcBlobEncoding* shaderSource = nullptr;
@@ -195647,6 +195804,22 @@ namespace YoRigine {
 		assert(SUCCEEDED(hr));
 
 		Logger(ConvertString(std::format(L"Compile Succeeded,path:{},profile:{}\n", filePath, profile)));
+
+		// ---- コンパイル結果をディスクキャッシュに保存 ----
+		if (blob && blob->GetBufferSize() > 0) {
+			std::error_code ec;
+			std::filesystem::create_directories(kShaderCacheDir, ec);
+			std::ofstream ofs(cachePath, std::ios::binary | std::ios::trunc);
+			if (ofs) {
+				const uint32_t ver = kShaderCacheVersion;
+				const uint64_t dxilSize = blob->GetBufferSize();
+				ofs.write(reinterpret_cast<const char*>(&ver), sizeof(ver));
+				ofs.write(reinterpret_cast<const char*>(&sourceHash), sizeof(sourceHash));
+				ofs.write(reinterpret_cast<const char*>(&dxilSize), sizeof(dxilSize));
+				ofs.write(reinterpret_cast<const char*>(blob->GetBufferPointer()),
+					static_cast<std::streamsize>(dxilSize));
+			}
+		}
 
 		shaderSource->Release();
 		result->Release();
@@ -195981,6 +196154,8 @@ namespace YoRigine {
 	public:
 		D3D12_GPU_DESCRIPTOR_HANDLE GetOffScreenGPUHandle() { return GetRTVSrvGPU("OffScreen"); }
 		D3D12_CPU_DESCRIPTOR_HANDLE GetOffScreenCPUHandle() { return GetRTVSrvCPU("OffScreen"); }
+		D3D12_GPU_DESCRIPTOR_HANDLE GetNormalGPUHandle() { return GetRTVSrvGPU("NormalBuffer"); }
+		D3D12_CPU_DESCRIPTOR_HANDLE GetNormalCPUHandle() { return GetRTVSrvCPU("NormalBuffer"); }
 		D3D12_GPU_DESCRIPTOR_HANDLE GetDepthGPUHandle() { return GetDSVSrvGPU("MainDepth"); }
 		D3D12_CPU_DESCRIPTOR_HANDLE GetDepthCPUHandle() { return GetDSVSrvCPU("MainDepth"); }
 		D3D12_GPU_DESCRIPTOR_HANDLE GetShadowDepthGPUHandle() { return GetDSVSrvGPU("ShadowDepth"); }
@@ -210956,7 +211131,8 @@ void OffScreen::RenderEffectCompute(
 	case OffScreenEffectType::CrossHatch:         psoKey = "PostEffectCrossHatchCS";  rsKey = "PostEffectRS_CB"; break;
 	case OffScreenEffectType::ColorGrade:         psoKey = "PostEffectColorGradeCS";  rsKey = "PostEffectRS_CB"; break;
 	case OffScreenEffectType::ColorAdjust:        psoKey = "PostEffectColorAdjustCS"; rsKey = "PostEffectRS_CB2"; break;
-	case OffScreenEffectType::DepthOutline:       psoKey = "PostEffectDepthOutlineCS"; rsKey = "PostEffectRS_Depth"; break;
+	case OffScreenEffectType::DepthOutline:       psoKey = "PostEffectDepthOutlineCS"; rsKey = "PostEffectRS_DepthNormal"; break;
+	case OffScreenEffectType::NormalVisualize:    psoKey = "PostEffectNormalVisualizeCS"; rsKey = "PostEffectRS_DepthNormal"; break;
 	case OffScreenEffectType::Fog:                psoKey = "PostEffectFogCS";          rsKey = "PostEffectRS_Depth"; break;
 	case OffScreenEffectType::GodRays:            psoKey = "PostEffectGodRaysCS";      rsKey = "PostEffectRS_Depth"; break;
 	case OffScreenEffectType::Dissolve:           psoKey = "PostEffectDissolveCS";     rsKey = "PostEffectRS_Tex"; break;
@@ -211045,13 +211221,24 @@ void OffScreen::RenderEffectCompute(
 		cmd->SetComputeRootConstantBufferView(3, toneParamsResource_->GetGPUVirtualAddress());
 		break;
 
-	// === RS_Depth: SRV(0)=color, SRV(1)=depth, UAV(2), CBV(3) ===
+	// === RS_DepthNormal: SRV(0)=color, SRV(1)=depth, SRV(2)=normal, UAV(3), CBV(4) ===
 	case OffScreenEffectType::DepthOutline:
 		cmd->SetComputeRootDescriptorTable(0, inputSRV);
 		cmd->SetComputeRootDescriptorTable(1, dxCommon_->GetDepthGPUHandle());
-		cmd->SetComputeRootDescriptorTable(2, outputUAV);
-		cmd->SetComputeRootConstantBufferView(3, materialResource_->GetGPUVirtualAddress());
+		cmd->SetComputeRootDescriptorTable(2, dxCommon_->GetNormalGPUHandle());
+		cmd->SetComputeRootDescriptorTable(3, outputUAV);
+		cmd->SetComputeRootConstantBufferView(4, materialResource_->GetGPUVirtualAddress());
 		break;
+	case OffScreenEffectType::NormalVisualize:
+		cmd->SetComputeRootDescriptorTable(0, inputSRV);
+		cmd->SetComputeRootDescriptorTable(1, dxCommon_->GetDepthGPUHandle());
+		cmd->SetComputeRootDescriptorTable(2, dxCommon_->GetNormalGPUHandle());
+		cmd->SetComputeRootDescriptorTable(3, outputUAV);
+		// CBV は未使用だが RS が要求するためダミーで materialResource_ をバインド
+		cmd->SetComputeRootConstantBufferView(4, materialResource_->GetGPUVirtualAddress());
+		break;
+
+	// === RS_Depth: SRV(0)=color, SRV(1)=depth, UAV(2), CBV(3) ===
 	case OffScreenEffectType::Fog:
 		cmd->SetComputeRootDescriptorTable(0, inputSRV);
 		cmd->SetComputeRootDescriptorTable(1, dxCommon_->GetDepthGPUHandle());
@@ -211156,11 +211343,22 @@ void OffScreen::SetGaussianBlurParams(float sigma, int kernelSize)
 }
 
 /// <summary>深度アウトラインの描画設定</summary>
-void OffScreen::SetDepthOutlineParams(int kernelSize, const Vector4& color)
+void OffScreen::SetDepthOutlineParams(int kernelSize, const Vector4& color,
+	const DepthOutlineParams& params)
 {
 	if (materialData_) {
 		materialData_->kernelSize = kernelSize;
 		materialData_->outlineColor = color;
+		materialData_->useDepth = params.useDepth ? 1 : 0;
+		materialData_->useNormal = params.useNormal ? 1 : 0;
+		materialData_->useLuminance = params.useLuminance ? 1 : 0;
+		materialData_->depthWeight = params.depthWeight;
+		materialData_->normalWeight = params.normalWeight;
+		materialData_->luminanceWeight = params.luminanceWeight;
+		materialData_->edgeStrength = params.edgeStrength;
+		materialData_->depthThreshold = params.depthThreshold;
+		materialData_->normalThreshold = params.normalThreshold;
+		materialData_->luminanceThreshold = params.luminanceThreshold;
 	}
 }
 
@@ -211433,6 +211631,16 @@ void OffScreen::CreateDepthOutLineResource()
 	materialData_->Inverse = MakeIdentity4x4();
 	materialData_->kernelSize = 3;
 	materialData_->outlineColor = { 0.0f, 0.0f, 0.0f, 1.0f };
+	materialData_->useDepth = 1;
+	materialData_->useNormal = 0;
+	materialData_->useLuminance = 0;
+	materialData_->depthWeight = 1.0f;
+	materialData_->normalWeight = 1.0f;
+	materialData_->luminanceWeight = 1.0f;
+	materialData_->edgeStrength = 1.0f;
+	materialData_->depthThreshold = 1.0f;
+	materialData_->normalThreshold = 1.0f;
+	materialData_->luminanceThreshold = 1.0f;
 	materialResource_->Unmap(0, nullptr);
 }
 
@@ -211686,6 +211894,7 @@ public:
 		ColorGrade,
 		Fog,
 		GodRays,
+		NormalVisualize,
 	};
 	///************************* パラメータ調整 *************************///
 	struct RadialBlurPrams
@@ -211702,6 +211911,20 @@ public:
 		float edgeWidth;
 		Vector3 edgeColor;
 		float invert;
+	};
+
+	// 強化版 DepthOutline 用（深度/法線/輝度の各エッジを個別トグル + 加重合計）
+	struct DepthOutlineParams {
+		bool  useDepth = true;          // 深度エッジ
+		bool  useNormal = false;        // 法線エッジ（G-buffer 参照）
+		bool  useLuminance = false;     // 輝度エッジ
+		float depthWeight = 1.0f;
+		float normalWeight = 1.0f;
+		float luminanceWeight = 1.0f;
+		float edgeStrength = 1.0f;       // 全体強度倍率
+		float depthThreshold = 1.0f;     // 各エッジの正規化しきい値
+		float normalThreshold = 1.0f;
+		float luminanceThreshold = 1.0f;
 	};
 
 	static OffScreen* GetInstance() {
@@ -211833,7 +212056,8 @@ public:
 	void SetGaussianBlurParams(float sigma, int kernelSize);
 
 	// デプスアウトラインのパラメータを設定
-	void SetDepthOutlineParams(int kernelSize, const Vector4& color);
+	void SetDepthOutlineParams(int kernelSize, const Vector4& color,
+		const DepthOutlineParams& params = {});
 
 	// ラジアルブラーのパラメータを設定
 	void SetRadialBlurParams(const RadialBlurPrams& params);
@@ -211946,9 +212170,19 @@ private:
 	};
 
 	struct Material {
-		Matrix4x4 Inverse;
+		Matrix4x4 Inverse;          // projectionInverse (viewZ 復元用)
 		int kernelSize;
-		int padding[3];
+		int useDepth;
+		int useNormal;
+		int useLuminance;
+		float depthWeight;
+		float normalWeight;
+		float luminanceWeight;
+		float edgeStrength;
+		float depthThreshold;
+		float normalThreshold;
+		float luminanceThreshold;
+		float _pad;
 		Vector4 outlineColor;
 	};
 
@@ -212626,6 +212860,37 @@ bool PostEffectChain::DrawEffectParametersImGui([[maybe_unused]] int selectedInd
 		if (ImGui::ColorEdit4("Outline Color", &effect->params.outlineColor.x)) {
 			changed = true;
 		}
+		{
+			auto& d = effect->params.depthOutline;
+			ImGui::SeparatorText("エッジ要因");
+			if (ImGui::Checkbox("深度", &d.useDepth)) changed = true;
+			ImGui::SameLine();
+			if (ImGui::Checkbox("法線", &d.useNormal)) changed = true;
+			ImGui::SameLine();
+			if (ImGui::Checkbox("輝度", &d.useLuminance)) changed = true;
+
+			if (ImGui::DragFloat("全体強度", &d.edgeStrength, 0.01f, 0.0f, 10.0f)) changed = true;
+
+			if (d.useDepth) {
+				if (ImGui::DragFloat("深度 重み", &d.depthWeight, 0.01f, 0.0f, 10.0f)) changed = true;
+				if (ImGui::DragFloat("深度 閾値", &d.depthThreshold, 0.001f, 0.0001f, 10.0f)) changed = true;
+			}
+			if (d.useNormal) {
+				if (ImGui::DragFloat("法線 重み", &d.normalWeight, 0.01f, 0.0f, 10.0f)) changed = true;
+				if (ImGui::DragFloat("法線 閾値", &d.normalThreshold, 0.001f, 0.0001f, 10.0f)) changed = true;
+			}
+			if (d.useLuminance) {
+				if (ImGui::DragFloat("輝度 重み", &d.luminanceWeight, 0.01f, 0.0f, 10.0f)) changed = true;
+				if (ImGui::DragFloat("輝度 閾値", &d.luminanceThreshold, 0.001f, 0.0001f, 10.0f)) changed = true;
+			}
+		}
+		break;
+
+		// --------------------------------------------------------
+		// 法線可視化（パラメータなし）
+		// --------------------------------------------------------
+	case OffScreen::OffScreenEffectType::NormalVisualize:
+		ImGui::TextUnformatted("法線 G-buffer をそのまま色表示します（調整項目なし）");
 		break;
 
 		// --------------------------------------------------------
@@ -212955,6 +213220,7 @@ const char* PostEffectChain::GetEffectTypeName(OffScreen::OffScreenEffectType ty
 	case OffScreen::OffScreenEffectType::ColorGrade:        return "ColorGrade";
 	case OffScreen::OffScreenEffectType::Fog:               return "Fog";
 	case OffScreen::OffScreenEffectType::GodRays:           return "GodRays";
+	case OffScreen::OffScreenEffectType::NormalVisualize:   return "NormalVisualize";
 	default:                                                return "Unknown";
 	}
 }
@@ -213112,6 +213378,7 @@ struct PostEffectData {
 		float sigma = 2.0f;                         // GaussSmoothing用
 		int kernelSize = 3;                         // 各種フィルタ用
 		Vector4 outlineColor = { 0,0,0,1 };         // DepthOutline用
+		OffScreen::DepthOutlineParams depthOutline; // DepthOutline用(深度/法線/輝度トグル)
 		OffScreen::RadialBlurPrams radialBlur;      // RadialBlur用
 		OffScreen::DissolveParams dissolve;         // Dissolve用
 		OffScreen::ChromaticParams chromatic;       // Chromatic用
@@ -213533,7 +213800,7 @@ void PostEffectManager::ImGui()
 			"Grayscale", "Vignette", "RadialBlur", "ToneMapping",
 			"Dissolve", "Chromatic", "ColorAdjust", "ShatterTransition",
 			"Bloom", "Posterize", "Kuwahara", "Halftone", "CrossHatch", "ColorGrade",
-			"Fog", "GodRays"
+			"Fog", "GodRays", "NormalVisualize"
 		};
 
 		for (int i = 0; i < IM_ARRAYSIZE(effectNames); ++i) {
@@ -213882,11 +214149,16 @@ void PostEffectManager::ApplyEffectParametersToOffScreen(const PostEffectData& e
 		break;
 
 	case OffScreen::OffScreenEffectType::DepthOutline:
-		// 輪郭線の太さと色
+		// 輪郭線の太さ・色・各エッジ(深度/法線/輝度)トグル
 		offScreen_->SetDepthOutlineParams(
 			effect.params.kernelSize,
-			effect.params.outlineColor
+			effect.params.outlineColor,
+			effect.params.depthOutline
 		);
+		break;
+
+	case OffScreen::OffScreenEffectType::NormalVisualize:
+		// 法線可視化（パラメータなし）
 		break;
 
 	case OffScreen::OffScreenEffectType::RadialBlur:
@@ -224554,6 +224826,18 @@ void PipCameraSystem::CreateRenderResources() {
 		true
 	);
 
+	// PiP 用 法線 RTV（MRT 第2ターゲット）。
+	// メインパスと同じく不透明オブジェクトは法線も出力するため、PiP でも
+	// 同サイズ・同フォーマットの法線 RT を bind する必要がある（PiP では内容は未使用）。
+	rtvMgr->Create(
+		rtName_ + "_Normal",
+		rtWidth_,
+		rtHeight_,
+		DXGI_FORMAT_R16G16B16A16_FLOAT,
+		Vector4{ 0.0f, 0.0f, 0.0f, 0.0f },
+		true
+	);
+
 	// PiP 用 DSV (Phase 1b の 2nd レンダーパスで使う)
 	dsvMgr->Create(
 		dsvName_,
@@ -230496,6 +230780,55 @@ void ComputeShaderManager::CreatePostEffectCS()
 	}
 
 	// ===========================================================
+	// RS_DepthNormal : SRV(t0=color)+SRV(t1=depth)+SRV(t2=normal) + UAV(u0) + CBV(b0) + Sampler(s0,s1)
+	// DepthOutline(強化版) / NormalVisualize 用
+	// ===========================================================
+	{
+		D3D12_DESCRIPTOR_RANGE srv0 = MakeRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0);
+		D3D12_DESCRIPTOR_RANGE srv1 = MakeRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1);
+		D3D12_DESCRIPTOR_RANGE srv2 = MakeRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2);
+		D3D12_DESCRIPTOR_RANGE uav  = MakeRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0);
+
+		D3D12_ROOT_PARAMETER params[5] = {};
+		params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		params[0].DescriptorTable.pDescriptorRanges = &srv0;
+		params[0].DescriptorTable.NumDescriptorRanges = 1;
+
+		params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		params[1].DescriptorTable.pDescriptorRanges = &srv1;
+		params[1].DescriptorTable.NumDescriptorRanges = 1;
+
+		params[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		params[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		params[2].DescriptorTable.pDescriptorRanges = &srv2;
+		params[2].DescriptorTable.NumDescriptorRanges = 1;
+
+		params[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		params[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		params[3].DescriptorTable.pDescriptorRanges = &uav;
+		params[3].DescriptorTable.NumDescriptorRanges = 1;
+
+		params[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+		params[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		params[4].Descriptor.ShaderRegister = 0;
+
+		D3D12_STATIC_SAMPLER_DESC samps[2] = {
+			MakeStaticSampler(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR),
+			MakeStaticSampler(1, D3D12_FILTER_MIN_MAG_MIP_POINT),
+		};
+
+		D3D12_ROOT_SIGNATURE_DESC desc{};
+		desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
+		desc.NumParameters = _countof(params);
+		desc.pParameters = params;
+		desc.NumStaticSamplers = _countof(samps);
+		desc.pStaticSamplers = samps;
+		SerializeAndCreateRS(device, desc, rootSignatures_["PostEffectRS_DepthNormal"]);
+	}
+
+	// ===========================================================
 	// RS_Tex : SRV(t0)+SRV(t1) + UAV(u0) + CBV(b0) + Sampler(s0)
 	// Dissolve / ShatterTransition 用
 	// ===========================================================
@@ -230560,7 +230893,8 @@ void ComputeShaderManager::CreatePostEffectCS()
 		// CB2
 		{ "PostEffectColorAdjustCS", L"Resources/Shaders/PostEffect/ColorRemapping/ColorAdjust.CS.hlsl", "PostEffectRS_CB2" },
 		// Depth
-		{ "PostEffectDepthOutlineCS", L"Resources/Shaders/PostEffect/OutLine/DepthBasedOutLine.CS.hlsl", "PostEffectRS_Depth" },
+		{ "PostEffectDepthOutlineCS", L"Resources/Shaders/PostEffect/OutLine/DepthBasedOutLine.CS.hlsl", "PostEffectRS_DepthNormal" },
+		{ "PostEffectNormalVisualizeCS", L"Resources/Shaders/PostEffect/NormalVisualize/NormalVisualize.CS.hlsl", "PostEffectRS_DepthNormal" },
 		{ "PostEffectFogCS",          L"Resources/Shaders/PostEffect/Fog/Fog.CS.hlsl",                   "PostEffectRS_Depth" },
 		{ "PostEffectGodRaysCS",      L"Resources/Shaders/PostEffect/GodRays/GodRays.CS.hlsl",           "PostEffectRS_Depth" },
 		// Tex
@@ -232836,15 +233170,31 @@ File Path: YEngine/Graphics/PipelineManager/PSOCache.cpp
 #include "PSOCache.h"
 #include <cassert>
 #include <stdexcept>
+#include <sstream>
+#include <algorithm>
+#include <iterator>
 #include "Debugger/Logger.h"
 
 namespace YoRigine {
     // バージョン番号（フォーマット変更時にインクリメント）
-    static const uint32_t CACHE_VERSION = 2;
+    // v3: 入力ハッシュ(inputHash)をヘッダーに追加
+    static const uint32_t CACHE_VERSION = 3;
 
     // ============================================================================
     // CompletePipelineCache 実装
     // ============================================================================
+
+    uint64_t CompletePipelineCache::HashData(const void* data, size_t size, uint64_t seed)
+    {
+        // FNV-1a
+        uint64_t hash = seed;
+        const uint8_t* bytes = static_cast<const uint8_t*>(data);
+        for (size_t i = 0; i < size; ++i) {
+            hash ^= bytes[i];
+            hash *= 0x100000001b3ULL;
+        }
+        return hash;
+    }
 
     void CompletePipelineCache::Initialize(ID3D12Device* device, const std::filesystem::path& cacheDirectory)
     {
@@ -232992,13 +233342,33 @@ namespace YoRigine {
         auto filePath = GetCacheFilePath(key);
 
         try {
-            std::ofstream file(filePath, std::ios::binary);
-            if (!file.is_open()) {
-                return false;
+            // ===== 入力ハッシュによる早期スキップ =====
+            // 既存ファイルが同じバージョン＆同じ入力ハッシュなら、パイプラインは
+            // 変わっていない。出力PSOブロブはドライバ依存で毎回変化するため、
+            // ここでファイルを書き換えない（更新時刻も維持し、git差分も出さない）。
+            if (std::filesystem::exists(filePath)) {
+                std::ifstream existing(filePath, std::ios::binary);
+                if (existing.is_open()) {
+                    uint32_t existingVersion = 0;
+                    uint64_t existingHash = 0;
+                    existing.read(reinterpret_cast<char*>(&existingVersion), sizeof(existingVersion));
+                    existing.read(reinterpret_cast<char*>(&existingHash), sizeof(existingHash));
+                    if (existing.good()
+                        && existingVersion == CACHE_VERSION
+                        && existingHash == data.inputHash
+                        && data.inputHash != 0) {
+                        // 入力に変化なし → 書き換え不要
+                        return true;
+                    }
+                }
             }
 
+            // メモリ上のバッファへシリアライズしてから一括書き込みする。
+            std::ostringstream oss(std::ios::binary);
+
             // ===== ヘッダー =====
-            file.write(reinterpret_cast<const char*>(&CACHE_VERSION), sizeof(CACHE_VERSION));
+            oss.write(reinterpret_cast<const char*>(&CACHE_VERSION), sizeof(CACHE_VERSION));
+            oss.write(reinterpret_cast<const char*>(&data.inputHash), sizeof(data.inputHash));
 
             // ===== ルートシグネチャのシリアライズデータ =====
             if (data.rootSignature) {
@@ -233007,16 +233377,16 @@ namespace YoRigine {
                 // 実装の簡略化のため、ここでは再シリアライズは行わず、
                 // パラメータインデックスとPSOのみ保存
                 uint32_t hasRootSig = 1;
-                file.write(reinterpret_cast<const char*>(&hasRootSig), sizeof(hasRootSig));
+                oss.write(reinterpret_cast<const char*>(&hasRootSig), sizeof(hasRootSig));
 
                 // TODO: 完全な実装では、ルートシグネチャの再シリアライズが必要
                 // 現時点ではスキップマーカーのみ書き込み
                 uint64_t rootSigSize = 0;
-                file.write(reinterpret_cast<const char*>(&rootSigSize), sizeof(rootSigSize));
+                oss.write(reinterpret_cast<const char*>(&rootSigSize), sizeof(rootSigSize));
             }
             else {
                 uint32_t hasRootSig = 0;
-                file.write(reinterpret_cast<const char*>(&hasRootSig), sizeof(hasRootSig));
+                oss.write(reinterpret_cast<const char*>(&hasRootSig), sizeof(hasRootSig));
             }
 
             // ===== PSOのキャッシュブロブ =====
@@ -233026,38 +233396,45 @@ namespace YoRigine {
 
                 if (SUCCEEDED(hr) && psoBlob) {
                     uint64_t psoSize = psoBlob->GetBufferSize();
-                    file.write(reinterpret_cast<const char*>(&psoSize), sizeof(psoSize));
-                    file.write(static_cast<const char*>(psoBlob->GetBufferPointer()), psoSize);
+                    oss.write(reinterpret_cast<const char*>(&psoSize), sizeof(psoSize));
+                    oss.write(static_cast<const char*>(psoBlob->GetBufferPointer()), psoSize);
                 }
                 else {
                     uint64_t psoSize = 0;
-                    file.write(reinterpret_cast<const char*>(&psoSize), sizeof(psoSize));
+                    oss.write(reinterpret_cast<const char*>(&psoSize), sizeof(psoSize));
                 }
             }
             else {
                 uint64_t psoSize = 0;
-                file.write(reinterpret_cast<const char*>(&psoSize), sizeof(psoSize));
+                oss.write(reinterpret_cast<const char*>(&psoSize), sizeof(psoSize));
             }
 
             // ===== パラメータインデックス =====
-            uint32_t paramCount = static_cast<uint32_t>(data.parameterIndices.size());
-            file.write(reinterpret_cast<const char*>(&paramCount), sizeof(paramCount));
+            // unordered_map は反復順が不定なので、キー順にソートして
+            // 出力を決定的にする（同じ内容なら毎回同じバイト列になるようにする）
+            std::vector<std::pair<std::string, UINT>> sortedParams(
+                data.parameterIndices.begin(), data.parameterIndices.end());
+            std::sort(sortedParams.begin(), sortedParams.end(),
+                [](const auto& a, const auto& b) { return a.first < b.first; });
 
-            for (const auto& [name, index] : data.parameterIndices) {
+            uint32_t paramCount = static_cast<uint32_t>(sortedParams.size());
+            oss.write(reinterpret_cast<const char*>(&paramCount), sizeof(paramCount));
+
+            for (const auto& [name, index] : sortedParams) {
                 // 名前の長さ
                 uint32_t nameLen = static_cast<uint32_t>(name.size());
-                file.write(reinterpret_cast<const char*>(&nameLen), sizeof(nameLen));
+                oss.write(reinterpret_cast<const char*>(&nameLen), sizeof(nameLen));
 
                 // 名前
-                file.write(name.c_str(), nameLen);
+                oss.write(name.c_str(), nameLen);
 
                 // インデックス
-                file.write(reinterpret_cast<const char*>(&index), sizeof(index));
+                oss.write(reinterpret_cast<const char*>(&index), sizeof(index));
             }
 
             // ===== インプットレイアウト =====
             uint32_t layoutCount = static_cast<uint32_t>(data.inputLayout.size());
-            file.write(reinterpret_cast<const char*>(&layoutCount), sizeof(layoutCount));
+            oss.write(reinterpret_cast<const char*>(&layoutCount), sizeof(layoutCount));
 
             for (size_t i = 0; i < data.inputLayout.size(); ++i) {
                 const auto& element = data.inputLayout[i];
@@ -233072,17 +233449,26 @@ namespace YoRigine {
                 }
 
                 uint32_t nameLen = static_cast<uint32_t>(semanticName.size());
-                file.write(reinterpret_cast<const char*>(&nameLen), sizeof(nameLen));
-                file.write(semanticName.c_str(), nameLen);
+                oss.write(reinterpret_cast<const char*>(&nameLen), sizeof(nameLen));
+                oss.write(semanticName.c_str(), nameLen);
 
                 // その他のフィールド
-                file.write(reinterpret_cast<const char*>(&element.SemanticIndex), sizeof(element.SemanticIndex));
-                file.write(reinterpret_cast<const char*>(&element.Format), sizeof(element.Format));
-                file.write(reinterpret_cast<const char*>(&element.InputSlot), sizeof(element.InputSlot));
-                file.write(reinterpret_cast<const char*>(&element.AlignedByteOffset), sizeof(element.AlignedByteOffset));
-                file.write(reinterpret_cast<const char*>(&element.InputSlotClass), sizeof(element.InputSlotClass));
-                file.write(reinterpret_cast<const char*>(&element.InstanceDataStepRate), sizeof(element.InstanceDataStepRate));
+                oss.write(reinterpret_cast<const char*>(&element.SemanticIndex), sizeof(element.SemanticIndex));
+                oss.write(reinterpret_cast<const char*>(&element.Format), sizeof(element.Format));
+                oss.write(reinterpret_cast<const char*>(&element.InputSlot), sizeof(element.InputSlot));
+                oss.write(reinterpret_cast<const char*>(&element.AlignedByteOffset), sizeof(element.AlignedByteOffset));
+                oss.write(reinterpret_cast<const char*>(&element.InputSlotClass), sizeof(element.InputSlotClass));
+                oss.write(reinterpret_cast<const char*>(&element.InstanceDataStepRate), sizeof(element.InstanceDataStepRate));
             }
+
+            const std::string newContent = oss.str();
+
+            // ===== 入力が変化した or ファイル未作成 → 書き込み =====
+            std::ofstream file(filePath, std::ios::binary | std::ios::trunc);
+            if (!file.is_open()) {
+                return false;
+            }
+            file.write(newContent.data(), static_cast<std::streamsize>(newContent.size()));
 
             return true;
 
@@ -233127,6 +233513,10 @@ namespace YoRigine {
             }
 
             PipelineData data;
+
+            // ===== 入力ハッシュ =====
+            // 次回保存時の「変化なし判定」に使うので読み込んで保持する
+            file.read(reinterpret_cast<char*>(&data.inputHash), sizeof(data.inputHash));
 
             // ===== ルートシグネチャ =====
             uint32_t hasRootSig;
@@ -234047,7 +234437,19 @@ namespace YoRigine {
 
             // InputLayoutのsemanticName用メモリ（ポインタの寿命管理）
             std::vector<std::string> semanticNames;
+
+            // 入力（コンパイル済みシェーダー等）のハッシュ。
+            // ディスクキャッシュは「出力PSOブロブ」ではなくこの値で同一判定する。
+            // （GetCachedBlob() はドライバ依存で毎回変化するため出力比較は不可）
+            uint64_t inputHash = 0;
         };
+
+        /// <summary>
+        /// FNV-1a でバイト列のハッシュを計算する（複数ブロブを seed で連結可能）。
+        /// 例: h = HashData(vs.ptr, vs.size); h = HashData(ps.ptr, ps.size, h);
+        /// </summary>
+        static uint64_t HashData(const void* data, size_t size,
+            uint64_t seed = 0xcbf29ce484222325ULL);
 
         CompletePipelineCache() = default;
         ~CompletePipelineCache() = default;
@@ -235898,6 +236300,16 @@ namespace YoRigine {
         psoDesc.DSVFormat = dsvFormat_;
         psoDesc.SampleDesc.Count = 1;
 
+        // G-buffer 法線（MRT 第2ターゲット）。
+        // writeNormal=false の場合は RenderTarget[1] の writemask を 0 のままにして法線を汚さない。
+        if (useGBufferNormal_) {
+            psoDesc.NumRenderTargets = 2;
+            psoDesc.RTVFormats[1] = DXGI_FORMAT_R16G16B16A16_FLOAT;
+            psoDesc.BlendState.RenderTarget[1].BlendEnable = FALSE;
+            psoDesc.BlendState.RenderTarget[1].RenderTargetWriteMask =
+                writeNormal_ ? D3D12_COLOR_WRITE_ENABLE_ALL : 0;
+        }
+
         HRESULT hr = device->CreateGraphicsPipelineState(&psoDesc,
             IID_PPV_ARGS(&result.pipelineState));
         if (FAILED(hr)) {
@@ -236267,6 +236679,16 @@ namespace YoRigine {
 			return *this;
         }
 
+        // G-buffer 法線出力（MRT 第2ターゲット）を有効化する。
+        //   writeNormal=true  : SV_TARGET1 へ法線を書き込む（不透明ジオメトリ用）
+        //   writeNormal=false : 第2ターゲットを宣言するが書き込まない（writemask=0）
+        // いずれの場合も NumRenderTargets=2 / RTVFormats[1]=R16G16B16A16_FLOAT になる。
+        ReflectionBasedPipelineBuilder& SetGBufferNormal(bool writeNormal) {
+            useGBufferNormal_ = true;
+            writeNormal_ = writeNormal;
+            return *this;
+        }
+
     private:
         D3D12_BLEND_DESC blendState_;
         D3D12_RASTERIZER_DESC rasterizerState_;
@@ -236275,6 +236697,10 @@ namespace YoRigine {
 
         DXGI_FORMAT rtvFormat_ = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
         DXGI_FORMAT dsvFormat_ = DXGI_FORMAT_D24_UNORM_S8_UINT;
+
+        // G-buffer 法線（MRT）設定
+        bool useGBufferNormal_ = false;
+        bool writeNormal_ = false;
 
         //void InitializeDefaultStates();
     };
@@ -236344,6 +236770,7 @@ File Path: YEngine/Graphics/PipelineManager/YPipelineManager.cpp
 #include "YPipelineManager.h"
 #include "DirectXCommon.h"
 
+#include <chrono>
 #include "Debugger/Logger.h"
 
 using namespace YoRigine;
@@ -236427,33 +236854,37 @@ D3D12_BLEND_DESC YPipelineManager::GetBlendDescFromMode(BlendMode mode)
     }
 }
 
+// ============================================================
+// 初期化
+// ============================================================
 void YPipelineManager::Initialize()
 {
     dxCommon_ = DirectXCommon::GetInstance();
 
     // PSOキャッシュの初期化
     psoCache_ = std::make_unique<PSOCache>();
-    psoCache_->Initialize(dxCommon_->GetDevice().Get(), "Resources/Binary/PSO/");
+    psoCache_->Initialize(dxCommon_->GetDevice().Get(), "Resources/Binary/YPipeline/");
 
 	completePipelineCache_ = std::make_unique<CompletePipelineCache>();
-	completePipelineCache_->Initialize(dxCommon_->GetDevice().Get(), "Resources/Binary/Pipeline/");
+	completePipelineCache_->Initialize(dxCommon_->GetDevice().Get(), "Resources/Binary/YPipeline/");
+
+    // 起動時間の計測開始（全パイプライン生成にかかる時間）
+    const auto pipelineBuildStart = std::chrono::high_resolution_clock::now();
 
     // 基本パイプラインの生成
     CreatePSO_Sprite();
     CreatePSO_Object();
-    CreatePSO_ShadowMap();
     CreatePSO_ObjectInstanced();
+    CreatePSO_ShadowMap();
     CreatePSO_ShadowMapInstanced();
     CreatePSO_Line();
     CreatePSO_InstancedCube();
-    CreatePSO_Particle();
-    CreatePSO_YParticle();
     CreatePSO_YParticleAllBlendModes();
-    CreatePSO_ParticleAllBlendModes();
     CreatePSO_GPUParticleALLBlendModes();
     CreatePSO_CubeMap();
     CreatePSO_GPUParticleInit();
-    CreatePSO_EffectObject();
+    // 使ってない
+    //CreatePSO_EffectObject();
 
     // ポストエフェクト系PSパイプライン: 全エフェクトCS化に伴い、
     // 最終 blit 用の BaseOffScreen (CopyImage.PS.hlsl) のみ残す
@@ -236465,6 +236896,18 @@ void YPipelineManager::Initialize()
     CreatePSO_VfxMeshSmoke();
     CreatePSO_VfxMeshLightning();
     CreatePSO_VfxMeshShockwave();
+
+    // 起動時間の計測終了・出力
+    const auto pipelineBuildEnd = std::chrono::high_resolution_clock::now();
+    const double pipelineBuildMs =
+        std::chrono::duration<double, std::milli>(pipelineBuildEnd - pipelineBuildStart).count();
+    {
+        char timeBuf[256];
+        sprintf_s(timeBuf,
+            "\n[YPipelineManager] ⏱ All pipelines built in %.2f ms\n\n",
+            pipelineBuildMs);
+        Logger(timeBuf);
+    }
 
     // 統計情報を出力
     auto stats = psoCache_->GetStats();
@@ -236480,6 +236923,9 @@ void YPipelineManager::Initialize()
     Logger(buf);
 }
 
+// ============================================================
+// 終了処理
+// ============================================================
 void YPipelineManager::Finalize()
 {
     // すべてのPSOをディスクに保存
@@ -236499,8 +236945,12 @@ void YPipelineManager::Finalize()
     parameterIndices_.clear();
 }
 
-// ===== パイプライン生成関数の実装 =====
 
+// ============================================================
+// 
+// Sprite
+// 
+// ============================================================
 void YPipelineManager::CreatePSO_Sprite()
 {
 
@@ -236555,6 +237005,14 @@ void YPipelineManager::CreatePSO_Sprite()
     cacheData.parameterIndices = result.parameterIndices;
     cacheData.inputLayout = result.inputLayout;
 
+    // 入力（コンパイル済みVS/PSバイトコード）のハッシュを計算。
+    // ディスクキャッシュはこの値で「変化なし＝書き換え不要」を判定する。
+    uint64_t inputHash = YoRigine::CompletePipelineCache::HashData(
+        vsBlob->GetBufferPointer(), vsBlob->GetBufferSize());
+    inputHash = YoRigine::CompletePipelineCache::HashData(
+        psBlob->GetBufferPointer(), psBlob->GetBufferSize(), inputHash);
+    cacheData.inputHash = inputHash;
+
     // SemanticNameの寿命管理用にコピー
     for (const auto& element : result.inputLayout) {
         if (element.SemanticName) {
@@ -236565,6 +237023,11 @@ void YPipelineManager::CreatePSO_Sprite()
     completePipelineCache_->Add(key, cacheData);
 }
 
+// ============================================================
+// 
+// BaseObject
+// 
+// ============================================================
 void YPipelineManager::CreatePSO_Object()
 {
 
@@ -236576,8 +237039,10 @@ void YPipelineManager::CreatePSO_Object()
     auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3d/Object3D.PS.hlsl", L"ps_6_0");
 
     // リフレクションベースで完全自動生成
+    // 不透明ジオメトリは法線 G-buffer(SV_TARGET1) へも出力する
     ReflectionBasedPipelineBuilder builder;
     auto result = builder
+        .SetGBufferNormal(true)
         .BuildFromCompiledShaders(
         dxCommon_->GetDevice().Get(),
         vsBlob.Get(),
@@ -236590,6 +237055,11 @@ void YPipelineManager::CreatePSO_Object()
     parameterIndices_["Object"] = result.parameterIndices;
 }
 
+// ============================================================
+// 
+// ShadowMap
+// 
+// ============================================================
 void YPipelineManager::CreatePSO_ShadowMap()
 {
 
@@ -236614,6 +237084,11 @@ void YPipelineManager::CreatePSO_ShadowMap()
     parameterIndices_["ShadowMap"] = result.parameterIndices;
 }
 
+// ============================================================
+// 
+// Object : Instance
+// 
+// ============================================================
 void YPipelineManager::CreatePSO_ObjectInstanced()
 {
     Logger("\n==============================================================\n\n\n");
@@ -236622,8 +237097,11 @@ void YPipelineManager::CreatePSO_ObjectInstanced()
     auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3d/Object3dInstanced.VS.hlsl", L"vs_6_0");
     auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3d/Object3dInstanced.PS.hlsl", L"ps_6_0");
 
+    // 不透明ジオメトリは法線 G-buffer(SV_TARGET1) へも出力する
     ReflectionBasedPipelineBuilder builder;
-    auto result = builder.BuildFromCompiledShaders(
+    auto result = builder
+        .SetGBufferNormal(true)
+        .BuildFromCompiledShaders(
         dxCommon_->GetDevice().Get(),
         vsBlob.Get(),
         psBlob.Get()
@@ -236634,6 +237112,11 @@ void YPipelineManager::CreatePSO_ObjectInstanced()
     parameterIndices_["ObjectInstanced"] = result.parameterIndices;
 }
 
+// ============================================================
+// 
+// ShadowMap : Insctance
+// 
+// ============================================================
 void YPipelineManager::CreatePSO_ShadowMapInstanced()
 {
     Logger("\n==============================================================\n\n\n");
@@ -236655,80 +237138,11 @@ void YPipelineManager::CreatePSO_ShadowMapInstanced()
     parameterIndices_["ShadowMapInstanced"] = result.parameterIndices;
 }
 
-void YPipelineManager::CreatePSO_Particle()
-{
-
-    Logger("\n==============================================================\n\n\n");
-    Logger("         Creating Pipeline: Particle            \n\n\n");
-    Logger("==============================================================\n");
-    // シェーダーをコンパイル
-    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Particle/Particle.VS.hlsl", L"vs_6_0");
-    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Particle/Particle.PS.hlsl", L"ps_6_0");
-
-    // 通常のアルファブレンド版
-    ReflectionBasedPipelineBuilder builder;
-    auto result = builder
-        .SetBlendState(BlendPresets::CreateAlphaBlend())
-        .SetRasterizerState(RasterizerPresets::CreateNoCull())
-        .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
-        .BuildFromCompiledShaders(
-            dxCommon_->GetDevice().Get(),
-            vsBlob.Get(),
-            psBlob.Get()
-        );
-
-    rootSignatures_["Particle"] = result.rootSignature;
-    pipelineStates_["Particle"] = result.pipelineState;
-    parameterIndices_["Particle"] = result.parameterIndices;
-}
-
-void YPipelineManager::CreatePSO_ParticleAllBlendModes()
-{
-    // シェーダーコンパイル（1回だけ）
-    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Particle/Particle.VS.hlsl", L"vs_6_0");
-    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Particle/Particle.PS.hlsl", L"ps_6_0");
-
-    // ブレンドモード設定
-    struct BlendConfig {
-        BlendMode mode;
-        std::string name;
-        D3D12_BLEND_DESC blendDesc;
-    };
-
-    BlendConfig configs[] = {
-        { BlendMode::kBlendModeNone, "None", BlendPresets::CreateNone() },
-        { BlendMode::kBlendModeNormal, "Normal", BlendPresets::CreateAlphaBlend() },
-        { BlendMode::kBlendModeAdd, "Add", BlendPresets::CreateAdditive() },
-        { BlendMode::kBlendModeSubtract, "Subtract", BlendPresets::CreateSubtractive() },
-        { BlendMode::kBlendModeMultiply, "Multiply", BlendPresets::CreateMultiply() },
-        { BlendMode::kBlendModeScreen, "Screen", BlendPresets::CreateScreen() },
-    };
-
-    // 各ブレンドモードごとにPSOを生成
-    for (const auto& config : configs) {
-        ReflectionBasedPipelineBuilder builder;
-        auto result = builder
-            .SetBlendState(config.blendDesc)
-            .SetRasterizerState(RasterizerPresets::CreateNoCull())
-            .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
-            .BuildFromCompiledShaders(
-                dxCommon_->GetDevice().Get(),
-                vsBlob.Get(),
-                psBlob.Get()
-            );
-
-        std::string psoName = "Particle_" + config.name;
-        pipelineStates_[psoName] = result.pipelineState;
-        blendModePipelineStates_["Particle"][config.mode] = result.pipelineState;
-
-        // 最初のモードだけルートシグネチャとインデックスを保存
-        if (config.mode == BlendMode::kBlendModeNormal) {
-            rootSignatures_["Particle"] = result.rootSignature;
-            parameterIndices_["Particle"] = result.parameterIndices;
-        }
-    }
-}
-
+// ============================================================
+// 
+// GPUParticle : ALLBlendMode
+// 
+// ============================================================
 void YPipelineManager::CreatePSO_GPUParticleALLBlendModes()
 {
 
@@ -236780,6 +237194,11 @@ void YPipelineManager::CreatePSO_GPUParticleALLBlendModes()
     }
 }
 
+// ============================================================
+// 
+// CPUParticle : ALLBlendMode
+// 
+// ============================================================
 void YPipelineManager::CreatePSO_YParticleAllBlendModes()
 {
     // ブレンドモード設定
@@ -236838,53 +237257,11 @@ void YPipelineManager::CreatePSO_YParticleAllBlendModes()
     buildSet("YParticleSoft", L"Resources/Shaders/Particle/YParticleSoft.PS.hlsl", true);
 }
 
-void YPipelineManager::CreatePSO_Object_Manual()
-{
-    // ルートシグネチャをビルダーで作成
-    RootSignatureBuilder rsBuilder;
-
-    rsBuilder.AddCBV("Material", 0, D3D12_SHADER_VISIBILITY_PIXEL);
-    rsBuilder.AddCBV("TransformMatrix", 0, D3D12_SHADER_VISIBILITY_VERTEX);
-    rsBuilder.AddCBV("DirectionalLight", 1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rsBuilder.AddDescriptorTable("Texture", 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rsBuilder.AddStaticSampler(0);
-
-    auto rootSignature = rsBuilder.Build(dxCommon_->GetDevice().Get());
-    rootSignatures_["Object"] = rootSignature;
-
-    // インデックスマップを保存
-    RootParameterIndices indices;
-    indices.InitializeFrom(rsBuilder);
-    rootParamIndices_["Object"] = indices;
-
-    // シェーダーをコンパイル
-    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3D.VS.hlsl", L"vs_6_0");
-    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3D.PS.hlsl", L"ps_6_0");
-
-    // インプットレイアウトを定義
-    D3D12_INPUT_ELEMENT_DESC inputElements[] = {
-        { "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
-    };
-
-    // パイプラインステートをビルダーで作成
-    GraphicsPipelineBuilder pipelineBuilder;
-    auto psoDesc = pipelineBuilder
-        .SetRootSignature(rootSignature.Get())
-        .SetVertexShader(vsBlob->GetBufferPointer(), vsBlob->GetBufferSize())
-        .SetPixelShader(psBlob->GetBufferPointer(), psBlob->GetBufferSize())
-        .SetInputLayout(inputElements, _countof(inputElements))
-        .SetBlendState(BlendPresets::CreateAlphaBlend())
-        .SetRasterizerState(RasterizerPresets::CreateDefault())
-        .SetDepthStencilState(DepthStencilPresets::CreateDefault())
-        .Build();
-
-    // PSOキャッシュを使って作成
-    auto pso = psoCache_->GetOrCreate("Object", psoDesc);
-    pipelineStates_["Object"] = pso;
-}
-
+// ============================================================
+// 
+// CPUParticle
+// 
+// ============================================================
 void YPipelineManager::CreatePSO_YParticle()
 {
 
@@ -236912,6 +237289,11 @@ void YPipelineManager::CreatePSO_YParticle()
     parameterIndices_["YParticle"] = result.parameterIndices;
 }
 
+// ============================================================
+// 
+// GPUParticle
+// 
+// ============================================================
 void YPipelineManager::CreatePSO_GPUParticleInit()
 {
     // シェーダーをコンパイル
@@ -236935,6 +237317,11 @@ void YPipelineManager::CreatePSO_GPUParticleInit()
     parameterIndices_["GPUParticleInit"] = result.parameterIndices;
 }
 
+// ============================================================
+// 
+// Line
+// 
+// ============================================================
 void YPipelineManager::CreatePSO_Line()
 {
     // シェーダーをコンパイル
@@ -236960,7 +237347,9 @@ void YPipelineManager::CreatePSO_Line()
 }
 
 // ============================================================
-// InstancedCube: 1 DrawInstanced で複数ワイヤー形状を描画する
+// 
+// InstancedCube
+// 
 // ============================================================
 void YPipelineManager::CreatePSO_InstancedCube()
 {
@@ -236984,6 +237373,11 @@ void YPipelineManager::CreatePSO_InstancedCube()
     parameterIndices_["InstancedCube"] = result.parameterIndices;
 }
 
+// ============================================================
+// 
+// CubeMap
+// 
+// ============================================================
 void YPipelineManager::CreatePSO_CubeMap()
 {
     // シェーダーをコンパイル
@@ -237007,9 +237401,11 @@ void YPipelineManager::CreatePSO_CubeMap()
     parameterIndices_["CubeMap"] = result.parameterIndices;
 }
 
-/// <summary>
-/// エフェクト用オブジェクト描画パイプライン
-/// </summary>
+// ============================================================
+// 
+// Effect用Object
+// 
+// ============================================================
 void YPipelineManager::CreatePSO_EffectObject()
 {
     // シェーダーをコンパイル
@@ -237032,9 +237428,11 @@ void YPipelineManager::CreatePSO_EffectObject()
     parameterIndices_["EffectObject"] = result.parameterIndices;
 }
 
-/// <summary>
-/// Meshを使用したVFX
-/// </summary>
+// ============================================================
+// 
+// VFXMesh - Trail
+// 
+// ============================================================
 void YPipelineManager::CreatePSO_VfxMeshTrail() {
 
     // シェーダーコンパイル
@@ -237083,6 +237481,11 @@ void YPipelineManager::CreatePSO_VfxMeshTrail() {
 
 }
 
+// ============================================================
+// 
+// VFXMesh - Volume
+// 
+// ============================================================
 void YPipelineManager::CreatePSO_VfxMeshVolume() {
     // シェーダーをコンパイル
     auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Vfx/VfxMesh/VfxMesh.VS.hlsl", L"vs_6_0");
@@ -237104,7 +237507,11 @@ void YPipelineManager::CreatePSO_VfxMeshVolume() {
     pipelineStates_["VfxMeshVolume"] = result.pipelineState;
     parameterIndices_["VfxMeshVolume"] = result.parameterIndices;
 }
-
+// ============================================================
+// 
+// VFXMesh - Smoke
+// 
+// ============================================================
 void YPipelineManager::CreatePSO_VfxMeshSmoke() {
     // Omen 風ボリュームスモーク。半透明スモークなのでアルファブレンド。
     auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Vfx/VfxMesh/VfxMesh.VS.hlsl", L"vs_6_0");
@@ -237126,6 +237533,11 @@ void YPipelineManager::CreatePSO_VfxMeshSmoke() {
     parameterIndices_["VfxMeshSmoke"] = result.parameterIndices;
 }
 
+// ============================================================
+// 
+// VFXMesh - Lightning
+// 
+// ============================================================
 void YPipelineManager::CreatePSO_VfxMeshLightning() {
     // プロシージャル稲妻。加算ブレンドで芯が光る。
     auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Vfx/VfxMesh/VfxMesh.VS.hlsl", L"vs_6_0");
@@ -237147,6 +237559,11 @@ void YPipelineManager::CreatePSO_VfxMeshLightning() {
     parameterIndices_["VfxMeshLightning"] = result.parameterIndices;
 }
 
+// ============================================================
+// 
+// VFXMesh - ShockWave
+// 
+// ============================================================
 void YPipelineManager::CreatePSO_VfxMeshShockwave() {
     // 爆発の衝撃波リング。加算ブレンド。
     auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Vfx/VfxMesh/VfxMesh.VS.hlsl", L"vs_6_0");
@@ -237169,8 +237586,11 @@ void YPipelineManager::CreatePSO_VfxMeshShockwave() {
 }
 
 
-// ===== ポストエフェクト系パイプライン =====
-
+// ============================================================
+// 
+// PostEffect
+// 
+// ============================================================
 void YPipelineManager::CreatePSO_BaseOffScreen(
     const std::wstring& pixelShaderPath,
     const std::string& pipelineKey
@@ -237469,29 +237889,22 @@ namespace YoRigine {
     class DirectXCommon;
 }
 
-/// <summary>
-/// 改良版パイプライン管理クラス
-/// 
-/// 主な改善点:
-/// 1. ルートパラメータの自動番号管理（RootSignatureBuilder使用）
-/// 2. PSOのバイナリキャッシュ（PSOCache使用）
-/// 3. シェーダーリフレクション（完全自動生成）
-/// 4. 名前ベースのパラメータアクセス（マジックナンバー排除）
-/// 
-/// 使用例:
-/// auto* manager = YPipelineManager::GetInstance();
-/// manager->Initialize();
-/// 
-/// // パイプラインステートを取得
-/// auto* pso = manager->GetPipeLineStateObject("Sprite");
-/// 
-/// // パラメータインデックスを取得（名前ベース）
-/// auto& indices = manager->GetParameterIndices("Sprite");
-/// UINT materialIdx = indices.at("Material");
-/// 
-/// // コマンドリストに設定
-/// commandList->SetGraphicsRootConstantBufferView(materialIdx, address);
-/// </summary>
+/* <summary>
+    改良版パイプライン管理クラス
+    使用例:
+    auto* manager = YPipelineManager::GetInstance();
+    manager->Initialize();
+    
+    パイプラインステートを取得
+    auto* pso = manager->GetPipeLineStateObject("Sprite");
+    
+    パラメータインデックスを取得（名前ベース）
+    auto& indices = manager->GetParameterIndices("Sprite");
+    UINT materialIdx = indices.at("Material");
+    
+    コマンドリストに設定
+    commandList->SetGraphicsRootConstantBufferView(materialIdx, address);
+    </summary>*/
 class YPipelineManager
 {
 public:
@@ -237567,15 +237980,6 @@ private:
     /// </summary>
     void CreatePSO_ShadowMapInstanced();
 
-    /// <summary>
-    /// パーティクル描画用パイプライン（通常版）
-    /// </summary>
-    void CreatePSO_Particle();
-
-    /// <summary>
-    /// パーティクル描画用パイプライン（全ブレンドモード版）
-    /// </summary>
-    void CreatePSO_ParticleAllBlendModes();
     void CreatePSO_GPUParticleALLBlendModes();
     void CreatePSO_YParticleAllBlendModes();
     /// <summary>
@@ -256832,15 +257236,6 @@ namespace YoRigine {
 	{
 		if (sceneInstances_.find(sceneName) != sceneInstances_.end())
 		{
-			// そのシーンのすべてのJsonManagerを保存してからクリア
-			auto& instances = sceneInstances_[sceneName];
-			for (auto& [key, manager] : instances)
-			{
-				if (manager)
-				{
-					manager->Save();
-				}
-			}
 			sceneInstances_.erase(sceneName);
 		}
 	}
@@ -290928,12 +291323,6 @@ void Player::UpdateMotionTime() {
 // ワールド座標の取得
 // ============================================================
 Vector3 Player::GetWorldPosition() {
-	// wt_.matWorld_ は wt_.UpdateMatrix() が走らないと更新されない。
-	// バトル中は BattleScene::Update が isBattleCameraActive=true の間
-	// player_->Update() を呼ばないため、matWorld_ が単位行列のまま放置されて
-	// この関数が (0,0,0) を返してしまうケースが発生する (エンカウント時の
-	// playerPosition 取得 → バトル復帰位置が原点になる原因)。
-	// Player は親を持たない root なので translate_ を直接返すのが安全。
 	return wt_.translate_;
 }
 
