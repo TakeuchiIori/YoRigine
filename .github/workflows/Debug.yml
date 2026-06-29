@@ -27,5 +27,9 @@ jobs:
         uses: microsoft/setup-msbuild@v2
 
       - name: Debug Build
+        # PlatformToolset=v143 を明示指定して上書きする。
+        # Externals(ImGui/DirectXTex) の x64 構成が v145 を要求するが、
+        # GitHub の windows-2022 ランナーには v143 までしか無く MSB8020 で失敗するため。
+        # (premake5.lua も本来 v143 指定。ローカルの VS は v145 を持つので手元はそのまま通る)
         run: |
-          msbuild ${{ env.SOLUTION_FILE_PATH }} /p:Platform=x64,Configuration=${{ env.CONFIGURATION }}
+          msbuild ${{ env.SOLUTION_FILE_PATH }} /p:Platform=x64,Configuration=${{ env.CONFIGURATION }},PlatformToolset=v143
