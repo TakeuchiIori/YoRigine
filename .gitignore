@@ -383,3 +383,10 @@ FodyWeavers.xsd
 *.ini
 /CLAUDE.md
 .claude
+
+# YoRigine エンジンの生成キャッシュ（再生成可能なのでリポジトリに含めない）
+# ※ Resources/Binary 直下の .anim 等のアセットは追跡対象のままにするため、
+#    キャッシュ用サブフォルダだけを無視する
+/Resources/Binary/Shader/
+/Resources/Binary/PSOBin/
+/Resources/Binary/YPipeline/

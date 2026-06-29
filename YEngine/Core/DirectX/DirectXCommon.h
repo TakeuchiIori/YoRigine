@@ -217,6 +217,8 @@ namespace YoRigine {
 	public:
 		D3D12_GPU_DESCRIPTOR_HANDLE GetOffScreenGPUHandle() { return GetRTVSrvGPU("OffScreen"); }
 		D3D12_CPU_DESCRIPTOR_HANDLE GetOffScreenCPUHandle() { return GetRTVSrvCPU("OffScreen"); }
+		D3D12_GPU_DESCRIPTOR_HANDLE GetNormalGPUHandle() { return GetRTVSrvGPU("NormalBuffer"); }
+		D3D12_CPU_DESCRIPTOR_HANDLE GetNormalCPUHandle() { return GetRTVSrvCPU("NormalBuffer"); }
 		D3D12_GPU_DESCRIPTOR_HANDLE GetDepthGPUHandle() { return GetDSVSrvGPU("MainDepth"); }
 		D3D12_CPU_DESCRIPTOR_HANDLE GetDepthCPUHandle() { return GetDSVSrvCPU("MainDepth"); }
 		D3D12_GPU_DESCRIPTOR_HANDLE GetShadowDepthGPUHandle() { return GetDSVSrvGPU("ShadowDepth"); }

@@ -287,6 +287,16 @@ namespace YoRigine {
 			return *this;
         }
 
+        // G-buffer 法線出力（MRT 第2ターゲット）を有効化する。
+        //   writeNormal=true  : SV_TARGET1 へ法線を書き込む（不透明ジオメトリ用）
+        //   writeNormal=false : 第2ターゲットを宣言するが書き込まない（writemask=0）
+        // いずれの場合も NumRenderTargets=2 / RTVFormats[1]=R16G16B16A16_FLOAT になる。
+        ReflectionBasedPipelineBuilder& SetGBufferNormal(bool writeNormal) {
+            useGBufferNormal_ = true;
+            writeNormal_ = writeNormal;
+            return *this;
+        }
+
     private:
         D3D12_BLEND_DESC blendState_;
         D3D12_RASTERIZER_DESC rasterizerState_;
@@ -295,6 +305,10 @@ namespace YoRigine {
 
         DXGI_FORMAT rtvFormat_ = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
         DXGI_FORMAT dsvFormat_ = DXGI_FORMAT_D24_UNORM_S8_UINT;
+
+        // G-buffer 法線（MRT）設定
+        bool useGBufferNormal_ = false;
+        bool writeNormal_ = false;
 
         //void InitializeDefaultStates();
     };

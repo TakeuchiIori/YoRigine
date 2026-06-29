@@ -1,6 +1,7 @@
 #include "YPipelineManager.h"
 #include "DirectXCommon.h"
 
+#include <chrono>
 #include "Debugger/Logger.h"
 
 using namespace YoRigine;
@@ -84,33 +85,37 @@ D3D12_BLEND_DESC YPipelineManager::GetBlendDescFromMode(BlendMode mode)
     }
 }
 
+// ============================================================
+// 初期化
+// ============================================================
 void YPipelineManager::Initialize()
 {
     dxCommon_ = DirectXCommon::GetInstance();
 
     // PSOキャッシュの初期化
     psoCache_ = std::make_unique<PSOCache>();
-    psoCache_->Initialize(dxCommon_->GetDevice().Get(), "Resources/Binary/PSO/");
+    psoCache_->Initialize(dxCommon_->GetDevice().Get(), "Resources/Binary/YPipeline/");
 
 	completePipelineCache_ = std::make_unique<CompletePipelineCache>();
-	completePipelineCache_->Initialize(dxCommon_->GetDevice().Get(), "Resources/Binary/Pipeline/");
+	completePipelineCache_->Initialize(dxCommon_->GetDevice().Get(), "Resources/Binary/YPipeline/");
+
+    // 起動時間の計測開始（全パイプライン生成にかかる時間）
+    const auto pipelineBuildStart = std::chrono::high_resolution_clock::now();
 
     // 基本パイプラインの生成
     CreatePSO_Sprite();
     CreatePSO_Object();
-    CreatePSO_ShadowMap();
     CreatePSO_ObjectInstanced();
+    CreatePSO_ShadowMap();
     CreatePSO_ShadowMapInstanced();
     CreatePSO_Line();
     CreatePSO_InstancedCube();
-    CreatePSO_Particle();
-    CreatePSO_YParticle();
     CreatePSO_YParticleAllBlendModes();
-    CreatePSO_ParticleAllBlendModes();
     CreatePSO_GPUParticleALLBlendModes();
     CreatePSO_CubeMap();
     CreatePSO_GPUParticleInit();
-    CreatePSO_EffectObject();
+    // 使ってない
+    //CreatePSO_EffectObject();
 
     // ポストエフェクト系PSパイプライン: 全エフェクトCS化に伴い、
     // 最終 blit 用の BaseOffScreen (CopyImage.PS.hlsl) のみ残す
@@ -122,6 +127,18 @@ void YPipelineManager::Initialize()
     CreatePSO_VfxMeshSmoke();
     CreatePSO_VfxMeshLightning();
     CreatePSO_VfxMeshShockwave();
+
+    // 起動時間の計測終了・出力
+    const auto pipelineBuildEnd = std::chrono::high_resolution_clock::now();
+    const double pipelineBuildMs =
+        std::chrono::duration<double, std::milli>(pipelineBuildEnd - pipelineBuildStart).count();
+    {
+        char timeBuf[256];
+        sprintf_s(timeBuf,
+            "\n[YPipelineManager] ⏱ All pipelines built in %.2f ms\n\n",
+            pipelineBuildMs);
+        Logger(timeBuf);
+    }
 
     // 統計情報を出力
     auto stats = psoCache_->GetStats();
@@ -137,6 +154,9 @@ void YPipelineManager::Initialize()
     Logger(buf);
 }
 
+// ============================================================
+// 終了処理
+// ============================================================
 void YPipelineManager::Finalize()
 {
     // すべてのPSOをディスクに保存
@@ -156,8 +176,12 @@ void YPipelineManager::Finalize()
     parameterIndices_.clear();
 }
 
-// ===== パイプライン生成関数の実装 =====
 
+// ============================================================
+// 
+// Sprite
+// 
+// ============================================================
 void YPipelineManager::CreatePSO_Sprite()
 {
 
@@ -212,6 +236,14 @@ void YPipelineManager::CreatePSO_Sprite()
     cacheData.parameterIndices = result.parameterIndices;
     cacheData.inputLayout = result.inputLayout;
 
+    // 入力（コンパイル済みVS/PSバイトコード）のハッシュを計算。
+    // ディスクキャッシュはこの値で「変化なし＝書き換え不要」を判定する。
+    uint64_t inputHash = YoRigine::CompletePipelineCache::HashData(
+        vsBlob->GetBufferPointer(), vsBlob->GetBufferSize());
+    inputHash = YoRigine::CompletePipelineCache::HashData(
+        psBlob->GetBufferPointer(), psBlob->GetBufferSize(), inputHash);
+    cacheData.inputHash = inputHash;
+
     // SemanticNameの寿命管理用にコピー
     for (const auto& element : result.inputLayout) {
         if (element.SemanticName) {
@@ -222,6 +254,11 @@ void YPipelineManager::CreatePSO_Sprite()
     completePipelineCache_->Add(key, cacheData);
 }
 
+// ============================================================
+// 
+// BaseObject
+// 
+// ============================================================
 void YPipelineManager::CreatePSO_Object()
 {
 
@@ -233,8 +270,10 @@ void YPipelineManager::CreatePSO_Object()
     auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3d/Object3D.PS.hlsl", L"ps_6_0");
 
     // リフレクションベースで完全自動生成
+    // 不透明ジオメトリは法線 G-buffer(SV_TARGET1) へも出力する
     ReflectionBasedPipelineBuilder builder;
     auto result = builder
+        .SetGBufferNormal(true)
         .BuildFromCompiledShaders(
         dxCommon_->GetDevice().Get(),
         vsBlob.Get(),
@@ -247,6 +286,11 @@ void YPipelineManager::CreatePSO_Object()
     parameterIndices_["Object"] = result.parameterIndices;
 }
 
+// ============================================================
+// 
+// ShadowMap
+// 
+// ============================================================
 void YPipelineManager::CreatePSO_ShadowMap()
 {
 
@@ -271,6 +315,11 @@ void YPipelineManager::CreatePSO_ShadowMap()
     parameterIndices_["ShadowMap"] = result.parameterIndices;
 }
 
+// ============================================================
+// 
+// Object : Instance
+// 
+// ============================================================
 void YPipelineManager::CreatePSO_ObjectInstanced()
 {
     Logger("\n==============================================================\n\n\n");
@@ -279,8 +328,11 @@ void YPipelineManager::CreatePSO_ObjectInstanced()
     auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3d/Object3dInstanced.VS.hlsl", L"vs_6_0");
     auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3d/Object3dInstanced.PS.hlsl", L"ps_6_0");
 
+    // 不透明ジオメトリは法線 G-buffer(SV_TARGET1) へも出力する
     ReflectionBasedPipelineBuilder builder;
-    auto result = builder.BuildFromCompiledShaders(
+    auto result = builder
+        .SetGBufferNormal(true)
+        .BuildFromCompiledShaders(
         dxCommon_->GetDevice().Get(),
         vsBlob.Get(),
         psBlob.Get()
@@ -291,6 +343,11 @@ void YPipelineManager::CreatePSO_ObjectInstanced()
     parameterIndices_["ObjectInstanced"] = result.parameterIndices;
 }
 
+// ============================================================
+// 
+// ShadowMap : Insctance
+// 
+// ============================================================
 void YPipelineManager::CreatePSO_ShadowMapInstanced()
 {
     Logger("\n==============================================================\n\n\n");
@@ -312,80 +369,11 @@ void YPipelineManager::CreatePSO_ShadowMapInstanced()
     parameterIndices_["ShadowMapInstanced"] = result.parameterIndices;
 }
 
-void YPipelineManager::CreatePSO_Particle()
-{
-
-    Logger("\n==============================================================\n\n\n");
-    Logger("         Creating Pipeline: Particle            \n\n\n");
-    Logger("==============================================================\n");
-    // シェーダーをコンパイル
-    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Particle/Particle.VS.hlsl", L"vs_6_0");
-    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Particle/Particle.PS.hlsl", L"ps_6_0");
-
-    // 通常のアルファブレンド版
-    ReflectionBasedPipelineBuilder builder;
-    auto result = builder
-        .SetBlendState(BlendPresets::CreateAlphaBlend())
-        .SetRasterizerState(RasterizerPresets::CreateNoCull())
-        .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
-        .BuildFromCompiledShaders(
-            dxCommon_->GetDevice().Get(),
-            vsBlob.Get(),
-            psBlob.Get()
-        );
-
-    rootSignatures_["Particle"] = result.rootSignature;
-    pipelineStates_["Particle"] = result.pipelineState;
-    parameterIndices_["Particle"] = result.parameterIndices;
-}
-
-void YPipelineManager::CreatePSO_ParticleAllBlendModes()
-{
-    // シェーダーコンパイル（1回だけ）
-    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Particle/Particle.VS.hlsl", L"vs_6_0");
-    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Particle/Particle.PS.hlsl", L"ps_6_0");
-
-    // ブレンドモード設定
-    struct BlendConfig {
-        BlendMode mode;
-        std::string name;
-        D3D12_BLEND_DESC blendDesc;
-    };
-
-    BlendConfig configs[] = {
-        { BlendMode::kBlendModeNone, "None", BlendPresets::CreateNone() },
-        { BlendMode::kBlendModeNormal, "Normal", BlendPresets::CreateAlphaBlend() },
-        { BlendMode::kBlendModeAdd, "Add", BlendPresets::CreateAdditive() },
-        { BlendMode::kBlendModeSubtract, "Subtract", BlendPresets::CreateSubtractive() },
-        { BlendMode::kBlendModeMultiply, "Multiply", BlendPresets::CreateMultiply() },
-        { BlendMode::kBlendModeScreen, "Screen", BlendPresets::CreateScreen() },
-    };
-
-    // 各ブレンドモードごとにPSOを生成
-    for (const auto& config : configs) {
-        ReflectionBasedPipelineBuilder builder;
-        auto result = builder
-            .SetBlendState(config.blendDesc)
-            .SetRasterizerState(RasterizerPresets::CreateNoCull())
-            .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
-            .BuildFromCompiledShaders(
-                dxCommon_->GetDevice().Get(),
-                vsBlob.Get(),
-                psBlob.Get()
-            );
-
-        std::string psoName = "Particle_" + config.name;
-        pipelineStates_[psoName] = result.pipelineState;
-        blendModePipelineStates_["Particle"][config.mode] = result.pipelineState;
-
-        // 最初のモードだけルートシグネチャとインデックスを保存
-        if (config.mode == BlendMode::kBlendModeNormal) {
-            rootSignatures_["Particle"] = result.rootSignature;
-            parameterIndices_["Particle"] = result.parameterIndices;
-        }
-    }
-}
-
+// ============================================================
+// 
+// GPUParticle : ALLBlendMode
+// 
+// ============================================================
 void YPipelineManager::CreatePSO_GPUParticleALLBlendModes()
 {
 
@@ -437,6 +425,11 @@ void YPipelineManager::CreatePSO_GPUParticleALLBlendModes()
     }
 }
 
+// ============================================================
+// 
+// CPUParticle : ALLBlendMode
+// 
+// ============================================================
 void YPipelineManager::CreatePSO_YParticleAllBlendModes()
 {
     // ブレンドモード設定
@@ -495,53 +488,11 @@ void YPipelineManager::CreatePSO_YParticleAllBlendModes()
     buildSet("YParticleSoft", L"Resources/Shaders/Particle/YParticleSoft.PS.hlsl", true);
 }
 
-void YPipelineManager::CreatePSO_Object_Manual()
-{
-    // ルートシグネチャをビルダーで作成
-    RootSignatureBuilder rsBuilder;
-
-    rsBuilder.AddCBV("Material", 0, D3D12_SHADER_VISIBILITY_PIXEL);
-    rsBuilder.AddCBV("TransformMatrix", 0, D3D12_SHADER_VISIBILITY_VERTEX);
-    rsBuilder.AddCBV("DirectionalLight", 1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rsBuilder.AddDescriptorTable("Texture", 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rsBuilder.AddStaticSampler(0);
-
-    auto rootSignature = rsBuilder.Build(dxCommon_->GetDevice().Get());
-    rootSignatures_["Object"] = rootSignature;
-
-    // インデックスマップを保存
-    RootParameterIndices indices;
-    indices.InitializeFrom(rsBuilder);
-    rootParamIndices_["Object"] = indices;
-
-    // シェーダーをコンパイル
-    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3D.VS.hlsl", L"vs_6_0");
-    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3D.PS.hlsl", L"ps_6_0");
-
-    // インプットレイアウトを定義
-    D3D12_INPUT_ELEMENT_DESC inputElements[] = {
-        { "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
-    };
-
-    // パイプラインステートをビルダーで作成
-    GraphicsPipelineBuilder pipelineBuilder;
-    auto psoDesc = pipelineBuilder
-        .SetRootSignature(rootSignature.Get())
-        .SetVertexShader(vsBlob->GetBufferPointer(), vsBlob->GetBufferSize())
-        .SetPixelShader(psBlob->GetBufferPointer(), psBlob->GetBufferSize())
-        .SetInputLayout(inputElements, _countof(inputElements))
-        .SetBlendState(BlendPresets::CreateAlphaBlend())
-        .SetRasterizerState(RasterizerPresets::CreateDefault())
-        .SetDepthStencilState(DepthStencilPresets::CreateDefault())
-        .Build();
-
-    // PSOキャッシュを使って作成
-    auto pso = psoCache_->GetOrCreate("Object", psoDesc);
-    pipelineStates_["Object"] = pso;
-}
-
+// ============================================================
+// 
+// CPUParticle
+// 
+// ============================================================
 void YPipelineManager::CreatePSO_YParticle()
 {
 
@@ -569,6 +520,11 @@ void YPipelineManager::CreatePSO_YParticle()
     parameterIndices_["YParticle"] = result.parameterIndices;
 }
 
+// ============================================================
+// 
+// GPUParticle
+// 
+// ============================================================
 void YPipelineManager::CreatePSO_GPUParticleInit()
 {
     // シェーダーをコンパイル
@@ -592,6 +548,11 @@ void YPipelineManager::CreatePSO_GPUParticleInit()
     parameterIndices_["GPUParticleInit"] = result.parameterIndices;
 }
 
+// ============================================================
+// 
+// Line
+// 
+// ============================================================
 void YPipelineManager::CreatePSO_Line()
 {
     // シェーダーをコンパイル
@@ -617,7 +578,9 @@ void YPipelineManager::CreatePSO_Line()
 }
 
 // ============================================================
-// InstancedCube: 1 DrawInstanced で複数ワイヤー形状を描画する
+// 
+// InstancedCube
+// 
 // ============================================================
 void YPipelineManager::CreatePSO_InstancedCube()
 {
@@ -641,6 +604,11 @@ void YPipelineManager::CreatePSO_InstancedCube()
     parameterIndices_["InstancedCube"] = result.parameterIndices;
 }
 
+// ============================================================
+// 
+// CubeMap
+// 
+// ============================================================
 void YPipelineManager::CreatePSO_CubeMap()
 {
     // シェーダーをコンパイル
@@ -664,9 +632,11 @@ void YPipelineManager::CreatePSO_CubeMap()
     parameterIndices_["CubeMap"] = result.parameterIndices;
 }
 
-/// <summary>
-/// エフェクト用オブジェクト描画パイプライン
-/// </summary>
+// ============================================================
+// 
+// Effect用Object
+// 
+// ============================================================
 void YPipelineManager::CreatePSO_EffectObject()
 {
     // シェーダーをコンパイル
@@ -689,9 +659,11 @@ void YPipelineManager::CreatePSO_EffectObject()
     parameterIndices_["EffectObject"] = result.parameterIndices;
 }
 
-/// <summary>
-/// Meshを使用したVFX
-/// </summary>
+// ============================================================
+// 
+// VFXMesh - Trail
+// 
+// ============================================================
 void YPipelineManager::CreatePSO_VfxMeshTrail() {
 
     // シェーダーコンパイル
@@ -740,6 +712,11 @@ void YPipelineManager::CreatePSO_VfxMeshTrail() {
 
 }
 
+// ============================================================
+// 
+// VFXMesh - Volume
+// 
+// ============================================================
 void YPipelineManager::CreatePSO_VfxMeshVolume() {
     // シェーダーをコンパイル
     auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Vfx/VfxMesh/VfxMesh.VS.hlsl", L"vs_6_0");
@@ -761,7 +738,11 @@ void YPipelineManager::CreatePSO_VfxMeshVolume() {
     pipelineStates_["VfxMeshVolume"] = result.pipelineState;
     parameterIndices_["VfxMeshVolume"] = result.parameterIndices;
 }
-
+// ============================================================
+// 
+// VFXMesh - Smoke
+// 
+// ============================================================
 void YPipelineManager::CreatePSO_VfxMeshSmoke() {
     // Omen 風ボリュームスモーク。半透明スモークなのでアルファブレンド。
     auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Vfx/VfxMesh/VfxMesh.VS.hlsl", L"vs_6_0");
@@ -783,6 +764,11 @@ void YPipelineManager::CreatePSO_VfxMeshSmoke() {
     parameterIndices_["VfxMeshSmoke"] = result.parameterIndices;
 }
 
+// ============================================================
+// 
+// VFXMesh - Lightning
+// 
+// ============================================================
 void YPipelineManager::CreatePSO_VfxMeshLightning() {
     // プロシージャル稲妻。加算ブレンドで芯が光る。
     auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Vfx/VfxMesh/VfxMesh.VS.hlsl", L"vs_6_0");
@@ -804,6 +790,11 @@ void YPipelineManager::CreatePSO_VfxMeshLightning() {
     parameterIndices_["VfxMeshLightning"] = result.parameterIndices;
 }
 
+// ============================================================
+// 
+// VFXMesh - ShockWave
+// 
+// ============================================================
 void YPipelineManager::CreatePSO_VfxMeshShockwave() {
     // 爆発の衝撃波リング。加算ブレンド。
     auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Vfx/VfxMesh/VfxMesh.VS.hlsl", L"vs_6_0");
@@ -826,8 +817,11 @@ void YPipelineManager::CreatePSO_VfxMeshShockwave() {
 }
 
 
-// ===== ポストエフェクト系パイプライン =====
-
+// ============================================================
+// 
+// PostEffect
+// 
+// ============================================================
 void YPipelineManager::CreatePSO_BaseOffScreen(
     const std::wstring& pixelShaderPath,
     const std::string& pipelineKey

@@ -15,29 +15,22 @@ namespace YoRigine {
     class DirectXCommon;
 }
 
-/// <summary>
-/// 改良版パイプライン管理クラス
-/// 
-/// 主な改善点:
-/// 1. ルートパラメータの自動番号管理（RootSignatureBuilder使用）
-/// 2. PSOのバイナリキャッシュ（PSOCache使用）
-/// 3. シェーダーリフレクション（完全自動生成）
-/// 4. 名前ベースのパラメータアクセス（マジックナンバー排除）
-/// 
-/// 使用例:
-/// auto* manager = YPipelineManager::GetInstance();
-/// manager->Initialize();
-/// 
-/// // パイプラインステートを取得
-/// auto* pso = manager->GetPipeLineStateObject("Sprite");
-/// 
-/// // パラメータインデックスを取得（名前ベース）
-/// auto& indices = manager->GetParameterIndices("Sprite");
-/// UINT materialIdx = indices.at("Material");
-/// 
-/// // コマンドリストに設定
-/// commandList->SetGraphicsRootConstantBufferView(materialIdx, address);
-/// </summary>
+/* <summary>
+    改良版パイプライン管理クラス
+    使用例:
+    auto* manager = YPipelineManager::GetInstance();
+    manager->Initialize();
+    
+    パイプラインステートを取得
+    auto* pso = manager->GetPipeLineStateObject("Sprite");
+    
+    パラメータインデックスを取得（名前ベース）
+    auto& indices = manager->GetParameterIndices("Sprite");
+    UINT materialIdx = indices.at("Material");
+    
+    コマンドリストに設定
+    commandList->SetGraphicsRootConstantBufferView(materialIdx, address);
+    </summary>*/
 class YPipelineManager
 {
 public:
@@ -113,15 +106,6 @@ private:
     /// </summary>
     void CreatePSO_ShadowMapInstanced();
 
-    /// <summary>
-    /// パーティクル描画用パイプライン（通常版）
-    /// </summary>
-    void CreatePSO_Particle();
-
-    /// <summary>
-    /// パーティクル描画用パイプライン（全ブレンドモード版）
-    /// </summary>
-    void CreatePSO_ParticleAllBlendModes();
     void CreatePSO_GPUParticleALLBlendModes();
     void CreatePSO_YParticleAllBlendModes();
     /// <summary>
