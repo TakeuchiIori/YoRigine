@@ -230,6 +230,7 @@
 └── └── └── ├── Settings/
 └── └── ├── PostEffectPresets/
 └── └── ├── Prefabs/
+└── └── ├── Render/
 └── └── ├── SceneSync/
 └── └── ├── Scenes/
 └── └── ├── UI/
@@ -661,7 +662,11 @@
 └── └── └── ├── MaterialManager.cpp
 └── └── └── ├── MaterialManager.h
 └── └── └── ├── MaterialUV.cpp
-└── └── └── └── MaterialUV.h
+└── └── └── ├── MaterialUV.h
+└── └── └── ├── OutlineSettings.cpp
+└── └── └── ├── OutlineSettings.h
+└── └── └── ├── ToonSettings.cpp
+└── └── └── └── ToonSettings.h
 └── └── ├── Mesh/
 └── └── └── ├── Mesh.cpp
 └── └── └── ├── Mesh.h
@@ -199476,7 +199481,7 @@ void DevelopScene::Initialize() {
 
 	// VFX テスト用：Bloom 入りのポストエフェクトを読み込む（エミッシブ強度→Bloom の確認用）。
 	// エディタ「ポストエフェクト」でしきい値/強度を調整できる。
-	PostEffectManager::GetInstance()->LoadPreset("TitleBloom");
+	PostEffectManager::GetInstance()->LoadPreset("TD");
 #ifdef USE_IMGUI
 	YEmitterGroupEditor::GetInstance().SetCamera(sceneCamera_.get());
 	YoRigine::VfxMeshEditor::GetInstance()->Initialize();
@@ -205713,6 +205718,7 @@ namespace YoRigine {
 				inst.color = obj->color;
 				inst.uvTransform = MakeScaleMatrix({ obj->uvScale.x, obj->uvScale.y, 1.0f });
 				inst.stochasticStrength = obj->uvStochastic;
+				inst.outlineMask = obj->outlineEnabled ? 1.0f : 0.0f;
 				instRenderer->AddInstance(model, inst);
 
 				// PickBuffer や他システムが worldTransform の CB を参照するため、
@@ -205888,6 +205894,7 @@ namespace YoRigine {
 				inst.color = obj->color;
 				inst.uvTransform = MakeScaleMatrix({ obj->uvScale.x, obj->uvScale.y, 1.0f });
 				inst.stochasticStrength = obj->uvStochastic;
+				inst.outlineMask = obj->outlineEnabled ? 1.0f : 0.0f;
 				instRenderer->AddInstance(model, inst);
 			} else {
 				obj->object->DrawShadow(*obj->worldTransform);
@@ -206202,6 +206209,7 @@ namespace YoRigine {
 			newObj->uvScale = srcObj->uvScale;
 			newObj->uvStochastic = srcObj->uvStochastic;
 			objectManager_->ApplyObjectUV(*newObj);
+			newObj->outlineEnabled = srcObj->outlineEnabled;
 
 			// 親子関係も維持
 			newObj->parentID = srcObj->parentID;
@@ -207654,6 +207662,9 @@ namespace YoRigine {
                 objectManager_->ApplyObjectUV(*obj);
             }
 
+            // インバートハル輪郭線をこのオブジェクトに掛けるか（地面・空など背景は OFF）
+            ImGui::Checkbox("アウトライン", &obj->outlineEnabled);
+
             ImGui::Separator();
 
             if (ImGui::Button("位置リセット")) {
@@ -208108,7 +208119,7 @@ namespace YoRigine {
         if (!objectManager_) return false;
         try {
             json j;
-            j["version"] = 11;
+            j["version"] = 12;
             j["objects"] = json::array();
 
             for (const auto* obj : objectManager_->GetAllActiveObjects()) {
@@ -208127,6 +208138,7 @@ namespace YoRigine {
                     {"color",               {obj->color.x,    obj->color.y,    obj->color.z,    obj->color.w}},
                     {"uvScale",             {obj->uvScale.x,  obj->uvScale.y}},
                     {"uvStochastic",        obj->uvStochastic},
+                    {"outlineEnabled",      obj->outlineEnabled},
                     {"parentID",            obj->parentID},
                     {"isAnimation",         obj->isAnimation},
                     {"animationName",       obj->animationName},
@@ -208164,7 +208176,7 @@ namespace YoRigine {
             json j;
             file >> j;
             const int version = j.value("version", 1);
-            if (version < 1 || version > 11) return false;
+            if (version < 1 || version > 12) return false;
 
             objectManager_->ClearAllObjects();
 
@@ -208220,6 +208232,9 @@ namespace YoRigine {
                     obj->uvStochastic = o["uvStochastic"].get<float>();
                 }
                 objectManager_->ApplyObjectUV(*obj);
+
+                // version 12+: per-object 輪郭線フラグ（無ければ true=従来通り輪郭あり）
+                obj->outlineEnabled = o.value("outlineEnabled", true);
 
                 // version 10+: シーン内一意名 (TriggerAction のターゲット参照用)
                 if (version >= 10 && o.contains("nameTag")) {
@@ -208311,7 +208326,7 @@ namespace YoRigine {
     {
         try {
             json j;
-            j["version"] = 11;
+            j["version"] = 12;
             j["objects"] = json::array();
 
             for (const auto* obj : objects) {
@@ -208330,6 +208345,7 @@ namespace YoRigine {
                     {"color",               {obj->color.x,    obj->color.y,    obj->color.z,    obj->color.w}},
                     {"uvScale",             {obj->uvScale.x,  obj->uvScale.y}},
                     {"uvStochastic",        obj->uvStochastic},
+                    {"outlineEnabled",      obj->outlineEnabled},
                     {"parentID",            obj->parentID},
                     {"isAnimation",         obj->isAnimation},
                     {"animationName",       obj->animationName},
@@ -208430,6 +208446,9 @@ namespace YoRigine {
                     obj->uvStochastic = o["uvStochastic"].get<float>();
                 }
                 objectManager_->ApplyObjectUV(*obj);
+
+                // version 12+: per-object 輪郭線フラグ（無ければ true=従来通り輪郭あり）
+                obj->outlineEnabled = o.value("outlineEnabled", true);
 
                 // version 10+: シーン内一意名
                 if (version >= 10 && o.contains("nameTag")) {
@@ -209475,6 +209494,7 @@ File Path: YEngine/Generators/Object3D/Object3d.cpp
 #include "Debugger/Logger.h"
 #include <LightManager/LightManager.h>
 #include "PipelineManager/YPipelineManager.h"
+#include "Material/OutlineSettings.h"
 
 const std::string Object3d::defaultModelPath_ = "Resources/Models/";
 
@@ -209549,6 +209569,20 @@ void Object3d::Draw(Camera* camera, WorldTransform& worldTransform)
 
 	auto commandList = object3dCommon_->GetDxCommon()->GetCommandList();
 
+	// === インバートハル輪郭線（本体より先に描き、内側は本体で上書きする） ===
+	// 専用 PSO/RS へ切り替えるため、ここで描いてからオブジェクト本体パイプラインへ復帰する。
+	if (camera && model_ && outlineEnabled_ && OutlineSettings::GetInstance()->IsEnabled()) {
+		DrawOutlinePass(camera, worldTransform);
+
+		// 輪郭用 RS へ切り替えた時点で Object RS の root 引数は無効化される。
+		// 本体パイプラインへ戻し、DrawPreference で張っていたライトを張り直す。
+		object3dCommon_->SetRootSignature();
+		object3dCommon_->SetGraphicsCommand();
+		object3dCommon_->SetPrimitiveTopology();
+		YoRigine::LightManager::GetInstance()->SetCommandList(
+			indices.at("gDirectionalLight"), indices.at("gPointLights"), indices.at("gSpotLights"));
+	}
+
 	// ワールド
 	commandList->SetGraphicsRootConstantBufferView(indices.at("gTransformationMatrix"), worldTransform.GetConstBuffer()->GetGPUVirtualAddress());
 
@@ -209602,6 +209636,39 @@ void Object3d::DrawShadow(WorldTransform& worldTransform)
 	model_->DrawShadow();
 }
 
+
+/// <summary>
+/// インバートハル輪郭線の描画。
+/// 専用 PSO/RS（前面カリング）に切り替え、頂点を法線方向へ押し出した
+/// シェルを描く。ジオメトリ供給は頂点/インデックスのみで足りるため
+/// Model::DrawShadow() を流用する（PSO/RS/CB は本関数で設定済み）。
+/// </summary>
+void Object3d::DrawOutlinePass(Camera* camera, WorldTransform& worldTransform)
+{
+	if (!model_ || !camera) return;
+
+	auto pm = YPipelineManager::GetInstance();
+	const auto& oidx = pm->GetParameterIndices("ObjectOutline");
+	auto commandList = object3dCommon_->GetDxCommon()->GetCommandList().Get();
+
+	// 輪郭用 PSO / RS / トポロジ
+	commandList->SetPipelineState(pm->GetPipeLineStateObject("ObjectOutline"));
+	commandList->SetGraphicsRootSignature(pm->GetRootSignature("ObjectOutline"));
+	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	// 最新のパラメータ（太さ・色）を CB へ反映
+	OutlineSettings::GetInstance()->UpdateCB();
+
+	commandList->SetGraphicsRootConstantBufferView(
+		oidx.at("gTransformationMatrix"), worldTransform.GetConstBuffer()->GetGPUVirtualAddress());
+	commandList->SetGraphicsRootConstantBufferView(
+		oidx.at("gCamera"), camera->GetCameraResource()->GetGPUVirtualAddress());
+	commandList->SetGraphicsRootConstantBufferView(
+		oidx.at("gOutline"), OutlineSettings::GetInstance()->GetResource()->GetGPUVirtualAddress());
+
+	// 頂点/インデックスをバインドして描画するだけ（Model::DrawShadow を流用）
+	model_->DrawShadow();
+}
 
 void Object3d::CreateShadowResources()
 {
@@ -209827,6 +209894,10 @@ private:
 	// シャドウマップ用リソース作成
 	void CreateShadowResources();
 
+	// インバートハル輪郭線の描画（OutlineSettings 有効時に Draw 内から呼ぶ）。
+	// 専用 PSO/RS へ切り替え、頂点ジオメトリを押し出しシェルとして描く。
+	void DrawOutlinePass(Camera* camera, WorldTransform& worldTransform);
+
 	// UVの更新
 	void UpdateUV();
 
@@ -209835,6 +209906,11 @@ public:
 
 	Model* GetModel() { return model_; }
 	MaterialLighting* GetMaterialLighting() const { return materialLighting_.get(); }
+
+	// インバートハル輪郭線をこのオブジェクトに掛けるか（既定 true）。
+	// 地面など輪郭を出したくないオブジェクトは false にする。
+	void SetOutlineEnabled(bool enable) { outlineEnabled_ = enable; }
+	bool IsOutlineEnabled() const { return outlineEnabled_; }
 
 	Vector4& GetColor() { return materialColor_->GetColor(); }
 	void SetMaterialColor(const Vector4& color) { materialColor_->SetColor(color); }
@@ -209873,6 +209949,9 @@ private:
 
 	Object3dCommon* object3dCommon_ = nullptr;
 	Model* model_ = nullptr;
+
+	// インバートハル輪郭線をこのオブジェクトに掛けるか（地面等は false）
+	bool outlineEnabled_ = true;
 
 	// マテリアル関連
 	std::unique_ptr<MaterialColor> materialColor_;
@@ -210041,8 +210120,6 @@ public: // アクセッサ
 	// setter
 	YoRigine::DirectXCommon* GetDxCommon() const { return dxCommon_; }
 	void SetDefaultCamera(Camera* camera) { this->defaultCamera_ = camera; }
-
-private:
 
 	/// <summary>
 	/// ルートシグネチャをセット
@@ -210857,6 +210934,10 @@ public:
 		// タイル単位ランダム化の強度 (0=オフ / 1=最大)。エディタから編集 / JSON 保存対象
 		float uvStochastic = 0.0f;
 
+		// インバートハル輪郭線を掛けるか。地面・空など大きな背景は false にして
+		// 輪郭が出ないようにする。エディタから編集 / JSON 保存対象。
+		bool outlineEnabled = true;
+
 		int id = 0;
 		int parentID = -1;
 		bool isActive = true;
@@ -211359,6 +211440,11 @@ void OffScreen::SetDepthOutlineParams(int kernelSize, const Vector4& color,
 		materialData_->depthThreshold = params.depthThreshold;
 		materialData_->normalThreshold = params.normalThreshold;
 		materialData_->luminanceThreshold = params.luminanceThreshold;
+		materialData_->normalWidth = params.normalWidth;
+		materialData_->luminanceWidth = params.luminanceWidth;
+		materialData_->useDistanceFade = params.useDistanceFade ? 1 : 0;
+		materialData_->distanceFadeStart = params.distanceFadeStart;
+		materialData_->distanceFadeEnd = params.distanceFadeEnd;
 	}
 }
 
@@ -211641,6 +211727,11 @@ void OffScreen::CreateDepthOutLineResource()
 	materialData_->depthThreshold = 1.0f;
 	materialData_->normalThreshold = 1.0f;
 	materialData_->luminanceThreshold = 1.0f;
+	materialData_->normalWidth = 1.0f;
+	materialData_->luminanceWidth = 1.0f;
+	materialData_->useDistanceFade = 0;
+	materialData_->distanceFadeStart = 30.0f;
+	materialData_->distanceFadeEnd = 80.0f;
 	materialResource_->Unmap(0, nullptr);
 }
 
@@ -211925,6 +212016,13 @@ public:
 		float depthThreshold = 1.0f;     // 各エッジの正規化しきい値
 		float normalThreshold = 1.0f;
 		float luminanceThreshold = 1.0f;
+		// --- 太さ（近傍サンプルのピクセル距離。1=隣接、大きいほど太い） ---
+		float normalWidth = 1.0f;        // 法線エッジの太さ
+		float luminanceWidth = 1.0f;     // 輝度エッジの太さ
+		// --- 距離フェード（遠景で線が太く見えて真っ黒化するのを防ぐ） ---
+		bool  useDistanceFade = false;
+		float distanceFadeStart = 30.0f; // ここから線が薄くなり始める(ビュー空間距離)
+		float distanceFadeEnd = 80.0f;   // これより遠いと線を消す
 	};
 
 	static OffScreen* GetInstance() {
@@ -212169,6 +212267,7 @@ private:
 		float padding[2];
 	};
 
+	// ※ HLSL 側 (DepthBasedOutLine.CS) の Material とフィールド順・オフセットを必ず一致させること
 	struct Material {
 		Matrix4x4 Inverse;          // projectionInverse (viewZ 復元用)
 		int kernelSize;
@@ -212182,8 +212281,12 @@ private:
 		float depthThreshold;
 		float normalThreshold;
 		float luminanceThreshold;
-		float _pad;
+		float normalWidth;          // 法線エッジの太さ
 		Vector4 outlineColor;
+		float luminanceWidth;       // 輝度エッジの太さ
+		float distanceFadeStart;    // 距離フェード開始(ビュー空間距離)
+		float distanceFadeEnd;      // 距離フェード終了
+		int   useDistanceFade;      // 距離フェード有効
 	};
 
 	struct RadialBlurForGPU {
@@ -212878,10 +212981,19 @@ bool PostEffectChain::DrawEffectParametersImGui([[maybe_unused]] int selectedInd
 			if (d.useNormal) {
 				if (ImGui::DragFloat("法線 重み", &d.normalWeight, 0.01f, 0.0f, 10.0f)) changed = true;
 				if (ImGui::DragFloat("法線 閾値", &d.normalThreshold, 0.001f, 0.0001f, 10.0f)) changed = true;
+				if (ImGui::DragFloat("法線 太さ", &d.normalWidth, 0.05f, 1.0f, 16.0f)) changed = true;
 			}
 			if (d.useLuminance) {
 				if (ImGui::DragFloat("輝度 重み", &d.luminanceWeight, 0.01f, 0.0f, 10.0f)) changed = true;
 				if (ImGui::DragFloat("輝度 閾値", &d.luminanceThreshold, 0.001f, 0.0001f, 10.0f)) changed = true;
+				if (ImGui::DragFloat("輝度 太さ", &d.luminanceWidth, 0.05f, 1.0f, 16.0f)) changed = true;
+			}
+
+			ImGui::SeparatorText("距離フェード（遠景の真っ黒化防止）");
+			if (ImGui::Checkbox("距離フェード有効", &d.useDistanceFade)) changed = true;
+			if (d.useDistanceFade) {
+				if (ImGui::DragFloat("フェード開始", &d.distanceFadeStart, 0.5f, 0.0f, 1000.0f)) changed = true;
+				if (ImGui::DragFloat("フェード終了", &d.distanceFadeEnd, 0.5f, 0.0f, 1000.0f)) changed = true;
 			}
 		}
 		break;
@@ -213005,7 +213117,7 @@ bool PostEffectChain::DrawEffectParametersImGui([[maybe_unused]] int selectedInd
 		// ポスタリゼーション
 		// --------------------------------------------------------
 	case OffScreen::OffScreenEffectType::Posterize:
-		if (ImGui::SliderInt("Steps", &effect->params.posterize.steps, 2, 16)) {
+		if (ImGui::SliderInt("Steps", &effect->params.posterize.steps, 2, 128)) {
 			changed = true;
 		}
 		if (ImGui::SliderFloat("Saturation Boost", &effect->params.posterize.saturationBoost, 0.0f, 2.0f)) {
@@ -214498,6 +214610,28 @@ std::string PostEffectManager::EffectChainToJson() const
 			<< effect->params.outlineColor.z << ","
 			<< effect->params.outlineColor.w << "],\n";
 
+		// 深度アウトライン（エッジトグル/重み/閾値/太さ/距離フェード）
+		{
+			const auto& d = effect->params.depthOutline;
+			json << "        \"depthOutline\": {\n";
+			json << "          \"useDepth\": " << (d.useDepth ? "true" : "false") << ",\n";
+			json << "          \"useNormal\": " << (d.useNormal ? "true" : "false") << ",\n";
+			json << "          \"useLuminance\": " << (d.useLuminance ? "true" : "false") << ",\n";
+			json << "          \"edgeStrength\": " << d.edgeStrength << ",\n";
+			json << "          \"depthWeight\": " << d.depthWeight << ",\n";
+			json << "          \"normalWeight\": " << d.normalWeight << ",\n";
+			json << "          \"luminanceWeight\": " << d.luminanceWeight << ",\n";
+			json << "          \"depthThreshold\": " << d.depthThreshold << ",\n";
+			json << "          \"normalThreshold\": " << d.normalThreshold << ",\n";
+			json << "          \"luminanceThreshold\": " << d.luminanceThreshold << ",\n";
+			json << "          \"normalWidth\": " << d.normalWidth << ",\n";
+			json << "          \"luminanceWidth\": " << d.luminanceWidth << ",\n";
+			json << "          \"useDistanceFade\": " << (d.useDistanceFade ? "true" : "false") << ",\n";
+			json << "          \"distanceFadeStart\": " << d.distanceFadeStart << ",\n";
+			json << "          \"distanceFadeEnd\": " << d.distanceFadeEnd << "\n";
+			json << "        },\n";
+		}
+
 		// ラジアルブラー
 		json << "        \"radialBlur\": {\n";
 		json << "          \"direction\": ["
@@ -214742,6 +214876,27 @@ bool PostEffectManager::JsonToEffectChain(const std::string& jsonStr)
 			if (outlineColor.size() >= 4) {
 				effect->params.outlineColor =
 				{ outlineColor[0], outlineColor[1], outlineColor[2], outlineColor[3] };
+			}
+
+			// ----- depthOutline（エッジトグル/重み/閾値/太さ/距離フェード） -----
+			std::string depthOutlineJson = JsonUtil::GetObjectValue(paramsJson, "depthOutline");
+			if (!depthOutlineJson.empty()) {
+				auto& d = effect->params.depthOutline;
+				d.useDepth = JsonUtil::GetBoolValue(depthOutlineJson, "useDepth", true);
+				d.useNormal = JsonUtil::GetBoolValue(depthOutlineJson, "useNormal", false);
+				d.useLuminance = JsonUtil::GetBoolValue(depthOutlineJson, "useLuminance", false);
+				d.edgeStrength = JsonUtil::GetNumberValue<float>(depthOutlineJson, "edgeStrength", 1.0f);
+				d.depthWeight = JsonUtil::GetNumberValue<float>(depthOutlineJson, "depthWeight", 1.0f);
+				d.normalWeight = JsonUtil::GetNumberValue<float>(depthOutlineJson, "normalWeight", 1.0f);
+				d.luminanceWeight = JsonUtil::GetNumberValue<float>(depthOutlineJson, "luminanceWeight", 1.0f);
+				d.depthThreshold = JsonUtil::GetNumberValue<float>(depthOutlineJson, "depthThreshold", 1.0f);
+				d.normalThreshold = JsonUtil::GetNumberValue<float>(depthOutlineJson, "normalThreshold", 1.0f);
+				d.luminanceThreshold = JsonUtil::GetNumberValue<float>(depthOutlineJson, "luminanceThreshold", 1.0f);
+				d.normalWidth = JsonUtil::GetNumberValue<float>(depthOutlineJson, "normalWidth", 1.0f);
+				d.luminanceWidth = JsonUtil::GetNumberValue<float>(depthOutlineJson, "luminanceWidth", 1.0f);
+				d.useDistanceFade = JsonUtil::GetBoolValue(depthOutlineJson, "useDistanceFade", false);
+				d.distanceFadeStart = JsonUtil::GetNumberValue<float>(depthOutlineJson, "distanceFadeStart", 30.0f);
+				d.distanceFadeEnd = JsonUtil::GetNumberValue<float>(depthOutlineJson, "distanceFadeEnd", 80.0f);
 			}
 
 			// ----- radialBlur -----
@@ -230988,21 +231143,11 @@ File Path: YEngine/Graphics/Drawer/InstancedObject3d.cpp
 #include "PipelineManager/YPipelineManager.h"
 #include "LightManager/LightManager.h"
 #include "Model.h"
+#include "Material/OutlineSettings.h"
 
 #include <cassert>
 
 namespace {
-	// 共有 MaterialLight CB の GPU 構造体 (HLSL の MaterialLight と一致)
-	struct MaterialLightGPU {
-		int32_t enableLighting;
-		int32_t enableSpecular;
-		int32_t enableEnvironment;
-		int32_t isHalfVector;
-		float   shininess;
-		float   environmentCoefficient;
-		float   _pad[2];
-	};
-
 	// バッチ初期容量 (壁を想定して 64 から始める)
 	constexpr uint32_t kInitialCapacity = 64;
 }
@@ -231022,7 +231167,17 @@ void InstancedObject3d::Initialize()
 	if (dxCommon_) return; // 二重初期化防止
 	dxCommon_ = YoRigine::DirectXCommon::GetInstance();
 	srvManager_ = SrvManager::GetInstance();
-	CreateMaterialLightCB();
+
+	// 共有 MaterialLight（lighting有効, specular/env無効, shininess=8）。
+	// MaterialLighting 経由なのでトゥーン等のグローバル設定も自動で反映される。
+	materialLighting_ = std::make_unique<MaterialLighting>();
+	materialLighting_->Initialize();
+	materialLighting_->SetEnableLighting(true);
+	materialLighting_->SetEnableSpecular(false);
+	materialLighting_->SetEnableEnvironment(false);
+	materialLighting_->SetIsHalfVector(false);
+	materialLighting_->SetShininess(8.0f);
+	materialLighting_->SetEnvironmentCoefficient(0.0f);
 }
 
 void InstancedObject3d::Finalize()
@@ -231033,22 +231188,7 @@ void InstancedObject3d::Finalize()
 		}
 	}
 	batches_.clear();
-	materialLightCB_.Reset();
-}
-
-void InstancedObject3d::CreateMaterialLightCB()
-{
-	materialLightCB_ = dxCommon_->CreateBufferResource(sizeof(MaterialLightGPU));
-	MaterialLightGPU* m = nullptr;
-	materialLightCB_->Map(0, nullptr, reinterpret_cast<void**>(&m));
-	m->enableLighting = 1;
-	m->enableSpecular = 0;
-	m->enableEnvironment = 0;
-	m->isHalfVector = 0;
-	m->shininess = 8.0f;
-	m->environmentCoefficient = 0.0f;
-	m->_pad[0] = m->_pad[1] = 0.0f;
-	// Map したまま放置 (生存期間中ずっと有効)
+	materialLighting_.reset();
 }
 
 void InstancedObject3d::Begin()
@@ -231104,6 +231244,32 @@ void InstancedObject3d::Flush(Camera* camera)
 	// CBV/SRV/UAV ヒープを確実にバインド (シャドウパス→カラーパスの境界で heap が外れているケース対策)
 	srvManager_->PreDraw();
 
+	// === インバートハル輪郭線（本体より先に描き、内側は本体で上書きする） ===
+	// 専用 PSO/RS へ切り替えてシェルを描く。直後に本体 PSO/RS を張り直すので復帰処理は不要。
+	if (OutlineSettings::GetInstance()->IsEnabled()) {
+		OutlineSettings::GetInstance()->UpdateCB();
+		const auto& oidx = pm->GetParameterIndices("ObjectOutlineInstanced");
+
+		cmd->SetPipelineState(pm->GetPipeLineStateObject("ObjectOutlineInstanced"));
+		cmd->SetGraphicsRootSignature(pm->GetRootSignature("ObjectOutlineInstanced"));
+		cmd->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+		cmd->SetGraphicsRootConstantBufferView(
+			oidx.at("gCamera"), camera->GetCameraResource()->GetGPUVirtualAddress());
+		cmd->SetGraphicsRootConstantBufferView(
+			oidx.at("gOutline"), OutlineSettings::GetInstance()->GetResource()->GetGPUVirtualAddress());
+
+		for (auto& [model, batch] : batches_) {
+			const uint32_t count = static_cast<uint32_t>(batch.cpuData.size());
+			if (count == 0) continue;
+
+			EnsureCapacity(batch, count);
+			std::memcpy(batch.mapped, batch.cpuData.data(), sizeof(InstanceData) * count);
+
+			model->DrawOutlineInstanced(count, batch.srvHandleGPU);
+		}
+	}
+
 	// PSO + RS + topology
 	cmd->SetPipelineState(pm->GetPipeLineStateObject("ObjectInstanced"));
 	cmd->SetGraphicsRootSignature(pm->GetRootSignature("ObjectInstanced"));
@@ -231125,10 +231291,8 @@ void InstancedObject3d::Flush(Camera* camera)
 		indices.at("gCamera"),
 		camera->GetCameraResource()->GetGPUVirtualAddress());
 
-	// MaterialLight (共有CB)
-	cmd->SetGraphicsRootConstantBufferView(
-		indices.at("gMaterialLight"),
-		materialLightCB_->GetGPUVirtualAddress());
+	// MaterialLight (共有CB)。RecordDrawCommands 内でグローバルなトゥーン設定が反映される。
+	materialLighting_->RecordDrawCommands(cmd, indices.at("gMaterialLight"));
 
 	// 各バッチを描画
 	for (auto& [model, batch] : batches_) {
@@ -231188,9 +231352,11 @@ File Path: YEngine/Graphics/Drawer/InstancedObject3d.h
 #include <cstdint>
 #include <unordered_map>
 #include <vector>
+#include <memory>
 
 #include "Vector4.h"
 #include "Matrix4x4.h"
+#include "Material/MaterialLighting.h"
 
 class Camera;
 class Model;
@@ -231231,7 +231397,7 @@ public:
 		Vector4   color = { 1.0f, 1.0f, 1.0f, 1.0f };
 		Matrix4x4 uvTransform;
 		float     stochasticStrength = 0.0f;
-		float     _pad0 = 0.0f;
+		float     outlineMask = 1.0f;   // インバートハル輪郭線の掛け率(1=線あり, 0=線なし)
 		float     _pad1 = 0.0f;
 		float     _pad2 = 0.0f;
 	};
@@ -231275,17 +231441,15 @@ private:
 	// 指定batchが指定要素数を入れられるように容量確保 (足りなければ再作成)
 	void EnsureCapacity(Batch& batch, uint32_t needed);
 
-	// 共有 MaterialLight CB をデフォルト値で初期化
-	void CreateMaterialLightCB();
-
 private:
 	YoRigine::DirectXCommon* dxCommon_ = nullptr;
 	SrvManager* srvManager_ = nullptr;
 
 	std::unordered_map<Model*, Batch> batches_;
 
-	// 全インスタンス共有の MaterialLight CB (lighting有効, specular無効, env無効)
-	Microsoft::WRL::ComPtr<ID3D12Resource> materialLightCB_;
+	// 全インスタンス共有の MaterialLight (lighting有効, specular無効, env無効)。
+	// MaterialLighting 経由にすることで、トゥーン等のグローバル設定が自動反映される。
+	std::unique_ptr<MaterialLighting> materialLighting_;
 
 	uint32_t totalInstances_ = 0;
 };
@@ -236877,6 +237041,8 @@ void YPipelineManager::Initialize()
     CreatePSO_ObjectInstanced();
     CreatePSO_ShadowMap();
     CreatePSO_ShadowMapInstanced();
+    CreatePSO_ObjectOutline();
+    CreatePSO_ObjectOutlineInstanced();
     CreatePSO_Line();
     CreatePSO_InstancedCube();
     CreatePSO_YParticleAllBlendModes();
@@ -237139,9 +237305,77 @@ void YPipelineManager::CreatePSO_ShadowMapInstanced()
 }
 
 // ============================================================
-// 
+//
+// Object : Outline (Inverted Hull)
+//
+// ============================================================
+void YPipelineManager::CreatePSO_ObjectOutline()
+{
+    Logger("\n==============================================================\n\n\n");
+    Logger("         Creating Pipeline: ObjectOutline              \n\n\n");
+    Logger("==============================================================\n");
+    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3d/OutLine.VS.hlsl", L"vs_6_0");
+    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3d/OutLine.PS.hlsl", L"ps_6_0");
+
+    // 前面カリング(背面のみ描画)で、押し出したシェルのシルエットを得る。
+    D3D12_RASTERIZER_DESC raster = YoRigine::RasterizerPresets::CreateDefault();
+    raster.CullMode = D3D12_CULL_MODE_FRONT;
+
+    // オブジェクト本体パスと同じ 2RTV(color + 法線 G-buffer) 構成に合わせる。
+    ReflectionBasedPipelineBuilder builder;
+    auto result = builder
+        .SetGBufferNormal(true)
+        .SetRasterizerState(raster)
+        .BuildFromCompiledShaders(
+            dxCommon_->GetDevice().Get(),
+            vsBlob.Get(),
+            psBlob.Get()
+        );
+
+    rootSignatures_["ObjectOutline"] = result.rootSignature;
+    pipelineStates_["ObjectOutline"] = result.pipelineState;
+    parameterIndices_["ObjectOutline"] = result.parameterIndices;
+}
+
+// ============================================================
+//
+// Object : Outline (Inverted Hull) — Instanced
+//   ModelManipulator 等のインスタンス描画オブジェクトに輪郭を付ける。
+//   ジオメトリ供給以外は ObjectOutline と同じ（前面カリング / 2RTV）。
+//
+// ============================================================
+void YPipelineManager::CreatePSO_ObjectOutlineInstanced()
+{
+    Logger("\n==============================================================\n\n\n");
+    Logger("         Creating Pipeline: ObjectOutlineInstanced              \n\n\n");
+    Logger("==============================================================\n");
+    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3d/OutLineInstanced.VS.hlsl", L"vs_6_0");
+    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3d/OutLine.PS.hlsl", L"ps_6_0");
+
+    // 前面カリング(背面のみ描画)で、押し出したシェルのシルエットを得る。
+    D3D12_RASTERIZER_DESC raster = YoRigine::RasterizerPresets::CreateDefault();
+    raster.CullMode = D3D12_CULL_MODE_FRONT;
+
+    // オブジェクト本体パスと同じ 2RTV(color + 法線 G-buffer) 構成に合わせる。
+    ReflectionBasedPipelineBuilder builder;
+    auto result = builder
+        .SetGBufferNormal(true)
+        .SetRasterizerState(raster)
+        .BuildFromCompiledShaders(
+            dxCommon_->GetDevice().Get(),
+            vsBlob.Get(),
+            psBlob.Get()
+        );
+
+    rootSignatures_["ObjectOutlineInstanced"] = result.rootSignature;
+    pipelineStates_["ObjectOutlineInstanced"] = result.pipelineState;
+    parameterIndices_["ObjectOutlineInstanced"] = result.parameterIndices;
+}
+
+// ============================================================
+//
 // GPUParticle : ALLBlendMode
-// 
+//
 // ============================================================
 void YPipelineManager::CreatePSO_GPUParticleALLBlendModes()
 {
@@ -237980,6 +238214,18 @@ private:
     /// </summary>
     void CreatePSO_ShadowMapInstanced();
 
+    /// <summary>
+    /// インバートハル輪郭線用パイプライン (OutLine.VS/PS.hlsl)
+    /// 前面カリングで押し出しシェルの背面のみ描画し、シルエットを縁取る。
+    /// </summary>
+    void CreatePSO_ObjectOutline();
+
+    /// <summary>
+    /// インバートハル輪郭線用パイプライン（インスタンス描画版 / OutLineInstanced.VS）
+    /// per-instance のワールド行列でシェルを押し出し、静的インスタンスにも輪郭を付ける。
+    /// </summary>
+    void CreatePSO_ObjectOutlineInstanced();
+
     void CreatePSO_GPUParticleALLBlendModes();
     void CreatePSO_YParticleAllBlendModes();
     /// <summary>
@@ -238702,6 +238948,7 @@ File Path: YEngine/Model/Material/MaterialLighting.cpp
 ============================================================
 #include "MaterialLighting.h"
 #include "DirectXCommon.h"
+#include "ToonSettings.h"
 
 void MaterialLighting::Initialize()
 {
@@ -238713,10 +238960,40 @@ void MaterialLighting::Initialize()
 	materialLight_->isHalfVector = false;
 	materialLight_->enableEnvironment = false;
 	materialLight_->environmentCoefficient = 1.0f;
+	// トゥーン拡張の既定値（既定では無効＝従来の見た目）
+	materialLight_->enableToon = 0;
+	materialLight_->toonBands = 3;
+	materialLight_->enableRim = 0;
+	materialLight_->enableToonSpecular = 0;
+	materialLight_->rimPower = 4.0f;
+	materialLight_->rimIntensity = 1.0f;
+	materialLight_->toonSpecularThreshold = 0.5f;
+	materialLight_->toonEdgeSoftness = 0.02f;
+	materialLight_->shadowStrength = 1.0f;
+	materialLight_->shadowColor = { 0.55f, 0.55f, 0.70f }; // 寒色寄りの影
+	materialLight_->highlightColor = { 1.0f, 1.0f, 1.0f };
+	materialLight_->_pad0 = materialLight_->_pad1 = materialLight_->_pad2 = 0.0f;
 }
 
 void MaterialLighting::RecordDrawCommands(ID3D12GraphicsCommandList* commandList, UINT rootParameterIndexCBV)
 {
+	// トゥーン関連は全オブジェクト共通のグローバル設定で上書きする
+	// （個別ではなく1か所「トゥーン」パネルで統一調整するため）
+	if (materialLight_) {
+		const ToonSettings::Params& t = ToonSettings::GetInstance()->Get();
+		materialLight_->enableToon = t.enableToon;
+		materialLight_->toonBands = t.toonBands;
+		materialLight_->enableRim = t.enableRim;
+		materialLight_->enableToonSpecular = t.enableToonSpecular;
+		materialLight_->rimPower = t.rimPower;
+		materialLight_->rimIntensity = t.rimIntensity;
+		materialLight_->toonSpecularThreshold = t.toonSpecularThreshold;
+		materialLight_->toonEdgeSoftness = t.toonEdgeSoftness;
+		materialLight_->shadowStrength = t.shadowStrength;
+		materialLight_->shadowColor = t.shadowColor;
+		materialLight_->highlightColor = t.highlightColor;
+	}
+
 	commandList->SetGraphicsRootConstantBufferView(rootParameterIndexCBV, resource_->GetGPUVirtualAddress());
 }
 
@@ -238734,6 +239011,7 @@ File Path: YEngine/Model/Material/MaterialLighting.h
 
 // Math
 #include "Matrix4x4.h"
+#include "Vector3.h"
 
 
 // モデルのマテリアルのライティング情報を扱うクラス
@@ -238743,6 +239021,8 @@ public:
 	///************************* GPU用の構造体 *************************///
 
 	// マテリアルのライティング情報
+	// ※ HLSL 側 (Object3d.PS / Object3dInstanced.PS) の MaterialLight と
+	//    フィールド順・オフセットを必ず一致させること
 	struct MaterialLight {
 		int32_t enableLighting;     // 32ビット整数
 		int32_t enableSpecular;     // 32ビット整数に変更
@@ -238750,7 +239030,22 @@ public:
 		int32_t isHalfVector;       // 32ビット整数に変更
 		float shininess;            // 32ビット浮動小数点
 		float environmentCoefficient; // 32ビット浮動小数点
-		float padding[2];           // 16バイトアライメントのためのパディング
+		// --- トゥーン（セルシェーディング）拡張 ---
+		int32_t enableToon;         // セルシェーディング有効
+		int32_t toonBands;          // 階調数 (2〜)
+		int32_t enableRim;          // リムライト有効
+		int32_t enableToonSpecular; // トゥーンスペキュラ有効
+		float   rimPower;           // リムの鋭さ (大きいほど縁が細い)
+		float   rimIntensity;       // リムの強さ
+		float   toonSpecularThreshold; // スペキュラを点灯するしきい値
+		float   toonEdgeSoftness;   // バンド境界の smoothstep 幅 (0=完全ハード)
+		// --- 2D表現（アニメ塗り）拡張 ---
+		float   shadowStrength;     // 影色の強さ (0=影なし/フラット, 1=shadowColor全適用)
+		float   _pad0;
+		Vector3 shadowColor;        // 影部分の色（暗くする代わりにこの色へ寄せる）
+		float   _pad1;
+		Vector3 highlightColor;     // 固定ハイライトの色
+		float   _pad2;              // 16バイトアライメント (合計 96 バイト)
 	};
 
 
@@ -238774,6 +239069,18 @@ public:
 	void SetIsHalfVector(bool isHalf) { materialLight_->isHalfVector = isHalf ? 1 : 0; }
 	void SetShininess(float value) { materialLight_->shininess = value; }
 	void SetEnvironmentCoefficient(float value) { materialLight_->environmentCoefficient = value; }
+
+	void SetEnableToon(bool enable) { materialLight_->enableToon = enable ? 1 : 0; }
+	void SetToonBands(int bands) { materialLight_->toonBands = bands; }
+	void SetEnableRim(bool enable) { materialLight_->enableRim = enable ? 1 : 0; }
+	void SetEnableToonSpecular(bool enable) { materialLight_->enableToonSpecular = enable ? 1 : 0; }
+	void SetRimPower(float value) { materialLight_->rimPower = value; }
+	void SetRimIntensity(float value) { materialLight_->rimIntensity = value; }
+	void SetToonSpecularThreshold(float value) { materialLight_->toonSpecularThreshold = value; }
+	void SetToonEdgeSoftness(float value) { materialLight_->toonEdgeSoftness = value; }
+	void SetShadowStrength(float value) { materialLight_->shadowStrength = value; }
+	void SetShadowColor(const Vector3& c) { materialLight_->shadowColor = c; }
+	void SetHighlightColor(const Vector3& c) { materialLight_->highlightColor = c; }
 
 	bool IsLightingEnabled() const { return materialLight_->enableLighting != 0; }
 	bool IsSpecularEnabled() const { return materialLight_->enableSpecular != 0; }
@@ -238965,6 +239272,292 @@ private:
 	MaterialUVData* materialUV_ = nullptr;
 };
 
+
+
+============================================================
+File Path: YEngine/Model/Material/OutlineSettings.cpp
+============================================================
+#include "OutlineSettings.h"
+
+#include "DirectXCommon.h"
+#include "Loaders/Json/JsonManager.h"
+
+#ifdef USE_IMGUI
+#include <imgui.h>
+#endif
+
+OutlineSettings* OutlineSettings::GetInstance()
+{
+	static OutlineSettings instance;
+	return &instance;
+}
+
+void OutlineSettings::Initialize()
+{
+	// シェーダーが直接読む定数バッファを確保（MaterialLighting と同じ作法）。
+	resource_ = YoRigine::DirectXCommon::GetInstance()->CreateBufferResource(sizeof(OutlineCB));
+	resource_->Map(0, nullptr, reinterpret_cast<void**>(&mapped_));
+
+	// JSON に登録すると Register 時点で保存値が自動ロードされる。
+	json_ = std::make_unique<YoRigine::JsonManager>("Outline", "Resources/Json/Render/");
+	json_->SetCategory("Render");
+	json_->Register("輪郭線有効", &enable_);
+	json_->Register("太さ", &width_);
+	json_->Register("色", &color_);
+	json_->Register("距離フェード有効", &useDistanceFade_);
+	json_->Register("フェード開始", &fadeStart_);
+	json_->Register("フェード終了", &fadeEnd_);
+
+	UpdateCB();
+}
+
+void OutlineSettings::UpdateCB()
+{
+	if (!mapped_) return;
+	mapped_->color[0] = color_.x;
+	mapped_->color[1] = color_.y;
+	mapped_->color[2] = color_.z;
+	mapped_->color[3] = 1.0f;
+	mapped_->width = width_;
+	mapped_->enable = enable_;
+	mapped_->useDistanceFade = useDistanceFade_;
+	mapped_->distanceFadeStart = fadeStart_;
+	mapped_->distanceFadeEnd = fadeEnd_;
+	mapped_->_pad[0] = mapped_->_pad[1] = 0.0f;
+}
+
+void OutlineSettings::ImGui()
+{
+#ifdef USE_IMGUI
+	ImGui::TextUnformatted("全オブジェクト共通の輪郭線（インバートハル）設定");
+	ImGui::Separator();
+
+	bool enable = enable_ != 0;
+	if (ImGui::Checkbox("輪郭線有効", &enable)) enable_ = enable ? 1 : 0;
+
+	ImGui::SliderFloat("太さ", &width_, 0.0f, 0.05f, "%.4f");
+	ImGui::ColorEdit3("色", &color_.x);
+
+	ImGui::SeparatorText("距離フェード（遠景の真っ黒化防止）");
+	bool useFade = useDistanceFade_ != 0;
+	if (ImGui::Checkbox("距離フェード有効", &useFade)) useDistanceFade_ = useFade ? 1 : 0;
+	if (useDistanceFade_) {
+		ImGui::DragFloat("フェード開始", &fadeStart_, 0.5f, 0.0f, 1000.0f);
+		ImGui::DragFloat("フェード終了", &fadeEnd_, 0.5f, 0.0f, 1000.0f);
+	}
+
+	ImGui::Separator();
+	if (ImGui::Button("保存")) {
+		if (json_) json_->Save();
+	}
+#endif
+}
+
+
+============================================================
+File Path: YEngine/Model/Material/OutlineSettings.h
+============================================================
+#pragma once
+
+// C++
+#include <memory>
+#include <wrl.h>
+#include <d3d12.h>
+
+#include "Vector3.h"
+
+namespace YoRigine {
+	class JsonManager;
+}
+
+/// <summary>
+/// インバートハル（背面押し出し）輪郭線のグローバル設定。
+/// 全オブジェクトの Object3d::Draw が参照するため、1か所（エディタの
+/// 「輪郭線」パネル）で太さ・色・有効を統一して調整できる。
+/// ToonSettings と異なり、シェーダーが直接読む定数バッファ(GPU)を内部に持つ。
+/// </summary>
+class OutlineSettings
+{
+public:
+	// HLSL の Outline cbuffer と一致させる（16バイト境界）。
+	struct OutlineCB {
+		float color[4];          // 線の色(RGBA)
+		float width;             // 押し出し量(スクリーン基準)
+		int   enable;            // 0=無効
+		int   useDistanceFade;   // 距離フェード有効
+		float distanceFadeStart; // フェード開始(ビュー空間距離)
+		float distanceFadeEnd;   // フェード終了。これより遠いと太さ0
+		float _pad[2];
+	};
+
+	static OutlineSettings* GetInstance();
+
+	// 定数バッファ生成 + JSON 永続化のセットアップ（起動時に1回、DirectX 初期化後）
+	void Initialize();
+
+	// 現在のパラメータを定数バッファへ書き込む（描画前に1回）
+	void UpdateCB();
+
+	// 描画でバインドするための定数バッファリソース
+	ID3D12Resource* GetResource() const { return resource_.Get(); }
+
+	bool IsEnabled() const { return enable_ != 0; }
+
+	// エディタUI（Editor::RegisterGameUI で登録）
+	void ImGui();
+
+private:
+	OutlineSettings() = default;
+	~OutlineSettings() = default;
+	OutlineSettings(const OutlineSettings&) = delete;
+	OutlineSettings& operator=(const OutlineSettings&) = delete;
+
+	// パラメータ（CPU 側の真値）
+	int     enable_ = 0;
+	float   width_ = 0.005f;                 // スクリーン基準のおおよその太さ
+	Vector3 color_ = { 0.05f, 0.05f, 0.06f }; // ほぼ黒のインク色
+	// 距離フェード（遠ざかると太さを徐々に 0 へ。真っ黒化防止）
+	int     useDistanceFade_ = 0;
+	float   fadeStart_ = 20.0f;              // ここから細くなり始める(ビュー空間距離)
+	float   fadeEnd_ = 60.0f;                // これより遠いと太さ0
+
+	// GPU 定数バッファ
+	Microsoft::WRL::ComPtr<ID3D12Resource> resource_;
+	OutlineCB* mapped_ = nullptr;
+
+	std::unique_ptr<YoRigine::JsonManager> json_;
+};
+
+
+============================================================
+File Path: YEngine/Model/Material/ToonSettings.cpp
+============================================================
+#include "ToonSettings.h"
+
+#include "Loaders/Json/JsonManager.h"
+
+#ifdef USE_IMGUI
+#include <imgui.h>
+#endif
+
+ToonSettings* ToonSettings::GetInstance()
+{
+	static ToonSettings instance;
+	return &instance;
+}
+
+void ToonSettings::Initialize()
+{
+	// JsonManager に登録すると Register 時点で保存値が自動ロードされる。
+	json_ = std::make_unique<YoRigine::JsonManager>("Toon", "Resources/Json/Render/");
+	json_->SetCategory("Render");
+	json_->Register("トゥーン有効", &params_.enableToon);
+	json_->Register("階調数", &params_.toonBands);
+	json_->Register("バンド境界ソフト", &params_.toonEdgeSoftness);
+	json_->Register("リムライト有効", &params_.enableRim);
+	json_->Register("リムの鋭さ", &params_.rimPower);
+	json_->Register("リムの強さ", &params_.rimIntensity);
+	json_->Register("トゥーンスペキュラ有効", &params_.enableToonSpecular);
+	json_->Register("スペキュラしきい値", &params_.toonSpecularThreshold);
+	json_->Register("影の強さ", &params_.shadowStrength);
+	json_->Register("影の色", &params_.shadowColor);
+	json_->Register("ハイライトの色", &params_.highlightColor);
+}
+
+void ToonSettings::ImGui()
+{
+#ifdef USE_IMGUI
+	ImGui::TextUnformatted("全オブジェクト共通のトゥーン設定");
+	ImGui::Separator();
+
+	bool enableToon = params_.enableToon != 0;
+	if (ImGui::Checkbox("トゥーン有効", &enableToon)) params_.enableToon = enableToon ? 1 : 0;
+
+	ImGui::SliderInt("階調数", &params_.toonBands, 1, 8);
+	ImGui::SliderFloat("バンド境界ソフト", &params_.toonEdgeSoftness, 0.0f, 0.2f);
+
+	ImGui::SeparatorText("影色（2D / アニメ塗り）");
+	ImGui::SliderFloat("影の強さ", &params_.shadowStrength, 0.0f, 1.0f);
+	ImGui::ColorEdit3("影の色", &params_.shadowColor.x);
+
+	ImGui::SeparatorText("リムライト");
+	bool enableRim = params_.enableRim != 0;
+	if (ImGui::Checkbox("リムライト有効", &enableRim)) params_.enableRim = enableRim ? 1 : 0;
+	ImGui::SliderFloat("リムの鋭さ", &params_.rimPower, 0.5f, 16.0f);
+	ImGui::SliderFloat("リムの強さ", &params_.rimIntensity, 0.0f, 4.0f);
+
+	ImGui::SeparatorText("トゥーンスペキュラ");
+	bool enableToonSpec = params_.enableToonSpecular != 0;
+	if (ImGui::Checkbox("トゥーンスペキュラ有効", &enableToonSpec)) params_.enableToonSpecular = enableToonSpec ? 1 : 0;
+	ImGui::SliderFloat("スペキュラしきい値", &params_.toonSpecularThreshold, 0.0f, 1.0f);
+	ImGui::ColorEdit3("ハイライトの色", &params_.highlightColor.x);
+
+	ImGui::Separator();
+	if (ImGui::Button("保存")) {
+		if (json_) json_->Save();
+	}
+#endif
+}
+
+
+============================================================
+File Path: YEngine/Model/Material/ToonSettings.h
+============================================================
+#pragma once
+
+// C++
+#include <memory>
+
+#include "Vector3.h"
+
+namespace YoRigine {
+	class JsonManager;
+}
+
+/// <summary>
+/// トゥーン（セルシェーディング）のグローバル設定。
+/// 全オブジェクトの MaterialLighting がこの値を参照するため、
+/// 1か所（エディタの「トゥーン」パネル）で全体を統一して調整できる。
+/// </summary>
+class ToonSettings
+{
+public:
+	// HLSL / MaterialLight CB に流し込むパラメータ
+	struct Params {
+		int   enableToon = 0;            // セルシェーディング有効
+		int   toonBands = 2;             // 階調数 (2〜)。2 でアニメ塗りの基本2トーン
+		int   enableRim = 0;             // リムライト有効
+		int   enableToonSpecular = 0;    // トゥーンスペキュラ有効
+		float rimPower = 4.0f;           // リムの鋭さ
+		float rimIntensity = 1.0f;       // リムの強さ
+		float toonSpecularThreshold = 0.5f; // スペキュラしきい値
+		float toonEdgeSoftness = 0.0f;   // バンド境界の smoothstep 幅。0 = Blender「一定」相当の完全ステップ
+		// --- 2D表現（アニメ塗り） ---
+		float   shadowStrength = 1.0f;            // 影色の強さ
+		Vector3 shadowColor = { 0.55f, 0.55f, 0.70f }; // 影の色
+		Vector3 highlightColor = { 1.0f, 1.0f, 1.0f }; // 固定ハイライトの色
+	};
+
+	static ToonSettings* GetInstance();
+
+	// JsonManager による永続化のセットアップ（起動時に1回）
+	void Initialize();
+
+	// 現在のパラメータ
+	const Params& Get() const { return params_; }
+
+	// エディタUI（Editor::RegisterGameUI で登録）
+	void ImGui();
+
+private:
+	ToonSettings() = default;
+	~ToonSettings() = default;
+	ToonSettings(const ToonSettings&) = delete;
+	ToonSettings& operator=(const ToonSettings&) = delete;
+
+	Params params_;
+	std::unique_ptr<YoRigine::JsonManager> json_;
+};
 
 
 ============================================================
@@ -240057,6 +240650,24 @@ void Model::DrawShadowInstanced(uint32_t instanceCount, D3D12_GPU_DESCRIPTOR_HAN
 	}
 }
 
+void Model::DrawOutlineInstanced(uint32_t instanceCount, D3D12_GPU_DESCRIPTOR_HANDLE instanceSRV)
+{
+	assert(!hasBones_ && "Model::DrawOutlineInstanced does not support skinned meshes");
+
+	auto pm = YPipelineManager::GetInstance();
+	const auto& indices = pm->GetParameterIndices("ObjectOutlineInstanced");
+	auto commandList = modelCommon_->GetDxCommon()->GetCommandList().Get();
+
+	// PSO + RS + gCamera/gOutline は呼び出し側 (InstancedObject3d::Flush) でセット済み
+	commandList->SetGraphicsRootDescriptorTable(indices.at("gInstances"), instanceSRV);
+
+	for (size_t i = 0; i < meshes_.size(); ++i) {
+		auto& mesh = meshes_[i];
+		mesh->RecordDrawCommands(commandList);
+		commandList->DrawIndexedInstanced(mesh->GetIndexCount(), instanceCount, 0, 0, 0);
+	}
+}
+
 
 
 void Model::LoadModelIndexFile(const std::string& directoryPath, const std::string& filename)
@@ -240493,6 +241104,9 @@ public:
 	void DrawInstanced(uint32_t instanceCount, D3D12_GPU_DESCRIPTOR_HANDLE instanceSRV);
 	// インスタンシング影描画 (ShadowMapInstanced PSO 使用)
 	void DrawShadowInstanced(uint32_t instanceCount, D3D12_GPU_DESCRIPTOR_HANDLE instanceSRV);
+	// インスタンシング輪郭線描画 (ObjectOutlineInstanced PSO 使用)。
+	// PSO/RS/CB は呼び出し側で設定済み。per-instance バッファをバインドして描く。
+	void DrawOutlineInstanced(uint32_t instanceCount, D3D12_GPU_DESCRIPTOR_HANDLE instanceSRV);
 
 	// モーション制御
 	void PlayOnce();
@@ -275756,6 +276370,8 @@ File Path: YGame/Core/MyGame.cpp
 #include <ModelManipulator/ModelManipulator.h>
 #include <PipCamera/PipCameraSystem.h>
 #include "OffScreen/PostEffectManager.h"
+#include "Material/ToonSettings.h"
+#include "Material/OutlineSettings.h"
 #include <Systems/UI/UIManager.h>
 #include "GPUParticle/GpuEmitManager.h"
 #include <Object3D/BaseObjectManager.h>
@@ -275821,6 +276437,12 @@ void MyGame::Initialize() {
 	// PiP カメラサブシステム
 	PipCameraSystem::GetInstance()->Initialize();
 
+	// トゥーン（全オブジェクト共通設定）
+	ToonSettings::GetInstance()->Initialize();
+
+	// 輪郭線（全オブジェクト共通設定・インバートハル）
+	OutlineSettings::GetInstance()->Initialize();
+
 	// 演出マネージャ（letterbox UI + Sequencer 駆動）
 	YoRigine::CinematicManager::GetInstance()->Initialize();
 
@@ -275848,6 +276470,8 @@ void MyGame::Initialize() {
 	// ParticleEditor は旧システム専用のため削除済み。YParticleEditor を使用。
 	Editor::GetInstance()->RegisterGameUI("モデル操作", []() { YoRigine::ModelManipulator::GetInstance()->DrawImGui(); });
 	Editor::GetInstance()->RegisterGameUI("ポストエフェクト", []() { PostEffectManager::GetInstance()->ImGui(); });
+	Editor::GetInstance()->RegisterGameUI("トゥーン", []() { ToonSettings::GetInstance()->ImGui(); });
+	Editor::GetInstance()->RegisterGameUI("輪郭線", []() { OutlineSettings::GetInstance()->ImGui(); });
 	Editor::GetInstance()->RegisterGameUI("JSON管理", &YoRigine::JsonManager::ImGuiManager);
 	Editor::GetInstance()->RegisterGameUI("UI管理", []() { YoRigine::UIManager::GetInstance()->ImGuiDebug(); });
 	Editor::GetInstance()->RegisterGameUI("ログ", []() { Editor::GetInstance()->DrawLog(); });
@@ -291372,6 +291996,7 @@ void Player::InitJson() {
 	jsonManager_->Register("ハーフベクトルを使用", &lighting->isHalfVector);
 	jsonManager_->Register("光沢度", &lighting->shininess);
 	jsonManager_->Register("環境光係数", &lighting->environmentCoefficient);
+	// トゥーンは ToonSettings（全オブジェクト共通／エディタの「トゥーン」パネル）で統一管理
 
 	//------------------------------------------------------------
 	// モーション・その他設定
