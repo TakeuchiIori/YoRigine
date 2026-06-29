@@ -583,7 +583,7 @@ bool PostEffectChain::DrawEffectParametersImGui([[maybe_unused]] int selectedInd
 		// ポスタリゼーション
 		// --------------------------------------------------------
 	case OffScreen::OffScreenEffectType::Posterize:
-		if (ImGui::SliderInt("Steps", &effect->params.posterize.steps, 2, 16)) {
+		if (ImGui::SliderInt("Steps", &effect->params.posterize.steps, 2, 128)) {
 			changed = true;
 		}
 		if (ImGui::SliderFloat("Saturation Boost", &effect->params.posterize.saturationBoost, 0.0f, 2.0f)) {
