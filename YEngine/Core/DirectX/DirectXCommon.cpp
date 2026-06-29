@@ -4,6 +4,12 @@
 #include <cassert>
 #include <thread>
 #include <format>
+#include <filesystem>
+#include <fstream>
+#include <vector>
+#include <string>
+#include <unordered_set>
+#include <cctype>
 #include "d3dx12.h"
 #include "Debugger/Logger.h"
 #include "Debugger/ConvertString.h"
@@ -542,12 +548,130 @@ namespace YoRigine {
 	}
 
 	// =========================================================================
+	// シェーダー DXIL ディスクキャッシュ用ヘルパー
+	// =========================================================================
+	namespace {
+		// キャッシュフォーマットのバージョン（フォーマットやコンパイル引数を変えたら +1）
+		constexpr uint32_t kShaderCacheVersion = 1;
+		// キャッシュ出力先 / インクルード解決のルート
+		const std::filesystem::path kShaderCacheDir = "Resources/Binary/Shader/";
+		const std::filesystem::path kShaderRoot     = "Resources/Shaders/";
+
+		// FNV-1a（seed を渡して複数バイト列を連結ハッシュできる）
+		uint64_t FnvHash(const void* data, size_t size, uint64_t seed = 0xcbf29ce484222325ULL) {
+			uint64_t h = seed;
+			const uint8_t* p = static_cast<const uint8_t*>(data);
+			for (size_t i = 0; i < size; ++i) { h ^= p[i]; h *= 0x100000001b3ULL; }
+			return h;
+		}
+
+		bool ReadFileBytes(const std::filesystem::path& path, std::string& out) {
+			std::ifstream ifs(path, std::ios::binary);
+			if (!ifs) return false;
+			out.assign((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+			return true;
+		}
+
+		// #include を再帰的に辿り、全ソース内容をハッシュに畳み込む。
+		// これにより共通 .hlsli を編集してもキャッシュが正しく無効化される。
+		void HashSourceRecursive(const std::filesystem::path& file,
+			std::unordered_set<std::string>& visited, uint64_t& hash) {
+			const std::string canonical = file.lexically_normal().string();
+			if (!visited.insert(canonical).second) return; // 既訪問
+
+			std::string content;
+			if (!ReadFileBytes(file, content)) {
+				// 読めない場合はパス文字列だけ畳み込んで継続（ベストエフォート）
+				hash = FnvHash(canonical.data(), canonical.size(), hash);
+				return;
+			}
+			hash = FnvHash(content.data(), content.size(), hash);
+
+			// #include "xxx" を素朴に抽出
+			size_t pos = 0;
+			while ((pos = content.find("#include", pos)) != std::string::npos) {
+				const size_t lineEnd = content.find('\n', pos);
+				const size_t q1 = content.find('"', pos);
+				if (q1 == std::string::npos || (lineEnd != std::string::npos && q1 > lineEnd)) {
+					pos += 8; continue;
+				}
+				const size_t q2 = content.find('"', q1 + 1);
+				if (q2 == std::string::npos) break;
+				const std::string inc = content.substr(q1 + 1, q2 - q1 - 1);
+				pos = q2 + 1;
+
+				// インクルード元ディレクトリ → シェーダールート の順で解決
+				std::filesystem::path incPath = file.parent_path() / inc;
+				if (!std::filesystem::exists(incPath)) incPath = kShaderRoot / inc;
+				if (std::filesystem::exists(incPath)) {
+					HashSourceRecursive(incPath, visited, hash);
+				} else {
+					// 解決できなくても include 文字列は畳み込む
+					hash = FnvHash(inc.data(), inc.size(), hash);
+				}
+			}
+		}
+
+		std::string SanitizeForFilename(const std::string& s) {
+			std::string out = s;
+			for (char& c : out) {
+				if (!std::isalnum(static_cast<unsigned char>(c))) c = '_';
+			}
+			return out;
+		}
+	} // namespace
+
+	// =========================================================================
 	// リソース生成ヘルパー
 	// =========================================================================
 	Microsoft::WRL::ComPtr<IDxcBlob> DirectXCommon::CompileShader(
 		const std::wstring& filePath,
 		const wchar_t* profile)
 	{
+		const std::string pathStr = ConvertString(filePath);
+		const std::string profileStr = ConvertString(std::wstring(profile));
+
+		// ---- キャッシュキー／パスの決定 ----
+		const std::string cacheName =
+			SanitizeForFilename(pathStr) + "__" + SanitizeForFilename(profileStr) + ".dxil";
+		const std::filesystem::path cachePath = kShaderCacheDir / cacheName;
+
+		// ---- ソースハッシュ（プロファイル + インクルード込みのソース内容）----
+		uint64_t sourceHash = FnvHash(profileStr.data(), profileStr.size());
+		{
+			std::unordered_set<std::string> visited;
+			HashSourceRecursive(filePath, visited, sourceHash);
+		}
+
+		// ---- キャッシュ命中なら DXC を呼ばずに DXIL を読み込んで返す ----
+		{
+			std::ifstream ifs(cachePath, std::ios::binary);
+			if (ifs) {
+				uint32_t ver = 0; uint64_t storedHash = 0; uint64_t dxilSize = 0;
+				ifs.read(reinterpret_cast<char*>(&ver), sizeof(ver));
+				ifs.read(reinterpret_cast<char*>(&storedHash), sizeof(storedHash));
+				ifs.read(reinterpret_cast<char*>(&dxilSize), sizeof(dxilSize));
+				if (ifs.good() && ver == kShaderCacheVersion && storedHash == sourceHash
+					&& dxilSize > 0 && dxilSize < 64ull * 1024 * 1024) {
+					std::vector<char> bytes(static_cast<size_t>(dxilSize));
+					ifs.read(bytes.data(), static_cast<std::streamsize>(dxilSize));
+					if (ifs.good()) {
+						Microsoft::WRL::ComPtr<IDxcBlobEncoding> enc;
+						if (SUCCEEDED(dxcUtils_->CreateBlob(bytes.data(),
+							static_cast<UINT32>(dxilSize), DXC_CP_ACP, &enc)) && enc) {
+							Microsoft::WRL::ComPtr<IDxcBlob> blob;
+							if (SUCCEEDED(enc.As(&blob))) {
+								Logger(ConvertString(std::format(
+									L"[ShaderCache] HIT: {} ({})\n", filePath, profile)));
+								return blob;
+							}
+						}
+					}
+				}
+			}
+		}
+
+		// ---- キャッシュミス → DXC でコンパイル ----
 		Logger(ConvertString(std::format(L"Begin CompileShader,path:{},profile:{}\n", filePath, profile)));
 
 		IDxcBlobEncoding* shaderSource = nullptr;
@@ -583,6 +707,22 @@ namespace YoRigine {
 		assert(SUCCEEDED(hr));
 
 		Logger(ConvertString(std::format(L"Compile Succeeded,path:{},profile:{}\n", filePath, profile)));
+
+		// ---- コンパイル結果をディスクキャッシュに保存 ----
+		if (blob && blob->GetBufferSize() > 0) {
+			std::error_code ec;
+			std::filesystem::create_directories(kShaderCacheDir, ec);
+			std::ofstream ofs(cachePath, std::ios::binary | std::ios::trunc);
+			if (ofs) {
+				const uint32_t ver = kShaderCacheVersion;
+				const uint64_t dxilSize = blob->GetBufferSize();
+				ofs.write(reinterpret_cast<const char*>(&ver), sizeof(ver));
+				ofs.write(reinterpret_cast<const char*>(&sourceHash), sizeof(sourceHash));
+				ofs.write(reinterpret_cast<const char*>(&dxilSize), sizeof(dxilSize));
+				ofs.write(reinterpret_cast<const char*>(blob->GetBufferPointer()),
+					static_cast<std::streamsize>(dxilSize));
+			}
+		}
 
 		shaderSource->Release();
 		result->Release();

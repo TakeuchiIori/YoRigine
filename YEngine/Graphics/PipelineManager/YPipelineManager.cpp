@@ -1,6 +1,7 @@
 #include "YPipelineManager.h"
 #include "DirectXCommon.h"
 
+#include <chrono>
 #include "Debugger/Logger.h"
 
 using namespace YoRigine;
@@ -98,20 +99,23 @@ void YPipelineManager::Initialize()
 	completePipelineCache_ = std::make_unique<CompletePipelineCache>();
 	completePipelineCache_->Initialize(dxCommon_->GetDevice().Get(), "Resources/Binary/YPipeline/");
 
+    // 起動時間の計測開始（全パイプライン生成にかかる時間）
+    const auto pipelineBuildStart = std::chrono::high_resolution_clock::now();
+
     // 基本パイプラインの生成
     CreatePSO_Sprite();
     CreatePSO_Object();
-    CreatePSO_ShadowMap();
     CreatePSO_ObjectInstanced();
+    CreatePSO_ShadowMap();
     CreatePSO_ShadowMapInstanced();
     CreatePSO_Line();
     CreatePSO_InstancedCube();
-    CreatePSO_YParticle();
     CreatePSO_YParticleAllBlendModes();
     CreatePSO_GPUParticleALLBlendModes();
     CreatePSO_CubeMap();
     CreatePSO_GPUParticleInit();
-    CreatePSO_EffectObject();
+    // 使ってない
+    //CreatePSO_EffectObject();
 
     // ポストエフェクト系PSパイプライン: 全エフェクトCS化に伴い、
     // 最終 blit 用の BaseOffScreen (CopyImage.PS.hlsl) のみ残す
@@ -123,6 +127,18 @@ void YPipelineManager::Initialize()
     CreatePSO_VfxMeshSmoke();
     CreatePSO_VfxMeshLightning();
     CreatePSO_VfxMeshShockwave();
+
+    // 起動時間の計測終了・出力
+    const auto pipelineBuildEnd = std::chrono::high_resolution_clock::now();
+    const double pipelineBuildMs =
+        std::chrono::duration<double, std::milli>(pipelineBuildEnd - pipelineBuildStart).count();
+    {
+        char timeBuf[256];
+        sprintf_s(timeBuf,
+            "\n[YPipelineManager] ⏱ All pipelines built in %.2f ms\n\n",
+            pipelineBuildMs);
+        Logger(timeBuf);
+    }
 
     // 統計情報を出力
     auto stats = psoCache_->GetStats();
@@ -465,58 +481,6 @@ void YPipelineManager::CreatePSO_YParticleAllBlendModes()
 
     buildSet("YParticle",     L"Resources/Shaders/Particle/YParticle.PS.hlsl",     false);
     buildSet("YParticleSoft", L"Resources/Shaders/Particle/YParticleSoft.PS.hlsl", true);
-}
-
-// ============================================================
-// 
-// BaseObject
-// 
-// ============================================================
-void YPipelineManager::CreatePSO_Object_Manual()
-{
-    // ルートシグネチャをビルダーで作成
-    RootSignatureBuilder rsBuilder;
-
-    rsBuilder.AddCBV("Material", 0, D3D12_SHADER_VISIBILITY_PIXEL);
-    rsBuilder.AddCBV("TransformMatrix", 0, D3D12_SHADER_VISIBILITY_VERTEX);
-    rsBuilder.AddCBV("DirectionalLight", 1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rsBuilder.AddDescriptorTable("Texture", 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rsBuilder.AddStaticSampler(0);
-
-    auto rootSignature = rsBuilder.Build(dxCommon_->GetDevice().Get());
-    rootSignatures_["Object"] = rootSignature;
-
-    // インデックスマップを保存
-    RootParameterIndices indices;
-    indices.InitializeFrom(rsBuilder);
-    rootParamIndices_["Object"] = indices;
-
-    // シェーダーをコンパイル
-    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3D.VS.hlsl", L"vs_6_0");
-    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3D.PS.hlsl", L"ps_6_0");
-
-    // インプットレイアウトを定義
-    D3D12_INPUT_ELEMENT_DESC inputElements[] = {
-        { "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
-    };
-
-    // パイプラインステートをビルダーで作成
-    GraphicsPipelineBuilder pipelineBuilder;
-    auto psoDesc = pipelineBuilder
-        .SetRootSignature(rootSignature.Get())
-        .SetVertexShader(vsBlob->GetBufferPointer(), vsBlob->GetBufferSize())
-        .SetPixelShader(psBlob->GetBufferPointer(), psBlob->GetBufferSize())
-        .SetInputLayout(inputElements, _countof(inputElements))
-        .SetBlendState(BlendPresets::CreateAlphaBlend())
-        .SetRasterizerState(RasterizerPresets::CreateDefault())
-        .SetDepthStencilState(DepthStencilPresets::CreateDefault())
-        .Build();
-
-    // PSOキャッシュを使って作成
-    auto pso = psoCache_->GetOrCreate("Object", psoDesc);
-    pipelineStates_["Object"] = pso;
 }
 
 // ============================================================
