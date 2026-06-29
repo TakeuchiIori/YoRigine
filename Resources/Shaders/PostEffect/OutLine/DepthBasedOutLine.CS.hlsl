@@ -16,8 +16,12 @@ struct Material
     float depthThreshold;       // 各エッジの正規化しきい値
     float normalThreshold;
     float luminanceThreshold;
-    float _pad;
+    float normalWidth;          // 法線エッジの太さ(近傍サンプルのピクセル距離。1=隣接)
     float4 outlineColor;        // 輪郭線の色
+    float luminanceWidth;       // 輝度エッジの太さ(同上)
+    float distanceFadeStart;    // 距離フェード開始(ビュー空間距離)。ここから線が薄くなり始める
+    float distanceFadeEnd;      // 距離フェード終了。これより遠いと線を消す(真っ黒化防止)
+    int   useDistanceFade;      // 距離フェード有効
 };
 
 Texture2D<float4> gInput         : register(t0); // シーンカラー
@@ -86,13 +90,15 @@ void main(uint3 dtid : SV_DispatchThreadID)
         {
             float3 c = normalize(nC.xyz);
             float acc = 0.0f;
+            // 太さ：近傍サンプルをこのピクセル距離で取る(>1 で線が太くなる)
+            float nWidth = max(gMaterial.normalWidth, 1.0f);
             const float2 offs[4] = {
                 float2(-1, 0), float2(1, 0), float2(0, -1), float2(0, 1)
             };
             [unroll]
             for (int i = 0; i < 4; ++i)
             {
-                float4 nn = gNormalTexture.SampleLevel(gSamplerPoint, uv + offs[i] * uvStep, 0);
+                float4 nn = gNormalTexture.SampleLevel(gSamplerPoint, uv + offs[i] * uvStep * nWidth, 0);
                 if (nn.w > 0.0f)
                 {
                     acc += 1.0f - saturate(dot(c, normalize(nn.xyz)));
@@ -105,17 +111,30 @@ void main(uint3 dtid : SV_DispatchThreadID)
     // === 輝度エッジ（4近傍の輝度差） ===
     if (gMaterial.useLuminance != 0)
     {
+        // 太さ：近傍サンプルをこのピクセル距離で取る(>1 で線が太くなる)
+        float lWidth = max(gMaterial.luminanceWidth, 1.0f);
         float lC = Luminance(gInput.SampleLevel(gSampler, uv, 0).rgb);
-        float lL = Luminance(gInput.SampleLevel(gSampler, uv + float2(-1, 0) * uvStep, 0).rgb);
-        float lR = Luminance(gInput.SampleLevel(gSampler, uv + float2(1, 0) * uvStep, 0).rgb);
-        float lU = Luminance(gInput.SampleLevel(gSampler, uv + float2(0, -1) * uvStep, 0).rgb);
-        float lD = Luminance(gInput.SampleLevel(gSampler, uv + float2(0, 1) * uvStep, 0).rgb);
+        float lL = Luminance(gInput.SampleLevel(gSampler, uv + float2(-1, 0) * uvStep * lWidth, 0).rgb);
+        float lR = Luminance(gInput.SampleLevel(gSampler, uv + float2(1, 0) * uvStep * lWidth, 0).rgb);
+        float lU = Luminance(gInput.SampleLevel(gSampler, uv + float2(0, -1) * uvStep * lWidth, 0).rgb);
+        float lD = Luminance(gInput.SampleLevel(gSampler, uv + float2(0, 1) * uvStep * lWidth, 0).rgb);
         float g = abs(lR - lL) + abs(lD - lU);
         lumEdge = saturate(g / max(gMaterial.luminanceThreshold, 1e-5f)) * gMaterial.luminanceWeight;
     }
 
     // === 加重合計 ===
     float weight = saturate((depthEdge + normalEdge + lumEdge) * gMaterial.edgeStrength);
+
+    // === 距離フェード ===
+    // スクリーン空間の線は固定ピクセル幅なので、遠ざかると小さく映ったオブジェクトを
+    // 線が覆い尽くして真っ黒に見える。ビュー空間距離で線を徐々に消して防ぐ。
+    if (gMaterial.useDistanceFade != 0 && gMaterial.distanceFadeEnd > gMaterial.distanceFadeStart)
+    {
+        float dist = abs(SampleViewZ(uv));
+        float fade = saturate(1.0f - (dist - gMaterial.distanceFadeStart)
+                                   / (gMaterial.distanceFadeEnd - gMaterial.distanceFadeStart));
+        weight *= fade;
+    }
 
     float3 sceneColor = gInput.SampleLevel(gSampler, uv, 0).rgb;
     float3 result = lerp(sceneColor, gMaterial.outlineColor.rgb, weight);

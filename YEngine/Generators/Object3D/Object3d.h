@@ -94,6 +94,10 @@ private:
 	// シャドウマップ用リソース作成
 	void CreateShadowResources();
 
+	// インバートハル輪郭線の描画（OutlineSettings 有効時に Draw 内から呼ぶ）。
+	// 専用 PSO/RS へ切り替え、頂点ジオメトリを押し出しシェルとして描く。
+	void DrawOutlinePass(Camera* camera, WorldTransform& worldTransform);
+
 	// UVの更新
 	void UpdateUV();
 
@@ -102,6 +106,11 @@ public:
 
 	Model* GetModel() { return model_; }
 	MaterialLighting* GetMaterialLighting() const { return materialLighting_.get(); }
+
+	// インバートハル輪郭線をこのオブジェクトに掛けるか（既定 true）。
+	// 地面など輪郭を出したくないオブジェクトは false にする。
+	void SetOutlineEnabled(bool enable) { outlineEnabled_ = enable; }
+	bool IsOutlineEnabled() const { return outlineEnabled_; }
 
 	Vector4& GetColor() { return materialColor_->GetColor(); }
 	void SetMaterialColor(const Vector4& color) { materialColor_->SetColor(color); }
@@ -140,6 +149,9 @@ private:
 
 	Object3dCommon* object3dCommon_ = nullptr;
 	Model* model_ = nullptr;
+
+	// インバートハル輪郭線をこのオブジェクトに掛けるか（地面等は false）
+	bool outlineEnabled_ = true;
 
 	// マテリアル関連
 	std::unique_ptr<MaterialColor> materialColor_;

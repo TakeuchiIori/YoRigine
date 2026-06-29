@@ -77,6 +77,13 @@ public:
 		float depthThreshold = 1.0f;     // 各エッジの正規化しきい値
 		float normalThreshold = 1.0f;
 		float luminanceThreshold = 1.0f;
+		// --- 太さ（近傍サンプルのピクセル距離。1=隣接、大きいほど太い） ---
+		float normalWidth = 1.0f;        // 法線エッジの太さ
+		float luminanceWidth = 1.0f;     // 輝度エッジの太さ
+		// --- 距離フェード（遠景で線が太く見えて真っ黒化するのを防ぐ） ---
+		bool  useDistanceFade = false;
+		float distanceFadeStart = 30.0f; // ここから線が薄くなり始める(ビュー空間距離)
+		float distanceFadeEnd = 80.0f;   // これより遠いと線を消す
 	};
 
 	static OffScreen* GetInstance() {
@@ -321,6 +328,7 @@ private:
 		float padding[2];
 	};
 
+	// ※ HLSL 側 (DepthBasedOutLine.CS) の Material とフィールド順・オフセットを必ず一致させること
 	struct Material {
 		Matrix4x4 Inverse;          // projectionInverse (viewZ 復元用)
 		int kernelSize;
@@ -334,8 +342,12 @@ private:
 		float depthThreshold;
 		float normalThreshold;
 		float luminanceThreshold;
-		float _pad;
+		float normalWidth;          // 法線エッジの太さ
 		Vector4 outlineColor;
+		float luminanceWidth;       // 輝度エッジの太さ
+		float distanceFadeStart;    // 距離フェード開始(ビュー空間距離)
+		float distanceFadeEnd;      // 距離フェード終了
+		int   useDistanceFade;      // 距離フェード有効
 	};
 
 	struct RadialBlurForGPU {

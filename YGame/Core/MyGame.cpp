@@ -7,6 +7,8 @@
 #include <ModelManipulator/ModelManipulator.h>
 #include <PipCamera/PipCameraSystem.h>
 #include "OffScreen/PostEffectManager.h"
+#include "Material/ToonSettings.h"
+#include "Material/OutlineSettings.h"
 #include <Systems/UI/UIManager.h>
 #include "GPUParticle/GpuEmitManager.h"
 #include <Object3D/BaseObjectManager.h>
@@ -72,6 +74,12 @@ void MyGame::Initialize() {
 	// PiP カメラサブシステム
 	PipCameraSystem::GetInstance()->Initialize();
 
+	// トゥーン（全オブジェクト共通設定）
+	ToonSettings::GetInstance()->Initialize();
+
+	// 輪郭線（全オブジェクト共通設定・インバートハル）
+	OutlineSettings::GetInstance()->Initialize();
+
 	// 演出マネージャ（letterbox UI + Sequencer 駆動）
 	YoRigine::CinematicManager::GetInstance()->Initialize();
 
@@ -99,6 +107,8 @@ void MyGame::Initialize() {
 	// ParticleEditor は旧システム専用のため削除済み。YParticleEditor を使用。
 	Editor::GetInstance()->RegisterGameUI("モデル操作", []() { YoRigine::ModelManipulator::GetInstance()->DrawImGui(); });
 	Editor::GetInstance()->RegisterGameUI("ポストエフェクト", []() { PostEffectManager::GetInstance()->ImGui(); });
+	Editor::GetInstance()->RegisterGameUI("トゥーン", []() { ToonSettings::GetInstance()->ImGui(); });
+	Editor::GetInstance()->RegisterGameUI("輪郭線", []() { OutlineSettings::GetInstance()->ImGui(); });
 	Editor::GetInstance()->RegisterGameUI("JSON管理", &YoRigine::JsonManager::ImGuiManager);
 	Editor::GetInstance()->RegisterGameUI("UI管理", []() { YoRigine::UIManager::GetInstance()->ImGuiDebug(); });
 	Editor::GetInstance()->RegisterGameUI("ログ", []() { Editor::GetInstance()->DrawLog(); });

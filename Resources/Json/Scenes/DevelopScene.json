@@ -48,10 +48,11 @@
                 1.0
             ],
             "filePath": "House_2\\House_2.obj",
-            "id": 64,
+            "id": 0,
             "isAnimation": false,
             "modelName": "House_2.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -124,10 +125,11 @@
                 1.0
             ],
             "filePath": "Blacksmith\\Blacksmith.obj",
-            "id": 0,
+            "id": 1,
             "isAnimation": false,
             "modelName": "Blacksmith.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -200,10 +202,11 @@
                 1.0
             ],
             "filePath": "WoodFence\\WoodFence.obj",
-            "id": 65,
+            "id": 2,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -276,10 +279,11 @@
                 1.0
             ],
             "filePath": "WoodFence\\WoodFence.obj",
-            "id": 66,
+            "id": 3,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -352,10 +356,11 @@
                 1.0
             ],
             "filePath": "WoodFence\\WoodFence.obj",
-            "id": 67,
+            "id": 4,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -428,10 +433,11 @@
                 1.0
             ],
             "filePath": "Bell_Tower\\Bell_Tower.obj",
-            "id": 3,
+            "id": 5,
             "isAnimation": false,
             "modelName": "Bell_Tower.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -504,10 +510,11 @@
                 1.0
             ],
             "filePath": "Floor_UnevenBrick\\Floor_UnevenBrick.obj",
-            "id": 4,
+            "id": 6,
             "isAnimation": false,
             "modelName": "Floor_UnevenBrick.obj",
             "nameTag": "",
+            "outlineEnabled": false,
             "parentID": -1,
             "pickable": false,
             "position": [
@@ -580,10 +587,11 @@
                 1.0
             ],
             "filePath": "MapleTree_1\\MapleTree_1.obj",
-            "id": 5,
+            "id": 7,
             "isAnimation": false,
             "modelName": "MapleTree_1.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -656,10 +664,11 @@
                 1.0
             ],
             "filePath": "Bell_Tower\\Bell_Tower.obj",
-            "id": 6,
+            "id": 8,
             "isAnimation": false,
             "modelName": "Bell_Tower.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -732,10 +741,11 @@
                 1.0
             ],
             "filePath": "MapleTree_1\\MapleTree_1.obj",
-            "id": 7,
+            "id": 9,
             "isAnimation": false,
             "modelName": "MapleTree_1.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -808,10 +818,11 @@
                 1.0
             ],
             "filePath": "Blacksmith\\Blacksmith.obj",
-            "id": 8,
+            "id": 10,
             "isAnimation": false,
             "modelName": "Blacksmith.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -884,10 +895,11 @@
                 1.0
             ],
             "filePath": "DeadTree_4\\DeadTree_4.obj",
-            "id": 9,
+            "id": 11,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -960,10 +972,11 @@
                 1.0
             ],
             "filePath": "MapleTree_1\\MapleTree_1.obj",
-            "id": 10,
+            "id": 12,
             "isAnimation": false,
             "modelName": "MapleTree_1.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -1036,10 +1049,11 @@
                 1.0
             ],
             "filePath": "MapleTree_1\\MapleTree_1.obj",
-            "id": 11,
+            "id": 13,
             "isAnimation": false,
             "modelName": "MapleTree_1.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -1112,10 +1126,11 @@
                 1.0
             ],
             "filePath": "MapleTree_1\\MapleTree_1.obj",
-            "id": 12,
+            "id": 14,
             "isAnimation": false,
             "modelName": "MapleTree_1.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -1188,10 +1203,11 @@
                 1.0
             ],
             "filePath": "MapleTree_1\\MapleTree_1.obj",
-            "id": 13,
+            "id": 15,
             "isAnimation": false,
             "modelName": "MapleTree_1.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -1264,10 +1280,11 @@
                 1.0
             ],
             "filePath": "DeadTree_4\\DeadTree_4.obj",
-            "id": 14,
+            "id": 16,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -1340,10 +1357,11 @@
                 1.0
             ],
             "filePath": "DeadTree_4\\DeadTree_4.obj",
-            "id": 15,
+            "id": 17,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -1416,10 +1434,11 @@
                 1.0
             ],
             "filePath": "DeadTree_4\\DeadTree_4.obj",
-            "id": 16,
+            "id": 18,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -1492,10 +1511,11 @@
                 1.0
             ],
             "filePath": "DeadTree_4\\DeadTree_4.obj",
-            "id": 17,
+            "id": 19,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -1568,10 +1588,11 @@
                 1.0
             ],
             "filePath": "DeadTree_4\\DeadTree_4.obj",
-            "id": 18,
+            "id": 20,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -1644,10 +1665,11 @@
                 1.0
             ],
             "filePath": "WoodFence\\WoodFence.obj",
-            "id": 19,
+            "id": 21,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -1720,10 +1742,11 @@
                 1.0
             ],
             "filePath": "WoodFence\\WoodFence.obj",
-            "id": 20,
+            "id": 22,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -1796,10 +1819,11 @@
                 1.0
             ],
             "filePath": "WoodFence\\WoodFence.obj",
-            "id": 21,
+            "id": 23,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "TestGate1",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -1872,10 +1896,11 @@
                 1.0
             ],
             "filePath": "WoodFence\\WoodFence.obj",
-            "id": 22,
+            "id": 24,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -1948,10 +1973,11 @@
                 1.0
             ],
             "filePath": "WoodFence\\WoodFence.obj",
-            "id": 23,
+            "id": 25,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -2024,10 +2050,11 @@
                 1.0
             ],
             "filePath": "WoodFence\\WoodFence.obj",
-            "id": 24,
+            "id": 26,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -2100,10 +2127,11 @@
                 1.0
             ],
             "filePath": "WoodFence\\WoodFence.obj",
-            "id": 25,
+            "id": 27,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -2176,10 +2204,11 @@
                 1.0
             ],
             "filePath": "DeadTree_4\\DeadTree_4.obj",
-            "id": 26,
+            "id": 28,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -2252,10 +2281,11 @@
                 1.0
             ],
             "filePath": "DeadTree_4\\DeadTree_4.obj",
-            "id": 27,
+            "id": 29,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -2328,10 +2358,11 @@
                 1.0
             ],
             "filePath": "DeadTree_4\\DeadTree_4.obj",
-            "id": 28,
+            "id": 30,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -2404,10 +2435,11 @@
                 1.0
             ],
             "filePath": "DeadTree_4\\DeadTree_4.obj",
-            "id": 29,
+            "id": 31,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -2480,10 +2512,11 @@
                 1.0
             ],
             "filePath": "DeadTree_4\\DeadTree_4.obj",
-            "id": 30,
+            "id": 32,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -2556,10 +2589,11 @@
                 1.0
             ],
             "filePath": "WoodFence\\WoodFence.obj",
-            "id": 31,
+            "id": 33,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -2632,10 +2666,11 @@
                 1.0
             ],
             "filePath": "WoodFence\\WoodFence.obj",
-            "id": 32,
+            "id": 34,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -2708,10 +2743,11 @@
                 1.0
             ],
             "filePath": "WoodFence\\WoodFence.obj",
-            "id": 33,
+            "id": 35,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "TestGate2",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -2784,10 +2820,11 @@
                 1.0
             ],
             "filePath": "WoodFence\\WoodFence.obj",
-            "id": 34,
+            "id": 36,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -2860,10 +2897,11 @@
                 1.0
             ],
             "filePath": "DeadTree_4\\DeadTree_4.obj",
-            "id": 35,
+            "id": 37,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -2936,10 +2974,11 @@
                 1.0
             ],
             "filePath": "DeadTree_4\\DeadTree_4.obj",
-            "id": 36,
+            "id": 38,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -3012,10 +3051,11 @@
                 1.0
             ],
             "filePath": "DeadTree_4\\DeadTree_4.obj",
-            "id": 37,
+            "id": 39,
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -3088,10 +3128,11 @@
                 1.0
             ],
             "filePath": "House_3\\House_3.obj",
-            "id": 38,
+            "id": 40,
             "isAnimation": false,
             "modelName": "House_3.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -3164,10 +3205,11 @@
                 1.0
             ],
             "filePath": "House_3\\House_3.obj",
-            "id": 39,
+            "id": 41,
             "isAnimation": false,
             "modelName": "House_3.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -3240,10 +3282,11 @@
                 1.0
             ],
             "filePath": "MapleTree_1\\MapleTree_1.obj",
-            "id": 40,
+            "id": 42,
             "isAnimation": false,
             "modelName": "MapleTree_1.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -3316,10 +3359,11 @@
                 1.0
             ],
             "filePath": "MapleTree_1\\MapleTree_1.obj",
-            "id": 41,
+            "id": 43,
             "isAnimation": false,
             "modelName": "MapleTree_1.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -3392,10 +3436,11 @@
                 1.0
             ],
             "filePath": "WoodFence\\WoodFence.obj",
-            "id": 42,
+            "id": 44,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -3468,10 +3513,11 @@
                 1.0
             ],
             "filePath": "WoodFence\\WoodFence.obj",
-            "id": 43,
+            "id": 45,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -3544,10 +3590,11 @@
                 1.0
             ],
             "filePath": "WoodFence\\WoodFence.obj",
-            "id": 44,
+            "id": 46,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -3620,10 +3667,11 @@
                 1.0
             ],
             "filePath": "WoodFence\\WoodFence.obj",
-            "id": 45,
+            "id": 47,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -3696,10 +3744,11 @@
                 1.0
             ],
             "filePath": "WoodFence\\WoodFence.obj",
-            "id": 46,
+            "id": 48,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -3772,10 +3821,11 @@
                 1.0
             ],
             "filePath": "WoodFence\\WoodFence.obj",
-            "id": 47,
+            "id": 49,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -3848,10 +3898,11 @@
                 1.0
             ],
             "filePath": "WoodFence\\WoodFence.obj",
-            "id": 48,
+            "id": 50,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -3924,10 +3975,11 @@
                 1.0
             ],
             "filePath": "WoodFence\\WoodFence.obj",
-            "id": 49,
+            "id": 51,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -4000,10 +4052,11 @@
                 1.0
             ],
             "filePath": "WoodFence\\WoodFence.obj",
-            "id": 50,
+            "id": 52,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -4076,10 +4129,11 @@
                 1.0
             ],
             "filePath": "WoodFence\\WoodFence.obj",
-            "id": 51,
+            "id": 53,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -4152,10 +4206,11 @@
                 1.0
             ],
             "filePath": "WoodFence\\WoodFence.obj",
-            "id": 52,
+            "id": 54,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -4228,10 +4283,11 @@
                 1.0
             ],
             "filePath": "House_2\\House_2.obj",
-            "id": 54,
+            "id": 55,
             "isAnimation": false,
             "modelName": "House_2.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -4304,10 +4360,11 @@
                 1.0
             ],
             "filePath": "House_2\\House_2.obj",
-            "id": 55,
+            "id": 56,
             "isAnimation": false,
             "modelName": "House_2.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -4380,10 +4437,11 @@
                 1.0
             ],
             "filePath": "Rock_2\\Rock_2.obj",
-            "id": 59,
+            "id": 57,
             "isAnimation": false,
             "modelName": "Rock_2.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -4456,10 +4514,11 @@
                 1.0
             ],
             "filePath": "Rock_2\\Rock_2.obj",
-            "id": 60,
+            "id": 58,
             "isAnimation": false,
             "modelName": "Rock_2.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -4532,10 +4591,11 @@
                 1.0
             ],
             "filePath": "Rock_2\\Rock_2.obj",
-            "id": 61,
+            "id": 59,
             "isAnimation": false,
             "modelName": "Rock_2.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -4608,10 +4668,11 @@
                 1.0
             ],
             "filePath": "Rock_2\\Rock_2.obj",
-            "id": 62,
+            "id": 60,
             "isAnimation": false,
             "modelName": "Rock_2.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -4684,10 +4745,11 @@
                 1.0
             ],
             "filePath": "Rock_2\\Rock_2.obj",
-            "id": 63,
+            "id": 61,
             "isAnimation": false,
             "modelName": "Rock_2.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -4760,10 +4822,11 @@
                 1.0
             ],
             "filePath": "WoodFence\\WoodFence.obj",
-            "id": 68,
+            "id": 62,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -4836,10 +4899,11 @@
                 1.0
             ],
             "filePath": "WoodFence\\WoodFence.obj",
-            "id": 69,
+            "id": 63,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "TestGate4",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -4912,10 +4976,11 @@
                 1.0
             ],
             "filePath": "WoodFence\\WoodFence.obj",
-            "id": 70,
+            "id": 64,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "TestGate3",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -4988,10 +5053,11 @@
                 1.0
             ],
             "filePath": "WoodFence\\WoodFence.obj",
-            "id": 71,
+            "id": 65,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -5064,10 +5130,11 @@
                 1.0
             ],
             "filePath": "WoodFence\\WoodFence.obj",
-            "id": 72,
+            "id": 66,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -5140,10 +5207,11 @@
                 1.0
             ],
             "filePath": "WoodFence\\WoodFence.obj",
-            "id": 73,
+            "id": 67,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -5216,10 +5284,11 @@
                 1.0
             ],
             "filePath": "WoodFence\\WoodFence.obj",
-            "id": 74,
+            "id": 68,
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -5292,10 +5361,11 @@
                 1.0
             ],
             "filePath": "Rock_2\\Rock_2.obj",
-            "id": 75,
+            "id": 69,
             "isAnimation": false,
             "modelName": "Rock_2.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -5368,10 +5438,11 @@
                 1.0
             ],
             "filePath": "Rock_5\\Rock_5.obj",
-            "id": 76,
+            "id": 70,
             "isAnimation": false,
             "modelName": "Rock_5.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -5444,10 +5515,11 @@
                 1.0
             ],
             "filePath": "Rock_4\\Rock_4.obj",
-            "id": 77,
+            "id": 71,
             "isAnimation": false,
             "modelName": "Rock_4.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -5520,10 +5592,11 @@
                 1.0
             ],
             "filePath": "Rock_3\\Rock_3.obj",
-            "id": 78,
+            "id": 72,
             "isAnimation": false,
             "modelName": "Rock_3.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -5596,10 +5669,11 @@
                 1.0
             ],
             "filePath": "Rock_1\\Rock_1.obj",
-            "id": 79,
+            "id": 73,
             "isAnimation": false,
             "modelName": "Rock_1.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -5672,10 +5746,11 @@
                 1.0
             ],
             "filePath": "Rock_5\\Rock_5.obj",
-            "id": 80,
+            "id": 74,
             "isAnimation": false,
             "modelName": "Rock_5.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -5748,10 +5823,11 @@
                 1.0
             ],
             "filePath": "Rock_5\\Rock_5.obj",
-            "id": 81,
+            "id": 75,
             "isAnimation": false,
             "modelName": "Rock_5.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -5824,10 +5900,11 @@
                 1.0
             ],
             "filePath": "Rock_5\\Rock_5.obj",
-            "id": 83,
+            "id": 76,
             "isAnimation": false,
             "modelName": "Rock_5.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -5900,10 +5977,11 @@
                 1.0
             ],
             "filePath": "Rock_5\\Rock_5.obj",
-            "id": 84,
+            "id": 77,
             "isAnimation": false,
             "modelName": "Rock_5.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -5976,10 +6054,11 @@
                 1.0
             ],
             "filePath": "Rock_5\\Rock_5.obj",
-            "id": 85,
+            "id": 78,
             "isAnimation": false,
             "modelName": "Rock_5.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -6052,10 +6131,11 @@
                 1.0
             ],
             "filePath": "Rock_5\\Rock_5.obj",
-            "id": 86,
+            "id": 79,
             "isAnimation": false,
             "modelName": "Rock_5.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -6128,10 +6208,11 @@
                 1.0
             ],
             "filePath": "Rock_5\\Rock_5.obj",
-            "id": 87,
+            "id": 80,
             "isAnimation": false,
             "modelName": "Rock_5.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -6204,10 +6285,11 @@
                 1.0
             ],
             "filePath": "Rock_5\\Rock_5.obj",
-            "id": 88,
+            "id": 81,
             "isAnimation": false,
             "modelName": "Rock_5.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -6280,10 +6362,11 @@
                 1.0
             ],
             "filePath": "Rock_5\\Rock_5.obj",
-            "id": 89,
+            "id": 82,
             "isAnimation": false,
             "modelName": "Rock_5.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -6356,10 +6439,11 @@
                 1.0
             ],
             "filePath": "Rock_5\\Rock_5.obj",
-            "id": 90,
+            "id": 83,
             "isAnimation": false,
             "modelName": "Rock_5.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -6432,10 +6516,11 @@
                 1.0
             ],
             "filePath": "Rock_5\\Rock_5.obj",
-            "id": 91,
+            "id": 84,
             "isAnimation": false,
             "modelName": "Rock_5.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -6508,10 +6593,11 @@
                 1.0
             ],
             "filePath": "Rock_5\\Rock_5.obj",
-            "id": 92,
+            "id": 85,
             "isAnimation": false,
             "modelName": "Rock_5.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -6584,10 +6670,11 @@
                 1.0
             ],
             "filePath": "Rock_5\\Rock_5.obj",
-            "id": 93,
+            "id": 86,
             "isAnimation": false,
             "modelName": "Rock_5.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -6660,10 +6747,11 @@
                 1.0
             ],
             "filePath": "Rock_5\\Rock_5.obj",
-            "id": 94,
+            "id": 87,
             "isAnimation": false,
             "modelName": "Rock_5.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -6736,10 +6824,11 @@
                 1.0
             ],
             "filePath": "Rock_5\\Rock_5.obj",
-            "id": 95,
+            "id": 88,
             "isAnimation": false,
             "modelName": "Rock_5.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -6812,10 +6901,11 @@
                 1.0
             ],
             "filePath": "Rock_5\\Rock_5.obj",
-            "id": 96,
+            "id": 89,
             "isAnimation": false,
             "modelName": "Rock_5.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -6888,10 +6978,11 @@
                 1.0
             ],
             "filePath": "Rock_5\\Rock_5.obj",
-            "id": 97,
+            "id": 90,
             "isAnimation": false,
             "modelName": "Rock_5.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -6917,5 +7008,5 @@
             "uvStochastic": 0.0
         }
     ],
-    "version": 11
+    "version": 12
 }

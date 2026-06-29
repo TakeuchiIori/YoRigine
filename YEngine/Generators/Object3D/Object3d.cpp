@@ -15,6 +15,7 @@
 #include "Debugger/Logger.h"
 #include <LightManager/LightManager.h>
 #include "PipelineManager/YPipelineManager.h"
+#include "Material/OutlineSettings.h"
 
 const std::string Object3d::defaultModelPath_ = "Resources/Models/";
 
@@ -89,6 +90,20 @@ void Object3d::Draw(Camera* camera, WorldTransform& worldTransform)
 
 	auto commandList = object3dCommon_->GetDxCommon()->GetCommandList();
 
+	// === インバートハル輪郭線（本体より先に描き、内側は本体で上書きする） ===
+	// 専用 PSO/RS へ切り替えるため、ここで描いてからオブジェクト本体パイプラインへ復帰する。
+	if (camera && model_ && outlineEnabled_ && OutlineSettings::GetInstance()->IsEnabled()) {
+		DrawOutlinePass(camera, worldTransform);
+
+		// 輪郭用 RS へ切り替えた時点で Object RS の root 引数は無効化される。
+		// 本体パイプラインへ戻し、DrawPreference で張っていたライトを張り直す。
+		object3dCommon_->SetRootSignature();
+		object3dCommon_->SetGraphicsCommand();
+		object3dCommon_->SetPrimitiveTopology();
+		YoRigine::LightManager::GetInstance()->SetCommandList(
+			indices.at("gDirectionalLight"), indices.at("gPointLights"), indices.at("gSpotLights"));
+	}
+
 	// ワールド
 	commandList->SetGraphicsRootConstantBufferView(indices.at("gTransformationMatrix"), worldTransform.GetConstBuffer()->GetGPUVirtualAddress());
 
@@ -142,6 +157,39 @@ void Object3d::DrawShadow(WorldTransform& worldTransform)
 	model_->DrawShadow();
 }
 
+
+/// <summary>
+/// インバートハル輪郭線の描画。
+/// 専用 PSO/RS（前面カリング）に切り替え、頂点を法線方向へ押し出した
+/// シェルを描く。ジオメトリ供給は頂点/インデックスのみで足りるため
+/// Model::DrawShadow() を流用する（PSO/RS/CB は本関数で設定済み）。
+/// </summary>
+void Object3d::DrawOutlinePass(Camera* camera, WorldTransform& worldTransform)
+{
+	if (!model_ || !camera) return;
+
+	auto pm = YPipelineManager::GetInstance();
+	const auto& oidx = pm->GetParameterIndices("ObjectOutline");
+	auto commandList = object3dCommon_->GetDxCommon()->GetCommandList().Get();
+
+	// 輪郭用 PSO / RS / トポロジ
+	commandList->SetPipelineState(pm->GetPipeLineStateObject("ObjectOutline"));
+	commandList->SetGraphicsRootSignature(pm->GetRootSignature("ObjectOutline"));
+	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	// 最新のパラメータ（太さ・色）を CB へ反映
+	OutlineSettings::GetInstance()->UpdateCB();
+
+	commandList->SetGraphicsRootConstantBufferView(
+		oidx.at("gTransformationMatrix"), worldTransform.GetConstBuffer()->GetGPUVirtualAddress());
+	commandList->SetGraphicsRootConstantBufferView(
+		oidx.at("gCamera"), camera->GetCameraResource()->GetGPUVirtualAddress());
+	commandList->SetGraphicsRootConstantBufferView(
+		oidx.at("gOutline"), OutlineSettings::GetInstance()->GetResource()->GetGPUVirtualAddress());
+
+	// 頂点/インデックスをバインドして描画するだけ（Model::DrawShadow を流用）
+	model_->DrawShadow();
+}
 
 void Object3d::CreateShadowResources()
 {

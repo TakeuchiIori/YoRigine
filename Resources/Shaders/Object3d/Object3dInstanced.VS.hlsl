@@ -9,7 +9,7 @@ struct InstanceData
     float4   color;                // 16
     float4x4 uvTransform;          // 64
     float    stochasticStrength;   //  4
-    float    _pad0;                //  4
+    float    outlineMask;          //  4  (輪郭線の掛け率。本体描画では未使用)
     float    _pad1;                //  4
     float    _pad2;                //  4
 };

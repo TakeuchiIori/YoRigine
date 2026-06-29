@@ -968,6 +968,28 @@ std::string PostEffectManager::EffectChainToJson() const
 			<< effect->params.outlineColor.z << ","
 			<< effect->params.outlineColor.w << "],\n";
 
+		// 深度アウトライン（エッジトグル/重み/閾値/太さ/距離フェード）
+		{
+			const auto& d = effect->params.depthOutline;
+			json << "        \"depthOutline\": {\n";
+			json << "          \"useDepth\": " << (d.useDepth ? "true" : "false") << ",\n";
+			json << "          \"useNormal\": " << (d.useNormal ? "true" : "false") << ",\n";
+			json << "          \"useLuminance\": " << (d.useLuminance ? "true" : "false") << ",\n";
+			json << "          \"edgeStrength\": " << d.edgeStrength << ",\n";
+			json << "          \"depthWeight\": " << d.depthWeight << ",\n";
+			json << "          \"normalWeight\": " << d.normalWeight << ",\n";
+			json << "          \"luminanceWeight\": " << d.luminanceWeight << ",\n";
+			json << "          \"depthThreshold\": " << d.depthThreshold << ",\n";
+			json << "          \"normalThreshold\": " << d.normalThreshold << ",\n";
+			json << "          \"luminanceThreshold\": " << d.luminanceThreshold << ",\n";
+			json << "          \"normalWidth\": " << d.normalWidth << ",\n";
+			json << "          \"luminanceWidth\": " << d.luminanceWidth << ",\n";
+			json << "          \"useDistanceFade\": " << (d.useDistanceFade ? "true" : "false") << ",\n";
+			json << "          \"distanceFadeStart\": " << d.distanceFadeStart << ",\n";
+			json << "          \"distanceFadeEnd\": " << d.distanceFadeEnd << "\n";
+			json << "        },\n";
+		}
+
 		// ラジアルブラー
 		json << "        \"radialBlur\": {\n";
 		json << "          \"direction\": ["
@@ -1212,6 +1234,27 @@ bool PostEffectManager::JsonToEffectChain(const std::string& jsonStr)
 			if (outlineColor.size() >= 4) {
 				effect->params.outlineColor =
 				{ outlineColor[0], outlineColor[1], outlineColor[2], outlineColor[3] };
+			}
+
+			// ----- depthOutline（エッジトグル/重み/閾値/太さ/距離フェード） -----
+			std::string depthOutlineJson = JsonUtil::GetObjectValue(paramsJson, "depthOutline");
+			if (!depthOutlineJson.empty()) {
+				auto& d = effect->params.depthOutline;
+				d.useDepth = JsonUtil::GetBoolValue(depthOutlineJson, "useDepth", true);
+				d.useNormal = JsonUtil::GetBoolValue(depthOutlineJson, "useNormal", false);
+				d.useLuminance = JsonUtil::GetBoolValue(depthOutlineJson, "useLuminance", false);
+				d.edgeStrength = JsonUtil::GetNumberValue<float>(depthOutlineJson, "edgeStrength", 1.0f);
+				d.depthWeight = JsonUtil::GetNumberValue<float>(depthOutlineJson, "depthWeight", 1.0f);
+				d.normalWeight = JsonUtil::GetNumberValue<float>(depthOutlineJson, "normalWeight", 1.0f);
+				d.luminanceWeight = JsonUtil::GetNumberValue<float>(depthOutlineJson, "luminanceWeight", 1.0f);
+				d.depthThreshold = JsonUtil::GetNumberValue<float>(depthOutlineJson, "depthThreshold", 1.0f);
+				d.normalThreshold = JsonUtil::GetNumberValue<float>(depthOutlineJson, "normalThreshold", 1.0f);
+				d.luminanceThreshold = JsonUtil::GetNumberValue<float>(depthOutlineJson, "luminanceThreshold", 1.0f);
+				d.normalWidth = JsonUtil::GetNumberValue<float>(depthOutlineJson, "normalWidth", 1.0f);
+				d.luminanceWidth = JsonUtil::GetNumberValue<float>(depthOutlineJson, "luminanceWidth", 1.0f);
+				d.useDistanceFade = JsonUtil::GetBoolValue(depthOutlineJson, "useDistanceFade", false);
+				d.distanceFadeStart = JsonUtil::GetNumberValue<float>(depthOutlineJson, "distanceFadeStart", 30.0f);
+				d.distanceFadeEnd = JsonUtil::GetNumberValue<float>(depthOutlineJson, "distanceFadeEnd", 80.0f);
 			}
 
 			// ----- radialBlur -----
