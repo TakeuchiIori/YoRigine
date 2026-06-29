@@ -46,6 +46,7 @@ public:
 		ColorGrade,
 		Fog,
 		GodRays,
+		NormalVisualize,
 	};
 	///************************* パラメータ調整 *************************///
 	struct RadialBlurPrams
@@ -62,6 +63,20 @@ public:
 		float edgeWidth;
 		Vector3 edgeColor;
 		float invert;
+	};
+
+	// 強化版 DepthOutline 用（深度/法線/輝度の各エッジを個別トグル + 加重合計）
+	struct DepthOutlineParams {
+		bool  useDepth = true;          // 深度エッジ
+		bool  useNormal = false;        // 法線エッジ（G-buffer 参照）
+		bool  useLuminance = false;     // 輝度エッジ
+		float depthWeight = 1.0f;
+		float normalWeight = 1.0f;
+		float luminanceWeight = 1.0f;
+		float edgeStrength = 1.0f;       // 全体強度倍率
+		float depthThreshold = 1.0f;     // 各エッジの正規化しきい値
+		float normalThreshold = 1.0f;
+		float luminanceThreshold = 1.0f;
 	};
 
 	static OffScreen* GetInstance() {
@@ -193,7 +208,8 @@ public:
 	void SetGaussianBlurParams(float sigma, int kernelSize);
 
 	// デプスアウトラインのパラメータを設定
-	void SetDepthOutlineParams(int kernelSize, const Vector4& color);
+	void SetDepthOutlineParams(int kernelSize, const Vector4& color,
+		const DepthOutlineParams& params = {});
 
 	// ラジアルブラーのパラメータを設定
 	void SetRadialBlurParams(const RadialBlurPrams& params);
@@ -306,9 +322,19 @@ private:
 	};
 
 	struct Material {
-		Matrix4x4 Inverse;
+		Matrix4x4 Inverse;          // projectionInverse (viewZ 復元用)
 		int kernelSize;
-		int padding[3];
+		int useDepth;
+		int useNormal;
+		int useLuminance;
+		float depthWeight;
+		float normalWeight;
+		float luminanceWeight;
+		float edgeStrength;
+		float depthThreshold;
+		float normalThreshold;
+		float luminanceThreshold;
+		float _pad;
 		Vector4 outlineColor;
 	};
 

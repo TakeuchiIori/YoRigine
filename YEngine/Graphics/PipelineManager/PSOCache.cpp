@@ -1,15 +1,31 @@
 #include "PSOCache.h"
 #include <cassert>
 #include <stdexcept>
+#include <sstream>
+#include <algorithm>
+#include <iterator>
 #include "Debugger/Logger.h"
 
 namespace YoRigine {
     // バージョン番号（フォーマット変更時にインクリメント）
-    static const uint32_t CACHE_VERSION = 2;
+    // v3: 入力ハッシュ(inputHash)をヘッダーに追加
+    static const uint32_t CACHE_VERSION = 3;
 
     // ============================================================================
     // CompletePipelineCache 実装
     // ============================================================================
+
+    uint64_t CompletePipelineCache::HashData(const void* data, size_t size, uint64_t seed)
+    {
+        // FNV-1a
+        uint64_t hash = seed;
+        const uint8_t* bytes = static_cast<const uint8_t*>(data);
+        for (size_t i = 0; i < size; ++i) {
+            hash ^= bytes[i];
+            hash *= 0x100000001b3ULL;
+        }
+        return hash;
+    }
 
     void CompletePipelineCache::Initialize(ID3D12Device* device, const std::filesystem::path& cacheDirectory)
     {
@@ -157,13 +173,33 @@ namespace YoRigine {
         auto filePath = GetCacheFilePath(key);
 
         try {
-            std::ofstream file(filePath, std::ios::binary);
-            if (!file.is_open()) {
-                return false;
+            // ===== 入力ハッシュによる早期スキップ =====
+            // 既存ファイルが同じバージョン＆同じ入力ハッシュなら、パイプラインは
+            // 変わっていない。出力PSOブロブはドライバ依存で毎回変化するため、
+            // ここでファイルを書き換えない（更新時刻も維持し、git差分も出さない）。
+            if (std::filesystem::exists(filePath)) {
+                std::ifstream existing(filePath, std::ios::binary);
+                if (existing.is_open()) {
+                    uint32_t existingVersion = 0;
+                    uint64_t existingHash = 0;
+                    existing.read(reinterpret_cast<char*>(&existingVersion), sizeof(existingVersion));
+                    existing.read(reinterpret_cast<char*>(&existingHash), sizeof(existingHash));
+                    if (existing.good()
+                        && existingVersion == CACHE_VERSION
+                        && existingHash == data.inputHash
+                        && data.inputHash != 0) {
+                        // 入力に変化なし → 書き換え不要
+                        return true;
+                    }
+                }
             }
 
+            // メモリ上のバッファへシリアライズしてから一括書き込みする。
+            std::ostringstream oss(std::ios::binary);
+
             // ===== ヘッダー =====
-            file.write(reinterpret_cast<const char*>(&CACHE_VERSION), sizeof(CACHE_VERSION));
+            oss.write(reinterpret_cast<const char*>(&CACHE_VERSION), sizeof(CACHE_VERSION));
+            oss.write(reinterpret_cast<const char*>(&data.inputHash), sizeof(data.inputHash));
 
             // ===== ルートシグネチャのシリアライズデータ =====
             if (data.rootSignature) {
@@ -172,16 +208,16 @@ namespace YoRigine {
                 // 実装の簡略化のため、ここでは再シリアライズは行わず、
                 // パラメータインデックスとPSOのみ保存
                 uint32_t hasRootSig = 1;
-                file.write(reinterpret_cast<const char*>(&hasRootSig), sizeof(hasRootSig));
+                oss.write(reinterpret_cast<const char*>(&hasRootSig), sizeof(hasRootSig));
 
                 // TODO: 完全な実装では、ルートシグネチャの再シリアライズが必要
                 // 現時点ではスキップマーカーのみ書き込み
                 uint64_t rootSigSize = 0;
-                file.write(reinterpret_cast<const char*>(&rootSigSize), sizeof(rootSigSize));
+                oss.write(reinterpret_cast<const char*>(&rootSigSize), sizeof(rootSigSize));
             }
             else {
                 uint32_t hasRootSig = 0;
-                file.write(reinterpret_cast<const char*>(&hasRootSig), sizeof(hasRootSig));
+                oss.write(reinterpret_cast<const char*>(&hasRootSig), sizeof(hasRootSig));
             }
 
             // ===== PSOのキャッシュブロブ =====
@@ -191,38 +227,45 @@ namespace YoRigine {
 
                 if (SUCCEEDED(hr) && psoBlob) {
                     uint64_t psoSize = psoBlob->GetBufferSize();
-                    file.write(reinterpret_cast<const char*>(&psoSize), sizeof(psoSize));
-                    file.write(static_cast<const char*>(psoBlob->GetBufferPointer()), psoSize);
+                    oss.write(reinterpret_cast<const char*>(&psoSize), sizeof(psoSize));
+                    oss.write(static_cast<const char*>(psoBlob->GetBufferPointer()), psoSize);
                 }
                 else {
                     uint64_t psoSize = 0;
-                    file.write(reinterpret_cast<const char*>(&psoSize), sizeof(psoSize));
+                    oss.write(reinterpret_cast<const char*>(&psoSize), sizeof(psoSize));
                 }
             }
             else {
                 uint64_t psoSize = 0;
-                file.write(reinterpret_cast<const char*>(&psoSize), sizeof(psoSize));
+                oss.write(reinterpret_cast<const char*>(&psoSize), sizeof(psoSize));
             }
 
             // ===== パラメータインデックス =====
-            uint32_t paramCount = static_cast<uint32_t>(data.parameterIndices.size());
-            file.write(reinterpret_cast<const char*>(&paramCount), sizeof(paramCount));
+            // unordered_map は反復順が不定なので、キー順にソートして
+            // 出力を決定的にする（同じ内容なら毎回同じバイト列になるようにする）
+            std::vector<std::pair<std::string, UINT>> sortedParams(
+                data.parameterIndices.begin(), data.parameterIndices.end());
+            std::sort(sortedParams.begin(), sortedParams.end(),
+                [](const auto& a, const auto& b) { return a.first < b.first; });
 
-            for (const auto& [name, index] : data.parameterIndices) {
+            uint32_t paramCount = static_cast<uint32_t>(sortedParams.size());
+            oss.write(reinterpret_cast<const char*>(&paramCount), sizeof(paramCount));
+
+            for (const auto& [name, index] : sortedParams) {
                 // 名前の長さ
                 uint32_t nameLen = static_cast<uint32_t>(name.size());
-                file.write(reinterpret_cast<const char*>(&nameLen), sizeof(nameLen));
+                oss.write(reinterpret_cast<const char*>(&nameLen), sizeof(nameLen));
 
                 // 名前
-                file.write(name.c_str(), nameLen);
+                oss.write(name.c_str(), nameLen);
 
                 // インデックス
-                file.write(reinterpret_cast<const char*>(&index), sizeof(index));
+                oss.write(reinterpret_cast<const char*>(&index), sizeof(index));
             }
 
             // ===== インプットレイアウト =====
             uint32_t layoutCount = static_cast<uint32_t>(data.inputLayout.size());
-            file.write(reinterpret_cast<const char*>(&layoutCount), sizeof(layoutCount));
+            oss.write(reinterpret_cast<const char*>(&layoutCount), sizeof(layoutCount));
 
             for (size_t i = 0; i < data.inputLayout.size(); ++i) {
                 const auto& element = data.inputLayout[i];
@@ -237,17 +280,26 @@ namespace YoRigine {
                 }
 
                 uint32_t nameLen = static_cast<uint32_t>(semanticName.size());
-                file.write(reinterpret_cast<const char*>(&nameLen), sizeof(nameLen));
-                file.write(semanticName.c_str(), nameLen);
+                oss.write(reinterpret_cast<const char*>(&nameLen), sizeof(nameLen));
+                oss.write(semanticName.c_str(), nameLen);
 
                 // その他のフィールド
-                file.write(reinterpret_cast<const char*>(&element.SemanticIndex), sizeof(element.SemanticIndex));
-                file.write(reinterpret_cast<const char*>(&element.Format), sizeof(element.Format));
-                file.write(reinterpret_cast<const char*>(&element.InputSlot), sizeof(element.InputSlot));
-                file.write(reinterpret_cast<const char*>(&element.AlignedByteOffset), sizeof(element.AlignedByteOffset));
-                file.write(reinterpret_cast<const char*>(&element.InputSlotClass), sizeof(element.InputSlotClass));
-                file.write(reinterpret_cast<const char*>(&element.InstanceDataStepRate), sizeof(element.InstanceDataStepRate));
+                oss.write(reinterpret_cast<const char*>(&element.SemanticIndex), sizeof(element.SemanticIndex));
+                oss.write(reinterpret_cast<const char*>(&element.Format), sizeof(element.Format));
+                oss.write(reinterpret_cast<const char*>(&element.InputSlot), sizeof(element.InputSlot));
+                oss.write(reinterpret_cast<const char*>(&element.AlignedByteOffset), sizeof(element.AlignedByteOffset));
+                oss.write(reinterpret_cast<const char*>(&element.InputSlotClass), sizeof(element.InputSlotClass));
+                oss.write(reinterpret_cast<const char*>(&element.InstanceDataStepRate), sizeof(element.InstanceDataStepRate));
             }
+
+            const std::string newContent = oss.str();
+
+            // ===== 入力が変化した or ファイル未作成 → 書き込み =====
+            std::ofstream file(filePath, std::ios::binary | std::ios::trunc);
+            if (!file.is_open()) {
+                return false;
+            }
+            file.write(newContent.data(), static_cast<std::streamsize>(newContent.size()));
 
             return true;
 
@@ -292,6 +344,10 @@ namespace YoRigine {
             }
 
             PipelineData data;
+
+            // ===== 入力ハッシュ =====
+            // 次回保存時の「変化なし判定」に使うので読み込んで保持する
+            file.read(reinterpret_cast<char*>(&data.inputHash), sizeof(data.inputHash));
 
             // ===== ルートシグネチャ =====
             uint32_t hasRootSig;

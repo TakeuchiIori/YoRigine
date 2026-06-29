@@ -49,6 +49,7 @@ SamplerComparisonState gShadowSampler : register(s1);
 struct PixelShaderOutput
 {
     float4 color : SV_TARGET0;
+    float4 normal : SV_TARGET1; // G-buffer: ワールド空間法線(.xyz) + 書き込みマスク(.w)
 };
 
 // タイル単位ハッシュランダム化サンプル (Object3d.PS と同じ)
@@ -81,6 +82,9 @@ float4 SampleStochastic(Texture2D tex, SamplerState sam, float2 uv, float streng
 PixelShaderOutput main(InstancedVertexShaderOutput input)
 {
     PixelShaderOutput output;
+
+    // G-buffer 法線出力（ワールド空間）
+    output.normal = float4(normalize(input.normal), 1.0f);
 
     InstanceData inst = gInstances[input.instanceID];
 

@@ -604,6 +604,16 @@ namespace YoRigine {
         psoDesc.DSVFormat = dsvFormat_;
         psoDesc.SampleDesc.Count = 1;
 
+        // G-buffer 法線（MRT 第2ターゲット）。
+        // writeNormal=false の場合は RenderTarget[1] の writemask を 0 のままにして法線を汚さない。
+        if (useGBufferNormal_) {
+            psoDesc.NumRenderTargets = 2;
+            psoDesc.RTVFormats[1] = DXGI_FORMAT_R16G16B16A16_FLOAT;
+            psoDesc.BlendState.RenderTarget[1].BlendEnable = FALSE;
+            psoDesc.BlendState.RenderTarget[1].RenderTargetWriteMask =
+                writeNormal_ ? D3D12_COLOR_WRITE_ENABLE_ALL : 0;
+        }
+
         HRESULT hr = device->CreateGraphicsPipelineState(&psoDesc,
             IID_PPV_ARGS(&result.pipelineState));
         if (FAILED(hr)) {

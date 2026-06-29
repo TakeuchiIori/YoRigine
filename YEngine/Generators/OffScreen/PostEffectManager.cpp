@@ -270,7 +270,7 @@ void PostEffectManager::ImGui()
 			"Grayscale", "Vignette", "RadialBlur", "ToneMapping",
 			"Dissolve", "Chromatic", "ColorAdjust", "ShatterTransition",
 			"Bloom", "Posterize", "Kuwahara", "Halftone", "CrossHatch", "ColorGrade",
-			"Fog", "GodRays"
+			"Fog", "GodRays", "NormalVisualize"
 		};
 
 		for (int i = 0; i < IM_ARRAYSIZE(effectNames); ++i) {
@@ -619,11 +619,16 @@ void PostEffectManager::ApplyEffectParametersToOffScreen(const PostEffectData& e
 		break;
 
 	case OffScreen::OffScreenEffectType::DepthOutline:
-		// 輪郭線の太さと色
+		// 輪郭線の太さ・色・各エッジ(深度/法線/輝度)トグル
 		offScreen_->SetDepthOutlineParams(
 			effect.params.kernelSize,
-			effect.params.outlineColor
+			effect.params.outlineColor,
+			effect.params.depthOutline
 		);
+		break;
+
+	case OffScreen::OffScreenEffectType::NormalVisualize:
+		// 法線可視化（パラメータなし）
 		break;
 
 	case OffScreen::OffScreenEffectType::RadialBlur:

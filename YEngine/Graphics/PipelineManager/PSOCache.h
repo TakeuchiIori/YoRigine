@@ -27,7 +27,19 @@ namespace YoRigine {
 
             // InputLayoutのsemanticName用メモリ（ポインタの寿命管理）
             std::vector<std::string> semanticNames;
+
+            // 入力（コンパイル済みシェーダー等）のハッシュ。
+            // ディスクキャッシュは「出力PSOブロブ」ではなくこの値で同一判定する。
+            // （GetCachedBlob() はドライバ依存で毎回変化するため出力比較は不可）
+            uint64_t inputHash = 0;
         };
+
+        /// <summary>
+        /// FNV-1a でバイト列のハッシュを計算する（複数ブロブを seed で連結可能）。
+        /// 例: h = HashData(vs.ptr, vs.size); h = HashData(ps.ptr, ps.size, h);
+        /// </summary>
+        static uint64_t HashData(const void* data, size_t size,
+            uint64_t seed = 0xcbf29ce484222325ULL);
 
         CompletePipelineCache() = default;
         ~CompletePipelineCache() = default;

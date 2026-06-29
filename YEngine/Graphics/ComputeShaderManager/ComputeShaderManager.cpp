@@ -690,6 +690,55 @@ void ComputeShaderManager::CreatePostEffectCS()
 	}
 
 	// ===========================================================
+	// RS_DepthNormal : SRV(t0=color)+SRV(t1=depth)+SRV(t2=normal) + UAV(u0) + CBV(b0) + Sampler(s0,s1)
+	// DepthOutline(強化版) / NormalVisualize 用
+	// ===========================================================
+	{
+		D3D12_DESCRIPTOR_RANGE srv0 = MakeRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0);
+		D3D12_DESCRIPTOR_RANGE srv1 = MakeRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1);
+		D3D12_DESCRIPTOR_RANGE srv2 = MakeRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2);
+		D3D12_DESCRIPTOR_RANGE uav  = MakeRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0);
+
+		D3D12_ROOT_PARAMETER params[5] = {};
+		params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		params[0].DescriptorTable.pDescriptorRanges = &srv0;
+		params[0].DescriptorTable.NumDescriptorRanges = 1;
+
+		params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		params[1].DescriptorTable.pDescriptorRanges = &srv1;
+		params[1].DescriptorTable.NumDescriptorRanges = 1;
+
+		params[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		params[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		params[2].DescriptorTable.pDescriptorRanges = &srv2;
+		params[2].DescriptorTable.NumDescriptorRanges = 1;
+
+		params[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		params[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		params[3].DescriptorTable.pDescriptorRanges = &uav;
+		params[3].DescriptorTable.NumDescriptorRanges = 1;
+
+		params[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+		params[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		params[4].Descriptor.ShaderRegister = 0;
+
+		D3D12_STATIC_SAMPLER_DESC samps[2] = {
+			MakeStaticSampler(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR),
+			MakeStaticSampler(1, D3D12_FILTER_MIN_MAG_MIP_POINT),
+		};
+
+		D3D12_ROOT_SIGNATURE_DESC desc{};
+		desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
+		desc.NumParameters = _countof(params);
+		desc.pParameters = params;
+		desc.NumStaticSamplers = _countof(samps);
+		desc.pStaticSamplers = samps;
+		SerializeAndCreateRS(device, desc, rootSignatures_["PostEffectRS_DepthNormal"]);
+	}
+
+	// ===========================================================
 	// RS_Tex : SRV(t0)+SRV(t1) + UAV(u0) + CBV(b0) + Sampler(s0)
 	// Dissolve / ShatterTransition 用
 	// ===========================================================
@@ -754,7 +803,8 @@ void ComputeShaderManager::CreatePostEffectCS()
 		// CB2
 		{ "PostEffectColorAdjustCS", L"Resources/Shaders/PostEffect/ColorRemapping/ColorAdjust.CS.hlsl", "PostEffectRS_CB2" },
 		// Depth
-		{ "PostEffectDepthOutlineCS", L"Resources/Shaders/PostEffect/OutLine/DepthBasedOutLine.CS.hlsl", "PostEffectRS_Depth" },
+		{ "PostEffectDepthOutlineCS", L"Resources/Shaders/PostEffect/OutLine/DepthBasedOutLine.CS.hlsl", "PostEffectRS_DepthNormal" },
+		{ "PostEffectNormalVisualizeCS", L"Resources/Shaders/PostEffect/NormalVisualize/NormalVisualize.CS.hlsl", "PostEffectRS_DepthNormal" },
 		{ "PostEffectFogCS",          L"Resources/Shaders/PostEffect/Fog/Fog.CS.hlsl",                   "PostEffectRS_Depth" },
 		{ "PostEffectGodRaysCS",      L"Resources/Shaders/PostEffect/GodRays/GodRays.CS.hlsl",           "PostEffectRS_Depth" },
 		// Tex
