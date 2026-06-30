@@ -1,6 +1,7 @@
 #include "YEmitterGroupManager.h"
 
 #include <fstream>
+#include <filesystem>
 
 /// <summary>
 /// エミッタグループの生成
@@ -131,4 +132,18 @@ bool YEmitterGroupManager::LoadGroupFromFile(const std::string& filePath) {
 		return true;
 	}
 	catch (...) { return false; }
+}
+
+size_t YEmitterGroupManager::ScanDirectory(const std::string& dir) {
+	namespace fs = std::filesystem;
+	std::error_code ec;
+	if (!fs::exists(dir, ec)) return 0;
+
+	size_t loaded = 0;
+	for (const auto& entry : fs::recursive_directory_iterator(dir, ec)) {
+		if (ec) break;
+		if (entry.path().extension() != ".json") continue;
+		if (LoadGroupFromFile(entry.path().string())) ++loaded;
+	}
+	return loaded;
 }

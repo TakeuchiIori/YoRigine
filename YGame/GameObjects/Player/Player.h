@@ -80,6 +80,8 @@ public:
 	void InitializeCamera(FollowCamera* followCamera) {
 		playerCamera_ = std::make_unique<PlayerCamera>();
 		playerCamera_->Initialize(followCamera, &wt_);
+		// 「右スティックでプレイヤーも回る」フラグをカメラエディタから切り替えられるよう接続
+		if (movement_) playerCamera_->SetCameraFollowFlag(movement_->GetCameraFollowEnabledPtr());
 	}
 
 	PlayerCamera*  GetPlayerCamera()  const { return playerCamera_.get(); }

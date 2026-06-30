@@ -68,6 +68,9 @@ public:
 	void ForceStop();
 
 	const MovementConfig& GetConfig() const { return config_; }
+	// 「右スティックでカメラを回すとプレイヤーも追従して回る」フラグのポインタ。
+	// カメラエディタ（PlayerCamera）から ON/OFF を切り替えられるよう公開する。
+	bool* GetCameraFollowEnabledPtr() { return &config_.enableCameraFollow; }
 	InputType GetCurrentInputType() const { return lastInputType_; }
 	Player* GetOwner() const { return owner_; }
 

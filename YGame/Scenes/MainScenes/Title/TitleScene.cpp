@@ -123,8 +123,6 @@ void TitleScene::Update() {
 	skyBox_->Update();
 	ground_->Update();
 
-	//auto* enemyHitEmitterGroup_ = YEmitterGroupManager::GetInstance().GetGroup("Title");
-	//enemyHitEmitterGroup_->EmitAll();
 
 	YoRigine::ModelManipulator::GetInstance()->Update();
 	YoRigine::CollisionManager::GetInstance()->Update();

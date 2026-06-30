@@ -1,6 +1,9 @@
 #include "ControlUI.h"
 #include <Systems/Input/Input.h>
 #include <Systems/GameTime/GameTime.h>
+#include <Systems/Text/TextTextureBaker.h>
+#include <filesystem>
+#include <cmath>
 
 void ControlUI::Initialize()
 {
@@ -13,6 +16,37 @@ void ControlUI::Initialize()
 	ripples = YoRigine::UIManager::GetInstance()->GetUI("ripples");
     ripples->SetVisible(false);
     originalSize_ = {100.0f,100.0f};
+
+    // 角丸四角の枠テクスチャを生成（丸枠が glyph と合わないため）。無ければ作る。
+    const std::string frameTex = "Resources/Textures/Operation/frame_square.png";
+    if (!std::filesystem::exists(frameTex)) {
+        YoRigine::TextTextureBaker::BakeRoundedRectFrame(
+            128, 128, /*cornerRadius*/18.0f, /*borderThickness*/8.0f,
+            Vector4{ 1.0f, 1.0f, 1.0f, 1.0f }, frameTex);
+    }
+
+    // LB / RB の操作ヒントを用意（シーンに既にあればそれを使い、無ければ生成）。
+    // outline を背面、グリフを前面に。画面(1600x900)の右上寄りに配置（アンカー中心）。
+    GetOrCreateButton("ExLB_outline", frameTex, { 1360.0f, 150.0f }, { 120.0f, 120.0f });
+    GetOrCreateButton("ExRB_outline", frameTex, { 1480.0f, 150.0f }, { 120.0f, 120.0f });
+    lbButton_ = GetOrCreateButton("ExLB", "Resources/Textures/Operation/Ex_LB.png", { 1360.0f, 150.0f }, { 100.0f, 100.0f });
+    rbButton_ = GetOrCreateButton("ExRB", "Resources/Textures/Operation/Ex_RB.png", { 1480.0f, 150.0f }, { 100.0f, 100.0f });
+
+    // ロックオン操作ヒント（照準＋右スティック）。テキストは廃止し、記号と動きで伝える。
+    // 左上のポーズメニューアイコン(startButton, (10,10)/100px)の下に横並びで配置（90px・調整可）。
+    lockOnIcon_  = GetOrCreateButton("LockOnHintIcon",  "Resources/Textures/GameScene/LockOn.png", { 70.0f, 185.0f }, { 90.0f, 90.0f });
+    lockOnStick_ = GetOrCreateButton("LockOnHintStick", "Resources/Textures/Operation/Right stick.png", { 170.0f, 185.0f }, { 90.0f, 90.0f });
+
+    // スティック押し込みバウンドの基準位置を控える（実際の上下動は Update で手動適用）。
+    if (lockOnStick_) {
+        stickBase_ = lockOnStick_->GetPosition();
+        stickPrevOffsetY_ = 0.0f;
+        stickBaseInit_ = true;
+    }
+
+    // 画面外ヒット時に一瞬だけ出す照準（画面中央・大きめ）。普段は非表示で FlashLockOn 時のみ再生。
+    lockOnFlash_ = GetOrCreateButton("LockOnFlash", "Resources/Textures/GameScene/LockOn.png", { 800.0f, 450.0f }, { 160.0f, 160.0f });
+    if (lockOnFlash_) lockOnFlash_->SetVisible(false);
 }
 
 void ControlUI::Update()
@@ -27,6 +61,33 @@ void ControlUI::Update()
     auto layer = YoRigine::UIManager::GetInstance()->GetUIsByLayer(1);
     for (auto& ui : layer) {
         ui->SetVisible(isVisble_);
+    }
+
+    // ロックオンヒント（照準＋スティック＋ラベル）はバトル中のみ表示する
+    const bool lockHintVisible = isVisble_ && battleActive_;
+    if (lockOnIcon_)  lockOnIcon_->SetVisible(lockHintVisible);
+    if (lockOnStick_) lockOnStick_->SetVisible(lockHintVisible);
+
+    // フラッシュ照準はアニメ再生中だけ表示（終わったら自動で消える）
+    if (lockOnFlash_) {
+        lockOnFlash_->SetVisible(isVisble_ && lockOnFlash_->IsAnimating());
+    }
+
+    // スティック押し込みバウンド（手動）。エディタで動かされたら基準を取り直して両立させる。
+    if (lockOnStick_ && stickBaseInit_) {
+        Vector3 cur = lockOnStick_->GetPosition();
+        Vector3 inferred = cur; inferred.y -= stickPrevOffsetY_; // 前回オフセットを除いた素の位置
+        if (std::abs(inferred.x - stickBase_.x) > 0.01f ||
+            std::abs(inferred.y - stickBase_.y) > 0.01f ||
+            std::abs(inferred.z - stickBase_.z) > 0.01f) {
+            stickBase_ = inferred;  // エディタ等で動かされた → 基準を更新
+        }
+        constexpr float kBobSpeed = 7.0f;   // 角速度(rad/s)：周期≒0.9s
+        constexpr float kBobAmp   = 12.0f;  // 押し込み量(px)
+        stickBobPhase_ += YoRigine::GameTime::GetUnscaledDeltaTime() * kBobSpeed;
+        float off = (std::sin(stickBobPhase_) * 0.5f + 0.5f) * kBobAmp; // 0..amp（下方向）
+        lockOnStick_->SetPosition({ stickBase_.x, stickBase_.y + off, stickBase_.z });
+        stickPrevOffsetY_ = off;
     }
 
     // Aボタンが押された瞬間
@@ -55,6 +116,16 @@ void ControlUI::Update()
         Vector2 baseX = button_[2]->GetSize();
         button_[2]->PlayScaleAnimation(Vector2{ 100.0f,100.0f } / baseX, Vector2{ 120.0f,120.0f } / baseX, duration_, Easing::Function::EaseInCubic, false);
         button_[2]->PlayFlash(duration_, 9);
+    }
+
+    // LB / RB はバトル中のみ押下アニメ（A/B と全く同じ：波紋＋拡縮＋フラッシュ）
+    if (battleActive_ && isVisble_) {
+        if (YoRigine::Input::GetInstance()->IsPadTriggered(0, GamePadButton::LB)) {
+            PlayButtonPress(lbButton_);
+        }
+        if (YoRigine::Input::GetInstance()->IsPadTriggered(0, GamePadButton::RB)) {
+            PlayButtonPress(rbButton_);
+        }
     }
 
 
@@ -119,4 +190,65 @@ void ControlUI::TriggerRipple(UIBase* targetButton)
 
     // 管理リストに追加
     activeRipples_.push_back(std::move(newRipple));
+}
+
+// 指定IDのUIを取得。無ければ生成して layer1 に登録する
+UIBase* ControlUI::GetOrCreateButton(const std::string& id, const std::string& texturePath,
+    const Vector2& pos, const Vector2& size)
+{
+    auto* mgr = YoRigine::UIManager::GetInstance();
+    if (UIBase* exist = mgr->GetUI(id)) return exist;  // 既にシーンに用意済みならそれを使う
+
+    // 個別保存（SaveToJSON）と次回起動の復元のため、必ず configPath を持たせる。
+    // configPath が空だと UIBase::SaveToJSON は何も書かずに失敗する。
+    const std::string cfg = "Resources/UIConfigs/GameScene/" + id + ".json";
+    const bool hadCfg = std::filesystem::exists(cfg);
+
+    auto ui = std::make_unique<UIBase>(id);
+    ui->Initialize(cfg);   // 既存あれば位置/サイズ/テクスチャを復元、無ければ configPath_ を設定
+
+    if (!hadCfg) {
+        // 初回のみデフォルトを適用し、その値を書き出す（次回以降は保存値を尊重）
+        ui->SetTexture(texturePath);          // ChangeTexture が実寸を反映（UV/サイズ）
+        if (size.x > 0.0f && size.y > 0.0f) ui->SetSize(size); // 0 はテクスチャ実寸を使う
+        ui->SetAnchorPoint({ 0.5f, 0.5f });   // 中心基準（拡縮アニメが中心から効く）
+        ui->SetLayer(1);
+        ui->SetPosition({ pos.x, pos.y, 0.0f });
+        ui->SaveToJSON();                     // 正しい初期値を保存（Initialize の白塗りデフォルトを上書き）
+    }
+    ui->SetVisible(true);
+
+    UIBase* raw = ui.get();
+    mgr->AddUI(id, std::move(ui));
+    return raw;
+}
+
+// ボタン押下時の共通アニメ（波紋＋拡縮ポップ＋フラッシュ）。A/B と全く同じ。
+void ControlUI::PlayButtonPress(UIBase* button)
+{
+    if (!button || !isVisble_) return;
+    TriggerRipple(button);
+    Vector2 base = button->GetSize();
+    button->PlayScaleAnimation(pushSize_ / base, originalSize_ / base, duration_, Easing::Function::EaseInCubic, false);
+    button->PlayFlash(duration_, 9);
+}
+
+// 画面外ヒット時のロックオン照準フラッシュ（赤→黄にフェードしながら消える）
+void ControlUI::FlashLockOn()
+{
+    if (!lockOnFlash_) return;
+
+    lockOnFlash_->SetVisible(true);
+
+    const Vector4 red{ 1.0f, 0.0f, 0.0f, 1.0f };
+    const Vector4 yellow{ 1.0f, 1.0f, 0.0f, 1.0f };  // 不透明の黄＝ロック確定色
+    lockOnFlash_->SetColor(red);
+
+    // ① 色：赤→黄を素早く（ターゲット捕捉 → ロック確定）。アルファはここでは保つ。
+    lockOnFlash_->PlayColorAnimation(red, yellow, 0.30f, Easing::Function::EaseOutCubic, false);
+    // ② アルファ：しばらく黄を保持してから後半でゆっくり消える（EaseInで余韻）。
+    lockOnFlash_->PlayAlphaAnimation(1.0f, 0.0f, 1.0f, Easing::Function::EaseInQuad, false);
+    // ③ 大きく開いた照準が一気に締まって軽くオーバーシュート＝「カチッとロック」
+    lockOnFlash_->PlayScaleAnimation(Vector2{ 1.8f, 1.8f }, Vector2{ 1.0f, 1.0f },
+        0.30f, Easing::Function::EaseOutBack, false);
 }

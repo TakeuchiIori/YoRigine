@@ -1,4 +1,5 @@
 #include "EffectHandle.h"
+#include "Debugger/Logger.h"
 
 // ============================================================================
 // ファクトリメソッド
@@ -9,7 +10,35 @@ EffectHandle EffectHandle::Play(const std::string& systemName,
                                 bool               loop,
                                 int                emitCount)
 {
-    auto* mgr = &YParticleManager::GetInstance();
+    auto* mgr      = &YParticleManager::GetInstance();
+    auto& groupMgr = YEmitterGroupManager::GetInstance();
+
+    // ── 入口統一: まず Group（束ねた完成エフェクト）として解決 ──────────────
+    if (YEmitterGroup* group = groupMgr.GetGroup(systemName)) {
+        // 同名の System も存在する場合は構成ミスの可能性が高いので警告
+        if (mgr->GetSystem(systemName)) {
+            Logger("EffectHandle: Group と System が同名 -> Group を優先: " + systemName);
+        }
+
+        EffectHandle h;
+        h.systemName_ = systemName;
+        h.group_      = group;
+
+        group->SetPosition(position);
+        group->SetActive(true);
+        if (loop) {
+            // ループ: 自動発生ON。GroupManager::Update（YParticleManager::Update
+            // から毎フレーム呼ばれる）で tick され、SetPosition 追従・Stop が効く。
+            group->SetAutoEmitAll(true);
+        } else {
+            // ワンショット: 1回だけ全エミッタ発火（emitCount<=0 はエミッタ設定に従う）
+            group->SetAutoEmitAll(false);
+            group->EmitAll(emitCount > 0 ? emitCount : -1);
+        }
+        return h;
+    }
+
+    // ── System 単体として再生 ──────────────────────────────────────────────
     YParticleSystem* sys = mgr->GetSystem(systemName);
     if (!sys) return {};
 
@@ -63,12 +92,16 @@ void EffectHandle::EmitAll(std::initializer_list<const char*> systemNames,
 
 void EffectHandle::SetPosition(const Vector3& pos)
 {
-    if (emitter_) emitter_->SetPosition(pos);
+    if (group_)        group_->SetPosition(pos);
+    else if (emitter_) emitter_->SetPosition(pos);
 }
 
 void EffectHandle::Stop()
 {
-    if (emitter_) {
+    if (group_) {
+        group_->SetAutoEmitAll(false);
+        group_->SetActive(false);
+    } else if (emitter_) {
         emitter_->SetAutoEmit(false);
         emitter_->SetActive(false);
     }
@@ -80,5 +113,6 @@ void EffectHandle::Stop()
 
 bool EffectHandle::IsActive() const
 {
+    if (group_) return group_->IsActive();
     return emitter_ && emitter_->IsActive();
 }

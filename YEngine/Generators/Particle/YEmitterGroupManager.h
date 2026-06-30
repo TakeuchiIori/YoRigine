@@ -81,6 +81,14 @@ public:
 	/// ファイルから単独グループを読み込み（単独形式・複数形式どちらも自動判別）
 	bool LoadGroupFromFile(const std::string& filePath);
 
+	/// <summary>
+	/// 指定ディレクトリ内の *.json をすべて Group として自動ロード（再帰）。
+	/// Group は System を名前参照するため、必ず YParticleManager::ScanDirectory の
+	/// 後に呼ぶこと。
+	/// </summary>
+	/// <returns>ロードに成功したファイル数</returns>
+	size_t ScanDirectory(const std::string& dir = "Resources/Json/YEmitterGroups/");
+
 	/// JSON から単独グループを読み込み
 	void LoadGroupFromJson(const nlohmann::json& j);
 private:

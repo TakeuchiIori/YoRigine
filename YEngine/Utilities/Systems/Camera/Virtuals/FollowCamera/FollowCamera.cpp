@@ -257,20 +257,27 @@ void FollowCamera::EnsureTargetInView(const Vector3& pivot, float dt) {
 // ============================================================
 void FollowCamera::RecenterBehindTarget() {
     if (!target_) return;
+    // 対象の向きへ寄せる（pitch リセットは従来どおり recenterResetPitch_ に従う）
+    RecenterToYaw(target_->rotate_.y, recenterResetPitch_);
+}
 
+// ============================================================
+// 任意のワールド yaw へ背後リセンター（RecenterBehindTarget の汎用版）
+// ============================================================
+void FollowCamera::RecenterToYaw(float targetWorldYaw, bool resetPitch) {
     constexpr float kPi    = 3.14159265358979f;
     constexpr float kTwoPi = 6.28318530717958f;
 
     recenterFromYaw_ = transform_.rotate.y;
 
-    // 目標 yaw = 対象の向き。現在角から最短回転になるよう正規化
-    float delta = target_->rotate_.y - recenterFromYaw_;
+    // 現在角から最短回転になるよう正規化
+    float delta = targetWorldYaw - recenterFromYaw_;
     while (delta >  kPi) delta -= kTwoPi;
     while (delta < -kPi) delta += kTwoPi;
     recenterToYaw_ = recenterFromYaw_ + delta;
 
     recenterFromPitch_ = transform_.rotate.x;
-    recenterToPitch_   = recenterResetPitch_
+    recenterToPitch_   = resetPitch
         ? std::clamp(recenterPitch_, minPitch_, maxPitch_)
         : transform_.rotate.x;
 

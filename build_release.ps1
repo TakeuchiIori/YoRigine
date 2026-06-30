@@ -1,0 +1,100 @@
+﻿<#
+.SYNOPSIS
+    既存の Release 出力を「実行ファイル」フォルダにまとめ、EXE を「Goldin.exe」にリネームします。
+    （ビルドは行いません。ビルド済みファイルをコピーするだけです）
+
+.DESCRIPTION
+    1. Release 出力 (generated/outputs/Release) 一式を「実行ファイル」フォルダへコピー
+    2. EXE (YMain.exe) を「Goldin.exe」へリネーム
+
+.PARAMETER SourceDir
+    コピー元（既定: リポジトリの一つ上の階層の generated\outputs\Release）。
+
+.PARAMETER DistDir
+    コピー先フォルダ（既定: リポジトリの一つ上の階層の「実行ファイル」）。
+
+.EXAMPLE
+    powershell -ExecutionPolicy Bypass -File .\build_release.ps1
+
+.EXAMPLE
+    powershell -ExecutionPolicy Bypass -File .\build_release.ps1 -SourceDir "D:\path\to\Release"
+#>
+
+[CmdletBinding()]
+param(
+    [string]$SourceDir,
+    [string]$DistDir
+)
+
+$ErrorActionPreference = 'Stop'
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+
+# --- 名前の定義 ---------------------------------------------------------------
+$ExeName  = 'Goldin.exe'      # 出力 EXE 名
+$DistName = '実行ファイル'    # 成果物をまとめるフォルダ名
+$Config   = 'Release'
+
+# --- パス解決 -----------------------------------------------------------------
+# このスクリプトはリポジトリ直下 (YoRigine.sln と同じ場所) に置く想定
+$RepoRoot = $PSScriptRoot
+if ([string]::IsNullOrEmpty($RepoRoot)) { $RepoRoot = (Get-Location).Path }
+$ParentDir = Split-Path $RepoRoot -Parent
+
+# premake5.lua の targetdir: $(SolutionDir)../generated/outputs/<cfg>
+if (-not $SourceDir) {
+    $SourceDir = Join-Path $ParentDir ("generated\outputs\{0}" -f $Config)
+}
+if (-not $DistDir) {
+    $DistDir = Join-Path $ParentDir $DistName   # 一つ上の階層に「実行ファイル」を作成
+}
+
+Write-Host "==========================================================" -ForegroundColor Cyan
+Write-Host " 既存の Release 出力をコピー" -ForegroundColor Cyan
+Write-Host "==========================================================" -ForegroundColor Cyan
+Write-Host (" Source   : {0}" -f $SourceDir)
+Write-Host (" Dist     : {0}" -f $DistDir)
+Write-Host (" Exe name : {0}" -f $ExeName)
+Write-Host ""
+
+# --- 入力チェック -------------------------------------------------------------
+if (-not (Test-Path $SourceDir)) {
+    throw ("コピー元が見つかりません: {0}" -f $SourceDir)
+}
+$builtExe = Join-Path $SourceDir 'YMain.exe'
+if (-not (Test-Path $builtExe)) {
+    throw ("YMain.exe が見つかりません: {0}`n先に Release ビルドを実行してください。" -f $builtExe)
+}
+
+# --- 1. 成果物の収集 ----------------------------------------------------------
+Write-Host "[1/2] 成果物をコピー ..." -ForegroundColor Yellow
+
+# 配布フォルダをクリーンに作り直す
+if (Test-Path $DistDir) {
+    Remove-Item $DistDir -Recurse -Force
+}
+New-Item -ItemType Directory -Path $DistDir | Out-Null
+
+# Release 出力一式（EXE / DLL / Resources など）をコピー。
+# .lib / .pdb / .idb / .exp / .ilk など配布に不要な中間物は除外。
+$excludeExt = @('.lib', '.pdb', '.idb', '.exp', '.ilk')
+Get-ChildItem -Path $SourceDir -Force | ForEach-Object {
+    if ($_.PSIsContainer) {
+        Copy-Item $_.FullName -Destination $DistDir -Recurse -Force
+    } elseif ($excludeExt -notcontains $_.Extension.ToLower()) {
+        Copy-Item $_.FullName -Destination $DistDir -Force
+    }
+}
+
+# --- 2. EXE のリネーム --------------------------------------------------------
+Write-Host "[2/2] EXE をリネーム ($ExeName) ..." -ForegroundColor Yellow
+$distExe  = Join-Path $DistDir 'YMain.exe'
+$finalExe = Join-Path $DistDir $ExeName
+if (Test-Path $finalExe) { Remove-Item $finalExe -Force }
+Rename-Item -Path $distExe -NewName $ExeName
+
+Write-Host ""
+Write-Host "==========================================================" -ForegroundColor Green
+Write-Host " 完了" -ForegroundColor Green
+Write-Host ("   フォルダ : {0}" -f $DistDir) -ForegroundColor Green
+Write-Host ("   実行 EXE : {0}" -f $finalExe) -ForegroundColor Green
+Write-Host "==========================================================" -ForegroundColor Green

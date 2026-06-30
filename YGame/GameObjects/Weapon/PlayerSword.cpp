@@ -4,7 +4,7 @@
 #include "Collision/Core/CollisionManager.h"
 #include "MathFunc.h"
 #include "Systems/GameTime/GameTime.h"
-#include "Particle/YEmitterGroupManager.h"
+#include "Particle/EffectHandle.h"
 #include <algorithm>
 
 #ifdef USE_IMGUI
@@ -230,13 +230,8 @@ void PlayerSword::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 		Vector3 hitPos = other->GetWorldTransform().translate_;
 		hitPos.y += 1.5f;
 
-		auto* enemyHitEmitterGroup_ = YEmitterGroupManager::GetInstance().GetGroup("EnemyHit");
-		if (enemyHitEmitterGroup_) {
-			enemyHitEmitterGroup_->SetPosition(hitPos);
-			enemyHitEmitterGroup_->SetActive(true);
-			enemyHitEmitterGroup_->SetAutoEmitAll(false);
-			enemyHitEmitterGroup_->EmitAll(10);
-		}
+		// "EnemyHit" は複数Systemを束ねた Group。EffectHandle が名前で解決して発火する。
+		hitEffect_ = EffectHandle::PlayOneShot("EnemyHit", hitPos, 10);
 		player_->GetCombat()->GetCombo()->RecoverCC(2);
 
 		// ------------------------------------------------------------
@@ -247,6 +242,11 @@ void PlayerSword::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 		// ------------------------------------------------------------
 		player_->GetCombat()->GetCombo()->NotifyAttackHit(other, hitPos);
 
+		// 画面外（見切れ）の敵にヒットしたら、敵を捉え直す決めカメラを発火する。
+		// 画面外判定・発火条件・クールダウンは PlayerCamera が一元管理する。
+		if (PlayerCamera* pc = player_->GetPlayerCamera()) {
+			pc->OnAttackHit(hitPos);
+		}
 	}
 }
 

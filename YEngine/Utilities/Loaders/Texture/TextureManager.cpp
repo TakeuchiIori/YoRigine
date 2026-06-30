@@ -118,6 +118,52 @@ void TextureManager::LoadTexture(const std::string& filePath)
 		textureData.metadata);
 }
 
+void TextureManager::ReloadTexture(const std::string& filePath)
+{
+	if (!srvManager_ || !dxCommon_) {
+		Logger("Error: srvManager_ or dxCommon_ is null in TextureManager::ReloadTexture");
+		return;
+	}
+
+	auto it = textureDatas.find(filePath);
+	if (it == textureDatas.end()) {
+		// 未ロードなら通常ロードと同じ
+		LoadTexture(filePath);
+		return;
+	}
+
+	// ディスクから読み直す
+	DirectX::ScratchImage image{};
+	std::wstring filepathW = ConvertString(filePath);
+	HRESULT hr;
+	if (filepathW.ends_with(L".dds")) {
+		hr = DirectX::LoadFromDDSFile(filepathW.c_str(), DirectX::DDS_FLAGS_NONE, nullptr, image);
+	} else {
+		hr = DirectX::LoadFromWICFile(filepathW.c_str(), DirectX::WIC_FLAGS_FORCE_SRGB, nullptr, image);
+	}
+	if (FAILED(hr)) return;
+	if (image.GetMetadata().width == 0 || image.GetMetadata().height == 0) return;
+
+	DirectX::ScratchImage mipImages{};
+	if (DirectX::IsCompressed(image.GetMetadata().format)) {
+		mipImages = std::move(image);
+	} else {
+		hr = DirectX::GenerateMipMaps(image.GetImages(), image.GetImageCount(),
+			image.GetMetadata(), DirectX::TEX_FILTER_SRGB, 0, mipImages);
+		if (FAILED(hr)) return;
+	}
+
+	// 既存の SRV インデックスを維持し、リソースだけ差し替えて SRV を作り直す
+	// （GPUハンドル不変＝参照側は再取得不要で最新を映す）
+	TextureData& td = it->second;
+	td.metadata = mipImages.GetMetadata();
+	td.resource = CreateTextureResource(td.metadata);
+	td.intermediateResource = UploadTextureData(td.resource.Get(), mipImages);
+	td.srvHandleCPU = srvManager_->GetCPUDescriptorHandle(td.srvIndex);
+	td.srvHandleGPU = srvManager_->GetGPUDescriptorHandle(td.srvIndex);
+	srvManager_->CreateSRVforTexture2D(td.srvIndex, td.resource.Get(), td.metadata);
+}
+
 /// <summary>
 /// ファイルパスからテクスチャのSRVインデックスを取得
 /// </summary>
