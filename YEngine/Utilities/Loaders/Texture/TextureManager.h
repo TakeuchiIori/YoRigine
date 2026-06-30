@@ -47,6 +47,12 @@ public:
 	// テクスチャ読み込み
 	void LoadTexture(const std::string& filePath);
 
+	// テクスチャ再読み込み（同じSRVインデックスを保持しGPUリソースだけ差し替える）。
+	// 同名ファイルを上書き保存した後のホットリロード用。GPUハンドルは不変なので
+	// 既にそのテクスチャを参照している Sprite / ImGui::Image はそのまま最新を映す。
+	// 未ロードなら LoadTexture と同じ挙動。
+	void ReloadTexture(const std::string& filePath);
+
 public:
 	///************************* アクセッサ *************************///
 

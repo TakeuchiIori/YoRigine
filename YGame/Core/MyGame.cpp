@@ -10,6 +10,7 @@
 #include "Material/ToonSettings.h"
 #include "Material/OutlineSettings.h"
 #include <Systems/UI/UIManager.h>
+#include <Systems/Text/TextTextureBaker.h>
 #include "GPUParticle/GpuEmitManager.h"
 #include <Object3D/BaseObjectManager.h>
 
@@ -114,6 +115,7 @@ void MyGame::Initialize() {
 	Editor::GetInstance()->RegisterGameUI("輪郭線", []() { OutlineSettings::GetInstance()->ImGui(); });
 	Editor::GetInstance()->RegisterGameUI("JSON管理", &YoRigine::JsonManager::ImGuiManager);
 	Editor::GetInstance()->RegisterGameUI("UI管理", []() { YoRigine::UIManager::GetInstance()->ImGuiDebug(); });
+	Editor::GetInstance()->RegisterGameUI("テキストベイク", []() { YoRigine::TextTextureBaker::ImGuiPanel(); });
 	Editor::GetInstance()->RegisterGameUI("ログ", []() { Editor::GetInstance()->DrawLog(); });
 	Editor::GetInstance()->RegisterGameUI("オーディオ詳細", [this]() { audio_->ShowDebugWindow(); });
 	Editor::GetInstance()->RegisterGameUI("オーディオ設定", [this]() { audio_->ShowSettingsWindow(); });
