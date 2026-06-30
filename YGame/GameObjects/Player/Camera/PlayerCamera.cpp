@@ -69,6 +69,11 @@ void PlayerCamera::Initialize(FollowCamera* followCamera, const WorldTransform* 
         LoadOffscreenHitReaction(ext["offscreenHitReaction"]);
     }
 
+    // カメラ操作フィールを extension JSON から復元
+    if (ext.contains("cameraFeel")) {
+        LoadCameraFeel(ext["cameraFeel"]);
+    }
+
 #ifdef USE_IMGUI
     editor_.Initialize(&attackCamera_, this);
     editor_.SetFilePath(defaultPath);
@@ -307,26 +312,49 @@ void PlayerCamera::UpdateStickInput() {
     stickActiveThisFrame_ = false;
     if (!followCamera_) return;
     if (followCamera_->GetIsCloseUp()) return;
+    if (!YoRigine::Input::GetInstance()->IsControllerConnected()) return;
 
-    if (YoRigine::Input::GetInstance()->IsControllerConnected()) {
-        XINPUT_STATE js;
-        if (YoRigine::Input::GetInstance()->GetJoystickState(0, js)) {
-            Vector3 move{};
-            move.y += static_cast<float>(js.Gamepad.sThumbRX);
-            move.x -= static_cast<float>(js.Gamepad.sThumbRY);
+    XINPUT_STATE js;
+    if (!YoRigine::Input::GetInstance()->GetJoystickState(0, js)) return;
 
-            if (Length(move) > 5000.0f) {
-                stickActiveThisFrame_ = true;
-                // 手動操作が入ったらリセンターを中断（プレイヤー操作を優先）
-                followCamera_->CancelRecenter();
-                move = Normalize(move) * rotateSpeed_;
-                Vector3 rot = followCamera_->GetRotate();
-                rot += move;
-                rot.x = std::clamp(rot.x, minPitch_, maxPitch_);
-                followCamera_->SetRotate(rot);
-            }
-        }
+    // 実時間 dt（タイムスケールに左右されない＝スロー中も操作感が一定）
+    const float dt = YoRigine::GameTime::GetUnscaledDeltaTime();
+
+    // 生入力を [-1,1] に正規化（x=ヨー方向, y=ピッチ方向）
+    Vector2 raw{
+        static_cast<float>(js.Gamepad.sThumbRX) / 32767.0f,
+        static_cast<float>(js.Gamepad.sThumbRY) / 32767.0f
+    };
+    float mag = std::min(Length(Vector3{ raw.x, raw.y, 0.0f }), 1.0f);
+
+    // ── ラジアルデッドゾーン ──────────────────────────────
+    if (mag < camDeadzone_) {
+        // 入力なし：加速ランプを減衰させて次回はゼロから立ち上げる
+        if (camAccelTime_ > 0.0f) camRampState_ = std::max(0.0f, camRampState_ - dt / camAccelTime_);
+        else                      camRampState_ = 0.0f;
+        return;
     }
+
+    stickActiveThisFrame_ = true;
+    followCamera_->CancelRecenter();  // 手動操作が入ったらリセンター中断（プレイヤー優先）
+
+    // デッドゾーン外を 0..1 に再マッピング → レスポンスカーブ（中央ほど精密）
+    float t = std::clamp((mag - camDeadzone_) / (1.0f - camDeadzone_), 0.0f, 1.0f);
+    float curved = std::powf(t, camResponseCurve_);
+
+    // 加速ランプ（0→最大まで camAccelTime_ 秒）
+    if (camAccelTime_ > 0.0f) camRampState_ = std::min(1.0f, camRampState_ + dt / camAccelTime_);
+    else                      camRampState_ = 1.0f;
+
+    // 倒し方向（単位ベクトル）に、角速度×カーブ×ランプ×dt を適用（フレームレート非依存）
+    Vector2 dir{ raw.x / mag, raw.y / mag };
+    float   scale = curved * camRampState_ * dt;
+
+    Vector3 rot = followCamera_->GetRotate();
+    rot.y +=  dir.x * camYawSpeed_   * scale;
+    rot.x += -dir.y * camPitchSpeed_ * scale * (camInvertY_ ? -1.0f : 1.0f);
+    rot.x = std::clamp(rot.x, minPitch_, maxPitch_);
+    followCamera_->SetRotate(rot);
 }
 
 // ── ヨー角を ±π に正規化 ──
@@ -494,6 +522,27 @@ void PlayerCamera::LoadLockOnFraming(const nlohmann::json& j) {
     lockOnShoulderYaw_ = j.value("shoulderYaw", 0.25f);
     lockOnPitchBias_   = j.value("pitchBias",   0.20f);
     lockOnLerpSpeed_   = j.value("lerpSpeed",   10.0f);
+}
+
+// ============================================================
+// カメラ操作フィール（右スティック）の保存 / 復元
+// ============================================================
+void PlayerCamera::SaveCameraFeel(nlohmann::json& j) const {
+    j["yawSpeed"]   = camYawSpeed_;
+    j["pitchSpeed"] = camPitchSpeed_;
+    j["deadzone"]   = camDeadzone_;
+    j["curve"]      = camResponseCurve_;
+    j["accelTime"]  = camAccelTime_;
+    j["invertY"]    = camInvertY_;
+}
+
+void PlayerCamera::LoadCameraFeel(const nlohmann::json& j) {
+    camYawSpeed_      = j.value("yawSpeed",   3.2f);
+    camPitchSpeed_    = j.value("pitchSpeed", 2.4f);
+    camDeadzone_      = j.value("deadzone",   0.18f);
+    camResponseCurve_ = j.value("curve",      2.0f);
+    camAccelTime_     = j.value("accelTime",  0.12f);
+    camInvertY_       = j.value("invertY",    false);
 }
 
 // ============================================================
@@ -891,6 +940,26 @@ void PlayerCamera::DrawImGui() {
             if (ImGui::IsItemHovered()) ImGui::SetTooltip("ON: カメラ回転にプレイヤーの向きが追従する（待機中のみ）/ OFF: カメラだけ回る");
             ImGui::Separator();
         }
+
+        // 右スティックの操作フィール（dt基準・アナログ・カーブ・加速）
+        ImGui::SeparatorText("カメラ操作フィール（右スティック）");
+        ImGui::DragFloat("ヨー速度(rad/s)",   &camYawSpeed_,   0.05f, 0.3f, 12.0f, "%.2f");
+        ImGui::DragFloat("ピッチ速度(rad/s)", &camPitchSpeed_, 0.05f, 0.3f, 12.0f, "%.2f");
+        ImGui::DragFloat("デッドゾーン",       &camDeadzone_,   0.01f, 0.0f, 0.6f, "%.2f");
+        ImGui::DragFloat("レスポンスカーブ",   &camResponseCurve_, 0.05f, 1.0f, 4.0f, "%.2f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("1=線形 / 大きいほど中央が精密（微調整しやすい）");
+        ImGui::DragFloat("加速時間(秒)",       &camAccelTime_,  0.01f, 0.0f, 0.5f, "%.2f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("0→最大入力まで滑らかに立ち上げる時間。0で即時");
+        ImGui::Checkbox("ピッチ反転", &camInvertY_);
+
+        // 編集値を extension JSON に反映（カメラ設定保存時に一緒に永続化）
+        nlohmann::json cfJson;
+        SaveCameraFeel(cfJson);
+        nlohmann::json ext = followCamera_->GetExtensionJson();
+        ext["cameraFeel"] = cfJson;
+        followCamera_->SetExtensionJson(ext);
+
+        ImGui::Separator();
         followCamera_->DrawDebugGui();
     }
 

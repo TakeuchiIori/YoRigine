@@ -221,6 +221,21 @@ private:
     float pivotHeight_  = 1.5f;
 
     // ============================================================
+    // カメラ操作フィール（右スティック）。dt 基準・アナログ・カーブ・加速。
+    //   extension JSON("cameraFeel") に永続化し、追従カメラ設定パネルで調整可能。
+    // ============================================================
+    float camYawSpeed_      = 3.2f;   // ヨー最大角速度(rad/s)
+    float camPitchSpeed_    = 2.4f;   // ピッチ最大角速度(rad/s)
+    float camDeadzone_      = 0.18f;  // ラジアルデッドゾーン(0..1)
+    float camResponseCurve_ = 2.0f;   // レスポンスカーブ指数(1=線形 / 大きいほど中央が精密)
+    float camAccelTime_     = 0.12f;  // 0→最大入力までの加速時間(秒)。0で即時
+    bool  camInvertY_       = false;  // ピッチ反転
+    float camRampState_     = 0.0f;   // 加速ランプの内部状態(0..1)
+
+    void SaveCameraFeel(nlohmann::json& j) const;
+    void LoadCameraFeel(const nlohmann::json& j);
+
+    // ============================================================
     // 最終フレーミングガード用パラメータ
     // ============================================================
     bool  framingGuardEnabled_ = true;   // ガード自体の ON / OFF
