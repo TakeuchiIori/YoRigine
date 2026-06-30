@@ -287,7 +287,6 @@ void GameScene::Update() {
 	YoRigine::CollisionManager::GetInstance()->Update();
 	YParticleManager::GetInstance().Update(YoRigine::GameTime::GetDeltaTime());
 	YoRigine::LightManager::GetInstance()->UpdateShadowMatrix(sceneCamera_.get());
-	YoRigine::LightManager::GetInstance()->TransferData();
 	YoRigine::GpuEmitManager::GetInstance()->Update();
 
 #ifdef USE_IMGUI
