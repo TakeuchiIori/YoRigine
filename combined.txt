@@ -235,8 +235,10 @@
 └── └── ├── Scenes/
 └── └── ├── UI/
 └── └── └── ├── Damage/
+└── └── ├── VfxMesh/
 └── └── ├── VirtualCameraData/
 └── └── ├── Weapon/
+└── └── ├── YEffects/
 └── └── ├── YEmitterGroups/
 └── └── └── YParticleSystems/
 └── ├── Models/
@@ -332,7 +334,7 @@
 └── └── ├── GameScene/
 └── └── ├── Title/
 └── ├── UIScenes/
-└── ├── Vfx/
+└── ├── UITex/
 └── └── images/
 ├── YEngine/
 └── ├── Core/
@@ -610,6 +612,10 @@
 └── └──         ├── VfxEffectAsset.h
 └── └──         ├── VfxMeshEditor.cpp
 └── └──         ├── VfxMeshEditor.h
+└── └──         ├── VfxMeshHandle.cpp
+└── └──         ├── VfxMeshHandle.h
+└── └──         ├── VfxMeshSpawner.cpp
+└── └──         ├── VfxMeshSpawner.h
 └── └──         ├── VolumeSmokeMesh.cpp
 └── └──         └── VolumeSmokeMesh.h
 └── ├── Graphics/
@@ -902,6 +908,9 @@
 └── └──     └── ├── NavPathfinder.h
 └── └──     └── ├── VisionSystem.cpp
 └── └──     └── └── VisionSystem.h
+└── └──     ├── Text/
+└── └──     └── ├── TextTextureBaker.cpp
+└── └──     └── └── TextTextureBaker.h
 └── └──     └── UI/
 └── └──         ├── UIAnimation.h
 └── └──         ├── UIAnimator.cpp
@@ -199015,6 +199024,9 @@ void Framework::Update()
 
 	// ゲームオブジェクト更新
 	ObjectManager::GetInstance()->Update();
+
+	// ポイント/スポットライトを GPU バッファへ同期（全シーン共通）
+	lightManager_->TransferData();
 }
 
 /// <summary>
@@ -215324,6 +215336,7 @@ private:
 File Path: YEngine/Generators/Particle/EffectHandle.cpp
 ============================================================
 #include "EffectHandle.h"
+#include "Debugger/Logger.h"
 
 // ============================================================================
 // ファクトリメソッド
@@ -215334,7 +215347,35 @@ EffectHandle EffectHandle::Play(const std::string& systemName,
                                 bool               loop,
                                 int                emitCount)
 {
-    auto* mgr = &YParticleManager::GetInstance();
+    auto* mgr      = &YParticleManager::GetInstance();
+    auto& groupMgr = YEmitterGroupManager::GetInstance();
+
+    // ── 入口統一: まず Group（束ねた完成エフェクト）として解決 ──────────────
+    if (YEmitterGroup* group = groupMgr.GetGroup(systemName)) {
+        // 同名の System も存在する場合は構成ミスの可能性が高いので警告
+        if (mgr->GetSystem(systemName)) {
+            Logger("EffectHandle: Group と System が同名 -> Group を優先: " + systemName);
+        }
+
+        EffectHandle h;
+        h.systemName_ = systemName;
+        h.group_      = group;
+
+        group->SetPosition(position);
+        group->SetActive(true);
+        if (loop) {
+            // ループ: 自動発生ON。GroupManager::Update（YParticleManager::Update
+            // から毎フレーム呼ばれる）で tick され、SetPosition 追従・Stop が効く。
+            group->SetAutoEmitAll(true);
+        } else {
+            // ワンショット: 1回だけ全エミッタ発火（emitCount<=0 はエミッタ設定に従う）
+            group->SetAutoEmitAll(false);
+            group->EmitAll(emitCount > 0 ? emitCount : -1);
+        }
+        return h;
+    }
+
+    // ── System 単体として再生 ──────────────────────────────────────────────
     YParticleSystem* sys = mgr->GetSystem(systemName);
     if (!sys) return {};
 
@@ -215388,12 +215429,16 @@ void EffectHandle::EmitAll(std::initializer_list<const char*> systemNames,
 
 void EffectHandle::SetPosition(const Vector3& pos)
 {
-    if (emitter_) emitter_->SetPosition(pos);
+    if (group_)        group_->SetPosition(pos);
+    else if (emitter_) emitter_->SetPosition(pos);
 }
 
 void EffectHandle::Stop()
 {
-    if (emitter_) {
+    if (group_) {
+        group_->SetAutoEmitAll(false);
+        group_->SetActive(false);
+    } else if (emitter_) {
         emitter_->SetAutoEmit(false);
         emitter_->SetActive(false);
     }
@@ -215405,6 +215450,7 @@ void EffectHandle::Stop()
 
 bool EffectHandle::IsActive() const
 {
+    if (group_) return group_->IsActive();
     return emitter_ && emitter_->IsActive();
 }
 
@@ -215416,6 +215462,7 @@ File Path: YEngine/Generators/Particle/EffectHandle.h
 
 #include "YParticleManager.h"
 #include "YParticleEmitter.h"
+#include "YEmitterGroupManager.h"   // Group経路解決（入口統一）
 #include "Vector3.h"
 #include <string>
 #include <memory>
@@ -215439,6 +215486,13 @@ File Path: YEngine/Generators/Particle/EffectHandle.h
 ///
 ///   // 複数エフェクト（爆発 = 閃光 + 煙 + 破片）
 ///   EffectHandle::EmitAll({"Explosion","Smoke","Debris"}, blastPos, 30);
+///
+/// ■ 入口統一（Group吸収）
+///   Play/PlayOneShot に渡す名前は、まず YEmitterGroup（複数Systemを束ねた
+///   「完成エフェクト」）として解決し、無ければ System単体として再生する。
+///   ゲーム側は「中身がGroupか単発か」を意識せず名前1つで呼べる:
+///     EffectHandle::PlayOneShot("EnemyHit", hitPos);  // Group "EnemyHit"
+///     EffectHandle::PlayOneShot("HitSpark", hitPos);  // System 単体
 /// </summary>
 class EffectHandle
 {
@@ -215488,7 +215542,7 @@ public:
 
     // ── クエリ ──────────────────────────────────────────────────────────
 
-    bool IsValid() const { return emitter_ != nullptr; }
+    bool IsValid() const { return emitter_ != nullptr || group_ != nullptr; }
     bool IsActive() const;
     const std::string& GetSystemName() const { return systemName_; }
 
@@ -215497,7 +215551,9 @@ public:
 
 private:
     std::string                      systemName_;
+    // どちらか一方が有効: System経路 = emitter_ / Group経路 = group_
     std::shared_ptr<YParticleEmitter> emitter_;
+    YEmitterGroup*                    group_ = nullptr;  // Managerが所有、借用ポインタ
 };
 
 
@@ -220199,7 +220255,8 @@ YEmitterGroupEditor::YEmitterGroupEditor()
     , loadBrowser_(emitterDirectory_, { ".json" }, YoRigine::FileBrowser::DisplayMode::List)
     , saveSingleBrowser_(emitterDirectory_, { ".json" }, YoRigine::FileBrowser::DisplayMode::List)
     , loadSingleBrowser_(emitterDirectory_, { ".json" }, YoRigine::FileBrowser::DisplayMode::List)
-    , saveBundleBrowser_("Resources/Json/YEffects/", { ".json" }, YoRigine::FileBrowser::DisplayMode::List) {
+    , saveBundleBrowser_("Resources/Json/YEffects/", { ".json" }, YoRigine::FileBrowser::DisplayMode::List)
+    , loadBundleBrowser_("Resources/Json/YEffects/", { ".json" }, YoRigine::FileBrowser::DisplayMode::List) {
     gizmoCtrl_.Initialize();
 
     // 全グループ保存
@@ -220237,6 +220294,13 @@ YEmitterGroupEditor::YEmitterGroupEditor()
             SetNotification(ok, ok ? "バンドル保存完了: " + path : "保存失敗: " + path);
         }
         showSaveBundlePopup_ = false;
+        });
+
+    // バンドル読込（YEffects/ の1ファイルから systems+groups をまとめてロード）
+    loadBundleBrowser_.SetOnFileSelected([this](const std::string& path) {
+        bool ok = YParticleManager::GetInstance().LoadEffectBundle(path);
+        showLoadBundlePopup_ = false;
+        SetNotification(ok, ok ? "エフェクト読み込み完了: " + path : "読み込み失敗: " + path);
         });
 }
 
@@ -220338,8 +220402,25 @@ void YEmitterGroupEditor::ShowEditor() {
 void YEmitterGroupEditor::ShowGizmoToolbar() { gizmoCtrl_.DrawSettings(); }
 
 void YEmitterGroupEditor::ShowGroupList() {
-    ImGui::Text("エミッターグループ");
+    ImGui::Text("エフェクト一覧");
     ImGui::Separator();
+
+    // ＋ 新規エフェクト（目立つ位置に。名前は自動でユニーク化）
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.16f, 0.40f, 0.24f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.22f, 0.54f, 0.32f, 1.0f));
+    if (ImGui::Button((std::string(Icon::PlusCircle) + " 新規エフェクト").c_str(), ImVec2(-1, 0))) {
+        auto& cmgr = YEmitterGroupManager::GetInstance();
+        std::string base = "NewEffect", nm = base;
+        int n = 1;
+        while (cmgr.GetGroup(nm)) nm = base + std::to_string(++n);
+        cmgr.CreateGroup(nm);
+        SelectGroup(nm);
+    }
+    ImGui::PopStyleColor(2);
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("空のエフェクトを作成して選択。右の詳細で「エミッターを追加」から System を足す");
+    ImGui::Separator();
+
     auto& mgr = YEmitterGroupManager::GetInstance();
     auto  names = mgr.GetAllGroupNames();
     for (const auto& name : names) {
@@ -220351,6 +220432,19 @@ void YEmitterGroupEditor::ShowGroupList() {
         if (!active) ImGui::PopStyleColor();
         if (ImGui::BeginPopupContextItem(name.c_str())) {
             if (ImGui::MenuItem("グループギズモを選択")) SelectGroup(name);
+            if (ImGui::MenuItem("複製")) {
+                std::string base = name + "_copy", newName = base;
+                int n = 1;
+                while (mgr.GetGroup(newName)) newName = base + std::to_string(++n);
+                if (auto* src = mgr.GetGroup(name)) {
+                    nlohmann::json j = src->SaveToJson();
+                    j["groupName"] = newName;
+                    if (auto* dst = mgr.CreateGroup(newName)) dst->LoadFromJson(j);
+                    SelectGroup(newName);
+                }
+                ImGui::EndPopup();
+                break;  // names が古くなるので安全にループ脱出
+            }
             ImGui::Separator();
             if (ImGui::MenuItem("グループを削除")) {
                 mgr.RemoveGroup(name);
@@ -220443,17 +220537,34 @@ void YEmitterGroupEditor::ShowGroupDetail() {
     // ★ グループ全体 Emit コントロールパネル
     // ================================================================
     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.10f, 0.13f, 0.17f, 1.0f));
-    ImGui::BeginChild("##EmitCtrlPanel", ImVec2(0, 78), true,
+    ImGui::BeginChild("##EmitCtrlPanel", ImVec2(0, 116), true,
         ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 
-    ImGui::TextColored({ 0.55f, 0.85f, 1.0f, 1.0f }, (std::string(Icon::Bullhorn) + "グループ全体 Emit").c_str());
+    ImGui::TextColored({ 0.55f, 0.85f, 1.0f, 1.0f }, (std::string(Icon::Bullhorn) + "プレビュー再生").c_str());
     ImGui::Spacing();
+
+    // 保存位置が画面外でも見えるよう、ここで指定した位置に発生させる。
+    ImGui::SetNextItemWidth(180);
+    ImGui::DragFloat3("位置##PV", previewPos_, 0.1f);
+    ImGui::SameLine();
+    if (ImGui::SmallButton("原点##PV")) { previewPos_[0] = 0.0f; previewPos_[1] = 2.0f; previewPos_[2] = 0.0f; }
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("プレビュー位置を原点付近(0,2,0)にリセット");
+    ImGui::Spacing();
+
+    // プレビューは保存位置を一時的に上書きして発生させ、直後に元へ戻す
+    // （保存位置は壊さない）。
+    auto emitAtPreview = [&](int n) {
+        Vector3 saved = group->GetPosition();
+        group->SetPosition({ previewPos_[0], previewPos_[1], previewPos_[2] });
+        group->EmitAll(n);
+        group->SetPosition(saved);
+    };
 
     // x1
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.42f, 0.18f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.28f, 0.58f, 0.28f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.12f, 0.32f, 0.12f, 1.0f));
-    if (ImGui::Button((std::string(Icon::Play) + "x1##EAG").c_str(), ImVec2(68, 0))) group->EmitAll(1);
+    if (ImGui::Button((std::string(Icon::Play) + "x1##EAG").c_str(), ImVec2(68, 0))) emitAtPreview(1);
     ImGui::PopStyleColor(3);
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("全エミッターから 1 個ずつ発生");
     ImGui::SameLine();
@@ -220462,7 +220573,7 @@ void YEmitterGroupEditor::ShowGroupDetail() {
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.22f, 0.42f, 0.12f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.32f, 0.58f, 0.18f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.16f, 0.32f, 0.08f, 1.0f));
-    if (ImGui::Button((std::string(Icon::Play) + "x10##EAG").c_str(), ImVec2(76, 0))) group->EmitAll(10);
+    if (ImGui::Button((std::string(Icon::Play) + "x10##EAG").c_str(), ImVec2(76, 0))) emitAtPreview(10);
     ImGui::PopStyleColor(3);
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("全エミッターから 10 個ずつ発生");
     ImGui::SameLine();
@@ -220471,7 +220582,7 @@ void YEmitterGroupEditor::ShowGroupDetail() {
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.50f, 0.32f, 0.08f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.70f, 0.48f, 0.12f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.38f, 0.24f, 0.05f, 1.0f));
-    if (ImGui::Button((std::string(Icon::Bolt) + "x100##EAG").c_str(), ImVec2(80, 0))) group->EmitAll(100);
+    if (ImGui::Button((std::string(Icon::Bolt) + "x100##EAG").c_str(), ImVec2(80, 0))) emitAtPreview(100);
     ImGui::PopStyleColor(3);
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("全エミッターから一気に 100 個バースト発生");
     ImGui::SameLine();
@@ -220808,20 +220919,22 @@ void YEmitterGroupEditor::ShowSelectedEmitterDetail(YParticleEmitter& emitter) {
 
     // 手動発生
     ImGui::Spacing();
-    ImGui::Text("手動発生 (このエミッター):"); ImGui::SameLine();
+    ImGui::Text("システムをプレビュー:"); ImGui::SameLine();
+    const Vector3 pv{ previewPos_[0], previewPos_[1], previewPos_[2] };
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.42f, 0.18f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.28f, 0.58f, 0.28f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.12f, 0.32f, 0.12f, 1.0f));
-    if (ImGui::SmallButton((std::string(Icon::Play) + " x1##ED").c_str()))  emitter.Emit(1);
+    if (ImGui::SmallButton((std::string(Icon::Play) + " x1##ED").c_str()))  emitter.FollowEmit(pv, 1);
     ImGui::SameLine();
-    if (ImGui::SmallButton((std::string(Icon::Play) + " x10##ED").c_str())) emitter.Emit(10);
+    if (ImGui::SmallButton((std::string(Icon::Play) + " x10##ED").c_str())) emitter.FollowEmit(pv, 10);
     ImGui::PopStyleColor(3);
     ImGui::SameLine();
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.50f, 0.32f, 0.08f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.70f, 0.48f, 0.12f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.38f, 0.24f, 0.05f, 1.0f));
-    if (ImGui::SmallButton((std::string(Icon::Bolt) + " x100##ED").c_str())) emitter.EmitBurst(100);
+    if (ImGui::SmallButton((std::string(Icon::Bolt) + " x100##ED").c_str())) emitter.FollowEmit(pv, 100);
     ImGui::PopStyleColor(3);
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("プレビュー位置 (%.1f, %.1f, %.1f) に発生", pv.x, pv.y, pv.z);
 
     ImGui::Spacing();
     auto* sys = emitter.GetTargetSystem();
@@ -220838,10 +220951,100 @@ void YEmitterGroupEditor::ShowSelectedEmitterDetail(YParticleEmitter& emitter) {
             (std::string(Icon::Xmark) + " システム \"%s\" が見つかりません").c_str(),
             emitter.GetSystemName().c_str());
     }
+
+    // ── このエミッタが使う System をその場で編集（YParticleEditor への往復をなくす）──
+    if (sys) {
+        ImGui::Spacing();
+        ImGui::Separator();
+        std::string header = std::string(Icon::Cog) + " システム \"" + sys->GetName() + "\" を編集";
+        if (ImGui::CollapsingHeader(header.c_str())) {
+            ImGui::Indent();
+            sys->ShowEditor();
+            ImGui::Unindent();
+        }
+    }
 }
 
 void YEmitterGroupEditor::ShowFileButtons() {
-    ImGui::Text("ファイル");
+    // ============================================================
+    // 主導線: エフェクト(=バンドル) の保存 / 開く（YEffects/ 1ファイル完結）
+    // ============================================================
+    ImGui::TextColored({ 0.6f, 0.85f, 1.0f, 1.0f },
+        (std::string(Icon::FloppyDisk) + "エフェクト (YEffects/)").c_str());
+
+    ImGui::BeginDisabled(selectedGroupName_.empty());
+    if (ImGui::Button((std::string(Icon::FloppyDisk) + "エフェクトを保存##FX").c_str(), ImVec2(-1, 0))) {
+        std::filesystem::create_directories("Resources/Json/YEffects");
+        saveBundleBrowser_.Scan();
+        std::string defaultName = selectedGroupName_ + ".json";
+        strncpy_s(saveAsNameBuf_, defaultName.c_str(), sizeof(saveAsNameBuf_));
+        showSaveBundlePopup_ = true;
+    }
+    ImGui::EndDisabled();
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+        ImGui::SetTooltip(selectedGroupName_.empty()
+            ? "エフェクト(グループ)を選択してください"
+            : "選択エフェクトと参照システムを YEffects/ に1ファイルで保存");
+
+    if (ImGui::Button((std::string(Icon::FolderOpen) + "エフェクトを開く##FX").c_str(), ImVec2(-1, 0))) {
+        std::filesystem::create_directories("Resources/Json/YEffects");
+        loadBundleBrowser_.Scan();
+        showLoadBundlePopup_ = true;
+    }
+
+    // バンドル保存ポップアップ
+    if (showSaveBundlePopup_) ImGui::OpenPopup("##SaveBundle");
+    ImGui::SetNextWindowSize(ImVec2(480, 380), ImGuiCond_Appearing);
+    if (ImGui::BeginPopupModal("##SaveBundle", &showSaveBundlePopup_,
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize)) {
+        ImGui::Text((std::string(Icon::FloppyDisk) + " エフェクトを保存: %s").c_str(), selectedGroupName_.c_str());
+        ImGui::TextDisabled("(グループ + 参照システムを1ファイルにまとめます)");
+        ImGui::Separator();
+        saveBundleBrowser_.Draw("##SaveBundleBrowser", ImVec2(0, 240));
+        ImGui::Separator();
+        ImGui::SetNextItemWidth(-80);
+        ImGui::InputTextWithHint("##SaveBundleName", "エフェクト名.json", saveAsNameBuf_, sizeof(saveAsNameBuf_));
+        ImGui::SameLine();
+        if (ImGui::Button("保存##SB")) {
+            if (saveAsNameBuf_[0] != '\0') {
+                std::string path = saveBundleBrowser_.GetCurrentDir() + saveAsNameBuf_;
+                bool ok = YParticleManager::GetInstance().SaveEffectBundle(selectedGroupName_, path);
+                SetNotification(ok, ok ? "エフェクト保存完了: " + path : "保存失敗: " + path);
+                saveAsNameBuf_[0] = '\0';
+                showSaveBundlePopup_ = false;
+                ImGui::CloseCurrentPopup();
+            }
+        }
+        if (ImGui::Button("キャンセル", ImVec2(-1, 0))) {
+            showSaveBundlePopup_ = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
+    // バンドル読込ポップアップ（YEffects/ の1ファイルから systems+groups をロード）
+    if (showLoadBundlePopup_) ImGui::OpenPopup("##LoadBundle");
+    ImGui::SetNextWindowSize(ImVec2(480, 360), ImGuiCond_Appearing);
+    if (ImGui::BeginPopupModal("##LoadBundle", &showLoadBundlePopup_,
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize)) {
+        ImGui::Text((std::string(Icon::FolderOpen) + "エフェクトを開く — YEffects/ のファイルを選択").c_str());
+        ImGui::Separator();
+        loadBundleBrowser_.Draw("##LoadBundleBrowser", ImVec2(0, 280));
+        ImGui::Separator();
+        if (ImGui::Button("キャンセル", ImVec2(-1, 0))) {
+            showLoadBundlePopup_ = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
+    ImGui::Separator();
+
+    // ============================================================
+    // 旧形式（System と Group を別ファイルに分離保存）。普段は折りたたみ。
+    // ============================================================
+    if (!ImGui::CollapsingHeader("旧形式の保存/読込 (YEmitterGroups 分離)"))
+        return;
 
     // ── 全グループ保存 ──────────────────────────────────────
     if (ImGui::Button((std::string(Icon::FloppyDisk) + "すべて保存##FG").c_str(), ImVec2(-1, 0))) {
@@ -220959,50 +221162,6 @@ void YEmitterGroupEditor::ShowFileButtons() {
         ImGui::EndPopup();
     }
 
-    ImGui::Separator();
-
-    // ── バンドル保存（グループ + 参照システムを1ファイル）────
-    ImGui::BeginDisabled(!hasSelection);
-    if (ImGui::Button((std::string(Icon::FloppyDisk) + "バンドル保存##FGB").c_str(), ImVec2(-1, 0))) {
-        // YEffects ディレクトリを自動生成
-        std::filesystem::create_directories("Resources/Json/YEffects");
-        saveBundleBrowser_.Scan();
-        std::string defaultName = selectedGroupName_ + ".json";
-        strncpy_s(saveAsNameBuf_, defaultName.c_str(), sizeof(saveAsNameBuf_));
-        showSaveBundlePopup_ = true;
-    }
-    ImGui::EndDisabled();
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-        ImGui::SetTooltip("選択グループと参照システムをまとめてYEffects/に保存\nLoadEffectBundle() で一括ロード可能");
-
-    if (showSaveBundlePopup_) ImGui::OpenPopup("##SaveBundle");
-    ImGui::SetNextWindowSize(ImVec2(480, 380), ImGuiCond_Appearing);
-    if (ImGui::BeginPopupModal("##SaveBundle", &showSaveBundlePopup_,
-        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize)) {
-        ImGui::Text((std::string(Icon::FloppyDisk) + " バンドル保存: %s").c_str(), selectedGroupName_.c_str());
-        ImGui::TextDisabled("(グループ + 参照システムを1ファイルにまとめます)");
-        ImGui::Separator();
-        saveBundleBrowser_.Draw("##SaveBundleBrowser", ImVec2(0, 240));
-        ImGui::Separator();
-        ImGui::SetNextItemWidth(-80);
-        ImGui::InputTextWithHint("##SaveBundleName", "エフェクト名.json", saveAsNameBuf_, sizeof(saveAsNameBuf_));
-        ImGui::SameLine();
-        if (ImGui::Button("保存##SB")) {
-            if (saveAsNameBuf_[0] != '\0') {
-                std::string path = saveBundleBrowser_.GetCurrentDir() + saveAsNameBuf_;
-                bool ok = YParticleManager::GetInstance().SaveEffectBundle(selectedGroupName_, path);
-                SetNotification(ok, ok ? "バンドル保存完了: " + path : "保存失敗: " + path);
-                saveAsNameBuf_[0] = '\0';
-                showSaveBundlePopup_ = false;
-                ImGui::CloseCurrentPopup();
-            }
-        }
-        if (ImGui::Button("キャンセル", ImVec2(-1, 0))) {
-            showSaveBundlePopup_ = false;
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::EndPopup();
-    }
 }
 
 #endif // USE_IMGUI
@@ -221147,6 +221306,10 @@ private:
     float newEmitterOffset_[3] = { 0, 0, 0 };
     float groupListWidth_ = 180.0f;
 
+    // プレビュー再生位置。保存位置が画面外でも確認できるよう、ここで指定した
+    // 見える位置にエフェクト/システムを発生させる。
+    float previewPos_[3] = { 0.0f, 2.0f, 0.0f };
+
     const std::string emitterDirectory_ = "Resources/Json/YEmitterGroups/";
 
     //=================================================================
@@ -221164,9 +221327,11 @@ private:
     bool showSaveSinglePopup_ = false;
     bool showLoadSinglePopup_ = false;
 
-    // バンドル保存
+    // バンドル保存/読込（YEffects/ = 1エフェクト=1ファイル）
     YoRigine::FileBrowser saveBundleBrowser_;
     bool showSaveBundlePopup_ = false;
+    YoRigine::FileBrowser loadBundleBrowser_;
+    bool showLoadBundlePopup_ = false;
 
     char saveAsNameBuf_[256] = "";
 
@@ -221299,6 +221464,7 @@ File Path: YEngine/Generators/Particle/YEmitterGroupManager.cpp
 #include "YEmitterGroupManager.h"
 
 #include <fstream>
+#include <filesystem>
 
 /// <summary>
 /// エミッタグループの生成
@@ -221431,6 +221597,20 @@ bool YEmitterGroupManager::LoadGroupFromFile(const std::string& filePath) {
 	catch (...) { return false; }
 }
 
+size_t YEmitterGroupManager::ScanDirectory(const std::string& dir) {
+	namespace fs = std::filesystem;
+	std::error_code ec;
+	if (!fs::exists(dir, ec)) return 0;
+
+	size_t loaded = 0;
+	for (const auto& entry : fs::recursive_directory_iterator(dir, ec)) {
+		if (ec) break;
+		if (entry.path().extension() != ".json") continue;
+		if (LoadGroupFromFile(entry.path().string())) ++loaded;
+	}
+	return loaded;
+}
+
 
 ============================================================
 File Path: YEngine/Generators/Particle/YEmitterGroupManager.h
@@ -221517,6 +221697,14 @@ public:
 
 	/// ファイルから単独グループを読み込み（単独形式・複数形式どちらも自動判別）
 	bool LoadGroupFromFile(const std::string& filePath);
+
+	/// <summary>
+	/// 指定ディレクトリ内の *.json をすべて Group として自動ロード（再帰）。
+	/// Group は System を名前参照するため、必ず YParticleManager::ScanDirectory の
+	/// 後に呼ぶこと。
+	/// </summary>
+	/// <returns>ロードに成功したファイル数</returns>
+	size_t ScanDirectory(const std::string& dir = "Resources/Json/YEmitterGroups/");
 
 	/// JSON から単独グループを読み込み
 	void LoadGroupFromJson(const nlohmann::json& j);
@@ -222872,6 +223060,8 @@ File Path: YEngine/Generators/Particle/YParticleManager.cpp
 #include "YParticleManager.h"
 #include <chrono>
 #include <algorithm>
+#include <fstream>
+#include <filesystem>
 #include "Graphics/LightManager/LightManager.h"
 #include <PipelineManager/YPipelineManager.h>
 #include "YEmitterGroupManager.h"
@@ -222994,6 +223184,34 @@ bool YParticleManager::LoadSystemsFromFile(const std::string& filePath) {
 	catch (const std::exception&) {
 		return false;
 	}
+}
+
+size_t YParticleManager::ScanDirectory(const std::string& dir) {
+	namespace fs = std::filesystem;
+	std::error_code ec;
+	if (!fs::exists(dir, ec)) return 0;
+
+	size_t loaded = 0;
+	for (const auto& entry : fs::recursive_directory_iterator(dir, ec)) {
+		if (ec) break;
+		if (entry.path().extension() != ".json") continue;
+		if (LoadSystemsFromFile(entry.path().string())) ++loaded;
+	}
+	return loaded;
+}
+
+size_t YParticleManager::ScanEffectBundles(const std::string& dir) {
+	namespace fs = std::filesystem;
+	std::error_code ec;
+	if (!fs::exists(dir, ec)) return 0;
+
+	size_t loaded = 0;
+	for (const auto& entry : fs::recursive_directory_iterator(dir, ec)) {
+		if (ec) break;
+		if (entry.path().extension() != ".json") continue;
+		if (LoadEffectBundle(entry.path().string())) ++loaded;
+	}
+	return loaded;
 }
 
 void YParticleManager::LoadSystemsFromJson(const nlohmann::json& json) {
@@ -223436,6 +223654,14 @@ public:
     bool LoadSystemsFromFile(const std::string& filePath);
 
     /// <summary>
+    /// 指定ディレクトリ内の *.json をすべて System として自動ロード（再帰）。
+    /// MyGame の手動ロード羅列を置き換える。Group は System を参照するため、
+    /// Group の Scan より先にこちらを呼ぶこと。
+    /// </summary>
+    /// <returns>ロードに成功したファイル数</returns>
+    size_t ScanDirectory(const std::string& dir = "Resources/Json/YParticleSystems/");
+
+    /// <summary>
     /// JSONからすべてのシステムを読み込み
     /// </summary>
     void LoadSystemsFromJson(const nlohmann::json& json);
@@ -223455,6 +223681,14 @@ public:
     /// 指定グループと参照システムをバンドルJSONとして保存
     /// </summary>
     bool SaveEffectBundle(const std::string& groupName, const std::string& filePath);
+
+    /// <summary>
+    /// 指定ディレクトリ内の *.json をすべて Effect バンドル（systems+groups 同梱の
+    /// 1エフェクト=1ファイル形式）として自動ロード（再帰）。System も Group も
+    /// 1ファイルに揃っているため、これ単体で完結する（参照切れが起きない）。
+    /// </summary>
+    /// <returns>ロードに成功したファイル数</returns>
+    size_t ScanEffectBundles(const std::string& dir = "Resources/Json/YEffects/");
 
     //=================================================================
     // 更新・描画
@@ -229736,7 +229970,7 @@ namespace YoRigine {
     public:
         static VfxMeshEditor* GetInstance();
 
-        void Initialize(const std::string& scanRoot = "Resources/Vfx/");
+        void Initialize(const std::string& scanRoot = "Resources/Json/VfxMesh/");
         void Finalize();
 
         void Update(float deltaTime);
@@ -229855,6 +230089,652 @@ namespace YoRigine {
 
 } // namespace YoRigine
 #endif
+
+============================================================
+File Path: YEngine/Generators/Vfx/VfxMesh/VfxMeshHandle.cpp
+============================================================
+#include "VfxMeshHandle.h"
+#include "VfxMeshSpawner.h"
+
+VfxMeshHandle VfxMeshHandle::Play(const std::string& assetName,
+                                  const Vector3&     position,
+                                  float              scale,
+                                  bool               loop)
+{
+    uint32_t id = VfxMeshSpawner::GetInstance()->Spawn(assetName, position, scale, loop);
+    return VfxMeshHandle(id);
+}
+
+void VfxMeshHandle::PlayOneShot(const std::string& assetName,
+                                const Vector3&     position,
+                                float              scale)
+{
+    VfxMeshSpawner::GetInstance()->Spawn(assetName, position, scale, false);
+}
+
+VfxMeshHandle VfxMeshHandle::PlayBolt(const std::string& assetName,
+                                      const Vector3&     start,
+                                      const Vector3&     end,
+                                      bool               loop)
+{
+    uint32_t id = VfxMeshSpawner::GetInstance()->SpawnBolt(assetName, start, end, loop);
+    return VfxMeshHandle(id);
+}
+
+void VfxMeshHandle::SetPosition(const Vector3& pos)
+{
+    if (id_ == 0) return;
+    VfxMeshSpawner::GetInstance()->SetPosition(id_, pos);
+}
+
+void VfxMeshHandle::SetScale(float scale)
+{
+    if (id_ == 0) return;
+    VfxMeshSpawner::GetInstance()->SetScale(id_, scale);
+}
+
+void VfxMeshHandle::SetEndpoints(const Vector3& start, const Vector3& end)
+{
+    if (id_ == 0) return;
+    VfxMeshSpawner::GetInstance()->SetEndpoints(id_, start, end);
+}
+
+void VfxMeshHandle::Stop()
+{
+    if (id_ == 0) return;
+    VfxMeshSpawner::GetInstance()->Stop(id_);
+    id_ = 0;
+}
+
+bool VfxMeshHandle::IsAlive() const
+{
+    if (id_ == 0) return false;
+    return VfxMeshSpawner::GetInstance()->IsAlive(id_);
+}
+
+
+============================================================
+File Path: YEngine/Generators/Vfx/VfxMesh/VfxMeshHandle.h
+============================================================
+#pragma once
+// ===========================================================
+// VfxMeshHandle.h
+//
+// EffectHandle と同じ発想で VfxMesh 系エフェクトを
+// ゲームコードからワンライナーで再生・操作するハンドル。
+//
+// 使い方:
+//   // ワンショット爆発（位置・スケール指定）
+//   VfxMeshHandle::PlayOneShot("Explosion", blastPos, 1.5f);
+//
+//   // ループ稲妻（始点→終点、毎フレーム追従）
+//   boltHandle_ = VfxMeshHandle::Play("Lightning", startPos, endPos);
+//   boltHandle_.SetEndpoints(swordBase, swordTip);
+//   boltHandle_.Stop();
+//
+//   // スモーク（位置指定、スケール1.0）
+//   smokeHandle_ = VfxMeshHandle::Play("Smoke", hitPos, 2.0f, true);
+//   smokeHandle_.SetPosition(newPos);
+// ===========================================================
+#include "Vector3.h"
+#include <string>
+#include <cstdint>
+
+class VfxMeshHandle
+{
+public:
+    VfxMeshHandle() = default;
+    ~VfxMeshHandle() = default;
+
+    // ── ファクトリ ────────────────────────────────────────────────────
+
+    // 位置 + スケール指定（スモーク・衝撃波など球系エフェクト向け）
+    static VfxMeshHandle Play(const std::string& assetName,
+                              const Vector3&     position,
+                              float              scale = 1.0f,
+                              bool               loop  = false);
+
+    static void PlayOneShot(const std::string& assetName,
+                            const Vector3&     position,
+                            float              scale = 1.0f);
+
+    // 始点・終点指定（稲妻など方向性エフェクト向け）
+    static VfxMeshHandle PlayBolt(const std::string& assetName,
+                                  const Vector3&     start,
+                                  const Vector3&     end,
+                                  bool               loop = false);
+
+    // ── 操作 ─────────────────────────────────────────────────────────
+
+    void SetPosition(const Vector3& pos);
+    void SetScale(float scale);
+    void SetEndpoints(const Vector3& start, const Vector3& end);
+    void Stop();
+
+    // ── クエリ ───────────────────────────────────────────────────────
+
+    bool IsValid() const { return id_ != 0; }
+    bool IsAlive() const;
+
+private:
+    VfxMeshHandle(uint32_t id) : id_(id) {}
+
+    uint32_t    id_ = 0;
+
+    friend class VfxMeshSpawner;
+};
+
+
+============================================================
+File Path: YEngine/Generators/Vfx/VfxMesh/VfxMeshSpawner.cpp
+============================================================
+#include "VfxMeshSpawner.h"
+#include "DirectXCommon.h"
+#include "PipelineManager/YPipelineManager.h"
+#include "Systems/Camera/Camera.h"
+#include "Debugger/Logger.h"
+
+#include <filesystem>
+#include <algorithm>
+#include <cmath>
+
+namespace fs = std::filesystem;
+
+static constexpr size_t kCBAlign = 256;
+template<typename T>
+static constexpr size_t CBSize() { return (sizeof(T) + kCBAlign - 1) & ~(kCBAlign - 1); }
+
+// ============================================================
+// シングルトン
+// ============================================================
+VfxMeshSpawner* VfxMeshSpawner::GetInstance()
+{
+    static VfxMeshSpawner inst;
+    return &inst;
+}
+
+// ============================================================
+// 初期化 / 終了
+// ============================================================
+void VfxMeshSpawner::Initialize()
+{
+    dxCommon_ = YoRigine::DirectXCommon::GetInstance();
+}
+
+void VfxMeshSpawner::Finalize()
+{
+    for (auto& fx : effects_) {
+        if (fx) fx->Release();
+    }
+    effects_.clear();
+    assetMap_.clear();
+}
+
+// ============================================================
+// アセット登録
+// ============================================================
+void VfxMeshSpawner::LoadAsset(const std::string& filePath)
+{
+    YoRigine::VfxEffectAsset asset;
+    if (!asset.LoadFromJson(filePath)) {
+        Logger("VfxMeshSpawner: ロード失敗 -> " + filePath);
+        return;
+    }
+    assetMap_[asset.name] = std::move(asset);
+}
+
+void VfxMeshSpawner::ScanDirectory(const std::string& dir)
+{
+    std::error_code ec;
+    if (!fs::exists(dir, ec)) return;
+
+    for (const auto& entry : fs::recursive_directory_iterator(dir, ec)) {
+        if (ec) break;
+        if (entry.path().extension() != ".json") continue;
+        LoadAsset(entry.path().string());
+    }
+}
+
+// ============================================================
+// 生成
+// ============================================================
+uint32_t VfxMeshSpawner::Spawn(const std::string& assetName,
+                               const Vector3&     position,
+                               float              scale,
+                               bool               loop)
+{
+    auto it = assetMap_.find(assetName);
+    if (it == assetMap_.end()) {
+        Logger("VfxMeshSpawner: アセット未登録 -> " + assetName);
+        return 0;
+    }
+
+    auto fx       = std::make_unique<ActiveEffect>();
+    fx->id        = nextId_++;
+    fx->loop      = loop;
+    fx->asset     = it->second;
+    fx->position  = position;
+    fx->scale     = scale;
+    fx->burstProgress = loop ? -1.f : 0.f;
+
+    // デフォルトの稲妻始終点（位置基準の上下）
+    float half = fx->asset.lightning.length * 0.5f * scale;
+    fx->boltStart = { position.x, position.y - half, position.z };
+    fx->boltEnd   = { position.x, position.y + half, position.z };
+
+    fx->smokeCenter = position;
+    fx->smokeRadius = fx->asset.smoke.radius * scale;
+
+    InitEffect(*fx);
+
+    uint32_t id = fx->id;
+    effects_.push_back(std::move(fx));
+    return id;
+}
+
+uint32_t VfxMeshSpawner::SpawnBolt(const std::string& assetName,
+                                   const Vector3&     start,
+                                   const Vector3&     end,
+                                   bool               loop)
+{
+    uint32_t id = Spawn(assetName, start, 1.0f, loop);
+    if (id != 0) SetEndpoints(id, start, end);
+    return id;
+}
+
+// ============================================================
+// 初期化ヘルパ
+// ============================================================
+void VfxMeshSpawner::InitEffect(ActiveEffect& fx)
+{
+    const auto& asset = fx.asset;
+
+    if (asset.useSmoke && asset.smoke.isEnable) {
+        fx.smoke = std::make_unique<YoRigine::VolumeSmokeMesh>();
+        fx.smoke->Initialize();
+        fx.smoke->SetTransform(fx.position, fx.asset.smoke.radius * fx.scale);
+
+        fx.smokeCBRes = dxCommon_->CreateBufferResource(CBSize<YoRigine::SmokeParamsCB>());
+        fx.smokeCBRes->Map(0, nullptr, reinterpret_cast<void**>(&fx.smokeCBMapped));
+    }
+
+    if (asset.useLightning && asset.lightning.isEnable) {
+        fx.lightning = std::make_unique<YoRigine::LightningMesh>();
+        fx.lightning->Initialize();
+        fx.lightning->SetCamera(camera_);
+        fx.lightning->ApplyParam(asset.lightning);
+        fx.lightning->SetEndpoints(fx.boltStart, fx.boltEnd);
+
+        fx.lightningCBRes = dxCommon_->CreateBufferResource(CBSize<YoRigine::LightningParamsCB>());
+        fx.lightningCBRes->Map(0, nullptr, reinterpret_cast<void**>(&fx.lightningCBMapped));
+    }
+
+    if (asset.useShockwave && asset.shockwave.isEnable) {
+        fx.shockwave = std::make_unique<YoRigine::ShockwaveMesh>();
+        fx.shockwave->Initialize();
+        fx.shockwave->SetCamera(camera_);
+        fx.shockwave->ApplyParam(asset.shockwave);
+        fx.shockwave->SetTransform(fx.position, asset.shockwave.radius * fx.scale);
+
+        fx.shockwaveCBRes = dxCommon_->CreateBufferResource(CBSize<YoRigine::ShockwaveParamsCB>());
+        fx.shockwaveCBRes->Map(0, nullptr, reinterpret_cast<void**>(&fx.shockwaveCBMapped));
+    }
+}
+
+// ============================================================
+// 毎フレーム更新
+// ============================================================
+void VfxMeshSpawner::Update(float deltaTime)
+{
+    for (auto& fx : effects_) {
+        if (!fx || !fx->alive) continue;
+        UpdateEffect(*fx, deltaTime);
+    }
+
+    // 死亡エフェクトを削除
+    effects_.erase(
+        std::remove_if(effects_.begin(), effects_.end(),
+            [](const std::unique_ptr<ActiveEffect>& f) {
+                return !f || !f->alive;
+            }),
+        effects_.end());
+}
+
+void VfxMeshSpawner::UpdateEffect(ActiveEffect& fx, float dt)
+{
+    fx.age += dt;
+    const auto& asset = fx.asset;
+
+    // バースト進捗更新（ワンショット）
+    if (!fx.loop) {
+        float duration = std::max(asset.smoke.isEnable
+            ? (asset.shockwave.isEnable
+                ? std::max(asset.shockwave.duration, 2.0f)
+                : 2.0f)
+            : asset.shockwave.duration,
+            0.1f);
+
+        fx.burstProgress = std::min(fx.age / duration, 1.0f);
+        if (fx.burstProgress >= 1.0f) {
+            fx.alive = false;
+            fx.Release();
+            return;
+        }
+    }
+
+    // Smoke 更新
+    if (fx.smoke) {
+        float rad = asset.smoke.radius * fx.scale;
+        fx.smokeCenter = fx.position;
+        if (fx.burstProgress >= 0.f) {
+            float grow = std::min(fx.burstProgress / 0.18f, 1.0f);
+            rad *= (0.2f + 0.8f * grow + 0.4f * fx.burstProgress);
+            fx.smokeCenter.y += asset.smoke.riseSpeed * fx.age;
+        }
+        fx.smokeRadius = rad;
+        fx.smoke->SetTransform(fx.smokeCenter, rad);
+        fx.smoke->Update(dt);
+    }
+
+    // Lightning 更新
+    if (fx.lightning) {
+        fx.lightning->SetCamera(camera_);
+        fx.lightning->SetEndpoints(fx.boltStart, fx.boltEnd);
+        fx.lightning->Update(dt);
+    }
+
+    // Shockwave 更新
+    if (fx.shockwave) {
+        fx.shockwave->SetCamera(camera_);
+        fx.shockwave->SetTransform(fx.position, asset.shockwave.radius * fx.scale);
+        fx.shockwave->Update(dt);
+    }
+}
+
+// ============================================================
+// 描画
+// ============================================================
+void VfxMeshSpawner::Draw()
+{
+    if (!camera_) return;
+
+    for (auto& fx : effects_) {
+        if (!fx || !fx->alive) continue;
+        DrawEffect(*fx);
+    }
+}
+
+void VfxMeshSpawner::DrawEffect(ActiveEffect& fx)
+{
+    auto* pm      = YPipelineManager::GetInstance();
+    auto* cmdList = dxCommon_->GetCommandList().Get();
+    D3D12_GPU_VIRTUAL_ADDRESS camAddr = camera_->GetCameraResource()->GetGPUVirtualAddress();
+
+    // Smoke
+    if (fx.smoke && fx.smokeCBMapped) {
+        const auto& sm = fx.asset.smoke;
+        auto& cb = *fx.smokeCBMapped;
+        cb.color         = sm.color;
+        cb.smokeColor    = sm.smokeColor;
+        cb.center        = fx.smokeCenter;
+        cb.radius        = fx.smokeRadius;
+        cb.time          = fx.age;
+        cb.noiseScale    = sm.noiseScale;
+        cb.noiseStrength = sm.noiseStrength;
+        cb.scrollSpeed   = sm.scrollSpeed;
+        cb.fresnelPower  = sm.fresnelPower;
+        cb.density       = sm.density;
+        cb.noiseOctaves  = sm.noiseOctaves;
+        cb.rimIntensity  = sm.rimIntensity;
+        cb.burst         = fx.burstProgress;
+
+        const auto& idx = pm->GetParameterIndices("VfxMeshSmoke");
+        cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshSmoke"));
+        cmdList->SetPipelineState(pm->GetPipeLineStateObject("VfxMeshSmoke"));
+        cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"),    camAddr);
+        cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), fx.smokeCBRes->GetGPUVirtualAddress());
+        fx.smoke->Draw(cmdList);
+    }
+
+    // Lightning
+    if (fx.lightning && fx.lightningCBMapped) {
+        const auto& lt = fx.asset.lightning;
+        auto& cb = *fx.lightningCBMapped;
+        cb.color      = lt.color;
+        cb.time       = fx.age;
+        cb.glowPower  = lt.glowPower;
+        cb.coreWidthN = 0.f;
+        cb._pad       = 0.f;
+
+        const auto& idx = pm->GetParameterIndices("VfxMeshLightning");
+        cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshLightning"));
+        cmdList->SetPipelineState(pm->GetPipeLineStateObject("VfxMeshLightning"));
+        cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"),    camAddr);
+        cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), fx.lightningCBRes->GetGPUVirtualAddress());
+        fx.lightning->Draw(cmdList);
+    }
+
+    // Shockwave
+    if (fx.shockwave && fx.shockwaveCBMapped) {
+        const auto& sw = fx.asset.shockwave;
+        auto& cb = *fx.shockwaveCBMapped;
+        cb.color     = sw.color;
+        cb.time      = fx.age;
+        cb.duration  = sw.duration;
+        cb.thickness = sw.thickness;
+        cb.burst     = (fx.burstProgress >= 0.f)
+            ? std::min(fx.age / std::max(sw.duration, 0.01f), 1.0f)
+            : -1.f;
+
+        const auto& idx = pm->GetParameterIndices("VfxMeshShockwave");
+        cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshShockwave"));
+        cmdList->SetPipelineState(pm->GetPipeLineStateObject("VfxMeshShockwave"));
+        cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"),    camAddr);
+        cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), fx.shockwaveCBRes->GetGPUVirtualAddress());
+        fx.shockwave->Draw(cmdList);
+    }
+}
+
+// ============================================================
+// 操作
+// ============================================================
+void VfxMeshSpawner::SetPosition(uint32_t id, const Vector3& pos)
+{
+    for (auto& fx : effects_) {
+        if (fx && fx->id == id) {
+            fx->position    = pos;
+            fx->smokeCenter = pos;
+            return;
+        }
+    }
+}
+
+void VfxMeshSpawner::SetScale(uint32_t id, float scale)
+{
+    for (auto& fx : effects_) {
+        if (fx && fx->id == id) {
+            fx->scale = scale;
+            return;
+        }
+    }
+}
+
+void VfxMeshSpawner::SetEndpoints(uint32_t id, const Vector3& start, const Vector3& end)
+{
+    for (auto& fx : effects_) {
+        if (fx && fx->id == id) {
+            fx->boltStart = start;
+            fx->boltEnd   = end;
+            return;
+        }
+    }
+}
+
+void VfxMeshSpawner::Stop(uint32_t id)
+{
+    for (auto& fx : effects_) {
+        if (fx && fx->id == id) {
+            fx->alive = false;
+            fx->Release();
+            return;
+        }
+    }
+}
+
+bool VfxMeshSpawner::IsAlive(uint32_t id) const
+{
+    for (const auto& fx : effects_) {
+        if (fx && fx->id == id) return fx->alive;
+    }
+    return false;
+}
+
+// ============================================================
+// ActiveEffect リソース解放
+// ============================================================
+void VfxMeshSpawner::ActiveEffect::Release()
+{
+    if (smokeCBMapped    && smokeCBRes)    { smokeCBRes->Unmap(0, nullptr);    smokeCBMapped    = nullptr; }
+    if (lightningCBMapped && lightningCBRes) { lightningCBRes->Unmap(0, nullptr); lightningCBMapped = nullptr; }
+    if (shockwaveCBMapped && shockwaveCBRes) { shockwaveCBRes->Unmap(0, nullptr); shockwaveCBMapped = nullptr; }
+    smoke.reset();
+    lightning.reset();
+    shockwave.reset();
+}
+
+
+============================================================
+File Path: YEngine/Generators/Vfx/VfxMesh/VfxMeshSpawner.h
+============================================================
+#pragma once
+// ===========================================================
+// VfxMeshSpawner.h
+//
+// VfxMesh 系エフェクト（Lightning / Shockwave / Smoke）を
+// 名前とトランスフォームで生成・管理するシングルトン。
+//
+// 使い方（MyGame 側）:
+//   // Initialize
+//   VfxMeshSpawner::GetInstance()->Initialize();
+//   VfxMeshSpawner::GetInstance()->ScanDirectory("Resources/Vfx/");
+//
+//   // 毎フレーム
+//   VfxMeshSpawner::GetInstance()->SetCamera(camera);
+//   VfxMeshSpawner::GetInstance()->Update(dt);
+//   VfxMeshSpawner::GetInstance()->Draw();
+// ===========================================================
+#include <wrl.h>
+#include <d3d12.h>
+#include <string>
+#include <vector>
+#include <unordered_map>
+#include <memory>
+
+#include "VfxEffectAsset.h"
+#include "LightningMesh.h"
+#include "ShockwaveMesh.h"
+#include "VolumeSmokeMesh.h"
+#include "Vector3.h"
+
+class Camera;
+
+namespace YoRigine { class DirectXCommon; }
+
+class VfxMeshSpawner
+{
+public:
+    static VfxMeshSpawner* GetInstance();
+
+    void Initialize();
+    void Finalize();
+
+    void SetCamera(Camera* camera) { camera_ = camera; }
+
+    // アセット登録
+    void LoadAsset(const std::string& filePath);
+    void ScanDirectory(const std::string& dir = "Resources/Json/VfxMesh/");
+
+    // 毎フレーム
+    void Update(float deltaTime);
+    void Draw();
+
+    // ── 生成 ─────────────────────────────────────────────────────────
+    // 位置 + スケール（スモーク・衝撃波など）
+    uint32_t Spawn(const std::string& assetName,
+                   const Vector3&     position,
+                   float              scale = 1.0f,
+                   bool               loop  = false);
+
+    // 始点・終点（稲妻など方向性エフェクト）
+    uint32_t SpawnBolt(const std::string& assetName,
+                       const Vector3&     start,
+                       const Vector3&     end,
+                       bool               loop = false);
+
+    // ── 操作（VfxMeshHandle から呼ばれる） ─────────────────────────
+    void SetPosition(uint32_t id, const Vector3& pos);
+    void SetScale(uint32_t id, float scale);
+    void SetEndpoints(uint32_t id, const Vector3& start, const Vector3& end);
+    void Stop(uint32_t id);
+    bool IsAlive(uint32_t id) const;
+
+private:
+    VfxMeshSpawner()  = default;
+    ~VfxMeshSpawner() = default;
+    VfxMeshSpawner(const VfxMeshSpawner&)            = delete;
+    VfxMeshSpawner& operator=(const VfxMeshSpawner&) = delete;
+
+    // ── アクティブエフェクト ─────────────────────────────────────────
+    struct ActiveEffect
+    {
+        uint32_t id   = 0;
+        bool     alive = true;
+        bool     loop  = false;
+        float    age   = 0.f;
+
+        YoRigine::VfxEffectAsset asset;
+
+        // 位置・スケール
+        Vector3 position  = { 0.f, 0.f, 0.f };
+        float   scale     = 1.0f;
+        Vector3 boltStart = { 0.f, 0.f, 0.f };
+        Vector3 boltEnd   = { 0.f, 3.f, 0.f };
+
+        // バースト進捗（-1=ループ継続、0..1=ワンショット）
+        float burstProgress = -1.f;
+        Vector3 smokeCenter;
+        float   smokeRadius = 1.5f;
+
+        // メッシュ実体
+        std::unique_ptr<YoRigine::VolumeSmokeMesh> smoke;
+        std::unique_ptr<YoRigine::LightningMesh>   lightning;
+        std::unique_ptr<YoRigine::ShockwaveMesh>   shockwave;
+
+        // CB リソース（各エフェクト独立）
+        Microsoft::WRL::ComPtr<ID3D12Resource> smokeCBRes;
+        YoRigine::SmokeParamsCB*               smokeCBMapped    = nullptr;
+
+        Microsoft::WRL::ComPtr<ID3D12Resource> lightningCBRes;
+        YoRigine::LightningParamsCB*           lightningCBMapped = nullptr;
+
+        Microsoft::WRL::ComPtr<ID3D12Resource> shockwaveCBRes;
+        YoRigine::ShockwaveParamsCB*           shockwaveCBMapped = nullptr;
+
+        void Release();
+    };
+
+    void InitEffect(ActiveEffect& fx);
+    void UpdateEffect(ActiveEffect& fx, float dt);
+    void DrawEffect(ActiveEffect& fx);
+
+    YoRigine::DirectXCommon* dxCommon_ = nullptr;
+    Camera*  camera_  = nullptr;
+    uint32_t nextId_  = 1;
+
+    std::unordered_map<std::string, YoRigine::VfxEffectAsset> assetMap_;
+    std::vector<std::unique_ptr<ActiveEffect>>                 effects_;
+};
+
 
 ============================================================
 File Path: YEngine/Generators/Vfx/VfxMesh/VolumeSmokeMesh.cpp
@@ -260070,6 +260950,52 @@ void TextureManager::LoadTexture(const std::string& filePath)
 		textureData.metadata);
 }
 
+void TextureManager::ReloadTexture(const std::string& filePath)
+{
+	if (!srvManager_ || !dxCommon_) {
+		Logger("Error: srvManager_ or dxCommon_ is null in TextureManager::ReloadTexture");
+		return;
+	}
+
+	auto it = textureDatas.find(filePath);
+	if (it == textureDatas.end()) {
+		// 未ロードなら通常ロードと同じ
+		LoadTexture(filePath);
+		return;
+	}
+
+	// ディスクから読み直す
+	DirectX::ScratchImage image{};
+	std::wstring filepathW = ConvertString(filePath);
+	HRESULT hr;
+	if (filepathW.ends_with(L".dds")) {
+		hr = DirectX::LoadFromDDSFile(filepathW.c_str(), DirectX::DDS_FLAGS_NONE, nullptr, image);
+	} else {
+		hr = DirectX::LoadFromWICFile(filepathW.c_str(), DirectX::WIC_FLAGS_FORCE_SRGB, nullptr, image);
+	}
+	if (FAILED(hr)) return;
+	if (image.GetMetadata().width == 0 || image.GetMetadata().height == 0) return;
+
+	DirectX::ScratchImage mipImages{};
+	if (DirectX::IsCompressed(image.GetMetadata().format)) {
+		mipImages = std::move(image);
+	} else {
+		hr = DirectX::GenerateMipMaps(image.GetImages(), image.GetImageCount(),
+			image.GetMetadata(), DirectX::TEX_FILTER_SRGB, 0, mipImages);
+		if (FAILED(hr)) return;
+	}
+
+	// 既存の SRV インデックスを維持し、リソースだけ差し替えて SRV を作り直す
+	// （GPUハンドル不変＝参照側は再取得不要で最新を映す）
+	TextureData& td = it->second;
+	td.metadata = mipImages.GetMetadata();
+	td.resource = CreateTextureResource(td.metadata);
+	td.intermediateResource = UploadTextureData(td.resource.Get(), mipImages);
+	td.srvHandleCPU = srvManager_->GetCPUDescriptorHandle(td.srvIndex);
+	td.srvHandleGPU = srvManager_->GetGPUDescriptorHandle(td.srvIndex);
+	srvManager_->CreateSRVforTexture2D(td.srvIndex, td.resource.Get(), td.metadata);
+}
+
 /// <summary>
 /// ファイルパスからテクスチャのSRVインデックスを取得
 /// </summary>
@@ -260289,6 +261215,12 @@ public:
 
 	// テクスチャ読み込み
 	void LoadTexture(const std::string& filePath);
+
+	// テクスチャ再読み込み（同じSRVインデックスを保持しGPUリソースだけ差し替える）。
+	// 同名ファイルを上書き保存した後のホットリロード用。GPUハンドルは不変なので
+	// 既にそのテクスチャを参照している Sprite / ImGui::Image はそのまま最新を映す。
+	// 未ロードなら LoadTexture と同じ挙動。
+	void ReloadTexture(const std::string& filePath);
 
 public:
 	///************************* アクセッサ *************************///
@@ -265682,20 +266614,27 @@ void FollowCamera::EnsureTargetInView(const Vector3& pivot, float dt) {
 // ============================================================
 void FollowCamera::RecenterBehindTarget() {
     if (!target_) return;
+    // 対象の向きへ寄せる（pitch リセットは従来どおり recenterResetPitch_ に従う）
+    RecenterToYaw(target_->rotate_.y, recenterResetPitch_);
+}
 
+// ============================================================
+// 任意のワールド yaw へ背後リセンター（RecenterBehindTarget の汎用版）
+// ============================================================
+void FollowCamera::RecenterToYaw(float targetWorldYaw, bool resetPitch) {
     constexpr float kPi    = 3.14159265358979f;
     constexpr float kTwoPi = 6.28318530717958f;
 
     recenterFromYaw_ = transform_.rotate.y;
 
-    // 目標 yaw = 対象の向き。現在角から最短回転になるよう正規化
-    float delta = target_->rotate_.y - recenterFromYaw_;
+    // 現在角から最短回転になるよう正規化
+    float delta = targetWorldYaw - recenterFromYaw_;
     while (delta >  kPi) delta -= kTwoPi;
     while (delta < -kPi) delta += kTwoPi;
     recenterToYaw_ = recenterFromYaw_ + delta;
 
     recenterFromPitch_ = transform_.rotate.x;
-    recenterToPitch_   = recenterResetPitch_
+    recenterToPitch_   = resetPitch
         ? std::clamp(recenterPitch_, minPitch_, maxPitch_)
         : transform_.rotate.x;
 
@@ -266062,6 +267001,11 @@ public:
     //   0 秒設定なら即時スナップ。
     // ============================================================
     void RecenterBehindTarget();
+    // 指定したワールド yaw（オービット角）へ同じイーズで寄せる。
+    //   RecenterBehindTarget が「対象の向き」へ寄せるのに対し、これは任意方向へ。
+    //   例: プレイヤー→敵 の方向 yaw を渡せば、カメラがプレイヤー真後ろ
+    //   （敵と反対側）へ回り込み、プレイヤー越しに敵を正面に捉える。
+    void RecenterToYaw(float targetWorldYaw, bool resetPitch = true);
     bool IsRecentering() const { return recentering_; }
     void CancelRecenter()      { recentering_ = false; }
 
@@ -268047,6 +268991,7 @@ namespace YoRigine {
 	float GameTime::accumulatedTime_ = 0.0f;
 	float GameTime::timeScale_ = 1.0f;
 	bool GameTime::isPause_ = false;
+	bool GameTime::debugFreeze_ = false;
 	bool GameTime::stepOneFrame_ = false;
 
 
@@ -268081,6 +269026,7 @@ namespace YoRigine {
 		timeScale_ = 1.0f;
 		fixedDeltaTime_ = std::chrono::duration<float, FrameRate>(1).count();
 		isPause_ = false;
+		debugFreeze_ = false;
 		stepOneFrame_ = false;
 	}
 
@@ -268093,7 +269039,9 @@ namespace YoRigine {
 		// 実時間の記録
 		unscaledDeltaTime_ = elapsed.count();
 
-		if (isPause_ && !stepOneFrame_) {
+		// ゲーム本編ポーズ or エディタ用フリーズのどちらかで時間を止める。
+		// （ゲームUIは IsPause()=isPause_ だけを見るので、エディタフリーズには反応しない）
+		if ((isPause_ || debugFreeze_) && !stepOneFrame_) {
 			deltaTime_ = 0.0f;
 			return;
 		}
@@ -268158,7 +269106,9 @@ namespace YoRigine {
 		ImGui::Text("Unscaled DeltaTime: %f", GameTime::GetUnscaledDeltaTime());
 		ImGui::Text("Total GamtTime: %.2f", GameTime::GetTotalTime());
 
-		ImGui::Checkbox("Pause", &isPause_);
+		// エディタ停止は debugFreeze_（時間だけ止める。ゲームUIのポーズには波及しない）
+		ImGui::Checkbox("Pause (エディタ停止)", &debugFreeze_);
+		if (ImGui::IsItemHovered()) ImGui::SetTooltip("時間だけ止める。ゲーム本編のポーズUIには影響しない（操作ヒントが隠れない）");
 		ImGui::Checkbox("Step One Frame", &stepOneFrame_);
 		ImGui::SliderFloat("Time Scale", &timeScale_, 0.0f, 2.0f);
 
@@ -268315,7 +269265,8 @@ namespace YoRigine {
 		static float fixedDeltaTime_;
 		static float accumulatedTime_;
 		static float timeScale_;
-		static bool isPause_;
+		static bool isPause_;       // ゲーム本編のポーズ（ポーズメニュー等のゲームUIが反応する）
+		static bool debugFreeze_;   // エディタ用の一時停止（時間だけ止める。ゲームUIは反応させない）
 		static bool stepOneFrame_;
 	};
 
@@ -270948,6 +271899,804 @@ public:
     static bool HasLineOfSight(const Vector3& from, const Vector3& to);
 };
 
+
+
+============================================================
+File Path: YEngine/Utilities/Systems/Text/TextTextureBaker.cpp
+============================================================
+#include "TextTextureBaker.h"
+
+// Windows / DirectWrite / Direct2D / WIC
+#include <Windows.h>
+#include <d2d1.h>
+#include <dwrite_3.h>
+#include <wincodec.h>
+#include <wrl.h>
+
+// C++
+#include <vector>
+#include <cmath>
+#include <cctype>
+#include <cstdio>
+#include <filesystem>
+#include <algorithm>
+
+// UI 登録用 / テクスチャ
+#include "Systems/UI/UIManager.h"
+#include "Systems/UI/UIBase.h"
+#include "Loaders/Texture/TextureManager.h"
+#include "json.hpp"
+#include <fstream>
+
+#ifdef USE_IMGUI
+#include <imgui.h>
+#endif
+
+#pragma comment(lib, "d2d1.lib")
+#pragma comment(lib, "dwrite.lib")
+#pragma comment(lib, "windowscodecs.lib")
+
+using Microsoft::WRL::ComPtr;
+
+namespace {
+
+	// ============================================================
+	// COM ファクトリ群（遅延生成・プロセス内で使い回す）
+	// ============================================================
+	struct Factories {
+		ComPtr<ID2D1Factory>        d2d;
+		ComPtr<IDWriteFactory>      dwrite;
+		ComPtr<IWICImagingFactory>  wic;
+		bool ok = false;
+	};
+
+	Factories& GetFactories() {
+		static Factories f;
+		static bool tried = false;
+		if (tried) return f;
+		tried = true;
+
+		// WIC 用に COM を初期化（既に初期化済みなら S_FALSE 等が返るだけで無害）
+		CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+
+		if (FAILED(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED,
+			__uuidof(ID2D1Factory), reinterpret_cast<void**>(f.d2d.GetAddressOf())))) {
+			return f;
+		}
+		if (FAILED(DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED,
+			__uuidof(IDWriteFactory), reinterpret_cast<IUnknown**>(f.dwrite.GetAddressOf())))) {
+			return f;
+		}
+		if (FAILED(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER,
+			IID_PPV_ARGS(f.wic.GetAddressOf())))) {
+			return f;
+		}
+		f.ok = true;
+		return f;
+	}
+
+	// UTF-8 → wstring
+	std::wstring ToWide(const std::string& s) {
+		if (s.empty()) return std::wstring();
+		int n = MultiByteToWideChar(CP_UTF8, 0, s.c_str(), -1, nullptr, 0);
+		std::wstring w(n > 0 ? n - 1 : 0, L'\0');
+		if (n > 0) MultiByteToWideChar(CP_UTF8, 0, s.c_str(), -1, w.data(), n);
+		return w;
+	}
+
+	D2D1_COLOR_F ToColor(const Vector4& c) {
+		return D2D1::ColorF(c.x, c.y, c.z, c.w);
+	}
+
+	// Resources/Fonts 等のディレクトリから .ttf/.otf のファイル名一覧を返す
+	std::vector<std::string> ListFontFiles(const std::string& dir) {
+		std::vector<std::string> out;
+		std::error_code ec;
+		if (!std::filesystem::exists(dir, ec)) return out;
+		for (auto& e : std::filesystem::directory_iterator(dir, ec)) {
+			if (!e.is_regular_file()) continue;
+			std::string ext = e.path().extension().string();
+			std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+			if (ext == ".ttf" || ext == ".otf") out.push_back(e.path().filename().string());
+		}
+		return out;
+	}
+
+	// ============================================================
+	// グリフ輪郭ジオメトリ方式のテキストレンダラー
+	//   IDWriteTextLayout::Draw から各グリフランごとに呼ばれ、
+	//   影 → アウトライン → 塗り の順でジオメトリを描く。
+	//   アウトラインはストローク幅を 2 倍にして塗りで内側を潰す＝外側に縁が残る。
+	// ============================================================
+	class OutlineTextRenderer : public IDWriteTextRenderer {
+	public:
+		OutlineTextRenderer(ID2D1Factory* d2d, ID2D1RenderTarget* rt,
+			ID2D1SolidColorBrush* fill, ID2D1SolidColorBrush* outline,
+			ID2D1SolidColorBrush* shadow,
+			float outlineWidth, bool useShadow, Vector2 shadowOffset)
+			: d2d_(d2d), rt_(rt), fill_(fill), outline_(outline), shadow_(shadow),
+			outlineWidth_(outlineWidth), useShadow_(useShadow), shadowOffset_(shadowOffset) {}
+
+		// ---- IDWriteTextRenderer ----
+		HRESULT STDMETHODCALLTYPE DrawGlyphRun(void*, FLOAT baselineX, FLOAT baselineY,
+			DWRITE_MEASURING_MODE, const DWRITE_GLYPH_RUN* run,
+			const DWRITE_GLYPH_RUN_DESCRIPTION*, IUnknown*) override {
+			if (!run || !run->fontFace) return S_OK;
+
+			ComPtr<ID2D1PathGeometry> geo;
+			if (FAILED(d2d_->CreatePathGeometry(&geo))) return S_OK;
+			ComPtr<ID2D1GeometrySink> sink;
+			if (FAILED(geo->Open(&sink))) return S_OK;
+			run->fontFace->GetGlyphRunOutline(run->fontEmSize, run->glyphIndices,
+				run->glyphAdvances, run->glyphOffsets, run->glyphCount,
+				run->isSideways, (run->bidiLevel & 1) != 0, sink.Get());
+			sink->Close();
+
+			// ベースライン位置へ平行移動
+			ComPtr<ID2D1TransformedGeometry> tg;
+			d2d_->CreateTransformedGeometry(geo.Get(),
+				D2D1::Matrix3x2F::Translation(baselineX, baselineY), &tg);
+
+			if (useShadow_ && shadow_) {
+				ComPtr<ID2D1TransformedGeometry> sg;
+				d2d_->CreateTransformedGeometry(geo.Get(),
+					D2D1::Matrix3x2F::Translation(baselineX + shadowOffset_.x, baselineY + shadowOffset_.y), &sg);
+				rt_->FillGeometry(sg.Get(), shadow_);
+			}
+			if (outlineWidth_ > 0.0f && outline_) {
+				rt_->DrawGeometry(tg.Get(), outline_, outlineWidth_ * 2.0f);
+			}
+			rt_->FillGeometry(tg.Get(), fill_);
+			return S_OK;
+		}
+		HRESULT STDMETHODCALLTYPE DrawUnderline(void*, FLOAT, FLOAT, const DWRITE_UNDERLINE*, IUnknown*) override { return S_OK; }
+		HRESULT STDMETHODCALLTYPE DrawStrikethrough(void*, FLOAT, FLOAT, const DWRITE_STRIKETHROUGH*, IUnknown*) override { return S_OK; }
+		HRESULT STDMETHODCALLTYPE DrawInlineObject(void*, FLOAT, FLOAT, IDWriteInlineObject*, BOOL, BOOL, IUnknown*) override { return S_OK; }
+
+		// ---- IDWritePixelSnapping ----
+		HRESULT STDMETHODCALLTYPE IsPixelSnappingDisabled(void*, BOOL* d) override { *d = TRUE; return S_OK; }
+		HRESULT STDMETHODCALLTYPE GetCurrentTransform(void*, DWRITE_MATRIX* m) override {
+			*m = DWRITE_MATRIX{ 1,0,0,1,0,0 }; return S_OK;
+		}
+		HRESULT STDMETHODCALLTYPE GetPixelsPerDip(void*, FLOAT* p) override { *p = 1.0f; return S_OK; }
+
+		// ---- IUnknown（スタック確保なので参照カウントは形だけ） ----
+		HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void** ppv) override {
+			if (iid == __uuidof(IUnknown) || iid == __uuidof(IDWritePixelSnapping) ||
+				iid == __uuidof(IDWriteTextRenderer)) {
+				*ppv = this; return S_OK;
+			}
+			*ppv = nullptr; return E_NOINTERFACE;
+		}
+		ULONG STDMETHODCALLTYPE AddRef() override { return 1; }
+		ULONG STDMETHODCALLTYPE Release() override { return 1; }
+
+	private:
+		ID2D1Factory* d2d_;
+		ID2D1RenderTarget* rt_;
+		ID2D1SolidColorBrush* fill_;
+		ID2D1SolidColorBrush* outline_;
+		ID2D1SolidColorBrush* shadow_;
+		float   outlineWidth_;
+		bool    useShadow_;
+		Vector2 shadowOffset_;
+	};
+
+	// ============================================================
+	// 任意の .ttf/.otf からフォントコレクション＋ファミリ名を作る（IDWriteFactory5 経由）
+	//   失敗時は false（呼び出し側でシステムフォントにフォールバック）
+	// ============================================================
+	bool BuildCustomFont(IDWriteFactory* base, const std::wstring& filePath,
+		ComPtr<IDWriteFontCollection>& outColl, std::wstring& outFamily) {
+		ComPtr<IDWriteFactory5> f5;
+		if (FAILED(base->QueryInterface(IID_PPV_ARGS(&f5)))) return false;
+
+		ComPtr<IDWriteFontSetBuilder1> builder;
+		if (FAILED(f5->CreateFontSetBuilder(&builder))) return false;
+		ComPtr<IDWriteFontFile> file;
+		if (FAILED(f5->CreateFontFileReference(filePath.c_str(), nullptr, &file))) return false;
+		if (FAILED(builder->AddFontFile(file.Get()))) return false;
+
+		ComPtr<IDWriteFontSet> set;
+		if (FAILED(builder->CreateFontSet(&set))) return false;
+		ComPtr<IDWriteFontCollection1> coll1;
+		if (FAILED(f5->CreateFontCollectionFromFontSet(set.Get(), &coll1))) return false;
+
+		// 先頭ファミリの名前を取得
+		if (coll1->GetFontFamilyCount() == 0) return false;
+		ComPtr<IDWriteFontFamily> family;
+		if (FAILED(coll1->GetFontFamily(0, &family))) return false;
+		ComPtr<IDWriteLocalizedStrings> names;
+		if (FAILED(family->GetFamilyNames(&names))) return false;
+
+		UINT32 idx = 0; BOOL exists = FALSE;
+		names->FindLocaleName(L"en-us", &idx, &exists);
+		if (!exists) idx = 0;
+		UINT32 len = 0; names->GetStringLength(idx, &len);
+		outFamily.assign(len, L'\0');
+		names->GetString(idx, outFamily.data(), len + 1);
+
+		outColl = coll1;
+		return true;
+	}
+
+	// PBGRA(プリマルチプライ)の WIC ビットマップを、ストレートアルファに直して PNG 保存する
+	bool SaveWicBitmapToPng(IWICImagingFactory* wic, IWICBitmap* wicBmp,
+		UINT bmpW, UINT bmpH, const std::string& outPngPath) {
+		// プリマルチプライ解除（PNG はストレートアルファ）
+		WICRect rc{ 0, 0, (INT)bmpW, (INT)bmpH };
+		ComPtr<IWICBitmapLock> lock;
+		if (FAILED(wicBmp->Lock(&rc, WICBitmapLockRead, &lock))) return false;
+		UINT cbBuf = 0, stride = 0; BYTE* src = nullptr;
+		lock->GetStride(&stride);
+		lock->GetDataPointer(&cbBuf, &src);
+		std::vector<BYTE> buf(src, src + cbBuf);
+		lock.Reset();
+		for (UINT y = 0; y < bmpH; ++y) {
+			BYTE* row = buf.data() + (size_t)y * stride;
+			for (UINT x = 0; x < bmpW; ++x) {
+				BYTE* px = row + (size_t)x * 4; // B,G,R,A
+				BYTE a = px[3];
+				if (a != 0 && a != 255) {
+					px[0] = (BYTE)std::min(255, px[0] * 255 / a);
+					px[1] = (BYTE)std::min(255, px[1] * 255 / a);
+					px[2] = (BYTE)std::min(255, px[2] * 255 / a);
+				}
+			}
+		}
+
+		// 出力先ディレクトリを用意
+		std::error_code ec;
+		std::filesystem::path outPath(outPngPath);
+		if (outPath.has_parent_path()) std::filesystem::create_directories(outPath.parent_path(), ec);
+
+		// PNG エンコード
+		ComPtr<IWICBitmap> straight;
+		if (FAILED(wic->CreateBitmapFromMemory(bmpW, bmpH, GUID_WICPixelFormat32bppBGRA,
+			stride, cbBuf, buf.data(), &straight))) {
+			return false;
+		}
+		ComPtr<IWICStream> stream;
+		if (FAILED(wic->CreateStream(&stream))) return false;
+		if (FAILED(stream->InitializeFromFilename(
+			std::filesystem::path(outPngPath).wstring().c_str(), GENERIC_WRITE))) return false;
+
+		ComPtr<IWICBitmapEncoder> encoder;
+		if (FAILED(wic->CreateEncoder(GUID_ContainerFormatPng, nullptr, &encoder))) return false;
+		if (FAILED(encoder->Initialize(stream.Get(), WICBitmapEncoderNoCache))) return false;
+
+		ComPtr<IWICBitmapFrameEncode> frame;
+		if (FAILED(encoder->CreateNewFrame(&frame, nullptr))) return false;
+		if (FAILED(frame->Initialize(nullptr))) return false;
+		frame->SetSize(bmpW, bmpH);
+		WICPixelFormatGUID pf = GUID_WICPixelFormat32bppBGRA;
+		frame->SetPixelFormat(&pf);
+		if (FAILED(frame->WriteSource(straight.Get(), nullptr))) return false;
+		if (FAILED(frame->Commit())) return false;
+		if (FAILED(encoder->Commit())) return false;
+		return true;
+	}
+
+	// ベイクに使ったパラメータを <png>.meta.json に保存（マネージャでの再編集用）
+	std::string MetaPath(const std::string& pngPath) { return pngPath + ".meta.json"; }
+
+	void SaveParamsSidecar(const YoRigine::TextBakeParams& p, const std::string& pngPath) {
+		nlohmann::json j;
+		j["text"] = p.text;
+		j["fontFamily"] = p.fontFamily;
+		j["fontFilePath"] = p.fontFilePath;
+		j["fontSize"] = p.fontSize;
+		j["bold"] = p.bold; j["italic"] = p.italic;
+		j["fill"] = { p.fillColor.x, p.fillColor.y, p.fillColor.z, p.fillColor.w };
+		j["outlineWidth"] = p.outlineWidth;
+		j["outlineColor"] = { p.outlineColor.x, p.outlineColor.y, p.outlineColor.z, p.outlineColor.w };
+		j["shadow"] = p.shadow;
+		j["shadowOffset"] = { p.shadowOffset.x, p.shadowOffset.y };
+		j["shadowColor"] = { p.shadowColor.x, p.shadowColor.y, p.shadowColor.z, p.shadowColor.w };
+		j["padding"] = p.padding;
+		j["charSpacing"] = p.charSpacing;
+		std::ofstream ofs(MetaPath(pngPath));
+		if (ofs) ofs << j.dump(2);
+	}
+
+	bool LoadParamsSidecar(YoRigine::TextBakeParams& p, const std::string& pngPath) {
+		std::ifstream ifs(MetaPath(pngPath));
+		if (!ifs) return false;
+		nlohmann::json j; ifs >> j;
+		p.text = j.value("text", p.text);
+		p.fontFamily = j.value("fontFamily", p.fontFamily);
+		p.fontFilePath = j.value("fontFilePath", p.fontFilePath);
+		p.fontSize = j.value("fontSize", p.fontSize);
+		p.bold = j.value("bold", p.bold); p.italic = j.value("italic", p.italic);
+		if (j.contains("fill")) { auto& c = j["fill"]; p.fillColor = { c[0], c[1], c[2], c[3] }; }
+		p.outlineWidth = j.value("outlineWidth", p.outlineWidth);
+		if (j.contains("outlineColor")) { auto& c = j["outlineColor"]; p.outlineColor = { c[0], c[1], c[2], c[3] }; }
+		p.shadow = j.value("shadow", p.shadow);
+		if (j.contains("shadowOffset")) { auto& c = j["shadowOffset"]; p.shadowOffset = { c[0], c[1] }; }
+		if (j.contains("shadowColor")) { auto& c = j["shadowColor"]; p.shadowColor = { c[0], c[1], c[2], c[3] }; }
+		p.padding = j.value("padding", p.padding);
+		p.charSpacing = j.value("charSpacing", p.charSpacing);
+		return true;
+	}
+
+} // namespace
+
+namespace YoRigine {
+
+	bool TextTextureBaker::Bake(const TextBakeParams& params, const std::string& outPngPath) {
+		Factories& f = GetFactories();
+		if (!f.ok) return false;
+
+		const std::wstring text = ToWide(params.text);
+		if (text.empty()) return false;
+
+		// ---- フォント（カスタム .ttf 優先、無ければシステムフォント） ----
+		ComPtr<IDWriteFontCollection> coll;     // nullptr = システムコレクション
+		std::wstring family = ToWide(params.fontFamily);
+		if (!params.fontFilePath.empty()) {
+			std::wstring famFromFile;
+			if (BuildCustomFont(f.dwrite.Get(), ToWide(params.fontFilePath), coll, famFromFile)) {
+				family = famFromFile;
+			}
+		}
+
+		DWRITE_FONT_WEIGHT weight = params.bold ? DWRITE_FONT_WEIGHT_BOLD : DWRITE_FONT_WEIGHT_NORMAL;
+		DWRITE_FONT_STYLE  style = params.italic ? DWRITE_FONT_STYLE_ITALIC : DWRITE_FONT_STYLE_NORMAL;
+
+		ComPtr<IDWriteTextFormat> format;
+		if (FAILED(f.dwrite->CreateTextFormat(family.c_str(), coll.Get(), weight, style,
+			DWRITE_FONT_STRETCH_NORMAL, params.fontSize, L"", &format))) {
+			return false;
+		}
+		format->SetWordWrapping(params.maxWidth > 0.0f ? DWRITE_WORD_WRAPPING_WRAP : DWRITE_WORD_WRAPPING_NO_WRAP);
+		format->SetTextAlignment(params.align == 1 ? DWRITE_TEXT_ALIGNMENT_CENTER
+			: params.align == 2 ? DWRITE_TEXT_ALIGNMENT_TRAILING
+			: DWRITE_TEXT_ALIGNMENT_LEADING);
+
+		// ---- レイアウトを作って実寸を測る ----
+		const float layoutMaxW = params.maxWidth > 0.0f ? params.maxWidth : 100000.0f;
+		ComPtr<IDWriteTextLayout> layout;
+		if (FAILED(f.dwrite->CreateTextLayout(text.c_str(), (UINT32)text.size(),
+			format.Get(), layoutMaxW, 100000.0f, &layout))) {
+			return false;
+		}
+
+		// 字間調整（trailing を負にすると詰まる）。実寸測定の前に適用する。
+		if (params.charSpacing != 0.0f) {
+			ComPtr<IDWriteTextLayout1> layout1;
+			if (SUCCEEDED(layout.As(&layout1))) {
+				DWRITE_TEXT_RANGE range{ 0, (UINT32)text.size() };
+				layout1->SetCharacterSpacing(0.0f, params.charSpacing, 0.0f, range);
+			}
+		}
+
+		DWRITE_TEXT_METRICS m{};
+		layout->GetMetrics(&m);
+
+		const float shadowExtent = params.shadow
+			? std::max(std::fabs(params.shadowOffset.x), std::fabs(params.shadowOffset.y)) : 0.0f;
+		const float margin = params.padding + params.outlineWidth + shadowExtent;
+
+		const float contentW = (params.maxWidth > 0.0f ? params.maxWidth : m.widthIncludingTrailingWhitespace);
+		const UINT  bmpW = (UINT)std::ceil(contentW + margin * 2.0f);
+		const UINT  bmpH = (UINT)std::ceil(m.height + margin * 2.0f);
+		if (bmpW == 0 || bmpH == 0) return false;
+
+		// ---- WIC ビットマップ＋ D2D レンダーターゲット ----
+		ComPtr<IWICBitmap> wicBmp;
+		if (FAILED(f.wic->CreateBitmap(bmpW, bmpH, GUID_WICPixelFormat32bppPBGRA,
+			WICBitmapCacheOnLoad, &wicBmp))) {
+			return false;
+		}
+		D2D1_RENDER_TARGET_PROPERTIES rtProps = D2D1::RenderTargetProperties(
+			D2D1_RENDER_TARGET_TYPE_DEFAULT,
+			D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED),
+			96.0f, 96.0f);
+		ComPtr<ID2D1RenderTarget> rt;
+		if (FAILED(f.d2d->CreateWicBitmapRenderTarget(wicBmp.Get(), &rtProps, &rt))) {
+			return false;
+		}
+
+		ComPtr<ID2D1SolidColorBrush> fillBrush, outlineBrush, shadowBrush;
+		rt->CreateSolidColorBrush(ToColor(params.fillColor), &fillBrush);
+		rt->CreateSolidColorBrush(ToColor(params.outlineColor), &outlineBrush);
+		rt->CreateSolidColorBrush(ToColor(params.shadowColor), &shadowBrush);
+
+		OutlineTextRenderer renderer(f.d2d.Get(), rt.Get(), fillBrush.Get(),
+			outlineBrush.Get(), shadowBrush.Get(),
+			params.outlineWidth, params.shadow, params.shadowOffset);
+
+		rt->BeginDraw();
+		rt->Clear(D2D1::ColorF(0, 0, 0, 0));   // 透明背景
+		layout->Draw(nullptr, &renderer, margin, margin);
+		if (FAILED(rt->EndDraw())) return false;
+
+		if (!SaveWicBitmapToPng(f.wic.Get(), wicBmp.Get(), bmpW, bmpH, outPngPath)) return false;
+		SaveParamsSidecar(params, outPngPath);  // 再編集用にパラメータも保存
+		return true;
+	}
+
+	bool TextTextureBaker::BakeRoundedRectFrame(int width, int height, float cornerRadius,
+		float borderThickness, const Vector4& color, const std::string& outPngPath) {
+		Factories& f = GetFactories();
+		if (!f.ok || width <= 0 || height <= 0) return false;
+
+		const UINT bmpW = (UINT)width, bmpH = (UINT)height;
+		ComPtr<IWICBitmap> wicBmp;
+		if (FAILED(f.wic->CreateBitmap(bmpW, bmpH, GUID_WICPixelFormat32bppPBGRA,
+			WICBitmapCacheOnLoad, &wicBmp))) {
+			return false;
+		}
+		D2D1_RENDER_TARGET_PROPERTIES rtProps = D2D1::RenderTargetProperties(
+			D2D1_RENDER_TARGET_TYPE_DEFAULT,
+			D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED),
+			96.0f, 96.0f);
+		ComPtr<ID2D1RenderTarget> rt;
+		if (FAILED(f.d2d->CreateWicBitmapRenderTarget(wicBmp.Get(), &rtProps, &rt))) return false;
+
+		ComPtr<ID2D1SolidColorBrush> brush;
+		rt->CreateSolidColorBrush(ToColor(color), &brush);
+
+		// 線が枠内に収まるよう半幅だけ内側に寄せた矩形をストローク
+		const float h = borderThickness * 0.5f;
+		D2D1_ROUNDED_RECT rr = D2D1::RoundedRect(
+			D2D1::RectF(h, h, (float)width - h, (float)height - h), cornerRadius, cornerRadius);
+
+		rt->BeginDraw();
+		rt->Clear(D2D1::ColorF(0, 0, 0, 0));
+		rt->DrawRoundedRectangle(rr, brush.Get(), borderThickness);
+		if (FAILED(rt->EndDraw())) return false;
+
+		return SaveWicBitmapToPng(f.wic.Get(), wicBmp.Get(), bmpW, bmpH, outPngPath);
+	}
+
+	bool TextTextureBaker::BakeAndRegisterUI(const std::string& uiId, const TextBakeParams& params,
+		const std::string& outPngPath, int layer) {
+		if (!Bake(params, outPngPath)) return false;
+
+		// 同名再ベイクでも最新画像を反映させる（キャッシュ済みなら作り直す）
+		TextureManager::GetInstance()->ReloadTexture(outPngPath);
+
+		auto* mgr = UIManager::GetInstance();
+		if (UIBase* existing = mgr->GetUI(uiId)) {
+			// 既存 UI があればテクスチャを貼り替えるだけ（サイズは自動追従）
+			existing->SetTexture(outPngPath);
+			existing->SetLayer(layer);
+			existing->SetVisible(true);
+			return true;
+		}
+
+		auto ui = std::make_unique<UIBase>(uiId);
+		ui->Initialize("");               // config 無し → 既定 white で初期化
+		ui->SetTexture(outPngPath);       // ベイク画像へ差し替え（AdjustTextureSize で実寸反映）
+		ui->SetLayer(layer);
+		ui->SetVisible(true);
+		mgr->AddUI(uiId, std::move(ui));
+		return true;
+	}
+
+#ifdef USE_IMGUI
+	void TextTextureBaker::ImGuiPanel() {
+		static char textBuf[256] = "Hello";
+		static char fontFamily[128] = "Meiryo";
+		static char fontFile[256] = "";
+		static char outName[128] = "Resources/UITex/text.png";
+		static char uiId[128] = "bakedText";
+		static float fontSize = 64.0f;
+		static float charSpacing = 0.0f;
+		static bool  bold = false, italic = false;
+		static Vector4 fill{ 1,1,1,1 };
+		static float   outlineW = 4.0f;
+		static Vector4 outlineC{ 0,0,0,1 };
+		static bool    shadow = false;
+		static float   shadowOff[2] = { 3,3 };
+		static Vector4 shadowC{ 0,0,0,0.5f };
+		static float   padding = 8.0f;
+		static int     layer = 0;
+		static std::string status;
+
+		static std::string previewPath;          // プレビュー対象のPNGパス
+
+		ImGui::TextUnformatted("テキストを PNG にベイクして UI 用テクスチャにする");
+
+		// ---- プレビュー（最上部・UI登録不要。ベイクした瞬間に表示） ----
+		if (!previewPath.empty()) {
+			auto* tm = TextureManager::GetInstance();
+			try {
+				const auto& md = tm->GetMetaData(previewPath);
+				float iw = (float)md.width, ih = (float)md.height;
+				float avail = ImGui::GetContentRegionAvail().x;
+				float maxW = (avail > 32.0f) ? avail : 256.0f;
+				float scale = (iw > maxW) ? (maxW / iw) : 1.0f;
+				ImVec2 sz(iw * scale, ih * scale);
+				// 透明背景の文字が見えるよう、暗いベタ塗りを背面に
+				ImVec2 p0 = ImGui::GetCursorScreenPos();
+				ImGui::GetWindowDrawList()->AddRectFilled(
+					p0, ImVec2(p0.x + sz.x, p0.y + sz.y), IM_COL32(48, 48, 48, 255));
+				ImGui::Image((ImTextureID)tm->GetsrvHandleGPU(previewPath).ptr, sz);
+				ImGui::Text("プレビュー: %d x %d px", (int)md.width, (int)md.height);
+			}
+			catch (...) { /* 未ロード等は無視 */ }
+		}
+
+		// ---- 既存ラベルを開いて編集（meta.json があるものを一覧） ----
+		{
+			static std::vector<std::string> bakedList;  // png パス一覧
+			static bool bakedScanned = false;
+			static int  bakedSel = 0;
+			auto rescan = []() {
+				bakedList.clear();
+				std::error_code ec;
+				const std::string dir = "Resources/UITex";
+				if (std::filesystem::exists(dir, ec)) {
+					for (auto& e : std::filesystem::directory_iterator(dir, ec)) {
+						if (!e.is_regular_file()) continue;
+						std::string f = e.path().string();
+						const std::string suf = ".meta.json";
+						if (f.size() > suf.size() && f.compare(f.size() - suf.size(), suf.size(), suf) == 0) {
+							bakedList.push_back(f.substr(0, f.size() - suf.size())); // png パス
+						}
+					}
+				}
+			};
+			if (!bakedScanned) { rescan(); bakedScanned = true; }
+
+			ImGui::SeparatorText("既存ラベルを編集");
+			if (ImGui::Button("再スキャン##baked")) rescan();
+			ImGui::SameLine();
+			if (bakedList.empty()) {
+				ImGui::TextDisabled("(ベイク済みラベルなし)");
+			} else {
+				if (bakedSel >= (int)bakedList.size()) bakedSel = 0;
+				if (ImGui::BeginCombo("##bakedlist", bakedList[bakedSel].c_str())) {
+					for (int i = 0; i < (int)bakedList.size(); ++i)
+						if (ImGui::Selectable(bakedList[i].c_str(), bakedSel == i)) bakedSel = i;
+					ImGui::EndCombo();
+				}
+				if (ImGui::Button("読み込んで編集")) {
+					TextBakeParams p;
+					if (LoadParamsSidecar(p, bakedList[bakedSel])) {
+						strncpy_s(textBuf, p.text.c_str(), sizeof(textBuf) - 1);
+						strncpy_s(fontFile, p.fontFilePath.c_str(), sizeof(fontFile) - 1);
+						strncpy_s(fontFamily, p.fontFamily.c_str(), sizeof(fontFamily) - 1);
+						strncpy_s(outName, bakedList[bakedSel].c_str(), sizeof(outName) - 1); // 上書き対象に
+						fontSize = p.fontSize; charSpacing = p.charSpacing;
+						bold = p.bold; italic = p.italic;
+						fill = p.fillColor; outlineW = p.outlineWidth; outlineC = p.outlineColor;
+						shadow = p.shadow; shadowOff[0] = p.shadowOffset.x; shadowOff[1] = p.shadowOffset.y; shadowC = p.shadowColor;
+						padding = p.padding;
+						TextureManager::GetInstance()->ReloadTexture(bakedList[bakedSel]);
+						previewPath = bakedList[bakedSel];
+						status = std::string("読込: ") + bakedList[bakedSel];
+					}
+				}
+				ImGui::SameLine();
+				ImGui::TextDisabled("→ 編集して「PNG にベイク」で上書き＝ゲーム内も即更新");
+			}
+		}
+
+		ImGui::Separator();
+
+		ImGui::InputText("テキスト", textBuf, sizeof(textBuf));
+
+		// ---- フォント選択（Resources/Fonts を走査してコンボ表示） ----
+		static std::vector<std::string> fontFiles;
+		static bool fontsScanned = false;
+		static int  fontSel = 0; // 0 =(システムフォント)、1.. = fontFiles[idx-1]
+		if (!fontsScanned) { fontFiles = ListFontFiles("Resources/Fonts"); fontsScanned = true; }
+
+		const char* curLabel = (fontSel == 0 || fontSel > (int)fontFiles.size())
+			? "(システムフォント)" : fontFiles[fontSel - 1].c_str();
+		if (ImGui::BeginCombo("フォント", curLabel)) {
+			if (ImGui::Selectable("(システムフォント)", fontSel == 0)) { fontSel = 0; fontFile[0] = '\0'; }
+			for (int i = 0; i < (int)fontFiles.size(); ++i) {
+				if (ImGui::Selectable(fontFiles[i].c_str(), fontSel == i + 1)) {
+					fontSel = i + 1;
+					std::string full = "Resources/Fonts/" + fontFiles[i];
+					strncpy_s(fontFile, full.c_str(), sizeof(fontFile) - 1);
+				}
+			}
+			ImGui::EndCombo();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("再スキャン")) { fontFiles = ListFontFiles("Resources/Fonts"); fontSel = 0; fontFile[0] = '\0'; }
+
+		// システムフォント選択時のみファミリ名入力を出す
+		if (fontSel == 0) {
+			ImGui::InputText("フォント名(システム)", fontFamily, sizeof(fontFamily));
+		}
+
+		ImGui::DragFloat("サイズ(px)", &fontSize, 1.0f, 4.0f, 512.0f, "%.0f");
+		ImGui::DragFloat("字間(px)", &charSpacing, 0.5f, -50.0f, 50.0f, "%.1f");
+		if (ImGui::IsItemHovered()) ImGui::SetTooltip("負で詰める / 正で広げる");
+		ImGui::Checkbox("太字", &bold); ImGui::SameLine(); ImGui::Checkbox("斜体", &italic);
+		ImGui::ColorEdit4("塗り色", &fill.x);
+
+		ImGui::SeparatorText("アウトライン");
+		ImGui::DragFloat("太さ(px)", &outlineW, 0.5f, 0.0f, 64.0f, "%.1f");
+		ImGui::ColorEdit4("縁色", &outlineC.x);
+
+		ImGui::SeparatorText("影");
+		ImGui::Checkbox("影を付ける", &shadow);
+		ImGui::DragFloat2("影オフセット", shadowOff, 0.5f, -64.0f, 64.0f, "%.1f");
+		ImGui::ColorEdit4("影色", &shadowC.x);
+
+		ImGui::SeparatorText("出力");
+		ImGui::DragFloat("余白(px)", &padding, 1.0f, 0.0f, 128.0f, "%.0f");
+		ImGui::InputText("出力PNGパス", outName, sizeof(outName));
+		ImGui::InputText("UI ID", uiId, sizeof(uiId));
+		ImGui::DragInt("レイヤー", &layer, 1, 0, 8);
+
+		auto buildParams = [&]() {
+			TextBakeParams p;
+			p.text = textBuf;
+			p.fontFamily = fontFamily;
+			p.fontFilePath = fontFile;
+			p.fontSize = fontSize;
+			p.bold = bold; p.italic = italic;
+			p.fillColor = fill;
+			p.outlineWidth = outlineW; p.outlineColor = outlineC;
+			p.shadow = shadow; p.shadowOffset = { shadowOff[0], shadowOff[1] }; p.shadowColor = shadowC;
+			p.padding = padding;
+			p.charSpacing = charSpacing;
+			return p;
+			};
+
+		static std::string lastRegisteredId;     // 位置調整の対象
+		static float uiPos[2] = { 640.0f, 360.0f };
+
+		// ---- リアルタイムプレビュー（パラメータが変わったら自動ベイク） ----
+		ImGui::Separator();
+		static bool autoPreview = false;
+		ImGui::Checkbox("リアルタイムプレビュー（自動ベイク）", &autoPreview);
+		if (autoPreview) {
+			// 見た目に効くパラメータからシグネチャを作り、変化時だけプレビュー用に焼き直す
+			char sig[512];
+			snprintf(sig, sizeof(sig), "%s|%s|%s|%.1f|%.1f|%d%d|%.2f,%.2f,%.2f,%.2f|%.1f|%.2f,%.2f,%.2f,%.2f|%d|%.1f,%.1f|%.2f,%.2f,%.2f,%.2f|%.0f",
+				textBuf, fontFamily, fontFile, fontSize, charSpacing, bold ? 1 : 0, italic ? 1 : 0,
+				fill.x, fill.y, fill.z, fill.w, outlineW, outlineC.x, outlineC.y, outlineC.z, outlineC.w,
+				shadow ? 1 : 0, shadowOff[0], shadowOff[1], shadowC.x, shadowC.y, shadowC.z, shadowC.w, padding);
+			static std::string lastSig;
+			if (lastSig != sig) {
+				const std::string previewFile = "Resources/UITex/__bake_preview.png";
+				if (Bake(buildParams(), previewFile)) {
+					TextureManager::GetInstance()->ReloadTexture(previewFile);
+					previewPath = previewFile;
+				}
+				lastSig = sig;
+			}
+		}
+
+		ImGui::Separator();
+		if (ImGui::Button("PNG にベイク")) {
+			if (Bake(buildParams(), outName)) {
+				// 登録なしでも見れるよう、テクスチャだけ読み直してプレビュー対象にする
+				TextureManager::GetInstance()->ReloadTexture(outName);
+				previewPath = outName;
+				status = std::string("ベイク成功: ") + outName;
+			} else {
+				status = "ベイク失敗";
+			}
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("ベイク & UI 登録")) {
+			if (BakeAndRegisterUI(uiId, buildParams(), outName, layer)) {
+				lastRegisteredId = uiId;
+				previewPath = outName;
+				if (auto* ui = UIManager::GetInstance()->GetUI(uiId)) {
+					ui->SetPosition({ uiPos[0], uiPos[1], 0.0f });
+				}
+				status = std::string("UI 登録成功: ") + uiId;
+			} else {
+				status = "失敗";
+			}
+		}
+
+		if (!status.empty()) {
+			ImGui::TextWrapped("%s", status.c_str());
+		}
+
+		// ---- 配置調整（登録済みUIをドラッグで動かす。将来ギズモ化） ----
+		if (!lastRegisteredId.empty()) {
+			if (auto* ui = UIManager::GetInstance()->GetUI(lastRegisteredId)) {
+				ImGui::SeparatorText("配置調整");
+				ImGui::Text("対象UI: %s", lastRegisteredId.c_str());
+				// 外部（UIエディタ等）で動かされた場合に追従
+				Vector3 cur = ui->GetPosition();
+				uiPos[0] = cur.x; uiPos[1] = cur.y;
+				if (ImGui::DragFloat2("位置(px)", uiPos, 1.0f)) {
+					ui->SetPosition({ uiPos[0], uiPos[1], cur.z });
+				}
+				if (ImGui::Button("中央へ")) {
+					uiPos[0] = 640.0f; uiPos[1] = 360.0f;
+					ui->SetPosition({ uiPos[0], uiPos[1], cur.z });
+				}
+			}
+		}
+	}
+#endif
+
+} // namespace YoRigine
+
+
+============================================================
+File Path: YEngine/Utilities/Systems/Text/TextTextureBaker.h
+============================================================
+#pragma once
+
+// C++
+#include <string>
+
+// Engine（数学型）
+#include "Vector2.h"
+#include "Vector4.h"
+
+namespace YoRigine {
+
+	// ============================================================
+	// テキスト→PNG ベイク パラメータ
+	//   文字列をフォント・サイズ・アウトライン付きで画像に焼き、UI 用テクスチャ
+	//   として保存するための設定。色は RGBA 0..1。サイズ系は px(DIP, 96dpi 基準)。
+	// ============================================================
+	struct TextBakeParams {
+		std::string text;                       // 焼く文字列（UTF-8）
+
+		// フォント指定：fontFilePath があればそれを優先（.ttf/.otf）。無ければ fontFamily（システム名）。
+		std::string fontFamily   = "Meiryo";    // システムフォントのファミリ名
+		std::string fontFilePath = "";          // 任意の .ttf/.otf パス（指定時はこちら優先）
+
+		float fontSize = 64.0f;                 // フォントサイズ(px)
+		bool  bold     = false;
+		bool  italic   = false;
+
+		Vector4 fillColor = { 1.0f, 1.0f, 1.0f, 1.0f };  // 塗り色 RGBA
+
+		// アウトライン（0 で無し）。太さはグリフ輪郭の外側に出る見た目上の太さ(px)。
+		float   outlineWidth = 0.0f;
+		Vector4 outlineColor = { 0.0f, 0.0f, 0.0f, 1.0f };
+
+		// ドロップシャドウ（任意）
+		bool    shadow       = false;
+		Vector2 shadowOffset = { 3.0f, 3.0f };
+		Vector4 shadowColor  = { 0.0f, 0.0f, 0.0f, 0.5f };
+
+		float padding  = 8.0f;   // 文字の四方に空ける余白(px)。アウトライン/影のはみ出し受けも兼ねる
+		float maxWidth = 0.0f;   // 0=単一行で自動幅 / >0=この幅で折り返し
+		int   align    = 0;      // 折り返し時の揃え 0=左 1=中央 2=右
+		float charSpacing = 0.0f;// 字間(px)。負で詰める / 正で広げる（文字送りの後ろ側に加算）
+	};
+
+	// ============================================================
+	// テキストテクスチャ ベイカー
+	//   DirectWrite + Direct2D + WIC でテキストを RGBA ビットマップに描画し、
+	//   PNG として保存する。D3D デバイス不要（WIC ビットマップへ直接描画）。
+	//   生成した PNG は TextureManager / Sprite / UIBase からそのまま使える。
+	// ============================================================
+	class TextTextureBaker {
+	public:
+		// テキストを PNG にベイクして outPngPath に書き出す。成功で true。
+		// 画像サイズはテキスト境界＋余白から自動算出する。
+		static bool Bake(const TextBakeParams& params, const std::string& outPngPath);
+
+		// 角丸四角の「枠」テクスチャ（中央は透明・縁だけ）を生成して PNG 保存する。
+		// ボタンの枠飾りなどに使う。cornerRadius=0 で直角の四角枠。
+		static bool BakeRoundedRectFrame(int width, int height, float cornerRadius,
+			float borderThickness, const Vector4& color, const std::string& outPngPath);
+
+		// ベイクして、その PNG を UIBase として UIManager に登録する便利関数。
+		// 既に同 id があれば貼り替える。成功で true。
+		static bool BakeAndRegisterUI(const std::string& uiId,
+			const TextBakeParams& params,
+			const std::string& outPngPath,
+			int layer = 0);
+
+#ifdef USE_IMGUI
+		// デバッグ用ベイクパネル（MyGame から Editor::RegisterGameUI で登録して使う）
+		static void ImGuiPanel();
+#endif
+	};
+
+} // namespace YoRigine
 
 
 ============================================================
@@ -274038,6 +275787,14 @@ namespace YoRigine {
 		RebuildDrawOrder();  // 追加時に描画順序を更新
 	}
 
+	void UIManager::BringToFront(const std::string& id) {
+		auto it = std::find(drawOrder_.begin(), drawOrder_.end(), id);
+		if (it == drawOrder_.end()) return;
+		std::string s = *it;
+		drawOrder_.erase(it);
+		drawOrder_.push_back(s);  // 最後尾＝同レイヤー内で最後に描画＝最前面
+	}
+
 	// RemoveUI()でも同様
 	void UIManager::RemoveUI(const std::string& id) {
 		for (auto& [groupName, uiIds] : groups_) {
@@ -274584,6 +276341,10 @@ namespace YoRigine {
 
 		// UIを削除
 		void RemoveUI(const std::string& id);
+
+		// 指定UIを描画順の最後尾へ（同レイヤー内で最前面に描く）。
+		// 背面→前面の順に連続で呼べば、レイヤー内の重なり順を任意に並べ替えられる。
+		void BringToFront(const std::string& id);
 
 		// UIを取得
 		UIBase* GetUI(const std::string& id);
@@ -276373,6 +278134,7 @@ File Path: YGame/Core/MyGame.cpp
 #include "Material/ToonSettings.h"
 #include "Material/OutlineSettings.h"
 #include <Systems/UI/UIManager.h>
+#include <Systems/Text/TextTextureBaker.h>
 #include "GPUParticle/GpuEmitManager.h"
 #include <Object3D/BaseObjectManager.h>
 
@@ -276380,6 +278142,7 @@ File Path: YGame/Core/MyGame.cpp
 #include "Particle/YEmitterGroupEditor.h"
 
 #include "Particle/YEmitterGroupManager.h"
+#include "Vfx/VfxMesh/VfxMeshSpawner.h"
 /// <summary>
 /// ゲーム全体の初期化処理（起動時に一度だけ実行）
 /// </summary>
@@ -276413,20 +278176,22 @@ void MyGame::Initialize() {
 	// YParticleManager::GetInstance().LoadEffectBundle("Resources/Json/YEffects/EnemyHit.json");
 	// バンドルファイルはエディタの「エミッタグループ → バンドル保存」ボタンで作成する。
 
-	YParticleManager::GetInstance().LoadSystemsFromFile("Resources/Json/YParticleSystems/EnemyHit1.json");
-	YParticleManager::GetInstance().LoadSystemsFromFile("Resources/Json/YParticleSystems/EnemyHit2.json");
-	YEmitterGroupManager::GetInstance().LoadGroupFromFile("Resources/Json/YEmitterGroups/EnemyHit.json");
+	// System を先に全ロード（Group が名前参照するため）→ Group を後にロード。
+	// JSON を追加するだけで自動ロードされる。手動羅列・ロード漏れ
+	// （以前 EnemyHit3 がロードされず無言で出ていなかった）を構造的に廃止。
+	YParticleManager::GetInstance().ScanDirectory("Resources/Json/YParticleSystems/");
+	YEmitterGroupManager::GetInstance().ScanDirectory("Resources/Json/YEmitterGroups/");
 
-	YParticleManager::GetInstance().LoadSystemsFromFile("Resources/Json/YParticleSystems/Clear.json");
-	YEmitterGroupManager::GetInstance().LoadGroupFromFile("Resources/Json/YEmitterGroups/Clear.json");
-
-	YParticleManager::GetInstance().LoadSystemsFromFile("Resources/Json/YParticleSystems/Title.json");
-	YEmitterGroupManager::GetInstance().LoadGroupFromFile("Resources/Json/YEmitterGroups/Title.json");
+	// 1エフェクト=1ファイル（systems+groups 同梱）。これ単体で完結し
+	// 参照切れが起きない。エフェクトはエディタからこの形式で保存していく（移行先）。
+	YParticleManager::GetInstance().ScanEffectBundles("Resources/Json/YEffects/");
 	//------------------------------------------------------------
 	// パーティクル関連の初期化（YParticle に完全移行済み）
-	// 旧 ParticleManager は削除。エフェクト定義は JSON で管理。
 	//------------------------------------------------------------
 	YoRigine::GpuEmitManager::GetInstance()->Initialize();
+
+	VfxMeshSpawner::GetInstance()->Initialize();
+	VfxMeshSpawner::GetInstance()->ScanDirectory("Resources/Json/VfxMesh/");
 
 	// モデル操作関連の初期化
 	YoRigine::ModelManipulator::GetInstance()->Initialize();
@@ -276474,6 +278239,7 @@ void MyGame::Initialize() {
 	Editor::GetInstance()->RegisterGameUI("輪郭線", []() { OutlineSettings::GetInstance()->ImGui(); });
 	Editor::GetInstance()->RegisterGameUI("JSON管理", &YoRigine::JsonManager::ImGuiManager);
 	Editor::GetInstance()->RegisterGameUI("UI管理", []() { YoRigine::UIManager::GetInstance()->ImGuiDebug(); });
+	Editor::GetInstance()->RegisterGameUI("テキストベイク", []() { YoRigine::TextTextureBaker::ImGuiPanel(); });
 	Editor::GetInstance()->RegisterGameUI("ログ", []() { Editor::GetInstance()->DrawLog(); });
 	Editor::GetInstance()->RegisterGameUI("オーディオ詳細", [this]() { audio_->ShowDebugWindow(); });
 	Editor::GetInstance()->RegisterGameUI("オーディオ設定", [this]() { audio_->ShowSettingsWindow(); });
@@ -276497,6 +278263,7 @@ void MyGame::Initialize() {
 /// </summary>
 void MyGame::Finalize() {
 	SceneManager::GetInstance()->Finalize();
+	VfxMeshSpawner::GetInstance()->Finalize();
 	YoRigine::ModelManipulator::GetInstance()->Finalize();
 
 #ifdef USE_IMGUI
@@ -285942,6 +287709,16 @@ void PlayerCamera::Initialize(FollowCamera* followCamera, const WorldTransform* 
         LoadLockOnFraming(ext["lockOnFraming"]);
     }
 
+    // 見切れヒット演出パラメータを extension JSON から復元
+    if (ext.contains("offscreenHitReaction")) {
+        LoadOffscreenHitReaction(ext["offscreenHitReaction"]);
+    }
+
+    // カメラ操作フィールを extension JSON から復元
+    if (ext.contains("cameraFeel")) {
+        LoadCameraFeel(ext["cameraFeel"]);
+    }
+
 #ifdef USE_IMGUI
     editor_.Initialize(&attackCamera_, this);
     editor_.SetFilePath(defaultPath);
@@ -285959,6 +287736,12 @@ void PlayerCamera::UpdatePreDirector() {
 
     float dt = YoRigine::GameTime::GetDeltaTime();
     bool  inPerformance = IsInPerformance();
+
+    // 見切れヒット演出のクールダウンを進める（ヒットストップの影響を受けないよう非スケール）
+    if (offscreenHitCdTimer_ > 0.0f) {
+        offscreenHitCdTimer_ -= YoRigine::GameTime::GetUnscaledDeltaTime();
+        if (offscreenHitCdTimer_ < 0.0f) offscreenHitCdTimer_ = 0.0f;
+    }
 
     if (!inPerformance) {
         // R3 でロックオン切り替え（isLockOn_ の状態に関わらず常にチェックする）
@@ -286002,6 +287785,10 @@ void PlayerCamera::UpdatePreDirector() {
 // ============================================================
 void PlayerCamera::ApplyPostDirector(Camera* sceneCamera, float dt) {
     if (!sceneCamera) return;
+
+    // 見切れヒット判定に使う最終カメラをキャッシュ（OnAttackHit から参照）
+    lastSceneCamera_ = sceneCamera;
+
     bool inPerformance = IsInPerformance();
     if (inPerformance) return;
 
@@ -286170,26 +287957,49 @@ void PlayerCamera::UpdateStickInput() {
     stickActiveThisFrame_ = false;
     if (!followCamera_) return;
     if (followCamera_->GetIsCloseUp()) return;
+    if (!YoRigine::Input::GetInstance()->IsControllerConnected()) return;
 
-    if (YoRigine::Input::GetInstance()->IsControllerConnected()) {
-        XINPUT_STATE js;
-        if (YoRigine::Input::GetInstance()->GetJoystickState(0, js)) {
-            Vector3 move{};
-            move.y += static_cast<float>(js.Gamepad.sThumbRX);
-            move.x -= static_cast<float>(js.Gamepad.sThumbRY);
+    XINPUT_STATE js;
+    if (!YoRigine::Input::GetInstance()->GetJoystickState(0, js)) return;
 
-            if (Length(move) > 5000.0f) {
-                stickActiveThisFrame_ = true;
-                // 手動操作が入ったらリセンターを中断（プレイヤー操作を優先）
-                followCamera_->CancelRecenter();
-                move = Normalize(move) * rotateSpeed_;
-                Vector3 rot = followCamera_->GetRotate();
-                rot += move;
-                rot.x = std::clamp(rot.x, minPitch_, maxPitch_);
-                followCamera_->SetRotate(rot);
-            }
-        }
+    // 実時間 dt（タイムスケールに左右されない＝スロー中も操作感が一定）
+    const float dt = YoRigine::GameTime::GetUnscaledDeltaTime();
+
+    // 生入力を [-1,1] に正規化（x=ヨー方向, y=ピッチ方向）
+    Vector2 raw{
+        static_cast<float>(js.Gamepad.sThumbRX) / 32767.0f,
+        static_cast<float>(js.Gamepad.sThumbRY) / 32767.0f
+    };
+    float mag = std::min(Length(Vector3{ raw.x, raw.y, 0.0f }), 1.0f);
+
+    // ── ラジアルデッドゾーン ──────────────────────────────
+    if (mag < camDeadzone_) {
+        // 入力なし：加速ランプを減衰させて次回はゼロから立ち上げる
+        if (camAccelTime_ > 0.0f) camRampState_ = std::max(0.0f, camRampState_ - dt / camAccelTime_);
+        else                      camRampState_ = 0.0f;
+        return;
     }
+
+    stickActiveThisFrame_ = true;
+    followCamera_->CancelRecenter();  // 手動操作が入ったらリセンター中断（プレイヤー優先）
+
+    // デッドゾーン外を 0..1 に再マッピング → レスポンスカーブ（中央ほど精密）
+    float t = std::clamp((mag - camDeadzone_) / (1.0f - camDeadzone_), 0.0f, 1.0f);
+    float curved = std::powf(t, camResponseCurve_);
+
+    // 加速ランプ（0→最大まで camAccelTime_ 秒）
+    if (camAccelTime_ > 0.0f) camRampState_ = std::min(1.0f, camRampState_ + dt / camAccelTime_);
+    else                      camRampState_ = 1.0f;
+
+    // 倒し方向（単位ベクトル）に、角速度×カーブ×ランプ×dt を適用（フレームレート非依存）
+    Vector2 dir{ raw.x / mag, raw.y / mag };
+    float   scale = curved * camRampState_ * dt;
+
+    Vector3 rot = followCamera_->GetRotate();
+    rot.y +=  dir.x * camYawSpeed_   * scale;
+    rot.x += -dir.y * camPitchSpeed_ * scale * (camInvertY_ ? -1.0f : 1.0f);
+    rot.x = std::clamp(rot.x, minPitch_, maxPitch_);
+    followCamera_->SetRotate(rot);
 }
 
 // ── ヨー角を ±π に正規化 ──
@@ -286357,6 +288167,121 @@ void PlayerCamera::LoadLockOnFraming(const nlohmann::json& j) {
     lockOnShoulderYaw_ = j.value("shoulderYaw", 0.25f);
     lockOnPitchBias_   = j.value("pitchBias",   0.20f);
     lockOnLerpSpeed_   = j.value("lerpSpeed",   10.0f);
+}
+
+// ============================================================
+// カメラ操作フィール（右スティック）の保存 / 復元
+// ============================================================
+void PlayerCamera::SaveCameraFeel(nlohmann::json& j) const {
+    j["yawSpeed"]   = camYawSpeed_;
+    j["pitchSpeed"] = camPitchSpeed_;
+    j["deadzone"]   = camDeadzone_;
+    j["curve"]      = camResponseCurve_;
+    j["accelTime"]  = camAccelTime_;
+    j["invertY"]    = camInvertY_;
+}
+
+void PlayerCamera::LoadCameraFeel(const nlohmann::json& j) {
+    camYawSpeed_      = j.value("yawSpeed",   3.2f);
+    camPitchSpeed_    = j.value("pitchSpeed", 2.4f);
+    camDeadzone_      = j.value("deadzone",   0.18f);
+    camResponseCurve_ = j.value("curve",      2.0f);
+    camAccelTime_     = j.value("accelTime",  0.12f);
+    camInvertY_       = j.value("invertY",    false);
+}
+
+// ============================================================
+// 見切れヒット演出
+// ============================================================
+
+// ワールド座標を最終カメラの view-projection で NDC へ投影し、画角外か判定する。
+bool PlayerCamera::IsWorldPosOffscreen(const Vector3& worldPos) const {
+    if (!lastSceneCamera_) return false;  // まだ最終カメラが無い＝判定不能（誤発火させない）
+
+    Vector4 clip = Transform(
+        Vector4{ worldPos.x, worldPos.y, worldPos.z, 1.0f },
+        lastSceneCamera_->GetViewProjectionMatrix());
+
+    if (clip.w <= 0.0001f) return true;   // カメラ背後＝完全に見えていない
+
+    float ndcX = clip.x / clip.w;
+    float ndcY = clip.y / clip.w;
+    return std::abs(ndcX) > offscreenHitMargin_ || std::abs(ndcY) > offscreenHitMargin_;
+}
+
+// 背後リセンター＋ズーム寄り＋シェイクで、見失った敵を捉え直す決めカメラを発火する。
+void PlayerCamera::TriggerOffscreenHitReaction(const Vector3* enemyWorldPos) {
+    if (!followCamera_) return;
+
+    // フラッシュを出す対象座標を控える（敵座標があればそれ、無ければプレイヤー位置）
+    lockOnFlashWorldPos_ = (enemyWorldPos) ? *enemyWorldPos
+        : (playerWT_ ? playerWT_->translate_ : Vector3{});
+
+    // 背後リセンター：カメラ→プレイヤー→敵 が一直線になる位置まで回り込ませる。
+    // 敵座標があれば「プレイヤー→敵の方向」へ寄せる＝プレイヤーの向きに依存せず
+    // 確実にプレイヤー越しの敵を正面に捉える。無ければ従来のプレイヤー向きへ。
+    if (offscreenHitFaceEnemy_ && enemyWorldPos && playerWT_) {
+        Vector3 dir = *enemyWorldPos - PlayerPivotWorld();
+        dir.y = 0.0f;
+        if (Length(dir) > 0.001f) {
+            followCamera_->RecenterToYaw(atan2f(dir.x, dir.z));
+        } else {
+            followCamera_->RecenterBehindTarget();
+        }
+    } else {
+        followCamera_->RecenterBehindTarget();
+    }
+
+    // 軽い寄り（StartZoom は指定FOV→基準FOVへイーズで戻る＝ズームパンチ）
+    if (offscreenHitZoomFov_ > 0.0f) {
+        followCamera_->StartZoom(offscreenHitZoomFov_, offscreenHitZoomDur_);
+    }
+
+    // コツンとシェイク
+    if (offscreenHitShakeInt_ > 0.0f && offscreenHitShakeDur_ > 0.0f) {
+        followCamera_->StartShake(offscreenHitShakeInt_, offscreenHitShakeDur_);
+    }
+
+    // ロックオンUIフラッシュを要求（GameScene が拾って GameUI::FlashLockOn を呼ぶ）
+    lockOnFlashRequested_ = true;
+}
+
+// 武器のヒット検出から呼ぶ入口。発火条件を満たし、かつ敵が画面外の時だけ演出する。
+void PlayerCamera::OnAttackHit(const Vector3& enemyWorldPos) {
+    if (!offscreenHitEnabled_ || !followCamera_) return;
+    if (!threatAwarenessSceneAllowed_)  return;  // バトル中のみ（フィールドでは出さない）
+    if (IsInPerformance())              return;  // 戦闘開始演出等の最中はスキップ
+    if (offscreenHitCdTimer_ > 0.0f)    return;  // クールダウン中
+    // NOTE: 攻撃カメラワーク再生中でもあえて発火させる。ヒット時は NotifyAttackHit が
+    //       先に攻撃カメラを起動するため、ここで弾くとほぼ毎回スキップされてしまう。
+    //       背後リセンターは base 回転を動かすので、攻撃ワークのオフセットと共存できる。
+    if (!IsWorldPosOffscreen(enemyWorldPos)) return;  // 画面内に見えているなら何もしない
+
+    TriggerOffscreenHitReaction(&enemyWorldPos);
+    offscreenHitCdTimer_ = offscreenHitCooldown_;
+}
+
+// パラメータの保存 / 復元（FollowCamera の extension JSON に相乗り）
+void PlayerCamera::SaveOffscreenHitReaction(nlohmann::json& j) const {
+    j["enabled"]   = offscreenHitEnabled_;
+    j["faceEnemy"] = offscreenHitFaceEnemy_;
+    j["margin"]   = offscreenHitMargin_;
+    j["cooldown"] = offscreenHitCooldown_;
+    j["zoomFov"]  = offscreenHitZoomFov_;
+    j["zoomDur"]  = offscreenHitZoomDur_;
+    j["shakeInt"] = offscreenHitShakeInt_;
+    j["shakeDur"] = offscreenHitShakeDur_;
+}
+
+void PlayerCamera::LoadOffscreenHitReaction(const nlohmann::json& j) {
+    offscreenHitEnabled_   = j.value("enabled",   true);
+    offscreenHitFaceEnemy_ = j.value("faceEnemy", true);
+    offscreenHitMargin_   = j.value("margin",   0.9f);
+    offscreenHitCooldown_ = j.value("cooldown", 0.8f);
+    offscreenHitZoomFov_  = j.value("zoomFov",  0.40f);
+    offscreenHitZoomDur_  = j.value("zoomDur",  0.30f);
+    offscreenHitShakeInt_ = j.value("shakeInt", 0.30f);
+    offscreenHitShakeDur_ = j.value("shakeDur", 0.15f);
 }
 
 // ============================================================
@@ -286654,6 +288579,32 @@ void PlayerCamera::DrawImGui() {
     if (!followCamera_) return;
 
     if (ImGui::CollapsingHeader("追従カメラ設定")) {
+        // 右スティックでカメラを回した時にプレイヤーの向きも追従させるか（PlayerMovement のフラグ）
+        if (cameraFollowEnabled_) {
+            ImGui::Checkbox("右スティックでプレイヤーも回す", cameraFollowEnabled_);
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("ON: カメラ回転にプレイヤーの向きが追従する（待機中のみ）/ OFF: カメラだけ回る");
+            ImGui::Separator();
+        }
+
+        // 右スティックの操作フィール（dt基準・アナログ・カーブ・加速）
+        ImGui::SeparatorText("カメラ操作フィール（右スティック）");
+        ImGui::DragFloat("ヨー速度(rad/s)",   &camYawSpeed_,   0.05f, 0.3f, 12.0f, "%.2f");
+        ImGui::DragFloat("ピッチ速度(rad/s)", &camPitchSpeed_, 0.05f, 0.3f, 12.0f, "%.2f");
+        ImGui::DragFloat("デッドゾーン",       &camDeadzone_,   0.01f, 0.0f, 0.6f, "%.2f");
+        ImGui::DragFloat("レスポンスカーブ",   &camResponseCurve_, 0.05f, 1.0f, 4.0f, "%.2f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("1=線形 / 大きいほど中央が精密（微調整しやすい）");
+        ImGui::DragFloat("加速時間(秒)",       &camAccelTime_,  0.01f, 0.0f, 0.5f, "%.2f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("0→最大入力まで滑らかに立ち上げる時間。0で即時");
+        ImGui::Checkbox("ピッチ反転", &camInvertY_);
+
+        // 編集値を extension JSON に反映（カメラ設定保存時に一緒に永続化）
+        nlohmann::json cfJson;
+        SaveCameraFeel(cfJson);
+        nlohmann::json ext = followCamera_->GetExtensionJson();
+        ext["cameraFeel"] = cfJson;
+        followCamera_->SetExtensionJson(ext);
+
+        ImGui::Separator();
         followCamera_->DrawDebugGui();
     }
 
@@ -286759,6 +288710,41 @@ void PlayerCamera::DrawImGui() {
 
     ImGui::Separator();
 
+    if (ImGui::CollapsingHeader("見切れヒット演出")) {
+        ImGui::Checkbox("有効", &offscreenHitEnabled_);
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("画面外の敵に攻撃が当たった瞬間、敵を捉え直す決めカメラを発火");
+        ImGui::Checkbox("敵の方向へ回り込む", &offscreenHitFaceEnemy_);
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("ON=カメラ→プレイヤー→敵が一直線になる位置へ(確実に敵を正面へ) / OFF=プレイヤーの向いてる方向の背後へ");
+        ImGui::DragFloat("画面外マージン(NDC)", &offscreenHitMargin_, 0.01f, 0.0f, 1.2f, "%.2f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("敵がこのNDCを越えたら『見切れ』扱い。値を小さくするほど中央寄りでも発動。0.9=端で切れかけ / 1.0=完全に枠外のみ / 0=画面中央以外すべて");
+        ImGui::DragFloat("クールダウン(秒)", &offscreenHitCooldown_, 0.05f, 0.0f, 5.0f, "%.2f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("連続ヒットで毎回発火しないための間隔");
+
+        ImGui::SeparatorText("演出");
+        ImGui::DragFloat("ズームFOV", &offscreenHitZoomFov_, 0.005f, 0.0f, 1.0f, "%.3f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("寄りの目標FOV(基準より小さいほど寄る)。0でズームなし");
+        ImGui::DragFloat("ズーム時間(秒)", &offscreenHitZoomDur_, 0.01f, 0.05f, 2.0f, "%.2f");
+        ImGui::DragFloat("シェイク強度", &offscreenHitShakeInt_, 0.05f, 0.0f, 3.0f, "%.2f");
+        ImGui::DragFloat("シェイク時間(秒)", &offscreenHitShakeDur_, 0.01f, 0.0f, 1.0f, "%.2f");
+
+        ImGui::Separator();
+        ImGui::Text("CD残り: %.2fs / シーン許可: %s", offscreenHitCdTimer_,
+            threatAwarenessSceneAllowed_ ? "ON(バトル)" : "OFF");
+        if (ImGui::Button("今すぐテスト発火")) {
+            TriggerOffscreenHitReaction();
+            offscreenHitCdTimer_ = offscreenHitCooldown_;
+        }
+
+        // 編集値を extension JSON に反映（カメラ設定保存時に一緒に永続化される）
+        nlohmann::json ohJson;
+        SaveOffscreenHitReaction(ohJson);
+        nlohmann::json ext = followCamera_->GetExtensionJson();
+        ext["offscreenHitReaction"] = ohJson;
+        followCamera_->SetExtensionJson(ext);
+    }
+
+    ImGui::Separator();
+
     // ロックオン状態
     ImGui::Text("ロックオン: %s", isLockOn_ ? "ON" : "OFF");
     if (lockedTarget_) {
@@ -286851,6 +288837,28 @@ public:
     bool IsThreatAwarenessAllowed() const   { return threatAwarenessSceneAllowed_; }
 
     // ============================================================
+    // 見切れヒット演出
+    // 画面外（フレーム外）の敵に攻撃がヒットした瞬間に呼ぶ。敵が画角外なら
+    // 「決めカメラ」（背後リセンター＋ズーム寄り＋シェイク）を1回だけ発火し、
+    // 見失った敵を捉え直す。ロックオンと違い対象を固定せず素早く戻る。
+    // 武器クラスのヒット検出から enemyWorldPos を渡して呼ぶ。
+    // ============================================================
+    void OnAttackHit(const Vector3& enemyWorldPos);
+
+    // 見切れヒット演出が発火した時 true を1回返し、対象敵のワールド座標を out に渡す
+    // （ロックオンUIフラッシュのトリガ＋敵追従用）。GameScene が毎フレーム拾う。
+    bool ConsumeLockOnFlashRequest(Vector3& outWorldPos) {
+        if (!lockOnFlashRequested_) return false;
+        lockOnFlashRequested_ = false;
+        outWorldPos = lockOnFlashWorldPos_;
+        return true;
+    }
+
+    // カメラ追従（右スティックでプレイヤーも回る）フラグのポインタを受け取る。
+    // PlayerMovement の config フラグを指し、カメラエディタから ON/OFF できるようにする。
+    void SetCameraFollowFlag(bool* p) { cameraFollowEnabled_ = p; }
+
+    // ============================================================
     // FollowCamera への委譲
     // ============================================================
     FollowCamera* GetFollowCamera() const { return followCamera_; }
@@ -286900,6 +288908,18 @@ private:
     void  LoadLockOnFraming(const nlohmann::json& j);
 
     // ============================================================
+    // 見切れヒット演出（内部）
+    //   IsWorldPosOffscreen … 最終カメラの view-projection で NDC 投影し画角外か判定
+    //   TriggerOffscreenHitReaction … 背後リセンター＋ズーム＋シェイクを発火
+    // ============================================================
+    bool  IsWorldPosOffscreen(const Vector3& worldPos) const;
+    // enemyWorldPos を渡すと「プレイヤー→敵の方向」へ背後リセンター（敵を確実に正面へ）。
+    // nullptr ならプレイヤーの向きへ背後リセンター（テスト発火等のフォールバック）。
+    void  TriggerOffscreenHitReaction(const Vector3* enemyWorldPos = nullptr);
+    void  SaveOffscreenHitReaction(nlohmann::json& j) const;
+    void  LoadOffscreenHitReaction(const nlohmann::json& j);
+
+    // ============================================================
     // 最終フレーミングガード
     // 攻撃カメラワークのオフセット適用後に呼び、プレイヤーが
     // 画角のハードリミットを越えていたら yaw / pitch を引き戻して
@@ -286923,6 +288943,9 @@ private:
     // ============================================================
     FollowCamera*          followCamera_ = nullptr;
     const WorldTransform*  playerWT_     = nullptr;
+
+    // PlayerMovement の「カメラ追従でプレイヤーも回る」フラグ（カメラエディタから切替）
+    bool* cameraFollowEnabled_ = nullptr;
 
     AttackCameraComponent  attackCamera_;
 
@@ -286957,6 +288980,21 @@ private:
     float pivotHeight_  = 1.5f;
 
     // ============================================================
+    // カメラ操作フィール（右スティック）。dt 基準・アナログ・カーブ・加速。
+    //   extension JSON("cameraFeel") に永続化し、追従カメラ設定パネルで調整可能。
+    // ============================================================
+    float camYawSpeed_      = 3.2f;   // ヨー最大角速度(rad/s)
+    float camPitchSpeed_    = 2.4f;   // ピッチ最大角速度(rad/s)
+    float camDeadzone_      = 0.18f;  // ラジアルデッドゾーン(0..1)
+    float camResponseCurve_ = 2.0f;   // レスポンスカーブ指数(1=線形 / 大きいほど中央が精密)
+    float camAccelTime_     = 0.12f;  // 0→最大入力までの加速時間(秒)。0で即時
+    bool  camInvertY_       = false;  // ピッチ反転
+    float camRampState_     = 0.0f;   // 加速ランプの内部状態(0..1)
+
+    void SaveCameraFeel(nlohmann::json& j) const;
+    void LoadCameraFeel(const nlohmann::json& j);
+
+    // ============================================================
     // 最終フレーミングガード用パラメータ
     // ============================================================
     bool  framingGuardEnabled_ = true;   // ガード自体の ON / OFF
@@ -286986,6 +289024,23 @@ private:
     float awarenessFovBias_     = 0.0f;   // 現在のFOV拡大量（内部状態）
 
     bool  stickActiveThisFrame_ = false;  // 今フレーム右スティック操作があったか
+
+    // ============================================================
+    // 見切れヒット演出 用パラメータ（extension JSON に相乗り）
+    // ============================================================
+    Camera* lastSceneCamera_ = nullptr;     // ApplyPostDirector でキャッシュした最終カメラ（見切れ判定用）
+
+    bool  offscreenHitEnabled_   = true;    // 機能マスタースイッチ
+    bool  offscreenHitFaceEnemy_ = true;    // true=プレイヤー→敵方向へ背後リセンター(確実) / false=プレイヤーの向きへ
+    float offscreenHitMargin_   = 0.9f;     // NDC これを越えたら画面外扱い（0.9=端で切れかけ / 1.0=完全に枠外のみ）
+    float offscreenHitCooldown_ = 0.8f;     // 連続発火防止の間隔（秒）
+    float offscreenHitZoomFov_  = 0.40f;    // 寄りの目標FOV（基準より小さいほど寄る・0でズームなし）
+    float offscreenHitZoomDur_  = 0.30f;    // ズーム時間（秒）
+    float offscreenHitShakeInt_ = 0.30f;    // シェイク強度
+    float offscreenHitShakeDur_ = 0.15f;    // シェイク時間（秒）
+    float offscreenHitCdTimer_  = 0.0f;     // クールダウン残り（内部状態）
+    bool    lockOnFlashRequested_ = false;  // 見切れ演出発火→UIフラッシュ要求（GameSceneが消費）
+    Vector3 lockOnFlashWorldPos_  = {};     // フラッシュを出す対象（敵）のワールド座標
 };
 
 
@@ -291522,6 +293577,9 @@ public:
 	void ForceStop();
 
 	const MovementConfig& GetConfig() const { return config_; }
+	// 「右スティックでカメラを回すとプレイヤーも追従して回る」フラグのポインタ。
+	// カメラエディタ（PlayerCamera）から ON/OFF を切り替えられるよう公開する。
+	bool* GetCameraFollowEnabledPtr() { return &config_.enableCameraFollow; }
 	InputType GetCurrentInputType() const { return lastInputType_; }
 	Player* GetOwner() const { return owner_; }
 
@@ -292259,6 +294317,8 @@ public:
 	void InitializeCamera(FollowCamera* followCamera) {
 		playerCamera_ = std::make_unique<PlayerCamera>();
 		playerCamera_->Initialize(followCamera, &wt_);
+		// 「右スティックでプレイヤーも回る」フラグをカメラエディタから切り替えられるよう接続
+		if (movement_) playerCamera_->SetCameraFollowFlag(movement_->GetCameraFollowEnabledPtr());
 	}
 
 	PlayerCamera*  GetPlayerCamera()  const { return playerCamera_.get(); }
@@ -293736,7 +295796,7 @@ File Path: YGame/GameObjects/Weapon/PlayerSword.cpp
 #include "Collision/Core/CollisionManager.h"
 #include "MathFunc.h"
 #include "Systems/GameTime/GameTime.h"
-#include "Particle/YEmitterGroupManager.h"
+#include "Particle/EffectHandle.h"
 #include <algorithm>
 
 #ifdef USE_IMGUI
@@ -293962,13 +296022,8 @@ void PlayerSword::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 		Vector3 hitPos = other->GetWorldTransform().translate_;
 		hitPos.y += 1.5f;
 
-		auto* enemyHitEmitterGroup_ = YEmitterGroupManager::GetInstance().GetGroup("EnemyHit");
-		if (enemyHitEmitterGroup_) {
-			enemyHitEmitterGroup_->SetPosition(hitPos);
-			enemyHitEmitterGroup_->SetActive(true);
-			enemyHitEmitterGroup_->SetAutoEmitAll(false);
-			enemyHitEmitterGroup_->EmitAll(10);
-		}
+		// "EnemyHit" は複数Systemを束ねた Group。EffectHandle が名前で解決して発火する。
+		hitEffect_ = EffectHandle::PlayOneShot("EnemyHit", hitPos, 10);
 		player_->GetCombat()->GetCombo()->RecoverCC(2);
 
 		// ------------------------------------------------------------
@@ -293979,6 +296034,11 @@ void PlayerSword::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 		// ------------------------------------------------------------
 		player_->GetCombat()->GetCombo()->NotifyAttackHit(other, hitPos);
 
+		// 画面外（見切れ）の敵にヒットしたら、敵を捉え直す決めカメラを発火する。
+		// 画面外判定・発火条件・クールダウンは PlayerCamera が一元管理する。
+		if (PlayerCamera* pc = player_->GetPlayerCamera()) {
+			pc->OnAttackHit(hitPos);
+		}
 	}
 }
 
@@ -294081,8 +296141,7 @@ File Path: YGame/GameObjects/Weapon/PlayerSword.h
 #include "Collision/Core/CollisionDirection.h"
 #include "Collision/OBB/OBBCollider.h"
 #include "Object3d/BaseObject.h"
-#include "Particle/EffectHandle.h"      // YParticle 統合ヘルパー
-#include "Particle/YEmitterGroup.h"
+#include "Particle/EffectHandle.h"      // YParticle 統合ヘルパー（Group/System を名前で解決）
 #include <Vfx/VfxMesh/TrailMeshEmitter.h>
 class Player;
 
@@ -294539,9 +296598,6 @@ File Path: YGame/Scenes/MainScenes/Clear/ClearScene.h
 #include "Player/Player.h"
 #include "WorldTransform./WorldTransform.h"
 #include "Drawer/LineManager/Line.h"
-#include "Particle/YParticleEmitter.h"
-
-
 // Camera
 #include "Systems/Camera/CameraDirector.h"
 #include "Systems/Camera/CameraEditor.h"
@@ -294621,6 +296677,7 @@ File Path: YGame/Scenes/MainScenes/Game/GameScene.cpp
 #include <Debugger/Logger.h>
 #include "Systems./Input./Input.h"
 #include "Systems/GameTime/GameTime.h"
+#include "MathFunc.h"   // Coordinate::WorldToScreen
 #include <Systems/UI/UIManager.h>
 #include "GPUParticle/GpuEmitManager.h"
 #include "Collision/AreaCollision/Base/AreaManager.h"
@@ -294635,6 +296692,7 @@ File Path: YGame/Scenes/MainScenes/Game/GameScene.cpp
 #include "Systems/Camera/Virtuals/FollowCamera/FollowCamera.h"
 #include "Systems/Camera/Virtuals/DebugCamera/DebugCamera.h"
 #include <Vfx/VfxMesh/VfxMeshEditor.h>
+#include <Vfx/VfxMesh/VfxMeshSpawner.h>
 
 // C++
 #include <cstdlib>
@@ -294686,15 +296744,6 @@ void GameScene::Initialize() {
 	AreaManager::GetInstance()->Initialize();
 	YParticleManager::GetInstance().SetCamera(sceneCamera_.get());
 
-	// エミッターを作成（システム名と初期位置を指定）
-	explosionEmitter_ = std::make_unique<YParticleEmitter>(
-		"DefaultParticleSystem",        // 使用するシステム名
-		Vector3{ 0, 0, 0 }    // 初期位置
-	);
-
-	// エミッター設定
-	explosionEmitter_->SetEmissionRate(50.0f);  // 秒間50個発生
-	explosionEmitter_->SetEmitCount(5);         // 1回に5個発生
 	//------------------------------------------------------------
 	// インゲーム用UI
 	//------------------------------------------------------------
@@ -294814,16 +296863,6 @@ void GameScene::Update() {
 	YoRigine::GameTime::Update();
 	Player* player = player_.get();
 
-	// エミッター位置を更新
-	explosionEmitter_->SetPosition(currentPosition_);
-
-	// エミッター更新（autoEmitがtrueなら自動発生）
-	explosionEmitter_->Update(YoRigine::GameTime::GetDeltaTime());
-
-#ifdef USE_IMGUI
-	//explosionEmitter_->ShowDebugInfo();
-#endif
-
 	//------------------------------------------------------------
 	// ゲームオーバー時の選択処理
 	//------------------------------------------------------------
@@ -294889,13 +296928,40 @@ void GameScene::Update() {
 
 	// 空と共通システム更新
 	skyBox_->Update();
+	// バトル中のみ LB/RB の押下アニメを許可
+	gameUI_->SetBattleActive(subSceneManager_ && subSceneManager_->GetCurrentSceneName() == "Battle");
+
+	// 画面外ヒット演出が発火していたら、ロックオン照準フラッシュを敵位置で再生
+	{
+		Vector3 flashWorld;
+		if (player_ && player_->GetPlayerCamera() &&
+			player_->GetPlayerCamera()->ConsumeLockOnFlashRequest(flashWorld)) {
+			lockFlashWorldPos_ = flashWorld;
+			lockFlashTimer_    = 1.7f;   // アニメ(アルファ1.6s)＋余裕。この間は敵に追従
+			lockFlashActive_   = true;
+			gameUI_->FlashLockOn();
+		}
+		// 演出中は敵ワールド座標をスクリーンへ投影してフラッシュを追従させる
+		//（カメラが敵方向へ回り込むのに合わせて照準が敵へ寄っていく）
+		if (lockFlashActive_ && sceneCamera_) {
+			auto proj = Coordinate::WorldToScreen(
+				lockFlashWorldPos_, sceneCamera_->GetViewProjectionMatrix());
+			if (proj.has_value()) {
+				gameUI_->SetLockOnFlashPos(proj->screenPos);
+			}
+			lockFlashTimer_ -= YoRigine::GameTime::GetUnscaledDeltaTime();
+			if (lockFlashTimer_ <= 0.0f) lockFlashActive_ = false;
+		}
+	}
+
 	gameUI_->Update();
 
 	YoRigine::ModelManipulator::GetInstance()->Update();
 	YoRigine::CollisionManager::GetInstance()->Update();
 	YParticleManager::GetInstance().Update(YoRigine::GameTime::GetDeltaTime());
+	VfxMeshSpawner::GetInstance()->SetCamera(sceneCamera_.get());
+	VfxMeshSpawner::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
 	YoRigine::LightManager::GetInstance()->UpdateShadowMatrix(sceneCamera_.get());
-	YoRigine::LightManager::GetInstance()->TransferData();
 	YoRigine::GpuEmitManager::GetInstance()->Update();
 
 #ifdef USE_IMGUI
@@ -294925,6 +296991,7 @@ void GameScene::Draw() {
 	//------------------------------------------------------------
 	// VFX描画
 	//------------------------------------------------------------
+	VfxMeshSpawner::GetInstance()->Draw();
 	player_->DrawVfx();
 }
 
@@ -295188,7 +297255,6 @@ File Path: YGame/Scenes/MainScenes/Game/GameScene.h
 #include "Systems/Camera/CameraEditor.h"
 #include "Systems/Camera/Camera.h"
 
-#include "Particle/YParticleEmitter.h"
 // App
 #include "../../SubScenes/SubSceneManager.h"
 #include "../../SubScenes/FieldScene.h"
@@ -295275,8 +297341,11 @@ private:
 	bool isGameCleared_ = false;
 	bool wasGameCleared_ = false;
 
-	std::unique_ptr<YParticleEmitter> explosionEmitter_;
-	Vector3 currentPosition_ = {0,3,0};
+	// ロックオン照準フラッシュ（画面外ヒット時・敵ワールド座標を投影して追従）
+	bool    lockFlashActive_   = false;
+	float   lockFlashTimer_    = 0.0f;
+	Vector3 lockFlashWorldPos_ = {};
+
 };
 
 ============================================================
@@ -295407,8 +297476,6 @@ void TitleScene::Update() {
 	skyBox_->Update();
 	ground_->Update();
 
-	//auto* enemyHitEmitterGroup_ = YEmitterGroupManager::GetInstance().GetGroup("Title");
-	//enemyHitEmitterGroup_->EmitAll();
 
 	YoRigine::ModelManipulator::GetInstance()->Update();
 	YoRigine::CollisionManager::GetInstance()->Update();
@@ -298207,6 +300274,9 @@ File Path: YGame/UI/Control/ControlUI.cpp
 #include "ControlUI.h"
 #include <Systems/Input/Input.h>
 #include <Systems/GameTime/GameTime.h>
+#include <Systems/Text/TextTextureBaker.h>
+#include <filesystem>
+#include <cmath>
 
 void ControlUI::Initialize()
 {
@@ -298219,6 +300289,37 @@ void ControlUI::Initialize()
 	ripples = YoRigine::UIManager::GetInstance()->GetUI("ripples");
     ripples->SetVisible(false);
     originalSize_ = {100.0f,100.0f};
+
+    // 角丸四角の枠テクスチャを生成（丸枠が glyph と合わないため）。無ければ作る。
+    const std::string frameTex = "Resources/Textures/Operation/frame_square.png";
+    if (!std::filesystem::exists(frameTex)) {
+        YoRigine::TextTextureBaker::BakeRoundedRectFrame(
+            128, 128, /*cornerRadius*/18.0f, /*borderThickness*/8.0f,
+            Vector4{ 1.0f, 1.0f, 1.0f, 1.0f }, frameTex);
+    }
+
+    // LB / RB の操作ヒントを用意（シーンに既にあればそれを使い、無ければ生成）。
+    // outline を背面、グリフを前面に。画面(1600x900)の右上寄りに配置（アンカー中心）。
+    GetOrCreateButton("ExLB_outline", frameTex, { 1360.0f, 150.0f }, { 120.0f, 120.0f });
+    GetOrCreateButton("ExRB_outline", frameTex, { 1480.0f, 150.0f }, { 120.0f, 120.0f });
+    lbButton_ = GetOrCreateButton("ExLB", "Resources/Textures/Operation/Ex_LB.png", { 1360.0f, 150.0f }, { 100.0f, 100.0f });
+    rbButton_ = GetOrCreateButton("ExRB", "Resources/Textures/Operation/Ex_RB.png", { 1480.0f, 150.0f }, { 100.0f, 100.0f });
+
+    // ロックオン操作ヒント（照準＋右スティック）。テキストは廃止し、記号と動きで伝える。
+    // 左上のポーズメニューアイコン(startButton, (10,10)/100px)の下に横並びで配置（90px・調整可）。
+    lockOnIcon_  = GetOrCreateButton("LockOnHintIcon",  "Resources/Textures/GameScene/LockOn.png", { 70.0f, 185.0f }, { 90.0f, 90.0f });
+    lockOnStick_ = GetOrCreateButton("LockOnHintStick", "Resources/Textures/Operation/Right stick.png", { 170.0f, 185.0f }, { 90.0f, 90.0f });
+
+    // スティック押し込みバウンドの基準位置を控える（実際の上下動は Update で手動適用）。
+    if (lockOnStick_) {
+        stickBase_ = lockOnStick_->GetPosition();
+        stickPrevOffsetY_ = 0.0f;
+        stickBaseInit_ = true;
+    }
+
+    // 画面外ヒット時に一瞬だけ出す照準（画面中央・大きめ）。普段は非表示で FlashLockOn 時のみ再生。
+    lockOnFlash_ = GetOrCreateButton("LockOnFlash", "Resources/Textures/GameScene/LockOn.png", { 800.0f, 450.0f }, { 160.0f, 160.0f });
+    if (lockOnFlash_) lockOnFlash_->SetVisible(false);
 }
 
 void ControlUI::Update()
@@ -298233,6 +300334,33 @@ void ControlUI::Update()
     auto layer = YoRigine::UIManager::GetInstance()->GetUIsByLayer(1);
     for (auto& ui : layer) {
         ui->SetVisible(isVisble_);
+    }
+
+    // ロックオンヒント（照準＋スティック＋ラベル）はバトル中のみ表示する
+    const bool lockHintVisible = isVisble_ && battleActive_;
+    if (lockOnIcon_)  lockOnIcon_->SetVisible(lockHintVisible);
+    if (lockOnStick_) lockOnStick_->SetVisible(lockHintVisible);
+
+    // フラッシュ照準はアニメ再生中だけ表示（終わったら自動で消える）
+    if (lockOnFlash_) {
+        lockOnFlash_->SetVisible(isVisble_ && lockOnFlash_->IsAnimating());
+    }
+
+    // スティック押し込みバウンド（手動）。エディタで動かされたら基準を取り直して両立させる。
+    if (lockOnStick_ && stickBaseInit_) {
+        Vector3 cur = lockOnStick_->GetPosition();
+        Vector3 inferred = cur; inferred.y -= stickPrevOffsetY_; // 前回オフセットを除いた素の位置
+        if (std::abs(inferred.x - stickBase_.x) > 0.01f ||
+            std::abs(inferred.y - stickBase_.y) > 0.01f ||
+            std::abs(inferred.z - stickBase_.z) > 0.01f) {
+            stickBase_ = inferred;  // エディタ等で動かされた → 基準を更新
+        }
+        constexpr float kBobSpeed = 7.0f;   // 角速度(rad/s)：周期≒0.9s
+        constexpr float kBobAmp   = 12.0f;  // 押し込み量(px)
+        stickBobPhase_ += YoRigine::GameTime::GetUnscaledDeltaTime() * kBobSpeed;
+        float off = (std::sin(stickBobPhase_) * 0.5f + 0.5f) * kBobAmp; // 0..amp（下方向）
+        lockOnStick_->SetPosition({ stickBase_.x, stickBase_.y + off, stickBase_.z });
+        stickPrevOffsetY_ = off;
     }
 
     // Aボタンが押された瞬間
@@ -298261,6 +300389,16 @@ void ControlUI::Update()
         Vector2 baseX = button_[2]->GetSize();
         button_[2]->PlayScaleAnimation(Vector2{ 100.0f,100.0f } / baseX, Vector2{ 120.0f,120.0f } / baseX, duration_, Easing::Function::EaseInCubic, false);
         button_[2]->PlayFlash(duration_, 9);
+    }
+
+    // LB / RB はバトル中のみ押下アニメ（A/B と全く同じ：波紋＋拡縮＋フラッシュ）
+    if (battleActive_ && isVisble_) {
+        if (YoRigine::Input::GetInstance()->IsPadTriggered(0, GamePadButton::LB)) {
+            PlayButtonPress(lbButton_);
+        }
+        if (YoRigine::Input::GetInstance()->IsPadTriggered(0, GamePadButton::RB)) {
+            PlayButtonPress(rbButton_);
+        }
     }
 
 
@@ -298327,6 +300465,67 @@ void ControlUI::TriggerRipple(UIBase* targetButton)
     activeRipples_.push_back(std::move(newRipple));
 }
 
+// 指定IDのUIを取得。無ければ生成して layer1 に登録する
+UIBase* ControlUI::GetOrCreateButton(const std::string& id, const std::string& texturePath,
+    const Vector2& pos, const Vector2& size)
+{
+    auto* mgr = YoRigine::UIManager::GetInstance();
+    if (UIBase* exist = mgr->GetUI(id)) return exist;  // 既にシーンに用意済みならそれを使う
+
+    // 個別保存（SaveToJSON）と次回起動の復元のため、必ず configPath を持たせる。
+    // configPath が空だと UIBase::SaveToJSON は何も書かずに失敗する。
+    const std::string cfg = "Resources/UIConfigs/GameScene/" + id + ".json";
+    const bool hadCfg = std::filesystem::exists(cfg);
+
+    auto ui = std::make_unique<UIBase>(id);
+    ui->Initialize(cfg);   // 既存あれば位置/サイズ/テクスチャを復元、無ければ configPath_ を設定
+
+    if (!hadCfg) {
+        // 初回のみデフォルトを適用し、その値を書き出す（次回以降は保存値を尊重）
+        ui->SetTexture(texturePath);          // ChangeTexture が実寸を反映（UV/サイズ）
+        if (size.x > 0.0f && size.y > 0.0f) ui->SetSize(size); // 0 はテクスチャ実寸を使う
+        ui->SetAnchorPoint({ 0.5f, 0.5f });   // 中心基準（拡縮アニメが中心から効く）
+        ui->SetLayer(1);
+        ui->SetPosition({ pos.x, pos.y, 0.0f });
+        ui->SaveToJSON();                     // 正しい初期値を保存（Initialize の白塗りデフォルトを上書き）
+    }
+    ui->SetVisible(true);
+
+    UIBase* raw = ui.get();
+    mgr->AddUI(id, std::move(ui));
+    return raw;
+}
+
+// ボタン押下時の共通アニメ（波紋＋拡縮ポップ＋フラッシュ）。A/B と全く同じ。
+void ControlUI::PlayButtonPress(UIBase* button)
+{
+    if (!button || !isVisble_) return;
+    TriggerRipple(button);
+    Vector2 base = button->GetSize();
+    button->PlayScaleAnimation(pushSize_ / base, originalSize_ / base, duration_, Easing::Function::EaseInCubic, false);
+    button->PlayFlash(duration_, 9);
+}
+
+// 画面外ヒット時のロックオン照準フラッシュ（赤→黄にフェードしながら消える）
+void ControlUI::FlashLockOn()
+{
+    if (!lockOnFlash_) return;
+
+    lockOnFlash_->SetVisible(true);
+
+    const Vector4 red{ 1.0f, 0.0f, 0.0f, 1.0f };
+    const Vector4 yellow{ 1.0f, 1.0f, 0.0f, 1.0f };  // 不透明の黄＝ロック確定色
+    lockOnFlash_->SetColor(red);
+
+    // ① 色：赤→黄を素早く（ターゲット捕捉 → ロック確定）。アルファはここでは保つ。
+    lockOnFlash_->PlayColorAnimation(red, yellow, 0.30f, Easing::Function::EaseOutCubic, false);
+    // ② アルファ：しばらく黄を保持してから後半でゆっくり消える（EaseInで余韻）。
+    lockOnFlash_->PlayAlphaAnimation(1.0f, 0.0f, 1.0f, Easing::Function::EaseInQuad, false);
+    // ③ 大きく開いた照準が一気に締まって軽くオーバーシュート＝「カチッとロック」
+    lockOnFlash_->PlayScaleAnimation(Vector2{ 1.8f, 1.8f }, Vector2{ 1.0f, 1.0f },
+        0.30f, Easing::Function::EaseOutBack, false);
+}
+
 
 ============================================================
 File Path: YGame/UI/Control/ControlUI.h
@@ -298346,18 +300545,55 @@ public:
 	void Initialize();
 	void Update();
 	void Draw();
+
+	// バトル中かどうか（LB/RB の押下アニメはバトル中のみ発火する）
+	void SetBattleActive(bool active) { battleActive_ = active; }
+
+	// ロックオン照準を一瞬出して「赤→黄にフェードしながら消える」演出を1回再生する。
+	// 画面外の敵に攻撃が当たってカメラが敵方向へ向いた瞬間に呼ぶ。
+	void FlashLockOn();
+
+	// フラッシュ照準のスクリーン座標を設定（GameScene が敵を投影して毎フレーム渡す＝敵追従）
+	void SetLockOnFlashPos(const Vector3& screenPos) {
+		if (lockOnFlash_) lockOnFlash_->SetPosition(screenPos);
+	}
 private:
 	///************************* 内部関数 *************************///
-	
+
 	// 波紋エフェクトの更新と削除
 	void UpdateRipples();
 	// 波紋を特定のボタン位置で再生する
 	void TriggerRipple(UIBase* targetButton);
+	// 指定IDのUIを取得。無ければ生成して layer1 に登録する（LB/RB ヒント用）
+	UIBase* GetOrCreateButton(const std::string& id, const std::string& texturePath,
+		const Vector2& pos, const Vector2& size);
+	// ボタン押下時の共通アニメ（波紋＋拡縮ポップ＋フラッシュ）。A/B と全く同じ挙動。
+	void PlayButtonPress(UIBase* button);
 private:
 	///************************* メンバ変数 *************************///
 
 	UIBase* button_[3];
 	UIBase* ripples = nullptr;
+
+	// LB / RB の操作ヒント（バトル中に押すとアニメ）
+	UIBase* lbButton_ = nullptr;
+	UIBase* rbButton_ = nullptr;
+	bool    battleActive_ = false;
+
+	// ロックオン操作ヒント（照準アイコン＋右スティック＋「ロックオン」文字）。バトル中のみ表示。
+	UIBase* lockOnIcon_  = nullptr;  // LockOn.png（照準）
+	UIBase* lockOnStick_ = nullptr;  // Right stick.png
+
+	// 画面外ヒット時に一瞬だけ出す照準（赤→黄フェード）。普段は非表示、FlashLockOn で再生。
+	UIBase* lockOnFlash_ = nullptr;
+
+	// スティック押し込みバウンド（手動・位置アニメと違いエディタ移動と両立する）
+	//   基準位置に sin オフセットを足して毎フレーム適用。エディタで動かされたら
+	//   前回オフセットを差し引いて基準を再取得する（テレスコープ方式）。
+	Vector3 stickBase_{};
+	float   stickBobPhase_    = 0.0f;
+	float   stickPrevOffsetY_ = 0.0f;
+	bool    stickBaseInit_    = false;
 	std::list<std::unique_ptr<UIBase>> activeRipples_;
 	// 波紋のテクスチャパス（キャッシュ用）
 	std::string rippleTexturePath_;
@@ -298698,6 +300934,49 @@ File Path: YGame/UI/GameUI.cpp
 #include <Systems/Input/Input.h>
 #include <Systems/GameTime/GameTime.h>
 #include <Systems/Cinematic/CinematicManager.h>
+#include <Systems/Text/TextTextureBaker.h>
+#include "OffScreen/PostEffectManager.h"
+#include <filesystem>
+#include <iterator>
+
+// ============================================================
+// ポーズメニューのレイアウト定数（マジックナンバーを排除）
+//   座標系は画面ピクセル(1600x900・アンカー中心)。色は RGBA 0..1。
+// ============================================================
+namespace PauseLayout {
+	// 色
+	const Vector4 kGold     { 0.85f, 0.72f, 0.25f, 1.0f };  // タイトル/枠
+	const Vector4 kOlive    { 0.43f, 0.40f, 0.19f, 1.0f };  // 行ラベル
+	const Vector4 kWhite    { 1.0f, 1.0f, 1.0f, 1.0f };
+	const Vector4 kPanel    { 0.04f, 0.05f, 0.08f, 0.72f };  // パネル地
+	const Vector4 kDim      { 0.0f, 0.0f, 0.0f, 0.7f };      // 背景暗転
+	const Vector4 kHighlight{ 0.85f, 0.72f, 0.25f, 0.30f };  // 選択バー
+
+	// 画面・パネル共通
+	constexpr float kScreenW = 1600.0f, kScreenH = 900.0f;
+	constexpr float kPanelY = 500.0f;
+	constexpr float kFrameRadius = 22.0f, kFrameThickness = 5.0f;
+
+	// 左パネル（メニュー）
+	constexpr float kLeftX = 400.0f, kLeftW = 600.0f, kLeftH = 640.0f;
+	constexpr float kPauseTitleY = 300.0f;
+	constexpr float kResumeY = 500.0f, kTitleItemY = 630.0f;  // メニュー項目のY
+	constexpr float kHighlightW = 540.0f, kHighlightH = 124.0f;
+
+	// 右パネル（操作一覧）
+	constexpr float kRightX = 1140.0f, kRightW = 860.0f, kRightH = 720.0f;
+	constexpr float kControlsTitleY = 230.0f;
+	constexpr float kRowStartY = 350.0f, kRowStepY = 100.0f;  // 1行目のYと行間
+	constexpr float kIconX = 830.0f, kLabelX = 1240.0f;
+	constexpr float kIconSize = 80.0f, kShoulderIconSize = 64.0f;
+	constexpr float kShoulderOffset = 36.0f;  // LB/RB を中心から左右にずらす量
+	constexpr float kCamLabelOffset = 30.0f;  // カメラリセットラベルの右寄せ微調整
+
+	// フォントサイズ / 字間（負＝詰める）
+	constexpr float kPauseTitleSize = 140.0f, kControlsTitleSize = 84.0f;
+	constexpr float kRowFontSize = 80.0f, kMenuFontSize = 72.0f;
+	constexpr float kRowSpacing = -3.0f, kTitleSpacing = -2.0f;
+}
 
 /// <summary>
 /// 初期化処理
@@ -298723,6 +301002,9 @@ void GameUI::Initialize()
 	startButton_ = YoRigine::UIManager::GetInstance()->GetUI("startButton");
 	toTitleButton_ = YoRigine::UIManager::GetInstance()->GetUI("title");
 	toGameButton_ = YoRigine::UIManager::GetInstance()->GetUI("toGame");
+
+	// ポーズメニューを2パネルレイアウトで構築（左メニュー＋右操作一覧）。
+	BuildPauseLayout();
 
 	// ポーズメニュー用の元サイズ・色情報保存用マップ初期化
 	pauseOriginalScales_.clear();
@@ -298756,18 +301038,16 @@ void GameUI::Initialize()
 	// ★ 初期状態の設定
 	pauseState_ = PauseState::HIDDEN;
 
-	// レイヤー2（ポーズUI）を最初は非表示・透明にしておく
+	// レイヤー2（ポーズUI）の作者値（JSON から読まれたスケール/色）を控えてから、
+	// 「隠れ状態」へ戻す。ここで scale0/alpha0 を live UI に焼いてしまうと、その状態で
+	// UI 保存された時に 0 が JSON に書かれ、二度とポーズメニューが出なくなる。
+	// → 隠れ状態は visible=false のみとし、スケール/色は作者値を維持する。
 	auto layer2 = YoRigine::UIManager::GetInstance()->GetUIsByLayer(2);
 	for (auto& ui : layer2) {
 		pauseOriginalScales_[ui] = ui->GetScale();
 		pauseOriginalColors_[ui] = ui->GetColor();
-		ui->SetVisible(false);
-		// 色情報の取得と透明化（初期化時にやっておく）
-		Vector4 col = ui->GetColor();
-		col.w = 0.0f;
-		ui->SetColor(col);
-		ui->SetScale(Vector2(0.0f, 0.0f)); // 最初はサイズ0
 	}
+	RestorePauseRestingState();
 
 	controlUI_ = std::make_unique<ControlUI>();
 	controlUI_->Initialize();
@@ -298788,6 +301068,12 @@ void GameUI::Update()
 				pauseState_ = PauseState::OPENING;
 				pauseAnimTimer_ = 0.0f;
 				YoRigine::GameTime::Pause(); // ゲーム時間を止める
+
+				// 背景をぼかす（ポーズ中だけ GaussSmoothing を後段に追加）
+				if (pauseBlurIndex_ < 0) {
+					pauseBlurIndex_ = PostEffectManager::GetInstance()->AddEffect(
+						OffScreen::OffScreenEffectType::GaussSmoothing, "PauseBlur");
+				}
 
 				// とりあえず表示フラグはONにする（サイズは0からスタート）
 				for (auto& pair : pauseOriginalScales_) {
@@ -298830,10 +301116,15 @@ void GameUI::Update()
 				pauseState_ = PauseState::HIDDEN;
 				YoRigine::GameTime::Resume(); // 時間を再開
 
-				// 完全に消えたら非表示にする
-				for (auto& pair : pauseOriginalScales_) {
-					if (pair.first) pair.first->SetVisible(false);
+				// ポーズ用ブラーを除去
+				if (pauseBlurIndex_ >= 0) {
+					PostEffectManager::GetInstance()->RemoveEffect(pauseBlurIndex_);
+					pauseBlurIndex_ = -1;
 				}
+
+				// 完全に消えたら隠れ状態へ。閉じアニメで縮んだスケール/色を作者値へ戻し、
+				// visible=false にする（live UI を保存安全な状態に保つ）。
+				RestorePauseRestingState();
 			}
 		}
 	}
@@ -298875,6 +301166,15 @@ void GameUI::Update()
 			float scale = (currentPauseSelection_ == PauseSelection::TO_TITLE) ? selectionScale_ : normalScale_;
 			Vector2 baseSize = pauseOriginalScales_[toTitleButton_];
 			toTitleButton_->SetScale(baseSize * scale);
+		}
+
+		// --- 選択ハイライトを選択中の項目へスッと移動 ---
+		if (pauseSelectHighlight_) {
+			float targetY = (currentPauseSelection_ == PauseSelection::TO_GAME)
+				? PauseLayout::kResumeY : PauseLayout::kTitleItemY;
+			Vector3 p = pauseSelectHighlight_->GetPosition();
+			p.y += (targetY - p.y) * 0.35f;  // 簡易スムージング
+			pauseSelectHighlight_->SetPosition(p);
 		}
 	}
 	// 操作用UIの更新
@@ -298970,6 +301270,27 @@ void GameUI::Update()
 
 
 /// <summary>
+/// バトル中フラグを ControlUI へ伝える
+/// </summary>
+void GameUI::SetBattleActive(bool active)
+{
+	if (controlUI_) controlUI_->SetBattleActive(active);
+}
+
+/// <summary>
+/// ロックオン照準フラッシュを再生（ControlUI へ委譲）
+/// </summary>
+void GameUI::FlashLockOn()
+{
+	if (controlUI_) controlUI_->FlashLockOn();
+}
+
+void GameUI::SetLockOnFlashPos(const Vector3& screenPos)
+{
+	if (controlUI_) controlUI_->SetLockOnFlashPos(screenPos);
+}
+
+/// <summary>
 /// UI描画（全部）
 /// </summary>
 void GameUI::DrawAll()
@@ -299060,6 +301381,178 @@ void GameUI::ResetGameOver()
 }
 
 /// <summary>
+/// ポーズメニューの隠れ状態へ戻す（保存しても壊れない状態）。
+/// スケール/色は作者値（pauseOriginalScales_/Colors_）に復元し、visible=false にする。
+/// 開くときは OPENING アニメが t=0 から動くので、ここで作者値に戻しておいて問題ない。
+/// </summary>
+void GameUI::RestorePauseRestingState()
+{
+	for (auto& pair : pauseOriginalScales_) {
+		UIBase* ui = pair.first;
+		if (!ui) continue;
+		ui->SetScale(pair.second);
+		auto itCol = pauseOriginalColors_.find(ui);
+		if (itCol != pauseOriginalColors_.end()) {
+			ui->SetColor(itCol->second);
+		}
+		ui->SetVisible(false);
+	}
+}
+
+/// <summary>
+/// ポーズ画面用 UI を取得（無ければ layer2 で生成し configPath を持たせる）
+/// </summary>
+UIBase* GameUI::GetOrCreatePauseUI(const std::string& id, const std::string& texturePath,
+	const Vector2& pos, const Vector2& size)
+{
+	auto* mgr = YoRigine::UIManager::GetInstance();
+	if (UIBase* exist = mgr->GetUI(id)) return exist;  // 既にシーンにあればそれを使う
+
+	const std::string cfg = "Resources/UIConfigs/GameScene/" + id + ".json";
+	const bool hadCfg = std::filesystem::exists(cfg);
+
+	auto ui = std::make_unique<UIBase>(id);
+	ui->Initialize(cfg);   // 既存あれば位置/サイズ/テクスチャ復元、無ければ configPath_ を設定
+	if (!hadCfg) {
+		ui->SetTexture(texturePath);
+		if (size.x > 0.0f && size.y > 0.0f) ui->SetSize(size); // 0 はテクスチャ実寸を使う
+		ui->SetAnchorPoint({ 0.5f, 0.5f });
+		ui->SetLayer(2);
+		ui->SetPosition({ pos.x, pos.y, 0.0f });
+		ui->SaveToJSON();  // 正しい初期値を保存（次回起動で復元）
+	}
+	UIBase* raw = ui.get();
+	mgr->AddUI(id, std::move(ui));
+	return raw;
+}
+
+// ラベル画像を（無ければ）ベイクするユーティリティ
+static void BakeLabelIfMissing(const std::string& text, const std::string& path,
+	float size, const Vector4& fill, float charSpacing = 0.0f,
+	const std::string& font = "Resources/Fonts/kurobara-cinderella.ttf")
+{
+	if (std::filesystem::exists(path)) return;
+	YoRigine::TextBakeParams tp;
+	tp.text = text;
+	tp.fontFilePath = font;
+	tp.fontSize = size;
+	tp.fillColor = fill;
+	tp.outlineWidth = 3.0f; tp.outlineColor = { 0.0f, 0.0f, 0.0f, 1.0f };  // 細め
+	tp.padding = 6.0f;
+	tp.charSpacing = charSpacing;  // 負で字間を詰める
+	YoRigine::TextTextureBaker::Bake(tp, path);
+}
+
+// レイアウト用：UIを取得/生成し、位置・サイズ・色・レイヤーを強制設定する
+UIBase* GameUI::SetupPauseUI(const std::string& id, const std::string& tex,
+	const Vector2& pos, const Vector2& size, const Vector4& color)
+{
+	auto* mgr = YoRigine::UIManager::GetInstance();
+	UIBase* ui = mgr->GetUI(id);
+	if (!ui) {
+		const std::string cfg = "Resources/UIConfigs/GameScene/" + id + ".json";
+		auto up = std::make_unique<UIBase>(id);
+		up->Initialize(cfg);
+		ui = up.get();
+		mgr->AddUI(id, std::move(up));
+	}
+	if (!tex.empty())               ui->SetTexture(tex);          // 空＝据え置き
+	if (size.x > 0.0f && size.y > 0.0f) ui->SetSize(size);        // 0＝実寸据え置き
+	ui->SetAnchorPoint({ 0.5f, 0.5f });
+	ui->SetLayer(2);
+	ui->SetPosition({ pos.x, pos.y, 0.0f });
+	ui->SetColor(color);
+	return ui;
+}
+
+// ポーズメニューを2パネルレイアウトで構築（左：PAUSE＋メニュー / 右：操作一覧）
+void GameUI::BuildPauseLayout()
+{
+	using namespace PauseLayout;
+
+	// ---- 画像パス ----
+	const std::string white_tex   = "Resources/Textures/white.png";
+	const std::string leftFrame   = "Resources/UITex/pause_frame_left.png";
+	const std::string rightFrame  = "Resources/UITex/pause_frame_right.png";
+	const std::string texPause    = "Resources/UITex/label_pause.png";
+	const std::string texControls = "Resources/UITex/label_controls.png";
+	const std::string texWeak     = "Resources/UITex/label_weak.png";
+	const std::string texStrong   = "Resources/UITex/label_strong.png";
+	const std::string texGuard    = "Resources/UITex/label_guard.png";
+	const std::string texLockon   = "Resources/UITex/label_lockon.png";
+	const std::string texCamReset = "Resources/UITex/label_camreset.png";
+	const std::string texResume   = "Resources/UITex/label_resume.png";
+	const std::string texTitle    = "Resources/UITex/label_title.png";
+	const std::string texStick    = "Resources/Textures/Operation/Right stick.png";
+
+	// ---- 必要な画像を用意（無ければベイク/生成） ----
+	if (!std::filesystem::exists(leftFrame))
+		YoRigine::TextTextureBaker::BakeRoundedRectFrame((int)kLeftW, (int)kLeftH, kFrameRadius, kFrameThickness, kGold, leftFrame);
+	if (!std::filesystem::exists(rightFrame))
+		YoRigine::TextTextureBaker::BakeRoundedRectFrame((int)kRightW, (int)kRightH, kFrameRadius, kFrameThickness, kGold, rightFrame);
+	BakeLabelIfMissing("\xE3\x83\x9D\xE3\x83\xBC\xE3\x82\xBA", texPause, kPauseTitleSize, kGold, kTitleSpacing);       // ポーズ
+	BakeLabelIfMissing("\xE6\x93\x8d\xE4\xBD\x9C\xE4\xB8\x80\xE8\xA6\xA7", texControls, kControlsTitleSize, kGold, kRowSpacing); // 操作一覧
+	BakeLabelIfMissing("\xE5\xBC\xB1\xE6\x94\xBB\xE6\x92\x83", texWeak,   kRowFontSize, kOlive, kRowSpacing);          // 弱攻撃
+	BakeLabelIfMissing("\xE5\xBC\xB7\xE6\x94\xBB\xE6\x92\x83", texStrong, kRowFontSize, kOlive, kRowSpacing);          // 強攻撃
+	BakeLabelIfMissing("\xE3\x82\xAC\xE3\x83\xBC\xE3\x83\x89", texGuard,  kRowFontSize, kOlive, kRowSpacing);          // ガード
+	BakeLabelIfMissing("\xE3\x83\xAD\xE3\x83\x83\xE3\x82\xAF\xE3\x82\xAA\xE3\x83\xB3", texLockon, kRowFontSize, kOlive, kRowSpacing); // ロックオン
+	BakeLabelIfMissing("\xE3\x82\xAB\xE3\x83\xA1\xE3\x83\xA9\xE3\x83\xAA\xE3\x82\xBB\xE3\x83\x83\xE3\x83\x88", texCamReset, kRowFontSize, kOlive, kRowSpacing); // カメラリセット
+	BakeLabelIfMissing("\xE3\x82\xB2\xE3\x83\xBC\xE3\x83\xA0\xE3\x81\xB8\xE6\x88\xBB\xE3\x82\x8B", texResume, kMenuFontSize, kGold, kRowSpacing); // ゲームへ戻る
+	BakeLabelIfMissing("\xE3\x82\xBF\xE3\x82\xA4\xE3\x83\x88\xE3\x83\xAB", texTitle, kMenuFontSize, kGold, kRowSpacing); // タイトル
+
+	const Vector2 leftPos { kLeftX,  kPanelY };
+	const Vector2 rightPos{ kRightX, kPanelY };
+
+	// ---- 背景・パネル ----
+	SetupPauseUI("UIBackGround", "", { kScreenW * 0.5f, kScreenH * 0.5f }, { kScreenW, kScreenH }, kDim);
+	SetupPauseUI("PauseLeftPanel",  white_tex, leftPos,  { kLeftW,  kLeftH },  kPanel);
+	SetupPauseUI("PauseRightPanel", white_tex, rightPos, { kRightW, kRightH }, kPanel);
+	SetupPauseUI("PauseLeftFrame",  leftFrame,  leftPos,  { kLeftW,  kLeftH },  kWhite);
+	SetupPauseUI("PauseRightFrame", rightFrame, rightPos, { kRightW, kRightH }, kWhite);
+
+	// ---- 左：タイトル＋ハイライト＋メニュー ----
+	SetupPauseUI("PauseTitle", texPause, { kLeftX, kPauseTitleY }, { 0,0 }, kWhite);
+	pauseSelectHighlight_ = SetupPauseUI("PauseSelectHighlight", white_tex, { kLeftX, kResumeY }, { kHighlightW, kHighlightH }, kHighlight);
+	SetupPauseUI("toGame", texResume, { kLeftX, kResumeY },    { 0,0 }, kWhite); // ゲームへ戻る
+	SetupPauseUI("title",  texTitle,  { kLeftX, kTitleItemY }, { 0,0 }, kWhite); // タイトル
+
+	// ---- 右：操作一覧（アイコン＋ラベルの行をループ生成） ----
+	SetupPauseUI("PauseControlsTitle", texControls, { kRightX, kControlsTitleY }, { 0,0 }, kWhite);
+
+	struct CtrlRow { const char* iconId; std::string iconTex; const char* labelId; std::string labelTex; };
+	const CtrlRow rows[] = {
+		{ "A",          "",        "Weak",             texWeak   },  // A → 弱攻撃
+		{ "B",          "",        "Strong",           texStrong },  // B → 強攻撃
+		{ "LB",         "",        "Guard",            texGuard  },  // X(Xbutton) → ガード
+		{ "LockOnIcon", texStick,  "PauseLockOnLabel", texLockon },  // R3 → ロックオン
+	};
+	for (int i = 0; i < (int)std::size(rows); ++i) {
+		const float y = kRowStartY + kRowStepY * i;
+		SetupPauseUI(rows[i].iconId,  rows[i].iconTex,  { kIconX,  y }, { kIconSize, kIconSize }, kWhite);
+		SetupPauseUI(rows[i].labelId, rows[i].labelTex, { kLabelX, y }, { 0, 0 }, kWhite);
+	}
+	// 最終行：LB/RB（2アイコン）＋ カメラリセット
+	const float camY = kRowStartY + kRowStepY * (float)std::size(rows);
+	SetupPauseUI("PauseLB", "Resources/Textures/Operation/Ex_LB.png", { kIconX - kShoulderOffset, camY }, { kShoulderIconSize, kShoulderIconSize }, kWhite);
+	SetupPauseUI("PauseRB", "Resources/Textures/Operation/Ex_RB.png", { kIconX + kShoulderOffset, camY }, { kShoulderIconSize, kShoulderIconSize }, kWhite);
+	SetupPauseUI("PauseCamResetLabel", texCamReset, { kLabelX + kCamLabelOffset, camY }, { 0,0 }, kWhite); // カメラリセット
+
+	// ---- 重なり順（背面→前面の順に最後尾へ送る） ----
+	const char* zorder[] = {
+		"UIBackGround",
+		"PauseLeftPanel", "PauseRightPanel",
+		"PauseLeftFrame", "PauseRightFrame",
+		"PauseSelectHighlight",
+		"PauseTitle", "PauseControlsTitle",
+		"toGame", "title",
+		"A", "B", "LB", "LockOnIcon", "PauseLB", "PauseRB",
+		"Weak", "Strong", "Guard", "PauseLockOnLabel", "PauseCamResetLabel",
+	};
+	auto* mgr = YoRigine::UIManager::GetInstance();
+	for (const char* id : zorder) mgr->BringToFront(id);
+}
+
+/// <summary>
 /// 選択状態も考慮してアニメーションさせる
 /// </summary>
 /// <param name="t"></param>
@@ -299146,6 +301639,14 @@ public:
 	void DrawAll();
 	void Draw();
 
+	// バトル中かどうかを ControlUI へ伝える（LB/RB 押下アニメのゲート用）
+	void SetBattleActive(bool active);
+
+	// 画面外ヒット時のロックオン照準フラッシュを再生する（ControlUI へ委譲）
+	void FlashLockOn();
+	// フラッシュ照準のスクリーン座標を更新（敵追従用・ControlUI へ委譲）
+	void SetLockOnFlashPos(const Vector3& screenPos);
+
 	/// <summary>
 	///  ゲームオーバーUIをフェード表示する
 	/// </summary>
@@ -299180,6 +301681,22 @@ public:
 private:
 
 	void UpdatePauseVisuals(float t);
+	// ポーズメニューの「隠れ状態」を、保存しても壊れない値（作者値スケール/色＋visible=false）
+	// に戻す。scale0/alpha0 のまま放置して UI 保存で焼き付くのを防ぐ。
+	void RestorePauseRestingState();
+	// ポーズ画面用 UI を取得。無ければ layer2 で生成して configPath を持たせる
+	// （個別保存・次回起動の復元のため）。size の x/y が 0 ならテクスチャ実寸を使う。
+	UIBase* GetOrCreatePauseUI(const std::string& id, const std::string& texturePath,
+		const Vector2& pos, const Vector2& size);
+
+	// ポーズ画面のレイアウトを構築（2パネル：左メニュー＋右操作一覧）。
+	// 既存UIは再配置、無いものは生成。layer2 キャプチャより前に呼ぶ。
+	void BuildPauseLayout();
+	// レイアウト用：UIを取得/生成し、位置・サイズ・色・レイヤーを強制設定する。
+	//   tex 空 = テクスチャ据え置き（既存流用） / size 0 = 実寸据え置き。
+	UIBase* SetupPauseUI(const std::string& id, const std::string& tex,
+		const Vector2& pos, const Vector2& size, const Vector4& color);
+
 	void ApplyAlpha(float a);
 private:
 	///************************* メンバ変数 *************************///
@@ -299249,6 +301766,12 @@ private:
 
 	float pauseAnimTimer_ = 0.0f;       // アニメーション経過時間
 	const float pauseAnimDuration_ = 0.125f; // アニメーションにかかる時間（秒）
+
+	// ポーズ中だけ追加する背景ブラーのエフェクト index（-1=未追加）
+	int pauseBlurIndex_ = -1;
+
+	// 選択ハイライト（左メニューの選択中項目の裏に出す金バー）
+	UIBase* pauseSelectHighlight_ = nullptr;
 
 private:
 	///************************* 他のUI *************************///
