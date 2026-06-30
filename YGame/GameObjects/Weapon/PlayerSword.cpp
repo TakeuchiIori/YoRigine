@@ -242,6 +242,11 @@ void PlayerSword::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 		// ------------------------------------------------------------
 		player_->GetCombat()->GetCombo()->NotifyAttackHit(other, hitPos);
 
+		// 画面外（見切れ）の敵にヒットしたら、敵を捉え直す決めカメラを発火する。
+		// 画面外判定・発火条件・クールダウンは PlayerCamera が一元管理する。
+		if (PlayerCamera* pc = player_->GetPlayerCamera()) {
+			pc->OnAttackHit(hitPos);
+		}
 	}
 }
 

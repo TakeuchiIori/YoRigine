@@ -378,3 +378,26 @@ DrawEditPanel の Trail/LightVolume/Smoke/Lightning 縦積み(checkbox+TreeNode)
 - フェーズ3: Effect Editor 1画面化。System追加はドロップダウン選択（手打ち廃止）・保存は `SaveEffectBundle` で `YEffects/` に1ボタン・プレビュー再生。これで Clear/Title/BattleArea も順次 YEffects へ移行でき、旧2フォルダを最終的に廃止。
 - フェーズ3で「再ロード時クリア（同名Systemのモジュール作り直し）」を入れると、エディタの上書き保存→即反映（ホットリロード）が安全になる。
 
+---
+
+## 2026-06-30 — フェーズ3実装: Effect Editor 改善（既存 YEmitterGroupEditor を育成、ビルド成功）
+
+**前提修正**: 現状エディタを読んだら想定よりずっと出来ていた。System選択リストもバンドル保存(YEffects へ `SaveEffectBundle`)も**既に実装済み**だった（「手打ちのみ・バンドル無し」という以前の診断は誤り）。新規エディタは作らず既存を育てる方針に変更。ユーザーが触って報告した不満を直接潰した。
+
+### 対応した不満と実装
+1. **保存/読込ボタンが多すぎる** → `ShowFileButtons` 再編。先頭に主導線「エフェクトを保存」「エフェクトを開く」(YEffects/ バンドル)。旧 YEmitterGroups 分離形式の4ボタンは `if(!CollapsingHeader("旧形式…")) return;` で折りたたみ。バンドル読込 `loadBundleBrowser_`(YEffects/, `LoadEffectBundle`)を新設(.h+コンストラクタ)。
+2. **System編集の往復** → `ShowSelectedEmitterDetail` 末尾に CollapsingHeader「システム "xxx" を編集」を追加し `sys->ShowEditor()` をインライン展開。`YParticleEditor` 別ウィンドウ不要に。
+3. **一覧が見づらい/新規作成が分からない** → `ShowGroupList` ヘッダを「エフェクト一覧」に。先頭に緑の「＋ 新規エフェクト」ボタン(NewEffect 自動ユニーク名→選択)。右クリックに「複製」(SaveToJson→ユニーク名→CreateGroup+LoadFromJson)。
+4. **プレビューが見えない**（実機で判明）→ 原因は **EmitAll がグループの保存位置で発生**し、EnemyHit は位置Y=33(ユーザー編集)で上空に出て画面外だった。`previewPos_`(既定{0,2,0}, DragFloat3+原点リセット)を追加し、グループ全体 Emit(x1/10/100)は保存位置を一時上書き→発生→復元する `emitAtPreview` 経由に。System プレビューも emitter の `FollowEmit(previewPos_, n)` で同位置に発生。これで保存位置に関係なく必ず見える。
+
+### つまずき
+- StepB/C とフェーズ3記録は一度ユーザーに中断され、その時の編集が**ファイルに適用されていなかった**（ラベルが「エミッターグループ」のままだった）。Grep でファイルの実状態を確認して再適用。**ツール結果を過信せず現物確認**する教訓。
+
+### 検証
+- **MSBuild Debug x64 ビルド成功**。0 error。
+- ⏳ 実機での確認は未（新規エフェクト作成→エミッタ追加→プレビュー再生→System インライン編集→保存の一連）。
+
+### 残
+- プレビュー: 再生は previewPos_ で出るが、カメラがそこを向いていないと依然見えない可能性。必要なら「カメラ前で再生」を追加。
+- 再ロード時クリア（ホットリロード安全化）。旧2フォルダ(YParticleSystems/YEmitterGroups)の最終廃止。
+

@@ -78,6 +78,15 @@ public:
     bool IsThreatAwarenessAllowed() const   { return threatAwarenessSceneAllowed_; }
 
     // ============================================================
+    // 見切れヒット演出
+    // 画面外（フレーム外）の敵に攻撃がヒットした瞬間に呼ぶ。敵が画角外なら
+    // 「決めカメラ」（背後リセンター＋ズーム寄り＋シェイク）を1回だけ発火し、
+    // 見失った敵を捉え直す。ロックオンと違い対象を固定せず素早く戻る。
+    // 武器クラスのヒット検出から enemyWorldPos を渡して呼ぶ。
+    // ============================================================
+    void OnAttackHit(const Vector3& enemyWorldPos);
+
+    // ============================================================
     // FollowCamera への委譲
     // ============================================================
     FollowCamera* GetFollowCamera() const { return followCamera_; }
@@ -125,6 +134,18 @@ private:
     // ロックオン2ショット・フレーミングの永続化（同じく extension JSON に相乗り）
     void  SaveLockOnFraming(nlohmann::json& j) const;
     void  LoadLockOnFraming(const nlohmann::json& j);
+
+    // ============================================================
+    // 見切れヒット演出（内部）
+    //   IsWorldPosOffscreen … 最終カメラの view-projection で NDC 投影し画角外か判定
+    //   TriggerOffscreenHitReaction … 背後リセンター＋ズーム＋シェイクを発火
+    // ============================================================
+    bool  IsWorldPosOffscreen(const Vector3& worldPos) const;
+    // enemyWorldPos を渡すと「プレイヤー→敵の方向」へ背後リセンター（敵を確実に正面へ）。
+    // nullptr ならプレイヤーの向きへ背後リセンター（テスト発火等のフォールバック）。
+    void  TriggerOffscreenHitReaction(const Vector3* enemyWorldPos = nullptr);
+    void  SaveOffscreenHitReaction(nlohmann::json& j) const;
+    void  LoadOffscreenHitReaction(const nlohmann::json& j);
 
     // ============================================================
     // 最終フレーミングガード
@@ -213,4 +234,19 @@ private:
     float awarenessFovBias_     = 0.0f;   // 現在のFOV拡大量（内部状態）
 
     bool  stickActiveThisFrame_ = false;  // 今フレーム右スティック操作があったか
+
+    // ============================================================
+    // 見切れヒット演出 用パラメータ（extension JSON に相乗り）
+    // ============================================================
+    Camera* lastSceneCamera_ = nullptr;     // ApplyPostDirector でキャッシュした最終カメラ（見切れ判定用）
+
+    bool  offscreenHitEnabled_   = true;    // 機能マスタースイッチ
+    bool  offscreenHitFaceEnemy_ = true;    // true=プレイヤー→敵方向へ背後リセンター(確実) / false=プレイヤーの向きへ
+    float offscreenHitMargin_   = 0.9f;     // NDC これを越えたら画面外扱い（0.9=端で切れかけ / 1.0=完全に枠外のみ）
+    float offscreenHitCooldown_ = 0.8f;     // 連続発火防止の間隔（秒）
+    float offscreenHitZoomFov_  = 0.40f;    // 寄りの目標FOV（基準より小さいほど寄る・0でズームなし）
+    float offscreenHitZoomDur_  = 0.30f;    // ズーム時間（秒）
+    float offscreenHitShakeInt_ = 0.30f;    // シェイク強度
+    float offscreenHitShakeDur_ = 0.15f;    // シェイク時間（秒）
+    float offscreenHitCdTimer_  = 0.0f;     // クールダウン残り（内部状態）
 };

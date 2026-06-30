@@ -64,6 +64,11 @@ void PlayerCamera::Initialize(FollowCamera* followCamera, const WorldTransform* 
         LoadLockOnFraming(ext["lockOnFraming"]);
     }
 
+    // 見切れヒット演出パラメータを extension JSON から復元
+    if (ext.contains("offscreenHitReaction")) {
+        LoadOffscreenHitReaction(ext["offscreenHitReaction"]);
+    }
+
 #ifdef USE_IMGUI
     editor_.Initialize(&attackCamera_, this);
     editor_.SetFilePath(defaultPath);
@@ -81,6 +86,12 @@ void PlayerCamera::UpdatePreDirector() {
 
     float dt = YoRigine::GameTime::GetDeltaTime();
     bool  inPerformance = IsInPerformance();
+
+    // 見切れヒット演出のクールダウンを進める（ヒットストップの影響を受けないよう非スケール）
+    if (offscreenHitCdTimer_ > 0.0f) {
+        offscreenHitCdTimer_ -= YoRigine::GameTime::GetUnscaledDeltaTime();
+        if (offscreenHitCdTimer_ < 0.0f) offscreenHitCdTimer_ = 0.0f;
+    }
 
     if (!inPerformance) {
         // R3 でロックオン切り替え（isLockOn_ の状態に関わらず常にチェックする）
@@ -124,6 +135,10 @@ void PlayerCamera::UpdatePreDirector() {
 // ============================================================
 void PlayerCamera::ApplyPostDirector(Camera* sceneCamera, float dt) {
     if (!sceneCamera) return;
+
+    // 見切れヒット判定に使う最終カメラをキャッシュ（OnAttackHit から参照）
+    lastSceneCamera_ = sceneCamera;
+
     bool inPerformance = IsInPerformance();
     if (inPerformance) return;
 
@@ -479,6 +494,93 @@ void PlayerCamera::LoadLockOnFraming(const nlohmann::json& j) {
     lockOnShoulderYaw_ = j.value("shoulderYaw", 0.25f);
     lockOnPitchBias_   = j.value("pitchBias",   0.20f);
     lockOnLerpSpeed_   = j.value("lerpSpeed",   10.0f);
+}
+
+// ============================================================
+// 見切れヒット演出
+// ============================================================
+
+// ワールド座標を最終カメラの view-projection で NDC へ投影し、画角外か判定する。
+bool PlayerCamera::IsWorldPosOffscreen(const Vector3& worldPos) const {
+    if (!lastSceneCamera_) return false;  // まだ最終カメラが無い＝判定不能（誤発火させない）
+
+    Vector4 clip = Transform(
+        Vector4{ worldPos.x, worldPos.y, worldPos.z, 1.0f },
+        lastSceneCamera_->GetViewProjectionMatrix());
+
+    if (clip.w <= 0.0001f) return true;   // カメラ背後＝完全に見えていない
+
+    float ndcX = clip.x / clip.w;
+    float ndcY = clip.y / clip.w;
+    return std::abs(ndcX) > offscreenHitMargin_ || std::abs(ndcY) > offscreenHitMargin_;
+}
+
+// 背後リセンター＋ズーム寄り＋シェイクで、見失った敵を捉え直す決めカメラを発火する。
+void PlayerCamera::TriggerOffscreenHitReaction(const Vector3* enemyWorldPos) {
+    if (!followCamera_) return;
+
+    // 背後リセンター：カメラ→プレイヤー→敵 が一直線になる位置まで回り込ませる。
+    // 敵座標があれば「プレイヤー→敵の方向」へ寄せる＝プレイヤーの向きに依存せず
+    // 確実にプレイヤー越しの敵を正面に捉える。無ければ従来のプレイヤー向きへ。
+    if (offscreenHitFaceEnemy_ && enemyWorldPos && playerWT_) {
+        Vector3 dir = *enemyWorldPos - PlayerPivotWorld();
+        dir.y = 0.0f;
+        if (Length(dir) > 0.001f) {
+            followCamera_->RecenterToYaw(atan2f(dir.x, dir.z));
+        } else {
+            followCamera_->RecenterBehindTarget();
+        }
+    } else {
+        followCamera_->RecenterBehindTarget();
+    }
+
+    // 軽い寄り（StartZoom は指定FOV→基準FOVへイーズで戻る＝ズームパンチ）
+    if (offscreenHitZoomFov_ > 0.0f) {
+        followCamera_->StartZoom(offscreenHitZoomFov_, offscreenHitZoomDur_);
+    }
+
+    // コツンとシェイク
+    if (offscreenHitShakeInt_ > 0.0f && offscreenHitShakeDur_ > 0.0f) {
+        followCamera_->StartShake(offscreenHitShakeInt_, offscreenHitShakeDur_);
+    }
+}
+
+// 武器のヒット検出から呼ぶ入口。発火条件を満たし、かつ敵が画面外の時だけ演出する。
+void PlayerCamera::OnAttackHit(const Vector3& enemyWorldPos) {
+    if (!offscreenHitEnabled_ || !followCamera_) return;
+    if (!threatAwarenessSceneAllowed_)  return;  // バトル中のみ（フィールドでは出さない）
+    if (IsInPerformance())              return;  // 戦闘開始演出等の最中はスキップ
+    if (offscreenHitCdTimer_ > 0.0f)    return;  // クールダウン中
+    // NOTE: 攻撃カメラワーク再生中でもあえて発火させる。ヒット時は NotifyAttackHit が
+    //       先に攻撃カメラを起動するため、ここで弾くとほぼ毎回スキップされてしまう。
+    //       背後リセンターは base 回転を動かすので、攻撃ワークのオフセットと共存できる。
+    if (!IsWorldPosOffscreen(enemyWorldPos)) return;  // 画面内に見えているなら何もしない
+
+    TriggerOffscreenHitReaction(&enemyWorldPos);
+    offscreenHitCdTimer_ = offscreenHitCooldown_;
+}
+
+// パラメータの保存 / 復元（FollowCamera の extension JSON に相乗り）
+void PlayerCamera::SaveOffscreenHitReaction(nlohmann::json& j) const {
+    j["enabled"]   = offscreenHitEnabled_;
+    j["faceEnemy"] = offscreenHitFaceEnemy_;
+    j["margin"]   = offscreenHitMargin_;
+    j["cooldown"] = offscreenHitCooldown_;
+    j["zoomFov"]  = offscreenHitZoomFov_;
+    j["zoomDur"]  = offscreenHitZoomDur_;
+    j["shakeInt"] = offscreenHitShakeInt_;
+    j["shakeDur"] = offscreenHitShakeDur_;
+}
+
+void PlayerCamera::LoadOffscreenHitReaction(const nlohmann::json& j) {
+    offscreenHitEnabled_   = j.value("enabled",   true);
+    offscreenHitFaceEnemy_ = j.value("faceEnemy", true);
+    offscreenHitMargin_   = j.value("margin",   0.9f);
+    offscreenHitCooldown_ = j.value("cooldown", 0.8f);
+    offscreenHitZoomFov_  = j.value("zoomFov",  0.40f);
+    offscreenHitZoomDur_  = j.value("zoomDur",  0.30f);
+    offscreenHitShakeInt_ = j.value("shakeInt", 0.30f);
+    offscreenHitShakeDur_ = j.value("shakeDur", 0.15f);
 }
 
 // ============================================================
@@ -876,6 +978,41 @@ void PlayerCamera::DrawImGui() {
         SaveLockOnFraming(loJson);
         nlohmann::json ext = followCamera_->GetExtensionJson();
         ext["lockOnFraming"] = loJson;
+        followCamera_->SetExtensionJson(ext);
+    }
+
+    ImGui::Separator();
+
+    if (ImGui::CollapsingHeader("見切れヒット演出")) {
+        ImGui::Checkbox("有効", &offscreenHitEnabled_);
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("画面外の敵に攻撃が当たった瞬間、敵を捉え直す決めカメラを発火");
+        ImGui::Checkbox("敵の方向へ回り込む", &offscreenHitFaceEnemy_);
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("ON=カメラ→プレイヤー→敵が一直線になる位置へ(確実に敵を正面へ) / OFF=プレイヤーの向いてる方向の背後へ");
+        ImGui::DragFloat("画面外マージン(NDC)", &offscreenHitMargin_, 0.01f, 0.0f, 1.2f, "%.2f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("敵がこのNDCを越えたら『見切れ』扱い。値を小さくするほど中央寄りでも発動。0.9=端で切れかけ / 1.0=完全に枠外のみ / 0=画面中央以外すべて");
+        ImGui::DragFloat("クールダウン(秒)", &offscreenHitCooldown_, 0.05f, 0.0f, 5.0f, "%.2f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("連続ヒットで毎回発火しないための間隔");
+
+        ImGui::SeparatorText("演出");
+        ImGui::DragFloat("ズームFOV", &offscreenHitZoomFov_, 0.005f, 0.0f, 1.0f, "%.3f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("寄りの目標FOV(基準より小さいほど寄る)。0でズームなし");
+        ImGui::DragFloat("ズーム時間(秒)", &offscreenHitZoomDur_, 0.01f, 0.05f, 2.0f, "%.2f");
+        ImGui::DragFloat("シェイク強度", &offscreenHitShakeInt_, 0.05f, 0.0f, 3.0f, "%.2f");
+        ImGui::DragFloat("シェイク時間(秒)", &offscreenHitShakeDur_, 0.01f, 0.0f, 1.0f, "%.2f");
+
+        ImGui::Separator();
+        ImGui::Text("CD残り: %.2fs / シーン許可: %s", offscreenHitCdTimer_,
+            threatAwarenessSceneAllowed_ ? "ON(バトル)" : "OFF");
+        if (ImGui::Button("今すぐテスト発火")) {
+            TriggerOffscreenHitReaction();
+            offscreenHitCdTimer_ = offscreenHitCooldown_;
+        }
+
+        // 編集値を extension JSON に反映（カメラ設定保存時に一緒に永続化される）
+        nlohmann::json ohJson;
+        SaveOffscreenHitReaction(ohJson);
+        nlohmann::json ext = followCamera_->GetExtensionJson();
+        ext["offscreenHitReaction"] = ohJson;
         followCamera_->SetExtensionJson(ext);
     }
 

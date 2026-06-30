@@ -68,6 +68,11 @@ public:
     //   0 秒設定なら即時スナップ。
     // ============================================================
     void RecenterBehindTarget();
+    // 指定したワールド yaw（オービット角）へ同じイーズで寄せる。
+    //   RecenterBehindTarget が「対象の向き」へ寄せるのに対し、これは任意方向へ。
+    //   例: プレイヤー→敵 の方向 yaw を渡せば、カメラがプレイヤー真後ろ
+    //   （敵と反対側）へ回り込み、プレイヤー越しに敵を正面に捉える。
+    void RecenterToYaw(float targetWorldYaw, bool resetPitch = true);
     bool IsRecentering() const { return recentering_; }
     void CancelRecenter()      { recentering_ = false; }
 
