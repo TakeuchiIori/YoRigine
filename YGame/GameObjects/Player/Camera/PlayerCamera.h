@@ -95,6 +95,10 @@ public:
         return true;
     }
 
+    // カメラ追従（右スティックでプレイヤーも回る）フラグのポインタを受け取る。
+    // PlayerMovement の config フラグを指し、カメラエディタから ON/OFF できるようにする。
+    void SetCameraFollowFlag(bool* p) { cameraFollowEnabled_ = p; }
+
     // ============================================================
     // FollowCamera への委譲
     // ============================================================
@@ -180,6 +184,9 @@ private:
     // ============================================================
     FollowCamera*          followCamera_ = nullptr;
     const WorldTransform*  playerWT_     = nullptr;
+
+    // PlayerMovement の「カメラ追従でプレイヤーも回る」フラグ（カメラエディタから切替）
+    bool* cameraFollowEnabled_ = nullptr;
 
     AttackCameraComponent  attackCamera_;
 

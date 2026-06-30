@@ -1607,6 +1607,11 @@
                         ]
                     ]
                 },
+                "lockOnFraming": {
+                    "lerpSpeed": 10.0,
+                    "pitchBias": 0.20000000298023224,
+                    "shoulderYaw": 0.25
+                },
                 "offscreenHitReaction": {
                     "cooldown": 0.800000011920929,
                     "enabled": true,
@@ -1653,21 +1658,21 @@
             "positionSmoothTime": 0.07999999821186066,
             "positionSmoothing": false,
             "priority": 10,
-            "recenterDuration": 0.800000011920929,
+            "recenterDuration": 0.550000011920929,
             "recenterPitch": 0.30000001192092896,
             "recenterResetPitch": true,
             "rotate": [
-                0.0,
-                -3.870089292526245,
+                0.30000001192092896,
+                -13.05191707611084,
                 0.0
             ],
             "rotateSpeed": 0.019999999552965164,
             "targetName": "Player",
             "targetPivot_Height": 1.0,
             "translate": [
-                -31.69957160949707,
-                3.7000346183776855,
-                -40.4138298034668
+                -18.984390258789063,
+                9.933089256286621,
+                -56.79608154296875
             ],
             "type": "Follow"
         }

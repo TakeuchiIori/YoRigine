@@ -885,6 +885,12 @@ void PlayerCamera::DrawImGui() {
     if (!followCamera_) return;
 
     if (ImGui::CollapsingHeader("追従カメラ設定")) {
+        // 右スティックでカメラを回した時にプレイヤーの向きも追従させるか（PlayerMovement のフラグ）
+        if (cameraFollowEnabled_) {
+            ImGui::Checkbox("右スティックでプレイヤーも回す", cameraFollowEnabled_);
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("ON: カメラ回転にプレイヤーの向きが追従する（待機中のみ）/ OFF: カメラだけ回る");
+            ImGui::Separator();
+        }
         followCamera_->DrawDebugGui();
     }
 
