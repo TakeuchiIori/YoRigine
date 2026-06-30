@@ -17,7 +17,6 @@
 #include "Systems/Camera/CameraEditor.h"
 #include "Systems/Camera/Camera.h"
 
-#include "Particle/YParticleEmitter.h"
 // App
 #include "../../SubScenes/SubSceneManager.h"
 #include "../../SubScenes/FieldScene.h"
@@ -104,6 +103,4 @@ private:
 	bool isGameCleared_ = false;
 	bool wasGameCleared_ = false;
 
-	std::unique_ptr<YParticleEmitter> explosionEmitter_;
-	Vector3 currentPosition_ = {0,3,0};
 };

@@ -17,6 +17,7 @@
 #include "Particle/YEmitterGroupEditor.h"
 
 #include "Particle/YEmitterGroupManager.h"
+#include "Vfx/VfxMesh/VfxMeshSpawner.h"
 /// <summary>
 /// ゲーム全体の初期化処理（起動時に一度だけ実行）
 /// </summary>
@@ -64,6 +65,9 @@ void MyGame::Initialize() {
 	// 旧 ParticleManager は削除。エフェクト定義は JSON で管理。
 	//------------------------------------------------------------
 	YoRigine::GpuEmitManager::GetInstance()->Initialize();
+
+	VfxMeshSpawner::GetInstance()->Initialize();
+	VfxMeshSpawner::GetInstance()->ScanDirectory("Resources/Json/VfxMesh/");
 
 	// モデル操作関連の初期化
 	YoRigine::ModelManipulator::GetInstance()->Initialize();
@@ -134,6 +138,7 @@ void MyGame::Initialize() {
 /// </summary>
 void MyGame::Finalize() {
 	SceneManager::GetInstance()->Finalize();
+	VfxMeshSpawner::GetInstance()->Finalize();
 	YoRigine::ModelManipulator::GetInstance()->Finalize();
 
 #ifdef USE_IMGUI

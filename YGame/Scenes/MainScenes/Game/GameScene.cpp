@@ -27,6 +27,7 @@
 #include "Systems/Camera/Virtuals/FollowCamera/FollowCamera.h"
 #include "Systems/Camera/Virtuals/DebugCamera/DebugCamera.h"
 #include <Vfx/VfxMesh/VfxMeshEditor.h>
+#include <Vfx/VfxMesh/VfxMeshSpawner.h>
 
 // C++
 #include <cstdlib>
@@ -78,15 +79,6 @@ void GameScene::Initialize() {
 	AreaManager::GetInstance()->Initialize();
 	YParticleManager::GetInstance().SetCamera(sceneCamera_.get());
 
-	// エミッターを作成（システム名と初期位置を指定）
-	explosionEmitter_ = std::make_unique<YParticleEmitter>(
-		"DefaultParticleSystem",        // 使用するシステム名
-		Vector3{ 0, 0, 0 }    // 初期位置
-	);
-
-	// エミッター設定
-	explosionEmitter_->SetEmissionRate(50.0f);  // 秒間50個発生
-	explosionEmitter_->SetEmitCount(5);         // 1回に5個発生
 	//------------------------------------------------------------
 	// インゲーム用UI
 	//------------------------------------------------------------
@@ -206,16 +198,6 @@ void GameScene::Update() {
 	YoRigine::GameTime::Update();
 	Player* player = player_.get();
 
-	// エミッター位置を更新
-	explosionEmitter_->SetPosition(currentPosition_);
-
-	// エミッター更新（autoEmitがtrueなら自動発生）
-	explosionEmitter_->Update(YoRigine::GameTime::GetDeltaTime());
-
-#ifdef USE_IMGUI
-	//explosionEmitter_->ShowDebugInfo();
-#endif
-
 	//------------------------------------------------------------
 	// ゲームオーバー時の選択処理
 	//------------------------------------------------------------
@@ -286,6 +268,8 @@ void GameScene::Update() {
 	YoRigine::ModelManipulator::GetInstance()->Update();
 	YoRigine::CollisionManager::GetInstance()->Update();
 	YParticleManager::GetInstance().Update(YoRigine::GameTime::GetDeltaTime());
+	VfxMeshSpawner::GetInstance()->SetCamera(sceneCamera_.get());
+	VfxMeshSpawner::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
 	YoRigine::LightManager::GetInstance()->UpdateShadowMatrix(sceneCamera_.get());
 	YoRigine::GpuEmitManager::GetInstance()->Update();
 
@@ -316,6 +300,7 @@ void GameScene::Draw() {
 	//------------------------------------------------------------
 	// VFX描画
 	//------------------------------------------------------------
+	VfxMeshSpawner::GetInstance()->Draw();
 	player_->DrawVfx();
 }
 
