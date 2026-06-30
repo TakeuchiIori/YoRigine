@@ -11,9 +11,6 @@
 #include "Player/Player.h"
 #include "WorldTransform./WorldTransform.h"
 #include "Drawer/LineManager/Line.h"
-#include "Particle/YParticleEmitter.h"
-
-
 // Camera
 #include "Systems/Camera/CameraDirector.h"
 #include "Systems/Camera/CameraEditor.h"

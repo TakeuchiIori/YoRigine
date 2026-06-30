@@ -61,7 +61,7 @@ namespace YoRigine {
     public:
         static VfxMeshEditor* GetInstance();
 
-        void Initialize(const std::string& scanRoot = "Resources/Vfx/");
+        void Initialize(const std::string& scanRoot = "Resources/Json/VfxMesh/");
         void Finalize();
 
         void Update(float deltaTime);

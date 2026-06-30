@@ -100,6 +100,14 @@ public:
     bool LoadSystemsFromFile(const std::string& filePath);
 
     /// <summary>
+    /// 指定ディレクトリ内の *.json をすべて System として自動ロード（再帰）。
+    /// MyGame の手動ロード羅列を置き換える。Group は System を参照するため、
+    /// Group の Scan より先にこちらを呼ぶこと。
+    /// </summary>
+    /// <returns>ロードに成功したファイル数</returns>
+    size_t ScanDirectory(const std::string& dir = "Resources/Json/YParticleSystems/");
+
+    /// <summary>
     /// JSONからすべてのシステムを読み込み
     /// </summary>
     void LoadSystemsFromJson(const nlohmann::json& json);
@@ -119,6 +127,14 @@ public:
     /// 指定グループと参照システムをバンドルJSONとして保存
     /// </summary>
     bool SaveEffectBundle(const std::string& groupName, const std::string& filePath);
+
+    /// <summary>
+    /// 指定ディレクトリ内の *.json をすべて Effect バンドル（systems+groups 同梱の
+    /// 1エフェクト=1ファイル形式）として自動ロード（再帰）。System も Group も
+    /// 1ファイルに揃っているため、これ単体で完結する（参照切れが起きない）。
+    /// </summary>
+    /// <returns>ロードに成功したファイル数</returns>
+    size_t ScanEffectBundles(const std::string& dir = "Resources/Json/YEffects/");
 
     //=================================================================
     // 更新・描画

@@ -51,18 +51,17 @@ void MyGame::Initialize() {
 	// YParticleManager::GetInstance().LoadEffectBundle("Resources/Json/YEffects/EnemyHit.json");
 	// バンドルファイルはエディタの「エミッタグループ → バンドル保存」ボタンで作成する。
 
-	YParticleManager::GetInstance().LoadSystemsFromFile("Resources/Json/YParticleSystems/EnemyHit1.json");
-	YParticleManager::GetInstance().LoadSystemsFromFile("Resources/Json/YParticleSystems/EnemyHit2.json");
-	YEmitterGroupManager::GetInstance().LoadGroupFromFile("Resources/Json/YEmitterGroups/EnemyHit.json");
+	// System を先に全ロード（Group が名前参照するため）→ Group を後にロード。
+	// JSON を追加するだけで自動ロードされる。手動羅列・ロード漏れ
+	// （以前 EnemyHit3 がロードされず無言で出ていなかった）を構造的に廃止。
+	YParticleManager::GetInstance().ScanDirectory("Resources/Json/YParticleSystems/");
+	YEmitterGroupManager::GetInstance().ScanDirectory("Resources/Json/YEmitterGroups/");
 
-	YParticleManager::GetInstance().LoadSystemsFromFile("Resources/Json/YParticleSystems/Clear.json");
-	YEmitterGroupManager::GetInstance().LoadGroupFromFile("Resources/Json/YEmitterGroups/Clear.json");
-
-	YParticleManager::GetInstance().LoadSystemsFromFile("Resources/Json/YParticleSystems/Title.json");
-	YEmitterGroupManager::GetInstance().LoadGroupFromFile("Resources/Json/YEmitterGroups/Title.json");
+	// 1エフェクト=1ファイル（systems+groups 同梱）。これ単体で完結し
+	// 参照切れが起きない。エフェクトはエディタからこの形式で保存していく（移行先）。
+	YParticleManager::GetInstance().ScanEffectBundles("Resources/Json/YEffects/");
 	//------------------------------------------------------------
 	// パーティクル関連の初期化（YParticle に完全移行済み）
-	// 旧 ParticleManager は削除。エフェクト定義は JSON で管理。
 	//------------------------------------------------------------
 	YoRigine::GpuEmitManager::GetInstance()->Initialize();
 
