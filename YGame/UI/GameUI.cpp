@@ -61,18 +61,16 @@ void GameUI::Initialize()
 	// ★ 初期状態の設定
 	pauseState_ = PauseState::HIDDEN;
 
-	// レイヤー2（ポーズUI）を最初は非表示・透明にしておく
+	// レイヤー2（ポーズUI）の作者値（JSON から読まれたスケール/色）を控えてから、
+	// 「隠れ状態」へ戻す。ここで scale0/alpha0 を live UI に焼いてしまうと、その状態で
+	// UI 保存された時に 0 が JSON に書かれ、二度とポーズメニューが出なくなる。
+	// → 隠れ状態は visible=false のみとし、スケール/色は作者値を維持する。
 	auto layer2 = YoRigine::UIManager::GetInstance()->GetUIsByLayer(2);
 	for (auto& ui : layer2) {
 		pauseOriginalScales_[ui] = ui->GetScale();
 		pauseOriginalColors_[ui] = ui->GetColor();
-		ui->SetVisible(false);
-		// 色情報の取得と透明化（初期化時にやっておく）
-		Vector4 col = ui->GetColor();
-		col.w = 0.0f;
-		ui->SetColor(col);
-		ui->SetScale(Vector2(0.0f, 0.0f)); // 最初はサイズ0
 	}
+	RestorePauseRestingState();
 
 	controlUI_ = std::make_unique<ControlUI>();
 	controlUI_->Initialize();
@@ -135,10 +133,9 @@ void GameUI::Update()
 				pauseState_ = PauseState::HIDDEN;
 				YoRigine::GameTime::Resume(); // 時間を再開
 
-				// 完全に消えたら非表示にする
-				for (auto& pair : pauseOriginalScales_) {
-					if (pair.first) pair.first->SetVisible(false);
-				}
+				// 完全に消えたら隠れ状態へ。閉じアニメで縮んだスケール/色を作者値へ戻し、
+				// visible=false にする（live UI を保存安全な状態に保つ）。
+				RestorePauseRestingState();
 			}
 		}
 	}
@@ -362,6 +359,25 @@ void GameUI::ResetGameOver()
 
 	// リクエストフラグもリセット
 	ClearRequests();
+}
+
+/// <summary>
+/// ポーズメニューの隠れ状態へ戻す（保存しても壊れない状態）。
+/// スケール/色は作者値（pauseOriginalScales_/Colors_）に復元し、visible=false にする。
+/// 開くときは OPENING アニメが t=0 から動くので、ここで作者値に戻しておいて問題ない。
+/// </summary>
+void GameUI::RestorePauseRestingState()
+{
+	for (auto& pair : pauseOriginalScales_) {
+		UIBase* ui = pair.first;
+		if (!ui) continue;
+		ui->SetScale(pair.second);
+		auto itCol = pauseOriginalColors_.find(ui);
+		if (itCol != pauseOriginalColors_.end()) {
+			ui->SetColor(itCol->second);
+		}
+		ui->SetVisible(false);
+	}
 }
 
 /// <summary>

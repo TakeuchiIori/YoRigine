@@ -49,6 +49,9 @@ public:
 private:
 
 	void UpdatePauseVisuals(float t);
+	// ポーズメニューの「隠れ状態」を、保存しても壊れない値（作者値スケール/色＋visible=false）
+	// に戻す。scale0/alpha0 のまま放置して UI 保存で焼き付くのを防ぐ。
+	void RestorePauseRestingState();
 	void ApplyAlpha(float a);
 private:
 	///************************* メンバ変数 *************************///
