@@ -4,7 +4,48 @@
 #include <Systems/GameTime/GameTime.h>
 #include <Systems/Cinematic/CinematicManager.h>
 #include <Systems/Text/TextTextureBaker.h>
+#include "OffScreen/PostEffectManager.h"
 #include <filesystem>
+#include <iterator>
+
+// ============================================================
+// ポーズメニューのレイアウト定数（マジックナンバーを排除）
+//   座標系は画面ピクセル(1600x900・アンカー中心)。色は RGBA 0..1。
+// ============================================================
+namespace PauseLayout {
+	// 色
+	const Vector4 kGold     { 0.85f, 0.72f, 0.25f, 1.0f };  // タイトル/枠
+	const Vector4 kOlive    { 0.43f, 0.40f, 0.19f, 1.0f };  // 行ラベル
+	const Vector4 kWhite    { 1.0f, 1.0f, 1.0f, 1.0f };
+	const Vector4 kPanel    { 0.04f, 0.05f, 0.08f, 0.72f };  // パネル地
+	const Vector4 kDim      { 0.0f, 0.0f, 0.0f, 0.7f };      // 背景暗転
+	const Vector4 kHighlight{ 0.85f, 0.72f, 0.25f, 0.30f };  // 選択バー
+
+	// 画面・パネル共通
+	constexpr float kScreenW = 1600.0f, kScreenH = 900.0f;
+	constexpr float kPanelY = 500.0f;
+	constexpr float kFrameRadius = 22.0f, kFrameThickness = 5.0f;
+
+	// 左パネル（メニュー）
+	constexpr float kLeftX = 400.0f, kLeftW = 600.0f, kLeftH = 640.0f;
+	constexpr float kPauseTitleY = 300.0f;
+	constexpr float kResumeY = 500.0f, kTitleItemY = 630.0f;  // メニュー項目のY
+	constexpr float kHighlightW = 540.0f, kHighlightH = 124.0f;
+
+	// 右パネル（操作一覧）
+	constexpr float kRightX = 1140.0f, kRightW = 860.0f, kRightH = 720.0f;
+	constexpr float kControlsTitleY = 230.0f;
+	constexpr float kRowStartY = 350.0f, kRowStepY = 100.0f;  // 1行目のYと行間
+	constexpr float kIconX = 830.0f, kLabelX = 1240.0f;
+	constexpr float kIconSize = 80.0f, kShoulderIconSize = 64.0f;
+	constexpr float kShoulderOffset = 36.0f;  // LB/RB を中心から左右にずらす量
+	constexpr float kCamLabelOffset = 30.0f;  // カメラリセットラベルの右寄せ微調整
+
+	// フォントサイズ / 字間（負＝詰める）
+	constexpr float kPauseTitleSize = 140.0f, kControlsTitleSize = 84.0f;
+	constexpr float kRowFontSize = 80.0f, kMenuFontSize = 72.0f;
+	constexpr float kRowSpacing = -3.0f, kTitleSpacing = -2.0f;
+}
 
 /// <summary>
 /// 初期化処理
@@ -31,8 +72,8 @@ void GameUI::Initialize()
 	toTitleButton_ = YoRigine::UIManager::GetInstance()->GetUI("title");
 	toGameButton_ = YoRigine::UIManager::GetInstance()->GetUI("toGame");
 
-	// ロックオン操作説明をポーズ画面（layer2）に追加：右スティックアイコンのみ（テキストは廃止）。
-	GetOrCreatePauseUI("LockOnIcon", "Resources/Textures/Operation/Right stick.png", { 1096.0f, 440.0f }, { 100.0f, 100.0f });
+	// ポーズメニューを2パネルレイアウトで構築（左メニュー＋右操作一覧）。
+	BuildPauseLayout();
 
 	// ポーズメニュー用の元サイズ・色情報保存用マップ初期化
 	pauseOriginalScales_.clear();
@@ -97,6 +138,12 @@ void GameUI::Update()
 				pauseAnimTimer_ = 0.0f;
 				YoRigine::GameTime::Pause(); // ゲーム時間を止める
 
+				// 背景をぼかす（ポーズ中だけ GaussSmoothing を後段に追加）
+				if (pauseBlurIndex_ < 0) {
+					pauseBlurIndex_ = PostEffectManager::GetInstance()->AddEffect(
+						OffScreen::OffScreenEffectType::GaussSmoothing, "PauseBlur");
+				}
+
 				// とりあえず表示フラグはONにする（サイズは0からスタート）
 				for (auto& pair : pauseOriginalScales_) {
 					if (pair.first) pair.first->SetVisible(true);
@@ -137,6 +184,12 @@ void GameUI::Update()
 			if (t >= 1.0f) {
 				pauseState_ = PauseState::HIDDEN;
 				YoRigine::GameTime::Resume(); // 時間を再開
+
+				// ポーズ用ブラーを除去
+				if (pauseBlurIndex_ >= 0) {
+					PostEffectManager::GetInstance()->RemoveEffect(pauseBlurIndex_);
+					pauseBlurIndex_ = -1;
+				}
 
 				// 完全に消えたら隠れ状態へ。閉じアニメで縮んだスケール/色を作者値へ戻し、
 				// visible=false にする（live UI を保存安全な状態に保つ）。
@@ -182,6 +235,15 @@ void GameUI::Update()
 			float scale = (currentPauseSelection_ == PauseSelection::TO_TITLE) ? selectionScale_ : normalScale_;
 			Vector2 baseSize = pauseOriginalScales_[toTitleButton_];
 			toTitleButton_->SetScale(baseSize * scale);
+		}
+
+		// --- 選択ハイライトを選択中の項目へスッと移動 ---
+		if (pauseSelectHighlight_) {
+			float targetY = (currentPauseSelection_ == PauseSelection::TO_GAME)
+				? PauseLayout::kResumeY : PauseLayout::kTitleItemY;
+			Vector3 p = pauseSelectHighlight_->GetPosition();
+			p.y += (targetY - p.y) * 0.35f;  // 簡易スムージング
+			pauseSelectHighlight_->SetPosition(p);
 		}
 	}
 	// 操作用UIの更新
@@ -431,6 +493,132 @@ UIBase* GameUI::GetOrCreatePauseUI(const std::string& id, const std::string& tex
 	UIBase* raw = ui.get();
 	mgr->AddUI(id, std::move(ui));
 	return raw;
+}
+
+// ラベル画像を（無ければ）ベイクするユーティリティ
+static void BakeLabelIfMissing(const std::string& text, const std::string& path,
+	float size, const Vector4& fill, float charSpacing = 0.0f,
+	const std::string& font = "Resources/Fonts/kurobara-cinderella.ttf")
+{
+	if (std::filesystem::exists(path)) return;
+	YoRigine::TextBakeParams tp;
+	tp.text = text;
+	tp.fontFilePath = font;
+	tp.fontSize = size;
+	tp.fillColor = fill;
+	tp.outlineWidth = 3.0f; tp.outlineColor = { 0.0f, 0.0f, 0.0f, 1.0f };  // 細め
+	tp.padding = 6.0f;
+	tp.charSpacing = charSpacing;  // 負で字間を詰める
+	YoRigine::TextTextureBaker::Bake(tp, path);
+}
+
+// レイアウト用：UIを取得/生成し、位置・サイズ・色・レイヤーを強制設定する
+UIBase* GameUI::SetupPauseUI(const std::string& id, const std::string& tex,
+	const Vector2& pos, const Vector2& size, const Vector4& color)
+{
+	auto* mgr = YoRigine::UIManager::GetInstance();
+	UIBase* ui = mgr->GetUI(id);
+	if (!ui) {
+		const std::string cfg = "Resources/UIConfigs/GameScene/" + id + ".json";
+		auto up = std::make_unique<UIBase>(id);
+		up->Initialize(cfg);
+		ui = up.get();
+		mgr->AddUI(id, std::move(up));
+	}
+	if (!tex.empty())               ui->SetTexture(tex);          // 空＝据え置き
+	if (size.x > 0.0f && size.y > 0.0f) ui->SetSize(size);        // 0＝実寸据え置き
+	ui->SetAnchorPoint({ 0.5f, 0.5f });
+	ui->SetLayer(2);
+	ui->SetPosition({ pos.x, pos.y, 0.0f });
+	ui->SetColor(color);
+	return ui;
+}
+
+// ポーズメニューを2パネルレイアウトで構築（左：PAUSE＋メニュー / 右：操作一覧）
+void GameUI::BuildPauseLayout()
+{
+	using namespace PauseLayout;
+
+	// ---- 画像パス ----
+	const std::string white_tex   = "Resources/Textures/white.png";
+	const std::string leftFrame   = "Resources/UITex/pause_frame_left.png";
+	const std::string rightFrame  = "Resources/UITex/pause_frame_right.png";
+	const std::string texPause    = "Resources/UITex/label_pause.png";
+	const std::string texControls = "Resources/UITex/label_controls.png";
+	const std::string texWeak     = "Resources/UITex/label_weak.png";
+	const std::string texStrong   = "Resources/UITex/label_strong.png";
+	const std::string texGuard    = "Resources/UITex/label_guard.png";
+	const std::string texLockon   = "Resources/UITex/label_lockon.png";
+	const std::string texCamReset = "Resources/UITex/label_camreset.png";
+	const std::string texResume   = "Resources/UITex/label_resume.png";
+	const std::string texTitle    = "Resources/UITex/label_title.png";
+	const std::string texStick    = "Resources/Textures/Operation/Right stick.png";
+
+	// ---- 必要な画像を用意（無ければベイク/生成） ----
+	if (!std::filesystem::exists(leftFrame))
+		YoRigine::TextTextureBaker::BakeRoundedRectFrame((int)kLeftW, (int)kLeftH, kFrameRadius, kFrameThickness, kGold, leftFrame);
+	if (!std::filesystem::exists(rightFrame))
+		YoRigine::TextTextureBaker::BakeRoundedRectFrame((int)kRightW, (int)kRightH, kFrameRadius, kFrameThickness, kGold, rightFrame);
+	BakeLabelIfMissing("\xE3\x83\x9D\xE3\x83\xBC\xE3\x82\xBA", texPause, kPauseTitleSize, kGold, kTitleSpacing);       // ポーズ
+	BakeLabelIfMissing("\xE6\x93\x8d\xE4\xBD\x9C\xE4\xB8\x80\xE8\xA6\xA7", texControls, kControlsTitleSize, kGold, kRowSpacing); // 操作一覧
+	BakeLabelIfMissing("\xE5\xBC\xB1\xE6\x94\xBB\xE6\x92\x83", texWeak,   kRowFontSize, kOlive, kRowSpacing);          // 弱攻撃
+	BakeLabelIfMissing("\xE5\xBC\xB7\xE6\x94\xBB\xE6\x92\x83", texStrong, kRowFontSize, kOlive, kRowSpacing);          // 強攻撃
+	BakeLabelIfMissing("\xE3\x82\xAC\xE3\x83\xBC\xE3\x83\x89", texGuard,  kRowFontSize, kOlive, kRowSpacing);          // ガード
+	BakeLabelIfMissing("\xE3\x83\xAD\xE3\x83\x83\xE3\x82\xAF\xE3\x82\xAA\xE3\x83\xB3", texLockon, kRowFontSize, kOlive, kRowSpacing); // ロックオン
+	BakeLabelIfMissing("\xE3\x82\xAB\xE3\x83\xA1\xE3\x83\xA9\xE3\x83\xAA\xE3\x82\xBB\xE3\x83\x83\xE3\x83\x88", texCamReset, kRowFontSize, kOlive, kRowSpacing); // カメラリセット
+	BakeLabelIfMissing("\xE3\x82\xB2\xE3\x83\xBC\xE3\x83\xA0\xE3\x81\xB8\xE6\x88\xBB\xE3\x82\x8B", texResume, kMenuFontSize, kGold, kRowSpacing); // ゲームへ戻る
+	BakeLabelIfMissing("\xE3\x82\xBF\xE3\x82\xA4\xE3\x83\x88\xE3\x83\xAB", texTitle, kMenuFontSize, kGold, kRowSpacing); // タイトル
+
+	const Vector2 leftPos { kLeftX,  kPanelY };
+	const Vector2 rightPos{ kRightX, kPanelY };
+
+	// ---- 背景・パネル ----
+	SetupPauseUI("UIBackGround", "", { kScreenW * 0.5f, kScreenH * 0.5f }, { kScreenW, kScreenH }, kDim);
+	SetupPauseUI("PauseLeftPanel",  white_tex, leftPos,  { kLeftW,  kLeftH },  kPanel);
+	SetupPauseUI("PauseRightPanel", white_tex, rightPos, { kRightW, kRightH }, kPanel);
+	SetupPauseUI("PauseLeftFrame",  leftFrame,  leftPos,  { kLeftW,  kLeftH },  kWhite);
+	SetupPauseUI("PauseRightFrame", rightFrame, rightPos, { kRightW, kRightH }, kWhite);
+
+	// ---- 左：タイトル＋ハイライト＋メニュー ----
+	SetupPauseUI("PauseTitle", texPause, { kLeftX, kPauseTitleY }, { 0,0 }, kWhite);
+	pauseSelectHighlight_ = SetupPauseUI("PauseSelectHighlight", white_tex, { kLeftX, kResumeY }, { kHighlightW, kHighlightH }, kHighlight);
+	SetupPauseUI("toGame", texResume, { kLeftX, kResumeY },    { 0,0 }, kWhite); // ゲームへ戻る
+	SetupPauseUI("title",  texTitle,  { kLeftX, kTitleItemY }, { 0,0 }, kWhite); // タイトル
+
+	// ---- 右：操作一覧（アイコン＋ラベルの行をループ生成） ----
+	SetupPauseUI("PauseControlsTitle", texControls, { kRightX, kControlsTitleY }, { 0,0 }, kWhite);
+
+	struct CtrlRow { const char* iconId; std::string iconTex; const char* labelId; std::string labelTex; };
+	const CtrlRow rows[] = {
+		{ "A",          "",        "Weak",             texWeak   },  // A → 弱攻撃
+		{ "B",          "",        "Strong",           texStrong },  // B → 強攻撃
+		{ "LB",         "",        "Guard",            texGuard  },  // X(Xbutton) → ガード
+		{ "LockOnIcon", texStick,  "PauseLockOnLabel", texLockon },  // R3 → ロックオン
+	};
+	for (int i = 0; i < (int)std::size(rows); ++i) {
+		const float y = kRowStartY + kRowStepY * i;
+		SetupPauseUI(rows[i].iconId,  rows[i].iconTex,  { kIconX,  y }, { kIconSize, kIconSize }, kWhite);
+		SetupPauseUI(rows[i].labelId, rows[i].labelTex, { kLabelX, y }, { 0, 0 }, kWhite);
+	}
+	// 最終行：LB/RB（2アイコン）＋ カメラリセット
+	const float camY = kRowStartY + kRowStepY * (float)std::size(rows);
+	SetupPauseUI("PauseLB", "Resources/Textures/Operation/Ex_LB.png", { kIconX - kShoulderOffset, camY }, { kShoulderIconSize, kShoulderIconSize }, kWhite);
+	SetupPauseUI("PauseRB", "Resources/Textures/Operation/Ex_RB.png", { kIconX + kShoulderOffset, camY }, { kShoulderIconSize, kShoulderIconSize }, kWhite);
+	SetupPauseUI("PauseCamResetLabel", texCamReset, { kLabelX + kCamLabelOffset, camY }, { 0,0 }, kWhite); // カメラリセット
+
+	// ---- 重なり順（背面→前面の順に最後尾へ送る） ----
+	const char* zorder[] = {
+		"UIBackGround",
+		"PauseLeftPanel", "PauseRightPanel",
+		"PauseLeftFrame", "PauseRightFrame",
+		"PauseSelectHighlight",
+		"PauseTitle", "PauseControlsTitle",
+		"toGame", "title",
+		"A", "B", "LB", "LockOnIcon", "PauseLB", "PauseRB",
+		"Weak", "Strong", "Guard", "PauseLockOnLabel", "PauseCamResetLabel",
+	};
+	auto* mgr = YoRigine::UIManager::GetInstance();
+	for (const char* id : zorder) mgr->BringToFront(id);
 }
 
 /// <summary>

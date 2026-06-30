@@ -64,6 +64,15 @@ private:
 	// （個別保存・次回起動の復元のため）。size の x/y が 0 ならテクスチャ実寸を使う。
 	UIBase* GetOrCreatePauseUI(const std::string& id, const std::string& texturePath,
 		const Vector2& pos, const Vector2& size);
+
+	// ポーズ画面のレイアウトを構築（2パネル：左メニュー＋右操作一覧）。
+	// 既存UIは再配置、無いものは生成。layer2 キャプチャより前に呼ぶ。
+	void BuildPauseLayout();
+	// レイアウト用：UIを取得/生成し、位置・サイズ・色・レイヤーを強制設定する。
+	//   tex 空 = テクスチャ据え置き（既存流用） / size 0 = 実寸据え置き。
+	UIBase* SetupPauseUI(const std::string& id, const std::string& tex,
+		const Vector2& pos, const Vector2& size, const Vector4& color);
+
 	void ApplyAlpha(float a);
 private:
 	///************************* メンバ変数 *************************///
@@ -133,6 +142,12 @@ private:
 
 	float pauseAnimTimer_ = 0.0f;       // アニメーション経過時間
 	const float pauseAnimDuration_ = 0.125f; // アニメーションにかかる時間（秒）
+
+	// ポーズ中だけ追加する背景ブラーのエフェクト index（-1=未追加）
+	int pauseBlurIndex_ = -1;
+
+	// 選択ハイライト（左メニューの選択中項目の裏に出す金バー）
+	UIBase* pauseSelectHighlight_ = nullptr;
 
 private:
 	///************************* 他のUI *************************///
