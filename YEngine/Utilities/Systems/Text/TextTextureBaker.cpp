@@ -211,6 +211,63 @@ namespace {
 		return true;
 	}
 
+	// PBGRA(プリマルチプライ)の WIC ビットマップを、ストレートアルファに直して PNG 保存する
+	bool SaveWicBitmapToPng(IWICImagingFactory* wic, IWICBitmap* wicBmp,
+		UINT bmpW, UINT bmpH, const std::string& outPngPath) {
+		// プリマルチプライ解除（PNG はストレートアルファ）
+		WICRect rc{ 0, 0, (INT)bmpW, (INT)bmpH };
+		ComPtr<IWICBitmapLock> lock;
+		if (FAILED(wicBmp->Lock(&rc, WICBitmapLockRead, &lock))) return false;
+		UINT cbBuf = 0, stride = 0; BYTE* src = nullptr;
+		lock->GetStride(&stride);
+		lock->GetDataPointer(&cbBuf, &src);
+		std::vector<BYTE> buf(src, src + cbBuf);
+		lock.Reset();
+		for (UINT y = 0; y < bmpH; ++y) {
+			BYTE* row = buf.data() + (size_t)y * stride;
+			for (UINT x = 0; x < bmpW; ++x) {
+				BYTE* px = row + (size_t)x * 4; // B,G,R,A
+				BYTE a = px[3];
+				if (a != 0 && a != 255) {
+					px[0] = (BYTE)std::min(255, px[0] * 255 / a);
+					px[1] = (BYTE)std::min(255, px[1] * 255 / a);
+					px[2] = (BYTE)std::min(255, px[2] * 255 / a);
+				}
+			}
+		}
+
+		// 出力先ディレクトリを用意
+		std::error_code ec;
+		std::filesystem::path outPath(outPngPath);
+		if (outPath.has_parent_path()) std::filesystem::create_directories(outPath.parent_path(), ec);
+
+		// PNG エンコード
+		ComPtr<IWICBitmap> straight;
+		if (FAILED(wic->CreateBitmapFromMemory(bmpW, bmpH, GUID_WICPixelFormat32bppBGRA,
+			stride, cbBuf, buf.data(), &straight))) {
+			return false;
+		}
+		ComPtr<IWICStream> stream;
+		if (FAILED(wic->CreateStream(&stream))) return false;
+		if (FAILED(stream->InitializeFromFilename(
+			std::filesystem::path(outPngPath).wstring().c_str(), GENERIC_WRITE))) return false;
+
+		ComPtr<IWICBitmapEncoder> encoder;
+		if (FAILED(wic->CreateEncoder(GUID_ContainerFormatPng, nullptr, &encoder))) return false;
+		if (FAILED(encoder->Initialize(stream.Get(), WICBitmapEncoderNoCache))) return false;
+
+		ComPtr<IWICBitmapFrameEncode> frame;
+		if (FAILED(encoder->CreateNewFrame(&frame, nullptr))) return false;
+		if (FAILED(frame->Initialize(nullptr))) return false;
+		frame->SetSize(bmpW, bmpH);
+		WICPixelFormatGUID pf = GUID_WICPixelFormat32bppBGRA;
+		frame->SetPixelFormat(&pf);
+		if (FAILED(frame->WriteSource(straight.Get(), nullptr))) return false;
+		if (FAILED(frame->Commit())) return false;
+		if (FAILED(encoder->Commit())) return false;
+		return true;
+	}
+
 } // namespace
 
 namespace YoRigine {
@@ -291,61 +348,43 @@ namespace YoRigine {
 		rt->BeginDraw();
 		rt->Clear(D2D1::ColorF(0, 0, 0, 0));   // 透明背景
 		layout->Draw(nullptr, &renderer, margin, margin);
-		HRESULT hrEnd = rt->EndDraw();
-		if (FAILED(hrEnd)) return false;
+		if (FAILED(rt->EndDraw())) return false;
 
-		// ---- プリマルチプライ解除（PNG はストレートアルファ） ----
-		WICRect rc{ 0, 0, (INT)bmpW, (INT)bmpH };
-		ComPtr<IWICBitmapLock> lock;
-		if (FAILED(wicBmp->Lock(&rc, WICBitmapLockRead, &lock))) return false;
-		UINT cbBuf = 0, stride = 0; BYTE* src = nullptr;
-		lock->GetStride(&stride);
-		lock->GetDataPointer(&cbBuf, &src);
-		std::vector<BYTE> buf(src, src + cbBuf);
-		lock.Reset();
-		for (UINT y = 0; y < bmpH; ++y) {
-			BYTE* row = buf.data() + (size_t)y * stride;
-			for (UINT x = 0; x < bmpW; ++x) {
-				BYTE* px = row + (size_t)x * 4; // B,G,R,A
-				BYTE a = px[3];
-				if (a != 0 && a != 255) {
-					px[0] = (BYTE)std::min(255, px[0] * 255 / a);
-					px[1] = (BYTE)std::min(255, px[1] * 255 / a);
-					px[2] = (BYTE)std::min(255, px[2] * 255 / a);
-				}
-			}
-		}
+		return SaveWicBitmapToPng(f.wic.Get(), wicBmp.Get(), bmpW, bmpH, outPngPath);
+	}
 
-		// ---- 出力先ディレクトリを用意 ----
-		std::error_code ec;
-		std::filesystem::path outPath(outPngPath);
-		if (outPath.has_parent_path()) std::filesystem::create_directories(outPath.parent_path(), ec);
+	bool TextTextureBaker::BakeRoundedRectFrame(int width, int height, float cornerRadius,
+		float borderThickness, const Vector4& color, const std::string& outPngPath) {
+		Factories& f = GetFactories();
+		if (!f.ok || width <= 0 || height <= 0) return false;
 
-		// ---- PNG エンコード ----
-		ComPtr<IWICBitmap> straight;
-		if (FAILED(f.wic->CreateBitmapFromMemory(bmpW, bmpH, GUID_WICPixelFormat32bppBGRA,
-			stride, cbBuf, buf.data(), &straight))) {
+		const UINT bmpW = (UINT)width, bmpH = (UINT)height;
+		ComPtr<IWICBitmap> wicBmp;
+		if (FAILED(f.wic->CreateBitmap(bmpW, bmpH, GUID_WICPixelFormat32bppPBGRA,
+			WICBitmapCacheOnLoad, &wicBmp))) {
 			return false;
 		}
-		ComPtr<IWICStream> stream;
-		if (FAILED(f.wic->CreateStream(&stream))) return false;
-		if (FAILED(stream->InitializeFromFilename(ToWide(outPngPath).c_str(), GENERIC_WRITE))) return false;
+		D2D1_RENDER_TARGET_PROPERTIES rtProps = D2D1::RenderTargetProperties(
+			D2D1_RENDER_TARGET_TYPE_DEFAULT,
+			D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED),
+			96.0f, 96.0f);
+		ComPtr<ID2D1RenderTarget> rt;
+		if (FAILED(f.d2d->CreateWicBitmapRenderTarget(wicBmp.Get(), &rtProps, &rt))) return false;
 
-		ComPtr<IWICBitmapEncoder> encoder;
-		if (FAILED(f.wic->CreateEncoder(GUID_ContainerFormatPng, nullptr, &encoder))) return false;
-		if (FAILED(encoder->Initialize(stream.Get(), WICBitmapEncoderNoCache))) return false;
+		ComPtr<ID2D1SolidColorBrush> brush;
+		rt->CreateSolidColorBrush(ToColor(color), &brush);
 
-		ComPtr<IWICBitmapFrameEncode> frame;
-		if (FAILED(encoder->CreateNewFrame(&frame, nullptr))) return false;
-		if (FAILED(frame->Initialize(nullptr))) return false;
-		frame->SetSize(bmpW, bmpH);
-		WICPixelFormatGUID pf = GUID_WICPixelFormat32bppBGRA;
-		frame->SetPixelFormat(&pf);
-		if (FAILED(frame->WriteSource(straight.Get(), nullptr))) return false;
-		if (FAILED(frame->Commit())) return false;
-		if (FAILED(encoder->Commit())) return false;
+		// 線が枠内に収まるよう半幅だけ内側に寄せた矩形をストローク
+		const float h = borderThickness * 0.5f;
+		D2D1_ROUNDED_RECT rr = D2D1::RoundedRect(
+			D2D1::RectF(h, h, (float)width - h, (float)height - h), cornerRadius, cornerRadius);
 
-		return true;
+		rt->BeginDraw();
+		rt->Clear(D2D1::ColorF(0, 0, 0, 0));
+		rt->DrawRoundedRectangle(rr, brush.Get(), borderThickness);
+		if (FAILED(rt->EndDraw())) return false;
+
+		return SaveWicBitmapToPng(f.wic.Get(), wicBmp.Get(), bmpW, bmpH, outPngPath);
 	}
 
 	bool TextTextureBaker::BakeAndRegisterUI(const std::string& uiId, const TextBakeParams& params,

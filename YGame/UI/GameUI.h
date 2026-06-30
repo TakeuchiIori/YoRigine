@@ -15,6 +15,12 @@ public:
 	void DrawAll();
 	void Draw();
 
+	// バトル中かどうかを ControlUI へ伝える（LB/RB 押下アニメのゲート用）
+	void SetBattleActive(bool active);
+
+	// 画面外ヒット時のロックオン照準フラッシュを再生する（ControlUI へ委譲）
+	void FlashLockOn();
+
 	/// <summary>
 	///  ゲームオーバーUIをフェード表示する
 	/// </summary>
@@ -52,6 +58,10 @@ private:
 	// ポーズメニューの「隠れ状態」を、保存しても壊れない値（作者値スケール/色＋visible=false）
 	// に戻す。scale0/alpha0 のまま放置して UI 保存で焼き付くのを防ぐ。
 	void RestorePauseRestingState();
+	// ポーズ画面用 UI を取得。無ければ layer2 で生成して configPath を持たせる
+	// （個別保存・次回起動の復元のため）。size の x/y が 0 ならテクスチャ実寸を使う。
+	UIBase* GetOrCreatePauseUI(const std::string& id, const std::string& texturePath,
+		const Vector2& pos, const Vector2& size);
 	void ApplyAlpha(float a);
 private:
 	///************************* メンバ変数 *************************///

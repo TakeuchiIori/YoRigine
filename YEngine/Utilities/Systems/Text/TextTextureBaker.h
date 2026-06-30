@@ -53,6 +53,11 @@ namespace YoRigine {
 		// 画像サイズはテキスト境界＋余白から自動算出する。
 		static bool Bake(const TextBakeParams& params, const std::string& outPngPath);
 
+		// 角丸四角の「枠」テクスチャ（中央は透明・縁だけ）を生成して PNG 保存する。
+		// ボタンの枠飾りなどに使う。cornerRadius=0 で直角の四角枠。
+		static bool BakeRoundedRectFrame(int width, int height, float cornerRadius,
+			float borderThickness, const Vector4& color, const std::string& outPngPath);
+
 		// ベイクして、その PNG を UIBase として UIManager に登録する便利関数。
 		// 既に同 id があれば貼り替える。成功で true。
 		static bool BakeAndRegisterUI(const std::string& uiId,

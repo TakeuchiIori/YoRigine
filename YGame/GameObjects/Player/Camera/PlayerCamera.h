@@ -86,6 +86,12 @@ public:
     // ============================================================
     void OnAttackHit(const Vector3& enemyWorldPos);
 
+    // 見切れヒット演出が発火した時 true を1回返す（ロックオンUIフラッシュのトリガ）。
+    // GameScene が毎フレーム拾って GameUI::FlashLockOn を呼ぶ。
+    bool ConsumeLockOnFlashRequest() {
+        bool r = lockOnFlashRequested_; lockOnFlashRequested_ = false; return r;
+    }
+
     // ============================================================
     // FollowCamera への委譲
     // ============================================================
@@ -249,4 +255,5 @@ private:
     float offscreenHitShakeInt_ = 0.30f;    // シェイク強度
     float offscreenHitShakeDur_ = 0.15f;    // シェイク時間（秒）
     float offscreenHitCdTimer_  = 0.0f;     // クールダウン残り（内部状態）
+    bool  lockOnFlashRequested_ = false;    // 見切れ演出発火→UIフラッシュ要求（GameSceneが消費）
 };

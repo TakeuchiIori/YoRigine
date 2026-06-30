@@ -263,6 +263,12 @@ void GameScene::Update() {
 
 	// 空と共通システム更新
 	skyBox_->Update();
+	// バトル中のみ LB/RB の押下アニメを許可
+	gameUI_->SetBattleActive(subSceneManager_ && subSceneManager_->GetCurrentSceneName() == "Battle");
+	// 画面外ヒット演出が発火していたら、ロックオン照準フラッシュを再生
+	if (player_ && player_->GetPlayerCamera() && player_->GetPlayerCamera()->ConsumeLockOnFlashRequest()) {
+		gameUI_->FlashLockOn();
+	}
 	gameUI_->Update();
 
 	YoRigine::ModelManipulator::GetInstance()->Update();

@@ -543,6 +543,9 @@ void PlayerCamera::TriggerOffscreenHitReaction(const Vector3* enemyWorldPos) {
     if (offscreenHitShakeInt_ > 0.0f && offscreenHitShakeDur_ > 0.0f) {
         followCamera_->StartShake(offscreenHitShakeInt_, offscreenHitShakeDur_);
     }
+
+    // ロックオンUIフラッシュを要求（GameScene が拾って GameUI::FlashLockOn を呼ぶ）
+    lockOnFlashRequested_ = true;
 }
 
 // 武器のヒット検出から呼ぶ入口。発火条件を満たし、かつ敵が画面外の時だけ演出する。

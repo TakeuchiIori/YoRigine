@@ -4,6 +4,7 @@
         "GameOver",
         "Retry",
         "ToTitle",
+        "EnemyAlert",
         "startButton",
         "buttonBG",
         "buttonBG2",
@@ -19,7 +20,13 @@
         "ripples",
         "playerHPBG",
         "playerHPBar",
-        "EnemyAlert",
+        "ExLB_outline",
+        "ExRB_outline",
+        "ExLB",
+        "ExRB",
+        "LockOnHintIcon",
+        "LockOnHintStick",
+        "LockOnFlash",
         "UIBackGround",
         "A",
         "B",
@@ -28,7 +35,8 @@
         "Weak",
         "Guard",
         "title",
-        "toGame"
+        "toGame",
+        "LockOnIcon"
     ],
     "groups": null,
     "uis": [
@@ -47,6 +55,10 @@
         {
             "configPath": "./Resources/UIConfigs/GameScene/ToTitle.json",
             "id": "ToTitle"
+        },
+        {
+            "configPath": "./Resources/UIConfigs/GameScene/EnemyAlert.json",
+            "id": "EnemyAlert"
         },
         {
             "configPath": "./Resources/UIConfigs/GameScene/startButton.json",
@@ -109,8 +121,32 @@
             "id": "playerHPBar"
         },
         {
-            "configPath": "./Resources/UIConfigs/GameScene/EnemyAlert.json",
-            "id": "EnemyAlert"
+            "configPath": "./Resources/UIConfigs/GameScene/ExLB_outline.json",
+            "id": "ExLB_outline"
+        },
+        {
+            "configPath": "./Resources/UIConfigs/GameScene/ExRB_outline.json",
+            "id": "ExRB_outline"
+        },
+        {
+            "configPath": "./Resources/UIConfigs/GameScene/ExLB.json",
+            "id": "ExLB"
+        },
+        {
+            "configPath": "./Resources/UIConfigs/GameScene/ExRB.json",
+            "id": "ExRB"
+        },
+        {
+            "configPath": "./Resources/UIConfigs/GameScene/LockOnHintIcon.json",
+            "id": "LockOnHintIcon"
+        },
+        {
+            "configPath": "./Resources/UIConfigs/GameScene/LockOnHintStick.json",
+            "id": "LockOnHintStick"
+        },
+        {
+            "configPath": "./Resources/UIConfigs/GameScene/LockOnFlash.json",
+            "id": "LockOnFlash"
         },
         {
             "configPath": "./Resources/UIConfigs/GameScene/UIBackGround.json",
@@ -147,6 +183,10 @@
         {
             "configPath": "./Resources/UIConfigs/GameScene/toGame.json",
             "id": "toGame"
+        },
+        {
+            "configPath": "./Resources/UIConfigs/GameScene/LockOnIcon.json",
+            "id": "LockOnIcon"
         }
     ]
 }

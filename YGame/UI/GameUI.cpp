@@ -3,6 +3,8 @@
 #include <Systems/Input/Input.h>
 #include <Systems/GameTime/GameTime.h>
 #include <Systems/Cinematic/CinematicManager.h>
+#include <Systems/Text/TextTextureBaker.h>
+#include <filesystem>
 
 /// <summary>
 /// 初期化処理
@@ -28,6 +30,9 @@ void GameUI::Initialize()
 	startButton_ = YoRigine::UIManager::GetInstance()->GetUI("startButton");
 	toTitleButton_ = YoRigine::UIManager::GetInstance()->GetUI("title");
 	toGameButton_ = YoRigine::UIManager::GetInstance()->GetUI("toGame");
+
+	// ロックオン操作説明をポーズ画面（layer2）に追加：右スティックアイコンのみ（テキストは廃止）。
+	GetOrCreatePauseUI("LockOnIcon", "Resources/Textures/Operation/Right stick.png", { 1096.0f, 440.0f }, { 100.0f, 100.0f });
 
 	// ポーズメニュー用の元サイズ・色情報保存用マップ初期化
 	pauseOriginalScales_.clear();
@@ -272,6 +277,22 @@ void GameUI::Update()
 
 
 /// <summary>
+/// バトル中フラグを ControlUI へ伝える
+/// </summary>
+void GameUI::SetBattleActive(bool active)
+{
+	if (controlUI_) controlUI_->SetBattleActive(active);
+}
+
+/// <summary>
+/// ロックオン照準フラッシュを再生（ControlUI へ委譲）
+/// </summary>
+void GameUI::FlashLockOn()
+{
+	if (controlUI_) controlUI_->FlashLockOn();
+}
+
+/// <summary>
 /// UI描画（全部）
 /// </summary>
 void GameUI::DrawAll()
@@ -378,6 +399,33 @@ void GameUI::RestorePauseRestingState()
 		}
 		ui->SetVisible(false);
 	}
+}
+
+/// <summary>
+/// ポーズ画面用 UI を取得（無ければ layer2 で生成し configPath を持たせる）
+/// </summary>
+UIBase* GameUI::GetOrCreatePauseUI(const std::string& id, const std::string& texturePath,
+	const Vector2& pos, const Vector2& size)
+{
+	auto* mgr = YoRigine::UIManager::GetInstance();
+	if (UIBase* exist = mgr->GetUI(id)) return exist;  // 既にシーンにあればそれを使う
+
+	const std::string cfg = "Resources/UIConfigs/GameScene/" + id + ".json";
+	const bool hadCfg = std::filesystem::exists(cfg);
+
+	auto ui = std::make_unique<UIBase>(id);
+	ui->Initialize(cfg);   // 既存あれば位置/サイズ/テクスチャ復元、無ければ configPath_ を設定
+	if (!hadCfg) {
+		ui->SetTexture(texturePath);
+		if (size.x > 0.0f && size.y > 0.0f) ui->SetSize(size); // 0 はテクスチャ実寸を使う
+		ui->SetAnchorPoint({ 0.5f, 0.5f });
+		ui->SetLayer(2);
+		ui->SetPosition({ pos.x, pos.y, 0.0f });
+		ui->SaveToJSON();  // 正しい初期値を保存（次回起動で復元）
+	}
+	UIBase* raw = ui.get();
+	mgr->AddUI(id, std::move(ui));
+	return raw;
 }
 
 /// <summary>

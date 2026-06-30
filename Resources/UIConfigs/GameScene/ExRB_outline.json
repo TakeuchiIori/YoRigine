@@ -1,22 +1,22 @@
 {
     "anchorPoint": {
-        "x": 0.0,
-        "y": 0.0
+        "x": 0.5,
+        "y": 0.5
     },
     "animations": [],
     "color": {
-        "a": 0.0,
+        "a": 1.0,
         "b": 1.0,
         "g": 1.0,
         "r": 1.0
     },
     "flipX": false,
     "flipY": false,
-    "layer": 0,
-    "name": "GameOver",
+    "layer": 1,
+    "name": "ExRB_outline",
     "position": {
-        "x": 228.0,
-        "y": 0.0,
+        "x": 1480.0,
+        "y": 150.0,
         "z": 0.0
     },
     "rotation": {
@@ -29,17 +29,17 @@
         "y": 1.0
     },
     "size": {
-        "x": 1200.0,
-        "y": 400.0
+        "x": 168.5,
+        "y": 120.0
     },
     "textureLeftTop": {
         "x": 0.0,
         "y": 0.0
     },
-    "texturePath": "Resources/Textures/GameScene/GameOver.dds",
+    "texturePath": "Resources/Textures/Operation/frame_square.png",
     "textureSize": {
-        "x": 1200.0,
-        "y": 400.0
+        "x": 128.0,
+        "y": 128.0
     },
     "uvRotation": 0.0,
     "uvScale": {
@@ -50,5 +50,5 @@
         "x": 0.0,
         "y": 0.0
     },
-    "visible": false
+    "visible": true
 }
