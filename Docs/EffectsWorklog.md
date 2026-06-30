@@ -298,3 +298,106 @@ DrawEditPanel の Trail/LightVolume/Smoke/Lightning 縦積み(checkbox+TreeNode)
 - UE5風レシピ: Smoke(火球色=明オレンジHDR/煙色=暗灰/上昇1.5/密度高)+Shockwave(暖色HDR/半径大/膨張0.4)+Lightning(任意)+ワンショットON/破裂時間2.5。
 - 残: 火花パーティクル同期・画面フラッシュ・熱揺らぎ・ワールド発火トリガ。
 
+---
+
+## 2026-06-30 — 新オーサリング設計確定: YParticle を「Effect」単位に集約（設計のみ・未実装）
+
+ユーザー要望: ①複数Systemを組み合わせて1つのエフェクトを完成させ名前を付けたい ②ゲーム側から超簡単に再生したい ③Editorが扱いにくいので何とかしたい。
+
+### 使いにくさ診断（現状）
+- **入口が2つに割れている**: 単一System→`EffectHandle::Play(name)` 1行 / 複数System束ね(Group)→`YEmitterGroupManager::GetGroup()` 生API 6行＋nullチェック。`EffectHandle` がGroup非対応なのが主因。
+- **手動ロード羅列が壊れやすい（実害あり）**: `MyGame.cpp` で `LoadSystemsFromFile` を1個ずつ手書き。`EnemyHit` グループは EnemyHit1/2/**3** を参照するが MyGame は 1/2 しかロードしておらず、**EnemyHit3 が無言で出ていない**。
+- **エディタが2ウィンドウ往復**: System編集=`YParticleEditor` / 束ね=`YEmitterGroupEditor`。後者は **System名を文字列で手打ち**（`newEmitterSystemName_[128]`）して繋ぐ→タイプミスでサイレント失敗。保存もSystem/Group/Bundleの3系統で迷う。「エフェクト」という第一級単位がエディタに存在しない。
+
+### 決定事項
+- **「Effect」を第一級概念にする**。Effect = 名前 + 構成System群（modules同梱）+ 各Systemのoffset。System1個だけのEffectも可。
+- **データ構造 = 同梱方式**（ユーザー選択）。`Resources/Json/YEffects/<名前>.json` 1ファイルに systems の定義(modules)も配置(offset)も全部入れる。参照切れが原理的に起きない（EnemyHit3問題が構造的に消える）。既存 `LoadEffectBundle`/`SaveEffectBundle`(systems+groups in 1 file) が土台。
+  ```json
+  { "name":"EnemyHit",
+    "systems":[ {"name":"EnemyHit1","modules":{...},"offset":[0,0,0]},
+                {"name":"EnemyHit2","modules":{...},"offset":[0,1,0]},
+                {"name":"EnemyHit3","modules":{...},"offset":[0,0,0]} ] }
+  ```
+- **ランタイム（ゲーム側）= 名前1発**。`EffectHandle::PlayOneShot("EnemyHit", pos)` / `Play("SlashTrail", pos, true)`。内部解決順: Effect(Group相当)を名前で引く→無ければSystem単体fallback。同名衝突はEffect優先＋警告ログ。EffectHandle 内部表現を「System経路(emitter_) or Group/Effect経路」のどちらか持つ形に拡張。
+- **自動ロード**: `MyGame` の手動羅列を廃止し `ScanDirectory("Resources/Json/YEffects/")` で全自動ロード（VfxMeshSpawner と同手法）。
+- **エディタ刷新 = 1画面 Effect Editor**: 左=Effect一覧 / 中=構成System一覧（追加は**ドロップダウン選択**、手打ち廃止 / offset編集）/ 右=選択Systemのモジュール編集をインライン / 上=[▶プレビュー再生] / 下=[このEffectを保存]1ボタン → `YEffects/<名前>.json`。
+
+### 移行方針
+- 既存 `YParticleSystems/*.json` `YEmitterGroups/*.json` は読めるまま残す（後方互換）。新規は `YEffects/` に集約。
+- 着手したら PlayerSword の `GetGroup("EnemyHit")` 6行を `EffectHandle::PlayOneShot("EnemyHit", hitPos)` に置換。BattleEnemy.cpp:312 の同コードはコメントアウト済み（死にコード）。
+
+### 状態
+- 設計確定 → **フェーズ1（入口統一＋自動ロード）実装完了・Debugビルド成功**（下記）。フェーズ2(YEffects同梱フォーマット)・3(Effect Editor 1画面化)は未着手。
+
+---
+
+## 2026-06-30 — フェーズ1実装: EffectHandle 入口統一 ＋ 自動ロード（ビルド成功）
+
+設計の施策1+2を実装。**既存JSONフォーマットのまま**、ゲーム側の入口統一とロード自動化を実現。
+
+### 変更点
+- **`YParticleManager::ScanDirectory(dir)`** 追加（`.cpp`/`.h`）: ディレクトリ内 `*.json` を `LoadSystemsFromFile` で再帰自動ロード。`<filesystem>`/`<fstream>` include 追加。
+- **`YEmitterGroupManager::ScanDirectory(dir)`** 追加: 同様に `LoadGroupFromFile` で自動ロード。**System を先に Scan → Group を後に Scan**（GroupはSystem名参照のため）。
+- **`EffectHandle` を Group 対応に拡張**: `Play/PlayOneShot` が名前をまず `YEmitterGroupManager::GetGroup` で解決→あればGroup経路（SetPosition/SetActive/loop時SetAutoEmitAll/非loop時EmitAll）、無ければ従来のSystem単体経路。`group_`(借用ptr)メンバ追加、`SetPosition/Stop/IsActive` を経路でディスパッチ。同名衝突は Group優先＋Loggerで警告。ループ追従は `YEmitterGroupManager::Update`(YParticleManager::Update内246行から毎フレーム呼ばれる)で機能。
+- **`MyGame.cpp`**: 手動 `LoadSystemsFromFile`/`LoadGroupFromFile` 羅列(8行) → `ScanDirectory` 2発に置換。
+- **`PlayerSword.cpp:233`**: 生グループAPI 6行 → `hitEffect_ = EffectHandle::PlayOneShot("EnemyHit", hitPos, 10);` 1行。`hitEffect_` メンバは元から宣言済みだが未使用だった。不要になった `YEmitterGroupManager.h`/`YEmitterGroup.h` include を整理。
+
+### 効果
+- ✅ **EnemyHit3 ロード漏れが自動解消**: `Resources/Json/YParticleSystems/EnemyHit3.json` は存在したが MyGame が EnemyHit1/2 しか手動ロードしておらず無言で出ていなかった。Scan化で全自動ロード。
+- ✅ ゲーム側は中身がGroupか単発System かを意識せず名前1つで再生（`EffectHandle::PlayOneShot("EnemyHit", pos)`）。
+- ✅ エフェクト追加=JSON置くだけ。MyGame修正不要。
+
+### 検証
+- premake5 再生成（前ターンのVfxMesh新規ファイル反映）→ **MSBuild Debug x64 ビルド成功、YMain.exe 生成**。0 error。
+- ⏳ 実機ランタイム検証は未（剣ヒットで EnemyHit1/2/3 が出るか、ループ追従の確認）。
+
+### 次の一手
+- フェーズ2: `YEffects/<名前>.json` 同梱フォーマット（systems定義+offset を1ファイル）。既存 `LoadEffectBundle`/`SaveEffectBundle` が土台。
+- フェーズ3: Effect Editor 1画面化（System追加はドロップダウン選択・保存1ボタン・プレビュー再生）。
+
+---
+
+## 2026-06-30 — フェーズ2実装: YEffects 同梱フォーマット採用（ビルド成功）
+
+設計の施策3。**同梱フォーマットは既存 `LoadEffectBundle`/`SaveEffectBundle` が既に提供していた**（`{"systems":[{name,modules...}], "groups":[{groupName,emitters:[{systemName,offset}]}]}`）。新フォーマットは作らず、これを `YEffects/` 単位の正式エフェクトとして採用するだけでフェーズ2が成立。
+
+### 変更点
+- **`YParticleManager::ScanEffectBundles(dir)`** 追加: `YEffects/*.json` を `LoadEffectBundle` で再帰自動ロード。1ファイルで systems(modules込み)＋groups(offset込み) が完結 → 参照切れ原理消滅。
+- **`MyGame.cpp`**: `ScanDirectory(Systems)` → `ScanDirectory(Groups)` → **`ScanEffectBundles("Resources/Json/YEffects/")`** を追加。旧フォルダ形式と YEffects 形式を共存させ、段階移行できる。
+- **EnemyHit を YEffects に移行**: `YParticleSystems/EnemyHit1,2,3.json` ＋ `YEmitterGroups/EnemyHit.json` を統合して **`Resources/Json/YEffects/EnemyHit.json`** を新規作成。旧4ファイルは削除（情報は完全移行）。
+
+### 重要な制約（二重ロード）
+- `LoadSystemsFromJson` は既存 System に対しても無条件で `AddSpawnModule`/`AddUpdateModule` する（`CreateSystem` は同名なら既存を返すだけ・クリアしない）。→ **同名 System を旧フォルダと YEffects の両方に置くとモジュールが二重追加されて壊れる**。移行したら旧ファイルを必ず消すこと。共存安全化（再ロード時クリア＝ホットリロード対応）は将来フェーズ3で別途検討。
+
+### 検証
+- **MSBuild Debug x64 ビルド成功、YMain.exe 生成**。0 error。
+- EnemyHit は `YEffects/EnemyHit.json` 1ファイルから systems+group がロードされ、`EffectHandle::PlayOneShot("EnemyHit", hitPos, 10)`（PlayerSword）で解決される構成。
+- ⏳ 実機での EnemyHit 表示確認は未。
+
+### 次の一手
+- フェーズ3: Effect Editor 1画面化。System追加はドロップダウン選択（手打ち廃止）・保存は `SaveEffectBundle` で `YEffects/` に1ボタン・プレビュー再生。これで Clear/Title/BattleArea も順次 YEffects へ移行でき、旧2フォルダを最終的に廃止。
+- フェーズ3で「再ロード時クリア（同名Systemのモジュール作り直し）」を入れると、エディタの上書き保存→即反映（ホットリロード）が安全になる。
+
+---
+
+## 2026-06-30 — フェーズ3実装: Effect Editor 改善（既存 YEmitterGroupEditor を育成、ビルド成功）
+
+**前提修正**: 現状エディタを読んだら想定よりずっと出来ていた。System選択リストもバンドル保存(YEffects へ `SaveEffectBundle`)も**既に実装済み**だった（「手打ちのみ・バンドル無し」という以前の診断は誤り）。新規エディタは作らず既存を育てる方針に変更。ユーザーが触って報告した不満を直接潰した。
+
+### 対応した不満と実装
+1. **保存/読込ボタンが多すぎる** → `ShowFileButtons` 再編。先頭に主導線「エフェクトを保存」「エフェクトを開く」(YEffects/ バンドル)。旧 YEmitterGroups 分離形式の4ボタンは `if(!CollapsingHeader("旧形式…")) return;` で折りたたみ。バンドル読込 `loadBundleBrowser_`(YEffects/, `LoadEffectBundle`)を新設(.h+コンストラクタ)。
+2. **System編集の往復** → `ShowSelectedEmitterDetail` 末尾に CollapsingHeader「システム "xxx" を編集」を追加し `sys->ShowEditor()` をインライン展開。`YParticleEditor` 別ウィンドウ不要に。
+3. **一覧が見づらい/新規作成が分からない** → `ShowGroupList` ヘッダを「エフェクト一覧」に。先頭に緑の「＋ 新規エフェクト」ボタン(NewEffect 自動ユニーク名→選択)。右クリックに「複製」(SaveToJson→ユニーク名→CreateGroup+LoadFromJson)。
+4. **プレビューが見えない**（実機で判明）→ 原因は **EmitAll がグループの保存位置で発生**し、EnemyHit は位置Y=33(ユーザー編集)で上空に出て画面外だった。`previewPos_`(既定{0,2,0}, DragFloat3+原点リセット)を追加し、グループ全体 Emit(x1/10/100)は保存位置を一時上書き→発生→復元する `emitAtPreview` 経由に。System プレビューも emitter の `FollowEmit(previewPos_, n)` で同位置に発生。これで保存位置に関係なく必ず見える。
+
+### つまずき
+- StepB/C とフェーズ3記録は一度ユーザーに中断され、その時の編集が**ファイルに適用されていなかった**（ラベルが「エミッターグループ」のままだった）。Grep でファイルの実状態を確認して再適用。**ツール結果を過信せず現物確認**する教訓。
+
+### 検証
+- **MSBuild Debug x64 ビルド成功**。0 error。
+- ⏳ 実機での確認は未（新規エフェクト作成→エミッタ追加→プレビュー再生→System インライン編集→保存の一連）。
+
+### 残
+- プレビュー: 再生は previewPos_ で出るが、カメラがそこを向いていないと依然見えない可能性。必要なら「カメラ前で再生」を追加。
+- 再ロード時クリア（ホットリロード安全化）。旧2フォルダ(YParticleSystems/YEmitterGroups)の最終廃止。
+

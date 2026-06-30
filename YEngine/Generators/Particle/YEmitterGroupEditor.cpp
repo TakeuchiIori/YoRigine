@@ -32,7 +32,8 @@ YEmitterGroupEditor::YEmitterGroupEditor()
     , loadBrowser_(emitterDirectory_, { ".json" }, YoRigine::FileBrowser::DisplayMode::List)
     , saveSingleBrowser_(emitterDirectory_, { ".json" }, YoRigine::FileBrowser::DisplayMode::List)
     , loadSingleBrowser_(emitterDirectory_, { ".json" }, YoRigine::FileBrowser::DisplayMode::List)
-    , saveBundleBrowser_("Resources/Json/YEffects/", { ".json" }, YoRigine::FileBrowser::DisplayMode::List) {
+    , saveBundleBrowser_("Resources/Json/YEffects/", { ".json" }, YoRigine::FileBrowser::DisplayMode::List)
+    , loadBundleBrowser_("Resources/Json/YEffects/", { ".json" }, YoRigine::FileBrowser::DisplayMode::List) {
     gizmoCtrl_.Initialize();
 
     // 全グループ保存
@@ -70,6 +71,13 @@ YEmitterGroupEditor::YEmitterGroupEditor()
             SetNotification(ok, ok ? "バンドル保存完了: " + path : "保存失敗: " + path);
         }
         showSaveBundlePopup_ = false;
+        });
+
+    // バンドル読込（YEffects/ の1ファイルから systems+groups をまとめてロード）
+    loadBundleBrowser_.SetOnFileSelected([this](const std::string& path) {
+        bool ok = YParticleManager::GetInstance().LoadEffectBundle(path);
+        showLoadBundlePopup_ = false;
+        SetNotification(ok, ok ? "エフェクト読み込み完了: " + path : "読み込み失敗: " + path);
         });
 }
 
@@ -171,8 +179,25 @@ void YEmitterGroupEditor::ShowEditor() {
 void YEmitterGroupEditor::ShowGizmoToolbar() { gizmoCtrl_.DrawSettings(); }
 
 void YEmitterGroupEditor::ShowGroupList() {
-    ImGui::Text("エミッターグループ");
+    ImGui::Text("エフェクト一覧");
     ImGui::Separator();
+
+    // ＋ 新規エフェクト（目立つ位置に。名前は自動でユニーク化）
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.16f, 0.40f, 0.24f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.22f, 0.54f, 0.32f, 1.0f));
+    if (ImGui::Button((std::string(Icon::PlusCircle) + " 新規エフェクト").c_str(), ImVec2(-1, 0))) {
+        auto& cmgr = YEmitterGroupManager::GetInstance();
+        std::string base = "NewEffect", nm = base;
+        int n = 1;
+        while (cmgr.GetGroup(nm)) nm = base + std::to_string(++n);
+        cmgr.CreateGroup(nm);
+        SelectGroup(nm);
+    }
+    ImGui::PopStyleColor(2);
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("空のエフェクトを作成して選択。右の詳細で「エミッターを追加」から System を足す");
+    ImGui::Separator();
+
     auto& mgr = YEmitterGroupManager::GetInstance();
     auto  names = mgr.GetAllGroupNames();
     for (const auto& name : names) {
@@ -184,6 +209,19 @@ void YEmitterGroupEditor::ShowGroupList() {
         if (!active) ImGui::PopStyleColor();
         if (ImGui::BeginPopupContextItem(name.c_str())) {
             if (ImGui::MenuItem("グループギズモを選択")) SelectGroup(name);
+            if (ImGui::MenuItem("複製")) {
+                std::string base = name + "_copy", newName = base;
+                int n = 1;
+                while (mgr.GetGroup(newName)) newName = base + std::to_string(++n);
+                if (auto* src = mgr.GetGroup(name)) {
+                    nlohmann::json j = src->SaveToJson();
+                    j["groupName"] = newName;
+                    if (auto* dst = mgr.CreateGroup(newName)) dst->LoadFromJson(j);
+                    SelectGroup(newName);
+                }
+                ImGui::EndPopup();
+                break;  // names が古くなるので安全にループ脱出
+            }
             ImGui::Separator();
             if (ImGui::MenuItem("グループを削除")) {
                 mgr.RemoveGroup(name);
@@ -276,17 +314,34 @@ void YEmitterGroupEditor::ShowGroupDetail() {
     // ★ グループ全体 Emit コントロールパネル
     // ================================================================
     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.10f, 0.13f, 0.17f, 1.0f));
-    ImGui::BeginChild("##EmitCtrlPanel", ImVec2(0, 78), true,
+    ImGui::BeginChild("##EmitCtrlPanel", ImVec2(0, 116), true,
         ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 
-    ImGui::TextColored({ 0.55f, 0.85f, 1.0f, 1.0f }, (std::string(Icon::Bullhorn) + "グループ全体 Emit").c_str());
+    ImGui::TextColored({ 0.55f, 0.85f, 1.0f, 1.0f }, (std::string(Icon::Bullhorn) + "プレビュー再生").c_str());
     ImGui::Spacing();
+
+    // 保存位置が画面外でも見えるよう、ここで指定した位置に発生させる。
+    ImGui::SetNextItemWidth(180);
+    ImGui::DragFloat3("位置##PV", previewPos_, 0.1f);
+    ImGui::SameLine();
+    if (ImGui::SmallButton("原点##PV")) { previewPos_[0] = 0.0f; previewPos_[1] = 2.0f; previewPos_[2] = 0.0f; }
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("プレビュー位置を原点付近(0,2,0)にリセット");
+    ImGui::Spacing();
+
+    // プレビューは保存位置を一時的に上書きして発生させ、直後に元へ戻す
+    // （保存位置は壊さない）。
+    auto emitAtPreview = [&](int n) {
+        Vector3 saved = group->GetPosition();
+        group->SetPosition({ previewPos_[0], previewPos_[1], previewPos_[2] });
+        group->EmitAll(n);
+        group->SetPosition(saved);
+    };
 
     // x1
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.42f, 0.18f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.28f, 0.58f, 0.28f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.12f, 0.32f, 0.12f, 1.0f));
-    if (ImGui::Button((std::string(Icon::Play) + "x1##EAG").c_str(), ImVec2(68, 0))) group->EmitAll(1);
+    if (ImGui::Button((std::string(Icon::Play) + "x1##EAG").c_str(), ImVec2(68, 0))) emitAtPreview(1);
     ImGui::PopStyleColor(3);
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("全エミッターから 1 個ずつ発生");
     ImGui::SameLine();
@@ -295,7 +350,7 @@ void YEmitterGroupEditor::ShowGroupDetail() {
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.22f, 0.42f, 0.12f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.32f, 0.58f, 0.18f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.16f, 0.32f, 0.08f, 1.0f));
-    if (ImGui::Button((std::string(Icon::Play) + "x10##EAG").c_str(), ImVec2(76, 0))) group->EmitAll(10);
+    if (ImGui::Button((std::string(Icon::Play) + "x10##EAG").c_str(), ImVec2(76, 0))) emitAtPreview(10);
     ImGui::PopStyleColor(3);
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("全エミッターから 10 個ずつ発生");
     ImGui::SameLine();
@@ -304,7 +359,7 @@ void YEmitterGroupEditor::ShowGroupDetail() {
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.50f, 0.32f, 0.08f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.70f, 0.48f, 0.12f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.38f, 0.24f, 0.05f, 1.0f));
-    if (ImGui::Button((std::string(Icon::Bolt) + "x100##EAG").c_str(), ImVec2(80, 0))) group->EmitAll(100);
+    if (ImGui::Button((std::string(Icon::Bolt) + "x100##EAG").c_str(), ImVec2(80, 0))) emitAtPreview(100);
     ImGui::PopStyleColor(3);
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("全エミッターから一気に 100 個バースト発生");
     ImGui::SameLine();
@@ -641,20 +696,22 @@ void YEmitterGroupEditor::ShowSelectedEmitterDetail(YParticleEmitter& emitter) {
 
     // 手動発生
     ImGui::Spacing();
-    ImGui::Text("手動発生 (このエミッター):"); ImGui::SameLine();
+    ImGui::Text("システムをプレビュー:"); ImGui::SameLine();
+    const Vector3 pv{ previewPos_[0], previewPos_[1], previewPos_[2] };
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.42f, 0.18f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.28f, 0.58f, 0.28f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.12f, 0.32f, 0.12f, 1.0f));
-    if (ImGui::SmallButton((std::string(Icon::Play) + " x1##ED").c_str()))  emitter.Emit(1);
+    if (ImGui::SmallButton((std::string(Icon::Play) + " x1##ED").c_str()))  emitter.FollowEmit(pv, 1);
     ImGui::SameLine();
-    if (ImGui::SmallButton((std::string(Icon::Play) + " x10##ED").c_str())) emitter.Emit(10);
+    if (ImGui::SmallButton((std::string(Icon::Play) + " x10##ED").c_str())) emitter.FollowEmit(pv, 10);
     ImGui::PopStyleColor(3);
     ImGui::SameLine();
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.50f, 0.32f, 0.08f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.70f, 0.48f, 0.12f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.38f, 0.24f, 0.05f, 1.0f));
-    if (ImGui::SmallButton((std::string(Icon::Bolt) + " x100##ED").c_str())) emitter.EmitBurst(100);
+    if (ImGui::SmallButton((std::string(Icon::Bolt) + " x100##ED").c_str())) emitter.FollowEmit(pv, 100);
     ImGui::PopStyleColor(3);
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("プレビュー位置 (%.1f, %.1f, %.1f) に発生", pv.x, pv.y, pv.z);
 
     ImGui::Spacing();
     auto* sys = emitter.GetTargetSystem();
@@ -671,10 +728,100 @@ void YEmitterGroupEditor::ShowSelectedEmitterDetail(YParticleEmitter& emitter) {
             (std::string(Icon::Xmark) + " システム \"%s\" が見つかりません").c_str(),
             emitter.GetSystemName().c_str());
     }
+
+    // ── このエミッタが使う System をその場で編集（YParticleEditor への往復をなくす）──
+    if (sys) {
+        ImGui::Spacing();
+        ImGui::Separator();
+        std::string header = std::string(Icon::Cog) + " システム \"" + sys->GetName() + "\" を編集";
+        if (ImGui::CollapsingHeader(header.c_str())) {
+            ImGui::Indent();
+            sys->ShowEditor();
+            ImGui::Unindent();
+        }
+    }
 }
 
 void YEmitterGroupEditor::ShowFileButtons() {
-    ImGui::Text("ファイル");
+    // ============================================================
+    // 主導線: エフェクト(=バンドル) の保存 / 開く（YEffects/ 1ファイル完結）
+    // ============================================================
+    ImGui::TextColored({ 0.6f, 0.85f, 1.0f, 1.0f },
+        (std::string(Icon::FloppyDisk) + "エフェクト (YEffects/)").c_str());
+
+    ImGui::BeginDisabled(selectedGroupName_.empty());
+    if (ImGui::Button((std::string(Icon::FloppyDisk) + "エフェクトを保存##FX").c_str(), ImVec2(-1, 0))) {
+        std::filesystem::create_directories("Resources/Json/YEffects");
+        saveBundleBrowser_.Scan();
+        std::string defaultName = selectedGroupName_ + ".json";
+        strncpy_s(saveAsNameBuf_, defaultName.c_str(), sizeof(saveAsNameBuf_));
+        showSaveBundlePopup_ = true;
+    }
+    ImGui::EndDisabled();
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+        ImGui::SetTooltip(selectedGroupName_.empty()
+            ? "エフェクト(グループ)を選択してください"
+            : "選択エフェクトと参照システムを YEffects/ に1ファイルで保存");
+
+    if (ImGui::Button((std::string(Icon::FolderOpen) + "エフェクトを開く##FX").c_str(), ImVec2(-1, 0))) {
+        std::filesystem::create_directories("Resources/Json/YEffects");
+        loadBundleBrowser_.Scan();
+        showLoadBundlePopup_ = true;
+    }
+
+    // バンドル保存ポップアップ
+    if (showSaveBundlePopup_) ImGui::OpenPopup("##SaveBundle");
+    ImGui::SetNextWindowSize(ImVec2(480, 380), ImGuiCond_Appearing);
+    if (ImGui::BeginPopupModal("##SaveBundle", &showSaveBundlePopup_,
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize)) {
+        ImGui::Text((std::string(Icon::FloppyDisk) + " エフェクトを保存: %s").c_str(), selectedGroupName_.c_str());
+        ImGui::TextDisabled("(グループ + 参照システムを1ファイルにまとめます)");
+        ImGui::Separator();
+        saveBundleBrowser_.Draw("##SaveBundleBrowser", ImVec2(0, 240));
+        ImGui::Separator();
+        ImGui::SetNextItemWidth(-80);
+        ImGui::InputTextWithHint("##SaveBundleName", "エフェクト名.json", saveAsNameBuf_, sizeof(saveAsNameBuf_));
+        ImGui::SameLine();
+        if (ImGui::Button("保存##SB")) {
+            if (saveAsNameBuf_[0] != '\0') {
+                std::string path = saveBundleBrowser_.GetCurrentDir() + saveAsNameBuf_;
+                bool ok = YParticleManager::GetInstance().SaveEffectBundle(selectedGroupName_, path);
+                SetNotification(ok, ok ? "エフェクト保存完了: " + path : "保存失敗: " + path);
+                saveAsNameBuf_[0] = '\0';
+                showSaveBundlePopup_ = false;
+                ImGui::CloseCurrentPopup();
+            }
+        }
+        if (ImGui::Button("キャンセル", ImVec2(-1, 0))) {
+            showSaveBundlePopup_ = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
+    // バンドル読込ポップアップ（YEffects/ の1ファイルから systems+groups をロード）
+    if (showLoadBundlePopup_) ImGui::OpenPopup("##LoadBundle");
+    ImGui::SetNextWindowSize(ImVec2(480, 360), ImGuiCond_Appearing);
+    if (ImGui::BeginPopupModal("##LoadBundle", &showLoadBundlePopup_,
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize)) {
+        ImGui::Text((std::string(Icon::FolderOpen) + "エフェクトを開く — YEffects/ のファイルを選択").c_str());
+        ImGui::Separator();
+        loadBundleBrowser_.Draw("##LoadBundleBrowser", ImVec2(0, 280));
+        ImGui::Separator();
+        if (ImGui::Button("キャンセル", ImVec2(-1, 0))) {
+            showLoadBundlePopup_ = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
+    ImGui::Separator();
+
+    // ============================================================
+    // 旧形式（System と Group を別ファイルに分離保存）。普段は折りたたみ。
+    // ============================================================
+    if (!ImGui::CollapsingHeader("旧形式の保存/読込 (YEmitterGroups 分離)"))
+        return;
 
     // ── 全グループ保存 ──────────────────────────────────────
     if (ImGui::Button((std::string(Icon::FloppyDisk) + "すべて保存##FG").c_str(), ImVec2(-1, 0))) {
@@ -792,50 +939,6 @@ void YEmitterGroupEditor::ShowFileButtons() {
         ImGui::EndPopup();
     }
 
-    ImGui::Separator();
-
-    // ── バンドル保存（グループ + 参照システムを1ファイル）────
-    ImGui::BeginDisabled(!hasSelection);
-    if (ImGui::Button((std::string(Icon::FloppyDisk) + "バンドル保存##FGB").c_str(), ImVec2(-1, 0))) {
-        // YEffects ディレクトリを自動生成
-        std::filesystem::create_directories("Resources/Json/YEffects");
-        saveBundleBrowser_.Scan();
-        std::string defaultName = selectedGroupName_ + ".json";
-        strncpy_s(saveAsNameBuf_, defaultName.c_str(), sizeof(saveAsNameBuf_));
-        showSaveBundlePopup_ = true;
-    }
-    ImGui::EndDisabled();
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-        ImGui::SetTooltip("選択グループと参照システムをまとめてYEffects/に保存\nLoadEffectBundle() で一括ロード可能");
-
-    if (showSaveBundlePopup_) ImGui::OpenPopup("##SaveBundle");
-    ImGui::SetNextWindowSize(ImVec2(480, 380), ImGuiCond_Appearing);
-    if (ImGui::BeginPopupModal("##SaveBundle", &showSaveBundlePopup_,
-        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize)) {
-        ImGui::Text((std::string(Icon::FloppyDisk) + " バンドル保存: %s").c_str(), selectedGroupName_.c_str());
-        ImGui::TextDisabled("(グループ + 参照システムを1ファイルにまとめます)");
-        ImGui::Separator();
-        saveBundleBrowser_.Draw("##SaveBundleBrowser", ImVec2(0, 240));
-        ImGui::Separator();
-        ImGui::SetNextItemWidth(-80);
-        ImGui::InputTextWithHint("##SaveBundleName", "エフェクト名.json", saveAsNameBuf_, sizeof(saveAsNameBuf_));
-        ImGui::SameLine();
-        if (ImGui::Button("保存##SB")) {
-            if (saveAsNameBuf_[0] != '\0') {
-                std::string path = saveBundleBrowser_.GetCurrentDir() + saveAsNameBuf_;
-                bool ok = YParticleManager::GetInstance().SaveEffectBundle(selectedGroupName_, path);
-                SetNotification(ok, ok ? "バンドル保存完了: " + path : "保存失敗: " + path);
-                saveAsNameBuf_[0] = '\0';
-                showSaveBundlePopup_ = false;
-                ImGui::CloseCurrentPopup();
-            }
-        }
-        if (ImGui::Button("キャンセル", ImVec2(-1, 0))) {
-            showSaveBundlePopup_ = false;
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::EndPopup();
-    }
 }
 
 #endif // USE_IMGUI

@@ -24,6 +24,10 @@ namespace YoRigine {
 		// UIを削除
 		void RemoveUI(const std::string& id);
 
+		// 指定UIを描画順の最後尾へ（同レイヤー内で最前面に描く）。
+		// 背面→前面の順に連続で呼べば、レイヤー内の重なり順を任意に並べ替えられる。
+		void BringToFront(const std::string& id);
+
 		// UIを取得
 		UIBase* GetUI(const std::string& id);
 

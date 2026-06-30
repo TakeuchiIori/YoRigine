@@ -2,6 +2,7 @@
 
 #include "YParticleManager.h"
 #include "YParticleEmitter.h"
+#include "YEmitterGroupManager.h"   // Group経路解決（入口統一）
 #include "Vector3.h"
 #include <string>
 #include <memory>
@@ -25,6 +26,13 @@
 ///
 ///   // 複数エフェクト（爆発 = 閃光 + 煙 + 破片）
 ///   EffectHandle::EmitAll({"Explosion","Smoke","Debris"}, blastPos, 30);
+///
+/// ■ 入口統一（Group吸収）
+///   Play/PlayOneShot に渡す名前は、まず YEmitterGroup（複数Systemを束ねた
+///   「完成エフェクト」）として解決し、無ければ System単体として再生する。
+///   ゲーム側は「中身がGroupか単発か」を意識せず名前1つで呼べる:
+///     EffectHandle::PlayOneShot("EnemyHit", hitPos);  // Group "EnemyHit"
+///     EffectHandle::PlayOneShot("HitSpark", hitPos);  // System 単体
 /// </summary>
 class EffectHandle
 {
@@ -74,7 +82,7 @@ public:
 
     // ── クエリ ──────────────────────────────────────────────────────────
 
-    bool IsValid() const { return emitter_ != nullptr; }
+    bool IsValid() const { return emitter_ != nullptr || group_ != nullptr; }
     bool IsActive() const;
     const std::string& GetSystemName() const { return systemName_; }
 
@@ -83,5 +91,7 @@ public:
 
 private:
     std::string                      systemName_;
+    // どちらか一方が有効: System経路 = emitter_ / Group経路 = group_
     std::shared_ptr<YParticleEmitter> emitter_;
+    YEmitterGroup*                    group_ = nullptr;  // Managerが所有、借用ポインタ
 };

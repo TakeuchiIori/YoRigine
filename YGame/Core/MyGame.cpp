@@ -10,6 +10,7 @@
 #include "Material/ToonSettings.h"
 #include "Material/OutlineSettings.h"
 #include <Systems/UI/UIManager.h>
+#include <Systems/Text/TextTextureBaker.h>
 #include "GPUParticle/GpuEmitManager.h"
 #include <Object3D/BaseObjectManager.h>
 
@@ -17,6 +18,7 @@
 #include "Particle/YEmitterGroupEditor.h"
 
 #include "Particle/YEmitterGroupManager.h"
+#include "Vfx/VfxMesh/VfxMeshSpawner.h"
 /// <summary>
 /// ゲーム全体の初期化処理（起動時に一度だけ実行）
 /// </summary>
@@ -50,20 +52,22 @@ void MyGame::Initialize() {
 	// YParticleManager::GetInstance().LoadEffectBundle("Resources/Json/YEffects/EnemyHit.json");
 	// バンドルファイルはエディタの「エミッタグループ → バンドル保存」ボタンで作成する。
 
-	YParticleManager::GetInstance().LoadSystemsFromFile("Resources/Json/YParticleSystems/EnemyHit1.json");
-	YParticleManager::GetInstance().LoadSystemsFromFile("Resources/Json/YParticleSystems/EnemyHit2.json");
-	YEmitterGroupManager::GetInstance().LoadGroupFromFile("Resources/Json/YEmitterGroups/EnemyHit.json");
+	// System を先に全ロード（Group が名前参照するため）→ Group を後にロード。
+	// JSON を追加するだけで自動ロードされる。手動羅列・ロード漏れ
+	// （以前 EnemyHit3 がロードされず無言で出ていなかった）を構造的に廃止。
+	YParticleManager::GetInstance().ScanDirectory("Resources/Json/YParticleSystems/");
+	YEmitterGroupManager::GetInstance().ScanDirectory("Resources/Json/YEmitterGroups/");
 
-	YParticleManager::GetInstance().LoadSystemsFromFile("Resources/Json/YParticleSystems/Clear.json");
-	YEmitterGroupManager::GetInstance().LoadGroupFromFile("Resources/Json/YEmitterGroups/Clear.json");
-
-	YParticleManager::GetInstance().LoadSystemsFromFile("Resources/Json/YParticleSystems/Title.json");
-	YEmitterGroupManager::GetInstance().LoadGroupFromFile("Resources/Json/YEmitterGroups/Title.json");
+	// 1エフェクト=1ファイル（systems+groups 同梱）。これ単体で完結し
+	// 参照切れが起きない。エフェクトはエディタからこの形式で保存していく（移行先）。
+	YParticleManager::GetInstance().ScanEffectBundles("Resources/Json/YEffects/");
 	//------------------------------------------------------------
 	// パーティクル関連の初期化（YParticle に完全移行済み）
-	// 旧 ParticleManager は削除。エフェクト定義は JSON で管理。
 	//------------------------------------------------------------
 	YoRigine::GpuEmitManager::GetInstance()->Initialize();
+
+	VfxMeshSpawner::GetInstance()->Initialize();
+	VfxMeshSpawner::GetInstance()->ScanDirectory("Resources/Json/VfxMesh/");
 
 	// モデル操作関連の初期化
 	YoRigine::ModelManipulator::GetInstance()->Initialize();
@@ -111,6 +115,7 @@ void MyGame::Initialize() {
 	Editor::GetInstance()->RegisterGameUI("輪郭線", []() { OutlineSettings::GetInstance()->ImGui(); });
 	Editor::GetInstance()->RegisterGameUI("JSON管理", &YoRigine::JsonManager::ImGuiManager);
 	Editor::GetInstance()->RegisterGameUI("UI管理", []() { YoRigine::UIManager::GetInstance()->ImGuiDebug(); });
+	Editor::GetInstance()->RegisterGameUI("テキストベイク", []() { YoRigine::TextTextureBaker::ImGuiPanel(); });
 	Editor::GetInstance()->RegisterGameUI("ログ", []() { Editor::GetInstance()->DrawLog(); });
 	Editor::GetInstance()->RegisterGameUI("オーディオ詳細", [this]() { audio_->ShowDebugWindow(); });
 	Editor::GetInstance()->RegisterGameUI("オーディオ設定", [this]() { audio_->ShowSettingsWindow(); });
@@ -134,6 +139,7 @@ void MyGame::Initialize() {
 /// </summary>
 void MyGame::Finalize() {
 	SceneManager::GetInstance()->Finalize();
+	VfxMeshSpawner::GetInstance()->Finalize();
 	YoRigine::ModelManipulator::GetInstance()->Finalize();
 
 #ifdef USE_IMGUI

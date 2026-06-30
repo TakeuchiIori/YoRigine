@@ -228,8 +228,8 @@ PixelShaderOutput main(InstancedVertexShaderOutput input)
             float3 specularPoint = pl.color.rgb * pl.intensity * ToonSpecular(pow(saturate(NdotHPoint), gMaterialLight.shininess)) * factor;
 
             if (gMaterialLight.enableSpecular != 0)
-                finalSpecular += specularPoint * shadowFactor;
-            finalDiffuse += diffusePoint * shadowFactor;
+                finalSpecular += specularPoint;
+            finalDiffuse += diffusePoint;
         }
 
         // スポットライト
@@ -252,8 +252,8 @@ PixelShaderOutput main(InstancedVertexShaderOutput input)
             float3 specularPoint = sl.color.rgb * sl.intensity * ToonSpecular(pow(saturate(NdotHPoint), gMaterialLight.shininess)) * falloffFactor;
 
             if (gMaterialLight.enableSpecular != 0)
-                finalSpecular += specularPoint * shadowFactor;
-            finalDiffuse += diffusePoint * shadowFactor;
+                finalSpecular += specularPoint;
+            finalDiffuse += diffusePoint;
         }
 
         // 環境マップ

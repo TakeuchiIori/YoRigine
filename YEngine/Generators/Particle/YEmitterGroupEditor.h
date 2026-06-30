@@ -135,6 +135,10 @@ private:
     float newEmitterOffset_[3] = { 0, 0, 0 };
     float groupListWidth_ = 180.0f;
 
+    // プレビュー再生位置。保存位置が画面外でも確認できるよう、ここで指定した
+    // 見える位置にエフェクト/システムを発生させる。
+    float previewPos_[3] = { 0.0f, 2.0f, 0.0f };
+
     const std::string emitterDirectory_ = "Resources/Json/YEmitterGroups/";
 
     //=================================================================
@@ -152,9 +156,11 @@ private:
     bool showSaveSinglePopup_ = false;
     bool showLoadSinglePopup_ = false;
 
-    // バンドル保存
+    // バンドル保存/読込（YEffects/ = 1エフェクト=1ファイル）
     YoRigine::FileBrowser saveBundleBrowser_;
     bool showSaveBundlePopup_ = false;
+    YoRigine::FileBrowser loadBundleBrowser_;
+    bool showLoadBundlePopup_ = false;
 
     char saveAsNameBuf_[256] = "";
 

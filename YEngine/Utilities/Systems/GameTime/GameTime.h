@@ -86,7 +86,8 @@ namespace YoRigine {
 		static float fixedDeltaTime_;
 		static float accumulatedTime_;
 		static float timeScale_;
-		static bool isPause_;
+		static bool isPause_;       // ゲーム本編のポーズ（ポーズメニュー等のゲームUIが反応する）
+		static bool debugFreeze_;   // エディタ用の一時停止（時間だけ止める。ゲームUIは反応させない）
 		static bool stepOneFrame_;
 	};
 

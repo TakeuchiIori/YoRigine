@@ -19,6 +19,7 @@ namespace YoRigine {
 	float GameTime::accumulatedTime_ = 0.0f;
 	float GameTime::timeScale_ = 1.0f;
 	bool GameTime::isPause_ = false;
+	bool GameTime::debugFreeze_ = false;
 	bool GameTime::stepOneFrame_ = false;
 
 
@@ -53,6 +54,7 @@ namespace YoRigine {
 		timeScale_ = 1.0f;
 		fixedDeltaTime_ = std::chrono::duration<float, FrameRate>(1).count();
 		isPause_ = false;
+		debugFreeze_ = false;
 		stepOneFrame_ = false;
 	}
 
@@ -65,7 +67,9 @@ namespace YoRigine {
 		// 実時間の記録
 		unscaledDeltaTime_ = elapsed.count();
 
-		if (isPause_ && !stepOneFrame_) {
+		// ゲーム本編ポーズ or エディタ用フリーズのどちらかで時間を止める。
+		// （ゲームUIは IsPause()=isPause_ だけを見るので、エディタフリーズには反応しない）
+		if ((isPause_ || debugFreeze_) && !stepOneFrame_) {
 			deltaTime_ = 0.0f;
 			return;
 		}
@@ -130,7 +134,9 @@ namespace YoRigine {
 		ImGui::Text("Unscaled DeltaTime: %f", GameTime::GetUnscaledDeltaTime());
 		ImGui::Text("Total GamtTime: %.2f", GameTime::GetTotalTime());
 
-		ImGui::Checkbox("Pause", &isPause_);
+		// エディタ停止は debugFreeze_（時間だけ止める。ゲームUIのポーズには波及しない）
+		ImGui::Checkbox("Pause (エディタ停止)", &debugFreeze_);
+		if (ImGui::IsItemHovered()) ImGui::SetTooltip("時間だけ止める。ゲーム本編のポーズUIには影響しない（操作ヒントが隠れない）");
 		ImGui::Checkbox("Step One Frame", &stepOneFrame_);
 		ImGui::SliderFloat("Time Scale", &timeScale_, 0.0f, 2.0f);
 

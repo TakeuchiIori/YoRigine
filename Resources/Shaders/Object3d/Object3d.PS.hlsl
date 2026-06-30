@@ -327,14 +327,14 @@ PixelShaderOutput main(VertexShaderOutput input)
             // フラグで有効化
             if (gMaterialLight.enableSpecular != 0)
             {
-                finalSpecular += specularPoint * shadowFactor;
+                finalSpecular += specularPoint;
             }
-            finalDiffuse += diffusePoint * shadowFactor;
+            finalDiffuse += diffusePoint;
         }
-        
+
         //===========================================================//
-        
-        //                      スポットライトの計算    
+
+        //                      スポットライトの計算
         
         //===========================================================//
         
@@ -369,14 +369,13 @@ PixelShaderOutput main(VertexShaderOutput input)
             // スペキュラー反射の有効化
             if (gMaterialLight.enableSpecular != 0)
             {
-                finalSpecular += specularPoint * shadowFactor;
+                finalSpecular += specularPoint;
             }
-            finalDiffuse += diffusePoint * shadowFactor;
+            finalDiffuse += diffusePoint;
         }
 
-        
         //===========================================================//
-        
+
         //                     環境マップの計算
         
         //===========================================================//

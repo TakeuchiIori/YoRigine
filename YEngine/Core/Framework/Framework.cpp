@@ -136,6 +136,9 @@ void Framework::Update()
 
 	// ゲームオブジェクト更新
 	ObjectManager::GetInstance()->Update();
+
+	// ポイント/スポットライトを GPU バッファへ同期（全シーン共通）
+	lightManager_->TransferData();
 }
 
 /// <summary>

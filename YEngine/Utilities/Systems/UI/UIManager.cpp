@@ -31,6 +31,14 @@ namespace YoRigine {
 		RebuildDrawOrder();  // 追加時に描画順序を更新
 	}
 
+	void UIManager::BringToFront(const std::string& id) {
+		auto it = std::find(drawOrder_.begin(), drawOrder_.end(), id);
+		if (it == drawOrder_.end()) return;
+		std::string s = *it;
+		drawOrder_.erase(it);
+		drawOrder_.push_back(s);  // 最後尾＝同レイヤー内で最後に描画＝最前面
+	}
+
 	// RemoveUI()でも同様
 	void UIManager::RemoveUI(const std::string& id) {
 		for (auto& [groupName, uiIds] : groups_) {

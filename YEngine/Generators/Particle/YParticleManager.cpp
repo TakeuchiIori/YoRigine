@@ -1,6 +1,8 @@
 #include "YParticleManager.h"
 #include <chrono>
 #include <algorithm>
+#include <fstream>
+#include <filesystem>
 #include "Graphics/LightManager/LightManager.h"
 #include <PipelineManager/YPipelineManager.h>
 #include "YEmitterGroupManager.h"
@@ -123,6 +125,34 @@ bool YParticleManager::LoadSystemsFromFile(const std::string& filePath) {
 	catch (const std::exception&) {
 		return false;
 	}
+}
+
+size_t YParticleManager::ScanDirectory(const std::string& dir) {
+	namespace fs = std::filesystem;
+	std::error_code ec;
+	if (!fs::exists(dir, ec)) return 0;
+
+	size_t loaded = 0;
+	for (const auto& entry : fs::recursive_directory_iterator(dir, ec)) {
+		if (ec) break;
+		if (entry.path().extension() != ".json") continue;
+		if (LoadSystemsFromFile(entry.path().string())) ++loaded;
+	}
+	return loaded;
+}
+
+size_t YParticleManager::ScanEffectBundles(const std::string& dir) {
+	namespace fs = std::filesystem;
+	std::error_code ec;
+	if (!fs::exists(dir, ec)) return 0;
+
+	size_t loaded = 0;
+	for (const auto& entry : fs::recursive_directory_iterator(dir, ec)) {
+		if (ec) break;
+		if (entry.path().extension() != ".json") continue;
+		if (LoadEffectBundle(entry.path().string())) ++loaded;
+	}
+	return loaded;
 }
 
 void YParticleManager::LoadSystemsFromJson(const nlohmann::json& json) {

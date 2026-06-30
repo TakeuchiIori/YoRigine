@@ -1607,6 +1607,29 @@
                         ]
                     ]
                 },
+                "cameraFeel": {
+                    "accelTime": 0.11999999731779099,
+                    "curve": 2.0,
+                    "deadzone": 0.15000000596046448,
+                    "invertY": false,
+                    "pitchSpeed": 2.4000000953674316,
+                    "yawSpeed": 3.0
+                },
+                "lockOnFraming": {
+                    "lerpSpeed": 10.0,
+                    "pitchBias": 0.20000000298023224,
+                    "shoulderYaw": 0.25
+                },
+                "offscreenHitReaction": {
+                    "cooldown": 0.800000011920929,
+                    "enabled": true,
+                    "faceEnemy": true,
+                    "margin": 0.0,
+                    "shakeDur": 0.15000000596046448,
+                    "shakeInt": 0.30000001192092896,
+                    "zoomDur": 0.30000001192092896,
+                    "zoomFov": 0.4000000059604645
+                },
                 "threatAwareness": {
                     "enabled": true,
                     "fovMax": 0.11999999731779099,
@@ -1643,21 +1666,21 @@
             "positionSmoothTime": 0.07999999821186066,
             "positionSmoothing": false,
             "priority": 10,
-            "recenterDuration": 0.800000011920929,
+            "recenterDuration": 0.550000011920929,
             "recenterPitch": 0.30000001192092896,
             "recenterResetPitch": true,
             "rotate": [
-                0.30000001192092896,
-                1.5590367317199707,
+                1.0,
+                -4.160795211791992,
                 0.0
             ],
             "rotateSpeed": 0.019999999552965164,
             "targetName": "Player",
             "targetPivot_Height": 1.0,
             "translate": [
-                -55.80351257324219,
-                9.933130264282227,
-                -38.26033401489258
+                -51.42942428588867,
+                20.55023193359375,
+                -34.8197021484375
             ],
             "type": "Follow"
         }
