@@ -240,13 +240,15 @@ void ControlUI::FlashLockOn()
 
     lockOnFlash_->SetVisible(true);
 
-    // 色とアルファを1本の色アニメで同時に：赤(不透明) → 黄(透明)
     const Vector4 red{ 1.0f, 0.0f, 0.0f, 1.0f };
-    const Vector4 yellowFade{ 1.0f, 1.0f, 0.0f, 0.0f };
+    const Vector4 yellow{ 1.0f, 1.0f, 0.0f, 1.0f };  // 不透明の黄＝ロック確定色
     lockOnFlash_->SetColor(red);
-    lockOnFlash_->PlayColorAnimation(red, yellowFade, 0.55f, Easing::Function::EaseOutCubic, false);
 
-    // スナップ感：大きめ → 等倍（ロックした瞬間の収束）
-    lockOnFlash_->PlayScaleAnimation(Vector2{ 1.4f, 1.4f }, Vector2{ 1.0f, 1.0f },
-        0.55f, Easing::Function::EaseOutCubic, false);
+    // ① 色：赤→黄を素早く（ターゲット捕捉 → ロック確定）。アルファはここでは保つ。
+    lockOnFlash_->PlayColorAnimation(red, yellow, 0.30f, Easing::Function::EaseOutCubic, false);
+    // ② アルファ：しばらく黄を保持してから後半でゆっくり消える（EaseInで余韻）。
+    lockOnFlash_->PlayAlphaAnimation(1.0f, 0.0f, 1.0f, Easing::Function::EaseInQuad, false);
+    // ③ 大きく開いた照準が一気に締まって軽くオーバーシュート＝「カチッとロック」
+    lockOnFlash_->PlayScaleAnimation(Vector2{ 1.8f, 1.8f }, Vector2{ 1.0f, 1.0f },
+        0.30f, Easing::Function::EaseOutBack, false);
 }

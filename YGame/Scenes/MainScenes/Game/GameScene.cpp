@@ -13,6 +13,7 @@
 #include <Debugger/Logger.h>
 #include "Systems./Input./Input.h"
 #include "Systems/GameTime/GameTime.h"
+#include "MathFunc.h"   // Coordinate::WorldToScreen
 #include <Systems/UI/UIManager.h>
 #include "GPUParticle/GpuEmitManager.h"
 #include "Collision/AreaCollision/Base/AreaManager.h"
@@ -265,10 +266,30 @@ void GameScene::Update() {
 	skyBox_->Update();
 	// バトル中のみ LB/RB の押下アニメを許可
 	gameUI_->SetBattleActive(subSceneManager_ && subSceneManager_->GetCurrentSceneName() == "Battle");
-	// 画面外ヒット演出が発火していたら、ロックオン照準フラッシュを再生
-	if (player_ && player_->GetPlayerCamera() && player_->GetPlayerCamera()->ConsumeLockOnFlashRequest()) {
-		gameUI_->FlashLockOn();
+
+	// 画面外ヒット演出が発火していたら、ロックオン照準フラッシュを敵位置で再生
+	{
+		Vector3 flashWorld;
+		if (player_ && player_->GetPlayerCamera() &&
+			player_->GetPlayerCamera()->ConsumeLockOnFlashRequest(flashWorld)) {
+			lockFlashWorldPos_ = flashWorld;
+			lockFlashTimer_    = 1.7f;   // アニメ(アルファ1.6s)＋余裕。この間は敵に追従
+			lockFlashActive_   = true;
+			gameUI_->FlashLockOn();
+		}
+		// 演出中は敵ワールド座標をスクリーンへ投影してフラッシュを追従させる
+		//（カメラが敵方向へ回り込むのに合わせて照準が敵へ寄っていく）
+		if (lockFlashActive_ && sceneCamera_) {
+			auto proj = Coordinate::WorldToScreen(
+				lockFlashWorldPos_, sceneCamera_->GetViewProjectionMatrix());
+			if (proj.has_value()) {
+				gameUI_->SetLockOnFlashPos(proj->screenPos);
+			}
+			lockFlashTimer_ -= YoRigine::GameTime::GetUnscaledDeltaTime();
+			if (lockFlashTimer_ <= 0.0f) lockFlashActive_ = false;
+		}
 	}
+
 	gameUI_->Update();
 
 	YoRigine::ModelManipulator::GetInstance()->Update();

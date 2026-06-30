@@ -292,6 +292,11 @@ void GameUI::FlashLockOn()
 	if (controlUI_) controlUI_->FlashLockOn();
 }
 
+void GameUI::SetLockOnFlashPos(const Vector3& screenPos)
+{
+	if (controlUI_) controlUI_->SetLockOnFlashPos(screenPos);
+}
+
 /// <summary>
 /// UI描画（全部）
 /// </summary>

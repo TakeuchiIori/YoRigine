@@ -86,10 +86,13 @@ public:
     // ============================================================
     void OnAttackHit(const Vector3& enemyWorldPos);
 
-    // 見切れヒット演出が発火した時 true を1回返す（ロックオンUIフラッシュのトリガ）。
-    // GameScene が毎フレーム拾って GameUI::FlashLockOn を呼ぶ。
-    bool ConsumeLockOnFlashRequest() {
-        bool r = lockOnFlashRequested_; lockOnFlashRequested_ = false; return r;
+    // 見切れヒット演出が発火した時 true を1回返し、対象敵のワールド座標を out に渡す
+    // （ロックオンUIフラッシュのトリガ＋敵追従用）。GameScene が毎フレーム拾う。
+    bool ConsumeLockOnFlashRequest(Vector3& outWorldPos) {
+        if (!lockOnFlashRequested_) return false;
+        lockOnFlashRequested_ = false;
+        outWorldPos = lockOnFlashWorldPos_;
+        return true;
     }
 
     // ============================================================
@@ -255,5 +258,6 @@ private:
     float offscreenHitShakeInt_ = 0.30f;    // シェイク強度
     float offscreenHitShakeDur_ = 0.15f;    // シェイク時間（秒）
     float offscreenHitCdTimer_  = 0.0f;     // クールダウン残り（内部状態）
-    bool  lockOnFlashRequested_ = false;    // 見切れ演出発火→UIフラッシュ要求（GameSceneが消費）
+    bool    lockOnFlashRequested_ = false;  // 見切れ演出発火→UIフラッシュ要求（GameSceneが消費）
+    Vector3 lockOnFlashWorldPos_  = {};     // フラッシュを出す対象（敵）のワールド座標
 };

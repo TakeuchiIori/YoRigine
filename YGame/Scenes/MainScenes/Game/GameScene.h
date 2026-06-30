@@ -103,4 +103,9 @@ private:
 	bool isGameCleared_ = false;
 	bool wasGameCleared_ = false;
 
+	// ロックオン照準フラッシュ（画面外ヒット時・敵ワールド座標を投影して追従）
+	bool    lockFlashActive_   = false;
+	float   lockFlashTimer_    = 0.0f;
+	Vector3 lockFlashWorldPos_ = {};
+
 };

@@ -20,6 +20,8 @@ public:
 
 	// 画面外ヒット時のロックオン照準フラッシュを再生する（ControlUI へ委譲）
 	void FlashLockOn();
+	// フラッシュ照準のスクリーン座標を更新（敵追従用・ControlUI へ委譲）
+	void SetLockOnFlashPos(const Vector3& screenPos);
 
 	/// <summary>
 	///  ゲームオーバーUIをフェード表示する

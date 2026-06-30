@@ -519,6 +519,10 @@ bool PlayerCamera::IsWorldPosOffscreen(const Vector3& worldPos) const {
 void PlayerCamera::TriggerOffscreenHitReaction(const Vector3* enemyWorldPos) {
     if (!followCamera_) return;
 
+    // フラッシュを出す対象座標を控える（敵座標があればそれ、無ければプレイヤー位置）
+    lockOnFlashWorldPos_ = (enemyWorldPos) ? *enemyWorldPos
+        : (playerWT_ ? playerWT_->translate_ : Vector3{});
+
     // 背後リセンター：カメラ→プレイヤー→敵 が一直線になる位置まで回り込ませる。
     // 敵座標があれば「プレイヤー→敵の方向」へ寄せる＝プレイヤーの向きに依存せず
     // 確実にプレイヤー越しの敵を正面に捉える。無ければ従来のプレイヤー向きへ。

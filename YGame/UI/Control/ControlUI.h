@@ -20,6 +20,11 @@ public:
 	// ロックオン照準を一瞬出して「赤→黄にフェードしながら消える」演出を1回再生する。
 	// 画面外の敵に攻撃が当たってカメラが敵方向へ向いた瞬間に呼ぶ。
 	void FlashLockOn();
+
+	// フラッシュ照準のスクリーン座標を設定（GameScene が敵を投影して毎フレーム渡す＝敵追従）
+	void SetLockOnFlashPos(const Vector3& screenPos) {
+		if (lockOnFlash_) lockOnFlash_->SetPosition(screenPos);
+	}
 private:
 	///************************* 内部関数 *************************///
 
