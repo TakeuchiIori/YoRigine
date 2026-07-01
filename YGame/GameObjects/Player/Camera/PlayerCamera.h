@@ -97,7 +97,16 @@ public:
 
     // カメラ追従（右スティックでプレイヤーも回る）フラグのポインタを受け取る。
     // PlayerMovement の config フラグを指し、カメラエディタから ON/OFF できるようにする。
-    void SetCameraFollowFlag(bool* p) { cameraFollowEnabled_ = p; }
+    // extension JSON に保存済みの値があれば復元する（Initialize() 直後に呼ばれる想定）。
+    void SetCameraFollowFlag(bool* p) {
+        cameraFollowEnabled_ = p;
+        if (!cameraFollowEnabled_ || !followCamera_) return;
+
+        const auto& ext = followCamera_->GetExtensionJson();
+        if (ext.contains("cameraFollowEnabled")) {
+            *cameraFollowEnabled_ = ext["cameraFollowEnabled"];
+        }
+    }
 
     // ============================================================
     // FollowCamera への委譲
@@ -182,24 +191,27 @@ private:
     // ============================================================
     // メンバ
     // ============================================================
+
+    // ---- コア参照 ----
     FollowCamera*          followCamera_ = nullptr;
     const WorldTransform*  playerWT_     = nullptr;
 
     // PlayerMovement の「カメラ追従でプレイヤーも回る」フラグ（カメラエディタから切替）
     bool* cameraFollowEnabled_ = nullptr;
 
-    AttackCameraComponent  attackCamera_;
+    // ---- 攻撃カメラワーク ----
+    AttackCameraComponent attackCamera_;
 
-    // 攻撃カメラワークの注視/参照基準アンカー（Play 時に渡された任意座標）
-    Vector3 cameraWorkAnchor_   = {};
+    // 注視/参照基準アンカー（Play 時に渡された任意座標）
+    Vector3 cameraWorkAnchor_    = {};
     bool    hasCameraWorkAnchor_ = false;
 
-    // BattleStart 演出：Debug / Release どちらでも動作する
+    // ---- 戦闘開始演出（Debug / Release どちらでも動作する） ----
     std::shared_ptr<BattleStartCameraState> battleStartState_;
     bool isPreviewMode_ = false;
 
 #ifdef USE_IMGUI
-    AttackCameraEditor editor_;
+    AttackCameraEditor editor_;  // 攻撃カメラワークエディタ
 #endif
 
     // ---- ロックオン ----

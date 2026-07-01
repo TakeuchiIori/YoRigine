@@ -31,10 +31,10 @@ AttackingCombatState::AttackingCombatState(PlayerCombat* combat) : combat_(comba
 
 		// 攻撃タイプに応じたエフェクトの読み込み
 		if (attack.type == AttackType::A_Arte) {
-			player->GetSword()->LoadVfxAssets("Resources/Vfx/NewEffect.json");
+			player->GetSword()->LoadVfxAssets("Resources/Json/VfxMesh/NewEffect2.json");
 		}
 		else if (attack.type == AttackType::B_Arte) {
-			player->GetSword()->LoadVfxAssets("Resources/Vfx/NewEffect2.json");
+			player->GetSword()->LoadVfxAssets("Resources/Json/VfxMesh/NewEffect3.json");
 		}
 
 		player->GetSword()->PlayTrail();
@@ -81,10 +81,10 @@ AttackingCombatState::AttackingCombatState(PlayerCombat* combat) : combat_(comba
 		obj->SetUpperMotionSpeed(attack.motionSpeed);
 
 		if (attack.type == AttackType::A_Arte) {
-			player->GetSword()->LoadVfxAssets("Resources/Vfx/NewEffect.json");
+			player->GetSword()->LoadVfxAssets("Resources/Json/VfxMesh/NewEffect2.json");
 		}
 		else if (attack.type == AttackType::B_Arte) {
-			player->GetSword()->LoadVfxAssets("Resources/Vfx/NewEffect2.json");
+			player->GetSword()->LoadVfxAssets("Resources/Json/VfxMesh/NewEffect3.json");
 		}
 		player->GetSword()->PlayTrail();
 		combat->NotifyAction("コンボ継続: " + attack.animationName);
