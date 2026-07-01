@@ -72,9 +72,19 @@ public:
     //   RecenterBehindTarget が「対象の向き」へ寄せるのに対し、これは任意方向へ。
     //   例: プレイヤー→敵 の方向 yaw を渡せば、カメラがプレイヤー真後ろ
     //   （敵と反対側）へ回り込み、プレイヤー越しに敵を正面に捉える。
-    void RecenterToYaw(float targetWorldYaw, bool resetPitch = true);
+    //   duration を省略（負値）すると recenterDuration_（手動リセンター用の既定値）を使う。
+    //   アイドルオートリセンターなど、手動より緩やかに寄せたい場合だけ明示的に渡す。
+    void RecenterToYaw(float targetWorldYaw, bool resetPitch = true, float duration = -1.0f);
     bool IsRecentering() const { return recentering_; }
     void CancelRecenter()      { recentering_ = false; }
+
+    // ============================================================
+    // アイドル時オートリセンター用通知
+    //   PlayerCamera 側でスティック操作 / ロックオン照準など「カメラを
+    //   能動的に制御している」と判定したフレームで毎回呼ぶ。呼ばれている
+    //   間はアイドルタイマーがリセットされ、オートリセンターは発動しない。
+    // ============================================================
+    void NotifyCameraActive() { idleRecenterTimer_ = 0.0f; }
 
     // ============================================================
     // フレーミング補正（追従対象が画角外に出そうな時だけ、
@@ -112,15 +122,18 @@ private:
 
     // ============================================================
     // 追従スムージング（位置ダンピング）
-    //   理想位置へ瞬間スナップせず、臨界減衰スプリングで滑らかに寄せる。
+    //   対象の pivot（＝キャラ位置＋先読み）だけに臨界減衰スプリングを掛ける。
+    //   スティック回転によるオフセット(offset_)はここでは平滑化せず、
+    //   FollowProcess 内でダンピング後の pivot に生の値のまま加算する
+    //   （右スティック操作が位置ダンピングの遅延を受けないようにするため）。
     //   smoothTime が小さいほどキビキビ、大きいほどフワッと遅れて追従する。
     // ============================================================
     bool    positionSmoothing_  = true;
     float   positionSmoothTime_ = 0.12f;   // 秒。追従の遅れ時間
     float   maxFollowSpeed_     = 300.0f;  // 追従速度上限（暴れ防止）
     float   followSnapDistance_ = 30.0f;   // この距離以上ズレたら瞬間スナップ（テレポート対策）
-    Vector3 followPos_          = {};      // 平滑化後のカメラ位置（内部状態）
-    Vector3 followVel_          = {};      // SmoothDamp 用の速度アキュムレータ
+    Vector3 smoothedPivot_      = {};      // 平滑化後の pivot（内部状態）
+    Vector3 pivotVel_           = {};      // SmoothDamp 用の速度アキュムレータ
     bool    followInitialized_  = false;
 
     // ============================================================
@@ -186,6 +199,7 @@ private:
     float recenterToPitch_    = 0.0f;
     bool  recenterResetPitch_ = true;   // pitch も既定値へ戻すか
     float recenterPitch_      = 0.30f;  // pitch リセット先（rad）
+    float activeRecenterDuration_ = 0.0f;  // 今回のリセンターに使うイーズ時間（内部状態。呼び出し側の duration 引数で上書きされる）
 
     // ============================================================
     // Game 拡張用の不透明 JSON ストレージ
@@ -211,7 +225,22 @@ private:
     void EnsureTargetInView(const Vector3& pivot, float dt);
 
     bool  framingEnabled_      = true;
-    float framingYawMargin_    = 0.45f;  // この角度差(rad)を越えたら yaw 補正開始（≒26°）
-    float framingPitchMargin_  = 0.30f;  // 同 pitch 補正開始（≒17°）
+    float framingYawMargin_    = 1.05f;  // この角度差(rad)を越えたら yaw 補正開始（≒60°・最終セーフティネット）
+    float framingPitchMargin_  = 0.55f;  // 同 pitch 補正開始（≒31°）
     float framingSpeed_        = 4.0f;   // 補正速度（rad/秒・はみ出し分に対する最大変化量）
+
+    // ============================================================
+    // アイドル時オートリセンター
+    //   移動方向を追いかけるのではなく、「カメラ操作（スティック / ロックオン
+    //   照準など）が一定時間なかった」ときにだけ、対象の向いている方向の
+    //   背後へ静かに戻す。プレイヤーが能動的にカメラを構えている間は
+    //   NotifyCameraActive() が毎フレーム呼ばれてタイマーがリセットされるため、
+    //   一切介入しない＝操作を奪わない。
+    // ============================================================
+    void  UpdateIdleRecenter(float dt);
+
+    bool  idleRecenterEnabled_  = true;
+    float idleRecenterDelay_    = 2.5f;   // 無操作がこの秒数続いたら発動
+    float idleRecenterDuration_ = 1.4f;   // 発動時のイーズ時間（RB/LB の手動リセンターより緩やかに）
+    float idleRecenterTimer_    = 0.0f;   // 内部状態：無操作の継続時間
 };

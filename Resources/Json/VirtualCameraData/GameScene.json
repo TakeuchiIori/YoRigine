@@ -1615,6 +1615,7 @@
                     "pitchSpeed": 2.4000000953674316,
                     "yawSpeed": 3.0
                 },
+                "cameraFollowEnabled": false,
                 "lockOnFraming": {
                     "lerpSpeed": 10.0,
                     "pitchBias": 0.20000000298023224,
@@ -1642,19 +1643,22 @@
                     "yawSpeed": 4.0
                 }
             },
-            "followSnapDistance": 4.0,
+            "followSnapDistance": 9.0,
             "fovY": 0.44999998807907104,
             "framingEnabled": true,
-            "framingPitchMargin": 0.30000001192092896,
+            "framingPitchMargin": 0.550000011920929,
             "framingSpeed": 4.0,
-            "framingYawMargin": 0.44999998807907104,
+            "framingYawMargin": 1.0499999523162842,
+            "idleRecenterDelay": 3.0,
+            "idleRecenterDuration": 1.399999976158142,
+            "idleRecenterEnabled": true,
             "interpSpeed": 5.0,
             "lookAheadEnabled": true,
             "lookAheadMaxDist": 3.0,
             "lookAheadSmooth": 6.0,
-            "lookAheadTime": 0.25,
+            "lookAheadTime": 0.7300000190734863,
             "lookAheadVertical": false,
-            "maxFollowSpeed": 1166.0,
+            "maxFollowSpeed": 935.0,
             "maxPitch": 1.0,
             "minPitch": 0.0,
             "name": "PlayerFollow",
@@ -1663,24 +1667,24 @@
                 2.700000047683716,
                 -21.5
             ],
-            "positionSmoothTime": 0.07999999821186066,
-            "positionSmoothing": false,
+            "positionSmoothTime": 0.1850000023841858,
+            "positionSmoothing": true,
             "priority": 10,
             "recenterDuration": 0.550000011920929,
             "recenterPitch": 0.30000001192092896,
             "recenterResetPitch": true,
             "rotate": [
                 0.30000001192092896,
-                -5.679131031036377,
+                1.9639060497283936,
                 0.0
             ],
             "rotateSpeed": 0.019999999552965164,
             "targetName": "Player",
             "targetPivot_Height": 1.0,
             "translate": [
-                -11.215964317321777,
-                9.93313217163086,
-                -90.42950439453125
+                -49.76763153076172,
+                9.933131217956543,
+                -38.697357177734375
             ],
             "type": "Follow"
         }
