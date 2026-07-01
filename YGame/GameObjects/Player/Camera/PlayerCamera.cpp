@@ -122,6 +122,9 @@ void PlayerCamera::UpdatePreDirector() {
             // ロックオン中はグランスを使わない。蓄積をリセットして次回フリー時の段差を防ぐ。
             awarenessYawBias_ = 0.0f;
             awarenessAppliedBias_ = 0.0f;
+            // ロックオン照準は毎フレーム能動的にカメラを制御しているので、
+            // アイドルオートリセンターが割り込まないようここでも通知する。
+            followCamera_->NotifyCameraActive();
             UpdateLockOn();
         } else {
             UpdateStickInput();
@@ -336,7 +339,8 @@ void PlayerCamera::UpdateStickInput() {
     }
 
     stickActiveThisFrame_ = true;
-    followCamera_->CancelRecenter();  // 手動操作が入ったらリセンター中断（プレイヤー優先）
+    followCamera_->CancelRecenter();     // 手動操作が入ったらリセンター中断（プレイヤー優先）
+    followCamera_->NotifyCameraActive(); // アイドルオートリセンターのタイマーもリセット
 
     // デッドゾーン外を 0..1 に再マッピング → レスポンスカーブ（中央ほど精密）
     float t = std::clamp((mag - camDeadzone_) / (1.0f - camDeadzone_), 0.0f, 1.0f);
@@ -938,6 +942,12 @@ void PlayerCamera::DrawImGui() {
         if (cameraFollowEnabled_) {
             ImGui::Checkbox("右スティックでプレイヤーも回す", cameraFollowEnabled_);
             if (ImGui::IsItemHovered()) ImGui::SetTooltip("ON: カメラ回転にプレイヤーの向きが追従する（待機中のみ）/ OFF: カメラだけ回る");
+
+            // 編集値を extension JSON に反映（カメラ設定保存時に一緒に永続化される）
+            nlohmann::json ext = followCamera_->GetExtensionJson();
+            ext["cameraFollowEnabled"] = *cameraFollowEnabled_;
+            followCamera_->SetExtensionJson(ext);
+
             ImGui::Separator();
         }
 

@@ -72,6 +72,8 @@ void FollowCamera::UpdateInput() {
             if (Length(move) > 5000.0f) {
                 move = Normalize(move) * kRotateSpeed_;
                 transform_.rotate += move;
+                // スティック操作中はアイドルオートリセンターのタイマーをリセット
+                NotifyCameraActive();
             }
             transform_.rotate.x = std::clamp(transform_.rotate.x, minPitch_, maxPitch_);
         }
@@ -168,34 +170,66 @@ void FollowCamera::FollowProcess() {
     // ── 注視点（先読み込み）と理想カメラ位置 ──
     Vector3 pivot = targetPos + Vector3(0.0f, targetPivot_Height_, 0.0f) + smoothedLookAhead_;
 
-    Vector3 offset = offset_ * currentScale_;
-    Matrix4x4 rotateMat = MakeRotateMatrixXYZ(transform_.rotate);
-    Vector3 rotatedOffset = TransformNormal(offset, rotateMat);
-    Vector3 idealPos = pivot + rotatedOffset;
-
-    // ── 位置ダンピング（臨界減衰スプリング）──
+    // ── 位置ダンピング（臨界減衰スプリング）は「対象の追従」にだけ掛ける ──
+    //   pivot（＝キャラの位置）だけを SmoothDamp し、スティック回転による
+    //   オフセット(rotatedOffset)はダンピング後に毎フレーム生で足す。
+    //   こうしないとスティックでカメラを振った瞬間の回転までスプリング
+    //   越しになり、右スティック操作が「フワッと遅れる」ように感じてしまう。
     if (!followInitialized_) {
-        followPos_ = idealPos;
-        followVel_ = {};
+        smoothedPivot_ = pivot;
+        pivotVel_ = {};
         followInitialized_ = true;
     } else if (teleported || !positionSmoothing_
-        || Length(idealPos - followPos_) > followSnapDistance_) {
+        || Length(pivot - smoothedPivot_) > followSnapDistance_) {
         // テレポート / スムージング無効 / 大きくズレた場合は瞬間スナップ
-        followPos_ = idealPos;
-        followVel_ = {};
+        smoothedPivot_ = pivot;
+        pivotVel_ = {};
     } else {
-        followPos_ = SmoothDampVec3(followPos_, idealPos, followVel_,
+        smoothedPivot_ = SmoothDampVec3(smoothedPivot_, pivot, pivotVel_,
             positionSmoothTime_, dt, maxFollowSpeed_);
     }
 
-    // ── 壁めり込み回避は最後にハード補正（平滑化後の位置に対して）──
-    Vector3 safePos = collisionResolver_.Resolve(followPos_, pivot);
+    Vector3 offset = offset_ * currentScale_;
+    Matrix4x4 rotateMat = MakeRotateMatrixXYZ(transform_.rotate);
+    Vector3 rotatedOffset = TransformNormal(offset, rotateMat);
+    Vector3 idealPos = smoothedPivot_ + rotatedOffset;  // 追従は平滑化済み、回転は生の値
+
+    // ── 壁めり込み回避は最後にハード補正 ──
+    Vector3 safePos = collisionResolver_.Resolve(idealPos, pivot);
+
+    // アイドル時オートリセンター：カメラ操作が一定時間なければ静かに背後へ戻す
+    UpdateIdleRecenter(dt);
 
     UpdateShake();
     transform_.translate = safePos + shakeOffset_;
 
     // フレーミング補正：追従対象が画角外に出そうな時だけ rotation を引き戻す
     EnsureTargetInView(pivot, dt);
+}
+
+// ============================================================
+// アイドル時オートリセンター更新
+//
+//   移動方向を追いかける旧オート Yaw とは異なり、「カメラ操作が一定時間
+//   なかったか」だけを見る。PlayerCamera 側でスティック操作やロックオン
+//   照準など能動的な制御があったフレームでは NotifyCameraActive() が
+//   呼ばれ idleRecenterTimer_ が 0 に戻るため、操作している間は絶対に
+//   介入しない。無操作が idleRecenterDelay_ 秒続いたときだけ、既存の
+//   RecenterToYaw（RB/LB の手動リセンターと同じイーズ処理）を１回だけ
+//   起動して対象の背後へ静かに寄せる。
+// ============================================================
+void FollowCamera::UpdateIdleRecenter(float dt) {
+    if (!idleRecenterEnabled_) return;
+    if (recentering_)          return;  // 手動リセンター等が既に進行中なら何もしない
+    if (IsInPerformance())     return;
+    if (!target_)              return;
+
+    idleRecenterTimer_ += dt;
+    if (idleRecenterTimer_ < idleRecenterDelay_) return;
+
+    // 対象の向いている方向の背後へ、手動リセンターより緩やかなイーズで寄せる。
+    // RecenterToYaw 内部で idleRecenterTimer_ は 0 にリセットされる。
+    RecenterToYaw(target_->rotate_.y, recenterResetPitch_, idleRecenterDuration_);
 }
 
 // ============================================================
@@ -263,10 +297,18 @@ void FollowCamera::RecenterBehindTarget() {
 
 // ============================================================
 // 任意のワールド yaw へ背後リセンター（RecenterBehindTarget の汎用版）
+//   duration が負値なら recenterDuration_（手動リセンターの既定値）を使う。
+//   アイドルオートリセンターなど、専用の緩やかな時間を使いたい場合だけ
+//   正の値を明示的に渡す。
 // ============================================================
-void FollowCamera::RecenterToYaw(float targetWorldYaw, bool resetPitch) {
+void FollowCamera::RecenterToYaw(float targetWorldYaw, bool resetPitch, float duration) {
     constexpr float kPi    = 3.14159265358979f;
     constexpr float kTwoPi = 6.28318530717958f;
+
+    // アイドルオートリセンター経由・手動リセンター経由を問わず、
+    // 何らかのリセンターが起動したらアイドルタイマーは必ず0に戻す
+    // （直後に再発火して二重に動くのを防ぐ）。
+    idleRecenterTimer_ = 0.0f;
 
     recenterFromYaw_ = transform_.rotate.y;
 
@@ -281,11 +323,13 @@ void FollowCamera::RecenterToYaw(float targetWorldYaw, bool resetPitch) {
         ? std::clamp(recenterPitch_, minPitch_, maxPitch_)
         : transform_.rotate.x;
 
+    activeRecenterDuration_ = (duration >= 0.0f) ? duration : recenterDuration_;
+
     recenterTimer_ = 0.0f;
     recentering_   = true;
 
     // 即時スナップ
-    if (recenterDuration_ <= 0.0f) {
+    if (activeRecenterDuration_ <= 0.0f) {
         transform_.rotate.y = recenterToYaw_;
         transform_.rotate.x = recenterToPitch_;
         recentering_ = false;
@@ -299,8 +343,8 @@ void FollowCamera::UpdateRecenter(float dt) {
     if (!recentering_) return;
 
     recenterTimer_ += dt;
-    float t = (recenterDuration_ > 0.0f)
-        ? std::clamp(recenterTimer_ / recenterDuration_, 0.0f, 1.0f)
+    float t = (activeRecenterDuration_ > 0.0f)
+        ? std::clamp(recenterTimer_ / activeRecenterDuration_, 0.0f, 1.0f)
         : 1.0f;
 
     // イーズアウト（1-(1-t)^3）：最初キビキビ動いて減速しながら収まる
@@ -398,6 +442,18 @@ void FollowCamera::DrawDebugGui() {
     }
     ImGui::Separator();
 
+    if (ImGui::TreeNode("アイドル時オートリセンター")) {
+        ImGui::Checkbox("有効", &idleRecenterEnabled_);
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("カメラ操作(スティック/ロックオン等)が一定時間なければ対象の背後へ静かに戻す");
+        ImGui::DragFloat("発動までの無操作時間 (秒)", &idleRecenterDelay_,    0.1f, 0.0f, 15.0f, "%.1f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("NotifyCameraActive() が呼ばれない状態がこの秒数続いたら発動");
+        ImGui::DragFloat("寄せ時間 (秒)",             &idleRecenterDuration_, 0.05f, 0.0f, 5.0f, "%.2f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("RB/LBの手動リセンターより緩やかにするのが基本");
+        ImGui::TextDisabled("無操作継続: %.1f / %.1f 秒", idleRecenterTimer_, idleRecenterDelay_);
+        ImGui::TreePop();
+    }
+    ImGui::Separator();
+
     if (ImGui::TreeNode("リセンター（RB/LB で対象背後へ）")) {
         ImGui::DragFloat("寄せ時間 (秒)", &recenterDuration_, 0.01f, 0.0f, 1.0f, "%.2f");
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("対象の向きへ寄せる時間。0 で即時スナップ");
@@ -455,6 +511,11 @@ void FollowCamera::Save(nlohmann::json& j) const {
     j["framingPitchMargin"] = framingPitchMargin_;
     j["framingSpeed"]       = framingSpeed_;
 
+    // アイドル時オートリセンター
+    j["idleRecenterEnabled"]  = idleRecenterEnabled_;
+    j["idleRecenterDelay"]    = idleRecenterDelay_;
+    j["idleRecenterDuration"] = idleRecenterDuration_;
+
     // リセンター
     j["recenterDuration"]   = recenterDuration_;
     j["recenterResetPitch"] = recenterResetPitch_;
@@ -501,9 +562,16 @@ void FollowCamera::Load(const nlohmann::json& j) {
     lookAheadSmooth_     = j.value("lookAheadSmooth",    6.0f);
 
     framingEnabled_      = j.value("framingEnabled",      true);
-    framingYawMargin_    = j.value("framingYawMargin",    0.45f);
-    framingPitchMargin_  = j.value("framingPitchMargin",  0.30f);
+    // セーフティネット既定値を拡大（≈60°/≈31°）。通常のプレイでは介入せず、
+    // 画角から本当に外れそうな時だけの最終保険として機能させる。
+    framingYawMargin_    = j.value("framingYawMargin",    1.05f);
+    framingPitchMargin_  = j.value("framingPitchMargin",  0.55f);
     framingSpeed_        = j.value("framingSpeed",        4.0f);
+
+    // アイドル時オートリセンター
+    idleRecenterEnabled_  = j.value("idleRecenterEnabled",  true);
+    idleRecenterDelay_    = j.value("idleRecenterDelay",    2.5f);
+    idleRecenterDuration_ = j.value("idleRecenterDuration", 1.4f);
 
     // リセンター
     recenterDuration_    = j.value("recenterDuration",   0.18f);

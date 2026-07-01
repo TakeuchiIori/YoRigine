@@ -57,7 +57,7 @@ void PlayerSword::Initialize(Camera* camera) {
 
 	trailEmitter_ = std::make_unique<YoRigine::TrailMeshEmitter>();
 	trailEmitter_->SetCamera(camera_);
-	trailEmitter_->LoadAsset("Resources/Vfx/NewEffect.json");
+	trailEmitter_->LoadAsset("Resources/Json/VfxMesh/NewEffect2.json");
 }
 
 // ============================================================
@@ -244,8 +244,9 @@ void PlayerSword::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 
 		// 画面外（見切れ）の敵にヒットしたら、敵を捉え直す決めカメラを発火する。
 		// 画面外判定・発火条件・クールダウンは PlayerCamera が一元管理する。
+		// ロックオンが無効な場合のみ
 		if (PlayerCamera* pc = player_->GetPlayerCamera()) {
-			pc->OnAttackHit(hitPos);
+			if(!player_->GetPlayerCamera()->IsLockOn()) pc->OnAttackHit(hitPos);
 		}
 	}
 }
