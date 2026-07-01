@@ -14,29 +14,129 @@
         "intensity": 1.5,
         "isEnable": true
     },
+    "lightning": {
+        "branchJitter": 0.5,
+        "branches": 3,
+        "color": {
+            "w": 1.0,
+            "x": 0.6000000238418579,
+            "y": 0.800000011920929,
+            "z": 1.5
+        },
+        "flickerRate": 18.0,
+        "glowPower": 2.0,
+        "isEnable": true,
+        "jitter": 0.6000000238418579,
+        "length": 4.0,
+        "segments": 24,
+        "width": 0.18000000715255737
+    },
     "name": "NewEffect3",
+    "shockwave": {
+        "color": {
+            "w": 1.0,
+            "x": 1.5,
+            "y": 0.8999999761581421,
+            "z": 0.4000000059604645
+        },
+        "duration": 0.6000000238418579,
+        "isEnable": true,
+        "radius": 3.0,
+        "thickness": 0.15000000596046448
+    },
+    "smoke": {
+        "color": {
+            "w": 1.0,
+            "x": 0.6000000238418579,
+            "y": 0.4000000059604645,
+            "z": 1.2000000476837158
+        },
+        "density": 1.0,
+        "fresnelPower": 2.5,
+        "isEnable": true,
+        "noiseOctaves": 4.0,
+        "noiseScale": 4.0,
+        "noiseStrength": 0.8999999761581421,
+        "radius": 1.5,
+        "rimIntensity": 2.0,
+        "riseSpeed": 1.2000000476837158,
+        "scrollSpeed": 0.30000001192092896,
+        "smokeColor": {
+            "w": 1.0,
+            "x": 0.07999999821186066,
+            "y": 0.07999999821186066,
+            "z": 0.09000000357627869
+        }
+    },
     "trail": {
+        "arcAngleDeg": 120.0,
         "blendMode": 2,
         "colorEnd": {
-            "w": 0.0,
-            "x": 0.800000011920929,
-            "y": 0.5,
-            "z": 0.10000000149011612
+            "w": 1.0,
+            "x": 1.0,
+            "y": 0.0,
+            "z": 0.0
         },
         "colorStart": {
             "w": 1.0,
             "x": 1.0,
-            "y": 0.949999988079071,
-            "z": 0.699999988079071
+            "y": 0.8333332538604736,
+            "z": 0.0
         },
+        "colorWaveAmp": 0.15000000596046448,
+        "colorWaveFreq": 3.0,
+        "crescentShape": true,
+        "distortion": 0.0,
+        "energyIntensity": 1.5,
+        "energySpeed": 2.5,
+        "fresnelStrength": 1.0,
+        "glowPower": 1.5,
         "lifetime": 0.25,
-        "maxPoints": 48,
+        "maxPoints": 512,
+        "noiseOctaves": 2.0,
         "noiseTexturePath": "",
+        "primitive": {
+            "halfExtents": {
+                "x": 0.5,
+                "y": 0.5,
+                "z": 0.5
+            },
+            "height": 1.0,
+            "latSegments": 16,
+            "lonSegments": 16,
+            "placement": 0,
+            "radius": 0.5,
+            "ringSegments": 12,
+            "scaleByAge": true,
+            "stampScale": 1.0,
+            "stampSpacing": 0.0,
+            "tubeRadius": 0.15000000596046448,
+            "type": 0
+        },
+        "rimColor": {
+            "w": 1.0,
+            "x": 0.4000000059604645,
+            "y": 0.699999988079071,
+            "z": 1.0
+        },
+        "shapeType": 0,
+        "softness": 0.15000000596046448,
+        "sparkleAmount": 0.4000000059604645,
+        "sparkleSpeed": 4.0,
+        "splineSubdivisions": 256,
         "texturePath": "",
+        "thickness": 0.10000000149011612,
+        "trailSharpness": 2.0,
         "uvScrollSpeed": 0.30000001192092896,
-        "widthEnd": 0.0,
-        "widthStart": 0.05000000074505806
+        "widthEnd": 5.0,
+        "widthSegments": 1,
+        "widthStart": 5.0,
+        "widthWaveAmp": 0.05000000074505806,
+        "widthWaveFreq": 8.0
     },
     "useLightVolume": true,
+    "useLightning": false,
+    "useShockwave": false,
+    "useSmoke": false,
     "useTrail": true
 }
