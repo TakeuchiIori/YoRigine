@@ -219,10 +219,11 @@ void FollowCamera::FollowProcess() {
 //   起動して対象の背後へ静かに寄せる。
 // ============================================================
 void FollowCamera::UpdateIdleRecenter(float dt) {
-    if (!idleRecenterEnabled_) return;
-    if (recentering_)          return;  // 手動リセンター等が既に進行中なら何もしない
-    if (IsInPerformance())     return;
-    if (!target_)              return;
+    if (!idleRecenterEnabled_)    return;
+    if (idleRecenterSuppressed_)  return;  // Game 側からの一時停止中（例：バトル中）
+    if (recentering_)             return;  // 手動リセンター等が既に進行中なら何もしない
+    if (IsInPerformance())        return;
+    if (!target_)                 return;
 
     idleRecenterTimer_ += dt;
     if (idleRecenterTimer_ < idleRecenterDelay_) return;

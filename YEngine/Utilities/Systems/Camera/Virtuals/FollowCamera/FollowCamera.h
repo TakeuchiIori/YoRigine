@@ -87,6 +87,15 @@ public:
     void NotifyCameraActive() { idleRecenterTimer_ = 0.0f; }
 
     // ============================================================
+    // アイドル時オートリセンターの一時停止
+    //   idleRecenterEnabled_（設計者がプリセットで保存する基本設定）とは別の、
+    //   実行時のみの一時停止フラグ。バトル中など「この間だけ止めたい」場合に
+    //   Game 側（PlayerCamera）から呼ぶ。プリセットの ON/OFF 設定自体は書き換えない。
+    // ============================================================
+    void SetIdleRecenterSuppressed(bool s) { idleRecenterSuppressed_ = s; }
+    bool IsIdleRecenterSuppressed()  const { return idleRecenterSuppressed_; }
+
+    // ============================================================
     // フレーミング補正（追従対象が画角外に出そうな時だけ、
     // はみ出した分を rotation で穏やかに pivot へ引き戻す）
     // ============================================================
@@ -239,8 +248,9 @@ private:
     // ============================================================
     void  UpdateIdleRecenter(float dt);
 
-    bool  idleRecenterEnabled_  = true;
-    float idleRecenterDelay_    = 2.5f;   // 無操作がこの秒数続いたら発動
-    float idleRecenterDuration_ = 1.4f;   // 発動時のイーズ時間（RB/LB の手動リセンターより緩やかに）
-    float idleRecenterTimer_    = 0.0f;   // 内部状態：無操作の継続時間
+    bool  idleRecenterEnabled_     = true;
+    float idleRecenterDelay_       = 2.5f;   // 無操作がこの秒数続いたら発動
+    float idleRecenterDuration_    = 1.4f;   // 発動時のイーズ時間（RB/LB の手動リセンターより緩やかに）
+    float idleRecenterTimer_       = 0.0f;   // 内部状態：無操作の継続時間
+    bool  idleRecenterSuppressed_  = false;  // 実行時の一時停止（非永続・Game 側から制御）
 };
