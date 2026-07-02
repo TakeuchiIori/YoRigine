@@ -9,8 +9,8 @@
 #ifdef USE_IMGUI
 #include <imgui.h>
 #endif
-#include <Editor/Icon/EditorIcon.h>
 
+#include <IconsFontAwesome5.h>
 void TimelinePanel::Initialize(MotionEditorContext* context)
 {
 	context_ = context;
@@ -121,13 +121,13 @@ void TimelinePanel::DrawImGui()
 		if (ImGui::IsItemHovered()) ImGui::SetTooltip("先頭に戻る");
 
 		ImGui::SameLine(0, 14);
-		ImGui::TextColored(ImVec4(1.0f, 0.59f, 0.2f, 1.0f), (std::string(Icon::ArrowsAlt) + " 位置").c_str());
+		ImGui::TextColored(ImVec4(1.0f, 0.59f, 0.2f, 1.0f), (std::string(ICON_FA_ARROWS_ALT) + " 位置").c_str());
 		ImGui::SameLine(0, 6);
-		ImGui::TextColored(ImVec4(0.35f, 0.78f, 0.35f, 1.0f), (std::string(Icon::SyncAlt) + " 回転").c_str());
+		ImGui::TextColored(ImVec4(0.35f, 0.78f, 0.35f, 1.0f), (std::string(ICON_FA_SYNC_ALT) + " 回転").c_str());
 		ImGui::SameLine(0, 6);
-		ImGui::TextColored(ImVec4(0.31f, 0.59f, 1.0f, 1.0f), (std::string(Icon::ExpandArrowsAlt) + " 拡縮").c_str());
+		ImGui::TextColored(ImVec4(0.31f, 0.59f, 1.0f, 1.0f), (std::string(ICON_FA_EXPAND_ARROWS_ALT) + " 拡縮").c_str());
 		ImGui::SameLine(0, 6);
-		ImGui::TextColored(ImVec4(1.0f, 0.94f, 0.2f, 1.0f), (std::string(Icon::CheckCircle) + " 選択中").c_str());
+		ImGui::TextColored(ImVec4(1.0f, 0.94f, 0.2f, 1.0f), (std::string(ICON_FA_CHECK_CIRCLE) + " 選択中").c_str());
 
 		ImGui::Separator();
 

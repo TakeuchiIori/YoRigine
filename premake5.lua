@@ -63,7 +63,8 @@ local engine_includes = {
     "Externals/nlohmann",
     "Externals/DirectXTex",
     "Externals/imgui",
-    "Externals/assimp/include"
+    "Externals/assimp/include",
+    "Externals/icon"
 }
 
 local directx_libs = {

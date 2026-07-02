@@ -2,7 +2,7 @@
 
 #include "YEmitterGroupEditor.h"
 #include "YParticleManager.h"
-#include <Editor/Icon/EditorIcon.h>
+#include <IconsFontAwesome5.h>
 #include <Editor/Editor.h>
 #include <algorithm>
 #include <cmath>
@@ -96,7 +96,7 @@ void YEmitterGroupEditor::ShowSaveNotification() {
         : ImVec4(1.0f, 0.3f, 0.2f, alpha);
     ImGui::PushStyleColor(ImGuiCol_Text, col);
     ImGui::Text("%s %s",
-        saveNotifySuccess_ ? Icon::CheckCircle : Icon::TimesCircle,
+        saveNotifySuccess_ ? ICON_FA_CHECK_CIRCLE : ICON_FA_TIMES_CIRCLE,
         saveNotifyMessage_.c_str());
     ImGui::PopStyleColor();
     ImGui::Separator();
@@ -185,7 +185,7 @@ void YEmitterGroupEditor::ShowGroupList() {
     // ＋ 新規エフェクト（目立つ位置に。名前は自動でユニーク化）
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.16f, 0.40f, 0.24f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.22f, 0.54f, 0.32f, 1.0f));
-    if (ImGui::Button((std::string(Icon::PlusCircle) + " 新規エフェクト").c_str(), ImVec2(-1, 0))) {
+    if (ImGui::Button((std::string(ICON_FA_PLUS_CIRCLE) + " 新規エフェクト").c_str(), ImVec2(-1, 0))) {
         auto& cmgr = YEmitterGroupManager::GetInstance();
         std::string base = "NewEffect", nm = base;
         int n = 1;
@@ -317,7 +317,7 @@ void YEmitterGroupEditor::ShowGroupDetail() {
     ImGui::BeginChild("##EmitCtrlPanel", ImVec2(0, 116), true,
         ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 
-    ImGui::TextColored({ 0.55f, 0.85f, 1.0f, 1.0f }, (std::string(Icon::Bullhorn) + "プレビュー再生").c_str());
+    ImGui::TextColored({ 0.55f, 0.85f, 1.0f, 1.0f }, (std::string(ICON_FA_BULLHORN) + "プレビュー再生").c_str());
     ImGui::Spacing();
 
     // 保存位置が画面外でも見えるよう、ここで指定した位置に発生させる。
@@ -341,7 +341,7 @@ void YEmitterGroupEditor::ShowGroupDetail() {
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.42f, 0.18f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.28f, 0.58f, 0.28f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.12f, 0.32f, 0.12f, 1.0f));
-    if (ImGui::Button((std::string(Icon::Play) + "x1##EAG").c_str(), ImVec2(68, 0))) emitAtPreview(1);
+    if (ImGui::Button((std::string(ICON_FA_PLAY) + "x1##EAG").c_str(), ImVec2(68, 0))) emitAtPreview(1);
     ImGui::PopStyleColor(3);
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("全エミッターから 1 個ずつ発生");
     ImGui::SameLine();
@@ -350,7 +350,7 @@ void YEmitterGroupEditor::ShowGroupDetail() {
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.22f, 0.42f, 0.12f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.32f, 0.58f, 0.18f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.16f, 0.32f, 0.08f, 1.0f));
-    if (ImGui::Button((std::string(Icon::Play) + "x10##EAG").c_str(), ImVec2(76, 0))) emitAtPreview(10);
+    if (ImGui::Button((std::string(ICON_FA_PLAY) + "x10##EAG").c_str(), ImVec2(76, 0))) emitAtPreview(10);
     ImGui::PopStyleColor(3);
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("全エミッターから 10 個ずつ発生");
     ImGui::SameLine();
@@ -359,7 +359,7 @@ void YEmitterGroupEditor::ShowGroupDetail() {
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.50f, 0.32f, 0.08f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.70f, 0.48f, 0.12f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.38f, 0.24f, 0.05f, 1.0f));
-    if (ImGui::Button((std::string(Icon::Bolt) + "x100##EAG").c_str(), ImVec2(80, 0))) emitAtPreview(100);
+    if (ImGui::Button((std::string(ICON_FA_BOLT) + "x100##EAG").c_str(), ImVec2(80, 0))) emitAtPreview(100);
     ImGui::PopStyleColor(3);
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("全エミッターから一気に 100 個バースト発生");
     ImGui::SameLine();
@@ -376,7 +376,7 @@ void YEmitterGroupEditor::ShowGroupDetail() {
         anyAutoOn ? ImVec4(0.15f, 0.35f, 0.55f, 1.0f) : ImVec4(0.24f, 0.24f, 0.24f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.22f, 0.48f, 0.70f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.10f, 0.28f, 0.45f, 1.0f));
-    if (ImGui::Button((std::string(Icon::Refresh) + "自動ON##AG").c_str(), ImVec2(90, 0))) group->SetAutoEmitAll(true);
+    if (ImGui::Button((std::string(ICON_FA_SYNC) + "自動ON##AG").c_str(), ImVec2(90, 0))) group->SetAutoEmitAll(true);
     ImGui::PopStyleColor(3);
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("全エミッターの自動発生を ON にする");
     ImGui::SameLine();
@@ -385,7 +385,7 @@ void YEmitterGroupEditor::ShowGroupDetail() {
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.40f, 0.16f, 0.16f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.56f, 0.24f, 0.24f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.30f, 0.10f, 0.10f, 1.0f));
-    if (ImGui::Button((std::string(Icon::Stop) + "自動OFF##AG").c_str(), ImVec2(96, 0))) group->SetAutoEmitAll(false);
+    if (ImGui::Button((std::string(ICON_FA_STOP) + "自動OFF##AG").c_str(), ImVec2(96, 0))) group->SetAutoEmitAll(false);
     ImGui::PopStyleColor(3);
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("全エミッターの自動発生を OFF にする");
 
@@ -399,13 +399,13 @@ void YEmitterGroupEditor::ShowGroupDetail() {
     ImGui::SameLine();
     ImGui::TextColored({ 0.5f, 0.7f, 1.0f, 1.0f }, "(Ctrl+[G]で複数ギズモ選択)");
     ImGui::SameLine();
-    if (ImGui::Button((std::string(Icon::PlusCircle) + "エミッターを追加##AddE").c_str()))
+    if (ImGui::Button((std::string(ICON_FA_PLUS_CIRCLE) + "エミッターを追加##AddE").c_str()))
         ImGui::OpenPopup("AddEmitterPopup");
 
     // システム一覧選択ポップアップ
     ImGui::SetNextWindowSize(ImVec2(360, 0), ImGuiCond_Appearing);
     if (ImGui::BeginPopup("AddEmitterPopup")) {
-        ImGui::Text((std::string(Icon::PlusCircle) + "エミッターを追加").c_str());
+        ImGui::Text((std::string(ICON_FA_PLUS_CIRCLE) + "エミッターを追加").c_str());
         ImGui::Separator();
         auto& pmgr = YParticleManager::GetInstance();
         auto sysNames = pmgr.GetAllSystemNames();
@@ -436,7 +436,7 @@ void YEmitterGroupEditor::ShowGroupDetail() {
         }
         else {
             ImGui::TextColored({ 1.0f, 0.7f, 0.0f, 1.0f },
-                (std::string(Icon::Xmark) + "読み込み済みのシステムがありません").c_str());
+                (std::string(ICON_FA_TIMES) + "読み込み済みのシステムがありません").c_str());
             ImGui::TextDisabled("パーティクルシステムを先に作成してください");
         }
         ImGui::Separator();
@@ -447,10 +447,10 @@ void YEmitterGroupEditor::ShowGroupDetail() {
             bool exists = (pmgr.GetSystem(newEmitterSystemName_) != nullptr);
             if (exists)
                 ImGui::TextColored({ 0.2f, 1.0f, 0.3f, 1.0f },
-                    (std::string(Icon::CheckCircle) + "\"%s\" が存在します").c_str(), newEmitterSystemName_);
+                    (std::string(ICON_FA_CHECK_CIRCLE) + "\"%s\" が存在します").c_str(), newEmitterSystemName_);
             else
                 ImGui::TextColored({ 1.0f, 0.6f, 0.1f, 1.0f },
-                    (std::string(Icon::Xmark) + "\"%s\" は未登録です").c_str(), newEmitterSystemName_);
+                    (std::string(ICON_FA_TIMES) + "\"%s\" は未登録です").c_str(), newEmitterSystemName_);
         }
         ImGui::Separator();
         ImGui::Text("ローカルオフセット:");
@@ -459,7 +459,7 @@ void YEmitterGroupEditor::ShowGroupDetail() {
         ImGui::Spacing();
         bool canAdd = (newEmitterSystemName_[0] != '\0');
         ImGui::BeginDisabled(!canAdd);
-        if (ImGui::Button((std::string(Icon::PlusCircle) + "追加##EA").c_str(), ImVec2(120, 0))) {
+        if (ImGui::Button((std::string(ICON_FA_PLUS_CIRCLE) + "追加##EA").c_str(), ImVec2(120, 0))) {
             group->AddEmitter(newEmitterSystemName_,
                 { newEmitterOffset_[0], newEmitterOffset_[1], newEmitterOffset_[2] });
             newEmitterSystemName_[0] = '\0';
@@ -519,7 +519,7 @@ void YEmitterGroupEditor::ShowGroupDetail() {
         auto* emitter = group->GetEmitter(selectedEmitterIndex_);
         if (emitter) {
             ImGui::Separator();
-            ImGui::Text((std::string(Icon::Cog) + "詳細: エミッター [%d]  システム: %s").c_str(),
+            ImGui::Text((std::string(ICON_FA_COG) + "詳細: エミッター [%d]  システム: %s").c_str(),
                 selectedEmitterIndex_, emitter->GetSystemName().c_str());
             ImGui::Separator();
             ShowSelectedEmitterDetail(*emitter);
@@ -575,7 +575,7 @@ bool YEmitterGroupEditor::ShowEmitterRow(YEmitterGroup& group, size_t index) {
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.6f, 0.1f, 0.1f, 0.8f));
     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.3f, 0.3f, 1.0f));
-    if (ImGui::SmallButton((std::string(Icon::Trash) + "##Del").c_str())) deleteRequested = true;
+    if (ImGui::SmallButton((std::string(ICON_FA_TRASH) + "##Del").c_str())) deleteRequested = true;
     ImGui::PopStyleColor(3);
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("このエミッターを削除");
 
@@ -598,9 +598,9 @@ void YEmitterGroupEditor::ShowSelectedEmitterDetail(YParticleEmitter& emitter) {
         emitter.SetSystemName(sysBuf);
     }
     ImGui::SameLine();
-    if (ImGui::SmallButton((std::string(Icon::Cog) + "##SysPick").c_str())) ImGui::OpenPopup("##DetailSysPick");
+    if (ImGui::SmallButton((std::string(ICON_FA_COG) + "##SysPick").c_str())) ImGui::OpenPopup("##DetailSysPick");
     if (ImGui::BeginPopup("##DetailSysPick")) {
-        ImGui::Text((std::string(Icon::Cog) + "システム選択:").c_str());
+        ImGui::Text((std::string(ICON_FA_COG) + "システム選択:").c_str());
         auto& pmgr2 = YParticleManager::GetInstance();
         auto sysNames2 = pmgr2.GetAllSystemNames();
         if (sysNames2.empty()) {
@@ -701,15 +701,15 @@ void YEmitterGroupEditor::ShowSelectedEmitterDetail(YParticleEmitter& emitter) {
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.42f, 0.18f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.28f, 0.58f, 0.28f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.12f, 0.32f, 0.12f, 1.0f));
-    if (ImGui::SmallButton((std::string(Icon::Play) + " x1##ED").c_str()))  emitter.FollowEmit(pv, 1);
+    if (ImGui::SmallButton((std::string(ICON_FA_PLAY) + " x1##ED").c_str()))  emitter.FollowEmit(pv, 1);
     ImGui::SameLine();
-    if (ImGui::SmallButton((std::string(Icon::Play) + " x10##ED").c_str())) emitter.FollowEmit(pv, 10);
+    if (ImGui::SmallButton((std::string(ICON_FA_PLAY) + " x10##ED").c_str())) emitter.FollowEmit(pv, 10);
     ImGui::PopStyleColor(3);
     ImGui::SameLine();
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.50f, 0.32f, 0.08f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.70f, 0.48f, 0.12f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.38f, 0.24f, 0.05f, 1.0f));
-    if (ImGui::SmallButton((std::string(Icon::Bolt) + " x100##ED").c_str())) emitter.FollowEmit(pv, 100);
+    if (ImGui::SmallButton((std::string(ICON_FA_BOLT) + " x100##ED").c_str())) emitter.FollowEmit(pv, 100);
     ImGui::PopStyleColor(3);
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("プレビュー位置 (%.1f, %.1f, %.1f) に発生", pv.x, pv.y, pv.z);
 
@@ -720,12 +720,12 @@ void YEmitterGroupEditor::ShowSelectedEmitterDetail(YParticleEmitter& emitter) {
         for (const auto& attr : sys->GetAttributes())
             if (attr.isActive) activeCnt++;
         ImGui::TextColored({ 0.2f, 1.0f, 0.3f, 1.0f },
-            (std::string(Icon::CheckCircle) + "  接続済み  最大:%u  有効:%zu").c_str(),
+            (std::string(ICON_FA_CHECK_CIRCLE) + "  接続済み  最大:%u  有効:%zu").c_str(),
             sys->GetMaxParticles(), activeCnt);
     }
     else {
         ImGui::TextColored({ 1.0f, 0.4f, 0.0f, 1.0f },
-            (std::string(Icon::Xmark) + " システム \"%s\" が見つかりません").c_str(),
+            (std::string(ICON_FA_TIMES) + " システム \"%s\" が見つかりません").c_str(),
             emitter.GetSystemName().c_str());
     }
 
@@ -733,7 +733,7 @@ void YEmitterGroupEditor::ShowSelectedEmitterDetail(YParticleEmitter& emitter) {
     if (sys) {
         ImGui::Spacing();
         ImGui::Separator();
-        std::string header = std::string(Icon::Cog) + " システム \"" + sys->GetName() + "\" を編集";
+        std::string header = std::string(ICON_FA_COG) + " システム \"" + sys->GetName() + "\" を編集";
         if (ImGui::CollapsingHeader(header.c_str())) {
             ImGui::Indent();
             sys->ShowEditor();
@@ -747,10 +747,10 @@ void YEmitterGroupEditor::ShowFileButtons() {
     // 主導線: エフェクト(=バンドル) の保存 / 開く（YEffects/ 1ファイル完結）
     // ============================================================
     ImGui::TextColored({ 0.6f, 0.85f, 1.0f, 1.0f },
-        (std::string(Icon::FloppyDisk) + "エフェクト (YEffects/)").c_str());
+        (std::string(ICON_FA_SAVE) + "エフェクト (YEffects/)").c_str());
 
     ImGui::BeginDisabled(selectedGroupName_.empty());
-    if (ImGui::Button((std::string(Icon::FloppyDisk) + "エフェクトを保存##FX").c_str(), ImVec2(-1, 0))) {
+    if (ImGui::Button((std::string(ICON_FA_SAVE) + "エフェクトを保存##FX").c_str(), ImVec2(-1, 0))) {
         std::filesystem::create_directories("Resources/Json/YEffects");
         saveBundleBrowser_.Scan();
         std::string defaultName = selectedGroupName_ + ".json";
@@ -763,7 +763,7 @@ void YEmitterGroupEditor::ShowFileButtons() {
             ? "エフェクト(グループ)を選択してください"
             : "選択エフェクトと参照システムを YEffects/ に1ファイルで保存");
 
-    if (ImGui::Button((std::string(Icon::FolderOpen) + "エフェクトを開く##FX").c_str(), ImVec2(-1, 0))) {
+    if (ImGui::Button((std::string(ICON_FA_FOLDER_OPEN) + "エフェクトを開く##FX").c_str(), ImVec2(-1, 0))) {
         std::filesystem::create_directories("Resources/Json/YEffects");
         loadBundleBrowser_.Scan();
         showLoadBundlePopup_ = true;
@@ -774,7 +774,7 @@ void YEmitterGroupEditor::ShowFileButtons() {
     ImGui::SetNextWindowSize(ImVec2(480, 380), ImGuiCond_Appearing);
     if (ImGui::BeginPopupModal("##SaveBundle", &showSaveBundlePopup_,
         ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize)) {
-        ImGui::Text((std::string(Icon::FloppyDisk) + " エフェクトを保存: %s").c_str(), selectedGroupName_.c_str());
+        ImGui::Text((std::string(ICON_FA_SAVE) + " エフェクトを保存: %s").c_str(), selectedGroupName_.c_str());
         ImGui::TextDisabled("(グループ + 参照システムを1ファイルにまとめます)");
         ImGui::Separator();
         saveBundleBrowser_.Draw("##SaveBundleBrowser", ImVec2(0, 240));
@@ -804,7 +804,7 @@ void YEmitterGroupEditor::ShowFileButtons() {
     ImGui::SetNextWindowSize(ImVec2(480, 360), ImGuiCond_Appearing);
     if (ImGui::BeginPopupModal("##LoadBundle", &showLoadBundlePopup_,
         ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize)) {
-        ImGui::Text((std::string(Icon::FolderOpen) + "エフェクトを開く — YEffects/ のファイルを選択").c_str());
+        ImGui::Text((std::string(ICON_FA_FOLDER_OPEN) + "エフェクトを開く — YEffects/ のファイルを選択").c_str());
         ImGui::Separator();
         loadBundleBrowser_.Draw("##LoadBundleBrowser", ImVec2(0, 280));
         ImGui::Separator();
@@ -824,7 +824,7 @@ void YEmitterGroupEditor::ShowFileButtons() {
         return;
 
     // ── 全グループ保存 ──────────────────────────────────────
-    if (ImGui::Button((std::string(Icon::FloppyDisk) + "すべて保存##FG").c_str(), ImVec2(-1, 0))) {
+    if (ImGui::Button((std::string(ICON_FA_SAVE) + "すべて保存##FG").c_str(), ImVec2(-1, 0))) {
         saveBrowser_.Scan();
         showSavePopup_ = true;
     }
@@ -832,7 +832,7 @@ void YEmitterGroupEditor::ShowFileButtons() {
     ImGui::SetNextWindowSize(ImVec2(480, 380), ImGuiCond_Appearing);
     if (ImGui::BeginPopupModal("##SaveEmitterGroups", &showSavePopup_,
         ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize)) {
-        ImGui::Text((std::string(Icon::FloppyDisk) + " 保存 — ファイルをクリックして上書き、または下に新しい名前を入力").c_str());
+        ImGui::Text((std::string(ICON_FA_SAVE) + " 保存 — ファイルをクリックして上書き、または下に新しい名前を入力").c_str());
         ImGui::Separator();
         saveBrowser_.Draw("##SaveBrowserChild", ImVec2(0, 260));
         ImGui::Separator();
@@ -857,7 +857,7 @@ void YEmitterGroupEditor::ShowFileButtons() {
     }
 
     // ── 全グループ読み込み ──────────────────────────────────
-    if (ImGui::Button((std::string(Icon::FolderOpen) + "すべて読み込み##FG").c_str(), ImVec2(-1, 0))) {
+    if (ImGui::Button((std::string(ICON_FA_FOLDER_OPEN) + "すべて読み込み##FG").c_str(), ImVec2(-1, 0))) {
         loadBrowser_.Scan();
         showLoadPopup_ = true;
     }
@@ -865,7 +865,7 @@ void YEmitterGroupEditor::ShowFileButtons() {
     ImGui::SetNextWindowSize(ImVec2(480, 360), ImGuiCond_Appearing);
     if (ImGui::BeginPopupModal("##LoadEmitterGroups", &showLoadPopup_,
         ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize)) {
-        ImGui::Text((std::string(Icon::FolderOpen) + "読み込み — JSONファイルを選択してください").c_str());
+        ImGui::Text((std::string(ICON_FA_FOLDER_OPEN) + "読み込み — JSONファイルを選択してください").c_str());
         ImGui::Separator();
         loadBrowser_.Draw("##LoadBrowserChild", ImVec2(0, 280));
         ImGui::Separator();
@@ -881,7 +881,7 @@ void YEmitterGroupEditor::ShowFileButtons() {
     // ── 選択中グループ 個別保存 ────────────────────────────
     bool hasSelection = !selectedGroupName_.empty();
     ImGui::BeginDisabled(!hasSelection);
-    if (ImGui::Button((std::string(Icon::FloppyDisk) + "選択グループを保存##FGS").c_str(), ImVec2(-1, 0))) {
+    if (ImGui::Button((std::string(ICON_FA_SAVE) + "選択グループを保存##FGS").c_str(), ImVec2(-1, 0))) {
         saveSingleBrowser_.Scan();
         std::string defaultName = selectedGroupName_ + ".json";
         strncpy_s(saveAsNameBuf_, defaultName.c_str(), sizeof(saveAsNameBuf_));
@@ -895,7 +895,7 @@ void YEmitterGroupEditor::ShowFileButtons() {
     ImGui::SetNextWindowSize(ImVec2(480, 380), ImGuiCond_Appearing);
     if (ImGui::BeginPopupModal("##SaveSingleGroup", &showSaveSinglePopup_,
         ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize)) {
-        ImGui::Text((std::string(Icon::FloppyDisk) + " グループ単独保存: %s").c_str(), selectedGroupName_.c_str());
+        ImGui::Text((std::string(ICON_FA_SAVE) + " グループ単独保存: %s").c_str(), selectedGroupName_.c_str());
         ImGui::Separator();
         saveSingleBrowser_.Draw("##SaveSingleBrowser", ImVec2(0, 260));
         ImGui::Separator();
@@ -920,7 +920,7 @@ void YEmitterGroupEditor::ShowFileButtons() {
     }
 
     // ── グループ単独読み込み ────────────────────────────────
-    if (ImGui::Button((std::string(Icon::FolderOpen) + "グループを読み込み##FGL").c_str(), ImVec2(-1, 0))) {
+    if (ImGui::Button((std::string(ICON_FA_FOLDER_OPEN) + "グループを読み込み##FGL").c_str(), ImVec2(-1, 0))) {
         loadSingleBrowser_.Scan();
         showLoadSinglePopup_ = true;
     }
@@ -928,7 +928,7 @@ void YEmitterGroupEditor::ShowFileButtons() {
     ImGui::SetNextWindowSize(ImVec2(480, 360), ImGuiCond_Appearing);
     if (ImGui::BeginPopupModal("##LoadSingleGroup", &showLoadSinglePopup_,
         ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize)) {
-        ImGui::Text((std::string(Icon::FolderOpen) + "グループ読み込み — JSONファイルを選択").c_str());
+        ImGui::Text((std::string(ICON_FA_FOLDER_OPEN) + "グループ読み込み — JSONファイルを選択").c_str());
         ImGui::Separator();
         loadSingleBrowser_.Draw("##LoadSingleBrowser", ImVec2(0, 280));
         ImGui::Separator();

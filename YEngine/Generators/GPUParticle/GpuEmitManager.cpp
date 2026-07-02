@@ -11,6 +11,7 @@
 #include <ModelManager.h>
 #include <Debugger/Logger.h>
 #include "Systems/GameTime/GameTime.h"
+#include <IconsFontAwesome5.h>
 
 namespace YoRigine {
 	// ImGui用の形状名一覧
@@ -173,14 +174,14 @@ namespace YoRigine {
 		if (ImGui::CollapsingHeader("ファイル操作・ロード", ImGuiTreeNodeFlags_DefaultOpen))
 		{
 			float halfWidth = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
-			if (ImGui::Button("\uF0C7 保存", ImVec2(halfWidth, 0))) {
+			if (ImGui::Button(ICON_FA_SAVE " 保存", ImVec2(halfWidth, 0))) {
 				if (SaveToFile(saveFilePath_))
 					std::cout << "保存成功: " << saveFilePath_ << std::endl;
 				else
 					std::cout << "保存失敗: " << saveFilePath_ << std::endl;
 			}
 			ImGui::SameLine();
-			if (ImGui::Button("\uF07C 読み込み", ImVec2(halfWidth, 0))) {
+			if (ImGui::Button(ICON_FA_FOLDER_OPEN " 読み込み", ImVec2(halfWidth, 0))) {
 				if (LoadFromFile(saveFilePath_))
 					std::cout << "読み込み成功: " << saveFilePath_ << std::endl;
 				else
@@ -798,7 +799,7 @@ namespace YoRigine {
 		// フィルター検索
 		static char groupFilter[256] = "";
 		ImGui::PushItemWidth(-1);
-		ImGui::InputTextWithHint("##GroupFilter", "\uf002 検索...", groupFilter, sizeof(groupFilter));
+		ImGui::InputTextWithHint("##GroupFilter", ICON_FA_SEARCH " 検索...", groupFilter, sizeof(groupFilter));
 		ImGui::PopItemWidth();
 
 		ImGui::Spacing();
@@ -861,13 +862,13 @@ namespace YoRigine {
 				ImGui::PushID((name + "_play").c_str());
 				if (groupData->isPlaying) {
 					ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.3f, 0.3f, 1.0f));
-					if (ImGui::SmallButton("\uf04b")) {
+					if (ImGui::SmallButton(ICON_FA_PLAY)) {
 						StopEmitterGroup(name);
 					}
 					ImGui::PopStyleColor();
 				} else {
 					ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.8f, 0.3f, 1.0f));
-					if (ImGui::SmallButton("▶")) {
+					if (ImGui::SmallButton(ICON_FA_PLAY)) {
 						PlayEmitterGroup(name);
 					}
 					ImGui::PopStyleColor();
@@ -911,13 +912,13 @@ namespace YoRigine {
 				if (currentGroup->isPlaying) {
 					ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "● 再生中");
 					ImGui::SameLine();
-					if (ImGui::Button("\uf04d 停止")) {
+					if (ImGui::Button(ICON_FA_STOP " 停止")) {
 						StopEmitterGroup(selectedGroupName_);
 					}
 				} else {
 					ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "○ 停止中");
 					ImGui::SameLine();
-					if (ImGui::Button("\uf04b 再生")) {
+					if (ImGui::Button(ICON_FA_PLAY " 再生")) {
 						PlayEmitterGroup(selectedGroupName_);
 					}
 				}
@@ -1060,7 +1061,7 @@ namespace YoRigine {
 		// フィルター検索
 		static char emitterFilter[256] = "";
 		ImGui::PushItemWidth(-1);
-		ImGui::InputTextWithHint("##EmitterFilter", "\uf002 検索...",
+		ImGui::InputTextWithHint("##EmitterFilter", ICON_FA_SEARCH " 検索...",
 			emitterFilter, sizeof(emitterFilter));
 		ImGui::PopItemWidth();
 

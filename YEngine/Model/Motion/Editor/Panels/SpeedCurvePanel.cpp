@@ -3,6 +3,7 @@
 #ifdef USE_IMGUI
 #include <imgui.h>
 #include <imgui_internal.h>
+#include <IconsFontAwesome5.h>
 #endif
 
 #include "../MotionEditorContext.h"
@@ -185,7 +186,7 @@ bool SpeedCurvePanel::DrawCurveEditor(ImVec2 size)
             ImGui::TextDisabled("端点は削除できません");
         }
         else {
-            if (ImGui::MenuItem("\uf00d  この点を削除")) {
+            if (ImGui::MenuItem(ICON_FA_TIMES "  この点を削除")) {
                 delegate_.RemovePoint(rightClickIdx_);
                 dirty = true;
                 rightClickIdx_ = -1;
@@ -287,13 +288,13 @@ void SpeedCurvePanel::DrawImGui()
     char headerLabel[128];
     if (hasBakedSnapshot_)
         snprintf(headerLabel, sizeof(headerLabel),
-            "\uf0e7 タイムスケールカーブ  [焼込済]###SpeedCurveHeader");
+            ICON_FA_BOLT " タイムスケールカーブ  [焼込済]###SpeedCurveHeader");
     else if (isDirty_)
         snprintf(headerLabel, sizeof(headerLabel),
-            "\uf0e7 タイムスケールカーブ  *###SpeedCurveHeader");
+            ICON_FA_BOLT " タイムスケールカーブ  *###SpeedCurveHeader");
     else
         snprintf(headerLabel, sizeof(headerLabel),
-            "\uf0e7 タイムスケールカーブ###SpeedCurveHeader");
+            ICON_FA_BOLT " タイムスケールカーブ###SpeedCurveHeader");
 
     bool open = ImGui::CollapsingHeader(headerLabel, ImGuiTreeNodeFlags_DefaultOpen);
 
@@ -329,7 +330,7 @@ void SpeedCurvePanel::DrawImGui()
     if (hasBakedSnapshot_) {
         ImGui::SameLine();
         ImGui::SetCursorPosX(ImGui::GetContentRegionMax().x - 130.0f);
-        ImGui::Checkbox("\uf0c7 焼込前を表示##bkprev", &showBakedPreview_);
+        ImGui::Checkbox(ICON_FA_SAVE " 焼込前を表示##bkprev", &showBakedPreview_);
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("焼き込む前のカーブをオレンジ色で重ねて表示します");
     }
@@ -357,7 +358,7 @@ void SpeedCurvePanel::DrawImGui()
     {
         const bool dis = !isDirty_;
         if (dis) ImGui::BeginDisabled();
-        if (ImGui::Button("\uf0e7 適用##apply", ImVec2(80, 0))) {
+        if (ImGui::Button(ICON_FA_BOLT " 適用##apply", ImVec2(80, 0))) {
             PushToMotion();
             isDirty_ = false;
             context_->statusMsg = "スピードカーブをランタイム適用しました";
@@ -370,7 +371,7 @@ void SpeedCurvePanel::DrawImGui()
     ImGui::SameLine(0, 6);
 
     // --- 焼き込み ---
-    if (ImGui::Button("\uf0c7 Bake##bake", ImVec2(80, 0))) {
+    if (ImGui::Button(ICON_FA_SAVE " Bake##bake", ImVec2(80, 0))) {
         bakeConfirmPending_ = true;
     }
     if (ImGui::IsItemHovered())
@@ -407,7 +408,7 @@ void SpeedCurvePanel::DrawImGui()
     ImGui::SameLine(0, 6);
 
     // --- リセット ---
-    if (ImGui::Button("\uf0e2 リセット##reset", ImVec2(80, 0))) {
+    if (ImGui::Button(ICON_FA_UNDO " リセット##reset", ImVec2(80, 0))) {
         motion->ClearSpeedCurve();
         PullFromMotion();
         isDirty_ = false;
