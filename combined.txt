@@ -266576,10 +266576,11 @@ void FollowCamera::FollowProcess() {
 //   起動して対象の背後へ静かに寄せる。
 // ============================================================
 void FollowCamera::UpdateIdleRecenter(float dt) {
-    if (!idleRecenterEnabled_) return;
-    if (recentering_)          return;  // 手動リセンター等が既に進行中なら何もしない
-    if (IsInPerformance())     return;
-    if (!target_)              return;
+    if (!idleRecenterEnabled_)    return;
+    if (idleRecenterSuppressed_)  return;  // Game 側からの一時停止中（例：バトル中）
+    if (recentering_)             return;  // 手動リセンター等が既に進行中なら何もしない
+    if (IsInPerformance())        return;
+    if (!target_)                 return;
 
     idleRecenterTimer_ += dt;
     if (idleRecenterTimer_ < idleRecenterDelay_) return;
@@ -267088,6 +267089,15 @@ public:
     void NotifyCameraActive() { idleRecenterTimer_ = 0.0f; }
 
     // ============================================================
+    // アイドル時オートリセンターの一時停止
+    //   idleRecenterEnabled_（設計者がプリセットで保存する基本設定）とは別の、
+    //   実行時のみの一時停止フラグ。バトル中など「この間だけ止めたい」場合に
+    //   Game 側（PlayerCamera）から呼ぶ。プリセットの ON/OFF 設定自体は書き換えない。
+    // ============================================================
+    void SetIdleRecenterSuppressed(bool s) { idleRecenterSuppressed_ = s; }
+    bool IsIdleRecenterSuppressed()  const { return idleRecenterSuppressed_; }
+
+    // ============================================================
     // フレーミング補正（追従対象が画角外に出そうな時だけ、
     // はみ出した分を rotation で穏やかに pivot へ引き戻す）
     // ============================================================
@@ -267240,10 +267250,11 @@ private:
     // ============================================================
     void  UpdateIdleRecenter(float dt);
 
-    bool  idleRecenterEnabled_  = true;
-    float idleRecenterDelay_    = 2.5f;   // 無操作がこの秒数続いたら発動
-    float idleRecenterDuration_ = 1.4f;   // 発動時のイーズ時間（RB/LB の手動リセンターより緩やかに）
-    float idleRecenterTimer_    = 0.0f;   // 内部状態：無操作の継続時間
+    bool  idleRecenterEnabled_     = true;
+    float idleRecenterDelay_       = 2.5f;   // 無操作がこの秒数続いたら発動
+    float idleRecenterDuration_    = 1.4f;   // 発動時のイーズ時間（RB/LB の手動リセンターより緩やかに）
+    float idleRecenterTimer_       = 0.0f;   // 内部状態：無操作の継続時間
+    bool  idleRecenterSuppressed_  = false;  // 実行時の一時停止（非永続・Game 側から制御）
 };
 
 
@@ -288881,7 +288892,7 @@ File Path: YGame/GameObjects/Player/Camera/PlayerCamera.h
 #include <vector>
 
 /// <summary>
-/// プレイヤー専用カメラ管理クラス（Game 層のアグリゲーター）。
+/// プレイヤー専用カメラ管理クラス
 ///
 /// 保有コンポーネント:
 ///   FollowCamera*            … Engine 側の追従カメラ本体
@@ -288903,10 +288914,10 @@ public:
     /// @param playerWT      プレイヤーの WorldTransform（ロックオン基準位置用）
     void Initialize(FollowCamera* followCamera, const WorldTransform* playerWT);
 
-    // スティック入力・ロックオン更新（CameraDirector::Update の前に呼ぶ）
+    // スティック入力・ロックオン更新
     void UpdatePreDirector();
 
-    // 攻撃カメラオフセットを sceneCamera に適用（CameraDirector::Update の後に呼ぶ）
+    // 攻撃カメラオフセットを sceneCamera に適用
     void ApplyPostDirector(Camera* sceneCamera, float dt);
 
     void DrawImGui();
@@ -288939,8 +288950,13 @@ public:
     // 脅威察知のシーン許可
     // フィールドでは背景・マップ見渡しを優先して OFF、バトル中だけ ON にする。
     // 各サブシーンの OnEnter から呼ぶ。
+    // 同じフラグでアイドルオートリセンターも制御する：バトル中に無操作が
+    // 続いてもカメラが勝手に背後へ回り込まないよう、ここで一時停止させる。
     // ============================================================
-    void SetThreatAwarenessAllowed(bool v) { threatAwarenessSceneAllowed_ = v; }
+    void SetThreatAwarenessAllowed(bool v) {
+        threatAwarenessSceneAllowed_ = v;
+        if (followCamera_) followCamera_->SetIdleRecenterSuppressed(v);
+    }
     bool IsThreatAwarenessAllowed() const   { return threatAwarenessSceneAllowed_; }
 
     // ============================================================
@@ -289006,9 +289022,9 @@ private:
     // 脅威察知（気配）
     // ロックオンのように特定の敵を中央へ固定するのではなく、周囲の敵の
     // 「気配」をそれとなく伝える。フリーカメラ時のみ動作する。
-    //   ① 周辺視グランス：視界外/背後に敵がいたら、その方向へごく軽く
+    // 周辺視グランス：視界外/背後に敵がいたら、その方向へごく軽く
     //      （awarenessMaxYaw_ まで）カメラを傾ける。完全には振り向かない。
-    //   ② 囲まれFOV：近くの敵が増えるほどFOVを少し広げて状況を見渡せるようにする。
+    // 囲まれFOV：近くの敵が増えるほどFOVを少し広げて状況を見渡せるようにする。
     // ============================================================
     void  UpdateThreatAwareness(float dt);                    // pre-director：周辺視グランス
     void  ApplyThreatFovWiden(Camera* sceneCamera, float dt); // post-director：囲まれFOV拡大
@@ -297619,7 +297635,7 @@ void TitleScene::Draw() {
 	//------------------------------------------------------------
 	// パーティクル描画
 	//------------------------------------------------------------
-	YParticleManager::GetInstance().Draw();
+	//YParticleManager::GetInstance().Draw();
 
 
 }
@@ -298977,6 +298993,14 @@ void FieldScene::ApplySpawnPose() {
 			spawnCameraRotDeg_.y * kDegToRad,
 			spawnCameraRotDeg_.z * kDegToRad });
 	}
+
+	// CameraDirector 側が持つ「今フレーム描画に使う角度」を、今設定したスポーン向きへ
+	// 即座に同期する。GameScene::Initialize() では PlayerFollow がまだ入力無効化・
+	// ターゲット未設定の状態で一度 SnapToActiveCamera() が走るため、そのままだと
+	// 古いプリセット角度がブレンド基準としてキャッシュされたまま残り、起動直後の
+	// 数フレームだけ設定した向きと違って見えることがある。ここで再スナップして
+	// キャッシュを打ち消す。
+	CameraDirector::GetInstance()->SnapToActiveCamera();
 }
 
 void FieldScene::OnEnter() {
