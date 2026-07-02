@@ -94,9 +94,10 @@ namespace YoRigine {
 		{
 			std::string name;
 			std::string sourceFilePath;			// どのJsonからロードしたか記録
-			bool isPlaying = false;				// 現在再生中かどうか
+			bool isPlaying = false;				// 現在発生中かどうか（emission ON）
 			float currentTime = 0.0f;			// 現在の再生時間
 			float systemDuration = 0.0f;		// システムの総再生時間（0以下で無限ループ）
+			float lingerTimer = 0.0f;			// 発生停止後も粒子を自然消滅させるための残りシミュレーション時間
 
 			// グループ全体の制御
 			Vector3 translate = { 0.0f, 0.0f, 0.0f };	// グループ全体の原点移動
@@ -131,13 +132,22 @@ namespace YoRigine {
 		EmitterGroup* GetGroup(const std::string& groupName);
 
 		// グループの作成：削除
-		EmitterGroup* CreateEmitterGroup(const std::string& groupName);
+		// sourceFilePath: どのJSON由来か（起動時ロードでは実ファイルパス、エディタ新規作成では選択中パス。空でも可）
+		EmitterGroup* CreateEmitterGroup(const std::string& groupName, const std::string& sourceFilePath = "");
 		void DeleteEmitterGroup(const std::string& groupName);
 		void DeleteAllEmitterGroups();
 
 		// グループの再生・停止制御
 		void PlayEmitterGroup(const std::string& groupName);
 		void StopEmitterGroup(const std::string& groupName);
+
+		// ── ゲーム向け（GpuParticleHandle から使う軽量API）──
+		// グループのワールド原点を移動（各エミッタは原点＋自身のローカルオフセットで発生）
+		void SetGroupPosition(const std::string& groupName, const Vector3& pos);
+		// グループが存在するか
+		bool HasGroup(const std::string& groupName) const;
+		// グループが再生中か
+		bool IsGroupPlaying(const std::string& groupName) const;
 
 	public:
 		///************************* アクセッサ *************************///
@@ -173,6 +183,12 @@ namespace YoRigine {
 		// エミッターパラメータ更新
 		void UpdateEmitterParams(EmitterData* emitterData);
 
+		// エミッターの形状ごとのローカル発生位置(オフセット)を取得
+		Vector3 GetEmitterLocalOffset(const EmitterData* emitterData) const;
+
+		// グループ内の最大パーティクル寿命（発生停止後の linger 時間の見積りに使う）
+		float GetGroupMaxLifetime(const EmitterGroup* group) const;
+
 
 	private:
 		///************************* ImGui : Json *************************///
@@ -185,7 +201,7 @@ namespace YoRigine {
 		bool LoadAllEmitters(const std::string& directory = "Resources/Json/GpuEmitters/");
 		// JSON変換
 		nlohmann::json ToJson() const;
-		bool FromJson(const nlohmann::json& json);
+		bool FromJson(const nlohmann::json& json, const std::string& sourceFilePath = "");
 		bool LoadEmitterFromJson(const std::string& groupName, const nlohmann::json& j);
 		void ScanTextureDirectory(const std::string& directory);
 		void ScanJsonDirectory(const std::string& directory);

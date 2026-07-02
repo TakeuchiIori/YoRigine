@@ -401,3 +401,103 @@ DrawEditPanel の Trail/LightVolume/Smoke/Lightning 縦積み(checkbox+TreeNode)
 - プレビュー: 再生は previewPos_ で出るが、カメラがそこを向いていないと依然見えない可能性。必要なら「カメラ前で再生」を追加。
 - 再ロード時クリア（ホットリロード安全化）。旧2フォルダ(YParticleSystems/YEmitterGroups)の最終廃止。
 
+---
+
+## 2026-07-03 — 設計: 複合エフェクト（Particle+VfxMesh+GPU）＋ サウンド付きハンドル（設計のみ・未実装）
+
+ユーザー要望: 「エフェクト合成」と「サウンド付きハンドル」をまとめて設計する。実装前の方針確認フェーズ。
+
+### 現状診断（3系統が名前空間ごと分断）
+
+| 系統 | 発生源JSON | ゲーム側ハンドル | 備考 |
+|---|---|---|---|
+| Particle | `YEffects/*.json`（systems+groups同梱） | `EffectHandle::Play/PlayOneShot(name)` | フェーズ1〜3で入口統一済み |
+| VfxMesh | `Resources/Json/VfxMesh/*.json`（Trail/Volume/Smoke/Lightning/Shockwave） | `VfxMeshHandle::Play/PlayOneShot/PlayBolt(assetName)` | 既に EffectHandle と同型の facade が実装済み（未使用に近い） |
+| GPU Particle | `GpuEmitters/*.json`（Emitter/Group） | ハンドルなし。`GpuEmitManager::EmitGroups/PlayEmitterGroup` 生API直叩き | facade 不在 |
+| Sound | なし | `Audio::GetInstance()->Play/PlayOneShot(filepath,...)` | エフェクトと無関係に独立して呼ぶしかない |
+
+→ 「爆発 = 火花(Particle) + 衝撃波(VfxMesh) + 破片(GPU) + 爆発音(Audio)」を1つとして扱う手段が無く、**ゲームコード側で4系統を手動で同期して呼ぶ**ことになっている（呼び忘れ・位置ズレのリスクは EnemyHit3 ロード漏れ問題と同種）。
+
+### 決定事項（案）
+
+**新しい合成レイヤーを1枚追加する。既存3系統のJSON/ハンドルは変更しない**（Trail断面形状やParticleモジュールのような内部フォーマットに手を入れると波及リスクが大きいため、疎結合な「名前を束ねるだけ」の薄いレイヤーにする）。
+
+- **`Resources/Json/YComposites/<名前>.json`** を新設。中身は既存アセット名の参照リストのみ:
+  ```json
+  {
+    "name": "Explosion",
+    "particleEffect": "ExplosionSparks",
+    "vfxMeshAssets": [
+      { "asset": "ExplosionShockwave", "offset": [0,0,0], "scale": 1.5 },
+      { "asset": "ExplosionSmoke",     "offset": [0,0,0], "scale": 2.0 }
+    ],
+    "gpuEmitterGroup": "ExplosionDebris",
+    "sounds": [
+      { "path": "Resources/Audio/SE/explosion.wav", "volume": 1.0, "category": "SE" }
+    ]
+  }
+  ```
+  各フィールドは省略可（例: 音だけ足したい場合は `sounds` のみでも成立）。
+- **ランタイム**: `EffectHandle` の名前解決チェーンの**先頭**に Composite 解決を追加（Composite→Group→System の順）。`EffectHandle::PlayOneShot("Explosion", pos)` 1行のままで4系統すべてが連動する。
+  - Composite 内部では既存API をそのまま呼ぶだけ（新規の描画/更新コードは書かない）:
+    - `particleEffect` → 既存 `EffectHandle` 経路
+    - `vfxMeshAssets` 各要素 → 既存 `VfxMeshHandle::Play/PlayOneShot`
+    - `gpuEmitterGroup` → 既存 `GpuEmitManager::EmitGroups`（PlayOneShot相当）/ `PlayEmitterGroup`・`StopEmitterGroup`（loop相当）
+    - `sounds` 各要素 → 既存 `Audio::PlayOneShot`（非loop）/ `Audio::Play`（loop、返り値の `SoundHandle` を保持）
+- **サウンド付きハンドル**: `EffectHandle` に `SoundHandle soundHandle_`（moveのみ、Audio.h の型そのまま）を追加。
+  - `PlayOneShot` 経由の音は fire-and-forget（`Audio::PlayOneShot`、ハンドル保持不要）。
+  - `Play(loop=true)` 経由の音は `Audio::Play(...,loop=true)` の戻り値を `soundHandle_` に保持し、`EffectHandle::Stop()` で `soundHandle_.Stop()` も呼ぶ（例: 剣の唸り音つきスラッシュトレイルが `Stop()` で音ごと止まる）。
+  - 位置追従は `SetPosition()` では音量/ピッチは変えない（Audio.h に3D減衰パラメータが無いため）。3D位置オーディオが要るなら Audio 側の拡張が別途必要＝**今回のスコープ外**として明記。
+
+### 実装ステップ案（低リスク・自己完結 — コア描画/オーディオパイプライン変更なし）
+
+1. `CompositeEffectAsset`（name+4フィールド）+ JSON Save/Load。`YComposites/` を `ScanDirectory` 対応（既存 `VfxMeshSpawner::ScanDirectory` 等と同パターン）。
+2. `CompositeEffectManager`(singleton) 新設。名前→アセットのマップのみ保持（描画は一切しない。既存 Handle を呼ぶだけの薄い層）。
+3. `EffectHandle::Play/PlayOneShot` の解決順に Composite を追加。内部で `VfxMeshHandle`/`GpuEmitManager`/`Audio` の子ハンドルを `EffectHandle` にぶら下げて `Stop()` で連鎖停止できるようにする（`std::vector<VfxMeshHandle>` 等を追加）。
+4. `EffectHandle` に `SoundHandle` 追加。Stop連鎖を実装。
+5. VfxMeshEditor / GpuEmitManager エディタ側は変更不要（Composite は既存アセット名を選ぶだけの薄いエディタを別途作るか、当面は手書きJSONで運用）。
+
+### リスク / 保留事項
+- GPU Emitter の「ループ→Stop」semantics は `PlayEmitterGroup`/`StopEmitterGroup` が groupName ベースの状態管理（同名グループの多重再生を想定していない）。Composite からの多重発生（同時に2つ爆発）で同名GPUグループを取り合う可能性 → 要検証、必要なら GPU側もインスタンスID方式に寄せる（EffectHandle 側で以前対応した `parentMatrix` 取り合い問題と同種）。
+- Composite 専用の編集UIは今回のステップ案に含めていない（手書きJSON運用でスタートし、需要が出たらフェーズ2でエディタ化）。
+- 3D位置オーディオ（距離減衰/パン）は Audio.h に無いため対象外。欲しくなったら Audio 側の別案件。
+
+### 状態
+設計のみ・未実装。実装着手はユーザー承認待ち。
+
+---
+
+## 2026-07-03 — GPUパーティクルを「ゲームで使える」状態にする（Phase1+2 実装・Debugビルド成功）
+
+ユーザー要望: 「GPUパーティクルが扱い悪すぎてゲームで使える状態でない。使える程度にしたい」。スコープは**大**（最小＋per-emitterオフセット＆複数同時再生＋エディタ刷新＆Composite連携）で合意。まず土台のPhase1・2を実装。
+
+### 現状診断（コードから特定した「使えない」理由）
+1. **🔴 起動時にグループが一切ロードされない（致命）**: `CreateEmitterGroup` 先頭が `selectedJsonFilePath_`（ImGuiで手選択したときだけ入るエディタ専用フィールド）必須で、空だと `ThrowError`。起動時は空→`LoadFromFile` の catch が例外を握りつぶし、**groups_ が空のまま**。ゲームが `EmitGroups` を呼んでも「見つかりません」で無言no-op。エディタ操作前提の状態がコアのデータモデルに漏れていた。
+2. **🔴 ゲーム向けハンドルが無い**: `EffectHandle`/`VfxMeshHandle` 相当が無く生API直叩きのみ。YGame側の再生呼び出しは実際ゼロ。
+3. **🟠 EmitGroups が全エミッタを同座標・同数で上書き**（グループ内の相対配置が1点に潰れる）。
+4. **🟠 emission と simulation が未分離**: 発生が interval 駆動で `isPlaying` と無関係、停止時は `Reset()` で粒子が即消滅。→ ワンショットも「停止後フェード」も表現不能。
+5. `Initialize()` が `LoadAllEmitters`/`LoadModel` を2回重複。
+
+### Phase1: 致命バグ修正（`GpuEmitManager`）
+- `CreateEmitterGroup(groupName, sourceFilePath="")` にシグネチャ変更。`selectedJsonFilePath_` 必須の `ThrowError` を撤去し、由来パスは引数優先→無ければ選択中にフォールバック。`LoadFromFile→FromJson(json, filepath)→CreateEmitterGroup(name, filepath)` と由来パスを引き回し、**起動時ロードでも確実にグループ生成**。
+- `DeleteEmitterGroup` の `ThrowError` 2箇所を非致命 `Logger` 化。ファイル一致ガードは `selectedJsonFilePath_` 非空時（エディタ文脈）のみ。
+- `Initialize()` の重複ロード/LoadModel を1回に。
+
+### Phase2: ゲーム向けハンドル ＋ emission/simulation 分離 ＋ per-emitterオフセット
+- **`GPUEmitter`**: 発生制御を追加。`continuousEmit_`（interval継続発生ON/OFF）と `burstRequest_`（ワンショット1回）を分離。`UpdateEmitters()` を `isEmit = burst || (continuousEmit_ && intervalHit)` に再構成。`SetContinuousEmit`/`RequestBurst`/`SetEmitWorldPosition`(translateのみ追従上書き) 追加。`EmitAtPosition` は translate/count設定＋`RequestBurst()`（従来の isEmit=1 直書きは UpdateEmitters に上書きされ無意味だった）。`Reset()` でフラグ클リア。
+- **`GpuEmitManager`**: 
+  - `Update()` を**再生中(isPlaying)＋停止後余韻(lingerTimer>0)の間シミュレーション継続**する形に。emission は `SetContinuousEmit(isPlaying)`。→ 停止後も既存粒子が寿命で自然消滅（剣トレイル等がプツッと消えない）。
+  - `EmitGroups`: 各エミッタを `position + ローカルオフセット` で発生（相対配置維持）、`count<0` で各エミッタ設定値を使用、`lingerTimer = max(既存, グループ最大寿命)` を立ててワンショットが寿命を全うするまで回す。
+  - `StopEmitterGroup`: `Reset()` 廃止し `lingerTimer` セットで自然消滅待ちに。
+  - 追加: `SetGroupPosition`/`HasGroup`/`IsGroupPlaying`/`GetEmitterLocalOffset`/`GetGroupMaxLifetime`。
+- **新規 `GpuParticleHandle.{h,cpp}`**（`EffectHandle`/`VfxMeshHandle` と同型・global名前空間）: `Play(group,pos)`（ループ）/`PlayOneShot(group,pos,count=-1)`/`SetPosition`/`Stop`/`IsActive`。ゲームから `GpuParticleHandle::PlayOneShot("ExplosionDebris", pos);` の1行で撃てる。
+
+### 検証
+- premake再生成＋**MSBuild Debug x64 ビルド成功（0 error / 0 warning）**。新規 `GpuParticleHandle.obj` コンパイル、`YEngine.lib`＋`YGame.dll` 再リンク確認。
+- ⏳ **実機未確認**。確認手順: 起動して既存グループ（`GpuEmitters/emrs.json` の "ss" 等）が**ロードされ表示されるか**（Phase1の証明）／テストで `GpuParticleHandle::PlayOneShot("ss", pos)` が1発出て消えるか／`Play`→`SetPosition`追従→`Stop`後に自然消滅するか。
+
+### 残（大スコープの続き）
+- **Phase3**: グループが名前ベース単一状態＝**同じエフェクトを2箇所同時再生できない**。インスタンス方式（VfxMeshHandle の id レジストリ相当）へ寄せる。
+- **Phase4**: エディタのファイル手選択ワークフロー撤廃・自動スキャン化・保存導線整理。
+- **Phase5**: 07-03設計の Composite レイヤーへ GPU を統合（`EffectHandle` 解決チェーンから連動）。
+

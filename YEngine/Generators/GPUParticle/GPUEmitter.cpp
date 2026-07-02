@@ -106,6 +106,8 @@ void GPUEmitter::Reset()
 	}
 
 	timeScalelastEmit_ = 0.0f;
+	burstRequest_ = 0;
+	continuousEmit_ = false;
 }
 
 /// <summary>
@@ -318,37 +320,37 @@ void GPUEmitter::EmitAtPosition(const Vector3& position, float count)
 	lastEmitWorldPos_ = position;
 	hasLastEmitWorldPos_ = true;
 
+	// translate と count のみ設定。実際の発生は次の Update()→UpdateEmitters() で
+	// burstRequest_ を消費して1回だけ行う（isEmit の直接設定は UpdateEmitters に上書きされるため使わない）
 	switch (currentShape_) {
 	case EmitterShape::Sphere:
 		emitterSphereData_->translate = position;
 		emitterSphereData_->count = count;
-		emitterSphereData_->isEmit = 1;
 		break;
 
 	case EmitterShape::Box:
 		emitterBoxData_->translate = position;
 		emitterBoxData_->count = count;
-		emitterBoxData_->isEmit = 1;
 		break;
 
 	case EmitterShape::Triangle:
 		emitterTriangleData_->translate = position;
 		emitterTriangleData_->count = count;
-		emitterTriangleData_->isEmit = 1;
 		break;
 
 	case EmitterShape::Cone:
 		emitterConeData_->translate = position;
 		emitterConeData_->count = count;
-		emitterConeData_->isEmit = 1;
 		break;
 
 	case EmitterShape::Mesh:
 		emitterMeshData_->translate = position;
 		emitterMeshData_->count = count;
-		emitterMeshData_->isEmit = 1;
 		break;
 	}
+
+	// 次フレームに1回だけ発生
+	RequestBurst();
 }
 
 /// <summary>
@@ -717,41 +719,54 @@ void GPUEmitter::UpdateEmitters()
 	//-----------------------------------------
 	// 現在の形状ごとに Emit 制御
 	//-----------------------------------------
+	// このフレームにワンショットのバースト要求があるか（continuousEmit_ と独立に1回だけ発生）
+	const bool burst = (burstRequest_ > 0);
+	if (burst) --burstRequest_;
+
+	const float dt = YoRigine::GameTime::GetUnscaledDeltaTime();
+
 	switch (currentShape_)
 	{
 	case EmitterShape::Sphere:
-		emitterSphereData_->intervalTime += YoRigine::GameTime::GetUnscaledDeltaTime();
-		emitterSphereData_->isEmit =
-			(emitterSphereData_->intervalTime >= emitterSphereData_->emitInterval);
+	{
+		emitterSphereData_->intervalTime += dt;
+		const bool intervalHit = emitterSphereData_->intervalTime >= emitterSphereData_->emitInterval;
+		emitterSphereData_->isEmit = (burst || (continuousEmit_ && intervalHit)) ? 1 : 0;
 		if (emitterSphereData_->isEmit) emitterSphereData_->intervalTime = 0.0f;
 		break;
-
+	}
 	case EmitterShape::Box:
-		emitterBoxData_->intervalTime += YoRigine::GameTime::GetUnscaledDeltaTime();
-		emitterBoxData_->isEmit =
-			(emitterBoxData_->intervalTime >= emitterBoxData_->emitInterval);
+	{
+		emitterBoxData_->intervalTime += dt;
+		const bool intervalHit = emitterBoxData_->intervalTime >= emitterBoxData_->emitInterval;
+		emitterBoxData_->isEmit = (burst || (continuousEmit_ && intervalHit)) ? 1 : 0;
 		if (emitterBoxData_->isEmit) emitterBoxData_->intervalTime = 0.0f;
 		break;
-
+	}
 	case EmitterShape::Triangle:
-		emitterTriangleData_->intervalTime += YoRigine::GameTime::GetUnscaledDeltaTime();
-		emitterTriangleData_->isEmit =
-			(emitterTriangleData_->intervalTime >= emitterTriangleData_->emitInterval);
+	{
+		emitterTriangleData_->intervalTime += dt;
+		const bool intervalHit = emitterTriangleData_->intervalTime >= emitterTriangleData_->emitInterval;
+		emitterTriangleData_->isEmit = (burst || (continuousEmit_ && intervalHit)) ? 1 : 0;
 		if (emitterTriangleData_->isEmit) emitterTriangleData_->intervalTime = 0.0f;
 		break;
-
+	}
 	case EmitterShape::Cone:
-		emitterConeData_->intervalTime += YoRigine::GameTime::GetUnscaledDeltaTime();
-		emitterConeData_->isEmit =
-			(emitterConeData_->intervalTime >= emitterConeData_->emitInterval);
+	{
+		emitterConeData_->intervalTime += dt;
+		const bool intervalHit = emitterConeData_->intervalTime >= emitterConeData_->emitInterval;
+		emitterConeData_->isEmit = (burst || (continuousEmit_ && intervalHit)) ? 1 : 0;
 		if (emitterConeData_->isEmit) emitterConeData_->intervalTime = 0.0f;
 		break;
+	}
 	case EmitterShape::Mesh:
-		emitterMeshData_->intervalTime += YoRigine::GameTime::GetUnscaledDeltaTime();
-		emitterMeshData_->isEmit =
-			(emitterMeshData_->intervalTime >= emitterMeshData_->emitInterval);
+	{
+		emitterMeshData_->intervalTime += dt;
+		const bool intervalHit = emitterMeshData_->intervalTime >= emitterMeshData_->emitInterval;
+		emitterMeshData_->isEmit = (burst || (continuousEmit_ && intervalHit)) ? 1 : 0;
 		if (emitterMeshData_->isEmit) emitterMeshData_->intervalTime = 0.0f;
 		break;
+	}
 	}
 }
 void GPUEmitter::UpdateEmitterTrail()
@@ -820,6 +835,18 @@ void GPUEmitter::UpdateEmitterTrail()
 
 	if (trail.lifeTime > 0.0f) {
 		particleParameters_->lifeTime = trail.lifeTime;
+	}
+}
+
+void GPUEmitter::SetEmitWorldPosition(const Vector3& worldPos)
+{
+	// 継続発生中の追従用。translate のみ差し替え、count/interval/isEmit は UpdateEmitters に委ねる
+	switch (currentShape_) {
+	case EmitterShape::Sphere:   if (emitterSphereData_)   emitterSphereData_->translate = worldPos;   break;
+	case EmitterShape::Box:      if (emitterBoxData_)      emitterBoxData_->translate = worldPos;      break;
+	case EmitterShape::Triangle: if (emitterTriangleData_) emitterTriangleData_->translate = worldPos; break;
+	case EmitterShape::Cone:     if (emitterConeData_)     emitterConeData_->translate = worldPos;     break;
+	case EmitterShape::Mesh:     if (emitterMeshData_)     emitterMeshData_->translate = worldPos;     break;
 	}
 }
 

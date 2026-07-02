@@ -4,6 +4,7 @@
 #include <fstream>
 #include <filesystem>
 #include <iostream>
+#include <algorithm>
 
 // Engine
 #include <Loaders/Json/ConversionJson.h>
@@ -72,10 +73,8 @@ namespace YoRigine {
 			});
 #endif
 
-		LoadAllEmitters();
 		ModelManager::GetInstance()->LoadModel("Resources/Models/Cube", "Cube.obj");
 		LoadAllEmitters();
-		ModelManager::GetInstance()->LoadModel("Resources/Models/Cube", "Cube.obj");
 	}
 
 	/// <summary>
@@ -87,24 +86,38 @@ namespace YoRigine {
 
 		// グループ全体をループ
 		for (auto& [groupName, groupData] : groups_) {
-			// グループが有効かつ再生中の場合のみ更新
-			if (groupData->isActive && groupData->isPlaying) {
+			if (!groupData->isActive) continue;
 
-				// システム時間の更新
+			// 発生中(isPlaying) か、発生停止後の余韻(lingerTimer>0)がある間は粒子シミュレーションを回す。
+			// これにより「停止後も既存粒子が自然に消える」「発生中でなくても撃ったワンショットが動く」が成立する。
+			const bool emitting = groupData->isPlaying;
+			const bool simulating = emitting || groupData->lingerTimer > 0.0f;
+			if (!simulating) continue;
+
+			// システム時間の更新
+			if (emitting) {
 				groupData->currentTime += deltaTime;
+			} else {
+				// 余韻中はエミッションせず、寿命ぶんだけ回して自然消滅を待つ
+				groupData->lingerTimer -= deltaTime;
+			}
 
-				// グループ内のエミッターをループ
-				for (auto& [emitterName, emitterData] : groupData->emitters) {
-					if (emitterData->isActive && emitterData->emitter) {
-						emitterData->emitter->SetTrailParams(emitterData->trailParams);
-						emitterData->emitter->Update();
-					}
+			// グループ内のエミッターをループ
+			for (auto& [emitterName, emitterData] : groupData->emitters) {
+				if (emitterData->isActive && emitterData->emitter) {
+					// 継続発生は再生中のみ。停止/余韻中はバースト要求だけが発生する
+					emitterData->emitter->SetContinuousEmit(emitting);
+					// グループ原点＋ローカルオフセットをワールド発生位置として毎フレーム反映（追従）
+					emitterData->emitter->SetEmitWorldPosition(
+						groupData->translate + GetEmitterLocalOffset(emitterData.get()));
+					emitterData->emitter->SetTrailParams(emitterData->trailParams);
+					emitterData->emitter->Update();
 				}
+			}
 
-				// システムの自動終了判定 (Durationが0より大きく、再生時間がDurationを超えたら停止)
-				if (groupData->systemDuration > 0.0f && groupData->currentTime >= groupData->systemDuration) {
-					StopEmitterGroup(groupName);
-				}
+			// システムの自動終了判定 (Durationが0より大きく、再生時間がDurationを超えたら停止)
+			if (emitting && groupData->systemDuration > 0.0f && groupData->currentTime >= groupData->systemDuration) {
+				StopEmitterGroup(groupName);
 			}
 		}
 	}
@@ -154,14 +167,88 @@ namespace YoRigine {
 		}
 
 		// グループ内の全エミッターに対してエミッションを発生
+		// 各エミッタは指定位置＋自身のローカルオフセットで発生（グループ内の相対配置を保持）
 		auto& groupData = groupIt->second;
+		groupData->translate = position;
 		for (auto& [emitterName, emitterData] : groupData->emitters) {
 			if (emitterData->isActive && emitterData->emitter) {
-				emitterData->emitter->EmitAtPosition(position, count);
+				// count < 0 は「各エミッタが持つ設定値を使う」の意味
+				float emitCount = count;
+				if (emitCount < 0.0f) {
+					switch (emitterData->shape) {
+					case EmitterShape::Sphere:   emitCount = emitterData->sphereParams.count;   break;
+					case EmitterShape::Box:      emitCount = emitterData->boxParams.count;      break;
+					case EmitterShape::Triangle: emitCount = emitterData->triangleParams.count; break;
+					case EmitterShape::Cone:     emitCount = emitterData->coneParams.count;     break;
+					case EmitterShape::Mesh:     emitCount = emitterData->meshParams.count;     break;
+					}
+				}
+				emitterData->emitter->EmitAtPosition(position + GetEmitterLocalOffset(emitterData.get()), emitCount);
 			}
 		}
+		// ワンショットは isPlaying を立てず、粒子が寿命を全うするまで linger でシミュレーションを継続させる
+		groupData->lingerTimer = std::max(groupData->lingerTimer, GetGroupMaxLifetime(groupData.get()));
+	}
 
+	/// <summary>
+	/// グループ内の最大パーティクル寿命を取得（発生停止後の linger 時間見積り用）
+	/// </summary>
+	float GpuEmitManager::GetGroupMaxLifetime(const EmitterGroup* group) const
+	{
+		float maxLife = 0.5f; // 最低保証（空グループ等でも最小限ティックする）
+		if (!group) return maxLife;
+		for (const auto& [name, e] : group->emitters) {
+			if (!e) continue;
+			const float life = e->particleParams.lifeTime + e->particleParams.lifeTimeVariance;
+			maxLife = std::max(maxLife, life);
+			// パーティクル自身のトレイル寿命も考慮
+			if (e->particleParams.child.isTrail) {
+				maxLife = std::max(maxLife, life + e->particleParams.child.lifeTime);
+			}
+		}
+		return maxLife;
+	}
 
+	/// <summary>
+	/// エミッターの形状ごとのローカル発生位置（オフセット）を取得
+	/// </summary>
+	Vector3 GpuEmitManager::GetEmitterLocalOffset(const EmitterData* emitterData) const
+	{
+		if (!emitterData) return { 0.0f, 0.0f, 0.0f };
+		switch (emitterData->shape) {
+		case EmitterShape::Sphere:   return emitterData->sphereParams.translate;
+		case EmitterShape::Box:      return emitterData->boxParams.translate;
+		case EmitterShape::Triangle: return emitterData->triangleParams.translate;
+		case EmitterShape::Cone:     return emitterData->coneParams.translate;
+		case EmitterShape::Mesh:     return emitterData->meshParams.translate;
+		}
+		return { 0.0f, 0.0f, 0.0f };
+	}
+
+	/// <summary>
+	/// グループのワールド原点を移動
+	/// </summary>
+	void GpuEmitManager::SetGroupPosition(const std::string& groupName, const Vector3& pos)
+	{
+		EmitterGroup* group = GetGroup(groupName);
+		if (group) group->translate = pos;
+	}
+
+	/// <summary>
+	/// グループが存在するか
+	/// </summary>
+	bool GpuEmitManager::HasGroup(const std::string& groupName) const
+	{
+		return groups_.count(groupName) > 0;
+	}
+
+	/// <summary>
+	/// グループが再生中か
+	/// </summary>
+	bool GpuEmitManager::IsGroupPlaying(const std::string& groupName) const
+	{
+		auto it = groups_.find(groupName);
+		return it != groups_.end() && it->second->isPlaying;
 	}
 	/// <summary>
 	/// エミッター管理用の ImGui 描画
@@ -1379,29 +1466,26 @@ namespace YoRigine {
 		return nullptr;
 	}
 
-	GpuEmitManager::EmitterGroup* GpuEmitManager::CreateEmitterGroup(const std::string& groupName)
+	GpuEmitManager::EmitterGroup* GpuEmitManager::CreateEmitterGroup(const std::string& groupName, const std::string& sourceFilePath)
 	{
-		// 必須チェック: JSONファイルが選択されているか
-		if (selectedJsonFilePath_.empty()) {
-			ThrowError("Group creation failed: Please select a JSON file first.");
-			return nullptr;
-		}
-
-		// 1. グループ名で重複がないかチェック
+		// 1. グループ名で重複がないかチェック（非致命: 既存を返さず nullptr。ログのみ）
 		if (groups_.count(groupName)) {
-			ThrowError("Group creation failed: Group name '" + groupName + "' already exists.");
+			Logger("GpuEmitManager: グループ名 '" + groupName + "' は既に存在するため作成をスキップ");
 			return nullptr;
 		}
 
-		// 2. 新しいグループを作成
+		// 2. 由来ファイルパスを決定（引数優先。空ならエディタ選択中パスにフォールバック）
+		std::string source = !sourceFilePath.empty() ? sourceFilePath : selectedJsonFilePath_;
+
+		// 3. 新しいグループを作成
 		auto newGroup = std::make_unique<EmitterGroup>();
 		newGroup->name = groupName;
-		newGroup->sourceFilePath = selectedJsonFilePath_; // ★★★ 選択中のJSONパスを設定 ★★★
+		newGroup->sourceFilePath = source;
 
-		// 3. groups_ に追加
+		// 4. groups_ に追加
 		auto [it, inserted] = groups_.emplace(groupName, std::move(newGroup));
 		if (inserted) {
-			Logger("Group created: " + groupName + " (File: " + selectedJsonFilePath_ + ")");
+			Logger("Group created: " + groupName + " (File: " + source + ")");
 			return it->second.get();
 		}
 
@@ -1412,18 +1496,16 @@ namespace YoRigine {
 	{
 		auto it = groups_.find(groupName);
 		if (it == groups_.end()) {
-			ThrowError("Group deletion failed: Group name '" + groupName + "' not found.");
+			Logger("GpuEmitManager: 削除対象グループ '" + groupName + "' が見つかりません");
 			return;
 		}
 
 		EmitterGroup* group = it->second.get();
 
-		// ★★★ 削除対象のグループが、選択中のJSONファイル由来かチェック ★★★
-		if (group->sourceFilePath != selectedJsonFilePath_) {
-			// ログを出し、削除を拒否
-			ThrowError("Group deletion failed: Group '" + groupName +
-				"' belongs to a different JSON file (" + group->sourceFilePath + "). " +
-				"Cannot delete from the current file selection (" + selectedJsonFilePath_ + ").");
+		// エディタで別ファイルを選択中の場合のみ、誤削除防止のガードを効かせる（非致命）
+		if (!selectedJsonFilePath_.empty() && group->sourceFilePath != selectedJsonFilePath_) {
+			Logger("GpuEmitManager: グループ '" + groupName + "' は別ファイル (" +
+				group->sourceFilePath + ") 由来のため、現在の選択 (" + selectedJsonFilePath_ + ") からは削除できません");
 			return;
 		}
 
@@ -1462,7 +1544,8 @@ namespace YoRigine {
 		{
 			group->isPlaying = true;
 			group->currentTime = 0.0f;
-			// グループ内のエミッターを再生
+			group->lingerTimer = 0.0f;
+			// グループ内のエミッターを再生（発生状態をリセットしてクリーンスタート）
 			for (auto& [name, data] : group->emitters)
 			{
 				if (data->emitter) {
@@ -1477,16 +1560,14 @@ namespace YoRigine {
 		EmitterGroup* group = GetGroup(groupName);
 		if (!group)return;
 
+		if (!group->isPlaying) return;
+
 		group->isPlaying = false;
 		group->currentTime = 0.0f;
 
-		// 停止時にエミッターをリセット
-		for (auto& [name, data] : group->emitters)
-		{
-			if (data->emitter) {
-				data->emitter->Reset();
-			}
-		}
+		// 停止時は Reset() で粒子を即消滅させず、linger でシミュレーションを続けて自然に消えるのを待つ
+		// （剣トレイル等を Stop したとき既存粒子がプツッと消えるのを防ぐ）
+		group->lingerTimer = std::max(group->lingerTimer, GetGroupMaxLifetime(group));
 	}
 
 	void GpuEmitManager::SetCamera(Camera* camera)
@@ -1649,7 +1730,7 @@ namespace YoRigine {
 			nlohmann::json json;
 			file >> json;
 
-			return FromJson(json);
+			return FromJson(json, filepath);
 		}
 		catch (const std::exception& e)
 		{
@@ -1822,7 +1903,7 @@ namespace YoRigine {
 	/// <summary>
 	/// JSON からエミッター情報を復元
 	/// </summary>
-	bool GpuEmitManager::FromJson(const nlohmann::json& json)
+	bool GpuEmitManager::FromJson(const nlohmann::json& json, const std::string& sourceFilePath)
 	{
 		try
 		{
@@ -1841,8 +1922,8 @@ namespace YoRigine {
 					// groupName がない場合に備えてデフォルト値 "LoadedGroup" を設定
 					std::string groupName = groupJson.value("groupName", "LoadedGroup");
 
-					// グループの作成
-					EmitterGroup* group = CreateEmitterGroup(groupName);
+					// グループの作成（由来ファイルパスを明示的に渡す＝起動時ロードでも確実に作成される）
+					EmitterGroup* group = CreateEmitterGroup(groupName, sourceFilePath);
 					if (!group) continue;
 
 					// グループパラメータの復元

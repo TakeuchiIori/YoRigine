@@ -239,6 +239,14 @@ public:
 	// 指定位置にパーティクルを放出
 	void EmitAtPosition(const Vector3& position, float count);
 
+	// 現在の形状の放出位置(translate)だけをワールド座標へ上書きする（継続発生の追従用）
+	void SetEmitWorldPosition(const Vector3& worldPos);
+
+	// 継続発生（interval駆動）の ON/OFF。OFFでも Update() による粒子シミュレーションは継続する
+	void SetContinuousEmit(bool enable) { continuousEmit_ = enable; }
+	// 次フレームに1回だけ発生させる（ワンショット。continuousEmit_ と独立）
+	void RequestBurst() { ++burstRequest_; }
+
 private:
 	///************************* 内部処理 *************************///
 	void CreateEmitterResources();
@@ -270,6 +278,10 @@ private:
 
 	EmitterShape currentShape_ = EmitterShape::Sphere;
 	MeshEmitMode currentMeshMode_ = MeshEmitMode::Surface;
+
+	// 発生制御（emission と simulation の分離）
+	bool continuousEmit_ = false;   // interval駆動の継続発生（マネージャが isPlaying に応じて毎フレーム設定）
+	int  burstRequest_ = 0;         // 未処理のワンショット発生要求数
 
 	// 各エミッター用のリソース
 	Microsoft::WRL::ComPtr<ID3D12Resource> emitterCommonResource_;
