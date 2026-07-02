@@ -226,8 +226,6 @@
 └── └── └── ├── Enemies/
 └── └── └── ├── FieldEnemies/
 └── └── └── └── Player/
-└── └── ├── Particles/
-└── └── └── ├── Settings/
 └── └── ├── PostEffectPresets/
 └── └── ├── Prefabs/
 └── └── ├── Render/
