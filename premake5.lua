@@ -20,7 +20,7 @@ workspace "YoRigine"
     flags { "MultiProcessorCompile" }
 
     -- PlatformToolset
-    toolset "v143"
+    toolset "v145"
     
     -- /FS: /MP(MultiProcessorCompile) で複数 cl.exe が同じ vc143.pdb へ書く際の
     --      書き込み競合(C1041)を防ぐ。並列ビルドや同時ビルドでも安全になる。
@@ -104,7 +104,7 @@ group "Externals"
         filename "DirectXTex_Desktop_2022_Win10"
         kind "StaticLib"
         language "C++"
-        toolset "v143"
+        toolset "v145"
         -- 外部 vcxproj は Debug/Release しか持たないため Develop は Debug にマップ
         configmap { ["Develop"] = "Debug" }
 

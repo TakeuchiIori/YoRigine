@@ -371,6 +371,14 @@ void FieldScene::ApplySpawnPose() {
 			spawnCameraRotDeg_.y * kDegToRad,
 			spawnCameraRotDeg_.z * kDegToRad });
 	}
+
+	// CameraDirector 側が持つ「今フレーム描画に使う角度」を、今設定したスポーン向きへ
+	// 即座に同期する。GameScene::Initialize() では PlayerFollow がまだ入力無効化・
+	// ターゲット未設定の状態で一度 SnapToActiveCamera() が走るため、そのままだと
+	// 古いプリセット角度がブレンド基準としてキャッシュされたまま残り、起動直後の
+	// 数フレームだけ設定した向きと違って見えることがある。ここで再スナップして
+	// キャッシュを打ち消す。
+	CameraDirector::GetInstance()->SnapToActiveCamera();
 }
 
 void FieldScene::OnEnter() {

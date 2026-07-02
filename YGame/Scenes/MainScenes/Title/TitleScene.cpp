@@ -146,7 +146,7 @@ void TitleScene::Draw() {
 	//------------------------------------------------------------
 	// パーティクル描画
 	//------------------------------------------------------------
-	YParticleManager::GetInstance().Draw();
+	//YParticleManager::GetInstance().Draw();
 
 
 }
