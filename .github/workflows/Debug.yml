@@ -18,11 +18,16 @@ jobs:
         with:
           submodules: recursive # 【重要】ライブラリのソースコードを全部持ってくる
 
+      - name: Setup Visual Studio with C++ v145
+        uses: microsoft/setup-msbuild@v2
+        with:
+          vs-version: '17'
+
       - name: Run Premake to Generate Solution
         shell: cmd # 明示的にコマンドプロンプトで実行
         run: |
-          .\premake.bat 
-          
+          .\premake.bat
+
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v2
 
