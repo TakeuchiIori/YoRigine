@@ -158,6 +158,8 @@ namespace YoRigine {
 		///************************* アクセッサ *************************///
 		EmitterData* GetEmitter(const std::string& groupName, const std::string& emitterName);
 		std::vector<std::string> GetEmitterNames() const;
+		// ロード済みグループ名の一覧（Compositeエディタのドロップダウン用）
+		std::vector<std::string> GetGroupNames() const;
 		bool HasEmitter(const std::string& emitterName) const;
 		void SetCamera(Camera* camera);
 

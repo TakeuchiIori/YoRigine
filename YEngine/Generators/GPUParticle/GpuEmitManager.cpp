@@ -1822,6 +1822,19 @@ namespace YoRigine {
 	}
 
 	/// <summary>
+	/// ロード済みグループ名の一覧
+	/// </summary>
+	std::vector<std::string> GpuEmitManager::GetGroupNames() const
+	{
+		std::vector<std::string> names;
+		names.reserve(groups_.size());
+		for (const auto& [name, group] : groups_) {
+			names.push_back(name);
+		}
+		return names;
+	}
+
+	/// <summary>
 	/// 指定エミッターが存在するか
 	/// </summary>
 	bool GpuEmitManager::HasEmitter(const std::string& emitterName) const

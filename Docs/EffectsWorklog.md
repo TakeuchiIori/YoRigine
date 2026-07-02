@@ -603,3 +603,60 @@ Phase3 当初案（VfxMeshHandle式にPlay毎インスタンスをクローン�
 - **MSBuild Debug＋Release 成功（0/0）**。シェーダ(VS/hlsli)は実行時コンパイル＝再起動で反映、C++はリビルド済み。
 - ⏳ 実機未確認: チェックON/OFFで板ポリが即カメラ向き↔固定に切り替わるか。もし「ONでもカメラを向かない」なら別要因（ビルボード行列の向き/カメラ規約）なので追加調査。
 
+---
+
+## 2026-07-03 — Phase5: 複合エフェクト（Particle+VfxMesh+GPU+Sound）実装（Debug/Releaseビルド成功）
+
+07-03設計の Composite レイヤーを実装。既存3系統(Particle/VfxMesh/GPU)のJSON・ハンドルには一切触れず、Phase2で作った `GpuParticleHandle` も活用して名前1発で連動させる薄い層を追加。
+
+### 追加物（`YEngine/Generators/Composite/`）
+- **`CompositeEffectAsset`**（参照リストのみ）: `particleEffect`(名) / `vfxMeshAssets`[{asset,offset,scale}] / `gpuEmitterGroup`(名) / `sounds`[{path,volume,category}]。各フィールド省略可。
+- **`CompositeInstance`**: ループ実行時の子ハンドル保持（`EffectHandle particle` / `vector<VfxMeshHandle>`＋offset / `GpuParticleHandle gpu` / `vector<SoundHandle>`）。`SetPosition`(音以外追従)/`Stop`(連鎖停止)/`IsActive`。
+- **`CompositeEffectManager`**(singleton): `ScanDirectory("Resources/Json/YComposites/")`＋`LoadAsset`（JSON→アセット。categoryは"BGM/SE/VOICE/AMBIENT"文字列→enum）、`Has`、`PlayOneShot`（各系統を撃ちっぱなし発火）、`Play`（ループ＝子ハンドル保持した `EffectHandle` を返す）。描画/更新コードは一切書かず既存API(`EffectHandle`/`VfxMeshHandle`/`GpuParticleHandle`/`Audio`)を呼ぶだけ。
+
+### 入口統一（EffectHandle 拡張）
+- `EffectHandle` に `std::shared_ptr<CompositeInstance> composite_`＋`friend CompositeEffectManager`（ヘッダは前方宣言のみで疎結合）。
+- `EffectHandle::Play/PlayOneShot` の名前解決**先頭**に Composite を追加（Composite→Group→System）。`SetPosition/Stop/IsActive/IsValid` を composite_ 経路に分岐。
+- → ゲーム側は `EffectHandle::PlayOneShot("Explosion", pos)` / `Play("Aura", pos, true)` の1行で、中身がComposite/Group/単発Systemかを意識せず4系統連動。
+
+### 配線・アセット
+- `MyGame::Initialize`: Particle/GPU の Scan 後に `CompositeEffectManager::ScanDirectory("Resources/Json/YComposites/")` を追加（子アセットが先に存在する順）。
+- サンプル `Resources/Json/YComposites/SampleComposite.json`（GPUグループ "ss" 参照）＝ `EffectHandle::PlayOneShot("SampleComposite", pos)` で即テスト可能。premake再生成。
+
+### 制約 / 既知（設計通り）
+- 3D位置オーディオ（距離減衰/パン）は Audio.h に無いため音は位置追従しない＝スコープ外。
+- GPUの「ループ→Stop」はグループ名ベース状態管理のため、同名Composite多重ループは取り合う可能性（GPUは現状インスタンス非対応＝Phase3-Bの残課題と同種）。ワンショット多重は粒子バッファ共有で問題なし。
+- Composite専用エディタは無し（手書きJSON運用でスタート。需要が出たらエディタ化）。
+
+### 検証
+- premake再生成＋**MSBuild Debug＋Release 成功（0 error/warning）**。`CompositeEffectManager.obj` コンパイル、YGame.dll/YMain.exe 再リンク確認。
+- ⏳ 実機未確認: `EffectHandle::PlayOneShot("SampleComposite", pos)` でGPUグループ "ss" が出るか／複数系統を束ねたComposite JSONを書いて1行で全部出るか／`Play`ループ→`Stop`で子が連鎖停止するか。
+
+---
+
+## 2026-07-03 — Phase5.5: 複合エフェクト・エディタ（手打ちJSON撲滅／Debug/Releaseビルド成功）
+
+ユーザー指摘「一緒に出すエディタが無いとダメでは？」＝手書きJSONは4系統のアセット名を正確に知る必要があり、タイプミスで無言で出ない（EnemyHit3問題の再来）。→ **ドロップダウン選択のComposite編集UI**を追加。
+
+### 不足していた列挙APIを追加
+- `GpuEmitManager::GetGroupNames()`（グループ名一覧。既存 `GetEmitterNames` はエミッタ名で不適）。
+- `VfxMeshSpawner::GetAssetNames()`（`assetMap_` のキー一覧）。
+- Particle は既存 `YParticleManager::GetAllSystemNames()` / `YEmitterGroupManager::GetAllGroupNames()` を使用。
+
+### CompositeEffectManager にエディタ＋保存
+- `SaveAsset(name)`＝ `Resources/Json/YComposites/<名前>.json` へ1件保存（ToJson: name/particleEffect/gpuEmitterGroup/vfxMeshAssets[asset,offset,scale]/sounds[path,volume,category名]）。
+- `#ifdef USE_IMGUI DrawImGui()`＋状態（新規名/選択中/プレビュー位置/ループハンドル/音声スキャン）。UI:
+  - 新規作成（名前→＋作成）／編集対象コンボ。
+  - **Particle エフェクト**＝System名＋Group名の統合コンボ（(なし)可）。**GPU グループ**＝`GetGroupNames` コンボ。
+  - **VfxMesh（複数）**＝アセット名コンボ＋オフセット＋スケール、行追加/削除。
+  - **サウンド（複数）**＝`Resources/Audio` 再帰スキャンのファイルコンボ＋音量＋カテゴリ、行追加/削除/再スキャン。
+  - **プレビュー**＝再生位置＋[ワンショット再生]/[ループ再生]/[停止]。**保存**ボタン＋保存先/呼び出しコードのヒント表示。
+- `GameScene` の Editor に「複合エフェクト(Composite)」パネルを登録（GpuParticle の隣）。
+
+### 効果
+- 各系統の実在名をリストから選ぶだけ＝**タイプミス由来の「無言で出ない」を構造的に排除**。作った瞬間プレビューで確認→保存→ゲームは `EffectHandle::PlayOneShot("<名前>", pos)` 1行。
+
+### 検証
+- **MSBuild Debug＋Release 成功（0/0）**。エディタは USE_IMGUI ガードで Release 無影響。
+- ⏳ 実機未確認: パネルで新規作成→各系統選択→プレビュー再生→保存→YComposites にJSON生成／再起動で復活するか。
+

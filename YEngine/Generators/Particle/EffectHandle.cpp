@@ -1,5 +1,6 @@
 #include "EffectHandle.h"
 #include "Debugger/Logger.h"
+#include "Composite/CompositeEffectManager.h"   // 複合エフェクト解決（入口統一の先頭）
 
 // ============================================================================
 // ファクトリメソッド
@@ -12,6 +13,15 @@ EffectHandle EffectHandle::Play(const std::string& systemName,
 {
     auto* mgr      = &YParticleManager::GetInstance();
     auto& groupMgr = YEmitterGroupManager::GetInstance();
+
+    // ── 入口統一(最優先): 複合エフェクト（Particle+VfxMesh+GPU+Sound）として解決 ──
+    if (auto* comp = CompositeEffectManager::GetInstance(); comp->Has(systemName)) {
+        if (loop) {
+            return comp->Play(systemName, position);
+        }
+        comp->PlayOneShot(systemName, position);
+        return {}; // ワンショットは撃ちっぱなし＝保持不要
+    }
 
     // ── 入口統一: まず Group（束ねた完成エフェクト）として解決 ──────────────
     if (YEmitterGroup* group = groupMgr.GetGroup(systemName)) {
@@ -92,13 +102,16 @@ void EffectHandle::EmitAll(std::initializer_list<const char*> systemNames,
 
 void EffectHandle::SetPosition(const Vector3& pos)
 {
-    if (group_)        group_->SetPosition(pos);
+    if (composite_)    composite_->SetPosition(pos);
+    else if (group_)   group_->SetPosition(pos);
     else if (emitter_) emitter_->SetPosition(pos);
 }
 
 void EffectHandle::Stop()
 {
-    if (group_) {
+    if (composite_) {
+        composite_->Stop();
+    } else if (group_) {
         group_->SetAutoEmitAll(false);
         group_->SetActive(false);
     } else if (emitter_) {
@@ -113,6 +126,7 @@ void EffectHandle::Stop()
 
 bool EffectHandle::IsActive() const
 {
+    if (composite_) return composite_->IsActive();
     if (group_) return group_->IsActive();
     return emitter_ && emitter_->IsActive();
 }

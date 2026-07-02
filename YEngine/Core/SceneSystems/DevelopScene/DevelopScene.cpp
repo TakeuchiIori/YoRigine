@@ -19,6 +19,7 @@
 #include "Particle/YParticleEditor.h"
 #include "Particle/YEmitterGroupEditor.h"
 #include "GPUParticle/GpuEmitManager.h"
+#include "Composite/CompositeEffectManager.h"
 #include <Vfx/VfxMesh/VfxMeshEditor.h>
 
 // WebAPI
@@ -105,6 +106,7 @@ void DevelopScene::Initialize() {
 	Editor::GetInstance()->RegisterGameUI("カメラエディター", [this]() {cameraEditor_->Update(); }, "Develop");
 	Editor::GetInstance()->RegisterGameUI("ライティング", [this]() { YoRigine::LightManager::GetInstance()->ShowLightingEditor(); }, "Develop");
 	Editor::GetInstance()->RegisterGameUI("GpuParticle", [this]() { YoRigine::GpuEmitManager::GetInstance()->DrawImGui(); }, "Develop");
+	Editor::GetInstance()->RegisterGameUI("複合エフェクト(Composite)", [this]() { CompositeEffectManager::GetInstance()->DrawImGui(); }, "Develop");
 	Editor::GetInstance()->RegisterGameUI("YoRigine:パーティクルエディター", [this]() {YParticleEditor::GetInstance().ShowEditorWindow(); }, "Develop");
 	//Editor::GetInstance()->RegisterGameUI("モーションエディタ", [this]() {motionEditor_->ShowEditor(); }, "Develop");
 	Editor::GetInstance()->RegisterGameUI("VFX", [this]() { YoRigine::VfxMeshEditor::GetInstance()->DrawImGui(); }, "Develop");
