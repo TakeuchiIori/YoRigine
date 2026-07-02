@@ -382,6 +382,7 @@ FodyWeavers.xsd
 # INI configuration files
 *.ini
 /CLAUDE.md
+/AGENTS.md
 .claude
 
 # YoRigine エンジンの生成キャッシュ（再生成可能なのでリポジトリに含めない）

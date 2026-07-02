@@ -15,7 +15,7 @@
 #include <vector>
 
 /// <summary>
-/// プレイヤー専用カメラ管理クラス（Game 層のアグリゲーター）。
+/// プレイヤー専用カメラ管理クラス
 ///
 /// 保有コンポーネント:
 ///   FollowCamera*            … Engine 側の追従カメラ本体
@@ -37,10 +37,10 @@ public:
     /// @param playerWT      プレイヤーの WorldTransform（ロックオン基準位置用）
     void Initialize(FollowCamera* followCamera, const WorldTransform* playerWT);
 
-    // スティック入力・ロックオン更新（CameraDirector::Update の前に呼ぶ）
+    // スティック入力・ロックオン更新
     void UpdatePreDirector();
 
-    // 攻撃カメラオフセットを sceneCamera に適用（CameraDirector::Update の後に呼ぶ）
+    // 攻撃カメラオフセットを sceneCamera に適用
     void ApplyPostDirector(Camera* sceneCamera, float dt);
 
     void DrawImGui();
@@ -73,8 +73,13 @@ public:
     // 脅威察知のシーン許可
     // フィールドでは背景・マップ見渡しを優先して OFF、バトル中だけ ON にする。
     // 各サブシーンの OnEnter から呼ぶ。
+    // 同じフラグでアイドルオートリセンターも制御する：バトル中に無操作が
+    // 続いてもカメラが勝手に背後へ回り込まないよう、ここで一時停止させる。
     // ============================================================
-    void SetThreatAwarenessAllowed(bool v) { threatAwarenessSceneAllowed_ = v; }
+    void SetThreatAwarenessAllowed(bool v) {
+        threatAwarenessSceneAllowed_ = v;
+        if (followCamera_) followCamera_->SetIdleRecenterSuppressed(v);
+    }
     bool IsThreatAwarenessAllowed() const   { return threatAwarenessSceneAllowed_; }
 
     // ============================================================
@@ -140,9 +145,9 @@ private:
     // 脅威察知（気配）
     // ロックオンのように特定の敵を中央へ固定するのではなく、周囲の敵の
     // 「気配」をそれとなく伝える。フリーカメラ時のみ動作する。
-    //   ① 周辺視グランス：視界外/背後に敵がいたら、その方向へごく軽く
+    // 周辺視グランス：視界外/背後に敵がいたら、その方向へごく軽く
     //      （awarenessMaxYaw_ まで）カメラを傾ける。完全には振り向かない。
-    //   ② 囲まれFOV：近くの敵が増えるほどFOVを少し広げて状況を見渡せるようにする。
+    // 囲まれFOV：近くの敵が増えるほどFOVを少し広げて状況を見渡せるようにする。
     // ============================================================
     void  UpdateThreatAwareness(float dt);                    // pre-director：周辺視グランス
     void  ApplyThreatFovWiden(Camera* sceneCamera, float dt); // post-director：囲まれFOV拡大
