@@ -37,8 +37,9 @@ VertexShaderOutput main(VertexShaderInput input, uint instanceID : SV_InstanceID
     );
 
     // ⑤ ワールド行列の構築
+    // ビルボードはエミッタ単位のuniform（PerView）で判定＝切替が既存粒子含め即反映される
     float4x4 worldMatrix;
-    if (particle.isBillboard == 1)
+    if (g_PerView.isBillboard == 1)
     {
         // ビルボード行列にスケールだけ適用
         worldMatrix = g_PerView.billboardMatrix;

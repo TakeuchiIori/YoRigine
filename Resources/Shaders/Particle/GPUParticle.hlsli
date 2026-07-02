@@ -1,4 +1,4 @@
-static const uint kMaxParticles = 500000; // 1024 × 4 = 4096個に増加
+static const uint kMaxParticles = 16384; // 1エミッタあたりの最大粒子数（バッファ・描画・ディスパッチの上限）。C++ 側 GPUParticle::kMaxParticles と必ず一致させること
 static const uint kParticlesPerThread = 128; // 1スレッドが処理するパーティクル数
 
 // エミッター形状の種類
@@ -121,6 +121,8 @@ struct PerView
 {
     float4x4 viewProjection;
     float4x4 billboardMatrix;
+    uint isBillboard;   // エミッタ単位のビルボード ON/OFF
+    float3 pad;
 };
 
 struct ParticleStats

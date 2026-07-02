@@ -501,3 +501,105 @@ DrawEditPanel の Trail/LightVolume/Smoke/Lightning 縦積み(checkbox+TreeNode)
 - **Phase4**: エディタのファイル手選択ワークフロー撤廃・自動スキャン化・保存導線整理。
 - **Phase5**: 07-03設計の Composite レイヤーへ GPU を統合（`EffectHandle` 解決チェーンから連動）。
 
+### Phase3 方針転換（重要な発見）: 1エミッタ=88MB・毎フレーム50万インスタンス描画
+Phase3 当初案（VfxMeshHandle式にPlay毎インスタンスをクローン）を実装しようと `GPUParticle` を精読したら、**`kMaxParticles = 500000` 固定**が判明:
+- 粒子バッファ = `sizeof(ParticleCSForGPU)(≈176B) × 500000 ≈ 88MB`／エミッタ（`GPUParticle.cpp:174`）＋ freeList 2MB。
+- **`DrawIndexedInstanced(indexCount, 500000, …)`** — 生存粒子が10個でも毎フレーム50万インスタンス描画（`GPUParticle.cpp:148`）。更新/初期化ディスパッチも50万規模。
+- → いま読まれている "ss" グループ1つで 88MB＋50万描画/frame。**エミッタを足すだけで重い**＝「ゲームで使えない」最大要因。3060基準で致命。
+- 当初のクローン方式は1インスタンス88MBで**数個でVRAM枯渇＆SRVヒープ枯渇**＝設計不成立。当初プランを撤回。
+
+ユーザー選択: **方針A「バッファ&描画コストを実用化」**。
+
+### Phase3-A 実施: グローバルキャップ 500000 → 16384（Debugビルド成功）
+- `kMaxParticles` は hlsli(`GPUParticle.hlsli`)とC++(`GPUParticle.h`)の**両方でコンパイル時定数**として一致必須（バッファ長＝shaderの安全境界＝描画インスタンス数）。Init/Emit/Update の3CSが境界として参照。
+- 両方を **16384** に変更（配線ゼロ・整合維持）。効果: 1エミッタ **88MB→約2.9MB**（≈30分の1）、**毎フレーム描画 50万→1.6万インスタンス**、ディスパッチも同縮小。行動ゲームなら1エミッタ16384生存で十分な余裕。
+- **MSBuild Debug x64 成功**、YGame.dll 再リンク確認。hlsli はランタイム/再起動で反映。
+- ⏳ 実機未確認（既存グループが従来通り出るか、描画コストが下がるか）。
+
+### Phase3 の残（per-emitter 微調整）
+- 現状は**全エミッタ共通の上限16384**。エミッタ個別に「火花=512／大爆発=16384」等に最適化するには、各CSへ per-emitter の粒子数を CB 経由で渡し、`kMaxParticles` 参照を CB 値に置換する配線が必要（Emit b6/Update b0 の PerFrame CB 拡張＋Init CS へCB追加＝ルートシグネチャ変更、中リスク）。上限16384で当面実用可能なため段階分離。ユーザー判断待ち。
+
+---
+
+## 2026-07-03 — Phase4: GPUエディタの使いにくさ解消（作成・保存導線／Debugビルド成功）
+
+ユーザーが挙げた「扱い悪すぎ」のうち**オーサリング側**を潰す。核心の2点＝「グループ作成にJSON手選択が必須」「保存で複数グループが1ファイルに混ざる（`ToJson` が全グループを1ファイルにdump）」。
+
+### 変更（`GpuEmitManager`、いずれも `#ifdef USE_IMGUI` 内 or データモデル）
+- **グループ単位保存を新設**: `ToJson()` の per-group 本体を `ToJsonGroup(group)` に切り出し。`SaveGroupToFile(groupName)` を追加＝そのグループを**自身の `sourceFilePath`（1ファイル1グループ）**に `{version, groups:[...]}` で書き出す。混線が原理的に消える。
+- **JSON手選択を不要化**: `CreateEmitterGroup` の由来パス決定を「引数→選択中→**グループ名から自動（`Resources/Json/GpuEmitters/<名前>.json`）**」に。エディタで JSON を先に選ばなくても作成・保存が完結。
+- **エディタUI**:
+  - グループ詳細に緑「■ このグループを保存」ボタン（`SaveGroupToFile`）＋保存先パス表示を追加＝**主導線**。
+  - 新規作成セクションに「名前を入れて＋作成だけ。保存先は自動。JSON事前選択不要」のヒスト＋作成ボタンを緑＆`ICON_FA_PLUS`化。作成失敗時は選択を変えない。
+  - 上部の全体保存を折りたたみ＋ラベル「ファイル操作（上級者向け・全グループ一括）」に格下げし、通常はグループ管理タブを使うよう明記。
+- **`DeleteEmitterGroup`**: グループ単位ファイル化で無意味になった `selectedJsonFilePath_` 一致ガードを撤去（削除ログは各グループ自身の `sourceFilePath` を出力）。
+
+### 検証
+- **MSBuild Debug x64 成功**（0 error/warning）、YGame.dll 再リンク確認。`ICON_FA_PLUS` 定義確認。
+- ⏳ 実機未確認。確認手順: エディタ→グループ管理→名前入力→＋作成（JSON未選択でOK）→エミッタ追加→「このグループを保存」で `GpuEmitters/<名前>.json` が生成されるか／再起動で復活するか。
+
+### 残（エディタのさらなる磨き・任意）
+- グループ管理/エミッター管理/エディターの**3タブ往復**は未統合（YParticleのEffect Editor 1画面化と同様に将来まとめられる。ImGui大改修のため今回は据え置き）。
+- 空テクスチャでのエミッタ作成の扱い（別件）。
+
+---
+
+## 2026-07-03 — GPU: ①エミッタ形状のライン可視化 ②粒子ごとの描画メッシュ形状（Debug/Releaseビルド成功）
+
+ユーザー要望2件。既存の `Line`（`YEngine/Graphics/Drawer/LineManager`）と `MeshPrimitive` を土台に実装。
+
+### ① エミッタ形状をライン描画で可視化（Debugのみ）
+- `Line` は各所有者が `make_unique`→`Initialize`→`SetCamera` で持ち、`RegisterLine(start,end)`＋形状ヘルパ（`DrawSphere`/`DrawAABB`）＋`SetColor`＋`Reset`＋`DrawLine`(flush) を提供。コライダーのワイヤー描画と同じ仕組みを流用。
+- `GpuEmitManager` に `gizmoLine_`(unique_ptr<Line>)＋`showEmitterGizmos_` を追加（すべて `#ifdef USE_IMGUI`）。`Initialize` で生成、`SetCamera` で追随、`Draw()` 末尾で `DrawEmitterGizmos()`。
+- **選択中グループのエミッタ形状**を描画: 選択エミッタ=黄、同グループの他=水色（2バッチで色分け＝register→SetColor→DrawLine を2回）。毎フレーム `Reset()`。
+- 形状マッピング: Sphere=`DrawSphere(半径)` / Box=`DrawAABB(±size*0.5)`（shaderのBox分布が±size*0.5なのに一致）/ Cone=方向ベクトルから垂直基底を作って底円＋側面ガイド線を手組み / Triangle=v1/v2/v3を線分（shaderがtranslateを無視しv1/v2/v3直参照なのに合わせグループ原点基準）/ Mesh=発生位置に小マーカー球。
+- 位置は他形状と同じく `group.translate + ローカルオフセット`。エディタに「エミッタ形状をライン表示（選択グループ）」チェック追加。
+
+### ② 粒子ごとの描画メッシュ形状（板ポリ以外を選べる）
+- VS(`GPUParticle.VS.hlsl`)は汎用頂点(position/texcoord/normal)を scale/回転/ビルボード/translate で変換するだけ＝メッシュ差し替えは既存 `GPUParticle::SetMesh` で成立。
+- `ParticleMeshShape` enum 新設（Plane/Box/Ring/Cylinder/Sphere/Cone/Fan）。`GPUEmitter::SetParticleMesh(shape)` で `MeshPrimitive::Create*`（ユニットサイズ、粒子scaleで拡縮）→`gpuParticle_->SetMesh`。
+- `EmitterData.particleMeshShape` 追加＋`ToJsonGroup`/`LoadEmitterFromJson`（旧データは既定Plane）でシリアライズ。ロード時に `SetParticleMesh` 適用。
+- エディタ: パーティクルパラメータ先頭に「粒子メッシュ形状」コンボ。変更で即 `SetParticleMesh`。立体は「ビルボードOFF推奨」ヒント表示。
+- 注意: 立体メッシュ＋ビルボードONは板ポリ同様カメラ向きに潰れる。3D形状は per-particle `isBillboard` をOFFにして使う。
+
+### 検証
+- **MSBuild Debug x64＋Release x64 いずれも成功（0 error/warning）**。Debug=YGame.dll / Release=YMain.exe 再リンク確認。ギズモは USE_IMGUI ガードでReleaseに無影響。
+- ⏳ 実機未確認。確認: エディタでグループ選択→エミッタ形状のワイヤーが出るか（半径/サイズ変更に追随）／粒子メッシュ形状を変えて見た目が板ポリ以外になるか（立体はビルボードOFF）。
+
+---
+
+## 2026-07-03 — GPU: 粒子メッシュ形状の「生成パラメータ調整」対応（Debug/Releaseビルド成功）
+
+前段②は形状を選べるが各形状のサイズがハードコードで調整不可だったのを、**per-emitterの生成パラメータ**で調整できるようにした。
+
+### 変更
+- **`ParticleMeshParams` 構造体**新設（`GPUEmitter.h`）: width/height/depth/outerRadius/innerRadius/radius/angleDegree/divide/subdivisions。形状ごとに使うフィールドが異なる superset。
+- **`GPUEmitter::SetParticleMesh(shape, params)`** にシグネチャ変更。`MeshPrimitive::Create*` へ各パラメータを渡す。`divide` は退化回避で下限3にクランプ。
+- **`EmitterData.particleMeshParams`** 追加。`ToJsonGroup`/`LoadEmitterFromJson` にシリアライズ（旧データは既定値、キー無しは各フィールド既定でフォールバック）。ロード時に `SetParticleMesh(shape, params)` 適用。
+- **エディタ**: 「粒子メッシュ形状」コンボの直下に、選択中形状に応じた調整UI（Plane=幅/高さ, Box=幅/高さ/奥行き, Ring=外周/内周/分割, Cylinder=外周/内周/高さ/分割, Sphere=半径/細分化, Cone=半径/高さ/分割, Fan=半径/角度/分割）。形状変更 or いずれかのパラメータ変更で即メッシュ再生成（live rebuild）。
+
+### 注意 / 既知
+- ドラッグ中は毎フレーム `MeshPrimitive::Create*`（頂点/インデックスバッファ再確保）＝小メッシュなのでエディタ用途では許容。気になれば「編集確定時のみ再生成」に変更可。
+- **MSBuild Debug＋Release 成功（0/0）**。⏳実機未確認（各形状のパラメータを動かして見た目が変わるか・保存/再起動で復活するか）。
+
+---
+
+## 2026-07-03 — GPU: ビルボードが「切り替えても効かない」問題を修正（発生時焼き込み→エミッタ単位uniform）
+
+ユーザー: 「ビルボードが有効にしっかりなっていない気がする」。
+
+### 原因（特定）
+- ビルボードは **Emit CS で粒子ごとに発生時へ焼き込み**（`g_Particles[i].isBillboard = g_ParticleParams.isBillboard;`）、VS(`GPUParticle.VS.hlsl`)は **`particle.isBillboard`（粒子固有値）** を参照していた。
+- → エディタでチェックを切り替えても**既存の生存粒子は古い値のまま**。ループ発生でも寿命ぶん混在し、ワンショット/停止中は永久に変わらない＝「効いていない」体感。ビルボードは本来エミッタ単位の設定なのに per-particle 状態になっていた。
+
+### 修正（エミッタ単位の live uniform 化）
+- `PerViewForGPU`(C++) / `PerView`(hlsli) に `uint isBillboard` 追加（行列2つの後ろ、offset128で一致）。
+- `GPUParticle` に `billboard_`＋`SetBillboard()`。`UpdatePerView`/`CreatePerViewResource` で毎フレーム `perViewData_->isBillboard` に反映。
+- `GPUParticle.VS.hlsl`: 判定を `particle.isBillboard` → **`g_PerView.isBillboard`** に変更。
+- `GPUEmitter::SetParticleParameters`: `gpuParticle_->SetBillboard(params.isBillboard)` を追加＝エディタでチェック変更→`UpdateParticleParams`→即 uniform 反映。
+- 効果: **チェック切替が既存粒子含め次フレームで全反映**。per-particle焼き込み(Emit CS)は残置（VS未参照・無害）。
+
+### 検証
+- **MSBuild Debug＋Release 成功（0/0）**。シェーダ(VS/hlsli)は実行時コンパイル＝再起動で反映、C++はリビルド済み。
+- ⏳ 実機未確認: チェックON/OFFで板ポリが即カメラ向き↔固定に切り替わるか。もし「ONでもカメラを向かない」なら別要因（ビルボード行列の向き/カメラ規約）なので追加調査。
+

@@ -20,6 +20,7 @@
 
 #ifdef USE_IMGUI
 #include <imgui.h>
+#include "Drawer/LineManager/Line.h"   // エミッタ形状のライン可視化（Debugのみ）
 #endif // _DEBUG
 
 
@@ -87,6 +88,10 @@ namespace YoRigine {
 
 			// エミッタートレイルパラメータ
 			EmitterTrailParams trailParams;
+
+			// 1粒子として描画するメッシュ形状＋その生成パラメータ
+			ParticleMeshShape particleMeshShape = ParticleMeshShape::Plane;
+			ParticleMeshParams particleMeshParams;
 		};
 
 		/// エミッターグループ（システム）データ構造体
@@ -186,6 +191,13 @@ namespace YoRigine {
 		// エミッターの形状ごとのローカル発生位置(オフセット)を取得
 		Vector3 GetEmitterLocalOffset(const EmitterData* emitterData) const;
 
+#ifdef USE_IMGUI
+		// エミッタ形状をライン描画で可視化（選択中グループのエミッタ）
+		void DrawEmitterGizmos();
+		// 単一エミッタの形状をラインとして gizmoLine_ に登録
+		void RegisterEmitterGizmo(const EmitterData* emitterData, const Vector3& worldPos);
+#endif
+
 		// グループ内の最大パーティクル寿命（発生停止後の linger 時間の見積りに使う）
 		float GetGroupMaxLifetime(const EmitterGroup* group) const;
 
@@ -197,10 +209,14 @@ namespace YoRigine {
 		bool SaveToFile(const std::string& filepath);
 		bool LoadFromFile(const std::string& filepath);
 
+		// グループ単位でそのグループ自身の sourceFilePath に保存（複数グループが1ファイルに混ざるのを防ぐ）
+		bool SaveGroupToFile(const std::string& groupName);
+
 		// すべてのエミッターを指定ディレクトリから読み込み
 		bool LoadAllEmitters(const std::string& directory = "Resources/Json/GpuEmitters/");
 		// JSON変換
 		nlohmann::json ToJson() const;
+		nlohmann::json ToJsonGroup(const EmitterGroup* group) const;
 		bool FromJson(const nlohmann::json& json, const std::string& sourceFilePath = "");
 		bool LoadEmitterFromJson(const std::string& groupName, const nlohmann::json& j);
 		void ScanTextureDirectory(const std::string& directory);
@@ -212,6 +228,8 @@ namespace YoRigine {
 #ifdef USE_IMGUI
 		FileBrowser textureBrowser_;
 		FileBrowser jsonBrowser_;
+		std::unique_ptr<Line> gizmoLine_;          // エミッタ形状のライン可視化
+		bool showEmitterGizmos_ = true;            // 選択グループのエミッタ形状を表示するか
 #endif
 		// ImGui用変数
 		char newEmitterName_[256] = "";

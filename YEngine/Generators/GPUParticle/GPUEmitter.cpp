@@ -6,6 +6,7 @@
 #include <ModelUtils.h>
 #include "GpuParticleMethod.h"
 #include <Debugger/Logger.h>
+#include <Mesh/MeshPrimitive.h>
 
 /// <summary>
 /// GPU エミッターの初期化（パーティクル生成・各種リソース作成）
@@ -302,6 +303,11 @@ void GPUEmitter::SetParticleParameters(const ParticleParams& params)
 
 		particleParameters_->gravity = params.gravity;
 		particleParameters_->isBillboard = params.isBillboard ? 1 : 0;
+
+		// ビルボードはエミッタ単位のuniformとしても反映（VSはこちらを参照＝切替が即全粒子へ）
+		if (gpuParticle_) {
+			gpuParticle_->SetBillboard(params.isBillboard);
+		}
 
 		// 子パーティクルパラメータ
 		particleParameters_->childParams.isTrail = params.child.isTrail ? 1 : 0;
@@ -835,6 +841,32 @@ void GPUEmitter::UpdateEmitterTrail()
 
 	if (trail.lifeTime > 0.0f) {
 		particleParameters_->lifeTime = trail.lifeTime;
+	}
+}
+
+void GPUEmitter::SetParticleMesh(ParticleMeshShape shape, const ParticleMeshParams& p)
+{
+	if (!gpuParticle_) return;
+	particleMeshShape_ = shape;
+
+	// 生成パラメータで基準形状を作り、実サイズは粒子ごとの scale で拡縮する。
+	// 分割数は 0 除算・退化を避けるため下限クランプ。
+	const uint32_t divide = p.divide < 3u ? 3u : p.divide;
+	const uint32_t subdiv = p.subdivisions; // Sphere の細分化（0でも最小の八面体等になる想定）
+
+	std::shared_ptr<Mesh> mesh;
+	switch (shape) {
+	case ParticleMeshShape::Plane:    mesh = MeshPrimitive::CreatePlane(p.width, p.height); break;
+	case ParticleMeshShape::Box:      mesh = MeshPrimitive::CreateBox(p.width, p.height, p.depth); break;
+	case ParticleMeshShape::Ring:     mesh = MeshPrimitive::CreateRing(p.outerRadius, p.innerRadius, divide); break;
+	case ParticleMeshShape::Cylinder: mesh = MeshPrimitive::CreateCylinder(p.outerRadius, p.innerRadius, divide, p.height); break;
+	case ParticleMeshShape::Sphere:   mesh = MeshPrimitive::CreateSphere(p.radius, subdiv); break;
+	case ParticleMeshShape::Cone:     mesh = MeshPrimitive::CreateCone(p.radius, p.height, divide); break;
+	case ParticleMeshShape::Fan:      mesh = MeshPrimitive::CreateFanShape(p.radius, p.angleDegree, divide); break;
+	default:                          mesh = MeshPrimitive::CreatePlane(p.width, p.height); break;
+	}
+	if (mesh) {
+		gpuParticle_->SetMesh(mesh);
 	}
 }
 
