@@ -13,7 +13,7 @@
 #include <Debugger/Logger.h>
 #include "Systems./Input./Input.h"
 #include "Systems/GameTime/GameTime.h"
-#include "MathFunc.h"   // Coordinate::WorldToScreen
+#include "MathFunc.h"
 #include <Systems/UI/UIManager.h>
 #include "GPUParticle/GpuEmitManager.h"
 #include "Composite/CompositeEffectManager.h"
@@ -176,8 +176,6 @@ void GameScene::Initialize() {
 		if (player_->GetPlayerCamera()) player_->GetPlayerCamera()->DrawImGui();
 		}, "Game");
 	Editor::GetInstance()->RegisterGameUI("ライティング", [this]() { YoRigine::LightManager::GetInstance()->ShowLightingEditor(); }, "Game");
-	Editor::GetInstance()->RegisterGameUI("GpuParticle", [this]() { YoRigine::GpuEmitManager::GetInstance()->DrawImGui(); }, "Game");
-	Editor::GetInstance()->RegisterGameUI("複合エフェクト(Composite)", [this]() { CompositeEffectManager::GetInstance()->DrawImGui(); }, "Game");
 	Editor::GetInstance()->RegisterGameUI("プレイヤー攻撃エディター", [this]() {attackEditor_->DrawImGui(); }, "Game");
 	Editor::GetInstance()->RegisterGameUI("YoRigine:パーティクルエディター", [this]() {YParticleEditor::GetInstance().ShowEditorWindow(); }, "Game");
 #endif
