@@ -77,7 +77,7 @@ void MyGame::Initialize() {
 	// モデル操作関連の初期化
 	YoRigine::ModelManipulator::GetInstance()->Initialize();
 
-	// BaseObject 一括管理マネージャ（インスペクタパネルの登録もここで行う）
+	// BaseObject 一括管理マネージャ
 	BaseObjectManager::GetInstance()->Initialize();
 
 	// PiP カメラサブシステム

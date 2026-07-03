@@ -19,6 +19,13 @@
 #endif
 #include <Collision/AreaCollision/Base/AreaManager.h>
 #include <SceneSystems/SceneManager.h>
+#include <Drawer/InstancedObject3d.h>
+#include "Object3D/BaseObjectManager.h"
+
+namespace {
+	// BaseObjectManager 登録名の一意連番（プロセス内で単調増加）
+	uint32_t g_battleEnemyRegSeq = 0;
+}
 
 /// <summary>
 /// コンストラクタ
@@ -36,7 +43,7 @@ BattleEnemyManager::~BattleEnemyManager() = default;
 /// <param name="camera">使用するカメラのポインタ</param>
 void BattleEnemyManager::Initialize(Camera* camera) {
 	camera_ = camera;
-	battleEnemies_.clear();
+	battleEnemies_.clear();   // 解除は BattleEnemy デストラクタが行う
 	enemyDataMap_.clear();
 	encounterDataMap_.clear();
 	formationMap_.clear();
@@ -147,7 +154,7 @@ void BattleEnemyManager::CleanupDefeatedEnemies() {
 			[this](const std::unique_ptr<BattleEnemy>& enemy) {
 				if (enemy && !enemy->IsAlive()) {
 					OnEnemyDefeated(enemy.get());
-					return true;
+					return true;   // erase → BattleEnemy デストラクタで登録解除
 				}
 				return false;
 			}),
@@ -338,6 +345,11 @@ void BattleEnemyManager::SpawnBattleEnemy(const std::string& enemyId, const Vect
 	AreaManager::GetInstance()->RegisterObject(&newEnemy->GetWT(), ("Enemy_" + enemyId).c_str());
 	battleEnemies_.push_back(std::move(newEnemy));
 
+	// BaseObjectManager へ一意名で登録（インスペクタ一覧・名前検索用。描画は当マネージャが担当）
+	BaseObjectManager::GetInstance()->Register(
+		battleEnemies_.back().get(),
+		"BattleEnemy_" + std::to_string(g_battleEnemyRegSeq++));
+
 	Logger(("[BattleEnemyManager] 敵を生成: " + enemyId + " 位置: (" +
 		std::to_string(position.x) + ", " + std::to_string(position.y) + ", " +
 		std::to_string(position.z) + ") 合計: " + std::to_string(battleEnemies_.size()) + "体\n").c_str());
@@ -374,7 +386,7 @@ void BattleEnemyManager::RemoveAllBattleEnemies() {
 
 	for (auto& enemy : battleEnemies_) {
 		if (enemy) {
-			// エリアの登録解除
+			// エリアの登録解除（BaseObjectManager の解除は BattleEnemy デストラクタ）
 			areaManager->UnregisterObject(&enemy->GetWT());
 		}
 	}
@@ -953,11 +965,20 @@ void BattleEnemyManager::DebugSpawnEnemy(const Vector3& position, const std::str
 void BattleEnemyManager::Draw() {
 	if (!isBattleActive_) return;
 
+	// 敵は静的メッシュ(.obj)なのでインスタンシングでまとめ描き。
+	// ただし死亡時ディゾルブ中の敵はインスタンシング PSO が非対応なので個別描画にフォールバック。
+	auto* inst = InstancedObject3d::GetInstance();
+	inst->Begin(camera_);
 	for (auto& enemy : battleEnemies_) {
-		if (enemy) {
-			enemy->Draw();
+		if (!enemy || !enemy->GetObject3d()) continue;
+		if (enemy->GetObject3d()->IsDissolveEnabled()) {
+			enemy->Draw();   // ディゾルブは個別描画（Draw 内で ApplyDeathFade も走る）
+		} else {
+			enemy->ApplyDeathFade();   // 旧 Draw と同じ発火条件で色を更新（Submit が読む）
+			inst->Submit(*enemy->GetObject3d(), enemy->GetWT());
 		}
 	}
+	inst->DrawAll(camera_);
 }
 
 void BattleEnemyManager::DrawUI()
@@ -973,11 +994,20 @@ void BattleEnemyManager::DrawUI()
 void BattleEnemyManager::DrawShadow()
 {
 	if (!isBattleActive_) return;
+
+	// 影パスもインスタンシング（影は WVP 不使用なのでカメラ不要）。
+	// ディゾルブ中の敵は色パスと揃えて個別影描画にフォールバック。
+	auto* inst = InstancedObject3d::GetInstance();
+	inst->Begin();
 	for (auto& enemy : battleEnemies_) {
-		if (enemy) {
+		if (!enemy || !enemy->GetObject3d()) continue;
+		if (enemy->GetObject3d()->IsDissolveEnabled()) {
 			enemy->DrawShadow();
+		} else {
+			inst->Submit(*enemy->GetObject3d(), enemy->GetWT());
 		}
 	}
+	inst->DrawShadow();
 }
 
 /// <summary>

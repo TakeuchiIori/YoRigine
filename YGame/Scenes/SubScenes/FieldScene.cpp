@@ -10,6 +10,7 @@
 #include <Editor/Editor.h>
 #include "Debugger/Logger.h"
 #include <Object3D/ObjectManager.h>
+#include "Object3D/BaseObjectManager.h"
 #include "Collision/AreaCollision/Base/AreaManager.h"
 #include <ModelManipulator/ModelManipulator.h>
 #include "Collision/AreaCollision/Base/AreaEditor.h"
@@ -28,6 +29,9 @@ void FieldScene::Initialize(Camera* camera, Player* player) {
 	sceneCamera_ = camera;
 	player_ = player;
 	player_->Reset();
+
+	// BaseObjectManager へ登録（描画は従来どおり直接。一覧・名前検索用）
+	BaseObjectManager::GetInstance()->Register(player_, "Player");
 
 	//------------------------------------------------------------
 	// プレイヤースポーン設定 (JSON ロード → プレイヤー / カメラに適用)
@@ -248,10 +252,12 @@ void FieldScene::Update() {
 	オブジェクトの描画
 //========================================================================*/
 void FieldScene::DrawObject() {
+	// インスタンシング描画(敵)は最後に。DrawAll が ObjectInstanced のルートシグネチャに
+	// 切り替えるため、その後に Object 系の個別描画を置くと RS 不一致でエラーになる。
 	player_->Draw();
+	player_->DrawAnimation();
 	ground_->Draw();
 	fieldEnemyManager_->Draw();
-	player_->DrawAnimation();
 }
 
 /*==========================================================================

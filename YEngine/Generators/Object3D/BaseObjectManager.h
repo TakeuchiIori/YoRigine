@@ -90,6 +90,14 @@ public:
 	void DrawCollisionAll();
 	void DrawShadowAll();
 
+	// インスタンシング対応の一括描画。
+	// IsInstanceable() が true のオブジェクトは InstancedObject3d でまとめ描き、
+	// それ以外 (アニメ / 特殊描画) は従来どおり個別 Draw() する。
+	// カラーパス。カメラは SetCamera() 済みのものを使う。
+	void DrawAllInstanced();
+	// 影パス。gLight は呼び出し側で設定済みであること (既存の影描画と同じ前提)。
+	void DrawShadowAllInstanced();
+
 	// ============================================================
 	// 検索 / アクセッサ
 	// ============================================================

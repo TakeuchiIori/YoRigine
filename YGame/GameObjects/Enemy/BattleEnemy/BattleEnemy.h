@@ -43,6 +43,9 @@ public:
 	// 描画処理
 	void Draw() override;
 
+	// プレイヤー敗北時の半透明フェード色更新（インスタンシング描画から呼ぶ）
+	void ApplyDeathFade();
+
 	// UI描画
 	void DrawUI();
 
