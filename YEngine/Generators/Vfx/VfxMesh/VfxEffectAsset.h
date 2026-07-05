@@ -184,6 +184,10 @@ namespace YoRigine {
         float   coreWidth        = 0.30f; // 芯の太さ/実体感(0..1)
         float   solidness        = 0.0f;  // 透明感を減らす(0=従来 / 1=べた塗り寄り)
         float   outlineIntensity = 0.0f;  // 枝/縁のアウトライン強調
+
+        // 方向・曲線（エディタプレビュー / 既定の伸ばし方向）
+        Vector3 direction    = { 0.0f, 1.0f, 0.0f }; // 稲妻を伸ばす向き（既定=上＝縦）
+        float   bendAmount   = 0.0f;   // 曲げ量（0=直線 / 中点を横へふくらませて弧にする）
         bool    isEnable     = true;
     };
 

@@ -275,10 +275,13 @@ namespace YoRigine {
         if (asset.useLightning && previewLightning_) {
             previewLightning_->SetCamera(camera_);
             previewLightning_->ApplyParam(asset.lightning);
-            // プレビュー: 中心を挟んで上下に length の長さで伸ばす
+            // プレビュー: 中心を挟んで direction 方向に length の長さで伸ばす
             float half = asset.lightning.length * 0.5f;
-            previewLightning_->SetEndpoints(previewCenter_ + Vector3{ 0, -half, 0 },
-                                            previewCenter_ + Vector3{ 0,  half, 0 });
+            Vector3 dir = asset.lightning.direction;
+            float dl = std::sqrt(dir.x * dir.x + dir.y * dir.y + dir.z * dir.z);
+            dir = (dl < 1e-4f) ? Vector3{ 0, 1, 0 } : Vector3{ dir.x / dl, dir.y / dl, dir.z / dl };
+            previewLightning_->SetEndpoints(previewCenter_ - dir * half,
+                                            previewCenter_ + dir * half);
             previewLightning_->Update(deltaTime);
         }
 
@@ -851,9 +854,10 @@ namespace YoRigine {
         {
             VfxEffectAsset b = sel->asset;
             bool c = false;
-            c |= ImGui::DragFloat4("芯の色##lt",   &lt.color.x,       0.02f, 0.0f, 10.0f, "%.2f");
-            c |= ImGui::DragFloat4("グロー色##lt", &lt.glowColor.x,   0.02f, 0.0f, 10.0f, "%.2f");
-            c |= ImGui::DragFloat4("枝の色##lt",   &lt.branchColor.x, 0.02f, 0.0f, 10.0f, "%.2f");
+            const ImGuiColorEditFlags hdr = ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_Float;
+            c |= ImGui::ColorEdit4("芯の色##lt",   &lt.color.x,       hdr);
+            c |= ImGui::ColorEdit4("グロー色##lt", &lt.glowColor.x,   hdr);
+            c |= ImGui::ColorEdit4("枝の色##lt",   &lt.branchColor.x, hdr);
             if (c) CommitChange(b, "Lightning 色");
             ImGui::TextDisabled("  芯→縁を2色でグラデ、枝は別色。rgb>1 で Bloom 発光");
         }
@@ -867,6 +871,21 @@ namespace YoRigine {
             c |= ImGui::SliderFloat("アウトライン強調##lto", &lt.outlineIntensity, 0.0f, 4.0f, "%.2f");
             if (c) CommitChange(b, "Lightning 実体感");
             ImGui::TextDisabled("  実体感を上げると透け感が消える。アウトラインで枝が際立つ");
+        }
+
+        ImGui::SeparatorText("方向 / 曲線");
+        {
+            VfxEffectAsset b = sel->asset;
+            bool c = false;
+            // プリセット
+            if (ImGui::SmallButton("縦##ltd")) { lt.direction = { 0,1,0 }; c = true; } ImGui::SameLine();
+            if (ImGui::SmallButton("横##ltd")) { lt.direction = { 1,0,0 }; c = true; } ImGui::SameLine();
+            if (ImGui::SmallButton("奥##ltd")) { lt.direction = { 0,0,1 }; c = true; } ImGui::SameLine();
+            if (ImGui::SmallButton("斜め##ltd")) { lt.direction = { 1,1,0 }; c = true; }
+            c |= ImGui::DragFloat3("方向(自由)##ltd", &lt.direction.x, 0.02f, -1.0f, 1.0f, "%.2f");
+            c |= ImGui::SliderFloat("曲げ量(弧)##ltbend", &lt.bendAmount, -5.0f, 5.0f, "%.2f");
+            if (c) CommitChange(b, "Lightning 方向/曲線");
+            ImGui::TextDisabled("  方向で縦/横/奥/自由。曲げ量>0 で弓なりの弧になる");
         }
 
         ImGui::SeparatorText("形状 / 明滅");

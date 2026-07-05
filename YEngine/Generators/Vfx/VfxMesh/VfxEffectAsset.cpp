@@ -125,6 +125,8 @@ namespace YoRigine {
         lt["coreWidth"]        = lightning.coreWidth;
         lt["solidness"]        = lightning.solidness;
         lt["outlineIntensity"] = lightning.outlineIntensity;
+        lt["direction"]        = lightning.direction;
+        lt["bendAmount"]       = lightning.bendAmount;
         lt["length"]       = lightning.length;
         lt["width"]        = lightning.width;
         lt["jitter"]       = lightning.jitter;
@@ -279,6 +281,8 @@ namespace YoRigine {
             lightning.coreWidth        = lt.value("coreWidth",        lightning.coreWidth);
             lightning.solidness        = lt.value("solidness",        lightning.solidness);
             lightning.outlineIntensity = lt.value("outlineIntensity", lightning.outlineIntensity);
+            if (lt.contains("direction")) lightning.direction = lt["direction"];
+            lightning.bendAmount       = lt.value("bendAmount",       lightning.bendAmount);
             lightning.length       = lt.value("length",       lightning.length);
             lightning.width        = lt.value("width",        lightning.width);
             lightning.jitter       = lt.value("jitter",       lightning.jitter);

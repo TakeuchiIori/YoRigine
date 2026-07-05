@@ -135,7 +135,18 @@ void LightningMesh::RebuildVertices()
     // --- 本線 ---
     std::vector<Vector3> main;
     main.push_back(start_);
-    Subdivide(start_, end_, param_.jitter, levels, main);
+    if (std::fabs(param_.bendAmount) > 1e-4f) {
+        // 弧: 軸に垂直な方向へ bendAmount ずらした中点制御点を通す（弓なり）
+        Vector3 axis = Normalize(end_ - start_);
+        Vector3 ref  = (std::fabs(axis.y) < 0.99f) ? Vector3{ 0,1,0 } : Vector3{ 1,0,0 };
+        Vector3 perp = Normalize(Cross(axis, ref));
+        Vector3 ctrl = (start_ + end_) * 0.5f + perp * param_.bendAmount;
+        int lv = (levels > 1) ? levels - 1 : 1;
+        Subdivide(start_, ctrl, param_.jitter, lv, main);
+        Subdivide(ctrl,   end_, param_.jitter, lv, main);
+    } else {
+        Subdivide(start_, end_, param_.jitter, levels, main);
+    }
     // 頂点色 r=0 → 本線（rgb は未使用・r を枝フラグに、a を強度に流用）
     AppendBoltRibbon(main, param_.width, Vector4{ 0.f, 0.f, 0.f, param_.color.w });
 
