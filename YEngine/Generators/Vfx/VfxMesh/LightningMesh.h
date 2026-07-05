@@ -63,7 +63,8 @@ private:
     std::vector<ProceduralMeshVertex> vertices_;
     float time_        = 0.f;
     float flickerTimer_ = 0.f;
-    uint32_t seed_     = 1; // 形のランダムシード（flickerで更新）
+    uint32_t seed_        = 1; // 形生成中の作業シード（毎フレーム flickerSeed_ から復元）
+    uint32_t flickerSeed_ = 1; // フリッカーで変わる基準シード（これが変わった時だけ形が変わる）
 };
 
 } // namespace YoRigine

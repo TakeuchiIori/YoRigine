@@ -48,7 +48,8 @@ void LockOnUI::Update()
 	isVisible_ = true;
 
 	// スプライト回転（ロックオンサイトをゆっくり回す演出）
-	const float deltaTime = YoRigine::GameTime::GetDeltaTime();
+	// UI チャンネル＝ヒットストップ/ポーズ中も回り続ける（UIは止めない）。
+	const float deltaTime = YoRigine::GameTime::GetDeltaTime(YoRigine::TimeChannel::UI);
 	currentRotation_ += rotateSpeed_ * deltaTime;
 	sprite_->SetRotate({ 0.0f, 0.0f, currentRotation_ });
 

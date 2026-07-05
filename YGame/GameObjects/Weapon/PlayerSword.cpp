@@ -72,7 +72,7 @@ void PlayerSword::Update() {
 	Vector3 rootW = Transform(localRoot, wt_.matWorld_);
 	Vector3 tipW = Transform(localTip, wt_.matWorld_);
 	trailEmitter_->AddPoint(tipW, rootW);
-	trailEmitter_->Update(YoRigine::GameTime::GetDeltaTime());
+	trailEmitter_->Update(YoRigine::GameTime::GetDeltaTime(YoRigine::TimeChannel::Vfx));
 
 	// Vector3 handPos = GetHandPosition(); // 使っていなければ削除でOK
 	obbCollider_->Update();

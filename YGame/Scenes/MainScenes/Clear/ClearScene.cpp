@@ -123,7 +123,7 @@ void ClearScene::Update() {
 	//auto clearEffect = EffectHandle::Play("ClearScene", Vector3{0,0,0},true,1);
 	YoRigine::ModelManipulator::GetInstance()->Update();
 	YoRigine::CollisionManager::GetInstance()->Update();
-	YParticleManager::GetInstance().Update(YoRigine::GameTime::GetDeltaTime());
+	YParticleManager::GetInstance().Update(YoRigine::GameTime::GetDeltaTime(YoRigine::TimeChannel::Vfx));
 }
 
 /// <summary>

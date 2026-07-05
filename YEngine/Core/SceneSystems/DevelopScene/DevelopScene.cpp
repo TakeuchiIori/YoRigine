@@ -131,15 +131,15 @@ void DevelopScene::Update() {
 
 	YoRigine::CollisionManager::GetInstance()->Update();
 	YoRigine::ModelManipulator::GetInstance()->Update();
-	YParticleManager::GetInstance().Update(YoRigine::GameTime::GetDeltaTime());
+	YParticleManager::GetInstance().Update(YoRigine::GameTime::GetDeltaTime(YoRigine::TimeChannel::Vfx));
 	VfxMeshSpawner::GetInstance()->SetCamera(sceneCamera_.get());
-	VfxMeshSpawner::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
+	VfxMeshSpawner::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime(YoRigine::TimeChannel::Vfx));
 	YoRigine::LightManager::GetInstance()->UpdateShadowMatrix(sceneCamera_.get());
 	YoRigine::GpuEmitManager::GetInstance()->Update();
 
 #ifdef USE_IMGUI
 
-	YoRigine::VfxMeshEditor::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
+	YoRigine::VfxMeshEditor::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime(YoRigine::TimeChannel::Vfx));
 #endif
 }
 

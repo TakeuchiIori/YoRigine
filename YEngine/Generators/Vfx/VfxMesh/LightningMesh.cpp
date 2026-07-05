@@ -41,7 +41,7 @@ void LightningMesh::Update(float deltaTime)
     bool reshaped = false;
     while (flickerTimer_ >= interval) {
         flickerTimer_ -= interval;
-        seed_ += 9173u;
+        flickerSeed_ += 9173u;   // 形が変わるのはフリッカーの瞬間だけ
         reshaped = true;
     }
 
@@ -124,6 +124,10 @@ void LightningMesh::RebuildVertices()
 {
     vertices_.clear();
     if (!camera_) return;
+
+    // 形は flickerSeed_ から毎フレーム決定的に再生成する。カメラ向きリボンのため毎フレーム
+    // 再構築するが、作業シードを基準へ戻すので flicker が起きるまで形は不変＝時間を止めれば静止する。
+    seed_ = flickerSeed_;
 
     int levels = 1;
     while ((1 << levels) < param_.segments && levels < 7) ++levels;

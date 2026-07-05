@@ -294,9 +294,9 @@ void GameScene::Update() {
 
 	YoRigine::ModelManipulator::GetInstance()->Update();
 	YoRigine::CollisionManager::GetInstance()->Update();
-	YParticleManager::GetInstance().Update(YoRigine::GameTime::GetDeltaTime());
+	YParticleManager::GetInstance().Update(YoRigine::GameTime::GetDeltaTime(YoRigine::TimeChannel::Vfx));
 	VfxMeshSpawner::GetInstance()->SetCamera(sceneCamera_.get());
-	VfxMeshSpawner::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
+	VfxMeshSpawner::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime(YoRigine::TimeChannel::Vfx));
 	YoRigine::LightManager::GetInstance()->UpdateShadowMatrix(sceneCamera_.get());
 	YoRigine::GpuEmitManager::GetInstance()->Update();
 
