@@ -259,6 +259,7 @@ void GPUParticle::CreatePerViewResource()
 
 	perViewData_->viewProjection = MakeIdentity4x4();
 	perViewData_->billboardMatrix = MakeIdentity4x4();
+	perViewData_->isBillboard = billboard_ ? 1u : 0u;
 }
 
 /// <summary>
@@ -509,4 +510,7 @@ void GPUParticle::UpdatePerView()
 
 	Matrix4x4 billboardBase = Inverse(billboard);
 	perViewData_->billboardMatrix = billboardBase;
+
+	// エミッタ単位のビルボード ON/OFF を毎フレーム反映（切替が既存粒子含め即反映される）
+	perViewData_->isBillboard = billboard_ ? 1u : 0u;
 }

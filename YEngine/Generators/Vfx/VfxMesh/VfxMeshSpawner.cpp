@@ -65,6 +65,16 @@ void VfxMeshSpawner::ScanDirectory(const std::string& dir)
     }
 }
 
+std::vector<std::string> VfxMeshSpawner::GetAssetNames() const
+{
+    std::vector<std::string> names;
+    names.reserve(assetMap_.size());
+    for (const auto& [name, asset] : assetMap_) {
+        names.push_back(name);
+    }
+    return names;
+}
+
 // ============================================================
 // 生成
 // ============================================================

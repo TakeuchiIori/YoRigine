@@ -29,6 +29,34 @@ enum class MeshEmitMode : uint32_t
 	Edge = 2       // メッシュのエッジ
 };
 
+// 1粒子として描画するメッシュ形状（板ポリ以外も選べる）
+enum class ParticleMeshShape : uint32_t
+{
+	Plane = 0,     // 板ポリ（既定・ビルボード向き）
+	Box = 1,       // 立方体
+	Ring = 2,      // リング
+	Cylinder = 3,  // 円柱
+	Sphere = 4,    // 球
+	Cone = 5,      // 円錐
+	Fan = 6,       // 扇形
+};
+static const uint32_t kParticleMeshShapeCount = 7;
+
+// 粒子メッシュ形状ごとの生成パラメータ（使うフィールドは形状で異なる）。
+// 実サイズは粒子ごとの scale で拡縮されるため、ここは「基準の形状」を決める。
+struct ParticleMeshParams
+{
+	float    width = 1.0f;         // Plane/Box: 幅
+	float    height = 1.0f;        // Plane/Box: 高さ, Cylinder/Cone: 高さ
+	float    depth = 1.0f;         // Box: 奥行き
+	float    outerRadius = 0.5f;   // Ring/Cylinder: 外周半径
+	float    innerRadius = 0.25f;  // Ring/Cylinder: 内周半径
+	float    radius = 0.5f;        // Sphere/Cone/Fan: 半径
+	float    angleDegree = 90.0f;  // Fan: 扇の角度
+	uint32_t divide = 16;          // Ring/Cylinder/Cone/Fan: 分割数
+	uint32_t subdivisions = 2;     // Sphere: 細分化レベル
+};
+
 
 struct TrailParams;
 /// <summary>
@@ -234,10 +262,22 @@ public:
 	// パーティクルパラメータ設定
 	void SetParticleParameters(const ParticleParams& params);
 
+	// 1粒子として描画するメッシュ形状を差し替える（形状＋生成パラメータ）
+	void SetParticleMesh(ParticleMeshShape shape, const ParticleMeshParams& params);
+	ParticleMeshShape GetParticleMeshShape() const { return particleMeshShape_; }
+
 	///************************* 外部から呼ぶ *************************///
 
 	// 指定位置にパーティクルを放出
 	void EmitAtPosition(const Vector3& position, float count);
+
+	// 現在の形状の放出位置(translate)だけをワールド座標へ上書きする（継続発生の追従用）
+	void SetEmitWorldPosition(const Vector3& worldPos);
+
+	// 継続発生（interval駆動）の ON/OFF。OFFでも Update() による粒子シミュレーションは継続する
+	void SetContinuousEmit(bool enable) { continuousEmit_ = enable; }
+	// 次フレームに1回だけ発生させる（ワンショット。continuousEmit_ と独立）
+	void RequestBurst() { ++burstRequest_; }
 
 private:
 	///************************* 内部処理 *************************///
@@ -270,6 +310,11 @@ private:
 
 	EmitterShape currentShape_ = EmitterShape::Sphere;
 	MeshEmitMode currentMeshMode_ = MeshEmitMode::Surface;
+	ParticleMeshShape particleMeshShape_ = ParticleMeshShape::Plane;  // 1粒子の描画メッシュ形状
+
+	// 発生制御（emission と simulation の分離）
+	bool continuousEmit_ = false;   // interval駆動の継続発生（マネージャが isPlaying に応じて毎フレーム設定）
+	int  burstRequest_ = 0;         // 未処理のワンショット発生要求数
 
 	// 各エミッター用のリソース
 	Microsoft::WRL::ComPtr<ID3D12Resource> emitterCommonResource_;

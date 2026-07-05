@@ -16,6 +16,13 @@
 #include "Drawer/LineManager/Line.h"
 #endif
 #include <Editor/Editor.h>
+#include <Drawer/InstancedObject3d.h>
+#include "Object3D/BaseObjectManager.h"
+
+namespace {
+	// BaseObjectManager 登録名の一意連番（プロセス内で単調増加）
+	uint32_t g_fieldEnemyRegSeq = 0;
+}
 
 FieldEnemyManager::FieldEnemyManager() = default;
 
@@ -289,6 +296,11 @@ void FieldEnemyManager::SpawnFieldEnemy(const FieldEnemySpawnData& spawnData) {
 	//-----------------------------------------
 	spawnDataMap_[spawnData.id] = spawnData;
 	fieldEnemies_.push_back(std::move(newEnemy));
+
+	// BaseObjectManager へ一意名で登録（解除は FieldEnemy デストラクタが担当）
+	BaseObjectManager::GetInstance()->Register(
+		fieldEnemies_.back().get(),
+		"FieldEnemy_" + std::to_string(g_fieldEnemyRegSeq++));
 
 	totalEnemiesSpawned_++;
 
@@ -1018,11 +1030,16 @@ void FieldEnemyManager::Draw() {
 #ifdef USE_IMGUI
 	if (editorHideEnemies_) return;
 #endif
+	// 敵は静的メッシュ(.obj)なのでインスタンシングでまとめ描き。
+	// IsActive() が Despawn 状態を弾く（従来の Draw 内ガードと同じ）。
+	auto* inst = InstancedObject3d::GetInstance();
+	inst->Begin(camera_);
 	for (auto& enemy : fieldEnemies_) {
-		if (enemy && enemy->IsActive()) {
-			enemy->Draw();
+		if (enemy && enemy->IsActive() && enemy->GetObject3d()) {
+			inst->Submit(*enemy->GetObject3d(), enemy->GetWT());
 		}
 	}
+	inst->DrawAll(camera_);
 }
 
 void FieldEnemyManager::DrawShadow()
@@ -1030,11 +1047,14 @@ void FieldEnemyManager::DrawShadow()
 #ifdef USE_IMGUI
 	if (editorHideEnemies_) return;
 #endif
+	auto* inst = InstancedObject3d::GetInstance();
+	inst->Begin();
 	for (auto& enemy : fieldEnemies_) {
-		if (enemy && enemy->IsActive()) {
-			enemy->DrawShadow();
+		if (enemy && enemy->IsActive() && enemy->GetObject3d()) {
+			inst->Submit(*enemy->GetObject3d(), enemy->GetWT());
 		}
 	}
+	inst->DrawShadow();
 }
 
 /// <summary>

@@ -401,3 +401,262 @@ DrawEditPanel の Trail/LightVolume/Smoke/Lightning 縦積み(checkbox+TreeNode)
 - プレビュー: 再生は previewPos_ で出るが、カメラがそこを向いていないと依然見えない可能性。必要なら「カメラ前で再生」を追加。
 - 再ロード時クリア（ホットリロード安全化）。旧2フォルダ(YParticleSystems/YEmitterGroups)の最終廃止。
 
+---
+
+## 2026-07-03 — 設計: 複合エフェクト（Particle+VfxMesh+GPU）＋ サウンド付きハンドル（設計のみ・未実装）
+
+ユーザー要望: 「エフェクト合成」と「サウンド付きハンドル」をまとめて設計する。実装前の方針確認フェーズ。
+
+### 現状診断（3系統が名前空間ごと分断）
+
+| 系統 | 発生源JSON | ゲーム側ハンドル | 備考 |
+|---|---|---|---|
+| Particle | `YEffects/*.json`（systems+groups同梱） | `EffectHandle::Play/PlayOneShot(name)` | フェーズ1〜3で入口統一済み |
+| VfxMesh | `Resources/Json/VfxMesh/*.json`（Trail/Volume/Smoke/Lightning/Shockwave） | `VfxMeshHandle::Play/PlayOneShot/PlayBolt(assetName)` | 既に EffectHandle と同型の facade が実装済み（未使用に近い） |
+| GPU Particle | `GpuEmitters/*.json`（Emitter/Group） | ハンドルなし。`GpuEmitManager::EmitGroups/PlayEmitterGroup` 生API直叩き | facade 不在 |
+| Sound | なし | `Audio::GetInstance()->Play/PlayOneShot(filepath,...)` | エフェクトと無関係に独立して呼ぶしかない |
+
+→ 「爆発 = 火花(Particle) + 衝撃波(VfxMesh) + 破片(GPU) + 爆発音(Audio)」を1つとして扱う手段が無く、**ゲームコード側で4系統を手動で同期して呼ぶ**ことになっている（呼び忘れ・位置ズレのリスクは EnemyHit3 ロード漏れ問題と同種）。
+
+### 決定事項（案）
+
+**新しい合成レイヤーを1枚追加する。既存3系統のJSON/ハンドルは変更しない**（Trail断面形状やParticleモジュールのような内部フォーマットに手を入れると波及リスクが大きいため、疎結合な「名前を束ねるだけ」の薄いレイヤーにする）。
+
+- **`Resources/Json/YComposites/<名前>.json`** を新設。中身は既存アセット名の参照リストのみ:
+  ```json
+  {
+    "name": "Explosion",
+    "particleEffect": "ExplosionSparks",
+    "vfxMeshAssets": [
+      { "asset": "ExplosionShockwave", "offset": [0,0,0], "scale": 1.5 },
+      { "asset": "ExplosionSmoke",     "offset": [0,0,0], "scale": 2.0 }
+    ],
+    "gpuEmitterGroup": "ExplosionDebris",
+    "sounds": [
+      { "path": "Resources/Audio/SE/explosion.wav", "volume": 1.0, "category": "SE" }
+    ]
+  }
+  ```
+  各フィールドは省略可（例: 音だけ足したい場合は `sounds` のみでも成立）。
+- **ランタイム**: `EffectHandle` の名前解決チェーンの**先頭**に Composite 解決を追加（Composite→Group→System の順）。`EffectHandle::PlayOneShot("Explosion", pos)` 1行のままで4系統すべてが連動する。
+  - Composite 内部では既存API をそのまま呼ぶだけ（新規の描画/更新コードは書かない）:
+    - `particleEffect` → 既存 `EffectHandle` 経路
+    - `vfxMeshAssets` 各要素 → 既存 `VfxMeshHandle::Play/PlayOneShot`
+    - `gpuEmitterGroup` → 既存 `GpuEmitManager::EmitGroups`（PlayOneShot相当）/ `PlayEmitterGroup`・`StopEmitterGroup`（loop相当）
+    - `sounds` 各要素 → 既存 `Audio::PlayOneShot`（非loop）/ `Audio::Play`（loop、返り値の `SoundHandle` を保持）
+- **サウンド付きハンドル**: `EffectHandle` に `SoundHandle soundHandle_`（moveのみ、Audio.h の型そのまま）を追加。
+  - `PlayOneShot` 経由の音は fire-and-forget（`Audio::PlayOneShot`、ハンドル保持不要）。
+  - `Play(loop=true)` 経由の音は `Audio::Play(...,loop=true)` の戻り値を `soundHandle_` に保持し、`EffectHandle::Stop()` で `soundHandle_.Stop()` も呼ぶ（例: 剣の唸り音つきスラッシュトレイルが `Stop()` で音ごと止まる）。
+  - 位置追従は `SetPosition()` では音量/ピッチは変えない（Audio.h に3D減衰パラメータが無いため）。3D位置オーディオが要るなら Audio 側の拡張が別途必要＝**今回のスコープ外**として明記。
+
+### 実装ステップ案（低リスク・自己完結 — コア描画/オーディオパイプライン変更なし）
+
+1. `CompositeEffectAsset`（name+4フィールド）+ JSON Save/Load。`YComposites/` を `ScanDirectory` 対応（既存 `VfxMeshSpawner::ScanDirectory` 等と同パターン）。
+2. `CompositeEffectManager`(singleton) 新設。名前→アセットのマップのみ保持（描画は一切しない。既存 Handle を呼ぶだけの薄い層）。
+3. `EffectHandle::Play/PlayOneShot` の解決順に Composite を追加。内部で `VfxMeshHandle`/`GpuEmitManager`/`Audio` の子ハンドルを `EffectHandle` にぶら下げて `Stop()` で連鎖停止できるようにする（`std::vector<VfxMeshHandle>` 等を追加）。
+4. `EffectHandle` に `SoundHandle` 追加。Stop連鎖を実装。
+5. VfxMeshEditor / GpuEmitManager エディタ側は変更不要（Composite は既存アセット名を選ぶだけの薄いエディタを別途作るか、当面は手書きJSONで運用）。
+
+### リスク / 保留事項
+- GPU Emitter の「ループ→Stop」semantics は `PlayEmitterGroup`/`StopEmitterGroup` が groupName ベースの状態管理（同名グループの多重再生を想定していない）。Composite からの多重発生（同時に2つ爆発）で同名GPUグループを取り合う可能性 → 要検証、必要なら GPU側もインスタンスID方式に寄せる（EffectHandle 側で以前対応した `parentMatrix` 取り合い問題と同種）。
+- Composite 専用の編集UIは今回のステップ案に含めていない（手書きJSON運用でスタートし、需要が出たらフェーズ2でエディタ化）。
+- 3D位置オーディオ（距離減衰/パン）は Audio.h に無いため対象外。欲しくなったら Audio 側の別案件。
+
+### 状態
+設計のみ・未実装。実装着手はユーザー承認待ち。
+
+---
+
+## 2026-07-03 — GPUパーティクルを「ゲームで使える」状態にする（Phase1+2 実装・Debugビルド成功）
+
+ユーザー要望: 「GPUパーティクルが扱い悪すぎてゲームで使える状態でない。使える程度にしたい」。スコープは**大**（最小＋per-emitterオフセット＆複数同時再生＋エディタ刷新＆Composite連携）で合意。まず土台のPhase1・2を実装。
+
+### 現状診断（コードから特定した「使えない」理由）
+1. **🔴 起動時にグループが一切ロードされない（致命）**: `CreateEmitterGroup` 先頭が `selectedJsonFilePath_`（ImGuiで手選択したときだけ入るエディタ専用フィールド）必須で、空だと `ThrowError`。起動時は空→`LoadFromFile` の catch が例外を握りつぶし、**groups_ が空のまま**。ゲームが `EmitGroups` を呼んでも「見つかりません」で無言no-op。エディタ操作前提の状態がコアのデータモデルに漏れていた。
+2. **🔴 ゲーム向けハンドルが無い**: `EffectHandle`/`VfxMeshHandle` 相当が無く生API直叩きのみ。YGame側の再生呼び出しは実際ゼロ。
+3. **🟠 EmitGroups が全エミッタを同座標・同数で上書き**（グループ内の相対配置が1点に潰れる）。
+4. **🟠 emission と simulation が未分離**: 発生が interval 駆動で `isPlaying` と無関係、停止時は `Reset()` で粒子が即消滅。→ ワンショットも「停止後フェード」も表現不能。
+5. `Initialize()` が `LoadAllEmitters`/`LoadModel` を2回重複。
+
+### Phase1: 致命バグ修正（`GpuEmitManager`）
+- `CreateEmitterGroup(groupName, sourceFilePath="")` にシグネチャ変更。`selectedJsonFilePath_` 必須の `ThrowError` を撤去し、由来パスは引数優先→無ければ選択中にフォールバック。`LoadFromFile→FromJson(json, filepath)→CreateEmitterGroup(name, filepath)` と由来パスを引き回し、**起動時ロードでも確実にグループ生成**。
+- `DeleteEmitterGroup` の `ThrowError` 2箇所を非致命 `Logger` 化。ファイル一致ガードは `selectedJsonFilePath_` 非空時（エディタ文脈）のみ。
+- `Initialize()` の重複ロード/LoadModel を1回に。
+
+### Phase2: ゲーム向けハンドル ＋ emission/simulation 分離 ＋ per-emitterオフセット
+- **`GPUEmitter`**: 発生制御を追加。`continuousEmit_`（interval継続発生ON/OFF）と `burstRequest_`（ワンショット1回）を分離。`UpdateEmitters()` を `isEmit = burst || (continuousEmit_ && intervalHit)` に再構成。`SetContinuousEmit`/`RequestBurst`/`SetEmitWorldPosition`(translateのみ追従上書き) 追加。`EmitAtPosition` は translate/count設定＋`RequestBurst()`（従来の isEmit=1 直書きは UpdateEmitters に上書きされ無意味だった）。`Reset()` でフラグ클リア。
+- **`GpuEmitManager`**: 
+  - `Update()` を**再生中(isPlaying)＋停止後余韻(lingerTimer>0)の間シミュレーション継続**する形に。emission は `SetContinuousEmit(isPlaying)`。→ 停止後も既存粒子が寿命で自然消滅（剣トレイル等がプツッと消えない）。
+  - `EmitGroups`: 各エミッタを `position + ローカルオフセット` で発生（相対配置維持）、`count<0` で各エミッタ設定値を使用、`lingerTimer = max(既存, グループ最大寿命)` を立ててワンショットが寿命を全うするまで回す。
+  - `StopEmitterGroup`: `Reset()` 廃止し `lingerTimer` セットで自然消滅待ちに。
+  - 追加: `SetGroupPosition`/`HasGroup`/`IsGroupPlaying`/`GetEmitterLocalOffset`/`GetGroupMaxLifetime`。
+- **新規 `GpuParticleHandle.{h,cpp}`**（`EffectHandle`/`VfxMeshHandle` と同型・global名前空間）: `Play(group,pos)`（ループ）/`PlayOneShot(group,pos,count=-1)`/`SetPosition`/`Stop`/`IsActive`。ゲームから `GpuParticleHandle::PlayOneShot("ExplosionDebris", pos);` の1行で撃てる。
+
+### 検証
+- premake再生成＋**MSBuild Debug x64 ビルド成功（0 error / 0 warning）**。新規 `GpuParticleHandle.obj` コンパイル、`YEngine.lib`＋`YGame.dll` 再リンク確認。
+- ⏳ **実機未確認**。確認手順: 起動して既存グループ（`GpuEmitters/emrs.json` の "ss" 等）が**ロードされ表示されるか**（Phase1の証明）／テストで `GpuParticleHandle::PlayOneShot("ss", pos)` が1発出て消えるか／`Play`→`SetPosition`追従→`Stop`後に自然消滅するか。
+
+### 残（大スコープの続き）
+- **Phase3**: グループが名前ベース単一状態＝**同じエフェクトを2箇所同時再生できない**。インスタンス方式（VfxMeshHandle の id レジストリ相当）へ寄せる。
+- **Phase4**: エディタのファイル手選択ワークフロー撤廃・自動スキャン化・保存導線整理。
+- **Phase5**: 07-03設計の Composite レイヤーへ GPU を統合（`EffectHandle` 解決チェーンから連動）。
+
+### Phase3 方針転換（重要な発見）: 1エミッタ=88MB・毎フレーム50万インスタンス描画
+Phase3 当初案（VfxMeshHandle式にPlay毎インスタンスをクローン）を実装しようと `GPUParticle` を精読したら、**`kMaxParticles = 500000` 固定**が判明:
+- 粒子バッファ = `sizeof(ParticleCSForGPU)(≈176B) × 500000 ≈ 88MB`／エミッタ（`GPUParticle.cpp:174`）＋ freeList 2MB。
+- **`DrawIndexedInstanced(indexCount, 500000, …)`** — 生存粒子が10個でも毎フレーム50万インスタンス描画（`GPUParticle.cpp:148`）。更新/初期化ディスパッチも50万規模。
+- → いま読まれている "ss" グループ1つで 88MB＋50万描画/frame。**エミッタを足すだけで重い**＝「ゲームで使えない」最大要因。3060基準で致命。
+- 当初のクローン方式は1インスタンス88MBで**数個でVRAM枯渇＆SRVヒープ枯渇**＝設計不成立。当初プランを撤回。
+
+ユーザー選択: **方針A「バッファ&描画コストを実用化」**。
+
+### Phase3-A 実施: グローバルキャップ 500000 → 16384（Debugビルド成功）
+- `kMaxParticles` は hlsli(`GPUParticle.hlsli`)とC++(`GPUParticle.h`)の**両方でコンパイル時定数**として一致必須（バッファ長＝shaderの安全境界＝描画インスタンス数）。Init/Emit/Update の3CSが境界として参照。
+- 両方を **16384** に変更（配線ゼロ・整合維持）。効果: 1エミッタ **88MB→約2.9MB**（≈30分の1）、**毎フレーム描画 50万→1.6万インスタンス**、ディスパッチも同縮小。行動ゲームなら1エミッタ16384生存で十分な余裕。
+- **MSBuild Debug x64 成功**、YGame.dll 再リンク確認。hlsli はランタイム/再起動で反映。
+- ⏳ 実機未確認（既存グループが従来通り出るか、描画コストが下がるか）。
+
+### Phase3 の残（per-emitter 微調整）
+- 現状は**全エミッタ共通の上限16384**。エミッタ個別に「火花=512／大爆発=16384」等に最適化するには、各CSへ per-emitter の粒子数を CB 経由で渡し、`kMaxParticles` 参照を CB 値に置換する配線が必要（Emit b6/Update b0 の PerFrame CB 拡張＋Init CS へCB追加＝ルートシグネチャ変更、中リスク）。上限16384で当面実用可能なため段階分離。ユーザー判断待ち。
+
+---
+
+## 2026-07-03 — Phase4: GPUエディタの使いにくさ解消（作成・保存導線／Debugビルド成功）
+
+ユーザーが挙げた「扱い悪すぎ」のうち**オーサリング側**を潰す。核心の2点＝「グループ作成にJSON手選択が必須」「保存で複数グループが1ファイルに混ざる（`ToJson` が全グループを1ファイルにdump）」。
+
+### 変更（`GpuEmitManager`、いずれも `#ifdef USE_IMGUI` 内 or データモデル）
+- **グループ単位保存を新設**: `ToJson()` の per-group 本体を `ToJsonGroup(group)` に切り出し。`SaveGroupToFile(groupName)` を追加＝そのグループを**自身の `sourceFilePath`（1ファイル1グループ）**に `{version, groups:[...]}` で書き出す。混線が原理的に消える。
+- **JSON手選択を不要化**: `CreateEmitterGroup` の由来パス決定を「引数→選択中→**グループ名から自動（`Resources/Json/GpuEmitters/<名前>.json`）**」に。エディタで JSON を先に選ばなくても作成・保存が完結。
+- **エディタUI**:
+  - グループ詳細に緑「■ このグループを保存」ボタン（`SaveGroupToFile`）＋保存先パス表示を追加＝**主導線**。
+  - 新規作成セクションに「名前を入れて＋作成だけ。保存先は自動。JSON事前選択不要」のヒスト＋作成ボタンを緑＆`ICON_FA_PLUS`化。作成失敗時は選択を変えない。
+  - 上部の全体保存を折りたたみ＋ラベル「ファイル操作（上級者向け・全グループ一括）」に格下げし、通常はグループ管理タブを使うよう明記。
+- **`DeleteEmitterGroup`**: グループ単位ファイル化で無意味になった `selectedJsonFilePath_` 一致ガードを撤去（削除ログは各グループ自身の `sourceFilePath` を出力）。
+
+### 検証
+- **MSBuild Debug x64 成功**（0 error/warning）、YGame.dll 再リンク確認。`ICON_FA_PLUS` 定義確認。
+- ⏳ 実機未確認。確認手順: エディタ→グループ管理→名前入力→＋作成（JSON未選択でOK）→エミッタ追加→「このグループを保存」で `GpuEmitters/<名前>.json` が生成されるか／再起動で復活するか。
+
+### 残（エディタのさらなる磨き・任意）
+- グループ管理/エミッター管理/エディターの**3タブ往復**は未統合（YParticleのEffect Editor 1画面化と同様に将来まとめられる。ImGui大改修のため今回は据え置き）。
+- 空テクスチャでのエミッタ作成の扱い（別件）。
+
+---
+
+## 2026-07-03 — GPU: ①エミッタ形状のライン可視化 ②粒子ごとの描画メッシュ形状（Debug/Releaseビルド成功）
+
+ユーザー要望2件。既存の `Line`（`YEngine/Graphics/Drawer/LineManager`）と `MeshPrimitive` を土台に実装。
+
+### ① エミッタ形状をライン描画で可視化（Debugのみ）
+- `Line` は各所有者が `make_unique`→`Initialize`→`SetCamera` で持ち、`RegisterLine(start,end)`＋形状ヘルパ（`DrawSphere`/`DrawAABB`）＋`SetColor`＋`Reset`＋`DrawLine`(flush) を提供。コライダーのワイヤー描画と同じ仕組みを流用。
+- `GpuEmitManager` に `gizmoLine_`(unique_ptr<Line>)＋`showEmitterGizmos_` を追加（すべて `#ifdef USE_IMGUI`）。`Initialize` で生成、`SetCamera` で追随、`Draw()` 末尾で `DrawEmitterGizmos()`。
+- **選択中グループのエミッタ形状**を描画: 選択エミッタ=黄、同グループの他=水色（2バッチで色分け＝register→SetColor→DrawLine を2回）。毎フレーム `Reset()`。
+- 形状マッピング: Sphere=`DrawSphere(半径)` / Box=`DrawAABB(±size*0.5)`（shaderのBox分布が±size*0.5なのに一致）/ Cone=方向ベクトルから垂直基底を作って底円＋側面ガイド線を手組み / Triangle=v1/v2/v3を線分（shaderがtranslateを無視しv1/v2/v3直参照なのに合わせグループ原点基準）/ Mesh=発生位置に小マーカー球。
+- 位置は他形状と同じく `group.translate + ローカルオフセット`。エディタに「エミッタ形状をライン表示（選択グループ）」チェック追加。
+
+### ② 粒子ごとの描画メッシュ形状（板ポリ以外を選べる）
+- VS(`GPUParticle.VS.hlsl`)は汎用頂点(position/texcoord/normal)を scale/回転/ビルボード/translate で変換するだけ＝メッシュ差し替えは既存 `GPUParticle::SetMesh` で成立。
+- `ParticleMeshShape` enum 新設（Plane/Box/Ring/Cylinder/Sphere/Cone/Fan）。`GPUEmitter::SetParticleMesh(shape)` で `MeshPrimitive::Create*`（ユニットサイズ、粒子scaleで拡縮）→`gpuParticle_->SetMesh`。
+- `EmitterData.particleMeshShape` 追加＋`ToJsonGroup`/`LoadEmitterFromJson`（旧データは既定Plane）でシリアライズ。ロード時に `SetParticleMesh` 適用。
+- エディタ: パーティクルパラメータ先頭に「粒子メッシュ形状」コンボ。変更で即 `SetParticleMesh`。立体は「ビルボードOFF推奨」ヒント表示。
+- 注意: 立体メッシュ＋ビルボードONは板ポリ同様カメラ向きに潰れる。3D形状は per-particle `isBillboard` をOFFにして使う。
+
+### 検証
+- **MSBuild Debug x64＋Release x64 いずれも成功（0 error/warning）**。Debug=YGame.dll / Release=YMain.exe 再リンク確認。ギズモは USE_IMGUI ガードでReleaseに無影響。
+- ⏳ 実機未確認。確認: エディタでグループ選択→エミッタ形状のワイヤーが出るか（半径/サイズ変更に追随）／粒子メッシュ形状を変えて見た目が板ポリ以外になるか（立体はビルボードOFF）。
+
+---
+
+## 2026-07-03 — GPU: 粒子メッシュ形状の「生成パラメータ調整」対応（Debug/Releaseビルド成功）
+
+前段②は形状を選べるが各形状のサイズがハードコードで調整不可だったのを、**per-emitterの生成パラメータ**で調整できるようにした。
+
+### 変更
+- **`ParticleMeshParams` 構造体**新設（`GPUEmitter.h`）: width/height/depth/outerRadius/innerRadius/radius/angleDegree/divide/subdivisions。形状ごとに使うフィールドが異なる superset。
+- **`GPUEmitter::SetParticleMesh(shape, params)`** にシグネチャ変更。`MeshPrimitive::Create*` へ各パラメータを渡す。`divide` は退化回避で下限3にクランプ。
+- **`EmitterData.particleMeshParams`** 追加。`ToJsonGroup`/`LoadEmitterFromJson` にシリアライズ（旧データは既定値、キー無しは各フィールド既定でフォールバック）。ロード時に `SetParticleMesh(shape, params)` 適用。
+- **エディタ**: 「粒子メッシュ形状」コンボの直下に、選択中形状に応じた調整UI（Plane=幅/高さ, Box=幅/高さ/奥行き, Ring=外周/内周/分割, Cylinder=外周/内周/高さ/分割, Sphere=半径/細分化, Cone=半径/高さ/分割, Fan=半径/角度/分割）。形状変更 or いずれかのパラメータ変更で即メッシュ再生成（live rebuild）。
+
+### 注意 / 既知
+- ドラッグ中は毎フレーム `MeshPrimitive::Create*`（頂点/インデックスバッファ再確保）＝小メッシュなのでエディタ用途では許容。気になれば「編集確定時のみ再生成」に変更可。
+- **MSBuild Debug＋Release 成功（0/0）**。⏳実機未確認（各形状のパラメータを動かして見た目が変わるか・保存/再起動で復活するか）。
+
+---
+
+## 2026-07-03 — GPU: ビルボードが「切り替えても効かない」問題を修正（発生時焼き込み→エミッタ単位uniform）
+
+ユーザー: 「ビルボードが有効にしっかりなっていない気がする」。
+
+### 原因（特定）
+- ビルボードは **Emit CS で粒子ごとに発生時へ焼き込み**（`g_Particles[i].isBillboard = g_ParticleParams.isBillboard;`）、VS(`GPUParticle.VS.hlsl`)は **`particle.isBillboard`（粒子固有値）** を参照していた。
+- → エディタでチェックを切り替えても**既存の生存粒子は古い値のまま**。ループ発生でも寿命ぶん混在し、ワンショット/停止中は永久に変わらない＝「効いていない」体感。ビルボードは本来エミッタ単位の設定なのに per-particle 状態になっていた。
+
+### 修正（エミッタ単位の live uniform 化）
+- `PerViewForGPU`(C++) / `PerView`(hlsli) に `uint isBillboard` 追加（行列2つの後ろ、offset128で一致）。
+- `GPUParticle` に `billboard_`＋`SetBillboard()`。`UpdatePerView`/`CreatePerViewResource` で毎フレーム `perViewData_->isBillboard` に反映。
+- `GPUParticle.VS.hlsl`: 判定を `particle.isBillboard` → **`g_PerView.isBillboard`** に変更。
+- `GPUEmitter::SetParticleParameters`: `gpuParticle_->SetBillboard(params.isBillboard)` を追加＝エディタでチェック変更→`UpdateParticleParams`→即 uniform 反映。
+- 効果: **チェック切替が既存粒子含め次フレームで全反映**。per-particle焼き込み(Emit CS)は残置（VS未参照・無害）。
+
+### 検証
+- **MSBuild Debug＋Release 成功（0/0）**。シェーダ(VS/hlsli)は実行時コンパイル＝再起動で反映、C++はリビルド済み。
+- ⏳ 実機未確認: チェックON/OFFで板ポリが即カメラ向き↔固定に切り替わるか。もし「ONでもカメラを向かない」なら別要因（ビルボード行列の向き/カメラ規約）なので追加調査。
+
+---
+
+## 2026-07-03 — Phase5: 複合エフェクト（Particle+VfxMesh+GPU+Sound）実装（Debug/Releaseビルド成功）
+
+07-03設計の Composite レイヤーを実装。既存3系統(Particle/VfxMesh/GPU)のJSON・ハンドルには一切触れず、Phase2で作った `GpuParticleHandle` も活用して名前1発で連動させる薄い層を追加。
+
+### 追加物（`YEngine/Generators/Composite/`）
+- **`CompositeEffectAsset`**（参照リストのみ）: `particleEffect`(名) / `vfxMeshAssets`[{asset,offset,scale}] / `gpuEmitterGroup`(名) / `sounds`[{path,volume,category}]。各フィールド省略可。
+- **`CompositeInstance`**: ループ実行時の子ハンドル保持（`EffectHandle particle` / `vector<VfxMeshHandle>`＋offset / `GpuParticleHandle gpu` / `vector<SoundHandle>`）。`SetPosition`(音以外追従)/`Stop`(連鎖停止)/`IsActive`。
+- **`CompositeEffectManager`**(singleton): `ScanDirectory("Resources/Json/YComposites/")`＋`LoadAsset`（JSON→アセット。categoryは"BGM/SE/VOICE/AMBIENT"文字列→enum）、`Has`、`PlayOneShot`（各系統を撃ちっぱなし発火）、`Play`（ループ＝子ハンドル保持した `EffectHandle` を返す）。描画/更新コードは一切書かず既存API(`EffectHandle`/`VfxMeshHandle`/`GpuParticleHandle`/`Audio`)を呼ぶだけ。
+
+### 入口統一（EffectHandle 拡張）
+- `EffectHandle` に `std::shared_ptr<CompositeInstance> composite_`＋`friend CompositeEffectManager`（ヘッダは前方宣言のみで疎結合）。
+- `EffectHandle::Play/PlayOneShot` の名前解決**先頭**に Composite を追加（Composite→Group→System）。`SetPosition/Stop/IsActive/IsValid` を composite_ 経路に分岐。
+- → ゲーム側は `EffectHandle::PlayOneShot("Explosion", pos)` / `Play("Aura", pos, true)` の1行で、中身がComposite/Group/単発Systemかを意識せず4系統連動。
+
+### 配線・アセット
+- `MyGame::Initialize`: Particle/GPU の Scan 後に `CompositeEffectManager::ScanDirectory("Resources/Json/YComposites/")` を追加（子アセットが先に存在する順）。
+- サンプル `Resources/Json/YComposites/SampleComposite.json`（GPUグループ "ss" 参照）＝ `EffectHandle::PlayOneShot("SampleComposite", pos)` で即テスト可能。premake再生成。
+
+### 制約 / 既知（設計通り）
+- 3D位置オーディオ（距離減衰/パン）は Audio.h に無いため音は位置追従しない＝スコープ外。
+- GPUの「ループ→Stop」はグループ名ベース状態管理のため、同名Composite多重ループは取り合う可能性（GPUは現状インスタンス非対応＝Phase3-Bの残課題と同種）。ワンショット多重は粒子バッファ共有で問題なし。
+- Composite専用エディタは無し（手書きJSON運用でスタート。需要が出たらエディタ化）。
+
+### 検証
+- premake再生成＋**MSBuild Debug＋Release 成功（0 error/warning）**。`CompositeEffectManager.obj` コンパイル、YGame.dll/YMain.exe 再リンク確認。
+- ⏳ 実機未確認: `EffectHandle::PlayOneShot("SampleComposite", pos)` でGPUグループ "ss" が出るか／複数系統を束ねたComposite JSONを書いて1行で全部出るか／`Play`ループ→`Stop`で子が連鎖停止するか。
+
+---
+
+## 2026-07-03 — Phase5.5: 複合エフェクト・エディタ（手打ちJSON撲滅／Debug/Releaseビルド成功）
+
+ユーザー指摘「一緒に出すエディタが無いとダメでは？」＝手書きJSONは4系統のアセット名を正確に知る必要があり、タイプミスで無言で出ない（EnemyHit3問題の再来）。→ **ドロップダウン選択のComposite編集UI**を追加。
+
+### 不足していた列挙APIを追加
+- `GpuEmitManager::GetGroupNames()`（グループ名一覧。既存 `GetEmitterNames` はエミッタ名で不適）。
+- `VfxMeshSpawner::GetAssetNames()`（`assetMap_` のキー一覧）。
+- Particle は既存 `YParticleManager::GetAllSystemNames()` / `YEmitterGroupManager::GetAllGroupNames()` を使用。
+
+### CompositeEffectManager にエディタ＋保存
+- `SaveAsset(name)`＝ `Resources/Json/YComposites/<名前>.json` へ1件保存（ToJson: name/particleEffect/gpuEmitterGroup/vfxMeshAssets[asset,offset,scale]/sounds[path,volume,category名]）。
+- `#ifdef USE_IMGUI DrawImGui()`＋状態（新規名/選択中/プレビュー位置/ループハンドル/音声スキャン）。UI:
+  - 新規作成（名前→＋作成）／編集対象コンボ。
+  - **Particle エフェクト**＝System名＋Group名の統合コンボ（(なし)可）。**GPU グループ**＝`GetGroupNames` コンボ。
+  - **VfxMesh（複数）**＝アセット名コンボ＋オフセット＋スケール、行追加/削除。
+  - **サウンド（複数）**＝`Resources/Audio` 再帰スキャンのファイルコンボ＋音量＋カテゴリ、行追加/削除/再スキャン。
+  - **プレビュー**＝再生位置＋[ワンショット再生]/[ループ再生]/[停止]。**保存**ボタン＋保存先/呼び出しコードのヒント表示。
+- `GameScene` の Editor に「複合エフェクト(Composite)」パネルを登録（GpuParticle の隣）。
+
+### 効果
+- 各系統の実在名をリストから選ぶだけ＝**タイプミス由来の「無言で出ない」を構造的に排除**。作った瞬間プレビューで確認→保存→ゲームは `EffectHandle::PlayOneShot("<名前>", pos)` 1行。
+
+### 検証
+- **MSBuild Debug＋Release 成功（0/0）**。エディタは USE_IMGUI ガードで Release 無影響。
+- ⏳ 実機未確認: パネルで新規作成→各系統選択→プレビュー再生→保存→YComposites にJSON生成／再起動で復活するか。
+

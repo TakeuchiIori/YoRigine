@@ -171,7 +171,7 @@ namespace YoRigine {
 
 		// インスタンシング: 非アニメオブジェクトをモデル単位でまとめて描画
 		auto* instRenderer = ::InstancedObject3d::GetInstance();
-		instRenderer->Begin();
+		instRenderer->Begin(camera_);
 		const Matrix4x4& vp = camera_->GetViewProjectionMatrix();
 
 		for (auto* obj : objectManager_->GetAllActiveObjects()) {
@@ -191,28 +191,13 @@ namespace YoRigine {
 			const bool canInstance = (model && !obj->isAnimation && !model->GetHasBones());
 
 			if (canInstance) {
-				// インスタンスバッファに積む
-				::InstancedObject3d::InstanceData inst{};
-				const Matrix4x4& world = obj->worldTransform->GetMatWorld();
-				inst.World = world;
-				inst.WVP = world * vp;
-				// WIT = Transpose(Inverse(World)) を手計算
-				{
-					Matrix4x4 inv = Inverse(world);
-					Matrix4x4& wit = inst.WorldInverseTranspose;
-					for (int r = 0; r < 4; ++r)
-						for (int c = 0; c < 4; ++c)
-							wit.m[r][c] = inv.m[c][r];
-				}
-				inst.color = obj->color;
-				inst.uvTransform = MakeScaleMatrix({ obj->uvScale.x, obj->uvScale.y, 1.0f });
-				inst.stochasticStrength = obj->uvStochastic;
-				inst.outlineMask = obj->outlineEnabled ? 1.0f : 0.0f;
-				instRenderer->AddInstance(model, inst);
+				// PlacedObject からまとめて積む (WVP / WIT は内部計算)
+				instRenderer->Submit(*obj);
 
 				// PickBuffer や他システムが worldTransform の CB を参照するため、
 				// Object3d::Draw を経由しなくても CB を最新行列で同期する
-				obj->worldTransform->SetMapWVP(inst.WVP);
+				const Matrix4x4& world = obj->worldTransform->GetMatWorld();
+				obj->worldTransform->SetMapWVP(world * vp);
 				obj->worldTransform->SetMapWorld(world);
 			} else {
 				// アニメ付き / 特殊エフェクト: 従来の個別 Draw 経路
@@ -222,7 +207,7 @@ namespace YoRigine {
 		}
 
 		// インスタンス分を1ドローコール/モデルでまとめて描画
-		instRenderer->Flush(camera_);
+		instRenderer->DrawAll(camera_);
 
 		motionEditor_.Draw();
 
@@ -357,9 +342,7 @@ namespace YoRigine {
 		if (!isInitialized_) return;
 
 		auto* instRenderer = ::InstancedObject3d::GetInstance();
-		instRenderer->Begin();
-		const bool hasCamera = (camera_ != nullptr);
-		const Matrix4x4 vp = hasCamera ? camera_->GetViewProjectionMatrix() : MakeIdentity4x4();
+		instRenderer->Begin(camera_);   // camera_ は null 可 (影パスは WVP 不使用)
 
 		for (auto* obj : objectManager_->GetAllActiveObjects()) {
 			if (!obj || !obj->object || !obj->worldTransform) continue;
@@ -368,29 +351,14 @@ namespace YoRigine {
 			const bool canInstance = (model && !obj->isAnimation && !model->GetHasBones());
 
 			if (canInstance) {
-				::InstancedObject3d::InstanceData inst{};
-				const Matrix4x4& world = obj->worldTransform->GetMatWorld();
-				inst.World = world;
-				inst.WVP = world * vp;
-				// WIT = Transpose(Inverse(World)) を手計算
-				{
-					Matrix4x4 inv = Inverse(world);
-					Matrix4x4& wit = inst.WorldInverseTranspose;
-					for (int r = 0; r < 4; ++r)
-						for (int c = 0; c < 4; ++c)
-							wit.m[r][c] = inv.m[c][r];
-				}
-				inst.color = obj->color;
-				inst.uvTransform = MakeScaleMatrix({ obj->uvScale.x, obj->uvScale.y, 1.0f });
-				inst.stochasticStrength = obj->uvStochastic;
-				inst.outlineMask = obj->outlineEnabled ? 1.0f : 0.0f;
-				instRenderer->AddInstance(model, inst);
+				// PlacedObject を渡すだけ (影パスは材質を無視)
+				instRenderer->Submit(*obj);
 			} else {
 				obj->object->DrawShadow(*obj->worldTransform);
 			}
 		}
 
-		instRenderer->FlushShadow();
+		instRenderer->DrawShadow();
 	}
 
 	// ============================================================

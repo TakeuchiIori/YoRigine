@@ -19,7 +19,10 @@
 #include "Particle/YParticleEditor.h"
 #include "Particle/YEmitterGroupEditor.h"
 #include "GPUParticle/GpuEmitManager.h"
+#include "Composite/CompositeEffectManager.h"
 #include <Vfx/VfxMesh/VfxMeshEditor.h>
+#include <Vfx/VfxMesh/VfxMeshSpawner.h>
+#include "Composite/CompositeEffectManager.h"
 
 // WebAPI
 #include <WebAPI/YWebApiManager.h>
@@ -105,8 +108,11 @@ void DevelopScene::Initialize() {
 	Editor::GetInstance()->RegisterGameUI("カメラエディター", [this]() {cameraEditor_->Update(); }, "Develop");
 	Editor::GetInstance()->RegisterGameUI("ライティング", [this]() { YoRigine::LightManager::GetInstance()->ShowLightingEditor(); }, "Develop");
 	Editor::GetInstance()->RegisterGameUI("GpuParticle", [this]() { YoRigine::GpuEmitManager::GetInstance()->DrawImGui(); }, "Develop");
+	Editor::GetInstance()->RegisterGameUI("複合エフェクト(Composite)", [this]() { CompositeEffectManager::GetInstance()->DrawImGui(); }, "Develop");
 	Editor::GetInstance()->RegisterGameUI("YoRigine:パーティクルエディター", [this]() {YParticleEditor::GetInstance().ShowEditorWindow(); }, "Develop");
 	//Editor::GetInstance()->RegisterGameUI("モーションエディタ", [this]() {motionEditor_->ShowEditor(); }, "Develop");
+
+	Editor::GetInstance()->RegisterGameUI("複合エフェクト(Composite)", [this]() { CompositeEffectManager::GetInstance()->DrawImGui(); }, "Develop");
 	Editor::GetInstance()->RegisterGameUI("VFX", [this]() { YoRigine::VfxMeshEditor::GetInstance()->DrawImGui(); }, "Develop");
 	Editor::GetInstance()->RegisterGameUI("YWebAPI", [this]() { YWebApiManager::GetInstance().DrawLogWindow(); }, "Develop");
 	Editor::GetInstance()->RegisterGameUI("AreaEditor", [this]() { AreaEditor::GetInstance()->Update();; }, "Develop");
@@ -126,11 +132,13 @@ void DevelopScene::Update() {
 	YoRigine::CollisionManager::GetInstance()->Update();
 	YoRigine::ModelManipulator::GetInstance()->Update();
 	YParticleManager::GetInstance().Update(YoRigine::GameTime::GetDeltaTime());
+	VfxMeshSpawner::GetInstance()->SetCamera(sceneCamera_.get());
+	VfxMeshSpawner::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
 	YoRigine::LightManager::GetInstance()->UpdateShadowMatrix(sceneCamera_.get());
 	YoRigine::GpuEmitManager::GetInstance()->Update();
 
 #ifdef USE_IMGUI
-	
+
 	YoRigine::VfxMeshEditor::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
 #endif
 }
@@ -151,6 +159,11 @@ void DevelopScene::Draw() {
 	YParticleManager::GetInstance().Draw();
 	DrawLine();
 	YoRigine::GpuEmitManager::GetInstance()->Draw();
+
+	//------------------------------------------------------------
+	// VFX描画（複合エフェクトの VfxMesh 用）
+	//------------------------------------------------------------
+	VfxMeshSpawner::GetInstance()->Draw();
 
 #ifdef USE_IMGUI
 	YoRigine::VfxMeshEditor::GetInstance()->DrawPreview();

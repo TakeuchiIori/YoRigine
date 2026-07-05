@@ -9,6 +9,7 @@
 #include "Debugger/Logger.h"
 #include <SceneSystems/SceneManager.h>
 #include <Debugger/ImGuiManager.h>
+#include <IconsFontAwesome5.h>
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  内部カラー定数 (ImGuiManager::GetAccentColor() と同値)
@@ -169,13 +170,13 @@ void Editor::DrawMenuBar()
 		// ---- エンジンロゴ的テキスト ----
 		ImGui::PushFont(ImGuiManager::GetInstance()->GetFontLarge());
 		ImGui::PushStyleColor(ImGuiCol_Text, ImGuiManager::GetAccentColor());
-		ImGui::Text("\uf6d1");   // Font Awesome: chess-king アイコン
+		ImGui::Text(ICON_FA_DICE_D6);   // Font Awesome: dice-d6 アイコン (元コメントは chess-king だったが実際のコードポイントは dice-d6)
 		ImGui::PopStyleColor();
 		ImGui::PopFont();
 		ImGui::SameLine(0, 6);
 
 		// ---- シーン切り替え ----
-		if (ImGui::BeginMenu("\uf0c9  シーン")) {
+		if (ImGui::BeginMenu(ICON_FA_BARS "  シーン")) {
 			ImGui::SeparatorText("シーン一覧");
 			for (const auto& sceneName : sceneNames_) {
 				bool selected = (currentScene_ == sceneName);
@@ -196,10 +197,10 @@ void Editor::DrawMenuBar()
 		}
 
 		// ---- UI 一覧 ----
-		if (ImGui::BeginMenu("\uf5fd  UI一覧")) {
+		if (ImGui::BeginMenu(ICON_FA_LAYER_GROUP "  UI一覧")) {
 			ImGui::SeparatorText("表示切替");
 
-			if (ImGui::MenuItem("\uf06e  全てのUIを表示", nullptr, &isAllDrawEditor_)) {
+			if (ImGui::MenuItem(ICON_FA_EYE "  全てのUIを表示", nullptr, &isAllDrawEditor_)) {
 				for (auto& [name, ui] : gameUIs_) {
 					ui.visible = isAllDrawEditor_;
 				}
@@ -213,14 +214,14 @@ void Editor::DrawMenuBar()
 		}
 
 		// ---- 表示 ----
-		if (ImGui::BeginMenu("\uf1fc  表示")) {
+		if (ImGui::BeginMenu(ICON_FA_PAINT_BRUSH "  表示")) {
 			ImGui::SeparatorText("ビュー");
-			if (ImGui::MenuItem("\uf070  エディターを非表示", "F1")) {
+			if (ImGui::MenuItem(ICON_FA_EYE_SLASH "  エディターを非表示", "F1")) {
 				showEditor_ = false;
 			}
 			ImGui::Separator();
 			ImGui::SeparatorText("設定");
-			if (ImGui::MenuItem("\uf0c7  設定をセーブ")) {
+			if (ImGui::MenuItem(ICON_FA_SAVE "  設定をセーブ")) {
 				SaveSettings();
 			}
 			ImGui::EndMenu();
@@ -235,7 +236,7 @@ void Editor::DrawMenuBar()
 		float rightOffset = ImGui::CalcTextSize(currentScene_.c_str()).x + 20.0f;
 		ImGui::SetCursorPosX(ImGui::GetContentRegionMax().x - rightOffset);
 		ImGui::PushStyleColor(ImGuiCol_Text, ImGuiManager::GetAccentColor());
-		ImGui::Text("\uf0ac  %s", currentScene_.c_str());
+		ImGui::Text(ICON_FA_GLOBE "  %s", currentScene_.c_str());
 		ImGui::PopStyleColor();
 
 		ImGui::EndMenuBar();
@@ -382,7 +383,7 @@ void Editor::DrawStatusBar()
 
 	// --- 左: シーン / エディタ状態 ---
 	ImGui::PushStyleColor(ImGuiCol_Text, ImGuiManager::GetAccentColor());
-	ImGui::Text("\uf0c9  %s", currentScene_.c_str());
+	ImGui::Text(ICON_FA_BARS "  %s", currentScene_.c_str());
 	ImGui::PopStyleColor();
 
 	ImGui::SameLine(0, 16);
@@ -394,7 +395,7 @@ void Editor::DrawStatusBar()
 	// --- 右: FPS ---
 	ImGuiIO& io = ImGui::GetIO();
 	char fpsBuf[32];
-	snprintf(fpsBuf, sizeof(fpsBuf), "\uf3fd  %.0f fps / %.2f ms",
+	snprintf(fpsBuf, sizeof(fpsBuf), ICON_FA_TACHOMETER_ALT "  %.0f fps / %.2f ms",
 		io.Framerate, 1000.0f / (io.Framerate + 0.0001f));
 
 	float fpsWidth = ImGui::CalcTextSize(fpsBuf).x + 10.0f;
@@ -523,15 +524,15 @@ void Editor::ApplySettings()
 void Editor::DrawLog()
 {
 	// --- ツールバー ---
-	SeparatorText("\uf086  ログ");
+	SeparatorText(ICON_FA_COMMENTS "  ログ");
 
 	// フィルタ (1.87+ InputTextWithHint)
 	static char filterBuf[128] = {};
 	ImGui::SetNextItemWidth(-1);
-	ImGui::InputTextWithHint("##logfilter", "\uf002  フィルタ...", filterBuf, sizeof(filterBuf));
+	ImGui::InputTextWithHint("##logfilter", ICON_FA_SEARCH "  フィルタ...", filterBuf, sizeof(filterBuf));
 
 	ImGui::SameLine();
-	if (ImGui::SmallButton("\uf12d  クリア")) {
+	if (ImGui::SmallButton(ICON_FA_ERASER "  クリア")) {
 		LogSystem::Get().Clear(); // ※ Clear() メソッドがある前提
 	}
 

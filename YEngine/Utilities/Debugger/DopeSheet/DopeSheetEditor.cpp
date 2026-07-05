@@ -7,8 +7,8 @@
 #include <imgui.h>
 #include <imgui_internal.h>
 #endif
-#include <Editor/Icon/EditorIcon.h>
 
+#include <IconsFontAwesome5.h>
 namespace DopeSheet
 {
 
@@ -117,7 +117,7 @@ namespace DopeSheet
                         IM_COL32(255, 210, 60, 255));
                     dl->PushClipRect({ winPos.x, y }, { winPos.x + kLabelW, y + kRowH }, true);
                     float indentX = winPos.x + 8.0f;
-                    dl->AddText({ indentX,      y + 4 }, IM_COL32(255, 210, 60, 255), Icon::CheckCircle);
+                    dl->AddText({ indentX,      y + 4 }, IM_COL32(255, 210, 60, 255), ICON_FA_CHECK_CIRCLE);
                     dl->AddText({ indentX + 18, y + 4 }, IM_COL32(255, 224, 100, 255), track.label.c_str());
                     dl->PopClipRect();
                     row++;

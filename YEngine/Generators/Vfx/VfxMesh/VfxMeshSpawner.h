@@ -46,6 +46,9 @@ public:
     void LoadAsset(const std::string& filePath);
     void ScanDirectory(const std::string& dir = "Resources/Json/VfxMesh/");
 
+    // ロード済みアセット名の一覧（Compositeエディタのドロップダウン用）
+    std::vector<std::string> GetAssetNames() const;
+
     // 毎フレーム
     void Update(float deltaTime);
     void Draw();

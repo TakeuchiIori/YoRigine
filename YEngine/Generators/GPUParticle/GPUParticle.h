@@ -27,7 +27,10 @@ class GPUParticle
 {
 public:
 	// 定数
-	static const uint32_t kMaxParticles = 500000;		  // 最大パーティクル数
+	// 1エミッタあたりの最大パーティクル数（＝粒子バッファ長・毎フレーム描画インスタンス数・ディスパッチ上限）。
+	// shader 側 Resources/Shaders/Particle/GPUParticle.hlsli の kMaxParticles と必ず一致させること。
+	// 500000 は 1エミッタ ≈ 88MB＋毎フレーム50万インスタンス描画で過大だったため実用値へ縮小。
+	static const uint32_t kMaxParticles = 16384;		  // 最大パーティクル数
 	static const uint32_t kParticlesPerThread = 128;		  // 1スレッド辺りの処理数
 	static const uint32_t kThreadsPerGroup = 1024;		  // 1グループ当たりのスレッド数
 
@@ -87,6 +90,8 @@ public:
 	struct PerViewForGPU {
 		Matrix4x4 viewProjection;
 		Matrix4x4 billboardMatrix;
+		uint32_t  isBillboard;   // エミッタ単位のビルボード ON/OFF（VSが毎フレーム参照＝切替が即全粒子へ反映）
+		float     pad[3];
 	};
 
 
@@ -127,6 +132,8 @@ public:
 
 	void SetMesh(std::shared_ptr<Mesh> mesh) { mesh_ = mesh; }
 	void SetCamera(Camera* camera) { camera_ = camera; }
+	// エミッタ単位のビルボード ON/OFF（次フレームの UpdatePerView で全粒子へ反映）
+	void SetBillboard(bool enable) { billboard_ = enable; }
 
 
 
@@ -195,6 +202,9 @@ private:
 	// Mesh
 	std::shared_ptr<Mesh> mesh_;
 	BlendMode blendMode_ = BlendMode::kBlendModeAdd;
+
+	// ビルボード（エミッタ単位・毎フレーム PerView に反映）
+	bool billboard_ = true;
 
 
 

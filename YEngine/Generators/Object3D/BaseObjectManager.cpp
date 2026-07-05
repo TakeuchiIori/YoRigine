@@ -2,6 +2,7 @@
 
 // Engine
 #include "Debugger/Logger.h"
+#include "Drawer/InstancedObject3d.h"
 
 // C++
 #include <algorithm>
@@ -180,6 +181,51 @@ void BaseObjectManager::DrawShadowAll() {
 }
 
 // ============================================================
+// 一括描画（インスタンシング対応・カラーパス）
+// ============================================================
+void BaseObjectManager::DrawAllInstanced() {
+	auto* inst = InstancedObject3d::GetInstance();
+	inst->Begin(camera_);
+
+	for (auto& entry : entries_) {
+		if (!entry.ptr || entry.pendingDestroy) continue;
+		if (!entry.ptr->IsActive()) continue;
+
+		if (entry.ptr->IsInstanceable()) {
+			// 非アニメ: インスタンスバッファに積む（材質は Object3d から取り出す）
+			inst->Submit(*entry.ptr->GetObject3d(), entry.ptr->GetWT());
+		} else {
+			// アニメ / 特殊描画: 従来どおり個別 Draw（本体が DrawAnimation にある型もあるため両方）
+			entry.ptr->Draw();
+			entry.ptr->DrawAnimation();
+		}
+	}
+
+	inst->DrawAll(camera_);
+}
+
+// ============================================================
+// 一括影描画（インスタンシング対応・影パス）
+// ============================================================
+void BaseObjectManager::DrawShadowAllInstanced() {
+	auto* inst = InstancedObject3d::GetInstance();
+	inst->Begin();   // 影は WVP を使わないのでカメラ不要
+
+	for (auto& entry : entries_) {
+		if (!entry.ptr || entry.pendingDestroy) continue;
+		if (!entry.ptr->IsActive()) continue;
+
+		if (entry.ptr->IsInstanceable()) {
+			inst->Submit(*entry.ptr->GetObject3d(), entry.ptr->GetWT());
+		} else {
+			entry.ptr->DrawShadow();
+		}
+	}
+
+	inst->DrawShadow();
+}
+
+// ============================================================
 // 名前で検索
 // ============================================================
 BaseObject* BaseObjectManager::FindByName(const std::string& name) {
@@ -249,46 +295,6 @@ void BaseObjectManager::DrawInspector() {
 			}
 
 			ImGui::PopID();
-		}
-	}
-	ImGui::EndChild();
-
-	ImGui::SameLine();
-
-	//------------------------------------------------------------
-	// 右: 選択オブジェクトの詳細
-	//------------------------------------------------------------
-	if (ImGui::BeginChild("ObjectDetail", ImVec2(0.0f, 0.0f), true)) {
-		if (selectedIndex_ >= 0 && selectedIndex_ < static_cast<int>(entries_.size())
-			&& entries_[selectedIndex_].ptr) {
-
-			BaseObject* obj = entries_[selectedIndex_].ptr;
-
-			ImGui::Text("型: %s", typeid(*obj).name());
-			ImGui::Text("所有: %s",
-				entries_[selectedIndex_].owned ? "Manager (Add)" : "外部 (Register)");
-			ImGui::Separator();
-
-			// SRT (BaseObject の公開アクセサ経由で共通編集)
-			Vector3 translate = obj->GetTranslate();
-			if (ImGui::DragFloat3("Position", &translate.x, 0.01f)) {
-				obj->SetTranslate(translate);
-			}
-			Vector3 rotate = obj->GetRotae();
-			if (ImGui::DragFloat3("Rotation", &rotate.x, 0.01f)) {
-				obj->SetRotae(rotate);
-			}
-			Vector3 scale = obj->GetScale();
-			if (ImGui::DragFloat3("Scale", &scale.x, 0.01f)) {
-				obj->SetScale(scale);
-			}
-
-			ImGui::Separator();
-
-			// オブジェクト固有の詳細 (オーバーライドしていれば描画される)
-			obj->DrawInspector();
-		} else {
-			ImGui::TextDisabled("オブジェクトを選択してください");
 		}
 	}
 	ImGui::EndChild();
