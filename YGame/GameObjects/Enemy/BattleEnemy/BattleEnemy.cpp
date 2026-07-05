@@ -15,6 +15,7 @@
 
 #include "Debugger/Logger.h"
 #include <Collision/AreaCollision/Base/AreaManager.h>
+#include "Object3D/BaseObjectManager.h"
 #include "States/BattleRecoveryState.h"
 #include "Particle/YEmitterGroupManager.h"
 
@@ -24,6 +25,9 @@
 デストラクタ
 //========================================================================*/
 BattleEnemy::~BattleEnemy() {
+	// どの削除経路（撃破 / 全消去 / シーン終了）でも確実に登録解除する
+	BaseObjectManager::GetInstance()->Unregister(this);
+
 	if (obbCollider_) {
 		obbCollider_->~OBBCollider();
 	}
@@ -413,8 +417,10 @@ void BattleEnemy::OnEnterDirectionCollision([[maybe_unused]] BaseCollider* self,
 /*==========================================================================
 描画
 //========================================================================*/
-void BattleEnemy::Draw() {
-	// 死亡していたら半透明にする
+// プレイヤー敗北時の半透明フェード。
+// インスタンシング描画では Draw() が呼ばれず Submit が色を読むだけなので、
+// フェードの色更新をここに分離し、マネージャの描画ループ直前で呼ぶ（発火条件は旧 Draw と同じ）。
+void BattleEnemy::ApplyDeathFade() {
 	if (player_->GetCombat()->IsDead()) {
 
 		// 現在のマテリアルカラー取得
@@ -432,6 +438,10 @@ void BattleEnemy::Draw() {
 			canAct_ = false;
 		}
 	}
+}
+
+void BattleEnemy::Draw() {
+	ApplyDeathFade();
 	if (obj_) obj_->Draw(camera_, wt_);
 }
 

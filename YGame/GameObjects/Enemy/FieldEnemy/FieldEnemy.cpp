@@ -14,6 +14,7 @@
 #include "States/FieldEnemyChaseState.h"
 #include <Collision/AreaCollision/Base/AreaManager.h>
 #include <LightManager/LightManager.h>
+#include "Object3D/BaseObjectManager.h"
 
 // ============================================================
 // コンストラクタ
@@ -24,6 +25,9 @@ FieldEnemy::FieldEnemy() = default;
 // デストラクタ
 // ============================================================
 FieldEnemy::~FieldEnemy() {
+	// どの削除経路（撃破 / 全消去 / シーン終了）でも確実に登録解除する
+	BaseObjectManager::GetInstance()->Unregister(this);
+
 	if (obbCollider_) {
 		obbCollider_->~OBBCollider();
 	}

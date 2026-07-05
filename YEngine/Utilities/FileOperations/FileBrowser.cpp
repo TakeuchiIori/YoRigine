@@ -6,6 +6,7 @@
 #include <iostream>
 
 #ifdef USE_IMGUI
+#include <IconsFontAwesome5.h>
 namespace YoRigine {
 
     // -----------------------------------------------------------------------
@@ -108,21 +109,21 @@ namespace YoRigine {
         if (ImGui::BeginChild(id, size, true, ImGuiWindowFlags_HorizontalScrollbar))
         {
             // ヘッダー：現在のディレクトリと再スキャンボタン
-            ImGui::Text("\uf07b %s", currentDir_.c_str());
+            ImGui::Text(ICON_FA_FOLDER " %s", currentDir_.c_str());
             ImGui::SameLine();
-            if (ImGui::SmallButton("\uf2f9 再スキャン")) {
+            if (ImGui::SmallButton(ICON_FA_REDO_ALT " 再スキャン")) {
                 Scan();
             }
 
             // 表示モード切り替えボタン
             ImGui::SameLine();
             if (displayMode_ == DisplayMode::List) {
-                if (ImGui::SmallButton("\uf00a グリッド")) {
+                if (ImGui::SmallButton(ICON_FA_TH " グリッド")) {
                     displayMode_ = DisplayMode::Grid;
                 }
             }
             else {
-                if (ImGui::SmallButton("\uf03a リスト")) {
+                if (ImGui::SmallButton(ICON_FA_LIST " リスト")) {
                     displayMode_ = DisplayMode::List;
                 }
             }
@@ -146,7 +147,7 @@ namespace YoRigine {
         bool selected = false;
 
         // ----- 親フォルダへ戻る -----
-        if (ImGui::Selectable("\uf148")) {
+        if (ImGui::Selectable(ICON_FA_LEVEL_UP_ALT)) {
             GoUp();
             return false;
         }
@@ -156,7 +157,7 @@ namespace YoRigine {
         // ----- サブフォルダ -----
         for (const auto& folder : folders_)
         {
-            std::string label = "\uf07b " + folder;
+            std::string label = ICON_FA_FOLDER " " + folder;
             if (ImGui::Selectable(label.c_str()))
             {
                 std::string fullPath = currentDir_ + folder;
@@ -217,7 +218,7 @@ namespace YoRigine {
                 else {
                     // アイコン代替ボタン
                     clicked = ImGui::Button(
-                        ("\uf15b\n" + filename).c_str(),
+                        (ICON_FA_FILE "\n" + filename).c_str(),
                         ImVec2(thumbnailSize_, thumbnailSize_));
                 }
 
@@ -261,7 +262,7 @@ namespace YoRigine {
             std::string filename = std::filesystem::path(fullPath).filename().string();
             bool isSelected = (selectedPath_ == fullPath);
 
-            std::string label = "\uf15b " + filename;
+            std::string label = ICON_FA_FILE " " + filename;
             if (ImGui::Selectable(label.c_str(), isSelected))
             {
                 selectedPath_ = fullPath;

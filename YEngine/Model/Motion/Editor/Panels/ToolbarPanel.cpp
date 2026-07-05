@@ -4,8 +4,8 @@
 #include "Model.h"
 #include "../../Core/MotionSystem.h"
 #include "../../Core/Motion.h"
-#include <Editor/Icon/EditorIcon.h>
 
+#include <IconsFontAwesome5.h>
 #ifdef USE_IMGUI
 #include <imgui.h>
 #endif
@@ -25,14 +25,14 @@ void ToolbarPanel::DrawImGui()
 	// 再生コントロール (1行目)
 	// ============================================================
 	if (context_->isPlaying) {
-		if (ImGui::Button((std::string(Icon::Pause) + " 一時停止").c_str())) {
+		if (ImGui::Button((std::string(ICON_FA_PAUSE) + " 一時停止").c_str())) {
 			if (model && model->GetMotionSystem()) model->GetMotionSystem()->Stop();
 			context_->isPlaying = false;
 			context_->statusMsg = "一時停止";
 		}
 	}
 	else {
-		if (ImGui::Button((std::string(Icon::Play) + " 再生").c_str())) {
+		if (ImGui::Button((std::string(ICON_FA_PLAY) + " 再生").c_str())) {
 			if (model && model->GetMotionSystem()) {
 				auto* ms = model->GetMotionSystem();
 				if (context_->currentMotion && ms->GetAnimation() != context_->currentMotion) {
@@ -50,7 +50,7 @@ void ToolbarPanel::DrawImGui()
 	}
 
 	ImGui::SameLine(0, 3);
-	if (ImGui::Button((std::string(Icon::Stop) + " 停止").c_str())) {
+	if (ImGui::Button((std::string(ICON_FA_STOP) + " 停止").c_str())) {
 		if (model && model->GetMotionSystem()) {
 			model->GetMotionSystem()->Stop();
 			model->GetMotionSystem()->SetAnimationTime(0.0f);
@@ -64,8 +64,8 @@ void ToolbarPanel::DrawImGui()
 	{
 		bool isRev = context_->isReverse;
 		if (isRev) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.7f, 0.2f, 0.2f, 1.0f));
-		if (ImGui::Button(isRev ? (std::string(Icon::SyncAlt) + " 逆再生 ON").c_str()
-			: (std::string(Icon::SyncAlt) + " 逆再生").c_str())) {
+		if (ImGui::Button(isRev ? (std::string(ICON_FA_SYNC_ALT) + " 逆再生 ON").c_str()
+			: (std::string(ICON_FA_SYNC_ALT) + " 逆再生").c_str())) {
 			context_->isReverse = !context_->isReverse;
 			if (model && model->GetMotionSystem()) {
 				auto* ms = model->GetMotionSystem();

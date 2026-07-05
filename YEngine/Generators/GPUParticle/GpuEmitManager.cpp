@@ -4,6 +4,7 @@
 #include <fstream>
 #include <filesystem>
 #include <iostream>
+#include <algorithm>
 
 // Engine
 #include <Loaders/Json/ConversionJson.h>
@@ -11,6 +12,7 @@
 #include <ModelManager.h>
 #include <Debugger/Logger.h>
 #include "Systems/GameTime/GameTime.h"
+#include <IconsFontAwesome5.h>
 
 namespace YoRigine {
 	// ImGui用の形状名一覧
@@ -69,12 +71,15 @@ namespace YoRigine {
 			selectedEmitterName_.clear();
 			newGroupName_[0] = '\0';
 			});
+
+		// エミッタ形状のライン可視化（Debugのみ）
+		gizmoLine_ = std::make_unique<Line>();
+		gizmoLine_->Initialize();
+		gizmoLine_->SetCamera(camera_);
 #endif
 
-		LoadAllEmitters();
 		ModelManager::GetInstance()->LoadModel("Resources/Models/Cube", "Cube.obj");
 		LoadAllEmitters();
-		ModelManager::GetInstance()->LoadModel("Resources/Models/Cube", "Cube.obj");
 	}
 
 	/// <summary>
@@ -86,24 +91,38 @@ namespace YoRigine {
 
 		// グループ全体をループ
 		for (auto& [groupName, groupData] : groups_) {
-			// グループが有効かつ再生中の場合のみ更新
-			if (groupData->isActive && groupData->isPlaying) {
+			if (!groupData->isActive) continue;
 
-				// システム時間の更新
+			// 発生中(isPlaying) か、発生停止後の余韻(lingerTimer>0)がある間は粒子シミュレーションを回す。
+			// これにより「停止後も既存粒子が自然に消える」「発生中でなくても撃ったワンショットが動く」が成立する。
+			const bool emitting = groupData->isPlaying;
+			const bool simulating = emitting || groupData->lingerTimer > 0.0f;
+			if (!simulating) continue;
+
+			// システム時間の更新
+			if (emitting) {
 				groupData->currentTime += deltaTime;
+			} else {
+				// 余韻中はエミッションせず、寿命ぶんだけ回して自然消滅を待つ
+				groupData->lingerTimer -= deltaTime;
+			}
 
-				// グループ内のエミッターをループ
-				for (auto& [emitterName, emitterData] : groupData->emitters) {
-					if (emitterData->isActive && emitterData->emitter) {
-						emitterData->emitter->SetTrailParams(emitterData->trailParams);
-						emitterData->emitter->Update();
-					}
+			// グループ内のエミッターをループ
+			for (auto& [emitterName, emitterData] : groupData->emitters) {
+				if (emitterData->isActive && emitterData->emitter) {
+					// 継続発生は再生中のみ。停止/余韻中はバースト要求だけが発生する
+					emitterData->emitter->SetContinuousEmit(emitting);
+					// グループ原点＋ローカルオフセットをワールド発生位置として毎フレーム反映（追従）
+					emitterData->emitter->SetEmitWorldPosition(
+						groupData->translate + GetEmitterLocalOffset(emitterData.get()));
+					emitterData->emitter->SetTrailParams(emitterData->trailParams);
+					emitterData->emitter->Update();
 				}
+			}
 
-				// システムの自動終了判定 (Durationが0より大きく、再生時間がDurationを超えたら停止)
-				if (groupData->systemDuration > 0.0f && groupData->currentTime >= groupData->systemDuration) {
-					StopEmitterGroup(groupName);
-				}
+			// システムの自動終了判定 (Durationが0より大きく、再生時間がDurationを超えたら停止)
+			if (emitting && groupData->systemDuration > 0.0f && groupData->currentTime >= groupData->systemDuration) {
+				StopEmitterGroup(groupName);
 			}
 		}
 	}
@@ -122,7 +141,113 @@ namespace YoRigine {
 				}
 			}
 		}
+
+#ifdef USE_IMGUI
+		// エミッタ形状のライン可視化（選択中グループ）
+		if (showEmitterGizmos_ && gizmoLine_) {
+			DrawEmitterGizmos();
+		}
+#endif
 	}
+
+#ifdef USE_IMGUI
+	/// <summary>
+	/// 選択中グループの各エミッタ形状をライン描画（選択エミッタ=黄 / それ以外=シアン）
+	/// </summary>
+	void GpuEmitManager::DrawEmitterGizmos()
+	{
+		gizmoLine_->Reset();
+
+		EmitterGroup* group = GetGroup(selectedGroupName_);
+		if (!group) return;
+
+		// --- 非選択エミッタ（シアン）---
+		for (auto& [name, e] : group->emitters) {
+			if (!e || name == selectedEmitterName_) continue;
+			RegisterEmitterGizmo(e.get(), group->translate + GetEmitterLocalOffset(e.get()));
+		}
+		gizmoLine_->SetColor({ 0.2f, 0.8f, 1.0f, 1.0f });
+		gizmoLine_->DrawLine();
+
+		// --- 選択エミッタ（黄・強調）---
+		auto it = group->emitters.find(selectedEmitterName_);
+		if (it != group->emitters.end() && it->second) {
+			RegisterEmitterGizmo(it->second.get(), group->translate + GetEmitterLocalOffset(it->second.get()));
+			gizmoLine_->SetColor({ 1.0f, 0.9f, 0.1f, 1.0f });
+			gizmoLine_->DrawLine();
+		}
+	}
+
+	/// <summary>
+	/// 単一エミッタの形状を gizmoLine_ に線分登録（DrawLine は呼び出し側が発行）
+	/// </summary>
+	void GpuEmitManager::RegisterEmitterGizmo(const EmitterData* e, const Vector3& worldPos)
+	{
+		if (!e) return;
+
+		switch (e->shape) {
+		case EmitterShape::Sphere:
+			gizmoLine_->DrawSphere(worldPos, e->sphereParams.radius, 16);
+			break;
+
+		case EmitterShape::Box:
+		{
+			// size はフルサイズ（shader は ±size*0.5 で分布）
+			Vector3 half = e->boxParams.size * 0.5f;
+			gizmoLine_->DrawAABB(worldPos - half, worldPos + half);
+			break;
+		}
+
+		case EmitterShape::Cone:
+		{
+			const auto& cp = e->coneParams;
+			const Vector3 apex = worldPos;
+
+			// 方向を正規化
+			Vector3 d = cp.direction;
+			float dlen = std::sqrt(d.x * d.x + d.y * d.y + d.z * d.z);
+			d = (dlen < 1e-4f) ? Vector3{ 0.0f, 1.0f, 0.0f } : d * (1.0f / dlen);
+
+			const Vector3 baseC = apex + d * cp.height;
+
+			// 方向に垂直な基底 (r, u) を作る
+			Vector3 up = (std::fabs(d.y) < 0.999f) ? Vector3{ 0.0f, 1.0f, 0.0f } : Vector3{ 1.0f, 0.0f, 0.0f };
+			Vector3 r = { up.y * d.z - up.z * d.y, up.z * d.x - up.x * d.z, up.x * d.y - up.y * d.x };
+			float rlen = std::sqrt(r.x * r.x + r.y * r.y + r.z * r.z);
+			if (rlen > 1e-4f) r = r * (1.0f / rlen);
+			Vector3 u = { d.y * r.z - d.z * r.y, d.z * r.x - d.x * r.z, d.x * r.y - d.y * r.x };
+
+			const int seg = 16;
+			const float twoPi = 6.28318530718f;
+			Vector3 prev{};
+			for (int i = 0; i <= seg; ++i) {
+				float a = twoPi * float(i) / float(seg);
+				Vector3 p = baseC + (r * std::cos(a) + u * std::sin(a)) * cp.radius;
+				if (i > 0) gizmoLine_->RegisterLine(prev, p);
+				prev = p;
+				if (i % 4 == 0) gizmoLine_->RegisterLine(apex, p); // 側面のガイド線
+			}
+			break;
+		}
+
+		case EmitterShape::Triangle:
+		{
+			// shader は translate を使わず v1/v2/v3 を直接使うため、グループ原点だけを基準にする
+			const Vector3 base = worldPos - e->triangleParams.translate;
+			const auto& tp = e->triangleParams;
+			gizmoLine_->RegisterLine(base + tp.v1, base + tp.v2);
+			gizmoLine_->RegisterLine(base + tp.v2, base + tp.v3);
+			gizmoLine_->RegisterLine(base + tp.v3, base + tp.v1);
+			break;
+		}
+
+		case EmitterShape::Mesh:
+			// メッシュ境界の取得は重いので、発生位置に小さなマーカー球のみ
+			gizmoLine_->DrawSphere(worldPos, 0.5f, 8);
+			break;
+		}
+	}
+#endif
 	
 	/// <summary>
 	/// エミッターのパラメータを更新
@@ -153,14 +278,88 @@ namespace YoRigine {
 		}
 
 		// グループ内の全エミッターに対してエミッションを発生
+		// 各エミッタは指定位置＋自身のローカルオフセットで発生（グループ内の相対配置を保持）
 		auto& groupData = groupIt->second;
+		groupData->translate = position;
 		for (auto& [emitterName, emitterData] : groupData->emitters) {
 			if (emitterData->isActive && emitterData->emitter) {
-				emitterData->emitter->EmitAtPosition(position, count);
+				// count < 0 は「各エミッタが持つ設定値を使う」の意味
+				float emitCount = count;
+				if (emitCount < 0.0f) {
+					switch (emitterData->shape) {
+					case EmitterShape::Sphere:   emitCount = emitterData->sphereParams.count;   break;
+					case EmitterShape::Box:      emitCount = emitterData->boxParams.count;      break;
+					case EmitterShape::Triangle: emitCount = emitterData->triangleParams.count; break;
+					case EmitterShape::Cone:     emitCount = emitterData->coneParams.count;     break;
+					case EmitterShape::Mesh:     emitCount = emitterData->meshParams.count;     break;
+					}
+				}
+				emitterData->emitter->EmitAtPosition(position + GetEmitterLocalOffset(emitterData.get()), emitCount);
 			}
 		}
+		// ワンショットは isPlaying を立てず、粒子が寿命を全うするまで linger でシミュレーションを継続させる
+		groupData->lingerTimer = std::max(groupData->lingerTimer, GetGroupMaxLifetime(groupData.get()));
+	}
 
+	/// <summary>
+	/// グループ内の最大パーティクル寿命を取得（発生停止後の linger 時間見積り用）
+	/// </summary>
+	float GpuEmitManager::GetGroupMaxLifetime(const EmitterGroup* group) const
+	{
+		float maxLife = 0.5f; // 最低保証（空グループ等でも最小限ティックする）
+		if (!group) return maxLife;
+		for (const auto& [name, e] : group->emitters) {
+			if (!e) continue;
+			const float life = e->particleParams.lifeTime + e->particleParams.lifeTimeVariance;
+			maxLife = std::max(maxLife, life);
+			// パーティクル自身のトレイル寿命も考慮
+			if (e->particleParams.child.isTrail) {
+				maxLife = std::max(maxLife, life + e->particleParams.child.lifeTime);
+			}
+		}
+		return maxLife;
+	}
 
+	/// <summary>
+	/// エミッターの形状ごとのローカル発生位置（オフセット）を取得
+	/// </summary>
+	Vector3 GpuEmitManager::GetEmitterLocalOffset(const EmitterData* emitterData) const
+	{
+		if (!emitterData) return { 0.0f, 0.0f, 0.0f };
+		switch (emitterData->shape) {
+		case EmitterShape::Sphere:   return emitterData->sphereParams.translate;
+		case EmitterShape::Box:      return emitterData->boxParams.translate;
+		case EmitterShape::Triangle: return emitterData->triangleParams.translate;
+		case EmitterShape::Cone:     return emitterData->coneParams.translate;
+		case EmitterShape::Mesh:     return emitterData->meshParams.translate;
+		}
+		return { 0.0f, 0.0f, 0.0f };
+	}
+
+	/// <summary>
+	/// グループのワールド原点を移動
+	/// </summary>
+	void GpuEmitManager::SetGroupPosition(const std::string& groupName, const Vector3& pos)
+	{
+		EmitterGroup* group = GetGroup(groupName);
+		if (group) group->translate = pos;
+	}
+
+	/// <summary>
+	/// グループが存在するか
+	/// </summary>
+	bool GpuEmitManager::HasGroup(const std::string& groupName) const
+	{
+		return groups_.count(groupName) > 0;
+	}
+
+	/// <summary>
+	/// グループが再生中か
+	/// </summary>
+	bool GpuEmitManager::IsGroupPlaying(const std::string& groupName) const
+	{
+		auto it = groups_.find(groupName);
+		return it != groups_.end() && it->second->isPlaying;
 	}
 	/// <summary>
 	/// エミッター管理用の ImGui 描画
@@ -170,17 +369,20 @@ namespace YoRigine {
 #ifdef USE_IMGUI
 		// メニューバー
 
-		if (ImGui::CollapsingHeader("ファイル操作・ロード", ImGuiTreeNodeFlags_DefaultOpen))
+		if (ImGui::CollapsingHeader("ファイル操作（上級者向け・全グループ一括）", ImGuiTreeNodeFlags_None))
 		{
+			ImGui::TextDisabled("通常はここを使わず、[グループ管理]タブでグループ単位に保存してください。");
+			ImGui::TextDisabled("↓は全グループをまとめて1ファイルに読み書きする一括操作です。");
+			ImGui::Spacing();
 			float halfWidth = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
-			if (ImGui::Button("\uF0C7 保存", ImVec2(halfWidth, 0))) {
+			if (ImGui::Button(ICON_FA_SAVE " 全グループを保存", ImVec2(halfWidth, 0))) {
 				if (SaveToFile(saveFilePath_))
 					std::cout << "保存成功: " << saveFilePath_ << std::endl;
 				else
 					std::cout << "保存失敗: " << saveFilePath_ << std::endl;
 			}
 			ImGui::SameLine();
-			if (ImGui::Button("\uF07C 読み込み", ImVec2(halfWidth, 0))) {
+			if (ImGui::Button(ICON_FA_FOLDER_OPEN " 読み込み", ImVec2(halfWidth, 0))) {
 				if (LoadFromFile(saveFilePath_))
 					std::cout << "読み込み成功: " << saveFilePath_ << std::endl;
 				else
@@ -218,6 +420,11 @@ namespace YoRigine {
 			}
 			ImGui::PopStyleColor();
 		}
+		// エミッタ形状のライン可視化トグル
+		ImGui::Checkbox("エミッタ形状をライン表示（選択グループ）", &showEmitterGizmos_);
+		ImGui::SameLine();
+		ImGui::TextDisabled("(黄=選択エミッタ / 水色=同グループの他)");
+
 		// タブバーでセクション分け
 		if (ImGui::BeginTabBar("MainTabs", ImGuiTabBarFlags_None))
 		{
@@ -260,6 +467,73 @@ namespace YoRigine {
 		{
 			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8, 4));
 			ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8, 8));
+
+			// ===== 描画メッシュ形状（1粒子の見た目）=====
+			{
+				static const char* meshShapeNames[] = {
+					"板ポリ(Plane)", "立方体(Box)", "リング(Ring)", "円柱(Cylinder)",
+					"球(Sphere)", "円錐(Cone)", "扇形(Fan)"
+				};
+				bool meshDirty = false;
+
+				int shapeIdx = static_cast<int>(emitterData->particleMeshShape);
+				if (ImGui::Combo("粒子メッシュ形状", &shapeIdx, meshShapeNames, IM_ARRAYSIZE(meshShapeNames))) {
+					emitterData->particleMeshShape = static_cast<ParticleMeshShape>(shapeIdx);
+					meshDirty = true;
+				}
+
+				// 形状ごとの生成パラメータ（実サイズは粒子scaleで拡縮）
+				auto& mp = emitterData->particleMeshParams;
+				int divideI = static_cast<int>(mp.divide);
+				int subdivI = static_cast<int>(mp.subdivisions);
+				switch (emitterData->particleMeshShape) {
+				case ParticleMeshShape::Plane:
+					meshDirty |= ImGui::DragFloat("幅",   &mp.width,  0.01f, 0.01f, 100.0f, "%.3f");
+					meshDirty |= ImGui::DragFloat("高さ", &mp.height, 0.01f, 0.01f, 100.0f, "%.3f");
+					break;
+				case ParticleMeshShape::Box:
+					meshDirty |= ImGui::DragFloat("幅",     &mp.width,  0.01f, 0.01f, 100.0f, "%.3f");
+					meshDirty |= ImGui::DragFloat("高さ",   &mp.height, 0.01f, 0.01f, 100.0f, "%.3f");
+					meshDirty |= ImGui::DragFloat("奥行き", &mp.depth,  0.01f, 0.01f, 100.0f, "%.3f");
+					break;
+				case ParticleMeshShape::Ring:
+					meshDirty |= ImGui::DragFloat("外周半径", &mp.outerRadius, 0.01f, 0.01f, 100.0f, "%.3f");
+					meshDirty |= ImGui::DragFloat("内周半径", &mp.innerRadius, 0.01f, 0.0f,  100.0f, "%.3f");
+					if (ImGui::DragInt("分割数", &divideI, 1, 3, 128)) { mp.divide = static_cast<uint32_t>(divideI); meshDirty = true; }
+					break;
+				case ParticleMeshShape::Cylinder:
+					meshDirty |= ImGui::DragFloat("外周半径", &mp.outerRadius, 0.01f, 0.01f, 100.0f, "%.3f");
+					meshDirty |= ImGui::DragFloat("内周半径", &mp.innerRadius, 0.01f, 0.0f,  100.0f, "%.3f");
+					meshDirty |= ImGui::DragFloat("高さ",     &mp.height,      0.01f, 0.01f, 100.0f, "%.3f");
+					if (ImGui::DragInt("分割数", &divideI, 1, 3, 128)) { mp.divide = static_cast<uint32_t>(divideI); meshDirty = true; }
+					break;
+				case ParticleMeshShape::Sphere:
+					meshDirty |= ImGui::DragFloat("半径", &mp.radius, 0.01f, 0.01f, 100.0f, "%.3f");
+					if (ImGui::DragInt("細分化レベル", &subdivI, 1, 0, 5)) { mp.subdivisions = static_cast<uint32_t>(subdivI); meshDirty = true; }
+					break;
+				case ParticleMeshShape::Cone:
+					meshDirty |= ImGui::DragFloat("半径", &mp.radius, 0.01f, 0.01f, 100.0f, "%.3f");
+					meshDirty |= ImGui::DragFloat("高さ", &mp.height, 0.01f, 0.01f, 100.0f, "%.3f");
+					if (ImGui::DragInt("分割数", &divideI, 1, 3, 128)) { mp.divide = static_cast<uint32_t>(divideI); meshDirty = true; }
+					break;
+				case ParticleMeshShape::Fan:
+					meshDirty |= ImGui::DragFloat("半径",     &mp.radius,      0.01f, 0.01f, 100.0f, "%.3f");
+					meshDirty |= ImGui::DragFloat("扇の角度", &mp.angleDegree, 1.0f,  1.0f,  360.0f, "%.1f°");
+					if (ImGui::DragInt("分割数", &divideI, 1, 3, 128)) { mp.divide = static_cast<uint32_t>(divideI); meshDirty = true; }
+					break;
+				}
+
+				// 形状 or パラメータが変わったらメッシュを再生成
+				if (meshDirty && emitterData->emitter) {
+					emitterData->emitter->SetParticleMesh(emitterData->particleMeshShape, emitterData->particleMeshParams);
+					changed = true;
+				}
+
+				if (emitterData->particleMeshShape != ParticleMeshShape::Plane) {
+					ImGui::TextDisabled("立体メッシュは「ビルボード」をOFFにすると向きが分かりやすくなります");
+				}
+				ImGui::Spacing();
+			}
 
 			// ===== ビルボード設定 =====
 			ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.2f, 0.5f, 0.7f, 0.8f));
@@ -772,6 +1046,7 @@ namespace YoRigine {
 
 		// ===== 新規グループ作成 =====
 		ImGui::SeparatorText("新規グループ作成");
+		ImGui::TextDisabled("名前を入れて「＋作成」だけ。保存先は名前から自動決定（JSONの事前選択は不要）。");
 
 		ImGui::PushItemWidth(-150);
 		ImGui::InputTextWithHint("##NewGroupName", "グループ名を入力...", newGroupName_, sizeof(newGroupName_));
@@ -779,11 +1054,15 @@ namespace YoRigine {
 
 		ImGui::SameLine();
 		ImGui::BeginDisabled(strlen(newGroupName_) == 0);
-		if (ImGui::Button("作成", ImVec2(140, 0))) {
-			CreateEmitterGroup(newGroupName_);
-			selectedGroupName_ = newGroupName_;
+		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.25f, 0.6f, 0.3f, 1.0f));
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.7f, 0.35f, 1.0f));
+		if (ImGui::Button(ICON_FA_PLUS " 作成", ImVec2(140, 0))) {
+			if (CreateEmitterGroup(newGroupName_)) {
+				selectedGroupName_ = newGroupName_;
+			}
 			newGroupName_[0] = '\0';
 		}
+		ImGui::PopStyleColor(2);
 		ImGui::EndDisabled();
 
 		ImGui::Spacing();
@@ -798,7 +1077,7 @@ namespace YoRigine {
 		// フィルター検索
 		static char groupFilter[256] = "";
 		ImGui::PushItemWidth(-1);
-		ImGui::InputTextWithHint("##GroupFilter", "\uf002 検索...", groupFilter, sizeof(groupFilter));
+		ImGui::InputTextWithHint("##GroupFilter", ICON_FA_SEARCH " 検索...", groupFilter, sizeof(groupFilter));
 		ImGui::PopItemWidth();
 
 		ImGui::Spacing();
@@ -861,13 +1140,13 @@ namespace YoRigine {
 				ImGui::PushID((name + "_play").c_str());
 				if (groupData->isPlaying) {
 					ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.3f, 0.3f, 1.0f));
-					if (ImGui::SmallButton("\uf04b")) {
+					if (ImGui::SmallButton(ICON_FA_PLAY)) {
 						StopEmitterGroup(name);
 					}
 					ImGui::PopStyleColor();
 				} else {
 					ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.8f, 0.3f, 1.0f));
-					if (ImGui::SmallButton("▶")) {
+					if (ImGui::SmallButton(ICON_FA_PLAY)) {
 						PlayEmitterGroup(name);
 					}
 					ImGui::PopStyleColor();
@@ -911,13 +1190,13 @@ namespace YoRigine {
 				if (currentGroup->isPlaying) {
 					ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "● 再生中");
 					ImGui::SameLine();
-					if (ImGui::Button("\uf04d 停止")) {
+					if (ImGui::Button(ICON_FA_STOP " 停止")) {
 						StopEmitterGroup(selectedGroupName_);
 					}
 				} else {
 					ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "○ 停止中");
 					ImGui::SameLine();
-					if (ImGui::Button("\uf04b 再生")) {
+					if (ImGui::Button(ICON_FA_PLAY " 再生")) {
 						PlayEmitterGroup(selectedGroupName_);
 					}
 				}
@@ -951,6 +1230,20 @@ namespace YoRigine {
 
 				ImGui::EndTable();
 			}
+
+			ImGui::Spacing();
+
+			// 保存先ファイル（このグループ専用。1ファイル1グループが基本）
+			ImGui::TextDisabled("保存先: %s",
+				currentGroup->sourceFilePath.empty() ? "(未設定→保存時に自動決定)" : currentGroup->sourceFilePath.c_str());
+
+			// グループ単位保存（主導線）
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.25f, 0.6f, 0.3f, 1.0f));
+			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.7f, 0.35f, 1.0f));
+			if (ImGui::Button(ICON_FA_SAVE " このグループを保存", ImVec2(-1, 32))) {
+				SaveGroupToFile(selectedGroupName_);
+			}
+			ImGui::PopStyleColor(2);
 
 			ImGui::Spacing();
 
@@ -1060,7 +1353,7 @@ namespace YoRigine {
 		// フィルター検索
 		static char emitterFilter[256] = "";
 		ImGui::PushItemWidth(-1);
-		ImGui::InputTextWithHint("##EmitterFilter", "\uf002 検索...",
+		ImGui::InputTextWithHint("##EmitterFilter", ICON_FA_SEARCH " 検索...",
 			emitterFilter, sizeof(emitterFilter));
 		ImGui::PopItemWidth();
 
@@ -1378,29 +1671,30 @@ namespace YoRigine {
 		return nullptr;
 	}
 
-	GpuEmitManager::EmitterGroup* GpuEmitManager::CreateEmitterGroup(const std::string& groupName)
+	GpuEmitManager::EmitterGroup* GpuEmitManager::CreateEmitterGroup(const std::string& groupName, const std::string& sourceFilePath)
 	{
-		// 必須チェック: JSONファイルが選択されているか
-		if (selectedJsonFilePath_.empty()) {
-			ThrowError("Group creation failed: Please select a JSON file first.");
-			return nullptr;
-		}
-
-		// 1. グループ名で重複がないかチェック
+		// 1. グループ名で重複がないかチェック（非致命: 既存を返さず nullptr。ログのみ）
 		if (groups_.count(groupName)) {
-			ThrowError("Group creation failed: Group name '" + groupName + "' already exists.");
+			Logger("GpuEmitManager: グループ名 '" + groupName + "' は既に存在するため作成をスキップ");
 			return nullptr;
 		}
 
-		// 2. 新しいグループを作成
+		// 2. 由来ファイルパスを決定（引数優先→エディタ選択中→最後はグループ名から自動決定）
+		//    これによりエディタで JSON を手選択しなくても新規グループを作成・保存できる
+		std::string source = !sourceFilePath.empty() ? sourceFilePath : selectedJsonFilePath_;
+		if (source.empty()) {
+			source = "Resources/Json/GpuEmitters/" + groupName + ".json";
+		}
+
+		// 3. 新しいグループを作成
 		auto newGroup = std::make_unique<EmitterGroup>();
 		newGroup->name = groupName;
-		newGroup->sourceFilePath = selectedJsonFilePath_; // ★★★ 選択中のJSONパスを設定 ★★★
+		newGroup->sourceFilePath = source;
 
-		// 3. groups_ に追加
+		// 4. groups_ に追加
 		auto [it, inserted] = groups_.emplace(groupName, std::move(newGroup));
 		if (inserted) {
-			Logger("Group created: " + groupName + " (File: " + selectedJsonFilePath_ + ")");
+			Logger("Group created: " + groupName + " (File: " + source + ")");
 			return it->second.get();
 		}
 
@@ -1411,20 +1705,12 @@ namespace YoRigine {
 	{
 		auto it = groups_.find(groupName);
 		if (it == groups_.end()) {
-			ThrowError("Group deletion failed: Group name '" + groupName + "' not found.");
+			Logger("GpuEmitManager: 削除対象グループ '" + groupName + "' が見つかりません");
 			return;
 		}
 
 		EmitterGroup* group = it->second.get();
-
-		// ★★★ 削除対象のグループが、選択中のJSONファイル由来かチェック ★★★
-		if (group->sourceFilePath != selectedJsonFilePath_) {
-			// ログを出し、削除を拒否
-			ThrowError("Group deletion failed: Group '" + groupName +
-				"' belongs to a different JSON file (" + group->sourceFilePath + "). " +
-				"Cannot delete from the current file selection (" + selectedJsonFilePath_ + ").");
-			return;
-		}
+		const std::string sourceFile = group->sourceFilePath;
 
 		// グループ内の全エミッターを破棄
 		group->emitters.clear();
@@ -1432,7 +1718,7 @@ namespace YoRigine {
 		// グループを groups_ から削除
 		groups_.erase(it);
 
-		Logger("Group deleted: " + groupName + " (File: " + selectedJsonFilePath_ + ")");
+		Logger("Group deleted: " + groupName + " (File: " + sourceFile + ")");
 
 		// 選択状態のリセット
 		if (selectedGroupName_ == groupName) {
@@ -1461,7 +1747,8 @@ namespace YoRigine {
 		{
 			group->isPlaying = true;
 			group->currentTime = 0.0f;
-			// グループ内のエミッターを再生
+			group->lingerTimer = 0.0f;
+			// グループ内のエミッターを再生（発生状態をリセットしてクリーンスタート）
 			for (auto& [name, data] : group->emitters)
 			{
 				if (data->emitter) {
@@ -1476,22 +1763,23 @@ namespace YoRigine {
 		EmitterGroup* group = GetGroup(groupName);
 		if (!group)return;
 
+		if (!group->isPlaying) return;
+
 		group->isPlaying = false;
 		group->currentTime = 0.0f;
 
-		// 停止時にエミッターをリセット
-		for (auto& [name, data] : group->emitters)
-		{
-			if (data->emitter) {
-				data->emitter->Reset();
-			}
-		}
+		// 停止時は Reset() で粒子を即消滅させず、linger でシミュレーションを続けて自然に消えるのを待つ
+		// （剣トレイル等を Stop したとき既存粒子がプツッと消えるのを防ぐ）
+		group->lingerTimer = std::max(group->lingerTimer, GetGroupMaxLifetime(group));
 	}
 
 	void GpuEmitManager::SetCamera(Camera* camera)
 	{
 		// GpuEmitManager 自身のカメラポインタを更新
 		camera_ = camera;
+#ifdef USE_IMGUI
+		if (gizmoLine_) gizmoLine_->SetCamera(camera);
+#endif
 		// 全グループをループ
 		for (auto& [groupName, groupData] : groups_) {
 			for (auto& [emitterName, emitterDataPtr] : groupData->emitters) {
@@ -1529,6 +1817,19 @@ namespace YoRigine {
 			for (const auto& [emitterName, _] : groupPtr->emitters) {
 				names.push_back(emitterName);
 			}
+		}
+		return names;
+	}
+
+	/// <summary>
+	/// ロード済みグループ名の一覧
+	/// </summary>
+	std::vector<std::string> GpuEmitManager::GetGroupNames() const
+	{
+		std::vector<std::string> names;
+		names.reserve(groups_.size());
+		for (const auto& [name, group] : groups_) {
+			names.push_back(name);
 		}
 		return names;
 	}
@@ -1633,6 +1934,52 @@ namespace YoRigine {
 	}
 
 	/// <summary>
+	/// グループ単位で、そのグループ自身の sourceFilePath に保存する。
+	/// 1ファイル1グループを基本とし、複数グループが1ファイルに混ざるのを防ぐ。
+	/// </summary>
+	bool GpuEmitManager::SaveGroupToFile(const std::string& groupName)
+	{
+		EmitterGroup* group = GetGroup(groupName);
+		if (!group) {
+			Logger("GpuEmitManager::SaveGroupToFile : グループ '" + groupName + "' が見つかりません");
+			return false;
+		}
+
+		// 保存先が未設定なら名前から自動決定
+		if (group->sourceFilePath.empty()) {
+			group->sourceFilePath = "Resources/Json/GpuEmitters/" + groupName + ".json";
+		}
+
+		try
+		{
+			nlohmann::json json;
+			json["version"] = "1.0";
+			json["groups"] = nlohmann::json::array();
+			json["groups"].push_back(ToJsonGroup(group));
+
+			std::filesystem::path path(group->sourceFilePath);
+			if (path.has_parent_path()) {
+				std::filesystem::create_directories(path.parent_path());
+			}
+
+			std::ofstream file(group->sourceFilePath);
+			if (!file.is_open()) {
+				Logger("GpuEmitManager::SaveGroupToFile : ファイルを開けません " + group->sourceFilePath);
+				return false;
+			}
+
+			file << json.dump(4);
+			Logger("GpuEmitManager: グループ '" + groupName + "' を保存 → " + group->sourceFilePath);
+			return true;
+		}
+		catch (const std::exception& e)
+		{
+			std::cerr << "Error saving group: " << e.what() << std::endl;
+			return false;
+		}
+	}
+
+	/// <summary>
 	/// JSON ファイルからエミッター情報を読み込み
 	/// </summary>
 	bool GpuEmitManager::LoadFromFile(const std::string& filepath)
@@ -1648,7 +1995,7 @@ namespace YoRigine {
 			nlohmann::json json;
 			file >> json;
 
-			return FromJson(json);
+			return FromJson(json, filepath);
 		}
 		catch (const std::exception& e)
 		{
@@ -1697,7 +2044,19 @@ namespace YoRigine {
 
 		for (const auto& [groupName, groupPtr] : groups_)
 		{
-			nlohmann::json groupJson;
+			json["groups"].push_back(ToJsonGroup(groupPtr.get()));
+		}
+		return json;
+	}
+
+	/// <summary>
+	/// 単一グループを JSON 化（グループ単位保存・全体保存の両方から使う）
+	/// </summary>
+	nlohmann::json GpuEmitManager::ToJsonGroup(const EmitterGroup* groupPtr) const
+	{
+		nlohmann::json groupJson;
+		if (!groupPtr) return groupJson;
+		{
 			// ------------------------------------------------------------
 			// エミッターグループのパラメータをシリアライズ
 			// ------------------------------------------------------------
@@ -1810,18 +2169,32 @@ namespace YoRigine {
 				{"emissionCount",e->trailParams.emissionCount },
 				{"inheritScale", e->trailParams.inheritScale }
 				};
+
+				// 1粒子の描画メッシュ形状＋生成パラメータ
+				j["particleMeshShape"] = static_cast<int>(e->particleMeshShape);
+				j["particleMeshParams"] = {
+					{"width",        e->particleMeshParams.width},
+					{"height",       e->particleMeshParams.height},
+					{"depth",        e->particleMeshParams.depth},
+					{"outerRadius",  e->particleMeshParams.outerRadius},
+					{"innerRadius",  e->particleMeshParams.innerRadius},
+					{"radius",       e->particleMeshParams.radius},
+					{"angleDegree",  e->particleMeshParams.angleDegree},
+					{"divide",       e->particleMeshParams.divide},
+					{"subdivisions", e->particleMeshParams.subdivisions},
+				};
+
 				groupJson["emitters"].push_back(j);
 			}
-			json["groups"].push_back(groupJson);
 		}
-		return json;
+		return groupJson;
 	}
 
 
 	/// <summary>
 	/// JSON からエミッター情報を復元
 	/// </summary>
-	bool GpuEmitManager::FromJson(const nlohmann::json& json)
+	bool GpuEmitManager::FromJson(const nlohmann::json& json, const std::string& sourceFilePath)
 	{
 		try
 		{
@@ -1840,8 +2213,8 @@ namespace YoRigine {
 					// groupName がない場合に備えてデフォルト値 "LoadedGroup" を設定
 					std::string groupName = groupJson.value("groupName", "LoadedGroup");
 
-					// グループの作成
-					EmitterGroup* group = CreateEmitterGroup(groupName);
+					// グループの作成（由来ファイルパスを明示的に渡す＝起動時ロードでも確実に作成される）
+					EmitterGroup* group = CreateEmitterGroup(groupName, sourceFilePath);
 					if (!group) continue;
 
 					// グループパラメータの復元
@@ -2010,9 +2383,32 @@ namespace YoRigine {
 				e->trailParams.inheritScale = tp.value("inheritScale", false);
 			}
 
+			//------------------------------------------------------------
+			// 1粒子の描画メッシュ形状＋生成パラメータ（旧データには無いので既定）
+			//------------------------------------------------------------
+			e->particleMeshShape = static_cast<ParticleMeshShape>(
+				j.value("particleMeshShape", static_cast<int>(ParticleMeshShape::Plane)));
+
+			if (j.contains("particleMeshParams")) {
+				const auto& mp = j["particleMeshParams"];
+				auto& d = e->particleMeshParams;
+				d.width = mp.value("width", d.width);
+				d.height = mp.value("height", d.height);
+				d.depth = mp.value("depth", d.depth);
+				d.outerRadius = mp.value("outerRadius", d.outerRadius);
+				d.innerRadius = mp.value("innerRadius", d.innerRadius);
+				d.radius = mp.value("radius", d.radius);
+				d.angleDegree = mp.value("angleDegree", d.angleDegree);
+				d.divide = mp.value("divide", d.divide);
+				d.subdivisions = mp.value("subdivisions", d.subdivisions);
+			}
+
 			// 適用
 			UpdateEmitterParams(e);
 			UpdateParticleParams(e);
+			if (e->emitter) {
+				e->emitter->SetParticleMesh(e->particleMeshShape, e->particleMeshParams);
+			}
 
 			return true;
 		}

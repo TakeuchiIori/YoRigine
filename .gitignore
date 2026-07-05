@@ -374,11 +374,13 @@ FodyWeavers.xsd
 *.vcxproj.filters
 *.vcxproj.user
 
-# 例外的に外部ライブラリは含める（無いとPremakeが実行されない為）
-!Externals/ImGui/*.vcxproj
-!Externals/ImGui/*.filters
+# 例外的に外部ライブラリの vcxproj は含める
+# （externalproject 方式で参照するため。無いと Premake が実行できない）
+# ※ ImGui / meshoptimizer は premake の project 化したため vcxproj は生成物 → 追跡しない
 !Externals/DirectXTex/*.vcxproj
 !Externals/DirectXTex/*.filters
+!Externals/DirectXMesh/DirectXMesh/*.vcxproj
+!Externals/DirectXMesh/DirectXMesh/*.filters
 # INI configuration files
 *.ini
 /CLAUDE.md

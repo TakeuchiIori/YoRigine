@@ -32,6 +32,8 @@ public:
 	///************************* アクセッサ *************************///
 	void SetUVTransform(const Matrix4x4& uvTransform) { materialUV_->uvTransform = uvTransform; }
 	void SetStochasticStrength(float s) { materialUV_->stochasticStrength = s; }
+	const Matrix4x4& GetUVTransform() const { return materialUV_->uvTransform; }
+	float GetStochasticStrength() const { return materialUV_->stochasticStrength; }
 
 private:
 

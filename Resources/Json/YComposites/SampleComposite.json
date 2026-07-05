@@ -1,0 +1,7 @@
+{
+    "name": "SampleComposite",
+    "particleEffect": "",
+    "vfxMeshAssets": [],
+    "gpuEmitterGroup": "ss",
+    "sounds": []
+}

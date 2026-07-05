@@ -19,6 +19,7 @@
 
 #include "Particle/YEmitterGroupManager.h"
 #include "Vfx/VfxMesh/VfxMeshSpawner.h"
+#include "Composite/CompositeEffectManager.h"
 /// <summary>
 /// ゲーム全体の初期化処理（起動時に一度だけ実行）
 /// </summary>
@@ -69,10 +70,14 @@ void MyGame::Initialize() {
 	VfxMeshSpawner::GetInstance()->Initialize();
 	VfxMeshSpawner::GetInstance()->ScanDirectory("Resources/Json/VfxMesh/");
 
+	// 複合エフェクト（Particle+VfxMesh+GPU+Sound を名前で束ねる層）を自動ロード。
+	// Particle/GPU の Scan より後（子アセットが先に存在している必要があるため）。
+	CompositeEffectManager::GetInstance()->ScanDirectory("Resources/Json/YComposites/");
+
 	// モデル操作関連の初期化
 	YoRigine::ModelManipulator::GetInstance()->Initialize();
 
-	// BaseObject 一括管理マネージャ（インスペクタパネルの登録もここで行う）
+	// BaseObject 一括管理マネージャ
 	BaseObjectManager::GetInstance()->Initialize();
 
 	// PiP カメラサブシステム

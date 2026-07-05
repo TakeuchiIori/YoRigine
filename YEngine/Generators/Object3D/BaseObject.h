@@ -64,6 +64,16 @@ public:
 	// 内部 Object3d への参照（マテリアル/ディゾルブ等を State 側から操作するため）
 	Object3d* GetObject3d() const { return obj_.get(); }
 
+	// インスタンシング描画の対象にできるか。
+	// 既定: モデルを持ち、ボーン（＝スケルタルアニメ）を持たない非アニメオブジェクト。
+	// ディゾルブや独自 Draw を行う等、個別描画が必要なオブジェクトは false を返すよう
+	// override して従来の Draw() 経路に残すこと。
+	virtual bool IsInstanceable() const {
+		if (!obj_) return false;
+		Model* model = obj_->GetModel();
+		return model && !model->GetHasBones();
+	}
+
 
 	///************************* マネージャ連携 *************************///
 

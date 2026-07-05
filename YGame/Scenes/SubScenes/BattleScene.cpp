@@ -16,6 +16,7 @@
 
 #include <UI/Damage/DamageNumberManager.h>
 #include <ModelManipulator/ModelManipulator.h>
+#include "Object3D/BaseObjectManager.h"
 #include <algorithm>
 #ifdef USE_IMGUI
 #include "imgui.h"
@@ -44,6 +45,9 @@ void BattleScene::Initialize(Camera* camera, Player* player) {
 	sceneCamera_ = camera;
 	player_ = player;
 	player->Reset();
+
+	// BaseObjectManager へ登録（描画は従来どおり直接。一覧・名前検索用）
+	BaseObjectManager::GetInstance()->Register(player_, "Player");
 
 	//------------------------------------------------------------
 	// バトル敵管理システム初期化
@@ -208,14 +212,15 @@ void BattleScene::Update() {
 /// 3Dオブジェクト描画
 /// </summary>
 void BattleScene::DrawObject() {
+	// インスタンシング描画(敵)は最後に。DrawAll が ObjectInstanced のルートシグネチャに
+	// 切り替えるため、その後に Object 系の個別描画を置くと RS 不一致でエラーになる。
 	ground_->Draw();
+	player_->Draw();
+	player_->DrawAnimation();
 
 	if (battleEnemyManager_) {
 		battleEnemyManager_->Draw();
 	}
-
-	player_->Draw();
-	player_->DrawAnimation();
 }
 
 /// <summary>

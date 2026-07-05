@@ -7,6 +7,9 @@
 #include "LightManager/LightManager.h"
 #include "Model.h"
 #include "Material/OutlineSettings.h"
+#include "WorldTransform/WorldTransform.h"
+#include "Object3D/Object3d.h"
+#include "Object3D/ObjectManager.h"
 
 #include <cassert>
 
@@ -60,6 +63,59 @@ void InstancedObject3d::Begin()
 		batch.cpuData.clear();
 	}
 	totalInstances_ = 0;
+	frameCamera_ = nullptr;
+}
+
+void InstancedObject3d::Begin(Camera* camera)
+{
+	Begin();
+	frameCamera_ = camera;
+}
+
+void InstancedObject3d::Submit(Model* model, const Instance& src)
+{
+	if (!model) return;
+
+	InstanceData d{};
+	d.World = src.world;
+	// カメラ未設定 (影パス等 WVP を使わない用途) では WVP は World をそのまま入れておく
+	d.WVP = frameCamera_ ? (src.world * frameCamera_->GetViewProjectionMatrix()) : src.world;
+	{
+		const Matrix4x4 inv = Inverse(src.world);
+		for (int r = 0; r < 4; ++r)
+			for (int c = 0; c < 4; ++c)
+				d.WorldInverseTranspose.m[r][c] = inv.m[c][r];
+	}
+	d.color = src.color;
+	d.uvTransform = src.uvTransform;
+	d.stochasticStrength = src.stochasticStrength;
+	d.outlineMask = src.outlineMask;
+
+	AddInstance(model, d);
+}
+
+void InstancedObject3d::Submit(const ObjectManager::PlacedObject& placed)
+{
+	if (!placed.object || !placed.worldTransform) return;
+
+	Submit(placed.object->GetModel(), Instance{
+		placed.worldTransform->matWorld_,
+		placed.color,
+		MakeScaleMatrix({ placed.uvScale.x, placed.uvScale.y, 1.0f }),
+		placed.uvStochastic,
+		placed.outlineEnabled ? 1.0f : 0.0f,
+	});
+}
+
+void InstancedObject3d::Submit(Object3d& object, const WorldTransform& transform)
+{
+	Submit(object.GetModel(), Instance{
+		transform.matWorld_,
+		object.GetColor(),
+		object.GetUvTransform(),
+		object.GetStochasticStrength(),
+		object.IsOutlineEnabled() ? 1.0f : 0.0f,
+	});
 }
 
 void InstancedObject3d::AddInstance(Model* model, const InstanceData& data)
@@ -96,7 +152,7 @@ void InstancedObject3d::EnsureCapacity(Batch& batch, uint32_t needed)
 	batch.srvHandleGPU = srvManager_->GetGPUDescriptorHandle(batch.srvIndex);
 }
 
-void InstancedObject3d::Flush(Camera* camera)
+void InstancedObject3d::DrawAll(Camera* camera)
 {
 	if (totalInstances_ == 0 || !camera) return;
 
@@ -169,7 +225,7 @@ void InstancedObject3d::Flush(Camera* camera)
 	}
 }
 
-void InstancedObject3d::FlushShadow()
+void InstancedObject3d::DrawShadow()
 {
 	if (totalInstances_ == 0) return;
 

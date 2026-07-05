@@ -12,7 +12,8 @@
 #include <cmath>
 #include "Debugger/Logger.h"
 #include <Loaders/Texture/TextureManager.h>
-#include <Editor/Icon/EditorIcon.h>
+#include <IconsFontAwesome5.h>
+
 
 namespace fs = std::filesystem;
 
@@ -882,14 +883,14 @@ namespace YoRigine {
 
         if (previewPlaying_) {
             // ★ 停止ボタン
-            if (ImGui::Button((std::string(Icon::Stop) + "停止").c_str())) {
+            if (ImGui::Button((std::string(ICON_FA_STOP) + " 停止").c_str())) {
                 previewPlaying_ = false;
                 if (previewTrailEmitter_) previewTrailEmitter_->Stop(); // Emitterを停止（描画されなくなる）
             }
         }
         else {
             // ★ 再生ボタン
-            if (ImGui::Button((std::string(Icon::Play) + "再生").c_str())) {
+            if (ImGui::Button((std::string(ICON_FA_PLAY) + " 再生").c_str())) {
                 previewPlaying_ = true;
                 previewTimer_ = 0.f;
                 if (previewTrailEmitter_) previewTrailEmitter_->Play(); // Emitterを再生（描画再開）
@@ -897,7 +898,7 @@ namespace YoRigine {
         }
         ImGui::SameLine();
         // ★ リセットボタン
-        if (ImGui::Button((std::string(Icon::Refresh) + "リセット").c_str())) {
+        if (ImGui::Button((std::string(ICON_FA_SYNC) + " リセット").c_str())) {
             previewTimer_ = 0.f;
             if (previewTrailEmitter_) previewTrailEmitter_->Play(); // リセットして最初から再生
         }

@@ -4,6 +4,7 @@
 #ifdef USE_IMGUI
 #include <imgui.h>
 #include "Debugger/DopeSheet/DopeSheetEditor.h"
+#include <IconsFontAwesome5.h>
 #endif
 
 // C++
@@ -174,9 +175,9 @@ void UIBase::ImGuiAnimationSettings() {
 
 	// 再生ボタン
 	ImGui::SameLine();
-	if (ImGui::Button("▶ 再生")) PlayClip(clip);
+	if (ImGui::Button(ICON_FA_PLAY " 再生")) PlayClip(clip);
 	ImGui::SameLine();
-	if (ImGui::Button("■ 停止")) StopClip(clip.name);
+	if (ImGui::Button(ICON_FA_STOP " 停止")) StopClip(clip.name);
 
 	ImGui::Spacing();
 	ImGui::Separator();
@@ -258,7 +259,7 @@ void UIBase::ImGuiAnimationSettings() {
 					if (ImGui::Combo("##e", &e, kEasingNames, kEasingCount))
 						key.easing = static_cast<Easing::Function>(e);
 					ImGui::SameLine();
-					if (ImGui::SmallButton("✕")) removeKeyIdx = ki;
+					if (ImGui::SmallButton(ICON_FA_TIMES)) removeKeyIdx = ki;
 
 					ImGui::PopID();
 				}

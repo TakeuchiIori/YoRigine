@@ -7,6 +7,10 @@
 #include <string>
 #include <memory>
 
+// 複合エフェクト（Particle+VfxMesh+GPU+Sound を束ねた実行インスタンス）。
+// 実体は Composite/CompositeEffectManager.h。ここでは前方宣言のみで疎結合を保つ。
+struct CompositeInstance;
+
 /// <summary>
 /// エフェクトの生存管理ハンドル
 ///
@@ -82,7 +86,7 @@ public:
 
     // ── クエリ ──────────────────────────────────────────────────────────
 
-    bool IsValid() const { return emitter_ != nullptr || group_ != nullptr; }
+    bool IsValid() const { return emitter_ != nullptr || group_ != nullptr || composite_ != nullptr; }
     bool IsActive() const;
     const std::string& GetSystemName() const { return systemName_; }
 
@@ -91,7 +95,11 @@ public:
 
 private:
     std::string                      systemName_;
-    // どちらか一方が有効: System経路 = emitter_ / Group経路 = group_
+    // いずれか一つが有効: System経路 = emitter_ / Group経路 = group_ / 複合経路 = composite_
     std::shared_ptr<YParticleEmitter> emitter_;
     YEmitterGroup*                    group_ = nullptr;  // Managerが所有、借用ポインタ
+    std::shared_ptr<CompositeInstance> composite_;       // 複合エフェクト実行インスタンス
+
+    // 複合エフェクトの生成時に composite_ を差し込むため
+    friend class CompositeEffectManager;
 };
