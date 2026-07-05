@@ -11,6 +11,7 @@
 #include <unordered_set>
 #include <cctype>
 #include "d3dx12.h"
+#include "RenderFormats.h"
 #include "Debugger/Logger.h"
 #include "Debugger/ConvertString.h"
 #include <Debugger/DebugConsole.h>
@@ -93,7 +94,8 @@ namespace YoRigine {
 		srvManager_->Initialize(this);
 
 		rtvManager_ = std::make_unique<RtvManager>();
-		rtvManager_->Initialize(deviceManager_.get(), 16);
+		// 16 → 32 に拡張（Dual Kawase ブルームのミップピラミッド RT 8 枚を追加確保するため）
+		rtvManager_->Initialize(deviceManager_.get(), 32);
 
 		dsvManager_ = std::make_unique<DsvManager>();
 		dsvManager_->Initialize(deviceManager_.get(), 8);
@@ -113,11 +115,11 @@ namespace YoRigine {
 				DXGI_FORMAT_R8G8B8A8_UNORM_SRGB);
 		}
 
-		// オフスクリーン RTV
+		// オフスクリーン RTV（HDR リニア。シーンの発光を >1.0 で保持し Bloom の選択性を得る）
 		rtvManager_->Create(
 			"OffScreen",
 			WinApp::kClientWidth, WinApp::kClientHeight,
-			DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+			YoRigine::kSceneColorFormat,
 			{ 0.1f, 0.1f, 0.2f, 1.0f },
 			true);   // SRV も同時に作成
 

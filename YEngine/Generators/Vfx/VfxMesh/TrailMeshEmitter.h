@@ -21,8 +21,10 @@ namespace YoRigine {
     //   Row3 : softness, glowPower, distortion, time
     //   Row4 : energyIntensity, energySpeed, sparkleAmount, sparkleSpeed
     //   Row5 : fresnelStrength, trailSharpness, colorWaveFreq, colorWaveAmp
-    //   Row6 : uvScrollSpeed, noiseOctaves, _pad0, _pad1
-    // 合計 112 bytes < 256 (1 CBV スロット内に収まる)
+    //   Row6 : uvScrollSpeed, noiseOctaves, dissolveStrength, dissolveEdgeWidth
+    //   Row7 : dissolveEdgeColor[4]
+    //   Row8 : emissiveIntensity, _pad2, _pad3, _pad4
+    // 合計 144 bytes < 256 (1 CBV スロット内に収まる)
     struct MeshTrailParamsCB
     {
         float colorInner[4];      // Row0
@@ -46,8 +48,15 @@ namespace YoRigine {
 
         float uvScrollSpeed;      // Row6 ★NEW
         float noiseOctaves;
-        float _pad0;
-        float _pad1;
+        float dissolveStrength;   // ★NEW: 溶けて消える強度 (0=OFF)
+        float dissolveEdgeWidth;  // ★NEW: 侵食エッジの帯幅
+
+        float dissolveEdgeColor[4]; // Row7 ★NEW: 侵食エッジのHDR発光色
+
+        float emissiveIntensity;    // Row8 ★NEW: 発光マスター強度 (0=消灯)
+        float _pad2;
+        float _pad3;
+        float _pad4;
     };
 
     class TrailMeshEmitter

@@ -794,7 +794,10 @@ void ComputeShaderManager::CreatePostEffectCS()
 		{ "PostEffectRadialBlurCS",  L"Resources/Shaders/PostEffect/Blur/RadialBlur.CS.hlsl",            "PostEffectRS_CB" },
 		{ "PostEffectToneMapCS",     L"Resources/Shaders/PostEffect/ColorRemapping/ToneMapping.CS.hlsl", "PostEffectRS_CB" },
 		{ "PostEffectChromaticCS",   L"Resources/Shaders/PostEffect/ColorRemapping/Chromatic.CS.hlsl",   "PostEffectRS_CB" },
-		{ "PostEffectBloomCS",       L"Resources/Shaders/PostEffect/Bloom/Bloom.CS.hlsl",                "PostEffectRS_CB" },
+		// Dual Kawase ブルーム（ミップピラミッド 3 段構成）
+		{ "PostEffectBloomDownCS",   L"Resources/Shaders/PostEffect/Bloom/BloomDownsample.CS.hlsl",      "PostEffectRS_CB" },
+		{ "PostEffectBloomUpCS",     L"Resources/Shaders/PostEffect/Bloom/BloomUpsample.CS.hlsl",        "PostEffectRS_CB" },
+		{ "PostEffectBloomCompCS",   L"Resources/Shaders/PostEffect/Bloom/BloomComposite.CS.hlsl",       "PostEffectRS_Tex" },
 		{ "PostEffectPosterizeCS",   L"Resources/Shaders/PostEffect/Posterize/Posterize.CS.hlsl",        "PostEffectRS_CB" },
 		{ "PostEffectKuwaharaCS",    L"Resources/Shaders/PostEffect/Kuwahara/Kuwahara.CS.hlsl",          "PostEffectRS_CB" },
 		{ "PostEffectHalftoneCS",    L"Resources/Shaders/PostEffect/Halftone/Halftone.CS.hlsl",          "PostEffectRS_CB" },

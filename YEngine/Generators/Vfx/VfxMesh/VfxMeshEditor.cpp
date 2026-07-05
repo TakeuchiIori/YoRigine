@@ -191,7 +191,26 @@ namespace YoRigine {
             Vector3 widthDir = { 0.f, 1.f, 0.f };
 
             const float period = std::max(asset.trail.lifetime * 1.5f, 0.5f);
-            const float t = std::fmod(previewTimer_, period) / period;
+
+            // ワンショット: 1振りして手を止め、既存トレイルがフェード/ディゾルブで
+            // 消えたら少し待って最初から。継続モードは従来どおりループ。
+            bool  addThisFrame = true;
+            float t;
+            if (trailOneShot_) {
+                const float swingDur = period / std::max(previewSpeed_, 0.01f);
+                const float cycle    = swingDur + asset.trail.lifetime + 0.4f;
+                const float local    = std::fmod(previewTimer_, cycle);
+                if (local < deltaTime && previewTrailEmitter_)
+                    previewTrailEmitter_->Play();          // サイクル頭で軌跡クリア＆再生
+                if (local <= swingDur) {
+                    t = std::min(local / swingDur, 1.0f);  // 0→1 で 1 振り
+                } else {
+                    t = 1.0f;                              // 振り終わり位置で固定
+                    addThisFrame = false;                  // 以降は点を足さない → 自然に消える
+                }
+            } else {
+                t = std::fmod(previewTimer_ * previewSpeed_, period) / period;
+            }
 
             switch (previewAnim_) {
             case PreviewAnimMode::Wobble: {
@@ -226,8 +245,9 @@ namespace YoRigine {
             }
             }
 
-            // ★ Emitterに点を追加（widthDirも渡す）
-            previewTrailEmitter_->AddPoint(tip, root, widthDir);
+            // ★ Emitterに点を追加（widthDirも渡す）。ワンショットの停止中は足さない。
+            if (addThisFrame)
+                previewTrailEmitter_->AddPoint(tip, root, widthDir);
             previewTrailEmitter_->Update(deltaTime);
         }
 
@@ -621,9 +641,34 @@ namespace YoRigine {
         {
             VfxEffectAsset b = sel->asset;
             bool c = false;
-            c |= ImGui::ColorEdit4("根元カラー##cs", &t.colorStart.x);
-            c |= ImGui::ColorEdit4("先端カラー##ce", &t.colorEnd.x);
+            const ImGuiColorEditFlags hdr = ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_Float;
+            c |= ImGui::ColorEdit4("根元カラー##cs", &t.colorStart.x, hdr);
+            c |= ImGui::ColorEdit4("先端カラー##ce", &t.colorEnd.x, hdr);
             if (c) CommitChange(b, "Trail カラー");
+            ImGui::TextDisabled("  ※値を >1 にすると Bloom で強く発光する");
+        }
+
+        ImGui::SeparatorText("発光");
+        {
+            VfxEffectAsset b = sel->asset;
+            bool c = false;
+            c |= ImGui::SliderFloat("発光強度 (0で消灯)##emi", &t.emissiveIntensity, 0.f, 5.f, "%.2f");
+            c |= ImGui::SliderFloat("中心グロー##glow", &t.glowPower, 0.f, 8.f, "%.2f");
+            c |= ImGui::SliderFloat("エッジソフト##sof", &t.softness, 0.f, 1.f, "%.2f");
+            if (c) CommitChange(b, "Trail 発光");
+            ImGui::TextDisabled("  ※発光強度=0 で完全に消灯（形だけ確認したい時に）");
+        }
+
+        ImGui::SeparatorText("アウトライン強調 (縁の発光)");
+        {
+            VfxEffectAsset b = sel->asset;
+            bool c = false;
+            c |= ImGui::ColorEdit4("縁の色##rim", &t.rimColor.x,
+                                   ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_Float);
+            c |= ImGui::SliderFloat("縁の強さ##rim",  &t.fresnelStrength, 0.f, 5.f, "%.2f");
+            c |= ImGui::SliderFloat("縁の細さ##rim",  &t.trailSharpness,  0.2f, 8.f, "%.2f");
+            if (c) CommitChange(b, "Trail アウトライン");
+            ImGui::TextDisabled("  ※縁を HDR(>1) にすると Bloom で強く光る");
         }
 
         ImGui::SeparatorText("ブレンドモード");
@@ -878,7 +923,15 @@ namespace YoRigine {
             }
             ImGui::SameLine();
             ImGui::SetNextItemWidth(100);
-            ImGui::DragFloat("剣の長さ", &swordLength_, 0.1f, 0.5f, 10.f, "%.1f");
+            ImGui::DragFloat("剣のサイズ", &swordLength_, 0.1f, 0.5f, 10.f, "%.1f");
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(100);
+            ImGui::DragFloat("再生速度", &previewSpeed_, 0.05f, 0.1f, 5.f, "%.2f");
+
+            if (ImGui::Checkbox("ワンショット再生 (1振りして消えるまで)", &trailOneShot_)) {
+                previewTimer_ = 0.f;
+                if (previewTrailEmitter_) previewTrailEmitter_->Play();
+            }
         }
 
         if (previewPlaying_) {

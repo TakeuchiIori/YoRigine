@@ -135,7 +135,9 @@ namespace YoRigine {
         std::unique_ptr<ShockwaveMesh>    previewShockwave_;
 
         PreviewAnimMode previewAnim_ = PreviewAnimMode::SlashHorizontal;
-        float swordLength_ = 2.0f;
+        float swordLength_ = 2.0f;    // プレビュー剣のサイズ（tip↔root）
+        float previewSpeed_ = 1.0f;   // プレビュー振りの再生速度倍率
+        bool  trailOneShot_ = false;  // トレイル: 1振りして消えるまで見せる（ワンショット）
 
         bool    previewPlaying_ = false;
         float   previewTimer_ = 0.f;

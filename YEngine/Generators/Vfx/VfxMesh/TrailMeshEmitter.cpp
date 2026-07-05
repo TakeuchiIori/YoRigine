@@ -79,11 +79,23 @@ namespace YoRigine {
         trailCBMapped_->colorWaveFreq   = t.colorWaveFreq;
         trailCBMapped_->colorWaveAmp    = t.colorWaveAmp;
 
-        // Row6: UV / ノイズ ★NEW
-        trailCBMapped_->uvScrollSpeed = t.uvScrollSpeed;
-        trailCBMapped_->noiseOctaves  = t.noiseOctaves;
-        trailCBMapped_->_pad0         = 0.f;
-        trailCBMapped_->_pad1         = 0.f;
+        // Row6: UV / ノイズ / ディゾルブ ★NEW
+        trailCBMapped_->uvScrollSpeed    = t.uvScrollSpeed;
+        trailCBMapped_->noiseOctaves     = t.noiseOctaves;
+        trailCBMapped_->dissolveStrength  = t.dissolveStrength;
+        trailCBMapped_->dissolveEdgeWidth = t.dissolveEdgeWidth;
+
+        // Row7: ディゾルブ エッジ色 ★NEW
+        trailCBMapped_->dissolveEdgeColor[0] = t.dissolveEdgeColor.x;
+        trailCBMapped_->dissolveEdgeColor[1] = t.dissolveEdgeColor.y;
+        trailCBMapped_->dissolveEdgeColor[2] = t.dissolveEdgeColor.z;
+        trailCBMapped_->dissolveEdgeColor[3] = t.dissolveEdgeColor.w;
+
+        // Row8: 発光マスター強度 ★NEW
+        trailCBMapped_->emissiveIntensity = t.emissiveIntensity;
+        trailCBMapped_->_pad2 = 0.f;
+        trailCBMapped_->_pad3 = 0.f;
+        trailCBMapped_->_pad4 = 0.f;
     }
 
     // -------------------------------------------------------

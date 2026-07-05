@@ -4,6 +4,164 @@ YParticle / VFX 関連の作業を時系列で記録する。方針: **A: facade
 
 ---
 
+## 2026-07-05 — VFXエディタ プレビュー操作追加: 剣サイズ / 再生速度 / 発光（Debugビルド成功）
+
+ユーザー要望でトレイルプレビューの調整項目を追加。
+- **剣のサイズ**: 既存 `swordLength_`（tip↔root）を「剣の長さ」→「剣のサイズ」にリネーム（プレビュー欄）。
+- **再生速度**: 新規 `previewSpeed_`（0.1〜5.0倍）追加。振りの位相 `t = fmod(previewTimer_*previewSpeed_, period)/period` に適用＝振りの速さを可変（burst等の他タイマーには非干渉）。プレビュー欄にスライダ。
+- **発光**: トレイルの `glowPower`（PSで使用中なのにエディタ未露出だった）を「発光」セクションで露出（中心グロー＋エッジソフト`softness`）。さらに **カラー編集を HDR 対応**（`ImGuiColorEditFlags_HDR|_Float`）にし、根元/先端カラーを >1 にして Bloom で強発光できるように。
+- ディゾルブ式も修正（別項）: `thr = saturate((age-(1-strength))/strength)` に変更＝寿命後半から溶け始め、新しい端は必ず solid（「最初から溶けてる」の解消）。
+- **発光マスター強度 `emissiveIntensity`**（TrailEffectParam＋CB Row8＋PSで最終色に乗算）追加。「発光しすぎて分からない/消せない」対策＝0で完全消灯・0.3で形確認・>1で強発光。カラー編集を HDR フラグ化（>1でBloom）。
+- **トレイル ワンショットプレビュー** `trailOneShot_`: 1振り→点追加停止→Update継続で自然にフェード/ディゾルブ→小休止→リピート。アーク＆消え方が読める。`period/previewSpeed` で振り時間算出、cycle=振り+lifetime+0.4s。
+- 「元の色が分からん」対策は既存ノブで対応可（発光強度↓／ランプ(t1)クリア／通常ブレンド）＝加算×HDR×Bloomの白飛びが原因。
+- **MSBuild Debug x64 成功（exit 0）**。VfxMeshEditor は USE_IMGUI(Debug) 限定。
+
+---
+
+## 2026-07-05 — 斬撃トレイルに「溶けて消える」ディゾルブ追加（Mesh Shader不要 / Debugビルド成功）
+
+ユーザー要望「メッシュがどんどん小さくなって消える」表現。Mesh Shaderは不要（見た目の消えは VS/PS で十分）と合意し、`ProceduralMeshVertex` が既に持つ**頂点ごとの `age`** ＋ トレイルPSが既にサンプルしている**ノイズテクスチャ**を使ってディゾルブ侵食を実装。
+
+### 仕組み
+`age`(0=新, 1=消えかけ) が進むほどノイズしきい値を押し上げ、`clip(noise - age*strength)` で縁から侵食して discard。侵食境界を HDR で発光させ Bloom に拾わせる（削れながら縁が光って消える）。
+
+### 変更（CBレイアウトは C++/HLSL を 1:1 で同時更新）
+- **`VfxEffectAsset.h` `TrailEffectParam`**: `dissolveStrength`(0=OFF) / `dissolveEdgeWidth` / `dissolveEdgeColor`(HDR) 追加。
+- **`VfxEffectAsset.cpp`**: 上記3つを Save/Load（後方互換 value()）。
+- **`TrailMeshEmitter.h` `MeshTrailParamsCB`**: Row6 の `_pad0/_pad1` を `dissolveStrength/dissolveEdgeWidth` に転用、Row7 に `dissolveEdgeColor[4]` 追加（112→128B、256B CBV 内）。
+- **`TrailMeshEmitter.cpp` UpdateCB**: 新フィールドをマップ。
+- **`VfxMesh_Common.hlsli` `MeshTrailParams`**: CBと一致するよう Row6/Row7 更新。
+- **`VfxMesh_Trail.PS.hlsl`**: age×ノイズで `clip`、侵食エッジを `dissolveEdgeColor` で premultiplied 加算発光（低αでも縁が光る）。
+- **`VfxMeshEditor.cpp`**: Trailタブに「ディゾルブ」セクション（溶ける強さ/縁の幅/縁の発光色＋CommitでUndo対応）。
+
+### 使い方 / 注意
+- VFXエディタ → Trail → **ノイズ(t0)テクスチャを設定**（雲/パーリン系）→「溶ける強さ」を上げる。**ノイズ未設定だと白フォールバックで溶けない**（安全既定OFF）。
+- 既定 `dissolveStrength=0` なので既存トレイルの見た目は不変（オプトイン）。
+- 次段: 侵食エッジから火花パーティクルを撒く（メッシュが粒子に分解＝前回話した「周りの粒子」と合体）。
+
+### 検証
+- **MSBuild Debug x64 成功（exit 0）**。⏳ 実機でノイズ設定→溶ける＆縁がBloomで光るか要確認。
+
+---
+
+## 2026-07-05 — CPUパーティクル: 保存した発光(emissive)版でなく旧版が出る問題を修正（Debugビルド成功）
+
+症状: エミッタグループを自動ONにすると、Bloom 用に emissive 調整して保存した版でなく、調整前の旧版パーティクルが出る。
+
+### 原因（エンジン2バグ ＋ データ重複）
+1. **`YParticleManager::LoadSystemsFromJson`（起動時ローダ）が `emissiveIntensity` を読んでいなかった**（texture/BlendMode/mesh 等は読むが emissive だけ抜け）。読むのはエディタ側ローダ（`YParticleEditor.cpp`）のみ。→ 起動時は emissive が常に既定 1.0 に戻る。
+2. **`CreateSystem` は同名なら既存を返すだけでモジュールをクリアしない**。→ 同名システムを2回ロードすると `AddSpawnModule`/`AddUpdateModule` が二重追加（`YEffects/ClearScene.json` の spawnModules 4重複はこれが保存に焼き込まれたもの）。
+3. **データ重複**: 同名システム "Clear" が `YParticleSystems/Clear.json`（emissive 6.25＝調整版）と `YEffects/ClearScene.json` 同梱（emissive 無し＝旧版・4重複）に二重存在。ロード順 `YParticleSystems/`（先）→ `YEffects/`（後）で**旧版が後勝ち**。
+
+### 修正
+- **`YParticleSystem.h`**: `ClearModules()`（spawn/update モジュールを一括 clear）追加。
+- **`YParticleManager::LoadSystemsFromJson`**: システム取得直後に `ClearModules()`（＝再ロードは追記でなく置換＝二重追加防止・ホットリロード安全化）。加えて `emissiveIntensity` を読んで `SetEmissiveIntensity`（起動時も発光が反映される）。
+- **データ単一ソース化（ユーザー選択: 個別ファイルをソースに）**: 最終的に `YEffects/ClearScene.json` を**丸ごと削除**。その中の group "ClearScene" は `YEmitterGroups/Clear.json` に**同一内容で既存**（emissionRate 1.0 / emitCount 35 / offsetY 7.4 / shapeType 2 …）だったため移行不要・データ損失なし。結果、システム "Clear" は `YParticleSystems/Clear.json`（emissive版）、group "ClearScene" は `YEmitterGroups/Clear.json` が各々唯一のソースに。`YEffects/` に残るのは `EnemyHit.json` のみ。
+- 参考: グループ側 `YEmitterGroup::LoadFromJson` は先頭で `emitters_.clear()` 済み＝**グループは元々二重化しない**（後勝ち）。二重追加はシステム側だけの問題だった。
+
+### 検証
+- **MSBuild Debug x64 成功（exit 0）**。
+- ⏳ 実機で「グループ自動ON → emissive 調整版（発光）が出る」か要確認。
+- 波及: 同じ「同名システムの二重ロード」耐性が全エフェクトに付いた（今後 YParticleSystems と YEffects に同名があってもモジュール二重化しない）。ただしデータ重複時の後勝ち precedence は残るので、単一ソース運用は継続推奨。
+
+---
+
+## 2026-07-05 — ClearScene で Bloom 確認中に踏んだ 2 バグ修正（Debugビルド成功）
+
+HDR 化した Bloom を ClearScene でも確認しようとして、続けて 2 つのバグを踏んだので修正。
+
+### バグ1: ClearUI Draw で D3D12 #613 RENDER_TARGET_FORMAT_MISMATCH
+- 症状: ClearScene 遷移時に `DrawIndexedInstanced` で PSO=R8G8B8A8_UNORM_SRGB vs RT=R16G16B16A16_FLOAT の不一致 → デバッグレイヤー BREAK でアプリ停止（黒フェードのまま固まる）。
+- 原因: `ClearScene::Draw()`（＝OffScreen(HDR R16F) パス内）で `clearUI_->DrawAll()` を呼んでいた。Sprite PSO は SRGB 据え置き（backbuffer/最終blit行きの想定）なので HDR RT と不一致。**ClearScene だけ Title/Game と違い UI を OffScreen パスで描いていた潜在バグ**が HDR 化で顕在化（HDR 前は OffScreen も SRGB で偶然一致）。
+- 修正: `clearUI_->DrawAll()`（＋直前の `SpriteCommon::DrawPreference()`）を `ClearScene::Draw()` → `ClearScene::DrawNonOffscreen()` へ移動。Title/Game と同じく**ポスト適用後のバックバッファ(SRGB)に UI を描く**正しい層に。Sprite PSO は無変更。※UI には Bloom 等ポストが乗らない（Title/Game と同挙動）。
+
+### バグ2: YParticleEmitter が emissionRate=0 で無限ループ → フリーズ
+- 症状: #613 修正後、ClearScene 遷移で今度は D3D エラー無しに黒フレームで固まる（デバッガも break しない）。ブレークで止めると常に `YParticleSystem::FindEmptyIndex()` 内。
+- 原因: `YParticleEmitter::Update` が `interval = (emissionRate_>0) ? 1/emissionRate_ : 0` としており、**`emissionRate_<=0` で interval=0 → `while (emissionTimer_ >= 0)` が無限ループ**。毎周 `EmitInternal → system->Emit → FindEmptyIndex` を呼び続けフレームが完了しない。トリガは ユーザーが `EffectHandle::Play("ClearScene", loop=true)`（`SetAutoEmitAll(true)`）を毎フレーム呼び、かつ `Resources/Json/YEffects/ClearScene.json` のエミッタが `"emissionRate": 0.0` だったこと。データ由来だがエンジンが自衛できていない潜在バグ。
+- 修正（`YParticleEmitter.cpp`）: (1) `emissionRate_<=0` なら連続発生せず early return（timer リセット）＝無限ループ封じ。(2) 1 フレームの発生回数を `kMaxEmitPerFrame=256` で上限化＝シーンロード直後の巨大 deltaTime で大量発生して実質フリーズするのも防止。`YEmitterGroup::Update` は各 emitter->Update へ委譲するだけなのでグループ経路も同修正でカバー。
+- 運用メモ: 修正でフリーズは消えるが `emissionRate=0` のままだと ClearScene の粒子は出ない。連続発生したいなら rate>0 に、単発なら `PlayOneShot` を使う。
+
+### 検証
+- **MSBuild Debug x64 成功（exit 0、YMain.exe 生成）**。
+- ⏳ 実機で ClearScene 遷移がフリーズせず Bloom が確認できるか要チェック。
+
+---
+
+## 2026-07-05 — Bloom を単一パス → マルチパス Dual Kawase 化（Debug・Releaseビルド成功・実機未検証）
+
+HDR パイプライン化に続き、Bloom を**単一パスの `Bloom.CS.hlsl` から、ミップピラミッド式 Dual Kawase の3パス構成**に作り替え。単一パスは半径が固定で「広く滑らかなグロー」が出せず、HDRの発光を活かしきれなかったため。※このセクションは PC クラッシュ後に現物（未コミット差分）から再構成した記録。
+
+### 新シェーダ（`Resources/Shaders/PostEffect/Bloom/`、旧 `Bloom.CS.hlsl` は削除）
+- **`BloomDownsample.CS.hlsl`**: 13タップ（COD/Jimenez方式）で 1/2 解像度へ縮小。`doThreshold=1` の時だけ BrightPass（`threshold` で高輝度抽出）を兼ねる。深いミップは `doThreshold=0` で純縮小＝しきい値で二度エネルギーを削らない。HDRリニア出力（saturateなし）。CB=`BloomDownParams{threshold, doThreshold}`。RS=`PostEffectRS_CB`。
+- **`BloomUpsample.CS.hlsl`**: 下位ミップを 3x3 テントで拡大し対象ミップへ **read-add-write** で加算。`filterRadius` で滲み半径。CB=`BloomUpParams{filterRadius}`。RS=`PostEffectRS_CB`。
+- **`BloomComposite.CS.hlsl`**: フル解像度シーン（t0）＋ブルーム mip0（t1）を `intensity` で加算。`colorTemperature` で暖/寒色寄せ。HDRリニア出力（トーンマップ/sRGBは最終blitに一元化）。CB=`BloomCompositeParams{intensity, colorTemperature}`。RS=`PostEffectRS_Tex`（SRV2枚必要）。
+
+### C++ 配線
+- **`ComputeShaderManager.cpp`**: 旧 `PostEffectBloomCS` 登録を削除し、`PostEffectBloomDownCS`/`PostEffectBloomUpCS`（RS_CB）/`PostEffectBloomCompCS`（RS_Tex）の3本を登録。
+- **`PostEffectManager.{h,cpp}`**: ミップピラミッド RT（`BloomMip0..7`、`kBloomMaxMips=8`、`kSceneColorFormat`＝R16F・SRV+UAV）を `InitializeRenderTargets` で確保。`RenderEffectChain` で Bloom は専用経路 `ApplyBloomPyramid` に分岐（①BrightPass兼DS: シーン→mip0 ②純DS: mip[i-1]→mip[i] ③加算US: mip[i+1]→mip[i] ④合成: シーン+mip0→outputRT）。`BloomParams.spread` を**アクティブ段数**(1〜8)に読み替え＝グローの届く広さ。
+- **`OffScreen.{h,cpp}`**: `DispatchBloomDown/Up/Composite` ＋ 段別CB（`bloomBright/Down/Up/Composite`）を追加。段内で値一定なので段ごとに個別CBを持ち、同一CBへの書き換えハザードを回避。`SetBloomParams` で threshold/intensity/colorTemperature をマップ（filterRadius は現状 1.0 固定）。
+- **`TD.json`**: Bloom（type12）を effect#4 として追加（`effectCount` 3→4）。
+
+### 検証
+- **MSBuild Debug＋Release x64 ビルド成功（exit 0、YMain.exe 生成）**。クラッシュ後の作業ツリー健全性も確認済み。
+- ⏳ **実機未検証**: (1)起動してデバイスロストしないか（BloomMip RT/RS_Tex ディスクリプタテーブルの最終確認）、(2)`spread` を上げてグローが広く滑らかに伸びるか、(3)`threshold≈1.0`＋パーティクルの emissive で「芯だけキュッと光り、外へ滑らかに滲む」か、(4)`colorTemperature` で暖/寒色寄せが効くか。
+- ロールバック: 未コミット。`git checkout -- .` ＋ 新規 `Bloom/BloomDownsample|Upsample|Composite.CS.hlsl` と `RenderFormats.h` 削除で戻る（旧 `Bloom.CS.hlsl` は `git checkout` で復活）。
+
+### 残
+- `filterRadius` が 1.0 固定＝`BloomParams` に露出＆エディタ/JSON化するとにじみの太さを調整できる。
+- HDRチェーン全体の実機トーン再グレーディング（下記 HDR セクションの残課題と同じ）。
+
+---
+
+## 2026-07-05 — HDRレンダーパイプライン化（案Y フルHDRチェーン / Debug・Releaseビルド成功・実機未検証）
+
+Bloomが「明るい所だけでなく画面全体が光る」原因を調査 → **パイプライン全体が8bit LDR(R8G8B8A8_SRGB)**で、発光(emissive>1)がRT書込み時に1.0クランプされ、Bloomがしきい値で芯と背景を分離できないためと判明（`YParticleSystem::emissiveIntensity_`が効かない根本原因）。加えて`ToneMapping.CS`に「PS版と同じ二重ガンマ再現」ハックが入っていた。
+
+案X(ミニマル)と案Y(フルHDR)を提示 → ユーザー判断で**案Y**。当初23シェーダ改修に見えたが、**23本の`LinearToSRGB`は共通ヘッダ`PostEffectCS.hlsli`の1関数**で、そこをパススルー化すれば一括対応と判明（[[feedback_prefer_full_refactor]]）。
+
+### 変更点
+- **`PostEffectCS.hlsli`**: `LinearToSRGB`を恒等(`return c`)化。内部の`saturate`(HDR潰し)も撤去。→ post CS 23本が一括でHDRリニア通過。sRGBエンコード/トーンマップは最終blitに一元化。
+- **`RenderFormats.h`(新規)**: `kSceneColorFormat=R16G16B16A16_FLOAT` / `kBackBufferFormat=R8G8B8A8_UNORM_SRGB`。
+- **シーンRT HDR化**: `DirectXCommon.cpp`の`OffScreen`、`PostEffectManager.cpp`の中間ping-pongバッファを`kSceneColorFormat`に。RtvManagerはTYPELESS実体+型付きR16Fビュー(SRV/UAV)で対応可。
+- **シーンPSOのRTV形式**: `ShaderReflection`の既定は`kBackBufferFormat`(SRGB=backbuffer/PS版post用)に据え置き、**OffScreen行きの14 PSOにだけ`.SetRenderTargetFormat(kSceneColorFormat)`を明示**（Object/ObjectInstanced/ObjectOutline±Instanced/Line/InstancedCube/CubeMap/YParticle(通常+Soft)/GPUParticle/VfxMesh Trail/Volume/Smoke/Lightning/Shockwave）。Sprite/BaseOffScreen(最終blit)/Shadow(depth専用)はSRGBのまま。
+- **`Bloom.CS.hlsl`**: 最終の`saturate`と`LinearToSRGB`を撤去しHDRリニア出力。threshold既定を0.6→1.0、UIスライダー上限を1→5（HDR基準＝発光した芯>1.0だけ抽出）。
+- **`CopyImage.PS.hlsl`(最終blit)**: ACESトーンマップを追加。HDRリニア→[0,1]リニア出力し、SRGBバックバッファRTVがガンマ。※中間の"Copy"はCS版(`CopyImage.CS`)なので影響なし、トーンマップは最終PS版1回だけ。
+
+### キャッシュ影響（確認済み・手動クリア不要）
+- シェーダDXILキャッシュは`HashSourceRecursive`でinclude込みハッシュ → `.hlsli`編集で23本が自動再コンパイル。
+- 変更したシーンPSOはリフレクションビルダーが毎起動生成（ディスクPSOキャッシュ非経由）。
+
+### 検証
+- **MSBuild Debug＋Release 成功（0 error/0 warning）**。
+- ⏳ **実機未検証（要ユーザーテスト）**: (1)起動してデバイスロストしないか（PSO形式取りこぼしの最終確認）、(2)全体トーン——二重ガンマ撤去でゲーム全体の明るさ/コントラスト/彩度が変わるはず、要再グレーディング、(3)パーティクルのemissiveを上げ+Bloom threshold≈1.0で「芯だけキュッと光る」か、(4)各ポストプリセット(TitleBloom.json等の旧threshold=0.6)の再調整。
+- ロールバック: 未コミットなので `git checkout -- .` ＋ 新規`RenderFormats.h`削除で戻せる。
+
+### 追記: 実機#613エラー修正（PiP RT の取りこぼし）
+Developビルドで `Model Draw` 時に D3D12 ERROR #613 (RENDER_TARGET_FORMAT_MISMATCH: PSO=R16F, RT=R8G8B8A8_SRGB)。原因は **PiP用RT `PipRT`(`PipCameraSystem.cpp:49`)がSRGBのまま**で、DevelopSceneの保存JSONでPiPが有効なため、毎フレームPiPパスがHDR化したObject PSOでモデルをこのSRGB RTへ描いていた（法線RTは既にR16F）。→ **PiP色RTを`kSceneColorFormat`(HDR)に変更**。PiPのImGui表示はトーンマップ無しのraw表示（許容）。他の自前SRGB RT(BackBuffer/FinalResult/ImGui)はモデル描画先でないため対象外と確認。Develop/Debug/Releaseビルド成功。
+
+## 2026-07-05 — CPUパーティクル: カーブ&グラデーション編集UI追加（Debug/Releaseビルド成功）
+
+CPUパーティクル(YParticle)の見た目バリエーションを阻んでいた本丸＝「Size over Life に自由カーブが無い／Color over Life の編集UIが生スライダーで結果が見えない」を解消。プリセットは今回スコープ外（ユーザー判断）。フリップシート(連番テクスチャ)は未着手。
+
+### 追加物: 共有ウィジェット `YEngine/Generators/Particle/ParticleCurve.h`（ヘッダオンリー＝premake再生成不要）
+- **`struct ParticleCurve`**: 正規化寿命[0,1]→値 の N 点自由カーブ。`keys_`(vector<Key{t,v}>)＋`interp_`(Linear/Smooth)。`Evaluate(t)` / `SortKeys` / `SaveToJson`/`LoadFromJson`（`{"interp","keys":[{t,v}]}`）。
+  - `#ifdef USE_IMGUI DrawEditor(label,vMin,vMax,size)`: ImDrawList自作の曲線エディタ。点ドラッグ移動（端点はt固定・内側は隣接キー間でクランプ＝順序不変）、**Wクリックで点追加／右クリックで点削除**、Linear/Smoothコンボ。編集で true。
+- **`ParticleWidgets::GradientBar(id, times, colors, count, maxStops, selected)`**: アルファ対応グラデバー。市松背景＋α込み補間帯で結果が一目で分かる。▲マーカーをドラッグで時刻移動（隣接クランプ）／クリック選択／右クリック削除、バーWクリックで追加、選択ストップを時刻スライダー＋ColorEdit4で編集。ドラッグ状態はImGuiStorageで保持。
+
+### 既存モジュール改修
+- **`UpdateSizeOverLifetime`**: 旧`startScale/endScale/useCurve`(2点)を廃し `ParticleCurve curve_` に置換。`OnUpdate`は `initialScale × curve_.Evaluate(age)`。JSONは`{"curve":{...}}`。**後方互換**: 旧キー(startScale等)しか無いJSONは2点カーブへ自動変換して読込。デフォルトは 1.0→0.0 smooth。
+- **`UpdateColorOverLifetime`**: 既存の5ストップ(時刻付き・α込み)データはそのまま、DrawEditorを`ParticleWidgets::GradientBar`へ差し替え（データ/JSON/OnUpdateは無変更）。ヘッダに非シリアライズ`selectedStop_`追加。
+
+### 実装メモ
+- 既製の`ImGradient`はpointのwを位置に使い描画時α=1固定＝**アルファ非対応**のためパーティクル用途に不適、自作を採用。`ImCurveEdit`もDelegateが煩雑なため見送り、自作カーブに。
+- `ImClamp/ImMin/ImMax`は`imgui_internal.h`側なので内部ヘッダ依存を避け`std::clamp/min/max`を使用。
+
+### 検証
+- **MSBuild Debug＋Release 成功（0 error / 0 warning）**。Debug=ImGui編集経路、Release=JSON/Evaluate経路＋ifdef分岐を両方コンパイル確認。
+- ⏳ 実機未確認: エディタでサイズカーブに点を追加/ドラッグ→形が変わるか／カラーバーでα込みグラデ編集→保存→再起動で復活するか／旧2点JSON(既存システム)が壊れず読めるか。
+
+---
+
 ## 2026-06-28 — A: EffectHandle を「本当に動く facade」にする（最小A）
 
 ### 背景 / 問題

@@ -1,36 +1,159 @@
 {
-    "emitters": [
+    "groups": [
         {
-            "autoEmit": false,
-            "emissionRate": 0.0,
-            "emitCount": 1,
-            "offsetX": 0.0,
-            "offsetY": 7.400000095367432,
-            "offsetZ": 0.0,
-            "shapeMaxSize": [
-                20.0,
-                20.0,
-                10.0
+            "emitters": [
+                {
+                    "autoEmit": false,
+                    "emissionRate": 1.0,
+                    "emitCount": 35,
+                    "offsetX": 0.0,
+                    "offsetY": 7.400000095367432,
+                    "offsetZ": 0.0,
+                    "shapeMaxSize": [
+                        20.0,
+                        20.0,
+                        10.0
+                    ],
+                    "shapeMinSize": [
+                        -20.0,
+                        -20.0,
+                        -10.0
+                    ],
+                    "shapeSize": [
+                        20.0,
+                        20.0,
+                        10.0
+                    ],
+                    "shapeType": 2,
+                    "systemName": "Clear"
+                }
             ],
-            "shapeMinSize": [
-                -20.0,
-                -20.0,
-                -10.0
+            "groupName": "ClearScene",
+            "isActive": true,
+            "position": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "emitters": [
+                {
+                    "autoEmit": false,
+                    "emissionRate": 10.0,
+                    "emitCount": 1,
+                    "offsetX": 0.0,
+                    "offsetY": 0.0,
+                    "offsetZ": 0.0,
+                    "shapeType": 0,
+                    "systemName": "BattleArea"
+                }
             ],
-            "shapeSize": [
-                20.0,
-                20.0,
-                10.0
+            "groupName": "BattleArea",
+            "isActive": true,
+            "position": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "emitters": [
+                {
+                    "autoEmit": false,
+                    "emissionRate": 57.5,
+                    "emitCount": 2,
+                    "offsetX": 0.0,
+                    "offsetY": 0.0,
+                    "offsetZ": 0.0,
+                    "shapeType": 0,
+                    "systemName": "DefaultParticleSystem"
+                },
+                {
+                    "autoEmit": false,
+                    "emissionRate": 50.0,
+                    "emitCount": 1,
+                    "offsetX": 0.40000009536743164,
+                    "offsetY": 0.0,
+                    "offsetZ": 0.0,
+                    "shapeType": 0,
+                    "systemName": "yey"
+                }
             ],
-            "shapeType": 2,
-            "systemName": "Clear"
+            "groupName": "ss",
+            "isActive": true,
+            "position": [
+                -3.375795364379883,
+                -1.5472955703735352,
+                -11.145904541015625
+            ]
+        },
+        {
+            "emitters": [
+                {
+                    "autoEmit": false,
+                    "emissionRate": 10.0,
+                    "emitCount": 26,
+                    "offsetX": 0.0,
+                    "offsetY": 0.0,
+                    "offsetZ": 0.0,
+                    "shapeMaxSize": [
+                        50.0,
+                        50.0,
+                        50.0
+                    ],
+                    "shapeMinSize": [
+                        -50.0,
+                        -50.0,
+                        -50.0
+                    ],
+                    "shapeSize": [
+                        50.0,
+                        50.0,
+                        50.0
+                    ],
+                    "shapeType": 2,
+                    "systemName": "Title"
+                }
+            ],
+            "groupName": "Title",
+            "isActive": true,
+            "position": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "emitters": [
+                {
+                    "autoEmit": false,
+                    "emissionRate": 10.0,
+                    "emitCount": 1,
+                    "offsetX": 0.0,
+                    "offsetY": 0.0,
+                    "offsetZ": 0.0,
+                    "shapeType": 0,
+                    "systemName": "EnemyHit1"
+                },
+                {
+                    "autoEmit": false,
+                    "emissionRate": 10.0,
+                    "emitCount": 1,
+                    "offsetX": 0.0,
+                    "offsetY": 0.0,
+                    "offsetZ": 0.0,
+                    "shapeType": 0,
+                    "systemName": "EnemyHit2"
+                }
+            ],
+            "groupName": "EnemyHit",
+            "isActive": true,
+            "position": [
+                7.100691318511963,
+                33.43552780151367,
+                -8.489126205444336
+            ]
         }
-    ],
-    "groupName": "ClearScene",
-    "isActive": true,
-    "position": [
-        0.0,
-        0.0,
-        0.0
     ]
 }

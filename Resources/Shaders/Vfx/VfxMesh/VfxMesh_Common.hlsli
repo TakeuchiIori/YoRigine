@@ -48,7 +48,8 @@ struct Camera
 //   Row3: softness, glowPower, distortion, time
 //   Row4: energyIntensity, energySpeed, sparkleAmount, sparkleSpeed
 //   Row5: fresnelStrength, trailSharpness, colorWaveFreq, colorWaveAmp
-//   Row6: uvScrollSpeed, noiseOctaves(=float), _pad2
+//   Row6: uvScrollSpeed, noiseOctaves(=float), dissolveStrength, dissolveEdgeWidth
+//   Row7: dissolveEdgeColor
 //--------------------------------------------------
 struct MeshTrailParams
 {
@@ -78,8 +79,15 @@ struct MeshTrailParams
     // ★NEW: UV
     float uvScrollSpeed;     // UV スクロール速度
     float noiseOctaves;      // ノイズオクターブ数 (1-4)
-    float _pad0;
-    float _pad1;
+    float dissolveStrength;  // ★NEW: 溶けて消える強度 (0=OFF)
+    float dissolveEdgeWidth; // ★NEW: 侵食エッジの帯幅
+
+    float4 dissolveEdgeColor;// ★NEW: 侵食エッジのHDR発光色 (Bloom用に >1)
+
+    float emissiveIntensity; // ★NEW: 発光マスター強度 (0=消灯)
+    float _pad2;
+    float _pad3;
+    float _pad4;
 };
 
 //--------------------------------------------------

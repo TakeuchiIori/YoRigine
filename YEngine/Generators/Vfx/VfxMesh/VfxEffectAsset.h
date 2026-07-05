@@ -98,6 +98,7 @@ namespace YoRigine {
         // ★★ UE Niagara 参考の拡張パラメータ ★★
 
         // --- グロー / エッジ ---
+        float   emissiveIntensity = 1.0f;  // 発光マスター強度 (0=消灯 / 1=そのまま / >1=強発光)
         float   softness       = 0.15f;    // エッジソフトフェード幅
         float   glowPower      = 1.5f;     // 中心コアグロー強度
         float   fresnelStrength = 1.0f;    // エッジフレネルグロー強度
@@ -123,6 +124,12 @@ namespace YoRigine {
         // --- 幅ウェーブ (慣性感) ---
         float widthWaveAmp  = 0.05f;    // 幅のサイン波振幅 (0=OFF)
         float widthWaveFreq = 8.0f;     // 幅のサイン波周波数
+
+        // --- ディゾルブ (溶けて消える) ---
+        // age(頂点の経過時間) が進むほどノイズしきい値を押し上げ、縁から侵食して discard する。
+        float   dissolveStrength  = 0.0f;                      // 0=OFF / 大きいほど早く溶ける
+        float   dissolveEdgeWidth = 0.08f;                     // 侵食エッジの光る帯幅
+        Vector4 dissolveEdgeColor = { 2.0f, 0.7f, 0.15f, 1.f };// 侵食エッジのHDR発光色 (Bloom用に >1 可)
 
         // --- 3D プリミティブ (shapeType == Primitive の時に参照) ★NEW ---
         PrimitiveSpec primitive;

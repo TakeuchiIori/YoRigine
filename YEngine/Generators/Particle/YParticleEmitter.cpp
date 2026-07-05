@@ -35,16 +35,31 @@ void YParticleEmitter::Update(float deltaTime) {
 	Matrix4x4 myMatrix = MakeTranslateMatrix(position_);
 	system->SetParentMatrix(myMatrix);
 
+	// 発生レートが 0 以下なら連続発生しない（interval=0 で while が無限ループするのを防ぐ）
+	if (emissionRate_ <= 0.0f) {
+		emissionTimer_ = 0.0f;
+		return;
+	}
+
 	// 発生タイマーを更新
 	emissionTimer_ += deltaTime;
 
 	// 発生間隔を計算（秒間発生数から）
-	float interval = (emissionRate_ > 0.0f) ? (1.0f / emissionRate_) : 0.0f;
+	const float interval = 1.0f / emissionRate_;
 
-	// 発生間隔に達したらパーティクルを発生
-	while (emissionTimer_ >= interval) {
+	// 発生間隔に達したらパーティクルを発生。
+	// deltaTime が大きい（シーンロード直後など）と 1 フレームで大量発生し得るため、
+	// 1 フレームあたりの発生回数に上限を設けて暴走を防ぐ。
+	constexpr int kMaxEmitPerFrame = 256;
+	int emitted = 0;
+	while (emissionTimer_ >= interval && emitted < kMaxEmitPerFrame) {
 		EmitInternal(position_, emitCount_);
 		emissionTimer_ -= interval;
+		++emitted;
+	}
+	// 上限に達したら余剰タイマーを捨てる（次フレームへ持ち越して雪だるま式に増やさない）
+	if (emitted >= kMaxEmitPerFrame) {
+		emissionTimer_ = 0.0f;
 	}
 }
 

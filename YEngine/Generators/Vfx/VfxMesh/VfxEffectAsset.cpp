@@ -45,6 +45,7 @@ namespace YoRigine {
 
         // ★★ 拡張パラメータ ★★
         // グロー / エッジ
+        t["emissiveIntensity"] = trail.emissiveIntensity;
         t["softness"]        = trail.softness;
         t["glowPower"]       = trail.glowPower;
         t["fresnelStrength"] = trail.fresnelStrength;
@@ -70,6 +71,11 @@ namespace YoRigine {
         // 幅ウェーブ
         t["widthWaveAmp"]  = trail.widthWaveAmp;
         t["widthWaveFreq"] = trail.widthWaveFreq;
+
+        // ディゾルブ (溶けて消える)
+        t["dissolveStrength"]  = trail.dissolveStrength;
+        t["dissolveEdgeWidth"] = trail.dissolveEdgeWidth;
+        t["dissolveEdgeColor"] = trail.dissolveEdgeColor;
 
         // 3D プリミティブ ★NEW
         {
@@ -185,6 +191,7 @@ namespace YoRigine {
 
             // ★★ 拡張パラメータ (既存 JSON との後方互換: value() でデフォルト値を持つ) ★★
             // グロー / エッジ
+            trail.emissiveIntensity = t.value("emissiveIntensity", trail.emissiveIntensity);
             trail.softness        = t.value("softness",        trail.softness);
             trail.glowPower       = t.value("glowPower",       trail.glowPower);
             trail.fresnelStrength = t.value("fresnelStrength", trail.fresnelStrength);
@@ -206,6 +213,11 @@ namespace YoRigine {
             // カラーウェーブ
             trail.colorWaveFreq = t.value("colorWaveFreq", trail.colorWaveFreq);
             trail.colorWaveAmp  = t.value("colorWaveAmp",  trail.colorWaveAmp);
+
+            // ディゾルブ (溶けて消える)
+            trail.dissolveStrength  = t.value("dissolveStrength",  trail.dissolveStrength);
+            trail.dissolveEdgeWidth = t.value("dissolveEdgeWidth", trail.dissolveEdgeWidth);
+            if (t.contains("dissolveEdgeColor")) trail.dissolveEdgeColor = t["dissolveEdgeColor"];
 
             // 幅ウェーブ
             trail.widthWaveAmp  = t.value("widthWaveAmp",  trail.widthWaveAmp);

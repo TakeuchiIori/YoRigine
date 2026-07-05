@@ -120,8 +120,7 @@ void ClearScene::Update() {
 	skyBox_->Update();
 	ground_->Update();
 
-	auto* enemyHitEmitterGroup_ = YEmitterGroupManager::GetInstance().GetGroup("ClearScene");
-	enemyHitEmitterGroup_->EmitAll();
+	//auto clearEffect = EffectHandle::Play("ClearScene", Vector3{0,0,0},true,1);
 	YoRigine::ModelManipulator::GetInstance()->Update();
 	YoRigine::CollisionManager::GetInstance()->Update();
 	YParticleManager::GetInstance().Update(YoRigine::GameTime::GetDeltaTime());
@@ -143,24 +142,20 @@ void ClearScene::Draw() {
 	// 演出関連の描画（パーティクルなど）
 	//------------------------------------------------------------
 	YParticleManager::GetInstance().Draw();
-
-	//------------------------------------------------------------
-	// 2Dスプライト描画
-	//------------------------------------------------------------
-	SpriteCommon::GetInstance()->DrawPreference();
-	clearUI_->DrawAll();
-
-	//------------------------------------------------------------
-	// 3Dオブジェクト描画（必要時に追加）
-	//------------------------------------------------------------
-	Object3dCommon::GetInstance()->DrawPreference();
 }
 
 /// <summary>
 /// オフスクリーン外の描画処理
 /// </summary>
 void ClearScene::DrawNonOffscreen() {
-	// 今のところ特に処理なし（タイトル演出など追加予定）
+	//------------------------------------------------------------
+	// 2Dスプライト描画（UI はポスト適用後のバックバッファへ描く）
+	// ※ OffScreen(HDR R16F) パス内で SRGB の Sprite PSO を使うと
+	//   #613 RENDER_TARGET_FORMAT_MISMATCH になるため、Title/Game と同様
+	//   ここ（DrawNonOffscreen）で描画する。
+	//------------------------------------------------------------
+	SpriteCommon::GetInstance()->DrawPreference();
+	clearUI_->DrawAll();
 }
 
 /// <summary>

@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <d3dcompiler.h>
 #include "PSOCache.h"
+#include "RenderFormats.h"
 #include "Debugger/Logger.h"
 
 namespace YoRigine {
@@ -548,7 +549,9 @@ namespace YoRigine {
         rasterizerState_ = RasterizerPresets::CreateDefault();
         depthStencilState_ = DepthStencilPresets::CreateDefault();
         primitiveTopology_ = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-        rtvFormat_ = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+        // 既定はバックバッファ / ポスト(PS版)行きの SRGB。OffScreen(HDR) へ描くシーン PSO だけ
+        // 各 CreatePSO_* で明示的に SetRenderTargetFormat(kSceneColorFormat) して上書きする。
+        rtvFormat_ = YoRigine::kBackBufferFormat;
         dsvFormat_ = DXGI_FORMAT_D24_UNORM_S8_UINT;
     }
 
