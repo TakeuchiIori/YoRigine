@@ -850,8 +850,23 @@ namespace YoRigine {
         ImGui::SeparatorText("カラー (rgb>1 で Bloom)");
         {
             VfxEffectAsset b = sel->asset;
-            if (ImGui::DragFloat4("色##lt", &lt.color.x, 0.02f, 0.0f, 10.0f, "%.2f"))
-                CommitChange(b, "Lightning 色");
+            bool c = false;
+            c |= ImGui::DragFloat4("芯の色##lt",   &lt.color.x,       0.02f, 0.0f, 10.0f, "%.2f");
+            c |= ImGui::DragFloat4("グロー色##lt", &lt.glowColor.x,   0.02f, 0.0f, 10.0f, "%.2f");
+            c |= ImGui::DragFloat4("枝の色##lt",   &lt.branchColor.x, 0.02f, 0.0f, 10.0f, "%.2f");
+            if (c) CommitChange(b, "Lightning 色");
+            ImGui::TextDisabled("  芯→縁を2色でグラデ、枝は別色。rgb>1 で Bloom 発光");
+        }
+
+        ImGui::SeparatorText("実体感 / アウトライン");
+        {
+            VfxEffectAsset b = sel->asset;
+            bool c = false;
+            c |= ImGui::SliderFloat("芯の太さ##ltcw",    &lt.coreWidth,        0.0f, 1.0f, "%.2f");
+            c |= ImGui::SliderFloat("実体感(透明感↓)##lts", &lt.solidness,     0.0f, 1.0f, "%.2f");
+            c |= ImGui::SliderFloat("アウトライン強調##lto", &lt.outlineIntensity, 0.0f, 4.0f, "%.2f");
+            if (c) CommitChange(b, "Lightning 実体感");
+            ImGui::TextDisabled("  実体感を上げると透け感が消える。アウトラインで枝が際立つ");
         }
 
         ImGui::SeparatorText("形状 / 明滅");
@@ -1220,11 +1235,15 @@ namespace YoRigine {
         if (!sel || !lightningCBMapped_) return;
         const auto& lt = sel->asset.lightning;
 
-        lightningCBMapped_->color      = lt.color;
-        lightningCBMapped_->time       = time;
-        lightningCBMapped_->glowPower  = lt.glowPower;
-        lightningCBMapped_->coreWidthN = 0.0f;
-        lightningCBMapped_->_pad       = 0.0f;
+        lightningCBMapped_->color            = lt.color;
+        lightningCBMapped_->glowColor        = lt.glowColor;
+        lightningCBMapped_->branchColor      = lt.branchColor;
+        lightningCBMapped_->time             = time;
+        lightningCBMapped_->glowPower        = lt.glowPower;
+        lightningCBMapped_->coreWidth        = lt.coreWidth;
+        lightningCBMapped_->solidness        = lt.solidness;
+        lightningCBMapped_->outlineIntensity = lt.outlineIntensity;
+        lightningCBMapped_->_pad0 = lightningCBMapped_->_pad1 = lightningCBMapped_->_pad2 = 0.0f;
     }
 
     void VfxMeshEditor::UpdateShockwaveCBV(float time)

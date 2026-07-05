@@ -15,23 +15,50 @@
         "isEnable": true
     },
     "lightning": {
-        "branchJitter": 1.7000000476837158,
-        "branches": 4,
+        "branchColor": {
+            "w": 1.0,
+            "x": 0.6000000238418579,
+            "y": 0.800000011920929,
+            "z": 10.0
+        },
+        "branchJitter": 1.940000057220459,
+        "branches": 8,
         "color": {
             "w": 1.0,
             "x": 1.940000057220459,
             "y": 0.800000011920929,
-            "z": 1.5
+            "z": 10.0
         },
+        "coreWidth": 0.12999999523162842,
         "flickerRate": 60.0,
-        "glowPower": 1.600000023841858,
+        "glowColor": {
+            "w": 1.0,
+            "x": 0.0,
+            "y": 8.220000267028809,
+            "z": 0.0
+        },
+        "glowPower": 1.899999976158142,
         "isEnable": true,
         "jitter": 2.5399999618530273,
-        "length": 17.450000762939453,
+        "length": 16.649999618530273,
+        "outlineIntensity": 0.0,
         "segments": 64,
+        "solidness": 0.41999998688697815,
         "width": 2.0
     },
     "name": "Lightning",
+    "shockwave": {
+        "color": {
+            "w": 1.0,
+            "x": 1.5,
+            "y": 0.8999999761581421,
+            "z": 0.4000000059604645
+        },
+        "duration": 0.6000000238418579,
+        "isEnable": true,
+        "radius": 3.0,
+        "thickness": 0.15000000596046448
+    },
     "smoke": {
         "color": {
             "w": 1.0,
@@ -47,7 +74,14 @@
         "noiseStrength": 0.8999999761581421,
         "radius": 1.5,
         "rimIntensity": 2.0,
-        "scrollSpeed": 0.30000001192092896
+        "riseSpeed": 1.2000000476837158,
+        "scrollSpeed": 0.30000001192092896,
+        "smokeColor": {
+            "w": 1.0,
+            "x": 0.07999999821186066,
+            "y": 0.07999999821186066,
+            "z": 0.09000000357627869
+        }
     },
     "trail": {
         "arcAngleDeg": 120.0,
@@ -67,7 +101,16 @@
         "colorWaveAmp": 0.15000000596046448,
         "colorWaveFreq": 3.0,
         "crescentShape": true,
+        "dissolveEdgeColor": {
+            "w": 1.0,
+            "x": 2.0,
+            "y": 0.699999988079071,
+            "z": 0.15000000596046448
+        },
+        "dissolveEdgeWidth": 0.07999999821186066,
+        "dissolveStrength": 0.0,
         "distortion": 0.0,
+        "emissiveIntensity": 1.0,
         "energyIntensity": 1.5,
         "energySpeed": 2.5,
         "fresnelStrength": 1.0,
@@ -117,6 +160,7 @@
     },
     "useLightVolume": false,
     "useLightning": true,
+    "useShockwave": false,
     "useSmoke": false,
     "useTrail": false
 }

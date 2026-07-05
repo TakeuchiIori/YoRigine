@@ -131,11 +131,17 @@ struct SmokeParams
 //--------------------------------------------------
 struct LightningParams
 {
-    float4 color;       // 芯の色(rgb>1 で Bloom)
-    float  time;        // アニメ時間
-    float  glowPower;   // 中心グロー強度
-    float  coreWidthN;  // 予約
-    float  _pad;
+    float4 color;            // 芯(コア)の色(HDR)
+    float4 glowColor;        // 外側グローの色(HDR) ★2色
+    float4 branchColor;      // 枝の色(HDR)
+    float  time;             // アニメ時間
+    float  glowPower;        // 中心グロー強度(芯の細さ)
+    float  coreWidth;        // 芯の太さ/実体感(0..1)
+    float  solidness;        // 透明感を減らす(0..1)
+    float  outlineIntensity; // 縁/枝のアウトライン強調
+    float  _pad0;
+    float  _pad1;
+    float  _pad2;
 };
 
 //--------------------------------------------------

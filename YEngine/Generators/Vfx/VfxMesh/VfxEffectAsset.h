@@ -170,7 +170,9 @@ namespace YoRigine {
     // -------------------------------------------------------
     struct LightningEffectParam
     {
-        Vector4 color        = { 0.6f, 0.8f, 1.5f, 1.0f }; // 青白（HDR）
+        Vector4 color        = { 0.6f, 0.8f, 1.5f, 1.0f }; // 芯(コア)の色（HDR / Bloom）
+        Vector4 glowColor    = { 0.6f, 0.8f, 1.5f, 1.0f }; // 外側グローの色（HDR）★2色
+        Vector4 branchColor  = { 0.6f, 0.8f, 1.5f, 1.0f }; // 枝の色（HDR）
         float   length       = 4.0f;   // 稲妻の全長
         float   width        = 0.18f;  // リボン幅
         float   jitter       = 0.6f;   // ジグザグの振れ幅
@@ -178,7 +180,10 @@ namespace YoRigine {
         int     branches     = 3;      // 枝分かれ本数
         float   branchJitter = 0.5f;   // 枝の振れ幅
         float   flickerRate  = 18.0f;  // 1秒あたりの形変化回数（明滅）
-        float   glowPower    = 2.0f;   // 中心グロー
+        float   glowPower    = 2.0f;   // 中心グロー（芯の細さ）
+        float   coreWidth        = 0.30f; // 芯の太さ/実体感(0..1)
+        float   solidness        = 0.0f;  // 透明感を減らす(0=従来 / 1=べた塗り寄り)
+        float   outlineIntensity = 0.0f;  // 枝/縁のアウトライン強調
         bool    isEnable     = true;
     };
 

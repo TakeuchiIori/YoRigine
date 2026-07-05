@@ -280,11 +280,15 @@ void VfxMeshSpawner::DrawEffect(ActiveEffect& fx)
     if (fx.lightning && fx.lightningCBMapped) {
         const auto& lt = fx.asset.lightning;
         auto& cb = *fx.lightningCBMapped;
-        cb.color      = lt.color;
-        cb.time       = fx.age;
-        cb.glowPower  = lt.glowPower;
-        cb.coreWidthN = 0.f;
-        cb._pad       = 0.f;
+        cb.color            = lt.color;
+        cb.glowColor        = lt.glowColor;
+        cb.branchColor      = lt.branchColor;
+        cb.time             = fx.age;
+        cb.glowPower        = lt.glowPower;
+        cb.coreWidth        = lt.coreWidth;
+        cb.solidness        = lt.solidness;
+        cb.outlineIntensity = lt.outlineIntensity;
+        cb._pad0 = cb._pad1 = cb._pad2 = 0.f;
 
         const auto& idx = pm->GetParameterIndices("VfxMeshLightning");
         cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshLightning"));

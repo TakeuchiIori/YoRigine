@@ -136,7 +136,8 @@ void LightningMesh::RebuildVertices()
     std::vector<Vector3> main;
     main.push_back(start_);
     Subdivide(start_, end_, param_.jitter, levels, main);
-    AppendBoltRibbon(main, param_.width, param_.color);
+    // 頂点色 r=0 → 本線（rgb は未使用・r を枝フラグに、a を強度に流用）
+    AppendBoltRibbon(main, param_.width, Vector4{ 0.f, 0.f, 0.f, param_.color.w });
 
     // --- 枝 ---
     for (int bIdx = 0; bIdx < param_.branches; ++bIdx) {
@@ -159,7 +160,8 @@ void LightningMesh::RebuildVertices()
         std::vector<Vector3> branch;
         branch.push_back(origin);
         Subdivide(origin, bend, param_.branchJitter, levels - 1, branch);
-        AppendBoltRibbon(branch, param_.width * 0.6f, param_.color);
+        // 頂点色 r=1 → 枝（シェーダで branchColor / アウトライン強調に使う）
+        AppendBoltRibbon(branch, param_.width * 0.6f, Vector4{ 1.f, 0.f, 0.f, param_.color.w });
     }
 
     UploadVertices(vertices_);

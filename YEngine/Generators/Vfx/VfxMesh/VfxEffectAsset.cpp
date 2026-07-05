@@ -120,6 +120,11 @@ namespace YoRigine {
         // --- Lightning ---
         auto& lt = j["lightning"];
         lt["color"]        = lightning.color;
+        lt["glowColor"]    = lightning.glowColor;
+        lt["branchColor"]  = lightning.branchColor;
+        lt["coreWidth"]        = lightning.coreWidth;
+        lt["solidness"]        = lightning.solidness;
+        lt["outlineIntensity"] = lightning.outlineIntensity;
         lt["length"]       = lightning.length;
         lt["width"]        = lightning.width;
         lt["jitter"]       = lightning.jitter;
@@ -268,7 +273,12 @@ namespace YoRigine {
 
         if (j.contains("lightning")) {
             auto& lt = j["lightning"];
-            if (lt.contains("color")) lightning.color = lt["color"];
+            if (lt.contains("color"))       lightning.color       = lt["color"];
+            if (lt.contains("glowColor"))   lightning.glowColor   = lt["glowColor"];
+            if (lt.contains("branchColor")) lightning.branchColor = lt["branchColor"];
+            lightning.coreWidth        = lt.value("coreWidth",        lightning.coreWidth);
+            lightning.solidness        = lt.value("solidness",        lightning.solidness);
+            lightning.outlineIntensity = lt.value("outlineIntensity", lightning.outlineIntensity);
             lightning.length       = lt.value("length",       lightning.length);
             lightning.width        = lt.value("width",        lightning.width);
             lightning.jitter       = lt.value("jitter",       lightning.jitter);
