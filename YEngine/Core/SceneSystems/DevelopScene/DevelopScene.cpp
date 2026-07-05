@@ -192,7 +192,6 @@ void DevelopScene::DrawNonOffscreen() {
 // ============================================================
 void DevelopScene::DrawShadow() {
 	DrawCommonShadow();
-	YoRigine::ModelManipulator::GetInstance()->DrawShadow();
 }
 
 // ============================================================

@@ -34,6 +34,7 @@ void BaseScene::DrawCommonShadow()
 	// 全シーンが本関数を呼んでいるため、シーン側に影描画コードは不要になる。
 	//------------------------------------------------------------
 	BaseObjectManager::GetInstance()->DrawShadowAll();
+	YoRigine::ModelManipulator::GetInstance()->DrawShadow();
 }
 
 void BaseScene::DrawCommonParticles()
