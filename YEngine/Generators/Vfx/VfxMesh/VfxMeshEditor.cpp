@@ -478,6 +478,8 @@ namespace YoRigine {
         if (ImGui::InputText("##effectname", nameBuffer_, sizeof(nameBuffer_), ImGuiInputTextFlags_EnterReturnsTrue)) {
             asset.name = nameBuffer_;
             CommitChange(before, "名前変更");
+            // 名前に合わせて JSON ファイル自体もリネームする
+            RenameCurrentFile(nameBuffer_);
         }
         ImGui::SameLine(0, 4); ImGui::TextDisabled("名前");
         ImGui::Separator();
@@ -1090,6 +1092,54 @@ namespace YoRigine {
 
         sel->filePath = newPath;
         SaveCurrent();
+    }
+
+    void VfxMeshEditor::RenameCurrentFile(const std::string& newName)
+    {
+        auto* sel = Selected();
+        if (!sel) return;
+
+        // 空名 / 不正文字はスキップ（ファイル名として使えない文字が入っていたら何もしない）
+        if (newName.empty()) return;
+        if (newName.find_first_of("\\/:*?\"<>|") != std::string::npos) {
+            Logger("VfxMeshEditor: ファイル名に使えない文字が含まれるためリネームしません -> " + newName);
+            return;
+        }
+
+        fs::path oldPath(sel->filePath);
+        fs::path dir = oldPath.parent_path();
+        if (dir.empty()) dir = fs::path(scanRoot_);
+
+        // 既に一致しているなら何もしない（拡張子を除いたファイル名で比較）
+        if (oldPath.stem().string() == newName) return;
+
+        // 他エントリや既存ファイルと衝突しないパスを探す（末尾に番号を付ける）
+        auto conflicts = [&](const fs::path& p) {
+            std::error_code e;
+            if (fs::exists(p, e)) return true;
+            for (int i = 0; i < static_cast<int>(entries_.size()); ++i) {
+                if (i == selectedIndex_) continue;
+                if (fs::path(entries_[i].filePath) == p) return true;
+            }
+            return false;
+        };
+        fs::path newPath = dir / (newName + ".json");
+        for (int n = 1; conflicts(newPath); ++n) {
+            newPath = dir / (newName + std::to_string(n) + ".json");
+        }
+
+        // ディスク上に旧ファイルがあれば実際にリネーム。無ければ（未保存の新規）パス変更のみ。
+        std::error_code ec;
+        if (fs::exists(oldPath, ec)) {
+            fs::rename(oldPath, newPath, ec);
+            if (ec) {
+                Logger("VfxMeshEditor: リネーム失敗 " + oldPath.string() + " -> " + newPath.string());
+                return;
+            }
+            Logger("VfxMeshEditor: リネーム " + oldPath.string() + " -> " + newPath.string());
+        }
+
+        sel->filePath = newPath.string();
     }
 
     void VfxMeshEditor::DeleteCurrent()

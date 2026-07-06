@@ -90,6 +90,9 @@ namespace YoRigine {
         void SelectEffect(int index);
         void SaveCurrent();
         void SaveAs(const std::string& newPath);
+        // 現在選択中エフェクトの JSON ファイル名を newName に合わせてリネームする。
+        // ディスク上の旧ファイルがあれば実際にリネームし、filePath も更新する。
+        void RenameCurrentFile(const std::string& newName);
         void DeleteCurrent();
         void CreateNew(const std::string& name,
             const std::string& filePath,
