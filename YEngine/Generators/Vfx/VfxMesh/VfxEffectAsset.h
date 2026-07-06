@@ -23,7 +23,7 @@ namespace YoRigine {
         Arc       = 1,
         Fan       = 2,
         Custom    = 3,
-        Primitive = 4,   // 3D プリミティブ (Box/Sphere/...) ★NEW
+        Primitive = 4,   // 3D プリミティブ (Box/Sphere/...)
     };
 
     // 3D プリミティブ種別
@@ -51,7 +51,7 @@ namespace YoRigine {
         PrimitivePlacement placement = PrimitivePlacement::Static;
 
         // ---- 共通サイズ ----
-        Vector3 halfExtents = { 0.5f, 0.5f, 0.5f };  // Box の半辺長
+        Vector3 halfExtents = { 0.5f, 0.5f, 0.5f };   // Box の半辺長
         float   radius      = 0.5f;                   // Sphere/Capsule/Cone/Cylinder/Torus
         float   height      = 1.0f;                   // Capsule/Cone/Cylinder
         float   tubeRadius  = 0.15f;                  // Torus
@@ -95,10 +95,10 @@ namespace YoRigine {
         std::vector<Vector2> customVertices;
         int splineSubdivisions = 4;
 
-        // ★★ UE Niagara 参考の拡張パラメータ ★★
+        // パラメータ
 
         // --- グロー / エッジ ---
-        float   emissiveIntensity = 1.0f;  // 発光マスター強度 (0=消灯 / 1=そのまま / >1=強発光)
+        float   emissiveIntensity = 1.0f;  // 発光強度 (0=消灯 / 1=そのまま / >1=強発光)
         float   softness       = 0.15f;    // エッジソフトフェード幅
         float   glowPower      = 1.5f;     // 中心コアグロー強度
         float   fresnelStrength = 1.0f;    // エッジフレネルグロー強度
@@ -171,7 +171,7 @@ namespace YoRigine {
     struct LightningEffectParam
     {
         Vector4 color        = { 0.6f, 0.8f, 1.5f, 1.0f }; // 芯(コア)の色（HDR / Bloom）
-        Vector4 glowColor    = { 0.6f, 0.8f, 1.5f, 1.0f }; // 外側グローの色（HDR）★2色
+        Vector4 glowColor    = { 0.6f, 0.8f, 1.5f, 1.0f }; // 外側グローの色（HDR）2色
         Vector4 branchColor  = { 0.6f, 0.8f, 1.5f, 1.0f }; // 枝の色（HDR）
         float   length       = 4.0f;   // 稲妻の全長
         float   width        = 0.18f;  // リボン幅

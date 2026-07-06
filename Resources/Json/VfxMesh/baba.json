@@ -15,6 +15,13 @@
         "isEnable": true
     },
     "lightning": {
+        "bendAmount": 0.0,
+        "branchColor": {
+            "w": 1.0,
+            "x": 0.6000000238418579,
+            "y": 0.800000011920929,
+            "z": 1.5
+        },
         "branchJitter": 0.5,
         "branches": 3,
         "color": {
@@ -23,15 +30,29 @@
             "y": 0.800000011920929,
             "z": 1.5
         },
+        "coreWidth": 0.30000001192092896,
+        "direction": {
+            "x": 0.0,
+            "y": 1.0,
+            "z": 0.0
+        },
         "flickerRate": 18.0,
+        "glowColor": {
+            "w": 1.0,
+            "x": 0.6000000238418579,
+            "y": 0.800000011920929,
+            "z": 1.5
+        },
         "glowPower": 2.0,
         "isEnable": true,
         "jitter": 0.6000000238418579,
         "length": 4.0,
+        "outlineIntensity": 0.0,
         "segments": 24,
+        "solidness": 0.0,
         "width": 0.18000000715255737
     },
-    "name": "baba",
+    "name": "Explosion",
     "shockwave": {
         "color": {
             "w": 1.0,
@@ -46,23 +67,23 @@
     },
     "smoke": {
         "color": {
-            "w": 3.5999999046325684,
-            "x": 1.5800000429153442,
-            "y": 0.07999999821186066,
-            "z": 0.0
+            "w": 2.140000104904175,
+            "x": 3.0199999809265137,
+            "y": 0.0,
+            "z": 0.07999999821186066
         },
-        "density": 1.6699999570846558,
+        "density": 3.0,
         "fresnelPower": 2.5999999046325684,
         "isEnable": true,
         "noiseOctaves": 1.0,
-        "noiseScale": 8.5,
+        "noiseScale": 4.849999904632568,
         "noiseStrength": 1.0,
         "radius": 7.150000095367432,
         "rimIntensity": 0.0,
-        "riseSpeed": 1.2000000476837158,
-        "scrollSpeed": 1.5399999618530273,
+        "riseSpeed": 2.5399999618530273,
+        "scrollSpeed": 2.4800000190734863,
         "smokeColor": {
-            "w": 1.0,
+            "w": 2.3499999046325684,
             "x": 0.07999999821186066,
             "y": 0.07999999821186066,
             "z": 0.09000000357627869
@@ -86,7 +107,16 @@
         "colorWaveAmp": 0.15000000596046448,
         "colorWaveFreq": 3.0,
         "crescentShape": true,
+        "dissolveEdgeColor": {
+            "w": 1.0,
+            "x": 2.0,
+            "y": 0.699999988079071,
+            "z": 0.15000000596046448
+        },
+        "dissolveEdgeWidth": 0.07999999821186066,
+        "dissolveStrength": 0.0,
         "distortion": 0.0,
+        "emissiveIntensity": 1.0,
         "energyIntensity": 1.5,
         "energySpeed": 2.5,
         "fresnelStrength": 1.0,

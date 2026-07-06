@@ -13,7 +13,7 @@
 
 namespace YoRigine {
 
-    // ★ HLSL MeshTrailParams と 1:1 で一致させること
+    // HLSL MeshTrailParams と 1:1 で一致させること
     // レイアウト (16バイト境界):
     //   Row0 : colorInner[4]
     //   Row1 : colorOuter[4]
@@ -29,31 +29,31 @@ namespace YoRigine {
     {
         float colorInner[4];      // Row0
         float colorOuter[4];      // Row1
-        float rimColor[4];        // Row2 ★NEW
+        float rimColor[4];        // Row2
 
         float softness;           // Row3
         float glowPower;
         float distortion;
         float time;
 
-        float energyIntensity;    // Row4 ★NEW
+        float energyIntensity;    // Row4
         float energySpeed;
         float sparkleAmount;
         float sparkleSpeed;
 
-        float fresnelStrength;    // Row5 ★NEW
+        float fresnelStrength;    // Row5
         float trailSharpness;
         float colorWaveFreq;
         float colorWaveAmp;
 
-        float uvScrollSpeed;      // Row6 ★NEW
+        float uvScrollSpeed;      // Row6
         float noiseOctaves;
-        float dissolveStrength;   // ★NEW: 溶けて消える強度 (0=OFF)
-        float dissolveEdgeWidth;  // ★NEW: 侵食エッジの帯幅
+        float dissolveStrength;   // 溶けて消える強度 (0=OFF)
+        float dissolveEdgeWidth;  // 侵食エッジの帯幅
 
-        float dissolveEdgeColor[4]; // Row7 ★NEW: 侵食エッジのHDR発光色
+        float dissolveEdgeColor[4]; // Row7 侵食エッジのHDR発光色
 
-        float emissiveIntensity;    // Row8 ★NEW: 発光マスター強度 (0=消灯)
+        float emissiveIntensity;    // Row8 発光強度 (0=消灯)
         float _pad2;
         float _pad3;
         float _pad4;

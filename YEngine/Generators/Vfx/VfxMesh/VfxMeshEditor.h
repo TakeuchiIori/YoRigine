@@ -18,7 +18,7 @@
 #include <Core/Editor/Command/CommandHistory.h>
 #include "FileOperations/FileBrowser.h"
 
-// ★ TrailMesh ではなく Emitter を使う
+// TrailMesh ではなく Emitter を使う
 #include "Vfx/VfxMesh/TrailMeshEmitter.h"
 #include "Systems/Camera/Camera.h"
 
@@ -66,11 +66,9 @@ namespace YoRigine {
 
         void Update(float deltaTime);
         void DrawImGui();
-
-        // ★ 引数から cmdList を削除
         void DrawPreview();
 
-        // ★ カメラをセットするための関数
+        //カメラをセット
         void SetCamera(Camera* camera) { camera_ = camera; }
 
     private:
@@ -151,7 +149,7 @@ namespace YoRigine {
         Vector3 previewCenter_ = { 0.f, 0.f, 0.f };
         float   previewYaw_ = 0.f;
 
-        // ★ CBVは Volume のみ保持（TrailのCBVはEmitterが持っているため削除）
+        // CBVは Volume のみ保持（TrailのCBVはEmitterが持っているため削除）
         Microsoft::WRL::ComPtr<ID3D12Resource> volumeCBResource_;
         LightVolumeParamsCB* volumeCBMapped_ = nullptr;
 

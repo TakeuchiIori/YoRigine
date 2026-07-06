@@ -55,7 +55,7 @@ namespace YoRigine {
         trailCBMapped_->colorOuter[2] = t.colorStart.z;
         trailCBMapped_->colorOuter[3] = t.colorStart.w;
 
-        // Row2: rimColor ★NEW
+        // Row2: rimColor
         trailCBMapped_->rimColor[0] = t.rimColor.x;
         trailCBMapped_->rimColor[1] = t.rimColor.y;
         trailCBMapped_->rimColor[2] = t.rimColor.z;
@@ -67,31 +67,31 @@ namespace YoRigine {
         trailCBMapped_->distortion = t.distortion;
         trailCBMapped_->time       = time_;
 
-        // Row4: エネルギーライン / スパークル ★NEW
+        // Row4: エネルギーライン / スパークル
         trailCBMapped_->energyIntensity = t.energyIntensity;
         trailCBMapped_->energySpeed     = t.energySpeed;
         trailCBMapped_->sparkleAmount   = t.sparkleAmount;
         trailCBMapped_->sparkleSpeed    = t.sparkleSpeed;
 
-        // Row5: フレネル / ウェーブ ★NEW
+        // Row5: フレネル / ウェーブ
         trailCBMapped_->fresnelStrength = t.fresnelStrength;
         trailCBMapped_->trailSharpness  = t.trailSharpness;
         trailCBMapped_->colorWaveFreq   = t.colorWaveFreq;
         trailCBMapped_->colorWaveAmp    = t.colorWaveAmp;
 
-        // Row6: UV / ノイズ / ディゾルブ ★NEW
+        // Row6: UV / ノイズ / ディゾルブ
         trailCBMapped_->uvScrollSpeed    = t.uvScrollSpeed;
         trailCBMapped_->noiseOctaves     = t.noiseOctaves;
         trailCBMapped_->dissolveStrength  = t.dissolveStrength;
         trailCBMapped_->dissolveEdgeWidth = t.dissolveEdgeWidth;
 
-        // Row7: ディゾルブ エッジ色 ★NEW
+        // Row7: ディゾルブ エッジ色
         trailCBMapped_->dissolveEdgeColor[0] = t.dissolveEdgeColor.x;
         trailCBMapped_->dissolveEdgeColor[1] = t.dissolveEdgeColor.y;
         trailCBMapped_->dissolveEdgeColor[2] = t.dissolveEdgeColor.z;
         trailCBMapped_->dissolveEdgeColor[3] = t.dissolveEdgeColor.w;
 
-        // Row8: 発光マスター強度 ★NEW
+        // Row8: 発光強度
         trailCBMapped_->emissiveIntensity = t.emissiveIntensity;
         trailCBMapped_->_pad2 = 0.f;
         trailCBMapped_->_pad3 = 0.f;

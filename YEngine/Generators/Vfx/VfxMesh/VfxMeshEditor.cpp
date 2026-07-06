@@ -81,7 +81,7 @@ namespace YoRigine {
         dxCommon_ = DirectXCommon::GetInstance();
         scanRoot_ = scanRoot;
 
-        // ★ Trail用のプレビューはEmitterに委譲
+        // Trail用のプレビューはEmitterに委譲
         previewTrailEmitter_ = std::make_unique<TrailMeshEmitter>();
         previewVolume_ = std::make_unique<LightVolumeMesh>();
         previewSmoke_ = std::make_unique<VolumeSmokeMesh>();
@@ -155,7 +155,7 @@ namespace YoRigine {
         previewTimer_ = 0.f;
         previewPlaying_ = false;
 
-        // ★ Emitter に現在のアセットを反映させる
+        // Emitter に現在のアセットを反映させる
         if (previewTrailEmitter_) {
             previewTrailEmitter_->Stop();
             previewTrailEmitter_->SetCamera(camera_);
@@ -294,7 +294,7 @@ namespace YoRigine {
     }
 
     // ===========================================================
-    // ★ 描画（cmdListを受け取らず、Emitter側のDrawを呼ぶ）
+    // 描画（cmdListを受け取らず、Emitter側のDrawを呼ぶ）
     // ===========================================================
     void VfxMeshEditor::DrawPreview()
     {
@@ -542,7 +542,7 @@ namespace YoRigine {
             if (c) CommitChange(b, "Trail 形状設定");
         }
 
-        // ★ Primitive (3D) 専用セクション
+        // Primitive (3D) 専用セクション
         if (t.shapeType == TrailShapeType::Primitive) {
             ImGui::SeparatorText("3D プリミティブ");
             VfxEffectAsset b = sel->asset;
@@ -969,14 +969,14 @@ namespace YoRigine {
         }
 
         if (previewPlaying_) {
-            // ★ 停止ボタン
+            // 停止ボタン
             if (ImGui::Button((std::string(ICON_FA_STOP) + " 停止").c_str())) {
                 previewPlaying_ = false;
                 if (previewTrailEmitter_) previewTrailEmitter_->Stop(); // Emitterを停止（描画されなくなる）
             }
         }
         else {
-            // ★ 再生ボタン
+            // 再生ボタン
             if (ImGui::Button((std::string(ICON_FA_PLAY) + " 再生").c_str())) {
                 previewPlaying_ = true;
                 previewTimer_ = 0.f;
@@ -984,7 +984,7 @@ namespace YoRigine {
             }
         }
         ImGui::SameLine();
-        // ★ リセットボタン
+        // リセットボタン
         if (ImGui::Button((std::string(ICON_FA_SYNC) + " リセット").c_str())) {
             previewTimer_ = 0.f;
             if (previewTrailEmitter_) previewTrailEmitter_->Play(); // リセットして最初から再生
@@ -1151,7 +1151,7 @@ namespace YoRigine {
         Logger("VfxMeshEditor: 新規作成 -> " + finalPath);
     }
 
-    // ★ 編集を即時プレビューに反映
+    // 編集を即時プレビューに反映
     void VfxMeshEditor::CommitChange(const VfxEffectAsset& before, const char* label)
     {
         auto* sel = Selected();
@@ -1166,7 +1166,7 @@ namespace YoRigine {
                 if (idx < static_cast<int>(entries_.size())) {
                     entries_[idx].asset = after;
                     entries_[idx].isDirty = true;
-                    if (previewTrailEmitter_) previewTrailEmitter_->SetAsset(after); // ★即時反映
+                    if (previewTrailEmitter_) previewTrailEmitter_->SetAsset(after); // 即時反映
                     if (previewVolume_) previewVolume_->ApplyParam(after.lightVolume);
                 }
             },
@@ -1174,7 +1174,7 @@ namespace YoRigine {
                 if (idx < static_cast<int>(entries_.size())) {
                     entries_[idx].asset = before;
                     entries_[idx].isDirty = true;
-                    if (previewTrailEmitter_) previewTrailEmitter_->SetAsset(before); // ★Undo即時反映
+                    if (previewTrailEmitter_) previewTrailEmitter_->SetAsset(before); // Undo即時反映
                     if (previewVolume_) previewVolume_->ApplyParam(before.lightVolume);
                 }
             }
