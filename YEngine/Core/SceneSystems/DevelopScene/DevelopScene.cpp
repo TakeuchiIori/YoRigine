@@ -20,8 +20,8 @@
 #include "Particle/YEmitterGroupEditor.h"
 #include "GPUParticle/GpuEmitManager.h"
 #include "Composite/CompositeEffectManager.h"
-#include <Vfx/VfxMesh/VfxMeshEditor.h>
-#include <Vfx/VfxMesh/VfxMeshSpawner.h>
+#include <Vfx/VfxMesh/Editor/VfxMeshEditor.h>
+#include <Vfx/VfxMesh/Runtime/VfxMeshSpawner.h>
 #include "Composite/CompositeEffectManager.h"
 
 // WebAPI
@@ -110,7 +110,6 @@ void DevelopScene::Initialize() {
 	Editor::GetInstance()->RegisterGameUI("GpuParticle", [this]() { YoRigine::GpuEmitManager::GetInstance()->DrawImGui(); }, "Develop");
 	Editor::GetInstance()->RegisterGameUI("複合エフェクト(Composite)", [this]() { CompositeEffectManager::GetInstance()->DrawImGui(); }, "Develop");
 	Editor::GetInstance()->RegisterGameUI("YoRigine:パーティクルエディター", [this]() {YParticleEditor::GetInstance().ShowEditorWindow(); }, "Develop");
-	//Editor::GetInstance()->RegisterGameUI("モーションエディタ", [this]() {motionEditor_->ShowEditor(); }, "Develop");
 
 	Editor::GetInstance()->RegisterGameUI("複合エフェクト(Composite)", [this]() { CompositeEffectManager::GetInstance()->DrawImGui(); }, "Develop");
 	Editor::GetInstance()->RegisterGameUI("VFX", [this]() { YoRigine::VfxMeshEditor::GetInstance()->DrawImGui(); }, "Develop");
@@ -128,7 +127,10 @@ void DevelopScene::Update() {
 	YoRigine::GameTime::Update();
 	UpdateCamera();
 
-
+	if (YoRigine::Input::GetInstance()->TriggerKey(DIK_8)) {
+		VfxMeshHandle::PlayOneShot("Explosion", Vector3{ 0,20,0 }, /*scale*/1.5f);
+		VfxMeshHandle::PlayBolt("Lightning", Vector3{ 0,50,0 }, Vector3{ 0,0,0 }, /*loop*/false);
+	}
 	YoRigine::CollisionManager::GetInstance()->Update();
 	YoRigine::ModelManipulator::GetInstance()->Update();
 	YParticleManager::GetInstance().Update(YoRigine::GameTime::GetDeltaTime(YoRigine::TimeChannel::Vfx));

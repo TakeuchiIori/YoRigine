@@ -3,6 +3,7 @@
 // ===========================================================
 #include "VolumeSmokeMesh.h"
 #include <cmath>
+#include <algorithm>
 
 namespace YoRigine {
 
@@ -28,6 +29,22 @@ void VolumeSmokeMesh::SetTransform(const Vector3& center, float radius)
         radius_ = radius;
         dirty_  = true;
     }
+}
+
+// 共有状態から中心・半径を算出（爆発ワンショット時は膨張＋上昇）。
+// ここは以前 VfxMeshSpawner / VfxMeshEditor に重複していた計算を集約したもの。
+void VolumeSmokeMesh::Drive(const VfxEvalState& s)
+{
+    float   rad = param_.radius * s.scale;
+    Vector3 c   = s.position;
+    if (s.progress >= 0.f) {
+        // 破裂: 最初に素早く膨張（ポップ）→ その後ゆっくり広がり続ける
+        float grow = std::min(s.progress / 0.18f, 1.0f);
+        rad *= (0.2f + 0.8f * grow + 0.4f * s.progress);
+        // 浮力で上昇
+        c.y += param_.riseSpeed * s.age;
+    }
+    SetTransform(c, rad);
 }
 
 void VolumeSmokeMesh::Update(float deltaTime)

@@ -29,14 +29,14 @@ VfxMeshSpawner* VfxMeshSpawner::GetInstance()
 void VfxMeshSpawner::Initialize()
 {
     dxCommon_ = YoRigine::DirectXCommon::GetInstance();
+    active_.reserve(kMaxActiveVfx);   // 以降 push_back で再確保させない
 }
 
 void VfxMeshSpawner::Finalize()
 {
-    for (auto& fx : effects_) {
-        if (fx) fx->Release();
-    }
-    effects_.clear();
+    // pool_.Clear() が生存中の ActiveEffect を破棄 → ~ActiveEffect が Release() を呼ぶ
+    pool_.Clear();
+    active_.clear();
     assetMap_.clear();
 }
 
@@ -89,27 +89,31 @@ uint32_t VfxMeshSpawner::Spawn(const std::string& assetName,
         return 0;
     }
 
-    auto fx       = std::make_unique<ActiveEffect>();
+    ActiveEffect* fx = pool_.Alloc();
+    if (!fx) {
+        Logger("VfxMeshSpawner: プール満杯（同時上限 " + std::to_string(kMaxActiveVfx) + "）-> " + assetName);
+        return 0;
+    }
     fx->id        = nextId_++;
+    fx->alive     = true;
     fx->loop      = loop;
-    fx->asset     = it->second;
+    fx->asset     = &it->second;   // コピーせず参照
     fx->position  = position;
     fx->scale     = scale;
     fx->burstProgress = loop ? -1.f : 0.f;
 
     // デフォルトの稲妻始終点（位置基準の上下）
-    float half = fx->asset.lightning.length * 0.5f * scale;
+    float half = fx->asset->lightning.length * 0.5f * scale;
     fx->boltStart = { position.x, position.y - half, position.z };
     fx->boltEnd   = { position.x, position.y + half, position.z };
 
     fx->smokeCenter = position;
-    fx->smokeRadius = fx->asset.smoke.radius * scale;
+    fx->smokeRadius = fx->asset->smoke.radius * scale;
 
     InitEffect(*fx);
 
-    uint32_t id = fx->id;
-    effects_.push_back(std::move(fx));
-    return id;
+    active_.push_back(fx);
+    return fx->id;
 }
 
 uint32_t VfxMeshSpawner::SpawnBolt(const std::string& assetName,
@@ -127,12 +131,13 @@ uint32_t VfxMeshSpawner::SpawnBolt(const std::string& assetName,
 // ============================================================
 void VfxMeshSpawner::InitEffect(ActiveEffect& fx)
 {
-    const auto& asset = fx.asset;
+    const auto& asset = *fx.asset;
 
     if (asset.useSmoke && asset.smoke.isEnable) {
         fx.smoke = std::make_unique<YoRigine::VolumeSmokeMesh>();
         fx.smoke->Initialize();
-        fx.smoke->SetTransform(fx.position, fx.asset.smoke.radius * fx.scale);
+        fx.smoke->ApplyParam(asset.smoke);   // 半径/上昇速度を Drive で使えるように
+        fx.smoke->SetTransform(fx.position, asset.smoke.radius * fx.scale);
 
         fx.smokeCBRes = dxCommon_->CreateBufferResource(CBSize<YoRigine::SmokeParamsCB>());
         fx.smokeCBRes->Map(0, nullptr, reinterpret_cast<void**>(&fx.smokeCBMapped));
@@ -166,24 +171,25 @@ void VfxMeshSpawner::InitEffect(ActiveEffect& fx)
 // ============================================================
 void VfxMeshSpawner::Update(float deltaTime)
 {
-    for (auto& fx : effects_) {
-        if (!fx || !fx->alive) continue;
-        UpdateEffect(*fx, deltaTime);
-    }
+    for (size_t i = 0; i < active_.size(); ) {
+        ActiveEffect* fx = active_[i];
+        if (fx && fx->alive) UpdateEffect(*fx, deltaTime);
 
-    // 死亡エフェクトを削除
-    effects_.erase(
-        std::remove_if(effects_.begin(), effects_.end(),
-            [](const std::unique_ptr<ActiveEffect>& f) {
-                return !f || !f->alive;
-            }),
-        effects_.end());
+        if (!fx || !fx->alive) {
+            // 死亡 → プールへ返却し、active_ から swap-remove（再確保なし）
+            if (fx) pool_.Free(fx);
+            active_[i] = active_.back();
+            active_.pop_back();
+            continue;
+        }
+        ++i;
+    }
 }
 
 void VfxMeshSpawner::UpdateEffect(ActiveEffect& fx, float dt)
 {
     fx.age += dt;
-    const auto& asset = fx.asset;
+    const auto& asset = *fx.asset;
 
     // バースト進捗更新（ワンショット）
     if (!fx.loop) {
@@ -202,31 +208,34 @@ void VfxMeshSpawner::UpdateEffect(ActiveEffect& fx, float dt)
         }
     }
 
-    // Smoke 更新
+    // 各 Mesh へ渡す共有状態を組み立て（動きの計算は Mesh 側 Drive に集約）
+    YoRigine::VfxEvalState st;
+    st.age       = fx.age;
+    st.progress  = fx.burstProgress;
+    st.position  = fx.position;
+    st.scale     = fx.scale;
+    st.boltStart = fx.boltStart;
+    st.boltEnd   = fx.boltEnd;
+
+    // Smoke 更新（膨張/上昇は Drive 内で計算 → 結果を CB 用に読み戻す）
     if (fx.smoke) {
-        float rad = asset.smoke.radius * fx.scale;
-        fx.smokeCenter = fx.position;
-        if (fx.burstProgress >= 0.f) {
-            float grow = std::min(fx.burstProgress / 0.18f, 1.0f);
-            rad *= (0.2f + 0.8f * grow + 0.4f * fx.burstProgress);
-            fx.smokeCenter.y += asset.smoke.riseSpeed * fx.age;
-        }
-        fx.smokeRadius = rad;
-        fx.smoke->SetTransform(fx.smokeCenter, rad);
+        fx.smoke->Drive(st);
         fx.smoke->Update(dt);
+        fx.smokeCenter = fx.smoke->GetCenter();
+        fx.smokeRadius = fx.smoke->GetRadius();
     }
 
     // Lightning 更新
     if (fx.lightning) {
         fx.lightning->SetCamera(camera_);
-        fx.lightning->SetEndpoints(fx.boltStart, fx.boltEnd);
+        fx.lightning->Drive(st);
         fx.lightning->Update(dt);
     }
 
     // Shockwave 更新
     if (fx.shockwave) {
         fx.shockwave->SetCamera(camera_);
-        fx.shockwave->SetTransform(fx.position, asset.shockwave.radius * fx.scale);
+        fx.shockwave->Drive(st);
         fx.shockwave->Update(dt);
     }
 }
@@ -238,7 +247,7 @@ void VfxMeshSpawner::Draw()
 {
     if (!camera_) return;
 
-    for (auto& fx : effects_) {
+    for (ActiveEffect* fx : active_) {
         if (!fx || !fx->alive) continue;
         DrawEffect(*fx);
     }
@@ -252,7 +261,7 @@ void VfxMeshSpawner::DrawEffect(ActiveEffect& fx)
 
     // Smoke
     if (fx.smoke && fx.smokeCBMapped) {
-        const auto& sm = fx.asset.smoke;
+        const auto& sm = fx.asset->smoke;
         auto& cb = *fx.smokeCBMapped;
         cb.color         = sm.color;
         cb.smokeColor    = sm.smokeColor;
@@ -278,7 +287,7 @@ void VfxMeshSpawner::DrawEffect(ActiveEffect& fx)
 
     // Lightning
     if (fx.lightning && fx.lightningCBMapped) {
-        const auto& lt = fx.asset.lightning;
+        const auto& lt = fx.asset->lightning;
         auto& cb = *fx.lightningCBMapped;
         cb.color            = lt.color;
         cb.glowColor        = lt.glowColor;
@@ -300,7 +309,7 @@ void VfxMeshSpawner::DrawEffect(ActiveEffect& fx)
 
     // Shockwave
     if (fx.shockwave && fx.shockwaveCBMapped) {
-        const auto& sw = fx.asset.shockwave;
+        const auto& sw = fx.asset->shockwave;
         auto& cb = *fx.shockwaveCBMapped;
         cb.color     = sw.color;
         cb.time      = fx.age;
@@ -324,7 +333,7 @@ void VfxMeshSpawner::DrawEffect(ActiveEffect& fx)
 // ============================================================
 void VfxMeshSpawner::SetPosition(uint32_t id, const Vector3& pos)
 {
-    for (auto& fx : effects_) {
+    for (ActiveEffect* fx : active_) {
         if (fx && fx->id == id) {
             fx->position    = pos;
             fx->smokeCenter = pos;
@@ -335,7 +344,7 @@ void VfxMeshSpawner::SetPosition(uint32_t id, const Vector3& pos)
 
 void VfxMeshSpawner::SetScale(uint32_t id, float scale)
 {
-    for (auto& fx : effects_) {
+    for (ActiveEffect* fx : active_) {
         if (fx && fx->id == id) {
             fx->scale = scale;
             return;
@@ -345,7 +354,7 @@ void VfxMeshSpawner::SetScale(uint32_t id, float scale)
 
 void VfxMeshSpawner::SetEndpoints(uint32_t id, const Vector3& start, const Vector3& end)
 {
-    for (auto& fx : effects_) {
+    for (ActiveEffect* fx : active_) {
         if (fx && fx->id == id) {
             fx->boltStart = start;
             fx->boltEnd   = end;
@@ -356,7 +365,7 @@ void VfxMeshSpawner::SetEndpoints(uint32_t id, const Vector3& start, const Vecto
 
 void VfxMeshSpawner::Stop(uint32_t id)
 {
-    for (auto& fx : effects_) {
+    for (ActiveEffect* fx : active_) {
         if (fx && fx->id == id) {
             fx->alive = false;
             fx->Release();
@@ -367,7 +376,7 @@ void VfxMeshSpawner::Stop(uint32_t id)
 
 bool VfxMeshSpawner::IsAlive(uint32_t id) const
 {
-    for (const auto& fx : effects_) {
+    for (const ActiveEffect* fx : active_) {
         if (fx && fx->id == id) return fx->alive;
     }
     return false;

@@ -258,18 +258,17 @@ namespace YoRigine {
         }
 
         if (asset.useSmoke && previewSmoke_) {
-            float rad = asset.smoke.radius;
-            smokeCenter_ = previewCenter_;
-            if (burstProgress_ >= 0.0f) {
-                // 破裂: 最初に素早く膨張（ポップ）→ 煙でゆっくり広がり続ける
-                float grow = std::min(burstProgress_ / 0.18f, 1.0f);
-                rad *= (0.2f + 0.8f * grow + 0.4f * burstProgress_);
-                // 浮力で上昇（爆発後の煙が立ち上る）
-                smokeCenter_.y += asset.smoke.riseSpeed * previewTimer_;
-            }
-            smokeRadius_ = rad;
-            previewSmoke_->SetTransform(smokeCenter_, rad);
+            // 膨張/上昇の計算は VolumeSmokeMesh::Drive に集約（ゲーム側 Spawner と同一）
+            previewSmoke_->ApplyParam(asset.smoke);
+            VfxEvalState st;
+            st.age      = previewTimer_;
+            st.progress = burstProgress_;
+            st.position = previewCenter_;
+            st.scale    = 1.0f;
+            previewSmoke_->Drive(st);
             previewSmoke_->Update(deltaTime);
+            smokeCenter_ = previewSmoke_->GetCenter();  // CB 用に読み戻す
+            smokeRadius_ = previewSmoke_->GetRadius();
         }
 
         if (asset.useLightning && previewLightning_) {

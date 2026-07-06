@@ -7,6 +7,7 @@
 #include <vector>
 #include <Buffers/DynamicVertexBuffer.h>
 #include "MathFunc.h"
+#include "VfxEvalState.h"
 
 namespace YoRigine {
 
@@ -40,6 +41,11 @@ namespace YoRigine {
         // --------------------------------------------------------
 
         virtual void Update(float deltaTime) = 0;
+
+        // 共有状態(VfxEvalState)を受け取り、自分の姿勢（位置/半径/始終点など）へ反映する。
+        // 「動きの計算」は呼び出し側が state に書き込み済み。Mesh は自分に必要な値だけ取り出す。
+        // デフォルトは何もしない（動きを持たない Mesh 用）。
+        virtual void Drive(const VfxEvalState& /*state*/) {}
 
         /// @param cmdList          コマンドリスト
         /// @param cameraGPUAddress gCamera CBV の GPU アドレス (b0)

@@ -27,6 +27,7 @@
 #include "ShockwaveMesh.h"
 #include "VolumeSmokeMesh.h"
 #include "Vector3.h"
+#include "Memory/PoolAllocator.h"
 
 class Camera;
 
@@ -79,6 +80,9 @@ private:
     VfxMeshSpawner(const VfxMeshSpawner&)            = delete;
     VfxMeshSpawner& operator=(const VfxMeshSpawner&) = delete;
 
+    // 同時に存在できる VfxMesh エフェクトの上限（PoolAllocator の固定長）
+    static constexpr size_t kMaxActiveVfx = 256;
+
     // ── アクティブエフェクト ─────────────────────────────────────────
     struct ActiveEffect
     {
@@ -87,7 +91,8 @@ private:
         bool     loop  = false;
         float    age   = 0.f;
 
-        YoRigine::VfxEffectAsset asset;
+        // アセットはコピーせず assetMap_ の実体を指す（生成時のヒープ確保/コピーを回避）
+        const YoRigine::VfxEffectAsset* asset = nullptr;
 
         // 位置・スケール
         Vector3 position  = { 0.f, 0.f, 0.f };
@@ -116,6 +121,9 @@ private:
         YoRigine::ShockwaveParamsCB*           shockwaveCBMapped = nullptr;
 
         void Release();
+
+        // プール返却時（~ActiveEffect）にマップ済み CB を確実に Unmap する
+        ~ActiveEffect() { Release(); }
     };
 
     void InitEffect(ActiveEffect& fx);
@@ -127,5 +135,9 @@ private:
     uint32_t nextId_  = 1;
 
     std::unordered_map<std::string, YoRigine::VfxEffectAsset> assetMap_;
-    std::vector<std::unique_ptr<ActiveEffect>>                 effects_;
+
+    // 実体は固定長プールから確保（生成/破棄でヒープが増減しない）。
+    // active_ は「今生きているエフェクトへのポインタ列」（reserve 済みで再確保しない）。
+    PoolAllocator<ActiveEffect, kMaxActiveVfx> pool_;
+    std::vector<ActiveEffect*>                 active_;
 };

@@ -23,7 +23,7 @@
 // ===========================================================
 #include "Vector3.h"
 #include "Particle/EffectHandle.h"
-#include "Vfx/VfxMesh/VfxMeshHandle.h"
+#include "Vfx/VfxMesh/Runtime/VfxMeshHandle.h"
 #include "GPUParticle/GpuParticleHandle.h"
 #include "Systems/Audio/Audio.h"
 

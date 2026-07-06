@@ -5,7 +5,7 @@
 // エディタのドロップダウン用（各系統の名前一覧）
 #include "Particle/YParticleManager.h"
 #include "Particle/YEmitterGroupManager.h"
-#include "Vfx/VfxMesh/VfxMeshSpawner.h"
+#include "Vfx/VfxMesh/Runtime/VfxMeshSpawner.h"
 #include "GPUParticle/GpuEmitManager.h"
 
 #include <json.hpp>

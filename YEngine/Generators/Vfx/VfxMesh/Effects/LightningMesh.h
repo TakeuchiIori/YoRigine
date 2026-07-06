@@ -50,6 +50,9 @@ public:
     void SetEndpoints(const Vector3& start, const Vector3& end);
     void ApplyParam(const LightningEffectParam& param) { param_ = param; }
 
+    // 共有状態の始終点をそのまま反映（方向性エフェクト）
+    void Drive(const VfxEvalState& state) override { SetEndpoints(state.boltStart, state.boltEnd); }
+
     void Update(float deltaTime) override;
     void Draw(ID3D12GraphicsCommandList* cmdList) override;
 

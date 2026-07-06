@@ -43,6 +43,9 @@ public:
     void SetTransform(const Vector3& center, float radius);
     void ApplyParam(const ShockwaveEffectParam& param) { param_ = param; }
 
+    // 共有状態の位置・スケールから中心・半径を反映
+    void Drive(const VfxEvalState& state) override { SetTransform(state.position, param_.radius * state.scale); }
+
     void Update(float deltaTime) override;
     void Draw(ID3D12GraphicsCommandList* cmdList) override;
 

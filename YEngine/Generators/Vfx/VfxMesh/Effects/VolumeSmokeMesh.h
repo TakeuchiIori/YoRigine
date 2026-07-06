@@ -18,6 +18,7 @@
 //   smoke_->Draw(cmdList);
 // ===========================================================
 #include "ProceduralMeshBase.h"
+#include "VfxEffectAsset.h"   // SmokeEffectParam
 
 namespace YoRigine {
 
@@ -53,7 +54,12 @@ public:
 
     void SetColor(const Vector4& color) { color_ = color; dirty_ = true; }
 
+    // 半径・上昇速度などの元パラメータを保持（Drive で膨張/上昇計算に使う）
+    void ApplyParam(const SmokeEffectParam& param) { param_ = param; }
+
     void Update(float deltaTime) override;
+    // 共有状態(burst進捗/位置/スケール/経過)から中心・半径を算出して SetTransform する
+    void Drive(const VfxEvalState& state) override;
     void Draw(ID3D12GraphicsCommandList* cmdList) override;
 
     const Vector3& GetCenter() const { return center_; }
@@ -62,6 +68,7 @@ public:
 private:
     void RebuildVertices();
 
+    SmokeEffectParam param_;   // 半径/上昇速度など（Drive で参照）
     int     rings_   = 18;
     int     sectors_ = 28;
     Vector3 center_  = { 0.f, 0.f, 0.f };

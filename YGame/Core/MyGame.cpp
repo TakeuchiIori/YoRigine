@@ -18,7 +18,7 @@
 #include "Particle/YEmitterGroupEditor.h"
 
 #include "Particle/YEmitterGroupManager.h"
-#include "Vfx/VfxMesh/VfxMeshSpawner.h"
+#include "Vfx/VfxMesh/Runtime/VfxMeshSpawner.h"
 #include "Composite/CompositeEffectManager.h"
 /// <summary>
 /// ゲーム全体の初期化処理（起動時に一度だけ実行）

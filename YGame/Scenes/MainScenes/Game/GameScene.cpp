@@ -28,8 +28,8 @@
 #include "Systems/Camera/CameraEditor.h"
 #include "Systems/Camera/Virtuals/FollowCamera/FollowCamera.h"
 #include "Systems/Camera/Virtuals/DebugCamera/DebugCamera.h"
-#include <Vfx/VfxMesh/VfxMeshEditor.h>
-#include <Vfx/VfxMesh/VfxMeshSpawner.h>
+#include <Vfx/VfxMesh/Editor/VfxMeshEditor.h>
+#include <Vfx/VfxMesh/Runtime/VfxMeshSpawner.h>
 
 // C++
 #include <cstdlib>

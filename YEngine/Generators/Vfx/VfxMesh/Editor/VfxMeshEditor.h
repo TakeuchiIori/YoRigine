@@ -19,7 +19,7 @@
 #include "FileOperations/FileBrowser.h"
 
 // TrailMesh ではなく Emitter を使う
-#include "Vfx/VfxMesh/TrailMeshEmitter.h"
+#include "Vfx/VfxMesh/Runtime/TrailMeshEmitter.h"
 #include "Systems/Camera/Camera.h"
 
 namespace YoRigine {
