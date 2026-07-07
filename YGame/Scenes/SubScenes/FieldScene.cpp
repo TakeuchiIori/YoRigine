@@ -221,6 +221,19 @@ void FieldScene::Initialize(Camera* camera, Player* player) {
 //========================================================================*/
 void FieldScene::Update() {
 
+	if (!YoRigine::GameTime::IsPause() && player_ && player_->GetMovement()) {
+		auto* input = YoRigine::Input::GetInstance();
+		if (input &&
+			(input->IsPadTriggered(0, GamePadButton::LB) ||
+			 input->IsPadTriggered(0, GamePadButton::RB))) {
+			if (player_->GetMovement()->FaceCurrentWaypointNow()) {
+				if (auto* followCamera = player_->GetFollowCamera()) {
+					followCamera->RecenterBehindTarget();
+				}
+			}
+		}
+	}
+
 	player_->Update();
 	ground_->Update();
 	fieldEnemyManager_->Update();

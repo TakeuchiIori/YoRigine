@@ -191,6 +191,31 @@ void PlayerMovement::UpdateWaypointFacing(float deltaTime) {
 }
 
 // ============================================================
+// 現在のウェイポイント方向へ即時向き合わせ
+// ============================================================
+bool PlayerMovement::FaceCurrentWaypointNow() {
+	if (!owner_) return false;
+	if (!canRotate_ || isHoming_) return false;
+	if (owner_->IsBattleMode()) return false;
+
+	auto* waypoint = WaypointManager::GetInstance();
+	if (!waypoint || !waypoint->HasCurrent()) return false;
+
+	Vector3 toWaypoint = waypoint->GetCurrentPosition() - owner_->GetWorldPosition();
+	toWaypoint.y = 0.0f;
+
+	const float distance = toWaypoint.Length();
+	if (distance <= config_.waypointFacingMinDistance) return false;
+
+	Vector3 direction = toWaypoint * (1.0f / distance);
+	targetRotateY_ = CalculateTargetRotate(direction);
+	currentRotateY_ = targetRotateY_;
+	isRotating_ = false;
+	ApplyRotate();
+	return true;
+}
+
+// ============================================================
 // JSON設定の初期化
 // ============================================================
 void PlayerMovement::InitJson(YoRigine::JsonManager* jsonManager) {

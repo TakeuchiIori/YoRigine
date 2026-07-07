@@ -116,6 +116,7 @@ public:
 	Vector3 GetCameraRotation() const;
 	void UpdateCameraFollow(float deltaTime);
 	void UpdateWaypointFacing(float deltaTime);
+	bool FaceCurrentWaypointNow();
 	bool IsCameraMoving() const { return isCameraMoving_; }
 
 private:
