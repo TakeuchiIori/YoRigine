@@ -228,7 +228,7 @@
       "action": {
         "beaconEffect": "WaypointBeacon",
         "beaconScale": 1.0,
-        "nextWaypoint": "",
+        "nextWaypoint": "Waypoint6",
         "requiredCount": 1,
         "requiredGroup": "",
         "startActive": true,
@@ -239,6 +239,33 @@
         -5.452000141143799,
         0.0,
         -74.3550033569336
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "action": {
+        "beaconEffect": "WaypointBeacon",
+        "beaconScale": 1.0,
+        "nextWaypoint": "",
+        "requiredCount": 3,
+        "requiredGroup": "",
+        "startActive": false,
+        "type": "Waypoint"
+      },
+      "name": "Waypoint6",
+      "position": [
+        39.821998596191406,
+        4.133359470870346e-05,
+        -62.10100173950195
       ],
       "rotation": [
         0.0,
