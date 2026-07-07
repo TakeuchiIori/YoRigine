@@ -223,6 +223,33 @@
         1.0,
         1.0
       ]
+    },
+    {
+      "action": {
+        "beaconEffect": "WaypointBeacon",
+        "beaconScale": 1.0,
+        "nextWaypoint": "",
+        "requiredCount": 1,
+        "requiredGroup": "",
+        "startActive": true,
+        "type": "Waypoint"
+      },
+      "name": "Waypoint5",
+      "position": [
+        -5.452000141143799,
+        0.0,
+        -74.3550033569336
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ]
     }
   ]
 }

@@ -14,6 +14,7 @@
 #include "Collision/AreaCollision/Base/AreaManager.h"
 #include <ModelManipulator/ModelManipulator.h>
 #include "Collision/AreaCollision/Base/AreaEditor.h"
+#include "Trigger/Actions/WaypointAction.h"
 #include "Trigger/WaypointManager.h"
 
 #ifdef USE_IMGUI
@@ -726,6 +727,32 @@ void FieldScene::DrawEventTriggerEditor() {
 		eventTriggers_.push_back(std::move(trigger));
 	}
 	ImGui::SameLine();
+	if (ImGui::Button("＋ Waypoint 追加")) {
+		bool hasWaypoint = false;
+		for (const auto& existing : eventTriggers_) {
+			if (existing && dynamic_cast<WaypointAction*>(existing->GetAction())) {
+				hasWaypoint = true;
+				break;
+			}
+		}
+
+		auto trigger = std::make_unique<EventTrigger>();
+		trigger->Initialize(sceneCamera_);
+		trigger->SetName("Waypoint" + std::to_string(eventTriggers_.size() + 1));
+		if (player_) {
+			auto& wt = trigger->GetWT();
+			wt.translate_ = player_->GetWorldPosition();
+			wt.scale_ = { 1.0f, 1.0f, 1.0f };
+			wt.UpdateMatrix();
+		}
+
+		auto action = std::make_unique<WaypointAction>(
+			std::string("WaypointBeacon"), std::string(""), 1, std::string(""), !hasWaypoint);
+
+		trigger->SetAction(std::move(action));
+		eventTriggers_.push_back(std::move(trigger));
+	}
+	ImGui::SameLine();
 	if (ImGui::Button("保存")) {
 		EventTriggerLoader::Save(EventTriggerPaths::Field, eventTriggers_);
 	}
@@ -733,6 +760,7 @@ void FieldScene::DrawEventTriggerEditor() {
 	if (ImGui::Button("再ロード")) {
 		eventTriggers_.clear();
 		openGateActions_.clear();
+		WaypointManager::GetInstance()->Reset();
 		EventTriggerLoader::Load(
 			EventTriggerPaths::Field,
 			sceneCamera_,
@@ -863,6 +891,72 @@ void FieldScene::DrawEventTriggerEditor() {
 				ImGui::SameLine();
 				if (ImGui::Button("状態リセット")) {
 					gate->Reset();
+				}
+			}
+			else if (auto* waypoint = dynamic_cast<WaypointAction*>(trig->GetAction())) {
+				ImGui::Separator();
+				ImGui::TextDisabled("Action: Waypoint");
+
+				{
+					char buf[128];
+					std::snprintf(buf, sizeof(buf), "%s", waypoint->GetBeaconEffect().c_str());
+					if (ImGui::InputText("ビーコンVfxMesh", buf, sizeof(buf))) {
+						waypoint->SetBeaconEffect(buf);
+					}
+					if (waypoint->GetBeaconEffect().empty()) {
+						ImGui::SameLine();
+						ImGui::TextDisabled("(空欄 = ビーコンなし)");
+					}
+				}
+				{
+					float s = waypoint->GetBeaconScale();
+					if (ImGui::DragFloat("ビーコンスケール", &s, 0.05f, 0.01f, 100.0f, "%.2f")) {
+						waypoint->SetBeaconScale(s);
+					}
+				}
+				{
+					char buf[128];
+					std::snprintf(buf, sizeof(buf), "%s", waypoint->GetRequiredGroup().c_str());
+					if (ImGui::InputText("必要敵グループ (enemyId)", buf, sizeof(buf))) {
+						waypoint->SetRequiredGroup(buf);
+					}
+					if (waypoint->GetRequiredGroup().empty()) {
+						ImGui::SameLine();
+						ImGui::TextDisabled("(空欄 = どの敵でもカウント)");
+					}
+				}
+				{
+					int n = waypoint->GetRequiredCount();
+					if (ImGui::DragInt("必要撃破数", &n, 1.0f, 1, 999)) {
+						waypoint->SetRequiredCount(n);
+					}
+				}
+				{
+					char buf[128];
+					std::snprintf(buf, sizeof(buf), "%s", waypoint->GetNextWaypoint().c_str());
+					if (ImGui::InputText("次のWaypoint名", buf, sizeof(buf))) {
+						waypoint->SetNextWaypoint(buf);
+					}
+					if (waypoint->GetNextWaypoint().empty()) {
+						ImGui::SameLine();
+						ImGui::TextDisabled("(空欄 = 最終目的地)");
+					}
+				}
+				{
+					bool start = waypoint->IsStartActive();
+					if (ImGui::Checkbox("最初の目的地", &start)) {
+						waypoint->SetStartActive(start);
+					}
+				}
+
+				ImGui::Text("状態: %s", waypoint->IsActive() ? "現在の目的地" : "待機");
+				ImGui::SameLine();
+				if (ImGui::Button("このWaypointを有効化")) {
+					WaypointManager::GetInstance()->Activate(trig->GetName());
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("目的地クリア")) {
+					WaypointManager::GetInstance()->Activate("");
 				}
 			}
 			else if (trig->GetAction()) {
