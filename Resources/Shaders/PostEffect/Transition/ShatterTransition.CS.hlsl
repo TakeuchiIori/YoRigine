@@ -17,6 +17,19 @@ float random(float2 st)
     return frac(sin(dot(st.xy, float2(12.9898f, 78.233f))) * 43758.5453123f);
 }
 
+// HDR リニアシーンを表示用に圧縮（ToneMapping.CS と同じ ACES フィット）。
+// OffScreen が HDR float 化されたことで sceneTex は 1 を超えるリニア値を返す。
+// これを通さないと最終 SRGB バックバッファで明部がクランプして黒白になる。
+float3 ToneMapACES(float3 x)
+{
+    float a = 2.51f;
+    float b = 0.03f;
+    float c = 2.43f;
+    float d = 0.59f;
+    float e = 0.14f;
+    return saturate((x * (a * x + b)) / (x * (c * x + d) + e));
+}
+
 [numthreads(8, 8, 1)]
 void main(uint3 dtid : SV_DispatchThreadID)
 {
@@ -76,6 +89,10 @@ void main(uint3 dtid : SV_DispatchThreadID)
 
     float2 finalUV = rotatedUV + displacement;
     float4 color = sceneTex.SampleLevel(smp, finalUV, 0);
+
+    // HDR リニアシーンを表示用レンジ [0,1] へトーンマップしてから割れ/暗転を適用する。
+    // （末尾の LinearToSRGB は表示ガンマ用にそのまま残す）
+    color.rgb = ToneMapACES(color.rgb);
 
     float inBounds = (finalUV.x >= 0.0f && finalUV.x <= 1.0f &&
                      finalUV.y >= 0.0f && finalUV.y <= 1.0f) ? 1.0f : 0.0f;

@@ -335,8 +335,8 @@ void VfxMeshSpawner::DrawEffect(ActiveEffect& fx)
                 cb.density       = sm.density;
                 cb.noiseOctaves  = sm.noiseOctaves;
                 cb.rimIntensity  = sm.rimIntensity;
-                // 従来破裂OFFならシェーダの火球→煙遷移も無効化（色はColorOverLifeで作る）
-                cb.burst         = sm.builtInBurstMotion ? fx.burstProgress : -1.f;
+                // Smoke の色/フェード/膨張/上昇はモーション駆動。シェーダは burst を使わないので -1（未使用）。
+                cb.burst         = -1.f;
 
                 const auto& idx = pm->GetParameterIndices("VfxMeshSmoke");
                 cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshSmoke"));

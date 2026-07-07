@@ -178,10 +178,13 @@ namespace YoRigine {
         float   loopDuration_       = 2.0f;  // モーションから自動検出できない場合のフォールバック秒数
         float   loopPeriodComputed_ = 0.0f;  // 直前フレームで算出した1サイクル長（UI表示用）
 
-        // 爆発ワンショット再生（破裂→膨張→消滅を1回。自動リピート）
-        bool    oneShot_       = false;
-        float   burstDuration_ = 2.0f; // 煙が漂う時間（爆発全体の長さ）
-        float   burstProgress_ = -1.f; // -1=継続モード, 0..1=ワンショット進捗
+        // ワンショット再生（寿命＝モーション優先ぶんで1回発生 → 休止 → くりかえす）
+        // 通常プレビューの既定挙動。loopOneShot_（モーション確認ループ）中のみ継続駆動になる。
+        float   burstDuration_ = 2.0f; // 寿命フォールバック（BurstGrow モーションが無いとき）
+        float   burstProgress_ = -1.f; // -1=継続(ループ確認中), 0..1=ワンショット進捗
+        float   oneShotGap_    = 0.6f; // 一発出しきってから次の一発までの休止時間（完全に消える間）
+        float   oneShotLocal_  = 0.f;  // 現サイクル内の経過秒（DrawPreview のサブ効果駆動に使う）
+        bool    burstMode_     = false;// このフレームがワンショット駆動か（false=継続ループ確認）
         Vector3 previewCenter_ = { 0.f, 0.f, 0.f };
         float   previewYaw_ = 0.f;
 

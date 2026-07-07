@@ -140,6 +140,7 @@ void DebugCamera::DrawDebugGui() {
 // ============================================================
 void DebugCamera::Save(nlohmann::json& j) const {
 	VirtualCamera::Save(j);
+	j["isMoving"] = isMoving_;
 	j["moveSpeed"] = moveSpeed_;
 	j["rotateSpeed"] = rotateSpeed_;
 	j["moveSpeedController"] = moveSpeedController_;
@@ -151,6 +152,7 @@ void DebugCamera::Save(nlohmann::json& j) const {
 // ============================================================
 void DebugCamera::Load(const nlohmann::json& j) {
 	VirtualCamera::Load(j);
+	isMoving_ = j.value("isMoving", true);
 	moveSpeed_ = j.value("moveSpeed", 0.5f);
 	rotateSpeed_ = j.value("rotateSpeed", 0.05f);
 	moveSpeedController_ = j.value("moveSpeedController", 0.1f);

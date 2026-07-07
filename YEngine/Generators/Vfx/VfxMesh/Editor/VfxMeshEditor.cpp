@@ -153,9 +153,8 @@ namespace YoRigine {
         previewTimer_ += deltaTime;
         const auto& asset = sel->asset;
 
-        // 爆発ワンショット: 進捗 0→1。終端で自動リピート。継続モードは -1。
-        // 寿命は BurstGrow モーション（全体/形状個別）があればそれを使う（ゲームと一致）。
-        // 無ければ UI の burstDuration_。
+        // ワンショット寿命はモーション優先（BurstGrow が全体/形状個別にあればその最大 duration。
+        // ゲーム側 OneShotDuration() と同じ考え方）。無ければ UI の burstDuration_ をフォールバック。
         float burstPeriod = burstDuration_;
         {
             float bg = 0.f;
@@ -168,46 +167,42 @@ namespace YoRigine {
             for (const auto& sub : asset.subEffects) scan(sub.motions);
             if (bg > 0.f) burstPeriod = std::max(bg, 0.01f);
         }
-        if (oneShot_ && burstPeriod > 0.01f) {
-            if (previewTimer_ >= burstPeriod) previewTimer_ = 0.f;
-            burstProgress_ = std::min(previewTimer_ / burstPeriod, 1.0f);
+
+        // プレビューは常に「寿命ぶんでモーションを1回再生」する（＝パーティクルのワンショット相当）。
+        //   loopOneShot_ ON  : 休止をはさんで毎サイクル まっさらに再Emit（1回ずつ繰り返し）
+        //   loopOneShot_ OFF : 1回だけ再生して終端で停止（もう一度/リセットで再生）
+        // 動きは全部モーション（ScaleOverLife/Rise/FadeInOut 等）で作る。ハードコードはしない。
+        burstMode_ = (burstPeriod > 0.01f);
+        oneShotLocal_ = 0.f;            // このサイクル内での経過（0 が一発の始まり）
+        bool oneShotIdle = false;       // 「出しきって終わった」休止中か（ループの休止）
+        if (burstMode_) {
+            if (loopOneShot_) {
+                const float gap   = std::max(oneShotGap_, 0.0f);
+                const float cycle = burstPeriod + gap;
+                oneShotLocal_ = std::fmod(previewTimer_, cycle);
+                if (oneShotLocal_ >= burstPeriod) {
+                    oneShotLocal_ = burstPeriod; // 終端で保持
+                    oneShotIdle   = true;        // 休止：完全に非表示 → 次サイクルで再Emit
+                }
+            } else {
+                oneShotLocal_ = std::min(previewTimer_, burstPeriod); // 1回で止まる
+            }
+            burstProgress_ = std::min(oneShotLocal_ / burstPeriod, 1.0f);
         } else {
             burstProgress_ = -1.0f;
         }
-
-        // 汎用ワンショットループ（burstProgress は触らず mbase.lifetime だけ設定する）
-        loopPeriodComputed_ = 0.f;
-        if (loopOneShot_ && !oneShot_) {
-            // BurstGrow があればその duration、なければ startTime+window の最大値
-            auto scanDur = [this](const std::vector<VfxMotion>& ms) {
-                for (const auto& m : ms) {
-                    if (m.type == VfxMotionType::BurstGrow)
-                        loopPeriodComputed_ = std::max(loopPeriodComputed_, m.duration);
-                    else if (m.window > 0.f)
-                        loopPeriodComputed_ = std::max(loopPeriodComputed_, m.startTime + m.window);
-                }
-            };
-            scanDur(asset.motions);
-            for (const auto& sub : asset.subEffects) scanDur(sub.motions);
-            if (loopPeriodComputed_ < 0.1f) loopPeriodComputed_ = loopDuration_;
-
-            if (previewTimer_ >= loopPeriodComputed_) {
-                previewTimer_ = std::fmod(previewTimer_, loopPeriodComputed_);
-                if (previewTrailEmitter_) previewTrailEmitter_->Play(); // Trail も先頭へ
-            }
-        }
+        const float oneShotLocal = oneShotLocal_; // 以降のローカル参照用
 
         // サブ効果の構成変更（追加/削除/種類変更/Undo）をプレビューへ反映
         SyncPreviewSubs();
 
         // データ駆動モーションのベース状態（サブ効果ごとに評価する）
         VfxEvalState mbase;
-        mbase.age      = previewTimer_;
+        // age は毎サイクル 0 から振り直す（＝毎回まっさらな1発。previewTimer_ をそのまま渡すと
+        // 上昇/漂いが累積してしまう）。lifetime は寿命（FadeInOut などの終端計算に使う）。
+        mbase.age      = burstMode_ ? oneShotLocal : previewTimer_;
         mbase.progress = burstProgress_;
-        // ワンショット中は寿命を渡す（FadeInOut などの終端計算に使う）
-        mbase.lifetime = (oneShot_ && burstPeriod > 0.01f)       ? burstPeriod
-                       : (loopOneShot_ && loopPeriodComputed_ > 0.f) ? loopPeriodComputed_
-                       : -1.f;
+        mbase.lifetime = burstMode_ ? burstPeriod : -1.f;
         mbase.position = previewCenter_;
         mbase.scale    = 1.0f;
 
@@ -284,6 +279,12 @@ namespace YoRigine {
             const auto& def = asset.subEffects[i];
             auto&       sub = *previewSubs_[i];
             if (!def.enabled) continue;
+
+            // ワンショットの休止中は「出しきって終わった」状態。完全に消す（描画側は visible を見る）。
+            if (oneShotIdle) {
+                sub.visible = false;
+                continue;
+            }
 
             VfxEvalState s = mbase;
             s.position += def.offset;
@@ -415,8 +416,9 @@ namespace YoRigine {
                     cb.density       = sm.density;
                     cb.noiseOctaves  = sm.noiseOctaves;
                     cb.rimIntensity  = sm.rimIntensity;
-                    // 従来破裂OFFならシェーダの火球→煙遷移も無効化（色はColorOverLifeで作る）
-                    cb.burst         = sm.builtInBurstMotion ? burstProgress_ : -1.0f;
+                    // Smoke の見た目はモーション駆動（色/フェード=CB color、膨張/上昇=center/radius）。
+                    // シェーダは burst を使わないので常に -1（未使用）。
+                    cb.burst         = -1.0f;
 
                     const auto& idx = pm->GetParameterIndices("VfxMeshSmoke");
                     cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshSmoke"));
@@ -458,9 +460,11 @@ namespace YoRigine {
                     cb.time      = previewTimer_;
                     cb.duration  = sw.duration;
                     cb.thickness = sw.thickness;
-                    // 衝撃波は煙より速い独自タイムスケール（sw.duration で1回膨張して終わる）
-                    cb.burst = (burstProgress_ >= 0.0f)
-                        ? std::min(previewTimer_ / std::max(sw.duration, 0.01f), 1.0f) : -1.0f;
+                    // ワンショット時は「現サイクル内の経過 / 衝撃波の duration」で 0→1 を1回だけ進める。
+                    // これで寿命中に1回だけ膨張して消え、休止をはさんで次サイクルでまた1回鳴る。
+                    // （継続=モーション確認ループ中のみ -1 でシェーダ側 frac ループに任せる）
+                    cb.burst = burstMode_
+                        ? std::min(oneShotLocal_ / std::max(sw.duration, 0.01f), 1.0f) : -1.0f;
 
                     const auto& idx = pm->GetParameterIndices("VfxMeshShockwave");
                     cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshShockwave"));
@@ -592,8 +596,8 @@ namespace YoRigine {
         if (ImGui::BeginTabBar("##vfxTabs")) {
             // Trail タブ
             {
-                // "###tab_xxx" でタブ ID を固定（● の付け外しで選択がリセットされないように）
-                std::string label = std::string(asset.useTrail ? "● " : "   ") + "Trail###tab_Trail";
+                // "###tab_xxx" でタブ ID を固定（アイコンの付け外しで選択がリセットされないように）
+                std::string label = std::string(asset.useTrail ? (ICON_FA_CIRCLE " ") : "   ") + "Trail###tab_Trail";
                 if (ImGui::BeginTabItem(label.c_str())) {
                     VfxEffectAsset b = asset;
                     if (ImGui::Checkbox("この効果を有効化", &asset.useTrail)) CommitChange(b, "Trail 有効切替");
@@ -606,7 +610,7 @@ namespace YoRigine {
 
             // 形状タブ（サブ効果リスト: 同じ種類を複数積める）
             {
-                std::string slabel = std::string(asset.subEffects.empty() ? "   " : "● ")
+                std::string slabel = std::string(asset.subEffects.empty() ? "   " : (ICON_FA_CIRCLE " "))
                                    + "形状 (" + std::to_string(asset.subEffects.size()) + ")###tab_SubEffects";
                 if (ImGui::BeginTabItem(slabel.c_str())) {
                     DrawSubEffectsSection();
@@ -616,7 +620,7 @@ namespace YoRigine {
 
             // Motion タブ（エフェクト全体の動きのリストを編集）
             {
-                std::string mlabel = std::string(asset.motions.empty() ? "   " : "● ")
+                std::string mlabel = std::string(asset.motions.empty() ? "   " : (ICON_FA_CIRCLE " "))
                                    + "Motion###tab_Motion";
                 if (ImGui::BeginTabItem(mlabel.c_str())) {
                     DrawMotionSection();
@@ -918,6 +922,9 @@ namespace YoRigine {
         if (showVolumeDebug_) ImGui::TextColored(ImVec4(1, 1, 0, 1), "  > OBB ワイヤーフレーム ON");
     }
 
+    // 既定モーション付与ヘルパの前方宣言（定義は DrawSubEffectsSection の直前）
+    static void ApplyDefaultSubEffectMotions(VfxSubEffect& sub);
+
     void VfxMeshEditor::DrawSmokeSection(VfxSubEffect& sub)
     {
         auto* sel = Selected();
@@ -950,13 +957,19 @@ namespace YoRigine {
             if (c) CommitChange(b, "Smoke パラメータ");
         }
 
-        ImGui::SeparatorText("破裂の動き");
+        ImGui::SeparatorText("動き（モーションで作る）");
         {
-            VfxEffectAsset b = sel->asset;
-            if (ImGui::Checkbox("従来の破裂挙動を使う##smburst", &sm.builtInBurstMotion))
-                CommitChange(b, "Smoke 破裂挙動切替");
-            ImGui::TextDisabled("  ON  = ワンショット時に自動でポップ膨張/上昇/火球→煙遷移（従来）\n"
-                                "  OFF = ScaleOverLife / ColorOverLife / Rise などのモーションだけで動きを組む");
+            ImGui::TextDisabled("  Smoke の膨張/上昇/フェードは下の「この形状のモーション」で作ります。\n"
+                                "  下のボタンで定番の動き（膨張+上昇+フェード）をまとめて追加できます。");
+            // 定番の動き（膨張 ScaleOverLife / 上昇 Rise / フェード FadeInOut）を Motion として追加。
+            // これらはそのまま JSON に保存され、追加後に自由に編集できる。
+            if (ImGui::Button("定番の動きをMotionで追加##smtomotion")) {
+                VfxEffectAsset b2 = sel->asset;
+                ApplyDefaultSubEffectMotions(sub); // 膨張/上昇/フェードを追加
+                CommitChange(b2, "Smoke に定番モーション追加");
+            }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("膨張(ScaleOverLife)/上昇(Rise)/フェード(FadeInOut) をモーションとして追加します。\n追加後は下の「この形状のモーション」で自由に編集できます。");
         }
     }
 
@@ -1208,6 +1221,79 @@ namespace YoRigine {
     // -------------------------------------------------------
     // 形状（サブ効果）リスト: 同じ種類を複数追加・複製・削除できる
     // -------------------------------------------------------
+    // 新規サブ効果を「ハードコードではなくモーションで動く」状態にするための既定モーション。
+    // ここで積んだ VfxMotion はそのまま JSON に保存され、エディタで自由に編集できる。
+    // （Smoke の膨張/上昇/フェードはシェーダや Drive に埋め込まず、必ずここで Motion として与える）
+    static void ApplyDefaultSubEffectMotions(VfxSubEffect& sub)
+    {
+        switch (sub.type) {
+        case VfxSubEffectType::Smoke: {
+            // 従来のハードコード破裂（builtInBurstMotion）は使わず、動きは全部モーションで作る
+            sub.smoke.builtInBurstMotion = false;
+            sub.smoke.riseSpeed = 0.f; // 上昇も Rise モーションで
+            // ベース色は白（中立）にしておく。ColorOverLife は色を「乗算」するので、
+            // ベースに色が付いていると灰色にしても色が残る。白にすると ColorOverLife の色が
+            // そのまま出て「暖色→灰色」の変化がちゃんと出る。
+            sub.smoke.color = { 1.0f, 1.0f, 1.0f, 1.0f };
+
+            // 膨張: 一気に広がって減速（EaseOutExpo）
+            VfxMotion grow;
+            grow.type = VfxMotionType::ScaleOverLife;
+            grow.ease = VfxEase::EaseOutExpo;
+            grow.window = 2.0f;
+            grow.scaleStart = 0.3f; grow.scaleEnd = 1.6f;
+            sub.motions.push_back(grow);
+
+            // 上昇: 0.2 秒後から浮力で上がる
+            VfxMotion rise;
+            rise.type = VfxMotionType::Rise;
+            rise.startTime = 0.2f;
+            rise.window = 1.8f;
+            rise.velocity = { 0.f, 1.0f, 0.f };
+            rise.amplitude = 1.0f;
+            sub.motions.push_back(rise);
+
+            // フェード（不透明度）: 立ち上がり一瞬 → 終盤 0.7 秒で消える
+            VfxMotion fade;
+            fade.type = VfxMotionType::FadeInOut;
+            fade.window = 2.0f;
+            fade.fadeIn = 0.05f; fade.fadeOut = 0.7f;
+            sub.motions.push_back(fade);
+
+            // 色変化: 暖色（火球）→ 灰色の煙へ（α は FadeInOut に任せるので 1 のまま）。
+            // ＝「フェードみたいに色を変えていく」動き。ベース白 × この色 が実際の見た目になる。
+            //  ・window を短め(0.7s)＋EaseOutで「灰色になるのを早く」＝まだ濃いうちに灰色が見える
+            //    （window=寿命(2s)だと消えかけてから灰色になり、灰色が見えない）。
+            //  ・colorStart は控えめ(r を少しだけ>1)にして白飛びを防ぐ（>1が大きいと Bloom で真っ白）。
+            VfxMotion color;
+            color.type = VfxMotionType::ColorOverLife;
+            color.ease = VfxEase::EaseOutCubic;
+            color.window = 0.7f;
+            color.colorStart = { 1.2f, 0.6f, 0.3f, 1.0f };   // 立ち上がりは暖色（火球。控えめHDR）
+            color.colorEnd   = { 0.22f, 0.22f, 0.24f, 1.0f }; // すぐ灰色の煙に落ち着く
+            sub.motions.push_back(color);
+
+            // billow: サイズをゆっくり脈動させて「もくもく」感を出す（Pulse=scale を sin で脈動）
+            VfxMotion pulse;
+            pulse.type = VfxMotionType::Pulse;
+            pulse.amplitude = 0.08f; // 振幅 8%
+            pulse.frequency = 1.2f;  // Hz
+            sub.motions.push_back(pulse);
+
+            // turbulence: 位置を細かく揺らして乱流っぽい漂いを足す（Shake=位置ジッタ）
+            VfxMotion shake;
+            shake.type = VfxMotionType::Shake;
+            shake.amplitude = 0.06f;
+            shake.frequency = 1.5f;
+            sub.motions.push_back(shake);
+            break;
+        }
+        default:
+            // 他の形状は既定モーションなし（必要になったらここに追加する）
+            break;
+        }
+    }
+
     void VfxMeshEditor::DrawSubEffectsSection()
     {
         auto* sel = Selected();
@@ -1229,6 +1315,8 @@ namespace YoRigine {
                     VfxEffectAsset b = sel->asset;
                     VfxSubEffect sub;
                     sub.type = t;
+                    // 生成時に既定の動きを Motion として積む（ハードコードに頼らず JSON 保存＆編集可能）
+                    ApplyDefaultSubEffectMotions(sub);
                     subs.push_back(std::move(sub));
                     CommitChange(b, "形状追加");
                 }
@@ -1248,8 +1336,8 @@ namespace YoRigine {
             ImGui::PushID(i);
             auto& sub = subs[i];
 
-            // ヘッダ: [●/○] 種類 + ラベル
-            std::string title = std::string(sub.enabled ? "● " : "○ ")
+            // ヘッダ: [有効/無効アイコン] 種類 + ラベル
+            std::string title = std::string(sub.enabled ? (ICON_FA_CHECK " ") : (ICON_FA_BAN " "))
                               + VfxSubEffectTypeName(sub.type);
             if (!sub.label.empty()) title += "  \"" + sub.label + "\"";
             title += "###subHeader";
@@ -1373,51 +1461,38 @@ namespace YoRigine {
             if (previewTrailEmitter_) previewTrailEmitter_->Play(); // リセットして最初から再生
         }
 
-        // 汎用ワンショットループ（全エフェクト共通）
-        if (ImGui::Checkbox("ワンショットループ (モーション確認)", &loopOneShot_)) {
+        // ループ再生：ON なら寿命ぶんで1回再生 → 休止 → まっさらに再Emit をくりかえす
+        // （パーティクルのワンショットループ相当）。OFF なら1回だけ再生して止まる。
+        if (ImGui::Checkbox("ループ再生 (1回ずつ繰り返しEmit)", &loopOneShot_)) {
             previewTimer_ = 0.f;
             if (previewTrailEmitter_) previewTrailEmitter_->Play();
         }
+        ImGui::TextDisabled("  OFF=1回だけ再生して停止 / ON=1回ずつ繰り返し。動きはモーションで作る。");
+
+        ImGui::SetNextItemWidth(120);
+        ImGui::DragFloat("寿命フォールバック(s)", &burstDuration_, 0.02f, 0.1f, 5.0f, "%.2f");
+        ImGui::SameLine();
+        ImGui::TextDisabled("BurstGrow モーションがあればそちら優先");
         if (loopOneShot_) {
-            if (loopPeriodComputed_ > 0.1f) {
-                // モーションから自動検出できた場合
-                ImGui::SameLine();
-                ImGui::TextDisabled("%.2f s / サイクル", loopPeriodComputed_);
-            } else {
-                // 検出できなかった場合は手動設定
-                ImGui::SameLine();
-                ImGui::SetNextItemWidth(110);
-                ImGui::DragFloat("ループ時間##ls", &loopDuration_, 0.05f, 0.1f, 30.f, "%.2f s");
-            }
-            ImGui::SameLine();
-            if (ImGui::SmallButton("もう一度##loop")) {
-                previewTimer_ = 0.f;
-                if (previewTrailEmitter_) previewTrailEmitter_->Play();
-            }
-        }
-
-        // 爆発ワンショット再生（Smoke/Shockwave が一発膨張して消える。自動リピート）
-        ImGui::Checkbox("爆発ワンショット再生 (破裂→膨張→消滅)", &oneShot_);
-        if (oneShot_) {
-            ImGui::SameLine();
             ImGui::SetNextItemWidth(120);
-            ImGui::DragFloat("破裂時間(s)", &burstDuration_, 0.02f, 0.1f, 5.0f, "%.2f");
-            if (ImGui::Button("もう一度")) previewTimer_ = 0.f;
+            ImGui::DragFloat("休止(s)", &oneShotGap_, 0.02f, 0.0f, 5.0f, "%.2f");
+            ImGui::SameLine();
+            ImGui::TextDisabled("次のEmitまでの間（完全に消える時間）");
         }
+        if (ImGui::Button("もう一度")) previewTimer_ = 0.f;
 
-        ImGui::DragFloat3("プレビュー位置", &previewCenter_.x, 0.05f, -20.f, 20.f);
+        ImGui::DragFloat3("プレビュー位置", &previewCenter_.x, 0.05f);
         ImGui::SliderAngle("プレビューYaw", &previewYaw_, -180.f, 180.f);
 
         auto* sel = Selected();
         if (sel) {
-            // ワンショットループ中はサイクル進捗バーを表示
-            if (loopOneShot_ && loopPeriodComputed_ > 0.1f) {
-                char ov[64];
-                snprintf(ov, sizeof(ov), "モーション  %.2f / %.2f s", previewTimer_, loopPeriodComputed_);
-                ImGui::ProgressBar(std::min(previewTimer_ / loopPeriodComputed_, 1.f),
-                                   ImVec2(-1, 0), ov);
-            } else if (oneShot_) {
-                // 爆発ワンショット中は既存の burstPeriod でバーを出す（Trail と同様）
+            // ワンショット進捗バー（burstProgress_ は 0→1、ループの休止中は 1 で貼り付く）
+            if (burstMode_) {
+                char ov[48];
+                snprintf(ov, sizeof(ov), "%s  %.0f%%",
+                         loopOneShot_ ? "ループEmit" : "ワンショット",
+                         std::max(burstProgress_, 0.f) * 100.f);
+                ImGui::ProgressBar(std::max(burstProgress_, 0.f), ImVec2(-1, 0), ov);
             } else if (sel->asset.useTrail && sel->asset.trail.lifetime > 0.f) {
                 char ov[48];
                 snprintf(ov, sizeof(ov), "Trail  %.2f / %.2f s",

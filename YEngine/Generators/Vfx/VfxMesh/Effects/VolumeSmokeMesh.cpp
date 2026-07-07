@@ -31,21 +31,11 @@ void VolumeSmokeMesh::SetTransform(const Vector3& center, float radius)
     }
 }
 
-// 共有状態から中心・半径を算出（爆発ワンショット時は膨張＋上昇）。
-// ここは以前 VfxMeshSpawner / VfxMeshEditor に重複していた計算を集約したもの。
+// 共有状態から中心・半径を反映するだけ。膨張(ScaleOverLife)・上昇(Rise) などの
+// 動きはすべてモーションが s.scale / s.position に積んでくれるので、ここではハードコードしない。
 void VolumeSmokeMesh::Drive(const VfxEvalState& s)
 {
-    float   rad = param_.radius * s.scale;
-    Vector3 c   = s.position;
-    // 従来の自動破裂挙動（builtInBurstMotion=false ならモーション側に全て任せる）
-    if (s.progress >= 0.f && param_.builtInBurstMotion) {
-        // 破裂: 最初に素早く膨張（ポップ）→ その後ゆっくり広がり続ける
-        float grow = std::min(s.progress / 0.18f, 1.0f);
-        rad *= (0.2f + 0.8f * grow + 0.4f * s.progress);
-        // 浮力で上昇
-        c.y += param_.riseSpeed * s.age;
-    }
-    SetTransform(c, rad);
+    SetTransform(s.position, param_.radius * s.scale);
 }
 
 void VolumeSmokeMesh::Update(float deltaTime)
