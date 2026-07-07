@@ -82,6 +82,7 @@ namespace YoRigine {
         // モーションリスト編集（全体用と形状個別用で共用。showTarget=false で対象コンボを隠す）
         void DrawMotionListUI(std::vector<VfxMotion>& motions, bool showTarget, const char* commitLabel);
         void DrawMotionSection();
+        static void ApplyDefaultSubEffectMotions(VfxSubEffect& sub);
         void DrawPreviewSection();
         void DrawNewEffectDialog();
         void DrawTextureSelectPopup();
