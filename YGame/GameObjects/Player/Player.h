@@ -90,6 +90,11 @@ public:
 		return playerCamera_ ? playerCamera_->GetFollowCamera() : nullptr;
 	}
 
+	// 戦闘モード。GameScene が毎フレーム「現在サブシーンが Battle か」で設定する。
+	// 攻撃/ガードなどの戦闘入力は戦闘中のみ受け付ける（フィールドでは不可）。
+	void SetBattleMode(bool b) { battleMode_ = b; }
+	bool IsBattleMode() const  { return battleMode_; }
+
 	float GetMotionSpeed() const { return motionSpeed_; }
 	void SetMotionSpeed(float speed) { motionSpeed_ = speed; }
 	const float* GetMotionSpeedArray() const { return motionSpeed; }
@@ -125,6 +130,7 @@ private:
 	// メンバ変数
 	// ============================================================
 	YoRigine::Input* input_ = nullptr;
+	bool battleMode_ = false;   // 戦闘中のみ攻撃/ガード入力を受け付ける
 	std::unique_ptr<PlayerCamera> playerCamera_;
 
 	std::unique_ptr<PlayerSword> playerSword_;

@@ -70,6 +70,20 @@ public:
     bool          IsLockOn()        const { return isLockOn_; }
 
     // ============================================================
+    // 戦闘モード
+    //   true の間は RB/LB を「押しっぱなしで左右カメラ回転」に割り当てる。
+    //   false（フィールド等）では従来どおり RB/LB は背後リセンター。
+    //   GameScene が毎フレーム、現在サブシーンが Battle かで設定する。
+    // ============================================================
+    void SetBattleMode(bool b) {
+        battleMode_ = b;
+        // 戦闘中はアイドルオートリセンターを止める。別方向を向いているのに
+        // 無操作で勝手に正面へ戻るとストレスなので、戦闘中は自動リセンターしない。
+        if (followCamera_) followCamera_->SetIdleRecenterSuppressed(b);
+    }
+    bool IsBattleMode() const  { return battleMode_; }
+
+    // ============================================================
     // 脅威察知のシーン許可
     // フィールドでは背景・マップ見渡しを優先して OFF、バトル中だけ ON にする。
     // 各サブシーンの OnEnter から呼ぶ。
@@ -243,6 +257,13 @@ private:
     // ============================================================
     float camYawSpeed_      = 3.2f;   // ヨー最大角速度(rad/s)
     float camPitchSpeed_    = 2.4f;   // ピッチ最大角速度(rad/s)
+
+    // 戦闘中の RB/LB 押しっぱなし回転（yaw）の角速度(rad/s)。JSON: "bumperYawSpeed"
+    bool  battleMode_        = false;
+    float bumperRotateSpeed_ = 2.6f;
+    // 戦闘中「移動を始めたら背後へ寄せる」自動リセンター用。左スティックの移動状態を追跡。
+    bool  camWasMoving_     = false;   // 前フレームで移動していたか（開始エッジ検出用）
+    float moveRecenterThreshold_ = 0.5f; // 左スティックのこの強さを超えたら「移動中」とみなす
     float camDeadzone_      = 0.18f;  // ラジアルデッドゾーン(0..1)
     float camResponseCurve_ = 2.0f;   // レスポンスカーブ指数(1=線形 / 大きいほど中央が精密)
     float camAccelTime_     = 0.12f;  // 0→最大入力までの加速時間(秒)。0で即時

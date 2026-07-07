@@ -111,11 +111,48 @@ void PlayerCamera::UpdatePreDirector() {
             }
         }
 
-        // RB / LB で自機の向いている方向の背後へ素早くリセンター（フリーカメラ時のみ）
-        if (!isLockOn_ &&
-            (YoRigine::Input::GetInstance()->IsPadTriggered(0, GamePadButton::RB) ||
-             YoRigine::Input::GetInstance()->IsPadTriggered(0, GamePadButton::LB))) {
-            followCamera_->RecenterBehindTarget();
+        // RB / LB（フリーカメラ時のみ）:
+        //   戦闘中 … 押しっぱなしで左右にカメラを回す（LB=左回り / RB=右回り）。
+        //            正面（背後）へ戻すのは自動（アイドルオートリセンター）に任せる＝ボタンを増やさない。
+        //   非戦闘 … 従来どおり押した瞬間に自機の背後へリセンター。
+        if (!isLockOn_) {
+            auto* input = YoRigine::Input::GetInstance();
+            if (battleMode_) {
+                bool holdingBumper = false;
+                float yawDir = 0.0f;
+                if (input->IsPadPressed(0, GamePadButton::LB)) { yawDir -= 1.0f; holdingBumper = true; } // 左回り
+                if (input->IsPadPressed(0, GamePadButton::RB)) { yawDir += 1.0f; holdingBumper = true; } // 右回り
+                if (yawDir != 0.0f) {
+                    // 実時間（スロー中も操作感一定。UpdateStickInput と同じ）
+                    const float bumperDt = YoRigine::GameTime::GetUnscaledDeltaTime();
+                    Vector3 rot = followCamera_->GetRotate();
+                    rot.y += yawDir * bumperRotateSpeed_ * bumperDt;
+                    followCamera_->SetRotate(rot);
+                    followCamera_->CancelRecenter();     // 手動操作優先（リセンター中なら中断）
+                    followCamera_->NotifyCameraActive(); // 回している間はアイドルリセンターを止める
+                }
+
+                // 前進移動を始めたら背後へ寄せる（戦闘中の自動リセンターはこれだけ）。
+                // 立ち止まって好きな方向を見るのは維持しつつ、走り出したら進行方向が見えるようにする。
+                bool movingNow = false;
+                XINPUT_STATE js;
+                if (input->IsControllerConnected() && input->GetJoystickState(0, js)) {
+                    float lx = static_cast<float>(js.Gamepad.sThumbLX) / 32767.0f;
+                    float ly = static_cast<float>(js.Gamepad.sThumbLY) / 32767.0f;
+                    movingNow = (std::sqrt(lx * lx + ly * ly) > moveRecenterThreshold_);
+                }
+                // 「止まっている → 動き出した」瞬間だけ発火。バンパーで回している間は手動優先で発火しない。
+                if (movingNow && !camWasMoving_ && !holdingBumper) {
+                    followCamera_->RecenterBehindTarget();
+                }
+                camWasMoving_ = movingNow;
+            } else {
+                camWasMoving_ = false;
+                if (input->IsPadTriggered(0, GamePadButton::RB) ||
+                    input->IsPadTriggered(0, GamePadButton::LB)) {
+                    followCamera_->RecenterBehindTarget();
+                }
+            }
         }
 
         if (isLockOn_) {
@@ -538,6 +575,7 @@ void PlayerCamera::SaveCameraFeel(nlohmann::json& j) const {
     j["curve"]      = camResponseCurve_;
     j["accelTime"]  = camAccelTime_;
     j["invertY"]    = camInvertY_;
+    j["bumperYawSpeed"] = bumperRotateSpeed_;
 }
 
 void PlayerCamera::LoadCameraFeel(const nlohmann::json& j) {
@@ -547,6 +585,7 @@ void PlayerCamera::LoadCameraFeel(const nlohmann::json& j) {
     camResponseCurve_ = j.value("curve",      2.0f);
     camAccelTime_     = j.value("accelTime",  0.12f);
     camInvertY_       = j.value("invertY",    false);
+    bumperRotateSpeed_ = j.value("bumperYawSpeed", 2.6f);
 }
 
 // ============================================================
@@ -961,6 +1000,8 @@ void PlayerCamera::DrawImGui() {
         ImGui::DragFloat("加速時間(秒)",       &camAccelTime_,  0.01f, 0.0f, 0.5f, "%.2f");
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("0→最大入力まで滑らかに立ち上げる時間。0で即時");
         ImGui::Checkbox("ピッチ反転", &camInvertY_);
+        ImGui::DragFloat("戦闘 RB/LB 回転速度(rad/s)", &bumperRotateSpeed_, 0.05f, 0.3f, 12.0f, "%.2f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("戦闘中に RB/LB 押しっぱなしで左右に回すヨー速度");
 
         // 編集値を extension JSON に反映（カメラ設定保存時に一緒に永続化）
         nlohmann::json cfJson;

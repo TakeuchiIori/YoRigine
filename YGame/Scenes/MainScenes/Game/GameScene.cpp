@@ -265,7 +265,16 @@ void GameScene::Update() {
 	// 空と共通システム更新
 	skyBox_->Update();
 	// バトル中のみ LB/RB の押下アニメを許可
-	gameUI_->SetBattleActive(subSceneManager_ && subSceneManager_->GetCurrentSceneName() == "Battle");
+	const bool inBattle = subSceneManager_ && subSceneManager_->GetCurrentSceneName() == "Battle";
+	gameUI_->SetBattleActive(inBattle);
+	// 戦闘中は RB/LB を「押しっぱなしで左右カメラ回転」に切り替える（非戦闘は背後リセンター）。
+	// 攻撃/ガード入力も戦闘中のみ受け付ける。
+	if (player_) {
+		player_->SetBattleMode(inBattle);
+		if (player_->GetPlayerCamera()) {
+			player_->GetPlayerCamera()->SetBattleMode(inBattle);
+		}
+	}
 
 	// 画面外ヒット演出が発火していたら、ロックオン照準フラッシュを敵位置で再生
 	{

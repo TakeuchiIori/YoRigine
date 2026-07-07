@@ -15,6 +15,18 @@ void ControlUI::Initialize()
 	// 波紋用のUI
 	ripples = YoRigine::UIManager::GetInstance()->GetUI("ripples");
     ripples->SetVisible(false);
+
+    // A/B/X ボタンの背面アウトライン枠（攻撃ボタンと一緒に戦闘中のみ表示する）
+    attackOutline_[0] = YoRigine::UIManager::GetInstance()->GetUI("outlineUI");
+    attackOutline_[1] = YoRigine::UIManager::GetInstance()->GetUI("outlineUI2");
+    attackOutline_[2] = YoRigine::UIManager::GetInstance()->GetUI("outlineUI3");
+    attackOutline_[3] = YoRigine::UIManager::GetInstance()->GetUI("outlineUI4");
+
+    // A/B/X ボタンの黒背景（同じく攻撃ボタンと一緒に戦闘中のみ表示する）
+    buttonBG_[0] = YoRigine::UIManager::GetInstance()->GetUI("buttonBG");
+    buttonBG_[1] = YoRigine::UIManager::GetInstance()->GetUI("buttonBG2");
+    buttonBG_[2] = YoRigine::UIManager::GetInstance()->GetUI("buttonBG2_1");
+    buttonBG_[3] = YoRigine::UIManager::GetInstance()->GetUI("buttonBG2_1_1");
     originalSize_ = {100.0f,100.0f};
 
     // 角丸四角の枠テクスチャを生成（丸枠が glyph と合わないため）。無ければ作る。
@@ -68,6 +80,18 @@ void ControlUI::Update()
     if (lockOnIcon_)  lockOnIcon_->SetVisible(lockHintVisible);
     if (lockOnStick_) lockOnStick_->SetVisible(lockHintVisible);
 
+    // 攻撃/ガードのボタンヒント(A/B/X)と、その背面アウトライン枠は戦闘中のみ表示
+    // （フィールドでは攻撃できないため）。LB/RB はフィールドでもカメラリセンターとして
+    // 機能するので常時表示のまま残す。
+    const bool combatHintVisible = isVisble_ && battleActive_;
+    for (int i = 0; i < 3; ++i) {
+        if (button_[i]) button_[i]->SetVisible(combatHintVisible);
+    }
+    for (int i = 0; i < 4; ++i) {
+        if (attackOutline_[i]) attackOutline_[i]->SetVisible(combatHintVisible);
+        if (buttonBG_[i])      buttonBG_[i]->SetVisible(combatHintVisible);
+    }
+
     // フラッシュ照準はアニメ再生中だけ表示（終わったら自動で消える）
     if (lockOnFlash_) {
         lockOnFlash_->SetVisible(isVisble_ && lockOnFlash_->IsAnimating());
@@ -90,6 +114,8 @@ void ControlUI::Update()
         stickPrevOffsetY_ = off;
     }
 
+    // A/B/X の押下演出（波紋＋ポップ）は戦闘中のみ（フィールドでは攻撃しないため波紋も出さない）
+    if (battleActive_) {
     // Aボタンが押された瞬間
     if (YoRigine::Input::GetInstance()->IsPadTriggered(0, GamePadButton::A)) {
         if (!isVisble_)return;
@@ -117,6 +143,7 @@ void ControlUI::Update()
         button_[2]->PlayScaleAnimation(Vector2{ 100.0f,100.0f } / baseX, Vector2{ 120.0f,120.0f } / baseX, duration_, Easing::Function::EaseInCubic, false);
         button_[2]->PlayFlash(duration_, 9);
     }
+    } // if (battleActive_) — A/B/X 押下演出ここまで
 
     // LB / RB はバトル中のみ押下アニメ（A/B と全く同じ：波紋＋拡縮＋フラッシュ）
     if (battleActive_ && isVisble_) {
