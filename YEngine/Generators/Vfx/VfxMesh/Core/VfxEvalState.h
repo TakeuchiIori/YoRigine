@@ -25,8 +25,10 @@ namespace YoRigine {
         Vector3 boltEnd   = { 0.f, 0.f, 0.f }; // 同 終点
 
         // モーションが積み上げる見た目の乗算値（Draw 時に CB の色へ掛ける）
-        Vector4 colorTint = { 1.f, 1.f, 1.f, 1.f }; // rgb=色乗算(HDR可) / a=不透明度乗算
-        bool    visible   = true;                   // Visibility モーションで false になる
+        Vector4 colorTint       = { 1.f, 1.f, 1.f, 1.f }; // rgb=色乗算(HDR可) / a=不透明度乗算
+        float   beamRadiusScale = 1.f;                    // LightVolume の beamRadius 乗算
+        float   beamGlowScale   = 1.f;                    // LightVolume の beamGlow 乗算
+        bool    visible         = true;                   // Visibility モーションで false になる
     };
 
 } // namespace YoRigine

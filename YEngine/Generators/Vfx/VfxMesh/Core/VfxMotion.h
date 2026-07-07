@@ -36,6 +36,7 @@ namespace YoRigine {
         Shake,          // 位置を細かく揺らす（amplitude=振れ幅 / frequency=速さ）
         Visibility,     // startTime〜startTime+window の間だけ表示（演出の順序付け）
         Flicker,        // 不透明度をランダム明滅（amplitude=深さ / frequency=回/秒）
+        BeamPulse,      // LightVolume の beamRadius/beamGlow を脈動
     };
 
     // 補間のイージング（ScaleOverLife / ColorOverLife などで使用）
@@ -77,8 +78,8 @@ namespace YoRigine {
         float           duration  = 2.0f;               // BurstGrow: 寿命(秒)
         Vector3         velocity  = { 0.f, 0.f, 0.f };  // Move/Rise/Accelerate: 速度 / Orbit: 回転軸
         Vector3         acceleration = { 0.f, 0.f, 0.f };// Accelerate: 加速度(重力など)
-        float           amplitude = 1.0f;               // Pulse/Shake: 振幅 / Rise: 係数 / Orbit: 半径 / Flicker: 深さ
-        float           frequency = 1.0f;               // Pulse/Shake/Orbit/Flicker: 周波数(Hz)
+        float           amplitude = 1.0f;               // Pulse/Shake/BeamPulse: 振幅 / Rise: 係数 / Orbit: 半径 / Flicker: 深さ
+        float           frequency = 1.0f;               // Pulse/Shake/Orbit/Flicker/BeamPulse: 周波数(Hz)
         float           scaleStart = 0.f;               // ScaleOverLife: 開始スケール倍率
         float           scaleEnd   = 1.f;               // ScaleOverLife: 終了スケール倍率
         Vector4         colorStart = { 1.f, 1.f, 1.f, 1.f }; // ColorOverLife: 開始色乗算(HDR可)

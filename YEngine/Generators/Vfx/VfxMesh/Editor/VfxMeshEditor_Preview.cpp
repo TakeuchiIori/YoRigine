@@ -148,6 +148,8 @@ namespace YoRigine {
             EvaluateSubEffectMotions(asset, def, s);
 
             sub.tint = s.colorTint;
+            sub.beamRadiusScale = s.beamRadiusScale;
+            sub.beamGlowScale = s.beamGlowScale;
             sub.visible = s.visible;
 
             switch (def.type) {
@@ -233,9 +235,9 @@ namespace YoRigine {
                     cb.noiseStrength = lv.noiseStrength;
                     cb.time = previewTimer_;
                     cb.beamStrength = lv.beamStrength;
-                    cb.beamRadius = lv.beamRadius;
+                    cb.beamRadius = lv.beamRadius * sub.beamRadiusScale;
                     cb.beamPower = lv.beamPower;
-                    cb.beamGlow = lv.beamGlow;
+                    cb.beamGlow = lv.beamGlow * sub.beamGlowScale;
 
                     const auto& idx = pm->GetParameterIndices("VfxMeshVolume");
                     cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshVolume"));

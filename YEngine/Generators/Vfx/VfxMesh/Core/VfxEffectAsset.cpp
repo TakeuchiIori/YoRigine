@@ -220,6 +220,14 @@ namespace YoRigine {
                 break;
             }
 
+            case VfxMotionType::BeamPulse: {
+                const float wave = 0.5f + 0.5f * std::sin(s.age * m.frequency * 6.2831853f);
+                const float radius = 1.0f + m.amplitude * (wave * 2.0f - 1.0f);
+                s.beamRadiusScale *= std::max(0.01f, radius);
+                s.beamGlowScale *= std::max(0.0f, 1.0f + m.amplitude * wave);
+                break;
+            }
+
             default:
                 break;
             }

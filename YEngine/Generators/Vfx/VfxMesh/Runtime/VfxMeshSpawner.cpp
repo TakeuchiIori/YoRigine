@@ -251,8 +251,10 @@ void VfxMeshSpawner::UpdateEffect(ActiveEffect& fx, float dt)
         YoRigine::EvaluateSubEffectMotions(asset, def, s);
 
         // 色乗算・表示状態は Draw の CB 反映で使う
-        sub.tint    = s.colorTint;
-        sub.visible = s.visible;
+        sub.tint            = s.colorTint;
+        sub.beamRadiusScale = s.beamRadiusScale;
+        sub.beamGlowScale   = s.beamGlowScale;
+        sub.visible         = s.visible;
 
         switch (def.type) {
         case YoRigine::VfxSubEffectType::Smoke:
@@ -421,9 +423,9 @@ void VfxMeshSpawner::DrawEffect(ActiveEffect& fx)
                 cb.noiseStrength = lv.noiseStrength;
                 cb.time          = fx.age;
                 cb.beamStrength  = lv.beamStrength;
-                cb.beamRadius    = lv.beamRadius;
+                cb.beamRadius    = lv.beamRadius * sub.beamRadiusScale;
                 cb.beamPower     = lv.beamPower;
-                cb.beamGlow      = lv.beamGlow;
+                cb.beamGlow      = lv.beamGlow * sub.beamGlowScale;
 
                 const auto& idx = pm->GetParameterIndices("VfxMeshVolume");
                 cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshVolume"));

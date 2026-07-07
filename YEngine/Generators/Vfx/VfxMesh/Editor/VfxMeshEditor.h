@@ -149,8 +149,10 @@ namespace YoRigine {
             float   smokeRadius = 1.5f;
 
             // モーション評価結果（Update で書き込み、DrawPreview の CB 反映で使う）
-            Vector4 tint    = { 1.f, 1.f, 1.f, 1.f }; // rgb=色乗算 / a=不透明度乗算
-            bool    visible = true;                   // Visibility モーションの結果
+            Vector4 tint            = { 1.f, 1.f, 1.f, 1.f }; // rgb=色乗算 / a=不透明度乗算
+            float   beamRadiusScale = 1.f;
+            float   beamGlowScale   = 1.f;
+            bool    visible         = true;                   // Visibility モーションの結果
 
             ~PreviewSub() {
                 if (cbMapped && cbRes) { cbRes->Unmap(0, nullptr); cbMapped = nullptr; }

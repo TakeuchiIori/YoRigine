@@ -1,0 +1,189 @@
+{
+    "motions": [],
+    "name": "WaypointBeacon",
+    "subEffects": [
+        {
+            "enabled": true,
+            "label": "Waypoint Beacon",
+            "lightVolume": {
+                "beamGlow": 4.349999904632568,
+                "beamPower": 0.10000000149011612,
+                "beamRadius": 1.5,
+                "beamStrength": 1.0,
+                "color": {
+                    "w": 1.0,
+                    "x": 1.0,
+                    "y": 0.9019607901573181,
+                    "z": 0.0
+                },
+                "depthFade": 50.0,
+                "edgeFade": 0.0010000000474974513,
+                "halfExtents": {
+                    "x": 1.0,
+                    "y": 50.0,
+                    "z": 1.0
+                },
+                "intensity": 0.6899999976158142,
+                "isEnable": true,
+                "noiseStrength": 0.0,
+                "noiseTiling": 0.009999999776482582
+            },
+            "motions": [
+                {
+                    "acceleration": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    "amplitude": 0.0,
+                    "colorEnd": {
+                        "w": 1.0,
+                        "x": 1.0,
+                        "y": 1.0,
+                        "z": 1.0
+                    },
+                    "colorStart": {
+                        "w": 1.0,
+                        "x": 1.0,
+                        "y": 1.0,
+                        "z": 1.0
+                    },
+                    "duration": 2.0,
+                    "ease": 0,
+                    "fadeIn": 0.10000000149011612,
+                    "fadeOut": 0.30000001192092896,
+                    "frequency": 1.399999976158142,
+                    "scaleEnd": 1.0,
+                    "scaleStart": 0.0,
+                    "startTime": 0.0,
+                    "target": 4,
+                    "type": 12,
+                    "velocity": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    "window": 0.0
+                },
+                {
+                    "acceleration": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    "amplitude": 0.05000000074505806,
+                    "colorEnd": {
+                        "w": 1.0,
+                        "x": 1.0,
+                        "y": 1.0,
+                        "z": 1.0
+                    },
+                    "colorStart": {
+                        "w": 1.0,
+                        "x": 1.0,
+                        "y": 1.0,
+                        "z": 1.0
+                    },
+                    "duration": 2.0,
+                    "ease": 0,
+                    "fadeIn": 0.10000000149011612,
+                    "fadeOut": 0.30000001192092896,
+                    "frequency": 9.0,
+                    "scaleEnd": 1.0,
+                    "scaleStart": 0.0,
+                    "startTime": 0.0,
+                    "target": 4,
+                    "type": 11,
+                    "velocity": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    "window": 0.0
+                }
+            ],
+            "offset": {
+                "x": 0.0,
+                "y": 50.0,
+                "z": 0.0
+            },
+            "type": 0
+        }
+    ],
+    "trail": {
+        "arcAngleDeg": 120.0,
+        "blendMode": 2,
+        "colorEnd": {
+            "w": 0.0,
+            "x": 1.0,
+            "y": 0.30000001192092896,
+            "z": 0.0
+        },
+        "colorStart": {
+            "w": 1.0,
+            "x": 1.0,
+            "y": 0.800000011920929,
+            "z": 0.0
+        },
+        "colorWaveAmp": 0.15000000596046448,
+        "colorWaveFreq": 3.0,
+        "crescentShape": true,
+        "dissolveEdgeColor": {
+            "w": 1.0,
+            "x": 2.0,
+            "y": 0.699999988079071,
+            "z": 0.15000000596046448
+        },
+        "dissolveEdgeWidth": 0.07999999821186066,
+        "dissolveStrength": 0.0,
+        "distortion": 0.0,
+        "emissiveIntensity": 1.0,
+        "energyIntensity": 1.5,
+        "energySpeed": 2.5,
+        "fresnelStrength": 1.0,
+        "glowPower": 1.5,
+        "lifetime": 0.5,
+        "maxPoints": 512,
+        "noiseOctaves": 2.0,
+        "noiseTexturePath": "",
+        "primitive": {
+            "halfExtents": {
+                "x": 0.5,
+                "y": 0.5,
+                "z": 0.5
+            },
+            "height": 1.0,
+            "latSegments": 16,
+            "lonSegments": 16,
+            "placement": 0,
+            "radius": 0.5,
+            "ringSegments": 12,
+            "scaleByAge": true,
+            "stampScale": 1.0,
+            "stampSpacing": 0.0,
+            "tubeRadius": 0.15000000596046448,
+            "type": 0
+        },
+        "rimColor": {
+            "w": 1.0,
+            "x": 0.4000000059604645,
+            "y": 0.699999988079071,
+            "z": 1.0
+        },
+        "shapeType": 0,
+        "softness": 0.15000000596046448,
+        "sparkleAmount": 0.4000000059604645,
+        "sparkleSpeed": 4.0,
+        "splineSubdivisions": 4,
+        "texturePath": "",
+        "thickness": 0.10000000149011612,
+        "trailSharpness": 2.0,
+        "uvScrollSpeed": 0.5,
+        "widthEnd": 0.0,
+        "widthSegments": 1,
+        "widthStart": 0.30000001192092896,
+        "widthWaveAmp": 0.05000000074505806,
+        "widthWaveFreq": 8.0
+    },
+    "useTrail": false
+}

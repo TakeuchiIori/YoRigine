@@ -8,12 +8,12 @@ namespace YoRigine {
     namespace {
         void AddWaypointBeamMotion(std::vector<VfxMotion>& motions)
         {
-            VfxMotion pulse;
-            pulse.type = VfxMotionType::Pulse;
-            pulse.target = VfxMotionTarget::LightVolume;
-            pulse.amplitude = 0.04f;
-            pulse.frequency = 1.6f;
-            motions.push_back(pulse);
+            VfxMotion beamPulse;
+            beamPulse.type = VfxMotionType::BeamPulse;
+            beamPulse.target = VfxMotionTarget::LightVolume;
+            beamPulse.amplitude = 0.18f;
+            beamPulse.frequency = 1.4f;
+            motions.push_back(beamPulse);
 
             VfxMotion flicker;
             flicker.type = VfxMotionType::Flicker;
@@ -35,7 +35,7 @@ namespace YoRigine {
             "BurstGrow (爆発の寿命)", "Move (等速移動)", "Rise (上昇)", "Pulse (脈動)",
             "ScaleOverLife (スケール変化)", "ColorOverLife (色変化)", "FadeInOut (フェード)",
             "Accelerate (加速/重力)", "Orbit (周回)", "Shake (揺れ)",
-            "Visibility (表示期間)", "Flicker (明滅)"
+            "Visibility (表示期間)", "Flicker (明滅)", "BeamPulse (ビーム脈動)"
         };
         const char* easeNames[] = {
             "Linear", "EaseIn (ゆっくり開始)", "EaseOut (ゆっくり終了)", "EaseInOut (両端)",
@@ -107,6 +107,11 @@ namespace YoRigine {
             case VfxMotionType::Pulse:
                 c |= ImGui::DragFloat("振幅##mp",      &m.amplitude, 0.01f, 0.0f, 2.0f, "%.2f");
                 c |= ImGui::DragFloat("周波数(Hz)##mf", &m.frequency, 0.05f, 0.0f, 20.0f, "%.2f");
+                break;
+            case VfxMotionType::BeamPulse:
+                c |= ImGui::DragFloat("ビーム振幅##mbpa", &m.amplitude, 0.01f, 0.0f, 2.0f, "%.2f");
+                c |= ImGui::DragFloat("脈動回数(/秒)##mbpf", &m.frequency, 0.05f, 0.0f, 20.0f, "%.2f");
+                ImGui::TextDisabled("  ※LightVolume の beamRadius / beamGlow を揺らします");
                 break;
             case VfxMotionType::ScaleOverLife:
                 c |= ImGui::DragFloat("開始スケール##mss", &m.scaleStart, 0.01f, 0.0f, 20.0f, "%.2f");
@@ -183,7 +188,7 @@ namespace YoRigine {
             CommitChange(b, "Waypoint Beam Motion 追加");
         }
         ImGui::SameLine();
-        ImGui::TextDisabled("LightVolume に Pulse/Flicker を追加");
+        ImGui::TextDisabled("LightVolume に BeamPulse/Flicker を追加");
         ImGui::Separator();
 
         DrawMotionListUI(sel->asset.motions, true, "モーション編集");
