@@ -18,7 +18,7 @@
 //     - 補間中はターゲットの worldTransform が毎フレーム更新される
 //       (collider も自動追従する)。
 //
-//   完了時に collider を無効化し、onGateOpened_ を発火する (RebakeNavGrid 用)。
+//   完了時に collider を無効化し、onGateOpened_ を発火する。
 //
 //   閉位置の永続化:
 //     - closedPosition_ / Rotation / Scale をトリガー JSON に保存する。
@@ -38,10 +38,10 @@ public:
 	// requiredCount: 撃破回数の閾値 (デフォルト 1)。
 	OpenGateAction(std::string targetName, std::string requiredGroup, int requiredCount = 1);
 
-	// 開放完了時のコールバック (FieldScene 側で RebakeNavGrid を渡す)
+	// 開放完了時のコールバック (必要なら Scene 側で NavMesh 更新などを渡す)
 	void SetOnGateOpened(std::function<void()> cb) { onGateOpened_ = std::move(cb); }
 
-	// FieldScene 側から FieldEnemyManager の撃破コールバック経由で叩く
+	// 外部システムの撃破通知から叩く
 	void NotifyEnemyDefeated(const std::string& group);
 
 	void Update(float deltaTime) override;

@@ -1,6 +1,6 @@
 #include "PlayerMovement.h"
 #include "../Player.h"
-#include "../../Trigger/WaypointManager.h"
+#include "Generators/Trigger/WaypointManager.h"
 
 // State
 #include "IdleMovementState.h"

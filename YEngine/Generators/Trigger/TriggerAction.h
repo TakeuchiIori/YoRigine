@@ -29,7 +29,7 @@ public:
 	virtual void OnTriggerStay (BaseCollider* /*other*/) {}
 	virtual void OnTriggerExit (BaseCollider* /*other*/) {}
 
-	// 敵グループ撃破通知。FieldScene の撃破コールバックから全アクションへ配られる。
+	// 敵グループ撃破通知。Scene や EventBridge など外部システムから配られる。
 	// 撃破条件で進行する系（OpenGate / Waypoint 等）がオーバーライドする。
 	virtual void NotifyEnemyDefeated(const std::string& /*group*/) {}
 

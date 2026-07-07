@@ -16,7 +16,7 @@ class WaypointAction;
 //   - 現在地は Player の「向く方向」算出に使う（GetCurrentPosition）。
 //
 //   ※ EventTrigger / WaypointAction はシーン再入場で作り直されるので、
-//     FieldScene の trigger ロード時に必ず Reset() を呼ぶこと。
+//     trigger ロード時に必ず Reset() を呼ぶこと。
 // ============================================================
 class WaypointManager {
 public:

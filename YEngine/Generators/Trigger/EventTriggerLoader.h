@@ -18,9 +18,9 @@ class Camera;
 //   出力:
 //     - outTriggers          : 所有権付きの EventTrigger 群
 //     - outOpenGateActions   : OpenGateAction だけの弱参照リスト
-//                              (FieldEnemyManager の撃破コールバックで dispatch する用)
+//                              (外部イベント通知の dispatch 用)
 //
-//   onAnyGateOpened は各 OpenGateAction に attach される (RebakeNavGrid を呼ぶ想定)。
+//   onAnyGateOpened は各 OpenGateAction に attach される任意コールバック。
 // ============================================================
 class EventTriggerLoader {
 public:
@@ -38,6 +38,3 @@ public:
 		const std::vector<std::unique_ptr<EventTrigger>>& triggers);
 };
 
-namespace EventTriggerPaths {
-	const std::string Field = "Resources/Json/EventTriggers/field_triggers.json";
-}

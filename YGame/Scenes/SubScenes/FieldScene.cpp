@@ -14,14 +14,18 @@
 #include "Collision/AreaCollision/Base/AreaManager.h"
 #include <ModelManipulator/ModelManipulator.h>
 #include "Collision/AreaCollision/Base/AreaEditor.h"
-#include "Trigger/Actions/WaypointAction.h"
-#include "Trigger/WaypointManager.h"
+#include "Generators/Trigger/EventTriggerEditor.h"
+#include "Generators/Trigger/WaypointManager.h"
 
 #ifdef USE_IMGUI
 #include "imgui.h"
 #include <algorithm>
 #include <cstdio>
 #endif
+
+namespace {
+	constexpr const char* kFieldEventTriggerPath = "Resources/Json/EventTriggers/field_triggers.json";
+}
 
 /*==========================================================================
 	初期化
@@ -99,9 +103,7 @@ void FieldScene::Initialize(Camera* camera, Player* player) {
 	// FieldEnemyManager の撃破コールバックを全トリガーアクションへディスパッチ。
 	// OpenGate / Waypoint など NotifyEnemyDefeated をオーバーライドした系が反応する。
 	fieldEnemyManager_->SetOnEnemyDefeatedCallback([this](const std::string& group) {
-		for (auto& trig : eventTriggers_) {
-			if (trig && trig->GetAction()) trig->GetAction()->NotifyEnemyDefeated(group);
-		}
+		eventTriggerSystem_.NotifyEnemyDefeated(group);
 	});
 
 	// EventTrigger のロードはシーン入場のたびに必要なため、OnEnter 側で実行する
@@ -222,9 +224,7 @@ void FieldScene::Update() {
 	player_->Update();
 	ground_->Update();
 	fieldEnemyManager_->Update();
-	for (auto& trig : eventTriggers_) {
-		if (trig) trig->Update();
-	}
+	eventTriggerSystem_.Update();
 	//sprite_->Update();
 	AreaManager::GetInstance()->UpdateSingleObject(&player_->GetWT());
 
@@ -273,9 +273,7 @@ void FieldScene::DrawLine() {
 
 	player_->DrawCollision();
 	fieldEnemyManager_->DrawCollision();
-	for (auto& trig : eventTriggers_) {
-		if (trig) trig->DrawCollision();
-	}
+	eventTriggerSystem_.DrawCollision();
 	fieldEnemyManager_->DrawLine(line_.get());
 	fieldEnemyManager_->DrawEditorMarkers(line_.get());
 	player_->DrawBone(*line_.get());
@@ -411,15 +409,13 @@ void FieldScene::OnEnter() {
 	// 倒すたびにカウントがリセットされてトリガーが永遠に発火しない。
 	// PlacedObject が LoadScene で作り直されても、cachedTargetId_ は BeginOpening 時に
 	// targetName_ から取り直すので問題ない。
-	if (eventTriggers_.empty()) {
+	if (eventTriggerSystem_.GetTriggers().empty()) {
 		// ウェイポイントの登録/現在地/ビーコンを作り直す前にリセット（トリガー再構築に合わせる）。
 		WaypointManager::GetInstance()->Reset();
-		EventTriggerLoader::Load(
-			EventTriggerPaths::Field,
+		eventTriggerSystem_.Load(
+			kFieldEventTriggerPath,
 			sceneCamera_,
-			[this]() { RebakeNavGrid(); },
-			eventTriggers_,
-			openGateActions_);
+			[this]() { RebakeNavGrid(); });
 	}
 
 	RebakeNavGrid();
@@ -691,8 +687,7 @@ void FieldScene::Finalize() {
 	if (fieldEnemyManager_) {
 		fieldEnemyManager_->Finalize();
 	}
-	openGateActions_.clear();
-	eventTriggers_.clear();
+	eventTriggerSystem_.Clear();
 }
 
 void FieldScene::RebakeNavGrid()
@@ -709,280 +704,14 @@ void FieldScene::RebakeNavGrid()
 	EventTrigger エディタ
 //========================================================================*/
 void FieldScene::DrawEventTriggerEditor() {
-	ImGui::TextDisabled("Resources/Json/EventTriggers/field_triggers.json");
-	ImGui::Separator();
-
-	// ── ツールバー ───────────────────────────────────────────
-	if (ImGui::Button("＋ OpenGate トリガー追加")) {
-		auto trigger = std::make_unique<EventTrigger>();
-		trigger->Initialize(sceneCamera_);
-		trigger->SetName("NewTrigger");
-
-		auto action = std::make_unique<OpenGateAction>(
-			std::string(""), std::string(""), 1);
-		action->SetOnGateOpened([this]() { RebakeNavGrid(); });
-
-		openGateActions_.push_back(action.get());
-		trigger->SetAction(std::move(action));
-		eventTriggers_.push_back(std::move(trigger));
-	}
-	ImGui::SameLine();
-	if (ImGui::Button("＋ Waypoint 追加")) {
-		bool hasWaypoint = false;
-		for (const auto& existing : eventTriggers_) {
-			if (existing && dynamic_cast<WaypointAction*>(existing->GetAction())) {
-				hasWaypoint = true;
-				break;
-			}
-		}
-
-		auto trigger = std::make_unique<EventTrigger>();
-		trigger->Initialize(sceneCamera_);
-		trigger->SetName("Waypoint" + std::to_string(eventTriggers_.size() + 1));
-		if (player_) {
-			auto& wt = trigger->GetWT();
-			wt.translate_ = player_->GetWorldPosition();
-			wt.scale_ = { 1.0f, 1.0f, 1.0f };
-			wt.UpdateMatrix();
-		}
-
-		auto action = std::make_unique<WaypointAction>(
-			std::string("WaypointBeacon"), std::string(""), 1, std::string(""), !hasWaypoint);
-
-		trigger->SetAction(std::move(action));
-		eventTriggers_.push_back(std::move(trigger));
-	}
-	ImGui::SameLine();
-	if (ImGui::Button("保存")) {
-		EventTriggerLoader::Save(EventTriggerPaths::Field, eventTriggers_);
-	}
-	ImGui::SameLine();
-	if (ImGui::Button("再ロード")) {
-		eventTriggers_.clear();
-		openGateActions_.clear();
-		WaypointManager::GetInstance()->Reset();
-		EventTriggerLoader::Load(
-			EventTriggerPaths::Field,
-			sceneCamera_,
-			[this]() { RebakeNavGrid(); },
-			eventTriggers_,
-			openGateActions_);
-	}
-
-	ImGui::Separator();
-	ImGui::Text("登録数: %d", static_cast<int>(eventTriggers_.size()));
-	ImGui::Separator();
-
-	// ── トリガー一覧 ──────────────────────────────────────────
-	int deleteIndex = -1;
-	for (size_t i = 0; i < eventTriggers_.size(); ++i) {
-		auto& trig = eventTriggers_[i];
-		if (!trig) continue;
-
-		ImGui::PushID(static_cast<int>(i));
-
-		const std::string header = "[" + std::to_string(i) + "] " +
-			(trig->GetName().empty() ? "(無名)" : trig->GetName());
-
-		if (ImGui::CollapsingHeader(header.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
-			// 名前
-			{
-				char buf[128];
-				std::snprintf(buf, sizeof(buf), "%s", trig->GetName().c_str());
-				if (ImGui::InputText("名前", buf, sizeof(buf))) {
-					trig->SetName(buf);
-				}
-			}
-
-			// トランスフォーム (アクションが空間情報を使う時だけ表示)
-			TriggerAction* curAction = trig->GetAction();
-			const bool needsSpatial = curAction ? curAction->NeedsSpatialPlacement() : true;
-			if (needsSpatial) {
-				auto& wt = trig->GetWT();
-				bool xformChanged = false;
-				if (ImGui::DragFloat3("位置",     &wt.translate_.x, 0.1f)) xformChanged = true;
-				if (ImGui::DragFloat3("回転(rad)", &wt.rotate_.x,    0.05f)) xformChanged = true;
-				if (ImGui::DragFloat3("スケール",  &wt.scale_.x,     0.1f, 0.1f, 100.0f)) xformChanged = true;
-				if (xformChanged) wt.UpdateMatrix();
-			} else {
-				ImGui::TextDisabled("(このアクションは位置情報を使いません)");
-			}
-
-			// Action 編集 (OpenGateAction のみ対応)
-			if (auto* gate = dynamic_cast<OpenGateAction*>(trig->GetAction())) {
-				ImGui::Separator();
-				ImGui::TextDisabled("Action: OpenGate");
-
-				{
-					char buf[128];
-					std::snprintf(buf, sizeof(buf), "%s", gate->GetTargetName().c_str());
-					if (ImGui::InputText("ターゲット nameTag", buf, sizeof(buf))) {
-						gate->SetTargetName(buf);
-					}
-				}
-				{
-					char buf[128];
-					std::snprintf(buf, sizeof(buf), "%s", gate->GetRequiredGroup().c_str());
-					if (ImGui::InputText("必要敵グループ (enemyId)", buf, sizeof(buf))) {
-						gate->SetRequiredGroup(buf);
-					}
-					if (gate->GetRequiredGroup().empty()) {
-						ImGui::SameLine();
-						ImGui::TextDisabled("(空欄 = どの敵でもカウント)");
-					}
-				}
-				{
-					int n = gate->GetRequiredCount();
-					if (ImGui::DragInt("必要撃破数", &n, 1.0f, 1, 999)) {
-						gate->SetRequiredCount(n);
-					}
-				}
-
-				// ── 開放モーション (コード補間) ────────────────────────
-				// 元の transform に対する差分を duration 秒で線形補間。
-				ImGui::Separator();
-				ImGui::TextDisabled("開放モーション (元 transform に対する差分)");
-				{
-					Vector3 v = gate->GetOpenOffsetPosition();
-					if (ImGui::DragFloat3("オフセット位置", &v.x, 0.1f)) gate->SetOpenOffsetPosition(v);
-				}
-				{
-					Vector3 v = gate->GetOpenOffsetRotationDeg();
-					if (ImGui::DragFloat3("オフセット回転(deg)", &v.x, 1.0f)) gate->SetOpenOffsetRotationDeg(v);
-				}
-				{
-					Vector3 v = gate->GetOpenOffsetScale();
-					if (ImGui::DragFloat3("オフセットスケール", &v.x, 0.05f)) gate->SetOpenOffsetScale(v);
-				}
-				{
-					float d = gate->GetOpenDuration();
-					if (ImGui::DragFloat("補間時間 (秒)", &d, 0.05f, 0.05f, 60.0f)) gate->SetOpenDuration(d);
-				}
-
-				ImGui::Separator();
-				ImGui::TextDisabled("ヒンジ式の扉なら、ターゲット PlacedObject 側でアンカーを設定してください (シーンエディタ → アンカー使用)");
-
-				// ── 閉位置の管理 ───────────────────────────────────
-				ImGui::Separator();
-				ImGui::TextDisabled("閉 (初期) 位置: %s",
-					gate->HasClosedPose() ? "記録済み" : "未記録 (初回起動時に target 現在位置を捕捉)");
-				if (gate->HasClosedPose()) {
-					ImGui::TextDisabled("  pos (%.2f, %.2f, %.2f)",
-						gate->GetClosedPosition().x, gate->GetClosedPosition().y, gate->GetClosedPosition().z);
-				}
-				if (ImGui::Button("現在の target 位置を「閉」として記録")) {
-					if (auto* om = ObjectManager::GetInstance()) {
-						if (auto* tgt = om->GetObjectByName(gate->GetTargetName())) {
-							gate->SetClosedPose(tgt->position, tgt->rotation, tgt->scale);
-						}
-					}
-				}
-
-				ImGui::Separator();
-				ImGui::Text("進捗: %d / %d (Phase: %d)",
-					gate->GetCurrentCount(), gate->GetRequiredCount(),
-					static_cast<int>(gate->GetPhase()));
-
-				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.5f, 0.2f, 1.0f));
-				if (ImGui::Button(" プレビュー (即発火)")) {
-					gate->TriggerPreview();
-				}
-				ImGui::PopStyleColor();
-				ImGui::SameLine();
-				if (ImGui::Button("状態リセット")) {
-					gate->Reset();
-				}
-			}
-			else if (auto* waypoint = dynamic_cast<WaypointAction*>(trig->GetAction())) {
-				ImGui::Separator();
-				ImGui::TextDisabled("Action: Waypoint");
-
-				{
-					char buf[128];
-					std::snprintf(buf, sizeof(buf), "%s", waypoint->GetBeaconEffect().c_str());
-					if (ImGui::InputText("ビーコンVfxMesh", buf, sizeof(buf))) {
-						waypoint->SetBeaconEffect(buf);
-					}
-					if (waypoint->GetBeaconEffect().empty()) {
-						ImGui::SameLine();
-						ImGui::TextDisabled("(空欄 = ビーコンなし)");
-					}
-				}
-				{
-					float s = waypoint->GetBeaconScale();
-					if (ImGui::DragFloat("ビーコンスケール", &s, 0.05f, 0.01f, 100.0f, "%.2f")) {
-						waypoint->SetBeaconScale(s);
-					}
-				}
-				{
-					char buf[128];
-					std::snprintf(buf, sizeof(buf), "%s", waypoint->GetRequiredGroup().c_str());
-					if (ImGui::InputText("必要敵グループ (enemyId)", buf, sizeof(buf))) {
-						waypoint->SetRequiredGroup(buf);
-					}
-					if (waypoint->GetRequiredGroup().empty()) {
-						ImGui::SameLine();
-						ImGui::TextDisabled("(空欄 = どの敵でもカウント)");
-					}
-				}
-				{
-					int n = waypoint->GetRequiredCount();
-					if (ImGui::DragInt("必要撃破数", &n, 1.0f, 1, 999)) {
-						waypoint->SetRequiredCount(n);
-					}
-				}
-				{
-					char buf[128];
-					std::snprintf(buf, sizeof(buf), "%s", waypoint->GetNextWaypoint().c_str());
-					if (ImGui::InputText("次のWaypoint名", buf, sizeof(buf))) {
-						waypoint->SetNextWaypoint(buf);
-					}
-					if (waypoint->GetNextWaypoint().empty()) {
-						ImGui::SameLine();
-						ImGui::TextDisabled("(空欄 = 最終目的地)");
-					}
-				}
-				{
-					bool start = waypoint->IsStartActive();
-					if (ImGui::Checkbox("最初の目的地", &start)) {
-						waypoint->SetStartActive(start);
-					}
-				}
-
-				ImGui::Text("状態: %s", waypoint->IsActive() ? "現在の目的地" : "待機");
-				ImGui::SameLine();
-				if (ImGui::Button("このWaypointを有効化")) {
-					WaypointManager::GetInstance()->Activate(trig->GetName());
-				}
-				ImGui::SameLine();
-				if (ImGui::Button("目的地クリア")) {
-					WaypointManager::GetInstance()->Activate("");
-				}
-			}
-			else if (trig->GetAction()) {
-				ImGui::TextDisabled("Action: %s (未対応のエディタ)",
-					trig->GetAction()->GetTypeName().c_str());
-			}
-
-			ImGui::Separator();
-			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6f, 0.2f, 0.2f, 1.0f));
-			if (ImGui::Button("このトリガーを削除")) {
-				deleteIndex = static_cast<int>(i);
-			}
-			ImGui::PopStyleColor();
-		}
-
-		ImGui::PopID();
-	}
-
-	// 削除を遅延適用 (ループ終了後)
-	if (deleteIndex >= 0) {
-		// openGateActions_ から該当ポインタを除外
-		auto* doomedAction = eventTriggers_[deleteIndex]->GetAction();
-		openGateActions_.erase(
-			std::remove(openGateActions_.begin(), openGateActions_.end(), doomedAction),
-			openGateActions_.end());
-		eventTriggers_.erase(eventTriggers_.begin() + deleteIndex);
-	}
+	EventTriggerEditor::Context context;
+	context.system = &eventTriggerSystem_;
+	context.filePath = kFieldEventTriggerPath;
+	context.camera = sceneCamera_;
+	context.getPlacementPosition = [this]() {
+		return player_ ? player_->GetWorldPosition() : Vector3{ 0.0f, 0.0f, 0.0f };
+	};
+	context.onGateOpened = [this]() { RebakeNavGrid(); };
+	EventTriggerEditor::Draw(context);
 }
 #endif
