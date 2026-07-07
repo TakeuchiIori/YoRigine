@@ -9,13 +9,13 @@ namespace YoRigine {
     {
         VfxEffectAsset a;
 
-        auto addVolume = [&a](const Vector3& halfExtents, const Vector4& color, float intensity) {
+        auto addVolume = [&a](const Vector3& halfExtents, const Vector4& color, float intensity, bool waypointBeam = false) {
             VfxSubEffect sub;
             sub.type = VfxSubEffectType::LightVolume;
             sub.lightVolume.halfExtents = halfExtents;
             sub.lightVolume.color = color;
             sub.lightVolume.intensity = intensity;
-            ApplyDefaultSubEffectMotions(sub);
+            if (waypointBeam) ApplyDefaultSubEffectMotions(sub);
             a.subEffects.push_back(std::move(sub));
         };
 
@@ -27,6 +27,12 @@ namespace YoRigine {
         case VfxPreset::VolumeOnly:
             a.useTrail = false;
             addVolume({ 2.f, 1.5f, 5.f }, { 1.f, 0.9f, 0.f, 0.15f }, 1.0f);
+            break;
+
+        case VfxPreset::WaypointBeam:
+            a.useTrail = false;
+            a.name = "WayPoint";
+            addVolume({ 7.1f, 16.9f, 14.1f }, { 1.f, 0.9019608f, 0.f, 1.0f }, 0.73f, true);
             break;
 
         case VfxPreset::Sword:

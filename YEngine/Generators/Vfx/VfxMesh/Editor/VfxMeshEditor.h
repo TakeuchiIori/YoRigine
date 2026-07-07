@@ -40,7 +40,7 @@ namespace YoRigine {
 
     enum class VfxPreset : int
     {
-        Blank = 0, TrailOnly, VolumeOnly, Sword, Magic, Explosion, COUNT
+        Blank = 0, TrailOnly, VolumeOnly, WaypointBeam, Sword, Magic, Explosion, COUNT
     };
 
     enum class PreviewAnimMode : int {
