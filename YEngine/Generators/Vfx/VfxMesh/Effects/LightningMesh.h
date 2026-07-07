@@ -15,8 +15,8 @@
 //   // 呼び出し元で PSO("VfxMeshLightning") + gCamera + gMeshParam(LightningParamsCB) を bind
 //   bolt_->Draw(cmdList);
 // ===========================================================
-#include "ProceduralMeshBase.h"
-#include "VfxEffectAsset.h"   // LightningEffectParam
+#include <Vfx/VfxMesh/Core/VfxEffectAsset.h>
+#include <Vfx/VfxMesh/Core/ProceduralMeshBase.h>
 
 class Camera;
 

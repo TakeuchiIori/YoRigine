@@ -63,8 +63,8 @@ namespace YoRigine {
 		// 毎フレーム描画パス
 		// =========================================================================
 	public:
-		/// シャドウマップパス開始（DSVのみセット・クリア・ビューポート設定）
-		void PreDrawShadow();
+		/// シャドウマップパス開始（指定カスケードスライスの DSV をセット・クリア・ビューポート設定）
+		void PreDrawShadow(uint32_t cascadeIndex = 0);
 
 		/// オフスクリーンパス開始（OffScreen RTV + MainDepth DSV）
 		void PreDrawOffScreen();

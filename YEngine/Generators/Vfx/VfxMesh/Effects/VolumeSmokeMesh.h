@@ -17,8 +17,8 @@
 //   // 呼び出し元で PSO("VfxMeshSmoke") + gCamera + gMeshParam(SmokeParamsCB) を bind
 //   smoke_->Draw(cmdList);
 // ===========================================================
-#include "ProceduralMeshBase.h"
-#include "VfxEffectAsset.h"   // SmokeEffectParam
+#include <Vfx/VfxMesh/Core/VfxEffectAsset.h>
+#include <Vfx/VfxMesh/Core/ProceduralMeshBase.h>
 
 namespace YoRigine {
 

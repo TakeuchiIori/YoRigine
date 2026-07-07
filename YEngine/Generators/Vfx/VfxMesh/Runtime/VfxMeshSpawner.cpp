@@ -102,13 +102,11 @@ uint32_t VfxMeshSpawner::Spawn(const std::string& assetName,
     fx->scale     = scale;
     fx->burstProgress = loop ? -1.f : 0.f;
 
-    // デフォルトの稲妻始終点（位置基準の上下）
-    float half = fx->asset->lightning.length * 0.5f * scale;
-    fx->boltStart = { position.x, position.y - half, position.z };
-    fx->boltEnd   = { position.x, position.y + half, position.z };
-
-    fx->smokeCenter = position;
-    fx->smokeRadius = fx->asset->smoke.radius * scale;
+    // 稲妻の端点は既定では各サブ効果の direction/length から自動計算する。
+    // SetEndpoints / SpawnBolt で明示指定された場合のみ boltStart/End を使う。
+    fx->explicitEndpoints = false;
+    fx->boltStart = position;
+    fx->boltEnd   = position;
 
     InitEffect(*fx);
 
@@ -133,36 +131,57 @@ void VfxMeshSpawner::InitEffect(ActiveEffect& fx)
 {
     const auto& asset = *fx.asset;
 
-    if (asset.useSmoke && asset.smoke.isEnable) {
-        fx.smoke = std::make_unique<YoRigine::VolumeSmokeMesh>();
-        fx.smoke->Initialize();
-        fx.smoke->ApplyParam(asset.smoke);   // 半径/上昇速度を Drive で使えるように
-        fx.smoke->SetTransform(fx.position, asset.smoke.radius * fx.scale);
+    fx.subs.clear();
+    fx.subs.reserve(asset.subEffects.size());
 
-        fx.smokeCBRes = dxCommon_->CreateBufferResource(CBSize<YoRigine::SmokeParamsCB>());
-        fx.smokeCBRes->Map(0, nullptr, reinterpret_cast<void**>(&fx.smokeCBMapped));
-    }
+    for (const auto& def : asset.subEffects) {
+        if (!def.enabled) continue;
 
-    if (asset.useLightning && asset.lightning.isEnable) {
-        fx.lightning = std::make_unique<YoRigine::LightningMesh>();
-        fx.lightning->Initialize();
-        fx.lightning->SetCamera(camera_);
-        fx.lightning->ApplyParam(asset.lightning);
-        fx.lightning->SetEndpoints(fx.boltStart, fx.boltEnd);
+        SubEffectRT sub;
+        sub.def = &def;
+        const Vector3 basePos = fx.position + def.offset * fx.scale;
 
-        fx.lightningCBRes = dxCommon_->CreateBufferResource(CBSize<YoRigine::LightningParamsCB>());
-        fx.lightningCBRes->Map(0, nullptr, reinterpret_cast<void**>(&fx.lightningCBMapped));
-    }
+        switch (def.type) {
+        case YoRigine::VfxSubEffectType::Smoke:
+            sub.smoke = std::make_unique<YoRigine::VolumeSmokeMesh>();
+            sub.smoke->Initialize();
+            sub.smoke->ApplyParam(def.smoke);   // 半径/上昇速度を Drive で使えるように
+            sub.smoke->SetTransform(basePos, def.smoke.radius * fx.scale);
+            sub.smokeCenter = basePos;
+            sub.smokeRadius = def.smoke.radius * fx.scale;
 
-    if (asset.useShockwave && asset.shockwave.isEnable) {
-        fx.shockwave = std::make_unique<YoRigine::ShockwaveMesh>();
-        fx.shockwave->Initialize();
-        fx.shockwave->SetCamera(camera_);
-        fx.shockwave->ApplyParam(asset.shockwave);
-        fx.shockwave->SetTransform(fx.position, asset.shockwave.radius * fx.scale);
+            sub.cbRes = dxCommon_->CreateBufferResource(CBSize<YoRigine::SmokeParamsCB>());
+            sub.cbRes->Map(0, nullptr, &sub.cbMapped);
+            break;
 
-        fx.shockwaveCBRes = dxCommon_->CreateBufferResource(CBSize<YoRigine::ShockwaveParamsCB>());
-        fx.shockwaveCBRes->Map(0, nullptr, reinterpret_cast<void**>(&fx.shockwaveCBMapped));
+        case YoRigine::VfxSubEffectType::Lightning:
+            sub.lightning = std::make_unique<YoRigine::LightningMesh>();
+            sub.lightning->Initialize();
+            sub.lightning->SetCamera(camera_);
+            sub.lightning->ApplyParam(def.lightning);
+
+            sub.cbRes = dxCommon_->CreateBufferResource(CBSize<YoRigine::LightningParamsCB>());
+            sub.cbRes->Map(0, nullptr, &sub.cbMapped);
+            break;
+
+        case YoRigine::VfxSubEffectType::Shockwave:
+            sub.shockwave = std::make_unique<YoRigine::ShockwaveMesh>();
+            sub.shockwave->Initialize();
+            sub.shockwave->SetCamera(camera_);
+            sub.shockwave->ApplyParam(def.shockwave);
+            sub.shockwave->SetTransform(basePos, def.shockwave.radius * fx.scale);
+
+            sub.cbRes = dxCommon_->CreateBufferResource(CBSize<YoRigine::ShockwaveParamsCB>());
+            sub.cbRes->Map(0, nullptr, &sub.cbMapped);
+            break;
+
+        case YoRigine::VfxSubEffectType::LightVolume:
+        default:
+            // LightVolume はゲーム内スポナーでは未対応（従来から Editor プレビューのみ）
+            continue;
+        }
+
+        fx.subs.push_back(std::move(sub));
     }
 }
 
@@ -191,16 +210,11 @@ void VfxMeshSpawner::UpdateEffect(ActiveEffect& fx, float dt)
     fx.age += dt;
     const auto& asset = *fx.asset;
 
-    // バースト進捗更新（ワンショット）
+    // バースト進捗更新（ワンショット）。寿命はモーション(BurstGrow)優先で決定。
+    float lifetime = -1.f;
     if (!fx.loop) {
-        float duration = std::max(asset.smoke.isEnable
-            ? (asset.shockwave.isEnable
-                ? std::max(asset.shockwave.duration, 2.0f)
-                : 2.0f)
-            : asset.shockwave.duration,
-            0.1f);
-
-        fx.burstProgress = std::min(fx.age / duration, 1.0f);
+        lifetime = asset.OneShotDuration();
+        fx.burstProgress = std::min(fx.age / lifetime, 1.0f);
         if (fx.burstProgress >= 1.0f) {
             fx.alive = false;
             fx.Release();
@@ -208,35 +222,70 @@ void VfxMeshSpawner::UpdateEffect(ActiveEffect& fx, float dt)
         }
     }
 
-    // 各 Mesh へ渡す共有状態を組み立て（動きの計算は Mesh 側 Drive に集約）
-    YoRigine::VfxEvalState st;
-    st.age       = fx.age;
-    st.progress  = fx.burstProgress;
-    st.position  = fx.position;
-    st.scale     = fx.scale;
-    st.boltStart = fx.boltStart;
-    st.boltEnd   = fx.boltEnd;
+    // 各 Mesh 共通のベース状態（動きの計算は Mesh 側 Drive に集約）
+    YoRigine::VfxEvalState base;
+    base.age       = fx.age;
+    base.progress  = fx.burstProgress;
+    base.lifetime  = lifetime;
+    base.position  = fx.position;
+    base.scale     = fx.scale;
+    base.boltStart = fx.boltStart;
+    base.boltEnd   = fx.boltEnd;
 
-    // Smoke 更新（膨張/上昇は Drive 内で計算 → 結果を CB 用に読み戻す）
-    if (fx.smoke) {
-        fx.smoke->Drive(st);
-        fx.smoke->Update(dt);
-        fx.smokeCenter = fx.smoke->GetCenter();
-        fx.smokeRadius = fx.smoke->GetRadius();
-    }
+    // サブ効果ごとに: オフセット → モーション（全体＋個別） → Drive
+    for (auto& sub : fx.subs) {
+        const auto& def = *sub.def;
 
-    // Lightning 更新
-    if (fx.lightning) {
-        fx.lightning->SetCamera(camera_);
-        fx.lightning->Drive(st);
-        fx.lightning->Update(dt);
-    }
+        YoRigine::VfxEvalState s = base;
+        const Vector3 offset = def.offset * fx.scale;
+        s.position  += offset;
+        s.boltStart += offset;
+        s.boltEnd   += offset;
+        YoRigine::EvaluateSubEffectMotions(asset, def, s);
 
-    // Shockwave 更新
-    if (fx.shockwave) {
-        fx.shockwave->SetCamera(camera_);
-        fx.shockwave->Drive(st);
-        fx.shockwave->Update(dt);
+        // 色乗算・表示状態は Draw の CB 反映で使う
+        sub.tint    = s.colorTint;
+        sub.visible = s.visible;
+
+        switch (def.type) {
+        case YoRigine::VfxSubEffectType::Smoke:
+            if (sub.smoke) {
+                sub.smoke->Drive(s);
+                sub.smoke->Update(dt);
+                sub.smokeCenter = sub.smoke->GetCenter();  // CB 用に読み戻す
+                sub.smokeRadius = sub.smoke->GetRadius();
+            }
+            break;
+
+        case YoRigine::VfxSubEffectType::Lightning:
+            if (sub.lightning) {
+                // 端点が明示指定されていなければ direction/length から自動計算
+                // （モーション適用後の中心を挟んで direction 方向へ伸ばす）
+                if (!fx.explicitEndpoints) {
+                    Vector3 dir = def.lightning.direction;
+                    const float dl = std::sqrt(dir.x * dir.x + dir.y * dir.y + dir.z * dir.z);
+                    dir = (dl < 1e-4f) ? Vector3{ 0.f, 1.f, 0.f } : dir / dl;
+                    const float half = def.lightning.length * 0.5f * fx.scale;
+                    s.boltStart = s.position - dir * half;
+                    s.boltEnd   = s.position + dir * half;
+                }
+                sub.lightning->SetCamera(camera_);
+                sub.lightning->Drive(s);
+                sub.lightning->Update(dt);
+            }
+            break;
+
+        case YoRigine::VfxSubEffectType::Shockwave:
+            if (sub.shockwave) {
+                sub.shockwave->SetCamera(camera_);
+                sub.shockwave->Drive(s);
+                sub.shockwave->Update(dt);
+            }
+            break;
+
+        default:
+            break;
+        }
     }
 }
 
@@ -259,72 +308,92 @@ void VfxMeshSpawner::DrawEffect(ActiveEffect& fx)
     auto* cmdList = dxCommon_->GetCommandList().Get();
     D3D12_GPU_VIRTUAL_ADDRESS camAddr = camera_->GetCameraResource()->GetGPUVirtualAddress();
 
-    // Smoke
-    if (fx.smoke && fx.smokeCBMapped) {
-        const auto& sm = fx.asset->smoke;
-        auto& cb = *fx.smokeCBMapped;
-        cb.color         = sm.color;
-        cb.smokeColor    = sm.smokeColor;
-        cb.center        = fx.smokeCenter;
-        cb.radius        = fx.smokeRadius;
-        cb.time          = fx.age;
-        cb.noiseScale    = sm.noiseScale;
-        cb.noiseStrength = sm.noiseStrength;
-        cb.scrollSpeed   = sm.scrollSpeed;
-        cb.fresnelPower  = sm.fresnelPower;
-        cb.density       = sm.density;
-        cb.noiseOctaves  = sm.noiseOctaves;
-        cb.rimIntensity  = sm.rimIntensity;
-        cb.burst         = fx.burstProgress;
+    // モーションの色乗算（rgb=色 / a=不透明度）を CB 用カラーへ適用する
+    auto tint4 = [](const Vector4& c, const Vector4& t) -> Vector4 {
+        return { c.x * t.x, c.y * t.y, c.z * t.z, c.w * t.w };
+    };
 
-        const auto& idx = pm->GetParameterIndices("VfxMeshSmoke");
-        cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshSmoke"));
-        cmdList->SetPipelineState(pm->GetPipeLineStateObject("VfxMeshSmoke"));
-        cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"),    camAddr);
-        cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), fx.smokeCBRes->GetGPUVirtualAddress());
-        fx.smoke->Draw(cmdList);
-    }
+    for (auto& sub : fx.subs) {
+        if (!sub.cbMapped || !sub.cbRes) continue;
+        if (!sub.visible || sub.tint.w <= 0.001f) continue; // Visibility/フェードで消えている
+        const auto& def = *sub.def;
 
-    // Lightning
-    if (fx.lightning && fx.lightningCBMapped) {
-        const auto& lt = fx.asset->lightning;
-        auto& cb = *fx.lightningCBMapped;
-        cb.color            = lt.color;
-        cb.glowColor        = lt.glowColor;
-        cb.branchColor      = lt.branchColor;
-        cb.time             = fx.age;
-        cb.glowPower        = lt.glowPower;
-        cb.coreWidth        = lt.coreWidth;
-        cb.solidness        = lt.solidness;
-        cb.outlineIntensity = lt.outlineIntensity;
-        cb._pad0 = cb._pad1 = cb._pad2 = 0.f;
+        switch (def.type) {
+        case YoRigine::VfxSubEffectType::Smoke:
+            if (sub.smoke) {
+                const auto& sm = def.smoke;
+                auto& cb = *static_cast<YoRigine::SmokeParamsCB*>(sub.cbMapped);
+                cb.color         = tint4(sm.color, sub.tint);
+                cb.smokeColor    = tint4(sm.smokeColor, sub.tint);
+                cb.center        = sub.smokeCenter;
+                cb.radius        = sub.smokeRadius;
+                cb.time          = fx.age;
+                cb.noiseScale    = sm.noiseScale;
+                cb.noiseStrength = sm.noiseStrength;
+                cb.scrollSpeed   = sm.scrollSpeed;
+                cb.fresnelPower  = sm.fresnelPower;
+                cb.density       = sm.density;
+                cb.noiseOctaves  = sm.noiseOctaves;
+                cb.rimIntensity  = sm.rimIntensity;
+                // 従来破裂OFFならシェーダの火球→煙遷移も無効化（色はColorOverLifeで作る）
+                cb.burst         = sm.builtInBurstMotion ? fx.burstProgress : -1.f;
 
-        const auto& idx = pm->GetParameterIndices("VfxMeshLightning");
-        cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshLightning"));
-        cmdList->SetPipelineState(pm->GetPipeLineStateObject("VfxMeshLightning"));
-        cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"),    camAddr);
-        cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), fx.lightningCBRes->GetGPUVirtualAddress());
-        fx.lightning->Draw(cmdList);
-    }
+                const auto& idx = pm->GetParameterIndices("VfxMeshSmoke");
+                cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshSmoke"));
+                cmdList->SetPipelineState(pm->GetPipeLineStateObject("VfxMeshSmoke"));
+                cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"),    camAddr);
+                cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), sub.cbRes->GetGPUVirtualAddress());
+                sub.smoke->Draw(cmdList);
+            }
+            break;
 
-    // Shockwave
-    if (fx.shockwave && fx.shockwaveCBMapped) {
-        const auto& sw = fx.asset->shockwave;
-        auto& cb = *fx.shockwaveCBMapped;
-        cb.color     = sw.color;
-        cb.time      = fx.age;
-        cb.duration  = sw.duration;
-        cb.thickness = sw.thickness;
-        cb.burst     = (fx.burstProgress >= 0.f)
-            ? std::min(fx.age / std::max(sw.duration, 0.01f), 1.0f)
-            : -1.f;
+        case YoRigine::VfxSubEffectType::Lightning:
+            if (sub.lightning) {
+                const auto& lt = def.lightning;
+                auto& cb = *static_cast<YoRigine::LightningParamsCB*>(sub.cbMapped);
+                cb.color            = tint4(lt.color, sub.tint);
+                cb.glowColor        = tint4(lt.glowColor, sub.tint);
+                cb.branchColor      = tint4(lt.branchColor, sub.tint);
+                cb.time             = fx.age;
+                cb.glowPower        = lt.glowPower;
+                cb.coreWidth        = lt.coreWidth;
+                cb.solidness        = lt.solidness;
+                cb.outlineIntensity = lt.outlineIntensity;
+                cb._pad0 = cb._pad1 = cb._pad2 = 0.f;
 
-        const auto& idx = pm->GetParameterIndices("VfxMeshShockwave");
-        cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshShockwave"));
-        cmdList->SetPipelineState(pm->GetPipeLineStateObject("VfxMeshShockwave"));
-        cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"),    camAddr);
-        cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), fx.shockwaveCBRes->GetGPUVirtualAddress());
-        fx.shockwave->Draw(cmdList);
+                const auto& idx = pm->GetParameterIndices("VfxMeshLightning");
+                cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshLightning"));
+                cmdList->SetPipelineState(pm->GetPipeLineStateObject("VfxMeshLightning"));
+                cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"),    camAddr);
+                cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), sub.cbRes->GetGPUVirtualAddress());
+                sub.lightning->Draw(cmdList);
+            }
+            break;
+
+        case YoRigine::VfxSubEffectType::Shockwave:
+            if (sub.shockwave) {
+                const auto& sw = def.shockwave;
+                auto& cb = *static_cast<YoRigine::ShockwaveParamsCB*>(sub.cbMapped);
+                cb.color     = tint4(sw.color, sub.tint);
+                cb.time      = fx.age;
+                cb.duration  = sw.duration;
+                cb.thickness = sw.thickness;
+                cb.burst     = (fx.burstProgress >= 0.f)
+                    ? std::min(fx.age / std::max(sw.duration, 0.01f), 1.0f)
+                    : -1.f;
+
+                const auto& idx = pm->GetParameterIndices("VfxMeshShockwave");
+                cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshShockwave"));
+                cmdList->SetPipelineState(pm->GetPipeLineStateObject("VfxMeshShockwave"));
+                cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"),    camAddr);
+                cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), sub.cbRes->GetGPUVirtualAddress());
+                sub.shockwave->Draw(cmdList);
+            }
+            break;
+
+        default:
+            break;
+        }
     }
 }
 
@@ -335,8 +404,7 @@ void VfxMeshSpawner::SetPosition(uint32_t id, const Vector3& pos)
 {
     for (ActiveEffect* fx : active_) {
         if (fx && fx->id == id) {
-            fx->position    = pos;
-            fx->smokeCenter = pos;
+            fx->position = pos;
             return;
         }
     }
@@ -358,6 +426,7 @@ void VfxMeshSpawner::SetEndpoints(uint32_t id, const Vector3& start, const Vecto
         if (fx && fx->id == id) {
             fx->boltStart = start;
             fx->boltEnd   = end;
+            fx->explicitEndpoints = true;
             return;
         }
     }
@@ -387,10 +456,11 @@ bool VfxMeshSpawner::IsAlive(uint32_t id) const
 // ============================================================
 void VfxMeshSpawner::ActiveEffect::Release()
 {
-    if (smokeCBMapped    && smokeCBRes)    { smokeCBRes->Unmap(0, nullptr);    smokeCBMapped    = nullptr; }
-    if (lightningCBMapped && lightningCBRes) { lightningCBRes->Unmap(0, nullptr); lightningCBMapped = nullptr; }
-    if (shockwaveCBMapped && shockwaveCBRes) { shockwaveCBRes->Unmap(0, nullptr); shockwaveCBMapped = nullptr; }
-    smoke.reset();
-    lightning.reset();
-    shockwave.reset();
+    for (auto& sub : subs) {
+        if (sub.cbMapped && sub.cbRes) { sub.cbRes->Unmap(0, nullptr); sub.cbMapped = nullptr; }
+        sub.smoke.reset();
+        sub.lightning.reset();
+        sub.shockwave.reset();
+    }
+    subs.clear();
 }

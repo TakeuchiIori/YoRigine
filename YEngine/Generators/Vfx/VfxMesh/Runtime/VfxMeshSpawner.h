@@ -22,10 +22,11 @@
 #include <unordered_map>
 #include <memory>
 
-#include "VfxEffectAsset.h"
-#include "LightningMesh.h"
-#include "ShockwaveMesh.h"
-#include "VolumeSmokeMesh.h"
+#include <Vfx/VfxMesh/Core/VfxEffectAsset.h>
+#include <Vfx/VfxMesh/Effects/LightningMesh.h>
+#include <Vfx/VfxMesh/Effects/LightVolumeMesh.h>
+#include <Vfx/VfxMesh/Effects/VolumeSmokeMesh.h>
+#include <Vfx/VfxMesh/Effects/ShockwaveMesh.h>
 #include "Vector3.h"
 #include "Memory/PoolAllocator.h"
 
@@ -83,6 +84,30 @@ private:
     // 同時に存在できる VfxMesh エフェクトの上限（PoolAllocator の固定長）
     static constexpr size_t kMaxActiveVfx = 256;
 
+    // ── サブ効果1個分の実行時リソース ────────────────────────────────
+    // アセットの subEffects と1対1対応（同じ種類が複数あればその数だけ作る）
+    struct SubEffectRT
+    {
+        const YoRigine::VfxSubEffect* def = nullptr;   // アセット内の定義を指す
+
+        // def->type に対応するものだけ生成される
+        std::unique_ptr<YoRigine::VolumeSmokeMesh> smoke;
+        std::unique_ptr<YoRigine::LightningMesh>   lightning;
+        std::unique_ptr<YoRigine::ShockwaveMesh>   shockwave;
+
+        // CB リソース（インスタンス独立。実型は def->type で決まる）
+        Microsoft::WRL::ComPtr<ID3D12Resource> cbRes;
+        void*                                  cbMapped = nullptr;
+
+        // Smoke の CB 用読み戻し値
+        Vector3 smokeCenter = { 0.f, 0.f, 0.f };
+        float   smokeRadius = 1.5f;
+
+        // モーション評価結果（Update で書き込み、Draw の CB 反映で使う）
+        Vector4 tint    = { 1.f, 1.f, 1.f, 1.f }; // rgb=色乗算 / a=不透明度乗算
+        bool    visible = true;                   // Visibility モーションの結果
+    };
+
     // ── アクティブエフェクト ─────────────────────────────────────────
     struct ActiveEffect
     {
@@ -99,26 +124,15 @@ private:
         float   scale     = 1.0f;
         Vector3 boltStart = { 0.f, 0.f, 0.f };
         Vector3 boltEnd   = { 0.f, 3.f, 0.f };
+        // SetEndpoints/SpawnBolt で明示指定されたか。
+        // false なら Lightning はアセットの direction/length から端点を自動計算する。
+        bool    explicitEndpoints = false;
 
         // バースト進捗（-1=ループ継続、0..1=ワンショット）
         float burstProgress = -1.f;
-        Vector3 smokeCenter;
-        float   smokeRadius = 1.5f;
 
-        // メッシュ実体
-        std::unique_ptr<YoRigine::VolumeSmokeMesh> smoke;
-        std::unique_ptr<YoRigine::LightningMesh>   lightning;
-        std::unique_ptr<YoRigine::ShockwaveMesh>   shockwave;
-
-        // CB リソース（各エフェクト独立）
-        Microsoft::WRL::ComPtr<ID3D12Resource> smokeCBRes;
-        YoRigine::SmokeParamsCB*               smokeCBMapped    = nullptr;
-
-        Microsoft::WRL::ComPtr<ID3D12Resource> lightningCBRes;
-        YoRigine::LightningParamsCB*           lightningCBMapped = nullptr;
-
-        Microsoft::WRL::ComPtr<ID3D12Resource> shockwaveCBRes;
-        YoRigine::ShockwaveParamsCB*           shockwaveCBMapped = nullptr;
+        // サブ効果ごとの実行時リソース
+        std::vector<SubEffectRT> subs;
 
         void Release();
 

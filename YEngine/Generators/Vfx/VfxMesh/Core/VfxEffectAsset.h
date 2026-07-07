@@ -9,9 +9,13 @@
 // ===========================================================
 #include "MathFunc.h"
 #include <string>
+#include <vector>
 #include "Loaders/Json/EnumUtils.h" // BlendMode
+#include "VfxMotion.h"              // データ駆動モーション
 
 namespace YoRigine {
+
+    struct VfxEvalState; // 前方宣言（EvaluateMotions 用。定義は VfxEvalState.h）
 
     // -------------------------------------------------------
     // Trail パラメータ
@@ -163,6 +167,10 @@ namespace YoRigine {
         float   noiseOctaves = 4.0f;
         float   rimIntensity = 2.0f;   // リム発光（太陽フレア風 / Bloom 用）
         bool    isEnable     = true;
+
+        // 従来の破裂挙動（ワンショット時の自動ポップ膨張/上昇/火球→煙のシェーダ遷移）を使うか。
+        // false にするとモーション（ScaleOverLife / ColorOverLife / Rise 等）だけで動きを組める。
+        bool    builtInBurstMotion = true;
     };
 
     // -------------------------------------------------------
@@ -204,24 +212,78 @@ namespace YoRigine {
     };
 
     // -------------------------------------------------------
+    // サブ効果インスタンス（形状1個分）
+    //
+    // Trail 以外のサブ効果は「種類＋パラメータ＋動き」を1エントリとして
+    // 好きな数だけ積める。同じ種類を複数（稲妻3本・衝撃波2重など）も可能。
+    // -------------------------------------------------------
+    enum class VfxSubEffectType : int
+    {
+        LightVolume = 0,
+        Smoke       = 1,
+        Lightning   = 2,
+        Shockwave   = 3,
+    };
+
+    // エディタ表示などに使う種類名
+    const char* VfxSubEffectTypeName(VfxSubEffectType type);
+
+    // サブ効果種別 → モーションの適用対象（All 指定のモーション振り分け用）
+    VfxMotionTarget MotionTargetFor(VfxSubEffectType type);
+
+    struct VfxSubEffect
+    {
+        VfxSubEffectType type    = VfxSubEffectType::Smoke;
+        std::string      label   = "";                 // エディタ表示名（空なら種類名）
+        bool             enabled = true;
+        Vector3          offset  = { 0.f, 0.f, 0.f };  // エフェクト基準位置からのオフセット
+
+        // type に対応するものだけ使う（他はデフォルトのまま持つだけ）
+        LightVolumeEffectParam lightVolume;
+        SmokeEffectParam       smoke;
+        LightningEffectParam   lightning;
+        ShockwaveEffectParam   shockwave;
+
+        // この形状インスタンスにだけ効く動き（全体 motions に加算で適用）
+        std::vector<VfxMotion> motions;
+    };
+
+    // -------------------------------------------------------
     // まとめアセット
     // -------------------------------------------------------
     struct VfxEffectAsset
     {
         std::string       name = "NewEffect";
         TrailEffectParam  trail;
-        LightVolumeEffectParam lightVolume;
-        SmokeEffectParam  smoke;
-        LightningEffectParam lightning;
-        ShockwaveEffectParam shockwave;
         bool useTrail       = true;
-        bool useLightVolume = true;
-        bool useSmoke       = false;   // 既定OFF（既存アセットは従来通り）
-        bool useLightning   = false;   // 既定OFF
-        bool useShockwave   = false;   // 既定OFF
+
+        // Trail 以外のサブ効果。同じ種類を複数積める。
+        std::vector<VfxSubEffect> subEffects;
+
+        // データ駆動の動き（エフェクト全体）。0個=従来挙動。
+        // target で「煙だけ」「稲妻だけ」のように適用先を絞れる。
+        std::vector<VfxMotion> motions;
+
+        // ワンショット寿命(秒)。BurstGrow モーション（全体/形状個別どちらでも）が
+        // あればその duration の最大値、無ければ既存アセット互換のヒューリスティック。
+        float OneShotDuration() const;
 
         void SaveToJson(const std::string& filePath) const;
         bool LoadFromJson(const std::string& filePath);
     };
+
+    // motions のうち target（または All）に一致するものを評価し、
+    // 共有状態(position/scale/端点)へ反映する唯一の関数。
+    // Spawner / Editor の双方がこれを呼ぶことで動きを一致させる。
+    void EvaluateMotionList(const std::vector<VfxMotion>& motions,
+                            VfxMotionTarget target, VfxEvalState& state);
+
+    // エフェクト全体の motions を target で絞って評価（従来 API）
+    void EvaluateMotions(const VfxEffectAsset& asset, VfxMotionTarget target, VfxEvalState& state);
+
+    // 形状インスタンス1個分の評価。
+    // 全体 motions（対象一致分）→ インスタンス固有 motions の順に適用する。
+    void EvaluateSubEffectMotions(const VfxEffectAsset& asset,
+                                  const VfxSubEffect& sub, VfxEvalState& state);
 
 } // namespace YoRigine

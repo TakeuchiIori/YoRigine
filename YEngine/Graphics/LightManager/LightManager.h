@@ -7,6 +7,7 @@
 #include <cassert>
 
 #include "Systems./Camera/Camera.h"
+#include "DsvManager.h"
 #include "Vector4.h"
 #include "Matrix4x4.h"
 #include "Vector2.h"
@@ -21,13 +22,16 @@ namespace YoRigine {
     public:
         static constexpr int kMaxPointLights = 10;
         static constexpr int kMaxSpotLights = 10;
+        // カスケードシャドウの枚数（DsvManager と一致させること）
+        static constexpr int kCascadeCount = DsvManager::kShadowCascadeCount;
 
         struct ShadowMapSettings {
             float shadowDistance = 1.0f;
-            float orthoWidth = 150.0f;
+            float orthoWidth = 150.0f;   // 最遠カスケードの覆う幅（近いカスケードは splitRatio 倍で縮小）
             float orthoHeight = 150.0f;
             float nearZ = 1.0f;
             float farZ = 150.0f;
+            float cascadeSplitRatio = 0.5f; // 隣接カスケード間のサイズ比 (0<r<1)。小さいほど近距離を高精細化
         };
 
         ///************************* GPU用の構造体（HLSLと完全一致）*************************///
@@ -83,8 +87,13 @@ namespace YoRigine {
         };
 
     private:
+        // 影パス（VS）用：1 カスケード分のライト VP
         struct ShadowMatrix {
             Matrix4x4 lightViewProjection;
+        };
+        // カラーパス（PS）用：全カスケードのライト VP 配列
+        struct CascadeMatrices {
+            Matrix4x4 lightViewProjection[kCascadeCount];
         };
 
     public:
@@ -142,7 +151,15 @@ namespace YoRigine {
 
         ///************************* リソース取得 *************************///
         ID3D12Resource* GetDirectionalLightResource() const { return directionalLightResource_.Get(); }
-        ID3D12Resource* GetShadowResource()           const { return shadowResource_.Get(); }
+        // 影パス用：現在描画中のカスケードの単一行列 CB（VS が読む）
+        ID3D12Resource* GetShadowResource()           const { return shadowCascadeResource_[currentCascade_].Get(); }
+        // カラーパス用：全カスケード行列配列 CB（PS が読む）
+        ID3D12Resource* GetCascadeResource()          const { return cascadeResource_.Get(); }
+
+        ///************************* カスケード制御 *************************///
+        // 影パスのループで、これから描くカスケードを指定してから DrawShadow を呼ぶ
+        void SetCurrentCascade(uint32_t index) { currentCascade_ = index; }
+        uint32_t GetCurrentCascade() const { return currentCascade_; }
 
         ///************************* シャドウマップ設定 *************************///
         ShadowMapSettings& GetShadowMapSettings() { return shadowMapSettings_; }
@@ -181,8 +198,14 @@ namespace YoRigine {
         std::vector<SpotLightInstance> spotLightInstances_;
         std::unordered_map<std::string, size_t> spotLightIndexMap_;
 
-        Microsoft::WRL::ComPtr<ID3D12Resource> shadowResource_;
-        ShadowMatrix* shadow_ = nullptr;
+        // 影パス用：カスケードごとの単一行列 CB（VS が読む。現在カスケードを GetShadowResource で返す）
+        Microsoft::WRL::ComPtr<ID3D12Resource> shadowCascadeResource_[kCascadeCount];
+        ShadowMatrix* shadowCascadeMapped_[kCascadeCount] = {};
+        uint32_t currentCascade_ = 0;
+
+        // カラーパス用：全カスケードの行列配列 CB（PS が読む）
+        Microsoft::WRL::ComPtr<ID3D12Resource> cascadeResource_;
+        CascadeMatrices* cascade_ = nullptr;
 
         Object3dCommon* object3dCommon_ = nullptr;
         Camera* camera_ = nullptr;

@@ -14,11 +14,6 @@ struct Instansing
     TransformationMatrix transformation;
     float4 color;
 };
-//　影計算用のライト行列 (ShadowMap用)
-struct LightMatrices
-{
-    float4x4 lightViewProjection;
-};
 
 // カメラ行列
 struct Camera
@@ -27,7 +22,6 @@ struct Camera
     float4x4 viewProjection;
 };
 
-ConstantBuffer<LightMatrices> gLight : register(b0);
 ConstantBuffer<Camera> gCamera : register(b8);
 
 StructuredBuffer<Instansing> gInstancingData : register(t0);
@@ -53,9 +47,8 @@ VertexShaderOutput main(VertexShaderInput input,uint instanceID : SV_InstanceID)
     // UV座標はそのままパス
     output.texcoord = input.texcoord;
 
-    // シャドウマップ用座標 (ワールド座標 * ライトの行列)
-    output.shadowPos = mul(worldPosH, gLight.lightViewProjection);
-    
+    // シャドウのカスケード選択・サンプルは PS 側で worldPosition から行う
+
     // インスタンスごとの色を出力
     output.color = gInstancingData[instanceID].color;
     return output;

@@ -3,6 +3,7 @@
 // VfxMeshEditor.h
 // ===========================================================
 #ifdef USE_IMGUI
+// C++
 #include <string>
 #include <vector>
 #include <memory>
@@ -10,11 +11,12 @@
 #include <filesystem>
 #include <wrl.h>
 #include <d3d12.h>
-#include "VfxEffectAsset.h"
-#include "LightVolumeMesh.h"
-#include "VolumeSmokeMesh.h"
-#include "LightningMesh.h"
-#include "ShockwaveMesh.h"
+
+#include <Vfx/VfxMesh/Core/VfxEffectAsset.h>
+#include <Vfx/VfxMesh/Effects/LightningMesh.h>
+#include <Vfx/VfxMesh/Effects/LightVolumeMesh.h>
+#include <Vfx/VfxMesh/Effects/VolumeSmokeMesh.h>
+#include <Vfx/VfxMesh/Effects/ShockwaveMesh.h>
 #include <Core/Editor/Command/CommandHistory.h>
 #include "FileOperations/FileBrowser.h"
 
@@ -46,7 +48,7 @@ namespace YoRigine {
 
     enum class VfxPreset : int
     {
-        Blank = 0, TrailOnly, VolumeOnly, Sword, Magic, COUNT
+        Blank = 0, TrailOnly, VolumeOnly, Sword, Magic, Explosion, COUNT
     };
 
     enum class PreviewAnimMode : int {
@@ -78,10 +80,16 @@ namespace YoRigine {
         void DrawListPanel();
         void DrawEditPanel();
         void DrawTrailSection();
-        void DrawLightVolumeSection();
-        void DrawSmokeSection();
-        void DrawLightningSection();
-        void DrawShockwaveSection();
+        // サブ効果（形状インスタンス）: 一覧＋追加/複製/削除
+        void DrawSubEffectsSection();
+        // 各種類のパラメータ編集（sub の対応パラメータを編集する）
+        void DrawLightVolumeSection(VfxSubEffect& sub);
+        void DrawSmokeSection(VfxSubEffect& sub);
+        void DrawLightningSection(VfxSubEffect& sub);
+        void DrawShockwaveSection(VfxSubEffect& sub);
+        // モーションリスト編集（全体用と形状個別用で共用。showTarget=false で対象コンボを隠す）
+        void DrawMotionListUI(std::vector<VfxMotion>& motions, bool showTarget, const char* commitLabel);
+        void DrawMotionSection();
         void DrawPreviewSection();
         void DrawNewEffectDialog();
         void DrawTextureSelectPopup();
@@ -104,12 +112,9 @@ namespace YoRigine {
 
         void CommitChange(const VfxEffectAsset& before, const char* label);
 
-        void RebuildPreviewMeshes();
-        void InitCBVs();
-        void UpdateVolumeCBV(float time);
-        void UpdateSmokeCBV(float time);
-        void UpdateLightningCBV(float time);
-        void UpdateShockwaveCBV(float time);
+        // アセットの subEffects と previewSubs_ の構成（数と種類）を同期させる。
+        // 追加/削除/種類変更/Undo などで構成が変わったら作り直す。
+        void SyncPreviewSubs();
 
         static VfxEffectAsset MakePreset(VfxPreset preset);
 
@@ -130,10 +135,35 @@ namespace YoRigine {
 
         // ★ プレビュー（TrailはEmitterに完全委譲）
         std::unique_ptr<TrailMeshEmitter> previewTrailEmitter_;
-        std::unique_ptr<LightVolumeMesh>  previewVolume_;
-        std::unique_ptr<VolumeSmokeMesh>  previewSmoke_;
-        std::unique_ptr<LightningMesh>    previewLightning_;
-        std::unique_ptr<ShockwaveMesh>    previewShockwave_;
+
+        // サブ効果1個分のプレビューリソース（asset.subEffects と1対1対応）
+        struct PreviewSub
+        {
+            VfxSubEffectType type = VfxSubEffectType::Smoke;
+
+            // type に対応するものだけ生成される
+            std::unique_ptr<LightVolumeMesh> volume;
+            std::unique_ptr<VolumeSmokeMesh> smoke;
+            std::unique_ptr<LightningMesh>   lightning;
+            std::unique_ptr<ShockwaveMesh>   shockwave;
+
+            // CB（実型は type で決まる）
+            Microsoft::WRL::ComPtr<ID3D12Resource> cbRes;
+            void*                                  cbMapped = nullptr;
+
+            // Smoke の CB 用読み戻し値
+            Vector3 smokeCenter = { 0.f, 0.f, 0.f };
+            float   smokeRadius = 1.5f;
+
+            // モーション評価結果（Update で書き込み、DrawPreview の CB 反映で使う）
+            Vector4 tint    = { 1.f, 1.f, 1.f, 1.f }; // rgb=色乗算 / a=不透明度乗算
+            bool    visible = true;                   // Visibility モーションの結果
+
+            ~PreviewSub() {
+                if (cbMapped && cbRes) { cbRes->Unmap(0, nullptr); cbMapped = nullptr; }
+            }
+        };
+        std::vector<std::unique_ptr<PreviewSub>> previewSubs_;
 
         PreviewAnimMode previewAnim_ = PreviewAnimMode::SlashHorizontal;
         float swordLength_ = 2.0f;    // プレビュー剣のサイズ（tip↔root）
@@ -143,27 +173,17 @@ namespace YoRigine {
         bool    previewPlaying_ = false;
         float   previewTimer_ = 0.f;
 
+        // 汎用ワンショットループ（モーションの終端を自動検出してリピート。全エフェクト対応）
+        bool    loopOneShot_        = false;
+        float   loopDuration_       = 2.0f;  // モーションから自動検出できない場合のフォールバック秒数
+        float   loopPeriodComputed_ = 0.0f;  // 直前フレームで算出した1サイクル長（UI表示用）
+
         // 爆発ワンショット再生（破裂→膨張→消滅を1回。自動リピート）
         bool    oneShot_       = false;
         float   burstDuration_ = 2.0f; // 煙が漂う時間（爆発全体の長さ）
         float   burstProgress_ = -1.f; // -1=継続モード, 0..1=ワンショット進捗
-        Vector3 smokeCenter_   = { 0.f, 0.f, 0.f }; // 上昇を反映した煙の中心
-        float   smokeRadius_   = 1.5f;              // 膨張を反映した煙の半径（メッシュと一致）
         Vector3 previewCenter_ = { 0.f, 0.f, 0.f };
         float   previewYaw_ = 0.f;
-
-        // CBVは Volume のみ保持（TrailのCBVはEmitterが持っているため削除）
-        Microsoft::WRL::ComPtr<ID3D12Resource> volumeCBResource_;
-        LightVolumeParamsCB* volumeCBMapped_ = nullptr;
-
-        Microsoft::WRL::ComPtr<ID3D12Resource> smokeCBResource_;
-        SmokeParamsCB* smokeCBMapped_ = nullptr;
-
-        Microsoft::WRL::ComPtr<ID3D12Resource> lightningCBResource_;
-        LightningParamsCB* lightningCBMapped_ = nullptr;
-
-        Microsoft::WRL::ComPtr<ID3D12Resource> shockwaveCBResource_;
-        ShockwaveParamsCB* shockwaveCBMapped_ = nullptr;
 
         bool showNewDialog_ = false;
         char newNameBuffer_[128] = "NewEffect";

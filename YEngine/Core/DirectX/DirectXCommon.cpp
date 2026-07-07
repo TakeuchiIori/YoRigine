@@ -98,7 +98,8 @@ namespace YoRigine {
 		rtvManager_->Initialize(deviceManager_.get(), 32);
 
 		dsvManager_ = std::make_unique<DsvManager>();
-		dsvManager_->Initialize(deviceManager_.get(), 8);
+		// MainDepth(1) + ShadowDepth(カスケード枚数) + PiP など。余裕を持たせる
+		dsvManager_->Initialize(deviceManager_.get(), 16);
 	}
 
 	// =========================================================================
@@ -147,10 +148,11 @@ namespace YoRigine {
 			DXGI_FORMAT_D24_UNORM_S8_UINT,
 			true);
 
-		// シャドウマップ用深度バッファ
-		dsvManager_->Create(
+		// シャドウマップ用深度バッファ（カスケードシャドウ = Texture2DArray）
+		dsvManager_->CreateArray(
 			"ShadowDepth",
 			DsvManager::kShadowmapWidth, DsvManager::kShadowmapHeight,
+			DsvManager::kShadowCascadeCount,
 			DXGI_FORMAT_D32_FLOAT,
 			true);
 	}
@@ -159,21 +161,23 @@ namespace YoRigine {
 	// 描画パス
 	// =========================================================================
 
-	/// シャドウパス：ShadowDepth DSV のみをセットしてクリア
-	void DirectXCommon::PreDrawShadow()
+	/// シャドウパス：ShadowDepth のカスケードスライスをセットしてクリア。
+	/// カスケードごとに呼ぶ。リソース全体の状態遷移は最初のカスケード(0)でのみ行う。
+	void DirectXCommon::PreDrawShadow(uint32_t cascadeIndex)
 	{
 		auto cmd = commandManager_->GetCommandList();
 
-		if (shadowDepthCurrentState_ != D3D12_RESOURCE_STATE_DEPTH_WRITE) {
+		// Texture2DArray はリソース単位で遷移するので cascade 0 で一度だけ DEPTH_WRITE へ
+		if (cascadeIndex == 0 && shadowDepthCurrentState_ != D3D12_RESOURCE_STATE_DEPTH_WRITE) {
 			dsvManager_->TransitionBarrier(
 				cmd.Get(), "ShadowDepth",
 				shadowDepthCurrentState_, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 			shadowDepthCurrentState_ = D3D12_RESOURCE_STATE_DEPTH_WRITE;
 		}
 
-		D3D12_CPU_DESCRIPTOR_HANDLE dsvH = dsvManager_->GetHandle("ShadowDepth");
+		D3D12_CPU_DESCRIPTOR_HANDLE dsvH = dsvManager_->GetSliceHandle("ShadowDepth", cascadeIndex);
 		cmd->OMSetRenderTargets(0, nullptr, FALSE, &dsvH);
-		dsvManager_->Clear("ShadowDepth", cmd.Get());
+		dsvManager_->ClearSlice("ShadowDepth", cascadeIndex, cmd.Get());
 		cmd->RSSetViewports(1, &shadowVP_);
 		cmd->RSSetScissorRects(1, &shadowSC_);
 	}

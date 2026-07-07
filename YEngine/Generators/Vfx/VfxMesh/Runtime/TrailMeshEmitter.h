@@ -7,8 +7,8 @@
 #include <wrl.h>
 #include <d3d12.h>
 
-#include "VfxEffectAsset.h"
-#include "TrailMesh.h"
+#include <Vfx/VfxMesh/Core/VfxEffectAsset.h>
+#include <Vfx/VfxMesh/Effects/TrailMesh.h>
 #include "Systems/Camera/Camera.h"
 
 namespace YoRigine {

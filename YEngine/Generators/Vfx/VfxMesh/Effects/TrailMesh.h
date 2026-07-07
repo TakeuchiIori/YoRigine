@@ -1,12 +1,12 @@
 #pragma once
 // ===========================================================
 // TrailMesh.h
-// ★ UE Niagara Ribbon 参考拡張
-//   - CalcWidthScale (crescentShape + widthWave 統合)
-//   - Arc/Fan でも Catmull-Rom スムージング
+// UE Niagara Ribbon 参考
+// - CalcWidthScale (crescentShape + widthWave 統合)
+// - Arc/Fan でも Catmull-Rom スムージング
 // ===========================================================
-#include "ProceduralMeshBase.h"
-#include "VfxEffectAsset.h"
+#include <Vfx/VfxMesh/Core/VfxEffectAsset.h>
+#include <Vfx/VfxMesh/Core/ProceduralMeshBase.h>
 #include <deque>
 
 namespace YoRigine {

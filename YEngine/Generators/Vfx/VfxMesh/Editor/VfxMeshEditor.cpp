@@ -83,15 +83,7 @@ namespace YoRigine {
 
         // Trail用のプレビューはEmitterに委譲
         previewTrailEmitter_ = std::make_unique<TrailMeshEmitter>();
-        previewVolume_ = std::make_unique<LightVolumeMesh>();
-        previewSmoke_ = std::make_unique<VolumeSmokeMesh>();
-        previewSmoke_->Initialize();
-        previewLightning_ = std::make_unique<LightningMesh>();
-        previewLightning_->Initialize();
-        previewShockwave_ = std::make_unique<ShockwaveMesh>();
-        previewShockwave_->Initialize();
 
-        InitCBVs();
         ScanDirectory(scanRoot_);
 
         if (!entries_.empty()) {
@@ -101,22 +93,7 @@ namespace YoRigine {
 
     void VfxMeshEditor::Finalize()
     {
-        if (volumeCBMapped_ && volumeCBResource_) {
-            volumeCBResource_->Unmap(0, nullptr);
-            volumeCBMapped_ = nullptr;
-        }
-        if (smokeCBMapped_ && smokeCBResource_) {
-            smokeCBResource_->Unmap(0, nullptr);
-            smokeCBMapped_ = nullptr;
-        }
-        if (lightningCBMapped_ && lightningCBResource_) {
-            lightningCBResource_->Unmap(0, nullptr);
-            lightningCBMapped_ = nullptr;
-        }
-        if (shockwaveCBMapped_ && shockwaveCBResource_) {
-            shockwaveCBResource_->Unmap(0, nullptr);
-            shockwaveCBMapped_ = nullptr;
-        }
+        previewSubs_.clear();   // ~PreviewSub が CB を Unmap する
         entries_.clear();
         selectedIndex_ = -1;
     }
@@ -165,7 +142,7 @@ namespace YoRigine {
 
         previewTrailEmitter_->Play();
 
-        RebuildPreviewMeshes();
+        SyncPreviewSubs();
     }
 
     void VfxMeshEditor::Update(float deltaTime)
@@ -177,12 +154,62 @@ namespace YoRigine {
         const auto& asset = sel->asset;
 
         // 爆発ワンショット: 進捗 0→1。終端で自動リピート。継続モードは -1。
-        if (oneShot_ && burstDuration_ > 0.01f) {
-            if (previewTimer_ >= burstDuration_) previewTimer_ = 0.f;
-            burstProgress_ = std::min(previewTimer_ / burstDuration_, 1.0f);
+        // 寿命は BurstGrow モーション（全体/形状個別）があればそれを使う（ゲームと一致）。
+        // 無ければ UI の burstDuration_。
+        float burstPeriod = burstDuration_;
+        {
+            float bg = 0.f;
+            auto scan = [&bg](const std::vector<VfxMotion>& ms) {
+                for (const auto& m : ms) {
+                    if (m.type == VfxMotionType::BurstGrow) bg = std::max(bg, m.duration);
+                }
+            };
+            scan(asset.motions);
+            for (const auto& sub : asset.subEffects) scan(sub.motions);
+            if (bg > 0.f) burstPeriod = std::max(bg, 0.01f);
+        }
+        if (oneShot_ && burstPeriod > 0.01f) {
+            if (previewTimer_ >= burstPeriod) previewTimer_ = 0.f;
+            burstProgress_ = std::min(previewTimer_ / burstPeriod, 1.0f);
         } else {
             burstProgress_ = -1.0f;
         }
+
+        // 汎用ワンショットループ（burstProgress は触らず mbase.lifetime だけ設定する）
+        loopPeriodComputed_ = 0.f;
+        if (loopOneShot_ && !oneShot_) {
+            // BurstGrow があればその duration、なければ startTime+window の最大値
+            auto scanDur = [this](const std::vector<VfxMotion>& ms) {
+                for (const auto& m : ms) {
+                    if (m.type == VfxMotionType::BurstGrow)
+                        loopPeriodComputed_ = std::max(loopPeriodComputed_, m.duration);
+                    else if (m.window > 0.f)
+                        loopPeriodComputed_ = std::max(loopPeriodComputed_, m.startTime + m.window);
+                }
+            };
+            scanDur(asset.motions);
+            for (const auto& sub : asset.subEffects) scanDur(sub.motions);
+            if (loopPeriodComputed_ < 0.1f) loopPeriodComputed_ = loopDuration_;
+
+            if (previewTimer_ >= loopPeriodComputed_) {
+                previewTimer_ = std::fmod(previewTimer_, loopPeriodComputed_);
+                if (previewTrailEmitter_) previewTrailEmitter_->Play(); // Trail も先頭へ
+            }
+        }
+
+        // サブ効果の構成変更（追加/削除/種類変更/Undo）をプレビューへ反映
+        SyncPreviewSubs();
+
+        // データ駆動モーションのベース状態（サブ効果ごとに評価する）
+        VfxEvalState mbase;
+        mbase.age      = previewTimer_;
+        mbase.progress = burstProgress_;
+        // ワンショット中は寿命を渡す（FadeInOut などの終端計算に使う）
+        mbase.lifetime = (oneShot_ && burstPeriod > 0.01f)       ? burstPeriod
+                       : (loopOneShot_ && loopPeriodComputed_ > 0.f) ? loopPeriodComputed_
+                       : -1.f;
+        mbase.position = previewCenter_;
+        mbase.scale    = 1.0f;
 
         // ★ Emitterを使って頂点を更新
         if (asset.useTrail && previewTrailEmitter_) {
@@ -251,44 +278,65 @@ namespace YoRigine {
             previewTrailEmitter_->Update(deltaTime);
         }
 
-        if (asset.useLightVolume) {
-            previewVolume_->ApplyParam(asset.lightVolume);
-            previewVolume_->SetTransform(previewCenter_, previewYaw_);
-            previewVolume_->Update(deltaTime);
-        }
+        // サブ効果ごとに: オフセット → モーション（全体＋個別） → 更新
+        const size_t subCount = std::min(asset.subEffects.size(), previewSubs_.size());
+        for (size_t i = 0; i < subCount; ++i) {
+            const auto& def = asset.subEffects[i];
+            auto&       sub = *previewSubs_[i];
+            if (!def.enabled) continue;
 
-        if (asset.useSmoke && previewSmoke_) {
-            // 膨張/上昇の計算は VolumeSmokeMesh::Drive に集約（ゲーム側 Spawner と同一）
-            previewSmoke_->ApplyParam(asset.smoke);
-            VfxEvalState st;
-            st.age      = previewTimer_;
-            st.progress = burstProgress_;
-            st.position = previewCenter_;
-            st.scale    = 1.0f;
-            previewSmoke_->Drive(st);
-            previewSmoke_->Update(deltaTime);
-            smokeCenter_ = previewSmoke_->GetCenter();  // CB 用に読み戻す
-            smokeRadius_ = previewSmoke_->GetRadius();
-        }
+            VfxEvalState s = mbase;
+            s.position += def.offset;
+            EvaluateSubEffectMotions(asset, def, s);
 
-        if (asset.useLightning && previewLightning_) {
-            previewLightning_->SetCamera(camera_);
-            previewLightning_->ApplyParam(asset.lightning);
-            // プレビュー: 中心を挟んで direction 方向に length の長さで伸ばす
-            float half = asset.lightning.length * 0.5f;
-            Vector3 dir = asset.lightning.direction;
-            float dl = std::sqrt(dir.x * dir.x + dir.y * dir.y + dir.z * dir.z);
-            dir = (dl < 1e-4f) ? Vector3{ 0, 1, 0 } : Vector3{ dir.x / dl, dir.y / dl, dir.z / dl };
-            previewLightning_->SetEndpoints(previewCenter_ - dir * half,
-                                            previewCenter_ + dir * half);
-            previewLightning_->Update(deltaTime);
-        }
+            // 色乗算・表示状態は DrawPreview の CB 反映で使う
+            sub.tint    = s.colorTint;
+            sub.visible = s.visible;
 
-        if (asset.useShockwave && previewShockwave_) {
-            previewShockwave_->SetCamera(camera_);
-            previewShockwave_->ApplyParam(asset.shockwave);
-            previewShockwave_->SetTransform(previewCenter_, asset.shockwave.radius);
-            previewShockwave_->Update(deltaTime);
+            switch (def.type) {
+            case VfxSubEffectType::LightVolume:
+                if (sub.volume) {
+                    sub.volume->ApplyParam(def.lightVolume);
+                    sub.volume->SetTransform(s.position, previewYaw_);
+                    sub.volume->Update(deltaTime);
+                }
+                break;
+
+            case VfxSubEffectType::Smoke:
+                if (sub.smoke) {
+                    // 膨張/上昇の計算は VolumeSmokeMesh::Drive に集約（ゲーム側 Spawner と同一）
+                    sub.smoke->ApplyParam(def.smoke);
+                    sub.smoke->Drive(s);
+                    sub.smoke->Update(deltaTime);
+                    sub.smokeCenter = sub.smoke->GetCenter();  // CB 用に読み戻す
+                    sub.smokeRadius = sub.smoke->GetRadius();
+                }
+                break;
+
+            case VfxSubEffectType::Lightning:
+                if (sub.lightning) {
+                    sub.lightning->SetCamera(camera_);
+                    sub.lightning->ApplyParam(def.lightning);
+                    // プレビュー: 中心を挟んで direction 方向に length の長さで伸ばす（中心はモーションで移動）
+                    float half = def.lightning.length * 0.5f;
+                    Vector3 dir = def.lightning.direction;
+                    float dl = std::sqrt(dir.x * dir.x + dir.y * dir.y + dir.z * dir.z);
+                    dir = (dl < 1e-4f) ? Vector3{ 0, 1, 0 } : Vector3{ dir.x / dl, dir.y / dl, dir.z / dl };
+                    sub.lightning->SetEndpoints(s.position - dir * half,
+                                                s.position + dir * half);
+                    sub.lightning->Update(deltaTime);
+                }
+                break;
+
+            case VfxSubEffectType::Shockwave:
+                if (sub.shockwave) {
+                    sub.shockwave->SetCamera(camera_);
+                    sub.shockwave->ApplyParam(def.shockwave);
+                    sub.shockwave->Drive(s);
+                    sub.shockwave->Update(deltaTime);
+                }
+                break;
+            }
         }
     }
 
@@ -308,64 +356,121 @@ namespace YoRigine {
             previewTrailEmitter_->Draw();
         }
 
-        // Volume は従来通り
-        if (asset.useLightVolume && camera_) {
-            auto* pm = YPipelineManager::GetInstance();
-            const auto& idx = pm->GetParameterIndices("VfxMeshVolume");
-            UpdateVolumeCBV(previewTimer_);
+        if (!camera_) return;
 
-            auto* cmdList = DirectXCommon::GetInstance()->GetCommandList().Get();
-            cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshVolume"));
-            cmdList->SetPipelineState(pm->GetPipeLineStateObject("VfxMeshVolume"));
-            cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"), camera_->GetCameraResource()->GetGPUVirtualAddress());
-            cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), volumeCBResource_->GetGPUVirtualAddress());
+        auto* pm      = YPipelineManager::GetInstance();
+        auto* cmdList = DirectXCommon::GetInstance()->GetCommandList().Get();
+        D3D12_GPU_VIRTUAL_ADDRESS camAddr = camera_->GetCameraResource()->GetGPUVirtualAddress();
 
-            previewVolume_->Draw(cmdList);
-        }
+        // モーションの色乗算（rgb=色 / a=不透明度）を CB 用カラーへ適用する
+        auto tint4 = [](const Vector4& c, const Vector4& t) -> Vector4 {
+            return { c.x * t.x, c.y * t.y, c.z * t.z, c.w * t.w };
+        };
 
-        // Volume Smoke (Omen 風)
-        if (asset.useSmoke && asset.smoke.isEnable && camera_ && previewSmoke_) {
-            auto* pm = YPipelineManager::GetInstance();
-            const auto& idx = pm->GetParameterIndices("VfxMeshSmoke");
-            UpdateSmokeCBV(previewTimer_);
+        // サブ効果ごとに CB 更新 → 描画
+        const size_t subCount = std::min(asset.subEffects.size(), previewSubs_.size());
+        for (size_t i = 0; i < subCount; ++i) {
+            const auto& def = asset.subEffects[i];
+            auto&       sub = *previewSubs_[i];
+            if (!def.enabled || !sub.cbMapped || !sub.cbRes) continue;
+            if (!sub.visible || sub.tint.w <= 0.001f) continue; // Visibility/フェードで消えている
 
-            auto* cmdList = DirectXCommon::GetInstance()->GetCommandList().Get();
-            cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshSmoke"));
-            cmdList->SetPipelineState(pm->GetPipeLineStateObject("VfxMeshSmoke"));
-            cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"), camera_->GetCameraResource()->GetGPUVirtualAddress());
-            cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), smokeCBResource_->GetGPUVirtualAddress());
+            switch (def.type) {
+            case VfxSubEffectType::LightVolume:
+                if (sub.volume) {
+                    const auto& lv = def.lightVolume;
+                    auto& cb = *static_cast<LightVolumeParamsCB*>(sub.cbMapped);
+                    cb.color[0] = lv.color.x * sub.tint.x;
+                    cb.color[1] = lv.color.y * sub.tint.y;
+                    cb.color[2] = lv.color.z * sub.tint.z;
+                    cb.color[3] = lv.color.w * lv.intensity * sub.tint.w;
+                    cb.edgeFade = 0.15f;
+                    cb.depthFade = 1.0f;
+                    cb.noiseTiling = 2.0f;
+                    cb.noiseStrength = 0.0f;
+                    cb.time = previewTimer_;
 
-            previewSmoke_->Draw(cmdList);
-        }
+                    const auto& idx = pm->GetParameterIndices("VfxMeshVolume");
+                    cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshVolume"));
+                    cmdList->SetPipelineState(pm->GetPipeLineStateObject("VfxMeshVolume"));
+                    cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"), camAddr);
+                    cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), sub.cbRes->GetGPUVirtualAddress());
+                    sub.volume->Draw(cmdList);
+                }
+                break;
 
-        // Lightning (プロシージャル稲妻)
-        if (asset.useLightning && asset.lightning.isEnable && camera_ && previewLightning_) {
-            auto* pm = YPipelineManager::GetInstance();
-            const auto& idx = pm->GetParameterIndices("VfxMeshLightning");
-            UpdateLightningCBV(previewTimer_);
+            case VfxSubEffectType::Smoke:
+                if (sub.smoke) {
+                    const auto& sm = def.smoke;
+                    auto& cb = *static_cast<SmokeParamsCB*>(sub.cbMapped);
+                    cb.color         = tint4(sm.color, sub.tint);
+                    cb.smokeColor    = tint4(sm.smokeColor, sub.tint);
+                    cb.center        = sub.smokeCenter; // 上昇を反映（フレネル法線の中心と一致させる）
+                    cb.radius        = sub.smokeRadius; // 膨張を反映（メッシュと一致）
+                    cb.time          = previewTimer_;
+                    cb.noiseScale    = sm.noiseScale;
+                    cb.noiseStrength = sm.noiseStrength;
+                    cb.scrollSpeed   = sm.scrollSpeed;
+                    cb.fresnelPower  = sm.fresnelPower;
+                    cb.density       = sm.density;
+                    cb.noiseOctaves  = sm.noiseOctaves;
+                    cb.rimIntensity  = sm.rimIntensity;
+                    // 従来破裂OFFならシェーダの火球→煙遷移も無効化（色はColorOverLifeで作る）
+                    cb.burst         = sm.builtInBurstMotion ? burstProgress_ : -1.0f;
 
-            auto* cmdList = DirectXCommon::GetInstance()->GetCommandList().Get();
-            cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshLightning"));
-            cmdList->SetPipelineState(pm->GetPipeLineStateObject("VfxMeshLightning"));
-            cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"), camera_->GetCameraResource()->GetGPUVirtualAddress());
-            cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), lightningCBResource_->GetGPUVirtualAddress());
+                    const auto& idx = pm->GetParameterIndices("VfxMeshSmoke");
+                    cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshSmoke"));
+                    cmdList->SetPipelineState(pm->GetPipeLineStateObject("VfxMeshSmoke"));
+                    cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"), camAddr);
+                    cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), sub.cbRes->GetGPUVirtualAddress());
+                    sub.smoke->Draw(cmdList);
+                }
+                break;
 
-            previewLightning_->Draw(cmdList);
-        }
+            case VfxSubEffectType::Lightning:
+                if (sub.lightning) {
+                    const auto& lt = def.lightning;
+                    auto& cb = *static_cast<LightningParamsCB*>(sub.cbMapped);
+                    cb.color            = tint4(lt.color, sub.tint);
+                    cb.glowColor        = tint4(lt.glowColor, sub.tint);
+                    cb.branchColor      = tint4(lt.branchColor, sub.tint);
+                    cb.time             = previewTimer_;
+                    cb.glowPower        = lt.glowPower;
+                    cb.coreWidth        = lt.coreWidth;
+                    cb.solidness        = lt.solidness;
+                    cb.outlineIntensity = lt.outlineIntensity;
+                    cb._pad0 = cb._pad1 = cb._pad2 = 0.0f;
 
-        // Shockwave (爆発の衝撃波リング)
-        if (asset.useShockwave && asset.shockwave.isEnable && camera_ && previewShockwave_) {
-            auto* pm = YPipelineManager::GetInstance();
-            const auto& idx = pm->GetParameterIndices("VfxMeshShockwave");
-            UpdateShockwaveCBV(previewTimer_);
+                    const auto& idx = pm->GetParameterIndices("VfxMeshLightning");
+                    cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshLightning"));
+                    cmdList->SetPipelineState(pm->GetPipeLineStateObject("VfxMeshLightning"));
+                    cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"), camAddr);
+                    cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), sub.cbRes->GetGPUVirtualAddress());
+                    sub.lightning->Draw(cmdList);
+                }
+                break;
 
-            auto* cmdList = DirectXCommon::GetInstance()->GetCommandList().Get();
-            cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshShockwave"));
-            cmdList->SetPipelineState(pm->GetPipeLineStateObject("VfxMeshShockwave"));
-            cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"), camera_->GetCameraResource()->GetGPUVirtualAddress());
-            cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), shockwaveCBResource_->GetGPUVirtualAddress());
+            case VfxSubEffectType::Shockwave:
+                if (sub.shockwave) {
+                    const auto& sw = def.shockwave;
+                    auto& cb = *static_cast<ShockwaveParamsCB*>(sub.cbMapped);
+                    cb.color     = tint4(sw.color, sub.tint);
+                    cb.time      = previewTimer_;
+                    cb.duration  = sw.duration;
+                    cb.thickness = sw.thickness;
+                    // 衝撃波は煙より速い独自タイムスケール（sw.duration で1回膨張して終わる）
+                    cb.burst = (burstProgress_ >= 0.0f)
+                        ? std::min(previewTimer_ / std::max(sw.duration, 0.01f), 1.0f) : -1.0f;
 
-            previewShockwave_->Draw(cmdList);
+                    const auto& idx = pm->GetParameterIndices("VfxMeshShockwave");
+                    cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshShockwave"));
+                    cmdList->SetPipelineState(pm->GetPipeLineStateObject("VfxMeshShockwave"));
+                    cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"), camAddr);
+                    cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), sub.cbRes->GetGPUVirtualAddress());
+                    sub.shockwave->Draw(cmdList);
+                }
+                break;
+            }
         }
     }
 
@@ -483,26 +588,41 @@ namespace YoRigine {
         ImGui::SameLine(0, 4); ImGui::TextDisabled("名前");
         ImGui::Separator();
 
-        // 効果タイプはタブで切替（縦に積むと長くて見づらいため）。
-        // 有効な効果のタブ名には ● を付けて一目で分かるようにする。
+        // タブ構成: Trail（Emitter駆動で1つ） / 形状（サブ効果リスト） / Motion（全体の動き）
         if (ImGui::BeginTabBar("##vfxTabs")) {
-            auto effectTab = [&](const char* name, bool& useFlag, const char* changeLabel, auto&& drawFn) {
+            // Trail タブ
+            {
                 // "###tab_xxx" でタブ ID を固定（● の付け外しで選択がリセットされないように）
-                std::string label = std::string(useFlag ? "● " : "   ") + name + "###tab_" + name;
+                std::string label = std::string(asset.useTrail ? "● " : "   ") + "Trail###tab_Trail";
                 if (ImGui::BeginTabItem(label.c_str())) {
                     VfxEffectAsset b = asset;
-                    if (ImGui::Checkbox("この効果を有効化", &useFlag)) CommitChange(b, changeLabel);
+                    if (ImGui::Checkbox("この効果を有効化", &asset.useTrail)) CommitChange(b, "Trail 有効切替");
                     ImGui::Separator();
-                    if (useFlag) drawFn();
-                    else         ImGui::TextDisabled("(無効) — 上のチェックで有効化");
+                    if (asset.useTrail) DrawTrailSection();
+                    else                ImGui::TextDisabled("(無効) — 上のチェックで有効化");
                     ImGui::EndTabItem();
                 }
-            };
-            effectTab("Trail",        asset.useTrail,       "Trail 有効切替",     [&] { DrawTrailSection(); });
-            effectTab("Light Volume", asset.useLightVolume, "Volume 有効切替",    [&] { DrawLightVolumeSection(); });
-            effectTab("Smoke",        asset.useSmoke,       "Smoke 有効切替",     [&] { DrawSmokeSection(); });
-            effectTab("Lightning",    asset.useLightning,   "Lightning 有効切替", [&] { DrawLightningSection(); });
-            effectTab("Shockwave",    asset.useShockwave,   "Shockwave 有効切替", [&] { DrawShockwaveSection(); });
+            }
+
+            // 形状タブ（サブ効果リスト: 同じ種類を複数積める）
+            {
+                std::string slabel = std::string(asset.subEffects.empty() ? "   " : "● ")
+                                   + "形状 (" + std::to_string(asset.subEffects.size()) + ")###tab_SubEffects";
+                if (ImGui::BeginTabItem(slabel.c_str())) {
+                    DrawSubEffectsSection();
+                    ImGui::EndTabItem();
+                }
+            }
+
+            // Motion タブ（エフェクト全体の動きのリストを編集）
+            {
+                std::string mlabel = std::string(asset.motions.empty() ? "   " : "● ")
+                                   + "Motion###tab_Motion";
+                if (ImGui::BeginTabItem(mlabel.c_str())) {
+                    DrawMotionSection();
+                    ImGui::EndTabItem();
+                }
+            }
             ImGui::EndTabBar();
         }
         ImGui::Separator();
@@ -771,11 +891,11 @@ namespace YoRigine {
         }
     }
 
-    void VfxMeshEditor::DrawLightVolumeSection()
+    void VfxMeshEditor::DrawLightVolumeSection(VfxSubEffect& sub)
     {
         auto* sel = Selected();
         if (!sel) return;
-        auto& lv = sel->asset.lightVolume;
+        auto& lv = sub.lightVolume;
 
         ImGui::SeparatorText("OBB サイズ  (X=右 / Y=上 / Z=前)");
         {
@@ -794,22 +914,15 @@ namespace YoRigine {
         }
 
         ImGui::Spacing();
-        {
-            VfxEffectAsset b = sel->asset;
-            if (ImGui::Checkbox("ボリューム有効##en", &lv.isEnable))
-                CommitChange(b, "Volume 有効切替");
-        }
-
-        ImGui::Spacing();
         ImGui::Checkbox("OBB ワイヤーフレーム表示", &showVolumeDebug_);
         if (showVolumeDebug_) ImGui::TextColored(ImVec4(1, 1, 0, 1), "  > OBB ワイヤーフレーム ON");
     }
 
-    void VfxMeshEditor::DrawSmokeSection()
+    void VfxMeshEditor::DrawSmokeSection(VfxSubEffect& sub)
     {
         auto* sel = Selected();
         if (!sel) return;
-        auto& sm = sel->asset.smoke;
+        auto& sm = sub.smoke;
 
         ImGui::SeparatorText("カラー  (rgb>1 で Bloom / a=濃度)");
         {
@@ -837,19 +950,21 @@ namespace YoRigine {
             if (c) CommitChange(b, "Smoke パラメータ");
         }
 
-        ImGui::Spacing();
+        ImGui::SeparatorText("破裂の動き");
         {
             VfxEffectAsset b = sel->asset;
-            if (ImGui::Checkbox("スモーク有効##smen", &sm.isEnable))
-                CommitChange(b, "Smoke 有効切替");
+            if (ImGui::Checkbox("従来の破裂挙動を使う##smburst", &sm.builtInBurstMotion))
+                CommitChange(b, "Smoke 破裂挙動切替");
+            ImGui::TextDisabled("  ON  = ワンショット時に自動でポップ膨張/上昇/火球→煙遷移（従来）\n"
+                                "  OFF = ScaleOverLife / ColorOverLife / Rise などのモーションだけで動きを組む");
         }
     }
 
-    void VfxMeshEditor::DrawLightningSection()
+    void VfxMeshEditor::DrawLightningSection(VfxSubEffect& sub)
     {
         auto* sel = Selected();
         if (!sel) return;
-        auto& lt = sel->asset.lightning;
+        auto& lt = sub.lightning;
 
         ImGui::SeparatorText("カラー (rgb>1 で Bloom)");
         {
@@ -903,20 +1018,13 @@ namespace YoRigine {
             c |= ImGui::DragFloat("芯のグロー##ltg",   &lt.glowPower,    0.05f, 0.1f, 8.0f, "%.2f");
             if (c) CommitChange(b, "Lightning パラメータ");
         }
-
-        ImGui::Spacing();
-        {
-            VfxEffectAsset b = sel->asset;
-            if (ImGui::Checkbox("稲妻有効##lten", &lt.isEnable))
-                CommitChange(b, "Lightning 有効切替");
-        }
     }
 
-    void VfxMeshEditor::DrawShockwaveSection()
+    void VfxMeshEditor::DrawShockwaveSection(VfxSubEffect& sub)
     {
         auto* sel = Selected();
         if (!sel) return;
-        auto& sw = sel->asset.shockwave;
+        auto& sw = sub.shockwave;
 
         ImGui::SeparatorText("カラー (rgb>1 で Bloom)");
         {
@@ -934,12 +1042,286 @@ namespace YoRigine {
             c |= ImGui::SliderFloat("リング太さ##swt", &sw.thickness, 0.01f, 1.0f);
             if (c) CommitChange(b, "Shockwave パラメータ");
         }
+    }
 
-        ImGui::Spacing();
-        {
+    // モーションリスト編集（エフェクト全体用と形状個別用で共用）
+    void VfxMeshEditor::DrawMotionListUI(std::vector<VfxMotion>& motions,
+                                         bool showTarget, const char* commitLabel)
+    {
+        auto* sel = Selected();
+        if (!sel) return;
+
+        const char* typeNames[] = {
+            "BurstGrow (爆発の寿命)", "Move (等速移動)", "Rise (上昇)", "Pulse (脈動)",
+            "ScaleOverLife (スケール変化)", "ColorOverLife (色変化)", "FadeInOut (フェード)",
+            "Accelerate (加速/重力)", "Orbit (周回)", "Shake (揺れ)",
+            "Visibility (表示期間)", "Flicker (明滅)"
+        };
+        const char* easeNames[] = {
+            "Linear", "EaseIn (ゆっくり開始)", "EaseOut (ゆっくり終了)", "EaseInOut (両端)",
+            "EaseOutCubic (強めブレーキ)", "EaseOutExpo (爆発向き)", "EaseOutBack (ポップ)"
+        };
+        const ImGuiColorEditFlags hdr = ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_Float;
+
+        int removeIdx = -1;
+        for (int i = 0; i < static_cast<int>(motions.size()); ++i) {
+            ImGui::PushID(i);
+            auto& m = motions[i];
+
             VfxEffectAsset b = sel->asset;
-            if (ImGui::Checkbox("衝撃波有効##swen", &sw.isEnable))
-                CommitChange(b, "Shockwave 有効切替");
+            bool c = false;
+
+            int typeIdx = static_cast<int>(m.type);
+            ImGui::SetNextItemWidth(220);
+            if (ImGui::Combo("種類##mt", &typeIdx, typeNames, IM_ARRAYSIZE(typeNames))) {
+                m.type = static_cast<VfxMotionType>(typeIdx);
+                c = true;
+            }
+            ImGui::SameLine();
+            if (ImGui::SmallButton("削除##m")) removeIdx = i;
+
+            // 適用対象（BurstGrow は効果全体の寿命なので対象指定なし。
+            // 形状個別モーションはその形状にだけ効くので対象指定は不要）
+            if (showTarget && m.type != VfxMotionType::BurstGrow) {
+                const char* targetNames[] = { "All (全効果)", "Smoke", "Lightning", "Shockwave", "LightVolume" };
+                int tgtIdx = static_cast<int>(m.target);
+                ImGui::SetNextItemWidth(220);
+                if (ImGui::Combo("対象##mtg", &tgtIdx, targetNames, IM_ARRAYSIZE(targetNames))) {
+                    m.target = static_cast<VfxMotionTarget>(tgtIdx);
+                    c = true;
+                }
+            }
+
+            // タイミング（BurstGrow 以外の全タイプ共通）
+            if (m.type != VfxMotionType::BurstGrow) {
+                ImGui::SetNextItemWidth(90);
+                c |= ImGui::DragFloat("開始遅延(秒)##mst", &m.startTime, 0.02f, 0.0f, 30.0f, "%.2f");
+                ImGui::SameLine();
+                ImGui::SetNextItemWidth(90);
+                c |= ImGui::DragFloat("効果時間(秒)##mwin", &m.window, 0.02f, 0.0f, 30.0f, "%.2f");
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("0 = 無限（Scale/Color はワンショット寿命全体で 0→1）\n"
+                                      ">0 = この秒数で完了（移動系はここで停止）");
+            }
+
+            // イージング（補間系のみ）
+            if (m.type == VfxMotionType::ScaleOverLife || m.type == VfxMotionType::ColorOverLife) {
+                int easeIdx = static_cast<int>(m.ease);
+                ImGui::SetNextItemWidth(220);
+                if (ImGui::Combo("カーブ##mease", &easeIdx, easeNames, IM_ARRAYSIZE(easeNames))) {
+                    m.ease = static_cast<VfxEase>(easeIdx);
+                    c = true;
+                }
+            }
+
+            // type ごとに使うパラメータだけ表示
+            switch (m.type) {
+            case VfxMotionType::BurstGrow:
+                c |= ImGui::DragFloat("寿命(秒)##md", &m.duration, 0.02f, 0.05f, 10.0f, "%.2f");
+                ImGui::TextDisabled("  ※ワンショットの全体寿命。Smokeの膨張/上昇もこの時間で進む");
+                break;
+            case VfxMotionType::Move:
+                c |= ImGui::DragFloat3("速度(/秒)##mv", &m.velocity.x, 0.02f, -20.0f, 20.0f, "%.2f");
+                break;
+            case VfxMotionType::Rise:
+                c |= ImGui::DragFloat("上昇速度##mr", &m.velocity.y, 0.02f, -20.0f, 20.0f, "%.2f");
+                c |= ImGui::DragFloat("係数##ma",     &m.amplitude, 0.02f, 0.0f, 10.0f, "%.2f");
+                break;
+            case VfxMotionType::Pulse:
+                c |= ImGui::DragFloat("振幅##mp",      &m.amplitude, 0.01f, 0.0f, 2.0f, "%.2f");
+                c |= ImGui::DragFloat("周波数(Hz)##mf", &m.frequency, 0.05f, 0.0f, 20.0f, "%.2f");
+                break;
+            case VfxMotionType::ScaleOverLife:
+                c |= ImGui::DragFloat("開始スケール##mss", &m.scaleStart, 0.01f, 0.0f, 20.0f, "%.2f");
+                c |= ImGui::DragFloat("終了スケール##mse", &m.scaleEnd,   0.01f, 0.0f, 20.0f, "%.2f");
+                ImGui::TextDisabled("  ※元サイズへの倍率。0→1.5 で「破裂して広がる」");
+                break;
+            case VfxMotionType::ColorOverLife:
+                c |= ImGui::ColorEdit4("開始色(乗算)##mcs", &m.colorStart.x, hdr);
+                c |= ImGui::ColorEdit4("終了色(乗算)##mce", &m.colorEnd.x,   hdr);
+                ImGui::TextDisabled("  ※元の色に掛ける倍率。白(1,1,1,1)=変化なし / >1 で Bloom 強化\n"
+                                    "     火球→煙なら 開始(1,1,1,1) → 終了(0.2,0.2,0.25,0.9) など");
+                break;
+            case VfxMotionType::FadeInOut:
+                c |= ImGui::DragFloat("フェードイン(秒)##mfi",  &m.fadeIn,  0.01f, 0.0f, 10.0f, "%.2f");
+                c |= ImGui::DragFloat("フェードアウト(秒)##mfo", &m.fadeOut, 0.01f, 0.0f, 10.0f, "%.2f");
+                ImGui::TextDisabled("  ※アウトは効果時間（0ならワンショット寿命）の終端から逆算");
+                break;
+            case VfxMotionType::Accelerate:
+                c |= ImGui::DragFloat3("初速(/秒)##mav",   &m.velocity.x,     0.02f, -50.0f, 50.0f, "%.2f");
+                c |= ImGui::DragFloat3("加速度(/秒²)##maa", &m.acceleration.x, 0.02f, -50.0f, 50.0f, "%.2f");
+                ImGui::TextDisabled("  ※重力なら加速度 Y=-9.8。打ち上げは初速+Y & 加速度-Y");
+                break;
+            case VfxMotionType::Orbit:
+                c |= ImGui::DragFloat3("回転軸##mox",     &m.velocity.x, 0.02f, -1.0f, 1.0f, "%.2f");
+                c |= ImGui::DragFloat("半径##mor",        &m.amplitude, 0.02f, 0.0f, 20.0f, "%.2f");
+                c |= ImGui::DragFloat("回転数(/秒)##mof", &m.frequency, 0.05f, -10.0f, 10.0f, "%.2f");
+                break;
+            case VfxMotionType::Shake:
+                c |= ImGui::DragFloat("振れ幅##msa",     &m.amplitude, 0.01f, 0.0f, 5.0f, "%.2f");
+                c |= ImGui::DragFloat("速さ(Hz)##msf",   &m.frequency, 0.1f,  0.0f, 60.0f, "%.1f");
+                break;
+            case VfxMotionType::Visibility:
+                ImGui::TextDisabled("  ※開始遅延〜開始遅延+効果時間 の間だけ表示（効果時間0=以降ずっと表示）");
+                ImGui::TextDisabled("     例: 閃光=0.00〜0.15秒 / リング=0.00〜0.50秒 と順序付けできる");
+                break;
+            case VfxMotionType::Flicker:
+                c |= ImGui::DragFloat("明滅の深さ##mfa",   &m.amplitude, 0.01f, 0.0f, 1.0f, "%.2f");
+                c |= ImGui::DragFloat("明滅回数(/秒)##mff", &m.frequency, 0.5f,  0.0f, 120.0f, "%.1f");
+                break;
+            }
+
+            if (c) CommitChange(b, commitLabel);
+            ImGui::Separator();
+            ImGui::PopID();
+        }
+
+        if (removeIdx >= 0) {
+            VfxEffectAsset b = sel->asset;
+            motions.erase(motions.begin() + removeIdx);
+            CommitChange(b, "モーション削除");
+        }
+
+        if (ImGui::Button("＋ モーション追加")) {
+            VfxEffectAsset b = sel->asset;
+            motions.push_back(VfxMotion{});
+            CommitChange(b, "モーション追加");
+        }
+        if (motions.empty()) {
+            ImGui::SameLine();
+            ImGui::TextDisabled("(動きなし = 従来挙動)");
+        }
+    }
+
+    void VfxMeshEditor::DrawMotionSection()
+    {
+        auto* sel = Selected();
+        if (!sel) return;
+
+        ImGui::TextDisabled("エフェクト全体の動き（寿命・移動・脈動）をデータで定義。ゲームでも同じ動きで再生されます。");
+        ImGui::TextDisabled("形状1個だけを動かしたい場合は、形状タブの各インスタンス内のモーションを使ってください。");
+        ImGui::Spacing();
+
+        DrawMotionListUI(sel->asset.motions, true, "モーション編集");
+    }
+
+    // -------------------------------------------------------
+    // 形状（サブ効果）リスト: 同じ種類を複数追加・複製・削除できる
+    // -------------------------------------------------------
+    void VfxMeshEditor::DrawSubEffectsSection()
+    {
+        auto* sel = Selected();
+        if (!sel) return;
+        auto& subs = sel->asset.subEffects;
+
+        ImGui::TextDisabled("形状（Smoke/Lightning/Shockwave/LightVolume）を好きな数だけ追加できます。同じ種類の複数追加も可能。");
+        ImGui::Spacing();
+
+        // ── 追加ボタン ──
+        if (ImGui::Button("＋ 形状を追加")) ImGui::OpenPopup("##addSubEffect");
+        if (ImGui::BeginPopup("##addSubEffect")) {
+            const VfxSubEffectType addTypes[] = {
+                VfxSubEffectType::Smoke, VfxSubEffectType::Lightning,
+                VfxSubEffectType::Shockwave, VfxSubEffectType::LightVolume,
+            };
+            for (VfxSubEffectType t : addTypes) {
+                if (ImGui::MenuItem(VfxSubEffectTypeName(t))) {
+                    VfxEffectAsset b = sel->asset;
+                    VfxSubEffect sub;
+                    sub.type = t;
+                    subs.push_back(std::move(sub));
+                    CommitChange(b, "形状追加");
+                }
+            }
+            ImGui::EndPopup();
+        }
+        if (subs.empty()) {
+            ImGui::SameLine();
+            ImGui::TextDisabled("(形状なし)");
+        }
+        ImGui::Separator();
+
+        // ── インスタンス一覧 ──
+        int removeIdx = -1;
+        int dupIdx    = -1;
+        for (int i = 0; i < static_cast<int>(subs.size()); ++i) {
+            ImGui::PushID(i);
+            auto& sub = subs[i];
+
+            // ヘッダ: [●/○] 種類 + ラベル
+            std::string title = std::string(sub.enabled ? "● " : "○ ")
+                              + VfxSubEffectTypeName(sub.type);
+            if (!sub.label.empty()) title += "  \"" + sub.label + "\"";
+            title += "###subHeader";
+
+            bool open = ImGui::CollapsingHeader(title.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
+
+            if (open) {
+                ImGui::Indent();
+
+                // 有効化 / 複製 / 削除
+                {
+                    VfxEffectAsset b = sel->asset;
+                    if (ImGui::Checkbox("有効##sub", &sub.enabled)) CommitChange(b, "形状 有効切替");
+                }
+                ImGui::SameLine();
+                if (ImGui::SmallButton("複製##sub")) dupIdx = i;
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip("この形状をパラメータごとコピーして追加");
+                ImGui::SameLine();
+                if (ImGui::SmallButton("削除##sub")) removeIdx = i;
+
+                // 表示名（エディタ整理用）
+                {
+                    char labelBuf[128] = {};
+                    strncpy_s(labelBuf, sizeof(labelBuf), sub.label.c_str(), _TRUNCATE);
+                    ImGui::SetNextItemWidth(200);
+                    VfxEffectAsset b = sel->asset;
+                    if (ImGui::InputText("表示名##sub", labelBuf, sizeof(labelBuf),
+                                         ImGuiInputTextFlags_EnterReturnsTrue)) {
+                        sub.label = labelBuf;
+                        CommitChange(b, "形状 表示名");
+                    }
+                }
+
+                // 配置オフセット
+                {
+                    VfxEffectAsset b = sel->asset;
+                    if (ImGui::DragFloat3("オフセット##sub", &sub.offset.x, 0.05f, -50.f, 50.f, "%.2f"))
+                        CommitChange(b, "形状 オフセット");
+                    ImGui::TextDisabled("  ※エフェクト基準位置からのずらし量。同種を並べる時に使う");
+                }
+
+                ImGui::Spacing();
+
+                // 種類ごとのパラメータ
+                switch (sub.type) {
+                case VfxSubEffectType::LightVolume: DrawLightVolumeSection(sub); break;
+                case VfxSubEffectType::Smoke:       DrawSmokeSection(sub);       break;
+                case VfxSubEffectType::Lightning:   DrawLightningSection(sub);   break;
+                case VfxSubEffectType::Shockwave:   DrawShockwaveSection(sub);   break;
+                }
+
+                // この形状専用のモーション
+                ImGui::SeparatorText("この形状のモーション");
+                ImGui::TextDisabled("  ※エフェクト全体のモーション（Motionタブ）に加算で適用されます");
+                DrawMotionListUI(sub.motions, false, "形状モーション編集");
+
+                ImGui::Unindent();
+            }
+            ImGui::Separator();
+            ImGui::PopID();
+        }
+
+        if (dupIdx >= 0) {
+            VfxEffectAsset b = sel->asset;
+            VfxSubEffect copy = subs[dupIdx];
+            subs.insert(subs.begin() + dupIdx + 1, std::move(copy));
+            CommitChange(b, "形状複製");
+        }
+        if (removeIdx >= 0) {
+            VfxEffectAsset b = sel->asset;
+            subs.erase(subs.begin() + removeIdx);
+            CommitChange(b, "形状削除");
         }
     }
 
@@ -991,6 +1373,29 @@ namespace YoRigine {
             if (previewTrailEmitter_) previewTrailEmitter_->Play(); // リセットして最初から再生
         }
 
+        // 汎用ワンショットループ（全エフェクト共通）
+        if (ImGui::Checkbox("ワンショットループ (モーション確認)", &loopOneShot_)) {
+            previewTimer_ = 0.f;
+            if (previewTrailEmitter_) previewTrailEmitter_->Play();
+        }
+        if (loopOneShot_) {
+            if (loopPeriodComputed_ > 0.1f) {
+                // モーションから自動検出できた場合
+                ImGui::SameLine();
+                ImGui::TextDisabled("%.2f s / サイクル", loopPeriodComputed_);
+            } else {
+                // 検出できなかった場合は手動設定
+                ImGui::SameLine();
+                ImGui::SetNextItemWidth(110);
+                ImGui::DragFloat("ループ時間##ls", &loopDuration_, 0.05f, 0.1f, 30.f, "%.2f s");
+            }
+            ImGui::SameLine();
+            if (ImGui::SmallButton("もう一度##loop")) {
+                previewTimer_ = 0.f;
+                if (previewTrailEmitter_) previewTrailEmitter_->Play();
+            }
+        }
+
         // 爆発ワンショット再生（Smoke/Shockwave が一発膨張して消える。自動リピート）
         ImGui::Checkbox("爆発ワンショット再生 (破裂→膨張→消滅)", &oneShot_);
         if (oneShot_) {
@@ -1005,7 +1410,15 @@ namespace YoRigine {
 
         auto* sel = Selected();
         if (sel) {
-            if (sel->asset.useTrail && sel->asset.trail.lifetime > 0.f) {
+            // ワンショットループ中はサイクル進捗バーを表示
+            if (loopOneShot_ && loopPeriodComputed_ > 0.1f) {
+                char ov[64];
+                snprintf(ov, sizeof(ov), "モーション  %.2f / %.2f s", previewTimer_, loopPeriodComputed_);
+                ImGui::ProgressBar(std::min(previewTimer_ / loopPeriodComputed_, 1.f),
+                                   ImVec2(-1, 0), ov);
+            } else if (oneShot_) {
+                // 爆発ワンショット中は既存の burstPeriod でバーを出す（Trail と同様）
+            } else if (sel->asset.useTrail && sel->asset.trail.lifetime > 0.f) {
                 char ov[48];
                 snprintf(ov, sizeof(ov), "Trail  %.2f / %.2f s",
                     previewTimer_, sel->asset.trail.lifetime);
@@ -1013,8 +1426,11 @@ namespace YoRigine {
                     std::min(previewTimer_ / sel->asset.trail.lifetime, 1.f),
                     ImVec2(-1, 0), ov);
             }
-            if (sel->asset.useLightVolume && sel->asset.lightVolume.isEnable) {
-                ImGui::ProgressBar(1.f, ImVec2(-1, 0), "Light Volume  (active)");
+            for (const auto& sub : sel->asset.subEffects) {
+                if (sub.type == VfxSubEffectType::LightVolume && sub.enabled) {
+                    ImGui::ProgressBar(1.f, ImVec2(-1, 0), "Light Volume  (active)");
+                    break;
+                }
             }
         }
         ImGui::TextDisabled("時刻: %.3f s", previewTimer_);
@@ -1047,7 +1463,7 @@ namespace YoRigine {
 
         ImGui::Spacing();
         ImGui::Text("プリセット");
-        const char* presetNames[] = { "Blank", "Trail Only", "Volume Only", "Sword", "Magic" };
+        const char* presetNames[] = { "Blank", "Trail Only", "Volume Only", "Sword", "Magic", "Explosion (モーション駆動)" };
         ImGui::SetNextItemWidth(-1);
         ImGui::Combo("##preset", &newPresetIdx_, presetNames, IM_ARRAYSIZE(presetNames));
 
@@ -1216,7 +1632,6 @@ namespace YoRigine {
                     entries_[idx].asset = after;
                     entries_[idx].isDirty = true;
                     if (previewTrailEmitter_) previewTrailEmitter_->SetAsset(after); // 即時反映
-                    if (previewVolume_) previewVolume_->ApplyParam(after.lightVolume);
                 }
             },
             [this, idx, before]() {
@@ -1224,7 +1639,6 @@ namespace YoRigine {
                     entries_[idx].asset = before;
                     entries_[idx].isDirty = true;
                     if (previewTrailEmitter_) previewTrailEmitter_->SetAsset(before); // Undo即時反映
-                    if (previewVolume_) previewVolume_->ApplyParam(before.lightVolume);
                 }
             }
         ));
@@ -1237,130 +1651,209 @@ namespace YoRigine {
         }
     }
 
-    void VfxMeshEditor::RebuildPreviewMeshes()
+    // アセットの subEffects と previewSubs_ の構成（数と種類）を同期させる。
+    // 一致していれば何もしない。変わっていたら全部作り直す（編集時のみなので軽い）。
+    void VfxMeshEditor::SyncPreviewSubs()
     {
         auto* sel = Selected();
-        if (!sel) return;
-        previewVolume_->Initialize(sel->asset.lightVolume);
-    }
+        if (!sel) { previewSubs_.clear(); return; }
+        const auto& subs = sel->asset.subEffects;
 
-    void VfxMeshEditor::InitCBVs()
-    {
-        volumeCBResource_ = dxCommon_->CreateBufferResource(AlignedSize<LightVolumeParamsCB>());
-        volumeCBResource_->Map(0, nullptr, reinterpret_cast<void**>(&volumeCBMapped_));
+        bool match = (previewSubs_.size() == subs.size());
+        if (match) {
+            for (size_t i = 0; i < subs.size(); ++i) {
+                if (previewSubs_[i]->type != subs[i].type) { match = false; break; }
+            }
+        }
+        if (match) return;
 
-        smokeCBResource_ = dxCommon_->CreateBufferResource(AlignedSize<SmokeParamsCB>());
-        smokeCBResource_->Map(0, nullptr, reinterpret_cast<void**>(&smokeCBMapped_));
+        previewSubs_.clear();
+        previewSubs_.reserve(subs.size());
 
-        lightningCBResource_ = dxCommon_->CreateBufferResource(AlignedSize<LightningParamsCB>());
-        lightningCBResource_->Map(0, nullptr, reinterpret_cast<void**>(&lightningCBMapped_));
+        for (const auto& def : subs) {
+            auto sub = std::make_unique<PreviewSub>();
+            sub->type = def.type;
 
-        shockwaveCBResource_ = dxCommon_->CreateBufferResource(AlignedSize<ShockwaveParamsCB>());
-        shockwaveCBResource_->Map(0, nullptr, reinterpret_cast<void**>(&shockwaveCBMapped_));
-    }
+            switch (def.type) {
+            case VfxSubEffectType::LightVolume:
+                sub->volume = std::make_unique<LightVolumeMesh>();
+                sub->volume->Initialize(def.lightVolume);
+                sub->cbRes = dxCommon_->CreateBufferResource(AlignedSize<LightVolumeParamsCB>());
+                break;
+            case VfxSubEffectType::Smoke:
+                sub->smoke = std::make_unique<VolumeSmokeMesh>();
+                sub->smoke->Initialize();
+                sub->cbRes = dxCommon_->CreateBufferResource(AlignedSize<SmokeParamsCB>());
+                break;
+            case VfxSubEffectType::Lightning:
+                sub->lightning = std::make_unique<LightningMesh>();
+                sub->lightning->Initialize();
+                sub->cbRes = dxCommon_->CreateBufferResource(AlignedSize<LightningParamsCB>());
+                break;
+            case VfxSubEffectType::Shockwave:
+                sub->shockwave = std::make_unique<ShockwaveMesh>();
+                sub->shockwave->Initialize();
+                sub->cbRes = dxCommon_->CreateBufferResource(AlignedSize<ShockwaveParamsCB>());
+                break;
+            }
+            sub->cbRes->Map(0, nullptr, &sub->cbMapped);
 
-    void VfxMeshEditor::UpdateVolumeCBV(float time)
-    {
-        auto* sel = Selected();
-        if (!sel || !volumeCBMapped_) return;
-        const auto& lv = sel->asset.lightVolume;
-
-        volumeCBMapped_->color[0] = lv.color.x;
-        volumeCBMapped_->color[1] = lv.color.y;
-        volumeCBMapped_->color[2] = lv.color.z;
-        volumeCBMapped_->color[3] = lv.color.w * lv.intensity;
-        volumeCBMapped_->edgeFade = 0.15f;
-        volumeCBMapped_->depthFade = 1.0f;
-        volumeCBMapped_->noiseTiling = 2.0f;
-        volumeCBMapped_->noiseStrength = 0.0f;
-        volumeCBMapped_->time = time;
-    }
-
-    void VfxMeshEditor::UpdateSmokeCBV(float time)
-    {
-        auto* sel = Selected();
-        if (!sel || !smokeCBMapped_) return;
-        const auto& sm = sel->asset.smoke;
-
-        smokeCBMapped_->color         = sm.color;
-        smokeCBMapped_->smokeColor    = sm.smokeColor;
-        smokeCBMapped_->center        = smokeCenter_; // 上昇を反映（フレネル法線の中心と一致させる）
-        smokeCBMapped_->radius        = smokeRadius_; // 膨張を反映（メッシュと一致）
-        smokeCBMapped_->time          = time;
-        smokeCBMapped_->noiseScale    = sm.noiseScale;
-        smokeCBMapped_->noiseStrength = sm.noiseStrength;
-        smokeCBMapped_->scrollSpeed   = sm.scrollSpeed;
-        smokeCBMapped_->fresnelPower  = sm.fresnelPower;
-        smokeCBMapped_->density       = sm.density;
-        smokeCBMapped_->noiseOctaves  = sm.noiseOctaves;
-        smokeCBMapped_->rimIntensity  = sm.rimIntensity;
-        smokeCBMapped_->burst         = burstProgress_;
-    }
-
-    void VfxMeshEditor::UpdateLightningCBV(float time)
-    {
-        auto* sel = Selected();
-        if (!sel || !lightningCBMapped_) return;
-        const auto& lt = sel->asset.lightning;
-
-        lightningCBMapped_->color            = lt.color;
-        lightningCBMapped_->glowColor        = lt.glowColor;
-        lightningCBMapped_->branchColor      = lt.branchColor;
-        lightningCBMapped_->time             = time;
-        lightningCBMapped_->glowPower        = lt.glowPower;
-        lightningCBMapped_->coreWidth        = lt.coreWidth;
-        lightningCBMapped_->solidness        = lt.solidness;
-        lightningCBMapped_->outlineIntensity = lt.outlineIntensity;
-        lightningCBMapped_->_pad0 = lightningCBMapped_->_pad1 = lightningCBMapped_->_pad2 = 0.0f;
-    }
-
-    void VfxMeshEditor::UpdateShockwaveCBV(float time)
-    {
-        auto* sel = Selected();
-        if (!sel || !shockwaveCBMapped_) return;
-        const auto& sw = sel->asset.shockwave;
-
-        shockwaveCBMapped_->color     = sw.color;
-        shockwaveCBMapped_->time      = time;
-        shockwaveCBMapped_->duration  = sw.duration;
-        shockwaveCBMapped_->thickness = sw.thickness;
-        // 衝撃波は煙より速い独自タイムスケール（sw.duration で1回膨張して終わる）
-        shockwaveCBMapped_->burst =
-            (burstProgress_ >= 0.0f) ? std::min(previewTimer_ / std::max(sw.duration, 0.01f), 1.0f) : -1.0f;
+            previewSubs_.push_back(std::move(sub));
+        }
     }
 
     VfxEffectAsset VfxMeshEditor::MakePreset(VfxPreset preset)
     {
         VfxEffectAsset a;
+
+        // LightVolume のサブ効果を1つ足すヘルパ
+        auto addVolume = [&a](const Vector3& halfExtents, const Vector4& color, float intensity) {
+            VfxSubEffect sub;
+            sub.type = VfxSubEffectType::LightVolume;
+            sub.lightVolume.halfExtents = halfExtents;
+            sub.lightVolume.color       = color;
+            sub.lightVolume.intensity   = intensity;
+            a.subEffects.push_back(std::move(sub));
+        };
+
         switch (preset) {
         case VfxPreset::TrailOnly:
-            a.useTrail = true; a.useLightVolume = false; break;
+            a.useTrail = true; break;
         case VfxPreset::VolumeOnly:
-            a.useTrail = false; a.useLightVolume = true; break;
+            a.useTrail = false;
+            addVolume({ 2.f, 1.5f, 5.f }, { 1.f, 0.9f, 0.f, 0.15f }, 1.0f);
+            break;
         case VfxPreset::Sword:
-            a.useTrail = true; a.useLightVolume = true;
+            a.useTrail = true;
             a.trail.widthStart = 0.05f; a.trail.widthEnd = 0.f;
             a.trail.lifetime = 0.25f; a.trail.maxPoints = 48;
             a.trail.colorStart = { 1.f, 0.95f, 0.7f, 1.f };
             a.trail.colorEnd = { 0.8f, 0.5f, 0.1f, 0.f };
             a.trail.blendMode = BlendMode::kBlendModeAdd;
             a.trail.uvScrollSpeed = 0.3f;
-            a.lightVolume.halfExtents = { 0.04f, 0.04f, 0.6f };
-            a.lightVolume.color = { 1.f, 0.9f, 0.5f, 0.18f };
-            a.lightVolume.intensity = 1.5f;
+            addVolume({ 0.04f, 0.04f, 0.6f }, { 1.f, 0.9f, 0.5f, 0.18f }, 1.5f);
             break;
         case VfxPreset::Magic:
-            a.useTrail = true; a.useLightVolume = true;
+            a.useTrail = true;
             a.trail.widthStart = 0.4f;  a.trail.widthEnd = 0.05f;
             a.trail.lifetime = 1.2f;  a.trail.maxPoints = 96;
             a.trail.colorStart = { 0.4f, 0.2f, 1.f, 1.f };
             a.trail.colorEnd = { 0.2f, 0.6f, 1.f, 0.f };
             a.trail.blendMode = BlendMode::kBlendModeAdd;
             a.trail.uvScrollSpeed = 0.8f;
-            a.lightVolume.halfExtents = { 1.5f, 1.5f, 4.f };
-            a.lightVolume.color = { 0.5f, 0.3f, 1.f, 0.25f };
-            a.lightVolume.intensity = 3.f;
+            addVolume({ 1.5f, 1.5f, 4.f }, { 0.5f, 0.3f, 1.f, 0.25f }, 3.f);
             break;
+
+        // 爆発ワンショット機能に頼らず、モーションの組み合わせだけで作った爆発。
+        // 「破裂ポップ → 火球が煙に変色しつつ上昇 → フェード消滅」＋「衝撃波リング」＋「閃光」
+        case VfxPreset::Explosion: {
+            a.useTrail = false;
+
+            // 全体寿命 2.2 秒（ゲームのワンショット再生・プレビューのリピートに使われる）
+            {
+                VfxMotion life;
+                life.type = VfxMotionType::BurstGrow;
+                life.duration = 2.2f;
+                a.motions.push_back(life);
+            }
+
+            // ── 火球 → 煙 ──
+            {
+                VfxSubEffect fire;
+                fire.type  = VfxSubEffectType::Smoke;
+                fire.label = "火球";
+                fire.smoke.color        = { 4.0f, 1.8f, 0.6f, 1.0f };   // HDR オレンジ（Bloom）
+                fire.smoke.radius       = 1.5f;
+                fire.smoke.riseSpeed    = 0.f;                          // 上昇はモーションで
+                fire.smoke.noiseStrength = 0.9f;
+                fire.smoke.rimIntensity = 3.0f;
+                fire.smoke.builtInBurstMotion = false;                  // 従来破裂OFF＝モーション駆動
+
+                VfxMotion pop;   // 破裂の急膨張（EaseOutExpo で一気に広がって減速）
+                pop.type = VfxMotionType::ScaleOverLife;
+                pop.ease = VfxEase::EaseOutExpo;
+                pop.window = 0.5f;
+                pop.scaleStart = 0.15f; pop.scaleEnd = 1.5f;
+                fire.motions.push_back(pop);
+
+                VfxMotion color; // 火球色 → 暗い煙色（後半で一気に暗く）
+                color.type = VfxMotionType::ColorOverLife;
+                color.ease = VfxEase::EaseInQuad;
+                color.window = 2.2f;
+                color.colorStart = { 1.0f, 1.0f, 1.0f, 1.0f };
+                color.colorEnd   = { 0.05f, 0.05f, 0.06f, 0.85f };
+                fire.motions.push_back(color);
+
+                VfxMotion rise;  // 0.4 秒後から浮力で上昇
+                rise.type = VfxMotionType::Rise;
+                rise.startTime = 0.4f;
+                rise.window = 1.8f;
+                rise.velocity = { 0.f, 1.0f, 0.f };
+                rise.amplitude = 1.0f;
+                fire.motions.push_back(rise);
+
+                VfxMotion fade;  // 立ち上がりは一瞬、終端 0.7 秒かけて消える
+                fade.type = VfxMotionType::FadeInOut;
+                fade.window = 2.2f;
+                fade.fadeIn = 0.03f; fade.fadeOut = 0.7f;
+                fire.motions.push_back(fade);
+
+                a.subEffects.push_back(std::move(fire));
+            }
+
+            // ── 衝撃波リング（最初の 0.5 秒だけ） ──
+            {
+                VfxSubEffect ring;
+                ring.type  = VfxSubEffectType::Shockwave;
+                ring.label = "衝撃波";
+                ring.shockwave.color     = { 6.0f, 2.5f, 1.0f, 1.0f }; // HDR 暖色
+                ring.shockwave.radius    = 3.5f;
+                ring.shockwave.duration  = 0.5f;
+                ring.shockwave.thickness = 0.18f;
+
+                VfxMotion show;
+                show.type = VfxMotionType::Visibility;
+                show.window = 0.5f;
+                ring.motions.push_back(show);
+
+                VfxMotion fade;
+                fade.type = VfxMotionType::FadeInOut;
+                fade.window = 0.5f;
+                fade.fadeIn = 0.f; fade.fadeOut = 0.25f;
+                ring.motions.push_back(fade);
+
+                a.subEffects.push_back(std::move(ring));
+            }
+
+            // ── 閃光（最初の 0.18 秒だけ明滅） ──
+            {
+                VfxSubEffect flash;
+                flash.type  = VfxSubEffectType::Lightning;
+                flash.label = "閃光";
+                flash.lightning.color       = { 8.0f, 8.0f, 10.0f, 1.0f }; // 白熱 HDR
+                flash.lightning.glowColor   = { 6.0f, 6.0f, 9.0f, 1.0f };
+                flash.lightning.branchColor = { 6.0f, 6.0f, 9.0f, 1.0f };
+                flash.lightning.length   = 3.0f;
+                flash.lightning.width    = 0.35f;
+                flash.lightning.branches = 6;
+                flash.lightning.flickerRate = 40.0f;
+
+                VfxMotion show;
+                show.type = VfxMotionType::Visibility;
+                show.window = 0.18f;
+                flash.motions.push_back(show);
+
+                VfxMotion flicker;
+                flicker.type = VfxMotionType::Flicker;
+                flicker.amplitude = 0.5f;
+                flicker.frequency = 60.0f;
+                flash.motions.push_back(flicker);
+
+                a.subEffects.push_back(std::move(flash));
+            }
+            break;
+        }
+
         default: break;
         }
         return a;

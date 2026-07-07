@@ -37,7 +37,8 @@ void VolumeSmokeMesh::Drive(const VfxEvalState& s)
 {
     float   rad = param_.radius * s.scale;
     Vector3 c   = s.position;
-    if (s.progress >= 0.f) {
+    // 従来の自動破裂挙動（builtInBurstMotion=false ならモーション側に全て任せる）
+    if (s.progress >= 0.f && param_.builtInBurstMotion) {
         // 破裂: 最初に素早く膨張（ポップ）→ その後ゆっくり広がり続ける
         float grow = std::min(s.progress / 0.18f, 1.0f);
         rad *= (0.2f + 0.8f * grow + 0.4f * s.progress);

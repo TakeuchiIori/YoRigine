@@ -366,13 +366,7 @@ void GameScene::DrawNonOffscreen() {
 /// </summary>
 void GameScene::DrawShadow()
 {
-	// PSO・RS・topology・gLight をフレーム内で一度だけ設定
 	DrawCommonShadow();
-
-	if (subSceneManager_) {
-		subSceneManager_->DrawShadow();
-	}
-	YoRigine::ModelManipulator::GetInstance()->DrawShadow();
 }
 
 /// <summary>

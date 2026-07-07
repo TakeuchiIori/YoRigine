@@ -14,8 +14,8 @@
 //   // 呼び出し元で PSO("VfxMeshShockwave") + gCamera + gMeshParam(ShockwaveParamsCB)
 //   shock_->Draw(cmdList);
 // ===========================================================
-#include "ProceduralMeshBase.h"
-#include "VfxEffectAsset.h"   // ShockwaveEffectParam
+#include <Vfx/VfxMesh/Core/VfxEffectAsset.h>
+#include <Vfx/VfxMesh/Core/ProceduralMeshBase.h>
 
 class Camera;
 

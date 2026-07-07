@@ -97,6 +97,82 @@ uint32_t DsvManager::Create(
 }
 
 /// <summary>
+/// Texture2DArray 深度ステンシルの作成と登録（シャドウカスケード用）
+/// </summary>
+uint32_t DsvManager::CreateArray(
+	const std::string& name,
+	uint32_t width,
+	uint32_t height,
+	uint32_t arraySize,
+	DXGI_FORMAT format,
+	bool createSRV,
+	float clearDepth,
+	uint8_t clearStencil)
+{
+	// 名前重複チェック
+	assert(nameToIndex_.find(name) == nameToIndex_.end());
+	assert(arraySize >= 1);
+	// スライスごとに 1 つ DSV を消費する
+	assert(currentIndex_ + arraySize <= maxCount_);
+
+	//-------------------- 情報準備 --------------------//
+	auto ds = std::make_unique<DepthStencil>();
+	ds->name = name;
+	ds->width = width;
+	ds->height = height;
+	ds->arraySize = arraySize;
+	ds->format = format;
+	ds->clearDepth = clearDepth;
+	ds->clearStencil = clearStencil;
+
+	//-------------------- リソース作成 --------------------//
+	ds->resource = CreateDepthStencilTextureResource(width, height, format, arraySize);
+
+	//-------------------- スライスごとの DSV 作成 --------------------//
+	ds->sliceDsvHandles.resize(arraySize);
+	for (uint32_t slice = 0; slice < arraySize; ++slice) {
+		D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
+		dsvDesc.Format = format;
+		dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
+		dsvDesc.Texture2DArray.MipSlice = 0;
+		dsvDesc.Texture2DArray.FirstArraySlice = slice;
+		dsvDesc.Texture2DArray.ArraySize = 1;
+
+		D3D12_CPU_DESCRIPTOR_HANDLE handle = CD3DX12_CPU_DESCRIPTOR_HANDLE(
+			heap_->GetCPUDescriptorHandleForHeapStart(),
+			currentIndex_ + slice,
+			descriptorSize_
+		);
+
+		deviceManager_->GetDevice()->CreateDepthStencilView(
+			ds->resource.Get(), &dsvDesc, handle);
+
+		ds->sliceDsvHandles[slice] = handle;
+	}
+	// [0] を代表 DSV としても保持
+	ds->dsvHandle = ds->sliceDsvHandles[0];
+
+	//-------------------- 配列 SRV 作成（必要な場合） --------------------//
+	if (createSRV) {
+		ds->srvIndex = SrvManager::GetInstance()->Allocate();
+
+		SrvManager::GetInstance()->CreateSRVforDepthArray(
+			ds->srvIndex, ds->resource.Get(), arraySize);
+
+		ds->srvHandleCPU = SrvManager::GetInstance()->GetCPUDescriptorHandle(ds->srvIndex);
+		ds->srvHandleGPU = SrvManager::GetInstance()->GetGPUDescriptorHandle(ds->srvIndex);
+	}
+
+	//-------------------- 管理配列に登録 --------------------//
+	uint32_t index = static_cast<uint32_t>(depthStencils_.size());
+	depthStencils_.push_back(std::move(ds));
+	nameToIndex_[name] = index;
+	currentIndex_ += arraySize;
+
+	return index;
+}
+
+/// <summary>
 /// 指定インデックスの深度をクリア
 /// </summary>
 void DsvManager::Clear(
@@ -129,6 +205,30 @@ void DsvManager::Clear(
 	assert(it != nameToIndex_.end());
 
 	Clear(it->second, commandList, flags);
+}
+
+/// <summary>
+/// Texture2DArray の特定スライスをクリア
+/// </summary>
+void DsvManager::ClearSlice(
+	const std::string& name,
+	uint32_t slice,
+	ID3D12GraphicsCommandList* commandList,
+	D3D12_CLEAR_FLAGS flags)
+{
+	auto it = nameToIndex_.find(name);
+	assert(it != nameToIndex_.end());
+	const auto& ds = depthStencils_[it->second];
+	assert(slice < ds->sliceDsvHandles.size());
+
+	commandList->ClearDepthStencilView(
+		ds->sliceDsvHandles[slice],
+		flags,
+		ds->clearDepth,
+		ds->clearStencil,
+		0,
+		nullptr
+	);
 }
 
 /// <summary>
@@ -216,6 +316,18 @@ D3D12_CPU_DESCRIPTOR_HANDLE DsvManager::GetHandle(const std::string& name) const
 }
 
 /// <summary>
+/// Texture2DArray のスライス DSV ハンドル取得
+/// </summary>
+D3D12_CPU_DESCRIPTOR_HANDLE DsvManager::GetSliceHandle(const std::string& name, uint32_t slice) const
+{
+	auto it = nameToIndex_.find(name);
+	assert(it != nameToIndex_.end());
+	const auto& ds = depthStencils_[it->second];
+	assert(slice < ds->sliceDsvHandles.size());
+	return ds->sliceDsvHandles[slice];
+}
+
+/// <summary>
 /// DSV ディスクリプタヒープの作成
 /// </summary>
 void DsvManager::CreateHeap(uint32_t maxCount)
@@ -238,13 +350,13 @@ void DsvManager::CreateHeap(uint32_t maxCount)
 /// DepthStencil リソースの作成
 /// </summary>
 Microsoft::WRL::ComPtr<ID3D12Resource>
-DsvManager::CreateDepthStencilTextureResource(uint32_t width, uint32_t height, DXGI_FORMAT format)
+DsvManager::CreateDepthStencilTextureResource(uint32_t width, uint32_t height, DXGI_FORMAT format, uint32_t arraySize)
 {
 	D3D12_RESOURCE_DESC desc{};
 	desc.Width = width;
 	desc.Height = height;
 	desc.MipLevels = 1;
-	desc.DepthOrArraySize = 1;
+	desc.DepthOrArraySize = static_cast<UINT16>(arraySize);
 	desc.Format = format;
 	desc.SampleDesc.Count = 1;
 	desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;

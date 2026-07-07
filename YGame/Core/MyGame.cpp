@@ -20,6 +20,8 @@
 #include "Particle/YEmitterGroupManager.h"
 #include "Vfx/VfxMesh/Runtime/VfxMeshSpawner.h"
 #include "Composite/CompositeEffectManager.h"
+#include "LightManager/LightManager.h"
+#include "DsvManager.h"
 /// <summary>
 /// ゲーム全体の初期化処理（起動時に一度だけ実行）
 /// </summary>
@@ -197,8 +199,13 @@ void MyGame::Draw() {
 	//------------------------------------------------------------
 	// オフスクリーン描画
 	//------------------------------------------------------------
-	dxCommon_->PreDrawShadow();
-	SceneManager::GetInstance()->DrawShadow();
+	// カスケードシャドウ：カスケードごとにスライスをクリアしてシーンを影描画する。
+	// SetCurrentCascade で影パスの gLight（ShadowDrawPreference / InstancedObject3d が読む）を切り替える。
+	for (uint32_t cascade = 0; cascade < DsvManager::kShadowCascadeCount; ++cascade) {
+		YoRigine::LightManager::GetInstance()->SetCurrentCascade(cascade);
+		dxCommon_->PreDrawShadow(cascade);
+		SceneManager::GetInstance()->DrawShadow();
+	}
 	dxCommon_->PreDrawOffScreen();
 	dxCommon_->GetSrvManager()->PreDraw();
 
