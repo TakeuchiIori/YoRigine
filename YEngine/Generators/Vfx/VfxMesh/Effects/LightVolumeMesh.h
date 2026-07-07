@@ -30,7 +30,10 @@ struct LightVolumeParamsCB
     float noiseTiling;
     float noiseStrength;
     float time;
-    float _pad[3];
+    float beamStrength;
+    float beamRadius;
+    float beamPower;
+    float beamGlow;
 };
 
 class LightVolumeMesh : public ProceduralMeshBase
@@ -74,10 +77,10 @@ public:
     const LightVolumeEffectParam& GetParam() const { return param_; }
 
 private:
-    // OBB の 6 面 (各面 = 2 三角形 = 4 頂点 + 縮退) を生成
+    // OBB の 6 面 (各面 = 2 三角形) を生成
     void RebuildVertices();
 
-    // 1 面分 (4 頂点) を vertices_ に追加するヘルパー
+    // 1 面分 (4 隅 → 6 頂点) を vertices_ に追加するヘルパー
     // @param corners  面の 4 隅ワールド座標 (時計回り)
     // @param uvZ      Z 方向の正規化距離 (age として渡す)
     void AppendFace(const Vector3 corners[4],

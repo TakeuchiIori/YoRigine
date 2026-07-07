@@ -1,7 +1,41 @@
 {
     "motions": [],
     "name": "WayPoint",
-    "subEffects": [],
+    "subEffects": [
+        {
+            "enabled": true,
+            "label": "",
+            "lightVolume": {
+                "beamGlow": 4.349999904632568,
+                "beamPower": 0.10000000149011612,
+                "beamRadius": 1.5,
+                "beamStrength": 1.0,
+                "color": {
+                    "w": 1.0,
+                    "x": 1.0,
+                    "y": 0.9019607901573181,
+                    "z": 0.0
+                },
+                "depthFade": 50.0,
+                "edgeFade": 0.0010000000474974513,
+                "halfExtents": {
+                    "x": 1.0,
+                    "y": 50.0,
+                    "z": 1.0
+                },
+                "intensity": 0.7300000190734863,
+                "isEnable": true,
+                "noiseStrength": 0.0,
+                "noiseTiling": 0.009999999776482582
+            },
+            "offset": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "type": 0
+        }
+    ],
     "trail": {
         "arcAngleDeg": 120.0,
         "blendMode": 2,
@@ -77,5 +111,5 @@
         "widthWaveAmp": 0.05000000074505806,
         "widthWaveFreq": 8.0
     },
-    "useTrail": true
+    "useTrail": false
 }

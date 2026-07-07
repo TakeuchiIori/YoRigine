@@ -6,7 +6,7 @@
 
 namespace YoRigine {
 
-// 頂点数: 6面 × 4頂点 + 縮退三角形 (面間接続) = 最大 6*4 + 5*2 = 34
+// 頂点数: 6面 × 2三角形 × 3頂点 = 36
 // 余裕を持って 64 で確保
 static constexpr size_t kVolumeInitialCapacity = 64;
 
@@ -99,54 +99,45 @@ void LightVolumeMesh::RebuildVertices()
     const Vector4& col = param_.color;
 
     // --- 6面を AppendFace で追加 ---
-    // age (uvZ) には各面の「Z 方向からの距離」を渡す
-    // シェーダーが fadeZ 計算に使う
+    // age (uvZ) はシェーダーの Z フェードに使う。
+    // 1.0 は完全にフェードアウトするため、箱の面自体は内部値として扱う。
+    constexpr float kFaceUvZ = 0.5f;
 
     // Front face (z = +1)
-    { Vector3 c[4] = { Pnnp, Ppnp, Pnpp, Pppp }; AppendFace(c, col, 1.f); }
+    { Vector3 c[4] = { Pnnp, Ppnp, Pnpp, Pppp }; AppendFace(c, col, kFaceUvZ); }
     // Back face  (z = -1)
-    { Vector3 c[4] = { Ppnn, Pnnn, Pppn, Pnpn }; AppendFace(c, col, 1.f); }
+    { Vector3 c[4] = { Ppnn, Pnnn, Pppn, Pnpn }; AppendFace(c, col, kFaceUvZ); }
     // Left face  (x = -1)
-    { Vector3 c[4] = { Pnnn, Pnnp, Pnpn, Pnpp }; AppendFace(c, col, 0.5f); }
+    { Vector3 c[4] = { Pnnn, Pnnp, Pnpn, Pnpp }; AppendFace(c, col, kFaceUvZ); }
     // Right face (x = +1)
-    { Vector3 c[4] = { Ppnp, Ppnn, Pppp, Pppn }; AppendFace(c, col, 0.5f); }
+    { Vector3 c[4] = { Ppnp, Ppnn, Pppp, Pppn }; AppendFace(c, col, kFaceUvZ); }
     // Bottom face (y = -1)
-    { Vector3 c[4] = { Pnnn, Ppnn, Pnnp, Ppnp }; AppendFace(c, col, 0.5f); }
+    { Vector3 c[4] = { Pnnn, Ppnn, Pnnp, Ppnp }; AppendFace(c, col, kFaceUvZ); }
     // Top face   (y = +1)
-    { Vector3 c[4] = { Pnpn, Pnpp, Pppn, Pppp }; AppendFace(c, col, 0.5f); }
+    { Vector3 c[4] = { Pnpn, Pnpp, Pppn, Pppp }; AppendFace(c, col, kFaceUvZ); }
 
     UploadVertices(vertices_);
 }
 
 // -----------------------------------------------------------
-// 1面 (TriangleStrip 向け 4 頂点) を追加
+// 1面 (TriangleList 向け 6 頂点) を追加
 //   corners[0]=左下, [1]=右下, [2]=左上, [3]=右上
 // -----------------------------------------------------------
 void LightVolumeMesh::AppendFace(const Vector3 corners[4],
                                   const Vector4& color,
                                   float          uvZ)
 {
-    // 縮退三角形で前の面と接続 (vertices_ が空でなければ)
-    if (!vertices_.empty()) {
-        vertices_.push_back(vertices_.back());       // 前の末尾を複製
-        vertices_.push_back({});                     // ダミー (次の先頭と同じ座標で後ほど上書き)
-    }
-
-    // 4頂点: 左下, 右下, 左上, 右上 → TriangleStrip で 2 三角形
+    // 4隅: 左下, 右下, 左上, 右上
     const Vector2 uvs[4] = { {0,0}, {1,0}, {0,1}, {1,1} };
+    const int indices[6] = { 0, 1, 2, 2, 1, 3 };
 
-    for (int i = 0; i < 4; ++i)
+    for (int idx : indices)
     {
         ProceduralMeshVertex v;
-        v.position = corners[i];
-        v.texcoord = uvs[i];
+        v.position = corners[idx];
+        v.texcoord = uvs[idx];
         v.color    = color;
         v.age      = uvZ;  // シェーダー内で fadeZ として使用
-
-        if (!vertices_.empty() && i == 0) {
-            // 縮退の末尾ダミーをここで上書き
-            vertices_.back() = v;
-        }
         vertices_.push_back(v);
     }
 }
@@ -157,11 +148,11 @@ void LightVolumeMesh::Draw(ID3D12GraphicsCommandList* cmdList)
     if (!isVisible_ || !param_.isEnable) return;
 
     const uint32_t vertCount = GetVertexCount();
-    if (vertCount < 4) return;
+    if (vertCount < 3) return;
 
     // PSO / CBV は呼び出し元でセット済みを前提
 
-    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     BindVertexBuffer(cmdList);
     cmdList->DrawInstanced(vertCount, 1, 0, 0);
 }

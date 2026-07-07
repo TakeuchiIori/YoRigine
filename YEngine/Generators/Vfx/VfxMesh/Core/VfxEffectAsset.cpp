@@ -243,14 +243,30 @@ namespace YoRigine {
     namespace {
 
         void ToJson(json& j, const LightVolumeEffectParam& p) {
-            j["halfExtents"] = p.halfExtents;
-            j["color"]       = p.color;
-            j["intensity"]   = p.intensity;
-            j["isEnable"]    = p.isEnable;
+            j["halfExtents"]   = p.halfExtents;
+            j["color"]         = p.color;
+            j["intensity"]     = p.intensity;
+            j["edgeFade"]      = p.edgeFade;
+            j["depthFade"]     = p.depthFade;
+            j["noiseTiling"]   = p.noiseTiling;
+            j["noiseStrength"] = p.noiseStrength;
+            j["beamStrength"]  = p.beamStrength;
+            j["beamRadius"]    = p.beamRadius;
+            j["beamPower"]     = p.beamPower;
+            j["beamGlow"]      = p.beamGlow;
+            j["isEnable"]      = p.isEnable;
         }
         void FromJson(const json& j, LightVolumeEffectParam& p) {
-            p.intensity = j.value("intensity", p.intensity);
-            p.isEnable  = j.value("isEnable",  p.isEnable);
+            p.intensity     = j.value("intensity",     p.intensity);
+            p.edgeFade      = j.value("edgeFade",      p.edgeFade);
+            p.depthFade     = j.value("depthFade",     p.depthFade);
+            p.noiseTiling   = j.value("noiseTiling",   p.noiseTiling);
+            p.noiseStrength = j.value("noiseStrength", p.noiseStrength);
+            p.beamStrength  = j.value("beamStrength",  p.beamStrength);
+            p.beamRadius    = j.value("beamRadius",    p.beamRadius);
+            p.beamPower     = j.value("beamPower",     p.beamPower);
+            p.beamGlow      = j.value("beamGlow",      p.beamGlow);
+            p.isEnable      = j.value("isEnable",      p.isEnable);
             if (j.contains("halfExtents")) p.halfExtents = j["halfExtents"];
             if (j.contains("color"))       p.color       = j["color"];
         }

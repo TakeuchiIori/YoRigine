@@ -385,11 +385,15 @@ namespace YoRigine {
                     cb.color[1] = lv.color.y * sub.tint.y;
                     cb.color[2] = lv.color.z * sub.tint.z;
                     cb.color[3] = lv.color.w * lv.intensity * sub.tint.w;
-                    cb.edgeFade = 0.15f;
-                    cb.depthFade = 1.0f;
-                    cb.noiseTiling = 2.0f;
-                    cb.noiseStrength = 0.0f;
+                    cb.edgeFade = lv.edgeFade;
+                    cb.depthFade = lv.depthFade;
+                    cb.noiseTiling = lv.noiseTiling;
+                    cb.noiseStrength = lv.noiseStrength;
                     cb.time = previewTimer_;
+                    cb.beamStrength = lv.beamStrength;
+                    cb.beamRadius = lv.beamRadius;
+                    cb.beamPower = lv.beamPower;
+                    cb.beamGlow = lv.beamGlow;
 
                     const auto& idx = pm->GetParameterIndices("VfxMeshVolume");
                     cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshVolume"));
@@ -915,6 +919,28 @@ namespace YoRigine {
             c |= ImGui::ColorEdit4("ボリュームカラー##vc", &lv.color.x);
             c |= ImGui::SliderFloat("輝度##inten", &lv.intensity, 0.f, 10.f, "%.2f");
             if (c) CommitChange(b, "Volume カラー");
+        }
+
+        ImGui::SeparatorText("フェード / ノイズ");
+        {
+            VfxEffectAsset b = sel->asset;
+            bool c = false;
+            c |= ImGui::SliderFloat("エッジフェード##lvedge", &lv.edgeFade, 0.001f, 0.5f, "%.3f");
+            c |= ImGui::DragFloat("近接フェード距離##lvdepth", &lv.depthFade, 0.05f, 0.001f, 50.0f, "%.2f");
+            c |= ImGui::DragFloat("ノイズ細かさ##lvnoiseTile", &lv.noiseTiling, 0.05f, 0.01f, 50.0f, "%.2f");
+            c |= ImGui::SliderFloat("ノイズ強度##lvnoiseStr", &lv.noiseStrength, 0.0f, 1.0f, "%.2f");
+            if (c) CommitChange(b, "Volume フェード/ノイズ");
+        }
+
+        ImGui::SeparatorText("ビーム");
+        {
+            VfxEffectAsset b = sel->asset;
+            bool c = false;
+            c |= ImGui::SliderFloat("ビーム強度##lvbeamStr", &lv.beamStrength, 0.0f, 1.0f, "%.2f");
+            c |= ImGui::SliderFloat("ビーム半径##lvbeamRadius", &lv.beamRadius, 0.01f, 1.5f, "%.2f");
+            c |= ImGui::DragFloat("ビーム鋭さ##lvbeamPower", &lv.beamPower, 0.05f, 0.1f, 12.0f, "%.2f");
+            c |= ImGui::DragFloat("ビーム発光##lvbeamGlow", &lv.beamGlow, 0.05f, 0.0f, 10.0f, "%.2f");
+            if (c) CommitChange(b, "Volume ビーム");
         }
 
         ImGui::Spacing();

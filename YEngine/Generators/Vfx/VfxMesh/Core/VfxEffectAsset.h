@@ -140,13 +140,21 @@ namespace YoRigine {
     };
 
     // -------------------------------------------------------
-    // LightVolume パラメータ (変更なし)
+    // LightVolume パラメータ
     // -------------------------------------------------------
     struct LightVolumeEffectParam
     {
         Vector3 halfExtents  = { 2.f, 1.5f, 5.f };
         Vector4 color        = { 1.f, 0.9f, 0.f, 0.15f };
         float   intensity    = 1.0f;
+        float   edgeFade     = 0.15f;
+        float   depthFade    = 1.0f;
+        float   noiseTiling  = 2.0f;
+        float   noiseStrength = 0.0f;
+        float   beamStrength = 0.0f;
+        float   beamRadius   = 0.35f;
+        float   beamPower    = 2.0f;
+        float   beamGlow     = 1.0f;
         bool    isEnable     = true;
     };
 

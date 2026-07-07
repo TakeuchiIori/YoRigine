@@ -53,14 +53,23 @@ PixelShaderOutput main(VertexShaderOutput input)
     float centerGlow = pow(centerX * centerY * centerZ, 1.5f);
 
     //--------------------------------------------------
+    // ビーム: 中心の芯を強く、外側を柔らかく落とす
+    //--------------------------------------------------
+    float2 beamUV = texcoord * 2.0f - 1.0f;
+    float  beamR  = length(beamUV);
+    float  beamRadius = max(gMeshParam.beamRadius, 0.001f);
+    float  beamCore = pow(saturate(1.0f - beamR / beamRadius), max(gMeshParam.beamPower, 0.001f));
+    float  beamMask = lerp(1.0f, beamCore, saturate(gMeshParam.beamStrength));
+
+    //--------------------------------------------------
     // 最終カラー合成
     // 加算ブレンドなので alpha を rgb に乗じて出力
     //--------------------------------------------------
     float4 baseColor = gMeshParam.color * input.color;
     float  intensity = baseColor.a * gMeshParam.color.a;
 
-    float3 color = baseColor.rgb * (1.0f + centerGlow);
-    float  alpha = intensity * shapeFade * depthFade * noiseMask;
+    float3 color = baseColor.rgb * (1.0f + centerGlow + beamCore * gMeshParam.beamGlow * gMeshParam.beamStrength);
+    float  alpha = intensity * shapeFade * depthFade * noiseMask * beamMask;
 
     output.color = float4(color * alpha, alpha);
     return output;

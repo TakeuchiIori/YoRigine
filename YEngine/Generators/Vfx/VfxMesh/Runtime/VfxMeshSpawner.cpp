@@ -415,11 +415,15 @@ void VfxMeshSpawner::DrawEffect(ActiveEffect& fx)
                 cb.color[1] = lv.color.y * sub.tint.y;
                 cb.color[2] = lv.color.z * sub.tint.z;
                 cb.color[3] = lv.color.w * lv.intensity * sub.tint.w;
-                cb.edgeFade      = 0.15f;
-                cb.depthFade     = 1.0f;
-                cb.noiseTiling   = 2.0f;
-                cb.noiseStrength = 0.0f;
+                cb.edgeFade      = lv.edgeFade;
+                cb.depthFade     = lv.depthFade;
+                cb.noiseTiling   = lv.noiseTiling;
+                cb.noiseStrength = lv.noiseStrength;
                 cb.time          = fx.age;
+                cb.beamStrength  = lv.beamStrength;
+                cb.beamRadius    = lv.beamRadius;
+                cb.beamPower     = lv.beamPower;
+                cb.beamGlow      = lv.beamGlow;
 
                 const auto& idx = pm->GetParameterIndices("VfxMeshVolume");
                 cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshVolume"));

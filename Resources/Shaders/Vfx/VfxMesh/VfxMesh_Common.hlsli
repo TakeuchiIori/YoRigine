@@ -101,7 +101,10 @@ struct LightVolumeParams
     float noiseTiling;
     float noiseStrength;
     float time;
-    float3 _pad;
+    float beamStrength;
+    float beamRadius;
+    float beamPower;
+    float beamGlow;
 };
 
 //--------------------------------------------------
