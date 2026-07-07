@@ -176,8 +176,15 @@ void VfxMeshSpawner::InitEffect(ActiveEffect& fx)
             break;
 
         case YoRigine::VfxSubEffectType::LightVolume:
+            sub.lightVolume = std::make_unique<YoRigine::LightVolumeMesh>();
+            sub.lightVolume->Initialize(def.lightVolume);
+            sub.lightVolume->SetTransform(basePos, 0.0f);
+
+            sub.cbRes = dxCommon_->CreateBufferResource(CBSize<YoRigine::LightVolumeParamsCB>());
+            sub.cbRes->Map(0, nullptr, &sub.cbMapped);
+            break;
+
         default:
-            // LightVolume はゲーム内スポナーでは未対応（従来から Editor プレビューのみ）
             continue;
         }
 
@@ -280,6 +287,14 @@ void VfxMeshSpawner::UpdateEffect(ActiveEffect& fx, float dt)
                 sub.shockwave->SetCamera(camera_);
                 sub.shockwave->Drive(s);
                 sub.shockwave->Update(dt);
+            }
+            break;
+
+        case YoRigine::VfxSubEffectType::LightVolume:
+            if (sub.lightVolume) {
+                sub.lightVolume->ApplyParam(def.lightVolume);
+                sub.lightVolume->SetTransform(s.position, 0.0f); // Y軸回転はまだ使わない
+                sub.lightVolume->Update(dt);
             }
             break;
 
@@ -388,6 +403,30 @@ void VfxMeshSpawner::DrawEffect(ActiveEffect& fx)
                 cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"),    camAddr);
                 cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), sub.cbRes->GetGPUVirtualAddress());
                 sub.shockwave->Draw(cmdList);
+            }
+            break;
+
+        case YoRigine::VfxSubEffectType::LightVolume:
+            if (sub.lightVolume) {
+                const auto& lv = def.lightVolume;
+                auto& cb = *static_cast<YoRigine::LightVolumeParamsCB*>(sub.cbMapped);
+                // Editor プレビュー(VfxMeshEditor)の LightVolume と同じ CB 構成
+                cb.color[0] = lv.color.x * sub.tint.x;
+                cb.color[1] = lv.color.y * sub.tint.y;
+                cb.color[2] = lv.color.z * sub.tint.z;
+                cb.color[3] = lv.color.w * lv.intensity * sub.tint.w;
+                cb.edgeFade      = 0.15f;
+                cb.depthFade     = 1.0f;
+                cb.noiseTiling   = 2.0f;
+                cb.noiseStrength = 0.0f;
+                cb.time          = fx.age;
+
+                const auto& idx = pm->GetParameterIndices("VfxMeshVolume");
+                cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshVolume"));
+                cmdList->SetPipelineState(pm->GetPipeLineStateObject("VfxMeshVolume"));
+                cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"),    camAddr);
+                cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), sub.cbRes->GetGPUVirtualAddress());
+                sub.lightVolume->Draw(cmdList);
             }
             break;
 

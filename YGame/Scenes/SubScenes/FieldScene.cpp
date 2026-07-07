@@ -14,6 +14,7 @@
 #include "Collision/AreaCollision/Base/AreaManager.h"
 #include <ModelManipulator/ModelManipulator.h>
 #include "Collision/AreaCollision/Base/AreaEditor.h"
+#include "Trigger/WaypointManager.h"
 
 #ifdef USE_IMGUI
 #include "imgui.h"
@@ -94,10 +95,11 @@ void FieldScene::Initialize(Camera* camera, Player* player) {
 		HandleDetailedEncounter(encounterInfo);
 		});
 
-	// FieldEnemyManager の撃破コールバックを全 OpenGateAction にディスパッチ
+	// FieldEnemyManager の撃破コールバックを全トリガーアクションへディスパッチ。
+	// OpenGate / Waypoint など NotifyEnemyDefeated をオーバーライドした系が反応する。
 	fieldEnemyManager_->SetOnEnemyDefeatedCallback([this](const std::string& group) {
-		for (auto* act : openGateActions_) {
-			if (act) act->NotifyEnemyDefeated(group);
+		for (auto& trig : eventTriggers_) {
+			if (trig && trig->GetAction()) trig->GetAction()->NotifyEnemyDefeated(group);
 		}
 	});
 
@@ -409,6 +411,8 @@ void FieldScene::OnEnter() {
 	// PlacedObject が LoadScene で作り直されても、cachedTargetId_ は BeginOpening 時に
 	// targetName_ から取り直すので問題ない。
 	if (eventTriggers_.empty()) {
+		// ウェイポイントの登録/現在地/ビーコンを作り直す前にリセット（トリガー再構築に合わせる）。
+		WaypointManager::GetInstance()->Reset();
 		EventTriggerLoader::Load(
 			EventTriggerPaths::Field,
 			sceneCamera_,

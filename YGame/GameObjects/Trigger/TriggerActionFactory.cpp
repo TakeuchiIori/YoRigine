@@ -1,6 +1,7 @@
 #include "TriggerActionFactory.h"
 
 #include "Actions/OpenGateAction.h"
+#include "Actions/WaypointAction.h"
 #include "Debugger/Logger.h"
 
 std::unique_ptr<TriggerAction> TriggerActionFactory::Create(const nlohmann::json& actionJson) {
@@ -48,6 +49,19 @@ std::unique_ptr<TriggerAction> TriggerActionFactory::Create(const nlohmann::json
 				readVec3("closedScale",    { 1.0f, 1.0f, 1.0f }));
 		}
 
+		return action;
+	}
+
+	if (type == "Waypoint") {
+		const std::string beaconEffect  = actionJson.value("beaconEffect",  std::string{});
+		const std::string requiredGroup = actionJson.value("requiredGroup", std::string{});
+		const int         requiredCount = actionJson.value("requiredCount", 1);
+		const std::string nextWaypoint  = actionJson.value("nextWaypoint",  std::string{});
+		const bool        startActive   = actionJson.value("startActive",   false);
+
+		auto action = std::make_unique<WaypointAction>(
+			beaconEffect, requiredGroup, requiredCount, nextWaypoint, startActive);
+		action->SetBeaconScale(actionJson.value("beaconScale", 1.0f));
 		return action;
 	}
 

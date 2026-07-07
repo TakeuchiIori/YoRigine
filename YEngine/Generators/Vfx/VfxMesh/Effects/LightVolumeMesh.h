@@ -20,6 +20,19 @@
 
 namespace YoRigine {
 
+// シェーダ b1: gMeshParam（VfxMesh_Volume.hlsli の LightVolumeParams と一致）。
+// Editor / ランタイム Spawner の両方から使うので Mesh 側ヘッダに置く。
+struct LightVolumeParamsCB
+{
+    float color[4];
+    float edgeFade;
+    float depthFade;
+    float noiseTiling;
+    float noiseStrength;
+    float time;
+    float _pad[3];
+};
+
 class LightVolumeMesh : public ProceduralMeshBase
 {
 public:

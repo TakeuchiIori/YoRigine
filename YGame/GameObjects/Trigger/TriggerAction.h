@@ -29,6 +29,10 @@ public:
 	virtual void OnTriggerStay (BaseCollider* /*other*/) {}
 	virtual void OnTriggerExit (BaseCollider* /*other*/) {}
 
+	// 敵グループ撃破通知。FieldScene の撃破コールバックから全アクションへ配られる。
+	// 撃破条件で進行する系（OpenGate / Waypoint 等）がオーバーライドする。
+	virtual void NotifyEnemyDefeated(const std::string& /*group*/) {}
+
 	// シリアライズ用: 自身を JSON ("action" ノード相当) に書き出す。"type" を必ず含めること。
 	virtual nlohmann::json SerializeToJson() const = 0;
 

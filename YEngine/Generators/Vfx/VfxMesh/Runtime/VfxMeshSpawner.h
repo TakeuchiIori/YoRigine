@@ -94,6 +94,7 @@ private:
         std::unique_ptr<YoRigine::VolumeSmokeMesh> smoke;
         std::unique_ptr<YoRigine::LightningMesh>   lightning;
         std::unique_ptr<YoRigine::ShockwaveMesh>   shockwave;
+        std::unique_ptr<YoRigine::LightVolumeMesh> lightVolume;
 
         // CB リソース（インスタンス独立。実型は def->type で決まる）
         Microsoft::WRL::ComPtr<ID3D12Resource> cbRes;

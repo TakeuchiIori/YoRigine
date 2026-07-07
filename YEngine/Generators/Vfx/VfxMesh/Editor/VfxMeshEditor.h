@@ -35,16 +35,8 @@ namespace YoRigine {
         bool           isDirty = false;
     };
 
-    struct LightVolumeParamsCB
-    {
-        float color[4];
-        float edgeFade;
-        float depthFade;
-        float noiseTiling;
-        float noiseStrength;
-        float time;
-        float _pad[3];
-    };
+    // LightVolumeParamsCB は LightVolumeMesh.h（YoRigine 名前空間）へ移設。
+    // Editor / ランタイム Spawner の両方から使うため。
 
     enum class VfxPreset : int
     {
