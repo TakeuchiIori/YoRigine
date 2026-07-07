@@ -381,7 +381,7 @@ void BattleScene::StartBattle(const BattleTransitionData& data) {
 	}
 
 	// フォーメーション設定
-	if (!data.battleFormation.empty() && battleEnemyManager_) {
+	if (!data.battleFormation.empty() && data.battleFormation != "default" && battleEnemyManager_) {
 		auto formation = battleEnemyManager_->GetFormation(data.battleFormation);
 		if (!formation.positions.empty()) {
 			encounter.formations = formation.positions;

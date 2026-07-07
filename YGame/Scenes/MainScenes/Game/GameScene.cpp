@@ -234,6 +234,7 @@ void GameScene::Update() {
 	if (subSceneManager_) {
 		cameraMode_ = subSceneManager_->GetCameraMode();
 	}
+	UpdateDebugCameraTimePause();
 
 	//------------------------------------------------------------
 	// スティック入力・ロックオンを確定
@@ -417,7 +418,7 @@ void GameScene::UpdateCamera() {
 	auto director = CameraDirector::GetInstance();
 
 
-	if (YoRigine::GameTime::IsPause()) {
+	if (YoRigine::GameTime::IsPause() && cameraMode_ != CameraMode::DEBUG) {
 		return;
 	}
 
@@ -452,24 +453,17 @@ void GameScene::UpdateCamera() {
 # ifdef _DEBUG	
 	YoRigine::Input* input = YoRigine::Input::GetInstance();
 	if (input->TriggerKey(DIK_F3)) {
-		isDebugCamera_ = !isDebugCamera_;
-		if (isDebugCamera_) {
-			// デバッグカメラを最優先に
-			cameraMode_ = CameraMode::DEBUG;
-			CameraDirector::GetInstance()->SetEnableBlending(false);
-		}
-		else {
-			// 通常のフォローカメラを優先に
-			cameraMode_ = CameraMode::FOLLOW;
-			CameraDirector::GetInstance()->SetEnableBlending(false);
-		}
+		SetDebugCameraActive(!isDebugCamera_);
 	}
 #endif
 
 	//------------------------------------------------------------
 	// Directorの更新（VirtualCameraの計算 ＋ ブレンド処理）
 	//------------------------------------------------------------
-	director->Update(YoRigine::GameTime::GetDeltaTime());
+	const float cameraDt = (cameraMode_ == CameraMode::DEBUG)
+		? YoRigine::GameTime::GetUnscaledDeltaTime()
+		: YoRigine::GameTime::GetDeltaTime();
+	director->Update(cameraDt);
 
 	//------------------------------------------------------------
 	// 出力用カメラ(sceneCamera_)への同期
@@ -491,16 +485,40 @@ void GameScene::UpdateCamera() {
 void GameScene::UpdateCameraMode() {
 #ifdef USE_IMGUI
 	if (ImGui::Button("Follow Camera")) {
-		cameraMode_ = CameraMode::FOLLOW;
-		CameraDirector::GetInstance()->SetEnableBlending(false);
+		SetDebugCameraActive(false);
 	}
 	if (ImGui::Button("Battle Start Camera")) cameraMode_ = CameraMode::BATTLE_START;
 	if (ImGui::Button("Debug Camera")) {
-		cameraMode_ = CameraMode::DEBUG;
-		CameraDirector::GetInstance()->SetEnableBlending(false);
+		SetDebugCameraActive(true);
 	}
 	if (subSceneManager_) subSceneManager_->SetCameraMode(cameraMode_);
 #endif
+}
+
+void GameScene::UpdateDebugCameraTimePause() {
+	const bool debugActive = (cameraMode_ == CameraMode::DEBUG);
+	isDebugCamera_ = debugActive;
+
+	if (debugActive) {
+		if (!YoRigine::GameTime::IsPause()) {
+			YoRigine::GameTime::Pause();
+			pausedGameTimeForDebugCamera_ = true;
+		}
+		return;
+	}
+
+	if (pausedGameTimeForDebugCamera_) {
+		YoRigine::GameTime::Resume();
+		pausedGameTimeForDebugCamera_ = false;
+	}
+}
+
+void GameScene::SetDebugCameraActive(bool active) {
+	cameraMode_ = active ? CameraMode::DEBUG : CameraMode::FOLLOW;
+	isDebugCamera_ = active;
+	CameraDirector::GetInstance()->SetEnableBlending(false);
+	if (subSceneManager_) subSceneManager_->SetCameraMode(cameraMode_);
+	UpdateDebugCameraTimePause();
 }
 
 /// <summary>
@@ -531,6 +549,7 @@ void GameScene::HandleRetry() {
 	}
 
 	isDebugCamera_ = false;
+	pausedGameTimeForDebugCamera_ = false;
 	//auto director = CameraDirector::GetInstance();
 	//director->SetPriority("MainDebug", 0);
 	//director->SetPriority("PlayerFollow", 10);
@@ -547,6 +566,11 @@ void GameScene::HandleRetry() {
 void GameScene::HandleReturnToTitle() {
 	Logger("[GameScene] Return to Title requested\n");
 
+	if (pausedGameTimeForDebugCamera_) {
+		YoRigine::GameTime::Resume();
+		pausedGameTimeForDebugCamera_ = false;
+	}
+
 	// タイトルシーンへ遷移
 	SceneManager::GetInstance()->ChangeScene("Title");
 	Logger("[GameScene] Changing to Title Scene\n");
@@ -558,6 +582,11 @@ void GameScene::HandleReturnToTitle() {
 void GameScene::HandleGameClear() {
 	Logger("[GameScene] Game Clear! All enemies defeated!\n");
 
+	if (pausedGameTimeForDebugCamera_) {
+		YoRigine::GameTime::Resume();
+		pausedGameTimeForDebugCamera_ = false;
+	}
+
 	// クリアシーンへ遷移
 	SceneManager::GetInstance()->ChangeScene("Clear");
 	Logger("[GameScene] Changing to Clear Scene\n");
@@ -567,6 +596,10 @@ void GameScene::HandleGameClear() {
 /// 終了処理
 /// </summary>
 void GameScene::Finalize() {
+	if (pausedGameTimeForDebugCamera_) {
+		YoRigine::GameTime::Resume();
+		pausedGameTimeForDebugCamera_ = false;
+	}
 	YoRigine::JsonManager::ClearSceneInstances("GameScene");
 	if (subSceneManager_) subSceneManager_->Finalize();
 	subSceneManager_ = nullptr;

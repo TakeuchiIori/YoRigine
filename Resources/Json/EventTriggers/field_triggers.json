@@ -34,7 +34,7 @@
           0.0,
           0.0
         ],
-        "requiredCount": 3,
+        "requiredCount": 1,
         "requiredGroup": "",
         "targetName": "TestGate1",
         "type": "OpenGate"
@@ -90,7 +90,7 @@
           0.0,
           0.0
         ],
-        "requiredCount": 3,
+        "requiredCount": 1,
         "requiredGroup": "",
         "targetName": "TestGate2",
         "type": "OpenGate"
@@ -146,7 +146,7 @@
           0.0,
           0.0
         ],
-        "requiredCount": 5,
+        "requiredCount": 3,
         "requiredGroup": "",
         "targetName": "TestGate3",
         "type": "OpenGate"
@@ -202,7 +202,7 @@
           0.0,
           0.0
         ],
-        "requiredCount": 5,
+        "requiredCount": 3,
         "requiredGroup": "",
         "targetName": "TestGate4",
         "type": "OpenGate"
