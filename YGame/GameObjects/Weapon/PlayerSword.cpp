@@ -11,6 +11,29 @@
 #include "imgui.h"
 #endif
 
+namespace {
+Matrix4x4 RemoveScaleFromMatrix(const Matrix4x4& matrix) {
+	Matrix4x4 result = matrix;
+
+	for (int row = 0; row < 3; ++row) {
+		Vector3 axis{
+			result.m[row][0],
+			result.m[row][1],
+			result.m[row][2]
+		};
+
+		const float length = Length(axis);
+		if (length > 0.0001f) {
+			result.m[row][0] /= length;
+			result.m[row][1] /= length;
+			result.m[row][2] /= length;
+		}
+	}
+
+	return result;
+}
+}
+
 
 // ============================================================
 // 初期化処理
@@ -24,8 +47,6 @@ void PlayerSword::Initialize(Camera* camera) {
 	obj_ = std::make_unique<Object3d>();
 	obj_->Initialize();
 	obj_->SetModel("Sword_Golden.obj");
-	obj_->SetEnableEnvironment(true);
-	obj_->SetEnvironmentCoefficient(1.0f);
 	wt_.Initialize();
 	colliderWT_.Initialize();
 
@@ -33,14 +54,7 @@ void PlayerSword::Initialize(Camera* camera) {
 	// プレイヤーの手ジョイントを探索し、剣を接続
 	// ------------------------------------------------------------
 	FindHandJointIndex();
-	if (isValidJoint_) {
-		WorldTransform& handWT = obj3d_
-			->GetModel()
-			->GetSkeleton()
-			->GetJoints()[handleIndex_]
-			.GetWorldTransform();
-		wt_.parent_ = &handWT;
-	}
+	wt_.parent_ = nullptr;
 
 	// ------------------------------------------------------------
 	// コライダー・Json初期化
@@ -124,7 +138,16 @@ void PlayerSword::SetPlayerWeaponPosition() {
 	wt_.translate_ = offsetPos_;
 	wt_.rotate_ = offsetRot_;
 	wt_.scale_ = offsetScale_;
-	wt_.UpdateMatrix();
+
+	WorldTransform& handWT = obj3d_
+		->GetModel()
+		->GetSkeleton()
+		->GetJoints()[handleIndex_]
+		.GetWorldTransform();
+
+	const Matrix4x4 handNoScale = RemoveScaleFromMatrix(handWT.matWorld_);
+	const Matrix4x4 weaponMatrix = MakeAffineMatrix(wt_.scale_, wt_.rotate_, wt_.translate_);
+	wt_.matWorld_ = Multiply(weaponMatrix, handNoScale);
 }
 
 // ============================================================
@@ -133,15 +156,7 @@ void PlayerSword::SetPlayerWeaponPosition() {
 void PlayerSword::UpdateColliderWorldTransform() {
 	if (!obj3d_ || !isValidJoint_) return;
 
-	WorldTransform& handWT = obj3d_
-		->GetModel()
-		->GetSkeleton()
-		->GetJoints()[handleIndex_]
-		.GetWorldTransform();
-
-	Matrix4x4 weaponMatrix = MakeAffineMatrix(wt_.scale_, wt_.rotate_, wt_.translate_);
-
-	finalMatrix_ = Multiply(weaponMatrix, handWT.matWorld_);
+	finalMatrix_ = wt_.matWorld_;
 
 	colliderWT_.matWorld_ = finalMatrix_;
 	colliderWT_.translate_ = ExtractTranslation(finalMatrix_);

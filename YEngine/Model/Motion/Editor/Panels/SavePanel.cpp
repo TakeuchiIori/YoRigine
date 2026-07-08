@@ -4,8 +4,8 @@
 #include "../../Core/Motion.h"
 #include "../../Core/MotionSystem.h"
 
-#include <assimp/Importer.hpp>
-#include <assimp/scene.h>
+#include <fstream>
+#include <json.hpp>
 
 #ifdef USE_IMGUI
 #include <imgui.h>
@@ -328,6 +328,14 @@ void SavePanel::DrawSourceAnimationPopup()
 		if (!canLoad) ImGui::EndDisabled();
 
 		ImGui::SameLine();
+		const bool canLoadAll = !sourceObjectPath_.empty() && !sourceAnimationNames_.empty() && context_->GetTargetObject();
+		if (!canLoadAll) ImGui::BeginDisabled();
+		if (ImGui::Button("全て読み込む", ImVec2(120, 0))) {
+			LoadAllSourceAnimations();
+		}
+		if (!canLoadAll) ImGui::EndDisabled();
+
+		ImGui::SameLine();
 		if (ImGui::Button("閉じる", ImVec2(100, 0))) {
 			context_->showSourceAnimationPopup = false;
 			sourceMsg_ = "";
@@ -440,16 +448,23 @@ void SavePanel::SelectSourceModel(const std::string& path)
 	}
 
 	try {
-		Assimp::Importer importer;
-		const aiScene* scene = importer.ReadFile(readPath.c_str(), 0);
-		if (!scene || scene->mNumAnimations == 0) {
+		std::ifstream file(readPath);
+		if (!file.is_open()) {
+			sourceMsg_ = "ファイルを開けません: " + readPath;
+			return;
+		}
+
+		nlohmann::json gltfJson;
+		file >> gltfJson;
+		if (!gltfJson.contains("animations") || gltfJson["animations"].empty()) {
 			sourceMsg_ = "アニメーションが見つかりません: " + readPath;
 			return;
 		}
 
-		sourceAnimationNames_.reserve(scene->mNumAnimations);
-		for (uint32_t i = 0; i < scene->mNumAnimations; ++i) {
-			std::string name = scene->mAnimations[i]->mName.C_Str();
+		const auto& animations = gltfJson["animations"];
+		sourceAnimationNames_.reserve(animations.size());
+		for (size_t i = 0; i < animations.size(); ++i) {
+			std::string name = animations[i].value("name", "");
 			if (name.empty()) name = "Animation" + std::to_string(i);
 			sourceAnimationNames_.push_back(name);
 		}
@@ -494,6 +509,60 @@ void SavePanel::LoadSourceAnimation()
 	}
 	catch (const std::exception& e) {
 		sourceMsg_ = std::string("読み込み失敗: ") + e.what();
+		context_->statusMsg = sourceMsg_;
+	}
+}
+
+void SavePanel::LoadAllSourceAnimations()
+{
+	try {
+		Object3d* target = context_->GetTargetObject();
+		if (!target || !target->GetModel()) {
+			sourceMsg_ = "一括読み込み失敗: 対象オブジェクトがありません";
+			context_->statusMsg = sourceMsg_;
+			return;
+		}
+		if (sourceAnimationNames_.empty()) {
+			sourceMsg_ = "一括読み込み失敗: アニメーション候補がありません";
+			context_->statusMsg = sourceMsg_;
+			return;
+		}
+
+		const std::string restoreName =
+			sourceAnimationName_.empty() ? sourceAnimationNames_.front() : sourceAnimationName_;
+
+		int loadedCount = 0;
+		for (const auto& name : sourceAnimationNames_) {
+			if (name.empty()) continue;
+			target->SetChangeMotion(sourceObjectPath_, MotionPlayMode::Loop, name);
+			++loadedCount;
+		}
+
+		sourceAnimationName_ = restoreName;
+		target->SetChangeMotion(sourceObjectPath_, MotionPlayMode::Loop, sourceAnimationName_);
+
+		auto* model = target->GetModel();
+		auto* ms = model ? model->GetMotionSystem() : nullptr;
+		if (!ms || !ms->GetAnimation()) {
+			sourceMsg_ = "一括読み込み失敗: MotionSystemに同期できません";
+			context_->statusMsg = sourceMsg_;
+			return;
+		}
+
+		context_->loadFileName = sourceObjectPath_;
+		context_->selectedAnimKey = ToModelFilePathFromObjectPath(sourceObjectPath_) + "#" + sourceAnimationName_;
+		context_->currentMotion = ms->GetAnimation();
+		context_->scrubTime = 0.0f;
+		context_->lastAppliedScrubTime = -1.0f;
+		context_->isPlaying = true;
+		context_->requireTimelineRebuild = true;
+		context_->selKF.Clear();
+
+		sourceMsg_ = "一括読み込み成功: " + std::to_string(loadedCount) + "件";
+		context_->statusMsg = sourceMsg_;
+	}
+	catch (const std::exception& e) {
+		sourceMsg_ = std::string("一括読み込み失敗: ") + e.what();
 		context_->statusMsg = sourceMsg_;
 	}
 }

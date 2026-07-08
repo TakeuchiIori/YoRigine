@@ -30,6 +30,7 @@ private:
 	void LoadBinary(const std::string& path);
 	void SelectSourceModel(const std::string& path);
 	void LoadSourceAnimation();
+	void LoadAllSourceAnimations();
 
 	MotionEditorContext* context_ = nullptr;
 
