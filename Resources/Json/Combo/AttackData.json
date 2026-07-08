@@ -1,6 +1,6 @@
 [
     {
-        "animationName": "Slash8test",
+        "animationName": "Attack1",
         "baseDamage": 30.0,
         "canCancel": true,
         "canChainToAny": true,
@@ -20,7 +20,7 @@
         "inputBufferStart": 7,
         "knockback": 0.0,
         "knockbackDuration": 1.0,
-        "motionSpeed": 2.0,
+        "motionSpeed": 1.0,
         "name": "A1",
         "playCameraWorkName": "A1",
         "shakeDuration": 0.27000001072883606,
@@ -30,7 +30,7 @@
         "type": 0
     },
     {
-        "animationName": "Slash3test",
+        "animationName": "Attack2",
         "baseDamage": 30.0,
         "canCancel": true,
         "canChainToAny": true,
@@ -50,7 +50,7 @@
         "inputBufferStart": 7,
         "knockback": 0.0,
         "knockbackDuration": 1.0,
-        "motionSpeed": 2.0,
+        "motionSpeed": 1.0,
         "name": "A2",
         "playCameraWorkName": "A2",
         "shakeDuration": 0.0,
@@ -60,7 +60,7 @@
         "type": 0
     },
     {
-        "animationName": "Attack2test",
+        "animationName": "Attack3",
         "baseDamage": 30.0,
         "canCancel": true,
         "canChainToAny": true,
@@ -80,7 +80,7 @@
         "inputBufferStart": 9,
         "knockback": 5.0,
         "knockbackDuration": 1.0,
-        "motionSpeed": 1.5,
+        "motionSpeed": 1.0,
         "name": "A3",
         "playCameraWorkName": "A3",
         "shakeDuration": 0.0,
@@ -90,7 +90,7 @@
         "type": 0
     },
     {
-        "animationName": "Slash1test",
+        "animationName": "HeavySlash1",
         "baseDamage": 35.0,
         "canCancel": true,
         "canChainToAny": true,
@@ -110,7 +110,7 @@
         "inputBufferStart": 10,
         "knockback": 1.0,
         "knockbackDuration": 1.0,
-        "motionSpeed": 2.299999952316284,
+        "motionSpeed": 1.0,
         "name": "B1",
         "playCameraWorkName": "B1",
         "shakeDuration": 0.0,
@@ -120,7 +120,7 @@
         "type": 1
     },
     {
-        "animationName": "Slash5test",
+        "animationName": "HeavySlash2",
         "baseDamage": 35.0,
         "canCancel": true,
         "canChainToAny": true,
@@ -140,7 +140,7 @@
         "inputBufferStart": 11,
         "knockback": 2.0,
         "knockbackDuration": 1.0,
-        "motionSpeed": 2.0,
+        "motionSpeed": 1.0,
         "name": "B2",
         "playCameraWorkName": "B2",
         "shakeDuration": 0.0,
@@ -150,7 +150,7 @@
         "type": 1
     },
     {
-        "animationName": "Attack2testReverse",
+        "animationName": "HeavySlash3",
         "baseDamage": 35.0,
         "canCancel": true,
         "canChainToAny": true,
@@ -170,7 +170,7 @@
         "inputBufferStart": 11,
         "knockback": 3.0,
         "knockbackDuration": 1.0,
-        "motionSpeed": 1.25,
+        "motionSpeed": 1.0,
         "name": "B3",
         "playCameraWorkName": "B3",
         "shakeDuration": 0.0,
@@ -180,7 +180,7 @@
         "type": 1
     },
     {
-        "animationName": "Slash2",
+        "animationName": "HeavySlash4",
         "baseDamage": 40.0,
         "canCancel": true,
         "canChainToAny": true,
@@ -200,7 +200,7 @@
         "inputBufferStart": 0,
         "knockback": 5.0,
         "knockbackDuration": 0.5,
-        "motionSpeed": 3.0,
+        "motionSpeed": 1.0,
         "name": "B4",
         "playCameraWorkName": "B4",
         "shakeDuration": 0.0,
@@ -210,7 +210,7 @@
         "type": 1
     },
     {
-        "animationName": "Attack2testMirror",
+        "animationName": "Attack4",
         "baseDamage": 30.0,
         "canCancel": true,
         "canChainToAny": true,
@@ -230,7 +230,7 @@
         "inputBufferStart": 9,
         "knockback": 5.0,
         "knockbackDuration": 0.5,
-        "motionSpeed": 1.5,
+        "motionSpeed": 1.0,
         "name": "A4",
         "playCameraWorkName": "A4",
         "shakeDuration": 0.0,
@@ -240,7 +240,7 @@
         "type": 0
     },
     {
-        "animationName": "Slash4test",
+        "animationName": "Kick1",
         "baseDamage": 30.0,
         "canCancel": true,
         "canChainToAny": true,
@@ -260,7 +260,7 @@
         "inputBufferStart": 8,
         "knockback": 5.0,
         "knockbackDuration": 0.5,
-        "motionSpeed": 1.5,
+        "motionSpeed": 1.0,
         "name": "A5",
         "playCameraWorkName": "A5",
         "shakeDuration": 0.0,
