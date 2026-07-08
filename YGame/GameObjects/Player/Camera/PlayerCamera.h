@@ -95,6 +95,8 @@ public:
         if (followCamera_) followCamera_->SetIdleRecenterSuppressed(v);
     }
     bool IsThreatAwarenessAllowed() const   { return threatAwarenessSceneAllowed_; }
+    void SetThreatTargetPositions(const std::vector<Vector3>& positions) { threatTargetPositions_ = positions; }
+    void ClearThreatTargetPositions() { threatTargetPositions_.clear(); }
 
     // ============================================================
     // 見切れヒット演出
@@ -166,6 +168,7 @@ private:
     void  UpdateThreatAwareness(float dt);                    // pre-director：周辺視グランス
     void  ApplyThreatFovWiden(Camera* sceneCamera, float dt); // post-director：囲まれFOV拡大
     int   GatherNearbyEnemies(std::vector<BaseCollider*>& out) const;
+    int   GatherThreatTargetPositions(std::vector<Vector3>& out) const;
     float ComputeGlanceBias() const;
 
     // 脅威察知パラメータの永続化（FollowCamera の extension JSON に相乗りさせる）
@@ -261,9 +264,6 @@ private:
     // 戦闘中の RB/LB 押しっぱなし回転（yaw）の角速度(rad/s)。JSON: "bumperYawSpeed"
     bool  battleMode_        = false;
     float bumperRotateSpeed_ = 2.6f;
-    // 戦闘中「移動を始めたら背後へ寄せる」自動リセンター用。左スティックの移動状態を追跡。
-    bool  camWasMoving_     = false;   // 前フレームで移動していたか（開始エッジ検出用）
-    float moveRecenterThreshold_ = 0.5f; // 左スティックのこの強さを超えたら「移動中」とみなす
     float camDeadzone_      = 0.18f;  // ラジアルデッドゾーン(0..1)
     float camResponseCurve_ = 2.0f;   // レスポンスカーブ指数(1=線形 / 大きいほど中央が精密)
     float camAccelTime_     = 0.12f;  // 0→最大入力までの加速時間(秒)。0で即時
@@ -286,6 +286,7 @@ private:
     // ============================================================
     bool  threatAwarenessEnabled_      = true;   // 機能マスタースイッチ（デザイナ調整用）
     bool  threatAwarenessSceneAllowed_ = false;  // 現在のシーンで許可されているか（バトル中のみ true）
+    std::vector<Vector3> threatTargetPositions_;  // BattleScene から渡される生存中の敵位置
     float awarenessRange_      = 25.0f;  // この距離内の敵を「気配」対象にする
 
     // ① 周辺視グランス

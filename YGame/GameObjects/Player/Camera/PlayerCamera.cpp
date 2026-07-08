@@ -113,15 +113,13 @@ void PlayerCamera::UpdatePreDirector() {
 
         // RB / LB（フリーカメラ時のみ）:
         //   戦闘中 … 押しっぱなしで左右にカメラを回す（LB=左回り / RB=右回り）。
-        //            正面（背後）へ戻すのは自動（アイドルオートリセンター）に任せる＝ボタンを増やさない。
-        //   非戦闘 … 従来どおり押した瞬間に自機の背後へリセンター。
+        //   非戦闘 … ここでは何もしない。
         if (!isLockOn_) {
             auto* input = YoRigine::Input::GetInstance();
             if (battleMode_) {
-                bool holdingBumper = false;
                 float yawDir = 0.0f;
-                if (input->IsPadPressed(0, GamePadButton::LB)) { yawDir -= 1.0f; holdingBumper = true; } // 左回り
-                if (input->IsPadPressed(0, GamePadButton::RB)) { yawDir += 1.0f; holdingBumper = true; } // 右回り
+                if (input->IsPadPressed(0, GamePadButton::LB)) { yawDir -= 1.0f; } // 左回り
+                if (input->IsPadPressed(0, GamePadButton::RB)) { yawDir += 1.0f; } // 右回り
                 if (yawDir != 0.0f) {
                     // 実時間（スロー中も操作感一定。UpdateStickInput と同じ）
                     const float bumperDt = YoRigine::GameTime::GetUnscaledDeltaTime();
@@ -130,27 +128,6 @@ void PlayerCamera::UpdatePreDirector() {
                     followCamera_->SetRotate(rot);
                     followCamera_->CancelRecenter();     // 手動操作優先（リセンター中なら中断）
                     followCamera_->NotifyCameraActive(); // 回している間はアイドルリセンターを止める
-                }
-
-                // 前進移動を始めたら背後へ寄せる（戦闘中の自動リセンターはこれだけ）。
-                // 立ち止まって好きな方向を見るのは維持しつつ、走り出したら進行方向が見えるようにする。
-                bool movingNow = false;
-                XINPUT_STATE js;
-                if (input->IsControllerConnected() && input->GetJoystickState(0, js)) {
-                    float lx = static_cast<float>(js.Gamepad.sThumbLX) / 32767.0f;
-                    float ly = static_cast<float>(js.Gamepad.sThumbLY) / 32767.0f;
-                    movingNow = (std::sqrt(lx * lx + ly * ly) > moveRecenterThreshold_);
-                }
-                // 「止まっている → 動き出した」瞬間だけ発火。バンパーで回している間は手動優先で発火しない。
-                if (movingNow && !camWasMoving_ && !holdingBumper) {
-                    followCamera_->RecenterBehindTarget();
-                }
-                camWasMoving_ = movingNow;
-            } else {
-                camWasMoving_ = false;
-                if (input->IsPadTriggered(0, GamePadButton::RB) ||
-                    input->IsPadTriggered(0, GamePadButton::LB)) {
-                    followCamera_->RecenterBehindTarget();
                 }
             }
         }
@@ -444,26 +421,26 @@ void PlayerCamera::UpdateThreatAwareness(float dt) {
 //   プレイヤーに最も近いものへ、符号付きで awarenessMaxYaw_ までの傾きを返す。
 // ============================================================
 float PlayerCamera::ComputeGlanceBias() const {
-    std::vector<BaseCollider*> enemies;
-    if (GatherNearbyEnemies(enemies) == 0) return 0.0f;
+    std::vector<Vector3> enemies;
+    if (GatherThreatTargetPositions(enemies) == 0) return 0.0f;
 
     Vector3 camPos  = followCamera_->GetTranslate();
     float   baseYaw = followCamera_->GetRotate().y - awarenessAppliedBias_; // プレイヤー由来の素の yaw
     Vector3 playerPos = playerWT_->translate_;
 
-    BaseCollider* pick = nullptr;
+    bool picked = false;
     float pickDist   = awarenessRange_;
     float pickSigned = 0.0f;
-    for (auto* e : enemies) {
-        Vector3 d = e->GetCenterPosition() - camPos; d.y = 0.0f;
+    for (const auto& enemyPos : enemies) {
+        Vector3 d = enemyPos - camPos; d.y = 0.0f;
         if (Length(d) < 0.01f) continue;
         float signedYaw = WrapPi(atan2f(d.x, d.z) - baseYaw);
         if (std::abs(signedYaw) < awarenessTriggerYaw_) continue; // 視界内寄り＝気配対象外
 
-        float pd = Length(e->GetCenterPosition() - playerPos);
-        if (pd < pickDist) { pickDist = pd; pick = e; pickSigned = signedYaw; }
+        float pd = Length(enemyPos - playerPos);
+        if (pd < pickDist) { pickDist = pd; picked = true; pickSigned = signedYaw; }
     }
-    if (!pick) return 0.0f;
+    if (!picked) return 0.0f;
 
     return std::clamp(pickSigned, -awarenessMaxYaw_, awarenessMaxYaw_);
 }
@@ -479,8 +456,8 @@ void PlayerCamera::ApplyThreatFovWiden(Camera* sceneCamera, float dt) {
 
     float target = 0.0f;
     if (threatAwarenessEnabled_ && threatAwarenessSceneAllowed_) {
-        std::vector<BaseCollider*> enemies;
-        int n = GatherNearbyEnemies(enemies);
+        std::vector<Vector3> enemies;
+        int n = GatherThreatTargetPositions(enemies);
         if (n >= awarenessFovMinCount_) {
             target = std::min(
                 (n - awarenessFovMinCount_ + 1) * awarenessFovPerEnemy_,
@@ -515,6 +492,29 @@ int PlayerCamera::GatherNearbyEnemies(std::vector<BaseCollider*>& out) const {
         if (Length(col->GetCenterPosition() - playerPos) <= awarenessRange_) {
             out.push_back(col);
         }
+    }
+    return static_cast<int>(out.size());
+}
+
+int PlayerCamera::GatherThreatTargetPositions(std::vector<Vector3>& out) const {
+    out.clear();
+    if (!playerWT_) return 0;
+
+    Vector3 playerPos = playerWT_->translate_;
+    if (!threatTargetPositions_.empty()) {
+        for (const auto& pos : threatTargetPositions_) {
+            if (Length(pos - playerPos) <= awarenessRange_) {
+                out.push_back(pos);
+            }
+        }
+        return static_cast<int>(out.size());
+    }
+
+    std::vector<BaseCollider*> colliders;
+    GatherNearbyEnemies(colliders);
+    out.reserve(colliders.size());
+    for (auto* col : colliders) {
+        if (col) out.push_back(col->GetCenterPosition());
     }
     return static_cast<int>(out.size());
 }
@@ -1087,6 +1087,7 @@ void PlayerCamera::DrawImGui() {
 
         ImGui::Separator();
         ImGui::Text("シーン許可: %s", threatAwarenessSceneAllowed_ ? "ON(バトル)" : "OFF(フィールド等)");
+        ImGui::Text("ターゲット数: %d", static_cast<int>(threatTargetPositions_.size()));
         ImGui::Text("現在グランス: %.2f rad / FOV拡大: %.3f", awarenessYawBias_, awarenessFovBias_);
 
         // 編集値を extension JSON に反映（カメラ設定保存時に一緒に永続化される）

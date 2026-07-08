@@ -198,6 +198,18 @@ void BattleScene::Update() {
 		battleEnemyManager_->Update();
 	}
 
+	if (player_ && player_->GetPlayerCamera() && battleEnemyManager_) {
+		std::vector<Vector3> enemyPositions;
+		if (!isBattleCameraActive) {
+			for (auto* enemy : battleEnemyManager_->GetActiveBattleEnemies()) {
+				if (enemy) {
+					enemyPositions.push_back(enemy->GetTranslate());
+				}
+			}
+		}
+		player_->GetPlayerCamera()->SetThreatTargetPositions(enemyPositions);
+	}
+
 	// 視覚効果・オブジェクト更新
 	sprite_->Update();
 	ground_->Update();
@@ -333,6 +345,10 @@ void BattleScene::OnExit() {
 
 	// 境界エリアを掃除（FieldScene 側でも除去しているが対称性のため明示）
 	AreaManager::GetInstance()->RemoveArea("BattleArea");
+	if (player_ && player_->GetPlayerCamera()) {
+		player_->GetPlayerCamera()->ClearThreatTargetPositions();
+		player_->GetPlayerCamera()->SetThreatAwarenessAllowed(false);
+	}
 
 	// ロックオンUIを非表示にする
 	lockOnUI_->SetIsVisible(false);
