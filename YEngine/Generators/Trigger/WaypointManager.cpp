@@ -68,3 +68,18 @@ void WaypointManager::Activate(const std::string& name) {
 	}
 	Logger("[Waypoint] アクティブ化: \"" + name + "\"\n");
 }
+
+void WaypointManager::SetBeaconVisible(bool visible) {
+	if (visible) {
+		if (current_ && !hasBeacon_) {
+			const std::string& fx = current_->GetBeaconEffect();
+			if (!fx.empty()) {
+				beaconId_ = VfxMeshSpawner::GetInstance()->Spawn(fx, currentPos_, current_->GetBeaconScale(), true);
+				hasBeacon_ = true;
+			}
+		}
+	}
+	else {
+		StopBeacon();
+	}
+}

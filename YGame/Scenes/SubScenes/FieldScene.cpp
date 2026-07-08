@@ -349,8 +349,15 @@ void FieldScene::DrawLine() {
 	UIの描画
 //========================================================================*/
 void FieldScene::DrawUI() {
-	//sprite_->Draw();
 	fieldEnemyManager_->DrawUI();
+}
+
+/*==========================================================================
+	VFXの描画
+//========================================================================*/
+void FieldScene::DrawVFX()
+{
+
 }
 
 /*==========================================================================
@@ -472,6 +479,7 @@ void FieldScene::OnEnter() {
 	シーンを抜けるときの処理
 //========================================================================*/
 void FieldScene::OnExit() {
+	WaypointManager::GetInstance()->SetBeaconVisible(false);
 	BaseSubScene::OnExit();
 	AreaManager::GetInstance()->RemoveArea("FieldArea");
 

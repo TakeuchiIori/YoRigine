@@ -31,6 +31,7 @@ public:
 	virtual void DrawShadow() = 0;
 	virtual void DrawLine() = 0;
 	virtual void DrawUI() = 0;
+	virtual void DrawVFX() = 0;
 	virtual void Finalize() = 0;
 
 	///************************* ライフサイクル *************************///

@@ -52,6 +52,9 @@ public:
 	// UI描画処理
 	void DrawUI() override;
 
+	// VFX描画処理
+	void DrawVFX() override;
+
 	// 非オフスクリーン描画処理
 	void DrawNonOffscreen() override;
 

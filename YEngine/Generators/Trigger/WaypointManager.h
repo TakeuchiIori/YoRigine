@@ -32,6 +32,9 @@ public:
 	// 指定名を現在の目的地にする（前のビーコンを止めて新しく出す）。空名 = 目的地なし（クリア）。
 	void Activate(const std::string& name);
 
+	// ビーコンの表示・非表示
+	void SetBeaconVisible(bool visible);
+
 	// 現在ウェイポイントがあるか / その位置（Player の向き用）
 	bool    HasCurrent() const { return current_ != nullptr; }
 	Vector3 GetCurrentPosition() const { return currentPos_; }
