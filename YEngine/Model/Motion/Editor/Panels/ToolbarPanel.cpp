@@ -109,7 +109,7 @@ void ToolbarPanel::DrawImGui()
 	// 2行目: 速度 / トリム / ユーティリティ
 	// ============================================================
 	ImGui::SetNextItemWidth(120);
-	if (ImGui::SliderFloat("再生速度", &context_->playbackSpeed, 0.1f, 3.0f, "x%.2f")) {
+	if (ImGui::DragFloat("再生速度", &context_->playbackSpeed, 0.1f, 3.0f)) {
 		if (model && model->GetMotionSystem()) {
 			float sign = context_->isReverse ? -1.0f : 1.0f;
 			model->GetMotionSystem()->SetMotionSpeed(sign * context_->playbackSpeed);

@@ -137,7 +137,8 @@ namespace YoRigine {
 		stampMode_.Update(viewPos, viewSize);
 #endif
 
-		objectManager_->Update();
+		// ObjectManager::Update() is driven once per frame from Framework::Update().
+		// Running it here as well advances animation time twice in editor previews.
 	}
 
 	// ============================================================
