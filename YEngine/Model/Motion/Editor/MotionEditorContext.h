@@ -73,6 +73,7 @@ struct MotionEditorContext
 	// UIフラグとレイアウト
 	bool isDrawBone = false;
 	bool showSavePopup = false;
+	bool showSourceAnimationPopup = false;
 	std::string statusMsg = "Ready";
 	bool requireTimelineRebuild = false;
 

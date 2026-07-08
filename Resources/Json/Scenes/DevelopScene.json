@@ -7097,6 +7097,84 @@
                 1.0
             ],
             "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "castShadow": true,
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Player\\Player.gltf",
+            "id": 91,
+            "isAnimation": true,
+            "modelName": "Player.gltf",
+            "nameTag": "",
+            "outlineEnabled": true,
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "rotate": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.009999999776482582,
+                0.009999999776482582,
+                0.009999999776482582
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
         }
     ],
     "version": 13
