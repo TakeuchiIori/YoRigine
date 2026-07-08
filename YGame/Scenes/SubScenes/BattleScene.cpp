@@ -188,7 +188,7 @@ void BattleScene::Update() {
 	}
 
 	// プレイヤー更新
-	// ★ 敵より先に動かすことで、敵AIが今フレームのプレイヤー位置を参照できる
+	// 敵より先に動かすことで、敵AIが今フレームのプレイヤー位置を参照できる
 	if (!isBattleCameraActive && !battleEnemyManager_->IsFinalBattleCleared()) {
 		player_->Update();
 	}

@@ -1634,7 +1634,7 @@
                 },
                 "threatAwareness": {
                     "enabled": true,
-                    "fovMax": 0.15000000596046448,
+                    "fovMax": 0.4000000059604645,
                     "fovMinCount": 2,
                     "fovPerEnemy": 0.20000000298023224,
                     "fovSpeed": 3.0,
@@ -1676,16 +1676,16 @@
             "recenterResetPitch": true,
             "rotate": [
                 0.30000001192092896,
-                1.365308165550232,
+                2.1523120403289795,
                 0.0
             ],
             "rotateSpeed": 0.019999999552965164,
             "targetName": "Player",
             "targetPivot_Height": 1.0,
             "translate": [
-                -38.103057861328125,
-                9.933090209960938,
-                16.74522590637207
+                -80.65055847167969,
+                9.933134078979492,
+                -25.28311538696289
             ],
             "type": "Follow"
         }

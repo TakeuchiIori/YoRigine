@@ -150,6 +150,11 @@ public:
         return attackCamera_.GetWorkNames();
     }
 
+    // ============================================================
+    // 最終カメラのアクセッサ
+    // ============================================================
+    Camera* GetLastCamera() { return lastSceneCamera_; }
+
 private:
     // ============================================================
     // 内部処理
@@ -290,14 +295,14 @@ private:
     std::vector<Vector3> threatTargetPositions_;  // BattleScene から渡される生存中の敵位置
     float awarenessRange_      = 25.0f;  // この距離内の敵を「気配」対象にする
 
-    // ① 周辺視グランス
+    // 周辺視グランス
     float awarenessTriggerYaw_ = 0.70f;  // カメラ前方からこの角(rad)以上外れた敵を対象に(≒40°)
     float awarenessMaxYaw_     = 0.18f;  // グランスの最大ヨー量(rad)(≒10°)。これ以上は向かない＝固定しない
     float awarenessYawSpeed_   = 4.0f;   // グランスの追従速度
     float awarenessYawBias_     = 0.0f;  // 現在のグランス量（内部状態）
     float awarenessAppliedBias_ = 0.0f;  // 前フレームに yaw へ加算した量（テレスコープ適用用）
 
-    // ② 囲まれFOV
+    // 囲まれFOV
     int   awarenessFovMinCount_ = 2;      // この体数以上で広げ始める
     float awarenessFovPerEnemy_ = 0.03f;  // 敵1体ごとに広げるFOV(rad)
     float awarenessFovMax_      = 0.12f;  // FOV拡大の上限(rad)

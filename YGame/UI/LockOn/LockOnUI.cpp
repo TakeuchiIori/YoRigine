@@ -31,7 +31,6 @@ void LockOnUI::Initialize(Player* player)
 void LockOnUI::Update()
 {
 	// ─── ロックオン対象の確認 ────────────────────────────────
-	//   Player → FollowCamera → GetLockedTarget() の経路
 	FollowCamera* followCamera = player_->GetFollowCamera();
 	if (!followCamera) {
 		isVisible_ = false;
@@ -72,17 +71,22 @@ void LockOnUI::Draw()
 void LockOnUI::UpdateScreenPosition()
 {
 	// ─── カメラと対象を取得 ──────────────────────────────────
-	FollowCamera* followCamera = player_->GetFollowCamera();
+	Camera* camera = player_->GetPlayerCamera()->GetLastCamera();
 	BaseCollider* target = player_->GetPlayerCamera()->GetLockedTarget();
 
 	// 対象のワールド座標 + 頭上オフセット
 	Vector3 worldPos = target->GetWT()->translate_ + offset_;
 
+	//─────────────────── 1フレーム前ではUpdateの順番的にLastCameraはnullptrなのでnullチェック　───────────────────//
+	FollowCamera* followCamera = player_->GetFollowCamera();
+	Matrix4x4 vpMatrix = camera
+		? camera->GetViewProjectionMatrix()			// 2f以降は安全
+		: followCamera->GetViewProjectionMatrix();	// 1fはLastCameraがnullptrなのでFollowCameraを入れる
+
 	// ─── Coordinate::WorldToScreen で変換 ───────────────────
-	//   EnemyAlert と同じ手順
 	auto projection = Coordinate::WorldToScreen(
 		worldPos,
-		followCamera->GetViewProjectionMatrix(),
+		vpMatrix,
 		kReferenceDistance_,
 		2.0f
 	);
