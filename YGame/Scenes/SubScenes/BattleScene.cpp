@@ -60,6 +60,9 @@ void BattleScene::Initialize(Camera* camera, Player* player) {
 	battleEnemyManager_->SetBattleEndCallback([this](BattleResult result, const BattleStats& stats) {
 		HandleBattleEnd(result, stats);
 		});
+	battleEnemyManager_->SetEnemyDefeatedCallback([this](const BattleEnemy&) {
+		FocusNearestEnemyAfterDefeat();
+		});
 
 	//------------------------------------------------------------
 	// 環境オブジェクト初期化
@@ -217,6 +220,15 @@ void BattleScene::Update() {
 	// UI更新
 	lockOnUI_->Update();
 	DamageNumberManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime(), sceneCamera_->GetViewProjectionMatrix());
+}
+
+void BattleScene::FocusNearestEnemyAfterDefeat() {
+	if (!player_ || !player_->GetPlayerCamera() || !battleEnemyManager_) return;
+
+	BattleEnemy* nearest = battleEnemyManager_->GetNearestEnemy(player_->GetWT().translate_);
+	if (!nearest) return;
+
+	player_->GetPlayerCamera()->FaceDefeatNextEnemy(nearest->GetTranslate());
 }
 
 

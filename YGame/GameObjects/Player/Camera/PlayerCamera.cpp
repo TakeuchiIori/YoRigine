@@ -445,6 +445,23 @@ float PlayerCamera::ComputeGlanceBias() const {
     return std::clamp(pickSigned, -awarenessMaxYaw_, awarenessMaxYaw_);
 }
 
+void PlayerCamera::FaceDefeatNextEnemy(const Vector3& enemyWorldPos) {
+    if (!followCamera_) return;
+
+    Vector3 toTarget = enemyWorldPos - followCamera_->GetTranslate();
+    const float dist = Length(toTarget);
+    if (dist < 0.01f) return;
+
+    Vector3 dir = toTarget / dist;
+    Vector3 rot = followCamera_->GetRotate();
+    rot.y = atan2f(dir.x, dir.z);
+    rot.x = asinf(std::clamp(-dir.y, -1.0f, 1.0f));
+    rot.x = std::clamp(rot.x, minPitch_, maxPitch_);
+    followCamera_->SetRotate(rot);
+    followCamera_->CancelRecenter();
+    followCamera_->NotifyCameraActive();
+}
+
 // ============================================================
 // 囲まれFOV拡大（post-director）
 //   近くの敵が awarenessFovMinCount_ 体以上いるほど FOV を少し広げ、

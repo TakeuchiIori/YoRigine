@@ -106,6 +106,8 @@ private:
 	// 戦闘終了後の戻りデータを作成
 	void CreateBattleReturnData(FieldReturnData& data, BattleResult result, const BattleStats& stats);
 
+	void FocusNearestEnemyAfterDefeat();
+
 private:
 	///************************* メンバ変数 *************************///
 

@@ -97,6 +97,7 @@ public:
     bool IsThreatAwarenessAllowed() const   { return threatAwarenessSceneAllowed_; }
     void SetThreatTargetPositions(const std::vector<Vector3>& positions) { threatTargetPositions_ = positions; }
     void ClearThreatTargetPositions() { threatTargetPositions_.clear(); }
+    void FaceDefeatNextEnemy(const Vector3& enemyWorldPos);
 
     // ============================================================
     // 見切れヒット演出
