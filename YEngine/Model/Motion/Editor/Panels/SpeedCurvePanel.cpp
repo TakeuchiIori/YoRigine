@@ -9,6 +9,17 @@
 #include "../MotionEditorContext.h"
 #include "../../Core/Motion.h"
 
+#include <cmath>
+
+namespace {
+constexpr float kSpeedStep = 0.1f;
+
+float SnapSpeedValue(float value)
+{
+    return std::round(value / kSpeedStep) * kSpeedStep;
+}
+}
+
 // -----------------------------------------------------------------------
 // Initialize
 // -----------------------------------------------------------------------
@@ -149,6 +160,8 @@ bool SpeedCurvePanel::DrawCurveEditor(ImVec2 size)
                 float xNext = delegate_.points[dragIndex_ + 1].x - 0.001f;
                 local.x = std::clamp(local.x, xPrev, xNext);
             }
+            local.y = SnapSpeedValue(local.y);
+            local = delegate_.Clamp(local);
             delegate_.points[dragIndex_] = local;
             dirty = true;
         }
@@ -171,6 +184,8 @@ bool SpeedCurvePanel::DrawCurveEditor(ImVec2 size)
         }
         else {
             // 空白クリック → 点を追加
+            rightClickLocalPos_.y = SnapSpeedValue(rightClickLocalPos_.y);
+            rightClickLocalPos_ = delegate_.Clamp(rightClickLocalPos_);
             if (delegate_.AddPoint(rightClickLocalPos_)) {
                 dirty = true;
             }
@@ -199,9 +214,9 @@ bool SpeedCurvePanel::DrawCurveEditor(ImVec2 size)
             ImGui::Text("X = %.3f", delegate_.points[rightClickIdx_].x);
             ImGui::SetNextItemWidth(100.f);
             float editY = delegate_.points[rightClickIdx_].y;
-            if (ImGui::DragFloat("倍率##ctxY", &editY, 0.01f,
-                delegate_.boundsMinY, delegate_.boundsMaxY, "%.2fx")) {
-                delegate_.points[rightClickIdx_].y = editY;
+            if (ImGui::DragFloat("倍率##ctxY", &editY, kSpeedStep,
+                delegate_.boundsMinY, delegate_.boundsMaxY, "%.1fx")) {
+                delegate_.points[rightClickIdx_].y = SnapSpeedValue(editY);
                 dirty = true;
             }
         }
@@ -235,7 +250,7 @@ bool SpeedCurvePanel::DrawCurveEditor(ImVec2 size)
         if (hovered) {
             float dx = mousePos.x - sp.x, dy = mousePos.y - sp.y;
             if (dx * dx + dy * dy < 10.f * 10.f) {
-                ImGui::SetTooltip("t=%.3f  speed=%.3f x",
+                ImGui::SetTooltip("t=%.3f  speed=%.1f x",
                     delegate_.points[i].x, delegate_.points[i].y);
             }
         }
