@@ -76,12 +76,6 @@ void ClearScene::Initialize() {
 	// オブジェクトの生成
 	//------------------------------------------------------------
 
-	player_ = std::make_unique<DemoPlayer>();
-	player_->Initialize(sceneCamera_.get());
-	player_->SetMotion("Idle2");
-	// 一括 Update/Draw/Shadow の対象に登録（所有は ClearScene のまま）
-	BaseObjectManager::GetInstance()->Register(player_.get(), "Player");
-
 	// スカイボックス / Ground は個別描画のためマネージャには登録しない
 	skyBox_ = std::make_unique<SkyBox>();
 	skyBox_->Initialize(sceneCamera_.get(), "Resources/DDS/vz_sinister_land_cubemap_ue.dds");
@@ -120,7 +114,7 @@ void ClearScene::Update() {
 	skyBox_->Update();
 	ground_->Update();
 
-	//auto clearEffect = EffectHandle::Play("ClearScene", Vector3{0,0,0},true,1);
+	auto clearEffect = EffectHandle::Play("ClearScene", Vector3{0,0,0},true,1);
 	YoRigine::ModelManipulator::GetInstance()->Update();
 	YoRigine::CollisionManager::GetInstance()->Update();
 	YParticleManager::GetInstance().Update(YoRigine::GameTime::GetDeltaTime(YoRigine::TimeChannel::Vfx));

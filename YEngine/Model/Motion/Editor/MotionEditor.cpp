@@ -453,6 +453,7 @@ void MotionEditor::ShowEditor()
 void MotionEditor::Draw()
 {
 	Object3d* target = context_.GetTargetObject();
+	if (!context_.camera) return;
 	if (context_.isDrawBone && target) {
 #ifdef USE_IMGUI
 		// デバッグ用ボーン形状（ICO球など）の描画
@@ -494,6 +495,7 @@ void MotionEditor::DrawGizmo()
 {
 #ifdef USE_IMGUI
 	Object3d* target = context_.GetTargetObject();
+	if (!context_.camera) return;
 	if (context_.isDrawBone && target && target->GetModel() && target->GetModel()->GetSkeleton()) {
 		if (!context_.selBone.empty()) {
 			static BoneGizmable currentSelectedGizmo(this, "");
@@ -518,8 +520,10 @@ void MotionEditor::DrawGizmo()
 void MotionEditor::DrawBone()
 {
 	Object3d* target = context_.GetTargetObject();
+	if (!context_.camera || !lineDrawer_) return;
 	if (context_.isDrawBone && target) {
 		lineDrawer_->SetCamera(context_.camera);
+		lineDrawer_->Reset();
 		target->DrawBone(*lineDrawer_.get(), GetTargetWorldMatrix());
 	}
 }

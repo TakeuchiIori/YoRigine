@@ -10,6 +10,9 @@
 #include <imgui.h>
 #endif
 
+#include <algorithm>
+#include <cmath>
+
 void ToolbarPanel::DrawImGui()
 {
 #ifdef USE_IMGUI
@@ -147,6 +150,29 @@ void ToolbarPanel::DrawImGui()
 			GeneratePingPongMotion();
 		}
 		if (ImGui::IsItemHovered()) ImGui::SetTooltip("正再生+逆再生を結合した\n1つのモーションを生成します");
+
+		ImGui::Separator();
+		ImGui::TextUnformatted("区間移動 焼き込み");
+		ImGui::BeginGroup();
+		ImGui::SetNextItemWidth(110);
+		ImGui::InputInt("開始f##offsetStart", &offsetStartFrame_);
+		ImGui::SameLine(0, 8);
+		ImGui::SetNextItemWidth(110);
+		ImGui::InputInt("終了f##offsetEnd", &offsetEndFrame_);
+		ImGui::SameLine(0, 8);
+		ImGui::SetNextItemWidth(220);
+		ImGui::DragFloat3("移動量XYZ##offsetTranslate", offsetTranslate_, 0.01f);
+		ImGui::SameLine(0, 8);
+		const bool canBakeOffset = !context_->selBone.empty();
+		if (!canBakeOffset) ImGui::BeginDisabled();
+		if (ImGui::Button("選択ボーンへ焼き込み")) {
+			BakeTranslateOffsetRange();
+		}
+		if (!canBakeOffset) ImGui::EndDisabled();
+		if (ImGui::IsItemHovered()) {
+			ImGui::SetTooltip("開始直前/開始/終了/終了直後にTranslateキーを作り、指定区間だけ移動量を足します");
+		}
+		ImGui::EndGroup();
 	}
 #endif
 }
@@ -335,4 +361,105 @@ void ToolbarPanel::GeneratePingPongMotion()
 	context_->lastAppliedScrubTime = -1.0f;
 	context_->scrubTime = 0.0f;
 	context_->statusMsg = "ピンポンモーション生成完了 (" + std::to_string(newDuration) + "s)";
+}
+
+void ToolbarPanel::BakeTranslateOffsetRange()
+{
+	if (!context_->currentMotion || context_->selBone.empty()) return;
+
+	constexpr int kFps = 60;
+	Motion* motion = context_->currentMotion;
+	auto nodeIt = motion->animation_.nodeAnimations_.find(context_->selBone);
+	if (nodeIt == motion->animation_.nodeAnimations_.end()) {
+		context_->statusMsg = "区間移動失敗: ボーンが見つかりません";
+		return;
+	}
+
+	const int totalFrames = std::max(0, static_cast<int>(motion->GetDuration() * kFps));
+	int startFrame = std::clamp(offsetStartFrame_, 0, totalFrames);
+	int endFrame = std::clamp(offsetEndFrame_, 0, totalFrames);
+	if (endFrame < startFrame) std::swap(startFrame, endFrame);
+
+	const float unitScale = std::max(0.0001f, context_->translateDisplayScale);
+	const Vector3 offset = {
+		offsetTranslate_[0] * unitScale,
+		offsetTranslate_[1] * unitScale,
+		offsetTranslate_[2] * unitScale
+	};
+	if (std::abs(offset.x) < 1e-6f && std::abs(offset.y) < 1e-6f && std::abs(offset.z) < 1e-6f) {
+		context_->statusMsg = "区間移動なし: 移動量が0です";
+		return;
+	}
+
+	const auto oldAnims = motion->animation_.nodeAnimations_;
+	auto newAnims = oldAnims;
+	auto& targetNode = newAnims[context_->selBone];
+
+	auto insertOrReplace = [](auto& keyframes, float time, const Vector3& value) {
+		auto it = std::find_if(keyframes.begin(), keyframes.end(),
+			[time](const auto& kf) { return std::abs(kf.time - time) < 1e-4f; });
+		if (it != keyframes.end()) {
+			it->value = value;
+		}
+		else {
+			keyframes.push_back({ time, value });
+		}
+		std::sort(keyframes.begin(), keyframes.end(),
+			[](const auto& a, const auto& b) { return a.time < b.time; });
+		};
+
+	const float startTime = startFrame / static_cast<float>(kFps);
+	const float endTime = endFrame / static_cast<float>(kFps);
+	const Motion::InterpolationType interp = targetNode.interpolationType;
+
+	if (startFrame > 0) {
+		const float beforeTime = (startFrame - 1) / static_cast<float>(kFps);
+		const Vector3 beforeValue = motion->CalculateValue(nodeIt->second.translate.keyframes, beforeTime, interp);
+		insertOrReplace(targetNode.translate.keyframes, beforeTime, beforeValue);
+	}
+
+	const Vector3 startValue = motion->CalculateValue(nodeIt->second.translate.keyframes, startTime, interp);
+	const Vector3 endValue = motion->CalculateValue(nodeIt->second.translate.keyframes, endTime, interp);
+	insertOrReplace(targetNode.translate.keyframes, startTime, startValue + offset);
+
+	for (const auto& kf : nodeIt->second.translate.keyframes) {
+		if (kf.time > startTime + 1e-4f && kf.time < endTime - 1e-4f) {
+			insertOrReplace(targetNode.translate.keyframes, kf.time, kf.value + offset);
+		}
+	}
+
+	insertOrReplace(targetNode.translate.keyframes, endTime, endValue + offset);
+
+	if (endFrame < totalFrames) {
+		const float afterTime = (endFrame + 1) / static_cast<float>(kFps);
+		const Vector3 afterValue = motion->CalculateValue(nodeIt->second.translate.keyframes, afterTime, interp);
+		insertOrReplace(targetNode.translate.keyframes, afterTime, afterValue);
+	}
+
+	context_->history.Execute(MakeLambdaCommand("区間移動焼き込み: " + context_->selBone,
+		[this, newAnims]() {
+			if (!context_->currentMotion) return;
+			context_->currentMotion->animation_.nodeAnimations_ = newAnims;
+			context_->requireTimelineRebuild = true;
+			context_->lastAppliedScrubTime = -1.0f;
+		},
+		[this, oldAnims]() {
+			if (!context_->currentMotion) return;
+			context_->currentMotion->animation_.nodeAnimations_ = oldAnims;
+			context_->requireTimelineRebuild = true;
+			context_->lastAppliedScrubTime = -1.0f;
+		}
+	));
+
+	Object3d* target = context_->GetTargetObject();
+	if (target && target->GetModel() && target->GetModel()->GetMotionSystem()) {
+		auto* ms = target->GetModel()->GetMotionSystem();
+		ms->SetAnimation(context_->currentMotion);
+		ms->SetAnimationTime(context_->scrubTime);
+	}
+
+	context_->requireTimelineRebuild = true;
+	context_->lastAppliedScrubTime = -1.0f;
+	context_->statusMsg = "区間移動焼き込み: " + context_->selBone
+		+ " [" + std::to_string(startFrame) + "f-" + std::to_string(endFrame) + "f]";
 }

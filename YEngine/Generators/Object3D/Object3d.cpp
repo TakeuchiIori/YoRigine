@@ -56,6 +56,8 @@ void Object3d::UpdateAnimation()
 /// </summary>
 void Object3d::Draw(Camera* camera, WorldTransform& worldTransform)
 {
+	object3dCommon_->DrawPreference();
+
 	auto pm = YPipelineManager::GetInstance();
 	const auto& indices = pm->GetParameterIndices("Object");
 

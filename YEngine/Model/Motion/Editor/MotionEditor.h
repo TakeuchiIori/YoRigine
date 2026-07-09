@@ -50,7 +50,13 @@ public:
 	// ============================================================
 	void SetTargetObjectId(int id);
 	int GetTargetObjectId() const { return context_.targetObjectId; }
-	void SetCamera(Camera* camera) { context_.camera = camera; }
+	void SetCamera(Camera* camera)
+	{
+		context_.camera = camera;
+		if (lineDrawer_) {
+			lineDrawer_->SetCamera(camera);
+		}
+	}
 	bool IsDrawBone() const { return context_.isDrawBone; }
 
 	Matrix4x4 GetJointWorldMatrix(const std::string& boneName) const;

@@ -66,6 +66,7 @@ struct MotionEditorContext
 	float editT[3] = { 0, 0, 0 };
 	float editR[3] = { 0, 0, 0 };
 	float editS[3] = { 1, 1, 1 };
+	float translateDisplayScale = 100.0f;
 
 	// キーフレームクリップボード
 	KeyframeClipboard clipboard;
