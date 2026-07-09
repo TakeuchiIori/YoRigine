@@ -2,7 +2,7 @@
 // ===========================================================
 // VfxMeshSpawner.h
 //
-// VfxMesh 系エフェクト（Lightning / Shockwave / Smoke）を
+// VfxMesh 系エレメント（LightningBolt / ShockwaveRing / NoiseVolume など）を
 // 名前とトランスフォームで生成・管理するシングルトン。
 //
 // 使い方（MyGame 側）:
@@ -84,11 +84,11 @@ private:
     // 同時に存在できる VfxMesh エフェクトの上限（PoolAllocator の固定長）
     static constexpr size_t kMaxActiveVfx = 256;
 
-    // ── サブ効果1個分の実行時リソース ────────────────────────────────
-    // アセットの subEffects と1対1対応（同じ種類が複数あればその数だけ作る）
-    struct SubEffectRT
+    // ── エレメント1個分の実行時リソース ────────────────────────────────
+    // アセットの elements と1対1対応（同じ種類が複数あればその数だけ作る）
+    struct ElementRT
     {
-        const YoRigine::VfxSubEffect* def = nullptr;   // アセット内の定義を指す
+        const YoRigine::VfxElement* def = nullptr;   // アセット内の定義を指す
 
         // def->type に対応するものだけ生成される
         std::unique_ptr<YoRigine::VolumeSmokeMesh> smoke;
@@ -100,7 +100,7 @@ private:
         Microsoft::WRL::ComPtr<ID3D12Resource> cbRes;
         void*                                  cbMapped = nullptr;
 
-        // Smoke の CB 用読み戻し値
+        // NoiseVolume の CB 用読み戻し値
         Vector3 smokeCenter = { 0.f, 0.f, 0.f };
         float   smokeRadius = 1.5f;
 
@@ -128,14 +128,14 @@ private:
         Vector3 boltStart = { 0.f, 0.f, 0.f };
         Vector3 boltEnd   = { 0.f, 3.f, 0.f };
         // SetEndpoints/SpawnBolt で明示指定されたか。
-        // false なら Lightning はアセットの direction/length から端点を自動計算する。
+        // false なら LightningBolt はアセットの direction/length から端点を自動計算する。
         bool    explicitEndpoints = false;
 
         // バースト進捗（-1=ループ継続、0..1=ワンショット）
         float burstProgress = -1.f;
 
-        // サブ効果ごとの実行時リソース
-        std::vector<SubEffectRT> subs;
+        // エレメントごとの実行時リソース
+        std::vector<ElementRT> subs;
 
         void Release();
 

@@ -102,7 +102,7 @@ uint32_t VfxMeshSpawner::Spawn(const std::string& assetName,
     fx->scale     = scale;
     fx->burstProgress = loop ? -1.f : 0.f;
 
-    // 稲妻の端点は既定では各サブ効果の direction/length から自動計算する。
+    // 稲妻の端点は既定では各エレメントの direction/length から自動計算する。
     // SetEndpoints / SpawnBolt で明示指定された場合のみ boltStart/End を使う。
     fx->explicitEndpoints = false;
     fx->boltStart = position;
@@ -132,17 +132,17 @@ void VfxMeshSpawner::InitEffect(ActiveEffect& fx)
     const auto& asset = *fx.asset;
 
     fx.subs.clear();
-    fx.subs.reserve(asset.subEffects.size());
+    fx.subs.reserve(asset.elements.size());
 
-    for (const auto& def : asset.subEffects) {
+    for (const auto& def : asset.elements) {
         if (!def.enabled) continue;
 
-        SubEffectRT sub;
+        ElementRT sub;
         sub.def = &def;
         const Vector3 basePos = fx.position + def.offset * fx.scale;
 
         switch (def.type) {
-        case YoRigine::VfxSubEffectType::Smoke:
+        case YoRigine::VfxElementType::NoiseVolume:
             sub.smoke = std::make_unique<YoRigine::VolumeSmokeMesh>();
             sub.smoke->Initialize();
             sub.smoke->ApplyParam(def.smoke);   // 半径/上昇速度を Drive で使えるように
@@ -154,7 +154,7 @@ void VfxMeshSpawner::InitEffect(ActiveEffect& fx)
             sub.cbRes->Map(0, nullptr, &sub.cbMapped);
             break;
 
-        case YoRigine::VfxSubEffectType::Lightning:
+        case YoRigine::VfxElementType::LightningBolt:
             sub.lightning = std::make_unique<YoRigine::LightningMesh>();
             sub.lightning->Initialize();
             sub.lightning->SetCamera(camera_);
@@ -164,7 +164,7 @@ void VfxMeshSpawner::InitEffect(ActiveEffect& fx)
             sub.cbRes->Map(0, nullptr, &sub.cbMapped);
             break;
 
-        case YoRigine::VfxSubEffectType::Shockwave:
+        case YoRigine::VfxElementType::ShockwaveRing:
             sub.shockwave = std::make_unique<YoRigine::ShockwaveMesh>();
             sub.shockwave->Initialize();
             sub.shockwave->SetCamera(camera_);
@@ -175,7 +175,7 @@ void VfxMeshSpawner::InitEffect(ActiveEffect& fx)
             sub.cbRes->Map(0, nullptr, &sub.cbMapped);
             break;
 
-        case YoRigine::VfxSubEffectType::LightVolume:
+        case YoRigine::VfxElementType::LightVolume:
             sub.lightVolume = std::make_unique<YoRigine::LightVolumeMesh>();
             sub.lightVolume->Initialize(def.lightVolume);
             sub.lightVolume->SetTransform(basePos, 0.0f);
@@ -239,7 +239,7 @@ void VfxMeshSpawner::UpdateEffect(ActiveEffect& fx, float dt)
     base.boltStart = fx.boltStart;
     base.boltEnd   = fx.boltEnd;
 
-    // サブ効果ごとに: オフセット → モーション（全体＋個別） → Drive
+    // エレメントごとに: オフセット → モーション（全体＋個別） → Drive
     for (auto& sub : fx.subs) {
         const auto& def = *sub.def;
 
@@ -248,7 +248,7 @@ void VfxMeshSpawner::UpdateEffect(ActiveEffect& fx, float dt)
         s.position  += offset;
         s.boltStart += offset;
         s.boltEnd   += offset;
-        YoRigine::EvaluateSubEffectMotions(asset, def, s);
+        YoRigine::EvaluateElementMotions(asset, def, s);
 
         // 色乗算・表示状態は Draw の CB 反映で使う
         sub.tint            = s.colorTint;
@@ -257,7 +257,7 @@ void VfxMeshSpawner::UpdateEffect(ActiveEffect& fx, float dt)
         sub.visible         = s.visible;
 
         switch (def.type) {
-        case YoRigine::VfxSubEffectType::Smoke:
+        case YoRigine::VfxElementType::NoiseVolume:
             if (sub.smoke) {
                 sub.smoke->Drive(s);
                 sub.smoke->Update(dt);
@@ -266,7 +266,7 @@ void VfxMeshSpawner::UpdateEffect(ActiveEffect& fx, float dt)
             }
             break;
 
-        case YoRigine::VfxSubEffectType::Lightning:
+        case YoRigine::VfxElementType::LightningBolt:
             if (sub.lightning) {
                 // 端点が明示指定されていなければ direction/length から自動計算
                 // （モーション適用後の中心を挟んで direction 方向へ伸ばす）
@@ -284,7 +284,7 @@ void VfxMeshSpawner::UpdateEffect(ActiveEffect& fx, float dt)
             }
             break;
 
-        case YoRigine::VfxSubEffectType::Shockwave:
+        case YoRigine::VfxElementType::ShockwaveRing:
             if (sub.shockwave) {
                 sub.shockwave->SetCamera(camera_);
                 sub.shockwave->Drive(s);
@@ -292,7 +292,7 @@ void VfxMeshSpawner::UpdateEffect(ActiveEffect& fx, float dt)
             }
             break;
 
-        case YoRigine::VfxSubEffectType::LightVolume:
+        case YoRigine::VfxElementType::LightVolume:
             if (sub.lightVolume) {
                 sub.lightVolume->ApplyParam(def.lightVolume);
                 sub.lightVolume->SetTransform(s.position, 0.0f); // Y軸回転はまだ使わない
@@ -336,7 +336,7 @@ void VfxMeshSpawner::DrawEffect(ActiveEffect& fx)
         const auto& def = *sub.def;
 
         switch (def.type) {
-        case YoRigine::VfxSubEffectType::Smoke:
+        case YoRigine::VfxElementType::NoiseVolume:
             if (sub.smoke) {
                 const auto& sm = def.smoke;
                 auto& cb = *static_cast<YoRigine::SmokeParamsCB*>(sub.cbMapped);
@@ -352,7 +352,7 @@ void VfxMeshSpawner::DrawEffect(ActiveEffect& fx)
                 cb.density       = sm.density;
                 cb.noiseOctaves  = sm.noiseOctaves;
                 cb.rimIntensity  = sm.rimIntensity;
-                // Smoke の色/フェード/膨張/上昇はモーション駆動。シェーダは burst を使わないので -1（未使用）。
+                // NoiseVolume の色/フェード/膨張/上昇はモーション駆動。シェーダは burst を使わないので -1（未使用）。
                 cb.burst         = -1.f;
 
                 const auto& idx = pm->GetParameterIndices("VfxMeshSmoke");
@@ -364,7 +364,7 @@ void VfxMeshSpawner::DrawEffect(ActiveEffect& fx)
             }
             break;
 
-        case YoRigine::VfxSubEffectType::Lightning:
+        case YoRigine::VfxElementType::LightningBolt:
             if (sub.lightning) {
                 const auto& lt = def.lightning;
                 auto& cb = *static_cast<YoRigine::LightningParamsCB*>(sub.cbMapped);
@@ -387,7 +387,7 @@ void VfxMeshSpawner::DrawEffect(ActiveEffect& fx)
             }
             break;
 
-        case YoRigine::VfxSubEffectType::Shockwave:
+        case YoRigine::VfxElementType::ShockwaveRing:
             if (sub.shockwave) {
                 const auto& sw = def.shockwave;
                 auto& cb = *static_cast<YoRigine::ShockwaveParamsCB*>(sub.cbMapped);
@@ -408,7 +408,7 @@ void VfxMeshSpawner::DrawEffect(ActiveEffect& fx)
             }
             break;
 
-        case YoRigine::VfxSubEffectType::LightVolume:
+        case YoRigine::VfxElementType::LightVolume:
             if (sub.lightVolume) {
                 const auto& lv = def.lightVolume;
                 auto& cb = *static_cast<YoRigine::LightVolumeParamsCB*>(sub.cbMapped);

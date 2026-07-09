@@ -159,7 +159,7 @@ namespace YoRigine {
     };
 
     // -------------------------------------------------------
-    // Volume Smoke パラメータ (Omen 風めらめらスモーク)
+    // NoiseVolume パラメータ (球状ノイズボリューム。煙/炎/霧/オーラに使う)
     // -------------------------------------------------------
     struct SmokeEffectParam
     {
@@ -182,7 +182,7 @@ namespace YoRigine {
     };
 
     // -------------------------------------------------------
-    // Lightning パラメータ (プロシージャル稲妻)
+    // LightningBolt パラメータ (プロシージャル稲妻)
     // -------------------------------------------------------
     struct LightningEffectParam
     {
@@ -208,7 +208,7 @@ namespace YoRigine {
     };
 
     // -------------------------------------------------------
-    // Shockwave パラメータ (爆発の衝撃波リング)
+    // ShockwaveRing パラメータ (爆発の衝撃波リング)
     // -------------------------------------------------------
     struct ShockwaveEffectParam
     {
@@ -220,28 +220,28 @@ namespace YoRigine {
     };
 
     // -------------------------------------------------------
-    // サブ効果インスタンス（形状1個分）
+    // VFXエレメントインスタンス（部品1個分）
     //
-    // Trail 以外のサブ効果は「種類＋パラメータ＋動き」を1エントリとして
+    // Trail 以外のエレメントは「種類＋パラメータ＋動き」を1エントリとして
     // 好きな数だけ積める。同じ種類を複数（稲妻3本・衝撃波2重など）も可能。
     // -------------------------------------------------------
-    enum class VfxSubEffectType : int
+    enum class VfxElementType : int
     {
-        LightVolume = 0,
-        Smoke       = 1,
-        Lightning   = 2,
-        Shockwave   = 3,
+        LightVolume   = 0,
+        NoiseVolume   = 1,
+        LightningBolt = 2,
+        ShockwaveRing = 3,
     };
 
     // エディタ表示などに使う種類名
-    const char* VfxSubEffectTypeName(VfxSubEffectType type);
+    const char* VfxElementTypeName(VfxElementType type);
 
-    // サブ効果種別 → モーションの適用対象（All 指定のモーション振り分け用）
-    VfxMotionTarget MotionTargetFor(VfxSubEffectType type);
+    // エレメント種別 → モーションの適用対象（All 指定のモーション振り分け用）
+    VfxMotionTarget MotionTargetFor(VfxElementType type);
 
-    struct VfxSubEffect
+    struct VfxElement
     {
-        VfxSubEffectType type    = VfxSubEffectType::Smoke;
+        VfxElementType type    = VfxElementType::NoiseVolume;
         std::string      label   = "";                 // エディタ表示名（空なら種類名）
         bool             enabled = true;
         Vector3          offset  = { 0.f, 0.f, 0.f };  // エフェクト基準位置からのオフセット
@@ -252,7 +252,7 @@ namespace YoRigine {
         LightningEffectParam   lightning;
         ShockwaveEffectParam   shockwave;
 
-        // この形状インスタンスにだけ効く動き（全体 motions に加算で適用）
+        // このエレメントにだけ効く動き（全体 motions に加算で適用）
         std::vector<VfxMotion> motions;
     };
 
@@ -265,14 +265,14 @@ namespace YoRigine {
         TrailEffectParam  trail;
         bool useTrail       = true;
 
-        // Trail 以外のサブ効果。同じ種類を複数積める。
-        std::vector<VfxSubEffect> subEffects;
+        // Trail 以外のエレメント。同じ種類を複数積める。
+        std::vector<VfxElement> elements;
 
         // データ駆動の動き（エフェクト全体）。0個=従来挙動。
         // target で「煙だけ」「稲妻だけ」のように適用先を絞れる。
         std::vector<VfxMotion> motions;
 
-        // ワンショット寿命(秒)。BurstGrow モーション（全体/形状個別どちらでも）が
+        // ワンショット寿命(秒)。BurstGrow モーション（全体/エレメント個別どちらでも）が
         // あればその duration の最大値、無ければ既存アセット互換のヒューリスティック。
         float OneShotDuration() const;
 
@@ -289,9 +289,9 @@ namespace YoRigine {
     // エフェクト全体の motions を target で絞って評価（従来 API）
     void EvaluateMotions(const VfxEffectAsset& asset, VfxMotionTarget target, VfxEvalState& state);
 
-    // 形状インスタンス1個分の評価。
+    // エレメント1個分の評価。
     // 全体 motions（対象一致分）→ インスタンス固有 motions の順に適用する。
-    void EvaluateSubEffectMotions(const VfxEffectAsset& asset,
-                                  const VfxSubEffect& sub, VfxEvalState& state);
+    void EvaluateElementMotions(const VfxEffectAsset& asset,
+                                  const VfxElement& sub, VfxEvalState& state);
 
 } // namespace YoRigine

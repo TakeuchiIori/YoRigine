@@ -24,7 +24,7 @@ namespace YoRigine {
         }
     }
 
-    // モーションリスト編集（エフェクト全体用と形状個別用で共用）
+    // モーションリスト編集（エフェクト全体用とエレメント個別用で共用）
     void VfxMeshEditor::DrawMotionListUI(std::vector<VfxMotion>& motions,
                                          bool showTarget, const char* commitLabel)
     {
@@ -61,9 +61,9 @@ namespace YoRigine {
             if (ImGui::SmallButton("削除##m")) removeIdx = i;
 
             // 適用対象（BurstGrow は効果全体の寿命なので対象指定なし。
-            // 形状個別モーションはその形状にだけ効くので対象指定は不要）
+            // エレメント個別モーションはそのエレメントにだけ効くので対象指定は不要）
             if (showTarget && m.type != VfxMotionType::BurstGrow) {
-                const char* targetNames[] = { "All (全効果)", "Smoke", "Lightning", "Shockwave", "LightVolume" };
+                const char* targetNames[] = { "All (全効果)", "NoiseVolume", "LightningBolt", "ShockwaveRing", "LightVolume" };
                 int tgtIdx = static_cast<int>(m.target);
                 ImGui::SetNextItemWidth(220);
                 if (ImGui::Combo("対象##mtg", &tgtIdx, targetNames, IM_ARRAYSIZE(targetNames))) {
@@ -95,7 +95,7 @@ namespace YoRigine {
             switch (m.type) {
             case VfxMotionType::BurstGrow:
                 c |= ImGui::DragFloat("寿命(秒)##md", &m.duration, 0.02f, 0.05f, 10.0f, "%.2f");
-                ImGui::TextDisabled("  ※ワンショットの全体寿命。Smokeの膨張/上昇もこの時間で進む");
+                ImGui::TextDisabled("  ※ワンショットの全体寿命。NoiseVolume の膨張/上昇もこの時間で進む");
                 break;
             case VfxMotionType::Move:
                 c |= ImGui::DragFloat3("速度(/秒)##mv", &m.velocity.x, 0.02f, -20.0f, 20.0f, "%.2f");
@@ -179,7 +179,7 @@ namespace YoRigine {
         if (!sel) return;
 
         ImGui::TextDisabled("エフェクト全体の動き（寿命・移動・脈動）をデータで定義。ゲームでも同じ動きで再生されます。");
-        ImGui::TextDisabled("形状1個だけを動かしたい場合は、形状タブの各インスタンス内のモーションを使ってください。");
+        ImGui::TextDisabled("エレメント1個だけを動かしたい場合は、エレメントタブの各インスタンス内のモーションを使ってください。");
         ImGui::Spacing();
 
         if (ImGui::Button("Waypoint Beam Motion 追加")) {
@@ -194,10 +194,10 @@ namespace YoRigine {
         DrawMotionListUI(sel->asset.motions, true, "モーション編集");
     }
 
-    void VfxMeshEditor::ApplyDefaultSubEffectMotions(VfxSubEffect& sub)
+    void VfxMeshEditor::ApplyDefaultElementMotions(VfxElement& sub)
     {
         switch (sub.type) {
-        case VfxSubEffectType::LightVolume:
+        case VfxElementType::LightVolume:
             sub.lightVolume.beamStrength = 0.85f;
             sub.lightVolume.beamRadius = 0.32f;
             sub.lightVolume.beamPower = 2.5f;
@@ -207,7 +207,7 @@ namespace YoRigine {
             AddWaypointBeamMotion(sub.motions);
             break;
 
-        case VfxSubEffectType::Smoke: {
+        case VfxElementType::NoiseVolume: {
             sub.smoke.builtInBurstMotion = false;
             sub.smoke.riseSpeed = 0.f;
             sub.smoke.color = { 1.0f, 1.0f, 1.0f, 1.0f };

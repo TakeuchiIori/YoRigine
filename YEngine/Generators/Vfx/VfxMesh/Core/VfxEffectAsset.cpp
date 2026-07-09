@@ -14,28 +14,28 @@ using json = nlohmann::json;
 namespace YoRigine {
 
     // -------------------------------------------------------
-    const char* VfxSubEffectTypeName(VfxSubEffectType type) {
+    const char* VfxElementTypeName(VfxElementType type) {
         switch (type) {
-        case VfxSubEffectType::LightVolume: return "LightVolume";
-        case VfxSubEffectType::Smoke:       return "Smoke";
-        case VfxSubEffectType::Lightning:   return "Lightning";
-        case VfxSubEffectType::Shockwave:   return "Shockwave";
+        case VfxElementType::LightVolume:   return "LightVolume";
+        case VfxElementType::NoiseVolume:   return "NoiseVolume";
+        case VfxElementType::LightningBolt: return "LightningBolt";
+        case VfxElementType::ShockwaveRing: return "ShockwaveRing";
         }
         return "Unknown";
     }
 
-    VfxMotionTarget MotionTargetFor(VfxSubEffectType type) {
+    VfxMotionTarget MotionTargetFor(VfxElementType type) {
         switch (type) {
-        case VfxSubEffectType::LightVolume: return VfxMotionTarget::LightVolume;
-        case VfxSubEffectType::Smoke:       return VfxMotionTarget::Smoke;
-        case VfxSubEffectType::Lightning:   return VfxMotionTarget::Lightning;
-        case VfxSubEffectType::Shockwave:   return VfxMotionTarget::Shockwave;
+        case VfxElementType::LightVolume:   return VfxMotionTarget::LightVolume;
+        case VfxElementType::NoiseVolume:   return VfxMotionTarget::NoiseVolume;
+        case VfxElementType::LightningBolt: return VfxMotionTarget::LightningBolt;
+        case VfxElementType::ShockwaveRing: return VfxMotionTarget::ShockwaveRing;
         }
         return VfxMotionTarget::All;
     }
 
     // -------------------------------------------------------
-    // ワンショット寿命: BurstGrow モーション（全体/形状個別）優先、
+    // ワンショット寿命: BurstGrow モーション（全体/エレメント個別）優先、
     // 無ければ従来ヒューリスティック
     float VfxEffectAsset::OneShotDuration() const {
         float burst = 0.f;
@@ -45,18 +45,18 @@ namespace YoRigine {
             }
         };
         scan(motions);
-        for (const auto& sub : subEffects) scan(sub.motions);
+        for (const auto& sub : elements) scan(sub.motions);
         if (burst > 0.f) return std::max(burst, 0.01f);
 
-        // ヒューリスティック: 煙があれば最低2秒、衝撃波はその膨張時間
-        bool  hasSmoke = false;
+        // ヒューリスティック: NoiseVolume があれば最低2秒、ShockwaveRing はその膨張時間
+        bool  hasNoiseVolume = false;
         float swDur    = 0.f;
-        for (const auto& sub : subEffects) {
+        for (const auto& sub : elements) {
             if (!sub.enabled) continue;
-            if (sub.type == VfxSubEffectType::Smoke)     hasSmoke = true;
-            if (sub.type == VfxSubEffectType::Shockwave) swDur = std::max(swDur, sub.shockwave.duration);
+            if (sub.type == VfxElementType::NoiseVolume)     hasNoiseVolume = true;
+            if (sub.type == VfxElementType::ShockwaveRing) swDur = std::max(swDur, sub.shockwave.duration);
         }
-        return std::max(hasSmoke
+        return std::max(hasNoiseVolume
             ? (swDur > 0.f ? std::max(swDur, 2.0f) : 2.0f)
             : swDur, 0.1f);
     }
@@ -94,7 +94,7 @@ namespace YoRigine {
     // -------------------------------------------------------
     // モーション評価: target（または All）に一致する動きを共有状態へ加算する。
     // 位置移動は position だけでなく端点(boltStart/End)にも同じオフセットを掛け、
-    // Lightning（端点駆動）も一緒に動くようにする。
+    // LightningBolt（端点駆動）も一緒に動くようにする。
     //
     // 全モーション共通のタイミング:
     //   startTime … この時刻まで不発（Visibility だけは「表示ウィンドウ」として解釈）
@@ -238,15 +238,15 @@ namespace YoRigine {
         EvaluateMotionList(a.motions, target, s);
     }
 
-    void EvaluateSubEffectMotions(const VfxEffectAsset& a,
-                                  const VfxSubEffect& sub, VfxEvalState& s) {
+    void EvaluateElementMotions(const VfxEffectAsset& a,
+                                  const VfxElement& sub, VfxEvalState& s) {
         const VfxMotionTarget target = MotionTargetFor(sub.type);
         EvaluateMotionList(a.motions, target, s);   // 全体モーション（対象一致分）
-        EvaluateMotionList(sub.motions, target, s); // この形状専用のモーション
+        EvaluateMotionList(sub.motions, target, s); // このエレメント専用のモーション
     }
 
     // ===========================================================
-    // JSON ヘルパ（サブ効果パラメータの読み書き）
+    // JSON ヘルパ（エレメントパラメータの読み書き）
     // ===========================================================
     namespace {
 
@@ -413,24 +413,35 @@ namespace YoRigine {
             }
         }
 
-        // サブ効果1個分: type に対応するパラメータブロックだけ書く
-        json SubEffectToJson(const VfxSubEffect& sub) {
+        // エレメント1個分: type に対応するパラメータブロックだけ書く
+        json ElementToJson(const VfxElement& sub) {
             json j;
             j["type"]    = static_cast<int>(sub.type);
+            j["typeName"] = VfxElementTypeName(sub.type);
             j["label"]   = sub.label;
             j["enabled"] = sub.enabled;
             j["offset"]  = sub.offset;
             switch (sub.type) {
-            case VfxSubEffectType::LightVolume: ToJson(j["lightVolume"], sub.lightVolume); break;
-            case VfxSubEffectType::Smoke:       ToJson(j["smoke"],       sub.smoke);       break;
-            case VfxSubEffectType::Lightning:   ToJson(j["lightning"],   sub.lightning);   break;
-            case VfxSubEffectType::Shockwave:   ToJson(j["shockwave"],   sub.shockwave);   break;
+            case VfxElementType::LightVolume: ToJson(j["lightVolume"], sub.lightVolume); break;
+            case VfxElementType::NoiseVolume:       ToJson(j["smoke"],       sub.smoke);       break;
+            case VfxElementType::LightningBolt:   ToJson(j["lightning"],   sub.lightning);   break;
+            case VfxElementType::ShockwaveRing:   ToJson(j["shockwave"],   sub.shockwave);   break;
             }
             if (!sub.motions.empty()) j["motions"] = MotionsToJson(sub.motions);
             return j;
         }
-        void SubEffectFromJson(const json& j, VfxSubEffect& sub) {
-            sub.type    = static_cast<VfxSubEffectType>(j.value("type", static_cast<int>(sub.type)));
+        VfxElementType ParseElementType(const json& j, VfxElementType fallback) {
+            if (j.contains("typeName") && j["typeName"].is_string()) {
+                const std::string s = j["typeName"].get<std::string>();
+                if (s == "LightVolume") return VfxElementType::LightVolume;
+                if (s == "NoiseVolume" || s == "VolumeSmoke" || s == "Smoke") return VfxElementType::NoiseVolume;
+                if (s == "LightningBolt" || s == "Lightning") return VfxElementType::LightningBolt;
+                if (s == "ShockwaveRing" || s == "Shockwave") return VfxElementType::ShockwaveRing;
+            }
+            return static_cast<VfxElementType>(j.value("type", static_cast<int>(fallback)));
+        }
+        void ElementFromJson(const json& j, VfxElement& sub) {
+            sub.type    = ParseElementType(j, sub.type);
             sub.label   = j.value("label",   sub.label);
             sub.enabled = j.value("enabled", sub.enabled);
             if (j.contains("offset")) sub.offset = j["offset"];
@@ -524,10 +535,10 @@ namespace YoRigine {
             pr["scaleByAge"]   = sp.scaleByAge;
         }
 
-        // --- サブ効果リスト（同じ種類を複数持てる） ---
-        j["subEffects"] = json::array();
-        for (const auto& sub : subEffects) {
-            j["subEffects"].push_back(SubEffectToJson(sub));
+        // --- エレメントリスト（同じ種類を複数持てる） ---
+        j["elements"] = json::array();
+        for (const auto& sub : elements) {
+            j["elements"].push_back(ElementToJson(sub));
         }
 
         // --- Motions (エフェクト全体の動き) ---
@@ -629,14 +640,21 @@ namespace YoRigine {
             }
         }
 
-        // --- サブ効果 ---
-        subEffects.clear();
-        if (j.contains("subEffects") && j["subEffects"].is_array()) {
-            // 新形式: サブ効果リスト
-            for (const auto& sj : j["subEffects"]) {
-                VfxSubEffect sub;
-                SubEffectFromJson(sj, sub);
-                subEffects.push_back(std::move(sub));
+        // --- エレメント ---
+        elements.clear();
+        const json* elementArray = nullptr;
+        if (j.contains("elements") && j["elements"].is_array()) {
+            elementArray = &j["elements"];
+        } else if (j.contains("subEffects") && j["subEffects"].is_array()) {
+            elementArray = &j["subEffects"];
+        }
+
+        if (elementArray) {
+            // 新形式 elements / 旧形式 subEffects の両方を読む
+            for (const auto& sj : *elementArray) {
+                VfxElement sub;
+                ElementFromJson(sj, sub);
+                elements.push_back(std::move(sub));
             }
         } else {
             // 旧形式: 各タイプ1個ずつ + useXXX フラグ → 使用中のものだけリスト化
@@ -645,26 +663,26 @@ namespace YoRigine {
             const bool useLightning   = j.value("useLightning",   false);
             const bool useShockwave   = j.value("useShockwave",   false);
 
-            auto migrate = [&](bool used, const char* key, VfxSubEffectType type) {
+            auto migrate = [&](bool used, const char* key, VfxElementType type) {
                 if (!used) return;
-                VfxSubEffect sub;
+                VfxElement sub;
                 sub.type = type;
                 if (j.contains(key)) {
                     // 有効/無効はインスタンスの enabled に一本化する
                     // （メッシュ側が参照する param.isEnable は常に true へ正規化）
                     switch (type) {
-                    case VfxSubEffectType::LightVolume: FromJson(j[key], sub.lightVolume); sub.enabled = sub.lightVolume.isEnable; sub.lightVolume.isEnable = true; break;
-                    case VfxSubEffectType::Smoke:       FromJson(j[key], sub.smoke);       sub.enabled = sub.smoke.isEnable;       sub.smoke.isEnable = true;       break;
-                    case VfxSubEffectType::Lightning:   FromJson(j[key], sub.lightning);   sub.enabled = sub.lightning.isEnable;   sub.lightning.isEnable = true;   break;
-                    case VfxSubEffectType::Shockwave:   FromJson(j[key], sub.shockwave);   sub.enabled = sub.shockwave.isEnable;   sub.shockwave.isEnable = true;   break;
+                    case VfxElementType::LightVolume: FromJson(j[key], sub.lightVolume); sub.enabled = sub.lightVolume.isEnable; sub.lightVolume.isEnable = true; break;
+                    case VfxElementType::NoiseVolume:       FromJson(j[key], sub.smoke);       sub.enabled = sub.smoke.isEnable;       sub.smoke.isEnable = true;       break;
+                    case VfxElementType::LightningBolt:   FromJson(j[key], sub.lightning);   sub.enabled = sub.lightning.isEnable;   sub.lightning.isEnable = true;   break;
+                    case VfxElementType::ShockwaveRing:   FromJson(j[key], sub.shockwave);   sub.enabled = sub.shockwave.isEnable;   sub.shockwave.isEnable = true;   break;
                     }
                 }
-                subEffects.push_back(std::move(sub));
+                elements.push_back(std::move(sub));
             };
-            migrate(useLightVolume, "lightVolume", VfxSubEffectType::LightVolume);
-            migrate(useSmoke,       "smoke",       VfxSubEffectType::Smoke);
-            migrate(useLightning,   "lightning",   VfxSubEffectType::Lightning);
-            migrate(useShockwave,   "shockwave",   VfxSubEffectType::Shockwave);
+            migrate(useLightVolume, "lightVolume", VfxElementType::LightVolume);
+            migrate(useSmoke,       "smoke",       VfxElementType::NoiseVolume);
+            migrate(useLightning,   "lightning",   VfxElementType::LightningBolt);
+            migrate(useShockwave,   "shockwave",   VfxElementType::ShockwaveRing);
         }
 
         // --- Motions (旧 JSON 互換: motions キーが無ければ空=従来挙動) ---

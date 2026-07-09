@@ -84,7 +84,7 @@ namespace YoRigine {
 
     void VfxMeshEditor::Finalize()
     {
-        previewSubs_.clear();   // ~PreviewSub が CB を Unmap する
+        previewElements_.clear();   // ~PreviewElement が CB を Unmap する
         entries_.clear();
         selectedIndex_ = -1;
     }
@@ -133,7 +133,7 @@ namespace YoRigine {
 
         previewTrailEmitter_->Play();
 
-        SyncPreviewSubs();
+        SyncPreviewElements();
     }
 
         // ===========================================================
@@ -253,7 +253,7 @@ namespace YoRigine {
         ImGui::SameLine(0, 4); ImGui::TextDisabled("名前");
         ImGui::Separator();
 
-        // タブ構成: Trail（Emitter駆動で1つ） / 形状（サブ効果リスト） / Motion（全体の動き）
+        // タブ構成: Trail（Emitter駆動で1つ） / エレメント（VFX部品リスト） / Motion（全体の動き）
         if (ImGui::BeginTabBar("##vfxTabs")) {
             // Trail タブ
             {
@@ -269,12 +269,12 @@ namespace YoRigine {
                 }
             }
 
-            // 形状タブ（サブ効果リスト: 同じ種類を複数積める）
+            // エレメントタブ（エレメントリスト: 同じ種類を複数積める）
             {
-                std::string slabel = std::string(asset.subEffects.empty() ? "   " : (ICON_FA_CIRCLE " "))
-                                   + "形状 (" + std::to_string(asset.subEffects.size()) + ")###tab_SubEffects";
+                std::string slabel = std::string(asset.elements.empty() ? "   " : (ICON_FA_CIRCLE " "))
+                                   + "エレメント (" + std::to_string(asset.elements.size()) + ")###tab_elements";
                 if (ImGui::BeginTabItem(slabel.c_str())) {
-                    DrawSubEffectsSection();
+                    DrawElementsSection();
                     ImGui::EndTabItem();
                 }
             }

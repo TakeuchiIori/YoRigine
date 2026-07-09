@@ -10,13 +10,13 @@ namespace YoRigine {
         VfxEffectAsset a;
 
         auto addVolume = [&a](const Vector3& halfExtents, const Vector4& color, float intensity, bool waypointBeam = false) {
-            VfxSubEffect sub;
-            sub.type = VfxSubEffectType::LightVolume;
+            VfxElement sub;
+            sub.type = VfxElementType::LightVolume;
             sub.lightVolume.halfExtents = halfExtents;
             sub.lightVolume.color = color;
             sub.lightVolume.intensity = intensity;
-            if (waypointBeam) ApplyDefaultSubEffectMotions(sub);
-            a.subEffects.push_back(std::move(sub));
+            if (waypointBeam) ApplyDefaultElementMotions(sub);
+            a.elements.push_back(std::move(sub));
         };
 
         switch (preset) {
@@ -69,8 +69,8 @@ namespace YoRigine {
             life.duration = 2.2f;
             a.motions.push_back(life);
 
-            VfxSubEffect fire;
-            fire.type = VfxSubEffectType::Smoke;
+            VfxElement fire;
+            fire.type = VfxElementType::NoiseVolume;
             fire.label = "火球";
             fire.smoke.color = { 4.0f, 1.8f, 0.6f, 1.0f };
             fire.smoke.radius = 1.5f;
@@ -109,10 +109,10 @@ namespace YoRigine {
             fade.fadeIn = 0.03f;
             fade.fadeOut = 0.7f;
             fire.motions.push_back(fade);
-            a.subEffects.push_back(std::move(fire));
+            a.elements.push_back(std::move(fire));
 
-            VfxSubEffect ring;
-            ring.type = VfxSubEffectType::Shockwave;
+            VfxElement ring;
+            ring.type = VfxElementType::ShockwaveRing;
             ring.label = "衝撃波";
             ring.shockwave.color = { 6.0f, 2.5f, 1.0f, 1.0f };
             ring.shockwave.radius = 3.5f;
@@ -130,10 +130,10 @@ namespace YoRigine {
             fadeRing.fadeIn = 0.f;
             fadeRing.fadeOut = 0.25f;
             ring.motions.push_back(fadeRing);
-            a.subEffects.push_back(std::move(ring));
+            a.elements.push_back(std::move(ring));
 
-            VfxSubEffect flash;
-            flash.type = VfxSubEffectType::Lightning;
+            VfxElement flash;
+            flash.type = VfxElementType::LightningBolt;
             flash.label = "閃光";
             flash.lightning.color = { 8.0f, 8.0f, 10.0f, 1.0f };
             flash.lightning.glowColor = { 6.0f, 6.0f, 9.0f, 1.0f };
@@ -153,7 +153,7 @@ namespace YoRigine {
             flicker.amplitude = 0.5f;
             flicker.frequency = 60.0f;
             flash.motions.push_back(flicker);
-            a.subEffects.push_back(std::move(flash));
+            a.elements.push_back(std::move(flash));
             break;
         }
 

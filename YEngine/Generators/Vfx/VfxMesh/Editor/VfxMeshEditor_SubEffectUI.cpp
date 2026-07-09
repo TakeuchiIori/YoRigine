@@ -9,7 +9,7 @@
 
 namespace YoRigine {
 
-    void VfxMeshEditor::DrawLightVolumeSection(VfxSubEffect& sub)
+    void VfxMeshEditor::DrawLightVolumeSection(VfxElement& sub)
     {
         auto* sel = Selected();
         if (!sel) return;
@@ -58,7 +58,7 @@ namespace YoRigine {
         if (showVolumeDebug_) ImGui::TextColored(ImVec4(1, 1, 0, 1), "  > OBB ワイヤーフレーム ON");
     }
 
-    void VfxMeshEditor::DrawSmokeSection(VfxSubEffect& sub)
+    void VfxMeshEditor::DrawNoiseVolumeSection(VfxElement& sub)
     {
         auto* sel = Selected();
         if (!sel) return;
@@ -71,11 +71,11 @@ namespace YoRigine {
             c |= ImGui::DragFloat4("火球色##sm", &sm.color.x, 0.02f, 0.0f, 10.0f, "%.2f");
             c |= ImGui::DragFloat4("煙色(爆発後)##smk", &sm.smokeColor.x, 0.01f, 0.0f, 4.0f, "%.2f");
             c |= ImGui::DragFloat("上昇速度(爆発後)##smrise", &sm.riseSpeed, 0.02f, 0.0f, 8.0f, "%.2f");
-            if (c) CommitChange(b, "Smoke 色");
+            if (c) CommitChange(b, "NoiseVolume 色");
             ImGui::TextDisabled("爆発ワンショット時: 火球色→煙色へ遷移し、上昇しながら漂って消えます");
         }
 
-        ImGui::SeparatorText("形状 / 渦巻き");
+        ImGui::SeparatorText("ボリューム / 渦巻き");
         {
             VfxEffectAsset b = sel->asset;
             bool c = false;
@@ -87,23 +87,23 @@ namespace YoRigine {
             c |= ImGui::DragFloat("密度##smd", &sm.density, 0.01f, 0.0f, 3.0f, "%.2f");
             c |= ImGui::DragFloat("オクターブ##smo", &sm.noiseOctaves, 0.1f, 1.0f, 5.0f, "%.1f");
             c |= ImGui::DragFloat("リム発光(フレア)##smrim", &sm.rimIntensity, 0.05f, 0.0f, 10.0f, "%.2f");
-            if (c) CommitChange(b, "Smoke パラメータ");
+            if (c) CommitChange(b, "NoiseVolume パラメータ");
         }
 
         ImGui::SeparatorText("動き（モーションで作る）");
         {
-            ImGui::TextDisabled("  Smoke の膨張/上昇/フェードは下の「この形状のモーション」で作ります。");
+            ImGui::TextDisabled("  NoiseVolume の膨張/上昇/フェードは下の「このエレメントのモーション」で作ります。");
             if (ImGui::Button("定番の動きをMotionで追加##smtomotion")) {
                 VfxEffectAsset b2 = sel->asset;
-                ApplyDefaultSubEffectMotions(sub);
-                CommitChange(b2, "Smoke に定番モーション追加");
+                ApplyDefaultElementMotions(sub);
+                CommitChange(b2, "NoiseVolume に定番モーション追加");
             }
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("膨張/上昇/フェード/色変化/揺れをモーションとして追加します。");
         }
     }
 
-    void VfxMeshEditor::DrawLightningSection(VfxSubEffect& sub)
+    void VfxMeshEditor::DrawLightningBoltSection(VfxElement& sub)
     {
         auto* sel = Selected();
         if (!sel) return;
@@ -117,7 +117,7 @@ namespace YoRigine {
             c |= ImGui::ColorEdit4("芯の色##lt", &lt.color.x, hdr);
             c |= ImGui::ColorEdit4("グロー色##lt", &lt.glowColor.x, hdr);
             c |= ImGui::ColorEdit4("枝の色##lt", &lt.branchColor.x, hdr);
-            if (c) CommitChange(b, "Lightning 色");
+            if (c) CommitChange(b, "LightningBolt 色");
         }
 
         ImGui::SeparatorText("実体感 / アウトライン");
@@ -127,7 +127,7 @@ namespace YoRigine {
             c |= ImGui::SliderFloat("芯の太さ##ltcw", &lt.coreWidth, 0.0f, 1.0f, "%.2f");
             c |= ImGui::SliderFloat("実体感(透明感↓)##lts", &lt.solidness, 0.0f, 1.0f, "%.2f");
             c |= ImGui::SliderFloat("アウトライン強調##lto", &lt.outlineIntensity, 0.0f, 4.0f, "%.2f");
-            if (c) CommitChange(b, "Lightning 実体感");
+            if (c) CommitChange(b, "LightningBolt 実体感");
         }
 
         ImGui::SeparatorText("方向 / 曲線");
@@ -140,10 +140,10 @@ namespace YoRigine {
             if (ImGui::SmallButton("斜め##ltd")) { lt.direction = { 1,1,0 }; c = true; }
             c |= ImGui::DragFloat3("方向(自由)##ltd", &lt.direction.x, 0.02f, -1.0f, 1.0f, "%.2f");
             c |= ImGui::SliderFloat("曲げ量(弧)##ltbend", &lt.bendAmount, -5.0f, 5.0f, "%.2f");
-            if (c) CommitChange(b, "Lightning 方向/曲線");
+            if (c) CommitChange(b, "LightningBolt 方向/曲線");
         }
 
-        ImGui::SeparatorText("形状 / 明滅");
+        ImGui::SeparatorText("稲妻 / 明滅");
         {
             VfxEffectAsset b = sel->asset;
             bool c = false;
@@ -155,11 +155,11 @@ namespace YoRigine {
             c |= ImGui::DragFloat("枝の振れ##ltbj", &lt.branchJitter, 0.02f, 0.0f, 5.0f, "%.2f");
             c |= ImGui::DragFloat("明滅レート(回/秒)##ltf", &lt.flickerRate, 0.5f, 0.0f, 60.0f, "%.1f");
             c |= ImGui::DragFloat("芯のグロー##ltg", &lt.glowPower, 0.05f, 0.1f, 8.0f, "%.2f");
-            if (c) CommitChange(b, "Lightning パラメータ");
+            if (c) CommitChange(b, "LightningBolt パラメータ");
         }
     }
 
-    void VfxMeshEditor::DrawShockwaveSection(VfxSubEffect& sub)
+    void VfxMeshEditor::DrawShockwaveRingSection(VfxElement& sub)
     {
         auto* sel = Selected();
         if (!sel) return;
@@ -169,50 +169,50 @@ namespace YoRigine {
         {
             VfxEffectAsset b = sel->asset;
             if (ImGui::DragFloat4("色##sw", &sw.color.x, 0.02f, 0.0f, 10.0f, "%.2f"))
-                CommitChange(b, "Shockwave 色");
+                CommitChange(b, "ShockwaveRing 色");
         }
 
-        ImGui::SeparatorText("形状 / 速度");
+        ImGui::SeparatorText("リング / 速度");
         {
             VfxEffectAsset b = sel->asset;
             bool c = false;
             c |= ImGui::DragFloat("最大半径##swr", &sw.radius, 0.05f, 0.1f, 50.0f, "%.2f");
             c |= ImGui::DragFloat("膨張時間(秒)##swd", &sw.duration, 0.01f, 0.05f, 5.0f, "%.2f");
             c |= ImGui::SliderFloat("リング太さ##swt", &sw.thickness, 0.01f, 1.0f);
-            if (c) CommitChange(b, "Shockwave パラメータ");
+            if (c) CommitChange(b, "ShockwaveRing パラメータ");
         }
     }
 
-    void VfxMeshEditor::DrawSubEffectsSection()
+    void VfxMeshEditor::DrawElementsSection()
     {
         auto* sel = Selected();
         if (!sel) return;
-        auto& subs = sel->asset.subEffects;
+        auto& subs = sel->asset.elements;
 
-        ImGui::TextDisabled("形状（Smoke/Lightning/Shockwave/LightVolume）を好きな数だけ追加できます。同じ種類の複数追加も可能。");
+        ImGui::TextDisabled("エレメント（NoiseVolume/LightningBolt/ShockwaveRing/LightVolume）を好きな数だけ追加できます。同じ種類の複数追加も可能。");
         ImGui::Spacing();
 
-        if (ImGui::Button("＋ 形状を追加")) ImGui::OpenPopup("##addSubEffect");
-        if (ImGui::BeginPopup("##addSubEffect")) {
-            const VfxSubEffectType addTypes[] = {
-                VfxSubEffectType::Smoke, VfxSubEffectType::Lightning,
-                VfxSubEffectType::Shockwave, VfxSubEffectType::LightVolume,
+        if (ImGui::Button("＋ エレメントを追加")) ImGui::OpenPopup("##addElement");
+        if (ImGui::BeginPopup("##addElement")) {
+            const VfxElementType addTypes[] = {
+                VfxElementType::NoiseVolume, VfxElementType::LightningBolt,
+                VfxElementType::ShockwaveRing, VfxElementType::LightVolume,
             };
-            for (VfxSubEffectType t : addTypes) {
-                if (ImGui::MenuItem(VfxSubEffectTypeName(t))) {
+            for (VfxElementType t : addTypes) {
+                if (ImGui::MenuItem(VfxElementTypeName(t))) {
                     VfxEffectAsset b = sel->asset;
-                    VfxSubEffect sub;
+                    VfxElement sub;
                     sub.type = t;
-                    ApplyDefaultSubEffectMotions(sub);
+                    ApplyDefaultElementMotions(sub);
                     subs.push_back(std::move(sub));
-                    CommitChange(b, "形状追加");
+                    CommitChange(b, "エレメント追加");
                 }
             }
             ImGui::EndPopup();
         }
         if (subs.empty()) {
             ImGui::SameLine();
-            ImGui::TextDisabled("(形状なし)");
+            ImGui::TextDisabled("(エレメントなし)");
         }
         ImGui::Separator();
 
@@ -223,7 +223,7 @@ namespace YoRigine {
             auto& sub = subs[i];
 
             std::string title = std::string(sub.enabled ? (ICON_FA_CHECK " ") : (ICON_FA_BAN " "))
-                + VfxSubEffectTypeName(sub.type);
+                + VfxElementTypeName(sub.type);
             if (!sub.label.empty()) title += "  \"" + sub.label + "\"";
             title += "###subHeader";
 
@@ -233,11 +233,11 @@ namespace YoRigine {
 
                 {
                     VfxEffectAsset b = sel->asset;
-                    if (ImGui::Checkbox("有効##sub", &sub.enabled)) CommitChange(b, "形状 有効切替");
+                    if (ImGui::Checkbox("有効##sub", &sub.enabled)) CommitChange(b, "エレメント 有効切替");
                 }
                 ImGui::SameLine();
                 if (ImGui::SmallButton("複製##sub")) dupIdx = i;
-                if (ImGui::IsItemHovered()) ImGui::SetTooltip("この形状をパラメータごとコピーして追加");
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip("このエレメントをパラメータごとコピーして追加");
                 ImGui::SameLine();
                 if (ImGui::SmallButton("削除##sub")) removeIdx = i;
 
@@ -249,27 +249,27 @@ namespace YoRigine {
                     if (ImGui::InputText("表示名##sub", labelBuf, sizeof(labelBuf),
                                          ImGuiInputTextFlags_EnterReturnsTrue)) {
                         sub.label = labelBuf;
-                        CommitChange(b, "形状 表示名");
+                        CommitChange(b, "エレメント 表示名");
                     }
                 }
 
                 {
                     VfxEffectAsset b = sel->asset;
                     if (ImGui::DragFloat3("オフセット##sub", &sub.offset.x, 0.05f, -50.f, 50.f, "%.2f"))
-                        CommitChange(b, "形状 オフセット");
+                        CommitChange(b, "エレメント オフセット");
                 }
 
                 ImGui::Spacing();
                 switch (sub.type) {
-                case VfxSubEffectType::LightVolume: DrawLightVolumeSection(sub); break;
-                case VfxSubEffectType::Smoke:       DrawSmokeSection(sub);       break;
-                case VfxSubEffectType::Lightning:   DrawLightningSection(sub);   break;
-                case VfxSubEffectType::Shockwave:   DrawShockwaveSection(sub);   break;
+                case VfxElementType::LightVolume: DrawLightVolumeSection(sub); break;
+                case VfxElementType::NoiseVolume:       DrawNoiseVolumeSection(sub);       break;
+                case VfxElementType::LightningBolt:   DrawLightningBoltSection(sub);   break;
+                case VfxElementType::ShockwaveRing:   DrawShockwaveRingSection(sub);   break;
                 }
 
-                ImGui::SeparatorText("この形状のモーション");
+                ImGui::SeparatorText("このエレメントのモーション");
                 ImGui::TextDisabled("  ※エフェクト全体のモーション（Motionタブ）に加算で適用されます");
-                DrawMotionListUI(sub.motions, false, "形状モーション編集");
+                DrawMotionListUI(sub.motions, false, "エレメントモーション編集");
 
                 ImGui::Unindent();
             }
@@ -279,14 +279,14 @@ namespace YoRigine {
 
         if (dupIdx >= 0) {
             VfxEffectAsset b = sel->asset;
-            VfxSubEffect copy = subs[dupIdx];
+            VfxElement copy = subs[dupIdx];
             subs.insert(subs.begin() + dupIdx + 1, std::move(copy));
-            CommitChange(b, "形状複製");
+            CommitChange(b, "エレメント複製");
         }
         if (removeIdx >= 0) {
             VfxEffectAsset b = sel->asset;
             subs.erase(subs.begin() + removeIdx);
-            CommitChange(b, "形状削除");
+            CommitChange(b, "エレメント削除");
         }
     }
 

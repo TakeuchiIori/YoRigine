@@ -72,17 +72,17 @@ namespace YoRigine {
         void DrawListPanel();
         void DrawEditPanel();
         void DrawTrailSection();
-        // サブ効果（形状インスタンス）: 一覧＋追加/複製/削除
-        void DrawSubEffectsSection();
+        // エレメント（エレメントインスタンス）: 一覧＋追加/複製/削除
+        void DrawElementsSection();
         // 各種類のパラメータ編集（sub の対応パラメータを編集する）
-        void DrawLightVolumeSection(VfxSubEffect& sub);
-        void DrawSmokeSection(VfxSubEffect& sub);
-        void DrawLightningSection(VfxSubEffect& sub);
-        void DrawShockwaveSection(VfxSubEffect& sub);
-        // モーションリスト編集（全体用と形状個別用で共用。showTarget=false で対象コンボを隠す）
+        void DrawLightVolumeSection(VfxElement& sub);
+        void DrawNoiseVolumeSection(VfxElement& sub);
+        void DrawLightningBoltSection(VfxElement& sub);
+        void DrawShockwaveRingSection(VfxElement& sub);
+        // モーションリスト編集（全体用とエレメント個別用で共用。showTarget=false で対象コンボを隠す）
         void DrawMotionListUI(std::vector<VfxMotion>& motions, bool showTarget, const char* commitLabel);
         void DrawMotionSection();
-        static void ApplyDefaultSubEffectMotions(VfxSubEffect& sub);
+        static void ApplyDefaultElementMotions(VfxElement& sub);
         void DrawPreviewSection();
         void DrawNewEffectDialog();
         void DrawTextureSelectPopup();
@@ -105,9 +105,9 @@ namespace YoRigine {
 
         void CommitChange(const VfxEffectAsset& before, const char* label);
 
-        // アセットの subEffects と previewSubs_ の構成（数と種類）を同期させる。
+        // アセットの elements と previewElements_ の構成（数と種類）を同期させる。
         // 追加/削除/種類変更/Undo などで構成が変わったら作り直す。
-        void SyncPreviewSubs();
+        void SyncPreviewElements();
 
         static VfxEffectAsset MakePreset(VfxPreset preset);
 
@@ -129,10 +129,10 @@ namespace YoRigine {
         // ★ プレビュー（TrailはEmitterに完全委譲）
         std::unique_ptr<TrailMeshEmitter> previewTrailEmitter_;
 
-        // サブ効果1個分のプレビューリソース（asset.subEffects と1対1対応）
-        struct PreviewSub
+        // エレメント1個分のプレビューリソース（asset.elements と1対1対応）
+        struct PreviewElement
         {
-            VfxSubEffectType type = VfxSubEffectType::Smoke;
+            VfxElementType type = VfxElementType::NoiseVolume;
 
             // type に対応するものだけ生成される
             std::unique_ptr<LightVolumeMesh> volume;
@@ -144,7 +144,7 @@ namespace YoRigine {
             Microsoft::WRL::ComPtr<ID3D12Resource> cbRes;
             void*                                  cbMapped = nullptr;
 
-            // Smoke の CB 用読み戻し値
+            // NoiseVolume の CB 用読み戻し値
             Vector3 smokeCenter = { 0.f, 0.f, 0.f };
             float   smokeRadius = 1.5f;
 
@@ -154,11 +154,11 @@ namespace YoRigine {
             float   beamGlowScale   = 1.f;
             bool    visible         = true;                   // Visibility モーションの結果
 
-            ~PreviewSub() {
+            ~PreviewElement() {
                 if (cbMapped && cbRes) { cbRes->Unmap(0, nullptr); cbMapped = nullptr; }
             }
         };
-        std::vector<std::unique_ptr<PreviewSub>> previewSubs_;
+        std::vector<std::unique_ptr<PreviewElement>> previewElements_;
 
         PreviewAnimMode previewAnim_ = PreviewAnimMode::SlashHorizontal;
         float swordLength_ = 2.0f;    // プレビュー剣のサイズ（tip↔root）
@@ -178,7 +178,7 @@ namespace YoRigine {
         float   burstDuration_ = 2.0f; // 寿命フォールバック（BurstGrow モーションが無いとき）
         float   burstProgress_ = -1.f; // -1=継続(ループ確認中), 0..1=ワンショット進捗
         float   oneShotGap_    = 0.6f; // 一発出しきってから次の一発までの休止時間（完全に消える間）
-        float   oneShotLocal_  = 0.f;  // 現サイクル内の経過秒（DrawPreview のサブ効果駆動に使う）
+        float   oneShotLocal_  = 0.f;  // 現サイクル内の経過秒（DrawPreview のエレメント駆動に使う）
         bool    burstMode_     = false;// このフレームがワンショット駆動か（false=継続ループ確認）
         Vector3 previewCenter_ = { 0.f, 0.f, 0.f };
         float   previewYaw_ = 0.f;

@@ -5,7 +5,7 @@
 // エフェクトの「動き」をデータとして表すコンポーネント。
 // enum + POD struct（ポインタを持たない）で、アセットに複数積める。
 // 追加する動きは VfxMotionType に1つ、EvaluateMotions() に1 case
-// 足すだけで、Smoke/Lightning/Shockwave など全 Mesh に適用できる。
+// 足すだけで、NoiseVolume/LightningBolt/ShockwaveRing など全 Mesh に適用できる。
 //
 // UE5 Niagara のモジュール（Scale/Color over Life・Fade・Gravity・
 // Orbit・遅延ウィンドウ・イージング）を参考にした構成。
@@ -51,15 +51,15 @@ namespace YoRigine {
         EaseOutBack,    // 少し行き過ぎて戻る（ポップ感）
     };
 
-    // このモーションを適用するサブ効果。All なら全効果に効く。
-    // 個別に指定すると「煙だけ上昇 / 衝撃波は固定」のような作り分けができる。
-    // （形状インスタンス個別の motions では常にその形状にだけ効く）
+    // このモーションを適用するエレメント。All なら全効果に効く。
+    // 個別に指定すると「ノイズボリュームだけ上昇 / 衝撃波リングは固定」のような作り分けができる。
+    // （エレメント個別の motions では常にそのエレメントにだけ効く）
     enum class VfxMotionTarget : uint8_t
     {
         All = 0,
-        Smoke,
-        Lightning,
-        Shockwave,
+        NoiseVolume,
+        LightningBolt,
+        ShockwaveRing,
         LightVolume,
     };
 

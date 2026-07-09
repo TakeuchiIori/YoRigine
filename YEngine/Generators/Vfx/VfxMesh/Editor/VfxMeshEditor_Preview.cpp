@@ -38,7 +38,7 @@ namespace YoRigine {
                 }
             };
             scan(asset.motions);
-            for (const auto& sub : asset.subEffects) scan(sub.motions);
+            for (const auto& sub : asset.elements) scan(sub.motions);
             if (bg > 0.f) burstPeriod = std::max(bg, 0.01f);
         }
 
@@ -63,7 +63,7 @@ namespace YoRigine {
         }
         const float oneShotLocal = oneShotLocal_;
 
-        SyncPreviewSubs();
+        SyncPreviewElements();
 
         VfxEvalState mbase;
         mbase.age = burstMode_ ? oneShotLocal : previewTimer_;
@@ -132,10 +132,10 @@ namespace YoRigine {
             previewTrailEmitter_->Update(deltaTime);
         }
 
-        const size_t subCount = std::min(asset.subEffects.size(), previewSubs_.size());
+        const size_t subCount = std::min(asset.elements.size(), previewElements_.size());
         for (size_t i = 0; i < subCount; ++i) {
-            const auto& def = asset.subEffects[i];
-            auto& sub = *previewSubs_[i];
+            const auto& def = asset.elements[i];
+            auto& sub = *previewElements_[i];
             if (!def.enabled) continue;
 
             if (oneShotIdle) {
@@ -145,7 +145,7 @@ namespace YoRigine {
 
             VfxEvalState s = mbase;
             s.position += def.offset;
-            EvaluateSubEffectMotions(asset, def, s);
+            EvaluateElementMotions(asset, def, s);
 
             sub.tint = s.colorTint;
             sub.beamRadiusScale = s.beamRadiusScale;
@@ -153,14 +153,14 @@ namespace YoRigine {
             sub.visible = s.visible;
 
             switch (def.type) {
-            case VfxSubEffectType::LightVolume:
+            case VfxElementType::LightVolume:
                 if (sub.volume) {
                     sub.volume->ApplyParam(def.lightVolume);
                     sub.volume->SetTransform(s.position, previewYaw_);
                     sub.volume->Update(deltaTime);
                 }
                 break;
-            case VfxSubEffectType::Smoke:
+            case VfxElementType::NoiseVolume:
                 if (sub.smoke) {
                     sub.smoke->ApplyParam(def.smoke);
                     sub.smoke->Drive(s);
@@ -169,7 +169,7 @@ namespace YoRigine {
                     sub.smokeRadius = sub.smoke->GetRadius();
                 }
                 break;
-            case VfxSubEffectType::Lightning:
+            case VfxElementType::LightningBolt:
                 if (sub.lightning) {
                     sub.lightning->SetCamera(camera_);
                     sub.lightning->ApplyParam(def.lightning);
@@ -181,7 +181,7 @@ namespace YoRigine {
                     sub.lightning->Update(deltaTime);
                 }
                 break;
-            case VfxSubEffectType::Shockwave:
+            case VfxElementType::ShockwaveRing:
                 if (sub.shockwave) {
                     sub.shockwave->SetCamera(camera_);
                     sub.shockwave->ApplyParam(def.shockwave);
@@ -213,15 +213,15 @@ namespace YoRigine {
             return { c.x * t.x, c.y * t.y, c.z * t.z, c.w * t.w };
         };
 
-        const size_t subCount = std::min(asset.subEffects.size(), previewSubs_.size());
+        const size_t subCount = std::min(asset.elements.size(), previewElements_.size());
         for (size_t i = 0; i < subCount; ++i) {
-            const auto& def = asset.subEffects[i];
-            auto& sub = *previewSubs_[i];
+            const auto& def = asset.elements[i];
+            auto& sub = *previewElements_[i];
             if (!def.enabled || !sub.cbMapped || !sub.cbRes) continue;
             if (!sub.visible || sub.tint.w <= 0.001f) continue;
 
             switch (def.type) {
-            case VfxSubEffectType::LightVolume:
+            case VfxElementType::LightVolume:
                 if (sub.volume) {
                     const auto& lv = def.lightVolume;
                     auto& cb = *static_cast<LightVolumeParamsCB*>(sub.cbMapped);
@@ -247,7 +247,7 @@ namespace YoRigine {
                     sub.volume->Draw(cmdList);
                 }
                 break;
-            case VfxSubEffectType::Smoke:
+            case VfxElementType::NoiseVolume:
                 if (sub.smoke) {
                     const auto& sm = def.smoke;
                     auto& cb = *static_cast<SmokeParamsCB*>(sub.cbMapped);
@@ -273,7 +273,7 @@ namespace YoRigine {
                     sub.smoke->Draw(cmdList);
                 }
                 break;
-            case VfxSubEffectType::Lightning:
+            case VfxElementType::LightningBolt:
                 if (sub.lightning) {
                     const auto& lt = def.lightning;
                     auto& cb = *static_cast<LightningParamsCB*>(sub.cbMapped);
@@ -295,7 +295,7 @@ namespace YoRigine {
                     sub.lightning->Draw(cmdList);
                 }
                 break;
-            case VfxSubEffectType::Shockwave:
+            case VfxElementType::ShockwaveRing:
                 if (sub.shockwave) {
                     const auto& sw = def.shockwave;
                     auto& cb = *static_cast<ShockwaveParamsCB*>(sub.cbMapped);
@@ -399,8 +399,8 @@ namespace YoRigine {
                     std::min(previewTimer_ / sel->asset.trail.lifetime, 1.f),
                     ImVec2(-1, 0), ov);
             }
-            for (const auto& sub : sel->asset.subEffects) {
-                if (sub.type == VfxSubEffectType::LightVolume && sub.enabled) {
+            for (const auto& sub : sel->asset.elements) {
+                if (sub.type == VfxElementType::LightVolume && sub.enabled) {
                     ImGui::ProgressBar(1.f, ImVec2(-1, 0), "Light Volume  (active)");
                     break;
                 }
@@ -409,51 +409,51 @@ namespace YoRigine {
         ImGui::TextDisabled("時刻: %.3f s", previewTimer_);
     }
 
-    void VfxMeshEditor::SyncPreviewSubs()
+    void VfxMeshEditor::SyncPreviewElements()
     {
         auto* sel = Selected();
-        if (!sel) { previewSubs_.clear(); return; }
-        const auto& subs = sel->asset.subEffects;
+        if (!sel) { previewElements_.clear(); return; }
+        const auto& subs = sel->asset.elements;
 
-        bool match = (previewSubs_.size() == subs.size());
+        bool match = (previewElements_.size() == subs.size());
         if (match) {
             for (size_t i = 0; i < subs.size(); ++i) {
-                if (previewSubs_[i]->type != subs[i].type) { match = false; break; }
+                if (previewElements_[i]->type != subs[i].type) { match = false; break; }
             }
         }
         if (match) return;
 
-        previewSubs_.clear();
-        previewSubs_.reserve(subs.size());
+        previewElements_.clear();
+        previewElements_.reserve(subs.size());
 
         for (const auto& def : subs) {
-            auto sub = std::make_unique<PreviewSub>();
+            auto sub = std::make_unique<PreviewElement>();
             sub->type = def.type;
 
             switch (def.type) {
-            case VfxSubEffectType::LightVolume:
+            case VfxElementType::LightVolume:
                 sub->volume = std::make_unique<LightVolumeMesh>();
                 sub->volume->Initialize(def.lightVolume);
                 sub->cbRes = dxCommon_->CreateBufferResource(AlignedSize<LightVolumeParamsCB>());
                 break;
-            case VfxSubEffectType::Smoke:
+            case VfxElementType::NoiseVolume:
                 sub->smoke = std::make_unique<VolumeSmokeMesh>();
                 sub->smoke->Initialize();
                 sub->cbRes = dxCommon_->CreateBufferResource(AlignedSize<SmokeParamsCB>());
                 break;
-            case VfxSubEffectType::Lightning:
+            case VfxElementType::LightningBolt:
                 sub->lightning = std::make_unique<LightningMesh>();
                 sub->lightning->Initialize();
                 sub->cbRes = dxCommon_->CreateBufferResource(AlignedSize<LightningParamsCB>());
                 break;
-            case VfxSubEffectType::Shockwave:
+            case VfxElementType::ShockwaveRing:
                 sub->shockwave = std::make_unique<ShockwaveMesh>();
                 sub->shockwave->Initialize();
                 sub->cbRes = dxCommon_->CreateBufferResource(AlignedSize<ShockwaveParamsCB>());
                 break;
             }
             sub->cbRes->Map(0, nullptr, &sub->cbMapped);
-            previewSubs_.push_back(std::move(sub));
+            previewElements_.push_back(std::move(sub));
         }
     }
 
