@@ -144,6 +144,9 @@ public:
 	// メッシュ取得
 	const std::vector<std::unique_ptr<Mesh>>& GetMeshes() const { return meshes_; }
 
+	// Mixamo由来モデルか
+	bool IsMixamoAsset() const { return isMixamoAsset_; }
+
 private:
 	///************************* ポインタ *************************///
 
@@ -161,6 +164,8 @@ private:
 	Motion motion_;
 	bool isMotion_;
 	bool hasBones_;
+	bool isMixamoAsset_ = false;
+	float importUnitScale_ = 1.0f;
 	float deltaTime_;
 
 public:

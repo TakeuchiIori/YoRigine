@@ -11,6 +11,50 @@
 #include "Vector3.h"
 #include "Quaternion.h"
 
+namespace {
+	using NodeAnimationLookup = std::unordered_map<std::string, const Motion::NodeAnimation*>;
+
+	NodeAnimationLookup BuildNodeAnimationLookup(const Motion* motion)
+	{
+		NodeAnimationLookup lookup;
+		if (!motion) {
+			return lookup;
+		}
+
+		lookup.reserve(motion->animation_.nodeAnimations_.size());
+		for (const auto& [nodeName, nodeAnimation] : motion->animation_.nodeAnimations_) {
+			lookup[NormalizeNodeName(nodeName)] = &nodeAnimation;
+		}
+		return lookup;
+	}
+
+	const Motion::NodeAnimation* FindNodeAnimation(const NodeAnimationLookup& lookup, const std::string& normalizedName)
+	{
+		auto it = lookup.find(normalizedName);
+		return it != lookup.end() ? it->second : nullptr;
+	}
+
+	QuaternionTransform SampleNodeAnimation(
+		const Motion& motion,
+		const Motion::NodeAnimation* nodeAnimation,
+		float time,
+		const QuaternionTransform& fallback)
+	{
+		if (!nodeAnimation) {
+			return fallback;
+		}
+
+		QuaternionTransform transform{};
+		transform.translate = const_cast<Motion&>(motion).CalculateValue(
+			nodeAnimation->translate.keyframes, time, nodeAnimation->interpolationType);
+		transform.rotate = const_cast<Motion&>(motion).CalculateValue(
+			nodeAnimation->rotate.keyframes, time, nodeAnimation->interpolationType);
+		transform.scale = const_cast<Motion&>(motion).CalculateValue(
+			nodeAnimation->scale.keyframes, time, nodeAnimation->interpolationType);
+		return transform;
+	}
+}
+
 // ============================================================
 // 初期化（スケルトンあり）
 // ============================================================
@@ -122,6 +166,18 @@ void MotionSystem::Update(float deltaTime){
 void MotionSystem::Apply()
 {
 	if (skeleton_) {
+		const NodeAnimationLookup baseLookup = BuildNodeAnimationLookup(animation_);
+		const NodeAnimationLookup upperLookup = BuildNodeAnimationLookup(
+			upperAnimation_ && upperPlayMode_ != MotionPlayMode::Stop && !isUpperFinished_ ? upperAnimation_ : nullptr);
+		const NodeAnimationLookup blendOutUpperLookup = BuildNodeAnimationLookup(
+			isUpperBlendingOut_ ? blendOutUpperAnimation_ : nullptr);
+		const NodeAnimationLookup blendFromLookup = animationBlendState_.isBlending
+			? BuildNodeAnimationLookup(&animationBlendState_.from)
+			: NodeAnimationLookup{};
+		const NodeAnimationLookup blendToLookup = animationBlendState_.isBlending
+			? BuildNodeAnimationLookup(&animationBlendState_.to)
+			: NodeAnimationLookup{};
+
 		for (Joint& joint : skeleton_->GetJoints()) {
 			std::string normName = GetNormalizedName(joint.GetName());
 
@@ -130,33 +186,47 @@ void MotionSystem::Apply()
 
 			QuaternionTransform appliedTransform;
 			bool transformSet = false;
+			const Motion::NodeAnimation* upperNode = FindNodeAnimation(upperLookup, normName);
 
 			// ★ここが一番重要！ 上半身であり、かつ攻撃アニメが再生中なら、上半身を攻撃モーションにする！
-			if (isUpperBody && upperAnimation_ && upperPlayMode_ != MotionPlayMode::Stop && !isUpperFinished_) {
-				appliedTransform = GetTransformAnimation(*upperAnimation_, normName, upperAnimationTime_);
+			if (isUpperBody && upperAnimation_ && upperPlayMode_ != MotionPlayMode::Stop && !isUpperFinished_ && upperNode) {
+				appliedTransform = SampleNodeAnimation(*upperAnimation_, upperNode, upperAnimationTime_, joint.GetTransform());
 				transformSet = true;
 			}
 			// ★ブレンドアウト中：上半身アニメーションからベースアニメーションへ徐々に遷移
 			else if (isUpperBody && isUpperBlendingOut_ && blendOutUpperAnimation_) {
 				float t = std::clamp(upperBlendOutTimer_ / upperBlendOutDuration_, 0.0f, 1.0f);
-				QuaternionTransform upperTr = GetTransformAnimation(*blendOutUpperAnimation_, normName, blendOutUpperAnimTime_);
+				QuaternionTransform upperTr = SampleNodeAnimation(
+					*blendOutUpperAnimation_,
+					FindNodeAnimation(blendOutUpperLookup, normName),
+					blendOutUpperAnimTime_,
+					joint.GetTransform());
 
 				// ベースレイヤーのトランスフォームを取得
-				QuaternionTransform baseTr{};
-				baseTr.translate = { 0.0f, 0.0f, 0.0f };
-				baseTr.rotate = { 0.0f, 0.0f, 0.0f, 1.0f };
-				baseTr.scale = { 1.0f, 1.0f, 1.0f };
+				QuaternionTransform baseTr = joint.GetTransform();
 
 				if (animationBlendState_.isBlending) {
 					float bt = std::clamp(animationBlendState_.currentTime / animationBlendState_.blendTime, 0.0f, 1.0f);
-					QuaternionTransform fromTr = GetTransformAnimation(animationBlendState_.from, normName, animationBlendState_.fromTime + animationBlendState_.currentTime);
-					QuaternionTransform toTr = GetTransformAnimation(animationBlendState_.to, normName, animationBlendState_.toTime + animationBlendState_.currentTime);
+					QuaternionTransform fromTr = SampleNodeAnimation(
+						animationBlendState_.from,
+						FindNodeAnimation(blendFromLookup, normName),
+						animationBlendState_.fromTime + animationBlendState_.currentTime,
+						joint.GetTransform());
+					QuaternionTransform toTr = SampleNodeAnimation(
+						animationBlendState_.to,
+						FindNodeAnimation(blendToLookup, normName),
+						animationBlendState_.toTime + animationBlendState_.currentTime,
+						joint.GetTransform());
 					baseTr.translate = Lerp(fromTr.translate, toTr.translate, bt);
 					baseTr.rotate = Slerp(fromTr.rotate, toTr.rotate, bt);
 					baseTr.scale = Lerp(fromTr.scale, toTr.scale, bt);
 				}
 				else if (animation_ && playMode_ != MotionPlayMode::Stop) {
-					baseTr = GetTransformAnimation(*animation_, normName, animationTime_);
+					baseTr = SampleNodeAnimation(
+						*animation_,
+						FindNodeAnimation(baseLookup, normName),
+						animationTime_,
+						joint.GetTransform());
 				}
 
 				// 攻撃ポーズからベースポーズへ補間（t: 0→1）
@@ -169,8 +239,21 @@ void MotionSystem::Apply()
 			else {
 				if (animationBlendState_.isBlending) {
 					float t = std::clamp(animationBlendState_.currentTime / animationBlendState_.blendTime, 0.0f, 1.0f);
-					QuaternionTransform fromTr = GetTransformAnimation(animationBlendState_.from, normName, animationBlendState_.fromTime + animationBlendState_.currentTime);
-					QuaternionTransform toTr = GetTransformAnimation(animationBlendState_.to, normName, animationBlendState_.toTime + animationBlendState_.currentTime);
+					const Motion::NodeAnimation* fromNode = FindNodeAnimation(blendFromLookup, normName);
+					const Motion::NodeAnimation* toNode = FindNodeAnimation(blendToLookup, normName);
+					if (!fromNode && !toNode) {
+						continue;
+					}
+					QuaternionTransform fromTr = SampleNodeAnimation(
+						animationBlendState_.from,
+						fromNode,
+						animationBlendState_.fromTime + animationBlendState_.currentTime,
+						joint.GetTransform());
+					QuaternionTransform toTr = SampleNodeAnimation(
+						animationBlendState_.to,
+						toNode,
+						animationBlendState_.toTime + animationBlendState_.currentTime,
+						joint.GetTransform());
 
 					appliedTransform.translate = Lerp(fromTr.translate, toTr.translate, t);
 					appliedTransform.rotate = Slerp(fromTr.rotate, toTr.rotate, t);
@@ -178,7 +261,11 @@ void MotionSystem::Apply()
 					transformSet = true;
 				}
 				else if (animation_ && playMode_ != MotionPlayMode::Stop) {
-					appliedTransform = GetTransformAnimation(*animation_, normName, animationTime_);
+					const Motion::NodeAnimation* baseNode = FindNodeAnimation(baseLookup, normName);
+					if (!baseNode) {
+						continue;
+					}
+					appliedTransform = SampleNodeAnimation(*animation_, baseNode, animationTime_, joint.GetTransform());
 					transformSet = true;
 				}
 			}
@@ -312,6 +399,15 @@ std::string MotionSystem::GetNormalizedName(const std::string& name) {
 	return normalized;
 }
 
+bool MotionSystem::HasTransformAnimation(const Motion& anim, const std::string& nodeName)
+{
+	const auto& animMap = anim.animation_.nodeAnimations_;
+	return std::any_of(animMap.begin(), animMap.end(),
+		[&](const auto& pair) {
+			return GetNormalizedName(pair.first) == GetNormalizedName(nodeName);
+		});
+}
+
 // ============================================================
 // トランスフォームの取得
 // ============================================================
@@ -367,14 +463,20 @@ void MotionSystem::BlendAndApplyAnimation(const Motion& from, const Motion& to, 
 {
 	float fromSampleTime = animationBlendState_.fromTime + animationBlendState_.currentTime;
 	float toSampleTime = animationBlendState_.toTime + animationBlendState_.currentTime;
+	const NodeAnimationLookup fromLookup = BuildNodeAnimationLookup(&from);
+	const NodeAnimationLookup toLookup = BuildNodeAnimationLookup(&to);
 
 	for (Joint& joint : skeleton_->GetJoints()) {
 		std::string name = GetNormalizedName(joint.GetName());
 
-		if (ignoreNodes.count(name)) { continue; }
+		const Motion::NodeAnimation* fromNode = FindNodeAnimation(fromLookup, name);
+		const Motion::NodeAnimation* toNode = FindNodeAnimation(toLookup, name);
+		if (!fromNode && !toNode) {
+			continue;
+		}
 
-		QuaternionTransform fromTr = GetTransformAnimation(from, name, fromSampleTime);
-		QuaternionTransform toTr = GetTransformAnimation(to, name, toSampleTime);
+		QuaternionTransform fromTr = SampleNodeAnimation(from, fromNode, fromSampleTime, joint.GetTransform());
+		QuaternionTransform toTr = SampleNodeAnimation(to, toNode, toSampleTime, joint.GetTransform());
 		QuaternionTransform blended;
 
 		blended.translate = Lerp(fromTr.translate, toTr.translate, t);

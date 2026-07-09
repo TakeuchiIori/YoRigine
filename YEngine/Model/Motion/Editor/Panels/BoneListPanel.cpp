@@ -74,6 +74,10 @@ void BoneListPanel::DrawImGui()
 	ImGui::Separator();
 	if (ImGui::SmallButton("選択解除")) {
 		context_->selBone = "";
+		context_->hasLiveBoneOverride = false;
+		context_->liveOverrideBone.clear();
+		context_->hasLiveBoneOriginal = false;
+		context_->liveOriginalBone.clear();
 		context_->statusMsg = "ボーン選択を解除しました";
 	}
 #endif
@@ -115,6 +119,12 @@ void BoneListPanel::DrawBoneNode(const std::vector<Joint>& joints, int jointInde
 
 	// アイテムがクリックされた時の選択処理 (開閉の矢印クリックは除く)
 	if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen()) {
+		if (context_->selBone != name) {
+			context_->hasLiveBoneOverride = false;
+			context_->liveOverrideBone.clear();
+			context_->hasLiveBoneOriginal = false;
+			context_->liveOriginalBone.clear();
+		}
 		context_->selBone = name;
 		context_->statusMsg = "ボーン選択: " + name;
 

@@ -154,7 +154,7 @@ void SkinCluster::SetInputVertices(const std::vector<Vertex>& vertices) {
 /// <summary>
 /// 複数メッシュごとのスキンクラスターデータを読み込む
 /// </summary>
-void SkinCluster::LoadFromScene(const aiScene* scene) {
+void SkinCluster::LoadFromScene(const aiScene* scene, float importUnitScale) {
 	std::vector<std::map<std::string, JointWeightData>> allMeshJointData;
 	meshVertexCounts_.clear();
 
@@ -174,10 +174,15 @@ void SkinCluster::LoadFromScene(const aiScene* scene) {
 			aiQuaternion rotate;
 			bindPoseMatrixAssimp.Decompose(scale, rotate, translate);
 
+			Vector3 bindScale = { scale.x, scale.y, scale.z };
+			if (importUnitScale != 1.0f && IsNearlyUniformScale(scale, kMixamoImportUnitScale)) {
+				bindScale = { 1.0f, 1.0f, 1.0f };
+			}
+
 			Matrix4x4 bindposeMatrix = MakeAffineMatrix(
-				{ scale.x, scale.y, scale.z },
+				bindScale,
 				{ rotate.x, -rotate.y, -rotate.z, rotate.w },
-				{ -translate.x, translate.y, translate.z });
+				{ -translate.x * importUnitScale, translate.y * importUnitScale, translate.z * importUnitScale });
 
 			jointWeightData.inverseBindPoseMatrix = Inverse(bindposeMatrix);
 

@@ -98,7 +98,7 @@ public:
 	// ============================================================
 	// 基本関数（ロード・セーブ・適用）
 	// ============================================================
-	static Motion LoadFromScene(const aiScene* scene, const std::string& gltfFilePath, const std::string& animationName);
+	static Motion LoadFromScene(const aiScene* scene, const std::string& gltfFilePath, const std::string& animationName, float importUnitScale = 1.0f);
 	static std::string ParseGLTFInterpolation(const std::string& gltfFilePath, uint32_t samplerIndex);
 
 	void SaveBinary(const Motion& motion, const std::string& animationName, const std::string& path);

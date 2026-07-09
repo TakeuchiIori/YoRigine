@@ -1,5 +1,6 @@
 #include "Motion.h"
 #include "MathFunc.h"
+#include "../../ModelUtils.h"
 #include <assert.h>
 #include <fstream>
 #include <filesystem>
@@ -75,7 +76,7 @@ namespace {
 // ============================================================
 // Assimp Scene からのロード
 // ============================================================
-Motion Motion::LoadFromScene(const aiScene* scene, const std::string& gltfFilePath, const std::string& animationName)
+Motion Motion::LoadFromScene(const aiScene* scene, const std::string& gltfFilePath, const std::string& animationName, float importUnitScale)
 {
 	assert(scene && scene->mNumAnimations > 0);
 	Motion anim;
@@ -127,7 +128,8 @@ Motion Motion::LoadFromScene(const aiScene* scene, const std::string& gltfFilePa
 	// ------------------------------------------------------------
 	for (uint32_t channelIndex = 0; channelIndex < animationAssimp->mNumChannels; ++channelIndex) {
 		aiNodeAnim* nodeAnimationAssimp = animationAssimp->mChannels[channelIndex];
-		NodeAnimation& nodeAnimation = anim.animation_.nodeAnimations_[nodeAnimationAssimp->mNodeName.C_Str()];
+		const std::string nodeName = nodeAnimationAssimp->mNodeName.C_Str();
+		NodeAnimation& nodeAnimation = anim.animation_.nodeAnimations_[nodeName];
 
 		const std::string& interpolation = interpolations[channelIndex];
 		if (interpolation == "LINEAR") nodeAnimation.interpolationType = InterpolationType::Linear;
@@ -139,7 +141,7 @@ Motion Motion::LoadFromScene(const aiScene* scene, const std::string& gltfFilePa
 			KeyframeVector3 kf;
 			kf.time = float(nodeAnimationAssimp->mPositionKeys[i].mTime / tps);
 			const auto& val = nodeAnimationAssimp->mPositionKeys[i].mValue;
-			kf.value = { -val.x, val.y, val.z };
+			kf.value = { -val.x * importUnitScale, val.y * importUnitScale, val.z * importUnitScale };
 			nodeAnimation.translate.keyframes.push_back(kf);
 		}
 
@@ -148,6 +150,9 @@ Motion Motion::LoadFromScene(const aiScene* scene, const std::string& gltfFilePa
 			kf.time = float(nodeAnimationAssimp->mScalingKeys[i].mTime / tps);
 			const auto& val = nodeAnimationAssimp->mScalingKeys[i].mValue;
 			kf.value = { val.x, val.y, val.z };
+			if (importUnitScale != 1.0f && IsArmatureNodeName(nodeName) && IsNearlyUniformScale(val, kMixamoImportUnitScale)) {
+				kf.value = { 1.0f, 1.0f, 1.0f };
+			}
 			nodeAnimation.scale.keyframes.push_back(kf);
 		}
 

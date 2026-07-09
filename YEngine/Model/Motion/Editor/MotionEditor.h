@@ -76,6 +76,7 @@ private:
 	QuaternionTransform BufferToTransform() const;
 	void SyncJointToBuffer(const std::string& bone);
 	void SyncBufferToJoint();
+	void RestoreLiveBoneOriginal();
 
 	Matrix4x4 GetTargetWorldMatrix() const;
 

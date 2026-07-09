@@ -294,6 +294,8 @@ void Model::LoadModelIndexFile(const std::string& directoryPath, const std::stri
 	std::string filePath = directoryPath + "/" + filename;
 	const aiScene* scene = importer.ReadFile(filePath.c_str(), aiProcess_FlipWindingOrder | aiProcess_FlipUVs);
 	assert(scene->HasMeshes());
+	isMixamoAsset_ = IsMixamoScene(scene);
+	importUnitScale_ = 1.0f;
 	LoadNode(scene);
 	hasBones_ = HasBones(scene);
 	LoadMesh(scene);
@@ -332,10 +334,10 @@ void Model::LoadMotionFile(const std::string& directoryPath, const std::string& 
 		throw std::runtime_error("アニメーション読み込み失敗: " + fullPath);
 	}
 
-	motion_ = Motion::LoadFromScene(scene, fullPath, animationName);
+	motion_ = Motion::LoadFromScene(scene, fullPath, animationName, importUnitScale_);
 
 	// 安全なファイル名（バイナリ保存）
-	motion_.SaveBinary(motion_, animationName, binPath + fileStem.string());
+	motion_.SaveBinary(motion_, animationName, binFile);
 
 	animationCache_[cacheKey] = motion_;
 }
@@ -625,12 +627,12 @@ void Model::LoadMaterial(const aiScene* scene, std::string directoryPath)
 void Model::LoadSkinCluster(const aiScene* scene)
 {
 	skinCluster_ = std::make_unique<SkinCluster>();
-	skinCluster_->LoadFromScene(scene);
+	skinCluster_->LoadFromScene(scene, importUnitScale_);
 }
 
 void Model::LoadNode(const aiScene* scene)
 {
-	rootNode_ = std::make_unique<Node>(Node::ReadNode(scene->mRootNode));
+	rootNode_ = std::make_unique<Node>(Node::ReadNode(scene->mRootNode, importUnitScale_, false));
 }
 void Model::ApplyNodeTransform(const aiScene* scene, const aiNode* node, const Matrix4x4& parentMatrix) {
 	Matrix4x4 local = ConvertMatrix(node->mTransformation);

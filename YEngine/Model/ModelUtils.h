@@ -4,7 +4,11 @@
 #include "float.h"
 #include "Matrix4x4.h"
 #include <unordered_set>
+#include <string>
+#include <cmath>
+#include <cstdint>
 #include <assimp/matrix4x4.h>
+#include <assimp/scene.h>
 
 ///************************* モデル関連のユーティリティ *************************///
 
@@ -43,6 +47,66 @@ inline std::string NormalizeNodeName(const std::string& name) {
 	}
 
 	return normalized;
+}
+
+inline constexpr float kMixamoImportUnitScale = 0.01f;
+
+inline bool IsMixamoNodeName(const std::string& name)
+{
+	return name.find("mixamorig:") == 0;
+}
+
+inline bool IsArmatureNodeName(const std::string& name)
+{
+	return NormalizeNodeName(name) == "Armature";
+}
+
+inline bool IsNearlyUniformScale(const aiVector3D& scale, float target, float epsilon = 0.001f)
+{
+	return std::abs(scale.x - target) <= epsilon &&
+		std::abs(scale.y - target) <= epsilon &&
+		std::abs(scale.z - target) <= epsilon;
+}
+
+inline bool ContainsMixamoNode(const aiNode* node)
+{
+	if (!node) {
+		return false;
+	}
+
+	if (IsMixamoNodeName(node->mName.C_Str())) {
+		return true;
+	}
+
+	for (uint32_t childIndex = 0; childIndex < node->mNumChildren; ++childIndex) {
+		if (ContainsMixamoNode(node->mChildren[childIndex])) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+inline bool IsMixamoScene(const aiScene* scene)
+{
+	if (!scene) {
+		return false;
+	}
+
+	if (ContainsMixamoNode(scene->mRootNode)) {
+		return true;
+	}
+
+	for (uint32_t meshIndex = 0; meshIndex < scene->mNumMeshes; ++meshIndex) {
+		const aiMesh* mesh = scene->mMeshes[meshIndex];
+		for (uint32_t boneIndex = 0; boneIndex < mesh->mNumBones; ++boneIndex) {
+			if (IsMixamoNodeName(mesh->mBones[boneIndex]->mName.C_Str())) {
+				return true;
+			}
+		}
+	}
+
+	return false;
 }
 
 // 無視ノードのリスト

@@ -369,10 +369,36 @@ void ToolbarPanel::BakeTranslateOffsetRange()
 
 	constexpr int kFps = 60;
 	Motion* motion = context_->currentMotion;
+	Object3d* targetObject = context_->GetTargetObject();
+	Model* model = targetObject ? targetObject->GetModel() : nullptr;
+
+	QuaternionTransform fallbackTransform{};
+	fallbackTransform.translate = { 0.0f, 0.0f, 0.0f };
+	fallbackTransform.rotate = { 0.0f, 0.0f, 0.0f, 1.0f };
+	fallbackTransform.scale = { 1.0f, 1.0f, 1.0f };
+	if (model && model->GetSkeleton()) {
+		if (Joint* joint = model->GetJointMap(context_->selBone)) {
+			fallbackTransform = joint->GetTransform();
+		}
+	}
+
 	auto nodeIt = motion->animation_.nodeAnimations_.find(context_->selBone);
-	if (nodeIt == motion->animation_.nodeAnimations_.end()) {
-		context_->statusMsg = "区間移動失敗: ボーンが見つかりません";
-		return;
+	Motion::NodeAnimation sourceNode{};
+	if (nodeIt != motion->animation_.nodeAnimations_.end()) {
+		sourceNode = nodeIt->second;
+	}
+	else {
+		sourceNode.interpolationType = Motion::InterpolationType::Linear;
+	}
+
+	if (sourceNode.translate.keyframes.empty()) {
+		sourceNode.translate.keyframes.push_back({ 0.0f, fallbackTransform.translate });
+	}
+	if (sourceNode.rotate.keyframes.empty()) {
+		sourceNode.rotate.keyframes.push_back({ 0.0f, fallbackTransform.rotate });
+	}
+	if (sourceNode.scale.keyframes.empty()) {
+		sourceNode.scale.keyframes.push_back({ 0.0f, fallbackTransform.scale });
 	}
 
 	const int totalFrames = std::max(0, static_cast<int>(motion->GetDuration() * kFps));
@@ -394,6 +420,7 @@ void ToolbarPanel::BakeTranslateOffsetRange()
 	const auto oldAnims = motion->animation_.nodeAnimations_;
 	auto newAnims = oldAnims;
 	auto& targetNode = newAnims[context_->selBone];
+	targetNode = sourceNode;
 
 	auto insertOrReplace = [](auto& keyframes, float time, const Vector3& value) {
 		auto it = std::find_if(keyframes.begin(), keyframes.end(),
@@ -414,15 +441,15 @@ void ToolbarPanel::BakeTranslateOffsetRange()
 
 	if (startFrame > 0) {
 		const float beforeTime = (startFrame - 1) / static_cast<float>(kFps);
-		const Vector3 beforeValue = motion->CalculateValue(nodeIt->second.translate.keyframes, beforeTime, interp);
+		const Vector3 beforeValue = motion->CalculateValue(sourceNode.translate.keyframes, beforeTime, interp);
 		insertOrReplace(targetNode.translate.keyframes, beforeTime, beforeValue);
 	}
 
-	const Vector3 startValue = motion->CalculateValue(nodeIt->second.translate.keyframes, startTime, interp);
-	const Vector3 endValue = motion->CalculateValue(nodeIt->second.translate.keyframes, endTime, interp);
+	const Vector3 startValue = motion->CalculateValue(sourceNode.translate.keyframes, startTime, interp);
+	const Vector3 endValue = motion->CalculateValue(sourceNode.translate.keyframes, endTime, interp);
 	insertOrReplace(targetNode.translate.keyframes, startTime, startValue + offset);
 
-	for (const auto& kf : nodeIt->second.translate.keyframes) {
+	for (const auto& kf : sourceNode.translate.keyframes) {
 		if (kf.time > startTime + 1e-4f && kf.time < endTime - 1e-4f) {
 			insertOrReplace(targetNode.translate.keyframes, kf.time, kf.value + offset);
 		}
@@ -432,7 +459,7 @@ void ToolbarPanel::BakeTranslateOffsetRange()
 
 	if (endFrame < totalFrames) {
 		const float afterTime = (endFrame + 1) / static_cast<float>(kFps);
-		const Vector3 afterValue = motion->CalculateValue(nodeIt->second.translate.keyframes, afterTime, interp);
+		const Vector3 afterValue = motion->CalculateValue(sourceNode.translate.keyframes, afterTime, interp);
 		insertOrReplace(targetNode.translate.keyframes, afterTime, afterValue);
 	}
 
@@ -456,6 +483,13 @@ void ToolbarPanel::BakeTranslateOffsetRange()
 		auto* ms = target->GetModel()->GetMotionSystem();
 		ms->SetAnimation(context_->currentMotion);
 		ms->SetAnimationTime(context_->scrubTime);
+		if (target->GetModel()->GetSkeleton()) {
+			context_->currentMotion->ApplyAnimation(target->GetModel()->GetSkeleton()->GetJoints(), context_->scrubTime);
+			target->GetModel()->GetSkeleton()->Update();
+			if (target->GetModel()->GetSkinCluster()) {
+				target->GetModel()->GetSkinCluster()->UpdateMatrixPalette(target->GetModel()->GetSkeleton()->GetJoints());
+			}
+		}
 	}
 
 	context_->requireTimelineRebuild = true;

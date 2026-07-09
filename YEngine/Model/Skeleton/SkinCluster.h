@@ -88,7 +88,7 @@ public:
 	void SetInputVertices(const std::vector<Vertex>& vertices);
 
 	// シーンから読み込み
-	void LoadFromScene(const aiScene* scene);
+	void LoadFromScene(const aiScene* scene, float importUnitScale = 1.0f);
 
 	// スキニング実行
 	void ExecuteSkinningCS();

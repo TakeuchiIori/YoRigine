@@ -75,23 +75,27 @@ void MotionEditor::Initialize(Camera* camera)
 	//------------------------------------------------------------
 	context_.SyncJointToBuffer = [this]() { SyncJointToBuffer(context_.selBone); };
 	context_.SyncBufferToJoint = [this]() { SyncBufferToJoint(); };
+	context_.RestoreLiveBoneOriginal = [this]() { RestoreLiveBoneOriginal(); };
 
 	// キーフレーム追加処理のラムダ登録
 	context_.AddKeyframe = [this](const std::string& bone, float time) {
 		if (!context_.currentMotion) return;
 		auto& nodeAnims = context_.currentMotion->animation_.nodeAnimations_;
-		if (!nodeAnims.count(bone)) return;
 
 		// 現在のUI編集バッファからトランスフォームを作成
 		Vector3 newT = { context_.editT[0], context_.editT[1], context_.editT[2] };
 		Quaternion newR = EulerToQuaternion({ context_.editR[0] * (kPi / 180), context_.editR[1] * (kPi / 180), context_.editR[2] * (kPi / 180) });
 		Vector3 newS = { context_.editS[0], context_.editS[1], context_.editS[2] };
-		Motion::NodeAnimation snap = nodeAnims[bone];
+		const bool hadAnimation = nodeAnims.count(bone) != 0;
+		Motion::NodeAnimation snap = hadAnimation ? nodeAnims[bone] : Motion::NodeAnimation{};
 
 		// コマンド履歴に登録して実行
 		context_.history.Execute(MakeLambdaCommand("KF挿入: " + bone,
 			[this, bone, time, newT, newR, newS]() {
 				auto& na = context_.currentMotion->animation_.nodeAnimations_[bone];
+				if (na.translate.keyframes.empty() && na.rotate.keyframes.empty() && na.scale.keyframes.empty()) {
+					na.interpolationType = Motion::InterpolationType::Linear;
+				}
 				auto insertOrReplace = [&]<typename T>(auto& kfs, T val) {
 					using KF = typename std::remove_reference<decltype(kfs)>::type::value_type;
 					auto it = std::find_if(kfs.begin(), kfs.end(),
@@ -107,8 +111,13 @@ void MotionEditor::Initialize(Camera* camera)
 				insertOrReplace(na.scale.keyframes, newS);
 				context_.requireTimelineRebuild = true;
 			},
-			[this, bone, snap]() {
-				context_.currentMotion->animation_.nodeAnimations_[bone] = snap;
+			[this, bone, snap, hadAnimation]() {
+				if (hadAnimation) {
+					context_.currentMotion->animation_.nodeAnimations_[bone] = snap;
+				}
+				else {
+					context_.currentMotion->animation_.nodeAnimations_.erase(bone);
+				}
 				context_.requireTimelineRebuild = true;
 			}
 		));
@@ -222,6 +231,12 @@ void MotionEditor::Update()
 #endif
 		}
 
+		if (context_.isPlaying && context_.hasLiveBoneOverride && !context_.liveOverrideBone.empty()) {
+			if (Joint* liveJoint = m->GetSkeleton()->GetJointByName(context_.liveOverrideBone)) {
+				liveJoint->SetTransform(BufferToTransform());
+			}
+		}
+
 		// 行列計算とスキニング用パレットの更新
 		m->GetSkeleton()->Update();
 		if (m->GetSkinCluster()) {
@@ -273,6 +288,12 @@ void MotionEditor::ShowEditor()
 			IGizmable* picked = gizmoCtrl_.TryPickObject(ImGui::GetMousePos(), viewPos, viewSize, context_.camera);
 			if (picked) {
 				BoneGizmable* bg = static_cast<BoneGizmable*>(picked);
+				if (context_.selBone != bg->GetBoneName()) {
+					context_.hasLiveBoneOverride = false;
+					context_.liveOverrideBone.clear();
+					context_.hasLiveBoneOriginal = false;
+					context_.liveOriginalBone.clear();
+				}
 				context_.selBone = bg->GetBoneName();
 				SyncJointToBuffer(context_.selBone);
 				context_.statusMsg = "ボーン選択: " + context_.selBone;
@@ -577,6 +598,10 @@ void MotionEditor::SetTargetObjectId(int id) {
 			context_.selBone = "";
 			context_.selKF.Clear();
 			context_.loadFileName = "";
+			context_.hasLiveBoneOverride = false;
+			context_.liveOverrideBone.clear();
+			context_.hasLiveBoneOriginal = false;
+			context_.liveOriginalBone.clear();
 			context_.statusMsg = "Ready";
 		}
 	}
@@ -589,7 +614,10 @@ void MotionEditor::InsertKeyframeFromTransform(const std::string& bone, float ti
 {
 	if (!context_.currentMotion) return;
 	auto& nodeAnims = context_.currentMotion->animation_.nodeAnimations_;
-	if (!nodeAnims.count(bone)) return;
+	auto& nodeAnim = nodeAnims[bone];
+	if (nodeAnim.translate.keyframes.empty() && nodeAnim.rotate.keyframes.empty() && nodeAnim.scale.keyframes.empty()) {
+		nodeAnim.interpolationType = Motion::InterpolationType::Linear;
+	}
 
 	// 指定時間に既存KFがあれば上書き、なければ新規挿入
 	auto insertOrReplace = [&]<typename T>(auto& kfs, T val) {
@@ -602,9 +630,9 @@ void MotionEditor::InsertKeyframeFromTransform(const std::string& bone, float ti
 		}
 	};
 
-	insertOrReplace(nodeAnims[bone].translate.keyframes, tr.translate);
-	insertOrReplace(nodeAnims[bone].rotate.keyframes, tr.rotate);
-	insertOrReplace(nodeAnims[bone].scale.keyframes, tr.scale);
+	insertOrReplace(nodeAnim.translate.keyframes, tr.translate);
+	insertOrReplace(nodeAnim.rotate.keyframes, tr.rotate);
+	insertOrReplace(nodeAnim.scale.keyframes, tr.scale);
 }
 
 // ============================================================
@@ -620,9 +648,7 @@ void MotionEditor::SavePose(float time)
 
 	// 全ジョイントの現在の姿勢をKFとして刻む
 	for (const auto& joint : skeleton->GetJoints()) {
-		if (context_.currentMotion->animation_.nodeAnimations_.count(joint.GetName())) {
-			InsertKeyframeFromTransform(joint.GetName(), time, joint.GetTransform());
-		}
+		InsertKeyframeFromTransform(joint.GetName(), time, joint.GetTransform());
 	}
 
 	auto newAnims = context_.currentMotion->animation_.nodeAnimations_;
@@ -689,6 +715,9 @@ void MotionEditor::SyncJointToBuffer(const std::string& bone)
 	Joint* j = FindJoint(bone);
 	if (!j) return;
 	const auto& tr = j->GetTransform();
+	Object3d* target = context_.GetTargetObject();
+	Model* m = target ? target->GetModel() : nullptr;
+	context_.translateDisplayScale = (m && m->IsMixamoAsset()) ? 100.0f : 1.0f;
 
 	// 内部値をUI用のバッファ（float配列）に展開
 	context_.editT[0] = tr.translate.x; context_.editT[1] = tr.translate.y; context_.editT[2] = tr.translate.z;
@@ -704,7 +733,14 @@ void MotionEditor::SyncBufferToJoint()
 {
 	Joint* j = FindJoint(context_.selBone);
 	if (j) {
+		if (!context_.hasLiveBoneOriginal || context_.liveOriginalBone != context_.selBone) {
+			context_.hasLiveBoneOriginal = true;
+			context_.liveOriginalBone = context_.selBone;
+			context_.liveOriginalTransform = j->GetTransform();
+		}
 		j->SetTransform(BufferToTransform());
+		context_.hasLiveBoneOverride = true;
+		context_.liveOverrideBone = context_.selBone;
 		Object3d* target = context_.GetTargetObject();
 		Model* m = target ? target->GetModel() : nullptr;
 		if (m && m->GetSkeleton()) {
@@ -712,6 +748,41 @@ void MotionEditor::SyncBufferToJoint()
 			if (m->GetSkinCluster()) m->GetSkinCluster()->UpdateMatrixPalette(m->GetSkeleton()->GetJoints());
 		}
 	}
+}
+
+// ============================================================
+// ライブ編集を開始時の姿勢へ戻す
+// ============================================================
+void MotionEditor::RestoreLiveBoneOriginal()
+{
+	if (!context_.hasLiveBoneOriginal || context_.liveOriginalBone.empty()) return;
+
+	const std::string bone = context_.liveOriginalBone;
+	Joint* j = FindJoint(bone);
+	if (!j) return;
+
+	j->SetTransform(context_.liveOriginalTransform);
+	context_.hasLiveBoneOverride = false;
+	context_.liveOverrideBone.clear();
+	context_.hasLiveBoneOriginal = false;
+	context_.liveOriginalBone.clear();
+
+	if (context_.selBone == bone) {
+		SyncJointToBuffer(bone);
+		context_.hasLiveBoneOverride = false;
+		context_.liveOverrideBone.clear();
+		context_.hasLiveBoneOriginal = false;
+		context_.liveOriginalBone.clear();
+	}
+
+	Object3d* target = context_.GetTargetObject();
+	Model* m = target ? target->GetModel() : nullptr;
+	if (m && m->GetSkeleton()) {
+		m->GetSkeleton()->Update();
+		if (m->GetSkinCluster()) m->GetSkinCluster()->UpdateMatrixPalette(m->GetSkeleton()->GetJoints());
+	}
+
+	context_.statusMsg = "一時編集を元に戻しました: " + bone;
 }
 
 // ============================================================
@@ -774,7 +845,14 @@ void MotionEditor::ApplyBoneGizmoTransform(const std::string& boneName, const Ma
 	tr.rotate = EulerToQuaternion({ lRDeg[0] * (kPi / 180), lRDeg[1] * (kPi / 180), lRDeg[2] * (kPi / 180) });
 	tr.scale = { lS[0], lS[1], lS[2] };
 
+	if (!context_.hasLiveBoneOriginal || context_.liveOriginalBone != boneName) {
+		context_.hasLiveBoneOriginal = true;
+		context_.liveOriginalBone = boneName;
+		context_.liveOriginalTransform = j->GetTransform();
+	}
 	j->SetTransform(tr);
+	context_.hasLiveBoneOverride = true;
+	context_.liveOverrideBone = boneName;
 
 	//------------------------------------------------------------
 	// 表示の即時反映

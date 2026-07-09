@@ -19,8 +19,9 @@ void Joint::Update(std::vector<Joint>& joints)
 		skeletonSpaceMatrix_ = localMatrix_;
 	}
 
-	wt_.translate_ = ExtractTranslation(localMatrix_);
-	wt_.rotate_ = MatrixToEuler(localMatrix_);
+	wt_.scale_ = transform_.scale;
+	wt_.translate_ = transform_.translate;
+	wt_.SetRotationQuaternion(transform_.rotate);
 
 	wt_.UpdateMatrix();
 }

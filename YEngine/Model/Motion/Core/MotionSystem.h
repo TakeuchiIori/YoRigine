@@ -60,6 +60,7 @@ public:
 	// アクセッサ
 	// ============================================================
 	std::string GetNormalizedName(const std::string& name);
+	bool HasTransformAnimation(const Motion& anim, const std::string& nodeName);
 	QuaternionTransform GetTransformAnimation(const Motion& anim, const std::string& nodeName, float time);
 
 	void SetPlayMode(MotionPlayMode playMode);
