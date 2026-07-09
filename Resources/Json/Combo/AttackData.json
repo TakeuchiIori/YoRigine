@@ -1,6 +1,6 @@
 [
     {
-        "animationName": "Attack1",
+        "animationName": "Attack1_rev",
         "baseDamage": 30.0,
         "canCancel": true,
         "canChainToAny": true,
@@ -30,7 +30,7 @@
         "type": 0
     },
     {
-        "animationName": "Attack2",
+        "animationName": "Attack2_rev",
         "baseDamage": 30.0,
         "canCancel": true,
         "canChainToAny": true,
@@ -60,7 +60,7 @@
         "type": 0
     },
     {
-        "animationName": "Attack3",
+        "animationName": "Slash1_rev",
         "baseDamage": 30.0,
         "canCancel": true,
         "canChainToAny": true,
@@ -90,7 +90,7 @@
         "type": 0
     },
     {
-        "animationName": "HeavySlash1",
+        "animationName": "HeavySlash1_rev",
         "baseDamage": 35.0,
         "canCancel": true,
         "canChainToAny": true,
@@ -120,7 +120,7 @@
         "type": 1
     },
     {
-        "animationName": "HeavySlash2",
+        "animationName": "HeavySlash2_rev",
         "baseDamage": 35.0,
         "canCancel": true,
         "canChainToAny": true,
@@ -150,7 +150,7 @@
         "type": 1
     },
     {
-        "animationName": "HeavySlash3",
+        "animationName": "HeavySlash3_rev",
         "baseDamage": 35.0,
         "canCancel": true,
         "canChainToAny": true,
@@ -180,7 +180,7 @@
         "type": 1
     },
     {
-        "animationName": "HeavySlash4",
+        "animationName": "HeavySlash4_rev",
         "baseDamage": 40.0,
         "canCancel": true,
         "canChainToAny": true,
@@ -210,7 +210,7 @@
         "type": 1
     },
     {
-        "animationName": "Attack4",
+        "animationName": "Attack4_rev",
         "baseDamage": 30.0,
         "canCancel": true,
         "canChainToAny": true,
@@ -240,7 +240,7 @@
         "type": 0
     },
     {
-        "animationName": "HeavyKick2",
+        "animationName": "HeavyKick2_rev",
         "baseDamage": 30.0,
         "canCancel": true,
         "canChainToAny": true,
