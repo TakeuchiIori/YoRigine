@@ -2,6 +2,7 @@
     "BlendMode": 2,
     "Lighting": false,
     "billboardType": 1,
+    "emissiveIntensity": 6.25,
     "isRelative": false,
     "maxParticles": 1000,
     "mesh": {
@@ -14,6 +15,8 @@
         "type": 0
     },
     "name": "Clear",
+    "softFadeDistance": 0.5,
+    "softParticle": false,
     "spawnModules": [
         {
             "data": {

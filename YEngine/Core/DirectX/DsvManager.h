@@ -27,12 +27,18 @@ public:
 		std::string name;
 		uint32_t width = 0;
 		uint32_t height = 0;
+		uint32_t arraySize = 1;
 		DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN;
 		float clearDepth = 1.0f;
 		uint8_t clearStencil = 0;
+		// Texture2DArray のスライスごとの DSV（arraySize > 1 のとき使用。[0] は dsvHandle と同一）
+		std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> sliceDsvHandles;
 	};
-	static const int32_t kShadowmapWidth = 4096;
-	static const int32_t kShadowmapHeight = 4096;
+	// シャドウカスケード（CSM）の枚数
+	static const int32_t kShadowCascadeCount = 3;
+	// 1 カスケードあたりの解像度
+	static const int32_t kShadowmapWidth = 2048;
+	static const int32_t kShadowmapHeight = 2048;
 public:
 	///************************* 基本関数 *************************///
 
@@ -50,6 +56,19 @@ public:
 		uint8_t clearStencil = 0
 	);
 
+	// Texture2DArray 深度バッファの作成（シャドウカスケード用）。
+	// スライスごとの DSV と、配列全体を読む SRV を作る。
+	uint32_t CreateArray(
+		const std::string& name,
+		uint32_t width,
+		uint32_t height,
+		uint32_t arraySize,
+		DXGI_FORMAT format = DXGI_FORMAT_D32_FLOAT,
+		bool createSRV = true,
+		float clearDepth = 1.0f,
+		uint8_t clearStencil = 0
+	);
+
 	// クリア
 	void Clear(
 		uint32_t index,
@@ -58,6 +77,13 @@ public:
 	);
 	void Clear(
 		const std::string& name,
+		ID3D12GraphicsCommandList* commandList,
+		D3D12_CLEAR_FLAGS flags = D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL
+	);
+	// Texture2DArray の特定スライスをクリア
+	void ClearSlice(
+		const std::string& name,
+		uint32_t slice,
 		ID3D12GraphicsCommandList* commandList,
 		D3D12_CLEAR_FLAGS flags = D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL
 	);
@@ -86,6 +112,8 @@ public:
 	// DSVハンドルの取得
 	D3D12_CPU_DESCRIPTOR_HANDLE GetHandle(uint32_t index) const;
 	D3D12_CPU_DESCRIPTOR_HANDLE GetHandle(const std::string& name) const;
+	// Texture2DArray のスライス DSV ハンドルの取得
+	D3D12_CPU_DESCRIPTOR_HANDLE GetSliceHandle(const std::string& name, uint32_t slice) const;
 
 	ID3D12DescriptorHeap* GetHeap() const { return heap_.Get(); }
 	uint32_t GetDescriptorSize() const { return descriptorSize_; }
@@ -97,7 +125,7 @@ private:
 	void CreateHeap(uint32_t maxCount);
 
 	// 深度ステンシルリソースの作成
-	Microsoft::WRL::ComPtr<ID3D12Resource> CreateDepthStencilTextureResource(uint32_t width, uint32_t height, DXGI_FORMAT format);
+	Microsoft::WRL::ComPtr<ID3D12Resource> CreateDepthStencilTextureResource(uint32_t width, uint32_t height, DXGI_FORMAT format, uint32_t arraySize = 1);
 
 private:
 	///************************* メンバ変数 *************************///

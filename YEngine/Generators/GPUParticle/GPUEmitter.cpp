@@ -66,14 +66,14 @@ void GPUEmitter::Initialize(Camera* camera, std::string& texturePath)
 /// <summary>
 /// エミッター更新処理（形状ごとに emit を制御）
 /// </summary>
-void GPUEmitter::Update()
+void GPUEmitter::Update(float dt)
 {
 	//-----------------------------------------
 	// 共通データの更新
 	//-----------------------------------------
 	emitterCommonData_->emitterShape = static_cast<uint32_t>(currentShape_);
 	perframeData_->time = YoRigine::GameTime::GetTotalTime();
-	perframeData_->deltaTime = YoRigine::GameTime::GetUnscaledDeltaTime();
+	perframeData_->deltaTime = dt;
 
 	// エミッターの更新
 	UpdateEmitters();

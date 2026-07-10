@@ -7,7 +7,7 @@
 #include "Collision/OBB/OBBCollider.h"
 #include "Object3d/BaseObject.h"
 #include "Particle/EffectHandle.h"      // YParticle 統合ヘルパー（Group/System を名前で解決）
-#include <Vfx/VfxMesh/TrailMeshEmitter.h>
+#include <Vfx/VfxMesh/Runtime/TrailMeshEmitter.h>
 class Player;
 
 // ============================================================

@@ -47,7 +47,8 @@ void TitleUI::Update()
 	UIBase* activeUi = connected ? startUiController_ : startUiKeyboard_;
 	if (!activeUi) return;
 
-	float deltaTime = YoRigine::GameTime::GetDeltaTime();
+	// UI チャンネル＝ゲーム時間(ヒットストップ/ポーズ)の影響を受けずフェードする。
+	float deltaTime = YoRigine::GameTime::GetDeltaTime(YoRigine::TimeChannel::UI);
 
 	if (isFadingOut_) {
 		alpha_ -= fadeSpeed_ * deltaTime;

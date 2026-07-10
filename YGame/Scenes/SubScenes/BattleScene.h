@@ -44,6 +44,9 @@ public:
 	// UI描画処理
 	void DrawUI() override;
 
+	// VFXの描画処理
+	void DrawVFX() override;
+
 	// 非オフスクリーン描画処理
 	void DrawNonOffscreen() override;
 
@@ -105,6 +108,8 @@ private:
 
 	// 戦闘終了後の戻りデータを作成
 	void CreateBattleReturnData(FieldReturnData& data, BattleResult result, const BattleStats& stats);
+
+	void FocusNearestEnemyAfterDefeat();
 
 private:
 	///************************* メンバ変数 *************************///

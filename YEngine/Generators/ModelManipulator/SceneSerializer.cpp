@@ -20,7 +20,7 @@ namespace YoRigine {
         if (!objectManager_) return false;
         try {
             json j;
-            j["version"] = 12;
+            j["version"] = 13;
             j["objects"] = json::array();
 
             for (const auto* obj : objectManager_->GetAllActiveObjects()) {
@@ -40,6 +40,7 @@ namespace YoRigine {
                     {"uvScale",             {obj->uvScale.x,  obj->uvScale.y}},
                     {"uvStochastic",        obj->uvStochastic},
                     {"outlineEnabled",      obj->outlineEnabled},
+                    {"castShadow",          obj->castShadow},
                     {"parentID",            obj->parentID},
                     {"isAnimation",         obj->isAnimation},
                     {"animationName",       obj->animationName},
@@ -77,7 +78,7 @@ namespace YoRigine {
             json j;
             file >> j;
             const int version = j.value("version", 1);
-            if (version < 1 || version > 12) return false;
+            if (version < 1 || version > 13) return false;
 
             objectManager_->ClearAllObjects();
 
@@ -136,6 +137,9 @@ namespace YoRigine {
 
                 // version 12+: per-object 輪郭線フラグ（無ければ true=従来通り輪郭あり）
                 obj->outlineEnabled = o.value("outlineEnabled", true);
+
+                // version 13+: per-object 影キャストフラグ（無ければ true=従来通り影を落とす）
+                obj->castShadow = o.value("castShadow", true);
 
                 // version 10+: シーン内一意名 (TriggerAction のターゲット参照用)
                 if (version >= 10 && o.contains("nameTag")) {
@@ -227,7 +231,7 @@ namespace YoRigine {
     {
         try {
             json j;
-            j["version"] = 12;
+            j["version"] = 13;
             j["objects"] = json::array();
 
             for (const auto* obj : objects) {
@@ -247,6 +251,7 @@ namespace YoRigine {
                     {"uvScale",             {obj->uvScale.x,  obj->uvScale.y}},
                     {"uvStochastic",        obj->uvStochastic},
                     {"outlineEnabled",      obj->outlineEnabled},
+                    {"castShadow",          obj->castShadow},
                     {"parentID",            obj->parentID},
                     {"isAnimation",         obj->isAnimation},
                     {"animationName",       obj->animationName},
@@ -350,6 +355,9 @@ namespace YoRigine {
 
                 // version 12+: per-object 輪郭線フラグ（無ければ true=従来通り輪郭あり）
                 obj->outlineEnabled = o.value("outlineEnabled", true);
+
+                // version 13+: per-object 影キャストフラグ（無ければ true=従来通り影を落とす）
+                obj->castShadow = o.value("castShadow", true);
 
                 // version 10+: シーン内一意名
                 if (version >= 10 && o.contains("nameTag")) {

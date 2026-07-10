@@ -51,8 +51,8 @@ public:
 	///************************* SRT *************************///
 	const Vector3& GetTranslate() const { return wt_.translate_; }
 	void SetTranslate(const Vector3& pos) { wt_.translate_ = pos; }
-	const Vector3& GetRotae() const { return wt_.rotate_; }
-	void SetRotae(const Vector3& rot) { wt_.rotate_ = rot; }
+	const Vector3& GetRotate() const { return wt_.rotate_; }
+	void SetRotate(const Vector3& rot) { wt_.rotate_ = rot; }
 	const Vector3& GetScale() const { return wt_.scale_; }
 	void SetScale(const Vector3& scale) { wt_.scale_ = scale; }
 

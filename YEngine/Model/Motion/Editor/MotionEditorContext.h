@@ -66,6 +66,12 @@ struct MotionEditorContext
 	float editT[3] = { 0, 0, 0 };
 	float editR[3] = { 0, 0, 0 };
 	float editS[3] = { 1, 1, 1 };
+	float translateDisplayScale = 1.0f;
+	bool hasLiveBoneOverride = false;
+	std::string liveOverrideBone = "";
+	bool hasLiveBoneOriginal = false;
+	std::string liveOriginalBone = "";
+	QuaternionTransform liveOriginalTransform = {};
 
 	// キーフレームクリップボード
 	KeyframeClipboard clipboard;
@@ -73,6 +79,7 @@ struct MotionEditorContext
 	// UIフラグとレイアウト
 	bool isDrawBone = false;
 	bool showSavePopup = false;
+	bool showSourceAnimationPopup = false;
 	std::string statusMsg = "Ready";
 	bool requireTimelineRebuild = false;
 
@@ -84,6 +91,7 @@ struct MotionEditorContext
 	// ============================================================
 	std::function<void()> SyncJointToBuffer;
 	std::function<void()> SyncBufferToJoint;
+	std::function<void()> RestoreLiveBoneOriginal;
 	std::function<void(const std::string&, float)> AddKeyframe;
 	std::function<void(const std::string&, float)> DeleteKeyframe;
 

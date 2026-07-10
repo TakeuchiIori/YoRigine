@@ -1,5 +1,6 @@
 #include "YPipelineManager.h"
 #include "DirectXCommon.h"
+#include "RenderFormats.h"
 
 #include <chrono>
 #include "Debugger/Logger.h"
@@ -275,6 +276,7 @@ void YPipelineManager::CreatePSO_Object()
     // 不透明ジオメトリは法線 G-buffer(SV_TARGET1) へも出力する
     ReflectionBasedPipelineBuilder builder;
     auto result = builder
+        .SetRenderTargetFormat(YoRigine::kSceneColorFormat)   // OffScreen(HDR) へ描く
         .SetGBufferNormal(true)
         .BuildFromCompiledShaders(
         dxCommon_->GetDevice().Get(),
@@ -333,6 +335,7 @@ void YPipelineManager::CreatePSO_ObjectInstanced()
     // 不透明ジオメトリは法線 G-buffer(SV_TARGET1) へも出力する
     ReflectionBasedPipelineBuilder builder;
     auto result = builder
+        .SetRenderTargetFormat(YoRigine::kSceneColorFormat)   // OffScreen(HDR) へ描く
         .SetGBufferNormal(true)
         .BuildFromCompiledShaders(
         dxCommon_->GetDevice().Get(),
@@ -391,6 +394,7 @@ void YPipelineManager::CreatePSO_ObjectOutline()
     // オブジェクト本体パスと同じ 2RTV(color + 法線 G-buffer) 構成に合わせる。
     ReflectionBasedPipelineBuilder builder;
     auto result = builder
+        .SetRenderTargetFormat(YoRigine::kSceneColorFormat)   // OffScreen(HDR) へ描く
         .SetGBufferNormal(true)
         .SetRasterizerState(raster)
         .BuildFromCompiledShaders(
@@ -426,6 +430,7 @@ void YPipelineManager::CreatePSO_ObjectOutlineInstanced()
     // オブジェクト本体パスと同じ 2RTV(color + 法線 G-buffer) 構成に合わせる。
     ReflectionBasedPipelineBuilder builder;
     auto result = builder
+        .SetRenderTargetFormat(YoRigine::kSceneColorFormat)   // OffScreen(HDR) へ描く
         .SetGBufferNormal(true)
         .SetRasterizerState(raster)
         .BuildFromCompiledShaders(
@@ -474,6 +479,7 @@ void YPipelineManager::CreatePSO_GPUParticleALLBlendModes()
     for (const auto& config : configs) {
         ReflectionBasedPipelineBuilder builder;
         auto result = builder
+            .SetRenderTargetFormat(YoRigine::kSceneColorFormat)   // OffScreen(HDR) へ描く
             .SetBlendState(config.blendDesc)
             .SetRasterizerState(RasterizerPresets::CreateNoCull())
             .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
@@ -529,6 +535,7 @@ void YPipelineManager::CreatePSO_YParticleAllBlendModes()
         for (const auto& config : configs) {
             ReflectionBasedPipelineBuilder builder;
             builder
+                .SetRenderTargetFormat(YoRigine::kSceneColorFormat)   // OffScreen(HDR) へ描く
                 .SetBlendState(config.blendDesc)
                 .SetRasterizerState(RasterizerPresets::CreateNoCull());
             if (isSoft) {
@@ -632,6 +639,7 @@ void YPipelineManager::CreatePSO_Line()
     // リフレクションベースで完全自動生成
     ReflectionBasedPipelineBuilder builder;
     auto result = builder
+        .SetRenderTargetFormat(YoRigine::kSceneColorFormat)   // OffScreen(HDR) へ描く
         .SetPrimitiveTopologyType(PrimitiveTopologyPresets::Line())
         .SetBlendState(BlendPresets::CreateAlphaBlend())
         .SetRasterizerState(RasterizerPresets::CreateNoCull())
@@ -659,6 +667,7 @@ void YPipelineManager::CreatePSO_InstancedCube()
 
     ReflectionBasedPipelineBuilder builder;
     auto result = builder
+        .SetRenderTargetFormat(YoRigine::kSceneColorFormat)   // OffScreen(HDR) へ描く
         .SetPrimitiveTopologyType(PrimitiveTopologyPresets::Line())
         .SetBlendState(BlendPresets::CreateAlphaBlend())
         .SetRasterizerState(RasterizerPresets::CreateNoCull())
@@ -688,6 +697,7 @@ void YPipelineManager::CreatePSO_CubeMap()
     // リフレクションベースで完全自動生成
     ReflectionBasedPipelineBuilder builder;
     auto result = builder
+        .SetRenderTargetFormat(YoRigine::kSceneColorFormat)   // OffScreen(HDR) へ描く
         .SetBlendState(BlendPresets::CreateNone())
         .SetRasterizerState(RasterizerPresets::CreateNoCull())
         .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
@@ -716,6 +726,7 @@ void YPipelineManager::CreatePSO_EffectObject()
     // リフレクションベースで完全自動生成
     ReflectionBasedPipelineBuilder builder;
     auto result = builder
+        .SetRenderTargetFormat(YoRigine::kSceneColorFormat)   // OffScreen(HDR) へ描く
         .SetRasterizerState(RasterizerPresets::CreateNoCull())
         .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
         .BuildFromCompiledShaders(
@@ -760,6 +771,7 @@ void YPipelineManager::CreatePSO_VfxMeshTrail() {
     for (const auto& config : configs) {
         ReflectionBasedPipelineBuilder builder;
         auto result = builder
+            .SetRenderTargetFormat(YoRigine::kSceneColorFormat)   // OffScreen(HDR) へ描く
             .SetBlendState(config.blendDesc)
             .SetRasterizerState(RasterizerPresets::CreateNoCull())
             .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
@@ -795,6 +807,7 @@ void YPipelineManager::CreatePSO_VfxMeshVolume() {
     // リフレクションベースで完全自動生成
     ReflectionBasedPipelineBuilder builder;
     auto result = builder
+        .SetRenderTargetFormat(YoRigine::kSceneColorFormat)   // OffScreen(HDR) へ描く
         .SetRasterizerState(RasterizerPresets::CreateNoCull())
         .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
 		.SetBlendState(BlendPresets::CreateAdditive())
@@ -820,6 +833,7 @@ void YPipelineManager::CreatePSO_VfxMeshSmoke() {
 
     ReflectionBasedPipelineBuilder builder;
     auto result = builder
+        .SetRenderTargetFormat(YoRigine::kSceneColorFormat)   // OffScreen(HDR) へ描く
         .SetRasterizerState(RasterizerPresets::CreateNoCull())
         .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
         .SetBlendState(BlendPresets::CreateAlphaBlend())
@@ -846,6 +860,7 @@ void YPipelineManager::CreatePSO_VfxMeshLightning() {
 
     ReflectionBasedPipelineBuilder builder;
     auto result = builder
+        .SetRenderTargetFormat(YoRigine::kSceneColorFormat)   // OffScreen(HDR) へ描く
         .SetRasterizerState(RasterizerPresets::CreateNoCull())
         .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
         .SetBlendState(BlendPresets::CreateAdditive())
@@ -872,6 +887,7 @@ void YPipelineManager::CreatePSO_VfxMeshShockwave() {
 
     ReflectionBasedPipelineBuilder builder;
     auto result = builder
+        .SetRenderTargetFormat(YoRigine::kSceneColorFormat)   // OffScreen(HDR) へ描く
         .SetRasterizerState(RasterizerPresets::CreateNoCull())
         .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
         .SetBlendState(BlendPresets::CreateAdditive())

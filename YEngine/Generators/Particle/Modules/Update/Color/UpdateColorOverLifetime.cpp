@@ -1,4 +1,5 @@
 #include "UpdateColorOverLifetime.h"
+#include "../../../ParticleCurve.h"
 #include <algorithm>
 
 UpdateColorOverLifetime::UpdateColorOverLifetime()
@@ -41,14 +42,9 @@ void UpdateColorOverLifetime::OnUpdate(ParticleAttribute* attrs, uint32_t index,
 void UpdateColorOverLifetime::DrawEditor()
 {
 #ifdef USE_IMGUI
-    ImGui::DragInt("ストップ数", &stopCount_, 1, 2, kMaxStops);
-    for (int i = 0; i < stopCount_; ++i) {
-        char buf[32];
-        sprintf_s(buf, "時刻 %d", i);
-        ImGui::SliderFloat(buf, &times_[i], 0.0f, 1.0f);
-        sprintf_s(buf, "カラー %d", i);
-        ImGui::ColorEdit4(buf, &colors_[i].x);
-    }
+    ImGui::TextDisabled("寿命でのカラー & アルファ変化");
+    ParticleWidgets::GradientBar("colOverLife", times_.data(), colors_.data(),
+                                 stopCount_, kMaxStops, selectedStop_);
 #endif
 }
 

@@ -709,6 +709,9 @@ void FieldEnemyManager::LoadEnemyData(const std::string& filePath) {
 
 			// 文字列・float・bool型など基本パラメータ
 			data.enemyId = jval.value("enemyId", id);
+			if (data.enemyId.empty() || data.enemyId != id) {
+				data.enemyId = id;
+			}
 			data.modelPath = jval.value("modelPath", "");
 			data.battleEnemyId = jval.value("battleEnemyId", "");
 			data.battleFormation = jval.value("battleFormation", "");
@@ -802,6 +805,8 @@ void FieldEnemyManager::SaveEnemySpawnData(const std::string& filePath) {
 			spawnJson["respawnAfterBattle"] = data.respawnAfterBattle;
 			spawnJson["respawnDelay"] = data.respawnDelay;
 			spawnJson["spawnOnLoad"] = data.spawnOnLoad;
+			spawnJson["comment"] = data.comment;
+			spawnJson["isEditorOnly"] = data.isEditorOnly;
 
 			json["spawnPoints"].push_back(spawnJson);
 		}
@@ -859,11 +864,21 @@ void FieldEnemyManager::LoadEnemySpawnData(const std::string& filePath) {
 			spawnData.spawnCondition = spawnJson.value("spawnCondition", "");
 			spawnData.respawnAfterBattle = spawnJson.value("respawnAfterBattle", true);
 			spawnData.respawnDelay = spawnJson.value("respawnDelay", 30.0f);
+			spawnData.comment = spawnJson.value("comment", std::string(""));
+			spawnData.isEditorOnly = spawnJson.value("isEditorOnly", false);
 
 			// 先にスポーンマップへ登録 (敵データ未定義でもマーカーは見えるようにするため)。
 			// SpawnFieldEnemy は enemyDataMap_ に該当データが無いと早期 return するが、
 			// その場合でもエディタ用に位置を可視化したいので spawnDataMap_ には残す。
 			spawnData.spawnOnLoad = spawnJson.value("spawnOnLoad", true);
+			if (spawnData.id.empty()) {
+				spawnData.id = GenerateUniqueSpawnPointId("Spawn");
+			}
+			else if (spawnDataMap_.contains(spawnData.id)) {
+				const std::string oldId = spawnData.id;
+				spawnData.id = GenerateUniqueSpawnPointId(oldId);
+				Logger("[FieldEnemyManager] 警告: 重複スポーンID '" + oldId + "' を '" + spawnData.id + "' に変更しました\n");
+			}
 			spawnDataMap_[spawnData.id] = spawnData;
 			// spawnOnLoad=false なら自動スポーンせず配置だけ登録する。
 			// 後でエディタの「全スポーンを実行」やリスポーン経由で出現させられる。
@@ -1197,6 +1212,44 @@ void FieldEnemyManager::ShowEnemyDataEditor() {
 		bool changed = false;
 
 		ImGui::Text("=== 基本情報 ===");
+		static std::string enemyIdBufferOwner;
+		static char enemyIdBuffer[128] = {};
+		if (enemyIdBufferOwner != selectedEnemyId_) {
+			strcpy_s(enemyIdBuffer, editorEnemyData_.enemyId.c_str());
+			enemyIdBufferOwner = selectedEnemyId_;
+		}
+		ImGui::InputText("敵データID", enemyIdBuffer, sizeof(enemyIdBuffer));
+		const std::string requestedEnemyId = enemyIdBuffer;
+		const bool enemyIdChanged = requestedEnemyId != selectedEnemyId_;
+		const bool enemyIdEmpty = requestedEnemyId.empty();
+		const bool enemyIdDuplicated = enemyIdChanged && enemyDataMap_.contains(requestedEnemyId);
+		if (enemyIdEmpty) {
+			ImGui::SameLine();
+			ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.25f, 1.0f), "空IDは不可");
+		}
+		else if (enemyIdDuplicated) {
+			ImGui::SameLine();
+			ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.25f, 1.0f), "同名あり");
+		}
+		const bool canRenameEnemy = enemyIdChanged && !enemyIdEmpty && !enemyIdDuplicated;
+		if (ImGui::Button("敵IDを変更してJSON保存", ImVec2(180, 28))) {
+			const std::string oldId = selectedEnemyId_;
+			if (canRenameEnemy) {
+				editorEnemyData_.enemyId = oldId;
+				enemyDataMap_[oldId] = editorEnemyData_;
+			}
+			if (canRenameEnemy && RenameEnemyData(oldId, requestedEnemyId)) {
+				enemyIdBufferOwner.clear();
+				SaveEnemyData(FieldEnemyPaths::EnemyData);
+				SaveEnemySpawnData(FieldEnemyPaths::Spawn);
+				Logger("[EnemyEditor] 敵データIDを変更: " + oldId + " -> " + requestedEnemyId + "\n");
+			}
+		}
+		if (!canRenameEnemy) {
+			ImGui::SameLine();
+			ImGui::TextDisabled("変更可能なIDを入力してください");
+		}
+
 		static char modelPathBuffer[256];
 		strcpy_s(modelPathBuffer, editorEnemyData_.modelPath.c_str());
 		if (ImGui::InputText("モデルパス", modelPathBuffer, sizeof(modelPathBuffer))) {
@@ -1215,19 +1268,47 @@ void FieldEnemyManager::ShowEnemyDataEditor() {
 
 		ImGui::Separator();
 		ImGui::Text("=== バトル設定 ===");
+		const std::vector<std::string> battleEnemyOptions = LoadBattleEnemyIdOptions();
 		if (editorEnemyData_.battleType == BattleType::Single) {
-			static char battleIdBuffer[256];
-			strcpy_s(battleIdBuffer, editorEnemyData_.battleEnemyId.c_str());
-			if (ImGui::InputText("バトル敵ID", battleIdBuffer, sizeof(battleIdBuffer))) {
-				editorEnemyData_.battleEnemyId = battleIdBuffer;
-				changed = true;
+			const char* preview = editorEnemyData_.battleEnemyId.empty()
+				? "(未設定)"
+				: editorEnemyData_.battleEnemyId.c_str();
+			if (ImGui::BeginCombo("バトル敵ID", preview)) {
+				for (const auto& id : battleEnemyOptions) {
+					const bool selected = (editorEnemyData_.battleEnemyId == id);
+					if (ImGui::Selectable(id.c_str(), selected)) {
+						editorEnemyData_.battleEnemyId = id;
+						changed = true;
+					}
+					if (selected) ImGui::SetItemDefaultFocus();
+				}
+				ImGui::EndCombo();
+			}
+			if (battleEnemyOptions.empty()) {
+				ImGui::SameLine();
+				ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.25f, 1.0f), "候補なし");
 			}
 		}
 		else {
 			ImGui::Text("バトル敵IDリスト:");
 			for (size_t i = 0; i < editorEnemyData_.battleEnemyIds.size(); ++i) {
 				ImGui::PushID(static_cast<int>(i));
-				ImGui::Text("%d: %s", static_cast<int>(i + 1), editorEnemyData_.battleEnemyIds[i].c_str());
+				ImGui::Text("%d:", static_cast<int>(i + 1));
+				ImGui::SameLine();
+				const char* preview = editorEnemyData_.battleEnemyIds[i].empty()
+					? "(未設定)"
+					: editorEnemyData_.battleEnemyIds[i].c_str();
+				if (ImGui::BeginCombo("##battleEnemyId", preview)) {
+					for (const auto& id : battleEnemyOptions) {
+						const bool selected = (editorEnemyData_.battleEnemyIds[i] == id);
+						if (ImGui::Selectable(id.c_str(), selected)) {
+							editorEnemyData_.battleEnemyIds[i] = id;
+							changed = true;
+						}
+						if (selected) ImGui::SetItemDefaultFocus();
+					}
+					ImGui::EndCombo();
+				}
 				ImGui::SameLine();
 				if (ImGui::Button("削除")) {
 					editorEnemyData_.battleEnemyIds.erase(editorEnemyData_.battleEnemyIds.begin() + i);
@@ -1236,21 +1317,59 @@ void FieldEnemyManager::ShowEnemyDataEditor() {
 				ImGui::PopID();
 			}
 
-			static char newBattleIdBuffer[256] = "";
-			ImGui::InputText("新しいバトル敵ID", newBattleIdBuffer, sizeof(newBattleIdBuffer));
+			static int addBattleEnemyIndex = 0;
+			if (addBattleEnemyIndex >= static_cast<int>(battleEnemyOptions.size())) {
+				addBattleEnemyIndex = 0;
+			}
+			const char* addPreview = battleEnemyOptions.empty()
+				? "(候補なし)"
+				: battleEnemyOptions[addBattleEnemyIndex].c_str();
+			if (ImGui::BeginCombo("追加するバトル敵ID", addPreview)) {
+				for (int i = 0; i < static_cast<int>(battleEnemyOptions.size()); ++i) {
+					const bool selected = (addBattleEnemyIndex == i);
+					if (ImGui::Selectable(battleEnemyOptions[i].c_str(), selected)) {
+						addBattleEnemyIndex = i;
+					}
+					if (selected) ImGui::SetItemDefaultFocus();
+				}
+				ImGui::EndCombo();
+			}
 			ImGui::SameLine();
-			if (ImGui::Button("追加") && strlen(newBattleIdBuffer) > 0) {
-				editorEnemyData_.battleEnemyIds.push_back(newBattleIdBuffer);
-				newBattleIdBuffer[0] = '\0';
+			if (ImGui::Button("追加") && !battleEnemyOptions.empty()) {
+				editorEnemyData_.battleEnemyIds.push_back(battleEnemyOptions[addBattleEnemyIndex]);
 				changed = true;
 			}
 		}
 
-		static char formationBuffer[256];
-		strcpy_s(formationBuffer, editorEnemyData_.battleFormation.c_str());
-		if (ImGui::InputText("バトルフォーメーション", formationBuffer, sizeof(formationBuffer))) {
-			editorEnemyData_.battleFormation = formationBuffer;
-			changed = true;
+		const char* formationValues[] = { "default", "single", "dual", "triple", "quad" };
+		const char* formationLabels[] = {
+			"default (人数で自動)",
+			"single (1体)",
+			"dual (2体)",
+			"triple (3体)",
+			"quad (4体)"
+		};
+		constexpr int formationCount = static_cast<int>(sizeof(formationValues) / sizeof(formationValues[0]));
+		int formationIndex = 0;
+		for (int i = 0; i < formationCount; ++i) {
+			if (editorEnemyData_.battleFormation == formationValues[i]) {
+				formationIndex = i;
+				break;
+			}
+		}
+		const char* preview = editorEnemyData_.battleFormation.empty()
+			? formationLabels[0]
+			: formationLabels[formationIndex];
+		if (ImGui::BeginCombo("バトルフォーメーション", preview)) {
+			for (int i = 0; i < formationCount; ++i) {
+				const bool selected = (formationIndex == i);
+				if (ImGui::Selectable(formationLabels[i], selected)) {
+					editorEnemyData_.battleFormation = formationValues[i];
+					changed = true;
+				}
+				if (selected) ImGui::SetItemDefaultFocus();
+			}
+			ImGui::EndCombo();
 		}
 
 		ImGui::Separator();
@@ -1323,7 +1442,21 @@ void FieldEnemyManager::ShowEnemyDataEditor() {
 
 		ImGui::Separator();
 		if (ImGui::Button("変更を保存(JSON)", ImVec2(120, 30))) {
+			if (canRenameEnemy) {
+				const std::string oldId = selectedEnemyId_;
+				editorEnemyData_.enemyId = oldId;
+				enemyDataMap_[oldId] = editorEnemyData_;
+				if (RenameEnemyData(oldId, requestedEnemyId)) {
+					enemyIdBufferOwner.clear();
+					Logger("[EnemyEditor] 敵データIDを変更: " + oldId + " -> " + requestedEnemyId + "\n");
+				}
+			}
+			else {
+				editorEnemyData_.enemyId = selectedEnemyId_;
+				enemyDataMap_[selectedEnemyId_] = editorEnemyData_;
+			}
 			SaveEnemyData(FieldEnemyPaths::EnemyData);
+			SaveEnemySpawnData(FieldEnemyPaths::Spawn);
 			Logger("[EnemyEditor] 敵データをファイルに保存しました\n");
 		}
 		ImGui::SameLine();
@@ -1394,6 +1527,43 @@ void FieldEnemyManager::ShowSpawnPointEditor() {
 		ImGui::Text("編集中: %s", selectedSpawnId_.c_str());
 		ImGui::Text("=== 基本設定 ===");
 
+		static std::string idBufferOwner;
+		static char idBuffer[128] = {};
+		if (idBufferOwner != selectedSpawnId_) {
+			strcpy_s(idBuffer, editorSpawnData_.id.c_str());
+			idBufferOwner = selectedSpawnId_;
+		}
+		ImGui::InputText("スポーンID", idBuffer, sizeof(idBuffer));
+		const std::string requestedId = idBuffer;
+		const bool idChanged = requestedId != selectedSpawnId_;
+		const bool idEmpty = requestedId.empty();
+		const bool idDuplicated = idChanged && spawnDataMap_.contains(requestedId);
+		if (idEmpty) {
+			ImGui::SameLine();
+			ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.25f, 1.0f), "空IDは不可");
+		}
+		else if (idDuplicated) {
+			ImGui::SameLine();
+			ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.25f, 1.0f), "同名あり");
+		}
+		const bool canRename = idChanged && !idEmpty && !idDuplicated;
+		if (ImGui::Button("IDを変更してJSON保存", ImVec2(170, 28))) {
+			const std::string oldId = selectedSpawnId_;
+			if (canRename) {
+				editorSpawnData_.id = oldId;
+				spawnDataMap_[oldId] = editorSpawnData_;
+			}
+			if (canRename && RenameSpawnPoint(oldId, requestedId)) {
+				idBufferOwner.clear();
+				SaveEnemySpawnData(FieldEnemyPaths::Spawn);
+				Logger("[EnemyEditor] スポーンポイントIDを変更: " + oldId + " -> " + requestedId + "\n");
+			}
+		}
+		if (!canRename) {
+			ImGui::SameLine();
+			ImGui::TextDisabled("変更可能なIDを入力してください");
+		}
+
 		if (ImGui::BeginCombo("敵ID", editorSpawnData_.enemyId.c_str())) {
 			for (const auto& pair : enemyDataMap_) {
 				bool isSelected = (pair.first == editorSpawnData_.enemyId);
@@ -1454,6 +1624,18 @@ void FieldEnemyManager::ShowSpawnPointEditor() {
 
 		ImGui::Separator();
 		if (ImGui::Button("変更を保存", ImVec2(120, 30))) {
+			if (canRename) {
+				const std::string oldId = selectedSpawnId_;
+				editorSpawnData_.id = oldId;
+				spawnDataMap_[oldId] = editorSpawnData_;
+				if (RenameSpawnPoint(oldId, requestedId)) {
+					idBufferOwner.clear();
+					Logger("[EnemyEditor] スポーンポイントIDを変更: " + oldId + " -> " + requestedId + "\n");
+				}
+			}
+			else {
+				editorSpawnData_.id = selectedSpawnId_;
+			}
 			spawnDataMap_[selectedSpawnId_] = editorSpawnData_;
 			SaveEnemySpawnData(FieldEnemyPaths::Spawn);
 			Logger("[EnemyEditor] スポーンポイントを保存: " + selectedSpawnId_ + "\n");
@@ -1476,10 +1658,7 @@ void FieldEnemyManager::ShowSpawnPointEditor() {
 /// 新しい敵データを作成
 /// </summary>
 void FieldEnemyManager::CreateNewEnemyData() {
-	static int newEnemyCounter = 0;
-	newEnemyCounter++;
-
-	std::string newId = "NewEnemy_" + std::to_string(newEnemyCounter);
+	std::string newId = GenerateUniqueEnemyDataId("NewEnemy");
 
 	FieldEnemyData newData;
 	newData.enemyId = newId;
@@ -1492,6 +1671,83 @@ void FieldEnemyManager::CreateNewEnemyData() {
 	editorEnemyData_ = newData;
 
 	Logger("[EnemyEditor] 新しい敵データを作成: " + newId + "\n");
+}
+
+std::string FieldEnemyManager::GenerateUniqueEnemyDataId(const std::string& prefix) const {
+	const std::string base = prefix.empty() ? "NewEnemy" : prefix;
+	for (int i = 1; i < 100000; ++i) {
+		const std::string candidate = base + "_" + std::to_string(i);
+		if (!enemyDataMap_.contains(candidate)) {
+			return candidate;
+		}
+	}
+
+	return base + "_overflow";
+}
+
+bool FieldEnemyManager::RenameEnemyData(const std::string& oldId, const std::string& newId) {
+	if (oldId.empty() || newId.empty() || oldId == newId) return false;
+	if (enemyDataMap_.contains(newId)) return false;
+
+	auto it = enemyDataMap_.find(oldId);
+	if (it == enemyDataMap_.end()) return false;
+
+	FieldEnemyData renamed = it->second;
+	renamed.enemyId = newId;
+	enemyDataMap_.erase(it);
+	enemyDataMap_[newId] = renamed;
+
+	for (auto& [spawnId, spawn] : spawnDataMap_) {
+		if (spawn.enemyId == oldId) {
+			spawn.enemyId = newId;
+		}
+	}
+
+	for (auto& respawn : respawnQueue_) {
+		if (respawn.spawnData.enemyId == oldId) {
+			respawn.spawnData.enemyId = newId;
+		}
+	}
+
+	for (auto& enemy : fieldEnemies_) {
+		if (enemy && enemy->GetEnemyData().enemyId == oldId) {
+			enemy->ApplyUpdatedData(renamed);
+		}
+	}
+
+	selectedEnemyId_ = newId;
+	editorEnemyData_ = renamed;
+	return true;
+}
+
+std::vector<std::string> FieldEnemyManager::LoadBattleEnemyIdOptions() const {
+	std::vector<std::string> ids;
+
+	try {
+		std::ifstream file("Resources/Json/BattleEnemies/enemy_data.json");
+		if (!file.is_open()) {
+			return ids;
+		}
+
+		nlohmann::json json;
+		file >> json;
+
+		if (!json.contains("battleEnemies") || !json["battleEnemies"].is_array()) {
+			return ids;
+		}
+
+		for (const auto& enemyJson : json["battleEnemies"]) {
+			std::string id = enemyJson.value("enemyId", std::string(""));
+			if (!id.empty() && std::find(ids.begin(), ids.end(), id) == ids.end()) {
+				ids.push_back(id);
+			}
+		}
+	}
+	catch (const std::exception& e) {
+		Logger("[EnemyEditor] バトル敵ID候補の読み込み失敗: " + std::string(e.what()) + "\n");
+	}
+
+	return ids;
 }
 
 /// <summary>
@@ -1522,10 +1778,7 @@ void FieldEnemyManager::DeleteEnemyData(const std::string& enemyId) {
 /// 新しいスポーンポイントを作成
 /// </summary>
 void FieldEnemyManager::CreateNewSpawnPoint() {
-	static int newSpawnCounter = 0;
-	newSpawnCounter++;
-
-	std::string newId = "Spawn_" + std::to_string(newSpawnCounter);
+	std::string newId = GenerateUniqueSpawnPointId("Spawn");
 
 	FieldEnemySpawnData newSpawn;
 	newSpawn.id = newId;
@@ -1539,6 +1792,47 @@ void FieldEnemyManager::CreateNewSpawnPoint() {
 	editorSpawnData_ = newSpawn;
 
 	Logger("[EnemyEditor] 新しいスポーンポイントを作成: " + newId + "\n");
+}
+
+std::string FieldEnemyManager::GenerateUniqueSpawnPointId(const std::string& prefix) const {
+	const std::string base = prefix.empty() ? "Spawn" : prefix;
+	for (int i = 1; i < 100000; ++i) {
+		const std::string candidate = base + "_" + std::to_string(i);
+		if (!spawnDataMap_.contains(candidate)) {
+			return candidate;
+		}
+	}
+
+	return base + "_overflow";
+}
+
+bool FieldEnemyManager::RenameSpawnPoint(const std::string& oldId, const std::string& newId) {
+	if (oldId.empty() || newId.empty() || oldId == newId) return false;
+	if (spawnDataMap_.contains(newId)) return false;
+
+	auto it = spawnDataMap_.find(oldId);
+	if (it == spawnDataMap_.end()) return false;
+
+	FieldEnemySpawnData renamed = it->second;
+	renamed.id = newId;
+	spawnDataMap_.erase(it);
+	spawnDataMap_[newId] = renamed;
+
+	for (auto& enemy : fieldEnemies_) {
+		if (enemy && enemy->GetSpawnId() == oldId) {
+			enemy->SetSpawnId(newId);
+		}
+	}
+
+	for (auto& respawn : respawnQueue_) {
+		if (respawn.spawnData.id == oldId) {
+			respawn.spawnData.id = newId;
+		}
+	}
+
+	selectedSpawnId_ = newId;
+	editorSpawnData_ = renamed;
+	return true;
 }
 
 /// <summary>

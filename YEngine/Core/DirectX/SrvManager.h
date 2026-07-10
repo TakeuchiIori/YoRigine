@@ -44,6 +44,8 @@ public:
 	void CreateSRVforStructuredBuffer(uint32_t srvIndex, ID3D12Resource* pResource, UINT numElements, UINT structureByteStride);
 	void CreateSRVforRenderTexture(uint32_t srvIndex, ID3D12Resource* pResource);
 	void CreateSRVforDepth(uint32_t srvIndex, ID3D12Resource* pResource);
+	// SRV生成（Texture2DArray 深度用：シャドウカスケード）
+	void CreateSRVforDepthArray(uint32_t srvIndex, ID3D12Resource* pResource, UINT arraySize);
 
 	// UAV生成 (StructureBuffer用)
 	void CreateUAVForStructuredBuffer(uint32_t uavIndex, ID3D12Resource* pResource, UINT numElements, UINT structureByteStride);

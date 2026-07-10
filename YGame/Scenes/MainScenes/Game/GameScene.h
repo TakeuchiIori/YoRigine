@@ -59,6 +59,8 @@ private:
 
 	void UpdateCamera();
 	void UpdateCameraMode();
+	void UpdateDebugCameraTimePause();
+	void SetDebugCameraActive(bool active);
 
 	void HandleRetry();
 	void HandleReturnToTitle();
@@ -82,6 +84,7 @@ private:
 
 	// デバッグフラグ
 	bool isDebugCamera_ = false;
+	bool pausedGameTimeForDebugCamera_ = false;
 
 	std::unique_ptr<SkyBox> skyBox_;
 

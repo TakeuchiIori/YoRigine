@@ -54,6 +54,12 @@ struct MovementConfig {
 	float cameraFollowSpeed = 5.0f;                     // カメラ追従の速度（緩やかに変更）
 	float cameraRotationThreshold = 0.02f;              // カメラが動いていると判定する閾値
 	float cameraFollowDelay = 0.05f;                    // カメラが止まってからプレイヤー制御に戻るまでの遅延
+
+	// ウェイポイント誘導設定
+	bool enableWaypointFacing = true;                   // 現在のウェイポイント方向へ向く
+	bool waypointFaceOnlyWhenIdle = true;               // 停止中だけウェイポイント方向へ向く
+	float waypointFacingSpeed = 3.5f;                   // ウェイポイント方向へ向く速度
+	float waypointFacingMinDistance = 0.5f;             // これより近い場合は向き補正しない
 };
 
 // ============================================================

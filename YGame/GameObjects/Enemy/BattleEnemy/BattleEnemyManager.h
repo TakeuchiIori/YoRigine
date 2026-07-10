@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <string>
 #include <functional>
+#include <utility>
 
 class Player;
 class Camera;
@@ -54,6 +55,7 @@ struct BattleStats {
 
 // 戦闘終了時のコールバック
 using BattleEndCallback = std::function<void(BattleResult result, const BattleStats& stats)>;
+using BattleEnemyDefeatedCallback = std::function<void(const BattleEnemy& enemy)>;
 
 ///************************* 戦闘用の敵管理クラス *************************///
 class BattleEnemyManager {
@@ -189,6 +191,7 @@ public:
 
 	// 戦闘終了コールバックを設定
 	void SetBattleEndCallback(BattleEndCallback callback) { battleEndCallback_ = callback; }
+	void SetEnemyDefeatedCallback(BattleEnemyDefeatedCallback callback) { enemyDefeatedCallback_ = std::move(callback); }
 
 	// 最終バトルモードを設定
 	void SetFinalBattleMode(bool isFinal) { isFinalBattle_ = isFinal; }
@@ -247,6 +250,7 @@ private:
 	Camera* camera_ = nullptr;
 	Player* player_ = nullptr;
 	BattleEndCallback battleEndCallback_;
+	BattleEnemyDefeatedCallback enemyDefeatedCallback_;
 
 	// 敵管理
 	std::vector<std::unique_ptr<BattleEnemy>> battleEnemies_;

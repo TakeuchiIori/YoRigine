@@ -56,6 +56,8 @@ void Object3d::UpdateAnimation()
 /// </summary>
 void Object3d::Draw(Camera* camera, WorldTransform& worldTransform)
 {
+	object3dCommon_->DrawPreference();
+
 	auto pm = YPipelineManager::GetInstance();
 	const auto& indices = pm->GetParameterIndices("Object");
 
@@ -111,7 +113,8 @@ void Object3d::Draw(Camera* camera, WorldTransform& worldTransform)
 	if (camera) {
 		commandList->SetGraphicsRootConstantBufferView(indices.at("gCamera"), camera->GetCameraResource()->GetGPUVirtualAddress());
 	}
-	commandList->SetGraphicsRootConstantBufferView(indices.at("gLight"), YoRigine::LightManager::GetInstance()->GetShadowResource()->GetGPUVirtualAddress());
+	// カラーパス：PS のカスケード選択用にライト VP 配列を渡す
+	commandList->SetGraphicsRootConstantBufferView(indices.at("gCascadeShadow"), YoRigine::LightManager::GetInstance()->GetCascadeResource()->GetGPUVirtualAddress());
 	// マテリアル
 	materialUV_->RecordDrawCommands(commandList.Get(), indices.at("gMaterial"));
 	materialColor_->RecordDrawCommands(commandList.Get(), indices.at("gMaterialColor"));

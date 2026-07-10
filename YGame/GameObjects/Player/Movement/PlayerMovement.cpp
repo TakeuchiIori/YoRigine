@@ -1,5 +1,6 @@
 #include "PlayerMovement.h"
 #include "../Player.h"
+#include "Generators/Trigger/WaypointManager.h"
 
 // State
 #include "IdleMovementState.h"
@@ -9,6 +10,7 @@
 #include "Systems/Input./Input.h"
 #include "MathFunc.h"
 
+#include <algorithm>
 #include <numbers>
 
 #ifdef USE_IMGUI
@@ -59,6 +61,11 @@ void PlayerMovement::Update(float deltaTime) {
 	// ステートマシン更新（Idle/Movingなどの状態を更新）
 	// ------------------------------------------------------------
 	stateMachine_.Update(deltaTime);
+
+	// ------------------------------------------------------------
+	// フィールド誘導: 現在のウェイポイント方向へ向きを補正
+	// ------------------------------------------------------------
+	UpdateWaypointFacing(deltaTime);
 
 	// ------------------------------------------------------------
 	// 攻撃ステップ補間（ヒット時の前進を毎フレーム進行）
@@ -157,6 +164,58 @@ void PlayerMovement::UpdateCameraFollow(float deltaTime) {
 }
 
 // ============================================================
+// ウェイポイント方向への向き補正
+// ============================================================
+void PlayerMovement::UpdateWaypointFacing(float deltaTime) {
+	if (!owner_ || !config_.enableWaypointFacing) return;
+	if (!canRotate_ || isHoming_) return;
+	if (owner_->IsBattleMode()) return;
+	if (config_.waypointFaceOnlyWhenIdle && IsMoving()) return;
+
+	auto* waypoint = WaypointManager::GetInstance();
+	if (!waypoint || !waypoint->HasCurrent()) return;
+
+	Vector3 toWaypoint = waypoint->GetCurrentPosition() - owner_->GetWorldPosition();
+	toWaypoint.y = 0.0f;
+
+	const float distance = toWaypoint.Length();
+	if (distance <= config_.waypointFacingMinDistance) return;
+
+	Vector3 direction = toWaypoint * (1.0f / distance);
+	targetRotateY_ = CalculateTargetRotate(direction);
+
+	const float t = std::clamp(config_.waypointFacingSpeed * deltaTime, 0.0f, 1.0f);
+	currentRotateY_ = LerpAngle(currentRotateY_, targetRotateY_, t);
+	isRotating_ = std::abs(currentRotateY_ - targetRotateY_) > 0.01f;
+	ApplyRotate();
+}
+
+// ============================================================
+// 現在のウェイポイント方向へ即時向き合わせ
+// ============================================================
+bool PlayerMovement::FaceCurrentWaypointNow() {
+	if (!owner_) return false;
+	if (!canRotate_ || isHoming_) return false;
+	if (owner_->IsBattleMode()) return false;
+
+	auto* waypoint = WaypointManager::GetInstance();
+	if (!waypoint || !waypoint->HasCurrent()) return false;
+
+	Vector3 toWaypoint = waypoint->GetCurrentPosition() - owner_->GetWorldPosition();
+	toWaypoint.y = 0.0f;
+
+	const float distance = toWaypoint.Length();
+	if (distance <= config_.waypointFacingMinDistance) return false;
+
+	Vector3 direction = toWaypoint * (1.0f / distance);
+	targetRotateY_ = CalculateTargetRotate(direction);
+	currentRotateY_ = targetRotateY_;
+	isRotating_ = false;
+	ApplyRotate();
+	return true;
+}
+
+// ============================================================
 // JSON設定の初期化
 // ============================================================
 void PlayerMovement::InitJson(YoRigine::JsonManager* jsonManager) {
@@ -204,6 +263,15 @@ void PlayerMovement::InitJson(YoRigine::JsonManager* jsonManager) {
 	jsonManager->Register("カメラ追従速度", &config_.cameraFollowSpeed);
 	jsonManager->Register("カメラ回転判定閾値", &config_.cameraRotationThreshold);
 	jsonManager->Register("カメラ停止遅延", &config_.cameraFollowDelay);
+
+	// ------------------------------------------------------------
+	// ウェイポイント誘導設定
+	// ------------------------------------------------------------
+	jsonManager->SetTreePrefix("ウェイポイント誘導設定");
+	jsonManager->Register("ウェイポイント方向を向く", &config_.enableWaypointFacing);
+	jsonManager->Register("停止中のみ向く", &config_.waypointFaceOnlyWhenIdle);
+	jsonManager->Register("向く速度", &config_.waypointFacingSpeed);
+	jsonManager->Register("最小距離", &config_.waypointFacingMinDistance);
 }
 
 // ============================================================

@@ -174,6 +174,9 @@ void BattleEnemyManager::OnEnemyDefeated(BattleEnemy* enemy) {
 
 	// 統計更新
 	battleStats_.enemiesDefeated++;
+	if (enemyDefeatedCallback_) {
+		enemyDefeatedCallback_(*enemy);
+	}
 
 	// 最終バトル時：残りの生存敵をカウント
 	if (isFinalBattle_) {

@@ -10,6 +10,13 @@
 
 // 時間管理クラス（デルタタイム・ポーズ・スロー・ヒットストップなどを統括）
 namespace YoRigine {
+
+	// 時間チャンネル。ヒットストップ / スロー / ポーズの影響範囲をチャンネルで分ける。
+	//   Gameplay : player/enemy/物理/戦闘。hitstop/slowmo/pause で止まる（＝GetDeltaTime() 既定）。
+	//   UI       : HUD/メニュー。実時間で動き続ける（hitstop/ゲームポーズの影響を受けない）。
+	//   Vfx      : エフェクト。独自スケール。既定は独立（ポーズ/hitstop非連動、後で連動可）。
+	enum class TimeChannel { Gameplay, UI, Vfx, Count };
+
 	class GameTime
 	{
 	public:
@@ -43,7 +50,12 @@ namespace YoRigine {
 		///************************* 特殊時間処理 *************************///
 
 		// ヒットストップを設定
-		static void SetHitStop(float duration);
+		//   duration    : 停止させる時間（秒）
+		//   freezeScale : 停止中の timeScale（0=完全停止 / 0.05=ほぼ停止だが微動 / 0.2=軽い溜め）
+		//   easeOut     : 停止明けに freezeScale→通常速へ戻す時間（0=即スナップ＝強い衝撃）
+		//   ※ Gameplay チャンネルのみに作用。UI/実時間は影響を受けない。
+		//   ※ 停止中に再度呼ぶと「長い/硬い/長イーズ」を採用（多段ヒットで縮まない）。
+		static void SetHitStop(float duration, float freezeScale = 0.0f, float easeOut = 0.0f);
 
 		// スローモーションを設定
 		static void SetSlowMotion(float duration, float speed);
@@ -54,7 +66,40 @@ namespace YoRigine {
 	public:
 		///************************* アクセッサ *************************///
 
-		static float GetDeltaTime() { return deltaTime_; }
+		static float GetDeltaTime() { return deltaTime_; }   // Gameplay チャンネル（後方互換）
+
+		// チャンネル指定の deltaTime。UI は実時間、Vfx は独自スケール。
+		static float GetDeltaTime(TimeChannel ch) {
+			switch (ch) {
+			case TimeChannel::UI:  return uiDeltaTime_;
+			case TimeChannel::Vfx: return vfxDeltaTime_;
+			default:               return deltaTime_;  // Gameplay
+			}
+		}
+
+		// Vfx チャンネルのスケール（1.0=等速）。エフェクトだけスローにしたい等に使う。
+		static void  SetVfxTimeScale(float s) { vfxTimeScale_ = s; }
+		static float GetVfxTimeScale() { return vfxTimeScale_; }
+
+		// チャンネルごとのスケール（1.0=等速）。※Gameplay は hitstop/slowmo でも上書きされる。
+		static void SetChannelScale(TimeChannel ch, float s) {
+			switch (ch) {
+			case TimeChannel::UI:  uiTimeScale_  = s; break;
+			case TimeChannel::Vfx: vfxTimeScale_ = s; break;
+			default:               timeScale_    = s; break;  // Gameplay
+			}
+		}
+		static float GetChannelScale(TimeChannel ch) {
+			switch (ch) {
+			case TimeChannel::UI:  return uiTimeScale_;
+			case TimeChannel::Vfx: return vfxTimeScale_;
+			default:               return timeScale_;         // Gameplay
+			}
+		}
+		// チャンネルごとの一時停止（そのチャンネルの dt を 0 にする）。
+		static void SetChannelPaused(TimeChannel ch, bool paused) { channelPaused_[static_cast<int>(ch)] = paused; }
+		static bool IsChannelPaused(TimeChannel ch) { return channelPaused_[static_cast<int>(ch)]; }
+
 		static float GetUnscaledDeltaTime() { return unscaledDeltaTime_; }
 		static float GetAccumulatedTime() { return accumulatedTime_; }
 		static float GetTotalTime() { return totalTime_; }
@@ -80,12 +125,17 @@ namespace YoRigine {
 		///************************* 時間管理変数 *************************///
 
 		static Clock::time_point prevTime_;
-		static float deltaTime_;
+		static float deltaTime_;         // Gameplay チャンネルの deltaTime（後方互換）
+		static float uiDeltaTime_;       // UI チャンネル（実時間）
+		static float vfxDeltaTime_;      // Vfx チャンネル（独自スケール）
 		static float unscaledDeltaTime_;
 		static float totalTime_;
 		static float fixedDeltaTime_;
 		static float accumulatedTime_;
-		static float timeScale_;
+		static float timeScale_;         // Gameplay スケール（hitstop/slowmo が駆動）
+		static float uiTimeScale_;       // UI スケール（既定1.0）
+		static float vfxTimeScale_;      // Vfx スケール（既定1.0・独立）
+		static bool  channelPaused_[static_cast<int>(TimeChannel::Count)]; // チャンネル別一時停止
 		static bool isPause_;       // ゲーム本編のポーズ（ポーズメニュー等のゲームUIが反応する）
 		static bool debugFreeze_;   // エディタ用の一時停止（時間だけ止める。ゲームUIは反応させない）
 		static bool stepOneFrame_;

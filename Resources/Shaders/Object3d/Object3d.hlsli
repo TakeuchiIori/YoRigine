@@ -4,10 +4,9 @@ struct VertexShaderOutput{
     float2 texcoord : TEXCOORD0;
     float3 normal : NORMAL0;
     float3 worldPosition : POSITION0;
-    float4 shadowPos : TEXCOORD1;
 };
 
-// ライトのViewProjection
+// ライトのViewProjection（影パス VS 用）
 struct LightMatrices
 {
     float4x4 lightViewProjection;

@@ -9,6 +9,29 @@
 #include "imgui.h"
 #endif
 
+namespace {
+Matrix4x4 RemoveScaleFromMatrix(const Matrix4x4& matrix) {
+	Matrix4x4 result = matrix;
+
+	for (int row = 0; row < 3; ++row) {
+		Vector3 axis{
+			result.m[row][0],
+			result.m[row][1],
+			result.m[row][2]
+		};
+
+		const float length = Length(axis);
+		if (length > 0.0001f) {
+			result.m[row][0] /= length;
+			result.m[row][1] /= length;
+			result.m[row][2] /= length;
+		}
+	}
+
+	return result;
+}
+}
+
 // ============================================================
 // デストラクタ
 // ============================================================
@@ -28,22 +51,13 @@ void PlayerShield::Initialize(Camera* camera) {
 	obj_ = std::make_unique<Object3d>();
 	obj_->Initialize();
 	obj_->SetModel("Shield_Heater.obj");
-	obj_->SetEnableEnvironment(true);
-	obj_->SetEnvironmentCoefficient(1.0f);
 	wt_.Initialize();
 
 	// ------------------------------------------------------------
 	// プレイヤーの「手ジョイント」を探索して、盾を接続
 	// ------------------------------------------------------------
 	FindHandJointIndex();
-	if (isValidJoint_) {
-		WorldTransform& handWT = obj3d_
-			->GetModel()
-			->GetSkeleton()
-			->GetJoints()[handleIndex_]
-			.GetWorldTransform();
-		wt_.parent_ = &handWT;
-	}
+	wt_.parent_ = nullptr;
 
 	// ------------------------------------------------------------
 	// コライダー・Json・パーティクル初期化
@@ -108,7 +122,16 @@ void PlayerShield::SetPlayerWeaponPosition() {
 	wt_.translate_ = offsetPos_;
 	wt_.rotate_ = offsetRot_;
 	wt_.scale_ = offsetScale_;
-	wt_.UpdateMatrix();
+
+	WorldTransform& handWT = obj3d_
+		->GetModel()
+		->GetSkeleton()
+		->GetJoints()[handleIndex_]
+		.GetWorldTransform();
+
+	const Matrix4x4 handNoScale = RemoveScaleFromMatrix(handWT.matWorld_);
+	const Matrix4x4 shieldMatrix = MakeAffineMatrix(wt_.scale_, wt_.rotate_, wt_.translate_);
+	wt_.matWorld_ = Multiply(shieldMatrix, handNoScale);
 }
 
 // ============================================================

@@ -2,6 +2,7 @@
 
 // Engine
 #include "DirectXCommon.h"
+#include "RenderFormats.h"
 #include "Vector4.h"
 #include "SceneSystems/SceneManager.h"
 #include "SceneSystems/BaseScene.h"
@@ -42,11 +43,13 @@ void PipCameraSystem::CreateRenderResources() {
 	if (!rtvMgr || !dsvMgr) return;
 
 	// PiP 用 RTV (SRV つき → ImGui::Image で表示可能)
+	// メインシーンと同じ HDR フォーマットにする。PiP は同じシーン PSO(HDR) でモデルを描くため、
+	// SRGB のままだと RTV 形式不一致(#613)になる。ImGui 表示はトーンマップ無しの raw 表示。
 	rtvMgr->Create(
 		rtName_,
 		rtWidth_,
 		rtHeight_,
-		DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+		YoRigine::kSceneColorFormat,
 		Vector4{ 0.05f, 0.05f, 0.10f, 1.0f }, // 視認しやすい暗い青のクリア色
 		true
 	);

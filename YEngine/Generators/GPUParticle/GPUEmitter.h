@@ -237,7 +237,7 @@ public:
 public:
 	///************************* 基本関数 *************************///
 	void Initialize(Camera* camera, std::string& texturePath);
-	void Update();
+	void Update(float dt);
 	void Draw();
 	void Reset();
 

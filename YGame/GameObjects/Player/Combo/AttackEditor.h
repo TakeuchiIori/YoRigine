@@ -50,6 +50,7 @@ private:
 	void DrawAttackList();
 	void DrawAttackDetail();
 	void DrawDopeSheet();
+	void DrawAnimationSelector(AttackData& atk, bool& changed);
 
 	// ============================================================
 	// 攻撃データの操作処理
@@ -67,6 +68,8 @@ private:
 	void SaveToJson();
 	void TriggerReload();
 	void OnAttackSelected();
+	void RefreshPlayerAnimationList();
+	static std::string ToAnimationNameFromBinaryFile(const std::string& filename);
 
 private:
 	// ============================================================
@@ -82,6 +85,7 @@ private:
 	bool autoReload_ = true;
 
 	char nameBuffer_[256];
+	std::vector<std::string> playerAnimationNames_;
 
 	std::function<void()> onReloadCallback_;
 

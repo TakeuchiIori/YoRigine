@@ -58,12 +58,29 @@ PixelShaderOutput main(VertexShaderOutput input)
     float3 glow = baseColor.rgb * centerHighlight * gMeshParam.glowPower;
 
     //--------------------------------------------------
+    // アウトライン(エッジ)強調
+    // リボンの幅端(texcoord.x=0/1)ほど強く光らせる。中央は暗く、縁がクッキリ光る。
+    //   rimColor        = 縁の発光色 (HDRで Bloom)
+    //   fresnelStrength = 縁の発光強度
+    //   trailSharpness  = 縁の細さ (大きいほど細く鋭い)
+    //--------------------------------------------------
+    float rim    = pow(abs(texcoord.x * 2.0f - 1.0f), max(gMeshParam.trailSharpness, 0.01f));
+    float rimAmt = rim * gMeshParam.fresnelStrength * ageFade; // 寿命でフェード
+
+    //--------------------------------------------------
     //  最終合成
     //  加算ブレンドなので alpha を rgb に乗じて出力
     //--------------------------------------------------
     float  alpha = baseColor.a * widthFade * ageFade;
     float3 color = baseColor.rgb + glow;
 
-    output.color = float4(color * alpha, alpha);
+    // アウトライン発光を premultiplied 加算（幅フェードで薄れる端でも縁がしっかり光る）
+    float3 rimGlow = gMeshParam.rimColor.rgb * (rimAmt * gMeshParam.rimColor.a);
+
+    // 発光マスター強度: 0 で完全消灯、下げれば形が見える、上げれば強発光(Bloom)
+    float3 outRGB = (color * alpha + rimGlow) * gMeshParam.emissiveIntensity;
+
+    output.color = float4(outRGB,
+                          saturate(alpha + rimAmt * gMeshParam.rimColor.a));
     return output;
 }

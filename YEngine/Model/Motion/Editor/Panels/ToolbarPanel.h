@@ -22,5 +22,12 @@ private:
 	// ピンポン再生用のモーションを生成
 	void GeneratePingPongMotion();
 
+	// 指定フレーム範囲に移動オフセットをTranslateキーとして焼き込む
+	void BakeTranslateOffsetRange();
+
 	MotionEditorContext* context_ = nullptr;
+
+	int offsetStartFrame_ = 2;
+	int offsetEndFrame_ = 10;
+	float offsetTranslate_[3] = { 0.0f, 1.0f, 0.0f };
 };

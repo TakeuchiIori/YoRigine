@@ -58,6 +58,7 @@ namespace YoRigine {
 		shadowJson_->Register("orthoHeight", &shadowMapSettings_.orthoHeight);
 		shadowJson_->Register("nearZ", &shadowMapSettings_.nearZ);
 		shadowJson_->Register("farZ", &shadowMapSettings_.farZ);
+		shadowJson_->Register("cascadeSplitRatio", &shadowMapSettings_.cascadeSplitRatio);
 	}
 
 	//=====================================================================
@@ -115,15 +116,25 @@ namespace YoRigine {
 	}
 
 	/*==========================================================================
-	影のリソース作成
+	影のリソース作成（カスケードシャドウ）
 	//========================================================================*/
 	void LightManager::CreateShadowResource()
 	{
-		shadowResource_ = object3dCommon_->GetDxCommon()->CreateBufferResource(sizeof(ShadowMatrix));
-		shadowResource_->Map(0, nullptr, reinterpret_cast<void**>(&shadow_));
+		auto* dxCommon = object3dCommon_->GetDxCommon();
 
-		// 初期値は単位行列
-		shadow_->lightViewProjection = MakeIdentity4x4();
+		// 影パス用：カスケードごとの単一行列 CB
+		for (int i = 0; i < kCascadeCount; ++i) {
+			shadowCascadeResource_[i] = dxCommon->CreateBufferResource(sizeof(ShadowMatrix));
+			shadowCascadeResource_[i]->Map(0, nullptr, reinterpret_cast<void**>(&shadowCascadeMapped_[i]));
+			shadowCascadeMapped_[i]->lightViewProjection = MakeIdentity4x4();
+		}
+
+		// カラーパス用：全カスケードの行列配列 CB
+		cascadeResource_ = dxCommon->CreateBufferResource(sizeof(CascadeMatrices));
+		cascadeResource_->Map(0, nullptr, reinterpret_cast<void**>(&cascade_));
+		for (int i = 0; i < kCascadeCount; ++i) {
+			cascade_->lightViewProjection[i] = MakeIdentity4x4();
+		}
 	}
 
 	//===========================================================================
@@ -187,62 +198,62 @@ namespace YoRigine {
 		Matrix4x4 lightView = MatrixLookAtLH(lightPos, target, up);
 
 		// -------------------------------------------------------------
-		// ピクセルスナップ処理（ちらつき防止）
-		// ワールド原点 (0,0,0) を基準にしてテクセルグリッドを固定します
+		// カスケードごとの正射影 + ピクセルスナップ（ちらつき防止）
+		// 同じライトビュー・同じ焦点まわりに、大きさ違いの正方フラスタムを
+		// 入れ子で作る。近いカスケードほど小さく＝高精細になる。
+		// ワールド原点 (0,0,0) を基準にテクセルグリッドを固定してスナップ。
 		// -------------------------------------------------------------
 
-		// 範囲設定
-		float width = shadowMapSettings_.orthoWidth;
-		float height = shadowMapSettings_.orthoHeight;
-		float halfWidth = width * 0.5f;
-		float halfHeight = height * 0.5f;
-
-		// テクセルサイズ
+		// テクセル基準サイズ（1 カスケードの解像度）
 		const float shadowMapSize = static_cast<float>(DsvManager::kShadowmapHeight);
-		float unitX = width / shadowMapSize;
-		float unitY = height / shadowMapSize;
 
-		// ライトビュー空間での「ワールド原点」と「ターゲット位置」を取得
+		// ライトビュー空間での「ワールド原点」と「ターゲット位置」を取得（カスケード共通）
 		Vector3 worldOriginInLight = Transform(Vector3(0.0f, 0.0f, 0.0f), lightView);
 		Vector3 targetInLight = Transform(target, lightView);
 
-		// カメラ（ターゲット）を中心にしたいが、グリッドはずらしたくない
-		// 理想的なビューポートの左端・上端
-		float idealMinX = targetInLight.x - halfWidth;
-		float idealMinY = targetInLight.y - halfHeight;
-
-		// ワールド原点からの距離を測り、ユニット単位で切り捨てる（スナップ）
-		float distFromOriginX = idealMinX - worldOriginInLight.x;
-		float distFromOriginY = idealMinY - worldOriginInLight.y;
-
-		float snappedDistX = std::floor(distFromOriginX / unitX) * unitX;
-		float snappedDistY = std::floor(distFromOriginY / unitY) * unitY;
-
-		// 最終的な境界を決定（ワールド原点 + スナップ済みの距離）
-		float minX = worldOriginInLight.x + snappedDistX;
-		float maxX = minX + width;
-		float minY = worldOriginInLight.y + snappedDistY;
-		float maxY = minY + height;
-
-		// Z 軸の範囲設定:
+		// Z 軸の範囲設定（カスケード共通）:
 		// target は lightView 空間で z = lightBackDistance に来る。
 		// そこから手前(nearZ)/奥(farZ) のオフセットで前後を広げる。
 		float minZ = lightBackDistance - shadowMapSettings_.nearZ;
 		float maxZ = lightBackDistance + shadowMapSettings_.farZ;
+		if (minZ < 0.1f) minZ = 0.1f;                 // クリップ空間 z >= 0 を満たす
+		if (maxZ < minZ + 0.1f) maxZ = minZ + 0.1f;   // 退化フラスタム防止
 
-		// 安全策: 近接面はクリップ空間 z >= 0 を満たすため微小正値で下限を切る
-		if (minZ < 0.1f) minZ = 0.1f;
-		// 退化したフラスタムを防ぐ
-		if (maxZ < minZ + 0.1f) maxZ = minZ + 0.1f;
+		// 隣接カスケード間のサイズ比（0<r<1）。最遠(kCascadeCount-1)が orthoWidth。
+		float splitRatio = std::clamp(shadowMapSettings_.cascadeSplitRatio, 0.05f, 0.95f);
 
-		// ライトの正射影行列を作成
-		Matrix4x4 lightProj = MakeOrthographicMatrix(
-			minX, maxY, maxX, minY,
-			minZ, maxZ
-		);
+		for (int c = 0; c < kCascadeCount; ++c) {
+			// c=0 が最小（近距離・高精細）、c=kCascadeCount-1 が最大（=orthoWidth）
+			float scale = std::pow(splitRatio, static_cast<float>(kCascadeCount - 1 - c));
+			float width = shadowMapSettings_.orthoWidth * scale;
+			float height = shadowMapSettings_.orthoHeight * scale;
+			float halfWidth = width * 0.5f;
+			float halfHeight = height * 0.5f;
 
-		// 最終的なライトビュー射影行列
-		shadow_->lightViewProjection = lightView * lightProj;
+			// テクセルサイズ（このカスケードの覆う範囲 / 解像度）
+			float unitX = width / shadowMapSize;
+			float unitY = height / shadowMapSize;
+
+			// ターゲット中心の理想左端・上端
+			float idealMinX = targetInLight.x - halfWidth;
+			float idealMinY = targetInLight.y - halfHeight;
+
+			// ワールド原点からの距離をユニット単位で切り捨て（スナップ）
+			float snappedDistX = std::floor((idealMinX - worldOriginInLight.x) / unitX) * unitX;
+			float snappedDistY = std::floor((idealMinY - worldOriginInLight.y) / unitY) * unitY;
+
+			float minX = worldOriginInLight.x + snappedDistX;
+			float maxX = minX + width;
+			float minY = worldOriginInLight.y + snappedDistY;
+			float maxY = minY + height;
+
+			Matrix4x4 lightProj = MakeOrthographicMatrix(minX, maxY, maxX, minY, minZ, maxZ);
+			Matrix4x4 vp = lightView * lightProj;
+
+			// 影パス用（カスケード別）とカラーパス用（配列）の両方に書き込む
+			shadowCascadeMapped_[c]->lightViewProjection = vp;
+			cascade_->lightViewProjection[c] = vp;
+		}
 
 		// Fog / God Rays ポストエフェクト用にもカメラ・ライト情報を流し込む。
 		// シーン毎に UpdateShadowMatrix は呼ばれるので、ここで一括更新するのが確実。
@@ -627,6 +638,10 @@ namespace YoRigine {
 
 			ImGui::DragFloat("Far Range (farZ)", &shadowMapSettings_.farZ, 1.0f, 0.0f, 1000.0f);
 			ImGui::TextDisabled("  ターゲットからライト反対方向（奥）に何単位ぶん影に入れるか");
+
+			ImGui::Separator();
+			ImGui::SliderFloat("Cascade Split Ratio", &shadowMapSettings_.cascadeSplitRatio, 0.05f, 0.95f, "%.2f");
+			ImGui::TextDisabled("  隣接カスケードのサイズ比。小さいほど近距離が高精細（カスケード数 %d）", kCascadeCount);
 
 			ImGui::Separator();
 			if (ImGui::Button("Save Shadowmap Settings") && shadowJson_) {

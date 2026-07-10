@@ -137,7 +137,8 @@ namespace YoRigine {
 		stampMode_.Update(viewPos, viewSize);
 #endif
 
-		objectManager_->Update();
+		// ObjectManager::Update() is driven once per frame from Framework::Update().
+		// Running it here as well advances animation time twice in editor previews.
 	}
 
 	// ============================================================
@@ -346,6 +347,9 @@ namespace YoRigine {
 
 		for (auto* obj : objectManager_->GetAllActiveObjects()) {
 			if (!obj || !obj->object || !obj->worldTransform) continue;
+			// 「影を落とす」が OFF のオブジェクトはシャドウマップへ描かない。
+			// 巨大スケールの地面などがシャドウマップを埋めて影がチラつくのを防ぐ。
+			if (!obj->castShadow) continue;
 
 			Model* model = obj->object->GetModel();
 			const bool canInstance = (model && !obj->isAnimation && !model->GetHasBones());
@@ -667,6 +671,7 @@ namespace YoRigine {
 			newObj->uvStochastic = srcObj->uvStochastic;
 			objectManager_->ApplyObjectUV(*newObj);
 			newObj->outlineEnabled = srcObj->outlineEnabled;
+			newObj->castShadow = srcObj->castShadow;
 
 			// 親子関係も維持
 			newObj->parentID = srcObj->parentID;

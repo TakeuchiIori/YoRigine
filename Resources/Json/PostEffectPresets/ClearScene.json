@@ -11,6 +11,23 @@
         "sigma": 2.000000,
         "kernelSize": 3,
         "outlineColor": [0.000000,0.000000,0.000000,1.000000],
+        "depthOutline": {
+          "useDepth": true,
+          "useNormal": false,
+          "useLuminance": false,
+          "edgeStrength": 1.000000,
+          "depthWeight": 1.000000,
+          "normalWeight": 1.000000,
+          "luminanceWeight": 1.000000,
+          "depthThreshold": 1.000000,
+          "normalThreshold": 1.000000,
+          "luminanceThreshold": 1.000000,
+          "normalWidth": 1.000000,
+          "luminanceWidth": 1.000000,
+          "useDistanceFade": false,
+          "distanceFadeStart": 30.000000,
+          "distanceFadeEnd": 80.000000
+        },
         "radialBlur": {
           "direction": [0.000000,0.000000],
           "center": [0.500000,0.500000],
@@ -77,6 +94,27 @@
           "vibrance": 0.300000,
           "colorTemp": 0.080000,
           "colorTint": 0.000000
+        },
+        "fog": {
+          "fogColor": [0.550000,0.650000,0.750000],
+          "fogDensity": 0.005000,
+          "fogStart": 10.000000,
+          "skyFogClamp": 0.700000,
+          "sunInscatterStrength": 0.500000,
+          "sunColor": [1.000000,0.850000,0.600000],
+          "heightFogTop": 20.000000,
+          "heightFogBottom": -5.000000,
+          "heightFogDensity": 0.300000,
+          "heightFogDistanceScale": 0.010000
+        },
+        "godRays": {
+          "sunColor": [1.000000,0.850000,0.600000],
+          "density": 1.000000,
+          "weight": 0.250000,
+          "decay": 0.950000,
+          "exposure": 0.120000,
+          "numSamples": 48,
+          "skyThreshold": 0.999000
         }
       }
     },
@@ -89,6 +127,23 @@
         "sigma": 2.000000,
         "kernelSize": 3,
         "outlineColor": [0.000000,0.000000,0.000000,1.000000],
+        "depthOutline": {
+          "useDepth": true,
+          "useNormal": false,
+          "useLuminance": false,
+          "edgeStrength": 1.000000,
+          "depthWeight": 1.000000,
+          "normalWeight": 1.000000,
+          "luminanceWeight": 1.000000,
+          "depthThreshold": 1.000000,
+          "normalThreshold": 1.000000,
+          "luminanceThreshold": 1.000000,
+          "normalWidth": 1.000000,
+          "luminanceWidth": 1.000000,
+          "useDistanceFade": false,
+          "distanceFadeStart": 30.000000,
+          "distanceFadeEnd": 80.000000
+        },
         "radialBlur": {
           "direction": [0.000000,0.000000],
           "center": [0.500000,0.500000],
@@ -123,8 +178,8 @@
           "time": 0.000000
         },
         "bloom": {
-          "threshold": 0.220000,
-          "intensity": 0.978000,
+          "threshold": 0.543000,
+          "intensity": 0.526000,
           "spread": 7.425000,
           "colorTemperature": -0.135000
         },
@@ -155,6 +210,27 @@
           "vibrance": 0.300000,
           "colorTemp": 0.080000,
           "colorTint": 0.000000
+        },
+        "fog": {
+          "fogColor": [0.550000,0.650000,0.750000],
+          "fogDensity": 0.005000,
+          "fogStart": 10.000000,
+          "skyFogClamp": 0.700000,
+          "sunInscatterStrength": 0.500000,
+          "sunColor": [1.000000,0.850000,0.600000],
+          "heightFogTop": 20.000000,
+          "heightFogBottom": -5.000000,
+          "heightFogDensity": 0.300000,
+          "heightFogDistanceScale": 0.010000
+        },
+        "godRays": {
+          "sunColor": [1.000000,0.850000,0.600000],
+          "density": 1.000000,
+          "weight": 0.250000,
+          "decay": 0.950000,
+          "exposure": 0.120000,
+          "numSamples": 48,
+          "skyThreshold": 0.999000
         }
       }
     }

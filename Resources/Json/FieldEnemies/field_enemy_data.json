@@ -1,51 +1,4 @@
 {
-    "Alien": {
-        "alertDuration": 0.800000011920929,
-        "battleEnemyId": "alien",
-        "battleFormation": "default",
-        "battleTypeStr": "Single",
-        "chaseRange": 10.0,
-        "chaseSpeed": 4.0,
-        "enemyId": "Alien",
-        "modelColor": {
-            "w": 1.0,
-            "x": 1.0,
-            "y": 1.0,
-            "z": 1.0
-        },
-        "modelPath": "Alien.obj",
-        "noiseDetectionRange": 8.0,
-        "pathRefreshInterval": 0.30000001192092896,
-        "patrolRadius": 5.0,
-        "patrolSpeed": 2.0,
-        "returnDistance": 15.0,
-        "rotationSpeed": 5.0,
-        "scale": {
-            "x": 1.0,
-            "y": 1.0,
-            "z": 1.0
-        },
-        "searchDuration": 3.0,
-        "searchSweepAngle": 70.0,
-        "spotLightColor": {
-            "w": 1.0,
-            "x": 1.0,
-            "y": 1.0,
-            "z": 1.0
-        },
-        "spotLightDecay": 0.10000000149011612,
-        "spotLightIntensity": 1000.0,
-        "spotLightOffset": {
-            "x": 0.0,
-            "y": 0.800000011920929,
-            "z": 0.0
-        },
-        "spotLightPitch": -0.44999998807907104,
-        "useCustomColor": false,
-        "useSpotLight": true,
-        "viewAngle": 60.0,
-        "viewDistance": 15.0
-    },
     "GreenSpikyBlob": {
         "alertDuration": 0.800000011920929,
         "battleEnemyId": "green_blob",
@@ -93,10 +46,61 @@
         "viewAngle": 60.0,
         "viewDistance": 15.0
     },
+    "Green_2": {
+        "alertDuration": 0.800000011920929,
+        "battleEnemyId": "",
+        "battleEnemyIds": [
+            "green_blob",
+            "green_blob"
+        ],
+        "battleFormation": "dual",
+        "battleTypeStr": "Group",
+        "chaseRange": 10.0,
+        "chaseSpeed": 4.0,
+        "enemyId": "Green_2",
+        "modelColor": {
+            "w": 1.0,
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "modelPath": "GreenSpikyBlob.obj",
+        "noiseDetectionRange": 8.0,
+        "pathRefreshInterval": 0.30000001192092896,
+        "patrolRadius": 5.0,
+        "patrolSpeed": 2.0,
+        "returnDistance": 15.0,
+        "rotationSpeed": 5.0,
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "searchDuration": 3.0,
+        "searchSweepAngle": 70.0,
+        "spotLightColor": {
+            "w": 1.0,
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "spotLightDecay": 0.10000000149011612,
+        "spotLightIntensity": 1000.0,
+        "spotLightOffset": {
+            "x": 0.0,
+            "y": 0.800000011920929,
+            "z": 0.0
+        },
+        "spotLightPitch": -0.4399999976158142,
+        "useCustomColor": false,
+        "useSpotLight": true,
+        "viewAngle": 60.0,
+        "viewDistance": 15.0
+    },
     "Mushnub_Evolved": {
         "alertDuration": 0.800000011920929,
         "battleEnemyId": "mushnub",
-        "battleFormation": "default",
+        "battleFormation": "single",
         "battleTypeStr": "Single",
         "chaseRange": 12.0,
         "chaseSpeed": 5.0,
@@ -140,17 +144,17 @@
         "viewAngle": 60.0,
         "viewDistance": 15.0
     },
-    "NewEnemy_1": {
+    "Purple1": {
         "alertDuration": 0.800000011920929,
         "battleEnemyId": "alien",
         "battleEnemyIds": [
             "mushnub"
         ],
         "battleFormation": "dual",
-        "battleTypeStr": "Group",
+        "battleTypeStr": "Single",
         "chaseRange": 10.0,
         "chaseSpeed": 4.0,
-        "enemyId": "NewEnemy_1",
+        "enemyId": "Purple1",
         "modelColor": {
             "w": 1.0,
             "x": 1.0,
@@ -190,25 +194,25 @@
         "viewAngle": 60.0,
         "viewDistance": 15.0
     },
-    "NewEnemy_2": {
+    "Purple_2": {
         "alertDuration": 0.800000011920929,
-        "battleEnemyId": "",
+        "battleEnemyId": "alien_1",
         "battleEnemyIds": [
-            "green_blob",
-            "green_blob"
+            "alien",
+            "alien"
         ],
         "battleFormation": "dual",
         "battleTypeStr": "Group",
         "chaseRange": 10.0,
         "chaseSpeed": 4.0,
-        "enemyId": "NewEnemy_2",
+        "enemyId": "Purple_2",
         "modelColor": {
             "w": 1.0,
             "x": 1.0,
             "y": 1.0,
             "z": 1.0
         },
-        "modelPath": "GreenSpikyBlob.obj",
+        "modelPath": "Alien.obj",
         "noiseDetectionRange": 8.0,
         "pathRefreshInterval": 0.30000001192092896,
         "patrolRadius": 5.0,
@@ -235,7 +239,7 @@
             "y": 0.800000011920929,
             "z": 0.0
         },
-        "spotLightPitch": -0.4399999976158142,
+        "spotLightPitch": -0.44999998807907104,
         "useCustomColor": false,
         "useSpotLight": true,
         "viewAngle": 60.0,

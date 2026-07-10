@@ -97,6 +97,13 @@ public:
 		return updateModules_;
 	}
 
+	// 登録済みモジュールを全消去。JSON 再ロード時に同名システムへモジュールが
+	// 二重追加されるのを防ぐため、ロード前にこれで一旦リセットする。
+	void ClearModules() {
+		spawnModules_.clear();
+		updateModules_.clear();
+	}
+
 	// ブレンドモードの設定
 	void SetBlendMode(BlendMode mode) { blendMode_ = mode; }
 	BlendMode GetBlendMode() const { return blendMode_; }

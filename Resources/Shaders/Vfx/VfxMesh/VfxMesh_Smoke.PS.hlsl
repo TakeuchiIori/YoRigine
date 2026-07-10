@@ -76,13 +76,9 @@ PixelShaderOutput main(VertexShaderOutput input)
     float  alpha = 0.0f;
     float3 col   = float3(0.0f, 0.0f, 0.0f);
 
-    // 爆発時は 火球色 → 煙色 へ遷移（前半オレンジ、後半は暗いグレーの煙）
+    // 色は gMeshParam.color をそのまま使う。火球→煙のような色遷移は
+    // ColorOverLife モーション（CB の color 乗算）で作る（ハードコードしない）。
     float3 baseRGB = gMeshParam.color.rgb;
-    if (gMeshParam.burst >= 0.0f)
-    {
-        baseRGB = lerp(gMeshParam.color.rgb, gMeshParam.smokeColor.rgb,
-                       smoothstep(0.04f, 0.30f, gMeshParam.burst));
-    }
 
     [loop]
     for (int i = 0; i < STEPS; ++i)
@@ -123,15 +119,8 @@ PixelShaderOutput main(VertexShaderOutput input)
     col   += baseRGB * rim;
     alpha  = saturate(alpha + rim * 0.35f);
 
-    // 爆発ワンショット: 立ち上がり速く（破裂）→ 長く尾を引いて消える（爆発後の煙）
-    if (gMeshParam.burst >= 0.0f)
-    {
-        float p   = gMeshParam.burst;
-        float pop = saturate(p / 0.07f);          // 一瞬で立ち上がる破裂
-        float linger = pow(saturate(1.0f - p), 0.7f); // ゆっくり尾を引いて消える
-        alpha *= pop * linger;
-    }
-
+    // フェード（立ち上がり/消滅）は FadeInOut / ColorOverLife モーションが
+    // CB の color.a（不透明度）に反映して作る。シェーダではハードコードしない。
     if (alpha < 0.004f) { discard; }
 
     // front-to-back の col はプリマルチ済み → SrcAlpha ブレンド用に非プリマルチ化

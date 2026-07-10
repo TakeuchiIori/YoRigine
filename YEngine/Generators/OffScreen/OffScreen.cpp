@@ -79,7 +79,6 @@ void OffScreen::RenderEffectCompute(
 	case OffScreenEffectType::RadialBlur:         psoKey = "PostEffectRadialBlurCS";  rsKey = "PostEffectRS_CB"; break;
 	case OffScreenEffectType::ToneMapping:        psoKey = "PostEffectToneMapCS";     rsKey = "PostEffectRS_CB"; break;
 	case OffScreenEffectType::Chromatic:          psoKey = "PostEffectChromaticCS";   rsKey = "PostEffectRS_CB"; break;
-	case OffScreenEffectType::Bloom:              psoKey = "PostEffectBloomCS";       rsKey = "PostEffectRS_CB"; break;
 	case OffScreenEffectType::Posterize:          psoKey = "PostEffectPosterizeCS";   rsKey = "PostEffectRS_CB"; break;
 	case OffScreenEffectType::Kuwahara:           psoKey = "PostEffectKuwaharaCS";    rsKey = "PostEffectRS_CB"; break;
 	case OffScreenEffectType::Halftone:           psoKey = "PostEffectHalftoneCS";    rsKey = "PostEffectRS_CB"; break;
@@ -136,11 +135,6 @@ void OffScreen::RenderEffectCompute(
 		cmd->SetComputeRootDescriptorTable(0, inputSRV);
 		cmd->SetComputeRootDescriptorTable(1, outputUAV);
 		cmd->SetComputeRootConstantBufferView(2, chromaticResource_->GetGPUVirtualAddress());
-		break;
-	case OffScreenEffectType::Bloom:
-		cmd->SetComputeRootDescriptorTable(0, inputSRV);
-		cmd->SetComputeRootDescriptorTable(1, outputUAV);
-		cmd->SetComputeRootConstantBufferView(2, bloomResource_->GetGPUVirtualAddress());
 		break;
 	case OffScreenEffectType::Posterize:
 		cmd->SetComputeRootDescriptorTable(0, inputSRV);
@@ -247,7 +241,10 @@ void OffScreen::ReleaseResources()
 	colorAdjustResource_.Reset();
 	toneParamsResource_.Reset();
 	shatterTransitionResource_.Reset();
-	bloomResource_.Reset();
+	bloomBrightCB_.Reset();
+	bloomDownCB_.Reset();
+	bloomUpCB_.Reset();
+	bloomCompositeCB_.Reset();
 	posterizeResource_.Reset();
 	kuwaharaResource_.Reset();
 	halftoneResource_.Reset();
@@ -266,7 +263,10 @@ void OffScreen::ReleaseResources()
 	colorAdjustData_ = nullptr;
 	toneParamsData_ = nullptr;
 	shatterTransitionData_ = nullptr;
-	bloomData_ = nullptr;
+	bloomBrightData_ = nullptr;
+	bloomDownData_ = nullptr;
+	bloomUpData_ = nullptr;
+	bloomCompositeData_ = nullptr;
 	posterizeData_ = nullptr;
 	kuwaharaData_ = nullptr;
 	halftoneData_ = nullptr;
@@ -381,14 +381,27 @@ void OffScreen::SetShatterTransitionParams(const ShatterTransitionParams& params
 	}
 }
 
-/// <summary>ブルーム設定</summary>
+/// <summary>ブルーム設定（Dual Kawase 各段の CB を更新）</summary>
 void OffScreen::SetBloomParams(const BloomParams& params)
 {
-	if (bloomData_) {
-		bloomData_->threshold = params.threshold;
-		bloomData_->intensity = params.intensity;
-		bloomData_->spread = params.spread;
-		bloomData_->colorTemperature = params.colorTemperature;
+	// BrightPass 段（mip0 生成時のみ高輝度抽出）
+	if (bloomBrightData_) {
+		bloomBrightData_->threshold = params.threshold;
+		bloomBrightData_->doThreshold = 1.0f;
+	}
+	// 純ダウンサンプル段（深いミップ・しきい値なし）
+	if (bloomDownData_) {
+		bloomDownData_->threshold = 0.0f;
+		bloomDownData_->doThreshold = 0.0f;
+	}
+	// アップサンプル段（にじみ半径。全段共通の定数）
+	if (bloomUpData_) {
+		bloomUpData_->filterRadius = 1.0f;
+	}
+	// 合成段
+	if (bloomCompositeData_) {
+		bloomCompositeData_->intensity = params.intensity;
+		bloomCompositeData_->colorTemperature = params.colorTemperature;
 	}
 }
 
@@ -680,12 +693,84 @@ void OffScreen::CreateShatterTransitionResource()
 /// <summary>ブルーム用バッファ</summary>
 void OffScreen::CreateBloomResource()
 {
-	bloomResource_ = dxCommon_->CreateBufferResource(sizeof(BloomForGPU));
-	bloomResource_->Map(0, nullptr, reinterpret_cast<void**>(&bloomData_));
-	bloomData_->threshold = 0.6f;
-	bloomData_->intensity = 0.5f;
-	bloomData_->spread = 6.0f;
-	bloomData_->colorTemperature = 0.3f;
+	// Dual Kawase ブルームは段ごとに別 CB を持つ。1 フレーム内で複数回ディスパッチ
+	// するが、各段内では値が一定なので段ごとに 1 個ずつ CB を用意すれば
+	// 「同一 CB へ異なる値を書いてハザード」を避けられる。
+	bloomBrightCB_ = dxCommon_->CreateBufferResource(sizeof(BloomDownForGPU));
+	bloomBrightCB_->Map(0, nullptr, reinterpret_cast<void**>(&bloomBrightData_));
+	bloomBrightData_->threshold = 1.0f;
+	bloomBrightData_->doThreshold = 1.0f;
+
+	bloomDownCB_ = dxCommon_->CreateBufferResource(sizeof(BloomDownForGPU));
+	bloomDownCB_->Map(0, nullptr, reinterpret_cast<void**>(&bloomDownData_));
+	bloomDownData_->threshold = 0.0f;
+	bloomDownData_->doThreshold = 0.0f;
+
+	bloomUpCB_ = dxCommon_->CreateBufferResource(sizeof(BloomUpForGPU));
+	bloomUpCB_->Map(0, nullptr, reinterpret_cast<void**>(&bloomUpData_));
+	bloomUpData_->filterRadius = 1.0f;
+
+	bloomCompositeCB_ = dxCommon_->CreateBufferResource(sizeof(BloomCompositeForGPU));
+	bloomCompositeCB_->Map(0, nullptr, reinterpret_cast<void**>(&bloomCompositeData_));
+	bloomCompositeData_->intensity = 0.5f;
+	bloomCompositeData_->colorTemperature = 0.3f;
+}
+
+/// <summary>Dual Kawase: ダウンサンプル 1 段（bright=true で mip0 の高輝度抽出兼用）</summary>
+void OffScreen::DispatchBloomDown(
+	D3D12_GPU_DESCRIPTOR_HANDLE srcSRV,
+	D3D12_GPU_DESCRIPTOR_HANDLE dstUAV,
+	uint32_t width, uint32_t height, bool bright)
+{
+	auto cmd = dxCommon_->GetCommandList();
+	auto cs = ComputeShaderManager::GetInstance();
+
+	cmd->SetPipelineState(cs->GetComputePipelineState("PostEffectBloomDownCS"));
+	cmd->SetComputeRootSignature(cs->GetRootSignature("PostEffectRS_CB"));
+	cmd->SetComputeRootDescriptorTable(0, srcSRV);
+	cmd->SetComputeRootDescriptorTable(1, dstUAV);
+	cmd->SetComputeRootConstantBufferView(2,
+		(bright ? bloomBrightCB_ : bloomDownCB_)->GetGPUVirtualAddress());
+
+	cmd->Dispatch((width + 7) / 8, (height + 7) / 8, 1);
+}
+
+/// <summary>Dual Kawase: アップサンプル 1 段（下位ミップを対象ミップへ加算合成）</summary>
+void OffScreen::DispatchBloomUp(
+	D3D12_GPU_DESCRIPTOR_HANDLE lowerSRV,
+	D3D12_GPU_DESCRIPTOR_HANDLE dstUAV,
+	uint32_t width, uint32_t height)
+{
+	auto cmd = dxCommon_->GetCommandList();
+	auto cs = ComputeShaderManager::GetInstance();
+
+	cmd->SetPipelineState(cs->GetComputePipelineState("PostEffectBloomUpCS"));
+	cmd->SetComputeRootSignature(cs->GetRootSignature("PostEffectRS_CB"));
+	cmd->SetComputeRootDescriptorTable(0, lowerSRV);
+	cmd->SetComputeRootDescriptorTable(1, dstUAV);
+	cmd->SetComputeRootConstantBufferView(2, bloomUpCB_->GetGPUVirtualAddress());
+
+	cmd->Dispatch((width + 7) / 8, (height + 7) / 8, 1);
+}
+
+/// <summary>Dual Kawase: 合成（フル解像度シーン＋ブルーム mip0 を加算して出力へ）</summary>
+void OffScreen::DispatchBloomComposite(
+	D3D12_GPU_DESCRIPTOR_HANDLE sceneSRV,
+	D3D12_GPU_DESCRIPTOR_HANDLE bloomSRV,
+	D3D12_GPU_DESCRIPTOR_HANDLE dstUAV,
+	uint32_t width, uint32_t height)
+{
+	auto cmd = dxCommon_->GetCommandList();
+	auto cs = ComputeShaderManager::GetInstance();
+
+	cmd->SetPipelineState(cs->GetComputePipelineState("PostEffectBloomCompCS"));
+	cmd->SetComputeRootSignature(cs->GetRootSignature("PostEffectRS_Tex"));
+	cmd->SetComputeRootDescriptorTable(0, sceneSRV);   // t0 = シーン
+	cmd->SetComputeRootDescriptorTable(1, bloomSRV);   // t1 = ブルーム mip0
+	cmd->SetComputeRootDescriptorTable(2, dstUAV);     // u0 = 出力
+	cmd->SetComputeRootConstantBufferView(3, bloomCompositeCB_->GetGPUVirtualAddress());
+
+	cmd->Dispatch((width + 7) / 8, (height + 7) / 8, 1);
 }
 
 /// <summary>ポスタリゼーション用バッファ</summary>

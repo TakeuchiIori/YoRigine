@@ -1,4 +1,5 @@
 #include "Effect.hlsli"
+#include "../Shadow/Cascade.hlsli"
 
 // ==========================================
 //  構造体定義 (Object3d由来 + Effect拡張)
@@ -67,6 +68,7 @@ struct Camera
 //  定数バッファ & テクスチャ
 // ==========================================
 
+ConstantBuffer<CascadeShadow> gCascadeShadow : register(b0);
 ConstantBuffer<MaterialUV> gMaterialUV : register(b1);
 ConstantBuffer<MaterialColor> gMaterialColor : register(b2);
 ConstantBuffer<MaterialLight> gMaterialLight : register(b3);
@@ -78,7 +80,7 @@ ConstantBuffer<Camera> gCamera : register(b7);
 
 Texture2D<float4> gTexture : register(t1);
 TextureCube<float4> gEnvironmentTexture : register(t2);
-Texture2D gShadowMap : register(t3);
+Texture2DArray<float> gShadowMap : register(t3);
 SamplerState gSampler : register(s0);
 SamplerComparisonState gShadowSampler : register(s1);
 
@@ -109,20 +111,10 @@ PixelShaderOutput main(VertexShaderOutput input)
 
     if (gMaterialLight.enableLighting)
     {
-        //========================================== シャドウマップ ==========================================//
-        float3 proj = input.shadowPos.xyz / input.shadowPos.w;
-        float2 shadowUV;
-        shadowUV.x = proj.x * 0.5f + 0.5f;
-        shadowUV.y = -proj.y * 0.5f + 0.5f;
-        float shadowDepth = proj.z - 0.002;
-        float shadow = 1.0f;
-        
-        if (shadowUV.x >= 0.0f && shadowUV.x <= 1.0f &&
-            shadowUV.y >= 0.0f && shadowUV.y <= 1.0f &&
-            shadowDepth <= 1.0f)
-        {
-            shadow = gShadowMap.SampleCmpLevelZero(gShadowSampler, shadowUV, shadowDepth);
-        }
+        //========================================== シャドウマップ（カスケード） ==========================================//
+        const float shadowMapSize = 2048.0f;
+        float shadow = SampleCascadeShadow(gShadowMap, gShadowSampler, gCascadeShadow,
+                                           input.worldPosition, shadowMapSize);
         float shadowFactor = max(shadow, 0.3f);
 
         // カメラ視線ベクトル

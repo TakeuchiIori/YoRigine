@@ -19,6 +19,12 @@ public:
 	CombatState GetStateType() const override { return CombatState::Attacking; }
 
 private:
+	void PlayAttackMotion(Player* player, const AttackData& attack);
+	float GetActiveAttackDuration(const AttackData& attack) const;
+	float GetAttackAnimationTime() const;
+
 	PlayerCombat* combat_;
 	float stateTimer_ = 0.0f; // 攻撃アニメーションの経過時間
+	float activeAnimationDuration_ = 0.0f;
+	float activeMotionSpeed_ = 1.0f;
 };

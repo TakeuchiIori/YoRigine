@@ -324,6 +324,10 @@ namespace YoRigine {
             // インバートハル輪郭線をこのオブジェクトに掛けるか（地面・空など背景は OFF）
             ImGui::Checkbox("アウトライン", &obj->outlineEnabled);
 
+            // このオブジェクトが影を落とす（シャドウマップに描く）か。
+            // 巨大スケールの地面はシャドウマップを埋めて影がチラつくので OFF にする。
+            ImGui::Checkbox("影を落とす", &obj->castShadow);
+
             ImGui::Separator();
 
             if (ImGui::Button("位置リセット")) {

@@ -1,5 +1,6 @@
 #include "AttackEditor.h"
 #include <algorithm>
+#include <filesystem>
 #include <map>
 
 #include <Debugger/Logger.h>
@@ -14,6 +15,7 @@ AttackDataEditor::AttackDataEditor()
 {
 	attacks_ = &AttackDatabase::Get();
 	std::fill(std::begin(nameBuffer_), std::end(nameBuffer_), '\0');
+	RefreshPlayerAnimationList();
 }
 
 // ============================================================
@@ -84,6 +86,8 @@ void AttackDataEditor::DrawToolbar()
 	if (ImGui::Button("読み込み")) { LoadFromJson(); TriggerReload(); }
 	ImGui::SameLine();
 	if (ImGui::Button("保存 & リロード")) { SaveToJson(); TriggerReload(); }
+	ImGui::SameLine();
+	if (ImGui::Button("アニメ一覧更新")) { RefreshPlayerAnimationList(); }
 
 	ImGui::SameLine();
 	ImGui::Text("ファイル: %s", filePath_.c_str());
@@ -206,12 +210,7 @@ void AttackDataEditor::DrawAttackDetail()
 	// ------------------------------------------------------------
 	if (ImGui::CollapsingHeader("基本情報"))
 	{
-		char buf[256];
-		std::snprintf(buf, sizeof(buf), "%s", atk.animationName.c_str());
-		if (ImGui::InputText("アニメーション名", buf, sizeof(buf)))
-		{
-			atk.animationName = buf; changed = true;
-		}
+		DrawAnimationSelector(atk, changed);
 
 		int t = static_cast<int>(atk.type);
 		if (ImGui::Combo("タイプ", &t, typeLabels, 3))
@@ -356,6 +355,55 @@ void AttackDataEditor::DrawAttackDetail()
 
 	// 更新があれば保存とリロード
 	if (changed && autoReload_) { SaveToJson(); TriggerReload(); }
+#endif
+}
+
+// ============================================================
+// プレイヤー用バイナリアニメーション選択
+// ============================================================
+void AttackDataEditor::DrawAnimationSelector(AttackData& atk, bool& changed)
+{
+#ifdef USE_IMGUI
+	const auto it = std::find(playerAnimationNames_.begin(), playerAnimationNames_.end(), atk.animationName);
+	const bool found = it != playerAnimationNames_.end();
+	const char* preview = atk.animationName.empty()
+		? "(未設定)"
+		: atk.animationName.c_str();
+
+	if (ImGui::BeginCombo("アニメーション", preview))
+	{
+		if (ImGui::Selectable("(未設定)", atk.animationName.empty()))
+		{
+			atk.animationName.clear();
+			changed = true;
+		}
+
+		for (const std::string& name : playerAnimationNames_)
+		{
+			const bool selected = (atk.animationName == name);
+			if (ImGui::Selectable(name.c_str(), selected))
+			{
+				atk.animationName = name;
+				changed = true;
+			}
+			if (selected)
+			{
+				ImGui::SetItemDefaultFocus();
+			}
+		}
+		ImGui::EndCombo();
+	}
+
+	ImGui::SameLine();
+	if (ImGui::SmallButton("更新##PlayerAnimList"))
+	{
+		RefreshPlayerAnimationList();
+	}
+
+	if (!atk.animationName.empty() && !found)
+	{
+		ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.25f, 1.0f), "未検出: Resources/Binary/Player_%s.anim", atk.animationName.c_str());
+	}
 #endif
 }
 
@@ -545,6 +593,70 @@ void AttackDataEditor::LoadFromJson()
 	{
 		Logger("[AttackEditor] Load failed\n");
 	}
+}
+
+// ============================================================
+// Player_*.anim から攻撃エディタ用のアニメーション名を作る
+// ============================================================
+std::string AttackDataEditor::ToAnimationNameFromBinaryFile(const std::string& filename)
+{
+	std::filesystem::path path(filename);
+	std::string stem = path.stem().string();
+
+	const std::string prefix = "Player_";
+	if (stem.rfind(prefix, 0) == 0)
+	{
+		stem.erase(0, prefix.size());
+	}
+
+	return stem;
+}
+
+// ============================================================
+// プレイヤー用バイナリアニメーション一覧の更新
+// ============================================================
+void AttackDataEditor::RefreshPlayerAnimationList()
+{
+	playerAnimationNames_.clear();
+
+	const std::filesystem::path binaryDir = "Resources/Binary";
+	if (!std::filesystem::exists(binaryDir))
+	{
+		Logger("[AttackEditor] Player animation binary directory not found: Resources/Binary\n");
+		return;
+	}
+
+	try
+	{
+		for (const auto& entry : std::filesystem::directory_iterator(binaryDir))
+		{
+			if (!entry.is_regular_file()) continue;
+
+			const std::filesystem::path path = entry.path();
+			if (path.extension() != ".anim") continue;
+
+			const std::string filename = path.filename().string();
+			if (filename.rfind("Player_", 0) != 0) continue;
+
+			std::string animationName = ToAnimationNameFromBinaryFile(filename);
+			if (animationName.empty()) continue;
+
+			playerAnimationNames_.push_back(animationName);
+		}
+	}
+	catch (const std::exception& e)
+	{
+		Logger(("[AttackEditor] Failed to scan player animations: " + std::string(e.what()) + "\n").c_str());
+		return;
+	}
+
+	std::sort(playerAnimationNames_.begin(), playerAnimationNames_.end());
+	playerAnimationNames_.erase(
+		std::unique(playerAnimationNames_.begin(), playerAnimationNames_.end()),
+		playerAnimationNames_.end()
+	);
+
+	Logger(("[AttackEditor] Player animations: " + std::to_string(playerAnimationNames_.size()) + "\n").c_str());
 }
 
 // ============================================================

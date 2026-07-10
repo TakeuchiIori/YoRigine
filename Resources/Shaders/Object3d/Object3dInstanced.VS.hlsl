@@ -16,7 +16,6 @@ struct InstanceData
 
 StructuredBuffer<InstanceData> gInstances : register(t3);
 
-ConstantBuffer<LightMatrices> gLight : register(b1);
 ConstantBuffer<Camera> gCamera : register(b3);
 
 struct VertexShaderInput
@@ -37,7 +36,7 @@ InstancedVertexShaderOutput main(VertexShaderInput input, uint instanceID : SV_I
     output.position = mul(worldPosH, gCamera.viewProjection);
     output.normal = normalize(mul(input.normal, (float3x3) inst.WorldInverseTranspose));
     output.texcoord = input.texcoord;
-    output.shadowPos = mul(worldPosH, gLight.lightViewProjection);
+    // シャドウのカスケード選択・サンプルは PS 側で worldPosition から行う
     output.instanceID = instanceID;
     return output;
 }

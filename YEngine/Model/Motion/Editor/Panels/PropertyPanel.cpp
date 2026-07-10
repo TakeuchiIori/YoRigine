@@ -1,5 +1,6 @@
 #include "PropertyPanel.h"
 #include "../../Core/Motion.h"
+#include <algorithm>
 
 #ifdef USE_IMGUI
 #include <imgui.h>
@@ -21,12 +22,35 @@ void PropertyPanel::DrawImGui()
 
 			// 値が変更されたら Joint に同期する
 			bool changed = false;
-			changed |= ImGui::DragFloat3("位置 (T)", context_->editT, 0.01f);
+			context_->translateDisplayScale = std::max(0.0001f, context_->translateDisplayScale);
+			float displayT[3] = {
+				context_->editT[0] / context_->translateDisplayScale,
+				context_->editT[1] / context_->translateDisplayScale,
+				context_->editT[2] / context_->translateDisplayScale
+			};
+			if (ImGui::DragFloat3("位置 (T)", displayT, 0.01f)) {
+				context_->editT[0] = displayT[0] * context_->translateDisplayScale;
+				context_->editT[1] = displayT[1] * context_->translateDisplayScale;
+				context_->editT[2] = displayT[2] * context_->translateDisplayScale;
+				changed = true;
+			}
 			changed |= ImGui::DragFloat3("回転 (R)", context_->editR, 0.5f);
 			changed |= ImGui::DragFloat3("拡縮 (S)", context_->editS, 0.01f, 0.001f, 100.0f);
 
 			if (changed && context_->SyncBufferToJoint) {
 				context_->SyncBufferToJoint();
+			}
+
+			ImGui::Spacing();
+			{
+				bool canRestoreLive = context_->hasLiveBoneOriginal && context_->liveOriginalBone == context_->selBone;
+				if (!canRestoreLive) ImGui::BeginDisabled();
+				if (ImGui::Button("一時編集を元に戻す", ImVec2(-1, 0))) {
+					if (context_->RestoreLiveBoneOriginal) {
+						context_->RestoreLiveBoneOriginal();
+					}
+				}
+				if (!canRestoreLive) ImGui::EndDisabled();
 			}
 
 			ImGui::Spacing();

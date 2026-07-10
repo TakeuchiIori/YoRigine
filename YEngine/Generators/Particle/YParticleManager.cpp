@@ -165,12 +165,21 @@ void YParticleManager::LoadSystemsFromJson(const nlohmann::json& json) {
 	auto* system = manager.CreateSystem(name, maxP);
 	if (!system) return;
 
+	// 同名システムを再ロードした場合、CreateSystem は既存を返すだけでモジュールを
+	// 消さない。ここでクリアしてから読み直すことで「モジュール二重追加」を防ぐ
+	// （＝旧フォルダと YEffects の両方に同名システムがあっても壊れない）。
+	system->ClearModules();
+
 	if (json.contains("texture"))      system->SetTexture(json["texture"]);
 	if (json.contains("isRelative"))   system->SetRelative(json["isRelative"]);
 	if (json.contains("billboardType"))
 		system->SetBillboardType(static_cast<BillboardType>(json["billboardType"].get<uint32_t>()));
 	if (json.contains("BlendMode"))
 		system->SetBlendMode(static_cast<BlendMode>(json["BlendMode"].get<int>()));
+	// エミッシブ強度（Bloom 用の発光倍率）。これを読まないと起動時は既定 1.0 に戻り、
+	// エディタで調整・保存した発光が実行時に反映されない。
+	if (json.contains("emissiveIntensity"))
+		system->SetEmissiveIntensity(json["emissiveIntensity"].get<float>());
 	if (json.contains("Lighting"))
 		system->SetLightSetting(json["Lighting"].get<bool>() ? ParticleLightSetting{ true, true, true } : ParticleLightSetting{ false, false, false });
 	if (json.contains("mesh")) {

@@ -115,6 +115,9 @@ void Player::HandleCombatInput() {
 
 	if (playerCamera_ && playerCamera_->IsInPerformance()) return;
 
+	// 攻撃/ガードは戦闘中のみ。フィールド探索中はブンブン振れない。
+	if (!battleMode_) return;
+
 	const bool pressedA = input_->IsPadTriggered(0, GamePadButton::A);
 	const bool pressedB = input_->IsPadTriggered(0, GamePadButton::B);
 

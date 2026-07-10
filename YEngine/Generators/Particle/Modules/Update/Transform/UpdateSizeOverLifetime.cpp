@@ -1,12 +1,16 @@
 #include "UpdateSizeOverLifetime.h"
-#include <cmath>
+
+UpdateSizeOverLifetime::UpdateSizeOverLifetime()
+{
+    // デフォルト: 1.0 から 0.0 へ smoothstep で縮む（広がって消える系の基本形）
+    curve_.keys_   = { {0.0f, 1.0f}, {1.0f, 0.0f} };
+    curve_.interp_ = ParticleCurve::Interp::Smooth;
+}
 
 void UpdateSizeOverLifetime::OnUpdate(ParticleAttribute* attrs, uint32_t index, float)
 {
     float t = attrs[index].GetNormalizedAge();
-    if (useCurve_) t = t * t * (3.0f - 2.0f * t); // smoothstep
-
-    float mult = ParticleMath::Lerp(startScale_, endScale_, t);
+    float mult = curve_.Evaluate(t);
 
     // initialScale を基準に乗算
     attrs[index].scale = {
@@ -19,21 +23,28 @@ void UpdateSizeOverLifetime::OnUpdate(ParticleAttribute* attrs, uint32_t index, 
 void UpdateSizeOverLifetime::DrawEditor()
 {
 #ifdef USE_IMGUI
-    ImGui::DragFloat("開始スケール倍率", &startScale_, 0.01f, 0.0f, 5.0f);
-    ImGui::DragFloat("終了スケール倍率", &endScale_,   0.01f, 0.0f, 5.0f);
-    ImGui::Checkbox("スムーズ補間", &useCurve_);
-    ImGui::TextDisabled("生成時スケール × 倍率 で実スケールを決定");
+    ImGui::TextDisabled("生成時スケール × カーブ値 で実スケールを決定");
+    curve_.DrawEditor("サイズ倍率カーブ", 0.0f, 3.0f, ImVec2(0, 120));
 #endif
 }
 
 void UpdateSizeOverLifetime::SaveToJson(nlohmann::json& json) const
 {
-    json = { {"startScale",startScale_},{"endScale",endScale_},{"useCurve",useCurve_} };
+    json = nlohmann::json::object();
+    curve_.SaveToJson(json["curve"]);
 }
 
 void UpdateSizeOverLifetime::LoadFromJson(const nlohmann::json& json)
 {
-    if (json.contains("startScale")) startScale_ = json["startScale"];
-    if (json.contains("endScale"))   endScale_   = json["endScale"];
-    if (json.contains("useCurve"))   useCurve_   = json["useCurve"];
+    if (json.contains("curve")) {
+        curve_.LoadFromJson(json["curve"]);
+        return;
+    }
+
+    // 後方互換: 旧 startScale / endScale / useCurve 形式を 2 点カーブへ変換
+    float startScale = json.value("startScale", 1.0f);
+    float endScale   = json.value("endScale",   0.0f);
+    bool  smooth     = json.value("useCurve",   true);
+    curve_.keys_   = { {0.0f, startScale}, {1.0f, endScale} };
+    curve_.interp_ = smooth ? ParticleCurve::Interp::Smooth : ParticleCurve::Interp::Linear;
 }
