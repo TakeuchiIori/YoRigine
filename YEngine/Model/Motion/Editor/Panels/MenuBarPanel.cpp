@@ -8,6 +8,7 @@ void MenuBarPanel::DrawImGui() {
 	if (!ImGui::BeginMenuBar()) return;
 
 	if (ImGui::BeginMenu("ファイル (File)")) {
+		if (ImGui::MenuItem("元アニメーション読み込み", "")) context_->showSourceAnimationPopup = true;
 		if (ImGui::MenuItem("バイナリ保存/読込", ""))  context_->showSavePopup = true;
 		ImGui::EndMenu();
 	}

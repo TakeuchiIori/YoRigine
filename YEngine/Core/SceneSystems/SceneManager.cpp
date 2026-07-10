@@ -193,6 +193,11 @@ void SceneManager::ChangeSceneImmediate(const std::string& sceneName) {
 		scene_ = nullptr;
 	}
 
+	// 前シーンの BaseObject 登録を一掃する（フェード遷移の PerformSceneTransition と同様）。
+	// これを忘れると、解放済みオブジェクトへのダングリング参照が entries_ に残り、
+	// 次シーンの DrawShadowAll / UpdateAll 等で落ちる（Develop への即時遷移で発生）。
+	BaseObjectManager::GetInstance()->ClearAll();
+
 	// 新しいシーンを生成して初期化
 	scene_ = sceneFactory_->CreateScene(sceneName);
 	scene_->SetSceneManager(this);

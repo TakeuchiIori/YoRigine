@@ -1,5 +1,6 @@
 #include "Object3d.hlsli"
 #include "../Light/Light.hlsli"
+#include "../Shadow/Cascade.hlsli"
 struct Material
 {
     float4x4 uvTransform;
@@ -57,6 +58,7 @@ struct MaterialDissolve
 };
 
 ConstantBuffer<Material> gMaterial : register(b0);
+ConstantBuffer<CascadeShadow> gCascadeShadow : register(b1);
 ConstantBuffer<DirectionalLightData> gDirectionalLight : register(b2);
 ConstantBuffer<Camera> gCamera : register(b3);
 ConstantBuffer<PointLights> gPointLights : register(b4);
@@ -69,7 +71,7 @@ ConstantBuffer<MaterialDissolve> gMaterialDissolve : register(b9);
 
 Texture2D<float4> gTexture : register(t0);
 TextureCube<float4> gEnvironmentTexture : register(t1);
-Texture2D gShadowMap : register(t2);
+Texture2DArray<float> gShadowMap : register(t2);
 
 SamplerState gSampler : register(s0);
 // シャドウマップ比較サンプラー
@@ -213,38 +215,13 @@ PixelShaderOutput main(VertexShaderOutput input)
     if (gMaterialLight.enableLighting)
     {
         //===========================================================//
-        //                   シャドウマップの計算
+        //                   シャドウマップの計算（カスケード）
         //===========================================================//
-        float3 proj = input.shadowPos.xyz / input.shadowPos.w;
-        float2 shadowUV;
-        shadowUV.x = proj.x * 0.5f + 0.5f;
-        shadowUV.y = -proj.y * 0.5f + 0.5f; // Y軸反転
-
+        // worldPosition から最も近いカスケードを選んで 3x3 PCF サンプル。
         // 主バイアスは PSO の SlopeScaledDepthBias 側で吸収する想定。
-        // 残った D32_FLOAT 精度由来のチラつき対策に微小な定数だけ引く。
-        float shadowDepth = proj.z - 0.0005f;
-
-        float shadow = 1.0f; // デフォルトは影なし
-        if (shadowUV.x >= 0.0f && shadowUV.x <= 1.0f &&
-        shadowUV.y >= 0.0f && shadowUV.y <= 1.0f &&
-        shadowDepth <= 1.0f)
-        {
-            // 3x3 PCF: HW 比較サンプラの 2x2 バイリニア × 9 タップでソフトシャドウ
-            const float shadowMapSize = 4096.0f; // DsvManager::kShadowmapWidth と一致
-            const float texel = 1.0f / shadowMapSize;
-            float sum = 0.0f;
-            [unroll]
-            for (int sy = -1; sy <= 1; ++sy)
-            {
-                [unroll]
-                for (int sx = -1; sx <= 1; ++sx)
-                {
-                    float2 off = float2(sx, sy) * texel;
-                    sum += gShadowMap.SampleCmpLevelZero(gShadowSampler, shadowUV + off, shadowDepth);
-                }
-            }
-            shadow = sum / 9.0f;
-        }
+        const float shadowMapSize = 2048.0f; // DsvManager::kShadowmapWidth と一致
+        float shadow = SampleCascadeShadow(gShadowMap, gShadowSampler, gCascadeShadow,
+                                           input.worldPosition, shadowMapSize);
 
         // 落ち影。トゥーン有効時はくっきり2値化(ベタ影)、無効時は従来のソフト(PCF)を維持。
         // step(0.5) で「日向(1) / 影(0)」の完全2階調 = Blender カラーランプ「一定」相当。

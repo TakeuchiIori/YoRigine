@@ -1,5 +1,6 @@
 #include "Motion.h"
 #include "MathFunc.h"
+#include "../../ModelUtils.h"
 #include <assert.h>
 #include <fstream>
 #include <filesystem>
@@ -10,15 +11,78 @@
 #include <assimp/scene.h>
 #include <Debugger/Logger.h>
 
+namespace {
+	std::vector<std::string> LoadGLTFInterpolations(
+		const std::string& gltfFilePath,
+		uint32_t animationIndex,
+		uint32_t channelCount)
+	{
+		std::vector<std::string> interpolations(channelCount, "LINEAR");
+
+		if (!std::filesystem::path(gltfFilePath).extension().string().ends_with("gltf")) {
+			return interpolations;
+		}
+
+		std::ifstream file(gltfFilePath);
+		if (!file.is_open()) {
+			return interpolations;
+		}
+
+		nlohmann::json gltfJson;
+		file >> gltfJson;
+
+		if (!gltfJson.contains("animations") || animationIndex >= gltfJson["animations"].size()) {
+			return interpolations;
+		}
+
+		const auto& animation = gltfJson["animations"][animationIndex];
+		if (!animation.contains("samplers") || !animation.contains("channels")) {
+			return interpolations;
+		}
+
+		const auto& samplers = animation["samplers"];
+		const auto& channels = animation["channels"];
+		for (uint32_t i = 0; i < channelCount && i < channels.size(); ++i) {
+			uint32_t samplerIndex = channels[i].value("sampler", i);
+			if (samplerIndex < samplers.size() && samplers[samplerIndex].contains("interpolation")) {
+				interpolations[i] = samplers[samplerIndex]["interpolation"].get<std::string>();
+			}
+		}
+
+		return interpolations;
+	}
+
+	void EnsureCompleteNodeAnimation(Motion::NodeAnimation& nodeAnim)
+	{
+		if (nodeAnim.translate.keyframes.empty()) {
+			nodeAnim.translate.keyframes.push_back({ 0.0f, Vector3{ 0.0f, 0.0f, 0.0f } });
+		}
+		if (nodeAnim.rotate.keyframes.empty()) {
+			nodeAnim.rotate.keyframes.push_back({ 0.0f, Quaternion{ 0.0f, 0.0f, 0.0f, 1.0f } });
+		}
+		if (nodeAnim.scale.keyframes.empty()) {
+			nodeAnim.scale.keyframes.push_back({ 0.0f, Vector3{ 1.0f, 1.0f, 1.0f } });
+		}
+	}
+
+	void EnsureCompleteMotion(Motion& motion)
+	{
+		for (auto& [_, nodeAnim] : motion.animation_.nodeAnimations_) {
+			EnsureCompleteNodeAnimation(nodeAnim);
+		}
+	}
+}
+
 // ============================================================
 // Assimp Scene からのロード
 // ============================================================
-Motion Motion::LoadFromScene(const aiScene* scene, const std::string& gltfFilePath, const std::string& animationName)
+Motion Motion::LoadFromScene(const aiScene* scene, const std::string& gltfFilePath, const std::string& animationName, float importUnitScale)
 {
 	assert(scene && scene->mNumAnimations > 0);
 	Motion anim;
 	std::string resolvedName = animationName;
 	aiAnimation* animationAssimp = nullptr;
+	uint32_t animationIndex = 0;
 
 	// ------------------------------------------------------------
 	// アニメーション名の検索
@@ -27,6 +91,7 @@ Motion Motion::LoadFromScene(const aiScene* scene, const std::string& gltfFilePa
 		for (uint32_t i = 0; i < scene->mNumAnimations; ++i) {
 			if (scene->mAnimations[i]->mName.C_Str() == animationName) {
 				animationAssimp = scene->mAnimations[i];
+				animationIndex = i;
 				break;
 			}
 		}
@@ -55,14 +120,18 @@ Motion Motion::LoadFromScene(const aiScene* scene, const std::string& gltfFilePa
 		Logger("アニメーションの時間が長すぎます: " + animationName);
 	}
 
+	const std::vector<std::string> interpolations =
+		LoadGLTFInterpolations(gltfFilePath, animationIndex, animationAssimp->mNumChannels);
+
 	// ------------------------------------------------------------
 	// チャンネル（ノード）ごとのキーフレーム読み込み
 	// ------------------------------------------------------------
 	for (uint32_t channelIndex = 0; channelIndex < animationAssimp->mNumChannels; ++channelIndex) {
 		aiNodeAnim* nodeAnimationAssimp = animationAssimp->mChannels[channelIndex];
-		NodeAnimation& nodeAnimation = anim.animation_.nodeAnimations_[nodeAnimationAssimp->mNodeName.C_Str()];
+		const std::string nodeName = nodeAnimationAssimp->mNodeName.C_Str();
+		NodeAnimation& nodeAnimation = anim.animation_.nodeAnimations_[nodeName];
 
-		std::string interpolation = ParseGLTFInterpolation(gltfFilePath, channelIndex);
+		const std::string& interpolation = interpolations[channelIndex];
 		if (interpolation == "LINEAR") nodeAnimation.interpolationType = InterpolationType::Linear;
 		else if (interpolation == "STEP") nodeAnimation.interpolationType = InterpolationType::Step;
 		else if (interpolation == "CUBICSPLINE") nodeAnimation.interpolationType = InterpolationType::CubicSpline;
@@ -70,29 +139,35 @@ Motion Motion::LoadFromScene(const aiScene* scene, const std::string& gltfFilePa
 
 		for (uint32_t i = 0; i < nodeAnimationAssimp->mNumPositionKeys; ++i) {
 			KeyframeVector3 kf;
-			kf.time = float(nodeAnimationAssimp->mPositionKeys[i].mTime / animationAssimp->mTicksPerSecond);
+			kf.time = float(nodeAnimationAssimp->mPositionKeys[i].mTime / tps);
 			const auto& val = nodeAnimationAssimp->mPositionKeys[i].mValue;
-			kf.value = { -val.x, val.y, val.z };
+			kf.value = { -val.x * importUnitScale, val.y * importUnitScale, val.z * importUnitScale };
 			nodeAnimation.translate.keyframes.push_back(kf);
 		}
 
 		for (uint32_t i = 0; i < nodeAnimationAssimp->mNumScalingKeys; ++i) {
 			KeyframeVector3 kf;
-			kf.time = float(nodeAnimationAssimp->mScalingKeys[i].mTime / animationAssimp->mTicksPerSecond);
+			kf.time = float(nodeAnimationAssimp->mScalingKeys[i].mTime / tps);
 			const auto& val = nodeAnimationAssimp->mScalingKeys[i].mValue;
 			kf.value = { val.x, val.y, val.z };
+			if (importUnitScale != 1.0f && IsArmatureNodeName(nodeName) && IsNearlyUniformScale(val, kMixamoImportUnitScale)) {
+				kf.value = { 1.0f, 1.0f, 1.0f };
+			}
 			nodeAnimation.scale.keyframes.push_back(kf);
 		}
 
 		for (uint32_t i = 0; i < nodeAnimationAssimp->mNumRotationKeys; ++i) {
 			KeyframeQuaternion kf;
-			kf.time = float(nodeAnimationAssimp->mRotationKeys[i].mTime / animationAssimp->mTicksPerSecond);
+			kf.time = float(nodeAnimationAssimp->mRotationKeys[i].mTime / tps);
 			const auto& val = nodeAnimationAssimp->mRotationKeys[i].mValue;
 			kf.value = { val.x, -val.y, -val.z, val.w };
 			nodeAnimation.rotate.keyframes.push_back(kf);
 		}
+
+		EnsureCompleteNodeAnimation(nodeAnimation);
 	}
 
+	EnsureCompleteMotion(anim);
 	return anim;
 }
 
@@ -125,6 +200,9 @@ std::string Motion::ParseGLTFInterpolation(const std::string& gltfFilePath, uint
 // ============================================================
 void Motion::SaveBinary(const Motion& motion, const std::string& animationName, const std::string& path)
 {
+	Motion safeMotion = motion;
+	EnsureCompleteMotion(safeMotion);
+
 	std::string safeName = animationName;
 	std::replace(safeName.begin(), safeName.end(), ' ', '_');
 	std::string fullPath = path;
@@ -157,14 +235,14 @@ void Motion::SaveBinary(const Motion& motion, const std::string& animationName, 
 	ofs.write(reinterpret_cast<const char*>(&nameLen), sizeof(uint32_t));
 	ofs.write(animationName.c_str(), nameLen);
 
-	ofs.write(reinterpret_cast<const char*>(&motion.animation_.duration_), sizeof(float));
-	size_t nodeCount = motion.animation_.nodeAnimations_.size();
+	ofs.write(reinterpret_cast<const char*>(&safeMotion.animation_.duration_), sizeof(float));
+	size_t nodeCount = safeMotion.animation_.nodeAnimations_.size();
 	ofs.write(reinterpret_cast<const char*>(&nodeCount), sizeof(size_t));
 
 	// ------------------------------------------------------------
 	// ノードごとのアニメーションデータ書き出し
 	// ------------------------------------------------------------
-	for (const auto& [jointName, nodeAnim] : motion.animation_.nodeAnimations_) {
+	for (const auto& [jointName, nodeAnim] : safeMotion.animation_.nodeAnimations_) {
 		size_t jointNameLen = jointName.size();
 		ofs.write(reinterpret_cast<const char*>(&jointNameLen), sizeof(size_t));
 		ofs.write(jointName.c_str(), jointNameLen);
@@ -270,9 +348,11 @@ Motion Motion::LoadBinary(const std::string& path)
 		ifs.read(reinterpret_cast<char*>(&interp), sizeof(int));
 		nodeAnim.interpolationType = static_cast<InterpolationType>(interp);
 
+		EnsureCompleteNodeAnimation(nodeAnim);
 		motion.animation_.nodeAnimations_[jointName] = std::move(nodeAnim);
 	}
 
+	EnsureCompleteMotion(motion);
 	return motion;
 }
 

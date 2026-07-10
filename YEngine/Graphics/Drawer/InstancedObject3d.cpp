@@ -52,6 +52,9 @@ void InstancedObject3d::Finalize()
 		if (batch.mapped) {
 			batch.gpuBuffer->Unmap(0, nullptr);
 		}
+		if (batch.shadowMapped) {
+			batch.shadowGpuBuffer->Unmap(0, nullptr);
+		}
 	}
 	batches_.clear();
 	materialLighting_.reset();
@@ -152,6 +155,31 @@ void InstancedObject3d::EnsureCapacity(Batch& batch, uint32_t needed)
 	batch.srvHandleGPU = srvManager_->GetGPUDescriptorHandle(batch.srvIndex);
 }
 
+void InstancedObject3d::EnsureShadowCapacity(Batch& batch, uint32_t needed)
+{
+	if (batch.shadowCapacity >= needed && batch.shadowGpuBuffer) return;
+
+	uint32_t newCap = batch.shadowCapacity == 0 ? kInitialCapacity : batch.shadowCapacity;
+	while (newCap < needed) newCap *= 2;
+
+	if (batch.shadowMapped) {
+		batch.shadowGpuBuffer->Unmap(0, nullptr);
+		batch.shadowMapped = nullptr;
+	}
+
+	const size_t bufSize = sizeof(InstanceData) * newCap;
+	batch.shadowGpuBuffer = dxCommon_->CreateBufferResource(bufSize);
+	batch.shadowGpuBuffer->Map(0, nullptr, reinterpret_cast<void**>(&batch.shadowMapped));
+	batch.shadowCapacity = newCap;
+
+	if (batch.shadowSrvIndex == UINT32_MAX) {
+		batch.shadowSrvIndex = srvManager_->Allocate();
+	}
+	srvManager_->CreateSRVforStructuredBuffer(
+		batch.shadowSrvIndex, batch.shadowGpuBuffer.Get(), newCap, sizeof(InstanceData));
+	batch.shadowSrvHandleGPU = srvManager_->GetGPUDescriptorHandle(batch.shadowSrvIndex);
+}
+
 void InstancedObject3d::DrawAll(Camera* camera)
 {
 	if (totalInstances_ == 0 || !camera) return;
@@ -200,10 +228,10 @@ void InstancedObject3d::DrawAll(Camera* camera)
 		indices.at("gPointLights"),
 		indices.at("gSpotLights"));
 
-	// Light VP (シャドウマップ用)
+	// Light VP 配列 (カラーパス PS のカスケード選択用)
 	cmd->SetGraphicsRootConstantBufferView(
-		indices.at("gLight"),
-		YoRigine::LightManager::GetInstance()->GetShadowResource()->GetGPUVirtualAddress());
+		indices.at("gCascadeShadow"),
+		YoRigine::LightManager::GetInstance()->GetCascadeResource()->GetGPUVirtualAddress());
 
 	// Camera
 	cmd->SetGraphicsRootConstantBufferView(
@@ -244,18 +272,33 @@ void InstancedObject3d::DrawShadow()
 		indices.at("gLight"),
 		YoRigine::LightManager::GetInstance()->GetShadowResource()->GetGPUVirtualAddress());
 
-	// EnsureCapacity / memcpy は Flush() で既に済んでる前提 (同フレーム内で先に Flush 呼ばれる)
-	// → 安全のため再 ensure するが、cpuData は同じなので memcpy はスキップして大丈夫
+	// 影パスは専用バッファ (shadowGpuBuffer) へ書き込む。
+	// カラーパスと共有すると、後から記録されるカラーパス (frustum culling 付き) の
+	// memcpy が GPU 実行前に中身を上書きし、影の内容が「カリング後の別の集合」に
+	// すり替わって広範囲の影が出たり消えたりチラつく。
 	for (auto& [model, batch] : batches_) {
 		const uint32_t count = static_cast<uint32_t>(batch.cpuData.size());
 		if (count == 0) continue;
 
-		EnsureCapacity(batch, count);
-		// Flush() で memcpy 済みのはずだが、影パス単独呼び出しにも対応
-		if (batch.mapped) {
-			std::memcpy(batch.mapped, batch.cpuData.data(), sizeof(InstanceData) * count);
-		}
+		EnsureShadowCapacity(batch, count);
+		std::memcpy(batch.shadowMapped, batch.cpuData.data(), sizeof(InstanceData) * count);
 
-		model->DrawShadowInstanced(count, batch.srvHandleGPU);
+		model->DrawShadowInstanced(count, batch.shadowSrvHandleGPU);
+	}
+
+	// ── 後始末: 非インスタンス影パイプライン("ShadowMap")を復元する ──
+	// Object3d::DrawShadow は ShadowDrawPreference が張った "ShadowMap" PSO/RS に
+	// 依存して自分では張らない。本関数が "ShadowMapInstanced" に切り替えたまま戻ると、
+	// この後に呼ばれた Object3d::DrawShadow がインスタンス用 VS + 残った SRV で
+	// ゴミ行列のジオメトリをシャドウマップへ焼く（広大な影チラつきの原因）。
+	// → 呼び出し順に依存しないよう、ここで必ず復元しておく。
+	{
+		const auto& sidx = pm->GetParameterIndices("ShadowMap");
+		cmd->SetPipelineState(pm->GetPipeLineStateObject("ShadowMap"));
+		cmd->SetGraphicsRootSignature(pm->GetRootSignature("ShadowMap"));
+		cmd->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		cmd->SetGraphicsRootConstantBufferView(
+			sidx.at("gLight"),
+			YoRigine::LightManager::GetInstance()->GetShadowResource()->GetGPUVirtualAddress());
 	}
 }

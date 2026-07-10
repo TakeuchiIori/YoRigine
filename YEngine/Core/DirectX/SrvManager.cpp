@@ -228,6 +228,46 @@ void SrvManager::CreateSRVforDepth(uint32_t srvIndex, ID3D12Resource* pResource)
 	);
 }
 
+/// <summary>
+/// Texture2DArray 深度用 SRV の作成（シャドウカスケード）
+/// </summary>
+void SrvManager::CreateSRVforDepthArray(uint32_t srvIndex, ID3D12Resource* pResource, UINT arraySize)
+{
+	const auto resourceDesc = pResource->GetDesc();
+	DXGI_FORMAT resourceFormat = resourceDesc.Format;
+
+	DXGI_FORMAT srvFormat = DXGI_FORMAT_UNKNOWN;
+	switch (resourceFormat)
+	{
+	case DXGI_FORMAT_D32_FLOAT:
+	case DXGI_FORMAT_R32_TYPELESS:
+		srvFormat = DXGI_FORMAT_R32_FLOAT;
+		break;
+	case DXGI_FORMAT_D24_UNORM_S8_UINT:
+	case DXGI_FORMAT_R24G8_TYPELESS:
+		srvFormat = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
+		break;
+	default:
+		assert(false && "この深度フォーマットはSRVに対応していません");
+		break;
+	}
+
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+	srvDesc.Format = srvFormat;
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+	srvDesc.Texture2DArray.MostDetailedMip = 0;
+	srvDesc.Texture2DArray.MipLevels = 1;
+	srvDesc.Texture2DArray.FirstArraySlice = 0;
+	srvDesc.Texture2DArray.ArraySize = arraySize;
+
+	dxCommon_->GetDevice()->CreateShaderResourceView(
+		pResource,
+		&srvDesc,
+		GetCPUDescriptorHandle(srvIndex)
+	);
+}
+
 
 /// <summary>
 /// 構造化バッファ用 UAV の作成

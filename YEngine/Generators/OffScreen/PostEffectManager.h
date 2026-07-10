@@ -99,6 +99,13 @@ private:
 	// エフェクトチェーンをオフスクリーンに適用
 	void ApplyEffectParametersToOffScreen(const PostEffectData& effect);
 
+	// Dual Kawase ブルームをミップピラミッドで適用する
+	//   inputSRV : フル解像度シーン（BrightPass 元＆合成のベース）
+	//   outputRT : 合成結果の書き込み先（中間RT名）
+	//   params   : threshold/intensity/colorTemperature/spread(=アクティブ段数)
+	void ApplyBloomPyramid(D3D12_GPU_DESCRIPTOR_HANDLE inputSRV,
+		const std::string& outputRT, const OffScreen::BloomParams& params);
+
 	// リソースの状態遷移を管理
 	void TransitionResource(const std::string& rtName, D3D12_RESOURCE_STATES newState);
 
@@ -136,6 +143,9 @@ private:
 	// 中間バッファ用レンダーターゲット名
 	std::vector<std::string> intermediateRTNames_;
 
+	// Dual Kawase ブルーム用ミップピラミッド RT 名（[0]=1/2 … [n]=1/2^(n+1)）
+	std::vector<std::string> bloomMipNames_;
+
 	// レンダーターゲットの現在の状態を管理
 	std::unordered_map<std::string, D3D12_RESOURCE_STATES> rtStates_;
 
@@ -146,4 +156,7 @@ private:
 	static constexpr const char* PRESET_DIRECTORY = "Resources/Json/PostEffectPresets/";
 	static constexpr const char* FILE_EXTENSION = ".json";
 	static constexpr int MAX_INTERMEDIATE_BUFFERS = 4;
+
+	// ブルームピラミッドの最大段数（spread で 1〜この値まで可変）
+	static constexpr int kBloomMaxMips = 8;
 };

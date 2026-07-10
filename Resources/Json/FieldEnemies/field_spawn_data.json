@@ -1,23 +1,11 @@
 {
     "spawnPoints": [
         {
-            "enemyId": "GreenSpikyBlob",
-            "id": "g_01",
-            "isActive": false,
-            "position": {
-                "x": -7.757887840270996,
-                "y": 0.0,
-                "z": -87.00019073486328
-            },
-            "respawnAfterBattle": false,
-            "respawnDelay": 35.0,
-            "spawnCondition": "",
-            "spawnOnLoad": true
-        },
-        {
+            "comment": "",
             "enemyId": "Mushnub_Evolved",
             "id": "m_01",
             "isActive": false,
+            "isEditorOnly": false,
             "position": {
                 "x": -2.6559946537017822,
                 "y": 0.0,
@@ -29,13 +17,15 @@
             "spawnOnLoad": true
         },
         {
-            "enemyId": "Alien",
+            "comment": "",
+            "enemyId": "Purple_2",
             "id": "Spawn_3",
             "isActive": false,
+            "isEditorOnly": false,
             "position": {
-                "x": 1.2313265800476074,
+                "x": 29.733814239501953,
                 "y": 0.0,
-                "z": -86.78729248046875
+                "z": -65.95581817626953
             },
             "respawnAfterBattle": false,
             "respawnDelay": 30.0,
@@ -43,27 +33,15 @@
             "spawnOnLoad": true
         },
         {
-            "enemyId": "NewEnemy_2",
+            "comment": "",
+            "enemyId": "Green_2",
             "id": "Spawn_1",
             "isActive": false,
+            "isEditorOnly": false,
             "position": {
                 "x": 46.61008071899414,
                 "y": 3.098160232184455e-05,
                 "z": -58.958282470703125
-            },
-            "respawnAfterBattle": false,
-            "respawnDelay": 30.0,
-            "spawnCondition": "",
-            "spawnOnLoad": true
-        },
-        {
-            "enemyId": "NewEnemy_1",
-            "id": "Spawn_2",
-            "isActive": false,
-            "position": {
-                "x": 22.136920928955078,
-                "y": 3.098160232184455e-05,
-                "z": -59.20934295654297
             },
             "respawnAfterBattle": false,
             "respawnDelay": 30.0,

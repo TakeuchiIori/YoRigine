@@ -111,11 +111,25 @@ void PlayerCamera::UpdatePreDirector() {
             }
         }
 
-        // RB / LB で自機の向いている方向の背後へ素早くリセンター（フリーカメラ時のみ）
-        if (!isLockOn_ &&
-            (YoRigine::Input::GetInstance()->IsPadTriggered(0, GamePadButton::RB) ||
-             YoRigine::Input::GetInstance()->IsPadTriggered(0, GamePadButton::LB))) {
-            followCamera_->RecenterBehindTarget();
+        // RB / LB（フリーカメラ時のみ）:
+        //   戦闘中 … 押しっぱなしで左右にカメラを回す（LB=左回り / RB=右回り）。
+        //   非戦闘 … ここでは何もしない。
+        if (!isLockOn_) {
+            auto* input = YoRigine::Input::GetInstance();
+            if (battleMode_) {
+                float yawDir = 0.0f;
+                if (input->IsPadPressed(0, GamePadButton::LB)) { yawDir -= 1.0f; } // 左回り
+                if (input->IsPadPressed(0, GamePadButton::RB)) { yawDir += 1.0f; } // 右回り
+                if (yawDir != 0.0f) {
+                    // 実時間（スロー中も操作感一定。UpdateStickInput と同じ）
+                    const float bumperDt = YoRigine::GameTime::GetUnscaledDeltaTime();
+                    Vector3 rot = followCamera_->GetRotate();
+                    rot.y += yawDir * bumperRotateSpeed_ * bumperDt;
+                    followCamera_->SetRotate(rot);
+                    followCamera_->CancelRecenter();     // 手動操作優先（リセンター中なら中断）
+                    followCamera_->NotifyCameraActive(); // 回している間はアイドルリセンターを止める
+                }
+            }
         }
 
         if (isLockOn_) {
@@ -407,28 +421,45 @@ void PlayerCamera::UpdateThreatAwareness(float dt) {
 //   プレイヤーに最も近いものへ、符号付きで awarenessMaxYaw_ までの傾きを返す。
 // ============================================================
 float PlayerCamera::ComputeGlanceBias() const {
-    std::vector<BaseCollider*> enemies;
-    if (GatherNearbyEnemies(enemies) == 0) return 0.0f;
+    std::vector<Vector3> enemies;
+    if (GatherThreatTargetPositions(enemies) == 0) return 0.0f;
 
     Vector3 camPos  = followCamera_->GetTranslate();
     float   baseYaw = followCamera_->GetRotate().y - awarenessAppliedBias_; // プレイヤー由来の素の yaw
     Vector3 playerPos = playerWT_->translate_;
 
-    BaseCollider* pick = nullptr;
+    bool picked = false;
     float pickDist   = awarenessRange_;
     float pickSigned = 0.0f;
-    for (auto* e : enemies) {
-        Vector3 d = e->GetCenterPosition() - camPos; d.y = 0.0f;
+    for (const auto& enemyPos : enemies) {
+        Vector3 d = enemyPos - camPos; d.y = 0.0f;
         if (Length(d) < 0.01f) continue;
         float signedYaw = WrapPi(atan2f(d.x, d.z) - baseYaw);
         if (std::abs(signedYaw) < awarenessTriggerYaw_) continue; // 視界内寄り＝気配対象外
 
-        float pd = Length(e->GetCenterPosition() - playerPos);
-        if (pd < pickDist) { pickDist = pd; pick = e; pickSigned = signedYaw; }
+        float pd = Length(enemyPos - playerPos);
+        if (pd < pickDist) { pickDist = pd; picked = true; pickSigned = signedYaw; }
     }
-    if (!pick) return 0.0f;
+    if (!picked) return 0.0f;
 
     return std::clamp(pickSigned, -awarenessMaxYaw_, awarenessMaxYaw_);
+}
+
+void PlayerCamera::FaceDefeatNextEnemy(const Vector3& enemyWorldPos) {
+    if (!followCamera_) return;
+
+    Vector3 toTarget = enemyWorldPos - followCamera_->GetTranslate();
+    const float dist = Length(toTarget);
+    if (dist < 0.01f) return;
+
+    Vector3 dir = toTarget / dist;
+    Vector3 rot = followCamera_->GetRotate();
+    rot.y = atan2f(dir.x, dir.z);
+    rot.x = asinf(std::clamp(-dir.y, -1.0f, 1.0f));
+    rot.x = std::clamp(rot.x, minPitch_, maxPitch_);
+    followCamera_->SetRotate(rot);
+    followCamera_->CancelRecenter();
+    followCamera_->NotifyCameraActive();
 }
 
 // ============================================================
@@ -442,8 +473,8 @@ void PlayerCamera::ApplyThreatFovWiden(Camera* sceneCamera, float dt) {
 
     float target = 0.0f;
     if (threatAwarenessEnabled_ && threatAwarenessSceneAllowed_) {
-        std::vector<BaseCollider*> enemies;
-        int n = GatherNearbyEnemies(enemies);
+        std::vector<Vector3> enemies;
+        int n = GatherThreatTargetPositions(enemies);
         if (n >= awarenessFovMinCount_) {
             target = std::min(
                 (n - awarenessFovMinCount_ + 1) * awarenessFovPerEnemy_,
@@ -478,6 +509,29 @@ int PlayerCamera::GatherNearbyEnemies(std::vector<BaseCollider*>& out) const {
         if (Length(col->GetCenterPosition() - playerPos) <= awarenessRange_) {
             out.push_back(col);
         }
+    }
+    return static_cast<int>(out.size());
+}
+
+int PlayerCamera::GatherThreatTargetPositions(std::vector<Vector3>& out) const {
+    out.clear();
+    if (!playerWT_) return 0;
+
+    Vector3 playerPos = playerWT_->translate_;
+    if (!threatTargetPositions_.empty()) {
+        for (const auto& pos : threatTargetPositions_) {
+            if (Length(pos - playerPos) <= awarenessRange_) {
+                out.push_back(pos);
+            }
+        }
+        return static_cast<int>(out.size());
+    }
+
+    std::vector<BaseCollider*> colliders;
+    GatherNearbyEnemies(colliders);
+    out.reserve(colliders.size());
+    for (auto* col : colliders) {
+        if (col) out.push_back(col->GetCenterPosition());
     }
     return static_cast<int>(out.size());
 }
@@ -538,6 +592,7 @@ void PlayerCamera::SaveCameraFeel(nlohmann::json& j) const {
     j["curve"]      = camResponseCurve_;
     j["accelTime"]  = camAccelTime_;
     j["invertY"]    = camInvertY_;
+    j["bumperYawSpeed"] = bumperRotateSpeed_;
 }
 
 void PlayerCamera::LoadCameraFeel(const nlohmann::json& j) {
@@ -547,6 +602,7 @@ void PlayerCamera::LoadCameraFeel(const nlohmann::json& j) {
     camResponseCurve_ = j.value("curve",      2.0f);
     camAccelTime_     = j.value("accelTime",  0.12f);
     camInvertY_       = j.value("invertY",    false);
+    bumperRotateSpeed_ = j.value("bumperYawSpeed", 2.6f);
 }
 
 // ============================================================
@@ -961,6 +1017,8 @@ void PlayerCamera::DrawImGui() {
         ImGui::DragFloat("加速時間(秒)",       &camAccelTime_,  0.01f, 0.0f, 0.5f, "%.2f");
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("0→最大入力まで滑らかに立ち上げる時間。0で即時");
         ImGui::Checkbox("ピッチ反転", &camInvertY_);
+        ImGui::DragFloat("戦闘 RB/LB 回転速度(rad/s)", &bumperRotateSpeed_, 0.05f, 0.3f, 12.0f, "%.2f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("戦闘中に RB/LB 押しっぱなしで左右に回すヨー速度");
 
         // 編集値を extension JSON に反映（カメラ設定保存時に一緒に永続化）
         nlohmann::json cfJson;
@@ -1046,6 +1104,7 @@ void PlayerCamera::DrawImGui() {
 
         ImGui::Separator();
         ImGui::Text("シーン許可: %s", threatAwarenessSceneAllowed_ ? "ON(バトル)" : "OFF(フィールド等)");
+        ImGui::Text("ターゲット数: %d", static_cast<int>(threatTargetPositions_.size()));
         ImGui::Text("現在グランス: %.2f rad / FOV拡大: %.3f", awarenessYawBias_, awarenessFovBias_);
 
         // 編集値を extension JSON に反映（カメラ設定保存時に一緒に永続化される）

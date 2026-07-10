@@ -43,6 +43,11 @@ private:
 	UIBase* button_[3];
 	UIBase* ripples = nullptr;
 
+	// A/B/X 攻撃ボタンの背面アウトライン枠（outlineUI〜outlineUI4）。攻撃ボタンと一緒に戦闘中のみ表示。
+	UIBase* attackOutline_[4] = {};
+	// A/B/X 攻撃ボタンの黒背景（buttonBG 系）。これも攻撃ボタンと一緒に戦闘中のみ表示。
+	UIBase* buttonBG_[4] = {};
+
 	// LB / RB の操作ヒント（バトル中に押すとアニメ）
 	UIBase* lbButton_ = nullptr;
 	UIBase* rbButton_ = nullptr;

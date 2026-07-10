@@ -7,6 +7,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -52,6 +53,7 @@
             "isAnimation": false,
             "modelName": "Blacksmith.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -83,6 +85,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -128,6 +131,7 @@
             "isAnimation": false,
             "modelName": "House_1.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -159,6 +163,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -204,6 +209,7 @@
             "isAnimation": false,
             "modelName": "House_2.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -235,6 +241,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -280,6 +287,7 @@
             "isAnimation": false,
             "modelName": "Bell_Tower.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -311,6 +319,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -356,6 +365,7 @@
             "isAnimation": false,
             "modelName": "Floor_Brick.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": false,
             "position": [
@@ -387,6 +397,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -432,6 +443,7 @@
             "isAnimation": false,
             "modelName": "Rock_5.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -463,6 +475,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -508,6 +521,7 @@
             "isAnimation": false,
             "modelName": "Rock_5.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -539,6 +553,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -584,6 +599,7 @@
             "isAnimation": false,
             "modelName": "Rock_5.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -607,7 +623,85 @@
                 1.0
             ],
             "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "castShadow": true,
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Player\\Player.gltf",
+            "id": 8,
+            "isAnimation": true,
+            "modelName": "Player.gltf",
+            "nameTag": "",
+            "outlineEnabled": false,
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                -0.7217884659767151,
+                -0.20000000298023224,
+                0.0
+            ],
+            "rotate": [
+                -3.1415908336639404,
+                -8.74227694680485e-08,
+                -3.1415908336639404
+            ],
+            "scale": [
+                0.009999999776482582,
+                0.009999999776482582,
+                0.009999999776482582
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
         }
     ],
-    "version": 11
+    "version": 13
 }

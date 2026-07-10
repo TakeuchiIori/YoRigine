@@ -116,7 +116,7 @@ public:
 	};
 
 	struct BloomParams {
-		float threshold = 0.6f;          // 輝度しきい値
+		float threshold = 1.0f;          // 輝度しきい値（HDR基準: 発光した芯 >1.0 を抽出）
 		float intensity = 0.5f;          // ブルームの強さ
 		float spread = 6.0f;             // サンプリング半径 [texels]
 		float colorTemperature = 0.3f;   // 暖色(+) / 寒色(-)
@@ -199,6 +199,21 @@ public:
 
 	// 指定エフェクトがCS実装を持つかどうか (段階移行期間中のルーティング判定用)
 	bool HasComputeImplementation(OffScreenEffectType type) const;
+
+	///************************* Dual Kawase ブルーム *************************///
+	// ミップピラミッド方式のブルーム。PostEffectManager が確保したミップ RT を渡し、
+	// ダウンサンプル→アップサンプル→合成を段ごとにディスパッチする。
+
+	// ダウンサンプル 1 段（bright=true で mip0 の高輝度抽出兼用）
+	void DispatchBloomDown(D3D12_GPU_DESCRIPTOR_HANDLE srcSRV,
+		D3D12_GPU_DESCRIPTOR_HANDLE dstUAV, uint32_t width, uint32_t height, bool bright);
+	// アップサンプル 1 段（下位ミップを対象ミップへ加算）
+	void DispatchBloomUp(D3D12_GPU_DESCRIPTOR_HANDLE lowerSRV,
+		D3D12_GPU_DESCRIPTOR_HANDLE dstUAV, uint32_t width, uint32_t height);
+	// 合成（フル解像度シーン＋ブルーム mip0 を加算）
+	void DispatchBloomComposite(D3D12_GPU_DESCRIPTOR_HANDLE sceneSRV,
+		D3D12_GPU_DESCRIPTOR_HANDLE bloomSRV, D3D12_GPU_DESCRIPTOR_HANDLE dstUAV,
+		uint32_t width, uint32_t height);
 
 	///************************* パラメータ設定 *************************///
 
@@ -402,11 +417,20 @@ private:
 		float padding;
 	};
 
-	struct BloomForGPU {
-		float threshold;
+	// Dual Kawase ブルーム 各段の GPU 定数バッファ
+	struct BloomDownForGPU {
+		float threshold;      // 高輝度しきい値
+		float doThreshold;    // 1=BrightPass あり / 0=縮小のみ
+		float pad[2];
+	};
+	struct BloomUpForGPU {
+		float filterRadius;   // にじみ半径 [下位ミップのテクセル]
+		float pad[3];
+	};
+	struct BloomCompositeForGPU {
 		float intensity;
-		float spread;
 		float colorTemperature;
+		float pad[2];
 	};
 
 	struct PosterizeForGPU {
@@ -535,9 +559,15 @@ private:
 	ShatterTransitionForGPU* shatterTransitionData_ = nullptr;
 	std::string shatterTexturePath_ = "Resources/images/break.png";
 
-	// ブルーム用
-	Microsoft::WRL::ComPtr<ID3D12Resource> bloomResource_;
-	BloomForGPU* bloomData_ = nullptr;
+	// ブルーム用（Dual Kawase 各段の CB）
+	Microsoft::WRL::ComPtr<ID3D12Resource> bloomBrightCB_;
+	Microsoft::WRL::ComPtr<ID3D12Resource> bloomDownCB_;
+	Microsoft::WRL::ComPtr<ID3D12Resource> bloomUpCB_;
+	Microsoft::WRL::ComPtr<ID3D12Resource> bloomCompositeCB_;
+	BloomDownForGPU*      bloomBrightData_    = nullptr;
+	BloomDownForGPU*      bloomDownData_      = nullptr;
+	BloomUpForGPU*        bloomUpData_        = nullptr;
+	BloomCompositeForGPU* bloomCompositeData_ = nullptr;
 
 	// ポスタリゼーション用
 	Microsoft::WRL::ComPtr<ID3D12Resource> posterizeResource_;

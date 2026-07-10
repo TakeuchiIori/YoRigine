@@ -18,7 +18,7 @@ public:
 	///************************* 基本関数 *************************///
 
 	// Assimpのノード読み込み
-	static Node ReadNode(aiNode* node);
+	static Node ReadNode(aiNode* node, float importUnitScale = 1.0f, bool normalizeMixamoRootScale = false);
 
 	// ローカル行列取得
 	Matrix4x4 GetLocalMatrix() const { return localMatrix_; }

@@ -230,6 +230,15 @@ private:
 	// 新しい敵データを作成
 	void CreateNewEnemyData();
 
+	// 敵データIDの空きを探す
+	std::string GenerateUniqueEnemyDataId(const std::string& prefix) const;
+
+	// 敵データIDを変更し、スポーンポイントの参照と出現済み敵も同期する
+	bool RenameEnemyData(const std::string& oldId, const std::string& newId);
+
+	// バトル敵データから選択候補IDを取得する
+	std::vector<std::string> LoadBattleEnemyIdOptions() const;
+
 	// 敵データを編集
 	void EditEnemyData(const std::string& enemyId);
 
@@ -238,6 +247,12 @@ private:
 
 	// 新しいスポーンポイントを作成
 	void CreateNewSpawnPoint();
+
+	// スポーンポイントIDの空きを探す
+	std::string GenerateUniqueSpawnPointId(const std::string& prefix) const;
+
+	// スポーンポイントIDを変更し、出現済み敵やリスポーン待ちデータも同期する
+	bool RenameSpawnPoint(const std::string& oldId, const std::string& newId);
 
 	// スポーンポイントを編集
 	void EditSpawnPoint(const std::string& spawnId);

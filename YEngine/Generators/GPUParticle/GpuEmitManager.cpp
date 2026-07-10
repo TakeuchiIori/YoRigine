@@ -87,7 +87,7 @@ namespace YoRigine {
 	/// </summary>
 	void GpuEmitManager::Update()
 	{
-		float deltaTime = GameTime::GetDeltaTime();
+		float deltaTime = GameTime::GetDeltaTime(TimeChannel::Vfx);
 
 		// グループ全体をループ
 		for (auto& [groupName, groupData] : groups_) {
@@ -116,7 +116,7 @@ namespace YoRigine {
 					emitterData->emitter->SetEmitWorldPosition(
 						groupData->translate + GetEmitterLocalOffset(emitterData.get()));
 					emitterData->emitter->SetTrailParams(emitterData->trailParams);
-					emitterData->emitter->Update();
+					emitterData->emitter->Update(deltaTime);
 				}
 			}
 

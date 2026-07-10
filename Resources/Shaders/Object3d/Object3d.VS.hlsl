@@ -6,7 +6,6 @@ struct TransformationMatrix
     float4x4 WorldInverseTranspose;
 };
 ConstantBuffer<TransformationMatrix> gTransformationMatrix : register(b0);
-ConstantBuffer<LightMatrices> gLight : register(b1);
 ConstantBuffer<Camera> gCamera : register(b3);
 struct VertexShaderInput
 {
@@ -20,14 +19,13 @@ VertexShaderOutput main(VertexShaderInput input)
     // ワールド座標の計算
     float4 worldPosH = mul(input.position, gTransformationMatrix.World);
     output.worldPosition = worldPosH.xyz;
-    
+
     // 最終的なクリップ座標の計算
     output.position = mul(worldPosH,gCamera.viewProjection);
     // 法線ベクトルの変換
     output.normal = normalize(mul(input.normal, (float3x3) gTransformationMatrix.WorldInverseTranspose));
     // その他の情報を出力
     output.texcoord = input.texcoord;
-    // シャドウ用ライト座標の計算 (PSに渡すため)
-    output.shadowPos = mul(worldPosH, gLight.lightViewProjection);
+    // シャドウのカスケード選択・サンプルは PS 側で worldPosition から行う
     return output;
 }

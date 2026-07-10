@@ -14,8 +14,9 @@ local function r(p)  return root .. "/" .. p end
 local function rw(p) return path.translate(root .. "/" .. p, "\\") end
 
 -- 出力／中間ディレクトリ（$(SolutionDir) は .sln のある場所 = ルート）
-local outputDir = "$(SolutionDir)../generated/outputs/%{cfg.buildcfg}"
-local intDir    = "$(SolutionDir)../generated/intermediates/%{prj.name}/%{cfg.buildcfg}"
+local parentDir = path.getabsolute(root .. "/..")
+local outputDir = parentDir .. "/generated/outputs/%{cfg.buildcfg}"
+local intDir    = parentDir .. "/generated/intermediates/%{prj.name}/%{cfg.buildcfg}"
 
 -- =============================================================================
 -- ワークスペース定義
@@ -276,7 +277,7 @@ group "Game"
         -- Develop: DirectXTex/DirectXMesh は externalproject で Debug 構成に
         -- マップされ Debug フォルダへ出力されるため、そこも検索対象に追加。
         filter "configurations:Develop"
-            libdirs { "$(SolutionDir)../generated/outputs/Debug" }
+            libdirs { outputDir:gsub("%%{cfg.buildcfg}", "Debug") }
 
         -- Release: StaticLib として EXE に直接埋め込む。
         -- static なので外部 lib はここでリンクしない（マージ回避）。実リンクは YMain。

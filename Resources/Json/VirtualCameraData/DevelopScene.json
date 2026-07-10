@@ -1525,23 +1525,103 @@
         },
         {
             "fovY": 0.7330383062362671,
+            "isMoving": true,
             "moveSpeed": 0.5,
             "moveSpeedController": 0.10000000149011612,
             "name": "MainDebug",
             "priority": 10,
             "rotate": [
-                0.08499837666749954,
-                -0.009997664019465446,
+                7.209995746612549,
+                -0.3599978983402252,
                 0.0
             ],
             "rotateSpeed": 0.05000000074505806,
             "rotateSpeedController": 0.004999999888241291,
             "translate": [
-                1.0678216218948364,
-                83.20939636230469,
-                -152.6112823486328
+                -1.653296709060669,
+                32.070228576660156,
+                -12.70206069946289
             ],
             "type": "Debug"
+        },
+        {
+            "fovY": 0.44999998807907104,
+            "isMoving": false,
+            "moveSpeed": 0.5,
+            "moveSpeedController": 0.10000000149011612,
+            "name": "NewCamera",
+            "priority": 10,
+            "rotate": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "rotateSpeed": 0.05000000074505806,
+            "rotateSpeedController": 0.004999999888241291,
+            "translate": [
+                0.0,
+                6.0,
+                -40.0
+            ],
+            "type": "Debug"
+        },
+        {
+            "closeUpScale": 0.30000001192092896,
+            "collisionResolver": {
+                "avoidSpeed": 0.30000001192092896,
+                "cameraRadius": 0.5,
+                "enableHighAngle": false,
+                "highAngleThreshold": 0.5,
+                "isEnabled": true,
+                "maxPushUpHeight": 3.0,
+                "minDistanceRatio": 0.15000000596046448,
+                "minGroundHeight": 0.5,
+                "returnSpeed": 0.05000000074505806
+            },
+            "followSnapDistance": 30.0,
+            "fovY": 0.44999998807907104,
+            "framingEnabled": true,
+            "framingPitchMargin": 0.550000011920929,
+            "framingSpeed": 4.0,
+            "framingYawMargin": 1.0499999523162842,
+            "idleRecenterDelay": 2.5,
+            "idleRecenterDuration": 1.399999976158142,
+            "idleRecenterEnabled": true,
+            "interpSpeed": 5.0,
+            "lookAheadEnabled": true,
+            "lookAheadMaxDist": 6.0,
+            "lookAheadSmooth": 6.0,
+            "lookAheadTime": 0.25,
+            "lookAheadVertical": false,
+            "maxFollowSpeed": 300.0,
+            "maxPitch": 1.2000000476837158,
+            "minPitch": -0.20000000298023224,
+            "name": "TestFollow",
+            "offset": [
+                0.0,
+                6.0,
+                -40.0
+            ],
+            "positionSmoothTime": 0.11999999731779099,
+            "positionSmoothing": true,
+            "priority": 10,
+            "recenterDuration": 0.18000000715255737,
+            "recenterPitch": 0.30000001192092896,
+            "recenterResetPitch": true,
+            "rotate": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "rotateSpeed": 0.10000000149011612,
+            "targetName": "",
+            "targetPivot_Height": 1.5,
+            "translate": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "type": "Follow"
         }
     ]
 }

@@ -70,6 +70,20 @@ public:
     bool          IsLockOn()        const { return isLockOn_; }
 
     // ============================================================
+    // 戦闘モード
+    //   true の間は RB/LB を「押しっぱなしで左右カメラ回転」に割り当てる。
+    //   false（フィールド等）では従来どおり RB/LB は背後リセンター。
+    //   GameScene が毎フレーム、現在サブシーンが Battle かで設定する。
+    // ============================================================
+    void SetBattleMode(bool b) {
+        battleMode_ = b;
+        // 戦闘中はアイドルオートリセンターを止める。別方向を向いているのに
+        // 無操作で勝手に正面へ戻るとストレスなので、戦闘中は自動リセンターしない。
+        if (followCamera_) followCamera_->SetIdleRecenterSuppressed(b);
+    }
+    bool IsBattleMode() const  { return battleMode_; }
+
+    // ============================================================
     // 脅威察知のシーン許可
     // フィールドでは背景・マップ見渡しを優先して OFF、バトル中だけ ON にする。
     // 各サブシーンの OnEnter から呼ぶ。
@@ -81,6 +95,9 @@ public:
         if (followCamera_) followCamera_->SetIdleRecenterSuppressed(v);
     }
     bool IsThreatAwarenessAllowed() const   { return threatAwarenessSceneAllowed_; }
+    void SetThreatTargetPositions(const std::vector<Vector3>& positions) { threatTargetPositions_ = positions; }
+    void ClearThreatTargetPositions() { threatTargetPositions_.clear(); }
+    void FaceDefeatNextEnemy(const Vector3& enemyWorldPos);
 
     // ============================================================
     // 見切れヒット演出
@@ -133,6 +150,11 @@ public:
         return attackCamera_.GetWorkNames();
     }
 
+    // ============================================================
+    // 最終カメラのアクセッサ
+    // ============================================================
+    Camera* GetLastCamera() { return lastSceneCamera_; }
+
 private:
     // ============================================================
     // 内部処理
@@ -152,6 +174,7 @@ private:
     void  UpdateThreatAwareness(float dt);                    // pre-director：周辺視グランス
     void  ApplyThreatFovWiden(Camera* sceneCamera, float dt); // post-director：囲まれFOV拡大
     int   GatherNearbyEnemies(std::vector<BaseCollider*>& out) const;
+    int   GatherThreatTargetPositions(std::vector<Vector3>& out) const;
     float ComputeGlanceBias() const;
 
     // 脅威察知パラメータの永続化（FollowCamera の extension JSON に相乗りさせる）
@@ -243,6 +266,10 @@ private:
     // ============================================================
     float camYawSpeed_      = 3.2f;   // ヨー最大角速度(rad/s)
     float camPitchSpeed_    = 2.4f;   // ピッチ最大角速度(rad/s)
+
+    // 戦闘中の RB/LB 押しっぱなし回転（yaw）の角速度(rad/s)。JSON: "bumperYawSpeed"
+    bool  battleMode_        = false;
+    float bumperRotateSpeed_ = 2.6f;
     float camDeadzone_      = 0.18f;  // ラジアルデッドゾーン(0..1)
     float camResponseCurve_ = 2.0f;   // レスポンスカーブ指数(1=線形 / 大きいほど中央が精密)
     float camAccelTime_     = 0.12f;  // 0→最大入力までの加速時間(秒)。0で即時
@@ -265,16 +292,17 @@ private:
     // ============================================================
     bool  threatAwarenessEnabled_      = true;   // 機能マスタースイッチ（デザイナ調整用）
     bool  threatAwarenessSceneAllowed_ = false;  // 現在のシーンで許可されているか（バトル中のみ true）
+    std::vector<Vector3> threatTargetPositions_;  // BattleScene から渡される生存中の敵位置
     float awarenessRange_      = 25.0f;  // この距離内の敵を「気配」対象にする
 
-    // ① 周辺視グランス
+    // 周辺視グランス
     float awarenessTriggerYaw_ = 0.70f;  // カメラ前方からこの角(rad)以上外れた敵を対象に(≒40°)
     float awarenessMaxYaw_     = 0.18f;  // グランスの最大ヨー量(rad)(≒10°)。これ以上は向かない＝固定しない
     float awarenessYawSpeed_   = 4.0f;   // グランスの追従速度
     float awarenessYawBias_     = 0.0f;  // 現在のグランス量（内部状態）
     float awarenessAppliedBias_ = 0.0f;  // 前フレームに yaw へ加算した量（テレスコープ適用用）
 
-    // ② 囲まれFOV
+    // 囲まれFOV
     int   awarenessFovMinCount_ = 2;      // この体数以上で広げ始める
     float awarenessFovPerEnemy_ = 0.03f;  // 敵1体ごとに広げるFOV(rad)
     float awarenessFovMax_      = 0.12f;  // FOV拡大の上限(rad)

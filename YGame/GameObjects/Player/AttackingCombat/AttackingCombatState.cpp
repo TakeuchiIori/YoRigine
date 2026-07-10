@@ -3,6 +3,8 @@
 #include "../Movement/PlayerMovement.h"
 #include "Model.h"
 #include "Systems/GameTime/GameTime.h"
+#include <algorithm>
+#include <cmath>
 
 // ============================================================
 // コンストラクタ
@@ -22,12 +24,7 @@ AttackingCombatState::AttackingCombatState(PlayerCombat* combat) : combat_(comba
 
 		// ★移動制限(SetCanMove(false)など)は行わず、PlayerMovementの下半身の動きを活かす
 
-		auto* obj = player->GetObject3d();
-
-
-		// 追加した関数で上半身だけ攻撃アニメーションを再生
-		obj->PlayUpperMotion("Player.gltf", MotionPlayMode::Once, attack.animationName);
-		obj->SetUpperMotionSpeed(attack.motionSpeed);
+		PlayAttackMotion(player, attack);
 
 		// 攻撃タイプに応じたエフェクトの読み込み
 		if (attack.type == AttackType::A_Arte) {
@@ -74,11 +71,7 @@ AttackingCombatState::AttackingCombatState(PlayerCombat* combat) : combat_(comba
 
 		stateTimer_ = 0.0f;
 
-		auto* obj = player->GetObject3d();
-
-		// 上半身アニメーションの再生
-		obj->PlayUpperMotion("Player.gltf", MotionPlayMode::Once, attack.animationName);
-		obj->SetUpperMotionSpeed(attack.motionSpeed);
+		PlayAttackMotion(player, attack);
 
 		if (attack.type == AttackType::A_Arte) {
 			player->GetSword()->LoadVfxAssets("Resources/Json/VfxMesh/NewEffect2.json");
@@ -159,7 +152,7 @@ void AttackingCombatState::Update([[maybe_unused]] float deltaTime) {
 
 	// 1. フレームの計算
 	const float frameDuration = (currentAttack->fps > 0) ? 1.0f / static_cast<float>(currentAttack->fps) : 1.0f / 60.0f;
-	const int currentFrame = static_cast<int>(stateTimer_ / frameDuration);
+	const int currentFrame = static_cast<int>(GetAttackAnimationTime() / frameDuration);
 
 	// 2. 当たり判定(Hitbox)のON/OFF
 	const bool inHitWindow = (currentAttack->hitEnd > currentAttack->hitStart) &&
@@ -183,11 +176,41 @@ void AttackingCombatState::Update([[maybe_unused]] float deltaTime) {
 	}
 
 	// 4. アニメーション終了：バッファされた先行入力があれば即時に次の攻撃へ、なければ Idle に戻る
-	if (stateTimer_ >= currentAttack->duration) {
+	if (stateTimer_ >= GetActiveAttackDuration(*currentAttack)) {
 		if (combat_->HasBufferedAttack()) {
 			AttackType next = combat_->PopBufferedAttack();
 			if (combat_->TryAttack(next)) return;
 		}
 		combat_->ChangeState(CombatState::Idle);
 	}
+}
+
+void AttackingCombatState::PlayAttackMotion(Player* player, const AttackData& attack) {
+	activeAnimationDuration_ = 0.0f;
+	activeMotionSpeed_ = (std::abs(attack.motionSpeed) > 0.0001f) ? attack.motionSpeed : 1.0f;
+
+	auto* obj = player ? player->GetObject3d() : nullptr;
+	if (!obj) return;
+
+	obj->PlayUpperMotion("Player.gltf", MotionPlayMode::Once, attack.animationName);
+	obj->SetUpperMotionSpeed(activeMotionSpeed_);
+
+	auto* model = obj->GetModel();
+	auto* motionSystem = model ? model->GetMotionSystem() : nullptr;
+	auto* upperMotion = motionSystem ? motionSystem->GetUpperAnimation() : nullptr;
+	if (upperMotion) {
+		activeAnimationDuration_ = upperMotion->GetDuration();
+	}
+}
+
+float AttackingCombatState::GetActiveAttackDuration(const AttackData& attack) const {
+	const float speed = std::max(std::abs(activeMotionSpeed_), 0.0001f);
+	if (activeAnimationDuration_ > 0.0f) {
+		return activeAnimationDuration_ / speed;
+	}
+	return attack.duration;
+}
+
+float AttackingCombatState::GetAttackAnimationTime() const {
+	return stateTimer_ * std::max(std::abs(activeMotionSpeed_), 0.0001f);
 }

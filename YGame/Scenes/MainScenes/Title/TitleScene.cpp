@@ -126,7 +126,7 @@ void TitleScene::Update() {
 
 	YoRigine::ModelManipulator::GetInstance()->Update();
 	YoRigine::CollisionManager::GetInstance()->Update();
-	YParticleManager::GetInstance().Update(YoRigine::GameTime::GetDeltaTime());
+	YParticleManager::GetInstance().Update(YoRigine::GameTime::GetDeltaTime(YoRigine::TimeChannel::Vfx));
 	YoRigine::LightManager::GetInstance()->UpdateShadowMatrix(sceneCamera_.get());
 	titleUI_->Update();
 }
@@ -147,8 +147,6 @@ void TitleScene::Draw() {
 	// パーティクル描画
 	//------------------------------------------------------------
 	//YParticleManager::GetInstance().Draw();
-
-
 }
 
 /// <summary>

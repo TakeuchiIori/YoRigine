@@ -22,5 +22,6 @@ private:
     std::array<float,  kMaxStops> times_;   // 0.0〜1.0
     std::array<Vector4,kMaxStops> colors_;
     int stopCount_ = 3;
+    int selectedStop_ = 0;   // エディタで選択中のストップ（非シリアライズ）
 };
 REGISTER_UPDATE_MODULE(UpdateColorOverLifetime)

@@ -574,7 +574,8 @@ bool PostEffectChain::DrawEffectParametersImGui([[maybe_unused]] int selectedInd
 		// ブルーム
 		// --------------------------------------------------------
 	case OffScreen::OffScreenEffectType::Bloom:
-		if (ImGui::SliderFloat("Threshold", &effect->params.bloom.threshold, 0.0f, 1.0f)) {
+		// HDR パイプライン: threshold は 1.0 付近＝発光した芯だけを抽出する基準。
+		if (ImGui::SliderFloat("Threshold", &effect->params.bloom.threshold, 0.0f, 5.0f)) {
 			changed = true;
 		}
 		if (ImGui::SliderFloat("Intensity", &effect->params.bloom.intensity, 0.0f, 3.0f)) {
@@ -869,7 +870,7 @@ void PostEffectChain::SetDefaultParameters(PostEffectData& effect)
 
 		// ----------------------------- ブルーム　-----------------------------//
 	case OffScreen::OffScreenEffectType::Bloom:
-		effect.params.bloom.threshold = 0.6f;
+		effect.params.bloom.threshold = 1.0f;   // HDR基準: 発光した芯(>1.0)だけ光らせる
 		effect.params.bloom.intensity = 0.5f;
 		effect.params.bloom.spread = 6.0f;
 		effect.params.bloom.colorTemperature = 0.3f;

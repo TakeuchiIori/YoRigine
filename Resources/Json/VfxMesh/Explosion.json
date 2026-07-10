@@ -1,0 +1,285 @@
+{
+    "motions": [],
+    "name": "Explosion",
+    "subEffects": [
+        {
+            "enabled": true,
+            "label": "",
+            "motions": [
+                {
+                    "acceleration": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    "amplitude": 1.0,
+                    "colorEnd": {
+                        "w": 1.0,
+                        "x": 1.0,
+                        "y": 1.0,
+                        "z": 1.0
+                    },
+                    "colorStart": {
+                        "w": 1.0,
+                        "x": 1.0,
+                        "y": 1.0,
+                        "z": 1.0
+                    },
+                    "duration": 2.0,
+                    "ease": 5,
+                    "fadeIn": 0.10000000149011612,
+                    "fadeOut": 0.30000001192092896,
+                    "frequency": 1.0,
+                    "scaleEnd": 4.0,
+                    "scaleStart": 0.30000001192092896,
+                    "startTime": 0.0,
+                    "target": 0,
+                    "type": 4,
+                    "velocity": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    "window": 2.0
+                },
+                {
+                    "acceleration": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    "amplitude": 1.0,
+                    "colorEnd": {
+                        "w": 1.0,
+                        "x": 1.0,
+                        "y": 1.0,
+                        "z": 1.0
+                    },
+                    "colorStart": {
+                        "w": 1.0,
+                        "x": 1.0,
+                        "y": 1.0,
+                        "z": 1.0
+                    },
+                    "duration": 2.0,
+                    "ease": 0,
+                    "fadeIn": 0.10000000149011612,
+                    "fadeOut": 0.30000001192092896,
+                    "frequency": 1.0,
+                    "scaleEnd": 1.0,
+                    "scaleStart": 0.0,
+                    "startTime": 0.20000000298023224,
+                    "target": 0,
+                    "type": 2,
+                    "velocity": {
+                        "x": 0.0,
+                        "y": 1.0,
+                        "z": 0.0
+                    },
+                    "window": 1.7999999523162842
+                },
+                {
+                    "acceleration": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    "amplitude": 1.0,
+                    "colorEnd": {
+                        "w": 1.0,
+                        "x": 1.0,
+                        "y": 1.0,
+                        "z": 1.0
+                    },
+                    "colorStart": {
+                        "w": 1.0,
+                        "x": 1.0,
+                        "y": 1.0,
+                        "z": 1.0
+                    },
+                    "duration": 2.0,
+                    "ease": 0,
+                    "fadeIn": 0.05000000074505806,
+                    "fadeOut": 0.699999988079071,
+                    "frequency": 1.0,
+                    "scaleEnd": 1.0,
+                    "scaleStart": 0.0,
+                    "startTime": 0.0,
+                    "target": 0,
+                    "type": 6,
+                    "velocity": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    "window": 2.0
+                },
+                {
+                    "acceleration": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    "amplitude": 1.0,
+                    "colorEnd": {
+                        "w": 4.090000152587891,
+                        "x": 0.20000000298023224,
+                        "y": 0.20000000298023224,
+                        "z": 0.20000000298023224
+                    },
+                    "colorStart": {
+                        "w": 3.930000066757202,
+                        "x": 1.2000000476837158,
+                        "y": 0.5,
+                        "z": 0.20000000298023224
+                    },
+                    "duration": 2.0,
+                    "ease": 0,
+                    "fadeIn": 0.10000000149011612,
+                    "fadeOut": 0.30000001192092896,
+                    "frequency": 1.0,
+                    "scaleEnd": 1.0,
+                    "scaleStart": 0.0,
+                    "startTime": 0.0,
+                    "target": 0,
+                    "type": 5,
+                    "velocity": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    "window": 0.0
+                }
+            ],
+            "offset": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "smoke": {
+                "builtInBurstMotion": false,
+                "color": {
+                    "w": 2.7200000286102295,
+                    "x": 1.0,
+                    "y": 1.0,
+                    "z": 1.0
+                },
+                "density": 3.0,
+                "fresnelPower": 2.5999999046325684,
+                "isEnable": true,
+                "noiseOctaves": 1.0,
+                "noiseScale": 4.849999904632568,
+                "noiseStrength": 1.0,
+                "radius": 7.150000095367432,
+                "rimIntensity": 0.0,
+                "riseSpeed": 0.0,
+                "scrollSpeed": 2.4800000190734863,
+                "smokeColor": {
+                    "w": 2.3499999046325684,
+                    "x": 0.07999999821186066,
+                    "y": 0.0,
+                    "z": 0.09000000357627869
+                }
+            },
+            "type": 1
+        },
+        {
+            "enabled": true,
+            "label": "",
+            "offset": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "shockwave": {
+                "color": {
+                    "w": 2.9200000762939453,
+                    "x": 10.0,
+                    "y": 1.0,
+                    "z": 0.0
+                },
+                "duration": 0.4000000059604645,
+                "isEnable": true,
+                "radius": 32.599998474121094,
+                "thickness": 0.23399999737739563
+            },
+            "type": 3
+        }
+    ],
+    "trail": {
+        "arcAngleDeg": 120.0,
+        "blendMode": 2,
+        "colorEnd": {
+            "w": 0.0,
+            "x": 1.0,
+            "y": 0.30000001192092896,
+            "z": 0.0
+        },
+        "colorStart": {
+            "w": 1.0,
+            "x": 1.0,
+            "y": 0.800000011920929,
+            "z": 0.0
+        },
+        "colorWaveAmp": 0.15000000596046448,
+        "colorWaveFreq": 3.0,
+        "crescentShape": true,
+        "dissolveEdgeColor": {
+            "w": 1.0,
+            "x": 2.0,
+            "y": 0.699999988079071,
+            "z": 0.15000000596046448
+        },
+        "dissolveEdgeWidth": 0.07999999821186066,
+        "dissolveStrength": 0.0,
+        "distortion": 0.0,
+        "emissiveIntensity": 1.0,
+        "energyIntensity": 1.5,
+        "energySpeed": 2.5,
+        "fresnelStrength": 1.0,
+        "glowPower": 1.5,
+        "lifetime": 0.5,
+        "maxPoints": 512,
+        "noiseOctaves": 2.0,
+        "noiseTexturePath": "",
+        "primitive": {
+            "halfExtents": {
+                "x": 0.5,
+                "y": 0.5,
+                "z": 0.5
+            },
+            "height": 1.0,
+            "latSegments": 16,
+            "lonSegments": 16,
+            "placement": 0,
+            "radius": 0.5,
+            "ringSegments": 12,
+            "scaleByAge": true,
+            "stampScale": 1.0,
+            "stampSpacing": 0.0,
+            "tubeRadius": 0.15000000596046448,
+            "type": 0
+        },
+        "rimColor": {
+            "w": 1.0,
+            "x": 0.4000000059604645,
+            "y": 0.699999988079071,
+            "z": 1.0
+        },
+        "shapeType": 0,
+        "softness": 0.15000000596046448,
+        "sparkleAmount": 0.4000000059604645,
+        "sparkleSpeed": 4.0,
+        "splineSubdivisions": 4,
+        "texturePath": "",
+        "thickness": 0.10000000149011612,
+        "trailSharpness": 2.0,
+        "uvScrollSpeed": 0.5,
+        "widthEnd": 0.0,
+        "widthSegments": 1,
+        "widthStart": 0.30000001192092896,
+        "widthWaveAmp": 0.05000000074505806,
+        "widthWaveFreq": 8.0
+    },
+    "useTrail": false
+}

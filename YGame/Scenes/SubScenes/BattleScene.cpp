@@ -60,6 +60,9 @@ void BattleScene::Initialize(Camera* camera, Player* player) {
 	battleEnemyManager_->SetBattleEndCallback([this](BattleResult result, const BattleStats& stats) {
 		HandleBattleEnd(result, stats);
 		});
+	battleEnemyManager_->SetEnemyDefeatedCallback([this](const BattleEnemy&) {
+		FocusNearestEnemyAfterDefeat();
+		});
 
 	//------------------------------------------------------------
 	// 環境オブジェクト初期化
@@ -185,7 +188,7 @@ void BattleScene::Update() {
 	}
 
 	// プレイヤー更新
-	// ★ 敵より先に動かすことで、敵AIが今フレームのプレイヤー位置を参照できる
+	// 敵より先に動かすことで、敵AIが今フレームのプレイヤー位置を参照できる
 	if (!isBattleCameraActive && !battleEnemyManager_->IsFinalBattleCleared()) {
 		player_->Update();
 	}
@@ -198,6 +201,18 @@ void BattleScene::Update() {
 		battleEnemyManager_->Update();
 	}
 
+	if (player_ && player_->GetPlayerCamera() && battleEnemyManager_) {
+		std::vector<Vector3> enemyPositions;
+		if (!isBattleCameraActive) {
+			for (auto* enemy : battleEnemyManager_->GetActiveBattleEnemies()) {
+				if (enemy) {
+					enemyPositions.push_back(enemy->GetTranslate());
+				}
+			}
+		}
+		player_->GetPlayerCamera()->SetThreatTargetPositions(enemyPositions);
+	}
+
 	// 視覚効果・オブジェクト更新
 	sprite_->Update();
 	ground_->Update();
@@ -205,6 +220,15 @@ void BattleScene::Update() {
 	// UI更新
 	lockOnUI_->Update();
 	DamageNumberManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime(), sceneCamera_->GetViewProjectionMatrix());
+}
+
+void BattleScene::FocusNearestEnemyAfterDefeat() {
+	if (!player_ || !player_->GetPlayerCamera() || !battleEnemyManager_) return;
+
+	BattleEnemy* nearest = battleEnemyManager_->GetNearestEnemy(player_->GetWT().translate_);
+	if (!nearest) return;
+
+	player_->GetPlayerCamera()->FaceDefeatNextEnemy(nearest->GetTranslate());
 }
 
 
@@ -264,6 +288,13 @@ void BattleScene::DrawUI() {
 			lockOnUI_->Draw();
 		}
 	}
+}
+
+/*==========================================================================
+	VFXの描画
+//========================================================================*/
+void BattleScene::DrawVFX()
+{
 }
 
 void BattleScene::DrawNonOffscreen()
@@ -333,6 +364,10 @@ void BattleScene::OnExit() {
 
 	// 境界エリアを掃除（FieldScene 側でも除去しているが対称性のため明示）
 	AreaManager::GetInstance()->RemoveArea("BattleArea");
+	if (player_ && player_->GetPlayerCamera()) {
+		player_->GetPlayerCamera()->ClearThreatTargetPositions();
+		player_->GetPlayerCamera()->SetThreatAwarenessAllowed(false);
+	}
 
 	// ロックオンUIを非表示にする
 	lockOnUI_->SetIsVisible(false);
@@ -381,7 +416,7 @@ void BattleScene::StartBattle(const BattleTransitionData& data) {
 	}
 
 	// フォーメーション設定
-	if (!data.battleFormation.empty() && battleEnemyManager_) {
+	if (!data.battleFormation.empty() && data.battleFormation != "default" && battleEnemyManager_) {
 		auto formation = battleEnemyManager_->GetFormation(data.battleFormation);
 		if (!formation.positions.empty()) {
 			encounter.formations = formation.positions;

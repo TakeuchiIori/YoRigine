@@ -3,10 +3,13 @@
 #include "RTVManager.h"
 #include "OffScreen.h"
 #include "WinApp/WinApp.h"
+#include "RenderFormats.h"
 #include <fstream>
 #include <filesystem>
 #include <sstream>
 #include <iostream>
+#include <algorithm>
+#include <cmath>
 
 #ifdef USE_IMGUI
 #include <imgui.h>
@@ -221,7 +224,7 @@ void PostEffectManager::InitializeRenderTargets()
 			rtName,
 			WinApp::kClientWidth,
 			WinApp::kClientHeight,
-			DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+			YoRigine::kSceneColorFormat,   // HDR リニア中間バッファ（R16F は型付きUAV可）
 			{ 0.0f, 0.0f, 0.0f, 1.0f },
 			/*createSRV*/ true,
 			/*createUAV*/ true
@@ -241,6 +244,29 @@ void PostEffectManager::InitializeRenderTargets()
 
 	// OffScreen は入力側のため READ にしておく
 	rtStates_["OffScreen"] = D3D12_RESOURCE_STATE_GENERIC_READ;
+
+	// -------------------------------------------------------------
+	// Dual Kawase ブルーム用ミップピラミッド RT を確保
+	// mip[i] は 1/2^(i+1) 解像度（[0]=1/2 … [kBloomMaxMips-1]=1/2^kBloomMaxMips）
+	// HDR リニア中間バッファと同じ R16F、SRV+UAV 付き。
+	// -------------------------------------------------------------
+	bloomMipNames_.clear();
+	for (int i = 0; i < kBloomMaxMips; ++i) {
+		const uint32_t w = (std::max)(1u, static_cast<uint32_t>(WinApp::kClientWidth) >> (i + 1));
+		const uint32_t h = (std::max)(1u, static_cast<uint32_t>(WinApp::kClientHeight) >> (i + 1));
+		std::string rtName = "BloomMip" + std::to_string(i);
+
+		rtvManager_->Create(
+			rtName, w, h,
+			YoRigine::kSceneColorFormat,
+			{ 0.0f, 0.0f, 0.0f, 1.0f },
+			/*createSRV*/ true,
+			/*createUAV*/ true
+		);
+
+		bloomMipNames_.push_back(rtName);
+		rtStates_[rtName] = D3D12_RESOURCE_STATE_GENERIC_READ;
+	}
 }
 
 /// <summary>
@@ -567,6 +593,17 @@ void PostEffectManager::RenderEffectChain()
 		std::string outputRT =
 			intermediateRTNames_[idx % intermediateRTNames_.size()];
 
+		// Bloom は単一パスに収まらないミップピラミッド処理なので専用経路へ分岐する
+		if (effectData->type == OffScreen::OffScreenEffectType::Bloom) {
+			TransitionResource(inputRT, D3D12_RESOURCE_STATE_GENERIC_READ);
+			ApplyBloomPyramid(
+				rtvManager_->Get(inputRT)->srvHandleGPU,
+				outputRT,
+				effectData->params.bloom);
+			inputRT = outputRT;
+			continue;
+		}
+
 		TransitionResource(inputRT, D3D12_RESOURCE_STATE_GENERIC_READ);
 		TransitionResource(outputRT, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
@@ -595,6 +632,67 @@ void PostEffectManager::RenderEffectChain()
 		OffScreen::OffScreenEffectType::Copy,
 		rtvManager_->Get(inputRT)->srvHandleGPU
 	);
+}
+
+/// <summary>
+/// Dual Kawase ブルーム本体。
+/// BrightPass 兼ダウンサンプルでミップピラミッドを作り、下から加算アップサンプルで
+/// 積み上げて mip0 に集約し、フル解像度シーンへ合成して outputRT に書き出す。
+/// spread はアクティブ段数（グローの届く広さ）として 1〜kBloomMaxMips に読み替える。
+/// </summary>
+void PostEffectManager::ApplyBloomPyramid(
+	D3D12_GPU_DESCRIPTOR_HANDLE inputSRV,
+	const std::string& outputRT,
+	const OffScreen::BloomParams& params)
+{
+	// spread → アクティブ段数
+	int activeMips = static_cast<int>(std::lround(params.spread));
+	activeMips = (std::max)(1, (std::min)(activeMips, kBloomMaxMips));
+
+	// 各段 CB を更新（段内では値一定なのでここで 1 回でよい）
+	offScreen_->SetBloomParams(params);
+
+	// --- 1) BrightPass 兼ダウンサンプル: フルシーン → mip0 ---
+	{
+		const std::string& mip0 = bloomMipNames_[0];
+		TransitionResource(mip0, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		const auto* rt = rtvManager_->Get(mip0);
+		offScreen_->DispatchBloomDown(inputSRV, rt->uavHandleGPU, rt->width, rt->height, /*bright*/true);
+		TransitionResource(mip0, D3D12_RESOURCE_STATE_GENERIC_READ);
+	}
+
+	// --- 2) 純ダウンサンプル: mip[i-1] → mip[i] ---
+	for (int i = 1; i < activeMips; ++i) {
+		const std::string& src = bloomMipNames_[i - 1];
+		const std::string& dst = bloomMipNames_[i];
+		TransitionResource(dst, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		const auto* rt = rtvManager_->Get(dst);
+		offScreen_->DispatchBloomDown(
+			rtvManager_->Get(src)->srvHandleGPU, rt->uavHandleGPU, rt->width, rt->height, /*bright*/false);
+		TransitionResource(dst, D3D12_RESOURCE_STATE_GENERIC_READ);
+	}
+
+	// --- 3) アップサンプル: 下位ミップを 1 段上へ加算（mip[i+1] → mip[i]）---
+	for (int i = activeMips - 2; i >= 0; --i) {
+		const std::string& lower  = bloomMipNames_[i + 1];
+		const std::string& target = bloomMipNames_[i];
+		TransitionResource(target, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		const auto* rt = rtvManager_->Get(target);
+		offScreen_->DispatchBloomUp(
+			rtvManager_->Get(lower)->srvHandleGPU, rt->uavHandleGPU, rt->width, rt->height);
+		TransitionResource(target, D3D12_RESOURCE_STATE_GENERIC_READ);
+	}
+
+	// --- 4) 合成: フルシーン + ブルーム mip0 → outputRT ---
+	{
+		TransitionResource(outputRT, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		const auto* out = rtvManager_->Get(outputRT);
+		offScreen_->DispatchBloomComposite(
+			inputSRV,
+			rtvManager_->Get(bloomMipNames_[0])->srvHandleGPU,
+			out->uavHandleGPU, out->width, out->height);
+		TransitionResource(outputRT, D3D12_RESOURCE_STATE_GENERIC_READ);
+	}
 }
 
 /// <summary>

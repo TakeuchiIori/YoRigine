@@ -7,6 +7,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.1743909120559692,
                 3.3299107551574707,
@@ -52,6 +53,7 @@
             "isAnimation": false,
             "modelName": "House_2.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -83,6 +85,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -128,6 +131,7 @@
             "isAnimation": false,
             "modelName": "Blacksmith.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -159,6 +163,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -204,6 +209,7 @@
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -235,6 +241,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -280,6 +287,7 @@
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -311,6 +319,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -356,6 +365,7 @@
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -387,6 +397,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": false,
             "colliderAabbMax": [
                 0.800000011920929,
                 4.0,
@@ -432,6 +443,7 @@
             "isAnimation": false,
             "modelName": "Bell_Tower.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -463,6 +475,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -508,6 +521,8 @@
             "isAnimation": false,
             "modelName": "Floor_UnevenBrick.obj",
             "nameTag": "",
+            "outlineEnabled": true,
+            "castShadow": false,
             "parentID": -1,
             "pickable": false,
             "position": [
@@ -539,6 +554,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.7339999675750732,
                 7.349999904632568,
@@ -584,6 +600,7 @@
             "isAnimation": false,
             "modelName": "MapleTree_1.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -615,6 +632,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 0.800000011920929,
                 4.0,
@@ -660,6 +678,7 @@
             "isAnimation": false,
             "modelName": "Bell_Tower.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -691,6 +710,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.7339999675750732,
                 7.462645530700684,
@@ -736,6 +756,7 @@
             "isAnimation": false,
             "modelName": "MapleTree_1.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -767,6 +788,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -812,6 +834,7 @@
             "isAnimation": false,
             "modelName": "Blacksmith.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -843,6 +866,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -888,6 +912,7 @@
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -919,6 +944,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.7339999675750732,
                 7.462645530700684,
@@ -964,6 +990,7 @@
             "isAnimation": false,
             "modelName": "MapleTree_1.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -995,6 +1022,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.7339999675750732,
                 7.349999904632568,
@@ -1040,6 +1068,7 @@
             "isAnimation": false,
             "modelName": "MapleTree_1.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -1071,6 +1100,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 3.7844903469085693,
                 7.462645530700684,
@@ -1116,6 +1146,7 @@
             "isAnimation": false,
             "modelName": "MapleTree_1.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -1147,6 +1178,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 3.7844903469085693,
                 7.462645530700684,
@@ -1192,6 +1224,7 @@
             "isAnimation": false,
             "modelName": "MapleTree_1.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -1223,6 +1256,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -1268,6 +1302,7 @@
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -1299,6 +1334,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -1344,6 +1380,7 @@
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -1375,6 +1412,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -1420,6 +1458,7 @@
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -1451,6 +1490,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -1496,6 +1536,7 @@
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -1527,6 +1568,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -1572,6 +1614,7 @@
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -1603,6 +1646,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -1648,6 +1692,7 @@
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -1679,6 +1724,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -1724,6 +1770,7 @@
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -1755,6 +1802,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -1800,6 +1848,7 @@
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "TestGate1",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -1831,6 +1880,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -1876,6 +1926,7 @@
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -1907,6 +1958,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": false,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -1952,6 +2004,7 @@
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": false,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -1983,6 +2036,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -2028,6 +2082,7 @@
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -2059,6 +2114,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -2104,6 +2160,7 @@
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -2135,6 +2192,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -2180,6 +2238,7 @@
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -2211,6 +2270,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -2256,6 +2316,7 @@
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -2287,6 +2348,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -2332,6 +2394,7 @@
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -2363,6 +2426,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -2408,6 +2472,7 @@
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -2439,6 +2504,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -2484,6 +2550,7 @@
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -2515,6 +2582,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -2560,6 +2628,7 @@
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -2591,6 +2660,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -2636,6 +2706,7 @@
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -2667,6 +2738,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -2712,6 +2784,7 @@
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "TestGate2",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -2743,6 +2816,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -2788,6 +2862,7 @@
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -2819,6 +2894,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -2864,6 +2940,7 @@
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -2895,6 +2972,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -2940,6 +3018,7 @@
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -2971,6 +3050,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -3016,6 +3096,7 @@
             "isAnimation": false,
             "modelName": "DeadTree_4.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -3047,6 +3128,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0255683660507202,
                 2.141460657119751,
@@ -3092,6 +3174,7 @@
             "isAnimation": false,
             "modelName": "House_3.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -3123,6 +3206,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0255683660507202,
                 2.141460657119751,
@@ -3168,6 +3252,7 @@
             "isAnimation": false,
             "modelName": "House_3.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -3199,6 +3284,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.7339999675750732,
                 7.349999904632568,
@@ -3244,6 +3330,7 @@
             "isAnimation": false,
             "modelName": "MapleTree_1.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -3275,6 +3362,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.7339999675750732,
                 7.349999904632568,
@@ -3320,6 +3408,7 @@
             "isAnimation": false,
             "modelName": "MapleTree_1.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -3351,6 +3440,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -3396,6 +3486,7 @@
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -3427,6 +3518,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -3472,6 +3564,7 @@
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -3503,6 +3596,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -3548,6 +3642,7 @@
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -3579,6 +3674,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -3624,6 +3720,7 @@
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -3655,6 +3752,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -3700,6 +3798,7 @@
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -3731,6 +3830,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -3776,6 +3876,7 @@
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -3807,6 +3908,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -3852,6 +3954,7 @@
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -3883,6 +3986,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -3928,6 +4032,7 @@
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -3959,6 +4064,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -4004,6 +4110,7 @@
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -4035,6 +4142,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -4080,6 +4188,7 @@
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -4111,6 +4220,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -4156,6 +4266,7 @@
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -4187,6 +4298,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.1743909120559692,
                 3.3299107551574707,
@@ -4232,6 +4344,7 @@
             "isAnimation": false,
             "modelName": "House_2.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -4263,6 +4376,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.1743909120559692,
                 3.3299107551574707,
@@ -4308,6 +4422,7 @@
             "isAnimation": false,
             "modelName": "House_2.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -4339,6 +4454,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 0.7273037433624268,
                 1.0315446853637695,
@@ -4384,6 +4500,7 @@
             "isAnimation": false,
             "modelName": "Rock_2.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -4415,6 +4532,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 0.7273037433624268,
                 1.0315446853637695,
@@ -4460,6 +4578,7 @@
             "isAnimation": false,
             "modelName": "Rock_2.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -4491,6 +4610,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 0.7273037433624268,
                 1.0315446853637695,
@@ -4536,6 +4656,7 @@
             "isAnimation": false,
             "modelName": "Rock_2.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -4567,6 +4688,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 0.7273037433624268,
                 1.0315446853637695,
@@ -4612,6 +4734,7 @@
             "isAnimation": false,
             "modelName": "Rock_2.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -4643,6 +4766,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 0.7273037433624268,
                 1.0315446853637695,
@@ -4688,6 +4812,7 @@
             "isAnimation": false,
             "modelName": "Rock_2.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -4719,6 +4844,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -4764,6 +4890,7 @@
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -4795,6 +4922,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -4840,6 +4968,7 @@
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "TestGate4",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -4871,6 +5000,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -4916,6 +5046,7 @@
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "TestGate3",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -4947,6 +5078,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -4992,6 +5124,7 @@
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -5023,6 +5156,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -5068,6 +5202,7 @@
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -5099,6 +5234,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -5144,6 +5280,7 @@
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -5175,6 +5312,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -5220,6 +5358,7 @@
             "isAnimation": false,
             "modelName": "WoodFence.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -5251,6 +5390,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 0.7273037433624268,
                 1.0315446853637695,
@@ -5296,6 +5436,7 @@
             "isAnimation": false,
             "modelName": "Rock_2.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -5327,6 +5468,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 0.8907464146614075,
                 1.6352660655975342,
@@ -5372,6 +5514,7 @@
             "isAnimation": false,
             "modelName": "Rock_5.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -5403,6 +5546,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 0.4876425862312317,
                 1.9971859455108643,
@@ -5448,6 +5592,7 @@
             "isAnimation": false,
             "modelName": "Rock_4.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -5479,6 +5624,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -5524,6 +5670,7 @@
             "isAnimation": false,
             "modelName": "Rock_3.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -5555,6 +5702,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -5600,6 +5748,7 @@
             "isAnimation": false,
             "modelName": "Rock_1.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -5631,6 +5780,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 0.8907464146614075,
                 1.6352660655975342,
@@ -5676,6 +5826,7 @@
             "isAnimation": false,
             "modelName": "Rock_5.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -5707,6 +5858,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 0.8907464146614075,
                 1.6352660655975342,
@@ -5752,6 +5904,7 @@
             "isAnimation": false,
             "modelName": "Rock_5.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -5783,6 +5936,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 0.8907464146614075,
                 1.6352660655975342,
@@ -5828,6 +5982,7 @@
             "isAnimation": false,
             "modelName": "Rock_5.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -5859,6 +6014,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 0.8907464146614075,
                 1.6352660655975342,
@@ -5904,6 +6060,7 @@
             "isAnimation": false,
             "modelName": "Rock_5.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -5935,6 +6092,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 0.8907464146614075,
                 1.6352660655975342,
@@ -5980,6 +6138,7 @@
             "isAnimation": false,
             "modelName": "Rock_5.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -6011,6 +6170,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 0.8907464146614075,
                 1.6352660655975342,
@@ -6056,6 +6216,7 @@
             "isAnimation": false,
             "modelName": "Rock_5.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -6087,6 +6248,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 0.8907464146614075,
                 1.6352660655975342,
@@ -6132,6 +6294,7 @@
             "isAnimation": false,
             "modelName": "Rock_5.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -6163,6 +6326,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 0.8907464146614075,
                 1.6352660655975342,
@@ -6208,6 +6372,7 @@
             "isAnimation": false,
             "modelName": "Rock_5.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -6239,6 +6404,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 0.8907464146614075,
                 1.6352660655975342,
@@ -6284,6 +6450,7 @@
             "isAnimation": false,
             "modelName": "Rock_5.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -6315,6 +6482,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 0.8907464146614075,
                 1.6352660655975342,
@@ -6360,6 +6528,7 @@
             "isAnimation": false,
             "modelName": "Rock_5.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -6391,6 +6560,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 0.8907464146614075,
                 1.6352660655975342,
@@ -6436,6 +6606,7 @@
             "isAnimation": false,
             "modelName": "Rock_5.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -6467,6 +6638,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 0.8907464146614075,
                 1.6352660655975342,
@@ -6512,6 +6684,7 @@
             "isAnimation": false,
             "modelName": "Rock_5.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -6543,6 +6716,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 0.8907464146614075,
                 1.6352660655975342,
@@ -6588,6 +6762,7 @@
             "isAnimation": false,
             "modelName": "Rock_5.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -6619,6 +6794,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 0.8907464146614075,
                 1.6352660655975342,
@@ -6664,6 +6840,7 @@
             "isAnimation": false,
             "modelName": "Rock_5.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -6695,6 +6872,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 0.8907464146614075,
                 1.6352660655975342,
@@ -6740,6 +6918,7 @@
             "isAnimation": false,
             "modelName": "Rock_5.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -6771,6 +6950,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 0.8907464146614075,
                 1.6352660655975342,
@@ -6816,6 +6996,7 @@
             "isAnimation": false,
             "modelName": "Rock_5.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -6847,6 +7028,7 @@
                 0.0
             ],
             "animationName": "",
+            "castShadow": true,
             "colliderAabbMax": [
                 0.8907464146614075,
                 1.6352660655975342,
@@ -6892,6 +7074,7 @@
             "isAnimation": false,
             "modelName": "Rock_5.obj",
             "nameTag": "",
+            "outlineEnabled": true,
             "parentID": -1,
             "pickable": true,
             "position": [
@@ -6917,5 +7100,5 @@
             "uvStochastic": 0.0
         }
     ],
-    "version": 11
+    "version": 13
 }

@@ -69,6 +69,11 @@ public:
 		// 輪郭が出ないようにする。エディタから編集 / JSON 保存対象。
 		bool outlineEnabled = true;
 
+		// このオブジェクトをシャドウマップへ描く（＝影を落とす）か。
+		// 巨大スケールの地面などはシャドウマップを埋めて影がチラつく原因になるため
+		// false にしてキャストから外す。エディタから編集 / JSON 保存対象。デフォルト true。
+		bool castShadow = true;
+
 		int id = 0;
 		int parentID = -1;
 		bool isActive = true;

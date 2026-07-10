@@ -53,20 +53,20 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <OutDir>$(SolutionDir)..\generated\outputs\Debug\</OutDir>
-    <IntDir>$(SolutionDir)..\generated\intermediates\ImGui\Debug\</IntDir>
+    <OutDir>$(ProjectDir)..\..\..\generated\outputs\Debug\</OutDir>
+    <IntDir>$(ProjectDir)..\..\..\generated\intermediates\ImGui\Debug\</IntDir>
     <TargetName>ImGui</TargetName>
     <TargetExt>.lib</TargetExt>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Develop|x64'">
-    <OutDir>$(SolutionDir)..\generated\outputs\Develop\</OutDir>
-    <IntDir>$(SolutionDir)..\generated\intermediates\ImGui\Develop\</IntDir>
+    <OutDir>$(ProjectDir)..\..\..\generated\outputs\Develop\</OutDir>
+    <IntDir>$(ProjectDir)..\..\..\generated\intermediates\ImGui\Develop\</IntDir>
     <TargetName>ImGui</TargetName>
     <TargetExt>.lib</TargetExt>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <OutDir>$(SolutionDir)..\generated\outputs\Release\</OutDir>
-    <IntDir>$(SolutionDir)..\generated\intermediates\ImGui\Release\</IntDir>
+    <OutDir>$(ProjectDir)..\..\..\generated\outputs\Release\</OutDir>
+    <IntDir>$(ProjectDir)..\..\..\generated\intermediates\ImGui\Release\</IntDir>
     <TargetName>ImGui</TargetName>
     <TargetExt>.lib</TargetExt>
   </PropertyGroup>
