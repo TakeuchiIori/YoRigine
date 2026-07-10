@@ -406,7 +406,7 @@ void FieldEnemy::DrawLine(Line* line) {
 	}
 	line->DrawCone(
 		GetPosition(),
-		GetRotae().y,
+		GetRotate().y,
 		enemyData_.viewDistance,
 		enemyData_.viewAngle
 	);
