@@ -75,13 +75,20 @@ std::vector<std::string> VfxMeshSpawner::GetAssetNames() const
     return names;
 }
 
+const YoRigine::VfxEffectAsset* VfxMeshSpawner::GetAsset(const std::string& assetName) const
+{
+    auto it = assetMap_.find(assetName);
+    return (it != assetMap_.end()) ? &it->second : nullptr;
+}
+
 // ============================================================
 // 生成
 // ============================================================
 uint32_t VfxMeshSpawner::Spawn(const std::string& assetName,
                                const Vector3&     position,
                                float              scale,
-                               bool               loop)
+                               bool               loop,
+                               float              timeScale)
 {
     auto it = assetMap_.find(assetName);
     if (it == assetMap_.end()) {
@@ -97,6 +104,7 @@ uint32_t VfxMeshSpawner::Spawn(const std::string& assetName,
     fx->id        = nextId_++;
     fx->alive     = true;
     fx->loop      = loop;
+    fx->timeScale = (timeScale > 0.0001f) ? timeScale : 1.0f;
     fx->asset     = &it->second;   // コピーせず参照
     fx->position  = position;
     fx->scale     = scale;
@@ -117,9 +125,10 @@ uint32_t VfxMeshSpawner::Spawn(const std::string& assetName,
 uint32_t VfxMeshSpawner::SpawnBolt(const std::string& assetName,
                                    const Vector3&     start,
                                    const Vector3&     end,
-                                   bool               loop)
+                                   bool               loop,
+                                   float              timeScale)
 {
-    uint32_t id = Spawn(assetName, start, 1.0f, loop);
+    uint32_t id = Spawn(assetName, start, 1.0f, loop, timeScale);
     if (id != 0) SetEndpoints(id, start, end);
     return id;
 }
@@ -214,7 +223,11 @@ void VfxMeshSpawner::Update(float deltaTime)
 
 void VfxMeshSpawner::UpdateEffect(ActiveEffect& fx, float dt)
 {
-    fx.age += dt;
+    // timeScale<1 で寿命を引き伸ばす（見た目のアニメ速度そのものを遅くする）。
+    // 各Meshの Drive/Update には「進んだage」だけを渡すので、Mesh側の実装は変更不要。
+    const float scaledDt = dt * fx.timeScale;
+    fx.age += scaledDt;
+    dt = scaledDt;
     const auto& asset = *fx.asset;
 
     // バースト進捗更新（ワンショット）。寿命はモーション(BurstGrow)優先で決定。
@@ -472,6 +485,16 @@ void VfxMeshSpawner::SetEndpoints(uint32_t id, const Vector3& start, const Vecto
             fx->boltStart = start;
             fx->boltEnd   = end;
             fx->explicitEndpoints = true;
+            return;
+        }
+    }
+}
+
+void VfxMeshSpawner::SetTimeScale(uint32_t id, float timeScale)
+{
+    for (ActiveEffect* fx : active_) {
+        if (fx && fx->id == id) {
+            fx->timeScale = (timeScale > 0.0001f) ? timeScale : 1.0f;
             return;
         }
     }

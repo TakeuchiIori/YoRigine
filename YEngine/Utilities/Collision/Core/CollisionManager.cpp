@@ -335,6 +335,42 @@ namespace YoRigine {
 	}
 
 	// ============================================================
+	// 一時オーバーラップクエリ
+	//   持続コライダーを登録せず、colliders_ を線形走査して
+	//   「今この瞬間、球の範囲に重なっているコライダー」を返すだけの一回限りの検索。
+	//   Enter/Exit・接触猶予・CCD 等は一切関与しない。
+	// ============================================================
+	std::vector<BaseCollider*> CollisionManager::QuerySphere(const Vector3& center, float radius,
+		uint32_t layerMask, const std::vector<uint32_t>& ignoreTypeIDs) const {
+
+		std::vector<BaseCollider*> result;
+		const Sphere querySphere{ center, radius };
+
+		for (BaseCollider* c : colliders_) {
+			if (!c) continue;
+			if (!c->GetIsActive() || !c->IsCollisionEnabled()) continue;
+			if ((c->GetLayerBits() & layerMask) == 0) continue;
+
+			if (!ignoreTypeIDs.empty()) {
+				bool ignored = false;
+				for (uint32_t id : ignoreTypeIDs) {
+					if (c->GetTypeID() == id) { ignored = true; break; }
+				}
+				if (ignored) continue;
+			}
+
+			// 精密形状ではなく AABB 近似で判定する（QuerySphere は「だいたいこの範囲」の
+			// 一括検索用途なので、形状ごとの厳密判定より簡潔さ・安全さを優先する）。
+			const AABB worldAABB = ComputeWorldAABB(c);
+			if (Intersection::IsCollision(querySphere, worldAABB)) {
+				result.push_back(c);
+			}
+		}
+
+		return result;
+	}
+
+	// ============================================================
 	// 全コライダーの当たり判定チェック
 	//   1) Broad Phase: 有効コライダーの AABB をグリッドに登録、同セル候補ペア列挙
 	//   2) ResolveContacts: 反復押し戻しで貫通解消

@@ -163,6 +163,11 @@ namespace YoRigine {
 		bool HasEmitter(const std::string& emitterName) const;
 		void SetCamera(Camera* camera);
 
+		// グループの「自然な寿命」の見積り（秒）。0以下=不明/無限ループ。
+		// 内部は linger 見積りに使っている GetGroupMaxLifetime の public wrapper。
+		// Composite::NaturalDuration() の集計に使う（設計は Docs/VfxExpansion_Design.md の 7.2 参照）。
+		float EstimateGroupNaturalDuration(const std::string& groupName) const;
+
 	private:
 		///************************* 内部処理 *************************///
 
@@ -261,4 +266,4 @@ namespace YoRigine {
 		std::vector<std::string> availableJsonFiles_;					// 見つかったJSONファイル名一覧
 		bool shouldRescanJson_ = true;									// JSONディレクトリを再スキャンするかどうか
 	};
-}
+};

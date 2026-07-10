@@ -321,6 +321,17 @@ namespace YoRigine {
 	}
 
 	/// <summary>
+	/// グループの「自然な寿命」の見積り（秒）。GetGroupMaxLifetime の public wrapper。
+	/// Composite::NaturalDuration() の集計に使う。存在しないグループは 0 を返す（=不明扱い）。
+	/// </summary>
+	float GpuEmitManager::EstimateGroupNaturalDuration(const std::string& groupName) const
+	{
+		auto it = groups_.find(groupName);
+		if (it == groups_.end() || !it->second) return 0.0f;
+		return GetGroupMaxLifetime(it->second.get());
+	}
+
+	/// <summary>
 	/// エミッターの形状ごとのローカル発生位置（オフセット）を取得
 	/// </summary>
 	Vector3 GpuEmitManager::GetEmitterLocalOffset(const EmitterData* emitterData) const

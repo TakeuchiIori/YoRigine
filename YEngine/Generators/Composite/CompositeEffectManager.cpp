@@ -8,11 +8,15 @@
 #include "Vfx/VfxMesh/Runtime/VfxMeshSpawner.h"
 #include "GPUParticle/GpuEmitManager.h"
 
+// hitDelay の一時オーバーラップクエリ用（QuerySphere / BaseCollider）
+#include "Collision/Core/CollisionManager.h"
+
 #include <json.hpp>
 #include <fstream>
 #include <filesystem>
 #include <algorithm>
 #include <cctype>
+#include <cstdio>
 
 #ifdef USE_IMGUI
 #include <imgui.h>
@@ -26,12 +30,33 @@
 void CompositeInstance::SetPosition(const Vector3& pos)
 {
     basePos = pos;
-    if (particle.IsValid()) particle.SetPosition(pos);
+    if (particle.IsValid()) particle.SetPosition(pos + particleOffset);
     for (size_t i = 0; i < vfx.size(); ++i) {
         vfx[i].SetPosition(pos + vfxOffsets[i]);
     }
-    if (gpu.IsValid()) gpu.SetPosition(pos);
+    if (gpu.IsValid()) gpu.SetPosition(pos + gpuOffset);
     // 音は Audio に3D位置がないため追従しない（スコープ外）
+}
+
+// ============================================================================
+// CompositeEffectAsset::NaturalDuration
+//   全チャイルドの中で最大の自然な寿命（秒）を返す。0以下=不明。
+//   VfxMeshは正確値、GPUは概算値。CPUパーティクル(particleEffect)は
+//   System=定義/インスタンス=粒バッファが未分離なため安全に見積もれず、現状0扱い
+//   （Docs/VfxExpansion_Design.md の 7.2 参照）。
+// ============================================================================
+float CompositeEffectAsset::NaturalDuration() const
+{
+    float maxDur = 0.0f;
+    for (const auto& v : vfxMeshAssets) {
+        if (const auto* vfxAsset = VfxMeshSpawner::GetInstance()->GetAsset(v.asset)) {
+            maxDur = std::max(maxDur, vfxAsset->OneShotDuration());
+        }
+    }
+    if (!gpuEmitterGroup.empty()) {
+        maxDur = std::max(maxDur, YoRigine::GpuEmitManager::GetInstance()->EstimateGroupNaturalDuration(gpuEmitterGroup));
+    }
+    return maxDur;
 }
 
 void CompositeInstance::Stop()
@@ -99,6 +124,22 @@ bool CompositeEffectManager::LoadAsset(const std::string& filepath)
         a.particleEffect = j.value("particleEffect", std::string());
         a.gpuEmitterGroup = j.value("gpuEmitterGroup", std::string());
 
+        auto readVec3 = [](const nlohmann::json& parent, const char* key, Vector3 def) -> Vector3 {
+            if (parent.contains(key) && parent[key].is_array() && parent[key].size() >= 3) {
+                return { parent[key][0].get<float>(), parent[key][1].get<float>(), parent[key][2].get<float>() };
+            }
+            return def;
+        };
+        a.particleOffset = readVec3(j, "particleOffset", { 0.0f, 0.0f, 0.0f });
+        a.gpuOffset       = readVec3(j, "gpuOffset", { 0.0f, 0.0f, 0.0f });
+
+        a.hitDelay     = j.value("hitDelay", -1.0f);
+        a.hitRadius    = j.value("hitRadius", 1.5f);
+        a.hitLayerMask = j.value("hitLayerMask", 0xFFFFFFFFu);
+
+        a.cameraShakeProfile = j.value("cameraShakeProfile", std::string());
+        a.hitStopMs          = j.value("hitStopMs", 0.0f);
+
         if (j.contains("vfxMeshAssets")) {
             for (const auto& v : j["vfxMeshAssets"]) {
                 CompositeVfxRef r;
@@ -149,7 +190,16 @@ bool CompositeEffectManager::SaveAsset(const std::string& name)
         nlohmann::json j;
         j["name"] = a.name;
         j["particleEffect"] = a.particleEffect;
+        j["particleOffset"] = { a.particleOffset.x, a.particleOffset.y, a.particleOffset.z };
         j["gpuEmitterGroup"] = a.gpuEmitterGroup;
+        j["gpuOffset"] = { a.gpuOffset.x, a.gpuOffset.y, a.gpuOffset.z };
+
+        j["hitDelay"] = a.hitDelay;
+        j["hitRadius"] = a.hitRadius;
+        j["hitLayerMask"] = a.hitLayerMask;
+
+        j["cameraShakeProfile"] = a.cameraShakeProfile;
+        j["hitStopMs"] = a.hitStopMs;
 
         j["vfxMeshAssets"] = nlohmann::json::array();
         for (const auto& v : a.vfxMeshAssets) {
@@ -191,6 +241,11 @@ bool CompositeEffectManager::SaveAsset(const std::string& name)
 
 void CompositeEffectManager::PlayOneShot(const std::string& name, const Vector3& pos)
 {
+    PlayOneShot(name, pos, PlayParams{});
+}
+
+void CompositeEffectManager::PlayOneShot(const std::string& name, const Vector3& pos, const PlayParams& params)
+{
     auto it = assets_.find(name);
     if (it == assets_.end()) {
         Logger("CompositeEffectManager::PlayOneShot : '" + name + "' が見つかりません");
@@ -200,20 +255,47 @@ void CompositeEffectManager::PlayOneShot(const std::string& name, const Vector3&
 
     // 各系統を「撃ちっぱなし」で発火（保持不要）
     if (!a.particleEffect.empty()) {
-        EffectHandle::PlayOneShot(a.particleEffect, pos);
+        EffectHandle::PlayOneShot(a.particleEffect, pos + a.particleOffset);
+    }
+
+    // minDuration保証: 自然な寿命(NaturalDuration)が足りなければVfxMesh側だけtimeScaleで引き伸ばす。
+    // 既にminDuration以上あるアセットには触らない（強制同期はしない。7.2参照）。
+    float vfxTimeScale = 1.0f;
+    if (params.minDuration > 0.0f) {
+        const float natural = a.NaturalDuration();
+        if (natural > 0.0001f && params.minDuration > natural) {
+            vfxTimeScale = natural / params.minDuration;
+        }
     }
     for (const auto& v : a.vfxMeshAssets) {
-        VfxMeshHandle::PlayOneShot(v.asset, pos + v.offset, v.scale);
+        VfxMeshHandle::PlayOneShot(v.asset, pos + v.offset, v.scale, vfxTimeScale);
     }
+
     if (!a.gpuEmitterGroup.empty()) {
-        GpuParticleHandle::PlayOneShot(a.gpuEmitterGroup, pos);
+        GpuParticleHandle::PlayOneShot(a.gpuEmitterGroup, pos + a.gpuOffset);
     }
     for (const auto& s : a.sounds) {
         YoRigine::Audio::GetInstance()->PlayOneShot(s.path, s.volume, s.category);
     }
+
+    // ダメージ判定（一時オーバーラップクエリ）を hitDelay 秒後に予約
+    if (a.hitDelay >= 0.0f) {
+        PendingHitQuery q;
+        q.pos       = pos;
+        q.radius    = a.hitRadius;
+        q.layerMask = a.hitLayerMask;
+        q.remaining = a.hitDelay;
+        q.callback  = params.onHitQuery;
+        pendingHitQueries_.push_back(std::move(q));
+    }
 }
 
 EffectHandle CompositeEffectManager::Play(const std::string& name, const Vector3& pos)
+{
+    return Play(name, pos, PlayParams{});
+}
+
+EffectHandle CompositeEffectManager::Play(const std::string& name, const Vector3& pos, const PlayParams& params)
 {
     EffectHandle handle;
 
@@ -225,29 +307,65 @@ EffectHandle CompositeEffectManager::Play(const std::string& name, const Vector3
     const CompositeEffectAsset& a = it->second;
 
     auto inst = std::make_shared<CompositeInstance>();
-    inst->basePos = pos;
+    inst->basePos        = pos;
+    inst->particleOffset = a.particleOffset;
+    inst->gpuOffset       = a.gpuOffset;
 
     // Particle 子（ループ）
     if (!a.particleEffect.empty()) {
-        inst->particle = EffectHandle::Play(a.particleEffect, pos, /*loop*/true);
+        inst->particle = EffectHandle::Play(a.particleEffect, pos + a.particleOffset, /*loop*/true);
     }
     // VfxMesh 子（ループ）
+    // ループ型は Stop() で寿命が外部制御される前提なので minDuration/timeScale は適用しない（7.2参照）。
     for (const auto& v : a.vfxMeshAssets) {
         inst->vfx.push_back(VfxMeshHandle::Play(v.asset, pos + v.offset, v.scale, /*loop*/true));
         inst->vfxOffsets.push_back(v.offset);
     }
     // GPU 子（ループ）
     if (!a.gpuEmitterGroup.empty()) {
-        inst->gpu = GpuParticleHandle::Play(a.gpuEmitterGroup, pos);
+        inst->gpu = GpuParticleHandle::Play(a.gpuEmitterGroup, pos + a.gpuOffset);
     }
     // ループ音（保持して Stop 連鎖）
     for (const auto& s : a.sounds) {
         inst->sounds.push_back(YoRigine::Audio::GetInstance()->Play(s.path, /*loop*/true, s.volume, s.category));
     }
 
+    if (a.hitDelay >= 0.0f) {
+        PendingHitQuery q;
+        q.pos       = pos;
+        q.radius    = a.hitRadius;
+        q.layerMask = a.hitLayerMask;
+        q.remaining = a.hitDelay;
+        q.callback  = params.onHitQuery;
+        pendingHitQueries_.push_back(std::move(q));
+    }
+
     handle.systemName_ = name;
     handle.composite_ = inst;
     return handle;
+}
+
+// ============================================================================
+// 毎フレーム更新: hitDelay の遅延ダメージクエリを消化する。
+// GameScene/DevelopScene 等、VfxMeshSpawner::Update と同じ場所で呼ぶ想定。
+// ============================================================================
+void CompositeEffectManager::Update(float deltaTime)
+{
+    for (size_t i = 0; i < pendingHitQueries_.size(); ) {
+        PendingHitQuery& q = pendingHitQueries_[i];
+        q.remaining -= deltaTime;
+        if (q.remaining <= 0.0f) {
+            if (q.callback) {
+                std::vector<BaseCollider*> hits =
+                    YoRigine::CollisionManager::GetInstance()->QuerySphere(q.pos, q.radius, q.layerMask);
+                q.callback(hits);
+            }
+            pendingHitQueries_[i] = std::move(pendingHitQueries_.back());
+            pendingHitQueries_.pop_back();
+            continue;
+        }
+        ++i;
+    }
 }
 
 // ============================================================================
@@ -344,11 +462,17 @@ void CompositeEffectManager::DrawImGui()
         auto groups = YEmitterGroupManager::GetInstance().GetAllGroupNames();
         opts.insert(opts.end(), groups.begin(), groups.end());
         stringCombo("Particle エフェクト", a.particleEffect, opts, true);
+        if (!a.particleEffect.empty()) {
+            ImGui::DragFloat3("Particle オフセット", &a.particleOffset.x, 0.05f);
+        }
     }
     // ── GPU ──
     {
         auto opts = YoRigine::GpuEmitManager::GetInstance()->GetGroupNames();
         stringCombo("GPU グループ", a.gpuEmitterGroup, opts, true);
+        if (!a.gpuEmitterGroup.empty()) {
+            ImGui::DragFloat3("GPU オフセット", &a.gpuOffset.x, 0.05f);
+        }
     }
 
     // ── VfxMesh（複数）──
@@ -401,6 +525,31 @@ void CompositeEffectManager::DrawImGui()
         if (ImGui::Button(ICON_FA_PLUS " サウンドを追加")) a.sounds.push_back({});
         ImGui::SameLine();
         if (ImGui::SmallButton("音声一覧を再スキャン")) ScanSounds();
+    }
+
+    // ── ダメージ判定（一時オーバーラップクエリ） ──
+    ImGui::SeparatorText("ダメージ判定");
+    ImGui::TextDisabled("hitDelay < 0 でダメージ判定なし。実際のダメージ適用はPlay呼び出し側のonHitQueryコールバックで行う。");
+    {
+        bool enabled = a.hitDelay >= 0.0f;
+        if (ImGui::Checkbox("有効", &enabled)) {
+            a.hitDelay = enabled ? std::max(a.hitDelay, 0.0f) : -1.0f;
+        }
+        if (enabled) {
+            ImGui::DragFloat("発火までの秒数(hitDelay)", &a.hitDelay, 0.01f, 0.0f, 10.0f);
+            ImGui::DragFloat("半径(hitRadius)", &a.hitRadius, 0.05f, 0.01f, 50.0f);
+        }
+    }
+
+    // ── カメラ演出フック（データのみ。発火配線は未実装） ──
+    ImGui::SeparatorText("カメラ演出フック（データのみ・未配線）");
+    {
+        char shakeBuf[128];
+        std::snprintf(shakeBuf, sizeof(shakeBuf), "%s", a.cameraShakeProfile.c_str());
+        if (ImGui::InputText("シェイクプロファイル名", shakeBuf, sizeof(shakeBuf))) {
+            a.cameraShakeProfile = shakeBuf;
+        }
+        ImGui::DragFloat("ヒットストップ(ms)", &a.hitStopMs, 1.0f, 0.0f, 2000.0f);
     }
 
     // ── プレビュー / 保存 ──

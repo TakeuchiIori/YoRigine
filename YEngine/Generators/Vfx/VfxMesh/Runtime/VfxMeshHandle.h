@@ -31,26 +31,31 @@ public:
     // ── ファクトリ ────────────────────────────────────────────────────
 
     // 位置 + スケール指定（スモーク・衝撃波など球系エフェクト向け）
+    // timeScale: ageの進み方の倍率。<1で寿命を引き伸ばす（Composite::minDuration保証用）。
     static VfxMeshHandle Play(const std::string& assetName,
                               const Vector3&     position,
                               float              scale = 1.0f,
-                              bool               loop  = false);
+                              bool               loop  = false,
+                              float              timeScale = 1.0f);
 
     static void PlayOneShot(const std::string& assetName,
                             const Vector3&     position,
-                            float              scale = 1.0f);
+                            float              scale = 1.0f,
+                            float              timeScale = 1.0f);
 
     // 始点・終点指定（稲妻など方向性エフェクト向け）
     static VfxMeshHandle PlayBolt(const std::string& assetName,
                                   const Vector3&     start,
                                   const Vector3&     end,
-                                  bool               loop = false);
+                                  bool               loop = false,
+                                  float              timeScale = 1.0f);
 
     // ── 操作 ─────────────────────────────────────────────────────────
 
     void SetPosition(const Vector3& pos);
     void SetScale(float scale);
     void SetEndpoints(const Vector3& start, const Vector3& end);
+    void SetTimeScale(float timeScale);
     void Stop();
 
     // ── クエリ ───────────────────────────────────────────────────────

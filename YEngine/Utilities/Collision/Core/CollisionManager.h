@@ -93,6 +93,20 @@ namespace YoRigine {
 		bool RaycastMasked(const Ray& ray, float maxDistance, uint32_t layerMask, RaycastHit* outHit);
 
 		// ============================================================
+		// 一時オーバーラップクエリ（持続コライダーを作らず「今この瞬間」だけ調べる）
+		//   - Enter/Exit・接触猶予・CCD 等の持続状態を一切持たない一回限りの検索。
+		//   - 衝撃波/爆発/範囲攻撃のダメージ判定など「一瞬だけ範囲を調べたい」用途向け。
+		//     GPUパーティクル1個1個のような大量対象の判定には使わないこと
+		//     （設計は Docs/VfxExpansion_Design.md の 5.4 を参照）。
+		//   - 実装は colliders_ の線形走査 + AABB近似（ComputeWorldAABB とのSphere-AABB判定）。
+		//     プレイヤー/敵/壁程度の登録数（数百程度まで）を想定した簡易版。
+		//   layerMask:     候補コライダーの layerBits と AND を取り、0 ならスキップ。0xFFFFFFFFu で全層。
+		//   ignoreTypeIDs: typeID が一致するコライダーをスキップ。
+		// ============================================================
+		std::vector<BaseCollider*> QuerySphere(const Vector3& center, float radius,
+			uint32_t layerMask = 0xFFFFFFFFu, const std::vector<uint32_t>& ignoreTypeIDs = {}) const;
+
+		// ============================================================
 		// Broad Phase 設定
 		// ============================================================
 		void SetBroadPhaseCellSize(float size) { grid_.SetCellSize(size); }
