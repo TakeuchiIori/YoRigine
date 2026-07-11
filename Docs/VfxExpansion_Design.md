@@ -558,11 +558,56 @@ struct GpuForceFieldParams {
 1. **発生**: `EmitterShape::Sphere`で大きめの半径（例: 半径8〜10）から粒を散発的に発生させる。色は明るいHDRの黄〜白。
 2. **収束フィールド**: 元気玉本体の中心座標を`center`、`radius`をSphere発生範囲より少し大きめに設定した`ConvergeToCenter`フィールドを1つ配置。`strength`と`falloff`でチャージの「加速していく感じ」を調整（falloffを効かせると外側はゆっくり、中心に近づくほど速く吸い込まれる）。
 3. **渦**: `spiralStrength`を0.2〜0.5あたりから調整し、まっすぐ収束ではなく少し巻き込むように。
-4. **終端処理**: `killRadius`を中心近くの小さい値に設定し、到達したら消える。既存の`EmitterTrailParams`（`isTrail=true`）を有効にして、各粒が飛来中に光の尾を引くようにすると密度感が出る。
+4. **終端処理**: `killRadius`を中心近くの小さい値に設定し、到達したら消える。既存の`ParticleParams::child`（`ChildParticleParams`。エディタ上は各エミッタの「トレイル」欄）を有効にして、各粒が飛来中に光の尾を引くようにすると密度感が出る。
 5. **中心の本体**: 別途Composite側で`VolumeSmokeMesh`か`LightVolumeMesh`を中心に置き、チャージ時間ぶんの`VfxMotion(ScaleOverLife)`で徐々に膨らませる。GPU収束粒子はあくまで「集まってくる光」担当、中心の球本体はVfxMesh担当、という役割分担にする（既存の「点/スパーク→YParticle・高数量→GPU・継続ボリューム→VfxMesh」という使い分け方針そのまま）。
 6. **発射**: チャージ完了後、収束フィールドを止め、`TrajectoryCurve`（3.1）を使った`ProjectileObject`（3.2）として本体を対象へ飛ばす。飛翔中の光跡はGPUトレイル、着弾はCompositeの`ExplosionShockwave`＋`hitDelay`ダメージクエリ、という形で今回実装した仕組み一式にそのまま繋がる。
 
-### 9.5 実装時の注意
+### 9.5 補足: 「元気玉」限定ではなく汎用の収束軌道バリエーション
+
+ユーザー要望の本質は「元気玉」そのものではなく、**様々な軌道で指定地点へ粒子が集まる演出**＋**トレイルを引かせたいのでGPUパーティクルで**、という汎用要件。設計を以下のように補強する。
+
+**トレイルは追加実装不要（ただし使う仕組みの名前を訂正）**: GPUパーティクルには名前が紛らわしい2つのトレイル機構がある。
+
+- **`EmitterTrailParams`**（`GPUEmitter::trail_`、`UpdateEmitterTrail()`）: **エミッター（発生源）自身の位置**が移動した軌跡に沿って、通常の粒子を連続発生させる仕組み。剣の斬撃のように「発生点そのものが動く」演出向け。今回のような「個々の粒子がフィールドに引っ張られて動く」ケースには効かない（発生点＝EmitterShapeの位置は動かないため）。
+- **`ParticleParams::child`（`ChildParticleParams`。エディタ上は各エミッタの「トレイル」欄）**: **個々の粒子自身**の`translate`と1フレーム前の`lastTranslate`の差分だけを見て、一定距離動くたびに子パーティクル（トレイルの粒）を生成する仕組み（`UpdateParticle.CS.hlsl`内、`isParent==1 && child.isTrail==1`のブロック）。移動の原因（重力・速度・今回追加するフォースフィールド）を一切区別しないため、**フォースフィールドで粒子を動かせば、この`child`トレイルは今のまま乗る**。
+
+前回「EmitterTrailParams」と書いたのは誤りで、正しくは`ParticleParams::child`（エディタの「トレイル」チェックボックス、JSON上は`isTrail`/`trailLifeTime`/`trailMinDistance`等）。既にエディタUI・JSON保存・GPUへのアップロードまで全部実装済みなので、フォースフィールド機能を作った後にこの「トレイル」を有効化するだけで、収束していく粒子それぞれが光の尾を引く見た目になる。追加実装が要らないという結論自体は変わらない。
+
+**「様々な軌道」の作り方**: `spiralStrength`を全粒子で同じ値にすると、全部が同じ平面・同じ向きに渦を巻いて収束するため、見た目が単調（1枚の円盤が閉じていくように見える）になりやすい。これを崩すには**粒子ごとに軌道パラメータをランダム化**するのが定石。幸い、Update Compute Shader内では`particleIndex`（`DTid.x * kParticlesPerThread + i`）が各粒子ごとに一意かつ寿命中ずっと安定しているため、**`Particle`構造体に新しいフィールドを足さずに**、`particleIndex`をシードにしたハッシュ関数だけで「粒子ごとに違うが、その粒子の生涯を通じて一貫した」乱数が得られる（構造体レイアウト変更を伴わない＝9.5で述べるリスクをこれ以上増やさない）。
+
+`GpuForceFieldParams`に軌道バリエーション用のフィールドを追加:
+
+```cpp
+struct GpuForceFieldParams {
+    // ...9.2の既存フィールド...
+
+    // ── 軌道のばらつき ──────────────────────────────────────────
+    float spiralStrengthMin = 0.0f;  // 接線成分（渦の強さ）の最小値。粒ごとにランダム
+    float spiralStrengthMax = 0.0f;  // 同、最大値
+    float randomAxisBlend   = 1.0f;  // 0=全粒が同じ軸で渦を巻く(揃った螺旋・従来通り) / 1=粒ごとに完全ランダムな軸
+    float orbitHoldRatio    = 0.0f;  // 0=すぐ中心へ収束開始 / >0でしばらく軌道を回ってから収束に転じる(周ってから落ちる演出)
+    float approachVariance  = 0.0f;  // 収束が効き始めるタイミングを粒ごとにランダムにずらす(0=全粒同時に収束開始)
+};
+```
+
+HLSL側は`particleIndex`をシードにしたハッシュで「その粒子固有の渦軸・渦の強さ・収束開始タイミング」を導出し、`spiralAxis`をこれまでの固定軸(Y軸等)とランダム軸の間で`randomAxisBlend`によりブレンドする。イメージ:
+
+```hlsl
+float3 randomAxis = HashToUnitVector(particleIndex ^ fieldSeed);
+float3 spiralAxis = normalize(lerp(float3(0,1,0), randomAxis, field.randomAxisBlend));
+float3 tangent    = normalize(cross(accelDir, spiralAxis));
+float  spiralAmt  = lerp(field.spiralStrengthMin, field.spiralStrengthMax, Hash11(particleIndex ^ fieldSeed ^ 0x9e3779b9));
+accel += tangent * field.strength * spiralAmt;
+
+// orbitHoldRatio: 経過時間に応じて「渦成分優勢→中心への引力優勢」に遷移させる
+float lifeRatio = saturate(particle.currentTime / particle.lifeTime);
+float radialScale = smoothstep(0.0, max(0.001, field.orbitHoldRatio), lifeRatio);
+accel = lerp(tangent * field.strength * spiralAmt, accelDir * field.strength, radialScale);
+```
+
+`randomAxisBlend=0, spiralStrengthMin=spiralStrengthMax, orbitHoldRatio=0`にすれば9.2までの元の（元気玉向けの）挙動と完全に一致するので、この拡張は既存設計を置き換えるのではなく**上位互換のパラメータ追加**になる。
+
+### 9.6 実装時の注意
 
 ルートシグネチャ変更を伴うため、他の機能追加より一段リスクが高い。着手する際は次の順でやるのが安全:
 1. まず`GpuForceFieldParams`と数個までの配列をC++側だけで用意し、JSON/エディタで編集できるようにする（GPU側は素通し）。

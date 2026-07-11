@@ -1,123 +1,148 @@
 #include "GPUParticle.hlsli"
 
-RWStructuredBuffer<Particle> g_Particles : register(u0);
-ConstantBuffer<PerFrame> g_PerFrame : register(b0);
+// Update は Hot のみ触る（scale/color は保存せず VS で導出）。SoA の帯域利得はここが本体。
+RWStructuredBuffer<ParticleHot>  g_Hot        : register(u0);
+ConstantBuffer<PerFrame>         g_PerFrame   : register(b0);
 ConstantBuffer<ParticleParameters> g_ParticleParams : register(b1);
-
-RWStructuredBuffer<int> g_FreeListIndex : register(u1);
-RWStructuredBuffer<uint> g_FreeList : register(u2);
-RWStructuredBuffer<uint> g_ActiveCount : register(u3);
+RWStructuredBuffer<int>  g_FreeListIndex      : register(u1);
+RWStructuredBuffer<uint> g_FreeList           : register(u2);
+RWStructuredBuffer<uint> g_ActiveCount        : register(u3);
+StructuredBuffer<GpuForceField> g_ForceFields : register(t0);
+// インダイレクト描画: 生存粒子のスロット番号だけを詰める。描画は生存数ぶんだけになる。
+RWStructuredBuffer<uint> g_DrawList : register(u6);
+RWStructuredBuffer<uint> g_DrawArgs : register(u7); // [1]=InstanceCount 兼 生存数カウンタ
 
 [numthreads(1024, 1, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
 {
     uint baseIndex = DTid.x * kParticlesPerThread;
-    
+
     for (uint i = 0; i < kParticlesPerThread; i++)
     {
         uint particleIndex = baseIndex + i;
-        
+
         if (particleIndex >= kMaxParticles)
             break;
-        
-        if (g_Particles[particleIndex].isActive == 0)
+
+        ParticleHot h = g_Hot[particleIndex];
+
+        if (h.isActive == 0)
             continue;
-        
+
         // --- 生存判定 ---
-        if (g_Particles[particleIndex].currentTime < g_Particles[particleIndex].lifeTime)
+        if (h.currentTime < h.lifeTime)
         {
-            // ==========================================================
-            // トレイル（子パーティクル）生成ロジック
-            // ==========================================================
-            if (g_Particles[particleIndex].isParent == 1 && g_ParticleParams.child.isTrail == 1)
+            // トレイル（子パーティクル）生成は SpawnTrailParticle.CS.hlsl の別パスで行う。
+            // このカーネル内で FreeList の Pop（子生成）と Push（死亡処理）を同時に行うと
+            // 競合でスロット喪失・カウント破壊が起きるため、Pop はここでは絶対にしない。
+
+            // --- 共通物理更新 ---
+            float lifeRatio = saturate(h.currentTime / h.lifeTime);
+            h.velocity.y -= g_ParticleParams.gravity * g_PerFrame.deltaTime;
+
+            // --- フォースフィールド適用 ---
+            for (uint f = 0; f < g_PerFrame.forceFieldCount; f++)
             {
-                float3 currentPos = g_Particles[particleIndex].translate;
-                float3 lastPos = g_Particles[particleIndex].lastTranslate;
-                float3 delta = currentPos - lastPos;
-                float d = length(delta);
+                GpuForceField field = g_ForceFields[f];
+                if (field.isEnable == 0) continue;
 
-                if (d >= g_ParticleParams.child.minDistance && g_ParticleParams.child.minDistance > 0.0f)
-                {
-                    int steps = (int) (d / g_ParticleParams.child.minDistance);
-                    if (steps < 1)
-                        steps = 1;
+                float3 toCenter = field.center - h.translate;
+                float  dist     = length(toCenter);
 
-                    float3 stepVec = delta / (float) steps;
-                    float3 spawnBasePos = lastPos;
+                // 範囲内判定
+                bool inside;
+                if (field.shape == FIELD_SHAPE_SPHERE) {
+                    inside = (dist <= field.radius);
+                } else {
+                    float3 delta = abs(h.translate - field.center);
+                    inside = (delta.x <= field.halfExtents.x &&
+                              delta.y <= field.halfExtents.y &&
+                              delta.z <= field.halfExtents.z);
+                }
+                if (!inside) continue;
 
-                    for (int s = 0; s < steps; s++)
-                    {
-                        spawnBasePos += stepVec;
-                        uint emitPerStep = (uint) g_ParticleParams.child.emissionCount;
-                        
-                        for (uint j = 0; j < emitPerStep; j++)
-                        {
-                            // 【修正：Pop処理】
-                            int originalCount;
-                            InterlockedAdd(g_FreeListIndex[0], -1, originalCount);
+                // 加速方向
+                float3 accelDir;
+                if (field.mode == FIELD_MODE_DIRECTIONAL) {
+                    accelDir = normalize(field.direction);
+                } else if (field.mode == FIELD_MODE_CONVERGE) {
+                    accelDir = (dist > 0.001f) ? (toCenter / dist) : float3(0, 0, 0);
+                } else { // REPEL
+                    accelDir = (dist > 0.001f) ? -(toCenter / dist) : float3(0, 0, 0);
+                }
 
-                            // 取り出す前の在庫が 1 以上あれば取得可能
-                            if (originalCount > 0)
-                            {
-                                // originalCount は 1～N なので、-1 して 0～N-1 のインデックスを得る
-                                uint childIdx = g_FreeList[originalCount - 1];
+                // 距離減衰
+                float falloffScale = 1.0f;
+                if (field.falloff > 0.0001f) {
+                    float normDist = (field.shape == FIELD_SHAPE_SPHERE)
+                        ? saturate(dist / max(0.001f, field.radius))
+                        : saturate(length(abs(h.translate - field.center)
+                                         / max(float3(0.001f, 0.001f, 0.001f), field.halfExtents)));
+                    falloffScale = lerp(1.0f, normDist, field.falloff);
+                }
 
-                                // 子の初期化
-                                g_Particles[childIdx].isActive = 1;
-                                g_Particles[childIdx].isParent = 0;
-                                g_Particles[childIdx].translate = spawnBasePos;
-                                g_Particles[childIdx].lastTranslate = spawnBasePos;
-                                g_Particles[childIdx].velocity = float3(0, 0, 0);
-                                g_Particles[childIdx].rotate = g_Particles[particleIndex].rotate;
-                                g_Particles[childIdx].currentTime = 0.0f;
-                                g_Particles[childIdx].lifeTime = g_ParticleParams.child.lifeTime;
-                                
-                                g_Particles[childIdx].startColor = g_Particles[particleIndex].color;
-                                g_Particles[childIdx].endColor = g_Particles[particleIndex].endColor;
-                                g_Particles[childIdx].color = g_Particles[childIdx].startColor;
+                float3 accel = accelDir * field.strength * falloffScale;
 
-                                float3 baseScale = (g_ParticleParams.child.inheritScale == 1) ? g_Particles[particleIndex].scale : float3(1, 1, 1);
-                                g_Particles[childIdx].startScale = baseScale * g_ParticleParams.child.startScale;
-                                g_Particles[childIdx].endScale = g_Particles[childIdx].startScale * g_ParticleParams.child.endScale;
-                                g_Particles[childIdx].scale = g_Particles[childIdx].startScale;
+                // 螺旋収束（Converge 時のみ）
+                if (field.mode == FIELD_MODE_CONVERGE && field.spiralStrengthMax > 0.0001f) {
+                    uint   fieldSeed   = f * 0x9e3779b9u;
+                    float3 randomAxis  = HashToUnitVector(particleIndex ^ fieldSeed);
+                    float3 spiralAxis  = normalize(lerp(float3(0, 1, 0), randomAxis, field.randomAxisBlend));
+                    float3 tangent     = normalize(cross(accelDir, spiralAxis));
+                    float  spiralAmt   = lerp(field.spiralStrengthMin, field.spiralStrengthMax,
+                                              Hash11(particleIndex ^ fieldSeed ^ 0x517cc1b7u));
 
-                                InterlockedAdd(g_ActiveCount[0], 1);
-                            }
-                            else
-                            {
-                                // 在庫切れなのでカウントを戻して終了
-                                InterlockedAdd(g_FreeListIndex[0], 1);
-                                s = steps; // 外側のループも抜ける
-                                break;
-                            }
-                        }
+                    // orbitHoldRatio: 寿命の途中まで周回し、その後収束へ遷移
+                    float effectiveHold = field.orbitHoldRatio;
+                    if (field.approachVariance > 0.0001f) {
+                        effectiveHold += Hash11(particleIndex ^ fieldSeed ^ 0xdeadbeefu) * field.approachVariance;
                     }
-                    g_Particles[particleIndex].lastTranslate = currentPos;
+                    float radialScale = smoothstep(0.0f, max(0.001f, effectiveHold), lifeRatio);
+                    float3 spiralAccel = tangent * field.strength * spiralAmt * falloffScale;
+                    accel = lerp(spiralAccel, accelDir * field.strength * falloffScale, radialScale);
+                }
+
+                h.velocity += accel * g_PerFrame.deltaTime;
+
+                // 最大速度クランプ
+                if (field.maxSpeed > 0.0001f) {
+                    float sp = length(h.velocity);
+                    if (sp > field.maxSpeed) {
+                        h.velocity *= field.maxSpeed / sp;
+                    }
+                }
+
+                // killRadius: 到達したら寿命満了扱いで消滅
+                if (field.mode == FIELD_MODE_CONVERGE && field.killRadius > 0.0001f && dist <= field.killRadius) {
+                    h.currentTime = h.lifeTime;
                 }
             }
 
-            // --- 共通物理更新 ---
-            float lifeRatio = saturate(g_Particles[particleIndex].currentTime / g_Particles[particleIndex].lifeTime);
-            g_Particles[particleIndex].velocity.y -= g_ParticleParams.gravity * g_PerFrame.deltaTime;
-            g_Particles[particleIndex].translate += g_Particles[particleIndex].velocity * g_PerFrame.deltaTime;
-            g_Particles[particleIndex].rotate += g_ParticleParams.rotationSpeed * g_PerFrame.deltaTime;
-            g_Particles[particleIndex].scale = lerp(g_Particles[particleIndex].startScale, g_Particles[particleIndex].endScale, lifeRatio);
-            g_Particles[particleIndex].color = lerp(g_Particles[particleIndex].startColor, g_Particles[particleIndex].endColor, lifeRatio);
-            
-            g_Particles[particleIndex].currentTime += g_PerFrame.deltaTime;
+            h.translate += h.velocity * g_PerFrame.deltaTime;
+            h.rotate += g_ParticleParams.rotationSpeed * g_PerFrame.deltaTime;
+            h.currentTime += g_PerFrame.deltaTime;
+
+            g_Hot[particleIndex] = h; // 書き戻し
+
+            // この粒子は今フレームも生存 → インダイレクト描画リストへ追記。
+            // 描画インスタンス数 = ここで数えた生存数（死粒は描かない）。
+            // ※Emit/Trail で今フレーム新規発生した粒子は次フレームの Update で拾われる（1F遅延・不可視）。
+            uint drawIdx;
+            InterlockedAdd(g_DrawArgs[1], 1, drawIdx);
+            g_DrawList[drawIdx] = particleIndex;
         }
         else
         {
             // ==========================================================
             // 死亡処理（Push処理）
             // ==========================================================
-            g_Particles[particleIndex].isActive = 0;
-            g_Particles[particleIndex].scale = float3(0.0f, 0.0f, 0.0f);
-            
+            h.isActive = 0;
+            g_Hot[particleIndex] = h;
+
             int originalCount;
             // 現在の在庫数を増やし、加算前の「空きスロット番号」を取得
             InterlockedAdd(g_FreeListIndex[0], 1, originalCount);
-            
+
             // 修正：originalCount（加算前）がそのまま書き込み先インデックスになる
             if (originalCount >= 0 && originalCount < (int) kMaxParticles)
             {
@@ -128,7 +153,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
                 // エラー回避：もし満杯ならカウントを戻す
                 InterlockedAdd(g_FreeListIndex[0], -1);
             }
-            
+
             InterlockedAdd(g_ActiveCount[0], (uint) -1);
         }
     }

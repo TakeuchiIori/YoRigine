@@ -11,11 +11,13 @@ ConstantBuffer<EmitterMesh> g_EmitterMesh : register(b5);
 ConstantBuffer<PerFrame> g_PerFrame : register(b6);
 ConstantBuffer<ParticleParameters> g_ParticleParams : register(b7);
 
-// UAVバッファ（パーティクルデータ）
-RWStructuredBuffer<Particle> g_Particles : register(u0);
+// UAVバッファ（パーティクルデータ：SoA hot/warm/cold）
+RWStructuredBuffer<ParticleHot>  g_Hot  : register(u0);
 RWStructuredBuffer<int> g_FreeListIndex : register(u1);
-RWStructuredBuffer<uint> g_FreeList : register(u2);
-RWStructuredBuffer<uint> g_ActiveCount : register(u3);
+RWStructuredBuffer<uint> g_FreeList     : register(u2);
+RWStructuredBuffer<uint> g_ActiveCount  : register(u3);
+RWStructuredBuffer<ParticleWarm> g_Warm : register(u4);
+RWStructuredBuffer<ParticleCold> g_Cold : register(u5);
 
 // SRVバッファ（メッシュ三角形データ）
 StructuredBuffer<MeshTriangle> g_MeshTriangles : register(t0);
@@ -497,63 +499,41 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID)
 
     //==============================================================================================*/
 
+    ParticleHot  hot  = (ParticleHot) 0;
+    ParticleWarm warm = (ParticleWarm) 0;
+    ParticleCold cold = (ParticleCold) 0;
+
     // 位置生成
     float3 particlePosition = GenerateParticlePosition(generator, g_EmitterCommon.emitterShape);
-    g_Particles[particleIndex].translate = particlePosition;
+    hot.translate = particlePosition;
 
     // 生存時間（ランダム幅適用）
-    g_Particles[particleIndex].lifeTime = GetRandomValue(
+    hot.lifeTime = GetRandomValue(
         generator,
         g_ParticleParams.lifeTime,
         g_ParticleParams.lifeTimeVariance
     );
-    g_Particles[particleIndex].currentTime = 0.0f;
+    hot.currentTime = 0.0f;
 
-    // スケール（ランダム幅適用）
-    
-    // 開始スケール
-    g_Particles[particleIndex].startScale = GetRandomVector3(
-    generator, g_ParticleParams.startScale,
-    g_ParticleParams.startScaleVariance
-    );
-    // 終了スケール
-    g_Particles[particleIndex].endScale = GetRandomVector3(
-    generator, g_ParticleParams.endScale,
-    g_ParticleParams.endScaleVariance
-    );
-    // 開始スケールを適用させる
-    g_Particles[particleIndex].scale = g_Particles[particleIndex].startScale;
+    // スケール（ランダム幅適用）。scale は保存せず VS で導出
+    warm.startScale = GetRandomVector3(
+        generator, g_ParticleParams.startScale, g_ParticleParams.startScaleVariance);
+    warm.endScale = GetRandomVector3(
+        generator, g_ParticleParams.endScale, g_ParticleParams.endScaleVariance);
 
-    
     // 回転（ランダム幅適用）
-    g_Particles[particleIndex].rotate = GetRandomValue(
+    hot.rotate = GetRandomValue(
         generator,
         g_ParticleParams.rotation,
         g_ParticleParams.rotationVariance
     );
 
-    // 色（ランダム幅適用）
-    
-    // 開始色
-    g_Particles[particleIndex].startColor = GetRandomColor(
-    generator, g_ParticleParams.startColor,
-    g_ParticleParams.startColorVariance
-    );
-    // 終了色
-    g_Particles[particleIndex].endColor = GetRandomColor(
-    generator, g_ParticleParams.endColor,
-    g_ParticleParams.endColorVariance
-    );
-    
-    // 色を適用
-    g_Particles[particleIndex].color = g_Particles[particleIndex].startColor;
-    g_Particles[particleIndex].color.a = saturate(g_Particles[particleIndex].color.a);
-
-    // アルファ値をクランプ
-    g_Particles[particleIndex].color.a = saturate(g_Particles[particleIndex].color.a);
-
-    // ビルボード設定
-    g_Particles[particleIndex].isBillboard = g_ParticleParams.isBillboard;
+    // 色（ランダム幅適用）。color は保存せず VS で導出。startColor.a のみクランプ
+    warm.startColor = GetRandomColor(
+        generator, g_ParticleParams.startColor, g_ParticleParams.startColorVariance);
+    warm.startColor.a = saturate(warm.startColor.a);
+    warm.endColor = GetRandomColor(
+        generator, g_ParticleParams.endColor, g_ParticleParams.endColorVariance);
 
     // 方向生成
     float3 direction = GenerateParticleDirection(
@@ -575,18 +555,23 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID)
     {
         // 速度パラメータが設定されている場合は、方向とミックス
         float3 mixedDir = normalize(direction + normalize(velocityBase) * 0.5f);
-        g_Particles[particleIndex].velocity = mixedDir * speed;
+        hot.velocity = mixedDir * speed;
     }
     else
     {
         // 速度パラメータが0の場合は、方向のみを使用
-        g_Particles[particleIndex].velocity = direction * 0.1f;
+        hot.velocity = direction * 0.1f;
     }
 
     // アクティブ化
-    g_Particles[particleIndex].isActive = 1;
-    g_Particles[particleIndex].isParent = 1;
-    g_Particles[particleIndex].lastTranslate = particlePosition;
+    hot.isActive = 1;
+    cold.isParent = 1;
+    cold.lastTranslate = particlePosition;
+
+    // SoA バッファへ書き込み
+    g_Hot[particleIndex]  = hot;
+    g_Warm[particleIndex] = warm;
+    g_Cold[particleIndex] = cold;
 
     // グループ内生成数をインクリメント（groupshared に対してのみ）
     InterlockedAdd(g_GroupEmitCount, 1);

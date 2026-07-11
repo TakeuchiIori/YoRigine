@@ -22,6 +22,7 @@ void GPUEmitter::Initialize(Camera* camera, std::string& texturePath)
 	CreateEmitterResources();
 	CreatePerFrameResource();
 	CreateParticleParametersResource();
+	CreateForceFieldBuffer();
 
 	ParticleParams defaultParams{};
 	defaultParams.lifeTime = 3.0f;
@@ -74,17 +75,16 @@ void GPUEmitter::Update(float dt)
 	emitterCommonData_->emitterShape = static_cast<uint32_t>(currentShape_);
 	perframeData_->time = YoRigine::GameTime::GetTotalTime();
 	perframeData_->deltaTime = dt;
+	perframeData_->forceFieldCount = forceFieldCount_;
 
 	// エミッターの更新
 	UpdateEmitters();
 
-	// トレイルの更新
-	UpdateEmitterTrail();
-
 	//-----------------------------------------
 	// パーティクルのレンダリング更新
 	//-----------------------------------------
-	gpuParticle_->Update(perframeResource_.Get(), particleParametersResource_.Get());
+	const bool trailEnabled = particleParameters_ && particleParameters_->childParams.isTrail != 0;
+	gpuParticle_->Update(perframeResource_.Get(), particleParametersResource_.Get(), forceFieldSrvHandle_, trailEnabled);
 
 	//-----------------------------------------
 	// ComputeShader 実行
@@ -448,6 +448,65 @@ void GPUEmitter::CreateMeshTriangleBuffer()
 	);
 }
 /// <summary>
+/// フォースフィールド定数バッファを初期化（kMaxForceFields 個分確保・SRV 登録）
+/// </summary>
+void GPUEmitter::CreateForceFieldBuffer()
+{
+	auto* dx = YoRigine::DirectXCommon::GetInstance();
+	size_t bufferSize = sizeof(ForceFieldForGPU) * kMaxForceFields;
+
+	forceFieldResource_ = dx->CreateBufferResource(bufferSize);
+	forceFieldResource_->Map(0, nullptr, reinterpret_cast<void**>(&forceFieldData_));
+	memset(forceFieldData_, 0, bufferSize);
+
+	auto* srvManager = SrvManager::GetInstance();
+	forceFieldSrvIndex_ = srvManager->Allocate();
+	srvManager->CreateSRVforStructuredBuffer(
+		forceFieldSrvIndex_,
+		forceFieldResource_.Get(),
+		static_cast<UINT>(kMaxForceFields),
+		sizeof(ForceFieldForGPU)
+	);
+	forceFieldSrvHandle_ = srvManager->GetGPUDescriptorHandle(forceFieldSrvIndex_);
+}
+
+/// <summary>
+/// フォースフィールドパラメータを GPU バッファへ転送
+/// </summary>
+void GPUEmitter::SetForceFields(const std::vector<GpuForceFieldParams>& fields, const Vector3& baseOffset)
+{
+	if (!forceFieldData_) return;
+
+	// 有効なフィールドだけを先頭から詰めて転送（CS は forceFieldCount 個を順に読むため）
+	uint32_t written = 0;
+	for (const auto& src : fields) {
+		if (!src.isEnable) continue;
+		if (written >= kMaxForceFields) break;
+
+		auto& dst = forceFieldData_[written];
+		dst.shape           = static_cast<uint32_t>(src.shape);
+		dst.center          = baseOffset + src.center;
+		dst.halfExtents     = src.halfExtents;
+		dst.radius          = src.radius;
+		dst.mode            = static_cast<uint32_t>(src.mode);
+		dst.direction       = src.direction;
+		dst.strength        = src.strength;
+		dst.falloff         = src.falloff;
+		dst.spiralStrengthMin  = src.spiralStrengthMin;
+		dst.spiralStrengthMax  = src.spiralStrengthMax;
+		dst.randomAxisBlend    = src.randomAxisBlend;
+		dst.orbitHoldRatio     = src.orbitHoldRatio;
+		dst.approachVariance   = src.approachVariance;
+		dst.maxSpeed           = src.maxSpeed;
+		dst.killRadius         = src.killRadius;
+		dst.isEnable           = 1u;
+		dst.pad2[0] = dst.pad2[1] = 0.f;
+		written++;
+	}
+	forceFieldCount_ = written;
+}
+
+/// <summary>
 /// モデルからメッシュ三角形情報を収集してGPUバッファへ転送
 /// </summary>
 void GPUEmitter::UpdateMeshTriangleData(Model* model)
@@ -612,6 +671,17 @@ void GPUEmitter::Dispatch()
 		D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
 		D3D12_RESOURCE_STATE_UNORDERED_ACCESS
 	);
+	// SoA warm/cold も Emit で書き込むため UAV へ
+	dx->TransitionBarrier(
+		gpuParticle_->GetWarmResource(),
+		D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+		D3D12_RESOURCE_STATE_UNORDERED_ACCESS
+	);
+	dx->TransitionBarrier(
+		gpuParticle_->GetColdResource(),
+		D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+		D3D12_RESOURCE_STATE_UNORDERED_ACCESS
+	);
 
 	dx->TransitionBarrier(
 		gpuParticle_->GetFreeListIndexResource(),
@@ -653,6 +723,9 @@ void GPUEmitter::Dispatch()
 	cmd->SetComputeRootDescriptorTable(9, gpuParticle_->GetFreeListIndexUavHandleGPU());
 	cmd->SetComputeRootDescriptorTable(10, gpuParticle_->GetFreeListUavHandleGPU());
 	cmd->SetComputeRootDescriptorTable(11, gpuParticle_->GetActiveCountUavHandleGPU());
+	// SoA warm(u4)/cold(u5) — Emit は3バッファすべて書き込む
+	cmd->SetComputeRootDescriptorTable(13, gpuParticle_->GetWarmUavHandleGPU());
+	cmd->SetComputeRootDescriptorTable(14, gpuParticle_->GetColdUavHandleGPU());
 
 	//-----------------------------------------
 	// Mesh用のSRV設定（新規追加）
@@ -703,6 +776,16 @@ void GPUEmitter::Dispatch()
 	//-----------------------------------------
 	dx->TransitionBarrier(
 		gpuParticle_->GetParticleResource(),
+		D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+		D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER
+	);
+	dx->TransitionBarrier(
+		gpuParticle_->GetWarmResource(),
+		D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+		D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER
+	);
+	dx->TransitionBarrier(
+		gpuParticle_->GetColdResource(),
 		D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
 		D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER
 	);
@@ -775,75 +858,6 @@ void GPUEmitter::UpdateEmitters()
 	}
 	}
 }
-void GPUEmitter::UpdateEmitterTrail()
-{
-	// ================================
-	// Trail の適用
-	// ================================
-	auto& trail = trail_;
-	if (!trail.isTrail) return;
-
-	// 今のエミッター位置
-	Vector3 current = GetEmitterPosition();
-
-	// まだ基準位置が無いなら「覚えるだけ」で終わり（出さない）
-	if (!trailHasLast_) {
-		trailLastPos_ = current;
-		trailHasLast_ = true;
-		return;
-	}
-
-	// 前回からどれくらい動いたか
-	Vector3 delta = current - trailLastPos_;
-	float dist = Length(delta);
-
-	// 全く動いてないなら出さない
-	if (dist <= 0.0f) {
-		return;
-	}
-
-	// -------------------------------
-	// しきい値 0 以下 → 「ちょっとでも動いたら出す」モード
-	// -------------------------------
-	if (trail.minDistance <= 0.0f) {
-		EmitAtPosition(current, trail.emissionCount);
-		trailLastPos_ = current;
-
-		if (trail.lifeTime > 0.0f) {
-			particleParameters_->lifeTime = trail.lifeTime;
-		}
-		return;
-	}
-
-	// -------------------------------
-	// 通常モード：一定距離ごとに出す
-	// -------------------------------
-	if (dist < trail.minDistance) {
-		// まだ閾値未満なので何もしない
-		return;
-	}
-
-	// 高速移動対策：dist が大きい場合は補間して複数発生
-	int steps = static_cast<int>(dist / trail.minDistance);
-	if (steps < 1) {
-		steps = 1;
-	}
-
-	Vector3 step = delta / static_cast<float>(steps);
-	Vector3 pos = trailLastPos_;
-
-	for (int i = 0; i < steps; ++i) {
-		pos += step;
-		EmitAtPosition(pos, trail.emissionCount);
-	}
-
-	trailLastPos_ = current;
-
-	if (trail.lifeTime > 0.0f) {
-		particleParameters_->lifeTime = trail.lifeTime;
-	}
-}
-
 void GPUEmitter::SetParticleMesh(ParticleMeshShape shape, const ParticleMeshParams& p)
 {
 	if (!gpuParticle_) return;

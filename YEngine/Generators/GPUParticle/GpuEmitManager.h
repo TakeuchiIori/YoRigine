@@ -17,6 +17,7 @@
 
 // JSON
 #include <json.hpp>
+#include "Loaders/Json/Use/AutoJson.h"   // フィールド登録だけで Save/Load するユーティリティ
 
 #ifdef USE_IMGUI
 #include <imgui.h>
@@ -86,8 +87,8 @@ namespace YoRigine {
 			// パーティクルパラメータ
 			ParticleParams particleParams;
 
-			// エミッタートレイルパラメータ
-			EmitterTrailParams trailParams;
+			// フォースフィールド（最大 kMaxForceFields 個）
+			std::vector<GpuForceFieldParams> forceFields;
 
 			// 1粒子として描画するメッシュ形状＋その生成パラメータ
 			ParticleMeshShape particleMeshShape = ParticleMeshShape::Plane;
@@ -203,6 +204,8 @@ namespace YoRigine {
 		void DrawEmitterGizmos();
 		// 単一エミッタの形状をラインとして gizmoLine_ に登録
 		void RegisterEmitterGizmo(const EmitterData* emitterData, const Vector3& worldPos);
+		// 単一エミッタのフォースフィールド範囲をラインとして gizmoLine_ に登録
+		void RegisterForceFieldGizmos(const EmitterData* emitterData, const Vector3& groupOrigin);
 #endif
 
 		// グループ内の最大パーティクル寿命（発生停止後の linger 時間の見積りに使う）
@@ -228,6 +231,19 @@ namespace YoRigine {
 		bool LoadEmitterFromJson(const std::string& groupName, const nlohmann::json& j);
 		void ScanTextureDirectory(const std::string& directory);
 		void ScanJsonDirectory(const std::string& directory);
+
+		///************************* エミッタのシリアライズ（AutoJson集約） *************************///
+		// 1つのエミッタの全シリアライズ対象を AutoJson ツリーに束ねる。
+		// 調整パラメータを増やすときは、この関数へ .Add() を1行足すだけで
+		// 保存・読込の両方に反映される（列挙の重複を排除する単一の情報源）。
+		// root と各グループ用 AutoJson は呼び出し側がローカルに持ち、Save/Load 中は生存させる。
+		void BuildEmitterSchema(EmitterData& e,
+			AutoJson& root, AutoJson& sphere, AutoJson& box, AutoJson& tri,
+			AutoJson& cone, AutoJson& mesh, AutoJson& particle, AutoJson& particleMesh) const;
+		// エミッタ1つ → JSON（model ポインタだけは名前で特別扱い）
+		nlohmann::json SerializeEmitter(EmitterData& e) const;
+		// JSON → エミッタ1つ（生成済みの e に流し込む。model は名前から解決）
+		void DeserializeEmitter(EmitterData& e, const nlohmann::json& j) const;
 	private:
 		///************************* メンバ変数 *************************///
 		Camera* camera_ = nullptr;

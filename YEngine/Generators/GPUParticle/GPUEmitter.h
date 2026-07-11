@@ -58,7 +58,6 @@ struct ParticleMeshParams
 };
 
 
-struct TrailParams;
 /// <summary>
 /// エミッタークラス
 /// </summary>
@@ -129,10 +128,37 @@ public:
 
 	__declspec(align(16))
 		struct PerFrameData {
-		float time;
-		float deltaTime;
-		float padding[2];
+		float    time;
+		float    deltaTime;
+		uint32_t forceFieldCount; // 有効なフォースフィールド数 (UpdateCS の PerFrame と同一レイアウト)
+		float    pad;
 	};
+	static_assert(sizeof(PerFrameData) == 16, "PerFrameData must be 16 bytes");
+
+	// GPU フォースフィールド (HLSL GpuForceField と同一レイアウト = 96 bytes)
+	__declspec(align(16))
+	struct ForceFieldForGPU {
+		uint32_t shape;        // GpuFieldShape
+		Vector3  center;       // 16
+		Vector3  halfExtents;  // 12
+		float    radius;       // 32
+		uint32_t mode;         // GpuFieldMode
+		Vector3  direction;    // 48
+		float    strength;
+		float    falloff;
+		float    spiralStrengthMin;
+		float    spiralStrengthMax; // 64
+		float    randomAxisBlend;
+		float    orbitHoldRatio;
+		float    approachVariance;
+		float    maxSpeed;          // 80
+		float    killRadius;
+		uint32_t isEnable;
+		float    pad2[2];           // 96
+	};
+	static_assert(sizeof(ForceFieldForGPU) == 96, "ForceFieldForGPU must be 96 bytes");
+
+	static const uint32_t kMaxForceFields = 4; // 1エミッタあたりの最大フォースフィールド数
 
 	// メッシュエミッター
 	__declspec(align(16))
@@ -262,6 +288,10 @@ public:
 	// パーティクルパラメータ設定
 	void SetParticleParameters(const ParticleParams& params);
 
+	// フォースフィールド設定（最大 kMaxForceFields 個。空の場合はフィールド無効）
+	// baseOffset: グループ原点などのワールドオフセット。center に加算して GPU へ送る
+	void SetForceFields(const std::vector<GpuForceFieldParams>& fields, const Vector3& baseOffset = {});
+
 	// 1粒子として描画するメッシュ形状を差し替える（形状＋生成パラメータ）
 	void SetParticleMesh(ParticleMeshShape shape, const ParticleMeshParams& params);
 	ParticleMeshShape GetParticleMeshShape() const { return particleMeshShape_; }
@@ -285,11 +315,11 @@ private:
 	void CreateParticleParametersResource();
 	void CreatePerFrameResource();
 	void CreateMeshTriangleBuffer();
+	void CreateForceFieldBuffer();
 	void UpdateMeshTriangleData(Model* model);
 	void Dispatch();
 
 	void UpdateEmitters();
-	void UpdateEmitterTrail();
 
 public:
 	///************************* アクセッサ *************************///
@@ -298,7 +328,6 @@ public:
 	MeshEmitMode GetCurrentMeshMode() const { return currentMeshMode_; }
 	Vector3 GetEmitterPosition() const;
 
-	void SetTrailParams(const EmitterTrailParams& params) { trail_ = params; };
 	void SetCamera(Camera* camera);
 private:
 	///************************* メンバ変数 *************************///
@@ -344,9 +373,13 @@ private:
 	Model* currentMeshModel_ = nullptr;
 	float timeScalelastEmit_ = 0.0f;
 
-	EmitterTrailParams trail_;
+	// フォースフィールド関連
+	Microsoft::WRL::ComPtr<ID3D12Resource> forceFieldResource_;
+	ForceFieldForGPU* forceFieldData_ = nullptr;
+	uint32_t forceFieldSrvIndex_ = 0;
+	D3D12_GPU_DESCRIPTOR_HANDLE forceFieldSrvHandle_ = {};
+	uint32_t forceFieldCount_ = 0;
+
 	Vector3 lastEmitWorldPos_{};
 	bool hasLastEmitWorldPos_ = false;
-	Vector3 trailLastPos_{};   // 実行状態
-	bool    trailHasLast_ = false;
 };

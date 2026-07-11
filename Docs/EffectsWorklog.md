@@ -4,6 +4,111 @@ YParticle / VFX 関連の作業を時系列で記録する。方針: **A: facade
 
 ---
 
+## 2026-07-12 — GPUパーティクル: インダイレクト描画化（生存粒子だけ描画・Debug/Releaseビルド成功・実機未検証）
+
+kMaxParticles を500万に上げたら FPS が40に低下。原因は **描画が `DrawIndexedInstanced(indexCount, kMaxParticles)` で毎フレーム最大数固定**＝生存数に関係なく500万インスタンス分VSが走り、死粒も頂点算出→カリングしていたため（FreeListがバッファ末尾から払い出すので生存粒子は全体に散在し「先頭N個だけ描画」の短縮も不可）。→ **生存粒子のスロット番号だけをコンパクトリスト化し `DrawIndexedInstancedIndirect` で生存数ぶんだけ描画**へ変更。描画コストが O(最大数) → O(生存数) になる。
+
+### 設計（リスク最小版: 追記は Update CS のみ）
+- 生存粒子の追記は **Update CS 1箇所だけ**が行う。Emit/Trail で今フレーム新規発生した粒子は**次フレームの Update で拾われて描画**（1フレーム遅延だが粒子は数フレーム生きるので不可視）。これにより Emit CS / Emit RS / Emitディスパッチ は無改修＝リスク大幅減。
+- 描画引数は `D3D12_DRAW_INDEXED_ARGUMENTS`(5 uint) を GPU バッファに置き、`[1]=InstanceCount` を Update CS が `InterlockedAdd` で数え上げる（＝生存数）。
+
+### 変更
+- **新規バッファ（GPUParticle）**: `drawListResource_`(uint[max] 生存スロット番号・UAV u6＋SRV t2) / `drawArgsResource_`(5 uint・UAV u7・間接引数) ＋ `drawIndirectCmdSig_`(コマンドシグネチャ, DRAW_INDEXED)。`CreateDrawIndirectResources()` で生成。
+- **新規 `ResetDrawArgs.CS.hlsl`＋`ResetDrawArgsCS` RS/PSO**（ComputeShaderManager）: 1スレッドで毎フレーム引数を初期化（IndexCount=索引数[root定数]、InstanceCount=0）。
+- **`UpdateParticle.CS.hlsl`**: `g_DrawList`(u6)/`g_DrawArgs`(u7) 追加。生存分岐の書き戻し後に `InterlockedAdd(g_DrawArgs[1],1,idx); g_DrawList[idx]=particleIndex;` で追記。
+- **`ParticleUpdateCS` RS**: drawList(u6)/drawArgs(u7) の2 UAV を末尾追加（9→11 params）。TrailSpawn は共用RSだが u6/u7 未使用でOK。
+- **`GPUParticle.VS.hlsl`**: `g_DrawList`(t2) 追加。`instanceID`→実スロット変換して hot/warm を引く。生存分だけ描くので isActive カリング撤去。
+- **`GPUParticle::DispatchUpdate`**: 冒頭で drawList/drawArgs を UAV へ遷移→ResetDrawArgsCS を Dispatch(1,1,1)→UAVバリア→Update CS で drawList/drawArgs をバインド。
+- **`GPUParticle::Draw`**: drawList→VERTEX(VS読み取り) / drawArgs→INDIRECT_ARGUMENT へ遷移し `ExecuteIndirect(cmdSig, 1, drawArgs, ...)`。旧 `DrawIndexedInstanced(…, kMaxParticles)` を置換。
+- **`DispatchInit`**: drawList→VERTEX / drawArgs→INDIRECT の静止状態を確定（中身は毎フレーム作り直す）。
+- 状態サイクル: Init(静止) → Update冒頭で UAV → 追記 → Draw で VERTEX/INDIRECT。既存の hot バッファの VERTEX↔UAV と同形。
+
+### 検証
+- **MSBuild Debug＋Release x64 成功（0 error / 0 warning）**。
+- ⏳ **実機未検証（要ユーザーテスト）**: (1)500万設定でも**生存数が少なければFPSが回復**するか（本命の狙い）、(2)粒子が正しく表示されるか（DrawList間接参照・コマンドシグネチャ）、(3)デバイスロスト/#xxx デバッグレイヤーエラーが出ないか（特に drawArgs の INDIRECT_ARGUMENT 遷移）、(4)Emit直後の粒子が1フレーム遅れて出ることの体感（バースト/短寿命で気になるか。気になるなら Emit/Trail 側にも追記を足す拡張余地あり）、(5)トレイル子粒子も正しく描画されるか。
+- ロールバック: 未コミット。`git checkout -- .` ＋ 新規 `ResetDrawArgs.CS.hlsl` 削除で戻る。
+
+### 残・拡張余地
+- 1フレーム遅延が問題なら Emit CS / SpawnTrail CS にも同じ追記（u6/u7バインド＋InterlockedAdd）を足せば即時描画になる（Emit RSに2 UAV追加が必要）。
+- **Update スキャン自体はまだ O(最大数)**（500万スロットを毎フレーム走査）。描画は生存数に比例化したが、更新の走査コストは残る。生存数ベースの更新にするには生存スロットの永続リスト管理が必要（今回スコープ外）。実測で更新が重ければ次段で検討。
+
+---
+
+## 2026-07-12 — GPUパーティクルをAoS→SoA(hot/warm/cold)化 C++側を完成（Debug/Releaseビルド成功・警告0・実機未検証）
+
+前回シェーダ側だけ先行してSoA化していた（hot=u0/warm=u4/cold=u5）が、C++・描画VS・ルートシグネチャが旧AoSのまま残りビルド不能な途中状態だったのを、C++側を仕上げて全体を整合させた。SoAの狙いは **Update CS が毎フレーム触るのを hot(48B) だけに絞り帯域を削る**こと（従来AoS 176B）。scale/color は保存せず startScale/endScale・startColor/endColor から `lifeRatio` で lerp 導出（Update/VS/Trailで同一式）。cold(lastTranslate/isParent)はトレイル生成のみが読む。
+
+### 分割レイアウト（C++⇔HLSL 1:1、static_assertでサイズ固定）
+- **ParticleHot 48B**: translate/rotate, velocity/lifeTime, currentTime/isActive/pad — Update が毎フレーム read-modify-write、VS も読む。
+- **ParticleWarm 64B**: startScale/endScale/startColor/endColor — Emit時確定・寿命中不変。VSが scale/color 導出に読む。
+- **ParticleCold 16B**: lastTranslate/isParent — トレイル生成専用。Update/描画は触らない。
+
+### C++変更
+- **GPUParticle.h**: 旧 `ParticleCSForGPU`(176B) を削除し `ParticleHotGPU`/`ParticleWarmGPU`/`ParticleColdGPU` の3構造体＋static_assert。warm/coldのResource/UAV index+handle、warm SRV(描画t1)を追加。
+- **GPUParticle.cpp**: `CreateUAV` で hot/warm/cold の3バッファ+UAV(u0/u4/u5)生成。`CreateGPUParticleResource` で hot(t0)+warm(t1) の2SRV作成（VSが導出に使う）。`DispatchInit`/`DispatchUpdate` で warm/cold のバリア+バインド追加。`Draw` は `g_Hot`/`g_Warm` の2SRVをバインド。kMaxParticles 16384→65536（SoAで1粒あたり176→128Bに減り総容量ほぼ据え置きで4倍確保）。
+- **GPUParticle.VS.hlsl**: `StructuredBuffer<Particle>` を廃し hot(t0)+warm(t1) を読み、scale/color を lerp 導出。描画RSはリフレクション自動生成なので `g_Hot`/`g_Warm` を宣言するだけで追従。
+- **ComputeShaderManager.cpp**: Init/Emit/Update の3ルートシグネチャに warm(u4)/cold(u5) のUAVレンジ+ルートパラメータを追加（Init: 4→6params, Emit: 13→15, Update: 7→9。UpdateはUpdate本体では未使用だが共用するTrailSpawnCSが読み書きするため必須）。
+- **GPUEmitter.cpp**: Emitディスパッチで warm(param13)/cold(param14) をバインド＋前後のUAV状態遷移に warm/cold を追加。
+
+### ついでの修正
+- **AttackEditor.cpp**: Release(USE_IMGUI無し)で `DrawAnimationSelector` の引数が未参照になりC4100→C2220でRelease失敗していた既存問題を `[[maybe_unused]]` で解消（SoAとは無関係だがRelease green化のため）。
+
+### 検証
+- **MSBuild Debug＋Release x64 成功（0 error / 0 warning）**。static_assertでhot/warm/coldのサイズ一致もコンパイル時に担保。
+- ⏳ **実機未検証（シェーダは実行時コンパイルなのでビルドでは検証されない）**: (1)そもそもGPUパーティクルが正しく表示されるか（3バッファSRV/UAVの取り違えが無いか）、(2)scale/colorがlerp導出で従来と同じ見た目か（開始/終了スケール・色の補間）、(3)トレイル（子生成）がwarm/cold経由で正しく出るか、(4)フォースフィールド＆killRadiusが従来通り効くか、(5)長時間再生でFreeListが安定しスロット数が減らないか。
+- ロールバック: 未コミット。`git checkout -- .` ＋ 新規 `SpawnTrailParticle.CS.hlsl`/`GpuEmitterJson.h` 削除で戻る。
+
+### 残
+- `SetParticleParameters` のCPU→GPU marshalling（前回ログの残と同じ）。今回のSoA分割はGPU常駐バッファのレイアウトのみで、パラメータCB側は不変。
+
+---
+
+## 2026-07-11 — GpuEmitManagerのJSON処理をAutoJson集約へリファクタ（Debugビルド成功・警告0）
+
+肥大化（GpuEmitManager.cpp 2620行）と「調整パラメータ追加のたびに保存/読込/GPUコピーの複数箇所を触る」問題への対応。同じフィールド列挙が **ToJsonGroup 158行 + LoadEmitterFromJson 178行 + DrawParticleParametersEditor 455行** の3箇所に重複していたのが根因。
+
+### 方針（ユーザー選択）
+**JSONのみAutoJson化・ImGuiは現状維持**。ImGuiエディタ（範囲付きスライダ/度⇔ラジアン/HDRカラー/条件表示）は作り込み価値が高いのでAutoJsonの汎用UIには置換しない。JSONの重複だけ単一情報源へ集約する。
+
+### 実装
+- **`GpuEmitManager::BuildEmitterSchema(EmitterData&, AutoJson& root, ...)`** 新設: 1エミッタの全シリアライズ対象を `AutoJson.Add(key, &field)` で1箇所に登録（保存・読込の単一情報源）。**調整パラメータ追加は今後この関数に1行足すだけ**で保存・読込の両方へ反映される。key名は既存JSONと厳密一致（child.* は "trailXxx" にフラット化）で後方互換維持。
+- **`SerializeEmitter`/`DeserializeEmitter`**: root+各グループ用AutoJsonをローカルに構築→`Save(j)`/`Load(j)`。`ToJsonGroup` のエミッタループは `push_back(SerializeEmitter(*e))` の1行に（158→29行）。`LoadEmitterFromJson` は name/shape/textureだけ先読み（CreateEmitterに必要）→`DeserializeEmitter` 1発（178→約25行）。
+- **`GpuEmitterJson.h`** 新設: `GpuForceFieldParams` の to_json/from_json をここ1箇所に定義（from_jsonは `value()` で欠損キー既定値＝後方互換）。AutoJsonが `Add("forceFields", &vector)` でフォースフィールド配列ごと保存/読込できるようになり、旧来の手書きループ（各16項目×2）を排除。
+- **Model* の特別扱い**: ポインタはAutoJson不可なので `meshParams.modelName` だけ手書き2行（save=model->GetName()、load=FindModelで解決）。schema外の唯一の例外として明示コメント。
+- enum(shape/mode/emitMode/particleMeshShape) は nlohmann標準のenum→int変換で既存の int 表現を維持。Vector/Quaternion は ConversionJson.h の to_json/from_json を利用。
+
+### 結果
+- GpuEmitManager.cpp 2620→2441行。重複列挙~280行が単一スキーマ75行＋薄いラッパへ集約。
+- 既存2アセット（emitters.json/emrs.json）はキー完全一致＋欠損既定値で読める想定。**実機での往復（load→編集→save→再load）確認をお願いしたい。**
+
+### 残（今回スコープ外）
+- `GPUEmitter::SetParticleParameters` のCPU→GPU構造体コピー（~50行）はパディング付きGPU構造体への手動marshallingで、パラメータ追加時にここも1行増える。AutoJson化は不向き（バイナリレイアウト都合）。必要なら別途マクロ化を検討。
+
+---
+
+## 2026-07-11 — GPUフォースフィールドのバグ修正一式＋エミッタトレイル削除＋フィールド可視化（Debugビルド成功・警告0）
+
+前回実装したGPUフォースフィールドの実機テストで発覚した問題への対応。
+
+### 症状と根本原因
+1. **途中でEmitされなくなる／未使用スロット表示が45億相当の数字に化ける**: `UpdateParticle.CS.hlsl` 内で「死亡処理（FreeListへのPush）」と「トレイル子生成（FreeListからのPop）」が同一ディスパッチ内で並走していた。Popの一時的なマイナス在庫中にPushが走ると `orig >= 0` 判定に落ちて**死んだスロットがどこにも戻らず永久喪失**（Emit不能化）。さらにFreeList競合で同一スロットが二重払い出し→二重死亡→`ActiveCount` がuintアンダーフロー（≈42.9億）し `freeCount = max - active` も化けた。
+2. **粒子トレイルが有効化できない**: エミッタトレイルの「有効化」チェックボックス（`trailParams.isTrail`）と粒子トレイルの「有効化」（`child.isTrail`）が**同一ウィンドウ内でImGui ID衝突**しており、クリックが正しく伝わっていなかった。加えて粒子トレイルのDragFloat群が `changed |=` されておらず、**値を変えてもGPUに転送されない**バグも併発。
+
+### 対応
+- **トレイル子生成を専用CSパスに分離**: 新規 `Resources/Shaders/Particle/SpawnTrailParticle.CS.hlsl`（Pop専用）。`UpdateParticle.CS.hlsl` からトレイル生成ブロックを削除（Push専用に）。`GPUParticle::DispatchUpdate` で UpdateCS → **UAVバリア4本**（particle/freeListIndex/freeList/activeCount）→ TrailSpawnCS の順に実行。ルートシグネチャは `ParticleUpdateCS` を共用（PSO名 `TrailSpawnCS`、`ComputeShaderManager::CreateParticleUpdateCS` 内で生成）。トレイル無効時はディスパッチ自体をスキップ（`trailEnabled` を `GPUEmitter::Update` から伝搬）。1粒あたり steps を32にクランプ（異常距離でのFreeList食い潰しガード）。子スロット初期化は `isActive=1` を**最後に**書く（初期化途中スロットの誤認防止）。
+- **エミッタ移動トレイル（`EmitterTrailParams`）を機能ごと削除**（ユーザー判断: 使わない）: struct削除、`GPUEmitter::UpdateEmitterTrail`/`SetTrailParams`/`trail_` 削除、`GpuEmitManager` のUI・JSON保存/読込（旧JSONの `"trail"` キーは読み捨て）削除。
+- **ImGui修正**: トレイルUIを「トレイル（粒子が動いた軌跡に子パーティクルを生成）」1セクションに統合、`PushID("ChildTrail")` でID衝突根絶、全ウィジェットに `changed |=` を付けてGPU転送漏れを解消。
+- **stats表示のクランプ**: `GPUParticle::Update` の cachedStats_ 反映で activeCount を `min(値, kMaxParticles)` にクランプ（万一GPU側カウンタが壊れても表示が化けない保険）。
+- **フォースフィールドのLine可視化**（Debug/USE_IMGUI、選択中グループ）: `GpuEmitManager::RegisterForceFieldGizmos` 新設。Sphere=ワイヤ球/AABB=ワイヤボックス（マゼンタ）、`killRadius`=赤の小球、DirectionalAccel=方向ガイド線、Converge/Repel=中心十字マーカー。既存 `DrawEmitterGizmos` のバッチに追加。
+- **フィールドのグループ追従**: `SetForceFields(fields, baseOffset)` に変更し、`GpuEmitManager::Update` で毎フレーム `group->translate + ff.center` をワールド座標として転送（エミッタ位置と同じ追従規則）。ギズモも同座標で描画。
+- **SetForceFields の詰め込みバグ修正**: 無効フィールドが混ざると先頭N個しか読まれずズレる問題→有効なものだけを先頭から圧縮して転送し `forceFieldCount_` = 転送数に。
+
+### 残課題
+- 実機での再確認: トレイル有効時のFreeList安定性（長時間再生でスロット数が減らないこと）、killRadius大量死亡時のカウント一致。
+- フォースフィールドのギズモは「選択中グループのみ」表示。全グループ常時表示が欲しければ `DrawEmitterGizmos` のループを groups_ 全体に広げるだけ。
+
+---
+
 ## 2026-07-05 — VFXエディタ プレビュー操作追加: 剣サイズ / 再生速度 / 発光（Debugビルド成功）
 
 ユーザー要望でトレイルプレビューの調整項目を追加。

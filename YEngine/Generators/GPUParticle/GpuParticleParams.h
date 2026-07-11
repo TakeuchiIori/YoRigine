@@ -1,5 +1,33 @@
 #pragma once
 #include "Vector3.h"
+#include <vector>
+
+// ──── GPU Force Field ──────────────────────────────────────────────────────
+enum class GpuFieldShape : uint32_t { Sphere = 0, AABB = 1 };
+enum class GpuFieldMode  : uint32_t { DirectionalAccel = 0, ConvergeToCenter = 1, RadialRepel = 2 };
+
+struct GpuForceFieldParams {
+	GpuFieldShape shape          = GpuFieldShape::Sphere;
+	Vector3       center         = {};
+	Vector3       halfExtents    = { 5.f, 5.f, 5.f };
+	float         radius         = 5.0f;
+
+	GpuFieldMode  mode           = GpuFieldMode::ConvergeToCenter;
+	Vector3       direction      = { 0.f, 1.f, 0.f };
+	float         strength       = 10.0f;
+
+	float falloff             = 0.5f;
+	float spiralStrengthMin   = 0.0f;
+	float spiralStrengthMax   = 0.0f;
+	float randomAxisBlend     = 0.0f;
+	float orbitHoldRatio      = 0.0f;
+	float approachVariance    = 0.0f;
+	float maxSpeed            = 0.0f;
+	float killRadius          = 0.0f;
+
+	bool isEnable = true;
+};
+// ──────────────────────────────────────────────────────────────────────────
 
 struct ChildParticleParams {
 	bool isTrail = false;      // トレイルを出すか
@@ -45,17 +73,4 @@ struct ParticleParams {
 
 	// トレイル
 	ChildParticleParams child;
-};
-
-struct EmitterTrailParams {
-	// トレイルエミッターにするかどうか
-	bool isTrail = false;
-	// どのくらい移動したら粒を出すか
-	float minDistance = 0.1f;
-	// トレイル専用の寿命（0 の場合は粒の元々の寿命を使用）
-	float lifeTime = 0.0f;
-	// 1回で何粒出すか
-	float emissionCount = 1;
-	// 親のスケールを反映するか
-	bool inheritScale = true;
 };

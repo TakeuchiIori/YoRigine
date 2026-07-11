@@ -13,6 +13,7 @@
 #include <Debugger/Logger.h>
 #include "Systems/GameTime/GameTime.h"
 #include <IconsFontAwesome5.h>
+#include "GpuEmitterJson.h"   // GpuForceFieldParams の to_json/from_json
 
 namespace YoRigine {
 	// ImGui用の形状名一覧
@@ -115,7 +116,8 @@ namespace YoRigine {
 					// グループ原点＋ローカルオフセットをワールド発生位置として毎フレーム反映（追従）
 					emitterData->emitter->SetEmitWorldPosition(
 						groupData->translate + GetEmitterLocalOffset(emitterData.get()));
-					emitterData->emitter->SetTrailParams(emitterData->trailParams);
+					// フォースフィールドもグループ原点に追従させる（center はグループ相対）
+					emitterData->emitter->SetForceFields(emitterData->forceFields, groupData->translate);
 					emitterData->emitter->Update(deltaTime);
 				}
 			}
@@ -175,6 +177,72 @@ namespace YoRigine {
 			RegisterEmitterGizmo(it->second.get(), group->translate + GetEmitterLocalOffset(it->second.get()));
 			gizmoLine_->SetColor({ 1.0f, 0.9f, 0.1f, 1.0f });
 			gizmoLine_->DrawLine();
+		}
+
+		// --- フォースフィールド範囲（マゼンタ）---
+		for (auto& [name, e] : group->emitters) {
+			if (!e) continue;
+			RegisterForceFieldGizmos(e.get(), group->translate);
+		}
+		gizmoLine_->SetColor({ 1.0f, 0.3f, 1.0f, 1.0f });
+		gizmoLine_->DrawLine();
+
+		// --- killRadius（赤・消滅範囲）---
+		for (auto& [name, e] : group->emitters) {
+			if (!e) continue;
+			for (const auto& ff : e->forceFields) {
+				if (!ff.isEnable) continue;
+				if (ff.mode == GpuFieldMode::ConvergeToCenter && ff.killRadius > 0.0001f) {
+					gizmoLine_->DrawSphere(group->translate + ff.center, ff.killRadius, 12);
+				}
+			}
+		}
+		gizmoLine_->SetColor({ 1.0f, 0.15f, 0.15f, 1.0f });
+		gizmoLine_->DrawLine();
+	}
+
+	/// <summary>
+	/// 単一エミッタのフォースフィールド範囲を gizmoLine_ に線分登録（DrawLine は呼び出し側が発行）
+	/// </summary>
+	void GpuEmitManager::RegisterForceFieldGizmos(const EmitterData* e, const Vector3& groupOrigin)
+	{
+		if (!e) return;
+
+		for (const auto& ff : e->forceFields) {
+			if (!ff.isEnable) continue;
+
+			const Vector3 center = groupOrigin + ff.center;
+
+			// フィールドの外形
+			if (ff.shape == GpuFieldShape::Sphere) {
+				gizmoLine_->DrawSphere(center, ff.radius, 16);
+			} else {
+				gizmoLine_->DrawAABB(center - ff.halfExtents, center + ff.halfExtents);
+			}
+
+			// モードの向きが分かるガイド線
+			switch (ff.mode) {
+			case GpuFieldMode::DirectionalAccel:
+			{
+				// 加速方向の矢印
+				Vector3 d = ff.direction;
+				float len = std::sqrt(d.x * d.x + d.y * d.y + d.z * d.z);
+				d = (len < 1e-4f) ? Vector3{ 0.0f, 1.0f, 0.0f } : d * (1.0f / len);
+				const float guide = (ff.shape == GpuFieldShape::Sphere) ? ff.radius : ff.halfExtents.y;
+				gizmoLine_->RegisterLine(center, center + d * guide);
+				break;
+			}
+			case GpuFieldMode::ConvergeToCenter:
+			case GpuFieldMode::RadialRepel:
+			{
+				// 中心マーカー（十字）
+				const float m = 0.3f;
+				gizmoLine_->RegisterLine(center - Vector3{ m, 0, 0 }, center + Vector3{ m, 0, 0 });
+				gizmoLine_->RegisterLine(center - Vector3{ 0, m, 0 }, center + Vector3{ 0, m, 0 });
+				gizmoLine_->RegisterLine(center - Vector3{ 0, 0, m }, center + Vector3{ 0, 0, m });
+				break;
+			}
+			}
 		}
 	}
 
@@ -260,6 +328,7 @@ namespace YoRigine {
 		auto* emitter = emitterData->emitter.get();
 		auto& params = emitterData->particleParams;
 		emitter->SetParticleParameters(params);
+		// フォースフィールドは Update() で毎フレーム（グループ原点込みで）転送する
 	}
 
 	/// <summary>
@@ -834,26 +903,18 @@ namespace YoRigine {
 				ImGui::PopStyleColor();
 			}
 			ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
-			if (ImGui::CollapsingHeader("トレイル", ImGuiTreeNodeFlags_None))
+			if (ImGui::CollapsingHeader("トレイル（粒子が動いた軌跡に子パーティクルを生成）", ImGuiTreeNodeFlags_None))
 			{
 				ImGui::PopStyleColor();
-				if (ImGui::CollapsingHeader("エミッター自身のトレイル設定")) {
-					changed |= ImGui::Checkbox("有効化", &emitterData->trailParams.isTrail);
-					changed |= ImGui::Checkbox("エミッターのスケールを継承", &emitterData->trailParams.inheritScale);
-					ImGui::DragFloat("トレイル生成距離", &emitterData->trailParams.minDistance, 0.01f, 0.0f, 1000.0f);
-					ImGui::DragFloat("トレイル寿命", &emitterData->trailParams.lifeTime, 0.01f, 0.0f, 1000.0f);
-					ImGui::DragFloat("生成パーティクル数", &emitterData->trailParams.emissionCount, 1.0f, 1.0f, 100000.0f);
-				}
-
-				if (ImGui::CollapsingHeader("パーティクル自身のトレイル設定")) {
-					changed |= ImGui::Checkbox("有効化",&emitterData->particleParams.child.isTrail);
-					changed |= ImGui::Checkbox("親のスケールを継承", &emitterData->particleParams.child.isInheritScale);
-					ImGui::DragFloat("寿命", &emitterData->particleParams.child.lifeTime, 0.1f, 5.0f);
-					ImGui::DragFloat("生成距離", &emitterData->particleParams.child.minDistance, 0.01f, 0.01f, 1000.0f);
-					ImGui::DragFloat("開始スケール", &emitterData->particleParams.child.startScale, 0.01f, 0.01f, 100.0f);
-					ImGui::DragFloat("終了スケール", &emitterData->particleParams.child.endScale, 0.01f, 0.0f, 100.0f);
-					ImGui::DragInt("パーティクル生成数",&emitterData->particleParams.child.emissionCount, 1.0f, 10000);
-				}
+				ImGui::PushID("ChildTrail");
+				changed |= ImGui::Checkbox("有効化", &emitterData->particleParams.child.isTrail);
+				changed |= ImGui::Checkbox("親のスケールを継承", &emitterData->particleParams.child.isInheritScale);
+				changed |= ImGui::DragFloat("寿命", &emitterData->particleParams.child.lifeTime, 0.01f, 0.01f, 30.0f);
+				changed |= ImGui::DragFloat("生成距離", &emitterData->particleParams.child.minDistance, 0.01f, 0.01f, 1000.0f);
+				changed |= ImGui::DragFloat("開始スケール", &emitterData->particleParams.child.startScale, 0.01f, 0.01f, 100.0f);
+				changed |= ImGui::DragFloat("終了スケール", &emitterData->particleParams.child.endScale, 0.01f, 0.0f, 100.0f);
+				changed |= ImGui::DragInt("1回の生成数", &emitterData->particleParams.child.emissionCount, 1.0f, 1, 100);
+				ImGui::PopID();
 			} else {
 				ImGui::PopStyleColor();
 			}
@@ -871,6 +932,55 @@ namespace YoRigine {
 			// 未実装
 			ImGui::PopStyleColor(3);
 			ImGui::PopStyleVar(2);
+		}
+
+		// ===== フォースフィールド =====
+		ImGui::Spacing();
+		ImGui::Separator();
+		if (ImGui::CollapsingHeader("フォースフィールド")) {
+			const char* shapeNames[] = { "Sphere", "AABB" };
+			const char* modeNames[]  = { "DirectionalAccel", "ConvergeToCenter", "RadialRepel" };
+
+			auto& ffs = emitterData->forceFields;
+			for (int i = 0; i < static_cast<int>(ffs.size()); i++) {
+				auto& ff = ffs[i];
+				ImGui::PushID(i);
+				char label[64];
+				snprintf(label, sizeof(label), "Field %d###FF%d", i, i);
+				if (ImGui::TreeNode(label)) {
+					changed |= ImGui::Checkbox("有効", &ff.isEnable);
+					int shapeIdx = static_cast<int>(ff.shape);
+					if (ImGui::Combo("形状", &shapeIdx, shapeNames, 2)) { ff.shape = static_cast<GpuFieldShape>(shapeIdx); changed = true; }
+					changed |= ImGui::DragFloat3("中心", &ff.center.x, 0.1f);
+					if (ff.shape == GpuFieldShape::Sphere)
+						changed |= ImGui::DragFloat("半径", &ff.radius, 0.1f, 0.1f, 100.f);
+					else
+						changed |= ImGui::DragFloat3("半サイズ(AABB)", &ff.halfExtents.x, 0.1f, 0.1f, 100.f);
+					int modeIdx = static_cast<int>(ff.mode);
+					if (ImGui::Combo("モード", &modeIdx, modeNames, 3)) { ff.mode = static_cast<GpuFieldMode>(modeIdx); changed = true; }
+					if (ff.mode == GpuFieldMode::DirectionalAccel)
+						changed |= ImGui::DragFloat3("方向", &ff.direction.x, 0.01f, -1.f, 1.f);
+					changed |= ImGui::DragFloat("強度", &ff.strength, 0.1f, 0.0f, 500.f);
+					changed |= ImGui::DragFloat("距離減衰(falloff)", &ff.falloff, 0.01f, 0.0f, 1.f);
+					if (ff.mode == GpuFieldMode::ConvergeToCenter) {
+						changed |= ImGui::DragFloat("螺旋Min", &ff.spiralStrengthMin, 0.01f, 0.0f, 10.f);
+						changed |= ImGui::DragFloat("螺旋Max", &ff.spiralStrengthMax, 0.01f, 0.0f, 10.f);
+						changed |= ImGui::DragFloat("ランダム軸ブレンド", &ff.randomAxisBlend, 0.01f, 0.0f, 1.f);
+						changed |= ImGui::DragFloat("軌道保持率", &ff.orbitHoldRatio, 0.01f, 0.0f, 1.f);
+						changed |= ImGui::DragFloat("収束遅延ばらつき", &ff.approachVariance, 0.01f, 0.0f, 1.f);
+						changed |= ImGui::DragFloat("killRadius", &ff.killRadius, 0.01f, 0.0f, 20.f);
+					}
+					changed |= ImGui::DragFloat("最大速度(0=無制限)", &ff.maxSpeed, 0.1f, 0.0f, 200.f);
+					if (ImGui::Button("削除")) { ffs.erase(ffs.begin() + i); changed = true; ImGui::TreePop(); ImGui::PopID(); break; }
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
+			if (static_cast<int>(ffs.size()) < static_cast<int>(GPUEmitter::kMaxForceFields)) {
+				if (ImGui::Button("+ フィールド追加")) { ffs.emplace_back(); changed = true; }
+			} else {
+				ImGui::TextDisabled("最大 %u 個まで", GPUEmitter::kMaxForceFields);
+			}
 		}
 
 		return changed;
@@ -2063,6 +2173,107 @@ namespace YoRigine {
 	/// <summary>
 	/// 単一グループを JSON 化（グループ単位保存・全体保存の両方から使う）
 	/// </summary>
+	/// <summary>
+	/// 1エミッタの全シリアライズ対象を AutoJson ツリーへ登録する（保存・読込の単一情報源）。
+	/// 調整パラメータを増やすときはここに .Add() を1行足すだけ。
+	/// key 名は既存JSONと一致させ後方互換を保つ（child.* は "trailXxx" にフラット化）。
+	/// </summary>
+	void GpuEmitManager::BuildEmitterSchema(EmitterData& e,
+		AutoJson& root, AutoJson& sphere, AutoJson& box, AutoJson& tri,
+		AutoJson& cone, AutoJson& mesh, AutoJson& particle, AutoJson& particleMesh) const
+	{
+		auto& sp = e.sphereParams;
+		sphere.Add("translate", &sp.translate).Add("radius", &sp.radius)
+			.Add("count", &sp.count).Add("emitInterval", &sp.emitInterval);
+
+		auto& bp = e.boxParams;
+		box.Add("translate", &bp.translate).Add("size", &bp.size)
+			.Add("count", &bp.count).Add("emitInterval", &bp.emitInterval);
+
+		auto& tp = e.triangleParams;
+		tri.Add("v1", &tp.v1).Add("v2", &tp.v2).Add("v3", &tp.v3)
+			.Add("count", &tp.count).Add("emitInterval", &tp.emitInterval);
+
+		auto& cp = e.coneParams;
+		cone.Add("translate", &cp.translate).Add("direction", &cp.direction)
+			.Add("radius", &cp.radius).Add("height", &cp.height)
+			.Add("count", &cp.count).Add("emitInterval", &cp.emitInterval);
+
+		// meshParams: model ポインタだけは名前で特別扱いするため schema には含めない
+		auto& mp = e.meshParams;
+		mesh.Add("translate", &mp.translate).Add("scale", &mp.scale)
+			.Add("rotation", &mp.rotation).Add("count", &mp.count)
+			.Add("emitInterval", &mp.emitInterval).Add("emitMode", &mp.emitMode);
+
+		// particleParams: child(トレイル) は "trailXxx" にフラット化して既存JSON互換
+		auto& pp = e.particleParams;
+		particle.Add("lifeTime", &pp.lifeTime).Add("lifeTimeVariance", &pp.lifeTimeVariance)
+			.Add("startScale", &pp.startScale).Add("startScaleVariance", &pp.startScaleVariance)
+			.Add("endScale", &pp.endScale).Add("endScaleVariance", &pp.endScaleVariance)
+			.Add("rotation", &pp.rotation).Add("rotationVariance", &pp.rotationVariance)
+			.Add("rotationSpeed", &pp.rotationSpeed).Add("rotationSpeedVariance", &pp.rotationSpeedVariance)
+			.Add("velocity", &pp.velocity).Add("velocityVariance", &pp.velocityVariance)
+			.Add("startColor", &pp.startColor).Add("startColorVariance", &pp.startColorVariance)
+			.Add("endColor", &pp.endColor).Add("endColorVariance", &pp.endColorVariance)
+			.Add("gravity", &pp.gravity).Add("isBillboard", &pp.isBillboard)
+			.Add("isTrail", &pp.child.isTrail).Add("isInheritScale", &pp.child.isInheritScale)
+			.Add("trailLifeTime", &pp.child.lifeTime).Add("trailEmissionCount", &pp.child.emissionCount)
+			.Add("trailMinDistance", &pp.child.minDistance)
+			.Add("trailStartScale", &pp.child.startScale).Add("trailEndScale", &pp.child.endScale);
+
+		auto& pm = e.particleMeshParams;
+		particleMesh.Add("width", &pm.width).Add("height", &pm.height).Add("depth", &pm.depth)
+			.Add("outerRadius", &pm.outerRadius).Add("innerRadius", &pm.innerRadius)
+			.Add("radius", &pm.radius).Add("angleDegree", &pm.angleDegree)
+			.Add("divide", &pm.divide).Add("subdivisions", &pm.subdivisions);
+
+		// ルート: スカラ + enum + フォースフィールド配列 + 各グループ
+		root.Add("name", &e.name).Add("shape", &e.shape)
+			.Add("isActive", &e.isActive).Add("textureFilePath", &e.texturePath)
+			.Add("particleMeshShape", &e.particleMeshShape)
+			.Add("forceFields", &e.forceFields);
+		root.AddGroup("sphereParams", sphere)
+			.AddGroup("boxParams", box)
+			.AddGroup("triangleParams", tri)
+			.AddGroup("coneParams", cone)
+			.AddGroup("meshParams", mesh)
+			.AddGroup("particleParams", particle)
+			.AddGroup("particleMeshParams", particleMesh);
+	}
+
+	/// <summary>
+	/// エミッタ1つ → JSON。model ポインタだけは名前(modelName)で書き出す特別扱い。
+	/// </summary>
+	nlohmann::json GpuEmitManager::SerializeEmitter(EmitterData& e) const
+	{
+		AutoJson root, sphere, box, tri, cone, mesh, particle, particleMesh;
+		BuildEmitterSchema(e, root, sphere, box, tri, cone, mesh, particle, particleMesh);
+
+		nlohmann::json j;
+		root.Save(j);
+		// 特別扱い: Model* はポインタなので名前で保存（schema 外の唯一の項目）
+		j["meshParams"]["modelName"] = e.meshParams.model ? e.meshParams.model->GetName() : "";
+		return j;
+	}
+
+	/// <summary>
+	/// JSON → 生成済みエミッタ。model は modelName から解決する。
+	/// </summary>
+	void GpuEmitManager::DeserializeEmitter(EmitterData& e, const nlohmann::json& j) const
+	{
+		AutoJson root, sphere, box, tri, cone, mesh, particle, particleMesh;
+		BuildEmitterSchema(e, root, sphere, box, tri, cone, mesh, particle, particleMesh);
+		root.Load(j);
+
+		// 特別扱い: modelName から Model* を解決
+		if (j.contains("meshParams")) {
+			const std::string modelName = j["meshParams"].value("modelName", std::string{});
+			if (!modelName.empty()) {
+				e.meshParams.model = ModelManager::GetInstance()->FindModel(modelName);
+			}
+		}
+	}
+
 	nlohmann::json GpuEmitManager::ToJsonGroup(const EmitterGroup* groupPtr) const
 	{
 		nlohmann::json groupJson;
@@ -2079,123 +2290,10 @@ namespace YoRigine {
 			groupJson["translate"] = groupPtr->translate;
 			groupJson["emitters"] = nlohmann::json::array(); // グループ内のエミッター配列
 
+			// 各エミッタは AutoJson スキーマ（BuildEmitterSchema）で一括シリアライズ
 			for (const auto& [emitterName, e] : groupPtr->emitters)
 			{
-				nlohmann::json j;
-				//------------------------------------------------------------
-				// 生成時に必要な情報
-				//------------------------------------------------------------
-				j["name"] = e->name;
-				j["shape"] = static_cast<int>(e->shape);
-				j["isActive"] = e->isActive;
-				j["textureFilePath"] = e->texturePath;
-
-				//------------------------------------------------------------
-				// エミッターの形状
-				//------------------------------------------------------------
-				j["sphereParams"] = {
-					{"translate", e->sphereParams.translate},
-					{"radius",    e->sphereParams.radius},
-					{"count",     e->sphereParams.count},
-					{"emitInterval", e->sphereParams.emitInterval}
-				};
-
-				j["boxParams"] = {
-					{"translate", e->boxParams.translate},
-					{"size",      e->boxParams.size},
-					{"count",     e->boxParams.count},
-					{"emitInterval", e->boxParams.emitInterval}
-				};
-
-				j["triangleParams"] = {
-					{"v1", e->triangleParams.v1},
-					{"v2", e->triangleParams.v2},
-					{"v3", e->triangleParams.v3},
-					{"count", e->triangleParams.count},
-					{"emitInterval", e->triangleParams.emitInterval}
-				};
-
-				j["coneParams"] = {
-					{"translate", e->coneParams.translate},
-					{"direction", e->coneParams.direction},
-					{"radius",    e->coneParams.radius},
-					{"height",    e->coneParams.height},
-					{"count",     e->coneParams.count},
-					{"emitInterval", e->coneParams.emitInterval}
-				};
-				j["meshParams"] = {
-					{"modelName", e->meshParams.model ? e->meshParams.model->GetName() : ""},
-					{"translate", e->meshParams.translate},
-					{"scale", e->meshParams.scale},
-					{"rotation", e->meshParams.rotation.x,e->meshParams.rotation.y,e->meshParams.rotation.z,e->meshParams.rotation.w},
-					{"count", e->meshParams.count},
-					{"emitInterval", e->meshParams.emitInterval},
-					{"emitMode", static_cast<int>(e->meshParams.emitMode)}
-				};
-
-
-
-				//------------------------------------------------------------
-				// パーティクルのパラメータ
-				//------------------------------------------------------------
-				j["particleParams"] = {
-					{"lifeTime",    e->particleParams.lifeTime},
-					{"lifeTimeVariance", e->particleParams.lifeTimeVariance},
-
-					{"startScale",          e->particleParams.startScale},
-					{"startScaleVariance",  e->particleParams.startScaleVariance},
-					{"endScale",            e->particleParams.endScale},
-					{"endScaleVariance",    e->particleParams.endScaleVariance},
-
-					{"rotation",               e->particleParams.rotation},
-					{"rotationVariance",       e->particleParams.rotationVariance},
-					{"rotationSpeed",          e->particleParams.rotationSpeed},
-					{"rotationSpeedVariance",  e->particleParams.rotationSpeedVariance},
-
-					{"velocity",         e->particleParams.velocity},
-					{"velocityVariance", e->particleParams.velocityVariance},
-
-					{"startColor",         e->particleParams.startColor},
-					{"startColorVariance", e->particleParams.startColorVariance},
-					{"endColor",           e->particleParams.endColor},
-					{"endColorVariance",   e->particleParams.endColorVariance},
-
-					{"gravity",					e->particleParams.gravity},
-
-					{"isBillboard",				e->particleParams.isBillboard},
-
-					{"isTrail",					e->particleParams.child.isTrail},
-					{"isInheritScale",			e->particleParams.child.isInheritScale},
-					{"trailLifeTime",			e->particleParams.child.lifeTime},
-					{"trailEmissionCount",		e->particleParams.child.emissionCount},
-					{"trailMinDistance",		e->particleParams.child.minDistance},
-					{"trailStartScale",			e->particleParams.child.startScale},
-					{"trailEndScale",			e->particleParams.child.endScale},
-				};
-
-				j["trail"] = {
-				{"enabled", e->trailParams.isTrail},
-				{"minDistance",e->trailParams.minDistance},
-				{"lifeTime",e->trailParams.lifeTime },
-				{"emissionCount",e->trailParams.emissionCount },
-				{"inheritScale", e->trailParams.inheritScale }
-				};
-
-				// 1粒子の描画メッシュ形状＋生成パラメータ
-				j["particleMeshShape"] = static_cast<int>(e->particleMeshShape);
-				j["particleMeshParams"] = {
-					{"width",        e->particleMeshParams.width},
-					{"height",       e->particleMeshParams.height},
-					{"depth",        e->particleMeshParams.depth},
-					{"outerRadius",  e->particleMeshParams.outerRadius},
-					{"innerRadius",  e->particleMeshParams.innerRadius},
-					{"radius",       e->particleMeshParams.radius},
-					{"angleDegree",  e->particleMeshParams.angleDegree},
-					{"divide",       e->particleMeshParams.divide},
-					{"subdivisions", e->particleMeshParams.subdivisions},
-				};
-
-				groupJson["emitters"].push_back(j);
+				groupJson["emitters"].push_back(SerializeEmitter(*e));
 			}
 		}
 		return groupJson;
@@ -2264,166 +2362,28 @@ namespace YoRigine {
 	/// </summary>
 	bool GpuEmitManager::LoadEmitterFromJson(const std::string& groupName, const nlohmann::json& j)
 	{
-		//------------------------------------------------------------
-		// 生成時に必要な情報
-		//------------------------------------------------------------
-		std::string		name = j.value("name", "UnnamedEmitter");
-		EmitterShape	shape = static_cast<EmitterShape>(j.value("shape", 0)); // 0はSphereを想定
-		bool			isActive = j.value("isActive", true);
-		std::string texturePath = j.value("textureFilePath", "");
+		// エミッタ生成には name/shape/texturePath が先に必要なので、この3つだけ直接読む。
+		// 残りの全フィールドは DeserializeEmitter（AutoJson スキーマ）が一括で流し込む。
+		std::string  name = j.value("name", "UnnamedEmitter");
+		EmitterShape shape = static_cast<EmitterShape>(j.value("shape", 0)); // 0=Sphere
+		std::string  texturePath = j.value("textureFilePath", "");
 
-		if (CreateEmitter(groupName, name, texturePath, shape))
-		{
-			// GetEmitter に groupName を渡す
-			auto* e = GetEmitter(groupName, name);
-			if (!e) return false;
-
-			e->isActive = isActive;
-
-			//------------------------------------------------------------
-			// エミッターの形状
-			//------------------------------------------------------------
-			// Sphere
-			if (j.contains("sphereParams")) {
-				const auto& p = j["sphereParams"];
-				e->sphereParams.translate = p["translate"];
-				e->sphereParams.radius = p["radius"];
-				e->sphereParams.count = p["count"];
-				e->sphereParams.emitInterval = p["emitInterval"];
-			}
-
-			// Box
-			if (j.contains("boxParams")) {
-				const auto& p = j["boxParams"];
-				e->boxParams.translate = p["translate"];
-				e->boxParams.size = p["size"];
-				e->boxParams.count = p["count"];
-				e->boxParams.emitInterval = p["emitInterval"];
-			}
-
-			// Triangle
-			if (j.contains("triangleParams")) {
-				const auto& p = j["triangleParams"];
-				e->triangleParams.v1 = p["v1"];
-				e->triangleParams.v2 = p["v2"];
-				e->triangleParams.v3 = p["v3"];
-				e->triangleParams.count = p["count"];
-				e->triangleParams.emitInterval = p["emitInterval"];
-			}
-
-			// Cone
-			if (j.contains("coneParams")) {
-				const auto& p = j["coneParams"];
-				e->coneParams.translate = p["translate"];
-				e->coneParams.direction = p["direction"];
-				e->coneParams.radius = p["radius"];
-				e->coneParams.height = p["height"];
-				e->coneParams.count = p["count"];
-				e->coneParams.emitInterval = p["emitInterval"];
-			}
-			// Mesh
-			if (j.contains("meshParams")) {
-				const auto& mp = j["meshParams"];
-
-				std::string modelName = mp.value("modelName", "");
-				if (!modelName.empty()) {
-					e->meshParams.model = ModelManager::GetInstance()->FindModel(modelName);
-				}
-
-				e->meshParams.translate = mp["translate"];
-				e->meshParams.scale = mp["scale"];
-				Vector4 r = mp["rotation"];
-				e->meshParams.rotation = Quaternion(r.x, r.y, r.z, r.w);
-
-				e->meshParams.count = mp["count"];
-				e->meshParams.emitInterval = mp["emitInterval"];
-				e->meshParams.emitMode = static_cast<MeshEmitMode>(mp["emitMode"]);
-			}
-
-
-			//------------------------------------------------------------
-			// パーティクルのパラメータ
-			//------------------------------------------------------------
-			if (j.contains("particleParams"))
-			{
-				const auto& pp = j["particleParams"];
-				e->particleParams.lifeTime = pp["lifeTime"];
-				e->particleParams.lifeTimeVariance = pp["lifeTimeVariance"];
-				e->particleParams.isBillboard = pp["isBillboard"];
-
-				e->particleParams.startScale = pp["startScale"];
-				e->particleParams.startScaleVariance = pp["startScaleVariance"];
-				e->particleParams.endScale = pp["endScale"];
-				e->particleParams.endScaleVariance = pp["endScaleVariance"];
-
-				e->particleParams.rotation = pp["rotation"];
-				e->particleParams.rotationVariance = pp["rotationVariance"];
-				e->particleParams.rotationSpeed = pp["rotationSpeed"];
-				e->particleParams.rotationSpeedVariance = pp["rotationSpeedVariance"];
-
-				e->particleParams.velocity = pp["velocity"];
-				e->particleParams.velocityVariance = pp["velocityVariance"];
-
-				e->particleParams.startColor = pp["startColor"];
-				e->particleParams.startColorVariance = pp["startColorVariance"];
-				e->particleParams.endColor = pp["endColor"];
-				e->particleParams.endColorVariance = pp["endColorVariance"];
-
-				e->particleParams.gravity = pp["gravity"];
-
-				// トレイルパラメータ
-				e->particleParams.child.isTrail = pp["isTrail"];
-				e->particleParams.child.isInheritScale = pp["isInheritScale"];
-				e->particleParams.child.lifeTime = pp["trailLifeTime"];
-				e->particleParams.child.emissionCount = pp["trailEmissionCount"];
-				e->particleParams.child.minDistance = pp["trailMinDistance"];
-				e->particleParams.child.startScale = pp["trailStartScale"];
-				e->particleParams.child.endScale = pp["trailEndScale"];
-
-			}
-			//------------------------------------------------------------
-			// トレイルのパラメータ
-			//------------------------------------------------------------
-			if (j.contains("trail"))
-			{
-				const auto& tp = j["trail"];
-				e->trailParams.isTrail = tp.value("enabled", false);
-				e->trailParams.minDistance = tp.value("minDistance", 0.1f);
-				e->trailParams.lifeTime = tp.value("lifeTime", 1.0f);
-				e->trailParams.emissionCount = tp.value("emissionCount", 1.0f);
-				e->trailParams.inheritScale = tp.value("inheritScale", false);
-			}
-
-			//------------------------------------------------------------
-			// 1粒子の描画メッシュ形状＋生成パラメータ（旧データには無いので既定）
-			//------------------------------------------------------------
-			e->particleMeshShape = static_cast<ParticleMeshShape>(
-				j.value("particleMeshShape", static_cast<int>(ParticleMeshShape::Plane)));
-
-			if (j.contains("particleMeshParams")) {
-				const auto& mp = j["particleMeshParams"];
-				auto& d = e->particleMeshParams;
-				d.width = mp.value("width", d.width);
-				d.height = mp.value("height", d.height);
-				d.depth = mp.value("depth", d.depth);
-				d.outerRadius = mp.value("outerRadius", d.outerRadius);
-				d.innerRadius = mp.value("innerRadius", d.innerRadius);
-				d.radius = mp.value("radius", d.radius);
-				d.angleDegree = mp.value("angleDegree", d.angleDegree);
-				d.divide = mp.value("divide", d.divide);
-				d.subdivisions = mp.value("subdivisions", d.subdivisions);
-			}
-
-			// 適用
-			UpdateEmitterParams(e);
-			UpdateParticleParams(e);
-			if (e->emitter) {
-				e->emitter->SetParticleMesh(e->particleMeshShape, e->particleMeshParams);
-			}
-
-			return true;
+		if (!CreateEmitter(groupName, name, texturePath, shape)) {
+			return false;
 		}
-		return false;
+		auto* e = GetEmitter(groupName, name);
+		if (!e) return false;
+
+		// 全パラメータを一括復元（欠損キーは既定値のまま＝後方互換）
+		DeserializeEmitter(*e, j);
+
+		// 適用
+		UpdateEmitterParams(e);
+		UpdateParticleParams(e);
+		if (e->emitter) {
+			e->emitter->SetParticleMesh(e->particleMeshShape, e->particleMeshParams);
+		}
+		return true;
 	}
 	// 画像一覧をスキャン
 	void GpuEmitManager::ScanTextureDirectory(const std::string& directory)
