@@ -28,21 +28,21 @@ void AreaManager::Initialize()
 	isDebugDrawEnabled_ = false;
 }
 
-void AreaManager::Update(const Vector3& targetPosition, void* targetKey)
+void AreaManager::Update(const Vector3& targetPosition, void* targetKey, float deltaTime)
 {
 	for (auto& [name, area] : areas_) {
 		if (area && area->IsActive()) {
-			area->Update(targetPosition, targetKey);
+			area->Update(targetPosition, targetKey, deltaTime);
 		}
 	}
 }
 
-void AreaManager::UpdateTargets(const std::vector<AreaTarget>& targets)
+void AreaManager::UpdateTargets(const std::vector<AreaTarget>& targets, float deltaTime)
 {
 	for (auto& [name, area] : areas_) {
 		if (!area || !area->IsActive()) continue;
 		for (const auto& t : targets) {
-			area->Update(t.position, t.key);
+			area->Update(t.position, t.key, deltaTime);
 		}
 	}
 }

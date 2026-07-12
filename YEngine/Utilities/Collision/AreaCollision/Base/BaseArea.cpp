@@ -1,7 +1,7 @@
 #include "BaseArea.h"
 #include "MathFunc.h"
 
-void BaseArea::Update(const Vector3& targetPosition, void* targetKey)
+void BaseArea::Update(const Vector3& targetPosition, void* targetKey, float deltaTime)
 {
 	if (!isActive_) {
 		return;
@@ -13,14 +13,30 @@ void BaseArea::Update(const Vector3& targetPosition, void* targetKey)
 
 	if (currentlyInside && !wasInside) {
 		insideTargets_.insert(targetKey);
-		if (enterCallback_) enterCallback_(targetPosition);
+		stayTimers_[targetKey] = 0.0f;           // 進入時に tick タイマーをリセット
+		if (enterCallback_) enterCallback_(targetKey, targetPosition);
 	}
 	else if (!currentlyInside && wasInside) {
 		insideTargets_.erase(it);
-		if (exitCallback_) exitCallback_(targetPosition);
+		stayTimers_.erase(targetKey);
+		if (exitCallback_) exitCallback_(targetKey, targetPosition);
 	}
 	else if (currentlyInside && wasInside) {
-		if (stayCallback_) stayCallback_(targetPosition);
+		if (!stayCallback_) return;
+
+		// tick 間隔が未設定なら毎フレーム発火（従来動作）。
+		if (stayTickInterval_ <= 0.0f) {
+			stayCallback_(targetKey, targetPosition);
+			return;
+		}
+
+		// 間隔ぶん経過するごとに Stay を発火（毒などの継続ダメージ tick）。
+		float& elapsed = stayTimers_[targetKey];
+		elapsed += deltaTime;
+		while (elapsed >= stayTickInterval_) {
+			elapsed -= stayTickInterval_;
+			stayCallback_(targetKey, targetPosition);
+		}
 	}
 }
 
