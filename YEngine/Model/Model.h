@@ -33,9 +33,9 @@
 #include "Motion/Core/MotionSystem.h"
 
 // モデルクラス
-class SrvManager;
 class Line;
 class ModelCommon;
+namespace YoRigine { class SrvManager; }
 class Model
 {
 public:
@@ -157,7 +157,7 @@ private:
 	std::unique_ptr<Skeleton> skeleton_;
 	std::unique_ptr<SkinCluster> skinCluster_;
 	std::unique_ptr<Node> rootNode_;
-	SrvManager* srvManager_ = nullptr;
+	YoRigine::SrvManager* srvManager_ = nullptr;
 
 	///************************* モーション関連 *************************///
 

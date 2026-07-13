@@ -14,12 +14,12 @@
 
 class Camera;
 class Model;
-class SrvManager;
 class WorldTransform;
 class Object3d;
 
 namespace YoRigine {
 	class DirectXCommon;
+	class SrvManager;
 }
 
 /// <summary>
@@ -138,7 +138,7 @@ private:
 
 private:
 	YoRigine::DirectXCommon* dxCommon_ = nullptr;
-	SrvManager* srvManager_ = nullptr;
+	YoRigine::SrvManager* srvManager_ = nullptr;
 
 	// Begin(camera) で保持する、このフレームの Submit 用カメラ
 	Camera* frameCamera_ = nullptr;

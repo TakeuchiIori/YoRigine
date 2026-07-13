@@ -5,10 +5,12 @@
 #include "CommandManager.h"
 #include "WinApp/WinApp.h"
 
+namespace YoRigine {
+
 /// <summary>
 /// スワップチェーンの初期化
 /// </summary>
-void SwapChainManager::Initialize(WinApp* winApp, DeviceManager* deviceManager, YoRigine::CommandManager* commandManager)
+void SwapChainManager::Initialize(WinApp* winApp, DeviceManager* deviceManager, CommandManager* commandManager)
 {
 	this->winApp_ = winApp;
 	this->deviceManager_ = deviceManager;
@@ -65,3 +67,5 @@ void SwapChainManager::CreateSwapChain()
 		assert(SUCCEEDED(hr));
 	}
 }
+
+} // namespace YoRigine

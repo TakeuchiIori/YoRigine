@@ -7,9 +7,11 @@
 #include <dxgi1_6.h>
 
 class WinApp;
-class DeviceManager;
 
-namespace YoRigine { class CommandManager; }
+namespace YoRigine {
+
+class CommandManager;
+class DeviceManager;
 
 /// <summary>
 /// スワップチェーン管理クラス
@@ -21,7 +23,7 @@ public:
 	/// <param name="winApp">ウィンドウハンドルを持つ WinApp</param>
 	/// <param name="deviceManager">デバイス生成済みの DeviceManager</param>
 	/// <param name="commandManager">コマンドキュー取得元の CommandManager</param>
-	void Initialize(WinApp* winApp, DeviceManager* deviceManager, YoRigine::CommandManager* commandManager);
+	void Initialize(WinApp* winApp, DeviceManager* deviceManager, CommandManager* commandManager);
 	void Finalize();
 
 private:
@@ -45,7 +47,7 @@ private:
 	///************************* メンバ変数 *************************///
 	WinApp* winApp_ = nullptr;
 	DeviceManager* deviceManager_ = nullptr;
-	YoRigine::CommandManager* commandManager_ = nullptr;
+	CommandManager* commandManager_ = nullptr;
 
 	Microsoft::WRL::ComPtr<IDXGISwapChain4> swapChain_;
 	DXGI_SWAP_CHAIN_DESC1 swapChainDesc{};
@@ -56,3 +58,4 @@ private:
 
 };
 
+} // namespace YoRigine

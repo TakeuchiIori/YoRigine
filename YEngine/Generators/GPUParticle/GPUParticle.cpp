@@ -145,7 +145,7 @@ void GPUParticle::Draw()
 	commandList->SetGraphicsRootDescriptorTable(indices.at("g_Hot"), particleSrvHandleGPU_);
 	commandList->SetGraphicsRootDescriptorTable(indices.at("g_Warm"), warmSrvHandleGPU_);
 	commandList->SetGraphicsRootDescriptorTable(indices.at("g_DrawList"), drawListSrvHandleGPU_);
-	SrvManager::GetInstance()->SetGraphicsRootDescriptorTable(indices.at("gTexture"), textureIndexSRV_);
+	YoRigine::SrvManager::GetInstance()->SetGraphicsRootDescriptorTable(indices.at("gTexture"), textureIndexSRV_);
 
 	//-----------------------------------------
 	// インダイレクト描画: DrawList を VS 読み取り状態へ、DrawArgs を間接引数状態へ遷移し、
@@ -193,98 +193,98 @@ void GPUParticle::CreateUAV()
 	//-----------------------------------------
 	// Hot UAV (u0)
 	//-----------------------------------------
-	uavIndex_ = SrvManager::GetInstance()->Allocate();
+	uavIndex_ = YoRigine::SrvManager::GetInstance()->Allocate();
 
 	particleResource_ = dxCommon_->CreateBufferResourceUAV(sizeof(ParticleHotGPU) * kMaxParticles);
 
-	SrvManager::GetInstance()->CreateUAVForStructuredBuffer(
+	YoRigine::SrvManager::GetInstance()->CreateUAVForStructuredBuffer(
 		uavIndex_,
 		particleResource_.Get(),
 		kMaxParticles,
 		sizeof(ParticleHotGPU)
 	);
 
-	particleUavHandleGPU_ = SrvManager::GetInstance()->GetGPUDescriptorHandle(uavIndex_);
+	particleUavHandleGPU_ = YoRigine::SrvManager::GetInstance()->GetGPUDescriptorHandle(uavIndex_);
 
 	//-----------------------------------------
 	// Warm UAV (u4)
 	//-----------------------------------------
-	warmUavIndex_ = SrvManager::GetInstance()->Allocate();
+	warmUavIndex_ = YoRigine::SrvManager::GetInstance()->Allocate();
 
 	warmResource_ = dxCommon_->CreateBufferResourceUAV(sizeof(ParticleWarmGPU) * kMaxParticles);
 
-	SrvManager::GetInstance()->CreateUAVForStructuredBuffer(
+	YoRigine::SrvManager::GetInstance()->CreateUAVForStructuredBuffer(
 		warmUavIndex_,
 		warmResource_.Get(),
 		kMaxParticles,
 		sizeof(ParticleWarmGPU)
 	);
 
-	warmUavHandleGPU_ = SrvManager::GetInstance()->GetGPUDescriptorHandle(warmUavIndex_);
+	warmUavHandleGPU_ = YoRigine::SrvManager::GetInstance()->GetGPUDescriptorHandle(warmUavIndex_);
 
 	//-----------------------------------------
 	// Cold UAV (u5)
 	//-----------------------------------------
-	coldUavIndex_ = SrvManager::GetInstance()->Allocate();
+	coldUavIndex_ = YoRigine::SrvManager::GetInstance()->Allocate();
 
 	coldResource_ = dxCommon_->CreateBufferResourceUAV(sizeof(ParticleColdGPU) * kMaxParticles);
 
-	SrvManager::GetInstance()->CreateUAVForStructuredBuffer(
+	YoRigine::SrvManager::GetInstance()->CreateUAVForStructuredBuffer(
 		coldUavIndex_,
 		coldResource_.Get(),
 		kMaxParticles,
 		sizeof(ParticleColdGPU)
 	);
 
-	coldUavHandleGPU_ = SrvManager::GetInstance()->GetGPUDescriptorHandle(coldUavIndex_);
+	coldUavHandleGPU_ = YoRigine::SrvManager::GetInstance()->GetGPUDescriptorHandle(coldUavIndex_);
 
 	//-----------------------------------------
 	// FreeListIndex UAV
 	//-----------------------------------------
-	freeListIndexUavIndex_ = SrvManager::GetInstance()->Allocate();
+	freeListIndexUavIndex_ = YoRigine::SrvManager::GetInstance()->Allocate();
 
 	freeListIndexResource_ = dxCommon_->CreateBufferResourceUAV(sizeof(int32_t));
 
-	SrvManager::GetInstance()->CreateUAVForStructuredBuffer(
+	YoRigine::SrvManager::GetInstance()->CreateUAVForStructuredBuffer(
 		freeListIndexUavIndex_,
 		freeListIndexResource_.Get(),
 		1,
 		sizeof(int32_t)
 	);
 
-	freeListIndexUavHandleGPU_ = SrvManager::GetInstance()->GetGPUDescriptorHandle(freeListIndexUavIndex_);
+	freeListIndexUavHandleGPU_ = YoRigine::SrvManager::GetInstance()->GetGPUDescriptorHandle(freeListIndexUavIndex_);
 
 	//-----------------------------------------
 	// FreeList UAV
 	//-----------------------------------------
-	freeListUavIndex_ = SrvManager::GetInstance()->Allocate();
+	freeListUavIndex_ = YoRigine::SrvManager::GetInstance()->Allocate();
 
 	freeListResource_ = dxCommon_->CreateBufferResourceUAV(sizeof(uint32_t) * kMaxParticles);
 
-	SrvManager::GetInstance()->CreateUAVForStructuredBuffer(
+	YoRigine::SrvManager::GetInstance()->CreateUAVForStructuredBuffer(
 		freeListUavIndex_,
 		freeListResource_.Get(),
 		kMaxParticles,
 		sizeof(uint32_t)
 	);
 
-	freeListUavHandleGPU_ = SrvManager::GetInstance()->GetGPUDescriptorHandle(freeListUavIndex_);
+	freeListUavHandleGPU_ = YoRigine::SrvManager::GetInstance()->GetGPUDescriptorHandle(freeListUavIndex_);
 
 	//-----------------------------------------
 	// ActiveCount UAV
 	//-----------------------------------------
-	activeCountUavIndex_ = SrvManager::GetInstance()->Allocate();
+	activeCountUavIndex_ = YoRigine::SrvManager::GetInstance()->Allocate();
 
 	activeCountResource_ = dxCommon_->CreateBufferResourceUAV(sizeof(uint32_t));
 
-	SrvManager::GetInstance()->CreateUAVForStructuredBuffer(
+	YoRigine::SrvManager::GetInstance()->CreateUAVForStructuredBuffer(
 		activeCountUavIndex_,
 		activeCountResource_.Get(),
 		1,
 		sizeof(uint32_t)
 	);
 
-	activeCountUavHandleGPU_ = SrvManager::GetInstance()->GetGPUDescriptorHandle(activeCountUavIndex_);
+	activeCountUavHandleGPU_ = YoRigine::SrvManager::GetInstance()->GetGPUDescriptorHandle(activeCountUavIndex_);
 
 }
 
@@ -293,7 +293,7 @@ void GPUParticle::CreateUAV()
 /// </summary>
 void GPUParticle::CreateDrawIndirectResources()
 {
-	auto* srv = SrvManager::GetInstance();
+	auto* srv = YoRigine::SrvManager::GetInstance();
 
 	//-----------------------------------------
 	// DrawList UAV (u6) — 生存スロット番号を詰める uint[max]
@@ -340,27 +340,27 @@ void GPUParticle::CreateDrawIndirectResources()
 void GPUParticle::CreateGPUParticleResource()
 {
 	// VS は hot(t0) と warm(t1) を読み、scale/color を lerp 導出する
-	srvIndex_ = SrvManager::GetInstance()->Allocate();
+	srvIndex_ = YoRigine::SrvManager::GetInstance()->Allocate();
 
-	SrvManager::GetInstance()->CreateSRVforStructuredBuffer(
+	YoRigine::SrvManager::GetInstance()->CreateSRVforStructuredBuffer(
 		srvIndex_,
 		particleResource_.Get(),
 		kMaxParticles,
 		sizeof(ParticleHotGPU)
 	);
 
-	particleSrvHandleGPU_ = SrvManager::GetInstance()->GetGPUDescriptorHandle(srvIndex_);
+	particleSrvHandleGPU_ = YoRigine::SrvManager::GetInstance()->GetGPUDescriptorHandle(srvIndex_);
 
-	warmSrvIndex_ = SrvManager::GetInstance()->Allocate();
+	warmSrvIndex_ = YoRigine::SrvManager::GetInstance()->Allocate();
 
-	SrvManager::GetInstance()->CreateSRVforStructuredBuffer(
+	YoRigine::SrvManager::GetInstance()->CreateSRVforStructuredBuffer(
 		warmSrvIndex_,
 		warmResource_.Get(),
 		kMaxParticles,
 		sizeof(ParticleWarmGPU)
 	);
 
-	warmSrvHandleGPU_ = SrvManager::GetInstance()->GetGPUDescriptorHandle(warmSrvIndex_);
+	warmSrvHandleGPU_ = YoRigine::SrvManager::GetInstance()->GetGPUDescriptorHandle(warmSrvIndex_);
 }
 
 /// <summary>
@@ -434,7 +434,7 @@ void GPUParticle::DispatchInit()
 
 	commandList->SetPipelineState(computeShaderManager_->GetComputePipelineState("ParticleInitCS"));
 
-	ID3D12DescriptorHeap* heaps[] = { SrvManager::GetInstance()->GetDescriptorHeap() };
+	ID3D12DescriptorHeap* heaps[] = { YoRigine::SrvManager::GetInstance()->GetDescriptorHeap() };
 	commandList->SetDescriptorHeaps(_countof(heaps), heaps);
 
 	commandList->SetComputeRootDescriptorTable(0, particleUavHandleGPU_);
@@ -538,7 +538,7 @@ void GPUParticle::DispatchUpdate(ID3D12Resource* resource, ID3D12Resource* param
 		D3D12_RESOURCE_STATE_UNORDERED_ACCESS
 	);
 
-	ID3D12DescriptorHeap* heaps[] = { SrvManager::GetInstance()->GetDescriptorHeap() };
+	ID3D12DescriptorHeap* heaps[] = { YoRigine::SrvManager::GetInstance()->GetDescriptorHeap() };
 	commandList->SetDescriptorHeaps(_countof(heaps), heaps);
 
 	//-----------------------------------------

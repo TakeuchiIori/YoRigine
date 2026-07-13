@@ -8,6 +8,8 @@
 #include "d3dx12.h"
 #include <cassert>
 
+namespace YoRigine {
+
 /// <summary>
 /// DSV マネージャーの初期化（ヒープ作成）
 /// </summary>
@@ -384,3 +386,5 @@ DsvManager::CreateDepthStencilTextureResource(uint32_t width, uint32_t height, D
 	}
 	return resource;
 }
+
+} // namespace YoRigine

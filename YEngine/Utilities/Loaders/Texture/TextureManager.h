@@ -39,7 +39,7 @@ public:
 	~TextureManager() = default;
 
 	// 初期化
-	void Initialize(YoRigine::DirectXCommon* dxCommon, SrvManager* srvManager);
+	void Initialize(YoRigine::DirectXCommon* dxCommon, YoRigine::SrvManager* srvManager);
 
 	// 終了
 	void Finalize();
@@ -109,7 +109,7 @@ private:
 
 	std::unordered_map<std::string, TextureData> textureDatas;
 	YoRigine::DirectXCommon* dxCommon_ = nullptr;
-	SrvManager* srvManager_ = nullptr;
+	YoRigine::SrvManager* srvManager_ = nullptr;
 
 	static uint32_t kSRVIndexTop;
 };

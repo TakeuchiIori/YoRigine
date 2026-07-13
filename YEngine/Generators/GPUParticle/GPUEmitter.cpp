@@ -437,7 +437,7 @@ void GPUEmitter::CreateMeshTriangleBuffer()
 	meshTriangleBuffer_->Map(0, nullptr, reinterpret_cast<void**>(&meshTriangleData_));
 
 	// SRV作成
-	auto* srvManager = SrvManager::GetInstance();
+	auto* srvManager = YoRigine::SrvManager::GetInstance();
 	meshTriangleBufferSrvIndex_ = srvManager->Allocate();
 
 	srvManager->CreateSRVforStructuredBuffer(
@@ -459,7 +459,7 @@ void GPUEmitter::CreateForceFieldBuffer()
 	forceFieldResource_->Map(0, nullptr, reinterpret_cast<void**>(&forceFieldData_));
 	memset(forceFieldData_, 0, bufferSize);
 
-	auto* srvManager = SrvManager::GetInstance();
+	auto* srvManager = YoRigine::SrvManager::GetInstance();
 	forceFieldSrvIndex_ = srvManager->Allocate();
 	srvManager->CreateSRVforStructuredBuffer(
 		forceFieldSrvIndex_,
@@ -701,7 +701,7 @@ void GPUEmitter::Dispatch()
 	cmd->SetComputeRootSignature(ComputeShaderManager::GetInstance()->GetRootSignature("EmitCS"));
 	cmd->SetPipelineState(ComputeShaderManager::GetInstance()->GetComputePipelineState("EmitCS"));
 
-	ID3D12DescriptorHeap* heaps[] = { SrvManager::GetInstance()->GetDescriptorHeap() };
+	ID3D12DescriptorHeap* heaps[] = { YoRigine::SrvManager::GetInstance()->GetDescriptorHeap() };
 	cmd->SetDescriptorHeaps(_countof(heaps), heaps);
 
 	//-----------------------------------------
@@ -731,7 +731,7 @@ void GPUEmitter::Dispatch()
 	// Mesh用のSRV設定（新規追加）
 	//-----------------------------------------
 	if (currentShape_ == EmitterShape::Mesh) {
-		auto* srvManager = SrvManager::GetInstance();
+		auto* srvManager = YoRigine::SrvManager::GetInstance();
 		cmd->SetComputeRootDescriptorTable(12,
 			srvManager->GetGPUDescriptorHandle(meshTriangleBufferSrvIndex_));
 	}

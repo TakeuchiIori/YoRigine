@@ -39,22 +39,22 @@ void SkinCluster::UpdateMatrixPalette(const std::vector<Joint>& joints) {
 void SkinCluster::CreateResourceCS(size_t jointsSize, size_t verticesSize, std::map<std::string, int32_t> jointMap)
 {
 	// === SRV を4連続で登録（t0〜t2, u0） ===
-	UINT baseIndex = SrvManager::GetInstance()->Allocate(4);
+	UINT baseIndex = YoRigine::SrvManager::GetInstance()->Allocate(4);
 
 	// === Palette用のResource (t0) ===
 	paletteResource_ = YoRigine::DirectXCommon::GetInstance()->CreateBufferResource(sizeof(WellForGPU) * jointsSize);
 	WellForGPU* mappedPalette = nullptr;
 	paletteResource_->Map(0, nullptr, reinterpret_cast<void**>(&mappedPalette));
 	mappedPalette_ = { mappedPalette, jointsSize };
-	SrvManager::GetInstance()->CreateSRVforStructuredBuffer(baseIndex + 0, paletteResource_.Get(), UINT(jointsSize), sizeof(WellForGPU));
-	paletteSrvHandle_.first = SrvManager::GetInstance()->GetCPUDescriptorHandle(baseIndex + 0);
-	paletteSrvHandle_.second = SrvManager::GetInstance()->GetGPUDescriptorHandle(baseIndex + 0);
+	YoRigine::SrvManager::GetInstance()->CreateSRVforStructuredBuffer(baseIndex + 0, paletteResource_.Get(), UINT(jointsSize), sizeof(WellForGPU));
+	paletteSrvHandle_.first = YoRigine::SrvManager::GetInstance()->GetCPUDescriptorHandle(baseIndex + 0);
+	paletteSrvHandle_.second = YoRigine::SrvManager::GetInstance()->GetGPUDescriptorHandle(baseIndex + 0);
 
 	// === InputVertices用のResource (t1) ===
 	inputVerticesResource_ = YoRigine::DirectXCommon::GetInstance()->CreateBufferResource(sizeof(Vertex) * verticesSize);
 	inputVerticesResource_->Map(0, nullptr, reinterpret_cast<void**>(&mappedInputVertices_));
 	std::memset(mappedInputVertices_, 0, sizeof(Vertex) * verticesSize);
-	SrvManager::GetInstance()->CreateSRVforStructuredBuffer(baseIndex + 1, inputVerticesResource_.Get(), UINT(verticesSize), sizeof(Vertex));
+	YoRigine::SrvManager::GetInstance()->CreateSRVforStructuredBuffer(baseIndex + 1, inputVerticesResource_.Get(), UINT(verticesSize), sizeof(Vertex));
 
 	// === Influence用のResource (t2) ===
 	influenceResource_ = YoRigine::DirectXCommon::GetInstance()->CreateBufferResource(sizeof(VertexInfluence) * verticesSize);
@@ -62,7 +62,7 @@ void SkinCluster::CreateResourceCS(size_t jointsSize, size_t verticesSize, std::
 	influenceResource_->Map(0, nullptr, reinterpret_cast<void**>(&mappedInfluence));
 	std::memset(mappedInfluence, 0, sizeof(VertexInfluence) * verticesSize);
 	mappedInfluence_ = { mappedInfluence, verticesSize };
-	SrvManager::GetInstance()->CreateSRVforStructuredBuffer(baseIndex + 2, influenceResource_.Get(), UINT(verticesSize), sizeof(VertexInfluence));
+	YoRigine::SrvManager::GetInstance()->CreateSRVforStructuredBuffer(baseIndex + 2, influenceResource_.Get(), UINT(verticesSize), sizeof(VertexInfluence));
 
 	influenceBufferView_.BufferLocation = influenceResource_->GetGPUVirtualAddress();
 	influenceBufferView_.SizeInBytes = UINT(sizeof(VertexInfluence) * verticesSize);
@@ -71,7 +71,7 @@ void SkinCluster::CreateResourceCS(size_t jointsSize, size_t verticesSize, std::
 	srvIndex_ = baseIndex;
 	// === OutputVertices（UAV: u0） ===
 	outputResource_ = YoRigine::DirectXCommon::GetInstance()->CreateBufferResourceUAV(sizeof(Vertex) * verticesSize);
-	SrvManager::GetInstance()->CreateUAVForStructuredBuffer(baseIndex + 3, outputResource_.Get(), static_cast<UINT>(verticesSize), sizeof(Vertex));
+	YoRigine::SrvManager::GetInstance()->CreateUAVForStructuredBuffer(baseIndex + 3, outputResource_.Get(), static_cast<UINT>(verticesSize), sizeof(Vertex));
 	uavIndex_ = baseIndex + 3;
 
 	outputBufferView_.BufferLocation = outputResource_->GetGPUVirtualAddress();
@@ -211,14 +211,14 @@ void SkinCluster::ExecuteSkinningCS()
 	commandList->SetPipelineState(graphicsPipelineState_.Get());
 
 	// ディスクリプタヒープセット
-	ID3D12DescriptorHeap* descriptorHeaps[] = { SrvManager::GetInstance()->GetDescriptorHeap() };
+	ID3D12DescriptorHeap* descriptorHeaps[] = { YoRigine::SrvManager::GetInstance()->GetDescriptorHeap() };
 	commandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
 
 	// SRVディスクリプタテーブル（MatrixPalette, InputVertices, Influences）
-	commandList->SetComputeRootDescriptorTable(0, SrvManager::GetInstance()->GetGPUDescriptorHandle(srvIndex_));
+	commandList->SetComputeRootDescriptorTable(0, YoRigine::SrvManager::GetInstance()->GetGPUDescriptorHandle(srvIndex_));
 
 	// UAVディスクリプタテーブル（OutputVertices）
-	commandList->SetComputeRootDescriptorTable(1, SrvManager::GetInstance()->GetGPUDescriptorHandle(uavIndex_));
+	commandList->SetComputeRootDescriptorTable(1, YoRigine::SrvManager::GetInstance()->GetGPUDescriptorHandle(uavIndex_));
 
 	// CBV（SkinningInformation）
 	commandList->SetComputeRootConstantBufferView(2, skinningInformationResource_->GetGPUVirtualAddress());

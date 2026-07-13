@@ -229,7 +229,7 @@ void MyGame::Draw() {
 	//------------------------------------------------------------
 	// カスケードシャドウ：カスケードごとにスライスをクリアしてシーンを影描画する。
 	// SetCurrentCascade で影パスの gLight（ShadowDrawPreference / InstancedObject3d が読む）を切り替える。
-	for (uint32_t cascade = 0; cascade < DsvManager::kShadowCascadeCount; ++cascade) {
+	for (uint32_t cascade = 0; cascade < YoRigine::DsvManager::kShadowCascadeCount; ++cascade) {
 		YoRigine::LightManager::GetInstance()->SetCurrentCascade(cascade);
 		dxCommon_->PreDrawShadow(cascade);
 		SceneManager::GetInstance()->DrawShadow();

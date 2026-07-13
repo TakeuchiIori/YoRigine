@@ -18,7 +18,7 @@ void Sprite::Initialize(const std::string& textureFilePath)
 {
 	this->spriteCommon_ = SpriteCommon::GetInstance();
 
-	srvManager_ = SrvManager::GetInstance();
+	srvManager_ = YoRigine::SrvManager::GetInstance();
 
 	filePath_ = textureFilePath;
 

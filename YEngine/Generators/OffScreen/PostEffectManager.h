@@ -9,9 +9,9 @@
 
 namespace YoRigine{
 class DirectXCommon;
+class RtvManager;
 }
 
-class RtvManager;
 class OffScreen;
 
 /// <summary>
@@ -134,7 +134,7 @@ private:
 	///************************* メンバ変数 *************************///
 
 	YoRigine::DirectXCommon* dxCommon_ = nullptr;
-	RtvManager* rtvManager_ = nullptr;
+	YoRigine::RtvManager* rtvManager_ = nullptr;
 	OffScreen* offScreen_ = nullptr;
 
 	// エフェクトチェーン（エフェクトの管理）

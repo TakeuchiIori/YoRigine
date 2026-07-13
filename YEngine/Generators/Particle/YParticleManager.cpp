@@ -18,7 +18,7 @@
 // 初期化・終了
 //=================================================================
 
-void YParticleManager::Initialize(SrvManager* srvManager, uint32_t maxTotalParticles) {
+void YParticleManager::Initialize(YoRigine::SrvManager* srvManager, uint32_t maxTotalParticles) {
 	if (initialized_) return;
 
 	srvManager_ = srvManager;

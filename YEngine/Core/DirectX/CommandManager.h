@@ -8,9 +8,9 @@
 #include <wrl.h>
 #include <array>
 
-class DeviceManager;
-
 namespace YoRigine {
+
+class DeviceManager;
 
 /// <summary>
 /// コマンド管理クラス

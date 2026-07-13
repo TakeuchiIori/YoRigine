@@ -4,6 +4,8 @@
 #include "Debugger/Logger.h"
 #include "Debugger/ConvertString.h"
 
+namespace YoRigine {
+
 /// <summary>
 /// DirectX12 デバイス・DXGI ファクトリー・デバッグレイヤーの初期化
 /// </summary>
@@ -116,3 +118,5 @@ void DeviceManager::Finalize()
 	device_.Reset();
 	dxgiFactory_.Reset();
 }
+
+} // namespace YoRigine

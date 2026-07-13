@@ -40,7 +40,7 @@ public:
     /// </summary>
     /// <param name="srvManager">SRVマネージャー</param>
     /// <param name="maxTotalParticles">全システム合計の最大パーティクル数</param>
-    void Initialize(SrvManager* srvManager, uint32_t maxTotalParticles = 10000);
+    void Initialize(YoRigine::SrvManager* srvManager, uint32_t maxTotalParticles = 10000);
 
     /// <summary>
     /// 終了処理
@@ -223,7 +223,7 @@ private:
     //=================================================================
 
     bool initialized_ = false;
-    SrvManager* srvManager_ = nullptr;
+    YoRigine::SrvManager* srvManager_ = nullptr;
     Camera* camera_ = nullptr;
 
     // パイプライン

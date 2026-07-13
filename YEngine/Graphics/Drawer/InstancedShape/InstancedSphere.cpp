@@ -12,7 +12,7 @@
 void InstancedSphere::Initialize()
 {
 	dxCommon_   = YoRigine::DirectXCommon::GetInstance();
-	srvManager_ = SrvManager::GetInstance();
+	srvManager_ = YoRigine::SrvManager::GetInstance();
 
 	BuildUnitSphereVertices();
 	CreateInstanceBuffer();
