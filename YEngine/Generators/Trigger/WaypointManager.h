@@ -7,6 +7,7 @@
 #include <cstdint>
 
 class WaypointAction;
+class VfxMeshSpawner;
 
 // ============================================================
 // WaypointManager
@@ -21,6 +22,15 @@ class WaypointAction;
 class WaypointManager {
 public:
 	static WaypointManager* GetInstance();
+
+	// ============================================================
+	// 依存先マネージャの注入 (DI)
+	//   所有はしない (借用のみ)。Finalize() で nullptr に戻すのでダングリングポインタは残らない。
+	// ============================================================
+	void SetVfxMeshSpawner(VfxMeshSpawner* vfxMeshSpawner) { vfxMeshSpawner_ = vfxMeshSpawner; }
+
+	// アプリ終了時に借用ポインタを手放す
+	void Finalize();
 
 	// 登録・現在地・ビーコンを全消去（シーン入場時に呼ぶ）
 	void Reset();
@@ -48,4 +58,7 @@ private:
 	Vector3  currentPos_ = { 0.0f, 0.0f, 0.0f };
 	uint32_t beaconId_   = 0;
 	bool     hasBeacon_  = false;
+
+	// 依存先マネージャ (借用のみ・非所有)。使用前に SetVfxMeshSpawner() で注入すること。
+	VfxMeshSpawner* vfxMeshSpawner_ = nullptr;
 };

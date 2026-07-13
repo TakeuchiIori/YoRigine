@@ -11,6 +11,9 @@
 #include "Transitions/Fade/Fade.h"
 #include "Transitions/Base/TransitionFactory.h"
 
+class PostEffectManager;
+class BaseObjectManager;
+
 /// <summary>
 /// メインシーンの管理クラス
 /// </summary>
@@ -40,6 +43,13 @@ public:
 	///************************* アクセッサ *************************///
 	void SetSceneFactory(AbstractSceneFactory* sceneFactory) { sceneFactory_ = sceneFactory; }
 	void SetTransitionFactory(std::unique_ptr<TransitionFactory> factory) { transitionFactory_ = std::move(factory); }
+
+	// ============================================================
+	// 依存先マネージャの注入 (DI)
+	//   所有はしない (借用のみ)。Finalize() で nullptr に戻すのでダングリングポインタは残らない。
+	// ============================================================
+	void SetPostEffectManager(PostEffectManager* postEffectManager) { postEffectManager_ = postEffectManager; }
+	void SetBaseObjectManager(BaseObjectManager* baseObjectManager) { baseObjectManager_ = baseObjectManager; }
 	BaseScene* GetScene() const { return scene_.get(); }
 	std::string GetCurrentSceneName() const {
 		if (scene_) {
@@ -74,4 +84,8 @@ private:
 	std::unique_ptr<TransitionFactory> transitionFactory_;
 	std::unique_ptr<ISceneTransition> transition_;
 	TransitionState transitionState_ = TransitionState::None;
+
+	// 依存先マネージャ (借用のみ・非所有)。Initialize() 前に Set 系で注入すること。
+	PostEffectManager* postEffectManager_ = nullptr;
+	BaseObjectManager* baseObjectManager_ = nullptr;
 };

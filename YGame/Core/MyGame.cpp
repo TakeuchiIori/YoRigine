@@ -13,6 +13,9 @@
 #include <Systems/Text/TextTextureBaker.h>
 #include "GPUParticle/GpuEmitManager.h"
 #include <Object3D/BaseObjectManager.h>
+#include <Drawer/InstancedObject3d.h>
+#include <Loaders/Texture/TextureManager.h>
+#include <ModelManager.h>
 
 #include "Particle/YParticleManager.h"
 #include "Particle/YEmitterGroupEditor.h"
@@ -20,6 +23,7 @@
 #include "Particle/YEmitterGroupManager.h"
 #include "Vfx/VfxMesh/Runtime/VfxMeshSpawner.h"
 #include "Composite/CompositeEffectManager.h"
+#include "Trigger/WaypointManager.h"
 #include "LightManager/LightManager.h"
 #include "DsvManager.h"
 /// <summary>
@@ -67,10 +71,14 @@ void MyGame::Initialize() {
 	//------------------------------------------------------------
 	// パーティクル関連の初期化（YParticle に完全移行済み）
 	//------------------------------------------------------------
+	YoRigine::GpuEmitManager::GetInstance()->SetTextureManager(TextureManager::GetInstance());
+	YoRigine::GpuEmitManager::GetInstance()->SetModelManager(ModelManager::GetInstance());
 	YoRigine::GpuEmitManager::GetInstance()->Initialize();
 
 	VfxMeshSpawner::GetInstance()->Initialize();
 	VfxMeshSpawner::GetInstance()->ScanDirectory("Resources/Json/VfxMesh/");
+
+	WaypointManager::GetInstance()->SetVfxMeshSpawner(VfxMeshSpawner::GetInstance());
 
 	// 複合エフェクト（Particle+VfxMesh+GPU+Sound を名前で束ねる層）を自動ロード。
 	// Particle/GPU の Scan より後（子アセットが先に存在している必要があるため）。
@@ -80,6 +88,10 @@ void MyGame::Initialize() {
 	YoRigine::ModelManipulator::GetInstance()->Initialize();
 
 	// BaseObject 一括管理マネージャ
+#ifdef USE_IMGUI
+	BaseObjectManager::GetInstance()->SetEditor(Editor::GetInstance());
+#endif
+	BaseObjectManager::GetInstance()->SetInstancedObject3d(InstancedObject3d::GetInstance());
 	BaseObjectManager::GetInstance()->Initialize();
 
 	// PiP カメラサブシステム
@@ -130,6 +142,12 @@ void MyGame::Initialize() {
 #endif
 
 	//------------------------------------------------------------
+	// SceneManager の依存先マネージャ注入（初回 ChangeScene より前に必要）
+	//------------------------------------------------------------
+	SceneManager::GetInstance()->SetPostEffectManager(PostEffectManager::GetInstance());
+	SceneManager::GetInstance()->SetBaseObjectManager(BaseObjectManager::GetInstance());
+
+	//------------------------------------------------------------
 	// 初期シーン設定
 	//------------------------------------------------------------
 #if defined(DEVELOP_BUILD)
@@ -146,6 +164,8 @@ void MyGame::Initialize() {
 /// </summary>
 void MyGame::Finalize() {
 	SceneManager::GetInstance()->Finalize();
+	WaypointManager::GetInstance()->Finalize();
+	YoRigine::GpuEmitManager::GetInstance()->Finalize();
 	VfxMeshSpawner::GetInstance()->Finalize();
 	YoRigine::ModelManipulator::GetInstance()->Finalize();
 

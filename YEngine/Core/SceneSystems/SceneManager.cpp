@@ -26,6 +26,10 @@ void SceneManager::Finalize() {
 		scene_->Finalize();
 		scene_ = nullptr;
 	}
+
+	// 借用ポインタを手放す (ダングリング防止)
+	postEffectManager_ = nullptr;
+	baseObjectManager_ = nullptr;
 }
 
 /// <summary>
@@ -102,13 +106,15 @@ void SceneManager::PerformSceneTransition() {
 	//------------------------------------------------------------
 
 	// ポストエフェクト初期化
-	PostEffectManager::GetInstance()->Reset(); 
+	assert(postEffectManager_ && "SceneManager : SetPostEffectManager() を先に呼ぶこと");
+	postEffectManager_->Reset();
 	scene_ = std::move(nextScene_);
 	nextScene_ = nullptr;
 	if (scene_) {
 		// 前シーンの BaseObject 登録を一掃してから次シーンを初期化する。
 		// これで各シーン側に「登録解除」コードを書く必要がなくなる。
-		BaseObjectManager::GetInstance()->ClearAll();
+		assert(baseObjectManager_ && "SceneManager : SetBaseObjectManager() を先に呼ぶこと");
+		baseObjectManager_->ClearAll();
 		scene_->SetSceneManager(this);
 		scene_->Initialize();
 	}
@@ -166,7 +172,8 @@ void SceneManager::ChangeScene(const std::string& sceneName) {
 		scene_ = std::move(nextScene_);
 		nextScene_ = nullptr;
 		// 初回シーンも空の状態から始められるように一掃しておく。
-		BaseObjectManager::GetInstance()->ClearAll();
+		assert(baseObjectManager_ && "SceneManager : SetBaseObjectManager() を先に呼ぶこと");
+		baseObjectManager_->ClearAll();
 		scene_->SetSceneManager(this);
 		scene_->Initialize();
 
@@ -186,7 +193,8 @@ void SceneManager::ChangeSceneImmediate(const std::string& sceneName) {
 	assert(sceneFactory_);
 
 	// ポストエフェクトのリセット
-	PostEffectManager::GetInstance()->Reset();
+	assert(postEffectManager_ && "SceneManager : SetPostEffectManager() を先に呼ぶこと");
+	postEffectManager_->Reset();
 	// 現在のシーンを終了
 	if (scene_) {
 		scene_->Finalize();
@@ -196,7 +204,8 @@ void SceneManager::ChangeSceneImmediate(const std::string& sceneName) {
 	// 前シーンの BaseObject 登録を一掃する（フェード遷移の PerformSceneTransition と同様）。
 	// これを忘れると、解放済みオブジェクトへのダングリング参照が entries_ に残り、
 	// 次シーンの DrawShadowAll / UpdateAll 等で落ちる（Develop への即時遷移で発生）。
-	BaseObjectManager::GetInstance()->ClearAll();
+	assert(baseObjectManager_ && "SceneManager : SetBaseObjectManager() を先に呼ぶこと");
+	baseObjectManager_->ClearAll();
 
 	// 新しいシーンを生成して初期化
 	scene_ = sceneFactory_->CreateScene(sceneName);

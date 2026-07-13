@@ -14,6 +14,7 @@
 #include "Systems/GameTime/GameTime.h"
 #include <IconsFontAwesome5.h>
 #include "GpuEmitterJson.h"   // GpuForceFieldParams の to_json/from_json
+#include <cassert>
 
 namespace YoRigine {
 	// ImGui用の形状名一覧
@@ -39,6 +40,9 @@ namespace YoRigine {
 	/// </summary>
 	void GpuEmitManager::Initialize()
 	{
+		assert(textureManager_ && "GpuEmitManager : SetTextureManager() を先に呼ぶこと");
+		assert(modelManager_ && "GpuEmitManager : SetModelManager() を先に呼ぶこと");
+
 #ifdef USE_IMGUI
 		// --- テクスチャブラウザ ---
 		textureBrowser_ = FileBrowser(
@@ -47,9 +51,9 @@ namespace YoRigine {
 			FileBrowser::DisplayMode::Grid
 		);
 		// サムネイルプロバイダ: TextureManager 経由で GPU ハンドルを返す
-		textureBrowser_.SetThumbnailProvider([](const std::string& path) -> ImTextureID {
-			TextureManager::GetInstance()->LoadTexture(path);
-			auto handle = TextureManager::GetInstance()->GetsrvHandleGPU(path);
+		textureBrowser_.SetThumbnailProvider([this](const std::string& path) -> ImTextureID {
+			textureManager_->LoadTexture(path);
+			auto handle = textureManager_->GetsrvHandleGPU(path);
 			return handle.ptr != 0 ? static_cast<ImTextureID>(handle.ptr) : 0;
 			});
 		// 選択時コールバック: テクスチャパスを入力バッファに反映
@@ -79,8 +83,17 @@ namespace YoRigine {
 		gizmoLine_->SetCamera(camera_);
 #endif
 
-		ModelManager::GetInstance()->LoadModel("Resources/Models/Cube", "Cube.obj");
+		modelManager_->LoadModel("Resources/Models/Cube", "Cube.obj");
 		LoadAllEmitters();
+	}
+
+	/// <summary>
+	/// アプリ終了時に借用ポインタを手放す
+	/// </summary>
+	void GpuEmitManager::Finalize()
+	{
+		textureManager_ = nullptr;
+		modelManager_ = nullptr;
 	}
 
 	/// <summary>
@@ -1100,7 +1113,8 @@ namespace YoRigine {
 		// -------------------------
 		// モデル選択コンボボックス
 		// -------------------------
-		auto modelKeys = ModelManager::GetInstance()->GetModelKeys();
+		assert(modelManager_ && "GpuEmitManager : SetModelManager() を先に呼ぶこと");
+		auto modelKeys = modelManager_->GetModelKeys();
 		static int selected = -1;
 
 		// 現在の選択を反映
@@ -1121,7 +1135,7 @@ namespace YoRigine {
 				bool isSelected = (selected == i);
 				if (ImGui::Selectable(modelKeys[i].c_str(), isSelected)) {
 					selected = i;
-					p.model = ModelManager::GetInstance()->FindModel(modelKeys[i]);
+					p.model = modelManager_->FindModel(modelKeys[i]);
 					changed = true;
 				}
 			}
@@ -2269,7 +2283,8 @@ namespace YoRigine {
 		if (j.contains("meshParams")) {
 			const std::string modelName = j["meshParams"].value("modelName", std::string{});
 			if (!modelName.empty()) {
-				e.meshParams.model = ModelManager::GetInstance()->FindModel(modelName);
+				assert(modelManager_ && "GpuEmitManager : SetModelManager() を先に呼ぶこと");
+				e.meshParams.model = modelManager_->FindModel(modelName);
 			}
 		}
 	}

@@ -11,6 +11,12 @@
 #include <type_traits>
 #include <utility>
 #include <typeinfo>
+#include <cassert>
+
+class InstancedObject3d;
+#ifdef USE_IMGUI
+class Editor;
+#endif
 
 // ============================================================
 // BaseObjectManager
@@ -56,6 +62,16 @@ public:
 	// 一度セットすれば、以降の Add<T>() で生成するオブジェクトに自動注入される。
 	void SetCamera(Camera* camera) { camera_ = camera; }
 	Camera* GetCamera() const { return camera_; }
+
+	// ============================================================
+	// 依存先マネージャの注入 (DI)
+	//   所有はしない (借用のみ)。渡した側の生存期間中に Finalize() すること。
+	//   Finalize() で nullptr に戻すのでダングリングポインタは残らない。
+	// ============================================================
+	void SetInstancedObject3d(InstancedObject3d* instancedObject3d) { instancedObject3d_ = instancedObject3d; }
+#ifdef USE_IMGUI
+	void SetEditor(Editor* editor) { editor_ = editor; }
+#endif
 
 	// ============================================================
 	// 登録 / 生成
@@ -136,6 +152,12 @@ private:
 	std::vector<Entry> entries_;          // 管理中の全エントリ
 	int selectedIndex_ = -1;              // インスペクタで選択中の行 (-1 で未選択)
 	bool inspectorRegistered_ = false;    // インスペクタパネルを Editor に登録済みか
+
+	// 依存先マネージャ (借用のみ・非所有)。Initialize() 前に Set 系で注入すること。
+	InstancedObject3d* instancedObject3d_ = nullptr;
+#ifdef USE_IMGUI
+	Editor* editor_ = nullptr;
+#endif
 };
 
 // ============================================================

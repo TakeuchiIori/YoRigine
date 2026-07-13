@@ -3,10 +3,15 @@
 #include "Actions/WaypointAction.h"
 #include "Vfx/VfxMesh/Runtime/VfxMeshSpawner.h"
 #include "Debugger/Logger.h"
+#include <cassert>
 
 WaypointManager* WaypointManager::GetInstance() {
 	static WaypointManager instance;
 	return &instance;
+}
+
+void WaypointManager::Finalize() {
+	vfxMeshSpawner_ = nullptr;
 }
 
 void WaypointManager::Reset() {
@@ -34,7 +39,8 @@ void WaypointManager::Unregister(WaypointAction* wp) {
 
 void WaypointManager::StopBeacon() {
 	if (hasBeacon_) {
-		VfxMeshSpawner::GetInstance()->Stop(beaconId_);
+		assert(vfxMeshSpawner_ && "WaypointManager : SetVfxMeshSpawner() を先に呼ぶこと");
+		vfxMeshSpawner_->Stop(beaconId_);
 		hasBeacon_ = false;
 	}
 }
@@ -63,7 +69,8 @@ void WaypointManager::Activate(const std::string& name) {
 	// ビーコン(VfxMesh)を目的地に常時再生で出す
 	const std::string& fx = current_->GetBeaconEffect();
 	if (!fx.empty()) {
-		beaconId_  = VfxMeshSpawner::GetInstance()->Spawn(fx, currentPos_, current_->GetBeaconScale(), /*loop*/ true);
+		assert(vfxMeshSpawner_ && "WaypointManager : SetVfxMeshSpawner() を先に呼ぶこと");
+		beaconId_  = vfxMeshSpawner_->Spawn(fx, currentPos_, current_->GetBeaconScale(), /*loop*/ true);
 		hasBeacon_ = true;
 	}
 	Logger("[Waypoint] アクティブ化: \"" + name + "\"\n");
@@ -74,7 +81,8 @@ void WaypointManager::SetBeaconVisible(bool visible) {
 		if (current_ && !hasBeacon_) {
 			const std::string& fx = current_->GetBeaconEffect();
 			if (!fx.empty()) {
-				beaconId_ = VfxMeshSpawner::GetInstance()->Spawn(fx, currentPos_, current_->GetBeaconScale(), true);
+				assert(vfxMeshSpawner_ && "WaypointManager : SetVfxMeshSpawner() を先に呼ぶこと");
+				beaconId_ = vfxMeshSpawner_->Spawn(fx, currentPos_, current_->GetBeaconScale(), true);
 				hasBeacon_ = true;
 			}
 		}

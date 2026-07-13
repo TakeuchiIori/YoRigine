@@ -15,6 +15,9 @@
 #include <memory>
 #include <vector>
 
+class TextureManager;
+class ModelManager;
+
 // JSON
 #include <json.hpp>
 #include "Loaders/Json/Use/AutoJson.h"   // フィールド登録だけで Save/Load するユーティリティ
@@ -116,7 +119,17 @@ namespace YoRigine {
 	public:
 		///************************* 基本的な関数 *************************///
 		static GpuEmitManager* GetInstance();
+
+		// ============================================================
+		// 依存先マネージャの注入 (DI)
+		//   所有はしない (借用のみ)。Finalize() で nullptr に戻すのでダングリングポインタは残らない。
+		//   Initialize() より前に呼ぶこと。
+		// ============================================================
+		void SetTextureManager(TextureManager* textureManager) { textureManager_ = textureManager; }
+		void SetModelManager(ModelManager* modelManager) { modelManager_ = modelManager; }
+
 		void Initialize();
+		void Finalize();
 		void Update();
 		void Draw();
 
@@ -247,6 +260,11 @@ namespace YoRigine {
 	private:
 		///************************* メンバ変数 *************************///
 		Camera* camera_ = nullptr;
+
+		// 依存先マネージャ (借用のみ・非所有)。Initialize() 前に Set 系で注入すること。
+		TextureManager* textureManager_ = nullptr;
+		ModelManager* modelManager_ = nullptr;
+
 		std::unordered_map<std::string, std::unique_ptr<EmitterGroup>> groups_;
 #ifdef USE_IMGUI
 		FileBrowser textureBrowser_;
