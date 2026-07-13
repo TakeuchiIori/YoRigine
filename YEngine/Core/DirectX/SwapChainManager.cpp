@@ -8,7 +8,7 @@
 /// <summary>
 /// スワップチェーンの初期化
 /// </summary>
-void SwapChainManager::Initialize(WinApp* winApp, DeviceManager* deviceManager, CommandManager* commandManager)
+void SwapChainManager::Initialize(WinApp* winApp, DeviceManager* deviceManager, YoRigine::CommandManager* commandManager)
 {
 	this->winApp_ = winApp;
 	this->deviceManager_ = deviceManager;

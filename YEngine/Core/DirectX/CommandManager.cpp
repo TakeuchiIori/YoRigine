@@ -3,6 +3,8 @@
 #include <Debugger/Logger.h>
 #include "DeviceManager.h"
 
+namespace YoRigine {
+
 /// <summary>
 /// コマンドキュー・コマンドリスト・フェンス・フレームコンテキストの初期化
 /// </summary>
@@ -232,3 +234,5 @@ void CommandManager::InitializeFrameContexts()
 		frameContexts_[i].Initialize(deviceManager_->GetDevice().Get(), i);
 	}
 }
+
+} // namespace YoRigine
