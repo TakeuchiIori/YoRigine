@@ -36,6 +36,14 @@
 // 一時オーバーラップクエリ（hitDelay到達時の QuerySphere）の結果型に使う。
 // 重いヘッダ(CollisionManager.h)はここでは読み込まず、.cpp側でのみincludeする。
 class BaseCollider;
+class VfxMeshSpawner;
+class YParticleManager;
+class YEmitterGroupManager;
+namespace YoRigine {
+    class GpuEmitManager;
+    class CollisionManager;
+    class Audio;
+}
 
 // ── アセット定義（既存アセット名の参照のみ）───────────────────────────
 struct CompositeVfxRef {
@@ -80,7 +88,8 @@ struct CompositeEffectAsset {
     //   - GPUParticle: GpuEmitManager::EstimateGroupNaturalDuration() から概算
     //   - CPUパーティクル(particleEffect): 現状未対応（System=定義/インスタンス=粒バッファが
     //     未分離なため安全に見積もれない）。0扱い＝このCompositeのNaturalDurationに寄与しない。
-    float NaturalDuration() const;
+    // vfxMeshSpawner/gpuEmitManager は呼び出し側 (CompositeEffectManager) が注入済みの借用ポインタを渡す。
+    float NaturalDuration(VfxMeshSpawner* vfxMeshSpawner, YoRigine::GpuEmitManager* gpuEmitManager) const;
 };
 
 // ── ループ複合エフェクトの実行インスタンス（子ハンドルを保持し Stop で連鎖停止）──
@@ -103,6 +112,21 @@ struct CompositeInstance {
 class CompositeEffectManager {
 public:
     static CompositeEffectManager* GetInstance();
+
+    // ============================================================
+    // 依存先マネージャの注入 (DI)
+    //   所有はしない (借用のみ)。Finalize() で nullptr に戻すのでダングリングポインタは残らない。
+    //   ScanDirectory()/Play 系を呼ぶより前に、全て注入しておくこと。
+    // ============================================================
+    void SetVfxMeshSpawner(VfxMeshSpawner* vfxMeshSpawner) { vfxMeshSpawner_ = vfxMeshSpawner; }
+    void SetGpuEmitManager(YoRigine::GpuEmitManager* gpuEmitManager) { gpuEmitManager_ = gpuEmitManager; }
+    void SetAudio(YoRigine::Audio* audio) { audio_ = audio; }
+    void SetCollisionManager(YoRigine::CollisionManager* collisionManager) { collisionManager_ = collisionManager; }
+    void SetYParticleManager(YParticleManager* yParticleManager) { yParticleManager_ = yParticleManager; }
+    void SetYEmitterGroupManager(YEmitterGroupManager* yEmitterGroupManager) { yEmitterGroupManager_ = yEmitterGroupManager; }
+
+    // アプリ終了時に借用ポインタを手放す
+    void Finalize();
 
     // YComposites/*.json を再帰スキャンして全ロード
     void ScanDirectory(const std::string& dir = "Resources/Json/YComposites/");
@@ -149,6 +173,14 @@ private:
     CompositeEffectManager& operator=(const CompositeEffectManager&) = delete;
 
     std::unordered_map<std::string, CompositeEffectAsset> assets_;
+
+    // 依存先マネージャ (借用のみ・非所有)。使用前に Set 系で注入すること。
+    VfxMeshSpawner*              vfxMeshSpawner_ = nullptr;
+    YoRigine::GpuEmitManager*    gpuEmitManager_ = nullptr;
+    YoRigine::Audio*             audio_ = nullptr;
+    YoRigine::CollisionManager*  collisionManager_ = nullptr;
+    YParticleManager*            yParticleManager_ = nullptr;
+    YEmitterGroupManager*        yEmitterGroupManager_ = nullptr;
 
     // ── hitDelay用の遅延ダメージクエリ待ち行列（Update()で毎フレーム消化） ──
     struct PendingHitQuery {

@@ -17,6 +17,8 @@
 #include <Collision/Core/ColliderPool.h>
 #include <Collision/Core/CollisionTypeIdDef.h>
 
+namespace YoRigine { class CollisionManager; }
+
 enum class ColliderShapeType : uint32_t {
 	kAABB = 0,
 	kOBB,
@@ -115,6 +117,13 @@ public:
 	///************************* 基本関数 *************************///
 
 	static ObjectManager* GetInstance();
+
+	// ============================================================
+	// 依存先マネージャの注入 (DI)
+	//   所有はしない (借用のみ)。Finalize() で nullptr に戻すのでダングリングポインタは残らない。
+	//   Initialize() より前に呼ぶこと。
+	// ============================================================
+	void SetCollisionManager(YoRigine::CollisionManager* collisionManager) { collisionManager_ = collisionManager; }
 
 	void Initialize();
 	void Update();
@@ -228,6 +237,9 @@ private:
 	ObjectManager& operator=(const ObjectManager&) = delete;
 
 	Camera* camera_ = nullptr;
+
+	// 依存先マネージャ (借用のみ・非所有)。Initialize() 前に SetCollisionManager() で注入すること。
+	YoRigine::CollisionManager* collisionManager_ = nullptr;
 
 	static ObjectManager* instance_;
 

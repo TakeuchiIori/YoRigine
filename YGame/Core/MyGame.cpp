@@ -16,6 +16,7 @@
 #include <Drawer/InstancedObject3d.h>
 #include <Loaders/Texture/TextureManager.h>
 #include <ModelManager.h>
+#include <Collision/Core/CollisionManager.h>
 
 #include "Particle/YParticleManager.h"
 #include "Particle/YEmitterGroupEditor.h"
@@ -82,6 +83,12 @@ void MyGame::Initialize() {
 
 	// 複合エフェクト（Particle+VfxMesh+GPU+Sound を名前で束ねる層）を自動ロード。
 	// Particle/GPU の Scan より後（子アセットが先に存在している必要があるため）。
+	CompositeEffectManager::GetInstance()->SetVfxMeshSpawner(VfxMeshSpawner::GetInstance());
+	CompositeEffectManager::GetInstance()->SetGpuEmitManager(YoRigine::GpuEmitManager::GetInstance());
+	CompositeEffectManager::GetInstance()->SetAudio(audio_);
+	CompositeEffectManager::GetInstance()->SetCollisionManager(YoRigine::CollisionManager::GetInstance());
+	CompositeEffectManager::GetInstance()->SetYParticleManager(&YParticleManager::GetInstance());
+	CompositeEffectManager::GetInstance()->SetYEmitterGroupManager(&YEmitterGroupManager::GetInstance());
 	CompositeEffectManager::GetInstance()->ScanDirectory("Resources/Json/YComposites/");
 
 	// モデル操作関連の初期化
@@ -166,6 +173,7 @@ void MyGame::Finalize() {
 	SceneManager::GetInstance()->Finalize();
 	WaypointManager::GetInstance()->Finalize();
 	YoRigine::GpuEmitManager::GetInstance()->Finalize();
+	CompositeEffectManager::GetInstance()->Finalize();
 	VfxMeshSpawner::GetInstance()->Finalize();
 	YoRigine::ModelManipulator::GetInstance()->Finalize();
 

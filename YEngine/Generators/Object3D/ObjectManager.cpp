@@ -7,6 +7,7 @@
 #include <Collision/Core/ColliderFactory.h>
 #include <Collision/OBB/OBBCollider.h>
 #include <Collision/Sphere/SphereCollider.h>
+#include <cassert>
 ObjectManager* ObjectManager::instance_ = nullptr;
 
 
@@ -35,7 +36,8 @@ void ObjectManager::Initialize() {
 /// アクティブオブジェクトのアニメーション更新
 /// </summary>
 void ObjectManager::Update() {
-	auto* cm = YoRigine::CollisionManager::GetInstance();
+	assert(collisionManager_ && "ObjectManager : SetCollisionManager() を先に呼ぶこと");
+	auto* cm = collisionManager_;
 	const bool cullingActive = cm->IsCullingActive();
 
 	int total = 0;
@@ -78,7 +80,8 @@ void ObjectManager::Update() {
 void ObjectManager::Finalize() {
 	// 退避中シーンを掃除 (PlacedObject を pool に戻し、collider を Manager から外す)
 	if (!stashedScenes_.empty()) {
-		auto* cm = YoRigine::CollisionManager::GetInstance();
+		assert(collisionManager_ && "ObjectManager : SetCollisionManager() を先に呼ぶこと");
+		auto* cm = collisionManager_;
 		for (auto& [name, stashed] : stashedScenes_) {
 			for (auto& [id, obj] : stashed.objects) {
 				if (!obj) continue;
@@ -89,6 +92,10 @@ void ObjectManager::Finalize() {
 		stashedScenes_.clear();
 	}
 	ClearAllObjects();
+
+	// 借用ポインタを手放す (ダングリング防止)
+	collisionManager_ = nullptr;
+
 	delete instance_;
 	instance_ = nullptr;
 }
@@ -160,7 +167,8 @@ void ObjectManager::ClearAllObjects() {
 	// 現在シーン分の PlacedObject だけ pool に戻す。
 	// objectPool_.Clear() を呼ぶと StashCurrentAs 経由で退避中のシーンの PlacedObject も
 	// destruct してしまい、TryRestore したときに dangling になるため使わない。
-	auto* cm = YoRigine::CollisionManager::GetInstance();
+	assert(collisionManager_ && "ObjectManager : SetCollisionManager() を先に呼ぶこと");
+	auto* cm = collisionManager_;
 	for (auto& [id, obj] : idToObject_) {
 		if (!obj) continue;
 		if (obj->collider) cm->RemoveCollider(obj->collider.get());
@@ -174,7 +182,8 @@ void ObjectManager::ClearAllObjects() {
 
 
 void ObjectManager::StashCurrentAs(const std::string& sceneName) {
-	auto* cm = YoRigine::CollisionManager::GetInstance();
+	assert(collisionManager_ && "ObjectManager : SetCollisionManager() を先に呼ぶこと");
+	auto* cm = collisionManager_;
 
 	// 同名の退避が既にある場合は古い方を破棄 (pool に戻す + collider を Manager から外す)。
 	auto existing = stashedScenes_.find(sceneName);
@@ -210,7 +219,8 @@ bool ObjectManager::TryRestore(const std::string& sceneName) {
 	nextObjectId_ = it->second.nextObjectId;
 	stashedScenes_.erase(it);
 
-	auto* cm = YoRigine::CollisionManager::GetInstance();
+	assert(collisionManager_ && "ObjectManager : SetCollisionManager() を先に呼ぶこと");
+	auto* cm = collisionManager_;
 	for (auto& [id, obj] : idToObject_) {
 		if (obj && obj->collider) cm->AddCollider(obj->collider.get());
 	}

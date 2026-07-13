@@ -1,6 +1,7 @@
 #include "CompositeEffectManager.h"
 
 #include "Debugger/Logger.h"
+#include <cassert>
 
 // エディタのドロップダウン用（各系統の名前一覧）
 #include "Particle/YParticleManager.h"
@@ -45,16 +46,16 @@ void CompositeInstance::SetPosition(const Vector3& pos)
 //   System=定義/インスタンス=粒バッファが未分離なため安全に見積もれず、現状0扱い
 //   （Docs/VfxExpansion_Design.md の 7.2 参照）。
 // ============================================================================
-float CompositeEffectAsset::NaturalDuration() const
+float CompositeEffectAsset::NaturalDuration(VfxMeshSpawner* vfxMeshSpawner, YoRigine::GpuEmitManager* gpuEmitManager) const
 {
     float maxDur = 0.0f;
     for (const auto& v : vfxMeshAssets) {
-        if (const auto* vfxAsset = VfxMeshSpawner::GetInstance()->GetAsset(v.asset)) {
+        if (const auto* vfxAsset = vfxMeshSpawner->GetAsset(v.asset)) {
             maxDur = std::max(maxDur, vfxAsset->OneShotDuration());
         }
     }
     if (!gpuEmitterGroup.empty()) {
-        maxDur = std::max(maxDur, YoRigine::GpuEmitManager::GetInstance()->EstimateGroupNaturalDuration(gpuEmitterGroup));
+        maxDur = std::max(maxDur, gpuEmitManager->EstimateGroupNaturalDuration(gpuEmitterGroup));
     }
     return maxDur;
 }
@@ -84,6 +85,16 @@ CompositeEffectManager* CompositeEffectManager::GetInstance()
 {
     static CompositeEffectManager instance;
     return &instance;
+}
+
+void CompositeEffectManager::Finalize()
+{
+    vfxMeshSpawner_ = nullptr;
+    gpuEmitManager_ = nullptr;
+    audio_ = nullptr;
+    collisionManager_ = nullptr;
+    yParticleManager_ = nullptr;
+    yEmitterGroupManager_ = nullptr;
 }
 
 namespace {
@@ -262,7 +273,8 @@ void CompositeEffectManager::PlayOneShot(const std::string& name, const Vector3&
     // 既にminDuration以上あるアセットには触らない（強制同期はしない。7.2参照）。
     float vfxTimeScale = 1.0f;
     if (params.minDuration > 0.0f) {
-        const float natural = a.NaturalDuration();
+        assert(vfxMeshSpawner_ && gpuEmitManager_ && "CompositeEffectManager : Set系で依存を先に注入すること");
+        const float natural = a.NaturalDuration(vfxMeshSpawner_, gpuEmitManager_);
         if (natural > 0.0001f && params.minDuration > natural) {
             vfxTimeScale = natural / params.minDuration;
         }
@@ -274,8 +286,9 @@ void CompositeEffectManager::PlayOneShot(const std::string& name, const Vector3&
     if (!a.gpuEmitterGroup.empty()) {
         GpuParticleHandle::PlayOneShot(a.gpuEmitterGroup, pos + a.gpuOffset);
     }
+    assert(audio_ && "CompositeEffectManager : SetAudio() を先に呼ぶこと");
     for (const auto& s : a.sounds) {
-        YoRigine::Audio::GetInstance()->PlayOneShot(s.path, s.volume, s.category);
+        audio_->PlayOneShot(s.path, s.volume, s.category);
     }
 
     // ダメージ判定（一時オーバーラップクエリ）を hitDelay 秒後に予約
@@ -326,8 +339,9 @@ EffectHandle CompositeEffectManager::Play(const std::string& name, const Vector3
         inst->gpu = GpuParticleHandle::Play(a.gpuEmitterGroup, pos + a.gpuOffset);
     }
     // ループ音（保持して Stop 連鎖）
+    assert(audio_ && "CompositeEffectManager : SetAudio() を先に呼ぶこと");
     for (const auto& s : a.sounds) {
-        inst->sounds.push_back(YoRigine::Audio::GetInstance()->Play(s.path, /*loop*/true, s.volume, s.category));
+        inst->sounds.push_back(audio_->Play(s.path, /*loop*/true, s.volume, s.category));
     }
 
     if (a.hitDelay >= 0.0f) {
@@ -356,8 +370,9 @@ void CompositeEffectManager::Update(float deltaTime)
         q.remaining -= deltaTime;
         if (q.remaining <= 0.0f) {
             if (q.callback) {
+                assert(collisionManager_ && "CompositeEffectManager : SetCollisionManager() を先に呼ぶこと");
                 std::vector<BaseCollider*> hits =
-                    YoRigine::CollisionManager::GetInstance()->QuerySphere(q.pos, q.radius, q.layerMask);
+                    collisionManager_->QuerySphere(q.pos, q.radius, q.layerMask);
                 q.callback(hits);
             }
             pendingHitQueries_[i] = std::move(pendingHitQueries_.back());
@@ -458,8 +473,9 @@ void CompositeEffectManager::DrawImGui()
 
     // ── Particle ──
     {
-        std::vector<std::string> opts = YParticleManager::GetInstance().GetAllSystemNames();
-        auto groups = YEmitterGroupManager::GetInstance().GetAllGroupNames();
+        assert(yParticleManager_ && yEmitterGroupManager_ && "CompositeEffectManager : Set系で依存を先に注入すること");
+        std::vector<std::string> opts = yParticleManager_->GetAllSystemNames();
+        auto groups = yEmitterGroupManager_->GetAllGroupNames();
         opts.insert(opts.end(), groups.begin(), groups.end());
         stringCombo("Particle エフェクト", a.particleEffect, opts, true);
         if (!a.particleEffect.empty()) {
@@ -468,7 +484,8 @@ void CompositeEffectManager::DrawImGui()
     }
     // ── GPU ──
     {
-        auto opts = YoRigine::GpuEmitManager::GetInstance()->GetGroupNames();
+        assert(gpuEmitManager_ && "CompositeEffectManager : SetGpuEmitManager() を先に呼ぶこと");
+        auto opts = gpuEmitManager_->GetGroupNames();
         stringCombo("GPU グループ", a.gpuEmitterGroup, opts, true);
         if (!a.gpuEmitterGroup.empty()) {
             ImGui::DragFloat3("GPU オフセット", &a.gpuOffset.x, 0.05f);
@@ -478,7 +495,8 @@ void CompositeEffectManager::DrawImGui()
     // ── VfxMesh（複数）──
     ImGui::SeparatorText("VfxMesh（複数可）");
     {
-        auto opts = VfxMeshSpawner::GetInstance()->GetAssetNames();
+        assert(vfxMeshSpawner_ && "CompositeEffectManager : SetVfxMeshSpawner() を先に呼ぶこと");
+        auto opts = vfxMeshSpawner_->GetAssetNames();
         int removeIdx = -1;
         for (int i = 0; i < static_cast<int>(a.vfxMeshAssets.size()); ++i) {
             ImGui::PushID(i);
