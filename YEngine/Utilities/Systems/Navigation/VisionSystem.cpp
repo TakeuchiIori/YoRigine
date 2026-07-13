@@ -70,21 +70,27 @@ bool VisionSystem::HasLineOfSight(const Vector3& from, const Vector3& to)
 		if (obj->colliderTypeId != CollisionTypeIdDef::kNavObstacle &&
 			obj->colliderTypeId != CollisionTypeIdDef::kStaticWall) continue;
 
-		// AABB
-		if (const auto* aabb = dynamic_cast<const AABBCollider*>(obj->collider.get())) {
+		// 形状ベースの静的ディスパッチ (dynamic_cast は使わない方針。CollisionManager 等と同様)
+		switch (obj->collider->GetShape()) {
+		case ColliderShape::AABB: {
+			const auto* aabb = static_cast<const AABBCollider*>(obj->collider.get());
 			if (Intersection::IsCollisionSegmentAABB2D(from, to, aabb->GetAABB())) {
 				return false;
 			}
-			continue;
+			break;
 		}
-		// OBB (回転を考慮した XZ 線分判定)
-		if (const auto* obb = dynamic_cast<const OBBCollider*>(obj->collider.get())) {
+		case ColliderShape::OBB: {
+			// OBB (回転を考慮した XZ 線分判定)
+			const auto* obb = static_cast<const OBBCollider*>(obj->collider.get());
 			if (SegmentVsOBBxz(from, to, obb->GetOBB())) {
 				return false;
 			}
-			continue;
+			break;
 		}
-		// Sphere / Capsule は視線遮蔽として扱わない
+		default:
+			// Sphere / Capsule は視線遮蔽として扱わない
+			break;
+		}
 	}
 	return true;
 }

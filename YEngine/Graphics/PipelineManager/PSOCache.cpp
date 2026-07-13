@@ -460,7 +460,11 @@ namespace YoRigine {
         const std::string& key,
         const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc
     ) {
-        assert(device_ != nullptr && "PSOCache not initialized");
+        if (device_ == nullptr) {
+            // Release では assert のみだと消えて device_->CreateGraphicsPipelineState が
+            // nullptr 経由でクラッシュする。未初期化利用を確実に検出する。
+            ThrowError("PSOCache: Initialize() より前に GetOrCreate が呼ばれました\n");
+        }
 
         char logBuf[512];
 
@@ -521,7 +525,9 @@ namespace YoRigine {
         const std::string& key,
         const D3D12_COMPUTE_PIPELINE_STATE_DESC& desc
     ) {
-        assert(device_ != nullptr && "PSOCache not initialized");
+        if (device_ == nullptr) {
+            ThrowError("PSOCache: Initialize() より前に GetOrCreate が呼ばれました\n");
+        }
 
         char logBuf[512];
 

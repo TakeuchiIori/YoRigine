@@ -59,6 +59,8 @@ using BattleEnemyDefeatedCallback = std::function<void(const BattleEnemy& enemy)
 
 ///************************* 戦闘用の敵管理クラス *************************///
 class BattleEnemyManager {
+	// デバッグ/データ編集用 ImGui UI (USE_IMGUI 限定)。神クラス化対策として別クラスに分離。
+	friend class BattleEnemyEditorUI;
 public:
 	///************************* 基本的な関数 *************************///
 

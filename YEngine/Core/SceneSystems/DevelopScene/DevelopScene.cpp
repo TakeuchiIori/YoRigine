@@ -135,7 +135,7 @@ void DevelopScene::Update() {
 	YoRigine::ModelManipulator::GetInstance()->Update();
 	YParticleManager::GetInstance().Update(YoRigine::GameTime::GetDeltaTime(YoRigine::TimeChannel::Vfx));
 	VfxMeshSpawner::GetInstance()->SetCamera(sceneCamera_.get());
-	VfxMeshSpawner::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime(YoRigine::TimeChannel::Vfx));
+	VfxMeshSpawner::GetInstance()->Update(YoRigine:ｆ:GameTime::GetDeltaTime(YoRigine::TimeChannel::Vfx));
 	YoRigine::LightManager::GetInstance()->UpdateShadowMatrix(sceneCamera_.get());
 	YoRigine::GpuEmitManager::GetInstance()->Update();
 	CompositeEffectManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime(YoRigine::TimeChannel::Vfx));

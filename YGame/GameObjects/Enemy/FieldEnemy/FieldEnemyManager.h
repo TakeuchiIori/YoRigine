@@ -64,6 +64,8 @@ namespace FieldEnemyPaths {
 
 ///************************* フィールド用の敵管理クラス *************************///
 class FieldEnemyManager {
+	// デバッグ/データ編集用 ImGui UI (USE_IMGUI 限定)。神クラス化対策として別クラスに分離。
+	friend class FieldEnemyEditorUI;
 public:
 	///************************* 基本的な関数 *************************///
 
@@ -200,15 +202,7 @@ public:
 	void ShowDebugInfo();
 
 	///************************* エディター機能 *************************///
-
-	// エネミーエディターを表示
-	void ShowEnemyEditor();
-
-	// スポーンポイントエディターを表示
-	void ShowSpawnPointEditor();
-
-	// 敵データエディターを表示
-	void ShowEnemyDataEditor();
+	// ShowEnemyEditor/ShowSpawnPointEditor/ShowEnemyDataEditor は FieldEnemyEditorUI に分離済み (神クラス対策)。
 
 	// エディターモードを設定
 	void SetEditorMode(bool enabled) { isEditorMode_ = enabled; }
@@ -220,6 +214,8 @@ public:
 	void ClearDefeatedList();
 private:
 	///************************* ★エディター内部処理 *************************///
+	// データ編集系のヘルパーは FieldEnemyEditorUI に分離済み (神クラス対策)。
+	// friend 経由で spawnDataMap_/enemyDataMap_ 等の private メンバへアクセスする。
 
 	// 特定のEnemyIDを持つ全インスタンスにデータを同期する
 	void SyncEnemyInstances(const std::string& enemyId);
@@ -227,38 +223,8 @@ private:
 	// 全フィールド敵を削除
 	void RemoveAllFieldEnemies();
 
-	// 新しい敵データを作成
-	void CreateNewEnemyData();
-
-	// 敵データIDの空きを探す
-	std::string GenerateUniqueEnemyDataId(const std::string& prefix) const;
-
-	// 敵データIDを変更し、スポーンポイントの参照と出現済み敵も同期する
-	bool RenameEnemyData(const std::string& oldId, const std::string& newId);
-
-	// バトル敵データから選択候補IDを取得する
-	std::vector<std::string> LoadBattleEnemyIdOptions() const;
-
-	// 敵データを編集
-	void EditEnemyData(const std::string& enemyId);
-
-	// 敵データを削除
-	void DeleteEnemyData(const std::string& enemyId);
-
-	// 新しいスポーンポイントを作成
-	void CreateNewSpawnPoint();
-
-	// スポーンポイントIDの空きを探す
+	// スポーンポイントIDの空きを探す (LoadEnemySpawnData での重複/空ID救済にも使うため残す)
 	std::string GenerateUniqueSpawnPointId(const std::string& prefix) const;
-
-	// スポーンポイントIDを変更し、出現済み敵やリスポーン待ちデータも同期する
-	bool RenameSpawnPoint(const std::string& oldId, const std::string& newId);
-
-	// スポーンポイントを編集
-	void EditSpawnPoint(const std::string& spawnId);
-
-	// スポーンポイントを削除
-	void DeleteSpawnPoint(const std::string& spawnId);
 
 private:
 	///************************* メンバ変数 *************************///

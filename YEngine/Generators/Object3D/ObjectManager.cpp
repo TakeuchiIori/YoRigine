@@ -619,10 +619,12 @@ void ObjectManager::ApplyColliderTemplate(PlacedObject& obj) {
 	// シェイプが変わった場合はコライダーを作り直す
 	bool needRebuild = !obj.collider;
 	if (!needRebuild) {
+		// dynamic_cast は使わず、形状IDで判定する (CollisionManager 等と同じ方針)
+		const ColliderShape currentShape = obj.collider->GetShape();
 		switch (obj.colliderShapeType) {
-		case ColliderShapeType::kAABB:   needRebuild = !dynamic_cast<AABBCollider*>(obj.collider.get());   break;
-		case ColliderShapeType::kOBB:    needRebuild = !dynamic_cast<OBBCollider*>(obj.collider.get());    break;
-		case ColliderShapeType::kSphere: needRebuild = !dynamic_cast<SphereCollider*>(obj.collider.get()); break;
+		case ColliderShapeType::kAABB:   needRebuild = (currentShape != ColliderShape::AABB);    break;
+		case ColliderShapeType::kOBB:    needRebuild = (currentShape != ColliderShape::OBB);     break;
+		case ColliderShapeType::kSphere: needRebuild = (currentShape != ColliderShape::Sphere);  break;
 		}
 	}
 
