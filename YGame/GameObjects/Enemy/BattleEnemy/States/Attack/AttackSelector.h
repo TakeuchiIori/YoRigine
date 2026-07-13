@@ -93,14 +93,14 @@ struct AttackWeightConfig {
 /// 攻撃パターンごとの重み情報
 /// </summary>
 struct AttackWeight {
-	std::string patternName;
+	AttackPatternType pattern;
 	float baseWeight = 1.0f;
 	float distanceWeight = 1.0f;
 	float hpWeight = 1.0f;
 	float finalWeight = 1.0f;
 
-	AttackWeight(const std::string& name, float base = 1.0f)
-		: patternName(name), baseWeight(base) {
+	AttackWeight(AttackPatternType p, float base = 1.0f)
+		: pattern(p), baseWeight(base) {
 	}
 
 	void CalculateFinalWeight() {
@@ -147,7 +147,7 @@ public:
 		std::vector<AttackWeight> weights = CalculateWeights(patterns, distance, hpRatio);
 
 		// 重みに基づいて攻撃を選択
-		std::string selectedPattern = SelectByWeight(weights);
+		AttackPatternType selectedPattern = SelectByWeight(weights);
 
 		return CreateAttackState(selectedPattern);
 	}
@@ -165,24 +165,24 @@ public:
 		Vector3 toPlayer = enemy.GetPlayerPosition() - enemy.GetTranslate();
 		float distance = Length(toPlayer);
 
-		// 条件に合致する攻撃名を格納するリスト
-		std::vector<std::string> candidatePatterns;
+		// 条件に合致する攻撃パターンを格納するリスト
+		std::vector<AttackPatternType> candidatePatterns;
 
 		// --- 距離に応じた候補の絞り込み ---
 		// 遠距離
 		if (distance > config_.distance.midRange) {
-			if (HasPattern(patterns, "jump")) candidatePatterns.push_back("jump");
-			if (HasPattern(patterns, "chargeRush")) candidatePatterns.push_back("chargeRush");
+			if (HasPattern(patterns, AttackPatternType::Jump)) candidatePatterns.push_back(AttackPatternType::Jump);
+			if (HasPattern(patterns, AttackPatternType::ChargeRush)) candidatePatterns.push_back(AttackPatternType::ChargeRush);
 		}
 		// 中距離
 		else if (distance > config_.distance.closeRange) {
-			if (HasPattern(patterns, "rush")) candidatePatterns.push_back("rush");
+			if (HasPattern(patterns, AttackPatternType::Rush)) candidatePatterns.push_back(AttackPatternType::Rush);
 			// もし中距離に他の候補を追加したい場合はここに追記
 		}
 		// 近距離
 		else {
-			if (HasPattern(patterns, "spin")) candidatePatterns.push_back("spin");
-			if (HasPattern(patterns, "combo")) candidatePatterns.push_back("combo");
+			if (HasPattern(patterns, AttackPatternType::Spin)) candidatePatterns.push_back(AttackPatternType::Spin);
+			if (HasPattern(patterns, AttackPatternType::Combo)) candidatePatterns.push_back(AttackPatternType::Combo);
 		}
 
 		// --- 抽選処理 ---
@@ -192,7 +192,7 @@ public:
 			static std::mt19937 gen(rd());
 			std::uniform_int_distribution<size_t> dist(0, candidatePatterns.size() - 1);
 
-			std::string selected = candidatePatterns[dist(gen)];
+			AttackPatternType selected = candidatePatterns[dist(gen)];
 			return CreateAttackState(selected);
 		}
 
@@ -205,7 +205,7 @@ private:
 	/// 各攻撃の重みを計算
 	/// </summary>
 	static std::vector<AttackWeight> CalculateWeights(
-		const std::vector<std::string>& patterns,
+		const std::vector<AttackPatternType>& patterns,
 		float distance,
 		float hpRatio)
 	{
@@ -232,47 +232,61 @@ private:
 	/// <summary>
 	/// 距離に基づく重み係数を取得
 	/// </summary>
-	static float GetDistanceWeight(const std::string& pattern, float distance) {
+	static float GetDistanceWeight(AttackPatternType pattern, float distance) {
 		const auto& affinity = config_.distanceAffinity;
 
 		// 距離レンジを判定して適性値を返す
 		if (distance < config_.distance.veryCloseRange) {
 			// 超近距離（0-2m）
-			if (pattern == "rush") return affinity.rushVeryClose;
-			if (pattern == "spin") return affinity.spinVeryClose;
-			if (pattern == "chargeRush") return affinity.chargeVeryClose;
-			if (pattern == "jump") return affinity.leapVeryClose;
-			if (pattern == "combo") return affinity.comboVeryClose;
+			switch (pattern) {
+			case AttackPatternType::Rush:       return affinity.rushVeryClose;
+			case AttackPatternType::Spin:       return affinity.spinVeryClose;
+			case AttackPatternType::ChargeRush: return affinity.chargeVeryClose;
+			case AttackPatternType::Jump:       return affinity.leapVeryClose;
+			case AttackPatternType::Combo:      return affinity.comboVeryClose;
+			default: break;
+			}
 		}
 		else if (distance < config_.distance.closeRange) {
 			// 近距離（2-4m）
-			if (pattern == "rush") return affinity.rushClose;
-			if (pattern == "spin") return affinity.spinClose;
-			if (pattern == "chargeRush") return affinity.chargeClose;
-			if (pattern == "jump") return affinity.leapClose;
-			if (pattern == "combo") return affinity.comboClose;
+			switch (pattern) {
+			case AttackPatternType::Rush:       return affinity.rushClose;
+			case AttackPatternType::Spin:       return affinity.spinClose;
+			case AttackPatternType::ChargeRush: return affinity.chargeClose;
+			case AttackPatternType::Jump:       return affinity.leapClose;
+			case AttackPatternType::Combo:      return affinity.comboClose;
+			default: break;
+			}
 		}
 		else if (distance < config_.distance.midRange) {
 			// 中距離（4-8m）
-			if (pattern == "rush") return affinity.rushMid;
-			if (pattern == "spin") return affinity.spinMid;
-			if (pattern == "chargeRush") return affinity.chargeMid;
-			if (pattern == "jump") return affinity.leapMid;
-			if (pattern == "combo") return affinity.comboMid;
+			switch (pattern) {
+			case AttackPatternType::Rush:       return affinity.rushMid;
+			case AttackPatternType::Spin:       return affinity.spinMid;
+			case AttackPatternType::ChargeRush: return affinity.chargeMid;
+			case AttackPatternType::Jump:       return affinity.leapMid;
+			case AttackPatternType::Combo:      return affinity.comboMid;
+			default: break;
+			}
 		}
 		else if (distance < config_.distance.farRange) {
 			// 遠距離（8-15m）
-			if (pattern == "rush") return affinity.rushFar;
-			if (pattern == "spin") return affinity.spinFar;
-			if (pattern == "chargeRush") return affinity.chargeFar;
-			if (pattern == "jump") return affinity.leapFar;
-			if (pattern == "combo") return affinity.comboFar;
+			switch (pattern) {
+			case AttackPatternType::Rush:       return affinity.rushFar;
+			case AttackPatternType::Spin:       return affinity.spinFar;
+			case AttackPatternType::ChargeRush: return affinity.chargeFar;
+			case AttackPatternType::Jump:       return affinity.leapFar;
+			case AttackPatternType::Combo:      return affinity.comboFar;
+			default: break;
+			}
 		}
 		else {
 			// 超遠距離（15m以上）
-			if (pattern == "chargeRush") return affinity.chargeFar * 1.2f;
-			if (pattern == "jump") return affinity.leapFar * 1.2f;
-			return 0.1f; // その他の攻撃は超遠距離では不向き
+			switch (pattern) {
+			case AttackPatternType::ChargeRush: return affinity.chargeFar * 1.2f;
+			case AttackPatternType::Jump:       return affinity.leapFar * 1.2f;
+			default: return 0.1f; // その他の攻撃は超遠距離では不向き
+			}
 		}
 
 		return 1.0f;
@@ -281,7 +295,7 @@ private:
 	/// <summary>
 	/// プレイヤーのHP状態に基づく重み係数を取得
 	/// </summary>
-	static float GetPlayerHPWeight(const std::string& pattern, float hpRatio) {
+	static float GetPlayerHPWeight(AttackPatternType pattern, float hpRatio) {
 		const auto& priority = config_.hpPriority;
 		float hpMultiplier = 1.0f;
 
@@ -305,11 +319,14 @@ private:
 
 		// 攻撃パターンごとのHP優先度を取得
 		float attackPriority = 1.0f;
-		if (pattern == "rush") attackPriority = priority.rushPriority;
-		else if (pattern == "spin") attackPriority = priority.spinPriority;
-		else if (pattern == "charge") attackPriority = priority.chargePriority;
-		else if (pattern == "jump") attackPriority = priority.leapPriority;
-		else if (pattern == "combo") attackPriority = priority.comboPriority;
+		switch (pattern) {
+		case AttackPatternType::Rush:       attackPriority = priority.rushPriority; break;
+		case AttackPatternType::Spin:       attackPriority = priority.spinPriority; break;
+		case AttackPatternType::ChargeRush: attackPriority = priority.chargePriority; break;
+		case AttackPatternType::Jump:       attackPriority = priority.leapPriority; break;
+		case AttackPatternType::Combo:      attackPriority = priority.comboPriority; break;
+		default: break;
+		}
 
 		return hpMultiplier * attackPriority;
 	}
@@ -317,9 +334,9 @@ private:
 	/// <summary>
 	/// 重みに基づいて攻撃を選択
 	/// </summary>
-	static std::string SelectByWeight(const std::vector<AttackWeight>& weights) {
+	static AttackPatternType SelectByWeight(const std::vector<AttackWeight>& weights) {
 		if (weights.empty()) {
-			return "rush";
+			return AttackPatternType::Rush;
 		}
 
 		// 総重みを計算
@@ -329,7 +346,7 @@ private:
 		}
 
 		if (totalWeight <= 0.0f) {
-			return weights.front().patternName;
+			return weights.front().pattern;
 		}
 
 		// ランダム値を生成（0.0 ~ totalWeight）
@@ -343,47 +360,37 @@ private:
 		for (const auto& weight : weights) {
 			cumulative += weight.finalWeight;
 			if (randomValue <= cumulative) {
-				return weight.patternName;
+				return weight.pattern;
 			}
 		}
 
 		// フォールバック（通常は到達しない）
-		return weights.back().patternName;
+		return weights.back().pattern;
 	}
 
 	/// <summary>
-	/// 攻撃名から状態を生成
+	/// 攻撃パターンから状態を生成
 	/// </summary>
 	static std::unique_ptr<IEnemyState<BattleEnemy>> CreateAttackState(
-		const std::string& patternName)
+		AttackPatternType pattern)
 	{
-		if (patternName == "rush") {
-			return std::make_unique<BattleRushAttackState>();
+		switch (pattern) {
+		case AttackPatternType::Rush:       return std::make_unique<BattleRushAttackState>();
+		case AttackPatternType::Jump:       return std::make_unique<BattleJumpAttackState>();
+		case AttackPatternType::Spin:       return std::make_unique<BattleSpinAttackState>();
+		case AttackPatternType::ChargeRush: return std::make_unique<BattleChargeRushAttackState>();
+		case AttackPatternType::Combo:      return std::make_unique<BattleComboAttackState>();
+		default:                           return std::make_unique<BattleRushAttackState>();
 		}
-		else if (patternName == "jump") {
-			return std::make_unique<BattleJumpAttackState>();
-		}
-		else if (patternName == "spin") {
-			return std::make_unique<BattleSpinAttackState>();
-		}
-		else if (patternName == "chargeRush") {
-			return std::make_unique<BattleChargeRushAttackState>();
-		}
-		else if (patternName == "combo") {
-			return std::make_unique<BattleComboAttackState>();
-		}
-
-		// デフォルト
-		return std::make_unique<BattleRushAttackState>();
 	}
 
 	/// <summary>
 	/// パターンリストに指定の攻撃が含まれるか
 	/// </summary>
-	static bool HasPattern(const std::vector<std::string>& patterns,
-		const std::string& name)
+	static bool HasPattern(const std::vector<AttackPatternType>& patterns,
+		AttackPatternType pattern)
 	{
-		return std::find(patterns.begin(), patterns.end(), name) != patterns.end();
+		return std::find(patterns.begin(), patterns.end(), pattern) != patterns.end();
 	}
 
 	// 設定データ

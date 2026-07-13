@@ -706,8 +706,11 @@ bool BattleEnemyManager::SaveEnemyData(const std::string& filePath) const {
 			{"moveSpeed", data.moveSpeed},
 			{"approachStateRange", data.approachStateRange},
 			{"attackStateRange", data.attackStateRange},
-			{"attackPatterns", data.attackPatterns}
+			{"attackPatterns", json::array()}
 		};
+		for (AttackPatternType pattern : data.attackPatterns) {
+			enemyJson["attackPatterns"].push_back(AttackPatternToString(pattern));
+		}
 
 		// 攻撃パラメータを構造化して保存
 		json ap = json::object();
@@ -841,7 +844,7 @@ bool BattleEnemyManager::LoadEnemyData(const std::string& filePath) {
 			data.attackPatterns.clear();
 			if (enemyJson.contains("attackPatterns") && enemyJson["attackPatterns"].is_array()) {
 				for (const auto& pattern : enemyJson["attackPatterns"]) {
-					data.attackPatterns.push_back(pattern.get<std::string>());
+					data.attackPatterns.push_back(AttackPatternFromString(pattern.get<std::string>()));
 				}
 			}
 
@@ -1118,11 +1121,15 @@ void BattleEnemyManager::ShowDebugInfo() {
 	// ★敵ベースデータ編集（攻撃パターン編集機能追加）★
 	if (ImGui::TreeNode("敵ベースデータ編集 （これを調整するとその敵全部に反映）")) {
 
-		// 使用可能な攻撃パターンのリスト
-		static const char* availablePatterns[] = {
-			"rush", "jump", "spin", "chargeRush", "sidestep", "combo"
+		// 使用可能な攻撃パターンのリスト ("sidestep" は対応する攻撃状態が存在しないため削除)
+		static const AttackPatternType availablePatterns[] = {
+			AttackPatternType::Rush, AttackPatternType::Jump, AttackPatternType::Spin,
+			AttackPatternType::ChargeRush, AttackPatternType::Combo
 		};
-		static const int patternCount = 6;
+		static const char* availablePatternNames[] = {
+			"rush", "jump", "spin", "chargeRush", "combo"
+		};
+		static const int patternCount = 5;
 
 		for (auto& pair : enemyDataMap_) {
 			BattleEnemyData& data = pair.second;
@@ -1231,7 +1238,7 @@ void BattleEnemyManager::ShowDebugInfo() {
 					for (size_t i = 0; i < data.attackPatterns.size(); ++i) {
 						ImGui::PushID(static_cast<int>(i));
 
-						ImGui::BulletText("%s", data.attackPatterns[i].c_str());
+						ImGui::BulletText("%s", AttackPatternToString(data.attackPatterns[i]));
 						ImGui::SameLine();
 
 						if (ImGui::SmallButton("削除")) {
@@ -1266,11 +1273,11 @@ void BattleEnemyManager::ShowDebugInfo() {
 
 					// 新しい攻撃パターンを追加
 					static int selectedPatternIndex = 0;
-					ImGui::Combo("追加する攻撃", &selectedPatternIndex, availablePatterns, patternCount);
+					ImGui::Combo("追加する攻撃", &selectedPatternIndex, availablePatternNames, patternCount);
 
 					ImGui::SameLine();
 					if (ImGui::Button("追加")) {
-						std::string newPattern = availablePatterns[selectedPatternIndex];
+						AttackPatternType newPattern = availablePatterns[selectedPatternIndex];
 
 						// 重複チェック
 						bool alreadyExists = false;
@@ -1283,9 +1290,9 @@ void BattleEnemyManager::ShowDebugInfo() {
 
 						if (!alreadyExists) {
 							data.attackPatterns.push_back(newPattern);
-							Logger(("[BattleEnemyManager] 攻撃パターン追加: " + data.enemyId + " -> " + newPattern + "\n").c_str());
+							Logger(("[BattleEnemyManager] 攻撃パターン追加: " + data.enemyId + " -> " + AttackPatternToString(newPattern) + "\n").c_str());
 						} else {
-							Logger(("[BattleEnemyManager] 警告: " + newPattern + " は既に存在します\n").c_str());
+							Logger((std::string("[BattleEnemyManager] 警告: ") + AttackPatternToString(newPattern) + " は既に存在します\n").c_str());
 						}
 					}
 
@@ -1301,19 +1308,20 @@ void BattleEnemyManager::ShowDebugInfo() {
 					ImGui::Text("クイック設定:");
 
 					if (ImGui::Button("基本型 (rush)")) {
-						data.attackPatterns = { "rush" };
+						data.attackPatterns = { AttackPatternType::Rush };
 					}
 					ImGui::SameLine();
 					if (ImGui::Button("アグレッシブ (rush, chargeRush, combo)")) {
-						data.attackPatterns = { "rush", "chargeRush", "combo" };
+						data.attackPatterns = { AttackPatternType::Rush, AttackPatternType::ChargeRush, AttackPatternType::Combo };
 					}
 
-					if (ImGui::Button("トリッキー (sidestep, spin)")) {
-						data.attackPatterns = { "sidestep", "spin" };
+					if (ImGui::Button("トリッキー (spin)")) {
+						data.attackPatterns = { AttackPatternType::Spin };
 					}
 					ImGui::SameLine();
 					if (ImGui::Button("全種類")) {
-						data.attackPatterns = { "rush", "jump", "spin", "chargeRush", "combo" };
+						data.attackPatterns = { AttackPatternType::Rush, AttackPatternType::Jump, AttackPatternType::Spin,
+							AttackPatternType::ChargeRush, AttackPatternType::Combo };
 					}
 
 					ImGui::TreePop();
@@ -1395,7 +1403,7 @@ void BattleEnemyManager::ShowDebugInfo() {
 					// 攻撃パターン表示
 					ImGui::Text("攻撃パターン:");
 					for (const auto& pattern : enemyData.attackPatterns) {
-						ImGui::BulletText("%s", pattern.c_str());
+						ImGui::BulletText("%s", AttackPatternToString(pattern));
 					}
 
 					// 敵操作ボタン

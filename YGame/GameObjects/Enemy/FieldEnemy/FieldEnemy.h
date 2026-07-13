@@ -8,6 +8,7 @@
 #include <vector>
 #include <string>
 #include <memory>
+#include <json.hpp>
 
 // 状態
 enum class FieldEnemyState {
@@ -23,6 +24,14 @@ enum class BattleType {
 	Group,    // グループバトル
 	Boss      // ボスバトル
 };
+// JSON上は "Single"/"Group"/"Boss" の文字列で保存する (nlohmann の enum <-> string 変換)。
+// これにより battleType 本体を直接シリアライズでき、以前あった battleTypeStr という
+// 手動同期の文字列フィールド (enum更新時に更新し忘れて表示とロジックがズレるバグの温床) が不要になる。
+NLOHMANN_JSON_SERIALIZE_ENUM(BattleType, {
+	{BattleType::Single, "Single"},
+	{BattleType::Group,  "Group"},
+	{BattleType::Boss,   "Boss"},
+})
 ///************************* フィールド敵データ構造体 *************************///
 struct FieldEnemyData {
 	std::string enemyId;
@@ -36,7 +45,6 @@ struct FieldEnemyData {
 
 	// バトルフォーメーション名
 	std::string battleFormation = "default";
-	std::string battleTypeStr = "Single";  // battleType の文字列版（AutoJsonで管理）
 
 	BattleType battleType = BattleType::Single;
 

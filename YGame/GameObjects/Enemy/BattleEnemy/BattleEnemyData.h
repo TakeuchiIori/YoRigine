@@ -13,6 +13,39 @@ enum class BattleEnemyState {
 	Dead        // 撃破
 };
 
+///************************* 攻撃パターン定義 *************************///
+// JSON上は従来通り文字列で保存する (AttackPatternToString/FromString で変換)。
+// enum化する前は "rush"/"chargeRush" 等の文字列比較が各所に散在し、
+// "charge" と "chargeRush" の表記ゆれのようなタイプミスがコンパイル時に検出できなかった。
+enum class AttackPatternType {
+	Rush,
+	Spin,
+	ChargeRush,
+	Combo,
+	Jump,
+	Unknown,   // 未知の文字列 (JSONの手打ちミス等) が来た場合のフォールバック
+};
+
+inline const char* AttackPatternToString(AttackPatternType type) {
+	switch (type) {
+	case AttackPatternType::Rush:       return "rush";
+	case AttackPatternType::Spin:       return "spin";
+	case AttackPatternType::ChargeRush: return "chargeRush";
+	case AttackPatternType::Combo:      return "combo";
+	case AttackPatternType::Jump:       return "jump";
+	default:                            return "unknown";
+	}
+}
+
+inline AttackPatternType AttackPatternFromString(const std::string& name) {
+	if (name == "rush")       return AttackPatternType::Rush;
+	if (name == "spin")       return AttackPatternType::Spin;
+	if (name == "chargeRush") return AttackPatternType::ChargeRush;
+	if (name == "combo")      return AttackPatternType::Combo;
+	if (name == "jump")       return AttackPatternType::Jump;
+	return AttackPatternType::Unknown;
+}
+
 ///************************* 攻撃用構造体 *************************///
 
 // 突進攻撃
@@ -132,7 +165,10 @@ struct BattleEnemyData {
 	// 攻撃状態に入る距離
 	float attackStateRange = 10.0f;
 
-	std::vector<std::string> attackPatterns = { "rush","spin","chargeRush","combo","jump" };
+	std::vector<AttackPatternType> attackPatterns = {
+		AttackPatternType::Rush, AttackPatternType::Spin, AttackPatternType::ChargeRush,
+		AttackPatternType::Combo, AttackPatternType::Jump
+	};
 	// 攻撃調整用パラメータ
 	EnemyAttackParams attackParams;
 };

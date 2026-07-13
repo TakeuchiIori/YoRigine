@@ -596,7 +596,7 @@ static AutoJson BuildFieldEnemyDataAj(FieldEnemyData& d)
 		.Add("modelPath", &d.modelPath)
 		.Add("battleEnemyId", &d.battleEnemyId)
 		.Add("battleFormation", &d.battleFormation)
-		.Add("battleTypeStr", &d.battleTypeStr)
+		.Add("battleType", &d.battleType)
 		.Add("scale", &d.scale)
 		.Add("patrolRadius", &d.patrolRadius)
 		.Add("patrolSpeed", &d.patrolSpeed)
@@ -624,16 +624,7 @@ static AutoJson BuildFieldEnemyDataAj(FieldEnemyData& d)
 
 void FieldEnemyManager::SaveEnemyData(const std::string& filePath) {
 	try {
-		// ① enum を文字列に同期
-		for (auto& [id, data] : enemyDataMap_) {
-			switch (data.battleType) {
-			case BattleType::Group: data.battleTypeStr = "Group"; break;
-			case BattleType::Boss:  data.battleTypeStr = "Boss";  break;
-			default:                data.battleTypeStr = "Single"; break;
-			}
-		}
-
-		// ② 各敵に対して一時AutoJsonを作り AddGroup でネスト登録
+		// 各敵に対して一時AutoJsonを作り AddGroup でネスト登録
 		//    ajList を root より先に宣言することで、root の SaveToFile 中も
 		//    ポインタが有効（ajList は root より後に破棄される）
 		std::vector<AutoJson> ajList;
@@ -715,7 +706,6 @@ void FieldEnemyManager::LoadEnemyData(const std::string& filePath) {
 			data.modelPath = jval.value("modelPath", "");
 			data.battleEnemyId = jval.value("battleEnemyId", "");
 			data.battleFormation = jval.value("battleFormation", "");
-			data.battleTypeStr = jval.value("battleTypeStr", "Single");
 			data.patrolRadius = jval.value("patrolRadius", 1.0f);
 			data.patrolSpeed = jval.value("patrolSpeed", 1.0f);
 			data.chaseSpeed = jval.value("chaseSpeed", 1.0f);
@@ -768,10 +758,17 @@ void FieldEnemyManager::LoadEnemyData(const std::string& filePath) {
 				data.battleEnemyIds.clear();
 			}
 
-			// battleTypeStr → enum変換
-			if (data.battleTypeStr == "Group") data.battleType = BattleType::Group;
-			else if (data.battleTypeStr == "Boss") data.battleType = BattleType::Boss;
-			else data.battleType = BattleType::Single;
+			// battleType: 新フォーマット(enum直接シリアライズ)を優先し、
+			// 旧フォーマット(battleTypeStr文字列)のファイルも読めるようフォールバックする。
+			if (jval.contains("battleType")) {
+				data.battleType = jval.value("battleType", BattleType::Single);
+			}
+			else {
+				const std::string oldStr = jval.value("battleTypeStr", "Single");
+				if (oldStr == "Group") data.battleType = BattleType::Group;
+				else if (oldStr == "Boss") data.battleType = BattleType::Boss;
+				else data.battleType = BattleType::Single;
+			}
 
 			// ... 他のパラメータ項目も必要に応じて追加してください ...
 
