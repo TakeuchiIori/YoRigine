@@ -34,6 +34,8 @@ class ModelManager;
 namespace YoRigine {
 	class GpuEmitManager
 	{
+		// グループ/エミッター編集用 ImGui UI (USE_IMGUI 限定)。神クラス化対策として別クラスに分離。
+		friend class GpuEmitManagerEditorUI;
 	public:
 		// エミッターデータ構造体
 		struct EmitterData
@@ -136,9 +138,8 @@ namespace YoRigine {
 		// エミッション強制発生
 		void EmitGroups(const std::string& groupName, const Vector3& position, float count);
 
+		// グループ管理/エミッター編集/削除ダイアログ等のUI本体は GpuEmitManagerEditorUI に分離済み (神クラス対策)。
 		void DrawImGui();
-		bool DrawParticleParametersEditor(EmitterData* emitterData);
-
 
 		// エミッター管理
 		EmitterData* CreateEmitter(const std::string& groupName, const std::string& emitterName, std::string& texturePath, EmitterShape shape = EmitterShape::Sphere);
@@ -192,19 +193,6 @@ namespace YoRigine {
 		GpuEmitManager& operator=(const GpuEmitManager&) = delete;
 
 		void UpdateParticleParams(EmitterData* emitterData);
-
-		bool DrawShapeEditor(EmitterData* emitterData);
-		bool DrawSphereEditor(EmitterData* emitterData);
-		bool DrawBoxEditor(EmitterData* emitterData);
-		bool DrawTriangleEditor(EmitterData* emitterData);
-		bool DrawConeEditor(EmitterData* emitterData);
-		bool DrawMeshEditor(EmitterData* emitterData);
-
-		void DrawGroupManagementTab();
-		void DrawEmitterManagementTab();
-		void DrawTextureBrowser(bool& isOpen);
-		void DrawEditorTab();
-		void DrawDeleteDialog();
 
 		// エミッターパラメータ更新
 		void UpdateEmitterParams(EmitterData* emitterData);
