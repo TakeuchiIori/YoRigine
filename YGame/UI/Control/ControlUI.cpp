@@ -303,17 +303,32 @@ void ControlUI::BakeStyleButtonTextures()
 void ControlUI::ApplyStyleTextures()
 {
     if (currentStyle_ == PlayerStyle::Sword) {
-        if (button_[0]) button_[0]->SetTexture("Resources/Textures/Operation/A_attack.png");
-        if (button_[1]) button_[1]->SetTexture("Resources/Textures/Operation/B_attack.png");
-        if (button_[2]) button_[2]->SetTexture("Resources/Textures/Operation/shield.png");
-        if (button_[3]) button_[3]->SetTexture("Resources/Textures/Operation/Y_to_magic.png");
+        SetButtonTextureKeepLayout(button_[0], "Resources/Textures/Operation/A_attack.png");
+        SetButtonTextureKeepLayout(button_[1], "Resources/Textures/Operation/B_attack.png");
+        SetButtonTextureKeepLayout(button_[2], "Resources/Textures/Operation/shield.png");
+        SetButtonTextureKeepLayout(button_[3], "Resources/Textures/Operation/Y_to_magic.png");
         return;
     }
 
-    if (button_[0]) button_[0]->SetTexture("Resources/Textures/Operation/A_magic.png");
-    if (button_[1]) button_[1]->SetTexture("Resources/Textures/Operation/B_magic.png");
-    if (button_[2]) button_[2]->SetTexture("Resources/Textures/Operation/X_magic.png");
-    if (button_[3]) button_[3]->SetTexture("Resources/Textures/Operation/Y_to_sword.png");
+    SetButtonTextureKeepLayout(button_[0], "Resources/Textures/Operation/A_magic.png");
+    SetButtonTextureKeepLayout(button_[1], "Resources/Textures/Operation/B_magic.png");
+    SetButtonTextureKeepLayout(button_[2], "Resources/Textures/Operation/X_magic.png");
+    SetButtonTextureKeepLayout(button_[3], "Resources/Textures/Operation/Y_to_sword.png");
+}
+
+void ControlUI::SetButtonTextureKeepLayout(UIBase* button, const std::string& texturePath)
+{
+    if (!button) return;
+
+    const Vector2 layoutSize = button->GetSize();
+
+    // Sprite::ChangeTexture はUV範囲を新テクスチャ実寸へ合わせるために size も更新する。
+    // ただし操作ボタンの見た目サイズは GameScene の UIConfig が決めるレイアウト情報なので、
+    // テクスチャ差し替え後に同じ size を戻し、画像内容だけを切り替える境界にしておく。
+    button->SetTexture(texturePath);
+    if (layoutSize.x > 0.0f && layoutSize.y > 0.0f) {
+        button->SetSize(layoutSize);
+    }
 }
 
 // 画面外ヒット時のロックオン照準フラッシュ（赤→黄にフェードしながら消える）

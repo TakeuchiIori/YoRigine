@@ -42,6 +42,9 @@ private:
 	void PlayButtonPress(UIBase* button);
 	void BakeStyleButtonTextures();
 	void ApplyStyleTextures();
+	// 操作表示はUIレイアウトの責務なので、入力スタイルの画像差し替えで
+	// Sprite 側の「テクスチャ実寸に合わせる」都合を外へ漏らさない。
+	void SetButtonTextureKeepLayout(UIBase* button, const std::string& texturePath);
 private:
 	///************************* メンバ変数 *************************///
 
