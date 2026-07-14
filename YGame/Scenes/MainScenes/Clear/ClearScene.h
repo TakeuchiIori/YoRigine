@@ -65,6 +65,7 @@ private:
 	// サウンド
 	YoRigine::Audio::SoundData soundData;
 
+	std::unique_ptr<DemoPlayer> player_;
 	std::unique_ptr<SkyBox> skyBox_;
 	std::unique_ptr<Ground> ground_;
 	std::unique_ptr<ClearUI> clearUI_;

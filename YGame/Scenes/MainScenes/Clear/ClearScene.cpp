@@ -76,6 +76,13 @@ void ClearScene::Initialize() {
 	// オブジェクトの生成
 	//------------------------------------------------------------
 
+	// デモ用プレイヤー（Title と同様に演出用として配置）
+	player_ = std::make_unique<DemoPlayer>();
+	player_->Initialize(sceneCamera_.get());
+	player_->SetMotion("PowerUp1");
+	// 一括 Update/Draw/Shadow の対象に登録（所有は ClearScene のまま）
+	BaseObjectManager::GetInstance()->Register(player_.get(), "Player");
+
 	// スカイボックス / Ground は個別描画のためマネージャには登録しない
 	skyBox_ = std::make_unique<SkyBox>();
 	skyBox_->Initialize(sceneCamera_.get(), "Resources/DDS/vz_sinister_land_cubemap_ue.dds");
