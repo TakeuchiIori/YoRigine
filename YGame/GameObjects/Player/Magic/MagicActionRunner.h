@@ -7,7 +7,7 @@ class MagicActionRunner {
 public:
 	void Start(const MagicActionData& action, Player* owner);
 	void Update(float deltaTime);
-	void Release();
+	bool Release();
 	void Reset();
 
 	bool IsRunning() const { return running_; }

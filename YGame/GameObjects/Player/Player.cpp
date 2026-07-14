@@ -279,6 +279,7 @@ void Player::DrawCollision() {
 	if (isAlive_) {
 		playerSword_->DrawCollision();
 		playerShield_->DrawCollision();
+		if (magicController_) magicController_->DrawCollision();
 		obbCollider_->Draw();
 	}
 }

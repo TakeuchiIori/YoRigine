@@ -1,7 +1,11 @@
 #pragma once
 
 #include "MagicActionEditor.h"
+#include "MagicAttackFactory.h"
 #include "MagicActionRunner.h"
+
+#include <memory>
+#include <vector>
 
 // ============================================================
 // プレイヤー魔法コントローラー
@@ -15,22 +19,32 @@ public:
 
 	void Update(float deltaTime);
 	void Reset();
+	void DrawCollision();
 
 	bool TryCast(PlayerMagicSlot slot);
 	void HandleSlotInput(PlayerMagicSlot slot, bool triggered, bool held);
 
 #ifdef USE_IMGUI
 	void ShowDebugImGui();
+	void DrawEditorWindow();
 #endif
 
 private:
 	bool CanCast() const;
 	bool BeginCast(const MagicActionData& action);
+	void SpawnAttackInstance(const MagicActionData& action);
 	int SlotIndex(PlayerMagicSlot slot) const;
+	void AdvanceChain(PlayerMagicSlot slot, const MagicActionData& action);
+	void ResetChain(PlayerMagicSlot slot);
 
 private:
 	Player* owner_ = nullptr;
 	MagicActionRunner runner_;
 	MagicActionEditor editor_;
+	std::vector<std::unique_ptr<MagicAttackInstance>> activeAttacks_;
+	MagicActionData pendingChargeAction_;
+	bool hasPendingChargeAction_ = false;
 	bool previousHeld_[3] = {};
+	int comboIndices_[3] = {};
+	float comboTimers_[3] = {};
 };

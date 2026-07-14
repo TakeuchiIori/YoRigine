@@ -177,6 +177,13 @@ void GameScene::Initialize() {
 		}, "Game");
 	Editor::GetInstance()->RegisterGameUI("ライティング", [this]() { YoRigine::LightManager::GetInstance()->ShowLightingEditor(); }, "Game");
 	Editor::GetInstance()->RegisterGameUI("プレイヤー攻撃エディター", [this]() {attackEditor_->DrawImGui(); }, "Game");
+	Editor::GetInstance()->RegisterGameUI("魔法攻撃エディター", [this]() {
+		// 魔法調整はプレイヤー状態確認とは作業目的が違う。
+		// Editor の独立パネルとして登録し、状態ウィンドウの開閉に引きずられないようにする。
+		if (player_ && player_->GetMagicController()) {
+			player_->GetMagicController()->DrawEditorWindow();
+		}
+		}, "Game");
 	Editor::GetInstance()->RegisterGameUI("YoRigine:パーティクルエディター", [this]() {YParticleEditor::GetInstance().ShowEditorWindow(); }, "Game");
 #endif
 

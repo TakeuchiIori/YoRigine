@@ -13,6 +13,9 @@
 #include "Vector3.h"
 #include "Matrix4x4.h"
 
+#include <functional>
+#include <memory>
+
 // コライダー形状の種別。
 // dynamic_cast を使わず static_cast で安全にダウンキャストするための識別子。
 // 値は配列インデックスとして使うので 0 から連番。
@@ -109,6 +112,13 @@ public:
 	// コライダータイプID設定
 	void SetTypeID(uint32_t typeID) { typeID_ = typeID; }
 
+	// コライダーから所有者を取り出すための軽い紐付け。
+	// CollisionManager は型を知らないまま衝突を配送し、ゲーム側が必要な時だけ
+	// BattleEnemy / MagicAttackInstance などへ戻す。BaseObject 前提にしないため raw に留める。
+	void SetOwnerRaw(void* owner) { ownerRaw_ = owner; }
+	template <typename T>
+	T* GetOwnerAs() const { return static_cast<T*>(ownerRaw_); }
+
 	// 形状種別取得 (CollisionManager のディスパッチで使用)
 	ColliderShape GetShape() const { return shape_; }
 
@@ -189,6 +199,7 @@ protected:
 
 	// 衝突タイプ識別ID（CollisionTypeIdDefで定義）
 	uint32_t typeID_ = 0u;
+	void* ownerRaw_ = nullptr;
 
 	// 形状種別 (派生クラスで Initialize() 時にセット)
 	ColliderShape shape_ = ColliderShape::Sphere;

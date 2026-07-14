@@ -1,6 +1,7 @@
 #pragma once
 
 #include "DebugMagicEventHandler.h"
+#include "MagicVfxEventHandler.h"
 
 #include <memory>
 #include <unordered_map>

@@ -65,6 +65,24 @@ const char* ToString(MagicEventType type)
 	}
 }
 
+const char* ToString(MagicTrajectoryType type)
+{
+	switch (type) {
+	case MagicTrajectoryType::Forward: return "Forward";
+	case MagicTrajectoryType::LockOnOrForward: return "LockOnOrForward";
+	case MagicTrajectoryType::StrikeTarget: return "StrikeTarget";
+	default: return "LockOnOrForward";
+	}
+}
+
+const char* ToString(MagicHitShape shape)
+{
+	switch (shape) {
+	case MagicHitShape::Sphere: return "Sphere";
+	default: return "Sphere";
+	}
+}
+
 PlayerMagicSlot PlayerMagicSlotFromString(const std::string& value)
 {
 	return EnumFromString<PlayerMagicSlot>(value,
@@ -107,6 +125,20 @@ MagicEventType MagicEventTypeFromString(const std::string& value)
 		MagicEventType::Debug);
 }
 
+MagicTrajectoryType MagicTrajectoryTypeFromString(const std::string& value)
+{
+	return EnumFromString<MagicTrajectoryType>(value,
+		{ {"Forward", MagicTrajectoryType::Forward}, {"LockOnOrForward", MagicTrajectoryType::LockOnOrForward}, {"StrikeTarget", MagicTrajectoryType::StrikeTarget} },
+		MagicTrajectoryType::LockOnOrForward);
+}
+
+MagicHitShape MagicHitShapeFromString(const std::string& value)
+{
+	return EnumFromString<MagicHitShape>(value,
+		{ {"Sphere", MagicHitShape::Sphere} },
+		MagicHitShape::Sphere);
+}
+
 void to_json(nlohmann::json& j, const MagicTimelineEvent& event)
 {
 	j = nlohmann::json{
@@ -142,9 +174,18 @@ void to_json(nlohmann::json& j, const MagicActionData& action)
 		{"name", action.name},
 		{"slot", ToString(action.slot)},
 		{"inputMode", ToString(action.inputMode)},
+		{"animationName", action.animationName},
+		{"trajectoryType", ToString(action.trajectoryType)},
+		{"hitShape", ToString(action.hitShape)},
+		{"duration", action.duration},
+		{"range", action.range},
+		{"hitRadius", action.hitRadius},
+		{"hitDelay", action.hitDelay},
 		{"minChargeTime", action.minChargeTime},
 		{"maxChargeTime", action.maxChargeTime},
 		{"cooldown", action.cooldown},
+		{"chainResetTime", action.chainResetTime},
+		{"scaleCurve", action.scaleCurve.SaveToJson()},
 		{"events", action.events},
 	};
 }
@@ -154,8 +195,22 @@ void from_json(const nlohmann::json& j, MagicActionData& action)
 	action.name = j.value("name", "DebugMagic");
 	action.slot = PlayerMagicSlotFromString(j.value("slot", "Primary"));
 	action.inputMode = MagicInputModeFromString(j.value("inputMode", "Tap"));
+	action.animationName = j.value("animationName", "");
+	action.trajectoryType = MagicTrajectoryTypeFromString(j.value("trajectoryType", "LockOnOrForward"));
+	action.hitShape = MagicHitShapeFromString(j.value("hitShape", "Sphere"));
+	action.duration = j.value("duration", 0.35f);
+	action.range = j.value("range", 18.0f);
+	action.hitRadius = j.value("hitRadius", 1.5f);
+	action.hitDelay = j.value("hitDelay", 0.0f);
 	action.minChargeTime = j.value("minChargeTime", 0.0f);
 	action.maxChargeTime = j.value("maxChargeTime", 1.0f);
 	action.cooldown = j.value("cooldown", 0.15f);
+	action.chainResetTime = j.value("chainResetTime", 1.0f);
+	if (j.contains("scaleCurve")) {
+		action.scaleCurve.LoadFromJson(j.at("scaleCurve"));
+	}
+	else {
+		action.scaleCurve.Reset(1.0f);
+	}
 	action.events = j.value("events", std::vector<MagicTimelineEvent>{});
 }

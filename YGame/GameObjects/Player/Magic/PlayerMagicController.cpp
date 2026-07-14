@@ -4,6 +4,8 @@
 #include "../Player.h"
 #include "../Combat/PlayerCombat.h"
 
+#include <algorithm>
+
 #ifdef USE_IMGUI
 #include "imgui.h"
 #endif
@@ -17,21 +19,50 @@ PlayerMagicController::PlayerMagicController(Player* owner)
 void PlayerMagicController::Update(float deltaTime)
 {
 	runner_.Update(deltaTime);
+
+	for (int i = 0; i < 3; ++i) {
+		if (comboTimers_[i] <= 0.0f) continue;
+		comboTimers_[i] = std::max(0.0f, comboTimers_[i] - deltaTime);
+		if (comboTimers_[i] <= 0.0f) {
+			comboIndices_[i] = 0;
+		}
+	}
+
+	for (auto& attack : activeAttacks_) {
+		if (attack) attack->Update(deltaTime);
+	}
+	activeAttacks_.erase(
+		std::remove_if(activeAttacks_.begin(), activeAttacks_.end(),
+			[](const std::unique_ptr<MagicAttackInstance>& attack) {
+				return !attack || !attack->IsAlive();
+			}),
+		activeAttacks_.end());
 }
 
 void PlayerMagicController::Reset()
 {
 	runner_.Reset();
+	activeAttacks_.clear();
+	hasPendingChargeAction_ = false;
 	for (bool& held : previousHeld_) {
 		held = false;
+	}
+	for (int& index : comboIndices_) {
+		index = 0;
+	}
+	for (float& timer : comboTimers_) {
+		timer = 0.0f;
 	}
 }
 
 bool PlayerMagicController::TryCast(PlayerMagicSlot slot)
 {
-	const MagicActionData* action = MagicActionDatabase::FindBySlot(slot);
+	const int index = SlotIndex(slot);
+	const MagicActionData* action = MagicActionDatabase::FindBySlotAt(slot, comboIndices_[index]);
 	if (!action) return false;
-	return BeginCast(*action);
+	if (!BeginCast(*action)) return false;
+	AdvanceChain(slot, *action);
+	return true;
 }
 
 void PlayerMagicController::HandleSlotInput(PlayerMagicSlot slot, bool triggered, bool held)
@@ -44,7 +75,17 @@ void PlayerMagicController::HandleSlotInput(PlayerMagicSlot slot, bool triggered
 		TryCast(slot);
 	}
 	if (released) {
-		runner_.Release();
+		if (runner_.Release() && hasPendingChargeAction_) {
+			SpawnAttackInstance(pendingChargeAction_);
+			hasPendingChargeAction_ = false;
+		}
+	}
+}
+
+void PlayerMagicController::DrawCollision()
+{
+	for (auto& attack : activeAttacks_) {
+		if (attack) attack->DrawCollision();
 	}
 }
 
@@ -65,7 +106,48 @@ bool PlayerMagicController::BeginCast(const MagicActionData& action)
 	if (!CanCast()) return false;
 
 	runner_.Start(action, owner_);
+	if (action.inputMode == MagicInputMode::ChargeRelease) {
+		pendingChargeAction_ = action;
+		hasPendingChargeAction_ = true;
+	}
+	else {
+		SpawnAttackInstance(action);
+	}
+
+	if (owner_ && owner_->GetObject3d() && !action.animationName.empty()) {
+		owner_->GetObject3d()->SetMotionSpeed(1.0f);
+		owner_->GetObject3d()->SetChangeMotion("Player.gltf", MotionPlayMode::Once, action.animationName);
+	}
 	return true;
+}
+
+void PlayerMagicController::SpawnAttackInstance(const MagicActionData& action)
+{
+	if (!owner_) return;
+	activeAttacks_.push_back(MagicAttackFactory::Create(action, owner_));
+}
+
+void PlayerMagicController::AdvanceChain(PlayerMagicSlot slot, const MagicActionData& action)
+{
+	const int index = SlotIndex(slot);
+	const int count = MagicActionDatabase::CountBySlot(slot);
+	if (count <= 1) {
+		comboIndices_[index] = 0;
+		comboTimers_[index] = 0.0f;
+		return;
+	}
+
+	// 魔法の連携は「同じスロット内の並び順」を段数として扱う。
+	// 個別クラスを増やす前にデータ順だけで試せるようにし、剣コンボの状態機械とは分離する。
+	comboIndices_[index] = (comboIndices_[index] + 1) % count;
+	comboTimers_[index] = std::max(0.0f, action.chainResetTime);
+}
+
+void PlayerMagicController::ResetChain(PlayerMagicSlot slot)
+{
+	const int index = SlotIndex(slot);
+	comboIndices_[index] = 0;
+	comboTimers_[index] = 0.0f;
 }
 
 int PlayerMagicController::SlotIndex(PlayerMagicSlot slot) const
@@ -89,14 +171,25 @@ void PlayerMagicController::ShowDebugImGui()
 		if (ImGui::BeginTabItem("魔法")) {
 			ImGui::Text("実行中の魔法: %s", runner_.GetCurrentActionName().c_str());
 			ImGui::Text("クールダウン: %.2f", runner_.GetCooldown());
+			ImGui::Text("主魔法段数: %d / %.2f", comboIndices_[0] + 1, comboTimers_[0]);
+			ImGui::Text("副魔法段数: %d / %.2f", comboIndices_[1] + 1, comboTimers_[1]);
+			ImGui::Text("補助魔法段数: %d / %.2f", comboIndices_[2] + 1, comboTimers_[2]);
 			if (ImGui::Button("主魔法")) { TryCast(PlayerMagicSlot::Primary); } ImGui::SameLine();
 			if (ImGui::Button("副魔法")) { TryCast(PlayerMagicSlot::Secondary); } ImGui::SameLine();
 			if (ImGui::Button("補助魔法")) { TryCast(PlayerMagicSlot::Utility); }
-			ImGui::Separator();
-			editor_.Draw();
+			if (ImGui::Button("魔法コンボリセット")) {
+				ResetChain(PlayerMagicSlot::Primary);
+				ResetChain(PlayerMagicSlot::Secondary);
+				ResetChain(PlayerMagicSlot::Utility);
+			}
 			ImGui::EndTabItem();
 		}
 		ImGui::EndTabBar();
 	}
+}
+
+void PlayerMagicController::DrawEditorWindow()
+{
+	editor_.Draw();
 }
 #endif

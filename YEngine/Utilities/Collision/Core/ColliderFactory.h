@@ -41,6 +41,7 @@ public:
 		collider->SetCamera(camera);
 		collider->Initialize();
 		collider->SetTypeID(typeID);
+		collider->SetOwnerRaw(owner);
 
 		// コールバック登録
 		collider->SetOnEnterCollision([owner](BaseCollider* self, BaseCollider* other) {
@@ -93,6 +94,7 @@ public:
 		collider->SetWT(worldTransform);
 		collider->Initialize();
 		collider->SetTypeID(typeID);
+		collider->SetOwnerRaw(nullptr);
 
 		return collider;
 	}

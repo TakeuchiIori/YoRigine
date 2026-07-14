@@ -1,76 +1,238 @@
 [
     {
-        "name": "ChargeBeam",
-        "slot": "Primary",
-        "inputMode": "ChargeRelease",
-        "minChargeTime": 0.4,
-        "maxChargeTime": 2.0,
-        "cooldown": 0.6,
+        "animationName": "MagicAttack1",
+        "chainResetTime": 1.2000000476837158,
+        "cooldown": 0.6000000238418579,
+        "duration": 0.44999998807907104,
         "events": [
             {
-                "time": 0.0,
-                "trigger": "OnStart",
-                "type": "PlayVfx",
+                "duration": 0.0,
                 "element": "Light",
                 "label": "ChargeStart",
                 "power": 0.0,
-                "duration": 0.0,
                 "radius": 0.0,
-                "speed": 0.0
+                "speed": 0.0,
+                "time": 0.0,
+                "trigger": "OnStart",
+                "type": "PlayVfx"
             },
             {
-                "time": 0.0,
-                "trigger": "OnRelease",
-                "type": "SpawnBeam",
+                "duration": 1.0,
                 "element": "Light",
                 "label": "ReleaseBeam",
                 "power": 12.0,
-                "duration": 1.0,
                 "radius": 0.0,
-                "speed": 0.0
+                "speed": 0.0,
+                "time": 0.0,
+                "trigger": "OnRelease",
+                "type": "SpawnBeam"
             }
-        ]
+        ],
+        "hitDelay": 0.0,
+        "hitRadius": 1.7999999523162842,
+        "hitShape": "Sphere",
+        "inputMode": "ChargeRelease",
+        "maxChargeTime": 2.0,
+        "minChargeTime": 0.4000000059604645,
+        "name": "ChargeBeam",
+        "range": 24.0,
+        "scaleCurve": {
+            "defaultMode": 1,
+            "keys": [
+                {
+                    "inTangent": 0.0,
+                    "interpMode": 1,
+                    "outTangent": 0.0,
+                    "time": 0.0,
+                    "value": 0.4000000059604645
+                },
+                {
+                    "inTangent": 0.0,
+                    "interpMode": 1,
+                    "outTangent": 0.0,
+                    "time": 0.3499999940395355,
+                    "value": 1.399999976158142
+                },
+                {
+                    "inTangent": 0.0,
+                    "interpMode": 1,
+                    "outTangent": 0.0,
+                    "time": 1.0,
+                    "value": 0.20000000298023224
+                }
+            ],
+            "name": "Scale",
+            "viewMax": 3.0,
+            "viewMin": 0.0
+        },
+        "slot": "Primary",
+        "trajectoryType": "LockOnOrForward"
     },
     {
-        "name": "FireBolt",
-        "slot": "Secondary",
-        "inputMode": "Tap",
-        "minChargeTime": 0.0,
-        "maxChargeTime": 1.0,
-        "cooldown": 0.25,
+        "animationName": "HeavyIdle1",
+        "chainResetTime": 1.0,
+        "cooldown": 0.3499999940395355,
+        "duration": 0.2800000011920929,
         "events": [
             {
+                "duration": 0.0,
+                "element": "Light",
+                "label": "LightBurst",
+                "power": 10.0,
+                "radius": 2.4000000953674316,
+                "speed": 0.0,
                 "time": 0.0,
                 "trigger": "OnStart",
-                "type": "SpawnProjectile",
+                "type": "StrikeTarget"
+            }
+        ],
+        "hitDelay": 0.0,
+        "hitRadius": 2.4000000953674316,
+        "hitShape": "Sphere",
+        "inputMode": "Tap",
+        "maxChargeTime": 1.0,
+        "minChargeTime": 0.0,
+        "name": "LightBurst",
+        "range": 20.0,
+        "scaleCurve": {
+            "defaultMode": 1,
+            "keys": [
+                {
+                    "inTangent": 0.0,
+                    "interpMode": 1,
+                    "outTangent": 0.0,
+                    "time": 0.0,
+                    "value": 0.30000001192092896
+                },
+                {
+                    "inTangent": 0.0,
+                    "interpMode": 1,
+                    "outTangent": 0.0,
+                    "time": 0.44999998807907104,
+                    "value": 1.7999999523162842
+                },
+                {
+                    "inTangent": 0.0,
+                    "interpMode": 1,
+                    "outTangent": 0.0,
+                    "time": 1.0,
+                    "value": 0.5
+                }
+            ],
+            "name": "Scale",
+            "viewMax": 3.0,
+            "viewMin": 0.0
+        },
+        "slot": "Primary",
+        "trajectoryType": "StrikeTarget"
+    },
+    {
+        "animationName": "Attack2",
+        "chainResetTime": 1.0,
+        "cooldown": 0.25,
+        "duration": 0.3499999940395355,
+        "events": [
+            {
+                "duration": 0.0,
                 "element": "Fire",
                 "label": "FireBolt",
                 "power": 6.0,
-                "duration": 0.0,
                 "radius": 0.0,
-                "speed": 32.0
-            }
-        ]
-    },
-    {
-        "name": "ThunderStrike",
-        "slot": "Utility",
-        "inputMode": "Tap",
-        "minChargeTime": 0.0,
-        "maxChargeTime": 1.0,
-        "cooldown": 0.4,
-        "events": [
-            {
+                "speed": 32.0,
                 "time": 0.0,
                 "trigger": "OnStart",
-                "type": "StrikeTarget",
+                "type": "SpawnProjectile"
+            }
+        ],
+        "hitDelay": 0.0,
+        "hitRadius": 1.600000023841858,
+        "hitShape": "Sphere",
+        "inputMode": "Tap",
+        "maxChargeTime": 1.0,
+        "minChargeTime": 0.0,
+        "name": "FireBolt",
+        "range": 18.0,
+        "scaleCurve": {
+            "defaultMode": 1,
+            "keys": [
+                {
+                    "inTangent": 0.0,
+                    "interpMode": 1,
+                    "outTangent": 0.0,
+                    "time": 0.0,
+                    "value": 1.0
+                },
+                {
+                    "inTangent": 0.0,
+                    "interpMode": 1,
+                    "outTangent": 0.0,
+                    "time": 1.0,
+                    "value": 1.0
+                }
+            ],
+            "name": "Scale",
+            "viewMax": 3.0,
+            "viewMin": 0.0
+        },
+        "slot": "Secondary",
+        "trajectoryType": "LockOnOrForward"
+    },
+    {
+        "animationName": "Attack3",
+        "chainResetTime": 1.0,
+        "cooldown": 0.4000000059604645,
+        "duration": 0.30000001192092896,
+        "events": [
+            {
+                "duration": 0.0,
                 "element": "Thunder",
                 "label": "ThunderStrike",
                 "power": 8.0,
-                "duration": 0.0,
                 "radius": 3.0,
-                "speed": 0.0
+                "speed": 0.0,
+                "time": 0.0,
+                "trigger": "OnStart",
+                "type": "StrikeTarget"
             }
-        ]
+        ],
+        "hitDelay": 0.0,
+        "hitRadius": 2.5,
+        "hitShape": "Sphere",
+        "inputMode": "Tap",
+        "maxChargeTime": 1.0,
+        "minChargeTime": 0.0,
+        "name": "ThunderStrike",
+        "range": 20.0,
+        "scaleCurve": {
+            "defaultMode": 1,
+            "keys": [
+                {
+                    "inTangent": 0.0,
+                    "interpMode": 1,
+                    "outTangent": 0.0,
+                    "time": 0.0,
+                    "value": 0.800000011920929
+                },
+                {
+                    "inTangent": 0.0,
+                    "interpMode": 1,
+                    "outTangent": 0.0,
+                    "time": 0.3499999940395355,
+                    "value": 1.399999976158142
+                },
+                {
+                    "inTangent": 0.0,
+                    "interpMode": 1,
+                    "outTangent": 0.0,
+                    "time": 1.0,
+                    "value": 0.6000000238418579
+                }
+            ],
+            "name": "Scale",
+            "viewMax": 3.0,
+            "viewMin": 0.0
+        },
+        "slot": "Utility",
+        "trajectoryType": "StrikeTarget"
     }
 ]

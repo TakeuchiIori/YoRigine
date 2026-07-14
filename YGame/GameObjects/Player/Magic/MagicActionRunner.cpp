@@ -40,15 +40,16 @@ void MagicActionRunner::Update(float deltaTime)
 	FireTimelineEvents();
 }
 
-void MagicActionRunner::Release()
+bool MagicActionRunner::Release()
 {
-	if (!running_ || released_) return;
-	if (chargeTime_ < currentAction_.minChargeTime) return;
+	if (!running_ || released_) return false;
+	if (chargeTime_ < currentAction_.minChargeTime) return false;
 
 	released_ = true;
 	FireEvents(MagicEventTrigger::OnRelease);
 	cooldown_ = currentAction_.cooldown;
 	running_ = false;
+	return true;
 }
 
 void MagicActionRunner::Reset()
