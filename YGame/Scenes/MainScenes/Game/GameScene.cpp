@@ -333,7 +333,7 @@ void GameScene::Draw() {
 	//------------------------------------------------------------
 	YParticleManager::GetInstance().Draw();
 	DrawLine();
-	YoRigine::GpuEmitManager::GetInstance()->Draw();
+	//YoRigine::GpuEmitManager::GetInstance()->Draw();
 
 	//------------------------------------------------------------
 	// VFX描画
