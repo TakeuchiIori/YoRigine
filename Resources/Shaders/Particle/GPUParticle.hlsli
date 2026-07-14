@@ -1,4 +1,4 @@
-static const uint kMaxParticles = 5000000; // 1エミッタあたりの最大粒子数（バッファ・描画・ディスパッチの上限）。C++ 側 GPUParticle::kMaxParticles と必ず一致させること
+static const uint kMaxParticles = 65536; // 1エミッタあたりの最大粒子数（バッファ・描画・ディスパッチの上限）。C++ 側 GPUParticle::kMaxParticles と必ず一致させること
 static const uint kParticlesPerThread = 128; // 1スレッドが処理するパーティクル数。C++ 側 GPUParticle::kParticlesPerThread と一致させること
 
 // エミッター形状の種類
