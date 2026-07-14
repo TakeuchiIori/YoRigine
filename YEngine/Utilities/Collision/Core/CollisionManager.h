@@ -115,6 +115,7 @@ namespace YoRigine {
 		// Broad Phase グリッドへのアクセサ (デバッグ描画用)
 		UniformGrid&       GetBroadPhaseGrid()       { return grid_; }
 		const UniformGrid& GetBroadPhaseGrid() const { return grid_; }
+		bool IsIterating() const { return isIterating_; }
 
 		// ============================================================
 		// 反復押し戻し回数 (3-4 推奨。1 は単純解決、0 で押し戻し無効)

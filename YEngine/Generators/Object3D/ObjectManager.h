@@ -267,4 +267,9 @@ private:
 	void InitializePlacedObject(PlacedObject& obj, const std::string& modelPath,
 		bool isAnimation,
 		const std::string& animationName);
+	void EnsureCollisionManager();
+	void FlushPendingObjectDisposals();
+
+	bool pendingClearAllObjects_ = false;
+	std::vector<int> pendingDeleteObjectIds_;
 };

@@ -533,8 +533,24 @@ namespace YoRigine {
 	void CollisionManager::RemoveCollider(BaseCollider* collider) {
 		if (!collider) return;
 		if (isIterating_) {
-			// 走査中の削除は遅延。即座に erase すると走査ループを壊す。
-			pendingRemoves_.push_back(collider);
+			// 走査中に実体が破棄される場合があるため、参照はこの場で即座に潰す。
+			// pendingRemoves_ に raw pointer を積むと、同フレーム中に ColliderPool が同じ番地を
+			// 再利用した時、新しく生成された collider まで後段 Flush で消してしまう。
+			// そのため「後で消す」のではなく、走査中の配列上では nullptr 化して無効化だけ行う。
+			for (BaseCollider*& c : colliders_) {
+				if (c == collider) c = nullptr;
+			}
+			for (auto& pair : broadPhasePairsScratch_) {
+				if (pair.first == collider) pair.first = nullptr;
+				if (pair.second == collider) pair.second = nullptr;
+			}
+			for (auto it = collidingPairs_.begin(); it != collidingPairs_.end(); ) {
+				if (it->first.first == collider || it->first.second == collider) {
+					it = collidingPairs_.erase(it);
+				} else {
+					++it;
+				}
+			}
 			return;
 		}
 		DoRemove(collider);
@@ -571,6 +587,7 @@ namespace YoRigine {
 			}
 		}
 		pendingAdds_.clear();
+		colliders_.erase(std::remove(colliders_.begin(), colliders_.end(), nullptr), colliders_.end());
 	}
 
 	bool CollisionManager::RaycastMasked(const Ray& ray, float maxDistance, uint32_t layerMask, RaycastHit* outHit)
