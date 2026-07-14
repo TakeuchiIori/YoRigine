@@ -7,10 +7,14 @@
 
 void ControlUI::Initialize()
 {
+    BakeStyleButtonTextures();
+
 	// コントロールUI取得
 	button_[0] = YoRigine::UIManager::GetInstance()->GetUI("A_attack");
 	button_[1] = YoRigine::UIManager::GetInstance()->GetUI("B_attack");
 	button_[2] = YoRigine::UIManager::GetInstance()->GetUI("shield");
+    button_[3] = GetOrCreateButton("Y_style", "Resources/Textures/Operation/Y_to_magic.png", { 1405.0f, 687.0f }, { 122.0f, 122.0f });
+    ApplyStyleTextures();
 
 	// 波紋用のUI
 	ripples = YoRigine::UIManager::GetInstance()->GetUI("ripples");
@@ -80,11 +84,11 @@ void ControlUI::Update()
     if (lockOnIcon_)  lockOnIcon_->SetVisible(lockHintVisible);
     if (lockOnStick_) lockOnStick_->SetVisible(lockHintVisible);
 
-    // 攻撃/ガードのボタンヒント(A/B/X)と、その背面アウトライン枠は戦闘中のみ表示
+    // 攻撃/ガード/スタイル切替のボタンヒント(A/B/X/Y)と、その背面アウトライン枠は戦闘中のみ表示
     // （フィールドでは攻撃できないため）。LB/RB はフィールドでもカメラリセンターとして
     // 機能するので常時表示のまま残す。
     const bool combatHintVisible = isVisble_ && battleActive_;
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < 4; ++i) {
         if (button_[i]) button_[i]->SetVisible(combatHintVisible);
     }
     for (int i = 0; i < 4; ++i) {
@@ -114,7 +118,7 @@ void ControlUI::Update()
         stickPrevOffsetY_ = off;
     }
 
-    // A/B/X の押下演出（波紋＋ポップ）は戦闘中のみ（フィールドでは攻撃しないため波紋も出さない）
+    // A/B/X/Y の押下演出（波紋＋ポップ）は戦闘中のみ（フィールドでは攻撃しないため波紋も出さない）
     if (battleActive_) {
     // Aボタンが押された瞬間
     if (YoRigine::Input::GetInstance()->IsPadTriggered(0, GamePadButton::A)) {
@@ -143,7 +147,13 @@ void ControlUI::Update()
         button_[2]->PlayScaleAnimation(Vector2{ 100.0f,100.0f } / baseX, Vector2{ 120.0f,120.0f } / baseX, duration_, Easing::Function::EaseInCubic, false);
         button_[2]->PlayFlash(duration_, 9);
     }
-    } // if (battleActive_) — A/B/X 押下演出ここまで
+
+    // Yボタンが押された瞬間
+    if (YoRigine::Input::GetInstance()->IsPadTriggered(0, GamePadButton::Y)) {
+        if (!isVisble_)return;
+        PlayButtonPress(button_[3]);
+    }
+    } // if (battleActive_) — A/B/X/Y 押下演出ここまで
 
     // LB / RB はバトル中のみ押下アニメ（A/B と全く同じ：波紋＋拡縮＋フラッシュ）
     if (battleActive_ && isVisble_) {
@@ -258,6 +268,52 @@ void ControlUI::PlayButtonPress(UIBase* button)
     Vector2 base = button->GetSize();
     button->PlayScaleAnimation(pushSize_ / base, originalSize_ / base, duration_, Easing::Function::EaseInCubic, false);
     button->PlayFlash(duration_, 9);
+}
+
+void ControlUI::SetPlayerStyle(PlayerStyle style)
+{
+    if (currentStyle_ == style) return;
+    currentStyle_ = style;
+    ApplyStyleTextures();
+}
+
+void ControlUI::BakeStyleButtonTextures()
+{
+    auto bakeLabel = [](const std::string& text, const std::string& path) {
+        if (std::filesystem::exists(path)) return;
+
+        YoRigine::TextBakeParams params;
+        params.text = text;
+        params.fontFilePath = "Resources/Fonts/kurobara-cinderella.ttf";
+        params.fontSize = 56.0f;
+        params.fillColor = { 1.0f, 1.0f, 1.0f, 1.0f };
+        params.outlineWidth = 5.0f;
+        params.outlineColor = { 0.0f, 0.0f, 0.0f, 1.0f };
+        params.padding = 12.0f;
+        YoRigine::TextTextureBaker::Bake(params, path);
+    };
+
+    bakeLabel("A Magic", "Resources/Textures/Operation/A_magic.png");
+    bakeLabel("B Magic", "Resources/Textures/Operation/B_magic.png");
+    bakeLabel("X Magic", "Resources/Textures/Operation/X_magic.png");
+    bakeLabel("Y Magic", "Resources/Textures/Operation/Y_to_magic.png");
+    bakeLabel("Y Sword", "Resources/Textures/Operation/Y_to_sword.png");
+}
+
+void ControlUI::ApplyStyleTextures()
+{
+    if (currentStyle_ == PlayerStyle::Sword) {
+        if (button_[0]) button_[0]->SetTexture("Resources/Textures/Operation/A_attack.png");
+        if (button_[1]) button_[1]->SetTexture("Resources/Textures/Operation/B_attack.png");
+        if (button_[2]) button_[2]->SetTexture("Resources/Textures/Operation/shield.png");
+        if (button_[3]) button_[3]->SetTexture("Resources/Textures/Operation/Y_to_magic.png");
+        return;
+    }
+
+    if (button_[0]) button_[0]->SetTexture("Resources/Textures/Operation/A_magic.png");
+    if (button_[1]) button_[1]->SetTexture("Resources/Textures/Operation/B_magic.png");
+    if (button_[2]) button_[2]->SetTexture("Resources/Textures/Operation/X_magic.png");
+    if (button_[3]) button_[3]->SetTexture("Resources/Textures/Operation/Y_to_sword.png");
 }
 
 // 画面外ヒット時のロックオン照準フラッシュ（赤→黄にフェードしながら消える）

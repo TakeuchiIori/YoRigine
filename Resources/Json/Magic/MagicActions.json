@@ -1,0 +1,76 @@
+[
+    {
+        "name": "ChargeBeam",
+        "slot": "Primary",
+        "inputMode": "ChargeRelease",
+        "minChargeTime": 0.4,
+        "maxChargeTime": 2.0,
+        "cooldown": 0.6,
+        "events": [
+            {
+                "time": 0.0,
+                "trigger": "OnStart",
+                "type": "PlayVfx",
+                "element": "Light",
+                "label": "ChargeStart",
+                "power": 0.0,
+                "duration": 0.0,
+                "radius": 0.0,
+                "speed": 0.0
+            },
+            {
+                "time": 0.0,
+                "trigger": "OnRelease",
+                "type": "SpawnBeam",
+                "element": "Light",
+                "label": "ReleaseBeam",
+                "power": 12.0,
+                "duration": 1.0,
+                "radius": 0.0,
+                "speed": 0.0
+            }
+        ]
+    },
+    {
+        "name": "FireBolt",
+        "slot": "Secondary",
+        "inputMode": "Tap",
+        "minChargeTime": 0.0,
+        "maxChargeTime": 1.0,
+        "cooldown": 0.25,
+        "events": [
+            {
+                "time": 0.0,
+                "trigger": "OnStart",
+                "type": "SpawnProjectile",
+                "element": "Fire",
+                "label": "FireBolt",
+                "power": 6.0,
+                "duration": 0.0,
+                "radius": 0.0,
+                "speed": 32.0
+            }
+        ]
+    },
+    {
+        "name": "ThunderStrike",
+        "slot": "Utility",
+        "inputMode": "Tap",
+        "minChargeTime": 0.0,
+        "maxChargeTime": 1.0,
+        "cooldown": 0.4,
+        "events": [
+            {
+                "time": 0.0,
+                "trigger": "OnStart",
+                "type": "StrikeTarget",
+                "element": "Thunder",
+                "label": "ThunderStrike",
+                "power": 8.0,
+                "duration": 0.0,
+                "radius": 3.0,
+                "speed": 0.0
+            }
+        ]
+    }
+]

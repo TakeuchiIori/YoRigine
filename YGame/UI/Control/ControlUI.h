@@ -1,6 +1,7 @@
 #pragma once
 #include <Systems/UI/UIManager.h>
 #include <Systems/UI/UIBase.h>
+#include "GameObjects/Player/Style/PlayerStyle.h"
 
 #include <list>
 /// <summary>
@@ -16,6 +17,8 @@ public:
 
 	// バトル中かどうか（LB/RB の押下アニメはバトル中のみ発火する）
 	void SetBattleActive(bool active) { battleActive_ = active; }
+	// UI はスタイル値だけを受け取り、PlayerCombat / PlayerMagic の中身には触れない。
+	void SetPlayerStyle(PlayerStyle style);
 
 	// ロックオン照準を一瞬出して「赤→黄にフェードしながら消える」演出を1回再生する。
 	// 画面外の敵に攻撃が当たってカメラが敵方向へ向いた瞬間に呼ぶ。
@@ -37,10 +40,12 @@ private:
 		const Vector2& pos, const Vector2& size);
 	// ボタン押下時の共通アニメ（波紋＋拡縮ポップ＋フラッシュ）。A/B と全く同じ挙動。
 	void PlayButtonPress(UIBase* button);
+	void BakeStyleButtonTextures();
+	void ApplyStyleTextures();
 private:
 	///************************* メンバ変数 *************************///
 
-	UIBase* button_[3];
+	UIBase* button_[4] = {};
 	UIBase* ripples = nullptr;
 
 	// A/B/X 攻撃ボタンの背面アウトライン枠（outlineUI〜outlineUI4）。攻撃ボタンと一緒に戦闘中のみ表示。
@@ -52,6 +57,7 @@ private:
 	UIBase* lbButton_ = nullptr;
 	UIBase* rbButton_ = nullptr;
 	bool    battleActive_ = false;
+	PlayerStyle currentStyle_ = PlayerStyle::Sword;
 
 	// ロックオン操作ヒント（照準アイコン＋右スティック＋「ロックオン」文字）。バトル中のみ表示。
 	UIBase* lockOnIcon_  = nullptr;  // LockOn.png（照準）

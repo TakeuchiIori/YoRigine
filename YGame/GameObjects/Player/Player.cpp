@@ -102,6 +102,8 @@ void Player::InitStates() {
 // ============================================================
 void Player::InitCombatSystem() {
 	combat_ = std::make_unique<PlayerCombat>(this);
+	magicController_ = std::make_unique<PlayerMagicController>(this);
+	styleController_ = std::make_unique<PlayerStyleController>();
 
 	// アクション変更コールバック（デバッグログ）
 	combat_->SetActionCallback([this]([[maybe_unused]] const std::string& action) {
@@ -120,10 +122,34 @@ void Player::HandleCombatInput() {
 
 	const bool pressedA = input_->IsPadTriggered(0, GamePadButton::A);
 	const bool pressedB = input_->IsPadTriggered(0, GamePadButton::B);
+	const bool pressedX = input_->IsPadTriggered(0, GamePadButton::X)
+		|| input_->GetInstance()->TriggerKey(DIK_N);
+	const bool heldA = input_->IsPadPressed(0, GamePadButton::A);
+	const bool heldB = input_->IsPadPressed(0, GamePadButton::B);
+	const bool heldX = input_->IsPadPressed(0, GamePadButton::X)
+		|| input_->GetInstance()->PushKey(DIK_N);
+
+	// Y は戦闘スタイルの切替だけを担当する。
+	// スタイル状態を専用クラスへ逃がすことで、剣/魔法が増えても PlayerCombat にUI都合の分岐を背負わせない。
+	if (styleController_ && input_->IsPadTriggered(0, GamePadButton::Y)) {
+		styleController_->Toggle();
+	}
 
 	// 攻撃中の入力は AttackingCombatState が AttackData の inputBufferStart に従ってバッファ管理する
 	if (!combat_->IsIdle()) return;
 
+	if (styleController_ && styleController_->IsMagic()) {
+		HandleMagicInput(pressedA, pressedB, pressedX, heldA, heldB, heldX);
+		return;
+	}
+
+	HandleSwordInput(pressedA, pressedB, pressedX);
+}
+
+// ============================================================
+// 剣スタイル入力
+// ============================================================
+void Player::HandleSwordInput(bool pressedA, bool pressedB, bool pressedX) {
 	// A（軽攻撃）コンボ開始
 	if (pressedA) {
 		combat_->TryAttack(AttackType::A_Arte);
@@ -135,11 +161,22 @@ void Player::HandleCombatInput() {
 	}
 
 	// ガード
-	if (input_->IsPadTriggered(0, GamePadButton::X)
-		|| input_->GetInstance()->TriggerKey(DIK_N)) {
+	if (pressedX) {
 		combat_->TryGuard();
 	}
+}
 
+// ============================================================
+// 魔法スタイル入力
+// ============================================================
+void Player::HandleMagicInput(bool pressedA, bool pressedB, bool pressedX, bool heldA, bool heldB, bool heldX) {
+	if (!magicController_) return;
+
+	// 魔法入力はコントローラーへ渡すだけにする。
+	// Player は「どのスロット入力か」だけを渡し、溜め・離し・イベント実行は魔法側へ閉じ込める。
+	magicController_->HandleSlotInput(PlayerMagicSlot::Primary, pressedA, heldA);
+	magicController_->HandleSlotInput(PlayerMagicSlot::Secondary, pressedB, heldB);
+	magicController_->HandleSlotInput(PlayerMagicSlot::Utility, pressedX, heldX);
 }
 
 // ============================================================
@@ -208,6 +245,7 @@ void Player::Update() {
 	// ステート更新
 	movement_->Update(YoRigine::GameTime::GetDeltaTime());
 	combat_->Update(YoRigine::GameTime::GetDeltaTime());
+	if (magicController_) magicController_->Update(YoRigine::GameTime::GetDeltaTime());
 
 	// オブジェクト更新
 	obj_->UpdateAnimation();
@@ -271,6 +309,9 @@ void Player::DrawShadow() {
 void Player::DrawImGui() {
 	movement_->ShowStateDebug();
 	combat_->ShowDebugImGui();
+#ifdef USE_IMGUI
+	if (magicController_) magicController_->ShowDebugImGui();
+#endif
 }
 
 // ============================================================
@@ -443,6 +484,8 @@ void Player::Reset() {
 	hp_ = maxHP_;
 	isAlive_ = true;
 	if (combat_) combat_->Reset();
+	if (magicController_) magicController_->Reset();
+	if (styleController_) styleController_->Reset();
 	if (movement_) {
 		movement_->SetCanMove(true);
 		movement_->SetCanRotate(true);

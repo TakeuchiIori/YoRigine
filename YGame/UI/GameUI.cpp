@@ -346,6 +346,11 @@ void GameUI::SetBattleActive(bool active)
 	if (controlUI_) controlUI_->SetBattleActive(active);
 }
 
+void GameUI::SetPlayerStyle(PlayerStyle style)
+{
+	if (controlUI_) controlUI_->SetPlayerStyle(style);
+}
+
 /// <summary>
 /// ロックオン照準フラッシュを再生（ControlUI へ委譲）
 /// </summary>

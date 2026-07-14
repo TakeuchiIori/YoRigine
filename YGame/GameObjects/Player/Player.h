@@ -16,6 +16,8 @@
 #include "../Generators/Object3D/BaseObject.h"
 #include "Movement/PlayerMovement.h"
 #include "Combat/PlayerCombat.h"
+#include "Magic/PlayerMagicController.h"
+#include "Style/PlayerStyleController.h"
 #include "Weapon/PlayerSword.h"
 #include "Weapon/PlayerShield.h"
 #include "UI/HealthBar/PlayerHealthBarUI.h"
@@ -73,6 +75,8 @@ public:
 
 	PlayerMovement* GetMovement() const { return movement_.get(); }
 	PlayerCombat* GetCombat() const { return combat_.get(); }
+	PlayerMagicController* GetMagicController() const { return magicController_.get(); }
+	PlayerStyle GetStyle() const { return styleController_ ? styleController_->GetStyle() : PlayerStyle::Sword; }
 	PlayerSword* GetSword() const { return playerSword_.get(); }
 	PlayerShield* GetShield() const { return playerShield_.get(); }
 
@@ -122,6 +126,8 @@ private:
 	void InitCombatSystem();
 
 	void HandleCombatInput();
+	void HandleSwordInput(bool pressedA, bool pressedB, bool pressedX);
+	void HandleMagicInput(bool pressedA, bool pressedB, bool pressedX, bool heldA, bool heldB, bool heldX);
 	void UpdateMotionTime();
 	void LookAtDirection(const Vector3& direction);
 
@@ -138,6 +144,8 @@ private:
 	std::unique_ptr<Line> boneLine_;
 	std::unique_ptr<PlayerMovement> movement_;
 	std::unique_ptr<PlayerCombat> combat_;
+	std::unique_ptr<PlayerMagicController> magicController_;
+	std::unique_ptr<PlayerStyleController> styleController_;
 	std::unique_ptr<PlayerHealthBarUI> healthUI_;
 
 	Vector3 anchorPoint_ = { 0.0f, -1.0f, 0.0f };

@@ -272,6 +272,7 @@ void GameScene::Update() {
 	// 攻撃/ガード入力も戦闘中のみ受け付ける。
 	if (player_) {
 		player_->SetBattleMode(inBattle);
+		gameUI_->SetPlayerStyle(player_->GetStyle());
 		if (player_->GetPlayerCamera()) {
 			player_->GetPlayerCamera()->SetBattleMode(inBattle);
 		}
