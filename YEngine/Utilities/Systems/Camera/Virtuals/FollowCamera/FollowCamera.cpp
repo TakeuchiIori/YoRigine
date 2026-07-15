@@ -302,7 +302,7 @@ void FollowCamera::RecenterBehindTarget() {
 //   アイドルオートリセンターなど、専用の緩やかな時間を使いたい場合だけ
 //   正の値を明示的に渡す。
 // ============================================================
-void FollowCamera::RecenterToYaw(float targetWorldYaw, bool resetPitch, float duration) {
+void FollowCamera::RecenterToYaw(float targetWorldYaw, bool resetPitch, float duration, float protectDuration) {
     constexpr float kPi    = 3.14159265358979f;
     constexpr float kTwoPi = 6.28318530717958f;
 
@@ -328,13 +328,26 @@ void FollowCamera::RecenterToYaw(float targetWorldYaw, bool resetPitch, float du
 
     recenterTimer_ = 0.0f;
     recentering_   = true;
+    recenterProtectTimer_ = std::max(0.0f, protectDuration);
 
     // 即時スナップ
     if (activeRecenterDuration_ <= 0.0f) {
         transform_.rotate.y = recenterToYaw_;
         transform_.rotate.x = recenterToPitch_;
         recentering_ = false;
+        recenterProtectTimer_ = 0.0f;
     }
+}
+
+// ============================================================
+// リセンター中断
+//   force=false: 保護時間中は無視（スティック等の割り込みから決めカメラを守る）
+//   force=true : 保護を無視して即中断
+// ============================================================
+void FollowCamera::CancelRecenter(bool force) {
+    if (!force && recenterProtectTimer_ > 0.0f) return;
+    recentering_ = false;
+    recenterProtectTimer_ = 0.0f;
 }
 
 // ============================================================
@@ -342,6 +355,10 @@ void FollowCamera::RecenterToYaw(float targetWorldYaw, bool resetPitch, float du
 // ============================================================
 void FollowCamera::UpdateRecenter(float dt) {
     if (!recentering_) return;
+
+    if (recenterProtectTimer_ > 0.0f) {
+        recenterProtectTimer_ = std::max(0.0f, recenterProtectTimer_ - dt);
+    }
 
     recenterTimer_ += dt;
     float t = (activeRecenterDuration_ > 0.0f)

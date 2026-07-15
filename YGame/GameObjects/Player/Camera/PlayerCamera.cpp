@@ -462,7 +462,7 @@ void PlayerCamera::FaceDefeatNextEnemy(const Vector3& enemyWorldPos) {
     rot.x = asinf(std::clamp(-dir.y, -1.0f, 1.0f));
     rot.x = std::clamp(rot.x, minPitch_, maxPitch_);
     followCamera_->SetRotate(rot);
-    followCamera_->CancelRecenter();
+    followCamera_->CancelRecenter(true);  // 撃破フェイシングは決めカメラより優先（保護を無視して上書き）
     followCamera_->NotifyCameraActive();
 }
 
@@ -636,18 +636,24 @@ void PlayerCamera::TriggerOffscreenHitReaction(const Vector3* enemyWorldPos) {
     lockOnFlashWorldPos_ = (enemyWorldPos) ? *enemyWorldPos
         : (playerWT_ ? playerWT_->translate_ : Vector3{});
 
-    // 背後リセンター：カメラ→プレイヤー→敵 が一直線になる位置まで回り込ませる。
-    // 敵座標があれば「プレイヤー→敵の方向」へ寄せる＝プレイヤーの向きに依存せず
-    // 確実にプレイヤー越しの敵を正面に捉える。無ければ従来のプレイヤー向きへ。
-    if (offscreenHitFaceEnemy_ && enemyWorldPos && playerWT_) {
+    // 敵方向リセンター：カメラ→プレイヤー→敵 が一直線になる位置まで回り込ませる。
+    // 敵座標があれば常に「プレイヤー→敵の方向」へ寄せる＝プレイヤーの向きに依存しない。
+    //   ※ プレイヤーの向きへ寄せる（RecenterBehindTarget）方式は、攻撃中に左スティックで
+    //     移動していると発火時のプレイヤー向き＝移動方向をスナップしてしまい、敵ではなく
+    //     移動方向を向いてしまう。決めカメラは常に敵を捉えるべきなので敵方向で固定する。
+    // offscreenHitProtect_ 秒だけこのリセンターを保護し、直後の一瞬のスティック当たりで
+    // 敵へ振る動きが消えないようにする（意図的な操作は保護明け後すぐ効く）。
+    bool facedEnemy = false;
+    if (enemyWorldPos && playerWT_) {
         Vector3 dir = *enemyWorldPos - PlayerPivotWorld();
         dir.y = 0.0f;
         if (Length(dir) > 0.001f) {
-            followCamera_->RecenterToYaw(atan2f(dir.x, dir.z));
-        } else {
-            followCamera_->RecenterBehindTarget();
+            followCamera_->RecenterToYaw(atan2f(dir.x, dir.z), true, -1.0f, offscreenHitProtect_);
+            facedEnemy = true;
         }
-    } else {
+    }
+    if (!facedEnemy) {
+        // 敵座標が無い（テスト発火など）ときのみプレイヤーの向きへ寄せる
         followCamera_->RecenterBehindTarget();
     }
 
@@ -683,24 +689,24 @@ void PlayerCamera::OnAttackHit(const Vector3& enemyWorldPos) {
 // パラメータの保存 / 復元（FollowCamera の extension JSON に相乗り）
 void PlayerCamera::SaveOffscreenHitReaction(nlohmann::json& j) const {
     j["enabled"]   = offscreenHitEnabled_;
-    j["faceEnemy"] = offscreenHitFaceEnemy_;
     j["margin"]   = offscreenHitMargin_;
     j["cooldown"] = offscreenHitCooldown_;
     j["zoomFov"]  = offscreenHitZoomFov_;
     j["zoomDur"]  = offscreenHitZoomDur_;
     j["shakeInt"] = offscreenHitShakeInt_;
     j["shakeDur"] = offscreenHitShakeDur_;
+    j["protect"]  = offscreenHitProtect_;
 }
 
 void PlayerCamera::LoadOffscreenHitReaction(const nlohmann::json& j) {
     offscreenHitEnabled_   = j.value("enabled",   true);
-    offscreenHitFaceEnemy_ = j.value("faceEnemy", true);
     offscreenHitMargin_   = j.value("margin",   0.9f);
     offscreenHitCooldown_ = j.value("cooldown", 0.8f);
     offscreenHitZoomFov_  = j.value("zoomFov",  0.40f);
     offscreenHitZoomDur_  = j.value("zoomDur",  0.30f);
     offscreenHitShakeInt_ = j.value("shakeInt", 0.30f);
     offscreenHitShakeDur_ = j.value("shakeDur", 0.15f);
+    offscreenHitProtect_  = j.value("protect",  0.12f);
 }
 
 // ============================================================
@@ -1137,12 +1143,12 @@ void PlayerCamera::DrawImGui() {
     if (ImGui::CollapsingHeader("見切れヒット演出")) {
         ImGui::Checkbox("有効", &offscreenHitEnabled_);
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("画面外の敵に攻撃が当たった瞬間、敵を捉え直す決めカメラを発火");
-        ImGui::Checkbox("敵の方向へ回り込む", &offscreenHitFaceEnemy_);
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("ON=カメラ→プレイヤー→敵が一直線になる位置へ(確実に敵を正面へ) / OFF=プレイヤーの向いてる方向の背後へ");
         ImGui::DragFloat("画面外マージン(NDC)", &offscreenHitMargin_, 0.01f, 0.0f, 1.2f, "%.2f");
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("敵がこのNDCを越えたら『見切れ』扱い。値を小さくするほど中央寄りでも発動。0.9=端で切れかけ / 1.0=完全に枠外のみ / 0=画面中央以外すべて");
         ImGui::DragFloat("クールダウン(秒)", &offscreenHitCooldown_, 0.05f, 0.0f, 5.0f, "%.2f");
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("連続ヒットで毎回発火しないための間隔");
+        ImGui::DragFloat("敵向き保護時間(秒)", &offscreenHitProtect_, 0.01f, 0.0f, 0.5f, "%.2f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("発火直後この秒数だけ敵向きリセンターを保護し、一瞬のスティック当たりで消えないようにする。0で無効(即キャンセル可)");
 
         ImGui::SeparatorText("演出");
         ImGui::DragFloat("ズームFOV", &offscreenHitZoomFov_, 0.005f, 0.0f, 1.0f, "%.3f");
