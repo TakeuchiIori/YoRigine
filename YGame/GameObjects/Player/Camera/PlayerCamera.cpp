@@ -197,10 +197,14 @@ void PlayerCamera::ApplyPostDirector(Camera* sceneCamera, float dt) {
     }
 
     // ---- FOV オフセット ----
+    // ディレクタが毎フレーム fovY_ を基準値へ戻し、その後 ApplyThreatFovWiden が
+    // 「囲まれ拡大」分を加算している。ここで代入すると囲まれ拡大分が瞬間的に消え、
+    // fovDelta が 0↔非0 を跨ぐたびに補間なしのジャンプになる（複数敵ほど顕著）。
+    // fovDelta は StartInterpolating / Returning で既に滑らかに補間されているので、
+    // 加算で乗せれば囲まれ拡大やズームと共存したままジャンプなく変化する。
     float fovDelta = attackCamera_.GetCurrentFovDelta();
     if (fovDelta != 0.0f) {
-        // savedBaseFov_ は AttackCameraComponent 側が保持している
-        sceneCamera->fovY_ = attackCamera_.GetSavedBaseFov() + fovDelta;
+        sceneCamera->fovY_ += fovDelta;
     }
 
     // ---- タイムスケール ----
@@ -824,10 +828,8 @@ void PlayerCamera::PlayAttackCameraWork(const std::string& attackName) {
     // アンカー未指定 → ロックオン対象があればそれを既定アンカーにする
     hasCameraWorkAnchor_ = false;
 
-    // 再生前 FOV を保存 → Play → savedBaseFov に渡す順で呼ぶ
-    const float baseFov = followCamera_->GetBaseFovY();
+    // FOV は基準値へ加算適用するため、再生前 FOV の保存は不要
     attackCamera_.Play(attackName);
-    attackCamera_.SetSavedBaseFov(baseFov);
 }
 
 void PlayerCamera::PlayAttackCameraWork(const std::string& attackName, const Vector3& anchor) {
@@ -836,9 +838,7 @@ void PlayerCamera::PlayAttackCameraWork(const std::string& attackName, const Vec
     cameraWorkAnchor_    = anchor;
     hasCameraWorkAnchor_ = true;
 
-    const float baseFov = followCamera_->GetBaseFovY();
     attackCamera_.Play(attackName);
-    attackCamera_.SetSavedBaseFov(baseFov);
 }
 
 // ============================================================
