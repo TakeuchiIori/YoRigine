@@ -75,10 +75,11 @@ void PlayerMagicController::HandleSlotInput(PlayerMagicSlot slot, bool triggered
 		TryCast(slot);
 	}
 	if (released) {
+		// 溜め成立時のみ実弾を出す。不発でも保留は必ず畳み、次のチャージへ持ち越さない。
 		if (runner_.Release() && hasPendingChargeAction_) {
 			SpawnAttackInstance(pendingChargeAction_);
-			hasPendingChargeAction_ = false;
 		}
+		hasPendingChargeAction_ = false;
 	}
 }
 
@@ -171,12 +172,12 @@ void PlayerMagicController::ShowDebugImGui()
 		if (ImGui::BeginTabItem("魔法")) {
 			ImGui::Text("実行中の魔法: %s", runner_.GetCurrentActionName().c_str());
 			ImGui::Text("クールダウン: %.2f", runner_.GetCooldown());
-			ImGui::Text("主魔法段数: %d / %.2f", comboIndices_[0] + 1, comboTimers_[0]);
-			ImGui::Text("副魔法段数: %d / %.2f", comboIndices_[1] + 1, comboTimers_[1]);
-			ImGui::Text("補助魔法段数: %d / %.2f", comboIndices_[2] + 1, comboTimers_[2]);
-			if (ImGui::Button("主魔法")) { TryCast(PlayerMagicSlot::Primary); } ImGui::SameLine();
-			if (ImGui::Button("副魔法")) { TryCast(PlayerMagicSlot::Secondary); } ImGui::SameLine();
-			if (ImGui::Button("補助魔法")) { TryCast(PlayerMagicSlot::Utility); }
+			ImGui::Text("主魔法(A) 段数: %d / %.2f", comboIndices_[0] + 1, comboTimers_[0]);
+			ImGui::Text("副魔法(B) 段数: %d / %.2f", comboIndices_[1] + 1, comboTimers_[1]);
+			ImGui::Text("補助魔法(X) 段数: %d / %.2f", comboIndices_[2] + 1, comboTimers_[2]);
+			if (ImGui::Button("A 主魔法")) { TryCast(PlayerMagicSlot::Primary); } ImGui::SameLine();
+			if (ImGui::Button("B 副魔法")) { TryCast(PlayerMagicSlot::Secondary); } ImGui::SameLine();
+			if (ImGui::Button("X 補助魔法")) { TryCast(PlayerMagicSlot::Utility); }
 			if (ImGui::Button("魔法コンボリセット")) {
 				ResetChain(PlayerMagicSlot::Primary);
 				ResetChain(PlayerMagicSlot::Secondary);

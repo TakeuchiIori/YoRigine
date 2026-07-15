@@ -1,11 +1,12 @@
 #pragma once
 
-#include "MagicActionData.h"
-#include "WorldTransform/WorldTransform.h"
 #include "Collision/Sphere/SphereCollider.h"
+#include "MagicActionData.h"
+#include "Vfx/VfxMesh/Runtime/VfxMeshHandle.h"
+#include "WorldTransform/WorldTransform.h"
 
 #include <memory>
-#include <unordered_set>
+#include <unordered_map>
 
 class BaseCollider;
 class Player;
@@ -18,32 +19,42 @@ class Player;
 // ============================================================
 class MagicAttackInstance {
 public:
-	void Initialize(const MagicActionData& action, Player* owner);
-	void Update(float deltaTime);
-	void DrawCollision();
+  ~MagicAttackInstance();
 
-	bool IsAlive() const { return alive_; }
+  void Initialize(const MagicActionData &action, Player *owner);
+  void Update(float deltaTime);
+  void DrawCollision();
 
-	void OnEnterCollision(BaseCollider* self, BaseCollider* other);
-	void OnCollision(BaseCollider* self, BaseCollider* other);
-	void OnExitCollision(BaseCollider* self, BaseCollider* other);
-	void OnDirectionCollision(BaseCollider* self, BaseCollider* other, HitDirection dir);
-	void OnEnterDirectionCollision(BaseCollider* self, BaseCollider* other, HitDirection dir);
+  bool IsAlive() const { return alive_; }
 
-private:
-	Vector3 ResolveOrigin(Player& owner) const;
-	Vector3 ResolveForward(Player& owner) const;
-	Vector3 ResolveTarget(Player& owner, const Vector3& origin) const;
-	void ApplyHit(BaseCollider* other);
+  void OnEnterCollision(BaseCollider *self, BaseCollider *other);
+  void OnCollision(BaseCollider *self, BaseCollider *other);
+  void OnExitCollision(BaseCollider *self, BaseCollider *other);
+  void OnDirectionCollision(BaseCollider *self, BaseCollider *other,
+                            HitDirection dir);
+  void OnEnterDirectionCollision(BaseCollider *self, BaseCollider *other,
+                                 HitDirection dir);
 
 private:
-	MagicActionData action_;
-	Player* owner_ = nullptr;
-	WorldTransform wt_;
-	std::shared_ptr<SphereCollider> collider_;
-	Vector3 origin_{};
-	Vector3 target_{};
-	float elapsedTime_ = 0.0f;
-	bool alive_ = false;
-	std::unordered_set<BaseCollider*> hitColliders_;
+  Vector3 ResolveTarget(Player &owner, const Vector3 &origin) const;
+  void ApplyHit(BaseCollider *other);
+  // 消滅処理。着弾VFXを一度出し、追従VFXを止め、判定を無効化する。
+  void Die();
+
+private:
+  MagicActionData action_;
+  Player *owner_ = nullptr;
+  WorldTransform wt_;
+  std::shared_ptr<SphereCollider> collider_;
+  Vector3 origin_{};
+  Vector3 target_{};
+  float elapsedTime_ = 0.0f;
+  bool alive_ = false;
+  bool feedbackFired_ =
+      false; // このインスタンスで手応え(ヒットストップ/シェイク)を出したか
+  // 各敵コライダーへ最後にダメージを与えた elapsedTime_。
+  // hitInterval と突き合わせて単発/周期ヒットを切り替える。
+  std::unordered_map<BaseCollider *, float> lastHitTimes_;
+  VfxMeshHandle travelVfx_; // 飛翔中に本体へ追従させるループVFXのハンドル
+  bool died_ = false;       // Die() を二重発火させないためのガード
 };

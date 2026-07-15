@@ -140,6 +140,8 @@ namespace {
 		}
 	}
 
+	const char* SlotButtonLabel(PlayerMagicSlot slot);
+
 	void DrawActionFields(MagicActionData& action)
 	{
 		char nameBuffer[128] = {};
@@ -150,6 +152,8 @@ namespace {
 
 		const char* slots[] = { "Primary", "Secondary", "Utility" };
 		DrawEnumCombo("スロット", action.slot, slots, PlayerMagicSlotFromString);
+		ImGui::SameLine();
+		ImGui::TextColored(ImVec4(0.35f, 0.8f, 1.0f, 1.0f), "→ %s", SlotButtonLabel(action.slot));
 
 		const char* inputModes[] = { "Tap", "ChargeRelease" };
 		DrawEnumCombo("入力方式", action.inputMode, inputModes, MagicInputModeFromString);
@@ -164,12 +168,35 @@ namespace {
 
 		ImGui::InputFloat("再生時間", &action.duration, 0.05f, 0.2f);
 		ImGui::InputFloat("射程", &action.range, 0.5f, 2.0f);
+		ImGui::InputFloat("威力", &action.damage, 1.0f, 5.0f);
 		ImGui::InputFloat("判定半径", &action.hitRadius, 0.1f, 0.5f);
 		ImGui::InputFloat("判定開始遅延", &action.hitDelay, 0.01f, 0.05f);
+		ImGui::InputFloat("再ヒット間隔", &action.hitInterval, 0.05f, 0.2f);
+		if (action.hitInterval <= 0.0f) {
+			ImGui::SameLine();
+			ImGui::TextDisabled("(0=単発)");
+		}
 		ImGui::InputFloat("最小溜め時間", &action.minChargeTime, 0.05f, 0.2f);
 		ImGui::InputFloat("最大溜め時間", &action.maxChargeTime, 0.05f, 0.2f);
 		ImGui::InputFloat("クールダウン", &action.cooldown, 0.05f, 0.2f);
 		ImGui::InputFloat("コンボ維持時間", &action.chainResetTime, 0.05f, 0.2f);
+		ImGui::SeparatorText("ヒット時の手応え");
+		ImGui::InputFloat("ヒットストップ", &action.hitStopDuration, 0.01f, 0.05f);
+		ImGui::InputFloat("シェイク強度", &action.shakeIntensity, 0.05f, 0.2f);
+		ImGui::InputFloat("シェイク時間", &action.shakeDuration, 0.05f, 0.2f);
+
+		ImGui::SeparatorText("飛道弾の見た目 (判定本体に追従)");
+		char travelBuffer[128] = {};
+		strncpy_s(travelBuffer, action.travelVfx.c_str(), sizeof(travelBuffer) - 1);
+		if (ImGui::InputText("飛翔VFX", travelBuffer, sizeof(travelBuffer))) {
+			action.travelVfx = travelBuffer;
+		}
+		char impactBuffer[128] = {};
+		strncpy_s(impactBuffer, action.impactVfx.c_str(), sizeof(impactBuffer) - 1);
+		if (ImGui::InputText("着弾VFX", impactBuffer, sizeof(impactBuffer))) {
+			action.impactVfx = impactBuffer;
+		}
+		ImGui::Checkbox("命中で消滅 (貫通しない)", &action.destroyOnHit);
 	}
 
 	void DrawScaleCurve(MagicActionData& action)
@@ -223,12 +250,24 @@ namespace {
 		}
 	}
 
+	// 入力の対応は Player::HandleMagicInput と一致させる:
+	//   A → Primary / B → Secondary / X → Utility
+	const char* SlotButtonLabel(PlayerMagicSlot slot)
+	{
+		switch (slot) {
+		case PlayerMagicSlot::Primary: return "Aボタン";
+		case PlayerMagicSlot::Secondary: return "Bボタン";
+		case PlayerMagicSlot::Utility: return "Xボタン";
+		default: return "?";
+		}
+	}
+
 	const char* SlotLabel(PlayerMagicSlot slot)
 	{
 		switch (slot) {
-		case PlayerMagicSlot::Primary: return "Primary";
-		case PlayerMagicSlot::Secondary: return "Secondary";
-		case PlayerMagicSlot::Utility: return "Utility";
+		case PlayerMagicSlot::Primary: return "Aボタン (Primary)";
+		case PlayerMagicSlot::Secondary: return "Bボタン (Secondary)";
+		case PlayerMagicSlot::Utility: return "Xボタン (Utility)";
 		default: return "Primary";
 		}
 	}
