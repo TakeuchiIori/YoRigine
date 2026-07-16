@@ -26,14 +26,10 @@ void FollowCamera::Initialize() {
     currentState_->Enter(this);
 
     collisionResolver_.Initialize();
-    // カメラのめり込み防止 Raycast から除外する TypeID。
-    // 壁 (kStaticWall / kNavObstacle) は除外してはならない（除外するとカメラが貫通する）。
-    // ここに登録するのはプレイヤー本体・武器・盾・敵など、カメラを遮らせたくないものだけ。
-    collisionResolver_.AddIgnoreTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayer));
-    collisionResolver_.AddIgnoreTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayerShield));
-    collisionResolver_.AddIgnoreTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon));
-    collisionResolver_.AddIgnoreTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kBattleEnemy));
-    collisionResolver_.AddIgnoreTypeID(static_cast<uint32_t>(CollisionTypeIdDef::kFieldEnemy));
+    // カメラのめり込み防止は「許可リスト方式」。
+    // Initialize() 内で既定の遮蔽対象（壁 kStaticWall / NavObstacle）がセットされる。
+    // プレイヤー・武器・盾・敵・魔法・トリガー領域などは登録されないので素通りする。
+    // 遮る対象を変えたい場合は JSON(collisionResolver.blockTypeIDs) かエディタから設定する。
 }
 
 // ============================================================

@@ -488,6 +488,7 @@ void Player::OnEnterDirectionCollision([[maybe_unused]] BaseCollider* self, Base
 void Player::Reset() {
 	hp_ = maxHP_;
 	isAlive_ = true;
+	isInvincible_ = false;
 	if (combat_) combat_->Reset();
 	if (magicController_) magicController_->Reset();
 	if (styleController_) styleController_->Reset();
@@ -525,8 +526,9 @@ void Player::TakeDamage(int damage) {
 // 発火されないため、ダメージ処理側から明示的に呼ぶ設計にしている。
 // ============================================================
 void Player::ApplyHitReaction(const Vector3& attackerPos) {
-	// 死亡・ガード中はのけぞらせない（ガードは盾側で処理）
+	// 死亡・ガード中・無敵中はのけぞらせない（ガードは盾側で処理）
 	if (!isAlive_ || hp_ <= 0) return;
+	if (isInvincible_) return;
 	if (combat_->IsDead() || combat_->IsGuarding()) return;
 
 	// 攻撃者との水平relative位置から、自分の向き基準で前/後を判定
@@ -560,6 +562,7 @@ void Player::Revive(int reviveHP) {
 
 	hp_ = reviveHP;
 	isAlive_ = true;
+	isInvincible_ = false;
 
 	// ステートをIdleに戻す
 	combat_->ChangeState(CombatState::Idle);

@@ -125,6 +125,15 @@ void OBBCollider::Update()
 	// Euler変換は描画用に1回だけ（純粋な回転行列に対して行う）
 	obb_.rotation = MatrixToEuler(combinedRotMatrix);
 
+	// ローカル3軸（回転後）を明示的に設定する。
+	// Ray-OBB 判定 (Intersection::IsCollision(Ray, OBB)) は obb_.rotation ではなく
+	// この orientations[] を読む。ここを埋めないと軸が未初期化のままになり、
+	// レイが常に距離0でヒット扱い → Raycast の至近距離無視で捨てられ、
+	// カメラのめり込み回避などでOBBをすり抜ける。
+	// 読み手側で Normalize されるため単位ベクトルで格納する。
+	obb_.orientations[0] = Transform({ 1.0f, 0.0f, 0.0f }, combinedRotMatrix);
+	obb_.orientations[1] = Transform({ 0.0f, 1.0f, 0.0f }, combinedRotMatrix);
+	obb_.orientations[2] = Transform({ 0.0f, 0.0f, 1.0f }, combinedRotMatrix);
 }
 
 void OBBCollider::Draw()

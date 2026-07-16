@@ -639,6 +639,34 @@ namespace YoRigine {
 		return hitAnything;
 	}
 
+	bool CollisionManager::RaycastAllowTypes(const Ray& ray, float maxDistance, RaycastHit* outHit, const std::vector<uint32_t>& allowTypeIDs)
+	{
+		if (allowTypeIDs.empty()) return false;
+
+		bool hitAnything = false;
+		float closestDistance = maxDistance;
+		RaycastHit tempHit;
+
+		for (BaseCollider* collider : colliders_) {
+			if (!collider || !collider->GetIsActive() || !collider->IsCollisionEnabled()) continue;
+
+			// 許可リストに無い型は素通り (壁だけ拾う等)
+			auto it = std::find(allowTypeIDs.begin(), allowTypeIDs.end(), collider->GetTypeID());
+			if (it == allowTypeIDs.end()) continue;
+
+			bool isHit = DispatchRay(ray, collider, &tempHit);
+
+			if (isHit && tempHit.distance <= 0.001f) continue; // 至近距離無視
+			if (isHit && tempHit.distance <= closestDistance) {
+				closestDistance = tempHit.distance;
+				if (outHit) *outHit = tempHit;
+				hitAnything = true;
+			}
+		}
+
+		return hitAnything;
+	}
+
 	// ============================================================
 	// ヒット方向判定用ユーティリティ
 	// ============================================================

@@ -116,6 +116,11 @@ public:
 	int32_t GetHP() const { return hp_; }
 	uint32_t GetMaxHP() const { return maxHP_; }
 	bool IsAlive() const { return isAlive_; }
+
+	// 無敵状態。急接近（ホーミング）攻撃の突進中などに ON にし、
+	// 敵の攻撃ヒット処理（ダメージ・のけぞり）を丸ごとスキップさせる。
+	void SetInvincible(bool v) { isInvincible_ = v; }
+	bool IsInvincible() const { return isInvincible_; }
 	void SetHP(int32_t hp) { hp_ = hp; }
 	void SetMaxHP(uint32_t maxHP) { maxHP_ = maxHP; }
 
@@ -159,6 +164,7 @@ private:
 	uint32_t maxHP_ = 400;
 	int32_t hp_ = 400;
 	bool isAlive_ = true;
+	bool isInvincible_ = false;   // 突進攻撃中などの無敵フラグ
 	const std::string emitterPath_ = "Player";
 
 	float motionSpeed[4] = { 1.0f, 1.0f, 1.0f, 1.0f };

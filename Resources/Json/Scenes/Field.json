@@ -87,14 +87,14 @@
             "animationName": "",
             "castShadow": true,
             "colliderAabbMax": [
-                1.0,
-                1.0,
-                1.0
+                2.4630000591278076,
+                4.525000095367432,
+                1.7077034711837769
             ],
             "colliderAabbMin": [
-                -1.0,
-                -1.0,
-                -1.0
+                -1.6710000038146973,
+                -0.079032301902771,
+                -1.7399684190750122
             ],
             "colliderEnabled": true,
             "colliderObbCenter": [
@@ -109,10 +109,10 @@
             ],
             "colliderObbSize": [
                 2.0422630310058594,
-                1.5767922401428223,
+                4.126999855041504,
                 1.7238359451293945
             ],
-            "colliderShapeType": 1,
+            "colliderShapeType": 0,
             "colliderSphCenter": [
                 0.0,
                 0.0,
@@ -789,14 +789,14 @@
             "animationName": "",
             "castShadow": true,
             "colliderAabbMax": [
-                1.0,
-                1.0,
-                1.0
+                1.5130000114440918,
+                3.674999952316284,
+                1.7077034711837769
             ],
             "colliderAabbMin": [
-                -1.0,
-                -1.0,
-                -1.0
+                -2.621000051498413,
+                -0.079032301902771,
+                -1.7399684190750122
             ],
             "colliderEnabled": true,
             "colliderObbCenter": [
@@ -811,10 +811,10 @@
             ],
             "colliderObbSize": [
                 2.0422630310058594,
-                1.5767922401428223,
+                4.126999855041504,
                 1.7238359451293945
             ],
-            "colliderShapeType": 1,
+            "colliderShapeType": 0,
             "colliderSphCenter": [
                 0.0,
                 0.0,

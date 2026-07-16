@@ -218,6 +218,8 @@ Vector3 BattleEnemy::GetPlayerPosition() const {
 //========================================================================*/
 void BattleEnemy::PerformBasicAttack() {
 	if (!player_) return;
+	// 突進（ホーミング）攻撃中など無敵のときはダメージものけぞりも与えない
+	if (player_->IsInvincible()) return;
 	player_->TakeDamage(enemyData_.attack);
 	// 被弾したプレイヤーをのけぞらせる（ヒットモーションへ遷移）
 	player_->ApplyHitReaction(wt_.translate_);

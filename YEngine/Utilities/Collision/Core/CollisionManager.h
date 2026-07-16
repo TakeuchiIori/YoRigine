@@ -92,6 +92,11 @@ namespace YoRigine {
 		bool Raycast(const Ray& ray, float maxDistance, RaycastHit* outHit, const std::vector<uint32_t>& ignoreTypeIDs = {});
 		bool RaycastMasked(const Ray& ray, float maxDistance, uint32_t layerMask, RaycastHit* outHit);
 
+		// allowTypeIDs に含まれる typeID のコライダーだけを対象にする Raycast (許可リスト方式)。
+		// 除外リスト(Raycast の ignoreTypeIDs) と違い「これ以外は全部素通り」なので、
+		// 新しい判定型を追加してもカメラ等が誤ってヒットしない。allowTypeIDs が空なら常に false。
+		bool RaycastAllowTypes(const Ray& ray, float maxDistance, RaycastHit* outHit, const std::vector<uint32_t>& allowTypeIDs);
+
 		// ============================================================
 		// 一時オーバーラップクエリ（持続コライダーを作らず「今この瞬間」だけ調べる）
 		//   - Enter/Exit・接触猶予・CCD 等の持続状態を一切持たない一回限りの検索。
