@@ -266,7 +266,9 @@ namespace YoRigine {
 			// 一括適用
 			for (auto& kv : accum) {
 				BaseCollider* c = kv.first;
-				const Vector3& disp = kv.second;
+				Vector3 disp = kv.second;
+				// 地面上で動くキャラは押し戻しで上下に浮かないよう水平成分のみ適用
+				if (c->GetLockPenetrationY()) disp.y = 0.0f;
 				WorldTransform* wt = c->GetWT();
 				if (!wt) continue;
 				wt->translate_ += disp;

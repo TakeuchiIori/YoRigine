@@ -638,6 +638,15 @@ namespace YoRigine {
 		group->lingerTimer = std::max(group->lingerTimer, GetGroupMaxLifetime(group));
 	}
 
+	void GpuEmitManager::StopAllEmitterGroups()
+	{
+		for (auto& [name, group] : groups_) {
+			group->isPlaying = false;
+			group->currentTime = 0.0f;
+			group->lingerTimer = 0.0f;
+		}
+	}
+
 	void GpuEmitManager::SetCamera(Camera* camera)
 	{
 		// GpuEmitManager 自身のカメラポインタを更新

@@ -93,6 +93,9 @@ void BattleEnemy::InitCollision() {
 		this, &wt_, camera_, static_cast<uint32_t>(CollisionTypeIdDef::kBattleEnemy));
 	obbCollider_->SetIsStatic(false);
 	obbCollider_->SetMass(1.0f);
+	// ジャンプ攻撃等で自前でYを制御するため、押し戻しは水平方向のみに限定する。
+	// これを許すと押し戻しのY成分がジャンプ中のY設定と競合してガタつく。
+	obbCollider_->SetLockPenetrationY(true);
 }
 
 /*==========================================================================
@@ -216,6 +219,8 @@ Vector3 BattleEnemy::GetPlayerPosition() const {
 void BattleEnemy::PerformBasicAttack() {
 	if (!player_) return;
 	player_->TakeDamage(enemyData_.attack);
+	// 被弾したプレイヤーをのけぞらせる（ヒットモーションへ遷移）
+	player_->ApplyHitReaction(wt_.translate_);
 }
 
 /*==========================================================================

@@ -609,6 +609,9 @@ void GameScene::Finalize() {
 		YoRigine::GameTime::Resume();
 		pausedGameTimeForDebugCamera_ = false;
 	}
+	// メインシーン遷移前にパーティクルを停止する（Title/Clear への移動ケース）
+	YParticleManager::GetInstance().StopAndClearActiveEmitters();
+	YoRigine::GpuEmitManager::GetInstance()->StopAllEmitterGroups();
 	YoRigine::JsonManager::ClearSceneInstances("GameScene");
 	if (subSceneManager_) subSceneManager_->Finalize();
 	subSceneManager_ = nullptr;

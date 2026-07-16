@@ -56,6 +56,9 @@ public:
 	// ============================================================
 	void Reset();
 	void TakeDamage(int damage);
+	// 敵の攻撃がヒットした際にのけぞり（ヒット）ステートへ遷移させる。
+	// attackerPos から被弾方向を算出する。ガード中・死亡中は何もしない。
+	void ApplyHitReaction(const Vector3& attackerPos);
 	void Revive(int reviveHP);
 	void SetInitialPosition();
 

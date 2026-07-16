@@ -172,6 +172,12 @@ public:
     /// </summary>
     void RegisterEmitter(const std::shared_ptr<YParticleEmitter>& emitter);
 
+    /// <summary>
+    /// 登録中の全アクティブエミッタを停止してリストを空にする。
+    /// シーン遷移時に呼び出し、前のシーンのエミッタが次のシーンに残らないようにする。
+    /// </summary>
+    void StopAndClearActiveEmitters();
+
     //=================================================================
     // カメラ設定
     //=================================================================

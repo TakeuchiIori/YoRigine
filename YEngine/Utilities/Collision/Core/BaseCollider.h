@@ -157,6 +157,11 @@ public:
 	void SetEnablePenetration(bool enable) { enablePenetration_ = enable; }
 	bool GetEnablePenetration() const { return enablePenetration_; }
 
+	// 押し戻しのY成分を無効化する（地面上で動くキャラ同士が重なった際に
+	// 上下に浮き上がったりガタつくのを防ぐ。水平方向のみ押し戻す）
+	void SetLockPenetrationY(bool lock) { lockPenetrationY_ = lock; }
+	bool GetLockPenetrationY() const { return lockPenetrationY_; }
+
 	// 質量の設定
 	void SetMass(float mass) { mass_ = mass; }
 	float GetMass() const { return mass_; }
@@ -217,6 +222,9 @@ protected:
 
 	// めり込みを行うかどうか
 	bool enablePenetration_ = true;
+
+	// 押し戻しのY成分をロックするか（地面上キャラ用）
+	bool lockPenetrationY_ = false;
 
 	// デバッグ表示用カメラ参照
 	Camera* camera_ = nullptr;

@@ -189,6 +189,8 @@ void Player::InitCollision() {
 	);
 	obbCollider_->SetIsStatic(false);
 	obbCollider_->SetMass(100.0f);
+	// 敵と重なっても押し戻しで浮き上がらないよう水平方向のみ押し戻す
+	obbCollider_->SetLockPenetrationY(true);
 	// Player は画面外でも常に当たり判定を回す
 	obbCollider_->SetCheckOutsideCamera(false);
 
@@ -452,6 +454,8 @@ void Player::OnDirectionCollision([[maybe_unused]] BaseCollider* self, [[maybe_u
 void Player::OnEnterDirectionCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other, HitDirection dir)
 {
 	if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kBattleEnemy)) {
+		// ガード中は盾コライダー側で処理するため、プレイヤー本体ではスキップ
+		if (combat_->IsGuarding()) return;
 
 		//------------------------------------------------------------
 		// SE再生
@@ -512,6 +516,40 @@ void Player::TakeDamage(int damage) {
 		hp_ = 0;
 		isAlive_ = false;
 	}
+}
+
+// ============================================================
+// 被弾時のヒット（のけぞり）反応
+// 敵の攻撃が実際にヒットしたタイミングで呼ばれ、被弾方向に応じた
+// ヒットモーションへ遷移させる。方向ヒットのコールバックは衝突系から
+// 発火されないため、ダメージ処理側から明示的に呼ぶ設計にしている。
+// ============================================================
+void Player::ApplyHitReaction(const Vector3& attackerPos) {
+	// 死亡・ガード中はのけぞらせない（ガードは盾側で処理）
+	if (!isAlive_ || hp_ <= 0) return;
+	if (combat_->IsDead() || combat_->IsGuarding()) return;
+
+	// 攻撃者との水平relative位置から、自分の向き基準で前/後を判定
+	Vector3 toAttacker = attackerPos - wt_.translate_;
+	toAttacker.y = 0.0f;
+
+	const float facing = wt_.rotate_.y;
+	const float forwardX = std::sin(facing);
+	const float forwardZ = std::cos(facing);
+	const float dot = toAttacker.x * forwardX + toAttacker.z * forwardZ;
+
+	// 前方から食らったら Front、背後から食らったら Back
+	HitDirection dir = (dot < 0.0f) ? HitDirection::Back : HitDirection::Front;
+
+	// カメラシェイク（被弾方向で強度を変える）
+	if (playerCamera_) {
+		float intensity = (dir == HitDirection::Back) ? 0.6f : 0.4f;
+		float duration  = (dir == HitDirection::Back) ? 0.25f : 0.2f;
+		playerCamera_->StartShake(intensity, duration);
+	}
+
+	combat_->SetHitDirection(dir);
+	combat_->ChangeState(CombatState::Hit);
 }
 
 // ============================================================

@@ -15,8 +15,8 @@ GuardingCombatState::GuardingCombatState(PlayerCombat* combat) : combat_(combat)
 	// ガードステート変更に応じたアニメーションと移動の制御
 	// ------------------------------------------------------------
 	guard->SetStateChangeCallback([combat, player](PlayerGuard::State from, PlayerGuard::State to) {
+		(void)from;
 		if (combat->GetCurrentState() == CombatState::Dead) return;
-		if (!combat->IsIdle() && from != PlayerGuard::State::Idle) return;
 
 		auto* obj = player->GetObject3d();
 		auto* movement = player->GetMovement();
