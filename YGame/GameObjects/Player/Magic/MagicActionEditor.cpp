@@ -1,6 +1,10 @@
 #include "MagicActionEditor.h"
 
 #include "MagicActionDatabase.h"
+#include "Vfx/VfxMesh/Runtime/VfxMeshSpawner.h"
+#include "Particle/YEmitterGroupManager.h"
+#include "Particle/YParticleManager.h"
+#include "GPUParticle/GpuEmitManager.h"
 
 #ifdef USE_IMGUI
 #include <Debugger/Logger.h>
@@ -163,13 +167,40 @@ namespace {
 		const char* trajectories[] = { "Forward", "LockOnOrForward", "StrikeTarget" };
 		DrawEnumCombo("軌道", action.trajectoryType, trajectories, MagicTrajectoryTypeFromString);
 
-		const char* hitShapes[] = { "Sphere" };
+		const char* hitShapes[] = { "Sphere", "AABB" };
 		DrawEnumCombo("判定形状", action.hitShape, hitShapes, MagicHitShapeFromString);
 
 		ImGui::InputFloat("再生時間", &action.duration, 0.05f, 0.2f);
 		ImGui::InputFloat("射程", &action.range, 0.5f, 2.0f);
 		ImGui::InputFloat("威力", &action.damage, 1.0f, 5.0f);
-		ImGui::InputFloat("判定半径", &action.hitRadius, 0.1f, 0.5f);
+
+		ImGui::SeparatorText("当たり判定");
+		ImGui::DragFloat3("中心オフセット", &action.hitOffset.x, 0.05f, -50.0f, 50.0f, "%.2f");
+		if (ImGui::IsItemHovered()) {
+			ImGui::SetTooltip("魔法本体の現在位置から判定中心をずらします。");
+		}
+		if (action.hitShape == MagicHitShape::Sphere) {
+			ImGui::DragFloat("球の半径", &action.hitRadius, 0.05f, 0.01f, 50.0f, "%.2f");
+			action.hitRadius = std::max(0.01f, action.hitRadius);
+		} else {
+			ImGui::DragFloat3("AABB 半サイズ XYZ", &action.hitHalfExtents.x,
+				0.05f, 0.01f, 50.0f, "%.2f");
+			action.hitHalfExtents.x = std::max(0.01f, action.hitHalfExtents.x);
+			action.hitHalfExtents.y = std::max(0.01f, action.hitHalfExtents.y);
+			action.hitHalfExtents.z = std::max(0.01f, action.hitHalfExtents.z);
+			ImGui::TextDisabled("表示値は全幅ではなく、中心から各面までの距離です。");
+			if (ImGui::Button("細いビーム")) {
+				action.hitHalfExtents = { 0.75f, 0.75f, 6.0f };
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("太いビーム")) {
+				action.hitHalfExtents = { 1.8f, 1.8f, 8.0f };
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("広範囲")) {
+				action.hitHalfExtents = { 5.0f, 2.0f, 5.0f };
+			}
+		}
 		ImGui::InputFloat("判定開始遅延", &action.hitDelay, 0.01f, 0.05f);
 		ImGui::InputFloat("再ヒット間隔", &action.hitInterval, 0.05f, 0.2f);
 		if (action.hitInterval <= 0.0f) {
@@ -387,6 +418,40 @@ namespace {
 			selectedEvent = std::clamp(selectedEvent, 0, std::max(0, static_cast<int>(action.events.size()) - 1));
 		}
 
+		auto appendLayer = [&](const char* memo, MagicEventTrigger trigger,
+			MagicEventType type, MagicEffectBackend backend, const char* asset,
+			float time, int count) {
+			MagicTimelineEvent e;
+			e.label = memo;
+			e.trigger = trigger;
+			e.type = type;
+			e.effectBackend = backend;
+			e.vfxAsset = asset;
+			e.time = time;
+			e.emitCount = count;
+			action.events.push_back(std::move(e));
+		};
+		if (ImGui::Button("発射3層プリセット")) {
+			appendLayer("Launch Mesh", MagicEventTrigger::OnRelease,
+				MagicEventType::PlayVfx, MagicEffectBackend::VfxMesh, "Smoke", 0.0f, 1);
+			appendLayer("Launch CPU", MagicEventTrigger::OnRelease,
+				MagicEventType::PlayVfx, MagicEffectBackend::CpuParticle, "EnemyHit", 0.0f, 28);
+			appendLayer("Launch GPU", MagicEventTrigger::OnRelease,
+				MagicEventType::PlayVfx, MagicEffectBackend::GpuParticle, "ss", 0.0f, 80);
+			selectedEvent = static_cast<int>(action.events.size()) - 3;
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("着弾3層プリセット")) {
+			const float hitTime = std::max(0.0f, action.duration * 0.85f);
+			appendLayer("Impact Mesh", MagicEventTrigger::OnTimeline,
+				MagicEventType::SpawnArea, MagicEffectBackend::VfxMesh, "Explosion", hitTime, 1);
+			appendLayer("Impact CPU", MagicEventTrigger::OnTimeline,
+				MagicEventType::SpawnArea, MagicEffectBackend::CpuParticle, "EnemyHit", hitTime, 40);
+			appendLayer("Impact GPU", MagicEventTrigger::OnTimeline,
+				MagicEventType::SpawnArea, MagicEffectBackend::GpuParticle, "ss", hitTime, 120);
+			selectedEvent = static_cast<int>(action.events.size()) - 3;
+		}
+
 		if (action.events.empty()) {
 			ImGui::TextDisabled("イベントがありません。");
 			return;
@@ -415,15 +480,78 @@ namespace {
 		DrawEnumCombo("発火条件", event.trigger, triggers, MagicEventTriggerFromString);
 
 		const char* types[] = { "Debug", "PlayVfx", "SpawnBeam", "SpawnProjectile", "SpawnArea", "StrikeTarget" };
-		DrawEnumCombo("イベント種類", event.type, types, MagicEventTypeFromString);
+		DrawEnumCombo("動作の種類", event.type, types, MagicEventTypeFromString);
+		const char* typeHelp = "ログのみ";
+		switch (event.type) {
+		case MagicEventType::PlayVfx: typeHelp = "発射位置にVFXを1回再生"; break;
+		case MagicEventType::SpawnBeam: typeHelp = "発射位置から目標までビームVFX"; break;
+		case MagicEventType::SpawnProjectile: typeHelp = "目標への軌跡＋着弾VFX"; break;
+		case MagicEventType::SpawnArea: typeHelp = "目標位置に範囲VFX"; break;
+		case MagicEventType::StrikeTarget: typeHelp = "目標の上から落雷＋着弾VFX"; break;
+		default: break;
+		}
+
+		ImGui::SameLine();
+		ImGui::TextDisabled("%s", typeHelp);
 
 		const char* elements[] = { "None", "Fire", "Thunder", "Ice", "Light" };
 		DrawEnumCombo("属性", event.element, elements, MagicElementFromString);
 
 		char labelBuffer[128] = {};
 		strncpy_s(labelBuffer, event.label.c_str(), sizeof(labelBuffer) - 1);
-		if (ImGui::InputText("ラベル", labelBuffer, sizeof(labelBuffer))) {
+		if (ImGui::InputText("メモ／イベント名", labelBuffer, sizeof(labelBuffer))) {
 			event.label = labelBuffer;
+		}
+
+		const char* backends[] = { "VfxMesh", "CpuParticle", "GpuParticle" };
+		DrawEnumCombo("エフェクト方式", event.effectBackend, backends,
+			MagicEffectBackendFromString);
+
+		std::vector<std::string> assets;
+		bool assetExists = false;
+		const char* assetLabel = "VfxMesh アセット";
+		if (event.effectBackend == MagicEffectBackend::VfxMesh) {
+			auto* spawner = VfxMeshSpawner::GetInstance();
+			assets = spawner->GetAssetNames();
+			assetExists = event.vfxAsset.empty() || spawner->GetAsset(event.vfxAsset);
+		} else if (event.effectBackend == MagicEffectBackend::CpuParticle) {
+			assetLabel = "CPU Particle グループ／システム";
+			assets = YEmitterGroupManager::GetInstance().GetAllGroupNames();
+			const auto systems = YParticleManager::GetInstance().GetAllSystemNames();
+			assets.insert(assets.end(), systems.begin(), systems.end());
+			assetExists = event.vfxAsset.empty() ||
+				YEmitterGroupManager::GetInstance().GetGroup(event.vfxAsset) ||
+				YParticleManager::GetInstance().GetSystem(event.vfxAsset);
+		} else {
+			assetLabel = "GPU Particle グループ";
+			assets = YoRigine::GpuEmitManager::GetInstance()->GetGroupNames();
+			assetExists = event.vfxAsset.empty() ||
+				YoRigine::GpuEmitManager::GetInstance()->HasGroup(event.vfxAsset);
+		}
+		std::sort(assets.begin(), assets.end());
+		assets.erase(std::unique(assets.begin(), assets.end()), assets.end());
+
+		const char* vfxPreview = event.vfxAsset.empty() ? "(未設定)" : event.vfxAsset.c_str();
+		if (ImGui::BeginCombo(assetLabel, vfxPreview)) {
+			if (ImGui::Selectable("(未設定)", event.vfxAsset.empty())) {
+				event.vfxAsset.clear();
+			}
+			for (const std::string& asset : assets) {
+				const bool selected = event.vfxAsset == asset;
+				if (ImGui::Selectable(asset.c_str(), selected)) event.vfxAsset = asset;
+				if (selected) ImGui::SetItemDefaultFocus();
+			}
+			ImGui::EndCombo();
+		}
+		if (!assetExists) {
+			ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.25f, 1.0f),
+				"未検出のエフェクト: %s", event.vfxAsset.c_str());
+		}
+		ImGui::DragFloat3("発生位置オフセット", &event.effectOffset.x,
+			0.05f, -50.0f, 50.0f, "%.2f");
+		if (event.effectBackend != MagicEffectBackend::VfxMesh) {
+			ImGui::DragInt("放出数", &event.emitCount, 1.0f, 1, 10000);
+			event.emitCount = std::clamp(event.emitCount, 1, 10000);
 		}
 
 		ImGui::InputFloat("威力", &event.power, 0.1f, 1.0f);
@@ -449,19 +577,29 @@ void MagicActionEditor::Draw()
 
 	selectedAction_ = std::clamp(selectedAction_, 0, static_cast<int>(actions.size()) - 1);
 
-	// 既存攻撃エディタと同じく、左に一覧、右に詳細、下に時間系の編集を置く。
-	// 魔法も「1スロットの中に並んだ順」がコンボ段数になるため、一覧側で段数が読める構成にする。
+	// 左は魔法選択に固定し、右は用途別タブに分ける。
+	// 縦長の単一フォームをスクロールし続ける必要をなくす。
 	ImGui::Columns(2, nullptr, true);
 	DrawActionList(actions, selectedAction_, selectedEvent_);
 	ImGui::NextColumn();
 	MagicActionData& action = actions[selectedAction_];
-	DrawActionDetail(action);
+	ImGui::TextColored(ImVec4(0.35f, 0.8f, 1.0f, 1.0f), "%s  /  %s  /  %s",
+		action.name.c_str(), ToString(action.hitShape), ToString(action.trajectoryType));
+	if (ImGui::BeginTabBar("MagicActionEditTabs")) {
+		if (ImGui::BeginTabItem("基本・判定")) {
+			DrawActionDetail(action);
+			ImGui::EndTabItem();
+		}
+		if (ImGui::BeginTabItem("スケールカーブ")) {
+			DrawScaleCurve(action);
+			ImGui::EndTabItem();
+		}
+		if (ImGui::BeginTabItem("イベント")) {
+			DrawEventList(action, selectedEvent_);
+			ImGui::EndTabItem();
+		}
+		ImGui::EndTabBar();
+	}
 	ImGui::Columns(1);
-
-	ImGui::Separator();
-	DrawScaleCurve(action);
-
-	ImGui::Separator();
-	DrawEventList(action, selectedEvent_);
 #endif
 }

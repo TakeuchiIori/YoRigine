@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Collision/Sphere/SphereCollider.h"
+#include "Collision/Core/BaseCollider.h"
 #include "MagicActionData.h"
 #include "Vfx/VfxMesh/Runtime/VfxMeshHandle.h"
 #include "WorldTransform/WorldTransform.h"
@@ -45,9 +45,10 @@ private:
   MagicActionData action_;
   Player *owner_ = nullptr;
   WorldTransform wt_;
-  std::shared_ptr<SphereCollider> collider_;
+  std::shared_ptr<BaseCollider> collider_;
   Vector3 origin_{};
   Vector3 target_{};
+  Vector3 attackPosition_{}; // VFXと軌道の基準位置（判定オフセット前）
   float elapsedTime_ = 0.0f;
   bool alive_ = false;
   bool feedbackFired_ =

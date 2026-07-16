@@ -3,6 +3,8 @@
         "animationName": "MagicAttack1",
         "chainResetTime": 1.2000000476837158,
         "cooldown": 0.6000000238418579,
+        "damage": 12.0,
+        "destroyOnHit": false,
         "duration": 0.44999998807907104,
         "events": [
             {
@@ -29,13 +31,25 @@
             }
         ],
         "hitDelay": 0.0,
+        "hitHalfExtents": [
+            1.5,
+            1.5,
+            4.0
+        ],
+        "hitInterval": 0.0,
+        "hitOffset": [
+            0.0,
+            0.0,
+            0.0
+        ],
         "hitRadius": 1.7999999523162842,
         "hitShape": "Sphere",
+        "hitStopDuration": 0.0,
+        "impactVfx": "",
         "inputMode": "ChargeRelease",
         "maxChargeTime": 2.0,
         "minChargeTime": 0.4000000059604645,
         "name": "ChargeBeam",
-        "damage": 12.0,
         "range": 24.0,
         "scaleCurve": {
             "defaultMode": 1,
@@ -66,13 +80,18 @@
             "viewMax": 3.0,
             "viewMin": 0.0
         },
+        "shakeDuration": 0.0,
+        "shakeIntensity": 0.0,
         "slot": "Primary",
-        "trajectoryType": "LockOnOrForward"
+        "trajectoryType": "LockOnOrForward",
+        "travelVfx": ""
     },
     {
         "animationName": "HeavyIdle1",
         "chainResetTime": 1.0,
         "cooldown": 0.3499999940395355,
+        "damage": 10.0,
+        "destroyOnHit": false,
         "duration": 0.2800000011920929,
         "events": [
             {
@@ -88,13 +107,25 @@
             }
         ],
         "hitDelay": 0.0,
+        "hitHalfExtents": [
+            1.5,
+            1.5,
+            4.0
+        ],
+        "hitInterval": 0.0,
+        "hitOffset": [
+            0.0,
+            0.0,
+            0.0
+        ],
         "hitRadius": 2.4000000953674316,
         "hitShape": "Sphere",
+        "hitStopDuration": 0.0,
+        "impactVfx": "",
         "inputMode": "Tap",
         "maxChargeTime": 1.0,
         "minChargeTime": 0.0,
         "name": "LightBurst",
-        "damage": 10.0,
         "range": 20.0,
         "scaleCurve": {
             "defaultMode": 1,
@@ -125,26 +156,40 @@
             "viewMax": 3.0,
             "viewMin": 0.0
         },
+        "shakeDuration": 0.0,
+        "shakeIntensity": 0.0,
         "slot": "Primary",
-        "trajectoryType": "StrikeTarget"
+        "trajectoryType": "StrikeTarget",
+        "travelVfx": ""
     },
     {
-        "animationName": "Attack2",
+        "animationName": "MagicAttack1",
         "chainResetTime": 1.0,
         "cooldown": 0.25,
+        "damage": 6.0,
+        "destroyOnHit": true,
         "duration": 0.3499999940395355,
         "events": [],
         "hitDelay": 0.0,
+        "hitHalfExtents": [
+            1.5,
+            1.5,
+            4.0
+        ],
+        "hitInterval": 0.0,
+        "hitOffset": [
+            0.0,
+            0.0,
+            0.0
+        ],
         "hitRadius": 1.600000023841858,
         "hitShape": "Sphere",
+        "hitStopDuration": 0.0,
+        "impactVfx": "Explosion",
         "inputMode": "Tap",
         "maxChargeTime": 1.0,
         "minChargeTime": 0.0,
         "name": "FireBolt",
-        "damage": 6.0,
-        "travelVfx": "Smoke",
-        "impactVfx": "Explosion",
-        "destroyOnHit": true,
         "range": 18.0,
         "scaleCurve": {
             "defaultMode": 1,
@@ -168,13 +213,18 @@
             "viewMax": 3.0,
             "viewMin": 0.0
         },
+        "shakeDuration": 0.0,
+        "shakeIntensity": 0.0,
         "slot": "Secondary",
-        "trajectoryType": "LockOnOrForward"
+        "trajectoryType": "LockOnOrForward",
+        "travelVfx": "Smoke"
     },
     {
-        "animationName": "Attack3",
+        "animationName": "MagicAttack1",
         "chainResetTime": 1.0,
         "cooldown": 0.4000000059604645,
+        "damage": 8.0,
+        "destroyOnHit": false,
         "duration": 0.30000001192092896,
         "events": [
             {
@@ -190,13 +240,25 @@
             }
         ],
         "hitDelay": 0.0,
+        "hitHalfExtents": [
+            1.5,
+            1.5,
+            4.0
+        ],
+        "hitInterval": 0.0,
+        "hitOffset": [
+            0.0,
+            0.0,
+            0.0
+        ],
         "hitRadius": 2.5,
         "hitShape": "Sphere",
+        "hitStopDuration": 0.0,
+        "impactVfx": "",
         "inputMode": "Tap",
         "maxChargeTime": 1.0,
         "minChargeTime": 0.0,
         "name": "ThunderStrike",
-        "damage": 8.0,
         "range": 20.0,
         "scaleCurve": {
             "defaultMode": 1,
@@ -227,7 +289,10 @@
             "viewMax": 3.0,
             "viewMin": 0.0
         },
+        "shakeDuration": 0.0,
+        "shakeIntensity": 0.0,
         "slot": "Utility",
-        "trajectoryType": "StrikeTarget"
+        "trajectoryType": "StrikeTarget",
+        "travelVfx": ""
     }
 ]

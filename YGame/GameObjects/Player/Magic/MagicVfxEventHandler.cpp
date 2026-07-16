@@ -4,6 +4,8 @@
 #include "GameObjects/Player/Camera/PlayerCamera.h"
 #include "GameObjects/Player/Player.h"
 #include "MagicCastGeometry.h"
+#include "Particle/EffectHandle.h"
+#include "GPUParticle/GpuEmitManager.h"
 #include "Vfx/VfxMesh/Runtime/VfxMeshHandle.h"
 #include "Vfx/VfxMesh/Runtime/VfxMeshSpawner.h"
 
@@ -20,6 +22,27 @@ void MagicVfxEventHandler::Execute(const MagicTimelineEvent &event,
   const Vector3 target = ResolveTargetPoint(player, event, origin);
   const float scale = ResolveScale(event, context.chargeTime);
   const float timeScale = ResolveTimeScale(event);
+
+  // CPU/GPU パーティクルはイベント種類から発生基準位置を選び、
+  // 同じタイムラインからワンショット放出する。
+  const bool atTarget = event.type == MagicEventType::SpawnArea ||
+                        event.type == MagicEventType::StrikeTarget;
+  const Vector3 effectPosition = (atTarget ? target : origin) + event.effectOffset;
+  if (event.effectBackend == MagicEffectBackend::CpuParticle) {
+    if (!event.vfxAsset.empty()) {
+      EffectHandle::PlayOneShot(event.vfxAsset, effectPosition,
+                                std::max(1, event.emitCount));
+    }
+    return;
+  }
+  if (event.effectBackend == MagicEffectBackend::GpuParticle) {
+    if (!event.vfxAsset.empty()) {
+      YoRigine::GpuEmitManager::GetInstance()->EmitGroups(
+          event.vfxAsset, effectPosition,
+          static_cast<float>(std::max(1, event.emitCount)));
+    }
+    return;
+  }
 
   switch (event.type) {
   case MagicEventType::PlayVfx:
@@ -93,6 +116,13 @@ float MagicVfxEventHandler::ResolveTimeScale(
 std::string
 MagicVfxEventHandler::ResolveAssetName(const MagicTimelineEvent &event,
                                        const std::string &fallback) const {
+  // VFX は Editor の専用欄から明示的に選ぶ。
+  if (!event.vfxAsset.empty() &&
+      VfxMeshSpawner::GetInstance()->GetAsset(event.vfxAsset)) {
+    return event.vfxAsset;
+  }
+
+  // 旧データは label が VFX 名も兼ねていたため、後方互換でのみ参照。
   if (!event.label.empty() &&
       VfxMeshSpawner::GetInstance()->GetAsset(event.label)) {
     return event.label;

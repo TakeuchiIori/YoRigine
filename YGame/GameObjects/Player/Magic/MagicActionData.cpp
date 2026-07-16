@@ -86,6 +86,15 @@ const char *ToString(MagicEventType type) {
   }
 }
 
+const char *ToString(MagicEffectBackend backend) {
+  switch (backend) {
+  case MagicEffectBackend::VfxMesh: return "VfxMesh";
+  case MagicEffectBackend::CpuParticle: return "CpuParticle";
+  case MagicEffectBackend::GpuParticle: return "GpuParticle";
+  default: return "VfxMesh";
+  }
+}
+
 const char *ToString(MagicTrajectoryType type) {
   switch (type) {
   case MagicTrajectoryType::Forward:
@@ -103,6 +112,8 @@ const char *ToString(MagicHitShape shape) {
   switch (shape) {
   case MagicHitShape::Sphere:
     return "Sphere";
+  case MagicHitShape::AABB:
+    return "AABB";
   default:
     return "Sphere";
   }
@@ -158,6 +169,15 @@ MagicEventType MagicEventTypeFromString(const std::string &value) {
       MagicEventType::Debug);
 }
 
+MagicEffectBackend MagicEffectBackendFromString(const std::string &value) {
+  return EnumFromString<MagicEffectBackend>(
+      value,
+      {{"VfxMesh", MagicEffectBackend::VfxMesh},
+       {"CpuParticle", MagicEffectBackend::CpuParticle},
+       {"GpuParticle", MagicEffectBackend::GpuParticle}},
+      MagicEffectBackend::VfxMesh);
+}
+
 MagicTrajectoryType MagicTrajectoryTypeFromString(const std::string &value) {
   return EnumFromString<MagicTrajectoryType>(
       value,
@@ -169,14 +189,21 @@ MagicTrajectoryType MagicTrajectoryTypeFromString(const std::string &value) {
 
 MagicHitShape MagicHitShapeFromString(const std::string &value) {
   return EnumFromString<MagicHitShape>(
-      value, {{"Sphere", MagicHitShape::Sphere}}, MagicHitShape::Sphere);
+      value,
+      {{"Sphere", MagicHitShape::Sphere}, {"AABB", MagicHitShape::AABB}},
+      MagicHitShape::Sphere);
 }
 
 void to_json(nlohmann::json &j, const MagicTimelineEvent &event) {
   j = nlohmann::json{
       {"time", event.time},           {"trigger", ToString(event.trigger)},
       {"type", ToString(event.type)}, {"element", ToString(event.element)},
-      {"label", event.label},         {"power", event.power},
+      {"label", event.label},         {"vfxAsset", event.vfxAsset},
+      {"effectBackend", ToString(event.effectBackend)},
+      {"effectOffset", {event.effectOffset.x, event.effectOffset.y,
+                          event.effectOffset.z}},
+      {"emitCount", event.emitCount},
+      {"power", event.power},
       {"duration", event.duration},   {"radius", event.radius},
       {"speed", event.speed},
   };
@@ -188,6 +215,18 @@ void from_json(const nlohmann::json &j, MagicTimelineEvent &event) {
   event.type = MagicEventTypeFromString(j.value("type", "Debug"));
   event.element = MagicElementFromString(j.value("element", "None"));
   event.label = j.value("label", "");
+  event.vfxAsset = j.value("vfxAsset", "");
+  event.effectBackend = MagicEffectBackendFromString(
+      j.value("effectBackend", "VfxMesh"));
+  if (j.contains("effectOffset") && j.at("effectOffset").is_array() &&
+      j.at("effectOffset").size() >= 3) {
+    const auto &v = j.at("effectOffset");
+    event.effectOffset = {v[0].get<float>(), v[1].get<float>(),
+                          v[2].get<float>()};
+  } else {
+    event.effectOffset = {0.0f, 0.0f, 0.0f};
+  }
+  event.emitCount = j.value("emitCount", 20);
   event.power = j.value("power", 0.0f);
   event.duration = j.value("duration", 0.0f);
   event.radius = j.value("radius", 0.0f);
@@ -207,6 +246,9 @@ void to_json(nlohmann::json &j, const MagicActionData &action) {
       {"range", action.range},
       {"damage", action.damage},
       {"hitRadius", action.hitRadius},
+      {"hitOffset", {action.hitOffset.x, action.hitOffset.y, action.hitOffset.z}},
+      {"hitHalfExtents", {action.hitHalfExtents.x, action.hitHalfExtents.y,
+                           action.hitHalfExtents.z}},
       {"hitInterval", action.hitInterval},
       {"hitDelay", action.hitDelay},
       {"minChargeTime", action.minChargeTime},
@@ -236,6 +278,21 @@ void from_json(const nlohmann::json &j, MagicActionData &action) {
   action.range = j.value("range", 18.0f);
   action.damage = j.value("damage", 10.0f);
   action.hitRadius = j.value("hitRadius", 1.5f);
+  if (j.contains("hitOffset") && j.at("hitOffset").is_array() &&
+      j.at("hitOffset").size() >= 3) {
+    const auto &v = j.at("hitOffset");
+    action.hitOffset = {v[0].get<float>(), v[1].get<float>(), v[2].get<float>()};
+  } else {
+    action.hitOffset = {0.0f, 0.0f, 0.0f};
+  }
+  if (j.contains("hitHalfExtents") && j.at("hitHalfExtents").is_array() &&
+      j.at("hitHalfExtents").size() >= 3) {
+    const auto &v = j.at("hitHalfExtents");
+    action.hitHalfExtents = {v[0].get<float>(), v[1].get<float>(),
+                             v[2].get<float>()};
+  } else {
+    action.hitHalfExtents = {1.5f, 1.5f, 4.0f};
+  }
   action.hitDelay = j.value("hitDelay", 0.0f);
   action.hitInterval = j.value("hitInterval", 0.0f);
   action.minChargeTime = j.value("minChargeTime", 0.0f);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Debugger/CurveEditor/CurveChannel.h"
+#include "Vector3.h"
 #include <json.hpp>
 #include <string>
 #include <vector>
@@ -39,6 +40,12 @@ enum class MagicEventType {
   StrikeTarget,
 };
 
+enum class MagicEffectBackend {
+  VfxMesh,
+  CpuParticle,
+  GpuParticle,
+};
+
 enum class MagicTrajectoryType {
   Forward,
   LockOnOrForward,
@@ -47,6 +54,7 @@ enum class MagicTrajectoryType {
 
 enum class MagicHitShape {
   Sphere,
+  AABB,
 };
 
 struct MagicTimelineEvent {
@@ -54,12 +62,17 @@ struct MagicTimelineEvent {
   MagicEventTrigger trigger = MagicEventTrigger::OnTimeline;
   MagicEventType type = MagicEventType::Debug;
   MagicElement element = MagicElement::None;
-  std::string label;
+  std::string label;    // Editor用のメモ／イベント名
   float power = 0.0f;
   float duration = 0.0f;
   float radius = 0.0f;
   float speed = 0.0f;
   bool fired = false;
+  // 既存の位置指定初期化と互換にするため末尾に追加。
+  std::string vfxAsset; // 再生する VfxMesh アセット名
+  MagicEffectBackend effectBackend = MagicEffectBackend::VfxMesh;
+  Vector3 effectOffset = {0.0f, 0.0f, 0.0f};
+  int emitCount = 20;
 };
 
 struct MagicActionData {
@@ -73,6 +86,10 @@ struct MagicActionData {
   float range = 18.0f;
   float damage = 10.0f;
   float hitRadius = 1.5f;
+  // AABB 判定時の中心オフセットと各軸の半サイズ。
+  // hitOffset は魔法本体の現在位置からのワールド軸オフセット。
+  Vector3 hitOffset = {0.0f, 0.0f, 0.0f};
+  Vector3 hitHalfExtents = {1.5f, 1.5f, 4.0f};
   float hitDelay = 0.0f;
   float hitInterval =
       0.0f; // 0以下: 1体1回のみ。0超: この間隔で同じ敵に再ヒット（設置型用）
@@ -100,6 +117,7 @@ const char *ToString(MagicInputMode mode);
 const char *ToString(MagicEventTrigger trigger);
 const char *ToString(MagicElement element);
 const char *ToString(MagicEventType type);
+const char *ToString(MagicEffectBackend backend);
 const char *ToString(MagicTrajectoryType type);
 const char *ToString(MagicHitShape shape);
 
@@ -108,6 +126,7 @@ MagicInputMode MagicInputModeFromString(const std::string &value);
 MagicEventTrigger MagicEventTriggerFromString(const std::string &value);
 MagicElement MagicElementFromString(const std::string &value);
 MagicEventType MagicEventTypeFromString(const std::string &value);
+MagicEffectBackend MagicEffectBackendFromString(const std::string &value);
 MagicTrajectoryType MagicTrajectoryTypeFromString(const std::string &value);
 MagicHitShape MagicHitShapeFromString(const std::string &value);
 

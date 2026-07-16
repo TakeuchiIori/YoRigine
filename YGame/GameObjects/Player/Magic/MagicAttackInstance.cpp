@@ -1,7 +1,9 @@
 #include "MagicAttackInstance.h"
 
+#include "Collision/AABB/AABBCollider.h"
 #include "Collision/Core/ColliderFactory.h"
 #include "Collision/Core/CollisionTypeIdDef.h"
+#include "Collision/Sphere/SphereCollider.h"
 #include "GameObjects/Enemy/BattleEnemy/BattleEnemy.h"
 #include "GameObjects/Player/Camera/PlayerCamera.h"
 #include "GameObjects/Player/Player.h"
@@ -32,16 +34,39 @@ void MagicAttackInstance::Initialize(const MagicActionData &action,
   if (owner_) {
     origin_ = MagicCastGeometry::ResolveCastOrigin(*owner_);
     target_ = ResolveTarget(*owner_, origin_);
-    wt_.translate_ = origin_;
+    attackPosition_ = origin_;
+    wt_.translate_ = attackPosition_ + action_.hitOffset;
   }
   wt_.UpdateMatrix();
 
-  collider_ = ColliderFactory::Create<SphereCollider>(
-      this, &wt_,
-      owner_ && owner_->GetPlayerCamera()
-          ? owner_->GetPlayerCamera()->GetLastCamera()
-          : nullptr,
-      static_cast<uint32_t>(CollisionTypeIdDef::kPlayerMagic));
+  Camera *camera = owner_ && owner_->GetPlayerCamera()
+                       ? owner_->GetPlayerCamera()->GetLastCamera()
+                       : nullptr;
+
+  if (action_.hitShape == MagicHitShape::AABB) {
+    auto aabb = ColliderFactory::Create<AABBCollider>(
+        this, &wt_, camera,
+        static_cast<uint32_t>(CollisionTypeIdDef::kPlayerMagic));
+    if (aabb) {
+      const Vector3 half = {
+          std::max(0.01f, std::abs(action_.hitHalfExtents.x)),
+          std::max(0.01f, std::abs(action_.hitHalfExtents.y)),
+          std::max(0.01f, std::abs(action_.hitHalfExtents.z)),
+      };
+      aabb->aabbOffset_.min = {-half.x, -half.y, -half.z};
+      aabb->aabbOffset_.max = {half.x, half.y, half.z};
+    }
+    collider_ = aabb;
+  } else {
+    auto sphere = ColliderFactory::Create<SphereCollider>(
+        this, &wt_, camera,
+        static_cast<uint32_t>(CollisionTypeIdDef::kPlayerMagic));
+    if (sphere) {
+      sphere->SetRadius(
+          std::max(0.01f, action_.hitRadius * action_.scaleCurve.Evaluate(0.0f)));
+    }
+    collider_ = sphere;
+  }
 
   if (collider_) {
     collider_->SetIsStatic(false);
@@ -49,13 +74,11 @@ void MagicAttackInstance::Initialize(const MagicActionData &action,
     collider_->SetEnablePenetration(false);
     collider_->SetCheckOutsideCamera(false);
     collider_->SetCollisionMask(CollisionLayerBit(CollisionLayer::Enemy));
-    collider_->SetRadius(
-        std::max(0.01f, action_.hitRadius * action_.scaleCurve.Evaluate(0.0f)));
   }
 
   // 飛道弾の見た目は判定本体に追従させ、位置・寿命を判定と同期させる。
   if (!action_.travelVfx.empty()) {
-    travelVfx_ = VfxMeshHandle::Play(action_.travelVfx, wt_.translate_,
+    travelVfx_ = VfxMeshHandle::Play(action_.travelVfx, attackPosition_,
                                      std::max(0.2f, action_.hitRadius),
                                      /*loop*/ true);
   }
@@ -73,27 +96,39 @@ void MagicAttackInstance::Update(float deltaTime) {
 
   switch (action_.trajectoryType) {
   case MagicTrajectoryType::StrikeTarget:
-    wt_.translate_ = target_;
+    attackPosition_ = target_;
     break;
   case MagicTrajectoryType::Forward:
   case MagicTrajectoryType::LockOnOrForward:
   default:
-    wt_.translate_ = origin_ + (target_ - origin_) * t;
+    attackPosition_ = origin_ + (target_ - origin_) * t;
     break;
   }
 
+	wt_.translate_ = attackPosition_ + action_.hitOffset;
   wt_.UpdateMatrix();
   if (collider_) {
     const bool active = elapsedTime_ >= action_.hitDelay;
     collider_->SetCollisionEnabled(active);
-    collider_->SetRadius(
-        std::max(0.01f, action_.hitRadius * action_.scaleCurve.Evaluate(t)));
+    if (auto *sphere = dynamic_cast<SphereCollider *>(collider_.get())) {
+      sphere->SetRadius(
+          std::max(0.01f, action_.hitRadius * action_.scaleCurve.Evaluate(t)));
+    } else if (auto *aabb = dynamic_cast<AABBCollider *>(collider_.get())) {
+      const float scale = std::max(0.01f, action_.scaleCurve.Evaluate(t));
+      const Vector3 half = {
+          std::max(0.01f, std::abs(action_.hitHalfExtents.x) * scale),
+          std::max(0.01f, std::abs(action_.hitHalfExtents.y) * scale),
+          std::max(0.01f, std::abs(action_.hitHalfExtents.z) * scale),
+      };
+      aabb->aabbOffset_.min = {-half.x, -half.y, -half.z};
+      aabb->aabbOffset_.max = {half.x, half.y, half.z};
+    }
     collider_->Update();
   }
 
   // 追従VFXを判定本体の現在位置へ。
   if (travelVfx_.IsValid())
-    travelVfx_.SetPosition(wt_.translate_);
+    travelVfx_.SetPosition(attackPosition_);
 
   if (elapsedTime_ >= duration) {
     Die();
@@ -101,8 +136,12 @@ void MagicAttackInstance::Update(float deltaTime) {
 }
 
 void MagicAttackInstance::DrawCollision() {
-  if (collider_ && alive_)
-    collider_->Draw();
+  if (!collider_ || !alive_)
+    return;
+  if (auto *sphere = dynamic_cast<SphereCollider *>(collider_.get()))
+    sphere->Draw();
+  else if (auto *aabb = dynamic_cast<AABBCollider *>(collider_.get()))
+    aabb->Draw();
 }
 
 void MagicAttackInstance::OnEnterCollision([[maybe_unused]] BaseCollider *self,
@@ -206,7 +245,7 @@ void MagicAttackInstance::Die() {
   if (travelVfx_.IsValid())
     travelVfx_.Stop();
   if (!action_.impactVfx.empty()) {
-    VfxMeshHandle::PlayOneShot(action_.impactVfx, wt_.translate_,
+    VfxMeshHandle::PlayOneShot(action_.impactVfx, attackPosition_,
                                std::max(0.3f, action_.hitRadius));
   }
 }
