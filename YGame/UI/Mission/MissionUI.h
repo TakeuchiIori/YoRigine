@@ -62,6 +62,7 @@ private:
 	bool  checkVisible_ = false; // Check 表示中か
 	float checkTimer_   = 0.0f;  // Check の表示経過（一定時間で自動的に隠す）
 	bool  completionPending_ = false; // チェック演出後の次ミッション表示待ち
+	bool  checkAnimationStarted_ = false; // フィールド復帰後に演出開始
 
 	int bakeSeq_ = 0;            // ベイクPNGのファイル名連番（テクスチャキャッシュ回避）
 };

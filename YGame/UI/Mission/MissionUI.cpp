@@ -14,9 +14,10 @@
 namespace {
 	// 演出の時間（秒）
 	constexpr float kWinFade   = 0.4f;   // ウィンドウのフェードイン
-	constexpr float kCheckPop  = 0.45f;  // Check のポップ
+	constexpr float kCheckPop  = 0.65f;  // Check の大きなポップ
 	constexpr float kCheckHold = 1.6f;   // Check を出しておく時間
 	constexpr float kMissionFade = 0.45f; // 次のミッション文のフェードイン
+	const Vector4 kClearAccent = { 0.2f, 1.0f, 0.35f, 1.0f };
 
 	// ミッションUIの描画レイヤー（ControlUI=1 / GameUI=0,2 とかぶらない層）
 	constexpr int kLayer = 3;
@@ -71,8 +72,49 @@ void MissionUI::Update()
 	// チェック演出が終わるまで現在の文言を保持する。
 	if (completionPending_) {
 		if (!fieldActive_) {
-			HideWindow();
+			// 遷移中は見た目だけ隠し、クリア通知とタイマーを保持する。
+			windowShown_ = false;
+			if (window_) window_->SetVisible(false);
+			if (frame_)  frame_->SetVisible(false);
+			if (text_)   text_->SetVisible(false);
+			if (check_)  check_->SetVisible(false);
 			return;
+		}
+
+		// フィールド復帰後の最初のフレームからチェック演出を始める。
+		if (!checkAnimationStarted_) {
+			checkAnimationStarted_ = true;
+			checkVisible_ = true;
+			checkTimer_ = 0.0f;
+			if (check_) {
+				check_->StopAllAnimations();
+				check_->SetColor(kClearAccent);
+				check_->SetVisible(true);
+				// 小さい状態から大きく飛び出し、同時にフェードイン。
+				// EaseOutBack のオーバーシュートで「ポン」と弾む。
+				check_->PlayScaleAnimation({ 0.05f, 0.05f }, { 1.35f, 1.35f },
+					kCheckPop, Easing::Function::EaseOutBack, false);
+				check_->PlayAlphaAnimation(
+					0.0f, 1.0f, kCheckPop * 0.45f,
+					Easing::Function::EaseOutQuad, false);
+			}
+
+			// チェックだけでなく、ミッションパネル全体を一瞬緑に発光させる。
+			if (window_) {
+				window_->PlayColorAnimation(
+					kClearAccent, windowColor_, kCheckPop,
+					Easing::Function::EaseOutQuad, false);
+			}
+			if (frame_) {
+				frame_->PlayColorAnimation(
+					kClearAccent, frameColor_, kCheckPop,
+					Easing::Function::EaseOutQuad, false);
+			}
+			if (text_) {
+				text_->PlayColorAnimation(
+					kClearAccent, textColor_, kCheckPop,
+					Easing::Function::EaseOutQuad, false);
+			}
 		}
 
 		if (window_) { window_->SetVisible(true); window_->SetColor(windowColor_); }
@@ -87,6 +129,7 @@ void MissionUI::Update()
 
 		completionPending_ = false;
 		checkVisible_ = false;
+		checkAnimationStarted_ = false;
 		if (check_) check_->SetVisible(false);
 		fadeInNextMission = true;
 	}
@@ -146,10 +189,12 @@ void MissionUI::Update()
 // ============================================================
 void MissionUI::Draw()
 {
-	auto layer = YoRigine::UIManager::GetInstance()->GetUIsByLayer(kLayer);
-	for (auto& ui : layer) {
-		ui->Draw();
-	}
+	// UIManager の格納順に依存すると Check が背景の後ろに描画される
+	// 場合があるため、ミッションUIは前後関係を明示して描画する。
+	if (window_) window_->Draw();
+	if (frame_)  frame_->Draw();
+	if (text_)   text_->Draw();
+	if (check_)  check_->Draw();
 }
 
 // ============================================================
@@ -158,20 +203,19 @@ void MissionUI::Draw()
 void MissionUI::OnMissionCleared()
 {
 	// フィールドで表示中のときだけ演出する（バトル中の撃破では出さない）。
-	if (!fieldActive_ || !windowShown_) return;
-
-	// カウンターも達成状態にしてからチェックを出す。
+	// バトル／シーン遷移中の通知も破棄しない。
+	// Activate(nextWaypoint) 前にクリア対象の内容を保存する。
+	auto* wm = WaypointManager::GetInstance();
+	currentTitle_ = wm->GetCurrentMissionTitle();
+	reqCount_ = wm->GetCurrentRequiredCount();
 	curCount_ = reqCount_;
 	RebakeText();
 
 	completionPending_ = true;
-	checkVisible_ = true;
+	checkAnimationStarted_ = false;
+	checkVisible_ = false;
 	checkTimer_   = 0.0f;
-	if (check_) {
-		check_->SetVisible(true);
-		check_->PlayScaleAnimation({ 0.1f, 0.1f }, { 1.0f, 1.0f }, kCheckPop, Easing::Function::EaseOutBack, false);
-		check_->PlayFlash(kCheckPop, 6);
-	}
+	if (check_) check_->SetVisible(false);
 }
 
 // ============================================================
@@ -221,6 +265,7 @@ void MissionUI::HideWindow()
 	windowShown_ = false;
 	shownSerial_ = 0; // 次に表示されるとき必ず「新目標」として焼き直す
 	completionPending_ = false;
+	checkAnimationStarted_ = false;
 	checkVisible_ = false;
 	if (window_) window_->SetVisible(false);
 	if (frame_)  frame_->SetVisible(false);
