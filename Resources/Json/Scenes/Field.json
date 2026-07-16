@@ -475,7 +475,7 @@
                 0.0
             ],
             "animationName": "",
-            "castShadow": true,
+            "castShadow": false,
             "colliderAabbMax": [
                 1.0,
                 1.0,
@@ -522,7 +522,6 @@
             "modelName": "Floor_UnevenBrick.obj",
             "nameTag": "",
             "outlineEnabled": true,
-            "castShadow": false,
             "parentID": -1,
             "pickable": false,
             "position": [
@@ -557,13 +556,13 @@
             "castShadow": true,
             "colliderAabbMax": [
                 1.7339999675750732,
-                7.349999904632568,
-                1.0
+                7.462645530700684,
+                1.2230000495910645
             ],
             "colliderAabbMin": [
                 -1.878999948501587,
-                -1.0,
-                -1.0
+                -0.181304931640625,
+                -1.3569999933242798
             ],
             "colliderEnabled": true,
             "colliderObbCenter": [
@@ -588,7 +587,7 @@
                 0.0
             ],
             "colliderSphRadius": 1.0,
-            "colliderTypeId": 7,
+            "colliderTypeId": 8,
             "color": [
                 1.0,
                 1.0,
@@ -744,7 +743,7 @@
                 0.0
             ],
             "colliderSphRadius": 1.0,
-            "colliderTypeId": 7,
+            "colliderTypeId": 8,
             "color": [
                 1.0,
                 1.0,
@@ -978,7 +977,7 @@
                 0.0
             ],
             "colliderSphRadius": 1.0,
-            "colliderTypeId": 7,
+            "colliderTypeId": 8,
             "color": [
                 1.0,
                 1.0,
@@ -1025,13 +1024,13 @@
             "castShadow": true,
             "colliderAabbMax": [
                 1.7339999675750732,
-                7.349999904632568,
-                1.0
+                7.462645530700684,
+                1.2230000495910645
             ],
             "colliderAabbMin": [
                 -1.878999948501587,
-                -1.0,
-                -1.0
+                -0.181304931640625,
+                -1.3569999933242798
             ],
             "colliderEnabled": true,
             "colliderObbCenter": [
@@ -1056,7 +1055,7 @@
                 0.0
             ],
             "colliderSphRadius": 1.0,
-            "colliderTypeId": 7,
+            "colliderTypeId": 8,
             "color": [
                 1.0,
                 1.0,
@@ -1102,14 +1101,14 @@
             "animationName": "",
             "castShadow": true,
             "colliderAabbMax": [
-                3.7844903469085693,
+                1.7339999675750732,
                 7.462645530700684,
-                2.7726104259490967
+                1.2230000495910645
             ],
             "colliderAabbMin": [
-                -3.5785152912139893,
+                -1.878999948501587,
                 -0.181304931640625,
-                -2.5570905208587646
+                -1.3569999933242798
             ],
             "colliderEnabled": true,
             "colliderObbCenter": [
@@ -1134,7 +1133,7 @@
                 0.0
             ],
             "colliderSphRadius": 1.0,
-            "colliderTypeId": 7,
+            "colliderTypeId": 8,
             "color": [
                 1.0,
                 1.0,
@@ -1180,14 +1179,14 @@
             "animationName": "",
             "castShadow": true,
             "colliderAabbMax": [
-                3.7844903469085693,
+                1.7339999675750732,
                 7.462645530700684,
-                2.7726104259490967
+                1.2230000495910645
             ],
             "colliderAabbMin": [
-                -3.5785152912139893,
+                -1.878999948501587,
                 -0.181304931640625,
-                -2.5570905208587646
+                -1.3569999933242798
             ],
             "colliderEnabled": true,
             "colliderObbCenter": [
@@ -1212,7 +1211,7 @@
                 0.0
             ],
             "colliderSphRadius": 1.0,
-            "colliderTypeId": 7,
+            "colliderTypeId": 8,
             "color": [
                 1.0,
                 1.0,
@@ -3162,7 +3161,7 @@
                 0.0
             ],
             "colliderSphRadius": 1.0,
-            "colliderTypeId": 7,
+            "colliderTypeId": 8,
             "color": [
                 1.0,
                 1.0,
@@ -3240,7 +3239,7 @@
                 0.0
             ],
             "colliderSphRadius": 1.0,
-            "colliderTypeId": 7,
+            "colliderTypeId": 8,
             "color": [
                 1.0,
                 1.0,
@@ -3287,13 +3286,13 @@
             "castShadow": true,
             "colliderAabbMax": [
                 1.7339999675750732,
-                7.349999904632568,
-                1.0
+                7.462645530700684,
+                1.2230000495910645
             ],
             "colliderAabbMin": [
                 -1.878999948501587,
-                -1.0,
-                -1.0
+                -0.181304931640625,
+                -1.3569999933242798
             ],
             "colliderEnabled": true,
             "colliderObbCenter": [
@@ -3318,7 +3317,7 @@
                 0.0
             ],
             "colliderSphRadius": 1.0,
-            "colliderTypeId": 7,
+            "colliderTypeId": 8,
             "color": [
                 1.0,
                 1.0,
@@ -3365,13 +3364,13 @@
             "castShadow": true,
             "colliderAabbMax": [
                 1.7339999675750732,
-                7.349999904632568,
-                1.0
+                7.462645530700684,
+                1.2230000495910645
             ],
             "colliderAabbMin": [
                 -1.878999948501587,
-                -1.0,
-                -1.0
+                -0.181304931640625,
+                -1.3569999933242798
             ],
             "colliderEnabled": true,
             "colliderObbCenter": [
@@ -3396,7 +3395,7 @@
                 0.0
             ],
             "colliderSphRadius": 1.0,
-            "colliderTypeId": 7,
+            "colliderTypeId": 8,
             "color": [
                 1.0,
                 1.0,
@@ -3688,7 +3687,7 @@
             "colliderEnabled": true,
             "colliderObbCenter": [
                 -0.0005990266799926758,
-                0.3908019959926605,
+                3.1410000324249268,
                 0.0
             ],
             "colliderObbEuler": [
@@ -3698,7 +3697,7 @@
             ],
             "colliderObbSize": [
                 1.0836524963378906,
-                0.440007746219635,
+                3.140000104904175,
                 0.06290549784898758
             ],
             "colliderShapeType": 1,

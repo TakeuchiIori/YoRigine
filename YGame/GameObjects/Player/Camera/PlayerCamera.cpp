@@ -421,8 +421,13 @@ void PlayerCamera::UpdateThreatAwareness(float dt) {
 
 // ============================================================
 // グランス目標量を算出
-//   カメラ前方から awarenessTriggerYaw_ 以上外れた（視界外寄りの）敵のうち
-//   プレイヤーに最も近いものへ、符号付きで awarenessMaxYaw_ までの傾きを返す。
+//   カメラ前方から awarenessTriggerYaw_ 以上外れた（視界外寄りの）敵の方向へ、
+//   符号付きで awarenessMaxYaw_ までの傾きを返す。
+//
+//   複数の敵がほぼ同距離・同方向にいるとき「最も近い1体」を毎フレーム選ぶ方式だと、
+//   わずかな距離変化で対象が入れ替わり、傾き量が飛んでガタつく。そこで対象敵の方向を
+//   近さで重み付けした「円環平均」で合成し、連続的で安定した目標量を返す。
+//   （±πをまたぐケースでも破綻しないよう sin/cos ベクトルの加重和で平均する）
 // ============================================================
 float PlayerCamera::ComputeGlanceBias() const {
     std::vector<Vector3> enemies;
@@ -432,21 +437,29 @@ float PlayerCamera::ComputeGlanceBias() const {
     float   baseYaw = followCamera_->GetRotate().y - awarenessAppliedBias_; // プレイヤー由来の素の yaw
     Vector3 playerPos = playerWT_->translate_;
 
-    bool picked = false;
-    float pickDist   = awarenessRange_;
-    float pickSigned = 0.0f;
+    float weightSum = 0.0f;
+    float sinSum    = 0.0f;
+    float cosSum    = 0.0f;
     for (const auto& enemyPos : enemies) {
         Vector3 d = enemyPos - camPos; d.y = 0.0f;
         if (Length(d) < 0.01f) continue;
         float signedYaw = WrapPi(atan2f(d.x, d.z) - baseYaw);
         if (std::abs(signedYaw) < awarenessTriggerYaw_) continue; // 視界内寄り＝気配対象外
 
+        // 近い敵ほど強く効く重み（距離2乗の逆数で遠方ほど滑らかに減衰）。
         float pd = Length(enemyPos - playerPos);
-        if (pd < pickDist) { pickDist = pd; picked = true; pickSigned = signedYaw; }
-    }
-    if (!picked) return 0.0f;
+        float w  = 1.0f / (pd * pd + 1.0f);
 
-    return std::clamp(pickSigned, -awarenessMaxYaw_, awarenessMaxYaw_);
+        // 角度そのものを平均するとπ跨ぎで破綻するため、単位ベクトルとして加重和を取る。
+        sinSum    += w * std::sin(signedYaw);
+        cosSum    += w * std::cos(signedYaw);
+        weightSum += w;
+    }
+    if (weightSum <= 0.0f) return 0.0f;
+
+    // 円環平均。全敵の方向を近さで重み付けした「代表方向」。
+    float blended = atan2f(sinSum, cosSum);
+    return std::clamp(blended, -awarenessMaxYaw_, awarenessMaxYaw_);
 }
 
 void PlayerCamera::FaceDefeatNextEnemy(const Vector3& enemyWorldPos) {
