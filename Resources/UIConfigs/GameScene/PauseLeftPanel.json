@@ -1,22 +1,22 @@
 {
     "anchorPoint": {
-        "x": 0.0,
-        "y": 0.0
+        "x": 0.5,
+        "y": 0.5
     },
     "animations": [],
     "color": {
-        "a": 1.0,
-        "b": 1.0,
-        "g": 1.0,
-        "r": 1.0
+        "a": 0.7200000286102295,
+        "b": 0.07999999821186066,
+        "g": 0.05000000074505806,
+        "r": 0.03999999910593033
     },
     "flipX": false,
     "flipY": false,
-    "layer": 0,
+    "layer": 2,
     "name": "PauseLeftPanel",
     "position": {
-        "x": 0.0,
-        "y": 0.0,
+        "x": 400.0,
+        "y": 500.0,
         "z": 0.0
     },
     "rotation": {
@@ -29,14 +29,14 @@
         "y": 1.0
     },
     "size": {
-        "x": 16.0,
-        "y": 16.0
+        "x": 600.0,
+        "y": 640.0
     },
     "textureLeftTop": {
         "x": 0.0,
         "y": 0.0
     },
-    "texturePath": "./Resources/images/white.png",
+    "texturePath": "Resources/Textures/white.png",
     "textureSize": {
         "x": 16.0,
         "y": 16.0
@@ -50,5 +50,5 @@
         "x": 0.0,
         "y": 0.0
     },
-    "visible": true
+    "visible": false
 }

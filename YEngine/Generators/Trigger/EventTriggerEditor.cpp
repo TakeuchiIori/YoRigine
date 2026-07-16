@@ -158,6 +158,26 @@ namespace {
 			}
 		}
 
+		// ------------------------------------------------------------
+		// ミッションUI表示（進行条件とは別に、画面に出す目標文をここでまとめる）
+		// ------------------------------------------------------------
+		ImGui::Spacing();
+		ImGui::SeparatorText("ミッションUI表示");
+		{
+			char buf[256];
+			std::snprintf(buf, sizeof(buf), "%s", waypoint.GetMissionTitle().c_str());
+			if (ImGui::InputText("目標文", buf, sizeof(buf))) {
+				waypoint.SetMissionTitle(buf);
+			}
+			if (waypoint.GetMissionTitle().empty()) {
+				ImGui::SameLine();
+				ImGui::TextDisabled("(空欄 = 既定文)");
+			}
+			ImGui::TextDisabled("例: 敵を倒せ！  ／ 撃破数「%d/%d」はUIが自動表示",
+				0, waypoint.GetRequiredCount());
+		}
+		ImGui::Separator();
+
 		ImGui::Text("状態: %s", waypoint.IsActive() ? "現在の目的地" : "待機");
 		ImGui::SameLine();
 		if (ImGui::Button("このWaypointを有効化")) {

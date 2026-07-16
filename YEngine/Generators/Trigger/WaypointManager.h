@@ -5,6 +5,7 @@
 #include <string>
 #include <unordered_map>
 #include <cstdint>
+#include <functional>
 
 class WaypointAction;
 class VfxMeshSpawner;
@@ -49,6 +50,30 @@ public:
 	bool    HasCurrent() const { return current_ != nullptr; }
 	Vector3 GetCurrentPosition() const { return currentPos_; }
 
+	// ミッションUI ポーリング用アクセサ（現在の目標文・必要撃破数・現在撃破数）。
+	// current_ が持つ WaypointAction の値をそのまま返す（実装は .cpp）。
+	std::string GetCurrentMissionTitle() const;
+	int         GetCurrentRequiredCount() const;
+	int         GetCurrentProgress() const;
+	// 目標が切り替わるたびに増える通し番号。UI側は変化を見て「新しい目標」を検知する。
+	uint32_t    GetMissionSerial() const { return missionSerial_; }
+
+	// ============================================================
+	// ミッションUI連携（エンジンはゲームUIを知らないまま、コールバックで通知する）
+	//   - Activated : 新しい目標がアクティブ化された（目標文・必要撃破数）
+	//   - Progress  : 現在の目標の撃破数が進んだ（現在数・必要数）
+	//   - Cleared   : 現在の目標を達成した（次が出る直前）
+	//   GameUI が Initialize で設定し、破棄時に ClearMissionCallbacks() で外すこと。
+	// ============================================================
+	void SetOnMissionActivated(std::function<void(const std::string& title, int required)> cb) { onMissionActivated_ = std::move(cb); }
+	void SetOnMissionProgress (std::function<void(int current, int required)> cb)              { onMissionProgress_  = std::move(cb); }
+	void SetOnMissionCleared  (std::function<void()> cb)                                       { onMissionCleared_   = std::move(cb); }
+	void ClearMissionCallbacks() { onMissionActivated_ = nullptr; onMissionProgress_ = nullptr; onMissionCleared_ = nullptr; }
+
+	// WaypointAction から進捗・クリアを中継する
+	void NotifyMissionProgress(int current, int required) { if (onMissionProgress_) onMissionProgress_(current, required); }
+	void NotifyMissionCleared() { if (onMissionCleared_) onMissionCleared_(); }
+
 private:
 	WaypointManager() = default;
 	void StopBeacon();
@@ -58,7 +83,13 @@ private:
 	Vector3  currentPos_ = { 0.0f, 0.0f, 0.0f };
 	uint32_t beaconId_   = 0;
 	bool     hasBeacon_  = false;
+	uint32_t missionSerial_ = 0;  // 目標が切り替わるたびに +1（UIの新目標検知用）
 
 	// 依存先マネージャ (借用のみ・非所有)。使用前に SetVfxMeshSpawner() で注入すること。
 	VfxMeshSpawner* vfxMeshSpawner_ = nullptr;
+
+	// ミッションUI通知コールバック（GameUI が設定・破棄時にクリア）
+	std::function<void(const std::string&, int)> onMissionActivated_;
+	std::function<void(int, int)>                onMissionProgress_;
+	std::function<void()>                        onMissionCleared_;
 };

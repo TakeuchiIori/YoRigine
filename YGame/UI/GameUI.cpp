@@ -1,12 +1,23 @@
 #include "GameUI.h"
+#include "Mission/MissionUI.h"
 #include <Systems/GameTime/GameTime.h>
 #include <Systems/Input/Input.h>
 #include <Systems/GameTime/GameTime.h>
 #include <Systems/Cinematic/CinematicManager.h>
 #include <Systems/Text/TextTextureBaker.h>
 #include "OffScreen/PostEffectManager.h"
+#include "Trigger/WaypointManager.h"
 #include <filesystem>
 #include <iterator>
+
+// ControlUI / MissionUI を不完全型のまま unique_ptr メンバに持つため、
+// 実体が見える .cpp 側でコンストラクタ／デストラクタを定義する。
+GameUI::GameUI() = default;
+GameUI::~GameUI() {
+	// シングルトンの WaypointManager に登録したコールバックが this（破棄済み）を
+	// 指し続けないよう、破棄時に必ず外す。
+	WaypointManager::GetInstance()->ClearMissionCallbacks();
+}
 
 // ============================================================
 // ポーズメニューのレイアウト定数（マジックナンバーを排除）
@@ -120,6 +131,16 @@ void GameUI::Initialize()
 
 	controlUI_ = std::make_unique<ControlUI>();
 	controlUI_->Initialize();
+
+	// ミッションUI（ウェイポイント進行の目標表示）。WaypointManager からの
+	// 通知をこのUIへ中継する。ラムダは this を捕らえるので ~GameUI で必ず外す。
+	missionUI_ = std::make_unique<MissionUI>();
+	missionUI_->Initialize();
+	// 目標文・進捗・表示可否は MissionUI が WaypointManager を毎フレーム参照して駆動する。
+	// クリアの瞬間だけ Check をポップさせたいので、そのイベントだけコールバックで受ける。
+	WaypointManager::GetInstance()->SetOnMissionCleared([this]() {
+		if (missionUI_) missionUI_->OnMissionCleared();
+		});
 }
 
 /// <summary>
@@ -248,6 +269,7 @@ void GameUI::Update()
 	}
 	// 操作用UIの更新
 	controlUI_->Update();
+	if (missionUI_) missionUI_->Update();
 
 
 
@@ -344,6 +366,8 @@ void GameUI::Update()
 void GameUI::SetBattleActive(bool active)
 {
 	if (controlUI_) controlUI_->SetBattleActive(active);
+	// ミッションUIはフィールドシーンでのみ表示（バトル中は隠す）。
+	if (missionUI_) missionUI_->SetFieldActive(!active);
 }
 
 void GameUI::SetPlayerStyle(PlayerStyle style)
@@ -387,9 +411,16 @@ void GameUI::Draw()
 		ui->Draw();
 	}
 	if (goVisible_)return;
-	// 演出中（クリアカットシーン等）は操作ヒントUIも隠す
-	if (YoRigine::CinematicManager::GetInstance()->IsActive()) return;
-	controlUI_->Draw();
+
+	// ミッションはゲーム開始時の演出中でも表示する。
+	// これを演出判定より後に置くと、startActive の目標が演出終了まで
+	// 描画されない。
+	if (missionUI_) missionUI_->Draw();
+
+	// 演出中（クリアカットシーン等）は操作ヒントだけを隠す。
+	if (!YoRigine::CinematicManager::GetInstance()->IsActive()) {
+		controlUI_->Draw();
+	}
 }
 
 /// <summary>

@@ -5,18 +5,18 @@
     },
     "animations": [],
     "color": {
-        "a": 1.0,
+        "a": 0.9986125230789185,
         "b": 1.0,
         "g": 1.0,
         "r": 1.0
     },
     "flipX": false,
     "flipY": false,
-    "layer": 2,
-    "name": "title",
+    "layer": 3,
+    "name": "MissionWindow",
     "position": {
-        "x": 400.0,
-        "y": 630.0,
+        "x": 302.0,
+        "y": 288.0,
         "z": 0.0
     },
     "rotation": {
@@ -29,17 +29,17 @@
         "y": 1.0
     },
     "size": {
-        "x": 160.0,
-        "y": 117.0
+        "x": 512.5,
+        "y": 229.5
     },
     "textureLeftTop": {
         "x": 0.0,
         "y": 0.0
     },
-    "texturePath": "Resources/UITex/label_title.png",
+    "texturePath": "Resources/Textures/Operation/MissionWindow.png",
     "textureSize": {
-        "x": 160.0,
-        "y": 117.0
+        "x": 512.0,
+        "y": 512.0
     },
     "uvRotation": 0.0,
     "uvScale": {
@@ -50,5 +50,5 @@
         "x": 0.0,
         "y": 0.0
     },
-    "visible": false
+    "visible": true
 }

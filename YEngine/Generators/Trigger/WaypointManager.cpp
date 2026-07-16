@@ -65,6 +65,12 @@ void WaypointManager::Activate(const std::string& name) {
 	current_    = it->second;
 	current_->SetActive(true);
 	currentPos_ = current_->GetWorldPosition();
+	++missionSerial_; // 新しい目標に切り替わった → UI がポーリングで検知する
+
+	// ミッションUIへ「新しい目標」を通知（目標文＋必要撃破数）
+	if (onMissionActivated_) {
+		onMissionActivated_(current_->GetMissionTitle(), current_->GetRequiredCount());
+	}
 
 	// ビーコン(VfxMesh)を目的地に常時再生で出す
 	const std::string& fx = current_->GetBeaconEffect();
@@ -74,6 +80,18 @@ void WaypointManager::Activate(const std::string& name) {
 		hasBeacon_ = true;
 	}
 	Logger("[Waypoint] アクティブ化: \"" + name + "\"\n");
+}
+
+std::string WaypointManager::GetCurrentMissionTitle() const {
+	return current_ ? current_->GetMissionTitle() : std::string{};
+}
+
+int WaypointManager::GetCurrentRequiredCount() const {
+	return current_ ? current_->GetRequiredCount() : 0;
+}
+
+int WaypointManager::GetCurrentProgress() const {
+	return current_ ? current_->GetCurrentCount() : 0;
 }
 
 void WaypointManager::SetBeaconVisible(bool visible) {

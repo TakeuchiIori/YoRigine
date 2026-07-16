@@ -15,8 +15,8 @@
     "layer": 2,
     "name": "Guard",
     "position": {
-        "x": 1254.0,
-        "y": 327.0,
+        "x": 1240.0,
+        "y": 550.0,
         "z": 0.0
     },
     "rotation": {
@@ -29,17 +29,17 @@
         "y": 1.0
     },
     "size": {
-        "x": 326.5,
-        "y": 140.5
+        "x": 144.0,
+        "y": 127.0
     },
     "textureLeftTop": {
         "x": 0.0,
         "y": 0.0
     },
-    "texturePath": "Resources/Textures/GameScene/guard.png",
+    "texturePath": "Resources/UITex/label_guard.png",
     "textureSize": {
-        "x": 800.0,
-        "y": 400.0
+        "x": 144.0,
+        "y": 127.0
     },
     "uvRotation": 0.0,
     "uvScale": {

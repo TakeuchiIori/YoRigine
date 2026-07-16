@@ -6,17 +6,17 @@
     "animations": [],
     "color": {
         "a": 1.0,
-        "b": 1.0,
-        "g": 1.0,
-        "r": 1.0
+        "b": 0.0,
+        "g": 0.0,
+        "r": 0.0
     },
     "flipX": false,
     "flipY": false,
-    "layer": 2,
-    "name": "title",
+    "layer": 3,
+    "name": "MissionCheck",
     "position": {
-        "x": 400.0,
-        "y": 630.0,
+        "x": 116.0,
+        "y": 229.0,
         "z": 0.0
     },
     "rotation": {
@@ -29,17 +29,17 @@
         "y": 1.0
     },
     "size": {
-        "x": 160.0,
-        "y": 117.0
+        "x": 64.0,
+        "y": 64.0
     },
     "textureLeftTop": {
         "x": 0.0,
         "y": 0.0
     },
-    "texturePath": "Resources/UITex/label_title.png",
+    "texturePath": "Resources/Textures/Operation/Check.png",
     "textureSize": {
-        "x": 160.0,
-        "y": 117.0
+        "x": 512.0,
+        "y": 512.0
     },
     "uvRotation": 0.0,
     "uvScale": {

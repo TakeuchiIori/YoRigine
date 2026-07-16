@@ -549,7 +549,12 @@ void UIAnimator::Update(float deltaTime) {
 		}
 
 		anim.elapsed += deltaTime;
-		float t = anim.elapsed / anim.duration;
+		// 起動直後や読み込み後は 1 フレームの deltaTime が duration を
+		// 大きく超えることがある。t > 1 のまま EaseOutQuad 等に渡すと
+		// 大きな負値になり、アルファへそのまま書き込まれるため、
+		// 各アニメーションの評価前に必ず [0, 1] へ制限する。
+		const float duration = (anim.duration > 0.0f) ? anim.duration : 0.0001f;
+		float t = std::clamp(anim.elapsed / duration, 0.0f, 1.0f);
 
 		// アニメーション完了チェック
 		bool isComplete = false;

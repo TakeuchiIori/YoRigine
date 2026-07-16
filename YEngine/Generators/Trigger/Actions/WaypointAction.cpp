@@ -38,8 +38,14 @@ void WaypointAction::NotifyEnemyDefeated(const std::string& group) {
 	if (!requiredGroup_.empty() && group != requiredGroup_) return; // 空 = ワイルドカード
 
 	if (++currentCount_ >= requiredCount_) {
-		// クリア → 次のウェイポイントへ（Manager がビーコン停止＋次のアクティブ化を行う）。
+		// クリア通知（UIのチェック演出用）→ 次のウェイポイントへ。
+		// 通知を Activate より先に出すことで、UIが「クリア→次ミッション出現」の順で演出できる。
+		WaypointManager::GetInstance()->NotifyMissionCleared();
 		WaypointManager::GetInstance()->Activate(nextWaypoint_);
+	}
+	else {
+		// 進捗をUIへ（現在数 / 必要数）
+		WaypointManager::GetInstance()->NotifyMissionProgress(currentCount_, requiredCount_);
 	}
 }
 
@@ -61,5 +67,6 @@ nlohmann::json WaypointAction::SerializeToJson() const {
 		{"requiredCount", requiredCount_},
 		{"nextWaypoint",  nextWaypoint_},
 		{"startActive",   startActive_},
+		{"missionTitle",  missionTitle_},
 	};
 }

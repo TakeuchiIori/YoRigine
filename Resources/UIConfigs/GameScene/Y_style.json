@@ -38,8 +38,8 @@
     },
     "texturePath": "Resources/Textures/Operation/ChangeTransform.png",
     "textureSize": {
-        "x": 189.0,
-        "y": 111.0
+        "x": 512.0,
+        "y": 512.0
     },
     "uvRotation": 0.0,
     "uvScale": {
@@ -50,5 +50,5 @@
         "x": 0.0,
         "y": 0.0
     },
-    "visible": true
+    "visible": false
 }

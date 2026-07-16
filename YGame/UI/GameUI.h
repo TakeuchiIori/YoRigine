@@ -4,12 +4,18 @@
 #include "Control/ControlUI.h"
 #include "GameObjects/Player/Style/PlayerStyle.h"
 #include <map>
+
+class MissionUI;
+
 /// <summary>
 /// ゲームシーンで表示するUIクラス
 /// </summary>
 class GameUI
 {
 public:
+	GameUI();
+	~GameUI();
+
 	///************************* 基本的な関数 *************************///
 	void Initialize();
 	void Update();
@@ -155,4 +161,5 @@ private:
 private:
 	///************************* 他のUI *************************///
 	std::unique_ptr<ControlUI> controlUI_;
+	std::unique_ptr<MissionUI> missionUI_;
 };
