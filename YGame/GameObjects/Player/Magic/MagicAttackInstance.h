@@ -2,7 +2,7 @@
 
 #include "Collision/Core/BaseCollider.h"
 #include "MagicActionData.h"
-#include "Vfx/VfxMesh/Runtime/VfxMeshHandle.h"
+#include "Particle/EffectHandle.h"
 #include "WorldTransform/WorldTransform.h"
 
 #include <memory>
@@ -56,6 +56,6 @@ private:
   // 各敵コライダーへ最後にダメージを与えた elapsedTime_。
   // hitInterval と突き合わせて単発/周期ヒットを切り替える。
   std::unordered_map<BaseCollider *, float> lastHitTimes_;
-  VfxMeshHandle travelVfx_; // 飛翔中に本体へ追従させるループVFXのハンドル
+  EffectHandle travelVfx_; // CPU/VfxMeshを束ねた複合VFXも追従できる統一ハンドル
   bool died_ = false;       // Die() を二重発火させないためのガード
 };

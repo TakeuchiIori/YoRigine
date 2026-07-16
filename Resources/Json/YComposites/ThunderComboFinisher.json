@@ -1,0 +1,15 @@
+{
+  "name": "ThunderComboFinisher",
+  "particleEffects": [
+    { "asset": "ThunderFinisherBurst", "offset": [0.0, 0.0, 0.0] },
+    { "asset": "ThunderImpactSparks", "offset": [0.0, 0.0, 0.0] },
+    { "asset": "ThunderChargeMotes", "offset": [0.0, 0.0, 0.0] }
+  ],
+  "vfxMeshAssets": [
+    { "asset": "Lightning", "offset": [0.0, 9.0, 0.0], "scale": 1.15 },
+    { "asset": "NewEffect2", "offset": [0.0, 0.0, 0.0], "scale": 1.0 },
+    { "asset": "Explosion", "offset": [0.0, 2.8, 0.0], "scale": 0.72 }
+  ],
+  "gpuEmitterGroup": "",
+  "sounds": []
+}

@@ -5,6 +5,7 @@
 #include "Particle/YEmitterGroupManager.h"
 #include "Particle/YParticleManager.h"
 #include "GPUParticle/GpuEmitManager.h"
+#include "Composite/CompositeEffectManager.h"
 
 #ifdef USE_IMGUI
 #include <Debugger/Logger.h>
@@ -429,26 +430,62 @@ namespace {
 			e.vfxAsset = asset;
 			e.time = time;
 			e.emitCount = count;
+			// 新規魔法素材の寿命は用途別の3規格だけを使う。
+			// エディタ上にも同じ値を出し、VfxMesh/Compositeの尺合わせにも利用する。
+			const std::string assetName = asset;
+			if (assetName.find("Charge") != std::string::npos ||
+				assetName.find("Cloud") != std::string::npos) {
+				e.duration = 1.2f;
+			} else if (assetName.find("Trail") != std::string::npos ||
+				assetName.find("Arc") != std::string::npos ||
+				assetName.find("Chain") != std::string::npos ||
+				assetName.find("Bolt") != std::string::npos) {
+				e.duration = 0.9f;
+			} else {
+				e.duration = 0.6f;
+			}
 			action.events.push_back(std::move(e));
 		};
-		if (ImGui::Button("発射3層プリセット")) {
+		if (ImGui::Button("炎発射3層プリセット")) {
 			appendLayer("Launch Mesh", MagicEventTrigger::OnRelease,
-				MagicEventType::PlayVfx, MagicEffectBackend::VfxMesh, "Smoke", 0.0f, 1);
+				MagicEventType::PlayVfx, MagicEffectBackend::VfxMesh, "NewEffect3", 0.0f, 1);
 			appendLayer("Launch CPU", MagicEventTrigger::OnRelease,
-				MagicEventType::PlayVfx, MagicEffectBackend::CpuParticle, "EnemyHit", 0.0f, 28);
-			appendLayer("Launch GPU", MagicEventTrigger::OnRelease,
-				MagicEventType::PlayVfx, MagicEffectBackend::GpuParticle, "ss", 0.0f, 80);
+				MagicEventType::PlayVfx, MagicEffectBackend::CpuParticle, "FireCastSparks", 0.0f, 26);
+			appendLayer("Launch Embers", MagicEventTrigger::OnRelease,
+				MagicEventType::PlayVfx, MagicEffectBackend::CpuParticle, "FireTrailEmbers", 0.0f, 14);
 			selectedEvent = static_cast<int>(action.events.size()) - 3;
 		}
 		ImGui::SameLine();
-		if (ImGui::Button("着弾3層プリセット")) {
+		if (ImGui::Button("炎着弾3層プリセット")) {
 			const float hitTime = std::max(0.0f, action.duration * 0.85f);
 			appendLayer("Impact Mesh", MagicEventTrigger::OnTimeline,
 				MagicEventType::SpawnArea, MagicEffectBackend::VfxMesh, "Explosion", hitTime, 1);
-			appendLayer("Impact CPU", MagicEventTrigger::OnTimeline,
-				MagicEventType::SpawnArea, MagicEffectBackend::CpuParticle, "EnemyHit", hitTime, 40);
-			appendLayer("Impact GPU", MagicEventTrigger::OnTimeline,
-				MagicEventType::SpawnArea, MagicEffectBackend::GpuParticle, "ss", hitTime, 120);
+			appendLayer("Impact Sparks", MagicEventTrigger::OnTimeline,
+				MagicEventType::SpawnArea, MagicEffectBackend::CpuParticle, "FireImpactSparks", hitTime, 42);
+			appendLayer("Impact Cloud", MagicEventTrigger::OnTimeline,
+				MagicEventType::SpawnArea, MagicEffectBackend::CpuParticle, "FireImpactCloud", hitTime, 16);
+			selectedEvent = static_cast<int>(action.events.size()) - 3;
+		}
+
+		if (ImGui::Button("炎魔法セット")) {
+			appendLayer("Fire Charge", MagicEventTrigger::OnStart,
+				MagicEventType::PlayVfx, MagicEffectBackend::Composite, "FireCharge", 0.0f, 1);
+			appendLayer("Fire Cast", MagicEventTrigger::OnRelease,
+				MagicEventType::PlayVfx, MagicEffectBackend::Composite, "FireCastFlash", 0.0f, 1);
+			appendLayer("Fire Impact", MagicEventTrigger::OnTimeline,
+				MagicEventType::SpawnArea, MagicEffectBackend::Composite, "FireImpact",
+				std::max(0.0f, action.duration * 0.85f), 1);
+			selectedEvent = static_cast<int>(action.events.size()) - 3;
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("雷魔法セット")) {
+			appendLayer("Thunder Charge", MagicEventTrigger::OnStart,
+				MagicEventType::PlayVfx, MagicEffectBackend::Composite, "ThunderCharge", 0.0f, 1);
+			appendLayer("Thunder Cast", MagicEventTrigger::OnRelease,
+				MagicEventType::PlayVfx, MagicEffectBackend::Composite, "ThunderCastFlash", 0.0f, 1);
+			appendLayer("Thunder Impact", MagicEventTrigger::OnTimeline,
+				MagicEventType::StrikeTarget, MagicEffectBackend::Composite, "ThunderImpact",
+				std::max(0.0f, action.duration * 0.85f), 1);
 			selectedEvent = static_cast<int>(action.events.size()) - 3;
 		}
 
@@ -503,14 +540,19 @@ namespace {
 			event.label = labelBuffer;
 		}
 
-		const char* backends[] = { "VfxMesh", "CpuParticle", "GpuParticle" };
+		const char* backends[] = { "Composite", "VfxMesh", "CpuParticle", "GpuParticle" };
 		DrawEnumCombo("エフェクト方式", event.effectBackend, backends,
 			MagicEffectBackendFromString);
 
 		std::vector<std::string> assets;
 		bool assetExists = false;
 		const char* assetLabel = "VfxMesh アセット";
-		if (event.effectBackend == MagicEffectBackend::VfxMesh) {
+		if (event.effectBackend == MagicEffectBackend::Composite) {
+			assetLabel = "複合エフェクト";
+			assets = CompositeEffectManager::GetInstance()->GetAssetNames();
+			assetExists = event.vfxAsset.empty() ||
+				CompositeEffectManager::GetInstance()->Has(event.vfxAsset);
+		} else if (event.effectBackend == MagicEffectBackend::VfxMesh) {
 			auto* spawner = VfxMeshSpawner::GetInstance();
 			assets = spawner->GetAssetNames();
 			assetExists = event.vfxAsset.empty() || spawner->GetAsset(event.vfxAsset);

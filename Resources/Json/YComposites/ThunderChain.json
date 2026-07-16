@@ -1,0 +1,14 @@
+{
+  "name": "ThunderChain",
+  "particleEffects": [
+    { "asset": "ThunderChainMotes", "offset": [0.0, 0.0, 0.0] },
+    { "asset": "ThunderTrailSparks", "offset": [0.45, 0.2, 0.0] }
+  ],
+  "vfxMeshAssets": [
+    { "asset": "Lightning", "offset": [0.0, 0.0, 0.0], "scale": 0.48 },
+    { "asset": "Lightning", "offset": [0.45, 0.2, 0.0], "scale": 0.3 },
+    { "asset": "NewEffect2", "offset": [0.0, 0.0, 0.0], "scale": 0.35 }
+  ],
+  "gpuEmitterGroup": "",
+  "sounds": []
+}

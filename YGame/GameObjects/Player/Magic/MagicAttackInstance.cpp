@@ -78,9 +78,8 @@ void MagicAttackInstance::Initialize(const MagicActionData &action,
 
   // 飛道弾の見た目は判定本体に追従させ、位置・寿命を判定と同期させる。
   if (!action_.travelVfx.empty()) {
-    travelVfx_ = VfxMeshHandle::Play(action_.travelVfx, attackPosition_,
-                                     std::max(0.2f, action_.hitRadius),
-                                     /*loop*/ true);
+    travelVfx_ = EffectHandle::Play(action_.travelVfx, attackPosition_,
+                                    /*loop*/ true, /*emitCount*/ -1);
   }
 
   alive_ = true;
@@ -245,7 +244,7 @@ void MagicAttackInstance::Die() {
   if (travelVfx_.IsValid())
     travelVfx_.Stop();
   if (!action_.impactVfx.empty()) {
-    VfxMeshHandle::PlayOneShot(action_.impactVfx, attackPosition_,
-                               std::max(0.3f, action_.hitRadius));
+    // Compositeを先に解決する統一入口から再生し、新規CPU素材も着弾へ含める。
+    EffectHandle::PlayOneShot(action_.impactVfx, attackPosition_, -1);
   }
 }

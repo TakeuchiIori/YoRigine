@@ -1,0 +1,11 @@
+{
+  "name": "FireBoltTrail",
+  "particleEffects": [
+    { "asset": "FireTrailEmbers", "offset": [0.0, 0.0, -0.15] }
+  ],
+  "vfxMeshAssets": [
+    { "asset": "NewEffect3", "offset": [0.0, 0.0, 0.0], "scale": 0.22 }
+  ],
+  "gpuEmitterGroup": "",
+  "sounds": []
+}

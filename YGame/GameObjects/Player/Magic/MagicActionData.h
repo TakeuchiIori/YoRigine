@@ -41,6 +41,7 @@ enum class MagicEventType {
 };
 
 enum class MagicEffectBackend {
+  Composite,
   VfxMesh,
   CpuParticle,
   GpuParticle,

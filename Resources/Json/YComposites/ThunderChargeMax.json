@@ -1,0 +1,14 @@
+{
+  "name": "ThunderChargeMax",
+  "particleEffects": [
+    { "asset": "ThunderChargeMotes", "offset": [0.0, 0.0, 0.0] },
+    { "asset": "ThunderCastSparks", "offset": [0.0, 0.0, 0.0] }
+  ],
+  "vfxMeshAssets": [
+    { "asset": "Lightning", "offset": [0.0, 0.0, 0.0], "scale": 0.42 },
+    { "asset": "NewEffect2", "offset": [0.0, 0.0, 0.0], "scale": 0.48 },
+    { "asset": "Explosion", "offset": [0.0, 0.45, 0.0], "scale": 0.12 }
+  ],
+  "gpuEmitterGroup": "",
+  "sounds": []
+}

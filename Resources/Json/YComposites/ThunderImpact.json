@@ -1,0 +1,14 @@
+{
+  "name": "ThunderImpact",
+  "particleEffects": [
+    { "asset": "ThunderImpactSparks", "offset": [0.0, 0.35, 0.0] },
+    { "asset": "ThunderCastSparks", "offset": [0.0, 0.45, 0.0] }
+  ],
+  "vfxMeshAssets": [
+    { "asset": "Lightning", "offset": [0.0, 6.0, 0.0], "scale": 0.7 },
+    { "asset": "NewEffect2", "offset": [0.0, 0.0, 0.0], "scale": 0.55 },
+    { "asset": "Explosion", "offset": [0.0, 1.1, 0.0], "scale": 0.3 }
+  ],
+  "gpuEmitterGroup": "",
+  "sounds": []
+}

@@ -12,7 +12,10 @@
 // アセット: Resources/Json/YComposites/<名前>.json（参照リストのみ）
 //   {
 //     "name": "Explosion",
-//     "particleEffect": "ExplosionSparks",
+//     "particleEffects": [
+//       { "asset": "ExplosionSparks", "offset": [0,0,0] },
+//       { "asset": "ExplosionSmoke",  "offset": [0,0.5,0] }
+//     ],
 //     "vfxMeshAssets": [ { "asset": "ExplosionShockwave", "offset": [0,0,0], "scale": 1.5 } ],
 //     "gpuEmitterGroup": "ExplosionDebris",
 //     "sounds": [ { "path": "Resources/Audio/SE/explosion.wav", "volume": 1.0, "category": "SE" } ]
@@ -51,6 +54,10 @@ struct CompositeVfxRef {
     Vector3     offset = { 0.0f, 0.0f, 0.0f };
     float       scale = 1.0f;
 };
+struct CompositeParticleRef {
+    std::string asset;
+    Vector3     offset = { 0.0f, 0.0f, 0.0f };
+};
 struct CompositeSoundRef {
     std::string           path;
     float                 volume = 1.0f;
@@ -59,8 +66,7 @@ struct CompositeSoundRef {
 struct CompositeEffectAsset {
     std::string                    name;
 
-    std::string                    particleEffect;      // 省略可
-    Vector3                        particleOffset = { 0.0f, 0.0f, 0.0f }; // particleEffectの相対オフセット
+    std::vector<CompositeParticleRef> particleEffects; // 省略可（複数CPU素材をレイヤー可能）
 
     std::vector<CompositeVfxRef>   vfxMeshAssets;       // 省略可（offset/scaleは各要素が持つ）
 
@@ -94,8 +100,8 @@ struct CompositeEffectAsset {
 
 // ── ループ複合エフェクトの実行インスタンス（子ハンドルを保持し Stop で連鎖停止）──
 struct CompositeInstance {
-    EffectHandle                        particle;       // Particle 子（ループ）
-    Vector3                             particleOffset = { 0.0f, 0.0f, 0.0f };
+    std::vector<EffectHandle>           particles;      // Particle 子（ループ）
+    std::vector<Vector3>                particleOffsets;// particles と対の相対オフセット
     std::vector<VfxMeshHandle>          vfx;            // VfxMesh 子（ループ）
     std::vector<Vector3>                vfxOffsets;     // vfx と対の相対オフセット
     GpuParticleHandle                   gpu;            // GPU 子（ループ）
@@ -133,6 +139,7 @@ public:
     bool LoadAsset(const std::string& filepath);
 
     bool Has(const std::string& name) const;
+    std::vector<std::string> GetAssetNames() const;
 
     // 毎フレーム呼ぶこと（hitDelayの遅延ダメージクエリを消化する）。
     // VfxMeshSpawner::Update等と同じ場所（GameScene/DevelopSceneのUpdate）で呼ぶ想定。

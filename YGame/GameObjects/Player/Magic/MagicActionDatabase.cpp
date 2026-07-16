@@ -138,9 +138,19 @@ std::vector<MagicActionData> MagicActionDatabase::CreateDefaultActions()
 	secondary.hitRadius = 1.6f;
 	secondary.cooldown = 0.25f;
 	secondary.chainResetTime = 1.0f;
-	secondary.events = {
-		{ 0.0f, MagicEventTrigger::OnStart, MagicEventType::SpawnProjectile, MagicElement::Fire, "FireBolt", 6.0f, 0.0f, 0.0f, 32.0f },
-	};
+	secondary.travelVfx = "FireBoltTrail";
+	secondary.impactVfx = "FireImpact";
+	secondary.destroyOnHit = true;
+	MagicTimelineEvent fireCast;
+	fireCast.trigger = MagicEventTrigger::OnStart;
+	fireCast.type = MagicEventType::PlayVfx;
+	fireCast.element = MagicElement::Fire;
+	fireCast.label = "FireCast";
+	fireCast.vfxAsset = "FireCastFlash";
+	fireCast.effectBackend = MagicEffectBackend::Composite;
+	fireCast.duration = 0.6f;
+	fireCast.emitCount = 1;
+	secondary.events = { fireCast };
 
 	MagicActionData utility;
 	utility.name = "ThunderStrike";
@@ -151,11 +161,37 @@ std::vector<MagicActionData> MagicActionDatabase::CreateDefaultActions()
 	utility.duration = 0.3f;
 	utility.range = 20.0f;
 	utility.hitRadius = 2.5f;
+	utility.hitDelay = 0.075f;
 	utility.cooldown = 0.4f;
 	utility.chainResetTime = 1.0f;
-	utility.events = {
-		{ 0.0f, MagicEventTrigger::OnStart, MagicEventType::StrikeTarget, MagicElement::Thunder, "ThunderStrike", 8.0f, 0.0f, 3.0f, 0.0f },
-	};
+	utility.hitStopDuration = 0.04f;
+	utility.shakeIntensity = 0.22f;
+	utility.shakeDuration = 0.12f;
+	MagicTimelineEvent thunderCast;
+	thunderCast.trigger = MagicEventTrigger::OnStart;
+	thunderCast.type = MagicEventType::PlayVfx;
+	thunderCast.element = MagicElement::Thunder;
+	thunderCast.label = "ThunderCast";
+	thunderCast.vfxAsset = "ThunderCastFlash";
+	thunderCast.effectBackend = MagicEffectBackend::Composite;
+	thunderCast.duration = 0.6f;
+	thunderCast.emitCount = 1;
+	MagicTimelineEvent thunderBolt = thunderCast;
+	thunderBolt.time = 0.035f;
+	thunderBolt.trigger = MagicEventTrigger::OnTimeline;
+	thunderBolt.type = MagicEventType::SpawnBeam;
+	thunderBolt.label = "ThunderWobbleBolt";
+	thunderBolt.vfxAsset = "Lightning";
+	thunderBolt.effectBackend = MagicEffectBackend::VfxMesh;
+	thunderBolt.speed = 20.0f;
+	MagicTimelineEvent thunderImpact = thunderCast;
+	thunderImpact.time = 0.075f;
+	thunderImpact.trigger = MagicEventTrigger::OnTimeline;
+	thunderImpact.type = MagicEventType::StrikeTarget;
+	thunderImpact.label = "ThunderImpact";
+	thunderImpact.vfxAsset = "ThunderImpact";
+	thunderImpact.radius = 3.0f;
+	utility.events = { thunderCast, thunderBolt, thunderImpact };
 
 	return { primary, primaryFinisher, secondary, utility };
 }

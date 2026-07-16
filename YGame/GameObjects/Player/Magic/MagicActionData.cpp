@@ -88,6 +88,7 @@ const char *ToString(MagicEventType type) {
 
 const char *ToString(MagicEffectBackend backend) {
   switch (backend) {
+  case MagicEffectBackend::Composite: return "Composite";
   case MagicEffectBackend::VfxMesh: return "VfxMesh";
   case MagicEffectBackend::CpuParticle: return "CpuParticle";
   case MagicEffectBackend::GpuParticle: return "GpuParticle";
@@ -172,7 +173,8 @@ MagicEventType MagicEventTypeFromString(const std::string &value) {
 MagicEffectBackend MagicEffectBackendFromString(const std::string &value) {
   return EnumFromString<MagicEffectBackend>(
       value,
-      {{"VfxMesh", MagicEffectBackend::VfxMesh},
+      {{"Composite", MagicEffectBackend::Composite},
+       {"VfxMesh", MagicEffectBackend::VfxMesh},
        {"CpuParticle", MagicEffectBackend::CpuParticle},
        {"GpuParticle", MagicEffectBackend::GpuParticle}},
       MagicEffectBackend::VfxMesh);

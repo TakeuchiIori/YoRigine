@@ -52,6 +52,24 @@ void FollowCamera::Update() {
 }
 
 // ============================================================
+// クローズアップ切り替え
+// 死亡演出への切り替え時に、通常追従の慣性や揺れを持ち込まない。
+// ============================================================
+void FollowCamera::SetIsCloseUp(bool v) {
+    if (isCloseUp_ == v) return;
+
+    isCloseUp_ = v;
+    if (isCloseUp_) {
+        CancelRecenter(true);
+        smoothedLookAhead_ = {};
+        pivotVel_ = {};
+        shakeOffset_ = {};
+        shakeTimer_ = shakeDuration_;
+        idleRecenterTimer_ = 0.0f;
+    }
+}
+
+// ============================================================
 // スティック入力 (inputEnabled_ = false でスキップ)
 // ============================================================
 void FollowCamera::UpdateInput() {
@@ -122,10 +140,14 @@ static Vector3 SmoothDampVec3(const Vector3& current, const Vector3& target, Vec
 void FollowCamera::FollowProcess() {
     if (!target_) return;
 
-    const float dt = YoRigine::GameTime::GetDeltaTime();
+    // クローズアップは死亡モーション終了後にゲーム時間が止まっても、
+    // 最終位置まで確実に収束させる。
+    const float dt = isCloseUp_
+        ? YoRigine::GameTime::GetUnscaledDeltaTime()
+        : YoRigine::GameTime::GetDeltaTime();
 
     // ── リセンター（対象 facing 背後へ寄せる）を先に進める ──
-    UpdateRecenter(dt);
+    if (!isCloseUp_) UpdateRecenter(dt);
 
     // ── クローズアップ倍率の補間 ──
     float targetScale = isCloseUp_ ? closeUpScale_ : 1.0f;
@@ -149,7 +171,7 @@ void FollowCamera::FollowProcess() {
     hasPrevTargetPos_ = true;
 
     Vector3 desiredLookAhead{};
-    if (lookAheadEnabled_ && !teleported) {
+    if (!isCloseUp_ && lookAheadEnabled_ && !teleported) {
         Vector3 flatVel = { targetVel.x,
                             lookAheadVertical_ ? targetVel.y : 0.0f,
                             targetVel.z };
@@ -191,16 +213,20 @@ void FollowCamera::FollowProcess() {
     Vector3 idealPos = smoothedPivot_ + rotatedOffset;  // 追従は平滑化済み、回転は生の値
 
     // ── 壁めり込み回避は最後にハード補正 ──
-    Vector3 safePos = collisionResolver_.Resolve(idealPos, pivot);
+    // 近接演出ではカメラ距離に合わせて壁との余白も縮める。
+    // また、Y 座標だけを大きく押し上げるハイアングル補正は死亡時の
+    // フレーミング崩れの原因になるためクローズアップ中は無効化する。
+    Vector3 safePos = collisionResolver_.Resolve(
+        idealPos, pivot, dt, currentScale_, !isCloseUp_);
 
     // アイドル時オートリセンター：カメラ操作が一定時間なければ静かに背後へ戻す
-    UpdateIdleRecenter(dt);
+    if (!isCloseUp_) UpdateIdleRecenter(dt);
 
     UpdateShake();
     transform_.translate = safePos + shakeOffset_;
 
     // フレーミング補正：追従対象が画角外に出そうな時だけ rotation を引き戻す
-    EnsureTargetInView(pivot, dt);
+    if (!isCloseUp_) EnsureTargetInView(pivot, dt);
 }
 
 // ============================================================

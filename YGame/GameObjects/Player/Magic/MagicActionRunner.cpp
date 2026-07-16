@@ -39,6 +39,12 @@ void MagicActionRunner::Update(float deltaTime) {
   }
 
   FireTimelineEvents();
+
+  // Tap 魔法も Release 直後に終了させず、action.duration まで
+  // OnTimeline を進める。これにより発射後の着弾・残光イベントが発火する。
+  if (released_ && elapsedTime_ >= std::max(0.01f, currentAction_.duration)) {
+    running_ = false;
+  }
 }
 
 bool MagicActionRunner::Release() {
@@ -55,7 +61,7 @@ bool MagicActionRunner::Release() {
   released_ = true;
   FireEvents(MagicEventTrigger::OnRelease);
   cooldown_ = currentAction_.cooldown;
-  running_ = false;
+  running_ = elapsedTime_ < std::max(0.01f, currentAction_.duration);
   return true;
 }
 

@@ -31,7 +31,7 @@ public:
   const std::string &GetTargetName() const { return targetName_; }
   const WorldTransform *GetTarget() const { return target_; }
 
-  void SetIsCloseUp(bool v) { isCloseUp_ = v; }
+  void SetIsCloseUp(bool v);
   bool GetIsCloseUp() const { return isCloseUp_; }
 
   CameraState *GetCurrentState() const { return currentState_.get(); }

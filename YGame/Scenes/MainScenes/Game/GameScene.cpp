@@ -425,9 +425,12 @@ void GameScene::DrawUI() {
 /// </summary>
 void GameScene::UpdateCamera() {
 	auto director = CameraDirector::GetInstance();
+	const bool isDeathCamera = player_ && player_->GetCombat() &&
+		player_->GetCombat()->IsDead();
 
-
-	if (YoRigine::GameTime::IsPause() && cameraMode_ != CameraMode::DEBUG) {
+	// 死亡モーション終了時はゲーム本体だけを止め、死亡クローズアップは
+	// 実時間で最終位置まで進める。
+	if (YoRigine::GameTime::IsPause() && cameraMode_ != CameraMode::DEBUG && !isDeathCamera) {
 		return;
 	}
 
@@ -469,7 +472,7 @@ void GameScene::UpdateCamera() {
 	//------------------------------------------------------------
 	// Directorの更新（VirtualCameraの計算 ＋ ブレンド処理）
 	//------------------------------------------------------------
-	const float cameraDt = (cameraMode_ == CameraMode::DEBUG)
+	const float cameraDt = (cameraMode_ == CameraMode::DEBUG || isDeathCamera)
 		? YoRigine::GameTime::GetUnscaledDeltaTime()
 		: YoRigine::GameTime::GetDeltaTime();
 	director->Update(cameraDt);

@@ -144,10 +144,7 @@ public:
   // ============================================================
   FollowCamera *GetFollowCamera() const { return followCamera_; }
 
-  void SetIsCloseUp(bool v) {
-    if (followCamera_)
-      followCamera_->SetIsCloseUp(v);
-  }
+  void SetIsCloseUp(bool v);
   void StartShake(float intensity, float dur) {
     if (followCamera_)
       followCamera_->StartShake(intensity, dur);

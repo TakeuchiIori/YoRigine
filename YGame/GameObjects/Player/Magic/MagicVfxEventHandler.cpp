@@ -6,6 +6,7 @@
 #include "MagicCastGeometry.h"
 #include "Particle/EffectHandle.h"
 #include "GPUParticle/GpuEmitManager.h"
+#include "Composite/CompositeEffectManager.h"
 #include "Vfx/VfxMesh/Runtime/VfxMeshHandle.h"
 #include "Vfx/VfxMesh/Runtime/VfxMeshSpawner.h"
 
@@ -28,6 +29,15 @@ void MagicVfxEventHandler::Execute(const MagicTimelineEvent &event,
   const bool atTarget = event.type == MagicEventType::SpawnArea ||
                         event.type == MagicEventType::StrikeTarget;
   const Vector3 effectPosition = (atTarget ? target : origin) + event.effectOffset;
+  if (event.effectBackend == MagicEffectBackend::Composite) {
+    if (!event.vfxAsset.empty()) {
+      CompositeEffectManager::PlayParams params;
+      params.minDuration = std::max(0.0f, event.duration);
+      CompositeEffectManager::GetInstance()->PlayOneShot(
+          event.vfxAsset, effectPosition, params);
+    }
+    return;
+  }
   if (event.effectBackend == MagicEffectBackend::CpuParticle) {
     if (!event.vfxAsset.empty()) {
       EffectHandle::PlayOneShot(event.vfxAsset, effectPosition,
@@ -46,7 +56,8 @@ void MagicVfxEventHandler::Execute(const MagicTimelineEvent &event,
 
   switch (event.type) {
   case MagicEventType::PlayVfx:
-    VfxMeshHandle::PlayOneShot(ResolveAssetName(event, "Smoke"), origin,
+    // 紫Smokeを暗黙の既定値にしない。必要な場合だけアセット欄で明示選択する。
+    VfxMeshHandle::PlayOneShot(ResolveAssetName(event, "NewEffect3"), origin,
                                std::max(scale * 0.35f, 0.2f), timeScale);
     break;
   case MagicEventType::SpawnBeam:

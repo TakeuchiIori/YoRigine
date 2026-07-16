@@ -11,21 +11,21 @@
                     "y": 0.7831858396530151,
                     "z": 10.071000099182129
                 },
-                "branchJitter": 1.940000057220459,
-                "branches": 8,
+                "branchJitter": 0.75,
+                "branches": 5,
                 "color": {
                     "w": 1.0,
                     "x": 1.0,
                     "y": 1.0,
                     "z": 10.121999740600586
                 },
-                "coreWidth": 0.12999999523162842,
+                "coreWidth": 0.24,
                 "direction": {
                     "x": 0.0,
                     "y": 1.0,
                     "z": 0.0
                 },
-                "flickerRate": 0.0,
+                "flickerRate": 24.0,
                 "glowColor": {
                     "w": 1.0,
                     "x": 0.0,
@@ -34,12 +34,12 @@
                 },
                 "glowPower": 0.949999988079071,
                 "isEnable": true,
-                "jitter": 2.5399999618530273,
+                "jitter": 1.15,
                 "length": 16.649999618530273,
                 "outlineIntensity": 0.0,
                 "segments": 64,
-                "solidness": 0.41999998688697815,
-                "width": 2.0
+                "solidness": 0.62,
+                "width": 0.62
             },
             "offset": {
                 "x": 0.0,

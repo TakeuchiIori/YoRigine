@@ -18,7 +18,9 @@ public:
 	/// <param name="idealPos">本来カメラが行きたい座標</param>
 	/// <param name="targetPivot">プレイヤーの頭など、レイの始点となる注視点</param>
 	/// <returns>壁避け・ハイアングル化を適用した最終座標</returns>
-	Vector3 Resolve(const Vector3& idealPos, const Vector3& targetPivot);
+	Vector3 Resolve(const Vector3& idealPos, const Vector3& targetPivot,
+		float deltaTime, float clearanceScale = 1.0f,
+		bool allowHighAngle = true);
 
 	// エディタ設定用
 	void DrawDebugGui();

@@ -1,0 +1,13 @@
+{
+  "name": "FireChargeMax",
+  "particleEffects": [
+    { "asset": "FireChargeMotes", "offset": [0.0, 0.0, 0.0] },
+    { "asset": "FireCastSparks", "offset": [0.0, 0.0, 0.0] }
+  ],
+  "vfxMeshAssets": [
+    { "asset": "NewEffect3", "offset": [0.0, 0.0, 0.0], "scale": 0.42 },
+    { "asset": "Explosion", "offset": [0.0, 0.6, 0.0], "scale": 0.16 }
+  ],
+  "gpuEmitterGroup": "",
+  "sounds": []
+}

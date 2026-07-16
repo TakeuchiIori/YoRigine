@@ -169,7 +169,23 @@
         "damage": 6.0,
         "destroyOnHit": true,
         "duration": 0.3499999940395355,
-        "events": [],
+        "events": [
+            {
+                "duration": 0.6,
+                "effectBackend": "Composite",
+                "effectOffset": [0.0, 0.0, 0.0],
+                "element": "Fire",
+                "emitCount": 1,
+                "label": "FireCast",
+                "power": 6.0,
+                "radius": 0.0,
+                "speed": 0.0,
+                "time": 0.0,
+                "trigger": "OnStart",
+                "type": "PlayVfx",
+                "vfxAsset": "FireCastFlash"
+            }
+        ],
         "hitDelay": 0.0,
         "hitHalfExtents": [
             1.5,
@@ -185,7 +201,7 @@
         "hitRadius": 1.600000023841858,
         "hitShape": "Sphere",
         "hitStopDuration": 0.0,
-        "impactVfx": "Explosion",
+        "impactVfx": "FireImpact",
         "inputMode": "Tap",
         "maxChargeTime": 1.0,
         "minChargeTime": 0.0,
@@ -217,7 +233,7 @@
         "shakeIntensity": 0.0,
         "slot": "Secondary",
         "trajectoryType": "LockOnOrForward",
-        "travelVfx": "Smoke"
+        "travelVfx": "FireBoltTrail"
     },
     {
         "animationName": "MagicAttack1",
@@ -228,18 +244,52 @@
         "duration": 0.30000001192092896,
         "events": [
             {
-                "duration": 0.0,
+                "duration": 0.6,
+                "effectBackend": "Composite",
+                "effectOffset": [0.0, 0.0, 0.0],
                 "element": "Thunder",
-                "label": "ThunderStrike",
+                "emitCount": 1,
+                "label": "ThunderCast",
                 "power": 8.0,
-                "radius": 3.0,
+                "radius": 0.0,
                 "speed": 0.0,
                 "time": 0.0,
                 "trigger": "OnStart",
-                "type": "StrikeTarget"
+                "type": "PlayVfx",
+                "vfxAsset": "ThunderCastFlash"
+            },
+            {
+                "duration": 0.6,
+                "effectBackend": "VfxMesh",
+                "effectOffset": [0.0, 0.0, 0.0],
+                "element": "Thunder",
+                "emitCount": 1,
+                "label": "ThunderWobbleBolt",
+                "power": 8.0,
+                "radius": 0.0,
+                "speed": 20.0,
+                "time": 0.035,
+                "trigger": "OnTimeline",
+                "type": "SpawnBeam",
+                "vfxAsset": "Lightning"
+            },
+            {
+                "duration": 0.6,
+                "effectBackend": "Composite",
+                "effectOffset": [0.0, 0.0, 0.0],
+                "element": "Thunder",
+                "emitCount": 1,
+                "label": "ThunderImpact",
+                "power": 8.0,
+                "radius": 3.0,
+                "speed": 0.0,
+                "time": 0.075,
+                "trigger": "OnTimeline",
+                "type": "StrikeTarget",
+                "vfxAsset": "ThunderImpact"
             }
         ],
-        "hitDelay": 0.0,
+        "hitDelay": 0.075,
         "hitHalfExtents": [
             1.5,
             1.5,
@@ -253,7 +303,7 @@
         ],
         "hitRadius": 2.5,
         "hitShape": "Sphere",
-        "hitStopDuration": 0.0,
+        "hitStopDuration": 0.04,
         "impactVfx": "",
         "inputMode": "Tap",
         "maxChargeTime": 1.0,
@@ -289,8 +339,8 @@
             "viewMax": 3.0,
             "viewMin": 0.0
         },
-        "shakeDuration": 0.0,
-        "shakeIntensity": 0.0,
+        "shakeDuration": 0.12,
+        "shakeIntensity": 0.22,
         "slot": "Utility",
         "trajectoryType": "StrikeTarget",
         "travelVfx": ""

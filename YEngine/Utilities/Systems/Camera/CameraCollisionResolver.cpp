@@ -41,7 +41,8 @@ void CameraCollisionResolver::SetDefaultBlockTypes() {
 // ============================================================
 // 理想のカメラ座標から地形や障害物のめり込みを計算し、安全な座標を返す
 // ============================================================
-Vector3 CameraCollisionResolver::Resolve(const Vector3& idealPos, const Vector3& targetPivot) {
+Vector3 CameraCollisionResolver::Resolve(const Vector3& idealPos, const Vector3& targetPivot,
+	float deltaTime, float clearanceScale, bool allowHighAngle) {
 	if (!isEnabled_) {
 		return idealPos;
 	}
@@ -63,7 +64,7 @@ Vector3 CameraCollisionResolver::Resolve(const Vector3& idealPos, const Vector3&
 		RaycastHit hitInfo;
 		// 許可リスト(壁など)に含まれる型だけを対象に Raycast。ヒットしたらカメラ半径分だけ手前にする。
 		if (YoRigine::CollisionManager::GetInstance()->RaycastAllowTypes(cameraRay, maxDistance, &hitInfo, blockTypeIDs_)) {
-			hitDistance = hitInfo.distance - cameraRadius_;
+			hitDistance = hitInfo.distance - cameraRadius_ * clearanceScale;
 		}
 
 		// ------------------------------------------------------------
@@ -76,7 +77,7 @@ Vector3 CameraCollisionResolver::Resolve(const Vector3& idealPos, const Vector3&
 			Vector3 clampedPos = areaManager->ClampToNearestArea(idealPos);
 
 			// クランプされた座標までの距離を計算し、カメラ半径分だけさらに手前にする
-			float areaDistance = Length(clampedPos - targetPivot) - cameraRadius_;
+			float areaDistance = Length(clampedPos - targetPivot) - cameraRadius_ * clearanceScale;
 
 			// 物理コライダー(Raycast)とエリアの壁、より手前にある方を最終的なヒット距離として採用する
 			if (areaDistance < hitDistance) {
@@ -103,7 +104,7 @@ Vector3 CameraCollisionResolver::Resolve(const Vector3& idealPos, const Vector3&
 	// 旧仕様は Lerp(a, b, speed) の speed を「60fps の 1 フレームあたり Lerp 係数」として
 	// 扱っていたため、fps 変動でカクついていた。speed * 60 を /sec のレートに換算し、
 	// dt を使った exponential smoothing に置き換える。
-	const float dt = YoRigine::GameTime::GetDeltaTime();
+	const float dt = std::max(0.0f, deltaTime);
 	const float baseSpeed = (targetDistanceRatio < currentDistanceRatio_) ? avoidSpeed_ : returnSpeed_;
 	const float ratePerSec = baseSpeed * 60.0f;
 	const float t = 1.0f - std::exp(-ratePerSec * dt);
@@ -116,7 +117,7 @@ Vector3 CameraCollisionResolver::Resolve(const Vector3& idealPos, const Vector3&
 	// 注意: rotation 補正を行っていないため Y だけ持ち上げると pivot が画面外に流れる。
 	// 既定では off。意図的に有効化したい場合のみ JSON から enableHighAngle=true にする。
 	// ------------------------------------------------------------
-	if (enableHighAngle_ && currentDistanceRatio_ < highAngleThreshold_) {
+	if (allowHighAngle && enableHighAngle_ && currentDistanceRatio_ < highAngleThreshold_) {
 		float closeFactor = (highAngleThreshold_ - currentDistanceRatio_) / highAngleThreshold_;
 		finalOffset.y += maxPushUpHeight_ * closeFactor;
 	}

@@ -89,6 +89,10 @@ void PlayerCamera::Initialize(FollowCamera* followCamera, const WorldTransform* 
 void PlayerCamera::UpdatePreDirector() {
     if (!followCamera_) return;
 
+    // 死亡クローズアップ中は通常の入力・ロックオン・攻撃カメラを
+    // 一切更新しない。死亡直前の敵方向へカメラが引っ張られるのを防ぐ。
+    if (followCamera_->GetIsCloseUp()) return;
+
     float dt = YoRigine::GameTime::GetDeltaTime();
     bool  inPerformance = IsInPerformance();
 
@@ -161,6 +165,9 @@ void PlayerCamera::ApplyPostDirector(Camera* sceneCamera, float dt) {
     // 見切れヒット判定に使う最終カメラをキャッシュ（OnAttackHit から参照）
     lastSceneCamera_ = sceneCamera;
 
+    // クローズアップの画角と位置を、脅威 FOV や攻撃カメラで上書きしない。
+    if (followCamera_ && followCamera_->GetIsCloseUp()) return;
+
     bool inPerformance = IsInPerformance();
     if (inPerformance) return;
 
@@ -226,6 +233,20 @@ void PlayerCamera::ApplyPostDirector(Camera* sceneCamera, float dt) {
     if (framingGuardEnabled_ && attackCamera_.ShouldKeepPlayerInFrame()) {
         EnsurePlayerInFrame(sceneCamera, dt);
     }
+}
+
+void PlayerCamera::SetIsCloseUp(bool v) {
+    if (!followCamera_ || followCamera_->GetIsCloseUp() == v) return;
+
+    if (v) {
+        isLockOn_ = false;
+        lockedTarget_ = nullptr;
+        awarenessYawBias_ = 0.0f;
+        awarenessAppliedBias_ = 0.0f;
+        attackCamera_.Stop(followCamera_);
+    }
+
+    followCamera_->SetIsCloseUp(v);
 }
 
 // ============================================================
