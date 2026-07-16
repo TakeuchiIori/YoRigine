@@ -1,17 +1,30 @@
 #include "MagicVfxEventHandler.h"
 
 #include "Collision/Core/BaseCollider.h"
+#include "GameObjects/Enemy/BattleEnemy/BattleEnemy.h"
+#include "GameObjects/Enemy/BattleEnemy/BattleEnemyManager.h"
 #include "GameObjects/Player/Camera/PlayerCamera.h"
 #include "GameObjects/Player/Player.h"
 #include "MagicCastGeometry.h"
 #include "Particle/EffectHandle.h"
 #include "GPUParticle/GpuEmitManager.h"
 #include "Composite/CompositeEffectManager.h"
+#include "Systems/Camera/Virtuals/FollowCamera/FollowCamera.h"
+#include "Systems/GameTime/GameTime.h"
+#include "UI/Damage/DamageNumberManager.h"
 #include "Vfx/VfxMesh/Runtime/VfxMeshHandle.h"
 #include "Vfx/VfxMesh/Runtime/VfxMeshSpawner.h"
 
 #include <algorithm>
 #include <cmath>
+
+namespace {
+// 全体落雷（コンボフィニッシャー）の落下開始高さと演出の手応え。
+constexpr float kStrikeAllBoltHeight = 14.0f; // 落雷ビームの始点高さ
+constexpr float kStrikeAllHitStop = 0.06f;    // 全体ヒットの瞬間だけ軽く止める
+constexpr float kStrikeAllShakeIntensity = 0.28f;
+constexpr float kStrikeAllShakeDuration = 0.22f;
+} // namespace
 
 void MagicVfxEventHandler::Execute(const MagicTimelineEvent &event,
                                    const MagicEventContext &context) {
@@ -71,18 +84,85 @@ void MagicVfxEventHandler::Execute(const MagicTimelineEvent &event,
     VfxMeshHandle::PlayOneShot(ResolveAssetName(event, "Explosion"), target,
                                scale, timeScale);
     break;
-  case MagicEventType::SpawnArea:
-    VfxMeshHandle::PlayOneShot(ResolveAssetName(event, "Explosion"), target,
+  case MagicEventType::SpawnArea: {
+    // 範囲攻撃は地面に沿わせる（対象が浮いていても・半分埋まっていても地表に出す）
+    const Vector3 ground = MagicCastGeometry::ResolveGroundPoint(target);
+    VfxMeshHandle::PlayOneShot(ResolveAssetName(event, "Explosion"), ground,
                                std::max(event.radius, scale), timeScale);
     break;
-  case MagicEventType::StrikeTarget:
+  }
+  case MagicEventType::StrikeTarget: {
+    // 落雷は敵の真下の地面へ落とす（着弾リングが地中に沈まないように）
+    const Vector3 ground = MagicCastGeometry::ResolveGroundPoint(target);
     VfxMeshHandle::PlayBolt(ResolveAssetName(event, "Lightning"),
-                            target + Vector3{0.0f, 12.0f, 0.0f}, target, false,
+                            ground + Vector3{0.0f, 12.0f, 0.0f}, ground, false,
                             timeScale);
-    VfxMeshHandle::PlayOneShot("Explosion", target, scale, timeScale);
+    VfxMeshHandle::PlayOneShot("Explosion", ground, scale, timeScale);
+    break;
+  }
+  case MagicEventType::StrikeAllEnemies:
+    ExecuteStrikeAllEnemies(player, event, scale, timeScale);
     break;
   default:
     break;
+  }
+}
+
+// ============================================================
+// 全体落雷（コンボフィニッシャー）
+//   バトル中の生存敵すべてへ上空から落雷し、各着地点（地面高さに
+//   クランプ）へ衝撃Composite(vfxAsset)を出す。event.power をダメージ
+//   として各敵へ適用する（この形態は弾インスタンスを持たないため、
+//   例外的にここでダメージまで面倒を見る）。
+// ============================================================
+void MagicVfxEventHandler::ExecuteStrikeAllEnemies(
+    Player &player, const MagicTimelineEvent &event, float scale,
+    float timeScale) {
+  BattleEnemyManager *manager = BattleEnemyManager::GetCurrent();
+  if (!manager)
+    return;
+
+  const std::vector<BattleEnemy *> enemies = manager->GetActiveBattleEnemies();
+  if (enemies.empty())
+    return;
+
+  const int damage = static_cast<int>(std::max(0.0f, event.power));
+  bool anyStruck = false;
+
+  for (BattleEnemy *enemy : enemies) {
+    if (!enemy || !enemy->IsAlive())
+      continue;
+
+    // 着地点は敵の直下の地面（埋もれ防止）。落雷はその真上から落とす。
+    const Vector3 ground =
+        MagicCastGeometry::ResolveGroundPoint(enemy->GetTranslate());
+    const Vector3 sky = ground + Vector3{0.0f, kStrikeAllBoltHeight, 0.0f};
+
+    // 落雷ビーム＋地面の衝撃Composite（雷リング・スパーク等はアセット側で束ねる）
+    VfxMeshHandle::PlayBolt("Lightning", sky, ground, false, timeScale);
+    if (!event.vfxAsset.empty()) {
+      CompositeEffectManager::PlayParams params;
+      params.minDuration = std::max(0.0f, event.duration);
+      CompositeEffectManager::GetInstance()->PlayOneShot(event.vfxAsset,
+                                                         ground, params);
+    } else {
+      VfxMeshHandle::PlayOneShot("Explosion", ground, scale, timeScale);
+    }
+
+    if (damage > 0) {
+      enemy->TakeDamage(damage);
+      DamageNumberManager::GetInstance()->SpawnDamage(
+          damage, enemy->GetTranslate(), false);
+    }
+    anyStruck = true;
+  }
+
+  // 手応え（全体ヒットで1回だけ）。フィニッシャーの重みを出す。
+  if (anyStruck) {
+    YoRigine::GameTime::SetHitStop(kStrikeAllHitStop);
+    if (FollowCamera *camera = player.GetFollowCamera()) {
+      camera->StartShake(kStrikeAllShakeIntensity, kStrikeAllShakeDuration);
+    }
   }
 }
 

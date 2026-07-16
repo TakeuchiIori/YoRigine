@@ -1,5 +1,8 @@
 #include "MagicActionRunner.h"
 
+#include "MagicCastGeometry.h"
+#include "../Player.h"
+
 #include <algorithm>
 
 void MagicActionRunner::Start(const MagicActionData &action, Player *owner) {
@@ -16,6 +19,15 @@ void MagicActionRunner::Start(const MagicActionData &action, Player *owner) {
   released_ = false;
   elapsedTime_ = 0.0f;
   chargeTime_ = 0.0f;
+  chargeMaxFired_ = false;
+
+  // チャージ式は長押し中の手元ループVFXを開始する（chargeVfx 指定時のみ）。
+  if (currentAction_.inputMode == MagicInputMode::ChargeRelease &&
+      !currentAction_.chargeVfx.empty() && owner_) {
+    const Vector3 origin = MagicCastGeometry::ResolveCastOrigin(*owner_);
+    chargeVfx_ = EffectHandle::Play(currentAction_.chargeVfx, origin,
+                                    /*loop*/ true, /*emitCount*/ -1);
+  }
 
   FireEvents(MagicEventTrigger::OnStart);
 
@@ -36,6 +48,22 @@ void MagicActionRunner::Update(float deltaTime) {
   if (!released_) {
     chargeTime_ =
         std::min(currentAction_.maxChargeTime, chargeTime_ + deltaTime);
+
+    // チャージループVFXは詠唱原点（手元）へ毎フレーム追従させる。
+    if (chargeVfx_.IsValid() && owner_) {
+      chargeVfx_.SetPosition(MagicCastGeometry::ResolveCastOrigin(*owner_));
+    }
+
+    // チャージ上限に到達した瞬間、一度だけ「満タン」の合図を出す。
+    if (!chargeMaxFired_ && currentAction_.maxChargeTime > 0.0f &&
+        chargeTime_ >= currentAction_.maxChargeTime) {
+      chargeMaxFired_ = true;
+      if (!currentAction_.chargeMaxVfx.empty() && owner_) {
+        EffectHandle::PlayOneShot(currentAction_.chargeMaxVfx,
+                                  MagicCastGeometry::ResolveCastOrigin(*owner_),
+                                  -1);
+      }
+    }
   }
 
   FireTimelineEvents();
@@ -50,6 +78,10 @@ void MagicActionRunner::Update(float deltaTime) {
 bool MagicActionRunner::Release() {
   if (!running_ || released_)
     return false;
+
+  // 手元のチャージループは放つ/不発を問わずここで必ず止める。
+  StopChargeVfx();
+
   if (chargeTime_ < currentAction_.minChargeTime) {
     // 溜め不足での離しは不発扱い。running_ を残すと CanCast が永久に弾かれ
     // 次の詠唱ができなくなるため、ここで詠唱状態を畳んで復帰可能にする。
@@ -66,11 +98,19 @@ bool MagicActionRunner::Release() {
 }
 
 void MagicActionRunner::Reset() {
+  StopChargeVfx();
   running_ = false;
   released_ = false;
   elapsedTime_ = 0.0f;
   chargeTime_ = 0.0f;
   cooldown_ = 0.0f;
+  chargeMaxFired_ = false;
+}
+
+void MagicActionRunner::StopChargeVfx() {
+  if (chargeVfx_.IsValid()) {
+    chargeVfx_.Stop();
+  }
 }
 
 void MagicActionRunner::FireEvents(MagicEventTrigger trigger) {

@@ -15,4 +15,8 @@ namespace MagicCastGeometry {
 Vector3 ResolveForward(Player &player);
 // プレイヤー胸元やや前方の詠唱起点。
 Vector3 ResolveCastOrigin(Player &player);
+// 指定位置の直下の地面座標を返す（着弾リング等の地面系VFX用）。
+// 上方から下向きに地形(kGroundSurface/kStaticWall/kNavObstacle)へレイを撃ち、
+// 当たらなければ Y=0 の平面へフォールバックする。返り値はわずかに浮かせる。
+Vector3 ResolveGroundPoint(const Vector3 &position);
 } // namespace MagicCastGeometry

@@ -38,6 +38,7 @@ enum class MagicEventType {
   SpawnProjectile,
   SpawnArea,
   StrikeTarget,
+  StrikeAllEnemies, // バトル中の全敵へ上空から落雷＋地面衝撃（コンボフィニッシャー用）
 };
 
 enum class MagicEffectBackend {
@@ -109,6 +110,13 @@ struct MagicActionData {
   std::string travelVfx;     // 飛翔中に本体へ追従させるループVFX
   std::string impactVfx;     // 着弾/消滅時に一度だけ出すVFX
   bool destroyOnHit = false; // true: 敵に最初に当たった時点で消滅（貫通しない）
+  // チャージ（ChargeRelease 専用）。長押し中に手元でループ再生し、
+  // maxChargeTime 到達の瞬間に chargeMaxVfx を一度だけ出して「満タン」を伝える。
+  std::string chargeVfx;    // 長押し中の手元ループVFX（Composite名）
+  std::string chargeMaxVfx; // チャージ上限到達の合図に出すワンショットVFX
+  // ヒットした敵へ追従させる状態VFX（例: 燃焼）。空なら何もしない。
+  std::string hitStatusVfx;       // 敵に付着させるループVFX（Composite名）
+  float hitStatusDuration = 0.0f; // 付着VFXの継続秒数
   CurveChannel scaleCurve{"Scale", 0.0f, 3.0f};
   std::vector<MagicTimelineEvent> events;
 };

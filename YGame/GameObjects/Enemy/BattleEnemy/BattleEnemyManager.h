@@ -70,6 +70,11 @@ public:
 	// デストラクタ
 	~BattleEnemyManager();
 
+	// 現在アクティブなマネージャ（BattleScene が所有・非所有の借用参照）。
+	// 魔法の全体攻撃など、シーン外から「バトル中の敵一覧」が必要な時に使う。
+	// Initialize でセットされ、Finalize / デストラクタで nullptr に戻る。
+	static BattleEnemyManager* GetCurrent() { return current_; }
+
 	// 初期化処理
 	void Initialize(Camera* camera);
 
@@ -253,6 +258,9 @@ private:
 	Player* player_ = nullptr;
 	BattleEndCallback battleEndCallback_;
 	BattleEnemyDefeatedCallback enemyDefeatedCallback_;
+
+	// 現在アクティブなインスタンス（GetCurrent 用・非所有）
+	static BattleEnemyManager* current_;
 
 	// 敵管理
 	std::vector<std::unique_ptr<BattleEnemy>> battleEnemies_;

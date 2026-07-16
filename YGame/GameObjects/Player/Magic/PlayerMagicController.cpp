@@ -99,7 +99,16 @@ void PlayerMagicController::HandleSlotInput(PlayerMagicSlot slot, bool triggered
 	if (released) {
 		// 溜め成立時のみ実弾を出す。不発でも保留は必ず畳み、次のチャージへ持ち越さない。
 		if (runner_.Release() && hasPendingChargeAction_) {
-			SpawnAttackInstance(pendingChargeAction_);
+			// チャージ量に応じて威力と判定半径を強化する（満タンでダメージ2倍・半径1.5倍）。
+			// scaleCurve が判定半径に掛かるのと同じ流儀で、見た目(travelVfx/impactVfx)は
+			// アセット側、ゲーム値はここでスケールと役割を分ける。
+			MagicActionData action = pendingChargeAction_;
+			const float maxCharge = std::max(0.01f, action.maxChargeTime);
+			const float chargeRatio =
+				std::clamp(runner_.GetChargeTime() / maxCharge, 0.0f, 1.0f);
+			action.damage *= 1.0f + chargeRatio;
+			action.hitRadius *= 1.0f + 0.5f * chargeRatio;
+			SpawnAttackInstance(action);
 		}
 		hasPendingChargeAction_ = false;
 	}

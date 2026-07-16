@@ -211,6 +211,11 @@ void MagicAttackInstance::ApplyHit(BaseCollider *other) {
   DamageNumberManager::GetInstance()->SpawnDamage(damage, enemy->GetTranslate(),
                                                   false);
 
+  // 状態VFX（燃焼など）を敵へ付着させる。アセット名・時間はデータ駆動。
+  if (!action_.hitStatusVfx.empty() && action_.hitStatusDuration > 0.0f) {
+    enemy->AttachStatusVfx(action_.hitStatusVfx, action_.hitStatusDuration);
+  }
+
   // 手応え(ヒットストップ/シェイク)はインスタンスの最初の命中でだけ発火する。
   // 貫通で複数体に当たった時やエリアの再ヒットで連発させない。
   if (!feedbackFired_) {

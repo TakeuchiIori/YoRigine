@@ -81,6 +81,8 @@ const char *ToString(MagicEventType type) {
     return "SpawnArea";
   case MagicEventType::StrikeTarget:
     return "StrikeTarget";
+  case MagicEventType::StrikeAllEnemies:
+    return "StrikeAllEnemies";
   default:
     return "Debug";
   }
@@ -166,6 +168,7 @@ MagicEventType MagicEventTypeFromString(const std::string &value) {
           {"SpawnProjectile", MagicEventType::SpawnProjectile},
           {"SpawnArea", MagicEventType::SpawnArea},
           {"StrikeTarget", MagicEventType::StrikeTarget},
+          {"StrikeAllEnemies", MagicEventType::StrikeAllEnemies},
       },
       MagicEventType::Debug);
 }
@@ -263,6 +266,10 @@ void to_json(nlohmann::json &j, const MagicActionData &action) {
       {"travelVfx", action.travelVfx},
       {"impactVfx", action.impactVfx},
       {"destroyOnHit", action.destroyOnHit},
+      {"chargeVfx", action.chargeVfx},
+      {"chargeMaxVfx", action.chargeMaxVfx},
+      {"hitStatusVfx", action.hitStatusVfx},
+      {"hitStatusDuration", action.hitStatusDuration},
       {"scaleCurve", action.scaleCurve.SaveToJson()},
       {"events", action.events},
   };
@@ -307,6 +314,10 @@ void from_json(const nlohmann::json &j, MagicActionData &action) {
   action.travelVfx = j.value("travelVfx", "");
   action.impactVfx = j.value("impactVfx", "");
   action.destroyOnHit = j.value("destroyOnHit", false);
+  action.chargeVfx = j.value("chargeVfx", "");
+  action.chargeMaxVfx = j.value("chargeMaxVfx", "");
+  action.hitStatusVfx = j.value("hitStatusVfx", "");
+  action.hitStatusDuration = j.value("hitStatusDuration", 0.0f);
   if (j.contains("scaleCurve")) {
     action.scaleCurve.LoadFromJson(j.at("scaleCurve"));
   } else {

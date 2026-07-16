@@ -10,6 +10,7 @@ MagicEventExecutor::MagicEventExecutor()
 	handlers_[MagicEventType::SpawnProjectile] = std::make_unique<MagicVfxEventHandler>();
 	handlers_[MagicEventType::SpawnArea] = std::make_unique<MagicVfxEventHandler>();
 	handlers_[MagicEventType::StrikeTarget] = std::make_unique<MagicVfxEventHandler>();
+	handlers_[MagicEventType::StrikeAllEnemies] = std::make_unique<MagicVfxEventHandler>();
 }
 
 void MagicEventExecutor::Execute(const MagicTimelineEvent& event, const MagicEventContext& context)

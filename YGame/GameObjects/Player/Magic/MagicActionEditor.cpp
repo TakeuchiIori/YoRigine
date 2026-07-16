@@ -229,6 +229,29 @@ namespace {
 			action.impactVfx = impactBuffer;
 		}
 		ImGui::Checkbox("命中で消滅 (貫通しない)", &action.destroyOnHit);
+
+		ImGui::SeparatorText("チャージ演出 (ChargeRelease 専用)");
+		char chargeBuffer[128] = {};
+		strncpy_s(chargeBuffer, action.chargeVfx.c_str(), sizeof(chargeBuffer) - 1);
+		if (ImGui::InputText("チャージ中ループVFX", chargeBuffer, sizeof(chargeBuffer))) {
+			action.chargeVfx = chargeBuffer;
+		}
+		if (ImGui::IsItemHovered()) ImGui::SetTooltip("長押し中に手元でループ再生するComposite名");
+		char chargeMaxBuffer[128] = {};
+		strncpy_s(chargeMaxBuffer, action.chargeMaxVfx.c_str(), sizeof(chargeMaxBuffer) - 1);
+		if (ImGui::InputText("チャージ満タンVFX", chargeMaxBuffer, sizeof(chargeMaxBuffer))) {
+			action.chargeMaxVfx = chargeMaxBuffer;
+		}
+		if (ImGui::IsItemHovered()) ImGui::SetTooltip("最大溜め時間に到達した瞬間に一度だけ出すComposite名");
+
+		ImGui::SeparatorText("ヒット状態VFX (敵に付着)");
+		char statusBuffer[128] = {};
+		strncpy_s(statusBuffer, action.hitStatusVfx.c_str(), sizeof(statusBuffer) - 1);
+		if (ImGui::InputText("付着VFX", statusBuffer, sizeof(statusBuffer))) {
+			action.hitStatusVfx = statusBuffer;
+		}
+		if (ImGui::IsItemHovered()) ImGui::SetTooltip("命中した敵へ追従させるループComposite名（例: FireBurning）");
+		ImGui::InputFloat("付着時間 (秒)", &action.hitStatusDuration, 0.1f, 0.5f);
 	}
 
 	void DrawScaleCurve(MagicActionData& action)
@@ -516,7 +539,7 @@ namespace {
 		const char* triggers[] = { "OnStart", "OnTimeline", "OnRelease" };
 		DrawEnumCombo("発火条件", event.trigger, triggers, MagicEventTriggerFromString);
 
-		const char* types[] = { "Debug", "PlayVfx", "SpawnBeam", "SpawnProjectile", "SpawnArea", "StrikeTarget" };
+		const char* types[] = { "Debug", "PlayVfx", "SpawnBeam", "SpawnProjectile", "SpawnArea", "StrikeTarget", "StrikeAllEnemies" };
 		DrawEnumCombo("動作の種類", event.type, types, MagicEventTypeFromString);
 		const char* typeHelp = "ログのみ";
 		switch (event.type) {
@@ -525,6 +548,7 @@ namespace {
 		case MagicEventType::SpawnProjectile: typeHelp = "目標への軌跡＋着弾VFX"; break;
 		case MagicEventType::SpawnArea: typeHelp = "目標位置に範囲VFX"; break;
 		case MagicEventType::StrikeTarget: typeHelp = "目標の上から落雷＋着弾VFX"; break;
+		case MagicEventType::StrikeAllEnemies: typeHelp = "バトル中の全敵へ落雷＋地面衝撃 (power=ダメージ)"; break;
 		default: break;
 		}
 

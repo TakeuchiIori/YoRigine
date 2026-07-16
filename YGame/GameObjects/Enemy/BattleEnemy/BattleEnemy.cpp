@@ -28,6 +28,9 @@ BattleEnemy::~BattleEnemy() {
 	// どの削除経路（撃破 / 全消去 / シーン終了）でも確実に登録解除する
 	BaseObjectManager::GetInstance()->Unregister(this);
 
+	// 燃焼などの付着VFXを取り残さない
+	StopStatusVfx();
+
 	if (obbCollider_) {
 		obbCollider_->~OBBCollider();
 	}
@@ -131,6 +134,7 @@ void BattleEnemy::Update() {
 	// deathTimer もリセットされ続けるため、見た目には何も起きなくなる）
 	if (enemyData_.currentHp_ == 0 && logicalState_ != BattleEnemyState::Dead) {
 		logicalState_ = BattleEnemyState::Dead;
+		StopStatusVfx(); // 死体が燃え続けないように付着VFXを止める
 		PlayDeathEffect();
 		ChangeState(std::make_unique<BattleDeadState>());
 	}
@@ -173,7 +177,8 @@ void BattleEnemy::Update() {
 	// ノックバック更新
 	UpdateKnockback(dt);
 
-
+	// 状態VFX（燃焼など）の追従・寿命更新
+	UpdateStatusVfx(dt);
 
 	// エリア制限補正
 	AreaManager::GetInstance()->UpdateSingleObject(&wt_);
@@ -302,6 +307,48 @@ void BattleEnemy::UpdateKnockback(float dt)
 		knockbackData_.isKnockingBack_ = false;
 		knockbackData_.knockbackPower_ = 0.0f;
 	}
+}
+
+/*==========================================================================
+状態VFX（燃焼など）の付着・追従・停止
+//========================================================================*/
+void BattleEnemy::AttachStatusVfx(const std::string& compositeName, float duration) {
+	if (compositeName.empty() || duration <= 0.0f || !isAlive_) return;
+
+	// 同じVFXの再付着は時間リフレッシュのみ（ループを二重再生しない）
+	if (statusVfx_.IsValid() && statusVfxName_ == compositeName) {
+		statusVfxTimer_ = duration;
+		return;
+	}
+
+	// 別のVFXが付いていたら止めてから付け直す
+	StopStatusVfx();
+	statusVfx_ = EffectHandle::Play(compositeName, wt_.translate_,
+		/*loop*/ true, /*emitCount*/ -1);
+	statusVfxName_ = compositeName;
+	statusVfxTimer_ = duration;
+}
+
+void BattleEnemy::UpdateStatusVfx(float dt) {
+	if (!statusVfx_.IsValid()) return;
+
+	statusVfxTimer_ -= dt;
+	if (statusVfxTimer_ <= 0.0f) {
+		StopStatusVfx();
+		return;
+	}
+	// 本体に追従（少し持ち上げて足元ではなく体に重ねる）
+	Vector3 pos = wt_.translate_;
+	pos.y += 1.0f;
+	statusVfx_.SetPosition(pos);
+}
+
+void BattleEnemy::StopStatusVfx() {
+	if (statusVfx_.IsValid()) {
+		statusVfx_.Stop();
+	}
+	statusVfxName_.clear();
+	statusVfxTimer_ = 0.0f;
 }
 
 /*==========================================================================
