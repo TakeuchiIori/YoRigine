@@ -40,7 +40,6 @@ private:
 		const Vector2& pos, const Vector2& size);
 	// ボタン押下時の共通アニメ（波紋＋拡縮ポップ＋フラッシュ）。A/B と全く同じ挙動。
 	void PlayButtonPress(UIBase* button);
-	void BakeStyleButtonTextures();
 	void ApplyStyleTextures();
 	// 操作表示はUIレイアウトの責務なので、入力スタイルの画像差し替えで
 	// Sprite 側の「テクスチャ実寸に合わせる」都合を外へ漏らさない。

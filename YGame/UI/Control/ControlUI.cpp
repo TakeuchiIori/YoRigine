@@ -7,13 +7,13 @@
 
 void ControlUI::Initialize()
 {
-    BakeStyleButtonTextures();
-
 	// コントロールUI取得
 	button_[0] = YoRigine::UIManager::GetInstance()->GetUI("A_attack");
 	button_[1] = YoRigine::UIManager::GetInstance()->GetUI("B_attack");
 	button_[2] = YoRigine::UIManager::GetInstance()->GetUI("shield");
-    button_[3] = GetOrCreateButton("Y_style", "Resources/Textures/Operation/Y_to_magic.png", { 1405.0f, 687.0f }, { 122.0f, 122.0f });
+    // Y ボタン（スタイル切替）。コントローラのボタン配置に合わせ、A(下)/B(右)/X(左) の
+    // 上に来る「一番上のボタン」の位置(1310,588)に置く。画像は切替を表す ChangeTransform。
+    button_[3] = GetOrCreateButton("Y_style", "Resources/Textures/Operation/ChangeTransform.png", { 1310.0f, 588.0f }, { 122.0f, 122.0f });
     ApplyStyleTextures();
 
 	// 波紋用のUI
@@ -277,43 +277,22 @@ void ControlUI::SetPlayerStyle(PlayerStyle style)
     ApplyStyleTextures();
 }
 
-void ControlUI::BakeStyleButtonTextures()
-{
-    auto bakeLabel = [](const std::string& text, const std::string& path) {
-        if (std::filesystem::exists(path)) return;
-
-        YoRigine::TextBakeParams params;
-        params.text = text;
-        params.fontFilePath = "Resources/Fonts/kurobara-cinderella.ttf";
-        params.fontSize = 56.0f;
-        params.fillColor = { 1.0f, 1.0f, 1.0f, 1.0f };
-        params.outlineWidth = 5.0f;
-        params.outlineColor = { 0.0f, 0.0f, 0.0f, 1.0f };
-        params.padding = 12.0f;
-        YoRigine::TextTextureBaker::Bake(params, path);
-    };
-
-    bakeLabel("A Magic", "Resources/Textures/Operation/A_magic.png");
-    bakeLabel("B Magic", "Resources/Textures/Operation/B_magic.png");
-    bakeLabel("X Magic", "Resources/Textures/Operation/X_magic.png");
-    bakeLabel("Y Magic", "Resources/Textures/Operation/Y_to_magic.png");
-    bakeLabel("Y Sword", "Resources/Textures/Operation/Y_to_sword.png");
-}
-
 void ControlUI::ApplyStyleTextures()
 {
+    // Y ボタン(button_[3])はスタイル切替なので、剣/魔法どちらでも切替を表す ChangeTransform で固定。
+    SetButtonTextureKeepLayout(button_[3], "Resources/Textures/Operation/ChangeTransform.png");
+
     if (currentStyle_ == PlayerStyle::Sword) {
         SetButtonTextureKeepLayout(button_[0], "Resources/Textures/Operation/A_attack.png");
         SetButtonTextureKeepLayout(button_[1], "Resources/Textures/Operation/B_attack.png");
         SetButtonTextureKeepLayout(button_[2], "Resources/Textures/Operation/shield.png");
-        SetButtonTextureKeepLayout(button_[3], "Resources/Textures/Operation/Y_to_magic.png");
         return;
     }
 
-    SetButtonTextureKeepLayout(button_[0], "Resources/Textures/Operation/A_magic.png");
-    SetButtonTextureKeepLayout(button_[1], "Resources/Textures/Operation/B_magic.png");
-    SetButtonTextureKeepLayout(button_[2], "Resources/Textures/Operation/X_magic.png");
-    SetButtonTextureKeepLayout(button_[3], "Resources/Textures/Operation/Y_to_sword.png");
+    // 魔法スタイル: A=主魔法, B=副魔法, X=補助魔法 の位置にアイコン画像を割り当てる。
+    SetButtonTextureKeepLayout(button_[0], "Resources/Textures/Operation/MagicCircle.png");
+    SetButtonTextureKeepLayout(button_[1], "Resources/Textures/Operation/StatusFire.png");
+    SetButtonTextureKeepLayout(button_[2], "Resources/Textures/Operation/StatusLightning.png");
 }
 
 void ControlUI::SetButtonTextureKeepLayout(UIBase* button, const std::string& texturePath)

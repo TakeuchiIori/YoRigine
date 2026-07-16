@@ -15,8 +15,8 @@
     "layer": 1,
     "name": "Y_style",
     "position": {
-        "x": 1405.0,
-        "y": 687.0,
+        "x": 1310.0,
+        "y": 588.0,
         "z": 0.0
     },
     "rotation": {
@@ -36,7 +36,7 @@
         "x": 0.0,
         "y": 0.0
     },
-    "texturePath": "Resources/Textures/Operation/Y_to_magic.png",
+    "texturePath": "Resources/Textures/Operation/ChangeTransform.png",
     "textureSize": {
         "x": 189.0,
         "y": 111.0
