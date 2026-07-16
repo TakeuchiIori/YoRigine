@@ -47,4 +47,8 @@ private:
 	bool previousHeld_[3] = {};
 	int comboIndices_[3] = {};
 	float comboTimers_[3] = {};
+
+	// 魔法の全身詠唱アニメ（Once）は再生後に最終フレームで固まる。終了を検知して
+	// Movement ステート（走り／歩き／待機）へアニメを戻すための待機フラグ。
+	bool waitingCastAnimEnd_ = false;
 };

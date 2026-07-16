@@ -138,6 +138,7 @@ void PlayerShield::SetPlayerWeaponPosition() {
 // 描画処理
 // ============================================================
 void PlayerShield::Draw() {
+	if (!isVisible_) return;
 	if (obj_) {
 		obj_->Draw(camera_, wt_);
 	}
@@ -148,6 +149,7 @@ void PlayerShield::Draw() {
 // ============================================================
 void PlayerShield::DrawShadow()
 {
+	if (!isVisible_) return;
 	if (obj_) {
 		obj_->DrawShadow(wt_);
 	}

@@ -50,6 +50,12 @@ void PlayerSword::Initialize(Camera* camera) {
 	wt_.Initialize();
 	colliderWT_.Initialize();
 
+	// 魔法スタイル時の見た目（杖）。剣と同じ手ジョイントに追従させる。
+	staffObj_ = std::make_unique<Object3d>();
+	staffObj_->Initialize();
+	staffObj_->SetModel("Staff.obj");
+	staffWT_.Initialize();
+
 	// ------------------------------------------------------------
 	// プレイヤーの手ジョイントを探索し、剣を接続
 	// ------------------------------------------------------------
@@ -130,15 +136,28 @@ void PlayerSword::FindHandJointIndex() {
 }
 
 // ============================================================
-// 手ジョイントの相対位置に剣を配置
+// 手ジョイントの相対位置に武器（剣・杖）を配置
 // ============================================================
 void PlayerSword::SetPlayerWeaponPosition() {
 	if (!obj3d_ || !isValidJoint_) return;
 
+	// 剣（近接コライダー・トレイルは wt_ に紐づくので常に更新しておく）
 	wt_.translate_ = offsetPos_;
 	wt_.rotate_ = offsetRot_;
 	wt_.scale_ = offsetScale_;
+	wt_.matWorld_ = ComposeWeaponMatrixFromHand(offsetPos_, offsetRot_, offsetScale_);
 
+	// 杖（魔法スタイル時に描画。中央原点前提のオフセットで手に合わせる）
+	staffWT_.translate_ = staffOffsetPos_;
+	staffWT_.rotate_ = staffOffsetRot_;
+	staffWT_.scale_ = staffOffsetScale_;
+	staffWT_.matWorld_ = ComposeWeaponMatrixFromHand(staffOffsetPos_, staffOffsetRot_, staffOffsetScale_);
+}
+
+// ============================================================
+// 手ジョイントを基準にオフセットからワールド行列を組む共通処理
+// ============================================================
+Matrix4x4 PlayerSword::ComposeWeaponMatrixFromHand(const Vector3& pos, const Vector3& rot, const Vector3& scale) const {
 	WorldTransform& handWT = obj3d_
 		->GetModel()
 		->GetSkeleton()
@@ -146,8 +165,8 @@ void PlayerSword::SetPlayerWeaponPosition() {
 		.GetWorldTransform();
 
 	const Matrix4x4 handNoScale = RemoveScaleFromMatrix(handWT.matWorld_);
-	const Matrix4x4 weaponMatrix = MakeAffineMatrix(wt_.scale_, wt_.rotate_, wt_.translate_);
-	wt_.matWorld_ = Multiply(weaponMatrix, handNoScale);
+	const Matrix4x4 weaponMatrix = MakeAffineMatrix(scale, rot, pos);
+	return Multiply(weaponMatrix, handNoScale);
 }
 
 // ============================================================
@@ -201,8 +220,12 @@ Vector3 PlayerSword::GetWowldPosition()
 // 描画処理
 // ============================================================
 void PlayerSword::Draw() {
-	if (obj_) {
-		obj_->Draw(camera_, wt_);
+	// 魔法スタイルなら杖、それ以外は剣を描画する。
+	if (isMagicVisual_) {
+		if (staffObj_) staffObj_->Draw(camera_, staffWT_);
+	}
+	else {
+		if (obj_) obj_->Draw(camera_, wt_);
 	}
 }
 
@@ -211,8 +234,11 @@ void PlayerSword::Draw() {
 // ============================================================
 void PlayerSword::DrawShadow()
 {
-	if (obj_) {
-		obj_->DrawShadow(wt_);
+	if (isMagicVisual_) {
+		if (staffObj_) staffObj_->DrawShadow(staffWT_);
+	}
+	else {
+		if (obj_) obj_->DrawShadow(wt_);
 	}
 }
 
@@ -229,6 +255,8 @@ void PlayerSword::DrawCollision() {
 // 剣の残像エフェクト描画
 // ============================================================
 void PlayerSword::DrawVfx() {
+	// 剣の軌跡は剣スタイルのときだけ描画する（杖表示中は出さない）。
+	if (isMagicVisual_) return;
 	if (trailEmitter_) {
 		trailEmitter_->Draw();
 	}
@@ -333,6 +361,14 @@ void PlayerSword::InitJson() {
 	jsonManager_->Register("Offset Position", &offsetPos_);
 	jsonManager_->Register("Offset Rotation", &offsetRot_);
 	jsonManager_->Register("Offset Scale", &offsetScale_);
+
+	// ------------------------------------------------------------
+	// 杖（魔法スタイル）オフセット。中央原点モデルを手のグリップに合わせる用。
+	// ------------------------------------------------------------
+	jsonManager_->SetTreePrefix("Staff");
+	jsonManager_->Register("Staff Offset Position", &staffOffsetPos_);
+	jsonManager_->Register("Staff Offset Rotation", &staffOffsetRot_);
+	jsonManager_->Register("Staff Offset Scale", &staffOffsetScale_);
 
 	// ------------------------------------------------------------
 	// カラー情報

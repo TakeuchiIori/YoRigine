@@ -60,6 +60,12 @@ public:
 
 	void SetisDrawTrail(bool isDraw) { isDrawTrail_ = isDraw; }
 
+	// スタイルに応じた見た目の切替。魔法スタイルなら杖(Staff)、剣スタイルなら剣を描画する。
+	// 当たり判定(剣の近接OBB)はどちらの見た目でも wt_ に紐づいたまま。魔法時は
+	// PlayerCombat が近接コライダーを有効化しないため、実質そのまま無害。
+	void SetMagicVisual(bool magic) { isMagicVisual_ = magic; }
+	bool IsMagicVisual() const { return isMagicVisual_; }
+
 private:
 	// ============================================================
 	// 内部処理
@@ -70,6 +76,9 @@ private:
 
 	void FindHandJointIndex();
 	void SetPlayerWeaponPosition();
+	// 手ジョイントを基準に、与えたオフセットからワールド行列を組む共通処理。
+	// 剣(wt_)・杖(staffWT_)の両方をこれで配置する。
+	Matrix4x4 ComposeWeaponMatrixFromHand(const Vector3& pos, const Vector3& rot, const Vector3& scale) const;
 	void UpdateColliderWorldTransform();
 	Vector3 GetHandPosition();
 	Vector3 ExtractTranslation(const Matrix4x4& matrix);
@@ -105,6 +114,18 @@ private:
 	Vector3 offsetRot_{};                                // 手からの回転オフセット
 	Vector3 offsetScale_{ 1.0f,1.0f,1.0f };              // 剣のスケール
 	Matrix4x4 finalMatrix_;                              // 計算済みの最終的なワールド行列
+
+	// ------------------------------------------------------------
+	// 杖（魔法スタイル時の見た目）関連
+	//   Blender で中央原点エクスポートされているため、手のグリップに合わせる
+	//   オフセットは剣とは別に持たせて JSON で調整できるようにする。
+	// ------------------------------------------------------------
+	std::unique_ptr<Object3d> staffObj_;                 // 杖モデル（Staff.obj）
+	WorldTransform staffWT_;                             // 杖用の独立したワールド変換
+	Vector3 staffOffsetPos_{};                           // 手からの位置オフセット（中央原点前提で調整）
+	Vector3 staffOffsetRot_{};                           // 手からの回転オフセット
+	Vector3 staffOffsetScale_{ 1.0f,1.0f,1.0f };         // 杖のスケール
+	bool isMagicVisual_ = false;                         // true の間は剣ではなく杖を描画する
 
 	// ------------------------------------------------------------
 	// トレイル（剣の軌跡）関連

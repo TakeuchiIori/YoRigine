@@ -212,6 +212,16 @@ void Player::Update() {
 	// 入力処理
 	HandleCombatInput();
 
+	// スタイルに応じて武器の見た目（剣／杖）を同期する。
+	const bool isMagicStyle = styleController_ && styleController_->IsMagic();
+	if (playerSword_) {
+		playerSword_->SetMagicVisual(isMagicStyle);
+	}
+	// 魔法スタイルでは防御できないので盾を外す（表示・判定とも）。
+	if (playerShield_) {
+		playerShield_->SetVisible(!isMagicStyle);
+	}
+
 	// HPチェック
 	if (hp_ <= 0) {
 		isAlive_ = false;
@@ -233,8 +243,8 @@ void Player::Update() {
 	//------------------------------------------------------------
 	// 生存時処理
 	//------------------------------------------------------------
-	// 盾のコライダーON/OFF制御
-	if (combat_->GetCurrentState() == CombatState::Guarding) {
+	// 盾のコライダーON/OFF制御（魔法スタイルでは防御しないので常に無効）
+	if (!isMagicStyle && combat_->GetCurrentState() == CombatState::Guarding) {
 		playerShield_->SetEnableCollider(true);
 	}
 	else {

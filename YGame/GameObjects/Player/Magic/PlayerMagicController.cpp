@@ -3,6 +3,7 @@
 #include "MagicActionDatabase.h"
 #include "../Player.h"
 #include "../Combat/PlayerCombat.h"
+#include "../Movement/PlayerMovement.h"
 
 #include <algorithm>
 
@@ -19,6 +20,26 @@ PlayerMagicController::PlayerMagicController(Player* owner)
 void PlayerMagicController::Update(float deltaTime)
 {
 	runner_.Update(deltaTime);
+
+	// 詠唱の全身アニメ（Once）が終わったら、Movement ステートに応じたアニメ
+	// （走り／歩き／待機）へ戻す。これをしないと走行中でも最終フレームで固まる。
+	if (waitingCastAnimEnd_ && owner_) {
+		PlayerCombat* combat = owner_->GetCombat();
+		if (combat && !combat->IsIdle()) {
+			// 被弾・スタン等で戦闘ステートが割り込んだ場合は、そのステート側の
+			// 復帰（OnExit の SyncAnimationToCurrentState）に任せる。
+			waitingCastAnimEnd_ = false;
+		}
+		else if (!runner_.IsRunning()) {
+			Object3d* obj = owner_->GetObject3d();
+			Model* model = obj ? obj->GetModel() : nullptr;
+			auto* motion = model ? model->GetMotionSystem() : nullptr;
+			if (motion && motion->IsFinished()) {
+				owner_->GetMovement()->SyncAnimationToCurrentState();
+				waitingCastAnimEnd_ = false;
+			}
+		}
+	}
 
 	for (int i = 0; i < 3; ++i) {
 		if (comboTimers_[i] <= 0.0f) continue;
@@ -44,6 +65,7 @@ void PlayerMagicController::Reset()
 	runner_.Reset();
 	activeAttacks_.clear();
 	hasPendingChargeAction_ = false;
+	waitingCastAnimEnd_ = false;
 	for (bool& held : previousHeld_) {
 		held = false;
 	}
@@ -118,6 +140,8 @@ bool PlayerMagicController::BeginCast(const MagicActionData& action)
 	if (owner_ && owner_->GetObject3d() && !action.animationName.empty()) {
 		owner_->GetObject3d()->SetMotionSpeed(1.0f);
 		owner_->GetObject3d()->SetChangeMotion("Player.gltf", MotionPlayMode::Once, action.animationName);
+		// この Once アニメが終わったら Movement 側のアニメ（走り等）へ戻す。
+		waitingCastAnimEnd_ = true;
 	}
 	return true;
 }
