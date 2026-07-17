@@ -102,15 +102,23 @@ void NavGrid::Bake(ObjectManager* objectManager) {
         AABB worldAabb{};
         bool isShapeOk = false;
 
-        // AABBCollider
-        if (auto* aabb = dynamic_cast<AABBCollider*>(obj->collider.get())) {
+        // 形状ベースの静的ディスパッチ (dynamic_cast は使わない方針)
+        switch (obj->collider->GetShape()) {
+        case ColliderShape::AABB: {
+            const auto* aabb = static_cast<AABBCollider*>(obj->collider.get());
             worldAabb = aabb->GetAABB();
             isShapeOk = true;
+            break;
         }
-        // OBBCollider — 回転を考慮してバウンディングAABBを計算してマーク
-        else if (auto* obb = dynamic_cast<OBBCollider*>(obj->collider.get())) {
+        case ColliderShape::OBB: {
+            // 回転を考慮してバウンディングAABBを計算してマーク
+            const auto* obb = static_cast<OBBCollider*>(obj->collider.get());
             worldAabb = ComputeAABBFromOBB(obb->GetOBB());
             isShapeOk = true;
+            break;
+        }
+        default:
+            break;
         }
 
         if (!isShapeOk) {

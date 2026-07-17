@@ -1,0 +1,63 @@
+{
+  "name": "FxFireBoltCore",
+  "useTrail": false,
+  "motions": [],
+  "subEffects": [
+    {
+      "enabled": true,
+      "label": "火球本体",
+      "type": 1,
+      "offset": { "x": 0.0, "y": 0.0, "z": 0.0 },
+      "smoke": {
+        "builtInBurstMotion": false,
+        "color": { "x": 2.4, "y": 1.0, "z": 0.26, "w": 1.0 },
+        "smokeColor": { "x": 0.25, "y": 0.08, "z": 0.02, "w": 0.3 },
+        "riseSpeed": 0.0,
+        "radius": 0.45,
+        "noiseScale": 6.0,
+        "noiseStrength": 1.35,
+        "scrollSpeed": 3.4,
+        "fresnelPower": 2.0,
+        "density": 1.4,
+        "noiseOctaves": 3.0,
+        "rimIntensity": 3.2,
+        "isEnable": true
+      },
+      "motions": [
+        {
+          "type": 3, "target": 0, "ease": 0,
+          "startTime": 0.0, "window": 0.0,
+          "duration": 2.0,
+          "velocity": { "x": 0.0, "y": 0.0, "z": 0.0 },
+          "acceleration": { "x": 0.0, "y": 0.0, "z": 0.0 },
+          "amplitude": 0.1, "frequency": 3.6,
+          "scaleStart": 0.0, "scaleEnd": 1.0,
+          "colorStart": { "x": 1.0, "y": 1.0, "z": 1.0, "w": 1.0 },
+          "colorEnd": { "x": 1.0, "y": 1.0, "z": 1.0, "w": 1.0 },
+          "fadeIn": 0.1, "fadeOut": 0.3
+        }
+      ]
+    },
+    {
+      "enabled": true,
+      "label": "弾グロー",
+      "type": 0,
+      "offset": { "x": 0.0, "y": 0.0, "z": 0.0 },
+      "lightVolume": {
+        "halfExtents": { "x": 1.0, "y": 1.0, "z": 1.0 },
+        "color": { "x": 1.3, "y": 0.55, "z": 0.15, "w": 0.12 },
+        "intensity": 1.0,
+        "edgeFade": 0.4,
+        "depthFade": 1.0,
+        "noiseTiling": 2.0,
+        "noiseStrength": 0.0,
+        "beamStrength": 0.0,
+        "beamRadius": 0.35,
+        "beamPower": 2.0,
+        "beamGlow": 1.0,
+        "isEnable": true
+      },
+      "motions": []
+    }
+  ]
+}

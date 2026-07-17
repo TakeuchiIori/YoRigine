@@ -14,6 +14,7 @@
 #include "Vector3.h"
 
 class Object3dCommon;
+class OffScreen;
 
 namespace YoRigine {
     class JsonManager;
@@ -99,7 +100,16 @@ namespace YoRigine {
     public:
         ///************************* 基本関数 *************************///
         static LightManager* GetInstance();
+
+        // ============================================================
+        // 依存先マネージャの注入 (DI)
+        //   所有はしない (借用のみ)。Finalize() で nullptr に戻すのでダングリングポインタは残らない。
+        //   Initialize() より前に呼ぶこと。
+        // ============================================================
+        void SetOffScreen(OffScreen* offScreen) { offScreen_ = offScreen; }
+
         void Initialize();
+        void Finalize();
         void TransferData();
         void UpdateShadowMatrix(Camera* camera);
 
@@ -210,6 +220,9 @@ namespace YoRigine {
         Object3dCommon* object3dCommon_ = nullptr;
         Camera* camera_ = nullptr;
         ShadowMapSettings shadowMapSettings_;
+
+        // 依存先マネージャ (借用のみ・非所有)。使用前に SetOffScreen() で注入すること。
+        OffScreen* offScreen_ = nullptr;
 
         // ShadowMapSettings の JSON 永続化用
         std::unique_ptr<JsonManager> shadowJson_;

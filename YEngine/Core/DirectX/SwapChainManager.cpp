@@ -5,6 +5,8 @@
 #include "CommandManager.h"
 #include "WinApp/WinApp.h"
 
+namespace YoRigine {
+
 /// <summary>
 /// スワップチェーンの初期化
 /// </summary>
@@ -65,3 +67,5 @@ void SwapChainManager::CreateSwapChain()
 		assert(SUCCEEDED(hr));
 	}
 }
+
+} // namespace YoRigine

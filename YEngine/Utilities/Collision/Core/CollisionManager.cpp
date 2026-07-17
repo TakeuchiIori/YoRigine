@@ -266,7 +266,9 @@ namespace YoRigine {
 			// 一括適用
 			for (auto& kv : accum) {
 				BaseCollider* c = kv.first;
-				const Vector3& disp = kv.second;
+				Vector3 disp = kv.second;
+				// 地面上で動くキャラは押し戻しで上下に浮かないよう水平成分のみ適用
+				if (c->GetLockPenetrationY()) disp.y = 0.0f;
 				WorldTransform* wt = c->GetWT();
 				if (!wt) continue;
 				wt->translate_ += disp;
@@ -332,6 +334,42 @@ namespace YoRigine {
 		default:
 			return AABB{};
 		}
+	}
+
+	// ============================================================
+	// 一時オーバーラップクエリ
+	//   持続コライダーを登録せず、colliders_ を線形走査して
+	//   「今この瞬間、球の範囲に重なっているコライダー」を返すだけの一回限りの検索。
+	//   Enter/Exit・接触猶予・CCD 等は一切関与しない。
+	// ============================================================
+	std::vector<BaseCollider*> CollisionManager::QuerySphere(const Vector3& center, float radius,
+		uint32_t layerMask, const std::vector<uint32_t>& ignoreTypeIDs) const {
+
+		std::vector<BaseCollider*> result;
+		const Sphere querySphere{ center, radius };
+
+		for (BaseCollider* c : colliders_) {
+			if (!c) continue;
+			if (!c->GetIsActive() || !c->IsCollisionEnabled()) continue;
+			if ((c->GetLayerBits() & layerMask) == 0) continue;
+
+			if (!ignoreTypeIDs.empty()) {
+				bool ignored = false;
+				for (uint32_t id : ignoreTypeIDs) {
+					if (c->GetTypeID() == id) { ignored = true; break; }
+				}
+				if (ignored) continue;
+			}
+
+			// 精密形状ではなく AABB 近似で判定する（QuerySphere は「だいたいこの範囲」の
+			// 一括検索用途なので、形状ごとの厳密判定より簡潔さ・安全さを優先する）。
+			const AABB worldAABB = ComputeWorldAABB(c);
+			if (Intersection::IsCollision(querySphere, worldAABB)) {
+				result.push_back(c);
+			}
+		}
+
+		return result;
 	}
 
 	// ============================================================
@@ -497,8 +535,24 @@ namespace YoRigine {
 	void CollisionManager::RemoveCollider(BaseCollider* collider) {
 		if (!collider) return;
 		if (isIterating_) {
-			// 走査中の削除は遅延。即座に erase すると走査ループを壊す。
-			pendingRemoves_.push_back(collider);
+			// 走査中に実体が破棄される場合があるため、参照はこの場で即座に潰す。
+			// pendingRemoves_ に raw pointer を積むと、同フレーム中に ColliderPool が同じ番地を
+			// 再利用した時、新しく生成された collider まで後段 Flush で消してしまう。
+			// そのため「後で消す」のではなく、走査中の配列上では nullptr 化して無効化だけ行う。
+			for (BaseCollider*& c : colliders_) {
+				if (c == collider) c = nullptr;
+			}
+			for (auto& pair : broadPhasePairsScratch_) {
+				if (pair.first == collider) pair.first = nullptr;
+				if (pair.second == collider) pair.second = nullptr;
+			}
+			for (auto it = collidingPairs_.begin(); it != collidingPairs_.end(); ) {
+				if (it->first.first == collider || it->first.second == collider) {
+					it = collidingPairs_.erase(it);
+				} else {
+					++it;
+				}
+			}
 			return;
 		}
 		DoRemove(collider);
@@ -535,6 +589,7 @@ namespace YoRigine {
 			}
 		}
 		pendingAdds_.clear();
+		colliders_.erase(std::remove(colliders_.begin(), colliders_.end(), nullptr), colliders_.end());
 	}
 
 	bool CollisionManager::RaycastMasked(const Ray& ray, float maxDistance, uint32_t layerMask, RaycastHit* outHit)
@@ -570,6 +625,34 @@ namespace YoRigine {
 				auto it = std::find(ignoreTypeIDs.begin(), ignoreTypeIDs.end(), collider->GetTypeID());
 				if (it != ignoreTypeIDs.end()) continue;
 			}
+
+			bool isHit = DispatchRay(ray, collider, &tempHit);
+
+			if (isHit && tempHit.distance <= 0.001f) continue; // 至近距離無視
+			if (isHit && tempHit.distance <= closestDistance) {
+				closestDistance = tempHit.distance;
+				if (outHit) *outHit = tempHit;
+				hitAnything = true;
+			}
+		}
+
+		return hitAnything;
+	}
+
+	bool CollisionManager::RaycastAllowTypes(const Ray& ray, float maxDistance, RaycastHit* outHit, const std::vector<uint32_t>& allowTypeIDs)
+	{
+		if (allowTypeIDs.empty()) return false;
+
+		bool hitAnything = false;
+		float closestDistance = maxDistance;
+		RaycastHit tempHit;
+
+		for (BaseCollider* collider : colliders_) {
+			if (!collider || !collider->GetIsActive() || !collider->IsCollisionEnabled()) continue;
+
+			// 許可リストに無い型は素通り (壁だけ拾う等)
+			auto it = std::find(allowTypeIDs.begin(), allowTypeIDs.end(), collider->GetTypeID());
+			if (it == allowTypeIDs.end()) continue;
 
 			bool isHit = DispatchRay(ray, collider, &tempHit);
 

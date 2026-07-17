@@ -13,6 +13,7 @@
 
 #include <Systems/Animation/ObjectAnimation.h>
 #include "Particle/YEmitterGroup.h"
+#include "Particle/EffectHandle.h"
 
 class Player;
 
@@ -202,6 +203,12 @@ public:
 	void StartKnockback(const Vector3& direction, float power, float duration);
 	void UpdateKnockback(float dt);
 
+	// 状態VFXの付着（燃焼・感電など）。Composite名をループ再生して自分に追従させ、
+	// duration 秒後（または死亡時）に自動停止する。再付着は時間をリフレッシュする。
+	void AttachStatusVfx(const std::string& compositeName, float duration);
+	void UpdateStatusVfx(float dt);
+	void StopStatusVfx();
+
 	///************************* デバッグ用 *************************///
 
 	// ダメージを与える
@@ -243,6 +250,11 @@ private:
 	// ダメージ点滅管理
 	float blinkTimer_ = 0.0f;
 	bool isDamageBlinking_ = false;
+
+	// 状態VFX（燃焼など）。ループ再生ハンドルと残り時間。
+	EffectHandle statusVfx_;
+	float statusVfxTimer_ = 0.0f;
+	std::string statusVfxName_;
 
 	// 点滅スピード
 	float blinkSpeed_ = 50.0f;

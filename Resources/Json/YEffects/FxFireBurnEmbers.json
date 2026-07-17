@@ -1,0 +1,31 @@
+{
+  "groups": [
+    {
+      "emitters": [
+        { "autoEmit": false, "emissionRate": 16.0, "emitCount": 8, "offsetX": 0.0, "offsetY": -0.2, "offsetZ": 0.0, "shapeType": 0, "systemName": "FxFireBurnEmbersSystem" }
+      ],
+      "groupName": "FxFireBurnEmbers", "isActive": true, "position": [0.0, 0.0, 0.0]
+    }
+  ],
+  "systems": [
+    {
+      "BlendMode": 2, "Lighting": false, "billboardType": 1, "isRelative": false, "maxParticles": 512,
+      "mesh": { "params": [1.0, 1.0, 1.0, 16.0], "type": 0 },
+      "name": "FxFireBurnEmbersSystem",
+      "texture": "Resources/Effects/starSmall.png",
+      "spawnModules": [
+        { "data": { "minScale": { "x": 0.04, "y": 0.04, "z": 0.04 }, "maxScale": { "x": 0.1, "y": 0.1, "z": 0.1 } }, "name": "火の粉サイズ", "type": "SpawnRandomScale" },
+        { "data": { "colorA": [1.2, 0.35, 0.03, 1.0], "colorB": [1.7, 0.95, 0.2, 1.0] }, "name": "火の粉色", "type": "SpawnColorRange" },
+        { "data": { "minVelocity": { "x": -0.6, "y": 1.0, "z": -0.6 }, "maxVelocity": { "x": 0.6, "y": 2.6, "z": 0.6 } }, "name": "舞い上がり", "type": "SpawnVelocity" },
+        { "data": { "minLifeTime": 0.9, "maxLifeTime": 1.4 }, "name": "浮遊寿命", "type": "SpawnLifeTime" }
+      ],
+      "updateModules": [
+        { "data": { "isRandom": true, "velocity": { "x": 0.0, "y": 0.0, "z": 0.0 } }, "name": "移動", "type": "UpdateVelocity" },
+        { "data": { "strength": 2.2, "frequency": 1.8, "speed": 1.3 }, "name": "熱気流", "type": "UpdateTurbulence" },
+        { "data": { "dragCoefficient": 0.8 }, "name": "減速", "type": "UpdateDrag" },
+        { "data": { "startScale": 1.0, "endScale": 0.1, "useCurve": true }, "name": "燃え尽き", "type": "UpdateSizeOverLifetime" },
+        { "data": { "fadeStart": 0.55, "fadeEnd": 1.0 }, "name": "自然消滅", "type": "UpdateFadeOut" }
+      ]
+    }
+  ]
+}

@@ -29,6 +29,7 @@ void GPUParticle::Initialize(const std::string& filepath, Camera* camera)
 	CreatePerViewResource();
 
 	CreateUAV();
+	CreateDrawIndirectResources();
 	CreateGPUParticleResource();
 	CreateTexture();
 
@@ -66,10 +67,10 @@ void GPUParticle::Initialize(const std::string& filepath, Camera* camera)
 /// <summary>
 /// 毎フレーム更新
 /// </summary>
-void GPUParticle::Update(ID3D12Resource* resource, ID3D12Resource* paramsResource)
+void GPUParticle::Update(ID3D12Resource* resource, ID3D12Resource* paramsResource, D3D12_GPU_DESCRIPTOR_HANDLE forceFieldSrv, bool trailEnabled)
 {
 	UpdatePerView();
-	DispatchUpdate(resource,paramsResource);
+	DispatchUpdate(resource, paramsResource, forceFieldSrv, trailEnabled);
 
 	auto commandList = dxCommon_->GetCommandList();
 
@@ -95,12 +96,13 @@ void GPUParticle::Update(ID3D12Resource* resource, ID3D12Resource* paramsResourc
 		activeCountReadback_->Unmap(0, nullptr);
 	}
 
-	// cachedStats_ 側に反映
+	// cachedStats_ 側に反映（GPU側カウンタが万一壊れても表示が数十億に化けないようクランプ）
+	const uint32_t clampedActive = std::min(cachedActiveCount_, kMaxParticles);
 	cachedStats_.maxParticles = kMaxParticles;
-	cachedStats_.activeCount = cachedActiveCount_;
-	cachedStats_.freeCount = kMaxParticles - cachedActiveCount_;
+	cachedStats_.activeCount = clampedActive;
+	cachedStats_.freeCount = kMaxParticles - clampedActive;
 	cachedStats_.usagePercent =
-		(float)cachedStats_.activeCount / (float)kMaxParticles * 100.0f;
+		(float)clampedActive / (float)kMaxParticles * 100.0f;
 	cachedStats_.isValid = true;
 }
 
@@ -139,13 +141,35 @@ void GPUParticle::Draw()
 	// マテリアル
 	materialUV_->RecordDrawCommands(commandList.Get(), indices.at("gMaterialUV"));
 	materialColor_->RecordDrawCommands(commandList.Get(), indices.at("gMaterialColor"));
-	commandList->SetGraphicsRootDescriptorTable(indices.at("g_Particles"), particleSrvHandleGPU_);
-	SrvManager::GetInstance()->SetGraphicsRootDescriptorTable(indices.at("gTexture"), textureIndexSRV_);
+	// SoA: hot(t0)+warm(t1)+drawList(t2) を VS へ。生存スロットのみ描画・scale/colorは VS で lerp 導出
+	commandList->SetGraphicsRootDescriptorTable(indices.at("g_Hot"), particleSrvHandleGPU_);
+	commandList->SetGraphicsRootDescriptorTable(indices.at("g_Warm"), warmSrvHandleGPU_);
+	commandList->SetGraphicsRootDescriptorTable(indices.at("g_DrawList"), drawListSrvHandleGPU_);
+	YoRigine::SrvManager::GetInstance()->SetGraphicsRootDescriptorTable(indices.at("gTexture"), textureIndexSRV_);
 
 	//-----------------------------------------
-	// 描画
+	// インダイレクト描画: DrawList を VS 読み取り状態へ、DrawArgs を間接引数状態へ遷移し、
+	// 生存粒子数（drawArgs[1]=InstanceCount）ぶんだけ描画する。
 	//-----------------------------------------
-	commandList->DrawIndexedInstanced(mesh_->GetIndexCount(), kMaxParticles, 0, 0, 0);
+	dxCommon_->TransitionBarrier(
+		drawListResource_.Get(),
+		D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+		D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER
+	);
+	dxCommon_->TransitionBarrier(
+		drawArgsResource_.Get(),
+		D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+		D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT
+	);
+
+	commandList->ExecuteIndirect(
+		drawIndirectCmdSig_.Get(),
+		1,                          // 最大コマンド数（DrawIndexedInstancedIndirect 1本）
+		drawArgsResource_.Get(),    // 引数バッファ（先頭に D3D12_DRAW_INDEXED_ARGUMENTS）
+		0,
+		nullptr,
+		0
+	);
 }
 
 void GPUParticle::Reset()
@@ -167,69 +191,147 @@ void GPUParticle::Reset()
 void GPUParticle::CreateUAV()
 {
 	//-----------------------------------------
-	// Particle UAV
+	// Hot UAV (u0)
 	//-----------------------------------------
-	uavIndex_ = SrvManager::GetInstance()->Allocate();
+	uavIndex_ = YoRigine::SrvManager::GetInstance()->Allocate();
 
-	particleResource_ = dxCommon_->CreateBufferResourceUAV(sizeof(ParticleCSForGPU) * kMaxParticles);
+	particleResource_ = dxCommon_->CreateBufferResourceUAV(sizeof(ParticleHotGPU) * kMaxParticles);
 
-	SrvManager::GetInstance()->CreateUAVForStructuredBuffer(
+	YoRigine::SrvManager::GetInstance()->CreateUAVForStructuredBuffer(
 		uavIndex_,
 		particleResource_.Get(),
 		kMaxParticles,
-		sizeof(ParticleCSForGPU)
+		sizeof(ParticleHotGPU)
 	);
 
-	particleUavHandleGPU_ = SrvManager::GetInstance()->GetGPUDescriptorHandle(uavIndex_);
+	particleUavHandleGPU_ = YoRigine::SrvManager::GetInstance()->GetGPUDescriptorHandle(uavIndex_);
+
+	//-----------------------------------------
+	// Warm UAV (u4)
+	//-----------------------------------------
+	warmUavIndex_ = YoRigine::SrvManager::GetInstance()->Allocate();
+
+	warmResource_ = dxCommon_->CreateBufferResourceUAV(sizeof(ParticleWarmGPU) * kMaxParticles);
+
+	YoRigine::SrvManager::GetInstance()->CreateUAVForStructuredBuffer(
+		warmUavIndex_,
+		warmResource_.Get(),
+		kMaxParticles,
+		sizeof(ParticleWarmGPU)
+	);
+
+	warmUavHandleGPU_ = YoRigine::SrvManager::GetInstance()->GetGPUDescriptorHandle(warmUavIndex_);
+
+	//-----------------------------------------
+	// Cold UAV (u5)
+	//-----------------------------------------
+	coldUavIndex_ = YoRigine::SrvManager::GetInstance()->Allocate();
+
+	coldResource_ = dxCommon_->CreateBufferResourceUAV(sizeof(ParticleColdGPU) * kMaxParticles);
+
+	YoRigine::SrvManager::GetInstance()->CreateUAVForStructuredBuffer(
+		coldUavIndex_,
+		coldResource_.Get(),
+		kMaxParticles,
+		sizeof(ParticleColdGPU)
+	);
+
+	coldUavHandleGPU_ = YoRigine::SrvManager::GetInstance()->GetGPUDescriptorHandle(coldUavIndex_);
 
 	//-----------------------------------------
 	// FreeListIndex UAV
 	//-----------------------------------------
-	freeListIndexUavIndex_ = SrvManager::GetInstance()->Allocate();
+	freeListIndexUavIndex_ = YoRigine::SrvManager::GetInstance()->Allocate();
 
 	freeListIndexResource_ = dxCommon_->CreateBufferResourceUAV(sizeof(int32_t));
 
-	SrvManager::GetInstance()->CreateUAVForStructuredBuffer(
+	YoRigine::SrvManager::GetInstance()->CreateUAVForStructuredBuffer(
 		freeListIndexUavIndex_,
 		freeListIndexResource_.Get(),
 		1,
 		sizeof(int32_t)
 	);
 
-	freeListIndexUavHandleGPU_ = SrvManager::GetInstance()->GetGPUDescriptorHandle(freeListIndexUavIndex_);
+	freeListIndexUavHandleGPU_ = YoRigine::SrvManager::GetInstance()->GetGPUDescriptorHandle(freeListIndexUavIndex_);
 
 	//-----------------------------------------
 	// FreeList UAV
 	//-----------------------------------------
-	freeListUavIndex_ = SrvManager::GetInstance()->Allocate();
+	freeListUavIndex_ = YoRigine::SrvManager::GetInstance()->Allocate();
 
 	freeListResource_ = dxCommon_->CreateBufferResourceUAV(sizeof(uint32_t) * kMaxParticles);
 
-	SrvManager::GetInstance()->CreateUAVForStructuredBuffer(
+	YoRigine::SrvManager::GetInstance()->CreateUAVForStructuredBuffer(
 		freeListUavIndex_,
 		freeListResource_.Get(),
 		kMaxParticles,
 		sizeof(uint32_t)
 	);
 
-	freeListUavHandleGPU_ = SrvManager::GetInstance()->GetGPUDescriptorHandle(freeListUavIndex_);
+	freeListUavHandleGPU_ = YoRigine::SrvManager::GetInstance()->GetGPUDescriptorHandle(freeListUavIndex_);
 
 	//-----------------------------------------
 	// ActiveCount UAV
 	//-----------------------------------------
-	activeCountUavIndex_ = SrvManager::GetInstance()->Allocate();
+	activeCountUavIndex_ = YoRigine::SrvManager::GetInstance()->Allocate();
 
 	activeCountResource_ = dxCommon_->CreateBufferResourceUAV(sizeof(uint32_t));
 
-	SrvManager::GetInstance()->CreateUAVForStructuredBuffer(
+	YoRigine::SrvManager::GetInstance()->CreateUAVForStructuredBuffer(
 		activeCountUavIndex_,
 		activeCountResource_.Get(),
 		1,
 		sizeof(uint32_t)
 	);
 
-	activeCountUavHandleGPU_ = SrvManager::GetInstance()->GetGPUDescriptorHandle(activeCountUavIndex_);
+	activeCountUavHandleGPU_ = YoRigine::SrvManager::GetInstance()->GetGPUDescriptorHandle(activeCountUavIndex_);
 
+}
+
+/// <summary>
+/// インダイレクト描画用リソース生成（生存粒子だけを描画するためのコンパクトリスト＋描画引数＋コマンドシグネチャ）
+/// </summary>
+void GPUParticle::CreateDrawIndirectResources()
+{
+	auto* srv = YoRigine::SrvManager::GetInstance();
+
+	//-----------------------------------------
+	// DrawList UAV (u6) — 生存スロット番号を詰める uint[max]
+	//-----------------------------------------
+	drawListUavIndex_ = srv->Allocate();
+	drawListResource_ = dxCommon_->CreateBufferResourceUAV(sizeof(uint32_t) * kMaxParticles);
+	srv->CreateUAVForStructuredBuffer(drawListUavIndex_, drawListResource_.Get(), kMaxParticles, sizeof(uint32_t));
+	drawListUavHandleGPU_ = srv->GetGPUDescriptorHandle(drawListUavIndex_);
+
+	// DrawList SRV (VS t2) — 同じバッファを VS が読む
+	drawListSrvIndex_ = srv->Allocate();
+	srv->CreateSRVforStructuredBuffer(drawListSrvIndex_, drawListResource_.Get(), kMaxParticles, sizeof(uint32_t));
+	drawListSrvHandleGPU_ = srv->GetGPUDescriptorHandle(drawListSrvIndex_);
+
+	//-----------------------------------------
+	// DrawArgs UAV (u7) — D3D12_DRAW_INDEXED_ARGUMENTS(5 uint)。[1]=InstanceCount 兼 生存数カウンタ
+	//-----------------------------------------
+	drawArgsUavIndex_ = srv->Allocate();
+	drawArgsResource_ = dxCommon_->CreateBufferResourceUAV(sizeof(uint32_t) * 5);
+	srv->CreateUAVForStructuredBuffer(drawArgsUavIndex_, drawArgsResource_.Get(), 5, sizeof(uint32_t));
+	drawArgsUavHandleGPU_ = srv->GetGPUDescriptorHandle(drawArgsUavIndex_);
+
+	//-----------------------------------------
+	// コマンドシグネチャ（DrawIndexedInstancedIndirect 1本）
+	// ルートシグネチャは描画時に別途設定するので nullptr
+	//-----------------------------------------
+	D3D12_INDIRECT_ARGUMENT_DESC argDesc = {};
+	argDesc.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
+
+	D3D12_COMMAND_SIGNATURE_DESC cmdDesc = {};
+	cmdDesc.ByteStride = sizeof(D3D12_DRAW_INDEXED_ARGUMENTS);
+	cmdDesc.NumArgumentDescs = 1;
+	cmdDesc.pArgumentDescs = &argDesc;
+
+	HRESULT hr = dxCommon_->GetDevice()->CreateCommandSignature(
+		&cmdDesc, nullptr, IID_PPV_ARGS(&drawIndirectCmdSig_));
+	assert(SUCCEEDED(hr));
+	(void)hr; // Release で assert が除去され未使用になるのを回避
 }
 
 /// <summary>
@@ -237,16 +339,28 @@ void GPUParticle::CreateUAV()
 /// </summary>
 void GPUParticle::CreateGPUParticleResource()
 {
-	srvIndex_ = SrvManager::GetInstance()->Allocate();
+	// VS は hot(t0) と warm(t1) を読み、scale/color を lerp 導出する
+	srvIndex_ = YoRigine::SrvManager::GetInstance()->Allocate();
 
-	SrvManager::GetInstance()->CreateSRVforStructuredBuffer(
+	YoRigine::SrvManager::GetInstance()->CreateSRVforStructuredBuffer(
 		srvIndex_,
 		particleResource_.Get(),
 		kMaxParticles,
-		sizeof(ParticleCSForGPU)
+		sizeof(ParticleHotGPU)
 	);
 
-	particleSrvHandleGPU_ = SrvManager::GetInstance()->GetGPUDescriptorHandle(srvIndex_);
+	particleSrvHandleGPU_ = YoRigine::SrvManager::GetInstance()->GetGPUDescriptorHandle(srvIndex_);
+
+	warmSrvIndex_ = YoRigine::SrvManager::GetInstance()->Allocate();
+
+	YoRigine::SrvManager::GetInstance()->CreateSRVforStructuredBuffer(
+		warmSrvIndex_,
+		warmResource_.Get(),
+		kMaxParticles,
+		sizeof(ParticleWarmGPU)
+	);
+
+	warmSrvHandleGPU_ = YoRigine::SrvManager::GetInstance()->GetGPUDescriptorHandle(warmSrvIndex_);
 }
 
 /// <summary>
@@ -285,6 +399,17 @@ void GPUParticle::DispatchInit()
 		D3D12_RESOURCE_STATE_COMMON,
 		D3D12_RESOURCE_STATE_UNORDERED_ACCESS
 	);
+	// SoA warm/cold も hot と同じく書き込み対象
+	dxCommon_->TransitionBarrier(
+		warmResource_.Get(),
+		D3D12_RESOURCE_STATE_COMMON,
+		D3D12_RESOURCE_STATE_UNORDERED_ACCESS
+	);
+	dxCommon_->TransitionBarrier(
+		coldResource_.Get(),
+		D3D12_RESOURCE_STATE_COMMON,
+		D3D12_RESOURCE_STATE_UNORDERED_ACCESS
+	);
 	dxCommon_->TransitionBarrier(
 		freeListIndexResource_.Get(),
 		D3D12_RESOURCE_STATE_COMMON,
@@ -309,13 +434,15 @@ void GPUParticle::DispatchInit()
 
 	commandList->SetPipelineState(computeShaderManager_->GetComputePipelineState("ParticleInitCS"));
 
-	ID3D12DescriptorHeap* heaps[] = { SrvManager::GetInstance()->GetDescriptorHeap() };
+	ID3D12DescriptorHeap* heaps[] = { YoRigine::SrvManager::GetInstance()->GetDescriptorHeap() };
 	commandList->SetDescriptorHeaps(_countof(heaps), heaps);
 
 	commandList->SetComputeRootDescriptorTable(0, particleUavHandleGPU_);
 	commandList->SetComputeRootDescriptorTable(1, freeListIndexUavHandleGPU_);
 	commandList->SetComputeRootDescriptorTable(2, freeListUavHandleGPU_);
 	commandList->SetComputeRootDescriptorTable(3, activeCountUavHandleGPU_);
+	commandList->SetComputeRootDescriptorTable(4, warmUavHandleGPU_); // u4
+	commandList->SetComputeRootDescriptorTable(5, coldUavHandleGPU_); // u5
 
 	uint32_t requiredGroups = GPUParticle::GetRequiredThreadGroups();
 	commandList->Dispatch(requiredGroups, 1, 1);
@@ -328,7 +455,16 @@ void GPUParticle::DispatchInit()
 		D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
 		D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER
 	);
-
+	dxCommon_->TransitionBarrier(
+		warmResource_.Get(),
+		D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+		D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER
+	);
+	dxCommon_->TransitionBarrier(
+		coldResource_.Get(),
+		D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+		D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER
+	);
 	dxCommon_->TransitionBarrier(
 		freeListIndexResource_.Get(),
 		D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
@@ -339,12 +475,25 @@ void GPUParticle::DispatchInit()
 		D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
 		D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER
 	);
+
+	// インダイレクト描画バッファを静止状態へ（DrawList=VS読み取り / DrawArgs=間接引数）。
+	// 中身は毎フレーム DispatchUpdate 冒頭で作り直すのでここでは状態のみ確定させる。
+	dxCommon_->TransitionBarrier(
+		drawListResource_.Get(),
+		D3D12_RESOURCE_STATE_COMMON,
+		D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER
+	);
+	dxCommon_->TransitionBarrier(
+		drawArgsResource_.Get(),
+		D3D12_RESOURCE_STATE_COMMON,
+		D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT
+	);
 }
 
 /// <summary>
 /// Update 用 ComputeShader 実行（Emit されたパーティクルを更新）
 /// </summary>
-void GPUParticle::DispatchUpdate(ID3D12Resource* resource, ID3D12Resource* paramsResource)
+void GPUParticle::DispatchUpdate(ID3D12Resource* resource, ID3D12Resource* paramsResource, D3D12_GPU_DESCRIPTOR_HANDLE forceFieldSrv, bool trailEnabled)
 {
 	auto commandList = dxCommon_->GetCommandList();
 
@@ -356,6 +505,17 @@ void GPUParticle::DispatchUpdate(ID3D12Resource* resource, ID3D12Resource* param
 		D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
 		D3D12_RESOURCE_STATE_UNORDERED_ACCESS
 	);
+	// warm/cold は TrailSpawn パスが読み書きする（Update 本体は hot のみ触る）
+	dxCommon_->TransitionBarrier(
+		warmResource_.Get(),
+		D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+		D3D12_RESOURCE_STATE_UNORDERED_ACCESS
+	);
+	dxCommon_->TransitionBarrier(
+		coldResource_.Get(),
+		D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+		D3D12_RESOURCE_STATE_UNORDERED_ACCESS
+	);
 	dxCommon_->TransitionBarrier(
 		freeListIndexResource_.Get(),
 		D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
@@ -366,7 +526,31 @@ void GPUParticle::DispatchUpdate(ID3D12Resource* resource, ID3D12Resource* param
 		D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
 		D3D12_RESOURCE_STATE_UNORDERED_ACCESS
 	);
+	// インダイレクト描画バッファも書き込み対象へ（DrawList=VS読み取り→UAV / DrawArgs=間接引数→UAV）
+	dxCommon_->TransitionBarrier(
+		drawListResource_.Get(),
+		D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+		D3D12_RESOURCE_STATE_UNORDERED_ACCESS
+	);
+	dxCommon_->TransitionBarrier(
+		drawArgsResource_.Get(),
+		D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT,
+		D3D12_RESOURCE_STATE_UNORDERED_ACCESS
+	);
 
+	ID3D12DescriptorHeap* heaps[] = { YoRigine::SrvManager::GetInstance()->GetDescriptorHeap() };
+	commandList->SetDescriptorHeaps(_countof(heaps), heaps);
+
+	//-----------------------------------------
+	// 描画引数リセット（1スレッド）: InstanceCount=0 / IndexCountPerInstance=索引数 に初期化。
+	// この後 Update CS が生存粒子を InterlockedAdd で数え上げる。
+	//-----------------------------------------
+	commandList->SetComputeRootSignature(computeShaderManager_->GetRootSignature("ResetDrawArgsCS"));
+	commandList->SetPipelineState(computeShaderManager_->GetComputePipelineState("ResetDrawArgsCS"));
+	commandList->SetComputeRootDescriptorTable(0, drawArgsUavHandleGPU_);
+	commandList->SetComputeRoot32BitConstant(1, static_cast<UINT>(mesh_->GetIndexCount()), 0);
+	commandList->Dispatch(1, 1, 1);
+	dxCommon_->BarrierTypeUAV(drawArgsResource_.Get());
 
 	//-----------------------------------------
 	// CS Pipeline
@@ -374,24 +558,56 @@ void GPUParticle::DispatchUpdate(ID3D12Resource* resource, ID3D12Resource* param
 	commandList->SetComputeRootSignature(computeShaderManager_->GetRootSignature("ParticleUpdateCS"));
 	commandList->SetPipelineState(computeShaderManager_->GetComputePipelineState("ParticleUpdateCS"));
 
-	ID3D12DescriptorHeap* heaps[] = { SrvManager::GetInstance()->GetDescriptorHeap() };
-	commandList->SetDescriptorHeaps(_countof(heaps), heaps);
-
 	commandList->SetComputeRootDescriptorTable(0, particleUavHandleGPU_);
 	commandList->SetComputeRootConstantBufferView(1, resource->GetGPUVirtualAddress());
 	commandList->SetComputeRootConstantBufferView(2, paramsResource->GetGPUVirtualAddress());
 	commandList->SetComputeRootDescriptorTable(3, freeListIndexUavHandleGPU_);
 	commandList->SetComputeRootDescriptorTable(4, freeListUavHandleGPU_);
 	commandList->SetComputeRootDescriptorTable(5, activeCountUavHandleGPU_);
+	commandList->SetComputeRootDescriptorTable(6, forceFieldSrv); // ForceFields SRV t0
+	// warm(u4)/cold(u5) は TrailSpawnCS 用（Update 本体は未使用だが同一 RS なのでバインド）
+	commandList->SetComputeRootDescriptorTable(7, warmUavHandleGPU_);
+	commandList->SetComputeRootDescriptorTable(8, coldUavHandleGPU_);
+	// drawList(u6)/drawArgs(u7): Update CS が生存粒子を追記する
+	commandList->SetComputeRootDescriptorTable(9, drawListUavHandleGPU_);
+	commandList->SetComputeRootDescriptorTable(10, drawArgsUavHandleGPU_);
 
 	uint32_t requiredGroups = GPUParticle::GetRequiredThreadGroups();
 	commandList->Dispatch(requiredGroups, 1, 1);
+
+	//-----------------------------------------
+	// トレイル生成パス（FreeList Pop 専用）
+	// Update パスの死亡処理（Push）と同一ディスパッチで Pop すると
+	// FreeList が競合破壊されるため、UAVバリアで完了を待ってから別パスで実行する
+	//-----------------------------------------
+	if (trailEnabled) {
+		dxCommon_->BarrierTypeUAV(particleResource_.Get());
+		dxCommon_->BarrierTypeUAV(warmResource_.Get());
+		dxCommon_->BarrierTypeUAV(coldResource_.Get());
+		dxCommon_->BarrierTypeUAV(freeListIndexResource_.Get());
+		dxCommon_->BarrierTypeUAV(freeListResource_.Get());
+		dxCommon_->BarrierTypeUAV(activeCountResource_.Get());
+
+		// ルートシグネチャは ParticleUpdateCS と共用（バインド済みの内容をそのまま使う）
+		commandList->SetPipelineState(computeShaderManager_->GetComputePipelineState("TrailSpawnCS"));
+		commandList->Dispatch(requiredGroups, 1, 1);
+	}
 
 	//-----------------------------------------
 	// 状態戻し
 	//-----------------------------------------
 	dxCommon_->TransitionBarrier(
 		particleResource_.Get(),
+		D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+		D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER
+	);
+	dxCommon_->TransitionBarrier(
+		warmResource_.Get(),
+		D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+		D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER
+	);
+	dxCommon_->TransitionBarrier(
+		coldResource_.Get(),
 		D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
 		D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER
 	);

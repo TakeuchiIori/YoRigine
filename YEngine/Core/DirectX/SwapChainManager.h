@@ -7,8 +7,11 @@
 #include <dxgi1_6.h>
 
 class WinApp;
-class DeviceManager;
+
+namespace YoRigine {
+
 class CommandManager;
+class DeviceManager;
 
 /// <summary>
 /// スワップチェーン管理クラス
@@ -17,6 +20,9 @@ class SwapChainManager
 {
 public:
 	///************************* 基本的な関数 *************************///
+	/// <param name="winApp">ウィンドウハンドルを持つ WinApp</param>
+	/// <param name="deviceManager">デバイス生成済みの DeviceManager</param>
+	/// <param name="commandManager">コマンドキュー取得元の CommandManager</param>
 	void Initialize(WinApp* winApp, DeviceManager* deviceManager, CommandManager* commandManager);
 	void Finalize();
 
@@ -52,3 +58,4 @@ private:
 
 };
 
+} // namespace YoRigine

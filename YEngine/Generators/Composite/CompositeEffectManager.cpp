@@ -1,6 +1,7 @@
 #include "CompositeEffectManager.h"
 
 #include "Debugger/Logger.h"
+#include <cassert>
 
 // エディタのドロップダウン用（各系統の名前一覧）
 #include "Particle/YParticleManager.h"
@@ -8,11 +9,15 @@
 #include "Vfx/VfxMesh/Runtime/VfxMeshSpawner.h"
 #include "GPUParticle/GpuEmitManager.h"
 
+// hitDelay の一時オーバーラップクエリ用（QuerySphere / BaseCollider）
+#include "Collision/Core/CollisionManager.h"
+
 #include <json.hpp>
 #include <fstream>
 #include <filesystem>
 #include <algorithm>
 #include <cctype>
+#include <cstdio>
 
 #ifdef USE_IMGUI
 #include <imgui.h>
@@ -26,17 +31,40 @@
 void CompositeInstance::SetPosition(const Vector3& pos)
 {
     basePos = pos;
-    if (particle.IsValid()) particle.SetPosition(pos);
+    for (size_t i = 0; i < particles.size(); ++i) {
+        if (particles[i].IsValid()) particles[i].SetPosition(pos + particleOffsets[i]);
+    }
     for (size_t i = 0; i < vfx.size(); ++i) {
         vfx[i].SetPosition(pos + vfxOffsets[i]);
     }
-    if (gpu.IsValid()) gpu.SetPosition(pos);
+    if (gpu.IsValid()) gpu.SetPosition(pos + gpuOffset);
     // 音は Audio に3D位置がないため追従しない（スコープ外）
+}
+
+// ============================================================================
+// CompositeEffectAsset::NaturalDuration
+//   全チャイルドの中で最大の自然な寿命（秒）を返す。0以下=不明。
+//   VfxMeshは正確値、GPUは概算値。CPUパーティクル(particleEffect)は
+//   System=定義/インスタンス=粒バッファが未分離なため安全に見積もれず、現状0扱い
+//   （Docs/VfxExpansion_Design.md の 7.2 参照）。
+// ============================================================================
+float CompositeEffectAsset::NaturalDuration(VfxMeshSpawner* vfxMeshSpawner, YoRigine::GpuEmitManager* gpuEmitManager) const
+{
+    float maxDur = 0.0f;
+    for (const auto& v : vfxMeshAssets) {
+        if (const auto* vfxAsset = vfxMeshSpawner->GetAsset(v.asset)) {
+            maxDur = std::max(maxDur, vfxAsset->OneShotDuration());
+        }
+    }
+    if (!gpuEmitterGroup.empty()) {
+        maxDur = std::max(maxDur, gpuEmitManager->EstimateGroupNaturalDuration(gpuEmitterGroup));
+    }
+    return maxDur;
 }
 
 void CompositeInstance::Stop()
 {
-    if (particle.IsValid()) particle.Stop();
+    for (auto& particle : particles) if (particle.IsValid()) particle.Stop();
     for (auto& v : vfx) v.Stop();
     if (gpu.IsValid()) gpu.Stop();
     for (auto& s : sounds) s.Stop();
@@ -44,7 +72,9 @@ void CompositeInstance::Stop()
 
 bool CompositeInstance::IsActive() const
 {
-    if (particle.IsValid() && particle.IsActive()) return true;
+    for (const auto& particle : particles) {
+        if (particle.IsValid() && particle.IsActive()) return true;
+    }
     for (const auto& v : vfx) if (v.IsAlive()) return true;
     if (gpu.IsValid() && gpu.IsActive()) return true;
     for (const auto& s : sounds) if (s.IsPlaying()) return true;
@@ -59,6 +89,16 @@ CompositeEffectManager* CompositeEffectManager::GetInstance()
 {
     static CompositeEffectManager instance;
     return &instance;
+}
+
+void CompositeEffectManager::Finalize()
+{
+    vfxMeshSpawner_ = nullptr;
+    gpuEmitManager_ = nullptr;
+    audio_ = nullptr;
+    collisionManager_ = nullptr;
+    yParticleManager_ = nullptr;
+    yEmitterGroupManager_ = nullptr;
 }
 
 namespace {
@@ -96,8 +136,41 @@ bool CompositeEffectManager::LoadAsset(const std::string& filepath)
 
         CompositeEffectAsset a;
         a.name = j.value("name", std::filesystem::path(filepath).stem().string());
-        a.particleEffect = j.value("particleEffect", std::string());
         a.gpuEmitterGroup = j.value("gpuEmitterGroup", std::string());
+
+        auto readVec3 = [](const nlohmann::json& parent, const char* key, Vector3 def) -> Vector3 {
+            if (parent.contains(key) && parent[key].is_array() && parent[key].size() >= 3) {
+                return { parent[key][0].get<float>(), parent[key][1].get<float>(), parent[key][2].get<float>() };
+            }
+            return def;
+        };
+        a.gpuOffset       = readVec3(j, "gpuOffset", { 0.0f, 0.0f, 0.0f });
+
+        // 新形式: CPUパーティクルを複数レイヤー可能。
+        if (j.contains("particleEffects") && j["particleEffects"].is_array()) {
+            for (const auto& p : j["particleEffects"]) {
+                CompositeParticleRef r;
+                r.asset = p.value("asset", std::string());
+                if (p.contains("offset") && p["offset"].is_array() && p["offset"].size() >= 3) {
+                    r.offset = { p["offset"][0].get<float>(), p["offset"][1].get<float>(), p["offset"][2].get<float>() };
+                }
+                if (!r.asset.empty()) a.particleEffects.push_back(r);
+            }
+        }
+        // 旧形式との互換性。ロード時に新形式へ正規化する。
+        if (a.particleEffects.empty()) {
+            const std::string legacyParticle = j.value("particleEffect", std::string());
+            if (!legacyParticle.empty()) {
+                a.particleEffects.push_back({ legacyParticle, readVec3(j, "particleOffset", { 0.0f, 0.0f, 0.0f }) });
+            }
+        }
+
+        a.hitDelay     = j.value("hitDelay", -1.0f);
+        a.hitRadius    = j.value("hitRadius", 1.5f);
+        a.hitLayerMask = j.value("hitLayerMask", 0xFFFFFFFFu);
+
+        a.cameraShakeProfile = j.value("cameraShakeProfile", std::string());
+        a.hitStopMs          = j.value("hitStopMs", 0.0f);
 
         if (j.contains("vfxMeshAssets")) {
             for (const auto& v : j["vfxMeshAssets"]) {
@@ -136,6 +209,18 @@ bool CompositeEffectManager::Has(const std::string& name) const
     return assets_.count(name) > 0;
 }
 
+std::vector<std::string> CompositeEffectManager::GetAssetNames() const
+{
+    std::vector<std::string> names;
+    names.reserve(assets_.size());
+    for (const auto& [name, asset] : assets_) {
+        (void)asset;
+        names.push_back(name);
+    }
+    std::sort(names.begin(), names.end());
+    return names;
+}
+
 bool CompositeEffectManager::SaveAsset(const std::string& name)
 {
     auto it = assets_.find(name);
@@ -148,8 +233,22 @@ bool CompositeEffectManager::SaveAsset(const std::string& name)
     try {
         nlohmann::json j;
         j["name"] = a.name;
-        j["particleEffect"] = a.particleEffect;
+        j["particleEffects"] = nlohmann::json::array();
+        for (const auto& p : a.particleEffects) {
+            j["particleEffects"].push_back({
+                {"asset", p.asset},
+                {"offset", { p.offset.x, p.offset.y, p.offset.z }},
+                });
+        }
         j["gpuEmitterGroup"] = a.gpuEmitterGroup;
+        j["gpuOffset"] = { a.gpuOffset.x, a.gpuOffset.y, a.gpuOffset.z };
+
+        j["hitDelay"] = a.hitDelay;
+        j["hitRadius"] = a.hitRadius;
+        j["hitLayerMask"] = a.hitLayerMask;
+
+        j["cameraShakeProfile"] = a.cameraShakeProfile;
+        j["hitStopMs"] = a.hitStopMs;
 
         j["vfxMeshAssets"] = nlohmann::json::array();
         for (const auto& v : a.vfxMeshAssets) {
@@ -191,6 +290,11 @@ bool CompositeEffectManager::SaveAsset(const std::string& name)
 
 void CompositeEffectManager::PlayOneShot(const std::string& name, const Vector3& pos)
 {
+    PlayOneShot(name, pos, PlayParams{});
+}
+
+void CompositeEffectManager::PlayOneShot(const std::string& name, const Vector3& pos, const PlayParams& params)
+{
     auto it = assets_.find(name);
     if (it == assets_.end()) {
         Logger("CompositeEffectManager::PlayOneShot : '" + name + "' が見つかりません");
@@ -199,21 +303,52 @@ void CompositeEffectManager::PlayOneShot(const std::string& name, const Vector3&
     const CompositeEffectAsset& a = it->second;
 
     // 各系統を「撃ちっぱなし」で発火（保持不要）
-    if (!a.particleEffect.empty()) {
-        EffectHandle::PlayOneShot(a.particleEffect, pos);
+    for (const auto& particle : a.particleEffects) {
+        // -1 で各CPUアセット側の emitCount を尊重する。
+        // 複合側の既定値(20)で全素材の密度が均一化されるのを防ぐ。
+        EffectHandle::PlayOneShot(particle.asset, pos + particle.offset, -1);
+    }
+
+    // minDuration保証: 自然な寿命(NaturalDuration)が足りなければVfxMesh側だけtimeScaleで引き伸ばす。
+    // 既にminDuration以上あるアセットには触らない（強制同期はしない。7.2参照）。
+    float vfxTimeScale = 1.0f;
+    if (params.minDuration > 0.0f) {
+        assert(vfxMeshSpawner_ && gpuEmitManager_ && "CompositeEffectManager : Set系で依存を先に注入すること");
+        const float natural = a.NaturalDuration(vfxMeshSpawner_, gpuEmitManager_);
+        if (natural > 0.0001f && params.minDuration > natural) {
+            vfxTimeScale = natural / params.minDuration;
+        }
     }
     for (const auto& v : a.vfxMeshAssets) {
-        VfxMeshHandle::PlayOneShot(v.asset, pos + v.offset, v.scale);
+        VfxMeshHandle::PlayOneShot(v.asset, pos + v.offset, v.scale, vfxTimeScale);
     }
+
     if (!a.gpuEmitterGroup.empty()) {
-        GpuParticleHandle::PlayOneShot(a.gpuEmitterGroup, pos);
+        GpuParticleHandle::PlayOneShot(a.gpuEmitterGroup, pos + a.gpuOffset);
     }
+    assert(audio_ && "CompositeEffectManager : SetAudio() を先に呼ぶこと");
     for (const auto& s : a.sounds) {
-        YoRigine::Audio::GetInstance()->PlayOneShot(s.path, s.volume, s.category);
+        audio_->PlayOneShot(s.path, s.volume, s.category);
+    }
+
+    // ダメージ判定（一時オーバーラップクエリ）を hitDelay 秒後に予約
+    if (a.hitDelay >= 0.0f) {
+        PendingHitQuery q;
+        q.pos       = pos;
+        q.radius    = a.hitRadius;
+        q.layerMask = a.hitLayerMask;
+        q.remaining = a.hitDelay;
+        q.callback  = params.onHitQuery;
+        pendingHitQueries_.push_back(std::move(q));
     }
 }
 
 EffectHandle CompositeEffectManager::Play(const std::string& name, const Vector3& pos)
+{
+    return Play(name, pos, PlayParams{});
+}
+
+EffectHandle CompositeEffectManager::Play(const std::string& name, const Vector3& pos, const PlayParams& params)
 {
     EffectHandle handle;
 
@@ -225,29 +360,67 @@ EffectHandle CompositeEffectManager::Play(const std::string& name, const Vector3
     const CompositeEffectAsset& a = it->second;
 
     auto inst = std::make_shared<CompositeInstance>();
-    inst->basePos = pos;
+    inst->basePos        = pos;
+    inst->gpuOffset       = a.gpuOffset;
 
     // Particle 子（ループ）
-    if (!a.particleEffect.empty()) {
-        inst->particle = EffectHandle::Play(a.particleEffect, pos, /*loop*/true);
+    for (const auto& particle : a.particleEffects) {
+        inst->particles.push_back(EffectHandle::Play(particle.asset, pos + particle.offset, /*loop*/true));
+        inst->particleOffsets.push_back(particle.offset);
     }
     // VfxMesh 子（ループ）
+    // ループ型は Stop() で寿命が外部制御される前提なので minDuration/timeScale は適用しない（7.2参照）。
     for (const auto& v : a.vfxMeshAssets) {
         inst->vfx.push_back(VfxMeshHandle::Play(v.asset, pos + v.offset, v.scale, /*loop*/true));
         inst->vfxOffsets.push_back(v.offset);
     }
     // GPU 子（ループ）
     if (!a.gpuEmitterGroup.empty()) {
-        inst->gpu = GpuParticleHandle::Play(a.gpuEmitterGroup, pos);
+        inst->gpu = GpuParticleHandle::Play(a.gpuEmitterGroup, pos + a.gpuOffset);
     }
     // ループ音（保持して Stop 連鎖）
+    assert(audio_ && "CompositeEffectManager : SetAudio() を先に呼ぶこと");
     for (const auto& s : a.sounds) {
-        inst->sounds.push_back(YoRigine::Audio::GetInstance()->Play(s.path, /*loop*/true, s.volume, s.category));
+        inst->sounds.push_back(audio_->Play(s.path, /*loop*/true, s.volume, s.category));
+    }
+
+    if (a.hitDelay >= 0.0f) {
+        PendingHitQuery q;
+        q.pos       = pos;
+        q.radius    = a.hitRadius;
+        q.layerMask = a.hitLayerMask;
+        q.remaining = a.hitDelay;
+        q.callback  = params.onHitQuery;
+        pendingHitQueries_.push_back(std::move(q));
     }
 
     handle.systemName_ = name;
     handle.composite_ = inst;
     return handle;
+}
+
+// ============================================================================
+// 毎フレーム更新: hitDelay の遅延ダメージクエリを消化する。
+// GameScene/DevelopScene 等、VfxMeshSpawner::Update と同じ場所で呼ぶ想定。
+// ============================================================================
+void CompositeEffectManager::Update(float deltaTime)
+{
+    for (size_t i = 0; i < pendingHitQueries_.size(); ) {
+        PendingHitQuery& q = pendingHitQueries_[i];
+        q.remaining -= deltaTime;
+        if (q.remaining <= 0.0f) {
+            if (q.callback) {
+                assert(collisionManager_ && "CompositeEffectManager : SetCollisionManager() を先に呼ぶこと");
+                std::vector<BaseCollider*> hits =
+                    collisionManager_->QuerySphere(q.pos, q.radius, q.layerMask);
+                q.callback(hits);
+            }
+            pendingHitQueries_[i] = std::move(pendingHitQueries_.back());
+            pendingHitQueries_.pop_back();
+            continue;
+        }
+        ++i;
+    }
 }
 
 // ============================================================================
@@ -338,23 +511,41 @@ void CompositeEffectManager::DrawImGui()
 
     ImGui::Separator();
 
-    // ── Particle ──
+    // ── Particle（複数）──
     {
-        std::vector<std::string> opts = YParticleManager::GetInstance().GetAllSystemNames();
-        auto groups = YEmitterGroupManager::GetInstance().GetAllGroupNames();
+        assert(yParticleManager_ && yEmitterGroupManager_ && "CompositeEffectManager : Set系で依存を先に注入すること");
+        std::vector<std::string> opts = yParticleManager_->GetAllSystemNames();
+        auto groups = yEmitterGroupManager_->GetAllGroupNames();
         opts.insert(opts.end(), groups.begin(), groups.end());
-        stringCombo("Particle エフェクト", a.particleEffect, opts, true);
+        ImGui::SeparatorText("CPU Particle（複数可）");
+        int removeIdx = -1;
+        for (int i = 0; i < static_cast<int>(a.particleEffects.size()); ++i) {
+            ImGui::PushID(2000 + i);
+            auto& particle = a.particleEffects[i];
+            stringCombo("アセット", particle.asset, opts, false);
+            ImGui::DragFloat3("オフセット", &particle.offset.x, 0.05f);
+            if (ImGui::SmallButton("このCPU行を削除")) removeIdx = i;
+            ImGui::Separator();
+            ImGui::PopID();
+        }
+        if (removeIdx >= 0) a.particleEffects.erase(a.particleEffects.begin() + removeIdx);
+        if (ImGui::Button(ICON_FA_PLUS " CPU Particle を追加")) a.particleEffects.push_back({});
     }
     // ── GPU ──
     {
-        auto opts = YoRigine::GpuEmitManager::GetInstance()->GetGroupNames();
+        assert(gpuEmitManager_ && "CompositeEffectManager : SetGpuEmitManager() を先に呼ぶこと");
+        auto opts = gpuEmitManager_->GetGroupNames();
         stringCombo("GPU グループ", a.gpuEmitterGroup, opts, true);
+        if (!a.gpuEmitterGroup.empty()) {
+            ImGui::DragFloat3("GPU オフセット", &a.gpuOffset.x, 0.05f);
+        }
     }
 
     // ── VfxMesh（複数）──
     ImGui::SeparatorText("VfxMesh（複数可）");
     {
-        auto opts = VfxMeshSpawner::GetInstance()->GetAssetNames();
+        assert(vfxMeshSpawner_ && "CompositeEffectManager : SetVfxMeshSpawner() を先に呼ぶこと");
+        auto opts = vfxMeshSpawner_->GetAssetNames();
         int removeIdx = -1;
         for (int i = 0; i < static_cast<int>(a.vfxMeshAssets.size()); ++i) {
             ImGui::PushID(i);
@@ -401,6 +592,31 @@ void CompositeEffectManager::DrawImGui()
         if (ImGui::Button(ICON_FA_PLUS " サウンドを追加")) a.sounds.push_back({});
         ImGui::SameLine();
         if (ImGui::SmallButton("音声一覧を再スキャン")) ScanSounds();
+    }
+
+    // ── ダメージ判定（一時オーバーラップクエリ） ──
+    ImGui::SeparatorText("ダメージ判定");
+    ImGui::TextDisabled("hitDelay < 0 でダメージ判定なし。実際のダメージ適用はPlay呼び出し側のonHitQueryコールバックで行う。");
+    {
+        bool enabled = a.hitDelay >= 0.0f;
+        if (ImGui::Checkbox("有効", &enabled)) {
+            a.hitDelay = enabled ? std::max(a.hitDelay, 0.0f) : -1.0f;
+        }
+        if (enabled) {
+            ImGui::DragFloat("発火までの秒数(hitDelay)", &a.hitDelay, 0.01f, 0.0f, 10.0f);
+            ImGui::DragFloat("半径(hitRadius)", &a.hitRadius, 0.05f, 0.01f, 50.0f);
+        }
+    }
+
+    // ── カメラ演出フック（データのみ。発火配線は未実装） ──
+    ImGui::SeparatorText("カメラ演出フック（データのみ・未配線）");
+    {
+        char shakeBuf[128];
+        std::snprintf(shakeBuf, sizeof(shakeBuf), "%s", a.cameraShakeProfile.c_str());
+        if (ImGui::InputText("シェイクプロファイル名", shakeBuf, sizeof(shakeBuf))) {
+            a.cameraShakeProfile = shakeBuf;
+        }
+        ImGui::DragFloat("ヒットストップ(ms)", &a.hitStopMs, 1.0f, 0.0f, 2000.0f);
     }
 
     // ── プレビュー / 保存 ──

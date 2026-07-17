@@ -8,8 +8,11 @@
 #include <string>
 #include <unordered_map>
 
+namespace YoRigine {
+
 class DeviceManager;
 class SrvManager;
+
 /// <summary>
 /// DSV管理クラス
 /// </summary>
@@ -142,3 +145,5 @@ private:
 	std::vector<std::unique_ptr<DepthStencil>> depthStencils_;
 	std::unordered_map<std::string, uint32_t> nameToIndex_;
 };
+
+} // namespace YoRigine

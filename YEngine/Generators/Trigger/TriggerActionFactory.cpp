@@ -99,6 +99,7 @@ std::unique_ptr<TriggerAction> TriggerActionFactory::Create(const nlohmann::json
 		auto action = std::make_unique<WaypointAction>(
 			beaconEffect, requiredGroup, requiredCount, nextWaypoint, startActive);
 		action->SetBeaconScale(actionJson.value("beaconScale", 1.0f));
+		action->SetMissionTitle(actionJson.value("missionTitle", std::string{}));
 		return action;
 	}
 

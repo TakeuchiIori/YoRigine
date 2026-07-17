@@ -201,6 +201,12 @@ void BattleScene::Update() {
 		battleEnemyManager_->Update();
 	}
 
+	// 敵削除と同フレームで lockedTarget_ がダングリングポインタになるのを防ぐ。
+	// battleEnemyManager_->Update() 内で敵コライダーが破棄された直後に検証する。
+	if (player_ && player_->GetPlayerCamera()) {
+		player_->GetPlayerCamera()->ValidateLockOnTarget();
+	}
+
 	if (player_ && player_->GetPlayerCamera() && battleEnemyManager_) {
 		std::vector<Vector3> enemyPositions;
 		if (!isBattleCameraActive) {

@@ -14,6 +14,7 @@
 #include <functional>
 #include <string>
 #include <unordered_set>
+#include <unordered_map>
 #include <json.hpp>
 
 
@@ -40,9 +41,11 @@ class BaseArea
 public:
 	///************************* コールバック定義 *************************///
 
-	using AreaEnterCallback = std::function<void(const Vector3& position)>;
-	using AreaExitCallback  = std::function<void(const Vector3& position)>;
-	using AreaStayCallback  = std::function<void(const Vector3& position)>;
+	// targetKey: Update に渡したターゲット識別キー (WorldTransform* やキャラクタポインタ)。
+	//            「誰が円内にいるか」をゲーム側で判別してダメージ等を適用するために渡す。
+	using AreaEnterCallback = std::function<void(void* targetKey, const Vector3& position)>;
+	using AreaExitCallback  = std::function<void(void* targetKey, const Vector3& position)>;
+	using AreaStayCallback  = std::function<void(void* targetKey, const Vector3& position)>;
 
 public:
 	///************************* デストラクタ *************************///
@@ -77,10 +80,12 @@ public:
 	///************************* 共通機能 *************************///
 
 	// 更新処理（位置トラッキングやコールバック判定）
-	//   targetKey: ターゲットを識別するキー (例: WorldTransform* やキャラクタポインタ)。
-	//              省略時は legacy 単一ターゲットモード (キーは nullptr)。
-	//              異なるターゲットそれぞれの Enter/Exit を独立して追跡する。
-	void Update(const Vector3& targetPosition, void* targetKey = nullptr);
+	//   targetKey:  ターゲットを識別するキー (例: WorldTransform* やキャラクタポインタ)。
+	//               省略時は legacy 単一ターゲットモード (キーは nullptr)。
+	//               異なるターゲットそれぞれの Enter/Exit を独立して追跡する。
+	//   deltaTime:  Stay tick 用の経過秒。SetStayTickInterval(>0) 時のみ使用。
+	//               0 (既定) の場合 Stay は毎フレーム発火する。
+	void Update(const Vector3& targetPosition, void* targetKey = nullptr, float deltaTime = 0.0f);
 
 	// あるターゲットが現在エリア内に居るか
 	bool IsTargetInside(void* targetKey) const {
@@ -89,7 +94,15 @@ public:
 	size_t GetInsideTargetCount() const { return insideTargets_.size(); }
 
 	// ターゲット忘却 (例: キャラクタが破棄されたときに呼ぶ)
-	void ForgetTarget(void* targetKey) { insideTargets_.erase(targetKey); }
+	void ForgetTarget(void* targetKey) {
+		insideTargets_.erase(targetKey);
+		stayTimers_.erase(targetKey);
+	}
+
+	// Stay コールバックの発火間隔（秒）。0 = 毎フレーム発火。
+	// 例: 毒ダメージを 0.5 秒ごとに入れたいなら 0.5f を設定する。
+	void  SetStayTickInterval(float seconds) { stayTickInterval_ = seconds; }
+	float GetStayTickInterval() const        { return stayTickInterval_; }
 
 	// 境界に接触しているかチェック（マージン付き）
 	bool IsTouchingBoundary(const Vector3& position, float margin = 0.1f) const;
@@ -143,6 +156,10 @@ protected:
 	// ターゲットごとの「現在エリア内」状態を独立管理。
 	// 旧 wasInside_ は単一 bool で複数ターゲット時に状態破壊が起きていたため廃止。
 	std::unordered_set<void*> insideTargets_;
+
+	// ターゲットごとの Stay tick 蓄積時間 (stayTickInterval_ > 0 のとき使用)。
+	std::unordered_map<void*, float> stayTimers_;
+	float       stayTickInterval_   = 0.0f;   // 0 = 毎フレーム Stay 発火
 
 	bool        isActive_           = true;
 	AreaPurpose purpose_            = AreaPurpose::Boundary;

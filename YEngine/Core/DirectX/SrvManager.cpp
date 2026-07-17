@@ -2,6 +2,8 @@
 #include "DirectXCommon.h"
 #include "Loaders./Texture./TextureManager.h"
 
+namespace YoRigine {
+
 SrvManager* SrvManager::instance = nullptr;
 const uint32_t SrvManager::kMaxSRVCount_ = 512;
 
@@ -311,3 +313,5 @@ void SrvManager::CreateUAVforRenderTexture(uint32_t uavIndex, ID3D12Resource* pR
 		GetCPUDescriptorHandle(uavIndex)
 	);
 }
+
+} // namespace YoRigine

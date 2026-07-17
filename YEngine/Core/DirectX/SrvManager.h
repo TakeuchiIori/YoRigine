@@ -8,8 +8,9 @@
 #include <DirectXTex.h>
 
 namespace YoRigine {
-	class DirectXCommon;
-}
+
+class DirectXCommon;
+
 class SrvManager
 {
 public:
@@ -84,4 +85,6 @@ private:
 	// デスクリプタヒープ
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap_;
 };
+
+} // namespace YoRigine
 

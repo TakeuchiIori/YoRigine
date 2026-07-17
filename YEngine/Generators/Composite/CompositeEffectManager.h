@@ -12,7 +12,10 @@
 // アセット: Resources/Json/YComposites/<名前>.json（参照リストのみ）
 //   {
 //     "name": "Explosion",
-//     "particleEffect": "ExplosionSparks",
+//     "particleEffects": [
+//       { "asset": "ExplosionSparks", "offset": [0,0,0] },
+//       { "asset": "ExplosionSmoke",  "offset": [0,0.5,0] }
+//     ],
 //     "vfxMeshAssets": [ { "asset": "ExplosionShockwave", "offset": [0,0,0], "scale": 1.5 } ],
 //     "gpuEmitterGroup": "ExplosionDebris",
 //     "sounds": [ { "path": "Resources/Audio/SE/explosion.wav", "volume": 1.0, "category": "SE" } ]
@@ -31,12 +34,29 @@
 #include <vector>
 #include <memory>
 #include <unordered_map>
+#include <functional>
+
+// 一時オーバーラップクエリ（hitDelay到達時の QuerySphere）の結果型に使う。
+// 重いヘッダ(CollisionManager.h)はここでは読み込まず、.cpp側でのみincludeする。
+class BaseCollider;
+class VfxMeshSpawner;
+class YParticleManager;
+class YEmitterGroupManager;
+namespace YoRigine {
+    class GpuEmitManager;
+    class CollisionManager;
+    class Audio;
+}
 
 // ── アセット定義（既存アセット名の参照のみ）───────────────────────────
 struct CompositeVfxRef {
     std::string asset;
     Vector3     offset = { 0.0f, 0.0f, 0.0f };
     float       scale = 1.0f;
+};
+struct CompositeParticleRef {
+    std::string asset;
+    Vector3     offset = { 0.0f, 0.0f, 0.0f };
 };
 struct CompositeSoundRef {
     std::string           path;
@@ -45,19 +65,48 @@ struct CompositeSoundRef {
 };
 struct CompositeEffectAsset {
     std::string                    name;
-    std::string                    particleEffect;    // 省略可
-    std::vector<CompositeVfxRef>   vfxMeshAssets;     // 省略可
-    std::string                    gpuEmitterGroup;   // 省略可
-    std::vector<CompositeSoundRef> sounds;            // 省略可
+
+    std::vector<CompositeParticleRef> particleEffects; // 省略可（複数CPU素材をレイヤー可能）
+
+    std::vector<CompositeVfxRef>   vfxMeshAssets;       // 省略可（offset/scaleは各要素が持つ）
+
+    std::string                    gpuEmitterGroup;      // 省略可
+    Vector3                        gpuOffset = { 0.0f, 0.0f, 0.0f };       // gpuEmitterGroupの相対オフセット
+
+    std::vector<CompositeSoundRef> sounds;               // 省略可
+
+    // ── ダメージ判定（一時オーバーラップクエリ） ──────────────────────
+    // hitDelay<0 ならダメージクエリを発火しない。Play/PlayOneShotからこの秒数後に
+    // CollisionManager::QuerySphere(pos, hitRadius, hitLayerMask) を1回だけ呼ぶ。
+    // 見た目側の寿命（各子のJSON）とは独立した、ダメージ専用の時刻として扱う
+    // （Docs/VfxExpansion_Design.md の 7.1 参照）。
+    float    hitDelay     = -1.0f;
+    float    hitRadius    = 1.5f;
+    uint32_t hitLayerMask = 0xFFFFFFFFu;
+
+    // ── カメラ演出フック ────────────────────────────────────────────
+    // データ保持のみ。実際にCameraへ発火する配線は未実装（TODO。3.6参照）。
+    std::string cameraShakeProfile;
+    float       hitStopMs = 0.0f;
+
+    // 全チャイルドの中で最大の自然な寿命（秒）。0以下=不明。
+    //   - VfxMesh: VfxEffectAsset::OneShotDuration() から正確に計算
+    //   - GPUParticle: GpuEmitManager::EstimateGroupNaturalDuration() から概算
+    //   - CPUパーティクル(particleEffect): 現状未対応（System=定義/インスタンス=粒バッファが
+    //     未分離なため安全に見積もれない）。0扱い＝このCompositeのNaturalDurationに寄与しない。
+    // vfxMeshSpawner/gpuEmitManager は呼び出し側 (CompositeEffectManager) が注入済みの借用ポインタを渡す。
+    float NaturalDuration(VfxMeshSpawner* vfxMeshSpawner, YoRigine::GpuEmitManager* gpuEmitManager) const;
 };
 
 // ── ループ複合エフェクトの実行インスタンス（子ハンドルを保持し Stop で連鎖停止）──
 struct CompositeInstance {
-    EffectHandle                        particle;   // Particle 子（ループ）
-    std::vector<VfxMeshHandle>          vfx;        // VfxMesh 子（ループ）
-    std::vector<Vector3>                vfxOffsets; // vfx と対の相対オフセット
-    GpuParticleHandle                   gpu;        // GPU 子（ループ）
-    std::vector<YoRigine::SoundHandle>  sounds;     // ループ音（保持して Stop 連鎖）
+    std::vector<EffectHandle>           particles;      // Particle 子（ループ）
+    std::vector<Vector3>                particleOffsets;// particles と対の相対オフセット
+    std::vector<VfxMeshHandle>          vfx;            // VfxMesh 子（ループ）
+    std::vector<Vector3>                vfxOffsets;     // vfx と対の相対オフセット
+    GpuParticleHandle                   gpu;            // GPU 子（ループ）
+    Vector3                             gpuOffset = { 0.0f, 0.0f, 0.0f };
+    std::vector<YoRigine::SoundHandle>  sounds;         // ループ音（保持して Stop 連鎖）
     Vector3                             basePos = { 0.0f, 0.0f, 0.0f };
 
     void SetPosition(const Vector3& pos);
@@ -70,16 +119,51 @@ class CompositeEffectManager {
 public:
     static CompositeEffectManager* GetInstance();
 
+    // ============================================================
+    // 依存先マネージャの注入 (DI)
+    //   所有はしない (借用のみ)。Finalize() で nullptr に戻すのでダングリングポインタは残らない。
+    //   ScanDirectory()/Play 系を呼ぶより前に、全て注入しておくこと。
+    // ============================================================
+    void SetVfxMeshSpawner(VfxMeshSpawner* vfxMeshSpawner) { vfxMeshSpawner_ = vfxMeshSpawner; }
+    void SetGpuEmitManager(YoRigine::GpuEmitManager* gpuEmitManager) { gpuEmitManager_ = gpuEmitManager; }
+    void SetAudio(YoRigine::Audio* audio) { audio_ = audio; }
+    void SetCollisionManager(YoRigine::CollisionManager* collisionManager) { collisionManager_ = collisionManager; }
+    void SetYParticleManager(YParticleManager* yParticleManager) { yParticleManager_ = yParticleManager; }
+    void SetYEmitterGroupManager(YEmitterGroupManager* yEmitterGroupManager) { yEmitterGroupManager_ = yEmitterGroupManager; }
+
+    // アプリ終了時に借用ポインタを手放す
+    void Finalize();
+
     // YComposites/*.json を再帰スキャンして全ロード
     void ScanDirectory(const std::string& dir = "Resources/Json/YComposites/");
     bool LoadAsset(const std::string& filepath);
 
     bool Has(const std::string& name) const;
+    std::vector<std::string> GetAssetNames() const;
+
+    // 毎フレーム呼ぶこと（hitDelayの遅延ダメージクエリを消化する）。
+    // VfxMeshSpawner::Update等と同じ場所（GameScene/DevelopSceneのUpdate）で呼ぶ想定。
+    void Update(float deltaTime);
+
+    // Play/PlayOneShot の拡張パラメータ。省略時は全て既定値＝従来と同じ挙動。
+    struct PlayParams {
+        // このComposite全体の見た目寿命がminDuration秒を下回らないよう、
+        // 対応可能な子（現状VfxMeshのみ。7.2参照）を自動で引き伸ばす。0=指定なし。
+        // 例: atk.totalFrames/atk.fps をそのまま渡す。
+        float minDuration = 0.0f;
+
+        // hitDelay到達時に呼ばれる（QuerySphereの結果を渡す）。
+        // asset側のhitDelay<0なら呼ばれない。ダメージ適用はコールバック側の責務
+        // （CompositeEffectManagerはHP/ダメージAPIを知らない設計を維持する）。
+        std::function<void(const std::vector<BaseCollider*>&)> onHitQuery;
+    };
 
     // ワンショット（撃ちっぱなし。破片・爆発など）
     void PlayOneShot(const std::string& name, const Vector3& pos);
+    void PlayOneShot(const std::string& name, const Vector3& pos, const PlayParams& params);
     // ループ（返り値の EffectHandle で追従・停止）
     EffectHandle Play(const std::string& name, const Vector3& pos);
+    EffectHandle Play(const std::string& name, const Vector3& pos, const PlayParams& params);
 
     // 1件を Resources/Json/YComposites/<名前>.json に保存
     bool SaveAsset(const std::string& name);
@@ -96,6 +180,24 @@ private:
     CompositeEffectManager& operator=(const CompositeEffectManager&) = delete;
 
     std::unordered_map<std::string, CompositeEffectAsset> assets_;
+
+    // 依存先マネージャ (借用のみ・非所有)。使用前に Set 系で注入すること。
+    VfxMeshSpawner*              vfxMeshSpawner_ = nullptr;
+    YoRigine::GpuEmitManager*    gpuEmitManager_ = nullptr;
+    YoRigine::Audio*             audio_ = nullptr;
+    YoRigine::CollisionManager*  collisionManager_ = nullptr;
+    YParticleManager*            yParticleManager_ = nullptr;
+    YEmitterGroupManager*        yEmitterGroupManager_ = nullptr;
+
+    // ── hitDelay用の遅延ダメージクエリ待ち行列（Update()で毎フレーム消化） ──
+    struct PendingHitQuery {
+        Vector3  pos;
+        float    radius = 1.5f;
+        uint32_t layerMask = 0xFFFFFFFFu;
+        float    remaining = 0.0f;
+        std::function<void(const std::vector<BaseCollider*>&)> callback;
+    };
+    std::vector<PendingHitQuery> pendingHitQueries_;
 
 #ifdef USE_IMGUI
     // 編集UI用の状態

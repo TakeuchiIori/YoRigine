@@ -102,6 +102,8 @@ void Player::InitStates() {
 // ============================================================
 void Player::InitCombatSystem() {
 	combat_ = std::make_unique<PlayerCombat>(this);
+	magicController_ = std::make_unique<PlayerMagicController>(this);
+	styleController_ = std::make_unique<PlayerStyleController>();
 
 	// アクション変更コールバック（デバッグログ）
 	combat_->SetActionCallback([this]([[maybe_unused]] const std::string& action) {
@@ -120,10 +122,34 @@ void Player::HandleCombatInput() {
 
 	const bool pressedA = input_->IsPadTriggered(0, GamePadButton::A);
 	const bool pressedB = input_->IsPadTriggered(0, GamePadButton::B);
+	const bool pressedX = input_->IsPadTriggered(0, GamePadButton::X)
+		|| input_->GetInstance()->TriggerKey(DIK_N);
+	const bool heldA = input_->IsPadPressed(0, GamePadButton::A);
+	const bool heldB = input_->IsPadPressed(0, GamePadButton::B);
+	const bool heldX = input_->IsPadPressed(0, GamePadButton::X)
+		|| input_->GetInstance()->PushKey(DIK_N);
+
+	// Y は戦闘スタイルの切替だけを担当する。
+	// スタイル状態を専用クラスへ逃がすことで、剣/魔法が増えても PlayerCombat にUI都合の分岐を背負わせない。
+	if (styleController_ && input_->IsPadTriggered(0, GamePadButton::Y)) {
+		styleController_->Toggle();
+	}
 
 	// 攻撃中の入力は AttackingCombatState が AttackData の inputBufferStart に従ってバッファ管理する
 	if (!combat_->IsIdle()) return;
 
+	if (styleController_ && styleController_->IsMagic()) {
+		HandleMagicInput(pressedA, pressedB, pressedX, heldA, heldB, heldX);
+		return;
+	}
+
+	HandleSwordInput(pressedA, pressedB, pressedX);
+}
+
+// ============================================================
+// 剣スタイル入力
+// ============================================================
+void Player::HandleSwordInput(bool pressedA, bool pressedB, bool pressedX) {
 	// A（軽攻撃）コンボ開始
 	if (pressedA) {
 		combat_->TryAttack(AttackType::A_Arte);
@@ -135,11 +161,22 @@ void Player::HandleCombatInput() {
 	}
 
 	// ガード
-	if (input_->IsPadTriggered(0, GamePadButton::X)
-		|| input_->GetInstance()->TriggerKey(DIK_N)) {
+	if (pressedX) {
 		combat_->TryGuard();
 	}
+}
 
+// ============================================================
+// 魔法スタイル入力
+// ============================================================
+void Player::HandleMagicInput(bool pressedA, bool pressedB, bool pressedX, bool heldA, bool heldB, bool heldX) {
+	if (!magicController_) return;
+
+	// 魔法入力はコントローラーへ渡すだけにする。
+	// Player は「どのスロット入力か」だけを渡し、溜め・離し・イベント実行は魔法側へ閉じ込める。
+	magicController_->HandleSlotInput(PlayerMagicSlot::Primary, pressedA, heldA);
+	magicController_->HandleSlotInput(PlayerMagicSlot::Secondary, pressedB, heldB);
+	magicController_->HandleSlotInput(PlayerMagicSlot::Utility, pressedX, heldX);
 }
 
 // ============================================================
@@ -152,6 +189,8 @@ void Player::InitCollision() {
 	);
 	obbCollider_->SetIsStatic(false);
 	obbCollider_->SetMass(100.0f);
+	// 敵と重なっても押し戻しで浮き上がらないよう水平方向のみ押し戻す
+	obbCollider_->SetLockPenetrationY(true);
 	// Player は画面外でも常に当たり判定を回す
 	obbCollider_->SetCheckOutsideCamera(false);
 
@@ -172,6 +211,16 @@ void Player::Update() {
 
 	// 入力処理
 	HandleCombatInput();
+
+	// スタイルに応じて武器の見た目（剣／杖）を同期する。
+	const bool isMagicStyle = styleController_ && styleController_->IsMagic();
+	if (playerSword_) {
+		playerSword_->SetMagicVisual(isMagicStyle);
+	}
+	// 魔法スタイルでは防御できないので盾を外す（表示・判定とも）。
+	if (playerShield_) {
+		playerShield_->SetVisible(!isMagicStyle);
+	}
 
 	// HPチェック
 	if (hp_ <= 0) {
@@ -194,8 +243,8 @@ void Player::Update() {
 	//------------------------------------------------------------
 	// 生存時処理
 	//------------------------------------------------------------
-	// 盾のコライダーON/OFF制御
-	if (combat_->GetCurrentState() == CombatState::Guarding) {
+	// 盾のコライダーON/OFF制御（魔法スタイルでは防御しないので常に無効）
+	if (!isMagicStyle && combat_->GetCurrentState() == CombatState::Guarding) {
 		playerShield_->SetEnableCollider(true);
 	}
 	else {
@@ -208,6 +257,7 @@ void Player::Update() {
 	// ステート更新
 	movement_->Update(YoRigine::GameTime::GetDeltaTime());
 	combat_->Update(YoRigine::GameTime::GetDeltaTime());
+	if (magicController_) magicController_->Update(YoRigine::GameTime::GetDeltaTime());
 
 	// オブジェクト更新
 	obj_->UpdateAnimation();
@@ -241,6 +291,7 @@ void Player::DrawCollision() {
 	if (isAlive_) {
 		playerSword_->DrawCollision();
 		playerShield_->DrawCollision();
+		if (magicController_) magicController_->DrawCollision();
 		obbCollider_->Draw();
 	}
 }
@@ -271,6 +322,9 @@ void Player::DrawShadow() {
 void Player::DrawImGui() {
 	movement_->ShowStateDebug();
 	combat_->ShowDebugImGui();
+#ifdef USE_IMGUI
+	if (magicController_) magicController_->ShowDebugImGui();
+#endif
 }
 
 // ============================================================
@@ -410,6 +464,8 @@ void Player::OnDirectionCollision([[maybe_unused]] BaseCollider* self, [[maybe_u
 void Player::OnEnterDirectionCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other, HitDirection dir)
 {
 	if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kBattleEnemy)) {
+		// ガード中は盾コライダー側で処理するため、プレイヤー本体ではスキップ
+		if (combat_->IsGuarding()) return;
 
 		//------------------------------------------------------------
 		// SE再生
@@ -442,7 +498,10 @@ void Player::OnEnterDirectionCollision([[maybe_unused]] BaseCollider* self, Base
 void Player::Reset() {
 	hp_ = maxHP_;
 	isAlive_ = true;
+	isInvincible_ = false;
 	if (combat_) combat_->Reset();
+	if (magicController_) magicController_->Reset();
+	if (styleController_) styleController_->Reset();
 	if (movement_) {
 		movement_->SetCanMove(true);
 		movement_->SetCanRotate(true);
@@ -471,6 +530,41 @@ void Player::TakeDamage(int damage) {
 }
 
 // ============================================================
+// 被弾時のヒット（のけぞり）反応
+// 敵の攻撃が実際にヒットしたタイミングで呼ばれ、被弾方向に応じた
+// ヒットモーションへ遷移させる。方向ヒットのコールバックは衝突系から
+// 発火されないため、ダメージ処理側から明示的に呼ぶ設計にしている。
+// ============================================================
+void Player::ApplyHitReaction(const Vector3& attackerPos) {
+	// 死亡・ガード中・無敵中はのけぞらせない（ガードは盾側で処理）
+	if (!isAlive_ || hp_ <= 0) return;
+	if (isInvincible_) return;
+	if (combat_->IsDead() || combat_->IsGuarding()) return;
+
+	// 攻撃者との水平relative位置から、自分の向き基準で前/後を判定
+	Vector3 toAttacker = attackerPos - wt_.translate_;
+	toAttacker.y = 0.0f;
+
+	const float facing = wt_.rotate_.y;
+	const float forwardX = std::sin(facing);
+	const float forwardZ = std::cos(facing);
+	const float dot = toAttacker.x * forwardX + toAttacker.z * forwardZ;
+
+	// 前方から食らったら Front、背後から食らったら Back
+	HitDirection dir = (dot < 0.0f) ? HitDirection::Back : HitDirection::Front;
+
+	// カメラシェイク（被弾方向で強度を変える）
+	if (playerCamera_) {
+		float intensity = (dir == HitDirection::Back) ? 0.6f : 0.4f;
+		float duration  = (dir == HitDirection::Back) ? 0.25f : 0.2f;
+		playerCamera_->StartShake(intensity, duration);
+	}
+
+	combat_->SetHitDirection(dir);
+	combat_->ChangeState(CombatState::Hit);
+}
+
+// ============================================================
 // 復活処理
 // ============================================================
 void Player::Revive(int reviveHP) {
@@ -478,6 +572,7 @@ void Player::Revive(int reviveHP) {
 
 	hp_ = reviveHP;
 	isAlive_ = true;
+	isInvincible_ = false;
 
 	// ステートをIdleに戻す
 	combat_->ChangeState(CombatState::Idle);

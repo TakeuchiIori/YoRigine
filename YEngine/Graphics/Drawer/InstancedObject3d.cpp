@@ -32,7 +32,7 @@ void InstancedObject3d::Initialize()
 {
 	if (dxCommon_) return; // 二重初期化防止
 	dxCommon_ = YoRigine::DirectXCommon::GetInstance();
-	srvManager_ = SrvManager::GetInstance();
+	srvManager_ = YoRigine::SrvManager::GetInstance();
 
 	// 共有 MaterialLight（lighting有効, specular/env無効, shininess=8）。
 	// MaterialLighting 経由なのでトゥーン等のグローバル設定も自動で反映される。

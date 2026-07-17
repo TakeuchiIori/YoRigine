@@ -28,21 +28,21 @@ void AreaManager::Initialize()
 	isDebugDrawEnabled_ = false;
 }
 
-void AreaManager::Update(const Vector3& targetPosition, void* targetKey)
+void AreaManager::Update(const Vector3& targetPosition, void* targetKey, float deltaTime)
 {
 	for (auto& [name, area] : areas_) {
 		if (area && area->IsActive()) {
-			area->Update(targetPosition, targetKey);
+			area->Update(targetPosition, targetKey, deltaTime);
 		}
 	}
 }
 
-void AreaManager::UpdateTargets(const std::vector<AreaTarget>& targets)
+void AreaManager::UpdateTargets(const std::vector<AreaTarget>& targets, float deltaTime)
 {
 	for (auto& [name, area] : areas_) {
 		if (!area || !area->IsActive()) continue;
 		for (const auto& t : targets) {
-			area->Update(t.position, t.key);
+			area->Update(t.position, t.key, deltaTime);
 		}
 	}
 }
@@ -300,11 +300,11 @@ void AreaManager::UpdateSingleObject(WorldTransform* wt)
 
 	if (!hasBoundaryArea) return;
 
-	Vector3 currentPos = {
-		wt->matWorld_.m[3][0],
-		wt->matWorld_.m[3][1],
-		wt->matWorld_.m[3][2]
-	};
+	// translate_ を参照する（matWorld_ は呼び出し側で UpdateMatrix() する前だと
+	// 1フレーム古い、または生成直後は未更新(原点)のため、クランプ判定が誤る）。
+	// クランプ対象は親を持たないトップレベルのオブジェクト(プレイヤー/敵)で、
+	// UpdateRestrictedObjects と同じ扱い。
+	Vector3 currentPos = wt->translate_;
 
 	if (!IsInsideAreaByPurpose(currentPos, AreaPurpose::Boundary)) {
 		Vector3 clampedPos = ClampToNearestArea(currentPos);

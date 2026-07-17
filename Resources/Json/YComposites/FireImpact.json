@@ -1,0 +1,12 @@
+{
+  "name": "FireImpact",
+  "particleEffects": [
+    { "asset": "FxFireExplosionSparks", "offset": [0.0, 0.2, 0.0] },
+    { "asset": "FxFireExplosionSmoke", "offset": [0.0, 0.3, 0.0] }
+  ],
+  "vfxMeshAssets": [
+    { "asset": "FxFireExplosionCore", "offset": [0.0, 0.0, 0.0], "scale": 0.8 }
+  ],
+  "gpuEmitterGroup": "",
+  "sounds": []
+}

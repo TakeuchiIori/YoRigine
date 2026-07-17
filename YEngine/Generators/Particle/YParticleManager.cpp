@@ -18,7 +18,7 @@
 // 初期化・終了
 //=================================================================
 
-void YParticleManager::Initialize(SrvManager* srvManager, uint32_t maxTotalParticles) {
+void YParticleManager::Initialize(YoRigine::SrvManager* srvManager, uint32_t maxTotalParticles) {
 	if (initialized_) return;
 
 	srvManager_ = srvManager;
@@ -283,6 +283,13 @@ void YParticleManager::Update(float deltaTime) {
 		activeEmitters_.end());
 
 	YEmitterGroupManager::GetInstance().Update(deltaTime);
+}
+
+void YParticleManager::StopAndClearActiveEmitters() {
+	for (auto& e : activeEmitters_) {
+		if (e) e->SetActive(false);
+	}
+	activeEmitters_.clear();
 }
 
 //=================================================================

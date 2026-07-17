@@ -37,6 +37,8 @@ private:
 	void CreateEmitCS();
 	// パーティクル更新
 	void CreateParticleUpdateCS();
+	// インダイレクト描画引数バッファのリセット（1スレッド）
+	void CreateResetDrawArgsCS();
 	// ポストエフェクト: 5種類の共通RootSignatureと、各エフェクトのCompute PSOを生成
 	void CreatePostEffectCS();
 

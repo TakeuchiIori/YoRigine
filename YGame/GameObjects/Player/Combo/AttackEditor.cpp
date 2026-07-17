@@ -361,7 +361,7 @@ void AttackDataEditor::DrawAttackDetail()
 // ============================================================
 // プレイヤー用バイナリアニメーション選択
 // ============================================================
-void AttackDataEditor::DrawAnimationSelector(AttackData& atk, bool& changed)
+void AttackDataEditor::DrawAnimationSelector([[maybe_unused]] AttackData& atk, [[maybe_unused]] bool& changed)
 {
 #ifdef USE_IMGUI
 	const auto it = std::find(playerAnimationNames_.begin(), playerAnimationNames_.end(), atk.animationName);

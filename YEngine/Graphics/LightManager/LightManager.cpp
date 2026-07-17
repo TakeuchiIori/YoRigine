@@ -12,6 +12,7 @@
 #include "OffScreen/OffScreen.h"
 // Math
 #include "MathFunc.h"
+#include <cassert>
 
 
 #ifdef USE_IMGUI
@@ -26,6 +27,14 @@ namespace YoRigine {
 	{
 		static LightManager instance;
 		return &instance;
+	}
+
+	//=====================================================================
+	// アプリ終了時に借用ポインタを手放す
+	//=====================================================================
+	void LightManager::Finalize()
+	{
+		offScreen_ = nullptr;
 	}
 
 	//=====================================================================
@@ -260,7 +269,8 @@ namespace YoRigine {
 		{
 			Matrix4x4 viewProj = camera_->GetViewProjectionMatrix();
 			Matrix4x4 invVP    = Inverse(viewProj);
-			OffScreen::GetInstance()->SetFogCameraAndLight(invVP, cameraPos, lightDir);
+			assert(offScreen_ && "LightManager : SetOffScreen() を先に呼ぶこと");
+			offScreen_->SetFogCameraAndLight(invVP, cameraPos, lightDir);
 
 			// --- God Rays 用の太陽スクリーン UV / 可視度 ---
 			// 太陽は光源方向の逆 (= -lightDir) に十分離れた場所にいると見なす
@@ -289,7 +299,7 @@ namespace YoRigine {
 				// 0(中央)〜1(端) → そこから先 1〜1.5 でフェードアウト
 				visibility = 1.0f - std::clamp((maxD - 1.0f) / 0.5f, 0.0f, 1.0f);
 			}
-			OffScreen::GetInstance()->SetGodRaysSun(sunUV, visibility);
+			offScreen_->SetGodRaysSun(sunUV, visibility);
 		}
 	}
 

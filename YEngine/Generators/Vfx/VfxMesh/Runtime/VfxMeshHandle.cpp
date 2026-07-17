@@ -4,25 +4,28 @@
 VfxMeshHandle VfxMeshHandle::Play(const std::string& assetName,
                                   const Vector3&     position,
                                   float              scale,
-                                  bool               loop)
+                                  bool               loop,
+                                  float              timeScale)
 {
-    uint32_t id = VfxMeshSpawner::GetInstance()->Spawn(assetName, position, scale, loop);
+    uint32_t id = VfxMeshSpawner::GetInstance()->Spawn(assetName, position, scale, loop, timeScale);
     return VfxMeshHandle(id);
 }
 
 void VfxMeshHandle::PlayOneShot(const std::string& assetName,
                                 const Vector3&     position,
-                                float              scale)
+                                float              scale,
+                                float              timeScale)
 {
-    VfxMeshSpawner::GetInstance()->Spawn(assetName, position, scale, false);
+    VfxMeshSpawner::GetInstance()->Spawn(assetName, position, scale, false, timeScale);
 }
 
 VfxMeshHandle VfxMeshHandle::PlayBolt(const std::string& assetName,
                                       const Vector3&     start,
                                       const Vector3&     end,
-                                      bool               loop)
+                                      bool               loop,
+                                      float              timeScale)
 {
-    uint32_t id = VfxMeshSpawner::GetInstance()->SpawnBolt(assetName, start, end, loop);
+    uint32_t id = VfxMeshSpawner::GetInstance()->SpawnBolt(assetName, start, end, loop, timeScale);
     return VfxMeshHandle(id);
 }
 
@@ -36,6 +39,12 @@ void VfxMeshHandle::SetScale(float scale)
 {
     if (id_ == 0) return;
     VfxMeshSpawner::GetInstance()->SetScale(id_, scale);
+}
+
+void VfxMeshHandle::SetTimeScale(float timeScale)
+{
+    if (id_ == 0) return;
+    VfxMeshSpawner::GetInstance()->SetTimeScale(id_, timeScale);
 }
 
 void VfxMeshHandle::SetEndpoints(const Vector3& start, const Vector3& end)

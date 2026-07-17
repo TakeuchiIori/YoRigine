@@ -1,0 +1,34 @@
+{
+  "bold": false,
+  "charSpacing": 0.0,
+  "fill": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+  ],
+  "fontFamily": "Meiryo",
+  "fontFilePath": "Resources/Fonts/ipaexg.ttf",
+  "fontSize": 44.0,
+  "italic": false,
+  "outlineColor": [
+    0.05000000074505806,
+    0.05000000074505806,
+    0.07999999821186066,
+    1.0
+  ],
+  "outlineWidth": 5.0,
+  "padding": 12.0,
+  "shadow": false,
+  "shadowColor": [
+    0.0,
+    0.0,
+    0.0,
+    0.5
+  ],
+  "shadowOffset": [
+    3.0,
+    3.0
+  ],
+  "text": "敵を倒せ！  0/1"
+}

@@ -13,6 +13,11 @@
 #include <Debugger/Logger.h>
 #include "Systems/GameTime/GameTime.h"
 #include <IconsFontAwesome5.h>
+#include "GpuEmitterJson.h"   // GpuForceFieldParams の to_json/from_json
+#include <cassert>
+#ifdef USE_IMGUI
+#include "GpuEmitManagerEditorUI.h"
+#endif
 
 namespace YoRigine {
 	// ImGui用の形状名一覧
@@ -38,6 +43,9 @@ namespace YoRigine {
 	/// </summary>
 	void GpuEmitManager::Initialize()
 	{
+		assert(textureManager_ && "GpuEmitManager : SetTextureManager() を先に呼ぶこと");
+		assert(modelManager_ && "GpuEmitManager : SetModelManager() を先に呼ぶこと");
+
 #ifdef USE_IMGUI
 		// --- テクスチャブラウザ ---
 		textureBrowser_ = FileBrowser(
@@ -46,9 +54,9 @@ namespace YoRigine {
 			FileBrowser::DisplayMode::Grid
 		);
 		// サムネイルプロバイダ: TextureManager 経由で GPU ハンドルを返す
-		textureBrowser_.SetThumbnailProvider([](const std::string& path) -> ImTextureID {
-			TextureManager::GetInstance()->LoadTexture(path);
-			auto handle = TextureManager::GetInstance()->GetsrvHandleGPU(path);
+		textureBrowser_.SetThumbnailProvider([this](const std::string& path) -> ImTextureID {
+			textureManager_->LoadTexture(path);
+			auto handle = textureManager_->GetsrvHandleGPU(path);
 			return handle.ptr != 0 ? static_cast<ImTextureID>(handle.ptr) : 0;
 			});
 		// 選択時コールバック: テクスチャパスを入力バッファに反映
@@ -78,8 +86,17 @@ namespace YoRigine {
 		gizmoLine_->SetCamera(camera_);
 #endif
 
-		ModelManager::GetInstance()->LoadModel("Resources/Models/Cube", "Cube.obj");
+		modelManager_->LoadModel("Resources/Models/Cube", "Cube.obj");
 		LoadAllEmitters();
+	}
+
+	/// <summary>
+	/// アプリ終了時に借用ポインタを手放す
+	/// </summary>
+	void GpuEmitManager::Finalize()
+	{
+		textureManager_ = nullptr;
+		modelManager_ = nullptr;
 	}
 
 	/// <summary>
@@ -115,7 +132,8 @@ namespace YoRigine {
 					// グループ原点＋ローカルオフセットをワールド発生位置として毎フレーム反映（追従）
 					emitterData->emitter->SetEmitWorldPosition(
 						groupData->translate + GetEmitterLocalOffset(emitterData.get()));
-					emitterData->emitter->SetTrailParams(emitterData->trailParams);
+					// フォースフィールドもグループ原点に追従させる（center はグループ相対）
+					emitterData->emitter->SetForceFields(emitterData->forceFields, groupData->translate);
 					emitterData->emitter->Update(deltaTime);
 				}
 			}
@@ -175,6 +193,72 @@ namespace YoRigine {
 			RegisterEmitterGizmo(it->second.get(), group->translate + GetEmitterLocalOffset(it->second.get()));
 			gizmoLine_->SetColor({ 1.0f, 0.9f, 0.1f, 1.0f });
 			gizmoLine_->DrawLine();
+		}
+
+		// --- フォースフィールド範囲（マゼンタ）---
+		for (auto& [name, e] : group->emitters) {
+			if (!e) continue;
+			RegisterForceFieldGizmos(e.get(), group->translate);
+		}
+		gizmoLine_->SetColor({ 1.0f, 0.3f, 1.0f, 1.0f });
+		gizmoLine_->DrawLine();
+
+		// --- killRadius（赤・消滅範囲）---
+		for (auto& [name, e] : group->emitters) {
+			if (!e) continue;
+			for (const auto& ff : e->forceFields) {
+				if (!ff.isEnable) continue;
+				if (ff.mode == GpuFieldMode::ConvergeToCenter && ff.killRadius > 0.0001f) {
+					gizmoLine_->DrawSphere(group->translate + ff.center, ff.killRadius, 12);
+				}
+			}
+		}
+		gizmoLine_->SetColor({ 1.0f, 0.15f, 0.15f, 1.0f });
+		gizmoLine_->DrawLine();
+	}
+
+	/// <summary>
+	/// 単一エミッタのフォースフィールド範囲を gizmoLine_ に線分登録（DrawLine は呼び出し側が発行）
+	/// </summary>
+	void GpuEmitManager::RegisterForceFieldGizmos(const EmitterData* e, const Vector3& groupOrigin)
+	{
+		if (!e) return;
+
+		for (const auto& ff : e->forceFields) {
+			if (!ff.isEnable) continue;
+
+			const Vector3 center = groupOrigin + ff.center;
+
+			// フィールドの外形
+			if (ff.shape == GpuFieldShape::Sphere) {
+				gizmoLine_->DrawSphere(center, ff.radius, 16);
+			} else {
+				gizmoLine_->DrawAABB(center - ff.halfExtents, center + ff.halfExtents);
+			}
+
+			// モードの向きが分かるガイド線
+			switch (ff.mode) {
+			case GpuFieldMode::DirectionalAccel:
+			{
+				// 加速方向の矢印
+				Vector3 d = ff.direction;
+				float len = std::sqrt(d.x * d.x + d.y * d.y + d.z * d.z);
+				d = (len < 1e-4f) ? Vector3{ 0.0f, 1.0f, 0.0f } : d * (1.0f / len);
+				const float guide = (ff.shape == GpuFieldShape::Sphere) ? ff.radius : ff.halfExtents.y;
+				gizmoLine_->RegisterLine(center, center + d * guide);
+				break;
+			}
+			case GpuFieldMode::ConvergeToCenter:
+			case GpuFieldMode::RadialRepel:
+			{
+				// 中心マーカー（十字）
+				const float m = 0.3f;
+				gizmoLine_->RegisterLine(center - Vector3{ m, 0, 0 }, center + Vector3{ m, 0, 0 });
+				gizmoLine_->RegisterLine(center - Vector3{ 0, m, 0 }, center + Vector3{ 0, m, 0 });
+				gizmoLine_->RegisterLine(center - Vector3{ 0, 0, m }, center + Vector3{ 0, 0, m });
+				break;
+			}
+			}
 		}
 	}
 
@@ -260,6 +344,7 @@ namespace YoRigine {
 		auto* emitter = emitterData->emitter.get();
 		auto& params = emitterData->particleParams;
 		emitter->SetParticleParameters(params);
+		// フォースフィールドは Update() で毎フレーム（グループ原点込みで）転送する
 	}
 
 	/// <summary>
@@ -321,6 +406,17 @@ namespace YoRigine {
 	}
 
 	/// <summary>
+	/// グループの「自然な寿命」の見積り（秒）。GetGroupMaxLifetime の public wrapper。
+	/// Composite::NaturalDuration() の集計に使う。存在しないグループは 0 を返す（=不明扱い）。
+	/// </summary>
+	float GpuEmitManager::EstimateGroupNaturalDuration(const std::string& groupName) const
+	{
+		auto it = groups_.find(groupName);
+		if (it == groups_.end() || !it->second) return 0.0f;
+		return GetGroupMaxLifetime(it->second.get());
+	}
+
+	/// <summary>
 	/// エミッターの形状ごとのローカル発生位置（オフセット）を取得
 	/// </summary>
 	Vector3 GpuEmitManager::GetEmitterLocalOffset(const EmitterData* emitterData) const
@@ -362,1246 +458,15 @@ namespace YoRigine {
 		return it != groups_.end() && it->second->isPlaying;
 	}
 	/// <summary>
-	/// エミッター管理用の ImGui 描画
+	/// エミッター管理用の ImGui 描画。UI本体は GpuEmitManagerEditorUI に分離済み (神クラス対策)。
 	/// </summary>
 	void GpuEmitManager::DrawImGui()
 	{
 #ifdef USE_IMGUI
-		// メニューバー
-
-		if (ImGui::CollapsingHeader("ファイル操作（上級者向け・全グループ一括）", ImGuiTreeNodeFlags_None))
-		{
-			ImGui::TextDisabled("通常はここを使わず、[グループ管理]タブでグループ単位に保存してください。");
-			ImGui::TextDisabled("↓は全グループをまとめて1ファイルに読み書きする一括操作です。");
-			ImGui::Spacing();
-			float halfWidth = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
-			if (ImGui::Button(ICON_FA_SAVE " 全グループを保存", ImVec2(halfWidth, 0))) {
-				if (SaveToFile(saveFilePath_))
-					std::cout << "保存成功: " << saveFilePath_ << std::endl;
-				else
-					std::cout << "保存失敗: " << saveFilePath_ << std::endl;
-			}
-			ImGui::SameLine();
-			if (ImGui::Button(ICON_FA_FOLDER_OPEN " 読み込み", ImVec2(halfWidth, 0))) {
-				if (LoadFromFile(saveFilePath_))
-					std::cout << "読み込み成功: " << saveFilePath_ << std::endl;
-				else
-					std::cout << "読み込み失敗: " << saveFilePath_ << std::endl;
-			}
-
-			ImGui::Separator();
-
-			// 2. パス入力とディレクトリのスキャンロジック
-			ImGui::InputText("ファイルパス", saveFilePath_, sizeof(saveFilePath_));
-
-			// 編集中のパスからディレクトリ部分を抽出 (既存ロジック)
-			std::filesystem::path currentPath(saveFilePath_);
-
-			// ディレクトリが変わっていたら再スキャン
-			std::string dirPath = currentPath.has_filename()
-				? currentPath.parent_path().string()
-				: currentPath.string();
-			if (!dirPath.empty() && dirPath.back() != '/') dirPath += '/';
-
-			if (dirPath != jsonBrowser_.GetCurrentDir()) {
-				jsonBrowser_.Scan(dirPath);
-			}
-
-			// FileBrowser に全部任せる
-			jsonBrowser_.Draw("JsonList", ImVec2(0, 150));
-
-			ImGui::Separator();
-
-			// 全削除ボタン（目立つように配置）
-			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.2f, 0.2f, 1.0f)); // 危険な操作なので赤くする
-			if (ImGui::Button("全削除", ImVec2(ImGui::GetContentRegionAvail().x, 0)) && !groups_.empty()) {
-				showDeleteDialog_ = true;
-				selectedGroupName_.clear();
-			}
-			ImGui::PopStyleColor();
-		}
-		// エミッタ形状のライン可視化トグル
-		ImGui::Checkbox("エミッタ形状をライン表示（選択グループ）", &showEmitterGizmos_);
-		ImGui::SameLine();
-		ImGui::TextDisabled("(黄=選択エミッタ / 水色=同グループの他)");
-
-		// タブバーでセクション分け
-		if (ImGui::BeginTabBar("MainTabs", ImGuiTabBarFlags_None))
-		{
-			// ===== グループ管理タブ =====
-			if (ImGui::BeginTabItem("グループ管理"))
-			{
-				DrawGroupManagementTab();
-				ImGui::EndTabItem();
-			}
-
-			// ===== エミッター管理タブ =====
-			if (ImGui::BeginTabItem("エミッター管理"))
-			{
-				DrawEmitterManagementTab();
-				ImGui::EndTabItem();
-			}
-
-			// ===== エディタータブ =====
-			if (ImGui::BeginTabItem("エディター"))
-			{
-				DrawEditorTab();
-				ImGui::EndTabItem();
-			}
-
-			ImGui::EndTabBar();
-		}
-
-		// 削除確認ダイアログ
-		DrawDeleteDialog();
-
-#endif // USE_IMGUI
-	}
-
-	bool GpuEmitManager::DrawParticleParametersEditor(EmitterData* emitterData)
-	{
-#ifdef USE_IMGUI
-		bool changed = false;
-
-		if (ImGui::CollapsingHeader("パーティクルパラメータ設定", ImGuiTreeNodeFlags_DefaultOpen))
-		{
-			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8, 4));
-			ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8, 8));
-
-			// ===== 描画メッシュ形状（1粒子の見た目）=====
-			{
-				static const char* meshShapeNames[] = {
-					"板ポリ(Plane)", "立方体(Box)", "リング(Ring)", "円柱(Cylinder)",
-					"球(Sphere)", "円錐(Cone)", "扇形(Fan)"
-				};
-				bool meshDirty = false;
-
-				int shapeIdx = static_cast<int>(emitterData->particleMeshShape);
-				if (ImGui::Combo("粒子メッシュ形状", &shapeIdx, meshShapeNames, IM_ARRAYSIZE(meshShapeNames))) {
-					emitterData->particleMeshShape = static_cast<ParticleMeshShape>(shapeIdx);
-					meshDirty = true;
-				}
-
-				// 形状ごとの生成パラメータ（実サイズは粒子scaleで拡縮）
-				auto& mp = emitterData->particleMeshParams;
-				int divideI = static_cast<int>(mp.divide);
-				int subdivI = static_cast<int>(mp.subdivisions);
-				switch (emitterData->particleMeshShape) {
-				case ParticleMeshShape::Plane:
-					meshDirty |= ImGui::DragFloat("幅",   &mp.width,  0.01f, 0.01f, 100.0f, "%.3f");
-					meshDirty |= ImGui::DragFloat("高さ", &mp.height, 0.01f, 0.01f, 100.0f, "%.3f");
-					break;
-				case ParticleMeshShape::Box:
-					meshDirty |= ImGui::DragFloat("幅",     &mp.width,  0.01f, 0.01f, 100.0f, "%.3f");
-					meshDirty |= ImGui::DragFloat("高さ",   &mp.height, 0.01f, 0.01f, 100.0f, "%.3f");
-					meshDirty |= ImGui::DragFloat("奥行き", &mp.depth,  0.01f, 0.01f, 100.0f, "%.3f");
-					break;
-				case ParticleMeshShape::Ring:
-					meshDirty |= ImGui::DragFloat("外周半径", &mp.outerRadius, 0.01f, 0.01f, 100.0f, "%.3f");
-					meshDirty |= ImGui::DragFloat("内周半径", &mp.innerRadius, 0.01f, 0.0f,  100.0f, "%.3f");
-					if (ImGui::DragInt("分割数", &divideI, 1, 3, 128)) { mp.divide = static_cast<uint32_t>(divideI); meshDirty = true; }
-					break;
-				case ParticleMeshShape::Cylinder:
-					meshDirty |= ImGui::DragFloat("外周半径", &mp.outerRadius, 0.01f, 0.01f, 100.0f, "%.3f");
-					meshDirty |= ImGui::DragFloat("内周半径", &mp.innerRadius, 0.01f, 0.0f,  100.0f, "%.3f");
-					meshDirty |= ImGui::DragFloat("高さ",     &mp.height,      0.01f, 0.01f, 100.0f, "%.3f");
-					if (ImGui::DragInt("分割数", &divideI, 1, 3, 128)) { mp.divide = static_cast<uint32_t>(divideI); meshDirty = true; }
-					break;
-				case ParticleMeshShape::Sphere:
-					meshDirty |= ImGui::DragFloat("半径", &mp.radius, 0.01f, 0.01f, 100.0f, "%.3f");
-					if (ImGui::DragInt("細分化レベル", &subdivI, 1, 0, 5)) { mp.subdivisions = static_cast<uint32_t>(subdivI); meshDirty = true; }
-					break;
-				case ParticleMeshShape::Cone:
-					meshDirty |= ImGui::DragFloat("半径", &mp.radius, 0.01f, 0.01f, 100.0f, "%.3f");
-					meshDirty |= ImGui::DragFloat("高さ", &mp.height, 0.01f, 0.01f, 100.0f, "%.3f");
-					if (ImGui::DragInt("分割数", &divideI, 1, 3, 128)) { mp.divide = static_cast<uint32_t>(divideI); meshDirty = true; }
-					break;
-				case ParticleMeshShape::Fan:
-					meshDirty |= ImGui::DragFloat("半径",     &mp.radius,      0.01f, 0.01f, 100.0f, "%.3f");
-					meshDirty |= ImGui::DragFloat("扇の角度", &mp.angleDegree, 1.0f,  1.0f,  360.0f, "%.1f°");
-					if (ImGui::DragInt("分割数", &divideI, 1, 3, 128)) { mp.divide = static_cast<uint32_t>(divideI); meshDirty = true; }
-					break;
-				}
-
-				// 形状 or パラメータが変わったらメッシュを再生成
-				if (meshDirty && emitterData->emitter) {
-					emitterData->emitter->SetParticleMesh(emitterData->particleMeshShape, emitterData->particleMeshParams);
-					changed = true;
-				}
-
-				if (emitterData->particleMeshShape != ParticleMeshShape::Plane) {
-					ImGui::TextDisabled("立体メッシュは「ビルボード」をOFFにすると向きが分かりやすくなります");
-				}
-				ImGui::Spacing();
-			}
-
-			// ===== ビルボード設定 =====
-			ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.2f, 0.5f, 0.7f, 0.8f));
-			if (ImGui::CollapsingHeader("ビルボード", ImGuiTreeNodeFlags_DefaultOpen))
-			{
-				ImGui::PopStyleColor();
-				ImGui::Indent(16.0f);
-				changed |= ImGui::Checkbox("ビルボードを有効", &emitterData->particleParams.isBillboard);
-				ImGui::TextDisabled("パーティクルが常にカメラの方向を向きます");
-				ImGui::Unindent(16.0f);
-				ImGui::Spacing();
-			} else
-			{
-				ImGui::PopStyleColor();
-			}
-
-			// ===== 生存時間 =====
-			ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.7f, 0.3f, 0.3f, 0.8f));
-			if (ImGui::CollapsingHeader("生存時間", ImGuiTreeNodeFlags_DefaultOpen))
-			{
-				ImGui::PopStyleColor();
-				ImGui::Indent(16.0f);
-
-				changed |= ImGui::DragFloat("基本時間 (秒)", &emitterData->particleParams.lifeTime,
-					0.1f, 0.1f, 30.0f, "%.2f 秒");
-
-				changed |= ImGui::DragFloat("ランダム生存幅 (±)", &emitterData->particleParams.lifeTimeVariance,
-					0.01f, 0.0f, 10.0f, "± %.2f 秒");
-
-				float minLife = emitterData->particleParams.lifeTime - emitterData->particleParams.lifeTimeVariance;
-				float maxLife = emitterData->particleParams.lifeTime + emitterData->particleParams.lifeTimeVariance;
-
-				ImGui::BeginDisabled();
-				ImGui::Text("範囲: %.2f ~ %.2f 秒", minLife, maxLife);
-				ImGui::EndDisabled();
-
-				ImGui::Unindent(16.0f);
-				ImGui::Spacing();
-			} else
-			{
-				ImGui::PopStyleColor();
-			}
-
-			// ===== スケール =====
-			ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.3f, 0.7f, 0.3f, 0.8f));
-			if (ImGui::CollapsingHeader("スケール", ImGuiTreeNodeFlags_DefaultOpen))
-			{
-				ImGui::PopStyleColor();
-				ImGui::Indent(16.0f);
-
-				// 基本スケール
-				changed |= ImGui::DragFloat3("開始スケール", &emitterData->particleParams.startScale.x,
-					0.01f, 0.01f, 100.0f, "%.2f");
-
-				// ランダム幅
-				changed |= ImGui::DragFloat3("開始ランダムスケール幅", &emitterData->particleParams.startScaleVariance.x,
-					0.01f, 0.0f, 50.0f, "± %.2f");
-				ImGui::Spacing();
-
-				// 終了スケール
-				changed |= ImGui::DragFloat3("終了スケール", &emitterData->particleParams.endScale.x,
-					0.01f, 0.0f, 100.0f, "%.2f");
-				// ランダム幅
-				changed |= ImGui::DragFloat3("終了ランダムスケール幅", &emitterData->particleParams.endScaleVariance.x,
-					0.01f, 0.0f, 50.0f, "± %.2f");
-
-				ImGui::Unindent(16.0f);
-				ImGui::Spacing();
-			} else
-			{
-				ImGui::PopStyleColor();
-			}
-
-			// ===== 回転 =====
-			ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.7f, 0.5f, 0.2f, 0.8f));
-			if (ImGui::CollapsingHeader("回転", ImGuiTreeNodeFlags_DefaultOpen))
-			{
-				ImGui::PopStyleColor();
-				ImGui::Indent(16.0f);
-
-				// 初期回転角度（ラジアン）
-				float rotationDeg = emitterData->particleParams.rotation * (180.0f / 3.14159265f);
-				if (ImGui::DragFloat("初期回転角度", &rotationDeg, 1.0f, -360.0f, 360.0f, "%.1f°"))
-				{
-					emitterData->particleParams.rotation = rotationDeg * (3.14159265f / 180.0f);
-					changed = true;
-				}
-
-				// 初期回転のランダム幅（ラジアン）
-				float rotationVarianceDeg = emitterData->particleParams.rotationVariance * (180.0f / 3.14159265f);
-				if (ImGui::DragFloat("ランダム回転幅", &rotationVarianceDeg, 1.0f, 0.0f, 180.0f, "± %.1f°"))
-				{
-					emitterData->particleParams.rotationVariance = rotationVarianceDeg * (3.14159265f / 180.0f);
-					changed = true;
-				}
-
-				ImGui::Spacing();
-				ImGui::Separator();
-				ImGui::Spacing();
-
-				// 回転速度（ラジアン/秒）
-				float rotationSpeedDeg = emitterData->particleParams.rotationSpeed * (180.0f / 3.14159265f);
-				if (ImGui::DragFloat("回転速度", &rotationSpeedDeg, 1.0f, -360.0f, 360.0f, "%.1f°/s"))
-				{
-					emitterData->particleParams.rotationSpeed = rotationSpeedDeg * (3.14159265f / 180.0f);
-					changed = true;
-				}
-
-				// 回転速度のランダム幅（ラジアン/秒）
-				float rotationSpeedVarianceDeg = emitterData->particleParams.rotationSpeedVariance * (180.0f / 3.14159265f);
-				if (ImGui::DragFloat("ランダム回転速度幅", &rotationSpeedVarianceDeg, 1.0f, 0.0f, 180.0f, "± %.1f°/s"))
-				{
-					emitterData->particleParams.rotationSpeedVariance = rotationSpeedVarianceDeg * (3.14159265f / 180.0f);
-					changed = true;
-				}
-
-				// プリセットボタン
-				ImGui::Spacing();
-				ImGui::TextDisabled("回転プリセット:");
-				if (ImGui::Button("回転しない")) {
-					emitterData->particleParams.rotationSpeed = 0.0f;
-					emitterData->particleParams.rotationSpeedVariance = 0.0f;
-					changed = true;
-				}
-				ImGui::SameLine();
-				if (ImGui::Button("ゆっくり右回転")) {
-					emitterData->particleParams.rotationSpeed = 0.5f;
-					emitterData->particleParams.rotationSpeedVariance = 0.1f;
-					changed = true;
-				}
-				ImGui::SameLine();
-				if (ImGui::Button("速く右回転")) {
-					emitterData->particleParams.rotationSpeed = 2.0f;
-					emitterData->particleParams.rotationSpeedVariance = 0.5f;
-					changed = true;
-				}
-				if (ImGui::Button("ゆっくり左回転")) {
-					emitterData->particleParams.rotationSpeed = -0.5f;
-					emitterData->particleParams.rotationSpeedVariance = 0.1f;
-					changed = true;
-				}
-				ImGui::SameLine();
-				if (ImGui::Button("速く左回転")) {
-					emitterData->particleParams.rotationSpeed = -2.0f;
-					emitterData->particleParams.rotationSpeedVariance = 0.5f;
-					changed = true;
-				}
-				ImGui::SameLine();
-				if (ImGui::Button("ランダム回転")) {
-					emitterData->particleParams.rotationSpeed = 0.0f;
-					emitterData->particleParams.rotationSpeedVariance = 2.0f;
-					changed = true;
-				}
-
-				// プレビュー表示
-				ImGui::Spacing();
-				ImGui::BeginDisabled();
-				float minRotSpeed = (emitterData->particleParams.rotationSpeed - emitterData->particleParams.rotationSpeedVariance) * (180.0f / 3.14159265f);
-				float maxRotSpeed = (emitterData->particleParams.rotationSpeed + emitterData->particleParams.rotationSpeedVariance) * (180.0f / 3.14159265f);
-				ImGui::Text("回転速度の範囲: %.1f° ~ %.1f° per second", minRotSpeed, maxRotSpeed);
-				ImGui::EndDisabled();
-
-				ImGui::Unindent(16.0f);
-				ImGui::Spacing();
-			} else
-			{
-				ImGui::PopStyleColor();
-			}
-
-			// ===== 速度 =====
-			ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.5f, 0.3f, 0.7f, 0.8f));
-			if (ImGui::CollapsingHeader("速度", ImGuiTreeNodeFlags_DefaultOpen))
-			{
-				ImGui::PopStyleColor();
-				ImGui::Indent(16.0f);
-
-				// 基本速度
-				changed |= ImGui::DragFloat3("基本速度", &emitterData->particleParams.velocity.x,
-					0.01f, -10.0f, 10.0f, "%.2f");
-
-				// ランダム幅
-				changed |= ImGui::DragFloat3("ランダム速度幅", &emitterData->particleParams.velocityVariance.x,
-					0.01f, 0.0f, 5.0f, "± %.2f");
-
-				// 方向プリセット
-				ImGui::Spacing();
-				ImGui::TextDisabled("方向プリセット:");
-				if (ImGui::Button("上")) {
-					emitterData->particleParams.velocity = Vector3(0.0f, 1.0f, 0.0f);
-					changed = true;
-				}
-				ImGui::SameLine();
-				if (ImGui::Button("下")) {
-					emitterData->particleParams.velocity = Vector3(0.0f, -1.0f, 0.0f);
-					changed = true;
-				}
-				ImGui::SameLine();
-				if (ImGui::Button("前")) {
-					emitterData->particleParams.velocity = Vector3(0.0f, 0.0f, 1.0f);
-					changed = true;
-				}
-				ImGui::SameLine();
-				if (ImGui::Button("後ろ")) {
-					emitterData->particleParams.velocity = Vector3(0.0f, 0.0f, -1.0f);
-					changed = true;
-				}
-				ImGui::SameLine();
-				if (ImGui::Button("右")) {
-					emitterData->particleParams.velocity = Vector3(1.0f, 0.0f, 0.0f);
-					changed = true;
-				}
-				ImGui::SameLine();
-				if (ImGui::Button("左")) {
-					emitterData->particleParams.velocity = Vector3(-1.0f, 0.0f, 0.0f);
-					changed = true;
-				}
-				ImGui::SameLine();
-				if (ImGui::Button("停止")) {
-					emitterData->particleParams.velocity = Vector3(0.0f, 0.0f, 0.0f);
-					changed = true;
-				}
-
-				// 速度の大きさを表示
-				ImGui::Spacing();
-				ImGui::BeginDisabled();
-				float speed = std::sqrt(
-					emitterData->particleParams.velocity.x * emitterData->particleParams.velocity.x +
-					emitterData->particleParams.velocity.y * emitterData->particleParams.velocity.y +
-					emitterData->particleParams.velocity.z * emitterData->particleParams.velocity.z
-				);
-				ImGui::Text("速度の大きさ: %.2f units/sec", speed);
-				ImGui::EndDisabled();
-
-				ImGui::Unindent(16.0f);
-				ImGui::Spacing();
-			} else
-			{
-				ImGui::PopStyleColor();
-			}
-
-			ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(1.0f, 0.2f, 0.0f, 1.0f));
-			if (ImGui::CollapsingHeader("物理設定", ImGuiTreeNodeFlags_None))
-			{
-				ImGui::PopStyleColor();
-				ImGui::Indent(16.0f);
-				ImGui::DragFloat("重力影響度", &emitterData->particleParams.gravity,0.01f, -10.0f, 10.0f, "%.2f");
-				ImGui::Unindent(16.0f);
-			}
-			else {
-				ImGui::PopStyleColor();
-			}
-
-			// ===== 色 =====
-			ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.7f, 0.7f, 0.2f, 0.8f));
-			if (ImGui::CollapsingHeader("色", ImGuiTreeNodeFlags_DefaultOpen))
-			{
-				ImGui::PopStyleColor();
-				ImGui::Indent(16.0f);
-
-				// 基本色（カラーピッカー）
-				changed |= ImGui::ColorEdit4("開始色", &emitterData->particleParams.startColor.x,
-					ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_DisplayRGB);
-
-				// ランダム幅（RGB）
-				changed |= ImGui::DragFloat3("開始色 RGB ランダム幅(±)", &emitterData->particleParams.startColorVariance.x,
-					0.01f, 0.0f, 1.0f, "± %.2f");
-
-				// アルファのランダム幅
-				changed |= ImGui::DragFloat("開始色 Alpha ランダム幅 (±)", &emitterData->particleParams.startColorVariance.w,
-					0.01f, 0.0f, 1.0f, "± %.2f");
-				ImGui::Spacing();
-
-				// 終了色（カラーピッカー）
-				changed |= ImGui::ColorEdit4("終了色", &emitterData->particleParams.endColor.x,
-					ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_DisplayRGB);
-				// ランダム幅（RGB）
-				changed |= ImGui::DragFloat3("終了色 RGB ランダム幅(±)", &emitterData->particleParams.endColorVariance.x,
-					0.01f, 0.0f, 1.0f, "± %.2f");
-				// アルファのランダム幅
-				changed |= ImGui::DragFloat("終了色 Alpha ランダム幅 (±)", &emitterData->particleParams.endColorVariance.w,
-					0.01f, 0.0f, 1.0f, "± %.2f");
-
-				ImGui::Unindent(16.0f);
-				ImGui::Spacing();
-			} else
-			{
-				ImGui::PopStyleColor();
-			}
-			ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
-			if (ImGui::CollapsingHeader("トレイル", ImGuiTreeNodeFlags_None))
-			{
-				ImGui::PopStyleColor();
-				if (ImGui::CollapsingHeader("エミッター自身のトレイル設定")) {
-					changed |= ImGui::Checkbox("有効化", &emitterData->trailParams.isTrail);
-					changed |= ImGui::Checkbox("エミッターのスケールを継承", &emitterData->trailParams.inheritScale);
-					ImGui::DragFloat("トレイル生成距離", &emitterData->trailParams.minDistance, 0.01f, 0.0f, 1000.0f);
-					ImGui::DragFloat("トレイル寿命", &emitterData->trailParams.lifeTime, 0.01f, 0.0f, 1000.0f);
-					ImGui::DragFloat("生成パーティクル数", &emitterData->trailParams.emissionCount, 1.0f, 1.0f, 100000.0f);
-				}
-
-				if (ImGui::CollapsingHeader("パーティクル自身のトレイル設定")) {
-					changed |= ImGui::Checkbox("有効化",&emitterData->particleParams.child.isTrail);
-					changed |= ImGui::Checkbox("親のスケールを継承", &emitterData->particleParams.child.isInheritScale);
-					ImGui::DragFloat("寿命", &emitterData->particleParams.child.lifeTime, 0.1f, 5.0f);
-					ImGui::DragFloat("生成距離", &emitterData->particleParams.child.minDistance, 0.01f, 0.01f, 1000.0f);
-					ImGui::DragFloat("開始スケール", &emitterData->particleParams.child.startScale, 0.01f, 0.01f, 100.0f);
-					ImGui::DragFloat("終了スケール", &emitterData->particleParams.child.endScale, 0.01f, 0.0f, 100.0f);
-					ImGui::DragInt("パーティクル生成数",&emitterData->particleParams.child.emissionCount, 1.0f, 10000);
-				}
-			} else {
-				ImGui::PopStyleColor();
-			}
-
-			// ===== プリセット全体 =====
-			ImGui::Spacing();
-			ImGui::Separator();
-			ImGui::Spacing();
-
-			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.6f, 0.3f, 0.8f));
-			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.4f, 0.7f, 0.4f, 1.0f));
-			ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.2f, 0.5f, 0.2f, 1.0f));
-
-			ImGui::Text("パーティクルプリセットs:");
-			// 未実装
-			ImGui::PopStyleColor(3);
-			ImGui::PopStyleVar(2);
-		}
-
-		return changed;
-#else
-		(void)emitterData;
-		return false;
+		GpuEmitManagerEditorUI::DrawImGui(*this);
 #endif
 	}
 
-	/// <summary>
-	/// 現在の形状に応じたパラメータ編集を表示
-	/// </summary>
-	bool GpuEmitManager::DrawShapeEditor(EmitterData* emitterData)
-	{
-		switch (emitterData->shape)
-		{
-		case EmitterShape::Sphere:   return DrawSphereEditor(emitterData);
-		case EmitterShape::Box:      return DrawBoxEditor(emitterData);
-		case EmitterShape::Triangle: return DrawTriangleEditor(emitterData);
-		case EmitterShape::Cone:     return DrawConeEditor(emitterData);
-		case EmitterShape::Mesh:     return DrawMeshEditor(emitterData);
-		}
-		return false;
-	}
-
-	/// <summary>
-	/// Sphere パラメータの ImGui 編集
-	/// </summary>
-	bool GpuEmitManager::DrawSphereEditor(EmitterData* emitterData)
-	{
-		(void)emitterData;
-		bool changed = false;
-#ifdef USE_IMGUI
-
-		auto& p = emitterData->sphereParams;
-
-		changed |= ImGui::DragFloat3("位置", &p.translate.x, 0.1f);
-		changed |= ImGui::DragFloat("半径", &p.radius, 0.1f, 0.1f, 10000.0f);
-		changed |= ImGui::DragFloat("射出パーティクル数", &p.count, 1.0f, 1.0f, GPUParticle::kMaxParticles);
-		changed |= ImGui::DragFloat("射出間隔", &p.emitInterval, 0.01f, 0.01f, 10.0f);
-
-
-#endif
-		return changed;
-	}
-
-	/// <summary>
-	/// Box パラメータの ImGui 編集
-	/// </summary>
-	bool GpuEmitManager::DrawBoxEditor(EmitterData* emitterData)
-	{
-		(void)emitterData;
-		bool changed = false;
-#ifdef USE_IMGUI
-
-		auto& p = emitterData->boxParams;
-
-		changed |= ImGui::DragFloat3("位置", &p.translate.x, 0.1f);
-		changed |= ImGui::DragFloat3("サイズ", &p.size.x, 0.1f, 0.1f, 10000.0f);
-		changed |= ImGui::DragFloat("射出パーティクル数", &p.count, 1.0f, 1.0f, GPUParticle::kMaxParticles);
-		changed |= ImGui::DragFloat("射出間隔", &p.emitInterval, 0.01f, 0.01f, 10.0f);
-
-
-#endif
-		return changed;
-	}
-
-	/// <summary>
-	/// Triangle パラメータの ImGui 編集
-	/// </summary>
-	bool GpuEmitManager::DrawTriangleEditor(EmitterData* emitterData)
-	{
-		(void)emitterData;
-		bool changed = false;
-#ifdef USE_IMGUI
-
-		auto& p = emitterData->triangleParams;
-
-		changed |= ImGui::DragFloat3("頂点 1", &p.v1.x, 0.1f);
-		changed |= ImGui::DragFloat3("頂点 2", &p.v2.x, 0.1f);
-		changed |= ImGui::DragFloat3("頂点 3", &p.v3.x, 0.1f);
-		changed |= ImGui::DragFloat("射出パーティクル数", &p.count, 1.0f, 1.0f, GPUParticle::kMaxParticles);
-		changed |= ImGui::DragFloat("射出間隔", &p.emitInterval, 0.01f, 0.01f, 10.0f);
-#endif
-		return changed;
-	}
-
-	/// <summary>
-	/// Cone パラメータの ImGui 編集
-	/// </summary>
-	bool GpuEmitManager::DrawConeEditor(EmitterData* emitterData)
-	{
-		(void)emitterData;
-		bool changed = false;
-#ifdef USE_IMGUI
-
-		auto& p = emitterData->coneParams;
-
-		changed |= ImGui::DragFloat3("位置", &p.translate.x, 0.1f);
-		changed |= ImGui::DragFloat3("とんがる方向", &p.direction.x, 0.01f, -1.0f, 1.0f);
-		changed |= ImGui::DragFloat("半径", &p.radius, 0.1f, 0.1f, 10000.0f);
-		changed |= ImGui::DragFloat("高さ", &p.height, 0.1f, 0.1f, 10000.0f);
-		changed |= ImGui::DragFloat("射出パーティクル数", &p.count, 1.0f, 1.0f, GPUParticle::kMaxParticles);
-		changed |= ImGui::DragFloat("射出間隔", &p.emitInterval, 0.01f, 0.01f, 10.0f);
-
-#endif
-		return changed;
-	}
-
-	bool GpuEmitManager::DrawMeshEditor(EmitterData* emitterData)
-	{
-		(void)emitterData;
-#ifdef USE_IMGUI
-		bool changed = false;
-		auto& p = emitterData->meshParams;
-
-		// -------------------------
-		// モデル選択コンボボックス
-		// -------------------------
-		auto modelKeys = ModelManager::GetInstance()->GetModelKeys();
-		static int selected = -1;
-
-		// 現在の選択を反映
-		if (p.model != nullptr) {
-			std::string currentKey = p.model->GetName();
-			for (int i = 0; i < modelKeys.size(); i++) {
-				if (modelKeys[i] == currentKey) {
-					selected = i;
-					break;
-				}
-			}
-		}
-
-		if (ImGui::BeginCombo("使用モデル", selected >= 0 ? modelKeys[selected].c_str() : "未選択"))
-		{
-			for (int i = 0; i < modelKeys.size(); i++)
-			{
-				bool isSelected = (selected == i);
-				if (ImGui::Selectable(modelKeys[i].c_str(), isSelected)) {
-					selected = i;
-					p.model = ModelManager::GetInstance()->FindModel(modelKeys[i]);
-					changed = true;
-				}
-			}
-			ImGui::EndCombo();
-		}
-
-		// -------------------------
-		// 通常パラメータ
-		// -------------------------
-
-		changed |= ImGui::DragFloat3("位置", &p.translate.x, 0.1f);
-		changed |= ImGui::DragFloat3("スケール", &p.scale.x, 0.1f);
-
-		float r[4] = { p.rotation.x, p.rotation.y, p.rotation.z, p.rotation.w };
-		if (ImGui::DragFloat4("回転(Quat)", r, 0.01f)) {
-			p.rotation = Quaternion(r[0], r[1], r[2], r[3]);
-			changed = true;
-		}
-
-		changed |= ImGui::DragFloat("射出数", &p.count, 1.0f);
-		changed |= ImGui::DragFloat("射出間隔", &p.emitInterval, 0.01f);
-
-		const char* modeList[] = { "Surface", "Volume", "Edge" };
-		int modeIndex = static_cast<int>(p.emitMode);
-		if (ImGui::Combo("Emit Mode", &modeIndex, modeList, 3)) {
-			p.emitMode = static_cast<MeshEmitMode>(modeIndex);
-			changed = true;
-		}
-
-		return changed;
-#else
-		return false;
-#endif
-	}
-
-	/// <summary>
-	/// グループ管理タブ
-	/// </summary>
-	void GpuEmitManager::DrawGroupManagementTab()
-	{
-#ifdef USE_IMGUI
-		ImGui::BeginChild("GroupManagement", ImVec2(0, 0), false);
-
-		// ===== 新規グループ作成 =====
-		ImGui::SeparatorText("新規グループ作成");
-		ImGui::TextDisabled("名前を入れて「＋作成」だけ。保存先は名前から自動決定（JSONの事前選択は不要）。");
-
-		ImGui::PushItemWidth(-150);
-		ImGui::InputTextWithHint("##NewGroupName", "グループ名を入力...", newGroupName_, sizeof(newGroupName_));
-		ImGui::PopItemWidth();
-
-		ImGui::SameLine();
-		ImGui::BeginDisabled(strlen(newGroupName_) == 0);
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.25f, 0.6f, 0.3f, 1.0f));
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.7f, 0.35f, 1.0f));
-		if (ImGui::Button(ICON_FA_PLUS " 作成", ImVec2(140, 0))) {
-			if (CreateEmitterGroup(newGroupName_)) {
-				selectedGroupName_ = newGroupName_;
-			}
-			newGroupName_[0] = '\0';
-		}
-		ImGui::PopStyleColor(2);
-		ImGui::EndDisabled();
-
-		ImGui::Spacing();
-		ImGui::Separator();
-		ImGui::Spacing();
-
-		// ===== グループリスト =====
-		ImGui::SeparatorText("グループリスト");
-
-		ImGui::Text("登録グループ数: %zu", groups_.size());
-
-		// フィルター検索
-		static char groupFilter[256] = "";
-		ImGui::PushItemWidth(-1);
-		ImGui::InputTextWithHint("##GroupFilter", ICON_FA_SEARCH " 検索...", groupFilter, sizeof(groupFilter));
-		ImGui::PopItemWidth();
-
-		ImGui::Spacing();
-
-		// グループリストテーブル
-		if (ImGui::BeginTable("GroupTable", 4,
-			ImGuiTableFlags_Borders |
-			ImGuiTableFlags_RowBg |
-			ImGuiTableFlags_ScrollY |
-			ImGuiTableFlags_Resizable,
-			ImVec2(0, 300)))
-		{
-			ImGui::TableSetupColumn("状態", ImGuiTableColumnFlags_WidthFixed, 50);
-			ImGui::TableSetupColumn("グループ名", ImGuiTableColumnFlags_WidthStretch);
-			ImGui::TableSetupColumn("エミッター数", ImGuiTableColumnFlags_WidthFixed, 100);
-			ImGui::TableSetupColumn("再生", ImGuiTableColumnFlags_WidthFixed, 80);
-			ImGui::TableHeadersRow();
-
-			for (auto& [name, groupData] : groups_)
-			{
-				// フィルター適用
-				if (strlen(groupFilter) > 0 && name.find(groupFilter) == std::string::npos)
-					continue;
-
-				ImGui::TableNextRow();
-
-				// 状態列
-				ImGui::TableSetColumnIndex(0);
-				ImGui::PushID(name.c_str());
-				ImGui::Checkbox("##Active", &groupData->isActive);
-				ImGui::PopID();
-
-				// グループ名列
-				ImGui::TableSetColumnIndex(1);
-				bool isSelected = (selectedGroupName_ == name);
-
-				ImGuiSelectableFlags flags = ImGuiSelectableFlags_SpanAllColumns;
-				if (ImGui::Selectable(name.c_str(), isSelected, flags)) {
-					selectedGroupName_ = name;
-					selectedEmitterName_.clear();
-				}
-
-				// 右クリックメニュー
-				if (ImGui::BeginPopupContextItem())
-				{
-					if (ImGui::MenuItem("削除")) {
-						DeleteEmitterGroup(name);
-						ImGui::EndPopup();
-						break;
-					}
-					ImGui::EndPopup();
-				}
-
-				// エミッター数列
-				ImGui::TableSetColumnIndex(2);
-				ImGui::TextDisabled("%zu", groupData->emitters.size());
-
-				// 再生状態列
-				ImGui::TableSetColumnIndex(3);
-				ImGui::PushID((name + "_play").c_str());
-				if (groupData->isPlaying) {
-					ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.3f, 0.3f, 1.0f));
-					if (ImGui::SmallButton(ICON_FA_PLAY)) {
-						StopEmitterGroup(name);
-					}
-					ImGui::PopStyleColor();
-				} else {
-					ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.8f, 0.3f, 1.0f));
-					if (ImGui::SmallButton(ICON_FA_PLAY)) {
-						PlayEmitterGroup(name);
-					}
-					ImGui::PopStyleColor();
-				}
-				ImGui::PopID();
-			}
-
-			ImGui::EndTable();
-		}
-
-		ImGui::Spacing();
-
-		// ===== 選択グループの詳細 =====
-		EmitterGroup* currentGroup = GetGroup(selectedGroupName_);
-		if (currentGroup)
-		{
-			ImGui::Separator();
-			ImGui::SeparatorText(("選択中: " + currentGroup->name).c_str());
-
-			// プロパティグリッド風のレイアウト
-			if (ImGui::BeginTable("GroupProperties", 2, ImGuiTableFlags_BordersInnerV))
-			{
-				ImGui::TableSetupColumn("プロパティ", ImGuiTableColumnFlags_WidthFixed, 150);
-				ImGui::TableSetupColumn("値", ImGuiTableColumnFlags_WidthStretch);
-
-				// 有効/無効
-				ImGui::TableNextRow();
-				ImGui::TableSetColumnIndex(0);
-				ImGui::AlignTextToFramePadding();
-				ImGui::Text("有効");
-				ImGui::TableSetColumnIndex(1);
-				ImGui::Checkbox("##GroupActive", &currentGroup->isActive);
-
-				// 再生状態
-				ImGui::TableNextRow();
-				ImGui::TableSetColumnIndex(0);
-				ImGui::AlignTextToFramePadding();
-				ImGui::Text("再生状態");
-				ImGui::TableSetColumnIndex(1);
-
-				if (currentGroup->isPlaying) {
-					ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "● 再生中");
-					ImGui::SameLine();
-					if (ImGui::Button(ICON_FA_STOP " 停止")) {
-						StopEmitterGroup(selectedGroupName_);
-					}
-				} else {
-					ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "○ 停止中");
-					ImGui::SameLine();
-					if (ImGui::Button(ICON_FA_PLAY " 再生")) {
-						PlayEmitterGroup(selectedGroupName_);
-					}
-				}
-
-				// 経過時間
-				ImGui::TableNextRow();
-				ImGui::TableSetColumnIndex(0);
-				ImGui::AlignTextToFramePadding();
-				ImGui::Text("経過時間");
-				ImGui::TableSetColumnIndex(1);
-				ImGui::Text("%.2f 秒", currentGroup->currentTime);
-
-				// システム寿命
-				ImGui::TableNextRow();
-				ImGui::TableSetColumnIndex(0);
-				ImGui::AlignTextToFramePadding();
-				ImGui::Text("システム寿命");
-				ImGui::TableSetColumnIndex(1);
-				ImGui::SetNextItemWidth(-1);
-				ImGui::DragFloat("##SystemDuration", &currentGroup->systemDuration,
-					0.1f, 0.0f, 60.0f, "%.1f 秒 (0=無限)");
-
-				// 位置
-				ImGui::TableNextRow();
-				ImGui::TableSetColumnIndex(0);
-				ImGui::AlignTextToFramePadding();
-				ImGui::Text("位置");
-				ImGui::TableSetColumnIndex(1);
-				ImGui::SetNextItemWidth(-1);
-				ImGui::DragFloat3("##GroupTranslate", &currentGroup->translate.x, 0.1f);
-
-				ImGui::EndTable();
-			}
-
-			ImGui::Spacing();
-
-			// 保存先ファイル（このグループ専用。1ファイル1グループが基本）
-			ImGui::TextDisabled("保存先: %s",
-				currentGroup->sourceFilePath.empty() ? "(未設定→保存時に自動決定)" : currentGroup->sourceFilePath.c_str());
-
-			// グループ単位保存（主導線）
-			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.25f, 0.6f, 0.3f, 1.0f));
-			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.7f, 0.35f, 1.0f));
-			if (ImGui::Button(ICON_FA_SAVE " このグループを保存", ImVec2(-1, 32))) {
-				SaveGroupToFile(selectedGroupName_);
-			}
-			ImGui::PopStyleColor(2);
-
-			ImGui::Spacing();
-
-			// グループ操作ボタン
-			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.3f, 0.3f, 0.8f));
-			if (ImGui::Button("このグループを削除", ImVec2(-1, 0))) {
-				showDeleteDialog_ = true;
-			}
-			ImGui::PopStyleColor();
-		}
-
-		ImGui::EndChild();
-#endif
-	}
-
-	/// <summary>
-	/// エミッター管理タブ
-	/// </summary>
-	void GpuEmitManager::DrawEmitterManagementTab()
-	{
-#ifdef USE_IMGUI
-		ImGui::BeginChild("EmitterManagement", ImVec2(0, 0), false);
-
-		if (selectedGroupName_.empty()) {
-			ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.3f, 1.0f),
-				"⚠ グループを選択してください");
-			ImGui::Text("「グループ管理」タブでグループを作成・選択してください。");
-			ImGui::EndChild();
-			return;
-		}
-
-		EmitterGroup* currentGroup = GetGroup(selectedGroupName_);
-		if (!currentGroup) {
-			ImGui::EndChild();
-			return;
-		}
-
-		// ===== 新規エミッター作成 =====
-		ImGui::SeparatorText("新規エミッター作成");
-		ImGui::Text("作成先グループ: %s", currentGroup->name.c_str());
-
-		ImGui::Spacing();
-
-		// 名前入力
-		ImGui::Text("名前:");
-		ImGui::SameLine();
-		ImGui::PushItemWidth(250);
-		ImGui::InputTextWithHint("##EmitterName", "エミッター名...",
-			newEmitterName_, sizeof(newEmitterName_));
-		ImGui::PopItemWidth();
-
-		// 形状選択
-		ImGui::Text("形状:");
-		ImGui::SameLine();
-		ImGui::PushItemWidth(150);
-		ImGui::Combo("##Shape", &selectedShapeIndex_, shapeNames_, IM_ARRAYSIZE(shapeNames_));
-		ImGui::PopItemWidth();
-
-		// テクスチャパス
-		ImGui::Text("テクスチャ:");
-		ImGui::PushItemWidth(-150);
-		ImGui::InputTextWithHint("##TexturePath", "テクスチャパス...",
-			newEmitterTexturePath_, sizeof(newEmitterTexturePath_));
-		ImGui::PopItemWidth();
-
-		ImGui::SameLine();
-		static bool textureBrowserOpen = false;
-		if (ImGui::Button("参照...", ImVec2(140, 0))) {
-			ScanTextureDirectory("Resources/Textures/");
-			textureBrowserOpen = !textureBrowserOpen;
-		}
-
-		// テクスチャブラウザ
-		if (textureBrowserOpen)
-		{
-			ImGui::Spacing();
-			DrawTextureBrowser(textureBrowserOpen);
-		}
-
-		ImGui::Spacing();
-
-		// 作成ボタン
-		ImGui::BeginDisabled(strlen(newEmitterName_) == 0);
-		if (ImGui::Button("エミッター作成", ImVec2(-1, 35)))
-		{
-			std::string name = newEmitterName_;
-			std::string texPath = newEmitterTexturePath_;
-			EmitterShape shape = static_cast<EmitterShape>(selectedShapeIndex_);
-
-			if (CreateEmitter(selectedGroupName_, name, texPath, shape))
-			{
-				selectedEmitterName_ = name;
-				std::memset(newEmitterName_, 0, sizeof(newEmitterName_));
-				std::memset(newEmitterTexturePath_, 0, sizeof(newEmitterTexturePath_));
-			}
-		}
-		ImGui::EndDisabled();
-
-		ImGui::Spacing();
-		ImGui::Separator();
-		ImGui::Spacing();
-
-		// ===== エミッターリスト =====
-		ImGui::SeparatorText("エミッターリスト");
-		ImGui::Text("エミッター数: %zu", currentGroup->emitters.size());
-
-		// フィルター検索
-		static char emitterFilter[256] = "";
-		ImGui::PushItemWidth(-1);
-		ImGui::InputTextWithHint("##EmitterFilter", ICON_FA_SEARCH " 検索...",
-			emitterFilter, sizeof(emitterFilter));
-		ImGui::PopItemWidth();
-
-		ImGui::Spacing();
-
-		// エミッターリストテーブル
-		if (ImGui::BeginTable("EmitterTable", 4,
-			ImGuiTableFlags_Borders |
-			ImGuiTableFlags_RowBg |
-			ImGuiTableFlags_ScrollY |
-			ImGuiTableFlags_Resizable,
-			ImVec2(0, -1)))
-		{
-			ImGui::TableSetupColumn("有効", ImGuiTableColumnFlags_WidthFixed, 50);
-			ImGui::TableSetupColumn("名前", ImGuiTableColumnFlags_WidthStretch);
-			ImGui::TableSetupColumn("形状", ImGuiTableColumnFlags_WidthFixed, 100);
-			ImGui::TableSetupColumn("操作", ImGuiTableColumnFlags_WidthFixed, 60);
-			ImGui::TableHeadersRow();
-
-			for (auto it = currentGroup->emitters.begin();
-				it != currentGroup->emitters.end(); )
-			{
-				const std::string& name = it->first;
-				auto* data = it->second.get();
-
-				// フィルター適用
-				if (strlen(emitterFilter) > 0 && name.find(emitterFilter) == std::string::npos) {
-					++it;
-					continue;
-				}
-
-				ImGui::TableNextRow();
-				ImGui::PushID(name.c_str());
-
-				// 有効列
-				ImGui::TableSetColumnIndex(0);
-				ImGui::Checkbox("##Active", &data->isActive);
-
-				// 名前列
-				ImGui::TableSetColumnIndex(1);
-				bool isSelected = (selectedEmitterName_ == name);
-
-				if (ImGui::Selectable(name.c_str(), isSelected,
-					ImGuiSelectableFlags_SpanAllColumns))
-				{
-					selectedEmitterName_ = name;
-				}
-
-				// 形状列
-				ImGui::TableSetColumnIndex(2);
-				ImGui::TextDisabled("%s", shapeNames_[static_cast<int>(data->shape)]);
-
-				// 操作列
-				ImGui::TableSetColumnIndex(3);
-				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.3f, 0.3f, 0.8f));
-				if (ImGui::SmallButton("削除")) {
-					if (selectedEmitterName_ == name) {
-						selectedEmitterName_.clear();
-					}
-					it = currentGroup->emitters.erase(it);
-					ImGui::PopStyleColor();
-					ImGui::PopID();
-					continue;
-				}
-				ImGui::PopStyleColor();
-
-				ImGui::PopID();
-				++it;
-			}
-
-			ImGui::EndTable();
-		}
-
-		ImGui::EndChild();
-#endif
-	}
-
-
-	/// <summary>
-	/// テクスチャブラウザ
-	/// </summary>
-#ifdef USE_IMGUI
-	void GpuEmitManager::DrawTextureBrowser(bool& isOpen)
-	{
-		(void)isOpen;
-		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10, 10));
-		// FileBrowser::Draw() が内部で Child を生成し、コールバックで選択通知する
-		textureBrowser_.Draw("TextureBrowser", ImVec2(0, 350));
-		ImGui::PopStyleVar();
-	}
-#endif
-
-	/// <summary>
-	/// エディタータブ
-	/// </summary>
-	void GpuEmitManager::DrawEditorTab()
-	{
-#ifdef USE_IMGUI
-		ImGui::BeginChild("Editor", ImVec2(0, 0), false);
-
-		if (selectedGroupName_.empty() || selectedEmitterName_.empty())
-		{
-			ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.3f, 1.0f),
-				"⚠ エミッターを選択してください");
-			ImGui::Text("「エミッター管理」タブでエミッターを選択してください。");
-			ImGui::EndChild();
-			return;
-		}
-
-		auto* emitterData = GetEmitter(selectedGroupName_, selectedEmitterName_);
-		if (!emitterData || !emitterData->emitter)
-		{
-			ImGui::EndChild();
-			return;
-		}
-
-		// ヘッダー情報
-		ImGui::SeparatorText(("編集中: " + emitterData->name).c_str());
-		ImGui::TextDisabled("形状: %s", shapeNames_[static_cast<int>(emitterData->shape)]);
-
-		ImGui::Spacing();
-		ImGui::Separator();
-		ImGui::Spacing();
-
-		// スクロール領域
-		ImGui::BeginChild("EditorScroll", ImVec2(0, 0), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
-
-		// パーティクルパラメータ編集
-		if (DrawParticleParametersEditor(emitterData)) {
-			UpdateParticleParams(emitterData);
-		}
-
-		ImGui::Spacing();
-		ImGui::Separator();
-		ImGui::Spacing();
-
-		// エミッター形状パラメータ編集
-		if (ImGui::CollapsingHeader("エミッター形状設定", ImGuiTreeNodeFlags_DefaultOpen))
-		{
-			// 形状変更
-			int currentShape = static_cast<int>(emitterData->shape);
-			if (ImGui::Combo("形状", &currentShape, shapeNames_, IM_ARRAYSIZE(shapeNames_)))
-			{
-				emitterData->shape = static_cast<EmitterShape>(currentShape);
-				emitterData->emitter->SetEmitterShape(emitterData->shape);
-				UpdateEmitterParams(emitterData);
-			}
-
-			ImGui::Spacing();
-
-			// 形状別パラメータ
-			if (DrawShapeEditor(emitterData)) {
-				UpdateEmitterParams(emitterData);
-			}
-		}
-
-		ImGui::Spacing();
-		ImGui::Separator();
-		ImGui::Spacing();
-
-		// 統計情報
-		if (ImGui::CollapsingHeader("パーティクル統計情報"))
-		{
-			auto stats = emitterData->emitter->GetGPUParticle()->GetCachedStats();
-
-			if (stats.isValid) {
-				ImGui::Text("アクティブ数: %u / %u", stats.activeCount, stats.maxParticles);
-				ImGui::Text("未使用スロット数: %u", stats.freeCount);
-
-				ImGui::ProgressBar(
-					stats.usagePercent / 100.0f,
-					ImVec2(-1, 0),
-					std::format("{:.1f}%%", stats.usagePercent).c_str()
-				);
-
-				if (stats.freeListIndex < 0) {
-					ImGui::TextColored(ImVec4(1, 0, 0, 1),
-						"エラー: 空きパーティクルがありません！");
-				}
-			} else {
-				ImGui::TextColored(ImVec4(1, 1, 0, 1),
-					"統計情報を読み込み中...");
-			}
-
-			if (ImGui::Button("詳細統計を表示", ImVec2(-1, 0))) {
-				emitterData->emitter->GetGPUParticle()->DrawStatsImGui();
-			}
-		}
-
-		ImGui::EndChild();
-
-		ImGui::EndChild();
-#endif
-	}
-	/// <summary>
-	/// 削除確認ダイアログ
-	/// </summary>
-	void GpuEmitManager::DrawDeleteDialog()
-	{
-#ifdef USE_IMGUI
-		if (showDeleteDialog_) {
-			ImGui::OpenPopup("削除確認");
-		}
-
-		ImVec2 center = ImGui::GetMainViewport()->GetCenter();
-		ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-
-		if (ImGui::BeginPopupModal("削除確認", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
-		{
-			// 削除対象によってメッセージを変更
-			if (selectedGroupName_.empty()) {
-				ImGui::Text("すべてのエミッターグループを削除しますか？");
-				ImGui::TextColored(ImVec4(1, 0.3f, 0.3f, 1), "この操作は取り消せません！");
-			} else {
-				ImGui::Text("選択中のグループ '%s' を削除しますか？", selectedGroupName_.c_str());
-				ImGui::TextColored(ImVec4(1, 0.3f, 0.3f, 1), "グループ内の全エミッターも削除されます！");
-			}
-
-			ImGui::Spacing();
-			ImGui::Separator();
-			ImGui::Spacing();
-
-			// 削除実行ボタン
-			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.2f, 0.2f, 1.0f));
-			if (ImGui::Button("削除する", ImVec2(120, 0))) {
-				if (selectedGroupName_.empty()) {
-					DeleteAllEmitterGroups();
-				} else {
-					DeleteEmitterGroup(selectedGroupName_);
-				}
-
-				showDeleteDialog_ = false;
-				ImGui::CloseCurrentPopup();
-			}
-			ImGui::PopStyleColor();
-
-			ImGui::SetItemDefaultFocus();
-			ImGui::SameLine();
-
-			if (ImGui::Button("キャンセル", ImVec2(120, 0))) {
-				showDeleteDialog_ = false;
-				ImGui::CloseCurrentPopup();
-			}
-
-			ImGui::EndPopup();
-		}
-#endif
-	}
 
 
 
@@ -1771,6 +636,15 @@ namespace YoRigine {
 		// 停止時は Reset() で粒子を即消滅させず、linger でシミュレーションを続けて自然に消えるのを待つ
 		// （剣トレイル等を Stop したとき既存粒子がプツッと消えるのを防ぐ）
 		group->lingerTimer = std::max(group->lingerTimer, GetGroupMaxLifetime(group));
+	}
+
+	void GpuEmitManager::StopAllEmitterGroups()
+	{
+		for (auto& [name, group] : groups_) {
+			group->isPlaying = false;
+			group->currentTime = 0.0f;
+			group->lingerTimer = 0.0f;
+		}
 	}
 
 	void GpuEmitManager::SetCamera(Camera* camera)
@@ -2052,6 +926,108 @@ namespace YoRigine {
 	/// <summary>
 	/// 単一グループを JSON 化（グループ単位保存・全体保存の両方から使う）
 	/// </summary>
+	/// <summary>
+	/// 1エミッタの全シリアライズ対象を AutoJson ツリーへ登録する（保存・読込の単一情報源）。
+	/// 調整パラメータを増やすときはここに .Add() を1行足すだけ。
+	/// key 名は既存JSONと一致させ後方互換を保つ（child.* は "trailXxx" にフラット化）。
+	/// </summary>
+	void GpuEmitManager::BuildEmitterSchema(EmitterData& e,
+		AutoJson& root, AutoJson& sphere, AutoJson& box, AutoJson& tri,
+		AutoJson& cone, AutoJson& mesh, AutoJson& particle, AutoJson& particleMesh) const
+	{
+		auto& sp = e.sphereParams;
+		sphere.Add("translate", &sp.translate).Add("radius", &sp.radius)
+			.Add("count", &sp.count).Add("emitInterval", &sp.emitInterval);
+
+		auto& bp = e.boxParams;
+		box.Add("translate", &bp.translate).Add("size", &bp.size)
+			.Add("count", &bp.count).Add("emitInterval", &bp.emitInterval);
+
+		auto& tp = e.triangleParams;
+		tri.Add("v1", &tp.v1).Add("v2", &tp.v2).Add("v3", &tp.v3)
+			.Add("count", &tp.count).Add("emitInterval", &tp.emitInterval);
+
+		auto& cp = e.coneParams;
+		cone.Add("translate", &cp.translate).Add("direction", &cp.direction)
+			.Add("radius", &cp.radius).Add("height", &cp.height)
+			.Add("count", &cp.count).Add("emitInterval", &cp.emitInterval);
+
+		// meshParams: model ポインタだけは名前で特別扱いするため schema には含めない
+		auto& mp = e.meshParams;
+		mesh.Add("translate", &mp.translate).Add("scale", &mp.scale)
+			.Add("rotation", &mp.rotation).Add("count", &mp.count)
+			.Add("emitInterval", &mp.emitInterval).Add("emitMode", &mp.emitMode);
+
+		// particleParams: child(トレイル) は "trailXxx" にフラット化して既存JSON互換
+		auto& pp = e.particleParams;
+		particle.Add("lifeTime", &pp.lifeTime).Add("lifeTimeVariance", &pp.lifeTimeVariance)
+			.Add("startScale", &pp.startScale).Add("startScaleVariance", &pp.startScaleVariance)
+			.Add("endScale", &pp.endScale).Add("endScaleVariance", &pp.endScaleVariance)
+			.Add("rotation", &pp.rotation).Add("rotationVariance", &pp.rotationVariance)
+			.Add("rotationSpeed", &pp.rotationSpeed).Add("rotationSpeedVariance", &pp.rotationSpeedVariance)
+			.Add("velocity", &pp.velocity).Add("velocityVariance", &pp.velocityVariance)
+			.Add("startColor", &pp.startColor).Add("startColorVariance", &pp.startColorVariance)
+			.Add("endColor", &pp.endColor).Add("endColorVariance", &pp.endColorVariance)
+			.Add("gravity", &pp.gravity).Add("isBillboard", &pp.isBillboard)
+			.Add("isTrail", &pp.child.isTrail).Add("isInheritScale", &pp.child.isInheritScale)
+			.Add("trailLifeTime", &pp.child.lifeTime).Add("trailEmissionCount", &pp.child.emissionCount)
+			.Add("trailMinDistance", &pp.child.minDistance)
+			.Add("trailStartScale", &pp.child.startScale).Add("trailEndScale", &pp.child.endScale);
+
+		auto& pm = e.particleMeshParams;
+		particleMesh.Add("width", &pm.width).Add("height", &pm.height).Add("depth", &pm.depth)
+			.Add("outerRadius", &pm.outerRadius).Add("innerRadius", &pm.innerRadius)
+			.Add("radius", &pm.radius).Add("angleDegree", &pm.angleDegree)
+			.Add("divide", &pm.divide).Add("subdivisions", &pm.subdivisions);
+
+		// ルート: スカラ + enum + フォースフィールド配列 + 各グループ
+		root.Add("name", &e.name).Add("shape", &e.shape)
+			.Add("isActive", &e.isActive).Add("textureFilePath", &e.texturePath)
+			.Add("particleMeshShape", &e.particleMeshShape)
+			.Add("forceFields", &e.forceFields);
+		root.AddGroup("sphereParams", sphere)
+			.AddGroup("boxParams", box)
+			.AddGroup("triangleParams", tri)
+			.AddGroup("coneParams", cone)
+			.AddGroup("meshParams", mesh)
+			.AddGroup("particleParams", particle)
+			.AddGroup("particleMeshParams", particleMesh);
+	}
+
+	/// <summary>
+	/// エミッタ1つ → JSON。model ポインタだけは名前(modelName)で書き出す特別扱い。
+	/// </summary>
+	nlohmann::json GpuEmitManager::SerializeEmitter(EmitterData& e) const
+	{
+		AutoJson root, sphere, box, tri, cone, mesh, particle, particleMesh;
+		BuildEmitterSchema(e, root, sphere, box, tri, cone, mesh, particle, particleMesh);
+
+		nlohmann::json j;
+		root.Save(j);
+		// 特別扱い: Model* はポインタなので名前で保存（schema 外の唯一の項目）
+		j["meshParams"]["modelName"] = e.meshParams.model ? e.meshParams.model->GetName() : "";
+		return j;
+	}
+
+	/// <summary>
+	/// JSON → 生成済みエミッタ。model は modelName から解決する。
+	/// </summary>
+	void GpuEmitManager::DeserializeEmitter(EmitterData& e, const nlohmann::json& j) const
+	{
+		AutoJson root, sphere, box, tri, cone, mesh, particle, particleMesh;
+		BuildEmitterSchema(e, root, sphere, box, tri, cone, mesh, particle, particleMesh);
+		root.Load(j);
+
+		// 特別扱い: modelName から Model* を解決
+		if (j.contains("meshParams")) {
+			const std::string modelName = j["meshParams"].value("modelName", std::string{});
+			if (!modelName.empty()) {
+				assert(modelManager_ && "GpuEmitManager : SetModelManager() を先に呼ぶこと");
+				e.meshParams.model = modelManager_->FindModel(modelName);
+			}
+		}
+	}
+
 	nlohmann::json GpuEmitManager::ToJsonGroup(const EmitterGroup* groupPtr) const
 	{
 		nlohmann::json groupJson;
@@ -2068,123 +1044,10 @@ namespace YoRigine {
 			groupJson["translate"] = groupPtr->translate;
 			groupJson["emitters"] = nlohmann::json::array(); // グループ内のエミッター配列
 
+			// 各エミッタは AutoJson スキーマ（BuildEmitterSchema）で一括シリアライズ
 			for (const auto& [emitterName, e] : groupPtr->emitters)
 			{
-				nlohmann::json j;
-				//------------------------------------------------------------
-				// 生成時に必要な情報
-				//------------------------------------------------------------
-				j["name"] = e->name;
-				j["shape"] = static_cast<int>(e->shape);
-				j["isActive"] = e->isActive;
-				j["textureFilePath"] = e->texturePath;
-
-				//------------------------------------------------------------
-				// エミッターの形状
-				//------------------------------------------------------------
-				j["sphereParams"] = {
-					{"translate", e->sphereParams.translate},
-					{"radius",    e->sphereParams.radius},
-					{"count",     e->sphereParams.count},
-					{"emitInterval", e->sphereParams.emitInterval}
-				};
-
-				j["boxParams"] = {
-					{"translate", e->boxParams.translate},
-					{"size",      e->boxParams.size},
-					{"count",     e->boxParams.count},
-					{"emitInterval", e->boxParams.emitInterval}
-				};
-
-				j["triangleParams"] = {
-					{"v1", e->triangleParams.v1},
-					{"v2", e->triangleParams.v2},
-					{"v3", e->triangleParams.v3},
-					{"count", e->triangleParams.count},
-					{"emitInterval", e->triangleParams.emitInterval}
-				};
-
-				j["coneParams"] = {
-					{"translate", e->coneParams.translate},
-					{"direction", e->coneParams.direction},
-					{"radius",    e->coneParams.radius},
-					{"height",    e->coneParams.height},
-					{"count",     e->coneParams.count},
-					{"emitInterval", e->coneParams.emitInterval}
-				};
-				j["meshParams"] = {
-					{"modelName", e->meshParams.model ? e->meshParams.model->GetName() : ""},
-					{"translate", e->meshParams.translate},
-					{"scale", e->meshParams.scale},
-					{"rotation", e->meshParams.rotation.x,e->meshParams.rotation.y,e->meshParams.rotation.z,e->meshParams.rotation.w},
-					{"count", e->meshParams.count},
-					{"emitInterval", e->meshParams.emitInterval},
-					{"emitMode", static_cast<int>(e->meshParams.emitMode)}
-				};
-
-
-
-				//------------------------------------------------------------
-				// パーティクルのパラメータ
-				//------------------------------------------------------------
-				j["particleParams"] = {
-					{"lifeTime",    e->particleParams.lifeTime},
-					{"lifeTimeVariance", e->particleParams.lifeTimeVariance},
-
-					{"startScale",          e->particleParams.startScale},
-					{"startScaleVariance",  e->particleParams.startScaleVariance},
-					{"endScale",            e->particleParams.endScale},
-					{"endScaleVariance",    e->particleParams.endScaleVariance},
-
-					{"rotation",               e->particleParams.rotation},
-					{"rotationVariance",       e->particleParams.rotationVariance},
-					{"rotationSpeed",          e->particleParams.rotationSpeed},
-					{"rotationSpeedVariance",  e->particleParams.rotationSpeedVariance},
-
-					{"velocity",         e->particleParams.velocity},
-					{"velocityVariance", e->particleParams.velocityVariance},
-
-					{"startColor",         e->particleParams.startColor},
-					{"startColorVariance", e->particleParams.startColorVariance},
-					{"endColor",           e->particleParams.endColor},
-					{"endColorVariance",   e->particleParams.endColorVariance},
-
-					{"gravity",					e->particleParams.gravity},
-
-					{"isBillboard",				e->particleParams.isBillboard},
-
-					{"isTrail",					e->particleParams.child.isTrail},
-					{"isInheritScale",			e->particleParams.child.isInheritScale},
-					{"trailLifeTime",			e->particleParams.child.lifeTime},
-					{"trailEmissionCount",		e->particleParams.child.emissionCount},
-					{"trailMinDistance",		e->particleParams.child.minDistance},
-					{"trailStartScale",			e->particleParams.child.startScale},
-					{"trailEndScale",			e->particleParams.child.endScale},
-				};
-
-				j["trail"] = {
-				{"enabled", e->trailParams.isTrail},
-				{"minDistance",e->trailParams.minDistance},
-				{"lifeTime",e->trailParams.lifeTime },
-				{"emissionCount",e->trailParams.emissionCount },
-				{"inheritScale", e->trailParams.inheritScale }
-				};
-
-				// 1粒子の描画メッシュ形状＋生成パラメータ
-				j["particleMeshShape"] = static_cast<int>(e->particleMeshShape);
-				j["particleMeshParams"] = {
-					{"width",        e->particleMeshParams.width},
-					{"height",       e->particleMeshParams.height},
-					{"depth",        e->particleMeshParams.depth},
-					{"outerRadius",  e->particleMeshParams.outerRadius},
-					{"innerRadius",  e->particleMeshParams.innerRadius},
-					{"radius",       e->particleMeshParams.radius},
-					{"angleDegree",  e->particleMeshParams.angleDegree},
-					{"divide",       e->particleMeshParams.divide},
-					{"subdivisions", e->particleMeshParams.subdivisions},
-				};
-
-				groupJson["emitters"].push_back(j);
+				groupJson["emitters"].push_back(SerializeEmitter(*e));
 			}
 		}
 		return groupJson;
@@ -2253,166 +1116,28 @@ namespace YoRigine {
 	/// </summary>
 	bool GpuEmitManager::LoadEmitterFromJson(const std::string& groupName, const nlohmann::json& j)
 	{
-		//------------------------------------------------------------
-		// 生成時に必要な情報
-		//------------------------------------------------------------
-		std::string		name = j.value("name", "UnnamedEmitter");
-		EmitterShape	shape = static_cast<EmitterShape>(j.value("shape", 0)); // 0はSphereを想定
-		bool			isActive = j.value("isActive", true);
-		std::string texturePath = j.value("textureFilePath", "");
+		// エミッタ生成には name/shape/texturePath が先に必要なので、この3つだけ直接読む。
+		// 残りの全フィールドは DeserializeEmitter（AutoJson スキーマ）が一括で流し込む。
+		std::string  name = j.value("name", "UnnamedEmitter");
+		EmitterShape shape = static_cast<EmitterShape>(j.value("shape", 0)); // 0=Sphere
+		std::string  texturePath = j.value("textureFilePath", "");
 
-		if (CreateEmitter(groupName, name, texturePath, shape))
-		{
-			// GetEmitter に groupName を渡す
-			auto* e = GetEmitter(groupName, name);
-			if (!e) return false;
-
-			e->isActive = isActive;
-
-			//------------------------------------------------------------
-			// エミッターの形状
-			//------------------------------------------------------------
-			// Sphere
-			if (j.contains("sphereParams")) {
-				const auto& p = j["sphereParams"];
-				e->sphereParams.translate = p["translate"];
-				e->sphereParams.radius = p["radius"];
-				e->sphereParams.count = p["count"];
-				e->sphereParams.emitInterval = p["emitInterval"];
-			}
-
-			// Box
-			if (j.contains("boxParams")) {
-				const auto& p = j["boxParams"];
-				e->boxParams.translate = p["translate"];
-				e->boxParams.size = p["size"];
-				e->boxParams.count = p["count"];
-				e->boxParams.emitInterval = p["emitInterval"];
-			}
-
-			// Triangle
-			if (j.contains("triangleParams")) {
-				const auto& p = j["triangleParams"];
-				e->triangleParams.v1 = p["v1"];
-				e->triangleParams.v2 = p["v2"];
-				e->triangleParams.v3 = p["v3"];
-				e->triangleParams.count = p["count"];
-				e->triangleParams.emitInterval = p["emitInterval"];
-			}
-
-			// Cone
-			if (j.contains("coneParams")) {
-				const auto& p = j["coneParams"];
-				e->coneParams.translate = p["translate"];
-				e->coneParams.direction = p["direction"];
-				e->coneParams.radius = p["radius"];
-				e->coneParams.height = p["height"];
-				e->coneParams.count = p["count"];
-				e->coneParams.emitInterval = p["emitInterval"];
-			}
-			// Mesh
-			if (j.contains("meshParams")) {
-				const auto& mp = j["meshParams"];
-
-				std::string modelName = mp.value("modelName", "");
-				if (!modelName.empty()) {
-					e->meshParams.model = ModelManager::GetInstance()->FindModel(modelName);
-				}
-
-				e->meshParams.translate = mp["translate"];
-				e->meshParams.scale = mp["scale"];
-				Vector4 r = mp["rotation"];
-				e->meshParams.rotation = Quaternion(r.x, r.y, r.z, r.w);
-
-				e->meshParams.count = mp["count"];
-				e->meshParams.emitInterval = mp["emitInterval"];
-				e->meshParams.emitMode = static_cast<MeshEmitMode>(mp["emitMode"]);
-			}
-
-
-			//------------------------------------------------------------
-			// パーティクルのパラメータ
-			//------------------------------------------------------------
-			if (j.contains("particleParams"))
-			{
-				const auto& pp = j["particleParams"];
-				e->particleParams.lifeTime = pp["lifeTime"];
-				e->particleParams.lifeTimeVariance = pp["lifeTimeVariance"];
-				e->particleParams.isBillboard = pp["isBillboard"];
-
-				e->particleParams.startScale = pp["startScale"];
-				e->particleParams.startScaleVariance = pp["startScaleVariance"];
-				e->particleParams.endScale = pp["endScale"];
-				e->particleParams.endScaleVariance = pp["endScaleVariance"];
-
-				e->particleParams.rotation = pp["rotation"];
-				e->particleParams.rotationVariance = pp["rotationVariance"];
-				e->particleParams.rotationSpeed = pp["rotationSpeed"];
-				e->particleParams.rotationSpeedVariance = pp["rotationSpeedVariance"];
-
-				e->particleParams.velocity = pp["velocity"];
-				e->particleParams.velocityVariance = pp["velocityVariance"];
-
-				e->particleParams.startColor = pp["startColor"];
-				e->particleParams.startColorVariance = pp["startColorVariance"];
-				e->particleParams.endColor = pp["endColor"];
-				e->particleParams.endColorVariance = pp["endColorVariance"];
-
-				e->particleParams.gravity = pp["gravity"];
-
-				// トレイルパラメータ
-				e->particleParams.child.isTrail = pp["isTrail"];
-				e->particleParams.child.isInheritScale = pp["isInheritScale"];
-				e->particleParams.child.lifeTime = pp["trailLifeTime"];
-				e->particleParams.child.emissionCount = pp["trailEmissionCount"];
-				e->particleParams.child.minDistance = pp["trailMinDistance"];
-				e->particleParams.child.startScale = pp["trailStartScale"];
-				e->particleParams.child.endScale = pp["trailEndScale"];
-
-			}
-			//------------------------------------------------------------
-			// トレイルのパラメータ
-			//------------------------------------------------------------
-			if (j.contains("trail"))
-			{
-				const auto& tp = j["trail"];
-				e->trailParams.isTrail = tp.value("enabled", false);
-				e->trailParams.minDistance = tp.value("minDistance", 0.1f);
-				e->trailParams.lifeTime = tp.value("lifeTime", 1.0f);
-				e->trailParams.emissionCount = tp.value("emissionCount", 1.0f);
-				e->trailParams.inheritScale = tp.value("inheritScale", false);
-			}
-
-			//------------------------------------------------------------
-			// 1粒子の描画メッシュ形状＋生成パラメータ（旧データには無いので既定）
-			//------------------------------------------------------------
-			e->particleMeshShape = static_cast<ParticleMeshShape>(
-				j.value("particleMeshShape", static_cast<int>(ParticleMeshShape::Plane)));
-
-			if (j.contains("particleMeshParams")) {
-				const auto& mp = j["particleMeshParams"];
-				auto& d = e->particleMeshParams;
-				d.width = mp.value("width", d.width);
-				d.height = mp.value("height", d.height);
-				d.depth = mp.value("depth", d.depth);
-				d.outerRadius = mp.value("outerRadius", d.outerRadius);
-				d.innerRadius = mp.value("innerRadius", d.innerRadius);
-				d.radius = mp.value("radius", d.radius);
-				d.angleDegree = mp.value("angleDegree", d.angleDegree);
-				d.divide = mp.value("divide", d.divide);
-				d.subdivisions = mp.value("subdivisions", d.subdivisions);
-			}
-
-			// 適用
-			UpdateEmitterParams(e);
-			UpdateParticleParams(e);
-			if (e->emitter) {
-				e->emitter->SetParticleMesh(e->particleMeshShape, e->particleMeshParams);
-			}
-
-			return true;
+		if (!CreateEmitter(groupName, name, texturePath, shape)) {
+			return false;
 		}
-		return false;
+		auto* e = GetEmitter(groupName, name);
+		if (!e) return false;
+
+		// 全パラメータを一括復元（欠損キーは既定値のまま＝後方互換）
+		DeserializeEmitter(*e, j);
+
+		// 適用
+		UpdateEmitterParams(e);
+		UpdateParticleParams(e);
+		if (e->emitter) {
+			e->emitter->SetParticleMesh(e->particleMeshShape, e->particleMeshParams);
+		}
+		return true;
 	}
 	// 画像一覧をスキャン
 	void GpuEmitManager::ScanTextureDirectory(const std::string& directory)

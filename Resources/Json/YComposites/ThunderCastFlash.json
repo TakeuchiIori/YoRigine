@@ -1,0 +1,9 @@
+{
+  "name": "ThunderCastFlash",
+  "particleEffects": [
+    { "asset": "FxThunderResidual", "offset": [0.0, 0.0, 0.0] }
+  ],
+  "vfxMeshAssets": [],
+  "gpuEmitterGroup": "",
+  "sounds": []
+}

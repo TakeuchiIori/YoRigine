@@ -18,7 +18,7 @@ struct TransformForGPU {
 
 class YParticleRenderer {
 public:
-    void Initialize(SrvManager* srvManager, uint32_t maxTotalParticles = 10000);
+    void Initialize(YoRigine::SrvManager* srvManager, uint32_t maxTotalParticles = 10000);
 
     // フレーム開始時にリセット
     void BeginFrame();
@@ -52,7 +52,7 @@ private:
     uint32_t currentInstanceOffset_ = 0;
     uint32_t  batchStartOffset_ = 0;
 
-    SrvManager* srvManager_ = nullptr;
+    YoRigine::SrvManager* srvManager_ = nullptr;
     YoRigine::DirectXCommon* dxCommon_ = nullptr;
 	Camera* camera_ = nullptr;
 
