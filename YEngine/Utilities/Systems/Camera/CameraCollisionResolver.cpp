@@ -1,7 +1,9 @@
 #include "CameraCollisionResolver.h"
 #include "Collision/AreaCollision/Base/AreaManager.h"
 #include "Collision/Core/CollisionManager.h"
+#include "Collision/Core/CollisionTypeIdDef.h"
 #include "Systems/GameTime/GameTime.h"
+#include <algorithm>
 #include <cmath>
 
 #ifdef USE_IMGUI
@@ -13,12 +15,34 @@
 // ============================================================
 void CameraCollisionResolver::Initialize() {
 	currentDistanceRatio_ = 1.0f;
+	if (blockTypeIDs_.empty()) {
+		SetDefaultBlockTypes();
+	}
+}
+
+// ============================================================
+// 遮蔽対象タイプIDの管理
+// ============================================================
+void CameraCollisionResolver::AddBlockTypeID(uint32_t typeID) {
+	if (std::find(blockTypeIDs_.begin(), blockTypeIDs_.end(), typeID) == blockTypeIDs_.end()) {
+		blockTypeIDs_.push_back(typeID);
+	}
+}
+
+void CameraCollisionResolver::SetDefaultBlockTypes() {
+	// 既定でカメラを遮るのは「移動を物理的に塞ぐ」型だけ。
+	// 壁・建物と NavObstacle(通行不可の障害物)。トリガー領域・飛道弾・敵などは含めない。
+	blockTypeIDs_ = {
+		static_cast<uint32_t>(CollisionTypeIdDef::kStaticWall),
+		static_cast<uint32_t>(CollisionTypeIdDef::kNavObstacle),
+	};
 }
 
 // ============================================================
 // 理想のカメラ座標から地形や障害物のめり込みを計算し、安全な座標を返す
 // ============================================================
-Vector3 CameraCollisionResolver::Resolve(const Vector3& idealPos, const Vector3& targetPivot) {
+Vector3 CameraCollisionResolver::Resolve(const Vector3& idealPos, const Vector3& targetPivot,
+	float deltaTime, float clearanceScale, bool allowHighAngle) {
 	if (!isEnabled_) {
 		return idealPos;
 	}
@@ -38,9 +62,9 @@ Vector3 CameraCollisionResolver::Resolve(const Vector3& idealPos, const Vector3&
 		cameraRay.direction = rayDir;
 
 		RaycastHit hitInfo;
-		// Raycastで衝突した場合、ヒット距離をカメラ半径分だけ手前にする
-		if (YoRigine::CollisionManager::GetInstance()->Raycast(cameraRay, maxDistance, &hitInfo, ignoreTypeIDs_)) {
-			hitDistance = hitInfo.distance - cameraRadius_;
+		// 許可リスト(壁など)に含まれる型だけを対象に Raycast。ヒットしたらカメラ半径分だけ手前にする。
+		if (YoRigine::CollisionManager::GetInstance()->RaycastAllowTypes(cameraRay, maxDistance, &hitInfo, blockTypeIDs_)) {
+			hitDistance = hitInfo.distance - cameraRadius_ * clearanceScale;
 		}
 
 		// ------------------------------------------------------------
@@ -53,7 +77,7 @@ Vector3 CameraCollisionResolver::Resolve(const Vector3& idealPos, const Vector3&
 			Vector3 clampedPos = areaManager->ClampToNearestArea(idealPos);
 
 			// クランプされた座標までの距離を計算し、カメラ半径分だけさらに手前にする
-			float areaDistance = Length(clampedPos - targetPivot) - cameraRadius_;
+			float areaDistance = Length(clampedPos - targetPivot) - cameraRadius_ * clearanceScale;
 
 			// 物理コライダー(Raycast)とエリアの壁、より手前にある方を最終的なヒット距離として採用する
 			if (areaDistance < hitDistance) {
@@ -80,7 +104,7 @@ Vector3 CameraCollisionResolver::Resolve(const Vector3& idealPos, const Vector3&
 	// 旧仕様は Lerp(a, b, speed) の speed を「60fps の 1 フレームあたり Lerp 係数」として
 	// 扱っていたため、fps 変動でカクついていた。speed * 60 を /sec のレートに換算し、
 	// dt を使った exponential smoothing に置き換える。
-	const float dt = YoRigine::GameTime::GetDeltaTime();
+	const float dt = std::max(0.0f, deltaTime);
 	const float baseSpeed = (targetDistanceRatio < currentDistanceRatio_) ? avoidSpeed_ : returnSpeed_;
 	const float ratePerSec = baseSpeed * 60.0f;
 	const float t = 1.0f - std::exp(-ratePerSec * dt);
@@ -93,7 +117,7 @@ Vector3 CameraCollisionResolver::Resolve(const Vector3& idealPos, const Vector3&
 	// 注意: rotation 補正を行っていないため Y だけ持ち上げると pivot が画面外に流れる。
 	// 既定では off。意図的に有効化したい場合のみ JSON から enableHighAngle=true にする。
 	// ------------------------------------------------------------
-	if (enableHighAngle_ && currentDistanceRatio_ < highAngleThreshold_) {
+	if (allowHighAngle && enableHighAngle_ && currentDistanceRatio_ < highAngleThreshold_) {
 		float closeFactor = (highAngleThreshold_ - currentDistanceRatio_) / highAngleThreshold_;
 		finalOffset.y += maxPushUpHeight_ * closeFactor;
 	}
@@ -126,6 +150,28 @@ void CameraCollisionResolver::DrawDebugGui() {
 			ImGui::DragFloat("復帰スピード", &returnSpeed_, 0.01f, 0.01f, 1.0f);
 
 			ImGui::Separator();
+			// --- カメラを遮る対象（許可リスト）の設定 ---
+			if (ImGui::TreeNode("遮る対象タイプ (許可リスト)")) {
+				ImGui::TextDisabled("チェックした型だけがカメラを押し戻す");
+				for (CollisionTypeIdDef type : kPlacedObjectColliderTypes) {
+					if (type == CollisionTypeIdDef::kNone) continue; // None は判定対象外
+					const uint32_t id = static_cast<uint32_t>(type);
+					bool blocking = std::find(blockTypeIDs_.begin(), blockTypeIDs_.end(), id) != blockTypeIDs_.end();
+					if (ImGui::Checkbox(CollisionTypeIdToString(type), &blocking)) {
+						if (blocking) {
+							AddBlockTypeID(id);
+						} else {
+							blockTypeIDs_.erase(std::remove(blockTypeIDs_.begin(), blockTypeIDs_.end(), id), blockTypeIDs_.end());
+						}
+					}
+				}
+				if (ImGui::Button("既定に戻す (壁 + NavObstacle)")) {
+					SetDefaultBlockTypes();
+				}
+				ImGui::TreePop();
+			}
+
+			ImGui::Separator();
 			ImGui::Checkbox("壁際ハイアングル化", &enableHighAngle_);
 			if (enableHighAngle_) {
 				ImGui::DragFloat("発動しきい値", &highAngleThreshold_, 0.05f, 0.1f, 1.0f);
@@ -150,6 +196,7 @@ void CameraCollisionResolver::Save(nlohmann::json& j) const {
 	j["enableHighAngle"] = enableHighAngle_;
 	j["highAngleThreshold"] = highAngleThreshold_;
 	j["maxPushUpHeight"] = maxPushUpHeight_;
+	j["blockTypeIDs"] = blockTypeIDs_;
 }
 
 // ============================================================
@@ -167,4 +214,11 @@ void CameraCollisionResolver::Load(const nlohmann::json& j) {
 	enableHighAngle_ = j.value("enableHighAngle", false);
 	highAngleThreshold_ = j.value("highAngleThreshold", 0.5f);
 	maxPushUpHeight_ = j.value("maxPushUpHeight", 3.0f);
+
+	// 遮蔽対象タイプID（許可リスト）。旧 JSON には無いので、その場合は既定(壁+NavObstacle)。
+	if (j.contains("blockTypeIDs") && j["blockTypeIDs"].is_array()) {
+		blockTypeIDs_ = j["blockTypeIDs"].get<std::vector<uint32_t>>();
+	} else {
+		SetDefaultBlockTypes();
+	}
 }

@@ -23,7 +23,7 @@ static const uint32_t kCubeEdges[12][2] = {
 void InstancedCube::Initialize()
 {
 	dxCommon_   = YoRigine::DirectXCommon::GetInstance();
-	srvManager_ = SrvManager::GetInstance();
+	srvManager_ = YoRigine::SrvManager::GetInstance();
 
 	CreateVertexBuffer();
 	CreateInstanceBuffer();

@@ -8,7 +8,7 @@
 #include "imgui.h"
 #endif
 
-void YParticleRenderer::Initialize(SrvManager* srvManager, uint32_t maxTotalParticles) {
+void YParticleRenderer::Initialize(YoRigine::SrvManager* srvManager, uint32_t maxTotalParticles) {
     dxCommon_ = YoRigine::DirectXCommon::GetInstance();
     srvManager_ = srvManager;
     maxTotalParticles_ = maxTotalParticles;

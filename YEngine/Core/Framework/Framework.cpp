@@ -1,5 +1,6 @@
 #include "Framework.h"
 #include "PipelineManager/YPipelineManager.h"
+#include "OffScreen/OffScreen.h"
 /// <summary>
 /// フレームワーク全体の初期化
 /// </summary>
@@ -77,6 +78,7 @@ void Framework::Initialize()
 	// ライト管理
 	//-----------------------------------------
 	lightManager_ = YoRigine::LightManager::GetInstance();
+	lightManager_->SetOffScreen(OffScreen::GetInstance());
 	lightManager_->Initialize();
 
 	//-----------------------------------------
@@ -99,6 +101,7 @@ void Framework::Initialize()
 	//-----------------------------------------
 	// オブジェクト管理
 	//-----------------------------------------
+	ObjectManager::GetInstance()->SetCollisionManager(collisionManager_);
 	ObjectManager::GetInstance()->Initialize();
 }
 
@@ -115,6 +118,7 @@ void Framework::Finalize()
 
 	ObjectManager::GetInstance()->Finalize();
 	YPipelineManager::GetInstance()->Finalize();
+	lightManager_->Finalize();
 	computeShaderManager_->Finalize();
 	textureManager_->Finalize();
 	imguiManager_->Finalize();

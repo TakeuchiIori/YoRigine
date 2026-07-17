@@ -40,7 +40,7 @@ public:
     /// </summary>
     /// <param name="srvManager">SRVマネージャー</param>
     /// <param name="maxTotalParticles">全システム合計の最大パーティクル数</param>
-    void Initialize(SrvManager* srvManager, uint32_t maxTotalParticles = 10000);
+    void Initialize(YoRigine::SrvManager* srvManager, uint32_t maxTotalParticles = 10000);
 
     /// <summary>
     /// 終了処理
@@ -172,6 +172,12 @@ public:
     /// </summary>
     void RegisterEmitter(const std::shared_ptr<YParticleEmitter>& emitter);
 
+    /// <summary>
+    /// 登録中の全アクティブエミッタを停止してリストを空にする。
+    /// シーン遷移時に呼び出し、前のシーンのエミッタが次のシーンに残らないようにする。
+    /// </summary>
+    void StopAndClearActiveEmitters();
+
     //=================================================================
     // カメラ設定
     //=================================================================
@@ -223,7 +229,7 @@ private:
     //=================================================================
 
     bool initialized_ = false;
-    SrvManager* srvManager_ = nullptr;
+    YoRigine::SrvManager* srvManager_ = nullptr;
     Camera* camera_ = nullptr;
 
     // パイプライン

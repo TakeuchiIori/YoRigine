@@ -16,7 +16,7 @@
     "name": "LockOnHintStick",
     "position": {
         "x": 231.0,
-        "y": 211.08509826660156,
+        "y": 211.59075927734375,
         "z": 0.0
     },
     "rotation": {
@@ -50,5 +50,5 @@
         "x": 0.0,
         "y": 0.0
     },
-    "visible": true
+    "visible": false
 }

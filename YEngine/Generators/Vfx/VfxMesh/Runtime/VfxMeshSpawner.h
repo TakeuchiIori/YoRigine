@@ -51,27 +51,34 @@ public:
     // ロード済みアセット名の一覧（Compositeエディタのドロップダウン用）
     std::vector<std::string> GetAssetNames() const;
 
+    // ロード済みアセットの実体を名前で取得（NaturalDuration集計などComposite側から使う。無ければnullptr）
+    const YoRigine::VfxEffectAsset* GetAsset(const std::string& assetName) const;
+
     // 毎フレーム
     void Update(float deltaTime);
     void Draw();
 
     // ── 生成 ─────────────────────────────────────────────────────────
     // 位置 + スケール（スモーク・衝撃波など）
+    // timeScale: ageの進み方に掛ける倍率。1.0=通常、0.5=倍の時間をかけて再生（寿命を引き伸ばす）。
     uint32_t Spawn(const std::string& assetName,
                    const Vector3&     position,
                    float              scale = 1.0f,
-                   bool               loop  = false);
+                   bool               loop  = false,
+                   float              timeScale = 1.0f);
 
     // 始点・終点（稲妻など方向性エフェクト）
     uint32_t SpawnBolt(const std::string& assetName,
                        const Vector3&     start,
                        const Vector3&     end,
-                       bool               loop = false);
+                       bool               loop = false,
+                       float              timeScale = 1.0f);
 
     // ── 操作（VfxMeshHandle から呼ばれる） ─────────────────────────
     void SetPosition(uint32_t id, const Vector3& pos);
     void SetScale(uint32_t id, float scale);
     void SetEndpoints(uint32_t id, const Vector3& start, const Vector3& end);
+    void SetTimeScale(uint32_t id, float timeScale);
     void Stop(uint32_t id);
     bool IsAlive(uint32_t id) const;
 
@@ -118,6 +125,7 @@ private:
         bool     alive = true;
         bool     loop  = false;
         float    age   = 0.f;
+        float    timeScale = 1.0f;   // ageの進み方の倍率。<1で寿命を引き伸ばす（Composite::minDuration用）
 
         // アセットはコピーせず assetMap_ の実体を指す（生成時のヒープ確保/コピーを回避）
         const YoRigine::VfxEffectAsset* asset = nullptr;

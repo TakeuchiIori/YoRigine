@@ -22,6 +22,7 @@ void ComputeShaderManager::Initialize()
 	CreatePaticleInitCS();
 	CreateEmitCS();
 	CreateParticleUpdateCS();
+	CreateResetDrawArgsCS();
 	CreatePostEffectCS();
 }
 
@@ -197,8 +198,21 @@ void ComputeShaderManager::CreatePaticleInitCS()
 	activeCountUAV[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 	activeCountUAV[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
 
+	// UAV: Warm (u4) / Cold (u5) — SoA バッファ
+	D3D12_DESCRIPTOR_RANGE warmUAV[1] = {};
+	warmUAV[0].BaseShaderRegister = 4;
+	warmUAV[0].NumDescriptors = 1;
+	warmUAV[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	warmUAV[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+
+	D3D12_DESCRIPTOR_RANGE coldUAV[1] = {};
+	coldUAV[0].BaseShaderRegister = 5;
+	coldUAV[0].NumDescriptors = 1;
+	coldUAV[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	coldUAV[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+
 	// Root Parameters
-	D3D12_ROOT_PARAMETER rootParameters[4] = {};
+	D3D12_ROOT_PARAMETER rootParameters[6] = {};
 
 	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
@@ -219,6 +233,16 @@ void ComputeShaderManager::CreatePaticleInitCS()
 	rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 	rootParameters[3].DescriptorTable.pDescriptorRanges = activeCountUAV;
 	rootParameters[3].DescriptorTable.NumDescriptorRanges = _countof(activeCountUAV);
+
+	rootParameters[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParameters[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	rootParameters[4].DescriptorTable.pDescriptorRanges = warmUAV;
+	rootParameters[4].DescriptorTable.NumDescriptorRanges = _countof(warmUAV);
+
+	rootParameters[5].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParameters[5].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	rootParameters[5].DescriptorTable.pDescriptorRanges = coldUAV;
+	rootParameters[5].DescriptorTable.NumDescriptorRanges = _countof(coldUAV);
 
 
 	D3D12_ROOT_SIGNATURE_DESC descriptionRootSignature{};
@@ -299,8 +323,21 @@ void ComputeShaderManager::CreateEmitCS()
 	meshTrianglesSRV[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 	meshTrianglesSRV[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 
+	// UAV: Warm (u4) / Cold (u5) — SoA バッファ
+	D3D12_DESCRIPTOR_RANGE warmUAV[1] = {};
+	warmUAV[0].BaseShaderRegister = 4;
+	warmUAV[0].NumDescriptors = 1;
+	warmUAV[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	warmUAV[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+
+	D3D12_DESCRIPTOR_RANGE coldUAV[1] = {};
+	coldUAV[0].BaseShaderRegister = 5;
+	coldUAV[0].NumDescriptors = 1;
+	coldUAV[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	coldUAV[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+
 	// ===== Root Parameters =====
-	D3D12_ROOT_PARAMETER rootParameters[13] = {};
+	D3D12_ROOT_PARAMETER rootParameters[15] = {};
 
 	// Emitter Parameters (CBV0～CBV6)
 	for (int i = 0; i <= 7; i++) {
@@ -334,6 +371,16 @@ void ComputeShaderManager::CreateEmitCS()
 	rootParameters[12].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 	rootParameters[12].DescriptorTable.pDescriptorRanges = meshTrianglesSRV;
 	rootParameters[12].DescriptorTable.NumDescriptorRanges = _countof(meshTrianglesSRV);
+
+	rootParameters[13].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParameters[13].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	rootParameters[13].DescriptorTable.pDescriptorRanges = warmUAV;
+	rootParameters[13].DescriptorTable.NumDescriptorRanges = _countof(warmUAV);
+
+	rootParameters[14].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParameters[14].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	rootParameters[14].DescriptorTable.pDescriptorRanges = coldUAV;
+	rootParameters[14].DescriptorTable.NumDescriptorRanges = _countof(coldUAV);
 
 	D3D12_ROOT_SIGNATURE_DESC descriptionRootSignature{};
 	descriptionRootSignature.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
@@ -406,43 +453,103 @@ void ComputeShaderManager::CreateParticleUpdateCS()
 	activeCountUAV[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 	activeCountUAV[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
 
-	// ===== Root Parameters =====
-	// UpdateCS は「UAV ×1 + PerFrame(CBV1) + FreeListIndex(UAV) + FreeList(UAV)」
-	D3D12_ROOT_PARAMETER rootParameters[6] = {};
+	// SRV: ForceFields (t0) — GPU フォースフィールド配列。0個時もバッファは存在し HLSL 側でカウント0ガード
+	D3D12_DESCRIPTOR_RANGE forceFieldSRV[1] = {};
+	forceFieldSRV[0].BaseShaderRegister = 0;
+	forceFieldSRV[0].NumDescriptors = 1;
+	forceFieldSRV[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	forceFieldSRV[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 
-	// UAV(Particle)
+	// UAV: Warm (u4) / Cold (u5) — Update 本体は未使用。共用する SpawnTrailCS が読み書きする
+	D3D12_DESCRIPTOR_RANGE warmUAV[1] = {};
+	warmUAV[0].BaseShaderRegister = 4;
+	warmUAV[0].NumDescriptors = 1;
+	warmUAV[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	warmUAV[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+
+	D3D12_DESCRIPTOR_RANGE coldUAV[1] = {};
+	coldUAV[0].BaseShaderRegister = 5;
+	coldUAV[0].NumDescriptors = 1;
+	coldUAV[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	coldUAV[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+
+	// UAV: DrawList (u6) / DrawArgs (u7) — インダイレクト描画。Update CS が生存粒子を追記する
+	D3D12_DESCRIPTOR_RANGE drawListUAV[1] = {};
+	drawListUAV[0].BaseShaderRegister = 6;
+	drawListUAV[0].NumDescriptors = 1;
+	drawListUAV[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	drawListUAV[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+
+	D3D12_DESCRIPTOR_RANGE drawArgsUAV[1] = {};
+	drawArgsUAV[0].BaseShaderRegister = 7;
+	drawArgsUAV[0].NumDescriptors = 1;
+	drawArgsUAV[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	drawArgsUAV[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+
+	// ===== Root Parameters =====
+	D3D12_ROOT_PARAMETER rootParameters[11] = {};
+
+	// 0: UAV(Particle) u0
 	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 	rootParameters[0].DescriptorTable.pDescriptorRanges = particleUAV;
 	rootParameters[0].DescriptorTable.NumDescriptorRanges = _countof(particleUAV);
 
-	// PerFrame (CBV0)
+	// 1: PerFrame CBV b0
 	rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 	rootParameters[1].Descriptor.ShaderRegister = 0;
 
-	// ParticleParams (CBV1)
+	// 2: ParticleParams CBV b1
 	rootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 	rootParameters[2].Descriptor.ShaderRegister = 1;
 
-	// FreeListIndex UAV
+	// 3: FreeListIndex UAV u1
 	rootParameters[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 	rootParameters[3].DescriptorTable.pDescriptorRanges = freeListIndexUAV;
 	rootParameters[3].DescriptorTable.NumDescriptorRanges = _countof(freeListIndexUAV);
 
-	// FreeList UAV
+	// 4: FreeList UAV u2
 	rootParameters[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	rootParameters[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 	rootParameters[4].DescriptorTable.pDescriptorRanges = freeListUAV;
 	rootParameters[4].DescriptorTable.NumDescriptorRanges = _countof(freeListUAV);
 
-	// ActiveCount UAV
+	// 5: ActiveCount UAV u3
 	rootParameters[5].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	rootParameters[5].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 	rootParameters[5].DescriptorTable.pDescriptorRanges = activeCountUAV;
 	rootParameters[5].DescriptorTable.NumDescriptorRanges = _countof(activeCountUAV);
+
+	// 6: ForceFields SRV t0 (末尾追加 — 既存インデックスを変更しない)
+	rootParameters[6].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParameters[6].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	rootParameters[6].DescriptorTable.pDescriptorRanges = forceFieldSRV;
+	rootParameters[6].DescriptorTable.NumDescriptorRanges = _countof(forceFieldSRV);
+
+	// 7: Warm UAV u4 / 8: Cold UAV u5 (SpawnTrailCS 用。Update 本体は未使用)
+	rootParameters[7].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParameters[7].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	rootParameters[7].DescriptorTable.pDescriptorRanges = warmUAV;
+	rootParameters[7].DescriptorTable.NumDescriptorRanges = _countof(warmUAV);
+
+	rootParameters[8].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParameters[8].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	rootParameters[8].DescriptorTable.pDescriptorRanges = coldUAV;
+	rootParameters[8].DescriptorTable.NumDescriptorRanges = _countof(coldUAV);
+
+	// 9: DrawList UAV u6 / 10: DrawArgs UAV u7 (Update CS が生存粒子を追記)
+	rootParameters[9].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParameters[9].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	rootParameters[9].DescriptorTable.pDescriptorRanges = drawListUAV;
+	rootParameters[9].DescriptorTable.NumDescriptorRanges = _countof(drawListUAV);
+
+	rootParameters[10].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParameters[10].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	rootParameters[10].DescriptorTable.pDescriptorRanges = drawArgsUAV;
+	rootParameters[10].DescriptorTable.NumDescriptorRanges = _countof(drawArgsUAV);
 
 
 
@@ -488,6 +595,79 @@ void ComputeShaderManager::CreateParticleUpdateCS()
 		&computePipelineStateDesc,
 		IID_PPV_ARGS(&computePipelineStates_["ParticleUpdateCS"])
 	);
+
+	// トレイル生成パス（FreeList Pop 専用。Update パスの Push と分離して競合を防ぐ）
+	// ルートシグネチャは ParticleUpdateCS と共用
+	Microsoft::WRL::ComPtr<IDxcBlob> trailSpawnBlob =
+		dxCommon_->CompileShader(L"Resources/Shaders/Particle/SpawnTrailParticle.CS.hlsl", L"cs_6_0");
+
+	D3D12_COMPUTE_PIPELINE_STATE_DESC trailSpawnDesc = {};
+	trailSpawnDesc.pRootSignature = rootSignatures_["ParticleUpdateCS"].Get();
+	trailSpawnDesc.CS = { trailSpawnBlob->GetBufferPointer(), trailSpawnBlob->GetBufferSize() };
+
+	hr = dxCommon_->GetDevice()->CreateComputePipelineState(
+		&trailSpawnDesc,
+		IID_PPV_ARGS(&computePipelineStates_["TrailSpawnCS"])
+	);
+}
+
+// =====================================================================
+// インダイレクト描画の引数バッファ（D3D12_DRAW_INDEXED_ARGUMENTS）を毎フレーム初期化する
+// 1スレッドの CS。u0=DrawArgs(RWStructuredBuffer<uint>×5)、b0=索引数(root定数)。
+// =====================================================================
+void ComputeShaderManager::CreateResetDrawArgsCS()
+{
+	HRESULT hr;
+
+	// UAV: DrawArgs (u0)
+	D3D12_DESCRIPTOR_RANGE drawArgsUAV[1] = {};
+	drawArgsUAV[0].BaseShaderRegister = 0;
+	drawArgsUAV[0].NumDescriptors = 1;
+	drawArgsUAV[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	drawArgsUAV[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+
+	D3D12_ROOT_PARAMETER rootParameters[2] = {};
+	// 0: DrawArgs UAV u0
+	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	rootParameters[0].DescriptorTable.pDescriptorRanges = drawArgsUAV;
+	rootParameters[0].DescriptorTable.NumDescriptorRanges = _countof(drawArgsUAV);
+	// 1: 索引数 root 定数 (b0)
+	rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+	rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	rootParameters[1].Constants.ShaderRegister = 0;
+	rootParameters[1].Constants.RegisterSpace = 0;
+	rootParameters[1].Constants.Num32BitValues = 1;
+
+	D3D12_ROOT_SIGNATURE_DESC descriptionRootSignature{};
+	descriptionRootSignature.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
+	descriptionRootSignature.NumParameters = _countof(rootParameters);
+	descriptionRootSignature.pParameters = rootParameters;
+
+	Microsoft::WRL::ComPtr<ID3DBlob> signatureBlob;
+	Microsoft::WRL::ComPtr<ID3DBlob> errorBlob;
+	hr = D3D12SerializeRootSignature(
+		&descriptionRootSignature, D3D_ROOT_SIGNATURE_VERSION_1, &signatureBlob, &errorBlob);
+	if (FAILED(hr)) {
+		Logger(reinterpret_cast<char*>(errorBlob->GetBufferPointer()));
+		assert(false);
+	}
+
+	hr = dxCommon_->GetDevice()->CreateRootSignature(
+		0, signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(),
+		IID_PPV_ARGS(&rootSignatures_["ResetDrawArgsCS"]));
+	assert(SUCCEEDED(hr));
+
+	Microsoft::WRL::ComPtr<IDxcBlob> csBlob =
+		dxCommon_->CompileShader(L"Resources/Shaders/Particle/ResetDrawArgs.CS.hlsl", L"cs_6_0");
+
+	D3D12_COMPUTE_PIPELINE_STATE_DESC psoDesc = {};
+	psoDesc.pRootSignature = rootSignatures_["ResetDrawArgsCS"].Get();
+	psoDesc.CS = { csBlob->GetBufferPointer(), csBlob->GetBufferSize() };
+
+	hr = dxCommon_->GetDevice()->CreateComputePipelineState(
+		&psoDesc, IID_PPV_ARGS(&computePipelineStates_["ResetDrawArgsCS"]));
+	assert(SUCCEEDED(hr));
 }
 
 // =====================================================================

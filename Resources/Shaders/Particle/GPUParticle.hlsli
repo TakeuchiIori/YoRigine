@@ -1,5 +1,5 @@
-static const uint kMaxParticles = 16384; // 1エミッタあたりの最大粒子数（バッファ・描画・ディスパッチの上限）。C++ 側 GPUParticle::kMaxParticles と必ず一致させること
-static const uint kParticlesPerThread = 128; // 1スレッドが処理するパーティクル数
+static const uint kMaxParticles = 65536; // 1エミッタあたりの最大粒子数（バッファ・描画・ディスパッチの上限）。C++ 側 GPUParticle::kMaxParticles と必ず一致させること
+static const uint kParticlesPerThread = 128; // 1スレッドが処理するパーティクル数。C++ 側 GPUParticle::kParticlesPerThread と一致させること
 
 // エミッター形状の種類
 static const uint EMITTER_SHAPE_SPHERE = 0;
@@ -34,40 +34,35 @@ struct ChildParticleParams
     float pad0;
 };
 
-struct Particle
-{
-    float3 translate;
-    float pad0;
-    
-    float3 lastTranslate;
-    float pad1;
-    
-    float3 scale;
-    float pad2;
-    
-    float3 startScale;
-    float pad3;
-    
-    float3 endScale;
-    float pad4;
-    
-    float rotate;
-    float lifeTime;
-    float currentTime;
-    float pad5;
-    
-    float3 velocity;
-    float pad6;
+// ─────────────────────────────────────────────────────────────────────────
+// SoA レイアウト（AoS 176B から hot/warm/cold の3バッファへ分割）
+//   scale / color は保存せず VS で startScale/endScale・startColor/endColor から
+//   lifeRatio でlerp導出する（Update CS のlerpと同一式）。isBillboard は PerView(uniform)。
+//   C++ 側 GPUParticle::ParticleHotGPU / ParticleWarmGPU / ParticleColdGPU と厳密一致。
+// ─────────────────────────────────────────────────────────────────────────
 
-    float4 color;
-    float4 startColor;
-    float4 endColor;
-    
-    uint isParent;
-    uint isBillboard;
-    uint isActive;
-    float pad7;
-};
+// Hot: 毎フレーム Update が書き換える + VS も読む
+struct ParticleHot
+{
+    float3 translate;   float rotate;        // 16
+    float3 velocity;    float lifeTime;      // 16
+    float  currentTime; uint  isActive; float2 pad; // 16
+};  // 48 bytes
+
+// Warm: Emit 時に確定・寿命中不変。VS が scale/color 導出に読む
+struct ParticleWarm
+{
+    float3 startScale; float pad0;   // 16
+    float3 endScale;   float pad1;   // 16
+    float4 startColor;               // 16
+    float4 endColor;                 // 16
+};  // 64 bytes
+
+// Cold: トレイル生成のみが使う（Update/描画は触らない）
+struct ParticleCold
+{
+    float3 lastTranslate; uint isParent;  // 16
+};  // 16 bytes
 
 
 // パーティクルの初期パラメータ設定
@@ -220,12 +215,56 @@ struct MeshTriangle
 
 struct PerFrame
 {
-    // ゲームを起動してからの時間
-    // パラメータいれるといい
-    
     float time;
     float deltaTime;
+    uint  forceFieldCount; // GPU フォースフィールドの有効数。0 = フィールド無し
+    float pad;
 };
+
+// ──── GPU フォースフィールド ────────────────────────────────────────────────
+static const uint FIELD_SHAPE_SPHERE = 0;
+static const uint FIELD_SHAPE_AABB   = 1;
+static const uint FIELD_MODE_DIRECTIONAL = 0;
+static const uint FIELD_MODE_CONVERGE    = 1;
+static const uint FIELD_MODE_REPEL       = 2;
+
+// C++ 側 GPUEmitter::ForceFieldForGPU と厳密に同一レイアウト (96 bytes)
+struct GpuForceField {
+    uint   shape;         // FIELD_SHAPE_*
+    float3 center;        // 16
+    float3 halfExtents;   // AABB 用
+    float  radius;        // 32
+    uint   mode;          // FIELD_MODE_*
+    float3 direction;     // DirectionalAccel 用  // 48
+    float  strength;
+    float  falloff;
+    float  spiralStrengthMin;
+    float  spiralStrengthMax; // 64
+    float  randomAxisBlend;
+    float  orbitHoldRatio;
+    float  approachVariance;
+    float  maxSpeed;          // 80
+    float  killRadius;
+    uint   isEnable;
+    float2 pad2;              // 96
+};
+// ────────────────────────────────────────────────────────────────────────────
+
+// ──── ハッシュ補助関数 ────────────────────────────────────────────────────
+uint Hash11u(uint x) {
+    x = ((x >> 16) ^ x) * 0x45d9f3bu;
+    x = ((x >> 16) ^ x) * 0x45d9f3bu;
+    x = (x >> 16) ^ x;
+    return x;
+}
+float Hash11(uint x) { return float(Hash11u(x)) / 4294967295.0f; }
+float3 HashToUnitVector(uint seed) {
+    float theta = Hash11(seed ^ 0x9e3779b9u) * 6.28318f;
+    float cosP  = Hash11(seed ^ 0x517cc1b7u) * 2.0f - 1.0f;
+    float sinP  = sqrt(max(0.0f, 1.0f - cosP * cosP));
+    return float3(sinP * cos(theta), cosP, sinP * sin(theta));
+}
+// ────────────────────────────────────────────────────────────────────────────
 
 
 //=============================================================================

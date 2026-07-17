@@ -36,7 +36,8 @@ void BaseObjectManager::Initialize() {
 	// インスペクタパネルを Editor に登録 (Debug のみ・一度きり)
 	//------------------------------------------------------------
 	if (!inspectorRegistered_) {
-		Editor::GetInstance()->RegisterGameUI(
+		assert(editor_ && "BaseObjectManager::Initialize : SetEditor() を先に呼ぶこと");
+		editor_->RegisterGameUI(
 			"オブジェクト一覧",
 			[this]() { this->DrawInspector(); });
 		inspectorRegistered_ = true;
@@ -49,6 +50,12 @@ void BaseObjectManager::Initialize() {
 // ============================================================
 void BaseObjectManager::Finalize() {
 	ClearAll();
+
+	// 借用ポインタを手放す (ダングリング防止)
+	instancedObject3d_ = nullptr;
+#ifdef USE_IMGUI
+	editor_ = nullptr;
+#endif
 }
 
 // ============================================================
@@ -184,7 +191,8 @@ void BaseObjectManager::DrawShadowAll() {
 // 一括描画（インスタンシング対応・カラーパス）
 // ============================================================
 void BaseObjectManager::DrawAllInstanced() {
-	auto* inst = InstancedObject3d::GetInstance();
+	assert(instancedObject3d_ && "BaseObjectManager : SetInstancedObject3d() を先に呼ぶこと");
+	auto* inst = instancedObject3d_;
 	inst->Begin(camera_);
 
 	for (auto& entry : entries_) {
@@ -208,7 +216,8 @@ void BaseObjectManager::DrawAllInstanced() {
 // 一括影描画（インスタンシング対応・影パス）
 // ============================================================
 void BaseObjectManager::DrawShadowAllInstanced() {
-	auto* inst = InstancedObject3d::GetInstance();
+	assert(instancedObject3d_ && "BaseObjectManager : SetInstancedObject3d() を先に呼ぶこと");
+	auto* inst = instancedObject3d_;
 	inst->Begin();   // 影は WVP を使わないのでカメラ不要
 
 	for (auto& entry : entries_) {

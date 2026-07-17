@@ -1,9 +1,11 @@
 #include "GPUParticle.hlsli"
 
-RWStructuredBuffer<Particle> g_Particles : register(u0);
-RWStructuredBuffer<int> g_FreeListIndex : register(u1);
-RWStructuredBuffer<uint> g_FreeList : register(u2);
-RWStructuredBuffer<uint> g_ActiveCount : register(u3);
+RWStructuredBuffer<ParticleHot>  g_Hot  : register(u0);
+RWStructuredBuffer<int>  g_FreeListIndex : register(u1);
+RWStructuredBuffer<uint> g_FreeList      : register(u2);
+RWStructuredBuffer<uint> g_ActiveCount   : register(u3);
+RWStructuredBuffer<ParticleWarm> g_Warm : register(u4);
+RWStructuredBuffer<ParticleCold> g_Cold : register(u5);
 
 [numthreads(1024, 1, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
@@ -34,20 +36,17 @@ void main(uint3 DTid : SV_DispatchThreadID)
         
         if (particleIndex < kMaxParticles)
         {
-            // パーティクルの完全クリア
-            g_Particles[particleIndex].translate = float3(0, 0, 0);
-            g_Particles[particleIndex].lastTranslate = float3(0, 0, 0);
-            g_Particles[particleIndex].scale = float3(0, 0, 0);
-            g_Particles[particleIndex].startScale = float3(0, 0, 0);
-            g_Particles[particleIndex].endScale = float3(0, 0, 0);
-            g_Particles[particleIndex].rotate = 0.0f;
-            g_Particles[particleIndex].velocity = float3(0, 0, 0);
-            g_Particles[particleIndex].lifeTime = 0.0f;
-            g_Particles[particleIndex].currentTime = 0.0f;
-            g_Particles[particleIndex].color = float4(1, 1, 1, 0);
-            g_Particles[particleIndex].isActive = 0;
-            g_Particles[particleIndex].isParent = 0;
-            g_Particles[particleIndex].isBillboard = 1;
+            // Hot のクリア
+            ParticleHot h = (ParticleHot) 0;
+            g_Hot[particleIndex] = h;
+
+            // Warm のクリア
+            ParticleWarm w = (ParticleWarm) 0;
+            g_Warm[particleIndex] = w;
+
+            // Cold のクリア
+            ParticleCold c = (ParticleCold) 0;
+            g_Cold[particleIndex] = c;
 
             // FreeListに自分のIDを登録（これで「空き席」が埋まる）
             g_FreeList[particleIndex] = particleIndex;

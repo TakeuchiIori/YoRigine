@@ -40,6 +40,10 @@ public:
 		obbCollider_->SetCollisionEnabled(enable);
 	}
 
+	// 盾の表示切替。魔法スタイル時は防御できないため非表示にする。
+	void SetVisible(bool visible) { isVisible_ = visible; }
+	bool IsVisible() const { return isVisible_; }
+
 	// ============================================================
 	// 当たり判定コールバック
 	// ============================================================
@@ -85,4 +89,6 @@ private:
 	Vector3 offsetPos_{};                               // 手からの位置オフセット
 	Vector3 offsetRot_{};                               // 手からの回転オフセット
 	Vector3 offsetScale_{ 1.0f,1.0f,1.0f };             // 盾のスケール
+
+	bool isVisible_ = true;                             // false の間は描画しない（魔法スタイル時に外す）
 };

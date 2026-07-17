@@ -29,14 +29,16 @@ public:
 	void Initialize();
 
 	// 単一ターゲットの更新 (Enter/Exit を targetKey で識別)
-	void Update(const Vector3& targetPosition, void* targetKey = nullptr);
+	//   deltaTime: Stay tick 間隔を使うエリア向けの経過秒（毒ダメージ等）。
+	void Update(const Vector3& targetPosition, void* targetKey = nullptr, float deltaTime = 0.0f);
 
 	// 複数ターゲットの一括更新。各ターゲットに対し全エリアの Enter/Exit を判定する。
+	//   deltaTime: Stay tick 間隔を使うエリア向けの経過秒（敵・プレイヤーへの継続効果）。
 	struct AreaTarget {
 		void*   key;
 		Vector3 position;
 	};
-	void UpdateTargets(const std::vector<AreaTarget>& targets);
+	void UpdateTargets(const std::vector<AreaTarget>& targets, float deltaTime = 0.0f);
 
 	// あるターゲットを忘却 (キャラクタ破棄時に呼ぶ)
 	void ForgetTarget(void* targetKey);

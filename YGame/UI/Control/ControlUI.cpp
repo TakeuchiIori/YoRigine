@@ -11,6 +11,10 @@ void ControlUI::Initialize()
 	button_[0] = YoRigine::UIManager::GetInstance()->GetUI("A_attack");
 	button_[1] = YoRigine::UIManager::GetInstance()->GetUI("B_attack");
 	button_[2] = YoRigine::UIManager::GetInstance()->GetUI("shield");
+    // Y ボタン（スタイル切替）。コントローラのボタン配置に合わせ、A(下)/B(右)/X(左) の
+    // 上に来る「一番上のボタン」の位置(1310,588)に置く。画像は切替を表す ChangeTransform。
+    button_[3] = GetOrCreateButton("Y_style", "Resources/Textures/Operation/ChangeTransform.png", { 1310.0f, 588.0f }, { 122.0f, 122.0f });
+    ApplyStyleTextures();
 
 	// 波紋用のUI
 	ripples = YoRigine::UIManager::GetInstance()->GetUI("ripples");
@@ -80,11 +84,11 @@ void ControlUI::Update()
     if (lockOnIcon_)  lockOnIcon_->SetVisible(lockHintVisible);
     if (lockOnStick_) lockOnStick_->SetVisible(lockHintVisible);
 
-    // 攻撃/ガードのボタンヒント(A/B/X)と、その背面アウトライン枠は戦闘中のみ表示
+    // 攻撃/ガード/スタイル切替のボタンヒント(A/B/X/Y)と、その背面アウトライン枠は戦闘中のみ表示
     // （フィールドでは攻撃できないため）。LB/RB はフィールドでもカメラリセンターとして
     // 機能するので常時表示のまま残す。
     const bool combatHintVisible = isVisble_ && battleActive_;
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < 4; ++i) {
         if (button_[i]) button_[i]->SetVisible(combatHintVisible);
     }
     for (int i = 0; i < 4; ++i) {
@@ -114,7 +118,7 @@ void ControlUI::Update()
         stickPrevOffsetY_ = off;
     }
 
-    // A/B/X の押下演出（波紋＋ポップ）は戦闘中のみ（フィールドでは攻撃しないため波紋も出さない）
+    // A/B/X/Y の押下演出（波紋＋ポップ）は戦闘中のみ（フィールドでは攻撃しないため波紋も出さない）
     if (battleActive_) {
     // Aボタンが押された瞬間
     if (YoRigine::Input::GetInstance()->IsPadTriggered(0, GamePadButton::A)) {
@@ -143,7 +147,13 @@ void ControlUI::Update()
         button_[2]->PlayScaleAnimation(Vector2{ 100.0f,100.0f } / baseX, Vector2{ 120.0f,120.0f } / baseX, duration_, Easing::Function::EaseInCubic, false);
         button_[2]->PlayFlash(duration_, 9);
     }
-    } // if (battleActive_) — A/B/X 押下演出ここまで
+
+    // Yボタンが押された瞬間
+    if (YoRigine::Input::GetInstance()->IsPadTriggered(0, GamePadButton::Y)) {
+        if (!isVisble_)return;
+        PlayButtonPress(button_[3]);
+    }
+    } // if (battleActive_) — A/B/X/Y 押下演出ここまで
 
     // LB / RB はバトル中のみ押下アニメ（A/B と全く同じ：波紋＋拡縮＋フラッシュ）
     if (battleActive_ && isVisble_) {
@@ -258,6 +268,46 @@ void ControlUI::PlayButtonPress(UIBase* button)
     Vector2 base = button->GetSize();
     button->PlayScaleAnimation(pushSize_ / base, originalSize_ / base, duration_, Easing::Function::EaseInCubic, false);
     button->PlayFlash(duration_, 9);
+}
+
+void ControlUI::SetPlayerStyle(PlayerStyle style)
+{
+    if (currentStyle_ == style) return;
+    currentStyle_ = style;
+    ApplyStyleTextures();
+}
+
+void ControlUI::ApplyStyleTextures()
+{
+    // Y ボタン(button_[3])はスタイル切替なので、剣/魔法どちらでも切替を表す ChangeTransform で固定。
+    SetButtonTextureKeepLayout(button_[3], "Resources/Textures/Operation/ChangeTransform.png");
+
+    if (currentStyle_ == PlayerStyle::Sword) {
+        SetButtonTextureKeepLayout(button_[0], "Resources/Textures/Operation/A_attack.png");
+        SetButtonTextureKeepLayout(button_[1], "Resources/Textures/Operation/B_attack.png");
+        SetButtonTextureKeepLayout(button_[2], "Resources/Textures/Operation/shield.png");
+        return;
+    }
+
+    // 魔法スタイル: A=主魔法, B=副魔法, X=補助魔法 の位置にアイコン画像を割り当てる。
+    SetButtonTextureKeepLayout(button_[0], "Resources/Textures/Operation/MagicCircle.png");
+    SetButtonTextureKeepLayout(button_[1], "Resources/Textures/Operation/StatusFire.png");
+    SetButtonTextureKeepLayout(button_[2], "Resources/Textures/Operation/StatusLightning.png");
+}
+
+void ControlUI::SetButtonTextureKeepLayout(UIBase* button, const std::string& texturePath)
+{
+    if (!button) return;
+
+    const Vector2 layoutSize = button->GetSize();
+
+    // Sprite::ChangeTexture はUV範囲を新テクスチャ実寸へ合わせるために size も更新する。
+    // ただし操作ボタンの見た目サイズは GameScene の UIConfig が決めるレイアウト情報なので、
+    // テクスチャ差し替え後に同じ size を戻し、画像内容だけを切り替える境界にしておく。
+    button->SetTexture(texturePath);
+    if (layoutSize.x > 0.0f && layoutSize.y > 0.0f) {
+        button->SetSize(layoutSize);
+    }
 }
 
 // 画面外ヒット時のロックオン照準フラッシュ（赤→黄にフェードしながら消える）

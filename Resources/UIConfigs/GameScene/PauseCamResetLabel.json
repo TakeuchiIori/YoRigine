@@ -1,7 +1,7 @@
 {
     "anchorPoint": {
-        "x": 0.0,
-        "y": 0.0
+        "x": 0.5,
+        "y": 0.5
     },
     "animations": [],
     "color": {
@@ -12,11 +12,11 @@
     },
     "flipX": false,
     "flipY": false,
-    "layer": 0,
+    "layer": 2,
     "name": "PauseCamResetLabel",
     "position": {
-        "x": 0.0,
-        "y": 0.0,
+        "x": 1270.0,
+        "y": 750.0,
         "z": 0.0
     },
     "rotation": {
@@ -29,17 +29,17 @@
         "y": 1.0
     },
     "size": {
-        "x": 16.0,
-        "y": 16.0
+        "x": 307.0,
+        "y": 127.0
     },
     "textureLeftTop": {
         "x": 0.0,
         "y": 0.0
     },
-    "texturePath": "./Resources/images/white.png",
+    "texturePath": "Resources/UITex/label_camreset.png",
     "textureSize": {
-        "x": 16.0,
-        "y": 16.0
+        "x": 307.0,
+        "y": 127.0
     },
     "uvRotation": 0.0,
     "uvScale": {
@@ -50,5 +50,5 @@
         "x": 0.0,
         "y": 0.0
     },
-    "visible": true
+    "visible": false
 }

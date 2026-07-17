@@ -154,13 +154,13 @@ public:
 	/*===============================================//
 				　		他クラスをセット
 	//===============================================*/
-	void SetSrvManager(SrvManager* srvManager) { this->srvManager_ = srvManager; }
+	void SetSrvManager(YoRigine::SrvManager* srvManager) { this->srvManager_ = srvManager; }
 	void SetCamera(Camera* camera) { this->camera_ = camera; }
 
 private:
 	///************************* メンバ変数 *************************///
 	SpriteCommon* spriteCommon_ = nullptr;
-	SrvManager* srvManager_ = nullptr;
+	YoRigine::SrvManager* srvManager_ = nullptr;
 	Camera* camera_ = nullptr;
 
 	// 頂点

@@ -225,13 +225,13 @@ void DebugConsole::DrawFrameContextTab()
 
     auto commandManager = dxCommon->GetCommandList();  // CommandManagerへのアクセスが必要
 
-    ImGui::Text("フレームバッファ数: %d", CommandManager::kFrameCount);
+    ImGui::Text("フレームバッファ数: %d", YoRigine::CommandManager::kFrameCount);
     ImGui::Text("現在のフレーム: %d", dxCommon->GetCurrentBackBufferIndex());
 
     ImGui::Separator();
 
     // 各フレームの状態
-    for (uint32_t i = 0; i < CommandManager::kFrameCount; ++i)
+    for (uint32_t i = 0; i < YoRigine::CommandManager::kFrameCount; ++i)
     {
         ImGui::Text("Frame[%d]:", i);
         ImGui::SameLine();

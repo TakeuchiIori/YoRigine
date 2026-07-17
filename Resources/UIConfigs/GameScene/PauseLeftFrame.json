@@ -1,7 +1,7 @@
 {
     "anchorPoint": {
-        "x": 0.0,
-        "y": 0.0
+        "x": 0.5,
+        "y": 0.5
     },
     "animations": [],
     "color": {
@@ -12,11 +12,11 @@
     },
     "flipX": false,
     "flipY": false,
-    "layer": 0,
+    "layer": 2,
     "name": "PauseLeftFrame",
     "position": {
-        "x": 0.0,
-        "y": 0.0,
+        "x": 400.0,
+        "y": 500.0,
         "z": 0.0
     },
     "rotation": {
@@ -29,17 +29,17 @@
         "y": 1.0
     },
     "size": {
-        "x": 16.0,
-        "y": 16.0
+        "x": 600.0,
+        "y": 640.0
     },
     "textureLeftTop": {
         "x": 0.0,
         "y": 0.0
     },
-    "texturePath": "./Resources/images/white.png",
+    "texturePath": "Resources/UITex/pause_frame_left.png",
     "textureSize": {
-        "x": 16.0,
-        "y": 16.0
+        "x": 600.0,
+        "y": 640.0
     },
     "uvRotation": 0.0,
     "uvScale": {
@@ -50,5 +50,5 @@
         "x": 0.0,
         "y": 0.0
     },
-    "visible": true
+    "visible": false
 }

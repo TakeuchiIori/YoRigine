@@ -42,6 +42,8 @@ namespace {
 	}
 }
 
+namespace YoRigine {
+
 /// <summary>
 /// RTV マネージャーの初期化（ディスクリプタヒープ作成）
 /// </summary>
@@ -417,3 +419,5 @@ RtvManager::CreateRenderTextureResource(uint32_t width, uint32_t height, const D
 	(void)hr;
 	return resource;
 }
+
+} // namespace YoRigine

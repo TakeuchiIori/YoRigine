@@ -36,7 +36,7 @@ void TextureManager::Finalize()
 /// </summary>
 /// <param name="dxCommon">DirectX共通オブジェクト</param>
 /// <param name="srvManager">SRVマネージャー</param>
-void TextureManager::Initialize(YoRigine::DirectXCommon* dxCommon, SrvManager* srvManager)
+void TextureManager::Initialize(YoRigine::DirectXCommon* dxCommon, YoRigine::SrvManager* srvManager)
 {
 	if (!dxCommon || !srvManager) {
 		Logger("Error: DirectXCommon or SrvManager is null in TextureManager::Initialize");
@@ -49,7 +49,7 @@ void TextureManager::Initialize(YoRigine::DirectXCommon* dxCommon, SrvManager* s
 	srvManager_ = srvManager;
 
 	// テクスチャデータのバケット数を予約
-	textureDatas.reserve(SrvManager::kMaxSRVCount_);
+	textureDatas.reserve(YoRigine::SrvManager::kMaxSRVCount_);
 }
 
 /// <summary>

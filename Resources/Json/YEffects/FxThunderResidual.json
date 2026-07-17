@@ -1,0 +1,31 @@
+{
+  "groups": [
+    {
+      "emitters": [
+        { "autoEmit": false, "emissionRate": 18.0, "emitCount": 18, "offsetX": 0.0, "offsetY": 0.3, "offsetZ": 0.0, "shapeType": 0, "systemName": "FxThunderResidualSystem" }
+      ],
+      "groupName": "FxThunderResidual", "isActive": true, "position": [0.0, 0.0, 0.0]
+    }
+  ],
+  "systems": [
+    {
+      "BlendMode": 2, "Lighting": false, "billboardType": 1, "isRelative": false, "maxParticles": 512,
+      "mesh": { "params": [1.0, 1.0, 1.0, 16.0], "type": 0 },
+      "name": "FxThunderResidualSystem",
+      "texture": "Resources/Effects/electric.png",
+      "spawnModules": [
+        { "data": { "minScale": { "x": 0.08, "y": 0.14, "z": 0.08 }, "maxScale": { "x": 0.2, "y": 0.35, "z": 0.2 } }, "name": "残留電サイズ", "type": "SpawnRandomScale" },
+        { "data": { "colorA": [0.3, 0.6, 2.2, 1.0], "colorB": [0.8, 0.5, 2.6, 1.0] }, "name": "残留紫電色", "type": "SpawnColorRange" },
+        { "data": { "minSpeed": 1.2, "maxSpeed": 3.4, "upwardBias": 0.3, "radius": 0.9 }, "name": "地表リング発生", "type": "SpawnRing" },
+        { "data": { "minLifeTime": 0.8, "maxLifeTime": 1.3 }, "name": "残留寿命", "type": "SpawnLifeTime" }
+      ],
+      "updateModules": [
+        { "data": { "isRandom": true, "velocity": { "x": 0.0, "y": 0.0, "z": 0.0 } }, "name": "移動", "type": "UpdateVelocity" },
+        { "data": { "strength": 6.0, "frequency": 5.5, "speed": 3.0 }, "name": "電撃クラックル", "type": "UpdateTurbulence" },
+        { "data": { "dragCoefficient": 2.2 }, "name": "急減速", "type": "UpdateDrag" },
+        { "data": { "startScale": 1.0, "endScale": 0.2, "useCurve": true }, "name": "放電減衰", "type": "UpdateSizeOverLifetime" },
+        { "data": { "fadeStart": 0.45, "fadeEnd": 1.0 }, "name": "消滅", "type": "UpdateFadeOut" }
+      ]
+    }
+  ]
+}

@@ -108,6 +108,8 @@ void PlayerMovement::Update(float deltaTime) {
 		if (t >= 1.0f) {
 			isHoming_ = false;
 			homingTimer_ = 0.0f;
+			// 突進終了で無敵解除
+			owner_->SetInvincible(false);
 		}
 	}
 }
@@ -505,6 +507,9 @@ void PlayerMovement::RequestAutoHoming(const Vector3& targetPosition, float dura
 	homingDuration_ = duration;
 	homingTimer_ = 0.0f;
 	isHoming_ = true;
+
+	// 突進中は敵の攻撃で潰されない（i-frame）。踏み込みを必ず出し切らせる。
+	owner_->SetInvincible(true);
 }
 
 // ============================================================

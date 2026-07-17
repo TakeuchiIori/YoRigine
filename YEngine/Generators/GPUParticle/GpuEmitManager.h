@@ -15,8 +15,12 @@
 #include <memory>
 #include <vector>
 
+class TextureManager;
+class ModelManager;
+
 // JSON
 #include <json.hpp>
+#include "Loaders/Json/Use/AutoJson.h"   // フィールド登録だけで Save/Load するユーティリティ
 
 #ifdef USE_IMGUI
 #include <imgui.h>
@@ -30,6 +34,8 @@
 namespace YoRigine {
 	class GpuEmitManager
 	{
+		// グループ/エミッター編集用 ImGui UI (USE_IMGUI 限定)。神クラス化対策として別クラスに分離。
+		friend class GpuEmitManagerEditorUI;
 	public:
 		// エミッターデータ構造体
 		struct EmitterData
@@ -86,8 +92,8 @@ namespace YoRigine {
 			// パーティクルパラメータ
 			ParticleParams particleParams;
 
-			// エミッタートレイルパラメータ
-			EmitterTrailParams trailParams;
+			// フォースフィールド（最大 kMaxForceFields 個）
+			std::vector<GpuForceFieldParams> forceFields;
 
 			// 1粒子として描画するメッシュ形状＋その生成パラメータ
 			ParticleMeshShape particleMeshShape = ParticleMeshShape::Plane;
@@ -115,16 +121,25 @@ namespace YoRigine {
 	public:
 		///************************* 基本的な関数 *************************///
 		static GpuEmitManager* GetInstance();
+
+		// ============================================================
+		// 依存先マネージャの注入 (DI)
+		//   所有はしない (借用のみ)。Finalize() で nullptr に戻すのでダングリングポインタは残らない。
+		//   Initialize() より前に呼ぶこと。
+		// ============================================================
+		void SetTextureManager(TextureManager* textureManager) { textureManager_ = textureManager; }
+		void SetModelManager(ModelManager* modelManager) { modelManager_ = modelManager; }
+
 		void Initialize();
+		void Finalize();
 		void Update();
 		void Draw();
 
 		// エミッション強制発生
 		void EmitGroups(const std::string& groupName, const Vector3& position, float count);
 
+		// グループ管理/エミッター編集/削除ダイアログ等のUI本体は GpuEmitManagerEditorUI に分離済み (神クラス対策)。
 		void DrawImGui();
-		bool DrawParticleParametersEditor(EmitterData* emitterData);
-
 
 		// エミッター管理
 		EmitterData* CreateEmitter(const std::string& groupName, const std::string& emitterName, std::string& texturePath, EmitterShape shape = EmitterShape::Sphere);
@@ -146,6 +161,10 @@ namespace YoRigine {
 		void PlayEmitterGroup(const std::string& groupName);
 		void StopEmitterGroup(const std::string& groupName);
 
+		/// 再生中の全グループを即時停止（lingerTimer もリセット）。
+		/// シーン遷移時に呼び出し、前のシーンの GPU パーティクルが次のシーンに残らないようにする。
+		void StopAllEmitterGroups();
+
 		// ── ゲーム向け（GpuParticleHandle から使う軽量API）──
 		// グループのワールド原点を移動（各エミッタは原点＋自身のローカルオフセットで発生）
 		void SetGroupPosition(const std::string& groupName, const Vector3& pos);
@@ -163,6 +182,11 @@ namespace YoRigine {
 		bool HasEmitter(const std::string& emitterName) const;
 		void SetCamera(Camera* camera);
 
+		// グループの「自然な寿命」の見積り（秒）。0以下=不明/無限ループ。
+		// 内部は linger 見積りに使っている GetGroupMaxLifetime の public wrapper。
+		// Composite::NaturalDuration() の集計に使う（設計は Docs/VfxExpansion_Design.md の 7.2 参照）。
+		float EstimateGroupNaturalDuration(const std::string& groupName) const;
+
 	private:
 		///************************* 内部処理 *************************///
 
@@ -173,19 +197,6 @@ namespace YoRigine {
 		GpuEmitManager& operator=(const GpuEmitManager&) = delete;
 
 		void UpdateParticleParams(EmitterData* emitterData);
-
-		bool DrawShapeEditor(EmitterData* emitterData);
-		bool DrawSphereEditor(EmitterData* emitterData);
-		bool DrawBoxEditor(EmitterData* emitterData);
-		bool DrawTriangleEditor(EmitterData* emitterData);
-		bool DrawConeEditor(EmitterData* emitterData);
-		bool DrawMeshEditor(EmitterData* emitterData);
-
-		void DrawGroupManagementTab();
-		void DrawEmitterManagementTab();
-		void DrawTextureBrowser(bool& isOpen);
-		void DrawEditorTab();
-		void DrawDeleteDialog();
 
 		// エミッターパラメータ更新
 		void UpdateEmitterParams(EmitterData* emitterData);
@@ -198,6 +209,8 @@ namespace YoRigine {
 		void DrawEmitterGizmos();
 		// 単一エミッタの形状をラインとして gizmoLine_ に登録
 		void RegisterEmitterGizmo(const EmitterData* emitterData, const Vector3& worldPos);
+		// 単一エミッタのフォースフィールド範囲をラインとして gizmoLine_ に登録
+		void RegisterForceFieldGizmos(const EmitterData* emitterData, const Vector3& groupOrigin);
 #endif
 
 		// グループ内の最大パーティクル寿命（発生停止後の linger 時間の見積りに使う）
@@ -223,9 +236,27 @@ namespace YoRigine {
 		bool LoadEmitterFromJson(const std::string& groupName, const nlohmann::json& j);
 		void ScanTextureDirectory(const std::string& directory);
 		void ScanJsonDirectory(const std::string& directory);
+
+		///************************* エミッタのシリアライズ（AutoJson集約） *************************///
+		// 1つのエミッタの全シリアライズ対象を AutoJson ツリーに束ねる。
+		// 調整パラメータを増やすときは、この関数へ .Add() を1行足すだけで
+		// 保存・読込の両方に反映される（列挙の重複を排除する単一の情報源）。
+		// root と各グループ用 AutoJson は呼び出し側がローカルに持ち、Save/Load 中は生存させる。
+		void BuildEmitterSchema(EmitterData& e,
+			AutoJson& root, AutoJson& sphere, AutoJson& box, AutoJson& tri,
+			AutoJson& cone, AutoJson& mesh, AutoJson& particle, AutoJson& particleMesh) const;
+		// エミッタ1つ → JSON（model ポインタだけは名前で特別扱い）
+		nlohmann::json SerializeEmitter(EmitterData& e) const;
+		// JSON → エミッタ1つ（生成済みの e に流し込む。model は名前から解決）
+		void DeserializeEmitter(EmitterData& e, const nlohmann::json& j) const;
 	private:
 		///************************* メンバ変数 *************************///
 		Camera* camera_ = nullptr;
+
+		// 依存先マネージャ (借用のみ・非所有)。Initialize() 前に Set 系で注入すること。
+		TextureManager* textureManager_ = nullptr;
+		ModelManager* modelManager_ = nullptr;
+
 		std::unordered_map<std::string, std::unique_ptr<EmitterGroup>> groups_;
 #ifdef USE_IMGUI
 		FileBrowser textureBrowser_;
@@ -261,4 +292,4 @@ namespace YoRigine {
 		std::vector<std::string> availableJsonFiles_;					// 見つかったJSONファイル名一覧
 		bool shouldRescanJson_ = true;									// JSONディレクトリを再スキャンするかどうか
 	};
-}
+};

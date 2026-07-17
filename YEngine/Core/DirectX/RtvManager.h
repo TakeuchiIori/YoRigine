@@ -12,8 +12,11 @@
 // Engine
 #include "Vector4.h"
 
+namespace YoRigine {
+
 class DeviceManager;
 class SrvManager;
+
 /// <summary>
 /// RTVの管理クラス
 /// </summary>
@@ -147,3 +150,5 @@ private:
 	std::vector<std::unique_ptr<RenderTarget>> renderTargets_;
 	std::unordered_map<std::string, uint32_t> nameToIndex_;
 };
+
+} // namespace YoRigine

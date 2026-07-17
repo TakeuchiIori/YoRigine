@@ -1531,16 +1531,16 @@
             "name": "MainDebug",
             "priority": 0,
             "rotate": [
-                -9170.7197265625,
-                155701.515625,
+                -9333.8486328125,
+                159762.203125,
                 0.0
             ],
             "rotateSpeed": 0.05000000074505806,
             "rotateSpeedController": 0.004999999888241291,
             "translate": [
-                11.121599197387695,
-                97.32759857177734,
-                -54.863956451416016
+                10.012370109558105,
+                49.955928802490234,
+                -47.267398834228516
             ],
             "type": "Debug"
         },
@@ -1610,6 +1610,7 @@
                 },
                 "cameraFeel": {
                     "accelTime": 0.11999999731779099,
+                    "bumperYawSpeed": 2.5999999046325684,
                     "curve": 2.0,
                     "deadzone": 0.15000000596046448,
                     "invertY": false,
@@ -1652,7 +1653,7 @@
             "framingYawMargin": 1.0499999523162842,
             "idleRecenterDelay": 3.0,
             "idleRecenterDuration": 1.399999976158142,
-            "idleRecenterEnabled": true,
+            "idleRecenterEnabled": false,
             "interpSpeed": 5.0,
             "lookAheadEnabled": true,
             "lookAheadMaxDist": 3.0,
@@ -1675,17 +1676,17 @@
             "recenterPitch": 0.30000001192092896,
             "recenterResetPitch": true,
             "rotate": [
-                0.30000001192092896,
-                2.1523120403289795,
+                0.3155681788921356,
+                7.856325626373291,
                 0.0
             ],
             "rotateSpeed": 0.019999999552965164,
             "targetName": "Player",
             "targetPivot_Height": 1.0,
             "translate": [
-                -80.65055847167969,
-                9.933134078979492,
-                -25.28311538696289
+                -16.918113708496094,
+                10.239383697509766,
+                -60.927223205566406
             ],
             "type": "Follow"
         }

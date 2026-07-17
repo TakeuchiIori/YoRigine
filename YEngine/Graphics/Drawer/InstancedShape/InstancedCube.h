@@ -11,10 +11,10 @@
 #include "Matrix4x4.h"
 
 class Camera;
-class SrvManager;
 
 namespace YoRigine {
 	class DirectXCommon;
+	class SrvManager;
 }
 
 // ============================================================
@@ -76,7 +76,7 @@ private:
 	static constexpr uint32_t kMaxInstances = 4096;
 
 	YoRigine::DirectXCommon* dxCommon_   = nullptr;
-	SrvManager*              srvManager_ = nullptr;
+	YoRigine::SrvManager*    srvManager_ = nullptr;
 	Camera*                  camera_     = nullptr;
 
 	// 単位立方体 VB

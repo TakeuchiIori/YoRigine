@@ -4,6 +4,8 @@
 #include "Debugger/Logger.h"
 #include "Debugger/ConvertString.h"
 
+namespace YoRigine {
+
 /// <summary>
 /// DirectX12 デバイス・DXGI ファクトリー・デバッグレイヤーの初期化
 /// </summary>
@@ -28,7 +30,9 @@ void DeviceManager::Initialize()
 	//-------------------- DXGI ファクトリー生成 --------------------//
 
 	HRESULT hr = CreateDXGIFactory(IID_PPV_ARGS(&dxgiFactory_));
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr)) {
+		ThrowError("DeviceManager: CreateDXGIFactory に失敗しました\n");
+	}
 
 	//-------------------- 高性能 GPU アダプタ探索 --------------------//
 
@@ -44,7 +48,9 @@ void DeviceManager::Initialize()
 	{
 		DXGI_ADAPTER_DESC3 desc{};
 		hr = useAdapter->GetDesc3(&desc);
-		assert(SUCCEEDED(hr));
+		if (FAILED(hr)) {
+			ThrowError("DeviceManager: IDXGIAdapter4::GetDesc3 に失敗しました\n");
+		}
 
 		// ハードウェア GPU のみ採用（ソフトウェアアダプタは除外）
 		if (!(desc.Flags & DXGI_ADAPTER_FLAG3_SOFTWARE)) {
@@ -56,7 +62,11 @@ void DeviceManager::Initialize()
 		useAdapter = nullptr;
 	}
 
-	assert(useAdapter != nullptr);
+	if (useAdapter == nullptr) {
+		// Release でも必ず検出する: ここを assert のみにすると NDEBUG で消え、
+		// GPU非対応PC等で useAdapter が null のまま以降の処理に進んで原因不明のクラッシュになる。
+		ThrowError("DeviceManager: 使用可能な GPU アダプタが見つかりませんでした\n");
+	}
 
 	//-------------------- デバイス生成（最も高い FL から挑戦） --------------------//
 
@@ -75,7 +85,10 @@ void DeviceManager::Initialize()
 		}
 	}
 
-	assert(device_ != nullptr);
+	if (device_ == nullptr) {
+		// 同上: Release で消える assert ではなく、確実に検出して終了させる。
+		ThrowError("DeviceManager: サポートされる FeatureLevel で D3D12Device を生成できませんでした\n");
+	}
 	Logger("Complete create D3D12Device!!!!!!\n");
 
 #ifdef _DEBUG
@@ -116,3 +129,5 @@ void DeviceManager::Finalize()
 	device_.Reset();
 	dxgiFactory_.Reset();
 }
+
+} // namespace YoRigine

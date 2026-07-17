@@ -1,7 +1,7 @@
 {
     "groups": [
         {
-            "currentTime": 0.0,
+            "currentTime": 162.71240234375,
             "emitters": [
                 {
                     "boxParams": {
@@ -34,6 +34,7 @@
                             "z": 0.0
                         }
                     },
+                    "forceFields": [],
                     "isActive": true,
                     "meshParams": {
                         "count": 10000.0,
@@ -58,6 +59,18 @@
                         }
                     },
                     "name": "ss",
+                    "particleMeshParams": {
+                        "angleDegree": 90.0,
+                        "depth": 1.0,
+                        "divide": 16,
+                        "height": 1.0,
+                        "innerRadius": 0.25,
+                        "outerRadius": 0.5,
+                        "radius": 0.5,
+                        "subdivisions": 2,
+                        "width": 1.0
+                    },
+                    "particleMeshShape": 0,
                     "particleParams": {
                         "endColor": {
                             "w": 0.0,
@@ -141,13 +154,6 @@
                         }
                     },
                     "textureFilePath": "Resources/Effects\\circle.png",
-                    "trail": {
-                        "emissionCount": 1.0,
-                        "enabled": false,
-                        "inheritScale": true,
-                        "lifeTime": 0.0,
-                        "minDistance": 0.10000000149011612
-                    },
                     "triangleParams": {
                         "count": 100.0,
                         "emitInterval": 1.0,
@@ -199,9 +205,10 @@
                             "z": 0.0
                         }
                     },
+                    "forceFields": [],
                     "isActive": true,
                     "meshParams": {
-                        "count": 100000.0,
+                        "count": 1000.0,
                         "emitInterval": 1.0,
                         "emitMode": 2,
                         "modelName": "Cube.obj",
@@ -223,6 +230,18 @@
                         }
                     },
                     "name": "dd",
+                    "particleMeshParams": {
+                        "angleDegree": 90.0,
+                        "depth": 1.0,
+                        "divide": 16,
+                        "height": 1.0,
+                        "innerRadius": 0.25,
+                        "outerRadius": 0.5,
+                        "radius": 0.5,
+                        "subdivisions": 2,
+                        "width": 1.0
+                    },
+                    "particleMeshShape": 0,
                     "particleParams": {
                         "endColor": {
                             "w": 0.0,
@@ -306,13 +325,6 @@
                         }
                     },
                     "textureFilePath": "Resources/Effects\\circle2.png",
-                    "trail": {
-                        "emissionCount": 1.0,
-                        "enabled": false,
-                        "inheritScale": true,
-                        "lifeTime": 0.0,
-                        "minDistance": 0.10000000149011612
-                    },
                     "triangleParams": {
                         "count": 100.0,
                         "emitInterval": 1.0,

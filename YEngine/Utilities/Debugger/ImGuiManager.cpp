@@ -64,7 +64,7 @@ void ImGuiManager::End()
 void ImGuiManager::Draw()
 {
 #ifdef USE_IMGUI
-	ID3D12DescriptorHeap* ppHeaps[] = { SrvManager::GetInstance()->GetDescriptorHeap() };
+	ID3D12DescriptorHeap* ppHeaps[] = { YoRigine::SrvManager::GetInstance()->GetDescriptorHeap() };
 	dxCommon_->GetCommandList()->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
 	ImDrawData* drawData = ImGui::GetDrawData();
@@ -83,14 +83,14 @@ void ImGuiManager::InitialzeDX12()
 	IMGUI_CHECKVERSION();
 	ImGui_ImplWin32_Init(winApp_->GetHwnd());
 
-	uint32_t srvIndex = SrvManager::GetInstance()->Allocate();
+	uint32_t srvIndex = YoRigine::SrvManager::GetInstance()->Allocate();
 	HRESULT hr = ImGui_ImplDX12_Init(
 		dxCommon_->GetDevice().Get(),
 		dxCommon_->GetBackBufferCount(),
 		DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
-		SrvManager::GetInstance()->GetDescriptorHeap(),
-		SrvManager::GetInstance()->GetCPUDescriptorHandle(srvIndex),
-		SrvManager::GetInstance()->GetGPUDescriptorHandle(srvIndex)
+		YoRigine::SrvManager::GetInstance()->GetDescriptorHeap(),
+		YoRigine::SrvManager::GetInstance()->GetCPUDescriptorHandle(srvIndex),
+		YoRigine::SrvManager::GetInstance()->GetGPUDescriptorHandle(srvIndex)
 	);
 	assert(SUCCEEDED(hr));
 #endif

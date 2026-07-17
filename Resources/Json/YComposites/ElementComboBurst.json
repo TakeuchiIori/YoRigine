@@ -1,0 +1,16 @@
+{
+  "name": "ElementComboBurst",
+  "particleEffects": [
+    { "asset": "FireImpactSparks", "offset": [0.0, 0.4, 0.0] },
+    { "asset": "FireImpactCloud", "offset": [0.0, 1.4, 0.0] },
+    { "asset": "ThunderFinisherBurst", "offset": [0.0, 0.0, 0.0] }
+  ],
+  "vfxMeshAssets": [
+    { "asset": "Explosion", "offset": [0.0, 4.0, 0.0], "scale": 1.0 },
+    { "asset": "Lightning", "offset": [0.0, 4.0, 0.0], "scale": 0.75 },
+    { "asset": "NewEffect2", "offset": [0.0, 0.0, 0.0], "scale": 0.65 },
+    { "asset": "NewEffect3", "offset": [0.0, 0.0, 0.0], "scale": 0.65 }
+  ],
+  "gpuEmitterGroup": "",
+  "sounds": []
+}

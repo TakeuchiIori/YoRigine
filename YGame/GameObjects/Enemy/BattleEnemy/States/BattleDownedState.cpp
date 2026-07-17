@@ -9,7 +9,7 @@ void BattleDownedState::Enter(BattleEnemy& enemy) {
 	enemy.ResetStateTimer();
 	enemy.SetColor({ 1.0f, 1.0f, 0.0f, 1.0f });
 	enemy.IsDamageBlinking() = true;
-	enemy.GetWT().anchorPoint_ = Vector3{ 0.0f, -1.0f, 0.0f };
+	enemy.GetWT().anchorPoint_ = Vector3{ 0.0f, 0.0f, 0.0f };
 }
 
 /// <summary>
@@ -18,8 +18,10 @@ void BattleDownedState::Enter(BattleEnemy& enemy) {
 void BattleDownedState::Update(BattleEnemy& enemy, [[maybe_unused]] float dt) {
 	float t = enemy.GetStateTimer();
 	float angle = t * speed_;
-	float rotX = std::sin(angle) * tilt_;
-	float rotZ = std::cos(angle) * tilt_;
+	// sin/cos を別軸に使うと (rotX, rotZ) が円を描きアンカー補正で位置が円軌道になる。
+	// 両軸とも sin にしつつ周期を非整数比でずらすことで、円にならない自然なふらつきにする。
+	float rotX = std::sin(angle * 1.3f) * tilt_ * 0.5f;
+	float rotZ = std::sin(angle) * tilt_;
 
 	enemy.GetRotationX() = rotX;
 	enemy.GetRotationZ() = rotZ;

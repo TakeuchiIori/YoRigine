@@ -44,7 +44,7 @@ void Model::Initialize(ModelCommon* modelCommon, const std::string& directorypat
 	// 引数から受け取ってメンバ変数に記録する
 	modelCommon_ = modelCommon;
 
-	srvManager_ = SrvManager::GetInstance();
+	srvManager_ = YoRigine::SrvManager::GetInstance();
 
 	// モデル読み込み
 	LoadModelIndexFile(directorypath, filename);

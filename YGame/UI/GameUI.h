@@ -2,13 +2,20 @@
 #include <Systems/UI/UIManager.h>
 #include <Systems/UI/UIBase.h>
 #include "Control/ControlUI.h"
+#include "GameObjects/Player/Style/PlayerStyle.h"
 #include <map>
+
+class MissionUI;
+
 /// <summary>
 /// ゲームシーンで表示するUIクラス
 /// </summary>
 class GameUI
 {
 public:
+	GameUI();
+	~GameUI();
+
 	///************************* 基本的な関数 *************************///
 	void Initialize();
 	void Update();
@@ -17,6 +24,8 @@ public:
 
 	// バトル中かどうかを ControlUI へ伝える（LB/RB 押下アニメのゲート用）
 	void SetBattleActive(bool active);
+	// PlayerStyle だけを ControlUI へ渡す。UI は入力体系の表示に徹し、戦闘実装を知らない。
+	void SetPlayerStyle(PlayerStyle style);
 
 	// 画面外ヒット時のロックオン照準フラッシュを再生する（ControlUI へ委譲）
 	void FlashLockOn();
@@ -152,4 +161,5 @@ private:
 private:
 	///************************* 他のUI *************************///
 	std::unique_ptr<ControlUI> controlUI_;
+	std::unique_ptr<MissionUI> missionUI_;
 };

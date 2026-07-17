@@ -1,0 +1,42 @@
+{
+  "name": "FxFireBurnAura",
+  "useTrail": false,
+  "motions": [],
+  "subEffects": [
+    {
+      "enabled": true,
+      "label": "燃焼オーラ",
+      "type": 1,
+      "offset": { "x": 0.0, "y": 0.0, "z": 0.0 },
+      "smoke": {
+        "builtInBurstMotion": false,
+        "color": { "x": 1.6, "y": 0.5, "z": 0.12, "w": 0.55 },
+        "smokeColor": { "x": 0.15, "y": 0.05, "z": 0.02, "w": 0.25 },
+        "riseSpeed": 0.0,
+        "radius": 0.78,
+        "noiseScale": 5.0,
+        "noiseStrength": 1.45,
+        "scrollSpeed": 2.8,
+        "fresnelPower": 1.8,
+        "density": 0.85,
+        "noiseOctaves": 3.0,
+        "rimIntensity": 1.8,
+        "isEnable": true
+      },
+      "motions": [
+        {
+          "type": 3, "target": 0, "ease": 0,
+          "startTime": 0.0, "window": 0.0,
+          "duration": 2.0,
+          "velocity": { "x": 0.0, "y": 0.0, "z": 0.0 },
+          "acceleration": { "x": 0.0, "y": 0.0, "z": 0.0 },
+          "amplitude": 0.1, "frequency": 3.0,
+          "scaleStart": 0.0, "scaleEnd": 1.0,
+          "colorStart": { "x": 1.0, "y": 1.0, "z": 1.0, "w": 1.0 },
+          "colorEnd": { "x": 1.0, "y": 1.0, "z": 1.0, "w": 1.0 },
+          "fadeIn": 0.1, "fadeOut": 0.3
+        }
+      ]
+    }
+  ]
+}

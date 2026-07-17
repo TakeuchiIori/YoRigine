@@ -11,6 +11,8 @@
 #include <thread>
 #include <format>
 
+namespace YoRigine {
+
 /// <summary>
 /// デバイス管理クラス
 /// </summary>
@@ -40,3 +42,5 @@ private:
 	// Mesh Shader サポートフラグ（Initialize() 後に有効）
 	bool meshShaderSupported_ = false;
 };
+
+} // namespace YoRigine

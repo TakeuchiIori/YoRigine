@@ -1,0 +1,11 @@
+{
+  "name": "FireCastFlash",
+  "particleEffects": [
+    { "asset": "FxFireChargeMaxBurst", "offset": [0.0, 0.0, 0.0] }
+  ],
+  "vfxMeshAssets": [
+    { "asset": "FxFireChargeMaxFlash", "offset": [0.0, 0.0, 0.0], "scale": 0.55 }
+  ],
+  "gpuEmitterGroup": "",
+  "sounds": []
+}
