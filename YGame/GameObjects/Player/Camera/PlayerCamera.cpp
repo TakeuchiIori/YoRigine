@@ -744,6 +744,29 @@ void PlayerCamera::LoadOffscreenHitReaction(const nlohmann::json& j) {
 }
 
 // ============================================================
+// ロックオンターゲット再検証（敵更新後に呼ぶ）
+//
+// battleEnemyManager_->Update() で敵が削除されると、同フレーム内で
+// lockedTarget_ がダングリングポインタになる。LockOnUI が使う前に
+// CollisionManager を引いて生死を確認し、無効なら即座にクリアする。
+// ============================================================
+void PlayerCamera::ValidateLockOnTarget() {
+    if (!isLockOn_ || !lockedTarget_) return;
+
+    bool alive = false;
+    for (auto* col : YoRigine::CollisionManager::GetInstance()->GetColliders()) {
+        if (col == lockedTarget_ && col->GetIsActive()) {
+            alive = true;
+            break;
+        }
+    }
+    if (!alive) {
+        lockedTarget_ = nullptr;
+        isLockOn_     = false;
+    }
+}
+
+// ============================================================
 // ロックオン更新
 // ============================================================
 void PlayerCamera::UpdateLockOn() {
@@ -778,6 +801,9 @@ void PlayerCamera::UpdateLockOn() {
             lockOnSwitchCooldown_ = 0.3f;
         }
     }
+
+    // SwitchLockOnTarget が対象を見つけられなかった場合（敵が全滅した直後など）
+    if (!lockedTarget_) { isLockOn_ = false; return; }
 
     // ── 2ショット・フレーミング ──────────────────────────────
     // カメラを player→enemy 軸の真後ろに置くと、プレイヤーの背中が敵を隠して

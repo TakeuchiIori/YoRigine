@@ -70,6 +70,9 @@ public:
   BaseCollider *GetLockedTarget() const { return lockedTarget_; }
   bool IsLockOn() const { return isLockOn_; }
 
+  // 敵更新後に呼ぶ。同フレームで削除されたコライダーへのダングリング参照を解消する。
+  void ValidateLockOnTarget();
+
   // ============================================================
   // 戦闘モード
   //   true の間は RB/LB を「押しっぱなしで左右カメラ回転」に割り当てる。
