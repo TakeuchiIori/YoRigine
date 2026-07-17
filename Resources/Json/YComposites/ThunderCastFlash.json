@@ -1,12 +1,9 @@
 {
   "name": "ThunderCastFlash",
   "particleEffects": [
-    { "asset": "ThunderCastSparks", "offset": [0.0, 0.0, 0.0] }
+    { "asset": "FxThunderResidual", "offset": [0.0, 0.0, 0.0] }
   ],
-  "vfxMeshAssets": [
-    { "asset": "Lightning", "offset": [0.0, 0.0, 0.0], "scale": 0.32 },
-    { "asset": "NewEffect2", "offset": [0.0, 0.0, 0.0], "scale": 0.3 }
-  ],
+  "vfxMeshAssets": [],
   "gpuEmitterGroup": "",
   "sounds": []
 }

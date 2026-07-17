@@ -37,11 +37,21 @@ void MagicVfxEventHandler::Execute(const MagicTimelineEvent &event,
   const float scale = ResolveScale(event, context.chargeTime);
   const float timeScale = ResolveTimeScale(event);
 
+  // 全体落雷はバックエンド指定に関係なく敵ごとに演出を出すため、
+  // 単一位置で再生する下のバックエンド分岐より先に処理する。
+  if (event.type == MagicEventType::StrikeAllEnemies) {
+    ExecuteStrikeAllEnemies(player, event, scale, timeScale);
+    return;
+  }
+
   // CPU/GPU パーティクルはイベント種類から発生基準位置を選び、
   // 同じタイムラインからワンショット放出する。
+  // 着弾系（範囲・落雷）は地面へクランプして埋もれ/浮きを防ぐ。
   const bool atTarget = event.type == MagicEventType::SpawnArea ||
                         event.type == MagicEventType::StrikeTarget;
-  const Vector3 effectPosition = (atTarget ? target : origin) + event.effectOffset;
+  const Vector3 basePosition =
+      atTarget ? MagicCastGeometry::ResolveGroundPoint(target) : origin;
+  const Vector3 effectPosition = basePosition + event.effectOffset;
   if (event.effectBackend == MagicEffectBackend::Composite) {
     if (!event.vfxAsset.empty()) {
       CompositeEffectManager::PlayParams params;

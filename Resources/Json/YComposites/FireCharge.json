@@ -1,10 +1,11 @@
 {
   "name": "FireCharge",
   "particleEffects": [
-    { "asset": "FireChargeMotes", "offset": [0.0, 0.0, 0.0] }
+    { "asset": "FxFireChargeSpiral", "offset": [0.0, 0.0, 0.0] },
+    { "asset": "FxFireChargeEmbers", "offset": [0.0, 0.0, 0.0] }
   ],
   "vfxMeshAssets": [
-    { "asset": "NewEffect3", "offset": [0.0, 0.0, 0.0], "scale": 0.18 }
+    { "asset": "FxFireChargeCore", "offset": [0.0, 0.0, 0.0], "scale": 1.0 }
   ],
   "gpuEmitterGroup": "",
   "sounds": []

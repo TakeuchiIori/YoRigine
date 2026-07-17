@@ -1,0 +1,36 @@
+{
+  "groups": [
+    {
+      "emitters": [
+        { "autoEmit": false, "emissionRate": 46.0, "emitCount": 12, "offsetX": 0.0, "offsetY": -0.6, "offsetZ": 0.0, "shapeType": 0, "systemName": "FxFireBurnFlamesSystem" }
+      ],
+      "groupName": "FxFireBurnFlames", "isActive": true, "position": [0.0, 0.0, 0.0]
+    }
+  ],
+  "systems": [
+    {
+      "BlendMode": 2, "Lighting": false, "billboardType": 1, "isRelative": false, "maxParticles": 1024,
+      "mesh": { "params": [1.0, 1.0, 1.0, 16.0], "type": 0 },
+      "name": "FxFireBurnFlamesSystem",
+      "texture": "Resources/Effects/fire_blue.png",
+      "spawnModules": [
+        { "data": { "minScale": { "x": 0.28, "y": 0.4, "z": 0.28 }, "maxScale": { "x": 0.5, "y": 0.85, "z": 0.5 } }, "name": "炎サイズ", "type": "SpawnRandomScale" },
+        { "data": { "colorA": [1.0, 0.28, 0.02, 1.0], "colorB": [1.7, 0.8, 0.15, 1.0] }, "name": "炎色", "type": "SpawnColorRange" },
+        { "data": { "direction": [0.0, 1.0, 0.0], "coneAngle": 22.0, "speed": 1.9, "speedVariation": 0.9 }, "name": "立ち上る炎", "type": "SpawnConeVelocity" },
+        { "data": { "minLifeTime": 0.45, "maxLifeTime": 0.7 }, "name": "炎寿命", "type": "SpawnLifeTime" }
+      ],
+      "updateModules": [
+        { "data": { "isRandom": true, "velocity": { "x": 0.0, "y": 0.0, "z": 0.0 } }, "name": "移動", "type": "UpdateVelocity" },
+        { "data": { "strength": 3.2, "frequency": 2.4, "speed": 1.8 }, "name": "炎の舌", "type": "UpdateTurbulence" },
+        { "data": { "dragCoefficient": 0.9 }, "name": "減速", "type": "UpdateDrag" },
+        { "data": { "stops": [
+            { "t": 0.0,  "color": [2.0, 1.2, 0.4, 0.9] },
+            { "t": 0.35, "color": [1.2, 0.42, 0.04, 1.0] },
+            { "t": 0.75, "color": [0.6, 0.08, 0.0, 0.8] },
+            { "t": 1.0,  "color": [0.15, 0.02, 0.0, 0.0] }
+        ] }, "name": "燃焼カーブ", "type": "UpdateColorOverLifetime" },
+        { "data": { "startScale": 0.9, "endScale": 0.15, "useCurve": true }, "name": "燃え上がり収縮", "type": "UpdateSizeOverLifetime" }
+      ]
+    }
+  ]
+}

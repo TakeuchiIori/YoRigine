@@ -1,11 +1,11 @@
 {
   "name": "FireBurning",
   "particleEffects": [
-    { "asset": "FireTrailEmbers", "offset": [0.0, 0.2, 0.0] },
-    { "asset": "FireChargeMotes", "offset": [0.0, 0.6, 0.0] }
+    { "asset": "FxFireBurnFlames", "offset": [0.0, 0.0, 0.0] },
+    { "asset": "FxFireBurnEmbers", "offset": [0.0, 0.2, 0.0] }
   ],
   "vfxMeshAssets": [
-    { "asset": "NewEffect3", "offset": [0.0, 0.4, 0.0], "scale": 0.3 }
+    { "asset": "FxFireBurnAura", "offset": [0.0, 0.2, 0.0], "scale": 1.0 }
   ],
   "gpuEmitterGroup": "",
   "sounds": []
