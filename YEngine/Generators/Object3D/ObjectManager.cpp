@@ -26,6 +26,7 @@ ObjectManager* ObjectManager::GetInstance() {
 /// マネージャ初期化（プール・ID管理のリセット）
 /// </summary>
 void ObjectManager::Initialize() {
+	EnsureCollisionManager();
 	objectPool_.Clear();
 	idToObject_.clear();
 	nextObjectId_ = 0;
@@ -36,7 +37,9 @@ void ObjectManager::Initialize() {
 /// アクティブオブジェクトのアニメーション更新
 /// </summary>
 void ObjectManager::Update() {
-	assert(collisionManager_ && "ObjectManager : SetCollisionManager() を先に呼ぶこと");
+	EnsureCollisionManager();
+	FlushPendingObjectDisposals();
+
 	auto* cm = collisionManager_;
 	const bool cullingActive = cm->IsCullingActive();
 
@@ -136,6 +139,18 @@ void ObjectManager::DeleteObject(int objectId) {
 	if (it == idToObject_.end()) return;
 
 	PlacedObject* obj = it->second;
+	if (obj && obj->collider) {
+		EnsureCollisionManager();
+		collisionManager_->RemoveCollider(obj->collider.get());
+	}
+
+	if (collisionManager_ && collisionManager_->IsIterating()) {
+		// 衝突コールバック中に PlacedObject を破棄すると、CollisionManager 側のローカル a/b が
+		// 関数復帰まで解放済みを指してしまう。判定対象からは外し、実体の返却だけ次フレームへ送る。
+		if (obj) obj->isActive = false;
+		pendingDeleteObjectIds_.push_back(objectId);
+		return;
+	}
 
 	// 子の親をクリア
 	for (auto& [id, child] : idToObject_) {
@@ -167,8 +182,24 @@ void ObjectManager::ClearAllObjects() {
 	// 現在シーン分の PlacedObject だけ pool に戻す。
 	// objectPool_.Clear() を呼ぶと StashCurrentAs 経由で退避中のシーンの PlacedObject も
 	// destruct してしまい、TryRestore したときに dangling になるため使わない。
-	assert(collisionManager_ && "ObjectManager : SetCollisionManager() を先に呼ぶこと");
+	EnsureCollisionManager();
 	auto* cm = collisionManager_;
+	if (cm->IsIterating()) {
+		// 衝突コールバック中は実体を破棄しない。RemoveCollider でこのフレームの判定対象から外し、
+		// PlacedObject の破棄は CollisionManager の走査が終わった次の ObjectManager::Update に送る。
+		for (auto& [id, obj] : idToObject_) {
+			if (!obj) continue;
+			obj->isActive = false;
+			if (obj->collider) {
+				obj->collider->SetActive(false);
+				obj->collider->SetCollisionEnabled(false);
+				cm->RemoveCollider(obj->collider.get());
+			}
+		}
+		pendingClearAllObjects_ = true;
+		return;
+	}
+
 	for (auto& [id, obj] : idToObject_) {
 		if (!obj) continue;
 		if (obj->collider) cm->RemoveCollider(obj->collider.get());
@@ -180,9 +211,28 @@ void ObjectManager::ClearAllObjects() {
 	std::cout << "現在シーンのオブジェクトを削除しました。" << std::endl;
 }
 
+void ObjectManager::FlushPendingObjectDisposals() {
+	if (!collisionManager_ || collisionManager_->IsIterating()) return;
+
+	if (pendingClearAllObjects_) {
+		pendingClearAllObjects_ = false;
+		pendingDeleteObjectIds_.clear();
+		ClearAllObjects();
+		return;
+	}
+
+	if (pendingDeleteObjectIds_.empty()) return;
+
+	std::vector<int> ids;
+	ids.swap(pendingDeleteObjectIds_);
+	for (int id : ids) {
+		DeleteObject(id);
+	}
+}
+
 
 void ObjectManager::StashCurrentAs(const std::string& sceneName) {
-	assert(collisionManager_ && "ObjectManager : SetCollisionManager() を先に呼ぶこと");
+	EnsureCollisionManager();
 	auto* cm = collisionManager_;
 
 	// 同名の退避が既にある場合は古い方を破棄 (pool に戻す + collider を Manager から外す)。
@@ -219,7 +269,7 @@ bool ObjectManager::TryRestore(const std::string& sceneName) {
 	nextObjectId_ = it->second.nextObjectId;
 	stashedScenes_.erase(it);
 
-	assert(collisionManager_ && "ObjectManager : SetCollisionManager() を先に呼ぶこと");
+	EnsureCollisionManager();
 	auto* cm = collisionManager_;
 	for (auto& [id, obj] : idToObject_) {
 		if (obj && obj->collider) cm->AddCollider(obj->collider.get());
@@ -533,6 +583,15 @@ void ObjectManager::InitializePlacedObject(
 	UpdateObjectTransform(obj);
 }
 
+void ObjectManager::EnsureCollisionManager() {
+	// Framework から SetCollisionManager されるのが正規ルート。
+	// ただしエディタ/シリアライザが ObjectManager を先に触る経路があるため、
+	// 未注入なら CollisionManager のシングルトンで補完してクラッシュを避ける。
+	if (!collisionManager_) {
+		collisionManager_ = YoRigine::CollisionManager::GetInstance();
+	}
+}
+
 void ObjectManager::ApplyObjectColor(PlacedObject& obj) {
 	if (!obj.object) return;
 	obj.object->SetMaterialColor(obj.color);
@@ -629,6 +688,12 @@ void ObjectManager::ApplyColliderTemplate(PlacedObject& obj) {
 	}
 
 	if (needRebuild) {
+		// BaseCollider は生成時に CollisionManager へ raw pointer 登録される。
+		// shared_ptr を差し替える前に明示的に外し、Manager 側に解放済み collider を残さない。
+		EnsureCollisionManager();
+		if (obj.collider && collisionManager_) {
+			collisionManager_->RemoveCollider(obj.collider.get());
+		}
 		obj.collider = nullptr;
 		switch (obj.colliderShapeType) {
 		case ColliderShapeType::kAABB:

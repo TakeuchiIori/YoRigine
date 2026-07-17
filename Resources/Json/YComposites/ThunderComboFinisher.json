@@ -1,0 +1,12 @@
+{
+  "name": "ThunderComboFinisher",
+  "particleEffects": [
+    { "asset": "FxThunderJudgmentSparks", "offset": [0.0, 0.1, 0.0] },
+    { "asset": "FxThunderResidual", "offset": [0.0, 0.1, 0.0] }
+  ],
+  "vfxMeshAssets": [
+    { "asset": "FxThunderJudgmentMesh", "offset": [0.0, 0.0, 0.0], "scale": 1.0 }
+  ],
+  "gpuEmitterGroup": "",
+  "sounds": []
+}

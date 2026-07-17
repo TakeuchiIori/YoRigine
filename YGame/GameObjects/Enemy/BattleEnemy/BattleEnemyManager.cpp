@@ -28,6 +28,9 @@ namespace {
 	uint32_t g_battleEnemyRegSeq = 0;
 }
 
+// 現在アクティブなインスタンス（非所有。Initialize でセット / Finalize・破棄でクリア）
+BattleEnemyManager* BattleEnemyManager::current_ = nullptr;
+
 /// <summary>
 /// コンストラクタ
 /// </summary>
@@ -36,13 +39,16 @@ BattleEnemyManager::BattleEnemyManager() = default;
 /// <summary>
 /// デストラクタ
 /// </summary>
-BattleEnemyManager::~BattleEnemyManager() = default;
+BattleEnemyManager::~BattleEnemyManager() {
+	if (current_ == this) current_ = nullptr;
+}
 
 /// <summary>
 /// 敵マネージャーの初期化処理
 /// </summary>
 /// <param name="camera">使用するカメラのポインタ</param>
 void BattleEnemyManager::Initialize(Camera* camera) {
+	current_ = this; // 全体攻撃などシーン外から敵一覧を引くための借用参照
 	camera_ = camera;
 	battleEnemies_.clear();   // 解除は BattleEnemy デストラクタが行う
 	enemyDataMap_.clear();
@@ -1044,6 +1050,7 @@ void BattleEnemyManager::Finalize() {
 	camera_ = nullptr;
 	player_ = nullptr;
 	battleEndCallback_ = nullptr;
+	if (current_ == this) current_ = nullptr;
 
 	Logger("[BattleEnemyManager] 終了処理完了\n");
 }

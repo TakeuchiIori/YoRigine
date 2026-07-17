@@ -31,7 +31,9 @@
 void CompositeInstance::SetPosition(const Vector3& pos)
 {
     basePos = pos;
-    if (particle.IsValid()) particle.SetPosition(pos + particleOffset);
+    for (size_t i = 0; i < particles.size(); ++i) {
+        if (particles[i].IsValid()) particles[i].SetPosition(pos + particleOffsets[i]);
+    }
     for (size_t i = 0; i < vfx.size(); ++i) {
         vfx[i].SetPosition(pos + vfxOffsets[i]);
     }
@@ -62,7 +64,7 @@ float CompositeEffectAsset::NaturalDuration(VfxMeshSpawner* vfxMeshSpawner, YoRi
 
 void CompositeInstance::Stop()
 {
-    if (particle.IsValid()) particle.Stop();
+    for (auto& particle : particles) if (particle.IsValid()) particle.Stop();
     for (auto& v : vfx) v.Stop();
     if (gpu.IsValid()) gpu.Stop();
     for (auto& s : sounds) s.Stop();
@@ -70,7 +72,9 @@ void CompositeInstance::Stop()
 
 bool CompositeInstance::IsActive() const
 {
-    if (particle.IsValid() && particle.IsActive()) return true;
+    for (const auto& particle : particles) {
+        if (particle.IsValid() && particle.IsActive()) return true;
+    }
     for (const auto& v : vfx) if (v.IsAlive()) return true;
     if (gpu.IsValid() && gpu.IsActive()) return true;
     for (const auto& s : sounds) if (s.IsPlaying()) return true;
@@ -132,7 +136,6 @@ bool CompositeEffectManager::LoadAsset(const std::string& filepath)
 
         CompositeEffectAsset a;
         a.name = j.value("name", std::filesystem::path(filepath).stem().string());
-        a.particleEffect = j.value("particleEffect", std::string());
         a.gpuEmitterGroup = j.value("gpuEmitterGroup", std::string());
 
         auto readVec3 = [](const nlohmann::json& parent, const char* key, Vector3 def) -> Vector3 {
@@ -141,8 +144,26 @@ bool CompositeEffectManager::LoadAsset(const std::string& filepath)
             }
             return def;
         };
-        a.particleOffset = readVec3(j, "particleOffset", { 0.0f, 0.0f, 0.0f });
         a.gpuOffset       = readVec3(j, "gpuOffset", { 0.0f, 0.0f, 0.0f });
+
+        // 新形式: CPUパーティクルを複数レイヤー可能。
+        if (j.contains("particleEffects") && j["particleEffects"].is_array()) {
+            for (const auto& p : j["particleEffects"]) {
+                CompositeParticleRef r;
+                r.asset = p.value("asset", std::string());
+                if (p.contains("offset") && p["offset"].is_array() && p["offset"].size() >= 3) {
+                    r.offset = { p["offset"][0].get<float>(), p["offset"][1].get<float>(), p["offset"][2].get<float>() };
+                }
+                if (!r.asset.empty()) a.particleEffects.push_back(r);
+            }
+        }
+        // 旧形式との互換性。ロード時に新形式へ正規化する。
+        if (a.particleEffects.empty()) {
+            const std::string legacyParticle = j.value("particleEffect", std::string());
+            if (!legacyParticle.empty()) {
+                a.particleEffects.push_back({ legacyParticle, readVec3(j, "particleOffset", { 0.0f, 0.0f, 0.0f }) });
+            }
+        }
 
         a.hitDelay     = j.value("hitDelay", -1.0f);
         a.hitRadius    = j.value("hitRadius", 1.5f);
@@ -188,6 +209,18 @@ bool CompositeEffectManager::Has(const std::string& name) const
     return assets_.count(name) > 0;
 }
 
+std::vector<std::string> CompositeEffectManager::GetAssetNames() const
+{
+    std::vector<std::string> names;
+    names.reserve(assets_.size());
+    for (const auto& [name, asset] : assets_) {
+        (void)asset;
+        names.push_back(name);
+    }
+    std::sort(names.begin(), names.end());
+    return names;
+}
+
 bool CompositeEffectManager::SaveAsset(const std::string& name)
 {
     auto it = assets_.find(name);
@@ -200,8 +233,13 @@ bool CompositeEffectManager::SaveAsset(const std::string& name)
     try {
         nlohmann::json j;
         j["name"] = a.name;
-        j["particleEffect"] = a.particleEffect;
-        j["particleOffset"] = { a.particleOffset.x, a.particleOffset.y, a.particleOffset.z };
+        j["particleEffects"] = nlohmann::json::array();
+        for (const auto& p : a.particleEffects) {
+            j["particleEffects"].push_back({
+                {"asset", p.asset},
+                {"offset", { p.offset.x, p.offset.y, p.offset.z }},
+                });
+        }
         j["gpuEmitterGroup"] = a.gpuEmitterGroup;
         j["gpuOffset"] = { a.gpuOffset.x, a.gpuOffset.y, a.gpuOffset.z };
 
@@ -265,8 +303,10 @@ void CompositeEffectManager::PlayOneShot(const std::string& name, const Vector3&
     const CompositeEffectAsset& a = it->second;
 
     // 各系統を「撃ちっぱなし」で発火（保持不要）
-    if (!a.particleEffect.empty()) {
-        EffectHandle::PlayOneShot(a.particleEffect, pos + a.particleOffset);
+    for (const auto& particle : a.particleEffects) {
+        // -1 で各CPUアセット側の emitCount を尊重する。
+        // 複合側の既定値(20)で全素材の密度が均一化されるのを防ぐ。
+        EffectHandle::PlayOneShot(particle.asset, pos + particle.offset, -1);
     }
 
     // minDuration保証: 自然な寿命(NaturalDuration)が足りなければVfxMesh側だけtimeScaleで引き伸ばす。
@@ -321,12 +361,12 @@ EffectHandle CompositeEffectManager::Play(const std::string& name, const Vector3
 
     auto inst = std::make_shared<CompositeInstance>();
     inst->basePos        = pos;
-    inst->particleOffset = a.particleOffset;
     inst->gpuOffset       = a.gpuOffset;
 
     // Particle 子（ループ）
-    if (!a.particleEffect.empty()) {
-        inst->particle = EffectHandle::Play(a.particleEffect, pos + a.particleOffset, /*loop*/true);
+    for (const auto& particle : a.particleEffects) {
+        inst->particles.push_back(EffectHandle::Play(particle.asset, pos + particle.offset, /*loop*/true));
+        inst->particleOffsets.push_back(particle.offset);
     }
     // VfxMesh 子（ループ）
     // ループ型は Stop() で寿命が外部制御される前提なので minDuration/timeScale は適用しない（7.2参照）。
@@ -471,16 +511,25 @@ void CompositeEffectManager::DrawImGui()
 
     ImGui::Separator();
 
-    // ── Particle ──
+    // ── Particle（複数）──
     {
         assert(yParticleManager_ && yEmitterGroupManager_ && "CompositeEffectManager : Set系で依存を先に注入すること");
         std::vector<std::string> opts = yParticleManager_->GetAllSystemNames();
         auto groups = yEmitterGroupManager_->GetAllGroupNames();
         opts.insert(opts.end(), groups.begin(), groups.end());
-        stringCombo("Particle エフェクト", a.particleEffect, opts, true);
-        if (!a.particleEffect.empty()) {
-            ImGui::DragFloat3("Particle オフセット", &a.particleOffset.x, 0.05f);
+        ImGui::SeparatorText("CPU Particle（複数可）");
+        int removeIdx = -1;
+        for (int i = 0; i < static_cast<int>(a.particleEffects.size()); ++i) {
+            ImGui::PushID(2000 + i);
+            auto& particle = a.particleEffects[i];
+            stringCombo("アセット", particle.asset, opts, false);
+            ImGui::DragFloat3("オフセット", &particle.offset.x, 0.05f);
+            if (ImGui::SmallButton("このCPU行を削除")) removeIdx = i;
+            ImGui::Separator();
+            ImGui::PopID();
         }
+        if (removeIdx >= 0) a.particleEffects.erase(a.particleEffects.begin() + removeIdx);
+        if (ImGui::Button(ICON_FA_PLUS " CPU Particle を追加")) a.particleEffects.push_back({});
     }
     // ── GPU ──
     {

@@ -44,9 +44,13 @@ public:
 	void SetRequiredCount(int n)               { requiredCount_ = (n > 0 ? n : 1); }
 	void SetNextWaypoint (const std::string& s){ nextWaypoint_  = s; }
 	void SetStartActive  (bool b)              { startActive_   = b; }
+	void SetMissionTitle (const std::string& s){ missionTitle_  = s; }
 	const std::string& GetRequiredGroup() const { return requiredGroup_; }
 	int                GetRequiredCount() const { return requiredCount_; }
+	int                GetCurrentCount()  const { return currentCount_; }
 	bool               IsStartActive()    const { return startActive_; }
+	// ミッションUIに出す目標文（例「敵を倒せ！」）。撃破数はUI側で「現在/必要」を付与する。
+	const std::string& GetMissionTitle()  const { return missionTitle_; }
 
 private:
 	std::string beaconEffect_;   // ビーコンに使う VfxMesh アセット名（LightVolume の柱など）
@@ -55,6 +59,7 @@ private:
 	std::string nextWaypoint_;   // クリア時にアクティブ化する次の EventTrigger 名（空 = 最終）
 	bool        startActive_   = false;
 	float       beaconScale_   = 1.0f;
+	std::string missionTitle_;   // ミッションUIに表示する目標文（空 = 既定文をUI側で使う）
 
 	// 実行時状態
 	bool active_         = false;  // 現在の目的地か（アクティブ時のみ撃破カウント）

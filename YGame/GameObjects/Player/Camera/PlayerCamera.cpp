@@ -89,6 +89,10 @@ void PlayerCamera::Initialize(FollowCamera* followCamera, const WorldTransform* 
 void PlayerCamera::UpdatePreDirector() {
     if (!followCamera_) return;
 
+    // 死亡クローズアップ中は通常の入力・ロックオン・攻撃カメラを
+    // 一切更新しない。死亡直前の敵方向へカメラが引っ張られるのを防ぐ。
+    if (followCamera_->GetIsCloseUp()) return;
+
     float dt = YoRigine::GameTime::GetDeltaTime();
     bool  inPerformance = IsInPerformance();
 
@@ -161,6 +165,9 @@ void PlayerCamera::ApplyPostDirector(Camera* sceneCamera, float dt) {
     // 見切れヒット判定に使う最終カメラをキャッシュ（OnAttackHit から参照）
     lastSceneCamera_ = sceneCamera;
 
+    // クローズアップの画角と位置を、脅威 FOV や攻撃カメラで上書きしない。
+    if (followCamera_ && followCamera_->GetIsCloseUp()) return;
+
     bool inPerformance = IsInPerformance();
     if (inPerformance) return;
 
@@ -197,10 +204,14 @@ void PlayerCamera::ApplyPostDirector(Camera* sceneCamera, float dt) {
     }
 
     // ---- FOV オフセット ----
+    // ディレクタが毎フレーム fovY_ を基準値へ戻し、その後 ApplyThreatFovWiden が
+    // 「囲まれ拡大」分を加算している。ここで代入すると囲まれ拡大分が瞬間的に消え、
+    // fovDelta が 0↔非0 を跨ぐたびに補間なしのジャンプになる（複数敵ほど顕著）。
+    // fovDelta は StartInterpolating / Returning で既に滑らかに補間されているので、
+    // 加算で乗せれば囲まれ拡大やズームと共存したままジャンプなく変化する。
     float fovDelta = attackCamera_.GetCurrentFovDelta();
     if (fovDelta != 0.0f) {
-        // savedBaseFov_ は AttackCameraComponent 側が保持している
-        sceneCamera->fovY_ = attackCamera_.GetSavedBaseFov() + fovDelta;
+        sceneCamera->fovY_ += fovDelta;
     }
 
     // ---- タイムスケール ----
@@ -222,6 +233,20 @@ void PlayerCamera::ApplyPostDirector(Camera* sceneCamera, float dt) {
     if (framingGuardEnabled_ && attackCamera_.ShouldKeepPlayerInFrame()) {
         EnsurePlayerInFrame(sceneCamera, dt);
     }
+}
+
+void PlayerCamera::SetIsCloseUp(bool v) {
+    if (!followCamera_ || followCamera_->GetIsCloseUp() == v) return;
+
+    if (v) {
+        isLockOn_ = false;
+        lockedTarget_ = nullptr;
+        awarenessYawBias_ = 0.0f;
+        awarenessAppliedBias_ = 0.0f;
+        attackCamera_.Stop(followCamera_);
+    }
+
+    followCamera_->SetIsCloseUp(v);
 }
 
 // ============================================================
@@ -417,8 +442,13 @@ void PlayerCamera::UpdateThreatAwareness(float dt) {
 
 // ============================================================
 // グランス目標量を算出
-//   カメラ前方から awarenessTriggerYaw_ 以上外れた（視界外寄りの）敵のうち
-//   プレイヤーに最も近いものへ、符号付きで awarenessMaxYaw_ までの傾きを返す。
+//   カメラ前方から awarenessTriggerYaw_ 以上外れた（視界外寄りの）敵の方向へ、
+//   符号付きで awarenessMaxYaw_ までの傾きを返す。
+//
+//   複数の敵がほぼ同距離・同方向にいるとき「最も近い1体」を毎フレーム選ぶ方式だと、
+//   わずかな距離変化で対象が入れ替わり、傾き量が飛んでガタつく。そこで対象敵の方向を
+//   近さで重み付けした「円環平均」で合成し、連続的で安定した目標量を返す。
+//   （±πをまたぐケースでも破綻しないよう sin/cos ベクトルの加重和で平均する）
 // ============================================================
 float PlayerCamera::ComputeGlanceBias() const {
     std::vector<Vector3> enemies;
@@ -428,21 +458,29 @@ float PlayerCamera::ComputeGlanceBias() const {
     float   baseYaw = followCamera_->GetRotate().y - awarenessAppliedBias_; // プレイヤー由来の素の yaw
     Vector3 playerPos = playerWT_->translate_;
 
-    bool picked = false;
-    float pickDist   = awarenessRange_;
-    float pickSigned = 0.0f;
+    float weightSum = 0.0f;
+    float sinSum    = 0.0f;
+    float cosSum    = 0.0f;
     for (const auto& enemyPos : enemies) {
         Vector3 d = enemyPos - camPos; d.y = 0.0f;
         if (Length(d) < 0.01f) continue;
         float signedYaw = WrapPi(atan2f(d.x, d.z) - baseYaw);
         if (std::abs(signedYaw) < awarenessTriggerYaw_) continue; // 視界内寄り＝気配対象外
 
+        // 近い敵ほど強く効く重み（距離2乗の逆数で遠方ほど滑らかに減衰）。
         float pd = Length(enemyPos - playerPos);
-        if (pd < pickDist) { pickDist = pd; picked = true; pickSigned = signedYaw; }
-    }
-    if (!picked) return 0.0f;
+        float w  = 1.0f / (pd * pd + 1.0f);
 
-    return std::clamp(pickSigned, -awarenessMaxYaw_, awarenessMaxYaw_);
+        // 角度そのものを平均するとπ跨ぎで破綻するため、単位ベクトルとして加重和を取る。
+        sinSum    += w * std::sin(signedYaw);
+        cosSum    += w * std::cos(signedYaw);
+        weightSum += w;
+    }
+    if (weightSum <= 0.0f) return 0.0f;
+
+    // 円環平均。全敵の方向を近さで重み付けした「代表方向」。
+    float blended = atan2f(sinSum, cosSum);
+    return std::clamp(blended, -awarenessMaxYaw_, awarenessMaxYaw_);
 }
 
 void PlayerCamera::FaceDefeatNextEnemy(const Vector3& enemyWorldPos) {
@@ -458,7 +496,7 @@ void PlayerCamera::FaceDefeatNextEnemy(const Vector3& enemyWorldPos) {
     rot.x = asinf(std::clamp(-dir.y, -1.0f, 1.0f));
     rot.x = std::clamp(rot.x, minPitch_, maxPitch_);
     followCamera_->SetRotate(rot);
-    followCamera_->CancelRecenter();
+    followCamera_->CancelRecenter(true);  // 撃破フェイシングは決めカメラより優先（保護を無視して上書き）
     followCamera_->NotifyCameraActive();
 }
 
@@ -632,18 +670,24 @@ void PlayerCamera::TriggerOffscreenHitReaction(const Vector3* enemyWorldPos) {
     lockOnFlashWorldPos_ = (enemyWorldPos) ? *enemyWorldPos
         : (playerWT_ ? playerWT_->translate_ : Vector3{});
 
-    // 背後リセンター：カメラ→プレイヤー→敵 が一直線になる位置まで回り込ませる。
-    // 敵座標があれば「プレイヤー→敵の方向」へ寄せる＝プレイヤーの向きに依存せず
-    // 確実にプレイヤー越しの敵を正面に捉える。無ければ従来のプレイヤー向きへ。
-    if (offscreenHitFaceEnemy_ && enemyWorldPos && playerWT_) {
+    // 敵方向リセンター：カメラ→プレイヤー→敵 が一直線になる位置まで回り込ませる。
+    // 敵座標があれば常に「プレイヤー→敵の方向」へ寄せる＝プレイヤーの向きに依存しない。
+    //   ※ プレイヤーの向きへ寄せる（RecenterBehindTarget）方式は、攻撃中に左スティックで
+    //     移動していると発火時のプレイヤー向き＝移動方向をスナップしてしまい、敵ではなく
+    //     移動方向を向いてしまう。決めカメラは常に敵を捉えるべきなので敵方向で固定する。
+    // offscreenHitProtect_ 秒だけこのリセンターを保護し、直後の一瞬のスティック当たりで
+    // 敵へ振る動きが消えないようにする（意図的な操作は保護明け後すぐ効く）。
+    bool facedEnemy = false;
+    if (enemyWorldPos && playerWT_) {
         Vector3 dir = *enemyWorldPos - PlayerPivotWorld();
         dir.y = 0.0f;
         if (Length(dir) > 0.001f) {
-            followCamera_->RecenterToYaw(atan2f(dir.x, dir.z));
-        } else {
-            followCamera_->RecenterBehindTarget();
+            followCamera_->RecenterToYaw(atan2f(dir.x, dir.z), true, -1.0f, offscreenHitProtect_);
+            facedEnemy = true;
         }
-    } else {
+    }
+    if (!facedEnemy) {
+        // 敵座標が無い（テスト発火など）ときのみプレイヤーの向きへ寄せる
         followCamera_->RecenterBehindTarget();
     }
 
@@ -679,24 +723,47 @@ void PlayerCamera::OnAttackHit(const Vector3& enemyWorldPos) {
 // パラメータの保存 / 復元（FollowCamera の extension JSON に相乗り）
 void PlayerCamera::SaveOffscreenHitReaction(nlohmann::json& j) const {
     j["enabled"]   = offscreenHitEnabled_;
-    j["faceEnemy"] = offscreenHitFaceEnemy_;
     j["margin"]   = offscreenHitMargin_;
     j["cooldown"] = offscreenHitCooldown_;
     j["zoomFov"]  = offscreenHitZoomFov_;
     j["zoomDur"]  = offscreenHitZoomDur_;
     j["shakeInt"] = offscreenHitShakeInt_;
     j["shakeDur"] = offscreenHitShakeDur_;
+    j["protect"]  = offscreenHitProtect_;
 }
 
 void PlayerCamera::LoadOffscreenHitReaction(const nlohmann::json& j) {
     offscreenHitEnabled_   = j.value("enabled",   true);
-    offscreenHitFaceEnemy_ = j.value("faceEnemy", true);
     offscreenHitMargin_   = j.value("margin",   0.9f);
     offscreenHitCooldown_ = j.value("cooldown", 0.8f);
     offscreenHitZoomFov_  = j.value("zoomFov",  0.40f);
     offscreenHitZoomDur_  = j.value("zoomDur",  0.30f);
     offscreenHitShakeInt_ = j.value("shakeInt", 0.30f);
     offscreenHitShakeDur_ = j.value("shakeDur", 0.15f);
+    offscreenHitProtect_  = j.value("protect",  0.12f);
+}
+
+// ============================================================
+// ロックオンターゲット再検証（敵更新後に呼ぶ）
+//
+// battleEnemyManager_->Update() で敵が削除されると、同フレーム内で
+// lockedTarget_ がダングリングポインタになる。LockOnUI が使う前に
+// CollisionManager を引いて生死を確認し、無効なら即座にクリアする。
+// ============================================================
+void PlayerCamera::ValidateLockOnTarget() {
+    if (!isLockOn_ || !lockedTarget_) return;
+
+    bool alive = false;
+    for (auto* col : YoRigine::CollisionManager::GetInstance()->GetColliders()) {
+        if (col == lockedTarget_ && col->GetIsActive()) {
+            alive = true;
+            break;
+        }
+    }
+    if (!alive) {
+        lockedTarget_ = nullptr;
+        isLockOn_     = false;
+    }
 }
 
 // ============================================================
@@ -734,6 +801,9 @@ void PlayerCamera::UpdateLockOn() {
             lockOnSwitchCooldown_ = 0.3f;
         }
     }
+
+    // SwitchLockOnTarget が対象を見つけられなかった場合（敵が全滅した直後など）
+    if (!lockedTarget_) { isLockOn_ = false; return; }
 
     // ── 2ショット・フレーミング ──────────────────────────────
     // カメラを player→enemy 軸の真後ろに置くと、プレイヤーの背中が敵を隠して
@@ -824,10 +894,8 @@ void PlayerCamera::PlayAttackCameraWork(const std::string& attackName) {
     // アンカー未指定 → ロックオン対象があればそれを既定アンカーにする
     hasCameraWorkAnchor_ = false;
 
-    // 再生前 FOV を保存 → Play → savedBaseFov に渡す順で呼ぶ
-    const float baseFov = followCamera_->GetBaseFovY();
+    // FOV は基準値へ加算適用するため、再生前 FOV の保存は不要
     attackCamera_.Play(attackName);
-    attackCamera_.SetSavedBaseFov(baseFov);
 }
 
 void PlayerCamera::PlayAttackCameraWork(const std::string& attackName, const Vector3& anchor) {
@@ -836,9 +904,7 @@ void PlayerCamera::PlayAttackCameraWork(const std::string& attackName, const Vec
     cameraWorkAnchor_    = anchor;
     hasCameraWorkAnchor_ = true;
 
-    const float baseFov = followCamera_->GetBaseFovY();
     attackCamera_.Play(attackName);
-    attackCamera_.SetSavedBaseFov(baseFov);
 }
 
 // ============================================================
@@ -1137,12 +1203,12 @@ void PlayerCamera::DrawImGui() {
     if (ImGui::CollapsingHeader("見切れヒット演出")) {
         ImGui::Checkbox("有効", &offscreenHitEnabled_);
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("画面外の敵に攻撃が当たった瞬間、敵を捉え直す決めカメラを発火");
-        ImGui::Checkbox("敵の方向へ回り込む", &offscreenHitFaceEnemy_);
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("ON=カメラ→プレイヤー→敵が一直線になる位置へ(確実に敵を正面へ) / OFF=プレイヤーの向いてる方向の背後へ");
         ImGui::DragFloat("画面外マージン(NDC)", &offscreenHitMargin_, 0.01f, 0.0f, 1.2f, "%.2f");
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("敵がこのNDCを越えたら『見切れ』扱い。値を小さくするほど中央寄りでも発動。0.9=端で切れかけ / 1.0=完全に枠外のみ / 0=画面中央以外すべて");
         ImGui::DragFloat("クールダウン(秒)", &offscreenHitCooldown_, 0.05f, 0.0f, 5.0f, "%.2f");
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("連続ヒットで毎回発火しないための間隔");
+        ImGui::DragFloat("敵向き保護時間(秒)", &offscreenHitProtect_, 0.01f, 0.0f, 0.5f, "%.2f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("発火直後この秒数だけ敵向きリセンターを保護し、一瞬のスティック当たりで消えないようにする。0で無効(即キャンセル可)");
 
         ImGui::SeparatorText("演出");
         ImGui::DragFloat("ズームFOV", &offscreenHitZoomFov_, 0.005f, 0.0f, 1.0f, "%.3f");

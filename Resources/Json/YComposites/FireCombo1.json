@@ -1,0 +1,11 @@
+{
+  "name": "FireCombo1",
+  "particleEffects": [
+    { "asset": "FireComboArc", "offset": [0.0, 0.0, 0.0] }
+  ],
+  "vfxMeshAssets": [
+    { "asset": "NewEffect3", "offset": [0.0, 0.0, 0.0], "scale": 0.25 }
+  ],
+  "gpuEmitterGroup": "",
+  "sounds": []
+}

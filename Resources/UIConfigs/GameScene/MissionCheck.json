@@ -1,0 +1,54 @@
+{
+    "anchorPoint": {
+        "x": 0.5,
+        "y": 0.5
+    },
+    "animations": [],
+    "color": {
+        "a": 1.0,
+        "b": 0.0,
+        "g": 0.0,
+        "r": 0.0
+    },
+    "flipX": false,
+    "flipY": false,
+    "layer": 3,
+    "name": "MissionCheck",
+    "position": {
+        "x": 116.0,
+        "y": 229.0,
+        "z": 0.0
+    },
+    "rotation": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+    },
+    "scale": {
+        "x": 1.0,
+        "y": 1.0
+    },
+    "size": {
+        "x": 64.0,
+        "y": 64.0
+    },
+    "textureLeftTop": {
+        "x": 0.0,
+        "y": 0.0
+    },
+    "texturePath": "Resources/Textures/Operation/Check.png",
+    "textureSize": {
+        "x": 512.0,
+        "y": 512.0
+    },
+    "uvRotation": 0.0,
+    "uvScale": {
+        "x": 1.0,
+        "y": 1.0
+    },
+    "uvTranslation": {
+        "x": 0.0,
+        "y": 0.0
+    },
+    "visible": false
+}

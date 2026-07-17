@@ -3,6 +3,8 @@
 #include "Systems/GameTime/GameTime.h"
 #include "BattleScene.h"
 #include "FieldScene.h"
+#include "Particle/YParticleManager.h"
+#include "GPUParticle/GpuEmitManager.h"
 #include <cmath>
 
 /// <summary>
@@ -294,6 +296,9 @@ void SubSceneManager::ActivateScene(const std::string& sceneName) {
 void SubSceneManager::DeactivateCurrentScene() {
 	if (currentScene_) {
 		currentScene_->OnExit();
+		// サブシーン切り替え時に前のシーンのパーティクルを停止する
+		YParticleManager::GetInstance().StopAndClearActiveEmitters();
+		YoRigine::GpuEmitManager::GetInstance()->StopAllEmitterGroups();
 		currentScene_ = nullptr;
 	}
 }

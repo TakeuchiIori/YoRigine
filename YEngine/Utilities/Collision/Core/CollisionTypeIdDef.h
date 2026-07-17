@@ -11,6 +11,7 @@ enum class CollisionTypeIdDef : uint32_t
 	kFieldEnemy,				// フィールド敵
 	kBattleEnemy,				// バトル敵
 	kPlayerWeapon,				// プレイヤーの武器
+	kPlayerMagic,				// プレイヤーの魔法攻撃
 	kPlayerShield,				// プレイヤーの盾
 
 	// ── エディター配置オブジェクト用 ──────────────────────────
@@ -34,6 +35,7 @@ inline const char* CollisionTypeIdToString(CollisionTypeIdDef id)
 	case CollisionTypeIdDef::kFieldEnemy:   return "FieldEnemy";
 	case CollisionTypeIdDef::kBattleEnemy:  return "BattleEnemy";
 	case CollisionTypeIdDef::kPlayerWeapon: return "PlayerWeapon";
+	case CollisionTypeIdDef::kPlayerMagic:  return "PlayerMagic";
 	case CollisionTypeIdDef::kPlayerShield: return "PlayerShield";
 	case CollisionTypeIdDef::kStaticWall:    return "StaticWall";
 	case CollisionTypeIdDef::kNavObstacle:   return "NavObstacle";
@@ -92,6 +94,7 @@ inline CollisionLayer LayerFromTypeId(CollisionTypeIdDef id) {
 	case CollisionTypeIdDef::kFieldEnemy:   return CollisionLayer::Enemy;
 	case CollisionTypeIdDef::kBattleEnemy:  return CollisionLayer::Enemy;
 	case CollisionTypeIdDef::kPlayerWeapon: return CollisionLayer::PlayerWeapon;
+	case CollisionTypeIdDef::kPlayerMagic:  return CollisionLayer::PlayerWeapon;
 	case CollisionTypeIdDef::kPlayerShield: return CollisionLayer::PlayerShield;
 	case CollisionTypeIdDef::kStaticWall:   return CollisionLayer::StaticWall;
 	case CollisionTypeIdDef::kNavObstacle:  return CollisionLayer::NavObstacle;

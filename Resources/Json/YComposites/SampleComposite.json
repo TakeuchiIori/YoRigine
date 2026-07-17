@@ -2,6 +2,6 @@
     "name": "SampleComposite",
     "particleEffect": "",
     "vfxMeshAssets": [],
-    "gpuEmitterGroup": "ss",
+    "gpuEmitterGroup": "",
     "sounds": []
 }

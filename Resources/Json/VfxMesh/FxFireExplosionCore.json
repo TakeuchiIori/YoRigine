@@ -1,0 +1,154 @@
+{
+  "name": "FxFireExplosionCore",
+  "useTrail": false,
+  "motions": [
+    {
+      "type": 0, "target": 0, "ease": 0,
+      "startTime": 0.0, "window": 0.75,
+      "duration": 0.75,
+      "velocity": { "x": 0.0, "y": 0.0, "z": 0.0 },
+      "acceleration": { "x": 0.0, "y": 0.0, "z": 0.0 },
+      "amplitude": 1.0, "frequency": 1.0,
+      "scaleStart": 0.0, "scaleEnd": 1.0,
+      "colorStart": { "x": 1.0, "y": 1.0, "z": 1.0, "w": 1.0 },
+      "colorEnd": { "x": 1.0, "y": 1.0, "z": 1.0, "w": 1.0 },
+      "fadeIn": 0.0, "fadeOut": 0.0
+    }
+  ],
+  "subEffects": [
+    {
+      "enabled": true,
+      "label": "火球爆発",
+      "type": 1,
+      "offset": { "x": 0.0, "y": 1.2, "z": 0.0 },
+      "smoke": {
+        "builtInBurstMotion": true,
+        "color": { "x": 2.8, "y": 0.95, "z": 0.22, "w": 1.0 },
+        "smokeColor": { "x": 0.12, "y": 0.06, "z": 0.04, "w": 0.6 },
+        "riseSpeed": 1.5,
+        "radius": 2.4,
+        "noiseScale": 4.2,
+        "noiseStrength": 1.3,
+        "scrollSpeed": 2.6,
+        "fresnelPower": 2.0,
+        "density": 1.6,
+        "noiseOctaves": 3.0,
+        "rimIntensity": 3.4,
+        "isEnable": true
+      },
+      "motions": [
+        {
+          "type": 4, "target": 0, "ease": 5,
+          "startTime": 0.0, "window": 0.75,
+          "duration": 0.75,
+          "velocity": { "x": 0.0, "y": 0.0, "z": 0.0 },
+          "acceleration": { "x": 0.0, "y": 0.0, "z": 0.0 },
+          "amplitude": 1.0, "frequency": 1.0,
+          "scaleStart": 0.2, "scaleEnd": 1.15,
+          "colorStart": { "x": 1.0, "y": 1.0, "z": 1.0, "w": 1.0 },
+          "colorEnd": { "x": 1.0, "y": 1.0, "z": 1.0, "w": 1.0 },
+          "fadeIn": 0.0, "fadeOut": 0.0
+        },
+        {
+          "type": 6, "target": 0, "ease": 0,
+          "startTime": 0.0, "window": 0.75,
+          "duration": 0.75,
+          "velocity": { "x": 0.0, "y": 0.0, "z": 0.0 },
+          "acceleration": { "x": 0.0, "y": 0.0, "z": 0.0 },
+          "amplitude": 1.0, "frequency": 1.0,
+          "scaleStart": 0.0, "scaleEnd": 1.0,
+          "colorStart": { "x": 1.0, "y": 1.0, "z": 1.0, "w": 1.0 },
+          "colorEnd": { "x": 1.0, "y": 1.0, "z": 1.0, "w": 1.0 },
+          "fadeIn": 0.02, "fadeOut": 0.3
+        }
+      ]
+    },
+    {
+      "enabled": true,
+      "label": "衝撃波リング1",
+      "type": 3,
+      "offset": { "x": 0.0, "y": 0.15, "z": 0.0 },
+      "shockwave": {
+        "color": { "x": 2.6, "y": 1.4, "z": 0.5, "w": 1.0 },
+        "radius": 4.8,
+        "duration": 0.4,
+        "thickness": 0.2,
+        "isEnable": true
+      },
+      "motions": []
+    },
+    {
+      "enabled": true,
+      "label": "衝撃波リング2 (遅れて大きく)",
+      "type": 3,
+      "offset": { "x": 0.0, "y": 0.15, "z": 0.0 },
+      "shockwave": {
+        "color": { "x": 1.8, "y": 0.85, "z": 0.3, "w": 0.85 },
+        "radius": 6.6,
+        "duration": 0.55,
+        "thickness": 0.12,
+        "isEnable": true
+      },
+      "motions": [
+        {
+          "type": 10, "target": 0, "ease": 0,
+          "startTime": 0.07, "window": 0.55,
+          "duration": 0.55,
+          "velocity": { "x": 0.0, "y": 0.0, "z": 0.0 },
+          "acceleration": { "x": 0.0, "y": 0.0, "z": 0.0 },
+          "amplitude": 1.0, "frequency": 1.0,
+          "scaleStart": 0.0, "scaleEnd": 1.0,
+          "colorStart": { "x": 1.0, "y": 1.0, "z": 1.0, "w": 1.0 },
+          "colorEnd": { "x": 1.0, "y": 1.0, "z": 1.0, "w": 1.0 },
+          "fadeIn": 0.0, "fadeOut": 0.0
+        }
+      ]
+    },
+    {
+      "enabled": true,
+      "label": "爆発閃光グロー",
+      "type": 0,
+      "offset": { "x": 0.0, "y": 1.2, "z": 0.0 },
+      "lightVolume": {
+        "halfExtents": { "x": 2.6, "y": 2.6, "z": 2.6 },
+        "color": { "x": 2.2, "y": 1.1, "z": 0.4, "w": 0.3 },
+        "intensity": 1.0,
+        "edgeFade": 0.4,
+        "depthFade": 1.0,
+        "noiseTiling": 2.0,
+        "noiseStrength": 0.0,
+        "beamStrength": 0.0,
+        "beamRadius": 0.35,
+        "beamPower": 2.0,
+        "beamGlow": 1.0,
+        "isEnable": true
+      },
+      "motions": [
+        {
+          "type": 6, "target": 0, "ease": 0,
+          "startTime": 0.0, "window": 0.4,
+          "duration": 0.4,
+          "velocity": { "x": 0.0, "y": 0.0, "z": 0.0 },
+          "acceleration": { "x": 0.0, "y": 0.0, "z": 0.0 },
+          "amplitude": 1.0, "frequency": 1.0,
+          "scaleStart": 0.0, "scaleEnd": 1.0,
+          "colorStart": { "x": 1.0, "y": 1.0, "z": 1.0, "w": 1.0 },
+          "colorEnd": { "x": 1.0, "y": 1.0, "z": 1.0, "w": 1.0 },
+          "fadeIn": 0.01, "fadeOut": 0.32
+        },
+        {
+          "type": 4, "target": 0, "ease": 5,
+          "startTime": 0.0, "window": 0.4,
+          "duration": 0.4,
+          "velocity": { "x": 0.0, "y": 0.0, "z": 0.0 },
+          "acceleration": { "x": 0.0, "y": 0.0, "z": 0.0 },
+          "amplitude": 1.0, "frequency": 1.0,
+          "scaleStart": 0.55, "scaleEnd": 1.45,
+          "colorStart": { "x": 1.0, "y": 1.0, "z": 1.0, "w": 1.0 },
+          "colorEnd": { "x": 1.0, "y": 1.0, "z": 1.0, "w": 1.0 },
+          "fadeIn": 0.0, "fadeOut": 0.0
+        }
+      ]
+    }
+  ]
+}

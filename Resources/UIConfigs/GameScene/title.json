@@ -15,8 +15,8 @@
     "layer": 2,
     "name": "title",
     "position": {
-        "x": 774.0,
-        "y": 751.0,
+        "x": 400.0,
+        "y": 630.0,
         "z": 0.0
     },
     "rotation": {
@@ -29,17 +29,17 @@
         "y": 1.0
     },
     "size": {
-        "x": 400.0,
-        "y": 200.0
+        "x": 160.0,
+        "y": 117.0
     },
     "textureLeftTop": {
         "x": 0.0,
         "y": 0.0
     },
-    "texturePath": "Resources/Textures/GameScene/ToTitle.png",
+    "texturePath": "Resources/UITex/label_title.png",
     "textureSize": {
-        "x": 800.0,
-        "y": 400.0
+        "x": 160.0,
+        "y": 117.0
     },
     "uvRotation": 0.0,
     "uvScale": {

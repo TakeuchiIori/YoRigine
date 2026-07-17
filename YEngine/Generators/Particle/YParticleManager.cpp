@@ -285,6 +285,13 @@ void YParticleManager::Update(float deltaTime) {
 	YEmitterGroupManager::GetInstance().Update(deltaTime);
 }
 
+void YParticleManager::StopAndClearActiveEmitters() {
+	for (auto& e : activeEmitters_) {
+		if (e) e->SetActive(false);
+	}
+	activeEmitters_.clear();
+}
+
 //=================================================================
 // 描画　（「描画設定が同じシステムをグループ化して、後でまとめて描画するための仕分け処理）
 //=================================================================

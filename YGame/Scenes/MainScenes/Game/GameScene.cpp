@@ -177,6 +177,13 @@ void GameScene::Initialize() {
 		}, "Game");
 	Editor::GetInstance()->RegisterGameUI("ライティング", [this]() { YoRigine::LightManager::GetInstance()->ShowLightingEditor(); }, "Game");
 	Editor::GetInstance()->RegisterGameUI("プレイヤー攻撃エディター", [this]() {attackEditor_->DrawImGui(); }, "Game");
+	Editor::GetInstance()->RegisterGameUI("魔法攻撃エディター", [this]() {
+		// 魔法調整はプレイヤー状態確認とは作業目的が違う。
+		// Editor の独立パネルとして登録し、状態ウィンドウの開閉に引きずられないようにする。
+		if (player_ && player_->GetMagicController()) {
+			player_->GetMagicController()->DrawEditorWindow();
+		}
+		}, "Game");
 	Editor::GetInstance()->RegisterGameUI("YoRigine:パーティクルエディター", [this]() {YParticleEditor::GetInstance().ShowEditorWindow(); }, "Game");
 #endif
 
@@ -272,6 +279,7 @@ void GameScene::Update() {
 	// 攻撃/ガード入力も戦闘中のみ受け付ける。
 	if (player_) {
 		player_->SetBattleMode(inBattle);
+		gameUI_->SetPlayerStyle(player_->GetStyle());
 		if (player_->GetPlayerCamera()) {
 			player_->GetPlayerCamera()->SetBattleMode(inBattle);
 		}
@@ -417,9 +425,12 @@ void GameScene::DrawUI() {
 /// </summary>
 void GameScene::UpdateCamera() {
 	auto director = CameraDirector::GetInstance();
+	const bool isDeathCamera = player_ && player_->GetCombat() &&
+		player_->GetCombat()->IsDead();
 
-
-	if (YoRigine::GameTime::IsPause() && cameraMode_ != CameraMode::DEBUG) {
+	// 死亡モーション終了時はゲーム本体だけを止め、死亡クローズアップは
+	// 実時間で最終位置まで進める。
+	if (YoRigine::GameTime::IsPause() && cameraMode_ != CameraMode::DEBUG && !isDeathCamera) {
 		return;
 	}
 
@@ -461,7 +472,7 @@ void GameScene::UpdateCamera() {
 	//------------------------------------------------------------
 	// Directorの更新（VirtualCameraの計算 ＋ ブレンド処理）
 	//------------------------------------------------------------
-	const float cameraDt = (cameraMode_ == CameraMode::DEBUG)
+	const float cameraDt = (cameraMode_ == CameraMode::DEBUG || isDeathCamera)
 		? YoRigine::GameTime::GetUnscaledDeltaTime()
 		: YoRigine::GameTime::GetDeltaTime();
 	director->Update(cameraDt);
@@ -601,6 +612,9 @@ void GameScene::Finalize() {
 		YoRigine::GameTime::Resume();
 		pausedGameTimeForDebugCamera_ = false;
 	}
+	// メインシーン遷移前にパーティクルを停止する（Title/Clear への移動ケース）
+	YParticleManager::GetInstance().StopAndClearActiveEmitters();
+	YoRigine::GpuEmitManager::GetInstance()->StopAllEmitterGroups();
 	YoRigine::JsonManager::ClearSceneInstances("GameScene");
 	if (subSceneManager_) subSceneManager_->Finalize();
 	subSceneManager_ = nullptr;

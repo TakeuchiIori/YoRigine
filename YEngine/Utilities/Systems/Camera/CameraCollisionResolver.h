@@ -18,7 +18,9 @@ public:
 	/// <param name="idealPos">本来カメラが行きたい座標</param>
 	/// <param name="targetPivot">プレイヤーの頭など、レイの始点となる注視点</param>
 	/// <returns>壁避け・ハイアングル化を適用した最終座標</returns>
-	Vector3 Resolve(const Vector3& idealPos, const Vector3& targetPivot);
+	Vector3 Resolve(const Vector3& idealPos, const Vector3& targetPivot,
+		float deltaTime, float clearanceScale = 1.0f,
+		bool allowHighAngle = true);
 
 	// エディタ設定用
 	void DrawDebugGui();
@@ -30,9 +32,13 @@ public:
 	void SetEnabled(bool enable) { isEnabled_ = enable; }
 	bool IsEnabled() const { return isEnabled_; }
 
-	// 無視するコライダーのTypeIDを設定する
-	void AddIgnoreTypeID(uint32_t typeID) { ignoreTypeIDs_.push_back(typeID); }
-	void ClearIgnoreTypeIDs() { ignoreTypeIDs_.clear(); }
+	// カメラを遮る（＝めり込み回避の対象にする）コライダーの TypeID を登録する。
+	// 許可リスト方式: ここに登録した型「だけ」がカメラを押し戻す。
+	// 未登録の型（プレイヤー・敵・武器・魔法・トリガー領域など）は全て素通りする。
+	void AddBlockTypeID(uint32_t typeID);
+	void ClearBlockTypeIDs() { blockTypeIDs_.clear(); }
+	// 既定の遮蔽対象（壁・NavObstacle）をセットする
+	void SetDefaultBlockTypes();
 
 	float GetCurrentDistanceRatio() const { return currentDistanceRatio_; }
 private:
@@ -54,5 +60,8 @@ private:
 	// --- 内部状態 ---
 	float currentDistanceRatio_ = 1.0f;				// 現在の距離の割合 (0.0 ~ 1.0、補間用)
 	float minGroundHeight_ = 0.5f;					// カメラが地面にめり込むのを防止するための最低高さ
-	std::vector<uint32_t> ignoreTypeIDs_;			// 衝突判定で無視するコライダーのタイプID（例: プレイヤー自身のコライダー）
+
+	// カメラを遮る対象のタイプID（許可リスト）。既定は壁と NavObstacle のみ。
+	// 未登録の型は素通りするので、トリガー領域や飛道弾でカメラが跳ねない。
+	std::vector<uint32_t> blockTypeIDs_;
 };

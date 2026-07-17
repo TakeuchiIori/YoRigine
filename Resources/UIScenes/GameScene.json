@@ -27,16 +27,32 @@
         "LockOnHintIcon",
         "LockOnHintStick",
         "LockOnFlash",
+        "Y_style",
+        "MissionWindow",
+        "MissionFrame",
+        "MissionText",
+        "MissionCheck",
         "UIBackGround",
+        "PauseLeftPanel",
+        "PauseRightPanel",
+        "PauseLeftFrame",
+        "PauseRightFrame",
+        "PauseSelectHighlight",
+        "PauseTitle",
+        "PauseControlsTitle",
+        "toGame",
+        "title",
         "A",
         "B",
         "LB",
-        "Strong",
+        "LockOnIcon",
+        "PauseLB",
+        "PauseRB",
         "Weak",
+        "Strong",
         "Guard",
-        "title",
-        "toGame",
-        "LockOnIcon"
+        "PauseLockOnLabel",
+        "PauseCamResetLabel"
     ],
     "groups": null,
     "uis": [
@@ -149,8 +165,64 @@
             "id": "LockOnFlash"
         },
         {
+            "configPath": "./Resources/UIConfigs/GameScene/Y_style.json",
+            "id": "Y_style"
+        },
+        {
+            "configPath": "./Resources/UIConfigs/GameScene/MissionWindow.json",
+            "id": "MissionWindow"
+        },
+        {
+            "configPath": "./Resources/UIConfigs/GameScene/MissionFrame.json",
+            "id": "MissionFrame"
+        },
+        {
+            "configPath": "./Resources/UIConfigs/GameScene/MissionText.json",
+            "id": "MissionText"
+        },
+        {
+            "configPath": "./Resources/UIConfigs/GameScene/MissionCheck.json",
+            "id": "MissionCheck"
+        },
+        {
             "configPath": "./Resources/UIConfigs/GameScene/UIBackGround.json",
             "id": "UIBackGround"
+        },
+        {
+            "configPath": "./Resources/UIConfigs/GameScene/PauseLeftPanel.json",
+            "id": "PauseLeftPanel"
+        },
+        {
+            "configPath": "./Resources/UIConfigs/GameScene/PauseRightPanel.json",
+            "id": "PauseRightPanel"
+        },
+        {
+            "configPath": "./Resources/UIConfigs/GameScene/PauseLeftFrame.json",
+            "id": "PauseLeftFrame"
+        },
+        {
+            "configPath": "./Resources/UIConfigs/GameScene/PauseRightFrame.json",
+            "id": "PauseRightFrame"
+        },
+        {
+            "configPath": "./Resources/UIConfigs/GameScene/PauseSelectHighlight.json",
+            "id": "PauseSelectHighlight"
+        },
+        {
+            "configPath": "./Resources/UIConfigs/GameScene/PauseTitle.json",
+            "id": "PauseTitle"
+        },
+        {
+            "configPath": "./Resources/UIConfigs/GameScene/PauseControlsTitle.json",
+            "id": "PauseControlsTitle"
+        },
+        {
+            "configPath": "./Resources/UIConfigs/GameScene/toGame.json",
+            "id": "toGame"
+        },
+        {
+            "configPath": "./Resources/UIConfigs/GameScene/title.json",
+            "id": "title"
         },
         {
             "configPath": "./Resources/UIConfigs/GameScene/A.json",
@@ -165,28 +237,36 @@
             "id": "LB"
         },
         {
-            "configPath": "./Resources/UIConfigs/GameScene/Strong.json",
-            "id": "Strong"
+            "configPath": "./Resources/UIConfigs/GameScene/LockOnIcon.json",
+            "id": "LockOnIcon"
+        },
+        {
+            "configPath": "./Resources/UIConfigs/GameScene/PauseLB.json",
+            "id": "PauseLB"
+        },
+        {
+            "configPath": "./Resources/UIConfigs/GameScene/PauseRB.json",
+            "id": "PauseRB"
         },
         {
             "configPath": "./Resources/UIConfigs/GameScene/Weak.json",
             "id": "Weak"
         },
         {
+            "configPath": "./Resources/UIConfigs/GameScene/Strong.json",
+            "id": "Strong"
+        },
+        {
             "configPath": "./Resources/UIConfigs/GameScene/Guard.json",
             "id": "Guard"
         },
         {
-            "configPath": "./Resources/UIConfigs/GameScene/title.json",
-            "id": "title"
+            "configPath": "./Resources/UIConfigs/GameScene/PauseLockOnLabel.json",
+            "id": "PauseLockOnLabel"
         },
         {
-            "configPath": "./Resources/UIConfigs/GameScene/toGame.json",
-            "id": "toGame"
-        },
-        {
-            "configPath": "./Resources/UIConfigs/GameScene/LockOnIcon.json",
-            "id": "LockOnIcon"
+            "configPath": "./Resources/UIConfigs/GameScene/PauseCamResetLabel.json",
+            "id": "PauseCamResetLabel"
         }
     ]
 }

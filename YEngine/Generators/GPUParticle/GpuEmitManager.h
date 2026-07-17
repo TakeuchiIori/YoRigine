@@ -161,6 +161,10 @@ namespace YoRigine {
 		void PlayEmitterGroup(const std::string& groupName);
 		void StopEmitterGroup(const std::string& groupName);
 
+		/// 再生中の全グループを即時停止（lingerTimer もリセット）。
+		/// シーン遷移時に呼び出し、前のシーンの GPU パーティクルが次のシーンに残らないようにする。
+		void StopAllEmitterGroups();
+
 		// ── ゲーム向け（GpuParticleHandle から使う軽量API）──
 		// グループのワールド原点を移動（各エミッタは原点＋自身のローカルオフセットで発生）
 		void SetGroupPosition(const std::string& groupName, const Vector3& pos);

@@ -79,6 +79,14 @@ namespace YoRigine {
 		// 実時間の記録
 		unscaledDeltaTime_ = elapsed.count();
 
+		// デルタタイムの上限クランプ。
+		// シーンロード / ブレークポイント / Alt-Tab 復帰などで prevTime_ からの経過が
+		// 極端に大きくなると、その1フレームで patrolSpeed*dt 等が巨大化し、キャラが
+		// 一気にワープしてしまう（例: フィールド敵がスポーン地点の外へ吹き飛ぶ）。
+		// 10fps 相当を下限として、それ以上のスパイクは 1 フレーム分に丸める。
+		constexpr float kMaxDeltaTime = 0.1f;
+		unscaledDeltaTime_ = std::min(unscaledDeltaTime_, kMaxDeltaTime);
+
 		// 停止判定
 		//   editorFrozen : エディタ用フリーズ。全チャンネルを止める（1フレーム検証用）。
 		//   gamePaused   : ゲーム本編ポーズ。Gameplay/Vfx は止めるが UI は動き続ける（メニューが反応する）。
