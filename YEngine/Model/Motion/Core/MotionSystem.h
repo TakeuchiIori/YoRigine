@@ -75,6 +75,8 @@ public:
 	float GetEffectiveSpeed() const { return motionSpeed_ * currentAnimationSpeed_; }
 
 	void SetAnimationTime(float time);
+	// 現在のベースモーションを、ブレンドや上半身レイヤーを残さず先頭から再生する。
+	void ResetPlaybackState();
 	float GetAnimationTime() const { return animationTime_; }
 	float GetDuration() const { return animation_ ? animation_->GetDuration() : 0.0f; }
 

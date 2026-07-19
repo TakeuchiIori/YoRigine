@@ -162,6 +162,9 @@ private:
 	///************************* モーション関連 *************************///
 
 	Motion motion_;
+	// 再生中モーションはModelインスタンスごとに管理する。
+	// staticにすると他オブジェクトの切替がPlayerの切替判定へ干渉する。
+	std::string currentMotionCacheKey_;
 	bool isMotion_;
 	bool hasBones_;
 	bool isMixamoAsset_ = false;

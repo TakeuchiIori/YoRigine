@@ -398,9 +398,8 @@ void Model::SetChangeMotion(const std::string& directoryPath, const std::string&
 {
 	// 既存のアニメーションと同じ場合はスキップ
 	std::string newCacheKey = directoryPath + "/" + filename + "#" + animationName;
-	static std::string currentCacheKey;
 
-	if (currentCacheKey == newCacheKey) {
+	if (currentMotionCacheKey_ == newCacheKey) {
 		// 同じアニメーションの場合は再生モードだけ変更
 		if (motionSystem_) {
 			motionSystem_->SetPlayMode(playMode);
@@ -408,7 +407,7 @@ void Model::SetChangeMotion(const std::string& directoryPath, const std::string&
 		return;
 	}
 
-	currentCacheKey = newCacheKey;
+	currentMotionCacheKey_ = newCacheKey;
 
 	// 新しいアニメーションファイルを読み込む
 	LoadMotionFile(directoryPath, filename, animationName);

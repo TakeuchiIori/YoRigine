@@ -55,6 +55,11 @@ public:
 	// 公開関数
 	// ============================================================
 	void Reset();
+	// バトル開始前に行動状態と装備表示を待機状態へ戻す。HPは変更しない。
+	void ResetForBattleStart();
+	void FacePosition(const Vector3& worldPosition);
+	void SetControlEnabled(bool enabled);
+	bool IsControlEnabled() const { return controlEnabled_; }
 	void TakeDamage(int damage);
 	// 敵の攻撃がヒットした際にのけぞり（ヒット）ステートへ遷移させる。
 	// attackerPos から被弾方向を算出する。ガード中・死亡中は何もしない。
@@ -145,6 +150,7 @@ private:
 	// ============================================================
 	YoRigine::Input* input_ = nullptr;
 	bool battleMode_ = false;   // 戦闘中のみ攻撃/ガード入力を受け付ける
+	bool controlEnabled_ = true; // カメラ演出中など、入力だけを止めるためのフラグ
 	std::unique_ptr<PlayerCamera> playerCamera_;
 
 	std::unique_ptr<PlayerSword> playerSword_;
