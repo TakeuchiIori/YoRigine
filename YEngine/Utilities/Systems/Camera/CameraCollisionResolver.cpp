@@ -44,6 +44,7 @@ void CameraCollisionResolver::SetDefaultBlockTypes() {
 Vector3 CameraCollisionResolver::Resolve(const Vector3& idealPos, const Vector3& targetPivot,
 	float deltaTime, float clearanceScale, bool allowHighAngle) {
 	if (!isEnabled_) {
+		fadeHits_.clear();
 		return idealPos;
 	}
 
@@ -61,10 +62,27 @@ Vector3 CameraCollisionResolver::Resolve(const Vector3& idealPos, const Vector3&
 		cameraRay.origin = targetPivot;
 		cameraRay.direction = rayDir;
 
-		RaycastHit hitInfo;
-		// 許可リスト(壁など)に含まれる型だけを対象に Raycast。ヒットしたらカメラ半径分だけ手前にする。
-		if (YoRigine::CollisionManager::GetInstance()->RaycastAllowTypes(cameraRay, maxDistance, &hitInfo, blockTypeIDs_)) {
-			hitDistance = hitInfo.distance - cameraRadius_ * clearanceScale;
+		// フェードコライダーはカメラ近距離でも検出できるよう延長距離でレイキャスト。
+		// ブロックコライダーは maxDistance 内のヒットのみカメラをずらす。
+		const float fadeCheckDist = maxDistance + proximityFadeExtend_;
+		fadeHits_.clear();
+		const auto hits = YoRigine::CollisionManager::GetInstance()
+			->RaycastAllAllowTypes(cameraRay, fadeCheckDist, blockTypeIDs_);
+		for (const auto &entry : hits) {
+			if (entry.collider->IsCameraFadeMode()) {
+				// レイ上の全フェード対象を収集する。家とその奥の木などが重なっても
+				// PlayerCamera 側でそれぞれ独立して透明化できる。
+				const float depth = std::max(0.0f, maxDistance - entry.hit.distance);
+				const float fadeT = (fullyTransparentDepth_ > 0.0f)
+					? std::clamp(depth / fullyTransparentDepth_, 0.0f, 1.0f)
+					: (depth > 0.0f ? 1.0f : 0.0f);
+				fadeHits_.push_back(
+					{entry.collider, std::lerp(occludeTargetAlpha_, 0.0f, fadeT)});
+			} else if (entry.hit.distance <= maxDistance) {
+				// 距離順なので最初の非フェードブロッカーが最も近い。
+				hitDistance = entry.hit.distance - cameraRadius_ * clearanceScale;
+				break;
+			}
 		}
 
 		// ------------------------------------------------------------
@@ -148,6 +166,12 @@ void CameraCollisionResolver::DrawDebugGui() {
 			if (ImGui::IsItemHovered()) ImGui::SetTooltip("これ以下にはカメラを target に寄せない (画面いっぱいになる回避)");
 			ImGui::DragFloat("回避スピード", &avoidSpeed_, 0.01f, 0.01f, 1.0f);
 			ImGui::DragFloat("復帰スピード", &returnSpeed_, 0.01f, 0.01f, 1.0f);
+			ImGui::DragFloat("フェード近距離延長", &proximityFadeExtend_, 0.1f, 0.0f, 5.0f);
+			if (ImGui::IsItemHovered()) ImGui::SetTooltip("カメラ近くのフェードコライダーを検出するための延長距離。0 にすると近距離フェード無効。");
+			ImGui::DragFloat("遮蔽アルファ (通常)", &occludeTargetAlpha_, 0.01f, 0.0f, 1.0f, "%.2f");
+			if (ImGui::IsItemHovered()) ImGui::SetTooltip("壁がカメラを遮っているときの半透明度。0=完全透明, 1=不透明");
+			ImGui::DragFloat("完全透明侵入深度", &fullyTransparentDepth_, 0.05f, 0.01f, 3.0f, "%.2f");
+			if (ImGui::IsItemHovered()) ImGui::SetTooltip("カメラがこの距離だけ壁に入ったら alpha=0 になる (NieR風)。小さいほど素早く透明になる");
 
 			ImGui::Separator();
 			// --- カメラを遮る対象（許可リスト）の設定 ---
@@ -197,6 +221,9 @@ void CameraCollisionResolver::Save(nlohmann::json& j) const {
 	j["highAngleThreshold"] = highAngleThreshold_;
 	j["maxPushUpHeight"] = maxPushUpHeight_;
 	j["blockTypeIDs"] = blockTypeIDs_;
+	j["proximityFadeExtend"]    = proximityFadeExtend_;
+	j["occludeTargetAlpha"]     = occludeTargetAlpha_;
+	j["fullyTransparentDepth"]  = fullyTransparentDepth_;
 }
 
 // ============================================================
@@ -214,6 +241,10 @@ void CameraCollisionResolver::Load(const nlohmann::json& j) {
 	enableHighAngle_ = j.value("enableHighAngle", false);
 	highAngleThreshold_ = j.value("highAngleThreshold", 0.5f);
 	maxPushUpHeight_ = j.value("maxPushUpHeight", 3.0f);
+
+	proximityFadeExtend_   = j.value("proximityFadeExtend",   1.5f);
+	occludeTargetAlpha_    = j.value("occludeTargetAlpha",    0.25f);
+	fullyTransparentDepth_ = j.value("fullyTransparentDepth", 0.5f);
 
 	// 遮蔽対象タイプID（許可リスト）。旧 JSON には無いので、その場合は既定(壁+NavObstacle)。
 	if (j.contains("blockTypeIDs") && j["blockTypeIDs"].is_array()) {

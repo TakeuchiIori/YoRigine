@@ -165,6 +165,9 @@ void PlayerCamera::ApplyPostDirector(Camera* sceneCamera, float dt) {
     // 見切れヒット判定に使う最終カメラをキャッシュ（OnAttackHit から参照）
     lastSceneCamera_ = sceneCamera;
 
+    // カメラ遮蔽フェード：FollowCamera の Resolve() 後に実行する
+    UpdateOcclusionFade(dt);
+
     // クローズアップの画角と位置を、脅威 FOV や攻撃カメラで上書きしない。
     if (followCamera_ && followCamera_->GetIsCloseUp()) return;
 
@@ -1241,4 +1244,41 @@ void PlayerCamera::DrawImGui() {
         ImGui::Text("ターゲット: %p", static_cast<void*>(lockedTarget_));
     }
 #endif
+}
+
+// ============================================================
+// カメラ遮蔽フェード
+// ============================================================
+void PlayerCamera::UpdateOcclusionFade(float dt) {
+    if (!followCamera_) return;
+
+    const float tIn  = 1.0f - std::exp(-occludeFadeInSpeed_  * dt);
+    const float tOut = 1.0f - std::exp(-occludeFadeOutSpeed_ * dt);
+
+    std::unordered_map<ObjectManager::PlacedObject *, float> targets;
+    for (const auto &hit : followCamera_->GetFadeHits()) {
+        auto *obj = hit.collider
+            ? hit.collider->GetOwnerAs<ObjectManager::PlacedObject>()
+            : nullptr;
+        if (!obj) continue;
+        auto [it, inserted] = targets.emplace(obj, hit.targetAlpha);
+        if (!inserted) it->second = std::min(it->second, hit.targetAlpha);
+        fadeOccluders_.try_emplace(obj, 1.0f);
+    }
+
+    for (auto it = fadeOccluders_.begin(); it != fadeOccluders_.end();) {
+        auto *obj = it->first;
+        auto targetIt = targets.find(obj);
+        const bool isHit = targetIt != targets.end();
+        const float targetAlpha = isHit ? targetIt->second : 1.0f;
+        it->second = Lerp(it->second, targetAlpha, isHit ? tIn : tOut);
+        obj->color.w = it->second;
+
+        if (!isHit && it->second >= 0.99f) {
+            obj->color.w = 1.0f;
+            it = fadeOccluders_.erase(it);
+        } else {
+            ++it;
+        }
+    }
 }

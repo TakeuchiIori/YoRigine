@@ -307,6 +307,7 @@ ObjectManager::PlacedObject* ObjectManager::DuplicateObject(
 
 	// コライダー設定を複製（各オブジェクト固有の設定をそのままコピー）
 	duplicate->colliderEnabled      = original->colliderEnabled;
+	duplicate->colliderCameraFade   = original->colliderCameraFade;
 	duplicate->colliderTypeId       = original->colliderTypeId;
 	duplicate->colliderShapeType    = original->colliderShapeType;
 	duplicate->colliderAabbOffset   = original->colliderAabbOffset;
@@ -717,6 +718,12 @@ void ObjectManager::ApplyColliderTemplate(PlacedObject& obj) {
 	obj.collider->SetEnablePenetration(true);
 	obj.collider->SetIsStatic(true);
 	obj.collider->SetCollisionEnabled(obj.colliderEnabled);
+	obj.collider->SetCameraFadeMode(obj.colliderCameraFade);
+	// カメラ遮蔽フェード用に PlacedObject* を owner として登録しておく。
+	// PlayerCamera が GetOwnerAs<PlacedObject>() でオブジェクトを取得し、color.w を操作する。
+	// インスタンシング描画は PlacedObject::color を直接参照するため Object3d* ではなく
+	// PlacedObject* を渡す必要がある。
+	obj.collider->SetOwnerRaw(&obj);
 
 	// NavGrid::Bake / VisionSystem::HasLineOfSight が AABB を読むため、
 	// 静的障害物は frustum culling から除外して常に最新の AABB を持たせる。
@@ -758,6 +765,7 @@ void ObjectManager::CopyColliderSettingsToAll(const PlacedObject& src) {
 	for (auto& [id, obj] : idToObject_) {
 		if (obj && obj->modelName == src.modelName && obj->id != src.id) {
 			obj->colliderEnabled      = src.colliderEnabled;
+			obj->colliderCameraFade   = src.colliderCameraFade;
 			obj->colliderTypeId       = src.colliderTypeId;
 			obj->colliderShapeType    = src.colliderShapeType;
 			obj->colliderAabbOffset   = src.colliderAabbOffset;

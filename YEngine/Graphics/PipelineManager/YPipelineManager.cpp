@@ -2,376 +2,372 @@
 #include "DirectXCommon.h"
 #include "RenderFormats.h"
 
-#include <chrono>
 #include "Debugger/Logger.h"
+#include <chrono>
 
 using namespace YoRigine;
 
 namespace {
-    const std::wstring DEFAULT_VS_PATH = L"Resources/Shaders/PostEffect/FullScreen/FullScreen.VS.hlsl";
-    const std::wstring DEFAULT_PS_PATH = L"Resources/Shaders/PostEffect/CopyImage/CopyImage.PS.hlsl";
+const std::wstring DEFAULT_VS_PATH =
+    L"Resources/Shaders/PostEffect/FullScreen/FullScreen.VS.hlsl";
+const std::wstring DEFAULT_PS_PATH =
+    L"Resources/Shaders/PostEffect/CopyImage/CopyImage.PS.hlsl";
+} // namespace
+
+YPipelineManager *YPipelineManager::GetInstance() {
+  static YPipelineManager instance;
+  return &instance;
 }
 
-YPipelineManager* YPipelineManager::GetInstance()
-{
-    static YPipelineManager instance;
-    return &instance;
+ID3D12RootSignature *
+YPipelineManager::GetRootSignature(const std::string &key) {
+  auto it = rootSignatures_.find(key);
+  if (it != rootSignatures_.end()) {
+    return it->second.Get();
+  }
+  return nullptr;
 }
 
-ID3D12RootSignature* YPipelineManager::GetRootSignature(const std::string& key)
-{
-    auto it = rootSignatures_.find(key);
-    if (it != rootSignatures_.end()) {
-        return it->second.Get();
-    }
-    return nullptr;
+ID3D12PipelineState *
+YPipelineManager::GetPipeLineStateObject(const std::string &key) {
+  auto it = pipelineStates_.find(key);
+  if (it != pipelineStates_.end()) {
+    return it->second.Get();
+  }
+  return nullptr;
 }
 
-ID3D12PipelineState* YPipelineManager::GetPipeLineStateObject(const std::string& key)
-{
-    auto it = pipelineStates_.find(key);
-    if (it != pipelineStates_.end()) {
-        return it->second.Get();
-    }
-    return nullptr;
+const RootParameterIndices &
+YPipelineManager::GetRootParameterIndices(const std::string &key) const {
+  auto it = rootParamIndices_.find(key);
+  if (it != rootParamIndices_.end()) {
+    return it->second;
+  }
+  throw std::runtime_error("Root parameter indices not found: " + key);
 }
 
-const RootParameterIndices& YPipelineManager::GetRootParameterIndices(const std::string& key) const
-{
-    auto it = rootParamIndices_.find(key);
-    if (it != rootParamIndices_.end()) {
-        return it->second;
-    }
-    throw std::runtime_error("Root parameter indices not found: " + key);
+const std::unordered_map<std::string, UINT> &
+YPipelineManager::GetParameterIndices(const std::string &pipelineName) const {
+  auto it = parameterIndices_.find(pipelineName);
+  if (it != parameterIndices_.end()) {
+    return it->second;
+  }
+
+  // 空のマップを返す（静的変数）
+  static std::unordered_map<std::string, UINT> empty;
+  return empty;
 }
 
-const std::unordered_map<std::string, UINT>& YPipelineManager::GetParameterIndices(const std::string& pipelineName) const
-{
-    auto it = parameterIndices_.find(pipelineName);
-    if (it != parameterIndices_.end()) {
-        return it->second;
-    }
-
-    // 空のマップを返す（静的変数）
-    static std::unordered_map<std::string, UINT> empty;
-    return empty;
+ID3D12PipelineState *YPipelineManager::GetBlendModePSO(const std::string &key,
+                                                       BlendMode blendMode) {
+  auto it = blendModePipelineStates_[key].find(blendMode);
+  if (it != blendModePipelineStates_[key].end()) {
+    return it->second.Get();
+  }
+  return nullptr;
 }
 
-ID3D12PipelineState* YPipelineManager::GetBlendModePSO(const std::string& key,BlendMode blendMode)
-{
-    auto it = blendModePipelineStates_[key].find(blendMode);
-    if (it != blendModePipelineStates_[key].end()) {
-        return it->second.Get();
-    }
-    return nullptr;
-}
-
-D3D12_BLEND_DESC YPipelineManager::GetBlendDescFromMode(BlendMode mode)
-{
-    switch (mode) {
-    case BlendMode::kBlendModeNone:
-        return BlendPresets::CreateNone();
-    case BlendMode::kBlendModeNormal:
-        return BlendPresets::CreateAlphaBlend();
-    case BlendMode::kBlendModeAdd:
-        return BlendPresets::CreateAdditive();
-    case BlendMode::kBlendModeSubtract:
-        return BlendPresets::CreateSubtractive();
-    case BlendMode::kBlendModeMultiply:
-        return BlendPresets::CreateMultiply();
-    case BlendMode::kBlendModeScreen:
-        return BlendPresets::CreateScreen();
-    default:
-        return BlendPresets::CreateAlphaBlend();
-    }
+D3D12_BLEND_DESC YPipelineManager::GetBlendDescFromMode(BlendMode mode) {
+  switch (mode) {
+  case BlendMode::kBlendModeNone:
+    return BlendPresets::CreateNone();
+  case BlendMode::kBlendModeNormal:
+    return BlendPresets::CreateAlphaBlend();
+  case BlendMode::kBlendModeAdd:
+    return BlendPresets::CreateAdditive();
+  case BlendMode::kBlendModeSubtract:
+    return BlendPresets::CreateSubtractive();
+  case BlendMode::kBlendModeMultiply:
+    return BlendPresets::CreateMultiply();
+  case BlendMode::kBlendModeScreen:
+    return BlendPresets::CreateScreen();
+  default:
+    return BlendPresets::CreateAlphaBlend();
+  }
 }
 
 // ============================================================
 // 初期化
 // ============================================================
-void YPipelineManager::Initialize()
-{
-    dxCommon_ = DirectXCommon::GetInstance();
+void YPipelineManager::Initialize() {
+  dxCommon_ = DirectXCommon::GetInstance();
 
-    // PSOキャッシュの初期化
-    psoCache_ = std::make_unique<PSOCache>();
-    psoCache_->Initialize(dxCommon_->GetDevice().Get(), "Resources/Binary/YPipeline/");
+  // PSOキャッシュの初期化
+  psoCache_ = std::make_unique<PSOCache>();
+  psoCache_->Initialize(dxCommon_->GetDevice().Get(),
+                        "Resources/Binary/YPipeline/");
 
-	completePipelineCache_ = std::make_unique<CompletePipelineCache>();
-	completePipelineCache_->Initialize(dxCommon_->GetDevice().Get(), "Resources/Binary/YPipeline/");
+  completePipelineCache_ = std::make_unique<CompletePipelineCache>();
+  completePipelineCache_->Initialize(dxCommon_->GetDevice().Get(),
+                                     "Resources/Binary/YPipeline/");
 
-    // 起動時間の計測開始（全パイプライン生成にかかる時間）
-    const auto pipelineBuildStart = std::chrono::high_resolution_clock::now();
+  // 起動時間の計測開始（全パイプライン生成にかかる時間）
+  const auto pipelineBuildStart = std::chrono::high_resolution_clock::now();
 
-    // 基本パイプラインの生成
-    CreatePSO_Sprite();
-    CreatePSO_Object();
-    CreatePSO_ObjectInstanced();
-    CreatePSO_ShadowMap();
-    CreatePSO_ShadowMapInstanced();
-    CreatePSO_ObjectOutline();
-    CreatePSO_ObjectOutlineInstanced();
-    CreatePSO_Line();
-    CreatePSO_InstancedCube();
-    CreatePSO_YParticleAllBlendModes();
-    CreatePSO_GPUParticleALLBlendModes();
-    CreatePSO_CubeMap();
-    CreatePSO_GPUParticleInit();
-    // 使ってない
-    //CreatePSO_EffectObject();
+  // 基本パイプラインの生成
+  CreatePSO_Sprite();
+  CreatePSO_Object();
+  CreatePSO_ObjectInstanced();
+  CreatePSO_ShadowMap();
+  CreatePSO_ShadowMapInstanced();
+  CreatePSO_ObjectOutline();
+  CreatePSO_ObjectOutlineInstanced();
+  CreatePSO_Line();
+  CreatePSO_InstancedCube();
+  CreatePSO_YParticleAllBlendModes();
+  CreatePSO_GPUParticleALLBlendModes();
+  CreatePSO_CubeMap();
+  CreatePSO_GPUParticleInit();
+  // 使ってない
+  // CreatePSO_EffectObject();
 
-    // ポストエフェクト系PSパイプライン: 全エフェクトCS化に伴い、
-    // 最終 blit 用の BaseOffScreen (CopyImage.PS.hlsl) のみ残す
-    CreatePSO_BaseOffScreen();
+  // ポストエフェクト系PSパイプライン: 全エフェクトCS化に伴い、
+  // 最終 blit 用の BaseOffScreen (CopyImage.PS.hlsl) のみ残す
+  CreatePSO_BaseOffScreen();
 
-	// Meshを使用したVFX用パイプライン
-    CreatePSO_VfxMeshTrail();
-    CreatePSO_VfxMeshVolume();
-    CreatePSO_VfxMeshSmoke();
-    CreatePSO_VfxMeshLightning();
-    CreatePSO_VfxMeshShockwave();
+  // Meshを使用したVFX用パイプライン
+  CreatePSO_VfxMeshTrail();
+  CreatePSO_VfxMeshVolume();
+  CreatePSO_VfxMeshSmoke();
+  CreatePSO_VfxMeshLightning();
+  CreatePSO_VfxMeshShockwave();
 
-    // 起動時間の計測終了・出力
-    const auto pipelineBuildEnd = std::chrono::high_resolution_clock::now();
-    const double pipelineBuildMs =
-        std::chrono::duration<double, std::milli>(pipelineBuildEnd - pipelineBuildStart).count();
-    {
-        char timeBuf[256];
-        sprintf_s(timeBuf,
-            "\n[YPipelineManager] ⏱ All pipelines built in %.2f ms\n\n",
-            pipelineBuildMs);
-        Logger(timeBuf);
-    }
+  // 起動時間の計測終了・出力
+  const auto pipelineBuildEnd = std::chrono::high_resolution_clock::now();
+  const double pipelineBuildMs = std::chrono::duration<double, std::milli>(
+                                     pipelineBuildEnd - pipelineBuildStart)
+                                     .count();
+  {
+    char timeBuf[256];
+    sprintf_s(timeBuf,
+              "\n[YPipelineManager] ⏱ All pipelines built in %.2f ms\n\n",
+              pipelineBuildMs);
+    Logger(timeBuf);
+  }
 
-    // 統計情報を出力
-    auto stats = psoCache_->GetStats();
-    char buf[512];
-    sprintf_s(buf,
-        "PSO Cache Stats:\n"
-        "  Total PSOs: %zu\n"
-        "  Cache Hits: %zu\n"
-        "  Cache Misses: %zu\n"
-        "  Disk Cache Hits: %zu\n",
-        stats.totalPSOs, stats.cacheHits, stats.cacheMisses, stats.diskCacheHits
-    );
-    Logger(buf);
+  // 統計情報を出力
+  auto stats = psoCache_->GetStats();
+  char buf[512];
+  sprintf_s(buf,
+            "PSO Cache Stats:\n"
+            "  Total PSOs: %zu\n"
+            "  Cache Hits: %zu\n"
+            "  Cache Misses: %zu\n"
+            "  Disk Cache Hits: %zu\n",
+            stats.totalPSOs, stats.cacheHits, stats.cacheMisses,
+            stats.diskCacheHits);
+  Logger(buf);
 }
 
 // ============================================================
 // 終了処理
 // ============================================================
-void YPipelineManager::Finalize()
-{
-    // すべてのPSOをディスクに保存
-    if (psoCache_) {
-        psoCache_->SaveAll();
-    }
-    // すべてのキャッシュをディスクに保存
-    if (completePipelineCache_) {
-        completePipelineCache_->SaveAll();
-    }
+void YPipelineManager::Finalize() {
+  // すべてのPSOをディスクに保存
+  if (psoCache_) {
+    psoCache_->SaveAll();
+  }
+  // すべてのキャッシュをディスクに保存
+  if (completePipelineCache_) {
+    completePipelineCache_->SaveAll();
+  }
 
-    // クリーンアップ
-    pipelineStates_.clear();
-    blendModePipelineStates_.clear();
-    rootSignatures_.clear();
-    rootParamIndices_.clear();
-    parameterIndices_.clear();
+  // クリーンアップ
+  pipelineStates_.clear();
+  blendModePipelineStates_.clear();
+  rootSignatures_.clear();
+  rootParamIndices_.clear();
+  parameterIndices_.clear();
 }
 
-
 // ============================================================
-// 
+//
 // Sprite
-// 
+//
 // ============================================================
-void YPipelineManager::CreatePSO_Sprite()
-{
+void YPipelineManager::CreatePSO_Sprite() {
 
-    const std::string key = "Sprite";
+  const std::string key = "Sprite";
 
-    Logger("\n==============================================================\n\n\n");
-    Logger("         Creating Pipeline: Sprite (Alpha Blend)              \n\n\n");
-    Logger("==============================================================\n");
+  Logger(
+      "\n==============================================================\n\n\n");
+  Logger(
+      "         Creating Pipeline: Sprite (Alpha Blend)              \n\n\n");
+  Logger("==============================================================\n");
 
-    // ⭐ まずキャッシュをチェック
-    auto* cached = completePipelineCache_->Get(key);
-    if (cached) {
-        Logger("[Sprite] ✅ Using cached pipeline data\n");
+  // ⭐ まずキャッシュをチェック
+  auto *cached = completePipelineCache_->Get(key);
+  if (cached) {
+    Logger("[Sprite] ✅ Using cached pipeline data\n");
 
-        rootSignatures_[key] = cached->rootSignature;
-        pipelineStates_[key] = cached->pipelineState;
-        parameterIndices_[key] = cached->parameterIndices;
+    rootSignatures_[key] = cached->rootSignature;
+    pipelineStates_[key] = cached->pipelineState;
+    parameterIndices_[key] = cached->parameterIndices;
 
-        // キャッシュから復元できた場合は終了
-        if (cached->rootSignature && cached->pipelineState) {
-            Logger("[Sprite] ✅ Pipeline fully restored from cache\n\n");
-            return;
-        }
-
-        // パラメータインデックスだけ復元できた場合は、PSO等を再作成
-        Logger("[Sprite] ⚠️ Partial cache hit, rebuilding PSO...\n");
+    // キャッシュから復元できた場合は終了
+    if (cached->rootSignature && cached->pipelineState) {
+      Logger("[Sprite] ✅ Pipeline fully restored from cache\n\n");
+      return;
     }
 
-    // ⭐ キャッシュミス or 部分的なキャッシュヒット → 新規作成
-    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Sprite/Sprite.VS.hlsl", L"vs_6_0");
-    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Sprite/Sprite.PS.hlsl", L"ps_6_0");
+    // パラメータインデックスだけ復元できた場合は、PSO等を再作成
+    Logger("[Sprite] ⚠️ Partial cache hit, rebuilding PSO...\n");
+  }
 
-    YoRigine::ReflectionBasedPipelineBuilder builder;
-    auto result = builder
-        .SetBlendState(YoRigine::BlendPresets::CreateAlphaBlend())
-        .SetRasterizerState(YoRigine::RasterizerPresets::CreateNoCull())
-        .SetDepthStencilState(YoRigine::DepthStencilPresets::CreateReadOnly())
-        .BuildFromCompiledShaders(
-            dxCommon_->GetDevice().Get(),
-            vsBlob.Get(),
-            psBlob.Get()
-        );
+  // ⭐ キャッシュミス or 部分的なキャッシュヒット → 新規作成
+  auto vsBlob = dxCommon_->CompileShader(
+      L"Resources/Shaders/Sprite/Sprite.VS.hlsl", L"vs_6_0");
+  auto psBlob = dxCommon_->CompileShader(
+      L"Resources/Shaders/Sprite/Sprite.PS.hlsl", L"ps_6_0");
 
-    rootSignatures_[key] = result.rootSignature;
-    pipelineStates_[key] = result.pipelineState;
-    parameterIndices_[key] = result.parameterIndices;
+  YoRigine::ReflectionBasedPipelineBuilder builder;
+  auto result =
+      builder.SetBlendState(YoRigine::BlendPresets::CreateAlphaBlend())
+          .SetRasterizerState(YoRigine::RasterizerPresets::CreateNoCull())
+          .SetDepthStencilState(YoRigine::DepthStencilPresets::CreateReadOnly())
+          .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(), vsBlob.Get(),
+                                    psBlob.Get());
 
-    // ⭐ 完全版キャッシュに追加（自動的にディスクにも保存される）
-    YoRigine::CompletePipelineCache::PipelineData cacheData;
-    cacheData.rootSignature = result.rootSignature;
-    cacheData.pipelineState = result.pipelineState;
-    cacheData.parameterIndices = result.parameterIndices;
-    cacheData.inputLayout = result.inputLayout;
+  rootSignatures_[key] = result.rootSignature;
+  pipelineStates_[key] = result.pipelineState;
+  parameterIndices_[key] = result.parameterIndices;
 
-    // 入力（コンパイル済みVS/PSバイトコード）のハッシュを計算。
-    // ディスクキャッシュはこの値で「変化なし＝書き換え不要」を判定する。
-    uint64_t inputHash = YoRigine::CompletePipelineCache::HashData(
-        vsBlob->GetBufferPointer(), vsBlob->GetBufferSize());
-    inputHash = YoRigine::CompletePipelineCache::HashData(
-        psBlob->GetBufferPointer(), psBlob->GetBufferSize(), inputHash);
-    cacheData.inputHash = inputHash;
+  // ⭐ 完全版キャッシュに追加（自動的にディスクにも保存される）
+  YoRigine::CompletePipelineCache::PipelineData cacheData;
+  cacheData.rootSignature = result.rootSignature;
+  cacheData.pipelineState = result.pipelineState;
+  cacheData.parameterIndices = result.parameterIndices;
+  cacheData.inputLayout = result.inputLayout;
 
-    // SemanticNameの寿命管理用にコピー
-    for (const auto& element : result.inputLayout) {
-        if (element.SemanticName) {
-            cacheData.semanticNames.push_back(element.SemanticName);
-        }
+  // 入力（コンパイル済みVS/PSバイトコード）のハッシュを計算。
+  // ディスクキャッシュはこの値で「変化なし＝書き換え不要」を判定する。
+  uint64_t inputHash = YoRigine::CompletePipelineCache::HashData(
+      vsBlob->GetBufferPointer(), vsBlob->GetBufferSize());
+  inputHash = YoRigine::CompletePipelineCache::HashData(
+      psBlob->GetBufferPointer(), psBlob->GetBufferSize(), inputHash);
+  cacheData.inputHash = inputHash;
+
+  // SemanticNameの寿命管理用にコピー
+  for (const auto &element : result.inputLayout) {
+    if (element.SemanticName) {
+      cacheData.semanticNames.push_back(element.SemanticName);
     }
+  }
 
-    completePipelineCache_->Add(key, cacheData);
+  completePipelineCache_->Add(key, cacheData);
 }
 
 // ============================================================
-// 
+//
 // BaseObject
-// 
+//
 // ============================================================
-void YPipelineManager::CreatePSO_Object()
-{
+void YPipelineManager::CreatePSO_Object() {
 
-    Logger("\n==============================================================\n\n\n");
-    Logger("         Creating Pipeline: Object              \n\n\n");
-    Logger("==============================================================\n");
-    // シェーダーをコンパイル
-    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3d/Object3D.VS.hlsl", L"vs_6_0");
-    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3d/Object3D.PS.hlsl", L"ps_6_0");
+  Logger(
+      "\n==============================================================\n\n\n");
+  Logger("         Creating Pipeline: Object              \n\n\n");
+  Logger("==============================================================\n");
+  // シェーダーをコンパイル
+  auto vsBlob = dxCommon_->CompileShader(
+      L"Resources/Shaders/Object3d/Object3D.VS.hlsl", L"vs_6_0");
+  auto psBlob = dxCommon_->CompileShader(
+      L"Resources/Shaders/Object3d/Object3D.PS.hlsl", L"ps_6_0");
 
-    // リフレクションベースで完全自動生成
-    // 不透明ジオメトリは法線 G-buffer(SV_TARGET1) へも出力する
-    ReflectionBasedPipelineBuilder builder;
-    auto result = builder
-        .SetRenderTargetFormat(YoRigine::kSceneColorFormat)   // OffScreen(HDR) へ描く
-        .SetGBufferNormal(true)
-        .BuildFromCompiledShaders(
-        dxCommon_->GetDevice().Get(),
-        vsBlob.Get(),
-        psBlob.Get()
-    );
+  // リフレクションベースで完全自動生成
+  // 不透明ジオメトリは法線 G-buffer(SV_TARGET1) へも出力する
+  ReflectionBasedPipelineBuilder builder;
+  auto result = builder
+                    .SetRenderTargetFormat(
+                        YoRigine::kSceneColorFormat) // OffScreen(HDR) へ描く
+                    .SetGBufferNormal(true)
+                    .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(),
+                                              vsBlob.Get(), psBlob.Get());
 
-    // 結果を保存
-    rootSignatures_["Object"] = result.rootSignature;
-    pipelineStates_["Object"] = result.pipelineState;
-    parameterIndices_["Object"] = result.parameterIndices;
+  // 結果を保存
+  rootSignatures_["Object"] = result.rootSignature;
+  pipelineStates_["Object"] = result.pipelineState;
+  parameterIndices_["Object"] = result.parameterIndices;
 }
 
 // ============================================================
-// 
+//
 // ShadowMap
-// 
+//
 // ============================================================
-void YPipelineManager::CreatePSO_ShadowMap()
-{
+void YPipelineManager::CreatePSO_ShadowMap() {
 
-    Logger("\n==============================================================\n\n\n");
-    Logger("         Creating Pipeline: ShadowMap             \n\n\n");
-    Logger("==============================================================\n");
-    // シェーダーをコンパイル
-    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Shadow/ShadowMap.VS.hlsl", L"vs_6_0");
-    // リフレクションベースで完全自動生成
-    ReflectionBasedPipelineBuilder builder;
-    auto result = builder
-		.SetDepthStencilFormat(DXGI_FORMAT_D32_FLOAT)
-        .SetRasterizerState(YoRigine::RasterizerPresets::CreateShadow())
-        .BuildFromCompiledShaders(
-            dxCommon_->GetDevice().Get(),
-            vsBlob.Get()
-        );
+  Logger(
+      "\n==============================================================\n\n\n");
+  Logger("         Creating Pipeline: ShadowMap             \n\n\n");
+  Logger("==============================================================\n");
+  // シェーダーをコンパイル
+  auto vsBlob = dxCommon_->CompileShader(
+      L"Resources/Shaders/Shadow/ShadowMap.VS.hlsl", L"vs_6_0");
+  // リフレクションベースで完全自動生成
+  ReflectionBasedPipelineBuilder builder;
+  auto result =
+      builder.SetDepthStencilFormat(DXGI_FORMAT_D32_FLOAT)
+          .SetRasterizerState(YoRigine::RasterizerPresets::CreateShadow())
+          .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(), vsBlob.Get());
 
-    // 結果を保存
-    rootSignatures_["ShadowMap"] = result.rootSignature;
-    pipelineStates_["ShadowMap"] = result.pipelineState;
-    parameterIndices_["ShadowMap"] = result.parameterIndices;
+  // 結果を保存
+  rootSignatures_["ShadowMap"] = result.rootSignature;
+  pipelineStates_["ShadowMap"] = result.pipelineState;
+  parameterIndices_["ShadowMap"] = result.parameterIndices;
 }
 
 // ============================================================
-// 
+//
 // Object : Instance
-// 
+//
 // ============================================================
-void YPipelineManager::CreatePSO_ObjectInstanced()
-{
-    Logger("\n==============================================================\n\n\n");
-    Logger("         Creating Pipeline: ObjectInstanced              \n\n\n");
-    Logger("==============================================================\n");
-    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3d/Object3dInstanced.VS.hlsl", L"vs_6_0");
-    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3d/Object3dInstanced.PS.hlsl", L"ps_6_0");
+void YPipelineManager::CreatePSO_ObjectInstanced() {
+  Logger(
+      "\n==============================================================\n\n\n");
+  Logger("         Creating Pipeline: ObjectInstanced              \n\n\n");
+  Logger("==============================================================\n");
+  auto vsBlob = dxCommon_->CompileShader(
+      L"Resources/Shaders/Object3d/Object3dInstanced.VS.hlsl", L"vs_6_0");
+  auto psBlob = dxCommon_->CompileShader(
+      L"Resources/Shaders/Object3d/Object3dInstanced.PS.hlsl", L"ps_6_0");
 
-    // 不透明ジオメトリは法線 G-buffer(SV_TARGET1) へも出力する
-    ReflectionBasedPipelineBuilder builder;
-    auto result = builder
-        .SetRenderTargetFormat(YoRigine::kSceneColorFormat)   // OffScreen(HDR) へ描く
-        .SetGBufferNormal(true)
-        .BuildFromCompiledShaders(
-        dxCommon_->GetDevice().Get(),
-        vsBlob.Get(),
-        psBlob.Get()
-    );
+  // 不透明ジオメトリは法線 G-buffer(SV_TARGET1) へも出力する
+  ReflectionBasedPipelineBuilder builder;
+  auto result = builder
+                    .SetRenderTargetFormat(
+                        YoRigine::kSceneColorFormat) // OffScreen(HDR) へ描く
+                    .SetGBufferNormal(true)
+                    .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(),
+                                              vsBlob.Get(), psBlob.Get());
 
-    rootSignatures_["ObjectInstanced"] = result.rootSignature;
-    pipelineStates_["ObjectInstanced"] = result.pipelineState;
-    parameterIndices_["ObjectInstanced"] = result.parameterIndices;
+  rootSignatures_["ObjectInstanced"] = result.rootSignature;
+  pipelineStates_["ObjectInstanced"] = result.pipelineState;
+  parameterIndices_["ObjectInstanced"] = result.parameterIndices;
 }
 
 // ============================================================
-// 
+//
 // ShadowMap : Insctance
-// 
+//
 // ============================================================
-void YPipelineManager::CreatePSO_ShadowMapInstanced()
-{
-    Logger("\n==============================================================\n\n\n");
-    Logger("         Creating Pipeline: ShadowMapInstanced              \n\n\n");
-    Logger("==============================================================\n");
-    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Shadow/ShadowmapInstanced.VS.hlsl", L"vs_6_0");
+void YPipelineManager::CreatePSO_ShadowMapInstanced() {
+  Logger(
+      "\n==============================================================\n\n\n");
+  Logger("         Creating Pipeline: ShadowMapInstanced              \n\n\n");
+  Logger("==============================================================\n");
+  auto vsBlob = dxCommon_->CompileShader(
+      L"Resources/Shaders/Shadow/ShadowmapInstanced.VS.hlsl", L"vs_6_0");
 
-    ReflectionBasedPipelineBuilder builder;
-    auto result = builder
-        .SetDepthStencilFormat(DXGI_FORMAT_D32_FLOAT)
-        .SetRasterizerState(YoRigine::RasterizerPresets::CreateShadow())
-        .BuildFromCompiledShaders(
-            dxCommon_->GetDevice().Get(),
-            vsBlob.Get()
-        );
+  ReflectionBasedPipelineBuilder builder;
+  auto result =
+      builder.SetDepthStencilFormat(DXGI_FORMAT_D32_FLOAT)
+          .SetRasterizerState(YoRigine::RasterizerPresets::CreateShadow())
+          .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(), vsBlob.Get());
 
-    rootSignatures_["ShadowMapInstanced"] = result.rootSignature;
-    pipelineStates_["ShadowMapInstanced"] = result.pipelineState;
-    parameterIndices_["ShadowMapInstanced"] = result.parameterIndices;
+  rootSignatures_["ShadowMapInstanced"] = result.rootSignature;
+  pipelineStates_["ShadowMapInstanced"] = result.pipelineState;
+  parameterIndices_["ShadowMapInstanced"] = result.parameterIndices;
 }
 
 // ============================================================
@@ -379,33 +375,33 @@ void YPipelineManager::CreatePSO_ShadowMapInstanced()
 // Object : Outline (Inverted Hull)
 //
 // ============================================================
-void YPipelineManager::CreatePSO_ObjectOutline()
-{
-    Logger("\n==============================================================\n\n\n");
-    Logger("         Creating Pipeline: ObjectOutline              \n\n\n");
-    Logger("==============================================================\n");
-    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3d/OutLine.VS.hlsl", L"vs_6_0");
-    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3d/OutLine.PS.hlsl", L"ps_6_0");
+void YPipelineManager::CreatePSO_ObjectOutline() {
+  Logger(
+      "\n==============================================================\n\n\n");
+  Logger("         Creating Pipeline: ObjectOutline              \n\n\n");
+  Logger("==============================================================\n");
+  auto vsBlob = dxCommon_->CompileShader(
+      L"Resources/Shaders/Object3d/OutLine.VS.hlsl", L"vs_6_0");
+  auto psBlob = dxCommon_->CompileShader(
+      L"Resources/Shaders/Object3d/OutLine.PS.hlsl", L"ps_6_0");
 
-    // 前面カリング(背面のみ描画)で、押し出したシェルのシルエットを得る。
-    D3D12_RASTERIZER_DESC raster = YoRigine::RasterizerPresets::CreateDefault();
-    raster.CullMode = D3D12_CULL_MODE_FRONT;
+  // 前面カリング(背面のみ描画)で、押し出したシェルのシルエットを得る。
+  D3D12_RASTERIZER_DESC raster = YoRigine::RasterizerPresets::CreateDefault();
+  raster.CullMode = D3D12_CULL_MODE_FRONT;
 
-    // オブジェクト本体パスと同じ 2RTV(color + 法線 G-buffer) 構成に合わせる。
-    ReflectionBasedPipelineBuilder builder;
-    auto result = builder
-        .SetRenderTargetFormat(YoRigine::kSceneColorFormat)   // OffScreen(HDR) へ描く
-        .SetGBufferNormal(true)
-        .SetRasterizerState(raster)
-        .BuildFromCompiledShaders(
-            dxCommon_->GetDevice().Get(),
-            vsBlob.Get(),
-            psBlob.Get()
-        );
+  // オブジェクト本体パスと同じ 2RTV(color + 法線 G-buffer) 構成に合わせる。
+  ReflectionBasedPipelineBuilder builder;
+  auto result = builder
+                    .SetRenderTargetFormat(
+                        YoRigine::kSceneColorFormat) // OffScreen(HDR) へ描く
+                    .SetGBufferNormal(true)
+                    .SetRasterizerState(raster)
+                    .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(),
+                                              vsBlob.Get(), psBlob.Get());
 
-    rootSignatures_["ObjectOutline"] = result.rootSignature;
-    pipelineStates_["ObjectOutline"] = result.pipelineState;
-    parameterIndices_["ObjectOutline"] = result.parameterIndices;
+  rootSignatures_["ObjectOutline"] = result.rootSignature;
+  pipelineStates_["ObjectOutline"] = result.pipelineState;
+  parameterIndices_["ObjectOutline"] = result.parameterIndices;
 }
 
 // ============================================================
@@ -415,33 +411,34 @@ void YPipelineManager::CreatePSO_ObjectOutline()
 //   ジオメトリ供給以外は ObjectOutline と同じ（前面カリング / 2RTV）。
 //
 // ============================================================
-void YPipelineManager::CreatePSO_ObjectOutlineInstanced()
-{
-    Logger("\n==============================================================\n\n\n");
-    Logger("         Creating Pipeline: ObjectOutlineInstanced              \n\n\n");
-    Logger("==============================================================\n");
-    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3d/OutLineInstanced.VS.hlsl", L"vs_6_0");
-    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3d/OutLine.PS.hlsl", L"ps_6_0");
+void YPipelineManager::CreatePSO_ObjectOutlineInstanced() {
+  Logger(
+      "\n==============================================================\n\n\n");
+  Logger(
+      "         Creating Pipeline: ObjectOutlineInstanced              \n\n\n");
+  Logger("==============================================================\n");
+  auto vsBlob = dxCommon_->CompileShader(
+      L"Resources/Shaders/Object3d/OutLineInstanced.VS.hlsl", L"vs_6_0");
+  auto psBlob = dxCommon_->CompileShader(
+      L"Resources/Shaders/Object3d/OutLine.PS.hlsl", L"ps_6_0");
 
-    // 前面カリング(背面のみ描画)で、押し出したシェルのシルエットを得る。
-    D3D12_RASTERIZER_DESC raster = YoRigine::RasterizerPresets::CreateDefault();
-    raster.CullMode = D3D12_CULL_MODE_FRONT;
+  // 前面カリング(背面のみ描画)で、押し出したシェルのシルエットを得る。
+  D3D12_RASTERIZER_DESC raster = YoRigine::RasterizerPresets::CreateDefault();
+  raster.CullMode = D3D12_CULL_MODE_FRONT;
 
-    // オブジェクト本体パスと同じ 2RTV(color + 法線 G-buffer) 構成に合わせる。
-    ReflectionBasedPipelineBuilder builder;
-    auto result = builder
-        .SetRenderTargetFormat(YoRigine::kSceneColorFormat)   // OffScreen(HDR) へ描く
-        .SetGBufferNormal(true)
-        .SetRasterizerState(raster)
-        .BuildFromCompiledShaders(
-            dxCommon_->GetDevice().Get(),
-            vsBlob.Get(),
-            psBlob.Get()
-        );
+  // オブジェクト本体パスと同じ 2RTV(color + 法線 G-buffer) 構成に合わせる。
+  ReflectionBasedPipelineBuilder builder;
+  auto result = builder
+                    .SetRenderTargetFormat(
+                        YoRigine::kSceneColorFormat) // OffScreen(HDR) へ描く
+                    .SetGBufferNormal(true)
+                    .SetRasterizerState(raster)
+                    .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(),
+                                              vsBlob.Get(), psBlob.Get());
 
-    rootSignatures_["ObjectOutlineInstanced"] = result.rootSignature;
-    pipelineStates_["ObjectOutlineInstanced"] = result.pipelineState;
-    parameterIndices_["ObjectOutlineInstanced"] = result.parameterIndices;
+  rootSignatures_["ObjectOutlineInstanced"] = result.rootSignature;
+  pipelineStates_["ObjectOutlineInstanced"] = result.pipelineState;
+  parameterIndices_["ObjectOutlineInstanced"] = result.parameterIndices;
 }
 
 // ============================================================
@@ -449,739 +446,699 @@ void YPipelineManager::CreatePSO_ObjectOutlineInstanced()
 // GPUParticle : ALLBlendMode
 //
 // ============================================================
-void YPipelineManager::CreatePSO_GPUParticleALLBlendModes()
-{
+void YPipelineManager::CreatePSO_GPUParticleALLBlendModes() {
 
-    Logger("\n==============================================================\n\n\n");
-    Logger("         Creating Pipeline: GPUParticleInit             \n\n\n");
-    Logger("==============================================================\n");
-    // シェーダーコンパイル（1回だけ）
-    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Particle/GPUParticle.VS.hlsl", L"vs_6_0");
-    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Particle/GPUParticle.PS.hlsl", L"ps_6_0");
+  Logger(
+      "\n==============================================================\n\n\n");
+  Logger("         Creating Pipeline: GPUParticleInit             \n\n\n");
+  Logger("==============================================================\n");
+  // シェーダーコンパイル（1回だけ）
+  auto vsBlob = dxCommon_->CompileShader(
+      L"Resources/Shaders/Particle/GPUParticle.VS.hlsl", L"vs_6_0");
+  auto psBlob = dxCommon_->CompileShader(
+      L"Resources/Shaders/Particle/GPUParticle.PS.hlsl", L"ps_6_0");
 
-    // ブレンドモード設定
-    struct BlendConfig {
-        BlendMode mode;
-        std::string name;
-        D3D12_BLEND_DESC blendDesc;
-    };
+  // ブレンドモード設定
+  struct BlendConfig {
+    BlendMode mode;
+    std::string name;
+    D3D12_BLEND_DESC blendDesc;
+  };
 
-    BlendConfig configs[] = {
-        { BlendMode::kBlendModeNone, "None", BlendPresets::CreateNone() },
-        { BlendMode::kBlendModeNormal, "Normal", BlendPresets::CreateAlphaBlend() },
-        { BlendMode::kBlendModeAdd, "Add", BlendPresets::CreateAdditive() },
-        { BlendMode::kBlendModeSubtract, "Subtract", BlendPresets::CreateSubtractive() },
-        { BlendMode::kBlendModeMultiply, "Multiply", BlendPresets::CreateMultiply() },
-        { BlendMode::kBlendModeScreen, "Screen", BlendPresets::CreateScreen() },
-    };
+  BlendConfig configs[] = {
+      {BlendMode::kBlendModeNone, "None", BlendPresets::CreateNone()},
+      {BlendMode::kBlendModeNormal, "Normal", BlendPresets::CreateAlphaBlend()},
+      {BlendMode::kBlendModeAdd, "Add", BlendPresets::CreateAdditive()},
+      {BlendMode::kBlendModeSubtract, "Subtract",
+       BlendPresets::CreateSubtractive()},
+      {BlendMode::kBlendModeMultiply, "Multiply",
+       BlendPresets::CreateMultiply()},
+      {BlendMode::kBlendModeScreen, "Screen", BlendPresets::CreateScreen()},
+  };
 
-    // 各ブレンドモードごとにPSOを生成
-    for (const auto& config : configs) {
-        ReflectionBasedPipelineBuilder builder;
-        auto result = builder
-            .SetRenderTargetFormat(YoRigine::kSceneColorFormat)   // OffScreen(HDR) へ描く
+  // 各ブレンドモードごとにPSOを生成
+  for (const auto &config : configs) {
+    ReflectionBasedPipelineBuilder builder;
+    auto result =
+        builder
+            .SetRenderTargetFormat(
+                YoRigine::kSceneColorFormat) // OffScreen(HDR) へ描く
             .SetBlendState(config.blendDesc)
             .SetRasterizerState(RasterizerPresets::CreateNoCull())
             .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
-            .BuildFromCompiledShaders(
-                dxCommon_->GetDevice().Get(),
-                vsBlob.Get(),
-                psBlob.Get()
-            );
+            .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(),
+                                      vsBlob.Get(), psBlob.Get());
 
-        std::string psoName = "GPUParticleInit_" + config.name;
-        pipelineStates_[psoName] = result.pipelineState;
-        blendModePipelineStates_["GPUParticleInit"][config.mode] = result.pipelineState;
+    std::string psoName = "GPUParticleInit_" + config.name;
+    pipelineStates_[psoName] = result.pipelineState;
+    blendModePipelineStates_["GPUParticleInit"][config.mode] =
+        result.pipelineState;
 
-        // 最初のモードだけルートシグネチャとインデックスを保存
-        if (config.mode == BlendMode::kBlendModeNormal) {
-            rootSignatures_["GPUParticleInit"] = result.rootSignature;
-            parameterIndices_["GPUParticleInit"] = result.parameterIndices;
-        }
+    // 最初のモードだけルートシグネチャとインデックスを保存
+    if (config.mode == BlendMode::kBlendModeNormal) {
+      rootSignatures_["GPUParticleInit"] = result.rootSignature;
+      parameterIndices_["GPUParticleInit"] = result.parameterIndices;
     }
+  }
 }
 
 // ============================================================
-// 
+//
 // CPUParticle : ALLBlendMode
-// 
+//
 // ============================================================
-void YPipelineManager::CreatePSO_YParticleAllBlendModes()
-{
-    // ブレンドモード設定
-    struct BlendConfig {
-        BlendMode mode;
-        std::string name;
-        D3D12_BLEND_DESC blendDesc;
-    };
+void YPipelineManager::CreatePSO_YParticleAllBlendModes() {
+  // ブレンドモード設定
+  struct BlendConfig {
+    BlendMode mode;
+    std::string name;
+    D3D12_BLEND_DESC blendDesc;
+  };
 
-    BlendConfig configs[] = {
-        { BlendMode::kBlendModeNone, "None", BlendPresets::CreateNone() },
-        { BlendMode::kBlendModeNormal, "Normal", BlendPresets::CreateAlphaBlend() },
-        { BlendMode::kBlendModeAdd, "Add", BlendPresets::CreateAdditive() },
-        { BlendMode::kBlendModeSubtract, "Subtract", BlendPresets::CreateSubtractive() },
-        { BlendMode::kBlendModeMultiply, "Multiply", BlendPresets::CreateMultiply() },
-        { BlendMode::kBlendModeScreen, "Screen", BlendPresets::CreateScreen() },
-    };
+  BlendConfig configs[] = {
+      {BlendMode::kBlendModeNone, "None", BlendPresets::CreateNone()},
+      {BlendMode::kBlendModeNormal, "Normal", BlendPresets::CreateAlphaBlend()},
+      {BlendMode::kBlendModeAdd, "Add", BlendPresets::CreateAdditive()},
+      {BlendMode::kBlendModeSubtract, "Subtract",
+       BlendPresets::CreateSubtractive()},
+      {BlendMode::kBlendModeMultiply, "Multiply",
+       BlendPresets::CreateMultiply()},
+      {BlendMode::kBlendModeScreen, "Screen", BlendPresets::CreateScreen()},
+  };
 
-    // 共通の VS を使い、PS だけ差し替えて「通常」「ソフトパーティクル」2系統の
-    // 全ブレンドモード PSO を生成する。リフレクションで root sig / index も自動生成。
-    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Particle/YParticle.VS.hlsl", L"vs_6_0");
+  // 共通の VS を使い、PS だけ差し替えて「通常」「ソフトパーティクル」2系統の
+  // 全ブレンドモード PSO を生成する。リフレクションで root sig / index
+  // も自動生成。
+  auto vsBlob = dxCommon_->CompileShader(
+      L"Resources/Shaders/Particle/YParticle.VS.hlsl", L"vs_6_0");
 
-    // isSoft=true のソフト版は「深度なしRT」で描くため、深度テスト無効＋DSVフォーマット UNKNOWN。
-    // （null DSV をバインドするには PSO の深度フォーマットも UNKNOWN である必要がある）
-    auto buildSet = [&](const std::string& logicalName, const std::wstring& psPath, bool isSoft) {
-        auto psBlob = dxCommon_->CompileShader(psPath.c_str(), L"ps_6_0");
-        for (const auto& config : configs) {
-            ReflectionBasedPipelineBuilder builder;
-            builder
-                .SetRenderTargetFormat(YoRigine::kSceneColorFormat)   // OffScreen(HDR) へ描く
-                .SetBlendState(config.blendDesc)
-                .SetRasterizerState(RasterizerPresets::CreateNoCull());
-            if (isSoft) {
-                builder.SetDepthStencilState(DepthStencilPresets::CreateDisabled())
-                       .SetDepthStencilFormat(DXGI_FORMAT_UNKNOWN);
-            } else {
-                builder.SetDepthStencilState(DepthStencilPresets::CreateReadOnly());
-            }
-            auto result = builder.BuildFromCompiledShaders(
-                dxCommon_->GetDevice().Get(),
-                vsBlob.Get(),
-                psBlob.Get()
-            );
+  // isSoft=true
+  // のソフト版は「深度なしRT」で描くため、深度テスト無効＋DSVフォーマット
+  // UNKNOWN。 （null DSV をバインドするには PSO の深度フォーマットも UNKNOWN
+  // である必要がある）
+  auto buildSet = [&](const std::string &logicalName,
+                      const std::wstring &psPath, bool isSoft) {
+    auto psBlob = dxCommon_->CompileShader(psPath.c_str(), L"ps_6_0");
+    for (const auto &config : configs) {
+      ReflectionBasedPipelineBuilder builder;
+      builder
+          .SetRenderTargetFormat(
+              YoRigine::kSceneColorFormat) // OffScreen(HDR) へ描く
+          .SetBlendState(config.blendDesc)
+          .SetRasterizerState(RasterizerPresets::CreateNoCull());
+      if (isSoft) {
+        builder.SetDepthStencilState(DepthStencilPresets::CreateDisabled())
+            .SetDepthStencilFormat(DXGI_FORMAT_UNKNOWN);
+      } else {
+        builder.SetDepthStencilState(DepthStencilPresets::CreateReadOnly());
+      }
+      auto result = builder.BuildFromCompiledShaders(
+          dxCommon_->GetDevice().Get(), vsBlob.Get(), psBlob.Get());
 
-            pipelineStates_[logicalName + "_" + config.name] = result.pipelineState;
-            blendModePipelineStates_[logicalName][config.mode] = result.pipelineState;
+      pipelineStates_[logicalName + "_" + config.name] = result.pipelineState;
+      blendModePipelineStates_[logicalName][config.mode] = result.pipelineState;
 
-            // 最初のモードだけ root sig / index を代表として保存
-            if (config.mode == BlendMode::kBlendModeNormal) {
-                rootSignatures_[logicalName] = result.rootSignature;
-                parameterIndices_[logicalName] = result.parameterIndices;
-            }
-        }
-    };
+      // 最初のモードだけ root sig / index を代表として保存
+      if (config.mode == BlendMode::kBlendModeNormal) {
+        rootSignatures_[logicalName] = result.rootSignature;
+        parameterIndices_[logicalName] = result.parameterIndices;
+      }
+    }
+  };
 
-    buildSet("YParticle",     L"Resources/Shaders/Particle/YParticle.PS.hlsl",     false);
-    buildSet("YParticleSoft", L"Resources/Shaders/Particle/YParticleSoft.PS.hlsl", true);
+  buildSet("YParticle", L"Resources/Shaders/Particle/YParticle.PS.hlsl", false);
+  buildSet("YParticleSoft", L"Resources/Shaders/Particle/YParticleSoft.PS.hlsl",
+           true);
 }
 
 // ============================================================
-// 
+//
 // CPUParticle
-// 
+//
 // ============================================================
-void YPipelineManager::CreatePSO_YParticle()
-{
+void YPipelineManager::CreatePSO_YParticle() {
 
-    Logger("\n==============================================================\n\n\n");
-    Logger("         Creating Pipeline: YParticle              \n\n\n");
-    Logger("==============================================================\n");
-    // シェーダーをコンパイル
-    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Particle/YParticle.VS.hlsl", L"vs_6_0");
-    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Particle/YParticle.PS.hlsl", L"ps_6_0");
+  Logger(
+      "\n==============================================================\n\n\n");
+  Logger("         Creating Pipeline: YParticle              \n\n\n");
+  Logger("==============================================================\n");
+  // シェーダーをコンパイル
+  auto vsBlob = dxCommon_->CompileShader(
+      L"Resources/Shaders/Particle/YParticle.VS.hlsl", L"vs_6_0");
+  auto psBlob = dxCommon_->CompileShader(
+      L"Resources/Shaders/Particle/YParticle.PS.hlsl", L"ps_6_0");
 
-    // リフレクションベースで完全自動生成
-    ReflectionBasedPipelineBuilder builder;
-    auto result = builder
-        .SetBlendState(BlendPresets::CreateAdditive())
-        .SetRasterizerState(RasterizerPresets::CreateNoCull())
-        .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
-        .BuildFromCompiledShaders(
-            dxCommon_->GetDevice().Get(),
-            vsBlob.Get(),
-            psBlob.Get()
-        );
+  // リフレクションベースで完全自動生成
+  ReflectionBasedPipelineBuilder builder;
+  auto result = builder.SetBlendState(BlendPresets::CreateAdditive())
+                    .SetRasterizerState(RasterizerPresets::CreateNoCull())
+                    .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
+                    .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(),
+                                              vsBlob.Get(), psBlob.Get());
 
-    rootSignatures_["YParticle"] = result.rootSignature;
-    pipelineStates_["YParticle"] = result.pipelineState;
-    parameterIndices_["YParticle"] = result.parameterIndices;
+  rootSignatures_["YParticle"] = result.rootSignature;
+  pipelineStates_["YParticle"] = result.pipelineState;
+  parameterIndices_["YParticle"] = result.parameterIndices;
 }
 
 // ============================================================
-// 
+//
 // GPUParticle
-// 
+//
 // ============================================================
-void YPipelineManager::CreatePSO_GPUParticleInit()
-{
-    // シェーダーをコンパイル
-    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Particle/GPUParticle.VS.hlsl", L"vs_6_0");
-    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Particle/GPUParticle.PS.hlsl", L"ps_6_0");
+void YPipelineManager::CreatePSO_GPUParticleInit() {
+  // シェーダーをコンパイル
+  auto vsBlob = dxCommon_->CompileShader(
+      L"Resources/Shaders/Particle/GPUParticle.VS.hlsl", L"vs_6_0");
+  auto psBlob = dxCommon_->CompileShader(
+      L"Resources/Shaders/Particle/GPUParticle.PS.hlsl", L"ps_6_0");
 
-    // リフレクションベースで完全自動生成
-    ReflectionBasedPipelineBuilder builder;
-    auto result = builder
-        .SetBlendState(BlendPresets::CreateAlphaBlend())
-        .SetRasterizerState(RasterizerPresets::CreateNoCull())
-        .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
-        .BuildFromCompiledShaders(
-            dxCommon_->GetDevice().Get(),
-            vsBlob.Get(),
-            psBlob.Get()
-        );
+  // リフレクションベースで完全自動生成
+  ReflectionBasedPipelineBuilder builder;
+  auto result = builder.SetBlendState(BlendPresets::CreateAlphaBlend())
+                    .SetRasterizerState(RasterizerPresets::CreateNoCull())
+                    .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
+                    .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(),
+                                              vsBlob.Get(), psBlob.Get());
 
-    rootSignatures_["GPUParticleInit"] = result.rootSignature;
-    pipelineStates_["GPUParticleInit"] = result.pipelineState;
-    parameterIndices_["GPUParticleInit"] = result.parameterIndices;
+  rootSignatures_["GPUParticleInit"] = result.rootSignature;
+  pipelineStates_["GPUParticleInit"] = result.pipelineState;
+  parameterIndices_["GPUParticleInit"] = result.parameterIndices;
 }
 
 // ============================================================
-// 
+//
 // Line
-// 
+//
 // ============================================================
-void YPipelineManager::CreatePSO_Line()
-{
-    // シェーダーをコンパイル
-    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Primitive/Line/Line.VS.hlsl", L"vs_6_0");
-    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Primitive/Line/Line.PS.hlsl", L"ps_6_0");
+void YPipelineManager::CreatePSO_Line() {
+  // シェーダーをコンパイル
+  auto vsBlob = dxCommon_->CompileShader(
+      L"Resources/Shaders/Primitive/Line/Line.VS.hlsl", L"vs_6_0");
+  auto psBlob = dxCommon_->CompileShader(
+      L"Resources/Shaders/Primitive/Line/Line.PS.hlsl", L"ps_6_0");
 
-    // リフレクションベースで完全自動生成
-    ReflectionBasedPipelineBuilder builder;
-    auto result = builder
-        .SetRenderTargetFormat(YoRigine::kSceneColorFormat)   // OffScreen(HDR) へ描く
-        .SetPrimitiveTopologyType(PrimitiveTopologyPresets::Line())
-        .SetBlendState(BlendPresets::CreateAlphaBlend())
-        .SetRasterizerState(RasterizerPresets::CreateNoCull())
-        .SetDepthStencilState(DepthStencilPresets::CreateWriteOnly())
-        .BuildFromCompiledShaders(
-            dxCommon_->GetDevice().Get(),
-            vsBlob.Get(),
-            psBlob.Get()
-        );
+  // リフレクションベースで完全自動生成
+  ReflectionBasedPipelineBuilder builder;
+  auto result =
+      builder
+          .SetRenderTargetFormat(
+              YoRigine::kSceneColorFormat) // OffScreen(HDR) へ描く
+          .SetPrimitiveTopologyType(PrimitiveTopologyPresets::Line())
+          .SetBlendState(BlendPresets::CreateAlphaBlend())
+          .SetRasterizerState(RasterizerPresets::CreateNoCull())
+          .SetDepthStencilState(DepthStencilPresets::CreateWriteOnly())
+          .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(), vsBlob.Get(),
+                                    psBlob.Get());
 
-    rootSignatures_["Line"] = result.rootSignature;
-    pipelineStates_["Line"] = result.pipelineState;
-    parameterIndices_["Line"] = result.parameterIndices;
+  rootSignatures_["Line"] = result.rootSignature;
+  pipelineStates_["Line"] = result.pipelineState;
+  parameterIndices_["Line"] = result.parameterIndices;
 }
 
 // ============================================================
-// 
+//
 // InstancedCube
-// 
+//
 // ============================================================
-void YPipelineManager::CreatePSO_InstancedCube()
-{
-    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Primitive/InstancedCube/InstancedCube.VS.hlsl", L"vs_6_0");
-    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Primitive/InstancedCube/InstancedCube.PS.hlsl", L"ps_6_0");
+void YPipelineManager::CreatePSO_InstancedCube() {
+  auto vsBlob = dxCommon_->CompileShader(
+      L"Resources/Shaders/Primitive/InstancedCube/InstancedCube.VS.hlsl",
+      L"vs_6_0");
+  auto psBlob = dxCommon_->CompileShader(
+      L"Resources/Shaders/Primitive/InstancedCube/InstancedCube.PS.hlsl",
+      L"ps_6_0");
 
-    ReflectionBasedPipelineBuilder builder;
-    auto result = builder
-        .SetRenderTargetFormat(YoRigine::kSceneColorFormat)   // OffScreen(HDR) へ描く
-        .SetPrimitiveTopologyType(PrimitiveTopologyPresets::Line())
-        .SetBlendState(BlendPresets::CreateAlphaBlend())
-        .SetRasterizerState(RasterizerPresets::CreateNoCull())
-        .SetDepthStencilState(DepthStencilPresets::CreateWriteOnly())
-        .BuildFromCompiledShaders(
-            dxCommon_->GetDevice().Get(),
-            vsBlob.Get(),
-            psBlob.Get()
-        );
+  ReflectionBasedPipelineBuilder builder;
+  auto result =
+      builder
+          .SetRenderTargetFormat(
+              YoRigine::kSceneColorFormat) // OffScreen(HDR) へ描く
+          .SetPrimitiveTopologyType(PrimitiveTopologyPresets::Line())
+          .SetBlendState(BlendPresets::CreateAlphaBlend())
+          .SetRasterizerState(RasterizerPresets::CreateNoCull())
+          .SetDepthStencilState(DepthStencilPresets::CreateWriteOnly())
+          .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(), vsBlob.Get(),
+                                    psBlob.Get());
 
-    rootSignatures_["InstancedCube"] = result.rootSignature;
-    pipelineStates_["InstancedCube"] = result.pipelineState;
-    parameterIndices_["InstancedCube"] = result.parameterIndices;
+  rootSignatures_["InstancedCube"] = result.rootSignature;
+  pipelineStates_["InstancedCube"] = result.pipelineState;
+  parameterIndices_["InstancedCube"] = result.parameterIndices;
 }
 
 // ============================================================
-// 
+//
 // CubeMap
-// 
+//
 // ============================================================
-void YPipelineManager::CreatePSO_CubeMap()
-{
-    // シェーダーをコンパイル
-    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/CubeMap/CubeMap.VS.hlsl", L"vs_6_0");
-    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/CubeMap/CubeMap.PS.hlsl", L"ps_6_0");
+void YPipelineManager::CreatePSO_CubeMap() {
+  // シェーダーをコンパイル
+  auto vsBlob = dxCommon_->CompileShader(
+      L"Resources/Shaders/CubeMap/CubeMap.VS.hlsl", L"vs_6_0");
+  auto psBlob = dxCommon_->CompileShader(
+      L"Resources/Shaders/CubeMap/CubeMap.PS.hlsl", L"ps_6_0");
 
-    // リフレクションベースで完全自動生成
-    ReflectionBasedPipelineBuilder builder;
-    auto result = builder
-        .SetRenderTargetFormat(YoRigine::kSceneColorFormat)   // OffScreen(HDR) へ描く
-        .SetBlendState(BlendPresets::CreateNone())
-        .SetRasterizerState(RasterizerPresets::CreateNoCull())
-        .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
-        .BuildFromCompiledShaders(
-            dxCommon_->GetDevice().Get(),
-            vsBlob.Get(),
-            psBlob.Get()
-        );
+  // リフレクションベースで完全自動生成
+  ReflectionBasedPipelineBuilder builder;
+  auto result = builder
+                    .SetRenderTargetFormat(
+                        YoRigine::kSceneColorFormat) // OffScreen(HDR) へ描く
+                    .SetBlendState(BlendPresets::CreateNone())
+                    .SetRasterizerState(RasterizerPresets::CreateNoCull())
+                    .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
+                    .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(),
+                                              vsBlob.Get(), psBlob.Get());
 
-    rootSignatures_["CubeMap"] = result.rootSignature;
-    pipelineStates_["CubeMap"] = result.pipelineState;
-    parameterIndices_["CubeMap"] = result.parameterIndices;
+  rootSignatures_["CubeMap"] = result.rootSignature;
+  pipelineStates_["CubeMap"] = result.pipelineState;
+  parameterIndices_["CubeMap"] = result.parameterIndices;
 }
 
 // ============================================================
-// 
+//
 // Effect用Object
-// 
+//
 // ============================================================
-void YPipelineManager::CreatePSO_EffectObject()
-{
-    // シェーダーをコンパイル
-    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Effect/Effect.VS.hlsl", L"vs_6_0");
-    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Effect/Effect.PS.hlsl", L"ps_6_0");
+void YPipelineManager::CreatePSO_EffectObject() {
+  // シェーダーをコンパイル
+  auto vsBlob = dxCommon_->CompileShader(
+      L"Resources/Shaders/Effect/Effect.VS.hlsl", L"vs_6_0");
+  auto psBlob = dxCommon_->CompileShader(
+      L"Resources/Shaders/Effect/Effect.PS.hlsl", L"ps_6_0");
 
-    // リフレクションベースで完全自動生成
-    ReflectionBasedPipelineBuilder builder;
-    auto result = builder
-        .SetRenderTargetFormat(YoRigine::kSceneColorFormat)   // OffScreen(HDR) へ描く
-        .SetRasterizerState(RasterizerPresets::CreateNoCull())
-        .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
-        .BuildFromCompiledShaders(
-            dxCommon_->GetDevice().Get(),
-            vsBlob.Get(),
-            psBlob.Get()
-        );
+  // リフレクションベースで完全自動生成
+  ReflectionBasedPipelineBuilder builder;
+  auto result = builder
+                    .SetRenderTargetFormat(
+                        YoRigine::kSceneColorFormat) // OffScreen(HDR) へ描く
+                    .SetRasterizerState(RasterizerPresets::CreateNoCull())
+                    .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
+                    .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(),
+                                              vsBlob.Get(), psBlob.Get());
 
-    rootSignatures_["EffectObject"] = result.rootSignature;
-    pipelineStates_["EffectObject"] = result.pipelineState;
-    parameterIndices_["EffectObject"] = result.parameterIndices;
+  rootSignatures_["EffectObject"] = result.rootSignature;
+  pipelineStates_["EffectObject"] = result.pipelineState;
+  parameterIndices_["EffectObject"] = result.parameterIndices;
 }
 
 // ============================================================
-// 
+//
 // VFXMesh - Trail
-// 
+//
 // ============================================================
 void YPipelineManager::CreatePSO_VfxMeshTrail() {
 
-    // シェーダーコンパイル
-    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Vfx/VfxMesh/VfxMesh.VS.hlsl", L"vs_6_0");
-    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Vfx/VfxMesh/VfxMesh_Trail.PS.hlsl", L"ps_6_0");
+  // シェーダーコンパイル
+  auto vsBlob = dxCommon_->CompileShader(
+      L"Resources/Shaders/Vfx/VfxMesh/VfxMesh.VS.hlsl", L"vs_6_0");
+  auto psBlob = dxCommon_->CompileShader(
+      L"Resources/Shaders/Vfx/VfxMesh/VfxMesh_Trail.PS.hlsl", L"ps_6_0");
 
-    // ブレンドモード設定
-    struct BlendConfig {
-        BlendMode mode;
-        std::string name;
-        D3D12_BLEND_DESC blendDesc;
-    };
+  // ブレンドモード設定
+  struct BlendConfig {
+    BlendMode mode;
+    std::string name;
+    D3D12_BLEND_DESC blendDesc;
+  };
 
-    BlendConfig configs[] = {
-        { BlendMode::kBlendModeNone, "None", BlendPresets::CreateNone() },
-        { BlendMode::kBlendModeNormal, "Normal", BlendPresets::CreateAlphaBlend() },
-        { BlendMode::kBlendModeAdd, "Add", BlendPresets::CreateAdditive() },
-        { BlendMode::kBlendModeSubtract, "Subtract", BlendPresets::CreateSubtractive() },
-        { BlendMode::kBlendModeMultiply, "Multiply", BlendPresets::CreateMultiply() },
-        { BlendMode::kBlendModeScreen, "Screen", BlendPresets::CreateScreen() },
-    };
+  BlendConfig configs[] = {
+      {BlendMode::kBlendModeNone, "None", BlendPresets::CreateNone()},
+      {BlendMode::kBlendModeNormal, "Normal", BlendPresets::CreateAlphaBlend()},
+      {BlendMode::kBlendModeAdd, "Add", BlendPresets::CreateAdditive()},
+      {BlendMode::kBlendModeSubtract, "Subtract",
+       BlendPresets::CreateSubtractive()},
+      {BlendMode::kBlendModeMultiply, "Multiply",
+       BlendPresets::CreateMultiply()},
+      {BlendMode::kBlendModeScreen, "Screen", BlendPresets::CreateScreen()},
+  };
 
-    // 各ブレンドモードごとにPSOを生成
-    for (const auto& config : configs) {
-        ReflectionBasedPipelineBuilder builder;
-        auto result = builder
-            .SetRenderTargetFormat(YoRigine::kSceneColorFormat)   // OffScreen(HDR) へ描く
+  // 各ブレンドモードごとにPSOを生成
+  for (const auto &config : configs) {
+    ReflectionBasedPipelineBuilder builder;
+    auto result =
+        builder
+            .SetRenderTargetFormat(
+                YoRigine::kSceneColorFormat) // OffScreen(HDR) へ描く
             .SetBlendState(config.blendDesc)
             .SetRasterizerState(RasterizerPresets::CreateNoCull())
             .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
-            .BuildFromCompiledShaders(
-                dxCommon_->GetDevice().Get(),
-                vsBlob.Get(),
-                psBlob.Get()
-            );
+            .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(),
+                                      vsBlob.Get(), psBlob.Get());
 
-        std::string psoName = "VfxMeshTrail_" + config.name;
-        pipelineStates_[psoName] = result.pipelineState;
-        blendModePipelineStates_["VfxMeshTrail"][config.mode] = result.pipelineState;
+    std::string psoName = "VfxMeshTrail_" + config.name;
+    pipelineStates_[psoName] = result.pipelineState;
+    blendModePipelineStates_["VfxMeshTrail"][config.mode] =
+        result.pipelineState;
 
-        // 最初のモードだけルートシグネチャとインデックスを保存
-        if (config.mode == BlendMode::kBlendModeNormal) {
-            rootSignatures_["VfxMeshTrail"] = result.rootSignature;
-            parameterIndices_["VfxMeshTrail"] = result.parameterIndices;
-        }
+    // 最初のモードだけルートシグネチャとインデックスを保存
+    if (config.mode == BlendMode::kBlendModeNormal) {
+      rootSignatures_["VfxMeshTrail"] = result.rootSignature;
+      parameterIndices_["VfxMeshTrail"] = result.parameterIndices;
     }
-
+  }
 }
 
 // ============================================================
-// 
+//
 // VFXMesh - Volume
-// 
+//
 // ============================================================
 void YPipelineManager::CreatePSO_VfxMeshVolume() {
-    // シェーダーをコンパイル
-    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Vfx/VfxMesh/VfxMesh.VS.hlsl", L"vs_6_0");
-    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Vfx/VfxMesh/VfxMesh_Volume.PS.hlsl", L"ps_6_0");
+  // シェーダーをコンパイル
+  auto vsBlob = dxCommon_->CompileShader(
+      L"Resources/Shaders/Vfx/VfxMesh/VfxMesh.VS.hlsl", L"vs_6_0");
+  auto psBlob = dxCommon_->CompileShader(
+      L"Resources/Shaders/Vfx/VfxMesh/VfxMesh_Volume.PS.hlsl", L"ps_6_0");
 
-    // リフレクションベースで完全自動生成
-    ReflectionBasedPipelineBuilder builder;
-    auto result = builder
-        .SetRenderTargetFormat(YoRigine::kSceneColorFormat)   // OffScreen(HDR) へ描く
-        .SetRasterizerState(RasterizerPresets::CreateNoCull())
-        .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
-		.SetBlendState(BlendPresets::CreateAdditive())
-        .BuildFromCompiledShaders(
-            dxCommon_->GetDevice().Get(),
-            vsBlob.Get(),
-            psBlob.Get()
-        );
+  // リフレクションベースで完全自動生成
+  ReflectionBasedPipelineBuilder builder;
+  auto result = builder
+                    .SetRenderTargetFormat(
+                        YoRigine::kSceneColorFormat) // OffScreen(HDR) へ描く
+                    .SetRasterizerState(RasterizerPresets::CreateNoCull())
+                    .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
+                    .SetBlendState(BlendPresets::CreateAdditive())
+                    .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(),
+                                              vsBlob.Get(), psBlob.Get());
 
-    rootSignatures_["VfxMeshVolume"] = result.rootSignature;
-    pipelineStates_["VfxMeshVolume"] = result.pipelineState;
-    parameterIndices_["VfxMeshVolume"] = result.parameterIndices;
+  rootSignatures_["VfxMeshVolume"] = result.rootSignature;
+  pipelineStates_["VfxMeshVolume"] = result.pipelineState;
+  parameterIndices_["VfxMeshVolume"] = result.parameterIndices;
 }
 // ============================================================
-// 
+//
 // VFXMesh - Smoke
-// 
+//
 // ============================================================
 void YPipelineManager::CreatePSO_VfxMeshSmoke() {
-    // Omen 風ボリュームスモーク。半透明スモークなのでアルファブレンド。
-    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Vfx/VfxMesh/VfxMesh.VS.hlsl", L"vs_6_0");
-    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Vfx/VfxMesh/VfxMesh_Smoke.PS.hlsl", L"ps_6_0");
+  // Omen 風ボリュームスモーク。半透明スモークなのでアルファブレンド。
+  auto vsBlob = dxCommon_->CompileShader(
+      L"Resources/Shaders/Vfx/VfxMesh/VfxMesh.VS.hlsl", L"vs_6_0");
+  auto psBlob = dxCommon_->CompileShader(
+      L"Resources/Shaders/Vfx/VfxMesh/VfxMesh_Smoke.PS.hlsl", L"ps_6_0");
 
-    ReflectionBasedPipelineBuilder builder;
-    auto result = builder
-        .SetRenderTargetFormat(YoRigine::kSceneColorFormat)   // OffScreen(HDR) へ描く
-        .SetRasterizerState(RasterizerPresets::CreateNoCull())
-        .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
-        .SetBlendState(BlendPresets::CreateAlphaBlend())
-        .BuildFromCompiledShaders(
-            dxCommon_->GetDevice().Get(),
-            vsBlob.Get(),
-            psBlob.Get()
-        );
+  ReflectionBasedPipelineBuilder builder;
+  auto result = builder
+                    .SetRenderTargetFormat(
+                        YoRigine::kSceneColorFormat) // OffScreen(HDR) へ描く
+                    .SetRasterizerState(RasterizerPresets::CreateNoCull())
+                    .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
+                    .SetBlendState(BlendPresets::CreateAlphaBlend())
+                    .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(),
+                                              vsBlob.Get(), psBlob.Get());
 
-    rootSignatures_["VfxMeshSmoke"] = result.rootSignature;
-    pipelineStates_["VfxMeshSmoke"] = result.pipelineState;
-    parameterIndices_["VfxMeshSmoke"] = result.parameterIndices;
+  rootSignatures_["VfxMeshSmoke"] = result.rootSignature;
+  pipelineStates_["VfxMeshSmoke"] = result.pipelineState;
+  parameterIndices_["VfxMeshSmoke"] = result.parameterIndices;
 }
 
 // ============================================================
-// 
+//
 // VFXMesh - Lightning
-// 
+//
 // ============================================================
 void YPipelineManager::CreatePSO_VfxMeshLightning() {
-    // プロシージャル稲妻。加算ブレンドで芯が光る。
-    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Vfx/VfxMesh/VfxMesh.VS.hlsl", L"vs_6_0");
-    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Vfx/VfxMesh/VfxMesh_Lightning.PS.hlsl", L"ps_6_0");
+  // プロシージャル稲妻。加算ブレンドで芯が光る。
+  auto vsBlob = dxCommon_->CompileShader(
+      L"Resources/Shaders/Vfx/VfxMesh/VfxMesh.VS.hlsl", L"vs_6_0");
+  auto psBlob = dxCommon_->CompileShader(
+      L"Resources/Shaders/Vfx/VfxMesh/VfxMesh_Lightning.PS.hlsl", L"ps_6_0");
 
-    ReflectionBasedPipelineBuilder builder;
-    auto result = builder
-        .SetRenderTargetFormat(YoRigine::kSceneColorFormat)   // OffScreen(HDR) へ描く
-        .SetRasterizerState(RasterizerPresets::CreateNoCull())
-        .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
-        .SetBlendState(BlendPresets::CreateAdditive())
-        .BuildFromCompiledShaders(
-            dxCommon_->GetDevice().Get(),
-            vsBlob.Get(),
-            psBlob.Get()
-        );
+  ReflectionBasedPipelineBuilder builder;
+  auto result = builder
+                    .SetRenderTargetFormat(
+                        YoRigine::kSceneColorFormat) // OffScreen(HDR) へ描く
+                    .SetRasterizerState(RasterizerPresets::CreateNoCull())
+                    .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
+                    .SetBlendState(BlendPresets::CreateAdditive())
+                    .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(),
+                                              vsBlob.Get(), psBlob.Get());
 
-    rootSignatures_["VfxMeshLightning"] = result.rootSignature;
-    pipelineStates_["VfxMeshLightning"] = result.pipelineState;
-    parameterIndices_["VfxMeshLightning"] = result.parameterIndices;
+  rootSignatures_["VfxMeshLightning"] = result.rootSignature;
+  pipelineStates_["VfxMeshLightning"] = result.pipelineState;
+  parameterIndices_["VfxMeshLightning"] = result.parameterIndices;
 }
 
 // ============================================================
-// 
+//
 // VFXMesh - ShockWave
-// 
+//
 // ============================================================
 void YPipelineManager::CreatePSO_VfxMeshShockwave() {
-    // 爆発の衝撃波リング。加算ブレンド。
-    auto vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Vfx/VfxMesh/VfxMesh.VS.hlsl", L"vs_6_0");
-    auto psBlob = dxCommon_->CompileShader(L"Resources/Shaders/Vfx/VfxMesh/VfxMesh_Shockwave.PS.hlsl", L"ps_6_0");
+  // 爆発の衝撃波リング。加算ブレンド。
+  auto vsBlob = dxCommon_->CompileShader(
+      L"Resources/Shaders/Vfx/VfxMesh/VfxMesh.VS.hlsl", L"vs_6_0");
+  auto psBlob = dxCommon_->CompileShader(
+      L"Resources/Shaders/Vfx/VfxMesh/VfxMesh_Shockwave.PS.hlsl", L"ps_6_0");
 
-    ReflectionBasedPipelineBuilder builder;
-    auto result = builder
-        .SetRenderTargetFormat(YoRigine::kSceneColorFormat)   // OffScreen(HDR) へ描く
-        .SetRasterizerState(RasterizerPresets::CreateNoCull())
-        .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
-        .SetBlendState(BlendPresets::CreateAdditive())
-        .BuildFromCompiledShaders(
-            dxCommon_->GetDevice().Get(),
-            vsBlob.Get(),
-            psBlob.Get()
-        );
+  ReflectionBasedPipelineBuilder builder;
+  auto result = builder
+                    .SetRenderTargetFormat(
+                        YoRigine::kSceneColorFormat) // OffScreen(HDR) へ描く
+                    .SetRasterizerState(RasterizerPresets::CreateNoCull())
+                    .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
+                    .SetBlendState(BlendPresets::CreateAdditive())
+                    .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(),
+                                              vsBlob.Get(), psBlob.Get());
 
-    rootSignatures_["VfxMeshShockwave"] = result.rootSignature;
-    pipelineStates_["VfxMeshShockwave"] = result.pipelineState;
-    parameterIndices_["VfxMeshShockwave"] = result.parameterIndices;
+  rootSignatures_["VfxMeshShockwave"] = result.rootSignature;
+  pipelineStates_["VfxMeshShockwave"] = result.pipelineState;
+  parameterIndices_["VfxMeshShockwave"] = result.parameterIndices;
 }
 
-
 // ============================================================
-// 
+//
 // PostEffect
-// 
+//
 // ============================================================
 void YPipelineManager::CreatePSO_BaseOffScreen(
-    const std::wstring& pixelShaderPath,
-    const std::string& pipelineKey
-)
-{
-    std::wstring vsPath = DEFAULT_VS_PATH;
-    std::wstring psPath = pixelShaderPath.empty() ? DEFAULT_PS_PATH : pixelShaderPath;
-    std::string key = pipelineKey.empty() ? "BaseOffScreen" : pipelineKey;
+    const std::wstring &pixelShaderPath, const std::string &pipelineKey) {
+  std::wstring vsPath = DEFAULT_VS_PATH;
+  std::wstring psPath =
+      pixelShaderPath.empty() ? DEFAULT_PS_PATH : pixelShaderPath;
+  std::string key = pipelineKey.empty() ? "BaseOffScreen" : pipelineKey;
 
-    // シェーダーをコンパイル
-    auto vsBlob = dxCommon_->CompileShader(vsPath, L"vs_6_0");
-    auto psBlob = dxCommon_->CompileShader(psPath, L"ps_6_0");
+  // シェーダーをコンパイル
+  auto vsBlob = dxCommon_->CompileShader(vsPath, L"vs_6_0");
+  auto psBlob = dxCommon_->CompileShader(psPath, L"ps_6_0");
 
-    // リフレクションベースで完全自動生成
-    ReflectionBasedPipelineBuilder builder;
-    auto result = builder
-        .SetBlendState(BlendPresets::CreateNone())
-        .SetRasterizerState(RasterizerPresets::CreateNoCull())
-        .SetDepthStencilState(DepthStencilPresets::CreateDisabled())
-        .BuildFromCompiledShaders(
-            dxCommon_->GetDevice().Get(),
-            vsBlob.Get(),
-            psBlob.Get()
-        );
+  // リフレクションベースで完全自動生成
+  ReflectionBasedPipelineBuilder builder;
+  auto result = builder.SetBlendState(BlendPresets::CreateNone())
+                    .SetRasterizerState(RasterizerPresets::CreateNoCull())
+                    .SetDepthStencilState(DepthStencilPresets::CreateDisabled())
+                    .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(),
+                                              vsBlob.Get(), psBlob.Get());
 
-    rootSignatures_[key] = result.rootSignature;
-    pipelineStates_[key] = result.pipelineState;
-    parameterIndices_[key] = result.parameterIndices;
+  rootSignatures_[key] = result.rootSignature;
+  pipelineStates_[key] = result.pipelineState;
+  parameterIndices_[key] = result.parameterIndices;
 }
 
-void YPipelineManager::CreatePSO_Smoothing(
-    const std::wstring& pixelShaderPath,
-    const std::string& pipelineKey
-)
-{
-    std::wstring vsPath = DEFAULT_VS_PATH;
-    std::wstring psPath = pixelShaderPath.empty() ?
-        L"Resources/Shaders/PostEffect/Smoothing/GaussianFilter.PS.hlsl" : pixelShaderPath;
-    std::string key = pipelineKey.empty() ? "Smoothing" : pipelineKey;
+void YPipelineManager::CreatePSO_Smoothing(const std::wstring &pixelShaderPath,
+                                           const std::string &pipelineKey) {
+  std::wstring vsPath = DEFAULT_VS_PATH;
+  std::wstring psPath =
+      pixelShaderPath.empty()
+          ? L"Resources/Shaders/PostEffect/Smoothing/GaussianFilter.PS.hlsl"
+          : pixelShaderPath;
+  std::string key = pipelineKey.empty() ? "Smoothing" : pipelineKey;
 
-    // シェーダーをコンパイル
-    auto vsBlob = dxCommon_->CompileShader(vsPath, L"vs_6_0");
-    auto psBlob = dxCommon_->CompileShader(psPath, L"ps_6_0");
+  // シェーダーをコンパイル
+  auto vsBlob = dxCommon_->CompileShader(vsPath, L"vs_6_0");
+  auto psBlob = dxCommon_->CompileShader(psPath, L"ps_6_0");
 
-    // リフレクションベースで完全自動生成
-    ReflectionBasedPipelineBuilder builder;
-    auto result = builder
-        .SetBlendState(BlendPresets::CreateNone())
-        .SetRasterizerState(RasterizerPresets::CreateNoCull())
-        .SetDepthStencilState(DepthStencilPresets::CreateDisabled())
-        .BuildFromCompiledShaders(
-            dxCommon_->GetDevice().Get(),
-            vsBlob.Get(),
-            psBlob.Get()
-        );
+  // リフレクションベースで完全自動生成
+  ReflectionBasedPipelineBuilder builder;
+  auto result = builder.SetBlendState(BlendPresets::CreateNone())
+                    .SetRasterizerState(RasterizerPresets::CreateNoCull())
+                    .SetDepthStencilState(DepthStencilPresets::CreateDisabled())
+                    .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(),
+                                              vsBlob.Get(), psBlob.Get());
 
-    rootSignatures_[key] = result.rootSignature;
-    pipelineStates_[key] = result.pipelineState;
-    parameterIndices_[key] = result.parameterIndices;
+  rootSignatures_[key] = result.rootSignature;
+  pipelineStates_[key] = result.pipelineState;
+  parameterIndices_[key] = result.parameterIndices;
 }
 
 void YPipelineManager::CreatePSO_DepthOutLine(
-    const std::wstring& pixelShaderPath,
-    const std::string& pipelineKey
-)
-{
-    std::wstring vsPath = DEFAULT_VS_PATH;
-    std::wstring psPath = pixelShaderPath.empty() ?
-        L"Resources/Shaders/PostEffect/OutLine/DepthBasedOutLine.PS.hlsl" : pixelShaderPath;
-    std::string key = pipelineKey.empty() ? "DepthOutLine" : pipelineKey;
+    const std::wstring &pixelShaderPath, const std::string &pipelineKey) {
+  std::wstring vsPath = DEFAULT_VS_PATH;
+  std::wstring psPath =
+      pixelShaderPath.empty()
+          ? L"Resources/Shaders/PostEffect/OutLine/DepthBasedOutLine.PS.hlsl"
+          : pixelShaderPath;
+  std::string key = pipelineKey.empty() ? "DepthOutLine" : pipelineKey;
 
-    // シェーダーをコンパイル
-    auto vsBlob = dxCommon_->CompileShader(vsPath, L"vs_6_0");
-    auto psBlob = dxCommon_->CompileShader(psPath, L"ps_6_0");
+  // シェーダーをコンパイル
+  auto vsBlob = dxCommon_->CompileShader(vsPath, L"vs_6_0");
+  auto psBlob = dxCommon_->CompileShader(psPath, L"ps_6_0");
 
-    // リフレクションベースで完全自動生成
-    ReflectionBasedPipelineBuilder builder;
-    auto result = builder
-        .SetBlendState(BlendPresets::CreateNone())
-        .SetRasterizerState(RasterizerPresets::CreateNoCull())
-        .SetDepthStencilState(DepthStencilPresets::CreateDisabled())
-        .BuildFromCompiledShaders(
-            dxCommon_->GetDevice().Get(),
-            vsBlob.Get(),
-            psBlob.Get()
-        );
+  // リフレクションベースで完全自動生成
+  ReflectionBasedPipelineBuilder builder;
+  auto result = builder.SetBlendState(BlendPresets::CreateNone())
+                    .SetRasterizerState(RasterizerPresets::CreateNoCull())
+                    .SetDepthStencilState(DepthStencilPresets::CreateDisabled())
+                    .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(),
+                                              vsBlob.Get(), psBlob.Get());
 
-    rootSignatures_[key] = result.rootSignature;
-    pipelineStates_[key] = result.pipelineState;
-    parameterIndices_[key] = result.parameterIndices;
+  rootSignatures_[key] = result.rootSignature;
+  pipelineStates_[key] = result.pipelineState;
+  parameterIndices_[key] = result.parameterIndices;
 }
 
-void YPipelineManager::CreatePSO_RadialBlur(
-    const std::wstring& pixelShaderPath,
-    const std::string& pipelineKey
-)
-{
-    std::wstring vsPath = DEFAULT_VS_PATH;
-    std::wstring psPath = pixelShaderPath.empty() ?
-        L"Resources/Shaders/PostEffect/Blur/RadialBlur.PS.hlsl" : pixelShaderPath;
-    std::string key = pipelineKey.empty() ? "RadialBlur" : pipelineKey;
+void YPipelineManager::CreatePSO_RadialBlur(const std::wstring &pixelShaderPath,
+                                            const std::string &pipelineKey) {
+  std::wstring vsPath = DEFAULT_VS_PATH;
+  std::wstring psPath =
+      pixelShaderPath.empty()
+          ? L"Resources/Shaders/PostEffect/Blur/RadialBlur.PS.hlsl"
+          : pixelShaderPath;
+  std::string key = pipelineKey.empty() ? "RadialBlur" : pipelineKey;
 
-    // シェーダーをコンパイル
-    auto vsBlob = dxCommon_->CompileShader(vsPath, L"vs_6_0");
-    auto psBlob = dxCommon_->CompileShader(psPath, L"ps_6_0");
+  // シェーダーをコンパイル
+  auto vsBlob = dxCommon_->CompileShader(vsPath, L"vs_6_0");
+  auto psBlob = dxCommon_->CompileShader(psPath, L"ps_6_0");
 
-    // リフレクションベースで完全自動生成
-    ReflectionBasedPipelineBuilder builder;
-    auto result = builder
-        .SetBlendState(BlendPresets::CreateNone())
-        .SetRasterizerState(RasterizerPresets::CreateNoCull())
-        .SetDepthStencilState(DepthStencilPresets::CreateDisabled())
-        .BuildFromCompiledShaders(
-            dxCommon_->GetDevice().Get(),
-            vsBlob.Get(),
-            psBlob.Get()
-        );
+  // リフレクションベースで完全自動生成
+  ReflectionBasedPipelineBuilder builder;
+  auto result = builder.SetBlendState(BlendPresets::CreateNone())
+                    .SetRasterizerState(RasterizerPresets::CreateNoCull())
+                    .SetDepthStencilState(DepthStencilPresets::CreateDisabled())
+                    .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(),
+                                              vsBlob.Get(), psBlob.Get());
 
-    rootSignatures_[key] = result.rootSignature;
-    pipelineStates_[key] = result.pipelineState;
-    parameterIndices_[key] = result.parameterIndices;
+  rootSignatures_[key] = result.rootSignature;
+  pipelineStates_[key] = result.pipelineState;
+  parameterIndices_[key] = result.parameterIndices;
 }
 
 void YPipelineManager::CreatePSO_ToneMapping(
-    const std::wstring& pixelShaderPath,
-    const std::string& pipelineKey
-)
-{
-    std::wstring vsPath = DEFAULT_VS_PATH;
-    std::wstring psPath = pixelShaderPath.empty() ?
-        L"Resources/Shaders/PostEffect/ColorRemapping/ToneMapping.PS.hlsl" : pixelShaderPath;
-    std::string key = pipelineKey.empty() ? "ToneMapping" : pipelineKey;
+    const std::wstring &pixelShaderPath, const std::string &pipelineKey) {
+  std::wstring vsPath = DEFAULT_VS_PATH;
+  std::wstring psPath =
+      pixelShaderPath.empty()
+          ? L"Resources/Shaders/PostEffect/ColorRemapping/ToneMapping.PS.hlsl"
+          : pixelShaderPath;
+  std::string key = pipelineKey.empty() ? "ToneMapping" : pipelineKey;
 
-    // シェーダーをコンパイル
-    auto vsBlob = dxCommon_->CompileShader(vsPath, L"vs_6_0");
-    auto psBlob = dxCommon_->CompileShader(psPath, L"ps_6_0");
+  // シェーダーをコンパイル
+  auto vsBlob = dxCommon_->CompileShader(vsPath, L"vs_6_0");
+  auto psBlob = dxCommon_->CompileShader(psPath, L"ps_6_0");
 
-    // リフレクションベースで完全自動生成
-    ReflectionBasedPipelineBuilder builder;
-    auto result = builder
-        .SetBlendState(BlendPresets::CreateNone())
-        .SetRasterizerState(RasterizerPresets::CreateNoCull())
-        .SetDepthStencilState(DepthStencilPresets::CreateDisabled())
-        .BuildFromCompiledShaders(
-            dxCommon_->GetDevice().Get(),
-            vsBlob.Get(),
-            psBlob.Get()
-        );
+  // リフレクションベースで完全自動生成
+  ReflectionBasedPipelineBuilder builder;
+  auto result = builder.SetBlendState(BlendPresets::CreateNone())
+                    .SetRasterizerState(RasterizerPresets::CreateNoCull())
+                    .SetDepthStencilState(DepthStencilPresets::CreateDisabled())
+                    .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(),
+                                              vsBlob.Get(), psBlob.Get());
 
-    rootSignatures_[key] = result.rootSignature;
-    pipelineStates_[key] = result.pipelineState;
-    parameterIndices_[key] = result.parameterIndices;
+  rootSignatures_[key] = result.rootSignature;
+  pipelineStates_[key] = result.pipelineState;
+  parameterIndices_[key] = result.parameterIndices;
 }
 
-void YPipelineManager::CreatePSO_Dissolve(
-    const std::wstring& pixelShaderPath,
-    const std::string& pipelineKey
-)
-{
-    std::wstring vsPath = DEFAULT_VS_PATH;
-    std::wstring psPath = pixelShaderPath.empty() ?
-        L"Resources/Shaders/PostEffect/Dissolve/Dissolve.PS.hlsl" : pixelShaderPath;
-    std::string key = pipelineKey.empty() ? "Dissolve" : pipelineKey;
+void YPipelineManager::CreatePSO_Dissolve(const std::wstring &pixelShaderPath,
+                                          const std::string &pipelineKey) {
+  std::wstring vsPath = DEFAULT_VS_PATH;
+  std::wstring psPath =
+      pixelShaderPath.empty()
+          ? L"Resources/Shaders/PostEffect/Dissolve/Dissolve.PS.hlsl"
+          : pixelShaderPath;
+  std::string key = pipelineKey.empty() ? "Dissolve" : pipelineKey;
 
-    // シェーダーをコンパイル
-    auto vsBlob = dxCommon_->CompileShader(vsPath, L"vs_6_0");
-    auto psBlob = dxCommon_->CompileShader(psPath, L"ps_6_0");
+  // シェーダーをコンパイル
+  auto vsBlob = dxCommon_->CompileShader(vsPath, L"vs_6_0");
+  auto psBlob = dxCommon_->CompileShader(psPath, L"ps_6_0");
 
-    // リフレクションベースで完全自動生成
-    ReflectionBasedPipelineBuilder builder;
-    auto result = builder
-        .SetBlendState(BlendPresets::CreateNone())
-        .SetRasterizerState(RasterizerPresets::CreateNoCull())
-        .SetDepthStencilState(DepthStencilPresets::CreateDisabled())
-        .BuildFromCompiledShaders(
-            dxCommon_->GetDevice().Get(),
-            vsBlob.Get(),
-            psBlob.Get()
-        );
+  // リフレクションベースで完全自動生成
+  ReflectionBasedPipelineBuilder builder;
+  auto result = builder.SetBlendState(BlendPresets::CreateNone())
+                    .SetRasterizerState(RasterizerPresets::CreateNoCull())
+                    .SetDepthStencilState(DepthStencilPresets::CreateDisabled())
+                    .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(),
+                                              vsBlob.Get(), psBlob.Get());
 
-    rootSignatures_[key] = result.rootSignature;
-    pipelineStates_[key] = result.pipelineState;
-    parameterIndices_[key] = result.parameterIndices;
+  rootSignatures_[key] = result.rootSignature;
+  pipelineStates_[key] = result.pipelineState;
+  parameterIndices_[key] = result.parameterIndices;
 }
 
-void YPipelineManager::CreatePSO_Chromatic(
-    const std::wstring& pixelShaderPath,
-    const std::string& pipelineKey
-)
-{
-    std::wstring vsPath = DEFAULT_VS_PATH;
-    std::wstring psPath = pixelShaderPath.empty() ?
-        L"Resources/Shaders/PostEffect/ColorRemapping/Chromatic.PS.hlsl" : pixelShaderPath;
-    std::string key = pipelineKey.empty() ? "Chromatic" : pipelineKey;
+void YPipelineManager::CreatePSO_Chromatic(const std::wstring &pixelShaderPath,
+                                           const std::string &pipelineKey) {
+  std::wstring vsPath = DEFAULT_VS_PATH;
+  std::wstring psPath =
+      pixelShaderPath.empty()
+          ? L"Resources/Shaders/PostEffect/ColorRemapping/Chromatic.PS.hlsl"
+          : pixelShaderPath;
+  std::string key = pipelineKey.empty() ? "Chromatic" : pipelineKey;
 
-    // シェーダーをコンパイル
-    auto vsBlob = dxCommon_->CompileShader(vsPath, L"vs_6_0");
-    auto psBlob = dxCommon_->CompileShader(psPath, L"ps_6_0");
+  // シェーダーをコンパイル
+  auto vsBlob = dxCommon_->CompileShader(vsPath, L"vs_6_0");
+  auto psBlob = dxCommon_->CompileShader(psPath, L"ps_6_0");
 
-    // リフレクションベースで完全自動生成
-    ReflectionBasedPipelineBuilder builder;
-    auto result = builder
-        .SetBlendState(BlendPresets::CreateNone())
-        .SetRasterizerState(RasterizerPresets::CreateNoCull())
-        .SetDepthStencilState(DepthStencilPresets::CreateDisabled())
-        .BuildFromCompiledShaders(
-            dxCommon_->GetDevice().Get(),
-            vsBlob.Get(),
-            psBlob.Get()
-        );
+  // リフレクションベースで完全自動生成
+  ReflectionBasedPipelineBuilder builder;
+  auto result = builder.SetBlendState(BlendPresets::CreateNone())
+                    .SetRasterizerState(RasterizerPresets::CreateNoCull())
+                    .SetDepthStencilState(DepthStencilPresets::CreateDisabled())
+                    .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(),
+                                              vsBlob.Get(), psBlob.Get());
 
-    rootSignatures_[key] = result.rootSignature;
-    pipelineStates_[key] = result.pipelineState;
-    parameterIndices_[key] = result.parameterIndices;
+  rootSignatures_[key] = result.rootSignature;
+  pipelineStates_[key] = result.pipelineState;
+  parameterIndices_[key] = result.parameterIndices;
 }
 
 void YPipelineManager::CreatePSO_ColorAdjust(
-    const std::wstring& pixelShaderPath,
-    const std::string& pipelineKey
-)
-{
-    std::wstring vsPath = DEFAULT_VS_PATH;
-    std::wstring psPath = pixelShaderPath.empty() ?
-        L"Resources/Shaders/PostEffect/ColorRemapping/ColorAdjust.PS.hlsl" : pixelShaderPath;
-    std::string key = pipelineKey.empty() ? "ColorAdjust" : pipelineKey;
+    const std::wstring &pixelShaderPath, const std::string &pipelineKey) {
+  std::wstring vsPath = DEFAULT_VS_PATH;
+  std::wstring psPath =
+      pixelShaderPath.empty()
+          ? L"Resources/Shaders/PostEffect/ColorRemapping/ColorAdjust.PS.hlsl"
+          : pixelShaderPath;
+  std::string key = pipelineKey.empty() ? "ColorAdjust" : pipelineKey;
 
-    // シェーダーをコンパイル
-    auto vsBlob = dxCommon_->CompileShader(vsPath, L"vs_6_0");
-    auto psBlob = dxCommon_->CompileShader(psPath, L"ps_6_0");
+  // シェーダーをコンパイル
+  auto vsBlob = dxCommon_->CompileShader(vsPath, L"vs_6_0");
+  auto psBlob = dxCommon_->CompileShader(psPath, L"ps_6_0");
 
-    // リフレクションベースで完全自動生成
-    ReflectionBasedPipelineBuilder builder;
-    auto result = builder
-        .SetBlendState(BlendPresets::CreateNone())
-        .SetRasterizerState(RasterizerPresets::CreateNoCull())
-        .SetDepthStencilState(DepthStencilPresets::CreateDisabled())
-        .BuildFromCompiledShaders(
-            dxCommon_->GetDevice().Get(),
-            vsBlob.Get(),
-            psBlob.Get()
-        );
+  // リフレクションベースで完全自動生成
+  ReflectionBasedPipelineBuilder builder;
+  auto result = builder.SetBlendState(BlendPresets::CreateNone())
+                    .SetRasterizerState(RasterizerPresets::CreateNoCull())
+                    .SetDepthStencilState(DepthStencilPresets::CreateDisabled())
+                    .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(),
+                                              vsBlob.Get(), psBlob.Get());
 
-    rootSignatures_[key] = result.rootSignature;
-    pipelineStates_[key] = result.pipelineState;
-    parameterIndices_[key] = result.parameterIndices;
+  rootSignatures_[key] = result.rootSignature;
+  pipelineStates_[key] = result.pipelineState;
+  parameterIndices_[key] = result.parameterIndices;
 }
 
 void YPipelineManager::CreatePSO_ShatterTransition(
-    const std::wstring& pixelShaderPath,
-    const std::string& pipelineKey
-)
-{
-    std::wstring vsPath = DEFAULT_VS_PATH;
-    std::wstring psPath = pixelShaderPath.empty() ?
-        L"Resources/Shaders/PostEffect/Transition/ShatterTransition.PS.hlsl" : pixelShaderPath;
-    std::string key = pipelineKey.empty() ? "ShatterTransition" : pipelineKey;
+    const std::wstring &pixelShaderPath, const std::string &pipelineKey) {
+  std::wstring vsPath = DEFAULT_VS_PATH;
+  std::wstring psPath =
+      pixelShaderPath.empty()
+          ? L"Resources/Shaders/PostEffect/Transition/ShatterTransition.PS.hlsl"
+          : pixelShaderPath;
+  std::string key = pipelineKey.empty() ? "ShatterTransition" : pipelineKey;
 
-    // シェーダーをコンパイル
-    auto vsBlob = dxCommon_->CompileShader(vsPath, L"vs_6_0");
-    auto psBlob = dxCommon_->CompileShader(psPath, L"ps_6_0");
+  // シェーダーをコンパイル
+  auto vsBlob = dxCommon_->CompileShader(vsPath, L"vs_6_0");
+  auto psBlob = dxCommon_->CompileShader(psPath, L"ps_6_0");
 
-    // リフレクションベースで完全自動生成
-    ReflectionBasedPipelineBuilder builder;
-    auto result = builder
-        .SetBlendState(BlendPresets::CreateNone())
-        .SetRasterizerState(RasterizerPresets::CreateNoCull())
-        .SetDepthStencilState(DepthStencilPresets::CreateDisabled())
-        .BuildFromCompiledShaders(
-            dxCommon_->GetDevice().Get(),
-            vsBlob.Get(),
-            psBlob.Get()
-        );
+  // リフレクションベースで完全自動生成
+  ReflectionBasedPipelineBuilder builder;
+  auto result = builder.SetBlendState(BlendPresets::CreateNone())
+                    .SetRasterizerState(RasterizerPresets::CreateNoCull())
+                    .SetDepthStencilState(DepthStencilPresets::CreateDisabled())
+                    .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(),
+                                              vsBlob.Get(), psBlob.Get());
 
-    rootSignatures_[key] = result.rootSignature;
-    pipelineStates_[key] = result.pipelineState;
-    parameterIndices_[key] = result.parameterIndices;
+  rootSignatures_[key] = result.rootSignature;
+  pipelineStates_[key] = result.pipelineState;
+  parameterIndices_[key] = result.parameterIndices;
 }

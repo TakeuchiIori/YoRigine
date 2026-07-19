@@ -381,6 +381,11 @@ namespace YoRigine {
                     objectManager_->ApplyColliderTemplate(*obj);
                 }
 
+                ImGui::SameLine();
+                if (ImGui::Checkbox("カメラフェード", &obj->colliderCameraFade)) {
+                    objectManager_->ApplyColliderTemplate(*obj);
+                }
+
                 // 同名一括 ON/OFF
                 ImGui::SameLine();
                 if (ImGui::SmallButton("同名を全ON")) {

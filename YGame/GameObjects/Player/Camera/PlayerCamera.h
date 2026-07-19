@@ -6,12 +6,14 @@
 #endif
 
 #include "Collision/Core/BaseCollider.h"
+#include "Object3D/ObjectManager.h"
 #include "Systems/Camera/Virtuals/FollowCamera/BattleStartCameraState.h"
 #include "Systems/Camera/Virtuals/FollowCamera/FollowCamera.h"
 #include "WorldTransform/WorldTransform.h"
 
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 /// <summary>
@@ -185,6 +187,10 @@ private:
   void UpdateStickInput();
   void UpdateLockOn();
   void SwitchLockOnTarget(int direction); // 0=最近傍, 1=右, -1=左
+
+  // カメラ遮蔽フェード：フェードモードのコライダーが検出された場合に対象
+  // Object3d を半透明化する
+  void UpdateOcclusionFade(float dt);
 
   // ============================================================
   // 脅威察知（気配）
@@ -374,4 +380,14 @@ private:
   bool lockOnFlashRequested_ =
       false; // 見切れ演出発火→UIフラッシュ要求（GameSceneが消費）
   Vector3 lockOnFlashWorldPos_ = {}; // フラッシュを出す対象（敵）のワールド座標
+
+  // ============================================================
+  // カメラ遮蔽フェード
+  // ============================================================
+  // 遮蔽中と復帰中の全オブジェクトを個別に追跡する。
+  std::unordered_map<ObjectManager::PlacedObject *, float> fadeOccluders_;
+  float occludeFadeInSpeed_ = 10.0f; // 遮蔽時の追従速度（/秒）
+  float occludeFadeOutSpeed_ = 7.0f; // 遮蔽解除時の復帰速度（/秒）
+  // 各目標アルファは CameraCollisionResolver::GetFadeHits()
+  // から毎フレーム取得する (侵入深度に応じて 0.25〜0.0 の間を動く)
 };

@@ -237,6 +237,13 @@ public:
   void SetExtensionJson(const nlohmann::json &j) { extensionJson_ = j; }
   const nlohmann::json &GetExtensionJson() const { return extensionJson_; }
 
+  // CameraCollisionResolver のフェードヒット結果を公開する。
+  // ApplyPostDirector (PlayerCamera) から毎フレーム読み取り、該当 Object3d
+  // を半透明化する。
+  const std::vector<CameraCollisionResolver::FadeHit> &GetFadeHits() const {
+    return collisionResolver_.GetFadeHits();
+  }
+
 private:
   // ============================================================
   // コリジョン回避コンポーネント

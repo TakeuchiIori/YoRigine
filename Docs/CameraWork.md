@@ -27,6 +27,55 @@
 - **攻撃カメラワーク**：攻撃ごとにキーフレーム駆動でオフセット／注視／FOV／タイムスケールを再生。
 - **見切れ演出**：画面外の敵を攻撃した瞬間、敵方向へ回り込み＋ズーム寄り＋シェイク＋ロックオン照準フラッシュ（赤→黄フェード）。
 
+### 2.1 カメラ遮蔽ディザーフェード
+
+プレイヤーとカメラの間に建物や木が入った場合、カメラを手前へ押し戻す代わりに遮蔽物をディザーで透明化できる。通常のアルファブレンドは使わず、ピクセルを確率的な閾値で間引くスクリーンドア透過を採用している。
+
+#### 有効化
+
+ModelManipulatorで対象オブジェクトのコライダーを有効にし、`カメラフェード`をONにする。設定は`PlacedObject::colliderCameraFade`としてシーンJSONへ保存される。「この設定を同名オブジェクト全てにコピー」、オブジェクト複製、コピー＆貼り付けでも引き継がれる。
+
+対象コライダーのType IDは、`CameraCollisionResolver`の許可リスト（既定では`kStaticWall`と`kNavObstacle`）に含まれている必要がある。
+
+#### 処理の流れ
+
+1. `CameraCollisionResolver`がプレイヤーのpivotから理想カメラ位置へレイを飛ばす。
+2. `CollisionManager::RaycastAllAllowTypes`がレイ上の全コライダーを距離順で返す。
+3. `IsCameraFadeMode()`が有効な全コライダーを`FadeHit`として収集する。家と、その奥にある木など複数の遮蔽物を同時に扱える。
+4. `PlayerCamera`が`PlacedObject*`ごとに現在のアルファ値を保持し、遮蔽中は目標値へ、レイから外れた後は`1.0`へ指数補間する。
+5. `ModelManipulator`がフェード中の静的モデルをディザー付きインスタンスとして通常の深度パスへ登録する。
+6. `Object3dInstanced.PS.hlsl`が画面上のピクセル座標から固定ノイズ閾値を生成し、`clip()`でピクセルを間引く。
+
+#### 透明度
+
+- 遮蔽開始時の目標アルファは`occludeTargetAlpha_`（既定`0.25`）。
+- カメラがコライダーへ侵入するほど`0.0`へ近づく。
+- 侵入深度が`fullyTransparentDepth_`（既定`0.5`）以上になると完全透明になる。
+- 透明化の追従速度は`occludeFadeInSpeed_`（既定`10.0`）、復帰速度は`occludeFadeOutSpeed_`（既定`7.0`）。いずれもフレームレート非依存の指数補間。
+
+#### ディザーを使う理由
+
+複雑な建物を通常のアルファブレンドで描くと、屋根・外壁・内部の面を奥から手前へ正しく並べる必要がある。並び順が不正確な場合、面が何重にも混ざってまだらに見える。ディザーでは残ったピクセルを不透明として描画し、深度書き込みも維持するため、この透明描画順問題を避けられる。
+
+ディザーパターンは時間で動かさないため、静止中のチラつきは発生しない。フェード中は不透明なインバートハル輪郭だけが残らないよう、対象インスタンスの輪郭描画を無効にする。
+
+#### 実装箇所
+
+| 責務 | ファイル |
+|---|---|
+| 全ヒットレイキャスト | `YEngine/Utilities/Collision/Core/CollisionManager.{h,cpp}` |
+| 遮蔽物の収集・目標アルファ計算 | `YEngine/Utilities/Systems/Camera/CameraCollisionResolver.{h,cpp}` |
+| 複数遮蔽物の補間・復帰 | `YGame/GameObjects/Player/Camera/PlayerCamera.{h,cpp}` |
+| ディザーインスタンス登録 | `YEngine/Graphics/Drawer/InstancedObject3d.{h,cpp}`、`YEngine/Generators/ModelManipulator/ModelManipulator.cpp` |
+| ピクセル間引き | `Resources/Shaders/Object3d/Object3dInstanced.PS.hlsl` |
+| エディタ設定・保存 | `SceneEditorUI.cpp`、`SceneSerializer.cpp`、`ObjectManager.{h,cpp}` |
+
+#### 現在の制約
+
+- ディザーパスはModelManipulatorがインスタンシング描画する静的・非スキニングモデル向け。アニメーション付きモデルや特殊な個別描画オブジェクトへ適用する場合は、それぞれの描画シェーダーにも同等のディザーフラグと`clip()`処理が必要。
+- 判定はpivot→cameraのレイ1本。画面上で大きな遮蔽物をより安定して検出したい場合は、将来的に球キャストまたは複数プローブへ拡張する。
+- `PlayerCamera`はフェード前の基準アルファを`1.0`として復帰させる。常設の半透明素材とカメラフェードを併用する場合は、元アルファを別途保存する必要がある。
+
 ---
 
 ## 3. 改善計画（操作感の引き上げ・優先度順）

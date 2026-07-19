@@ -15,7 +15,7 @@ struct InstanceData
     float4x4 uvTransform;          // 64
     float    stochasticStrength;   //  4
     float    outlineMask;          //  4  (1=線あり, 0=線なし。地面等を除外する)
-    float    _pad1;                //  4
+    float    ditherFade;           //  4
     float    _pad2;                //  4
 };
 
