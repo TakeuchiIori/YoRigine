@@ -111,16 +111,19 @@ namespace YoRigine {
 		bool GetJoystickStatePrevious(int32_t stickNo, DIJOYSTATE2& out) const;
 		bool GetJoystickState(int32_t stickNo, XINPUT_STATE& out) const;
 		bool GetJoystickStatePrevious(int32_t stickNo, XINPUT_STATE& out) const;
-		void SetJoystickDeadZone(int32_t stickNo, int32_t deadZoneL, int32_t deadZoneR);
-		void SetJoystickVibration(int32_t stickNo, uint16_t leftMotorSpeed, uint16_t rightMotorSpeed);
-		void StartVibration(int32_t stickNo, uint16_t leftMotorSpeed, uint16_t rightMotorSpeed, float duration);
 		float GetJoystickAngle(int32_t stickNo);
 		size_t GetNumberOfJoysticks();
-		void CalibrateJoystick(int32_t stickNo);
-		bool IsPadPressed(int32_t playerIndex, GamePadButton button) const;
-		bool IsPadTriggered(int32_t playerIndex, GamePadButton button) const;
 		Vector2 GetLeftStickInput(int32_t stickNo) const;
 		Vector2 GetRightStickInput(int32_t stickNo) const;
+		
+		void SetJoystickDeadZone(int32_t stickNo, int32_t deadZoneL, int32_t deadZoneR);
+		void StartVibration(int32_t stickNo, float duration,
+		                    uint16_t leftMotorSpeed = UINT16_MAX,
+		                    uint16_t rightMotorSpeed = UINT16_MAX);
+		void CalibrateJoystick(int32_t stickNo);
+		
+		bool IsPadPressed(int32_t playerIndex, GamePadButton button) const;
+		bool IsPadTriggered(int32_t playerIndex, GamePadButton button) const;
 		static bool IsControllerConnected();
 		bool IsLeftStickMoving();
 		bool IsRightStickMoving();
@@ -153,6 +156,8 @@ namespace YoRigine {
 		float GetRightStickY(int32_t stickNo) const;
 
 	private:
+		void SetJoystickVibration(int32_t stickNo, uint16_t leftMotorSpeed, uint16_t rightMotorSpeed);
+
 		///************************* メンバ変数 *************************///
 
 		static Input* instance;

@@ -153,12 +153,39 @@ private:
 #ifdef USE_IMGUI
     ///************************* ImGui描画関数の自動生成（完全に排他的） *************************///
 
-    // int型
+    // int / int32_t型
     template <typename FieldType>
     std::enable_if_t<std::is_same_v<FieldType, int>>
         RegisterImGuiDrawer(const std::string& name, FieldType T::* field) {
         imguiDrawers_[name] = [field, name](T& obj) -> bool {
-            return ImGui::InputInt(name.c_str(), &(obj.*field));
+            return ImGui::InputScalar(name.c_str(), ImGuiDataType_S32, &(obj.*field));
+            };
+    }
+
+    // int16_t型
+    template <typename FieldType>
+    std::enable_if_t<std::is_same_v<FieldType, int16_t>>
+        RegisterImGuiDrawer(const std::string& name, FieldType T::* field) {
+        imguiDrawers_[name] = [field, name](T& obj) -> bool {
+            return ImGui::InputScalar(name.c_str(), ImGuiDataType_S16, &(obj.*field));
+            };
+    }
+
+    // uint16_t型
+    template <typename FieldType>
+    std::enable_if_t<std::is_same_v<FieldType, uint16_t>>
+        RegisterImGuiDrawer(const std::string& name, FieldType T::* field) {
+        imguiDrawers_[name] = [field, name](T& obj) -> bool {
+            return ImGui::InputScalar(name.c_str(), ImGuiDataType_U16, &(obj.*field));
+            };
+    }
+
+    // uint32_t型
+    template <typename FieldType>
+    std::enable_if_t<std::is_same_v<FieldType, uint32_t>>
+        RegisterImGuiDrawer(const std::string& name, FieldType T::* field) {
+        imguiDrawers_[name] = [field, name](T& obj) -> bool {
+            return ImGui::InputScalar(name.c_str(), ImGuiDataType_U32, &(obj.*field));
             };
     }
 
@@ -352,6 +379,10 @@ private:
         !std::is_same_v<FieldType, float> &&
         !std::is_same_v<FieldType, double> &&
         !std::is_same_v<FieldType, bool> &&
+        !std::is_same_v<FieldType, uint16_t> &&
+        !std::is_same_v<FieldType, uint32_t> &&
+        !std::is_same_v<FieldType, int16_t> &&
+        !std::is_same_v<FieldType, int32_t> &&
         !std::is_same_v<FieldType, std::string> &&
         !IsVector_v<FieldType> &&
         !HasXYMembers_v<FieldType> &&

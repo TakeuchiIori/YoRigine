@@ -270,13 +270,13 @@ void AttackDataEditor::DrawAttackDetail()
 	{
 		changed |= ImGui::InputFloat("持続時間", &atk.duration, 0.01f, 0.1f, "%.2f");
 		changed |= ImGui::InputFloat("モーション速度", &atk.motionSpeed, 0.01f, 0.1f, "%.2f");
-		changed |= ImGui::InputInt("ヒット開始フレーム", &atk.hitStart);
-		changed |= ImGui::InputInt("ヒット終了フレーム", &atk.hitEnd);
-		changed |= ImGui::InputInt("先行入力受付開始フレーム", &atk.inputBufferStart);
+		changed |= ImGui::InputScalar("ヒット開始フレーム", ImGuiDataType_S32, &atk.hitStart);
+		changed |= ImGui::InputScalar("ヒット終了フレーム", ImGuiDataType_S32, &atk.hitEnd);
+		changed |= ImGui::InputScalar("先行入力受付開始フレーム", ImGuiDataType_S32, &atk.inputBufferStart);
 		if (ImGui::IsItemHovered()) {
 			ImGui::SetTooltip("このフレーム以降に押された入力をバッファし、同フレーム以降で即時に次の攻撃へ発火する");
 		}
-		changed |= ImGui::InputInt("先行入力受付終了フレーム", &atk.comboWindowEnd);
+		changed |= ImGui::InputScalar("先行入力受付終了フレーム", ImGuiDataType_S32, &atk.comboWindowEnd);
 		if (ImGui::IsItemHovered()) {
 			ImGui::SetTooltip("このフレームを越えるとバッファは破棄される");
 		}
@@ -316,6 +316,8 @@ void AttackDataEditor::DrawAttackDetail()
 			atk.hitStopDuration = 0.0f; atk.shakeIntensity = 0.0f; atk.shakeDuration = 0.0f;
 			changed = true;
 		}
+		changed |= ImGui::DragFloat("コントローラーの振動時間", &atk.inputVibrationTime, 0.0f, 10.0f,0.1f);
+		changed |= ImGui::InputScalar("コントローラーの振動強度", ImGuiDataType_U16,&atk.inputVibrationPower);
 	}
 
 	// ------------------------------------------------------------
@@ -335,8 +337,8 @@ void AttackDataEditor::DrawAttackDetail()
 	// ------------------------------------------------------------
 	if (ImGui::CollapsingHeader("CCシステム"))
 	{
-		changed |= ImGui::InputInt("CC消費", &atk.ccCost);
-		changed |= ImGui::InputInt("CCヒット時回復", &atk.ccOnHit);
+		changed |= ImGui::InputScalar("CC消費", ImGuiDataType_S32, &atk.ccCost);
+		changed |= ImGui::InputScalar("CCヒット時回復", ImGuiDataType_S32, &atk.ccOnHit);
 	}
 
 	// ------------------------------------------------------------
@@ -436,10 +438,10 @@ void AttackDataEditor::DrawDopeSheet()
 	ImGui::Text("タイムライン : %s", atk.animationName.c_str());
 	bool headerChanged = false;
 	ImGui::SetNextItemWidth(80.0f);
-	headerChanged |= ImGui::InputInt("総フレーム数", &atk.totalFrames);
+	headerChanged |= ImGui::InputScalar("総フレーム数", ImGuiDataType_S32, &atk.totalFrames);
 	ImGui::SameLine();
 	ImGui::SetNextItemWidth(60.0f);
-	headerChanged |= ImGui::InputInt("FPS", &atk.fps);
+	headerChanged |= ImGui::InputScalar("FPS", ImGuiDataType_S32, &atk.fps);
 	atk.totalFrames = std::max(1, atk.totalFrames);
 	atk.fps = std::max(1, atk.fps);
 

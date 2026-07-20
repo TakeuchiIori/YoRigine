@@ -22,7 +22,7 @@ AttackingCombatState::AttackingCombatState(PlayerCombat* combat) : combat_(comba
 
 		stateTimer_ = 0.0f;
 
-		// ★移動制限(SetCanMove(false)など)は行わず、PlayerMovementの下半身の動きを活かす
+		// 移動制限(SetCanMove(false)など)は行わず、PlayerMovementの下半身の動きを活かす
 
 		PlayAttackMotion(player, attack);
 
@@ -150,18 +150,18 @@ void AttackingCombatState::Update([[maybe_unused]] float deltaTime) {
 
 	stateTimer_ += deltaTime;
 
-	// 1. フレームの計算
+	// フレームの計算
 	const float frameDuration = (currentAttack->fps > 0) ? 1.0f / static_cast<float>(currentAttack->fps) : 1.0f / 60.0f;
 	const int currentFrame = static_cast<int>(GetAttackAnimationTime() / frameDuration);
 
-	// 2. 当たり判定(Hitbox)のON/OFF
+	// 当たり判定(Hitbox)のON/OFF
 	const bool inHitWindow = (currentAttack->hitEnd > currentAttack->hitStart) &&
 		(currentFrame >= currentAttack->hitStart) &&
 		(currentFrame < currentAttack->hitEnd);
 	player->GetSword()->SetEnableCollider(inHitWindow);
 
-	// 3. 先行入力受付：inputBufferStart 〜 comboWindowEnd の間に押された入力をバッファに積む
-	//    （ここでは発火しない。現在の攻撃モーションは最後まで再生する）
+	// 先行入力受付：inputBufferStart 〜 comboWindowEnd の間に押された入力をバッファに積む
+	//（ここでは発火しない。現在の攻撃モーションは最後まで再生する）
 	const bool inInputWindow =
 		currentFrame >= currentAttack->inputBufferStart &&
 		currentFrame <= currentAttack->comboWindowEnd;
@@ -175,7 +175,7 @@ void AttackingCombatState::Update([[maybe_unused]] float deltaTime) {
 		}
 	}
 
-	// 4. アニメーション終了：バッファされた先行入力があれば即時に次の攻撃へ、なければ Idle に戻る
+	// アニメーション終了：バッファされた先行入力があれば即時に次の攻撃へ、なければ Idle に戻る
 	if (stateTimer_ >= GetActiveAttackDuration(*currentAttack)) {
 		if (combat_->HasBufferedAttack()) {
 			AttackType next = combat_->PopBufferedAttack();

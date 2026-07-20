@@ -320,7 +320,7 @@ namespace YoRigine {
 	/// <summary>
 	/// ジョイスティックの振動を指定時間実行する
 	/// </summary>
-	void Input::StartVibration(int32_t stickNo, uint16_t leftMotorSpeed, uint16_t rightMotorSpeed, float duration)
+	void Input::StartVibration(int32_t stickNo, float duration, uint16_t leftMotorSpeed, uint16_t rightMotorSpeed)
 	{
 		if (stickNo < 0 || stickNo >= devJoysticks_.size()) return;
 		SetJoystickVibration(stickNo, leftMotorSpeed, rightMotorSpeed);

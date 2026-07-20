@@ -137,6 +137,14 @@ void PlayerCombo::ExecuteAttack(const AttackData& attack) {
 	}
 
 	// ------------------------------------------------------------
+	// コントローラーによる振動の処理
+	// ------------------------------------------------------------
+	if (attack.inputVibrationTime != 0.0f) {
+		YoRigine::Input::GetInstance()->StartVibration(0, attack.inputVibrationTime,
+			attack.inputVibrationPower, attack.inputVibrationPower);
+	}
+
+	// ------------------------------------------------------------
 	// 攻撃開始/継続コールバックの発火
 	// （これにより AttackingCombatState 側の処理が更新される）
 	// ------------------------------------------------------------
