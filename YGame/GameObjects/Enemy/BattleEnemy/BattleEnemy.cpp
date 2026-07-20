@@ -76,6 +76,17 @@ void BattleEnemy::InitializeBattleData(const BattleEnemyData& data, Vector3 posi
 	// 初期位置・スケール設定（フィールド敵の見た目を引き継ぐ）
 	wt_.translate_ = position;
 	wt_.scale_ = scale;
+
+	// バトル開始演出中は敵のUpdateが停止するため、生成時点で描画用Transformも
+	// 同期しておく。これが無いと複数体が原点に重なり、1体だけに見える。
+	wt_.UpdateMatrix();
+	visualWt_.scale_ = wt_.scale_;
+	visualWt_.rotate_ = wt_.rotate_;
+	visualWt_.translate_ = wt_.translate_;
+	visualWt_.anchorPoint_ = wt_.anchorPoint_;
+	visualWt_.useAnchorPoint_ = wt_.useAnchorPoint_;
+	visualWt_.UpdateMatrix();
+
 	// 攻撃時の punch/bounce アニメーションは baseScale_ を起点に補間するので、
 	// ここで揃えないと攻撃の瞬間にスケールが (1,1,1) へスナップしてしまう。
 	if (animation_) {

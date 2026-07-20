@@ -134,6 +134,13 @@ void BattleScene::Update() {
 		clearCinematicStarted_ = true;
 		battleEnemyManager_->ResetFinalBattleClearFlag();
 
+		// ゲーム更新を止める前に、攻撃中の剣軌跡と攻撃判定を確実に終了する。
+		// TrailMeshEmitter::Stop() は保持頂点もClearするため、静止した軌跡が
+		// クリア演出中に残り続けることを防げる。
+		if (player_ && player_->GetSword()) {
+			player_->GetSword()->ResetRuntimeState();
+		}
+
 		// チェーンから Fog / GodRays を引っ張る（無ければ tween をスキップ）
 		auto* chain = PostEffectManager::GetInstance()->GetEffectChain();
 		auto* fog = chain ? chain->GetFirstEffectByType(OffScreen::OffScreenEffectType::Fog) : nullptr;
