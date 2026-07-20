@@ -448,6 +448,9 @@ void BattleEnemy::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 	if (isAlive_ && !isInvincible_) {
 		// 攻撃を食らった時
 		if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon)) {
+			// ダウン中などはダメージを受けても、その反撃チャンス状態を維持する。
+			const bool keepCurrentState = currentState_ && currentState_->KeepsStateWhenDamaged();
+
 			// --------------------- ダメージの処理 --------------------- //
 			int damage = static_cast<int>(player_->GetCombat()->GetCombo()->GetCurrentDamage());
 			TakeDamage(damage);
@@ -466,17 +469,19 @@ void BattleEnemy::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 
 			// --------------------- ヒットカウントの処理 --------------------- //
 			// しきい値・有効フラグは CounterAttackParams (JSON 経由) で調整可能
-			const auto& counterParams = enemyData_.attackParams.counter;
-			consecutiveHitCount_++;
-			hitCountResetTimer_ = 0.0f;
-			// 連続ヒット数が限界を超え、かつカウンター挙動が有効なら Recovery 状態へ
-			if (counterParams.enabled && consecutiveHitCount_ >= counterParams.triggerHitCount) {
-				ChangeState(std::make_unique<BattleRecoveryState>());
-				consecutiveHitCount_ = 0;  // リセット
-			}
-			else {
-				// 通常のダメージ状態
-				ChangeState(std::make_unique<BattleDamageState>());
+			if (!keepCurrentState) {
+				const auto& counterParams = enemyData_.attackParams.counter;
+				consecutiveHitCount_++;
+				hitCountResetTimer_ = 0.0f;
+				// 連続ヒット数が限界を超え、かつカウンター挙動が有効なら Recovery 状態へ
+				if (counterParams.enabled && consecutiveHitCount_ >= counterParams.triggerHitCount) {
+					ChangeState(std::make_unique<BattleRecoveryState>());
+					consecutiveHitCount_ = 0;  // リセット
+				}
+				else {
+					// 通常のダメージ状態
+					ChangeState(std::make_unique<BattleDamageState>());
+				}
 			}
 
 			// --------------------- ノックバックの処理 --------------------- //

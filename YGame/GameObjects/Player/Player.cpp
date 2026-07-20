@@ -421,6 +421,18 @@ void Player::InitJson() {
 	jsonManager_->Register("死亡状態速度", &motionSpeed[3]);
 
 	//------------------------------------------------------------
+	// 被弾フィードバック
+	//------------------------------------------------------------
+	jsonManager_->SetTreePrefix("被弾演出");
+	jsonManager_->Register("ヒットストップ秒数", &hitStopDuration_);
+	jsonManager_->Register("正面シェイク強度", &frontHitShakeIntensity_);
+	jsonManager_->Register("正面シェイク時間", &frontHitShakeDuration_);
+	jsonManager_->Register("背面シェイク強度", &backHitShakeIntensity_);
+	jsonManager_->Register("背面シェイク時間", &backHitShakeDuration_);
+	jsonManager_->Register("振動時間", &hitVibrationDuration_);
+	jsonManager_->Register("振動強度", &hitVibrationPower_);
+
+	//------------------------------------------------------------
 	// 下層システム登録
 	//------------------------------------------------------------
 	movement_->InitJson(jsonManager_.get());
@@ -483,15 +495,6 @@ void Player::OnEnterDirectionCollision([[maybe_unused]] BaseCollider* self, Base
 		//	0.2f,
 		//	YoRigine::SoundCategory::SE
 		//);
-
-		//------------------------------------------------------------
-		// カメラシェイク（被弾方向で強度を変える）
-		//------------------------------------------------------------
-		if (playerCamera_) {
-			float intensity = (dir == HitDirection::Back) ? 0.6f : 0.4f;
-			float duration  = (dir == HitDirection::Back) ? 0.25f : 0.2f;
-			playerCamera_->StartShake(intensity, duration);
-		}
 
 		// 方向ヒット状態へ遷移
 		combat_->SetHitDirection(dir);
@@ -606,15 +609,30 @@ void Player::ApplyHitReaction(const Vector3& attackerPos) {
 	// 前方から食らったら Front、背後から食らったら Back
 	HitDirection dir = (dot < 0.0f) ? HitDirection::Back : HitDirection::Front;
 
-	// カメラシェイク（被弾方向で強度を変える）
-	if (playerCamera_) {
-		float intensity = (dir == HitDirection::Back) ? 0.6f : 0.4f;
-		float duration  = (dir == HitDirection::Back) ? 0.25f : 0.2f;
-		playerCamera_->StartShake(intensity, duration);
-	}
+	PlayHitFeedback(dir);
 
 	combat_->SetHitDirection(dir);
 	combat_->ChangeState(CombatState::Hit);
+}
+
+// ============================================================
+// 被弾時フィードバック
+// ============================================================
+void Player::PlayHitFeedback(HitDirection direction) {
+	if (hitStopDuration_ > 0.0f) {
+		YoRigine::GameTime::SetHitStop(hitStopDuration_);
+	}
+
+	const bool fromBack = direction == HitDirection::Back;
+	const float shakeIntensity = fromBack ? backHitShakeIntensity_ : frontHitShakeIntensity_;
+	const float shakeDuration = fromBack ? backHitShakeDuration_ : frontHitShakeDuration_;
+	if (playerCamera_ && shakeIntensity > 0.0f && shakeDuration > 0.0f) {
+		playerCamera_->StartShake(shakeIntensity, shakeDuration);
+	}
+
+	if (input_ && hitVibrationDuration_ > 0.0f && hitVibrationPower_ > 0) {
+		input_->StartVibration(0, hitVibrationDuration_, hitVibrationPower_, hitVibrationPower_);
+	}
 }
 
 // ============================================================

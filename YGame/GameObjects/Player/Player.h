@@ -143,6 +143,7 @@ private:
 	void HandleMagicInput(bool pressedA, bool pressedB, bool pressedX, bool heldA, bool heldB, bool heldX);
 	void UpdateMotionTime();
 	void LookAtDirection(const Vector3& direction);
+	void PlayHitFeedback(HitDirection direction);
 
 private:
 	// ============================================================
@@ -172,6 +173,15 @@ private:
 	bool isAlive_ = true;
 	bool isInvincible_ = false;   // 突進攻撃中などの無敵フラグ
 	const std::string emitterPath_ = "Player";
+
+	// 敵の攻撃を受けた瞬間のフィードバック（Player.jsonから調整）
+	float hitStopDuration_ = 0.06f;
+	float frontHitShakeIntensity_ = 0.4f;
+	float frontHitShakeDuration_ = 0.2f;
+	float backHitShakeIntensity_ = 0.6f;
+	float backHitShakeDuration_ = 0.25f;
+	float hitVibrationDuration_ = 0.12f;
+	uint16_t hitVibrationPower_ = 32000;
 
 	float motionSpeed[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
 };

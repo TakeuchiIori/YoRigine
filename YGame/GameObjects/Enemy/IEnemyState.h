@@ -21,4 +21,8 @@ public:
 
 	// 同じ番号の攻撃判定時間では1回だけ命中させる。コンボは段ごとに番号を変える。
 	virtual int GetContactDamageWindow() const { return IsContactDamageActive() ? 0 : -1; }
+
+	// 被弾しても現在状態を維持するか。ダウンなどの反撃チャンスを
+	// 通常のヒット状態で上書きしたくない場合に true を返す。
+	virtual bool KeepsStateWhenDamaged() const { return false; }
 };
