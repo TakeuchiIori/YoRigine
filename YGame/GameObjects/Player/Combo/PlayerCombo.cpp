@@ -7,6 +7,7 @@
 #include "Collision/Core/CollisionManager.h"
 #include "Collision/Core/CollisionTypeIdDef.h"
 #include "MathFunc.h"
+#include "Systems/GameTime/GameTime.h"
 
 #include <cmath>
 #include <limits>
@@ -137,14 +138,6 @@ void PlayerCombo::ExecuteAttack(const AttackData& attack) {
 	}
 
 	// ------------------------------------------------------------
-	// コントローラーによる振動の処理
-	// ------------------------------------------------------------
-	if (attack.inputVibrationTime != 0.0f) {
-		YoRigine::Input::GetInstance()->StartVibration(0, attack.inputVibrationTime,
-			attack.inputVibrationPower, attack.inputVibrationPower);
-	}
-
-	// ------------------------------------------------------------
 	// 攻撃開始/継続コールバックの発火
 	// （これにより AttackingCombatState 側の処理が更新される）
 	// ------------------------------------------------------------
@@ -226,6 +219,25 @@ void PlayerCombo::NotifyAttackHit(BaseCollider* victim, const Vector3& hitPositi
 	if (!currentAttack_) return;
 
 	++hitIndexInCurrentAttack_;
+
+	// 攻撃入力時ではなく、敵へのヒットが確定した瞬間に振動させる。
+	if (currentAttack_->inputVibrationTime != 0.0f) {
+		YoRigine::Input::GetInstance()->StartVibration(
+			0, currentAttack_->inputVibrationTime,
+			currentAttack_->inputVibrationPower, currentAttack_->inputVibrationPower);
+	}
+
+	// エディタで設定したヒット演出は、命中通知そのものから直接発火する。
+	// CombatState のコールバック登録状態に依存させず、振動と同じ瞬間に揃える。
+	if (currentAttack_->hitStopDuration > 0.0f) {
+		YoRigine::GameTime::SetHitStop(currentAttack_->hitStopDuration);
+	}
+	if (currentAttack_->shakeIntensity > 0.0f && currentAttack_->shakeDuration > 0.0f) {
+		if (owner_ && owner_->GetFollowCamera()) {
+			owner_->GetFollowCamera()->StartShake(
+				currentAttack_->shakeIntensity, currentAttack_->shakeDuration);
+		}
+	}
 
 	if (onAttackHit_) {
 		AttackHitContext ctx{};

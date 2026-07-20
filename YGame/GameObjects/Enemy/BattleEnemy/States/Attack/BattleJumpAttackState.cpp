@@ -3,6 +3,7 @@
 void BattleJumpAttackState::Enter(BattleEnemy& enemy) {
 	enemy.SetCanAct(false);
 	enemy.ResetStateTimer();
+	isContactDamageActive_ = false;
 
 	if (auto anim = enemy.GetAnimation()) {
 		// ジャンプ前はシアン色に変化しつつ、横に平べったく（縦に潰れる）なる
@@ -30,6 +31,7 @@ void BattleJumpAttackState::Enter(BattleEnemy& enemy) {
 }
 
 void BattleJumpAttackState::Update(BattleEnemy& enemy, float dt) {
+	isContactDamageActive_ = false;
 	const auto& params = enemy.GetEnemyData().attackParams.jump;
 	const float currentTime = enemy.GetStateTimer();
 	const float previousTime = currentTime - dt;
@@ -75,6 +77,7 @@ void BattleJumpAttackState::Update(BattleEnemy& enemy, float dt) {
 	}
 	// === フェーズ3: ジャンプ ===
 	else if (currentTime < jumpEndTime) {
+		isContactDamageActive_ = true;
 		// ジャンプ開始の瞬間に縦長に引き伸ばすアニメーション
 		if (previousTime < chargeEndTime && currentTime >= chargeEndTime) {
 			if (auto anim = enemy.GetAnimation()) {
@@ -131,6 +134,7 @@ void BattleJumpAttackState::Update(BattleEnemy& enemy, float dt) {
 }
 
 void BattleJumpAttackState::Exit(BattleEnemy& enemy) {
+	isContactDamageActive_ = false;
 	// 元の高さに戻す
 	Vector3 pos = enemy.GetTranslate();
 	pos.y = startY_;

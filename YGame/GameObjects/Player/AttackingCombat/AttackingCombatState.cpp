@@ -52,15 +52,6 @@ AttackingCombatState::AttackingCombatState(PlayerCombat* combat) : combat_(comba
 			player->GetPlayerCamera()->PlayAttackCameraWork(attack.playCameraWorkName);
 		}
 
-		// ヒットストップとシェイクは AttackData の値が 0 のときはスキップ。
-		if (attack.hitStopDuration > 0.0f) {
-			YoRigine::GameTime::SetHitStop(attack.hitStopDuration);
-		}
-		if (attack.shakeIntensity > 0.0f && attack.shakeDuration > 0.0f) {
-			if (player->GetFollowCamera()) {
-				player->GetFollowCamera()->StartShake(attack.shakeIntensity, attack.shakeDuration);
-			}
-		}
 		});
 
 	// ------------------------------------------------------------

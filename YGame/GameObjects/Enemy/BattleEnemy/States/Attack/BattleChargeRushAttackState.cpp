@@ -3,6 +3,7 @@
 void BattleChargeRushAttackState::Enter(BattleEnemy& enemy) {
 	enemy.SetCanAct(false);
 	enemy.ResetStateTimer();
+	isContactDamageActive_ = false;
 
 	if (auto anim = enemy.GetAnimation()) {
 		anim->StartColorAnimation({ 1, 1, 1, 1 }, { 1.0f, 0.5f, 0.0f, 1.0f }, 0.3f);
@@ -77,6 +78,7 @@ void BattleChargeRushAttackState::Update(BattleEnemy& enemy, float dt) {
 	}
 	// === フェーズ3: 高速突進 ===
 	else if (currentTime < rushEndTime) {
+		isContactDamageActive_ = true;
 		if (previousTime < chargeEndTime && currentTime >= chargeEndTime) {
 			if (auto anim = enemy.GetAnimation()) {
 				anim->StopAll(); // シェイク停止
@@ -90,11 +92,16 @@ void BattleChargeRushAttackState::Update(BattleEnemy& enemy, float dt) {
 	}
 	// === フェーズ4: クールダウン ===
 	else if (currentTime >= totalDuration) {
+		isContactDamageActive_ = false;
 		enemy.ChangeState(std::make_unique<BattleIdleState>());
+	}
+	else {
+		isContactDamageActive_ = false;
 	}
 }
 
 void BattleChargeRushAttackState::Exit(BattleEnemy& enemy) {
+	isContactDamageActive_ = false;
 	enemy.SetCanAct(true);
 
 	if (auto anim = enemy.GetAnimation()) {

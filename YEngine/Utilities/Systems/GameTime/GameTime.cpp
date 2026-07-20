@@ -107,7 +107,12 @@ namespace YoRigine {
 		if (editorFrozen || gamePaused || gPaused) {
 			deltaTime_ = 0.0f;
 		} else {
-			deltaTime_ = unscaledDeltaTime_ * timeScale_;
+			// カメラ演出などが timeScale_ を上書きしても、ヒットストップ中は
+			// 専用の停止スケールを最優先でゲーム更新へ反映する。
+			const float gameplayScale = (hitStopTimer_ > 0.0f)
+				? hitStopFreezeScale_
+				: timeScale_;
+			deltaTime_ = unscaledDeltaTime_ * gameplayScale;
 			totalTime_ += deltaTime_;
 			accumulatedTime_ += deltaTime_;
 		}

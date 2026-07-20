@@ -44,7 +44,9 @@ void BattleEnemy::Initialize(Camera* camera) {
 	obj_ = std::make_unique<Object3d>();
 	obj_->Initialize();
 	wt_.Initialize();
+	visualWt_.Initialize();
 	wt_.useAnchorPoint_ = true;
+	visualWt_.useAnchorPoint_ = true;
 	InitCollision();
 
 	healthBarUI_ = std::make_unique<EnemyHealthBarUI>(this, camera);
@@ -119,6 +121,11 @@ void BattleEnemy::InitJson() {
 	jsonManager_->Register("エッジ発光色", &dissolveEdgeColor_);
 	jsonManager_->Register("ノイズスケール", &dissolveNoiseScale_);
 	jsonManager_->ClearTreePrefix();
+
+	jsonManager_->SetTreePrefix("ヒットリアクション");
+	jsonManager_->Register("のけぞり角度(rad)", &hitReactionAngle_);
+	jsonManager_->Register("のけぞり時間(秒)", &hitReactionDuration_);
+	jsonManager_->ClearTreePrefix();
 }
 
 /*==========================================================================
@@ -176,6 +183,7 @@ void BattleEnemy::Update() {
 
 	// ノックバック更新
 	UpdateKnockback(dt);
+	UpdateDirectionalHitReaction(dt);
 
 	// 状態VFX（燃焼など）の追従・寿命更新
 	UpdateStatusVfx(dt);
@@ -186,6 +194,13 @@ void BattleEnemy::Update() {
 	// 行列と更新
 	currentVelocity_ = wt_.translate_ - previousPosition_;
 	wt_.UpdateMatrix();
+	// 描画専用Transformにだけのけぞり回転を加える。コライダーはwt_のまま傾けない。
+	visualWt_.scale_ = wt_.scale_;
+	visualWt_.rotate_ = wt_.rotate_ + hitReactionRotation_;
+	visualWt_.translate_ = wt_.translate_;
+	visualWt_.anchorPoint_ = wt_.anchorPoint_;
+	visualWt_.useAnchorPoint_ = wt_.useAnchorPoint_;
+	visualWt_.UpdateMatrix();
 	// コリジョン更新
 	if (obbCollider_) {
 		obbCollider_->Update();
@@ -203,6 +218,7 @@ void BattleEnemy::Update() {
 void BattleEnemy::ChangeState(std::unique_ptr<IEnemyState<BattleEnemy>> newState) {
 	if (currentState_) currentState_->Exit(*this);
 	currentState_ = std::move(newState);
+	lastDealtContactDamageWindow_ = -1;
 	if (currentState_) currentState_->Enter(*this);
 	stateTimer_ = 0.0f;
 }
@@ -309,6 +325,68 @@ void BattleEnemy::UpdateKnockback(float dt)
 	}
 }
 
+void BattleEnemy::TryPerformContactAttack() {
+	if (!currentState_) return;
+	const int damageWindow = currentState_->GetContactDamageWindow();
+	if (damageWindow < 0 || damageWindow == lastDealtContactDamageWindow_) return;
+
+	PerformBasicAttack();
+	// 無敵中などで実ダメージが通らなかった場合も、同じ判定時間で毎フレーム再試行しない。
+	lastDealtContactDamageWindow_ = damageWindow;
+}
+
+/*==========================================================================
+攻撃方向に応じたのけぞり開始
+//========================================================================*/
+void BattleEnemy::StartDirectionalHitReaction(const Vector3& direction)
+{
+	hitReactionRotation_ = {};
+
+	Vector3 horizontalDirection = direction;
+	horizontalDirection.y = 0.0f;
+	if (Length(horizontalDirection) < 0.001f || hitReactionDuration_ <= 0.0f) {
+		isHitReacting_ = false;
+		return;
+	}
+	horizontalDirection = Normalize(horizontalDirection);
+
+	// 攻撃のワールド方向を、敵から見た前後・左右成分へ変換する。
+	const float yaw = wt_.rotate_.y;
+	const Vector3 forward = { std::sinf(yaw), 0.0f, std::cosf(yaw) };
+	const Vector3 right = { std::cosf(yaw), 0.0f, -std::sinf(yaw) };
+	const float forwardAmount = Dot(horizontalDirection, forward);
+	const float rightAmount = Dot(horizontalDirection, right);
+
+	hitReactionTargetRotation_ = {
+		-forwardAmount * hitReactionAngle_,
+		0.0f,
+		-rightAmount * hitReactionAngle_
+	};
+	hitReactionTimer_ = 0.0f;
+	isHitReacting_ = true;
+}
+
+/*==========================================================================
+攻撃方向に応じたのけぞり更新
+//========================================================================*/
+void BattleEnemy::UpdateDirectionalHitReaction(float dt)
+{
+	hitReactionRotation_ = {};
+
+	if (!isHitReacting_) return;
+
+	hitReactionTimer_ += dt;
+	const float progress = std::fminf(hitReactionTimer_ / hitReactionDuration_, 1.0f);
+	// 素早く最大まで傾き、そのまま滑らかに基準姿勢へ戻る。
+	constexpr float kPi = 3.14159265358979323846f;
+	const float weight = std::sinf(progress * kPi);
+	hitReactionRotation_ = hitReactionTargetRotation_ * weight;
+
+	if (progress >= 1.0f) {
+		isHitReacting_ = false;
+	}
+}
+
 /*==========================================================================
 状態VFX（燃焼など）の付着・追従・停止
 //========================================================================*/
@@ -398,6 +476,7 @@ void BattleEnemy::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 			float power = player_->GetCombat()->GetCombo()->GetCurrentKnockback();
 			float duration = player_->GetCombat()->GetCombo()->GetCurrentKnockbackDuration();
 			StartKnockback(knockbackDir, power, duration);
+			StartDirectionalHitReaction(knockbackDir);
 
 			// --------------------- 攻撃ヒット時の前進ステップを発火 --------------------- //
 			player_->GetCombat()->GetCombo()->OnHitStep(wt_.translate_);
@@ -418,9 +497,7 @@ void BattleEnemy::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 
 		// プレイヤー本体に当たった時。攻撃実行中のStateの時だけダメージを与える
 		if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayer)) {
-			if (currentState_ && currentState_->IsAttacking()) {
-				PerformBasicAttack();
-			}
+			TryPerformContactAttack();
 		}
 	}
 }
@@ -430,6 +507,11 @@ void BattleEnemy::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 //========================================================================*/
 void BattleEnemy::OnCollision([[maybe_unused]] BaseCollider* self, [[maybe_unused]] BaseCollider* other) {
 	if (!isAlive_) return;
+
+	// 溜め中から接触し続けたまま攻撃判定時間へ入った場合にも、一度だけ命中させる。
+	if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayer)) {
+		TryPerformContactAttack();
+	}
 
 	// 敵同士の押し出し処理（重なり防止）
 	if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kBattleEnemy)) {
@@ -496,7 +578,7 @@ void BattleEnemy::ApplyDeathFade() {
 
 void BattleEnemy::Draw() {
 	ApplyDeathFade();
-	if (obj_) obj_->Draw(camera_, wt_);
+	if (obj_) obj_->Draw(camera_, visualWt_);
 }
 
 /*==========================================================================
@@ -515,7 +597,7 @@ void BattleEnemy::DrawUI()
 void BattleEnemy::DrawShadow()
 {
 
-	if (obj_) obj_->DrawShadow(wt_);
+	if (obj_) obj_->DrawShadow(visualWt_);
 }
 
 /*==========================================================================

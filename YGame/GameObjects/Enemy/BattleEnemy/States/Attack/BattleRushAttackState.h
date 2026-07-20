@@ -12,9 +12,11 @@ public:
 	void Exit(BattleEnemy& enemy) override;
 
 	bool IsAttacking() const override { return true; }
+	bool IsContactDamageActive() const override { return isContactDamageActive_; }
 
 private:
 	Vector3 attackDir_{ 0,0,0 };
 	Vector3 anticipationStartPos_{ 0,0,0 };
 	bool dirLocked_ = false;
+	bool isContactDamageActive_ = false;
 };
