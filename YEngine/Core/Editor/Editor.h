@@ -38,7 +38,9 @@ public:
 	void RegisterGameUI(
 		const std::string& name,
 		std::function<void()> drawFunc,
-		const std::string& sceneName = "AllScene");
+		const std::string& sceneName = "AllScene",
+		const std::string& category = "",
+		bool defaultVisible = false);
 
 	void UnregisterGameUI(const std::string& name);
 
@@ -119,6 +121,8 @@ private:
 	void SaveSettings();
 	void LoadSettings();
 	void ApplySettings();
+	void ResetWorkspace();
+	ImGuiID GetDefaultDockForCategory(const std::string& category) const;
 
 	// DockSpace 初回レイアウトを組む (imgui.ini がない場合)
 	void SetupDefaultDockLayout(ImGuiID dockspaceID);
@@ -128,8 +132,10 @@ private:
 	struct GameUI {
 		std::string           name;
 		std::string           sceneName = "AllScene";
+		std::string           category = "その他";
 		std::function<void()> drawFunc;
-		bool                  visible = true;
+		bool                  visible = false;
+		bool                  defaultVisible = false;
 	};
 
 	struct SavedSettings {
@@ -143,10 +149,12 @@ private:
 	static bool    showEditor_;
 
 	///======================== メンバ変数 ==========================///
-	bool        isAllDrawEditor_ = false;
 	bool        showFpsOverlay_ = true;   // FPS オーバーレイ表示フラグ
 	bool        dockLayoutDone_ = false;  // デフォルトレイアウト適用済みフラグ
 	bool        settingsLoaded_ = false;
+	bool        workspaceResetRequested_ = false;
+
+	static constexpr int kLayoutVersion = 2;
 
 	std::string currentScene_ = "Title";
 	std::vector<std::string> sceneNames_ = { "Title", "Game", "Clear", "Develop" };
@@ -158,6 +166,10 @@ private:
 	std::vector<std::function<void()>>      menuCallbacks_;
 
 	ImGuiID dockspaceID_ = 0;
+	ImGuiID dockMainID_ = 0;
+	ImGuiID dockLeftID_ = 0;
+	ImGuiID dockRightID_ = 0;
+	ImGuiID dockBottomID_ = 0;
 
 	ImVec2  gameViewSize_ = { 0, 0 };
 	ImVec2  gameViewPos_ = { 0, 0 };

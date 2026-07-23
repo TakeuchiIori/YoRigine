@@ -134,23 +134,49 @@ void MyGame::Initialize() {
 		});
 
 	// 各種ImGuiツール登録
-	Editor::GetInstance()->RegisterGameUI("ゲーム時間管理", &YoRigine::GameTime::ImGui);
+	Editor::GetInstance()->RegisterGameUI(
+		"ゲーム時間管理", &YoRigine::GameTime::ImGui,
+		"AllScene", "デバッグ");
 	YoRigine::CollisionEditor::GetInstance()->Initialize();
 	Editor::GetInstance()->RegisterGameUI(
 		"当たり判定Editor",
-		[]() { YoRigine::CollisionEditor::GetInstance()->DrawImGui(); });
+		[]() { YoRigine::CollisionEditor::GetInstance()->DrawImGui(); },
+		"AllScene", "システム");
 	// ParticleEditor は旧システム専用のため削除済み。YParticleEditor を使用。
-	Editor::GetInstance()->RegisterGameUI("モデル操作", []() { YoRigine::ModelManipulator::GetInstance()->DrawImGui(); });
-	Editor::GetInstance()->RegisterGameUI("ポストエフェクト", []() { PostEffectManager::GetInstance()->ImGui(); });
-	Editor::GetInstance()->RegisterGameUI("トゥーン", []() { ToonSettings::GetInstance()->ImGui(); });
-	Editor::GetInstance()->RegisterGameUI("輪郭線", []() { OutlineSettings::GetInstance()->ImGui(); });
-	Editor::GetInstance()->RegisterGameUI("JSON管理", &YoRigine::JsonManager::ImGuiManager);
-	Editor::GetInstance()->RegisterGameUI("UI管理", []() { YoRigine::UIManager::GetInstance()->ImGuiDebug(); });
-	Editor::GetInstance()->RegisterGameUI("テキストベイク", []() { YoRigine::TextTextureBaker::ImGuiPanel(); });
-	Editor::GetInstance()->RegisterGameUI("ログ", []() { Editor::GetInstance()->DrawLog(); });
-	Editor::GetInstance()->RegisterGameUI("オーディオ詳細", [this]() { audio_->ShowDebugWindow(); });
-	Editor::GetInstance()->RegisterGameUI("オーディオ設定", [this]() { audio_->ShowSettingsWindow(); });
-	Editor::GetInstance()->RegisterGameUI("PiP カメラ", []() { PipCameraSystem::GetInstance()->DrawImGuiWindow(); });
+	Editor::GetInstance()->RegisterGameUI(
+		"モデル操作",
+		[]() { YoRigine::ModelManipulator::GetInstance()->DrawImGui(); },
+		"AllScene", "シーン", true);
+	Editor::GetInstance()->RegisterGameUI(
+		"ポストエフェクト", []() { PostEffectManager::GetInstance()->ImGui(); },
+		"AllScene", "レンダリング");
+	Editor::GetInstance()->RegisterGameUI(
+		"トゥーン", []() { ToonSettings::GetInstance()->ImGui(); },
+		"AllScene", "レンダリング");
+	Editor::GetInstance()->RegisterGameUI(
+		"輪郭線", []() { OutlineSettings::GetInstance()->ImGui(); },
+		"AllScene", "レンダリング");
+	Editor::GetInstance()->RegisterGameUI(
+		"JSON管理", &YoRigine::JsonManager::ImGuiManager,
+		"AllScene", "システム");
+	Editor::GetInstance()->RegisterGameUI(
+		"UI管理", []() { YoRigine::UIManager::GetInstance()->ImGuiDebug(); },
+		"AllScene", "システム");
+	Editor::GetInstance()->RegisterGameUI(
+		"テキストベイク", []() { YoRigine::TextTextureBaker::ImGuiPanel(); },
+		"AllScene", "システム");
+	Editor::GetInstance()->RegisterGameUI(
+		"ログ", []() { Editor::GetInstance()->DrawLog(); },
+		"AllScene", "デバッグ", true);
+	Editor::GetInstance()->RegisterGameUI(
+		"オーディオ詳細", [this]() { audio_->ShowDebugWindow(); },
+		"AllScene", "システム");
+	Editor::GetInstance()->RegisterGameUI(
+		"オーディオ設定", [this]() { audio_->ShowSettingsWindow(); },
+		"AllScene", "システム");
+	Editor::GetInstance()->RegisterGameUI(
+		"PiP カメラ", []() { PipCameraSystem::GetInstance()->DrawImGuiWindow(); },
+		"AllScene", "レンダリング");
 #endif
 
 	//------------------------------------------------------------

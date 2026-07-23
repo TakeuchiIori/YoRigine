@@ -39,7 +39,8 @@ void BaseObjectManager::Initialize() {
 		assert(editor_ && "BaseObjectManager::Initialize : SetEditor() を先に呼ぶこと");
 		editor_->RegisterGameUI(
 			"オブジェクト一覧",
-			[this]() { this->DrawInspector(); });
+			[this]() { this->DrawInspector(); },
+			"AllScene", "シーン", true);
 		inspectorRegistered_ = true;
 	}
 #endif

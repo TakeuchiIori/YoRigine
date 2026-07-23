@@ -10,6 +10,44 @@
 #include <SceneSystems/SceneManager.h>
 #include <Debugger/ImGuiManager.h>
 #include <IconsFontAwesome5.h>
+#include <array>
+
+namespace {
+
+std::string InferEditorCategory(const std::string& name)
+{
+	auto contains = [&name](const char* token) {
+		return name.find(token) != std::string::npos;
+	};
+
+	if (contains("パーティクル") || contains("VFX") || contains("GpuParticle") ||
+		contains("複合エフェクト")) {
+		return "エフェクト";
+	}
+	if (contains("カメラ") || contains("ライティング") || contains("ポストエフェクト") ||
+		contains("トゥーン") || contains("輪郭線") || contains("PiP")) {
+		return "レンダリング";
+	}
+	if (contains("モデル操作") || contains("オブジェクト") || contains("Area") ||
+		contains("NavGrid") || contains("EventTrigger") || contains("スポーン") ||
+		contains("フィールドエネミー")) {
+		return "シーン";
+	}
+	if (contains("プレイヤー") || contains("バトルモード")) {
+		return "ゲームプレイ";
+	}
+	if (contains("ログ") || contains("デバッグ") || contains("状態情報") ||
+		contains("ゲーム時間") || contains("YWebAPI")) {
+		return "デバッグ";
+	}
+	if (contains("当たり判定") || contains("JSON") || contains("UI管理") ||
+		contains("テキスト") || contains("オーディオ")) {
+		return "システム";
+	}
+	return "その他";
+}
+
+} // namespace
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  内部カラー定数 (ImGuiManager::GetAccentColor() と同値)
@@ -119,6 +157,10 @@ void Editor::Draw()
 		}
 		dockLayoutDone_ = true;
 	}
+	if (workspaceResetRequested_) {
+		ResetWorkspace();
+		workspaceResetRequested_ = false;
+	}
 
 	ImGui::End();
 
@@ -141,17 +183,20 @@ void Editor::SetupDefaultDockLayout(ImGuiID dockspaceID)
 	ImGui::DockBuilderAddNode(dockspaceID, ImGuiDockNodeFlags_DockSpace);
 	ImGui::DockBuilderSetNodeSize(dockspaceID, ImGui::GetMainViewport()->Size);
 
-	ImGuiID dockMain = dockspaceID;
-	ImGuiID dockRight = ImGui::DockBuilderSplitNode(dockMain, ImGuiDir_Right, 0.22f, nullptr, &dockMain);
-	ImGuiID dockLeft = ImGui::DockBuilderSplitNode(dockMain, ImGuiDir_Left, 0.20f, nullptr, &dockMain);
-	ImGuiID dockBottom = ImGui::DockBuilderSplitNode(dockMain, ImGuiDir_Down, 0.22f, nullptr, &dockMain);
+	dockMainID_ = dockspaceID;
+	dockRightID_ = ImGui::DockBuilderSplitNode(
+		dockMainID_, ImGuiDir_Right, 0.25f, nullptr, &dockMainID_);
+	dockLeftID_ = ImGui::DockBuilderSplitNode(
+		dockMainID_, ImGuiDir_Left, 0.20f, nullptr, &dockMainID_);
+	dockBottomID_ = ImGui::DockBuilderSplitNode(
+		dockMainID_, ImGuiDir_Down, 0.24f, nullptr, &dockMainID_);
 
 	// ゲームビューを中央に配置
 	ImGui::DockBuilderDockWindow(
-		SceneManager::GetInstance()->GetCurrentSceneName().c_str(), dockMain);
-	ImGui::DockBuilderDockWindow("ログ", dockBottom);
-	ImGui::DockBuilderDockWindow("Inspector", dockRight);
-	ImGui::DockBuilderDockWindow("Hierarchy", dockLeft);
+		SceneManager::GetInstance()->GetCurrentSceneName().c_str(), dockMainID_);
+	ImGui::DockBuilderDockWindow("オブジェクト一覧", dockLeftID_);
+	ImGui::DockBuilderDockWindow("モデル操作", dockRightID_);
+	ImGui::DockBuilderDockWindow("ログ", dockBottomID_);
 
 	ImGui::DockBuilderFinish(dockspaceID);
 }
@@ -196,19 +241,44 @@ void Editor::DrawMenuBar()
 			ImGui::EndMenu();
 		}
 
-		// ---- UI 一覧 ----
-		if (ImGui::BeginMenu(ICON_FA_LAYER_GROUP "  UI一覧")) {
-			ImGui::SeparatorText("表示切替");
-
-			if (ImGui::MenuItem(ICON_FA_EYE "  全てのUIを表示", nullptr, &isAllDrawEditor_)) {
+		// ---- Unity / Unreal 風のカテゴリ別パネルメニュー ----
+		if (ImGui::BeginMenu(ICON_FA_LAYER_GROUP "  ウィンドウ")) {
+			if (ImGui::MenuItem("標準レイアウトに戻す")) {
+				workspaceResetRequested_ = true;
+			}
+			if (ImGui::MenuItem("全パネルを閉じる")) {
 				for (auto& [name, ui] : gameUIs_) {
-					ui.visible = isAllDrawEditor_;
+					ui.visible = false;
 				}
 			}
 			ImGui::Separator();
 
-			for (auto& [name, ui] : gameUIs_) {
-				ImGui::MenuItem(name.c_str(), nullptr, &ui.visible);
+			const auto currentScene = SceneManager::GetInstance()->GetCurrentSceneName();
+			constexpr std::array<const char*, 7> kCategoryOrder = {
+				"シーン", "ゲームプレイ", "レンダリング", "エフェクト",
+				"システム", "デバッグ", "その他"
+			};
+
+			for (const char* category : kCategoryOrder) {
+				std::vector<GameUI*> panels;
+				for (auto& [name, ui] : gameUIs_) {
+					if (ui.category != category) continue;
+					if (ui.sceneName != "AllScene" && ui.sceneName != currentScene) continue;
+					panels.push_back(&ui);
+				}
+				if (panels.empty()) continue;
+
+				std::sort(panels.begin(), panels.end(),
+					[](const GameUI* a, const GameUI* b) {
+						return a->name < b->name;
+					});
+
+				if (ImGui::BeginMenu(category)) {
+					for (auto* panel : panels) {
+						ImGui::MenuItem(panel->name.c_str(), nullptr, &panel->visible);
+					}
+					ImGui::EndMenu();
+				}
 			}
 			ImGui::EndMenu();
 		}
@@ -331,7 +401,7 @@ void Editor::DrawGameUIs()
 	auto currentScene = SceneManager::GetInstance()->GetCurrentSceneName();
 
 	for (auto& [name, ui] : gameUIs_) {
-		if (!isAllDrawEditor_ && !ui.visible) continue;
+		if (!ui.visible)                       continue;
 		if (!ui.drawFunc)                     continue;
 		if (ui.sceneName != "AllScene" && ui.sceneName != currentScene) continue;
 
@@ -341,6 +411,10 @@ void Editor::DrawGameUIs()
 		ImGui::PushStyleColor(ImGuiCol_BorderShadow,
 			ImVec4(0.852f, 0.682f, 0.196f, 0.10f));
 
+		const ImGuiID defaultDock = GetDefaultDockForCategory(ui.category);
+		if (defaultDock != 0) {
+			ImGui::SetNextWindowDockID(defaultDock, ImGuiCond_FirstUseEver);
+		}
 		if (ImGui::Begin(name.c_str(), &ui.visible)) {
 			ui.drawFunc();
 		}
@@ -421,9 +495,18 @@ void Editor::DrawStatusBar()
 void Editor::RegisterGameUI(
 	const std::string& name,
 	std::function<void()> drawFunc,
-	const std::string& sceneName)
+	const std::string& sceneName,
+	const std::string& category,
+	bool defaultVisible)
 {
-	GameUI newUI = { name, sceneName, drawFunc, true };
+	GameUI newUI{
+		name,
+		sceneName,
+		category.empty() ? InferEditorCategory(name) : category,
+		std::move(drawFunc),
+		defaultVisible,
+		defaultVisible
+	};
 
 	if (settingsLoaded_) {
 		auto it = savedSettings_.find(name);
@@ -448,6 +531,7 @@ void Editor::SaveSettings()
 	if (!file.is_open()) return;
 
 	file << "[Editor]\n";
+	file << "LayoutVersion=" << kLayoutVersion << "\n";
 	file << "ShowEditor=" << (showEditor_ ? "1" : "0") << "\n";
 	file << "CurrentScene=" << currentScene_ << "\n\n";
 
@@ -468,6 +552,7 @@ void Editor::LoadSettings()
 	}
 
 	std::string line, section;
+	int loadedLayoutVersion = 0;
 
 	while (std::getline(file, line)) {
 		if (line.empty() || line[0] == '#') continue;
@@ -484,7 +569,8 @@ void Editor::LoadSettings()
 		std::string value = line.substr(pos + 1);
 
 		if (section == "Editor") {
-			if (key == "ShowEditor")     showEditor_ = (value == "1");
+			if (key == "LayoutVersion")  loadedLayoutVersion = std::stoi(value);
+			else if (key == "ShowEditor")     showEditor_ = (value == "1");
 			else if (key == "CurrentScene")   currentScene_ = value;
 		}
 		else if (section == "GameUI") {
@@ -504,6 +590,12 @@ void Editor::LoadSettings()
 		}
 	}
 
+	// 旧形式は全パネルが初期表示だったため、その可視状態は引き継がない。
+	if (loadedLayoutVersion != kLayoutVersion) {
+		savedSettings_.clear();
+		workspaceResetRequested_ = true;
+	}
+
 	settingsLoaded_ = true;
 	file.close();
 }
@@ -516,6 +608,29 @@ void Editor::ApplySettings()
 			ui.visible = it->second.visible;
 		}
 	}
+}
+
+void Editor::ResetWorkspace()
+{
+	// 旧ウィンドウの浮動位置やDock参照も含めて一度消し、
+	// 現在の標準ワークスペースを同じ状態から再構築する。
+	ImGui::ClearIniSettings();
+
+	for (auto& [name, ui] : gameUIs_) {
+		ui.visible = ui.defaultVisible;
+	}
+
+	SetupDefaultDockLayout(dockspaceID_);
+	dockLayoutDone_ = true;
+	SaveSettings();
+}
+
+ImGuiID Editor::GetDefaultDockForCategory(const std::string& category) const
+{
+	if (category == "シーン") return dockLeftID_;
+	if (category == "デバッグ" || category == "システム") return dockBottomID_;
+	if (category == "エフェクト") return dockMainID_;
+	return dockRightID_;
 }
 
 // =============================================================================
