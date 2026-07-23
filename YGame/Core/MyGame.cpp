@@ -2,6 +2,7 @@
 // ParticleManager は削除済み。YParticleManager + EffectHandle を使用。
 #include "Mesh/MeshPrimitive.h"
 #include "Editor/Editor.h"
+#include "Editor/Tools/ImGuiStudio.h"
 #include "Systems/GameTime/GameTime.h"
 #include "Systems/Cinematic/CinematicManager.h"
 #include <ModelManipulator/ModelManipulator.h>
@@ -141,6 +142,11 @@ void MyGame::Initialize() {
 	Editor::GetInstance()->RegisterGameUI(
 		"当たり判定Editor",
 		[]() { YoRigine::CollisionEditor::GetInstance()->DrawImGui(); },
+		"AllScene", "システム");
+	ImGuiStudio::GetInstance()->Initialize();
+	Editor::GetInstance()->RegisterGameUI(
+		"ImGui Studio",
+		[]() { ImGuiStudio::GetInstance()->Draw(); },
 		"AllScene", "システム");
 	// ParticleEditor は旧システム専用のため削除済み。YParticleEditor を使用。
 	Editor::GetInstance()->RegisterGameUI(
