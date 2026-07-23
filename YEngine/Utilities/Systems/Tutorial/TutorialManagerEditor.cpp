@@ -1,0 +1,343 @@
+#include "TutorialManager.h"
+
+#ifdef USE_IMGUI
+
+#include <algorithm>
+#include <cctype>
+#include <filesystem>
+#include <vector>
+
+#include <imgui.h>
+#include "Editor/Widgets/YEditorWidget.h"
+#include "Systems/UI/UIManager.h"
+
+namespace {
+	std::vector<std::string> ListTutorialFiles() {
+		std::vector<std::string> files;
+		std::error_code error;
+		const std::filesystem::path directory("Resources/Json/Tutorials");
+		if (!std::filesystem::exists(directory, error)) return files;
+		for (const auto& entry : std::filesystem::directory_iterator(directory, error)) {
+			if (entry.is_regular_file() && entry.path().extension() == ".json") {
+				files.push_back(entry.path().generic_string());
+			}
+		}
+		std::sort(files.begin(), files.end());
+		return files;
+	}
+
+	std::vector<std::string> ListFontFiles() {
+		std::vector<std::string> files;
+		std::error_code error;
+		const std::filesystem::path directory("Resources/Fonts");
+		if (!std::filesystem::exists(directory, error)) return files;
+		for (const auto& entry : std::filesystem::directory_iterator(directory, error)) {
+			if (!entry.is_regular_file()) continue;
+			std::string extension = entry.path().extension().string();
+			std::transform(extension.begin(), extension.end(), extension.begin(),
+				[](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+			if (extension == ".ttf" || extension == ".otf") {
+				files.push_back(entry.path().generic_string());
+			}
+		}
+		std::sort(files.begin(), files.end());
+		return files;
+	}
+
+	std::vector<std::string> ListUIIds() {
+		std::vector<std::string> ids;
+		for (const auto& [id, ui] : YoRigine::UIManager::GetInstance()->GetAllUIs()) {
+			if (ui && !ui->IsTransient()) ids.push_back(id);
+		}
+		std::sort(ids.begin(), ids.end());
+		return ids;
+	}
+
+	std::vector<std::string> ListPanelTextures() {
+		std::vector<std::string> files;
+		const std::filesystem::path roots[] = { "Resources/UITex", "Resources/images" };
+		for (const auto& root : roots) {
+			std::error_code error;
+			if (!std::filesystem::exists(root, error)) continue;
+			for (const auto& entry : std::filesystem::recursive_directory_iterator(root, error)) {
+				if (!entry.is_regular_file()) continue;
+				std::string extension = entry.path().extension().string();
+				std::transform(extension.begin(), extension.end(), extension.begin(),
+					[](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+				if (extension == ".png" || extension == ".jpg" || extension == ".jpeg") {
+					const std::string path = entry.path().generic_string();
+					if (path.find("__tutorial_runtime") == std::string::npos &&
+						path.find("__bake_preview") == std::string::npos) files.push_back(path);
+				}
+			}
+		}
+		std::sort(files.begin(), files.end());
+		files.erase(std::unique(files.begin(), files.end()), files.end());
+		return files;
+	}
+}
+
+namespace YoRigine {
+
+	void TutorialManager::DrawEditor() {
+		if (editorPreviewPending_ && ImGui::GetTime() - editorPreviewChangeTime_ >= 0.12) {
+			runtimeUIDirty_ = true;
+			editorPreviewPending_ = false;
+		}
+		static std::vector<std::string> availableFiles;
+		static std::vector<std::string> availableFonts;
+		static std::vector<std::string> availablePanelTextures;
+		static int availableSelection = 0;
+		static bool resourcesScanned = false;
+		if (!resourcesScanned) {
+			availableFiles = ListTutorialFiles();
+			availableFonts = ListFontFiles();
+			availablePanelTextures = ListPanelTextures();
+			for (const std::string& path : availableFiles) {
+				TutorialData discovered;
+				Load(discovered, path); // 保存済みデータ内のイベント名も候補へ登録
+			}
+			resourcesScanned = true;
+		}
+		const std::vector<std::string> uiIds = ListUIIds();
+
+		ImGui::TextUnformatted("説明ステップを並べて、ゲーム内でそのまま再生できます");
+		ImGui::TextDisabled("待機方法: 決定入力 / 指定秒数 / ゲームイベント");
+
+		if (YEditorWidget::Section section{ "ファイル" }) {
+			if (!availableFiles.empty()) {
+				availableSelection = std::clamp(availableSelection, 0, static_cast<int>(availableFiles.size()) - 1);
+				if (YEditorWidget::StringCombo("既存チュートリアル", editorPath_, availableFiles)) {
+					auto it = std::find(availableFiles.begin(), availableFiles.end(), editorPath_);
+					if (it != availableFiles.end()) availableSelection = static_cast<int>(std::distance(availableFiles.begin(), it));
+				}
+			}
+			if (YEditorWidget::TreeNode directPath{ "保存先を直接編集" }) {
+				YEditorWidget::InputText("保存先", editorPath_);
+			}
+			if (ImGui::Button("新規作成")) {
+				editorData_ = TutorialData{};
+				editorData_.steps.push_back(TutorialStep{});
+				editorSelectedStep_ = 0;
+				editorStatus_ = "新しいチュートリアルを作成しました";
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("保存")) {
+				editorStatus_ = Save(editorData_, editorPath_) ? "保存しました: " + editorPath_ : "保存に失敗しました";
+				availableFiles = ListTutorialFiles();
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("読込")) {
+				TutorialData loaded;
+				if (Load(loaded, editorPath_)) {
+					editorData_ = std::move(loaded);
+					editorSelectedStep_ = 0;
+					editorStatus_ = "読み込みました: " + editorPath_;
+				}
+				else editorStatus_ = "読み込みに失敗しました";
+			}
+
+			if (ImGui::Button("一覧を更新")) {
+				availableFiles = ListTutorialFiles();
+				availableFonts = ListFontFiles();
+				availablePanelTextures = ListPanelTextures();
+			}
+			if (!editorStatus_.empty()) ImGui::TextWrapped("%s", editorStatus_.c_str());
+		}
+
+		if (YEditorWidget::Section section{ "再生確認" }) {
+			if (!IsPlaying()) {
+				if (ImGui::Button("最初から再生") && !editorData_.steps.empty()) Start(editorData_);
+				ImGui::SameLine();
+				if (ImGui::Button("選択ステップから再生") && !editorData_.steps.empty()) {
+					Start(editorData_, static_cast<std::size_t>(std::max(0, editorSelectedStep_)));
+				}
+			}
+			else {
+				ImGui::Text("再生中: %zu / %zu", currentStep_ + 1, currentData_.steps.size());
+				if (ImGui::Button("次へ")) Advance();
+				ImGui::SameLine();
+				if (ImGui::Button("停止")) Stop();
+				if (currentStep_ < currentData_.steps.size() &&
+					currentData_.steps[currentStep_].waitType == TutorialWaitType::Event) {
+					const std::string& eventName = currentData_.steps[currentStep_].eventName;
+					if (ImGui::Button("現在のイベントを送信")) NotifyEvent(eventName);
+					ImGui::SameLine();
+					ImGui::TextDisabled("%s", eventName.c_str());
+				}
+			}
+		}
+
+		bool styleChanged = false;
+		if (YEditorWidget::Section section{ "レイアウト・デザイン" }) {
+			YEditorWidget::Checkbox("再生中にリアルタイム反映", editorLivePreview_);
+			ImGui::TextDisabled("プリセット");
+			if (ImGui::Button("画面下")) {
+				editorData_.style.panelPosition = { 640.0f, 610.0f };
+				editorData_.style.panelSize = { 1120.0f, 170.0f };
+				editorData_.style.textOffset = { -90.0f, 0.0f };
+				editorData_.style.textMaxWidth = 780.0f;
+				editorData_.style.hintOffset = { 420.0f, 50.0f };
+				styleChanged = true;
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("画面上")) {
+				editorData_.style.panelPosition = { 640.0f, 110.0f };
+				editorData_.style.panelSize = { 1120.0f, 170.0f };
+				editorData_.style.textOffset = { -90.0f, 0.0f };
+				editorData_.style.textMaxWidth = 780.0f;
+				editorData_.style.hintOffset = { 420.0f, 50.0f };
+				styleChanged = true;
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("中央カード")) {
+				editorData_.style.panelPosition = { 640.0f, 360.0f };
+				editorData_.style.panelSize = { 760.0f, 300.0f };
+				editorData_.style.textMaxWidth = 680.0f;
+				editorData_.style.textOffset = { 0.0f, -30.0f };
+				editorData_.style.hintOffset = { 0.0f, 105.0f };
+				styleChanged = true;
+			}
+
+			YEditorWidget::SectionHeader("説明パネル");
+			styleChanged |= YEditorWidget::StringCombo("説明パネル画像", editorData_.style.panelTexturePath,
+				availablePanelTextures, true);
+			styleChanged |= YEditorWidget::Color("説明パネル色", editorData_.style.panelColor);
+			styleChanged |= YEditorWidget::DragVec2("説明パネル位置", editorData_.style.panelPosition, 1.0f);
+			styleChanged |= YEditorWidget::DragVec2("説明パネルサイズ", editorData_.style.panelSize, 1.0f, 1.0f, 4096.0f);
+			styleChanged |= YEditorWidget::DragVec2("説明文位置", editorData_.style.textOffset, 1.0f, -2048.0f, 2048.0f);
+			YEditorWidget::HelpMarker("説明パネルの中心を基準にした説明文の位置です");
+
+			YEditorWidget::SectionHeader("説明文のデザイン");
+			styleChanged |= YEditorWidget::InputText("チュートリアル名", editorData_.name);
+			styleChanged |= YEditorWidget::StringCombo("フォント", editorData_.style.fontFilePath, availableFonts, true);
+			if (editorData_.style.fontFilePath.empty()) {
+				styleChanged |= YEditorWidget::InputText("システムフォント名", editorData_.style.fontFamily);
+			}
+			styleChanged |= YEditorWidget::DragFloat("文字サイズ", editorData_.style.fontSize, 1.0f, 8.0f, 128.0f, "%.0f");
+			styleChanged |= YEditorWidget::Color("文字色", editorData_.style.textColor);
+			styleChanged |= YEditorWidget::DragFloat("縁取り", editorData_.style.outlineWidth, 0.5f, 0.0f, 16.0f, "%.1f");
+			styleChanged |= YEditorWidget::Color("縁色", editorData_.style.outlineColor);
+			styleChanged |= YEditorWidget::DragFloat("文章幅", editorData_.style.textMaxWidth, 1.0f, 64.0f, 4096.0f, "%.0f");
+			styleChanged |= YEditorWidget::DragFloat("文字余白", editorData_.style.textPadding, 1.0f, 0.0f, 128.0f, "%.0f");
+			static constexpr const char* alignLabels[] = { "左揃え", "中央揃え", "右揃え" };
+			styleChanged |= ImGui::Combo("文字揃え", &editorData_.style.textAlign, alignLabels, IM_ARRAYSIZE(alignLabels));
+			styleChanged |= YEditorWidget::Checkbox("文字に影を付ける", editorData_.style.textShadow);
+			if (editorData_.style.textShadow) {
+				styleChanged |= YEditorWidget::DragVec2("影オフセット", editorData_.style.shadowOffset, 0.5f, -64.0f, 64.0f);
+				styleChanged |= YEditorWidget::Color("影色", editorData_.style.shadowColor);
+			}
+
+			YEditorWidget::SectionHeader("次へ・スキップUI");
+			styleChanged |= YEditorWidget::Checkbox("操作案内を表示", editorData_.style.showControlHint);
+			if (editorData_.style.showControlHint) {
+				styleChanged |= YEditorWidget::InputText("次への表示文", editorData_.style.hintText);
+				styleChanged |= YEditorWidget::InputText("スキップの表示文", editorData_.style.skipHintText);
+				styleChanged |= YEditorWidget::DragVec2("次へUI位置", editorData_.style.hintOffset, 1.0f, -2048.0f, 2048.0f);
+				YEditorWidget::HelpMarker("説明パネルの中心を基準にした次へUIの位置です");
+				styleChanged |= YEditorWidget::DragVec2("次へUIサイズ", editorData_.style.hintPanelSize, 1.0f, 1.0f, 4096.0f);
+				styleChanged |= YEditorWidget::StringCombo("次へUI背景画像", editorData_.style.hintPanelTexturePath,
+					availablePanelTextures, true);
+				styleChanged |= YEditorWidget::Color("次へUI背景色", editorData_.style.hintPanelColor);
+				styleChanged |= YEditorWidget::DragFloat("次へ文字サイズ", editorData_.style.hintFontSize,
+					1.0f, 8.0f, 128.0f, "%.0f");
+				styleChanged |= YEditorWidget::Color("次へ文字色", editorData_.style.hintTextColor);
+				styleChanged |= YEditorWidget::DragFloat("次へ文字の縁取り", editorData_.style.hintOutlineWidth,
+					0.5f, 0.0f, 16.0f, "%.1f");
+				styleChanged |= YEditorWidget::Color("次へ文字の縁色", editorData_.style.hintOutlineColor);
+				styleChanged |= YEditorWidget::DragFloat("次へ文字余白", editorData_.style.hintPadding,
+					1.0f, 0.0f, 128.0f, "%.0f");
+			}
+			styleChanged |= YEditorWidget::DragInt("描画レイヤー", editorData_.style.layer, 1, 0, 10000);
+		}
+		if (styleChanged && editorLivePreview_ && IsPlaying()) {
+			currentData_.style = editorData_.style;
+			editorPreviewPending_ = true;
+			editorPreviewChangeTime_ = ImGui::GetTime();
+		}
+
+		if (YEditorWidget::Section section{ "ステップ一覧" }) {
+			if (ImGui::Button("追加")) {
+				editorData_.steps.push_back(TutorialStep{});
+				editorSelectedStep_ = static_cast<int>(editorData_.steps.size()) - 1;
+			}
+			ImGui::SameLine();
+			const bool hasSelection = !editorData_.steps.empty() && editorSelectedStep_ >= 0 &&
+				editorSelectedStep_ < static_cast<int>(editorData_.steps.size());
+			if (!hasSelection) ImGui::BeginDisabled();
+			if (ImGui::Button("複製") && hasSelection) {
+				TutorialStep copy = editorData_.steps[editorSelectedStep_];
+				copy.name += " コピー";
+				editorData_.steps.insert(editorData_.steps.begin() + editorSelectedStep_ + 1, std::move(copy));
+				++editorSelectedStep_;
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("上へ") && hasSelection && editorSelectedStep_ > 0) {
+				std::swap(editorData_.steps[editorSelectedStep_], editorData_.steps[editorSelectedStep_ - 1]);
+				--editorSelectedStep_;
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("下へ") && hasSelection && editorSelectedStep_ + 1 < static_cast<int>(editorData_.steps.size())) {
+				std::swap(editorData_.steps[editorSelectedStep_], editorData_.steps[editorSelectedStep_ + 1]);
+				++editorSelectedStep_;
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("削除") && hasSelection) {
+				editorData_.steps.erase(editorData_.steps.begin() + editorSelectedStep_);
+				editorSelectedStep_ = std::min(editorSelectedStep_, static_cast<int>(editorData_.steps.size()) - 1);
+			}
+			if (!hasSelection) ImGui::EndDisabled();
+
+			ImGui::BeginChild("##tutorialStepList", ImVec2(0.0f, 150.0f), true);
+			for (int i = 0; i < static_cast<int>(editorData_.steps.size()); ++i) {
+				const std::string label = std::to_string(i + 1) + ". " + editorData_.steps[i].name;
+				if (ImGui::Selectable(label.c_str(), editorSelectedStep_ == i)) editorSelectedStep_ = i;
+			}
+			ImGui::EndChild();
+		}
+
+		if (!editorData_.steps.empty()) {
+			editorSelectedStep_ = std::clamp(editorSelectedStep_, 0, static_cast<int>(editorData_.steps.size()) - 1);
+			TutorialStep& step = editorData_.steps[editorSelectedStep_];
+			if (YEditorWidget::Section section{ "選択ステップの編集" }) {
+				YEditorWidget::InputText("管理名", step.name);
+				YEditorWidget::InputText("話者名", step.speaker);
+				YEditorWidget::InputTextMultiline("本文", step.text, 6);
+
+				static constexpr const char* waitLabels[] = { "決定入力を待つ", "指定秒数を待つ", "ゲームイベントを待つ" };
+				int waitType = static_cast<int>(step.waitType);
+				if (ImGui::Combo("完了条件", &waitType, waitLabels, IM_ARRAYSIZE(waitLabels))) {
+					step.waitType = static_cast<TutorialWaitType>(waitType);
+				}
+				if (step.waitType == TutorialWaitType::Seconds) {
+					YEditorWidget::DragFloat("待ち時間(秒)", step.waitSeconds, 0.1f, 0.0f, 60.0f, "%.1f");
+				}
+				else if (step.waitType == TutorialWaitType::Event) {
+					const auto& knownEvents = GetKnownEventNames();
+					if (!knownEvents.empty()) {
+						YEditorWidget::StringCombo("イベント名", step.eventName, knownEvents);
+					}
+					const bool eventIsKnown = std::find(knownEvents.begin(), knownEvents.end(), step.eventName) != knownEvents.end();
+					if (knownEvents.empty() || !eventIsKnown) {
+						YEditorWidget::InputText("新しいイベント名", step.eventName);
+						if (!step.eventName.empty() && ImGui::SmallButton("イベント候補に登録")) {
+							RegisterEventName(step.eventName);
+						}
+					}
+					else if (ImGui::SmallButton("一覧にないイベントを追加")) {
+						step.eventName.clear();
+					}
+					YEditorWidget::HelpMarker("ゲーム側から TutorialManager::NotifyEvent(イベント名) を呼ぶと次へ進みます");
+				}
+				if (!uiIds.empty()) YEditorWidget::StringCombo("強調するUI", step.targetUIId, uiIds, true);
+				else YEditorWidget::InputText("強調するUI ID", step.targetUIId);
+				YEditorWidget::HelpMarker("UI管理に登録されているIDを指定すると、そのUIをパルス表示します");
+				YEditorWidget::Checkbox("ゲームを一時停止", step.pauseGameplay);
+				YEditorWidget::Checkbox("スキップ可能", step.skippable);
+			}
+		}
+	}
+
+} // namespace YoRigine
+
+#endif // USE_IMGUI

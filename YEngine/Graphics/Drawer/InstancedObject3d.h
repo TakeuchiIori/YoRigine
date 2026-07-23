@@ -122,30 +122,32 @@ private:
 
   struct Batch {
     std::vector<InstanceData> cpuData;
-    Microsoft::WRL::ComPtr<ID3D12Resource> gpuBuffer;
-    InstanceData *mapped = nullptr;
-    uint32_t capacity = 0;
-    uint32_t srvIndex = UINT32_MAX;
-    D3D12_GPU_DESCRIPTOR_HANDLE srvHandleGPU{};
 
-    // ── 影パス専用バッファ ──────────────────────────────────
-    // 影パスとカラーパスは同一コマンドリスト内で記録され、GPU
-    // 実行はフレーム末尾。 バッファを共有すると、影パス記録後にカラーパス
-    // (frustum culling 付き) が 同じマップ済みメモリを上書きし、GPU
-    // が影パスを実行する時点では中身が 「カリング後の別の集合」になってしまう
-    // (影が出たり消えたりチラつく原因)。 → 影パスは独立したバッファへ書き込む。
-    Microsoft::WRL::ComPtr<ID3D12Resource> shadowGpuBuffer;
-    InstanceData *shadowMapped = nullptr;
-    uint32_t shadowCapacity = 0;
-    uint32_t shadowSrvIndex = UINT32_MAX;
-    D3D12_GPU_DESCRIPTOR_HANDLE shadowSrvHandleGPU{};
+    struct BufferSlot {
+      Microsoft::WRL::ComPtr<ID3D12Resource> gpuBuffer;
+      InstanceData *mapped = nullptr;
+      uint32_t capacity = 0;
+      uint32_t srvIndex = UINT32_MAX;
+      D3D12_GPU_DESCRIPTOR_HANDLE srvHandleGPU{};
+    };
+
+    std::vector<BufferSlot> colorSlots;
+    uint32_t colorFrameIndex = UINT32_MAX;
+    size_t nextColorSlot = 0;
+
+    std::vector<BufferSlot> shadowSlots;
+    uint32_t shadowFrameIndex = UINT32_MAX;
+    size_t nextShadowSlot = 0;
   };
 
   // 指定batchが指定要素数を入れられるように容量確保 (足りなければ再作成)
-  void EnsureCapacity(Batch &batch, uint32_t needed);
+  void EnsureCapacity(Batch::BufferSlot &slot, uint32_t needed);
 
-  // 影パス用バッファの容量確保 (カラーパスとは独立)
-  void EnsureShadowCapacity(Batch &batch, uint32_t needed);
+  // 同一フレーム内の複数 DrawAll/DrawShadow が GPU 実行前に互いのデータを
+  // 上書きしないよう、呼び出しごとに別スロットを使う。
+  void EnsureShadowCapacity(Batch::BufferSlot &slot, uint32_t needed);
+  Batch::BufferSlot &AcquireColorSlot(Batch &batch, uint32_t needed);
+  Batch::BufferSlot &AcquireShadowSlot(Batch &batch, uint32_t needed);
 
 private:
   YoRigine::DirectXCommon *dxCommon_ = nullptr;

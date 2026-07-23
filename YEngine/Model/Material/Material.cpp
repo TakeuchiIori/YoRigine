@@ -15,10 +15,12 @@ void Material::Initialize(std::string& textureFilePath)
 	materialConstant_->Kd = mtlData_.Kd;
 }
 
-void Material::RecordDrawCommands(ID3D12GraphicsCommandList* command, UINT rootParameterIndexCBV, UINT rootParameterIndexSRV)
+void Material::RecordDrawCommands(ID3D12GraphicsCommandList* command, UINT rootParameterIndexCBV, UINT rootParameterIndexSRV, const std::string& overrideTexturePath)
 {
 	command->SetGraphicsRootConstantBufferView(rootParameterIndexCBV, materialConstantResource_->GetGPUVirtualAddress());
-	command->SetGraphicsRootDescriptorTable(rootParameterIndexSRV, TextureManager::GetInstance()->GetsrvHandleGPU(mtlData_.textureFilePath));
+	// 上書き指定があればそのテクスチャを、無ければ本来のテクスチャをバインドする
+	const std::string& texturePath = overrideTexturePath.empty() ? mtlData_.textureFilePath : overrideTexturePath;
+	command->SetGraphicsRootDescriptorTable(rootParameterIndexSRV, TextureManager::GetInstance()->GetsrvHandleGPU(texturePath));
 }
 
 

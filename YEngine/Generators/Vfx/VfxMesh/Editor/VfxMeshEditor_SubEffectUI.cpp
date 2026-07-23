@@ -6,180 +6,103 @@
 #include <cstring>
 #include <string>
 #include <utility>
+#include <vector>
+#include "Core/Editor/Widgets/YEditorWidget.h"
+#include <Vfx/VfxMesh/Core/VfxMeshRegistry.h>
+#include <Vfx/VfxMesh/Core/GeometryRegistry.h>
+#include <Vfx/VfxMesh/Core/MaterialRegistry.h>
 
 namespace YoRigine {
 
-    void VfxMeshEditor::DrawLightVolumeSection(VfxElement& sub)
+    namespace {
+        constexpr float kRad2Deg = 57.29577951308232f;
+        constexpr float kDeg2Rad = 0.017453292519943295f;
+
+        // レジストリの displayName から現在 type のインデックスを引く
+        template <typename Registry, typename TypeEnum>
+        int CurrentComboIndex(const Registry& reg, TypeEnum type) {
+            const auto& all = reg.GetAll();
+            for (int i = 0; i < static_cast<int>(all.size()); ++i)
+                if (all[i].type == type) return i;
+            return 0;
+        }
+    }
+
+    // 形状（Composed）1個分の編集 UI
+    void VfxMeshEditor::DrawComposedElementBody(VfxElement& sub)
     {
         auto* sel = Selected();
         if (!sel) return;
-        auto& lv = sub.lightVolume;
 
-        ImGui::SeparatorText("OBB サイズ  (X=右 / Y=上 / Z=前)");
-        {
-            VfxEffectAsset b = sel->asset;
-            if (ImGui::DragFloat3("半辺長##he", &lv.halfExtents.x, 0.05f, 0.01f, 50.f, "%.2f"))
-                CommitChange(b, "Volume サイズ");
-        }
+        auto& geomReg = GeometryRegistry::Instance();
+        auto& matReg  = MaterialRegistry::Instance();
 
-        ImGui::SeparatorText("カラー  (α = ボリューム濃度)");
+        // ── 回転（Cone の向き / 地面デカール用） ──
         {
+            Vector3 euler = QuaternionToEuler(sub.rotation);
+            Vector3 deg = { euler.x * kRad2Deg, euler.y * kRad2Deg, euler.z * kRad2Deg };
             VfxEffectAsset b = sel->asset;
-            bool c = false;
-            c |= ImGui::ColorEdit4("ボリュームカラー##vc", &lv.color.x);
-            c |= ImGui::SliderFloat("輝度##inten", &lv.intensity, 0.f, 10.f, "%.2f");
-            if (c) CommitChange(b, "Volume カラー");
-        }
-
-        ImGui::SeparatorText("フェード / ノイズ");
-        {
-            VfxEffectAsset b = sel->asset;
-            bool c = false;
-            c |= ImGui::SliderFloat("エッジフェード##lvedge", &lv.edgeFade, 0.001f, 0.5f, "%.3f");
-            c |= ImGui::DragFloat("近接フェード距離##lvdepth", &lv.depthFade, 0.05f, 0.001f, 50.0f, "%.2f");
-            c |= ImGui::DragFloat("ノイズ細かさ##lvnoiseTile", &lv.noiseTiling, 0.05f, 0.01f, 50.0f, "%.2f");
-            c |= ImGui::SliderFloat("ノイズ強度##lvnoiseStr", &lv.noiseStrength, 0.0f, 1.0f, "%.2f");
-            if (c) CommitChange(b, "Volume フェード/ノイズ");
-        }
-
-        ImGui::SeparatorText("ビーム");
-        {
-            VfxEffectAsset b = sel->asset;
-            bool c = false;
-            c |= ImGui::SliderFloat("ビーム強度##lvbeamStr", &lv.beamStrength, 0.0f, 1.0f, "%.2f");
-            c |= ImGui::SliderFloat("ビーム半径##lvbeamRadius", &lv.beamRadius, 0.01f, 1.5f, "%.2f");
-            c |= ImGui::DragFloat("ビーム鋭さ##lvbeamPower", &lv.beamPower, 0.05f, 0.1f, 12.0f, "%.2f");
-            c |= ImGui::DragFloat("ビーム発光##lvbeamGlow", &lv.beamGlow, 0.05f, 0.0f, 10.0f, "%.2f");
-            if (c) CommitChange(b, "Volume ビーム");
+            if (YEditorWidget::DragVec3("回転(deg)##rot", deg, 0.5f, -180.f, 180.f, "%.1f")) {
+                Vector3 rad = { deg.x * kDeg2Rad, deg.y * kDeg2Rad, deg.z * kDeg2Rad };
+                sub.rotation = EulerToQuaternion(rad);
+                CommitChange(b, "エレメント 回転");
+            }
+            ImGui::SameLine();
+            if (ImGui::SmallButton("地面に寝かせる##rot")) {
+                sub.rotation = MakeRotateAxisAngleQuaternion(Vector3{ 1,0,0 }, -1.57079633f);
+                CommitChange(b, "エレメント 回転(地面)");
+            }
+            ImGui::SameLine();
+            if (ImGui::SmallButton("向きリセット##rot")) {
+                sub.rotation = Quaternion::Identity();
+                CommitChange(b, "エレメント 回転リセット");
+            }
         }
 
         ImGui::Spacing();
-        ImGui::Checkbox("OBB ワイヤーフレーム表示", &showVolumeDebug_);
-        if (showVolumeDebug_) ImGui::TextColored(ImVec4(1, 1, 0, 1), "  > OBB ワイヤーフレーム ON");
-    }
 
-    void VfxMeshEditor::DrawNoiseVolumeSection(VfxElement& sub)
-    {
-        auto* sel = Selected();
-        if (!sel) return;
-        auto& sm = sub.smoke;
-
-        ImGui::SeparatorText("カラー  (rgb>1 で Bloom / a=濃度)");
+        // ── 形状（Geometry）選択 ──
+        YEditorWidget::SectionHeader("形状 (Geometry)");
         {
+            const auto& all = geomReg.GetAll();
+            std::vector<const char*> names;
+            names.reserve(all.size());
+            for (const auto& d : all) names.push_back(d.displayName);
+            int cur = CurrentComboIndex(geomReg, sub.GeometryType());
+            ImGui::SetNextItemWidth(180);
             VfxEffectAsset b = sel->asset;
-            bool c = false;
-            c |= ImGui::DragFloat4("火球色##sm", &sm.color.x, 0.02f, 0.0f, 10.0f, "%.2f");
-            c |= ImGui::DragFloat4("煙色(爆発後)##smk", &sm.smokeColor.x, 0.01f, 0.0f, 4.0f, "%.2f");
-            c |= ImGui::DragFloat("上昇速度(爆発後)##smrise", &sm.riseSpeed, 0.02f, 0.0f, 8.0f, "%.2f");
-            if (c) CommitChange(b, "NoiseVolume 色");
-            ImGui::TextDisabled("爆発ワンショット時: 火球色→煙色へ遷移し、上昇しながら漂って消えます");
-        }
-
-        ImGui::SeparatorText("ボリューム / 渦巻き");
-        {
-            VfxEffectAsset b = sel->asset;
-            bool c = false;
-            c |= ImGui::DragFloat("半径##smr", &sm.radius, 0.05f, 0.1f, 20.0f, "%.2f");
-            c |= ImGui::DragFloat("ノイズスケール##sms", &sm.noiseScale, 0.05f, 0.1f, 16.0f, "%.2f");
-            c |= ImGui::SliderFloat("渦巻きの強さ##smn", &sm.noiseStrength, 0.0f, 1.0f);
-            c |= ImGui::DragFloat("スクロール速度##smc", &sm.scrollSpeed, 0.01f, 0.0f, 3.0f, "%.2f");
-            c |= ImGui::DragFloat("縁の柔らかさ##smf", &sm.fresnelPower, 0.05f, 0.1f, 8.0f, "%.2f");
-            c |= ImGui::DragFloat("密度##smd", &sm.density, 0.01f, 0.0f, 3.0f, "%.2f");
-            c |= ImGui::DragFloat("オクターブ##smo", &sm.noiseOctaves, 0.1f, 1.0f, 5.0f, "%.1f");
-            c |= ImGui::DragFloat("リム発光(フレア)##smrim", &sm.rimIntensity, 0.05f, 0.0f, 10.0f, "%.2f");
-            if (c) CommitChange(b, "NoiseVolume パラメータ");
-        }
-
-        ImGui::SeparatorText("動き（モーションで作る）");
-        {
-            ImGui::TextDisabled("  NoiseVolume の膨張/上昇/フェードは下の「このエレメントのモーション」で作ります。");
-            if (ImGui::Button("定番の動きをMotionで追加##smtomotion")) {
-                VfxEffectAsset b2 = sel->asset;
-                ApplyDefaultElementMotions(sub);
-                CommitChange(b2, "NoiseVolume に定番モーション追加");
+            if (ImGui::Combo("形状##geomType", &cur, names.data(), static_cast<int>(names.size()))) {
+                sub.geom = geomReg.MakeDefault(all[cur].type);
+                CommitChange(b, "形状 変更");
             }
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("膨張/上昇/フェード/色変化/揺れをモーションとして追加します。");
         }
-    }
-
-    void VfxMeshEditor::DrawLightningBoltSection(VfxElement& sub)
-    {
-        auto* sel = Selected();
-        if (!sel) return;
-        auto& lt = sub.lightning;
-        const ImGuiColorEditFlags hdr = ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_Float;
-
-        ImGui::SeparatorText("カラー (rgb>1 で Bloom)");
         {
             VfxEffectAsset b = sel->asset;
-            bool c = false;
-            c |= ImGui::ColorEdit4("芯の色##lt", &lt.color.x, hdr);
-            c |= ImGui::ColorEdit4("グロー色##lt", &lt.glowColor.x, hdr);
-            c |= ImGui::ColorEdit4("枝の色##lt", &lt.branchColor.x, hdr);
-            if (c) CommitChange(b, "LightningBolt 色");
+            if (geomReg.DrawUI(sub.GeometryType(), sub.geom))
+                CommitChange(b, "形状パラメータ");
         }
 
-        ImGui::SeparatorText("実体感 / アウトライン");
+        ImGui::Spacing();
+
+        // ── マテリアル（Material）選択 ──
+        YEditorWidget::SectionHeader("マテリアル (Material)");
         {
+            const auto& all = matReg.GetAll();
+            std::vector<const char*> names;
+            names.reserve(all.size());
+            for (const auto& d : all) names.push_back(d.displayName);
+            int cur = CurrentComboIndex(matReg, sub.MaterialType());
+            ImGui::SetNextItemWidth(180);
             VfxEffectAsset b = sel->asset;
-            bool c = false;
-            c |= ImGui::SliderFloat("芯の太さ##ltcw", &lt.coreWidth, 0.0f, 1.0f, "%.2f");
-            c |= ImGui::SliderFloat("実体感(透明感↓)##lts", &lt.solidness, 0.0f, 1.0f, "%.2f");
-            c |= ImGui::SliderFloat("アウトライン強調##lto", &lt.outlineIntensity, 0.0f, 4.0f, "%.2f");
-            if (c) CommitChange(b, "LightningBolt 実体感");
+            if (ImGui::Combo("マテリアル##matType", &cur, names.data(), static_cast<int>(names.size()))) {
+                sub.mat = matReg.MakeDefault(all[cur].type);
+                CommitChange(b, "マテリアル 変更");
+            }
         }
-
-        ImGui::SeparatorText("方向 / 曲線");
         {
             VfxEffectAsset b = sel->asset;
-            bool c = false;
-            if (ImGui::SmallButton("縦##ltd")) { lt.direction = { 0,1,0 }; c = true; } ImGui::SameLine();
-            if (ImGui::SmallButton("横##ltd")) { lt.direction = { 1,0,0 }; c = true; } ImGui::SameLine();
-            if (ImGui::SmallButton("奥##ltd")) { lt.direction = { 0,0,1 }; c = true; } ImGui::SameLine();
-            if (ImGui::SmallButton("斜め##ltd")) { lt.direction = { 1,1,0 }; c = true; }
-            c |= ImGui::DragFloat3("方向(自由)##ltd", &lt.direction.x, 0.02f, -1.0f, 1.0f, "%.2f");
-            c |= ImGui::SliderFloat("曲げ量(弧)##ltbend", &lt.bendAmount, -5.0f, 5.0f, "%.2f");
-            if (c) CommitChange(b, "LightningBolt 方向/曲線");
-        }
-
-        ImGui::SeparatorText("稲妻 / 明滅");
-        {
-            VfxEffectAsset b = sel->asset;
-            bool c = false;
-            c |= ImGui::DragFloat("長さ##ltlen", &lt.length, 0.05f, 0.1f, 50.0f, "%.2f");
-            c |= ImGui::DragFloat("幅##ltw", &lt.width, 0.005f, 0.01f, 2.0f, "%.3f");
-            c |= ImGui::DragFloat("ジグザグ振れ##ltj", &lt.jitter, 0.02f, 0.0f, 5.0f, "%.2f");
-            c |= ImGui::SliderInt("分割数##lts", &lt.segments, 4, 64);
-            c |= ImGui::SliderInt("枝の数##ltb", &lt.branches, 0, 8);
-            c |= ImGui::DragFloat("枝の振れ##ltbj", &lt.branchJitter, 0.02f, 0.0f, 5.0f, "%.2f");
-            c |= ImGui::DragFloat("明滅レート(回/秒)##ltf", &lt.flickerRate, 0.5f, 0.0f, 60.0f, "%.1f");
-            c |= ImGui::DragFloat("芯のグロー##ltg", &lt.glowPower, 0.05f, 0.1f, 8.0f, "%.2f");
-            if (c) CommitChange(b, "LightningBolt パラメータ");
-        }
-    }
-
-    void VfxMeshEditor::DrawShockwaveRingSection(VfxElement& sub)
-    {
-        auto* sel = Selected();
-        if (!sel) return;
-        auto& sw = sub.shockwave;
-
-        ImGui::SeparatorText("カラー (rgb>1 で Bloom)");
-        {
-            VfxEffectAsset b = sel->asset;
-            if (ImGui::DragFloat4("色##sw", &sw.color.x, 0.02f, 0.0f, 10.0f, "%.2f"))
-                CommitChange(b, "ShockwaveRing 色");
-        }
-
-        ImGui::SeparatorText("リング / 速度");
-        {
-            VfxEffectAsset b = sel->asset;
-            bool c = false;
-            c |= ImGui::DragFloat("最大半径##swr", &sw.radius, 0.05f, 0.1f, 50.0f, "%.2f");
-            c |= ImGui::DragFloat("膨張時間(秒)##swd", &sw.duration, 0.01f, 0.05f, 5.0f, "%.2f");
-            c |= ImGui::SliderFloat("リング太さ##swt", &sw.thickness, 0.01f, 1.0f);
-            if (c) CommitChange(b, "ShockwaveRing パラメータ");
+            if (matReg.DrawUI(sub.MaterialType(), sub.mat))
+                CommitChange(b, "マテリアルパラメータ");
         }
     }
 
@@ -189,25 +112,45 @@ namespace YoRigine {
         if (!sel) return;
         auto& subs = sel->asset.elements;
 
-        ImGui::TextDisabled("エレメント（NoiseVolume/LightningBolt/ShockwaveRing/LightVolume）を好きな数だけ追加できます。同じ種類の複数追加も可能。");
+        auto& geomReg = GeometryRegistry::Instance();
+        auto& matReg  = MaterialRegistry::Instance();
+
+        ImGui::TextDisabled("形状（Geometry×Material）を好きな数だけ追加できます。特殊エフェクトも混在可。");
         ImGui::Spacing();
 
-        if (ImGui::Button("＋ エレメントを追加")) ImGui::OpenPopup("##addElement");
+        // ── 追加メニュー（形状 / 特殊） ──
+        if (ImGui::Button("＋ 追加")) ImGui::OpenPopup("##addElement");
         if (ImGui::BeginPopup("##addElement")) {
-            const VfxElementType addTypes[] = {
-                VfxElementType::NoiseVolume, VfxElementType::LightningBolt,
-                VfxElementType::ShockwaveRing, VfxElementType::LightVolume,
-            };
-            for (VfxElementType t : addTypes) {
-                if (ImGui::MenuItem(VfxElementTypeName(t))) {
+            ImGui::TextDisabled("形状 (Geometry × Material)");
+            ImGui::Separator();
+            for (const auto& gd : geomReg.GetAll()) {
+                if (ImGui::MenuItem(gd.displayName)) {
                     VfxEffectAsset b = sel->asset;
-                    VfxElement sub;
-                    sub.type = t;
-                    ApplyDefaultElementMotions(sub);
-                    subs.push_back(std::move(sub));
-                    CommitChange(b, "エレメント追加");
+                    VfxElement e;
+                    e.kind = VfxElementKind::Composed;
+                    e.geom = geomReg.MakeDefault(gd.type);
+                    e.mat  = matReg.MakeDefault(VfxMaterialType::Noise);
+                    subs.push_back(std::move(e));
+                    CommitChange(b, "形状を追加");
                 }
             }
+            ImGui::Spacing();
+            ImGui::TextDisabled("特殊エフェクト (専用メッシュ)");
+            ImGui::Separator();
+            auto addMono = [&](VfxElementType t, const char* name) {
+                if (ImGui::MenuItem(name)) {
+                    VfxEffectAsset b = sel->asset;
+                    VfxElement e;
+                    e.kind = VfxElementKind::Monolithic;
+                    e.type = t;
+                    if (auto* d = VfxMeshRegistry::Instance().FindDesc(t); d && d->applyDefaults)
+                        d->applyDefaults(e);
+                    subs.push_back(std::move(e));
+                    CommitChange(b, "特殊エフェクトを追加");
+                }
+            };
+            addMono(VfxElementType::LightningBolt, "Lightning (稲妻)");
+            addMono(VfxElementType::LightVolume,   "LightVolume (光ボリューム)");
             ImGui::EndPopup();
         }
         if (subs.empty()) {
@@ -216,19 +159,36 @@ namespace YoRigine {
         }
         ImGui::Separator();
 
+        auto commitFn = [this](const VfxEffectAsset& before, const char* label) {
+            CommitChange(before, label);
+        };
+
         int removeIdx = -1;
         int dupIdx = -1;
         for (int i = 0; i < static_cast<int>(subs.size()); ++i) {
             ImGui::PushID(i);
             auto& sub = subs[i];
+            const bool composed = (sub.kind == VfxElementKind::Composed);
 
-            std::string title = std::string(sub.enabled ? (ICON_FA_CHECK " ") : (ICON_FA_BAN " "))
-                + VfxElementTypeName(sub.type);
+            // タイトルは「形状名」で分かりやすく（Composed）／種類名（Monolithic）
+            const char* typeName;
+            if (composed) {
+                const auto* gd = geomReg.FindDesc(sub.GeometryType());
+                typeName = gd ? gd->displayName : "Shape";
+            } else {
+                const VfxElementDesc* desc = VfxMeshRegistry::Instance().FindDesc(sub.type);
+                typeName = desc ? desc->displayName : VfxElementTypeName(sub.type);
+            }
+
+            std::string title = std::string(sub.enabled ? (ICON_FA_CHECK " ") : (ICON_FA_BAN " ")) + typeName;
+            if (composed) {
+                if (const auto* md = matReg.FindDesc(sub.MaterialType()))
+                    title += std::string("  ×  ") + md->displayName;
+            }
             if (!sub.label.empty()) title += "  \"" + sub.label + "\"";
             title += "###subHeader";
 
-            bool open = ImGui::CollapsingHeader(title.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
-            if (open) {
+            if (YEditorWidget::Section sec{ title.c_str() }) {
                 ImGui::Indent();
 
                 {
@@ -237,7 +197,7 @@ namespace YoRigine {
                 }
                 ImGui::SameLine();
                 if (ImGui::SmallButton("複製##sub")) dupIdx = i;
-                if (ImGui::IsItemHovered()) ImGui::SetTooltip("このエレメントをパラメータごとコピーして追加");
+                YEditorWidget::ItemTooltip("このエレメントをパラメータごとコピーして追加");
                 ImGui::SameLine();
                 if (ImGui::SmallButton("削除##sub")) removeIdx = i;
 
@@ -255,21 +215,47 @@ namespace YoRigine {
 
                 {
                     VfxEffectAsset b = sel->asset;
-                    if (ImGui::DragFloat3("オフセット##sub", &sub.offset.x, 0.05f, -50.f, 50.f, "%.2f"))
+                    if (YEditorWidget::DragVec3("オフセット##sub", sub.offset, 0.05f, -50.f, 50.f, "%.2f"))
                         CommitChange(b, "エレメント オフセット");
                 }
 
-                ImGui::Spacing();
-                switch (sub.type) {
-                case VfxElementType::LightVolume: DrawLightVolumeSection(sub); break;
-                case VfxElementType::NoiseVolume:       DrawNoiseVolumeSection(sub);       break;
-                case VfxElementType::LightningBolt:   DrawLightningBoltSection(sub);   break;
-                case VfxElementType::ShockwaveRing:   DrawShockwaveRingSection(sub);   break;
+                {
+                    // ブレンドモード上書き（HDRで加算が重なって飽和する場合に Normal/Screen 等へ）
+                    // 先頭 "既定" = マテリアル本来のブレンド（内部値 -1）
+                    static const char* kBlendNames[] = {
+                        "既定(マテリアル)", "None", "Normal", "Add", "Subtract", "Multiply", "Screen"
+                    };
+                    int cur = sub.blendModeOverride + 1; // -1(既定)→0
+                    if (cur < 0 || cur >= IM_ARRAYSIZE(kBlendNames)) cur = 0;
+                    ImGui::SetNextItemWidth(200);
+                    VfxEffectAsset b = sel->asset;
+                    if (ImGui::Combo("ブレンド##sub", &cur, kBlendNames, IM_ARRAYSIZE(kBlendNames))) {
+                        sub.blendModeOverride = cur - 1; // 0→-1(既定)
+                        CommitChange(b, "エレメント ブレンドモード");
+                    }
+                    YEditorWidget::ItemTooltip(
+                        "加算(Add)で重なると光が飽和して真っ白になる場合、Normal/Screen に変えると合成を抑えられます。\n"
+                        "既定(マテリアル)は各エフェクト本来のブレンド。");
                 }
 
-                ImGui::SeparatorText("このエレメントのモーション");
-                ImGui::TextDisabled("  ※エフェクト全体のモーション（Motionタブ）に加算で適用されます");
-                DrawMotionListUI(sub.motions, false, "エレメントモーション編集");
+                ImGui::Spacing();
+
+                if (composed) {
+                    // 形状 × マテリアルの編集
+                    DrawComposedElementBody(sub);
+                } else {
+                    // 特殊エフェクト（Lightning / LightVolume）は専用 UI
+                    if (sub.type == VfxElementType::LightVolume) {
+                        ImGui::Checkbox("OBB ワイヤーフレーム表示", &showVolumeDebug_);
+                        if (showVolumeDebug_) ImGui::TextColored(ImVec4(1, 1, 0, 1), "  > OBB ワイヤーフレーム ON");
+                    }
+                    ImGui::Spacing();
+                    VfxMeshRegistry::Instance().DrawUI(sub.type, sub, sel->asset, commitFn);
+                }
+
+                YEditorWidget::SectionHeader("このエレメントのモジュール");
+                ImGui::TextDisabled("  ※エフェクト全体のモジュール（Moduleタブ）に加算で適用されます");
+                DrawModuleListUI(sub.modules, false, "エレメントモジュール編集");
 
                 ImGui::Unindent();
             }

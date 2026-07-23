@@ -11,6 +11,7 @@
 
 // Engine
 #include <Collision/Core/CollisionTypeIdDef.h>
+#include <Collision/Core/CollisionManager.h>
 
 using json = nlohmann::json;
 
@@ -21,7 +22,15 @@ bool SceneSerializer::SaveScene(const std::string &filePath) {
     return false;
   try {
     json j;
-    j["version"] = 13;
+    j["version"] = 14;
+    // シーン全体の描画・コリジョンカリング設定。
+    // オブジェクトとは別に保存し、シーン切り替え時に前シーンの値を引き継がない。
+    j["sceneSettings"] = {
+        {"drawFrustumCulling",
+         drawFrustumCulling_ ? *drawFrustumCulling_ : true},
+        {"collisionFrustumCulling",
+         CollisionManager::GetInstance()->GetEnableFrustumCulling()},
+    };
     j["objects"] = json::array();
 
     for (const auto *obj : objectManager_->GetAllActiveObjects()) {
@@ -96,8 +105,22 @@ bool SceneSerializer::LoadScene(const std::string &filePath) {
     json j;
     file >> j;
     const int version = j.value("version", 1);
-    if (version < 1 || version > 13)
+    if (version < 1 || version > 14)
       return false;
+
+    // version 14+: シーン単位のカリング設定。
+    // 古いシーンには項目がないため現在値を維持し、次回保存時にversion 14へ移行する。
+    if (version >= 14 && j.contains("sceneSettings")) {
+      const auto &settings = j["sceneSettings"];
+      if (drawFrustumCulling_) {
+        *drawFrustumCulling_ = settings.value(
+            "drawFrustumCulling", *drawFrustumCulling_);
+      }
+      auto *collisionManager = CollisionManager::GetInstance();
+      collisionManager->SetEnableFrustumCulling(settings.value(
+          "collisionFrustumCulling",
+          collisionManager->GetEnableFrustumCulling()));
+    }
 
     objectManager_->ClearAllObjects();
 

@@ -87,19 +87,23 @@ Vector3 CameraCollisionResolver::Resolve(const Vector3& idealPos, const Vector3&
 
 		// ------------------------------------------------------------
 		// AreaManager を使った見えない壁（闘技場・エリア制限）の判定
+		// blockByArea_ が false のときはカメラはエリアを貫通し、境界で手前へ
+		// クランプしない（プレイヤーから常に一定距離を保つ）。
 		// ------------------------------------------------------------
-		AreaManager* areaManager = AreaManager::GetInstance();
+		if (blockByArea_) {
+			AreaManager* areaManager = AreaManager::GetInstance();
 
-		if (!areaManager->IsInsideAreaByPurpose(idealPos, AreaPurpose::Boundary)) {
-			// エリア外に出ていたら、境界線上の座標にクランプ（補正）する
-			Vector3 clampedPos = areaManager->ClampToNearestArea(idealPos);
+			if (!areaManager->IsInsideAreaByPurpose(idealPos, AreaPurpose::Boundary)) {
+				// エリア外に出ていたら、境界線上の座標にクランプ（補正）する
+				Vector3 clampedPos = areaManager->ClampToNearestArea(idealPos);
 
-			// クランプされた座標までの距離を計算し、カメラ半径分だけさらに手前にする
-			float areaDistance = Length(clampedPos - targetPivot) - cameraRadius_ * clearanceScale;
+				// クランプされた座標までの距離を計算し、カメラ半径分だけさらに手前にする
+				float areaDistance = Length(clampedPos - targetPivot) - cameraRadius_ * clearanceScale;
 
-			// 物理コライダー(Raycast)とエリアの壁、より手前にある方を最終的なヒット距離として採用する
-			if (areaDistance < hitDistance) {
-				hitDistance = areaDistance;
+				// 物理コライダー(Raycast)とエリアの壁、より手前にある方を最終的なヒット距離として採用する
+				if (areaDistance < hitDistance) {
+					hitDistance = areaDistance;
+				}
 			}
 		}
 
@@ -173,6 +177,9 @@ void CameraCollisionResolver::DrawDebugGui() {
 			ImGui::DragFloat("完全透明侵入深度", &fullyTransparentDepth_, 0.05f, 0.01f, 3.0f, "%.2f");
 			if (ImGui::IsItemHovered()) ImGui::SetTooltip("カメラがこの距離だけ壁に入ったら alpha=0 になる (NieR風)。小さいほど素早く透明になる");
 
+			ImGui::Checkbox("エリア境界でカメラを止める", &blockByArea_);
+			if (ImGui::IsItemHovered()) ImGui::SetTooltip("OFF: カメラはエリアを貫通し、プレイヤーから常に一定距離を保つ。\nON: 移動範囲(Boundary)の境界でカメラを手前へクランプする(闘技場演出向け)。");
+
 			ImGui::Separator();
 			// --- カメラを遮る対象（許可リスト）の設定 ---
 			if (ImGui::TreeNode("遮る対象タイプ (許可リスト)")) {
@@ -221,6 +228,7 @@ void CameraCollisionResolver::Save(nlohmann::json& j) const {
 	j["highAngleThreshold"] = highAngleThreshold_;
 	j["maxPushUpHeight"] = maxPushUpHeight_;
 	j["blockTypeIDs"] = blockTypeIDs_;
+	j["blockByArea"]  = blockByArea_;
 	j["proximityFadeExtend"]    = proximityFadeExtend_;
 	j["occludeTargetAlpha"]     = occludeTargetAlpha_;
 	j["fullyTransparentDepth"]  = fullyTransparentDepth_;
@@ -241,6 +249,9 @@ void CameraCollisionResolver::Load(const nlohmann::json& j) {
 	enableHighAngle_ = j.value("enableHighAngle", false);
 	highAngleThreshold_ = j.value("highAngleThreshold", 0.5f);
 	maxPushUpHeight_ = j.value("maxPushUpHeight", 3.0f);
+
+	// 既定 false = カメラはエリアを貫通し、プレイヤーから一定距離を保つ。
+	blockByArea_ = j.value("blockByArea", false);
 
 	proximityFadeExtend_   = j.value("proximityFadeExtend",   1.5f);
 	occludeTargetAlpha_    = j.value("occludeTargetAlpha",    0.25f);

@@ -96,6 +96,35 @@ void EffectHandle::EmitAll(std::initializer_list<const char*> systemNames,
     }
 }
 
+void EffectHandle::EmitGroup(const std::string& groupName,
+                             const Vector3&     position,
+                             int                emitCount)
+{
+    YEmitterGroup* group = YEmitterGroupManager::GetInstance().GetGroup(groupName);
+    if (!group) {
+        Logger("EffectHandle::EmitGroup: グループ未登録 -> " + groupName);
+        return;
+    }
+    // ワンショット発火（PlayOneShot の Group 経路と同じ手順を撃ちっぱなしで実行）
+    group->SetPosition(position);
+    group->SetActive(true);
+    group->SetAutoEmitAll(false);                       // 自動発生させない（1回だけ）
+    group->EmitAll(emitCount > 0 ? emitCount : -1);     // -1 = 各エミッタ設定に従う
+}
+
+float EffectHandle::GetEffectDuration(const std::string& name)
+{
+    // Group を優先（複数Systemを束ねた完成エフェクト）
+    if (YEmitterGroup* group = YEmitterGroupManager::GetInstance().GetGroup(name)) {
+        return group->GetEffectDuration();
+    }
+    // System 単体
+    if (YParticleSystem* sys = YParticleManager::GetInstance().GetSystem(name)) {
+        return sys->GetMaxLifetime();
+    }
+    return 0.0f;
+}
+
 // ============================================================================
 // 操作
 // ============================================================================

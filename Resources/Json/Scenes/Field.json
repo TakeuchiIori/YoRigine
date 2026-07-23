@@ -7190,5 +7190,9 @@
             "uvStochastic": 0.0
         }
     ],
-    "version": 13
+    "sceneSettings": {
+        "collisionFrustumCulling": true,
+        "drawFrustumCulling": true
+    },
+    "version": 14
 }

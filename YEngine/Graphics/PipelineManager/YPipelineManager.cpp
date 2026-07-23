@@ -67,6 +67,19 @@ ID3D12PipelineState *YPipelineManager::GetBlendModePSO(const std::string &key,
   return nullptr;
 }
 
+ID3D12PipelineState *YPipelineManager::ResolveBlendPSO(const std::string &key,
+                                                       int blendModeOverride) {
+  if (blendModeOverride >= 0 &&
+      blendModeOverride < static_cast<int>(BlendMode::kCount0fBlendMode)) {
+    if (auto *pso =
+            GetBlendModePSO(key, static_cast<BlendMode>(blendModeOverride))) {
+      return pso;
+    }
+  }
+  // -1(継承) や、該当バリアント未登録なら既定 PSO へフォールバック
+  return GetPipeLineStateObject(key);
+}
+
 D3D12_BLEND_DESC YPipelineManager::GetBlendDescFromMode(BlendMode mode) {
   switch (mode) {
   case BlendMode::kBlendModeNone:
@@ -131,6 +144,8 @@ void YPipelineManager::Initialize() {
   CreatePSO_VfxMeshSmoke();
   CreatePSO_VfxMeshLightning();
   CreatePSO_VfxMeshShockwave();
+  CreatePSO_VfxMeshAreaField();
+  CreatePSO_VfxMeshRimFx();
 
   // 起動時間の計測終了・出力
   const auto pipelineBuildEnd = std::chrono::high_resolution_clock::now();
@@ -799,31 +814,64 @@ void YPipelineManager::CreatePSO_VfxMeshTrail() {
 }
 
 // ============================================================
+// VfxMesh 系エレメント PSO を全ブレンドモード分まとめて生成する共通ヘルパー。
+//   blendModePipelineStates_[logicalName][mode] に全モードを登録し、
+//   defaultMode の PSO を pipelineStates_[logicalName]（＝GetPipeLineStateObject
+//   / ResolveBlendPSO の継承フォールバック先）として据える。
+//   これにより既存アセット(blendModeOverride=-1)の見た目は従来のまま保たれる。
+// ============================================================
+void YPipelineManager::CreateVfxMeshBlendPSOs(const std::string &logicalName,
+                                              const std::wstring &psPath,
+                                              BlendMode defaultMode) {
+  auto vsBlob = dxCommon_->CompileShader(
+      L"Resources/Shaders/Vfx/VfxMesh/VfxMesh.VS.hlsl", L"vs_6_0");
+  auto psBlob = dxCommon_->CompileShader(psPath, L"ps_6_0");
+
+  struct BlendConfig {
+    BlendMode mode;
+    D3D12_BLEND_DESC blendDesc;
+  };
+  const BlendConfig configs[] = {
+      {BlendMode::kBlendModeNone, BlendPresets::CreateNone()},
+      {BlendMode::kBlendModeNormal, BlendPresets::CreateAlphaBlend()},
+      {BlendMode::kBlendModeAdd, BlendPresets::CreateAdditive()},
+      {BlendMode::kBlendModeSubtract, BlendPresets::CreateSubtractive()},
+      {BlendMode::kBlendModeMultiply, BlendPresets::CreateMultiply()},
+      {BlendMode::kBlendModeScreen, BlendPresets::CreateScreen()},
+  };
+
+  for (const auto &config : configs) {
+    ReflectionBasedPipelineBuilder builder;
+    auto result = builder
+                      .SetRenderTargetFormat(
+                          YoRigine::kSceneColorFormat) // OffScreen(HDR) へ描く
+                      .SetRasterizerState(RasterizerPresets::CreateNoCull())
+                      .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
+                      .SetBlendState(config.blendDesc)
+                      .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(),
+                                                vsBlob.Get(), psBlob.Get());
+
+    blendModePipelineStates_[logicalName][config.mode] = result.pipelineState;
+
+    // 既定モードを従来の単一 PSO / ルートシグネチャ / インデックスとして採用
+    if (config.mode == defaultMode) {
+      rootSignatures_[logicalName] = result.rootSignature;
+      pipelineStates_[logicalName] = result.pipelineState;
+      parameterIndices_[logicalName] = result.parameterIndices;
+    }
+  }
+}
+
+// ============================================================
 //
 // VFXMesh - Volume
 //
 // ============================================================
 void YPipelineManager::CreatePSO_VfxMeshVolume() {
-  // シェーダーをコンパイル
-  auto vsBlob = dxCommon_->CompileShader(
-      L"Resources/Shaders/Vfx/VfxMesh/VfxMesh.VS.hlsl", L"vs_6_0");
-  auto psBlob = dxCommon_->CompileShader(
-      L"Resources/Shaders/Vfx/VfxMesh/VfxMesh_Volume.PS.hlsl", L"ps_6_0");
-
-  // リフレクションベースで完全自動生成
-  ReflectionBasedPipelineBuilder builder;
-  auto result = builder
-                    .SetRenderTargetFormat(
-                        YoRigine::kSceneColorFormat) // OffScreen(HDR) へ描く
-                    .SetRasterizerState(RasterizerPresets::CreateNoCull())
-                    .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
-                    .SetBlendState(BlendPresets::CreateAdditive())
-                    .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(),
-                                              vsBlob.Get(), psBlob.Get());
-
-  rootSignatures_["VfxMeshVolume"] = result.rootSignature;
-  pipelineStates_["VfxMeshVolume"] = result.pipelineState;
-  parameterIndices_["VfxMeshVolume"] = result.parameterIndices;
+  // 既定は加算。エレメントの blendModeOverride で切り替え可。
+  CreateVfxMeshBlendPSOs("VfxMeshVolume",
+                         L"Resources/Shaders/Vfx/VfxMesh/VfxMesh_Volume.PS.hlsl",
+                         BlendMode::kBlendModeAdd);
 }
 // ============================================================
 //
@@ -831,25 +879,11 @@ void YPipelineManager::CreatePSO_VfxMeshVolume() {
 //
 // ============================================================
 void YPipelineManager::CreatePSO_VfxMeshSmoke() {
-  // Omen 風ボリュームスモーク。半透明スモークなのでアルファブレンド。
-  auto vsBlob = dxCommon_->CompileShader(
-      L"Resources/Shaders/Vfx/VfxMesh/VfxMesh.VS.hlsl", L"vs_6_0");
-  auto psBlob = dxCommon_->CompileShader(
-      L"Resources/Shaders/Vfx/VfxMesh/VfxMesh_Smoke.PS.hlsl", L"ps_6_0");
-
-  ReflectionBasedPipelineBuilder builder;
-  auto result = builder
-                    .SetRenderTargetFormat(
-                        YoRigine::kSceneColorFormat) // OffScreen(HDR) へ描く
-                    .SetRasterizerState(RasterizerPresets::CreateNoCull())
-                    .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
-                    .SetBlendState(BlendPresets::CreateAlphaBlend())
-                    .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(),
-                                              vsBlob.Get(), psBlob.Get());
-
-  rootSignatures_["VfxMeshSmoke"] = result.rootSignature;
-  pipelineStates_["VfxMeshSmoke"] = result.pipelineState;
-  parameterIndices_["VfxMeshSmoke"] = result.parameterIndices;
+  // Omen 風ボリュームスモーク。半透明スモークなので既定はアルファ(Normal)。
+  // エレメントの blendModeOverride で切り替え可。
+  CreateVfxMeshBlendPSOs("VfxMeshSmoke",
+                         L"Resources/Shaders/Vfx/VfxMesh/VfxMesh_Smoke.PS.hlsl",
+                         BlendMode::kBlendModeNormal);
 }
 
 // ============================================================
@@ -858,25 +892,11 @@ void YPipelineManager::CreatePSO_VfxMeshSmoke() {
 //
 // ============================================================
 void YPipelineManager::CreatePSO_VfxMeshLightning() {
-  // プロシージャル稲妻。加算ブレンドで芯が光る。
-  auto vsBlob = dxCommon_->CompileShader(
-      L"Resources/Shaders/Vfx/VfxMesh/VfxMesh.VS.hlsl", L"vs_6_0");
-  auto psBlob = dxCommon_->CompileShader(
-      L"Resources/Shaders/Vfx/VfxMesh/VfxMesh_Lightning.PS.hlsl", L"ps_6_0");
-
-  ReflectionBasedPipelineBuilder builder;
-  auto result = builder
-                    .SetRenderTargetFormat(
-                        YoRigine::kSceneColorFormat) // OffScreen(HDR) へ描く
-                    .SetRasterizerState(RasterizerPresets::CreateNoCull())
-                    .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
-                    .SetBlendState(BlendPresets::CreateAdditive())
-                    .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(),
-                                              vsBlob.Get(), psBlob.Get());
-
-  rootSignatures_["VfxMeshLightning"] = result.rootSignature;
-  pipelineStates_["VfxMeshLightning"] = result.pipelineState;
-  parameterIndices_["VfxMeshLightning"] = result.parameterIndices;
+  // プロシージャル稲妻。既定は加算で芯が光る。blendModeOverride で切り替え可。
+  CreateVfxMeshBlendPSOs(
+      "VfxMeshLightning",
+      L"Resources/Shaders/Vfx/VfxMesh/VfxMesh_Lightning.PS.hlsl",
+      BlendMode::kBlendModeAdd);
 }
 
 // ============================================================
@@ -885,25 +905,36 @@ void YPipelineManager::CreatePSO_VfxMeshLightning() {
 //
 // ============================================================
 void YPipelineManager::CreatePSO_VfxMeshShockwave() {
-  // 爆発の衝撃波リング。加算ブレンド。
-  auto vsBlob = dxCommon_->CompileShader(
-      L"Resources/Shaders/Vfx/VfxMesh/VfxMesh.VS.hlsl", L"vs_6_0");
-  auto psBlob = dxCommon_->CompileShader(
-      L"Resources/Shaders/Vfx/VfxMesh/VfxMesh_Shockwave.PS.hlsl", L"ps_6_0");
+  // 爆発の衝撃波リング。既定は加算。blendModeOverride で切り替え可。
+  CreateVfxMeshBlendPSOs(
+      "VfxMeshShockwave",
+      L"Resources/Shaders/Vfx/VfxMesh/VfxMesh_Shockwave.PS.hlsl",
+      BlendMode::kBlendModeAdd);
+}
 
-  ReflectionBasedPipelineBuilder builder;
-  auto result = builder
-                    .SetRenderTargetFormat(
-                        YoRigine::kSceneColorFormat) // OffScreen(HDR) へ描く
-                    .SetRasterizerState(RasterizerPresets::CreateNoCull())
-                    .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
-                    .SetBlendState(BlendPresets::CreateAdditive())
-                    .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(),
-                                              vsBlob.Get(), psBlob.Get());
+// ============================================================
+//
+// VFXMesh - AreaField（地面円フィールド）
+//
+// ============================================================
+void YPipelineManager::CreatePSO_VfxMeshAreaField() {
+  // バフエリア/AoE/射程の地面円。既定は加算(魔法陣風)。blendModeOverride で切り替え可。
+  CreateVfxMeshBlendPSOs(
+      "VfxMeshAreaField",
+      L"Resources/Shaders/Vfx/VfxMesh/VfxMesh_AreaField.PS.hlsl",
+      BlendMode::kBlendModeAdd);
+}
 
-  rootSignatures_["VfxMeshShockwave"] = result.rootSignature;
-  pipelineStates_["VfxMeshShockwave"] = result.pipelineState;
-  parameterIndices_["VfxMeshShockwave"] = result.parameterIndices;
+// ============================================================
+//
+// VFXMesh - RimFx（縁の縦演出：炎など）
+//
+// ============================================================
+void YPipelineManager::CreatePSO_VfxMeshRimFx() {
+  // 縁から立ち上がる炎/霊気/電撃。既定は加算。blendModeOverride で切り替え可。
+  CreateVfxMeshBlendPSOs("VfxMeshRimFx",
+                         L"Resources/Shaders/Vfx/VfxMesh/VfxMesh_RimFx.PS.hlsl",
+                         BlendMode::kBlendModeAdd);
 }
 
 // ============================================================

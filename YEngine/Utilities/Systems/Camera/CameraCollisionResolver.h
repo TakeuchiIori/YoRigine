@@ -82,6 +82,11 @@ private:
   // 未登録の型は素通りするので、トリガー領域や飛道弾でカメラが跳ねない。
   std::vector<uint32_t> blockTypeIDs_;
 
+  // AreaManager の境界エリア（Boundary）をカメラの見えない壁として扱うか。
+  // false（既定）: カメラはエリアを貫通し、プレイヤーから常に一定距離を保つ。
+  // true         : 従来どおり境界でカメラを手前へクランプする（闘技場演出向け）。
+  bool blockByArea_ = false;
+
   // フェードモードの近距離検出: カメラ理想位置からこの距離だけ先まで延長して
   // フェードコライダーを探す。カメラが壁に非常に近いときも透明化できる。
   float proximityFadeExtend_ = 1.5f;

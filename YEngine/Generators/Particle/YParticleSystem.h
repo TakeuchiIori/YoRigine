@@ -29,7 +29,23 @@ public:
 
 	///************************* メインとなる処理 *************************///
 	void Update(float deltaTime);
-	void Emit(const Vector3& position, int count = 1);
+
+	/// <summary>
+	/// パーティクルを発生させる。
+	/// </summary>
+	/// <param name="position">発生位置</param>
+	/// <param name="count">発生数</param>
+	/// <param name="prewarmAge">
+	/// true にすると各粒の経過時間を [0, lifeTime) のランダム値で初期化する（プリウォーム）。
+	/// 個数維持モードで一斉発生させても集団の年齢がばらけ、
+	/// 一斉に死んで一斉に再生する「同期パルス」を防いで連続的に見せられる。
+	/// </param>
+	/// <param name="immortal">
+	/// true にすると寿命で死なず、更新モジュールを受け続ける（Persistent 用）。
+	/// 一度出して以後消さずに永遠にアニメさせたい粒に使う。
+	/// ※ 寿命依存モジュール（フェードアウト等）とは併用しないこと。
+	/// </param>
+	void Emit(const Vector3& position, int count = 1, bool prewarmAge = false, bool immortal = false);
 
 
 public:
@@ -87,6 +103,16 @@ public:
 		return lightSetting_.enableDirectionalLight
 			|| lightSetting_.enablePointLight
 			|| lightSetting_.enableSpotLight;
+	}
+
+	// このシステムの粒が生きうる最大秒数（＝ワンショット再生尺の見積り）。
+	// SpawnLifeTime モジュールの最大寿命を採り、無ければ既定の 1.0 を返す。
+	float GetMaxLifetime() const {
+		float maxLife = 0.0f;
+		for (const auto& m : spawnModules_) {
+			if (m) maxLife = (std::max)(maxLife, m->GetMaxLifetimeHint());
+		}
+		return (maxLife > 0.0f) ? maxLife : 1.0f; // Emit の既定 lifeTime=1.0 に合わせる
 	}
 
 	// モジュール群の取得

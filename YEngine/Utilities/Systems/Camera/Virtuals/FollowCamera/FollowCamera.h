@@ -60,6 +60,17 @@ public:
   void SetInputEnabled(bool e) { inputEnabled_ = e; }
   bool GetInputEnabled() const { return inputEnabled_; }
 
+  // ============================================================
+  // ヘディング追従モード（後方視点でターゲットの向きを常に追う）
+  //   true にすると、毎フレーム カメラ yaw を target_->rotate_.y へ
+  //   臨界減衰で寄せ続ける（＝常にターゲット背後・進行方向を向く）。
+  //   相対操舵（差分入力）と組み合わせるとフィードバックループが起きない。
+  //   ON の間はアイドルオートリセンターは介入しない。
+  // ============================================================
+  void SetYawFollowsTarget(bool e) { yawFollowsTarget_ = e; }
+  bool GetYawFollowsTarget() const { return yawFollowsTarget_; }
+  void SetYawFollowSmoothTime(float t) { yawFollowSmoothTime_ = t; }
+
   void UpdateInput();
   void FollowProcess();
 
@@ -206,6 +217,13 @@ private:
   // 入力制御フラグ
   // ============================================================
   bool inputEnabled_ = true;
+
+  // ============================================================
+  // ヘディング追従（後方視点でターゲットの向きを常に追う）
+  // ============================================================
+  bool  yawFollowsTarget_    = false; // ON でカメラ yaw を対象 facing へ追従
+  float yawFollowSmoothTime_ = 0.15f; // 追従の遅れ時間（小さいほどキビキビ）
+  float yawFollowVel_        = 0.0f;  // SmoothDamp 用の速度アキュムレータ
 
   // ============================================================
   // リセンター（対象 facing 背後へ素早く回す）

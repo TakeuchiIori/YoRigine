@@ -2,7 +2,7 @@
 // ===========================================================
 // GpuParticleHandle.h
 //
-// EffectHandle / VfxMeshHandle と同じ発想で、GPUパーティクル（GpuEmitManager
+// EffectHandle / YVfxHandle と同じ発想で、GPUパーティクル（GpuEmitManager
 // のエミッターグループ）をゲームコードからワンライナーで再生・操作するハンドル。
 //
 // 「名前」は GpuEmitManager のグループ名（JSON の groupName）。

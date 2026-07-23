@@ -69,6 +69,15 @@ public:
                                        BlendMode blendMode);
 
   /// <summary>
+  /// ブレンドモード上書きを考慮して PSO を解決する。
+  ///   blendModeOverride が 0..(kCount未満) かつ該当バリアントがあればそれを返し、
+  ///   それ以外（-1=継承 や 未登録）なら key の既定 PSO を返す。
+  /// VfxMesh のエレメント単位ブレンド切り替え等に使う。
+  /// </summary>
+  ID3D12PipelineState *ResolveBlendPSO(const std::string &key,
+                                       int blendModeOverride);
+
+  /// <summary>
   /// PSOキャッシュの統計情報を取得
   /// </summary>
   const YoRigine::PSOCache::Stats &GetCacheStats() const {
@@ -171,6 +180,20 @@ private:
   void CreatePSO_VfxMeshSmoke();
   void CreatePSO_VfxMeshLightning();
   void CreatePSO_VfxMeshShockwave();
+  void CreatePSO_VfxMeshAreaField();
+  void CreatePSO_VfxMeshRimFx();
+
+  /// <summary>
+  /// VfxMesh 系 PSO を全ブレンドモード分まとめて生成するヘルパー。
+  ///   logicalName … "VfxMeshSmoke" 等の論理キー
+  ///   psPath      … ピクセルシェーダのパス（VS は VfxMesh.VS 共通）
+  ///   defaultMode … blendModePipelineStates_ とは別に、
+  ///                 既定 PSO(pipelineStates_[logicalName]) / ルートシグネチャ /
+  ///                 パラメータインデックスとして採用するモード（従来の見た目を維持）
+  /// </summary>
+  void CreateVfxMeshBlendPSOs(const std::string &logicalName,
+                              const std::wstring &psPath,
+                              BlendMode defaultMode);
   // ===== ポストエフェクト系パイプライン作成関数群 =====
 
   /// <summary>

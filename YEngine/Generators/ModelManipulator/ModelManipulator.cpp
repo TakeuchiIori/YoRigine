@@ -41,6 +41,7 @@ namespace YoRigine {
 		objectManager_ = ObjectManager::GetInstance();
 		serializer_.SetObjectManager(objectManager_);
 		serializer_.SetModelFolderPath(modelFolderPath_);
+		serializer_.SetDrawFrustumCullingFlag(&enableDrawFrustumCulling_);
 
 		prefabMgr_.SetObjectManager(objectManager_);
 		prefabMgr_.SetSerializer(&serializer_);

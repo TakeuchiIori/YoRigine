@@ -4,6 +4,9 @@
 #include "ShockwaveMesh.h"
 #include "Systems/Camera/Camera.h"
 #include <cmath>
+#ifdef USE_IMGUI
+#include "Core/Editor/Widgets/YEditorWidget.h"
+#endif
 
 namespace YoRigine {
 
@@ -72,6 +75,75 @@ void ShockwaveMesh::Draw(ID3D12GraphicsCommandList* cmdList)
     cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     BindVertexBuffer(cmdList);
     cmdList->DrawInstanced(vertCount, 1, 0, 0);
+}
+
+static constexpr size_t kCBAlign256_S = 256;
+template<typename T>
+static constexpr size_t CBSize256_S() { return (sizeof(T) + kCBAlign256_S - 1) & ~(kCBAlign256_S - 1); }
+
+size_t ShockwaveMesh::GetCBByteSize() const { return CBSize256_S<ShockwaveParamsCB>(); }
+
+void ShockwaveMesh::FillCB(void* mapped, const CBFillArgs& args) const
+{
+    const auto& sw = args.def.shockwave;
+    auto& cb = *static_cast<ShockwaveParamsCB*>(mapped);
+    cb.color     = { sw.color.x * args.tint.x, sw.color.y * args.tint.y,
+                     sw.color.z * args.tint.z, sw.color.w * args.tint.w };
+    cb.thickness  = sw.thickness;
+    cb.ringRadius = 0.8f;         // 固定（膨張は radius スケール＝Drive で表現）
+    cb._pad0 = cb._pad1 = 0.f;
+}
+
+// ===========================================================
+// Describe()
+// ===========================================================
+VfxElementDesc ShockwaveMesh::Describe()
+{
+    VfxElementDesc d;
+    d.type        = VfxElementType::ShockwaveRing;
+    d.displayName = "ShockwaveRing";
+
+    d.applyDefaults = [](VfxElement& sub) {
+        auto& sw = sub.shockwave;
+        sw.radius    = 4.0f;
+        sw.duration  = 0.5f;
+        sw.thickness = 0.25f;
+        sw.color     = { 1.2f, 1.1f, 0.8f, 1.0f };
+    };
+
+    d.create = [](const VfxElement& def, const Vector3& pos, float scale, Camera* cam) {
+        auto m = std::make_unique<ShockwaveMesh>();
+        m->Initialize();
+        m->SetCamera(cam);
+        m->ApplyParam(def.shockwave);
+        m->SetTransform(pos, def.shockwave.radius * scale);
+        return m;
+    };
+
+#ifdef USE_IMGUI
+    d.drawUI = [](VfxElement& sub, const VfxEffectAsset& asset, const VfxElementDesc::CommitFn& commit) {
+        auto& sw = sub.shockwave;
+
+        YEditorWidget::SectionHeader("カラー (rgb>1 で Bloom)");
+        {
+            VfxEffectAsset b = asset;
+            if (YEditorWidget::ColorHDR("色##sw", sw.color))
+                commit(b, "ShockwaveRing 色");
+        }
+
+        YEditorWidget::SectionHeader("リング / 速度");
+        {
+            VfxEffectAsset b = asset;
+            bool c = false;
+            c |= YEditorWidget::DragFloat("最大半径##swr", sw.radius, 0.05f, 0.1f, 50.0f, "%.2f");
+            c |= YEditorWidget::DragFloat("膨張時間(秒)##swd", sw.duration, 0.01f, 0.05f, 5.0f, "%.2f");
+            c |= YEditorWidget::SliderFloat("リング太さ##swt", sw.thickness, 0.01f, 1.0f);
+            if (c) commit(b, "ShockwaveRing パラメータ");
+        }
+    };
+#endif
+
+    return d;
 }
 
 } // namespace YoRigine

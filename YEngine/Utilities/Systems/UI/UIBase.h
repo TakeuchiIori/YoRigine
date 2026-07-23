@@ -113,6 +113,10 @@ public:
 	void SetLayer(int layer) { layer_ = layer; }
 	int GetLayer() const { return layer_; }
 
+	// 実行中だけ生成する通知・チュートリアル等。シーンJSONへ保存しない。
+	void SetTransient(bool transient) { transient_ = transient; }
+	bool IsTransient() const { return transient_; }
+
 	///************************* 基本アニメーション制御 *************************///
 
 	// シンプルなアニメーション
@@ -206,6 +210,7 @@ protected:
 
 	bool visible_ = true;
 	int layer_ = 0;
+	bool transient_ = false;
 
 	bool gridEnabled_ = false;
 	float gridSize_ = 10.0f;

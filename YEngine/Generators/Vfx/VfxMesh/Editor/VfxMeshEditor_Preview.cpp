@@ -5,6 +5,7 @@
 #include <PipelineManager/YPipelineManager.h>
 #include <IconsFontAwesome5.h>
 #include <imgui.h>
+#include "Core/Editor/Widgets/YEditorWidget.h"
 
 #include <algorithm>
 #include <cmath>
@@ -32,17 +33,19 @@ namespace YoRigine {
         float burstPeriod = burstDuration_;
         {
             float bg = 0.f;
-            auto scan = [&bg](const std::vector<VfxMotion>& ms) {
+            auto scan = [&bg](const std::vector<VfxModule>& ms) {
                 for (const auto& m : ms) {
-                    if (m.type == VfxMotionType::BurstGrow) bg = std::max(bg, m.duration);
+                    if (m.type == VfxModuleType::Lifetime) bg = std::max(bg, m.duration);
                 }
             };
-            scan(asset.motions);
-            for (const auto& sub : asset.elements) scan(sub.motions);
+            scan(asset.modules);
+            for (const auto& sub : asset.elements) scan(sub.modules);
             if (bg > 0.f) burstPeriod = std::max(bg, 0.01f);
         }
 
         burstMode_ = (burstPeriod > 0.01f);
+        // 寿命無限アセットは常に連続再生（ワンショット/Lifetime を無視）
+        if (asset.loopForever) burstMode_ = false;
         oneShotLocal_ = 0.f;
         bool oneShotIdle = false;
         if (burstMode_) {
@@ -70,7 +73,7 @@ namespace YoRigine {
         mbase.progress = burstProgress_;
         mbase.lifetime = burstMode_ ? burstPeriod : -1.f;
         mbase.position = previewCenter_;
-        mbase.scale = 1.0f;
+        mbase.scale = previewScale_;   // 表示ズーム（実寸には無関係。ゲーム内は element scale で制御）
 
         if (asset.useTrail && previewTrailEmitter_) {
             Vector3 tip = previewCenter_;
@@ -145,12 +148,24 @@ namespace YoRigine {
 
             VfxEvalState s = mbase;
             s.position += def.offset;
-            EvaluateElementMotions(asset, def, s);
+            s.rotation  = def.rotation;
+            EvaluateElementModules(asset, def, s);
 
             sub.tint = s.colorTint;
             sub.beamRadiusScale = s.beamRadiusScale;
             sub.beamGlowScale = s.beamGlowScale;
             sub.visible = s.visible;
+
+            // Composed: パラメータをライブ反映 → Drive → Update
+            if (def.kind == VfxElementKind::Composed) {
+                if (sub.composed) {
+                    sub.composed->SetCamera(camera_); // ビルボード用に毎フレーム更新
+                    sub.composed->ApplyParams(def.geom, def.mat);
+                    sub.composed->Drive(s);
+                    sub.composed->Update(deltaTime);
+                }
+                continue;
+            }
 
             switch (def.type) {
             case VfxElementType::LightVolume:
@@ -220,6 +235,26 @@ namespace YoRigine {
             if (!def.enabled || !sub.cbMapped || !sub.cbRes) continue;
             if (!sub.visible || sub.tint.w <= 0.001f) continue;
 
+            // Composed: VfxMeshElement に FillCB → 描画を委譲（ランタイムと同じ経路）
+            if (def.kind == VfxElementKind::Composed) {
+                if (!sub.composed) continue;
+                ProceduralMeshBase::CBFillArgs args{
+                    def, sub.tint, previewTimer_, burstProgress_,
+                    sub.beamRadiusScale, sub.beamGlowScale
+                };
+                sub.composed->FillCB(sub.cbMapped, args);
+
+                const char* psoName = sub.composed->GetPSOName();
+                const auto& idx = pm->GetParameterIndices(psoName);
+                cmdList->SetGraphicsRootSignature(pm->GetRootSignature(psoName));
+                cmdList->SetPipelineState(pm->ResolveBlendPSO(psoName, def.blendModeOverride));
+                cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"), camAddr);
+                cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), sub.cbRes->GetGPUVirtualAddress());
+                sub.composed->BindResources(cmdList, idx); // テクスチャ等(あれば)
+                sub.composed->Draw(cmdList);
+                continue;
+            }
+
             switch (def.type) {
             case VfxElementType::LightVolume:
                 if (sub.volume) {
@@ -241,7 +276,7 @@ namespace YoRigine {
 
                     const auto& idx = pm->GetParameterIndices("VfxMeshVolume");
                     cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshVolume"));
-                    cmdList->SetPipelineState(pm->GetPipeLineStateObject("VfxMeshVolume"));
+                    cmdList->SetPipelineState(pm->ResolveBlendPSO("VfxMeshVolume", def.blendModeOverride));
                     cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"), camAddr);
                     cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), sub.cbRes->GetGPUVirtualAddress());
                     sub.volume->Draw(cmdList);
@@ -267,7 +302,7 @@ namespace YoRigine {
 
                     const auto& idx = pm->GetParameterIndices("VfxMeshSmoke");
                     cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshSmoke"));
-                    cmdList->SetPipelineState(pm->GetPipeLineStateObject("VfxMeshSmoke"));
+                    cmdList->SetPipelineState(pm->ResolveBlendPSO("VfxMeshSmoke", def.blendModeOverride));
                     cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"), camAddr);
                     cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), sub.cbRes->GetGPUVirtualAddress());
                     sub.smoke->Draw(cmdList);
@@ -289,7 +324,7 @@ namespace YoRigine {
 
                     const auto& idx = pm->GetParameterIndices("VfxMeshLightning");
                     cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshLightning"));
-                    cmdList->SetPipelineState(pm->GetPipeLineStateObject("VfxMeshLightning"));
+                    cmdList->SetPipelineState(pm->ResolveBlendPSO("VfxMeshLightning", def.blendModeOverride));
                     cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"), camAddr);
                     cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), sub.cbRes->GetGPUVirtualAddress());
                     sub.lightning->Draw(cmdList);
@@ -300,16 +335,13 @@ namespace YoRigine {
                     const auto& sw = def.shockwave;
                     auto& cb = *static_cast<ShockwaveParamsCB*>(sub.cbMapped);
                     cb.color = tint4(sw.color, sub.tint);
-                    cb.time = previewTimer_;
-                    cb.duration = sw.duration;
                     cb.thickness = sw.thickness;
-                    cb.burst = burstMode_
-                        ? std::min(oneShotLocal_ / std::max(sw.duration, 0.01f), 1.0f)
-                        : -1.0f;
+                    cb.ringRadius = 0.8f;   // 固定（膨張は radius スケールで表現）
+                    cb._pad0 = cb._pad1 = 0.f;
 
                     const auto& idx = pm->GetParameterIndices("VfxMeshShockwave");
                     cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshShockwave"));
-                    cmdList->SetPipelineState(pm->GetPipeLineStateObject("VfxMeshShockwave"));
+                    cmdList->SetPipelineState(pm->ResolveBlendPSO("VfxMeshShockwave", def.blendModeOverride));
                     cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"), camAddr);
                     cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), sub.cbRes->GetGPUVirtualAddress());
                     sub.shockwave->Draw(cmdList);
@@ -321,13 +353,13 @@ namespace YoRigine {
 
     void VfxMeshEditor::DrawPreviewSection()
     {
-        ImGui::SeparatorText("プレビュー");
+        YEditorWidget::SectionHeader("プレビュー");
 
         if (auto* selT = Selected(); selT && selT->asset.useTrail) {
-            const char* animNames[] = { "Wobble (往復)", "Slash (横なぎ)", "Slash (縦斬り)", "Spin (回転)" };
+            static const char* kAnimNames[] = { "Wobble (往復)", "Slash (横なぎ)", "Slash (縦斬り)", "Spin (回転)" };
             int animIdx = static_cast<int>(previewAnim_);
             ImGui::SetNextItemWidth(150);
-            if (ImGui::Combo("軌道アニメ", &animIdx, animNames, IM_ARRAYSIZE(animNames))) {
+            if (ImGui::Combo("軌道アニメ", &animIdx, kAnimNames, IM_ARRAYSIZE(kAnimNames))) {
                 previewAnim_ = static_cast<PreviewAnimMode>(animIdx);
                 if (previewTrailEmitter_) previewTrailEmitter_->Play();
             }
@@ -366,12 +398,12 @@ namespace YoRigine {
             previewTimer_ = 0.f;
             if (previewTrailEmitter_) previewTrailEmitter_->Play();
         }
-        ImGui::TextDisabled("  OFF=1回だけ再生して停止 / ON=1回ずつ繰り返し。動きはモーションで作る。");
+        ImGui::TextDisabled("  OFF=1回だけ再生して停止 / ON=1回ずつ繰り返し。動きはモジュールで作る。");
 
         ImGui::SetNextItemWidth(120);
-        ImGui::DragFloat("寿命フォールバック(s)", &burstDuration_, 0.02f, 0.1f, 5.0f, "%.2f");
+        ImGui::DragFloat("エフェクト寿命フォールバック(s)", &burstDuration_, 0.02f, 0.1f, 5.0f, "%.2f");
         ImGui::SameLine();
-        ImGui::TextDisabled("BurstGrow モーションがあればそちら優先");
+        ImGui::TextDisabled("Lifetime モジュールがあればそちら優先");
         if (loopOneShot_) {
             ImGui::SetNextItemWidth(120);
             ImGui::DragFloat("休止(s)", &oneShotGap_, 0.02f, 0.0f, 5.0f, "%.2f");
@@ -380,8 +412,11 @@ namespace YoRigine {
         }
         if (ImGui::Button("もう一度")) previewTimer_ = 0.f;
 
-        ImGui::DragFloat3("プレビュー位置", &previewCenter_.x, 0.05f);
-        ImGui::SliderAngle("プレビューYaw", &previewYaw_, -180.f, 180.f);
+        YEditorWidget::DragVec3("プレビュー位置", previewCenter_, 0.05f);
+        YEditorWidget::AngleSlider("プレビューYaw", previewYaw_, -180.f, 180.f);
+        ImGui::SetNextItemWidth(160);
+        ImGui::DragFloat("プレビュー表示倍率", &previewScale_, 0.1f, 0.1f, 50.f, "%.1f");
+        ImGui::SameLine(); ImGui::TextDisabled("表示だけ。実寸=element scale(ゲーム内)");
 
         auto* sel = Selected();
         if (sel) {
@@ -418,7 +453,12 @@ namespace YoRigine {
         bool match = (previewElements_.size() == subs.size());
         if (match) {
             for (size_t i = 0; i < subs.size(); ++i) {
-                if (previewElements_[i]->type != subs[i].type) { match = false; break; }
+                const auto& pe = *previewElements_[i];
+                if (pe.kind != subs[i].kind || pe.type != subs[i].type) { match = false; break; }
+                // Composed は形状／マテリアルの種類が変わったら作り直す
+                if (subs[i].kind == VfxElementKind::Composed &&
+                    (pe.geomType != subs[i].GeometryType() ||
+                     pe.matType  != subs[i].MaterialType())) { match = false; break; }
             }
         }
         if (match) return;
@@ -428,7 +468,23 @@ namespace YoRigine {
 
         for (const auto& def : subs) {
             auto sub = std::make_unique<PreviewElement>();
+            sub->kind = def.kind;
             sub->type = def.type;
+            sub->geomType = def.GeometryType();
+            sub->matType  = def.MaterialType();
+
+            // Composed（Geometry × Material）: VfxMeshElement を生成して委譲
+            if (def.kind == VfxElementKind::Composed) {
+                sub->composed = VfxMeshElement::CreateComposed(
+                    def.GeometryType(), def.geom,
+                    def.MaterialType(), def.mat, camera_);
+                if (sub->composed) {
+                    sub->cbRes = dxCommon_->CreateBufferResource(sub->composed->GetCBByteSize());
+                    sub->cbRes->Map(0, nullptr, &sub->cbMapped);
+                }
+                previewElements_.push_back(std::move(sub));
+                continue;
+            }
 
             switch (def.type) {
             case VfxElementType::LightVolume:

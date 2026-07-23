@@ -146,6 +146,21 @@ void FollowCamera::FollowProcess() {
         ? YoRigine::GameTime::GetUnscaledDeltaTime()
         : YoRigine::GameTime::GetDeltaTime();
 
+    // ── ヘディング追従：カメラ yaw を対象 facing へ毎フレーム寄せる ──
+    //   相対操舵（差分入力）の後方視点用。入力はカメラ向きを参照しないため
+    //   ここでカメラをいくら滑らかに回してもプレイヤーの向きはズレない。
+    if (yawFollowsTarget_ && target_ && !isCloseUp_) {
+        constexpr float kPi    = 3.14159265358979f;
+        constexpr float kTwoPi = 6.28318530717958f;
+        float delta = target_->rotate_.y - transform_.rotate.y;
+        while (delta >  kPi) delta -= kTwoPi;
+        while (delta < -kPi) delta += kTwoPi;
+        const float targetYaw = transform_.rotate.y + delta; // 最短角の目標
+        transform_.rotate.y = SmoothDampScalar(
+            transform_.rotate.y, targetYaw, yawFollowVel_,
+            yawFollowSmoothTime_, dt, 1000.0f);
+    }
+
     // ── リセンター（対象 facing 背後へ寄せる）を先に進める ──
     if (!isCloseUp_) UpdateRecenter(dt);
 
@@ -241,6 +256,7 @@ void FollowCamera::FollowProcess() {
 //   起動して対象の背後へ静かに寄せる。
 // ============================================================
 void FollowCamera::UpdateIdleRecenter(float dt) {
+    if (yawFollowsTarget_)        return;  // ヘディング追従中は yaw を常時制御しているので不要
     if (!idleRecenterEnabled_)    return;
     if (idleRecenterSuppressed_)  return;  // Game 側からの一時停止中（例：バトル中）
     if (recentering_)             return;  // 手動リセンター等が既に進行中なら何もしない

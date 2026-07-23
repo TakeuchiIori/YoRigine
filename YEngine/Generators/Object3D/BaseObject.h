@@ -34,9 +34,11 @@ public:
 	virtual void Draw() = 0;
 	virtual void DrawAnimation() {}
 	virtual void DrawCollision() {}
-	// 影パス描画。BaseObjectManager から一括で呼べるよう基底に持たせる。
-	// 影を落とさないオブジェクトは未オーバーライドのまま (デフォルト空) で良い。
-	virtual void DrawShadow() {}
+	// 標準の OBJ は内部 Object3d をそのまま影パスへ流す。
+	// 影を落とさないオブジェクトだけ空実装で override する。
+	virtual void DrawShadow() {
+		if (obj_) obj_->DrawShadow(wt_);
+	}
 
 
 	///************************* 当たり判定 *************************///

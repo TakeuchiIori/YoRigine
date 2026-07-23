@@ -47,11 +47,15 @@ void InstancedObject3d::Initialize() {
 
 void InstancedObject3d::Finalize() {
   for (auto &[model, batch] : batches_) {
-    if (batch.mapped) {
-      batch.gpuBuffer->Unmap(0, nullptr);
+    for (auto &slot : batch.colorSlots) {
+      if (slot.mapped) {
+        slot.gpuBuffer->Unmap(0, nullptr);
+      }
     }
-    if (batch.shadowMapped) {
-      batch.shadowGpuBuffer->Unmap(0, nullptr);
+    for (auto &slot : batch.shadowSlots) {
+      if (slot.mapped) {
+        slot.gpuBuffer->Unmap(0, nullptr);
+      }
     }
   }
   batches_.clear();
@@ -112,13 +116,20 @@ void InstancedObject3d::Submit(const ObjectManager::PlacedObject &placed) {
 
 void InstancedObject3d::Submit(Object3d &object,
                                const WorldTransform &transform) {
-  Submit(object.GetModel(), Instance{
-                                transform.matWorld_,
-                                object.GetColor(),
-                                object.GetUvTransform(),
-                                object.GetStochasticStrength(),
-                                object.IsOutlineEnabled() ? 1.0f : 0.0f,
-                            });
+  Model *model = object.GetModel();
+  if (!model)
+    return;
+  const Matrix4x4 visualWorld =
+      model->GetHasBones()
+          ? transform.matWorld_
+          : (transform.matWorld_ * model->GetRootNode().GetLocalMatrix());
+  Submit(model, Instance{
+                    visualWorld,
+                    object.GetColor(),
+                    object.GetUvTransform(),
+                    object.GetStochasticStrength(),
+                    object.IsOutlineEnabled() ? 1.0f : 0.0f,
+                });
 }
 
 void InstancedObject3d::AddInstance(Model *model, const InstanceData &data) {
@@ -144,61 +155,92 @@ void InstancedObject3d::SubmitDitherFade(
          });
 }
 
-void InstancedObject3d::EnsureCapacity(Batch &batch, uint32_t needed) {
-  if (batch.capacity >= needed && batch.gpuBuffer)
+void InstancedObject3d::EnsureCapacity(Batch::BufferSlot &slot,
+                                       uint32_t needed) {
+  if (slot.capacity >= needed && slot.gpuBuffer)
     return;
 
-  uint32_t newCap = batch.capacity == 0 ? kInitialCapacity : batch.capacity;
+  uint32_t newCap = slot.capacity == 0 ? kInitialCapacity : slot.capacity;
   while (newCap < needed)
     newCap *= 2;
 
-  if (batch.mapped) {
-    batch.gpuBuffer->Unmap(0, nullptr);
-    batch.mapped = nullptr;
+  if (slot.mapped) {
+    slot.gpuBuffer->Unmap(0, nullptr);
+    slot.mapped = nullptr;
   }
 
   const size_t bufSize = sizeof(InstanceData) * newCap;
-  batch.gpuBuffer = dxCommon_->CreateBufferResource(bufSize);
-  batch.gpuBuffer->Map(0, nullptr, reinterpret_cast<void **>(&batch.mapped));
-  batch.capacity = newCap;
+  slot.gpuBuffer = dxCommon_->CreateBufferResource(bufSize);
+  slot.gpuBuffer->Map(0, nullptr, reinterpret_cast<void **>(&slot.mapped));
+  slot.capacity = newCap;
 
   // SRV を作成 / 再作成
-  if (batch.srvIndex == UINT32_MAX) {
-    batch.srvIndex = srvManager_->Allocate();
+  if (slot.srvIndex == UINT32_MAX) {
+    slot.srvIndex = srvManager_->Allocate();
   }
   srvManager_->CreateSRVforStructuredBuffer(
-      batch.srvIndex, batch.gpuBuffer.Get(), newCap, sizeof(InstanceData));
-  batch.srvHandleGPU = srvManager_->GetGPUDescriptorHandle(batch.srvIndex);
+      slot.srvIndex, slot.gpuBuffer.Get(), newCap, sizeof(InstanceData));
+  slot.srvHandleGPU = srvManager_->GetGPUDescriptorHandle(slot.srvIndex);
 }
 
-void InstancedObject3d::EnsureShadowCapacity(Batch &batch, uint32_t needed) {
-  if (batch.shadowCapacity >= needed && batch.shadowGpuBuffer)
+void InstancedObject3d::EnsureShadowCapacity(Batch::BufferSlot &slot,
+                                             uint32_t needed) {
+  if (slot.capacity >= needed && slot.gpuBuffer)
     return;
 
-  uint32_t newCap =
-      batch.shadowCapacity == 0 ? kInitialCapacity : batch.shadowCapacity;
+  uint32_t newCap = slot.capacity == 0 ? kInitialCapacity : slot.capacity;
   while (newCap < needed)
     newCap *= 2;
 
-  if (batch.shadowMapped) {
-    batch.shadowGpuBuffer->Unmap(0, nullptr);
-    batch.shadowMapped = nullptr;
+  if (slot.mapped) {
+    slot.gpuBuffer->Unmap(0, nullptr);
+    slot.mapped = nullptr;
   }
 
   const size_t bufSize = sizeof(InstanceData) * newCap;
-  batch.shadowGpuBuffer = dxCommon_->CreateBufferResource(bufSize);
-  batch.shadowGpuBuffer->Map(0, nullptr,
-                             reinterpret_cast<void **>(&batch.shadowMapped));
-  batch.shadowCapacity = newCap;
+  slot.gpuBuffer = dxCommon_->CreateBufferResource(bufSize);
+  slot.gpuBuffer->Map(0, nullptr, reinterpret_cast<void **>(&slot.mapped));
+  slot.capacity = newCap;
 
-  if (batch.shadowSrvIndex == UINT32_MAX) {
-    batch.shadowSrvIndex = srvManager_->Allocate();
+  if (slot.srvIndex == UINT32_MAX) {
+    slot.srvIndex = srvManager_->Allocate();
   }
-  srvManager_->CreateSRVforStructuredBuffer(batch.shadowSrvIndex,
-                                            batch.shadowGpuBuffer.Get(), newCap,
+  srvManager_->CreateSRVforStructuredBuffer(slot.srvIndex,
+                                            slot.gpuBuffer.Get(), newCap,
                                             sizeof(InstanceData));
-  batch.shadowSrvHandleGPU =
-      srvManager_->GetGPUDescriptorHandle(batch.shadowSrvIndex);
+  slot.srvHandleGPU = srvManager_->GetGPUDescriptorHandle(slot.srvIndex);
+}
+
+InstancedObject3d::Batch::BufferSlot &
+InstancedObject3d::AcquireColorSlot(Batch &batch, uint32_t needed) {
+  const uint32_t frameIndex = dxCommon_->GetCurrentBackBufferIndex();
+  if (batch.colorFrameIndex != frameIndex) {
+    batch.colorFrameIndex = frameIndex;
+    batch.nextColorSlot = 0;
+  }
+  const size_t slotIndex = batch.nextColorSlot++;
+  if (batch.colorSlots.size() <= slotIndex) {
+    batch.colorSlots.emplace_back();
+  }
+  auto &slot = batch.colorSlots[slotIndex];
+  EnsureCapacity(slot, needed);
+  return slot;
+}
+
+InstancedObject3d::Batch::BufferSlot &
+InstancedObject3d::AcquireShadowSlot(Batch &batch, uint32_t needed) {
+  const uint32_t frameIndex = dxCommon_->GetCurrentBackBufferIndex();
+  if (batch.shadowFrameIndex != frameIndex) {
+    batch.shadowFrameIndex = frameIndex;
+    batch.nextShadowSlot = 0;
+  }
+  const size_t slotIndex = batch.nextShadowSlot++;
+  if (batch.shadowSlots.size() <= slotIndex) {
+    batch.shadowSlots.emplace_back();
+  }
+  auto &slot = batch.shadowSlots[slotIndex];
+  EnsureShadowCapacity(slot, needed);
+  return slot;
 }
 
 void InstancedObject3d::DrawAll(Camera *camera) {
@@ -237,11 +279,11 @@ void InstancedObject3d::DrawAll(Camera *camera) {
       if (count == 0)
         continue;
 
-      EnsureCapacity(batch, count);
-      std::memcpy(batch.mapped, batch.cpuData.data(),
+      auto &slot = AcquireColorSlot(batch, count);
+      std::memcpy(slot.mapped, batch.cpuData.data(),
                   sizeof(InstanceData) * count);
 
-      model->DrawOutlineInstanced(count, batch.srvHandleGPU);
+      model->DrawOutlineInstanced(count, slot.srvHandleGPU);
     }
   }
 
@@ -276,11 +318,11 @@ void InstancedObject3d::DrawAll(Camera *camera) {
     if (count == 0)
       continue;
 
-    EnsureCapacity(batch, count);
-    std::memcpy(batch.mapped, batch.cpuData.data(),
+    auto &slot = AcquireColorSlot(batch, count);
+    std::memcpy(slot.mapped, batch.cpuData.data(),
                 sizeof(InstanceData) * count);
 
-    model->DrawInstanced(count, batch.srvHandleGPU);
+    model->DrawInstanced(count, slot.srvHandleGPU);
   }
 }
 
@@ -305,21 +347,19 @@ void InstancedObject3d::DrawShadow() {
                                              ->GetShadowResource()
                                              ->GetGPUVirtualAddress());
 
-  // 影パスは専用バッファ (shadowGpuBuffer) へ書き込む。
-  // カラーパスと共有すると、後から記録されるカラーパス (frustum culling 付き)
-  // の memcpy が GPU
-  // 実行前に中身を上書きし、影の内容が「カリング後の別の集合」に
-  // すり替わって広範囲の影が出たり消えたりチラつく。
+  // 影パスも DrawShadow 呼び出しごとに別スロットへ書く。
+  // 同一フレーム内で後続のインスタンス描画が同じバッファを上書きすると、
+  // GPU 実行時に先に記録した描画コマンドの行列がすり替わるため。
   for (auto &[model, batch] : batches_) {
     const uint32_t count = static_cast<uint32_t>(batch.cpuData.size());
     if (count == 0)
       continue;
 
-    EnsureShadowCapacity(batch, count);
-    std::memcpy(batch.shadowMapped, batch.cpuData.data(),
+    auto &slot = AcquireShadowSlot(batch, count);
+    std::memcpy(slot.mapped, batch.cpuData.data(),
                 sizeof(InstanceData) * count);
 
-    model->DrawShadowInstanced(count, batch.shadowSrvHandleGPU);
+    model->DrawShadowInstanced(count, slot.srvHandleGPU);
   }
 
   // ── 後始末: 非インスタンス影パイプライン("ShadowMap")を復元する ──

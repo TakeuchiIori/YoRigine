@@ -17,6 +17,7 @@
 #include <Loaders/Texture/TextureManager.h>
 #include <ModelManager.h>
 #include <Collision/Core/CollisionManager.h>
+#include <Collision/Core/CollisionEditor.h>
 
 #include "Particle/YParticleManager.h"
 #include "Particle/YEmitterGroupEditor.h"
@@ -134,6 +135,10 @@ void MyGame::Initialize() {
 
 	// 各種ImGuiツール登録
 	Editor::GetInstance()->RegisterGameUI("ゲーム時間管理", &YoRigine::GameTime::ImGui);
+	YoRigine::CollisionEditor::GetInstance()->Initialize();
+	Editor::GetInstance()->RegisterGameUI(
+		"当たり判定Editor",
+		[]() { YoRigine::CollisionEditor::GetInstance()->DrawImGui(); });
 	// ParticleEditor は旧システム専用のため削除済み。YParticleEditor を使用。
 	Editor::GetInstance()->RegisterGameUI("モデル操作", []() { YoRigine::ModelManipulator::GetInstance()->DrawImGui(); });
 	Editor::GetInstance()->RegisterGameUI("ポストエフェクト", []() { PostEffectManager::GetInstance()->ImGui(); });

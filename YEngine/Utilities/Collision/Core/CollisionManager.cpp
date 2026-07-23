@@ -24,6 +24,9 @@ void CollisionManager::Update() { CheckAllCollisions(); }
 void CollisionManager::Reset() {
   colliders_.clear();
   collidingPairs_.clear();
+  grid_.Clear();
+  queryGrid_.Clear();
+  queryGridReady_ = false;
 }
 
 // ============================================================
@@ -173,6 +176,7 @@ void CollisionManager::CheckCollisionPair(BaseCollider *a, BaseCollider *b) {
   bool hit = DispatchShapePair(a, b, &res);
 
   if (hit) {
+    ++lastNarrowPhaseHitCount_;
     if (!wasColliding) {
       a->CallOnEnterCollision(b);
       b->CallOnEnterCollision(a);
@@ -350,6 +354,147 @@ AABB CollisionManager::ComputeWorldAABB(BaseCollider *c) {
 }
 
 // ============================================================
+// コライダー c の表面上で worldPoint に最も近い点を返す。
+//   Sphere/Capsule: 中心軸から worldPoint 方向へ半径ぶん出した球面/側面上の点。
+//   AABB/OBB:       ボックス内へクランプした点（外側なら表面、内側なら内部点）。
+// ============================================================
+Vector3 CollisionManager::ClosestPointOnCollider(BaseCollider *c,
+                                                 const Vector3 &worldPoint) {
+  if (!c)
+    return worldPoint;
+
+  switch (c->GetShape()) {
+  case ColliderShape::Sphere: {
+    auto *sc = static_cast<SphereCollider *>(c);
+    const Vector3 center = sc->GetCenterPosition();
+    const float r = sc->GetRadius();
+    Vector3 d = worldPoint - center;
+    const float len = Length(d);
+    if (len <= 1e-6f)
+      return center;
+    return center + d * (r / len);
+  }
+  case ColliderShape::AABB: {
+    const AABB box = static_cast<AABBCollider *>(c)->GetAABB();
+    return Vector3{std::clamp(worldPoint.x, box.min.x, box.max.x),
+                   std::clamp(worldPoint.y, box.min.y, box.max.y),
+                   std::clamp(worldPoint.z, box.min.z, box.max.z)};
+  }
+  case ColliderShape::OBB: {
+    const OBB obb = static_cast<OBBCollider *>(c)->GetOBB();
+    const Vector3 d = worldPoint - obb.center;
+    const float half[3] = {obb.size.x, obb.size.y, obb.size.z};
+    Vector3 q = obb.center;
+    for (int i = 0; i < 3; ++i) {
+      const Vector3 axis = Normalize(obb.orientations[i]);
+      float dist = Dot(d, axis);
+      dist = std::clamp(dist, -half[i], half[i]);
+      q += axis * dist;
+    }
+    return q;
+  }
+  case ColliderShape::Capsule: {
+    const Capsule cap = static_cast<CapsuleCollider *>(c)->GetCapsule();
+    const Vector3 onSeg =
+        Intersection::ClosestPointOnSegment(worldPoint, cap.start, cap.end);
+    Vector3 d = worldPoint - onSeg;
+    const float len = Length(d);
+    if (len <= 1e-6f)
+      return onSeg;
+    return onSeg + d * (cap.radius / len);
+  }
+  default:
+    return c->GetCenterPosition();
+  }
+}
+
+// ============================================================
+// 2コライダーの接触点(ワールド)を近似する（UE の ImpactPoint 相当）。
+//   相手中心に最も近い「自分の表面点」と、自分中心に最も近い「相手の表面点」の
+//   中点を採る。両形状の境界付近を1回で実用的に近似できる。
+//   （Sphere-Sphere なら 2 表面の中点＝厳密な接触線上の点になる）
+// ============================================================
+Vector3 CollisionManager::ComputeContactPoint(BaseCollider *a,
+                                              BaseCollider *b) {
+  if (!a || !b)
+    return a ? a->GetCenterPosition() : Vector3{};
+
+  const Vector3 pa = ClosestPointOnCollider(a, b->GetCenterPosition());
+  const Vector3 pb = ClosestPointOnCollider(b, a->GetCenterPosition());
+  return (pa + pb) * 0.5f;
+}
+
+// ============================================================
+// a の表面が b 側を向く外向き法線（UE の ImpactNormal 相当）。
+//   Sphere/Capsule: 中心軸から b 方向への単位ベクトル。
+//   AABB/OBB:       b が最も張り出している軸を当たった面とし、その面法線。
+// ============================================================
+Vector3 CollisionManager::ComputeContactNormal(BaseCollider *a,
+                                               BaseCollider *b,
+                                               const Vector3 &fallback) {
+  if (!a || !b)
+    return fallback;
+
+  const Vector3 toB = b->GetCenterPosition() - a->GetCenterPosition();
+
+  auto safeNormalize = [&](const Vector3 &v) -> Vector3 {
+    const float len = Length(v);
+    return (len > 1e-6f) ? v * (1.0f / len) : fallback;
+  };
+
+  switch (a->GetShape()) {
+  case ColliderShape::Sphere:
+    return safeNormalize(toB);
+  case ColliderShape::Capsule: {
+    const Capsule cap = static_cast<CapsuleCollider *>(a)->GetCapsule();
+    const Vector3 onSeg = Intersection::ClosestPointOnSegment(
+        b->GetCenterPosition(), cap.start, cap.end);
+    return safeNormalize(b->GetCenterPosition() - onSeg);
+  }
+  case ColliderShape::AABB: {
+    // 世界軸(X/Y/Z)のうち、half で正規化した張り出しが最大の面を採る
+    const AABB box = static_cast<AABBCollider *>(a)->GetAABB();
+    const Vector3 half = (box.max - box.min) * 0.5f;
+    const float h[3] = {half.x, half.y, half.z};
+    const float d[3] = {toB.x, toB.y, toB.z};
+    int bestAxis = 0;
+    float bestRatio = -1.0f;
+    for (int i = 0; i < 3; ++i) {
+      const float ratio = (h[i] > 1e-6f) ? std::fabs(d[i]) / h[i] : 0.0f;
+      if (ratio > bestRatio) {
+        bestRatio = ratio;
+        bestAxis = i;
+      }
+    }
+    Vector3 n{};
+    (&n.x)[bestAxis] = (d[bestAxis] >= 0.0f) ? 1.0f : -1.0f;
+    return n;
+  }
+  case ColliderShape::OBB: {
+    // ローカル軸(orientations)のうち、half で正規化した張り出しが最大の面を採る
+    const OBB obb = static_cast<OBBCollider *>(a)->GetOBB();
+    const float h[3] = {obb.size.x, obb.size.y, obb.size.z};
+    int bestAxis = 0;
+    float bestRatio = -1.0f;
+    float bestSign = 1.0f;
+    for (int i = 0; i < 3; ++i) {
+      const Vector3 axis = Normalize(obb.orientations[i]);
+      const float proj = Dot(toB, axis);
+      const float ratio = (h[i] > 1e-6f) ? std::fabs(proj) / h[i] : 0.0f;
+      if (ratio > bestRatio) {
+        bestRatio = ratio;
+        bestAxis = i;
+        bestSign = (proj >= 0.0f) ? 1.0f : -1.0f;
+      }
+    }
+    return Normalize(obb.orientations[bestAxis]) * bestSign;
+  }
+  default:
+    return safeNormalize(toB);
+  }
+}
+
+// ============================================================
 // 一時オーバーラップクエリ
 //   持続コライダーを登録せず、colliders_ を線形走査して
 //   「今この瞬間、球の範囲に重なっているコライダー」を返すだけの一回限りの検索。
@@ -360,9 +505,21 @@ std::vector<BaseCollider *> CollisionManager::QuerySphere(
     const std::vector<uint32_t> &ignoreTypeIDs) const {
 
   std::vector<BaseCollider *> result;
-  const Sphere querySphere{center, radius};
+  if (radius < 0.0f)
+    return result;
 
-  for (BaseCollider *c : colliders_) {
+  if (!queryGridReady_)
+    RebuildQueryGrid();
+
+  const Sphere querySphere{center, radius};
+  const Vector3 extent{radius, radius, radius};
+  const AABB queryAABB{center - extent, center + extent};
+  std::vector<BaseCollider *> candidates;
+  queryGrid_.QueryAABB(queryAABB, layerMask, candidates);
+  lastQuerySphereCandidateCount_ = candidates.size();
+  result.reserve(candidates.size());
+
+  for (BaseCollider *c : candidates) {
     if (!c)
       continue;
     if (!c->GetIsActive() || !c->IsCollisionEnabled())
@@ -394,6 +551,20 @@ std::vector<BaseCollider *> CollisionManager::QuerySphere(
   return result;
 }
 
+void CollisionManager::RebuildQueryGrid() const {
+  queryGrid_.Clear();
+  for (BaseCollider *c : colliders_) {
+    if (!c)
+      continue;
+    if (c->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kNone))
+      continue;
+    if (!c->GetIsActive() || !c->IsCollisionEnabled())
+      continue;
+    queryGrid_.Insert(c, ComputeWorldAABB(c));
+  }
+  queryGridReady_ = true;
+}
+
 // ============================================================
 // 全コライダーの当たり判定チェック
 //   1) Broad Phase: 有効コライダーの AABB をグリッドに登録、同セル候補ペア列挙
@@ -406,7 +577,10 @@ std::vector<BaseCollider *> CollisionManager::QuerySphere(
 // 衝突を検出した場合は衝突直前の位置で止める。
 // 自身を無視するため typeID を ignore リストに追加する。
 // ============================================================
-void CollisionManager::SweepCCDColliders() {
+bool CollisionManager::SweepCCDColliders() {
+  bool correctedAny = false;
+  std::vector<BaseCollider *> candidates;
+
   for (BaseCollider *c : colliders_) {
     if (!c)
       continue;
@@ -433,30 +607,70 @@ void CollisionManager::SweepCCDColliders() {
     Vector3 dir = delta * (1.0f / dist);
     Ray ray{prev, dir};
 
-    // 自身の typeID を無視
-    std::vector<uint32_t> ignore{c->GetTypeID()};
-    RaycastHit hit;
-    if (Raycast(ray, dist, &hit, ignore)) {
+    // 現在形状のAABBを移動量だけ過去側へ広げ、移動経路全体を包む。
+    // この範囲と重なるセルだけをCCDの候補にする。
+    const AABB currentAABB = ComputeWorldAABB(c);
+    const AABB sweptAABB{
+        {std::min(currentAABB.min.x, currentAABB.min.x - delta.x),
+         std::min(currentAABB.min.y, currentAABB.min.y - delta.y),
+         std::min(currentAABB.min.z, currentAABB.min.z - delta.z)},
+        {std::max(currentAABB.max.x, currentAABB.max.x - delta.x),
+         std::max(currentAABB.max.y, currentAABB.max.y - delta.y),
+         std::max(currentAABB.max.z, currentAABB.max.z - delta.z)}};
+    queryGrid_.QueryAABB(sweptAABB, c->GetCollisionMask(), candidates);
+    lastCCDCandidateCount_ += candidates.size();
+
+    bool hitAnything = false;
+    float closestDistance = dist;
+    RaycastHit closestHit{};
+    for (BaseCollider *candidate : candidates) {
+      if (!candidate || candidate == c)
+        continue;
+      if (!candidate->GetIsActive() || !candidate->IsCollisionEnabled())
+        continue;
+      RaycastHit hit{};
+      if (!DispatchRay(ray, candidate, &hit))
+        continue;
+      if (hit.distance <= 0.001f || hit.distance > closestDistance)
+        continue;
+      closestDistance = hit.distance;
+      closestHit = hit;
+      hitAnything = true;
+    }
+
+    if (hitAnything) {
       // 衝突直前で止める
       WorldTransform *wt = c->GetWT();
       if (wt) {
-        Vector3 safePos = hit.hitPoint - dir * 0.01f;
+        Vector3 safePos = closestHit.hitPoint - dir * 0.01f;
         wt->translate_ = safePos;
         wt->UpdateMatrix();
         c->Update();
+        correctedAny = true;
       }
     }
   }
+  return correctedAny;
 }
 
 void CollisionManager::CheckAllCollisions() {
   // コールバック内 Add/Remove を保留に誘導
   isIterating_ = true;
+  lastActiveColliderCount_ = 0;
+  lastBroadPhasePairCount_ = 0;
+  lastNarrowPhaseHitCount_ = 0;
+  lastCCDCandidateCount_ = 0;
 
-  // CCD パス (broad/narrow より前に実行してトンネリング防止)
-  SweepCCDColliders();
+  // CCD/範囲クエリ用グリッドは視錐台カリングせず全有効コライダーを保持する。
+  // 前フレームのコールバックで Add/Remove があった場合は遅延再構築する。
+  if (!queryGridReady_)
+    RebuildQueryGrid();
+  // CCDで位置補正が発生した場合は、補正後の位置でもう一度同期する。
+  if (SweepCCDColliders())
+    RebuildQueryGrid();
 
   grid_.Clear();
+  queryGrid_.Clear();
 
   // Frustum culling 用に視錐台を抽出 (毎フレーム)
   Frustum frustum{};
@@ -467,6 +681,7 @@ void CollisionManager::CheckAllCollisions() {
   }
 
   // Broad Phase: 有効コライダーをグリッドに登録
+  // queryGrid_ (QuerySphere/CCD用) も同時に構築し、ComputeWorldAABB の二重計算を避ける
   for (BaseCollider *c : colliders_) {
     if (!c)
       continue;
@@ -476,6 +691,9 @@ void CollisionManager::CheckAllCollisions() {
       continue;
     AABB aabb = ComputeWorldAABB(c);
 
+    // queryGrid_ は Frustum Culling なしで全有効コライダーを保持する
+    queryGrid_.Insert(c, aabb);
+
     // Frustum culling: 視錐台外なら BroadPhase 登録をスキップ。
     // IsCheckOutsideCamera() が true のコライダーだけがカリング対象
     // (常時アクティブなプレイヤーなどは false にしておく)。
@@ -484,11 +702,14 @@ void CollisionManager::CheckAllCollisions() {
         continue;
     }
 
+    ++lastActiveColliderCount_;
     grid_.Insert(c, aabb);
   }
+  queryGridReady_ = true;
 
   // 候補ペア列挙
   grid_.QueryPairs(broadPhasePairsScratch_);
+  lastBroadPhasePairCount_ = broadPhasePairsScratch_.size();
 
   // 静的×静的のペアは narrow-phase もコールバックも実質意味がないので
   // この時点で一括除去する。同一場所に多数の static collider を置いた場合の
@@ -555,6 +776,9 @@ void CollisionManager::CheckAllCollisions() {
 
   isIterating_ = false;
   FlushPending();
+  // queryGrid_ は Broad Phase ループ内で構築済み。
+  // コールバック内の AddCollider/RemoveCollider が queryGridReady_ = false を
+  // セット済みの場合、次の QuerySphere/CCD 要求時に遅延再構築される。
 }
 
 bool CollisionManager::IsColliderInView(const Vector3 &position,
@@ -570,14 +794,17 @@ void CollisionManager::AddCollider(BaseCollider *collider) {
   if (isIterating_) {
     // 走査中の追加は遅延 (走査終了後にflush)
     pendingAdds_.push_back(collider);
+    queryGridReady_ = false;
     return;
   }
   colliders_.push_back(collider);
+  queryGridReady_ = false;
 }
 
 void CollisionManager::RemoveCollider(BaseCollider *collider) {
   if (!collider)
     return;
+  queryGridReady_ = false;
   if (isIterating_) {
     // 走査中に実体が破棄される場合があるため、参照はこの場で即座に潰す。
     // pendingRemoves_ に raw pointer を積むと、同フレーム中に ColliderPool
@@ -644,7 +871,8 @@ void CollisionManager::FlushPending() {
 }
 
 bool CollisionManager::RaycastMasked(const Ray &ray, float maxDistance,
-                                     uint32_t layerMask, RaycastHit *outHit) {
+                                     uint32_t layerMask, RaycastHit *outHit,
+                                     const BaseCollider *ignoreCollider) {
   bool hitAnything = false;
   float closestDistance = maxDistance;
   RaycastHit tempHit;
@@ -652,6 +880,8 @@ bool CollisionManager::RaycastMasked(const Ray &ray, float maxDistance,
   for (BaseCollider *collider : colliders_) {
     if (!collider || !collider->GetIsActive() ||
         !collider->IsCollisionEnabled())
+      continue;
+    if (collider == ignoreCollider)
       continue;
     if ((collider->GetLayerBits() & layerMask) == 0u)
       continue;

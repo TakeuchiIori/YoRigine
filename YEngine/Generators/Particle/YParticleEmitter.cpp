@@ -35,6 +35,43 @@ void YParticleEmitter::Update(float deltaTime) {
 	Matrix4x4 myMatrix = MakeTranslateMatrix(position_);
 	system->SetParentMatrix(myMatrix);
 
+	// 1 フレームあたりの発生上限（暴走防止。全モード共通）
+	constexpr int kMaxEmitPerFrame = 256;
+
+	switch (emissionMode_) {
+
+	// ── 個数維持：エリア内に targetCount 個を常に保つ（死んだら補充） ──
+	case EmissionMode::MaintainCount: {
+		int active  = CountActiveParticles(system);
+		int deficit = targetCount_ - active;
+		if (deficit > 0) {
+			if (deficit > kMaxEmitPerFrame) deficit = kMaxEmitPerFrame;
+			// プリウォーム発生。一斉に死んで一斉に再生する「同期パルス」を防ぐため、
+			// 各粒の経過時間を寿命内ランダムで初期化し、集団の年齢をばらけさせる。
+			EmitInternal(position_, deficit, /*prewarmAge=*/true);
+		}
+		return;
+	}
+
+	// ── 静的エリア：一度だけ targetCount 個を発生し、以後は消さず更新し続ける ──
+	case EmissionMode::Persistent: {
+		// targetCount が多い場合は複数フレームに分けて出し切る（取りこぼし防止）
+		if (persistentEmitted_ < targetCount_) {
+			int remaining = targetCount_ - persistentEmitted_;
+			int n = (remaining > kMaxEmitPerFrame) ? kMaxEmitPerFrame : remaining;
+			// immortal=true で発生。寿命で死なず、UV アニメ等の更新を永遠に受け続ける。
+			EmitInternal(position_, n, /*prewarmAge=*/false, /*immortal=*/true);
+			persistentEmitted_ += n;
+		}
+		return;
+	}
+
+	// ── 従来：秒間発生数で撃ち続ける ──
+	case EmissionMode::Rate:
+	default:
+		break;
+	}
+
 	// 発生レートが 0 以下なら連続発生しない（interval=0 で while が無限ループするのを防ぐ）
 	if (emissionRate_ <= 0.0f) {
 		emissionTimer_ = 0.0f;
@@ -50,7 +87,6 @@ void YParticleEmitter::Update(float deltaTime) {
 	// 発生間隔に達したらパーティクルを発生。
 	// deltaTime が大きい（シーンロード直後など）と 1 フレームで大量発生し得るため、
 	// 1 フレームあたりの発生回数に上限を設けて暴走を防ぐ。
-	constexpr int kMaxEmitPerFrame = 256;
 	int emitted = 0;
 	while (emissionTimer_ >= interval && emitted < kMaxEmitPerFrame) {
 		EmitInternal(position_, emitCount_);
@@ -61,6 +97,20 @@ void YParticleEmitter::Update(float deltaTime) {
 	if (emitted >= kMaxEmitPerFrame) {
 		emissionTimer_ = 0.0f;
 	}
+}
+
+//=================================================================
+// アクティブ粒数のカウント（MaintainCount 用）
+//=================================================================
+
+int YParticleEmitter::CountActiveParticles(YParticleSystem* system) const
+{
+	if (!system) return 0;
+	int count = 0;
+	for (const auto& attr : system->GetAttributes()) {
+		if (attr.isActive) ++count;
+	}
+	return count;
 }
 
 //=================================================================
@@ -103,6 +153,7 @@ void YParticleEmitter::FollowEmit(const Vector3& position, int count) {
 void YParticleEmitter::Reset()
 {
 	emissionTimer_ = 0.0f;
+	persistentEmitted_ = 0; // Persistent モードを再発生できるようにする
 }
 
 /// <summary>
@@ -110,7 +161,8 @@ void YParticleEmitter::Reset()
 /// </summary>
 /// <param name="position"></param>
 /// <param name="count"></param>
-void YParticleEmitter::EmitInternal(const Vector3& position, int count)
+void YParticleEmitter::EmitInternal(const Vector3& position, int count,
+                                    bool prewarmAge, bool immortal)
 {
 	auto* system = GetTargetSystem();
 	if (!system) return;
@@ -125,7 +177,7 @@ void YParticleEmitter::EmitInternal(const Vector3& position, int count)
 
 		// システムへ1つ発生要求
 		// ※システム側が「Emit(pos, count)」で単純にposに生成する仕様であると仮定
-		system->Emit(spawnPos, 1);
+		system->Emit(spawnPos, 1, prewarmAge, immortal);
 	}
 }
 

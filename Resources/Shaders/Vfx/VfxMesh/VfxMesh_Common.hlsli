@@ -152,11 +152,50 @@ struct LightningParams
 //--------------------------------------------------
 struct ShockwaveParams
 {
-    float4 color;     // rgb>1 で Bloom
-    float  time;      // アニメ時間
-    float  duration;  // 1サイクル秒
-    float  thickness; // リング太さ
-    float  burst;     // -1=継続ループ, 0..1=爆発ワンショット進捗
+    float4 color;      // rgb>1 で Bloom / a=不透明度(モジュール適用済み)
+    float  thickness;  // リング太さ(UV)
+    float  ringRadius; // リング位置(UV, 0..1)。膨張は Module(scale) が担当
+    float2 _pad;
+};
+
+//--------------------------------------------------
+// AreaField パラメータ (DiscGeometry × AreaFieldMaterial — 地面円フィールド)
+//   C++ 側 AreaFieldParamsCB と一致させること
+//--------------------------------------------------
+struct AreaFieldParams
+{
+    float4 color;       // rgb=ベース色(>1でBloom) / a=不透明度
+    float4 edgeColor;   // 外周リムの HDR 色
+    float  fillOpacity; // 内部塗りの濃さ
+    float  edgeWidth;   // 外周リム帯幅(UV)
+    float  ringSpeed;   // 魔法陣の回転速度
+    float  noiseScale;  // エネルギーノイズのタイリング
+    float  scanSpeed;   // スキャン波の速さ
+    float  runeCount;   // 魔法陣の対称数
+    float  styleRune;   // 魔法陣デザインの強さ（発光ライン）
+    float  styleEnergy; // ②エネルギー場ブレンド
+    float  styleScan;   // ③スキャン波ブレンド
+    float  time;        // アニメ時間
+    float  style;       // 魔法陣デザイン種別(0..7)
+    float  fillStyle;   // 内部の質感(0..5) 無地/毒/バフ/エネルギー/波紋/残り火
+};
+
+//--------------------------------------------------
+// RimFx パラメータ (RimCurtain × RimFxMaterial — 縁の縦演出)
+//   C++ 側 RimFxParamsCB と一致させること
+//--------------------------------------------------
+struct RimFxParams
+{
+    float4 color;       // 根本の色(>1でBloom) / a=強度
+    float4 tipColor;    // 先端(上)の色
+    float  style;       // 0=炎 / 1=霊気 / 2=電撃 / …
+    float  riseSpeed;   // 上昇スクロール速度
+    float  noiseScale;  // 揺らぎ/炎舌のタイリング（電撃/渦は本数）
+    float  turbulence;  // 揺らぎの強さ
+    float  time;        // アニメ時間
+    float  texStrength; // テクスチャの寄与(0=無効)
+    float  texTiling;   // テクスチャUVタイリング
+    float  texScroll;   // テクスチャ縦スクロール速度
 };
 
 //--------------------------------------------------

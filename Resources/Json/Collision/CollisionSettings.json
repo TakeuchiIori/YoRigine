@@ -1,0 +1,6 @@
+{
+    "broadPhaseCellSize": 10.0,
+    "contactExitGraceFrames": 2,
+    "enableFrustumCulling": true,
+    "resolveIterations": 3
+}

@@ -320,7 +320,7 @@ void CompositeEffectManager::PlayOneShot(const std::string& name, const Vector3&
         }
     }
     for (const auto& v : a.vfxMeshAssets) {
-        VfxMeshHandle::PlayOneShot(v.asset, pos + v.offset, v.scale, vfxTimeScale);
+        YVfxHandle::PlayOneShot(v.asset, pos + v.offset, v.scale, vfxTimeScale);
     }
 
     if (!a.gpuEmitterGroup.empty()) {
@@ -371,7 +371,7 @@ EffectHandle CompositeEffectManager::Play(const std::string& name, const Vector3
     // VfxMesh 子（ループ）
     // ループ型は Stop() で寿命が外部制御される前提なので minDuration/timeScale は適用しない（7.2参照）。
     for (const auto& v : a.vfxMeshAssets) {
-        inst->vfx.push_back(VfxMeshHandle::Play(v.asset, pos + v.offset, v.scale, /*loop*/true));
+        inst->vfx.push_back(YVfxHandle::Play(v.asset, pos + v.offset, v.scale, /*loop*/true));
         inst->vfxOffsets.push_back(v.offset);
     }
     // GPU 子（ループ）

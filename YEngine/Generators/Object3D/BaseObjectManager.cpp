@@ -51,11 +51,10 @@ void BaseObjectManager::Initialize() {
 void BaseObjectManager::Finalize() {
 	ClearAll();
 
-	// 借用ポインタを手放す (ダングリング防止)
-	instancedObject3d_ = nullptr;
-#ifdef USE_IMGUI
-	editor_ = nullptr;
-#endif
+	// instancedObject3d_ / editor_ はアプリ生存期間中ずっと生きるシングルトンを
+	// MyGame::Initialize() で一度だけ借用しているだけなので、ここで手放してはいけない。
+	// 手放すと 2 回目以降のシーン入場で null のままになり、DrawAllInstanced() の
+	// assert が発火して停止する。シングルトンなのでダングリングは起きない。
 }
 
 // ============================================================
@@ -147,11 +146,7 @@ void BaseObjectManager::UpdateAll() {
 // 一括描画
 // ============================================================
 void BaseObjectManager::DrawAll() {
-	for (auto& entry : entries_) {
-		if (!entry.ptr || entry.pendingDestroy) continue;
-		if (!entry.ptr->IsActive()) continue;
-		entry.ptr->Draw();
-	}
+	DrawAllInstanced();
 }
 
 // ============================================================
@@ -191,6 +186,9 @@ void BaseObjectManager::DrawShadowAll() {
 // 一括描画（インスタンシング対応・カラーパス）
 // ============================================================
 void BaseObjectManager::DrawAllInstanced() {
+	if (!instancedObject3d_ || !camera_) {
+		return;
+	}
 	assert(instancedObject3d_ && "BaseObjectManager : SetInstancedObject3d() を先に呼ぶこと");
 	auto* inst = instancedObject3d_;
 	inst->Begin(camera_);
@@ -216,6 +214,9 @@ void BaseObjectManager::DrawAllInstanced() {
 // 一括影描画（インスタンシング対応・影パス）
 // ============================================================
 void BaseObjectManager::DrawShadowAllInstanced() {
+	if (!instancedObject3d_ || !camera_) {
+		return;
+	}
 	assert(instancedObject3d_ && "BaseObjectManager : SetInstancedObject3d() を先に呼ぶこと");
 	auto* inst = instancedObject3d_;
 	inst->Begin();   // 影は WVP を使わないのでカメラ不要

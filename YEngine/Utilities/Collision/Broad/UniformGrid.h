@@ -56,6 +56,11 @@ namespace YoRigine {
 		// 重複ペアは内部で除去する。
 		void QueryPairs(std::vector<std::pair<BaseCollider*, BaseCollider*>>& outPairs);
 
+		// 指定AABBと重なるセルに登録されたコライダーを重複なしで取得する。
+		// layerMask は候補生成時の早期除外に使う（精密形状判定は呼び出し側で行う）。
+		void QueryAABB(const AABB& area, uint32_t layerMask,
+			std::vector<BaseCollider*>& outColliders) const;
+
 		// ============================================================
 		// デバッグ描画: カメラ位置周辺 (radius 範囲) のセルを全て描く。
 		// 空セルも含めて全て出すので、ノイズを下げたいなら radius を絞る。
@@ -67,11 +72,22 @@ namespace YoRigine {
 	private:
 		void CellRangeFor(const AABB& aabb, CellKey& outMin, CellKey& outMax) const;
 
+		struct PairHash {
+			size_t operator()(const std::pair<BaseCollider*, BaseCollider*>& p) const noexcept {
+				auto h1 = std::hash<BaseCollider*>{}(p.first);
+				auto h2 = std::hash<BaseCollider*>{}(p.second);
+				return h1 ^ (h2 + 0x9e3779b9 + (h1 << 6) + (h1 >> 2));
+			}
+		};
+
 	private:
-		float cellSize_ = 5.0f;
-		float invCellSize_ = 1.0f / 5.0f;
+		float cellSize_ = 2.5f;
+		float invCellSize_ = 1.0f / 2.5f;
 
 		std::unordered_map<CellKey, std::vector<BaseCollider*>, CellKeyHash> cells_;
+		std::unordered_set<std::pair<BaseCollider*, BaseCollider*>, PairHash> seenPairsScratch_;
+		std::vector<BaseCollider*> overflowColliders_;
+		mutable std::unordered_set<BaseCollider*> querySeenScratch_;
 	};
 
 } // namespace YoRigine

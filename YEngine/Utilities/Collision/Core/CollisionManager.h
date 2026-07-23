@@ -76,6 +76,13 @@ public:
   // から抽出する。
   void SetCullingCamera(Camera *cam) { cullingCamera_ = cam; }
   const std::vector<BaseCollider *> &GetColliders() const { return colliders_; }
+  size_t GetLastActiveColliderCount() const { return lastActiveColliderCount_; }
+  size_t GetLastBroadPhasePairCount() const { return lastBroadPhasePairCount_; }
+  size_t GetLastNarrowPhaseHitCount() const { return lastNarrowPhaseHitCount_; }
+  size_t GetLastCCDCandidateCount() const { return lastCCDCandidateCount_; }
+  size_t GetLastQuerySphereCandidateCount() const {
+    return lastQuerySphereCandidateCount_;
+  }
 
   // 視錐台 culling が有効か (enable フラグ + カメラ両方がそろっているか)
   bool IsCullingActive() const {
@@ -96,7 +103,8 @@ public:
   bool Raycast(const Ray &ray, float maxDistance, RaycastHit *outHit,
                const std::vector<uint32_t> &ignoreTypeIDs = {});
   bool RaycastMasked(const Ray &ray, float maxDistance, uint32_t layerMask,
-                     RaycastHit *outHit);
+                     RaycastHit *outHit,
+                     const BaseCollider *ignoreCollider = nullptr);
 
   // allowTypeIDs に含まれる typeID のコライダーだけを対象にする Raycast
   // (許可リスト方式)。 除外リスト(Raycast の ignoreTypeIDs)
@@ -139,7 +147,11 @@ public:
   // ============================================================
   // Broad Phase 設定
   // ============================================================
-  void SetBroadPhaseCellSize(float size) { grid_.SetCellSize(size); }
+  void SetBroadPhaseCellSize(float size) {
+    grid_.SetCellSize(size);
+    queryGrid_.SetCellSize(size);
+    queryGridReady_ = false;
+  }
   float GetBroadPhaseCellSize() const { return grid_.GetCellSize(); }
 
   // Broad Phase グリッドへのアクセサ (デバッグ描画用)
@@ -169,6 +181,26 @@ public:
   // 形状からワールドAABBを計算
   // ============================================================
   static AABB ComputeWorldAABB(BaseCollider *c);
+
+  // ============================================================
+  // 接触点の近似算出（UE の FHitResult::ImpactPoint 相当）
+  //   - narrow-phase の CollisionResult は法線・貫通のみで接触点を持たないため、
+  //     2コライダーの形状から境界付近の接触点を実用的に近似する。
+  //   - ヒットエフェクトの発生位置など「当たった場所」を欲しい用途向け。
+  //     厳密な接触解ではない（GJK/EPA 等ではない）。
+  // ============================================================
+  // コライダー c の表面上で worldPoint に最も近い点を返す。
+  static Vector3 ClosestPointOnCollider(BaseCollider *c,
+                                        const Vector3 &worldPoint);
+  // 2つのコライダーの接触点(ワールド)を近似算出する。
+  static Vector3 ComputeContactPoint(BaseCollider *a, BaseCollider *b);
+  // a の表面が b 側を向く外向き法線を返す（UE の ImpactNormal 相当）。
+  //   Sphere/Capsule は中心軸→接触方向、AABB/OBB は当たった面の軸法線。
+  //   ヒットエフェクトを面から立てる/外側へオフセットする向きとして使う。
+  //   算出不能時（中心一致など）は fallback を返す。
+  static Vector3 ComputeContactNormal(BaseCollider *a, BaseCollider *b,
+                                      const Vector3 &fallback = {0.0f, 1.0f,
+                                                                0.0f});
 
   // ============================================================
   // ヒット方向判定用ユーティリティ
@@ -202,7 +234,10 @@ private:
       int iterations);
 
   // CCD: 前フレーム位置→現在位置を Raycast でスイープしてトンネリングを防ぐ
-  void SweepCCDColliders();
+  bool SweepCCDColliders();
+
+  // カリングなしの範囲検索用グリッドを現在位置から再構築する。
+  void RebuildQueryGrid() const;
 
   std::vector<BaseCollider *> colliders_;
 
@@ -224,8 +259,15 @@ private:
 
   // Broad Phase 用 Uniform Grid
   UniformGrid grid_;
+  mutable UniformGrid queryGrid_;
+  mutable bool queryGridReady_ = false;
   std::vector<std::pair<BaseCollider *, BaseCollider *>>
       broadPhasePairsScratch_;
+  size_t lastActiveColliderCount_ = 0;
+  size_t lastBroadPhasePairCount_ = 0;
+  size_t lastNarrowPhaseHitCount_ = 0;
+  size_t lastCCDCandidateCount_ = 0;
+  mutable size_t lastQuerySphereCandidateCount_ = 0;
 
   // 反復押し戻し回数 (0 で無効)
   int resolveIterations_ = 3;

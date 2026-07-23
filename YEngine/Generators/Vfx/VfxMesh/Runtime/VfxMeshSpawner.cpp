@@ -4,15 +4,32 @@
 #include "Systems/Camera/Camera.h"
 #include "Debugger/Logger.h"
 
+#include <Vfx/VfxMesh/Effects/LightningMesh.h>
+#include <Vfx/VfxMesh/Effects/LightVolumeMesh.h>
+#include <Vfx/VfxMesh/Effects/VolumeSmokeMesh.h>
+#include <Vfx/VfxMesh/Effects/ShockwaveMesh.h>
+
+// 2軸合成（Geometry × Material）
+#include <Vfx/VfxMesh/Core/GeometryRegistry.h>
+#include <Vfx/VfxMesh/Core/MaterialRegistry.h>
+#include <Vfx/VfxMesh/Geometry/SphereGeometry.h>
+#include <Vfx/VfxMesh/Geometry/ConeGeometry.h>
+#include <Vfx/VfxMesh/Geometry/RingGeometry.h>
+#include <Vfx/VfxMesh/Geometry/PlaneGeometry.h>
+#include <Vfx/VfxMesh/Geometry/DiscGeometry.h>
+#include <Vfx/VfxMesh/Geometry/RimCurtainGeometry.h>
+#include <Vfx/VfxMesh/Geometry/LobeClusterGeometry.h>
+#include <Vfx/VfxMesh/Materials/NoiseMaterial.h>
+#include <Vfx/VfxMesh/Materials/ShockwaveMaterial.h>
+#include <Vfx/VfxMesh/Materials/AreaFieldMaterial.h>
+#include <Vfx/VfxMesh/Materials/RimFxMaterial.h>
+#include <Vfx/VfxMesh/Core/VfxMeshElement.h>
+
 #include <filesystem>
 #include <algorithm>
 #include <cmath>
 
 namespace fs = std::filesystem;
-
-static constexpr size_t kCBAlign = 256;
-template<typename T>
-static constexpr size_t CBSize() { return (sizeof(T) + kCBAlign - 1) & ~(kCBAlign - 1); }
 
 // ============================================================
 // シングルトン
@@ -29,7 +46,32 @@ VfxMeshSpawner* VfxMeshSpawner::GetInstance()
 void VfxMeshSpawner::Initialize()
 {
     dxCommon_ = YoRigine::DirectXCommon::GetInstance();
-    active_.reserve(kMaxActiveVfx);   // 以降 push_back で再確保させない
+    active_.reserve(kMaxActiveVfx);
+
+    // ── 既知エフェクト型を Registry に登録（モノリシック / 従来型） ──────
+    // 新しい型を追加するときは Describe() を書いて1行追加するだけ。
+    auto& reg = YoRigine::VfxMeshRegistry::Instance();
+    reg.Register(YoRigine::VolumeSmokeMesh::Describe());
+    reg.Register(YoRigine::LightningMesh::Describe());
+    reg.Register(YoRigine::ShockwaveMesh::Describe());
+    reg.Register(YoRigine::LightVolumeMesh::Describe());
+
+    // ── 2軸合成用のジオメトリ / マテリアルを登録 ───────────────────────
+    // Geometry × Material の任意の組み合わせでエフェクトを作れる。
+    auto& geomReg = YoRigine::GeometryRegistry::Instance();
+    geomReg.Register(YoRigine::SphereGeometry::Describe());
+    geomReg.Register(YoRigine::ConeGeometry::Describe());
+    geomReg.Register(YoRigine::RingGeometry::Describe());
+    geomReg.Register(YoRigine::PlaneGeometry::Describe());
+    geomReg.Register(YoRigine::DiscGeometry::Describe());
+    geomReg.Register(YoRigine::RimCurtainGeometry::Describe());
+    geomReg.Register(YoRigine::LobeClusterGeometry::Describe());
+
+    auto& matReg = YoRigine::MaterialRegistry::Instance();
+    matReg.Register(YoRigine::NoiseMaterial::Describe());
+    matReg.Register(YoRigine::ShockwaveMaterial::Describe());
+    matReg.Register(YoRigine::AreaFieldMaterial::Describe());
+    matReg.Register(YoRigine::RimFxMaterial::Describe());
 }
 
 void VfxMeshSpawner::Finalize()
@@ -88,7 +130,8 @@ uint32_t VfxMeshSpawner::Spawn(const std::string& assetName,
                                const Vector3&     position,
                                float              scale,
                                bool               loop,
-                               float              timeScale)
+                               float              timeScale,
+                               float              lifetime)
 {
     auto it = assetMap_.find(assetName);
     if (it == assetMap_.end()) {
@@ -103,12 +146,20 @@ uint32_t VfxMeshSpawner::Spawn(const std::string& assetName,
     }
     fx->id        = nextId_++;
     fx->alive     = true;
-    fx->loop      = loop;
+    fx->age       = 0.f;         // プール再利用時に前回の経過時間を持ち越さない
+    fx->lifetimeOverride = (lifetime > 0.f) ? lifetime : -1.f;
+    // アセット側で「寿命無限」が立っていれば loop を強制 true（呼び出し側が false でも消えない）。
+    // ただし寿命(秒)が明示指定された場合はワンショット扱いとし、必ずその秒数で消す。
+    const bool effLoop = (fx->lifetimeOverride > 0.f)
+                             ? false
+                             : (loop || it->second.loopForever);
+    fx->loop      = effLoop;
     fx->timeScale = (timeScale > 0.0001f) ? timeScale : 1.0f;
     fx->asset     = &it->second;   // コピーせず参照
     fx->position  = position;
     fx->scale     = scale;
-    fx->burstProgress = loop ? -1.f : 0.f;
+    fx->userColor = { 1.f, 1.f, 1.f, 1.f }; // プール再利用時に前回の色を持ち越さない
+    fx->burstProgress = effLoop ? -1.f : 0.f;
 
     // 稲妻の端点は既定では各エレメントの direction/length から自動計算する。
     // SetEndpoints / SpawnBolt で明示指定された場合のみ boltStart/End を使う。
@@ -138,64 +189,32 @@ uint32_t VfxMeshSpawner::SpawnBolt(const std::string& assetName,
 // ============================================================
 void VfxMeshSpawner::InitEffect(ActiveEffect& fx)
 {
-    const auto& asset = *fx.asset;
-
     fx.subs.clear();
-    fx.subs.reserve(asset.elements.size());
+    fx.subs.reserve(fx.asset->elements.size());
 
-    for (const auto& def : asset.elements) {
+    auto& reg = YoRigine::VfxMeshRegistry::Instance();
+
+    for (const auto& def : fx.asset->elements) {
         if (!def.enabled) continue;
 
-        ElementRT sub;
-        sub.def = &def;
         const Vector3 basePos = fx.position + def.offset * fx.scale;
 
-        switch (def.type) {
-        case YoRigine::VfxElementType::NoiseVolume:
-            sub.smoke = std::make_unique<YoRigine::VolumeSmokeMesh>();
-            sub.smoke->Initialize();
-            sub.smoke->ApplyParam(def.smoke);   // 半径/上昇速度を Drive で使えるように
-            sub.smoke->SetTransform(basePos, def.smoke.radius * fx.scale);
-            sub.smokeCenter = basePos;
-            sub.smokeRadius = def.smoke.radius * fx.scale;
-
-            sub.cbRes = dxCommon_->CreateBufferResource(CBSize<YoRigine::SmokeParamsCB>());
-            sub.cbRes->Map(0, nullptr, &sub.cbMapped);
-            break;
-
-        case YoRigine::VfxElementType::LightningBolt:
-            sub.lightning = std::make_unique<YoRigine::LightningMesh>();
-            sub.lightning->Initialize();
-            sub.lightning->SetCamera(camera_);
-            sub.lightning->ApplyParam(def.lightning);
-
-            sub.cbRes = dxCommon_->CreateBufferResource(CBSize<YoRigine::LightningParamsCB>());
-            sub.cbRes->Map(0, nullptr, &sub.cbMapped);
-            break;
-
-        case YoRigine::VfxElementType::ShockwaveRing:
-            sub.shockwave = std::make_unique<YoRigine::ShockwaveMesh>();
-            sub.shockwave->Initialize();
-            sub.shockwave->SetCamera(camera_);
-            sub.shockwave->ApplyParam(def.shockwave);
-            sub.shockwave->SetTransform(basePos, def.shockwave.radius * fx.scale);
-
-            sub.cbRes = dxCommon_->CreateBufferResource(CBSize<YoRigine::ShockwaveParamsCB>());
-            sub.cbRes->Map(0, nullptr, &sub.cbMapped);
-            break;
-
-        case YoRigine::VfxElementType::LightVolume:
-            sub.lightVolume = std::make_unique<YoRigine::LightVolumeMesh>();
-            sub.lightVolume->Initialize(def.lightVolume);
-            sub.lightVolume->SetTransform(basePos, 0.0f);
-
-            sub.cbRes = dxCommon_->CreateBufferResource(CBSize<YoRigine::LightVolumeParamsCB>());
-            sub.cbRes->Map(0, nullptr, &sub.cbMapped);
-            break;
-
-        default:
-            continue;
+        // Composed（Geometry × Material）と Monolithic（専用メッシュ）で生成経路を分ける
+        std::unique_ptr<YoRigine::ProceduralMeshBase> mesh;
+        if (def.kind == YoRigine::VfxElementKind::Composed) {
+            mesh = YoRigine::VfxMeshElement::CreateComposed(
+                def.GeometryType(), def.geom,
+                def.MaterialType(), def.mat, camera_);
+        } else {
+            mesh = reg.Create(def, basePos, fx.scale, camera_);
         }
+        if (!mesh) continue;
+
+        ElementRT sub;
+        sub.def  = &def;
+        sub.mesh = std::move(mesh);
+        sub.cbRes = dxCommon_->CreateBufferResource(sub.mesh->GetCBByteSize());
+        sub.cbRes->Map(0, nullptr, &sub.cbMapped);
 
         fx.subs.push_back(std::move(sub));
     }
@@ -230,10 +249,13 @@ void VfxMeshSpawner::UpdateEffect(ActiveEffect& fx, float dt)
     dt = scaledDt;
     const auto& asset = *fx.asset;
 
-    // バースト進捗更新（ワンショット）。寿命はモーション(BurstGrow)優先で決定。
+    // バースト進捗更新（ワンショット）。寿命は
+    //   lifetimeOverride(秒) が指定されていれば最優先、
+    //   無ければアセットの OneShotDuration（モジュール Lifetime 優先）で決定。
     float lifetime = -1.f;
-    if (!fx.loop) {
-        lifetime = asset.OneShotDuration();
+    if (!fx.loop || fx.lifetimeOverride > 0.f) {
+        lifetime = (fx.lifetimeOverride > 0.f) ? fx.lifetimeOverride
+                                               : asset.OneShotDuration();
         fx.burstProgress = std::min(fx.age / lifetime, 1.0f);
         if (fx.burstProgress >= 1.0f) {
             fx.alive = false;
@@ -252,7 +274,7 @@ void VfxMeshSpawner::UpdateEffect(ActiveEffect& fx, float dt)
     base.boltStart = fx.boltStart;
     base.boltEnd   = fx.boltEnd;
 
-    // エレメントごとに: オフセット → モーション（全体＋個別） → Drive
+    // エレメントごとに: オフセット → モジュール（全体＋個別） → Drive → Update
     for (auto& sub : fx.subs) {
         const auto& def = *sub.def;
 
@@ -261,60 +283,18 @@ void VfxMeshSpawner::UpdateEffect(ActiveEffect& fx, float dt)
         s.position  += offset;
         s.boltStart += offset;
         s.boltEnd   += offset;
-        YoRigine::EvaluateElementMotions(asset, def, s);
+        s.rotation   = def.rotation;   // エレメントの基準向き（Cone/地面デカール等）
+        s.useAutoEndpoints = !fx.explicitEndpoints;
+        YoRigine::EvaluateElementModules(asset, def, s);
 
-        // 色乗算・表示状態は Draw の CB 反映で使う
         sub.tint            = s.colorTint;
         sub.beamRadiusScale = s.beamRadiusScale;
         sub.beamGlowScale   = s.beamGlowScale;
         sub.visible         = s.visible;
 
-        switch (def.type) {
-        case YoRigine::VfxElementType::NoiseVolume:
-            if (sub.smoke) {
-                sub.smoke->Drive(s);
-                sub.smoke->Update(dt);
-                sub.smokeCenter = sub.smoke->GetCenter();  // CB 用に読み戻す
-                sub.smokeRadius = sub.smoke->GetRadius();
-            }
-            break;
-
-        case YoRigine::VfxElementType::LightningBolt:
-            if (sub.lightning) {
-                // 端点が明示指定されていなければ direction/length から自動計算
-                // （モーション適用後の中心を挟んで direction 方向へ伸ばす）
-                if (!fx.explicitEndpoints) {
-                    Vector3 dir = def.lightning.direction;
-                    const float dl = std::sqrt(dir.x * dir.x + dir.y * dir.y + dir.z * dir.z);
-                    dir = (dl < 1e-4f) ? Vector3{ 0.f, 1.f, 0.f } : dir / dl;
-                    const float half = def.lightning.length * 0.5f * fx.scale;
-                    s.boltStart = s.position - dir * half;
-                    s.boltEnd   = s.position + dir * half;
-                }
-                sub.lightning->SetCamera(camera_);
-                sub.lightning->Drive(s);
-                sub.lightning->Update(dt);
-            }
-            break;
-
-        case YoRigine::VfxElementType::ShockwaveRing:
-            if (sub.shockwave) {
-                sub.shockwave->SetCamera(camera_);
-                sub.shockwave->Drive(s);
-                sub.shockwave->Update(dt);
-            }
-            break;
-
-        case YoRigine::VfxElementType::LightVolume:
-            if (sub.lightVolume) {
-                sub.lightVolume->ApplyParam(def.lightVolume);
-                sub.lightVolume->SetTransform(s.position, 0.0f); // Y軸回転はまだ使わない
-                sub.lightVolume->Update(dt);
-            }
-            break;
-
-        default:
-            break;
+        if (sub.mesh) {
+            sub.mesh->Drive(s);
+            sub.mesh->Update(dt);
         }
     }
 }
@@ -338,120 +318,33 @@ void VfxMeshSpawner::DrawEffect(ActiveEffect& fx)
     auto* cmdList = dxCommon_->GetCommandList().Get();
     D3D12_GPU_VIRTUAL_ADDRESS camAddr = camera_->GetCameraResource()->GetGPUVirtualAddress();
 
-    // モーションの色乗算（rgb=色 / a=不透明度）を CB 用カラーへ適用する
-    auto tint4 = [](const Vector4& c, const Vector4& t) -> Vector4 {
-        return { c.x * t.x, c.y * t.y, c.z * t.z, c.w * t.w };
-    };
-
     for (auto& sub : fx.subs) {
-        if (!sub.cbMapped || !sub.cbRes) continue;
-        if (!sub.visible || sub.tint.w <= 0.001f) continue; // Visibility/フェードで消えている
-        const auto& def = *sub.def;
+        if (!sub.mesh || !sub.cbMapped || !sub.cbRes) continue;
+        if (!sub.visible || sub.tint.w <= 0.001f) continue;
 
-        switch (def.type) {
-        case YoRigine::VfxElementType::NoiseVolume:
-            if (sub.smoke) {
-                const auto& sm = def.smoke;
-                auto& cb = *static_cast<YoRigine::SmokeParamsCB*>(sub.cbMapped);
-                cb.color         = tint4(sm.color, sub.tint);
-                cb.smokeColor    = tint4(sm.smokeColor, sub.tint);
-                cb.center        = sub.smokeCenter;
-                cb.radius        = sub.smokeRadius;
-                cb.time          = fx.age;
-                cb.noiseScale    = sm.noiseScale;
-                cb.noiseStrength = sm.noiseStrength;
-                cb.scrollSpeed   = sm.scrollSpeed;
-                cb.fresnelPower  = sm.fresnelPower;
-                cb.density       = sm.density;
-                cb.noiseOctaves  = sm.noiseOctaves;
-                cb.rimIntensity  = sm.rimIntensity;
-                // NoiseVolume の色/フェード/膨張/上昇はモーション駆動。シェーダは burst を使わないので -1（未使用）。
-                cb.burst         = -1.f;
+        // インスタンス色をモジュール評価結果（tint）に乗算する
+        const Vector4 tint = {
+            sub.tint.x * fx.userColor.x,
+            sub.tint.y * fx.userColor.y,
+            sub.tint.z * fx.userColor.z,
+            sub.tint.w * fx.userColor.w
+        };
 
-                const auto& idx = pm->GetParameterIndices("VfxMeshSmoke");
-                cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshSmoke"));
-                cmdList->SetPipelineState(pm->GetPipeLineStateObject("VfxMeshSmoke"));
-                cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"),    camAddr);
-                cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), sub.cbRes->GetGPUVirtualAddress());
-                sub.smoke->Draw(cmdList);
-            }
-            break;
+        YoRigine::ProceduralMeshBase::CBFillArgs args{
+            *sub.def, tint, fx.age, fx.burstProgress,
+            sub.beamRadiusScale, sub.beamGlowScale
+        };
+        sub.mesh->FillCB(sub.cbMapped, args);
 
-        case YoRigine::VfxElementType::LightningBolt:
-            if (sub.lightning) {
-                const auto& lt = def.lightning;
-                auto& cb = *static_cast<YoRigine::LightningParamsCB*>(sub.cbMapped);
-                cb.color            = tint4(lt.color, sub.tint);
-                cb.glowColor        = tint4(lt.glowColor, sub.tint);
-                cb.branchColor      = tint4(lt.branchColor, sub.tint);
-                cb.time             = fx.age;
-                cb.glowPower        = lt.glowPower;
-                cb.coreWidth        = lt.coreWidth;
-                cb.solidness        = lt.solidness;
-                cb.outlineIntensity = lt.outlineIntensity;
-                cb._pad0 = cb._pad1 = cb._pad2 = 0.f;
-
-                const auto& idx = pm->GetParameterIndices("VfxMeshLightning");
-                cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshLightning"));
-                cmdList->SetPipelineState(pm->GetPipeLineStateObject("VfxMeshLightning"));
-                cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"),    camAddr);
-                cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), sub.cbRes->GetGPUVirtualAddress());
-                sub.lightning->Draw(cmdList);
-            }
-            break;
-
-        case YoRigine::VfxElementType::ShockwaveRing:
-            if (sub.shockwave) {
-                const auto& sw = def.shockwave;
-                auto& cb = *static_cast<YoRigine::ShockwaveParamsCB*>(sub.cbMapped);
-                cb.color     = tint4(sw.color, sub.tint);
-                cb.time      = fx.age;
-                cb.duration  = sw.duration;
-                cb.thickness = sw.thickness;
-                cb.burst     = (fx.burstProgress >= 0.f)
-                    ? std::min(fx.age / std::max(sw.duration, 0.01f), 1.0f)
-                    : -1.f;
-
-                const auto& idx = pm->GetParameterIndices("VfxMeshShockwave");
-                cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshShockwave"));
-                cmdList->SetPipelineState(pm->GetPipeLineStateObject("VfxMeshShockwave"));
-                cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"),    camAddr);
-                cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), sub.cbRes->GetGPUVirtualAddress());
-                sub.shockwave->Draw(cmdList);
-            }
-            break;
-
-        case YoRigine::VfxElementType::LightVolume:
-            if (sub.lightVolume) {
-                const auto& lv = def.lightVolume;
-                auto& cb = *static_cast<YoRigine::LightVolumeParamsCB*>(sub.cbMapped);
-                // Editor プレビュー(VfxMeshEditor)の LightVolume と同じ CB 構成
-                cb.color[0] = lv.color.x * sub.tint.x;
-                cb.color[1] = lv.color.y * sub.tint.y;
-                cb.color[2] = lv.color.z * sub.tint.z;
-                cb.color[3] = lv.color.w * lv.intensity * sub.tint.w;
-                cb.edgeFade      = lv.edgeFade;
-                cb.depthFade     = lv.depthFade;
-                cb.noiseTiling   = lv.noiseTiling;
-                cb.noiseStrength = lv.noiseStrength;
-                cb.time          = fx.age;
-                cb.beamStrength  = lv.beamStrength;
-                cb.beamRadius    = lv.beamRadius * sub.beamRadiusScale;
-                cb.beamPower     = lv.beamPower;
-                cb.beamGlow      = lv.beamGlow * sub.beamGlowScale;
-
-                const auto& idx = pm->GetParameterIndices("VfxMeshVolume");
-                cmdList->SetGraphicsRootSignature(pm->GetRootSignature("VfxMeshVolume"));
-                cmdList->SetPipelineState(pm->GetPipeLineStateObject("VfxMeshVolume"));
-                cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"),    camAddr);
-                cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), sub.cbRes->GetGPUVirtualAddress());
-                sub.lightVolume->Draw(cmdList);
-            }
-            break;
-
-        default:
-            break;
-        }
+        const char* psoName = sub.mesh->GetPSOName();
+        const auto& idx = pm->GetParameterIndices(psoName);
+        const int blendOverride = sub.def ? sub.def->blendModeOverride : -1;
+        cmdList->SetGraphicsRootSignature(pm->GetRootSignature(psoName));
+        cmdList->SetPipelineState(pm->ResolveBlendPSO(psoName, blendOverride));
+        cmdList->SetGraphicsRootConstantBufferView(idx.at("gCamera"),    camAddr);
+        cmdList->SetGraphicsRootConstantBufferView(idx.at("gMeshParam"), sub.cbRes->GetGPUVirtualAddress());
+        sub.mesh->BindResources(cmdList, idx); // テクスチャ等(あれば)
+        sub.mesh->Draw(cmdList);
     }
 }
 
@@ -500,6 +393,28 @@ void VfxMeshSpawner::SetTimeScale(uint32_t id, float timeScale)
     }
 }
 
+void VfxMeshSpawner::SetColor(uint32_t id, const Vector4& color)
+{
+    for (ActiveEffect* fx : active_) {
+        if (fx && fx->id == id) {
+            fx->userColor = color;
+            return;
+        }
+    }
+}
+
+void VfxMeshSpawner::SetStyleIndices(uint32_t id, int a, int b, int c)
+{
+    for (ActiveEffect* fx : active_) {
+        if (fx && fx->id == id) {
+            for (auto& sub : fx->subs) {
+                if (sub.mesh) sub.mesh->SetStyleIndices(a, b, c);
+            }
+            return;
+        }
+    }
+}
+
 void VfxMeshSpawner::Stop(uint32_t id)
 {
     for (ActiveEffect* fx : active_) {
@@ -526,9 +441,7 @@ void VfxMeshSpawner::ActiveEffect::Release()
 {
     for (auto& sub : subs) {
         if (sub.cbMapped && sub.cbRes) { sub.cbRes->Unmap(0, nullptr); sub.cbMapped = nullptr; }
-        sub.smoke.reset();
-        sub.lightning.reset();
-        sub.shockwave.reset();
+        sub.mesh.reset();
     }
     subs.clear();
 }

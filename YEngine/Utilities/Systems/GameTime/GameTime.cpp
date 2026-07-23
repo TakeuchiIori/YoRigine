@@ -68,6 +68,15 @@ namespace YoRigine {
 		isPause_ = false;
 		debugFreeze_ = false;
 		stepOneFrame_ = false;
+
+		// シーン再初期化時に、前シーンのヒットストップ／スロー状態を残さない。
+		hitStopTimer_ = 0.0f;
+		hitStopDuration_ = 0.0f;
+		hitStopFreezeScale_ = 0.0f;
+		hitStopEaseTimer_ = 0.0f;
+		hitStopEaseDuration_ = 0.0f;
+		slowMotionTimer_ = 0.0f;
+		slowMotionSpeed_ = 1.0f;
 	}
 
 	void GameTime::Update()
@@ -107,8 +116,8 @@ namespace YoRigine {
 		if (editorFrozen || gamePaused || gPaused) {
 			deltaTime_ = 0.0f;
 		} else {
-			// カメラ演出などが timeScale_ を上書きしても、ヒットストップ中は
-			// 専用の停止スケールを最優先でゲーム更新へ反映する。
+			// ヒットストップ要求直後のフレームから停止倍率を優先する。
+			// timeScale_ が別の演出から変更されても、停止中は必ずこちらを使う。
 			const float gameplayScale = (hitStopTimer_ > 0.0f)
 				? hitStopFreezeScale_
 				: timeScale_;
@@ -258,6 +267,11 @@ namespace YoRigine {
 
 	void GameTime::SetHitStop(float duration, float freezeScale, float easeOut)
 	{
+		duration = (std::max)(duration, 0.0f);
+		freezeScale = std::clamp(freezeScale, 0.0f, 1.0f);
+		easeOut = (std::max)(easeOut, 0.0f);
+		if (duration <= 0.0f) return;
+
 		// 多段ヒットのリフレッシュ：既に停止中なら「長い/硬い(小scale)/長イーズ」を採用。
 		if (hitStopTimer_ > 0.0f) {
 			hitStopTimer_        = (std::max)(hitStopTimer_, duration);
@@ -270,6 +284,12 @@ namespace YoRigine {
 		}
 		hitStopDuration_  = hitStopTimer_;
 		hitStopEaseTimer_ = 0.0f;   // 新しい停止が入ったら復帰ランプは仕切り直し
+
+		// SetHitStop は GameTime::Update より後（衝突コールバック中）に呼ばれる。
+		// タイマーだけを設定すると、短い停止は次フレームのタイマー更新で
+		// 消費され、Gameplay の deltaTime に一度も反映されない場合がある。
+		// 要求時点で倍率も反映し、必ず次のゲームプレイ更新を停止させる。
+		timeScale_ = (std::min)(timeScale_, hitStopFreezeScale_);
 	}
 
 	void GameTime::SetSlowMotion(float duration, float speed) {

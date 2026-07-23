@@ -46,7 +46,9 @@ void main(uint3 dtid : SV_DispatchThreadID)
     hsv.y = saturate(hsv.y * saturationBoost);
     c = HSVtoRGB(hsv);
 
-    c = saturate(c);
-    c = LinearToSRGB(c);
+    // ポストエフェクトチェーンの中間バッファは HDR リニア。
+    // ここで saturate / sRGB 変換すると後段 Bloom が色と輝度を正しく判定できないため、
+    // HDR 値を保ったまま次のエフェクトへ渡す。表示変換は最終 blit だけで行う。
+    c = max(c, 0.0f);
     gOutput[dtid.xy] = float4(c, original.a);
 }

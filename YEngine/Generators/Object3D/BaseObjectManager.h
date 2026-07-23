@@ -101,9 +101,12 @@ public:
 	// ============================================================
 	// active なオブジェクトのみ処理する。UpdateAll はフレーム末に遅延破棄を実行する。
 	void UpdateAll();
+	// 登録済みオブジェクトを自動分類し、可能なものはインスタンシング描画する。
+	// アプリ側は通常この関数だけを呼べばよい。
 	void DrawAll();
 	void DrawAnimationAll();
 	void DrawCollisionAll();
+	// 登録済みオブジェクトの影を自動分類して描画する。
 	void DrawShadowAll();
 
 	// インスタンシング対応の一括描画。

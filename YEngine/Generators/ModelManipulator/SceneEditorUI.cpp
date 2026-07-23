@@ -107,6 +107,7 @@ namespace YoRigine {
             if (showBroadPhaseGrid_) {
                 ImGui::Separator();
                 ImGui::MenuItem("BroadPhase グリッドを表示", nullptr, showBroadPhaseGrid_);
+
                 if (broadPhaseGridDrawRadius_) {
                     ImGui::SetNextItemWidth(120.0f);
                     ImGui::DragFloat("  描画半径", broadPhaseGridDrawRadius_, 1.0f, 5.0f, 500.0f, "%.1f");
@@ -115,17 +116,13 @@ namespace YoRigine {
             ImGui::EndMenu();
         }
 
-        // ── カリング (描画 + コリジョンを並列表示) ───────────────
+        // ── 描画カリング ────────────────────────────────────────
+        // コリジョン側のカリング設定は専用の「当たり判定Editor」で扱う。
         if (ImGui::BeginMenu("カリング")) {
             if (drawFrustumCulling_) {
                 ImGui::MenuItem("描画 Frustum カリング", nullptr, drawFrustumCulling_);
             }
             {
-                auto* cm = YoRigine::CollisionManager::GetInstance();
-                bool collisionCulling = cm->GetEnableFrustumCulling();
-                if (ImGui::MenuItem("コリジョン Frustum カリング", nullptr, &collisionCulling)) {
-                    cm->SetEnableFrustumCulling(collisionCulling);
-                }
                 auto* om = ObjectManager::GetInstance();
                 ImGui::Text("  culled %d / %d", om->GetLastFrameCulledCount(), om->GetLastFrameTotalCount());
             }

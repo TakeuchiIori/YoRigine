@@ -7,6 +7,8 @@
 #include <unordered_map>
 #include <tuple>
 #include <string>
+#include <variant>
+#include <cstddef>
 
 // Math
 #include "Vector2.h"
@@ -182,3 +184,48 @@ inline void from_json(const json& j, Quaternion& q)
 	j.at("z").get_to(q.z);
 	j.at("w").get_to(q.w);
 }
+
+///************************* variant（型安全union） *************************///
+///
+/// nlohmann::adl_serializer を特殊化することで、名前空間に依存せず
+/// 任意の std::variant を JSON 化できる（global の to_json は
+/// std 型の ADL で見つからないため、こちらで対応する）。
+/// 形式: { "_index": アクティブ番号, "_data": 中身 }
+/// _data の各候補型は自分の to_json/from_json を持つこと。
+///
+namespace nlohmann {
+
+	// index に一致する候補型で _data を復元する（再帰でインデックス探索）
+	template <typename Variant, std::size_t I = 0>
+	inline void VariantFromJsonAt(const json& j, std::size_t index, Variant& out)
+	{
+		if constexpr (I < std::variant_size_v<Variant>)
+		{
+			if (I == index)
+			{
+				using Alt = std::variant_alternative_t<I, Variant>;
+				out.template emplace<I>(j.at("_data").template get<Alt>());
+				return;
+			}
+			VariantFromJsonAt<Variant, I + 1>(j, index, out);
+		}
+	}
+
+	template <typename... Ts>
+	struct adl_serializer<std::variant<Ts...>>
+	{
+		static void to_json(json& j, const std::variant<Ts...>& v)
+		{
+			j = json::object();
+			j["_index"] = static_cast<int>(v.index());
+			std::visit([&j](const auto& value) { j["_data"] = value; }, v);
+		}
+
+		static void from_json(const json& j, std::variant<Ts...>& v)
+		{
+			const std::size_t index = static_cast<std::size_t>(j.value("_index", 0));
+			VariantFromJsonAt<std::variant<Ts...>, 0>(j, index, v);
+		}
+	};
+
+} // namespace nlohmann

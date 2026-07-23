@@ -53,8 +53,8 @@ public:
 	// 上半身専用モーションの再生
 	void PlayUpperMotion(const std::string& directoryPath, const std::string& filename, MotionPlayMode playMode, const std::string& animationName = "");
 	
-	// 描画
-	void Draw();
+	// 描画。overrideTexturePath を渡すと全メッシュのテクスチャをそれで上書きして描く（空なら本来のテクスチャ）。
+	void Draw(const std::string& overrideTexturePath = "");
 	// 影描画
 	void DrawShadow();
 	// ボーン描画
@@ -143,6 +143,16 @@ public:
 
 	// メッシュ取得
 	const std::vector<std::unique_ptr<Mesh>>& GetMeshes() const { return meshes_; }
+
+	// マテリアルの拡散反射色(Kd)から「白でも黒でもない」最初の色を返す。
+	// マルチメッシュ/マルチマテリアルなら白以外の色が採用される。
+	// 見つかれば out に格納して true、無ければ false。
+	bool TryGetThemeColor(Vector4& out) const;
+
+	// マテリアルの中から「実テクスチャ（＝白デフォルト以外）を持つ最初の1つ」のテクスチャパスを返す。
+	// マルチメッシュで一方にだけ画像を割り当てた場合の“アクセント画像”を取り出す用途。
+	// 見つかれば out に格納して true、無ければ false。
+	bool TryGetAccentTexturePath(std::string& out) const;
 
 	// Mixamo由来モデルか
 	bool IsMixamoAsset() const { return isMixamoAsset_; }

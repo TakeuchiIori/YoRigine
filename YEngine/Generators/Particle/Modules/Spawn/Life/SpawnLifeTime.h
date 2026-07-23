@@ -16,6 +16,9 @@ public:
     void SaveToJson(nlohmann::json& json) const override;
     void LoadFromJson(const nlohmann::json& json) override;
 
+    // エフェクト再生尺の見積り用（最後の粒はこの秒数まで生存しうる）
+    float GetMaxLifetimeHint() const override { return maxLifeTime_; }
+
 private:
     float minLifeTime_ = 0.5f;  // 最小生存時間
     float maxLifeTime_ = 2.0f;  // 最大生存時間
