@@ -46,8 +46,11 @@ public:
     /// Registry への型登録と内部リソースの初期化を行う
     void Initialize();
 
-    /// アクティブなエフェクトを全解放する
+    /// アクティブなエフェクトを全解放する（アセットマップも含む。アプリ終了時用）
     void Finalize();
+
+    /// アクティブなエフェクトのみを全停止する（アセットは保持する。シーン遷移時用）
+    void StopAll();
 
     /// 描画に使うカメラをセットする（毎フレーム呼ぶ）
     void SetCamera(Camera* camera) { camera_ = camera; }

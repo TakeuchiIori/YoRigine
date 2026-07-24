@@ -82,6 +82,12 @@ void VfxMeshSpawner::Finalize()
     assetMap_.clear();
 }
 
+void VfxMeshSpawner::StopAll()
+{
+    pool_.Clear();
+    active_.clear();
+}
+
 // ============================================================
 // アセット登録
 // ============================================================
