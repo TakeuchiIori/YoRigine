@@ -27,7 +27,7 @@ namespace YoRigine {
 		~StampMode() = default;
 
 		void SetObjectManager(ObjectManager* mgr) { objectManager_ = mgr; }
-		void SetCamera(Camera* camera) { camera_ = camera; }
+		void SetCamera(YoRigine::Camera* camera) { camera_ = camera; }
 
 		bool IsActive() const { return active_; }
 
@@ -59,7 +59,7 @@ namespace YoRigine {
 
 	private:
 		ObjectManager* objectManager_ = nullptr;
-		Camera* camera_ = nullptr;
+		YoRigine::Camera* camera_ = nullptr;
 
 		bool active_ = false;
 		int  sourceObjectId_ = -1;
@@ -69,8 +69,8 @@ namespace YoRigine {
 		bool    lastHitValid_ = false;
 
 		// ゴースト (転送オブジェクト)
-		std::unique_ptr<Object3d> ghost_;
-		std::unique_ptr<WorldTransform> ghostWT_;
+		std::unique_ptr<YoRigine::Object3d> ghost_;
+		std::unique_ptr<YoRigine::WorldTransform> ghostWT_;
 	};
 
 } // namespace YoRigine

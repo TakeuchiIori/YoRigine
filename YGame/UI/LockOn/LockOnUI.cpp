@@ -15,7 +15,7 @@ void LockOnUI::Initialize(Player* player)
 	player_ = player;
 
 	// ─── スプライト生成 ──────────────────────────────────────
-	sprite_ = std::make_unique<Sprite>();
+	sprite_ = std::make_unique<YoRigine::Sprite>();
 	sprite_->Initialize("Resources/Textures/GameScene/LockOn.png");
 	sprite_->SetAnchorPoint({ 0.5f, 0.5f });	// 中央アンカー（対象の真上に表示）
 
@@ -71,7 +71,7 @@ void LockOnUI::Draw()
 void LockOnUI::UpdateScreenPosition()
 {
 	// ─── カメラと対象を取得 ──────────────────────────────────
-	Camera* camera = player_->GetPlayerCamera()->GetLastCamera();
+	YoRigine::Camera* camera = player_->GetPlayerCamera()->GetLastCamera();
 	BaseCollider* target = player_->GetPlayerCamera()->GetLockedTarget();
 
 	// 対象のワールド座標 + 頭上オフセット

@@ -10,7 +10,7 @@
 #include <vector>
 #include <unordered_map>
 
-class Line;
+namespace YoRigine { class Line; }
 
 // ============================================================
 // 複数の AreaEffect と効果対象を束ねて一括駆動するマネージャ（シーンが所有）。
@@ -41,7 +41,7 @@ public:
 	void Update(float deltaTime);
 
 	// 全エリアのデバッグ描画
-	void Draw(Line* line);
+	void Draw(YoRigine::Line* line);
 
 private:
 	std::vector<IAreaEffectTarget*> targets_;

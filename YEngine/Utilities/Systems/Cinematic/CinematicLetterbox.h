@@ -1,7 +1,7 @@
 #pragma once
 #include <memory>
 
-class Sprite;
+namespace YoRigine { class Sprite; }
 
 namespace YoRigine {
 
@@ -26,8 +26,8 @@ namespace YoRigine {
 		void SetBarHeightRatio(float ratio) { barHeightRatio_ = ratio; }
 
 	private:
-		std::unique_ptr<Sprite> topBar_;
-		std::unique_ptr<Sprite> bottomBar_;
+		std::unique_ptr<YoRigine::Sprite> topBar_;
+		std::unique_ptr<YoRigine::Sprite> bottomBar_;
 		float progress_ = 0.0f;
 		float barHeightRatio_ = 0.12f;
 	};

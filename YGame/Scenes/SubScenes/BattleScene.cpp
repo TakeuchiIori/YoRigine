@@ -40,7 +40,7 @@ namespace {
 /// <summary>
 /// バトルシーン初期化
 /// </summary>
-void BattleScene::Initialize(Camera* camera, Player* player) {
+void BattleScene::Initialize(YoRigine::Camera* camera, Player* player) {
 
 	sceneCamera_ = camera;
 	player_ = player;
@@ -67,7 +67,7 @@ void BattleScene::Initialize(Camera* camera, Player* player) {
 	//------------------------------------------------------------
 	// 環境オブジェクト初期化
 	//------------------------------------------------------------
-	line_ = std::make_unique<Line>();
+	line_ = std::make_unique<YoRigine::Line>();
 	line_->Initialize();
 	line_->SetCamera(sceneCamera_);
 
@@ -75,7 +75,7 @@ void BattleScene::Initialize(Camera* camera, Player* player) {
 	ground_->Initialize(sceneCamera_);
 	ground_->GetColor() = { 0.5f, 0.2f, 0.5f, 1.0f };
 
-	sprite_ = std::make_unique<Sprite>();
+	sprite_ = std::make_unique<YoRigine::Sprite>();
 	sprite_->Initialize("Resources/Textures/GameScene/BattleScene.png");
 	sprite_->SetTranslate({ 200.0f, 0.0f, 0.0f });
 

@@ -12,10 +12,10 @@
 #include "Object3D/ObjectManager.h" // PlacedObject (ネスト型なので前方宣言不可)
 #include "Vector4.h"
 
-class Camera;
-class Model;
-class WorldTransform;
-class Object3d;
+namespace YoRigine { class Camera; }
+namespace YoRigine { class Model; }
+namespace YoRigine { class WorldTransform; }
+namespace YoRigine { class Object3d; }
 
 namespace YoRigine {
 class DirectXCommon;
@@ -77,12 +77,12 @@ public:
   void Begin();
 
   // フレーム開始 + このフレームのカメラを保持 (Submit の WVP 計算に使う)
-  void Begin(Camera *camera);
+  void Begin(YoRigine::Camera *camera);
 
   // 低レベル: 生データを渡すだけ。WIT = Transpose(Inverse(world)) は内部計算。
   // WVP は直前の Begin(camera) のカメラで計算 (未指定なら World
   // をそのまま入れる=影パス用)。
-  void Submit(Model *model, const Instance &src);
+  void Submit(YoRigine::Model *model, const Instance &src);
 
   // PlacedObject 用: model / world / 色 / UV / 輪郭線をすべて PlacedObject
   // から取り出して積む。 影パスでも同じ呼び出しでよい (Begin()
@@ -92,13 +92,13 @@ public:
   // Object3d 用: Object3d は自前の WorldTransform を持たないので transform
   // を別途渡す。 材質 (色 / UV / stochastic / 輪郭線) は Object3d
   // から取り出す。
-  void Submit(Object3d &object, const WorldTransform &transform);
+  void Submit(YoRigine::Object3d &object, const YoRigine::WorldTransform &transform);
 
   // 低レベル: WVP / WIT を含む完成済みデータを積む
-  void AddInstance(Model *model, const InstanceData &data);
+  void AddInstance(YoRigine::Model *model, const InstanceData &data);
 
   // カラーパス: ObjectInstanced PSO で全バッチを描画
-  void DrawAll(Camera *camera);
+  void DrawAll(YoRigine::Camera *camera);
 
   // カメラ遮蔽用: 深度書き込みを維持したままディザーで面を間引く。
   // 複雑なモデルの面同士が重なって崩れない。
@@ -154,9 +154,9 @@ private:
   YoRigine::SrvManager *srvManager_ = nullptr;
 
   // Begin(camera) で保持する、このフレームの Submit 用カメラ
-  Camera *frameCamera_ = nullptr;
+  YoRigine::Camera *frameCamera_ = nullptr;
 
-  std::unordered_map<Model *, Batch> batches_;
+  std::unordered_map<YoRigine::Model *, Batch> batches_;
 
   // 全インスタンス共有の MaterialLight (lighting有効, specular無効, env無効)。
   // MaterialLighting

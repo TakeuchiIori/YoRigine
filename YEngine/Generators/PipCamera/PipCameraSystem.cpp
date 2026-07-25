@@ -18,7 +18,7 @@ PipCameraSystem* PipCameraSystem::GetInstance() {
 
 void PipCameraSystem::Initialize() {
 	// カメラ実体生成 + 基本パラメータ
-	pipCamera_ = std::make_unique<Camera>();
+	pipCamera_ = std::make_unique<YoRigine::Camera>();
 	pipCamera_->SetTranslate({ 0.0f, 10.0f, -20.0f });
 	pipCamera_->SetRotate({ 0.4f, 0.0f, 0.0f });
 	pipCamera_->SetFovY(0.45f);
@@ -102,7 +102,7 @@ void PipCameraSystem::Finalize() {
 	resourcesCreated_ = false;
 }
 
-void PipCameraSystem::ApplyToCamera(Camera* target) {
+void PipCameraSystem::ApplyToCamera(YoRigine::Camera* target) {
 	if (!target || !pipCamera_) return;
 
 	// 元の値を退避
@@ -125,7 +125,7 @@ void PipCameraSystem::ApplyToCamera(Camera* target) {
 	target->Update();
 }
 
-void PipCameraSystem::SnapToSceneCamera(const Camera* src) {
+void PipCameraSystem::SnapToSceneCamera(const YoRigine::Camera* src) {
 	if (!src || !pipCamera_) return;
 	pipCamera_->transform_   = src->transform_;
 	pipCamera_->fovY_        = src->fovY_;
@@ -135,7 +135,7 @@ void PipCameraSystem::SnapToSceneCamera(const Camera* src) {
 	pipCamera_->UpdateMatrix();
 }
 
-void PipCameraSystem::RestoreCamera(Camera* target) {
+void PipCameraSystem::RestoreCamera(YoRigine::Camera* target) {
 	if (!target || !saved_.valid) return;
 
 	target->transform_   = saved_.transform;
@@ -163,7 +163,7 @@ void PipCameraSystem::DrawImGuiWindow() {
 	if (ImGui::Button("シーンカメラに揃える")) {
 		auto* scene = SceneManager::GetInstance()->GetScene();
 		if (scene) {
-			if (const Camera* sc = scene->GetSceneCamera()) {
+			if (const YoRigine::Camera* sc = scene->GetSceneCamera()) {
 				SnapToSceneCamera(sc);
 				dirty = true;
 			}

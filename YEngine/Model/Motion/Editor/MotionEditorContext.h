@@ -10,8 +10,8 @@
 // 前方宣言
 // ============================================================
 class Motion;
-class Camera;
-class Object3d;
+namespace YoRigine { class Camera; }
+namespace YoRigine { class Object3d; }
 
 // ============================================================
 // キーフレームクリップボード
@@ -33,7 +33,7 @@ struct KeyframeClipboard
 struct MotionEditorContext
 {
 	Motion* currentMotion = nullptr;
-	Camera* camera = nullptr;
+	YoRigine::Camera* camera = nullptr;
 	int targetObjectId = -1;
 
 	// ============================================================
@@ -103,5 +103,5 @@ struct MotionEditorContext
 	// ============================================================
 	// ヘルパー関数
 	// ============================================================
-	Object3d* GetTargetObject() const;
+	YoRigine::Object3d* GetTargetObject() const;
 };

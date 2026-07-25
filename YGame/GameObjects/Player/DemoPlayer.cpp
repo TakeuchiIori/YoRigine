@@ -22,13 +22,13 @@ DemoPlayer::~DemoPlayer() {
 // ============================================================
 // 初期化
 // ============================================================
-void DemoPlayer::Initialize(Camera* camera) {
+void DemoPlayer::Initialize(YoRigine::Camera* camera) {
 	camera_ = camera;
 
 	// ------------------------------------------------------------
 	// モデル生成と初期化
 	// ------------------------------------------------------------
-	obj_ = std::make_unique<Object3d>();
+	obj_ = std::make_unique<YoRigine::Object3d>();
 	obj_->Initialize();
 	obj_->SetModel("Player.gltf", true, "Idle1");
 	input_ = YoRigine::Input::GetInstance();
@@ -51,7 +51,7 @@ void DemoPlayer::Initialize(Camera* camera) {
 	// ------------------------------------------------------------
 	// ボーン線や当たり判定などの初期化
 	// ------------------------------------------------------------
-	boneLine_ = std::make_unique<Line>();
+	boneLine_ = std::make_unique<YoRigine::Line>();
 	boneLine_->Initialize();
 	boneLine_->SetCamera(camera_);
 
@@ -102,7 +102,7 @@ void DemoPlayer::DrawCollision() {
 	playerShield_->DrawCollision();
 }
 
-void DemoPlayer::DrawBone(Line& line) {
+void DemoPlayer::DrawBone(YoRigine::Line& line) {
 	obj_->DrawBone(line, wt_.GetMatWorld());
 }
 

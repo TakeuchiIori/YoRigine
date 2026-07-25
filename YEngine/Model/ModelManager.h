@@ -38,7 +38,7 @@ public:
 	void LoadModel(const std::string& directoryPath, const std::string& filePath, const std::string& animationName = "", bool isAnimation = false);
 
 	// モデル検索
-	Model* FindModel(const std::string& filePath, const std::string& animationName = "", bool isAnimation = false);
+	YoRigine::Model* FindModel(const std::string& filePath, const std::string& animationName = "", bool isAnimation = false);
 
 	// パスから「拡張子なしのベース名」と「拡張子付きファイル名」を分離する
 	std::pair<std::string, std::string> ParseModelPath(const std::string& filePath);
@@ -49,8 +49,8 @@ public:
 	// 登録されているすべてのモデルのキー一覧を返す
 	std::vector<std::string> GetModelKeys() const;
 
-	// Model* を直接返す一覧（必要なら）
-	std::vector<Model*> GetAllModels() const;
+	// YoRigine::Model* を直接返す一覧（必要なら）
+	std::vector<YoRigine::Model*> GetAllModels() const;
 private:
 	///************************* シングルトン管理 *************************///
 
@@ -66,5 +66,5 @@ private:
 	///************************* メンバ変数 *************************///
 
 	// モデルリスト
-	std::map<std::string, std::unique_ptr<Model>> models;
+	std::map<std::string, std::unique_ptr<YoRigine::Model>> models;
 };

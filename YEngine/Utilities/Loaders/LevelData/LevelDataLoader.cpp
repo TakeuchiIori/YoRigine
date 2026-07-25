@@ -161,10 +161,10 @@ void LevelDataLoader::SetScene()
 {
 	for (auto& data : levelData_->objData)
 	{
-		auto obj = Object3d::Create(data.fileName);
+		auto obj = YoRigine::Object3d::Create(data.fileName);
 		if (!obj) continue;
 
-		auto wt = std::make_unique<WorldTransform>();
+		auto wt = std::make_unique<YoRigine::WorldTransform>();
 		wt->Initialize();
 		wt->translate_ = ConvertPosition(data.translation);
 		wt->rotate_ = data.rotation;
@@ -183,7 +183,7 @@ void LevelDataLoader::Update()
 	}
 }
 
-void LevelDataLoader::Draw(Camera* camera)
+void LevelDataLoader::Draw(YoRigine::Camera* camera)
 {
 	for (size_t i = 0; i < objects_.size(); ++i) {
 		objects_[i]->Draw(camera, *worldTransforms_[i]);

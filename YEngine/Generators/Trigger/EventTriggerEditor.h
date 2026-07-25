@@ -8,7 +8,7 @@
 #include <functional>
 #include <string>
 
-class Camera;
+namespace YoRigine { class Camera; }
 
 // ============================================================
 // EventTriggerEditor
@@ -20,7 +20,7 @@ public:
 	struct Context {
 		EventTriggerSystem* system = nullptr;
 		std::string filePath;
-		Camera* camera = nullptr;
+		YoRigine::Camera* camera = nullptr;
 		std::function<Vector3()> getPlacementPosition;
 		std::function<void()> onGateOpened;
 	};

@@ -43,9 +43,9 @@ public:
 	// あるターゲットを忘却 (キャラクタ破棄時に呼ぶ)
 	void ForgetTarget(void* targetKey);
 
-	void Draw(Line* line,
+	void Draw(YoRigine::Line* line,
 		const std::initializer_list<std::string>& excludes = {});
-	void DrawArea(const std::string& name, Line* line);
+	void DrawArea(const std::string& name, YoRigine::Line* line);
 	void Reset();
 
 public:
@@ -75,21 +75,21 @@ public:
 	///************************* オブジェクト登録管理 *************************///
 
 	struct RestrictedObject {
-		WorldTransform* worldTransform = nullptr;
+		YoRigine::WorldTransform* worldTransform = nullptr;
 		bool            enabled        = true;
 		std::string     tag            = "";
 
 		RestrictedObject() = default;
-		RestrictedObject(WorldTransform* wt, const std::string& t = "")
+		RestrictedObject(YoRigine::WorldTransform* wt, const std::string& t = "")
 			: worldTransform(wt), enabled(true), tag(t) {
 		}
 	};
 
-	void RegisterObject(WorldTransform* wt, const std::string& tag = "");
-	void UnregisterObject(WorldTransform* wt);
-	void UpdateSingleObject(WorldTransform* wt);
+	void RegisterObject(YoRigine::WorldTransform* wt, const std::string& tag = "");
+	void UnregisterObject(YoRigine::WorldTransform* wt);
+	void UpdateSingleObject(YoRigine::WorldTransform* wt);
 	void UpdateRestrictedObjects();
-	void SetObjectRestrictionEnabled(WorldTransform* wt, bool enabled);
+	void SetObjectRestrictionEnabled(YoRigine::WorldTransform* wt, bool enabled);
 	void ClearAllObjects();
 
 public:

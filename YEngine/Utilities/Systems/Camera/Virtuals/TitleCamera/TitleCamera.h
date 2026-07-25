@@ -25,7 +25,7 @@ public:
 	// ============================================================
 	// アクセッサ
 	// ============================================================
-	void SetTarget(const WorldTransform& target) { target_ = &target; }
+	void SetTarget(const YoRigine::WorldTransform& target) { target_ = &target; }
 	void SetPosition(const Vector3& position) { transform_.translate = position; }
 	Vector3 GetPosition() const { return transform_.translate; }
 	float GetFov() const { return (fov_ >= 110.0f) ? fov_ : fov_; }
@@ -37,7 +37,7 @@ public:
 	bool enableOrbit_ = false;
 
 private:
-	const WorldTransform* target_;
+	const YoRigine::WorldTransform* target_;
 	Vector2 prevMousePos_ = { 0.0f, 0.0f };
 	float fov_ = 0.90f;
 

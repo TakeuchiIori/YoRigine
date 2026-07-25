@@ -326,7 +326,7 @@ VfxElementDesc LightningMesh::Describe()
         lt.direction        = { 0.f, 1.f, 0.f };
     };
 
-    d.create = [](const VfxElement& def, const Vector3& /*pos*/, float /*scale*/, Camera* cam) {
+    d.create = [](const VfxElement& def, const Vector3& /*pos*/, float /*scale*/, YoRigine::Camera* cam) {
         auto m = std::make_unique<LightningMesh>();
         m->Initialize();
         m->SetCamera(cam);

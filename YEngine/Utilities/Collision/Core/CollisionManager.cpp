@@ -237,8 +237,8 @@ void CollisionManager::ResolveContacts(
       if ((b->GetLayerBits() & a->GetCollisionMask()) == 0u)
         continue;
 
-      WorldTransform *wtA = a->GetWT();
-      WorldTransform *wtB = b->GetWT();
+      YoRigine::WorldTransform *wtA = a->GetWT();
+      YoRigine::WorldTransform *wtB = b->GetWT();
       if (!wtA || !wtB)
         continue;
 
@@ -289,7 +289,7 @@ void CollisionManager::ResolveContacts(
       // 地面上で動くキャラは押し戻しで上下に浮かないよう水平成分のみ適用
       if (c->GetLockPenetrationY())
         disp.y = 0.0f;
-      WorldTransform *wt = c->GetWT();
+      YoRigine::WorldTransform *wt = c->GetWT();
       if (!wt)
         continue;
       wt->translate_ += disp;
@@ -640,7 +640,7 @@ bool CollisionManager::SweepCCDColliders() {
 
     if (hitAnything) {
       // 衝突直前で止める
-      WorldTransform *wt = c->GetWT();
+      YoRigine::WorldTransform *wt = c->GetWT();
       if (wt) {
         Vector3 safePos = closestHit.hitPoint - dir * 0.01f;
         wt->translate_ = safePos;
@@ -782,7 +782,7 @@ void CollisionManager::CheckAllCollisions() {
 }
 
 bool CollisionManager::IsColliderInView(const Vector3 &position,
-                                        const Camera *camera) {
+                                        const YoRigine::Camera *camera) {
   Vector3 clipPos = Transform(position, camera->GetViewProjectionMatrix());
   return (clipPos.x >= -1.0f && clipPos.x <= 1.0f && clipPos.y >= -1.0f &&
           clipPos.y <= 1.0f && clipPos.z >= 0.0f && clipPos.z <= 1.0f);

@@ -111,7 +111,7 @@ VfxElementDesc ShockwaveMesh::Describe()
         sw.color     = { 1.2f, 1.1f, 0.8f, 1.0f };
     };
 
-    d.create = [](const VfxElement& def, const Vector3& pos, float scale, Camera* cam) {
+    d.create = [](const VfxElement& def, const Vector3& pos, float scale, YoRigine::Camera* cam) {
         auto m = std::make_unique<ShockwaveMesh>();
         m->Initialize();
         m->SetCamera(cam);

@@ -18,7 +18,7 @@
 #include <Vfx/VfxMesh/Core/ProceduralMeshBase.h>
 #include <Vfx/VfxMesh/Core/VfxMeshRegistry.h>
 
-class Camera;
+namespace YoRigine { class Camera; }
 
 namespace YoRigine {
 
@@ -46,7 +46,7 @@ public:
     // ── 設定 ─────────────────────────────────────────────────
 
     /// 描画に使うカメラを渡す（カメラ向きクワッドの計算に必要）
-    void SetCamera(Camera* camera) { camera_ = camera; }
+    void SetCamera(YoRigine::Camera* camera) { camera_ = camera; }
 
     /// 衝撃波リングの中心とワールド半径を設定する
     void SetTransform(const Vector3& center, float radius);
@@ -80,7 +80,7 @@ private:
     void RebuildVertices();
 
     ShockwaveEffectParam param_;
-    Camera* camera_ = nullptr;
+    YoRigine::Camera* camera_ = nullptr;
 
     Vector3 center_ = { 0.f, 0.f, 0.f };
     float   radius_ = 3.0f;

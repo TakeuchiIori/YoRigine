@@ -16,7 +16,7 @@
 #include "VfxEffectAsset.h"
 #include "ProceduralMeshBase.h"
 
-class Camera;
+namespace YoRigine { class Camera; }
 
 namespace YoRigine {
 
@@ -38,7 +38,7 @@ struct VfxElementDesc
             const VfxElement& def,
             const Vector3&    basePos,
             float             scale,
-            Camera*           camera)>;
+            YoRigine::Camera*           camera)>;
     CreateFn create;
 
     // ── デフォルト値設定 ──────────────────────────────────────
@@ -74,7 +74,7 @@ public:
 
     /// def.type に対応する Mesh を生成して返す。未登録なら nullptr
     std::unique_ptr<ProceduralMeshBase> Create(
-        const VfxElement& def, const Vector3& basePos, float scale, Camera* camera) const;
+        const VfxElement& def, const Vector3& basePos, float scale, YoRigine::Camera* camera) const;
 
     /// 登録済み全記述子（エディタのメニュー生成などに使う）
     const std::vector<VfxElementDesc>& GetAll() const { return descs_; }

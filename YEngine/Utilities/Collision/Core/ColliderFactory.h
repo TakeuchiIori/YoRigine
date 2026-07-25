@@ -24,8 +24,8 @@ public:
 	template <typename T, typename TObject>
 	static std::shared_ptr<T> Create(
 		TObject* owner,
-		 WorldTransform* worldTransform,
-		Camera* camera,
+		 YoRigine::WorldTransform* worldTransform,
+		YoRigine::Camera* camera,
 		uint32_t typeID)
 	{
 		static_assert(std::is_base_of<BaseCollider, T>::value, "T must be derived from BaseCollider");
@@ -80,7 +80,7 @@ public:
 
 	template<typename T>
 	static std::shared_ptr<T> CreateStatic(
-		WorldTransform* worldTransform,
+		YoRigine::WorldTransform* worldTransform,
 		uint32_t typeID)
 	{
 		static_assert(std::is_base_of<BaseCollider, T>::value,

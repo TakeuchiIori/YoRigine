@@ -16,7 +16,7 @@
 
 // 前方宣言
 class SpriteCommon;
-class Camera;
+namespace YoRigine { class Camera; }
 
 ///************************* UI基本クラス *************************///
 class UIBase {
@@ -64,7 +64,7 @@ public:
 	void SetTexture(const std::string& texturePath);
 	std::string GetTexturePath() const;
 
-	void SetCamera(Camera* camera);
+	void SetCamera(YoRigine::Camera* camera);
 	void SetName(const std::string& name);
 	std::string GetName() const;
 
@@ -73,7 +73,7 @@ public:
 	bool GetFlipX() const;
 	bool GetFlipY() const;
 
-	Sprite* GetSprite() { return sprite_.get(); }
+	YoRigine::Sprite* GetSprite() { return sprite_.get(); }
 
 	void SetTextureLeftTop(const Vector2& leftTop);
 	Vector2 GetTextureLeftTop() const;
@@ -200,8 +200,8 @@ public:
 protected:
 	///************************* メンバ変数 *************************///
 
-	std::unique_ptr<Sprite> sprite_;
-	Camera* camera_ = nullptr;
+	std::unique_ptr<YoRigine::Sprite> sprite_;
+	YoRigine::Camera* camera_ = nullptr;
 	std::string configPath_;
 	std::filesystem::file_time_type lastModTime_;
 	std::string name_;

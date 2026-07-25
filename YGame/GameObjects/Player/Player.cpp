@@ -27,11 +27,11 @@ Player::~Player() {
 // ============================================================
 // 初期化
 // ============================================================
-void Player::Initialize(Camera* camera) {
+void Player::Initialize(YoRigine::Camera* camera) {
 	camera_ = camera;
 
 	// オブジェクト初期化
-	obj_ = std::make_unique<Object3d>();
+	obj_ = std::make_unique<YoRigine::Object3d>();
 	obj_->Initialize();
 	obj_->SetModel("Player.gltf", true, "Idle4");
 	input_ = YoRigine::Input::GetInstance();
@@ -67,7 +67,7 @@ void Player::Initialize(Camera* camera) {
 	InitCombatSystem();
 	combat_->GetCombo()->RecoverCC(combat_->GetMaxCC());
 
-	boneLine_ = std::make_unique<Line>();
+	boneLine_ = std::make_unique<YoRigine::Line>();
 	boneLine_->Initialize();
 	boneLine_->SetCamera(camera_);
 
@@ -306,7 +306,7 @@ void Player::DrawCollision() {
 // ============================================================
 // 骨の描画
 // ============================================================
-void Player::DrawBone(Line& line) {
+void Player::DrawBone(YoRigine::Line& line) {
 	if (isAlive_) {
 		obj_->DrawBone(line, wt_.GetMatWorld());
 	}

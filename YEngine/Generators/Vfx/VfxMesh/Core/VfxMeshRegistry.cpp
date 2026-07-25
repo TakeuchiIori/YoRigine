@@ -33,7 +33,7 @@ void VfxMeshRegistry::Register(VfxElementDesc desc)
 // ===========================================================
 
 std::unique_ptr<ProceduralMeshBase> VfxMeshRegistry::Create(
-    const VfxElement& def, const Vector3& basePos, float scale, Camera* camera) const
+    const VfxElement& def, const Vector3& basePos, float scale, YoRigine::Camera* camera) const
 {
     const auto* d = FindDesc(def.type);
     if (!d || !d->create) return nullptr;

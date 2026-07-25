@@ -8,7 +8,7 @@
 // ============================================================
 // コンストラクタ
 // ============================================================
-EnemyAlert::EnemyAlert(const FieldEnemy* enemy, Camera* camera){
+EnemyAlert::EnemyAlert(const FieldEnemy* enemy, YoRigine::Camera* camera){
 	targetEnemy_ = enemy;
 	camera_ = camera;
 }
@@ -17,7 +17,7 @@ EnemyAlert::EnemyAlert(const FieldEnemy* enemy, Camera* camera){
 // 初期化
 // ============================================================
 void EnemyAlert::Initialize() {
-	alertUI_ = std::make_unique<Sprite>();
+	alertUI_ = std::make_unique<YoRigine::Sprite>();
 	alertUI_->Initialize("Resources/Textures/GameScene/AlertIcon.png");
 	alertUI_->SetAnchorPoint({ 0.5f, 0.5f });
 	defaultScale_ = alertUI_->GetTextureSize();

@@ -11,7 +11,7 @@
 /// <summary>
 /// GPU エミッターの初期化（パーティクル生成・各種リソース作成）
 /// </summary>
-void GPUEmitter::Initialize(Camera* camera, std::string& texturePath)
+void GPUEmitter::Initialize(YoRigine::Camera* camera, std::string& texturePath)
 {
 	camera_ = camera;
 
@@ -185,7 +185,7 @@ void GPUEmitter::SetConeParams(const Vector3& translate, const Vector3& directio
 	emitterConeData_->isEmit = 1;
 }
 
-void GPUEmitter::SetMeshParams(Model* model, const Vector3& translate, const Vector3& scale, const Quaternion& rotation, float count, float emitInterval, MeshEmitMode mode)
+void GPUEmitter::SetMeshParams(YoRigine::Model* model, const Vector3& translate, const Vector3& scale, const Quaternion& rotation, float count, float emitInterval, MeshEmitMode mode)
 {
 	if (!emitterMeshData_ || !model) return;
 
@@ -258,7 +258,7 @@ void GPUEmitter::UpdateConeParams(const Vector3& translate, const Vector3& direc
 	emitterConeData_->emitInterval = emitInterval;
 }
 
-void GPUEmitter::UpdateMeshParams(Model* model, const Vector3& translate, const Vector3& scale, const Quaternion& rotation, float count, float emitInterval, MeshEmitMode mode)
+void GPUEmitter::UpdateMeshParams(YoRigine::Model* model, const Vector3& translate, const Vector3& scale, const Quaternion& rotation, float count, float emitInterval, MeshEmitMode mode)
 {
 	if (!emitterMeshData_) return;
 
@@ -509,7 +509,7 @@ void GPUEmitter::SetForceFields(const std::vector<GpuForceFieldParams>& fields, 
 /// <summary>
 /// モデルからメッシュ三角形情報を収集してGPUバッファへ転送
 /// </summary>
-void GPUEmitter::UpdateMeshTriangleData(Model* model)
+void GPUEmitter::UpdateMeshTriangleData(YoRigine::Model* model)
 {
 	if (!model || !meshTriangleData_) {
 		return;
@@ -908,13 +908,13 @@ Vector3 GPUEmitter::GetEmitterPosition() const
 	return { 0,0,0 };
 }
 
-void GPUEmitter::SetCamera(Camera* camera)
+void GPUEmitter::SetCamera(YoRigine::Camera* camera)
 {
 	// 自身のカメラポインタを更新
 	camera_ = camera;
 
 	// 内部のGPUParticleのカメラポインタを更新
-	// ※ GPUParticle にも SetCamera(Camera*) があることを前提とします。
+	// ※ GPUParticle にも SetCamera(YoRigine::Camera*) があることを前提とします。
 	if (gpuParticle_) {
 		// 
 		gpuParticle_->SetCamera(camera);

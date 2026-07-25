@@ -60,7 +60,7 @@ private:
 
 private:
 
-	std::unique_ptr<Sprite> sprite_;
+	std::unique_ptr<YoRigine::Sprite> sprite_;
 
 	// 終了フラグ
 	bool finished_ = false;

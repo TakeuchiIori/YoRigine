@@ -23,7 +23,7 @@ Vector3 OBBCollider::GetCenterPosition() const {
   return newPos;
 }
 
-const WorldTransform &OBBCollider::GetWorldTransform() { return *wt_; }
+const YoRigine::WorldTransform &OBBCollider::GetWorldTransform() { return *wt_; }
 
 Vector3 OBBCollider::GetEulerRotation() const {
   return wt_ ? wt_->rotate_ : Vector3{};

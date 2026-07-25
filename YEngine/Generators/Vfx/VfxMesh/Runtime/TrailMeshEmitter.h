@@ -118,7 +118,7 @@ namespace YoRigine {
         const YoRigine::VfxEffectAsset& GetAsset()     const { return asset_; }
 
         /// 描画に使うカメラをセットする
-        void SetCamera(Camera* camera) { camera_ = camera; }
+        void SetCamera(YoRigine::Camera* camera) { camera_ = camera; }
 
     private:
         /// CB リソースが未確保なら確保して Map する
@@ -132,7 +132,7 @@ namespace YoRigine {
         std::unique_ptr<YoRigine::TrailMesh> trailMesh_;
         bool isPlaying_ = false;
 
-        Camera* camera_ = nullptr;
+        YoRigine::Camera* camera_ = nullptr;
         float   time_   = 0.0f;
 
         Microsoft::WRL::ComPtr<ID3D12Resource> trailCBResource_;

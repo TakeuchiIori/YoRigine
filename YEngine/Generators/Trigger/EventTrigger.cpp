@@ -4,7 +4,7 @@
 #include "Collision/Core/ColliderFactory.h"
 #include "Collision/OBB/OBBCollider.h"
 
-void EventTrigger::Initialize(Camera* camera) {
+void EventTrigger::Initialize(YoRigine::Camera* camera) {
 	camera_ = camera;
 	// WorldTransform は D3D12 マップポインタ (transformData_) を内部で持つため、
 	// 必ず Initialize を通さないと UpdateMatrix で nullptr deref する。

@@ -166,7 +166,7 @@ void CameraDirector::SnapToActiveCamera() {
 // ============================================================
 // 全 VirtualCamera にデバッグ 3D 描画を委譲
 // ============================================================
-void CameraDirector::DrawDebug3D(Line& line) {
+void CameraDirector::DrawDebug3D(YoRigine::Line& line) {
 	for (auto& [name, cam] : cameras_) {
 		if (cam) cam->DrawDebug3D(line);
 	}

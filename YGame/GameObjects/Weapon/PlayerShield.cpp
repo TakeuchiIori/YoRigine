@@ -42,13 +42,13 @@ PlayerShield::~PlayerShield() {
 // ============================================================
 // 初期化処理
 // ============================================================
-void PlayerShield::Initialize(Camera* camera) {
+void PlayerShield::Initialize(YoRigine::Camera* camera) {
 
 	camera_ = camera;
 	// ------------------------------------------------------------
 	// モデル初期化
 	// ------------------------------------------------------------
-	obj_ = std::make_unique<Object3d>();
+	obj_ = std::make_unique<YoRigine::Object3d>();
 	obj_->Initialize();
 	obj_->SetModel("Shield_Heater.obj");
 	wt_.Initialize();
@@ -123,7 +123,7 @@ void PlayerShield::SetPlayerWeaponPosition() {
 	wt_.rotate_ = offsetRot_;
 	wt_.scale_ = offsetScale_;
 
-	WorldTransform& handWT = obj3d_
+	YoRigine::WorldTransform& handWT = obj3d_
 		->GetModel()
 		->GetSkeleton()
 		->GetJoints()[handleIndex_]

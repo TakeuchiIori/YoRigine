@@ -206,7 +206,7 @@ VfxElementDesc VolumeSmokeMesh::Describe()
     d.displayName = "NoiseVolume";
     d.applyDefaults = applyDefaults;
 
-    d.create = [](const VfxElement& def, const Vector3& pos, float scale, Camera*) {
+    d.create = [](const VfxElement& def, const Vector3& pos, float scale, YoRigine::Camera*) {
         auto m = std::make_unique<VolumeSmokeMesh>();
         m->Initialize();
         m->ApplyParam(def.smoke);

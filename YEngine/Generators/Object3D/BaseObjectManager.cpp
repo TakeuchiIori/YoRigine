@@ -58,7 +58,7 @@ void BaseObjectManager::Finalize() {
 // ============================================================
 // 生成済みオブジェクトを駆動対象に登録 (所有は移さない)
 // ============================================================
-void BaseObjectManager::Register(BaseObject *obj, const std::string &name) {
+void BaseObjectManager::Register(YoRigine::BaseObject *obj, const std::string &name) {
   if (!obj)
     return;
 
@@ -89,7 +89,7 @@ void BaseObjectManager::Register(BaseObject *obj, const std::string &name) {
 // ============================================================
 // 駆動対象から外す
 // ============================================================
-void BaseObjectManager::Unregister(BaseObject *obj) {
+void BaseObjectManager::Unregister(YoRigine::BaseObject *obj) {
   if (!obj)
     return;
 
@@ -106,7 +106,7 @@ void BaseObjectManager::Unregister(BaseObject *obj) {
 // ============================================================
 // 遅延破棄の予約
 // ============================================================
-void BaseObjectManager::Destroy(BaseObject *obj) {
+void BaseObjectManager::Destroy(YoRigine::BaseObject *obj) {
   if (!obj)
     return;
 
@@ -252,7 +252,7 @@ void BaseObjectManager::DrawShadowAllInstanced() {
 // ============================================================
 // 名前で検索
 // ============================================================
-BaseObject *BaseObjectManager::FindByName(const std::string &name) {
+YoRigine::BaseObject *BaseObjectManager::FindByName(const std::string &name) {
   if (name.empty())
     return nullptr;
 

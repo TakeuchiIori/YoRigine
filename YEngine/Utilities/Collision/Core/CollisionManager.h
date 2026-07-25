@@ -61,7 +61,7 @@ public:
   // ============================================================
   void CheckCollisionPair(BaseCollider *a, BaseCollider *b);
   void CheckAllCollisions();
-  bool IsColliderInView(const Vector3 &position, const Camera *camera);
+  bool IsColliderInView(const Vector3 &position, const YoRigine::Camera *camera);
   void AddCollider(BaseCollider *collider);
   void RemoveCollider(BaseCollider *collider);
 
@@ -78,7 +78,7 @@ public:
 
   // 視錐台の元になる Camera を設定。SetCamera をしていれば自動的に毎フレーム VP
   // から抽出する。
-  void SetCullingCamera(Camera *cam) { cullingCamera_ = cam; }
+  void SetCullingCamera(YoRigine::Camera *cam) { cullingCamera_ = cam; }
   const std::vector<BaseCollider *> &GetColliders() const { return colliders_; }
   size_t GetLastActiveColliderCount() const { return lastActiveColliderCount_; }
   size_t GetLastBroadPhasePairCount() const { return lastBroadPhasePairCount_; }
@@ -281,7 +281,7 @@ private:
 
   // Frustum culling
   bool enableFrustumCulling_ = false;
-  Camera *cullingCamera_ = nullptr;
+  YoRigine::Camera *cullingCamera_ = nullptr;
 
   // 走査中 (CheckAllCollisions 中) に Add/Remove が来た場合に保留する
   bool isIterating_ = false;

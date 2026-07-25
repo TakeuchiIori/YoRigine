@@ -106,7 +106,7 @@ void KeyframeCamera::EvaluateAt(float time) {
 // ============================================================
 // 3D デバッグ描画 (パスと球マーカー)
 // ============================================================
-void KeyframeCamera::DrawDebug3D(Line& line) {
+void KeyframeCamera::DrawDebug3D(YoRigine::Line& line) {
 	if (!showPath_ || keyframes_.size() < 2) return;
 
 	// ----------------------------------------

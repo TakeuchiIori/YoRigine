@@ -20,7 +20,7 @@
 // ============================================================
 // 前方宣言
 // ============================================================
-class Camera;
+namespace YoRigine { class Camera; }
 class Joint;
 #ifdef USE_IMGUI
 class BoneGizmable;
@@ -38,7 +38,7 @@ public:
 	MotionEditor();
 	~MotionEditor();
 
-	void Initialize(Camera* camera);
+	void Initialize(YoRigine::Camera* camera);
 	void Update();
 	void Draw();
 	void DrawGizmo();
@@ -50,7 +50,7 @@ public:
 	// ============================================================
 	void SetTargetObjectId(int id);
 	int GetTargetObjectId() const { return context_.targetObjectId; }
-	void SetCamera(Camera* camera)
+	void SetCamera(YoRigine::Camera* camera)
 	{
 		context_.camera = camera;
 		if (lineDrawer_) {
@@ -89,14 +89,14 @@ private:
 	MotionEditorContext context_;
 	std::vector<std::unique_ptr<IMotionEditorPanel>> panels_;
 
-	WorldTransform previewTransform_;
-	std::unique_ptr<Line> lineDrawer_;
+	YoRigine::WorldTransform previewTransform_;
+	std::unique_ptr<YoRigine::Line> lineDrawer_;
 
 #ifdef USE_IMGUI
-	std::unique_ptr<Object3d> boneObj_;
+	std::unique_ptr<YoRigine::Object3d> boneObj_;
 	GizmoController gizmoCtrl_;
 	std::vector<std::unique_ptr<BoneGizmable>> boneGizmables_;
-	std::vector<WorldTransform> boneWorldTransforms_;
+	std::vector<YoRigine::WorldTransform> boneWorldTransforms_;
 #endif
 
 	bool draggingBone_ = false;

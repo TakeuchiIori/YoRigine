@@ -27,7 +27,7 @@ class Editor;
 // 目的:
 //   - カメラを 1 回だけ SetCamera しておけば、登録済みオブジェクト全体の
 //     Update / Draw を一括で回せるようにして、シーン側の配線を減らす。
-//   - 既存の Initialize(Camera*) シグネチャはそのまま使う (A 方式) ので、
+//   - 既存の Initialize(YoRigine::Camera*) シグネチャはそのまま使う (A 方式) ので、
 //     既存オブジェクトは無改修で乗せられる。
 //
 // 所有モデル (ハイブリッド):
@@ -42,8 +42,8 @@ public:
 	// 1 オブジェクト 1 エントリ。owned が非 null なら Add 由来 (マネージャ所有)、
 	// null なら Register 由来 (呼び出し側所有)。参照は常に ptr 経由で行う。
 	struct Entry {
-		BaseObject* ptr = nullptr;             // 参照用 (owned / 外部所有どちらでも有効)
-		std::unique_ptr<BaseObject> owned;     // Add 時のみ実体を持つ
+		YoRigine::BaseObject* ptr = nullptr;             // 参照用 (owned / 外部所有どちらでも有効)
+		std::unique_ptr<YoRigine::BaseObject> owned;     // Add 時のみ実体を持つ
 		std::string name;                      // 表示名 / 検索キー
 		bool pendingDestroy = false;           // フレーム末に除去する予約フラグ
 	};
@@ -60,8 +60,8 @@ public:
 	// カメラ
 	// ============================================================
 	// 一度セットすれば、以降の Add<T>() で生成するオブジェクトに自動注入される。
-	void SetCamera(Camera* camera) { camera_ = camera; }
-	Camera* GetCamera() const { return camera_; }
+	void SetCamera(YoRigine::Camera* camera) { camera_ = camera; }
+	YoRigine::Camera* GetCamera() const { return camera_; }
 
 	// ============================================================
 	// 依存先マネージャの注入 (DI)
@@ -83,15 +83,15 @@ public:
 
 	// 既に呼び出し側が所有しているオブジェクトを駆動対象に登録する (所有は移さない)。
 	// Initialize は呼び出し側で済ませておくこと。
-	void Register(BaseObject* obj, const std::string& name = "");
+	void Register(YoRigine::BaseObject* obj, const std::string& name = "");
 
 	// 駆動対象から外す。Add 由来 (マネージャ所有) の場合は実体も破棄される。
 	// 反復処理中の呼び出しは避けること。
-	void Unregister(BaseObject* obj);
+	void Unregister(YoRigine::BaseObject* obj);
 
 	// 遅延破棄を予約する。実際の除去はフレーム末 (UpdateAll の最後) に行うため、
 	// 更新ループ中から安全に呼べる。
-	void Destroy(BaseObject* obj);
+	void Destroy(YoRigine::BaseObject* obj);
 
 	// すべてのオブジェクトを破棄してクリアする。
 	void ClearAll();
@@ -121,7 +121,7 @@ public:
 	// 検索 / アクセッサ
 	// ============================================================
 	// 名前で最初に一致したオブジェクトを返す。空文字 / 未登録なら nullptr。
-	BaseObject* FindByName(const std::string& name);
+	YoRigine::BaseObject* FindByName(const std::string& name);
 
 	// 指定型 (T 派生) の全オブジェクトを抽出して返す。
 	template<class T>
@@ -149,7 +149,7 @@ private:
 	// pendingDestroy が立ったエントリをまとめて除去する。
 	void ProcessPendingDestroy();
 
-	Camera* camera_ = nullptr;            // Add 時に各オブジェクトへ注入するカメラ
+	YoRigine::Camera* camera_ = nullptr;            // Add 時に各オブジェクトへ注入するカメラ
 	std::vector<Entry> entries_;          // 管理中の全エントリ
 	int selectedIndex_ = -1;              // インスペクタで選択中の行 (-1 で未選択)
 	bool inspectorRegistered_ = false;    // インスペクタパネルを Editor に登録済みか
@@ -166,7 +166,7 @@ private:
 // ============================================================
 template<class T, class... Args>
 T* BaseObjectManager::Add(const std::string& name, Args&&... args) {
-	static_assert(std::is_base_of_v<BaseObject, T>,
+	static_assert(std::is_base_of_v<YoRigine::BaseObject, T>,
 		"BaseObjectManager::Add<T> : T は BaseObject を継承している必要があります");
 
 	//------------------------------------------------------------

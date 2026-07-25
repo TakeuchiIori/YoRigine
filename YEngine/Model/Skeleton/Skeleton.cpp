@@ -28,7 +28,7 @@ void Skeleton::Update()
 	}
 }
 
-void Skeleton::Draw(Line& line, const Matrix4x4& worldMatrix)
+void Skeleton::Draw(YoRigine::Line& line, const Matrix4x4& worldMatrix)
 {
 	if (joints_.empty()) {
 		return;

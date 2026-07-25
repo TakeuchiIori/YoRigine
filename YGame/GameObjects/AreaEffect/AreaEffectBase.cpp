@@ -30,7 +30,7 @@ void AreaEffectBase::Drive(const std::vector<Target>& targets, float deltaTime)
 	}
 }
 
-void AreaEffectBase::Draw(Line* line)
+void AreaEffectBase::Draw(YoRigine::Line* line)
 {
 	if (area_) area_->Draw(line);
 }

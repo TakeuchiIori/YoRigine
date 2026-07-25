@@ -44,7 +44,7 @@ private:
 private:
   MagicActionData action_;
   Player *owner_ = nullptr;
-  WorldTransform wt_;
+  YoRigine::WorldTransform wt_;
   std::shared_ptr<BaseCollider> collider_;
   Vector3 origin_{};
   Vector3 target_{};

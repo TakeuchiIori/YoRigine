@@ -219,7 +219,7 @@ VfxElementDesc LightVolumeMesh::Describe()
     d.displayName = "LightVolume";
     d.applyDefaults = applyDefaults;
 
-    d.create = [](const VfxElement& def, const Vector3& pos, float /*scale*/, Camera*) {
+    d.create = [](const VfxElement& def, const Vector3& pos, float /*scale*/, YoRigine::Camera*) {
         auto m = std::make_unique<LightVolumeMesh>();
         m->Initialize(def.lightVolume);
         m->SetTransform(pos, 0.f);

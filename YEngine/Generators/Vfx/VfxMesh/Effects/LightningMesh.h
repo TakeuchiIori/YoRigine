@@ -19,7 +19,7 @@
 #include <Vfx/VfxMesh/Core/ProceduralMeshBase.h>
 #include <Vfx/VfxMesh/Core/VfxMeshRegistry.h>
 
-class Camera;
+namespace YoRigine { class Camera; }
 
 namespace YoRigine {
 
@@ -53,7 +53,7 @@ public:
     // ── 設定 ─────────────────────────────────────────────────
 
     /// 描画に使うカメラを渡す（カメラ向きリボンの計算に必要）
-    void SetCamera(Camera* camera) { camera_ = camera; }
+    void SetCamera(YoRigine::Camera* camera) { camera_ = camera; }
 
     /// 稲妻の始点・終点をワールド座標で設定する
     void SetEndpoints(const Vector3& start, const Vector3& end);
@@ -103,7 +103,7 @@ private:
     // ── データ ───────────────────────────────────────────────
 
     LightningEffectParam param_;
-    Camera* camera_ = nullptr;
+    YoRigine::Camera* camera_ = nullptr;
 
     Vector3 start_ = { 0.f, 0.f, 0.f };
     Vector3 end_   = { 0.f, 3.f, 0.f };

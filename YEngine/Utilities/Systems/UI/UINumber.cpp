@@ -30,7 +30,7 @@ void UINumber::Initialize(const std::string& textureFilePath, int maxDigits)
     // アニメーション系は sprite_ の Transform / Color を読み書きするため、
     // sprite_ を有効な状態にしておく必要がある。
     // UINumber では sprite_ を直接描画しない（Draw() をオーバーライド済み）
-    sprite_ = std::make_unique<Sprite>();
+    sprite_ = std::make_unique<YoRigine::Sprite>();
     sprite_->Initialize(textureFilePath);
     texturePath_ = textureFilePath;
 
@@ -151,7 +151,7 @@ void UINumber::RebuildDigits()
     // ─── スプライトを過不足なく確保 ────────────────────────────────
     // 足りない分を生成
     while (static_cast<int>(digitSprites_.size()) < needed) {
-        auto sp = std::make_unique<Sprite>();
+        auto sp = std::make_unique<YoRigine::Sprite>();
         sp->Initialize(numberTexturePath_);
         sp->SetSize(digitSize_);
         if (camera_) sp->SetCamera(camera_);
@@ -193,7 +193,7 @@ void UINumber::SyncDigitSprites()
     }
 
     for (int i = 0; i < count; ++i) {
-        Sprite* s = digitSprites_[i].get();
+        YoRigine::Sprite* s = digitSprites_[i].get();
 
         // 位置（アニメーション後の基準位置 + 桁オフセット）
         s->SetTranslate({
@@ -212,7 +212,7 @@ void UINumber::SyncDigitSprites()
 //=============================================================================
 // private: 指定スプライトに digit（0〜9）の UV をセット
 //=============================================================================
-void UINumber::ApplyDigitUV(Sprite* sprite, int digit) const
+void UINumber::ApplyDigitUV(YoRigine::Sprite* sprite, int digit) const
 {
     // テクスチャ上の切り出し左上座標（ピクセル）
     sprite->SetTextureLeftTop({

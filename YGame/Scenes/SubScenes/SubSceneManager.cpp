@@ -10,7 +10,7 @@
 /// <summary>
 /// 初期化処理
 /// </summary>
-void SubSceneManager::Initialize(Camera* camera, Player* player) {
+void SubSceneManager::Initialize(YoRigine::Camera* camera, Player* player) {
 	camera_ = camera;
 	player_ = player;
 	state_ = SubSceneState::IDLE;

@@ -20,7 +20,7 @@
 #include <memory>
 #include <vector>
 
-class Camera;
+namespace YoRigine { class Camera; }
 
 namespace YoRigine {
 
@@ -35,12 +35,12 @@ namespace YoRigine {
         static std::unique_ptr<VfxMeshElement> CreateComposed(
             VfxGeometryType   geomType, const VfxGeometryParams& geomParams,
             VfxMaterialType   matType,  const VfxMaterialParams& matParams,
-            Camera*           camera);
+            YoRigine::Camera*           camera);
 
         // ── 設定 ─────────────────────────────────────────────
 
         /// ビルボード形状などカメラが必要な Geometry に渡す
-        void SetCamera(Camera* camera) { geomState_.camera = camera; }
+        void SetCamera(YoRigine::Camera* camera) { geomState_.camera = camera; }
 
         /// Geometry / Material のパラメータを差し替える（エディタのライブ編集用）。
         /// 次の Update で必ずジオメトリを再構築する。

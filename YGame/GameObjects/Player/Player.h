@@ -25,18 +25,18 @@
 // ============================================================
 // ゲームシーンのプレイヤークラス
 // ============================================================
-class Player : public BaseObject {
+class Player : public YoRigine::BaseObject {
 public:
 	// ============================================================
 	// 基本関数
 	// ============================================================
 	~Player();
-	void Initialize(Camera* camera) override;
+	void Initialize(YoRigine::Camera* camera) override;
 	void Update() override;
 	void Draw() override;
 	void DrawAnimation() override;
 	void DrawCollision() override;
-	void DrawBone(Line& line);
+	void DrawBone(YoRigine::Line& line);
 	void DrawShadow();
 	void DrawImGui();
 	void DrawVfx();
@@ -78,8 +78,8 @@ public:
 	void SetPosition(const Vector3& position) { wt_.translate_ = position; }
 	Vector3 GetCameraRotation() const;
 
-	Object3d* GetObject3d() { return obj_.get(); }
-	const Object3d* GetObject3d() const { return obj_.get(); }
+	YoRigine::Object3d* GetObject3d() { return obj_.get(); }
+	const YoRigine::Object3d* GetObject3d() const { return obj_.get(); }
 
 	PlayerMovement* GetMovement() const { return movement_.get(); }
 	PlayerCombat* GetCombat() const { return combat_.get(); }
@@ -156,7 +156,7 @@ private:
 
 	std::unique_ptr<PlayerSword> playerSword_;
 	std::unique_ptr<PlayerShield> playerShield_;
-	std::unique_ptr<Line> boneLine_;
+	std::unique_ptr<YoRigine::Line> boneLine_;
 	std::unique_ptr<PlayerMovement> movement_;
 	std::unique_ptr<PlayerCombat> combat_;
 	std::unique_ptr<PlayerMagicController> magicController_;

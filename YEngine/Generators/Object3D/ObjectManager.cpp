@@ -326,7 +326,7 @@ ObjectManager::PlacedObject* ObjectManager::DuplicateObject(
 }
 
 
-Object3d* ObjectManager::GetObject3dById(int id) {
+YoRigine::Object3d* ObjectManager::GetObject3dById(int id) {
 	PlacedObject* obj = GetObjectById(id);
 	return (obj && obj->object) ? obj->object.get() : nullptr;
 }
@@ -546,12 +546,12 @@ void ObjectManager::InitializePlacedObject(
 	obj.animationName = animationName;
 
 	// Object3d 生成
-	obj.object = std::make_unique<Object3d>();
+	obj.object = std::make_unique<YoRigine::Object3d>();
 	obj.object->Initialize();
 	obj.object->SetModel(obj.modelName, isAnimation, animationName);
 
 	// WorldTransform 初期化
-	obj.worldTransform = std::make_unique<WorldTransform>();
+	obj.worldTransform = std::make_unique<YoRigine::WorldTransform>();
 	obj.worldTransform->Initialize();
 
 	// 基本トランスフォーム設定
@@ -599,7 +599,7 @@ void ObjectManager::ApplyObjectUV(PlacedObject& obj) {
 
 bool ObjectManager::ComputeModelLocalAABB(const PlacedObject& obj, AABB& outAabb) const {
 	if (!obj.object) return false;
-	Model* model = obj.object->GetModel();
+	YoRigine::Model* model = obj.object->GetModel();
 	if (!model) return false;
 	const auto& meshes = model->GetMeshes();
 	if (meshes.empty()) return false;
@@ -713,7 +713,7 @@ void ObjectManager::ApplyColliderTemplate(PlacedObject& obj) {
 	obj.collider->SetCameraFadeMode(obj.colliderCameraFade);
 	// カメラ遮蔽フェード用に PlacedObject* を owner として登録しておく。
 	// PlayerCamera が GetOwnerAs<PlacedObject>() でオブジェクトを取得し、color.w を操作する。
-	// インスタンシング描画は PlacedObject::color を直接参照するため Object3d* ではなく
+	// インスタンシング描画は PlacedObject::color を直接参照するため YoRigine::Object3d* ではなく
 	// PlacedObject* を渡す必要がある。
 	obj.collider->SetOwnerRaw(&obj);
 

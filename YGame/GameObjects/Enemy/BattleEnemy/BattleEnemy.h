@@ -18,7 +18,7 @@
 class Player;
 
 ///************************* 戦闘用の敵クラス *************************///
-class BattleEnemy : public BaseObject {
+class BattleEnemy : public YoRigine::BaseObject {
 public:
 	///************************* 基本関数 *************************///
 
@@ -26,7 +26,7 @@ public:
 	~BattleEnemy();
 
 	// 初期化処理
-	void Initialize(Camera* camera) override;
+	void Initialize(YoRigine::Camera* camera) override;
 
 	// 戦闘データをもとに初期化（scale はフィールド敵から引き継ぐ見た目スケール）
 	void InitializeBattleData(const BattleEnemyData& data, Vector3 position,
@@ -161,7 +161,7 @@ public:
 	// 位置を取得
 	Vector3 GetTranslate() const { return wt_.translate_; }
 	void SetTranslate(const Vector3& pos) { wt_.translate_ = pos; }
-	WorldTransform& GetVisualWT() { return visualWt_; }
+	YoRigine::WorldTransform& GetVisualWT() { return visualWt_; }
 	// Y軸回転を設定
 	void SetRotationY(float y) { wt_.rotate_.y = y; }
 	// Y軸回転を取得
@@ -288,7 +288,7 @@ private:
 	float hitReactionDuration_ = 0.22f;
 	float hitReactionAngle_ = 0.20f;
 	bool isHitReacting_ = false;
-	WorldTransform visualWt_;
+	YoRigine::WorldTransform visualWt_;
 
 	std::unique_ptr<EnemyHealthBarUI> healthBarUI_;
 	std::string objectName_ = "BattleEnemy"; // デフォルト名

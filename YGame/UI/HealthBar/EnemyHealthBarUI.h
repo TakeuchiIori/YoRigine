@@ -7,12 +7,12 @@
 
 // 前方宣言
 class BattleEnemy;
-class Camera;
+namespace YoRigine { class Camera; }
 
 class EnemyHealthBarUI {
 public:
     // コンストラクタ
-    EnemyHealthBarUI(const BattleEnemy* enemy, Camera* camera);
+    EnemyHealthBarUI(const BattleEnemy* enemy, YoRigine::Camera* camera);
 
     // 初期化 (UIBase::Initializeをオーバーロード)
     void Initialize();
@@ -26,11 +26,11 @@ private:
     void InitJson();
 private:
     const BattleEnemy* targetEnemy_ = nullptr; // 追従対象の敵
-    Camera* camera_ = nullptr;                 // カメラ
+    YoRigine::Camera* camera_ = nullptr;                 // カメラ
 
     // HPバーの背景とゲージ用
-    std::unique_ptr<Sprite> bgHP_;
-    std::unique_ptr<Sprite> barHP_;
+    std::unique_ptr<YoRigine::Sprite> bgHP_;
+    std::unique_ptr<YoRigine::Sprite> barHP_;
 
     // HPの割合
     float currentRatio_ = 1.0f;

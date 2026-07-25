@@ -18,12 +18,12 @@
 //     trigger->SetAction(std::make_unique<OpenGateAction>(...));
 //     // 毎フレーム trigger->Update() を呼ぶ
 // ============================================================
-class EventTrigger : public BaseObject {
+class EventTrigger : public YoRigine::BaseObject {
 public:
 	EventTrigger() = default;
 	~EventTrigger() override = default;
 
-	void Initialize(Camera* camera) override;
+	void Initialize(YoRigine::Camera* camera) override;
 	void Update() override;
 	void Draw() override {}
 	void DrawCollision() override;

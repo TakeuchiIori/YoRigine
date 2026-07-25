@@ -4,7 +4,7 @@
 
 void BaseCollider::Initialize()
 {
-	line_ = std::make_unique<Line>();
+	line_ = std::make_unique<YoRigine::Line>();
 	line_->Initialize();
 	line_->SetCamera(camera_);
 	YoRigine::CollisionManager::GetInstance()->AddCollider(this);

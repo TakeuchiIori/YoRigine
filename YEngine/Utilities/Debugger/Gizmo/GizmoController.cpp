@@ -20,7 +20,7 @@ void GizmoController::Initialize()
 //=================================================================
 
 bool GizmoController::DrawSingle(
-    Camera* camera,
+    YoRigine::Camera* camera,
     IGizmable* target,
     const ImVec2& viewportPos,
     const ImVec2& viewportSize)
@@ -83,7 +83,7 @@ bool GizmoController::DrawSingle(
 //=================================================================
 
 bool GizmoController::DrawMulti(
-    Camera* camera,
+    YoRigine::Camera* camera,
     std::vector<IGizmable*>& targets,
     const ImVec2& viewportPos,
     const ImVec2& viewportSize)
@@ -159,7 +159,7 @@ bool GizmoController::DrawMulti(
 //=================================================================
 
 bool GizmoController::Draw(
-    Camera* camera,
+    YoRigine::Camera* camera,
     std::vector<IGizmable*>& targets,
     const ImVec2& viewportPos,
     const ImVec2& viewportSize)
@@ -292,7 +292,7 @@ IGizmable* GizmoController::TryPickObject(
     const ImVec2& mouseScreenPos,
     const ImVec2& viewportPos,
     const ImVec2& viewportSize,
-    Camera* camera)
+    YoRigine::Camera* camera)
 {
     if (!camera || pickables_.empty()) return nullptr;
 
@@ -571,7 +571,7 @@ Ray GizmoController::BuildPickRay(
     const ImVec2& mouseScreenPos,
     const ImVec2& viewportPos,
     const ImVec2& viewportSize,
-    Camera* camera) const
+    YoRigine::Camera* camera) const
 {
     // NDC に変換（-1〜1）
     float ndcX = ((mouseScreenPos.x - viewportPos.x) / viewportSize.x) * 2.0f - 1.0f;

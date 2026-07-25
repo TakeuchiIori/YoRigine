@@ -27,7 +27,7 @@ public:
 	~SubSceneManager() = default;
 
 	// 初期化処理
-	void Initialize(Camera* camera, Player* player);
+	void Initialize(YoRigine::Camera* camera, Player* player);
 
 	// 終了処理
 	void Finalize();
@@ -139,6 +139,6 @@ private:
 	SubScenePayload pendingPayload_;
 	SubSceneTransitionType pendingTransitionType_ = SubSceneTransitionType::TO_FIELD;
 
-	Camera* camera_ = nullptr;
+	YoRigine::Camera* camera_ = nullptr;
 	Player* player_ = nullptr;
 };

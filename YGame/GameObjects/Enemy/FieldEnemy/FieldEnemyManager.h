@@ -13,8 +13,8 @@
 #endif
 
 class Player;
-class Camera;
-class Line;
+namespace YoRigine { class Camera; }
+namespace YoRigine { class Line; }
 
 ///************************* フィールド敵スポーンデータ構造体 *************************///
 struct FieldEnemySpawnData {
@@ -76,7 +76,7 @@ public:
 	~FieldEnemyManager();
 
 	// 初期化処理
-	void Initialize(Camera* camera);
+	void Initialize(YoRigine::Camera* camera);
 
 	// 更新処理
 	void Update();
@@ -89,11 +89,11 @@ public:
 
 	// 当たり判定の描画
 	void DrawCollision();
-	void DrawLine(Line* line);
+	void DrawLine(YoRigine::Line* line);
 
 	// スポーンポイントの視覚マーカー (球+縦線) を描画する。
 	// 通常の Line 描画パスから呼ぶ。ImGuizmo ハンドルは Editor のギズモコールバック側で描画する。
-	void DrawEditorMarkers(Line* line);
+	void DrawEditorMarkers(YoRigine::Line* line);
 
 	// UI描画
 	void DrawUI();
@@ -230,7 +230,7 @@ private:
 	///************************* メンバ変数 *************************///
 
 	// 外部参照
-	Camera* camera_ = nullptr;
+	YoRigine::Camera* camera_ = nullptr;
 	Player* player_ = nullptr;
 	EncounterDetailCallback encounterDetailCallback_;
 	EnemyDefeatedCallback onEnemyDefeatedCallback_;
@@ -287,10 +287,10 @@ private:
 	// スポーンマーカー用に状態ごとの専用 Line インスタンスを持つ。
 	// 単一インスタンスで DrawLine を複数回呼ぶと GPU バッファが上書きされて
 	// 最後の 1 回分しか描画されないため、色 (状態) ごとに別バッファに分ける。
-	std::unique_ptr<Line> markerLineSelected_;
-	std::unique_ptr<Line> markerLineActive_;
-	std::unique_ptr<Line> markerLineInactive_;
-	std::unique_ptr<Line> markerLinePole_; // 縦線 (地面まで) 用
+	std::unique_ptr<YoRigine::Line> markerLineSelected_;
+	std::unique_ptr<YoRigine::Line> markerLineActive_;
+	std::unique_ptr<YoRigine::Line> markerLineInactive_;
+	std::unique_ptr<YoRigine::Line> markerLinePole_; // 縦線 (地面まで) 用
 
 	// ImGuizmo ハンドル描画 (Editor のゲームビューウィンドウ内コンテキストから呼ばれる)
 	void DrawSpawnPointGizmoHandles();

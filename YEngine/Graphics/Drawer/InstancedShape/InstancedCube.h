@@ -10,7 +10,7 @@
 #include "Vector4.h"
 #include "Matrix4x4.h"
 
-class Camera;
+namespace YoRigine { class Camera; }
 
 namespace YoRigine {
 	class DirectXCommon;
@@ -41,7 +41,7 @@ class InstancedCube
 public:
 	void Initialize();
 
-	void SetCamera(Camera* camera) { camera_ = camera; }
+	void SetCamera(YoRigine::Camera* camera) { camera_ = camera; }
 
 	// フレーム開始時にカウンタリセット
 	void Begin();
@@ -77,7 +77,7 @@ private:
 
 	YoRigine::DirectXCommon* dxCommon_   = nullptr;
 	YoRigine::SrvManager*    srvManager_ = nullptr;
-	Camera*                  camera_     = nullptr;
+	YoRigine::Camera*                  camera_     = nullptr;
 
 	// 単位立方体 VB
 	Microsoft::WRL::ComPtr<ID3D12Resource> vbResource_;

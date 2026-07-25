@@ -412,12 +412,12 @@ void SavePanel::LoadBinary(const std::string& path)
 	try {
 		Motion loaded = Motion().LoadBinary(path);
 		const std::string key = "Binary:" + path;
-		Model::animationCache_[key] = std::move(loaded);
+		YoRigine::Model::animationCache_[key] = std::move(loaded);
 		context_->selectedAnimKey = key;
-		context_->currentMotion = &Model::animationCache_[key];
+		context_->currentMotion = &YoRigine::Model::animationCache_[key];
 
 		// MotionSystem のアニメーションポインタも同期
-		Object3d* target = context_->GetTargetObject();
+		YoRigine::Object3d* target = context_->GetTargetObject();
 		if (target && target->GetModel() && target->GetModel()->GetMotionSystem()) {
 			auto* ms = target->GetModel()->GetMotionSystem();
 			ms->SetAnimation(context_->currentMotion);
@@ -480,7 +480,7 @@ void SavePanel::SelectSourceModel(const std::string& path)
 void SavePanel::LoadSourceAnimation()
 {
 	try {
-		Object3d* target = context_->GetTargetObject();
+		YoRigine::Object3d* target = context_->GetTargetObject();
 		if (!target || !target->GetModel()) {
 			sourceMsg_ = "読み込み失敗: 対象オブジェクトがありません";
 			return;
@@ -516,7 +516,7 @@ void SavePanel::LoadSourceAnimation()
 void SavePanel::LoadAllSourceAnimations()
 {
 	try {
-		Object3d* target = context_->GetTargetObject();
+		YoRigine::Object3d* target = context_->GetTargetObject();
 		if (!target || !target->GetModel()) {
 			sourceMsg_ = "一括読み込み失敗: 対象オブジェクトがありません";
 			context_->statusMsg = sourceMsg_;

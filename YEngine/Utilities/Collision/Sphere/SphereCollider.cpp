@@ -19,7 +19,7 @@ Vector3 SphereCollider::GetCenterPosition() const {
   return newPos;
 }
 
-const WorldTransform &SphereCollider::GetWorldTransform() { return *wt_; }
+const YoRigine::WorldTransform &SphereCollider::GetWorldTransform() { return *wt_; }
 
 Vector3 SphereCollider::GetEulerRotation() const {
   return wt_ ? wt_->rotate_ : Vector3{};

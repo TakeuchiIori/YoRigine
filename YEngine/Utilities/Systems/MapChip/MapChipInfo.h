@@ -33,7 +33,7 @@ public:
 public:
 	///************************* カメラ設定 *************************///
 	/// 使用するカメラを設定する
-	void SetCamera(Camera* camera) { camera_ = camera; }
+	void SetCamera(YoRigine::Camera* camera) { camera_ = camera; }
 
 private:
 	///************************* 内部処理 *************************///
@@ -51,14 +51,14 @@ public:
 private:
 	///************************* メンバ変数 *************************///
 	/// 使用中のカメラ
-	Camera* camera_ = nullptr;
+	YoRigine::Camera* camera_ = nullptr;
 
 	/// 各ブロックのワールド変換
-	std::vector<std::vector<std::unique_ptr<WorldTransform>>> wt_;
+	std::vector<std::vector<std::unique_ptr<YoRigine::WorldTransform>>> wt_;
 
 	/// マップチップデータ
 	std::unique_ptr<MapChipField> mpField_ = nullptr;
 
 	/// 各ブロックの描画オブジェクト
-	std::vector<std::vector<std::unique_ptr<Object3d>>> objects_;
+	std::vector<std::vector<std::unique_ptr<YoRigine::Object3d>>> objects_;
 };

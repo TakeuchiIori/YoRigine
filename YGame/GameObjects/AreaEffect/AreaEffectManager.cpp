@@ -73,7 +73,7 @@ void AreaEffectManager::Update(float deltaTime)
 	}
 }
 
-void AreaEffectManager::Draw(Line* line)
+void AreaEffectManager::Draw(YoRigine::Line* line)
 {
 	for (auto& [name, effect] : effects_) {
 		if (effect) effect->Draw(line);

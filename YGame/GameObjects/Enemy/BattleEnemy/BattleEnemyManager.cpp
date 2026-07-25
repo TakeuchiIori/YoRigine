@@ -47,7 +47,7 @@ BattleEnemyManager::~BattleEnemyManager() {
 /// 敵マネージャーの初期化処理
 /// </summary>
 /// <param name="camera">使用するカメラのポインタ</param>
-void BattleEnemyManager::Initialize(Camera* camera) {
+void BattleEnemyManager::Initialize(YoRigine::Camera* camera) {
 	current_ = this; // 全体攻撃などシーン外から敵一覧を引くための借用参照
 	camera_ = camera;
 	battleEnemies_.clear();   // 解除は BattleEnemy デストラクタが行う

@@ -41,7 +41,7 @@ class BaseArea
 public:
 	///************************* コールバック定義 *************************///
 
-	// targetKey: Update に渡したターゲット識別キー (WorldTransform* やキャラクタポインタ)。
+	// targetKey: Update に渡したターゲット識別キー (YoRigine::WorldTransform* やキャラクタポインタ)。
 	//            「誰が円内にいるか」をゲーム側で判別してダメージ等を適用するために渡す。
 	using AreaEnterCallback = std::function<void(void* targetKey, const Vector3& position)>;
 	using AreaExitCallback  = std::function<void(void* targetKey, const Vector3& position)>;
@@ -68,7 +68,7 @@ public:
 	virtual Vector3 GetCenter() const = 0;
 
 	// デバッグ描画
-	virtual void Draw(Line* line) = 0;
+	virtual void Draw(YoRigine::Line* line) = 0;
 
 	// エリアタイプを取得
 	virtual AreaType GetAreaType() const = 0;
@@ -80,7 +80,7 @@ public:
 	///************************* 共通機能 *************************///
 
 	// 更新処理（位置トラッキングやコールバック判定）
-	//   targetKey:  ターゲットを識別するキー (例: WorldTransform* やキャラクタポインタ)。
+	//   targetKey:  ターゲットを識別するキー (例: YoRigine::WorldTransform* やキャラクタポインタ)。
 	//               省略時は legacy 単一ターゲットモード (キーは nullptr)。
 	//               異なるターゲットそれぞれの Enter/Exit を独立して追跡する。
 	//   deltaTime:  Stay tick 用の経過秒。SetStayTickInterval(>0) 時のみ使用。
@@ -134,7 +134,7 @@ public:
 	void SetDebugDrawEnabled(bool enabled)  { isDebugDrawEnabled_ = enabled; }
 	bool IsDebugDrawEnabled() const         { return isDebugDrawEnabled_; }
 
-	void SetCamera(Camera* camera)          { camera_ = camera; }
+	void SetCamera(YoRigine::Camera* camera)          { camera_ = camera; }
 
 	// AutoJson アクセッサ
 	AutoJson& GetAutoJson()                 { return aj_; }
@@ -164,7 +164,7 @@ protected:
 	bool        isActive_           = true;
 	AreaPurpose purpose_            = AreaPurpose::Boundary;
 	bool        isDebugDrawEnabled_ = true;
-	Camera*     camera_             = nullptr;
+	YoRigine::Camera*     camera_             = nullptr;
 
 	AutoJson    aj_;
 
