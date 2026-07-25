@@ -16,8 +16,8 @@
 void ToolbarPanel::DrawImGui()
 {
 #ifdef USE_IMGUI
-	Object3d* target = context_->GetTargetObject();
-	Model* model = target ? target->GetModel() : nullptr;
+	YoRigine::Object3d* target = context_->GetTargetObject();
+	YoRigine::Model* model = target ? target->GetModel() : nullptr;
 
 	if (model) {
 		ImGui::TextColored(ImVec4(0.6f, 1.0f, 0.6f, 1.0f), "[%s]", model->GetName().c_str());
@@ -232,12 +232,12 @@ void ToolbarPanel::GenerateMirrorMotion()
 	mirrored.animation_.nodeAnimations_ = std::move(swapped);
 
 	const std::string key = "Mirror:" + context_->selectedAnimKey;
-	Model::animationCache_[key] = std::move(mirrored);
+	YoRigine::Model::animationCache_[key] = std::move(mirrored);
 	context_->selectedAnimKey = key;
-	context_->currentMotion = &Model::animationCache_[key];
+	context_->currentMotion = &YoRigine::Model::animationCache_[key];
 
 	// MotionSystemにも同期
-	Object3d* target = context_->GetTargetObject();
+	YoRigine::Object3d* target = context_->GetTargetObject();
 	if (target && target->GetModel() && target->GetModel()->GetMotionSystem()) {
 		target->GetModel()->GetMotionSystem()->SetAnimation(context_->currentMotion);
 	}
@@ -292,11 +292,11 @@ void ToolbarPanel::TrimMotion()
 
 	const std::string key = "Trim:" + context_->selectedAnimKey + "[" +
 		std::to_string(tStart) + "-" + std::to_string(tEnd) + "]";
-	Model::animationCache_[key] = std::move(trimmed);
+	YoRigine::Model::animationCache_[key] = std::move(trimmed);
 	context_->selectedAnimKey = key;
-	context_->currentMotion = &Model::animationCache_[key];
+	context_->currentMotion = &YoRigine::Model::animationCache_[key];
 
-	Object3d* target = context_->GetTargetObject();
+	YoRigine::Object3d* target = context_->GetTargetObject();
 	if (target && target->GetModel() && target->GetModel()->GetMotionSystem()) {
 		auto* ms = target->GetModel()->GetMotionSystem();
 		ms->SetAnimation(context_->currentMotion);
@@ -346,11 +346,11 @@ void ToolbarPanel::GeneratePingPongMotion()
 	}
 
 	const std::string key = "PingPong:" + context_->selectedAnimKey;
-	Model::animationCache_[key] = std::move(pingpong);
+	YoRigine::Model::animationCache_[key] = std::move(pingpong);
 	context_->selectedAnimKey = key;
-	context_->currentMotion = &Model::animationCache_[key];
+	context_->currentMotion = &YoRigine::Model::animationCache_[key];
 
-	Object3d* target = context_->GetTargetObject();
+	YoRigine::Object3d* target = context_->GetTargetObject();
 	if (target && target->GetModel() && target->GetModel()->GetMotionSystem()) {
 		auto* ms = target->GetModel()->GetMotionSystem();
 		ms->SetAnimation(context_->currentMotion);
@@ -369,8 +369,8 @@ void ToolbarPanel::BakeTranslateOffsetRange()
 
 	constexpr int kFps = 60;
 	Motion* motion = context_->currentMotion;
-	Object3d* targetObject = context_->GetTargetObject();
-	Model* model = targetObject ? targetObject->GetModel() : nullptr;
+	YoRigine::Object3d* targetObject = context_->GetTargetObject();
+	YoRigine::Model* model = targetObject ? targetObject->GetModel() : nullptr;
 
 	QuaternionTransform fallbackTransform{};
 	fallbackTransform.translate = { 0.0f, 0.0f, 0.0f };
@@ -478,7 +478,7 @@ void ToolbarPanel::BakeTranslateOffsetRange()
 		}
 	));
 
-	Object3d* target = context_->GetTargetObject();
+	YoRigine::Object3d* target = context_->GetTargetObject();
 	if (target && target->GetModel() && target->GetModel()->GetMotionSystem()) {
 		auto* ms = target->GetModel()->GetMotionSystem();
 		ms->SetAnimation(context_->currentMotion);

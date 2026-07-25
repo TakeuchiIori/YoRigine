@@ -6,13 +6,13 @@
 // ============================================================
 // 地面オブジェクトを初期化
 // ============================================================
-void Ground::Initialize(Camera* camera) {
+void Ground::Initialize(YoRigine::Camera* camera) {
 	camera_ = camera;
 
 	//------------------------------------------------------------
 	// Object3dの生成���初期化
 	//------------------------------------------------------------
-	obj_ = std::make_unique<Object3d>();
+	obj_ = std::make_unique<YoRigine::Object3d>();
 	obj_->Initialize();
 
 	// 地面のモデルデータをセットする

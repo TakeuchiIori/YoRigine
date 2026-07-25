@@ -16,8 +16,10 @@ public:
 	void Exit(BattleEnemy& enemy) override;
 
 	bool IsAttacking() const override { return true; }
+	bool IsContactDamageActive() const override { return isContactDamageActive_; }
 
 private:
 	Vector3 attackDir_{ 0, 0, 0 };
 	float startY_ = 0.0f;
+	bool isContactDamageActive_ = false;
 };

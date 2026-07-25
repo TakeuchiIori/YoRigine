@@ -182,8 +182,8 @@ public:
     // カメラ設定
     //=================================================================
 
-    void SetCamera(Camera* camera) { camera_ = camera; }
-    Camera* GetCamera() const { return camera_; }
+    void SetCamera(YoRigine::Camera* camera) { camera_ = camera; }
+    YoRigine::Camera* GetCamera() const { return camera_; }
 
     //=================================================================
     // 統計情報
@@ -230,7 +230,7 @@ private:
 
     bool initialized_ = false;
     YoRigine::SrvManager* srvManager_ = nullptr;
-    Camera* camera_ = nullptr;
+    YoRigine::Camera* camera_ = nullptr;
 
     // パイプライン
     Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature_;

@@ -6,6 +6,7 @@ void BattleRushAttackState::Enter(BattleEnemy& enemy) {
 	enemy.SetCanAct(false);
 	enemy.ResetStateTimer();
 	dirLocked_ = false;
+	isContactDamageActive_ = false;
 
 	if (auto anim = enemy.GetAnimation()) {
 		anim->StartColorAnimation({ 1, 1, 1, 1 }, { 1.0f, 1.0f, 0.0f, 1.0f }, 0.2f);
@@ -27,6 +28,7 @@ void BattleRushAttackState::Enter(BattleEnemy& enemy) {
 }
 
 void BattleRushAttackState::Update(BattleEnemy& enemy, float dt) {
+	isContactDamageActive_ = false;
 	const float currentTime = enemy.GetStateTimer();
 	const float previousTime = currentTime - dt;
 	const auto& params = enemy.GetEnemyData().attackParams.rush;
@@ -60,6 +62,7 @@ void BattleRushAttackState::Update(BattleEnemy& enemy, float dt) {
 	}
 	// === フェーズ3: 突進 ===
 	else if (currentTime < rushEndTime) {
+		isContactDamageActive_ = true;
 		if (previousTime < chargeEndTime && currentTime >= chargeEndTime) {
 			if (auto anim = enemy.GetAnimation()) {
 				// 突進時に細長くなる（base 比 0.8/0.8/1.3 倍）
@@ -78,6 +81,7 @@ void BattleRushAttackState::Update(BattleEnemy& enemy, float dt) {
 }
 
 void BattleRushAttackState::Exit(BattleEnemy& enemy) {
+	isContactDamageActive_ = false;
 	enemy.SetCanAct(true);
 
 	if (auto anim = enemy.GetAnimation()) {

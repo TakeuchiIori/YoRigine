@@ -44,7 +44,7 @@ void ModelManager::LoadModel(const std::string& directoryPath, const std::string
 	}
 
 	// モデル生成と初期化
-	std::unique_ptr<Model> model = std::make_unique<Model>();
+	std::unique_ptr<YoRigine::Model> model = std::make_unique<YoRigine::Model>();
 	model->Initialize(ModelCommon::GetInstance(), directoryPath, filePath, animationName, isAnimation);
 	model->SetName(filePath);
 	// 登録
@@ -56,7 +56,7 @@ void ModelManager::LoadModel(const std::string& directoryPath, const std::string
 /// </summary>
 /// <param name="filePath">検索するモデルのファイルパス</param>
 /// <returns>モデルが見つかった場合、そのポインタ。見つからなければnullptr。</returns>
-Model* ModelManager::FindModel(const std::string& filePath, const std::string& animationName, bool isAnimation)
+YoRigine::Model* ModelManager::FindModel(const std::string& filePath, const std::string& animationName, bool isAnimation)
 {
 	std::string modelKey = filePath;
 	if (isAnimation) {
@@ -107,9 +107,9 @@ std::vector<std::string> ModelManager::GetModelKeys() const
 	return keys;
 }
 
-std::vector<Model*> ModelManager::GetAllModels() const
+std::vector<YoRigine::Model*> ModelManager::GetAllModels() const
 {
-	std::vector<Model*> list;
+	std::vector<YoRigine::Model*> list;
 	list.reserve(models.size());
 
 	for (const auto& [key, model] : models) {

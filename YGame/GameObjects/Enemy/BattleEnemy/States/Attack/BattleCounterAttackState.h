@@ -17,10 +17,12 @@ public:
     void Exit(BattleEnemy& enemy) override;
 
     bool IsAttacking() const override { return true; }
+	bool IsContactDamageActive() const override { return isContactDamageActive_; }
 
 private:
     Vector3 attackDir_{ 0, 0, 0 };
     Vector3 anticipationStartPos_{ 0, 0, 0 };
+	bool isContactDamageActive_ = false;
 
     // ※ パラメータはすべて enemy.GetEnemyData().attackParams.counter から取得する
     //   (Phase: startup → anticipation → charge → rush → cooldown)

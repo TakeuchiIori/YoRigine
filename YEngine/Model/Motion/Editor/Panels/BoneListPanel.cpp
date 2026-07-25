@@ -33,8 +33,8 @@ void BoneListPanel::DrawImGui()
 	if (ImGui::IsItemHovered())
 		ImGui::SetTooltip("編集するボーンを選択します\n選択後、右のパネルで値を変更できます");
 
-	Object3d* target = context_->GetTargetObject();
-	Model* model = target ? target->GetModel() : nullptr;
+	YoRigine::Object3d* target = context_->GetTargetObject();
+	YoRigine::Model* model = target ? target->GetModel() : nullptr;
 	if (!model || !model->GetSkeleton()) {
 		ImGui::TextDisabled("スケルトンなし");
 		return;

@@ -10,7 +10,7 @@ void Fade::Initialize(const std::string textureFilePath) {
 	//------------------------------------------------------------
 	// フェード用スプライト初期化
 	//------------------------------------------------------------
-	sprite_ = std::make_unique<Sprite>();
+	sprite_ = std::make_unique<YoRigine::Sprite>();
 	sprite_->Initialize(textureFilePath);
 	sprite_->SetSize(Vector2(WinApp::kClientWidth, WinApp::kClientHeight));
 	sprite_->SetTextureSize(Vector2(WinApp::kClientWidth, WinApp::kClientHeight));

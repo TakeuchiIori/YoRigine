@@ -11,6 +11,7 @@
 #include <vector>
 #include <cmath>
 #include <cctype>
+#include <cfloat>
 #include <cstdio>
 #include <filesystem>
 #include <algorithm>
@@ -19,11 +20,13 @@
 #include "Systems/UI/UIManager.h"
 #include "Systems/UI/UIBase.h"
 #include "Loaders/Texture/TextureManager.h"
+#include "Loaders/Json/Use/AutoJson.h"
 #include "json.hpp"
 #include <fstream>
 
 #ifdef USE_IMGUI
 #include <imgui.h>
+#include "Editor/Widgets/YEditorWidget.h"
 #endif
 
 #pragma comment(lib, "d2d1.lib")
@@ -275,41 +278,48 @@ namespace {
 	std::string MetaPath(const std::string& pngPath) { return pngPath + ".meta.json"; }
 
 	void SaveParamsSidecar(const YoRigine::TextBakeParams& p, const std::string& pngPath) {
-		nlohmann::json j;
-		j["text"] = p.text;
-		j["fontFamily"] = p.fontFamily;
-		j["fontFilePath"] = p.fontFilePath;
-		j["fontSize"] = p.fontSize;
-		j["bold"] = p.bold; j["italic"] = p.italic;
-		j["fill"] = { p.fillColor.x, p.fillColor.y, p.fillColor.z, p.fillColor.w };
-		j["outlineWidth"] = p.outlineWidth;
-		j["outlineColor"] = { p.outlineColor.x, p.outlineColor.y, p.outlineColor.z, p.outlineColor.w };
-		j["shadow"] = p.shadow;
-		j["shadowOffset"] = { p.shadowOffset.x, p.shadowOffset.y };
-		j["shadowColor"] = { p.shadowColor.x, p.shadowColor.y, p.shadowColor.z, p.shadowColor.w };
-		j["padding"] = p.padding;
-		j["charSpacing"] = p.charSpacing;
-		std::ofstream ofs(MetaPath(pngPath));
-		if (ofs) ofs << j.dump(2);
+		auto params = p;
+		AutoJson json;
+		json.Add("text", &params.text)
+			.Add("fontFamily", &params.fontFamily)
+			.Add("fontFilePath", &params.fontFilePath)
+			.Add("fontSize", &params.fontSize)
+			.Add("bold", &params.bold)
+			.Add("italic", &params.italic)
+			.Add("fill", &params.fillColor)
+			.Add("outlineWidth", &params.outlineWidth)
+			.Add("outlineColor", &params.outlineColor)
+			.Add("shadow", &params.shadow)
+			.Add("shadowOffset", &params.shadowOffset)
+			.Add("shadowColor", &params.shadowColor)
+			.Add("padding", &params.padding)
+			.Add("maxWidth", &params.maxWidth)
+			.Add("align", &params.align)
+			.Add("charSpacing", &params.charSpacing);
+		json.SaveToFile(MetaPath(pngPath));
 	}
 
 	bool LoadParamsSidecar(YoRigine::TextBakeParams& p, const std::string& pngPath) {
-		std::ifstream ifs(MetaPath(pngPath));
-		if (!ifs) return false;
-		nlohmann::json j; ifs >> j;
-		p.text = j.value("text", p.text);
-		p.fontFamily = j.value("fontFamily", p.fontFamily);
-		p.fontFilePath = j.value("fontFilePath", p.fontFilePath);
-		p.fontSize = j.value("fontSize", p.fontSize);
-		p.bold = j.value("bold", p.bold); p.italic = j.value("italic", p.italic);
-		if (j.contains("fill")) { auto& c = j["fill"]; p.fillColor = { c[0], c[1], c[2], c[3] }; }
-		p.outlineWidth = j.value("outlineWidth", p.outlineWidth);
-		if (j.contains("outlineColor")) { auto& c = j["outlineColor"]; p.outlineColor = { c[0], c[1], c[2], c[3] }; }
-		p.shadow = j.value("shadow", p.shadow);
-		if (j.contains("shadowOffset")) { auto& c = j["shadowOffset"]; p.shadowOffset = { c[0], c[1] }; }
-		if (j.contains("shadowColor")) { auto& c = j["shadowColor"]; p.shadowColor = { c[0], c[1], c[2], c[3] }; }
-		p.padding = j.value("padding", p.padding);
-		p.charSpacing = j.value("charSpacing", p.charSpacing);
+		const std::string path = MetaPath(pngPath);
+		if (!std::filesystem::exists(path)) return false;
+		AutoJson json;
+		json.Add("text", &p.text)
+			.Add("fontFamily", &p.fontFamily)
+			.Add("fontFilePath", &p.fontFilePath)
+			.Add("fontSize", &p.fontSize)
+			.Add("bold", &p.bold)
+			.Add("italic", &p.italic)
+			.Add("fill", &p.fillColor)
+			.Add("outlineWidth", &p.outlineWidth)
+			.Add("outlineColor", &p.outlineColor)
+			.Add("shadow", &p.shadow)
+			.Add("shadowOffset", &p.shadowOffset)
+			.Add("shadowColor", &p.shadowColor)
+			.Add("padding", &p.padding)
+			.Add("maxWidth", &p.maxWidth)
+			.Add("align", &p.align)
+			.Add("charSpacing", &p.charSpacing);
+		json.LoadFromFile(path);
 		return true;
 	}
 
@@ -317,7 +327,8 @@ namespace {
 
 namespace YoRigine {
 
-	bool TextTextureBaker::Bake(const TextBakeParams& params, const std::string& outPngPath) {
+	bool TextTextureBaker::Bake(const TextBakeParams& params, const std::string& outPngPath,
+		bool saveMetadata) {
 		Factories& f = GetFactories();
 		if (!f.ok) return false;
 
@@ -406,7 +417,9 @@ namespace YoRigine {
 		if (FAILED(rt->EndDraw())) return false;
 
 		if (!SaveWicBitmapToPng(f.wic.Get(), wicBmp.Get(), bmpW, bmpH, outPngPath)) return false;
-		SaveParamsSidecar(params, outPngPath);  // 再編集用にパラメータも保存
+		if (saveMetadata) {
+			SaveParamsSidecar(params, outPngPath);  // 再編集用にパラメータも保存
+		}
 		return true;
 	}
 
@@ -471,7 +484,7 @@ namespace YoRigine {
 
 #ifdef USE_IMGUI
 	void TextTextureBaker::ImGuiPanel() {
-		static char textBuf[256] = "Hello";
+		static char textBuf[2048] = "Hello";
 		static char fontFamily[128] = "Meiryo";
 		static char fontFile[256] = "";
 		static char outName[128] = "Resources/UITex/text.png";
@@ -483,18 +496,35 @@ namespace YoRigine {
 		static float   outlineW = 4.0f;
 		static Vector4 outlineC{ 0,0,0,1 };
 		static bool    shadow = false;
-		static float   shadowOff[2] = { 3,3 };
+		static Vector2 shadowOff{ 3,3 };
 		static Vector4 shadowC{ 0,0,0,0.5f };
 		static float   padding = 8.0f;
+		static float   maxWidth = 0.0f;
+		static int     align = 0;
 		static int     layer = 0;
 		static std::string status;
+		static bool autoPreview = true;
 
 		static std::string previewPath;          // プレビュー対象のPNGパス
+		static std::vector<std::string> fontFiles;
+		static bool fontsScanned = false;
+		static int fontSel = 0; // 0=(システムフォント)、1..=fontFiles[idx-1]
+		if (!fontsScanned) {
+			fontFiles = ListFontFiles("Resources/Fonts");
+			fontsScanned = true;
+		}
 
-		ImGui::TextUnformatted("テキストを PNG にベイクして UI 用テクスチャにする");
+		ImGui::TextUnformatted("テキストを編集し、PNG または UI として利用します");
+		ImGui::TextDisabled("入力内容はリアルタイムでプレビューできます");
 
 		// ---- プレビュー（最上部・UI登録不要。ベイクした瞬間に表示） ----
-		if (!previewPath.empty()) {
+		if (YEditorWidget::Section section{ "プレビュー" }) {
+			YEditorWidget::Checkbox("リアルタイム更新", autoPreview);
+			YEditorWidget::ItemTooltip("入力停止から約120ms後にプレビューを更新します");
+			if (previewPath.empty()) {
+				ImGui::TextDisabled("テキストを入力すると、ここにプレビューが表示されます");
+			}
+			else {
 			auto* tm = TextureManager::GetInstance();
 			try {
 				const auto& md = tm->GetMetaData(previewPath);
@@ -511,10 +541,11 @@ namespace YoRigine {
 				ImGui::Text("プレビュー: %d x %d px", (int)md.width, (int)md.height);
 			}
 			catch (...) { /* 未ロード等は無視 */ }
+			}
 		}
 
 		// ---- 既存ラベルを開いて編集（meta.json があるものを一覧） ----
-		{
+		if (YEditorWidget::Section section{ "既存テキストを編集", false }) {
 			static std::vector<std::string> bakedList;  // png パス一覧
 			static bool bakedScanned = false;
 			static int  bakedSel = 0;
@@ -532,10 +563,10 @@ namespace YoRigine {
 						}
 					}
 				}
+				std::sort(bakedList.begin(), bakedList.end());
 			};
 			if (!bakedScanned) { rescan(); bakedScanned = true; }
 
-			ImGui::SeparatorText("既存ラベルを編集");
 			if (ImGui::Button("再スキャン##baked")) rescan();
 			ImGui::SameLine();
 			if (bakedList.empty()) {
@@ -557,8 +588,16 @@ namespace YoRigine {
 						fontSize = p.fontSize; charSpacing = p.charSpacing;
 						bold = p.bold; italic = p.italic;
 						fill = p.fillColor; outlineW = p.outlineWidth; outlineC = p.outlineColor;
-						shadow = p.shadow; shadowOff[0] = p.shadowOffset.x; shadowOff[1] = p.shadowOffset.y; shadowC = p.shadowColor;
-						padding = p.padding;
+						shadow = p.shadow; shadowOff = p.shadowOffset; shadowC = p.shadowColor;
+						padding = p.padding; maxWidth = p.maxWidth; align = p.align;
+						fontSel = 0;
+						if (!p.fontFilePath.empty()) {
+							const std::string loadedFont = std::filesystem::path(p.fontFilePath).filename().string();
+							auto it = std::find(fontFiles.begin(), fontFiles.end(), loadedFont);
+							if (it != fontFiles.end()) {
+								fontSel = static_cast<int>(std::distance(fontFiles.begin(), it)) + 1;
+							}
+						}
 						TextureManager::GetInstance()->ReloadTexture(bakedList[bakedSel]);
 						previewPath = bakedList[bakedSel];
 						status = std::string("読込: ") + bakedList[bakedSel];
@@ -569,16 +608,10 @@ namespace YoRigine {
 			}
 		}
 
-		ImGui::Separator();
-
-		ImGui::InputText("テキスト", textBuf, sizeof(textBuf));
+		if (YEditorWidget::Section section{ "テキストとフォント" }) {
+			YEditorWidget::InputTextMultiline("テキスト", textBuf, 5);
 
 		// ---- フォント選択（Resources/Fonts を走査してコンボ表示） ----
-		static std::vector<std::string> fontFiles;
-		static bool fontsScanned = false;
-		static int  fontSel = 0; // 0 =(システムフォント)、1.. = fontFiles[idx-1]
-		if (!fontsScanned) { fontFiles = ListFontFiles("Resources/Fonts"); fontsScanned = true; }
-
 		const char* curLabel = (fontSel == 0 || fontSel > (int)fontFiles.size())
 			? "(システムフォント)" : fontFiles[fontSel - 1].c_str();
 		if (ImGui::BeginCombo("フォント", curLabel)) {
@@ -597,29 +630,41 @@ namespace YoRigine {
 
 		// システムフォント選択時のみファミリ名入力を出す
 		if (fontSel == 0) {
-			ImGui::InputText("フォント名(システム)", fontFamily, sizeof(fontFamily));
+			YEditorWidget::InputText("フォント名(システム)", fontFamily);
 		}
 
-		ImGui::DragFloat("サイズ(px)", &fontSize, 1.0f, 4.0f, 512.0f, "%.0f");
-		ImGui::DragFloat("字間(px)", &charSpacing, 0.5f, -50.0f, 50.0f, "%.1f");
-		if (ImGui::IsItemHovered()) ImGui::SetTooltip("負で詰める / 正で広げる");
-		ImGui::Checkbox("太字", &bold); ImGui::SameLine(); ImGui::Checkbox("斜体", &italic);
-		ImGui::ColorEdit4("塗り色", &fill.x);
+		YEditorWidget::DragFloat("サイズ(px)", fontSize, 1.0f, 4.0f, 512.0f, "%.0f");
+		YEditorWidget::DragFloat("字間(px)", charSpacing, 0.5f, -50.0f, 50.0f, "%.1f");
+		YEditorWidget::ItemTooltip("負で詰める / 正で広げる");
+		YEditorWidget::Checkbox("太字", bold); ImGui::SameLine(); YEditorWidget::Checkbox("斜体", italic);
+		YEditorWidget::DragFloat("折り返し幅(px)", maxWidth, 1.0f, 0.0f, 4096.0f, "%.0f");
+		YEditorWidget::ItemTooltip("0は自動幅、1以上で指定幅に折り返します");
+		if (maxWidth > 0.0f) {
+			static constexpr const char* alignItems[] = { "左揃え", "中央揃え", "右揃え" };
+			ImGui::Combo("文字揃え", &align, alignItems, IM_ARRAYSIZE(alignItems));
+		}
+		}
 
-		ImGui::SeparatorText("アウトライン");
-		ImGui::DragFloat("太さ(px)", &outlineW, 0.5f, 0.0f, 64.0f, "%.1f");
-		ImGui::ColorEdit4("縁色", &outlineC.x);
+		if (YEditorWidget::Section section{ "文字の見た目" }) {
+			YEditorWidget::Color("塗り色", fill);
+			YEditorWidget::SectionHeader("アウトライン");
+			YEditorWidget::DragFloat("太さ(px)", outlineW, 0.5f, 0.0f, 64.0f, "%.1f");
+			YEditorWidget::Color("縁色", outlineC);
 
-		ImGui::SeparatorText("影");
-		ImGui::Checkbox("影を付ける", &shadow);
-		ImGui::DragFloat2("影オフセット", shadowOff, 0.5f, -64.0f, 64.0f, "%.1f");
-		ImGui::ColorEdit4("影色", &shadowC.x);
+			YEditorWidget::SectionHeader("影");
+			YEditorWidget::Checkbox("影を付ける", shadow);
+			if (shadow) {
+				YEditorWidget::DragVec2("影オフセット", shadowOff, 0.5f, -64.0f, 64.0f);
+				YEditorWidget::Color("影色", shadowC);
+			}
+		}
 
-		ImGui::SeparatorText("出力");
-		ImGui::DragFloat("余白(px)", &padding, 1.0f, 0.0f, 128.0f, "%.0f");
-		ImGui::InputText("出力PNGパス", outName, sizeof(outName));
-		ImGui::InputText("UI ID", uiId, sizeof(uiId));
-		ImGui::DragInt("レイヤー", &layer, 1, 0, 8);
+		if (YEditorWidget::Section section{ "出力設定" }) {
+			YEditorWidget::DragFloat("余白(px)", padding, 1.0f, 0.0f, 128.0f, "%.0f");
+			YEditorWidget::InputPath("出力PNGパス", outName);
+			YEditorWidget::InputText("UI ID", uiId);
+			YEditorWidget::DragInt("レイヤー", layer, 1, 0, 8);
+		}
 
 		auto buildParams = [&]() {
 			TextBakeParams p;
@@ -630,38 +675,64 @@ namespace YoRigine {
 			p.bold = bold; p.italic = italic;
 			p.fillColor = fill;
 			p.outlineWidth = outlineW; p.outlineColor = outlineC;
-			p.shadow = shadow; p.shadowOffset = { shadowOff[0], shadowOff[1] }; p.shadowColor = shadowC;
+			p.shadow = shadow; p.shadowOffset = shadowOff; p.shadowColor = shadowC;
 			p.padding = padding;
+			p.maxWidth = maxWidth;
+			p.align = align;
 			p.charSpacing = charSpacing;
 			return p;
 			};
 
 		static std::string lastRegisteredId;     // 位置調整の対象
-		static float uiPos[2] = { 640.0f, 360.0f };
+		static Vector2 uiPos{ 640.0f, 360.0f };
 
-		// ---- リアルタイムプレビュー（パラメータが変わったら自動ベイク） ----
-		ImGui::Separator();
-		static bool autoPreview = false;
-		ImGui::Checkbox("リアルタイムプレビュー（自動ベイク）", &autoPreview);
+		// ---- リアルタイムプレビュー（変更が落ち着いたら自動ベイク） ----
 		if (autoPreview) {
-			// 見た目に効くパラメータからシグネチャを作り、変化時だけプレビュー用に焼き直す
-			char sig[512];
-			snprintf(sig, sizeof(sig), "%s|%s|%s|%.1f|%.1f|%d%d|%.2f,%.2f,%.2f,%.2f|%.1f|%.2f,%.2f,%.2f,%.2f|%d|%.1f,%.1f|%.2f,%.2f,%.2f,%.2f|%.0f",
-				textBuf, fontFamily, fontFile, fontSize, charSpacing, bold ? 1 : 0, italic ? 1 : 0,
-				fill.x, fill.y, fill.z, fill.w, outlineW, outlineC.x, outlineC.y, outlineC.z, outlineC.w,
-				shadow ? 1 : 0, shadowOff[0], shadowOff[1], shadowC.x, shadowC.y, shadowC.z, shadowC.w, padding);
-			static std::string lastSig;
-			if (lastSig != sig) {
+			// 固定長バッファでは長文が途中で切れて変更を検出できないため、
+			// 全パラメータをJSON文字列化して署名にする。
+			const TextBakeParams previewParams = buildParams();
+			nlohmann::json signatureJson = {
+				{"text", previewParams.text},
+				{"fontFamily", previewParams.fontFamily},
+				{"fontFilePath", previewParams.fontFilePath},
+				{"fontSize", previewParams.fontSize},
+				{"charSpacing", previewParams.charSpacing},
+				{"bold", previewParams.bold}, {"italic", previewParams.italic},
+				{"fill", {fill.x, fill.y, fill.z, fill.w}},
+				{"outlineWidth", outlineW},
+				{"outlineColor", {outlineC.x, outlineC.y, outlineC.z, outlineC.w}},
+				{"shadow", shadow}, {"shadowOffset", {shadowOff.x, shadowOff.y}},
+				{"shadowColor", {shadowC.x, shadowC.y, shadowC.z, shadowC.w}},
+				{"padding", padding},
+				{"maxWidth", maxWidth}, {"align", align},
+			};
+			const std::string currentSig = signatureJson.dump();
+			static std::string pendingSig;
+			static std::string renderedSig;
+			static double lastChangeTime = 0.0;
+			const double now = ImGui::GetTime();
+			if (pendingSig != currentSig) {
+				pendingSig = currentSig;
+				lastChangeTime = now;
+			}
+
+			constexpr double kPreviewDebounceSeconds = 0.12;
+			if (renderedSig != pendingSig &&
+				(now - lastChangeTime) >= kPreviewDebounceSeconds) {
 				const std::string previewFile = "Resources/UITex/__bake_preview.png";
-				if (Bake(buildParams(), previewFile)) {
+				// 一時プレビューには再編集用 meta.json を生成しない。
+				if (Bake(previewParams, previewFile, false)) {
 					TextureManager::GetInstance()->ReloadTexture(previewFile);
 					previewPath = previewFile;
+					status = "プレビュー更新";
+				} else if (!previewParams.text.empty()) {
+					status = "プレビュー生成失敗";
 				}
-				lastSig = sig;
+				renderedSig = pendingSig;
 			}
 		}
 
-		ImGui::Separator();
+		if (YEditorWidget::Section section{ "保存とUI登録" }) {
 		if (ImGui::Button("PNG にベイク")) {
 			if (Bake(buildParams(), outName)) {
 				// 登録なしでも見れるよう、テクスチャだけ読み直してプレビュー対象にする
@@ -678,7 +749,7 @@ namespace YoRigine {
 				lastRegisteredId = uiId;
 				previewPath = outName;
 				if (auto* ui = UIManager::GetInstance()->GetUI(uiId)) {
-					ui->SetPosition({ uiPos[0], uiPos[1], 0.0f });
+					ui->SetPosition({ uiPos.x, uiPos.y, 0.0f });
 				}
 				status = std::string("UI 登録成功: ") + uiId;
 			} else {
@@ -689,21 +760,23 @@ namespace YoRigine {
 		if (!status.empty()) {
 			ImGui::TextWrapped("%s", status.c_str());
 		}
+		}
 
 		// ---- 配置調整（登録済みUIをドラッグで動かす。将来ギズモ化） ----
 		if (!lastRegisteredId.empty()) {
 			if (auto* ui = UIManager::GetInstance()->GetUI(lastRegisteredId)) {
-				ImGui::SeparatorText("配置調整");
+				if (YEditorWidget::Section section{ "登録したUIの配置", false }) {
 				ImGui::Text("対象UI: %s", lastRegisteredId.c_str());
 				// 外部（UIエディタ等）で動かされた場合に追従
 				Vector3 cur = ui->GetPosition();
-				uiPos[0] = cur.x; uiPos[1] = cur.y;
-				if (ImGui::DragFloat2("位置(px)", uiPos, 1.0f)) {
-					ui->SetPosition({ uiPos[0], uiPos[1], cur.z });
+				uiPos.x = cur.x; uiPos.y = cur.y;
+				if (YEditorWidget::DragVec2("位置(px)", uiPos, 1.0f)) {
+					ui->SetPosition({ uiPos.x, uiPos.y, cur.z });
 				}
 				if (ImGui::Button("中央へ")) {
-					uiPos[0] = 640.0f; uiPos[1] = 360.0f;
-					ui->SetPosition({ uiPos[0], uiPos[1], cur.z });
+					uiPos = { 640.0f, 360.0f };
+					ui->SetPosition({ uiPos.x, uiPos.y, cur.z });
+				}
 				}
 			}
 		}

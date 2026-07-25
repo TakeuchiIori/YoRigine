@@ -56,8 +56,9 @@ public:
 	// 初期化
 	void Initialize(std::string& textureFilePath);
 
-	// コマンドリストを積む
-	void RecordDrawCommands(ID3D12GraphicsCommandList* command, UINT rootParameterIndexCBV, UINT rootParameterIndexSRV);
+	// コマンドリストを積む。overrideTexturePath を指定するとマテリアル本来のテクスチャの代わりに
+	// そのテクスチャ（パスがキー）をバインドする（空なら自分のテクスチャを使う）。
+	void RecordDrawCommands(ID3D12GraphicsCommandList* command, UINT rootParameterIndexCBV, UINT rootParameterIndexSRV, const std::string& overrideTexturePath = "");
 
 private:
 

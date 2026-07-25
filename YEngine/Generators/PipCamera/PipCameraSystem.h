@@ -42,20 +42,20 @@ public:
 	bool IsEnabled()  const { return enabled_; }
 	uint32_t GetWidth()  const { return rtWidth_; }
 	uint32_t GetHeight() const { return rtHeight_; }
-	Camera*  GetCamera()       { return pipCamera_.get(); }
+	YoRigine::Camera*  GetCamera()       { return pipCamera_.get(); }
 
 	const std::string& GetRTName()    const { return rtName_; }
 	const std::string& GetDSVName()   const { return dsvName_; }
 
 	// PiP パス前に対象カメラ (シーンカメラ) を退避して PiP の値を流し込む。
 	// 内部で UpdateMatrix + Update を呼ぶので GPU バッファも PiP のものに書き換わる。
-	void ApplyToCamera(Camera* target);
+	void ApplyToCamera(YoRigine::Camera* target);
 
 	// PiP パス後に元の値を書き戻して GPU バッファも復元する。
-	void RestoreCamera(Camera* target);
+	void RestoreCamera(YoRigine::Camera* target);
 
 	// シーンカメラの位置/回転/FOV をコピーして PiP カメラに反映する (動作確認用)
-	void SnapToSceneCamera(const Camera* sceneCamera);
+	void SnapToSceneCamera(const YoRigine::Camera* sceneCamera);
 
 private:
 	PipCameraSystem() = default;
@@ -69,7 +69,7 @@ private:
 
 private:
 	// PiP 専用カメラ
-	std::unique_ptr<Camera> pipCamera_;
+	std::unique_ptr<YoRigine::Camera> pipCamera_;
 	std::unique_ptr<YoRigine::JsonManager> jsonManager_;
 
 	// 表示する/しないフラグ (ImGui のチェックボックスで制御)

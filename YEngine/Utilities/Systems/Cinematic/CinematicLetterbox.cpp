@@ -14,12 +14,12 @@ namespace YoRigine {
 	void CinematicLetterbox::Initialize()
 	{
 		// 真っ黒の Sprite × 2 を作る（white.png を tint）
-		topBar_ = std::make_unique<Sprite>();
+		topBar_ = std::make_unique<YoRigine::Sprite>();
 		topBar_->Initialize("Resources/Textures/white.png");
 		topBar_->SetColor(Vector4{ 0.0f, 0.0f, 0.0f, 1.0f });
 		topBar_->SetAnchorPoint(Vector2{ 0.0f, 0.0f });
 
-		bottomBar_ = std::make_unique<Sprite>();
+		bottomBar_ = std::make_unique<YoRigine::Sprite>();
 		bottomBar_->Initialize("Resources/Textures/white.png");
 		bottomBar_->SetColor(Vector4{ 0.0f, 0.0f, 0.0f, 1.0f });
 		bottomBar_->SetAnchorPoint(Vector2{ 0.0f, 0.0f });

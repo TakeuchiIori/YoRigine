@@ -26,7 +26,7 @@ public:
 	Matrix4x4 GetViewProjection() override { return sceneCamera_->viewProjectionMatrix_; }
 
 	// PiP 用: シーンカメラ公開 + 3D オンリー描画パス
-	Camera* GetSceneCamera() override { return sceneCamera_.get(); }
+	YoRigine::Camera* GetSceneCamera() override { return sceneCamera_.get(); }
 	void DrawScene3DOnly() override;
 
 private:
@@ -41,7 +41,7 @@ private:
 	///************************* メンバ変数 *************************///
 
 	// 出力用カメラ（実体）
-	std::unique_ptr<Camera> sceneCamera_;
+	std::unique_ptr<YoRigine::Camera> sceneCamera_;
 	CameraMode cameraMode_ = CameraMode::DEBUG;
 	std::unique_ptr<CameraEditor> cameraEditor_;
 
@@ -49,6 +49,6 @@ private:
 	bool isDebugCamera_ = false;
 
 	std::unique_ptr<MotionEditor> motionEditor_ = nullptr;
-	std::unique_ptr<Line> line_;
+	std::unique_ptr<YoRigine::Line> line_;
 };
 

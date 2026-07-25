@@ -46,7 +46,7 @@ void DevelopScene::Initialize() {
 	//------------------------------------------------------------
 
 	// 出力用カメラの実体を生成
-	sceneCamera_ = std::make_unique<Camera>();
+	sceneCamera_ = std::make_unique<YoRigine::Camera>();
 	auto director = CameraDirector::GetInstance();
 	director->Initialize();
 
@@ -61,7 +61,7 @@ void DevelopScene::Initialize() {
 
 
 	// ライン
-	line_ = std::make_unique<Line>();
+	line_ = std::make_unique<YoRigine::Line>();
 	line_->Initialize();
 	line_->SetCamera(sceneCamera_.get());
 
@@ -128,8 +128,8 @@ void DevelopScene::Update() {
 	UpdateCamera();
 
 	if (YoRigine::Input::GetInstance()->TriggerKey(DIK_8)) {
-		VfxMeshHandle::PlayOneShot("Explosion", Vector3{ 0,20,0 }, /*scale*/1.5f);
-		VfxMeshHandle::PlayBolt("Lightning", Vector3{ 0,50,0 }, Vector3{ 0,0,0 }, /*loop*/false);
+		YVfxHandle::PlayOneShot("Explosion", Vector3{ 0,20,0 }, /*scale*/1.5f);
+		YVfxHandle::PlayBolt("Lightning", Vector3{ 0,50,0 }, Vector3{ 0,0,0 }, /*loop*/false);
 	}
 	YoRigine::CollisionManager::GetInstance()->Update();
 	YoRigine::ModelManipulator::GetInstance()->Update();

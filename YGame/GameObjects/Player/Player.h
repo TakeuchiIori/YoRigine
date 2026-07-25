@@ -25,18 +25,18 @@
 // ============================================================
 // ゲームシーンのプレイヤークラス
 // ============================================================
-class Player : public BaseObject {
+class Player : public YoRigine::BaseObject {
 public:
 	// ============================================================
 	// 基本関数
 	// ============================================================
 	~Player();
-	void Initialize(Camera* camera) override;
+	void Initialize(YoRigine::Camera* camera) override;
 	void Update() override;
 	void Draw() override;
 	void DrawAnimation() override;
 	void DrawCollision() override;
-	void DrawBone(Line& line);
+	void DrawBone(YoRigine::Line& line);
 	void DrawShadow();
 	void DrawImGui();
 	void DrawVfx();
@@ -55,6 +55,11 @@ public:
 	// 公開関数
 	// ============================================================
 	void Reset();
+	// バトル開始前に行動状態と装備表示を待機状態へ戻す。HPは変更しない。
+	void ResetForBattleStart();
+	void FacePosition(const Vector3& worldPosition);
+	void SetControlEnabled(bool enabled);
+	bool IsControlEnabled() const { return controlEnabled_; }
 	void TakeDamage(int damage);
 	// 敵の攻撃がヒットした際にのけぞり（ヒット）ステートへ遷移させる。
 	// attackerPos から被弾方向を算出する。ガード中・死亡中は何もしない。
@@ -73,8 +78,8 @@ public:
 	void SetPosition(const Vector3& position) { wt_.translate_ = position; }
 	Vector3 GetCameraRotation() const;
 
-	Object3d* GetObject3d() { return obj_.get(); }
-	const Object3d* GetObject3d() const { return obj_.get(); }
+	YoRigine::Object3d* GetObject3d() { return obj_.get(); }
+	const YoRigine::Object3d* GetObject3d() const { return obj_.get(); }
 
 	PlayerMovement* GetMovement() const { return movement_.get(); }
 	PlayerCombat* GetCombat() const { return combat_.get(); }
@@ -138,6 +143,7 @@ private:
 	void HandleMagicInput(bool pressedA, bool pressedB, bool pressedX, bool heldA, bool heldB, bool heldX);
 	void UpdateMotionTime();
 	void LookAtDirection(const Vector3& direction);
+	void PlayHitFeedback(HitDirection direction);
 
 private:
 	// ============================================================
@@ -145,11 +151,12 @@ private:
 	// ============================================================
 	YoRigine::Input* input_ = nullptr;
 	bool battleMode_ = false;   // 戦闘中のみ攻撃/ガード入力を受け付ける
+	bool controlEnabled_ = true; // カメラ演出中など、入力だけを止めるためのフラグ
 	std::unique_ptr<PlayerCamera> playerCamera_;
 
 	std::unique_ptr<PlayerSword> playerSword_;
 	std::unique_ptr<PlayerShield> playerShield_;
-	std::unique_ptr<Line> boneLine_;
+	std::unique_ptr<YoRigine::Line> boneLine_;
 	std::unique_ptr<PlayerMovement> movement_;
 	std::unique_ptr<PlayerCombat> combat_;
 	std::unique_ptr<PlayerMagicController> magicController_;
@@ -166,6 +173,15 @@ private:
 	bool isAlive_ = true;
 	bool isInvincible_ = false;   // 突進攻撃中などの無敵フラグ
 	const std::string emitterPath_ = "Player";
+
+	// 敵の攻撃を受けた瞬間のフィードバック（Player.jsonから調整）
+	float hitStopDuration_ = 0.06f;
+	float frontHitShakeIntensity_ = 0.4f;
+	float frontHitShakeDuration_ = 0.2f;
+	float backHitShakeIntensity_ = 0.6f;
+	float backHitShakeDuration_ = 0.25f;
+	float hitVibrationDuration_ = 0.12f;
+	uint16_t hitVibrationPower_ = 32000;
 
 	float motionSpeed[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
 };

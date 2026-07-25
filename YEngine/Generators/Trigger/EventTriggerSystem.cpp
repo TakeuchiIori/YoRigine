@@ -12,7 +12,7 @@ void EventTriggerSystem::Clear() {
 }
 
 bool EventTriggerSystem::Load(const std::string& filePath,
-                              Camera* camera,
+                              YoRigine::Camera* camera,
                               std::function<void()> onAnyGateOpened) {
 	Clear();
 	bool loaded = EventTriggerLoader::Load(

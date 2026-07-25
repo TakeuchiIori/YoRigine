@@ -30,7 +30,7 @@ namespace {
 /*==========================================================================
 	初期化
 //========================================================================*/
-void FieldScene::Initialize(Camera* camera, Player* player) {
+void FieldScene::Initialize(YoRigine::Camera* camera, Player* player) {
 
 	sceneCamera_ = camera;
 	player_ = player;
@@ -60,7 +60,7 @@ void FieldScene::Initialize(Camera* camera, Player* player) {
 	ground_->Initialize(sceneCamera_);
 
 
-	line_ = std::make_unique<Line>();
+	line_ = std::make_unique<YoRigine::Line>();
 	line_->Initialize();
 	line_->SetCamera(sceneCamera_);
 
@@ -110,7 +110,7 @@ void FieldScene::Initialize(Camera* camera, Player* player) {
 	// (ModelManipulator::LoadScene が ObjectManager をクリアして PlacedObject を作り直すので、
 	//  EventTrigger も同タイミングで作り直さないとターゲット参照がずれる)。
 
-	sprite_ = std::make_unique<Sprite>();
+	sprite_ = std::make_unique<YoRigine::Sprite>();
 	sprite_->Initialize("Resources/Textures/GameScene/FieldScene.png");
 
 

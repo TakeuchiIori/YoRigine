@@ -219,11 +219,12 @@ namespace YoRigine {
 
 			nlohmann::json sceneData;
 			nlohmann::json uiArray = nlohmann::json::array();
+			nlohmann::json savedDrawOrder = nlohmann::json::array();
 
 			// drawOrder_の順番でUIを保存
 			for (const auto& id : drawOrder_) {
 				auto it = uiElements_.find(id);
-				if (it == uiElements_.end() || !it->second) continue;
+				if (it == uiElements_.end() || !it->second || it->second->IsTransient()) continue;
 
 				nlohmann::json uiData;
 				uiData["id"] = id;
@@ -233,11 +234,12 @@ namespace YoRigine {
 				it->second->SaveToJSON(uiData["configPath"]);
 
 				uiArray.push_back(uiData);
+				savedDrawOrder.push_back(id);
 			}
 			sceneData["uis"] = uiArray;
 
 			// 描画順序を保存
-			sceneData["drawOrder"] = drawOrder_;
+			sceneData["drawOrder"] = savedDrawOrder;
 
 			// グループ情報（そのまま）
 			nlohmann::json groupsData;
@@ -265,19 +267,22 @@ namespace YoRigine {
 	bool UIManager::LoadScene(const std::string& sceneName) {
 		const std::string scenePath = SCENE_DIRECTORY + sceneName + ".json";
 		std::ifstream f(scenePath);
-		if (f.is_open()) {
-			this->currentSceneName_ = sceneName;;
-		}
-		else {
+
+		// シーン遷移では常に現在のUIをリセットする。
+		// レイアウトJSONが無いシーン（UI未定義のシーン）へ移った場合でも、
+		// 前シーンで登録したUIが残らないよう、ファイルの有無に関わらず先にクリアする。
+		// （従来は open 失敗時に Clear の手前で return していたため、
+		//   Title.json のような未作成のシーンへ行くと前シーンのUIが残っていた）
+		Clear();
+
+		if (!f.is_open()) {
 			return false;
 		}
+		this->currentSceneName_ = sceneName;
 
 		nlohmann::json sceneData;
 		f >> sceneData;
 		f.close();
-
-		// 既存UIをクリア
-		Clear();
 
 		const std::string sceneConfigDir = GetSceneConfigDir(sceneName);
 

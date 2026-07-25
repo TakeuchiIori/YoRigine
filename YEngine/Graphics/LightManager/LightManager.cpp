@@ -156,7 +156,7 @@ namespace YoRigine {
 	//   nearZ          : ターゲットから「ライト方向（手前）」へどこまで影に入れるか
 	//   farZ           : ターゲットから「ライト反対方向（奥）」へどこまで影に入れるか
 	//   orthoWidth/Height : XY 方向の覆い範囲
-	void LightManager::UpdateShadowMatrix(Camera* camera)
+	void LightManager::UpdateShadowMatrix(YoRigine::Camera* camera)
 	{
 		camera_ = camera;
 

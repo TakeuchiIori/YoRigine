@@ -634,18 +634,40 @@ void YEmitterGroupEditor::ShowSelectedEmitterDetail(YParticleEmitter& emitter) {
     if (ImGui::Checkbox("##EAuto", &autoE)) emitter.SetAutoEmit(autoE);
     ImGui::NextColumn();
 
-    ImGui::Text("レート (毎秒)");  ImGui::NextColumn();
-    float rate = emitter.GetEmissionRate();
+    // 発生モード（Rate / 個数維持 / 静的）
+    ImGui::Text("発生モード");     ImGui::NextColumn();
+    const char* modeNames[] = { "レート(毎秒)", "個数維持(エリア)", "静的(一度だけ)" };
+    int modeIdx = static_cast<int>(emitter.GetEmissionMode());
     ImGui::SetNextItemWidth(-1);
-    if (ImGui::DragFloat("##ERate", &rate, 0.5f, 0.0f, 10000.0f))
-        emitter.SetEmissionRate(rate);
+    if (ImGui::Combo("##EMode", &modeIdx, modeNames, IM_ARRAYSIZE(modeNames)))
+        emitter.SetEmissionMode(static_cast<YParticleEmitter::EmissionMode>(modeIdx));
     ImGui::NextColumn();
 
-    ImGui::Text("発生数");         ImGui::NextColumn();
-    int cnt = emitter.GetEmitCount();
-    ImGui::SetNextItemWidth(-1);
-    if (ImGui::DragInt("##ECnt", &cnt, 1, 1, 9999)) emitter.SetEmitCount(cnt);
-    ImGui::NextColumn();
+    const YParticleEmitter::EmissionMode mode = emitter.GetEmissionMode();
+
+    if (mode == YParticleEmitter::EmissionMode::Rate) {
+        // Rate モードのみレート／1回の発生数を表示
+        ImGui::Text("レート (毎秒)");  ImGui::NextColumn();
+        float rate = emitter.GetEmissionRate();
+        ImGui::SetNextItemWidth(-1);
+        if (ImGui::DragFloat("##ERate", &rate, 0.5f, 0.0f, 10000.0f))
+            emitter.SetEmissionRate(rate);
+        ImGui::NextColumn();
+
+        ImGui::Text("発生数");         ImGui::NextColumn();
+        int cnt = emitter.GetEmitCount();
+        ImGui::SetNextItemWidth(-1);
+        if (ImGui::DragInt("##ECnt", &cnt, 1, 1, 9999)) emitter.SetEmitCount(cnt);
+        ImGui::NextColumn();
+    }
+    else {
+        // 個数維持 / 静的モードは維持数を表示
+        ImGui::Text("維持数");         ImGui::NextColumn();
+        int target = emitter.GetTargetCount();
+        ImGui::SetNextItemWidth(-1);
+        if (ImGui::DragInt("##ETarget", &target, 1, 0, 100000)) emitter.SetTargetCount(target);
+        ImGui::NextColumn();
+    }
 
     ImGui::Text("位置");           ImGui::NextColumn();
     Vector3 pos = emitter.GetPosition();

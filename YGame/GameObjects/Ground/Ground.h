@@ -19,7 +19,7 @@ public:
 	// ============================================================
 
 	// 初期化
-	void Initialize(Camera* camera);
+	void Initialize(YoRigine::Camera* camera);
 
 	// 更新
 	void Update();
@@ -41,13 +41,13 @@ private:
 	// ============================================================
 
 	// 描画する3Dオブジェクトのスマートポインタ
-	std::unique_ptr<Object3d> obj_;
+	std::unique_ptr<YoRigine::Object3d> obj_;
 
 	// 描画に使用するカメラポインタ
-	Camera* camera_;
+	YoRigine::Camera* camera_;
 
 	// 地面のワールド座標、回転、スケールを管理するトランスフォーム
-	WorldTransform wt_;
+	YoRigine::WorldTransform wt_;
 
 	// スタンプ配置等の Raycast 受け用 AABB (narrow-phase 衝突には参加しない)
 	std::shared_ptr<AABBCollider> collider_;

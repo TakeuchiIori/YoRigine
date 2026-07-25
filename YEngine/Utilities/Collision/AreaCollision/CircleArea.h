@@ -24,7 +24,7 @@ public:
 	Vector3  ClampPosition(const Vector3& position) const override;
 	float    GetDistanceFromBoundary(const Vector3& position) const override;
 	Vector3  GetCenter() const override             { return center_; }
-	void     Draw(Line* line) override;
+	void     Draw(YoRigine::Line* line) override;
 	AreaType GetAreaType() const override           { return AreaType::Circle; }
 
 	// JSON 保存・ファクトリ用

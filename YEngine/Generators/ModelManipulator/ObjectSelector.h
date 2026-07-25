@@ -38,7 +38,7 @@ namespace YoRigine {
         ~ObjectSelector() = default;
 
         void SetObjectManager(ObjectManager* mgr) { objectManager_ = mgr; }
-        void SetCamera(Camera* camera) { camera_ = camera; }
+        void SetCamera(YoRigine::Camera* camera) { camera_ = camera; }
         void SetPickBuffer(PickBuffer* pb) { pickBuffer_ = pb; }
 
         void SelectObject(int objectId, bool multiSelect);
@@ -66,7 +66,7 @@ namespace YoRigine {
         }
 
         ObjectManager* objectManager_ = nullptr;
-        Camera* camera_ = nullptr;
+        YoRigine::Camera* camera_ = nullptr;
         PickBuffer* pickBuffer_ = nullptr;
 
         std::set<int>  selectedObjectIds_;

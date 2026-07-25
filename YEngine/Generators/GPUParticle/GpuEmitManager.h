@@ -80,7 +80,7 @@ namespace YoRigine {
 			} coneParams;
 
 			struct MeshParams {
-				Model* model = nullptr;         // 使用するモデル (UIから指定する)
+				YoRigine::Model* model = nullptr;         // 使用するモデル (UIから指定する)
 				Vector3 translate = { 0,0,0 };
 				Vector3 scale = { 1,1,1 };
 				Quaternion rotation = { 0,0,0,1 };
@@ -180,7 +180,7 @@ namespace YoRigine {
 		// ロード済みグループ名の一覧（Compositeエディタのドロップダウン用）
 		std::vector<std::string> GetGroupNames() const;
 		bool HasEmitter(const std::string& emitterName) const;
-		void SetCamera(Camera* camera);
+		void SetCamera(YoRigine::Camera* camera);
 
 		// グループの「自然な寿命」の見積り（秒）。0以下=不明/無限ループ。
 		// 内部は linger 見積りに使っている GetGroupMaxLifetime の public wrapper。
@@ -251,7 +251,7 @@ namespace YoRigine {
 		void DeserializeEmitter(EmitterData& e, const nlohmann::json& j) const;
 	private:
 		///************************* メンバ変数 *************************///
-		Camera* camera_ = nullptr;
+		YoRigine::Camera* camera_ = nullptr;
 
 		// 依存先マネージャ (借用のみ・非所有)。Initialize() 前に Set 系で注入すること。
 		TextureManager* textureManager_ = nullptr;
@@ -261,7 +261,7 @@ namespace YoRigine {
 #ifdef USE_IMGUI
 		FileBrowser textureBrowser_;
 		FileBrowser jsonBrowser_;
-		std::unique_ptr<Line> gizmoLine_;          // エミッタ形状のライン可視化
+		std::unique_ptr<YoRigine::Line> gizmoLine_;          // エミッタ形状のライン可視化
 		bool showEmitterGizmos_ = true;            // 選択グループのエミッタ形状を表示するか
 #endif
 		// ImGui用変数

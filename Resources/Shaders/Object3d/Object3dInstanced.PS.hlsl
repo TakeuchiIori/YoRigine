@@ -11,8 +11,8 @@ struct InstanceData
     float4   color;
     float4x4 uvTransform;
     float    stochasticStrength;
-    float    _pad0;
-    float    _pad1;
+    float    outlineMask;
+    float    ditherFade;
     float    _pad2;
 };
 
@@ -125,6 +125,19 @@ PixelShaderOutput main(InstancedVertexShaderOutput input)
     output.normal = float4(normalize(input.normal), 1.0f);
 
     InstanceData inst = gInstances[input.instanceID];
+
+    // カメラ遮蔽は通常の alpha blend ではなく高密度ディザーで
+    // ピクセルを間引く。生き残ったピクセルは不透明として深度を書くため、
+    // 建物内部の面が何重にもブレンドされる描画順アーティファクトを防げる。
+    if (inst.ditherFade > 0.5f)
+    {
+        // 4x4 Bayer の16段階ではフェードがコマ送りに見えるため、画素座標から
+        // ほぼ連続な閾値を生成する。時間を入力しないので静止時のチラつきもない。
+        float2 pixel = floor(input.position.xy);
+        float threshold = frac(52.9829189f *
+            frac(dot(pixel, float2(0.06711056f, 0.00583715f))));
+        clip(saturate(inst.color.a) - threshold);
+    }
 
     // UV変換 + テクスチャサンプリング (per-instance uvTransform / stochasticStrength)
     float4 transformedUV = mul(float4(input.texcoord, 0.0f, 1.0f), inst.uvTransform);
@@ -258,6 +271,10 @@ PixelShaderOutput main(InstancedVertexShaderOutput input)
         output.color.rgb = inst.color.rgb * baseColor.rgb;
     }
 
-    output.color.a = inst.color.a * baseColor.a;
+    // ディザー時は透過率を clip にのみ使用し、生き残ったピクセルは不透明。
+    // 通常素材の alpha blend は従来どおり維持する。
+    output.color.a = (inst.ditherFade > 0.5f)
+        ? baseColor.a
+        : inst.color.a * baseColor.a;
     return output;
 }

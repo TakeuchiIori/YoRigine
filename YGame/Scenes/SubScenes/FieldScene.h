@@ -38,7 +38,7 @@ public:
 	FieldScene() : BaseSubScene("Field") {}
 
 	// 初期化処理
-	void Initialize(Camera* camera, Player* player) override;
+	void Initialize(YoRigine::Camera* camera, Player* player) override;
 
 	// 更新処理
 	void Update() override;
@@ -116,8 +116,8 @@ private:
 	std::unique_ptr<Ground> ground_;
 	std::unique_ptr<FieldEnemyManager> fieldEnemyManager_;
 	std::unique_ptr<GPUEmitter> gpuEmitter_;
-	std::unique_ptr<Line> line_;
-	std::unique_ptr<Sprite> sprite_;
+	std::unique_ptr<YoRigine::Line> line_;
+	std::unique_ptr<YoRigine::Sprite> sprite_;
 
 	// イベントトリガー (討伐数→扉開放など) の所有・更新・通知配送。
 	EventTriggerSystem eventTriggerSystem_;

@@ -23,7 +23,7 @@
 // ============================================================
 // 初期化
 // ============================================================
-void PlayerCamera::Initialize(FollowCamera* followCamera, const WorldTransform* playerWT) {
+void PlayerCamera::Initialize(FollowCamera* followCamera, const YoRigine::WorldTransform* playerWT) {
     followCamera_ = followCamera;
     playerWT_     = playerWT;
 
@@ -159,11 +159,14 @@ void PlayerCamera::UpdatePreDirector() {
 // 攻撃カメラオフセットを sceneCamera に後付けで適用
 // CameraDirector::Update() + UpdateCamera() の後に呼ぶ
 // ============================================================
-void PlayerCamera::ApplyPostDirector(Camera* sceneCamera, float dt) {
+void PlayerCamera::ApplyPostDirector(YoRigine::Camera* sceneCamera, float dt) {
     if (!sceneCamera) return;
 
     // 見切れヒット判定に使う最終カメラをキャッシュ（OnAttackHit から参照）
     lastSceneCamera_ = sceneCamera;
+
+    // カメラ遮蔽フェード：FollowCamera の Resolve() 後に実行する
+    UpdateOcclusionFade(dt);
 
     // クローズアップの画角と位置を、脅威 FOV や攻撃カメラで上書きしない。
     if (followCamera_ && followCamera_->GetIsCloseUp()) return;
@@ -254,7 +257,7 @@ void PlayerCamera::SetIsCloseUp(bool v) {
 // プレイヤーのピボットを最終 view-projection で NDC に投影し、
 // ハードリミットを越えた分だけ yaw / pitch を引き戻してフレーム内へ収める。
 // ============================================================
-void PlayerCamera::EnsurePlayerInFrame(Camera* sceneCamera, float dt) {
+void PlayerCamera::EnsurePlayerInFrame(YoRigine::Camera* sceneCamera, float dt) {
     if (!sceneCamera || !playerWT_) return;
 
     //------------------------------------------------------------
@@ -506,7 +509,7 @@ void PlayerCamera::FaceDefeatNextEnemy(const Vector3& enemyWorldPos) {
 //   「囲まれている」状況を見渡せるようにする。攻撃カメラ等が FOV を
 //   上書きするフレームでは自然にそちらが優先される。
 // ============================================================
-void PlayerCamera::ApplyThreatFovWiden(Camera* sceneCamera, float dt) {
+void PlayerCamera::ApplyThreatFovWiden(YoRigine::Camera* sceneCamera, float dt) {
     if (!sceneCamera) return;
 
     float target = 0.0f;
@@ -962,7 +965,7 @@ bool PlayerCamera::ResolveLookAtPos(LookAtTarget target, Vector3& outPos) const 
 // ============================================================
 // posOffset を解釈する参照フレーム（回転行列）を組む
 // ============================================================
-Matrix4x4 PlayerCamera::BuildOffsetFrame(CameraSpace space, const Camera* sceneCamera) const {
+Matrix4x4 PlayerCamera::BuildOffsetFrame(CameraSpace space, const YoRigine::Camera* sceneCamera) const {
     switch (space) {
     case CameraSpace::CameraLocal:
         return MakeRotateMatrixXYZ(sceneCamera->transform_.rotate);
@@ -1002,7 +1005,7 @@ Matrix4x4 PlayerCamera::BuildOffsetFrame(CameraSpace space, const Camera* sceneC
 // 注視ブレンド：カメラ回転を対象へ weight だけ寄せる
 // （weight=1 で完全に対象を向く。yaw は最短角で補間）
 // ============================================================
-void PlayerCamera::ApplyLookAt(Camera* sceneCamera, LookAtTarget target, float weight) const {
+void PlayerCamera::ApplyLookAt(YoRigine::Camera* sceneCamera, LookAtTarget target, float weight) const {
     if (!sceneCamera) return;
 
     Vector3 lookPos{};
@@ -1241,4 +1244,41 @@ void PlayerCamera::DrawImGui() {
         ImGui::Text("ターゲット: %p", static_cast<void*>(lockedTarget_));
     }
 #endif
+}
+
+// ============================================================
+// カメラ遮蔽フェード
+// ============================================================
+void PlayerCamera::UpdateOcclusionFade(float dt) {
+    if (!followCamera_) return;
+
+    const float tIn  = 1.0f - std::exp(-occludeFadeInSpeed_  * dt);
+    const float tOut = 1.0f - std::exp(-occludeFadeOutSpeed_ * dt);
+
+    std::unordered_map<ObjectManager::PlacedObject *, float> targets;
+    for (const auto &hit : followCamera_->GetFadeHits()) {
+        auto *obj = hit.collider
+            ? hit.collider->GetOwnerAs<ObjectManager::PlacedObject>()
+            : nullptr;
+        if (!obj) continue;
+        auto [it, inserted] = targets.emplace(obj, hit.targetAlpha);
+        if (!inserted) it->second = std::min(it->second, hit.targetAlpha);
+        fadeOccluders_.try_emplace(obj, 1.0f);
+    }
+
+    for (auto it = fadeOccluders_.begin(); it != fadeOccluders_.end();) {
+        auto *obj = it->first;
+        auto targetIt = targets.find(obj);
+        const bool isHit = targetIt != targets.end();
+        const float targetAlpha = isHit ? targetIt->second : 1.0f;
+        it->second = Lerp(it->second, targetAlpha, isHit ? tIn : tOut);
+        obj->color.w = it->second;
+
+        if (!isHit && it->second >= 0.99f) {
+            obj->color.w = 1.0f;
+            it = fadeOccluders_.erase(it);
+        } else {
+            ++it;
+        }
+    }
 }

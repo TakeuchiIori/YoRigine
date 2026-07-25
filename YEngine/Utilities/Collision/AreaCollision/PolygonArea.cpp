@@ -154,7 +154,7 @@ Vector3 PolygonArea::GetCenter() const
 // ============================================================
 // デバッグ描画
 // ============================================================
-void PolygonArea::Draw(Line* line)
+void PolygonArea::Draw(YoRigine::Line* line)
 {
 	if (!line || !isDebugDrawEnabled_) return;
 

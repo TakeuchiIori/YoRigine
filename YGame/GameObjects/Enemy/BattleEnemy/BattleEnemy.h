@@ -18,7 +18,7 @@
 class Player;
 
 ///************************* 戦闘用の敵クラス *************************///
-class BattleEnemy : public BaseObject {
+class BattleEnemy : public YoRigine::BaseObject {
 public:
 	///************************* 基本関数 *************************///
 
@@ -26,7 +26,7 @@ public:
 	~BattleEnemy();
 
 	// 初期化処理
-	void Initialize(Camera* camera) override;
+	void Initialize(YoRigine::Camera* camera) override;
 
 	// 戦闘データをもとに初期化（scale はフィールド敵から引き継ぐ見た目スケール）
 	void InitializeBattleData(const BattleEnemyData& data, Vector3 position,
@@ -161,6 +161,7 @@ public:
 	// 位置を取得
 	Vector3 GetTranslate() const { return wt_.translate_; }
 	void SetTranslate(const Vector3& pos) { wt_.translate_ = pos; }
+	YoRigine::WorldTransform& GetVisualWT() { return visualWt_; }
 	// Y軸回転を設定
 	void SetRotationY(float y) { wt_.rotate_.y = y; }
 	// Y軸回転を取得
@@ -189,6 +190,7 @@ public:
 
 	// 通常攻撃を実行
 	void PerformBasicAttack();
+	void TryPerformContactAttack();
 
 	// 死亡エフェクトを再生
 	void PlayDeathEffect();
@@ -202,6 +204,8 @@ public:
 	// ノックバック
 	void StartKnockback(const Vector3& direction, float power, float duration);
 	void UpdateKnockback(float dt);
+	void StartDirectionalHitReaction(const Vector3& direction);
+	void UpdateDirectionalHitReaction(float dt);
 
 	// 状態VFXの付着（燃焼・感電など）。Composite名をループ再生して自分に追従させ、
 	// duration 秒後（または死亡時）に自動停止する。再付着は時間をリフレッシュする。
@@ -242,6 +246,7 @@ private:
 	bool hasTargetPosition_ = false;
 	bool isInvincible_ = false;
 	bool isAlive_ = true;
+	int lastDealtContactDamageWindow_ = -1;
 
 	// 移動関連
 	Vector3 targetPosition_;
@@ -275,6 +280,16 @@ private:
 
 	//	ノックバックデータ
 	KnockbackData knockbackData_;
+
+	// 攻撃方向に応じた見た目上ののけぞり
+	Vector3 hitReactionRotation_{};
+	Vector3 hitReactionTargetRotation_{};
+	float hitReactionTimer_ = 0.0f;
+	float hitReactionDuration_ = 0.22f;
+	float hitReactionAngle_ = 0.20f;
+	bool isHitReacting_ = false;
+	YoRigine::WorldTransform visualWt_;
+
 	std::unique_ptr<EnemyHealthBarUI> healthBarUI_;
 	std::string objectName_ = "BattleEnemy"; // デフォルト名
 

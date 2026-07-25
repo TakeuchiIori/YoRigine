@@ -456,6 +456,28 @@ void MotionSystem::SetAnimationTime(float time)
 	animationTime_ = std::clamp(time, 0.0f, duration);
 }
 
+void MotionSystem::ResetPlaybackState()
+{
+	// StartBlend後のanimation_は遷移先を指しているため、遷移元だけ破棄すれば
+	// 現在指定されたモーションをそのまま先頭から再生できる。
+	animationBlendState_.isBlending = false;
+	animationBlendState_.fromTime = 0.0f;
+	animationBlendState_.toTime = 0.0f;
+	animationBlendState_.currentTime = 0.0f;
+	animationTime_ = 0.0f;
+	isFinished_ = false;
+
+	upperAnimation_ = nullptr;
+	upperAnimationTime_ = 0.0f;
+	upperPlayMode_ = MotionPlayMode::Stop;
+	isUpperFinished_ = false;
+	isUpperBlendingOut_ = false;
+	upperBlendOutTimer_ = 0.0f;
+	upperBlendOutDuration_ = 0.0f;
+	blendOutUpperAnimation_ = nullptr;
+	blendOutUpperAnimTime_ = 0.0f;
+}
+
 // ============================================================
 // ブレンド計算と適用
 // ============================================================

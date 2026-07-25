@@ -17,6 +17,7 @@
 // ===========================================================
 #include <Vfx/VfxMesh/Core/VfxEffectAsset.h>
 #include <Vfx/VfxMesh/Core/ProceduralMeshBase.h>
+#include <Vfx/VfxMesh/Core/VfxMeshRegistry.h>
 
 namespace YoRigine {
 
@@ -46,35 +47,43 @@ public:
     // 初期化 / パラメータ更新
     // --------------------------------------------------------
 
+    // ── 初期化 ───────────────────────────────────────────────
+
+    /// パラメータを渡して初期化する。頂点バッファを確保し最初の OBB を構築する
     void Initialize(const LightVolumeEffectParam& param);
 
-    /// ホットリロード対応: パラメータを差し替え → 次の Update で再構築
+    /// パラメータを差し替える（エディタのホットリロード用）。次の Update で再構築される
     void ApplyParam(const LightVolumeEffectParam& param);
 
-    // --------------------------------------------------------
-    // 毎フレーム
-    // --------------------------------------------------------
+    // ── 毎フレーム ────────────────────────────────────────────
 
-    /// OBB のワールド変換を更新する
-    /// @param center   OBB 中心ワールド座標
-    /// @param right    X 軸方向 (正規化)
-    /// @param up       Y 軸方向 (正規化)
-    /// @param forward  Z 軸方向 (正規化)
+    /// OBB のワールド姿勢を3軸ベクトルで更新する（姿勢が変わった時だけ頂点を再構築）
     void SetTransform(const Vector3& center,
                       const Vector3& right,
                       const Vector3& up,
                       const Vector3& forward);
 
-    /// SetTransform の簡易版: center + Y 軸回転のみ
+    /// SetTransform の簡易版。center + Y 軸回転角（ラジアン）だけ指定する
     void SetTransform(const Vector3& center, float yawRad);
 
+    /// time を進め、dirty なら頂点を再構築する
     void Update(float deltaTime) override;
+
+    /// 頂点バッファをバインドして描画する
     void Draw(ID3D12GraphicsCommandList* cmdList) override;
 
-    // --------------------------------------------------------
-    // アクセサ
-    // --------------------------------------------------------
+    const char* GetPSOName()    const override { return "VfxMeshVolume"; }
+    size_t      GetCBByteSize() const override;
+
+    /// モジュール評価結果を定数バッファに書き込む
+    void        FillCB(void* mapped, const CBFillArgs& args) const override;
+
+    // ── アクセサ ─────────────────────────────────────────────
+
     const LightVolumeEffectParam& GetParam() const { return param_; }
+
+    /// VfxMeshRegistry に渡す記述子を返す
+    static VfxElementDesc Describe();
 
 private:
     // OBB の 6 面 (各面 = 2 三角形) を生成

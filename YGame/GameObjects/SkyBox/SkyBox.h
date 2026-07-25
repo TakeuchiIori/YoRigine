@@ -13,7 +13,7 @@ class SkyBox
 public:
 	///************************* 基本関数 *************************///
 
-	void Initialize(Camera* camera, const std::string& textureFilePath);
+	void Initialize(YoRigine::Camera* camera, const std::string& textureFilePath);
 	void Update();
 	void Draw();
 

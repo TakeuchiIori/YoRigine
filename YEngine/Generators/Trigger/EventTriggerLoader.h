@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-class Camera;
+namespace YoRigine { class Camera; }
 
 // ============================================================
 // EventTriggerLoader
@@ -26,7 +26,7 @@ class EventTriggerLoader {
 public:
 	static bool Load(
 		const std::string& filePath,
-		Camera* camera,
+		YoRigine::Camera* camera,
 		std::function<void()> onAnyGateOpened,
 		std::vector<std::unique_ptr<EventTrigger>>& outTriggers,
 		std::vector<OpenGateAction*>& outOpenGateActions);

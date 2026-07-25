@@ -7,7 +7,7 @@
 
 #include "json.hpp"
 
-class Line;
+namespace YoRigine { class Line; }
 
 class VirtualCamera
 {
@@ -19,7 +19,7 @@ public:
 	virtual void UpdateMatrix();
 	virtual void DrawDebugGui() {}
 	// シーン空間に Line でデバッグ描画する用（パス可視化など）
-	virtual void DrawDebug3D(Line& /*line*/) {}
+	virtual void DrawDebug3D(YoRigine::Line& /*line*/) {}
 	virtual void Save(nlohmann::json& j) const;
 	virtual void Load(const nlohmann::json& j);
 public:

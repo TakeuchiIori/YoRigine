@@ -44,7 +44,7 @@ FieldEnemyManager::~FieldEnemyManager() {
 /// フィールド敵マネージャーの初期化
 /// </summary>
 /// <param name="camera">描画に使用するカメラ</param>
-void FieldEnemyManager::Initialize(Camera* camera) {
+void FieldEnemyManager::Initialize(YoRigine::Camera* camera) {
 	camera_ = camera;
 	fieldEnemies_.clear();
 	spawnDataMap_.clear();
@@ -71,10 +71,10 @@ void FieldEnemyManager::Initialize(Camera* camera) {
 
 	// スポーンマーカー用 Line インスタンス (状態別に 4 本)。
 	// 各々が独立した GPU バッファを持つので、DrawLine 1 回ずつで stomp が起きない。
-	markerLineSelected_ = std::make_unique<Line>();
-	markerLineActive_   = std::make_unique<Line>();
-	markerLineInactive_ = std::make_unique<Line>();
-	markerLinePole_     = std::make_unique<Line>();
+	markerLineSelected_ = std::make_unique<YoRigine::Line>();
+	markerLineActive_   = std::make_unique<YoRigine::Line>();
+	markerLineInactive_ = std::make_unique<YoRigine::Line>();
+	markerLinePole_     = std::make_unique<YoRigine::Line>();
 	markerLineSelected_->Initialize();
 	markerLineActive_  ->Initialize();
 	markerLineInactive_->Initialize();
@@ -963,7 +963,7 @@ void FieldEnemyManager::DrawCollision() {
 	}
 }
 
-void FieldEnemyManager::DrawLine(Line* line)
+void FieldEnemyManager::DrawLine(YoRigine::Line* line)
 {
 #ifdef USE_IMGUI
 	if (editorHideEnemies_) return;
@@ -1000,7 +1000,7 @@ void FieldEnemyManager::Finalize() {
 /// スポーンポイントの視覚マーカー (球+縦線) を描画する。
 /// FieldScene の DrawLine 経由で呼ばれる (DX12 コマンドリスト発行段階)。
 /// </summary>
-void FieldEnemyManager::DrawEditorMarkers(Line* /*sharedLine*/) {
+void FieldEnemyManager::DrawEditorMarkers(YoRigine::Line* /*sharedLine*/) {
 #ifdef USE_IMGUI
 	if (!markerLineSelected_ || !markerLineActive_ || !markerLineInactive_ || !markerLinePole_) return;
 
@@ -1012,7 +1012,7 @@ void FieldEnemyManager::DrawEditorMarkers(Line* /*sharedLine*/) {
 	markerLinePole_    ->SetColor({ 1.0f, 1.0f, 1.0f,  0.6f });
 
 	for (const auto& [id, data] : spawnDataMap_) {
-		Line* target = nullptr;
+		YoRigine::Line* target = nullptr;
 		if (id == selectedSpawnId_) target = markerLineSelected_.get();
 		else if (data.isActive)     target = markerLineActive_.get();
 		else                        target = markerLineInactive_.get();

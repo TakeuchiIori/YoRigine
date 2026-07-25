@@ -3,6 +3,7 @@
 void BattleSpinAttackState::Enter(BattleEnemy& enemy) {
 	enemy.SetCanAct(false);
 	enemy.ResetStateTimer();
+	isContactDamageActive_ = false;
 
 	if (auto anim = enemy.GetAnimation()) {
 		anim->StartColorAnimation({ 1, 1, 1, 1 }, { 1.0f, 0.5f, 1.0f, 1.0f }, 0.3f);
@@ -26,6 +27,7 @@ void BattleSpinAttackState::Enter(BattleEnemy& enemy) {
 }
 
 void BattleSpinAttackState::Update(BattleEnemy& enemy, float dt) {
+	isContactDamageActive_ = false;
 	const float currentTime = enemy.GetStateTimer();
 	const auto& params = enemy.GetEnemyData().attackParams.spin;
 	const float PI = std::numbers::pi_v<float>;
@@ -56,6 +58,7 @@ void BattleSpinAttackState::Update(BattleEnemy& enemy, float dt) {
 	}
 	// === フェーズ3: 回転攻撃 ===
 	else if (currentTime < spinEndTime) {
+		isContactDamageActive_ = true;
 		const float spinTime = currentTime - chargeEndTime;
 		const float spinProgress = spinTime / params.spinTime;
 
@@ -79,6 +82,7 @@ void BattleSpinAttackState::Update(BattleEnemy& enemy, float dt) {
 }
 
 void BattleSpinAttackState::Exit(BattleEnemy& enemy) {
+	isContactDamageActive_ = false;
 	if (enemy.GetPlayer()) {
 		Vector3 dir = enemy.GetPlayerPosition() - enemy.GetTranslate();
 		if (Length(dir) > 0.01f) {

@@ -22,6 +22,7 @@ public:
 
     void SetObjectManager(ObjectManager* mgr) { objectManager_ = mgr; }
     void SetModelFolderPath(const std::string& path) { modelFolderPath_ = path; }
+    void SetDrawFrustumCullingFlag(bool* flag) { drawFrustumCulling_ = flag; }
 
     // ── シーン ───────────────────────────────────────────────
     bool SaveScene(const std::string& filePath);
@@ -34,6 +35,7 @@ public:
 
 private:
     ObjectManager* objectManager_  = nullptr;
+    bool*          drawFrustumCulling_ = nullptr;
     std::string    modelFolderPath_ = "Resources/Models/";
 };
 

@@ -22,6 +22,13 @@ public:
 class ISpawnModule : public IParticleModule {
 public:
     virtual void OnSpawn(ParticleAttribute* attrs, uint32_t index) = 0;
+
+    /// <summary>
+    /// この生成モジュールが粒に設定しうる「最大生存時間(秒)」のヒント。
+    /// エフェクトの再生尺（＝最後の粒が消えるまで）の見積りに使う。
+    /// 寿命に関与しないモジュールは 0（既定）を返す。
+    /// </summary>
+    virtual float GetMaxLifetimeHint() const { return 0.0f; }
 };
 
 // --- 更新タイミング専用 ---

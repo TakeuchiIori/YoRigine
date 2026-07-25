@@ -29,7 +29,7 @@ void UIBase::Initialize(const std::string& jsonConfigPath) {
 	// アニメーションエンジンに自分を接続（Play 系 API はこの animator_ へ転送される）
 	animator_.SetTarget(this);
 
-	sprite_ = std::make_unique<Sprite>();
+	sprite_ = std::make_unique<YoRigine::Sprite>();
 
 	bool jsonExists = std::filesystem::exists(jsonConfigPath);
 
@@ -485,7 +485,7 @@ std::string UIBase::GetTexturePath() const {
 	return texturePath_;
 }
 
-void UIBase::SetCamera(Camera* camera) {
+void UIBase::SetCamera(YoRigine::Camera* camera) {
 	if (sprite_) {
 		sprite_->SetCamera(camera);
 	}
@@ -653,7 +653,7 @@ void UIBase::ApplyDataToSprite() {
 		texturePath_ = "./Resources/images/white.png";
 	}
 	if (!sprite_) {
-		sprite_ = std::make_unique<Sprite>();
+		sprite_ = std::make_unique<YoRigine::Sprite>();
 	}
 	sprite_->Initialize(texturePath_);
 

@@ -102,7 +102,7 @@ float CircleArea::GetDistanceFromBoundary(const Vector3& position) const
 // ============================================================
 // デバッグ描画
 // ============================================================
-void CircleArea::Draw(Line* line)
+void CircleArea::Draw(YoRigine::Line* line)
 {
 	if (!line || !isDebugDrawEnabled_) {
 		return;

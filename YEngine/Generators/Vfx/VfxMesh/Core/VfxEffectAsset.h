@@ -8,14 +8,17 @@
 // ★ UE Niagara Ribbon Trail 参考の拡張パラメータ追加済み
 // ===========================================================
 #include "MathFunc.h"
+#include "Quaternion.h"
 #include <string>
 #include <vector>
 #include "Loaders/Json/EnumUtils.h" // BlendMode
-#include "VfxMotion.h"              // データ駆動モーション
+#include "VfxModule.h"              // データ駆動モジュール
+#include "VfxGeometryParams.h"      // 二軸合成: ジオメトリ params（軽量）
+#include "VfxMaterialParams.h"      // 二軸合成: マテリアル params（軽量）
 
 namespace YoRigine {
 
-    struct VfxEvalState; // 前方宣言（EvaluateMotions 用。定義は VfxEvalState.h）
+    struct VfxEvalState; // 前方宣言（EvaluateModules 用。定義は VfxEvalState.h）
 
     // -------------------------------------------------------
     // Trail パラメータ
@@ -177,7 +180,7 @@ namespace YoRigine {
         bool    isEnable     = true;
 
         // 従来の破裂挙動（ワンショット時の自動ポップ膨張/上昇/火球→煙のシェーダ遷移）を使うか。
-        // false にするとモーション（ScaleOverLife / ColorOverLife / Rise 等）だけで動きを組める。
+        // false にするとモジュール（ScaleOverLife / ColorOverLife / Rise 等）だけで動きを組める。
         bool    builtInBurstMotion = true;
     };
 
@@ -236,24 +239,57 @@ namespace YoRigine {
     // エディタ表示などに使う種類名
     const char* VfxElementTypeName(VfxElementType type);
 
-    // エレメント種別 → モーションの適用対象（All 指定のモーション振り分け用）
-    VfxMotionTarget MotionTargetFor(VfxElementType type);
+    // エレメント種別 → モジュールの適用対象（All 指定のモジュール振り分け用）
+    VfxModuleTarget ModuleTargetFor(VfxElementType type);
+
+    // エレメントの表現方式
+    //   Composed   … Geometry × Material の2軸合成（新: 幅広い表現）
+    //   Monolithic … 専用メッシュ（Lightning / LightVolume など特殊効果）
+    enum class VfxElementKind : int
+    {
+        Composed   = 0,
+        Monolithic = 1,
+    };
 
     struct VfxElement
     {
-        VfxElementType type    = VfxElementType::NoiseVolume;
-        std::string      label   = "";                 // エディタ表示名（空なら種類名）
-        bool             enabled = true;
-        Vector3          offset  = { 0.f, 0.f, 0.f };  // エフェクト基準位置からのオフセット
+        // ── 共通 ─────────────────────────────────────────────
+        std::string label   = "";                        // エディタ表示名（空なら種類名）
+        bool        enabled = true;
+        Vector3     offset  = { 0.f, 0.f, 0.f };          // エフェクト基準位置からのオフセット
+        Quaternion  rotation = Quaternion::Identity();    // 向き（Cone / 非ビルボード Ring・Plane で使用）
 
-        // type に対応するものだけ使う（他はデフォルトのまま持つだけ）
+        // ブレンドモード上書き。
+        //   -1                  = マテリアル既定（PSO にベイクされた本来のブレンド）を使う
+        //   0..(kCount未満)      = BlendMode（None/Normal/Add/Subtract/Multiply/Screen）で明示上書き
+        // HDR で加算(Add)が重なって飽和する場合に Normal/Screen 等へ変えて合成を抑えるためのもの。
+        int         blendModeOverride = -1;
+
+        VfxElementKind kind = VfxElementKind::Composed;
+
+        // ── Composed（kind == Composed） ─────────────────────
+        // variant の index が種別（Sphere/Cone/... , Noise/Shockwave/...）
+        VfxGeometryParams geom = SphereGeomParams{};
+        VfxMaterialParams mat  = NoiseMatParams{};
+
+        // ── Monolithic（kind == Monolithic） ─────────────────
+        // 専用メッシュ。type が LightningBolt / LightVolume を指す。
+        VfxElementType         type = VfxElementType::LightningBolt;
         LightVolumeEffectParam lightVolume;
-        SmokeEffectParam       smoke;
         LightningEffectParam   lightning;
+
+        // ── 旧アセット移行用（読み取り専用・Composed へ変換される） ──
+        // 旧 NoiseVolume/ShockwaveRing の JSON を読むために残す。
+        // 実行時は Composed（geom/mat）が使われる。
+        SmokeEffectParam       smoke;
         ShockwaveEffectParam   shockwave;
 
-        // このエレメントにだけ効く動き（全体 motions に加算で適用）
-        std::vector<VfxMotion> motions;
+        // ── このエレメントにだけ効く動き（全体 modules に加算で適用） ──
+        std::vector<VfxModule> modules;
+
+        // Composed の種別ヘルパ（variant index ↔ 型 ID）
+        VfxGeometryType GeometryType() const { return static_cast<VfxGeometryType>(geom.index()); }
+        VfxMaterialType MaterialType() const { return static_cast<VfxMaterialType>(mat.index()); }
     };
 
     // -------------------------------------------------------
@@ -265,14 +301,18 @@ namespace YoRigine {
         TrailEffectParam  trail;
         bool useTrail       = true;
 
+        // 寿命を無限にする（ワンショット寿命/Lifetime を無視してループし続ける）。
+        // バフエリア等「Stop するまで消えないエフェクト」向け。Spawn 時に loop を強制 true にする。
+        bool loopForever    = false;
+
         // Trail 以外のエレメント。同じ種類を複数積める。
         std::vector<VfxElement> elements;
 
         // データ駆動の動き（エフェクト全体）。0個=従来挙動。
         // target で「煙だけ」「稲妻だけ」のように適用先を絞れる。
-        std::vector<VfxMotion> motions;
+        std::vector<VfxModule> modules;
 
-        // ワンショット寿命(秒)。BurstGrow モーション（全体/エレメント個別どちらでも）が
+        // ワンショット寿命(秒)。Lifetime モジュール（全体/エレメント個別どちらでも）が
         // あればその duration の最大値、無ければ既存アセット互換のヒューリスティック。
         float OneShotDuration() const;
 
@@ -280,18 +320,18 @@ namespace YoRigine {
         bool LoadFromJson(const std::string& filePath);
     };
 
-    // motions のうち target（または All）に一致するものを評価し、
+    // modules のうち target（または All）に一致するものを評価し、
     // 共有状態(position/scale/端点)へ反映する唯一の関数。
     // Spawner / Editor の双方がこれを呼ぶことで動きを一致させる。
-    void EvaluateMotionList(const std::vector<VfxMotion>& motions,
-                            VfxMotionTarget target, VfxEvalState& state);
+    void EvaluateModuleList(const std::vector<VfxModule>& modules,
+                            VfxModuleTarget target, VfxEvalState& state);
 
-    // エフェクト全体の motions を target で絞って評価（従来 API）
-    void EvaluateMotions(const VfxEffectAsset& asset, VfxMotionTarget target, VfxEvalState& state);
+    // エフェクト全体の modules を target で絞って評価（従来 API）
+    void EvaluateModules(const VfxEffectAsset& asset, VfxModuleTarget target, VfxEvalState& state);
 
     // エレメント1個分の評価。
-    // 全体 motions（対象一致分）→ インスタンス固有 motions の順に適用する。
-    void EvaluateElementMotions(const VfxEffectAsset& asset,
+    // 全体 modules（対象一致分）→ インスタンス固有 modules の順に適用する。
+    void EvaluateElementModules(const VfxEffectAsset& asset,
                                   const VfxElement& sub, VfxEvalState& state);
 
 } // namespace YoRigine

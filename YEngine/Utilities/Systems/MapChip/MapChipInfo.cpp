@@ -20,7 +20,7 @@ void MapChipInfo::Initialize()
 void MapChipInfo::Update()
 {
 
-	for (std::vector<std::unique_ptr<WorldTransform>>& row : wt_) {
+	for (std::vector<std::unique_ptr<YoRigine::WorldTransform>>& row : wt_) {
 		for (auto& wt : row) {
 			if (wt) {
 				Matrix4x4 scaleMatrix = MakeScaleMatrix(wt->scale_);
@@ -70,12 +70,12 @@ void MapChipInfo::GenerateBlocks()
 			// どちらも2で割り切れる時またはどちらも割り切れない時
 			//i % 2 == 0 && j % 2 == 0 || i % 2 != 0 && j % 2 != 0 02_02の穴あき
 			if (mpField_->GetMapChipTypeByIndex(j, i) == MapChipType::kBlock) {
-				std::unique_ptr<WorldTransform> worldTransform = std::make_unique<WorldTransform>();
+				std::unique_ptr<YoRigine::WorldTransform> worldTransform = std::make_unique<YoRigine::WorldTransform>();
 				worldTransform->Initialize();
 				wt_[i][j] = std::move(worldTransform);
 				wt_[i][j]->translate_ = mpField_->GetMapChipPositionByIndex(j, i);
 
-				auto obj = std::make_unique<Object3d>();
+				auto obj = std::make_unique<YoRigine::Object3d>();
 				obj->Initialize();
 				obj->SetModel("cube.obj");
 				objects_[i][j] = std::move(obj);

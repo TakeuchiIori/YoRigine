@@ -1531,16 +1531,16 @@
             "name": "MainDebug",
             "priority": 0,
             "rotate": [
-                -9333.8486328125,
-                159762.203125,
+                63650.75,
+                177493.671875,
                 0.0
             ],
             "rotateSpeed": 0.05000000074505806,
             "rotateSpeedController": 0.004999999888241291,
             "translate": [
-                10.012370109558105,
-                49.955928802490234,
-                -47.267398834228516
+                3.5648887157440186,
+                -33.8647346496582,
+                -59.801170349121094
             ],
             "type": "Debug"
         },
@@ -1548,13 +1548,20 @@
             "closeUpScale": 0.30000001192092896,
             "collisionResolver": {
                 "avoidSpeed": 0.30000001192092896,
+                "blockTypeIDs": [
+                    8,
+                    9
+                ],
                 "cameraRadius": 5.0,
                 "enableHighAngle": true,
+                "fullyTransparentDepth": 0.5,
                 "highAngleThreshold": 0.5,
                 "isEnabled": true,
                 "maxPushUpHeight": 10.0,
                 "minDistanceRatio": 0.15000000596046448,
                 "minGroundHeight": 0.0,
+                "occludeTargetAlpha": 0.25,
+                "proximityFadeExtend": 3.0,
                 "returnSpeed": 0.05000000074505806
             },
             "extension": {
@@ -1676,17 +1683,17 @@
             "recenterPitch": 0.30000001192092896,
             "recenterResetPitch": true,
             "rotate": [
-                0.3155681788921356,
-                7.856325626373291,
+                0.3645128905773163,
+                -3.4775843620300293,
                 0.0
             ],
             "rotateSpeed": 0.019999999552965164,
             "targetName": "Player",
             "targetPivot_Height": 1.0,
             "translate": [
-                -16.918113708496094,
-                10.239383697509766,
-                -60.927223205566406
+                -25.313518524169922,
+                11.187265396118164,
+                -9.554489135742188
             ],
             "type": "Follow"
         }

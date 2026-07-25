@@ -1,4 +1,6 @@
 #include "YEmitterGroup.h"
+#include "YParticleSystem.h"
+#include <algorithm>
 
 // コンストラクタ
 YEmitterGroup::YEmitterGroup(const std::string& groupName)
@@ -34,6 +36,18 @@ void YEmitterGroup::RemoveEmitter(size_t index) {
     if (index < emitters_.size()) {
         emitters_.erase(emitters_.begin() + index);
     }
+}
+
+// ワンショット再生尺（最後の粒が消えるまでの秒数）
+float YEmitterGroup::GetEffectDuration() const {
+    float duration = 0.0f;
+    for (const auto& emitter : emitters_) {
+        if (!emitter) continue;
+        if (YParticleSystem* sys = emitter->GetTargetSystem()) {
+            duration = (std::max)(duration, sys->GetMaxLifetime());
+        }
+    }
+    return duration;
 }
 
 // 更新
@@ -102,6 +116,8 @@ nlohmann::json YEmitterGroup::SaveToJson() const {
         ej["offsetZ"] = pos.z - position_.z;
         ej["emissionRate"] = emitter->GetEmissionRate();
         ej["emitCount"] = emitter->GetEmitCount();
+        ej["emissionMode"] = static_cast<int>(emitter->GetEmissionMode());
+        ej["targetCount"] = emitter->GetTargetCount();
         ej["autoEmit"] = false; // ロード時に自動射出しないよう常にfalseで保存
 
         // 形状（min/max フィールドに対応）
@@ -165,6 +181,9 @@ void YEmitterGroup::LoadFromJson(const nlohmann::json& j) {
 
         emitter.SetEmissionRate((float)ej.value("emissionRate", 10.0));
         emitter.SetEmitCount(ej.value("emitCount", 1));
+        emitter.SetEmissionMode(
+            static_cast<YParticleEmitter::EmissionMode>(ej.value("emissionMode", 0)));
+        emitter.SetTargetCount(ej.value("targetCount", 100));
         emitter.SetAutoEmit(ej.value("autoEmit", false));
 
         // 形状復元（min/max 対応 + 後方互換）

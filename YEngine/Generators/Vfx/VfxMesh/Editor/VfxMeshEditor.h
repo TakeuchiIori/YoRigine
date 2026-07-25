@@ -17,6 +17,7 @@
 #include <Vfx/VfxMesh/Effects/LightVolumeMesh.h>
 #include <Vfx/VfxMesh/Effects/VolumeSmokeMesh.h>
 #include <Vfx/VfxMesh/Effects/ShockwaveMesh.h>
+#include <Vfx/VfxMesh/Core/VfxMeshElement.h> // 2軸合成プレビュー
 #include <Core/Editor/Command/CommandHistory.h>
 #include "FileOperations/FileBrowser.h"
 
@@ -63,7 +64,7 @@ namespace YoRigine {
         void DrawPreview();
 
         //カメラをセット
-        void SetCamera(Camera* camera) { camera_ = camera; }
+        void SetCamera(YoRigine::Camera* camera) { camera_ = camera; }
 
     private:
         VfxMeshEditor();
@@ -74,15 +75,12 @@ namespace YoRigine {
         void DrawTrailSection();
         // エレメント（エレメントインスタンス）: 一覧＋追加/複製/削除
         void DrawElementsSection();
-        // 各種類のパラメータ編集（sub の対応パラメータを編集する）
-        void DrawLightVolumeSection(VfxElement& sub);
-        void DrawNoiseVolumeSection(VfxElement& sub);
-        void DrawLightningBoltSection(VfxElement& sub);
-        void DrawShockwaveRingSection(VfxElement& sub);
-        // モーションリスト編集（全体用とエレメント個別用で共用。showTarget=false で対象コンボを隠す）
-        void DrawMotionListUI(std::vector<VfxMotion>& motions, bool showTarget, const char* commitLabel);
-        void DrawMotionSection();
-        static void ApplyDefaultElementMotions(VfxElement& sub);
+        // 形状（Composed: Geometry × Material）1個分の編集 UI
+        void DrawComposedElementBody(VfxElement& sub);
+        // モジュールリスト編集（全体用とエレメント個別用で共用。showTarget=false で対象コンボを隠す）
+        void DrawModuleListUI(std::vector<VfxModule>& modules, bool showTarget, const char* commitLabel);
+        void DrawModuleSection();
+        static void ApplyDefaultElementModules(VfxElement& sub);
         void DrawPreviewSection();
         void DrawNewEffectDialog();
         void DrawTextureSelectPopup();
@@ -112,7 +110,7 @@ namespace YoRigine {
         static VfxEffectAsset MakePreset(VfxPreset preset);
 
         DirectXCommon* dxCommon_ = nullptr;
-        Camera* camera_ = nullptr; // ★追加
+        YoRigine::Camera* camera_ = nullptr; // ★追加
         std::string    scanRoot_;
 
         std::vector<VfxEffectEntry> entries_;
@@ -132,13 +130,21 @@ namespace YoRigine {
         // エレメント1個分のプレビューリソース（asset.elements と1対1対応）
         struct PreviewElement
         {
+            VfxElementKind kind = VfxElementKind::Monolithic; // Composed は当面プレビュー対象外（2bで対応）
             VfxElementType type = VfxElementType::NoiseVolume;
+
+            // Composed の作り直し判定用（形状／マテリアルの種類を変えたら再生成する）
+            VfxGeometryType geomType = VfxGeometryType::Sphere;
+            VfxMaterialType matType  = VfxMaterialType::Noise;
 
             // type に対応するものだけ生成される
             std::unique_ptr<LightVolumeMesh> volume;
             std::unique_ptr<VolumeSmokeMesh> smoke;
             std::unique_ptr<LightningMesh>   lightning;
             std::unique_ptr<ShockwaveMesh>   shockwave;
+
+            // Composed（Geometry × Material）用
+            std::unique_ptr<VfxMeshElement>  composed;
 
             // CB（実型は type で決まる）
             Microsoft::WRL::ComPtr<ID3D12Resource> cbRes;
@@ -148,11 +154,11 @@ namespace YoRigine {
             Vector3 smokeCenter = { 0.f, 0.f, 0.f };
             float   smokeRadius = 1.5f;
 
-            // モーション評価結果（Update で書き込み、DrawPreview の CB 反映で使う）
+            // モジュール評価結果（Update で書き込み、DrawPreview の CB 反映で使う）
             Vector4 tint            = { 1.f, 1.f, 1.f, 1.f }; // rgb=色乗算 / a=不透明度乗算
             float   beamRadiusScale = 1.f;
             float   beamGlowScale   = 1.f;
-            bool    visible         = true;                   // Visibility モーションの結果
+            bool    visible         = true;                   // Visibility モジュールの結果
 
             ~PreviewElement() {
                 if (cbMapped && cbRes) { cbRes->Unmap(0, nullptr); cbMapped = nullptr; }
@@ -168,20 +174,21 @@ namespace YoRigine {
         bool    previewPlaying_ = false;
         float   previewTimer_ = 0.f;
 
-        // 汎用ワンショットループ（モーションの終端を自動検出してリピート。全エフェクト対応）
+        // 汎用ワンショットループ（モジュールの終端を自動検出してリピート。全エフェクト対応）
         bool    loopOneShot_        = false;
-        float   loopDuration_       = 2.0f;  // モーションから自動検出できない場合のフォールバック秒数
+        float   loopDuration_       = 2.0f;  // モジュールから自動検出できない場合のフォールバック秒数
         float   loopPeriodComputed_ = 0.0f;  // 直前フレームで算出した1サイクル長（UI表示用）
 
-        // ワンショット再生（寿命＝モーション優先ぶんで1回発生 → 休止 → くりかえす）
-        // 通常プレビューの既定挙動。loopOneShot_（モーション確認ループ）中のみ継続駆動になる。
-        float   burstDuration_ = 2.0f; // 寿命フォールバック（BurstGrow モーションが無いとき）
+        // ワンショット再生（寿命＝モジュール優先ぶんで1回発生 → 休止 → くりかえす）
+        // 通常プレビューの既定挙動。loopOneShot_（モジュール確認ループ）中のみ継続駆動になる。
+        float   burstDuration_ = 2.0f; // 寿命フォールバック（Lifetime モジュールが無いとき）
         float   burstProgress_ = -1.f; // -1=継続(ループ確認中), 0..1=ワンショット進捗
         float   oneShotGap_    = 0.6f; // 一発出しきってから次の一発までの休止時間（完全に消える間）
         float   oneShotLocal_  = 0.f;  // 現サイクル内の経過秒（DrawPreview のエレメント駆動に使う）
         bool    burstMode_     = false;// このフレームがワンショット駆動か（false=継続ループ確認）
         Vector3 previewCenter_ = { 0.f, 0.f, 0.f };
         float   previewYaw_ = 0.f;
+        float   previewScale_ = 1.0f;  // プレビュー表示倍率（アセットの実寸には影響しない。小さいアセットを見る為のズーム）
 
         bool showNewDialog_ = false;
         char newNameBuffer_[128] = "NewEffect";

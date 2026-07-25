@@ -14,14 +14,14 @@ class Player;
 // プレイヤー武器（剣）クラス
 // プレイヤーの腕のボーンに追従し、攻撃判定用コライダーや剣の軌跡エフェクトを管理する
 // ============================================================
-class PlayerSword : public BaseObject
+class PlayerSword : public YoRigine::BaseObject
 {
 public:
 	// ============================================================
 	// 初期化と更新処理
 	// ============================================================
 
-	void Initialize(Camera* camera) override;
+	void Initialize(YoRigine::Camera* camera) override;
 	void Update() override;
 	void Draw() override;
 	void DrawShadow();
@@ -43,6 +43,11 @@ public:
 	void LoadVfxAssets(const std::string vfxAssetPath);
 	void PlayTrail() { if (trailEmitter_) trailEmitter_->Play(); }
 	void StopTrail() { if (trailEmitter_) trailEmitter_->Stop(); }
+	void ResetRuntimeState() {
+		StopTrail();
+		isDrawTrail_ = false;
+		if (obbCollider_) obbCollider_->SetCollisionEnabled(false);
+	}
 
 	// ============================================================
 	// アクセッサ・状態操作
@@ -56,7 +61,7 @@ public:
 	Vector3 GetWowldPosition();
 
 	void SetPlayer(Player* player) { player_ = player; }
-	void SetObject(Object3d* obj3d) { obj3d_ = obj3d; }
+	void SetObject(YoRigine::Object3d* obj3d) { obj3d_ = obj3d; }
 
 	void SetisDrawTrail(bool isDraw) { isDrawTrail_ = isDraw; }
 
@@ -91,14 +96,14 @@ private:
 	// ------------------------------------------------------------
 	// システム連携・参照
 	// ------------------------------------------------------------
-	Camera* camera_ = nullptr;            // 描画に使用するカメラ
-	Object3d* obj3d_ = nullptr;           // プレイヤーの3Dモデル（ジョイント探索用）
+	YoRigine::Camera* camera_ = nullptr;            // 描画に使用するカメラ
+	YoRigine::Object3d* obj3d_ = nullptr;           // プレイヤーの3Dモデル（ジョイント探索用）
 	Player* player_ = nullptr;            // 剣を装備しているプレイヤー本体
 
 	// ------------------------------------------------------------
 	// コライダー・パーティクル
 	// ------------------------------------------------------------
-	WorldTransform colliderWT_;                                 // コライダー用の独立したワールド変換
+	YoRigine::WorldTransform colliderWT_;                                 // コライダー用の独立したワールド変換
 	// エフェクトハンドル（YParticle 統合）
 	EffectHandle hitEffect_;     // ヒット時エフェクト
 	EffectHandle trailEffect_;   // 通常スラッシュエフェクト
@@ -120,8 +125,8 @@ private:
 	//   Blender で中央原点エクスポートされているため、手のグリップに合わせる
 	//   オフセットは剣とは別に持たせて JSON で調整できるようにする。
 	// ------------------------------------------------------------
-	std::unique_ptr<Object3d> staffObj_;                 // 杖モデル（Staff.obj）
-	WorldTransform staffWT_;                             // 杖用の独立したワールド変換
+	std::unique_ptr<YoRigine::Object3d> staffObj_;                 // 杖モデル（Staff.obj）
+	YoRigine::WorldTransform staffWT_;                             // 杖用の独立したワールド変換
 	Vector3 staffOffsetPos_{};                           // 手からの位置オフセット（中央原点前提で調整）
 	Vector3 staffOffsetRot_{};                           // 手からの回転オフセット
 	Vector3 staffOffsetScale_{ 1.0f,1.0f,1.0f };         // 杖のスケール

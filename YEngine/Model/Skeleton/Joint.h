@@ -56,13 +56,13 @@ public:
 	const std::vector<int32_t>& GetChildren() const { return children_; }
 
 	// ワールドトランスフォーム取得
-	WorldTransform& GetWorldTransform() { return wt_; }
+	YoRigine::WorldTransform& GetWorldTransform() { return wt_; }
 
 private:
 	///************************* メンバ変数 *************************///
 
 	// ワールドトランスフォーム
-	WorldTransform wt_;
+	YoRigine::WorldTransform wt_;
 
 	// トランスフォーム
 	QuaternionTransform transform_;

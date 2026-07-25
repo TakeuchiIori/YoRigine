@@ -15,8 +15,10 @@ public:
 	void Exit(BattleEnemy& enemy) override;
 
 	bool IsAttacking() const override { return true; }
+	bool IsContactDamageActive() const override { return isContactDamageActive_; }
 
 private:
 	float startRotation_ = 0.0f;
 	float targetTwistRotation_ = 0.0f;
+	bool isContactDamageActive_ = false;
 };

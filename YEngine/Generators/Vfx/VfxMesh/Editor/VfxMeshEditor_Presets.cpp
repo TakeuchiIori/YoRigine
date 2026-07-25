@@ -15,7 +15,7 @@ namespace YoRigine {
             sub.lightVolume.halfExtents = halfExtents;
             sub.lightVolume.color = color;
             sub.lightVolume.intensity = intensity;
-            if (waypointBeam) ApplyDefaultElementMotions(sub);
+            if (waypointBeam) ApplyDefaultElementModules(sub);
             a.elements.push_back(std::move(sub));
         };
 
@@ -64,10 +64,10 @@ namespace YoRigine {
         case VfxPreset::Explosion: {
             a.useTrail = false;
 
-            VfxMotion life;
-            life.type = VfxMotionType::BurstGrow;
+            VfxModule life;
+            life.type = VfxModuleType::Lifetime;
             life.duration = 2.2f;
-            a.motions.push_back(life);
+            a.modules.push_back(life);
 
             VfxElement fire;
             fire.type = VfxElementType::NoiseVolume;
@@ -79,36 +79,36 @@ namespace YoRigine {
             fire.smoke.rimIntensity = 3.0f;
             fire.smoke.builtInBurstMotion = false;
 
-            VfxMotion pop;
-            pop.type = VfxMotionType::ScaleOverLife;
+            VfxModule pop;
+            pop.type = VfxModuleType::ScaleOverLife;
             pop.ease = VfxEase::EaseOutExpo;
             pop.window = 0.5f;
             pop.scaleStart = 0.15f;
             pop.scaleEnd = 1.5f;
-            fire.motions.push_back(pop);
+            fire.modules.push_back(pop);
 
-            VfxMotion color;
-            color.type = VfxMotionType::ColorOverLife;
+            VfxModule color;
+            color.type = VfxModuleType::ColorOverLife;
             color.ease = VfxEase::EaseInQuad;
             color.window = 2.2f;
             color.colorStart = { 1.0f, 1.0f, 1.0f, 1.0f };
             color.colorEnd = { 0.05f, 0.05f, 0.06f, 0.85f };
-            fire.motions.push_back(color);
+            fire.modules.push_back(color);
 
-            VfxMotion rise;
-            rise.type = VfxMotionType::Rise;
+            VfxModule rise;
+            rise.type = VfxModuleType::Rise;
             rise.startTime = 0.4f;
             rise.window = 1.8f;
             rise.velocity = { 0.f, 1.0f, 0.f };
             rise.amplitude = 1.0f;
-            fire.motions.push_back(rise);
+            fire.modules.push_back(rise);
 
-            VfxMotion fade;
-            fade.type = VfxMotionType::FadeInOut;
+            VfxModule fade;
+            fade.type = VfxModuleType::FadeInOut;
             fade.window = 2.2f;
             fade.fadeIn = 0.03f;
             fade.fadeOut = 0.7f;
-            fire.motions.push_back(fade);
+            fire.modules.push_back(fade);
             a.elements.push_back(std::move(fire));
 
             VfxElement ring;
@@ -119,17 +119,17 @@ namespace YoRigine {
             ring.shockwave.duration = 0.5f;
             ring.shockwave.thickness = 0.18f;
 
-            VfxMotion showRing;
-            showRing.type = VfxMotionType::Visibility;
+            VfxModule showRing;
+            showRing.type = VfxModuleType::Visibility;
             showRing.window = 0.5f;
-            ring.motions.push_back(showRing);
+            ring.modules.push_back(showRing);
 
-            VfxMotion fadeRing;
-            fadeRing.type = VfxMotionType::FadeInOut;
+            VfxModule fadeRing;
+            fadeRing.type = VfxModuleType::FadeInOut;
             fadeRing.window = 0.5f;
             fadeRing.fadeIn = 0.f;
             fadeRing.fadeOut = 0.25f;
-            ring.motions.push_back(fadeRing);
+            ring.modules.push_back(fadeRing);
             a.elements.push_back(std::move(ring));
 
             VfxElement flash;
@@ -143,16 +143,16 @@ namespace YoRigine {
             flash.lightning.branches = 6;
             flash.lightning.flickerRate = 40.0f;
 
-            VfxMotion showFlash;
-            showFlash.type = VfxMotionType::Visibility;
+            VfxModule showFlash;
+            showFlash.type = VfxModuleType::Visibility;
             showFlash.window = 0.18f;
-            flash.motions.push_back(showFlash);
+            flash.modules.push_back(showFlash);
 
-            VfxMotion flicker;
-            flicker.type = VfxMotionType::Flicker;
+            VfxModule flicker;
+            flicker.type = VfxModuleType::Flicker;
             flicker.amplitude = 0.5f;
             flicker.frequency = 60.0f;
-            flash.motions.push_back(flicker);
+            flash.modules.push_back(flicker);
             a.elements.push_back(std::move(flash));
             break;
         }

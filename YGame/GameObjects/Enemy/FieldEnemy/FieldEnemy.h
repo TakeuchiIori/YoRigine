@@ -106,14 +106,14 @@ class Player;
 class FieldEnemyManager;
 
 ///************************* フィールド用の敵クラス *************************///
-class FieldEnemy : public BaseObject {
+class FieldEnemy : public YoRigine::BaseObject {
 public:
 	///************************* 基本的な関数 *************************///
 
 	FieldEnemy();
 	~FieldEnemy() override;
 
-	void Initialize(Camera* camera) override;
+	void Initialize(YoRigine::Camera* camera) override;
 	void InitializeFieldData(const FieldEnemyData& data, const Vector3& spawnPosition);
 	void InitCollision() override;
 	void InitJson() override;
@@ -121,7 +121,7 @@ public:
 	void Draw() override;
 	void DrawShadow();
 	void DrawCollision() override;
-	void DrawLine(Line* line);
+	void DrawLine(YoRigine::Line* line);
 	void DrawUI();
 
 	// ライトの有効/無効を強制的に切り替える

@@ -10,7 +10,7 @@ struct InstanceData
     float4x4 uvTransform;          // 64
     float    stochasticStrength;   //  4
     float    outlineMask;          //  4  (輪郭線の掛け率。本体描画では未使用)
-    float    _pad1;                //  4
+    float    ditherFade;           //  4  (1=alpha をディザー透過率に使用)
     float    _pad2;                //  4
 };
 

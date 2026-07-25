@@ -11,6 +11,7 @@ public:
 	void Enter(BattleEnemy& enemy) override;
 	void Update(BattleEnemy& enemy, float dt) override;
 	void Exit(BattleEnemy& enemy) override;
+	bool KeepsStateWhenDamaged() const override { return true; }
 
 private:
 
@@ -23,4 +24,3 @@ private:
 	// 立ち上がりの時間
 	float standUpTime_ = 3.5f;
 };
-

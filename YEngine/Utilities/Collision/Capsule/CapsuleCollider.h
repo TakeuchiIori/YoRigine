@@ -23,7 +23,7 @@ public:
 	~CapsuleCollider() = default;
 	void InitJson(YoRigine::JsonManager* jsonManager) override;
 	Vector3 GetCenterPosition() const override;
-	const WorldTransform& GetWorldTransform() override;
+	const YoRigine::WorldTransform& GetWorldTransform() override;
 	Vector3 GetEulerRotation() const override;
 
 public:
@@ -31,7 +31,7 @@ public:
 
 	void Initialize();
 	void Update() override;
-	void Draw();
+	void Draw() override;
 
 public:
 	///************************* アクセッサ *************************///

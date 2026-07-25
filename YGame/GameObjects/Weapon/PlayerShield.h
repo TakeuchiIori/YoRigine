@@ -13,14 +13,14 @@ class Player;
 // プレイヤー盾クラス
 // プレイヤーの腕のボーンに追従し、ガードやパリィ判定のコライダーを提供する
 // ============================================================
-class PlayerShield : public BaseObject
+class PlayerShield : public YoRigine::BaseObject
 {
 public:
 	// ============================================================
 	// 初期化と更新処理
 	// ============================================================
 	~PlayerShield();
-	void Initialize(Camera* camera) override;
+	void Initialize(YoRigine::Camera* camera) override;
 
 	void Update() override;
 
@@ -32,9 +32,9 @@ public:
 	// アクセッサ・状態操作
 	// ============================================================
 	void SetPlayer(Player* player) { player_ = player; }
-	void SetObject(Object3d* obj3d) { obj3d_ = obj3d; }
+	void SetObject(YoRigine::Object3d* obj3d) { obj3d_ = obj3d; }
 	bool IsJointValid() const { return isValidJoint_; }
-	WorldTransform& GetWorldTransform() { return wt_; }
+	YoRigine::WorldTransform& GetWorldTransform() { return wt_; }
 
 	void SetEnableCollider(bool enable) {
 		obbCollider_->SetCollisionEnabled(enable);
@@ -71,9 +71,9 @@ private:
 	// ------------------------------------------------------------
 	// システム連携・参照
 	// ------------------------------------------------------------
-	Camera* camera_ = nullptr;            // 描画に使用するカメラ
+	YoRigine::Camera* camera_ = nullptr;            // 描画に使用するカメラ
 	Player* player_ = nullptr;            // 盾を装備しているプレイヤー本体
-	Object3d* obj3d_ = nullptr;           // プレイヤーの3Dモデル（ジョイント探索用）
+	YoRigine::Object3d* obj3d_ = nullptr;           // プレイヤーの3Dモデル（ジョイント探索用）
 
 	// ------------------------------------------------------------
 	// パーティクル

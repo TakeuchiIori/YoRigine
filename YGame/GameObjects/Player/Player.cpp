@@ -9,6 +9,8 @@
 #include "Systems/Cinematic/CinematicManager.h"
 #include <Debugger/Logger.h>
 #include "Collision/AreaCollision/Base/AreaManager.h"
+#include "Model/Model.h"
+#include "Model/Motion/Core/MotionSystem.h"
 
 #ifdef USE_IMGUI
 #include "imgui.h" 
@@ -25,11 +27,11 @@ Player::~Player() {
 // ============================================================
 // 初期化
 // ============================================================
-void Player::Initialize(Camera* camera) {
+void Player::Initialize(YoRigine::Camera* camera) {
 	camera_ = camera;
 
 	// オブジェクト初期化
-	obj_ = std::make_unique<Object3d>();
+	obj_ = std::make_unique<YoRigine::Object3d>();
 	obj_->Initialize();
 	obj_->SetModel("Player.gltf", true, "Idle4");
 	input_ = YoRigine::Input::GetInstance();
@@ -65,7 +67,7 @@ void Player::Initialize(Camera* camera) {
 	InitCombatSystem();
 	combat_->GetCombo()->RecoverCC(combat_->GetMaxCC());
 
-	boneLine_ = std::make_unique<Line>();
+	boneLine_ = std::make_unique<YoRigine::Line>();
 	boneLine_->Initialize();
 	boneLine_->SetCamera(camera_);
 
@@ -209,8 +211,10 @@ void Player::Update() {
 		return;
 	}
 
-	// 入力処理
-	HandleCombatInput();
+	// 入力処理。演出中も描画・アニメーション更新は継続し、操作だけを止める。
+	if (controlEnabled_) {
+		HandleCombatInput();
+	}
 
 	// スタイルに応じて武器の見た目（剣／杖）を同期する。
 	const bool isMagicStyle = styleController_ && styleController_->IsMagic();
@@ -254,10 +258,13 @@ void Player::Update() {
 	UpdateMotionTime();
 	Vector3 sp = playerSword_->GetWowldPosition();
 
-	// ステート更新
-	movement_->Update(YoRigine::GameTime::GetDeltaTime());
-	combat_->Update(YoRigine::GameTime::GetDeltaTime());
-	if (magicController_) magicController_->Update(YoRigine::GameTime::GetDeltaTime());
+	// 操作ロック中はゲームプレイ用StateMachineを進めず、下のアニメーション・
+	// 装備追従更新だけを行う。
+	if (controlEnabled_) {
+		movement_->Update(YoRigine::GameTime::GetDeltaTime());
+		combat_->Update(YoRigine::GameTime::GetDeltaTime());
+		if (magicController_) magicController_->Update(YoRigine::GameTime::GetDeltaTime());
+	}
 
 	// オブジェクト更新
 	obj_->UpdateAnimation();
@@ -299,7 +306,7 @@ void Player::DrawCollision() {
 // ============================================================
 // 骨の描画
 // ============================================================
-void Player::DrawBone(Line& line) {
+void Player::DrawBone(YoRigine::Line& line) {
 	if (isAlive_) {
 		obj_->DrawBone(line, wt_.GetMatWorld());
 	}
@@ -414,6 +421,18 @@ void Player::InitJson() {
 	jsonManager_->Register("死亡状態速度", &motionSpeed[3]);
 
 	//------------------------------------------------------------
+	// 被弾フィードバック
+	//------------------------------------------------------------
+	jsonManager_->SetTreePrefix("被弾演出");
+	jsonManager_->Register("ヒットストップ秒数", &hitStopDuration_);
+	jsonManager_->Register("正面シェイク強度", &frontHitShakeIntensity_);
+	jsonManager_->Register("正面シェイク時間", &frontHitShakeDuration_);
+	jsonManager_->Register("背面シェイク強度", &backHitShakeIntensity_);
+	jsonManager_->Register("背面シェイク時間", &backHitShakeDuration_);
+	jsonManager_->Register("振動時間", &hitVibrationDuration_);
+	jsonManager_->Register("振動強度", &hitVibrationPower_);
+
+	//------------------------------------------------------------
 	// 下層システム登録
 	//------------------------------------------------------------
 	movement_->InitJson(jsonManager_.get());
@@ -477,15 +496,6 @@ void Player::OnEnterDirectionCollision([[maybe_unused]] BaseCollider* self, Base
 		//	YoRigine::SoundCategory::SE
 		//);
 
-		//------------------------------------------------------------
-		// カメラシェイク（被弾方向で強度を変える）
-		//------------------------------------------------------------
-		if (playerCamera_) {
-			float intensity = (dir == HitDirection::Back) ? 0.6f : 0.4f;
-			float duration  = (dir == HitDirection::Back) ? 0.25f : 0.2f;
-			playerCamera_->StartShake(intensity, duration);
-		}
-
 		// 方向ヒット状態へ遷移
 		combat_->SetHitDirection(dir);
 		combat_->ChangeState(CombatState::Hit);
@@ -498,19 +508,65 @@ void Player::OnEnterDirectionCollision([[maybe_unused]] BaseCollider* self, Base
 void Player::Reset() {
 	hp_ = maxHP_;
 	isAlive_ = true;
+	ResetForBattleStart();
+	if (styleController_) styleController_->Reset();
+	if (playerSword_) playerSword_->SetMagicVisual(false);
+	if (playerShield_) playerShield_->SetVisible(true);
+}
+
+void Player::ResetForBattleStart() {
+	isAlive_ = hp_ > 0;
 	isInvincible_ = false;
+	// バトル開始装備は剣＋盾に統一する。状態変更後に表示も明示的に同期する。
+	if (styleController_) styleController_->Reset();
 	if (combat_) combat_->Reset();
 	if (magicController_) magicController_->Reset();
-	if (styleController_) styleController_->Reset();
 	if (movement_) {
+		movement_->ForceStop();
+		movement_->ChangeState(MovementState::Idle);
 		movement_->SetCanMove(true);
 		movement_->SetCanRotate(true);
+		movement_->SetIsRotating(false);
 	}
+	if (playerSword_) playerSword_->ResetRuntimeState();
+	if (playerShield_) playerShield_->SetEnableCollider(false);
+	if (playerCamera_) playerCamera_->StopAttackCameraWork();
+	if (playerSword_) playerSword_->SetMagicVisual(false);
+	if (playerShield_) playerShield_->SetVisible(true);
 
 	// Idleモーションに戻す
 	if (obj_) {
 		obj_->SetMotionSpeed(motionSpeed[0]);
 		obj_->SetChangeMotion("Player.gltf", MotionPlayMode::Loop, "Idle4");
+		if (obj_->GetModel() && obj_->GetModel()->GetMotionSystem()) {
+			auto* motion = obj_->GetModel()->GetMotionSystem();
+			motion->ResetPlaybackState();
+		}
+		obj_->UpdateAnimation();
+	}
+	wt_.UpdateMatrix();
+	if (playerSword_) playerSword_->Update();
+	if (playerShield_) playerShield_->Update();
+}
+
+void Player::FacePosition(const Vector3& worldPosition) {
+	LookAtDirection(worldPosition);
+	wt_.UpdateMatrix();
+}
+
+void Player::SetControlEnabled(bool enabled) {
+	controlEnabled_ = enabled;
+	if (!movement_) return;
+	if (!enabled) {
+		movement_->ForceStop();
+		movement_->ChangeState(MovementState::Idle);
+		movement_->SetCanMove(false);
+		movement_->SetCanRotate(false);
+		movement_->SetIsRotating(false);
+	}
+	else {
+		movement_->SetCanMove(true);
+		movement_->SetCanRotate(true);
 	}
 }
 
@@ -553,15 +609,30 @@ void Player::ApplyHitReaction(const Vector3& attackerPos) {
 	// 前方から食らったら Front、背後から食らったら Back
 	HitDirection dir = (dot < 0.0f) ? HitDirection::Back : HitDirection::Front;
 
-	// カメラシェイク（被弾方向で強度を変える）
-	if (playerCamera_) {
-		float intensity = (dir == HitDirection::Back) ? 0.6f : 0.4f;
-		float duration  = (dir == HitDirection::Back) ? 0.25f : 0.2f;
-		playerCamera_->StartShake(intensity, duration);
-	}
+	PlayHitFeedback(dir);
 
 	combat_->SetHitDirection(dir);
 	combat_->ChangeState(CombatState::Hit);
+}
+
+// ============================================================
+// 被弾時フィードバック
+// ============================================================
+void Player::PlayHitFeedback(HitDirection direction) {
+	if (hitStopDuration_ > 0.0f) {
+		YoRigine::GameTime::SetHitStop(hitStopDuration_);
+	}
+
+	const bool fromBack = direction == HitDirection::Back;
+	const float shakeIntensity = fromBack ? backHitShakeIntensity_ : frontHitShakeIntensity_;
+	const float shakeDuration = fromBack ? backHitShakeDuration_ : frontHitShakeDuration_;
+	if (playerCamera_ && shakeIntensity > 0.0f && shakeDuration > 0.0f) {
+		playerCamera_->StartShake(shakeIntensity, shakeDuration);
+	}
+
+	if (input_ && hitVibrationDuration_ > 0.0f && hitVibrationPower_ > 0) {
+		input_->StartVibration(0, hitVibrationDuration_, hitVibrationPower_, hitVibrationPower_);
+	}
 }
 
 // ============================================================

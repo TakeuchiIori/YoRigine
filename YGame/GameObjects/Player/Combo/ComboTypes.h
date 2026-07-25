@@ -79,9 +79,11 @@ struct AttackData {
 	// ヒット時の手応え演出（攻撃ごとに上書き可能）
 	// すべて 0 のときは発動しない
 	// ------------------------------------------------------------
-	float hitStopDuration = 0.0f;    // ヒットストップ秒数（攻撃ヒット時に時間を止める）
-	float shakeIntensity = 0.0f;     // カメラシェイク強度
-	float shakeDuration = 0.0f;      // カメラシェイク継続秒数
+	float hitStopDuration = 0.0f;		// ヒットストップ秒数（攻撃ヒット時に時間を止める）
+	float shakeIntensity = 0.0f;		// カメラシェイク強度
+	float shakeDuration = 0.0f;			// カメラシェイク継続秒数
+	float inputVibrationTime = 0.0f;	// コントローラーの振動時間
+	uint16_t inputVibrationPower = 0;	// コントローラーの振動強度
 
 	// ------------------------------------------------------------
 	// オートホーミング（攻撃開始時に最も近い敵へ吸い付く）
@@ -182,6 +184,8 @@ SERIALIZE_FIELD(AttackData, stepDistance)
 SERIALIZE_FIELD(AttackData, hitStopDuration)
 SERIALIZE_FIELD(AttackData, shakeIntensity)
 SERIALIZE_FIELD(AttackData, shakeDuration)
+SERIALIZE_FIELD(AttackData, inputVibrationTime)
+SERIALIZE_FIELD(AttackData, inputVibrationPower)
 
 SERIALIZE_FIELD(AttackData, enableHoming)
 SERIALIZE_FIELD(AttackData, homingRange)

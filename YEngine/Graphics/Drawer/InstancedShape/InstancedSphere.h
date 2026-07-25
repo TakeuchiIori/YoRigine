@@ -8,7 +8,7 @@
 #include "Vector4.h"
 #include "Matrix4x4.h"
 
-class Camera;
+namespace YoRigine { class Camera; }
 
 namespace YoRigine {
 	class DirectXCommon;
@@ -26,7 +26,7 @@ class InstancedSphere
 {
 public:
 	void Initialize();
-	void SetCamera(Camera* camera) { camera_ = camera; }
+	void SetCamera(YoRigine::Camera* camera) { camera_ = camera; }
 
 	void Begin();
 
@@ -61,7 +61,7 @@ private:
 
 	YoRigine::DirectXCommon* dxCommon_   = nullptr;
 	YoRigine::SrvManager*    srvManager_ = nullptr;
-	Camera*                  camera_     = nullptr;
+	YoRigine::Camera*                  camera_     = nullptr;
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> vbResource_;
 	D3D12_VERTEX_BUFFER_VIEW               vbView_{};

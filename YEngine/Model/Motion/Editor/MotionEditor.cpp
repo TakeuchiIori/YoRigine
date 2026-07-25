@@ -33,7 +33,7 @@
 // ============================================================
 // コンテキストヘルパーの実装
 // ============================================================
-Object3d* MotionEditorContext::GetTargetObject() const {
+YoRigine::Object3d* MotionEditorContext::GetTargetObject() const {
 	if (targetObjectId != -1) {
 		return ObjectManager::GetInstance()->GetObject3dById(targetObjectId);
 	}
@@ -53,19 +53,19 @@ MotionEditor::~MotionEditor() {}
 // ============================================================
 // 初期化
 // ============================================================
-void MotionEditor::Initialize(Camera* camera)
+void MotionEditor::Initialize(YoRigine::Camera* camera)
 {
 	context_.camera = camera;
 	previewTransform_.Initialize();
 
-	lineDrawer_ = std::make_unique<Line>();
+	lineDrawer_ = std::make_unique<YoRigine::Line>();
 	lineDrawer_->SetCamera(context_.camera);
 	lineDrawer_->Initialize();
 	lineDrawer_->SetColor({ 0.5f, 0.5f, 0.5f, 1.0f });
 
 #ifdef USE_IMGUI
 	// デバッグ表示用のボーンオブジェクト生成
-	boneObj_ = Object3d::Create("ICO.obj");
+	boneObj_ = YoRigine::Object3d::Create("ICO.obj");
 	gizmoCtrl_.Initialize();
 	gizmoCtrl_.SetMode(GizmoController::Mode::Local);
 #endif
@@ -176,10 +176,10 @@ void MotionEditor::RegisterPanel(std::unique_ptr<IMotionEditorPanel> panel)
 // ============================================================
 void MotionEditor::Update()
 {
-	Object3d* target = context_.GetTargetObject();
+	YoRigine::Object3d* target = context_.GetTargetObject();
 	if (!target) return;
 
-	Model* m = target->GetModel();
+	YoRigine::Model* m = target->GetModel();
 	MotionSystem* ms = m ? m->GetMotionSystem() : nullptr;
 
 	//------------------------------------------------------------
@@ -261,7 +261,7 @@ void MotionEditor::ShowEditor()
 	ImGui::SetNextWindowSize(ImVec2(1200, 750), ImGuiCond_FirstUseEver);
 	ImGui::Begin("Motion Editor", nullptr, ImGuiWindowFlags_MenuBar);
 
-	Object3d* target = context_.GetTargetObject();
+	YoRigine::Object3d* target = context_.GetTargetObject();
 
 	//------------------------------------------------------------
 	// 3Dビュー上でのボーン選択＆ギズモ処理
@@ -473,7 +473,7 @@ void MotionEditor::ShowEditor()
 // ============================================================
 void MotionEditor::Draw()
 {
-	Object3d* target = context_.GetTargetObject();
+	YoRigine::Object3d* target = context_.GetTargetObject();
 	if (!context_.camera) return;
 	if (context_.isDrawBone && target) {
 #ifdef USE_IMGUI
@@ -515,7 +515,7 @@ void MotionEditor::Draw()
 void MotionEditor::DrawGizmo()
 {
 #ifdef USE_IMGUI
-	Object3d* target = context_.GetTargetObject();
+	YoRigine::Object3d* target = context_.GetTargetObject();
 	if (!context_.camera) return;
 	if (context_.isDrawBone && target && target->GetModel() && target->GetModel()->GetSkeleton()) {
 		if (!context_.selBone.empty()) {
@@ -540,7 +540,7 @@ void MotionEditor::DrawGizmo()
 // ============================================================
 void MotionEditor::DrawBone()
 {
-	Object3d* target = context_.GetTargetObject();
+	YoRigine::Object3d* target = context_.GetTargetObject();
 	if (!context_.camera || !lineDrawer_) return;
 	if (context_.isDrawBone && target) {
 		lineDrawer_->SetCamera(context_.camera);
@@ -553,7 +553,7 @@ void MotionEditor::DrawBone()
 // ターゲットオブジェクトの設定
 // ============================================================
 void MotionEditor::SetTargetObjectId(int id) {
-	Object3d* obj = nullptr;
+	YoRigine::Object3d* obj = nullptr;
 	if (id != -1) {
 		obj = ObjectManager::GetInstance()->GetObject3dById(id);
 		// アニメーションシステムを持っていないオブジェクトは対象外とするガード
@@ -568,8 +568,8 @@ void MotionEditor::SetTargetObjectId(int id) {
 
 		// ターゲット変更に伴うコンテキストの初期化・同期
 		if (context_.targetObjectId != -1) {
-			Object3d* target = context_.GetTargetObject();
-			Model* model = target->GetModel();
+			YoRigine::Object3d* target = context_.GetTargetObject();
+			YoRigine::Model* model = target->GetModel();
 			MotionSystem* ms = model->GetMotionSystem();
 
 			context_.loadFileName = model->GetName();
@@ -578,7 +578,7 @@ void MotionEditor::SetTargetObjectId(int id) {
 
 			// キャッシュからアニメーションキーを逆引き
 			if (context_.currentMotion) {
-				for (auto& [key, motion] : Model::animationCache_) {
+				for (auto& [key, motion] : YoRigine::Model::animationCache_) {
 					if (&motion == context_.currentMotion) {
 						context_.selectedAnimKey = key;
 						break;
@@ -640,7 +640,7 @@ void MotionEditor::InsertKeyframeFromTransform(const std::string& bone, float ti
 // ============================================================
 void MotionEditor::SavePose(float time)
 {
-	Object3d* target = context_.GetTargetObject();
+	YoRigine::Object3d* target = context_.GetTargetObject();
 	if (!target || !target->GetModel() || !target->GetModel()->GetSkeleton() || !context_.currentMotion) return;
 
 	Skeleton* skeleton = target->GetModel()->GetSkeleton();
@@ -677,8 +677,8 @@ void MotionEditor::SetJointTransform(const std::string& bone, const QuaternionTr
 	j->SetTransform(tr);
 
 	// トランスフォーム変更をスケルトン全体に伝搬させる
-	Object3d* target = context_.GetTargetObject();
-	Model* m = target ? target->GetModel() : nullptr;
+	YoRigine::Object3d* target = context_.GetTargetObject();
+	YoRigine::Model* m = target ? target->GetModel() : nullptr;
 	if (m && m->GetSkeleton()) {
 		m->GetSkeleton()->Update();
 		if (m->GetSkinCluster()) m->GetSkinCluster()->UpdateMatrixPalette(m->GetSkeleton()->GetJoints());
@@ -690,7 +690,7 @@ void MotionEditor::SetJointTransform(const std::string& bone, const QuaternionTr
 // ============================================================
 Joint* MotionEditor::FindJoint(const std::string& name) const
 {
-	Object3d* target = context_.GetTargetObject();
+	YoRigine::Object3d* target = context_.GetTargetObject();
 	if (!target || !target->GetModel() || !target->GetModel()->GetSkeleton()) return nullptr;
 	return target->GetModel()->GetSkeleton()->GetJointByName(name);
 }
@@ -715,8 +715,8 @@ void MotionEditor::SyncJointToBuffer(const std::string& bone)
 	Joint* j = FindJoint(bone);
 	if (!j) return;
 	const auto& tr = j->GetTransform();
-	Object3d* target = context_.GetTargetObject();
-	Model* m = target ? target->GetModel() : nullptr;
+	YoRigine::Object3d* target = context_.GetTargetObject();
+	YoRigine::Model* m = target ? target->GetModel() : nullptr;
 	context_.translateDisplayScale = (m && m->IsMixamoAsset()) ? 100.0f : 1.0f;
 
 	// 内部値をUI用のバッファ（float配列）に展開
@@ -741,8 +741,8 @@ void MotionEditor::SyncBufferToJoint()
 		j->SetTransform(BufferToTransform());
 		context_.hasLiveBoneOverride = true;
 		context_.liveOverrideBone = context_.selBone;
-		Object3d* target = context_.GetTargetObject();
-		Model* m = target ? target->GetModel() : nullptr;
+		YoRigine::Object3d* target = context_.GetTargetObject();
+		YoRigine::Model* m = target ? target->GetModel() : nullptr;
 		if (m && m->GetSkeleton()) {
 			m->GetSkeleton()->Update();
 			if (m->GetSkinCluster()) m->GetSkinCluster()->UpdateMatrixPalette(m->GetSkeleton()->GetJoints());
@@ -775,8 +775,8 @@ void MotionEditor::RestoreLiveBoneOriginal()
 		context_.liveOriginalBone.clear();
 	}
 
-	Object3d* target = context_.GetTargetObject();
-	Model* m = target ? target->GetModel() : nullptr;
+	YoRigine::Object3d* target = context_.GetTargetObject();
+	YoRigine::Model* m = target ? target->GetModel() : nullptr;
 	if (m && m->GetSkeleton()) {
 		m->GetSkeleton()->Update();
 		if (m->GetSkinCluster()) m->GetSkinCluster()->UpdateMatrixPalette(m->GetSkeleton()->GetJoints());
@@ -857,8 +857,8 @@ void MotionEditor::ApplyBoneGizmoTransform(const std::string& boneName, const Ma
 	//------------------------------------------------------------
 	// 表示の即時反映
 	//------------------------------------------------------------
-	Object3d* target = context_.GetTargetObject();
-	Model* m = target ? target->GetModel() : nullptr;
+	YoRigine::Object3d* target = context_.GetTargetObject();
+	YoRigine::Model* m = target ? target->GetModel() : nullptr;
 	if (m && m->GetSkeleton()) {
 		m->GetSkeleton()->Update();
 		if (m->GetSkinCluster()) m->GetSkinCluster()->UpdateMatrixPalette(m->GetSkeleton()->GetJoints());

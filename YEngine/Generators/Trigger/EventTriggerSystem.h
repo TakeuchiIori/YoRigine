@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-class Camera;
+namespace YoRigine { class Camera; }
 
 // ============================================================
 // EventTriggerSystem
@@ -21,7 +21,7 @@ public:
 	void Clear();
 
 	bool Load(const std::string& filePath,
-	          Camera* camera,
+	          YoRigine::Camera* camera,
 	          std::function<void()> onAnyGateOpened);
 	bool Save(const std::string& filePath) const;
 

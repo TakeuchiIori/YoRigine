@@ -111,7 +111,7 @@ namespace YoRigine {
         void Initialize();
         void Finalize();
         void TransferData();
-        void UpdateShadowMatrix(Camera* camera);
+        void UpdateShadowMatrix(YoRigine::Camera* camera);
 
         // 3Dオブジェクト用（全ライト）
         void SetCommandList(UINT directionalIndex,
@@ -218,7 +218,7 @@ namespace YoRigine {
         CascadeMatrices* cascade_ = nullptr;
 
         Object3dCommon* object3dCommon_ = nullptr;
-        Camera* camera_ = nullptr;
+        YoRigine::Camera* camera_ = nullptr;
         ShadowMapSettings shadowMapSettings_;
 
         // 依存先マネージャ (借用のみ・非所有)。使用前に SetOffScreen() で注入すること。

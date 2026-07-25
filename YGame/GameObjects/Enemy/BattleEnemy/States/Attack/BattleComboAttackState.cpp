@@ -14,11 +14,13 @@ void BattleComboAttackState::Enter(BattleEnemy& enemy) {
 	}
 
 	comboCount_ = 0;
+	contactDamageWindow_ = -1;
 	hasPerformedAnticipation_ = false;
 	anticipationStartPos_ = enemy.GetTranslate();
 }
 
 void BattleComboAttackState::Update(BattleEnemy& enemy, float dt) {
+	contactDamageWindow_ = -1;
 	const auto& params = enemy.GetEnemyData().attackParams.combo;
 	const float currentTime = enemy.GetStateTimer();
 	const int maxHits = 3;
@@ -73,6 +75,8 @@ void BattleComboAttackState::Update(BattleEnemy& enemy, float dt) {
 			}
 		}
 		else if (isSubRushing) {
+			// コンボの各突進を独立した1回の攻撃判定として扱う。
+			contactDamageWindow_ = currentHit;
 			// 各ヒットの突進開始時
 			if (previousTimeInPhase < params.subChargeTime && timeInPhase >= params.subChargeTime) {
 				if (auto anim = enemy.GetAnimation()) {
@@ -92,6 +96,7 @@ void BattleComboAttackState::Update(BattleEnemy& enemy, float dt) {
 }
 
 void BattleComboAttackState::Exit(BattleEnemy& enemy) {
+	contactDamageWindow_ = -1;
 	enemy.SetCanAct(true);
 	if (auto anim = enemy.GetAnimation()) {
 		anim->StopAll();

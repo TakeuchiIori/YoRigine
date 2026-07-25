@@ -10,9 +10,9 @@
 // ============================================================
 AreaManager::AreaManager()
 {
-	indexAj_.Add("names",    &savedNames_)
-	         .Add("types",    &savedTypes_)
-	         .Add("purposes", &savedPurposes_);
+	indexAj_.Add("names", &savedNames_)
+		.Add("types", &savedTypes_)
+		.Add("purposes", &savedPurposes_);
 }
 
 AreaManager* AreaManager::GetInstance()
@@ -54,7 +54,7 @@ void AreaManager::ForgetTarget(void* targetKey)
 	}
 }
 
-void AreaManager::Draw(Line* line,
+void AreaManager::Draw(YoRigine::Line* line,
 	const std::initializer_list<std::string>& excludes)
 {
 	if (!isDebugDrawEnabled_ || !line) return;
@@ -73,7 +73,7 @@ void AreaManager::Draw(Line* line,
 	}
 }
 
-void AreaManager::DrawArea(const std::string& name, Line* line)
+void AreaManager::DrawArea(const std::string& name, YoRigine::Line* line)
 {
 	auto area = GetArea(name);
 	if (area) {
@@ -162,6 +162,7 @@ Vector3 AreaManager::ClampToNearestArea(const Vector3& position) const
 	// 2) 外側にいる場合は「境界が最も近いエリア」を選んでクランプする。
 	//    GetDistanceFromBoundary は外側で負、絶対値が境界までの距離。
 	std::shared_ptr<BaseArea> nearestArea = nullptr;
+
 	float minAbs = FLT_MAX;
 
 	for (const auto& [name, area] : areas_) {
@@ -174,6 +175,9 @@ Vector3 AreaManager::ClampToNearestArea(const Vector3& position) const
 	}
 
 	if (nearestArea) {
+		if (nearestArea->GetPurpose() != AreaPurpose::Boundary) {
+			return position;
+		}
 		return nearestArea->ClampPosition(position);
 	}
 	return position;
@@ -261,7 +265,7 @@ void AreaManager::LoadAllFromFile(const std::string& filepath)
 
 ///************************* オブジェクト登録管理 *************************///
 
-void AreaManager::RegisterObject(WorldTransform* wt, const std::string& tag)
+void AreaManager::RegisterObject(YoRigine::WorldTransform* wt, const std::string& tag)
 {
 	if (!wt) return;
 
@@ -272,7 +276,7 @@ void AreaManager::RegisterObject(WorldTransform* wt, const std::string& tag)
 	restrictedObjects_.emplace_back(wt, tag);
 }
 
-void AreaManager::UnregisterObject(WorldTransform* wt)
+void AreaManager::UnregisterObject(YoRigine::WorldTransform* wt)
 {
 	if (!wt) return;
 
@@ -288,7 +292,7 @@ void AreaManager::UnregisterObject(WorldTransform* wt)
 	);
 }
 
-void AreaManager::UpdateSingleObject(WorldTransform* wt)
+void AreaManager::UpdateSingleObject(YoRigine::WorldTransform* wt)
 {
 	bool hasBoundaryArea = false;
 	for (const auto& [name, area] : areas_) {
@@ -339,7 +343,7 @@ void AreaManager::UpdateRestrictedObjects()
 	}
 }
 
-void AreaManager::SetObjectRestrictionEnabled(WorldTransform* wt, bool enabled)
+void AreaManager::SetObjectRestrictionEnabled(YoRigine::WorldTransform* wt, bool enabled)
 {
 	if (!wt) return;
 

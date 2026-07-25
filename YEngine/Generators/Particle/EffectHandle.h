@@ -79,6 +79,28 @@ public:
                         const Vector3& position,
                         int            countEach = 20);
 
+    /// <summary>
+    /// グループ（複数 System を束ねた完成エフェクト）を名前指定でワンショット発火する。
+    /// この関数を呼ぶたびにグループ内の全エミッタが 1 回ずつ Emit される（撃ちっぱなし）。
+    /// System 名をいちいち列挙する EmitAll({...}) の置き換え：
+    /// 中身の System 構成を気にせず、グループ名 1 つで発生させられる。
+    /// </summary>
+    /// <param name="groupName">YEmitterGroup 名</param>
+    /// <param name="position">ワールド位置</param>
+    /// <param name="emitCount">1 エミッタあたり放出数（-1 = 各エミッタ設定に従う）</param>
+    static void EmitGroup(const std::string& groupName,
+                          const Vector3&     position,
+                          int                emitCount = -1);
+
+    /// <summary>
+    /// 名前で指定したエフェクトをワンショット再生したときの「再生尺（秒）」を返す。
+    /// ＝発火してから最後の粒が消えるまでの時間。演出が終わった瞬間に何かを
+    /// 起こしたい（例: スポーン演出後に敵を出す）ときのタイマー値に使う。
+    /// Group（束ね）→ 各Systemの最大寿命の最大値。System単体 → その最大寿命。
+    /// 見つからなければ 0 を返す。
+    /// </summary>
+    static float GetEffectDuration(const std::string& name);
+
     // ── 操作 ────────────────────────────────────────────────────────────
 
     void SetPosition(const Vector3& pos);

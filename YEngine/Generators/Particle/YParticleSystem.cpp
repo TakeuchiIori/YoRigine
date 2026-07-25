@@ -39,6 +39,7 @@
 #include "Modules/Update/Transform/UpdateScale.h"
 
 #include "Modules/Update/UV/UpdateUVScroll.h"
+#include "Modules/Update/UV/UpdateUVFlicker.h"
 
 #ifdef USE_IMGUI
 #include "imgui.h"
@@ -103,6 +104,14 @@ void YParticleSystem::Update(float deltaTime)
 		// 個別の経過時間を進める
 		attr.currentTime += deltaTime;
 
+		// 不滅粒は寿命で死なず、モジュール更新だけ受け続ける（Persistent 用）
+		if (attr.immortal) {
+			for (auto& module : updateModules_) {
+				module->OnUpdate(attributes_.data(), i, deltaTime);
+			}
+			continue;
+		}
+
 		// 寿命チェック（死亡の瞬間に OnDeath フックを発火 → サブエミッタ等）
 		if (attr.currentTime >= attr.lifeTime) {
 			for (auto& module : updateModules_) {
@@ -119,7 +128,7 @@ void YParticleSystem::Update(float deltaTime)
 	}
 }
 
-void YParticleSystem::Emit(const Vector3& position, int count)
+void YParticleSystem::Emit(const Vector3& position, int count, bool prewarmAge, bool immortal)
 {
 	for (int i = 0; i < count; ++i) {
 		int index = FindEmptyIndex();
@@ -129,6 +138,7 @@ void YParticleSystem::Emit(const Vector3& position, int count)
 		// ※ lifeTime も必ずリセット（前回使用値が残るバグ防止）
 		auto& a = attributes_[index];
 		a.isActive       = true;
+		a.immortal       = immortal; // 不滅（寿命で死なない）
 		a.position       = position;
 		a.currentTime    = 0.0f;
 		a.lifeTime       = 1.0f;  // SpawnLifeTime モジュールが上書きする
@@ -155,6 +165,12 @@ void YParticleSystem::Emit(const Vector3& position, int count)
 		// （UpdateSizeOverLifetime / UpdateColorOverLifetime の補間起点）
 		a.initialScale = a.scale;
 		a.initialColor = a.color;
+
+		// プリウォーム：経過時間を寿命内のランダム値にして集団の年齢をばらけさせる。
+		// SpawnLifeTime 適用後の lifeTime を使うため、この位置で行う。
+		if (prewarmAge && a.lifeTime > 0.0f) {
+			a.currentTime = ParticleMath::RandomRange(0.0f, a.lifeTime);
+		}
 	}
 }
 
@@ -564,6 +580,7 @@ void YParticleSystem::ShowEditor()
 		static UpdateModuleEntry availableUpdateModules[] = {
 			{ "速度", []() { return std::make_shared<UpdateVelocity>(); } },
 			{  "UVスクロール", []() { return std::make_shared<UpdateUVScroll>(); } },
+			{  "UVちらつき", []() { return std::make_shared<UpdateUVFlicker>(); } },
 			{ "重力", []() { return std::make_shared<UpdateGravity>(); } },
 			{ "カラー", []() { return std::make_shared<UpdateColor>(); } },
 			{ "アトラクタ", []() { return std::make_shared<UpdateAttractor>(); } },
