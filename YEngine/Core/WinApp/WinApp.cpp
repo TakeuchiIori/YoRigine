@@ -1,7 +1,6 @@
 #include "WinApp.h"
 #define IDI_ICON1 101
 
-WinApp *WinApp::instance = nullptr;
 std::wstring WinApp::textInputBuffer_;
 
 #ifdef USE_IMGUI
@@ -61,10 +60,8 @@ std::wstring WinApp::PopTextInput() {
 /// WinApp シングルトン取得
 /// </summary>
 WinApp *WinApp::GetInstance() {
-  if (instance == nullptr) {
-    instance = new WinApp;
-  }
-  return instance;
+  static WinApp instance;
+  return &instance;
 }
 
 /// <summary>
@@ -101,13 +98,13 @@ void WinApp::Initialize() {
   //-----------------------------------------
   // ウィンドウ生成
   //-----------------------------------------
-  hwnd_ = CreateWindow(wc_.lpszClassName,              // クラス名
-                       L"ゴルディン", // タイトル
-                       WS_OVERLAPPEDWINDOW,            // ウィンドウスタイル
-                       CW_USEDEFAULT,                  // X
-                       CW_USEDEFAULT,                  // Y
-                       wrc.right - wrc.left,           // 横幅
-                       wrc.bottom - wrc.top,           // 高さ
+  hwnd_ = CreateWindow(wc_.lpszClassName,    // クラス名
+                       L"ゴルディン",        // タイトル
+                       WS_OVERLAPPEDWINDOW,  // ウィンドウスタイル
+                       CW_USEDEFAULT,        // X
+                       CW_USEDEFAULT,        // Y
+                       wrc.right - wrc.left, // 横幅
+                       wrc.bottom - wrc.top, // 高さ
                        nullptr, nullptr, wc_.hInstance, nullptr);
 
   //-----------------------------------------
@@ -134,9 +131,6 @@ void WinApp::Finalize() {
   CloseWindow(hwnd_);
   UnregisterClass(wc_.lpszClassName, wc_.hInstance);
   CoUninitialize();
-
-  delete instance;
-  instance = nullptr;
 }
 
 /// <summary>

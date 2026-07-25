@@ -61,7 +61,6 @@ namespace EditorTheme
 // ─────────────────────────────────────────────────────────────────────────────
 //  静的メンバ
 // ─────────────────────────────────────────────────────────────────────────────
-Editor* Editor::instance_ = nullptr;
 bool    Editor::showEditor_ = false;
 
 // =============================================================================
@@ -69,10 +68,8 @@ bool    Editor::showEditor_ = false;
 // =============================================================================
 Editor* Editor::GetInstance()
 {
-	if (!instance_) {
-		instance_ = new Editor();
-	}
-	return instance_;
+	static Editor instance;
+	return &instance;
 }
 
 // =============================================================================
@@ -100,8 +97,6 @@ void Editor::Finalize()
 {
 	SaveSettings();
 	gameUIs_.clear();
-	delete instance_;
-	instance_ = nullptr;
 }
 
 // =============================================================================

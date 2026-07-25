@@ -40,8 +40,6 @@ public:
 
 private:
   ///************************* メンバ変数 *************************///
-  static WinApp *instance;
-
   WinApp() = default;
   ~WinApp() = default;
   WinApp(const WinApp &) = delete;

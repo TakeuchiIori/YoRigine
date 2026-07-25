@@ -8,17 +8,12 @@
 #include <Collision/OBB/OBBCollider.h>
 #include <Collision/Sphere/SphereCollider.h>
 #include <cassert>
-ObjectManager* ObjectManager::instance_ = nullptr;
-
-
 /// <summary>
 /// シングルトンインスタンス取得
 /// </summary>
 ObjectManager* ObjectManager::GetInstance() {
-	if (!instance_) {
-		instance_ = new ObjectManager;
-	}
-	return instance_;
+	static ObjectManager instance;
+	return &instance;
 }
 
 
@@ -98,9 +93,6 @@ void ObjectManager::Finalize() {
 
 	// 借用ポインタを手放す (ダングリング防止)
 	collisionManager_ = nullptr;
-
-	delete instance_;
-	instance_ = nullptr;
 }
 
 

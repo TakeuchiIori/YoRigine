@@ -259,8 +259,6 @@ private:
   // SetCollisionManager() で注入すること。
   YoRigine::CollisionManager *collisionManager_ = nullptr;
 
-  static ObjectManager *instance_;
-
   // プールアロケータ
   PoolAllocator<PlacedObject, MAX_OBJECTS> objectPool_;
 

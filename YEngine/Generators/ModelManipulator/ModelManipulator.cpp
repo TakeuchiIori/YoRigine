@@ -26,10 +26,9 @@
 
 namespace YoRigine {
 
-	ModelManipulator* ModelManipulator::instance_ = nullptr;
 	ModelManipulator* ModelManipulator::GetInstance() {
-		if (!instance_) instance_ = new ModelManipulator;
-		return instance_;
+		static ModelManipulator instance;
+		return &instance;
 	}
 
 	// ============================================================
@@ -512,8 +511,6 @@ namespace YoRigine {
 		}
 #endif
 		if (objectManager_) objectManager_->Finalize();
-		delete instance_;
-		instance_ = nullptr;
 	}
 
 	// ============================================================
