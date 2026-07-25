@@ -64,7 +64,7 @@ namespace YoRigine {
         void DrawPreview();
 
         //カメラをセット
-        void SetCamera(Camera* camera) { camera_ = camera; }
+        void SetCamera(YoRigine::Camera* camera) { camera_ = camera; }
 
     private:
         VfxMeshEditor();
@@ -110,7 +110,7 @@ namespace YoRigine {
         static VfxEffectAsset MakePreset(VfxPreset preset);
 
         DirectXCommon* dxCommon_ = nullptr;
-        Camera* camera_ = nullptr; // ★追加
+        YoRigine::Camera* camera_ = nullptr; // ★追加
         std::string    scanRoot_;
 
         std::vector<VfxEffectEntry> entries_;

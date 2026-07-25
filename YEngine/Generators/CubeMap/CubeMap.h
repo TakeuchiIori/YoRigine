@@ -18,11 +18,11 @@ namespace YoRigine {
 	{
 	public:
 		///************************* 基本関数 *************************///
-		void Initialize(Camera* camera, std::string textureFilePath);
+		void Initialize(YoRigine::Camera* camera, std::string textureFilePath);
 		void Update();
 		void Draw();
 		void SetTextureFilePath(const std::string& filePath);
-		WorldTransform wt_;
+		YoRigine::WorldTransform wt_;
 
 	private:
 		///************************* 内部処理 *************************///
@@ -38,7 +38,7 @@ namespace YoRigine {
 
 		std::shared_ptr<Mesh> mesh_ = nullptr;
 		std::unique_ptr<MaterialColor> materialColor_;
-		Camera* camera_ = nullptr;
+		YoRigine::Camera* camera_ = nullptr;
 
 
 		std::string textureFilePath_;

@@ -51,7 +51,7 @@ void GameScene::Initialize() {
 	//------------------------------------------------------------
 
 	// 出力用カメラの実体を生成
-	sceneCamera_ = std::make_unique<Camera>();
+	sceneCamera_ = std::make_unique<YoRigine::Camera>();
 	auto director = CameraDirector::GetInstance();
 	director->Initialize();
 

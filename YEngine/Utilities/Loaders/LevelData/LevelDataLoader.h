@@ -72,7 +72,7 @@ public:
 	void Update();
 
 	// 読み込んだ全オブジェクトを描画
-	void Draw(Camera* camera);
+	void Draw(YoRigine::Camera* camera);
 
 private:
 	///************************* メンバ変数 *************************///
@@ -84,8 +84,8 @@ private:
 	nlohmann::json deserialized_;					// デシリアライズ済みJSONデータ
 
 	std::unique_ptr<LevelData> levelData_;			// レベルデータ本体
-	std::map<std::string, Model*> models_;			// モデルキャッシュ
+	std::map<std::string, YoRigine::Model*> models_;			// モデルキャッシュ
 
-	std::vector<std::unique_ptr<Object3d>> objects_;		 // シーン上の3Dオブジェクト
-	std::vector<std::unique_ptr<WorldTransform>> worldTransforms_; // オブジェクトの変換情報
+	std::vector<std::unique_ptr<YoRigine::Object3d>> objects_;		 // シーン上の3Dオブジェクト
+	std::vector<std::unique_ptr<YoRigine::WorldTransform>> worldTransforms_; // オブジェクトの変換情報
 };

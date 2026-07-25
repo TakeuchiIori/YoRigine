@@ -288,7 +288,7 @@ void MyGame::Draw() {
 	{
 		auto* pip = PipCameraSystem::GetInstance();
 		auto* scene = SceneManager::GetInstance()->GetScene();
-		Camera* sceneCam = scene ? scene->GetSceneCamera() : nullptr;
+		YoRigine::Camera* sceneCam = scene ? scene->GetSceneCamera() : nullptr;
 		if (pip->IsEnabled() && sceneCam) {
 			// メインパスを真に GPU 完了まで待つ (シェーダは gCamera.viewProjection を
 			// 使うので、メイン draw が GPU で CB を読み終える前に PiP の値で上書きしてはいけない)

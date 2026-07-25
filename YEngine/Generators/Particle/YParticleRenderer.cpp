@@ -107,7 +107,7 @@ Matrix4x4 CreateYAxisBillboard(const Vector3& position, const Vector3& cameraPos
 }
 
 
-void YParticleRenderer::AddSystem(const YParticleSystem& system, Camera* camera) {
+void YParticleRenderer::AddSystem(const YParticleSystem& system, YoRigine::Camera* camera) {
     if (!camera) return;
     camera_ = camera;
 

@@ -38,20 +38,20 @@ Matrix4x4 RemoveScaleFromMatrix(const Matrix4x4& matrix) {
 // ============================================================
 // 初期化処理
 // ============================================================
-void PlayerSword::Initialize(Camera* camera) {
+void PlayerSword::Initialize(YoRigine::Camera* camera) {
 
 	camera_ = camera;
 	// ------------------------------------------------------------
 	// モデル初期化
 	// ------------------------------------------------------------
-	obj_ = std::make_unique<Object3d>();
+	obj_ = std::make_unique<YoRigine::Object3d>();
 	obj_->Initialize();
 	obj_->SetModel("Sword_Golden.obj");
 	wt_.Initialize();
 	colliderWT_.Initialize();
 
 	// 魔法スタイル時の見た目（杖）。剣と同じ手ジョイントに追従させる。
-	staffObj_ = std::make_unique<Object3d>();
+	staffObj_ = std::make_unique<YoRigine::Object3d>();
 	staffObj_->Initialize();
 	staffObj_->SetModel("Staff.obj");
 	staffWT_.Initialize();
@@ -158,7 +158,7 @@ void PlayerSword::SetPlayerWeaponPosition() {
 // 手ジョイントを基準にオフセットからワールド行列を組む共通処理
 // ============================================================
 Matrix4x4 PlayerSword::ComposeWeaponMatrixFromHand(const Vector3& pos, const Vector3& rot, const Vector3& scale) const {
-	WorldTransform& handWT = obj3d_
+	YoRigine::WorldTransform& handWT = obj3d_
 		->GetModel()
 		->GetSkeleton()
 		->GetJoints()[handleIndex_]
@@ -193,7 +193,7 @@ Vector3 PlayerSword::GetHandPosition() {
 	auto* skeleton = obj->GetModel()->GetSkeleton();
 	if (!skeleton) return Vector3{};
 
-	WorldTransform& handWT = skeleton->GetJoints()[handleIndex_].GetWorldTransform();
+	YoRigine::WorldTransform& handWT = skeleton->GetJoints()[handleIndex_].GetWorldTransform();
 	return Vector3(handWT.matWorld_.m[3][0], handWT.matWorld_.m[3][1], handWT.matWorld_.m[3][2]);
 }
 

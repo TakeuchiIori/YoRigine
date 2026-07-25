@@ -24,7 +24,7 @@ void TimelinePanel::Initialize(MotionEditorContext* context)
 	// ── シーク時のコールバック設定（1回だけ登録）──
 	dopeSheet_.SetSeekCallback([this](int frame) {
 		context_->scrubTime = frame / static_cast<float>(fps_);
-		Object3d* t = context_->GetTargetObject();
+		YoRigine::Object3d* t = context_->GetTargetObject();
 		if (t && t->GetModel() && t->GetModel()->GetMotionSystem()) {
 			auto* ms = t->GetModel()->GetMotionSystem();
 			ms->Stop();
@@ -96,7 +96,7 @@ void TimelinePanel::DrawImGui()
 		ImGui::SameLine(0, 4);
 		ImGui::SetNextItemWidth(canvasW - 300);
 
-		Object3d* target = context_->GetTargetObject();
+		YoRigine::Object3d* target = context_->GetTargetObject();
 
 		// スライダー操作時に一時停止＆同期
 		if (ImGui::SliderFloat("##scrub", &context_->scrubTime, 0.0f, duration, "%.3f s")) {
@@ -139,7 +139,7 @@ void TimelinePanel::DrawImGui()
 		// ドープシート操作時に一時停止＆同期
 		dopeSheet_.SetSeekCallback([this](int frame) {
 			context_->scrubTime = frame / static_cast<float>(fps_);
-			Object3d* t = context_->GetTargetObject();
+			YoRigine::Object3d* t = context_->GetTargetObject();
 			if (t && t->GetModel()) {
 				auto* ms = t->GetModel()->GetMotionSystem();
 				if (ms) {

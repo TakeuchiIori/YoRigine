@@ -188,7 +188,7 @@ namespace YoRigine {
 			bool isTargetAndBoneDraw = (motionEditor_.IsDrawBone() && obj->id == motionEditor_.GetTargetObjectId());
 			if (isTargetAndBoneDraw) continue;
 
-			Model* model = obj->object->GetModel();
+			YoRigine::Model* model = obj->object->GetModel();
 			const bool canInstance = (model && !obj->isAnimation && !model->GetHasBones());
 
 			// カメラ遮蔽フェードは alpha blend ではなく深度書き込み ON の
@@ -363,7 +363,7 @@ namespace YoRigine {
 			// 巨大スケールの地面などがシャドウマップを埋めて影がチラつくのを防ぐ。
 			if (!obj->castShadow) continue;
 
-			Model* model = obj->object->GetModel();
+			YoRigine::Model* model = obj->object->GetModel();
 			const bool canInstance = (model && !obj->isAnimation && !model->GetHasBones());
 
 			if (canInstance) {

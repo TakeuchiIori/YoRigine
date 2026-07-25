@@ -8,7 +8,7 @@
 #include <utility>
 
 class Player;
-class Camera;
+namespace YoRigine { class Camera; }
 
 ///************************* 戦闘フォーメーションデータ *************************///
 struct BattleFormationData {
@@ -76,7 +76,7 @@ public:
 	static BattleEnemyManager* GetCurrent() { return current_; }
 
 	// 初期化処理
-	void Initialize(Camera* camera);
+	void Initialize(YoRigine::Camera* camera);
 
 	// 更新処理
 	void Update();
@@ -254,7 +254,7 @@ private:
 	///************************* メンバ変数 *************************///
 
 	// 外部参照
-	Camera* camera_ = nullptr;
+	YoRigine::Camera* camera_ = nullptr;
 	Player* player_ = nullptr;
 	BattleEndCallback battleEndCallback_;
 	BattleEnemyDefeatedCallback enemyDefeatedCallback_;

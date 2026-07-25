@@ -7,7 +7,7 @@
 #include "Virtuals/VirtualCamera.h"
 #include <WorldTransform/WorldTransform.h>
 
-class Line;
+namespace YoRigine { class Line; }
 
 // ============================================================
 // カメラディレクタークラス
@@ -45,16 +45,16 @@ public:
 	void SnapToActiveCamera();
 
 	// 各 VirtualCamera のデバッグ 3D 描画を一括呼び出し
-	void DrawDebug3D(Line& line);
+	void DrawDebug3D(YoRigine::Line& line);
 
 	// ============================================================
 	// ターゲット管理（プレイヤーや敵の座標をカメラが探せるようにする）
 	// ============================================================
-	void RegisterTarget(const std::string& name, const WorldTransform* transform) {
+	void RegisterTarget(const std::string& name, const YoRigine::WorldTransform* transform) {
 		targetRegistry_[name] = transform;
 	}
 
-	const WorldTransform* FindTarget(const std::string& name) const {
+	const YoRigine::WorldTransform* FindTarget(const std::string& name) const {
 		if (targetRegistry_.count(name)) return targetRegistry_.at(name);
 		return nullptr;
 	}
@@ -101,7 +101,7 @@ private:
 	std::shared_ptr<VirtualCamera> activeCamera_ = nullptr; // 現在メインとなっているカメラ
 	std::shared_ptr<VirtualCamera> prevCamera_ = nullptr;   // 1つ前のカメラ（補間用）
 
-	std::unordered_map<std::string, const WorldTransform*> targetRegistry_;
+	std::unordered_map<std::string, const YoRigine::WorldTransform*> targetRegistry_;
 	BlendSettings blendSettings_;
 
 	// 補間（ブレンド）用

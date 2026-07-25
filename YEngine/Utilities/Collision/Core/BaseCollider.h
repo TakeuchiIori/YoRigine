@@ -108,7 +108,7 @@ public:
   virtual Vector3 GetCenterPosition() const = 0;
 
   // ワールドトランスフォーム取得
-  virtual const WorldTransform &GetWorldTransform() = 0;
+  virtual const YoRigine::WorldTransform &GetWorldTransform() = 0;
 
   // 回転角度取得（オイラー角）
   virtual Vector3 GetEulerRotation() const = 0;
@@ -146,11 +146,11 @@ public:
   ColliderShape GetShape() const { return shape_; }
 
   // カメラ設定（デバッグ表示などで使用）
-  void SetCamera(Camera *camera) { camera_ = camera; }
+  void SetCamera(YoRigine::Camera *camera) { camera_ = camera; }
 
   // ワールドトランスフォーム設定
-  WorldTransform *GetWT() { return wt_; }
-  void SetWT(WorldTransform *worldTransform) { wt_ = worldTransform; }
+  YoRigine::WorldTransform *GetWT() { return wt_; }
+  void SetWT(YoRigine::WorldTransform *worldTransform) { wt_ = worldTransform; }
 
   // 当たり判定の有効フラグ設定
   void SetCollisionEnabled(bool enabled) { isCollisionEnabled_ = enabled; }
@@ -234,10 +234,10 @@ protected:
   ///************************* 継承クラス用変数 *************************///
 
   // コライダー可視化ライン描画用
-  std::unique_ptr<Line> line_ = nullptr;
+  std::unique_ptr<YoRigine::Line> line_ = nullptr;
 
   // 所属オブジェクトのワールドトランスフォーム
-  WorldTransform *wt_ = nullptr;
+  YoRigine::WorldTransform *wt_ = nullptr;
 
   // 衝突タイプ識別ID（CollisionTypeIdDefで定義）
   uint32_t typeID_ = 0u;
@@ -264,7 +264,7 @@ protected:
   bool lockPenetrationY_ = false;
 
   // デバッグ表示用カメラ参照
-  Camera *camera_ = nullptr;
+  YoRigine::Camera *camera_ = nullptr;
 
   // コライダーに設定する質量
   float mass_ = 1.0f;

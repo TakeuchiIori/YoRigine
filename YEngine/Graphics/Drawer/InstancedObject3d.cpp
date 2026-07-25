@@ -70,12 +70,12 @@ void InstancedObject3d::Begin() {
   frameCamera_ = nullptr;
 }
 
-void InstancedObject3d::Begin(Camera *camera) {
+void InstancedObject3d::Begin(YoRigine::Camera *camera) {
   Begin();
   frameCamera_ = camera;
 }
 
-void InstancedObject3d::Submit(Model *model, const Instance &src) {
+void InstancedObject3d::Submit(YoRigine::Model *model, const Instance &src) {
   if (!model)
     return;
 
@@ -114,9 +114,9 @@ void InstancedObject3d::Submit(const ObjectManager::PlacedObject &placed) {
          });
 }
 
-void InstancedObject3d::Submit(Object3d &object,
-                               const WorldTransform &transform) {
-  Model *model = object.GetModel();
+void InstancedObject3d::Submit(YoRigine::Object3d &object,
+                               const YoRigine::WorldTransform &transform) {
+  YoRigine::Model *model = object.GetModel();
   if (!model)
     return;
   const Matrix4x4 visualWorld =
@@ -132,7 +132,7 @@ void InstancedObject3d::Submit(Object3d &object,
                 });
 }
 
-void InstancedObject3d::AddInstance(Model *model, const InstanceData &data) {
+void InstancedObject3d::AddInstance(YoRigine::Model *model, const InstanceData &data) {
   if (!model)
     return;
   auto &batch = batches_[model];
@@ -243,7 +243,7 @@ InstancedObject3d::AcquireShadowSlot(Batch &batch, uint32_t needed) {
   return slot;
 }
 
-void InstancedObject3d::DrawAll(Camera *camera) {
+void InstancedObject3d::DrawAll(YoRigine::Camera *camera) {
   if (totalInstances_ == 0 || !camera)
     return;
 

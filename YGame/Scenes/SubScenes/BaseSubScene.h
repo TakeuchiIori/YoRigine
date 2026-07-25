@@ -24,7 +24,7 @@ public:
 	virtual ~BaseSubScene() = default;
 
 	///************************* 基本関数（純粋仮想） *************************///
-	virtual void Initialize(Camera* camera, Player* player) = 0;
+	virtual void Initialize(YoRigine::Camera* camera, Player* player) = 0;
 	virtual void Update() = 0;
 	virtual void DrawObject() = 0;
 	virtual void DrawNonOffscreen() = 0;
@@ -97,7 +97,7 @@ protected:
 	///************************* メンバ変数 *************************///
 
 	std::string sceneName_;
-	Camera* sceneCamera_ = nullptr;
+	YoRigine::Camera* sceneCamera_ = nullptr;
 	Player* player_ = nullptr;
 
 	CameraMode currentCameraMode_ = CameraMode::FOLLOW;

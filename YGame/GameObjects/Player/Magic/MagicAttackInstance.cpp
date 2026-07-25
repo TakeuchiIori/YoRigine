@@ -39,7 +39,7 @@ void MagicAttackInstance::Initialize(const MagicActionData &action,
   }
   wt_.UpdateMatrix();
 
-  Camera *camera = owner_ && owner_->GetPlayerCamera()
+  YoRigine::Camera *camera = owner_ && owner_->GetPlayerCamera()
                        ? owner_->GetPlayerCamera()->GetLastCamera()
                        : nullptr;
 

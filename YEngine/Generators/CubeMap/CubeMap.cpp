@@ -7,7 +7,7 @@
 /// キューブマップの初期化（メッシュ生成・テクスチャ読み込み・行列準備）
 /// </summary>
 namespace YoRigine {
-	void CubeMap::Initialize(Camera* camera, std::string textureFilePath)
+	void CubeMap::Initialize(YoRigine::Camera* camera, std::string textureFilePath)
 	{
 		camera_ = camera;
 		textureFilePath_ = textureFilePath;

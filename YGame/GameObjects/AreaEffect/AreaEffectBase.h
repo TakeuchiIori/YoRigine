@@ -10,7 +10,7 @@
 #include <memory>
 #include <vector>
 
-class Line;
+namespace YoRigine { class Line; }
 
 // ============================================================
 // エリアエフェクトの基底クラス（ゲーム側）。
@@ -37,7 +37,7 @@ public:
 	void Drive(const std::vector<Target>& targets, float deltaTime);
 
 	// デバッグ描画（円の輪郭）
-	void Draw(Line* line);
+	void Draw(YoRigine::Line* line);
 
 	///--- アクセッサ ---///
 

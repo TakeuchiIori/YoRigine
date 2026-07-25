@@ -19,20 +19,20 @@
 // ============================================================
 // タイトルシーンのプレイヤークラス
 // ============================================================
-class DemoPlayer : public BaseObject {
+class DemoPlayer : public YoRigine::BaseObject {
 public:
 	// ============================================================
 	// 基本関数
 	// ============================================================
 	~DemoPlayer();
-	void Initialize(Camera* camera) override;
+	void Initialize(YoRigine::Camera* camera) override;
 
 	void Update() override;
 
 	void Draw() override;
 	void DrawAnimation() override;
 	void DrawCollision() override;
-	void DrawBone(Line& line);
+	void DrawBone(YoRigine::Line& line);
 	void DrawShadow();
 
 	// ============================================================
@@ -57,7 +57,7 @@ public:
 	Vector3 GetWorldPosition();
 	void SetPosition(const Vector3& position) { wt_.translate_ = position; }
 	Vector3 GetCameraRotation() const;
-	Object3d* GetObject3d() { return obj_.get(); }
+	YoRigine::Object3d* GetObject3d() { return obj_.get(); }
 
 	void SetFollowCamera(FollowCamera* camera) { followCamera_ = camera; }
 	void SetMotion(const std::string& motionName) {
@@ -84,7 +84,7 @@ private:
 
 	std::unique_ptr<PlayerSword> playerSword_;
 	std::unique_ptr<PlayerShield> playerShield_;
-	std::unique_ptr<Line> boneLine_;
+	std::unique_ptr<YoRigine::Line> boneLine_;
 
 	Vector3 anchorPoint_ = { 0.0f, -1.0f, 0.0f };
 

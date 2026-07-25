@@ -43,11 +43,11 @@ public: // メンバ関数
 
 public: // アクセッサ
 	// getter
-	Camera* GetDefaultCamera() const { return defaultCamera_; }
+	YoRigine::Camera* GetDefaultCamera() const { return defaultCamera_; }
 
 	// setter
 	YoRigine::DirectXCommon* GetDxCommon() const { return dxCommon_; }
-	void SetDefaultCamera(Camera* camera) { this->defaultCamera_ = camera; }
+	void SetDefaultCamera(YoRigine::Camera* camera) { this->defaultCamera_ = camera; }
 
 	/// <summary>
 	/// ルートシグネチャをセット
@@ -76,7 +76,7 @@ private:
 	// DirectX共通クラスのポインタ
 	YoRigine::DirectXCommon* dxCommon_;
 	// デフォルトカメラのポインタ
-	Camera* defaultCamera_ = nullptr;
+	YoRigine::Camera* defaultCamera_ = nullptr;
 
 	// ルートシグネチャとグラフィックパイプラインステートのポインタ
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature_ = nullptr;

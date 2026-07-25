@@ -43,8 +43,8 @@ public:
 
   // 配置済みオブジェクトの情報
   struct PlacedObject {
-    std::unique_ptr<Object3d> object;
-    std::unique_ptr<WorldTransform> worldTransform;
+    std::unique_ptr<YoRigine::Object3d> object;
+    std::unique_ptr<YoRigine::WorldTransform> worldTransform;
     std::string modelName;
     std::string modelPath;
     // シーン内で一意な識別子 (TriggerAction 等がターゲットを名前参照する用途)。
@@ -171,7 +171,7 @@ public:
 
   ///************************* オブジェクト検索 *************************///
 
-  Object3d *GetObject3dById(int id);
+  YoRigine::Object3d *GetObject3dById(int id);
   PlacedObject *GetObjectById(int id);
   const PlacedObject *GetObjectById(int id) const;
 
@@ -209,7 +209,7 @@ public:
 
   int GetObjectCount() const { return static_cast<int>(idToObject_.size()); }
   int GetNextObjectId() const { return nextObjectId_; }
-  void SetCamera(Camera *camera) { camera_ = camera; }
+  void SetCamera(YoRigine::Camera *camera) { camera_ = camera; }
 
   // 直前フレームの Frustum culling 統計 (シーンエディタで確認用)
   int GetLastFrameCulledCount() const { return lastFrameCulledCount_; }
@@ -253,7 +253,7 @@ private:
   ObjectManager(const ObjectManager &) = delete;
   ObjectManager &operator=(const ObjectManager &) = delete;
 
-  Camera *camera_ = nullptr;
+  YoRigine::Camera *camera_ = nullptr;
 
   // 依存先マネージャ (借用のみ・非所有)。Initialize() 前に
   // SetCollisionManager() で注入すること。

@@ -26,7 +26,7 @@ VfxMeshElement::VfxMeshElement(
 std::unique_ptr<VfxMeshElement> VfxMeshElement::CreateComposed(
     VfxGeometryType geomType, const VfxGeometryParams& geomParams,
     VfxMaterialType matType,  const VfxMaterialParams& matParams,
-    Camera* camera)
+    YoRigine::Camera* camera)
 {
     auto geometry = GeometryRegistry::Instance().Create(geomType, geomParams);
     auto material = MaterialRegistry::Instance().Create(matType, matParams);

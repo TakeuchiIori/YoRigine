@@ -61,7 +61,7 @@ private:
 	///************************* メンバ変数 *************************///
 
 	// 出力用カメラ（実体）
-	std::unique_ptr<Camera> sceneCamera_;
+	std::unique_ptr<YoRigine::Camera> sceneCamera_;
 	CameraMode cameraMode_;
 	std::unique_ptr<CameraEditor> cameraEditor_;
 	bool isDebugCamera_ = false;

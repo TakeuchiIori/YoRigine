@@ -23,7 +23,7 @@ Vector3 CapsuleCollider::GetCenterPosition() const {
   return worldPos + centerOffset_;
 }
 
-const WorldTransform &CapsuleCollider::GetWorldTransform() { return *wt_; }
+const YoRigine::WorldTransform &CapsuleCollider::GetWorldTransform() { return *wt_; }
 
 Vector3 CapsuleCollider::GetEulerRotation() const {
   return wt_ ? wt_->rotate_ : Vector3{};

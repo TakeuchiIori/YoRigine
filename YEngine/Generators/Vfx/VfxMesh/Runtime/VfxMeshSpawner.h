@@ -32,7 +32,7 @@
 #include "Vector3.h"
 #include "Memory/PoolAllocator.h"
 
-class Camera;
+namespace YoRigine { class Camera; }
 
 namespace YoRigine { class DirectXCommon; }
 
@@ -53,7 +53,7 @@ public:
     void StopAll();
 
     /// 描画に使うカメラをセットする（毎フレーム呼ぶ）
-    void SetCamera(Camera* camera) { camera_ = camera; }
+    void SetCamera(YoRigine::Camera* camera) { camera_ = camera; }
 
     // ── アセット登録 ─────────────────────────────────────────
 
@@ -201,7 +201,7 @@ private:
     void DrawEffect(ActiveEffect& fx);
 
     YoRigine::DirectXCommon* dxCommon_ = nullptr;
-    Camera*  camera_  = nullptr;
+    YoRigine::Camera*  camera_  = nullptr;
     uint32_t nextId_  = 1; ///< 次に発行する ID（単調増加）
 
     std::unordered_map<std::string, YoRigine::VfxEffectAsset> assetMap_;

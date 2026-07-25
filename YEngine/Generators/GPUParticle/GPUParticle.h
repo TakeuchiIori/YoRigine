@@ -95,7 +95,7 @@ public:
 	GPUParticle() = default;
 	~GPUParticle() = default;
 
-	void Initialize(const std::string& filepath, Camera* camera);
+	void Initialize(const std::string& filepath, YoRigine::Camera* camera);
 	void Update(ID3D12Resource* resource, ID3D12Resource* paramsResource, D3D12_GPU_DESCRIPTOR_HANDLE forceFieldSrv, bool trailEnabled);
 	void Draw();
 	void Reset();
@@ -132,7 +132,7 @@ public:
 	PerViewForGPU* GetPerViewData() const { return perViewData_; }
 
 	void SetMesh(std::shared_ptr<Mesh> mesh) { mesh_ = mesh; }
-	void SetCamera(Camera* camera) { camera_ = camera; }
+	void SetCamera(YoRigine::Camera* camera) { camera_ = camera; }
 	// エミッタ単位のビルボード ON/OFF（次フレームの UpdatePerView で全粒子へ反映）
 	void SetBillboard(bool enable) { billboard_ = enable; }
 
@@ -165,7 +165,7 @@ private:
 	YoRigine::DirectXCommon* dxCommon_;
 	YPipelineManager* pipelineManager_;
 	ComputeShaderManager* computeShaderManager_;
-	Camera* camera_;
+	YoRigine::Camera* camera_;
 
 	// マテリアル関連
 	std::unique_ptr<MaterialColor> materialColor_;

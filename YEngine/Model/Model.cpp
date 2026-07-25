@@ -29,6 +29,7 @@
 #endif // _DEBUG
 #include <PipelineManager/YPipelineManager.h>
 
+namespace YoRigine {
 
 // 静的メンバ変数の定義
 const std::string Model::binPath = "Resources/Binary/";
@@ -471,7 +472,7 @@ void Model::PlayUpperMotion(const std::string& directoryPath, const std::string&
 	}
 }
 
-void Model::DrawBone(Line& line, const Matrix4x4& worldMatrix)
+void Model::DrawBone(YoRigine::Line& line, const Matrix4x4& worldMatrix)
 {
 	if (skeleton_) {
 		skeleton_->Draw(line, worldMatrix);
@@ -683,5 +684,7 @@ void Model::ApplyNodeTransform(const aiScene* scene, const aiNode* node, const M
 		ApplyNodeTransform(scene, node->mChildren[i], world);
 	}
 }
+
+} // namespace YoRigine
 
 

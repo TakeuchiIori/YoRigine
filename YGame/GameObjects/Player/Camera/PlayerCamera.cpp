@@ -23,7 +23,7 @@
 // ============================================================
 // 初期化
 // ============================================================
-void PlayerCamera::Initialize(FollowCamera* followCamera, const WorldTransform* playerWT) {
+void PlayerCamera::Initialize(FollowCamera* followCamera, const YoRigine::WorldTransform* playerWT) {
     followCamera_ = followCamera;
     playerWT_     = playerWT;
 
@@ -159,7 +159,7 @@ void PlayerCamera::UpdatePreDirector() {
 // 攻撃カメラオフセットを sceneCamera に後付けで適用
 // CameraDirector::Update() + UpdateCamera() の後に呼ぶ
 // ============================================================
-void PlayerCamera::ApplyPostDirector(Camera* sceneCamera, float dt) {
+void PlayerCamera::ApplyPostDirector(YoRigine::Camera* sceneCamera, float dt) {
     if (!sceneCamera) return;
 
     // 見切れヒット判定に使う最終カメラをキャッシュ（OnAttackHit から参照）
@@ -257,7 +257,7 @@ void PlayerCamera::SetIsCloseUp(bool v) {
 // プレイヤーのピボットを最終 view-projection で NDC に投影し、
 // ハードリミットを越えた分だけ yaw / pitch を引き戻してフレーム内へ収める。
 // ============================================================
-void PlayerCamera::EnsurePlayerInFrame(Camera* sceneCamera, float dt) {
+void PlayerCamera::EnsurePlayerInFrame(YoRigine::Camera* sceneCamera, float dt) {
     if (!sceneCamera || !playerWT_) return;
 
     //------------------------------------------------------------
@@ -509,7 +509,7 @@ void PlayerCamera::FaceDefeatNextEnemy(const Vector3& enemyWorldPos) {
 //   「囲まれている」状況を見渡せるようにする。攻撃カメラ等が FOV を
 //   上書きするフレームでは自然にそちらが優先される。
 // ============================================================
-void PlayerCamera::ApplyThreatFovWiden(Camera* sceneCamera, float dt) {
+void PlayerCamera::ApplyThreatFovWiden(YoRigine::Camera* sceneCamera, float dt) {
     if (!sceneCamera) return;
 
     float target = 0.0f;
@@ -965,7 +965,7 @@ bool PlayerCamera::ResolveLookAtPos(LookAtTarget target, Vector3& outPos) const 
 // ============================================================
 // posOffset を解釈する参照フレーム（回転行列）を組む
 // ============================================================
-Matrix4x4 PlayerCamera::BuildOffsetFrame(CameraSpace space, const Camera* sceneCamera) const {
+Matrix4x4 PlayerCamera::BuildOffsetFrame(CameraSpace space, const YoRigine::Camera* sceneCamera) const {
     switch (space) {
     case CameraSpace::CameraLocal:
         return MakeRotateMatrixXYZ(sceneCamera->transform_.rotate);
@@ -1005,7 +1005,7 @@ Matrix4x4 PlayerCamera::BuildOffsetFrame(CameraSpace space, const Camera* sceneC
 // 注視ブレンド：カメラ回転を対象へ weight だけ寄せる
 // （weight=1 で完全に対象を向く。yaw は最短角で補間）
 // ============================================================
-void PlayerCamera::ApplyLookAt(Camera* sceneCamera, LookAtTarget target, float weight) const {
+void PlayerCamera::ApplyLookAt(YoRigine::Camera* sceneCamera, LookAtTarget target, float weight) const {
     if (!sceneCamera) return;
 
     Vector3 lookPos{};

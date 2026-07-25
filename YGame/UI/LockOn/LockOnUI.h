@@ -82,7 +82,7 @@ private:
 	// スプライト
 	// ============================================================
 
-	std::unique_ptr<Sprite> sprite_ = nullptr;
+	std::unique_ptr<YoRigine::Sprite> sprite_ = nullptr;
 	Vector2 defaultScale_ = {};			// テクスチャ元サイズ（スケーリングの基準）
 
 	// ============================================================

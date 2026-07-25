@@ -40,11 +40,11 @@ FieldEnemy::~FieldEnemy() {
 // ============================================================
 // 初期化
 // ============================================================
-void FieldEnemy::Initialize(Camera* camera) {
+void FieldEnemy::Initialize(YoRigine::Camera* camera) {
 	camera_ = camera;
 
 	// Object3dの初期化
-	obj_ = std::make_unique<Object3d>();
+	obj_ = std::make_unique<YoRigine::Object3d>();
 	obj_->Initialize();
 
 	// WorldTransformの初期化
@@ -400,7 +400,7 @@ void FieldEnemy::DrawCollision() {
 // ============================================================
 // 線の描画
 // ============================================================
-void FieldEnemy::DrawLine(Line* line) {
+void FieldEnemy::DrawLine(YoRigine::Line* line) {
 	if(!line || logicalState_ == FieldEnemyState::Despawn) {
 		return;
 	}

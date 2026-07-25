@@ -19,7 +19,7 @@ Vector3 AABBCollider::GetCenterPosition() const {
   return newPos;
 }
 
-const WorldTransform &AABBCollider::GetWorldTransform() { return *wt_; }
+const YoRigine::WorldTransform &AABBCollider::GetWorldTransform() { return *wt_; }
 
 Vector3 AABBCollider::GetEulerRotation() const {
   return wt_ ? wt_->rotate_ : Vector3{};

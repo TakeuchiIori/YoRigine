@@ -4,7 +4,7 @@
 
 
 class FieldEnemy;
-class Camera;
+namespace YoRigine { class Camera; }
 // ============================================================
 // プレイヤー発見時のUIクラス
 // ============================================================
@@ -16,7 +16,7 @@ public:
 	// 基本的なクラス
 	// ============================================================
 
-	EnemyAlert(const FieldEnemy* enemy, Camera* camera);
+	EnemyAlert(const FieldEnemy* enemy, YoRigine::Camera* camera);
 
 	void Initialize();
 
@@ -42,8 +42,8 @@ private:
 
 private:
 	const FieldEnemy* targetEnemy_ = nullptr;				// 追従対象の敵
-	Camera* camera_ = nullptr;								// カメラ
-	std::unique_ptr<Sprite> alertUI_ = nullptr;								// 実際のUI画像
+	YoRigine::Camera* camera_ = nullptr;								// カメラ
+	std::unique_ptr<YoRigine::Sprite> alertUI_ = nullptr;								// 実際のUI画像
 	std::unique_ptr<YoRigine::JsonManager> jsonManager_;	// 保存用のJsonManager
 
 	// 座標変換用の変数

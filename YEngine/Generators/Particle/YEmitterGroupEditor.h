@@ -52,7 +52,7 @@ public:
     // セットアップ（毎フレームまたは初期化時）
     //=================================================================
 
-    void SetCamera(Camera* camera) { camera_ = camera; }
+    void SetCamera(YoRigine::Camera* camera) { camera_ = camera; }
 
     //=================================================================
     // 描画
@@ -119,7 +119,7 @@ private:
     //=================================================================
 
     GizmoController gizmoCtrl_;
-    Camera* camera_ = nullptr;
+    YoRigine::Camera* camera_ = nullptr;
 
     // アダプタ（毎回 RebuildGizmoTargets() で作り直す）
     std::unique_ptr<YEmitterGroupGizmable>         groupGizmable_;

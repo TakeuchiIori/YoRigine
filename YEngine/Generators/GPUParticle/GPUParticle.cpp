@@ -12,7 +12,7 @@
 /// <summary>
 /// GPU パーティクルの初期化処理（各種バッファ生成）
 /// </summary>
-void GPUParticle::Initialize(const std::string& filepath, Camera* camera)
+void GPUParticle::Initialize(const std::string& filepath, YoRigine::Camera* camera)
 {
 	textureFilePath_ = filepath;
 	camera_ = camera;

@@ -18,7 +18,7 @@
 #include "ProceduralMeshBase.h"
 #include "VfxGeometryParams.h" // ApplyParams(const VfxGeometryParams&) 用
 
-class Camera;
+namespace YoRigine { class Camera; }
 
 namespace YoRigine {
 
@@ -33,7 +33,7 @@ namespace YoRigine {
         Quaternion rotation = Quaternion::Identity(); ///< 向き指定ジオメトリ（Cone / 非ビルボード Ring・Plane）で使用
         float      time     = 0.f;
         float      progress = -1.f;    ///< -1=ループ継続 / 0..1=ワンショット進捗
-        Camera*    camera   = nullptr; ///< ビルボード形状（RingGeometry 等）で使用
+        YoRigine::Camera*    camera   = nullptr; ///< ビルボード形状（RingGeometry 等）で使用
     };
 
     // ===========================================================

@@ -30,7 +30,7 @@ public:
 	BattleScene() : BaseSubScene("Battle") {}
 
 	// 初期化処理
-	void Initialize(Camera* camera, Player* player) override;
+	void Initialize(YoRigine::Camera* camera, Player* player) override;
 
 	// 更新処理
 	void Update() override;
@@ -115,10 +115,10 @@ private:
 	///************************* メンバ変数 *************************///
 
 	std::unique_ptr<BattleEnemyManager> battleEnemyManager_;
-	std::unique_ptr<Line> line_;
-	std::unique_ptr<Sprite> sprite_;
+	std::unique_ptr<YoRigine::Line> line_;
+	std::unique_ptr<YoRigine::Sprite> sprite_;
 	std::unique_ptr<Ground> ground_;
-	std::unique_ptr<BaseObject> enemy_;
+	std::unique_ptr<YoRigine::BaseObject> enemy_;
 	std::unique_ptr<LockOnUI> lockOnUI_;
 
 	std::string currentEnemyGroup_;

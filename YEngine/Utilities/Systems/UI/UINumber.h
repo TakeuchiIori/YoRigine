@@ -109,14 +109,14 @@ private:
     /// 指定スプライトに digit（0〜9）の UV を設定する
     ///   TextureLeftTop.x = digit * digitTexWidth_
     ///   TextureSize      = { digitTexWidth_, digitTexHeight_ }
-    void ApplyDigitUV(Sprite* sprite, int digit) const;
+    void ApplyDigitUV(YoRigine::Sprite* sprite, int digit) const;
 
     // -------------------------------------------------------------------------
     // メンバ変数
     // -------------------------------------------------------------------------
 
     /// 桁ごとのスプライト（index 0 = 最上位桁）
-    std::vector<std::unique_ptr<Sprite>> digitSprites_;
+    std::vector<std::unique_ptr<YoRigine::Sprite>> digitSprites_;
 
     std::string numberTexturePath_;
 

@@ -31,8 +31,8 @@ void PlayerMagicController::Update(float deltaTime)
 			waitingCastAnimEnd_ = false;
 		}
 		else if (!runner_.IsRunning()) {
-			Object3d* obj = owner_->GetObject3d();
-			Model* model = obj ? obj->GetModel() : nullptr;
+			YoRigine::Object3d* obj = owner_->GetObject3d();
+			YoRigine::Model* model = obj ? obj->GetModel() : nullptr;
 			auto* motion = model ? model->GetMotionSystem() : nullptr;
 			if (motion && motion->IsFinished()) {
 				owner_->GetMovement()->SyncAnimationToCurrentState();

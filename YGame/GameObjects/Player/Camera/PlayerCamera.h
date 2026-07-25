@@ -37,13 +37,13 @@ public:
 
   /// @param followCamera  CameraDirector が所有する FollowCamera インスタンス
   /// @param playerWT      プレイヤーの WorldTransform（ロックオン基準位置用）
-  void Initialize(FollowCamera *followCamera, const WorldTransform *playerWT);
+  void Initialize(FollowCamera *followCamera, const YoRigine::WorldTransform *playerWT);
 
   // スティック入力・ロックオン更新
   void UpdatePreDirector();
 
   // 攻撃カメラオフセットを sceneCamera に適用
-  void ApplyPostDirector(Camera *sceneCamera, float dt);
+  void ApplyPostDirector(YoRigine::Camera *sceneCamera, float dt);
 
   void DrawImGui();
 
@@ -178,7 +178,7 @@ public:
   // ============================================================
   // 最終カメラのアクセッサ
   // ============================================================
-  Camera *GetLastCamera() { return lastSceneCamera_; }
+  YoRigine::Camera *GetLastCamera() { return lastSceneCamera_; }
 
 private:
   // ============================================================
@@ -201,7 +201,7 @@ private:
   // 囲まれFOV：近くの敵が増えるほどFOVを少し広げて状況を見渡せるようにする。
   // ============================================================
   void UpdateThreatAwareness(float dt); // pre-director：周辺視グランス
-  void ApplyThreatFovWiden(Camera *sceneCamera,
+  void ApplyThreatFovWiden(YoRigine::Camera *sceneCamera,
                            float dt); // post-director：囲まれFOV拡大
   int GatherNearbyEnemies(std::vector<BaseCollider *> &out) const;
   int GatherThreatTargetPositions(std::vector<Vector3> &out) const;
@@ -237,7 +237,7 @@ private:
   // 確実にフレーム内へ収める（オフセットを見落とす EnsureTargetInView
   // の後段ガード）。
   // ============================================================
-  void EnsurePlayerInFrame(Camera *sceneCamera, float dt);
+  void EnsurePlayerInFrame(YoRigine::Camera *sceneCamera, float dt);
 
   // ============================================================
   // 攻撃カメラワーク：参照フレーム / 注視
@@ -246,10 +246,10 @@ private:
   //   PlayerPivotWorld … プレイヤーピボット（pivotHeight 込み）のワールド座標
   // ============================================================
   Matrix4x4 BuildOffsetFrame(CameraSpace space,
-                             const Camera *sceneCamera) const;
+                             const YoRigine::Camera *sceneCamera) const;
   bool ResolveLookAtPos(LookAtTarget target, Vector3 &outPos) const;
   Vector3 PlayerPivotWorld() const;
-  void ApplyLookAt(Camera *sceneCamera, LookAtTarget target,
+  void ApplyLookAt(YoRigine::Camera *sceneCamera, LookAtTarget target,
                    float weight) const;
 
   // ============================================================
@@ -258,7 +258,7 @@ private:
 
   // ---- コア参照 ----
   FollowCamera *followCamera_ = nullptr;
-  const WorldTransform *playerWT_ = nullptr;
+  const YoRigine::WorldTransform *playerWT_ = nullptr;
 
   // PlayerMovement
   // の「カメラ追従でプレイヤーも回る」フラグ（カメラエディタから切替）
@@ -361,7 +361,7 @@ private:
   // ============================================================
   // 見切れヒット演出 用パラメータ（extension JSON に相乗り）
   // ============================================================
-  Camera *lastSceneCamera_ =
+  YoRigine::Camera *lastSceneCamera_ =
       nullptr; // ApplyPostDirector でキャッシュした最終カメラ（見切れ判定用）
 
   bool offscreenHitEnabled_ = true; // 機能マスタースイッチ

@@ -81,7 +81,7 @@ namespace YoRigine {
 			});
 
 		// エミッタ形状のライン可視化（Debugのみ）
-		gizmoLine_ = std::make_unique<Line>();
+		gizmoLine_ = std::make_unique<YoRigine::Line>();
 		gizmoLine_->Initialize();
 		gizmoLine_->SetCamera(camera_);
 #endif
@@ -647,7 +647,7 @@ namespace YoRigine {
 		}
 	}
 
-	void GpuEmitManager::SetCamera(Camera* camera)
+	void GpuEmitManager::SetCamera(YoRigine::Camera* camera)
 	{
 		// GpuEmitManager 自身のカメラポインタを更新
 		camera_ = camera;
@@ -1004,7 +1004,7 @@ namespace YoRigine {
 
 		nlohmann::json j;
 		root.Save(j);
-		// 特別扱い: Model* はポインタなので名前で保存（schema 外の唯一の項目）
+		// 特別扱い: YoRigine::Model* はポインタなので名前で保存（schema 外の唯一の項目）
 		j["meshParams"]["modelName"] = e.meshParams.model ? e.meshParams.model->GetName() : "";
 		return j;
 	}
@@ -1018,7 +1018,7 @@ namespace YoRigine {
 		BuildEmitterSchema(e, root, sphere, box, tri, cone, mesh, particle, particleMesh);
 		root.Load(j);
 
-		// 特別扱い: modelName から Model* を解決
+		// 特別扱い: modelName から YoRigine::Model* を解決
 		if (j.contains("meshParams")) {
 			const std::string modelName = j["meshParams"].value("modelName", std::string{});
 			if (!modelName.empty()) {

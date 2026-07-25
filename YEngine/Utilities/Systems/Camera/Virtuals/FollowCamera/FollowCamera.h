@@ -24,12 +24,12 @@ public:
   // ============================================================
   // ターゲット管理
   // ============================================================
-  void SetTarget(const WorldTransform *target, const std::string &name) {
+  void SetTarget(const YoRigine::WorldTransform *target, const std::string &name) {
     target_ = target;
     targetName_ = name;
   }
   const std::string &GetTargetName() const { return targetName_; }
-  const WorldTransform *GetTarget() const { return target_; }
+  const YoRigine::WorldTransform *GetTarget() const { return target_; }
 
   void SetIsCloseUp(bool v);
   bool GetIsCloseUp() const { return isCloseUp_; }
@@ -137,7 +137,7 @@ private:
   // ============================================================
   // ターゲット
   // ============================================================
-  const WorldTransform *target_ = nullptr;
+  const YoRigine::WorldTransform *target_ = nullptr;
   std::string targetName_;
 
   // ============================================================

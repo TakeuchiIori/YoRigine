@@ -39,9 +39,9 @@ BattleEnemy::~BattleEnemy() {
 /*==========================================================================
 メイン初期化
 //========================================================================*/
-void BattleEnemy::Initialize(Camera* camera) {
+void BattleEnemy::Initialize(YoRigine::Camera* camera) {
 	camera_ = camera;
-	obj_ = std::make_unique<Object3d>();
+	obj_ = std::make_unique<YoRigine::Object3d>();
 	obj_->Initialize();
 	wt_.Initialize();
 	visualWt_.Initialize();

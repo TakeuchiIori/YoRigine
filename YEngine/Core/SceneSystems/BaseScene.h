@@ -39,7 +39,7 @@ public:
 	// PiP (Picture-in-Picture) サポート: シーンが持つカメラを返す。
 	// PipCameraSystem からこのポインタの transform/fov を一時的に書き換えて 2nd 描画する。
 	// 未対応シーンは nullptr を返す既定実装でよい (PiP パスがスキップされるだけ)。
-	virtual Camera* GetSceneCamera() { return nullptr; }
+	virtual YoRigine::Camera* GetSceneCamera() { return nullptr; }
 
 	// PiP 用の 3D オンリー描画。スカイボックスとシーンオブジェクトを描く程度に絞る。
 	// UI / ポストエフェクト / シャドウパスは含めない。
@@ -69,7 +69,7 @@ private:
 	///************************* メンバ変数 *************************///
 	std::string sceneName_;
 	// カメラ
-	std::shared_ptr<Camera> sceneCamera_;
+	std::shared_ptr<YoRigine::Camera> sceneCamera_;
 
 };
 

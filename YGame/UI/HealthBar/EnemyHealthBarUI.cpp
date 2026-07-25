@@ -3,7 +3,7 @@
 #include <Systems/GameTime/GameTime.h>
 #include <Systems/UI/UIManager.h>
 
-EnemyHealthBarUI::EnemyHealthBarUI(const BattleEnemy* enemy, Camera* camera)
+EnemyHealthBarUI::EnemyHealthBarUI(const BattleEnemy* enemy, YoRigine::Camera* camera)
 {
 	targetEnemy_ = enemy;
 	camera_ = camera;
@@ -11,8 +11,8 @@ EnemyHealthBarUI::EnemyHealthBarUI(const BattleEnemy* enemy, Camera* camera)
 
 void EnemyHealthBarUI::Initialize()
 {
-	bgHP_ = std::make_unique<Sprite>();
-	barHP_ = std::make_unique<Sprite>();
+	bgHP_ = std::make_unique<YoRigine::Sprite>();
+	barHP_ = std::make_unique<YoRigine::Sprite>();
 
 
 	bgHP_->Initialize("Resources/Textures/GameScene/EnemyHPBg.png");

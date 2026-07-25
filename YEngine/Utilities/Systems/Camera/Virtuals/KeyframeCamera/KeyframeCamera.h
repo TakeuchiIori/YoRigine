@@ -37,7 +37,7 @@ public:
 	void Initialize() override;
 	void Update() override;
 	void DrawDebugGui() override;
-	void DrawDebug3D(Line& line) override;
+	void DrawDebug3D(YoRigine::Line& line) override;
 
 	// 指定時刻のキー補間を即時評価して transform_ / fovY_ に反映する
 	// （プレビューや外部スクラブから利用）

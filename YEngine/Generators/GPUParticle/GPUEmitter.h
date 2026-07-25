@@ -262,7 +262,7 @@ public:
 
 public:
 	///************************* 基本関数 *************************///
-	void Initialize(Camera* camera, std::string& texturePath);
+	void Initialize(YoRigine::Camera* camera, std::string& texturePath);
 	void Update(float dt);
 	void Draw();
 	void Reset();
@@ -273,7 +273,7 @@ public:
 	void SetBoxParams(const Vector3& translate, const Vector3& size, float count, float emitInterval);
 	void SetTriangleParams(const Vector3& v1, const Vector3& v2, const Vector3& v3, const Vector3& translate, float count, float emitInterval);
 	void SetConeParams(const Vector3& translate, const Vector3& direction, float radius, float height, float count, float emitInterval);
-	void SetMeshParams(Model* model, const Vector3& translate, const Vector3& scale,
+	void SetMeshParams(YoRigine::Model* model, const Vector3& translate, const Vector3& scale,
 		const Quaternion& rotation, float count, float emitInterval, MeshEmitMode mode = MeshEmitMode::Surface);
 
 
@@ -282,7 +282,7 @@ public:
 	void UpdateBoxParams(const Vector3& translate, const Vector3& size, float count, float emitInterval);
 	void UpdateTriangleParams(const Vector3& v1, const Vector3& v2, const Vector3& v3, const Vector3& translate, float count, float emitInterval);
 	void UpdateConeParams(const Vector3& translate, const Vector3& direction, float radius, float height, float count, float emitInterval);
-	void UpdateMeshParams(Model* model, const Vector3& translate, const Vector3& scale,
+	void UpdateMeshParams(YoRigine::Model* model, const Vector3& translate, const Vector3& scale,
 		const Quaternion& rotation, float count, float emitInterval, MeshEmitMode mode = MeshEmitMode::Surface);
 
 	// パーティクルパラメータ設定
@@ -316,7 +316,7 @@ private:
 	void CreatePerFrameResource();
 	void CreateMeshTriangleBuffer();
 	void CreateForceFieldBuffer();
-	void UpdateMeshTriangleData(Model* model);
+	void UpdateMeshTriangleData(YoRigine::Model* model);
 	void Dispatch();
 
 	void UpdateEmitters();
@@ -328,10 +328,10 @@ public:
 	MeshEmitMode GetCurrentMeshMode() const { return currentMeshMode_; }
 	Vector3 GetEmitterPosition() const;
 
-	void SetCamera(Camera* camera);
+	void SetCamera(YoRigine::Camera* camera);
 private:
 	///************************* メンバ変数 *************************///
-	Camera* camera_ = nullptr;
+	YoRigine::Camera* camera_ = nullptr;
 	std::unique_ptr<GPUParticle> gpuParticle_;
 	const uint32_t kMaxEmitters_ = 1;
 	const uint32_t threadsPerGroup_ = 1024;
@@ -370,7 +370,7 @@ private:
 	// メッシュ関連
 	std::vector<MeshTriangle> meshTriangles_;  // CPUサイドのキャッシュ
 	uint32_t meshTriangleBufferSrvIndex_ = 0;  // SRVインデックス
-	Model* currentMeshModel_ = nullptr;
+	YoRigine::Model* currentMeshModel_ = nullptr;
 	float timeScalelastEmit_ = 0.0f;
 
 	// フォースフィールド関連

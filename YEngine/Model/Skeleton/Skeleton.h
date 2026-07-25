@@ -16,7 +16,7 @@
 #include "Vector3.h"
 
 // スケルトンクラス
-class Line;
+namespace YoRigine { class Line; }
 class Skeleton
 {
 public:
@@ -29,7 +29,7 @@ public:
 	void Update();
 
 	// スケルトン描画
-	void Draw(Line& line, const Matrix4x4& worldMatrix);
+	void Draw(YoRigine::Line& line, const Matrix4x4& worldMatrix);
 
 	// ★追加: 指定したボーンを起点として、その全ての子ボーン（子孫）の名前リストを取得する
 	std::unordered_set<std::string> GetDescendantBones(const std::string& rootBoneName) const;
@@ -63,7 +63,7 @@ public:
 	}
 
 	// ルートの親設定
-	void SetRootParent(WorldTransform* parent) {
+	void SetRootParent(YoRigine::WorldTransform* parent) {
 		joints_[root_].GetWorldTransform().parent_ = parent;
 	}
 

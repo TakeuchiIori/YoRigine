@@ -22,7 +22,7 @@ namespace {
 
 bool EventTriggerLoader::Load(
 	const std::string& filePath,
-	Camera* camera,
+	YoRigine::Camera* camera,
 	std::function<void()> onAnyGateOpened,
 	std::vector<std::unique_ptr<EventTrigger>>& outTriggers,
 	std::vector<OpenGateAction*>& outOpenGateActions)

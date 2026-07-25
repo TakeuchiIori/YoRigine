@@ -196,10 +196,10 @@ namespace YoRigine {
 		if (!src) return;
 
 		// アニメーションはスキップして軽量に
-		ghost_ = Object3d::Create(src->modelPath);
+		ghost_ = YoRigine::Object3d::Create(src->modelPath);
 		if (!ghost_) return;
 
-		ghostWT_ = std::make_unique<WorldTransform>();
+		ghostWT_ = std::make_unique<YoRigine::WorldTransform>();
 		ghostWT_->Initialize();
 		ghostWT_->scale_ = src->scale;
 		ghostWT_->rotate_ = src->rotation;

@@ -21,7 +21,7 @@
 #include "IGizmable.h"
 
 // 前方宣言
-class Camera;
+namespace YoRigine { class Camera; }
 
 /// <summary>
 /// 汎用ギズモコントローラー
@@ -95,7 +95,7 @@ public:
     /// @return 操作が行われた場合 true
     /// </summary>
     bool Draw(
-        Camera* camera,
+        YoRigine::Camera* camera,
         std::vector<IGizmable*>& targets,
         const ImVec2& viewportPos,
         const ImVec2& viewportSize);
@@ -124,7 +124,7 @@ public:
         const ImVec2& mouseScreenPos,
         const ImVec2& viewportPos,
         const ImVec2& viewportSize,
-        Camera* camera);
+        YoRigine::Camera* camera);
 
     /// ピッキング対象として登録
     void RegisterPickable(IGizmable* obj);
@@ -181,9 +181,9 @@ private:
     void      ApplyWorldMatrix(const Matrix4x4& mat, IGizmable* target) const;
 
     // ギズモ描画（内部）
-    bool DrawSingle(Camera* camera, IGizmable* target,
+    bool DrawSingle(YoRigine::Camera* camera, IGizmable* target,
         const ImVec2& viewportPos, const ImVec2& viewportSize);
-    bool DrawMulti(Camera* camera, std::vector<IGizmable*>& targets,
+    bool DrawMulti(YoRigine::Camera* camera, std::vector<IGizmable*>& targets,
         const ImVec2& viewportPos, const ImVec2& viewportSize);
 
     // ImGuizmo ↔ Matrix4x4 変換
@@ -204,7 +204,7 @@ private:
         const ImVec2& mouseScreenPos,
         const ImVec2& viewportPos,
         const ImVec2& viewportSize,
-        Camera* camera) const;
+        YoRigine::Camera* camera) const;
 
     // 球とレイの交差判定
     bool IntersectRaySphere(

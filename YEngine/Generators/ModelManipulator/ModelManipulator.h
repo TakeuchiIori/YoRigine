@@ -49,7 +49,7 @@ public:
   void PlaceObject(const std::string &modelPath);
   void LoadScene(const std::string &sceneName);
 
-  void SetCamera(Camera *camera) {
+  void SetCamera(YoRigine::Camera *camera) {
     camera_ = camera;
     selector_.SetCamera(camera);
     motionEditor_.SetCamera(camera);
@@ -109,7 +109,7 @@ private:
   //=========================================================================
   // メンバ変数
   //=========================================================================
-  Camera *camera_ = nullptr;
+  YoRigine::Camera *camera_ = nullptr;
   ObjectManager *objectManager_ = nullptr;
   PickBuffer *pickBuffer_ = nullptr;
   bool isInitialized_ = false;
@@ -125,7 +125,7 @@ private:
   // Sphere もインスタンス描画 (worldMat = scale(r) * translate(c))
   InstancedSphere colliderSpheres_;
   // Capsule は単位形状化が複雑 (start/end が可変) なので既存 Line を継続。
-  Line colliderLineCapsule_;
+  YoRigine::Line colliderLineCapsule_;
   bool showColliderDebug_ = true; // コライダー表示フラグ
 
 #ifdef USE_IMGUI

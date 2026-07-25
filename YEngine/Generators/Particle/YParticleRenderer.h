@@ -30,7 +30,7 @@ public:
     void ApplySoftParticle(bool enabled, float fadeDistance);
 
     // システムをバッチに追加（まだ描画しない）
-    void AddSystem(const YParticleSystem& system, Camera* camera);
+    void AddSystem(const YParticleSystem& system, YoRigine::Camera* camera);
 
     // 溜まったデータを一気に描画
     void EndFrame(const std::shared_ptr<Mesh>& mesh, uint32_t textureIndex, BlendMode blendMode);
@@ -54,7 +54,7 @@ private:
 
     YoRigine::SrvManager* srvManager_ = nullptr;
     YoRigine::DirectXCommon* dxCommon_ = nullptr;
-	Camera* camera_ = nullptr;
+	YoRigine::Camera* camera_ = nullptr;
 
     // 現在のバッチに適用するライト設定
     ParticleLightSetting currentLightSetting_;
