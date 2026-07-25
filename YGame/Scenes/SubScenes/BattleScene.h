@@ -125,6 +125,8 @@ private:
 	BattleTransitionData originalTransitionData_;
 	bool battleCameraFinished_ = false;
 	bool shouldResetBattleCamera_ = false;
+	bool battleIntroActive_ = false;
+	bool battleIntroSawPerformance_ = false;
 	bool isFinalBattle_ = false;  // 最終バトルかどうか
 	size_t totalRemainingFieldEnemies_ = 0;  // ★追加: フィールドに残っているエンカウントグループ数
 

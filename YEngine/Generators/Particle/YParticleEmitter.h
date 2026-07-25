@@ -14,6 +14,19 @@
 class YParticleEmitter {
 public:
 	//=================================================================
+	// 発生モード
+	//=================================================================
+
+	/// <summary>
+	/// パーティクルの発生方式
+	/// </summary>
+	enum class EmissionMode {
+		Rate,          ///< 秒間発生数で撃ち続ける（従来）
+		MaintainCount, ///< エリア内に targetCount 個を常に維持（寿命で死んだら自動補充）
+		Persistent,    ///< 一度だけ targetCount 個をバースト発生（以後補充しない。静的エリア向け）
+	};
+
+	//=================================================================
 	// コンストラクタ
 	//=================================================================
 
@@ -76,7 +89,16 @@ private:
 	/// </summary>
 	/// <param name="position"></param>
 	/// <param name="count"></param>
-	void EmitInternal(const Vector3& position, int count);
+	/// <param name="prewarmAge">経過時間を寿命内ランダムで初期化（同期パルス防止）</param>
+	/// <param name="immortal">寿命で死なず更新され続ける粒として発生（Persistent 用）</param>
+	void EmitInternal(const Vector3& position, int count,
+	                  bool prewarmAge = false, bool immortal = false);
+
+	/// <summary>
+	/// 対象システムで現在アクティブな粒の数を数える（MaintainCount 用）
+	/// ※カウントはシステム単位。1 システムを複数エミッターで共有すると合算される点に注意。
+	/// </summary>
+	int CountActiveParticles(YParticleSystem* system) const;
 public:
 	//=================================================================
 	// アクセサ
@@ -85,6 +107,17 @@ public:
 	// 位置
 	void SetPosition(const Vector3& position) { position_ = position; }
 	const Vector3& GetPosition() const { return position_; }
+
+	// 発生モード
+	void SetEmissionMode(EmissionMode mode) {
+		emissionMode_ = mode;
+		persistentEmitted_ = 0; // モード切替時に一発発生をやり直せるようにする
+	}
+	EmissionMode GetEmissionMode() const { return emissionMode_; }
+
+	// 維持個数（MaintainCount / Persistent モードで使用）
+	void SetTargetCount(int count) { targetCount_ = (count < 0) ? 0 : count; }
+	int GetTargetCount() const { return targetCount_; }
 
 	// 発生レート（秒間の発生数）
 	void SetEmissionRate(float rate) { emissionRate_ = rate; }
@@ -193,9 +226,12 @@ private:
 
 	// エミッション制御
 	std::unique_ptr<YEmitterShape> shape_; // エミッター形状
-	float emissionRate_;                    // 秒間発生数
+	EmissionMode emissionMode_ = EmissionMode::Rate; // 発生モード
+	float emissionRate_;                    // 秒間発生数（Rate モード）
 	float emissionTimer_;                   // 発生タイマー
-	int emitCount_;                         // 1回の発生数
+	int emitCount_;                         // 1回の発生数（Rate モード）
+	int targetCount_ = 100;                 // 維持個数（MaintainCount / Persistent モード）
+	int persistentEmitted_ = 0;             // Persistent モードで発生済みの個数
 
 	// 状態
 	bool isActive_;             // 有効フラグ

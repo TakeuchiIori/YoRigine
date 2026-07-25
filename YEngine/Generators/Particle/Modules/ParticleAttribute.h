@@ -21,6 +21,7 @@ struct ParticleAttribute {
     float   lifeTime    = 1.0f;   // 寿命（秒）
     float   currentTime = 0.0f;   // 経過時間（秒）
     bool    isActive    = false;
+    bool    immortal    = false;  // true なら寿命で死なず、更新され続ける（Persistent 用）
 
     // ── UV アニメーション ──────────────────────────────────────────────
     Vector2 uvOffset{};

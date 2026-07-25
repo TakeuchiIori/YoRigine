@@ -26,10 +26,9 @@
 
 namespace YoRigine {
 
-	ModelManipulator* ModelManipulator::instance_ = nullptr;
 	ModelManipulator* ModelManipulator::GetInstance() {
-		if (!instance_) instance_ = new ModelManipulator;
-		return instance_;
+		static ModelManipulator instance;
+		return &instance;
 	}
 
 	// ============================================================
@@ -41,6 +40,7 @@ namespace YoRigine {
 		objectManager_ = ObjectManager::GetInstance();
 		serializer_.SetObjectManager(objectManager_);
 		serializer_.SetModelFolderPath(modelFolderPath_);
+		serializer_.SetDrawFrustumCullingFlag(&enableDrawFrustumCulling_);
 
 		prefabMgr_.SetObjectManager(objectManager_);
 		prefabMgr_.SetSerializer(&serializer_);
@@ -191,8 +191,20 @@ namespace YoRigine {
 			Model* model = obj->object->GetModel();
 			const bool canInstance = (model && !obj->isAnimation && !model->GetHasBones());
 
-			if (canInstance) {
-				// PlacedObject からまとめて積む (WVP / WIT は内部計算)
+			// カメラ遮蔽フェードは alpha blend ではなく深度書き込み ON の
+			// ディザーフェードを使う。複雑な建物の内部面が描画順で透けて
+			// まだらになるのを防ぐ。
+			const bool isCameraDitherFade =
+				canInstance && obj->colliderCameraFade && obj->color.w < 0.99f;
+
+			if (isCameraDitherFade) {
+				instRenderer->SubmitDitherFade(*obj);
+
+				const Matrix4x4& world = obj->worldTransform->GetMatWorld();
+				obj->worldTransform->SetMapWVP(world * vp);
+				obj->worldTransform->SetMapWorld(world);
+			} else if (canInstance) {
+				// 不透明: 通常インスタンシングバッチへ積む
 				instRenderer->Submit(*obj);
 
 				// PickBuffer や他システムが worldTransform の CB を参照するため、
@@ -499,8 +511,6 @@ namespace YoRigine {
 		}
 #endif
 		if (objectManager_) objectManager_->Finalize();
-		delete instance_;
-		instance_ = nullptr;
 	}
 
 	// ============================================================
@@ -654,6 +664,7 @@ namespace YoRigine {
 
 			// コライダー設定をオブジェクト個別にコピー
 			newObj->colliderEnabled      = srcObj->colliderEnabled;
+			newObj->colliderCameraFade   = srcObj->colliderCameraFade;
 			newObj->colliderTypeId       = srcObj->colliderTypeId;
 			newObj->colliderShapeType    = srcObj->colliderShapeType;
 			newObj->colliderAabbOffset   = srcObj->colliderAabbOffset;

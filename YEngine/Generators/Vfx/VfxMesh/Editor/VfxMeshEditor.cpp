@@ -10,6 +10,7 @@
 #include "Debugger/Logger.h"
 #include <Loaders/Texture/TextureManager.h>
 #include <IconsFontAwesome5.h>
+#include "Core/Editor/Widgets/YEditorWidget.h"
 
 
 namespace fs = std::filesystem;
@@ -163,7 +164,6 @@ namespace YoRigine {
 		ImGui::TextDisabled("エフェクト一覧");
 		ImGui::SameLine();
 		if (ImGui::SmallButton("+")) {
-			// 既存名と衝突しない初期名をセット（NewEffect / NewEffect1 / NewEffect2 ...）
 			std::string uniq = MakeUniqueEffectName("NewEffect");
 			strncpy_s(newNameBuffer_, sizeof(newNameBuffer_), uniq.c_str(), _TRUNCATE);
 			newPathBuffer_[0] = '\0';
@@ -181,7 +181,7 @@ namespace YoRigine {
 				SelectEffect(0);
 			}
 		}
-		if (ImGui::IsItemHovered()) ImGui::SetTooltip("ディレクトリを再スキャン");
+		YEditorWidget::ItemTooltip("ディレクトリを再スキャン");
 
 		ImGui::Separator();
 
@@ -210,9 +210,7 @@ namespace YoRigine {
 				ImGui::EndPopup();
 			}
 
-			if (ImGui::IsItemHovered()) {
-				ImGui::SetTooltip("%s", e.filePath.c_str());
-			}
+			YEditorWidget::ItemTooltip(e.filePath.c_str());
 		}
 
 		if (entries_.empty()) {
@@ -247,48 +245,51 @@ namespace YoRigine {
 		if (ImGui::InputText("##effectname", nameBuffer_, sizeof(nameBuffer_), ImGuiInputTextFlags_EnterReturnsTrue)) {
 			asset.name = nameBuffer_;
 			CommitChange(before, "名前変更");
-			// 名前に合わせて JSON ファイル自体もリネームする
 			RenameCurrentFile(nameBuffer_);
 		}
 		ImGui::SameLine(0, 4); ImGui::TextDisabled("名前");
+
+		// 寿命無限（バフエリア等、Stop するまで消えないエフェクト）
+		{
+			VfxEffectAsset bLoop = asset;
+			if (ImGui::Checkbox("寿命を無限にする (ループし続ける)", &asset.loopForever)) {
+				CommitChange(bLoop, "寿命無限 切替");
+			}
+			ImGui::SameLine(0, 6);
+			ImGui::TextDisabled(asset.loopForever ? "(無限: Stop まで持続)" : "(ワンショット/Lifetime に従う)");
+		}
 		ImGui::Separator();
 
-		// タブ構成: Trail（Emitter駆動で1つ） / エレメント（VFX部品リスト） / Motion（全体の動き）
-		if (ImGui::BeginTabBar("##vfxTabs")) {
+		if (YEditorWidget::TabBar tabBar{"##vfxTabs"}) {
 			// Trail タブ
 			{
-				// "###tab_xxx" でタブ ID を固定（アイコンの付け外しで選択がリセットされないように）
 				std::string label = std::string(asset.useTrail ? (ICON_FA_CIRCLE " ") : "   ") + "Trail###tab_Trail";
-				if (ImGui::BeginTabItem(label.c_str())) {
+				if (YEditorWidget::Tab t{label.c_str()}) {
 					VfxEffectAsset b = asset;
 					if (ImGui::Checkbox("この効果を有効化", &asset.useTrail)) CommitChange(b, "Trail 有効切替");
 					ImGui::Separator();
 					if (asset.useTrail) DrawTrailSection();
 					else                ImGui::TextDisabled("(無効) — 上のチェックで有効化");
-					ImGui::EndTabItem();
 				}
 			}
 
-			// エレメントタブ（エレメントリスト: 同じ種類を複数積める）
+			// エレメントタブ
 			{
 				std::string slabel = std::string(asset.elements.empty() ? "   " : (ICON_FA_CIRCLE " "))
 					+ "エレメント (" + std::to_string(asset.elements.size()) + ")###tab_elements";
-				if (ImGui::BeginTabItem(slabel.c_str())) {
+				if (YEditorWidget::Tab t{slabel.c_str()}) {
 					DrawElementsSection();
-					ImGui::EndTabItem();
 				}
 			}
 
-			// Motion タブ（エフェクト全体の動きのリストを編集）
+			// Module タブ
 			{
-				std::string mlabel = std::string(asset.motions.empty() ? "   " : (ICON_FA_CIRCLE " "))
-					+ "Motion###tab_Motion";
-				if (ImGui::BeginTabItem(mlabel.c_str())) {
-					DrawMotionSection();
-					ImGui::EndTabItem();
+				std::string mlabel = std::string(asset.modules.empty() ? "   " : (ICON_FA_CIRCLE " "))
+					+ "Module###tab_Module";
+				if (YEditorWidget::Tab t{mlabel.c_str()}) {
+					DrawModuleSection();
 				}
 			}
-			ImGui::EndTabBar();
 		}
 		ImGui::Separator();
 
@@ -304,7 +305,6 @@ namespace YoRigine {
 		ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
 		ImGui::SetNextWindowSize(ImVec2(420, 300), ImGuiCond_Appearing);
 
-		// 固定サイズ。AlwaysAutoResize だと入力に応じてウィンドウサイズが変わってしまうため NoResize に。
 		if (!ImGui::BeginPopupModal("新規エフェクト作成", &showNewDialog_, ImGuiWindowFlags_NoResize)) return;
 
 		ImGui::Text("エフェクト名");
@@ -323,9 +323,11 @@ namespace YoRigine {
 
 		ImGui::Spacing();
 		ImGui::Text("プリセット");
-		const char* presetNames[] = { "Blank", "Trail Only", "Volume Only", "Waypoint Beam", "Sword", "Magic", "Explosion (モーション駆動)" };
-		ImGui::SetNextItemWidth(-1);
-		ImGui::Combo("##preset", &newPresetIdx_, presetNames, IM_ARRAYSIZE(presetNames));
+		static const char* kPresetNames[] = {
+			"Blank", "Trail Only", "Volume Only", "Waypoint Beam",
+			"Sword", "Magic", "Explosion (モジュール駆動)"
+		};
+		YEditorWidget::Combo("##preset", newPresetIdx_, kPresetNames, IM_ARRAYSIZE(kPresetNames));
 
 		ImGui::Spacing(); ImGui::Separator(); ImGui::Spacing();
 

@@ -114,6 +114,12 @@ group "Externals"
         location (r"Externals/ImGui")
         warnings "Default"
 
+        -- project location が Externals/ImGui でも、生成物は他プロジェクトと同じ
+        -- D:/GameEngine/generated 以下へ集約する。ここで明示的に再指定して、
+        -- 将来 workspace 設定を変更しても Externals/generated へ戻らないようにする。
+        targetdir (outputDir)
+        objdir    (intDir)
+
         files { r"Externals/ImGui/**.h", r"Externals/ImGui/**.cpp" }
 
         includedirs {

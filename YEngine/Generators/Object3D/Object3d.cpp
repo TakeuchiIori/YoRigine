@@ -124,9 +124,9 @@ void Object3d::Draw(Camera* camera, WorldTransform& worldTransform)
 		materialDissolve_->RecordDrawCommands(commandList.Get(), it->second);
 	}
 
-	// モデル描画
+	// モデル描画（テクスチャ上書きが設定されていればそれを使う）
 	if (model_) {
-		model_->Draw();
+		model_->Draw(overrideTexturePath_);
 	}
 }
 
@@ -230,6 +230,30 @@ void Object3d::SetModel(const std::string& filePath, bool isAnimation, const std
 	model_ = ModelManager::GetInstance()->FindModel(
 		fileName, animationName, isAnimation
 	);
+}
+
+bool Object3d::TryGetModelThemeColor(const std::string& filePath, Vector4& out)
+{
+	// モデルを（未ロードなら）読み込み、そのマテリアルの「白以外」の色を取り出す。
+	auto [basePath, fileName] = ModelManager::GetInstance()->ParseModelPath(filePath);
+	ModelManager::GetInstance()->LoadModel(defaultModelPath_ + basePath, fileName, "", false);
+	Model* model = ModelManager::GetInstance()->FindModel(fileName, "", false);
+	if (!model) {
+		return false;
+	}
+	return model->TryGetThemeColor(out);
+}
+
+bool Object3d::TryGetModelAccentTexture(const std::string& filePath, std::string& out)
+{
+	// モデルを（未ロードなら）読み込む。この時点でモデルのテクスチャも TextureManager に登録される。
+	auto [basePath, fileName] = ModelManager::GetInstance()->ParseModelPath(filePath);
+	ModelManager::GetInstance()->LoadModel(defaultModelPath_ + basePath, fileName, "", false);
+	Model* model = ModelManager::GetInstance()->FindModel(fileName, "", false);
+	if (!model) {
+		return false;
+	}
+	return model->TryGetAccentTexturePath(out);
 }
 
 /// <summary>

@@ -100,7 +100,35 @@ void Model::UpdateAnimation()
 	}
 }
 
-void Model::Draw() {
+bool Model::TryGetAccentTexturePath(std::string& out) const {
+	// テクスチャ無しのマテリアルは白デフォルト(Resources/images/white.png)が入る。
+	// それ以外＝実際に画像が割り当てられたマテリアル（アクセント）のパスを返す。
+	for (const auto& material : materials_) {
+		const std::string& tex = material->GetTextureFilePath();
+		if (!tex.empty() && tex != "Resources/images/white.png") {
+			out = tex;
+			return true;
+		}
+	}
+	return false;
+}
+
+bool Model::TryGetThemeColor(Vector4& out) const {
+	// マテリアルの拡散反射色(Kd)を順に見て、白でも黒でもない最初の色を採用する。
+	// 白=未指定/無色、黒=Kd未設定(既定 {0,0,0})のことが多いので、どちらも「色なし」とみなす。
+	for (const auto& material : materials_) {
+		const Vector3& kd = material->GetKd();
+		const bool isWhite = kd.x > 0.95f && kd.y > 0.95f && kd.z > 0.95f;
+		const bool isBlack = kd.x < 0.05f && kd.y < 0.05f && kd.z < 0.05f;
+		if (!isWhite && !isBlack) {
+			out = { kd.x, kd.y, kd.z, 1.0f };
+			return true;
+		}
+	}
+	return false;
+}
+
+void Model::Draw(const std::string& overrideTexturePath) {
 
 	auto pm = YPipelineManager::GetInstance();
 	const auto& indices = pm->GetParameterIndices("Object");
@@ -155,7 +183,7 @@ void Model::Draw() {
 	commandList->SetGraphicsRootDescriptorTable(indices.at("gShadowMap"), shadowHandle);
 	for (size_t i = 0; i < meshes_.size(); ++i) {
 		auto& mesh = meshes_[i];
-		materials_[mesh->GetMaterialIndex()]->RecordDrawCommands(commandList, indices.at("gMaterialConstant"), indices.at("gTexture"));
+		materials_[mesh->GetMaterialIndex()]->RecordDrawCommands(commandList, indices.at("gMaterialConstant"), indices.at("gTexture"), overrideTexturePath);
 		// 環境マップが有効な場合のみバインド
 		if (EnvironmentMap::GetInstance()->GetSrvIndex() != UINT32_MAX) {
 			auto envHandle = EnvironmentMap::GetInstance()->GetSrvHandle();
@@ -293,7 +321,14 @@ void Model::LoadModelIndexFile(const std::string& directoryPath, const std::stri
 	Assimp::Importer importer;
 	std::string filePath = directoryPath + "/" + filename;
 	const aiScene* scene = importer.ReadFile(filePath.c_str(), aiProcess_FlipWindingOrder | aiProcess_FlipUVs);
-	assert(scene->HasMeshes());
+	if (scene == nullptr || !scene->HasMeshes()) {
+		// 読み込み失敗時に null を参照してクラッシュしないよう防ぐ。assimp のエラーを残す。
+		const std::string reason = (scene == nullptr) ? importer.GetErrorString() : "meshes empty";
+		std::ofstream("model_load_error.log", std::ios::app) << filePath << " | " << reason << "\n";
+		// 空モデルでも GetRootNode() 等が null 参照で落ちないよう、既定ノードだけは用意しておく
+		if (!rootNode_) { rootNode_ = std::make_unique<Node>(); }
+		return;
+	}
 	isMixamoAsset_ = IsMixamoScene(scene);
 	importUnitScale_ = 1.0f;
 	LoadNode(scene);
@@ -398,9 +433,8 @@ void Model::SetChangeMotion(const std::string& directoryPath, const std::string&
 {
 	// 既存のアニメーションと同じ場合はスキップ
 	std::string newCacheKey = directoryPath + "/" + filename + "#" + animationName;
-	static std::string currentCacheKey;
 
-	if (currentCacheKey == newCacheKey) {
+	if (currentMotionCacheKey_ == newCacheKey) {
 		// 同じアニメーションの場合は再生モードだけ変更
 		if (motionSystem_) {
 			motionSystem_->SetPlayMode(playMode);
@@ -408,7 +442,7 @@ void Model::SetChangeMotion(const std::string& directoryPath, const std::string&
 		return;
 	}
 
-	currentCacheKey = newCacheKey;
+	currentMotionCacheKey_ = newCacheKey;
 
 	// 新しいアニメーションファイルを読み込む
 	LoadMotionFile(directoryPath, filename, animationName);

@@ -35,6 +35,10 @@ public:
 	bool IsActive() const;
 	void SetActive(bool active);
 
+	// このグループをワンショット発火したとき、最後の粒が消えるまでの秒数（再生尺）。
+	// 各エミッタの対象システムの最大寿命のうち最大値を返す。エミッタ無しなら 0。
+	float GetEffectDuration() const;
+
 	const Vector3& GetPosition() const;
 	const std::vector<std::unique_ptr<YParticleEmitter>>& GetEmitters() const;
 

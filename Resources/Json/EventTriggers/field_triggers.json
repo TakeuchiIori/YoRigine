@@ -258,7 +258,7 @@
         "beaconScale": 1.0,
         "missionTitle": "敵を倒せ！",
         "nextWaypoint": "",
-        "requiredCount": 3,
+        "requiredCount": 2,
         "requiredGroup": "",
         "startActive": false,
         "type": "Waypoint"

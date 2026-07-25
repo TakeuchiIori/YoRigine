@@ -15,6 +15,8 @@ public:
 	void Exit(BattleEnemy& enemy) override;
 
 	bool IsAttacking() const override { return true; }
+	bool IsContactDamageActive() const override { return contactDamageWindow_ >= 0; }
+	int GetContactDamageWindow() const override { return contactDamageWindow_; }
 
 private:
 	// --- 補助関数 (Helper Functions) ---
@@ -24,6 +26,7 @@ private:
 	void ExecuteRush(BattleEnemy& enemy, float speedMultiplier, float dt);
 private:
 	int comboCount_ = 0;
+	int contactDamageWindow_ = -1;
 	Vector3 anticipationStartPos_{};
 	bool hasPerformedAnticipation_ = false;
 };

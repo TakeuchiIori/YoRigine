@@ -52,7 +52,8 @@ namespace YoRigine {
 	public:
 		// テキストを PNG にベイクして outPngPath に書き出す。成功で true。
 		// 画像サイズはテキスト境界＋余白から自動算出する。
-		static bool Bake(const TextBakeParams& params, const std::string& outPngPath);
+		static bool Bake(const TextBakeParams& params, const std::string& outPngPath,
+			bool saveMetadata = true);
 
 		// 角丸四角の「枠」テクスチャ（中央は透明・縁だけ）を生成して PNG 保存する。
 		// ボタンの枠飾りなどに使う。cornerRadius=0 で直角の四角枠。

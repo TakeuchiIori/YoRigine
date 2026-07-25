@@ -6,7 +6,7 @@
 // 既存アセット名の参照だけで1つに束ねる薄いレイヤー。
 //
 // 既存3系統(Particle/VfxMesh/GPU)のJSON・ハンドルには一切手を入れず、
-// それぞれの facade（EffectHandle / VfxMeshHandle / GpuParticleHandle）と
+// それぞれの facade（EffectHandle / YVfxHandle / GpuParticleHandle）と
 // Audio を「名前で呼ぶだけ」で連動させる。
 //
 // アセット: Resources/Json/YComposites/<名前>.json（参照リストのみ）
@@ -26,7 +26,7 @@
 // ===========================================================
 #include "Vector3.h"
 #include "Particle/EffectHandle.h"
-#include "Vfx/VfxMesh/Runtime/VfxMeshHandle.h"
+#include "Vfx/VfxMesh/Runtime/YVfxHandle.h"
 #include "GPUParticle/GpuParticleHandle.h"
 #include "Systems/Audio/Audio.h"
 
@@ -102,7 +102,7 @@ struct CompositeEffectAsset {
 struct CompositeInstance {
     std::vector<EffectHandle>           particles;      // Particle 子（ループ）
     std::vector<Vector3>                particleOffsets;// particles と対の相対オフセット
-    std::vector<VfxMeshHandle>          vfx;            // VfxMesh 子（ループ）
+    std::vector<YVfxHandle>             vfx;            // VfxMesh 子（ループ）
     std::vector<Vector3>                vfxOffsets;     // vfx と対の相対オフセット
     GpuParticleHandle                   gpu;            // GPU 子（ループ）
     Vector3                             gpuOffset = { 0.0f, 0.0f, 0.0f };

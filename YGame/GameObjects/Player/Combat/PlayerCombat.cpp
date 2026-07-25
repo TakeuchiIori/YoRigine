@@ -119,6 +119,9 @@ void PlayerCombat::UpdateInputBuffer(float deltaTime) {
 void PlayerCombat::Reset() {
 	combo_->ResetCombo();
 	guard_->Reset();
+	hasBufferedInput_ = false;
+	bufferedInputAge_ = 0.0f;
+	lastHitDirection_ = HitDirection::Front;
 	stateMachine_.ChangeState(CombatState::Idle);
 }
 

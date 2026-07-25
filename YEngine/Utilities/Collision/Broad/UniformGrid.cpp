@@ -1,4 +1,5 @@
 #include "UniformGrid.h"
+#include "Collision/Core/BaseCollider.h"
 #include <cmath>
 #include <algorithm>
 
@@ -15,6 +16,7 @@ namespace YoRigine {
 
 	void UniformGrid::Clear() {
 		cells_.clear();
+		overflowColliders_.clear();
 	}
 
 	void UniformGrid::CellRangeFor(const AABB& aabb, CellKey& outMin, CellKey& outMax) const {
@@ -54,7 +56,10 @@ namespace YoRigine {
 				frameCounter = 0;
 			}
 
+			// 従来のペア検索との互換性を保ちつつ、範囲クエリでは場所に関係なく
+			// 必ず候補へ含められるよう専用リストにも保持する。
 			cells_[{0, 0, 0}].push_back(c);
+			overflowColliders_.push_back(c);
 			return;
 		}
 
@@ -65,6 +70,49 @@ namespace YoRigine {
 				}
 			}
 		}
+	}
+
+	void UniformGrid::QueryAABB(const AABB& area, uint32_t layerMask,
+		std::vector<BaseCollider*>& outColliders) const {
+		outColliders.clear();
+		querySeenScratch_.clear();
+
+		CellKey cmin, cmax;
+		CellRangeFor(area, cmin, cmax);
+
+		auto append = [&](BaseCollider* collider) {
+			if (!collider) return;
+			if ((collider->GetLayerBits() & layerMask) == 0u) return;
+			if (querySeenScratch_.insert(collider).second) {
+				outColliders.push_back(collider);
+			}
+		};
+
+		// 極端に広い検索で空セルを何百万個も走査しない。広域クエリは
+		// 登録済みセルを一度ずつ走査し、呼び出し側の精密判定で範囲外を落とす。
+		constexpr int kMaxQueryCellSpan = 64;
+		const bool wideQuery = (cmax.x - cmin.x) > kMaxQueryCellSpan ||
+			(cmax.y - cmin.y) > kMaxQueryCellSpan ||
+			(cmax.z - cmin.z) > kMaxQueryCellSpan;
+		if (wideQuery) {
+			for (const auto& [key, list] : cells_) {
+				for (BaseCollider* collider : list) append(collider);
+			}
+		} else {
+			for (int z = cmin.z; z <= cmax.z; ++z) {
+				for (int y = cmin.y; y <= cmax.y; ++y) {
+					for (int x = cmin.x; x <= cmax.x; ++x) {
+						auto it = cells_.find({x, y, z});
+						if (it == cells_.end()) continue;
+						for (BaseCollider* collider : it->second) append(collider);
+					}
+				}
+			}
+		}
+
+		// 32セルを超える巨大コライダーは通常セルへ展開していないため、
+		// どの場所のクエリでも候補へ含め、呼び出し側の精密判定で落とす。
+		for (BaseCollider* collider : overflowColliders_) append(collider);
 	}
 
 	void UniformGrid::DrawDebugAroundCamera(InstancedCube* cubes,
@@ -105,17 +153,12 @@ namespace YoRigine {
 	}
 
 	void UniformGrid::QueryPairs(std::vector<std::pair<BaseCollider*, BaseCollider*>>& outPairs) {
-		// 同セル内コライダーの全ペアを生成。重複ペアは unordered_set で防ぐ。
-		struct PairHash {
-			size_t operator()(const std::pair<BaseCollider*, BaseCollider*>& p) const noexcept {
-				auto h1 = std::hash<BaseCollider*>{}(p.first);
-				auto h2 = std::hash<BaseCollider*>{}(p.second);
-				return h1 ^ (h2 + 0x9e3779b9 + (h1 << 6) + (h1 >> 2));
-			}
-		};
-		std::unordered_set<std::pair<BaseCollider*, BaseCollider*>, PairHash> seen;
-
+		// 同セル内ペアを生成する前にレイヤーマスクで落とす。
+		// 敵が密集したとき、Enemy-Enemy のような非反応ペアを O(N^2) で溜めないため。
 		outPairs.clear();
+		seenPairsScratch_.clear();
+		seenPairsScratch_.reserve(cells_.size() * 8);
+
 		for (auto& [key, list] : cells_) {
 			const size_t n = list.size();
 			if (n < 2) continue;
@@ -123,9 +166,12 @@ namespace YoRigine {
 				for (size_t j = i + 1; j < n; ++j) {
 					BaseCollider* a = list[i];
 					BaseCollider* b = list[j];
+					if (!a || !b) continue;
+					if ((a->GetLayerBits() & b->GetCollisionMask()) == 0u) continue;
+					if ((b->GetLayerBits() & a->GetCollisionMask()) == 0u) continue;
 					if (a > b) std::swap(a, b);
 					auto pr = std::make_pair(a, b);
-					if (seen.insert(pr).second) {
+					if (seenPairsScratch_.insert(pr).second) {
 						outPairs.push_back(pr);
 					}
 				}

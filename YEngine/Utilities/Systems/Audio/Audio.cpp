@@ -154,21 +154,13 @@ namespace YoRigine {
 
 	///************************* Audio シングルトン *************************///
 
-	Audio* Audio::instance = nullptr;
-
 	Audio* Audio::GetInstance() {
-		if (instance == nullptr) {
-			instance = new Audio;
-		}
-		return instance;
+		static Audio instance;
+		return &instance;
 	}
 
 	void Audio::Finalize() {
-		if (instance) {
-			instance->FinalizeAudio();
-			delete instance;
-			instance = nullptr;
-		}
+		GetInstance()->FinalizeAudio();
 	}
 
 	Audio::Audio()

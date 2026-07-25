@@ -111,17 +111,35 @@ void BattleScene::Initialize(Camera* camera, Player* player) {
 /// </summary>
 void BattleScene::Update() {
 
-	// カメラ終了チェック
-	if (currentCameraMode_ == CameraMode::BATTLE_START && battleCameraFinished_) {
-		currentCameraMode_ = CameraMode::FOLLOW;
+	// 開始演出はCameraModeと独立して管理する。演出中はこの場でゲーム更新を止める。
+	if (battleIntroActive_) {
+		const bool inPerformance = player_ && player_->GetPlayerCamera() &&
+			player_->GetPlayerCamera()->IsInPerformance();
+		if (inPerformance) {
+			battleIntroSawPerformance_ = true;
+		}
+		else if (battleIntroSawPerformance_) {
+			battleIntroActive_ = false;
+			battleCameraFinished_ = true;
+			if (player_) {
+				player_->SetControlEnabled(true);
+				player_->SetInvincible(false);
+			}
+		}
 	}
-	bool isBattleCameraActive = (currentCameraMode_ == CameraMode::BATTLE_START && !battleCameraFinished_);
 
 	// 最終バトルクリア検知（BattleScene側で遷移したいならここ）
 	// 直接 ChangeScene せず、霧晴れ＋光芒のカットシーン演出を挟んでから遷移
-	if (!isBattleCameraActive && battleEnemyManager_->IsFinalBattleCleared() && !clearCinematicStarted_) {
+	if (battleEnemyManager_->IsFinalBattleCleared() && !clearCinematicStarted_) {
 		clearCinematicStarted_ = true;
 		battleEnemyManager_->ResetFinalBattleClearFlag();
+
+		// ゲーム更新を止める前に、攻撃中の剣軌跡と攻撃判定を確実に終了する。
+		// TrailMeshEmitter::Stop() は保持頂点もClearするため、静止した軌跡が
+		// クリア演出中に残り続けることを防げる。
+		if (player_ && player_->GetSword()) {
+			player_->GetSword()->ResetRuntimeState();
+		}
 
 		// チェーンから Fog / GodRays を引っ張る（無ければ tween をスキップ）
 		auto* chain = PostEffectManager::GetInstance()->GetEffectChain();
@@ -189,15 +207,16 @@ void BattleScene::Update() {
 
 	// プレイヤー更新
 	// 敵より先に動かすことで、敵AIが今フレームのプレイヤー位置を参照できる
-	if (!isBattleCameraActive && !battleEnemyManager_->IsFinalBattleCleared()) {
+	if (!battleEnemyManager_->IsFinalBattleCleared()) {
 		player_->Update();
 	}
 
 	// エリア制限補正（プレイヤー移動直後に境界クランプ → 敵がクランプ済みの位置を参照）
 	AreaManager::GetInstance()->UpdateSingleObject(&player_->GetWT());
 
-	// 敵更新（今フレームのプレイヤー位置・状態を参照してAIが反応）
-	if (!isBattleCameraActive) {
+	// 開始演出中は敵のAI・移動・攻撃・アニメーション進行だけを停止する。
+	// GameTime自体は止めないため、カメラやPlayerの表示更新には影響しない。
+	if (!battleIntroActive_) {
 		battleEnemyManager_->Update();
 	}
 
@@ -209,11 +228,9 @@ void BattleScene::Update() {
 
 	if (player_ && player_->GetPlayerCamera() && battleEnemyManager_) {
 		std::vector<Vector3> enemyPositions;
-		if (!isBattleCameraActive) {
-			for (auto* enemy : battleEnemyManager_->GetActiveBattleEnemies()) {
-				if (enemy) {
-					enemyPositions.push_back(enemy->GetTranslate());
-				}
+		for (auto* enemy : battleEnemyManager_->GetActiveBattleEnemies()) {
+			if (enemy) {
+				enemyPositions.push_back(enemy->GetTranslate());
 			}
 		}
 		player_->GetPlayerCamera()->SetThreatTargetPositions(enemyPositions);
@@ -319,6 +336,7 @@ void BattleScene::DrawShadow()
 /// </summary>
 void BattleScene::OnEnter() {
 	BaseSubScene::OnEnter();
+	if (player_) player_->ResetForBattleStart();
 
 	// 脅威察知（気配）はバトル中だけ有効化（フィールドでは背景・マップ見渡しを優先）
 	if (player_ && player_->GetPlayerCamera()) {
@@ -345,9 +363,14 @@ void BattleScene::OnEnter() {
 		mgr->AddArea("BattleArea", battleField);
 	}
 
-	// カメラリセット
-	currentCameraMode_ = CameraMode::FOLLOW;
+	// 開始演出の停止状態だけ初期化する。CameraModeは変更しない。
 	battleCameraFinished_ = true;
+	battleIntroActive_ = false;
+	battleIntroSawPerformance_ = false;
+	if (player_) {
+		player_->SetControlEnabled(true);
+		player_->SetInvincible(false);
+	}
 	shouldResetBattleCamera_ = true;
 
 	// クリア演出フラグをリセット（再戦・別バトル開始時のため）
@@ -365,6 +388,12 @@ void BattleScene::OnEnter() {
 /// </summary>
 void BattleScene::OnExit() {
 	BaseSubScene::OnExit();
+	battleIntroActive_ = false;
+	battleIntroSawPerformance_ = false;
+	if (player_) {
+		player_->SetControlEnabled(true);
+		player_->SetInvincible(false);
+	}
 
 	Logger("[BattleScene] ===== OnExit() START =====\n");
 
@@ -434,13 +463,26 @@ void BattleScene::StartBattle(const BattleTransitionData& data) {
 		encounter.formations = battleEnemyManager_->GetFormationPositions(encounter.enemyIds.size());
 	}
 
-	// バトル開始演出
-	player_->GetPlayerCamera()->PlayBattleStart();
-
 	if (battleEnemyManager_) {
 		battleEnemyManager_->SetFinalBattleMode(isFinalBattle_);
 		battleEnemyManager_->StartBattle(encounter);
 	}
+
+	// 敵生成後、最も近い敵の方向へ向いた待機姿勢を確定する。
+	if (player_ && battleEnemyManager_) {
+		if (auto* nearest = battleEnemyManager_->GetNearestEnemy(player_->GetWorldPosition())) {
+			player_->FacePosition(nearest->GetTranslate());
+		}
+	}
+
+	// CameraModeは変更せず、開始演出中はプレイヤー操作だけを停止する。
+	battleIntroActive_ = true;
+	battleIntroSawPerformance_ = false;
+	battleCameraFinished_ = false;
+	player_->SetControlEnabled(false);
+	player_->SetInvincible(true);
+	player_->GetPlayerCamera()->PlayBattleStart();
+	battleIntroSawPerformance_ = player_->GetPlayerCamera()->IsInPerformance();
 
 	Logger("[BattleScene] ===== StartBattle() END =====\n");
 }

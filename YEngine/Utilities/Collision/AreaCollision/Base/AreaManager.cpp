@@ -10,9 +10,9 @@
 // ============================================================
 AreaManager::AreaManager()
 {
-	indexAj_.Add("names",    &savedNames_)
-	         .Add("types",    &savedTypes_)
-	         .Add("purposes", &savedPurposes_);
+	indexAj_.Add("names", &savedNames_)
+		.Add("types", &savedTypes_)
+		.Add("purposes", &savedPurposes_);
 }
 
 AreaManager* AreaManager::GetInstance()
@@ -162,6 +162,7 @@ Vector3 AreaManager::ClampToNearestArea(const Vector3& position) const
 	// 2) 外側にいる場合は「境界が最も近いエリア」を選んでクランプする。
 	//    GetDistanceFromBoundary は外側で負、絶対値が境界までの距離。
 	std::shared_ptr<BaseArea> nearestArea = nullptr;
+
 	float minAbs = FLT_MAX;
 
 	for (const auto& [name, area] : areas_) {
@@ -174,6 +175,9 @@ Vector3 AreaManager::ClampToNearestArea(const Vector3& position) const
 	}
 
 	if (nearestArea) {
+		if (nearestArea->GetPurpose() != AreaPurpose::Boundary) {
+			return position;
+		}
 		return nearestArea->ClampPosition(position);
 	}
 	return position;

@@ -31,7 +31,7 @@ public:
 
 	void Initialize();
 	void Update() override;
-	void Draw();
+	void Draw() override;
 
 public:
 	///************************* アクセッサ *************************///

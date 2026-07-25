@@ -6,6 +6,7 @@ void BattleCounterAttackState::Enter(BattleEnemy& enemy) {
     enemy.SetCanAct(false);
     enemy.ResetStateTimer();
     enemy.IsInvincible() = true;
+	isContactDamageActive_ = false;
 
     anticipationStartPos_ = enemy.GetTranslate();
 
@@ -30,6 +31,7 @@ void BattleCounterAttackState::Enter(BattleEnemy& enemy) {
 }
 
 void BattleCounterAttackState::Update(BattleEnemy& enemy, float dt) {
+	isContactDamageActive_ = false;
     const auto& p = enemy.GetEnemyData().attackParams.counter;
     const float currentTime = enemy.GetStateTimer();
 
@@ -74,6 +76,7 @@ void BattleCounterAttackState::Update(BattleEnemy& enemy, float dt) {
         }
     }
     else if (currentTime < rushEnd) {
+		isContactDamageActive_ = true;
         enemy.SetColor({ 1.0f, 0.0f, 0.0f, 1.0f });
         if (enemy.GetPlayer()) {
             Vector3 toPlayer = enemy.GetPlayerPosition() - enemy.GetTranslate();
@@ -91,6 +94,7 @@ void BattleCounterAttackState::Update(BattleEnemy& enemy, float dt) {
 }
 
 void BattleCounterAttackState::Exit(BattleEnemy& enemy) {
+	isContactDamageActive_ = false;
     enemy.SetCanAct(true);
     enemy.IsInvincible() = false;
 

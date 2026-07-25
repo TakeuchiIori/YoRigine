@@ -29,7 +29,7 @@ public:
 	void Update() override;
 
 	// 描画
-	void Draw();
+	void Draw() override;
 
 public:
 	///************************* アクセッサ *************************///

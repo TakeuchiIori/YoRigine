@@ -46,6 +46,14 @@ public:
 
 	static std::unique_ptr<Object3d> Create(const std::string& filePath, const std::string& animationName = "", bool isAnimation = false);
 
+	// 指定モデルのマテリアルから「白以外」の代表色を取り出す（無ければ false）。
+	// モデルが未ロードなら読み込む。攻撃モデルの色を体へ反映する等に使う。
+	static bool TryGetModelThemeColor(const std::string& filePath, Vector4& out);
+
+	// 指定モデルの「実テクスチャ（アクセント画像）」のパスを取り出す（無ければ false）。
+	// モデルが未ロードなら読み込む（＝そのテクスチャも TextureManager に登録される）。
+	static bool TryGetModelAccentTexture(const std::string& filePath, std::string& out);
+
 
 	///************************* 基本的な関数 *************************///
 
@@ -107,6 +115,11 @@ public:
 	Model* GetModel() { return model_; }
 	MaterialLighting* GetMaterialLighting() const { return materialLighting_.get(); }
 
+	// このオブジェクトだけモデルのテクスチャを別テクスチャ（パス）で上書きする。空で解除（本来のテクスチャ）。
+	// モデルは共有されるが、上書きは Object3d 単位（描画時に適用）なので他インスタンスに影響しない。
+	void SetOverrideTexturePath(const std::string& path) { overrideTexturePath_ = path; }
+	const std::string& GetOverrideTexturePath() const { return overrideTexturePath_; }
+
 	// インバートハル輪郭線をこのオブジェクトに掛けるか（既定 true）。
 	// 地面など輪郭を出したくないオブジェクトは false にする。
 	void SetOutlineEnabled(bool enable) { outlineEnabled_ = enable; }
@@ -154,6 +167,9 @@ private:
 
 	// インバートハル輪郭線をこのオブジェクトに掛けるか（地面等は false）
 	bool outlineEnabled_ = true;
+
+	// このオブジェクト固有のテクスチャ上書きパス（空なら上書きしない）
+	std::string overrideTexturePath_;
 
 	// マテリアル関連
 	std::unique_ptr<MaterialColor> materialColor_;

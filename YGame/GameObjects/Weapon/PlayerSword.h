@@ -43,6 +43,11 @@ public:
 	void LoadVfxAssets(const std::string vfxAssetPath);
 	void PlayTrail() { if (trailEmitter_) trailEmitter_->Play(); }
 	void StopTrail() { if (trailEmitter_) trailEmitter_->Stop(); }
+	void ResetRuntimeState() {
+		StopTrail();
+		isDrawTrail_ = false;
+		if (obbCollider_) obbCollider_->SetCollisionEnabled(false);
+	}
 
 	// ============================================================
 	// アクセッサ・状態操作

@@ -26,3 +26,6 @@ void UpdateUVScroll::LoadFromJson(const nlohmann::json& json){
     if (json.contains("scrollSpeedX")) scrollSpeed.x = json["scrollSpeedX"];
 	if (json.contains("scrollSpeedY")) scrollSpeed.y = json["scrollSpeedY"];
 }
+
+// JSON ロード用ファクトリ登録（従来これが無く、保存後の再ロードで復元されなかった）
+REGISTER_UPDATE_MODULE(UpdateUVScroll)

@@ -7,15 +7,10 @@
 #include <dxgi1_6.h>
 #include <vector>
 
-DebugConsole* DebugConsole::instance_ = nullptr;
-
 DebugConsole* DebugConsole::GetInstance()
 {
-    if (!instance_)
-    {
-        instance_ = new DebugConsole();
-    }
-    return instance_;
+    static DebugConsole instance;
+    return &instance;
 }
 
 void DebugConsole::Initialize()
@@ -37,8 +32,6 @@ void DebugConsole::Initialize()
 void DebugConsole::Finalize()
 {
     Editor::GetInstance()->UnregisterGameUI("デバッグ情報");
-    delete instance_;
-    instance_ = nullptr;
 }
 
 void DebugConsole::BeginFrame()
