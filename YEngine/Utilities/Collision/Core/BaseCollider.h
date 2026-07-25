@@ -119,6 +119,11 @@ public:
   // 更新
   virtual void Update() = 0;
 
+  // デバッグ用のワイヤーフレーム描画。
+  // 形状ごとに派生クラスが実装する。CollisionManager::DrawAllColliders から
+  // 登録済みの全コライダーをまとめて可視化するために virtual にしている。
+  virtual void Draw() {}
+
 public:
   ///************************* アクセッサ *************************///
 

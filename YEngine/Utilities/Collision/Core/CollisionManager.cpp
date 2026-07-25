@@ -833,6 +833,16 @@ void CollisionManager::RemoveCollider(BaseCollider *collider) {
   DoRemove(collider);
 }
 
+void CollisionManager::DrawAllColliders() {
+  // 登録済みの全コライダーを形状ごとの Draw() でまとめて可視化する。
+  // colliders_ には走査中に nullptr 化されたスロットが混じり得るので弾く。
+  for (BaseCollider *collider : colliders_) {
+    if (collider) {
+      collider->Draw();
+    }
+  }
+}
+
 void CollisionManager::DoRemove(BaseCollider *collider) {
   if (!collider)
     return;

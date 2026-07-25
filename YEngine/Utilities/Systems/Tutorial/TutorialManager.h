@@ -16,6 +16,29 @@ namespace YoRigine {
 		Event,
 	};
 
+	// 各説明ページへ追加表示する画像UI。
+	// 操作図、キー画像、ゲーム画面の注目箇所などを本文と一緒に表示できる。
+	struct TutorialStepUI {
+		std::string name = "補足画像";
+		std::string texturePath;
+		Vector2 position{ 640.0f, 360.0f };
+		Vector2 size{ 320.0f, 180.0f };
+		Vector2 anchorPoint{ 0.5f, 0.5f };
+		Vector4 color{ 1.0f, 1.0f, 1.0f, 1.0f };
+		int layerOffset = 4;
+	};
+
+	// 説明ページごとのレイアウト。
+	// ページによって本文量や補足画像の位置が異なるため、共通Styleとは分離して保存する。
+	struct TutorialStepLayout {
+		Vector2 panelPosition{ 640.0f, 570.0f };
+		Vector2 panelSize{ 1120.0f, 240.0f };
+		Vector2 textOffset{ 0.0f, -35.0f };
+		float textMaxWidth = 1020.0f;
+		Vector2 hintOffset{ 0.0f, 85.0f };
+		Vector2 hintPanelSize{ 540.0f, 54.0f };
+	};
+
 	struct TutorialStep {
 		std::string name = "新しいステップ";
 		std::string speaker;
@@ -26,6 +49,8 @@ namespace YoRigine {
 		std::string targetUIId;
 		bool pauseGameplay = true;
 		bool skippable = true;
+		TutorialStepLayout layout;
+		std::vector<TutorialStepUI> additionalUIs;
 	};
 
 	struct TutorialStyle {
@@ -37,10 +62,6 @@ namespace YoRigine {
 		Vector4 outlineColor{ 0.0f, 0.0f, 0.0f, 1.0f };
 		Vector4 panelColor{ 0.03f, 0.04f, 0.07f, 0.90f };
 		std::string panelTexturePath;
-		Vector2 panelPosition{ 640.0f, 610.0f };
-		Vector2 panelSize{ 1120.0f, 170.0f };
-		Vector2 textOffset{ 0.0f, 0.0f };
-		float textMaxWidth = 1020.0f;
 		float textPadding = 8.0f;
 		int textAlign = 0;
 		bool textShadow = false;
@@ -49,8 +70,6 @@ namespace YoRigine {
 		bool showControlHint = true;
 		std::string hintText = "[SPACE / A] 次へ";
 		std::string skipHintText = "[ESC / B] スキップ";
-		Vector2 hintOffset{ 420.0f, 50.0f };
-		Vector2 hintPanelSize{ 230.0f, 54.0f };
 		std::string hintPanelTexturePath;
 		Vector4 hintPanelColor{ 0.10f, 0.24f, 0.38f, 0.95f };
 		float hintFontSize = 22.0f;
@@ -58,6 +77,15 @@ namespace YoRigine {
 		float hintOutlineWidth = 1.0f;
 		Vector4 hintOutlineColor{ 0.0f, 0.0f, 0.0f, 1.0f };
 		float hintPadding = 6.0f;
+		// ページ切り替え演出
+		float fadeInSeconds = 0.25f;
+		float fadeOutSeconds = 0.2f;
+		// 操作案内。キー名はエディターの候補から選択する。
+		std::string confirmKeyboardKey = "SPACE";
+		std::string confirmGamepadButton = "A";
+		std::string skipKeyboardKey = "ESC";
+		std::string skipGamepadButton = "B";
+		bool autoBuildControlHint = true;
 		int layer = 1000;
 	};
 
@@ -96,15 +124,32 @@ namespace YoRigine {
 		void EnterStep(std::size_t index);
 		void RefreshRuntimeUI();
 		void HideRuntimeUI();
+		void ApplyRuntimeOpacity();
+		void CompleteAdvance();
 		void ApplyTargetHighlight();
 		void ClearTargetHighlight();
 		void ApplyGameplayPause(bool pause);
+		bool IsConfirmTriggered() const;
+		bool IsSkipTriggered() const;
+		std::string BuildConfirmHintText() const;
+		std::string BuildSkipHintText() const;
+
+		enum class TransitionPhase {
+			FadeIn,
+			Showing,
+			FadeOut,
+		};
 
 		TutorialData currentData_;
 		std::size_t currentStep_ = 0;
 		float stepElapsed_ = 0.0f;
 		bool playing_ = false;
 		bool runtimeUIDirty_ = false;
+		TransitionPhase transitionPhase_ = TransitionPhase::Showing;
+		float transitionElapsed_ = 0.0f;
+		float transitionOpacity_ = 1.0f;
+		float transitionStartOpacity_ = 1.0f;
+		std::size_t activeAdditionalUICount_ = 0;
 		bool gameplayPauseOwned_ = false;
 		bool gameplayWasPaused_ = false;
 		std::unordered_set<std::string> receivedEvents_;
@@ -114,7 +159,7 @@ namespace YoRigine {
 
 #ifdef USE_IMGUI
 		TutorialData editorData_;
-		std::string editorPath_ = "Resources/Json/Tutorials/NewTutorial.json";
+		std::string editorPath_ = "Resources/Json/Tutorials/GameStartTutorial.json";
 		int editorSelectedStep_ = 0;
 		std::string editorStatus_;
 		bool editorLivePreview_ = true;

@@ -23,6 +23,29 @@ namespace {
 	constexpr const char* kHintTextUIId = "__TutorialRuntimeHintText";
 	constexpr const char* kRuntimeTexturePath = "Resources/UITex/__tutorial_runtime.png";
 	constexpr const char* kRuntimeHintTexturePath = "Resources/UITex/__tutorial_runtime_hint.png";
+	constexpr const char* kAdditionalUIPrefix = "__TutorialRuntimeAdditionalUI_";
+
+	std::string AdditionalUIId(std::size_t index) {
+		return std::string(kAdditionalUIPrefix) + std::to_string(index);
+	}
+
+	BYTE KeyboardKeyCode(const std::string& keyName) {
+		if (keyName == "ENTER") return DIK_RETURN;
+		if (keyName == "E") return DIK_E;
+		if (keyName == "F") return DIK_F;
+		if (keyName == "TAB") return DIK_TAB;
+		if (keyName == "ESC") return DIK_ESCAPE;
+		return DIK_SPACE;
+	}
+
+	GamePadButton GamepadButtonCode(const std::string& buttonName) {
+		if (buttonName == "B") return GamePadButton::B;
+		if (buttonName == "X") return GamePadButton::X;
+		if (buttonName == "Y") return GamePadButton::Y;
+		if (buttonName == "START") return GamePadButton::Start;
+		if (buttonName == "BACK") return GamePadButton::Back;
+		return GamePadButton::A;
+	}
 
 	const char* WaitTypeName(YoRigine::TutorialWaitType type) {
 		switch (type) {
@@ -40,12 +63,53 @@ namespace {
 }
 
 namespace YoRigine {
+	void to_json(nlohmann::json& json, const TutorialStepLayout& layout) {
+		json = {
+			{ "panelPosition", layout.panelPosition },
+			{ "panelSize", layout.panelSize },
+			{ "textOffset", layout.textOffset },
+			{ "textMaxWidth", layout.textMaxWidth },
+			{ "hintOffset", layout.hintOffset },
+			{ "hintPanelSize", layout.hintPanelSize },
+		};
+	}
+
+	void from_json(const nlohmann::json& json, TutorialStepLayout& layout) {
+		layout.panelPosition = json.value("panelPosition", layout.panelPosition);
+		layout.panelSize = json.value("panelSize", layout.panelSize);
+		layout.textOffset = json.value("textOffset", layout.textOffset);
+		layout.textMaxWidth = json.value("textMaxWidth", layout.textMaxWidth);
+		layout.hintOffset = json.value("hintOffset", layout.hintOffset);
+		layout.hintPanelSize = json.value("hintPanelSize", layout.hintPanelSize);
+	}
+
+	void to_json(nlohmann::json& json, const TutorialStepUI& ui) {
+		json = {
+			{ "name", ui.name }, { "texturePath", ui.texturePath },
+			{ "position", ui.position }, { "size", ui.size },
+			{ "anchorPoint", ui.anchorPoint }, { "color", ui.color },
+			{ "layerOffset", ui.layerOffset },
+		};
+	}
+
+	void from_json(const nlohmann::json& json, TutorialStepUI& ui) {
+		ui.name = json.value("name", ui.name);
+		ui.texturePath = json.value("texturePath", ui.texturePath);
+		ui.position = json.value("position", ui.position);
+		ui.size = json.value("size", ui.size);
+		ui.anchorPoint = json.value("anchorPoint", ui.anchorPoint);
+		ui.color = json.value("color", ui.color);
+		ui.layerOffset = json.value("layerOffset", ui.layerOffset);
+	}
+
 	void to_json(nlohmann::json& json, const TutorialStep& step) {
 		json = {
 			{ "name", step.name }, { "speaker", step.speaker }, { "text", step.text },
 			{ "waitType", WaitTypeName(step.waitType) }, { "waitSeconds", step.waitSeconds },
 			{ "eventName", step.eventName }, { "targetUIId", step.targetUIId },
 			{ "pauseGameplay", step.pauseGameplay }, { "skippable", step.skippable },
+			{ "layout", step.layout },
+			{ "additionalUIs", step.additionalUIs },
 		};
 	}
 
@@ -59,6 +123,8 @@ namespace YoRigine {
 		step.targetUIId = json.value("targetUIId", step.targetUIId);
 		step.pauseGameplay = json.value("pauseGameplay", step.pauseGameplay);
 		step.skippable = json.value("skippable", step.skippable);
+		step.layout = json.value("layout", step.layout);
+		step.additionalUIs = json.value("additionalUIs", step.additionalUIs);
 	}
 
 	namespace {
@@ -73,10 +139,6 @@ namespace YoRigine {
 					.Add("outlineColor", &data.style.outlineColor)
 					.Add("panelColor", &data.style.panelColor)
 					.Add("panelTexturePath", &data.style.panelTexturePath)
-					.Add("panelPosition", &data.style.panelPosition)
-					.Add("panelSize", &data.style.panelSize)
-					.Add("textOffset", &data.style.textOffset)
-					.Add("textMaxWidth", &data.style.textMaxWidth)
 					.Add("textPadding", &data.style.textPadding)
 					.Add("textAlign", &data.style.textAlign)
 					.Add("textShadow", &data.style.textShadow)
@@ -85,8 +147,6 @@ namespace YoRigine {
 					.Add("showControlHint", &data.style.showControlHint)
 					.Add("hintText", &data.style.hintText)
 					.Add("skipHintText", &data.style.skipHintText)
-					.Add("hintOffset", &data.style.hintOffset)
-					.Add("hintPanelSize", &data.style.hintPanelSize)
 					.Add("hintPanelTexturePath", &data.style.hintPanelTexturePath)
 					.Add("hintPanelColor", &data.style.hintPanelColor)
 					.Add("hintFontSize", &data.style.hintFontSize)
@@ -94,6 +154,13 @@ namespace YoRigine {
 					.Add("hintOutlineWidth", &data.style.hintOutlineWidth)
 					.Add("hintOutlineColor", &data.style.hintOutlineColor)
 					.Add("hintPadding", &data.style.hintPadding)
+					.Add("fadeInSeconds", &data.style.fadeInSeconds)
+					.Add("fadeOutSeconds", &data.style.fadeOutSeconds)
+					.Add("confirmKeyboardKey", &data.style.confirmKeyboardKey)
+					.Add("confirmGamepadButton", &data.style.confirmGamepadButton)
+					.Add("skipKeyboardKey", &data.style.skipKeyboardKey)
+					.Add("skipGamepadButton", &data.style.skipGamepadButton)
+					.Add("autoBuildControlHint", &data.style.autoBuildControlHint)
 					.Add("layer", &data.style.layer);
 
 				root_.Add("version", &version_)
@@ -167,6 +234,10 @@ namespace YoRigine {
 		runtimeUIDirty_ = false;
 		currentStep_ = 0;
 		stepElapsed_ = 0.0f;
+		transitionElapsed_ = 0.0f;
+		transitionOpacity_ = 1.0f;
+		transitionStartOpacity_ = 1.0f;
+		transitionPhase_ = TransitionPhase::Showing;
 		receivedEvents_.clear();
 	}
 
@@ -176,7 +247,36 @@ namespace YoRigine {
 			RefreshRuntimeUI();
 			runtimeUIDirty_ = false;
 		}
-		stepElapsed_ += GameTime::GetDeltaTime(TimeChannel::UI);
+		const float deltaTime = GameTime::GetDeltaTime(TimeChannel::UI);
+		const TutorialStyle& style = currentData_.style;
+
+		if (transitionPhase_ == TransitionPhase::FadeIn) {
+			transitionElapsed_ += deltaTime;
+			const float duration = std::max(0.0f, style.fadeInSeconds);
+			transitionOpacity_ = duration > 0.0f
+				? std::clamp(transitionElapsed_ / duration, 0.0f, 1.0f)
+				: 1.0f;
+			ApplyRuntimeOpacity();
+			if (transitionOpacity_ >= 1.0f) {
+				transitionPhase_ = TransitionPhase::Showing;
+				transitionElapsed_ = 0.0f;
+			}
+			return;
+		}
+
+		if (transitionPhase_ == TransitionPhase::FadeOut) {
+			transitionElapsed_ += deltaTime;
+			const float duration = std::max(0.0f, style.fadeOutSeconds);
+			const float t = duration > 0.0f
+				? std::clamp(transitionElapsed_ / duration, 0.0f, 1.0f)
+				: 1.0f;
+			transitionOpacity_ = transitionStartOpacity_ * (1.0f - t);
+			ApplyRuntimeOpacity();
+			if (t >= 1.0f) CompleteAdvance();
+			return;
+		}
+
+		stepElapsed_ += deltaTime;
 
 		const TutorialStep& step = currentData_.steps[currentStep_];
 		bool completed = false;
@@ -187,17 +287,15 @@ namespace YoRigine {
 		case TutorialWaitType::Event:
 			completed = !step.eventName.empty() && receivedEvents_.contains(step.eventName);
 			break;
-		case TutorialWaitType::Confirm: {
-			Input* input = Input::GetInstance();
-			completed = input->TriggerKey(DIK_SPACE) || input->TriggerKey(DIK_RETURN) ||
-				input->IsPadTriggered(0, GamePadButton::A);
+		case TutorialWaitType::Confirm:
+			completed = IsConfirmTriggered();
 			break;
 		}
-		}
 
-		Input* input = Input::GetInstance();
-		if (step.skippable && (input->TriggerKey(DIK_ESCAPE) || input->IsPadTriggered(0, GamePadButton::B))) {
-			completed = true;
+		if (step.skippable && IsSkipTriggered()) {
+			// 「スキップ」は現在の1ページ送りではなく、説明全体を閉じる。
+			Stop();
+			return;
 		}
 		if (completed) Advance();
 	}
@@ -216,6 +314,18 @@ namespace YoRigine {
 	}
 
 	void TutorialManager::Advance() {
+		if (!playing_ || transitionPhase_ == TransitionPhase::FadeOut) return;
+		const float fadeOutSeconds = std::max(0.0f, currentData_.style.fadeOutSeconds);
+		if (fadeOutSeconds <= 0.0f) {
+			CompleteAdvance();
+			return;
+		}
+		transitionPhase_ = TransitionPhase::FadeOut;
+		transitionElapsed_ = 0.0f;
+		transitionStartOpacity_ = transitionOpacity_;
+	}
+
+	void TutorialManager::CompleteAdvance() {
 		if (!playing_) return;
 		const std::size_t next = currentStep_ + 1;
 		if (next >= currentData_.steps.size()) Stop();
@@ -226,6 +336,11 @@ namespace YoRigine {
 		ClearTargetHighlight();
 		currentStep_ = index;
 		stepElapsed_ = 0.0f;
+		transitionElapsed_ = 0.0f;
+		transitionOpacity_ = currentData_.style.fadeInSeconds > 0.0f ? 0.0f : 1.0f;
+		transitionStartOpacity_ = transitionOpacity_;
+		transitionPhase_ = currentData_.style.fadeInSeconds > 0.0f
+			? TransitionPhase::FadeIn : TransitionPhase::Showing;
 		receivedEvents_.clear();
 		const TutorialStep& step = currentData_.steps[currentStep_];
 		ApplyGameplayPause(step.pauseGameplay);
@@ -239,6 +354,7 @@ namespace YoRigine {
 		if (!playing_ || currentStep_ >= currentData_.steps.size()) return;
 		const TutorialStep& step = currentData_.steps[currentStep_];
 		const TutorialStyle& style = currentData_.style;
+		const TutorialStepLayout& layout = step.layout;
 
 		std::string displayText;
 		if (!step.speaker.empty()) displayText = step.speaker + "\n";
@@ -246,8 +362,8 @@ namespace YoRigine {
 
 		std::string hintText;
 		if (style.showControlHint) {
-			if (step.waitType == TutorialWaitType::Confirm) hintText = style.hintText;
-			else if (step.skippable) hintText = style.skipHintText;
+			if (step.waitType == TutorialWaitType::Confirm) hintText = BuildConfirmHintText();
+			else if (step.skippable) hintText = BuildSkipHintText();
 		}
 
 		TextBakeParams params;
@@ -259,7 +375,7 @@ namespace YoRigine {
 		params.outlineWidth = style.outlineWidth;
 		params.outlineColor = style.outlineColor;
 		params.padding = style.textPadding;
-		params.maxWidth = style.textMaxWidth;
+		params.maxWidth = layout.textMaxWidth;
 		params.align = style.textAlign;
 		params.shadow = style.textShadow;
 		params.shadowOffset = style.shadowOffset;
@@ -290,8 +406,8 @@ namespace YoRigine {
 		}
 		panel->SetAnchorPoint({ 0.5f, 0.5f });
 		panel->SetTexture(style.panelTexturePath.empty() ? "./Resources/images/white.png" : style.panelTexturePath);
-		panel->SetPosition({ style.panelPosition.x, style.panelPosition.y, 0.0f });
-		panel->SetSize(style.panelSize);
+		panel->SetPosition({ layout.panelPosition.x, layout.panelPosition.y, 0.0f });
+		panel->SetSize(layout.panelSize);
 		panel->SetColor(style.panelColor);
 		panel->SetLayer(style.layer);
 		panel->SetVisible(true);
@@ -307,13 +423,12 @@ namespace YoRigine {
 		TextureManager::GetInstance()->ReloadTexture(kRuntimeTexturePath);
 		text->SetTexture(kRuntimeTexturePath);
 		text->SetAnchorPoint({ 0.5f, 0.5f });
-		text->SetPosition({ style.panelPosition.x + style.textOffset.x,
-			style.panelPosition.y + style.textOffset.y, 0.0f });
+		text->SetPosition({ layout.panelPosition.x + layout.textOffset.x,
+			layout.panelPosition.y + layout.textOffset.y, 0.0f });
 		text->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
 		text->SetLayer(style.layer + 1);
 		text->SetVisible(true);
 		text->StopAnimation(UIAnimationType::FadeIn);
-		text->SetAlpha(1.0f);
 
 		UIBase* hintPanel = uiManager->GetUI(kHintPanelUIId);
 		if (!hintPanel) {
@@ -324,14 +439,14 @@ namespace YoRigine {
 			uiManager->AddUI(kHintPanelUIId, std::move(created));
 		}
 		const Vector2 hintPosition{
-			style.panelPosition.x + style.hintOffset.x,
-			style.panelPosition.y + style.hintOffset.y
+			layout.panelPosition.x + layout.hintOffset.x,
+			layout.panelPosition.y + layout.hintOffset.y
 		};
 		hintPanel->SetAnchorPoint({ 0.5f, 0.5f });
 		hintPanel->SetTexture(style.hintPanelTexturePath.empty() ?
 			"./Resources/images/white.png" : style.hintPanelTexturePath);
 		hintPanel->SetPosition({ hintPosition.x, hintPosition.y, 0.0f });
-		hintPanel->SetSize(style.hintPanelSize);
+		hintPanel->SetSize(layout.hintPanelSize);
 		hintPanel->SetColor(style.hintPanelColor);
 		hintPanel->SetLayer(style.layer + 2);
 		hintPanel->SetVisible(!hintText.empty());
@@ -354,19 +469,54 @@ namespace YoRigine {
 		hint->SetLayer(style.layer + 3);
 		hint->SetVisible(!hintText.empty());
 		hint->StopAnimation(UIAnimationType::FadeIn);
-		hint->SetAlpha(1.0f);
+
+		// 前のページで使っていた追加UIをいったん隠し、現在のページ分だけ再設定する。
+		for (std::size_t i = 0; i < activeAdditionalUICount_; ++i) {
+			if (UIBase* additional = uiManager->GetUI(AdditionalUIId(i))) {
+				additional->SetVisible(false);
+			}
+		}
+		activeAdditionalUICount_ = step.additionalUIs.size();
+		for (std::size_t i = 0; i < step.additionalUIs.size(); ++i) {
+			const TutorialStepUI& data = step.additionalUIs[i];
+			const std::string id = AdditionalUIId(i);
+			UIBase* additional = uiManager->GetUI(id);
+			if (!additional) {
+				auto created = std::make_unique<UIBase>(id);
+				created->Initialize("");
+				created->SetTransient(true);
+				additional = created.get();
+				uiManager->AddUI(id, std::move(created));
+			}
+			if (!data.texturePath.empty()) {
+				TextureManager::GetInstance()->LoadTexture(data.texturePath);
+				additional->SetTexture(data.texturePath);
+			}
+			additional->SetName(data.name);
+			additional->SetAnchorPoint(data.anchorPoint);
+			additional->SetPosition({ data.position.x, data.position.y, 0.0f });
+			additional->SetSize(data.size);
+			additional->SetColor(data.color);
+			additional->SetLayer(style.layer + data.layerOffset);
+			additional->SetVisible(!data.texturePath.empty());
+			uiManager->BringToFront(id);
+		}
 
 		uiManager->BringToFront(kPanelUIId);
 		uiManager->BringToFront(kTextUIId);
 		uiManager->BringToFront(kHintPanelUIId);
 		uiManager->BringToFront(kHintTextUIId);
 		uiManager->SortByLayer();
+		ApplyRuntimeOpacity();
 		// TutorialManager は通常の UIManager::UpdateAll より後に更新されるため、
 		// 新規生成したスプライトの頂点をこのフレーム分だけ即時更新する。
 		panel->Update();
 		text->Update();
 		hintPanel->Update();
 		hint->Update();
+		for (std::size_t i = 0; i < activeAdditionalUICount_; ++i) {
+			if (UIBase* additional = uiManager->GetUI(AdditionalUIId(i))) additional->Update();
+		}
 	}
 
 	void TutorialManager::HideRuntimeUI() {
@@ -375,6 +525,32 @@ namespace YoRigine {
 		if (UIBase* text = manager->GetUI(kTextUIId)) text->SetVisible(false);
 		if (UIBase* hintPanel = manager->GetUI(kHintPanelUIId)) hintPanel->SetVisible(false);
 		if (UIBase* hint = manager->GetUI(kHintTextUIId)) hint->SetVisible(false);
+		for (std::size_t i = 0; i < activeAdditionalUICount_; ++i) {
+			if (UIBase* additional = manager->GetUI(AdditionalUIId(i))) additional->SetVisible(false);
+		}
+		activeAdditionalUICount_ = 0;
+	}
+
+	void TutorialManager::ApplyRuntimeOpacity() {
+		if (!playing_ || currentStep_ >= currentData_.steps.size()) return;
+		UIManager* manager = UIManager::GetInstance();
+		const TutorialStyle& style = currentData_.style;
+		const TutorialStep& step = currentData_.steps[currentStep_];
+		const float opacity = std::clamp(transitionOpacity_, 0.0f, 1.0f);
+
+		auto applyColor = [](UIBase* ui, Vector4 color, float alpha) {
+			if (!ui) return;
+			color.w *= alpha;
+			ui->SetColor(color);
+			ui->Update();
+		};
+		applyColor(manager->GetUI(kPanelUIId), style.panelColor, opacity);
+		applyColor(manager->GetUI(kTextUIId), { 1.0f, 1.0f, 1.0f, 1.0f }, opacity);
+		applyColor(manager->GetUI(kHintPanelUIId), style.hintPanelColor, opacity);
+		applyColor(manager->GetUI(kHintTextUIId), { 1.0f, 1.0f, 1.0f, 1.0f }, opacity);
+		for (std::size_t i = 0; i < step.additionalUIs.size(); ++i) {
+			applyColor(manager->GetUI(AdditionalUIId(i)), step.additionalUIs[i].color, opacity);
+		}
 	}
 
 	void TutorialManager::ApplyTargetHighlight() {
@@ -409,6 +585,37 @@ namespace YoRigine {
 			GameTime::SetChannelPaused(TimeChannel::Gameplay, gameplayWasPaused_);
 			gameplayPauseOwned_ = false;
 		}
+	}
+
+	bool TutorialManager::IsConfirmTriggered() const {
+		Input* input = Input::GetInstance();
+		return input->TriggerKey(KeyboardKeyCode(currentData_.style.confirmKeyboardKey)) ||
+			input->IsPadTriggered(0, GamepadButtonCode(currentData_.style.confirmGamepadButton));
+	}
+
+	bool TutorialManager::IsSkipTriggered() const {
+		Input* input = Input::GetInstance();
+		return input->TriggerKey(KeyboardKeyCode(currentData_.style.skipKeyboardKey)) ||
+			input->IsPadTriggered(0, GamepadButtonCode(currentData_.style.skipGamepadButton));
+	}
+
+	std::string TutorialManager::BuildConfirmHintText() const {
+		const TutorialStyle& style = currentData_.style;
+		if (!style.autoBuildControlHint) return style.hintText;
+		std::string text = "[" + style.confirmKeyboardKey + " / " +
+			style.confirmGamepadButton + "] 次へ";
+		if (currentStep_ < currentData_.steps.size() && currentData_.steps[currentStep_].skippable) {
+			text += "    [" + style.skipKeyboardKey + " / " + style.skipGamepadButton +
+				"] チュートリアルを閉じる";
+		}
+		return text;
+	}
+
+	std::string TutorialManager::BuildSkipHintText() const {
+		const TutorialStyle& style = currentData_.style;
+		if (!style.autoBuildControlHint) return style.skipHintText;
+		return "[" + style.skipKeyboardKey + " / " + style.skipGamepadButton +
+			"] チュートリアルを閉じる";
 	}
 
 } // namespace YoRigine

@@ -65,6 +65,10 @@ public:
   void AddCollider(BaseCollider *collider);
   void RemoveCollider(BaseCollider *collider);
 
+  // 登録済みの全コライダーをまとめてデバッグ描画する。
+  // 「当たり判定が設定されているもの」を所有者ごとに呼び分けず、一括で可視化する用途。
+  void DrawAllColliders();
+
   // ── Frustum culling 設定 ──────────────────────────
   // 視錐台外のコライダーを BroadPhase Insert からスキップする。
   // checkOutsideCamera=true のコライダーに対して効く
