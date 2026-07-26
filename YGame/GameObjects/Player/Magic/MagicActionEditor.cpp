@@ -4,7 +4,7 @@
 #include "Vfx/VfxMesh/Runtime/VfxMeshSpawner.h"
 #include "Particle/YEmitterGroupManager.h"
 #include "Particle/YParticleManager.h"
-#include "GPUParticle/GpuEmitManager.h"
+#include "GPUParticle/YGpuEmitManager.h"
 #include "Composite/CompositeEffectManager.h"
 
 #ifdef USE_IMGUI
@@ -590,9 +590,9 @@ namespace {
 				YParticleManager::GetInstance().GetSystem(event.vfxAsset);
 		} else {
 			assetLabel = "GPU Particle グループ";
-			assets = YoRigine::GpuEmitManager::GetInstance()->GetGroupNames();
+			assets = YoRigine::YGpuEmitManager::GetInstance()->GetGroupNames();
 			assetExists = event.vfxAsset.empty() ||
-				YoRigine::GpuEmitManager::GetInstance()->HasGroup(event.vfxAsset);
+				YoRigine::YGpuEmitManager::GetInstance()->HasGroup(event.vfxAsset);
 		}
 		std::sort(assets.begin(), assets.end());
 		assets.erase(std::unique(assets.begin(), assets.end()), assets.end());

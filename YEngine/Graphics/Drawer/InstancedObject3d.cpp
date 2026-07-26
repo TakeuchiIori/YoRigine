@@ -46,7 +46,7 @@ void InstancedObject3d::Initialize() {
 }
 
 void InstancedObject3d::Finalize() {
-  for (auto &[model, batch] : batches_) {
+  for (auto &[key, batch] : batches_) {
     for (auto &slot : batch.colorSlots) {
       if (slot.mapped) {
         slot.gpuBuffer->Unmap(0, nullptr);
@@ -63,7 +63,7 @@ void InstancedObject3d::Finalize() {
 }
 
 void InstancedObject3d::Begin() {
-  for (auto &[model, batch] : batches_) {
+  for (auto &[key, batch] : batches_) {
     batch.cpuData.clear();
   }
   totalInstances_ = 0;
@@ -75,7 +75,8 @@ void InstancedObject3d::Begin(YoRigine::Camera *camera) {
   frameCamera_ = camera;
 }
 
-void InstancedObject3d::Submit(YoRigine::Model *model, const Instance &src) {
+void InstancedObject3d::Submit(YoRigine::Model *model, const Instance &src,
+                               const std::string &overrideTexturePath) {
   if (!model)
     return;
 
@@ -97,7 +98,7 @@ void InstancedObject3d::Submit(YoRigine::Model *model, const Instance &src) {
   d.outlineMask = src.outlineMask;
   d.ditherFade = src.ditherFade;
 
-  AddInstance(model, d);
+  AddInstance(model, d, overrideTexturePath);
 }
 
 void InstancedObject3d::Submit(const ObjectManager::PlacedObject &placed) {
@@ -123,19 +124,22 @@ void InstancedObject3d::Submit(YoRigine::Object3d &object,
       model->GetHasBones()
           ? transform.matWorld_
           : (transform.matWorld_ * model->GetRootNode().GetLocalMatrix());
-  Submit(model, Instance{
-                    visualWorld,
-                    object.GetColor(),
-                    object.GetUvTransform(),
-                    object.GetStochasticStrength(),
-                    object.IsOutlineEnabled() ? 1.0f : 0.0f,
-                });
+  Submit(model,
+         Instance{
+             visualWorld,
+             object.GetColor(),
+             object.GetUvTransform(),
+             object.GetStochasticStrength(),
+             object.IsOutlineEnabled() ? 1.0f : 0.0f,
+         },
+         object.GetOverrideTexturePath());
 }
 
-void InstancedObject3d::AddInstance(YoRigine::Model *model, const InstanceData &data) {
+void InstancedObject3d::AddInstance(YoRigine::Model *model, const InstanceData &data,
+                                    const std::string &overrideTexturePath) {
   if (!model)
     return;
-  auto &batch = batches_[model];
+  auto &batch = batches_[BatchKey{model, overrideTexturePath}];
   batch.cpuData.push_back(data);
   ++totalInstances_;
 }
@@ -274,7 +278,7 @@ void InstancedObject3d::DrawAll(YoRigine::Camera *camera) {
         oidx.at("gOutline"),
         OutlineSettings::GetInstance()->GetResource()->GetGPUVirtualAddress());
 
-    for (auto &[model, batch] : batches_) {
+    for (auto &[key, batch] : batches_) {
       const uint32_t count = static_cast<uint32_t>(batch.cpuData.size());
       if (count == 0)
         continue;
@@ -283,7 +287,7 @@ void InstancedObject3d::DrawAll(YoRigine::Camera *camera) {
       std::memcpy(slot.mapped, batch.cpuData.data(),
                   sizeof(InstanceData) * count);
 
-      model->DrawOutlineInstanced(count, slot.srvHandleGPU);
+      key.model->DrawOutlineInstanced(count, slot.srvHandleGPU);
     }
   }
 
@@ -312,8 +316,8 @@ void InstancedObject3d::DrawAll(YoRigine::Camera *camera) {
   // 内でグローバルなトゥーン設定が反映される。
   materialLighting_->RecordDrawCommands(cmd, indices.at("gMaterialLight"));
 
-  // 各バッチを描画
-  for (auto &[model, batch] : batches_) {
+  // 各バッチを描画 (テクスチャ上書きがあればバッチ単位で差し替える)
+  for (auto &[key, batch] : batches_) {
     const uint32_t count = static_cast<uint32_t>(batch.cpuData.size());
     if (count == 0)
       continue;
@@ -322,7 +326,7 @@ void InstancedObject3d::DrawAll(YoRigine::Camera *camera) {
     std::memcpy(slot.mapped, batch.cpuData.data(),
                 sizeof(InstanceData) * count);
 
-    model->DrawInstanced(count, slot.srvHandleGPU);
+    key.model->DrawInstanced(count, slot.srvHandleGPU, key.overrideTexturePath);
   }
 }
 
@@ -350,7 +354,7 @@ void InstancedObject3d::DrawShadow() {
   // 影パスも DrawShadow 呼び出しごとに別スロットへ書く。
   // 同一フレーム内で後続のインスタンス描画が同じバッファを上書きすると、
   // GPU 実行時に先に記録した描画コマンドの行列がすり替わるため。
-  for (auto &[model, batch] : batches_) {
+  for (auto &[key, batch] : batches_) {
     const uint32_t count = static_cast<uint32_t>(batch.cpuData.size());
     if (count == 0)
       continue;
@@ -359,7 +363,7 @@ void InstancedObject3d::DrawShadow() {
     std::memcpy(slot.mapped, batch.cpuData.data(),
                 sizeof(InstanceData) * count);
 
-    model->DrawShadowInstanced(count, slot.srvHandleGPU);
+    key.model->DrawShadowInstanced(count, slot.srvHandleGPU);
   }
 
   // ── 後始末: 非インスタンス影パイプライン("ShadowMap")を復元する ──

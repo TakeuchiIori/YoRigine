@@ -1,9 +1,11 @@
 #pragma once
 //Engine
 #include <DirectXCommon.h>
-#include <GPUParticle/GPUParticle.h>
+#include <GPUParticle/YGpuParticle.h>
 #include <Systems/Camera/Camera.h>
 #include "GpuParticleParams.h"
+#include "Modules/YGpuFieldArrayModule.h"
+#include "Modules/GpuExtModules.h"
 // Math
 #include <Matrix4x4.h>
 #include <Vector3.h>
@@ -19,8 +21,12 @@ enum class EmitterShape : uint32_t
 	Box = 1,
 	Triangle = 2,
 	Cone = 3,
-	Mesh = 4
+	Mesh = 4,
+	Ring = 5,   // 円環（衝撃波の輪・魔法陣）
+	Line = 6,   // 線分（レーザー・ビーム）
 };
+// 形状コンボの項目数などに使う。新しい形状を足したらここも更新すること。
+static const uint32_t kEmitterShapeCount = 7;
 
 enum class MeshEmitMode : uint32_t
 {
@@ -61,7 +67,7 @@ struct ParticleMeshParams
 /// <summary>
 /// エミッタークラス
 /// </summary>
-class GPUEmitter
+class YGpuEmitter
 {
 public:
 	///************************* GPUバッファ用の構造体 *************************///
@@ -126,14 +132,65 @@ public:
 	};
 	static_assert(sizeof(EmitterConeData) == 64, "EmitterConeData must be 64 bytes");
 
+	// リングエミッター（HLSL EmitterRing と同一レイアウト = 64 bytes）
+	__declspec(align(16))
+		struct EmitterRingData {
+		Vector3 translate;
+		float pad0;            // 16
+		Vector3 normal;        // リング面の法線
+		float outerRadius;     // 32
+		float innerRadius;
+		float count;
+		float emitInterval;
+		float intervalTime;    // 48
+		uint32_t isEmit;
+		float pad1[3];         // 64
+	};
+	static_assert(sizeof(EmitterRingData) == 64, "EmitterRingData must be 64 bytes");
+
+	// ラインエミッター（HLSL EmitterLine と同一レイアウト = 48 bytes）
+	__declspec(align(16))
+		struct EmitterLineData {
+		Vector3 start;
+		float pad0;            // 16
+		Vector3 end;
+		float pad1;            // 32
+		float count;
+		float emitInterval;
+		float intervalTime;
+		uint32_t isEmit;       // 48
+	};
+	static_assert(sizeof(EmitterLineData) == 48, "EmitterLineData must be 48 bytes");
+
 	__declspec(align(16))
 		struct PerFrameData {
 		float    time;
 		float    deltaTime;
 		uint32_t forceFieldCount; // 有効なフォースフィールド数 (UpdateCS の PerFrame と同一レイアウト)
-		float    pad;
+		uint32_t noiseFieldCount; // 有効なノイズフィールド数 (Curl/Turbulence/Vortex)
+
+		uint32_t accelerationFieldCount; // 有効なアクセラレーションフィールド数
+		float    pad[3];
 	};
-	static_assert(sizeof(PerFrameData) == 16, "PerFrameData must be 16 bytes");
+	static_assert(sizeof(PerFrameData) == 32, "PerFrameData must be 32 bytes");
+
+	// GPU アクセラレーションフィールド (HLSL GpuAccelerationField と同一レイアウト = 64 bytes)
+	// ForceFieldのDirectionalAccelよりも単純な、範囲内一定方向の加速度のみを持つ軽量フィールド。
+	__declspec(align(16))
+	struct AccelerationForGPU {
+		uint32_t shape;        // GpuFieldShape
+		Vector3  center;       // 16
+		Vector3  halfExtents;  // AABB用
+		float    radius;       // 32 (Sphere用)
+		Vector3  direction;
+		float    strength;     // 48
+		float    falloff;
+		uint32_t isEnable;
+		float    pad[2];       // 64
+	};
+	static_assert(sizeof(AccelerationForGPU) == 64, "AccelerationForGPU must be 64 bytes");
+
+	static const uint32_t kMaxAccelerationFields = 4; // 1エミッタあたりの最大アクセラレーションフィールド数
 
 	// GPU フォースフィールド (HLSL GpuForceField と同一レイアウト = 96 bytes)
 	__declspec(align(16))
@@ -159,6 +216,29 @@ public:
 	static_assert(sizeof(ForceFieldForGPU) == 96, "ForceFieldForGPU must be 96 bytes");
 
 	static const uint32_t kMaxForceFields = 4; // 1エミッタあたりの最大フォースフィールド数
+
+	// GPU ノイズフィールド (HLSL GpuNoiseField と同一レイアウト = 96 bytes)
+	__declspec(align(16))
+	struct NoiseForGPU {
+		uint32_t type;         // GpuNoiseType
+		float    frequency;
+		float    amplitude;
+		uint32_t octaves;      // 16
+
+		float    lacunarity;
+		float    gain;
+		float    pad0[2];      // 32
+
+		Vector3  scrollSpeed;  float pad1; // 48
+		Vector3  axis;         float pad2; // 64
+		Vector3  center;       float radius; // 80
+
+		uint32_t isEnable;
+		float    pad3[3];      // 96
+	};
+	static_assert(sizeof(NoiseForGPU) == 96, "NoiseForGPU must be 96 bytes");
+
+	static const uint32_t kMaxNoiseFields = 4; // 1エミッタあたりの最大ノイズフィールド数
 
 	// メッシュエミッター
 	__declspec(align(16))
@@ -188,9 +268,6 @@ public:
 		uint32_t activeEdges;
 	};
 	static_assert(sizeof(MeshTriangle) == 56, "MeshTriangle must be 64 bytes");
-
-
-	static_assert(sizeof(PerFrameData) == 16, "PerFrameData must be 16 bytes");
 
 
 	__declspec(align(16))
@@ -275,6 +352,8 @@ public:
 	void SetConeParams(const Vector3& translate, const Vector3& direction, float radius, float height, float count, float emitInterval);
 	void SetMeshParams(YoRigine::Model* model, const Vector3& translate, const Vector3& scale,
 		const Quaternion& rotation, float count, float emitInterval, MeshEmitMode mode = MeshEmitMode::Surface);
+	void SetRingParams(const Vector3& translate, const Vector3& normal, float innerRadius, float outerRadius, float count, float emitInterval);
+	void SetLineParams(const Vector3& start, const Vector3& end, float count, float emitInterval);
 
 
 	// エミッターの更新用
@@ -284,6 +363,8 @@ public:
 	void UpdateConeParams(const Vector3& translate, const Vector3& direction, float radius, float height, float count, float emitInterval);
 	void UpdateMeshParams(YoRigine::Model* model, const Vector3& translate, const Vector3& scale,
 		const Quaternion& rotation, float count, float emitInterval, MeshEmitMode mode = MeshEmitMode::Surface);
+	void UpdateRingParams(const Vector3& translate, const Vector3& normal, float innerRadius, float outerRadius, float count, float emitInterval);
+	void UpdateLineParams(const Vector3& start, const Vector3& end, float count, float emitInterval);
 
 	// パーティクルパラメータ設定
 	void SetParticleParameters(const ParticleParams& params);
@@ -292,9 +373,26 @@ public:
 	// baseOffset: グループ原点などのワールドオフセット。center に加算して GPU へ送る
 	void SetForceFields(const std::vector<GpuForceFieldParams>& fields, const Vector3& baseOffset = {});
 
+	// ノイズフィールド設定（最大 kMaxNoiseFields 個。空の場合はノイズ無効）
+	// baseOffset: グループ原点などのワールドオフセット。center に加算して GPU へ送る
+	void SetNoiseFields(const std::vector<GpuNoiseParams>& fields, const Vector3& baseOffset = {});
+
+	// アクセラレーションフィールド設定（最大 kMaxAccelerationFields 個。空の場合は無効）
+	// baseOffset: グループ原点などのワールドオフセット。center に加算して GPU へ送る
+	void SetAccelerationFields(const std::vector<GpuAccelerationParams>& fields, const Vector3& baseOffset = {});
+
+	// 拡張Paramモジュール（任意演出。エディタで個別に追加・削除できる）を共有CBVへ反映。
+	// isEnable==false のものは自動的に無効化される。モジュールを増やすときは
+	// GpuExtModules へメンバを1行足すだけでよい（この関数のシグネチャは変わらない）。
+	void SetExtParams(const GpuExtModules& modules);
+
 	// 1粒子として描画するメッシュ形状を差し替える（形状＋生成パラメータ）
 	void SetParticleMesh(ParticleMeshShape shape, const ParticleMeshParams& params);
 	ParticleMeshShape GetParticleMeshShape() const { return particleMeshShape_; }
+
+	// 実行時のテクスチャ差し替え（YGpuParticle::SetTexture への委譲）
+	void SetTexture(const std::string& textureFilePath) { gpuParticle_->SetTexture(textureFilePath); }
+	const std::string& GetTexturePath() const { return gpuParticle_->GetTexturePath(); }
 
 	///************************* 外部から呼ぶ *************************///
 
@@ -315,7 +413,6 @@ private:
 	void CreateParticleParametersResource();
 	void CreatePerFrameResource();
 	void CreateMeshTriangleBuffer();
-	void CreateForceFieldBuffer();
 	void UpdateMeshTriangleData(YoRigine::Model* model);
 	void Dispatch();
 
@@ -323,7 +420,7 @@ private:
 
 public:
 	///************************* アクセッサ *************************///
-	GPUParticle* GetGPUParticle() const { return gpuParticle_.get(); }
+	YGpuParticle* GetYGpuParticle() const { return gpuParticle_.get(); }
 	EmitterShape GetCurrentShape() const { return currentShape_; }
 	MeshEmitMode GetCurrentMeshMode() const { return currentMeshMode_; }
 	Vector3 GetEmitterPosition() const;
@@ -332,7 +429,7 @@ public:
 private:
 	///************************* メンバ変数 *************************///
 	YoRigine::Camera* camera_ = nullptr;
-	std::unique_ptr<GPUParticle> gpuParticle_;
+	std::unique_ptr<YGpuParticle> gpuParticle_;
 	const uint32_t kMaxEmitters_ = 1;
 	const uint32_t threadsPerGroup_ = 1024;
 	const uint32_t kMaxTriangles_ = 200000;
@@ -352,6 +449,8 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> emitterTriangleResource_;
 	Microsoft::WRL::ComPtr<ID3D12Resource> emitterConeResource_;
 	Microsoft::WRL::ComPtr<ID3D12Resource> emitterMeshResource_;  // 新規追加
+	Microsoft::WRL::ComPtr<ID3D12Resource> emitterRingResource_;
+	Microsoft::WRL::ComPtr<ID3D12Resource> emitterLineResource_;
 	Microsoft::WRL::ComPtr<ID3D12Resource> meshTriangleBuffer_;   // 新規追加
 	Microsoft::WRL::ComPtr<ID3D12Resource> perframeResource_;
 	Microsoft::WRL::ComPtr<ID3D12Resource> particleParametersResource_;
@@ -363,6 +462,8 @@ private:
 	EmitterTriangleData* emitterTriangleData_ = nullptr;
 	EmitterConeData* emitterConeData_ = nullptr;
 	EmitterMeshData* emitterMeshData_ = nullptr;  // 新規追加
+	EmitterRingData* emitterRingData_ = nullptr;
+	EmitterLineData* emitterLineData_ = nullptr;
 	MeshTriangle* meshTriangleData_ = nullptr;    // 新規追加
 	PerFrameData* perframeData_ = nullptr;
 	ParticleParameters* particleParameters_ = nullptr;
@@ -373,12 +474,14 @@ private:
 	YoRigine::Model* currentMeshModel_ = nullptr;
 	float timeScalelastEmit_ = 0.0f;
 
-	// フォースフィールド関連
-	Microsoft::WRL::ComPtr<ID3D12Resource> forceFieldResource_;
-	ForceFieldForGPU* forceFieldData_ = nullptr;
-	uint32_t forceFieldSrvIndex_ = 0;
-	D3D12_GPU_DESCRIPTOR_HANDLE forceFieldSrvHandle_ = {};
-	uint32_t forceFieldCount_ = 0;
+	// フォースフィールド関連（配列インスタンスモジュール。ForceFieldForGPU は96Bで t0 に供給）
+	YGpuFieldArrayModule<GpuForceFieldParams, ForceFieldForGPU, kMaxForceFields> forceFieldModule_;
+
+	// ノイズフィールド関連 (Curl/Turbulence/Vortex。NoiseForGPU は96Bで t1 に供給)
+	YGpuFieldArrayModule<GpuNoiseParams, NoiseForGPU, kMaxNoiseFields> noiseFieldModule_;
+
+	// アクセラレーションフィールド関連 (AccelerationForGPU は64Bで t2 に供給)
+	YGpuFieldArrayModule<GpuAccelerationParams, AccelerationForGPU, kMaxAccelerationFields> accelerationFieldModule_;
 
 	Vector3 lastEmitWorldPos_{};
 	bool hasLastEmitWorldPos_ = false;

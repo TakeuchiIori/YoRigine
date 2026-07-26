@@ -1,30 +1,30 @@
 #pragma once
 
 // C++
-#include <memory>
 #include <functional>
+#include <memory>
 #include <vector>
 
 // Engine
-#include "Systems/Camera/Camera.h"
-#include "Object3D/Object3d.h"
-#include "Player/Player.h"
-#include "WorldTransform./WorldTransform.h"
+#include "Collision/AreaCollision/CircleArea.h"
 #include "Drawer/LineManager/Line.h"
 #include "Ground/Ground.h"
-#include <GPUParticle/GPUEmitter.h>
-#include "Collision/AreaCollision/CircleArea.h"
+#include "Object3D/Object3d.h"
+#include "Player/Player.h"
+#include "Systems/Camera/Camera.h"
+#include "WorldTransform./WorldTransform.h"
+#include <GPUParticle/YGpuEmitter.h>
 
 // App
 #include "Enemy/FieldEnemy/FieldEnemyManager.h"
 #include "Generators/Trigger/EventTriggerSystem.h"
 
 // Navigation
-#include <Systems/Navigation/NavGrid.h>
-#include <Systems/Navigation/NavPathfinder.h>
-#include <Systems/Navigation/NavGridConfig.h>
-#include "SceneDataStructures.h"
 #include "BaseSubScene.h"
+#include "SceneDataStructures.h"
+#include <Systems/Navigation/NavGrid.h>
+#include <Systems/Navigation/NavGridConfig.h>
+#include <Systems/Navigation/NavPathfinder.h>
 
 // JSON
 #include "Loaders/Json/JsonManager.h"
@@ -32,120 +32,123 @@
 ///************************* フィールドシーン *************************///
 class FieldScene : public BaseSubScene {
 public:
-	///************************* 基本関数 *************************///
+  ///************************* 基本関数 *************************///
 
-	// コンストラクタ
-	FieldScene() : BaseSubScene("Field") {}
+  // コンストラクタ
+  FieldScene() : BaseSubScene("Field") {}
 
-	// 初期化処理
-	void Initialize(YoRigine::Camera* camera, Player* player) override;
+  // 初期化処理
+  void Initialize(YoRigine::Camera *camera, Player *player) override;
 
-	// 更新処理
-	void Update() override;
+  // 更新処理
+  void Update() override;
 
-	// オブジェクト描画処理
-	void DrawObject() override;
+  // オブジェクト描画処理
+  void DrawObject() override;
 
-	// ライン描画処理
-	void DrawLine() override;
+  // ライン描画処理
+  void DrawLine() override;
 
-	// UI描画処理
-	void DrawUI() override;
+  // UI描画処理
+  void DrawUI() override;
 
-	// VFX描画処理
-	void DrawVFX() override;
+  // VFX描画処理
+  void DrawVFX() override;
 
-	// 非オフスクリーン描画処理
-	void DrawNonOffscreen() override;
+  // 非オフスクリーン描画処理
+  void DrawNonOffscreen() override;
 
-	// シャドウ描画処理
-	void DrawShadow() override;
+  // シャドウ描画処理
+  void DrawShadow() override;
 
-	// 終了処理
-	void Finalize() override;
+  // 終了処理
+  void Finalize() override;
 
-	void RebakeNavGrid();
+  void RebakeNavGrid();
 
-	///************************* ライフサイクル *************************///
+  ///************************* ライフサイクル *************************///
 
-	// シーンに入ったときの処理
-	void OnEnter() override;
+  // シーンに入ったときの処理
+  void OnEnter() override;
 
-	// シーンから出るときの処理
-	void OnExit() override;
+  // シーンから出るときの処理
+  void OnExit() override;
 
-	///************************* シーン固有処理 *************************///
+  ///************************* シーン固有処理 *************************///
 
-	// バトルシーンから戻った際の処理
-	void HandleBattleReturn(const FieldReturnData& data);
+  // バトルシーンから戻った際の処理
+  void HandleBattleReturn(const FieldReturnData &data);
 
 #ifdef USE_IMGUI
-	// EventTrigger エディタ (Editor::RegisterGameUI から呼ばれる)
-	void DrawEventTriggerEditor();
+  // EventTrigger エディタ (Editor::RegisterGameUI から呼ばれる)
+  void DrawEventTriggerEditor();
 #endif
 
-	///************************* アクセッサ *************************///
+  ///************************* アクセッサ *************************///
 
-	// プレイヤーの現在位置を取得
-	Vector3 GetPlayerPosition() const;
+  // プレイヤーの現在位置を取得
+  Vector3 GetPlayerPosition() const;
 
-	// プレイヤーを取得
-	Player* GetPlayer() const { return player_; }
+  // プレイヤーを取得
+  Player *GetPlayer() const { return player_; }
 
-	// すべての敵が撃破されたかチェック
-	bool AreAllEnemiesDefeated() const;
-
-private:
-	///************************* 内部処理 *************************///
-
-	// カメラモードを更新
-	void UpdateCameraMode();
-
-	// 詳細なエンカウント処理を実行
-	void HandleDetailedEncounter(const EncountInfo& encounterInfo);
-
-	// カメラ状態を保存
-	void SaveCameraState(BattleTransitionData& data);
-
-	// カメラ状態を復元
-	void RestoreCameraState(const FieldReturnData& data);
+  // すべての敵が撃破されたかチェック
+  bool AreAllEnemiesDefeated() const;
 
 private:
-	///************************* メンバ変数 *************************///
+  ///************************* 内部処理 *************************///
 
-	std::unique_ptr<Ground> ground_;
-	std::unique_ptr<FieldEnemyManager> fieldEnemyManager_;
-	std::unique_ptr<GPUEmitter> gpuEmitter_;
-	std::unique_ptr<YoRigine::Line> line_;
-	std::unique_ptr<YoRigine::Sprite> sprite_;
+  // カメラモードを更新
+  void UpdateCameraMode();
 
-	// イベントトリガー (討伐数→扉開放など) の所有・更新・通知配送。
-	EventTriggerSystem eventTriggerSystem_;
+  // 詳細なエンカウント処理を実行
+  void HandleDetailedEncounter(const EncountInfo &encounterInfo);
 
-	// Navigation
-	NavGridConfig navGridConfig_;  // データドリブン設定（JSON管理）
-	NavGrid navGrid_;
-	NavPathfinder navPathfinder_;
-	bool showNavGridDebug_ = false; // NavGridデバッグ描画ON/OFF
+  // カメラ状態を保存
+  void SaveCameraState(BattleTransitionData &data);
 
-	// エンカウント時に保存するプレイヤー座標。バトル復帰時に SetPosition で復元する。
-	// データパイプライン (BattleTransitionData → FieldReturnData) と二重化することで、
-	// 中継経路でデータが落ちても確実にエンカウント位置に戻れるようにする。
-	Vector3 savedEncounterPos_ = { 0.0f, 0.0f, 0.0f };
-	bool    hasSavedEncounterPos_ = false;
+  // カメラ状態を復元
+  void RestoreCameraState(const FieldReturnData &data);
 
-	// プレイヤー初期スポーン (フィールドに最初に降り立つ位置 / 向き)。JSON 保存対象。
-	// バトル復帰時の位置 (HandleBattleReturn) とは別物。
-	Vector3 spawnPos_ = { 0.0f, 0.0f, 0.0f };
-	float   spawnYawDeg_ = 0.0f;
-	// フォローカメラの初期 Euler (deg)。x=pitch / y=yaw / z=roll。
-	Vector3 spawnCameraRotDeg_ = { 0.0f, 0.0f, 0.0f };
-	std::unique_ptr<YoRigine::JsonManager> spawnJson_;
+private:
+  ///************************* メンバ変数 *************************///
 
-	// リトライ/初回時、フェード遷移後の OnEnter でスポーン姿勢を再適用するためのフラグ。
-	// バトル復帰では立てない（HandleBattleReturn が復帰位置を上書きするため）。
-	bool pendingSpawnReset_ = false;
+  std::unique_ptr<Ground> ground_;
+  std::unique_ptr<FieldEnemyManager> fieldEnemyManager_;
+  std::unique_ptr<YGpuEmitter> YGPUEmitter_;
+  std::unique_ptr<YoRigine::Line> line_;
+  std::unique_ptr<YoRigine::Sprite> sprite_;
 
-	// spawnPos_ / spawnYawDeg_ / spawnCameraRotDeg_ をプレイヤー・カメラへ適用する。
-	void ApplySpawnPose();
+  // イベントトリガー (討伐数→扉開放など) の所有・更新・通知配送。
+  EventTriggerSystem eventTriggerSystem_;
+
+  // Navigation
+  NavGridConfig navGridConfig_; // データドリブン設定（JSON管理）
+  NavGrid navGrid_;
+  NavPathfinder navPathfinder_;
+  bool showNavGridDebug_ = false; // NavGridデバッグ描画ON/OFF
+
+  // エンカウント時に保存するプレイヤー座標。バトル復帰時に SetPosition
+  // で復元する。 データパイプライン (BattleTransitionData → FieldReturnData)
+  // と二重化することで、
+  // 中継経路でデータが落ちても確実にエンカウント位置に戻れるようにする。
+  Vector3 savedEncounterPos_ = {0.0f, 0.0f, 0.0f};
+  bool hasSavedEncounterPos_ = false;
+
+  // プレイヤー初期スポーン (フィールドに最初に降り立つ位置 / 向き)。JSON
+  // 保存対象。 バトル復帰時の位置 (HandleBattleReturn) とは別物。
+  Vector3 spawnPos_ = {0.0f, 0.0f, 0.0f};
+  float spawnYawDeg_ = 0.0f;
+  // フォローカメラの初期 Euler (deg)。x=pitch / y=yaw / z=roll。
+  Vector3 spawnCameraRotDeg_ = {0.0f, 0.0f, 0.0f};
+  std::unique_ptr<YoRigine::JsonManager> spawnJson_;
+
+  // リトライ/初回時、フェード遷移後の OnEnter
+  // でスポーン姿勢を再適用するためのフラグ。
+  // バトル復帰では立てない（HandleBattleReturn が復帰位置を上書きするため）。
+  bool pendingSpawnReset_ = false;
+
+  // spawnPos_ / spawnYawDeg_ / spawnCameraRotDeg_
+  // をプレイヤー・カメラへ適用する。
+  void ApplySpawnPose();
 };

@@ -10,6 +10,8 @@ ConstantBuffer<EmitterCone> g_EmitterCone : register(b4);
 ConstantBuffer<EmitterMesh> g_EmitterMesh : register(b5);
 ConstantBuffer<PerFrame> g_PerFrame : register(b6);
 ConstantBuffer<ParticleParameters> g_ParticleParams : register(b7);
+ConstantBuffer<EmitterRing> g_EmitterRing : register(b8);
+ConstantBuffer<EmitterLine> g_EmitterLine : register(b9);
 
 // UAVバッファ（パーティクルデータ：SoA hot/warm/cold）
 RWStructuredBuffer<ParticleHot>  g_Hot  : register(u0);
@@ -252,6 +254,47 @@ float3 GetMeshNormalDirection(inout RandomGenerator generator, float3 particlePo
 }
 
 //=============================================================================
+// Ring / Line エミッター専用関数
+//=============================================================================
+
+/// <summary>
+/// 法線に直交する2軸（リング面の基底）を求める
+/// </summary>
+void BuildPlaneBasis(float3 normal, out float3 u, out float3 v)
+{
+    float3 n = normalize(normal + float3(1e-6f, 1e-6f, 1e-6f));
+    // n と平行になりにくい世界軸を選んで外積の縮退を避ける
+    float3 helper = (abs(n.y) < 0.9f) ? float3(0, 1, 0) : float3(1, 0, 0);
+    u = normalize(cross(helper, n));
+    v = cross(n, u);
+}
+
+/// <summary>
+/// リング（円環）上のランダムな点を生成。
+/// 半径は sqrt 補正して面積一様にする（そのまま lerp すると内周に密集する）。
+/// </summary>
+float3 GenerateRandomPositionOnRing(inout RandomGenerator generator,
+    float3 center, float3 normal, float innerRadius, float outerRadius)
+{
+    float3 u, v;
+    BuildPlaneBasis(normal, u, v);
+
+    float theta = generator.Generated1d() * 6.28318530718f;
+    float t = generator.Generated1d();
+    float r = sqrt(lerp(innerRadius * innerRadius, outerRadius * outerRadius, t));
+
+    return center + (u * cos(theta) + v * sin(theta)) * r;
+}
+
+/// <summary>
+/// 線分上のランダムな点を生成
+/// </summary>
+float3 GenerateRandomPositionOnLine(inout RandomGenerator generator, float3 start, float3 end)
+{
+    return lerp(start, end, generator.Generated1d());
+}
+
+//=============================================================================
 // 汎用位置生成関数
 //=============================================================================
 
@@ -313,6 +356,22 @@ float3 GenerateParticlePosition(inout RandomGenerator generator, uint emitterSha
                 }
             }
 
+        case EMITTER_SHAPE_RING:
+            return GenerateRandomPositionOnRing(
+            generator,
+            g_EmitterRing.translate,
+            g_EmitterRing.normal,
+            g_EmitterRing.innerRadius,
+            g_EmitterRing.outerRadius
+        );
+
+        case EMITTER_SHAPE_LINE:
+            return GenerateRandomPositionOnLine(
+            generator,
+            g_EmitterLine.start,
+            g_EmitterLine.end
+        );
+
         default:
             return float3(0, 0, 0);
     }
@@ -361,6 +420,32 @@ float3 GenerateParticleDirection(inout RandomGenerator generator, uint emitterSh
             );
             }
 
+        case EMITTER_SHAPE_RING:
+        {
+                // リング面内で中心から外向き。衝撃波が輪のまま広がる形になる。
+                float3 outward = particlePos - g_EmitterRing.translate;
+                float len = length(outward);
+                if (len < 1e-4f)
+                {
+                    return normalize(g_EmitterRing.normal);
+                }
+                return outward / len;
+            }
+
+        case EMITTER_SHAPE_LINE:
+        {
+                // 線の軸に直交する平面内でランダム（ビームから横に噴き出す形）
+                float3 axis = g_EmitterLine.end - g_EmitterLine.start;
+                if (dot(axis, axis) < 1e-8f)
+                {
+                    return normalize(generator.Generated3d() * 2.0f - 1.0f);
+                }
+                float3 u, v;
+                BuildPlaneBasis(axis, u, v);
+                float theta = generator.Generated1d() * 6.28318530718f;
+                return normalize(u * cos(theta) + v * sin(theta));
+            }
+
         default:
             return float3(0, 1, 0);
     }
@@ -398,6 +483,14 @@ bool GetEmitInfo(out float particleCount)
         case EMITTER_SHAPE_MESH:
             particleCount = g_EmitterMesh.count;
             return g_EmitterMesh.isEmit != 0;
+
+        case EMITTER_SHAPE_RING:
+            particleCount = g_EmitterRing.count;
+            return g_EmitterRing.isEmit != 0;
+
+        case EMITTER_SHAPE_LINE:
+            particleCount = g_EmitterLine.count;
+            return g_EmitterLine.isEmit != 0;
 
         default:
             return false;

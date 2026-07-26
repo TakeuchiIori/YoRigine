@@ -18,7 +18,7 @@
 #include "Particle/YParticleManager.h"
 #include "Particle/YParticleEditor.h"
 #include "Particle/YEmitterGroupEditor.h"
-#include "GPUParticle/GpuEmitManager.h"
+#include "GPUParticle/YGpuEmitManager.h"
 #include "Composite/CompositeEffectManager.h"
 #include <Vfx/VfxMesh/Editor/VfxMeshEditor.h>
 #include <Vfx/VfxMesh/Runtime/VfxMeshSpawner.h>
@@ -86,7 +86,7 @@ void DevelopScene::Initialize() {
 	YoRigine::ModelManipulator::GetInstance()->SetCamera(sceneCamera_.get());
 	YoRigine::ModelManipulator::GetInstance()->LoadScene("DevelopScene");
 
-	YoRigine::GpuEmitManager::GetInstance()->SetCamera(sceneCamera_.get());
+	YoRigine::YGpuEmitManager::GetInstance()->SetCamera(sceneCamera_.get());
 	// 視錐台外コライダーは BroadPhase 登録をスキップする (個別オプトアウトは BaseCollider::SetCheckOutsideCamera(false))
 	YoRigine::CollisionManager::GetInstance()->SetCullingCamera(sceneCamera_.get());
 	YoRigine::CollisionManager::GetInstance()->SetEnableFrustumCulling(true);
@@ -107,7 +107,7 @@ void DevelopScene::Initialize() {
 #ifdef USE_IMGUI
 	Editor::GetInstance()->RegisterGameUI("カメラエディター", [this]() {cameraEditor_->Update(); }, "Develop");
 	Editor::GetInstance()->RegisterGameUI("ライティング", [this]() { YoRigine::LightManager::GetInstance()->ShowLightingEditor(); }, "Develop");
-	Editor::GetInstance()->RegisterGameUI("GpuParticle", [this]() { YoRigine::GpuEmitManager::GetInstance()->DrawImGui(); }, "Develop");
+	Editor::GetInstance()->RegisterGameUI("GpuParticle", [this]() { YoRigine::YGpuEmitManager::GetInstance()->DrawImGui(); }, "Develop");
 	Editor::GetInstance()->RegisterGameUI("複合エフェクト(Composite)", [this]() { CompositeEffectManager::GetInstance()->DrawImGui(); }, "Develop");
 	Editor::GetInstance()->RegisterGameUI("YoRigine:パーティクルエディター", [this]() {YParticleEditor::GetInstance().ShowEditorWindow(); }, "Develop");
 
@@ -137,7 +137,7 @@ void DevelopScene::Update() {
 	VfxMeshSpawner::GetInstance()->SetCamera(sceneCamera_.get());
 	VfxMeshSpawner::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime(YoRigine::TimeChannel::Vfx));
 	YoRigine::LightManager::GetInstance()->UpdateShadowMatrix(sceneCamera_.get());
-	YoRigine::GpuEmitManager::GetInstance()->Update();
+	YoRigine::YGpuEmitManager::GetInstance()->Update();
 	CompositeEffectManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime(YoRigine::TimeChannel::Vfx));
 
 #ifdef USE_IMGUI
@@ -161,7 +161,7 @@ void DevelopScene::Draw() {
 	//------------------------------------------------------------
 	YParticleManager::GetInstance().Draw();
 	DrawLine();
-	YoRigine::GpuEmitManager::GetInstance()->Draw();
+	YoRigine::YGpuEmitManager::GetInstance()->Draw();
 
 	//------------------------------------------------------------
 	// VFX描画（複合エフェクトの VfxMesh 用）

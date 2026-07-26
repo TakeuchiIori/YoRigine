@@ -24,4 +24,8 @@ void LineManager::Initialize()
 	// Line 用パイプラインリソース取得
 	rootSignature_ = YPipelineManager::GetInstance()->GetRootSignature("Line");
 	graphicsPipelineState_ = YPipelineManager::GetInstance()->GetPipeLineStateObject("Line");
+
+	// 太線モード(TRIANGLELIST)用
+	rootSignatureThick_ = YPipelineManager::GetInstance()->GetRootSignature("LineThick");
+	graphicsPipelineStateThick_ = YPipelineManager::GetInstance()->GetPipeLineStateObject("LineThick");
 }

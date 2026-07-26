@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <d3d12.h>
 #include <memory>
+#include <string>
 #include <unordered_map>
 #include <vector>
 #include <wrl.h>
@@ -82,7 +83,10 @@ public:
   // 低レベル: 生データを渡すだけ。WIT = Transpose(Inverse(world)) は内部計算。
   // WVP は直前の Begin(camera) のカメラで計算 (未指定なら World
   // をそのまま入れる=影パス用)。
-  void Submit(YoRigine::Model *model, const Instance &src);
+  // overrideTexturePath: 空でなければモデル既定の代わりにこのテクスチャを貼る。
+  // 同一モデルでもテクスチャが異なると別バッチとして描画される。
+  void Submit(YoRigine::Model *model, const Instance &src,
+              const std::string &overrideTexturePath = "");
 
   // PlacedObject 用: model / world / 色 / UV / 輪郭線をすべて PlacedObject
   // から取り出して積む。 影パスでも同じ呼び出しでよい (Begin()
@@ -94,8 +98,10 @@ public:
   // から取り出す。
   void Submit(YoRigine::Object3d &object, const YoRigine::WorldTransform &transform);
 
-  // 低レベル: WVP / WIT を含む完成済みデータを積む
-  void AddInstance(YoRigine::Model *model, const InstanceData &data);
+  // 低レベル: WVP / WIT を含む完成済みデータを積む。
+  // overrideTexturePath が空でなければテクスチャ別のバッチに積む。
+  void AddInstance(YoRigine::Model *model, const InstanceData &data,
+                   const std::string &overrideTexturePath = "");
 
   // カラーパス: ObjectInstanced PSO で全バッチを描画
   void DrawAll(YoRigine::Camera *camera);
@@ -119,6 +125,22 @@ private:
   ~InstancedObject3d() = default;
   InstancedObject3d(const InstancedObject3d &) = delete;
   InstancedObject3d &operator=(const InstancedObject3d &) = delete;
+
+  // バッチ識別子: 同じモデルでもテクスチャ上書きが違えば別バッチにする。
+  // (インスタンシングは 1 ドロー = 1 テクスチャのため、テクスチャごとに分ける)
+  struct BatchKey {
+    YoRigine::Model *model = nullptr;
+    std::string overrideTexturePath;
+    bool operator==(const BatchKey &o) const {
+      return model == o.model && overrideTexturePath == o.overrideTexturePath;
+    }
+  };
+  struct BatchKeyHash {
+    size_t operator()(const BatchKey &k) const {
+      return std::hash<const void *>()(k.model) ^
+             (std::hash<std::string>()(k.overrideTexturePath) << 1);
+    }
+  };
 
   struct Batch {
     std::vector<InstanceData> cpuData;
@@ -156,7 +178,7 @@ private:
   // Begin(camera) で保持する、このフレームの Submit 用カメラ
   YoRigine::Camera *frameCamera_ = nullptr;
 
-  std::unordered_map<YoRigine::Model *, Batch> batches_;
+  std::unordered_map<BatchKey, Batch, BatchKeyHash> batches_;
 
   // 全インスタンス共有の MaterialLight (lighting有効, specular無効, env無効)。
   // MaterialLighting

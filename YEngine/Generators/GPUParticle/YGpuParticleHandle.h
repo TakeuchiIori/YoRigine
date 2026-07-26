@@ -1,34 +1,34 @@
 #pragma once
 // ===========================================================
-// GpuParticleHandle.h
+// YGpuParticleHandle.h
 //
-// EffectHandle / YVfxHandle と同じ発想で、GPUパーティクル（GpuEmitManager
+// EffectHandle / YVfxHandle と同じ発想で、GPUパーティクル（YGpuEmitManager
 // のエミッターグループ）をゲームコードからワンライナーで再生・操作するハンドル。
 //
-// 「名前」は GpuEmitManager のグループ名（JSON の groupName）。
+// 「名前」は YGpuEmitManager のグループ名（JSON の groupName）。
 //
 // 使い方:
 //   // ワンショット（1回発生して粒子は寿命で自然消滅。破片・火花など）
-//   GpuParticleHandle::PlayOneShot("ExplosionDebris", blastPos);
+//   YGpuParticleHandle::PlayOneShot("ExplosionDebris", blastPos);
 //
 //   // 継続再生（ループ。手動 Stop() まで発生し続ける。オーラ・炎など）
-//   auraHandle_ = GpuParticleHandle::Play("Aura", playerPos);
+//   auraHandle_ = YGpuParticleHandle::Play("Aura", playerPos);
 //   auraHandle_.SetPosition(playerPos); // 毎フレーム追従
 //   auraHandle_.Stop();                 // 停止（既存粒子は寿命で自然に消える）
 // ===========================================================
 #include "Vector3.h"
 #include <string>
 
-class GpuParticleHandle
+class YGpuParticleHandle
 {
 public:
-    GpuParticleHandle() = default;
-    ~GpuParticleHandle() = default;
+    YGpuParticleHandle() = default;
+    ~YGpuParticleHandle() = default;
 
     // ── ファクトリ ────────────────────────────────────────────────────
 
     // 継続再生（ループ）。返り値のハンドルで追従・停止する。
-    static GpuParticleHandle Play(const std::string& groupName,
+    static YGpuParticleHandle Play(const std::string& groupName,
                                   const Vector3&     position);
 
     // ワンショット。1回だけ発生し、粒子は寿命で自然消滅する。

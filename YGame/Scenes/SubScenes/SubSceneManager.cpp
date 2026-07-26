@@ -1,257 +1,260 @@
 #include "SubSceneManager.h"
-#include "OffScreen/PostEffectManager.h"
-#include "Systems/GameTime/GameTime.h"
 #include "BattleScene.h"
 #include "FieldScene.h"
+#include "GPUParticle/YGpuEmitManager.h"
+#include "OffScreen/PostEffectManager.h"
 #include "Particle/YParticleManager.h"
-#include "GPUParticle/GpuEmitManager.h"
+#include "Systems/GameTime/GameTime.h"
 #include <cmath>
 
 /// <summary>
 /// 初期化処理
 /// </summary>
-void SubSceneManager::Initialize(YoRigine::Camera* camera, Player* player) {
-	camera_ = camera;
-	player_ = player;
-	state_ = SubSceneState::IDLE;
+void SubSceneManager::Initialize(YoRigine::Camera *camera, Player *player) {
+  camera_ = camera;
+  player_ = player;
+  state_ = SubSceneState::IDLE;
 
-	auto postEffectManager = PostEffectManager::GetInstance();
+  auto postEffectManager = PostEffectManager::GetInstance();
 
-	//------------------------------------------------------------
-	// シーン遷移用ポストエフェクトの追加
-	//------------------------------------------------------------
-	shatterEffectIndex_ = postEffectManager->AddEffect(
-		OffScreen::OffScreenEffectType::ShatterTransition,
-		"SceneTransition"
-	);
+  //------------------------------------------------------------
+  // シーン遷移用ポストエフェクトの追加
+  //------------------------------------------------------------
+  shatterEffectIndex_ = postEffectManager->AddEffect(
+      OffScreen::OffScreenEffectType::ShatterTransition, "SceneTransition");
 
-	radialBlurEffectIndex_ = postEffectManager->AddEffect(
-		OffScreen::OffScreenEffectType::RadialBlur,
-		"SceneTransitionBlur"
-	);
+  radialBlurEffectIndex_ = postEffectManager->AddEffect(
+      OffScreen::OffScreenEffectType::RadialBlur, "SceneTransitionBlur");
 
-	postEffectManager->SetEffectEnabled(shatterEffectIndex_, false);
-	postEffectManager->SetEffectEnabled(radialBlurEffectIndex_, false);
+  postEffectManager->SetEffectEnabled(shatterEffectIndex_, false);
+  postEffectManager->SetEffectEnabled(radialBlurEffectIndex_, false);
 }
 
 /// <summary>
 /// 終了処理
 /// </summary>
 void SubSceneManager::Finalize() {
-	pendingPayload_ = std::monostate{};
+  pendingPayload_ = std::monostate{};
 
-	for (auto& [name, scene] : subScenes_) {
-		if (scene) scene->Finalize();
-	}
-	subScenes_.clear();
-	currentScene_ = nullptr;
+  for (auto &[name, scene] : subScenes_) {
+    if (scene)
+      scene->Finalize();
+  }
+  subScenes_.clear();
+  currentScene_ = nullptr;
 }
 
 /// <summary>
 /// 即時シーン切り替え（フェードなし）
 /// </summary>
 /// <param name="sceneName"></param>
-void SubSceneManager::SwitchToScene(const std::string& sceneName) {
-	if (state_ == SubSceneState::TRANSITIONING) return;
+void SubSceneManager::SwitchToScene(const std::string &sceneName) {
+  if (state_ == SubSceneState::TRANSITIONING)
+    return;
 
-	auto it = subScenes_.find(sceneName);
-	if (it == subScenes_.end()) return;
+  auto it = subScenes_.find(sceneName);
+  if (it == subScenes_.end())
+    return;
 
-	DeactivateCurrentScene();
-	ActivateScene(sceneName);
+  DeactivateCurrentScene();
+  ActivateScene(sceneName);
 }
 
 /// <summary>
 /// フェード付きシーン切り替え
 /// </summary>
-void SubSceneManager::SwitchToSceneWithFade(const std::string& sceneName) {
-	if (state_ == SubSceneState::TRANSITIONING) return;
+void SubSceneManager::SwitchToSceneWithFade(const std::string &sceneName) {
+  if (state_ == SubSceneState::TRANSITIONING)
+    return;
 
-	auto it = subScenes_.find(sceneName);
-	if (it == subScenes_.end()) return;
+  auto it = subScenes_.find(sceneName);
+  if (it == subScenes_.end())
+    return;
 
-	state_ = SubSceneState::TRANSITIONING;
-	pendingSceneName_ = sceneName;
-	transitionTime_ = 0.0f;
-	hasSceneSwitched_ = false;
+  state_ = SubSceneState::TRANSITIONING;
+  pendingSceneName_ = sceneName;
+  transitionTime_ = 0.0f;
+  hasSceneSwitched_ = false;
 
-	auto postEffectManager = PostEffectManager::GetInstance();
+  auto postEffectManager = PostEffectManager::GetInstance();
 
-	//------------------------------------------------------------
-	// エフェクト初期化
-	//------------------------------------------------------------
-	postEffectManager->SetEffectEnabled(shatterEffectIndex_, true);
-	postEffectManager->SetEffectEnabled(radialBlurEffectIndex_, true);
+  //------------------------------------------------------------
+  // エフェクト初期化
+  //------------------------------------------------------------
+  postEffectManager->SetEffectEnabled(shatterEffectIndex_, true);
+  postEffectManager->SetEffectEnabled(radialBlurEffectIndex_, true);
 
-	OffScreen::ShatterTransitionParams params{};
-	params.progress = 0.0f;
-	params.resolution = { static_cast<float>(WinApp::kClientWidth), static_cast<float>(WinApp::kClientHeight) };
-	params.time = 0.0f;
+  OffScreen::ShatterTransitionParams params{};
+  params.progress = 0.0f;
+  params.resolution = {static_cast<float>(WinApp::kClientWidth),
+                       static_cast<float>(WinApp::kClientHeight)};
+  params.time = 0.0f;
 
-	auto shatterData = postEffectManager->GetEffectData(shatterEffectIndex_);
-	if (shatterData) {
-		shatterData->params.shatter = params;
-	}
+  auto shatterData = postEffectManager->GetEffectData(shatterEffectIndex_);
+  if (shatterData) {
+    shatterData->params.shatter = params;
+  }
 
-	auto blurData = postEffectManager->GetEffectData(radialBlurEffectIndex_);
-	if (blurData) {
-		auto& blur = blurData->params.radialBlur;
-		blur.center = { 0.5f, 0.5f };
-		blur.width = 0.0f;
-		blur.sampleCount = 3;
-		blur.isRadial = true;
-	}
+  auto blurData = postEffectManager->GetEffectData(radialBlurEffectIndex_);
+  if (blurData) {
+    auto &blur = blurData->params.radialBlur;
+    blur.center = {0.5f, 0.5f};
+    blur.width = 0.0f;
+    blur.sampleCount = 3;
+    blur.isRadial = true;
+  }
 }
 
 /// <summary>
 /// 更新処理
 /// </summary>
 void SubSceneManager::Update() {
-	if (state_ == SubSceneState::TRANSITIONING) {
-		UpdateTransition();
-		return;
-	}
+  if (state_ == SubSceneState::TRANSITIONING) {
+    UpdateTransition();
+    return;
+  }
 
-	if (currentScene_ && !currentScene_->IsPaused()) {
-		currentScene_->Update();
-	}
+  if (currentScene_ && !currentScene_->IsPaused()) {
+    currentScene_->Update();
+  }
 }
 
 /// <summary>
 /// シーン遷移演出の更新
 /// </summary>
 void SubSceneManager::UpdateTransition() {
-	auto postEffectManager = PostEffectManager::GetInstance();
-	float deltaTime = YoRigine::GameTime::GetDeltaTime();
+  auto postEffectManager = PostEffectManager::GetInstance();
+  float deltaTime = YoRigine::GameTime::GetDeltaTime();
 
-	transitionTime_ += deltaTime;
-	float progress = std::min(transitionTime_ / transitionDuration_, 1.0f);
+  transitionTime_ += deltaTime;
+  float progress = std::min(transitionTime_ / transitionDuration_, 1.0f);
 
-	//------------------------------------------------------------
-	// 破片エフェクト更新
-	//------------------------------------------------------------
-	auto shatterData = postEffectManager->GetEffectData(shatterEffectIndex_);
-	if (shatterData) {
-		shatterData->params.shatter.progress = progress;
-		shatterData->params.shatter.resolution = { (float)WinApp::kClientWidth, (float)WinApp::kClientHeight };
-		shatterData->params.shatter.time = transitionTime_;
-	}
+  //------------------------------------------------------------
+  // 破片エフェクト更新
+  //------------------------------------------------------------
+  auto shatterData = postEffectManager->GetEffectData(shatterEffectIndex_);
+  if (shatterData) {
+    shatterData->params.shatter.progress = progress;
+    shatterData->params.shatter.resolution = {(float)WinApp::kClientWidth,
+                                              (float)WinApp::kClientHeight};
+    shatterData->params.shatter.time = transitionTime_;
+  }
 
-	//------------------------------------------------------------
-	// ブラー演出更新
-	//------------------------------------------------------------
-	auto blurData = postEffectManager->GetEffectData(radialBlurEffectIndex_);
-	if (blurData) {
-		float strength = sinf(progress * 3.1415926f);
-		auto& blur = blurData->params.radialBlur;
-		blur.center = { 0.5f, 0.5f };
-		blur.width = 0.02f * strength;
-		blur.sampleCount = 8 + int(16 * strength);
-		blur.isRadial = true;
-	}
+  //------------------------------------------------------------
+  // ブラー演出更新
+  //------------------------------------------------------------
+  auto blurData = postEffectManager->GetEffectData(radialBlurEffectIndex_);
+  if (blurData) {
+    float strength = sinf(progress * 3.1415926f);
+    auto &blur = blurData->params.radialBlur;
+    blur.center = {0.5f, 0.5f};
+    blur.width = 0.02f * strength;
+    blur.sampleCount = 8 + int(16 * strength);
+    blur.isRadial = true;
+  }
 
-	//------------------------------------------------------------
-	// シーン切り替えタイミング
-	//------------------------------------------------------------
-	if (!hasSceneSwitched_ && progress >= switchThreshold_) {
-		DeactivateCurrentScene();
-		ActivateScene(pendingSceneName_);
-		ApplyTransitionData();
-		hasSceneSwitched_ = true;
-	}
+  //------------------------------------------------------------
+  // シーン切り替えタイミング
+  //------------------------------------------------------------
+  if (!hasSceneSwitched_ && progress >= switchThreshold_) {
+    DeactivateCurrentScene();
+    ActivateScene(pendingSceneName_);
+    ApplyTransitionData();
+    hasSceneSwitched_ = true;
+  }
 
-	//------------------------------------------------------------
-	// 遷移完了処理
-	//------------------------------------------------------------
-	if (progress >= 1.0f) {
-		postEffectManager->SetEffectEnabled(shatterEffectIndex_, false);
-		postEffectManager->SetEffectEnabled(radialBlurEffectIndex_, false);
+  //------------------------------------------------------------
+  // 遷移完了処理
+  //------------------------------------------------------------
+  if (progress >= 1.0f) {
+    postEffectManager->SetEffectEnabled(shatterEffectIndex_, false);
+    postEffectManager->SetEffectEnabled(radialBlurEffectIndex_, false);
 
-		state_ = SubSceneState::ACTIVE;
-		hasSceneSwitched_ = false;
-		transitionTime_ = 0.0f;
+    state_ = SubSceneState::ACTIVE;
+    hasSceneSwitched_ = false;
+    transitionTime_ = 0.0f;
 
-		if (currentScene_) currentScene_->OnResume();
+    if (currentScene_)
+      currentScene_->OnResume();
 
-		pendingPayload_ = std::monostate{};
-	}
+    pendingPayload_ = std::monostate{};
+  }
 }
 
 /// <summary>
 /// 3Dオブジェクト描画
 /// </summary>
 void SubSceneManager::DrawObject() {
-	if (currentScene_ && currentScene_->IsActive()) {
-		currentScene_->DrawObject();
-	}
+  if (currentScene_ && currentScene_->IsActive()) {
+    currentScene_->DrawObject();
+  }
 }
 
 /// <summary>
 /// ライン描画（デバッグ用）
 /// </summary>
 void SubSceneManager::DrawLine() {
-	if (currentScene_ && currentScene_->IsActive()) {
-		currentScene_->DrawLine();
-	}
+  if (currentScene_ && currentScene_->IsActive()) {
+    currentScene_->DrawLine();
+  }
 }
 
 /// <summary>
 /// UI描画
 /// </summary>
 void SubSceneManager::DrawUI() {
-	if (currentScene_ && currentScene_->IsActive()) {
-		currentScene_->DrawUI();
-	}
+  if (currentScene_ && currentScene_->IsActive()) {
+    currentScene_->DrawUI();
+  }
 }
 
-void SubSceneManager::DrawNonOffscreen()
-{
-	if (currentScene_ && currentScene_->IsActive()) {
-		currentScene_->DrawNonOffscreen();
-	}
+void SubSceneManager::DrawNonOffscreen() {
+  if (currentScene_ && currentScene_->IsActive()) {
+    currentScene_->DrawNonOffscreen();
+  }
 }
 
-void SubSceneManager::DrawShadow()
-{
-	if (currentScene_ && currentScene_->IsActive()) {
-		currentScene_->DrawShadow();
-	}
+void SubSceneManager::DrawShadow() {
+  if (currentScene_ && currentScene_->IsActive()) {
+    currentScene_->DrawShadow();
+  }
 }
 
 /// <summary>
 /// 遷移リクエストの受付処理
 /// </summary>
-void SubSceneManager::HandleTransitionRequest(const SubSceneTransitionRequest& request) {
-	pendingPayload_ = request.payload;
-	pendingTransitionType_ = request.type;
+void SubSceneManager::HandleTransitionRequest(
+    const SubSceneTransitionRequest &request) {
+  pendingPayload_ = request.payload;
+  pendingTransitionType_ = request.type;
 
-	switch (request.type) {
-	case SubSceneTransitionType::TO_FIELD:
-		SwitchToSceneWithFade("Field");
-		break;
-	case SubSceneTransitionType::TO_BATTLE:
-		SwitchToSceneWithFade("Battle");
-		break;
-	case SubSceneTransitionType::TO_MENU:
-		SwitchToSceneWithFade("Menu");
-		break;
-	case SubSceneTransitionType::CUSTOM:
-		if (!request.targetSceneName.empty()) {
-			SwitchToSceneWithFade(request.targetSceneName);
-		}
-		break;
-	}
+  switch (request.type) {
+  case SubSceneTransitionType::TO_FIELD:
+    SwitchToSceneWithFade("Field");
+    break;
+  case SubSceneTransitionType::TO_BATTLE:
+    SwitchToSceneWithFade("Battle");
+    break;
+  case SubSceneTransitionType::TO_MENU:
+    SwitchToSceneWithFade("Menu");
+    break;
+  case SubSceneTransitionType::CUSTOM:
+    if (!request.targetSceneName.empty()) {
+      SwitchToSceneWithFade(request.targetSceneName);
+    }
+    break;
+  }
 }
 
 /// <summary>
 /// 指定シーンの取得
 /// </summary>
-BaseSubScene* SubSceneManager::GetScene(const std::string& name) const {
-	auto it = subScenes_.find(name);
-	if (it != subScenes_.end()) {
-		return it->second.get();
-	}
-	return nullptr;
+BaseSubScene *SubSceneManager::GetScene(const std::string &name) const {
+  auto it = subScenes_.find(name);
+  if (it != subScenes_.end()) {
+    return it->second.get();
+  }
+  return nullptr;
 }
 
 /// <summary>
@@ -259,65 +262,65 @@ BaseSubScene* SubSceneManager::GetScene(const std::string& name) const {
 /// payload は variant なので、型と中身が一致しなければ何もしない。
 /// </summary>
 void SubSceneManager::ApplyTransitionData() {
-	if (!currentScene_) return;
+  if (!currentScene_)
+    return;
 
-	if (auto* battleData = std::get_if<BattleTransitionData>(&pendingPayload_)) {
-		if (auto* battleScene = dynamic_cast<BattleScene*>(currentScene_)) {
-			battleScene->StartBattle(*battleData);
-		}
-	}
-	else if (auto* fieldData = std::get_if<FieldReturnData>(&pendingPayload_)) {
-		if (auto* fieldScene = dynamic_cast<FieldScene*>(currentScene_)) {
-			fieldScene->HandleBattleReturn(*fieldData);
-		}
-	}
+  if (auto *battleData = std::get_if<BattleTransitionData>(&pendingPayload_)) {
+    if (auto *battleScene = dynamic_cast<BattleScene *>(currentScene_)) {
+      battleScene->StartBattle(*battleData);
+    }
+  } else if (auto *fieldData = std::get_if<FieldReturnData>(&pendingPayload_)) {
+    if (auto *fieldScene = dynamic_cast<FieldScene *>(currentScene_)) {
+      fieldScene->HandleBattleReturn(*fieldData);
+    }
+  }
 }
 
 /// <summary>
 /// シーンの有効化
 /// </summary>
-void SubSceneManager::ActivateScene(const std::string& sceneName) {
-	auto it = subScenes_.find(sceneName);
-	if (it != subScenes_.end()) {
-		currentScene_ = it->second.get();
-		currentScene_->OnEnter();
+void SubSceneManager::ActivateScene(const std::string &sceneName) {
+  auto it = subScenes_.find(sceneName);
+  if (it != subScenes_.end()) {
+    currentScene_ = it->second.get();
+    currentScene_->OnEnter();
 
-		if (state_ == SubSceneState::TRANSITIONING) {
-			currentScene_->OnPause();
-		} else {
-			state_ = SubSceneState::ACTIVE;
-		}
-	}
+    if (state_ == SubSceneState::TRANSITIONING) {
+      currentScene_->OnPause();
+    } else {
+      state_ = SubSceneState::ACTIVE;
+    }
+  }
 }
 
 /// <summary>
 /// 現在のシーンを無効化
 /// </summary>
 void SubSceneManager::DeactivateCurrentScene() {
-	if (currentScene_) {
-		currentScene_->OnExit();
-		// サブシーン切り替え時に前のシーンのパーティクルを停止する
-		YParticleManager::GetInstance().StopAndClearActiveEmitters();
-		YoRigine::GpuEmitManager::GetInstance()->StopAllEmitterGroups();
-		currentScene_ = nullptr;
-	}
+  if (currentScene_) {
+    currentScene_->OnExit();
+    // サブシーン切り替え時に前のシーンのパーティクルを停止する
+    YParticleManager::GetInstance().StopAndClearActiveEmitters();
+    YoRigine::YGpuEmitManager::GetInstance()->StopAllEmitterGroups();
+    currentScene_ = nullptr;
+  }
 }
 
 /// <summary>
 /// カメラモード設定
 /// </summary>
 void SubSceneManager::SetCameraMode(CameraMode mode) {
-	if (currentScene_) {
-		currentScene_->SetCameraMode(mode);
-	}
+  if (currentScene_) {
+    currentScene_->SetCameraMode(mode);
+  }
 }
 
 /// <summary>
 /// 現在のカメラモード取得
 /// </summary>
 CameraMode SubSceneManager::GetCameraMode() const {
-	if (currentScene_) {
-		return currentScene_->GetCameraMode();
-	}
-	return CameraMode::DEFAULT;
+  if (currentScene_) {
+    return currentScene_->GetCameraMode();
+  }
+  return CameraMode::DEFAULT;
 }

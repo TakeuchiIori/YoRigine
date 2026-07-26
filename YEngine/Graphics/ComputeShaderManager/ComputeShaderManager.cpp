@@ -337,7 +337,7 @@ void ComputeShaderManager::CreateEmitCS()
 	coldUAV[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
 
 	// ===== Root Parameters =====
-	D3D12_ROOT_PARAMETER rootParameters[15] = {};
+	D3D12_ROOT_PARAMETER rootParameters[17] = {};
 
 	// Emitter Parameters (CBV0～CBV6)
 	for (int i = 0; i <= 7; i++) {
@@ -381,6 +381,15 @@ void ComputeShaderManager::CreateEmitCS()
 	rootParameters[14].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 	rootParameters[14].DescriptorTable.pDescriptorRanges = coldUAV;
 	rootParameters[14].DescriptorTable.NumDescriptorRanges = _countof(coldUAV);
+
+	// 15: EmitterRing CBV b8 / 16: EmitterLine CBV b9 (末尾追加 — 既存インデックスを変更しない)
+	rootParameters[15].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	rootParameters[15].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	rootParameters[15].Descriptor.ShaderRegister = 8;
+
+	rootParameters[16].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	rootParameters[16].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	rootParameters[16].Descriptor.ShaderRegister = 9;
 
 	D3D12_ROOT_SIGNATURE_DESC descriptionRootSignature{};
 	descriptionRootSignature.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
@@ -486,8 +495,22 @@ void ComputeShaderManager::CreateParticleUpdateCS()
 	drawArgsUAV[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 	drawArgsUAV[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
 
+	// SRV: NoiseFields (t1) — Curl/Turbulence/Vortex ノイズ配列。0個時もバッファは存在し HLSL 側でカウント0ガード
+	D3D12_DESCRIPTOR_RANGE noiseFieldSRV[1] = {};
+	noiseFieldSRV[0].BaseShaderRegister = 1;
+	noiseFieldSRV[0].NumDescriptors = 1;
+	noiseFieldSRV[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	noiseFieldSRV[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+
+	// SRV: AccelerationFields (t2) — 範囲内一定加速度の配列。0個時もバッファは存在し HLSL 側でカウント0ガード
+	D3D12_DESCRIPTOR_RANGE accelerationFieldSRV[1] = {};
+	accelerationFieldSRV[0].BaseShaderRegister = 2;
+	accelerationFieldSRV[0].NumDescriptors = 1;
+	accelerationFieldSRV[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	accelerationFieldSRV[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+
 	// ===== Root Parameters =====
-	D3D12_ROOT_PARAMETER rootParameters[11] = {};
+	D3D12_ROOT_PARAMETER rootParameters[14] = {};
 
 	// 0: UAV(Particle) u0
 	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
@@ -550,6 +573,23 @@ void ComputeShaderManager::CreateParticleUpdateCS()
 	rootParameters[10].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 	rootParameters[10].DescriptorTable.pDescriptorRanges = drawArgsUAV;
 	rootParameters[10].DescriptorTable.NumDescriptorRanges = _countof(drawArgsUAV);
+
+	// 11: NoiseFields SRV t1 (末尾追加 — 既存インデックスを変更しない)
+	rootParameters[11].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParameters[11].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	rootParameters[11].DescriptorTable.pDescriptorRanges = noiseFieldSRV;
+	rootParameters[11].DescriptorTable.NumDescriptorRanges = _countof(noiseFieldSRV);
+
+	// 12: AccelerationFields SRV t2 (末尾追加 — 既存インデックスを変更しない)
+	rootParameters[12].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParameters[12].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	rootParameters[12].DescriptorTable.pDescriptorRanges = accelerationFieldSRV;
+	rootParameters[12].DescriptorTable.NumDescriptorRanges = _countof(accelerationFieldSRV);
+
+	// 13: ExtParams CBV b2 (Drag/Bounce。VS 側は b1 で同じ内容を読む)
+	rootParameters[13].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	rootParameters[13].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	rootParameters[13].Descriptor.ShaderRegister = 2;
 
 
 
