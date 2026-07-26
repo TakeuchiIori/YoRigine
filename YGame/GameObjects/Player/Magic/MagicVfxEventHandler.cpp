@@ -1,14 +1,14 @@
 #include "MagicVfxEventHandler.h"
 
 #include "Collision/Core/BaseCollider.h"
+#include "Composite/CompositeEffectManager.h"
+#include "GPUParticle/YGpuEmitManager.h"
 #include "GameObjects/Enemy/BattleEnemy/BattleEnemy.h"
 #include "GameObjects/Enemy/BattleEnemy/BattleEnemyManager.h"
 #include "GameObjects/Player/Camera/PlayerCamera.h"
 #include "GameObjects/Player/Player.h"
 #include "MagicCastGeometry.h"
 #include "Particle/EffectHandle.h"
-#include "GPUParticle/GpuEmitManager.h"
-#include "Composite/CompositeEffectManager.h"
 #include "Systems/Camera/Virtuals/FollowCamera/FollowCamera.h"
 #include "Systems/GameTime/GameTime.h"
 #include "UI/Damage/DamageNumberManager.h"
@@ -70,7 +70,7 @@ void MagicVfxEventHandler::Execute(const MagicTimelineEvent &event,
   }
   if (event.effectBackend == MagicEffectBackend::GpuParticle) {
     if (!event.vfxAsset.empty()) {
-      YoRigine::GpuEmitManager::GetInstance()->EmitGroups(
+      YoRigine::YGpuEmitManager::GetInstance()->EmitGroups(
           event.vfxAsset, effectPosition,
           static_cast<float>(std::max(1, event.emitCount)));
     }
@@ -153,8 +153,8 @@ void MagicVfxEventHandler::ExecuteStrikeAllEnemies(
     if (!event.vfxAsset.empty()) {
       CompositeEffectManager::PlayParams params;
       params.minDuration = std::max(0.0f, event.duration);
-      CompositeEffectManager::GetInstance()->PlayOneShot(event.vfxAsset,
-                                                         ground, params);
+      CompositeEffectManager::GetInstance()->PlayOneShot(event.vfxAsset, ground,
+                                                         params);
     } else {
       VfxMeshHandle::PlayOneShot("Explosion", ground, scale, timeScale);
     }

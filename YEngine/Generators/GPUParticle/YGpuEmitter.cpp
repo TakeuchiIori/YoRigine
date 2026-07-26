@@ -1,4 +1,4 @@
-#include "GPUEmitter.h"
+#include "YGpuEmitter.h"
 
 // Engine
 #include <Systems/GameTime/GameTime.h>
@@ -8,21 +8,30 @@
 #include <Debugger/Logger.h>
 #include <Mesh/MeshPrimitive.h>
 
+// Paramモジュール（ParticleParameters CBVの担当フィールド群ごとに分割）
+#include "Modules/Lifetime/YLifetimeModule.h"
+#include "Modules/ScaleOverLife/YScaleOverLifeModule.h"
+#include "Modules/ColorOverLife/YColorOverLifeModule.h"
+#include "Modules/Velocity/YVelocityModule.h"
+#include "Modules/Rotation/YRotationModule.h"
+
 /// <summary>
 /// GPU エミッターの初期化（パーティクル生成・各種リソース作成）
 /// </summary>
-void GPUEmitter::Initialize(YoRigine::Camera* camera, std::string& texturePath)
+void YGpuEmitter::Initialize(YoRigine::Camera* camera, std::string& texturePath)
 {
 	camera_ = camera;
 
 	// GPU パーティクル本体
-	gpuParticle_ = std::make_unique<GPUParticle>();
+	gpuParticle_ = std::make_unique<YGpuParticle>();
 	gpuParticle_->Initialize(texturePath, camera_);
 
 	CreateEmitterResources();
 	CreatePerFrameResource();
 	CreateParticleParametersResource();
-	CreateForceFieldBuffer();
+	forceFieldModule_.CreateBuffer();
+	noiseFieldModule_.CreateBuffer();
+	accelerationFieldModule_.CreateBuffer();
 
 	ParticleParams defaultParams{};
 	defaultParams.lifeTime = 3.0f;
@@ -67,7 +76,7 @@ void GPUEmitter::Initialize(YoRigine::Camera* camera, std::string& texturePath)
 /// <summary>
 /// エミッター更新処理（形状ごとに emit を制御）
 /// </summary>
-void GPUEmitter::Update(float dt)
+void YGpuEmitter::Update(float dt)
 {
 	//-----------------------------------------
 	// 共通データの更新
@@ -75,7 +84,9 @@ void GPUEmitter::Update(float dt)
 	emitterCommonData_->emitterShape = static_cast<uint32_t>(currentShape_);
 	perframeData_->time = YoRigine::GameTime::GetTotalTime();
 	perframeData_->deltaTime = dt;
-	perframeData_->forceFieldCount = forceFieldCount_;
+	perframeData_->forceFieldCount = forceFieldModule_.GetCount();
+	perframeData_->noiseFieldCount = noiseFieldModule_.GetCount();
+	perframeData_->accelerationFieldCount = accelerationFieldModule_.GetCount();
 
 	// エミッターの更新
 	UpdateEmitters();
@@ -84,7 +95,9 @@ void GPUEmitter::Update(float dt)
 	// パーティクルのレンダリング更新
 	//-----------------------------------------
 	const bool trailEnabled = particleParameters_ && particleParameters_->childParams.isTrail != 0;
-	gpuParticle_->Update(perframeResource_.Get(), particleParametersResource_.Get(), forceFieldSrvHandle_, trailEnabled);
+	gpuParticle_->Update(perframeResource_.Get(), particleParametersResource_.Get(),
+		forceFieldModule_.GetSrvHandle(), noiseFieldModule_.GetSrvHandle(),
+		accelerationFieldModule_.GetSrvHandle(), trailEnabled);
 
 	//-----------------------------------------
 	// ComputeShader 実行
@@ -95,12 +108,12 @@ void GPUEmitter::Update(float dt)
 /// <summary>
 /// GPU パーティクル描画
 /// </summary>
-void GPUEmitter::Draw()
+void YGpuEmitter::Draw()
 {
 	gpuParticle_->Draw();
 }
 
-void GPUEmitter::Reset()
+void YGpuEmitter::Reset()
 {
 	if (gpuParticle_) {
 		gpuParticle_->Reset();
@@ -114,7 +127,7 @@ void GPUEmitter::Reset()
 /// <summary>
 /// 使用するエミッター形状を変更
 /// </summary>
-void GPUEmitter::SetEmitterShape(EmitterShape shape)
+void YGpuEmitter::SetEmitterShape(EmitterShape shape)
 {
 	currentShape_ = shape;
 }
@@ -122,7 +135,7 @@ void GPUEmitter::SetEmitterShape(EmitterShape shape)
 /// <summary>
 /// Sphere パラメータ設定
 /// </summary>
-void GPUEmitter::SetSphereParams(const Vector3& translate, float radius, float count, float emitInterval)
+void YGpuEmitter::SetSphereParams(const Vector3& translate, float radius, float count, float emitInterval)
 {
 	if (!emitterSphereData_) return;
 
@@ -137,7 +150,7 @@ void GPUEmitter::SetSphereParams(const Vector3& translate, float radius, float c
 /// <summary>
 /// Box パラメータ設定
 /// </summary>
-void GPUEmitter::SetBoxParams(const Vector3& translate, const Vector3& size, float count, float emitInterval)
+void YGpuEmitter::SetBoxParams(const Vector3& translate, const Vector3& size, float count, float emitInterval)
 {
 	if (!emitterBoxData_) return;
 
@@ -152,7 +165,7 @@ void GPUEmitter::SetBoxParams(const Vector3& translate, const Vector3& size, flo
 /// <summary>
 /// Triangle パラメータ設定
 /// </summary>
-void GPUEmitter::SetTriangleParams(const Vector3& v1, const Vector3& v2, const Vector3& v3,
+void YGpuEmitter::SetTriangleParams(const Vector3& v1, const Vector3& v2, const Vector3& v3,
 	const Vector3& translate, float count, float emitInterval)
 {
 	if (!emitterTriangleData_) return;
@@ -170,7 +183,7 @@ void GPUEmitter::SetTriangleParams(const Vector3& v1, const Vector3& v2, const V
 /// <summary>
 /// Cone パラメータ設定
 /// </summary>
-void GPUEmitter::SetConeParams(const Vector3& translate, const Vector3& direction, float radius,
+void YGpuEmitter::SetConeParams(const Vector3& translate, const Vector3& direction, float radius,
 	float height, float count, float emitInterval)
 {
 	if (!emitterConeData_) return;
@@ -185,7 +198,7 @@ void GPUEmitter::SetConeParams(const Vector3& translate, const Vector3& directio
 	emitterConeData_->isEmit = 1;
 }
 
-void GPUEmitter::SetMeshParams(YoRigine::Model* model, const Vector3& translate, const Vector3& scale, const Quaternion& rotation, float count, float emitInterval, MeshEmitMode mode)
+void YGpuEmitter::SetMeshParams(YoRigine::Model* model, const Vector3& translate, const Vector3& scale, const Quaternion& rotation, float count, float emitInterval, MeshEmitMode mode)
 {
 	if (!emitterMeshData_ || !model) return;
 
@@ -208,11 +221,44 @@ void GPUEmitter::SetMeshParams(YoRigine::Model* model, const Vector3& translate,
 	emitterMeshData_->triangleCount = static_cast<uint32_t>(meshTriangles_.size());
 }
 
+/// <summary>
+/// Ring パラメータ設定（衝撃波の輪・魔法陣向け）
+/// </summary>
+void YGpuEmitter::SetRingParams(const Vector3& translate, const Vector3& normal,
+	float innerRadius, float outerRadius, float count, float emitInterval)
+{
+	if (!emitterRingData_) return;
+
+	emitterRingData_->translate = translate;
+	emitterRingData_->normal = normal;
+	emitterRingData_->innerRadius = innerRadius;
+	emitterRingData_->outerRadius = outerRadius;
+	emitterRingData_->count = count;
+	emitterRingData_->emitInterval = emitInterval;
+	emitterRingData_->intervalTime = 0.0f;
+	emitterRingData_->isEmit = 1;
+}
+
+/// <summary>
+/// Line パラメータ設定（レーザー・ビーム向け）
+/// </summary>
+void YGpuEmitter::SetLineParams(const Vector3& start, const Vector3& end, float count, float emitInterval)
+{
+	if (!emitterLineData_) return;
+
+	emitterLineData_->start = start;
+	emitterLineData_->end = end;
+	emitterLineData_->count = count;
+	emitterLineData_->emitInterval = emitInterval;
+	emitterLineData_->intervalTime = 0.0f;
+	emitterLineData_->isEmit = 1;
+}
+
 //-----------------------------------------
 // UpdateXXXParams は初期化時との差分だけ更新
 //-----------------------------------------
 
-void GPUEmitter::UpdateSphereParams(const Vector3& translate, float radius, float count, float emitInterval)
+void YGpuEmitter::UpdateSphereParams(const Vector3& translate, float radius, float count, float emitInterval)
 {
 	if (!emitterSphereData_) return;
 
@@ -222,7 +268,7 @@ void GPUEmitter::UpdateSphereParams(const Vector3& translate, float radius, floa
 	emitterSphereData_->emitInterval = emitInterval;
 }
 
-void GPUEmitter::UpdateBoxParams(const Vector3& translate, const Vector3& size, float count, float emitInterval)
+void YGpuEmitter::UpdateBoxParams(const Vector3& translate, const Vector3& size, float count, float emitInterval)
 {
 	if (!emitterBoxData_) return;
 
@@ -232,7 +278,7 @@ void GPUEmitter::UpdateBoxParams(const Vector3& translate, const Vector3& size, 
 	emitterBoxData_->emitInterval = emitInterval;
 }
 
-void GPUEmitter::UpdateTriangleParams(const Vector3& v1, const Vector3& v2, const Vector3& v3,
+void YGpuEmitter::UpdateTriangleParams(const Vector3& v1, const Vector3& v2, const Vector3& v3,
 	const Vector3& translate, float count, float emitInterval)
 {
 	if (!emitterTriangleData_) return;
@@ -245,7 +291,7 @@ void GPUEmitter::UpdateTriangleParams(const Vector3& v1, const Vector3& v2, cons
 	emitterTriangleData_->emitInterval = emitInterval;
 }
 
-void GPUEmitter::UpdateConeParams(const Vector3& translate, const Vector3& direction, float radius,
+void YGpuEmitter::UpdateConeParams(const Vector3& translate, const Vector3& direction, float radius,
 	float height, float count, float emitInterval)
 {
 	if (!emitterConeData_) return;
@@ -258,7 +304,7 @@ void GPUEmitter::UpdateConeParams(const Vector3& translate, const Vector3& direc
 	emitterConeData_->emitInterval = emitInterval;
 }
 
-void GPUEmitter::UpdateMeshParams(YoRigine::Model* model, const Vector3& translate, const Vector3& scale, const Quaternion& rotation, float count, float emitInterval, MeshEmitMode mode)
+void YGpuEmitter::UpdateMeshParams(YoRigine::Model* model, const Vector3& translate, const Vector3& scale, const Quaternion& rotation, float count, float emitInterval, MeshEmitMode mode)
 {
 	if (!emitterMeshData_) return;
 
@@ -277,31 +323,39 @@ void GPUEmitter::UpdateMeshParams(YoRigine::Model* model, const Vector3& transla
 	currentMeshMode_ = mode;
 }
 
-void GPUEmitter::SetParticleParameters(const ParticleParams& params)
+void YGpuEmitter::UpdateRingParams(const Vector3& translate, const Vector3& normal,
+	float innerRadius, float outerRadius, float count, float emitInterval)
+{
+	if (!emitterRingData_) return;
+
+	emitterRingData_->translate = translate;
+	emitterRingData_->normal = normal;
+	emitterRingData_->innerRadius = innerRadius;
+	emitterRingData_->outerRadius = outerRadius;
+	emitterRingData_->count = count;
+	emitterRingData_->emitInterval = emitInterval;
+}
+
+void YGpuEmitter::UpdateLineParams(const Vector3& start, const Vector3& end, float count, float emitInterval)
+{
+	if (!emitterLineData_) return;
+
+	emitterLineData_->start = start;
+	emitterLineData_->end = end;
+	emitterLineData_->count = count;
+	emitterLineData_->emitInterval = emitInterval;
+}
+
+void YGpuEmitter::SetParticleParameters(const ParticleParams& params)
 {
 	if (particleParameters_) {
-		particleParameters_->lifeTime = params.lifeTime;
-		particleParameters_->lifeTimeVariance = params.lifeTimeVariance;
+		// 各Paramモジュールが担当フィールドだけをCBVへ書き込む（Fieldモジュールと違い専用バッファは持たない）
+		YLifetimeModule::WriteTo(*particleParameters_, params);
+		YScaleOverLifeModule::WriteTo(*particleParameters_, params);
+		YColorOverLifeModule::WriteTo(*particleParameters_, params);
+		YVelocityModule::WriteTo(*particleParameters_, params);
+		YRotationModule::WriteTo(*particleParameters_, params);
 
-		particleParameters_->startScale = params.startScale;
-		particleParameters_->startScaleVariance = params.startScaleVariance;
-		particleParameters_->endScale = params.endScale;
-		particleParameters_->endScaleVariance = params.endScaleVariance;
-
-		particleParameters_->rotation = params.rotation;
-		particleParameters_->rotationVariance = params.rotationVariance;
-		particleParameters_->rotationSpeed = params.rotationSpeed;
-		particleParameters_->rotationSpeedVariance = params.rotationSpeedVariance;
-
-		particleParameters_->velocity = params.velocity;
-		particleParameters_->velocityVariance = params.velocityVariance;
-
-		particleParameters_->startColor = params.startColor;
-		particleParameters_->startColorVariance = params.startColorVariance;
-		particleParameters_->endColor = params.endColor;
-		particleParameters_->endColorVariance = params.endColorVariance;
-
-		particleParameters_->gravity = params.gravity;
 		particleParameters_->isBillboard = params.isBillboard ? 1 : 0;
 
 		// ビルボードはエミッタ単位のuniformとしても反映（VSはこちらを参照＝切替が即全粒子へ）
@@ -309,7 +363,7 @@ void GPUEmitter::SetParticleParameters(const ParticleParams& params)
 			gpuParticle_->SetBillboard(params.isBillboard);
 		}
 
-		// 子パーティクルパラメータ
+		// 子パーティクルパラメータ（トレイル。今回のモジュール分割の対象外）
 		particleParameters_->childParams.isTrail = params.child.isTrail ? 1 : 0;
 		particleParameters_->childParams.minDistance = params.child.minDistance;
 		particleParameters_->childParams.lifeTime = params.child.lifeTime;
@@ -321,7 +375,7 @@ void GPUEmitter::SetParticleParameters(const ParticleParams& params)
 	}
 }
 
-void GPUEmitter::EmitAtPosition(const Vector3& position, float count)
+void YGpuEmitter::EmitAtPosition(const Vector3& position, float count)
 {
 	lastEmitWorldPos_ = position;
 	hasLastEmitWorldPos_ = true;
@@ -353,6 +407,21 @@ void GPUEmitter::EmitAtPosition(const Vector3& position, float count)
 		emitterMeshData_->translate = position;
 		emitterMeshData_->count = count;
 		break;
+
+	case EmitterShape::Ring:
+		emitterRingData_->translate = position;
+		emitterRingData_->count = count;
+		break;
+
+	case EmitterShape::Line:
+	{
+		// 線分は2点で定義されるため、長さ・向きを保ったまま中点を position へ移す
+		const Vector3 delta = emitterLineData_->end - emitterLineData_->start;
+		emitterLineData_->start = position - delta * 0.5f;
+		emitterLineData_->end = position + delta * 0.5f;
+		emitterLineData_->count = count;
+		break;
+	}
 	}
 
 	// 次フレームに1回だけ発生
@@ -362,7 +431,7 @@ void GPUEmitter::EmitAtPosition(const Vector3& position, float count)
 /// <summary>
 /// 各エミッター形状の GPU リソース（ConstantBuffer）を生成
 /// </summary>
-void GPUEmitter::CreateEmitterResources()
+void YGpuEmitter::CreateEmitterResources()
 {
 	auto* dx = YoRigine::DirectXCommon::GetInstance();
 
@@ -403,9 +472,17 @@ void GPUEmitter::CreateEmitterResources()
 	emitterMeshResource_ = dx->CreateBufferResource(sizeof(EmitterMeshData));
 	emitterMeshResource_->Map(0, nullptr, reinterpret_cast<void**>(&emitterMeshData_));
 
+	//-----------------------------------------
+	// Ring / Line
+	//-----------------------------------------
+	emitterRingResource_ = dx->CreateBufferResource(sizeof(EmitterRingData));
+	emitterRingResource_->Map(0, nullptr, reinterpret_cast<void**>(&emitterRingData_));
+
+	emitterLineResource_ = dx->CreateBufferResource(sizeof(EmitterLineData));
+	emitterLineResource_->Map(0, nullptr, reinterpret_cast<void**>(&emitterLineData_));
 }
 
-void GPUEmitter::CreateParticleParametersResource()
+void YGpuEmitter::CreateParticleParametersResource()
 {
 	auto* dx = YoRigine::DirectXCommon::GetInstance();
 	particleParametersResource_ = dx->CreateBufferResource(sizeof(ParticleParameters));
@@ -415,7 +492,7 @@ void GPUEmitter::CreateParticleParametersResource()
 /// <summary>
 /// 毎フレーム用定数バッファ作成（時間・デルタ）
 /// </summary>
-void GPUEmitter::CreatePerFrameResource()
+void YGpuEmitter::CreatePerFrameResource()
 {
 	auto* dx = YoRigine::DirectXCommon::GetInstance();
 
@@ -423,7 +500,7 @@ void GPUEmitter::CreatePerFrameResource()
 	perframeResource_->Map(0, nullptr, reinterpret_cast<void**>(&perframeData_));
 }
 
-void GPUEmitter::CreateMeshTriangleBuffer()
+void YGpuEmitter::CreateMeshTriangleBuffer()
 {
 	auto* dx = YoRigine::DirectXCommon::GetInstance();
 	if (meshTriangleBuffer_) {
@@ -448,68 +525,99 @@ void GPUEmitter::CreateMeshTriangleBuffer()
 	);
 }
 /// <summary>
-/// フォースフィールド定数バッファを初期化（kMaxForceFields 個分確保・SRV 登録）
+/// フォースフィールドパラメータを GPU バッファへ転送（ToGPU変換だけを YGpuFieldArrayModule に渡す）
 /// </summary>
-void GPUEmitter::CreateForceFieldBuffer()
+void YGpuEmitter::SetForceFields(const std::vector<GpuForceFieldParams>& fields, const Vector3& baseOffset)
 {
-	auto* dx = YoRigine::DirectXCommon::GetInstance();
-	size_t bufferSize = sizeof(ForceFieldForGPU) * kMaxForceFields;
-
-	forceFieldResource_ = dx->CreateBufferResource(bufferSize);
-	forceFieldResource_->Map(0, nullptr, reinterpret_cast<void**>(&forceFieldData_));
-	memset(forceFieldData_, 0, bufferSize);
-
-	auto* srvManager = YoRigine::SrvManager::GetInstance();
-	forceFieldSrvIndex_ = srvManager->Allocate();
-	srvManager->CreateSRVforStructuredBuffer(
-		forceFieldSrvIndex_,
-		forceFieldResource_.Get(),
-		static_cast<UINT>(kMaxForceFields),
-		sizeof(ForceFieldForGPU)
-	);
-	forceFieldSrvHandle_ = srvManager->GetGPUDescriptorHandle(forceFieldSrvIndex_);
+	forceFieldModule_.Upload(fields, baseOffset,
+		[](const GpuForceFieldParams& src, const Vector3& offset) {
+			ForceFieldForGPU dst{};
+			dst.shape             = static_cast<uint32_t>(src.shape);
+			dst.center             = offset + src.center;
+			dst.halfExtents        = src.halfExtents;
+			dst.radius             = src.radius;
+			dst.mode               = static_cast<uint32_t>(src.mode);
+			dst.direction          = src.direction;
+			dst.strength           = src.strength;
+			dst.falloff            = src.falloff;
+			dst.spiralStrengthMin  = src.spiralStrengthMin;
+			dst.spiralStrengthMax  = src.spiralStrengthMax;
+			dst.randomAxisBlend    = src.randomAxisBlend;
+			dst.orbitHoldRatio     = src.orbitHoldRatio;
+			dst.approachVariance   = src.approachVariance;
+			dst.maxSpeed           = src.maxSpeed;
+			dst.killRadius         = src.killRadius;
+			dst.isEnable           = 1u;
+			return dst;
+		});
 }
 
 /// <summary>
-/// フォースフィールドパラメータを GPU バッファへ転送
+/// ノイズフィールドパラメータを GPU バッファへ転送（ToGPU変換だけを YGpuFieldArrayModule に渡す）
 /// </summary>
-void GPUEmitter::SetForceFields(const std::vector<GpuForceFieldParams>& fields, const Vector3& baseOffset)
+void YGpuEmitter::SetNoiseFields(const std::vector<GpuNoiseParams>& fields, const Vector3& baseOffset)
 {
-	if (!forceFieldData_) return;
+	noiseFieldModule_.Upload(fields, baseOffset,
+		[](const GpuNoiseParams& src, const Vector3& offset) {
+			NoiseForGPU dst{};
+			dst.type        = static_cast<uint32_t>(src.type);
+			dst.frequency   = src.frequency;
+			dst.amplitude   = src.amplitude;
+			dst.octaves     = src.octaves;
+			dst.lacunarity  = src.lacunarity;
+			dst.gain        = src.gain;
+			dst.scrollSpeed = src.scrollSpeed;
+			dst.axis        = src.axis;
+			dst.center      = offset + src.center;
+			dst.radius      = src.radius;
+			dst.isEnable    = 1u;
+			return dst;
+		});
+}
 
-	// 有効なフィールドだけを先頭から詰めて転送（CS は forceFieldCount 個を順に読むため）
-	uint32_t written = 0;
-	for (const auto& src : fields) {
-		if (!src.isEnable) continue;
-		if (written >= kMaxForceFields) break;
+/// <summary>
+/// アクセラレーションフィールドパラメータを GPU バッファへ転送（ToGPU変換だけを YGpuFieldArrayModule に渡す）
+/// </summary>
+void YGpuEmitter::SetAccelerationFields(const std::vector<GpuAccelerationParams>& fields, const Vector3& baseOffset)
+{
+	accelerationFieldModule_.Upload(fields, baseOffset,
+		[](const GpuAccelerationParams& src, const Vector3& offset) {
+			AccelerationForGPU dst{};
+			dst.shape       = static_cast<uint32_t>(src.shape);
+			dst.center      = offset + src.center;
+			dst.halfExtents = src.halfExtents;
+			dst.radius      = src.radius;
+			dst.direction   = src.direction;
+			dst.strength    = src.strength;
+			dst.falloff     = src.falloff;
+			dst.isEnable    = 1u;
+			return dst;
+		});
+}
 
-		auto& dst = forceFieldData_[written];
-		dst.shape           = static_cast<uint32_t>(src.shape);
-		dst.center          = baseOffset + src.center;
-		dst.halfExtents     = src.halfExtents;
-		dst.radius          = src.radius;
-		dst.mode            = static_cast<uint32_t>(src.mode);
-		dst.direction       = src.direction;
-		dst.strength        = src.strength;
-		dst.falloff         = src.falloff;
-		dst.spiralStrengthMin  = src.spiralStrengthMin;
-		dst.spiralStrengthMax  = src.spiralStrengthMax;
-		dst.randomAxisBlend    = src.randomAxisBlend;
-		dst.orbitHoldRatio     = src.orbitHoldRatio;
-		dst.approachVariance   = src.approachVariance;
-		dst.maxSpeed           = src.maxSpeed;
-		dst.killRadius         = src.killRadius;
-		dst.isEnable           = 1u;
-		dst.pad2[0] = dst.pad2[1] = 0.f;
-		written++;
-	}
-	forceFieldCount_ = written;
+/// <summary>
+/// 拡張Paramモジュール群を1つの共有CBVにまとめてGPU側へ反映（VS b1 / CS b2 が同じ内容を読む）
+/// </summary>
+void YGpuEmitter::SetExtParams(const GpuExtModules& modules)
+{
+	if (!gpuParticle_) return;
+
+	YGpuParticle::ParticleExtParameters ext{};
+	YUVScrollModule::WriteTo(ext, modules.uvScroll);
+	YScalePulseModule::WriteTo(ext, modules.scalePulse);
+	YColorFlickerModule::WriteTo(ext, modules.colorFlicker);
+	YDragModule::WriteTo(ext, modules.drag);
+	YStretchByVelocityModule::WriteTo(ext, modules.stretch);
+	YBounceModule::WriteTo(ext, modules.bounce);
+	YEmissiveModule::WriteTo(ext, modules.emissive);
+	YFlipbookModule::WriteTo(ext, modules.flipbook);
+	gpuParticle_->SetExtParams(ext);
 }
 
 /// <summary>
 /// モデルからメッシュ三角形情報を収集してGPUバッファへ転送
 /// </summary>
-void GPUEmitter::UpdateMeshTriangleData(YoRigine::Model* model)
+void YGpuEmitter::UpdateMeshTriangleData(YoRigine::Model* model)
 {
 	if (!model || !meshTriangleData_) {
 		return;
@@ -658,7 +766,7 @@ end_triangle_loop:
 /// <summary>
 /// ComputeShader “EmitCS” を用いてパーティクルを生成
 /// </summary>
-void GPUEmitter::Dispatch()
+void YGpuEmitter::Dispatch()
 {
 	auto* dx = YoRigine::DirectXCommon::GetInstance();
 	auto* cmd = dx->GetCommandList().Get();
@@ -715,6 +823,9 @@ void GPUEmitter::Dispatch()
 	cmd->SetComputeRootConstantBufferView(5, emitterMeshResource_->GetGPUVirtualAddress());
 	cmd->SetComputeRootConstantBufferView(6, perframeResource_->GetGPUVirtualAddress());
 	cmd->SetComputeRootConstantBufferView(7, particleParametersResource_->GetGPUVirtualAddress());
+	// b8/b9: Ring/Line（末尾追加のルートパラメータ 15/16）
+	cmd->SetComputeRootConstantBufferView(15, emitterRingResource_->GetGPUVirtualAddress());
+	cmd->SetComputeRootConstantBufferView(16, emitterLineResource_->GetGPUVirtualAddress());
 
 	//-----------------------------------------
 	// UAV テーブル
@@ -761,6 +872,12 @@ void GPUEmitter::Dispatch()
 	case EmitterShape::Mesh:
 		emitCount = static_cast<uint32_t>(emitterMeshData_->count);
 		break;
+	case EmitterShape::Ring:
+		emitCount = static_cast<uint32_t>(emitterRingData_->count);
+		break;
+	case EmitterShape::Line:
+		emitCount = static_cast<uint32_t>(emitterLineData_->count);
+		break;
 	}
 
 	//-----------------------------------------
@@ -803,7 +920,7 @@ void GPUEmitter::Dispatch()
 
 }
 
-void GPUEmitter::UpdateEmitters()
+void YGpuEmitter::UpdateEmitters()
 {
 	//-----------------------------------------
 	// 現在の形状ごとに Emit 制御
@@ -856,9 +973,25 @@ void GPUEmitter::UpdateEmitters()
 		if (emitterMeshData_->isEmit) emitterMeshData_->intervalTime = 0.0f;
 		break;
 	}
+	case EmitterShape::Ring:
+	{
+		emitterRingData_->intervalTime += dt;
+		const bool intervalHit = emitterRingData_->intervalTime >= emitterRingData_->emitInterval;
+		emitterRingData_->isEmit = (burst || (continuousEmit_ && intervalHit)) ? 1 : 0;
+		if (emitterRingData_->isEmit) emitterRingData_->intervalTime = 0.0f;
+		break;
+	}
+	case EmitterShape::Line:
+	{
+		emitterLineData_->intervalTime += dt;
+		const bool intervalHit = emitterLineData_->intervalTime >= emitterLineData_->emitInterval;
+		emitterLineData_->isEmit = (burst || (continuousEmit_ && intervalHit)) ? 1 : 0;
+		if (emitterLineData_->isEmit) emitterLineData_->intervalTime = 0.0f;
+		break;
+	}
 	}
 }
-void GPUEmitter::SetParticleMesh(ParticleMeshShape shape, const ParticleMeshParams& p)
+void YGpuEmitter::SetParticleMesh(ParticleMeshShape shape, const ParticleMeshParams& p)
 {
 	if (!gpuParticle_) return;
 	particleMeshShape_ = shape;
@@ -884,7 +1017,7 @@ void GPUEmitter::SetParticleMesh(ParticleMeshShape shape, const ParticleMeshPara
 	}
 }
 
-void GPUEmitter::SetEmitWorldPosition(const Vector3& worldPos)
+void YGpuEmitter::SetEmitWorldPosition(const Vector3& worldPos)
 {
 	// 継続発生中の追従用。translate のみ差し替え、count/interval/isEmit は UpdateEmitters に委ねる
 	switch (currentShape_) {
@@ -893,10 +1026,19 @@ void GPUEmitter::SetEmitWorldPosition(const Vector3& worldPos)
 	case EmitterShape::Triangle: if (emitterTriangleData_) emitterTriangleData_->translate = worldPos; break;
 	case EmitterShape::Cone:     if (emitterConeData_)     emitterConeData_->translate = worldPos;     break;
 	case EmitterShape::Mesh:     if (emitterMeshData_)     emitterMeshData_->translate = worldPos;     break;
+	case EmitterShape::Ring:     if (emitterRingData_)     emitterRingData_->translate = worldPos;     break;
+	case EmitterShape::Line:
+		if (emitterLineData_) {
+			// 長さ・向きを保ったまま中点を worldPos へ移す
+			const Vector3 delta = emitterLineData_->end - emitterLineData_->start;
+			emitterLineData_->start = worldPos - delta * 0.5f;
+			emitterLineData_->end = worldPos + delta * 0.5f;
+		}
+		break;
 	}
 }
 
-Vector3 GPUEmitter::GetEmitterPosition() const
+Vector3 YGpuEmitter::GetEmitterPosition() const
 {
 	switch (currentShape_) {
 	case EmitterShape::Sphere:   return emitterSphereData_->translate;
@@ -904,17 +1046,19 @@ Vector3 GPUEmitter::GetEmitterPosition() const
 	case EmitterShape::Triangle: return emitterTriangleData_->translate;
 	case EmitterShape::Cone:     return emitterConeData_->translate;
 	case EmitterShape::Mesh:     return emitterMeshData_->translate;
+	case EmitterShape::Ring:     return emitterRingData_->translate;
+	case EmitterShape::Line:     return (emitterLineData_->start + emitterLineData_->end) * 0.5f; // 線分は中点を代表点とする
 	}
 	return { 0,0,0 };
 }
 
-void GPUEmitter::SetCamera(YoRigine::Camera* camera)
+void YGpuEmitter::SetCamera(YoRigine::Camera* camera)
 {
 	// 自身のカメラポインタを更新
 	camera_ = camera;
 
-	// 内部のGPUParticleのカメラポインタを更新
-	// ※ GPUParticle にも SetCamera(YoRigine::Camera*) があることを前提とします。
+	// 内部のYGpuParticleのカメラポインタを更新
+	// ※ YGpuParticle にも SetCamera(YoRigine::Camera*) があることを前提とします。
 	if (gpuParticle_) {
 		// 
 		gpuParticle_->SetCamera(camera);

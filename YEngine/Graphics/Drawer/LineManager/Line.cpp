@@ -63,14 +63,26 @@ void Line::DrawLine() {
   slot.mapped->color = currentColor_;
   ++currentMaterialIndex_;
 
+  // lineWidth_ > 0 の間に登録された頂点は RegisterLine 側で四角形(2三角形)として
+  // 書き込まれているため、PSO・RootSignature・トポロジすべて TRIANGLELIST 用に
+  // 揃える必要がある（PSOに焼き込んだ PrimitiveTopologyType と IASetPrimitiveTopology
+  // の実トポロジが食い違うと描画が壊れる/クラッシュするため、細線用と太線用で別PSOを使う）。
+  const bool isThick = lineWidth_ > 0.0001f;
+  const auto rootSignature = isThick ? lineManager_->GetRootSignatureThick()
+                                      : lineManager_->GetRootSignature();
+  const auto pipelineState = isThick ? lineManager_->GetGraphicsPiplineStateThick()
+                                      : lineManager_->GetGraphicsPiplineState();
+
   auto pm = YPipelineManager::GetInstance();
-  const auto &indices = pm->GetParameterIndices("Line");
+  const auto &indices = pm->GetParameterIndices(isThick ? "LineThick" : "Line");
 
   // GPU にセットして描画
   auto commandList = dxCommon_->GetCommandList();
-  commandList->SetGraphicsRootSignature(lineManager_->GetRootSignature().Get());
-  commandList->SetPipelineState(lineManager_->GetGraphicsPiplineState().Get());
-  commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
+  commandList->SetGraphicsRootSignature(rootSignature.Get());
+  commandList->SetPipelineState(pipelineState.Get());
+  commandList->IASetPrimitiveTopology(
+      isThick ? D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST
+              : D3D_PRIMITIVE_TOPOLOGY_LINELIST);
   commandList->IASetVertexBuffers(0, 1, &vertexBufferView_);
 
   commandList->SetGraphicsRootConstantBufferView(
@@ -90,6 +102,46 @@ void Line::DrawLine() {
 /// 始点と終点を指定して 1 本のラインを登録する
 /// </summary>
 void Line::RegisterLine(const Vector3 &start, const Vector3 &end) {
+  // ----- 太線モード: カメラ視線に直交する板状の四角形(2三角形/6頂点)として登録 -----
+  if (lineWidth_ > 0.0001f) {
+    if (index + 6 > kMaxNum) {
+      return;
+    }
+
+    Vector3 segDir = end - start;
+    const float segLen = Length(segDir);
+
+    Vector3 viewDir = camera_
+        ? Normalize(((start + end) * 0.5f) - camera_->GetTranslate())
+        : Vector3{0.0f, 0.0f, 1.0f};
+
+    Vector3 side;
+    if (segLen > 1e-6f) {
+      side = Cross(segDir * (1.0f / segLen), viewDir);
+    } else {
+      side = Cross(Vector3{0.0f, 0.0f, 1.0f}, viewDir);
+    }
+    // segDir と viewDir がほぼ平行で外積が縮退した場合のフォールバック
+    if (Length(side) < 1e-6f) {
+      side = Vector3{1.0f, 0.0f, 0.0f};
+    } else {
+      side = Normalize(side);
+    }
+
+    const Vector3 offset = side * (lineWidth_ * 0.5f);
+    const Vector3 a0 = start - offset, a1 = start + offset;
+    const Vector3 b0 = end - offset, b1 = end + offset;
+
+    auto push = [&](const Vector3 &p) {
+      vertexData_[index++].position = {p.x, p.y, p.z, 1.0f};
+    };
+    // 三角形1: a0,a1,b0 / 三角形2: a1,b1,b0
+    push(a0); push(a1); push(b0);
+    push(a1); push(b1); push(b0);
+    return;
+  }
+
+  // ----- 従来の細線モード: LINELIST 用に2頂点だけ登録 -----
   // 頂点バッファが満杯のときは描画を諦めて静かにスキップする。
   // 死亡時など大量のコライダー・視界コーンが同時に登録されるケースで
   // assert で止まらないようにするための防御。デバッグ描画が一部欠けるだけで

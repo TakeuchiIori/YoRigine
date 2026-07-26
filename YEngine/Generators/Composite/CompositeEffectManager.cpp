@@ -7,7 +7,7 @@
 #include "Particle/YParticleManager.h"
 #include "Particle/YEmitterGroupManager.h"
 #include "Vfx/VfxMesh/Runtime/VfxMeshSpawner.h"
-#include "GPUParticle/GpuEmitManager.h"
+#include "GPUParticle/YGpuEmitManager.h"
 
 // hitDelay の一時オーバーラップクエリ用（QuerySphere / BaseCollider）
 #include "Collision/Core/CollisionManager.h"
@@ -48,7 +48,7 @@ void CompositeInstance::SetPosition(const Vector3& pos)
 //   System=定義/インスタンス=粒バッファが未分離なため安全に見積もれず、現状0扱い
 //   （Docs/VfxExpansion_Design.md の 7.2 参照）。
 // ============================================================================
-float CompositeEffectAsset::NaturalDuration(VfxMeshSpawner* vfxMeshSpawner, YoRigine::GpuEmitManager* gpuEmitManager) const
+float CompositeEffectAsset::NaturalDuration(VfxMeshSpawner* vfxMeshSpawner, YoRigine::YGpuEmitManager* gpuEmitManager) const
 {
     float maxDur = 0.0f;
     for (const auto& v : vfxMeshAssets) {
@@ -324,7 +324,7 @@ void CompositeEffectManager::PlayOneShot(const std::string& name, const Vector3&
     }
 
     if (!a.gpuEmitterGroup.empty()) {
-        GpuParticleHandle::PlayOneShot(a.gpuEmitterGroup, pos + a.gpuOffset);
+        YGpuParticleHandle::PlayOneShot(a.gpuEmitterGroup, pos + a.gpuOffset);
     }
     assert(audio_ && "CompositeEffectManager : SetAudio() を先に呼ぶこと");
     for (const auto& s : a.sounds) {
@@ -376,7 +376,7 @@ EffectHandle CompositeEffectManager::Play(const std::string& name, const Vector3
     }
     // GPU 子（ループ）
     if (!a.gpuEmitterGroup.empty()) {
-        inst->gpu = GpuParticleHandle::Play(a.gpuEmitterGroup, pos + a.gpuOffset);
+        inst->gpu = YGpuParticleHandle::Play(a.gpuEmitterGroup, pos + a.gpuOffset);
     }
     // ループ音（保持して Stop 連鎖）
     assert(audio_ && "CompositeEffectManager : SetAudio() を先に呼ぶこと");
@@ -533,7 +533,7 @@ void CompositeEffectManager::DrawImGui()
     }
     // ── GPU ──
     {
-        assert(gpuEmitManager_ && "CompositeEffectManager : SetGpuEmitManager() を先に呼ぶこと");
+        assert(gpuEmitManager_ && "CompositeEffectManager : SetYGpuEmitManager() を先に呼ぶこと");
         auto opts = gpuEmitManager_->GetGroupNames();
         stringCombo("GPU グループ", a.gpuEmitterGroup, opts, true);
         if (!a.gpuEmitterGroup.empty()) {

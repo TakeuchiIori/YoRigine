@@ -3,7 +3,7 @@
 #include "OffScreen/PostEffectManager.h"
 #include <Object3D/BaseObjectManager.h>
 #include "Particle/YParticleManager.h"
-#include "GPUParticle/GpuEmitManager.h"
+#include "GPUParticle/YGpuEmitManager.h"
 #include <assert.h>
 
 std::unique_ptr<SceneManager> SceneManager::instance = nullptr;
@@ -105,7 +105,7 @@ void SceneManager::PerformSceneTransition() {
 
 	// シーンをまたいでパーティクルが残存しないよう一括停止する
 	YParticleManager::GetInstance().StopAndClearActiveEmitters();
-	YoRigine::GpuEmitManager::GetInstance()->StopAllEmitterGroups();
+	YoRigine::YGpuEmitManager::GetInstance()->StopAllEmitterGroups();
 
 	//------------------------------------------------------------
 	// 新しいシーンに切り替え
@@ -209,7 +209,7 @@ void SceneManager::ChangeSceneImmediate(const std::string& sceneName) {
 
 	// シーンをまたいでパーティクルが残存しないよう一括停止する
 	YParticleManager::GetInstance().StopAndClearActiveEmitters();
-	YoRigine::GpuEmitManager::GetInstance()->StopAllEmitterGroups();
+	YoRigine::YGpuEmitManager::GetInstance()->StopAllEmitterGroups();
 
 	// 前シーンの BaseObject 登録を一掃する（フェード遷移の PerformSceneTransition と同様）。
 	// これを忘れると、解放済みオブジェクトへのダングリング参照が entries_ に残り、

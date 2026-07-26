@@ -7,6 +7,8 @@ static const uint EMITTER_SHAPE_BOX = 1;
 static const uint EMITTER_SHAPE_TRIANGLE = 2;
 static const uint EMITTER_SHAPE_CONE = 3;
 static const uint EMITTER_SHAPE_MESH = 4;
+static const uint EMITTER_SHAPE_RING = 5;
+static const uint EMITTER_SHAPE_LINE = 6;
 
 // メッシュ放出モード
 static const uint MESH_EMIT_MODE_SURFACE = 0;
@@ -177,6 +179,40 @@ struct EmitterCone
 };
 
 /// <summary>
+/// リングエミッター（衝撃波の輪・魔法陣向け）
+/// C++ 側 YGpuEmitter::EmitterRingData と同一レイアウト (64 bytes)
+/// </summary>
+struct EmitterRing
+{
+    float3 translate;
+    float  pad0;         // 16
+    float3 normal;       // リング面の法線
+    float  outerRadius;  // 32
+    float  innerRadius;
+    float  count;
+    float  emitInterval;
+    float  intervalTime; // 48
+    uint   isEmit;
+    float3 pad1;         // 64
+};
+
+/// <summary>
+/// ラインエミッター（レーザー・ビームの線状発生向け）
+/// C++ 側 YGpuEmitter::EmitterLineData と同一レイアウト (48 bytes)
+/// </summary>
+struct EmitterLine
+{
+    float3 start;
+    float  pad0;         // 16
+    float3 end;
+    float  pad1;         // 32
+    float  count;
+    float  emitInterval;
+    float  intervalTime;
+    uint   isEmit;       // 48
+};
+
+/// <summary>
 /// メッシュエミッター
 /// </summary>
 struct EmitterMesh
@@ -213,12 +249,62 @@ struct MeshTriangle
     uint activeEdges;
 };
 
+// ──── 拡張Paramモジュール（任意ON/OFFの演出） ───────────────────────────────
+// エミッタ単位の共有CBV。VS(YGpuParticle.VS.hlsl)が b1、
+// Update CS(UpdateParticle.CS.hlsl)が b2 で同じ内容を読む。
+//   VS が使う: uvScroll / pulse / flicker / stretch（見た目）
+//   CS が使う: drag / bounce（速度・位置の物理更新）
+// C++ 側 YGpuParticle::ParticleExtParameters と厳密に同一レイアウト (96 bytes)。
+struct ParticleExtParams
+{
+    float2 uvScrollSpeed;
+    uint   uvScrollEnable;
+    float  pad0;              // 16
+
+    float  pulseAmplitude;
+    float  pulseFrequency;
+    uint   pulseEnable;
+    float  pad1;              // 32
+
+    float  flickerSpeed;
+    float  flickerIntensity;
+    uint   flickerEnable;
+    float  pad2;              // 48
+
+    float  dragCoefficient;
+    uint   dragEnable;
+    float2 pad3;              // 64
+
+    float  stretchScale;
+    float  stretchMax;
+    uint   stretchEnable;
+    float  pad4;              // 80
+
+    float  bounceGroundY;
+    float  bounceRestitution;
+    float  bounceFriction;
+    uint   bounceEnable;      // 96
+
+    float  emissiveIntensity;
+    uint   emissiveEnable;
+    float2 pad5;              // 112
+
+    uint   flipbookCols;
+    uint   flipbookRows;
+    float  flipbookFps;       // 0以下なら寿命全体でちょうど1周する
+    uint   flipbookEnable;    // 128
+};
+// ────────────────────────────────────────────────────────────────────────────
+
 struct PerFrame
 {
     float time;
     float deltaTime;
     uint  forceFieldCount; // GPU フォースフィールドの有効数。0 = フィールド無し
-    float pad;
+    uint  noiseFieldCount; // GPU ノイズフィールド(Curl/Turbulence/Vortex)の有効数。0 = 無し
+
+    uint  accelerationFieldCount; // GPU アクセラレーションフィールドの有効数。0 = 無し
+    float3 pad;
 };
 
 // ──── GPU フォースフィールド ────────────────────────────────────────────────
@@ -227,6 +313,20 @@ static const uint FIELD_SHAPE_AABB   = 1;
 static const uint FIELD_MODE_DIRECTIONAL = 0;
 static const uint FIELD_MODE_CONVERGE    = 1;
 static const uint FIELD_MODE_REPEL       = 2;
+
+// C++ 側 GPUEmitter::AccelerationForGPU と厳密に同一レイアウト (64 bytes)
+// ForceFieldのDirectionalAccelよりも単純な、範囲内一定方向の加速度のみを持つ軽量フィールド。
+struct GpuAccelerationField {
+    uint   shape;         // FIELD_SHAPE_*
+    float3 center;        // 16
+    float3 halfExtents;   // AABB用
+    float  radius;        // 32 (Sphere用)
+    float3 direction;
+    float  strength;      // 48
+    float  falloff;
+    uint   isEnable;
+    float2 pad;           // 64
+};
 
 // C++ 側 GPUEmitter::ForceFieldForGPU と厳密に同一レイアウト (96 bytes)
 struct GpuForceField {
@@ -247,6 +347,31 @@ struct GpuForceField {
     float  killRadius;
     uint   isEnable;
     float2 pad2;              // 96
+};
+// ────────────────────────────────────────────────────────────────────────────
+
+// ──── GPU ノイズフィールド (Curl / Turbulence / Vortex) ─────────────────────
+static const uint NOISE_TYPE_CURL       = 0;
+static const uint NOISE_TYPE_TURBULENCE = 1;
+static const uint NOISE_TYPE_VORTEX     = 2;
+
+// C++ 側 GPUEmitter::NoiseForGPU と厳密に同一レイアウト (96 bytes)
+struct GpuNoiseField {
+    uint   type;         // NOISE_TYPE_*
+    float  frequency;
+    float  amplitude;
+    uint   octaves;       // 16 (Turbulenceのみ使用)
+
+    float  lacunarity;
+    float  gain;
+    float2 pad0;          // 32
+
+    float3 scrollSpeed;  float pad1; // 48 (ノイズ空間を時間で流す速度)
+    float3 axis;         float pad2; // 64 (Vortexの回転軸)
+    float3 center;       float radius; // 80 (Vortex/Turbulenceの中心・減衰半径。0=無限)
+
+    uint   isEnable;
+    float3 pad3;          // 96
 };
 // ────────────────────────────────────────────────────────────────────────────
 

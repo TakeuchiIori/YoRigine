@@ -2,7 +2,7 @@
 
 // Engine
 #include <DirectXCommon.h>
-#include "GPUEmitter.h"
+#include "YGpuEmitter.h"
 #include <Systems/Camera/Camera.h>
 #include <GPUParticle/GpuParticleParams.h>
 #include "FileOperations/FileBrowser.h"
@@ -32,16 +32,16 @@ class ModelManager;
 /// GPUパーティクルエミッター管理クラス
 /// </summary>
 namespace YoRigine {
-	class GpuEmitManager
+	class YGpuEmitManager
 	{
 		// グループ/エミッター編集用 ImGui UI (USE_IMGUI 限定)。神クラス化対策として別クラスに分離。
-		friend class GpuEmitManagerEditorUI;
+		friend class YGpuEmitManagerEditorUI;
 	public:
 		// エミッターデータ構造体
 		struct EmitterData
 		{
 			std::string name;
-			std::unique_ptr<GPUEmitter> emitter;
+			std::unique_ptr<YGpuEmitter> emitter;
 			EmitterShape shape;
 			bool isActive;
 			std::string texturePath;
@@ -79,6 +79,22 @@ namespace YoRigine {
 				float emitInterval = 1.0f;
 			} coneParams;
 
+			struct RingParams {
+				Vector3 translate = { 0.0f, 0.0f, 0.0f };
+				Vector3 normal = { 0.0f, 1.0f, 0.0f }; // リング面の法線（既定は水平な輪）
+				float innerRadius = 4.0f;
+				float outerRadius = 5.0f;
+				float count = 100.0f;
+				float emitInterval = 1.0f;
+			} ringParams;
+
+			struct LineParams {
+				Vector3 start = { -5.0f, 0.0f, 0.0f };
+				Vector3 end = { 5.0f, 0.0f, 0.0f };
+				float count = 100.0f;
+				float emitInterval = 1.0f;
+			} lineParams;
+
 			struct MeshParams {
 				YoRigine::Model* model = nullptr;         // 使用するモデル (UIから指定する)
 				Vector3 translate = { 0,0,0 };
@@ -94,6 +110,16 @@ namespace YoRigine {
 
 			// フォースフィールド（最大 kMaxForceFields 個）
 			std::vector<GpuForceFieldParams> forceFields;
+
+			// ノイズフィールド（Curl/Turbulence/Vortex、最大 kMaxNoiseFields 個）
+			std::vector<GpuNoiseParams> noiseFields;
+
+			// アクセラレーションフィールド（範囲内一定方向の加速度、最大 kMaxAccelerationFields 個）
+			std::vector<GpuAccelerationParams> accelerationFields;
+
+			// 拡張Paramモジュール（任意ON/OFF。エディタで追加・削除できる演出）
+			// モジュールを増やすときは GpuExtModules へ1行足すだけでよい。
+			GpuExtModules extModules;
 
 			// 1粒子として描画するメッシュ形状＋その生成パラメータ
 			ParticleMeshShape particleMeshShape = ParticleMeshShape::Plane;
@@ -120,7 +146,7 @@ namespace YoRigine {
 
 	public:
 		///************************* 基本的な関数 *************************///
-		static GpuEmitManager* GetInstance();
+		static YGpuEmitManager* GetInstance();
 
 		// ============================================================
 		// 依存先マネージャの注入 (DI)
@@ -138,13 +164,17 @@ namespace YoRigine {
 		// エミッション強制発生
 		void EmitGroups(const std::string& groupName, const Vector3& position, float count);
 
-		// グループ管理/エミッター編集/削除ダイアログ等のUI本体は GpuEmitManagerEditorUI に分離済み (神クラス対策)。
+		// グループ管理/エミッター編集/削除ダイアログ等のUI本体は YGpuEmitManagerEditorUI に分離済み (神クラス対策)。
 		void DrawImGui();
 
 		// エミッター管理
 		EmitterData* CreateEmitter(const std::string& groupName, const std::string& emitterName, std::string& texturePath, EmitterShape shape = EmitterShape::Sphere);
 		void DeleteEmitter(const std::string& groupName, const std::string& emitterName);
 		void DeleteAllEmitters();
+
+		// 実行時のテクスチャ差し替え（YParticleSystem::SetTexture 相当）。
+		// 対象エミッターが見つからなければ何もしない。
+		void SetEmitterTexture(const std::string& groupName, const std::string& emitterName, const std::string& texturePath);
 
 		///************************* エミッターグループ管理 *************************///
 
@@ -165,7 +195,7 @@ namespace YoRigine {
 		/// シーン遷移時に呼び出し、前のシーンの GPU パーティクルが次のシーンに残らないようにする。
 		void StopAllEmitterGroups();
 
-		// ── ゲーム向け（GpuParticleHandle から使う軽量API）──
+		// ── ゲーム向け（YGpuParticleHandle から使う軽量API）──
 		// グループのワールド原点を移動（各エミッタは原点＋自身のローカルオフセットで発生）
 		void SetGroupPosition(const std::string& groupName, const Vector3& pos);
 		// グループが存在するか
@@ -191,10 +221,10 @@ namespace YoRigine {
 		///************************* 内部処理 *************************///
 
 		// シングルトンパターン
-		GpuEmitManager() = default;
-		~GpuEmitManager() = default;
-		GpuEmitManager(const GpuEmitManager&) = delete;
-		GpuEmitManager& operator=(const GpuEmitManager&) = delete;
+		YGpuEmitManager() = default;
+		~YGpuEmitManager() = default;
+		YGpuEmitManager(const YGpuEmitManager&) = delete;
+		YGpuEmitManager& operator=(const YGpuEmitManager&) = delete;
 
 		void UpdateParticleParams(EmitterData* emitterData);
 
@@ -211,6 +241,8 @@ namespace YoRigine {
 		void RegisterEmitterGizmo(const EmitterData* emitterData, const Vector3& worldPos);
 		// 単一エミッタのフォースフィールド範囲をラインとして gizmoLine_ に登録
 		void RegisterForceFieldGizmos(const EmitterData* emitterData, const Vector3& groupOrigin);
+		// 単一エミッタのアクセラレーションフィールド範囲をラインとして gizmoLine_ に登録
+		void RegisterAccelerationFieldGizmos(const EmitterData* emitterData, const Vector3& groupOrigin);
 #endif
 
 		// グループ内の最大パーティクル寿命（発生停止後の linger 時間の見積りに使う）
@@ -244,7 +276,8 @@ namespace YoRigine {
 		// root と各グループ用 AutoJson は呼び出し側がローカルに持ち、Save/Load 中は生存させる。
 		void BuildEmitterSchema(EmitterData& e,
 			AutoJson& root, AutoJson& sphere, AutoJson& box, AutoJson& tri,
-			AutoJson& cone, AutoJson& mesh, AutoJson& particle, AutoJson& particleMesh) const;
+			AutoJson& cone, AutoJson& mesh, AutoJson& particle, AutoJson& particleMesh,
+			AutoJson& ring, AutoJson& line) const;
 		// エミッタ1つ → JSON（model ポインタだけは名前で特別扱い）
 		nlohmann::json SerializeEmitter(EmitterData& e) const;
 		// JSON → エミッタ1つ（生成済みの e に流し込む。model は名前から解決）

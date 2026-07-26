@@ -1,4 +1,4 @@
-#include "GPUParticle.h"
+#include "YGpuParticle.h"
 #include <cassert>
 #include <SrvManager.h>
 #include <Loaders/Texture/TextureManager.h>
@@ -12,7 +12,7 @@
 /// <summary>
 /// GPU パーティクルの初期化処理（各種バッファ生成）
 /// </summary>
-void GPUParticle::Initialize(const std::string& filepath, YoRigine::Camera* camera)
+void YGpuParticle::Initialize(const std::string& filepath, YoRigine::Camera* camera)
 {
 	textureFilePath_ = filepath;
 	camera_ = camera;
@@ -27,10 +27,11 @@ void GPUParticle::Initialize(const std::string& filepath, YoRigine::Camera* came
 
 	CreateVertexResource();
 	CreatePerViewResource();
+	CreateExtParamsResource();
 
 	CreateUAV();
 	CreateDrawIndirectResources();
-	CreateGPUParticleResource();
+	CreateYGpuParticleResource();
 	CreateTexture();
 
 	// Readback for ActiveCount
@@ -67,10 +68,12 @@ void GPUParticle::Initialize(const std::string& filepath, YoRigine::Camera* came
 /// <summary>
 /// 毎フレーム更新
 /// </summary>
-void GPUParticle::Update(ID3D12Resource* resource, ID3D12Resource* paramsResource, D3D12_GPU_DESCRIPTOR_HANDLE forceFieldSrv, bool trailEnabled)
+void YGpuParticle::Update(ID3D12Resource* resource, ID3D12Resource* paramsResource,
+	D3D12_GPU_DESCRIPTOR_HANDLE forceFieldSrv, D3D12_GPU_DESCRIPTOR_HANDLE noiseFieldSrv,
+		D3D12_GPU_DESCRIPTOR_HANDLE accelerationFieldSrv, bool trailEnabled)
 {
 	UpdatePerView();
-	DispatchUpdate(resource, paramsResource, forceFieldSrv, trailEnabled);
+	DispatchUpdate(resource, paramsResource, forceFieldSrv, noiseFieldSrv, accelerationFieldSrv, trailEnabled);
 
 	auto commandList = dxCommon_->GetCommandList();
 
@@ -110,7 +113,7 @@ void GPUParticle::Update(ID3D12Resource* resource, ID3D12Resource* paramsResourc
 /// <summary>
 /// GPU パーティクル描画
 /// </summary>
-void GPUParticle::Draw()
+void YGpuParticle::Draw()
 {
 	auto commandList = dxCommon_->GetCommandList();
 
@@ -118,11 +121,11 @@ void GPUParticle::Draw()
 	// パイプライン設定
 	//-----------------------------------------
 	auto pm = YPipelineManager::GetInstance();
-	const auto& indices = pm->GetParameterIndices("GPUParticleInit");
+	const auto& indices = pm->GetParameterIndices("YGpuParticleInit");
 
-	auto pso = YPipelineManager::GetInstance()->GetBlendModePSO("GPUParticleInit",blendMode_);
+	auto pso = YPipelineManager::GetInstance()->GetBlendModePSO("YGpuParticleInit",blendMode_);
 	commandList->SetPipelineState(pso);
-	commandList->SetGraphicsRootSignature(pipelineManager_->GetRootSignature("GPUParticleInit"));
+	commandList->SetGraphicsRootSignature(pipelineManager_->GetRootSignature("YGpuParticleInit"));
 
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
@@ -138,6 +141,7 @@ void GPUParticle::Draw()
 	//-----------------------------------------
 	
 	commandList->SetGraphicsRootConstantBufferView(indices.at("g_PerView"), perViewResource_->GetGPUVirtualAddress());
+	commandList->SetGraphicsRootConstantBufferView(indices.at("g_ExtParams"), extParamsResource_->GetGPUVirtualAddress());
 	// マテリアル
 	materialUV_->RecordDrawCommands(commandList.Get(), indices.at("gMaterialUV"));
 	materialColor_->RecordDrawCommands(commandList.Get(), indices.at("gMaterialColor"));
@@ -172,7 +176,7 @@ void GPUParticle::Draw()
 	);
 }
 
-void GPUParticle::Reset()
+void YGpuParticle::Reset()
 {
 	DispatchInit();
 	// 初期値 0 にしておく
@@ -188,7 +192,7 @@ void GPUParticle::Reset()
 /// <summary>
 /// UAV リソース作成（パーティクル・フリーリスト）
 /// </summary>
-void GPUParticle::CreateUAV()
+void YGpuParticle::CreateUAV()
 {
 	//-----------------------------------------
 	// Hot UAV (u0)
@@ -291,7 +295,7 @@ void GPUParticle::CreateUAV()
 /// <summary>
 /// インダイレクト描画用リソース生成（生存粒子だけを描画するためのコンパクトリスト＋描画引数＋コマンドシグネチャ）
 /// </summary>
-void GPUParticle::CreateDrawIndirectResources()
+void YGpuParticle::CreateDrawIndirectResources()
 {
 	auto* srv = YoRigine::SrvManager::GetInstance();
 
@@ -337,7 +341,7 @@ void GPUParticle::CreateDrawIndirectResources()
 /// <summary>
 /// GPU パーティクルの SRV 作成（パーティクルを読み込む）
 /// </summary>
-void GPUParticle::CreateGPUParticleResource()
+void YGpuParticle::CreateYGpuParticleResource()
 {
 	// VS は hot(t0) と warm(t1) を読み、scale/color を lerp 導出する
 	srvIndex_ = YoRigine::SrvManager::GetInstance()->Allocate();
@@ -366,7 +370,7 @@ void GPUParticle::CreateGPUParticleResource()
 /// <summary>
 /// PerView用 CB 作成
 /// </summary>
-void GPUParticle::CreatePerViewResource()
+void YGpuParticle::CreatePerViewResource()
 {
 	perViewResource_ = dxCommon_->CreateBufferResource(sizeof(PerViewForGPU));
 	perViewResource_->Map(0, nullptr, reinterpret_cast<void**>(&perViewData_));
@@ -377,9 +381,19 @@ void GPUParticle::CreatePerViewResource()
 }
 
 /// <summary>
+/// 拡張Paramモジュール(UVScroll/ScalePulse/ColorFlicker)用 CB 作成
+/// </summary>
+void YGpuParticle::CreateExtParamsResource()
+{
+	extParamsResource_ = dxCommon_->CreateBufferResource(sizeof(ParticleExtParameters));
+	extParamsResource_->Map(0, nullptr, reinterpret_cast<void**>(&extParamsData_));
+	*extParamsData_ = ParticleExtParameters{}; // 既定: 全モジュール無効
+}
+
+/// <summary>
 /// パーティクル描画用の頂点（板ポリ）
 /// </summary>
-void GPUParticle::CreateVertexResource()
+void YGpuParticle::CreateVertexResource()
 {
 	mesh_ = MeshPrimitive::CreatePlane(1.0f, 1.0f);
 }
@@ -387,7 +401,7 @@ void GPUParticle::CreateVertexResource()
 /// <summary>
 /// 初期化用 ComputeShader の実行
 /// </summary>
-void GPUParticle::DispatchInit()
+void YGpuParticle::DispatchInit()
 {
 	auto commandList = dxCommon_->GetCommandList();
 
@@ -444,7 +458,7 @@ void GPUParticle::DispatchInit()
 	commandList->SetComputeRootDescriptorTable(4, warmUavHandleGPU_); // u4
 	commandList->SetComputeRootDescriptorTable(5, coldUavHandleGPU_); // u5
 
-	uint32_t requiredGroups = GPUParticle::GetRequiredThreadGroups();
+	uint32_t requiredGroups = YGpuParticle::GetRequiredThreadGroups();
 	commandList->Dispatch(requiredGroups, 1, 1);
 
 	//-----------------------------------------
@@ -493,7 +507,9 @@ void GPUParticle::DispatchInit()
 /// <summary>
 /// Update 用 ComputeShader 実行（Emit されたパーティクルを更新）
 /// </summary>
-void GPUParticle::DispatchUpdate(ID3D12Resource* resource, ID3D12Resource* paramsResource, D3D12_GPU_DESCRIPTOR_HANDLE forceFieldSrv, bool trailEnabled)
+void YGpuParticle::DispatchUpdate(ID3D12Resource* resource, ID3D12Resource* paramsResource,
+	D3D12_GPU_DESCRIPTOR_HANDLE forceFieldSrv, D3D12_GPU_DESCRIPTOR_HANDLE noiseFieldSrv,
+		D3D12_GPU_DESCRIPTOR_HANDLE accelerationFieldSrv, bool trailEnabled)
 {
 	auto commandList = dxCommon_->GetCommandList();
 
@@ -571,8 +587,12 @@ void GPUParticle::DispatchUpdate(ID3D12Resource* resource, ID3D12Resource* param
 	// drawList(u6)/drawArgs(u7): Update CS が生存粒子を追記する
 	commandList->SetComputeRootDescriptorTable(9, drawListUavHandleGPU_);
 	commandList->SetComputeRootDescriptorTable(10, drawArgsUavHandleGPU_);
+	commandList->SetComputeRootDescriptorTable(11, noiseFieldSrv); // NoiseFields SRV t1 (末尾追加)
+	commandList->SetComputeRootDescriptorTable(12, accelerationFieldSrv); // AccelerationFields SRV t2 (末尾追加)
+	// ExtParams CBV b2: Drag/Bounce を CS でも読む（VS は b1 で同じリソースを見る）
+	commandList->SetComputeRootConstantBufferView(13, extParamsResource_->GetGPUVirtualAddress());
 
-	uint32_t requiredGroups = GPUParticle::GetRequiredThreadGroups();
+	uint32_t requiredGroups = YGpuParticle::GetRequiredThreadGroups();
 	commandList->Dispatch(requiredGroups, 1, 1);
 
 	//-----------------------------------------
@@ -628,7 +648,7 @@ void GPUParticle::DispatchUpdate(ID3D12Resource* resource, ID3D12Resource* param
 /// <summary>
 /// ImGuiで統計情報を表示
 /// </summary>
-void GPUParticle::DrawStatsImGui()
+void YGpuParticle::DrawStatsImGui()
 {
 	ImGui::Begin("GPU Particle Statistics");
 
@@ -681,30 +701,43 @@ void GPUParticle::DrawStatsImGui()
 /// <summary>
 /// テクスチャ読み込み＆SRV 取得
 /// </summary>
-void GPUParticle::CreateTexture()
+void YGpuParticle::CreateTexture()
 {
 	TextureManager::GetInstance()->LoadTexture(textureFilePath_);
 	textureIndexSRV_ = TextureManager::GetInstance()->GetTextureIndexByFilePath(textureFilePath_);
 }
 
 /// <summary>
+/// 実行時のテクスチャ差し替え（YParticleSystem::SetTexture と同じパターン）
+/// </summary>
+void YGpuParticle::SetTexture(const std::string& textureFilePath)
+{
+	textureFilePath_ = textureFilePath;
+
+	if (!textureFilePath.empty()) {
+		TextureManager::GetInstance()->LoadTexture(textureFilePath);
+		textureIndexSRV_ = TextureManager::GetInstance()->GetTextureIndexByFilePath(textureFilePath);
+	}
+}
+
+/// <summary>
 /// Material の動的更新（現状未使用）
 /// </summary>
-void GPUParticle::UpdateMaterial()
+void YGpuParticle::UpdateMaterial()
 {
 }
 
 /// <summary>
 /// Light の動的更新（現状未使用）
 /// </summary>
-void GPUParticle::UpdateLight()
+void YGpuParticle::UpdateLight()
 {
 }
 
 /// <summary>
 /// PerView 更新（WVP・ビルボード行列計算）
 /// </summary>
-void GPUParticle::UpdatePerView()
+void YGpuParticle::UpdatePerView()
 {
 	//-----------------------------------------
 	// ViewProjection 更新

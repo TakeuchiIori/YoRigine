@@ -222,12 +222,20 @@ namespace YoRigine {
                         ImVec2(thumbnailSize_, thumbnailSize_));
                 }
 
-                if (clicked) {
+                // ダブルクリック判定はボタンの戻り値とは別に取る。
+                // Button/ImageButton は既定でマウス "リリース" で true を返すのに対し、
+                // IsMouseDoubleClicked は 2回目の "押下" フレームでしか true にならないため、
+                // 両者を && で繋ぐと永久に成立しない（＝コールバックが発火しない）。
+                const bool doubleClicked =
+                    ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
+
+                if (clicked || doubleClicked) {
                     selectedPath_ = fullPath;
                     selected = true;
-                    if (onFileSelected_) {
-                        onFileSelected_(fullPath);
-                    }
+                }
+                // シングルクリックはハイライトのみ。適用はダブルクリック時だけ。
+                if (doubleClicked && onFileSelected_) {
+                    onFileSelected_(fullPath);
                 }
 
                 // ホバー時ツールチップ
@@ -263,13 +271,20 @@ namespace YoRigine {
             bool isSelected = (selectedPath_ == fullPath);
 
             std::string label = ICON_FA_FILE " " + filename;
-            if (ImGui::Selectable(label.c_str(), isSelected))
-            {
+            const bool clicked =
+                ImGui::Selectable(label.c_str(), isSelected, ImGuiSelectableFlags_AllowDoubleClick);
+
+            // グリッド側と同じ理由（DrawGrid のコメント参照）で、ダブルクリックは
+            // Selectable の戻り値と独立に判定する。
+            const bool doubleClicked =
+                ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
+
+            if (clicked || doubleClicked) {
                 selectedPath_ = fullPath;
                 selected = true;
-                if (onFileSelected_) {
-                    onFileSelected_(fullPath);
-                }
+            }
+            if (doubleClicked && onFileSelected_) {
+                onFileSelected_(fullPath);
             }
 
             if (isSelected) {

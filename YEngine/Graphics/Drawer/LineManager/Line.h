@@ -61,6 +61,13 @@ public:
   void SetCamera(YoRigine::Camera *camera) { this->camera_ = camera; }
   void SetColor(const Vector4 &color) { currentColor_ = color; }
 
+  // 線の太さ（ワールド単位）。0以下で従来どおりの1px相当の細線(LINELIST)。
+  // 0より大きいとカメラ視線に直交する板状の四角形(TRIANGLELIST)で太線を描く。
+  // 注意: DrawLine() を呼ぶまでは値を変更しないこと（同一バッチ内で太さが混在すると
+  // 頂点レイアウトとトポロジが食い違う）。RegisterXxx → DrawLine() → SetLineWidth(次の太さ) の順で使う。
+  void SetLineWidth(float width) { lineWidth_ = width; }
+  float GetLineWidth() const { return lineWidth_; }
+
 private:
   ///************************* GPU用の構造体 *************************///
   // 頂点データ構造体
@@ -103,6 +110,7 @@ private:
   std::array<MaterialSlot, kMaterialSlotCount> materialSlots_;
   uint32_t currentMaterialIndex_ = 0u;
   Vector4 currentColor_ = {1.0f, 1.0f, 1.0f, 1.0f};
+  float lineWidth_ = 0.0f; // 0以下=従来の細線(LINELIST)
 
   // 座標関連
   Microsoft::WRL::ComPtr<ID3D12Resource> transformationResource_;

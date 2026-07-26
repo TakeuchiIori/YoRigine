@@ -128,9 +128,9 @@ void YPipelineManager::Initialize() {
   CreatePSO_Line();
   CreatePSO_InstancedCube();
   CreatePSO_YParticleAllBlendModes();
-  CreatePSO_GPUParticleALLBlendModes();
+  CreatePSO_YGpuParticleALLBlendModes();
   CreatePSO_CubeMap();
-  CreatePSO_GPUParticleInit();
+  CreatePSO_YGpuParticleInit();
   // 使ってない
   // CreatePSO_EffectObject();
 
@@ -458,20 +458,20 @@ void YPipelineManager::CreatePSO_ObjectOutlineInstanced() {
 
 // ============================================================
 //
-// GPUParticle : ALLBlendMode
+// YGpuParticle : ALLBlendMode
 //
 // ============================================================
-void YPipelineManager::CreatePSO_GPUParticleALLBlendModes() {
+void YPipelineManager::CreatePSO_YGpuParticleALLBlendModes() {
 
   Logger(
       "\n==============================================================\n\n\n");
-  Logger("         Creating Pipeline: GPUParticleInit             \n\n\n");
+  Logger("         Creating Pipeline: YGpuParticleInit             \n\n\n");
   Logger("==============================================================\n");
   // シェーダーコンパイル（1回だけ）
   auto vsBlob = dxCommon_->CompileShader(
-      L"Resources/Shaders/Particle/GPUParticle.VS.hlsl", L"vs_6_0");
+      L"Resources/Shaders/Particle/YGpuParticle.VS.hlsl", L"vs_6_0");
   auto psBlob = dxCommon_->CompileShader(
-      L"Resources/Shaders/Particle/GPUParticle.PS.hlsl", L"ps_6_0");
+      L"Resources/Shaders/Particle/YGpuParticle.PS.hlsl", L"ps_6_0");
 
   // ブレンドモード設定
   struct BlendConfig {
@@ -504,15 +504,15 @@ void YPipelineManager::CreatePSO_GPUParticleALLBlendModes() {
             .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(),
                                       vsBlob.Get(), psBlob.Get());
 
-    std::string psoName = "GPUParticleInit_" + config.name;
+    std::string psoName = "YGpuParticleInit_" + config.name;
     pipelineStates_[psoName] = result.pipelineState;
-    blendModePipelineStates_["GPUParticleInit"][config.mode] =
+    blendModePipelineStates_["YGpuParticleInit"][config.mode] =
         result.pipelineState;
 
     // 最初のモードだけルートシグネチャとインデックスを保存
     if (config.mode == BlendMode::kBlendModeNormal) {
-      rootSignatures_["GPUParticleInit"] = result.rootSignature;
-      parameterIndices_["GPUParticleInit"] = result.parameterIndices;
+      rootSignatures_["YGpuParticleInit"] = result.rootSignature;
+      parameterIndices_["YGpuParticleInit"] = result.parameterIndices;
     }
   }
 }
@@ -618,15 +618,15 @@ void YPipelineManager::CreatePSO_YParticle() {
 
 // ============================================================
 //
-// GPUParticle
+// YGpuParticle
 //
 // ============================================================
-void YPipelineManager::CreatePSO_GPUParticleInit() {
+void YPipelineManager::CreatePSO_YGpuParticleInit() {
   // シェーダーをコンパイル
   auto vsBlob = dxCommon_->CompileShader(
-      L"Resources/Shaders/Particle/GPUParticle.VS.hlsl", L"vs_6_0");
+      L"Resources/Shaders/Particle/YGpuParticle.VS.hlsl", L"vs_6_0");
   auto psBlob = dxCommon_->CompileShader(
-      L"Resources/Shaders/Particle/GPUParticle.PS.hlsl", L"ps_6_0");
+      L"Resources/Shaders/Particle/YGpuParticle.PS.hlsl", L"ps_6_0");
 
   // リフレクションベースで完全自動生成
   ReflectionBasedPipelineBuilder builder;
@@ -636,9 +636,9 @@ void YPipelineManager::CreatePSO_GPUParticleInit() {
                     .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(),
                                               vsBlob.Get(), psBlob.Get());
 
-  rootSignatures_["GPUParticleInit"] = result.rootSignature;
-  pipelineStates_["GPUParticleInit"] = result.pipelineState;
-  parameterIndices_["GPUParticleInit"] = result.parameterIndices;
+  rootSignatures_["YGpuParticleInit"] = result.rootSignature;
+  pipelineStates_["YGpuParticleInit"] = result.pipelineState;
+  parameterIndices_["YGpuParticleInit"] = result.parameterIndices;
 }
 
 // ============================================================
@@ -653,22 +653,45 @@ void YPipelineManager::CreatePSO_Line() {
   auto psBlob = dxCommon_->CompileShader(
       L"Resources/Shaders/Primitive/Line/Line.PS.hlsl", L"ps_6_0");
 
-  // リフレクションベースで完全自動生成
-  ReflectionBasedPipelineBuilder builder;
-  auto result =
-      builder
-          .SetRenderTargetFormat(
-              YoRigine::kSceneColorFormat) // OffScreen(HDR) へ描く
-          .SetPrimitiveTopologyType(PrimitiveTopologyPresets::Line())
-          .SetBlendState(BlendPresets::CreateAlphaBlend())
-          .SetRasterizerState(RasterizerPresets::CreateNoCull())
-          .SetDepthStencilState(DepthStencilPresets::CreateWriteOnly())
-          .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(), vsBlob.Get(),
-                                    psBlob.Get());
+  // 細線 (LINELIST)。PSOに焼き込んだ PrimitiveTopologyType は draw 時に
+  // IASetPrimitiveTopology で指定する実トポロジと一致させる必要があるため、
+  // TRIANGLELIST で描く太線用に別PSO(LineThick)を用意する。
+  {
+    ReflectionBasedPipelineBuilder builder;
+    auto result =
+        builder
+            .SetRenderTargetFormat(
+                YoRigine::kSceneColorFormat) // OffScreen(HDR) へ描く
+            .SetPrimitiveTopologyType(PrimitiveTopologyPresets::Line())
+            .SetBlendState(BlendPresets::CreateAlphaBlend())
+            .SetRasterizerState(RasterizerPresets::CreateNoCull())
+            .SetDepthStencilState(DepthStencilPresets::CreateWriteOnly())
+            .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(), vsBlob.Get(),
+                                      psBlob.Get());
 
-  rootSignatures_["Line"] = result.rootSignature;
-  pipelineStates_["Line"] = result.pipelineState;
-  parameterIndices_["Line"] = result.parameterIndices;
+    rootSignatures_["Line"] = result.rootSignature;
+    pipelineStates_["Line"] = result.pipelineState;
+    parameterIndices_["Line"] = result.parameterIndices;
+  }
+
+  // 太線 (TRIANGLELIST)。Line::RegisterLine が lineWidth_>0 のとき四角形(2三角形)として
+  // 頂点を積むため、その描画にはこちらの TopologyType=Triangle な PSO を使う。
+  {
+    ReflectionBasedPipelineBuilder builder;
+    auto result =
+        builder
+            .SetRenderTargetFormat(YoRigine::kSceneColorFormat)
+            .SetPrimitiveTopologyType(PrimitiveTopologyPresets::Triangle())
+            .SetBlendState(BlendPresets::CreateAlphaBlend())
+            .SetRasterizerState(RasterizerPresets::CreateNoCull())
+            .SetDepthStencilState(DepthStencilPresets::CreateWriteOnly())
+            .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(), vsBlob.Get(),
+                                      psBlob.Get());
+
+    rootSignatures_["LineThick"] = result.rootSignature;
+    pipelineStates_["LineThick"] = result.pipelineState;
+    parameterIndices_["LineThick"] = result.parameterIndices;
+  }
 }
 
 // ============================================================

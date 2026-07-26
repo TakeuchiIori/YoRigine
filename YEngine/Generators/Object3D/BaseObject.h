@@ -35,6 +35,11 @@ public:
   virtual void Draw() = 0;
   virtual void DrawAnimation() {}
   virtual void DrawCollision() {}
+  // インスタンシング描画経路 (BaseObjectManager::DrawAllInstanced) で、
+  // 本体をインスタンスバッファに積んだ後に呼ばれる追加描画フック。
+  // 本体モデルはインスタンス化しつつ、付属物 (例: 頭に乗る目) だけ個別描画したい
+  // オブジェクトがオーバーライドする。既定は空。
+  virtual void DrawExtra() {}
   // 標準の OBJ は内部 Object3d をそのまま影パスへ流す。
   // 影を落とさないオブジェクトだけ空実装で override する。
   virtual void DrawShadow() {

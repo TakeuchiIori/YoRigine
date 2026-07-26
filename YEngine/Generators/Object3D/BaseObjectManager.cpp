@@ -219,6 +219,18 @@ void BaseObjectManager::DrawAllInstanced() {
   }
 
   inst->DrawAll(camera_);
+
+  // インスタンス化した本体に付属する個別描画物 (例: プレイヤーの頭に乗る目) を、
+  // 本体のインスタンス描画が終わった後にまとめて描く。
+  for (auto &entry : entries_) {
+    if (!entry.ptr || entry.pendingDestroy)
+      continue;
+    if (!entry.ptr->IsActive())
+      continue;
+    if (entry.ptr->IsInstanceable()) {
+      entry.ptr->DrawExtra();
+    }
+  }
 }
 
 // ============================================================
