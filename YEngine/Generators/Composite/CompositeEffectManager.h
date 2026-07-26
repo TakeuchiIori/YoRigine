@@ -2,11 +2,11 @@
 // ===========================================================
 // CompositeEffectManager.h
 //
-// 「複合エフェクト（Composite）」＝ Particle + VfxMesh + GPUParticle + Sound を
+// 「複合エフェクト（Composite）」＝ Particle + VfxMesh + YGpuParticle + Sound を
 // 既存アセット名の参照だけで1つに束ねる薄いレイヤー。
 //
 // 既存3系統(Particle/VfxMesh/GPU)のJSON・ハンドルには一切手を入れず、
-// それぞれの facade（EffectHandle / YVfxHandle / GpuParticleHandle）と
+// それぞれの facade（EffectHandle / YVfxHandle / YGpuParticleHandle）と
 // Audio を「名前で呼ぶだけ」で連動させる。
 //
 // アセット: Resources/Json/YComposites/<名前>.json（参照リストのみ）
@@ -27,7 +27,7 @@
 #include "Vector3.h"
 #include "Particle/EffectHandle.h"
 #include "Vfx/VfxMesh/Runtime/YVfxHandle.h"
-#include "GPUParticle/GpuParticleHandle.h"
+#include "GPUParticle/YGpuParticleHandle.h"
 #include "Systems/Audio/Audio.h"
 
 #include <string>
@@ -43,7 +43,7 @@ class VfxMeshSpawner;
 class YParticleManager;
 class YEmitterGroupManager;
 namespace YoRigine {
-    class GpuEmitManager;
+    class YGpuEmitManager;
     class CollisionManager;
     class Audio;
 }
@@ -91,11 +91,11 @@ struct CompositeEffectAsset {
 
     // 全チャイルドの中で最大の自然な寿命（秒）。0以下=不明。
     //   - VfxMesh: VfxEffectAsset::OneShotDuration() から正確に計算
-    //   - GPUParticle: GpuEmitManager::EstimateGroupNaturalDuration() から概算
+    //   - YGpuParticle: YGpuEmitManager::EstimateGroupNaturalDuration() から概算
     //   - CPUパーティクル(particleEffect): 現状未対応（System=定義/インスタンス=粒バッファが
     //     未分離なため安全に見積もれない）。0扱い＝このCompositeのNaturalDurationに寄与しない。
     // vfxMeshSpawner/gpuEmitManager は呼び出し側 (CompositeEffectManager) が注入済みの借用ポインタを渡す。
-    float NaturalDuration(VfxMeshSpawner* vfxMeshSpawner, YoRigine::GpuEmitManager* gpuEmitManager) const;
+    float NaturalDuration(VfxMeshSpawner* vfxMeshSpawner, YoRigine::YGpuEmitManager* gpuEmitManager) const;
 };
 
 // ── ループ複合エフェクトの実行インスタンス（子ハンドルを保持し Stop で連鎖停止）──
@@ -104,7 +104,7 @@ struct CompositeInstance {
     std::vector<Vector3>                particleOffsets;// particles と対の相対オフセット
     std::vector<YVfxHandle>             vfx;            // VfxMesh 子（ループ）
     std::vector<Vector3>                vfxOffsets;     // vfx と対の相対オフセット
-    GpuParticleHandle                   gpu;            // GPU 子（ループ）
+    YGpuParticleHandle                   gpu;            // GPU 子（ループ）
     Vector3                             gpuOffset = { 0.0f, 0.0f, 0.0f };
     std::vector<YoRigine::SoundHandle>  sounds;         // ループ音（保持して Stop 連鎖）
     Vector3                             basePos = { 0.0f, 0.0f, 0.0f };
@@ -125,7 +125,7 @@ public:
     //   ScanDirectory()/Play 系を呼ぶより前に、全て注入しておくこと。
     // ============================================================
     void SetVfxMeshSpawner(VfxMeshSpawner* vfxMeshSpawner) { vfxMeshSpawner_ = vfxMeshSpawner; }
-    void SetGpuEmitManager(YoRigine::GpuEmitManager* gpuEmitManager) { gpuEmitManager_ = gpuEmitManager; }
+    void SetYGpuEmitManager(YoRigine::YGpuEmitManager* gpuEmitManager) { gpuEmitManager_ = gpuEmitManager; }
     void SetAudio(YoRigine::Audio* audio) { audio_ = audio; }
     void SetCollisionManager(YoRigine::CollisionManager* collisionManager) { collisionManager_ = collisionManager; }
     void SetYParticleManager(YParticleManager* yParticleManager) { yParticleManager_ = yParticleManager; }
@@ -183,7 +183,7 @@ private:
 
     // 依存先マネージャ (借用のみ・非所有)。使用前に Set 系で注入すること。
     VfxMeshSpawner*              vfxMeshSpawner_ = nullptr;
-    YoRigine::GpuEmitManager*    gpuEmitManager_ = nullptr;
+    YoRigine::YGpuEmitManager*    gpuEmitManager_ = nullptr;
     YoRigine::Audio*             audio_ = nullptr;
     YoRigine::CollisionManager*  collisionManager_ = nullptr;
     YParticleManager*            yParticleManager_ = nullptr;

@@ -1,33 +1,33 @@
 #include "GameScene.h"
 
 // Engine
-#include <SceneSystems/SceneManager.h>
-#include "Object3D/Object3dCommon.h"
-#include "LightManager/LightManager.h"
+#include "Collision/AreaCollision/Base/AreaEditor.h"
+#include "Collision/AreaCollision/Base/AreaManager.h"
 #include "Collision/Core/CollisionManager.h"
-#include "Sprite/SpriteCommon.h"
-#include <Editor/Editor.h>
+#include "Composite/CompositeEffectManager.h"
+#include "GPUParticle/YGpuEmitManager.h"
+#include "LightManager/LightManager.h"
 #include "Loaders/Json/JsonManager.h"
+#include "MathFunc.h"
 #include "ModelManipulator/ModelManipulator.h"
+#include "Object3D/Object3dCommon.h"
 #include "OffScreen/PostEffectManager.h"
-#include <Debugger/Logger.h>
+#include "Sprite/SpriteCommon.h"
 #include "Systems./Input./Input.h"
 #include "Systems/GameTime/GameTime.h"
-#include "MathFunc.h"
-#include <Systems/UI/UIManager.h>
-#include "GPUParticle/GpuEmitManager.h"
-#include "Composite/CompositeEffectManager.h"
-#include "Collision/AreaCollision/Base/AreaManager.h"
-#include "Collision/AreaCollision/Base/AreaEditor.h"
+#include <Debugger/Logger.h>
+#include <Editor/Editor.h>
+#include <SceneSystems/SceneManager.h>
 #include <Systems/Audio/Audio.h>
+#include <Systems/UI/UIManager.h>
 
-#include "Particle/YParticleManager.h"
 #include "Particle/YParticleEditor.h"
+#include "Particle/YParticleManager.h"
 // Camera
-#include "Systems/Camera/CameraFactory.h"
 #include "Systems/Camera/CameraEditor.h"
-#include "Systems/Camera/Virtuals/FollowCamera/FollowCamera.h"
+#include "Systems/Camera/CameraFactory.h"
 #include "Systems/Camera/Virtuals/DebugCamera/DebugCamera.h"
+#include "Systems/Camera/Virtuals/FollowCamera/FollowCamera.h"
 #include <Vfx/VfxMesh/Editor/VfxMeshEditor.h>
 #include <Vfx/VfxMesh/Runtime/VfxMeshSpawner.h>
 
@@ -43,359 +43,380 @@
 /// 初期化処理
 /// </summary>
 void GameScene::Initialize() {
-	srand(static_cast<unsigned int>(time(nullptr)));
+  srand(static_cast<unsigned int>(time(nullptr)));
 
+  //------------------------------------------------------------
+  // カメラ初期化
+  //------------------------------------------------------------
 
-	//------------------------------------------------------------
-	// カメラ初期化
-	//------------------------------------------------------------
+  // 出力用カメラの実体を生成
+  sceneCamera_ = std::make_unique<YoRigine::Camera>();
+  auto director = CameraDirector::GetInstance();
+  director->Initialize();
 
-	// 出力用カメラの実体を生成
-	sceneCamera_ = std::make_unique<YoRigine::Camera>();
-	auto director = CameraDirector::GetInstance();
-	director->Initialize();
+  cameraEditor_ = std::make_unique<CameraEditor>();
+  cameraEditor_->Initialize();
+  cameraEditor_->SetFilePath("Resources/Json/VirtualCameraData/GameScene.json");
+  cameraEditor_->LoadFileOrDefault(cameraEditor_->GetFilePath(), "Game");
 
+  // ゲーム用のポストエフェクト（TestGame: Fog + GodRays 等）
+  PostEffectManager::GetInstance()->LoadPreset("TestGame");
 
-	cameraEditor_ = std::make_unique<CameraEditor>();
-	cameraEditor_->Initialize();
-	cameraEditor_->SetFilePath("Resources/Json/VirtualCameraData/GameScene.json");
-	cameraEditor_->LoadFileOrDefault(cameraEditor_->GetFilePath(), "Game");
+  cameraMode_ = CameraMode::FOLLOW;
+  //------------------------------------------------------------
+  // システム初期化
+  //------------------------------------------------------------
+  YoRigine::GameTime::Initialize();
+  YoRigine::JsonManager::SetCurrentScene("GameScene");
+  YoRigine::CollisionManager::GetInstance()->Initialize();
+  // 視錐台外コライダーは BroadPhase 登録をスキップする (個別オプトアウトは
+  // BaseCollider::SetCheckOutsideCamera(false))
+  YoRigine::CollisionManager::GetInstance()->SetCullingCamera(
+      sceneCamera_.get());
+  YoRigine::CollisionManager::GetInstance()->SetEnableFrustumCulling(true);
+  // ModelManipulator のシーン読み込みは FieldScene / BattleScene の OnEnter で
+  // 各サブシーン用の JSON ("Field.json" / "Battle.json") を読む方式に統一した。
+  // ここで GameScene.json を読むと直後の SwitchToScene → OnEnter で上書きされる
+  // だけなので、ロードはしない。
+  AreaManager::GetInstance()->Initialize();
+  YParticleManager::GetInstance().SetCamera(sceneCamera_.get());
 
-	// ゲーム用のポストエフェクト（TestGame: Fog + GodRays 等）
-	PostEffectManager::GetInstance()->LoadPreset("TestGame");
+  //------------------------------------------------------------
+  // インゲーム用UI
+  //------------------------------------------------------------
+  gameUI_ = std::make_unique<GameUI>();
+  gameUI_->Initialize();
 
-	cameraMode_ = CameraMode::FOLLOW;
-	//------------------------------------------------------------
-	// システム初期化
-	//------------------------------------------------------------
-	YoRigine::GameTime::Initialize();
-	YoRigine::JsonManager::SetCurrentScene("GameScene");
-	YoRigine::CollisionManager::GetInstance()->Initialize();
-	// 視錐台外コライダーは BroadPhase 登録をスキップする (個別オプトアウトは BaseCollider::SetCheckOutsideCamera(false))
-	YoRigine::CollisionManager::GetInstance()->SetCullingCamera(sceneCamera_.get());
-	YoRigine::CollisionManager::GetInstance()->SetEnableFrustumCulling(true);
-	// ModelManipulator のシーン読み込みは FieldScene / BattleScene の OnEnter で
-	// 各サブシーン用の JSON ("Field.json" / "Battle.json") を読む方式に統一した。
-	// ここで GameScene.json を読むと直後の SwitchToScene → OnEnter で上書きされる
-	// だけなので、ロードはしない。
-	AreaManager::GetInstance()->Initialize();
-	YParticleManager::GetInstance().SetCamera(sceneCamera_.get());
+  //------------------------------------------------------------
+  // 共通オブジェクト
+  //------------------------------------------------------------
 
-	//------------------------------------------------------------
-	// インゲーム用UI
-	//------------------------------------------------------------
-	gameUI_ = std::make_unique<GameUI>();
-	gameUI_->Initialize();
+  player_ = std::make_unique<Player>();
+  player_->Initialize(sceneCamera_.get());
+  auto playerCam = std::dynamic_pointer_cast<FollowCamera>(
+      director->GetCamera("PlayerFollow"));
+  director->RegisterTarget("Player", &player_->GetWT());
 
-	//------------------------------------------------------------
-	// 共通オブジェクト
-	//------------------------------------------------------------
+  if (playerCam) {
+    playerCam->SetTarget(&player_->GetWT(), "Player");
+  }
+  // フォローカメラを取得（JSON読み込み後に存在する）
+  auto follow = director->GetCamera("PlayerFollow");
+  auto followPtr = std::static_pointer_cast<FollowCamera>(follow);
 
-	player_ = std::make_unique<Player>();
-	player_->Initialize(sceneCamera_.get());
-	auto playerCam = std::dynamic_pointer_cast<FollowCamera>(director->GetCamera("PlayerFollow"));
-	director->RegisterTarget("Player", &player_->GetWT());
+  // デバッグカメラを取得または作成
+  auto debug = director->GetCamera("MainDebug");
 
-	if (playerCam) {
-		playerCam->SetTarget(&player_->GetWT(), "Player");
-	}
-	// フォローカメラを取得（JSON読み込み後に存在する）
-	auto follow = director->GetCamera("PlayerFollow");
-	auto followPtr = std::static_pointer_cast<FollowCamera>(follow);
+  // JSON保存値で MainDebug が高優先のまま残っていると、SnapToActiveCamera が
+  // MainDebug にスナップ → 次フレームの UpdateCamera で PlayerFollow へ切替が
+  // 発生し、巨大累積角度（例: 99236rad）から Euler 線形補間でグルグル回る。
+  // 初期モードに合わせて優先度を確定してからスナップする。
+  director->SetPriority("PlayerFollow", 10);
+  director->SetPriority("MainDebug", 0);
+  director->SetPriority("ClearCinematic", 0);
+  director->SnapToActiveCamera();
 
+  // PlayerCamera を初期化（FollowCamera を内包するコンポーネント構成）
+  if (followPtr) {
+    player_->InitializeCamera(followPtr.get());
+  }
+  skyBox_ = std::make_unique<SkyBox>();
+  skyBox_->Initialize(sceneCamera_.get(),
+                      "Resources/DDS/vz_classic_cubemap_ue.dds");
 
-	// デバッグカメラを取得または作成
-	auto debug = director->GetCamera("MainDebug");
+  YoRigine::ModelManipulator::GetInstance()->SetCamera(sceneCamera_.get());
+  YoRigine::YGpuEmitManager::GetInstance()->SetCamera(sceneCamera_.get());
 
-	// JSON保存値で MainDebug が高優先のまま残っていると、SnapToActiveCamera が
-	// MainDebug にスナップ → 次フレームの UpdateCamera で PlayerFollow へ切替が
-	// 発生し、巨大累積角度（例: 99236rad）から Euler 線形補間でグルグル回る。
-	// 初期モードに合わせて優先度を確定してからスナップする。
-	director->SetPriority("PlayerFollow", 10);
-	director->SetPriority("MainDebug", 0);
-	director->SetPriority("ClearCinematic", 0);
-	director->SnapToActiveCamera();
+  //------------------------------------------------------------
+  // サブシーン管理初期化
+  //------------------------------------------------------------
+  subSceneManager_ = std::make_unique<SubSceneManager>();
+  subSceneManager_->Initialize(sceneCamera_.get(), player_.get());
 
-	// PlayerCamera を初期化（FollowCamera を内包するコンポーネント構成）
-	if (followPtr) {
-		player_->InitializeCamera(followPtr.get());
-	}
-	skyBox_ = std::make_unique<SkyBox>();
-	skyBox_->Initialize(sceneCamera_.get(), "Resources/DDS/vz_classic_cubemap_ue.dds");
+  // フィールドシーン登録
+  auto fieldScene = std::make_unique<FieldScene>();
+  fieldScene->Initialize(sceneCamera_.get(), player_.get());
+  subSceneManager_->RegisterSubScene("Field", std::move(fieldScene));
 
+  // バトルシーン登録
+  // フィールドへの復帰は BattleScene::HandleBattleEnd 内で
+  // RequestFieldTransition(returnData)
+  // を直接呼ぶので、ここではコールバック不要。
+  auto battleScene = std::make_unique<BattleScene>();
+  battleScene->Initialize(sceneCamera_.get(), player_.get());
+  subSceneManager_->RegisterSubScene("Battle", std::move(battleScene));
 
-	YoRigine::ModelManipulator::GetInstance()->SetCamera(sceneCamera_.get());
-	YoRigine::GpuEmitManager::GetInstance()->SetCamera(sceneCamera_.get());
+  // 初期サブシーンをフィールドに設定
+  subSceneManager_->SwitchToScene("Field");
 
-	//------------------------------------------------------------
-	// サブシーン管理初期化
-	//------------------------------------------------------------
-	subSceneManager_ = std::make_unique<SubSceneManager>();
-	subSceneManager_->Initialize(sceneCamera_.get(), player_.get());
-
-	// フィールドシーン登録
-	auto fieldScene = std::make_unique<FieldScene>();
-	fieldScene->Initialize(sceneCamera_.get(), player_.get());
-	subSceneManager_->RegisterSubScene("Field", std::move(fieldScene));
-
-	// バトルシーン登録
-	// フィールドへの復帰は BattleScene::HandleBattleEnd 内で
-	// RequestFieldTransition(returnData) を直接呼ぶので、ここではコールバック不要。
-	auto battleScene = std::make_unique<BattleScene>();
-	battleScene->Initialize(sceneCamera_.get(), player_.get());
-	subSceneManager_->RegisterSubScene("Battle", std::move(battleScene));
-
-	// 初期サブシーンをフィールドに設定
-	subSceneManager_->SwitchToScene("Field");
-
-	//------------------------------------------------------------
-	// エディター用GUI登録
-	//------------------------------------------------------------
-	AttackDatabase::LoadFromFile("Resources/Json/Combo/AttackData.json");
+  //------------------------------------------------------------
+  // エディター用GUI登録
+  //------------------------------------------------------------
+  AttackDatabase::LoadFromFile("Resources/Json/Combo/AttackData.json");
 #ifdef USE_IMGUI
-	// エディターを初期化
-	attackEditor_ = std::make_unique<AttackDataEditor>();
-	attackEditor_->SetFilePath("Resources/Json/Combo/AttackData.json");
-	attackEditor_->SetPlayer(player_.get());
-	attackEditor_->SetAutoReload(true);  // 自動リロード有効
-	attackEditor_->SetOpen(true);
+  // エディターを初期化
+  attackEditor_ = std::make_unique<AttackDataEditor>();
+  attackEditor_->SetFilePath("Resources/Json/Combo/AttackData.json");
+  attackEditor_->SetPlayer(player_.get());
+  attackEditor_->SetAutoReload(true); // 自動リロード有効
+  attackEditor_->SetOpen(true);
 
-	// リロードコールバックを設定
-	attackEditor_->SetReloadCallback([this]() {
-		// プレイヤーのコンボシステムをリロード
-		if (player_) {
-			player_->GetCombat()->GetCombo()->ReloadAttacks();
-		}
-		Logger("[GameScene] Attack data reloaded from editor!\n");
-		});
+  // リロードコールバックを設定
+  attackEditor_->SetReloadCallback([this]() {
+    // プレイヤーのコンボシステムをリロード
+    if (player_) {
+      player_->GetCombat()->GetCombo()->ReloadAttacks();
+    }
+    Logger("[GameScene] Attack data reloaded from editor!\n");
+  });
 
-	Editor::GetInstance()->RegisterGameUI("カメラエディター", [this]() {cameraEditor_->Update(); }, "Game");
-	Editor::GetInstance()->RegisterGameUI("カメラモード切り替え", [this]() {UpdateCameraMode(); }, "Game");
-	Editor::GetInstance()->RegisterGameUI("プレイヤーの状態情報", [this]() {player_->DrawImGui(); }, "Game");
-	Editor::GetInstance()->RegisterGameUI("プレイヤーカメラ", [this]() {
-		if (player_->GetPlayerCamera()) player_->GetPlayerCamera()->DrawImGui();
-		}, "Game");
-	Editor::GetInstance()->RegisterGameUI("ライティング", [this]() { YoRigine::LightManager::GetInstance()->ShowLightingEditor(); }, "Game");
-	Editor::GetInstance()->RegisterGameUI("プレイヤー攻撃エディター", [this]() {attackEditor_->DrawImGui(); }, "Game");
-	Editor::GetInstance()->RegisterGameUI("魔法攻撃エディター", [this]() {
-		// 魔法調整はプレイヤー状態確認とは作業目的が違う。
-		// Editor の独立パネルとして登録し、状態ウィンドウの開閉に引きずられないようにする。
-		if (player_ && player_->GetMagicController()) {
-			player_->GetMagicController()->DrawEditorWindow();
-		}
-		}, "Game");
-	Editor::GetInstance()->RegisterGameUI("YoRigine:パーティクルエディター", [this]() {YParticleEditor::GetInstance().ShowEditorWindow(); }, "Game");
+  Editor::GetInstance()->RegisterGameUI(
+      "カメラエディター", [this]() { cameraEditor_->Update(); }, "Game");
+  Editor::GetInstance()->RegisterGameUI(
+      "カメラモード切り替え", [this]() { UpdateCameraMode(); }, "Game");
+  Editor::GetInstance()->RegisterGameUI(
+      "プレイヤーの状態情報", [this]() { player_->DrawImGui(); }, "Game");
+  Editor::GetInstance()->RegisterGameUI(
+      "プレイヤーカメラ",
+      [this]() {
+        if (player_->GetPlayerCamera())
+          player_->GetPlayerCamera()->DrawImGui();
+      },
+      "Game");
+  Editor::GetInstance()->RegisterGameUI(
+      "ライティング",
+      [this]() { YoRigine::LightManager::GetInstance()->ShowLightingEditor(); },
+      "Game");
+  Editor::GetInstance()->RegisterGameUI(
+      "プレイヤー攻撃エディター", [this]() { attackEditor_->DrawImGui(); },
+      "Game");
+  Editor::GetInstance()->RegisterGameUI(
+      "魔法攻撃エディター",
+      [this]() {
+        // 魔法調整はプレイヤー状態確認とは作業目的が違う。
+        // Editor
+        // の独立パネルとして登録し、状態ウィンドウの開閉に引きずられないようにする。
+        if (player_ && player_->GetMagicController()) {
+          player_->GetMagicController()->DrawEditorWindow();
+        }
+      },
+      "Game");
+  Editor::GetInstance()->RegisterGameUI(
+      "YoRigine:パーティクルエディター",
+      [this]() { YParticleEditor::GetInstance().ShowEditorWindow(); }, "Game");
 #endif
 
-	//------------------------------------------------------------
-	// BGM再生
-	//------------------------------------------------------------
+  //------------------------------------------------------------
+  // BGM再生
+  //------------------------------------------------------------
 
-	//static auto bgm = YoRigine::Audio::GetInstance()->Play(
-	//	"Resources/Audio/BGM2.mp3",
-	//	true,
-	//	0.2f,
-	//	YoRigine::SoundCategory::BGM
-	//);
+  // static auto bgm = YoRigine::Audio::GetInstance()->Play(
+  //	"Resources/Audio/BGM2.mp3",
+  //	true,
+  //	0.2f,
+  //	YoRigine::SoundCategory::BGM
+  //);
 }
 
 /// <summary>
 /// 更新処理
 /// </summary>
 void GameScene::Update() {
-	YoRigine::GameTime::Update();
-	Player* player = player_.get();
+  YoRigine::GameTime::Update();
+  Player *player = player_.get();
 
-	//------------------------------------------------------------
-	// ゲームオーバー時の選択処理
-	//------------------------------------------------------------
-	bool isPlayerDead = player->GetCombat()->IsDead();
-	auto director = CameraDirector::GetInstance();
-	auto follow = director->GetCamera("PlayerFollow");
-	auto followPtr = std::static_pointer_cast<FollowCamera>(follow);
+  //------------------------------------------------------------
+  // ゲームオーバー時の選択処理
+  //------------------------------------------------------------
+  bool isPlayerDead = player->GetCombat()->IsDead();
+  auto director = CameraDirector::GetInstance();
+  auto follow = director->GetCamera("PlayerFollow");
+  auto followPtr = std::static_pointer_cast<FollowCamera>(follow);
 
-	if (isPlayerDead != wasPlayerDead_) {
-		if (isPlayerDead) {
-			// 死亡した瞬間:フェード開始
-			gameUI_->ShowGameOverWithFade(3.0f);
-		}
-		else {
-			// 復活した瞬間:リセット
-			gameUI_->ResetGameOver();
-		}
-		wasPlayerDead_ = isPlayerDead;
-	}
-	if (player_->GetPlayerCamera()) player_->GetPlayerCamera()->SetIsCloseUp(isPlayerDead);
-	// リトライ処理
-	if (gameUI_->IsRetryRequested()) {
-		HandleRetry();
-		gameUI_->ClearRequests();
-	}
-	// タイトルへ戻る処理（ポーズ画面 or ゲームオーバー画面）
-	else if (gameUI_->IsReturnToTitleRequested()) {
-		HandleReturnToTitle();
-		gameUI_->ClearRequests();
-	}
+  if (isPlayerDead != wasPlayerDead_) {
+    if (isPlayerDead) {
+      // 死亡した瞬間:フェード開始
+      gameUI_->ShowGameOverWithFade(3.0f);
+    } else {
+      // 復活した瞬間:リセット
+      gameUI_->ResetGameOver();
+    }
+    wasPlayerDead_ = isPlayerDead;
+  }
+  if (player_->GetPlayerCamera())
+    player_->GetPlayerCamera()->SetIsCloseUp(isPlayerDead);
+  // リトライ処理
+  if (gameUI_->IsRetryRequested()) {
+    HandleRetry();
+    gameUI_->ClearRequests();
+  }
+  // タイトルへ戻る処理（ポーズ画面 or ゲームオーバー画面）
+  else if (gameUI_->IsReturnToTitleRequested()) {
+    HandleReturnToTitle();
+    gameUI_->ClearRequests();
+  }
 
-	// カメラモード同期
-	if (subSceneManager_) {
-		cameraMode_ = subSceneManager_->GetCameraMode();
-	}
-	UpdateDebugCameraTimePause();
+  // カメラモード同期
+  if (subSceneManager_) {
+    cameraMode_ = subSceneManager_->GetCameraMode();
+  }
+  UpdateDebugCameraTimePause();
 
-	//------------------------------------------------------------
-	// スティック入力・ロックオンを確定
-	//------------------------------------------------------------
-	if (player_->GetPlayerCamera()) {
-		player_->GetPlayerCamera()->UpdatePreDirector();
-	}
+  //------------------------------------------------------------
+  // スティック入力・ロックオンを確定
+  //------------------------------------------------------------
+  if (player_->GetPlayerCamera()) {
+    player_->GetPlayerCamera()->UpdatePreDirector();
+  }
 
-	//------------------------------------------------------------
-	// サブシーン更新（プレイヤー・敵など全オブジェクトを動かす）
-	//------------------------------------------------------------
-	if (subSceneManager_) {
-		subSceneManager_->Update();
-	}
+  //------------------------------------------------------------
+  // サブシーン更新（プレイヤー・敵など全オブジェクトを動かす）
+  //------------------------------------------------------------
+  if (subSceneManager_) {
+    subSceneManager_->Update();
+  }
 
-	//------------------------------------------------------------
-	// 動いたプレイヤー位置をもとにカメラ計算
-	//------------------------------------------------------------
-	UpdateCamera();
+  //------------------------------------------------------------
+  // 動いたプレイヤー位置をもとにカメラ計算
+  //------------------------------------------------------------
+  UpdateCamera();
 
-	//------------------------------------------------------------
-	//  攻撃カメラオフセットを sceneCamera に後付けで適用
-	//------------------------------------------------------------
-	if (player_->GetPlayerCamera()) {
-		player_->GetPlayerCamera()->ApplyPostDirector(
-			sceneCamera_.get(), YoRigine::GameTime::GetDeltaTime());
-	}
+  //------------------------------------------------------------
+  //  攻撃カメラオフセットを sceneCamera に後付けで適用
+  //------------------------------------------------------------
+  if (player_->GetPlayerCamera()) {
+    player_->GetPlayerCamera()->ApplyPostDirector(
+        sceneCamera_.get(), YoRigine::GameTime::GetDeltaTime());
+  }
 
-	// 空と共通システム更新
-	skyBox_->Update();
-	// バトル中のみ LB/RB の押下アニメを許可
-	const bool inBattle = subSceneManager_ && subSceneManager_->GetCurrentSceneName() == "Battle";
-	gameUI_->SetBattleActive(inBattle);
-	// 戦闘中は RB/LB を「押しっぱなしで左右カメラ回転」に切り替える（非戦闘は背後リセンター）。
-	// 攻撃/ガード入力も戦闘中のみ受け付ける。
-	if (player_) {
-		player_->SetBattleMode(inBattle);
-		gameUI_->SetPlayerStyle(player_->GetStyle());
-		if (player_->GetPlayerCamera()) {
-			player_->GetPlayerCamera()->SetBattleMode(inBattle);
-		}
-	}
+  // 空と共通システム更新
+  skyBox_->Update();
+  // バトル中のみ LB/RB の押下アニメを許可
+  const bool inBattle =
+      subSceneManager_ && subSceneManager_->GetCurrentSceneName() == "Battle";
+  gameUI_->SetBattleActive(inBattle);
+  // 戦闘中は RB/LB
+  // を「押しっぱなしで左右カメラ回転」に切り替える（非戦闘は背後リセンター）。
+  // 攻撃/ガード入力も戦闘中のみ受け付ける。
+  if (player_) {
+    player_->SetBattleMode(inBattle);
+    gameUI_->SetPlayerStyle(player_->GetStyle());
+    if (player_->GetPlayerCamera()) {
+      player_->GetPlayerCamera()->SetBattleMode(inBattle);
+    }
+  }
 
-	// 画面外ヒット演出が発火していたら、ロックオン照準フラッシュを敵位置で再生
-	{
-		Vector3 flashWorld;
-		if (player_ && player_->GetPlayerCamera() &&
-			player_->GetPlayerCamera()->ConsumeLockOnFlashRequest(flashWorld)) {
-			lockFlashWorldPos_ = flashWorld;
-			lockFlashTimer_    = 1.7f;   // アニメ(アルファ1.6s)＋余裕。この間は敵に追従
-			lockFlashActive_   = true;
-			gameUI_->FlashLockOn();
-		}
-		// 演出中は敵ワールド座標をスクリーンへ投影してフラッシュを追従させる
-		//（カメラが敵方向へ回り込むのに合わせて照準が敵へ寄っていく）
-		if (lockFlashActive_ && sceneCamera_) {
-			auto proj = Coordinate::WorldToScreen(
-				lockFlashWorldPos_, sceneCamera_->GetViewProjectionMatrix());
-			if (proj.has_value()) {
-				gameUI_->SetLockOnFlashPos(proj->screenPos);
-			}
-			lockFlashTimer_ -= YoRigine::GameTime::GetUnscaledDeltaTime();
-			if (lockFlashTimer_ <= 0.0f) lockFlashActive_ = false;
-		}
-	}
+  // 画面外ヒット演出が発火していたら、ロックオン照準フラッシュを敵位置で再生
+  {
+    Vector3 flashWorld;
+    if (player_ && player_->GetPlayerCamera() &&
+        player_->GetPlayerCamera()->ConsumeLockOnFlashRequest(flashWorld)) {
+      lockFlashWorldPos_ = flashWorld;
+      lockFlashTimer_ = 1.7f; // アニメ(アルファ1.6s)＋余裕。この間は敵に追従
+      lockFlashActive_ = true;
+      gameUI_->FlashLockOn();
+    }
+    // 演出中は敵ワールド座標をスクリーンへ投影してフラッシュを追従させる
+    // （カメラが敵方向へ回り込むのに合わせて照準が敵へ寄っていく）
+    if (lockFlashActive_ && sceneCamera_) {
+      auto proj = Coordinate::WorldToScreen(
+          lockFlashWorldPos_, sceneCamera_->GetViewProjectionMatrix());
+      if (proj.has_value()) {
+        gameUI_->SetLockOnFlashPos(proj->screenPos);
+      }
+      lockFlashTimer_ -= YoRigine::GameTime::GetUnscaledDeltaTime();
+      if (lockFlashTimer_ <= 0.0f)
+        lockFlashActive_ = false;
+    }
+  }
 
-	gameUI_->Update();
+  gameUI_->Update();
 
-	YoRigine::ModelManipulator::GetInstance()->Update();
-	YoRigine::CollisionManager::GetInstance()->Update();
-	YParticleManager::GetInstance().Update(YoRigine::GameTime::GetDeltaTime(YoRigine::TimeChannel::Vfx));
-	VfxMeshSpawner::GetInstance()->SetCamera(sceneCamera_.get());
-	VfxMeshSpawner::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime(YoRigine::TimeChannel::Vfx));
-	YoRigine::LightManager::GetInstance()->UpdateShadowMatrix(sceneCamera_.get());
-	YoRigine::GpuEmitManager::GetInstance()->Update();
-	CompositeEffectManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime(YoRigine::TimeChannel::Vfx));
+  YoRigine::ModelManipulator::GetInstance()->Update();
+  YoRigine::CollisionManager::GetInstance()->Update();
+  YParticleManager::GetInstance().Update(
+      YoRigine::GameTime::GetDeltaTime(YoRigine::TimeChannel::Vfx));
+  VfxMeshSpawner::GetInstance()->SetCamera(sceneCamera_.get());
+  VfxMeshSpawner::GetInstance()->Update(
+      YoRigine::GameTime::GetDeltaTime(YoRigine::TimeChannel::Vfx));
+  YoRigine::LightManager::GetInstance()->UpdateShadowMatrix(sceneCamera_.get());
+  YoRigine::YGpuEmitManager::GetInstance()->Update();
+  CompositeEffectManager::GetInstance()->Update(
+      YoRigine::GameTime::GetDeltaTime(YoRigine::TimeChannel::Vfx));
 
 #ifdef USE_IMGUI
-	AreaEditor::GetInstance()->Update();
+  AreaEditor::GetInstance()->Update();
 #endif // USE_IMGUI
-
 }
 
 /// <summary>
 /// 描画処理
 /// </summary>
 void GameScene::Draw() {
-	//------------------------------------------------------------
-	// 3Dオブジェクト描画
-	//------------------------------------------------------------
-	skyBox_->Draw();
-	Object3dCommon::GetInstance()->DrawPreference();
-	DrawObject();
+  //------------------------------------------------------------
+  // 3Dオブジェクト描画
+  //------------------------------------------------------------
+  skyBox_->Draw();
+  Object3dCommon::GetInstance()->DrawPreference();
+  DrawObject();
 
-	//------------------------------------------------------------
-	// パーティクル描画
-	//------------------------------------------------------------
-	YParticleManager::GetInstance().Draw();
-	DrawLine();
-	//YoRigine::GpuEmitManager::GetInstance()->Draw();
+  //------------------------------------------------------------
+  // パーティクル描画
+  //------------------------------------------------------------
+  YParticleManager::GetInstance().Draw();
+  DrawLine();
+  // YoRigine::YGpuEmitManager::GetInstance()->Draw();
 
-	//------------------------------------------------------------
-	// VFX描画
-	//------------------------------------------------------------
-	VfxMeshSpawner::GetInstance()->Draw();
-	player_->DrawVfx();
+  //------------------------------------------------------------
+  // VFX描画
+  //------------------------------------------------------------
+  VfxMeshSpawner::GetInstance()->Draw();
+  player_->DrawVfx();
 }
 
 /// <summary>
 /// PiP 用の 3D-only 描画 (スカイ + シーンオブジェクトのみ)。
-/// PipCameraSystem がシーンカメラの行列を PiP カメラの値に書き換えた状態で呼び出されるので、
-/// ここでは普段の DrawObject 経路と同じものを呼べば PiP 視点で再描画される。
-/// UI / ライン / ポストエフェクト / シャドウは含めない。
+/// PipCameraSystem がシーンカメラの行列を PiP
+/// カメラの値に書き換えた状態で呼び出されるので、 ここでは普段の DrawObject
+/// 経路と同じものを呼べば PiP 視点で再描画される。 UI / ライン /
+/// ポストエフェクト / シャドウは含めない。
 /// </summary>
 void GameScene::DrawScene3DOnly() {
-	skyBox_->Draw();
-	Object3dCommon::GetInstance()->DrawPreference();
-	DrawObject();
+  skyBox_->Draw();
+  Object3dCommon::GetInstance()->DrawPreference();
+  DrawObject();
 
-	DrawLine();
+  DrawLine();
 }
 
 /// <summary>
 /// オフスクリーン対象外のUI描画
 /// </summary>
 void GameScene::DrawNonOffscreen() {
-	SpriteCommon::GetInstance()->DrawPreference();
-	//------------------------------------------------------------
-	// UI描画
-	//------------------------------------------------------------
-	SpriteCommon::GetInstance()->DrawPreference();
-	DrawUI();
-	if (subSceneManager_) {
-		subSceneManager_->DrawNonOffscreen();
-	}
-
+  SpriteCommon::GetInstance()->DrawPreference();
+  //------------------------------------------------------------
+  // UI描画
+  //------------------------------------------------------------
+  SpriteCommon::GetInstance()->DrawPreference();
+  DrawUI();
+  if (subSceneManager_) {
+    subSceneManager_->DrawNonOffscreen();
+  }
 }
 
 /// <summary>
 /// 影の描画
 /// </summary>
-void GameScene::DrawShadow()
-{
-	DrawCommonShadow();
-}
+void GameScene::DrawShadow() { DrawCommonShadow(); }
 
 /// <summary>
 /// サブシーンのオブジェクト描画
 /// </summary>
 void GameScene::DrawObject() {
-	if (subSceneManager_) {
-		subSceneManager_->DrawObject();
-	}
-	YoRigine::ModelManipulator::GetInstance()->Draw();
+  if (subSceneManager_) {
+    subSceneManager_->DrawObject();
+  }
+  YoRigine::ModelManipulator::GetInstance()->Draw();
 }
 
 /// <summary>
@@ -403,92 +424,91 @@ void GameScene::DrawObject() {
 /// </summary>
 void GameScene::DrawLine() {
 
-	YoRigine::ModelManipulator::GetInstance()->DrawLine();
-	if (subSceneManager_) {
-		subSceneManager_->DrawLine();
-	}
+  YoRigine::ModelManipulator::GetInstance()->DrawLine();
+  if (subSceneManager_) {
+    subSceneManager_->DrawLine();
+  }
 }
 
 /// <summary>
 /// UI描画（現在空）
 /// </summary>
 void GameScene::DrawUI() {
-	//gameUI_->DrawAll();
-	gameUI_->Draw();
-	if (subSceneManager_) {
-		subSceneManager_->DrawUI();
-	}
+  // gameUI_->DrawAll();
+  gameUI_->Draw();
+  if (subSceneManager_) {
+    subSceneManager_->DrawUI();
+  }
 }
 
 /// <summary>
 /// カメラ更新処理
 /// </summary>
 void GameScene::UpdateCamera() {
-	auto director = CameraDirector::GetInstance();
-	const bool isDeathCamera = player_ && player_->GetCombat() &&
-		player_->GetCombat()->IsDead();
+  auto director = CameraDirector::GetInstance();
+  const bool isDeathCamera =
+      player_ && player_->GetCombat() && player_->GetCombat()->IsDead();
 
-	// 死亡モーション終了時はゲーム本体だけを止め、死亡クローズアップは
-	// 実時間で最終位置まで進める。
-	if (YoRigine::GameTime::IsPause() && cameraMode_ != CameraMode::DEBUG && !isDeathCamera) {
-		return;
-	}
+  // 死亡モーション終了時はゲーム本体だけを止め、死亡クローズアップは
+  // 実時間で最終位置まで進める。
+  if (YoRigine::GameTime::IsPause() && cameraMode_ != CameraMode::DEBUG &&
+      !isDeathCamera) {
+    return;
+  }
 
-	// カメラの優先度
-	switch (cameraMode_)
-	{
-	case CameraMode::FOLLOW:
-		// フォローカメラ優先
-		director->SetPriority("PlayerFollow", 10);
-		director->SetPriority("MainDebug", 0);
-		break;
-	case CameraMode::BATTLE_START:
-		// バトル開始カメラ優先
-		director->SetPriority("PlayerFollow", 0);
-		director->SetPriority("MainDebug", 0);
-		break;
-	case CameraMode::DEBUG:
-		director->SetPriority("MainDebug", 10);
-		director->SetPriority("PlayerFollow", 0);
-		break;
-	case CameraMode::CLEAR_CINEMATIC:
-		// シネマティックカメラ優先（例: BattleScene 内で切り替える）
-		director->SetPriority("ClearCinematic", 0);
-		director->SetPriority("MainDebug", 0);
-		break;
-	}
+  // カメラの優先度
+  switch (cameraMode_) {
+  case CameraMode::FOLLOW:
+    // フォローカメラ優先
+    director->SetPriority("PlayerFollow", 10);
+    director->SetPriority("MainDebug", 0);
+    break;
+  case CameraMode::BATTLE_START:
+    // バトル開始カメラ優先
+    director->SetPriority("PlayerFollow", 0);
+    director->SetPriority("MainDebug", 0);
+    break;
+  case CameraMode::DEBUG:
+    director->SetPriority("MainDebug", 10);
+    director->SetPriority("PlayerFollow", 0);
+    break;
+  case CameraMode::CLEAR_CINEMATIC:
+    // シネマティックカメラ優先（例: BattleScene 内で切り替える）
+    director->SetPriority("ClearCinematic", 0);
+    director->SetPriority("MainDebug", 0);
+    break;
+  }
 
-
-	//------------------------------------------------------------
-	// デバッグ用：カメラ切り替え入力
-	//------------------------------------------------------------
-# ifdef _DEBUG	
-	YoRigine::Input* input = YoRigine::Input::GetInstance();
-	if (input->TriggerKey(DIK_F3)) {
-		SetDebugCameraActive(!isDebugCamera_);
-	}
+  //------------------------------------------------------------
+  // デバッグ用：カメラ切り替え入力
+  //------------------------------------------------------------
+#ifdef _DEBUG
+  YoRigine::Input *input = YoRigine::Input::GetInstance();
+  if (input->TriggerKey(DIK_F3)) {
+    SetDebugCameraActive(!isDebugCamera_);
+  }
 #endif
 
-	//------------------------------------------------------------
-	// Directorの更新（VirtualCameraの計算 ＋ ブレンド処理）
-	//------------------------------------------------------------
-	const float cameraDt = (cameraMode_ == CameraMode::DEBUG || isDeathCamera)
-		? YoRigine::GameTime::GetUnscaledDeltaTime()
-		: YoRigine::GameTime::GetDeltaTime();
-	director->Update(cameraDt);
+  //------------------------------------------------------------
+  // Directorの更新（VirtualCameraの計算 ＋ ブレンド処理）
+  //------------------------------------------------------------
+  const float cameraDt = (cameraMode_ == CameraMode::DEBUG || isDeathCamera)
+                             ? YoRigine::GameTime::GetUnscaledDeltaTime()
+                             : YoRigine::GameTime::GetDeltaTime();
+  director->Update(cameraDt);
 
-	//------------------------------------------------------------
-	// 出力用カメラ(sceneCamera_)への同期
-	//------------------------------------------------------------
-	// Directorが導き出した「理想の座標・回転・レンズ情報」をコピー
-	sceneCamera_->SetTranslate(director->GetActiveCameraPos());
-	sceneCamera_->SetRotate(director->GetActiveCameraRot());
-	sceneCamera_->SetFovY(director->GetFovY());
-	sceneCamera_->viewMatrix_ = director->GetViewMatrix();
-	// カメラ自体の更新（内部でのシェイク計算など）
-	sceneCamera_->Update();
-	// 最終的な行列の計算
-	sceneCamera_->UpdateMatrix();
+  //------------------------------------------------------------
+  // 出力用カメラ(sceneCamera_)への同期
+  //------------------------------------------------------------
+  // Directorが導き出した「理想の座標・回転・レンズ情報」をコピー
+  sceneCamera_->SetTranslate(director->GetActiveCameraPos());
+  sceneCamera_->SetRotate(director->GetActiveCameraRot());
+  sceneCamera_->SetFovY(director->GetFovY());
+  sceneCamera_->viewMatrix_ = director->GetViewMatrix();
+  // カメラ自体の更新（内部でのシェイク計算など）
+  sceneCamera_->Update();
+  // 最終的な行列の計算
+  sceneCamera_->UpdateMatrix();
 }
 
 /// <summary>
@@ -496,126 +516,131 @@ void GameScene::UpdateCamera() {
 /// </summary>
 void GameScene::UpdateCameraMode() {
 #ifdef USE_IMGUI
-	if (ImGui::Button("Follow Camera")) {
-		SetDebugCameraActive(false);
-	}
-	if (ImGui::Button("Battle Start Camera")) cameraMode_ = CameraMode::BATTLE_START;
-	if (ImGui::Button("Debug Camera")) {
-		SetDebugCameraActive(true);
-	}
-	if (subSceneManager_) subSceneManager_->SetCameraMode(cameraMode_);
+  if (ImGui::Button("Follow Camera")) {
+    SetDebugCameraActive(false);
+  }
+  if (ImGui::Button("Battle Start Camera"))
+    cameraMode_ = CameraMode::BATTLE_START;
+  if (ImGui::Button("Debug Camera")) {
+    SetDebugCameraActive(true);
+  }
+  if (subSceneManager_)
+    subSceneManager_->SetCameraMode(cameraMode_);
 #endif
 }
 
 void GameScene::UpdateDebugCameraTimePause() {
-	const bool debugActive = (cameraMode_ == CameraMode::DEBUG);
-	isDebugCamera_ = debugActive;
+  const bool debugActive = (cameraMode_ == CameraMode::DEBUG);
+  isDebugCamera_ = debugActive;
 
-	if (debugActive) {
-		if (!YoRigine::GameTime::IsPause()) {
-			YoRigine::GameTime::Pause();
-			pausedGameTimeForDebugCamera_ = true;
-		}
-		return;
-	}
+  if (debugActive) {
+    if (!YoRigine::GameTime::IsPause()) {
+      YoRigine::GameTime::Pause();
+      pausedGameTimeForDebugCamera_ = true;
+    }
+    return;
+  }
 
-	if (pausedGameTimeForDebugCamera_) {
-		YoRigine::GameTime::Resume();
-		pausedGameTimeForDebugCamera_ = false;
-	}
+  if (pausedGameTimeForDebugCamera_) {
+    YoRigine::GameTime::Resume();
+    pausedGameTimeForDebugCamera_ = false;
+  }
 }
 
 void GameScene::SetDebugCameraActive(bool active) {
-	cameraMode_ = active ? CameraMode::DEBUG : CameraMode::FOLLOW;
-	isDebugCamera_ = active;
-	CameraDirector::GetInstance()->SetEnableBlending(false);
-	if (subSceneManager_) subSceneManager_->SetCameraMode(cameraMode_);
-	UpdateDebugCameraTimePause();
+  cameraMode_ = active ? CameraMode::DEBUG : CameraMode::FOLLOW;
+  isDebugCamera_ = active;
+  CameraDirector::GetInstance()->SetEnableBlending(false);
+  if (subSceneManager_)
+    subSceneManager_->SetCameraMode(cameraMode_);
+  UpdateDebugCameraTimePause();
 }
 
 /// <summary>
 /// リトライ処理
 /// </summary>
 void GameScene::HandleRetry() {
-	Logger("[GameScene] Retry requested - Restarting Field Scene\n");
+  Logger("[GameScene] Retry requested - Restarting Field Scene\n");
 
-	// プレイヤーをリセット
-	if (player_) {
-		player_->Reset();
-	}
+  // プレイヤーをリセット
+  if (player_) {
+    player_->Reset();
+  }
 
-	// ゲームオーバーUIをリセット
-	gameUI_->ResetGameOver();
-	wasPlayerDead_ = false;
+  // ゲームオーバーUIをリセット
+  gameUI_->ResetGameOver();
+  wasPlayerDead_ = false;
 
-	// フィールドシーンを再初期化
-	if (subSceneManager_) {
-		auto* fieldScene = dynamic_cast<FieldScene*>(subSceneManager_->GetScene("Field"));
-		if (fieldScene) {
-			// フィールドシーンを再初期化
-			fieldScene->Initialize(sceneCamera_.get(), player_.get());
-		}
+  // フィールドシーンを再初期化
+  if (subSceneManager_) {
+    auto *fieldScene =
+        dynamic_cast<FieldScene *>(subSceneManager_->GetScene("Field"));
+    if (fieldScene) {
+      // フィールドシーンを再初期化
+      fieldScene->Initialize(sceneCamera_.get(), player_.get());
+    }
 
-		// フィールドシーンに切り替え
-		subSceneManager_->SwitchToSceneWithFade("Field");
-	}
+    // フィールドシーンに切り替え
+    subSceneManager_->SwitchToSceneWithFade("Field");
+  }
 
-	isDebugCamera_ = false;
-	pausedGameTimeForDebugCamera_ = false;
-	//auto director = CameraDirector::GetInstance();
-	//director->SetPriority("MainDebug", 0);
-	//director->SetPriority("PlayerFollow", 10);
+  isDebugCamera_ = false;
+  pausedGameTimeForDebugCamera_ = false;
+  // auto director = CameraDirector::GetInstance();
+  // director->SetPriority("MainDebug", 0);
+  // director->SetPriority("PlayerFollow", 10);
 
-	// ゲーム時間を再開
-	YoRigine::GameTime::Resume();
+  // ゲーム時間を再開
+  YoRigine::GameTime::Resume();
 
-	Logger("[GameScene] Field Scene restarted\n");
+  Logger("[GameScene] Field Scene restarted\n");
 }
 
 /// <summary>
 /// タイトルへ戻る処理
 /// </summary>
 void GameScene::HandleReturnToTitle() {
-	Logger("[GameScene] Return to Title requested\n");
+  Logger("[GameScene] Return to Title requested\n");
 
-	if (pausedGameTimeForDebugCamera_) {
-		YoRigine::GameTime::Resume();
-		pausedGameTimeForDebugCamera_ = false;
-	}
+  if (pausedGameTimeForDebugCamera_) {
+    YoRigine::GameTime::Resume();
+    pausedGameTimeForDebugCamera_ = false;
+  }
 
-	// タイトルシーンへ遷移
-	SceneManager::GetInstance()->ChangeScene("Title");
-	Logger("[GameScene] Changing to Title Scene\n");
+  // タイトルシーンへ遷移
+  SceneManager::GetInstance()->ChangeScene("Title");
+  Logger("[GameScene] Changing to Title Scene\n");
 }
 
 /// <summary>
 /// ゲームクリア処理
 /// </summary>
 void GameScene::HandleGameClear() {
-	Logger("[GameScene] Game Clear! All enemies defeated!\n");
+  Logger("[GameScene] Game Clear! All enemies defeated!\n");
 
-	if (pausedGameTimeForDebugCamera_) {
-		YoRigine::GameTime::Resume();
-		pausedGameTimeForDebugCamera_ = false;
-	}
+  if (pausedGameTimeForDebugCamera_) {
+    YoRigine::GameTime::Resume();
+    pausedGameTimeForDebugCamera_ = false;
+  }
 
-	// クリアシーンへ遷移
-	SceneManager::GetInstance()->ChangeScene("Clear");
-	Logger("[GameScene] Changing to Clear Scene\n");
+  // クリアシーンへ遷移
+  SceneManager::GetInstance()->ChangeScene("Clear");
+  Logger("[GameScene] Changing to Clear Scene\n");
 }
 
 /// <summary>
 /// 終了処理
 /// </summary>
 void GameScene::Finalize() {
-	if (pausedGameTimeForDebugCamera_) {
-		YoRigine::GameTime::Resume();
-		pausedGameTimeForDebugCamera_ = false;
-	}
-	// メインシーン遷移前にパーティクルを停止する（Title/Clear への移動ケース）
-	YParticleManager::GetInstance().StopAndClearActiveEmitters();
-	YoRigine::GpuEmitManager::GetInstance()->StopAllEmitterGroups();
-	YoRigine::JsonManager::ClearSceneInstances("GameScene");
-	if (subSceneManager_) subSceneManager_->Finalize();
-	subSceneManager_ = nullptr;
+  if (pausedGameTimeForDebugCamera_) {
+    YoRigine::GameTime::Resume();
+    pausedGameTimeForDebugCamera_ = false;
+  }
+  // メインシーン遷移前にパーティクルを停止する（Title/Clear への移動ケース）
+  YParticleManager::GetInstance().StopAndClearActiveEmitters();
+  YoRigine::YGpuEmitManager::GetInstance()->StopAllEmitterGroups();
+  YoRigine::JsonManager::ClearSceneInstances("GameScene");
+  if (subSceneManager_)
+    subSceneManager_->Finalize();
+  subSceneManager_ = nullptr;
 }

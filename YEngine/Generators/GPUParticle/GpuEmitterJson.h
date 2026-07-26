@@ -4,7 +4,7 @@
 ///
 /// AutoJson は「登録した型を j = *ptr / j.get<T>() でシリアライズ」するため、
 /// 構造体型（GpuForceFieldParams など）を扱うには to_json/from_json が必要。
-/// ここに1箇所だけ定義しておけば、GpuEmitManager 側は AutoJson.Add() 1行で
+/// ここに1箇所だけ定義しておけば、YGpuEmitManager 側は AutoJson.Add() 1行で
 /// フォースフィールド配列ごと保存・読込できる。
 ///
 /// スカラ・Vector・enum は ConversionJson.h / nlohmann 標準で変換されるため
@@ -61,4 +61,72 @@ inline void from_json(const nlohmann::json& j, GpuForceFieldParams& p)
 	p.approachVariance  = j.value("approachVariance", d.approachVariance);
 	p.maxSpeed          = j.value("maxSpeed", d.maxSpeed);
 	p.killRadius        = j.value("killRadius", d.killRadius);
+}
+
+//-----------------------------------------------------------------------------
+// GpuAccelerationParams
+//   ForceFieldParams と同じ方針: enum は int 保存、from_json は value() でフォールバック。
+//-----------------------------------------------------------------------------
+inline void to_json(nlohmann::json& j, const GpuAccelerationParams& p)
+{
+	j = nlohmann::json{
+		{"isEnable",    p.isEnable},
+		{"shape",       static_cast<int>(p.shape)},
+		{"center",      p.center},
+		{"halfExtents", p.halfExtents},
+		{"radius",      p.radius},
+		{"direction",   p.direction},
+		{"strength",    p.strength},
+		{"falloff",     p.falloff},
+	};
+}
+
+inline void from_json(const nlohmann::json& j, GpuAccelerationParams& p)
+{
+	const GpuAccelerationParams d{}; // 既定値ソース
+	p.isEnable    = j.value("isEnable", d.isEnable);
+	p.shape       = static_cast<GpuFieldShape>(j.value("shape", static_cast<int>(d.shape)));
+	p.center      = j.value("center", d.center);
+	p.halfExtents = j.value("halfExtents", d.halfExtents);
+	p.radius      = j.value("radius", d.radius);
+	p.direction   = j.value("direction", d.direction);
+	p.strength    = j.value("strength", d.strength);
+	p.falloff     = j.value("falloff", d.falloff);
+}
+
+//-----------------------------------------------------------------------------
+// GpuNoiseParams (Curl / Turbulence / Vortex)
+//   ForceFieldParams と同じ方針: enum は int 保存、from_json は value() でフォールバック。
+//-----------------------------------------------------------------------------
+inline void to_json(nlohmann::json& j, const GpuNoiseParams& p)
+{
+	j = nlohmann::json{
+		{"isEnable",    p.isEnable},
+		{"type",        static_cast<int>(p.type)},
+		{"frequency",   p.frequency},
+		{"amplitude",   p.amplitude},
+		{"octaves",     p.octaves},
+		{"lacunarity",  p.lacunarity},
+		{"gain",        p.gain},
+		{"scrollSpeed", p.scrollSpeed},
+		{"axis",        p.axis},
+		{"center",      p.center},
+		{"radius",      p.radius},
+	};
+}
+
+inline void from_json(const nlohmann::json& j, GpuNoiseParams& p)
+{
+	const GpuNoiseParams d{}; // 既定値ソース
+	p.isEnable    = j.value("isEnable", d.isEnable);
+	p.type        = static_cast<GpuNoiseType>(j.value("type", static_cast<int>(d.type)));
+	p.frequency   = j.value("frequency", d.frequency);
+	p.amplitude   = j.value("amplitude", d.amplitude);
+	p.octaves     = j.value("octaves", d.octaves);
+	p.lacunarity  = j.value("lacunarity", d.lacunarity);
+	p.gain        = j.value("gain", d.gain);
+	p.scrollSpeed = j.value("scrollSpeed", d.scrollSpeed);
+	p.axis        = j.value("axis", d.axis);
+	p.center      = j.value("center", d.center);
+	p.radius      = j.value("radius", d.radius);
 }

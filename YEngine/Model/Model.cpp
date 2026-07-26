@@ -240,7 +240,7 @@ void Model::DrawShadow()
 
 }
 
-void Model::DrawInstanced(uint32_t instanceCount, D3D12_GPU_DESCRIPTOR_HANDLE instanceSRV)
+void Model::DrawInstanced(uint32_t instanceCount, D3D12_GPU_DESCRIPTOR_HANDLE instanceSRV, const std::string& overrideTexturePath)
 {
 	// Skinning付きはインスタンス対応外 (CSスキニングが per-object 前提のため)
 	assert(!hasBones_ && "Model::DrawInstanced does not support skinned meshes");
@@ -262,7 +262,7 @@ void Model::DrawInstanced(uint32_t instanceCount, D3D12_GPU_DESCRIPTOR_HANDLE in
 	for (size_t i = 0; i < meshes_.size(); ++i) {
 		auto& mesh = meshes_[i];
 		materials_[mesh->GetMaterialIndex()]->RecordDrawCommands(
-			commandList, indices.at("gMaterialConstant"), indices.at("gTexture"));
+			commandList, indices.at("gMaterialConstant"), indices.at("gTexture"), overrideTexturePath);
 
 		if (EnvironmentMap::GetInstance()->GetSrvIndex() != UINT32_MAX) {
 			auto envHandle = EnvironmentMap::GetInstance()->GetSrvHandle();

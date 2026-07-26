@@ -12,7 +12,7 @@
 #include "Material/OutlineSettings.h"
 #include <Systems/UI/UIManager.h>
 #include <Systems/Text/TextTextureBaker.h>
-#include "GPUParticle/GpuEmitManager.h"
+#include "GPUParticle/YGpuEmitManager.h"
 #include <Object3D/BaseObjectManager.h>
 #include <Drawer/InstancedObject3d.h>
 #include <Loaders/Texture/TextureManager.h>
@@ -74,9 +74,9 @@ void MyGame::Initialize() {
 	//------------------------------------------------------------
 	// パーティクル関連の初期化（YParticle に完全移行済み）
 	//------------------------------------------------------------
-	YoRigine::GpuEmitManager::GetInstance()->SetTextureManager(TextureManager::GetInstance());
-	YoRigine::GpuEmitManager::GetInstance()->SetModelManager(ModelManager::GetInstance());
-	YoRigine::GpuEmitManager::GetInstance()->Initialize();
+	YoRigine::YGpuEmitManager::GetInstance()->SetTextureManager(TextureManager::GetInstance());
+	YoRigine::YGpuEmitManager::GetInstance()->SetModelManager(ModelManager::GetInstance());
+	YoRigine::YGpuEmitManager::GetInstance()->Initialize();
 
 	VfxMeshSpawner::GetInstance()->Initialize();
 	VfxMeshSpawner::GetInstance()->ScanDirectory("Resources/Json/VfxMesh/");
@@ -86,7 +86,7 @@ void MyGame::Initialize() {
 	// 複合エフェクト（Particle+VfxMesh+GPU+Sound を名前で束ねる層）を自動ロード。
 	// Particle/GPU の Scan より後（子アセットが先に存在している必要があるため）。
 	CompositeEffectManager::GetInstance()->SetVfxMeshSpawner(VfxMeshSpawner::GetInstance());
-	CompositeEffectManager::GetInstance()->SetGpuEmitManager(YoRigine::GpuEmitManager::GetInstance());
+	CompositeEffectManager::GetInstance()->SetYGpuEmitManager(YoRigine::YGpuEmitManager::GetInstance());
 	CompositeEffectManager::GetInstance()->SetAudio(audio_);
 	CompositeEffectManager::GetInstance()->SetCollisionManager(YoRigine::CollisionManager::GetInstance());
 	CompositeEffectManager::GetInstance()->SetYParticleManager(&YParticleManager::GetInstance());
@@ -209,7 +209,7 @@ void MyGame::Initialize() {
 void MyGame::Finalize() {
 	SceneManager::GetInstance()->Finalize();
 	WaypointManager::GetInstance()->Finalize();
-	YoRigine::GpuEmitManager::GetInstance()->Finalize();
+	YoRigine::YGpuEmitManager::GetInstance()->Finalize();
 	CompositeEffectManager::GetInstance()->Finalize();
 	VfxMeshSpawner::GetInstance()->Finalize();
 	YoRigine::ModelManipulator::GetInstance()->Finalize();

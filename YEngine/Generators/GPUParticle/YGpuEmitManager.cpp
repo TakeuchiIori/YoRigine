@@ -1,4 +1,4 @@
-#include "GpuEmitManager.h"
+#include "YGpuEmitManager.h"
 
 // C++
 #include <fstream>
@@ -14,37 +14,40 @@
 #include "Systems/GameTime/GameTime.h"
 #include <IconsFontAwesome5.h>
 #include "GpuEmitterJson.h"   // GpuForceFieldParams の to_json/from_json
+#include "Modules/ExtParamsJson.h" // UVScroll/ScalePulse/ColorFlicker の to_json/from_json
 #include <cassert>
 #ifdef USE_IMGUI
-#include "GpuEmitManagerEditorUI.h"
+#include "YGpuEmitManagerEditorUI.h"
 #endif
 
 namespace YoRigine {
 	// ImGui用の形状名一覧
-	const char* GpuEmitManager::shapeNames_[] = {
+	const char* YGpuEmitManager::shapeNames_[] = {
 		"円形",
 		"箱形",
 		"三角形",
 		"コーン",
-		"メッシュ"
+		"メッシュ",
+		"リング",
+		"ライン"
 	};
 
 	/// <summary>
-	/// GpuEmitManager シングルトン取得
+	/// YGpuEmitManager シングルトン取得
 	/// </summary>
-	GpuEmitManager* GpuEmitManager::GetInstance()
+	YGpuEmitManager* YGpuEmitManager::GetInstance()
 	{
-		static GpuEmitManager instance;
+		static YGpuEmitManager instance;
 		return &instance;
 	}
 
 	/// <summary>
 	/// 初期化（カメラ登録のみ）
 	/// </summary>
-	void GpuEmitManager::Initialize()
+	void YGpuEmitManager::Initialize()
 	{
-		assert(textureManager_ && "GpuEmitManager : SetTextureManager() を先に呼ぶこと");
-		assert(modelManager_ && "GpuEmitManager : SetModelManager() を先に呼ぶこと");
+		assert(textureManager_ && "YGpuEmitManager : SetTextureManager() を先に呼ぶこと");
+		assert(modelManager_ && "YGpuEmitManager : SetModelManager() を先に呼ぶこと");
 
 #ifdef USE_IMGUI
 		// --- テクスチャブラウザ ---
@@ -93,7 +96,7 @@ namespace YoRigine {
 	/// <summary>
 	/// アプリ終了時に借用ポインタを手放す
 	/// </summary>
-	void GpuEmitManager::Finalize()
+	void YGpuEmitManager::Finalize()
 	{
 		textureManager_ = nullptr;
 		modelManager_ = nullptr;
@@ -102,7 +105,7 @@ namespace YoRigine {
 	/// <summary>
 	/// 全エミッターを更新 (グループ内をループ)
 	/// </summary>
-	void GpuEmitManager::Update()
+	void YGpuEmitManager::Update()
 	{
 		float deltaTime = GameTime::GetDeltaTime(TimeChannel::Vfx);
 
@@ -134,6 +137,12 @@ namespace YoRigine {
 						groupData->translate + GetEmitterLocalOffset(emitterData.get()));
 					// フォースフィールドもグループ原点に追従させる（center はグループ相対）
 					emitterData->emitter->SetForceFields(emitterData->forceFields, groupData->translate);
+					// ノイズフィールドも同様にグループ原点に追従させる
+					emitterData->emitter->SetNoiseFields(emitterData->noiseFields, groupData->translate);
+					// アクセラレーションフィールドも同様にグループ原点に追従させる
+					emitterData->emitter->SetAccelerationFields(emitterData->accelerationFields, groupData->translate);
+					// 拡張Paramモジュール（任意演出。集約構造体でまとめて渡す）
+					emitterData->emitter->SetExtParams(emitterData->extModules);
 					emitterData->emitter->Update(deltaTime);
 				}
 			}
@@ -148,7 +157,7 @@ namespace YoRigine {
 	/// <summary>
 	/// 全エミッター描画 (グループ内をループ)
 	/// </summary>
-	void GpuEmitManager::Draw()
+	void YGpuEmitManager::Draw()
 	{
 		for (auto& [groupName, groupData] : groups_) {
 			if (groupData->isActive) {
@@ -172,7 +181,7 @@ namespace YoRigine {
 	/// <summary>
 	/// 選択中グループの各エミッタ形状をライン描画（選択エミッタ=黄 / それ以外=シアン）
 	/// </summary>
-	void GpuEmitManager::DrawEmitterGizmos()
+	void YGpuEmitManager::DrawEmitterGizmos()
 	{
 		gizmoLine_->Reset();
 
@@ -215,12 +224,23 @@ namespace YoRigine {
 		}
 		gizmoLine_->SetColor({ 1.0f, 0.15f, 0.15f, 1.0f });
 		gizmoLine_->DrawLine();
+
+		// --- アクセラレーションフィールド範囲（黄緑・太線）---
+		// 細線だと範囲が分かりにくいため、この区間だけ太線モードにして描画後に戻す。
+		gizmoLine_->SetLineWidth(0.08f);
+		for (auto& [name, e] : group->emitters) {
+			if (!e) continue;
+			RegisterAccelerationFieldGizmos(e.get(), group->translate);
+		}
+		gizmoLine_->SetColor({ 0.5f, 1.0f, 0.2f, 1.0f });
+		gizmoLine_->DrawLine();
+		gizmoLine_->SetLineWidth(0.0f); // 以降のバッチは通常の細線に戻す
 	}
 
 	/// <summary>
 	/// 単一エミッタのフォースフィールド範囲を gizmoLine_ に線分登録（DrawLine は呼び出し側が発行）
 	/// </summary>
-	void GpuEmitManager::RegisterForceFieldGizmos(const EmitterData* e, const Vector3& groupOrigin)
+	void YGpuEmitManager::RegisterForceFieldGizmos(const EmitterData* e, const Vector3& groupOrigin)
 	{
 		if (!e) return;
 
@@ -263,9 +283,37 @@ namespace YoRigine {
 	}
 
 	/// <summary>
+	/// 単一エミッタのアクセラレーションフィールド範囲を gizmoLine_ に線分登録（DrawLine は呼び出し側が発行）
+	/// </summary>
+	void YGpuEmitManager::RegisterAccelerationFieldGizmos(const EmitterData* e, const Vector3& groupOrigin)
+	{
+		if (!e) return;
+
+		for (const auto& af : e->accelerationFields) {
+			if (!af.isEnable) continue;
+
+			const Vector3 center = groupOrigin + af.center;
+
+			// フィールドの外形
+			if (af.shape == GpuFieldShape::Sphere) {
+				gizmoLine_->DrawSphere(center, af.radius, 16);
+			} else {
+				gizmoLine_->DrawAABB(center - af.halfExtents, center + af.halfExtents);
+			}
+
+			// 加速方向の矢印
+			Vector3 d = af.direction;
+			float len = std::sqrt(d.x * d.x + d.y * d.y + d.z * d.z);
+			d = (len < 1e-4f) ? Vector3{ 0.0f, 1.0f, 0.0f } : d * (1.0f / len);
+			const float guide = (af.shape == GpuFieldShape::Sphere) ? af.radius : af.halfExtents.y;
+			gizmoLine_->RegisterLine(center, center + d * guide);
+		}
+	}
+
+	/// <summary>
 	/// 単一エミッタの形状を gizmoLine_ に線分登録（DrawLine は呼び出し側が発行）
 	/// </summary>
-	void GpuEmitManager::RegisterEmitterGizmo(const EmitterData* e, const Vector3& worldPos)
+	void YGpuEmitManager::RegisterEmitterGizmo(const EmitterData* e, const Vector3& worldPos)
 	{
 		if (!e) return;
 
@@ -329,6 +377,52 @@ namespace YoRigine {
 			// メッシュ境界の取得は重いので、発生位置に小さなマーカー球のみ
 			gizmoLine_->DrawSphere(worldPos, 0.5f, 8);
 			break;
+
+		case EmitterShape::Ring:
+		{
+			// 内周・外周の2つの円をリング面（法線に直交する平面）上に描く
+			const auto& rp = e->ringParams;
+
+			Vector3 n = rp.normal;
+			float nlen = std::sqrt(n.x * n.x + n.y * n.y + n.z * n.z);
+			n = (nlen < 1e-4f) ? Vector3{ 0.0f, 1.0f, 0.0f } : n * (1.0f / nlen);
+
+			// n に平行になりにくい軸を選んで外積の縮退を避ける（shader 側 BuildPlaneBasis と同じ考え方）
+			Vector3 helper = (std::fabs(n.y) < 0.9f) ? Vector3{ 0.0f, 1.0f, 0.0f } : Vector3{ 1.0f, 0.0f, 0.0f };
+			Vector3 u = { helper.y * n.z - helper.z * n.y, helper.z * n.x - helper.x * n.z, helper.x * n.y - helper.y * n.x };
+			float ulen = std::sqrt(u.x * u.x + u.y * u.y + u.z * u.z);
+			if (ulen > 1e-4f) u = u * (1.0f / ulen);
+			Vector3 v = { n.y * u.z - n.z * u.y, n.z * u.x - n.x * u.z, n.x * u.y - n.y * u.x };
+
+			const int seg = 24;
+			const float twoPi = 6.28318530718f;
+			for (float radius : { rp.innerRadius, rp.outerRadius }) {
+				Vector3 prev{};
+				for (int i = 0; i <= seg; ++i) {
+					float a = twoPi * float(i) / float(seg);
+					Vector3 p = worldPos + (u * std::cos(a) + v * std::sin(a)) * radius;
+					if (i > 0) gizmoLine_->RegisterLine(prev, p);
+					prev = p;
+				}
+			}
+			// 法線方向のガイド線
+			gizmoLine_->RegisterLine(worldPos, worldPos + n * rp.outerRadius * 0.5f);
+			break;
+		}
+
+		case EmitterShape::Line:
+		{
+			// worldPos は中点。ローカルの start/end を中点基準で復元して描く
+			const auto& lp = e->lineParams;
+			const Vector3 localMid = (lp.start + lp.end) * 0.5f;
+			const Vector3 s = worldPos + (lp.start - localMid);
+			const Vector3 t = worldPos + (lp.end - localMid);
+			gizmoLine_->RegisterLine(s, t);
+			// 端点マーカー
+			gizmoLine_->DrawSphere(s, 0.2f, 8);
+			gizmoLine_->DrawSphere(t, 0.2f, 8);
+			break;
+		}
 		}
 	}
 #endif
@@ -337,7 +431,7 @@ namespace YoRigine {
 	/// エミッターのパラメータを更新
 	/// </summary>
 	/// <param name="emitterData"></param>
-	void GpuEmitManager::UpdateParticleParams(EmitterData* emitterData)
+	void YGpuEmitManager::UpdateParticleParams(EmitterData* emitterData)
 	{
 		if (!emitterData || !emitterData->emitter) return;
 
@@ -353,12 +447,12 @@ namespace YoRigine {
 	/// <param name="groupName"></param>
 	/// <param name="position"></param>
 	/// <param name="count"></param>
-	void GpuEmitManager::EmitGroups(const std::string& groupName, const Vector3& position, float count)
+	void YGpuEmitManager::EmitGroups(const std::string& groupName, const Vector3& position, float count)
 	{
 		// グループを検索
 		auto groupIt = groups_.find(groupName);
 		if (groupIt == groups_.end()) {
-			Logger("GpuEmitManager::EmitGroups() : エミッターグループが見つかりません");
+			Logger("YGpuEmitManager::EmitGroups() : エミッターグループが見つかりません");
 			return;
 		}
 
@@ -389,7 +483,7 @@ namespace YoRigine {
 	/// <summary>
 	/// グループ内の最大パーティクル寿命を取得（発生停止後の linger 時間見積り用）
 	/// </summary>
-	float GpuEmitManager::GetGroupMaxLifetime(const EmitterGroup* group) const
+	float YGpuEmitManager::GetGroupMaxLifetime(const EmitterGroup* group) const
 	{
 		float maxLife = 0.5f; // 最低保証（空グループ等でも最小限ティックする）
 		if (!group) return maxLife;
@@ -409,7 +503,7 @@ namespace YoRigine {
 	/// グループの「自然な寿命」の見積り（秒）。GetGroupMaxLifetime の public wrapper。
 	/// Composite::NaturalDuration() の集計に使う。存在しないグループは 0 を返す（=不明扱い）。
 	/// </summary>
-	float GpuEmitManager::EstimateGroupNaturalDuration(const std::string& groupName) const
+	float YGpuEmitManager::EstimateGroupNaturalDuration(const std::string& groupName) const
 	{
 		auto it = groups_.find(groupName);
 		if (it == groups_.end() || !it->second) return 0.0f;
@@ -419,7 +513,7 @@ namespace YoRigine {
 	/// <summary>
 	/// エミッターの形状ごとのローカル発生位置（オフセット）を取得
 	/// </summary>
-	Vector3 GpuEmitManager::GetEmitterLocalOffset(const EmitterData* emitterData) const
+	Vector3 YGpuEmitManager::GetEmitterLocalOffset(const EmitterData* emitterData) const
 	{
 		if (!emitterData) return { 0.0f, 0.0f, 0.0f };
 		switch (emitterData->shape) {
@@ -428,6 +522,10 @@ namespace YoRigine {
 		case EmitterShape::Triangle: return emitterData->triangleParams.translate;
 		case EmitterShape::Cone:     return emitterData->coneParams.translate;
 		case EmitterShape::Mesh:     return emitterData->meshParams.translate;
+		case EmitterShape::Ring:     return emitterData->ringParams.translate;
+		case EmitterShape::Line:
+			// 線分はローカル中点を代表点として扱う（YGpuEmitter 側も中点基準で移動する）
+			return (emitterData->lineParams.start + emitterData->lineParams.end) * 0.5f;
 		}
 		return { 0.0f, 0.0f, 0.0f };
 	}
@@ -435,7 +533,7 @@ namespace YoRigine {
 	/// <summary>
 	/// グループのワールド原点を移動
 	/// </summary>
-	void GpuEmitManager::SetGroupPosition(const std::string& groupName, const Vector3& pos)
+	void YGpuEmitManager::SetGroupPosition(const std::string& groupName, const Vector3& pos)
 	{
 		EmitterGroup* group = GetGroup(groupName);
 		if (group) group->translate = pos;
@@ -444,7 +542,7 @@ namespace YoRigine {
 	/// <summary>
 	/// グループが存在するか
 	/// </summary>
-	bool GpuEmitManager::HasGroup(const std::string& groupName) const
+	bool YGpuEmitManager::HasGroup(const std::string& groupName) const
 	{
 		return groups_.count(groupName) > 0;
 	}
@@ -452,18 +550,18 @@ namespace YoRigine {
 	/// <summary>
 	/// グループが再生中か
 	/// </summary>
-	bool GpuEmitManager::IsGroupPlaying(const std::string& groupName) const
+	bool YGpuEmitManager::IsGroupPlaying(const std::string& groupName) const
 	{
 		auto it = groups_.find(groupName);
 		return it != groups_.end() && it->second->isPlaying;
 	}
 	/// <summary>
-	/// エミッター管理用の ImGui 描画。UI本体は GpuEmitManagerEditorUI に分離済み (神クラス対策)。
+	/// エミッター管理用の ImGui 描画。UI本体は YGpuEmitManagerEditorUI に分離済み (神クラス対策)。
 	/// </summary>
-	void GpuEmitManager::DrawImGui()
+	void YGpuEmitManager::DrawImGui()
 	{
 #ifdef USE_IMGUI
-		GpuEmitManagerEditorUI::DrawImGui(*this);
+		YGpuEmitManagerEditorUI::DrawImGui(*this);
 #endif
 	}
 
@@ -473,7 +571,7 @@ namespace YoRigine {
 	/// <summary>
 	/// 新しいエミッターを作成
 	/// </summary>
-	GpuEmitManager::EmitterData* GpuEmitManager::CreateEmitter(const std::string& groupName, const std::string& emitterName, std::string& texturePath, EmitterShape shape)
+	YGpuEmitManager::EmitterData* YGpuEmitManager::CreateEmitter(const std::string& groupName, const std::string& emitterName, std::string& texturePath, EmitterShape shape)
 	{
 		EmitterGroup* group = GetGroup(groupName);
 		// グループが存在しない
@@ -488,9 +586,9 @@ namespace YoRigine {
 		newEmitterData->shape = shape;
 		newEmitterData->isActive = true;
 		newEmitterData->texturePath = texturePath;
-		newEmitterData->emitter = std::make_unique<GPUEmitter>();
+		newEmitterData->emitter = std::make_unique<YGpuEmitter>();
 
-		// GPUEmitter の初期化
+		// YGpuEmitter の初期化
 		newEmitterData->emitter->Initialize(camera_, texturePath);
 		newEmitterData->emitter->SetEmitterShape(shape);
 
@@ -505,7 +603,7 @@ namespace YoRigine {
 	/// <summary>
 	/// エミッターを 1 つ削除
 	/// </summary>
-	void GpuEmitManager::DeleteEmitter(const std::string& groupName, const std::string& emitterName)
+	void YGpuEmitManager::DeleteEmitter(const std::string& groupName, const std::string& emitterName)
 	{
 		EmitterGroup* group = GetGroup(groupName);
 		if (!group) return;
@@ -521,14 +619,30 @@ namespace YoRigine {
 	/// <summary>
 	/// 全エミッター削除
 	/// </summary>
-	void GpuEmitManager::DeleteAllEmitters()
+	void YGpuEmitManager::DeleteAllEmitters()
 	{
 		for (auto& [name, data] : groups_) {
 			data->emitters.clear();
 		}
 	}
 
-	GpuEmitManager::EmitterGroup* GpuEmitManager::GetGroup(const std::string& groupName)
+	/// <summary>
+	/// 実行時のテクスチャ差し替え（YParticleSystem::SetTexture 相当）
+	/// </summary>
+	void YGpuEmitManager::SetEmitterTexture(const std::string& groupName, const std::string& emitterName, const std::string& texturePath)
+	{
+		EmitterGroup* group = GetGroup(groupName);
+		if (!group) return;
+
+		auto it = group->emitters.find(emitterName);
+		if (it == group->emitters.end()) return;
+
+		EmitterData* data = it->second.get();
+		data->texturePath = texturePath;
+		data->emitter->SetTexture(texturePath);
+	}
+
+	YGpuEmitManager::EmitterGroup* YGpuEmitManager::GetGroup(const std::string& groupName)
 	{
 		if (groups_.count(groupName)) {
 			return groups_.at(groupName).get();
@@ -536,11 +650,11 @@ namespace YoRigine {
 		return nullptr;
 	}
 
-	GpuEmitManager::EmitterGroup* GpuEmitManager::CreateEmitterGroup(const std::string& groupName, const std::string& sourceFilePath)
+	YGpuEmitManager::EmitterGroup* YGpuEmitManager::CreateEmitterGroup(const std::string& groupName, const std::string& sourceFilePath)
 	{
 		// 1. グループ名で重複がないかチェック（非致命: 既存を返さず nullptr。ログのみ）
 		if (groups_.count(groupName)) {
-			Logger("GpuEmitManager: グループ名 '" + groupName + "' は既に存在するため作成をスキップ");
+			Logger("YGpuEmitManager: グループ名 '" + groupName + "' は既に存在するため作成をスキップ");
 			return nullptr;
 		}
 
@@ -566,11 +680,11 @@ namespace YoRigine {
 		return nullptr;
 	}
 	
-	void GpuEmitManager::DeleteEmitterGroup(const std::string& groupName)
+	void YGpuEmitManager::DeleteEmitterGroup(const std::string& groupName)
 	{
 		auto it = groups_.find(groupName);
 		if (it == groups_.end()) {
-			Logger("GpuEmitManager: 削除対象グループ '" + groupName + "' が見つかりません");
+			Logger("YGpuEmitManager: 削除対象グループ '" + groupName + "' が見つかりません");
 			return;
 		}
 
@@ -592,7 +706,7 @@ namespace YoRigine {
 		}
 	}
 
-	void GpuEmitManager::DeleteAllEmitterGroups()
+	void YGpuEmitManager::DeleteAllEmitterGroups()
 	{
 		// グループコンテナ全体をクリア
 		groups_.clear();
@@ -602,7 +716,7 @@ namespace YoRigine {
 		selectedEmitterName_.clear();
 	}
 
-	void GpuEmitManager::PlayEmitterGroup(const std::string& groupName)
+	void YGpuEmitManager::PlayEmitterGroup(const std::string& groupName)
 	{
 		EmitterGroup* group = GetGroup(groupName);
 		if (!group)return;
@@ -623,7 +737,7 @@ namespace YoRigine {
 		}
 	}
 
-	void GpuEmitManager::StopEmitterGroup(const std::string& groupName)
+	void YGpuEmitManager::StopEmitterGroup(const std::string& groupName)
 	{
 		EmitterGroup* group = GetGroup(groupName);
 		if (!group)return;
@@ -638,7 +752,7 @@ namespace YoRigine {
 		group->lingerTimer = std::max(group->lingerTimer, GetGroupMaxLifetime(group));
 	}
 
-	void GpuEmitManager::StopAllEmitterGroups()
+	void YGpuEmitManager::StopAllEmitterGroups()
 	{
 		for (auto& [name, group] : groups_) {
 			group->isPlaying = false;
@@ -647,9 +761,9 @@ namespace YoRigine {
 		}
 	}
 
-	void GpuEmitManager::SetCamera(YoRigine::Camera* camera)
+	void YGpuEmitManager::SetCamera(YoRigine::Camera* camera)
 	{
-		// GpuEmitManager 自身のカメラポインタを更新
+		// YGpuEmitManager 自身のカメラポインタを更新
 		camera_ = camera;
 #ifdef USE_IMGUI
 		if (gizmoLine_) gizmoLine_->SetCamera(camera);
@@ -658,7 +772,7 @@ namespace YoRigine {
 		for (auto& [groupName, groupData] : groups_) {
 			for (auto& [emitterName, emitterDataPtr] : groupData->emitters) {
 				if (emitterDataPtr) {
-					GPUEmitter* emitter = emitterDataPtr->emitter.get();
+					YGpuEmitter* emitter = emitterDataPtr->emitter.get();
 					if (emitter) {
 						emitter->SetCamera(camera);
 					}
@@ -670,7 +784,7 @@ namespace YoRigine {
 	/// <summary>
 	/// エミッター名からデータ取得
 	/// </summary>
-	GpuEmitManager::EmitterData* GpuEmitManager::GetEmitter(const std::string& groupName, const std::string& emitterName)
+	YGpuEmitManager::EmitterData* YGpuEmitManager::GetEmitter(const std::string& groupName, const std::string& emitterName)
 	{
 		EmitterGroup* group = GetGroup(groupName);
 		if (!group) return nullptr;
@@ -684,7 +798,7 @@ namespace YoRigine {
 	/// <summary>
 	/// 全エミッター名リスト取得
 	/// </summary>
-	std::vector<std::string> GpuEmitManager::GetEmitterNames() const
+	std::vector<std::string> YGpuEmitManager::GetEmitterNames() const
 	{
 		std::vector<std::string> names;
 		for (const auto& [groupName, groupPtr] : groups_) {
@@ -698,7 +812,7 @@ namespace YoRigine {
 	/// <summary>
 	/// ロード済みグループ名の一覧
 	/// </summary>
-	std::vector<std::string> GpuEmitManager::GetGroupNames() const
+	std::vector<std::string> YGpuEmitManager::GetGroupNames() const
 	{
 		std::vector<std::string> names;
 		names.reserve(groups_.size());
@@ -711,7 +825,7 @@ namespace YoRigine {
 	/// <summary>
 	/// 指定エミッターが存在するか
 	/// </summary>
-	bool GpuEmitManager::HasEmitter(const std::string& emitterName) const
+	bool YGpuEmitManager::HasEmitter(const std::string& emitterName) const
 	{
 		for (const auto& [groupName, groupPtr] : groups_) {
 			if (groupPtr->emitters.count(emitterName)) {
@@ -722,9 +836,9 @@ namespace YoRigine {
 	}
 
 	/// <summary>
-	/// エミッターの形状パラメータを GPUEmitter に反映
+	/// エミッターの形状パラメータを YGpuEmitter に反映
 	/// </summary>
-	void GpuEmitManager::UpdateEmitterParams(EmitterData* emitterData)
+	void YGpuEmitManager::UpdateEmitterParams(EmitterData* emitterData)
 	{
 		if (!emitterData || !emitterData->emitter) {
 			return;
@@ -776,13 +890,29 @@ namespace YoRigine {
 			);
 		}
 		break;
+		case EmitterShape::Ring:
+		{
+			const auto& p = emitterData->ringParams;
+			emitterData->emitter->UpdateRingParams(
+				p.translate, p.normal, p.innerRadius, p.outerRadius, p.count, p.emitInterval
+			);
+		}
+		break;
+		case EmitterShape::Line:
+		{
+			const auto& p = emitterData->lineParams;
+			emitterData->emitter->UpdateLineParams(
+				p.start, p.end, p.count, p.emitInterval
+			);
+		}
+		break;
 		}
 	}
 
 	/// <summary>
 	/// JSON ファイルとしてエミッター情報を保存
 	/// </summary>
-	bool GpuEmitManager::SaveToFile(const std::string& filepath)
+	bool YGpuEmitManager::SaveToFile(const std::string& filepath)
 	{
 		try
 		{
@@ -811,11 +941,11 @@ namespace YoRigine {
 	/// グループ単位で、そのグループ自身の sourceFilePath に保存する。
 	/// 1ファイル1グループを基本とし、複数グループが1ファイルに混ざるのを防ぐ。
 	/// </summary>
-	bool GpuEmitManager::SaveGroupToFile(const std::string& groupName)
+	bool YGpuEmitManager::SaveGroupToFile(const std::string& groupName)
 	{
 		EmitterGroup* group = GetGroup(groupName);
 		if (!group) {
-			Logger("GpuEmitManager::SaveGroupToFile : グループ '" + groupName + "' が見つかりません");
+			Logger("YGpuEmitManager::SaveGroupToFile : グループ '" + groupName + "' が見つかりません");
 			return false;
 		}
 
@@ -838,12 +968,12 @@ namespace YoRigine {
 
 			std::ofstream file(group->sourceFilePath);
 			if (!file.is_open()) {
-				Logger("GpuEmitManager::SaveGroupToFile : ファイルを開けません " + group->sourceFilePath);
+				Logger("YGpuEmitManager::SaveGroupToFile : ファイルを開けません " + group->sourceFilePath);
 				return false;
 			}
 
 			file << json.dump(4);
-			Logger("GpuEmitManager: グループ '" + groupName + "' を保存 → " + group->sourceFilePath);
+			Logger("YGpuEmitManager: グループ '" + groupName + "' を保存 → " + group->sourceFilePath);
 			return true;
 		}
 		catch (const std::exception& e)
@@ -856,7 +986,7 @@ namespace YoRigine {
 	/// <summary>
 	/// JSON ファイルからエミッター情報を読み込み
 	/// </summary>
-	bool GpuEmitManager::LoadFromFile(const std::string& filepath)
+	bool YGpuEmitManager::LoadFromFile(const std::string& filepath)
 	{
 		try
 		{
@@ -884,7 +1014,7 @@ namespace YoRigine {
 	/// </summary>
 	/// <param name="directory"></param>
 	/// <returns></returns>
-	bool GpuEmitManager::LoadAllEmitters(const std::string& directory)
+	bool YGpuEmitManager::LoadAllEmitters(const std::string& directory)
 	{
 		ScanJsonDirectory(directory);
 		bool allSucceeded = true; // 初期値は成功
@@ -910,7 +1040,7 @@ namespace YoRigine {
 	/// <summary>
 	/// 全エミッターを JSON 化
 	/// </summary>
-	nlohmann::json GpuEmitManager::ToJson() const
+	nlohmann::json YGpuEmitManager::ToJson() const
 	{
 		nlohmann::json json;
 		json["version"] = "1.0";
@@ -931,9 +1061,10 @@ namespace YoRigine {
 	/// 調整パラメータを増やすときはここに .Add() を1行足すだけ。
 	/// key 名は既存JSONと一致させ後方互換を保つ（child.* は "trailXxx" にフラット化）。
 	/// </summary>
-	void GpuEmitManager::BuildEmitterSchema(EmitterData& e,
+	void YGpuEmitManager::BuildEmitterSchema(EmitterData& e,
 		AutoJson& root, AutoJson& sphere, AutoJson& box, AutoJson& tri,
-		AutoJson& cone, AutoJson& mesh, AutoJson& particle, AutoJson& particleMesh) const
+		AutoJson& cone, AutoJson& mesh, AutoJson& particle, AutoJson& particleMesh,
+		AutoJson& ring, AutoJson& line) const
 	{
 		auto& sp = e.sphereParams;
 		sphere.Add("translate", &sp.translate).Add("radius", &sp.radius)
@@ -951,6 +1082,15 @@ namespace YoRigine {
 		cone.Add("translate", &cp.translate).Add("direction", &cp.direction)
 			.Add("radius", &cp.radius).Add("height", &cp.height)
 			.Add("count", &cp.count).Add("emitInterval", &cp.emitInterval);
+
+		auto& rp = e.ringParams;
+		ring.Add("translate", &rp.translate).Add("normal", &rp.normal)
+			.Add("innerRadius", &rp.innerRadius).Add("outerRadius", &rp.outerRadius)
+			.Add("count", &rp.count).Add("emitInterval", &rp.emitInterval);
+
+		auto& lp = e.lineParams;
+		line.Add("start", &lp.start).Add("end", &lp.end)
+			.Add("count", &lp.count).Add("emitInterval", &lp.emitInterval);
 
 		// meshParams: model ポインタだけは名前で特別扱いするため schema には含めない
 		auto& mp = e.meshParams;
@@ -984,12 +1124,25 @@ namespace YoRigine {
 		root.Add("name", &e.name).Add("shape", &e.shape)
 			.Add("isActive", &e.isActive).Add("textureFilePath", &e.texturePath)
 			.Add("particleMeshShape", &e.particleMeshShape)
-			.Add("forceFields", &e.forceFields);
+			.Add("forceFields", &e.forceFields)
+			.Add("noiseFields", &e.noiseFields)
+			.Add("accelerationFields", &e.accelerationFields)
+			// 拡張Paramモジュール（キーはモジュール単位。集約構造体化しても既存JSONと互換）
+			.Add("uvScrollParams", &e.extModules.uvScroll)
+			.Add("scalePulseParams", &e.extModules.scalePulse)
+			.Add("colorFlickerParams", &e.extModules.colorFlicker)
+			.Add("dragParams", &e.extModules.drag)
+			.Add("stretchByVelocityParams", &e.extModules.stretch)
+			.Add("bounceParams", &e.extModules.bounce)
+			.Add("emissiveParams", &e.extModules.emissive)
+			.Add("flipbookParams", &e.extModules.flipbook);
 		root.AddGroup("sphereParams", sphere)
 			.AddGroup("boxParams", box)
 			.AddGroup("triangleParams", tri)
 			.AddGroup("coneParams", cone)
 			.AddGroup("meshParams", mesh)
+			.AddGroup("ringParams", ring)
+			.AddGroup("lineParams", line)
 			.AddGroup("particleParams", particle)
 			.AddGroup("particleMeshParams", particleMesh);
 	}
@@ -997,10 +1150,10 @@ namespace YoRigine {
 	/// <summary>
 	/// エミッタ1つ → JSON。model ポインタだけは名前(modelName)で書き出す特別扱い。
 	/// </summary>
-	nlohmann::json GpuEmitManager::SerializeEmitter(EmitterData& e) const
+	nlohmann::json YGpuEmitManager::SerializeEmitter(EmitterData& e) const
 	{
-		AutoJson root, sphere, box, tri, cone, mesh, particle, particleMesh;
-		BuildEmitterSchema(e, root, sphere, box, tri, cone, mesh, particle, particleMesh);
+		AutoJson root, sphere, box, tri, cone, mesh, particle, particleMesh, ring, line;
+		BuildEmitterSchema(e, root, sphere, box, tri, cone, mesh, particle, particleMesh, ring, line);
 
 		nlohmann::json j;
 		root.Save(j);
@@ -1012,23 +1165,23 @@ namespace YoRigine {
 	/// <summary>
 	/// JSON → 生成済みエミッタ。model は modelName から解決する。
 	/// </summary>
-	void GpuEmitManager::DeserializeEmitter(EmitterData& e, const nlohmann::json& j) const
+	void YGpuEmitManager::DeserializeEmitter(EmitterData& e, const nlohmann::json& j) const
 	{
-		AutoJson root, sphere, box, tri, cone, mesh, particle, particleMesh;
-		BuildEmitterSchema(e, root, sphere, box, tri, cone, mesh, particle, particleMesh);
+		AutoJson root, sphere, box, tri, cone, mesh, particle, particleMesh, ring, line;
+		BuildEmitterSchema(e, root, sphere, box, tri, cone, mesh, particle, particleMesh, ring, line);
 		root.Load(j);
 
 		// 特別扱い: modelName から YoRigine::Model* を解決
 		if (j.contains("meshParams")) {
 			const std::string modelName = j["meshParams"].value("modelName", std::string{});
 			if (!modelName.empty()) {
-				assert(modelManager_ && "GpuEmitManager : SetModelManager() を先に呼ぶこと");
+				assert(modelManager_ && "YGpuEmitManager : SetModelManager() を先に呼ぶこと");
 				e.meshParams.model = modelManager_->FindModel(modelName);
 			}
 		}
 	}
 
-	nlohmann::json GpuEmitManager::ToJsonGroup(const EmitterGroup* groupPtr) const
+	nlohmann::json YGpuEmitManager::ToJsonGroup(const EmitterGroup* groupPtr) const
 	{
 		nlohmann::json groupJson;
 		if (!groupPtr) return groupJson;
@@ -1057,7 +1210,7 @@ namespace YoRigine {
 	/// <summary>
 	/// JSON からエミッター情報を復元
 	/// </summary>
-	bool GpuEmitManager::FromJson(const nlohmann::json& json, const std::string& sourceFilePath)
+	bool YGpuEmitManager::FromJson(const nlohmann::json& json, const std::string& sourceFilePath)
 	{
 		try
 		{
@@ -1114,7 +1267,7 @@ namespace YoRigine {
 	/// <summary>
 	/// JSONから単一のエミッター情報を復元
 	/// </summary>
-	bool GpuEmitManager::LoadEmitterFromJson(const std::string& groupName, const nlohmann::json& j)
+	bool YGpuEmitManager::LoadEmitterFromJson(const std::string& groupName, const nlohmann::json& j)
 	{
 		// エミッタ生成には name/shape/texturePath が先に必要なので、この3つだけ直接読む。
 		// 残りの全フィールドは DeserializeEmitter（AutoJson スキーマ）が一括で流し込む。
@@ -1140,7 +1293,7 @@ namespace YoRigine {
 		return true;
 	}
 	// 画像一覧をスキャン
-	void GpuEmitManager::ScanTextureDirectory(const std::string& directory)
+	void YGpuEmitManager::ScanTextureDirectory(const std::string& directory)
 	{
 		currentTextureDir_ = directory;
 		availableTextures_.clear();
@@ -1169,7 +1322,7 @@ namespace YoRigine {
 		}
 	}
 	// JSONファイル一覧をスキャン
-	void GpuEmitManager::ScanJsonDirectory(const std::string& directory)
+	void YGpuEmitManager::ScanJsonDirectory(const std::string& directory)
 	{
 		// ディレクトリが存在しない、またはディレクトリでない場合はクリアして終了
 		if (!std::filesystem::exists(directory) || !std::filesystem::is_directory(directory)) {

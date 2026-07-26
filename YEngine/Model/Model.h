@@ -72,8 +72,11 @@ public:
 
   // インスタンシング描画 (ObjectInstanced PSO 使用、skinning未対応)
   // instanceSRV: StructuredBuffer<InstanceData> の GPU descriptor handle
+  // overrideTexturePath: 空でなければモデル既定テクスチャの代わりにこれを貼る
+  // (非インスタンスの Model::Draw と同じアクセントテクスチャ差し替えをバッチ単位で行う)
   void DrawInstanced(uint32_t instanceCount,
-                     D3D12_GPU_DESCRIPTOR_HANDLE instanceSRV);
+                     D3D12_GPU_DESCRIPTOR_HANDLE instanceSRV,
+                     const std::string &overrideTexturePath = "");
   // インスタンシング影描画 (ShadowMapInstanced PSO 使用)
   void DrawShadowInstanced(uint32_t instanceCount,
                            D3D12_GPU_DESCRIPTOR_HANDLE instanceSRV);

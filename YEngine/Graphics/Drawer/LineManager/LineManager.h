@@ -30,6 +30,11 @@ public:
 	///************************* アクセッサ *************************///
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> GetRootSignature() { return rootSignature_.Get(); }
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> GetGraphicsPiplineState() { return graphicsPipelineState_.Get(); }
+
+	// 太線モード(TRIANGLELISTで四角形として描く)用。PSOのPrimitiveTopologyTypeが
+	// 細線用と異なるため別のRootSignature/PSOを使う（Line::SetLineWidthで切り替え）。
+	Microsoft::WRL::ComPtr<ID3D12RootSignature> GetRootSignatureThick() { return rootSignatureThick_.Get(); }
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> GetGraphicsPiplineStateThick() { return graphicsPipelineStateThick_.Get(); }
 private:
 	// シングルトン
 	LineManager(const LineManager&) = delete;
@@ -41,6 +46,8 @@ private:
 	YoRigine::DirectXCommon* dxCommon_ = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature_;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> graphicsPipelineState_;
+	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignatureThick_;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> graphicsPipelineStateThick_;
 
 };
 

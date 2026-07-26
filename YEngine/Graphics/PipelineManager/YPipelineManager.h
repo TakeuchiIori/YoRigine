@@ -135,7 +135,7 @@ private:
   /// </summary>
   void CreatePSO_ObjectOutlineInstanced();
 
-  void CreatePSO_GPUParticleALLBlendModes();
+  void CreatePSO_YGpuParticleALLBlendModes();
   void CreatePSO_YParticleAllBlendModes();
   /// <summary>
   /// 手動ルートシグネチャビルダーを使用したオブジェクト用パイプライン
@@ -150,7 +150,7 @@ private:
   /// <summary>
   /// GPUパーティクル初期化用パイプライン
   /// </summary>
-  void CreatePSO_GPUParticleInit();
+  void CreatePSO_YGpuParticleInit();
 
   /// <summary>
   /// ライン描画用パイプライン
