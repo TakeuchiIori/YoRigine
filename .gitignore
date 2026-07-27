@@ -368,6 +368,13 @@ FodyWeavers.xsd
 !externals/assimp/lib/Release/
 !externals/assimp/lib/Release/*.lib
 
+# DirectXTex の事前ビルド版 lib フォルダを除外対象から外す（毎回コンパイルしない方式）
+!Externals/DirectXTex/lib/
+!Externals/DirectXTex/lib/Debug/
+!Externals/DirectXTex/lib/Debug/*.lib
+!Externals/DirectXTex/lib/Release/
+!Externals/DirectXTex/lib/Release/*.lib
+
 # Visual Studio solution and project files
 *.sln
 *.vcxproj

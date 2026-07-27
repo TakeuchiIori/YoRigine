@@ -28,7 +28,13 @@
 #include <algorithm>
 #include <utility>
 #include <optional>
+// 並行処理 / 時間系（それぞれ単体で重く、複数ファイルで使われるため集約）
+// 特に C++20 の <chrono> はカレンダー/タイムゾーンを抱え非常に重い(~0.7s/TU)。
 #include <mutex>
+#include <thread>
+#include <atomic>
+#include <future>
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <sstream>

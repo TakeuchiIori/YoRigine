@@ -1,4 +1,5 @@
 #include "YWebApiManager.h"
+#include <curl/curl.h>   // curl 実体はこの .cpp だけで使う（.h には持ち込まない）
 #include <iostream>
 #include <thread>
 

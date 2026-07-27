@@ -1,6 +1,9 @@
 #pragma once
 
-#include <curl/curl.h>
+// curl/curl.h は非常に重く(Windowsでは winsock2 等を芋づるで引き込む)、この .h を
+// include する全ファイルがそのコストを払う。ハンドルはポインタとしてしか使わないため、
+// ここでは curl.h を include せず void* で保持し、実体の include は .cpp 側だけに留める。
+// (libcurl では `typedef void CURL;` なので void* と CURL* は同一型)
 #include <functional>
 #include <json.hpp>
 #include <mutex>
@@ -101,8 +104,8 @@ private:
     // ログの保存
     std::vector<std::string> logs_;
 
-    // cURLのハンドル
-    CURL* curl_ = nullptr;
+    // cURLのハンドル (実体は CURL* = void*。curl.h を .h に持ち込まないため void* で保持)
+    void* curl_ = nullptr;
 
     // 非同期リクエストの結果待ちキュー（別スレッド→メインスレッドの受け渡し用）。
     // 呼び出し側のコールバック引数の型に依らないよう、結果を包んだ関数として溜める。
