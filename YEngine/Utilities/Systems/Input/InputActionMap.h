@@ -51,6 +51,8 @@ struct InputAxisBinding {
   BYTE keyLeft = 0;
   BYTE keyRight = 0;
   float deadzone = 0.2f;
+  // 「この軸を倒した」と通知する閾値。倒し量がこれを跨いだ瞬間に観測者へ知らせる。
+  float signalThreshold = 0.5f;
 };
 
 // 軸の評価結果。
@@ -125,9 +127,16 @@ public:
   // 最後に入力があったデバイス。入力が無い間は直前の値を保持する。
   InputDeviceKind LastDevice() const { return lastDevice_; }
 
-  // アクションが押された瞬間に呼ばれる。チュートリアル等の購読用。
-  // ゲートで無効化されたアクションは通知しない。
-  void SetTriggerObserver(std::function<void(const std::string &)> observer) {
+  // 入力の立ち上がりの種類。観測者はこれで区別する。
+  enum class EventKind {
+    ActionTriggered, // ボタン系アクションを押した瞬間
+    AxisEngaged,     // 軸の倒し量が signalThreshold を超えた瞬間
+  };
+
+  // 入力の立ち上がりを通知する。チュートリアル等の購読用。
+  // ゲートで無効化されている名前は通知しない。
+  void SetTriggerObserver(
+      std::function<void(const std::string &, EventKind)> observer) {
     triggerObserver_ = std::move(observer);
   }
 
@@ -181,6 +190,8 @@ private:
   NameMap<InputAxisBinding> axes_;
   NameMap<ActionState> actionStates_;
   NameMap<InputAxisValue> axisValues_;
+  // 前フレームの倒し量。閾値を跨いだ瞬間だけ通知するために保持する。
+  NameMap<float> axisPreviousMagnitude_;
 
   // 登録順を保つ名前リスト。エディタ表示とチュートリアルの候補一覧に使う。
   std::vector<std::string> actionNames_;
@@ -189,7 +200,7 @@ private:
   // ゲートで無効化されている名前。アクション／軸を区別せず1つの集合で持つ。
   std::unordered_set<std::string, StringHash, std::equal_to<>> disabled_;
 
-  std::function<void(const std::string &)> triggerObserver_;
+  std::function<void(const std::string &, EventKind)> triggerObserver_;
 
   InputDeviceKind lastDevice_ = InputDeviceKind::Keyboard;
   int32_t playerIndex_ = 0;

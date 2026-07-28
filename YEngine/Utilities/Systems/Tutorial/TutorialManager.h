@@ -21,6 +21,28 @@ namespace YoRigine {
 		Event,
 	};
 
+	// 注目させたいUIを揺らして目立たせる設定。
+	// 暗幕（スポットライト）が「周りを暗くする」のに対し、こちらは「対象を動かす」。
+	// 併用すると分かりやすい。
+	struct TutorialHighlight {
+		bool enabled = false;
+		std::vector<std::string> uiIds;
+		// UIに保存済みのアニメーションクリップ名。指定するとこちらを再生し、
+		// 下のプリセット（pulse / blink）は使わない。
+		// クリップは UIアニメーションエディタで作り、UIのconfig JSONへ保存される。
+		// 新しい動きが欲しいたびにここへフラグを増やさずに済む。
+		std::string clipName;
+		// 拡大縮小の脈動。scaleAmount は最大倍率、seconds は1往復にかける時間。
+		bool pulse = true;
+		float scaleAmount = 1.2f;
+		float pulseSeconds = 0.5f;
+		// 点滅（アルファの明滅）。
+		bool blink = true;
+		float blinkSeconds = 0.8f;
+		// 他のUIに隠れないよう最前面へ持ち上げる。
+		bool bringToFront = true;
+	};
+
 	// 説明中に受け付ける操作の制限。
 	// allow に挙げたアクションだけを有効にし、それ以外を一時的に封じる。
 	// 「回避だけ練習させる」といった誘導に使う。
@@ -64,10 +86,15 @@ namespace YoRigine {
 		TutorialCondition trigger;
 		// 注目させたい場所以外を暗幕で覆う設定。enabled が false なら何もしない。
 		TutorialSpotlightConfig spotlight;
+		// 注目させたいUIを揺らす設定。enabled が false なら targetUIId の従来動作。
+		TutorialHighlight highlight;
 		// 表示中に受け付ける操作の制限。
 		TutorialGate gate;
 		// 一度見たら二度と出さない。既読は TutorialProgress へ保存される。
 		bool once = false;
+		// 表示中のゲーム速度（1.0=等速 / 0.3=スロー）。pauseGameplay が true なら無視される。
+		// hitstop とは掛け算で合成されるので、演出を潰さずに共存する。
+		float gameplaySpeed = 1.0f;
 		TutorialWaitType waitType = TutorialWaitType::Confirm;
 		float waitSeconds = 2.0f;
 		std::string eventName;
@@ -131,6 +158,12 @@ namespace YoRigine {
 		void Start(const TutorialData& data, std::size_t startStep = 0);
 		void Stop();
 		void Update();
+
+		// 説明パネルと暗幕を描画する。
+		// シーンごとに描画レイヤーの扱いが違い（GameUI は特定レイヤーしか描かない）、
+		// UIManager の一括描画に任せると出るシーンと出ないシーンができるため、
+		// どのシーンでも同じ見え方になるよう自前で描く。
+		void Draw();
 		void NotifyEvent(const std::string& eventName);
 		void RegisterEventName(const std::string& eventName);
 		const std::vector<std::string>& GetKnownEventNames() const { return knownEventNames_; }
@@ -162,6 +195,10 @@ namespace YoRigine {
 		// 入力ゲート。
 		void ApplyGate(const TutorialGate& gate);
 		void ReleaseGate();
+
+		// 表示中のゲーム速度。解除まで維持される持続スケールを使う。
+		void ApplyGameplaySpeed(float speed);
+		void ReleaseGameplaySpeed();
 
 		void RefreshRuntimeUI();
 		void HideRuntimeUI();
@@ -219,9 +256,16 @@ namespace YoRigine {
 		float totalElapsed_ = 0.0f;
 		bool hasActiveStep_ = false;
 		bool gateOwned_ = false;
+		bool gameplaySpeedOwned_ = false;
 
-		std::string highlightedUIId_;
-		Vector2 highlightedOriginalScale_{ 1.0f, 1.0f };
+		// 強調を掛けたUIの元の見た目。解除時にここへ戻す。
+		struct HighlightRestore {
+			std::string uiId;
+			std::string clipName;   // クリップ再生の場合のみ。停止に使う。
+			Vector2 scale{ 1.0f, 1.0f };
+			Vector4 color{ 1.0f, 1.0f, 1.0f, 1.0f };
+		};
+		std::vector<HighlightRestore> highlightRestores_;
 
 #ifdef USE_IMGUI
 		TutorialData editorData_;

@@ -10,6 +10,9 @@ namespace {
 // 入力アクション由来のシグナルに付ける接頭辞。
 constexpr const char *kActionTriggeredPrefix = "action.triggered.";
 
+// 軸を倒したときのシグナルに付ける接頭辞。
+constexpr const char *kAxisEngagedPrefix = "action.axis.";
+
 // 接触由来のシグナルに付ける接頭辞。
 constexpr const char *kContactEnterPrefix = "collision.enter.";
 constexpr const char *kContactExitPrefix = "collision.exit.";
@@ -82,14 +85,22 @@ void TutorialSignal::ConnectEngineSources() {
   // これだけで「攻撃ボタンを押す」チュートリアルがゲーム側の改修なしに作れる。
   // 注意: SetTriggerObserver
   // は1枠しかない。他の購読者が要る場合はここを分岐させること。
-  actionMap->SetTriggerObserver([](const std::string &actionName) {
-    Emit(ActionTriggeredName(actionName));
-  });
+  actionMap->SetTriggerObserver(
+      [](const std::string &name, InputActionMap::EventKind kind) {
+        if (kind == InputActionMap::EventKind::AxisEngaged) {
+          Emit(AxisEngagedName(name));
+          return;
+        }
+        Emit(ActionTriggeredName(name));
+      });
 
-  // 登録済みアクションの名前を、まだ押されていなくても候補として載せておく。
+  // 登録済みアクション・軸の名前を、まだ触られていなくても候補として載せておく。
   // エディタで完了条件を選ぶときに一覧へ出したいため。
   for (const std::string &actionName : actionMap->GetActionNames()) {
     RegisterName(ActionTriggeredName(actionName));
+  }
+  for (const std::string &axisName : actionMap->GetAxisNames()) {
+    RegisterName(AxisEngagedName(axisName));
   }
 
   // 接触の開始・終了をシグナルへ変換する。
@@ -133,6 +144,10 @@ void TutorialSignal::RegisterName(const std::string &name) {
 
 std::string TutorialSignal::ActionTriggeredName(const std::string &actionName) {
   return std::string(kActionTriggeredPrefix) + actionName;
+}
+
+std::string TutorialSignal::AxisEngagedName(const std::string &axisName) {
+  return std::string(kAxisEngagedPrefix) + axisName;
 }
 
 } // namespace YoRigine

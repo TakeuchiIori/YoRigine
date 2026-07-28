@@ -12,6 +12,48 @@
     },
     "steps": [
         {
+            "name": "移動してみよう",
+            "speaker": "",
+            "text": "左スティック（または WASD）で移動しよう",
+            "complete": {
+                "type": "signal",
+                "name": "action.axis.Move",
+                "count": 1
+            },
+            "spotlight": {
+                "enabled": true,
+                "dimColor": [ 0.0, 0.0, 0.0, 0.6 ],
+                "padding": 24.0,
+                "fadeSeconds": 0.25,
+                "targets": [
+                    {
+                        "kind": "world",
+                        "id": "Player",
+                        "center": [ 800.0, 450.0 ],
+                        "size": [ 200.0, 100.0 ],
+                        "radius": 1.5
+                    }
+                ]
+            },
+            "gameplaySpeed": 1.0,
+            "once": false,
+            "pauseGameplay": false,
+            "skippable": true,
+            "waitType": "confirm",
+            "waitSeconds": 2.0,
+            "eventName": "",
+            "targetUIId": "",
+            "layout": {
+                "panelPosition": [ 640.0, 570.0 ],
+                "panelSize": [ 1120.0, 240.0 ],
+                "textOffset": [ 0.0, -35.0 ],
+                "textMaxWidth": 1020.0,
+                "hintOffset": [ 0.0, 85.0 ],
+                "hintPanelSize": [ 540.0, 54.0 ]
+            },
+            "additionalUIs": []
+        },
+        {
             "name": "軽攻撃を3回",
             "speaker": "",
             "text": "A ボタンで攻撃だ。3回続けて振ってみよう",
@@ -39,6 +81,7 @@
                 "enabled": true,
                 "allow": [ "Move", "AttackLight" ]
             },
+            "gameplaySpeed": 0.5,
             "once": false,
             "pauseGameplay": false,
             "skippable": true,

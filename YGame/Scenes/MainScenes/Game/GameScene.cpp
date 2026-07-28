@@ -15,6 +15,7 @@
 #include "Sprite/SpriteCommon.h"
 #include "Systems./Input./Input.h"
 #include "Systems/GameTime/GameTime.h"
+#include "Systems/Tutorial/TutorialSpotlight.h"
 #include <Debugger/Logger.h>
 #include <Editor/Editor.h>
 #include <SceneSystems/SceneManager.h>
@@ -126,6 +127,16 @@ void GameScene::Initialize() {
 
   YoRigine::ModelManipulator::GetInstance()->SetCamera(sceneCamera_.get());
   YoRigine::YGpuEmitManager::GetInstance()->SetCamera(sceneCamera_.get());
+
+  //------------------------------------------------------------
+  // チュートリアルのスポットライト
+  //   ワールド上の対象へ穴を開けるには、投影用カメラと位置の取得先が要る。
+  //   位置は関数で渡すので、対象が動いても矩形が追従する。
+  //------------------------------------------------------------
+  auto *spotlight = YoRigine::TutorialSpotlight::GetInstance();
+  spotlight->SetCamera(sceneCamera_.get());
+  spotlight->RegisterWorldTarget(
+      "Player", [this]() { return player_->GetWorldPosition(); });
 
   //------------------------------------------------------------
   // サブシーン管理初期化
@@ -640,6 +651,13 @@ void GameScene::Finalize() {
   YParticleManager::GetInstance().StopAndClearActiveEmitters();
   YoRigine::YGpuEmitManager::GetInstance()->StopAllEmitterGroups();
   YoRigine::JsonManager::ClearSceneInstances("GameScene");
+
+  // スポットライトへ渡したカメラと位置取得の関数は、このシーンの寿命に紐づく。
+  // シングルトン側に残すと解放済みのシーンを参照してしまうため必ず外す。
+  auto *spotlight = YoRigine::TutorialSpotlight::GetInstance();
+  spotlight->ClearWorldTargets();
+  spotlight->SetCamera(nullptr);
+
   if (subSceneManager_)
     subSceneManager_->Finalize();
   subSceneManager_ = nullptr;

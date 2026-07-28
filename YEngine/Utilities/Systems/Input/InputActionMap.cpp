@@ -177,7 +177,7 @@ void InputActionMap::Update() {
     // ゲートで塞がれているアクションは、押されても外部へ通知しない。
     if (state.pressed && !state.previous && triggerObserver_ &&
         IsEnabled(name)) {
-      triggerObserver_(name);
+      triggerObserver_(name, EventKind::ActionTriggered);
     }
   }
 
@@ -198,6 +198,17 @@ void InputActionMap::Update() {
       else
         keyboardUsed = true;
     }
+
+    // 倒し量が閾値を跨いだ瞬間だけ「倒した」として通知する。
+    // 押しっぱなしで毎フレーム流れないよう、前フレームの値と比較している。
+    float &previousMagnitude = axisPreviousMagnitude_[name];
+    const float threshold =
+        std::clamp(bindingIt->second.signalThreshold, 0.01f, 1.0f);
+    if (previousMagnitude <= threshold && value.magnitude > threshold &&
+        triggerObserver_ && IsEnabled(name)) {
+      triggerObserver_(name, EventKind::AxisEngaged);
+    }
+    previousMagnitude = value.magnitude;
   }
 
   // 同時に触られた場合はゲームパッドを優先する。
@@ -226,6 +237,7 @@ void InputActionMap::AddAxis(const InputAxisBinding &binding) {
   if (axes_.find(binding.name) == axes_.end()) {
     axisNames_.push_back(binding.name);
     axisValues_.emplace(binding.name, InputAxisValue{});
+    axisPreviousMagnitude_.emplace(binding.name, 0.0f);
   }
   axes_[binding.name] = binding;
 }
@@ -235,6 +247,7 @@ void InputActionMap::Clear() {
   axes_.clear();
   actionStates_.clear();
   axisValues_.clear();
+  axisPreviousMagnitude_.clear();
   actionNames_.clear();
   axisNames_.clear();
   disabled_.clear();
@@ -420,6 +433,8 @@ bool InputActionMap::LoadFromFile(const std::string &path) {
 
       binding.stick = StickFromName(item.value("stick", std::string("None")));
       binding.deadzone = item.value("deadzone", binding.deadzone);
+      binding.signalThreshold =
+          item.value("signalThreshold", binding.signalThreshold);
       binding.keyUp = KeyCodeFromName(item.value("keyUp", std::string()));
       binding.keyDown = KeyCodeFromName(item.value("keyDown", std::string()));
       binding.keyLeft = KeyCodeFromName(item.value("keyLeft", std::string()));
@@ -480,6 +495,7 @@ bool InputActionMap::SaveToFile(const std::string &path) const {
       item["name"] = binding.name;
       item["stick"] = StickName(binding.stick);
       item["deadzone"] = binding.deadzone;
+      item["signalThreshold"] = binding.signalThreshold;
       item["keyUp"] = KeyNameFromCode(binding.keyUp);
       item["keyDown"] = KeyNameFromCode(binding.keyDown);
       item["keyLeft"] = KeyNameFromCode(binding.keyLeft);

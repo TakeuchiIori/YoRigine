@@ -146,6 +146,32 @@ void from_json(const nlohmann::json &json, TutorialStepUI &ui) {
   ui.layerOffset = json.value("layerOffset", ui.layerOffset);
 }
 
+void to_json(nlohmann::json &json, const TutorialHighlight &highlight) {
+  json = {
+      {"enabled", highlight.enabled},
+      {"uiIds", highlight.uiIds},
+      {"clipName", highlight.clipName},
+      {"pulse", highlight.pulse},
+      {"scaleAmount", highlight.scaleAmount},
+      {"pulseSeconds", highlight.pulseSeconds},
+      {"blink", highlight.blink},
+      {"blinkSeconds", highlight.blinkSeconds},
+      {"bringToFront", highlight.bringToFront},
+  };
+}
+
+void from_json(const nlohmann::json &json, TutorialHighlight &highlight) {
+  highlight.enabled = json.value("enabled", highlight.enabled);
+  highlight.uiIds = json.value("uiIds", std::vector<std::string>{});
+  highlight.clipName = json.value("clipName", highlight.clipName);
+  highlight.pulse = json.value("pulse", highlight.pulse);
+  highlight.scaleAmount = json.value("scaleAmount", highlight.scaleAmount);
+  highlight.pulseSeconds = json.value("pulseSeconds", highlight.pulseSeconds);
+  highlight.blink = json.value("blink", highlight.blink);
+  highlight.blinkSeconds = json.value("blinkSeconds", highlight.blinkSeconds);
+  highlight.bringToFront = json.value("bringToFront", highlight.bringToFront);
+}
+
 void to_json(nlohmann::json &json, const TutorialGate &gate) {
   json = {
       {"enabled", gate.enabled},
@@ -240,8 +266,10 @@ void to_json(nlohmann::json &json, const TutorialStep &step) {
       {"complete", step.complete},
       {"trigger", step.trigger},
       {"spotlight", step.spotlight},
+      {"highlight", step.highlight},
       {"gate", step.gate},
       {"once", step.once},
+      {"gameplaySpeed", step.gameplaySpeed},
   };
 }
 
@@ -262,8 +290,10 @@ void from_json(const nlohmann::json &json, TutorialStep &step) {
   step.spotlight = json.value("spotlight", TutorialSpotlightConfig{});
   // trigger が無い既存ファイルは type=None のままとなり、従来の線形進行になる。
   step.trigger = json.value("trigger", TutorialCondition{});
+  step.highlight = json.value("highlight", TutorialHighlight{});
   step.gate = json.value("gate", TutorialGate{});
   step.once = json.value("once", step.once);
+  step.gameplaySpeed = json.value("gameplaySpeed", step.gameplaySpeed);
 }
 
 namespace {
@@ -447,6 +477,7 @@ void TutorialManager::Stop() {
   pendingQueue_.clear();
   TutorialSpotlight::GetInstance()->Clear();
   ReleaseGate();
+  ReleaseGameplaySpeed();
   playing_ = false;
   hasActiveStep_ = false;
   runtimeUIDirty_ = false;
@@ -529,6 +560,7 @@ void TutorialManager::FinishCurrentStep() {
   TutorialSpotlight::GetInstance()->Clear();
   ApplyGameplayPause(false);
   ReleaseGate();
+  ReleaseGameplaySpeed();
   completeRuntime_.Clear();
 }
 
@@ -556,6 +588,25 @@ void TutorialManager::ReleaseGate() {
     return;
   InputActionMap::GetInstance()->EnableAll();
   gateOwned_ = false;
+}
+
+///************************* ゲーム速度 *************************///
+
+void TutorialManager::ApplyGameplaySpeed(float speed) {
+  // 等速なら何も触らない。他の演出が持続スケールを使っていても壊さないため。
+  if (speed >= 0.999f && speed <= 1.001f) {
+    ReleaseGameplaySpeed();
+    return;
+  }
+  GameTime::SetGameplaySustainedScale(std::max(0.0f, speed));
+  gameplaySpeedOwned_ = true;
+}
+
+void TutorialManager::ReleaseGameplaySpeed() {
+  if (!gameplaySpeedOwned_)
+    return;
+  GameTime::SetGameplaySustainedScale(1.0f);
+  gameplaySpeedOwned_ = false;
 }
 
 void TutorialManager::Update() {
@@ -653,6 +704,42 @@ void TutorialManager::Update() {
     Advance();
 }
 
+void TutorialManager::Draw() {
+  if (!playing_ || !hasActiveStep_)
+    return;
+
+  // 暗幕が先。説明パネルより下に敷く。
+  TutorialSpotlight::GetInstance()->Draw();
+
+  UIManager *uiManager = UIManager::GetInstance();
+  std::vector<UIBase *> targets;
+  targets.reserve(4 + activeAdditionalUICount_);
+
+  auto collect = [&](const std::string &id) {
+    if (UIBase *ui = uiManager->GetUI(id)) {
+      if (ui->IsVisible())
+        targets.push_back(ui);
+    }
+  };
+  collect(kPanelUIId);
+  collect(kTextUIId);
+  collect(kHintPanelUIId);
+  collect(kHintTextUIId);
+  for (std::size_t i = 0; i < activeAdditionalUICount_; ++i) {
+    collect(AdditionalUIId(i));
+  }
+
+  // レイヤー順に並べ替えてから描く。追加画像UIは layerOffset で
+  // 説明パネルの前後どちらにも置けるため、順序を固定できない。
+  std::stable_sort(targets.begin(), targets.end(),
+                   [](const UIBase *a, const UIBase *b) {
+                     return a->GetLayer() < b->GetLayer();
+                   });
+  for (UIBase *ui : targets) {
+    ui->Draw();
+  }
+}
+
 void TutorialManager::NotifyEvent(const std::string &eventName) {
   RegisterEventName(eventName);
   if (eventName.empty())
@@ -721,6 +808,8 @@ void TutorialManager::EnterStep(std::size_t index) {
                                           currentData_.style.layer - 1);
   ApplyGate(step.gate);
   ApplyGameplayPause(step.pauseGameplay);
+  // 一時停止するステップでは速度指定の意味が無いので触らない。
+  ApplyGameplaySpeed(step.pauseGameplay ? 1.0f : step.gameplaySpeed);
   // Editor::Draw 中に Start される場合があるため、GPUテクスチャの更新は
   // Framework::Update 後に呼ばれる TutorialManager::Update まで遅延する。
   runtimeUIDirty_ = true;
@@ -782,6 +871,8 @@ void TutorialManager::RefreshRuntimeUI() {
     auto created = std::make_unique<UIBase>(kPanelUIId);
     created->Initialize("");
     created->SetTransient(true);
+    // 描画は TutorialManager::Draw が行う（UIManager の一括描画には任せない）。
+    created->SetSelfDrawn(true);
     panel = created.get();
     uiManager->AddUI(kPanelUIId, std::move(created));
   }
@@ -800,6 +891,8 @@ void TutorialManager::RefreshRuntimeUI() {
     auto created = std::make_unique<UIBase>(kTextUIId);
     created->Initialize("");
     created->SetTransient(true);
+    // 描画は TutorialManager::Draw が行う（UIManager の一括描画には任せない）。
+    created->SetSelfDrawn(true);
     text = created.get();
     uiManager->AddUI(kTextUIId, std::move(created));
   }
@@ -818,6 +911,8 @@ void TutorialManager::RefreshRuntimeUI() {
     auto created = std::make_unique<UIBase>(kHintPanelUIId);
     created->Initialize("");
     created->SetTransient(true);
+    // 描画は TutorialManager::Draw が行う（UIManager の一括描画には任せない）。
+    created->SetSelfDrawn(true);
     hintPanel = created.get();
     uiManager->AddUI(kHintPanelUIId, std::move(created));
   }
@@ -838,6 +933,8 @@ void TutorialManager::RefreshRuntimeUI() {
     auto created = std::make_unique<UIBase>(kHintTextUIId);
     created->Initialize("");
     created->SetTransient(true);
+    // 描画は TutorialManager::Draw が行う（UIManager の一括描画には任せない）。
+    created->SetSelfDrawn(true);
     hint = created.get();
     uiManager->AddUI(kHintTextUIId, std::move(created));
   }
@@ -945,26 +1042,87 @@ void TutorialManager::ApplyRuntimeOpacity() {
 }
 
 void TutorialManager::ApplyTargetHighlight() {
-  const std::string &targetId = currentData_.steps[currentStep_].targetUIId;
-  if (targetId.empty() || targetId == kPanelUIId || targetId == kTextUIId ||
-      targetId == kHintPanelUIId || targetId == kHintTextUIId)
+  const TutorialStep &step = currentData_.steps[currentStep_];
+  const TutorialHighlight &highlight = step.highlight;
+
+  // 対象の集め方は2通り。highlight を設定していればそちら、
+  // 未設定なら従来の targetUIId 1個ぶんを同じ経路へ流す。
+  std::vector<std::string> targetIds;
+  if (highlight.enabled) {
+    targetIds = highlight.uiIds;
+  } else if (!step.targetUIId.empty()) {
+    targetIds.push_back(step.targetUIId);
+  }
+  if (targetIds.empty())
     return;
-  if (UIBase *target = UIManager::GetInstance()->GetUI(targetId)) {
-    highlightedUIId_ = targetId;
-    highlightedOriginalScale_ = target->GetScale();
-    target->PlayPulse(1.12f, 0.55f, true);
-    UIManager::GetInstance()->BringToFront(targetId);
+
+  // 既定値は従来の見た目（1.12倍 / 0.55秒のパルスのみ）に合わせる。
+  const bool usePulse = highlight.enabled ? highlight.pulse : true;
+  const bool useBlink = highlight.enabled ? highlight.blink : false;
+  const float scaleAmount = highlight.enabled ? highlight.scaleAmount : 1.12f;
+  const float pulseSeconds = highlight.enabled ? highlight.pulseSeconds : 0.55f;
+  const float blinkSeconds = highlight.enabled ? highlight.blinkSeconds : 0.8f;
+  const bool bringToFront = highlight.enabled ? highlight.bringToFront : true;
+
+  UIManager *uiManager = UIManager::GetInstance();
+  for (const std::string &targetId : targetIds) {
+    // チュートリアル自身のUIを強調対象にすると見た目が壊れるので弾く。
+    if (targetId.empty() || targetId == kPanelUIId || targetId == kTextUIId ||
+        targetId == kHintPanelUIId || targetId == kHintTextUIId)
+      continue;
+
+    UIBase *target = uiManager->GetUI(targetId);
+    if (!target)
+      continue;
+
+    HighlightRestore restore;
+    restore.uiId = targetId;
+    restore.scale = target->GetScale();
+    restore.color = target->GetColor();
+
+    // クリップ名が指定されていれば、UIに保存済みのアニメーションを再生する。
+    // 見つからない場合は黙ってプリセットへフォールバックする（作成前でも動くように）。
+    bool clipPlayed = false;
+    if (highlight.enabled && !highlight.clipName.empty()) {
+      for (const UIAnimationClip &clip : target->GetClips()) {
+        if (clip.name != highlight.clipName)
+          continue;
+        target->PlayClip(clip);
+        restore.clipName = clip.name;
+        clipPlayed = true;
+        break;
+      }
+    }
+
+    if (!clipPlayed) {
+      if (usePulse)
+        target->PlayPulse((std::max)(1.01f, scaleAmount),
+                          (std::max)(0.05f, pulseSeconds), true);
+      if (useBlink)
+        target->PlayBlink((std::max)(0.05f, blinkSeconds), true);
+    }
+
+    highlightRestores_.push_back(restore);
+    if (bringToFront)
+      uiManager->BringToFront(targetId);
   }
 }
 
 void TutorialManager::ClearTargetHighlight() {
-  if (!highlightedUIId_.empty()) {
-    if (UIBase *target = UIManager::GetInstance()->GetUI(highlightedUIId_)) {
-      target->StopAnimation(UIAnimationType::Pulse);
-      target->SetScale(highlightedOriginalScale_);
-    }
+  UIManager *uiManager = UIManager::GetInstance();
+  for (const HighlightRestore &restore : highlightRestores_) {
+    UIBase *target = uiManager->GetUI(restore.uiId);
+    if (!target)
+      continue;
+    // 途中で止めると縮んだまま・透けたままになるので、必ず元の値へ戻す。
+    if (!restore.clipName.empty())
+      target->StopClip(restore.clipName);
+    target->StopAnimation(UIAnimationType::Pulse);
+    target->StopAnimation(UIAnimationType::Blink);
+    target->SetScale(restore.scale);
+    target->SetColor(restore.color);
   }
-  highlightedUIId_.clear();
+  highlightRestores_.clear();
 }
 
 void TutorialManager::ApplyGameplayPause(bool pause) {

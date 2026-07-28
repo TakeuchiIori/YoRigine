@@ -338,6 +338,11 @@ void MyGame::Draw() {
 	SceneManager::GetInstance()->DrawNonOffscreen();
 	// 映画風レターボックスは全シーン共通で最後（ImGui の手前）に描画
 	YoRigine::CinematicManager::GetInstance()->Draw();
+
+	// チュートリアルも全シーン共通で自前描画する。
+	// シーンごとのUI描画（GameUI は特定レイヤーしか描かない）に依存させると、
+	// 出るシーンと出ないシーンができてしまうため。
+	YoRigine::TutorialManager::GetInstance()->Draw();
 	dxCommon_->CopyBackBufferToFinalResult();
 	imguiManager_->Draw();
 

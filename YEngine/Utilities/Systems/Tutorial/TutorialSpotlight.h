@@ -66,6 +66,10 @@ public:
   // 毎フレーム呼ぶ。フェードと、動く対象への矩形追従を行う。
   void Update(float deltaTime);
 
+  // 暗幕を描画する。シーンごとに描画レイヤーの扱いが違うため、
+  // UIManager の一括描画には任せず TutorialManager から明示的に呼ぶ。
+  void Draw();
+
   bool IsActive() const { return active_; }
 
   ///************************* ワールド対象 *************************///

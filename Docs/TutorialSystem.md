@@ -47,9 +47,22 @@ Editor::GetInstance()->RegisterGameUI(
 Framework::Update();
 SceneManager::GetInstance()->Update();
 YoRigine::TutorialManager::GetInstance()->Update();
+
+// MyGame::Draw — シーン描画とレターボックスの後
+SceneManager::GetInstance()->DrawNonOffscreen();
+YoRigine::CinematicManager::GetInstance()->Draw();
+YoRigine::TutorialManager::GetInstance()->Draw();
 ```
 
-**この順序は崩さないこと。** 説明パネルのスプライトは、シーン側UIが呼ぶ `UIManager::UpdateAll()` より後に差し込む必要がある。またチュートリアルの開始は `Editor::Draw()`（`Framework::Update` より前）から起きうるため、テクスチャ更新は `TutorialManager::Update()` まで遅延する作りになっている。
+**更新の順序は崩さないこと。** 説明パネルのスプライトは、シーン側UIが呼ぶ `UIManager::UpdateAll()` より後に差し込む必要がある。またチュートリアルの開始は `Editor::Draw()`（`Framework::Update` より前）から起きうるため、テクスチャ更新は `TutorialManager::Update()` まで遅延する作りになっている。
+
+### なぜ自前で描くのか
+
+**シーンごとにUIの描き方が違うため、`UIManager::DrawAll()` には任せられない。** 例えば `GameUI::Draw()` はレイヤー0と2しか描かないので、チュートリアルのUI（レイヤー999〜1003）は一切描画されない。一方 `TitleUI` / `ClearUI` は `DrawAll()` を呼ぶので描かれる。同じJSONがシーンによって出たり出なかったりする。
+
+そこで `UIBase::SetSelfDrawn(true)` を付けて `UIManager::DrawAll()` の対象から外し、`TutorialManager::Draw()` が暗幕 → 説明パネルの順に自分で描く。追加画像UIは `layerOffset` で説明パネルの前後どちらにも置けるため、描画直前にレイヤー順へ並べ替えている。
+
+これで**どのシーンでも同じ見え方になる**。
 
 ---
 
@@ -83,8 +96,11 @@ TutorialSignal::GetInstance()->Unsubscribe(handle);
 | 発火源 | シグナル名 | ゲーム側のコード |
 |---|---|---|
 | `InputActionMap` のアクション押下 | `action.triggered.<アクション名>` | **0行** |
+| `InputActionMap` の軸を倒した | `action.axis.<軸名>` | **0行** |
 | `CollisionManager` の接触開始 | `collision.enter.<型名>` | **0行** |
 | `CollisionManager` の接触終了 | `collision.exit.<型名>` | **0行** |
+
+軸は倒し続けている間ずっと流れるのではなく、倒し量が `signalThreshold`（既定 `0.5`）を跨いだ瞬間だけ流れる。「スティックで移動してみよう」は `action.axis.Move` で書ける。
 
 型名は `CollisionTypeIdToString` の文字列（`Player` `Enemy` `PlayerWeapon` …）。接触1件につき両者ぶんの2本が流れるため、`collision.enter.Enemy` は「敵に何かが触れた」を意味する。誰が触れたかまでは区別できない。
 
@@ -213,6 +229,8 @@ spotlight->RegisterWorldTarget("NearestEnemy",
 
 位置を**関数で**受け取るので、動き回る敵にもそのまま追従する（矩形は毎フレーム組み直される）。カメラ未設定、名前未登録、対象がカメラの後ろ、のいずれでも黙って無視され、他の穴だけで暗幕が作られる。
 
+現在 `GameScene::Initialize` でカメラと `"Player"` を登録し、`GameScene::Finalize` で解除している。**登録した関数はシーンの寿命に紐づくため、シーン破棄時の `ClearWorldTargets()` / `SetCamera(nullptr)` は必須。** シングルトン側に残すと解放済みのシーンを参照する。
+
 半径のピクセル換算は、対象の中心と XYZ 各方向へ半径ぶんずらした点を投影し、最も大きな見かけの距離を採用している。カメラの向きで特定の軸が潰れても破綻しないため。
 
 ### 制限
@@ -259,6 +277,24 @@ Waiting（開始条件の成立待ち） → Queued（表示の順番待ち） �
 
 軸（`Move` / `Look`）も同じ集合で扱われるので、移動もさせたい場合は `Move` を明示的に許可する。
 
+### ゲーム速度
+
+```jsonc
+"pauseGameplay": false,
+"gameplaySpeed": 0.5
+```
+
+止めずに遅くして、考える時間を作る。`pauseGameplay` が `true` のときは無視される。
+
+実現には `GameTime` 側へ**持続スケール**の枠を足した。`timeScale_` は毎フレーム hitstop / slowmo から再計算されて上書きされるため、そこへ書き込む方式では「解除するまで遅い」を維持できない。持続スケールは最終倍率へ**掛け算で合成**されるので、hitstop の演出を潰さずに共存する。
+
+```cpp
+GameTime::SetGameplaySustainedScale(0.5f);  // 解除するまで維持
+GameTime::SetGameplaySustainedScale(1.0f);  // 解除
+```
+
+チュートリアル側はステップ終了時と `Stop()` で自動的に 1.0 へ戻す。等速指定のときは値に触らないため、他の演出が持続スケールを使っていても壊さない。
+
 ### 既読
 
 ```jsonc
@@ -299,16 +335,16 @@ Debug / Develop / Release の3構成でビルド成功（両プロジェクト�
 
 ## 9. Gotchas
 
-- **軸（移動）はシグナルを出さない。** 自動発火するのはボタン系アクションの押下だけで、`Move` / `Look` のような軸は対象外。「スティックで移動してみよう」を完了条件にはまだできない。閾値超えでシグナル化する仕組みが要る。
-- **`gameplaySpeed`（スロー再生）は入れていない。** `GameTime::Update()` が毎フレーム `timeScale_` を hitstop / slowmo から再計算して上書きするため、`SetChannelScale` は次フレームで消える（`GameTime.cpp` の Gameplay チャンネル更新）。実装するには `GameTime` 側に「持続スケール」の枠を足し、hitstop と合成する形にする必要がある。
 - **`InputActionMap::SetTriggerObserver` は1枠しかない。** `ConnectEngineSources()` がその枠を占有する。他にアクション押下を購読したいものが出たら、ここを複数購読に分岐させること。
+- **`GameTime` の持続スケールも1枠しかない。** チュートリアル以外が `SetGameplaySustainedScale` を使い始めると取り合いになる。所有者を増やすなら加算・乗算の合成器を挟むこと。
 - **`TutorialConditionRuntime` は定義へのポインタを持つ。** 指す先は `TutorialManager::currentData_` の中なので、`Start` / `Stop` のタイミングで必ず張り直している。条件木を別の場所で使う場合は寿命に注意。
 - **`CollisionManager::SetContactObserver` も1枠しかない。** `SetTriggerObserver` と同じ制約。接触シグナルは型ID単位なので「誰が触れたか」は区別できない。
 - **`ConnectEngineSources()` の呼び出し場所が暫定。** 現在は `TutorialManager::Start()` とエディタ描画から呼んでいる（冪等）。本来は初期化時に一度で足りるので、エンジンの初期化順が固まったら `MyGame::Initialize` へ移す。
 - **ゲームからチュートリアルを開始する導線がまだ無い。** `LoadAndStart()` を呼ぶのは現状エディタパネルだけ。シーン側から自動で始める仕組みは入れていない（どのシーンでどのファイルを読むかがゲーム設計の話になるため）。
 - **開始条件はチュートリアルが再生中でないと働かない。** `trigger` の評価は `TutorialManager` が playing の間だけ行われる。「ゲーム中いつでも、敵に初めて会ったら出る」を実現するには、シーン開始時に `LoadAndStart` しておく運用になる。
-- **スポットライトのカメラとワールド対象は未登録。** `TutorialSpotlight::SetCamera` / `RegisterWorldTarget` をゲーム側から呼んでいる箇所がまだ無いため、`kind: "world"` は現状すべて無視される。`ui` と `rect` は動く。
-- **暗幕は `style.layer - 1` 固定。** ゲームUIがそれ以上のレイヤーを使っていると暗幕の上に出てしまう。HUD 側のレイヤー帯と衝突しないか確認すること。
+- **ワールド対象は `GameScene` でしか登録していない。** 現在登録済みなのはカメラと `"Player"` のみ。Title / Clear シーンでは `kind: "world"` が無視される。敵などを狙いたい場合はその都度 `RegisterWorldTarget` を足す。
+- **チュートリアルは常に最前面。** 自前描画をレターボックスの後に置いているため、カットシーン中でも説明パネルが上に乗る。演出中は隠したい場合は `MyGame::Draw` の呼び出しを条件付きにすること。
+- **`style.layer` はチュートリアル内部の重なり順にしか効かない。** 暗幕が `layer - 1`、パネルが `layer`、追加画像UIが `layer + layerOffset`。ゲームUIとの前後関係はレイヤーではなく描画タイミングで決まる。
 
 ---
 
@@ -320,12 +356,11 @@ Debug / Develop / Release の3構成でビルド成功（両プロジェクト�
 | 1 | `TutorialSignal`、`TutorialCondition`、非ポーズ進行 | **完了** |
 | 2 | `TutorialSpotlight`（暗幕の矩形くり抜き、UI／ワールド両対応） | **完了** |
 | 3 | 開始条件（trigger）による非線形起動、既読フラグの永続化、入力ゲートの実効化、当たり判定シグナル | **完了** |
+| 3.5 | 軸のシグナル化、スロー再生（持続スケール）、ワールド対象の登録導線 | **完了** |
 | 4 | エディタの拡充（条件のプレビュー、シグナルのログ表示） | 未着手 |
 
-残っている大きな穴は3つ。
+機能としては一通り揃った。残っているのは主に運用面。
 
-1. **軸のシグナル化** — 「スティックで移動してみよう」が書けない
-2. **スロー再生** — `GameTime` に持続スケールの枠が要る
-3. **ワールドスポットライトの登録** — `SetCamera` / `RegisterWorldTarget` をゲーム側から呼ぶ導線
-
-Phase 4 のエディタ拡充より、この3つを先に潰すほうが実用上の効果は大きい。
+- **ゲーム内からチュートリアルを開始する導線。** `LoadAndStart` を呼ぶのは今もエディタパネルだけ。どのシーンでどのファイルを読むかはゲーム設計の話なので未着手。
+- **エディタでのシグナルのログ表示。** 何が流れているか目視できると条件の設定が一気に楽になる。Phase 4 の本命。
+- **接触シグナルの粒度。** 型ID単位なので「誰が触れたか」を区別できない。必要になったら発火側へ相手の型も載せる。

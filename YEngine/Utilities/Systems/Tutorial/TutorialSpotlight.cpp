@@ -293,6 +293,9 @@ void TutorialSpotlight::RebuildPanels() {
       auto created = std::make_unique<UIBase>(id);
       created->Initialize("");
       created->SetTransient(true);
+      // 描画は TutorialSpotlight::Draw が行う（UIManager
+      // の一括描画には任せない）。
+      created->SetSelfDrawn(true);
       ui = created.get();
       uiManager->AddUI(id, std::move(created));
     }
@@ -316,6 +319,18 @@ void TutorialSpotlight::RebuildPanels() {
   for (std::size_t i = 0; i < panels.size(); ++i) {
     if (UIBase *ui = uiManager->GetUI(PanelId(i)))
       ui->Update();
+  }
+}
+
+void TutorialSpotlight::Draw() {
+  if (!active_)
+    return;
+  UIManager *uiManager = UIManager::GetInstance();
+  for (std::size_t i = 0; i < activePanelCount_; ++i) {
+    if (UIBase *ui = uiManager->GetUI(PanelId(i))) {
+      if (ui->IsVisible())
+        ui->Draw();
+    }
   }
 }
 

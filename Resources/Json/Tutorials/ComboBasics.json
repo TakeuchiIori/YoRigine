@@ -1,0 +1,324 @@
+{
+    "version": 1,
+    "name": "ComboBasics",
+    "style": {
+        "fontFamily": "Meiryo",
+        "fontSize": 32.0,
+        "showControlHint": true,
+        "autoBuildControlHint": true,
+        "fadeInSeconds": 0.12,
+        "fadeOutSeconds": 0.1,
+        "layer": 1000
+    },
+    "steps": [
+        {
+            "name": "1撃目",
+            "speaker": "",
+            "text": "A ボタンで攻撃してみよう",
+            "complete": {
+                "type": "signal",
+                "name": "action.triggered.AttackLight",
+                "count": 1
+            },
+            "gate": {
+                "enabled": true,
+                "allow": [
+                    "Move",
+                    "AttackLight"
+                ]
+            },
+            "gameplaySpeed": 1.0,
+            "once": false,
+            "pauseGameplay": false,
+            "skippable": true,
+            "waitType": "confirm",
+            "waitSeconds": 2.0,
+            "eventName": "",
+            "targetUIId": "",
+            "layout": {
+                "panelPosition": [
+                    800.0,
+                    760.0
+                ],
+                "panelSize": [
+                    1120.0,
+                    160.0
+                ],
+                "textOffset": [
+                    0.0,
+                    -20.0
+                ],
+                "textMaxWidth": 1020.0,
+                "hintOffset": [
+                    0.0,
+                    50.0
+                ],
+                "hintPanelSize": [
+                    540.0,
+                    44.0
+                ]
+            },
+            "additionalUIs": [],
+            "highlight": {
+                "enabled": true,
+                "uiIds": [
+                    "A",
+                    "A_attack"
+                ],
+                "pulse": true,
+                "scaleAmount": 1.25,
+                "pulseSeconds": 0.45,
+                "blink": true,
+                "blinkSeconds": 0.9,
+                "bringToFront": true
+            }
+        },
+        {
+            "name": "2撃目",
+            "speaker": "",
+            "text": "いいぞ。続けてもう一度 A を押すとコンボが繋がる",
+            "complete": {
+                "type": "signal",
+                "name": "action.triggered.AttackLight",
+                "count": 1
+            },
+            "gate": {
+                "enabled": true,
+                "allow": [
+                    "Move",
+                    "AttackLight"
+                ]
+            },
+            "gameplaySpeed": 1.0,
+            "once": false,
+            "pauseGameplay": false,
+            "skippable": true,
+            "waitType": "confirm",
+            "waitSeconds": 2.0,
+            "eventName": "",
+            "targetUIId": "",
+            "layout": {
+                "panelPosition": [
+                    800.0,
+                    760.0
+                ],
+                "panelSize": [
+                    1120.0,
+                    160.0
+                ],
+                "textOffset": [
+                    0.0,
+                    -20.0
+                ],
+                "textMaxWidth": 1020.0,
+                "hintOffset": [
+                    0.0,
+                    50.0
+                ],
+                "hintPanelSize": [
+                    540.0,
+                    44.0
+                ]
+            },
+            "additionalUIs": [],
+            "highlight": {
+                "enabled": true,
+                "uiIds": [
+                    "A",
+                    "A_attack"
+                ],
+                "pulse": true,
+                "scaleAmount": 1.25,
+                "pulseSeconds": 0.45,
+                "blink": true,
+                "blinkSeconds": 0.9,
+                "bringToFront": true
+            }
+        },
+        {
+            "name": "3撃目",
+            "speaker": "",
+            "text": "最後にもう一度 A ！ 3連撃で締める",
+            "complete": {
+                "type": "signal",
+                "name": "action.triggered.AttackLight",
+                "count": 1
+            },
+            "gate": {
+                "enabled": true,
+                "allow": [
+                    "Move",
+                    "AttackLight"
+                ]
+            },
+            "gameplaySpeed": 1.0,
+            "once": false,
+            "pauseGameplay": false,
+            "skippable": true,
+            "waitType": "confirm",
+            "waitSeconds": 2.0,
+            "eventName": "",
+            "targetUIId": "",
+            "layout": {
+                "panelPosition": [
+                    800.0,
+                    760.0
+                ],
+                "panelSize": [
+                    1120.0,
+                    160.0
+                ],
+                "textOffset": [
+                    0.0,
+                    -20.0
+                ],
+                "textMaxWidth": 1020.0,
+                "hintOffset": [
+                    0.0,
+                    50.0
+                ],
+                "hintPanelSize": [
+                    540.0,
+                    44.0
+                ]
+            },
+            "additionalUIs": [],
+            "highlight": {
+                "enabled": true,
+                "uiIds": [
+                    "A",
+                    "A_attack"
+                ],
+                "pulse": true,
+                "scaleAmount": 1.25,
+                "pulseSeconds": 0.45,
+                "blink": true,
+                "blinkSeconds": 0.9,
+                "bringToFront": true
+            }
+        },
+        {
+            "name": "重攻撃",
+            "speaker": "",
+            "text": "次は B ボタン。遅いが威力の高い重攻撃だ",
+            "complete": {
+                "type": "signal",
+                "name": "action.triggered.AttackHeavy",
+                "count": 1
+            },
+            "gate": {
+                "enabled": true,
+                "allow": [
+                    "Move",
+                    "AttackHeavy"
+                ]
+            },
+            "gameplaySpeed": 1.0,
+            "once": false,
+            "pauseGameplay": false,
+            "skippable": true,
+            "waitType": "confirm",
+            "waitSeconds": 2.0,
+            "eventName": "",
+            "targetUIId": "",
+            "layout": {
+                "panelPosition": [
+                    800.0,
+                    760.0
+                ],
+                "panelSize": [
+                    1120.0,
+                    160.0
+                ],
+                "textOffset": [
+                    0.0,
+                    -20.0
+                ],
+                "textMaxWidth": 1020.0,
+                "hintOffset": [
+                    0.0,
+                    50.0
+                ],
+                "hintPanelSize": [
+                    540.0,
+                    44.0
+                ]
+            },
+            "additionalUIs": [],
+            "highlight": {
+                "enabled": true,
+                "uiIds": [
+                    "B",
+                    "B_attack"
+                ],
+                "pulse": true,
+                "scaleAmount": 1.25,
+                "pulseSeconds": 0.45,
+                "blink": true,
+                "blinkSeconds": 0.9,
+                "bringToFront": true
+            }
+        },
+        {
+            "name": "ガード",
+            "speaker": "",
+            "text": "最後に X でガード。敵の攻撃を受け止められる",
+            "complete": {
+                "type": "signal",
+                "name": "action.triggered.Guard",
+                "count": 1
+            },
+            "gate": {
+                "enabled": true,
+                "allow": [
+                    "Move",
+                    "Guard"
+                ]
+            },
+            "gameplaySpeed": 1.0,
+            "once": false,
+            "pauseGameplay": false,
+            "skippable": true,
+            "waitType": "confirm",
+            "waitSeconds": 2.0,
+            "eventName": "",
+            "targetUIId": "",
+            "layout": {
+                "panelPosition": [
+                    800.0,
+                    760.0
+                ],
+                "panelSize": [
+                    1120.0,
+                    160.0
+                ],
+                "textOffset": [
+                    0.0,
+                    -20.0
+                ],
+                "textMaxWidth": 1020.0,
+                "hintOffset": [
+                    0.0,
+                    50.0
+                ],
+                "hintPanelSize": [
+                    540.0,
+                    44.0
+                ]
+            },
+            "additionalUIs": [],
+            "highlight": {
+                "enabled": true,
+                "uiIds": [
+                    "Guard"
+                ],
+                "pulse": true,
+                "scaleAmount": 1.25,
+                "pulseSeconds": 0.45,
+                "blink": true,
+                "blinkSeconds": 0.9,
+                "bringToFront": true
+            }
+        }
+    ]
+}

@@ -66,6 +66,7 @@ struct InputAxisBinding {
     InputStickKind stick = InputStickKind::Left;  // None / Left / Right
     BYTE keyUp = 0, keyDown = 0, keyLeft = 0, keyRight = 0;  // 0 は未割り当て
     float deadzone = 0.2f;
+    float signalThreshold = 0.5f;  // 「倒した」と通知する倒し量
 };
 ```
 
@@ -134,12 +135,15 @@ map->EnableAll();                                      // 解除
 ### 観測
 
 ```cpp
-map->SetTriggerObserver([](const std::string& action) {
-    // アクションが押された瞬間に呼ばれる
+map->SetTriggerObserver([](const std::string& name, InputActionMap::EventKind kind) {
+    // ActionTriggered : ボタンを押した瞬間
+    // AxisEngaged     : 軸の倒し量が signalThreshold を超えた瞬間
 });
 ```
 
-ゲートで無効化されているアクションは通知されない（封じられている操作を「押した」ことにしないため）。チュートリアルのシグナルバスはここに接続する予定。
+軸は「倒し続けている間ずっと」ではなく、閾値を跨いだ瞬間だけ通知する。閾値は `InputAxisBinding::signalThreshold`（既定 `0.5`）で軸ごとに指定でき、JSON にも書ける。
+
+ゲートで無効化されている名前は通知されない（封じられている操作を「押した」ことにしないため）。チュートリアルのシグナルバスがここに接続されている。
 
 ### デバイス判定
 

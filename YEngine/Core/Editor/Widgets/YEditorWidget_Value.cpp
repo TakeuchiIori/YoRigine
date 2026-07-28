@@ -3,6 +3,7 @@
 // ===========================================================
 #ifdef USE_IMGUI
 #include "YEditorWidget_Value.h"
+#include "YEditorWidget_ItemWidth.h"
 
 namespace YEditorWidget {
 
@@ -11,18 +12,21 @@ namespace YEditorWidget {
 bool DragFloat(const char* label, float& v,
                float speed, float vmin, float vmax, const char* fmt)
 {
+    SetNextItemWidthForLabel(label);
     return ImGui::DragFloat(label, &v, speed, vmin, vmax, fmt);
 }
 
 bool SliderFloat(const char* label, float& v, float vmin, float vmax,
                  const char* fmt)
 {
+    SetNextItemWidthForLabel(label);
     return ImGui::SliderFloat(label, &v, vmin, vmax, fmt);
 }
 
 bool AngleSlider(const char* label, float& radians, float minDeg, float maxDeg)
 {
     float deg = radians * (180.f / 3.14159265358979f);
+    SetNextItemWidthForLabel(label);
     if (ImGui::SliderFloat(label, &deg, minDeg, maxDeg, "%.1f deg")) {
         radians = deg * (3.14159265358979f / 180.f);
         return true;
@@ -34,11 +38,13 @@ bool AngleSlider(const char* label, float& radians, float minDeg, float maxDeg)
 
 bool DragInt(const char* label, int& v, float speed, int vmin, int vmax)
 {
+    SetNextItemWidthForLabel(label);
     return ImGui::DragInt(label, &v, speed, vmin, vmax);
 }
 
 bool SliderInt(const char* label, int& v, int vmin, int vmax)
 {
+    SetNextItemWidthForLabel(label);
     return ImGui::SliderInt(label, &v, vmin, vmax);
 }
 
@@ -47,12 +53,14 @@ bool SliderInt(const char* label, int& v, int vmin, int vmax)
 bool DragVec2(const char* label, Vector2& v,
               float speed, float vmin, float vmax)
 {
+    SetNextItemWidthForLabel(label);
     return ImGui::DragFloat2(label, &v.x, speed, vmin, vmax, "%.3f");
 }
 
 bool DragVec3(const char* label, Vector3& v,
               float speed, float vmin, float vmax, const char* fmt)
 {
+    SetNextItemWidthForLabel(label);
     return ImGui::DragFloat3(label, &v.x, speed, vmin, vmax, fmt);
 }
 

@@ -7,6 +7,7 @@
 // ===========================================================
 #ifdef USE_IMGUI
 #include <imgui.h>
+#include "YEditorWidget_ItemWidth.h"
 #include <cstddef>
 #include <string>
 
@@ -21,6 +22,7 @@ template<std::size_t N>
 inline bool InputText(const char* label, char (&buffer)[N],
 	ImGuiInputTextFlags flags = 0)
 {
+	SetNextItemWidthForLabel(label);
 	return ImGui::InputText(label, buffer, N, flags);
 }
 
@@ -35,7 +37,7 @@ inline bool InputTextMultiline(const char* label, char (&buffer)[N],
 template<std::size_t N>
 inline bool InputPath(const char* label, char (&buffer)[N])
 {
-	ImGui::SetNextItemWidth(-1.0f);
+	SetNextItemWidthForLabel(label);
 	return ImGui::InputText(label, buffer, N);
 }
 
@@ -59,6 +61,7 @@ inline bool InputText(const char* label, std::string& value,
 	ImGuiInputTextFlags flags = 0)
 {
 	Detail::StringInputUserData userData{ &value };
+	SetNextItemWidthForLabel(label);
 	return ImGui::InputText(label, value.data(), value.capacity() + 1,
 		flags | ImGuiInputTextFlags_CallbackResize, Detail::ResizeStringInput, &userData);
 }
