@@ -72,7 +72,7 @@ struct ParticleCurve {
 
     /// カーブ編集ウィジェット。編集されたら true を返す。
     bool DrawEditor(const char* label, float vMin = 0.0f, float vMax = 3.0f,
-                    ImVec2 size = ImVec2(0, 120)) {
+        ImVec2 size = ImVec2(0, 120)) {
         bool changed = false;
         ImGui::PushID(this);
         if (label && label[0]) ImGui::TextUnformatted(label);
@@ -102,7 +102,7 @@ struct ParticleCurve {
             float ny = (vMax > vMin) ? (v - vMin) / (vMax - vMin) : 0.0f;
             ny = std::clamp(ny, 0.0f, 1.0f);
             return ImVec2(p0.x + std::clamp(t, 0.0f, 1.0f) * size.x, p1.y - ny * size.y);
-        };
+            };
 
         // カーブ本体
         const int kSamples = 64;
@@ -133,13 +133,13 @@ struct ParticleCurve {
         // ハンドル描画 + 選択 / 削除
         for (int i = 0; i < static_cast<int>(keys_.size()); ++i) {
             ImVec2 s = toScr(keys_[i].t, keys_[i].v);
-            bool near = std::fabs(mouse.x - s.x) < kR + 3 && std::fabs(mouse.y - s.y) < kR + 3;
+            bool isNear = std::fabs(mouse.x - s.x) < kR + 3 && std::fabs(mouse.y - s.y) < kR + 3;
             ImU32 col = (i == dragKey_) ? IM_COL32(255, 220, 120, 255)
-                      : (near ? IM_COL32(255, 255, 255, 255) : IM_COL32(200, 220, 255, 255));
+                : (isNear ? IM_COL32(255, 255, 255, 255) : IM_COL32(200, 220, 255, 255));
             dl->AddCircleFilled(s, kR, col);
             dl->AddCircle(s, kR, IM_COL32(0, 0, 0, 255));
-            if (hovered && near && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) dragKey_ = i;
-            if (hovered && near && ImGui::IsMouseClicked(ImGuiMouseButton_Right) &&
+            if (hovered && isNear && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) dragKey_ = i;
+            if (hovered && isNear && ImGui::IsMouseClicked(ImGuiMouseButton_Right) &&
                 i != 0 && i != static_cast<int>(keys_.size()) - 1 && keys_.size() > 2) {
                 keys_.erase(keys_.begin() + i);
                 changed = true;
@@ -178,7 +178,7 @@ namespace ParticleWidgets {
     /// selected は選択中ストップ index。編集されたら true を返す。
     /// ストップは t 昇順を保つ（隣接クランプ）。
     inline bool GradientBar(const char* strId, float* times, Vector4* colors,
-                            int& count, int maxStops, int& selected) {
+        int& count, int maxStops, int& selected) {
         bool changed = false;
         ImGui::PushID(strId);
         ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -221,7 +221,7 @@ namespace ParticleWidgets {
                 }
             }
             return colors[count - 1];
-        };
+            };
 
         // グラデーション帯（アルファは市松に重ねてブレンド）
         const int seg = static_cast<int>(w);
@@ -229,7 +229,7 @@ namespace ParticleWidgets {
             float t = static_cast<float>(i) / seg;
             Vector4 c = sample(t);
             ImU32 col = IM_COL32(static_cast<int>(c.x * 255), static_cast<int>(c.y * 255),
-                                 static_cast<int>(c.z * 255), static_cast<int>(c.w * 255));
+                static_cast<int>(c.z * 255), static_cast<int>(c.w * 255));
             float x = p0.x + w * i / seg;
             dl->AddRectFilled(ImVec2(x, p0.y), ImVec2(x + w / seg + 1, barMax.y), col);
         }
@@ -248,13 +248,13 @@ namespace ParticleWidgets {
             bool sel = (i == selected);
             dl->AddTriangleFilled(a, b, c, sel ? IM_COL32(255, 220, 120, 255) : IM_COL32(220, 220, 220, 255));
             dl->AddTriangle(a, b, c, IM_COL32(0, 0, 0, 255));
-            bool near = std::fabs(mouse.x - x) < 7 && mouse.y > my - 2 && mouse.y < my + markH + 2;
-            if (hovered && near && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+            bool isNear = std::fabs(mouse.x - x) < 7 && mouse.y > my - 2 && mouse.y < my + markH + 2;
+            if (hovered && isNear && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
                 selected = i;
                 st->SetInt(dragId, i);
                 drag = i;
             }
-            if (hovered && near && ImGui::IsMouseClicked(ImGuiMouseButton_Right) && count > 2) {
+            if (hovered && isNear && ImGui::IsMouseClicked(ImGuiMouseButton_Right) && count > 2) {
                 for (int k = i; k < count - 1; ++k) { times[k] = times[k + 1]; colors[k] = colors[k + 1]; }
                 --count;
                 if (selected >= count) selected = count - 1;
