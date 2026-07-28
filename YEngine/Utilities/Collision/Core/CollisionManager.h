@@ -6,6 +6,7 @@
 #include "WorldTransform/WorldTransform.h"
 
 // C++
+#include <functional>
 #include <memory>
 #include <unordered_map>
 #include <unordered_set>
@@ -61,9 +62,19 @@ public:
   // ============================================================
   void CheckCollisionPair(BaseCollider *a, BaseCollider *b);
   void CheckAllCollisions();
-  bool IsColliderInView(const Vector3 &position, const YoRigine::Camera *camera);
+  bool IsColliderInView(const Vector3 &position,
+                        const YoRigine::Camera *camera);
   void AddCollider(BaseCollider *collider);
   void RemoveCollider(BaseCollider *collider);
+
+  // 接触の開始・終了を型IDで外部へ通知する。チュートリアルの条件判定などが購読する。
+  // 個々のコライダーのコールバックとは別枠で、当たり判定の中身には関与しない。
+  // 注意: 枠は1つしかない。購読者が増えたら複数登録できる形へ変えること。
+  using ContactObserver =
+      std::function<void(uint32_t typeIdA, uint32_t typeIdB, bool entered)>;
+  void SetContactObserver(ContactObserver observer) {
+    contactObserver_ = std::move(observer);
+  }
 
   // 登録済みの全コライダーをまとめてデバッグ描画する。
   // 「当たり判定が設定されているもの」を所有者ごとに呼び分けず、一括で可視化する用途。
@@ -188,7 +199,8 @@ public:
 
   // ============================================================
   // 接触点の近似算出（UE の FHitResult::ImpactPoint 相当）
-  //   - narrow-phase の CollisionResult は法線・貫通のみで接触点を持たないため、
+  //   - narrow-phase の CollisionResult
+  //   は法線・貫通のみで接触点を持たないため、
   //     2コライダーの形状から境界付近の接触点を実用的に近似する。
   //   - ヒットエフェクトの発生位置など「当たった場所」を欲しい用途向け。
   //     厳密な接触解ではない（GJK/EPA 等ではない）。
@@ -204,7 +216,7 @@ public:
   //   算出不能時（中心一致など）は fallback を返す。
   static Vector3 ComputeContactNormal(BaseCollider *a, BaseCollider *b,
                                       const Vector3 &fallback = {0.0f, 1.0f,
-                                                                0.0f});
+                                                                 0.0f});
 
   // ============================================================
   // ヒット方向判定用ユーティリティ
@@ -278,6 +290,9 @@ private:
 
   // 接触の Exit 猶予フレーム数 (スティッキー接触。0 で従来通り)
   int contactExitGraceFrames_ = 2;
+
+  // 接触の開始・終了を型IDで受け取る外部購読者 (未設定なら何もしない)
+  ContactObserver contactObserver_;
 
   // Frustum culling
   bool enableFrustumCulling_ = false;

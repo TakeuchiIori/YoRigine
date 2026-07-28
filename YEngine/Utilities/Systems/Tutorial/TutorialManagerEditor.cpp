@@ -9,6 +9,7 @@
 
 #include <imgui.h>
 #include "Editor/Widgets/YEditorWidget.h"
+#include "Systems/Input/InputActionMap.h"
 #include "Systems/UI/UIManager.h"
 
 namespace {
@@ -92,6 +93,46 @@ namespace {
 		default:
 			break;
 		}
+		return changed;
+	}
+
+	// 入力ゲートの編集UI。許可するアクションをチェックで選ぶ。
+	bool DrawGateEditor(YoRigine::TutorialGate& gate) {
+		bool changed = YEditorWidget::Checkbox("この説明中は操作を制限する", gate.enabled);
+		YEditorWidget::HelpMarker(
+			"チェックした操作だけを受け付けます。移動もさせたい場合は Move も選んでください");
+		if (!gate.enabled) return changed;
+
+		YoRigine::InputActionMap* actionMap = YoRigine::InputActionMap::GetInstance();
+		const std::vector<std::string>& actionNames = actionMap->GetActionNames();
+		const std::vector<std::string>& axisNames = actionMap->GetAxisNames();
+
+		if (actionNames.empty() && axisNames.empty()) {
+			ImGui::TextDisabled("アクションが未登録です。ゲームを起動した状態で設定してください");
+			return changed;
+		}
+
+		auto drawToggles = [&](const std::vector<std::string>& names) {
+			for (const std::string& name : names) {
+				const auto found = std::find(gate.allow.begin(), gate.allow.end(), name);
+				bool allowed = (found != gate.allow.end());
+				if (ImGui::Checkbox(name.c_str(), &allowed)) {
+					if (allowed) {
+						gate.allow.push_back(name);
+					}
+					else {
+						gate.allow.erase(
+							std::remove(gate.allow.begin(), gate.allow.end(), name),
+							gate.allow.end());
+					}
+					changed = true;
+				}
+			}
+			};
+		ImGui::Indent();
+		drawToggles(actionNames);
+		drawToggles(axisNames);
+		ImGui::Unindent();
 		return changed;
 	}
 
@@ -590,6 +631,11 @@ namespace YoRigine {
 					YEditorWidget::HelpMarker("ゲーム側から TutorialManager::NotifyEvent(イベント名) を呼ぶと次へ進みます");
 				}
 				ImGui::EndDisabled();
+
+				YEditorWidget::SectionHeader("開始条件");
+				ImGui::TextDisabled("未設定なら、前のステップが終わった時点で順番に表示されます");
+				stepChanged |= DrawConditionEditor(
+					step.trigger, TutorialSignal::GetInstance()->GetKnownNames(), 0);
 				if (!uiIds.empty()) stepChanged |= YEditorWidget::StringCombo("強調するUI", step.targetUIId, uiIds, true);
 				else stepChanged |= YEditorWidget::InputText("強調するUI ID", step.targetUIId);
 				YEditorWidget::HelpMarker("UI管理に登録されているIDを指定すると、そのUIをパルス表示します");
@@ -599,6 +645,13 @@ namespace YoRigine {
 
 				stepChanged |= YEditorWidget::Checkbox("ゲームを一時停止", step.pauseGameplay);
 				stepChanged |= YEditorWidget::Checkbox("チュートリアル全体を閉じられる", step.skippable);
+				stepChanged |= YEditorWidget::Checkbox("一度見たら二度と出さない", step.once);
+				YEditorWidget::HelpMarker(
+					"既読は Resources/Json/Tutorials/Progress.json へ保存されます。"
+					"ステップの管理名を変えると別物として扱われ、また表示されます");
+
+				YEditorWidget::SectionHeader("操作の制限");
+				stepChanged |= DrawGateEditor(step.gate);
 
 				YEditorWidget::SectionHeader("このページと一緒に表示する画像UI");
 				ImGui::TextDisabled("操作図やキー画像などを、本文とは別の位置へ複数配置できます");

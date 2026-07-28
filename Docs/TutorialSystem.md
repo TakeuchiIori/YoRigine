@@ -2,7 +2,7 @@
 
 説明UIを順に表示するだけだったチュートリアルを、**「プレイヤーが実際に行動したら次へ進む」**形にするための資料。
 
-更新日：2026-07-28（Phase 2 まで実装）
+更新日：2026-07-28（Phase 3 まで実装）
 
 ---
 
@@ -27,7 +27,8 @@
 | `TutorialCondition` | 同上 | 完了条件の木（定義） |
 | `TutorialConditionRuntime` | 同上 | 条件の評価状態（受信回数など） |
 | `TutorialSpotlight` | 同上 | 注目させたい場所以外を暗幕で覆う |
-| `TutorialManager` | 同上 | ステップ進行、UI表示、条件と暗幕の駆動 |
+| `TutorialProgress` | 同上 | 既読ステップの永続化 |
+| `TutorialManager` | 同上 | ステップ進行、UI表示、条件・暗幕・ゲートの駆動 |
 
 設計の要は、**ゲームとチュートリアルが互いを知らないこと**。ゲーム側は「チュートリアルのため」ではなく自分の出来事として `Emit` するだけで、チュートリアルはそれを購読する。
 
@@ -82,6 +83,10 @@ TutorialSignal::GetInstance()->Unsubscribe(handle);
 | 発火源 | シグナル名 | ゲーム側のコード |
 |---|---|---|
 | `InputActionMap` のアクション押下 | `action.triggered.<アクション名>` | **0行** |
+| `CollisionManager` の接触開始 | `collision.enter.<型名>` | **0行** |
+| `CollisionManager` の接触終了 | `collision.exit.<型名>` | **0行** |
+
+型名は `CollisionTypeIdToString` の文字列（`Player` `Enemy` `PlayerWeapon` …）。接触1件につき両者ぶんの2本が流れるため、`collision.enter.Enemy` は「敵に何かが触れた」を意味する。誰が触れたかまでは区別できない。
 
 `PlayerActions.json` に `AttackLight` を定義してあれば `action.triggered.AttackLight` が流れる。**「攻撃ボタンを3回押す」チュートリアルは、ゲーム側を1行も触らずに JSON だけで作れる。**
 
@@ -217,7 +222,56 @@ spotlight->RegisterWorldTarget("NearestEnemy",
 
 ---
 
-## 8. サンプル
+## 8. 開始条件・ゲート・既読
+
+### 進行モデル
+
+線形カーソル1本をやめ、ステップを状態の集合として持つようになった。
+
+```
+Waiting（開始条件の成立待ち） → Queued（表示の順番待ち） → Done（完了）
+```
+
+毎フレームの流れは以下。
+
+1. 待機中ステップの `trigger` を評価する（説明を表示している最中も裏で進む）
+2. 成立したものを表示待ちキューへ積む
+3. 表示中のステップが無ければ、キューを優先して次を起動する
+4. キューが空なら、`trigger` を持たないステップを順番に起動する
+
+**`trigger` 未設定のステップだけで構成された JSON は、従来とまったく同じ線形進行になる。** 既存ファイルはそのまま動く。
+
+キューが空でも待機中のステップが残っている間はチュートリアルを終了しない（何も表示しないまま成立を待つ）。全ステップが `Done` になって初めて終了する。
+
+```jsonc
+"trigger": { "type": "signal", "name": "collision.enter.Enemy", "count": 1 }
+```
+
+開始条件の `elapsed` は**チュートリアル開始からの経過秒**を見る（ステップ開始からではない）。`confirm` は開始条件としては受け付けない。
+
+### 入力ゲート
+
+```jsonc
+"gate": { "enabled": true, "allow": ["Move", "AttackLight"] }
+```
+
+`InputActionMap::SetExclusivelyEnabled` を呼び、挙げたアクション以外を封じる。**ゲーム側のコードは1行も変わらない** — `PlayerInput` 経由の問い合わせが `false` を返すようになるだけ。ステップ終了時と `Stop()` で自動的に解除される。
+
+軸（`Move` / `Look`）も同じ集合で扱われるので、移動もさせたい場合は `Move` を明示的に許可する。
+
+### 既読
+
+```jsonc
+"once": true
+```
+
+完了時に `Resources/Json/Tutorials/Progress.json` へ「チュートリアル名 / ステップ名」を記録し、次回以降そのステップを飛ばす。記録は完了のたび即座に保存されるので、途中で落ちても残る。
+
+ステップの管理名を変えると別物として扱われ、また表示される。作り直したステップを見せ直したいので、この挙動を意図している。
+
+---
+
+## 9. サンプル
 
 `Resources/Json/Tutorials/AttackBasics.json`
 
@@ -249,9 +303,10 @@ Debug / Develop / Release の3構成でビルド成功（両プロジェクト�
 - **`gameplaySpeed`（スロー再生）は入れていない。** `GameTime::Update()` が毎フレーム `timeScale_` を hitstop / slowmo から再計算して上書きするため、`SetChannelScale` は次フレームで消える（`GameTime.cpp` の Gameplay チャンネル更新）。実装するには `GameTime` 側に「持続スケール」の枠を足し、hitstop と合成する形にする必要がある。
 - **`InputActionMap::SetTriggerObserver` は1枠しかない。** `ConnectEngineSources()` がその枠を占有する。他にアクション押下を購読したいものが出たら、ここを複数購読に分岐させること。
 - **`TutorialConditionRuntime` は定義へのポインタを持つ。** 指す先は `TutorialManager::currentData_` の中なので、`Start` / `Stop` のタイミングで必ず張り直している。条件木を別の場所で使う場合は寿命に注意。
-- **当たり判定はまだシグナルを出さない。** `CollisionManager` に購読フックが無く、「敵に近づいたら開始」のような条件は書けない。開始条件（trigger）を入れる Phase 3 と同時に対応する。
+- **`CollisionManager::SetContactObserver` も1枠しかない。** `SetTriggerObserver` と同じ制約。接触シグナルは型ID単位なので「誰が触れたか」は区別できない。
 - **`ConnectEngineSources()` の呼び出し場所が暫定。** 現在は `TutorialManager::Start()` とエディタ描画から呼んでいる（冪等）。本来は初期化時に一度で足りるので、エンジンの初期化順が固まったら `MyGame::Initialize` へ移す。
-- **ゲームからチュートリアルを開始する導線がまだ無い。** `LoadAndStart()` を呼ぶのは現状エディタパネルだけで、シーン側から自動で始まる仕組みは入れていない。開始条件（trigger）を扱う Phase 3 で用意する。
+- **ゲームからチュートリアルを開始する導線がまだ無い。** `LoadAndStart()` を呼ぶのは現状エディタパネルだけ。シーン側から自動で始める仕組みは入れていない（どのシーンでどのファイルを読むかがゲーム設計の話になるため）。
+- **開始条件はチュートリアルが再生中でないと働かない。** `trigger` の評価は `TutorialManager` が playing の間だけ行われる。「ゲーム中いつでも、敵に初めて会ったら出る」を実現するには、シーン開始時に `LoadAndStart` しておく運用になる。
 - **スポットライトのカメラとワールド対象は未登録。** `TutorialSpotlight::SetCamera` / `RegisterWorldTarget` をゲーム側から呼んでいる箇所がまだ無いため、`kind: "world"` は現状すべて無視される。`ui` と `rect` は動く。
 - **暗幕は `style.layer - 1` 固定。** ゲームUIがそれ以上のレイヤーを使っていると暗幕の上に出てしまう。HUD 側のレイヤー帯と衝突しないか確認すること。
 
@@ -264,7 +319,13 @@ Debug / Develop / Release の3構成でビルド成功（両プロジェクト�
 | 0 | `InputActionMap` + `PlayerInput`（[InputActionMap.md](InputActionMap.md)） | **完了** |
 | 1 | `TutorialSignal`、`TutorialCondition`、非ポーズ進行 | **完了** |
 | 2 | `TutorialSpotlight`（暗幕の矩形くり抜き、UI／ワールド両対応） | **完了** |
-| 3 | 開始条件（trigger）による非線形起動、既読フラグの永続化、入力ゲートの実効化、当たり判定シグナル | 未着手 |
+| 3 | 開始条件（trigger）による非線形起動、既読フラグの永続化、入力ゲートの実効化、当たり判定シグナル | **完了** |
 | 4 | エディタの拡充（条件のプレビュー、シグナルのログ表示） | 未着手 |
 
-Phase 3 でステップの進行を「線形カーソル」から「待機プール → トリガ成立でアクティブ → 完了で終了」の状態機械へ変える。`trigger` 未設定のステップは「前のステップ完了で起動」に落ちるので、既存 JSON は従来の線形挙動のまま動く。
+残っている大きな穴は3つ。
+
+1. **軸のシグナル化** — 「スティックで移動してみよう」が書けない
+2. **スロー再生** — `GameTime` に持続スケールの枠が要る
+3. **ワールドスポットライトの登録** — `SetCamera` / `RegisterWorldTarget` をゲーム側から呼ぶ導線
+
+Phase 4 のエディタ拡充より、この3つを先に潰すほうが実用上の効果は大きい。

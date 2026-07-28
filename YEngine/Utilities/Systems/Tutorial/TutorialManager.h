@@ -9,6 +9,7 @@
 #include "Vector4.h"
 
 #include "TutorialCondition.h"
+#include "TutorialProgress.h"
 #include "TutorialSignal.h"
 #include "TutorialSpotlight.h"
 
@@ -18,6 +19,14 @@ namespace YoRigine {
 		Confirm,
 		Seconds,
 		Event,
+	};
+
+	// 説明中に受け付ける操作の制限。
+	// allow に挙げたアクションだけを有効にし、それ以外を一時的に封じる。
+	// 「回避だけ練習させる」といった誘導に使う。
+	struct TutorialGate {
+		bool enabled = false;
+		std::vector<std::string> allow;
 	};
 
 	// 各説明ページへ追加表示する画像UI。
@@ -50,8 +59,15 @@ namespace YoRigine {
 		// 完了条件。type が None のときだけ、従来の waitType へフォールバックする。
 		// 既存の JSON には complete が無いため、そのまま読み込めば従来動作になる。
 		TutorialCondition complete;
+		// 開始条件。type が None なら「前のステップが終わったら順番に開始」となり、
+		// 従来の線形進行と同じ挙動になる。設定するとその条件が成立するまで待機する。
+		TutorialCondition trigger;
 		// 注目させたい場所以外を暗幕で覆う設定。enabled が false なら何もしない。
 		TutorialSpotlightConfig spotlight;
+		// 表示中に受け付ける操作の制限。
+		TutorialGate gate;
+		// 一度見たら二度と出さない。既読は TutorialProgress へ保存される。
+		bool once = false;
 		TutorialWaitType waitType = TutorialWaitType::Confirm;
 		float waitSeconds = 2.0f;
 		std::string eventName;
@@ -121,6 +137,8 @@ namespace YoRigine {
 		void Advance();
 
 		bool IsPlaying() const { return playing_; }
+		// 説明を表示中か。開始条件の成立待ちで何も出していない間は false になる。
+		bool HasActiveStep() const { return hasActiveStep_; }
 		std::size_t GetCurrentStepIndex() const { return currentStep_; }
 		const TutorialData& GetCurrentData() const { return currentData_; }
 
@@ -133,6 +151,18 @@ namespace YoRigine {
 		void EnterStep(std::size_t index);
 		void SubscribeSignals();
 		void UnsubscribeSignals();
+
+		// 開始条件まわり。
+		void ResetStepStates(std::size_t startStep);
+		void UpdateTriggers();
+		bool TryActivateNext();
+		void FinishCurrentStep();
+		bool AllStepsDone() const;
+
+		// 入力ゲート。
+		void ApplyGate(const TutorialGate& gate);
+		void ReleaseGate();
+
 		void RefreshRuntimeUI();
 		void HideRuntimeUI();
 		void ApplyRuntimeOpacity();
@@ -170,6 +200,26 @@ namespace YoRigine {
 		// currentData_ が差し替わるタイミング（Start / Stop）で必ず張り直す。
 		TutorialConditionRuntime completeRuntime_;
 		TutorialSignal::Handle signalHandle_ = 0;
+
+		// ステップの進行状態。
+		// 線形カーソル1本ではなく「待機 → 起動 → 完了」の集合として持つ。
+		enum class StepState {
+			Waiting,   // 開始条件の成立待ち
+			Queued,    // 条件が成立し、表示の順番待ち
+			Done,      // 完了済み（既読スキップを含む）
+		};
+		std::vector<StepState> stepStates_;
+		// 待機中ステップの開始条件。stepStates_ と同じ添字で対応する。
+		std::vector<TutorialConditionRuntime> triggerRuntimes_;
+		// 条件が成立して表示待ちになっているステップの添字。
+		std::vector<std::size_t> pendingQueue_;
+		// 開始条件を持たないステップを順番に起動していくための位置。
+		std::size_t autoCursor_ = 0;
+		// チュートリアル開始からの経過秒。開始条件の elapsed はこれを見る。
+		float totalElapsed_ = 0.0f;
+		bool hasActiveStep_ = false;
+		bool gateOwned_ = false;
+
 		std::string highlightedUIId_;
 		Vector2 highlightedOriginalScale_{ 1.0f, 1.0f };
 

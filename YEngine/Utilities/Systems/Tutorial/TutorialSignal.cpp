@@ -2,11 +2,17 @@
 
 #include <algorithm>
 
+#include "Collision/Core/CollisionManager.h"
+#include "Collision/Core/CollisionTypeIdDef.h"
 #include "Systems/Input/InputActionMap.h"
 
 namespace {
 // 入力アクション由来のシグナルに付ける接頭辞。
 constexpr const char *kActionTriggeredPrefix = "action.triggered.";
+
+// 接触由来のシグナルに付ける接頭辞。
+constexpr const char *kContactEnterPrefix = "collision.enter.";
+constexpr const char *kContactExitPrefix = "collision.exit.";
 } // namespace
 
 namespace YoRigine {
@@ -85,6 +91,32 @@ void TutorialSignal::ConnectEngineSources() {
   for (const std::string &actionName : actionMap->GetActionNames()) {
     RegisterName(ActionTriggeredName(actionName));
   }
+
+  // 接触の開始・終了をシグナルへ変換する。
+  // 型ID単位なので「敵に触れた」までしか分からないが、
+  // 「敵に近づいたら説明を出す」程度の開始条件はこれで書ける。
+  CollisionManager::GetInstance()->SetContactObserver(
+      [](uint32_t typeIdA, uint32_t typeIdB, bool entered) {
+        Emit(ContactName(typeIdA, entered));
+        Emit(ContactName(typeIdB, entered));
+      });
+
+  // 接触シグナルも候補として先に並べておく。
+  for (uint32_t id = 0;
+       id <= static_cast<uint32_t>(CollisionTypeIdDef::kEventTrigger); ++id) {
+    if (id == static_cast<uint32_t>(CollisionTypeIdDef::kNone))
+      continue;
+    RegisterName(ContactName(id, true));
+    RegisterName(ContactName(id, false));
+  }
+}
+
+std::string TutorialSignal::ContactName(uint32_t collisionTypeId,
+                                        bool entered) {
+  const char *typeName =
+      CollisionTypeIdToString(static_cast<CollisionTypeIdDef>(collisionTypeId));
+  return std::string(entered ? kContactEnterPrefix : kContactExitPrefix) +
+         typeName;
 }
 
 ///************************* 名前の一覧 *************************///

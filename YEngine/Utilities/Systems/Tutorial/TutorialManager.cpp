@@ -7,6 +7,7 @@
 #include "Loaders/Texture/TextureManager.h"
 #include "Systems/GameTime/GameTime.h"
 #include "Systems/Input/Input.h"
+#include "Systems/Input/InputActionMap.h"
 #include "Systems/Text/TextTextureBaker.h"
 #include "Systems/UI/UIBase.h"
 #include "Systems/UI/UIManager.h"
@@ -145,6 +146,18 @@ void from_json(const nlohmann::json &json, TutorialStepUI &ui) {
   ui.layerOffset = json.value("layerOffset", ui.layerOffset);
 }
 
+void to_json(nlohmann::json &json, const TutorialGate &gate) {
+  json = {
+      {"enabled", gate.enabled},
+      {"allow", gate.allow},
+  };
+}
+
+void from_json(const nlohmann::json &json, TutorialGate &gate) {
+  gate.enabled = json.value("enabled", gate.enabled);
+  gate.allow = json.value("allow", std::vector<std::string>{});
+}
+
 void to_json(nlohmann::json &json, const TutorialSpotlightTarget &target) {
   json = {
       {"kind", SpotlightKindName(target.kind)},
@@ -225,7 +238,10 @@ void to_json(nlohmann::json &json, const TutorialStep &step) {
       {"layout", step.layout},
       {"additionalUIs", step.additionalUIs},
       {"complete", step.complete},
+      {"trigger", step.trigger},
       {"spotlight", step.spotlight},
+      {"gate", step.gate},
+      {"once", step.once},
   };
 }
 
@@ -244,6 +260,10 @@ void from_json(const nlohmann::json &json, TutorialStep &step) {
   // complete が無い既存ファイルは type=None のままになり、waitType で進む。
   step.complete = json.value("complete", TutorialCondition{});
   step.spotlight = json.value("spotlight", TutorialSpotlightConfig{});
+  // trigger が無い既存ファイルは type=None のままとなり、従来の線形進行になる。
+  step.trigger = json.value("trigger", TutorialCondition{});
+  step.gate = json.value("gate", TutorialGate{});
+  step.once = json.value("once", step.once);
 }
 
 namespace {
@@ -348,7 +368,40 @@ void TutorialManager::Start(const TutorialData &data, std::size_t startStep) {
   currentData_ = data;
   playing_ = true;
   SubscribeSignals();
-  EnterStep(startStep);
+  ResetStepStates(startStep);
+
+  // 開始条件を持たないステップがあれば即座に始まる。
+  // 全ステップが条件待ちの場合は、何も表示せず成立を待つ状態になる。
+  if (!TryActivateNext() && AllStepsDone())
+    Stop();
+}
+
+void TutorialManager::ResetStepStates(std::size_t startStep) {
+  const std::size_t count = currentData_.steps.size();
+  stepStates_.assign(count, StepState::Waiting);
+  triggerRuntimes_.clear();
+  triggerRuntimes_.resize(count);
+  pendingQueue_.clear();
+  autoCursor_ = startStep;
+  totalElapsed_ = 0.0f;
+  hasActiveStep_ = false;
+
+  TutorialProgress *progress = TutorialProgress::GetInstance();
+  for (std::size_t i = 0; i < count; ++i) {
+    const TutorialStep &step = currentData_.steps[i];
+
+    // startStep より前は「もう見た扱い」にして飛ばす。
+    if (i < startStep) {
+      stepStates_[i] = StepState::Done;
+      continue;
+    }
+    // once 指定のステップは、既読なら最初から完了扱いにする。
+    if (step.once && progress->IsSeen(currentData_.name, step.name)) {
+      stepStates_[i] = StepState::Done;
+      continue;
+    }
+    triggerRuntimes_[i].Reset(step.trigger);
+  }
 }
 
 void TutorialManager::SubscribeSignals() {
@@ -364,6 +417,13 @@ void TutorialManager::SubscribeSignals() {
         // 旧 waitType=Event との互換のため、名前を受信済みイベントにも残す。
         receivedEvents_.insert(signal.name);
         completeRuntime_.OnSignal(signal);
+
+        // 待機中ステップの開始条件へも配る。表示中でも裏で成立を数える。
+        for (std::size_t i = 0; i < triggerRuntimes_.size(); ++i) {
+          if (stepStates_[i] != StepState::Waiting)
+            continue;
+          triggerRuntimes_[i].OnSignal(signal);
+        }
       });
 }
 
@@ -382,11 +442,18 @@ void TutorialManager::Stop() {
   // データが差し替わる前に必ず切り離す。
   UnsubscribeSignals();
   completeRuntime_.Clear();
+  triggerRuntimes_.clear();
+  stepStates_.clear();
+  pendingQueue_.clear();
   TutorialSpotlight::GetInstance()->Clear();
+  ReleaseGate();
   playing_ = false;
+  hasActiveStep_ = false;
   runtimeUIDirty_ = false;
   currentStep_ = 0;
+  autoCursor_ = 0;
   stepElapsed_ = 0.0f;
+  totalElapsed_ = 0.0f;
   transitionElapsed_ = 0.0f;
   transitionOpacity_ = 1.0f;
   transitionStartOpacity_ = 1.0f;
@@ -394,15 +461,130 @@ void TutorialManager::Stop() {
   receivedEvents_.clear();
 }
 
-void TutorialManager::Update() {
-  if (!playing_ || currentStep_ >= currentData_.steps.size())
+///************************* 開始条件 *************************///
+
+void TutorialManager::UpdateTriggers() {
+  for (std::size_t i = 0; i < triggerRuntimes_.size(); ++i) {
+    if (stepStates_[i] != StepState::Waiting)
+      continue;
+
+    TutorialConditionRuntime &runtime = triggerRuntimes_[i];
+    if (!runtime.HasDefinition())
+      continue;
+
+    // 開始条件の elapsed はチュートリアル開始からの経過秒を見る。
+    // 決定入力で始まる開始条件は紛らわしいので受け付けない。
+    runtime.Update(totalElapsed_, false);
+    if (!runtime.IsSatisfied())
+      continue;
+
+    stepStates_[i] = StepState::Queued;
+    pendingQueue_.push_back(i);
+  }
+}
+
+bool TutorialManager::TryActivateNext() {
+  // 条件が成立したステップを優先する。割り込みで教えたい内容のため。
+  while (!pendingQueue_.empty()) {
+    const std::size_t index = pendingQueue_.front();
+    pendingQueue_.erase(pendingQueue_.begin());
+    if (index >= stepStates_.size() || stepStates_[index] == StepState::Done)
+      continue;
+    EnterStep(index);
+    return true;
+  }
+
+  // 次は開始条件を持たないステップを順番に。これが従来の線形進行にあたる。
+  while (autoCursor_ < currentData_.steps.size()) {
+    const std::size_t index = autoCursor_;
+    if (stepStates_[index] == StepState::Waiting &&
+        currentData_.steps[index].trigger.type == TutorialConditionType::None) {
+      ++autoCursor_;
+      EnterStep(index);
+      return true;
+    }
+    // 条件待ちのステップは飛ばして先へ進む（起動はキュー経由で行われる）。
+    if (stepStates_[index] == StepState::Done ||
+        currentData_.steps[index].trigger.type != TutorialConditionType::None) {
+      ++autoCursor_;
+      continue;
+    }
+    break;
+  }
+  return false;
+}
+
+void TutorialManager::FinishCurrentStep() {
+  if (currentStep_ < currentData_.steps.size() &&
+      currentStep_ < stepStates_.size()) {
+    const TutorialStep &step = currentData_.steps[currentStep_];
+    stepStates_[currentStep_] = StepState::Done;
+    if (step.once) {
+      TutorialProgress::GetInstance()->MarkSeen(currentData_.name, step.name);
+    }
+  }
+  hasActiveStep_ = false;
+  ClearTargetHighlight();
+  HideRuntimeUI();
+  TutorialSpotlight::GetInstance()->Clear();
+  ApplyGameplayPause(false);
+  ReleaseGate();
+  completeRuntime_.Clear();
+}
+
+bool TutorialManager::AllStepsDone() const {
+  for (const StepState state : stepStates_) {
+    if (state != StepState::Done)
+      return false;
+  }
+  return true;
+}
+
+///************************* 入力ゲート *************************///
+
+void TutorialManager::ApplyGate(const TutorialGate &gate) {
+  if (!gate.enabled) {
+    ReleaseGate();
     return;
+  }
+  InputActionMap::GetInstance()->SetExclusivelyEnabled(gate.allow);
+  gateOwned_ = true;
+}
+
+void TutorialManager::ReleaseGate() {
+  if (!gateOwned_)
+    return;
+  InputActionMap::GetInstance()->EnableAll();
+  gateOwned_ = false;
+}
+
+void TutorialManager::Update() {
+  if (!playing_)
+    return;
+
+  const float deltaTime = GameTime::GetDeltaTime(TimeChannel::UI);
+  totalElapsed_ += deltaTime;
+
+  // 待機中ステップの開始条件は、説明を表示しているかに関わらず毎フレーム評価する。
+  UpdateTriggers();
+
+  if (!hasActiveStep_) {
+    if (!TryActivateNext()) {
+      // 起動待ちのステップが残っている間は、何も表示せずチュートリアルを生かしておく。
+      // 全て終わって初めて終了する。
+      if (AllStepsDone())
+        Stop();
+      return;
+    }
+  }
+  if (currentStep_ >= currentData_.steps.size())
+    return;
+
   if (runtimeUIDirty_ || !UIManager::GetInstance()->HasUI(kPanelUIId) ||
       !UIManager::GetInstance()->HasUI(kTextUIId)) {
     RefreshRuntimeUI();
     runtimeUIDirty_ = false;
   }
-  const float deltaTime = GameTime::GetDeltaTime(TimeChannel::UI);
   const TutorialStyle &style = currentData_.style;
 
   // 暗幕はページ送りのフェード中も動かし続ける（下の早期 return
@@ -509,11 +691,11 @@ void TutorialManager::Advance() {
 void TutorialManager::CompleteAdvance() {
   if (!playing_)
     return;
-  const std::size_t next = currentStep_ + 1;
-  if (next >= currentData_.steps.size())
+  FinishCurrentStep();
+
+  // 次に出すものが無くても、開始条件待ちが残っていれば終了しない。
+  if (!TryActivateNext() && AllStepsDone())
     Stop();
-  else
-    EnterStep(next);
 }
 
 void TutorialManager::EnterStep(std::size_t index) {
@@ -527,12 +709,17 @@ void TutorialManager::EnterStep(std::size_t index) {
                          ? TransitionPhase::FadeIn
                          : TransitionPhase::Showing;
   receivedEvents_.clear();
+  hasActiveStep_ = true;
+  if (index < stepStates_.size())
+    stepStates_[index] = StepState::Queued;
+
   const TutorialStep &step = currentData_.steps[currentStep_];
   // 完了条件の受信回数をこのステップ用に張り直す。
   completeRuntime_.Reset(step.complete);
   // 暗幕は説明パネルの1つ下に敷く。穴の下にあるUIや3Dの画をそのまま見せたいため。
   TutorialSpotlight::GetInstance()->Apply(step.spotlight,
                                           currentData_.style.layer - 1);
+  ApplyGate(step.gate);
   ApplyGameplayPause(step.pauseGameplay);
   // Editor::Draw 中に Start される場合があるため、GPUテクスチャの更新は
   // Framework::Update 後に呼ばれる TutorialManager::Update まで遅延する。

@@ -61,6 +61,10 @@ public:
   // 入力アクションから作られるシグナル名。
   static std::string ActionTriggeredName(const std::string &actionName);
 
+  // 接触から作られるシグナル名
+  // （"collision.enter.<型名>" / "collision.exit.<型名>"）。
+  static std::string ContactName(uint32_t collisionTypeId, bool entered);
+
 private:
   ///************************* 内部構造 *************************///
 

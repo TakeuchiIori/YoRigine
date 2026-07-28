@@ -35,6 +35,11 @@
                     }
                 ]
             },
+            "gate": {
+                "enabled": true,
+                "allow": [ "Move", "AttackLight" ]
+            },
+            "once": false,
             "pauseGameplay": false,
             "skippable": true,
             "waitType": "confirm",
@@ -93,6 +98,34 @@
                         "seconds": 8.0
                     }
                 ]
+            },
+            "pauseGameplay": false,
+            "skippable": true,
+            "waitType": "confirm",
+            "waitSeconds": 2.0,
+            "eventName": "",
+            "targetUIId": "",
+            "layout": {
+                "panelPosition": [ 640.0, 570.0 ],
+                "panelSize": [ 1120.0, 240.0 ],
+                "textOffset": [ 0.0, -35.0 ],
+                "textMaxWidth": 1020.0,
+                "hintOffset": [ 0.0, 85.0 ],
+                "hintPanelSize": [ 540.0, 54.0 ]
+            },
+            "additionalUIs": []
+        },
+        {
+            "name": "敵に接触したときの注意",
+            "speaker": "",
+            "text": "敵に触れるとダメージを受ける。距離を取って戦おう",
+            "trigger": {
+                "type": "signal",
+                "name": "collision.enter.Enemy",
+                "count": 1
+            },
+            "complete": {
+                "type": "confirm"
             },
             "pauseGameplay": false,
             "skippable": true,
