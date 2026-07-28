@@ -63,16 +63,44 @@ namespace YoRigine {
 		int layerOffset = 4;
 	};
 
+	// 説明UIを構成する要素1つぶんの見た目。
+	// 4要素（パネル / 本文 / ヒント背景 / ヒント文字）が同じ形の設定を持ち、
+	// それぞれ独立に配置・着色・アニメーションできる。
+	struct TutorialElementLayout {
+		bool visible = true;
+		Vector2 position{ 640.0f, 570.0f };   // 画面座標
+		Vector2 size{ 100.0f, 100.0f };       // パネル系のみ有効（文字は実寸で描く）
+		Vector2 anchorPoint{ 0.5f, 0.5f };
+		// style の色へ掛ける倍率。ページ単位で濃さを変えたいときに使う。
+		Vector4 colorTint{ 1.0f, 1.0f, 1.0f, 1.0f };
+		// style.layer からの相対。要素同士の重なり順を決める。
+		int layerOffset = 0;
+		// 表示時に再生するアニメーションクリップ名。
+		// スライドイン等の凝った動きは、UIアニメーションエディタで作ってここで指定する。
+		std::string clipName;
+	};
+
 	// 説明ページごとのレイアウト。
 	// ページによって本文量や補足画像の位置が異なるため、共通Styleとは分離して保存する。
 	struct TutorialStepLayout {
-		Vector2 panelPosition{ 640.0f, 570.0f };
-		Vector2 panelSize{ 1120.0f, 240.0f };
-		Vector2 textOffset{ 0.0f, -35.0f };
+		// 既定値は旧形式の既定レイアウトと同じ見た目になるよう揃えてある。
+		TutorialElementLayout panel{
+			.position = { 640.0f, 570.0f }, .size = { 1120.0f, 240.0f }, .layerOffset = 0 };
+		TutorialElementLayout text{
+			.position = { 640.0f, 535.0f }, .layerOffset = 1 };
+		TutorialElementLayout hintPanel{
+			.position = { 640.0f, 655.0f }, .size = { 540.0f, 54.0f }, .layerOffset = 2 };
+		TutorialElementLayout hintText{
+			.position = { 640.0f, 655.0f }, .layerOffset = 3 };
+		// 本文の折り返し幅（テキストをベイクするときに使う。配置ではない）
 		float textMaxWidth = 1020.0f;
-		Vector2 hintOffset{ 0.0f, 85.0f };
-		Vector2 hintPanelSize{ 540.0f, 54.0f };
 	};
+
+	// 旧形式（panelPosition / textOffset / hintOffset …）のレイアウトを
+	// 要素ごとの形式へ変換する。読み込み時の互換のためだけに使う。
+	TutorialStepLayout MakeLegacyStepLayout(const Vector2& panelPosition,
+		const Vector2& panelSize, const Vector2& textOffset, float textMaxWidth,
+		const Vector2& hintOffset, const Vector2& hintPanelSize);
 
 	struct TutorialStep {
 		std::string name = "新しいステップ";

@@ -96,6 +96,50 @@ namespace {
 		return changed;
 	}
 
+	// 説明UI1要素ぶんの配置・色・アニメーションの編集UI。
+	// hasSize=false の文字要素は、ベイクしたテクスチャの実寸で描かれるためサイズを持たない。
+	bool DrawElementEditor(const char* label, const char* idScope,
+		YoRigine::TutorialElementLayout& element, bool hasSize) {
+		bool changed = false;
+		ImGui::PushID(idScope);
+		if (ImGui::TreeNodeEx(label, ImGuiTreeNodeFlags_DefaultOpen)) {
+			changed |= YEditorWidget::Checkbox("表示する", element.visible);
+			changed |= YEditorWidget::DragVec2("中心位置", element.position, 1.0f, -2048.0f, 4096.0f);
+			if (hasSize) {
+				changed |= YEditorWidget::DragVec2("サイズ", element.size, 1.0f, 1.0f, 4096.0f);
+			}
+			changed |= YEditorWidget::DragVec2("アンカー", element.anchorPoint, 0.01f, 0.0f, 1.0f);
+			YEditorWidget::HelpMarker(
+				"0,0 が左上、0.5,0.5 が中心、1,1 が右下。中心位置がどこを指すかを決めます");
+			changed |= YEditorWidget::Color("色の補正", element.colorTint);
+			YEditorWidget::HelpMarker("全ページ共通のデザインで決めた色に掛け算されます");
+			changed |= YEditorWidget::DragInt("重なり順", element.layerOffset, 1.0f, -8, 32);
+
+			// この要素に使えるクリップを、実行中のUIから拾って候補にする。
+			std::vector<std::string> clipNames;
+			const char* runtimeId =
+				(std::string(idScope) == "panel") ? "__TutorialRuntimePanel" :
+				(std::string(idScope) == "text") ? "__TutorialRuntimeText" :
+				(std::string(idScope) == "hintPanel") ? "__TutorialRuntimeHintPanel" :
+				"__TutorialRuntimeHintText";
+			if (UIBase* ui = YoRigine::UIManager::GetInstance()->GetUI(runtimeId)) {
+				for (const UIAnimationClip& clip : ui->GetClips()) clipNames.push_back(clip.name);
+			}
+			std::sort(clipNames.begin(), clipNames.end());
+			if (!clipNames.empty()) {
+				changed |= YEditorWidget::StringCombo("アニメーションクリップ", element.clipName, clipNames, true);
+			}
+			else {
+				changed |= YEditorWidget::InputText("アニメーションクリップ名", element.clipName);
+			}
+			YEditorWidget::HelpMarker(
+				"表示された瞬間に再生されます。スライドインなどの動きはクリップで作ってください");
+			ImGui::TreePop();
+		}
+		ImGui::PopID();
+		return changed;
+	}
+
 	// 入力ゲートの編集UI。許可するアクションをチェックで選ぶ。
 	bool DrawGateEditor(YoRigine::TutorialGate& gate) {
 		bool changed = YEditorWidget::Checkbox("この説明中は操作を制限する", gate.enabled);
@@ -621,42 +665,30 @@ namespace YoRigine {
 				}
 				ImGui::SameLine();
 				if (ImGui::Button("画面上に配置")) {
-					step.layout.panelPosition = { 640.0f, 150.0f };
-					step.layout.panelSize = { 1120.0f, 240.0f };
-					step.layout.textOffset = { 0.0f, -35.0f };
-					step.layout.textMaxWidth = 1020.0f;
-					step.layout.hintOffset = { 0.0f, 85.0f };
-					step.layout.hintPanelSize = { 540.0f, 54.0f };
+					step.layout = YoRigine::MakeLegacyStepLayout(
+						{ 640.0f, 150.0f }, { 1120.0f, 240.0f }, { 0.0f, -35.0f },
+						1020.0f, { 0.0f, 85.0f }, { 540.0f, 54.0f });
 					stepChanged = true;
 				}
 				ImGui::SameLine();
 				if (ImGui::Button("中央に配置")) {
-					step.layout.panelPosition = { 640.0f, 360.0f };
-					step.layout.panelSize = { 840.0f, 320.0f };
-					step.layout.textOffset = { 0.0f, -45.0f };
-					step.layout.textMaxWidth = 760.0f;
-					step.layout.hintOffset = { 0.0f, 115.0f };
-					step.layout.hintPanelSize = { 540.0f, 54.0f };
+					step.layout = YoRigine::MakeLegacyStepLayout(
+						{ 640.0f, 360.0f }, { 840.0f, 320.0f }, { 0.0f, -45.0f },
+						760.0f, { 0.0f, 115.0f }, { 540.0f, 54.0f });
 					stepChanged = true;
 				}
 				if (editorSelectedStep_ > 0 && ImGui::Button("前のページからレイアウトをコピー")) {
 					step.layout = editorData_.steps[editorSelectedStep_ - 1].layout;
 					stepChanged = true;
 				}
-				stepChanged |= YEditorWidget::DragVec2(
-					"説明パネルの中心位置", step.layout.panelPosition, 1.0f, -2048.0f, 4096.0f);
-				stepChanged |= YEditorWidget::DragVec2(
-					"説明パネルのサイズ", step.layout.panelSize, 1.0f, 1.0f, 4096.0f);
-				stepChanged |= YEditorWidget::DragVec2(
-					"説明文の相対位置", step.layout.textOffset, 1.0f, -2048.0f, 2048.0f);
-				YEditorWidget::HelpMarker("説明パネルの中心を基準にした位置です");
 				stepChanged |= YEditorWidget::DragFloat(
-					"説明文の最大幅", step.layout.textMaxWidth, 1.0f, 64.0f, 4096.0f, "%.0f");
-				stepChanged |= YEditorWidget::DragVec2(
-					"操作案内の相対位置", step.layout.hintOffset, 1.0f, -2048.0f, 2048.0f);
-				YEditorWidget::HelpMarker("説明パネルの中心を基準にした位置です");
-				stepChanged |= YEditorWidget::DragVec2(
-					"操作案内の背景サイズ", step.layout.hintPanelSize, 1.0f, 1.0f, 4096.0f);
+					"説明文の折り返し幅", step.layout.textMaxWidth, 1.0f, 64.0f, 4096.0f, "%.0f");
+				YEditorWidget::HelpMarker("配置ではなく、本文を何ピクセルで改行するかの設定です");
+
+				stepChanged |= DrawElementEditor("説明パネル", "panel", step.layout.panel, true);
+				stepChanged |= DrawElementEditor("説明文", "text", step.layout.text, false);
+				stepChanged |= DrawElementEditor("操作案内の背景", "hintPanel", step.layout.hintPanel, true);
+				stepChanged |= DrawElementEditor("操作案内の文字", "hintText", step.layout.hintText, false);
 
 				YEditorWidget::SectionHeader("このページの内容");
 				stepChanged |= YEditorWidget::InputText("管理名", step.name);

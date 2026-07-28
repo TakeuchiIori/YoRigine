@@ -60,8 +60,13 @@ public:
   // 穴の下にあるものを見せたいので、説明パネルより1つ下を指定する。
   void Apply(const TutorialSpotlightConfig &config, int layer);
 
-  // 暗幕を即座に消す。フェードアウトはしない。
+  // 暗幕を消す。fadeSeconds を掛けて薄くしてから消える。
+  // 消え終わるまで IsActive() は true のままなので、Update / Draw
+  // を回し続けること。
   void Clear();
+
+  // フェードを待たずに即座に消す。シーン終了など、次のフレームが無い場面用。
+  void ClearImmediate();
 
   // 毎フレーム呼ぶ。フェードと、動く対象への矩形追従を行う。
   void Update(float deltaTime);
@@ -124,6 +129,8 @@ private:
   int layer_ = 0;
   float opacity_ = 0.0f;
   bool active_ = false;
+  // 消える途中。opacity_ が 0 になった時点で active_ を落とす。
+  bool fadingOut_ = false;
 };
 
 } // namespace YoRigine

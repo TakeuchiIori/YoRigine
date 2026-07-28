@@ -236,7 +236,8 @@ spotlight->RegisterWorldTarget("NearestEnemy",
 ### 制限
 
 - 穴は**軸並行の矩形のみ**。円形や角丸にしたい場合は、穴の上に枠テクスチャを重ねる想定。
-- **フェードインのみ**。`Clear()` は即座に消える。ステップ間の暗幕は毎回フェードインし直す。
+- **フェードイン・フェードアウト両対応**。`Clear()` は `fadeSeconds` を掛けて薄くしてから消える。消え終わるまで `IsActive()` が true のままなので、`TutorialManager` は `playing_` の判定より前に `Update` / `Draw` を回している（そうしないと消えかけで固まる）。シーン終了など次のフレームが無い場面用に `ClearImmediate()` がある。
+- ステップ間では、消えかけの途中から次の暗幕へ**滑らかに戻る**（毎回0からやり直さない）。
 
 ---
 
@@ -307,13 +308,77 @@ GameTime::SetGameplaySustainedScale(1.0f);  // 解除
 
 ---
 
-## 9. サンプル
+## 9. デザインとアニメーション
+
+### 要素ごとのレイアウト
+
+説明UIは4要素（説明パネル / 説明文 / 操作案内の背景 / 操作案内の文字）でできていて、**それぞれが独立した設定を持つ**。
+
+```jsonc
+"layout": {
+  "textMaxWidth": 1020.0,        // 本文の折り返し幅（配置ではない）
+  "panel":     { "position": [640, 570], "size": [1120, 240], "layerOffset": 0 },
+  "text":      { "position": [640, 535], "layerOffset": 1 },
+  "hintPanel": { "position": [640, 655], "size": [540, 54],   "layerOffset": 2 },
+  "hintText":  { "position": [640, 655], "layerOffset": 3 }
+}
+```
+
+各要素が持つもの：
+
+| 項目 | 意味 |
+|---|---|
+| `visible` | この要素を出すか |
+| `position` | 画面座標。**パネルからの相対ではなく絶対座標**なので独立して動かせる |
+| `size` | パネル系のみ有効。文字はベイクしたテクスチャの実寸で描く |
+| `anchorPoint` | `position` がどこを指すか（0,0=左上 / 0.5,0.5=中心 / 1,1=右下） |
+| `colorTint` | 共通スタイルの色に掛ける倍率。ページ単位で濃さを変えられる |
+| `layerOffset` | `style.layer` からの相対。要素同士の重なり順 |
+| `clipName` | 表示された瞬間に再生するアニメーションクリップ名 |
+
+**旧形式（`panelPosition` / `textOffset` / `hintOffset` …）のJSONはそのまま読める。** 読み込み時に要素ごとの形へ変換され、保存すると新形式になる。旧形式ではヒントがパネル位置に縛られていたが、変換後は絶対座標になるので自由に動かせる。
+
+### アニメーション
+
+要素ごとの `clipName` に、**UIアニメーションエディタで作ったクリップ名**を指定する。`UIAnimationClip` は `Alpha / PosX / PosY / ScaleX / ScaleY / RotationZ / R / G / B` のキーフレーム列とイージングを持つ（CSS の `@keyframes` 相当）。スライドイン、ポップ、回転などはここで作る。
+
+`UIBase` には `PlayPulse` `PlayShake` `PlayBlink` … といったプリセット関数が20個ほどあるが、**新しい動きのたびに関数を増やさないこと。** クリップで表現する。
+
+注意点：
+
+- ページ送りのフェード中（`FadeIn` / `FadeOut`）は `ApplyRuntimeOpacity` が毎フレーム色を上書きするため、**クリップの Alpha トラックはその間だけ効かない**。表示が安定している間はクリップが色を握る。
+- ページが変わるとき、前のクリップは `StopAllAnimations()` で必ず止まる（残っていると位置がずれるため）。
+
+### 注目UIの強調
+
+`highlight` は暗幕とは別系統で、**対象のUIそのものを動かす**（暗幕は周りを暗くする）。併用できる。
+
+```jsonc
+"highlight": {
+  "enabled": true,
+  "uiIds": ["A", "A_attack"],
+  "clipName": "TutorialFocus",   // 指定するとクリップ優先。プリセットは使わない
+  "pulse": true, "scaleAmount": 1.25, "pulseSeconds": 0.45,
+  "blink": true, "blinkSeconds": 0.9,
+  "bringToFront": true
+}
+```
+
+クリップ名を指定して見つからなかった場合は、黙ってプリセットへ戻る（クリップを作る前でも動く）。解除時は元のスケールと色へ必ず戻す。
+
+---
+
+## 10. サンプル
 
 `Resources/Json/Tutorials/AttackBasics.json`
 
 1. 軽攻撃を3回（`signal` × count 3、`pauseGameplay: false`）
 2. ガードを1回（`signal`）
 3. スタイル切替、または8秒経過（`any` の入れ子）
+
+`Resources/Json/Tutorials/ComboBasics.json`
+
+「UIを出す → 攻撃1回 → 次のUIを出す → 攻撃1回」を繰り返す形。各ステップの `complete` を攻撃シグナル1回にし、`gate` で当該ボタンだけを許可している。`highlight` で対応するボタンUI（`A` / `B` / `Guard`）を光らせる。**攻撃入力は戦闘中しか受け付けない**ので、バトルシーンで再生すること。
 
 `TutorialManager::GetInstance()->LoadAndStart("Resources/Json/Tutorials/AttackBasics.json")` で開始できる。
 

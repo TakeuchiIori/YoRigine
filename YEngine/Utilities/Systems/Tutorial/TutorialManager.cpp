@@ -104,24 +104,81 @@ YoRigine::TutorialWaitType ReadWaitType(const std::string &value) {
 } // namespace
 
 namespace YoRigine {
+void to_json(nlohmann::json &json, const TutorialElementLayout &element) {
+  json = {
+      {"visible", element.visible},     {"position", element.position},
+      {"size", element.size},           {"anchorPoint", element.anchorPoint},
+      {"colorTint", element.colorTint}, {"layerOffset", element.layerOffset},
+      {"clipName", element.clipName},
+  };
+}
+
+void from_json(const nlohmann::json &json, TutorialElementLayout &element) {
+  element.visible = json.value("visible", element.visible);
+  element.position = json.value("position", element.position);
+  element.size = json.value("size", element.size);
+  element.anchorPoint = json.value("anchorPoint", element.anchorPoint);
+  element.colorTint = json.value("colorTint", element.colorTint);
+  element.layerOffset = json.value("layerOffset", element.layerOffset);
+  element.clipName = json.value("clipName", element.clipName);
+}
+
+TutorialStepLayout
+MakeLegacyStepLayout(const Vector2 &panelPosition, const Vector2 &panelSize,
+                     const Vector2 &textOffset, float textMaxWidth,
+                     const Vector2 &hintOffset, const Vector2 &hintPanelSize) {
+  TutorialStepLayout layout;
+  layout.textMaxWidth = textMaxWidth;
+
+  layout.panel.position = panelPosition;
+  layout.panel.size = panelSize;
+  layout.panel.layerOffset = 0;
+
+  // 旧形式では本文もヒントもパネル位置からのオフセットで置いていた。
+  // 変換後は絶対座標になるので、以降は独立して動かせる。
+  layout.text.position = {panelPosition.x + textOffset.x,
+                          panelPosition.y + textOffset.y};
+  layout.text.layerOffset = 1;
+
+  layout.hintPanel.position = {panelPosition.x + hintOffset.x,
+                               panelPosition.y + hintOffset.y};
+  layout.hintPanel.size = hintPanelSize;
+  layout.hintPanel.layerOffset = 2;
+
+  layout.hintText.position = layout.hintPanel.position;
+  layout.hintText.layerOffset = 3;
+  return layout;
+}
+
 void to_json(nlohmann::json &json, const TutorialStepLayout &layout) {
   json = {
-      {"panelPosition", layout.panelPosition},
-      {"panelSize", layout.panelSize},
-      {"textOffset", layout.textOffset},
+      {"panel", layout.panel},
+      {"text", layout.text},
+      {"hintPanel", layout.hintPanel},
+      {"hintText", layout.hintText},
       {"textMaxWidth", layout.textMaxWidth},
-      {"hintOffset", layout.hintOffset},
-      {"hintPanelSize", layout.hintPanelSize},
   };
 }
 
 void from_json(const nlohmann::json &json, TutorialStepLayout &layout) {
-  layout.panelPosition = json.value("panelPosition", layout.panelPosition);
-  layout.panelSize = json.value("panelSize", layout.panelSize);
-  layout.textOffset = json.value("textOffset", layout.textOffset);
-  layout.textMaxWidth = json.value("textMaxWidth", layout.textMaxWidth);
-  layout.hintOffset = json.value("hintOffset", layout.hintOffset);
-  layout.hintPanelSize = json.value("hintPanelSize", layout.hintPanelSize);
+  // 新形式（要素ごと）が入っていればそれを読む。
+  if (json.contains("panel")) {
+    layout.panel = json.value("panel", layout.panel);
+    layout.text = json.value("text", layout.text);
+    layout.hintPanel = json.value("hintPanel", layout.hintPanel);
+    layout.hintText = json.value("hintText", layout.hintText);
+    layout.textMaxWidth = json.value("textMaxWidth", layout.textMaxWidth);
+    return;
+  }
+
+  // 旧形式は要素ごとの形へ変換して読み込む。保存すると新形式へ移行する。
+  layout =
+      MakeLegacyStepLayout(json.value("panelPosition", Vector2{640.0f, 570.0f}),
+                           json.value("panelSize", Vector2{1120.0f, 240.0f}),
+                           json.value("textOffset", Vector2{0.0f, -35.0f}),
+                           json.value("textMaxWidth", 1020.0f),
+                           json.value("hintOffset", Vector2{0.0f, 85.0f}),
+                           json.value("hintPanelSize", Vector2{540.0f, 54.0f}));
 }
 
 void to_json(nlohmann::json &json, const TutorialStepUI &ui) {
@@ -610,10 +667,15 @@ void TutorialManager::ReleaseGameplaySpeed() {
 }
 
 void TutorialManager::Update() {
+  const float deltaTime = GameTime::GetDeltaTime(TimeChannel::UI);
+
+  // 暗幕はチュートリアルが終わった後もフェードアウトを続ける必要がある。
+  // playing_ の判定より前に回さないと、消えかけのまま固まってしまう。
+  TutorialSpotlight::GetInstance()->Update(deltaTime);
+
   if (!playing_)
     return;
 
-  const float deltaTime = GameTime::GetDeltaTime(TimeChannel::UI);
   totalElapsed_ += deltaTime;
 
   // 待機中ステップの開始条件は、説明を表示しているかに関わらず毎フレーム評価する。
@@ -637,10 +699,6 @@ void TutorialManager::Update() {
     runtimeUIDirty_ = false;
   }
   const TutorialStyle &style = currentData_.style;
-
-  // 暗幕はページ送りのフェード中も動かし続ける（下の早期 return
-  // より前に置く）。
-  TutorialSpotlight::GetInstance()->Update(deltaTime);
 
   if (transitionPhase_ == TransitionPhase::FadeIn) {
     transitionElapsed_ += deltaTime;
@@ -705,11 +763,12 @@ void TutorialManager::Update() {
 }
 
 void TutorialManager::Draw() {
+  // 暗幕が先。説明パネルより下に敷く。
+  // 消えかけの間も描き続ける必要があるため、再生判定より前に呼ぶ。
+  TutorialSpotlight::GetInstance()->Draw();
+
   if (!playing_ || !hasActiveStep_)
     return;
-
-  // 暗幕が先。説明パネルより下に敷く。
-  TutorialSpotlight::GetInstance()->Draw();
 
   UIManager *uiManager = UIManager::GetInstance();
   std::vector<UIBase *> targets;
@@ -866,88 +925,68 @@ void TutorialManager::RefreshRuntimeUI() {
   }
 
   UIManager *uiManager = UIManager::GetInstance();
-  UIBase *panel = uiManager->GetUI(kPanelUIId);
-  if (!panel) {
-    auto created = std::make_unique<UIBase>(kPanelUIId);
+
+  // 4要素は生成手順が同じなので、まとめて用意する。
+  auto ensureUI = [&](const char *id) -> UIBase * {
+    UIBase *ui = uiManager->GetUI(id);
+    if (ui)
+      return ui;
+    auto created = std::make_unique<UIBase>(id);
     created->Initialize("");
     created->SetTransient(true);
     // 描画は TutorialManager::Draw が行う（UIManager の一括描画には任せない）。
     created->SetSelfDrawn(true);
-    panel = created.get();
-    uiManager->AddUI(kPanelUIId, std::move(created));
-  }
-  panel->SetAnchorPoint({0.5f, 0.5f});
+    ui = created.get();
+    uiManager->AddUI(id, std::move(created));
+    return ui;
+  };
+
+  // 要素ごとの配置とアニメーションを適用する。
+  // useSize=false の文字要素は、ベイクしたテクスチャの実寸をそのまま使う。
+  auto applyElement = [&](UIBase *ui, const TutorialElementLayout &element,
+                          bool useSize, bool contentVisible) {
+    // 前のページのクリップが残っていると位置がずれるので必ず止める。
+    ui->StopAllAnimations();
+    ui->SetAnchorPoint(element.anchorPoint);
+    ui->SetPosition({element.position.x, element.position.y, 0.0f});
+    if (useSize)
+      ui->SetSize(element.size);
+    ui->SetLayer(style.layer + element.layerOffset);
+    ui->SetVisible(contentVisible && element.visible);
+
+    if (element.clipName.empty())
+      return;
+    for (const UIAnimationClip &clip : ui->GetClips()) {
+      if (clip.name == element.clipName) {
+        ui->PlayClip(clip);
+        break;
+      }
+    }
+  };
+
+  UIBase *panel = ensureUI(kPanelUIId);
   panel->SetTexture(style.panelTexturePath.empty()
                         ? "./Resources/images/white.png"
                         : style.panelTexturePath);
-  panel->SetPosition({layout.panelPosition.x, layout.panelPosition.y, 0.0f});
-  panel->SetSize(layout.panelSize);
-  panel->SetColor(style.panelColor);
-  panel->SetLayer(style.layer);
-  panel->SetVisible(true);
+  applyElement(panel, layout.panel, true, true);
 
-  UIBase *text = uiManager->GetUI(kTextUIId);
-  if (!text) {
-    auto created = std::make_unique<UIBase>(kTextUIId);
-    created->Initialize("");
-    created->SetTransient(true);
-    // 描画は TutorialManager::Draw が行う（UIManager の一括描画には任せない）。
-    created->SetSelfDrawn(true);
-    text = created.get();
-    uiManager->AddUI(kTextUIId, std::move(created));
-  }
+  UIBase *text = ensureUI(kTextUIId);
   TextureManager::GetInstance()->ReloadTexture(kRuntimeTexturePath);
   text->SetTexture(kRuntimeTexturePath);
-  text->SetAnchorPoint({0.5f, 0.5f});
-  text->SetPosition({layout.panelPosition.x + layout.textOffset.x,
-                     layout.panelPosition.y + layout.textOffset.y, 0.0f});
-  text->SetColor({1.0f, 1.0f, 1.0f, 1.0f});
-  text->SetLayer(style.layer + 1);
-  text->SetVisible(true);
-  text->StopAnimation(UIAnimationType::FadeIn);
+  applyElement(text, layout.text, false, true);
 
-  UIBase *hintPanel = uiManager->GetUI(kHintPanelUIId);
-  if (!hintPanel) {
-    auto created = std::make_unique<UIBase>(kHintPanelUIId);
-    created->Initialize("");
-    created->SetTransient(true);
-    // 描画は TutorialManager::Draw が行う（UIManager の一括描画には任せない）。
-    created->SetSelfDrawn(true);
-    hintPanel = created.get();
-    uiManager->AddUI(kHintPanelUIId, std::move(created));
-  }
-  const Vector2 hintPosition{layout.panelPosition.x + layout.hintOffset.x,
-                             layout.panelPosition.y + layout.hintOffset.y};
-  hintPanel->SetAnchorPoint({0.5f, 0.5f});
+  UIBase *hintPanel = ensureUI(kHintPanelUIId);
   hintPanel->SetTexture(style.hintPanelTexturePath.empty()
                             ? "./Resources/images/white.png"
                             : style.hintPanelTexturePath);
-  hintPanel->SetPosition({hintPosition.x, hintPosition.y, 0.0f});
-  hintPanel->SetSize(layout.hintPanelSize);
-  hintPanel->SetColor(style.hintPanelColor);
-  hintPanel->SetLayer(style.layer + 2);
-  hintPanel->SetVisible(!hintText.empty());
+  applyElement(hintPanel, layout.hintPanel, true, !hintText.empty());
 
-  UIBase *hint = uiManager->GetUI(kHintTextUIId);
-  if (!hint) {
-    auto created = std::make_unique<UIBase>(kHintTextUIId);
-    created->Initialize("");
-    created->SetTransient(true);
-    // 描画は TutorialManager::Draw が行う（UIManager の一括描画には任せない）。
-    created->SetSelfDrawn(true);
-    hint = created.get();
-    uiManager->AddUI(kHintTextUIId, std::move(created));
-  }
+  UIBase *hint = ensureUI(kHintTextUIId);
   if (!hintText.empty()) {
     TextureManager::GetInstance()->ReloadTexture(kRuntimeHintTexturePath);
     hint->SetTexture(kRuntimeHintTexturePath);
   }
-  hint->SetAnchorPoint({0.5f, 0.5f});
-  hint->SetPosition({hintPosition.x, hintPosition.y, 0.0f});
-  hint->SetColor({1.0f, 1.0f, 1.0f, 1.0f});
-  hint->SetLayer(style.layer + 3);
-  hint->SetVisible(!hintText.empty());
-  hint->StopAnimation(UIAnimationType::FadeIn);
+  applyElement(hint, layout.hintText, false, !hintText.empty());
 
   // 前のページで使っていた追加UIをいったん隠し、現在のページ分だけ再設定する。
   for (std::size_t i = 0; i < activeAdditionalUICount_; ++i) {
@@ -1024,20 +1063,31 @@ void TutorialManager::ApplyRuntimeOpacity() {
   const TutorialStep &step = currentData_.steps[currentStep_];
   const float opacity = std::clamp(transitionOpacity_, 0.0f, 1.0f);
 
-  auto applyColor = [](UIBase *ui, Vector4 color, float alpha) {
+  // 最終色 = style の色 × 要素ごとの色補正 × ページ送りの不透明度。
+  auto applyColor = [](UIBase *ui, Vector4 color, const Vector4 &tint,
+                       float alpha) {
     if (!ui)
       return;
-    color.w *= alpha;
+    color.x *= tint.x;
+    color.y *= tint.y;
+    color.z *= tint.z;
+    color.w *= tint.w * alpha;
     ui->SetColor(color);
     ui->Update();
   };
-  applyColor(manager->GetUI(kPanelUIId), style.panelColor, opacity);
-  applyColor(manager->GetUI(kTextUIId), {1.0f, 1.0f, 1.0f, 1.0f}, opacity);
-  applyColor(manager->GetUI(kHintPanelUIId), style.hintPanelColor, opacity);
-  applyColor(manager->GetUI(kHintTextUIId), {1.0f, 1.0f, 1.0f, 1.0f}, opacity);
+  const TutorialStepLayout &layout = step.layout;
+  applyColor(manager->GetUI(kPanelUIId), style.panelColor,
+             layout.panel.colorTint, opacity);
+  applyColor(manager->GetUI(kTextUIId), {1.0f, 1.0f, 1.0f, 1.0f},
+             layout.text.colorTint, opacity);
+  applyColor(manager->GetUI(kHintPanelUIId), style.hintPanelColor,
+             layout.hintPanel.colorTint, opacity);
+  applyColor(manager->GetUI(kHintTextUIId), {1.0f, 1.0f, 1.0f, 1.0f},
+             layout.hintText.colorTint, opacity);
   for (std::size_t i = 0; i < step.additionalUIs.size(); ++i) {
+    // 追加画像UIは色補正を持たないので、補正なし（1倍）を渡す。
     applyColor(manager->GetUI(AdditionalUIId(i)), step.additionalUIs[i].color,
-               opacity);
+               {1.0f, 1.0f, 1.0f, 1.0f}, opacity);
   }
 }
 

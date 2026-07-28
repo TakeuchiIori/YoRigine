@@ -61,17 +61,36 @@ void TutorialSpotlight::Apply(const TutorialSpotlightConfig &config,
     return;
   }
 
+  // 消えかけの状態から同じ設定で呼ばれた場合は、そこから明るさを戻す。
+  const bool wasFading = fadingOut_;
   config_ = config;
   layer_ = layer;
   active_ = true;
-  opacity_ = (config_.fadeSeconds > 0.0f) ? 0.0f : 1.0f;
+  fadingOut_ = false;
+  if (!wasFading) {
+    opacity_ = (config_.fadeSeconds > 0.0f) ? 0.0f : 1.0f;
+  }
   RebuildPanels();
 }
 
 void TutorialSpotlight::Clear() {
+  if (!active_) {
+    ClearImmediate();
+    return;
+  }
+  // フェード時間が無いなら待つ意味が無い。
+  if (config_.fadeSeconds <= 0.0f) {
+    ClearImmediate();
+    return;
+  }
+  fadingOut_ = true;
+}
+
+void TutorialSpotlight::ClearImmediate() {
   HidePanelsFrom(0);
   activePanelCount_ = 0;
   active_ = false;
+  fadingOut_ = false;
   opacity_ = 0.0f;
   config_ = TutorialSpotlightConfig{};
 }
@@ -80,8 +99,16 @@ void TutorialSpotlight::Update(float deltaTime) {
   if (!active_)
     return;
 
-  if (opacity_ < 1.0f) {
-    const float duration = (std::max)(0.0f, config_.fadeSeconds);
+  const float duration = (std::max)(0.0f, config_.fadeSeconds);
+  if (fadingOut_) {
+    opacity_ = (duration > 0.0f)
+                   ? std::clamp(opacity_ - deltaTime / duration, 0.0f, 1.0f)
+                   : 0.0f;
+    if (opacity_ <= 0.0f) {
+      ClearImmediate();
+      return;
+    }
+  } else if (opacity_ < 1.0f) {
     opacity_ = (duration > 0.0f)
                    ? std::clamp(opacity_ + deltaTime / duration, 0.0f, 1.0f)
                    : 1.0f;
