@@ -2,8 +2,8 @@
 
 // Engine
 #include "Sprite/Sprite.h"
-#include "Systems/Input./Input.h"
 #include "Systems/Camera/Virtuals/FollowCamera/FollowCamera.h"
+#include "Systems/Input./Input.h"
 
 // App (Camera)
 #include "Camera/PlayerCamera.h"
@@ -14,174 +14,195 @@
 
 // App
 #include "../Generators/Object3D/BaseObject.h"
-#include "Movement/PlayerMovement.h"
 #include "Combat/PlayerCombat.h"
+#include "Input/PlayerInput.h"
 #include "Magic/PlayerMagicController.h"
+#include "Movement/PlayerMovement.h"
 #include "Style/PlayerStyleController.h"
-#include "Weapon/PlayerSword.h"
-#include "Weapon/PlayerShield.h"
 #include "UI/HealthBar/PlayerHealthBarUI.h"
+#include "Weapon/PlayerShield.h"
+#include "Weapon/PlayerSword.h"
 
 // ============================================================
 // ゲームシーンのプレイヤークラス
 // ============================================================
 class Player : public YoRigine::BaseObject {
 public:
-	// ============================================================
-	// 基本関数
-	// ============================================================
-	~Player();
-	void Initialize(YoRigine::Camera* camera) override;
-	void Update() override;
-	void Draw() override;
-	void DrawAnimation() override;
-	void DrawCollision() override;
-	void DrawBone(YoRigine::Line& line);
-	void DrawShadow();
-	void DrawImGui();
-	void DrawVfx();
+  // ============================================================
+  // 基本関数
+  // ============================================================
+  ~Player();
+  void Initialize(YoRigine::Camera *camera) override;
+  void Update() override;
+  void Draw() override;
+  void DrawAnimation() override;
+  void DrawCollision() override;
+  void DrawBone(YoRigine::Line &line);
+  void DrawShadow();
+  void DrawImGui();
+  void DrawVfx();
 
-	// ============================================================
-	// 当たり判定
-	// ============================================================
-	void OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other);
-	void OnCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other);
-	void OnExitCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other);
-	void OnDirectionCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other, [[maybe_unused]] HitDirection dir);
-	void OnEnterDirectionCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other, [[maybe_unused]] HitDirection dir);
-
-public:
-	// ============================================================
-	// 公開関数
-	// ============================================================
-	void Reset();
-	// バトル開始前に行動状態と装備表示を待機状態へ戻す。HPは変更しない。
-	void ResetForBattleStart();
-	void FacePosition(const Vector3& worldPosition);
-	void SetControlEnabled(bool enabled);
-	bool IsControlEnabled() const { return controlEnabled_; }
-	void TakeDamage(int damage);
-	// 敵の攻撃がヒットした際にのけぞり（ヒット）ステートへ遷移させる。
-	// attackerPos から被弾方向を算出する。ガード中・死亡中は何もしない。
-	void ApplyHitReaction(const Vector3& attackerPos);
-	void Revive(int reviveHP);
-	void SetInitialPosition();
-
-	bool IsAttackPressedA() const;
-	bool IsAttackPressedB() const;
+  // ============================================================
+  // 当たり判定
+  // ============================================================
+  void OnEnterCollision([[maybe_unused]] BaseCollider *self,
+                        BaseCollider *other);
+  void OnCollision([[maybe_unused]] BaseCollider *self, BaseCollider *other);
+  void OnExitCollision([[maybe_unused]] BaseCollider *self,
+                       BaseCollider *other);
+  void OnDirectionCollision([[maybe_unused]] BaseCollider *self,
+                            BaseCollider *other,
+                            [[maybe_unused]] HitDirection dir);
+  void OnEnterDirectionCollision([[maybe_unused]] BaseCollider *self,
+                                 BaseCollider *other,
+                                 [[maybe_unused]] HitDirection dir);
 
 public:
-	// ============================================================
-	// アクセッサ
-	// ============================================================
-	Vector3 GetWorldPosition();
-	void SetPosition(const Vector3& position) { wt_.translate_ = position; }
-	Vector3 GetCameraRotation() const;
+  // ============================================================
+  // 公開関数
+  // ============================================================
+  void Reset();
+  // バトル開始前に行動状態と装備表示を待機状態へ戻す。HPは変更しない。
+  void ResetForBattleStart();
+  void FacePosition(const Vector3 &worldPosition);
+  void SetControlEnabled(bool enabled);
+  bool IsControlEnabled() const { return controlEnabled_; }
+  void TakeDamage(int damage);
+  // 敵の攻撃がヒットした際にのけぞり（ヒット）ステートへ遷移させる。
+  // attackerPos から被弾方向を算出する。ガード中・死亡中は何もしない。
+  void ApplyHitReaction(const Vector3 &attackerPos);
+  void Revive(int reviveHP);
+  void SetInitialPosition();
 
-	YoRigine::Object3d* GetObject3d() { return obj_.get(); }
-	const YoRigine::Object3d* GetObject3d() const { return obj_.get(); }
+  bool IsAttackPressedA() const;
+  bool IsAttackPressedB() const;
 
-	PlayerMovement* GetMovement() const { return movement_.get(); }
-	PlayerCombat* GetCombat() const { return combat_.get(); }
-	PlayerMagicController* GetMagicController() const { return magicController_.get(); }
-	PlayerStyle GetStyle() const { return styleController_ ? styleController_->GetStyle() : PlayerStyle::Sword; }
-	PlayerSword* GetSword() const { return playerSword_.get(); }
-	PlayerShield* GetShield() const { return playerShield_.get(); }
+public:
+  // ============================================================
+  // アクセッサ
+  // ============================================================
+  Vector3 GetWorldPosition();
+  void SetPosition(const Vector3 &position) { wt_.translate_ = position; }
+  Vector3 GetCameraRotation() const;
 
-	// カメラ初期化（GameScene から FollowCamera ポインタを渡す）
-	void InitializeCamera(FollowCamera* followCamera) {
-		playerCamera_ = std::make_unique<PlayerCamera>();
-		playerCamera_->Initialize(followCamera, &wt_);
-		// 「右スティックでプレイヤーも回る」フラグをカメラエディタから切り替えられるよう接続
-		if (movement_) playerCamera_->SetCameraFollowFlag(movement_->GetCameraFollowEnabledPtr());
-	}
+  YoRigine::Object3d *GetObject3d() { return obj_.get(); }
+  const YoRigine::Object3d *GetObject3d() const { return obj_.get(); }
 
-	PlayerCamera*  GetPlayerCamera()  const { return playerCamera_.get(); }
-	// 後方互換：FollowCamera ポインタが必要な呼び出し元向け
-	FollowCamera*  GetFollowCamera()  const {
-		return playerCamera_ ? playerCamera_->GetFollowCamera() : nullptr;
-	}
+  PlayerMovement *GetMovement() const { return movement_.get(); }
+  PlayerCombat *GetCombat() const { return combat_.get(); }
+  PlayerMagicController *GetMagicController() const {
+    return magicController_.get();
+  }
+  PlayerStyle GetStyle() const {
+    return styleController_ ? styleController_->GetStyle() : PlayerStyle::Sword;
+  }
+  PlayerSword *GetSword() const { return playerSword_.get(); }
+  PlayerShield *GetShield() const { return playerShield_.get(); }
 
-	// 戦闘モード。GameScene が毎フレーム「現在サブシーンが Battle か」で設定する。
-	// 攻撃/ガードなどの戦闘入力は戦闘中のみ受け付ける（フィールドでは不可）。
-	void SetBattleMode(bool b) { battleMode_ = b; }
-	bool IsBattleMode() const  { return battleMode_; }
+  // プレイヤー操作の入力窓口。生のキー／パッドを触りたくなったらここを経由する。
+  PlayerInput *GetPlayerInput() const { return playerInput_.get(); }
 
-	float GetMotionSpeed() const { return motionSpeed_; }
-	void SetMotionSpeed(float speed) { motionSpeed_ = speed; }
-	const float* GetMotionSpeedArray() const { return motionSpeed; }
-	float GetMotionSpeed(int index) const {
-		if (index >= 0 && index < 3) return motionSpeed[index];
-		return 1.0f;
-	}
-	void SetMotionSpeed(int index, float speed) {
-		if (index >= 0 && index < 3) motionSpeed[index] = speed;
-	}
+  // カメラ初期化（GameScene から FollowCamera ポインタを渡す）
+  void InitializeCamera(FollowCamera *followCamera) {
+    playerCamera_ = std::make_unique<PlayerCamera>();
+    playerCamera_->Initialize(followCamera, &wt_);
+    // 「右スティックでプレイヤーも回る」フラグをカメラエディタから切り替えられるよう接続
+    if (movement_)
+      playerCamera_->SetCameraFollowFlag(
+          movement_->GetCameraFollowEnabledPtr());
+  }
 
-	int32_t GetHP() const { return hp_; }
-	uint32_t GetMaxHP() const { return maxHP_; }
-	bool IsAlive() const { return isAlive_; }
+  PlayerCamera *GetPlayerCamera() const { return playerCamera_.get(); }
+  // 後方互換：FollowCamera ポインタが必要な呼び出し元向け
+  FollowCamera *GetFollowCamera() const {
+    return playerCamera_ ? playerCamera_->GetFollowCamera() : nullptr;
+  }
 
-	// 無敵状態。急接近（ホーミング）攻撃の突進中などに ON にし、
-	// 敵の攻撃ヒット処理（ダメージ・のけぞり）を丸ごとスキップさせる。
-	void SetInvincible(bool v) { isInvincible_ = v; }
-	bool IsInvincible() const { return isInvincible_; }
-	void SetHP(int32_t hp) { hp_ = hp; }
-	void SetMaxHP(uint32_t maxHP) { maxHP_ = maxHP; }
+  // 戦闘モード。GameScene が毎フレーム「現在サブシーンが Battle
+  // か」で設定する。
+  // 攻撃/ガードなどの戦闘入力は戦闘中のみ受け付ける（フィールドでは不可）。
+  void SetBattleMode(bool b) { battleMode_ = b; }
+  bool IsBattleMode() const { return battleMode_; }
+
+  float GetMotionSpeed() const { return motionSpeed_; }
+  void SetMotionSpeed(float speed) { motionSpeed_ = speed; }
+  const float *GetMotionSpeedArray() const { return motionSpeed; }
+  float GetMotionSpeed(int index) const {
+    if (index >= 0 && index < 3)
+      return motionSpeed[index];
+    return 1.0f;
+  }
+  void SetMotionSpeed(int index, float speed) {
+    if (index >= 0 && index < 3)
+      motionSpeed[index] = speed;
+  }
+
+  int32_t GetHP() const { return hp_; }
+  uint32_t GetMaxHP() const { return maxHP_; }
+  bool IsAlive() const { return isAlive_; }
+
+  // 無敵状態。急接近（ホーミング）攻撃の突進中などに ON にし、
+  // 敵の攻撃ヒット処理（ダメージ・のけぞり）を丸ごとスキップさせる。
+  void SetInvincible(bool v) { isInvincible_ = v; }
+  bool IsInvincible() const { return isInvincible_; }
+  void SetHP(int32_t hp) { hp_ = hp; }
+  void SetMaxHP(uint32_t maxHP) { maxHP_ = maxHP; }
 
 private:
-	// ============================================================
-	// 内部処理関数
-	// ============================================================
-	void InitCollision() override;
-	void InitJson() override;
-	void InitStates();
-	void InitCombatSystem();
+  // ============================================================
+  // 内部処理関数
+  // ============================================================
+  void InitCollision() override;
+  void InitJson() override;
+  void InitStates();
+  void InitCombatSystem();
 
-	void HandleCombatInput();
-	void HandleSwordInput(bool pressedA, bool pressedB, bool pressedX);
-	void HandleMagicInput(bool pressedA, bool pressedB, bool pressedX, bool heldA, bool heldB, bool heldX);
-	void UpdateMotionTime();
-	void LookAtDirection(const Vector3& direction);
-	void PlayHitFeedback(HitDirection direction);
+  void HandleCombatInput();
+  void HandleSwordInput();
+  void HandleMagicInput();
+  void UpdateMotionTime();
+  void LookAtDirection(const Vector3 &direction);
+  void PlayHitFeedback(HitDirection direction);
 
 private:
-	// ============================================================
-	// メンバ変数
-	// ============================================================
-	YoRigine::Input* input_ = nullptr;
-	bool battleMode_ = false;   // 戦闘中のみ攻撃/ガード入力を受け付ける
-	bool controlEnabled_ = true; // カメラ演出中など、入力だけを止めるためのフラグ
-	std::unique_ptr<PlayerCamera> playerCamera_;
+  // ============================================================
+  // メンバ変数
+  // ============================================================
+  // 振動などデバイス固有の機能用。操作の読み取りは playerInput_ を使うこと。
+  YoRigine::Input *input_ = nullptr;
+  std::unique_ptr<PlayerInput> playerInput_;
+  bool battleMode_ = false;    // 戦闘中のみ攻撃/ガード入力を受け付ける
+  bool controlEnabled_ = true; // カメラ演出中など、入力だけを止めるためのフラグ
+  std::unique_ptr<PlayerCamera> playerCamera_;
 
-	std::unique_ptr<PlayerSword> playerSword_;
-	std::unique_ptr<PlayerShield> playerShield_;
-	std::unique_ptr<YoRigine::Line> boneLine_;
-	std::unique_ptr<PlayerMovement> movement_;
-	std::unique_ptr<PlayerCombat> combat_;
-	std::unique_ptr<PlayerMagicController> magicController_;
-	std::unique_ptr<PlayerStyleController> styleController_;
-	std::unique_ptr<PlayerHealthBarUI> healthUI_;
+  std::unique_ptr<PlayerSword> playerSword_;
+  std::unique_ptr<PlayerShield> playerShield_;
+  std::unique_ptr<YoRigine::Line> boneLine_;
+  std::unique_ptr<PlayerMovement> movement_;
+  std::unique_ptr<PlayerCombat> combat_;
+  std::unique_ptr<PlayerMagicController> magicController_;
+  std::unique_ptr<PlayerStyleController> styleController_;
+  std::unique_ptr<PlayerHealthBarUI> healthUI_;
 
-	Vector3 anchorPoint_ = { 0.0f, -1.0f, 0.0f };
+  Vector3 anchorPoint_ = {0.0f, -1.0f, 0.0f};
 
-	float motionSpeed_ = 1.0f;
-	float preMotionSpeed_ = 1.0f;
+  float motionSpeed_ = 1.0f;
+  float preMotionSpeed_ = 1.0f;
 
-	uint32_t maxHP_ = 400;
-	int32_t hp_ = 400;
-	bool isAlive_ = true;
-	bool isInvincible_ = false;   // 突進攻撃中などの無敵フラグ
-	const std::string emitterPath_ = "Player";
+  uint32_t maxHP_ = 400;
+  int32_t hp_ = 400;
+  bool isAlive_ = true;
+  bool isInvincible_ = false; // 突進攻撃中などの無敵フラグ
+  const std::string emitterPath_ = "Player";
 
-	// 敵の攻撃を受けた瞬間のフィードバック（Player.jsonから調整）
-	float hitStopDuration_ = 0.06f;
-	float frontHitShakeIntensity_ = 0.4f;
-	float frontHitShakeDuration_ = 0.2f;
-	float backHitShakeIntensity_ = 0.6f;
-	float backHitShakeDuration_ = 0.25f;
-	float hitVibrationDuration_ = 0.12f;
-	uint16_t hitVibrationPower_ = 32000;
+  // 敵の攻撃を受けた瞬間のフィードバック（Player.jsonから調整）
+  float hitStopDuration_ = 0.06f;
+  float frontHitShakeIntensity_ = 0.4f;
+  float frontHitShakeDuration_ = 0.2f;
+  float backHitShakeIntensity_ = 0.6f;
+  float backHitShakeDuration_ = 0.25f;
+  float hitVibrationDuration_ = 0.12f;
+  uint16_t hitVibrationPower_ = 32000;
 
-	float motionSpeed[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+  float motionSpeed[4] = {1.0f, 1.0f, 1.0f, 1.0f};
 };

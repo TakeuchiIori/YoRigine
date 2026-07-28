@@ -36,6 +36,11 @@ void Player::Initialize(YoRigine::Camera* camera) {
 	obj_->SetModel("Player.gltf", true, "Idle4");
 	input_ = YoRigine::Input::GetInstance();
 
+	// 操作の読み取りは全て PlayerInput 経由にする。
+	// 生のキーコードを知っているのはこのクラスの初期化だけになる。
+	playerInput_ = std::make_unique<PlayerInput>();
+	playerInput_->Initialize();
+
 	// ワールドトランスフォーム初期化
 	wt_.Initialize();
 	wt_.useAnchorPoint_ = true;
@@ -122,18 +127,11 @@ void Player::HandleCombatInput() {
 	// 攻撃/ガードは戦闘中のみ。フィールド探索中はブンブン振れない。
 	if (!battleMode_) return;
 
-	const bool pressedA = input_->IsPadTriggered(0, GamePadButton::A);
-	const bool pressedB = input_->IsPadTriggered(0, GamePadButton::B);
-	const bool pressedX = input_->IsPadTriggered(0, GamePadButton::X)
-		|| input_->GetInstance()->TriggerKey(DIK_N);
-	const bool heldA = input_->IsPadPressed(0, GamePadButton::A);
-	const bool heldB = input_->IsPadPressed(0, GamePadButton::B);
-	const bool heldX = input_->IsPadPressed(0, GamePadButton::X)
-		|| input_->GetInstance()->PushKey(DIK_N);
+	if (!playerInput_) return;
 
-	// Y は戦闘スタイルの切替だけを担当する。
+	// スタイル切替は戦闘スタイルの切り替えだけを担当する。
 	// スタイル状態を専用クラスへ逃がすことで、剣/魔法が増えても PlayerCombat にUI都合の分岐を背負わせない。
-	if (styleController_ && input_->IsPadTriggered(0, GamePadButton::Y)) {
+	if (styleController_ && playerInput_->StyleToggleTriggered()) {
 		styleController_->Toggle();
 	}
 
@@ -141,29 +139,29 @@ void Player::HandleCombatInput() {
 	if (!combat_->IsIdle()) return;
 
 	if (styleController_ && styleController_->IsMagic()) {
-		HandleMagicInput(pressedA, pressedB, pressedX, heldA, heldB, heldX);
+		HandleMagicInput();
 		return;
 	}
 
-	HandleSwordInput(pressedA, pressedB, pressedX);
+	HandleSwordInput();
 }
 
 // ============================================================
 // 剣スタイル入力
 // ============================================================
-void Player::HandleSwordInput(bool pressedA, bool pressedB, bool pressedX) {
-	// A（軽攻撃）コンボ開始
-	if (pressedA) {
+void Player::HandleSwordInput() {
+	// 軽攻撃コンボ開始
+	if (playerInput_->AttackLightTriggered()) {
 		combat_->TryAttack(AttackType::A_Arte);
 	}
 
-	// B（重攻撃）コンボ開始
-	if (pressedB) {
+	// 重攻撃コンボ開始
+	if (playerInput_->AttackHeavyTriggered()) {
 		combat_->TryAttack(AttackType::B_Arte);
 	}
 
 	// ガード
-	if (pressedX) {
+	if (playerInput_->GuardTriggered()) {
 		combat_->TryGuard();
 	}
 }
@@ -171,14 +169,18 @@ void Player::HandleSwordInput(bool pressedA, bool pressedB, bool pressedX) {
 // ============================================================
 // 魔法スタイル入力
 // ============================================================
-void Player::HandleMagicInput(bool pressedA, bool pressedB, bool pressedX, bool heldA, bool heldB, bool heldX) {
+void Player::HandleMagicInput() {
 	if (!magicController_) return;
 
 	// 魔法入力はコントローラーへ渡すだけにする。
 	// Player は「どのスロット入力か」だけを渡し、溜め・離し・イベント実行は魔法側へ閉じ込める。
-	magicController_->HandleSlotInput(PlayerMagicSlot::Primary, pressedA, heldA);
-	magicController_->HandleSlotInput(PlayerMagicSlot::Secondary, pressedB, heldB);
-	magicController_->HandleSlotInput(PlayerMagicSlot::Utility, pressedX, heldX);
+	// 剣スタイルの軽攻撃/重攻撃/ガードと同じアクションを、魔法では3つのスロットとして解釈する。
+	magicController_->HandleSlotInput(PlayerMagicSlot::Primary,
+		playerInput_->AttackLightTriggered(), playerInput_->AttackLightHeld());
+	magicController_->HandleSlotInput(PlayerMagicSlot::Secondary,
+		playerInput_->AttackHeavyTriggered(), playerInput_->AttackHeavyHeld());
+	magicController_->HandleSlotInput(PlayerMagicSlot::Utility,
+		playerInput_->GuardTriggered(), playerInput_->GuardHeld());
 }
 
 // ============================================================
@@ -669,8 +671,13 @@ void Player::SetInitialPosition()
 // ============================================================
 // 攻撃入力の判定
 // ============================================================
-bool Player::IsAttackPressedA() const { return input_->IsPadTriggered(0, GamePadButton::A); }
-bool Player::IsAttackPressedB() const { return input_->IsPadTriggered(0, GamePadButton::B); }
+bool Player::IsAttackPressedA() const {
+	return playerInput_ && playerInput_->AttackLightTriggered();
+}
+
+bool Player::IsAttackPressedB() const {
+	return playerInput_ && playerInput_->AttackHeavyTriggered();
+}
 
 // ============================================================
 // 指定方向を向く
