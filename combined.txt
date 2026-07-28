@@ -72,6 +72,9 @@
 └── └── └── └── Compiled/
 └── └── ├── d3dx12.h
 └── └── ├── filters.h
+└── └── ├── lib/
+└── └── └── ├── Debug/
+└── └── └── └── Release/
 └── └── └── scoped.h
 └── ├── ImGui/
 └── └── ├── GraphEditor.cpp
@@ -1128,9 +1131,11 @@
 └── └──         ├── UIManagerEditor.cpp
 └── └──         ├── UINumber.cpp
 └── └──         └── UINumber.h
-└── └── WebAPI/
-└──     ├── YWebApiManager.cpp
-└──     └── YWebApiManager.h
+└── ├── WebAPI/
+└── └── ├── YWebApiManager.cpp
+└── └── └── YWebApiManager.h
+└── ├── pch.cpp
+└── └── pch.h
 ├── YGame/
 └── ├── Core/
 └── └── ├── MyGame.cpp
@@ -1325,33 +1330,35 @@
 └── └──     ├── SceneDataStructures.h
 └── └──     ├── SubSceneManager.cpp
 └── └──     └── SubSceneManager.h
-└── └── UI/
-└──     ├── Alert/
-└──     └── ├── EnemyAlert.cpp
-└──     └── └── EnemyAlert.h
-└──     ├── ClearUI.cpp
-└──     ├── ClearUI.h
-└──     ├── Control/
-└──     └── ├── ControlUI.cpp
-└──     └── └── ControlUI.h
-└──     ├── Damage/
-└──     └── ├── DamageNumberManager.cpp
-└──     └── └── DamageNumberManager.h
-└──     ├── GameUI.cpp
-└──     ├── GameUI.h
-└──     ├── HealthBar/
-└──     └── ├── EnemyHealthBarUI.cpp
-└──     └── ├── EnemyHealthBarUI.h
-└──     └── ├── PlayerHealthBarUI.cpp
-└──     └── └── PlayerHealthBarUI.h
-└──     ├── LockOn/
-└──     └── ├── LockOnUI.cpp
-└──     └── └── LockOnUI.h
-└──     ├── Mission/
-└──     └── ├── MissionUI.cpp
-└──     └── └── MissionUI.h
-└──     ├── TitleUI.cpp
-└──     └── TitleUI.h
+└── ├── UI/
+└── └── ├── Alert/
+└── └── └── ├── EnemyAlert.cpp
+└── └── └── └── EnemyAlert.h
+└── └── ├── ClearUI.cpp
+└── └── ├── ClearUI.h
+└── └── ├── Control/
+└── └── └── ├── ControlUI.cpp
+└── └── └── └── ControlUI.h
+└── └── ├── Damage/
+└── └── └── ├── DamageNumberManager.cpp
+└── └── └── └── DamageNumberManager.h
+└── └── ├── GameUI.cpp
+└── └── ├── GameUI.h
+└── └── ├── HealthBar/
+└── └── └── ├── EnemyHealthBarUI.cpp
+└── └── └── ├── EnemyHealthBarUI.h
+└── └── └── ├── PlayerHealthBarUI.cpp
+└── └── └── └── PlayerHealthBarUI.h
+└── └── ├── LockOn/
+└── └── └── ├── LockOnUI.cpp
+└── └── └── └── LockOnUI.h
+└── └── ├── Mission/
+└── └── └── ├── MissionUI.cpp
+└── └── └── └── MissionUI.h
+└── └── ├── TitleUI.cpp
+└── └── └── TitleUI.h
+└── ├── pch.cpp
+└── └── pch.h
 ├── YMain/
 └── └── main.cpp
 └── YMath/
@@ -58333,7 +58340,7 @@ File Path: Externals/ImGui/ImGui.vcxproj
       <WarningLevel>Level3</WarningLevel>
       <PreprocessorDefinitions>NOMINMAX;_WINDOWS;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>.;..\DirectXTex;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
       <MinimalRebuild>false</MinimalRebuild>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -58353,7 +58360,7 @@ File Path: Externals/ImGui/ImGui.vcxproj
       <WarningLevel>Level3</WarningLevel>
       <PreprocessorDefinitions>NOMINMAX;_WINDOWS;_DEBUG;DEVELOP_BUILD;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>.;..\DirectXTex;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
       <MinimalRebuild>false</MinimalRebuild>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -254536,7 +254543,7 @@ struct ParticleCurve {
 
     /// カーブ編集ウィジェット。編集されたら true を返す。
     bool DrawEditor(const char* label, float vMin = 0.0f, float vMax = 3.0f,
-                    ImVec2 size = ImVec2(0, 120)) {
+        ImVec2 size = ImVec2(0, 120)) {
         bool changed = false;
         ImGui::PushID(this);
         if (label && label[0]) ImGui::TextUnformatted(label);
@@ -254566,7 +254573,7 @@ struct ParticleCurve {
             float ny = (vMax > vMin) ? (v - vMin) / (vMax - vMin) : 0.0f;
             ny = std::clamp(ny, 0.0f, 1.0f);
             return ImVec2(p0.x + std::clamp(t, 0.0f, 1.0f) * size.x, p1.y - ny * size.y);
-        };
+            };
 
         // カーブ本体
         const int kSamples = 64;
@@ -254597,13 +254604,13 @@ struct ParticleCurve {
         // ハンドル描画 + 選択 / 削除
         for (int i = 0; i < static_cast<int>(keys_.size()); ++i) {
             ImVec2 s = toScr(keys_[i].t, keys_[i].v);
-            bool near = std::fabs(mouse.x - s.x) < kR + 3 && std::fabs(mouse.y - s.y) < kR + 3;
+            bool isNear = std::fabs(mouse.x - s.x) < kR + 3 && std::fabs(mouse.y - s.y) < kR + 3;
             ImU32 col = (i == dragKey_) ? IM_COL32(255, 220, 120, 255)
-                      : (near ? IM_COL32(255, 255, 255, 255) : IM_COL32(200, 220, 255, 255));
+                : (isNear ? IM_COL32(255, 255, 255, 255) : IM_COL32(200, 220, 255, 255));
             dl->AddCircleFilled(s, kR, col);
             dl->AddCircle(s, kR, IM_COL32(0, 0, 0, 255));
-            if (hovered && near && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) dragKey_ = i;
-            if (hovered && near && ImGui::IsMouseClicked(ImGuiMouseButton_Right) &&
+            if (hovered && isNear && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) dragKey_ = i;
+            if (hovered && isNear && ImGui::IsMouseClicked(ImGuiMouseButton_Right) &&
                 i != 0 && i != static_cast<int>(keys_.size()) - 1 && keys_.size() > 2) {
                 keys_.erase(keys_.begin() + i);
                 changed = true;
@@ -254642,7 +254649,7 @@ namespace ParticleWidgets {
     /// selected は選択中ストップ index。編集されたら true を返す。
     /// ストップは t 昇順を保つ（隣接クランプ）。
     inline bool GradientBar(const char* strId, float* times, Vector4* colors,
-                            int& count, int maxStops, int& selected) {
+        int& count, int maxStops, int& selected) {
         bool changed = false;
         ImGui::PushID(strId);
         ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -254685,7 +254692,7 @@ namespace ParticleWidgets {
                 }
             }
             return colors[count - 1];
-        };
+            };
 
         // グラデーション帯（アルファは市松に重ねてブレンド）
         const int seg = static_cast<int>(w);
@@ -254693,7 +254700,7 @@ namespace ParticleWidgets {
             float t = static_cast<float>(i) / seg;
             Vector4 c = sample(t);
             ImU32 col = IM_COL32(static_cast<int>(c.x * 255), static_cast<int>(c.y * 255),
-                                 static_cast<int>(c.z * 255), static_cast<int>(c.w * 255));
+                static_cast<int>(c.z * 255), static_cast<int>(c.w * 255));
             float x = p0.x + w * i / seg;
             dl->AddRectFilled(ImVec2(x, p0.y), ImVec2(x + w / seg + 1, barMax.y), col);
         }
@@ -254712,13 +254719,13 @@ namespace ParticleWidgets {
             bool sel = (i == selected);
             dl->AddTriangleFilled(a, b, c, sel ? IM_COL32(255, 220, 120, 255) : IM_COL32(220, 220, 220, 255));
             dl->AddTriangle(a, b, c, IM_COL32(0, 0, 0, 255));
-            bool near = std::fabs(mouse.x - x) < 7 && mouse.y > my - 2 && mouse.y < my + markH + 2;
-            if (hovered && near && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+            bool isNear = std::fabs(mouse.x - x) < 7 && mouse.y > my - 2 && mouse.y < my + markH + 2;
+            if (hovered && isNear && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
                 selected = i;
                 st->SetInt(dragId, i);
                 drag = i;
             }
-            if (hovered && near && ImGui::IsMouseClicked(ImGuiMouseButton_Right) && count > 2) {
+            if (hovered && isNear && ImGui::IsMouseClicked(ImGuiMouseButton_Right) && count > 2) {
                 for (int k = i; k < count - 1; ++k) { times[k] = times[k + 1]; colors[k] = colors[k + 1]; }
                 --count;
                 if (selected >= count) selected = count - 1;
@@ -325869,6 +325876,7 @@ private:
 File Path: YEngine/WebAPI/YWebApiManager.cpp
 ============================================================
 #include "YWebApiManager.h"
+#include <curl/curl.h>   // curl 実体はこの .cpp だけで使う（.h には持ち込まない）
 #include <iostream>
 #include <thread>
 
@@ -325876,221 +325884,279 @@ File Path: YEngine/WebAPI/YWebApiManager.cpp
 #include <imgui.h>
 #endif
 
-YWebApiManager &YWebApiManager::GetInstance() {
-  static YWebApiManager instance;
-  return instance;
+YWebApiManager& YWebApiManager::GetInstance() {
+    static YWebApiManager instance;
+    return instance;
 }
 
 bool YWebApiManager::Initialize() {
-  if (initialized_)
-    return true;
+    if (initialized_)
+        return true;
 
-  // アプリケーション全体で一生に一度のcURLグローバル初期化
-  if (curl_global_init(CURL_GLOBAL_ALL) != CURLE_OK) {
-    AddLog("[YWebApiManager] cURLのグローバル初期化に失敗しました。");
-    return false;
-  }
-  curl_ = curl_easy_init();
-  if (curl_) {
-    initialized_ = true;
-    AddLog("[YWebApiManager] 初期化に成功しました。");
-    curl_easy_cleanup(curl_);
-  }
-  curl_global_cleanup();
-  return true;
+    // アプリケーション全体で一生に一度のcURLグローバル初期化
+    if (curl_global_init(CURL_GLOBAL_ALL) != CURLE_OK) {
+        AddLog("[YWebApiManager] cURLのグローバル初期化に失敗しました。");
+        return false;
+    }
+    curl_ = curl_easy_init();
+    if (curl_) {
+        initialized_ = true;
+        AddLog("[YWebApiManager] 初期化に成功しました。");
+        curl_easy_cleanup(curl_);
+    }
+    curl_global_cleanup();
+    return true;
 }
 
 void YWebApiManager::Finalize() {
-  if (!initialized_)
-    return;
+    if (!initialized_)
+        return;
 
-  // cURLのグローバル解放
-  curl_global_cleanup();
-  initialized_ = false;
-  AddLog("[YWebApiManager] シャットダウンしました。");
+    // cURLのグローバル解放
+    curl_global_cleanup();
+    initialized_ = false;
+    AddLog("[YWebApiManager] シャットダウンしました。");
 }
 
 void YWebApiManager::DrawLogWindow() {
 #ifdef USE_IMGUI
-  // 上部に便利な操作ボタンを配置
-  if (ImGui::Button("Clear")) {
-    ClearLogs();
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Test Request (Local)")) {
-    // ボタンを押したらテスト通信が走るようにしておくと超便利！
-    SendGetRequest("http://localhost/Backend/api/ranking.php");
-  }
-
-  ImGui::Separator();
-
-  // ログ表示部分をスクロールできるように子ウィンドウにする
-  ImGui::BeginChild("ScrollingRegion", ImVec2(0, 0), true,
-                    ImGuiWindowFlags_HorizontalScrollbar);
-
-  // ログを一行ずつ描画
-  for (const auto &log : logs_) {
-    // ログの種類（[Error] や [Request]）によって文字の色を変えるとおしゃれ
-    if (log.rfind("[Error]", 0) == 0) {
-      ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), log.c_str()); // 赤色
-    } else if (log.rfind("[Request]", 0) == 0) {
-      ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), log.c_str()); // 青色
-    } else if (log.rfind("[JSON]", 0) == 0) {
-      ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), log.c_str()); // 緑色
-    } else {
-      ImGui::TextUnformatted(log.c_str()); // 通常（白、またはテーマ色）
+    // 上部に便利な操作ボタンを配置
+    if (ImGui::Button("Clear")) {
+        ClearLogs();
     }
-  }
+    ImGui::SameLine();
+    if (ImGui::Button("Test Request (Local)")) {
+        // ボタンを押したらテスト通信が走るようにしておくと超便利！
+        SendGetRequest("http://localhost/Backend/api/ranking.php");
+    }
 
-  // 新しいログが追加されたら自動で一番下までスクロールさせるお守り
-  if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY()) {
-    ImGui::SetScrollHereY(1.0f);
-  }
+    ImGui::Separator();
 
-  ImGui::EndChild();
+    // ログ表示部分をスクロールできるように子ウィンドウにする
+    ImGui::BeginChild("ScrollingRegion", ImVec2(0, 0), true,
+        ImGuiWindowFlags_HorizontalScrollbar);
+
+    // ログを一行ずつ描画
+    for (const auto& log : logs_) {
+        // ログの種類（[Error] や [Request]）によって文字の色を変えるとおしゃれ
+        if (log.rfind("[Error]", 0) == 0) {
+            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), log.c_str()); // 赤色
+        }
+        else if (log.rfind("[Request]", 0) == 0) {
+            ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), log.c_str()); // 青色
+        }
+        else if (log.rfind("[JSON]", 0) == 0) {
+            ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), log.c_str()); // 緑色
+        }
+        else {
+            ImGui::TextUnformatted(log.c_str()); // 通常（白、またはテーマ色）
+        }
+    }
+
+    // 新しいログが追加されたら自動で一番下までスクロールさせるお守り
+    if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY()) {
+        ImGui::SetScrollHereY(1.0f);
+    }
+
+    ImGui::EndChild();
 #endif // USE_IMGUI
 }
 
 // cURLがWEBサーバーからデータを少しずつ受信するたびに呼び出される関数
-size_t YWebApiManager::WriteCallback(void *contents, size_t size, size_t nmemb,
-                                     void *userp) {
-  size_t totalSize = size * nmemb;
+size_t YWebApiManager::WriteCallback(void* contents, size_t size, size_t nmemb,
+    void* userp) {
+    size_t totalSize = size * nmemb;
 
-  // 引数（userp）として渡された std::string（バッファ）に受信データを追加
-  std::string *responseString = static_cast<std::string *>(userp);
-  responseString->append(static_cast<char *>(contents), totalSize);
+    // 引数（userp）として渡された std::string（バッファ）に受信データを追加
+    std::string* responseString = static_cast<std::string*>(userp);
+    responseString->append(static_cast<char*>(contents), totalSize);
 
-  return totalSize;
+    return totalSize;
 }
 
-void YWebApiManager::AddLog(const std::string &logs) { logs_.push_back(logs); }
+void YWebApiManager::AddLog(const std::string& logs) { logs_.push_back(logs); }
 nlohmann::json
-YWebApiManager::SendGetRequest(const std::string &url,
-                               const std::vector<std::string> &headers) {
-  return PerformRequest("GET", url, nullptr, headers);
+YWebApiManager::SendGetRequest(const std::string& url,
+    const std::vector<std::string>& headers) {
+    return PerformRequest("GET", url, nullptr, headers);
 }
 
 nlohmann::json
-YWebApiManager::SendPostRequest(const std::string &url,
-                                const nlohmann::json &body,
-                                const std::vector<std::string> &headers) {
-  return PerformRequest("POST", url, &body, headers);
+YWebApiManager::SendPostRequest(const std::string& url,
+    const nlohmann::json& body,
+    const std::vector<std::string>& headers) {
+    return PerformRequest("POST", url, &body, headers);
 }
 
 void YWebApiManager::SendGetRequestAsync(
-    const std::string &url, const std::vector<std::string> &headers,
+    const std::string& url, const std::vector<std::string>& headers,
     std::function<void(nlohmann::json)> callback) {
-  std::thread([this, url, headers, callback]() {
-    nlohmann::json result = PerformRequest("GET", url, nullptr, headers);
-    std::lock_guard<std::mutex> lock(pendingMutex_);
-    pendingResults_.push_back({callback, std::move(result)});
-  }).detach();
+    std::thread([this, url, headers, callback]() {
+        nlohmann::json result = PerformRequest("GET", url, nullptr, headers);
+        std::lock_guard<std::mutex> lock(pendingMutex_);
+        pendingResults_.push_back([callback, result]() {
+            if (callback)
+                callback(result);
+            });
+        }).detach();
 }
 
 void YWebApiManager::SendPostRequestAsync(
-    const std::string &url, const nlohmann::json &body,
-    const std::vector<std::string> &headers,
+    const std::string& url, const nlohmann::json& body,
+    const std::vector<std::string>& headers,
     std::function<void(nlohmann::json)> callback) {
-  std::thread([this, url, body, headers, callback]() {
-    nlohmann::json result = PerformRequest("POST", url, &body, headers);
-    std::lock_guard<std::mutex> lock(pendingMutex_);
-    pendingResults_.push_back({callback, std::move(result)});
-  }).detach();
+    std::thread([this, url, body, headers, callback]() {
+        nlohmann::json result = PerformRequest("POST", url, &body, headers);
+        std::lock_guard<std::mutex> lock(pendingMutex_);
+        pendingResults_.push_back([callback, result]() {
+            if (callback)
+                callback(result);
+            });
+        }).detach();
+}
+
+void YWebApiManager::SendPostRequestWithStatusAsync(
+    const std::string& url, const nlohmann::json& body,
+    const std::vector<std::string>& headers,
+    std::function<void(nlohmann::json body, long httpStatus)> callback) {
+    std::thread([this, url, body, headers, callback]() {
+        long httpStatus = 0;
+        nlohmann::json result =
+            PerformRequest("POST", url, &body, headers, &httpStatus);
+        std::lock_guard<std::mutex> lock(pendingMutex_);
+        pendingResults_.push_back([callback, result, httpStatus]() {
+            if (callback)
+                callback(result, httpStatus);
+            });
+        }).detach();
+}
+
+void YWebApiManager::SendPatchRequestWithStatusAsync(
+    const std::string& url, const nlohmann::json& body,
+    const std::vector<std::string>& headers,
+    std::function<void(nlohmann::json body, long httpStatus)> callback) {
+    std::thread([this, url, body, headers, callback]() {
+        long httpStatus = 0;
+        nlohmann::json result =
+            PerformRequest("PATCH", url, &body, headers, &httpStatus);
+        std::lock_guard<std::mutex> lock(pendingMutex_);
+        pendingResults_.push_back([callback, result, httpStatus]() {
+            if (callback)
+                callback(result, httpStatus);
+            });
+        }).detach();
 }
 
 void YWebApiManager::Update() {
-  std::vector<PendingResult> finished;
-  {
-    std::lock_guard<std::mutex> lock(pendingMutex_);
-    if (pendingResults_.empty()) {
-      return;
+    std::vector<std::function<void()>> finished;
+    {
+        std::lock_guard<std::mutex> lock(pendingMutex_);
+        if (pendingResults_.empty()) {
+            return;
+        }
+        finished.swap(pendingResults_);
     }
-    finished.swap(pendingResults_);
-  }
-  // コールバックはロックの外（メインスレッド）で実行する
-  for (auto &item : finished) {
-    if (item.callback) {
-      item.callback(item.result);
+    // コールバックはロックの外（メインスレッド）で実行する
+    for (auto& invoke : finished) {
+        if (invoke) {
+            invoke();
+        }
     }
-  }
 }
 
 nlohmann::json YWebApiManager::PerformRequest(
-    const std::string &method, const std::string &url,
-    const nlohmann::json *body, const std::vector<std::string> &headers) {
-  if (!initialized_) {
-    // DevelopScene等で明示初期化されていない場合に備えた遅延初期化
-    Initialize();
-  }
-
-  // 通信開始ログ
-  AddLog("[Request] " + method + " -> " + url);
-
-  CURL *curl = curl_easy_init();
-  if (!curl) {
-    AddLog("[Error] cURLハンドルの作成に失敗しました。");
-    return nlohmann::json();
-  }
-
-  std::string responseBuffer;
-  std::string bodyString;
-  curl_slist *headerList = nullptr;
-
-  curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-  curl_easy_setopt(curl, CURLOPT_WRITEDATA, &responseBuffer);
-  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
-  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
-
-  if (method == "POST") {
-    curl_easy_setopt(curl, CURLOPT_POST, 1L);
-    if (body) {
-      bodyString = body->dump();
-      curl_easy_setopt(curl, CURLOPT_POSTFIELDS, bodyString.c_str());
-      curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE,
-                       static_cast<long>(bodyString.size()));
+    const std::string& method, const std::string& url,
+    const nlohmann::json* body, const std::vector<std::string>& headers,
+    long* outHttpStatus) {
+    if (!initialized_) {
+        // DevelopScene等で明示初期化されていない場合に備えた遅延初期化
+        Initialize();
     }
-  }
 
-  for (const auto &header : headers) {
-    headerList = curl_slist_append(headerList, header.c_str());
-  }
-  if (headerList) {
-    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headerList);
-  }
+    // 通信開始ログ
+    AddLog("[Request] " + method + " -> " + url);
 
-  CURLcode res = curl_easy_perform(curl);
+    CURL* curl = curl_easy_init();
+    if (!curl) {
+        AddLog("[Error] cURLハンドルの作成に失敗しました。");
+        return nlohmann::json();
+    }
 
-  if (headerList) {
-    curl_slist_free_all(headerList);
-  }
-  curl_easy_cleanup(curl);
+    std::string responseBuffer;
+    std::string bodyString;
+    curl_slist* headerList = nullptr;
 
-  if (res != CURLE_OK) {
-    // 通信失敗ログ
-    AddLog("[Error] 通信失敗: " + std::string(curl_easy_strerror(res)));
-    return nlohmann::json();
-  }
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &responseBuffer);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
 
-  // 通信成功ログ
-  AddLog("[Success] レスポンス受信完了。");
+    if (method == "POST") {
+        curl_easy_setopt(curl, CURLOPT_POST, 1L);
+        if (body) {
+            bodyString = body->dump();
+            curl_easy_setopt(curl, CURLOPT_POSTFIELDS, bodyString.c_str());
+            curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE,
+                static_cast<long>(bodyString.size()));
+        }
+    }
+    else if (method == "PATCH") {
+        curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PATCH");
+        if (body) {
+            bodyString = body->dump();
+            curl_easy_setopt(curl, CURLOPT_POSTFIELDS, bodyString.c_str());
+            curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE,
+                static_cast<long>(bodyString.size()));
+        }
+    }
 
-  if (responseBuffer.empty()) {
-    // Prefer: return=minimal のPOST等、正常でも中身が空のことがある
-    return nlohmann::json::array();
-  }
+    for (const auto& header : headers) {
+        headerList = curl_slist_append(headerList, header.c_str());
+    }
+    if (headerList) {
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headerList);
+    }
 
-  try {
-    nlohmann::json jsonResult = nlohmann::json::parse(responseBuffer);
-    // パースしたJSONを綺麗に整形（インデント4）してログに出す
-    AddLog("[JSON] \n" + jsonResult.dump(4));
-    return jsonResult;
-  } catch (const nlohmann::json::parse_error &e) {
-    // パース失敗ログ
-    AddLog("[Error] JSONパース失敗: " + std::string(e.what()));
-    AddLog("[Raw Response] " + responseBuffer);
-    return nlohmann::json();
-  }
+    CURLcode res = curl_easy_perform(curl);
+
+    if (res == CURLE_OK && outHttpStatus) {
+        long httpCode = 0;
+        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
+        *outHttpStatus = httpCode;
+    }
+
+    if (headerList) {
+        curl_slist_free_all(headerList);
+    }
+    curl_easy_cleanup(curl);
+
+    if (res != CURLE_OK) {
+        // 通信失敗ログ
+        AddLog("[Error] 通信失敗: " + std::string(curl_easy_strerror(res)));
+        return nlohmann::json();
+    }
+
+    // 通信成功ログ
+    AddLog("[Success] レスポンス受信完了。");
+
+    if (responseBuffer.empty()) {
+        // Prefer: return=minimal のPOST等、正常でも中身が空のことがある
+        return nlohmann::json::array();
+    }
+
+    try {
+        nlohmann::json jsonResult = nlohmann::json::parse(responseBuffer);
+        // パースしたJSONを綺麗に整形（インデント4）してログに出す
+        AddLog("[JSON] \n" + jsonResult.dump(4));
+        return jsonResult;
+    }
+    catch (const nlohmann::json::parse_error& e) {
+        // パース失敗ログ
+        AddLog("[Error] JSONパース失敗: " + std::string(e.what()));
+        AddLog("[Raw Response] " + responseBuffer);
+        return nlohmann::json();
+    }
 }
 
 ============================================================
@@ -326098,7 +326164,10 @@ File Path: YEngine/WebAPI/YWebApiManager.h
 ============================================================
 #pragma once
 
-#include<curl/curl.h>
+// curl/curl.h は非常に重く(Windowsでは winsock2 等を芋づるで引き込む)、この .h を
+// include する全ファイルがそのコストを払う。ハンドルはポインタとしてしか使わないため、
+// ここでは curl.h を include せず void* で保持し、実体の include は .cpp 側だけに留める。
+// (libcurl では `typedef void CURL;` なので void* と CURL* は同一型)
 #include <functional>
 #include <json.hpp>
 #include <mutex>
@@ -326110,93 +326179,182 @@ File Path: YEngine/WebAPI/YWebApiManager.h
 //=========================================================================
 class YWebApiManager {
 public:
-  //=========================================================================
-  // シングルトンインスタンスの取得など
-  //=========================================================================
-  static YWebApiManager &GetInstance();
-  YWebApiManager(const YWebApiManager &) = delete;
-  YWebApiManager &operator=(const YWebApiManager &) = delete;
+    //=========================================================================
+    // シングルトンインスタンスの取得など
+    //=========================================================================
+    static YWebApiManager& GetInstance();
+    YWebApiManager(const YWebApiManager&) = delete;
+    YWebApiManager& operator=(const YWebApiManager&) = delete;
 
-  //=========================================================================
-  // 基本的な処理
-  //=========================================================================
-  bool Initialize();
-  void Finalize();
-  void DrawLogWindow();
+    //=========================================================================
+    // 基本的な処理
+    //=========================================================================
+    bool Initialize();
+    void Finalize();
+    void DrawLogWindow();
 
-  // 非同期リクエストの完了コールバックをメインスレッドで処理する。
-  // 毎フレーム（Framework::Update等）から呼び出すこと。
-  void Update();
+    // 非同期リクエストの完了コールバックをメインスレッドで処理する。
+    // 毎フレーム（Framework::Update等）から呼び出すこと。
+    void Update();
 
-  //=========================================================================
-  // 公開関数
-  //=========================================================================
-  // WebAPIにGETリクエストを送り、パース済みのJSONを返す関数（同期・ブロッキング）
-  nlohmann::json SendGetRequest(const std::string &url,
-                                const std::vector<std::string> &headers = {});
-  // WebAPIにPOSTリクエストを送り、パース済みのJSONを返す関数（同期・ブロッキング）
-  nlohmann::json SendPostRequest(const std::string &url,
-                                 const nlohmann::json &body,
-                                 const std::vector<std::string> &headers = {});
+    //=========================================================================
+    // 公開関数
+    //=========================================================================
+    // WebAPIにGETリクエストを送り、パース済みのJSONを返す関数（同期・ブロッキング）
+    nlohmann::json SendGetRequest(const std::string& url,
+        const std::vector<std::string>& headers = {});
+    // WebAPIにPOSTリクエストを送り、パース済みのJSONを返す関数（同期・ブロッキング）
+    nlohmann::json SendPostRequest(const std::string& url,
+        const nlohmann::json& body,
+        const std::vector<std::string>& headers = {});
 
-  // 非同期版（別スレッドで通信し、完了後は次の Update()
-  // 呼び出し時にメインスレッドで callback を実行する）
-  void SendGetRequestAsync(const std::string &url,
-                           const std::vector<std::string> &headers,
-                           std::function<void(nlohmann::json)> callback);
-  void SendPostRequestAsync(const std::string &url, const nlohmann::json &body,
-                            const std::vector<std::string> &headers,
-                            std::function<void(nlohmann::json)> callback);
+    // 非同期版（別スレッドで通信し、完了後は次の Update()
+    // 呼び出し時にメインスレッドで callback を実行する）
+    void SendGetRequestAsync(const std::string& url,
+        const std::vector<std::string>& headers,
+        std::function<void(nlohmann::json)> callback);
+    void SendPostRequestAsync(const std::string& url, const nlohmann::json& body,
+        const std::vector<std::string>& headers,
+        std::function<void(nlohmann::json)> callback);
 
-  void ClearLogs() { logs_.clear(); }
+    // HTTPステータスコードも受け取りたい場合の非同期版（重複チェック等、
+    // 成否をボディの中身ではなくステータスコードで判定したい場面向け）
+    void SendPostRequestWithStatusAsync(
+        const std::string& url, const nlohmann::json& body,
+        const std::vector<std::string>& headers,
+        std::function<void(nlohmann::json body, long httpStatus)> callback);
+    // PATCH（既存レコードの部分更新。PostgRESTの更新はPATCHを使う）
+    void SendPatchRequestWithStatusAsync(
+        const std::string& url, const nlohmann::json& body,
+        const std::vector<std::string>& headers,
+        std::function<void(nlohmann::json body, long httpStatus)> callback);
 
-  //=========================================================================
-  // アクセッサ
-  //=========================================================================
-  const std::vector<std::string> &GetLogs() const { return logs_; }
+    void ClearLogs() { logs_.clear(); }
 
-private:
-  //=========================================================================
-  // 内部関数
-  //=========================================================================
-  // 外部からの new や実体化を禁止
-  YWebApiManager() = default;
-  ~YWebApiManager() = default;
-
-  // GET/POST共通の送受信本体
-  nlohmann::json PerformRequest(const std::string &method,
-                                const std::string &url,
-                                const nlohmann::json *body,
-                                const std::vector<std::string> &headers);
-
-  // cURLがデータを受信したときに呼ばれる静的コールバック関数
-  static size_t WriteCallback(void *contents, size_t size, size_t nmemb,
-                              void *userp);
-  // ログを追加
-  void AddLog(const std::string &logs);
+    //=========================================================================
+    // アクセッサ
+    //=========================================================================
+    const std::vector<std::string>& GetLogs() const { return logs_; }
 
 private:
-  //=========================================================================
-  // メンバ変数
-  //=========================================================================
+    //=========================================================================
+    // 内部関数
+    //=========================================================================
+    // 外部からの new や実体化を禁止
+    YWebApiManager() = default;
+    ~YWebApiManager() = default;
 
-  // 初期化されたか
-  bool initialized_ = false;
+    // GET/POST/PATCH共通の送受信本体。outHttpStatusを渡せばHTTPステータスコードも取得できる
+    nlohmann::json PerformRequest(const std::string& method,
+        const std::string& url,
+        const nlohmann::json* body,
+        const std::vector<std::string>& headers,
+        long* outHttpStatus = nullptr);
 
-  // ログの保存
-  std::vector<std::string> logs_;
+    // cURLがデータを受信したときに呼ばれる静的コールバック関数
+    static size_t WriteCallback(void* contents, size_t size, size_t nmemb,
+        void* userp);
+    // ログを追加
+    void AddLog(const std::string& logs);
 
-  // cURLのハンドル
-  CURL *curl_ = nullptr;
+private:
+    //=========================================================================
+    // メンバ変数
+    //=========================================================================
 
-  // 非同期リクエストの結果待ちキュー（別スレッド→メインスレッドの受け渡し用）
-  struct PendingResult {
-    std::function<void(nlohmann::json)> callback;
-    nlohmann::json result;
-  };
-  std::mutex pendingMutex_;
-  std::vector<PendingResult> pendingResults_;
+    // 初期化されたか
+    bool initialized_ = false;
+
+    // ログの保存
+    std::vector<std::string> logs_;
+
+    // cURLのハンドル (実体は CURL* = void*。curl.h を .h に持ち込まないため void* で保持)
+    void* curl_ = nullptr;
+
+    // 非同期リクエストの結果待ちキュー（別スレッド→メインスレッドの受け渡し用）。
+    // 呼び出し側のコールバック引数の型に依らないよう、結果を包んだ関数として溜める。
+    std::mutex pendingMutex_;
+    std::vector<std::function<void()>> pendingResults_;
 };
+
+
+============================================================
+File Path: YEngine/pch.cpp
+============================================================
+// pch.cpp — このファイルだけが /Yc でコンパイルされ PCH を生成する。
+// 中身は pch.h を include するだけでよい。
+#include "pch.h"
+
+
+============================================================
+File Path: YEngine/pch.h
+============================================================
+// =============================================================================
+// pch.h — YEngine プリコンパイルヘッダ
+//
+// ここには「変更頻度が低く・多数の .cpp から使われ・パースが重い」ヘッダだけを置く。
+// （STL / Windows / DirectX12 / nlohmann-json / ImGui など外部・システムヘッダ）
+//
+// プロジェクト自作ヘッダ (MathFunc.h / Logger.h 等) はここに入れないこと。
+// それらを入れると、編集のたびに PCH が再生成され YEngine 全体が再コンパイルされ、
+// PCH の目的（再コンパイル削減）が逆効果になる。
+// =============================================================================
+#pragma once
+
+// ---- C ランタイム / 標準ライブラリ -----------------------------------------
+#include <cstdint>
+#include <cstdio>
+#include <cmath>
+#include <cassert>
+
+#include <string>
+#include <string_view>
+#include <vector>
+#include <array>
+#include <map>
+#include <unordered_map>
+#include <unordered_set>
+#include <memory>
+#include <functional>
+#include <algorithm>
+#include <utility>
+#include <optional>
+// 並行処理 / 時間系（それぞれ単体で重く、複数ファイルで使われるため集約）
+// 特に C++20 の <chrono> はカレンダー/タイムゾーンを抱え非常に重い(~0.7s/TU)。
+#include <mutex>
+#include <thread>
+#include <atomic>
+#include <future>
+#include <chrono>
+#include <filesystem>
+#include <fstream>
+#include <sstream>
+#include <iostream>
+
+// ---- Windows / DirectX 12 ---------------------------------------------------
+// NOMINMAX は premake5.lua で全構成に定義済み。
+#include <Windows.h>
+#include <wrl.h>
+#include <d3d12.h>
+#include <dxgi1_6.h>
+
+// ---- YMath コア (全TUがほぼ必ず使い、かつ変更頻度が低い安定ヘッダ) ----------
+// 注意: YMath 側を編集すると YEngine 全体が再コンパイルされる。頻繁に触る場合は外すこと。
+#include "Vector2.h"
+#include "Vector3.h"
+#include "Vector4.h"
+#include "Matrix4x4.h"
+#include "Quaternion.h"
+#include "MathFunc.h"
+
+// ---- サードパーティ (angle include = /external:W3 扱いで /WX に掛からない) ----
+#include <json.hpp>
+
+// ---- ImGui は Debug/Develop (USE_IMGUI) のみ --------------------------------
+#ifdef USE_IMGUI
+#include <imgui.h>
+#include <IconsFontAwesome5.h>
+#endif
 
 
 ============================================================
@@ -355097,6 +355255,70 @@ private:
 	float minAlpha_ = 0.0f;
 	float maxAlpha_ = 1.0f;
 };
+
+
+============================================================
+File Path: YGame/pch.cpp
+============================================================
+// pch.cpp — このファイルだけが /Yc でコンパイルされ PCH を生成する。
+#include "pch.h"
+
+
+============================================================
+File Path: YGame/pch.h
+============================================================
+// =============================================================================
+// pch.h — YGame プリコンパイルヘッダ
+//
+// 方針は YEngine/pch.h と同じ:
+// 「変更頻度が低く・多数の .cpp から使われ・パースが重い」外部/システムヘッダだけを置く。
+// ゲーム自作ヘッダはここに入れない (編集のたびに全再コンパイルになるため)。
+// =============================================================================
+#pragma once
+
+// ---- 標準ライブラリ ---------------------------------------------------------
+#include <cstdint>
+#include <cstddef>
+#include <cmath>
+#include <cassert>
+
+#include <string>
+#include <string_view>
+#include <vector>
+#include <array>
+#include <map>
+#include <unordered_map>
+#include <unordered_set>
+#include <memory>
+#include <functional>
+#include <algorithm>
+#include <utility>
+#include <optional>
+// 並行処理 / 時間系（C++20 の <chrono> は特に重いためここで集約）
+#include <mutex>
+#include <thread>
+#include <atomic>
+#include <future>
+#include <chrono>
+#include <random>
+#include <limits>
+#include <filesystem>
+#include <fstream>
+#include <sstream>
+
+// ---- Windows / DirectX 12 (エンジンヘッダ経由でも多用される) ----------------
+#include <Windows.h>
+#include <wrl.h>
+#include <d3d12.h>
+
+// ---- サードパーティ ---------------------------------------------------------
+#include <json.hpp>
+
+// ---- ImGui は Debug/Develop (USE_IMGUI) のみ --------------------------------
+#ifdef USE_IMGUI
+#include <imgui.h>
+#include <IconsFontAwesome5.h>
+#endif
 
 
 ============================================================
