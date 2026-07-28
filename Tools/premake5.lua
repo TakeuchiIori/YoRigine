@@ -50,6 +50,9 @@ workspace "YoRigine"
     filter "configurations:Debug or Develop"
         defines { "_DEBUG" }
         symbols "On"
+        -- Edit&Continue(/ZI) を無効化し /Zi にする。コンパイル/リンクが軽くなる。
+        -- (デバッグ実行中のコード書き換え機能は使わない前提)
+        editandcontinue "Off"
 
     -- Develop: Debug と同等のエディタ構成 + 起動シーンを DevelopScene にする。
     -- エンジン機能 (パーティクル/当たり判定/VFX) のテスト専用。
@@ -127,15 +130,14 @@ group "Externals"
             r"Externals/DirectXTex"
         }
 
-    --------------------- DirectXTex (既存のvcxprojを参照) ---------------------
-    externalproject "DirectXTex"
-        location (r"Externals/DirectXTex")
-        filename "DirectXTex_Desktop_2022_Win10"
-        kind "StaticLib"
-        language "C++"
-        toolset "v145"
-        -- 外部 vcxproj は Debug/Release しか持たないため Develop は Debug にマップ
-        configmap { ["Develop"] = "Debug" }
+    -- DirectXTex は毎回コンパイルすると遅く(21ファイル+fxcシェーダ生成)、かつ Rebuild 時に
+    -- コミット済みシェーダ生成物(Shaders/Compiled/*.inc)を破壊するため、assimp/curl と同様に
+    -- 「事前ビルド版 .lib を直接リンク」する方式に変更した。ビルドグラフからは外してある。
+    --   .lib の場所: Externals/DirectXTex/lib/{Debug,Release}/DirectXTex.lib
+    --   ★DirectXTex を更新したとき（滅多に無い）は、元 vcxproj
+    --     (Externals/DirectXTex/DirectXTex_Desktop_2022_Win10.vcxproj) を Debug/Release で
+    --     ビルドし、生成された DirectXTex.lib を上記フォルダへコピーして差し替えること。
+    -- （DirectXMesh はシェーダ生成の罠が無く Rebuild を壊さないため従来どおりソースビルド）
 
     --------------------- DirectXMesh (既存のvcxprojを参照) ---------------------
     externalproject "DirectXMesh"
@@ -196,6 +198,12 @@ group "Engine"
         fatalwarnings { "All" }
         linkoptions { "/ignore:4099" }
 
+        -- プリコンパイルヘッダ (コンパイル時間短縮)。
+        -- forceincludes で全 .cpp の先頭に pch.h を自動挿入するため、既存ソースは無改修。
+        pchheader "pch.h"
+        pchsource (r"YEngine/pch.cpp")
+        forceincludes { "pch.h" }
+
         files {
             r"YEngine/**.h",
             r"YEngine/**.cpp",
@@ -215,7 +223,8 @@ group "Engine"
         -- YEngine.lib に丸ごとマージされ、最終リンクで LNK4006(重複)になる。
         -- よってここでは link せず、build 順序のための dependson のみ残す。
         -- 実際のリンクは最終バイナリ(Debug/Develop=YGame.dll / Release=YMain.exe)で行う。
-        dependson { "YMath", "DirectXTex", "DirectXMesh", "meshoptimizer" }
+        -- DirectXTex は事前ビルド .lib 直リンクに変更したため dependson から外す。
+        dependson { "YMath", "DirectXMesh", "meshoptimizer" }
 
         postbuildcommands {
             -- DXC/DXIL DLLのコピー
@@ -247,6 +256,11 @@ group "Game"
         fatalwarnings { "All" }
         linkoptions { "/ignore:4099" }
 
+        -- プリコンパイルヘッダ (コンパイル時間短縮)。YEngine と同方針。
+        pchheader "pch.h"
+        pchsource (r"YGame/pch.cpp")
+        forceincludes { "pch.h" }
+
         files {
             r"YGame/**.h",
             r"YGame/**.cpp"
@@ -272,7 +286,8 @@ group "Game"
             libdirs {
                 outputDir,
                 r"Externals/curl/lib",
-                r"Externals/assimp/lib/Debug"
+                r"Externals/assimp/lib/Debug",
+                r"Externals/DirectXTex/lib/Debug"  -- 事前ビルド版 DirectXTex.lib
             }
             links {
                 "YMath", "YEngine", "meshoptimizer", "ImGui",
@@ -335,7 +350,8 @@ group "Game"
             libdirs {
                 outputDir,
                 r"Externals/curl/lib",
-                r"Externals/assimp/lib/Release"
+                r"Externals/assimp/lib/Release",
+                r"Externals/DirectXTex/lib/Release"  -- 事前ビルド版 DirectXTex.lib
             }
             links {
                 "YGame", "YEngine", "YMath", "meshoptimizer",
