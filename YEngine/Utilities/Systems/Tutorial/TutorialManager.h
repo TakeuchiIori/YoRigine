@@ -8,6 +8,10 @@
 #include "Vector2.h"
 #include "Vector4.h"
 
+#include "TutorialCondition.h"
+#include "TutorialSignal.h"
+#include "TutorialSpotlight.h"
+
 namespace YoRigine {
 
 	enum class TutorialWaitType {
@@ -43,6 +47,11 @@ namespace YoRigine {
 		std::string name = "新しいステップ";
 		std::string speaker;
 		std::string text = "説明文を入力してください";
+		// 完了条件。type が None のときだけ、従来の waitType へフォールバックする。
+		// 既存の JSON には complete が無いため、そのまま読み込めば従来動作になる。
+		TutorialCondition complete;
+		// 注目させたい場所以外を暗幕で覆う設定。enabled が false なら何もしない。
+		TutorialSpotlightConfig spotlight;
 		TutorialWaitType waitType = TutorialWaitType::Confirm;
 		float waitSeconds = 2.0f;
 		std::string eventName;
@@ -122,6 +131,8 @@ namespace YoRigine {
 	private:
 		TutorialManager() = default;
 		void EnterStep(std::size_t index);
+		void SubscribeSignals();
+		void UnsubscribeSignals();
 		void RefreshRuntimeUI();
 		void HideRuntimeUI();
 		void ApplyRuntimeOpacity();
@@ -154,6 +165,11 @@ namespace YoRigine {
 		bool gameplayWasPaused_ = false;
 		std::unordered_set<std::string> receivedEvents_;
 		std::vector<std::string> knownEventNames_;
+
+		// 完了条件の評価状態。currentData_ 内の定義を指すため、
+		// currentData_ が差し替わるタイミング（Start / Stop）で必ず張り直す。
+		TutorialConditionRuntime completeRuntime_;
+		TutorialSignal::Handle signalHandle_ = 0;
 		std::string highlightedUIId_;
 		Vector2 highlightedOriginalScale_{ 1.0f, 1.0f };
 

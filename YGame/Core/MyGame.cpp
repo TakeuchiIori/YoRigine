@@ -12,6 +12,7 @@
 #include "Material/OutlineSettings.h"
 #include <Systems/UI/UIManager.h>
 #include <Systems/Text/TextTextureBaker.h>
+#include <Systems/Tutorial/TutorialManager.h>
 #include "GPUParticle/YGpuEmitManager.h"
 #include <Object3D/BaseObjectManager.h>
 #include <Drawer/InstancedObject3d.h>
@@ -148,6 +149,13 @@ void MyGame::Initialize() {
 		"ImGui Studio",
 		[]() { ImGuiStudio::GetInstance()->Draw(); },
 		"AllScene", "システム");
+	// TutorialManager::DrawEditor は USE_IMGUI でのみ存在するため、登録ごと囲む。
+#ifdef USE_IMGUI
+	Editor::GetInstance()->RegisterGameUI(
+		"チュートリアル",
+		[]() { YoRigine::TutorialManager::GetInstance()->DrawEditor(); },
+		"AllScene", "システム");
+#endif
 	// ParticleEditor は旧システム専用のため削除済み。YParticleEditor を使用。
 	Editor::GetInstance()->RegisterGameUI(
 		"モデル操作",
@@ -244,6 +252,11 @@ void MyGame::Update() {
 	//------------------------------------------------------------
 	Framework::Update();
 	SceneManager::GetInstance()->Update();
+
+	// チュートリアルはシーン更新の後。
+	// 説明パネルのスプライトを UIManager::UpdateAll（シーン側UIが呼ぶ）より後に
+	// 差し込む必要があるため、この順序を崩さないこと。
+	YoRigine::TutorialManager::GetInstance()->Update();
 	PipCameraSystem::GetInstance()->Update();
 	YoRigine::CinematicManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
 

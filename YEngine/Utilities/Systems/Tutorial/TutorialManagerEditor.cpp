@@ -12,6 +12,169 @@
 #include "Systems/UI/UIManager.h"
 
 namespace {
+	// 条件ツリーの入れ子の深さ上限。UIが際限なく深くならないよう抑える。
+	constexpr int kMaxConditionDepth = 4;
+
+	// 完了条件ツリーの編集UI。all/any/not は子を持つため再帰的に描く。
+	bool DrawConditionEditor(YoRigine::TutorialCondition& condition,
+		const std::vector<std::string>& signalNames, int depth) {
+		using YoRigine::TutorialCondition;
+		using YoRigine::TutorialConditionType;
+
+		// 並び順は TutorialConditionType の宣言順と一致させること。
+		static constexpr std::string_view kTypeNames[] = {
+			"使わない（下の旧設定に従う）",
+			"シグナルを待つ",
+			"時間が経過する",
+			"決定入力を待つ",
+			"すべて成立したら",
+			"いずれか成立したら",
+			"成立しなければ",
+		};
+
+		bool changed = YEditorWidget::EnumCombo("条件の種類", condition.type, kTypeNames);
+
+		switch (condition.type) {
+		case TutorialConditionType::Signal:
+			if (!signalNames.empty()) {
+				changed |= YEditorWidget::StringCombo("シグナル名", condition.signalName, signalNames, true);
+			}
+			changed |= YEditorWidget::InputText("シグナル名を直接入力", condition.signalName);
+			YEditorWidget::HelpMarker(
+				"入力アクションは action.triggered.<アクション名> という名前で自動的に流れてきます。"
+				"ゲーム固有の出来事は TutorialSignal::Emit(\"名前\") をゲーム側から呼んでください");
+			changed |= YEditorWidget::DragInt("必要な回数", condition.requiredCount, 1.0f, 1, 99);
+			break;
+
+		case TutorialConditionType::Elapsed:
+			changed |= YEditorWidget::DragFloat("経過秒数", condition.seconds, 0.1f, 0.0f, 600.0f, "%.1f");
+			break;
+
+		case TutorialConditionType::All:
+		case TutorialConditionType::Any:
+		case TutorialConditionType::Not: {
+			// 「成立しなければ」は先頭の子だけを見るため、子は1つで足りる。
+			const bool acceptsMore = (condition.type != TutorialConditionType::Not)
+				|| condition.children.empty();
+
+			ImGui::Indent();
+			if (acceptsMore && ImGui::SmallButton("子の条件を追加")) {
+				condition.children.push_back(TutorialCondition{});
+				changed = true;
+			}
+
+			int removeIndex = -1;
+			for (int i = 0; i < static_cast<int>(condition.children.size()); ++i) {
+				ImGui::PushID(i);
+				const std::string header = "条件 " + std::to_string(i + 1);
+				if (ImGui::TreeNodeEx(header.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+					if (depth < kMaxConditionDepth) {
+						changed |= DrawConditionEditor(condition.children[i], signalNames, depth + 1);
+					}
+					else {
+						ImGui::TextDisabled("これ以上は入れ子にできません");
+					}
+					if (ImGui::SmallButton("この条件を削除")) removeIndex = i;
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
+			if (removeIndex >= 0) {
+				condition.children.erase(condition.children.begin() + removeIndex);
+				changed = true;
+			}
+			ImGui::Unindent();
+			break;
+		}
+
+		case TutorialConditionType::None:
+		case TutorialConditionType::Confirm:
+		default:
+			break;
+		}
+		return changed;
+	}
+
+	// 暗幕（スポットライト）の編集UI。
+	bool DrawSpotlightEditor(YoRigine::TutorialSpotlightConfig& spotlight,
+		const std::vector<std::string>& uiIds) {
+		using YoRigine::TutorialSpotlightTarget;
+		using YoRigine::TutorialSpotlightTargetKind;
+
+		bool changed = YEditorWidget::Checkbox("注目させたい場所以外を暗くする", spotlight.enabled);
+		YEditorWidget::HelpMarker(
+			"指定した場所だけ穴を開けて、それ以外を暗幕で覆います。"
+			"穴の中は下にあるUIも3Dの画もそのまま明るく残ります");
+		if (!spotlight.enabled) return changed;
+
+		changed |= YEditorWidget::Color("暗幕の色", spotlight.dimColor);
+		changed |= YEditorWidget::DragFloat("穴の余白(px)", spotlight.padding, 1.0f, 0.0f, 200.0f, "%.0f");
+		changed |= YEditorWidget::DragFloat("暗転にかける時間(秒)", spotlight.fadeSeconds, 0.05f, 0.0f, 3.0f, "%.2f");
+
+		// 並び順は TutorialSpotlightTargetKind の宣言順と一致させること。
+		static constexpr std::string_view kKindNames[] = {
+			"UIを指定", "画面上の矩形を指定", "ワールド上の対象を指定",
+		};
+
+		if (ImGui::Button("注目させる場所を追加")) {
+			spotlight.targets.push_back(TutorialSpotlightTarget{});
+			changed = true;
+		}
+
+		const std::vector<std::string> worldNames =
+			YoRigine::TutorialSpotlight::GetInstance()->GetWorldTargetNames();
+
+		int removeIndex = -1;
+		for (int i = 0; i < static_cast<int>(spotlight.targets.size()); ++i) {
+			TutorialSpotlightTarget& target = spotlight.targets[i];
+			ImGui::PushID(i);
+			const std::string header = std::to_string(i + 1) + ". " +
+				(target.id.empty() ? std::string("(未設定)") : target.id);
+			if (ImGui::TreeNodeEx(header.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+				changed |= YEditorWidget::EnumCombo("対象の種類", target.kind, kKindNames);
+
+				switch (target.kind) {
+				case TutorialSpotlightTargetKind::Ui:
+					if (!uiIds.empty()) {
+						changed |= YEditorWidget::StringCombo("UI", target.id, uiIds, true);
+					}
+					else {
+						changed |= YEditorWidget::InputText("UI ID", target.id);
+					}
+					break;
+
+				case TutorialSpotlightTargetKind::Rect:
+					changed |= YEditorWidget::DragVec2("中心位置", target.center, 1.0f, -2048.0f, 4096.0f);
+					changed |= YEditorWidget::DragVec2("大きさ", target.size, 1.0f, 1.0f, 4096.0f);
+					break;
+
+				case TutorialSpotlightTargetKind::World:
+					if (!worldNames.empty()) {
+						changed |= YEditorWidget::StringCombo("登録名", target.id, worldNames, true);
+					}
+					else {
+						changed |= YEditorWidget::InputText("登録名", target.id);
+						ImGui::TextDisabled("ゲーム側から RegisterWorldTarget で登録された名前がここに並びます");
+					}
+					changed |= YEditorWidget::DragFloat("半径(ワールド単位)", target.radius, 0.1f, 0.1f, 100.0f, "%.1f");
+					break;
+
+				default:
+					break;
+				}
+
+				if (ImGui::SmallButton("この対象を削除")) removeIndex = i;
+				ImGui::TreePop();
+			}
+			ImGui::PopID();
+		}
+		if (removeIndex >= 0) {
+			spotlight.targets.erase(spotlight.targets.begin() + removeIndex);
+			changed = true;
+		}
+		return changed;
+	}
+
 	std::vector<std::string> ListTutorialFiles() {
 		std::vector<std::string> files;
 		std::error_code error;
@@ -388,6 +551,18 @@ namespace YoRigine {
 				YEditorWidget::HelpMarker(
 					"初めて遊ぶ学生が、このページだけを読んでも操作と目的を理解できる文章にしてください");
 
+				YEditorWidget::SectionHeader("完了条件");
+				ImGui::TextDisabled("プレイヤーが実際に行動したら次へ進めたい場合はこちらを使います");
+				TutorialSignal::GetInstance()->ConnectEngineSources();
+				stepChanged |= DrawConditionEditor(
+					step.complete, TutorialSignal::GetInstance()->GetKnownNames(), 0);
+
+				const bool usesCondition = step.complete.type != TutorialConditionType::None;
+				if (usesCondition) {
+					ImGui::TextDisabled("完了条件を設定したため、下の旧設定は使用されません");
+				}
+				ImGui::BeginDisabled(usesCondition);
+
 				static constexpr const char* waitLabels[] = { "決定入力を待つ", "指定秒数を待つ", "ゲームイベントを待つ" };
 				int waitType = static_cast<int>(step.waitType);
 				if (ImGui::Combo("完了条件", &waitType, waitLabels, IM_ARRAYSIZE(waitLabels))) {
@@ -414,9 +589,14 @@ namespace YoRigine {
 					}
 					YEditorWidget::HelpMarker("ゲーム側から TutorialManager::NotifyEvent(イベント名) を呼ぶと次へ進みます");
 				}
+				ImGui::EndDisabled();
 				if (!uiIds.empty()) stepChanged |= YEditorWidget::StringCombo("強調するUI", step.targetUIId, uiIds, true);
 				else stepChanged |= YEditorWidget::InputText("強調するUI ID", step.targetUIId);
 				YEditorWidget::HelpMarker("UI管理に登録されているIDを指定すると、そのUIをパルス表示します");
+
+				YEditorWidget::SectionHeader("スポットライト");
+				stepChanged |= DrawSpotlightEditor(step.spotlight, uiIds);
+
 				stepChanged |= YEditorWidget::Checkbox("ゲームを一時停止", step.pauseGameplay);
 				stepChanged |= YEditorWidget::Checkbox("チュートリアル全体を閉じられる", step.skippable);
 

@@ -277,9 +277,13 @@ Debug / Develop / Release の3構成でビルド成功。両プロジェクト�
 | Phase | 内容 | 状態 |
 |---|---|---|
 | 0 | `InputActionMap` + `PlayerInput` | **完了** |
-| 1 | `TutorialSignal`（シグナルバス）、`TutorialCondition`（条件ツリー）、ポーズせず進行 | 未着手 |
+| 1 | `TutorialSignal`（シグナルバス）、`TutorialCondition`（条件ツリー）、ポーズせず進行 | **完了** |
 | 2 | `TutorialSpotlight`（暗幕の矩形くり抜き、UI／ワールド両対応） | 未着手 |
 | 3 | 開始条件による非線形起動、既読フラグの永続化、ゲートの実効化 | 未着手 |
 | 4 | エディタの条件ピッカー、シグナル一覧 | 未着手 |
 
+詳細は [TutorialSystem.md](TutorialSystem.md) を参照。
+
 Phase 1 のシグナルバスは `InputActionMap::SetTriggerObserver` に接続するだけで `action.triggered.AttackLight` が流れる。**ボタン押下を完了条件にするチュートリアルは、ゲーム側のコードを1行も書かずに作れる**というのが、この層を先に入れた理由。
+
+なお `SetTriggerObserver` は1枠しかなく、現在は `TutorialSignal::ConnectEngineSources()` が占有している。他に購読者が必要になったら複数購読へ拡張すること。
