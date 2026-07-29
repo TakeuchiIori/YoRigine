@@ -1,6 +1,7 @@
 #pragma once
 
 // C++
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -9,25 +10,39 @@
 #include <Object3D/ObjectManager.h>
 #include <Systems/Camera/Camera.h>
 
-#ifdef USE_IMGUI
-#include "ModelBrowser.h"
-#include "PlacedObjectGizmable.h"
-#include "SceneEditorUI.h"
-#include "StampMode.h"
-#include <Debugger/Gizmo/GizmoController.h>
-#endif
-
-// Subsystems
+// サブシステム
+#include "Core/SceneEditorContext.h"
+#include "Core/SceneViewSettings.h"
+#include "Edit/SceneClipboard.h"
+#include "Edit/SceneLoadController.h"
+#include "Edit/ScenePlacementService.h"
 #include "ObjectSelector.h"
 #include "PickBuffer.h"
 #include "PrefabManager.h"
+#include "Render/SceneDebugDrawer.h"
+#include "Render/SceneObjectRenderer.h"
 #include "SceneSerializer.h"
-#include <Graphics/Drawer/InstancedShape/InstancedCube.h>
-#include <Graphics/Drawer/InstancedShape/InstancedSphere.h>
-#include <Graphics/Drawer/LineManager/Line.h>
+
+#ifdef USE_IMGUI
+#include "Edit/SceneEditorShortcuts.h"
+#include "Edit/SceneGizmoLayer.h"
+#include "ModelBrowser.h"
+#include "SceneEditorUI.h"
+#include "StampMode.h"
+#endif
 
 namespace YoRigine {
 
+/// <summary>
+/// シーンエディタのファサード。
+///
+/// 実際の処理はすべてサブシステムが持ち、このクラスは
+///   - サブシステムの所有と初期化
+///   - 共有コンテキスト (SceneEditorContext) の構築
+///   - シーン側 (BaseScene / MyGame) からの呼び出しの取り次ぎ
+/// だけを行う。ロジックをここに書き足さないこと。追加したい機能は
+/// Render/ Edit/ Panels/ のいずれかに置いて、ここからは呼ぶだけにする。
+/// </summary>
 class SceneEditor {
 public:
   //=========================================================================
@@ -37,33 +52,22 @@ public:
 
   void Initialize();
   void Update();
-  void Draw();
-  void DrawLine();
-  void DrawPickPass();
-  void DrawShadow();
-  void DrawImGui();
-  void DrawGizmo();
-  void DrawForPick();
   void Finalize();
 
-  void PlaceObject(const std::string &modelPath);
-  void LoadScene(const std::string &sceneName);
+  // ── 描画パス ─────────────────────────────────────────────
+  void Draw();         // カラーパス
+  void DrawLine();     // デバッグ線 (コライダー / 選択枠 / グリッド)
+  void DrawShadow();   // シャドウマップ
+  void DrawPickPass(); // ピック用 ObjectID の焼き込み
+  void DrawForPick();  // ピックパスの中身 (PickBuffer の Begin/End 間で呼ぶ)
+  void DrawImGui();    // エディタ UI
+  void DrawGizmo();    // 選択中オブジェクトのギズモ
 
-  void SetCamera(YoRigine::Camera *camera) {
-    camera_ = camera;
-    selector_.SetCamera(camera);
-    motionEditor_.SetCamera(camera);
-    // AABB/OBB は InstancedCube 集約描画
-    colliderCubes_.SetCamera(camera_);
-    // Sphere は InstancedSphere 集約描画
-    colliderSpheres_.SetCamera(camera_);
-    // Capsule は Line で描画
-    colliderLineCapsule_.SetCamera(camera_);
-    objectManager_->SetCamera(camera);
-#ifdef USE_IMGUI
-    stampMode_.SetCamera(camera);
-#endif
-  }
+  // ── シーン操作 ───────────────────────────────────────────
+  void LoadScene(const std::string &sceneName);
+  void PlaceObject(const std::string &modelPath);
+
+  void SetCamera(Camera *camera);
 
   //=========================================================================
   // サブシステムアクセッサ
@@ -71,35 +75,37 @@ public:
   SceneSerializer &GetSerializer() { return serializer_; }
   ObjectSelector &GetSelector() { return selector_; }
   MotionEditor &GetMotionEditor() { return motionEditor_; }
+  SceneViewSettings &GetViewSettings() { return viewSettings_; }
+  ScenePlacementService &GetPlacementService() { return placement_; }
 
 #ifdef USE_IMGUI
   // シーンエディタ (オブジェクト選択・ギズモ) が有効かどうか。
-  // オブジェクト一覧ウィンドウが閉じている、または Editor 全体が非表示なら
-  // false。 この返り値で ObjectSelector::Update / DrawGizmo を抑制する。
+  // 「モデル操作」ウィンドウが閉じている、または Editor 全体が非表示なら
+  // false。
   bool IsSceneEditorActive() const;
-
-  //=========================================================================
-  // デバッグ描画設定（SceneEditorUI から操作）
-  //=========================================================================
-  bool *GetShowColliderDebugPtr() { return &showColliderDebug_; }
-  bool *GetShowColliderSelectedOnlyPtr() { return &showColliderSelectedOnly_; }
-  bool *GetShowBroadPhaseGridPtr() { return &showBroadPhaseGrid_; }
-  float *GetBroadPhaseGridDrawRadiusPtr() { return &broadPhaseGridDrawRadius_; }
-  bool *GetEnableDrawFrustumCullingPtr() { return &enableDrawFrustumCulling_; }
 #endif
 
 private:
   //=========================================================================
   // 内部処理
   //=========================================================================
-  void ShortcutKey();
-  void CopyObject();
-  void PasteObject();
+  void BuildContext();
+
+#ifdef USE_IMGUI
+  void SetupUI();
+  void SetupShortcuts();
+  // 選択中オブジェクトをビューポート中央に収める (F キー)
+  void FocusSelection();
+  // 選択中オブジェクトをまとめて削除する (Delete キー)
+  void DeleteSelection();
+  // 選択中オブジェクトをその場で複製する (Ctrl+D)
+  void DuplicateSelection();
+#endif
 
   //=========================================================================
   // シングルトン
   //=========================================================================
-  SceneEditor() = default;
+  SceneEditor();
   ~SceneEditor() = default;
   SceneEditor(const SceneEditor &) = delete;
   SceneEditor &operator=(const SceneEditor &) = delete;
@@ -109,49 +115,35 @@ private:
   //=========================================================================
   // メンバ変数
   //=========================================================================
-  YoRigine::Camera *camera_ = nullptr;
-  ObjectManager *objectManager_ = nullptr;
-  PickBuffer *pickBuffer_ = nullptr;
   bool isInitialized_ = false;
-  std::string jsonPath_;
-  std::string modelFolderPath_ = "Resources/Models/";
-  // 現在ロード中のシーン名 (LoadScene 切替で前シーンを ObjectManager
-  // に退避するキーに使う)
-  std::string currentSceneName_;
+
+  // ── サブシステムが共有する状態 ────────────────────────────
+  SceneViewSettings viewSettings_;
+  SceneEditorContext context_;
+
+  // ── 所有するサブシステム ─────────────────────────────────
+  ObjectManager *objectManager_ = nullptr;
+  Camera *camera_ = nullptr;
+
   MotionEditor motionEditor_;
-
-  // AABB/OBB はインスタンス描画(1 DrawInstanced)。色はインスタンス毎。
-  InstancedCube colliderCubes_;
-  // Sphere もインスタンス描画 (worldMat = scale(r) * translate(c))
-  InstancedSphere colliderSpheres_;
-  // Capsule は単位形状化が複雑 (start/end が可変) なので既存 Line を継続。
-  YoRigine::Line colliderLineCapsule_;
-  bool showColliderDebug_ = true; // コライダー表示フラグ
-
-#ifdef USE_IMGUI
-  bool showColliderSelectedOnly_ = false;  // 選択中のみ描画
-  bool showBroadPhaseGrid_ = false;        // BroadPhase グリッド可視化
-  float broadPhaseGridDrawRadius_ = 30.0f; // カメラからの可視化半径
-#endif
-
-  // ── Frustum culling ──────────────────────────────
-  bool enableDrawFrustumCulling_ = true; // 描画でカリングするか
-  float drawBoundsScaleFactor_ =
-      2.0f; // スケール → 半サイズ係数 (コライダー無いとき)
-
-  std::vector<int> copyObjectIDs_;
-  Vector3 offsetCopyPos_ = {1.0f, 0.0f, 0.0f};
-
   SceneSerializer serializer_;
-  PrefabManager prefabMgr_;
+  PrefabManager prefabManager_;
   ObjectSelector selector_;
 
+  SceneObjectRenderer renderer_;
+  SceneDebugDrawer debugDrawer_;
+  SceneClipboard clipboard_;
+  ScenePlacementService placement_;
+  SceneLoadController loadController_;
+
 #ifdef USE_IMGUI
-  ModelBrowser browser_;
+  PickBuffer *pickBuffer_ = nullptr;
+
+  ModelBrowser modelBrowser_;
   SceneEditorUI editorUI_;
   StampMode stampMode_;
-  GizmoController gizmoCtrl_;
-  std::vector<PlacedObjectGizmable> gizmables_;
+  SceneGizmoLayer gizmoLayer_;
+  SceneEditorShortcuts shortcuts_;
 #endif
 };
 

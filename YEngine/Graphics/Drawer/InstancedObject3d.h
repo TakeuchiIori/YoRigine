@@ -9,6 +9,7 @@
 #include <wrl.h>
 
 #include "Material/MaterialLighting.h"
+#include "Material/MaterialOverrideSet.h"
 #include "Matrix4x4.h"
 #include "Object3D/ObjectManager.h" // PlacedObject (ネスト型なので前方宣言不可)
 #include "Vector4.h"
@@ -93,8 +94,12 @@ public:
   // をそのまま入れる=影パス用)。
   // overrideTexturePath: 空でなければモデル既定の代わりにこのテクスチャを貼る。
   // 同一モデルでもテクスチャが異なると別バッチとして描画される。
+  // materialOverrides: メッシュ単位のマテリアル差し替え。マテリアルは
+  // ドローコール単位でしかバインドできないため、上書きが異なるオブジェクトは
+  // 別バッチになる (同じ設定同士はまとまるのでインスタンシングは維持される)。
   void Submit(YoRigine::Model *model, const Instance &src,
-              const std::string &overrideTexturePath = "");
+              const std::string &overrideTexturePath = "",
+              MaterialOverrideSet *materialOverrides = nullptr);
 
   // PlacedObject 用: model / world / 色 / UV / 輪郭線をすべて PlacedObject
   // から取り出して積む。 影パスでも同じ呼び出しでよい (Begin()
@@ -110,7 +115,8 @@ public:
   // 低レベル: WVP / WIT を含む完成済みデータを積む。
   // overrideTexturePath が空でなければテクスチャ別のバッチに積む。
   void AddInstance(YoRigine::Model *model, const InstanceData &data,
-                   const std::string &overrideTexturePath = "");
+                   const std::string &overrideTexturePath = "",
+                   MaterialOverrideSet *materialOverrides = nullptr);
 
   // カラーパス: ObjectInstanced PSO で全バッチを描画
   void DrawAll(YoRigine::Camera *camera);
@@ -135,19 +141,22 @@ private:
   InstancedObject3d(const InstancedObject3d &) = delete;
   InstancedObject3d &operator=(const InstancedObject3d &) = delete;
 
-  // バッチ識別子: 同じモデルでもテクスチャ上書きが違えば別バッチにする。
-  // (インスタンシングは 1 ドロー = 1 テクスチャのため、テクスチャごとに分ける)
+  // バッチ識別子: 同じモデルでもテクスチャ上書き / マテリアル上書きが違えば
+  // 別バッチにする。(インスタンシングは 1 ドロー = 1 マテリアルのため)
   struct BatchKey {
     YoRigine::Model *model = nullptr;
     std::string overrideTexturePath;
+    MaterialOverrideSet *materialOverrides = nullptr;
     bool operator==(const BatchKey &o) const {
-      return model == o.model && overrideTexturePath == o.overrideTexturePath;
+      return model == o.model && overrideTexturePath == o.overrideTexturePath &&
+             materialOverrides == o.materialOverrides;
     }
   };
   struct BatchKeyHash {
     size_t operator()(const BatchKey &k) const {
       return std::hash<const void *>()(k.model) ^
-             (std::hash<std::string>()(k.overrideTexturePath) << 1);
+             (std::hash<std::string>()(k.overrideTexturePath) << 1) ^
+             (std::hash<const void *>()(k.materialOverrides) << 2);
     }
   };
 

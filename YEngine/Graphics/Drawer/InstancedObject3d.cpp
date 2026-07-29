@@ -76,7 +76,8 @@ void InstancedObject3d::Begin(YoRigine::Camera *camera) {
 }
 
 void InstancedObject3d::Submit(YoRigine::Model *model, const Instance &src,
-                               const std::string &overrideTexturePath) {
+                               const std::string &overrideTexturePath,
+                               MaterialOverrideSet *materialOverrides) {
   if (!model)
     return;
 
@@ -98,7 +99,7 @@ void InstancedObject3d::Submit(YoRigine::Model *model, const Instance &src,
   d.outlineMask = src.outlineMask;
   d.ditherFade = src.ditherFade;
 
-  AddInstance(model, d, overrideTexturePath);
+  AddInstance(model, d, overrideTexturePath, materialOverrides);
 }
 
 void InstancedObject3d::Submit(const ObjectManager::PlacedObject &placed) {
@@ -112,7 +113,9 @@ void InstancedObject3d::Submit(const ObjectManager::PlacedObject &placed) {
              MakeScaleMatrix({placed.uvScale.x, placed.uvScale.y, 1.0f}),
              placed.uvStochastic,
              placed.outlineEnabled ? 1.0f : 0.0f,
-         });
+         },
+         placed.object->GetOverrideTexturePath(),
+         placed.object->GetActiveMaterialOverrides());
 }
 
 void InstancedObject3d::Submit(YoRigine::Object3d &object,
@@ -132,14 +135,25 @@ void InstancedObject3d::Submit(YoRigine::Object3d &object,
              object.GetStochasticStrength(),
              object.IsOutlineEnabled() ? 1.0f : 0.0f,
          },
-         object.GetOverrideTexturePath());
+         object.GetOverrideTexturePath(), object.GetActiveMaterialOverrides());
 }
 
-void InstancedObject3d::AddInstance(YoRigine::Model *model, const InstanceData &data,
-                                    const std::string &overrideTexturePath) {
+void InstancedObject3d::AddInstance(YoRigine::Model *model,
+                                    const InstanceData &data,
+                                    const std::string &overrideTexturePath,
+                                    MaterialOverrideSet *materialOverrides) {
   if (!model)
     return;
-  auto &batch = batches_[BatchKey{model, overrideTexturePath}];
+  // 実際には何も上書きしていないセットでバッチを分けない (インスタンス数を保つ)
+  if (materialOverrides && !materialOverrides->HasAnyOverride()) {
+    materialOverrides = nullptr;
+  }
+  if (materialOverrides) {
+    // GPU へ書き込むのは dirty のときだけなので毎フレーム呼んでよい
+    materialOverrides->Apply(*model);
+  }
+  auto &batch =
+      batches_[BatchKey{model, overrideTexturePath, materialOverrides}];
   batch.cpuData.push_back(data);
   ++totalInstances_;
 }
@@ -156,7 +170,9 @@ void InstancedObject3d::SubmitDitherFade(
              placed.uvStochastic,
              0.0f, // フェード途中に不透明な輪郭だけが残るのを防ぐ
              1.0f,
-         });
+         },
+         placed.object->GetOverrideTexturePath(),
+         placed.object->GetActiveMaterialOverrides());
 }
 
 void InstancedObject3d::EnsureCapacity(Batch::BufferSlot &slot,
@@ -182,8 +198,8 @@ void InstancedObject3d::EnsureCapacity(Batch::BufferSlot &slot,
   if (slot.srvIndex == UINT32_MAX) {
     slot.srvIndex = srvManager_->Allocate();
   }
-  srvManager_->CreateSRVforStructuredBuffer(
-      slot.srvIndex, slot.gpuBuffer.Get(), newCap, sizeof(InstanceData));
+  srvManager_->CreateSRVforStructuredBuffer(slot.srvIndex, slot.gpuBuffer.Get(),
+                                            newCap, sizeof(InstanceData));
   slot.srvHandleGPU = srvManager_->GetGPUDescriptorHandle(slot.srvIndex);
 }
 
@@ -209,9 +225,8 @@ void InstancedObject3d::EnsureShadowCapacity(Batch::BufferSlot &slot,
   if (slot.srvIndex == UINT32_MAX) {
     slot.srvIndex = srvManager_->Allocate();
   }
-  srvManager_->CreateSRVforStructuredBuffer(slot.srvIndex,
-                                            slot.gpuBuffer.Get(), newCap,
-                                            sizeof(InstanceData));
+  srvManager_->CreateSRVforStructuredBuffer(slot.srvIndex, slot.gpuBuffer.Get(),
+                                            newCap, sizeof(InstanceData));
   slot.srvHandleGPU = srvManager_->GetGPUDescriptorHandle(slot.srvIndex);
 }
 
@@ -326,7 +341,8 @@ void InstancedObject3d::DrawAll(YoRigine::Camera *camera) {
     std::memcpy(slot.mapped, batch.cpuData.data(),
                 sizeof(InstanceData) * count);
 
-    key.model->DrawInstanced(count, slot.srvHandleGPU, key.overrideTexturePath);
+    key.model->DrawInstanced(count, slot.srvHandleGPU, key.overrideTexturePath,
+                             key.materialOverrides);
   }
 }
 

@@ -12,12 +12,14 @@
 #include <Debugger/Logger.h>
 #include <json.hpp>
 #include "Debugger/DebugConsole.h"
+#include "Material/MaterialOverrideSet.h"
 
 // C++
 #include <fstream>
 #include <assert.h>
 #include <sstream>
 #include <iostream>
+#include <cmath>
 
 
 // assimp
@@ -30,6 +32,27 @@
 #include <PipelineManager/YPipelineManager.h>
 
 namespace YoRigine {
+
+namespace {
+// マテリアルスロットの上書き解決ヘルパー。
+// overrides が無い / そのスロットに指定が無い場合は従来どおりの値を返すので、
+// 上書きを使わない描画パスの挙動は一切変わらない。
+const std::string& ResolveSlotTexture(const MaterialOverrideSet* overrides,
+	uint32_t slot, const std::string& fallback) {
+	if (overrides) {
+		const std::string& slotTexture = overrides->GetSlotTexturePath(slot);
+		if (!slotTexture.empty()) {
+			return slotTexture;
+		}
+	}
+	return fallback;
+}
+
+D3D12_GPU_VIRTUAL_ADDRESS ResolveSlotConstant(const MaterialOverrideSet* overrides,
+	uint32_t slot) {
+	return overrides ? overrides->GetSlotConstantAddress(slot) : 0;
+}
+} // namespace
 
 // 静的メンバ変数の定義
 const std::string Model::binPath = "Resources/Binary/";
@@ -129,7 +152,7 @@ bool Model::TryGetThemeColor(Vector4& out) const {
 	return false;
 }
 
-void Model::Draw(const std::string& overrideTexturePath) {
+void Model::Draw(const std::string& overrideTexturePath, const MaterialOverrideSet* overrides) {
 
 	auto pm = YPipelineManager::GetInstance();
 	const auto& indices = pm->GetParameterIndices("Object");
@@ -184,7 +207,10 @@ void Model::Draw(const std::string& overrideTexturePath) {
 	commandList->SetGraphicsRootDescriptorTable(indices.at("gShadowMap"), shadowHandle);
 	for (size_t i = 0; i < meshes_.size(); ++i) {
 		auto& mesh = meshes_[i];
-		materials_[mesh->GetMaterialIndex()]->RecordDrawCommands(commandList, indices.at("gMaterialConstant"), indices.at("gTexture"), overrideTexturePath);
+		const uint32_t slot = mesh->GetMaterialIndex();
+		materials_[slot]->RecordDrawCommands(commandList, indices.at("gMaterialConstant"), indices.at("gTexture"),
+			ResolveSlotTexture(overrides, slot, overrideTexturePath),
+			ResolveSlotConstant(overrides, slot));
 		// 環境マップが有効な場合のみバインド
 		if (EnvironmentMap::GetInstance()->GetSrvIndex() != UINT32_MAX) {
 			auto envHandle = EnvironmentMap::GetInstance()->GetSrvHandle();
@@ -240,7 +266,7 @@ void Model::DrawShadow()
 
 }
 
-void Model::DrawInstanced(uint32_t instanceCount, D3D12_GPU_DESCRIPTOR_HANDLE instanceSRV, const std::string& overrideTexturePath)
+void Model::DrawInstanced(uint32_t instanceCount, D3D12_GPU_DESCRIPTOR_HANDLE instanceSRV, const std::string& overrideTexturePath, const MaterialOverrideSet* overrides)
 {
 	// Skinning付きはインスタンス対応外 (CSスキニングが per-object 前提のため)
 	assert(!hasBones_ && "Model::DrawInstanced does not support skinned meshes");
@@ -261,8 +287,11 @@ void Model::DrawInstanced(uint32_t instanceCount, D3D12_GPU_DESCRIPTOR_HANDLE in
 	// メッシュごとのマテリアル + DrawIndexedInstanced
 	for (size_t i = 0; i < meshes_.size(); ++i) {
 		auto& mesh = meshes_[i];
-		materials_[mesh->GetMaterialIndex()]->RecordDrawCommands(
-			commandList, indices.at("gMaterialConstant"), indices.at("gTexture"), overrideTexturePath);
+		const uint32_t slot = mesh->GetMaterialIndex();
+		materials_[slot]->RecordDrawCommands(
+			commandList, indices.at("gMaterialConstant"), indices.at("gTexture"),
+			ResolveSlotTexture(overrides, slot, overrideTexturePath),
+			ResolveSlotConstant(overrides, slot));
 
 		if (EnvironmentMap::GetInstance()->GetSrvIndex() != UINT32_MAX) {
 			auto envHandle = EnvironmentMap::GetInstance()->GetSrvHandle();
@@ -622,10 +651,25 @@ void Model::LoadMaterial(const aiScene* scene, std::string directoryPath)
 			fullPath = directoryPath + "/" + textureFilePath.C_Str(); // スペース消して正しいパス連結
 			hasTexture = true;
 
+		} else if (materialSrc->GetTextureCount(aiTextureType_BASE_COLOR) != 0) {
+			// glTF (Blender エクスポート) は baseColorTexture として入ってくる。
+			// assimp のバージョン差で DIFFUSE に写らないことがあるので両方見る。
+			materialSrc->GetTexture(aiTextureType_BASE_COLOR, 0, &textureFilePath);
+			fullPath = directoryPath + "/" + textureFilePath.C_Str();
+			hasTexture = true;
 		}
 
 		materials_[materialIndex] = std::make_unique<Material>();
 		Material& material = *materials_[materialIndex];
+
+		// マテリアル名 (Blender 上のマテリアル名)。エディタのスロット表示に使う。
+		aiString materialName;
+		if (materialSrc->Get(AI_MATKEY_NAME, materialName) == AI_SUCCESS) {
+			material.SetName(materialName.C_Str());
+		} else {
+			material.SetName("Material " + std::to_string(materialIndex));
+		}
+
 		aiColor3D color;
 
 		if (materialSrc->Get(AI_MATKEY_COLOR_DIFFUSE, color) == AI_SUCCESS) {

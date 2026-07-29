@@ -34,6 +34,7 @@
 
 // モデルクラス
 class ModelCommon;
+class MaterialOverrideSet;
 
 namespace YoRigine {
 
@@ -64,7 +65,11 @@ public:
 
   // 描画。overrideTexturePath
   // を渡すと全メッシュのテクスチャをそれで上書きして描く（空なら本来のテクスチャ）。
-  void Draw(const std::string &overrideTexturePath = "");
+  // overrides を渡すとメッシュ (マテリアルスロット)
+  // ごとに色・粗さ・メタリック・ テクスチャを個別に差し替えられる。overrides
+  // 側の指定が優先される。
+  void Draw(const std::string &overrideTexturePath = "",
+            const MaterialOverrideSet *overrides = nullptr);
   // 影描画
   void DrawShadow();
   // ボーン描画
@@ -73,10 +78,13 @@ public:
   // インスタンシング描画 (ObjectInstanced PSO 使用、skinning未対応)
   // instanceSRV: StructuredBuffer<InstanceData> の GPU descriptor handle
   // overrideTexturePath: 空でなければモデル既定テクスチャの代わりにこれを貼る
-  // (非インスタンスの Model::Draw と同じアクセントテクスチャ差し替えをバッチ単位で行う)
+  // (非インスタンスの Model::Draw
+  // と同じアクセントテクスチャ差し替えをバッチ単位で行う)
+  // overrides: メッシュごとのマテリアル差し替え (バッチ単位で共有される)
   void DrawInstanced(uint32_t instanceCount,
                      D3D12_GPU_DESCRIPTOR_HANDLE instanceSRV,
-                     const std::string &overrideTexturePath = "");
+                     const std::string &overrideTexturePath = "",
+                     const MaterialOverrideSet *overrides = nullptr);
   // インスタンシング影描画 (ShadowMapInstanced PSO 使用)
   void DrawShadowInstanced(uint32_t instanceCount,
                            D3D12_GPU_DESCRIPTOR_HANDLE instanceSRV);
@@ -166,6 +174,15 @@ public:
   // メッシュ取得
   const std::vector<std::unique_ptr<Mesh>> &GetMeshes() const {
     return meshes_;
+  }
+
+  // マテリアル取得 (マテリアルスロット単位)。範囲外は nullptr。
+  size_t GetMaterialCount() const { return materials_.size(); }
+  Material *GetMaterial(size_t index) {
+    return index < materials_.size() ? materials_[index].get() : nullptr;
+  }
+  const Material *GetMaterial(size_t index) const {
+    return index < materials_.size() ? materials_[index].get() : nullptr;
   }
 
   // マテリアルの拡散反射色(Kd)から「白でも黒でもない」最初の色を返す。

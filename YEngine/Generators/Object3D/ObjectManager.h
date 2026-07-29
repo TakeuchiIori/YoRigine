@@ -21,6 +21,8 @@ namespace YoRigine {
 class CollisionManager;
 }
 
+class MaterialOverrideSet;
+
 enum class ColliderShapeType : uint32_t {
   kAABB = 0,
   kOBB,
@@ -83,6 +85,12 @@ public:
     int id = 0;
     int parentID = -1;
     bool isActive = true;
+
+    // アウトライナの「目」トグル。false
+    // にすると描画・影・ピックから外れるが、 一覧には残り続ける
+    // (isActive=false と違い、編集対象としては生きている)。
+    // エディタ専用の見た目フラグなので、当たり判定には影響しない。
+    bool visible = true;
 
     // シーンエディタのクリック選択対象にするか。
     // 地面・スカイ等の背景要素を false にすると、ピックバッファ描画から除外され
@@ -234,6 +242,17 @@ public:
 
   // PlacedObject の uvScale を内部 Object3d に反映する
   void ApplyObjectUV(PlacedObject &obj);
+
+  ///************************* マテリアル上書き *************************///
+
+  // メッシュ(マテリアルスロット)単位の上書きセットを取得する。
+  // モデルは共有されるため、色・粗さ・メタリック・テクスチャの個別変更は
+  // すべてこのセットを経由する。モデル未ロード時は nullptr。
+  MaterialOverrideSet *GetOrCreateMaterialOverrides(PlacedObject &obj);
+  MaterialOverrideSet *GetMaterialOverrides(const PlacedObject &obj) const;
+
+  // src のマテリアル上書きを dst へコピーする (複製・貼り付け用)
+  void CopyMaterialOverrides(const PlacedObject &src, PlacedObject &dst);
 
   ///************************* コライダー自動フィット
   ///*************************///

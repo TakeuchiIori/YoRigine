@@ -1,696 +1,379 @@
 #include "SceneEditor.h"
 
-#include <filesystem>
-#include <algorithm>
-#include <iostream>
-#include <cfloat>
-
-#include "ModelManager.h"
-#include <Collision/Core/CollisionTypeIdDef.h>
-#include <Collision/OBB/OBBCollider.h>
-#include <Collision/Sphere/SphereCollider.h>
-#include <Drawer/InstancedObject3d.h>
-#include "WorldTransform/WorldTransform.h"
-#include "Model.h"
-#include "MathFunc.h"
+// Engine
+#include <Debugger/Logger.h>
 
 #ifdef USE_IMGUI
-#include "imgui.h"
-#include "ImGuizmo.h"
+#include <Core/Editor/Widgets/YEditorWidget.h>
 #include <Editor/Editor.h>
-#include <Debugger/Gizmo/IGizmable.h>
-#include <DirectX/DirectXCommon.h>
+#include <imgui.h>
 #endif
-#include <Debugger/Logger.h>
-#include <Collision/Core/CollisionManager.h>
+
+// C++
+#include <vector>
 
 namespace YoRigine {
 
-	SceneEditor* SceneEditor::GetInstance() {
-		static SceneEditor instance;
-		return &instance;
-	}
+SceneEditor *SceneEditor::GetInstance() {
+  static SceneEditor instance;
+  return &instance;
+}
 
-	// ============================================================
-	// 初期化
-	// ============================================================
-	void SceneEditor::Initialize() {
-		if (isInitialized_) return; // 重複初期化を防止
+//=============================================================================
+// コンストラクタ
+//
+// サブシステムはすべて context_ への参照を握るので、必ずここで束縛する。
+// context_ の中身 (実体へのポインタ) は Initialize / SetCamera で埋まる。
+//=============================================================================
+SceneEditor::SceneEditor()
+    : renderer_(context_), debugDrawer_(context_), clipboard_(context_),
+      placement_(context_), loadController_(context_)
+#ifdef USE_IMGUI
+      ,
+      gizmoLayer_(context_)
+#endif
+{
+}
 
-		objectManager_ = ObjectManager::GetInstance();
-		serializer_.SetObjectManager(objectManager_);
-		serializer_.SetModelFolderPath(modelFolderPath_);
-		serializer_.SetDrawFrustumCullingFlag(&enableDrawFrustumCulling_);
+//=============================================================================
+// 共有コンテキストの構築
+//=============================================================================
+void SceneEditor::BuildContext() {
+  context_.camera = camera_;
+  context_.objectManager = objectManager_;
+  context_.selector = &selector_;
+  context_.serializer = &serializer_;
+  context_.prefabManager = &prefabManager_;
+  context_.motionEditor = &motionEditor_;
+  context_.viewSettings = &viewSettings_;
+}
 
-		prefabMgr_.SetObjectManager(objectManager_);
-		prefabMgr_.SetSerializer(&serializer_);
-		prefabMgr_.ScanPrefabFolder();
+//=============================================================================
+// 初期化
+//=============================================================================
+void SceneEditor::Initialize() {
+  if (isInitialized_) {
+    return; // 重複初期化を防止
+  }
 
-		selector_.SetObjectManager(objectManager_);
-		motionEditor_.Initialize(camera_);
-		colliderCubes_.Initialize();
-		colliderSpheres_.Initialize();
-		colliderLineCapsule_.Initialize();
+  objectManager_ = ObjectManager::GetInstance();
+  BuildContext();
+
+  serializer_.SetObjectManager(objectManager_);
+  serializer_.SetModelFolderPath(placement_.GetModelFolderPath());
+  serializer_.SetViewSettings(&viewSettings_);
+
+  prefabManager_.SetObjectManager(objectManager_);
+  prefabManager_.SetSerializer(&serializer_);
+  prefabManager_.ScanPrefabFolder();
+
+  selector_.SetObjectManager(objectManager_);
+  motionEditor_.Initialize(camera_);
+  debugDrawer_.Initialize();
 
 #ifdef USE_IMGUI
-		pickBuffer_ = PickBuffer::GetInstance();
-		pickBuffer_->Initialize(); // PickBuffer もここで一度だけ初期化
-		selector_.SetPickBuffer(pickBuffer_);
+  pickBuffer_ = PickBuffer::GetInstance();
+  pickBuffer_->Initialize(); // PickBuffer もここで一度だけ初期化
+  selector_.SetPickBuffer(pickBuffer_);
 
-		browser_.SetModelFolderPath(modelFolderPath_);
-		browser_.SetPlaceCallback([this](const std::string& path) { PlaceObject(path); });
-		browser_.ScanModelFolder();
+  stampMode_.SetObjectManager(objectManager_);
+  gizmoLayer_.Initialize();
 
-		editorUI_.SetObjectManager(objectManager_);
-		editorUI_.SetSelector(&selector_);
-		editorUI_.SetPrefabManager(&prefabMgr_);
-		editorUI_.SetSerializer(&serializer_);
-		editorUI_.SetGizmoController(&gizmoCtrl_);
-		editorUI_.SetPlaceCallback([this](const std::string& path) { PlaceObject(path); });
-		editorUI_.SetSaveCallback([this]() { serializer_.SaveScene(jsonPath_); });
-		editorUI_.SetLoadCallback([this]() { serializer_.LoadScene(jsonPath_); });
-		editorUI_.SetColliderDebugFlag(&showColliderDebug_);
-		editorUI_.SetColliderSelectedOnlyFlag(&showColliderSelectedOnly_);
-		editorUI_.SetBroadPhaseGridFlag(&showBroadPhaseGrid_);
-		editorUI_.SetBroadPhaseGridRadius(&broadPhaseGridDrawRadius_);
-		editorUI_.SetDrawFrustumCullingFlag(&enableDrawFrustumCulling_);
-
-		// スタンプモードのセットアップ + メニュー / ショートカットからの起動経路
-		stampMode_.SetObjectManager(objectManager_);
-		editorUI_.SetStartStampCallback([this]() {
-			stampMode_.Enter(selector_.GetPrimaryId());
-		});
-		editorUI_.SetStampActiveQuery([this]() { return stampMode_.IsActive(); });
-		editorUI_.SetExitStampCallback([this]() { stampMode_.Exit(); });
-
-		gizmoCtrl_.Initialize();
-
-		// Editor へのメニュー登録もここで一度だけ行う
-		Editor::GetInstance()->RegisterMenuBar([this] { editorUI_.DrawMenuBar(); });
+  SetupUI();
+  SetupShortcuts();
 #endif
 
-		isInitialized_ = true;
-	}
-
-	// =============================================================================
-	// Update
-	//
-	// ■ Pick Pass の順番
-	//   1. BeginPickPass()     ← RT クリア・パイプラインセット
-	//   2. DrawForPick()       ← 全オブジェクトを PickPSO で描画（IDを焼き込む）
-	//   3. EndPickPass()       ← クリックがあった座標を 1px コピー + Signal
-	//   4. selector_.Update()  ← クリック検出時は RequestPick、
-	//                            前フレームの結果があれば ReadPickResult
-	//
-	//   PickBuffer の RT にはこのフレームの描画結果が入っている。
-	//   クリック座標は RequestPick で登録され、EndPickPass でコピーされ、
-	//   次フレームの Update の先頭で ReadPickResult が読み取る。
-	// =============================================================================
-	void SceneEditor::Update() {
-		if (!isInitialized_) return;
+  isInitialized_ = true;
+}
 
 #ifdef USE_IMGUI
-		if (!ImGui::GetIO().WantTextInput) {
-			if (ImGui::GetIO().KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S)) {
-				serializer_.SaveScene(jsonPath_);
-				std::cout << "[SceneEditor] Saved (Ctrl+S)\n";
-			}
-		}
+//=============================================================================
+// UI のセットアップ
+//=============================================================================
+void SceneEditor::SetupUI() {
+  modelBrowser_.SetModelFolderPath(placement_.GetModelFolderPath());
+  modelBrowser_.SetPlaceCallback(
+      [this](const std::string &path) { PlaceObject(path); });
+  modelBrowser_.ScanModelFolder();
 
-		ShortcutKey();
+  // マテリアルのテクスチャ差し替えは MaterialPanel が持つ FileBrowser が
+  // 走査するので、ここで候補を先読みする必要はない。
 
-		motionEditor_.SetTargetObjectId(selector_.GetPrimaryId());
-		motionEditor_.Update();
+  ScenePanelContext panelContext;
+  panelContext.scene = &context_;
+  panelContext.placement = &placement_;
+  panelContext.loader = &loadController_;
+  panelContext.gizmoLayer = &gizmoLayer_;
+  panelContext.startStamp = [this] {
+    stampMode_.Enter(selector_.GetPrimaryId());
+  };
+  panelContext.exitStamp = [this] { stampMode_.Exit(); };
+  panelContext.isStamping = [this] { return stampMode_.IsActive(); };
 
-		const ImVec2 viewPos  = Editor::GetInstance()->GetGameViewPos();
-		const ImVec2 viewSize = Editor::GetInstance()->GetGameViewSize();
+  editorUI_.SetContext(panelContext);
 
-		// スタンプモード中はクリックを StampMode が消費するので selector_ の選択処理は抑制
-		const bool stamping = stampMode_.IsActive();
-		selector_.SetCamera(camera_);
-		selector_.Update(
-			IsSceneEditorActive() && !stamping,
-			viewPos,
-			viewSize);
+  // Editor へのメニュー登録もここで一度だけ行う
+  Editor::GetInstance()->RegisterMenuBar([this] { editorUI_.DrawMenuBar(); });
+}
 
-		// スタンプモードの更新 (マウス位置 → ヒット計算 → 左クリックで実体化)
-		stampMode_.Update(viewPos, viewSize);
+//=============================================================================
+// ショートカットのセットアップ
+//
+// 「どのキーで何が起きるか」は SceneEditorShortcuts
+// 側にまとまっているので、 ここでは各操作の実体を渡すだけ。
+//=============================================================================
+void SceneEditor::SetupShortcuts() {
+  SceneEditorShortcuts::Actions actions;
+  actions.save = [this] { loadController_.Save(); };
+  actions.copy = [this] { clipboard_.Copy(); };
+  actions.paste = [this] { clipboard_.Paste(); };
+  actions.duplicate = [this] { DuplicateSelection(); };
+  actions.deleteSelection = [this] { DeleteSelection(); };
+  actions.snapToSurface = [this] { placement_.SnapSelectionToSurface(); };
+  actions.focusSelection = [this] { FocusSelection(); };
+  actions.startStamp = [this] { stampMode_.Enter(selector_.GetPrimaryId()); };
+  actions.exitStamp = [this] { stampMode_.Exit(); };
+  shortcuts_.SetActions(std::move(actions));
+}
+
+//=============================================================================
+// 選択操作のヘルパー
+//=============================================================================
+void SceneEditor::DeleteSelection() {
+  // 反復中に選択集合が変化しないよう ID を控えてから削除する
+  const std::vector<int> ids(selector_.GetSelectedIds().begin(),
+                             selector_.GetSelectedIds().end());
+  for (const int id : ids) {
+    objectManager_->DeleteObject(id);
+  }
+  selector_.ClearSelection();
+}
+
+void SceneEditor::DuplicateSelection() {
+  const std::vector<int> ids(selector_.GetSelectedIds().begin(),
+                             selector_.GetSelectedIds().end());
+  selector_.ClearSelection();
+  for (const int id : ids) {
+    if (auto *duplicate =
+            objectManager_->DuplicateObject(id, {1.0f, 0.0f, 0.0f})) {
+      selector_.AddToSelection(duplicate->id);
+    }
+  }
+}
+
+void SceneEditor::FocusSelection() {
+  if (!camera_ || !selector_.HasSelection()) {
+    return;
+  }
+  // 選択中の重心へカメラの注視点だけを寄せる。
+  // カメラの操作方式 (デバッグカメラ / ゲームカメラ) に踏み込まないよう、
+  // ここでは平行移動だけに留める。
+  Vector3 center{};
+  int count = 0;
+  for (const int id : selector_.GetSelectedIds()) {
+    if (auto *obj = objectManager_->GetObjectById(id)) {
+      center += obj->position;
+      ++count;
+    }
+  }
+  if (count == 0) {
+    return;
+  }
+  center /= static_cast<float>(count);
+
+  // 現在の視線方向を保ったまま、一定距離だけ手前に下がった位置へ移動する。
+  // 視線はカメラのワールド行列の Z 軸 (3 行目) から取る。
+  constexpr float kFocusDistance = 12.0f;
+  const Matrix4x4 &world = camera_->worldMatrix_;
+  Vector3 forward{world.m[2][0], world.m[2][1], world.m[2][2]};
+  forward = Normalize(forward);
+  camera_->SetTranslate(center - forward * kFocusDistance);
+}
+
+//=============================================================================
+// シーンエディタが有効か
+//
+// 宣言 (ヘッダ) と呼び出し元はすべて USE_IMGUI ガード内に閉じているため、
+// Release ビルド (USE_IMGUI 未定義) ではこの関数は存在しない。
+//=============================================================================
+bool SceneEditor::IsSceneEditorActive() const {
+  // 「モデル操作」ウィンドウ (MyGame で RegisterGameUI 登録された名前) が
+  // 開かれているときのみ、選択・ギズモを有効化する。
+  return Editor::GetInstance()->GetShowEditor() &&
+         Editor::GetInstance()->IsGameUIVisible("モデル操作");
+}
+#endif // USE_IMGUI
+
+//=============================================================================
+// カメラの設定
+//=============================================================================
+void SceneEditor::SetCamera(Camera *camera) {
+  camera_ = camera;
+  context_.camera = camera;
+
+  selector_.SetCamera(camera);
+  motionEditor_.SetCamera(camera);
+  debugDrawer_.SetCamera(camera);
+  if (objectManager_) {
+    objectManager_->SetCamera(camera);
+  }
+#ifdef USE_IMGUI
+  stampMode_.SetCamera(camera);
 #endif
+}
 
-		// ObjectManager::Update() is driven once per frame from Framework::Update().
-		// Running it here as well advances animation time twice in editor previews.
-	}
-
-	// ============================================================
-	// 描画
-	// ============================================================
-	void SceneEditor::Draw() {
-		if (!isInitialized_ || !camera_) return;
-
-		// Frustum culling: 視錐台を抽出 (有効時のみ)
-		Frustum frustum{};
-		const bool useCulling = enableDrawFrustumCulling_;
-		if (useCulling) {
-			frustum = FrustumUtil::ExtractFromViewProjection(
-				camera_->GetViewProjectionMatrix());
-		}
-
-		auto boundsFor = [&](const auto* obj) -> AABB {
-			// コライダー有効時はそのワールドAABB を流用
-			if (obj->collider && obj->colliderEnabled) {
-				return YoRigine::CollisionManager::ComputeWorldAABB(obj->collider.get());
-			}
-			// 無いときは position ± (scale * factor) で大雑把に
-			float ex = std::fabs(obj->scale.x) * drawBoundsScaleFactor_;
-			float ey = std::fabs(obj->scale.y) * drawBoundsScaleFactor_;
-			float ez = std::fabs(obj->scale.z) * drawBoundsScaleFactor_;
-			return AABB{
-				{ obj->position.x - ex, obj->position.y - ey, obj->position.z - ez },
-				{ obj->position.x + ex, obj->position.y + ey, obj->position.z + ez }
-			};
-		};
-
-		// インスタンシング: 非アニメオブジェクトをモデル単位でまとめて描画
-		auto* instRenderer = ::InstancedObject3d::GetInstance();
-		instRenderer->Begin(camera_);
-		const Matrix4x4& vp = camera_->GetViewProjectionMatrix();
-
-		for (auto* obj : objectManager_->GetAllActiveObjects()) {
-			if (!obj || !obj->object || !obj->worldTransform) continue;
-
-			// Frustum 外ならスキップ
-			if (useCulling) {
-				AABB bounds = boundsFor(obj);
-				if (!FrustumUtil::IsAABBVisible(frustum, bounds)) continue;
-			}
-
-			// ボーン表示中の対象はスキップ
-			bool isTargetAndBoneDraw = (motionEditor_.IsDrawBone() && obj->id == motionEditor_.GetTargetObjectId());
-			if (isTargetAndBoneDraw) continue;
-
-			YoRigine::Model* model = obj->object->GetModel();
-			const bool canInstance = (model && !obj->isAnimation && !model->GetHasBones());
-
-			// カメラ遮蔽フェードは alpha blend ではなく深度書き込み ON の
-			// ディザーフェードを使う。複雑な建物の内部面が描画順で透けて
-			// まだらになるのを防ぐ。
-			const bool isCameraDitherFade =
-				canInstance && obj->colliderCameraFade && obj->color.w < 0.99f;
-
-			if (isCameraDitherFade) {
-				instRenderer->SubmitDitherFade(*obj);
-
-				const Matrix4x4& world = obj->worldTransform->GetMatWorld();
-				obj->worldTransform->SetMapWVP(world * vp);
-				obj->worldTransform->SetMapWorld(world);
-			} else if (canInstance) {
-				// 不透明: 通常インスタンシングバッチへ積む
-				instRenderer->Submit(*obj);
-
-				// PickBuffer や他システムが worldTransform の CB を参照するため、
-				// Object3d::Draw を経由しなくても CB を最新行列で同期する
-				const Matrix4x4& world = obj->worldTransform->GetMatWorld();
-				obj->worldTransform->SetMapWVP(world * vp);
-				obj->worldTransform->SetMapWorld(world);
-			} else {
-				// アニメ付き / 特殊エフェクト: 従来の個別 Draw 経路
-				obj->object->SetMaterialColor(obj->color);
-				obj->object->Draw(camera_, *obj->worldTransform);
-			}
-		}
-
-		// インスタンス分を1ドローコール/モデルでまとめて描画
-		instRenderer->DrawAll(camera_);
-
-		motionEditor_.Draw();
+//=============================================================================
+// Update
+//
+// ■ Pick Pass の順番
+//   1. BeginPickPass()     ← RT クリア・パイプラインセット
+//   2. DrawForPick()       ← 全オブジェクトを PickPSO で描画 (ID を焼き込む)
+//   3. EndPickPass()       ← クリック座標を 1px コピー + Signal
+//   4. selector_.Update()  ← クリック検出時は RequestPick、
+//                            前フレームの結果があれば ReadPickResult
+//
+//   クリック座標は RequestPick で登録され EndPickPass でコピーされる。
+//   次フレームの Update の先頭で ReadPickResult が読み取る。
+//=============================================================================
+void SceneEditor::Update() {
+  if (!isInitialized_) {
+    return;
+  }
 
 #ifdef USE_IMGUI
-		// スタンプモード中はカーソル下にゴーストを描画
-		stampMode_.DrawGhost();
+  const bool editorActive = IsSceneEditorActive();
+  const bool stamping = stampMode_.IsActive();
+
+  shortcuts_.Update(editorActive, selector_.HasSelection(), stamping);
+
+  motionEditor_.SetTargetObjectId(selector_.GetPrimaryId());
+  motionEditor_.Update();
+
+  const ImVec2 viewPos = Editor::GetInstance()->GetGameViewPos();
+  const ImVec2 viewSize = Editor::GetInstance()->GetGameViewSize();
+
+  // スタンプモード中はクリックを StampMode が消費するので選択処理は抑制する
+  selector_.SetCamera(camera_);
+  selector_.Update(editorActive && !stamping, viewPos, viewSize);
+
+  stampMode_.Update(viewPos, viewSize);
 #endif
-	}
 
+  // ObjectManager::Update() は Framework::Update() から毎フレーム
+  // 1 回だけ駆動される。ここでも呼ぶとアニメーション時間が二重に進む。
+}
 
-	// ============================================================
-	// 線の描画
-	// ============================================================
-	void SceneEditor::DrawLine() {
-		if (!isInitialized_ || !camera_) return;
-		motionEditor_.DrawBone();
+//=============================================================================
+// 描画パス (すべてサブシステムへの取り次ぎ)
+//=============================================================================
+void SceneEditor::Draw() {
+  if (!isInitialized_) {
+    return;
+  }
+  renderer_.Draw();
+  motionEditor_.Draw();
 
 #ifdef USE_IMGUI
-		// ── 選択中ハイライト（モデル外接の世界 AABB をオレンジ枠で表示） ──
-		// 色のマテリアル上書きを避け、ここでビジュアルな選択フィードバックを与える。
-		// コライダーデバッグ表示の ON/OFF に関係なく常時描画。
-		if (selector_.HasSelection()) {
-			const Vector4 kSelectionColor{ 1.0f, 0.55f, 0.0f, 1.0f }; // Blender 風オレンジ
-			colliderCubes_.Begin();
-			for (auto* obj : objectManager_->GetAllActiveObjects()) {
-				if (!obj || !obj->object || !obj->worldTransform) continue;
-				if (!selector_.IsSelected(obj->id)) continue;
-
-				AABB local{};
-				if (!objectManager_->ComputeModelLocalAABB(*obj, local)) continue;
-
-				// ローカル AABB の 8 隅をワールド変換して、その AABB を求める
-				const Vector3 corners[8] = {
-					{ local.min.x, local.min.y, local.min.z },
-					{ local.max.x, local.min.y, local.min.z },
-					{ local.min.x, local.max.y, local.min.z },
-					{ local.max.x, local.max.y, local.min.z },
-					{ local.min.x, local.min.y, local.max.z },
-					{ local.max.x, local.min.y, local.max.z },
-					{ local.min.x, local.max.y, local.max.z },
-					{ local.max.x, local.max.y, local.max.z },
-				};
-				const Matrix4x4& mw = obj->worldTransform->GetMatWorld();
-				Vector3 wmn = {  FLT_MAX,  FLT_MAX,  FLT_MAX };
-				Vector3 wmx = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
-				for (const auto& c : corners) {
-					Vector3 wp = Transform(c, mw);
-					wmn.x = std::min(wmn.x, wp.x); wmn.y = std::min(wmn.y, wp.y); wmn.z = std::min(wmn.z, wp.z);
-					wmx.x = std::max(wmx.x, wp.x); wmx.y = std::max(wmx.y, wp.y); wmx.z = std::max(wmx.z, wp.z);
-				}
-				colliderCubes_.AddAABB(wmn, wmx, kSelectionColor);
-			}
-			colliderCubes_.Flush();
-		}
-
-		if (!showColliderDebug_) return;
-
-		// タイプID → 色
-		auto colorForType = [](uint32_t typeKey) -> Vector4 {
-			switch (static_cast<CollisionTypeIdDef>(typeKey)) {
-			case CollisionTypeIdDef::kStaticWall:  return { 1.0f, 0.2f, 0.2f, 1.0f }; // 赤
-			case CollisionTypeIdDef::kNavObstacle: return { 1.0f, 0.8f, 0.0f, 1.0f }; // 黄
-			case CollisionTypeIdDef::kNavTrigger:  return { 0.2f, 0.5f, 1.0f, 1.0f }; // 青
-			case CollisionTypeIdDef::kWaypoint:    return { 0.2f, 1.0f, 0.3f, 1.0f }; // 緑
-			case CollisionTypeIdDef::kEventTrigger:return { 0.9f, 0.3f, 0.9f, 1.0f }; // マゼンタ
-			default:                               return { 0.6f, 0.6f, 0.6f, 1.0f }; // グレー
-			}
-		};
-
-		// AABB/OBB は InstancedCube に、Sphere は InstancedSphere に集約
-		colliderCubes_.Begin();
-		colliderSpheres_.Begin();
-		colliderLineCapsule_.SetColor({ 0.6f, 0.6f, 0.6f, 1.0f });
-
-		for (auto* obj : objectManager_->GetAllActiveObjects()) {
-			if (!obj || !obj->collider) continue;
-			if (!obj->colliderEnabled) continue;
-			if (showColliderSelectedOnly_ && !selector_.IsSelected(obj->id)) continue;
-
-			const uint32_t typeKey = obj->collider->GetTypeID();
-			const Vector4 col = colorForType(typeKey);
-
-			if (auto* a = dynamic_cast<AABBCollider*>(obj->collider.get())) {
-				colliderCubes_.AddAABB(a->GetAABB().min, a->GetAABB().max, col);
-			} else if (auto* o = dynamic_cast<OBBCollider*>(obj->collider.get())) {
-				colliderCubes_.AddOBB(o->GetOBB().center, o->GetOBB().rotation, o->GetOBB().size, col);
-			} else if (auto* s = dynamic_cast<SphereCollider*>(obj->collider.get())) {
-				colliderSpheres_.AddSphere(s->GetSphere().center, s->GetSphere().radius, col);
-			} else if (auto* cap = dynamic_cast<CapsuleCollider*>(obj->collider.get())) {
-				// Capsule のみ Line (低解像度)
-				const auto& c = cap->GetCapsule();
-				colliderLineCapsule_.DrawCapsule(c.start, c.end, c.radius, 12);
-			}
-		}
-
-		// 1 DrawInstanced (Cube), 1 DrawInstanced (Sphere), 1 DrawCall (Capsule Line)
-		colliderCubes_.Flush();
-		colliderSpheres_.Flush();
-		colliderLineCapsule_.DrawLine();
-
-		// BroadPhase グリッド可視化 (カメラ周辺のみ) - 別 Flush で2回目の DrawInstanced
-		if (showBroadPhaseGrid_ && camera_) {
-			colliderCubes_.Begin();
-			Vector3 camPos = camera_->GetTranslate();
-			YoRigine::CollisionManager::GetInstance()
-				->GetBroadPhaseGrid()
-				.DrawDebugAroundCamera(&colliderCubes_, camPos, broadPhaseGridDrawRadius_,
-					Vector4{ 0.3f, 0.8f, 0.3f, 0.4f });
-			colliderCubes_.Flush();
-		}
+  // スタンプモード中はカーソル下にゴーストを描画
+  stampMode_.DrawGhost();
 #endif
-	}
+}
 
-	// ============================================================
-	// ピックパスの描画
-	// ============================================================
-	void SceneEditor::DrawPickPass() {
-#ifdef USE_IMGUI
-		if (!isInitialized_ || !pickBuffer_) return;
-
-		if (!pickBuffer_->IsPickPending()) return; // クリックがないなら描画しない（無駄なGPU負荷を避ける）
-		pickBuffer_->BeginPickPass();
-		DrawForPick();
-		pickBuffer_->EndPickPass();
-#endif
-	}
-
-	// ============================================================
-	// 影の描画
-	// ============================================================
-	void SceneEditor::DrawShadow() {
-		if (!isInitialized_) return;
-
-		auto* instRenderer = ::InstancedObject3d::GetInstance();
-		instRenderer->Begin(camera_);   // camera_ は null 可 (影パスは WVP 不使用)
-
-		for (auto* obj : objectManager_->GetAllActiveObjects()) {
-			if (!obj || !obj->object || !obj->worldTransform) continue;
-			// 「影を落とす」が OFF のオブジェクトはシャドウマップへ描かない。
-			// 巨大スケールの地面などがシャドウマップを埋めて影がチラつくのを防ぐ。
-			if (!obj->castShadow) continue;
-
-			YoRigine::Model* model = obj->object->GetModel();
-			const bool canInstance = (model && !obj->isAnimation && !model->GetHasBones());
-
-			if (canInstance) {
-				// PlacedObject を渡すだけ (影パスは材質を無視)
-				instRenderer->Submit(*obj);
-			} else {
-				obj->object->DrawShadow(*obj->worldTransform);
-			}
-		}
-
-		instRenderer->DrawShadow();
-	}
-
-	// ============================================================
-	// ImGuiの描画
-	// ============================================================
-	void SceneEditor::DrawImGui() {
-#ifdef USE_IMGUI
-		if (!isInitialized_) return;
-		browser_.Draw();
-		ImGui::Separator();
-		if (editorUI_.GetShowObjectListPtr() && *editorUI_.GetShowObjectListPtr())
-			editorUI_.DrawObjectList();
-		if (editorUI_.GetShowTransformControlsPtr() && *editorUI_.GetShowTransformControlsPtr())
-			editorUI_.DrawTransformControls();
-		if (*editorUI_.GetShowDuplicateWindowPtr())
-			editorUI_.DrawDuplicateWindow();
-		if (*editorUI_.GetShowPrefabWindowPtr())
-			editorUI_.DrawPrefabWindow();
-		motionEditor_.ShowEditor();
-#endif
-	}
+void SceneEditor::DrawLine() {
+  if (!isInitialized_ || !camera_) {
+    return;
+  }
+  motionEditor_.DrawBone();
 
 #ifdef USE_IMGUI
-	// ============================================================
-	// シーンエディタが有効か (オブジェクト一覧ウィンドウ + Editor 全体の表示)
-	// 宣言 (ヘッダ) と呼び出し元はすべて USE_IMGUI ガード内に閉じているため、
-	// Release ビルド (USE_IMGUI 未定義) ではこの関数は存在しない。
-	// ============================================================
-	bool SceneEditor::IsSceneEditorActive() const {
-		// 「モデル操作」ウィンドウ (MyGame で RegisterGameUI 登録された名前) が
-		// 開かれているときのみ、選択・ギズモを有効化する。
-		return Editor::GetInstance()->GetShowEditor()
-			&& Editor::GetInstance()->IsGameUIVisible("モデル操作");
-	}
+  // デバッグ線はエディタ専用。Release では描画コストごと消す。
+  debugDrawer_.Draw();
 #endif
+}
 
-	// ============================================================
-	// ギズモの描画
-	// ============================================================
-	void SceneEditor::DrawGizmo() {
+void SceneEditor::DrawShadow() {
+  if (!isInitialized_) {
+    return;
+  }
+  renderer_.DrawShadow();
+}
+
+void SceneEditor::DrawForPick() { renderer_.DrawForPick(); }
+
+void SceneEditor::DrawPickPass() {
 #ifdef USE_IMGUI
-		if (!camera_ || !selector_.HasSelection()) return;
-		// オブジェクト一覧ウィンドウが閉じてるときはギズモも非表示
-		if (!IsSceneEditorActive()) return;
-
-		gizmables_.clear();
-		std::vector<IGizmable*> targets;
-
-		const auto& selectedIds = selector_.GetSelectedIds();
-		// reallocによるポインタ無効化を防ぐため、事前に要素数を確保
-		gizmables_.reserve(selectedIds.size());
-
-		// 選択されているすべてのオブジェクトをリストに追加
-		for (int id : selectedIds) {
-			if (motionEditor_.IsDrawBone() && id == motionEditor_.GetTargetObjectId()) {
-				continue;
-			}
-			auto* obj = objectManager_->GetObjectById(id);
-			if (obj && obj->worldTransform) {
-				gizmables_.emplace_back(obj, objectManager_);
-			}
-		}
-
-		// pointerをtargetsに登録
-		for (auto& g : gizmables_) {
-			targets.push_back(&g);
-		}
-
-		if (!targets.empty()) {
-			gizmoCtrl_.Draw(
-				camera_,
-				targets,
-				Editor::GetInstance()->GetGameViewPos(),
-				Editor::GetInstance()->GetGameViewSize());
-		}
-
-		motionEditor_.DrawGizmo();
+  if (!isInitialized_ || !pickBuffer_) {
+    return;
+  }
+  // クリックが無いなら描画しない (無駄な GPU 負荷を避ける)
+  if (!pickBuffer_->IsPickPending()) {
+    return;
+  }
+  pickBuffer_->BeginPickPass();
+  renderer_.DrawForPick();
+  pickBuffer_->EndPickPass();
 #endif
-	}
+}
 
-	// =============================================================================
-	// DrawForPick
-	//   BeginPickPass / EndPickPass の間に呼ぶ。
-	//   DrawShadow と同じ頂点/インデックスバッファを流用し、
-	//   PickPSO で ObjectID を R32_UINT RT に書き込む。
-	// =============================================================================
-	void SceneEditor::DrawForPick() {
+void SceneEditor::DrawImGui() {
 #ifdef USE_IMGUI
-		if (!camera_ || !pickBuffer_) return;
-
-		auto* cmd = DirectXCommon::GetInstance()->GetCommandList().Get();
-
-		for (auto* obj : objectManager_->GetAllActiveObjects()) {
-			if (!obj || !obj->object || !obj->worldTransform) continue;
-			// pickable=false の背景オブジェクト (地面など) は Pick バッファに描かない。
-			// クリックは裏の手前オブジェクトか空 (-1) に抜ける。
-			if (!obj->pickable) continue;
-
-			auto* model = obj->object->GetModel();
-			if (!model) continue;
-
-			// WVP 行列 CBV (b0)
-			cmd->SetGraphicsRootConstantBufferView(
-				PickBuffer::ROOT_PARAM_MVP_CBV,
-				obj->worldTransform->GetConstBuffer()->GetGPUVirtualAddress());
-
-			// ObjectID ルート定数 (b1)  ※ 0 は空選択予約なので +1
-			uint32_t encodedID = static_cast<uint32_t>(obj->id) + 1;
-			cmd->SetGraphicsRoot32BitConstant(
-				PickBuffer::ROOT_PARAM_OBJECT_ID, encodedID, 0);
-
-			// 頂点/インデックス描画（DrawShadow と同じ方式）
-			for (auto& mesh : model->GetMeshes()) {
-				if (mesh->HasBones() && model->GetSkinCluster()) {
-					mesh->RecordDrawCommands(cmd, *model->GetSkinCluster());
-				}
-				else {
-					mesh->RecordDrawCommands(cmd);
-				}
-				cmd->DrawIndexedInstanced(mesh->GetIndexCount(), 1, 0, 0, 0);
-			}
-		}
+  if (!isInitialized_) {
+    return;
+  }
+  if (editorUI_.GetShowModelBrowserPtr() &&
+      *editorUI_.GetShowModelBrowserPtr()) {
+    modelBrowser_.Draw();
+    ImGui::Separator();
+  }
+  editorUI_.DrawPanels();
+  motionEditor_.ShowEditor();
 #endif
-	}
+}
 
-	// ============================================================
-	// 終了処理
-	// ============================================================
-	void SceneEditor::Finalize() {
+void SceneEditor::DrawGizmo() {
 #ifdef USE_IMGUI
-		// 状態リセットのみ（GPU同期は不要）
-		if (pickBuffer_) {
-			pickBuffer_->Reset();
-		}
+  if (!isInitialized_ || !IsSceneEditorActive()) {
+    return;
+  }
+  gizmoLayer_.Draw(Editor::GetInstance()->GetGameViewPos(),
+                   Editor::GetInstance()->GetGameViewSize());
+  motionEditor_.DrawGizmo();
 #endif
-		if (objectManager_) objectManager_->Finalize();
-	}
+}
 
-	// ============================================================
-	// シーンの読み込み
-	// ============================================================
-	void SceneEditor::LoadScene(const std::string& sceneName) {
-		// システムが初期化されていなければ初期化する (安全策)
-		if (!isInitialized_) Initialize();
+//=============================================================================
+// シーン操作
+//=============================================================================
+void SceneEditor::LoadScene(const std::string &sceneName) {
+  // システムが初期化されていなければ初期化する (安全策)
+  if (!isInitialized_) {
+    Initialize();
+  }
 #ifdef USE_IMGUI
-		// PickBufferの状態をリセット
-		if (pickBuffer_) {
-			pickBuffer_->Reset();
-		}
+  if (pickBuffer_) {
+    pickBuffer_->Reset();
+  }
 #endif
-		jsonPath_ = "Resources/Json/Scenes/" + sceneName + ".json";
+  loadController_.Load(sceneName);
+}
 
-		// 同じシーンの再ロード要求は何もしない (退避→復元で空になるのを避ける)
-		if (currentSceneName_ == sceneName) {
-			selector_.ClearSelection();
-			Logger("[SceneEditor] Scene (already active): " + sceneName);
-			return;
-		}
+void SceneEditor::PlaceObject(const std::string &modelPath) {
+  placement_.PlaceModel(modelPath);
+}
 
-		// 現在のシーンを ObjectManager に退避 (PlacedObject は pool に残したまま、
-		// collider だけ CollisionManager から外す。D3D12 リソース再確保を回避する)。
-		if (!currentSceneName_.empty()) {
-			objectManager_->StashCurrentAs(currentSceneName_);
-		}
-
-		// 退避していたシーンがあれば、JSON 再パース + CreateObject ループをまるごと省略して復元
-		if (objectManager_->TryRestore(sceneName)) {
-			selector_.ClearSelection();
-			currentSceneName_ = sceneName;
-			Logger("[SceneEditor] Scene Restored from cache: " + sceneName);
-			return;
-		}
-
-		// 初回ロード: 通常の JSON 読み込み経路
-		objectManager_->ClearAllObjects();
-		serializer_.LoadScene(jsonPath_);
-		selector_.ClearSelection();
-		currentSceneName_ = sceneName;
-		Logger("[SceneEditor] Scene Loaded: " + sceneName);
-	}
-
-	// ============================================================
-	// ショートカットキーの処理
-	// ============================================================
-	void SceneEditor::ShortcutKey() {
+//=============================================================================
+// 終了処理
+//=============================================================================
+void SceneEditor::Finalize() {
 #ifdef USE_IMGUI
-		ImGuiIO& io = ImGui::GetIO();
-
-		// 「実際にテキスト入力中の時だけ」ブロックしたいので WantTextInput を使う。
-		// WantCaptureKeyboard は ImGui ウィンドウにフォーカスがあるだけで true になり、
-		// シーンエディタ表示中はほぼ常に true になって誤って全ショートカットを潰してしまう。
-		if (io.WantTextInput) return;
-		if (!IsSceneEditorActive()) return;
-
-		if (io.KeyCtrl) {
-			if (ImGui::IsKeyPressed(ImGuiKey_C)) {
-				CopyObject();
-			}
-			if (ImGui::IsKeyPressed(ImGuiKey_V)) {
-				PasteObject();
-			}
-			// Ctrl+G : 選択中を地面に吸着 (Snap to surface)
-			if (ImGui::IsKeyPressed(ImGuiKey_G)) {
-				editorUI_.SnapSelectedToSurface();
-			}
-		}
-		else {
-			// B キー単独: 選択中オブジェクトをスタンプ元にしてスタンプモード開始
-			//   モード中は左クリック連打で連続配置、Esc/右クリックで終了
-			if (ImGui::IsKeyPressed(ImGuiKey_B) && selector_.HasSelection()
-				&& !stampMode_.IsActive()) {
-				stampMode_.Enter(selector_.GetPrimaryId());
-			}
-		}
+  // 状態リセットのみ (GPU 同期は不要)
+  if (pickBuffer_) {
+    pickBuffer_->Reset();
+  }
 #endif
-	}
+  if (objectManager_) {
+    objectManager_->Finalize();
+  }
+}
 
-	// ============================================================
-	// 指定したモデルファイルをシーンに配置
-	// ============================================================
-	void SceneEditor::PlaceObject(const std::string& modelPath) {
-		try {
-			if (modelPath.empty() || !std::filesystem::exists(modelPath)) {
-				std::cout << "[SceneEditor] Invalid path: " << modelPath << "\n";
-				return;
-			}
-
-			std::filesystem::path full(modelPath);
-			std::filesystem::path rel = std::filesystem::relative(full, modelFolderPath_);
-
-			std::string ext = full.extension().string();
-			std::transform(ext.begin(), ext.end(), ext.begin(),
-				[](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-			bool isAnim = (ext == ".gltf" || ext == ".glb");
-
-			auto* obj = objectManager_->CreateObject(rel.string(), isAnim);
-			if (obj) {
-				selector_.ClearSelection();
-				selector_.AddToSelection(obj->id);
-				objectManager_->UpdateObjectTransform(*obj);
-				std::cout << "[SceneEditor] Placed: " << full.filename() << "\n";
-			}
-		}
-		catch (const std::exception& e) {
-			std::cout << "[SceneEditor] PlaceObject error: " << e.what() << "\n";
-		}
-	}
-
-	// ============================================================
-	// 選択したオブジェクトのコピー
-	// ============================================================
-	void SceneEditor::CopyObject() {
-		auto& selectID = selector_.GetSelectedIds();
-		if (selectID.empty()) {
-			std::cout << "[SceneEditor] CopyObject: 選択なし、コピー対象なし\n";
-			return;
-		}
-
-		copyObjectIDs_.assign(selectID.begin(), selectID.end());
-		std::cout << "[SceneEditor] CopyObject: " << copyObjectIDs_.size() << "件 コピー\n";
-	}
-
-	// ============================================================
-	// コピーしたオブジェクトを貼り付け
-	// ============================================================
-	void SceneEditor::PasteObject() {
-		if (copyObjectIDs_.empty()) {
-			std::cout << "[SceneEditor] PasteObject: コピーバッファ空\n";
-			return;
-		}
-		// 貼り付けたものを新しく選択状態にするためにクリアする
-		selector_.ClearSelection();
-
-		for (int id : copyObjectIDs_) {
-			auto* srcObj = objectManager_->GetObjectById(id);
-			if (!srcObj) continue;
-
-			// 生成元のオブジェクト情報を参照してコピーを作成
-			auto* newObj = objectManager_->CreateObject(srcObj->modelPath, srcObj->isAnimation, srcObj->animationName);
-			if (!newObj) {
-				std::cout << "[SceneEditor] PasteObject: CreateObject失敗 (src ID=" << id << ")\n";
-				continue;
-			}
-			newObj->position = srcObj->position + offsetCopyPos_;
-			newObj->rotation = srcObj->rotation;
-			newObj->scale = srcObj->scale;
-
-			// コライダー設定をオブジェクト個別にコピー
-			newObj->colliderEnabled      = srcObj->colliderEnabled;
-			newObj->colliderCameraFade   = srcObj->colliderCameraFade;
-			newObj->colliderTypeId       = srcObj->colliderTypeId;
-			newObj->colliderShapeType    = srcObj->colliderShapeType;
-			newObj->colliderAabbOffset   = srcObj->colliderAabbOffset;
-			newObj->colliderObbCenter    = srcObj->colliderObbCenter;
-			newObj->colliderObbSize      = srcObj->colliderObbSize;
-			newObj->colliderObbEuler     = srcObj->colliderObbEuler;
-			newObj->colliderSphereCenter = srcObj->colliderSphereCenter;
-			newObj->colliderSphereRadius = srcObj->colliderSphereRadius;
-			objectManager_->ApplyColliderTemplate(*newObj);
-
-			// マテリアル色・UV (旧コードは抜けていたので明示的にコピー)
-			newObj->color = srcObj->color;
-			objectManager_->ApplyObjectColor(*newObj);
-			newObj->uvScale = srcObj->uvScale;
-			newObj->uvStochastic = srcObj->uvStochastic;
-			objectManager_->ApplyObjectUV(*newObj);
-			newObj->outlineEnabled = srcObj->outlineEnabled;
-			newObj->castShadow = srcObj->castShadow;
-
-			// 親子関係も維持
-			newObj->parentID = srcObj->parentID;
-
-			// 選択状態に追加
-			selector_.AddToSelection(newObj->id);
-			objectManager_->UpdateObjectTransform(*newObj);
-		}
-		std::cout << "[SceneEditor] PasteObject: " << copyObjectIDs_.size() << "件 貼り付け\n";
-	}
 } // namespace YoRigine
