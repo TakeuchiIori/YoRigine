@@ -18,6 +18,7 @@
                 -0.08295989036560059,
                 -2.1565845012664795
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.008806467056274414,
@@ -96,6 +97,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.6212015151977539,
@@ -174,6 +176,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 -0.0005990266799926758,
@@ -252,6 +255,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 -0.0005990266799926758,
@@ -330,6 +334,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 -0.0005990266799926758,
@@ -408,6 +413,7 @@
                 0.0,
                 -0.8500000238418579
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.0,
@@ -486,6 +492,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": false,
             "colliderObbCenter": [
                 0.0,
@@ -564,6 +571,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.0,
@@ -642,6 +650,7 @@
                 0.0,
                 -0.8500000238418579
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.0,
@@ -720,6 +729,7 @@
                 -0.181304931640625,
                 -1.3569999933242798
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.0,
@@ -798,6 +808,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.6212015151977539,
@@ -876,6 +887,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.14300000667572021,
@@ -954,6 +966,7 @@
                 -0.181304931640625,
                 -1.3569999933242798
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.0,
@@ -1032,6 +1045,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.0,
@@ -1110,6 +1124,7 @@
                 -0.181304931640625,
                 -2.5570905208587646
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.0,
@@ -1188,6 +1203,7 @@
                 -0.181304931640625,
                 -2.5570905208587646
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.0,
@@ -1266,6 +1282,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.0430000014603138,
@@ -1344,6 +1361,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 -0.007000000216066837,
@@ -1422,6 +1440,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.09300000220537186,
@@ -1500,6 +1519,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.14300000667572021,
@@ -1578,6 +1598,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.19300000369548798,
@@ -1656,6 +1677,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 -0.0005990266799926758,
@@ -1734,6 +1756,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 -0.0005990266799926758,
@@ -1812,6 +1835,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 -0.0005990266799926758,
@@ -1890,6 +1914,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 -0.0005990266799926758,
@@ -1968,6 +1993,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 -0.0005990266799926758,
@@ -2046,6 +2072,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 -0.0005990266799926758,
@@ -2124,6 +2151,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 -0.0005990266799926758,
@@ -2202,6 +2230,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.19300000369548798,
@@ -2280,6 +2309,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.19300000369548798,
@@ -2358,6 +2388,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.19300000369548798,
@@ -2436,6 +2467,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.19300000369548798,
@@ -2514,6 +2546,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.14300000667572021,
@@ -2592,6 +2625,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 -0.0005990266799926758,
@@ -2670,6 +2704,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 -0.0005990266799926758,
@@ -2748,6 +2783,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 -0.0005990266799926758,
@@ -2826,6 +2862,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 -0.0005990266799926758,
@@ -2904,6 +2941,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.14300000667572021,
@@ -2982,6 +3020,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.14300000667572021,
@@ -3060,6 +3099,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.14300000667572021,
@@ -3138,6 +3178,7 @@
                 -0.051976680755615234,
                 -1.1105310916900635
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.008677005767822266,
@@ -3216,6 +3257,7 @@
                 -0.051976680755615234,
                 -1.1105310916900635
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.008677005767822266,
@@ -3294,6 +3336,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.0,
@@ -3372,6 +3415,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.0,
@@ -3450,6 +3494,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 -0.0005990266799926758,
@@ -3528,6 +3573,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 -0.0005990266799926758,
@@ -3606,6 +3652,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 -0.0005990266799926758,
@@ -3684,6 +3731,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 -0.0005990266799926758,
@@ -3762,6 +3810,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 -0.0005990266799926758,
@@ -3840,6 +3889,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 -0.0005990266799926758,
@@ -3918,6 +3968,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 -0.0005990266799926758,
@@ -3996,6 +4047,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 -0.0005990266799926758,
@@ -4074,6 +4126,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 -0.0005990266799926758,
@@ -4152,6 +4205,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 -0.0005990266799926758,
@@ -4230,6 +4284,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 -0.0005990266799926758,
@@ -4308,6 +4363,7 @@
                 -0.08295989036560059,
                 -2.1565845012664795
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.008806467056274414,
@@ -4386,6 +4442,7 @@
                 -0.08295989036560059,
                 -2.1565845012664795
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.008806467056274414,
@@ -4464,6 +4521,7 @@
                 -0.1495257019996643,
                 -0.5354641079902649
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.0,
@@ -4542,6 +4600,7 @@
                 -0.1495257019996643,
                 -0.5354641079902649
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.0,
@@ -4620,6 +4679,7 @@
                 -0.1495257019996643,
                 -0.5354641079902649
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.0,
@@ -4698,6 +4758,7 @@
                 -0.1495257019996643,
                 -0.5354641079902649
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.0,
@@ -4776,6 +4837,7 @@
                 -0.1495257019996643,
                 -0.5354641079902649
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.0,
@@ -4854,6 +4916,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 -0.0005990266799926758,
@@ -4932,6 +4995,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 -0.0005990266799926758,
@@ -5010,6 +5074,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 -0.0005990266799926758,
@@ -5088,6 +5153,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 -0.0005990266799926758,
@@ -5166,6 +5232,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 -0.0005990266799926758,
@@ -5244,6 +5311,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 -0.0005990266799926758,
@@ -5322,6 +5390,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 -0.0005990266799926758,
@@ -5400,6 +5469,7 @@
                 -0.1495257019996643,
                 -0.5354641079902649
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.0,
@@ -5478,6 +5548,7 @@
                 -0.1440250277519226,
                 -0.6557949185371399
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.21313051879405975,
@@ -5556,6 +5627,7 @@
                 -0.2634239196777344,
                 -0.583491325378418
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.03655000030994415,
@@ -5634,6 +5706,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.05641500651836395,
@@ -5712,6 +5785,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.09638550877571106,
@@ -5790,6 +5864,7 @@
                 -0.1440250277519226,
                 -0.6557949185371399
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.21313051879405975,
@@ -5868,6 +5943,7 @@
                 -0.1440250277519226,
                 -0.6557949185371399
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.21313051879405975,
@@ -5946,6 +6022,7 @@
                 -0.1440250277519226,
                 -0.6557949185371399
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.21313051879405975,
@@ -6024,6 +6101,7 @@
                 -0.1440250277519226,
                 -0.6557949185371399
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.21313051879405975,
@@ -6102,6 +6180,7 @@
                 -0.1440250277519226,
                 -0.6557949185371399
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.21313051879405975,
@@ -6180,6 +6259,7 @@
                 -0.1440250277519226,
                 -0.6557949185371399
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.21313051879405975,
@@ -6258,6 +6338,7 @@
                 -0.1440250277519226,
                 -0.6557949185371399
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.21313051879405975,
@@ -6336,6 +6417,7 @@
                 -0.1440250277519226,
                 -0.6557949185371399
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.21313051879405975,
@@ -6414,6 +6496,7 @@
                 -0.1440250277519226,
                 -0.6557949185371399
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.21313051879405975,
@@ -6492,6 +6575,7 @@
                 -0.1440250277519226,
                 -0.6557949185371399
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.21313051879405975,
@@ -6570,6 +6654,7 @@
                 -0.1440250277519226,
                 -0.6557949185371399
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.21313051879405975,
@@ -6648,6 +6733,7 @@
                 -0.1440250277519226,
                 -0.6557949185371399
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.21313051879405975,
@@ -6726,6 +6812,7 @@
                 -0.1440250277519226,
                 -0.6557949185371399
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.21313051879405975,
@@ -6804,6 +6891,7 @@
                 -0.1440250277519226,
                 -0.6557949185371399
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.21313051879405975,
@@ -6882,6 +6970,7 @@
                 -0.1440250277519226,
                 -0.6557949185371399
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.21313051879405975,
@@ -6960,6 +7049,7 @@
                 -0.1440250277519226,
                 -0.6557949185371399
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.21313051879405975,
@@ -7038,6 +7128,7 @@
                 -0.1440250277519226,
                 -0.6557949185371399
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": true,
             "colliderObbCenter": [
                 0.21313051879405975,
@@ -7116,6 +7207,7 @@
                 -1.0,
                 -1.0
             ],
+            "colliderCameraFade": false,
             "colliderEnabled": false,
             "colliderObbCenter": [
                 0.0,
@@ -7175,7 +7267,90 @@
                 1.0
             ],
             "uvStochastic": 0.0
+        },
+        {
+            "anchorPoint": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "animationName": "",
+            "castShadow": true,
+            "colliderAabbMax": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderAabbMin": [
+                -1.0,
+                -1.0,
+                -1.0
+            ],
+            "colliderCameraFade": false,
+            "colliderEnabled": false,
+            "colliderObbCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbEuler": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderObbSize": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "colliderShapeType": 0,
+            "colliderSphCenter": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "filePath": "Boss\\Boss.gltf",
+            "id": 92,
+            "isAnimation": true,
+            "modelName": "Boss.gltf",
+            "nameTag": "",
+            "outlineEnabled": true,
+            "parentID": -1,
+            "pickable": true,
+            "position": [
+                0.0,
+                12.39900016784668,
+                11.512214660644531
+            ],
+            "rotate": [
+                0.0,
+                -3.7350046634674072,
+                0.0
+            ],
+            "scale": [
+                10.0,
+                10.0,
+                10.0
+            ],
+            "useAnchorPoint": false,
+            "uvScale": [
+                1.0,
+                1.0
+            ],
+            "uvStochastic": 0.0
         }
     ],
-    "version": 13
+    "sceneSettings": {
+        "collisionFrustumCulling": true,
+        "drawFrustumCulling": true
+    },
+    "version": 14
 }
