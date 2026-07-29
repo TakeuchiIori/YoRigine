@@ -13,10 +13,18 @@
 #include "Object3D/ObjectManager.h" // PlacedObject (ネスト型なので前方宣言不可)
 #include "Vector4.h"
 
-namespace YoRigine { class Camera; }
-namespace YoRigine { class Model; }
-namespace YoRigine { class WorldTransform; }
-namespace YoRigine { class Object3d; }
+namespace YoRigine {
+class Camera;
+}
+namespace YoRigine {
+class Model;
+}
+namespace YoRigine {
+class WorldTransform;
+}
+namespace YoRigine {
+class Object3d;
+}
 
 namespace YoRigine {
 class DirectXCommon;
@@ -31,7 +39,7 @@ class SrvManager;
 ///   ...
 ///   // 毎フレーム
 ///   inst->Begin(camera);                     // このフレームのカメラを渡す
-///   // PlacedObject を積む場合 (ModelManipulator 等)
+///   // PlacedObject を積む場合 (SceneEditor 等)
 ///   for (auto* obj : placedObjects)  inst->Submit(*obj);
 ///   // 素の Object3d を積む場合 (WorldTransform は別途渡す)
 ///   for (auto& e : enemies)          inst->Submit(e.object, e.worldTransform);
@@ -53,7 +61,7 @@ public:
     Matrix4x4 uvTransform;
     float stochasticStrength = 0.0f;
     float outlineMask =
-        1.0f; // インバートハル輪郭線の掛け率(1=線あり, 0=線なし)
+        1.0f;                // インバートハル輪郭線の掛け率(1=線あり, 0=線なし)
     float ditherFade = 0.0f; // 1=alpha をスクリーンドア透過率として使用
     float _pad2 = 0.0f;
   };
@@ -96,7 +104,8 @@ public:
   // Object3d 用: Object3d は自前の WorldTransform を持たないので transform
   // を別途渡す。 材質 (色 / UV / stochastic / 輪郭線) は Object3d
   // から取り出す。
-  void Submit(YoRigine::Object3d &object, const YoRigine::WorldTransform &transform);
+  void Submit(YoRigine::Object3d &object,
+              const YoRigine::WorldTransform &transform);
 
   // 低レベル: WVP / WIT を含む完成済みデータを積む。
   // overrideTexturePath が空でなければテクスチャ別のバッチに積む。

@@ -28,12 +28,12 @@
 
 namespace YoRigine {
 
-class ModelManipulator {
+class SceneEditor {
 public:
   //=========================================================================
   // 基本
   //=========================================================================
-  static ModelManipulator *GetInstance();
+  static SceneEditor *GetInstance();
 
   void Initialize();
   void Update();
@@ -99,12 +99,12 @@ private:
   //=========================================================================
   // シングルトン
   //=========================================================================
-  ModelManipulator() = default;
-  ~ModelManipulator() = default;
-  ModelManipulator(const ModelManipulator &) = delete;
-  ModelManipulator &operator=(const ModelManipulator &) = delete;
-  ModelManipulator(ModelManipulator &&) = delete;
-  ModelManipulator &operator=(ModelManipulator &&) = delete;
+  SceneEditor() = default;
+  ~SceneEditor() = default;
+  SceneEditor(const SceneEditor &) = delete;
+  SceneEditor &operator=(const SceneEditor &) = delete;
+  SceneEditor(SceneEditor &&) = delete;
+  SceneEditor &operator=(SceneEditor &&) = delete;
 
   //=========================================================================
   // メンバ変数

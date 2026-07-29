@@ -1,4 +1,4 @@
-#include "ModelManipulator.h"
+#include "SceneEditor.h"
 
 #include <filesystem>
 #include <algorithm>
@@ -26,15 +26,15 @@
 
 namespace YoRigine {
 
-	ModelManipulator* ModelManipulator::GetInstance() {
-		static ModelManipulator instance;
+	SceneEditor* SceneEditor::GetInstance() {
+		static SceneEditor instance;
 		return &instance;
 	}
 
 	// ============================================================
 	// 初期化
 	// ============================================================
-	void ModelManipulator::Initialize() {
+	void SceneEditor::Initialize() {
 		if (isInitialized_) return; // 重複初期化を防止
 
 		objectManager_ = ObjectManager::GetInstance();
@@ -106,14 +106,14 @@ namespace YoRigine {
 	//   クリック座標は RequestPick で登録され、EndPickPass でコピーされ、
 	//   次フレームの Update の先頭で ReadPickResult が読み取る。
 	// =============================================================================
-	void ModelManipulator::Update() {
+	void SceneEditor::Update() {
 		if (!isInitialized_) return;
 
 #ifdef USE_IMGUI
 		if (!ImGui::GetIO().WantTextInput) {
 			if (ImGui::GetIO().KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S)) {
 				serializer_.SaveScene(jsonPath_);
-				std::cout << "[ModelManipulator] Saved (Ctrl+S)\n";
+				std::cout << "[SceneEditor] Saved (Ctrl+S)\n";
 			}
 		}
 
@@ -144,7 +144,7 @@ namespace YoRigine {
 	// ============================================================
 	// 描画
 	// ============================================================
-	void ModelManipulator::Draw() {
+	void SceneEditor::Draw() {
 		if (!isInitialized_ || !camera_) return;
 
 		// Frustum culling: 視錐台を抽出 (有効時のみ)
@@ -234,7 +234,7 @@ namespace YoRigine {
 	// ============================================================
 	// 線の描画
 	// ============================================================
-	void ModelManipulator::DrawLine() {
+	void SceneEditor::DrawLine() {
 		if (!isInitialized_ || !camera_) return;
 		motionEditor_.DrawBone();
 
@@ -337,7 +337,7 @@ namespace YoRigine {
 	// ============================================================
 	// ピックパスの描画
 	// ============================================================
-	void ModelManipulator::DrawPickPass() {
+	void SceneEditor::DrawPickPass() {
 #ifdef USE_IMGUI
 		if (!isInitialized_ || !pickBuffer_) return;
 
@@ -351,7 +351,7 @@ namespace YoRigine {
 	// ============================================================
 	// 影の描画
 	// ============================================================
-	void ModelManipulator::DrawShadow() {
+	void SceneEditor::DrawShadow() {
 		if (!isInitialized_) return;
 
 		auto* instRenderer = ::InstancedObject3d::GetInstance();
@@ -380,7 +380,7 @@ namespace YoRigine {
 	// ============================================================
 	// ImGuiの描画
 	// ============================================================
-	void ModelManipulator::DrawImGui() {
+	void SceneEditor::DrawImGui() {
 #ifdef USE_IMGUI
 		if (!isInitialized_) return;
 		browser_.Draw();
@@ -403,7 +403,7 @@ namespace YoRigine {
 	// 宣言 (ヘッダ) と呼び出し元はすべて USE_IMGUI ガード内に閉じているため、
 	// Release ビルド (USE_IMGUI 未定義) ではこの関数は存在しない。
 	// ============================================================
-	bool ModelManipulator::IsSceneEditorActive() const {
+	bool SceneEditor::IsSceneEditorActive() const {
 		// 「モデル操作」ウィンドウ (MyGame で RegisterGameUI 登録された名前) が
 		// 開かれているときのみ、選択・ギズモを有効化する。
 		return Editor::GetInstance()->GetShowEditor()
@@ -414,7 +414,7 @@ namespace YoRigine {
 	// ============================================================
 	// ギズモの描画
 	// ============================================================
-	void ModelManipulator::DrawGizmo() {
+	void SceneEditor::DrawGizmo() {
 #ifdef USE_IMGUI
 		if (!camera_ || !selector_.HasSelection()) return;
 		// オブジェクト一覧ウィンドウが閉じてるときはギズモも非表示
@@ -461,7 +461,7 @@ namespace YoRigine {
 	//   DrawShadow と同じ頂点/インデックスバッファを流用し、
 	//   PickPSO で ObjectID を R32_UINT RT に書き込む。
 	// =============================================================================
-	void ModelManipulator::DrawForPick() {
+	void SceneEditor::DrawForPick() {
 #ifdef USE_IMGUI
 		if (!camera_ || !pickBuffer_) return;
 
@@ -503,7 +503,7 @@ namespace YoRigine {
 	// ============================================================
 	// 終了処理
 	// ============================================================
-	void ModelManipulator::Finalize() {
+	void SceneEditor::Finalize() {
 #ifdef USE_IMGUI
 		// 状態リセットのみ（GPU同期は不要）
 		if (pickBuffer_) {
@@ -516,7 +516,7 @@ namespace YoRigine {
 	// ============================================================
 	// シーンの読み込み
 	// ============================================================
-	void ModelManipulator::LoadScene(const std::string& sceneName) {
+	void SceneEditor::LoadScene(const std::string& sceneName) {
 		// システムが初期化されていなければ初期化する (安全策)
 		if (!isInitialized_) Initialize();
 #ifdef USE_IMGUI
@@ -530,7 +530,7 @@ namespace YoRigine {
 		// 同じシーンの再ロード要求は何もしない (退避→復元で空になるのを避ける)
 		if (currentSceneName_ == sceneName) {
 			selector_.ClearSelection();
-			Logger("[ModelManipulator] Scene (already active): " + sceneName);
+			Logger("[SceneEditor] Scene (already active): " + sceneName);
 			return;
 		}
 
@@ -544,7 +544,7 @@ namespace YoRigine {
 		if (objectManager_->TryRestore(sceneName)) {
 			selector_.ClearSelection();
 			currentSceneName_ = sceneName;
-			Logger("[ModelManipulator] Scene Restored from cache: " + sceneName);
+			Logger("[SceneEditor] Scene Restored from cache: " + sceneName);
 			return;
 		}
 
@@ -553,13 +553,13 @@ namespace YoRigine {
 		serializer_.LoadScene(jsonPath_);
 		selector_.ClearSelection();
 		currentSceneName_ = sceneName;
-		Logger("[ModelManipulator] Scene Loaded: " + sceneName);
+		Logger("[SceneEditor] Scene Loaded: " + sceneName);
 	}
 
 	// ============================================================
 	// ショートカットキーの処理
 	// ============================================================
-	void ModelManipulator::ShortcutKey() {
+	void SceneEditor::ShortcutKey() {
 #ifdef USE_IMGUI
 		ImGuiIO& io = ImGui::GetIO();
 
@@ -595,10 +595,10 @@ namespace YoRigine {
 	// ============================================================
 	// 指定したモデルファイルをシーンに配置
 	// ============================================================
-	void ModelManipulator::PlaceObject(const std::string& modelPath) {
+	void SceneEditor::PlaceObject(const std::string& modelPath) {
 		try {
 			if (modelPath.empty() || !std::filesystem::exists(modelPath)) {
-				std::cout << "[ModelManipulator] Invalid path: " << modelPath << "\n";
+				std::cout << "[SceneEditor] Invalid path: " << modelPath << "\n";
 				return;
 			}
 
@@ -615,34 +615,34 @@ namespace YoRigine {
 				selector_.ClearSelection();
 				selector_.AddToSelection(obj->id);
 				objectManager_->UpdateObjectTransform(*obj);
-				std::cout << "[ModelManipulator] Placed: " << full.filename() << "\n";
+				std::cout << "[SceneEditor] Placed: " << full.filename() << "\n";
 			}
 		}
 		catch (const std::exception& e) {
-			std::cout << "[ModelManipulator] PlaceObject error: " << e.what() << "\n";
+			std::cout << "[SceneEditor] PlaceObject error: " << e.what() << "\n";
 		}
 	}
 
 	// ============================================================
 	// 選択したオブジェクトのコピー
 	// ============================================================
-	void ModelManipulator::CopyObject() {
+	void SceneEditor::CopyObject() {
 		auto& selectID = selector_.GetSelectedIds();
 		if (selectID.empty()) {
-			std::cout << "[ModelManipulator] CopyObject: 選択なし、コピー対象なし\n";
+			std::cout << "[SceneEditor] CopyObject: 選択なし、コピー対象なし\n";
 			return;
 		}
 
 		copyObjectIDs_.assign(selectID.begin(), selectID.end());
-		std::cout << "[ModelManipulator] CopyObject: " << copyObjectIDs_.size() << "件 コピー\n";
+		std::cout << "[SceneEditor] CopyObject: " << copyObjectIDs_.size() << "件 コピー\n";
 	}
 
 	// ============================================================
 	// コピーしたオブジェクトを貼り付け
 	// ============================================================
-	void ModelManipulator::PasteObject() {
+	void SceneEditor::PasteObject() {
 		if (copyObjectIDs_.empty()) {
-			std::cout << "[ModelManipulator] PasteObject: コピーバッファ空\n";
+			std::cout << "[SceneEditor] PasteObject: コピーバッファ空\n";
 			return;
 		}
 		// 貼り付けたものを新しく選択状態にするためにクリアする
@@ -655,7 +655,7 @@ namespace YoRigine {
 			// 生成元のオブジェクト情報を参照してコピーを作成
 			auto* newObj = objectManager_->CreateObject(srcObj->modelPath, srcObj->isAnimation, srcObj->animationName);
 			if (!newObj) {
-				std::cout << "[ModelManipulator] PasteObject: CreateObject失敗 (src ID=" << id << ")\n";
+				std::cout << "[SceneEditor] PasteObject: CreateObject失敗 (src ID=" << id << ")\n";
 				continue;
 			}
 			newObj->position = srcObj->position + offsetCopyPos_;
@@ -691,6 +691,6 @@ namespace YoRigine {
 			selector_.AddToSelection(newObj->id);
 			objectManager_->UpdateObjectTransform(*newObj);
 		}
-		std::cout << "[ModelManipulator] PasteObject: " << copyObjectIDs_.size() << "件 貼り付け\n";
+		std::cout << "[SceneEditor] PasteObject: " << copyObjectIDs_.size() << "件 貼り付け\n";
 	}
 } // namespace YoRigine

@@ -12,7 +12,7 @@
 #include <Object3D/ObjectManager.h>
 #include "Object3D/BaseObjectManager.h"
 #include "Collision/AreaCollision/Base/AreaManager.h"
-#include <ModelManipulator/ModelManipulator.h>
+#include <SceneEditor/SceneEditor.h>
 #include "Collision/AreaCollision/Base/AreaEditor.h"
 #include "Generators/Trigger/EventTriggerEditor.h"
 #include "Generators/Trigger/WaypointManager.h"
@@ -107,7 +107,7 @@ void FieldScene::Initialize(YoRigine::Camera* camera, Player* player) {
 	});
 
 	// EventTrigger のロードはシーン入場のたびに必要なため、OnEnter 側で実行する
-	// (ModelManipulator::LoadScene が ObjectManager をクリアして PlacedObject を作り直すので、
+	// (SceneEditor::LoadScene が ObjectManager をクリアして PlacedObject を作り直すので、
 	//  EventTrigger も同タイミングで作り直さないとターゲット参照がずれる)。
 
 	sprite_ = std::make_unique<YoRigine::Sprite>();
@@ -418,11 +418,11 @@ void FieldScene::OnEnter() {
 
 	Logger("[FieldScene] ===== OnEnter() START =====\n");
 
-	// フィールド用 ModelManipulator シーンへ切替。
+	// フィールド用 SceneEditor シーンへ切替。
 	// Field.json が無い場合は空シーンになるので、初回は GameScene.json から
 	// 必要なものだけ残して保存して Field.json を作る運用にする。
 	// (LoadScene 内で ObjectManager をクリアするため NavGrid も貼り直す)
-	YoRigine::ModelManipulator::GetInstance()->LoadScene("Field");
+	YoRigine::SceneEditor::GetInstance()->LoadScene("Field");
 
 	// EventTrigger は初回入場時のみロードする。
 	// バトル復帰時の再入場でも作り直すと OpenGateAction の currentCount_ が 0 に戻り、

@@ -2,7 +2,7 @@
 // インバートハル（背面押し出し）輪郭線 VS（インスタンス描画版）
 //   OutLine.VS.hlsl と同じく頂点を法線方向へ押し出してシェルを作るが、
 //   ワールド/法線行列を per-instance の StructuredBuffer から取得する。
-//   ModelManipulator 等でインスタンス描画される静的オブジェクトに輪郭を付ける。
+//   SceneEditor 等でインスタンス描画される静的オブジェクトに輪郭を付ける。
 // =============================================================================
 
 // Per-instance データ (CPU側 InstancedObject3d::InstanceData / Object3dInstanced.VS と一致)

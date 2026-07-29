@@ -422,7 +422,7 @@ void YPipelineManager::CreatePSO_ObjectOutline() {
 // ============================================================
 //
 // Object : Outline (Inverted Hull) — Instanced
-//   ModelManipulator 等のインスタンス描画オブジェクトに輪郭を付ける。
+//   SceneEditor 等のインスタンス描画オブジェクトに輪郭を付ける。
 //   ジオメトリ供給以外は ObjectOutline と同じ（前面カリング / 2RTV）。
 //
 // ============================================================
@@ -666,27 +666,27 @@ void YPipelineManager::CreatePSO_Line() {
             .SetBlendState(BlendPresets::CreateAlphaBlend())
             .SetRasterizerState(RasterizerPresets::CreateNoCull())
             .SetDepthStencilState(DepthStencilPresets::CreateWriteOnly())
-            .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(), vsBlob.Get(),
-                                      psBlob.Get());
+            .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(),
+                                      vsBlob.Get(), psBlob.Get());
 
     rootSignatures_["Line"] = result.rootSignature;
     pipelineStates_["Line"] = result.pipelineState;
     parameterIndices_["Line"] = result.parameterIndices;
   }
 
-  // 太線 (TRIANGLELIST)。Line::RegisterLine が lineWidth_>0 のとき四角形(2三角形)として
-  // 頂点を積むため、その描画にはこちらの TopologyType=Triangle な PSO を使う。
+  // 太線 (TRIANGLELIST)。Line::RegisterLine が lineWidth_>0
+  // のとき四角形(2三角形)として 頂点を積むため、その描画にはこちらの
+  // TopologyType=Triangle な PSO を使う。
   {
     ReflectionBasedPipelineBuilder builder;
     auto result =
-        builder
-            .SetRenderTargetFormat(YoRigine::kSceneColorFormat)
+        builder.SetRenderTargetFormat(YoRigine::kSceneColorFormat)
             .SetPrimitiveTopologyType(PrimitiveTopologyPresets::Triangle())
             .SetBlendState(BlendPresets::CreateAlphaBlend())
             .SetRasterizerState(RasterizerPresets::CreateNoCull())
             .SetDepthStencilState(DepthStencilPresets::CreateWriteOnly())
-            .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(), vsBlob.Get(),
-                                      psBlob.Get());
+            .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(),
+                                      vsBlob.Get(), psBlob.Get());
 
     rootSignatures_["LineThick"] = result.rootSignature;
     pipelineStates_["LineThick"] = result.pipelineState;
@@ -839,8 +839,9 @@ void YPipelineManager::CreatePSO_VfxMeshTrail() {
 // ============================================================
 // VfxMesh 系エレメント PSO を全ブレンドモード分まとめて生成する共通ヘルパー。
 //   blendModePipelineStates_[logicalName][mode] に全モードを登録し、
-//   defaultMode の PSO を pipelineStates_[logicalName]（＝GetPipeLineStateObject
-//   / ResolveBlendPSO の継承フォールバック先）として据える。
+//   defaultMode の PSO を
+//   pipelineStates_[logicalName]（＝GetPipeLineStateObject / ResolveBlendPSO
+//   の継承フォールバック先）として据える。
 //   これにより既存アセット(blendModeOverride=-1)の見た目は従来のまま保たれる。
 // ============================================================
 void YPipelineManager::CreateVfxMeshBlendPSOs(const std::string &logicalName,
@@ -865,14 +866,15 @@ void YPipelineManager::CreateVfxMeshBlendPSOs(const std::string &logicalName,
 
   for (const auto &config : configs) {
     ReflectionBasedPipelineBuilder builder;
-    auto result = builder
-                      .SetRenderTargetFormat(
-                          YoRigine::kSceneColorFormat) // OffScreen(HDR) へ描く
-                      .SetRasterizerState(RasterizerPresets::CreateNoCull())
-                      .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
-                      .SetBlendState(config.blendDesc)
-                      .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(),
-                                                vsBlob.Get(), psBlob.Get());
+    auto result =
+        builder
+            .SetRenderTargetFormat(
+                YoRigine::kSceneColorFormat) // OffScreen(HDR) へ描く
+            .SetRasterizerState(RasterizerPresets::CreateNoCull())
+            .SetDepthStencilState(DepthStencilPresets::CreateReadOnly())
+            .SetBlendState(config.blendDesc)
+            .BuildFromCompiledShaders(dxCommon_->GetDevice().Get(),
+                                      vsBlob.Get(), psBlob.Get());
 
     blendModePipelineStates_[logicalName][config.mode] = result.pipelineState;
 
@@ -892,9 +894,9 @@ void YPipelineManager::CreateVfxMeshBlendPSOs(const std::string &logicalName,
 // ============================================================
 void YPipelineManager::CreatePSO_VfxMeshVolume() {
   // 既定は加算。エレメントの blendModeOverride で切り替え可。
-  CreateVfxMeshBlendPSOs("VfxMeshVolume",
-                         L"Resources/Shaders/Vfx/VfxMesh/VfxMesh_Volume.PS.hlsl",
-                         BlendMode::kBlendModeAdd);
+  CreateVfxMeshBlendPSOs(
+      "VfxMeshVolume", L"Resources/Shaders/Vfx/VfxMesh/VfxMesh_Volume.PS.hlsl",
+      BlendMode::kBlendModeAdd);
 }
 // ============================================================
 //
@@ -941,7 +943,8 @@ void YPipelineManager::CreatePSO_VfxMeshShockwave() {
 //
 // ============================================================
 void YPipelineManager::CreatePSO_VfxMeshAreaField() {
-  // バフエリア/AoE/射程の地面円。既定は加算(魔法陣風)。blendModeOverride で切り替え可。
+  // バフエリア/AoE/射程の地面円。既定は加算(魔法陣風)。blendModeOverride
+  // で切り替え可。
   CreateVfxMeshBlendPSOs(
       "VfxMeshAreaField",
       L"Resources/Shaders/Vfx/VfxMesh/VfxMesh_AreaField.PS.hlsl",

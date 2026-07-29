@@ -5,7 +5,7 @@
 #include "Editor/Tools/ImGuiStudio.h"
 #include "Systems/GameTime/GameTime.h"
 #include "Systems/Cinematic/CinematicManager.h"
-#include <ModelManipulator/ModelManipulator.h>
+#include <SceneEditor/SceneEditor.h>
 #include <PipCamera/PipCameraSystem.h>
 #include "OffScreen/PostEffectManager.h"
 #include "Material/ToonSettings.h"
@@ -95,7 +95,7 @@ void MyGame::Initialize() {
 	CompositeEffectManager::GetInstance()->ScanDirectory("Resources/Json/YComposites/");
 
 	// モデル操作関連の初期化
-	YoRigine::ModelManipulator::GetInstance()->Initialize();
+	YoRigine::SceneEditor::GetInstance()->Initialize();
 
 	// BaseObject 一括管理マネージャ
 #ifdef USE_IMGUI
@@ -131,7 +131,7 @@ void MyGame::Initialize() {
 	);
 
 	Editor::GetInstance()->SetGizmoDrawCallback([]() {
-		YoRigine::ModelManipulator::GetInstance()->DrawGizmo();
+		YoRigine::SceneEditor::GetInstance()->DrawGizmo();
 		YEmitterGroupEditor::GetInstance().DrawGizmo();
 		});
 
@@ -159,7 +159,7 @@ void MyGame::Initialize() {
 	// ParticleEditor は旧システム専用のため削除済み。YParticleEditor を使用。
 	Editor::GetInstance()->RegisterGameUI(
 		"モデル操作",
-		[]() { YoRigine::ModelManipulator::GetInstance()->DrawImGui(); },
+		[]() { YoRigine::SceneEditor::GetInstance()->DrawImGui(); },
 		"AllScene", "シーン", true);
 	Editor::GetInstance()->RegisterGameUI(
 		"ポストエフェクト", []() { PostEffectManager::GetInstance()->ImGui(); },
@@ -220,7 +220,7 @@ void MyGame::Finalize() {
 	YoRigine::YGpuEmitManager::GetInstance()->Finalize();
 	CompositeEffectManager::GetInstance()->Finalize();
 	VfxMeshSpawner::GetInstance()->Finalize();
-	YoRigine::ModelManipulator::GetInstance()->Finalize();
+	YoRigine::SceneEditor::GetInstance()->Finalize();
 
 #ifdef USE_IMGUI
 	Editor::GetInstance()->Finalize();
@@ -272,7 +272,7 @@ void MyGame::Update() {
 void MyGame::Draw() {
 
 
-	YoRigine::ModelManipulator::GetInstance()->DrawPickPass();
+	YoRigine::SceneEditor::GetInstance()->DrawPickPass();
 
 	//------------------------------------------------------------
 	// オフスクリーン描画

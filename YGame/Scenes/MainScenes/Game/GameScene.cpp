@@ -9,9 +9,9 @@
 #include "LightManager/LightManager.h"
 #include "Loaders/Json/JsonManager.h"
 #include "MathFunc.h"
-#include "ModelManipulator/ModelManipulator.h"
 #include "Object3D/Object3dCommon.h"
 #include "OffScreen/PostEffectManager.h"
+#include "SceneEditor/SceneEditor.h"
 #include "Sprite/SpriteCommon.h"
 #include "Systems./Input./Input.h"
 #include "Systems/GameTime/GameTime.h"
@@ -75,7 +75,7 @@ void GameScene::Initialize() {
   YoRigine::CollisionManager::GetInstance()->SetCullingCamera(
       sceneCamera_.get());
   YoRigine::CollisionManager::GetInstance()->SetEnableFrustumCulling(true);
-  // ModelManipulator のシーン読み込みは FieldScene / BattleScene の OnEnter で
+  // SceneEditor のシーン読み込みは FieldScene / BattleScene の OnEnter で
   // 各サブシーン用の JSON ("Field.json" / "Battle.json") を読む方式に統一した。
   // ここで GameScene.json を読むと直後の SwitchToScene → OnEnter で上書きされる
   // だけなので、ロードはしない。
@@ -125,7 +125,7 @@ void GameScene::Initialize() {
   skyBox_->Initialize(sceneCamera_.get(),
                       "Resources/DDS/vz_classic_cubemap_ue.dds");
 
-  YoRigine::ModelManipulator::GetInstance()->SetCamera(sceneCamera_.get());
+  YoRigine::SceneEditor::GetInstance()->SetCamera(sceneCamera_.get());
   YoRigine::YGpuEmitManager::GetInstance()->SetCamera(sceneCamera_.get());
 
   //------------------------------------------------------------
@@ -343,7 +343,7 @@ void GameScene::Update() {
 
   gameUI_->Update();
 
-  YoRigine::ModelManipulator::GetInstance()->Update();
+  YoRigine::SceneEditor::GetInstance()->Update();
   YoRigine::CollisionManager::GetInstance()->Update();
   YParticleManager::GetInstance().Update(
       YoRigine::GameTime::GetDeltaTime(YoRigine::TimeChannel::Vfx));
@@ -427,7 +427,7 @@ void GameScene::DrawObject() {
   if (subSceneManager_) {
     subSceneManager_->DrawObject();
   }
-  YoRigine::ModelManipulator::GetInstance()->Draw();
+  YoRigine::SceneEditor::GetInstance()->Draw();
 }
 
 /// <summary>
@@ -435,7 +435,7 @@ void GameScene::DrawObject() {
 /// </summary>
 void GameScene::DrawLine() {
 
-  YoRigine::ModelManipulator::GetInstance()->DrawLine();
+  YoRigine::SceneEditor::GetInstance()->DrawLine();
   if (subSceneManager_) {
     subSceneManager_->DrawLine();
   }
