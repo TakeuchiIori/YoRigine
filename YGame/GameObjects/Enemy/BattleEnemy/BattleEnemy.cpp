@@ -65,8 +65,7 @@ void BattleEnemy::InitializeBattleData(const BattleEnemyData& data, Vector3 posi
 {
 	// データ適用
 	enemyData_ = data;
-	enemyData_.maxHp_ = data.hp;
-	enemyData_.currentHp_ = enemyData_.maxHp_;
+	SetupHP(data.hp);
 
 	// モデル設定
 	if (obj_) {
@@ -80,12 +79,7 @@ void BattleEnemy::InitializeBattleData(const BattleEnemyData& data, Vector3 posi
 	// バトル開始演出中は敵のUpdateが停止するため、生成時点で描画用Transformも
 	// 同期しておく。これが無いと複数体が原点に重なり、1体だけに見える。
 	wt_.UpdateMatrix();
-	visualWt_.scale_ = wt_.scale_;
-	visualWt_.rotate_ = wt_.rotate_;
-	visualWt_.translate_ = wt_.translate_;
-	visualWt_.anchorPoint_ = wt_.anchorPoint_;
-	visualWt_.useAnchorPoint_ = wt_.useAnchorPoint_;
-	visualWt_.UpdateMatrix();
+	SyncVisualTransform();
 
 	// 攻撃時の punch/bounce アニメーションは baseScale_ を起点に補間するので、
 	// ここで揃えないと攻撃の瞬間にスケールが (1,1,1) へスナップしてしまう。
@@ -150,7 +144,7 @@ void BattleEnemy::Update() {
 	// 死亡チェック（1度だけ遷移させる。毎フレーム走ると PlayDeathEffect で
 	// 有効化したディゾルブが直後の Exit() で無効化されてしまい、threshold も
 	// deathTimer もリセットされ続けるため、見た目には何も起きなくなる）
-	if (enemyData_.currentHp_ == 0 && logicalState_ != BattleEnemyState::Dead) {
+	if (currentHp_ == 0 && logicalState_ != BattleEnemyState::Dead) {
 		logicalState_ = BattleEnemyState::Dead;
 		StopStatusVfx(); // 死体が燃え続けないように付着VFXを止める
 		PlayDeathEffect();
@@ -159,24 +153,10 @@ void BattleEnemy::Update() {
 
 	float dt = YoRigine::GameTime::GetDeltaTime();
 	stateTimer_ += dt;
-	previousPosition_ = wt_.translate_;
+	MarkPreviousPosition();
 
 	// アニメーター更新
-	if (animation_) {
-		animation_->Update(dt);
-
-		// アニメーション中の場合、スケールを適用
-		if (animation_->IsScaleAnimating()) {
-			wt_.scale_ = animation_->GetCurrentScale();
-		}
-
-		// カラーアニメーション中の場合、色を適用
-		if (animation_->IsColorAnimating()) {
-			if (obj_) {
-				obj_->SetMaterialColor(animation_->GetCurrentColor());
-			}
-		}
-	}
+	UpdateAnimation(dt);
 
 	// ヒットカウントのリセット処理（しきい値は CounterAttackParams 経由）
 	if (consecutiveHitCount_ > 0 && !isInvincible_) {
@@ -192,26 +172,17 @@ void BattleEnemy::Update() {
 		currentState_->Update(*this, dt);
 	}
 
-	// ノックバック更新
-	UpdateKnockback(dt);
-	UpdateDirectionalHitReaction(dt);
-
-	// 状態VFX（燃焼など）の追従・寿命更新
-	UpdateStatusVfx(dt);
+	// ノックバック・のけぞり・状態VFX（燃焼など）の更新
+	UpdateReactions(dt);
 
 	// エリア制限補正
 	AreaManager::GetInstance()->UpdateSingleObject(&wt_);
 
 	// 行列と更新
-	currentVelocity_ = wt_.translate_ - previousPosition_;
+	UpdateVelocity();
 	wt_.UpdateMatrix();
 	// 描画専用Transformにだけのけぞり回転を加える。コライダーはwt_のまま傾けない。
-	visualWt_.scale_ = wt_.scale_;
-	visualWt_.rotate_ = wt_.rotate_ + hitReactionRotation_;
-	visualWt_.translate_ = wt_.translate_;
-	visualWt_.anchorPoint_ = wt_.anchorPoint_;
-	visualWt_.useAnchorPoint_ = wt_.useAnchorPoint_;
-	visualWt_.UpdateMatrix();
+	SyncVisualTransform();
 	// コリジョン更新
 	if (obbCollider_) {
 		obbCollider_->Update();
@@ -233,17 +204,6 @@ void BattleEnemy::ChangeState(std::unique_ptr<IEnemyState<BattleEnemy>> newState
 	if (currentState_) currentState_->Enter(*this);
 	stateTimer_ = 0.0f;
 }
-
-/*==========================================================================
-プレイヤーの現在位置の取得
-//========================================================================*/
-Vector3 BattleEnemy::GetPlayerPosition() const {
-	if (player_) {
-		return player_->GetWorldPosition();
-	}
-	return Vector3(0.0f, 0.0f, 0.0f);
-}
-
 
 /*==========================================================================
 攻撃の実行
@@ -269,73 +229,6 @@ void BattleEnemy::PlayDeathEffect() {
 	obj_->SetDissolveNoiseScale(dissolveNoiseScale_);
 }
 
-/*==========================================================================
-ダメージを受ける処理
-//========================================================================*/
-void BattleEnemy::TakeDamage(int damage) {
-	if (isInvincible_ || !IsAlive()) return;
-	enemyData_.currentHp_ -= damage;
-	if (enemyData_.currentHp_ < 0) enemyData_.currentHp_ = 0;
-}
-
-/*==========================================================================
-HPの回復
-//========================================================================*/
-void BattleEnemy::Heal(int amount)
-{
-	if (!IsAlive()) return;
-	enemyData_.currentHp_ += amount;
-	if (enemyData_.currentHp_ > enemyData_.maxHp_) enemyData_.currentHp_ = enemyData_.maxHp_;
-}
-
-/*==========================================================================
-ダメージを受けた瞬間の点滅処理
-//========================================================================*/
-void BattleEnemy::UpdateBlinking(float dt) {
-	// ダメージ時の点滅中でなければ処理しない
-	if (!isDamageBlinking_) return;
-	blinkTimer_ += dt;
-
-	// サイン波を利用してα値を周期的に変化させる
-	float alpha = 0.65f + 0.35f * std::sin(blinkTimer_ * blinkSpeed_);
-
-	if (obj_) {
-		obj_->GetColor() = { 1.0f, 0.0f, 0.0f, alpha };
-	}
-}
-
-/*==========================================================================
-ノックバック開始の処理
-//========================================================================*/
-void BattleEnemy::StartKnockback(const Vector3& direction, float power, float duration)
-{
-	knockbackData_.isKnockingBack_ = true;
-	knockbackData_.knockbackDirection_ = Vector3::Normalize(direction);
-	knockbackData_.knockbackPower_ = power;
-	knockbackData_.knockbackDuration_ = duration;
-	knockbackData_.knockbackTimer_ = 0.0f;
-}
-
-/*==========================================================================
-ノックバック中の処理
-//========================================================================*/
-void BattleEnemy::UpdateKnockback(float dt)
-{
-	// ノックバック中でなければ処理しない
-	if (!knockbackData_.isKnockingBack_) return;
-	knockbackData_.knockbackTimer_ += dt;
-
-	// 時間経過でパワーを減衰
-	float currentPower = knockbackData_.knockbackPower_ * (1.0f - (knockbackData_.knockbackTimer_ / knockbackData_.knockbackDuration_));
-	Vector3 delta = knockbackData_.knockbackDirection_ * currentPower * dt;
-	AddTranslate(delta);
-
-	if (knockbackData_.knockbackTimer_ >= knockbackData_.knockbackDuration_) {
-		knockbackData_.isKnockingBack_ = false;
-		knockbackData_.knockbackPower_ = 0.0f;
-	}
-}
-
 void BattleEnemy::TryPerformContactAttack() {
 	if (!currentState_) return;
 	const int damageWindow = currentState_->GetContactDamageWindow();
@@ -344,100 +237,6 @@ void BattleEnemy::TryPerformContactAttack() {
 	PerformBasicAttack();
 	// 無敵中などで実ダメージが通らなかった場合も、同じ判定時間で毎フレーム再試行しない。
 	lastDealtContactDamageWindow_ = damageWindow;
-}
-
-/*==========================================================================
-攻撃方向に応じたのけぞり開始
-//========================================================================*/
-void BattleEnemy::StartDirectionalHitReaction(const Vector3& direction)
-{
-	hitReactionRotation_ = {};
-
-	Vector3 horizontalDirection = direction;
-	horizontalDirection.y = 0.0f;
-	if (Length(horizontalDirection) < 0.001f || hitReactionDuration_ <= 0.0f) {
-		isHitReacting_ = false;
-		return;
-	}
-	horizontalDirection = Normalize(horizontalDirection);
-
-	// 攻撃のワールド方向を、敵から見た前後・左右成分へ変換する。
-	const float yaw = wt_.rotate_.y;
-	const Vector3 forward = { std::sinf(yaw), 0.0f, std::cosf(yaw) };
-	const Vector3 right = { std::cosf(yaw), 0.0f, -std::sinf(yaw) };
-	const float forwardAmount = Dot(horizontalDirection, forward);
-	const float rightAmount = Dot(horizontalDirection, right);
-
-	hitReactionTargetRotation_ = {
-		-forwardAmount * hitReactionAngle_,
-		0.0f,
-		-rightAmount * hitReactionAngle_
-	};
-	hitReactionTimer_ = 0.0f;
-	isHitReacting_ = true;
-}
-
-/*==========================================================================
-攻撃方向に応じたのけぞり更新
-//========================================================================*/
-void BattleEnemy::UpdateDirectionalHitReaction(float dt)
-{
-	hitReactionRotation_ = {};
-
-	if (!isHitReacting_) return;
-
-	hitReactionTimer_ += dt;
-	const float progress = std::fminf(hitReactionTimer_ / hitReactionDuration_, 1.0f);
-	// 素早く最大まで傾き、そのまま滑らかに基準姿勢へ戻る。
-	constexpr float kPi = 3.14159265358979323846f;
-	const float weight = std::sinf(progress * kPi);
-	hitReactionRotation_ = hitReactionTargetRotation_ * weight;
-
-	if (progress >= 1.0f) {
-		isHitReacting_ = false;
-	}
-}
-
-/*==========================================================================
-状態VFX（燃焼など）の付着・追従・停止
-//========================================================================*/
-void BattleEnemy::AttachStatusVfx(const std::string& compositeName, float duration) {
-	if (compositeName.empty() || duration <= 0.0f || !isAlive_) return;
-
-	// 同じVFXの再付着は時間リフレッシュのみ（ループを二重再生しない）
-	if (statusVfx_.IsValid() && statusVfxName_ == compositeName) {
-		statusVfxTimer_ = duration;
-		return;
-	}
-
-	// 別のVFXが付いていたら止めてから付け直す
-	StopStatusVfx();
-	statusVfx_ = EffectHandle::Play(compositeName, wt_.translate_,
-		/*loop*/ true, /*emitCount*/ -1);
-	statusVfxName_ = compositeName;
-	statusVfxTimer_ = duration;
-}
-
-void BattleEnemy::UpdateStatusVfx(float dt) {
-	if (!statusVfx_.IsValid()) return;
-
-	statusVfxTimer_ -= dt;
-	if (statusVfxTimer_ <= 0.0f) {
-		StopStatusVfx();
-		return;
-	}
-	// 本体に追従（少し持ち上げて足元ではなく体に重ねる）
-	Vector3 pos = wt_.translate_;
-	pos.y += 1.0f;
-	statusVfx_.SetPosition(pos);
-}
-
-void BattleEnemy::StopStatusVfx() {
-	if (statusVfx_.IsValid()) {
-		statusVfx_.Stop();
-	}
-	statusVfxName_.clear();
-	statusVfxTimer_ = 0.0f;
 }
 
 /*==========================================================================

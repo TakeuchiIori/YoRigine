@@ -1,5 +1,5 @@
 #pragma once
-#include "../Generators/Object3D/BaseObject.h"
+#include "../BaseEnemy.h"
 #include "../IEnemyState.h"
 #include "Graphics/Drawer/LineManager/Line.h"
 #include <UI/Alert/EnemyAlert.h>
@@ -106,7 +106,7 @@ class Player;
 class FieldEnemyManager;
 
 ///************************* フィールド用の敵クラス *************************///
-class FieldEnemy : public YoRigine::BaseObject {
+class FieldEnemy : public BaseEnemy {
 public:
 	///************************* 基本的な関数 *************************///
 
@@ -145,31 +145,7 @@ public:
 	FieldEnemyState GetLogicalState() const { return logicalState_; }
 	void SetLogicalState(FieldEnemyState state) { logicalState_ = state; }
 
-	///************************* タイマー制御 *************************///
-
-	void ResetStateTimer() { stateTimer_ = 0.0f; }
-	void AddStateTimer(float dt) { stateTimer_ += dt; }
-	float GetStateTimer() const { return stateTimer_; }
-
-	///************************* 回転ユーティリティ *************************///
-
-	/// <summary>
-	/// 目標角度に向かって補間回転する（毎フレーム呼ぶ）
-	/// </summary>
-	/// <param name="targetAngle">目標Y回転角（ラジアン）</param>
-	/// <param name="speed">回転速度（rad/s）</param>
-	/// <param name="dt">デルタタイム</param>
-	void RotateTowards(float targetAngle, float speed, float dt);
-
-	/// <summary>
-	/// プレイヤー方向へ補間回転する
-	/// </summary>
-	void RotateTowardsPlayer(float speed, float dt);
-
-	/// <summary>
-	/// 移動方向へ補間回転する
-	/// </summary>
-	void RotateTowardsDirection(const Vector3& direction, float speed, float dt);
+	// タイマー制御・回転ユーティリティは BaseEnemy が持つ。
 
 	///************************* アクセッサ *************************///
 
@@ -182,9 +158,6 @@ public:
 	std::string GetEnemyGroupName() const { return enemyData_.enemyId; }
 
 	Vector3 GetPosition() const { return wt_.translate_; }
-	Vector3 GetTranslate() const { return wt_.translate_; }
-	void SetTranslate(const Vector3& pos) { wt_.translate_ = pos; }
-	void AddTranslate(const Vector3& delta) { wt_.translate_ += delta; }
 
 	Vector3 GetSpawnPosition() const { return spawnPosition_; }
 	Vector3 GetPatrolTarget() const { return patrolTarget_; }
@@ -209,14 +182,6 @@ public:
 	bool ShouldRefreshPath(float interval = 0.3f) const { return pathRefreshTimer_ >= interval; }
 	void ResetPathRefreshTimer() { pathRefreshTimer_ = 0.0f; }
 
-	void SetRotationY(float y) { wt_.rotate_.y = y; }
-	float GetRotationY() const { return wt_.rotate_.y; }
-
-	void SetPlayer(Player* player) { player_ = player; }
-	Player* GetPlayer() const { return player_; }
-	Vector3 GetPlayerPosition() const;
-	bool HasPlayer() const { return player_ != nullptr; }
-
 	void SetFieldEnemyManager(FieldEnemyManager* manager) { fieldEnemyManager_ = manager; }
 
 	bool HasTriggeredEncounter() const { return hasTriggeredEncounter_; }
@@ -232,26 +197,25 @@ public:
 	std::string GetSpawnId() const { return spawnId_; }
 	void SetSpawnId(const std::string& id) { spawnId_ = id; }
 
-	float GetTakeDamage() const { return takeDamage_; }
+	// 背後からの奇襲で与えたダメージ。HPは減らさず、バトル開始時に持ち越すための記録値。
+	float GetCarryOverDamage() const { return carryOverDamage_; }
 
 private:
 	///************************* 内部処理 *************************///
 
 	void TriggerEncounter();
-	void TakeDamage(const float damage);
+	void SetCarryOverDamage(float damage) { carryOverDamage_ = damage; }
 
 private:
 	///************************* メンバ変数 *************************///
 
 	std::unique_ptr<IEnemyState<FieldEnemy>> currentState_;
-	float stateTimer_ = 0.0f;
 	FieldEnemyState logicalState_ = FieldEnemyState::Patrol;
 	std::unique_ptr<EnemyAlert> alertUI_;
 
 	FieldEnemyData enemyData_;
 	std::string spawnId_;
 
-	Player* player_ = nullptr;
 	FieldEnemyManager* fieldEnemyManager_ = nullptr;
 
 	Vector3 spawnPosition_;
@@ -261,7 +225,7 @@ private:
 	float encounterCooldown_ = 0.0f;
 	float encounterCooldownDuration_ = 1.0f;
 
-	float takeDamage_ = 0.0f;
+	float carryOverDamage_ = 0.0f;
 
 	// スポットライト管理用
 	std::string spotLightName_;

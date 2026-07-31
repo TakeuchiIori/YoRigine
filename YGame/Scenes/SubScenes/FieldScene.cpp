@@ -519,7 +519,7 @@ void FieldScene::HandleDetailedEncounter(const EncountInfo& encounterInfo) {
 	transitionData.battleEnemyIds = encounterInfo.battleEnemyIds;
 	transitionData.battleEnemyScale = encounterInfo.encounterScale;
 	transitionData.playerPosition = GetPlayerPosition();
-	transitionData.playerHitDamage = encounterInfo.encounteredEnemy->GetTakeDamage();
+	transitionData.playerHitDamage = encounterInfo.encounteredEnemy->GetCarryOverDamage();
 	SaveCameraState(transitionData);
 
 	// エンカウント位置を自前で保存しておく。BattleScene を経由する FieldReturnData
