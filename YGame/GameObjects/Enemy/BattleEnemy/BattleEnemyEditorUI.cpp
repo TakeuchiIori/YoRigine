@@ -7,6 +7,49 @@
 #include "imgui.h"
 #include <utility>
 
+namespace {
+
+/// <summary>
+/// 間合い取りパラメータの編集UI。
+/// ベースデータ編集と個体編集の両方から呼ぶので関数に切り出している。
+/// </summary>
+void DrawSpacingEditor(SpacingParams& sp, const char* idSuffix)
+{
+	ImGui::PushID(idSuffix);
+
+	ImGui::SeparatorText("共通");
+	ImGui::DragFloat("維持したい間合い", &sp.preferredDistance, 0.1f, 1.0f, 30.0f, "%.1fm");
+	ImGui::DragFloat("近すぎ判定距離", &sp.tooCloseDistance, 0.1f, 0.5f, 20.0f, "%.1fm");
+	ImGui::DragFloat("プレイヤーへ向く速度", &sp.faceRotationSpeed, 0.1f, 0.1f, 30.0f, "%.1frad/s");
+
+	ImGui::SeparatorText("後退 (Backstep)");
+	ImGui::DragFloat("後退時間", &sp.backstepDuration, 0.05f, 0.05f, 3.0f, "%.2f秒");
+	ImGui::DragFloat("後退速度倍率", &sp.backstepSpeedMultiplier, 0.1f, 0.1f, 10.0f, "x%.1f");
+
+	ImGui::SeparatorText("横移動 (Strafe)");
+	ImGui::DragFloat("最短時間##strafe", &sp.strafeMinDuration, 0.05f, 0.05f, 5.0f, "%.2f秒");
+	ImGui::DragFloat("最長時間##strafe", &sp.strafeMaxDuration, 0.05f, 0.05f, 8.0f, "%.2f秒");
+	ImGui::DragFloat("横移動速度倍率", &sp.strafeSpeedMultiplier, 0.05f, 0.0f, 5.0f, "x%.2f");
+	ImGui::DragFloat("間合い維持の強さ", &sp.strafeDistanceKeepStrength, 0.05f, 0.0f, 10.0f, "%.2f");
+
+	ImGui::SeparatorText("様子見 (Observe)");
+	ImGui::DragFloat("最短時間##observe", &sp.observeMinDuration, 0.05f, 0.0f, 5.0f, "%.2f秒");
+	ImGui::DragFloat("最長時間##observe", &sp.observeMaxDuration, 0.05f, 0.0f, 8.0f, "%.2f秒");
+
+	ImGui::SeparatorText("攻撃後の選択重み");
+	ImGui::DragFloat("後退##weight", &sp.backstepWeight, 0.05f, 0.0f, 10.0f, "%.2f");
+	ImGui::DragFloat("横移動##weight", &sp.strafeWeight, 0.05f, 0.0f, 10.0f, "%.2f");
+	ImGui::DragFloat("様子見##weight", &sp.observeWeight, 0.05f, 0.0f, 10.0f, "%.2f");
+
+	// 最短 > 最長 になると乱数レンジが壊れるので、その場で入れ替えておく
+	if (sp.strafeMaxDuration < sp.strafeMinDuration)   std::swap(sp.strafeMinDuration, sp.strafeMaxDuration);
+	if (sp.observeMaxDuration < sp.observeMinDuration) std::swap(sp.observeMinDuration, sp.observeMaxDuration);
+
+	ImGui::PopID();
+}
+
+} // namespace
+
 void BattleEnemyEditorUI::Draw(BattleEnemyManager& manager)
 {
 	if (ImGui::Button("敵データ読み込み")) {
@@ -98,6 +141,12 @@ void BattleEnemyEditorUI::Draw(BattleEnemyManager& manager)
 				ImGui::DragFloat("移動速度", &data.moveSpeed, 0.1f, 0.1f, 50.0f);
 				ImGui::DragFloat("追跡開始距離", &data.approachStateRange, 0.5f, 1.0f, 100.0f);
 				ImGui::DragFloat("攻撃開始距離", &data.attackStateRange, 0.5f, 1.0f, 50.0f);
+
+				// --- 間合い取り（攻撃と攻撃の「間」）---
+				// 戦っている感じはここの数値で決まるので、攻撃詳細より前に置いている。
+				if (ImGui::CollapsingHeader("間合い取り (攻撃の合間の動き)")) {
+					DrawSpacingEditor(data.spacing, "base");
+				}
 
 				// --- 攻撃詳細パラメータ ---
 				if (ImGui::CollapsingHeader("攻撃詳細設定 (各Stateの数値)")) {
@@ -290,15 +339,11 @@ void BattleEnemyEditorUI::Draw(BattleEnemyManager& manager)
 					int appliedCount = 0;
 					for (auto& enemy : manager.battleEnemies_) {
 						if (enemy && enemy->GetEnemyData().enemyId == data.enemyId) {
-							// 生成中の敵のデータを更新
-							BattleEnemyData& enemyData = enemy->GetEnemyData();
-							enemyData.attack = data.attack;
-							enemyData.defense = data.defense;
-							enemyData.moveSpeed = data.moveSpeed;
-							enemyData.approachStateRange = data.approachStateRange;
-							enemyData.attackStateRange = data.attackStateRange;
-							enemyData.attackPatterns = data.attackPatterns;
-							enemyData.attackParams = data.attackParams;
+							// 生成中の敵のデータを丸ごと差し替える。
+							// 以前はフィールドを1つずつ写していたため、BattleEnemyData に
+							// 項目を足すたびに写し忘れて「エディタで変えても効かない」が起きていた。
+							// 実行時のHPは BaseEnemy 側が持つので、丸ごとコピーしても現在HPは巻き戻らない。
+							enemy->GetEnemyData() = data;
 							appliedCount++;
 						}
 					}
@@ -355,6 +400,11 @@ void BattleEnemyEditorUI::Draw(BattleEnemyManager& manager)
 					ImGui::DragFloat("移動速度 (Current)", &enemyData.moveSpeed, 0.1f, 0.0f, 20.0f);
 					ImGui::DragFloat("攻撃状態に入る距離 (Current)", &enemyData.attackStateRange, 0.1f, 0.0f, 100.0f);
 					ImGui::DragFloat("追跡状態に入る距離 (Current)", &enemyData.approachStateRange, 0.1f, 0.0f, 100.0f);
+
+					// 間合い取り（この個体にだけ即座に効く。数値の当たりを付けるのに使う）
+					if (ImGui::CollapsingHeader("間合い取り (この個体のみ・即反映)")) {
+						DrawSpacingEditor(enemyData.spacing, "inst");
+					}
 
 					// 攻撃パターン表示
 					ImGui::Text("攻撃パターン:");

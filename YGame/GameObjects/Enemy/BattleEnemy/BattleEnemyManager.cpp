@@ -783,6 +783,25 @@ bool BattleEnemyManager::SaveEnemyData(const std::string& filePath) const {
 
 		// メインのJSONに攻撃パラメータを追加
 		enemyJson["attackParams"] = ap;
+
+		// 間合い取り（攻撃と攻撃の間の非攻撃行動）
+		enemyJson["spacing"] = {
+			{"preferredDistance", data.spacing.preferredDistance},
+			{"tooCloseDistance", data.spacing.tooCloseDistance},
+			{"faceRotationSpeed", data.spacing.faceRotationSpeed},
+			{"backstepDuration", data.spacing.backstepDuration},
+			{"backstepSpeedMultiplier", data.spacing.backstepSpeedMultiplier},
+			{"strafeMinDuration", data.spacing.strafeMinDuration},
+			{"strafeMaxDuration", data.spacing.strafeMaxDuration},
+			{"strafeSpeedMultiplier", data.spacing.strafeSpeedMultiplier},
+			{"strafeDistanceKeepStrength", data.spacing.strafeDistanceKeepStrength},
+			{"observeMinDuration", data.spacing.observeMinDuration},
+			{"observeMaxDuration", data.spacing.observeMaxDuration},
+			{"backstepWeight", data.spacing.backstepWeight},
+			{"strafeWeight", data.spacing.strafeWeight},
+			{"observeWeight", data.spacing.observeWeight}
+		};
+
 		enemyArray.push_back(enemyJson);
 	}
 
@@ -943,6 +962,27 @@ bool BattleEnemyManager::LoadEnemyData(const std::string& filePath) {
 					target.rushHomingStrength   = ct.value("rushHomingStrength", 1.5f);
 					target.cooldownTime         = ct.value("cooldownTime", 0.8f);
 				}
+			}
+
+			// 間合い取り（攻撃と攻撃の間の非攻撃行動）。
+			// 未記載の既存JSONでも既定値でそのまま動くようにしている。
+			if (enemyJson.contains("spacing")) {
+				const auto& sp = enemyJson["spacing"];
+				auto& target = data.spacing;
+				target.preferredDistance          = sp.value("preferredDistance", 6.0f);
+				target.tooCloseDistance           = sp.value("tooCloseDistance", 3.5f);
+				target.faceRotationSpeed          = sp.value("faceRotationSpeed", 6.0f);
+				target.backstepDuration           = sp.value("backstepDuration", 0.45f);
+				target.backstepSpeedMultiplier    = sp.value("backstepSpeedMultiplier", 2.2f);
+				target.strafeMinDuration          = sp.value("strafeMinDuration", 0.8f);
+				target.strafeMaxDuration          = sp.value("strafeMaxDuration", 1.8f);
+				target.strafeSpeedMultiplier      = sp.value("strafeSpeedMultiplier", 0.9f);
+				target.strafeDistanceKeepStrength = sp.value("strafeDistanceKeepStrength", 1.5f);
+				target.observeMinDuration         = sp.value("observeMinDuration", 0.4f);
+				target.observeMaxDuration         = sp.value("observeMaxDuration", 1.2f);
+				target.backstepWeight             = sp.value("backstepWeight", 1.0f);
+				target.strafeWeight               = sp.value("strafeWeight", 1.4f);
+				target.observeWeight              = sp.value("observeWeight", 1.0f);
 			}
 
 			// マップにデータを格納

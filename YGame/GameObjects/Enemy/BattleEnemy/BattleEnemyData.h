@@ -149,6 +149,36 @@ struct CounterAttackParams {
   float cooldownTime = 0.8f; // クールダウン
 };
 
+///*************************
+/// 間合い取り（非攻撃行動）*************************///
+// 攻撃と攻撃の「間」を作るためのパラメータ。
+// 戦っている感じは攻撃の種類ではなく、この間合いの取り直しで決まる。
+struct SpacingParams {
+  // ── 共通 ──
+  float preferredDistance = 6.0f; // 維持したい間合い
+  float tooCloseDistance = 3.5f;  // これより近いと後退を選びやすくなる
+  float faceRotationSpeed = 6.0f; // 間合い取り中にプレイヤーへ向く速度（rad/s）
+
+  // ── Backstep（後退して間合いをリセット）──
+  float backstepDuration = 0.45f;
+  float backstepSpeedMultiplier = 2.2f;
+
+  // ── Strafe（距離を保ったまま横移動・回り込み）──
+  float strafeMinDuration = 0.8f;
+  float strafeMaxDuration = 1.8f;
+  float strafeSpeedMultiplier = 0.9f;
+  float strafeDistanceKeepStrength = 1.5f; // 間合いのズレを詰め戻す強さ
+
+  // ── Observe（構えて様子を見る。これが「間」を作る）──
+  float observeMinDuration = 0.4f;
+  float observeMaxDuration = 1.2f;
+
+  // ── 攻撃後にどれを選ぶかの重み ──
+  float backstepWeight = 1.0f;
+  float strafeWeight = 1.4f;
+  float observeWeight = 1.0f;
+};
+
 // 各状態の攻撃パラメータをまとめた構造体
 struct EnemyAttackParams {
   RushAttackParams rush;
@@ -183,6 +213,9 @@ struct BattleEnemyData {
       AttackPatternType::Jump};
   // 攻撃調整用パラメータ
   EnemyAttackParams attackParams;
+
+  // 間合い取り（攻撃と攻撃の間の非攻撃行動）
+  SpacingParams spacing;
 };
 
 // KnockbackData は敵共通なので BaseEnemy.h へ移動した。
