@@ -1,6 +1,6 @@
 #include "BattleBackstepState.h"
 
-#include "BattleObserveState.h"
+#include "SpacingSelector.h"
 
 #include <cmath>
 
@@ -40,9 +40,9 @@ void BattleBackstepState::Update(BattleEnemy &enemy, float dt) {
   enemy.AddTranslate(retreatDir_ * enemy.GetEnemyData().moveSpeed *
                      params.backstepSpeedMultiplier * speedScale * dt);
 
-  // 下がり切ったら一拍置いてから再交戦する
+  // 下がって間合いが戻ったので、横移動か様子見へ繋ぐ
   if (enemy.GetStateTimer() >= params.backstepDuration) {
-    enemy.ChangeState(std::make_unique<BattleObserveState>());
+    enemy.ChangeState(SpacingSelector::SelectAfterBackstep(enemy));
   }
 }
 

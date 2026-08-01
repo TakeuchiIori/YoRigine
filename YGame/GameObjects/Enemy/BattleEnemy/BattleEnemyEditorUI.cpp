@@ -3,11 +3,220 @@
 
 #include "BattleEnemyManager.h"
 #include "BattleEnemy.h"
+#include "../AI/EnemyAIContext.h"
 #include <Debugger/Logger.h>
 #include "imgui.h"
 #include <utility>
 
 namespace {
+
+/// <summary>
+/// 被弾リアクション（硬直・のけぞり・ダウン）の編集UI
+/// </summary>
+void DrawDamageReactionEditor(DamageReactionParams& dr, const char* idSuffix)
+{
+	ImGui::PushID(idSuffix);
+
+	ImGui::SeparatorText("被弾硬直");
+	ImGui::DragFloat("硬直時間", &dr.staggerDuration, 0.05f, 0.0f, 5.0f, "%.2f秒");
+	ImGui::SameLine();
+	ImGui::TextDisabled("(?)");
+	if (ImGui::BeginItemTooltip()) {
+		ImGui::TextUnformatted("被弾してから動き出すまでの秒数。\n長いと一方的に殴れてしまい、短いと反撃が理不尽になる。");
+		ImGui::EndTooltip();
+	}
+
+	ImGui::Checkbox("ノックバックが終わってから数え始める", &dr.waitForKnockback);
+	ImGui::SameLine();
+	ImGui::TextDisabled("(?)");
+	if (ImGui::BeginItemTooltip()) {
+		ImGui::TextUnformatted("ONだと実際の硬直は「ノックバック時間 + 硬直時間」になる。\nOFFにすると被弾した瞬間から数えるので、全体の硬直が短くなる。");
+		ImGui::EndTooltip();
+	}
+
+	ImGui::SeparatorText("被弾時の見た目");
+	ImGui::DragFloat("膨らむ量", &dr.punchScale, 0.01f, 0.0f, 1.0f, "%.2f");
+	ImGui::DragFloat("膨らみの戻り時間", &dr.punchDuration, 0.01f, 0.01f, 2.0f, "%.2f秒");
+	ImGui::DragFloat("赤くなるまでの時間", &dr.flashDuration, 0.01f, 0.01f, 2.0f, "%.2f秒");
+	ImGui::DragFloat("色を戻す時間", &dr.colorReturnDuration, 0.01f, 0.01f, 2.0f, "%.2f秒");
+	ImGui::DragFloat("点滅の速さ", &dr.blinkSpeed, 1.0f, 1.0f, 200.0f, "%.0f");
+
+	ImGui::SeparatorText("のけぞり（傾き）");
+	ImGui::DragFloat("のけぞり角度", &dr.hitReactionAngle, 0.01f, 0.0f, 1.5f, "%.2frad");
+	ImGui::DragFloat("のけぞり時間", &dr.hitReactionDuration, 0.01f, 0.0f, 2.0f, "%.2f秒");
+
+	ImGui::SeparatorText("ダウン（盾で弾いた時）");
+	ImGui::DragFloat("立ち上がるまで", &dr.downedStandUpTime, 0.1f, 0.1f, 15.0f, "%.1f秒");
+	ImGui::DragFloat("ふらつきの速さ", &dr.downedWobbleSpeed, 0.1f, 0.0f, 30.0f, "%.1f");
+	ImGui::DragFloat("ふらつきの傾き", &dr.downedWobbleTilt, 0.01f, 0.0f, 1.5f, "%.2frad");
+
+	ImGui::PopID();
+}
+
+/// <summary>
+/// 知覚パラメータの編集UI
+/// </summary>
+void DrawPerceptionEditor(PerceptionParams& pc, const char* idSuffix)
+{
+	ImGui::PushID(idSuffix);
+
+	ImGui::Checkbox("プレイヤーの状態を見る", &pc.enabled);
+	ImGui::SameLine();
+	ImGui::TextDisabled("(?)");
+	if (ImGui::BeginItemTooltip()) {
+		ImGui::TextUnformatted("OFFにすると距離とHPだけで判断する従来挙動に戻る。\nONとOFFを切り替えて手応えを比べるのに使う。");
+		ImGui::EndTooltip();
+	}
+
+	ImGui::BeginDisabled(!pc.enabled);
+
+	ImGui::SeparatorText("何を隙とみなすか");
+	ImGui::Checkbox("のけぞり・スタン中", &pc.openingOnStagger);
+	ImGui::Checkbox("CCが尽きている", &pc.openingOnOutOfCC);
+	ImGui::Checkbox("こちらを見ていない", &pc.openingOnLookAway);
+	ImGui::Checkbox("別の敵にロックオン中", &pc.openingOnLockedOther);
+	ImGui::DragFloat("正対とみなす角度", &pc.facingHalfAngleDeg, 1.0f, 5.0f, 180.0f, "±%.0f度");
+	ImGui::SameLine();
+	ImGui::TextDisabled("(?)");
+	if (ImGui::BeginItemTooltip()) {
+		ImGui::TextUnformatted("プレイヤーの正面からこの角度の外にいれば\n「見られていない」と判断する。\n小さくするほど敵は強気に回り込んでくる。");
+		ImGui::EndTooltip();
+	}
+
+	ImGui::SeparatorText("隙を見つけたとき");
+	ImGui::DragFloat("踏み込み距離ボーナス", &pc.openingAttackRangeBonus, 0.1f, 0.0f, 20.0f, "+%.1fm");
+	ImGui::DragFloat("速い技を選ぶ倍率", &pc.openingFastAttackWeight, 0.05f, 0.0f, 10.0f, "x%.2f");
+	ImGui::DragFloat("溜め技を避ける倍率", &pc.openingSlowAttackWeight, 0.05f, 0.0f, 10.0f, "x%.2f");
+
+	ImGui::SeparatorText("相手がこちらを向いて攻撃しているとき");
+	ImGui::DragFloat("後退を選ぶ倍率", &pc.threatBackstepWeight, 0.05f, 0.0f, 10.0f, "x%.2f");
+
+	ImGui::SeparatorText("相手がガード中のとき");
+	ImGui::DragFloat("回り込みを選ぶ倍率", &pc.guardStrafeWeight, 0.05f, 0.0f, 10.0f, "x%.2f");
+
+	ImGui::SeparatorText("相手が回避中のとき");
+	ImGui::DragFloat("溜め技で釣る倍率", &pc.baitSlowAttackWeight, 0.05f, 0.0f, 10.0f, "x%.2f");
+
+	ImGui::EndDisabled();
+	ImGui::PopID();
+}
+
+/// <summary>
+/// 状態名からカテゴリ色を決める。攻撃／間合い取り／被弾を一目で区別するため。
+/// </summary>
+ImVec4 StateColor(const std::string& name)
+{
+	if (name.rfind("Attack:", 0) == 0)  return { 1.00f, 0.45f, 0.35f, 1.0f }; // 赤 = 攻撃
+	if (name.rfind("Spacing:", 0) == 0) return { 0.40f, 0.80f, 1.00f, 1.0f }; // 青 = 間合い取り
+	if (name == "Damage" || name == "Downed") return { 1.00f, 0.85f, 0.30f, 1.0f }; // 黄 = 被弾
+	if (name == "Approach")             return { 0.60f, 1.00f, 0.60f, 1.0f }; // 緑 = 接近
+	return { 0.70f, 0.70f, 0.70f, 1.0f };
+}
+
+/// <summary>
+/// 現在の状態と直近の遷移履歴。
+/// 「攻撃のあとに間合い取りが挟まっているか」を目で確かめるためのもの。
+/// </summary>
+void DrawStateMonitor(BattleEnemy& enemy)
+{
+	const std::string current = enemy.GetStateName();
+	ImGui::TextUnformatted("現在:");
+	ImGui::SameLine();
+	ImGui::TextColored(StateColor(current), "%s", current.c_str());
+	ImGui::SameLine();
+	ImGui::TextDisabled("(%.2f秒)", enemy.GetTimeInCurrentState());
+
+	// 直近の遷移を新しい順に並べる。間合い取り(青)が攻撃(赤)の間に入っていれば成功。
+	if (ImGui::BeginChild("stateLog", ImVec2(0, 160), ImGuiChildFlags_Borders)) {
+		const auto& log = enemy.GetTransitionLog();
+		for (auto it = log.rbegin(); it != log.rend(); ++it) {
+			ImGui::TextDisabled("%6.1fs", it->lifeTime);
+			ImGui::SameLine();
+			ImGui::TextColored(StateColor(it->name), "%-18s", it->name.c_str());
+			ImGui::SameLine();
+			ImGui::TextDisabled("(前の状態 %.2f秒)", it->duration);
+		}
+	}
+	ImGui::EndChild();
+
+	if (ImGui::Button("ログをクリア")) {
+		enemy.ClearTransitionLog();
+	}
+}
+
+/// <summary>
+/// この敵が今プレイヤーをどう見ているかの実況表示。
+/// 知覚が実際に働いているかを目視で確認するために使う。
+/// </summary>
+void DrawPerceptionMonitor(const BattleEnemy& enemy)
+{
+	const PerceptionParams& perception = enemy.GetEnemyData().perception;
+	const EnemyAIContext ctx = EnemyAIContext::Capture(enemy, perception.facingHalfAngleDeg);
+	if (!ctx.hasPlayer) {
+		ImGui::TextDisabled("プレイヤー未設定");
+		return;
+	}
+
+	const ImVec4 on{ 0.35f, 1.0f, 0.35f, 1.0f };
+	const ImVec4 off{ 0.45f, 0.45f, 0.45f, 1.0f };
+	auto flag = [&](const char* label, bool value) {
+		ImGui::TextColored(value ? on : off, "%s", label);
+		ImGui::SameLine();
+	};
+
+	ImGui::Text("距離 %.2fm / 自HP %.0f%% / 敵HP %.0f%%",
+		ctx.distance, ctx.selfHpRatio * 100.0f, ctx.playerHpRatio * 100.0f);
+
+	// 向き。オートホーミングがあっても向きだけは埋まらないので、ここが主役になる。
+	ImGui::Text("正面からの角度 %.0f度", ctx.facingAngleDeg);
+	ImGui::SameLine();
+	if (ctx.playerIsFacingMe) {
+		ImGui::TextColored({ 1.0f, 0.5f, 0.4f, 1.0f }, "[見られている]");
+	} else {
+		ImGui::TextColored(on, "[死角にいる]");
+	}
+
+	// ロックオン
+	if (ctx.playerLockedOnMe) {
+		ImGui::TextColored({ 1.0f, 0.5f, 0.4f, 1.0f }, "ロックオン: 自分が狙われている");
+	} else if (ctx.playerLockedOnOther) {
+		ImGui::TextColored(on, "ロックオン: 別の敵が狙われている");
+	} else {
+		ImGui::TextDisabled("ロックオン: なし");
+	}
+
+	// 攻撃リソース
+	ImGui::Text("CC %.0f%%", ctx.playerCcRatio * 100.0f);
+	ImGui::SameLine();
+	if (ctx.playerIsOutOfCC) {
+		ImGui::TextColored(on, "[枯渇・攻撃できない]");
+	} else {
+		ImGui::TextDisabled("[攻撃可能]");
+	}
+
+	flag("攻撃中", ctx.playerIsAttacking);
+	flag("予備動作", ctx.playerIsWindingUp);
+	flag("振り終わり", ctx.playerIsRecovering);
+	ImGui::NewLine();
+
+	flag("ガード", ctx.playerIsGuarding);
+	flag("回避", ctx.playerIsDodging);
+	flag("のけぞり", ctx.playerIsStaggered);
+	flag("無敵", ctx.playerIsInvincible);
+	ImGui::NewLine();
+
+	flag("移動中", ctx.playerIsMoving);
+	flag("走行中", ctx.playerIsRunning);
+	ImGui::NewLine();
+
+	if (ctx.HasOpening(perception)) {
+		ImGui::TextColored({ 1.0f, 0.85f, 0.2f, 1.0f }, "→ 隙あり（差し込む）");
+	} else if (ctx.IsThreatening()) {
+		ImGui::TextColored({ 1.0f, 0.4f, 0.4f, 1.0f }, "→ 危険（下がる）");
+	} else {
+		ImGui::TextDisabled("→ 通常");
+	}
+}
 
 /// <summary>
 /// 間合い取りパラメータの編集UI。
@@ -146,6 +355,16 @@ void BattleEnemyEditorUI::Draw(BattleEnemyManager& manager)
 				// 戦っている感じはここの数値で決まるので、攻撃詳細より前に置いている。
 				if (ImGui::CollapsingHeader("間合い取り (攻撃の合間の動き)")) {
 					DrawSpacingEditor(data.spacing, "base");
+				}
+
+				// --- 知覚（プレイヤーの状態を見る）---
+				if (ImGui::CollapsingHeader("知覚 (プレイヤーの状態への反応)")) {
+					DrawPerceptionEditor(data.perception, "base");
+				}
+
+				// --- 被弾リアクション ---
+				if (ImGui::CollapsingHeader("被弾リアクション (硬直・のけぞり・ダウン)")) {
+					DrawDamageReactionEditor(data.damageReaction, "base");
 				}
 
 				// --- 攻撃詳細パラメータ ---
@@ -401,9 +620,29 @@ void BattleEnemyEditorUI::Draw(BattleEnemyManager& manager)
 					ImGui::DragFloat("攻撃状態に入る距離 (Current)", &enemyData.attackStateRange, 0.1f, 0.0f, 100.0f);
 					ImGui::DragFloat("追跡状態に入る距離 (Current)", &enemyData.approachStateRange, 0.1f, 0.0f, 100.0f);
 
+					// 状態モニタ（遷移が実際に起きているかの確認用）
+					if (ImGui::CollapsingHeader("状態モニタ (遷移ログ)", ImGuiTreeNodeFlags_DefaultOpen)) {
+						DrawStateMonitor(*enemy);
+					}
+
+					// 今この敵がプレイヤーをどう見ているか（読み取り専用）
+					if (ImGui::CollapsingHeader("知覚モニタ (リアルタイム)")) {
+						DrawPerceptionMonitor(*enemy);
+					}
+
 					// 間合い取り（この個体にだけ即座に効く。数値の当たりを付けるのに使う）
 					if (ImGui::CollapsingHeader("間合い取り (この個体のみ・即反映)")) {
 						DrawSpacingEditor(enemyData.spacing, "inst");
+					}
+
+					// 知覚（この個体にだけ即座に効く）
+					if (ImGui::CollapsingHeader("知覚 (この個体のみ・即反映)")) {
+						DrawPerceptionEditor(enemyData.perception, "inst");
+					}
+
+					// 被弾リアクション（この個体にだけ即座に効く）
+					if (ImGui::CollapsingHeader("被弾リアクション (この個体のみ・即反映)")) {
+						DrawDamageReactionEditor(enemyData.damageReaction, "inst");
 					}
 
 					// 攻撃パターン表示

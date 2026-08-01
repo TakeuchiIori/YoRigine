@@ -8,18 +8,19 @@
 /// </summary>
 class BattleJumpAttackState : public IEnemyState<BattleEnemy> {
 public:
-	void Enter(BattleEnemy& enemy) override;
+  void Enter(BattleEnemy &enemy) override;
 
-	void Update(BattleEnemy& enemy, float dt) override;
+  void Update(BattleEnemy &enemy, float dt) override;
 
-	void Exit(BattleEnemy& enemy) override;
+  void Exit(BattleEnemy &enemy) override;
+  const char *GetName() const override { return "Attack:Jump"; }
 
-	bool IsAttacking() const override { return true; }
-	bool IsContactDamageActive() const override { return isContactDamageActive_; }
+  bool IsAttacking() const override { return true; }
+  bool IsContactDamageActive() const override { return isContactDamageActive_; }
 
 private:
-	Vector3 startPos_{ 0, 0, 0 };
-	Vector3 targetPos_{ 0, 0, 0 };
-	float startY_ = 0.0f;
-	bool isContactDamageActive_ = false;
+  Vector3 startPos_{0, 0, 0};
+  Vector3 targetPos_{0, 0, 0};
+  float startY_ = 0.0f;
+  bool isContactDamageActive_ = false;
 };

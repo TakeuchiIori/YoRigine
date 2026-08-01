@@ -151,18 +151,24 @@ public:
 
   ObjectAnimation *GetAnimation() { return animation_.get(); }
 
+  // 本体のコライダー。ロックオン対象の照合などに使う（所有権は渡さない）
+  const BaseCollider *GetPrimaryCollider() const { return obbCollider_.get(); }
+
   ///************************* 被弾リアクション *************************///
 
   void StartKnockback(const Vector3 &direction, float power, float duration);
   void UpdateKnockback(float dt);
   const KnockbackData &GetKnockbackData() const { return knockbackData_; }
 
-  // 攻撃を受けた方向に応じて見た目上のけぞらせる
-  void StartDirectionalHitReaction(const Vector3 &direction);
+  // 攻撃を受けた方向に応じて見た目上のけぞらせる。
+  // 角度と時間は敵データ側で持つので、開始時に渡してもらう。
+  void StartDirectionalHitReaction(const Vector3 &direction, float angle,
+                                   float duration);
   void UpdateDirectionalHitReaction(float dt);
 
   // ダメージ時の点滅更新（isDamageBlinking_ が true の間だけ動く）
   void UpdateBlinking(float dt);
+  void SetBlinkSpeed(float speed) { blinkSpeed_ = speed; }
 
   ///************************* 状態VFX *************************///
 

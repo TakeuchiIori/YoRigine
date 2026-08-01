@@ -84,6 +84,29 @@ public:
     return currentState_.get();
   }
 
+  // 現在の状態名（デバッグ表示用）
+  const char *GetStateName() const {
+    return currentState_ ? currentState_->GetName() : "None";
+  }
+
+  ///*************************
+  ///遷移ログ（デバッグ用）*************************///
+
+  // 1回分の状態遷移の記録
+  struct StateTransitionLog {
+    std::string name; // 遷移先の状態名
+    float duration;   // 直前の状態に留まっていた秒数
+    float lifeTime;   // 敵が生成されてからの経過秒
+  };
+
+  const std::vector<StateTransitionLog> &GetTransitionLog() const {
+    return transitionLog_;
+  }
+  void ClearTransitionLog() { transitionLog_.clear(); }
+
+  // 現在の状態に留まっている秒数
+  float GetTimeInCurrentState() const { return timeInCurrentState_; }
+
   ///************************* アクセッサ *************************///
 
   // 敵データを取得
@@ -123,6 +146,12 @@ private:
 
   // 同じ攻撃判定時間で二重にダメージを与えないための記録
   int lastDealtContactDamageWindow_ = -1;
+
+  // 状態遷移の履歴（エディタ表示用のリングバッファ）
+  std::vector<StateTransitionLog> transitionLog_;
+  size_t maxTransitionLog_ = 40;
+  float timeInCurrentState_ = 0.0f;
+  float lifeTime_ = 0.0f;
 
   // フェードスピード（プレイヤー敗北時の消失演出）
   float fadeSpeed_ = 3.0f;

@@ -28,28 +28,82 @@ public:
   /// </summary>
   static std::unique_ptr<IEnemyState<BattleEnemy>>
   SelectAfterAttack(const BattleEnemy &enemy) {
-    const SpacingParams &params = enemy.GetEnemyData().spacing;
+    const BattleEnemyData &data = enemy.GetEnemyData();
+    const SpacingParams &params = data.spacing;
+    const PerceptionParams &perception = data.perception;
 
     // プレイヤーがいないなら間合いを測る意味がないので、その場で様子を見る
     if (!enemy.GetPlayer()) {
       return std::make_unique<BattleObserveState>();
     }
 
+    const EnemyAIContext ctx =
+        EnemyAIContext::Capture(enemy, perception.facingHalfAngleDeg);
+
+    // 相手が隙を晒しているなら間合いを取らずに差し込む。
+    // ここで一拍置いてしまうと、せっかくの隙を毎回見逃すことになる。
+    if (ctx.HasOpening(perception) &&
+        ctx.distance <
+            data.attackStateRange + perception.openingAttackRangeBonus) {
+      return AttackSelector::SelectSmartAttack(enemy);
+    }
+
     // 近すぎるときは迷わず後退する。密着状態が続くのが一番「戦っている感じ」を殺す
-    if (enemy.GetDistanceToPlayer() < params.tooCloseDistance) {
+    if (ctx.distance < params.tooCloseDistance) {
       return std::make_unique<BattleBackstepState>();
     }
 
-    // それ以外は重み抽選
-    const float total =
-        params.backstepWeight + params.strafeWeight + params.observeWeight;
+    // 基本の重みに、プレイヤーの状態による補正を掛ける
+    float backstepWeight = params.backstepWeight;
+    float strafeWeight = params.strafeWeight;
+    const float observeWeight = params.observeWeight;
+    if (perception.enabled) {
+      // こちらを向いて振ってきているので下がって空振りさせる
+      if (ctx.IsThreatening()) {
+        backstepWeight *= perception.threatBackstepWeight;
+      }
+      // 正面は固いので側面へ回り込む。
+      // ここで Strafe を返しても、その後は必ず再交戦へ抜けるのでループしない。
+      if (ctx.playerIsGuarding) {
+        strafeWeight *= perception.guardStrafeWeight;
+      }
+    }
+
+    const float total = backstepWeight + strafeWeight + observeWeight;
     if (total <= 0.0f) {
       return std::make_unique<BattleStrafeState>();
     }
 
     float roll = RandomRange(0.0f, total);
-    if ((roll -= params.backstepWeight) < 0.0f)
+    if ((roll -= backstepWeight) < 0.0f)
       return std::make_unique<BattleBackstepState>();
+    if ((roll -= strafeWeight) < 0.0f)
+      return std::make_unique<BattleStrafeState>();
+    return std::make_unique<BattleObserveState>();
+  }
+
+  /// <summary>
+  /// 後退が終わった後の行動を選ぶ（横移動 or 様子見）。
+  ///
+  /// 突進系の攻撃はプレイヤーに密着した状態で終わるため、SelectAfterAttack が
+  /// ほぼ毎回「近すぎ→後退」に倒れる。そこから常に様子見へ繋ぐと、敵は
+  /// 少し下がって突っ立つだけになり、攻撃のクールダウンと見分けが付かない。
+  /// 後退で間合いが戻った後は横移動を選べるようにして、動きを見えるようにする。
+  /// </summary>
+  static std::unique_ptr<IEnemyState<BattleEnemy>>
+  SelectAfterBackstep(const BattleEnemy &enemy) {
+    const SpacingParams &params = enemy.GetEnemyData().spacing;
+
+    if (!enemy.GetPlayer()) {
+      return std::make_unique<BattleObserveState>();
+    }
+
+    const float total = params.strafeWeight + params.observeWeight;
+    if (total <= 0.0f) {
+      return std::make_unique<BattleStrafeState>();
+    }
+
+    float roll = RandomRange(0.0f, total);
     if ((roll -= params.strafeWeight) < 0.0f)
       return std::make_unique<BattleStrafeState>();
     return std::make_unique<BattleObserveState>();
@@ -64,8 +118,18 @@ public:
       return std::make_unique<BattleObserveState>();
     }
 
+    const BattleEnemyData &data = enemy.GetEnemyData();
+    const EnemyAIContext ctx =
+        EnemyAIContext::Capture(enemy, data.perception.facingHalfAngleDeg);
+
+    // 相手に隙があるなら、多少遠くても踏み込む
+    float attackRange = data.attackStateRange;
+    if (ctx.HasOpening(data.perception)) {
+      attackRange += data.perception.openingAttackRangeBonus;
+    }
+
     // 攻撃レンジに入っていれば攻撃、遠ければ詰める
-    if (enemy.GetDistanceToPlayer() < enemy.GetEnemyData().attackStateRange) {
+    if (ctx.distance < attackRange) {
       return AttackSelector::SelectSmartAttack(enemy);
     }
     return std::make_unique<BattleApproachState>();

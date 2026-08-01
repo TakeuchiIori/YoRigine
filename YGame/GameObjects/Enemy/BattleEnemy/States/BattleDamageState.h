@@ -8,8 +8,8 @@
 /// </summary>
 class BattleDamageState : public IEnemyState<BattleEnemy> {
 public:
-	void Enter(BattleEnemy& enemy) override;
-	void Update(BattleEnemy& enemy, float dt) override;
-	void Exit(BattleEnemy& enemy) override;
+  void Enter(BattleEnemy &enemy) override;
+  void Update(BattleEnemy &enemy, float dt) override;
+  void Exit(BattleEnemy &enemy) override;
+  const char *GetName() const override { return "Damage"; }
 };
-

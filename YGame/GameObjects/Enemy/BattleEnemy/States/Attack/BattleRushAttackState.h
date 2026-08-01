@@ -7,16 +7,17 @@
 /// </summary>
 class BattleRushAttackState : public IEnemyState<BattleEnemy> {
 public:
-	void Enter(BattleEnemy& enemy) override;
-	void Update(BattleEnemy& enemy, float dt) override;
-	void Exit(BattleEnemy& enemy) override;
+  void Enter(BattleEnemy &enemy) override;
+  void Update(BattleEnemy &enemy, float dt) override;
+  void Exit(BattleEnemy &enemy) override;
 
-	bool IsAttacking() const override { return true; }
-	bool IsContactDamageActive() const override { return isContactDamageActive_; }
+  const char *GetName() const override { return "Attack:Rush"; }
+  bool IsAttacking() const override { return true; }
+  bool IsContactDamageActive() const override { return isContactDamageActive_; }
 
 private:
-	Vector3 attackDir_{ 0,0,0 };
-	Vector3 anticipationStartPos_{ 0,0,0 };
-	bool dirLocked_ = false;
-	bool isContactDamageActive_ = false;
+  Vector3 attackDir_{0, 0, 0};
+  Vector3 anticipationStartPos_{0, 0, 0};
+  bool dirLocked_ = false;
+  bool isContactDamageActive_ = false;
 };

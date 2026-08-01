@@ -57,12 +57,56 @@
                 "chargeRush"
             ],
             "attackStateRange": 10.0,
+            "damageReaction": {
+                "blinkSpeed": 50.0,
+                "colorReturnDuration": 0.15000000596046448,
+                "downedStandUpTime": 3.5,
+                "downedWobbleSpeed": 5.0,
+                "downedWobbleTilt": 0.30000001192092896,
+                "flashDuration": 0.20000000298023224,
+                "hitReactionAngle": 0.20000000298023224,
+                "hitReactionDuration": 0.2199999988079071,
+                "punchDuration": 0.25,
+                "punchScale": 0.15000000596046448,
+                "staggerDuration": 1.0,
+                "waitForKnockback": true
+            },
             "defense": 12,
             "enemyId": "alien",
             "hp": 200,
             "level": 3,
             "modelPath": "Alien.obj",
-            "moveSpeed": 5.0
+            "moveSpeed": 5.0,
+            "perception": {
+                "baitSlowAttackWeight": 1.5,
+                "enabled": true,
+                "facingHalfAngleDeg": 70.0,
+                "guardStrafeWeight": 3.0,
+                "openingAttackRangeBonus": 3.0,
+                "openingFastAttackWeight": 2.0,
+                "openingOnLockedOther": true,
+                "openingOnLookAway": true,
+                "openingOnOutOfCC": true,
+                "openingOnStagger": true,
+                "openingSlowAttackWeight": 0.30000001192092896,
+                "threatBackstepWeight": 3.0
+            },
+            "spacing": {
+                "backstepDuration": 0.44999998807907104,
+                "backstepSpeedMultiplier": 2.200000047683716,
+                "backstepWeight": 1.0,
+                "faceRotationSpeed": 6.0,
+                "observeMaxDuration": 1.2000000476837158,
+                "observeMinDuration": 0.4000000059604645,
+                "observeWeight": 1.0,
+                "preferredDistance": 6.0,
+                "strafeDistanceKeepStrength": 1.5,
+                "strafeMaxDuration": 1.7999999523162842,
+                "strafeMinDuration": 0.800000011920929,
+                "strafeSpeedMultiplier": 0.8999999761581421,
+                "strafeWeight": 1.399999976158142,
+                "tooCloseDistance": 3.5
+            }
         },
         {
             "approachStateRange": 15.0,
@@ -122,12 +166,56 @@
                 "rush"
             ],
             "attackStateRange": 10.0,
+            "damageReaction": {
+                "blinkSpeed": 50.0,
+                "colorReturnDuration": 0.15000000596046448,
+                "downedStandUpTime": 3.5,
+                "downedWobbleSpeed": 5.0,
+                "downedWobbleTilt": 0.30000001192092896,
+                "flashDuration": 0.20000000298023224,
+                "hitReactionAngle": 0.20000000298023224,
+                "hitReactionDuration": 0.2199999988079071,
+                "punchDuration": 0.25,
+                "punchScale": 0.15000000596046448,
+                "staggerDuration": 1.0,
+                "waitForKnockback": true
+            },
             "defense": 30,
             "enemyId": "green_blob",
             "hp": 350,
             "level": 5,
             "modelPath": "GreenSpikyBlob.obj",
-            "moveSpeed": 3.0
+            "moveSpeed": 3.0,
+            "perception": {
+                "baitSlowAttackWeight": 1.5,
+                "enabled": true,
+                "facingHalfAngleDeg": 70.0,
+                "guardStrafeWeight": 3.0,
+                "openingAttackRangeBonus": 3.0,
+                "openingFastAttackWeight": 2.0,
+                "openingOnLockedOther": true,
+                "openingOnLookAway": true,
+                "openingOnOutOfCC": true,
+                "openingOnStagger": true,
+                "openingSlowAttackWeight": 0.30000001192092896,
+                "threatBackstepWeight": 3.0
+            },
+            "spacing": {
+                "backstepDuration": 0.44999998807907104,
+                "backstepSpeedMultiplier": 2.200000047683716,
+                "backstepWeight": 1.0,
+                "faceRotationSpeed": 6.0,
+                "observeMaxDuration": 1.2000000476837158,
+                "observeMinDuration": 0.4000000059604645,
+                "observeWeight": 1.0,
+                "preferredDistance": 6.0,
+                "strafeDistanceKeepStrength": 1.5,
+                "strafeMaxDuration": 1.7999999523162842,
+                "strafeMinDuration": 0.800000011920929,
+                "strafeSpeedMultiplier": 0.8999999761581421,
+                "strafeWeight": 1.399999976158142,
+                "tooCloseDistance": 3.5
+            }
         },
         {
             "approachStateRange": 15.0,
@@ -187,12 +275,56 @@
                 "combo"
             ],
             "attackStateRange": 10.0,
+            "damageReaction": {
+                "blinkSpeed": 50.0,
+                "colorReturnDuration": 0.15000000596046448,
+                "downedStandUpTime": 3.5,
+                "downedWobbleSpeed": 5.0,
+                "downedWobbleTilt": 0.30000001192092896,
+                "flashDuration": 0.20000000298023224,
+                "hitReactionAngle": 0.20000000298023224,
+                "hitReactionDuration": 0.2199999988079071,
+                "punchDuration": 0.25,
+                "punchScale": 0.15000000596046448,
+                "staggerDuration": 0.5,
+                "waitForKnockback": false
+            },
             "defense": 8,
             "enemyId": "mushnub",
             "hp": 250,
             "level": 4,
             "modelPath": "Mushnub_Evolved.obj",
-            "moveSpeed": 3.0
+            "moveSpeed": 3.0,
+            "perception": {
+                "baitSlowAttackWeight": 1.5,
+                "enabled": true,
+                "facingHalfAngleDeg": 70.0,
+                "guardStrafeWeight": 3.0,
+                "openingAttackRangeBonus": 3.0,
+                "openingFastAttackWeight": 2.0,
+                "openingOnLockedOther": true,
+                "openingOnLookAway": true,
+                "openingOnOutOfCC": true,
+                "openingOnStagger": true,
+                "openingSlowAttackWeight": 0.30000001192092896,
+                "threatBackstepWeight": 3.0
+            },
+            "spacing": {
+                "backstepDuration": 0.44999998807907104,
+                "backstepSpeedMultiplier": 2.200000047683716,
+                "backstepWeight": 1.0,
+                "faceRotationSpeed": 6.0,
+                "observeMaxDuration": 1.2000000476837158,
+                "observeMinDuration": 0.4000000059604645,
+                "observeWeight": 1.0,
+                "preferredDistance": 6.0,
+                "strafeDistanceKeepStrength": 1.5,
+                "strafeMaxDuration": 1.7999999523162842,
+                "strafeMinDuration": 0.800000011920929,
+                "strafeSpeedMultiplier": 0.8999999761581421,
+                "strafeWeight": 1.399999976158142,
+                "tooCloseDistance": 3.5
+            }
         }
     ]
 }

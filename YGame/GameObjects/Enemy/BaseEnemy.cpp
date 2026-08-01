@@ -126,7 +126,10 @@ void BaseEnemy::UpdateKnockback(float dt) {
 /*==========================================================================
 攻撃方向に応じたのけぞり
 //========================================================================*/
-void BaseEnemy::StartDirectionalHitReaction(const Vector3 &direction) {
+void BaseEnemy::StartDirectionalHitReaction(const Vector3 &direction,
+                                            float angle, float duration) {
+  hitReactionAngle_ = angle;
+  hitReactionDuration_ = duration;
   hitReactionRotation_ = {};
 
   Vector3 horizontalDirection = direction;

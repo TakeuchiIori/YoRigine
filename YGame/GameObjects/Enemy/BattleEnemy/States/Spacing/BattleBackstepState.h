@@ -12,6 +12,7 @@ public:
   void Enter(BattleEnemy &enemy) override;
   void Update(BattleEnemy &enemy, float dt) override;
   void Exit(BattleEnemy &enemy) override;
+  const char *GetName() const override { return "Spacing:Backstep"; }
 
 private:
   // 後退方向（Enter でプレイヤーの反対方向に固定する）

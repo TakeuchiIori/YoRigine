@@ -16,19 +16,21 @@ void BattleDownedState::Enter(BattleEnemy &enemy) {
 /// ダウン中の更新処理（揺れ演出）
 /// </summary>
 void BattleDownedState::Update(BattleEnemy &enemy, [[maybe_unused]] float dt) {
+  const DamageReactionParams &params = enemy.GetEnemyData().damageReaction;
+
   float t = enemy.GetStateTimer();
-  float angle = t * speed_;
+  float angle = t * params.downedWobbleSpeed;
   // sin/cos を別軸に使うと (rotX, rotZ)
   // が円を描きアンカー補正で位置が円軌道になる。 両軸とも sin
   // にしつつ周期を非整数比でずらすことで、円にならない自然なふらつきにする。
-  float rotX = std::sin(angle * 1.3f) * tilt_ * 0.5f;
-  float rotZ = std::sin(angle) * tilt_;
+  float rotX = std::sin(angle * 1.3f) * params.downedWobbleTilt * 0.5f;
+  float rotZ = std::sin(angle) * params.downedWobbleTilt;
 
   enemy.GetRotationX() = rotX;
   enemy.GetRotationZ() = rotZ;
 
   // 一定時間経過で立ち上がり
-  if (t > standUpTime_) {
+  if (t > params.downedStandUpTime) {
     enemy.ChangeState(SpacingSelector::SelectAfterAttack(enemy));
   }
 }

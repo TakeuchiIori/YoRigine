@@ -127,10 +127,8 @@ void BattleEnemy::InitJson() {
 	jsonManager_->Register("ノイズスケール", &dissolveNoiseScale_);
 	jsonManager_->ClearTreePrefix();
 
-	jsonManager_->SetTreePrefix("ヒットリアクション");
-	jsonManager_->Register("のけぞり角度(rad)", &hitReactionAngle_);
-	jsonManager_->Register("のけぞり時間(秒)", &hitReactionDuration_);
-	jsonManager_->ClearTreePrefix();
+	// のけぞりの角度・時間は enemy_data.json の damageReaction 側へ移した。
+	// 被弾まわりの数値が2箇所に分かれていると、どちらを触ればいいのか分からなくなる。
 }
 
 /*==========================================================================
@@ -153,6 +151,8 @@ void BattleEnemy::Update() {
 
 	float dt = YoRigine::GameTime::GetDeltaTime();
 	stateTimer_ += dt;
+	timeInCurrentState_ += dt;
+	lifeTime_ += dt;
 	MarkPreviousPosition();
 
 	// アニメーター更新
@@ -203,6 +203,15 @@ void BattleEnemy::ChangeState(std::unique_ptr<IEnemyState<BattleEnemy>> newState
 	lastDealtContactDamageWindow_ = -1;
 	if (currentState_) currentState_->Enter(*this);
 	stateTimer_ = 0.0f;
+
+	// 遷移をログに残す。エディタの状態モニタで「今どう動いているか」を見るために使う。
+	if (currentState_) {
+		transitionLog_.push_back({ currentState_->GetName(), timeInCurrentState_, lifeTime_ });
+		if (transitionLog_.size() > maxTransitionLog_) {
+			transitionLog_.erase(transitionLog_.begin());
+		}
+	}
+	timeInCurrentState_ = 0.0f;
 }
 
 /*==========================================================================
@@ -291,7 +300,9 @@ void BattleEnemy::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 			float power = player_->GetCombat()->GetCombo()->GetCurrentKnockback();
 			float duration = player_->GetCombat()->GetCombo()->GetCurrentKnockbackDuration();
 			StartKnockback(knockbackDir, power, duration);
-			StartDirectionalHitReaction(knockbackDir);
+			StartDirectionalHitReaction(knockbackDir,
+				enemyData_.damageReaction.hitReactionAngle,
+				enemyData_.damageReaction.hitReactionDuration);
 
 			// --------------------- 攻撃ヒット時の前進ステップを発火 --------------------- //
 			player_->GetCombat()->GetCombo()->OnHitStep(wt_.translate_);

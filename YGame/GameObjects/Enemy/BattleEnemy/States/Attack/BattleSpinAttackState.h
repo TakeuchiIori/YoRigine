@@ -8,17 +8,18 @@
 /// </summary>
 class BattleSpinAttackState : public IEnemyState<BattleEnemy> {
 public:
-	void Enter(BattleEnemy& enemy) override;
+  void Enter(BattleEnemy &enemy) override;
 
-	void Update(BattleEnemy& enemy, float dt) override;
+  void Update(BattleEnemy &enemy, float dt) override;
 
-	void Exit(BattleEnemy& enemy) override;
+  void Exit(BattleEnemy &enemy) override;
+  const char *GetName() const override { return "Attack:Spin"; }
 
-	bool IsAttacking() const override { return true; }
-	bool IsContactDamageActive() const override { return isContactDamageActive_; }
+  bool IsAttacking() const override { return true; }
+  bool IsContactDamageActive() const override { return isContactDamageActive_; }
 
 private:
-	float startRotation_ = 0.0f;
-	float targetTwistRotation_ = 0.0f;
-	bool isContactDamageActive_ = false;
+  float startRotation_ = 0.0f;
+  float targetTwistRotation_ = 0.0f;
+  bool isContactDamageActive_ = false;
 };

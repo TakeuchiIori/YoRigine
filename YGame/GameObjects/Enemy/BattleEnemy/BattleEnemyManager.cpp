@@ -802,6 +802,38 @@ bool BattleEnemyManager::SaveEnemyData(const std::string& filePath) const {
 			{"observeWeight", data.spacing.observeWeight}
 		};
 
+		// 知覚（プレイヤーの状態を見て行動を変える）
+		enemyJson["perception"] = {
+			{"enabled", data.perception.enabled},
+			{"facingHalfAngleDeg", data.perception.facingHalfAngleDeg},
+			{"openingOnStagger", data.perception.openingOnStagger},
+			{"openingOnOutOfCC", data.perception.openingOnOutOfCC},
+			{"openingOnLookAway", data.perception.openingOnLookAway},
+			{"openingOnLockedOther", data.perception.openingOnLockedOther},
+			{"openingAttackRangeBonus", data.perception.openingAttackRangeBonus},
+			{"openingFastAttackWeight", data.perception.openingFastAttackWeight},
+			{"openingSlowAttackWeight", data.perception.openingSlowAttackWeight},
+			{"threatBackstepWeight", data.perception.threatBackstepWeight},
+			{"guardStrafeWeight", data.perception.guardStrafeWeight},
+			{"baitSlowAttackWeight", data.perception.baitSlowAttackWeight}
+		};
+
+		// 被弾リアクション（硬直・のけぞり・ダウン）
+		enemyJson["damageReaction"] = {
+			{"staggerDuration", data.damageReaction.staggerDuration},
+			{"waitForKnockback", data.damageReaction.waitForKnockback},
+			{"punchScale", data.damageReaction.punchScale},
+			{"punchDuration", data.damageReaction.punchDuration},
+			{"flashDuration", data.damageReaction.flashDuration},
+			{"colorReturnDuration", data.damageReaction.colorReturnDuration},
+			{"blinkSpeed", data.damageReaction.blinkSpeed},
+			{"hitReactionAngle", data.damageReaction.hitReactionAngle},
+			{"hitReactionDuration", data.damageReaction.hitReactionDuration},
+			{"downedStandUpTime", data.damageReaction.downedStandUpTime},
+			{"downedWobbleSpeed", data.damageReaction.downedWobbleSpeed},
+			{"downedWobbleTilt", data.damageReaction.downedWobbleTilt}
+		};
+
 		enemyArray.push_back(enemyJson);
 	}
 
@@ -983,6 +1015,42 @@ bool BattleEnemyManager::LoadEnemyData(const std::string& filePath) {
 				target.backstepWeight             = sp.value("backstepWeight", 1.0f);
 				target.strafeWeight               = sp.value("strafeWeight", 1.4f);
 				target.observeWeight              = sp.value("observeWeight", 1.0f);
+			}
+
+			// 知覚（プレイヤーの状態を見て行動を変える）。未記載なら既定値で動く。
+			if (enemyJson.contains("perception")) {
+				const auto& pc = enemyJson["perception"];
+				auto& target = data.perception;
+				target.enabled                 = pc.value("enabled", true);
+				target.facingHalfAngleDeg      = pc.value("facingHalfAngleDeg", 70.0f);
+				target.openingOnStagger        = pc.value("openingOnStagger", true);
+				target.openingOnOutOfCC        = pc.value("openingOnOutOfCC", true);
+				target.openingOnLookAway       = pc.value("openingOnLookAway", true);
+				target.openingOnLockedOther    = pc.value("openingOnLockedOther", true);
+				target.openingAttackRangeBonus = pc.value("openingAttackRangeBonus", 3.0f);
+				target.openingFastAttackWeight = pc.value("openingFastAttackWeight", 2.0f);
+				target.openingSlowAttackWeight = pc.value("openingSlowAttackWeight", 0.3f);
+				target.threatBackstepWeight    = pc.value("threatBackstepWeight", 3.0f);
+				target.guardStrafeWeight       = pc.value("guardStrafeWeight", 3.0f);
+				target.baitSlowAttackWeight    = pc.value("baitSlowAttackWeight", 1.5f);
+			}
+
+			// 被弾リアクション（硬直・のけぞり・ダウン）。未記載なら既定値で動く。
+			if (enemyJson.contains("damageReaction")) {
+				const auto& dr = enemyJson["damageReaction"];
+				auto& target = data.damageReaction;
+				target.staggerDuration      = dr.value("staggerDuration", 1.0f);
+				target.waitForKnockback     = dr.value("waitForKnockback", true);
+				target.punchScale           = dr.value("punchScale", 0.15f);
+				target.punchDuration        = dr.value("punchDuration", 0.25f);
+				target.flashDuration        = dr.value("flashDuration", 0.2f);
+				target.colorReturnDuration  = dr.value("colorReturnDuration", 0.15f);
+				target.blinkSpeed           = dr.value("blinkSpeed", 50.0f);
+				target.hitReactionAngle     = dr.value("hitReactionAngle", 0.20f);
+				target.hitReactionDuration  = dr.value("hitReactionDuration", 0.22f);
+				target.downedStandUpTime    = dr.value("downedStandUpTime", 3.5f);
+				target.downedWobbleSpeed    = dr.value("downedWobbleSpeed", 5.0f);
+				target.downedWobbleTilt     = dr.value("downedWobbleTilt", 0.3f);
 			}
 
 			// マップにデータを格納

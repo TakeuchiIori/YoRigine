@@ -1,4 +1,5 @@
 #pragma once
+#include "../AI/EnemyAIContext.h" // PerceptionParams
 #include "Vector3.h"
 #include <string>
 #include <vector>
@@ -179,6 +180,37 @@ struct SpacingParams {
   float observeWeight = 1.0f;
 };
 
+// PerceptionParams は知覚そのものと対で扱うため AI/EnemyAIContext.h
+// に置いている。
+
+///************************* 被弾リアクション *************************///
+// 攻撃を受けた時の硬直・のけぞり・ダウンのパラメータ。
+// 硬直が長いと一方的に殴れてしまい、短いと反撃が理不尽になる。
+// 手触りに直結するので全部エディタから触れるようにしている。
+struct DamageReactionParams {
+  // ── 被弾硬直（Damage状態）──
+  float staggerDuration = 1.0f; // 被弾してから動き出すまでの秒数
+  // ノックバック中は硬直タイマーを進めない。
+  // true だと実際の硬直は「ノックバック時間 + 上の秒数」になる。
+  bool waitForKnockback = true;
+
+  // ── 被弾時の見た目 ──
+  float punchScale = 0.15f;          // ヒット時に一瞬膨らむ量
+  float punchDuration = 0.25f;       // その戻り時間
+  float flashDuration = 0.2f;        // 白く光ってから赤くなるまで
+  float colorReturnDuration = 0.15f; // 元の色へ戻す時間
+  float blinkSpeed = 50.0f;          // ダメージ点滅の速さ
+
+  // ── のけぞり（描画のみの傾き。コライダーは傾けない）──
+  float hitReactionAngle = 0.20f;    // 傾き角（ラジアン）
+  float hitReactionDuration = 0.22f; // 傾いて戻るまでの秒数
+
+  // ── ダウン（盾で弾かれた時）──
+  float downedStandUpTime = 3.5f; // 起き上がるまでの秒数
+  float downedWobbleSpeed = 5.0f; // ふらつきの速さ
+  float downedWobbleTilt = 0.3f;  // ふらつきの傾き
+};
+
 // 各状態の攻撃パラメータをまとめた構造体
 struct EnemyAttackParams {
   RushAttackParams rush;
@@ -216,6 +248,12 @@ struct BattleEnemyData {
 
   // 間合い取り（攻撃と攻撃の間の非攻撃行動）
   SpacingParams spacing;
+
+  // 知覚（プレイヤーの状態を見て行動を変える）
+  PerceptionParams perception;
+
+  // 被弾リアクション（硬直・のけぞり・ダウン）
+  DamageReactionParams damageReaction;
 };
 
 // KnockbackData は敵共通なので BaseEnemy.h へ移動した。
