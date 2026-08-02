@@ -8,7 +8,6 @@
 #include <json.hpp>
 
 #include "States/BattleIdleState.h"
-#include "States/Attack/BattleRushAttackState.h"
 #include "States/BattleDamageState.h"
 #include "States/BattleDownedState.h"
 #include "States/BattleDeadState.h"
@@ -17,6 +16,7 @@
 #include <Collision/AreaCollision/Base/AreaManager.h>
 #include "Object3D/BaseObjectManager.h"
 #include "States/BattleRecoveryState.h"
+#include "../AI/AttackTokenPool.h"
 #include "Particle/YEmitterGroupManager.h"
 
 #include <UI/Damage/DamageNumberManager.h>
@@ -27,6 +27,11 @@
 BattleEnemy::~BattleEnemy() {
 	// どの削除経路（撃破 / 全消去 / シーン終了）でも確実に登録解除する
 	BaseObjectManager::GetInstance()->Unregister(this);
+
+	// 攻撃権を握ったまま消えると、その枠が永久に埋まってしまう
+	if (auto* pool = AttackTokenPool::GetCurrent()) {
+		pool->Forget(this);
+	}
 
 	// 燃焼などの付着VFXを取り残さない
 	StopStatusVfx();
@@ -198,6 +203,14 @@ void BattleEnemy::Update() {
 状態の切り替え
 //========================================================================*/
 void BattleEnemy::ChangeState(std::unique_ptr<IEnemyState<BattleEnemy>> newState) {
+	// 攻撃状態から抜けるときは必ず攻撃権を返す。
+	// 被弾・ダウン・死亡による中断もここを通るので、返し忘れが起きない。
+	if (currentState_ && currentState_->IsAttacking()) {
+		if (auto* pool = AttackTokenPool::GetCurrent()) {
+			pool->Release(this);
+		}
+	}
+
 	if (currentState_) currentState_->Exit(*this);
 	currentState_ = std::move(newState);
 	lastDealtContactDamageWindow_ = -1;
@@ -253,78 +266,83 @@ void BattleEnemy::TryPerformContactAttack() {
 //========================================================================*/
 void BattleEnemy::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other) {
 
-	if (isAlive_ && !isInvincible_) {
-		// 攻撃を食らった時
-		if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon)) {
-			// ダウン中などはダメージを受けても、その反撃チャンス状態を維持する。
-			const bool keepCurrentState = currentState_ && currentState_->KeepsStateWhenDamaged();
+	if (!isAlive_ || isInvincible_) return;
 
-			// --------------------- ダメージの処理 --------------------- //
-			int damage = static_cast<int>(player_->GetCombat()->GetCombo()->GetCurrentDamage());
-			TakeDamage(damage);
+	// 攻撃を食らった時。
+	// ここでは「誰にどう殴られたか」を集めるだけにして、
+	// 状態遷移やリアクションの判断は OnDamaged 側へ寄せる。
+	if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon)) {
+		auto* combo = player_->GetCombat()->GetCombo();
 
-			// ダメージ数値UIをスポーン（頭上Yオフセットは DamageNumberManager 側でJSON調整）
-			bool isSine = (player_->GetCombat()->GetComboDamageMultiplier() > 1.0f);
-			DamageNumberManager::GetInstance()->SpawnDamage(damage, wt_.translate_, isSine);
-			// --------------------- ヒットエフェクトの処理 --------------------- //
-			//auto* enemyHitEmitterGroup_ = YEmitterGroupManager::GetInstance().GetGroup("EnemyHit");
-			//if (enemyHitEmitterGroup_) {
-			//	enemyHitEmitterGroup_->SetPosition(wt_.translate_);
-			//	enemyHitEmitterGroup_->SetActive(true);
-			//	enemyHitEmitterGroup_->SetAutoEmitAll(false);  // 自動射出OFF
-			//	enemyHitEmitterGroup_->EmitAll(10);
-			//}
+		DamageInfo info{};
+		info.amount = static_cast<int>(combo->GetCurrentDamage());
+		info.sourcePosition = player_->GetWorldPosition();
+		info.knockbackPower = combo->GetCurrentKnockback();
+		info.knockbackDuration = combo->GetCurrentKnockbackDuration();
 
-			// --------------------- ヒットカウントの処理 --------------------- //
-			// しきい値・有効フラグは CounterAttackParams (JSON 経由) で調整可能
-			if (!keepCurrentState) {
-				const auto& counterParams = enemyData_.attackParams.counter;
-				consecutiveHitCount_++;
-				hitCountResetTimer_ = 0.0f;
-				// 連続ヒット数が限界を超え、かつカウンター挙動が有効なら Recovery 状態へ
-				if (counterParams.enabled && consecutiveHitCount_ >= counterParams.triggerHitCount) {
-					ChangeState(std::make_unique<BattleRecoveryState>());
-					consecutiveHitCount_ = 0;  // リセット
-				}
-				else {
-					// 通常のダメージ状態
-					ChangeState(std::make_unique<BattleDamageState>());
-				}
-			}
+		ApplyDamage(info);
 
-			// --------------------- ノックバックの処理 --------------------- //
-			Vector3 knockbackDir = wt_.translate_ - player_->GetWorldPosition();
-			knockbackDir.y = 0.0f;
-			knockbackDir = Vector3::Normalize(knockbackDir);
+		// 攻撃ヒット時の前進ステップ（プレイヤー側の手応え演出）は
+		// 敵が死んでいても出したいので、リアクションとは別に発火する。
+		combo->OnHitStep(wt_.translate_);
+	}
 
-			float power = player_->GetCombat()->GetCombo()->GetCurrentKnockback();
-			float duration = player_->GetCombat()->GetCombo()->GetCurrentKnockbackDuration();
-			StartKnockback(knockbackDir, power, duration);
-			StartDirectionalHitReaction(knockbackDir,
-				enemyData_.damageReaction.hitReactionAngle,
-				enemyData_.damageReaction.hitReactionDuration);
-
-			// --------------------- 攻撃ヒット時の前進ステップを発火 --------------------- //
-			player_->GetCombat()->GetCombo()->OnHitStep(wt_.translate_);
-
-		}
-
-		// 盾に当たった時
-		if (dynamic_cast<BattleRushAttackState*>(GetCurrentState()) != nullptr) {
-			if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayerShield)) {
-				if (player_->GetCombat()->GetGuard()->GetState() == PlayerGuard::State::Active ||
-					player_->GetCombat()->GetGuard()->GetState() == PlayerGuard::State::Recovery) {
-					if (isAlive_) {
-						ChangeState(std::make_unique<BattleDownedState>());
-					}
-				}
+	// 盾に当たった時。
+	// どの攻撃を盾で止められるかは攻撃データ側の parriable で決まる。
+	if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayerShield)) {
+		if (currentState_ && currentState_->CanBeParried()) {
+			const auto guardState = player_->GetCombat()->GetGuard()->GetState();
+			if (guardState == PlayerGuard::State::Active ||
+				guardState == PlayerGuard::State::Recovery) {
+				ChangeState(std::make_unique<BattleDownedState>());
 			}
 		}
+	}
 
-		// プレイヤー本体に当たった時。攻撃実行中のStateの時だけダメージを与える
-		if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayer)) {
-			TryPerformContactAttack();
+	// プレイヤー本体に当たった時。攻撃実行中のStateの時だけダメージを与える
+	if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayer)) {
+		TryPerformContactAttack();
+	}
+}
+
+/*==========================================================================
+被弾リアクション（ダメージが実際に通ったときだけ呼ばれる）
+//========================================================================*/
+void BattleEnemy::OnDamaged(const DamageInfo& info) {
+	// ダウン中などはダメージを受けても、その反撃チャンス状態を維持する。
+	const bool keepCurrentState = currentState_ && currentState_->KeepsStateWhenDamaged();
+
+	// --------------------- ダメージ数値UI --------------------- //
+	// 頭上Yオフセットは DamageNumberManager 側でJSON調整
+	if (player_) {
+		const bool isSine = (player_->GetCombat()->GetComboDamageMultiplier() > 1.0f);
+		DamageNumberManager::GetInstance()->SpawnDamage(info.amount, wt_.translate_, isSine);
+	}
+
+	// --------------------- 連続被弾からのカウンター --------------------- //
+	// しきい値・有効フラグは CounterAttackParams (JSON 経由) で調整可能
+	if (!keepCurrentState) {
+		const auto& counterParams = enemyData_.attackParams.counter;
+		consecutiveHitCount_++;
+		hitCountResetTimer_ = 0.0f;
+
+		if (counterParams.enabled && consecutiveHitCount_ >= counterParams.triggerHitCount) {
+			ChangeState(std::make_unique<BattleRecoveryState>());
+			consecutiveHitCount_ = 0;
+		} else {
+			ChangeState(std::make_unique<BattleDamageState>());
 		}
+	}
+
+	// --------------------- ノックバックとのけぞり --------------------- //
+	Vector3 knockbackDir = wt_.translate_ - info.sourcePosition;
+	knockbackDir.y = 0.0f;
+	if (Length(knockbackDir) > 0.001f) {
+		knockbackDir = Vector3::Normalize(knockbackDir);
+		StartKnockback(knockbackDir, info.knockbackPower, info.knockbackDuration);
+		StartDirectionalHitReaction(knockbackDir,
+			enemyData_.damageReaction.hitReactionAngle,
+			enemyData_.damageReaction.hitReactionDuration);
 	}
 }
 

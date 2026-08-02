@@ -14,6 +14,7 @@ public:
 
   void Exit(BattleEnemy &enemy) override;
   const char *GetName() const override { return "Attack:Combo"; }
+  bool CanBeParried() const override { return parriable_; }
 
   bool IsAttacking() const override { return true; }
   bool IsContactDamageActive() const override {
@@ -29,6 +30,9 @@ private:
   void ExecuteRush(BattleEnemy &enemy, float speedMultiplier, float dt);
 
 private:
+  // Enter で攻撃データから読む（盾で受け止められる攻撃か）
+  bool parriable_ = false;
+
   int comboCount_ = 0;
   int contactDamageWindow_ = -1;
   Vector3 anticipationStartPos_{};

@@ -4,6 +4,7 @@
 void BattleSpinAttackState::Enter(BattleEnemy &enemy) {
   enemy.SetCanAct(false);
   enemy.ResetStateTimer();
+  parriable_ = enemy.GetEnemyData().attackParams.spin.parriable;
   isContactDamageActive_ = false;
 
   if (auto anim = enemy.GetAnimation()) {

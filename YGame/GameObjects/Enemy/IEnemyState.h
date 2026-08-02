@@ -31,4 +31,10 @@ public:
   // 被弾しても現在状態を維持するか。ダウンなどの反撃チャンスを
   // 通常のヒット状態で上書きしたくない場合に true を返す。
   virtual bool KeepsStateWhenDamaged() const { return false; }
+
+  // 盾で受け止めるとダウンする攻撃か。
+  // 以前は BattleEnemy 側が dynamic_cast で具象型を見ていたため、
+  // 盾で止められるのは突進だけで、攻撃を増やすたびに判定を書き足す必要があった。
+  // 各攻撃State が自分の攻撃データから読んで返す。
+  virtual bool CanBeParried() const { return false; }
 };

@@ -5,6 +5,7 @@
 void BattleRushAttackState::Enter(BattleEnemy &enemy) {
   enemy.SetCanAct(false);
   enemy.ResetStateTimer();
+  parriable_ = enemy.GetEnemyData().attackParams.rush.parriable;
   dirLocked_ = false;
   isContactDamageActive_ = false;
 

@@ -5,6 +5,7 @@
 void BattleCounterAttackState::Enter(BattleEnemy &enemy) {
   enemy.SetCanAct(false);
   enemy.ResetStateTimer();
+  parriable_ = enemy.GetEnemyData().attackParams.counter.parriable;
   enemy.IsInvincible() = true;
   isContactDamageActive_ = false;
 

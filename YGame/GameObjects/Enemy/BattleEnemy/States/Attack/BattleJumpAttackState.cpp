@@ -4,6 +4,7 @@
 void BattleJumpAttackState::Enter(BattleEnemy &enemy) {
   enemy.SetCanAct(false);
   enemy.ResetStateTimer();
+  parriable_ = enemy.GetEnemyData().attackParams.jump.parriable;
   isContactDamageActive_ = false;
 
   if (auto anim = enemy.GetAnimation()) {

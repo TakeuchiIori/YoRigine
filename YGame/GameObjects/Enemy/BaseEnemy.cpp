@@ -16,6 +16,17 @@ void BaseEnemy::TakeDamage(int damage) {
     currentHp_ = 0;
 }
 
+void BaseEnemy::ApplyDamage(const DamageInfo &info) {
+  // 無敵や死亡でHPが動かなかったときはリアクションも起こさない
+  const int before = currentHp_;
+  TakeDamage(info.amount);
+  if (currentHp_ == before) {
+    return;
+  }
+
+  OnDamaged(info);
+}
+
 void BaseEnemy::Heal(int amount) {
   if (!IsAlive())
     return;

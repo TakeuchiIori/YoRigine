@@ -18,6 +18,18 @@ struct KnockbackData {
   float knockbackTimer_ = 0.0f;
 };
 
+///************************* ダメージ情報 *************************///
+// 「誰にどう殴られたか」をまとめて派生へ渡すための構造体。
+// これがあると当たり判定コールバックは情報を集めるだけで済み、
+// 状態遷移やリアクションの判断を OnDamaged 側へ寄せられる。
+struct DamageInfo {
+  int amount = 0; // 与ダメージ
+  Vector3
+      sourcePosition{}; // 攻撃してきた側の位置（ノックバック方向の算出に使う）
+  float knockbackPower = 0.0f;
+  float knockbackDuration = 0.0f;
+};
+
 ///************************* 敵の共通基底クラス *************************///
 // BattleEnemy / FieldEnemy / 今後の BossEnemy が共有する「敵なら必ず持つ」
 // データと振る舞いだけを担当する。
@@ -33,8 +45,23 @@ public:
 
   ///************************* 体力 *************************///
 
-  // ダメージを与える。無敵中・死亡後は無視される。
+  // HPだけを減らす。無敵中・死亡後は無視される。
+  // リアクション（のけぞり・状態遷移）は起こさないので、
+  // デバッグ用の即死ボタンや、演出を挟まない魔法ダメージはこちらを使う。
   void TakeDamage(int damage);
+
+  /// <summary>
+  /// ダメージを与え、被弾リアクションまで走らせる。
+  /// TakeDamage と分けているのは、既存の魔法ダメージが
+  /// 「HPだけ減らしてのけぞらせない」挙動になっているため。
+  /// </summary>
+  void ApplyDamage(const DamageInfo &info);
+
+  /// <summary>
+  /// ダメージを受けた直後に呼ばれる。状態遷移やリアクションは派生が実装する。
+  /// 無敵などで実際にHPが減らなかった場合は呼ばれない。
+  /// </summary>
+  virtual void OnDamaged([[maybe_unused]] const DamageInfo &info) {}
 
   // HPを回復する。死亡後は無視される。
   void Heal(int amount);

@@ -7,11 +7,13 @@
                 "chargeRush": {
                     "chargeTime": 1.75,
                     "cooldownTime": 1.0,
+                    "parriable": true,
                     "rushTime": 0.5,
                     "speedMultiplier": 8.5
                 },
                 "combo": {
                     "cooldownTime": 0.800000011920929,
+                    "parriable": true,
                     "phaseDuration": 0.800000011920929,
                     "rushSpeedMultiplier": 8.0,
                     "subChargeTime": 0.4000000059604645,
@@ -24,6 +26,7 @@
                     "cooldownTime": 0.800000011920929,
                     "enabled": true,
                     "hitCountResetTime": 2.5,
+                    "parriable": true,
                     "recoveryDuration": 1.5,
                     "rushHomingStrength": 10.0,
                     "rushSpeedMultiplier": 6.0,
@@ -36,11 +39,13 @@
                     "cooldownTime": 0.699999988079071,
                     "crouchDepth": 0.30000001192092896,
                     "jumpHeight": 6.0,
-                    "jumpTime": 0.699999988079071
+                    "jumpTime": 0.699999988079071,
+                    "parriable": true
                 },
                 "rush": {
                     "chargeTime": 1.0,
                     "cooldownTime": 1.2000000476837158,
+                    "parriable": true,
                     "rushTime": 0.5,
                     "speedMultiplier": 7.0
                 },
@@ -48,6 +53,7 @@
                     "chargeTime": 0.30000001192092896,
                     "cooldownTime": 0.5,
                     "moveSpeedMultiplier": 2.0,
+                    "parriable": true,
                     "rotationCount": 2.0,
                     "spinTime": 1.0
                 }
@@ -115,11 +121,13 @@
                 "chargeRush": {
                     "chargeTime": 1.5,
                     "cooldownTime": 1.0,
+                    "parriable": true,
                     "rushTime": 0.5,
                     "speedMultiplier": 12.0
                 },
                 "combo": {
                     "cooldownTime": 0.800000011920929,
+                    "parriable": true,
                     "phaseDuration": 0.800000011920929,
                     "rushSpeedMultiplier": 8.0,
                     "subChargeTime": 0.4000000059604645,
@@ -132,6 +140,7 @@
                     "cooldownTime": 0.800000011920929,
                     "enabled": true,
                     "hitCountResetTime": 2.5,
+                    "parriable": true,
                     "recoveryDuration": 1.5,
                     "rushHomingStrength": 1.5,
                     "rushSpeedMultiplier": 14.0,
@@ -144,11 +153,13 @@
                     "cooldownTime": 0.6000000238418579,
                     "crouchDepth": 0.30000001192092896,
                     "jumpHeight": 4.0,
-                    "jumpTime": 0.699999988079071
+                    "jumpTime": 0.699999988079071,
+                    "parriable": true
                 },
                 "rush": {
                     "chargeTime": 0.8500000238418579,
                     "cooldownTime": 0.6499999761581421,
+                    "parriable": true,
                     "rushTime": 0.5,
                     "speedMultiplier": 7.5
                 },
@@ -156,6 +167,7 @@
                     "chargeTime": 0.44999998807907104,
                     "cooldownTime": 0.699999988079071,
                     "moveSpeedMultiplier": 4.0,
+                    "parriable": true,
                     "rotationCount": 3.0,
                     "spinTime": 0.800000011920929
                 }
@@ -224,11 +236,13 @@
                 "chargeRush": {
                     "chargeTime": 1.5,
                     "cooldownTime": 1.0,
+                    "parriable": true,
                     "rushTime": 0.5,
                     "speedMultiplier": 12.0
                 },
                 "combo": {
                     "cooldownTime": 1.2000000476837158,
+                    "parriable": true,
                     "phaseDuration": 0.8999999761581421,
                     "rushSpeedMultiplier": 6.5,
                     "subChargeTime": 0.4000000059604645,
@@ -241,6 +255,7 @@
                     "cooldownTime": 0.800000011920929,
                     "enabled": true,
                     "hitCountResetTime": 2.5,
+                    "parriable": true,
                     "recoveryDuration": 1.5,
                     "rushHomingStrength": 1.5,
                     "rushSpeedMultiplier": 15.0,
@@ -253,11 +268,13 @@
                     "cooldownTime": 0.6000000238418579,
                     "crouchDepth": 0.30000001192092896,
                     "jumpHeight": 4.0,
-                    "jumpTime": 0.699999988079071
+                    "jumpTime": 0.699999988079071,
+                    "parriable": true
                 },
                 "rush": {
                     "chargeTime": 1.0,
                     "cooldownTime": 1.2000000476837158,
+                    "parriable": true,
                     "rushTime": 0.5,
                     "speedMultiplier": 7.0
                 },
@@ -265,6 +282,7 @@
                     "chargeTime": 0.30000001192092896,
                     "cooldownTime": 0.5,
                     "moveSpeedMultiplier": 2.0,
+                    "parriable": true,
                     "rotationCount": 2.0,
                     "spinTime": 1.0
                 }
@@ -326,5 +344,10 @@
                 "tooCloseDistance": 3.5
             }
         }
-    ]
+    ],
+    "battleSettings": {
+        "attackTokenCount": 1,
+        "attackTokenEnabled": true,
+        "attackTokenReacquireCooldown": 0.5
+    }
 }

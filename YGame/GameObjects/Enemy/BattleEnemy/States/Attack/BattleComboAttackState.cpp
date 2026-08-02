@@ -5,6 +5,7 @@
 void BattleComboAttackState::Enter(BattleEnemy &enemy) {
   enemy.SetCanAct(false);
   enemy.ResetStateTimer();
+  parriable_ = enemy.GetEnemyData().attackParams.combo.parriable;
 
   if (auto anim = enemy.GetAnimation()) {
     anim->StartColorAnimation({1, 1, 1, 1}, {1.0f, 0.0f, 1.0f, 1.0f}, 0.2f);

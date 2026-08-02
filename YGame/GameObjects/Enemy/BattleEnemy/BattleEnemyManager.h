@@ -1,298 +1,314 @@
 #pragma once
+#include "../AI/AttackTokenPool.h"
 #include "BattleEnemy.h"
-#include <memory>
-#include <vector>
-#include <unordered_map>
-#include <string>
 #include <functional>
+#include <memory>
+#include <string>
+#include <unordered_map>
 #include <utility>
+#include <vector>
 
 class Player;
-namespace YoRigine { class Camera; }
+namespace YoRigine {
+class Camera;
+}
 
-///************************* 戦闘フォーメーションデータ *************************///
+///************************* 戦闘フォーメーションデータ
+///*************************///
 struct BattleFormationData {
-	std::string formationName;
-	std::vector<Vector3> positions;
-	std::string description;
+  std::string formationName;
+  std::vector<Vector3> positions;
+  std::string description;
 };
 
 ///************************* 敵エンカウントデータ *************************///
 struct EnemyEncounterData {
-	std::string encounterName;
-	std::vector<std::string> enemyIds;
-	std::vector<Vector3> formations;
-	std::string battleBackground = "default";
-	std::string bgm = "battle_default";
-	bool isBossEncounter = false;
-	int minLevel = 1;
-	int maxLevel = 5;
-	float encounterRate = 1.0f;
-	bool isOnlyOnce = false;
-	std::string requiredFlag;
-	// フィールド敵から引き継ぐ見た目スケール（全敵に適用）
-	Vector3 enemyScale = Vector3(1.0f, 1.0f, 1.0f);
+  std::string encounterName;
+  std::vector<std::string> enemyIds;
+  std::vector<Vector3> formations;
+  std::string battleBackground = "default";
+  std::string bgm = "battle_default";
+  bool isBossEncounter = false;
+  int minLevel = 1;
+  int maxLevel = 5;
+  float encounterRate = 1.0f;
+  bool isOnlyOnce = false;
+  std::string requiredFlag;
+  // フィールド敵から引き継ぐ見た目スケール（全敵に適用）
+  Vector3 enemyScale = Vector3(1.0f, 1.0f, 1.0f);
 };
 
 ///************************* 戦闘結果列挙 *************************///
-enum class BattleResult {
-	None,
-	Victory,
-	Defeat,
-	Escape,
-	InProgress
-};
+enum class BattleResult { None, Victory, Defeat, Escape, InProgress };
 
 ///************************* 戦闘統計データ *************************///
 struct BattleStats {
-	int totalExpGained = 0;
-	int totalGaldGained = 0;
-	int enemiesDefeated = 0;
-	float battleDuration = 0.0f;
-	std::string enemyID = "";
-	std::vector<std::string> droppedItems;
+  int totalExpGained = 0;
+  int totalGaldGained = 0;
+  int enemiesDefeated = 0;
+  float battleDuration = 0.0f;
+  std::string enemyID = "";
+  std::vector<std::string> droppedItems;
 };
 
 // 戦闘終了時のコールバック
-using BattleEndCallback = std::function<void(BattleResult result, const BattleStats& stats)>;
-using BattleEnemyDefeatedCallback = std::function<void(const BattleEnemy& enemy)>;
+using BattleEndCallback =
+    std::function<void(BattleResult result, const BattleStats &stats)>;
+using BattleEnemyDefeatedCallback =
+    std::function<void(const BattleEnemy &enemy)>;
 
 ///************************* 戦闘用の敵管理クラス *************************///
 class BattleEnemyManager {
-	// デバッグ/データ編集用 ImGui UI (USE_IMGUI 限定)。神クラス化対策として別クラスに分離。
-	friend class BattleEnemyEditorUI;
+  // デバッグ/データ編集用 ImGui UI (USE_IMGUI
+  // 限定)。神クラス化対策として別クラスに分離。
+  friend class BattleEnemyEditorUI;
+
 public:
-	///************************* 基本的な関数 *************************///
+  ///************************* 基本的な関数 *************************///
 
-	// コンストラクタ
-	BattleEnemyManager();
+  // コンストラクタ
+  BattleEnemyManager();
 
-	// デストラクタ
-	~BattleEnemyManager();
+  // デストラクタ
+  ~BattleEnemyManager();
 
-	// 現在アクティブなマネージャ（BattleScene が所有・非所有の借用参照）。
-	// 魔法の全体攻撃など、シーン外から「バトル中の敵一覧」が必要な時に使う。
-	// Initialize でセットされ、Finalize / デストラクタで nullptr に戻る。
-	static BattleEnemyManager* GetCurrent() { return current_; }
+  // 現在アクティブなマネージャ（BattleScene が所有・非所有の借用参照）。
+  // 魔法の全体攻撃など、シーン外から「バトル中の敵一覧」が必要な時に使う。
+  // Initialize でセットされ、Finalize / デストラクタで nullptr に戻る。
+  static BattleEnemyManager *GetCurrent() { return current_; }
 
-	// 初期化処理
-	void Initialize(YoRigine::Camera* camera);
+  // 初期化処理
+  void Initialize(YoRigine::Camera *camera);
 
-	// 更新処理
-	void Update();
+  // 更新処理
+  void Update();
 
-	// 描画処理
-	void Draw();
+  // 描画処理
+  void Draw();
 
-	// UI描画処理
-	void DrawUI();
+  // UI描画処理
+  void DrawUI();
 
-	// 影描画処理
-	void DrawShadow();
+  // 影描画処理
+  void DrawShadow();
 
-	// 当たり判定描画
-	void DrawCollision();
+  // 当たり判定描画
+  void DrawCollision();
 
-	// 終了処理
-	void Finalize();
+  // 終了処理
+  void Finalize();
 
-	///************************* 戦闘管理 *************************///
+  ///************************* 戦闘管理 *************************///
 
-	// 戦闘開始（エンカウント名指定）
-	void StartBattle(const std::string& encounterName);
+  // 戦闘開始（エンカウント名指定）
+  void StartBattle(const std::string &encounterName);
 
-	// 戦闘開始（エンカウントデータ指定）
-	void StartBattle(const EnemyEncounterData& encounterData);
+  // 戦闘開始（エンカウントデータ指定）
+  void StartBattle(const EnemyEncounterData &encounterData);
 
-	// 戦闘終了
-	void EndBattle(BattleResult result);
+  // 戦闘終了
+  void EndBattle(BattleResult result);
 
-	// 強制戦闘終了
-	void ForceBattleEnd();
+  // 強制戦闘終了
+  void ForceBattleEnd();
 
-	// 敵を生成
-	void SpawnBattleEnemy(const std::string& enemyId, const Vector3& position,
-		const Vector3& scale = Vector3(1.0f, 1.0f, 1.0f));
+  // 敵を生成
+  void SpawnBattleEnemy(const std::string &enemyId, const Vector3 &position,
+                        const Vector3 &scale = Vector3(1.0f, 1.0f, 1.0f));
 
-	// 敵グループを生成
-	void SpawnEnemyGroup(const std::vector<std::string>& enemyIds, const std::vector<Vector3>& positions,
-		const Vector3& scale = Vector3(1.0f, 1.0f, 1.0f));
+  // 敵グループを生成
+  void SpawnEnemyGroup(const std::vector<std::string> &enemyIds,
+                       const std::vector<Vector3> &positions,
+                       const Vector3 &scale = Vector3(1.0f, 1.0f, 1.0f));
 
-	// すべての敵を削除
-	void RemoveAllBattleEnemies();
+  // すべての敵を削除
+  void RemoveAllBattleEnemies();
 
-	// 戦闘中かどうか取得
-	bool IsBattleActive() const { return isBattleActive_; }
+  // 戦闘中かどうか取得
+  bool IsBattleActive() const { return isBattleActive_; }
 
-	// 全ての敵が撃破されたか確認
-	bool AreAllEnemiesDefeated() const;
+  // 全ての敵が撃破されたか確認
+  bool AreAllEnemiesDefeated() const;
 
-	// プレイヤーが撃破されたか確認
-	bool IsPlayerDefeated() const;
+  // プレイヤーが撃破されたか確認
+  bool IsPlayerDefeated() const;
 
-	// 戦闘の一時停止
-	void PauseBattle(bool isPaused) { isBattlePaused_ = isPaused; }
+  // 戦闘の一時停止
+  void PauseBattle(bool isPaused) { isBattlePaused_ = isPaused; }
 
-	///************************* 敵管理 *************************///
+  ///************************* 敵管理 *************************///
 
-	// 全敵にターゲットを設定
-	void SetAllEnemiesTarget(Player* player);
+  // 全敵にターゲットを設定
+  void SetAllEnemiesTarget(Player *player);
 
-	// 全敵をスタン状態にする
-	void StunAllEnemies(float duration);
+  // 全敵をスタン状態にする
+  void StunAllEnemies(float duration);
 
-	// 全敵にダメージを与える
-	void DamageAllEnemies(int damage);
+  // 全敵にダメージを与える
+  void DamageAllEnemies(int damage);
 
-	// アクティブな敵一覧を取得
-	std::vector<BattleEnemy*> GetActiveBattleEnemies();
+  // アクティブな敵一覧を取得
+  std::vector<BattleEnemy *> GetActiveBattleEnemies();
 
-	// 指定範囲内の敵を取得
-	std::vector<BattleEnemy*> GetEnemiesInRange(const Vector3& center, float range);
+  // 指定範囲内の敵を取得
+  std::vector<BattleEnemy *> GetEnemiesInRange(const Vector3 &center,
+                                               float range);
 
-	// 最も近い敵を取得
-	BattleEnemy* GetNearestEnemy(const Vector3& position);
+  // 最も近い敵を取得
+  BattleEnemy *GetNearestEnemy(const Vector3 &position);
 
-	// IDで敵を取得
-	BattleEnemy* GetEnemyById(const std::string& id);
+  // IDで敵を取得
+  BattleEnemy *GetEnemyById(const std::string &id);
 
-	// アクティブな敵の数を取得
-	size_t GetActiveEnemyCount() const;
+  // アクティブな敵の数を取得
+  size_t GetActiveEnemyCount() const;
 
-	// デフォルトフォーメーションを読み込み
-	void LoadDefaultFormations();
+  // デフォルトフォーメーションを読み込み
+  void LoadDefaultFormations();
 
-	///************************* フォーメーション管理 *************************///
+  ///************************* フォーメーション管理 *************************///
 
-	// フォーメーションデータを読み込み
-	void LoadFormations(const std::string& filePath);
+  // フォーメーションデータを読み込み
+  void LoadFormations(const std::string &filePath);
 
-	// 使用するフォーメーションを設定
-	void SetFormation(const std::string& formationName);
+  // 使用するフォーメーションを設定
+  void SetFormation(const std::string &formationName);
 
-	// 指定名のフォーメーションを取得
-	BattleFormationData GetFormation(const std::string& formationName) const;
+  // 指定名のフォーメーションを取得
+  BattleFormationData GetFormation(const std::string &formationName) const;
 
-	// 敵数に応じたフォーメーション座標を取得
-	std::vector<Vector3> GetFormationPositions(size_t enemyCount) const;
+  // 敵数に応じたフォーメーション座標を取得
+  std::vector<Vector3> GetFormationPositions(size_t enemyCount) const;
 
-	///************************* データ管理 *************************///
+  ///************************* データ管理 *************************///
 
-	// 敵データの保存・読み込み
-	bool SaveEnemyData(const std::string& filePath) const;
-	bool LoadEnemyData(const std::string& filePath);
+  // 敵データの保存・読み込み
+  bool SaveEnemyData(const std::string &filePath) const;
+  bool LoadEnemyData(const std::string &filePath);
 
-	// 指定エンカウントデータを取得
-	EnemyEncounterData GetEncounterData(const std::string& encounterName) const;
+  // 指定エンカウントデータを取得
+  EnemyEncounterData GetEncounterData(const std::string &encounterName) const;
 
-	// 現在の戦闘統計を取得
-	const BattleStats& GetBattleStats() const { return battleStats_; }
+  // 現在の戦闘統計を取得
+  // 同時攻撃数を制限する攻撃権プール
+  AttackTokenPool &GetAttackTokens() { return attackTokens_; }
+  const AttackTokenPool &GetAttackTokens() const { return attackTokens_; }
 
-	// 戦闘統計をリセット
-	void ResetBattleStats();
+  const BattleStats &GetBattleStats() const { return battleStats_; }
 
-	///************************* アクセッサ *************************///
+  // 戦闘統計をリセット
+  void ResetBattleStats();
 
-	// プレイヤーを設定
-	void SetPlayer(Player* player) { player_ = player; }
+  ///************************* アクセッサ *************************///
 
-	// 戦闘終了コールバックを設定
-	void SetBattleEndCallback(BattleEndCallback callback) { battleEndCallback_ = callback; }
-	void SetEnemyDefeatedCallback(BattleEnemyDefeatedCallback callback) { enemyDefeatedCallback_ = std::move(callback); }
+  // プレイヤーを設定
+  void SetPlayer(Player *player) { player_ = player; }
 
-	// 最終バトルモードを設定
-	void SetFinalBattleMode(bool isFinal) { isFinalBattle_ = isFinal; }
+  // 戦闘終了コールバックを設定
+  void SetBattleEndCallback(BattleEndCallback callback) {
+    battleEndCallback_ = callback;
+  }
+  void SetEnemyDefeatedCallback(BattleEnemyDefeatedCallback callback) {
+    enemyDefeatedCallback_ = std::move(callback);
+  }
 
-	// 最終バトルをクリアしたか取得
-	bool IsFinalBattleCleared() const { return isFinalBattleCleared_; }
+  // 最終バトルモードを設定
+  void SetFinalBattleMode(bool isFinal) { isFinalBattle_ = isFinal; }
 
-	// 最終バトルクリアフラグをリセット
-	void ResetFinalBattleClearFlag() { isFinalBattleCleared_ = false; }
+  // 最終バトルをクリアしたか取得
+  bool IsFinalBattleCleared() const { return isFinalBattleCleared_; }
 
-	// 戦闘結果を取得
-	BattleResult GetBattleResult() const { return battleResult_; }
+  // 最終バトルクリアフラグをリセット
+  void ResetFinalBattleClearFlag() { isFinalBattleCleared_ = false; }
 
-	// 戦闘経過時間を取得
-	float GetBattleTimer() const { return battleTimer_; }
+  // 戦闘結果を取得
+  BattleResult GetBattleResult() const { return battleResult_; }
 
-	// 現在のエンカウント名を取得
-	std::string GetCurrentEncounterName() const { return currentEncounterName_; }
+  // 戦闘経過時間を取得
+  float GetBattleTimer() const { return battleTimer_; }
 
-	///************************* デバッグ *************************///
+  // 現在のエンカウント名を取得
+  std::string GetCurrentEncounterName() const { return currentEncounterName_; }
 
-	// デバッグ情報を表示
-	void ShowDebugInfo();
+  ///************************* デバッグ *************************///
 
-	// デバッグ用敵スポーン
-	void DebugSpawnEnemy(const Vector3& position, const std::string& enemyId);
+  // デバッグ情報を表示
+  void ShowDebugInfo();
 
-private:
-	///************************* 内部処理 *************************///
-
-	// 戦闘状態を更新
-	void UpdateBattleState();
-
-	// 戦闘タイマーを更新
-	void UpdateBattleTimer();
-
-	// 戦闘終了条件を確認
-	void CheckBattleEndConditions();
-
-	// 敵撃破時の処理
-	void OnEnemyDefeated(BattleEnemy* enemy);
-
-	// 戦闘報酬を計算
-	void CalculateBattleRewards();
-
-	// 撃破済み敵のクリーンアップ
-	void CleanupDefeatedEnemies();
-
-	// デフォルトフォーメーション座標を取得
-	Vector3 GetDefaultFormationPosition(size_t index, size_t totalCount) const;
+  // デバッグ用敵スポーン
+  void DebugSpawnEnemy(const Vector3 &position, const std::string &enemyId);
 
 private:
-	///************************* メンバ変数 *************************///
+  ///************************* 内部処理 *************************///
 
-	// 外部参照
-	YoRigine::Camera* camera_ = nullptr;
-	Player* player_ = nullptr;
-	BattleEndCallback battleEndCallback_;
-	BattleEnemyDefeatedCallback enemyDefeatedCallback_;
+  // 戦闘状態を更新
+  void UpdateBattleState();
 
-	// 現在アクティブなインスタンス（GetCurrent 用・非所有）
-	static BattleEnemyManager* current_;
+  // 戦闘タイマーを更新
+  void UpdateBattleTimer();
 
-	// 敵管理
-	std::vector<std::unique_ptr<BattleEnemy>> battleEnemies_;
-	std::unordered_map<std::string, BattleEnemyData> enemyDataMap_;
-	const std::string enemyDataFilePath_ = "Resources/Json/BattleEnemies/enemy_data.json";
+  // 戦闘終了条件を確認
+  void CheckBattleEndConditions();
 
-	// 戦闘状態
-	bool isBattleActive_ = false;
-	bool isBattlePaused_ = false;
-	BattleResult battleResult_ = BattleResult::None;
-	float battleTimer_ = 0.0f;
+  // 敵撃破時の処理
+  void OnEnemyDefeated(BattleEnemy *enemy);
 
-	// 最終バトル管理
-	bool isFinalBattle_ = false;
-	bool isFinalBattleCleared_ = false;  //  最終バトルクリアフラグ
-	bool isWaitingForClearTransition_ = false;
-	float finalBattleSlowTimer_ = 0.0f;
+  // 戦闘報酬を計算
+  void CalculateBattleRewards();
 
-	// エンカウント管理
-	std::string currentEncounterName_;
-	EnemyEncounterData currentEncounter_;
-	std::unordered_map<std::string, EnemyEncounterData> encounterDataMap_;
+  // 撃破済み敵のクリーンアップ
+  void CleanupDefeatedEnemies();
 
-	// フォーメーション管理
-	std::unordered_map<std::string, BattleFormationData> formationMap_;
-	std::string currentFormation_ = "default";
+  // デフォルトフォーメーション座標を取得
+  Vector3 GetDefaultFormationPosition(size_t index, size_t totalCount) const;
 
-	// 戦闘統計
-	BattleStats battleStats_;
+private:
+  ///************************* メンバ変数 *************************///
 
-	// 設定・AI更新
-	bool showDebugInfo_ = false;
-	float aiUpdateInterval_ = 0.1f;
-	float aiUpdateTimer_ = 0.0f;
+  // 外部参照
+  YoRigine::Camera *camera_ = nullptr;
+  Player *player_ = nullptr;
+  BattleEndCallback battleEndCallback_;
+  BattleEnemyDefeatedCallback enemyDefeatedCallback_;
+
+  // 現在アクティブなインスタンス（GetCurrent 用・非所有）
+  static BattleEnemyManager *current_;
+
+  // 敵管理
+  std::vector<std::unique_ptr<BattleEnemy>> battleEnemies_;
+  std::unordered_map<std::string, BattleEnemyData> enemyDataMap_;
+  const std::string enemyDataFilePath_ =
+      "Resources/Json/BattleEnemies/enemy_data.json";
+
+  // 戦闘状態
+  bool isBattleActive_ = false;
+  bool isBattlePaused_ = false;
+  BattleResult battleResult_ = BattleResult::None;
+  float battleTimer_ = 0.0f;
+
+  // 最終バトル管理
+  bool isFinalBattle_ = false;
+  bool isFinalBattleCleared_ = false; //  最終バトルクリアフラグ
+  bool isWaitingForClearTransition_ = false;
+  float finalBattleSlowTimer_ = 0.0f;
+
+  // エンカウント管理
+  std::string currentEncounterName_;
+  EnemyEncounterData currentEncounter_;
+  std::unordered_map<std::string, EnemyEncounterData> encounterDataMap_;
+
+  // フォーメーション管理
+  std::unordered_map<std::string, BattleFormationData> formationMap_;
+  std::string currentFormation_ = "default";
+
+  // 戦闘統計
+  BattleStats battleStats_;
+
+  // 設定・AI更新
+  // 同時に攻撃してよい敵の数を制限する（囲まれた時に全員が同時に来ないように）
+  AttackTokenPool attackTokens_;
+
+  bool showDebugInfo_ = false;
+  float aiUpdateInterval_ = 0.1f;
+  float aiUpdateTimer_ = 0.0f;
 };

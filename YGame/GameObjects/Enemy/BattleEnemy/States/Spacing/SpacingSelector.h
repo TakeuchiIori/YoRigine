@@ -1,4 +1,5 @@
 #pragma once
+#include "../../../AI/AttackTokenPool.h"
 #include "../../BattleEnemy.h"
 #include "../Attack/AttackSelector.h"
 #include "../BattleApproachState.h"
@@ -24,6 +25,31 @@
 class SpacingSelector {
 public:
   /// <summary>
+  /// 攻撃権（トークン）を取れたら攻撃状態を、取れなければ周囲を回る動きを返す。
+  ///
+  /// 攻撃へ移る入口は「接近から」「間合い取りから」「隙を見つけて」の3箇所
+  /// あるので、トークンの取得は必ずここを通す。1箇所でも素通りさせると
+  /// そこから全員が同時に突っ込んでくる。
+  /// </summary>
+  static std::unique_ptr<IEnemyState<BattleEnemy>>
+  AttackOrCircle(const BattleEnemy &enemy) {
+    AttackTokenPool *pool = AttackTokenPool::GetCurrent();
+
+    // 戦闘外などプールが無いときは従来どおり自由に攻撃する
+    if (!pool || pool->TryAcquire(&enemy)) {
+      return AttackSelector::SelectSmartAttack(enemy);
+    }
+
+    // 攻撃権が空くまで周囲を回って待つ。
+    // 密着したまま回ると押し合いになるので、近すぎるときは一度下がる。
+    if (enemy.GetDistanceToPlayer() <
+        enemy.GetEnemyData().spacing.tooCloseDistance) {
+      return std::make_unique<BattleBackstepState>();
+    }
+    return std::make_unique<BattleStrafeState>();
+  }
+
+  /// <summary>
   /// 攻撃・ダウンなどが終わった直後の行動を選ぶ（後退／横移動／様子見）
   /// </summary>
   static std::unique_ptr<IEnemyState<BattleEnemy>>
@@ -45,7 +71,7 @@ public:
     if (ctx.HasOpening(perception) &&
         ctx.distance <
             data.attackStateRange + perception.openingAttackRangeBonus) {
-      return AttackSelector::SelectSmartAttack(enemy);
+      return AttackOrCircle(enemy);
     }
 
     // 近すぎるときは迷わず後退する。密着状態が続くのが一番「戦っている感じ」を殺す
@@ -130,7 +156,7 @@ public:
 
     // 攻撃レンジに入っていれば攻撃、遠ければ詰める
     if (ctx.distance < attackRange) {
-      return AttackSelector::SelectSmartAttack(enemy);
+      return AttackOrCircle(enemy);
     }
     return std::make_unique<BattleApproachState>();
   }

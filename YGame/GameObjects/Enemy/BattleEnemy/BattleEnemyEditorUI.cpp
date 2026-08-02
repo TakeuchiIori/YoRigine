@@ -313,15 +313,67 @@ void BattleEnemyEditorUI::Draw(BattleEnemyManager& manager)
 
 	ImGui::Separator();
 
-	static char enemyIdBuffer[256] = "goblin";
-	static float spawnPos[3] = { 0.0f, 0.0f, 5.0f };
+	// --- 攻撃権（同時に攻撃してよい敵の数）---
+	if (ImGui::CollapsingHeader("攻撃権 (同時に攻撃する敵の数)", ImGuiTreeNodeFlags_DefaultOpen)) {
+		AttackTokenPool& tokens = manager.GetAttackTokens();
 
-	ImGui::InputText("敵ID", enemyIdBuffer, sizeof(enemyIdBuffer));
-	ImGui::InputFloat3("生成位置", spawnPos);
+		ImGui::Checkbox("攻撃権による制限を使う", tokens.GetEnabledPtr());
+		ImGui::SameLine();
+		ImGui::TextDisabled("(?)");
+		if (ImGui::BeginItemTooltip()) {
+			ImGui::TextUnformatted("OFFにすると全員が自由に攻撃する（従来挙動）。\nONとOFFを切り替えて囲まれた時の圧を比べるのに使う。");
+			ImGui::EndTooltip();
+		}
 
-	if (ImGui::Button("デバッグ生成")) {
-		Vector3 position(spawnPos[0], spawnPos[1], spawnPos[2]);
-		manager.DebugSpawnEnemy(position, enemyIdBuffer);
+		ImGui::BeginDisabled(!tokens.IsEnabled());
+		ImGui::DragInt("同時に攻撃できる数", tokens.GetMaxTokensPtr(), 1, 1, 8);
+		ImGui::DragFloat("再攻撃までの待ち", tokens.GetReacquireCooldownPtr(), 0.05f, 0.0f, 10.0f, "%.2f秒");
+		ImGui::SameLine();
+		ImGui::TextDisabled("(?)");
+		if (ImGui::BeginItemTooltip()) {
+			ImGui::TextUnformatted("攻撃を終えた敵が、次に攻撃権を取れるようになるまでの秒数。\n0にすると同じ個体が連続で攻めてくることがある。");
+			ImGui::EndTooltip();
+		}
+		ImGui::EndDisabled();
+
+		// 今どの敵が攻撃権を持っているか
+		ImGui::Text("攻撃中: %d / %d", tokens.GetHolderCount(), tokens.GetMaxTokens());
+		for (size_t i = 0; i < manager.battleEnemies_.size(); ++i) {
+			const auto& enemy = manager.battleEnemies_[i];
+			if (!enemy) continue;
+
+			const bool holds = tokens.Holds(enemy.get());
+			const float cooldown = tokens.GetCooldownRemaining(enemy.get());
+			if (holds) {
+				ImGui::TextColored({ 1.0f, 0.45f, 0.35f, 1.0f }, "  敵%zu: 攻撃権あり [%s]", i, enemy->GetStateName());
+			} else if (cooldown > 0.0f) {
+				ImGui::TextColored({ 0.6f, 0.6f, 0.6f, 1.0f }, "  敵%zu: 待機中 (あと%.1f秒) [%s]", i, cooldown, enemy->GetStateName());
+			} else {
+				ImGui::TextColored({ 0.4f, 0.8f, 1.0f, 1.0f }, "  敵%zu: 順番待ち [%s]", i, enemy->GetStateName());
+			}
+		}
+
+		// 保存先は敵データと同じ enemy_data.json（battleSettings に入る）。
+		// 下の「敵ベースデータ編集」の中にも同じボタンがあるが、
+		// そこまで辿らないと保存できないのは分かりにくいのでここにも置く。
+		ImGui::Separator();
+		if (ImGui::Button("この設定をJSONに保存##tokens")) {
+			if (manager.SaveEnemyData(manager.enemyDataFilePath_)) {
+				Logger("[BattleEnemyManager] 攻撃権の設定をJSONファイルに保存しました。\n");
+			} else {
+				ThrowError("[BattleEnemyManager] 攻撃権の設定の保存に失敗しました。\n");
+			}
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("JSONから再読み込み##tokens")) {
+			manager.LoadEnemyData(manager.enemyDataFilePath_);
+		}
+		ImGui::SameLine();
+		ImGui::TextDisabled("(?)");
+		if (ImGui::BeginItemTooltip()) {
+			ImGui::TextUnformatted("敵データと同じ enemy_data.json に書き出す。\n敵ベースデータの変更も同時に保存される。");
+			ImGui::EndTooltip();
+		}
 	}
 
 	ImGui::Separator();
@@ -379,6 +431,7 @@ void BattleEnemyEditorUI::Draw(BattleEnemyManager& manager)
 						ImGui::DragFloat("突進時間", &r.rushTime, 0.05f, 0.0f, 5.0f, "%.2f秒");
 						ImGui::DragFloat("速度倍率", &r.speedMultiplier, 0.1f, 0.0f, 20.0f, "x%.1f");
 						ImGui::DragFloat("後隙", &r.cooldownTime, 0.05f, 0.0f, 5.0f, "%.2f秒");
+						ImGui::Checkbox("盾で止められる", &r.parriable);
 						ImGui::TreePop();
 					}
 
@@ -389,6 +442,7 @@ void BattleEnemyEditorUI::Draw(BattleEnemyManager& manager)
 						ImGui::DragFloat("突進時間", &c.rushTime, 0.05f, 0.0f, 5.0f, "%.2f秒");
 						ImGui::DragFloat("速度倍率", &c.speedMultiplier, 0.1f, 0.0f, 30.0f, "x%.1f");
 						ImGui::DragFloat("後隙", &c.cooldownTime, 0.05f, 0.0f, 5.0f, "%.2f秒");
+						ImGui::Checkbox("盾で止められる", &c.parriable);
 						ImGui::TreePop();
 					}
 
@@ -400,6 +454,7 @@ void BattleEnemyEditorUI::Draw(BattleEnemyManager& manager)
 						ImGui::DragFloat("回転数", &s.rotationCount, 0.1f, 0.0f, 10.0f, "%.1f回");
 						ImGui::DragFloat("移動倍率", &s.moveSpeedMultiplier, 0.1f, 0.0f, 10.0f, "x%.1f");
 						ImGui::DragFloat("後隙", &s.cooldownTime, 0.05f, 0.0f, 5.0f, "%.2f秒");
+						ImGui::Checkbox("盾で止められる", &s.parriable);
 						ImGui::TreePop();
 					}
 
@@ -411,6 +466,7 @@ void BattleEnemyEditorUI::Draw(BattleEnemyManager& manager)
 						ImGui::DragFloat("ジャンプ高度", &l.jumpHeight, 0.1f, 0.0f, 20.0f, "%.1fm");
 						ImGui::DragFloat("しゃがみ深さ", &l.crouchDepth, 0.05f, 0.0f, 2.0f, "%.2fm");
 						ImGui::DragFloat("後隙", &l.cooldownTime, 0.05f, 0.0f, 5.0f, "%.2f秒");
+						ImGui::Checkbox("盾で止められる", &l.parriable);
 						ImGui::TreePop();
 					}
 
@@ -422,6 +478,7 @@ void BattleEnemyEditorUI::Draw(BattleEnemyManager& manager)
 						ImGui::DragFloat("段内突進", &cb.subRushTime, 0.05f, 0.0f, 2.0f, "%.2f秒");
 						ImGui::DragFloat("加速倍率", &cb.rushSpeedMultiplier, 0.1f, 0.0f, 20.0f, "x%.1f");
 						ImGui::DragFloat("全体後隙", &cb.cooldownTime, 0.05f, 0.0f, 5.0f, "%.2f秒");
+						ImGui::Checkbox("盾で止められる", &cb.parriable);
 						ImGui::TreePop();
 					}
 
@@ -447,6 +504,7 @@ void BattleEnemyEditorUI::Draw(BattleEnemyManager& manager)
 						ImGui::DragFloat(" 突進ホーミング強度", &ct.rushHomingStrength, 0.1f, 0.0f, 10.0f, "%.1f");
 						if (ImGui::IsItemHovered()) ImGui::SetTooltip("大きいほどプレイヤーを追尾する。1.5前後で読み避け可能");
 						ImGui::DragFloat(" クールダウン", &ct.cooldownTime, 0.05f, 0.0f, 3.0f, "%.2f秒");
+						ImGui::Checkbox("盾で止められる", &ct.parriable);
 						ImGui::TreePop();
 					}
 				}

@@ -70,6 +70,9 @@ struct RushAttackParams {
   float rushTime = 0.5f;        // 突進している時間
   float speedMultiplier = 7.0f; // 速度倍率
   float cooldownTime = 1.2f;    // 突進後の硬直
+
+  // 盾で受け止めるとダウンするか
+  bool parriable = true;
 };
 
 // 強力な突進攻撃
@@ -83,6 +86,9 @@ struct ChargeRushAttackParams {
   float rushTime = 0.5f;         // 突進時間
   float speedMultiplier = 12.0f; // より速い突進
   float cooldownTime = 1.0f;
+
+  // 盾で受け止めるとダウンするか
+  bool parriable = false;
 };
 
 struct SpinAttackParams {
@@ -96,6 +102,9 @@ struct SpinAttackParams {
   float rotationCount = 2.0f;       // 何回転するか
   float moveSpeedMultiplier = 2.0f; // 回転中の移動速度倍率
   float cooldownTime = 0.5f;
+
+  // 盾で受け止めるとダウンするか
+  bool parriable = false;
 };
 
 // しゃがんで攻撃
@@ -110,6 +119,9 @@ struct JumpAttackParams {
   float jumpHeight = 4.0f;  // ジャンプの高さ
   float crouchDepth = 0.3f; // 溜め時の沈み込み
   float cooldownTime = 0.6f;
+
+  // 盾で受け止めるとダウンするか
+  bool parriable = false;
 };
 
 struct ComboAttackParams {
@@ -123,6 +135,9 @@ struct ComboAttackParams {
   float subRushTime = 0.2f;   // コンボ内での突進
   float rushSpeedMultiplier = 8.0f;
   float cooldownTime = 0.8f;
+
+  // 盾で受け止めるとダウンするか
+  bool parriable = false;
 };
 
 // 反撃（カウンター）
@@ -148,6 +163,10 @@ struct CounterAttackParams {
   float rushHomingStrength =
       1.5f; // 突進中のホーミング強度（旧 4.0 → 1.5 で読み避け可能に）
   float cooldownTime = 0.8f; // クールダウン
+
+  // 盾で受け止めるとダウンするか。
+  // カウンターは連続被弾への回答なので、既定では盾でも止まらない。
+  bool parriable = false;
 };
 
 ///*************************

@@ -66,6 +66,9 @@ public:
   void OnDirectionCollision(BaseCollider *self, BaseCollider *other,
                             HitDirection dir) override;
 
+  // 被弾リアクション（ダメージが実際に通ったときだけ呼ばれる）
+  void OnDamaged(const DamageInfo &info) override;
+
   // 方向付き衝突開始時
   void OnEnterDirectionCollision([[maybe_unused]] BaseCollider *self,
                                  BaseCollider *other,
@@ -90,7 +93,7 @@ public:
   }
 
   ///*************************
-  ///遷移ログ（デバッグ用）*************************///
+  /// 遷移ログ（デバッグ用）*************************///
 
   // 1回分の状態遷移の記録
   struct StateTransitionLog {
