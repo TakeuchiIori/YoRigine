@@ -15,6 +15,7 @@
 // App
 #include "../Generators/Object3D/BaseObject.h"
 #include "Combat/PlayerCombat.h"
+#include "Guard/GuardEditor.h"
 #include "Input/PlayerInput.h"
 #include "Magic/PlayerMagicController.h"
 #include "Movement/PlayerMovement.h"
@@ -67,10 +68,29 @@ public:
   void FacePosition(const Vector3 &worldPosition);
   void SetControlEnabled(bool enabled);
   bool IsControlEnabled() const { return controlEnabled_; }
+  // HPだけを減らす。ガード判定もリアクションも行わない。
   void TakeDamage(int damage);
+
+  /// <summary>
+  /// 敵の攻撃を受けたときの入口。ガード判定・ダメージ軽減・リアクションまでを行う。
+  ///
+  /// ガードの成否はここで一度だけ判定するので、盾のコライダー側で
+  /// 別途判定する必要はない（判定が二重になると結果が不定になる）。
+  /// </summary>
+  /// <param name="damage">軽減前のダメージ量</param>
+  /// <param name="attackerPos">攻撃してきた相手の位置</param>
+  /// <returns>防御の判定結果。攻撃した側はこれを見て自分の反応を決める</returns>
+  PlayerGuard::GuardResult ApplyDamage(int damage, const Vector3 &attackerPos);
+
   // 敵の攻撃がヒットした際にのけぞり（ヒット）ステートへ遷移させる。
   // attackerPos から被弾方向を算出する。ガード中・死亡中は何もしない。
   void ApplyHitReaction(const Vector3 &attackerPos);
+
+  /// <summary>
+  /// ガードで受け止めたときに押し込まれる。指定方向へ duration 秒かけて
+  /// distance だけ滑る。
+  /// </summary>
+  void StartGuardPush(const Vector3 &direction, float distance, float duration);
   void Revive(int reviveHP);
   void SetInitialPosition();
 
@@ -164,6 +184,13 @@ private:
   void LookAtDirection(const Vector3 &direction);
   void PlayHitFeedback(HitDirection direction);
 
+  // ガードで押し込まれる移動を進める（Update から毎フレーム呼ぶ）
+  void UpdateGuardPush(float deltaTime);
+
+  // ガード／パリィ成立時の手応え（ヒットストップ・カメラ・盾）をまとめて再生する
+  void PlayGuardFeedback(const GuardOutcome &outcome,
+                         const Vector3 &attackerPos);
+
 private:
   // ============================================================
   // メンバ変数
@@ -203,6 +230,18 @@ private:
   float backHitShakeDuration_ = 0.25f;
   float hitVibrationDuration_ = 0.12f;
   uint16_t hitVibrationPower_ = 32000;
+
+  // ガードで受け止めたときの押し込み。
+  // 敵から見て後ろ方向へ、指定時間かけて減速しながら滑る。
+#ifdef USE_IMGUI
+  // ガード設定のドープシート付きエディタ（Debugのみ）
+  GuardEditor guardEditor_;
+#endif
+
+  Vector3 guardPushDirection_{};
+  float guardPushSpeed_ = 0.0f;    // 開始時の速度（距離と時間から算出）
+  float guardPushTimer_ = 0.0f;    // 残り時間
+  float guardPushDuration_ = 0.0f; // 全体時間
 
   float motionSpeed[4] = {1.0f, 1.0f, 1.0f, 1.0f};
 };

@@ -234,9 +234,39 @@ void BattleEnemy::PerformBasicAttack() {
 	if (!player_) return;
 	// 突進（ホーミング）攻撃中など無敵のときはダメージものけぞりも与えない
 	if (player_->IsInvincible()) return;
-	player_->TakeDamage(enemyData_.attack);
-	// 被弾したプレイヤーをのけぞらせる（ヒットモーションへ遷移）
-	player_->ApplyHitReaction(wt_.translate_);
+
+	// ダメージ・ガード判定・プレイヤー側のリアクションはすべて向こうで処理される。
+	// こちらは結果を受け取って「攻撃を防がれた側」としての反応だけを決める。
+	const auto result = player_->ApplyDamage(enemyData_.attack, wt_.translate_);
+
+	if (result == PlayerGuard::GuardResult::GuardFail) return;
+
+	// 防がれたので突進の勢いを殺す。
+	// パリィなら大きく突き放され、通常ガードならその場で止まる程度。
+	// この押し合いの差が「弾き返した」と「受け止められた」の違いになる。
+	const PlayerGuard* guard = player_->GetCombat()->GetGuard();
+	const GuardOutcome* outcome = guard ? guard->GetOutcome(result) : nullptr;
+	if (outcome && outcome->enemyPushPower > 0.0f) {
+		Vector3 pushDir = wt_.translate_ - player_->GetWorldPosition();
+		pushDir.y = 0.0f;
+		if (Length(pushDir) > 0.001f) {
+			StartKnockback(Normalize(pushDir), outcome->enemyPushPower, outcome->enemyPushDuration);
+		}
+	} else {
+		knockbackData_.isKnockingBack_ = false;
+	}
+
+	// パリィが実際に成立し、かつその攻撃が盾で崩せる設定ならダウンさせる。
+	//
+	// 以前はここではなく盾コライダーの接触側で判定していて、
+	// 「盾に触れた + ガードがActiveかRecovery」だけを見ていた。
+	// パリィ窓を見ていなかったため、タイミングを外したガードでも
+	// 敵がダウンしてしまっていた。
+	if (result == PlayerGuard::GuardResult::ParrySuccess) {
+		if (currentState_ && currentState_->CanBeParried()) {
+			ChangeState(std::make_unique<BattleDownedState>());
+		}
+	}
 }
 
 /*==========================================================================
@@ -287,20 +317,14 @@ void BattleEnemy::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseColl
 		combo->OnHitStep(wt_.translate_);
 	}
 
-	// 盾に当たった時。
-	// どの攻撃を盾で止められるかは攻撃データ側の parriable で決まる。
-	if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayerShield)) {
-		if (currentState_ && currentState_->CanBeParried()) {
-			const auto guardState = player_->GetCombat()->GetGuard()->GetState();
-			if (guardState == PlayerGuard::State::Active ||
-				guardState == PlayerGuard::State::Recovery) {
-				ChangeState(std::make_unique<BattleDownedState>());
-			}
-		}
-	}
-
-	// プレイヤー本体に当たった時。攻撃実行中のStateの時だけダメージを与える
-	if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayer)) {
+	// プレイヤー本体または盾に当たった時。攻撃実行中のStateの時だけ攻撃を成立させる。
+	//
+	// 盾も本体と同じ扱いにするのは、ガード中は盾が敵を押し返して
+	// 体同士が接触しないことがあり、そのままだとガード判定自体が走らないため。
+	// どちらに当たっても TryPerformContactAttack() が攻撃判定時間ごとに
+	// 一度だけ通すので、二重に成立することはない。
+	if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayer) ||
+		other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayerShield)) {
 		TryPerformContactAttack();
 	}
 }
@@ -353,7 +377,9 @@ void BattleEnemy::OnCollision([[maybe_unused]] BaseCollider* self, [[maybe_unuse
 	if (!isAlive_) return;
 
 	// 溜め中から接触し続けたまま攻撃判定時間へ入った場合にも、一度だけ命中させる。
-	if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayer)) {
+	// 盾を本体と同じ扱いにする理由は OnEnterCollision 側のコメントを参照。
+	if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayer) ||
+		other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayerShield)) {
 		TryPerformContactAttack();
 	}
 

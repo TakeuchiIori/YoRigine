@@ -9,6 +9,7 @@
 #include "Systems/Cinematic/CinematicManager.h"
 #include <Debugger/Logger.h>
 #include "Collision/AreaCollision/Base/AreaManager.h"
+#include "Particle/EffectHandle.h"
 #include "Model/Model.h"
 #include "Model/Motion/Core/MotionSystem.h"
 
@@ -268,6 +269,10 @@ void Player::Update() {
 		if (magicController_) magicController_->Update(YoRigine::GameTime::GetDeltaTime());
 	}
 
+	// ガードで押し込まれる移動。
+	// 通常移動の後に適用して、押されている間も入力で歩けるようにする。
+	UpdateGuardPush(YoRigine::GameTime::GetDeltaTime());
+
 	// オブジェクト更新
 	obj_->UpdateAnimation();
 	wt_.UpdateMatrix();
@@ -333,6 +338,13 @@ void Player::DrawImGui() {
 	combat_->ShowDebugImGui();
 #ifdef USE_IMGUI
 	if (magicController_) magicController_->ShowDebugImGui();
+
+	// ガードはタイムラインの前後関係が要になるので、
+	// 数値の羅列ではなくドープシート付きの専用エディタで編集する。
+	if (ImGui::CollapsingHeader("ガード設定")) {
+		guardEditor_.SetTarget(combat_->GetGuard());
+		guardEditor_.Draw();
+	}
 #endif
 }
 
@@ -439,7 +451,9 @@ void Player::InitJson() {
 	//------------------------------------------------------------
 	movement_->InitJson(jsonManager_.get());
 	combat_->GetCombo()->InitJson(jsonManager_.get());
-	combat_->GetGuard()->InitJson(jsonManager_.get());
+	// ガード設定は項目数が多くタイムライン編集も要るため、
+	// Player.json ではなく専用ファイル＋専用エディタで扱う。
+	combat_->GetGuard()->LoadConfig();
 
 	jsonCollider_ = std::make_unique<YoRigine::JsonManager>("PlayerCollider", "Resources/Json/Colliders");
 	obbCollider_->InitJson(jsonCollider_.get());
@@ -635,6 +649,126 @@ void Player::PlayHitFeedback(HitDirection direction) {
 	if (input_ && hitVibrationDuration_ > 0.0f && hitVibrationPower_ > 0) {
 		input_->StartVibration(0, hitVibrationDuration_, hitVibrationPower_, hitVibrationPower_);
 	}
+}
+
+// ============================================================
+// 敵の攻撃を受けたときの入口
+//
+// ガード判定はここで一度だけ行う。判定結果によって
+//   ・失敗   → 素のダメージ + のけぞり
+//   ・ガード → 軽減ダメージ + CC消費 + 自分が押し込まれる
+//   ・パリィ → 無効化 + CC回復 + 自分は動かない（相手を突き放すのは攻撃側の仕事）
+// と処理を分ける。
+// ============================================================
+PlayerGuard::GuardResult Player::ApplyDamage(int damage, const Vector3& attackerPos) {
+	using GuardResult = PlayerGuard::GuardResult;
+
+	// 無敵中・死亡中は判定そのものを行わない
+	if (!isAlive_ || hp_ <= 0 || isInvincible_) {
+		return GuardResult::GuardFail;
+	}
+
+	PlayerGuard* guard = combat_ ? combat_->GetGuard() : nullptr;
+	const GuardResult result = guard ? guard->ResolveHit(attackerPos) : GuardResult::GuardFail;
+
+	// ------------------------------------------------------------
+	// 防御が成立しなかった場合は素通し
+	// ------------------------------------------------------------
+	if (result == GuardResult::GuardFail) {
+		TakeDamage(damage);
+		ApplyHitReaction(attackerPos);
+		return result;
+	}
+
+	// ------------------------------------------------------------
+	// 防御成立。結果パラメータに従って軽減とCCの増減を行う
+	// ------------------------------------------------------------
+	const GuardOutcome* outcome = guard->GetOutcome(result);
+	if (!outcome) return result;
+
+	const int reducedDamage = static_cast<int>(damage * outcome->damageRate);
+	if (reducedDamage > 0) {
+		TakeDamage(reducedDamage);
+	}
+
+	if (auto* combo = combat_->GetCombo()) {
+		if (outcome->ccCost > 0)    combo->ConsumeCC(outcome->ccCost);
+		if (outcome->ccRecover > 0) combo->RecoverCC(outcome->ccRecover);
+	}
+
+	// ------------------------------------------------------------
+	// 押し込み。
+	// 通常ガードは selfPushDistance > 0 で自分が下がり、
+	// パリィは 0 なので踏みとどまる。この差が両者の性格になる。
+	// ------------------------------------------------------------
+	if (outcome->selfPushDistance > 0.0f && outcome->selfPushDuration > 0.0f) {
+		Vector3 pushDir = wt_.translate_ - attackerPos;
+		pushDir.y = 0.0f;
+		if (Length(pushDir) > 0.001f) {
+			StartGuardPush(Normalize(pushDir), outcome->selfPushDistance, outcome->selfPushDuration);
+		}
+	}
+
+	PlayGuardFeedback(*outcome, attackerPos);
+	return result;
+}
+
+// ============================================================
+// ガード／パリィ成立時の手応え
+// ============================================================
+void Player::PlayGuardFeedback(const GuardOutcome& outcome, const Vector3& attackerPos) {
+	// 時間を一瞬止めて「硬いものに当たった」ことを伝える。
+	// パリィの方を長く取ると、同じ演出でも重みの差が出る。
+	if (outcome.hitStop > 0.0f) {
+		YoRigine::GameTime::SetHitStop(outcome.hitStop, 0.0f, outcome.hitStopEase);
+	}
+
+	if (playerCamera_ && outcome.shakeIntensity > 0.0f && outcome.shakeDuration > 0.0f) {
+		playerCamera_->StartShake(outcome.shakeIntensity, outcome.shakeDuration);
+	}
+
+	// 盾のスケールを跳ね返り付きで変形させる。受け止めたことが一番分かりやすい部分。
+	if (playerShield_ && outcome.shieldSquash > 0.0f) {
+		playerShield_->PlayGuardImpact(outcome.shieldSquash, outcome.shieldSquashTime,
+			outcome.shieldSquashAxis, outcome.shieldSquashBounce);
+	}
+
+	// 接触点のエフェクト。盾と相手のちょうど中間に出す。
+	if (!outcome.vfxName.empty()) {
+		Vector3 contactPos = (wt_.translate_ + attackerPos) * 0.5f;
+		contactPos.y += 1.0f;
+		EffectHandle::PlayOneShot(outcome.vfxName, contactPos);
+	}
+}
+
+// ============================================================
+// ガードで押し込まれる移動の開始
+// ============================================================
+void Player::StartGuardPush(const Vector3& direction, float distance, float duration) {
+	if (duration <= 0.0f) return;
+
+	guardPushDirection_ = direction;
+	guardPushDuration_ = duration;
+	guardPushTimer_ = duration;
+	// 線形に減速して距離ちょうどで止まるよう、初速を 2*d/t にする
+	guardPushSpeed_ = (distance * 2.0f) / duration;
+}
+
+// ============================================================
+// ガードで押し込まれる移動の更新
+// ============================================================
+void Player::UpdateGuardPush(float deltaTime) {
+	if (guardPushTimer_ <= 0.0f) return;
+
+	guardPushTimer_ -= deltaTime;
+	if (guardPushTimer_ <= 0.0f) {
+		guardPushTimer_ = 0.0f;
+		return;
+	}
+
+	// 残り時間に比例して減速させる（開始が最速、終了で0）
+	const float ratio = guardPushTimer_ / guardPushDuration_;
+	wt_.translate_ += guardPushDirection_ * guardPushSpeed_ * ratio * deltaTime;
 }
 
 // ============================================================
