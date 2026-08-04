@@ -67,22 +67,22 @@ void FieldEnemyManager::Initialize(YoRigine::Camera* camera) {
 	// Editor のギズモコールバックに登録する (FieldScene の DrawLine ではダメ)。
 	gizmoCallbackId_ = Editor::GetInstance()->AddGizmoDrawCallback([this]() {
 		DrawSpawnPointGizmoHandles();
-	});
+		});
 
 	// スポーンマーカー用 Line インスタンス (状態別に 4 本)。
 	// 各々が独立した GPU バッファを持つので、DrawLine 1 回ずつで stomp が起きない。
 	markerLineSelected_ = std::make_unique<YoRigine::Line>();
-	markerLineActive_   = std::make_unique<YoRigine::Line>();
+	markerLineActive_ = std::make_unique<YoRigine::Line>();
 	markerLineInactive_ = std::make_unique<YoRigine::Line>();
-	markerLinePole_     = std::make_unique<YoRigine::Line>();
+	markerLinePole_ = std::make_unique<YoRigine::Line>();
 	markerLineSelected_->Initialize();
-	markerLineActive_  ->Initialize();
+	markerLineActive_->Initialize();
 	markerLineInactive_->Initialize();
-	markerLinePole_    ->Initialize();
+	markerLinePole_->Initialize();
 	markerLineSelected_->SetCamera(camera_);
-	markerLineActive_  ->SetCamera(camera_);
+	markerLineActive_->SetCamera(camera_);
 	markerLineInactive_->SetCamera(camera_);
-	markerLinePole_    ->SetCamera(camera_);
+	markerLinePole_->SetCamera(camera_);
 #endif // _DEBUG
 	// 敵のデータを読み込み
 	LoadEnemyData(FieldEnemyPaths::EnemyData);
@@ -117,7 +117,7 @@ void FieldEnemyManager::Update() {
 /// </summary>
 void FieldEnemyManager::UpdateEnemyStates() {
 	for (auto& enemy : fieldEnemies_) {
-		if (enemy && enemy->IsActive()) {
+		if (enemy && !enemy->IsDespawned()) {
 			enemy->Update();
 		}
 	}
@@ -146,10 +146,18 @@ void FieldEnemyManager::UpdateRespawnTimers() {
 /// 非アクティブな敵をリストから削除
 /// </summary>
 void FieldEnemyManager::CleanupInactiveEnemies() {
+	// これから破棄する個体を指したままにしない。
+	// バトル終了処理はこのポインタで対象を特定するので、
+	// 解放後に残っていると次のエンカウントで不正なアクセスになる。
+	if (lastEncounterInfo_.encounteredEnemy &&
+		lastEncounterInfo_.encounteredEnemy->IsDespawned()) {
+		lastEncounterInfo_.encounteredEnemy = nullptr;
+	}
+
 	fieldEnemies_.erase(
 		std::remove_if(fieldEnemies_.begin(), fieldEnemies_.end(),
 			[](const std::unique_ptr<FieldEnemy>& enemy) {
-				return !enemy || !enemy->IsActive();
+				return !enemy || enemy->IsDespawned();
 			}),
 		fieldEnemies_.end()
 	);
@@ -206,7 +214,7 @@ void FieldEnemyManager::OnEnemyEncounter(FieldEnemy* enemy) {
 void FieldEnemyManager::ResetEnCount()
 {
 	for (auto& enemy : fieldEnemies_) {
-		if (enemy && enemy->IsActive()) {
+		if (enemy && !enemy->IsDespawned()) {
 			enemy->ResetEncounterState();
 		}
 	}
@@ -377,10 +385,16 @@ void FieldEnemyManager::SetAllEnemiesActive(bool isActive) {
 	// コライダーを落とさないと BattleScene 中も FieldEnemy の OBB が
 	// グローバル CollisionManager にヒットしてプレイヤーの移動を塞ぐ。
 	for (auto& enemy : fieldEnemies_) {
-		if (enemy && enemy->IsActive()) {
-			enemy->SetLightActive(isActive);
-			enemy->SetCollisionActive(isActive);
-		}
+		if (!enemy || enemy->IsDespawned()) continue;
+
+		enemy->SetLightActive(isActive);
+		enemy->SetCollisionActive(isActive);
+
+		// 基底のアクティブフラグも合わせる。
+		// 影は FieldEnemyManager ではなく BaseObjectManager::DrawShadowAll()
+		// から描かれ、そこは BaseObject::IsActive() しか見ない。
+		// ここを落とさないとバトル中にフィールド敵の影だけが残る。
+		enemy->SetActive(isActive);
 	}
 }
 
@@ -392,59 +406,83 @@ void FieldEnemyManager::SetAllEnemiesActive(bool isActive) {
 void FieldEnemyManager::HandleBattleEnd(const std::string& enemyGroup, bool playerWon) {
 	Logger("[FieldEnemyManager] バトル終了処理: " + enemyGroup + " 勝利: " + (playerWon ? "はい" : "いいえ") + "\n");
 
-	if (playerWon) {
+	// 実際に接触した個体を特定する。
+	//
+	// グループ名（＝enemyId）で検索すると、同じIDのスポーン点が複数ある場合に
+	// 「戦っていない方」がヒットしてしまう。すると戦った個体の
+	// hasTriggeredEncounter_ が true のまま残り、その敵は二度と
+	// エンカウントできなくなる。勝利時は倒していない敵が消えることにもなる。
+	FieldEnemy* battledEnemy = lastEncounterInfo_.encounteredEnemy;
+
+	// 保険。ポインタが失われている場合だけ従来どおり名前で拾う。
+	if (!battledEnemy) {
 		for (auto& enemy : fieldEnemies_) {
-			if (enemy && enemy->GetEnemyGroupName() == enemyGroup) {
-				// リスポーン対象の敵は defeatedEnemyIds_ に登録しない。
-				// 登録すると SpawnFieldEnemy 冒頭の IsEnemyDefeated チェックで
-				// 再スポーンが永久ブロックされ、EventTrigger のカウントが 1 で止まる。
-				bool willRespawn = false;
-				for (const auto& pair : spawnDataMap_) {
-					if (pair.second.enemyId == enemyGroup &&
-						pair.second.respawnAfterBattle) {
-						RespawnInfo respawnInfo;
-						respawnInfo.spawnData = pair.second;
-						respawnInfo.timer = pair.second.respawnDelay;
-						respawnInfo.isWaiting = true;
-						respawnQueue_.push_back(respawnInfo);
-
-						Logger("[FieldEnemyManager] リスポーンキューに追加: " + enemyGroup +
-							" 待機時間: " + std::to_string(pair.second.respawnDelay) + "秒\n");
-						willRespawn = true;
-						break;
-					}
-				}
-
-				if (willRespawn) {
-					if (onEnemyDefeatedCallback_) {
-						onEnemyDefeatedCallback_(enemyGroup);
-					}
-				} else {
-					RegisterDefeatedEnemy(enemyGroup);
-				}
-
-				enemy->ResetEncounterState();
-				enemy->Despawn();
-
-				Logger("[FieldEnemyManager] 敵を撃破済みに設定: " + enemyGroup + "\n");
+			if (enemy && !enemy->IsDespawned() &&
+				enemy->GetEnemyGroupName() == enemyGroup &&
+				enemy->HasTriggeredEncounter()) {
+				battledEnemy = enemy.get();
 				break;
 			}
 		}
+	}
+
+	if (!battledEnemy) {
+		Logger("[FieldEnemyManager] 戦った個体を特定できませんでした: " + enemyGroup + "\n");
+	}
+	else if (playerWon) {
+		// リスポーン対象の敵は defeatedEnemyIds_ に登録しない。
+		// 登録すると SpawnFieldEnemy 冒頭の IsEnemyDefeated チェックで
+		// 再スポーンが永久ブロックされ、EventTrigger のカウントが 1 で止まる。
+		const bool willRespawn = EnqueueRespawnIfNeeded(enemyGroup);
+
+		if (willRespawn) {
+			if (onEnemyDefeatedCallback_) {
+				onEnemyDefeatedCallback_(enemyGroup);
+			}
+		}
+		else {
+			RegisterDefeatedEnemy(enemyGroup);
+		}
+
+		battledEnemy->ResetEncounterState();
+		battledEnemy->Despawn();
+
+		Logger("[FieldEnemyManager] 敵を撃破済みに設定: " + enemyGroup + "\n");
 	}
 	else {
-		for (auto& enemy : fieldEnemies_) {
-			if (enemy && enemy->GetEnemyGroupName() == enemyGroup) {
-				enemy->ResetEncounterState();
-				Logger("[FieldEnemyManager] 敗北後、エンカウントリセット: " + enemyGroup + "\n");
-				break;
-			}
-		}
-		encounterOccurred_ = false;
+		// 敗北・逃走時は消さずにエンカウント状態だけ戻す。
+		// ここを戻し忘れるとその個体に二度と接触できなくなる。
+		battledEnemy->ResetEncounterState();
+		Logger("[FieldEnemyManager] 敗北後、エンカウントリセット: " + enemyGroup + "\n");
 	}
 
+	lastEncounterInfo_.encounteredEnemy = nullptr;
 	encounterOccurred_ = false;
 	encounterCooldown_ = 0.0f;
 	Logger("[FieldEnemyManager] バトル終了処理完了\n");
+}
+
+/// <summary>
+/// リスポーン設定があればキューに積む
+/// </summary>
+/// <returns>キューに積んだら true</returns>
+bool FieldEnemyManager::EnqueueRespawnIfNeeded(const std::string& enemyGroup) {
+	for (const auto& pair : spawnDataMap_) {
+		if (pair.second.enemyId != enemyGroup || !pair.second.respawnAfterBattle) {
+			continue;
+		}
+
+		RespawnInfo respawnInfo;
+		respawnInfo.spawnData = pair.second;
+		respawnInfo.timer = pair.second.respawnDelay;
+		respawnInfo.isWaiting = true;
+		respawnQueue_.push_back(respawnInfo);
+
+		Logger("[FieldEnemyManager] リスポーンキューに追加: " + enemyGroup +
+			" 待機時間: " + std::to_string(pair.second.respawnDelay) + "秒\n");
+		return true;
+	}
+	return false;
 }
 
 /// <summary>
@@ -513,7 +551,7 @@ std::vector<FieldEnemy*> FieldEnemyManager::GetFieldEnemiesInRange(const Vector3
 	std::vector<FieldEnemy*> result;
 
 	for (auto& enemy : fieldEnemies_) {
-		if (enemy && enemy->IsActive()) {
+		if (enemy && !enemy->IsDespawned()) {
 			float distance = Length(enemy->GetPosition() - center);
 			if (distance <= range) {
 				result.push_back(enemy.get());
@@ -532,7 +570,7 @@ std::vector<FieldEnemy*> FieldEnemyManager::GetActiveFieldEnemies() {
 	std::vector<FieldEnemy*> result;
 
 	for (auto& enemy : fieldEnemies_) {
-		if (enemy && enemy->IsActive()) {
+		if (enemy && !enemy->IsDespawned()) {
 			result.push_back(enemy.get());
 		}
 	}
@@ -547,7 +585,7 @@ std::vector<FieldEnemy*> FieldEnemyManager::GetActiveFieldEnemies() {
 size_t FieldEnemyManager::GetActiveEnemyCount() const {
 	return std::count_if(fieldEnemies_.begin(), fieldEnemies_.end(),
 		[](const std::unique_ptr<FieldEnemy>& enemy) {
-			return enemy && enemy->IsActive();
+			return enemy && !enemy->IsDespawned();
 		});
 }
 
@@ -560,7 +598,7 @@ size_t FieldEnemyManager::GetActiveEncounterGroupCount() const
 	std::unordered_set<std::string> groupSet;
 
 	for (auto& enemy : fieldEnemies_) {
-		if (enemy->IsActive()) {
+		if (!enemy->IsDespawned()) {
 			groupSet.insert(enemy->GetSpawnId());
 		}
 	}
@@ -577,7 +615,7 @@ size_t FieldEnemyManager::GetActiveEncounterGroupCount() const
 bool FieldEnemyManager::IsLastEncounterGroup(const std::string& enemyGroup) const {
 	// このグループ以外にアクティブな敵がいるか確認
 	for (const auto& enemy : fieldEnemies_) {
-		if (enemy && enemy->IsActive() &&
+		if (enemy && !enemy->IsDespawned() &&
 			enemy->GetEnemyGroupName() != enemyGroup) {
 			return false; // 他のアクティブな敵が存在
 		}
@@ -927,7 +965,7 @@ void FieldEnemyManager::Draw() {
 	auto* inst = InstancedObject3d::GetInstance();
 	inst->Begin(camera_);
 	for (auto& enemy : fieldEnemies_) {
-		if (enemy && enemy->IsActive() && enemy->GetObject3d()) {
+		if (enemy && !enemy->IsDespawned() && enemy->GetObject3d()) {
 			inst->Submit(*enemy->GetObject3d(), enemy->GetWT());
 		}
 	}
@@ -942,7 +980,7 @@ void FieldEnemyManager::DrawShadow()
 	auto* inst = InstancedObject3d::GetInstance();
 	inst->Begin();
 	for (auto& enemy : fieldEnemies_) {
-		if (enemy && enemy->IsActive() && enemy->GetObject3d()) {
+		if (enemy && !enemy->IsDespawned() && enemy->GetObject3d()) {
 			inst->Submit(*enemy->GetObject3d(), enemy->GetWT());
 		}
 	}
@@ -957,7 +995,7 @@ void FieldEnemyManager::DrawCollision() {
 	if (editorHideEnemies_) return;
 #endif
 	for (auto& enemy : fieldEnemies_) {
-		if (enemy && enemy->IsActive()) {
+		if (enemy && !enemy->IsDespawned()) {
 			enemy->DrawCollision();
 		}
 	}
@@ -969,7 +1007,7 @@ void FieldEnemyManager::DrawLine(YoRigine::Line* line)
 	if (editorHideEnemies_) return;
 #endif
 	for (auto& enemy : fieldEnemies_) {
-		if (enemy && enemy->IsActive()) {
+		if (enemy && !enemy->IsDespawned()) {
 			enemy->DrawLine(line);
 		}
 	}
@@ -981,7 +1019,7 @@ void FieldEnemyManager::DrawUI()
 	if (editorHideEnemies_) return;
 #endif
 	for (auto& enemy : fieldEnemies_) {
-		if (enemy && enemy->IsActive()) {
+		if (enemy && !enemy->IsDespawned()) {
 			enemy->DrawUI();
 		}
 	}
@@ -1007,9 +1045,9 @@ void FieldEnemyManager::DrawEditorMarkers(YoRigine::Line* /*sharedLine*/) {
 	// 色は各 Line インスタンスに固定で割り当てる (DrawLine は 1 回しか呼ばないため安定)。
 	// 色分け: 選択中=赤 / アクティブ=黄 / 無効=灰 / 縦線=白
 	markerLineSelected_->SetColor({ 1.0f, 0.15f, 0.15f, 1.0f });
-	markerLineActive_  ->SetColor({ 1.0f, 0.85f, 0.15f, 1.0f });
+	markerLineActive_->SetColor({ 1.0f, 0.85f, 0.15f, 1.0f });
 	markerLineInactive_->SetColor({ 0.5f, 0.5f, 0.5f,  0.6f });
-	markerLinePole_    ->SetColor({ 1.0f, 1.0f, 1.0f,  0.6f });
+	markerLinePole_->SetColor({ 1.0f, 1.0f, 1.0f,  0.6f });
 
 	for (const auto& [id, data] : spawnDataMap_) {
 		YoRigine::Line* target = nullptr;
@@ -1023,9 +1061,9 @@ void FieldEnemyManager::DrawEditorMarkers(YoRigine::Line* /*sharedLine*/) {
 
 	// 全頂点を 1 回ずつフラッシュ (GPU バッファ stomp を回避)
 	markerLineSelected_->DrawLine();
-	markerLineActive_  ->DrawLine();
+	markerLineActive_->DrawLine();
 	markerLineInactive_->DrawLine();
-	markerLinePole_    ->DrawLine();
+	markerLinePole_->DrawLine();
 #endif
 }
 
@@ -1048,7 +1086,7 @@ void FieldEnemyManager::DrawSpawnPointGizmoHandles() {
 		if (it2 != spawnDataMap_.end()) {
 			editorSpawnData_ = it2->second;
 		}
-	});
+		});
 
 	std::vector<IGizmable*> targets = { &gz };
 	spawnGizmoCtrl_.Draw(camera_, targets,

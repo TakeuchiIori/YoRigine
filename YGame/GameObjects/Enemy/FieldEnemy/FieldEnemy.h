@@ -191,8 +191,18 @@ public:
 	void UpdateEncounterCooldown(float dt);
 	float GetEncounterCooldown() const { return encounterCooldown_; }
 
-	bool IsActive() const { return logicalState_ != FieldEnemyState::Despawn; }
-	void Despawn() { logicalState_ = FieldEnemyState::Despawn; }
+	// 消滅済みか。
+	// 基底の BaseObject::IsActive() と紛らわしい名前にすると、
+	// マネージャ側が基底の方を呼んでしまい消滅判定が効かなくなるため、
+	// あえて別の名前にしている。
+	bool IsDespawned() const { return logicalState_ == FieldEnemyState::Despawn; }
+	// 消滅させる。
+	// 基底のアクティブフラグも落とさないと、BaseObjectManager 経由の
+	// 影描画だけが残り「倒したはずの敵の影が残る」状態になる。
+	void Despawn() {
+		logicalState_ = FieldEnemyState::Despawn;
+		SetActive(false);
+	}
 
 	std::string GetSpawnId() const { return spawnId_; }
 	void SetSpawnId(const std::string& id) { spawnId_ = id; }
