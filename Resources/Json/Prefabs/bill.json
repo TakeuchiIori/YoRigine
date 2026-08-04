@@ -1,0 +1,85 @@
+{
+    "objects": [
+        {
+            "anchorPoint": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "animationName": "",
+            "castShadow": true,
+            "colliderAabbMax": {
+                "x": 1.016891360282898,
+                "y": 1.1000304222106934,
+                "z": 1.1192142963409424
+            },
+            "colliderAabbMin": {
+                "x": -1.016891360282898,
+                "y": -0.026936471462249756,
+                "z": -1.1105310916900635
+            },
+            "colliderCameraFade": true,
+            "colliderEnabled": true,
+            "colliderObbCenter": {
+                "x": 0.0,
+                "y": 0.5365470051765442,
+                "z": 0.004341542720794678
+            },
+            "colliderObbEuler": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbSize": {
+                "x": 1.016891360282898,
+                "y": 0.563483476638794,
+                "z": 1.114872694015503
+            },
+            "colliderShapeType": 1,
+            "colliderSphCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": {
+                "w": 1.0,
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "filePath": "House_4\\House_4.obj",
+            "id": 56,
+            "isAnimation": false,
+            "modelName": "House_4.obj",
+            "nameTag": "",
+            "outlineEnabled": true,
+            "parentID": -1,
+            "pickable": true,
+            "position": {
+                "x": -33.511634826660156,
+                "y": 0.0,
+                "z": 42.37432098388672
+            },
+            "rotate": {
+                "x": -3.1415908336639404,
+                "y": 0.6894049644470215,
+                "z": -3.1415908336639404
+            },
+            "scale": {
+                "x": 4.0,
+                "y": 5.0,
+                "z": 5.0
+            },
+            "useAnchorPoint": false,
+            "uvScale": {
+                "x": 1.0,
+                "y": 1.0
+            },
+            "uvStochastic": 0.0,
+            "visible": true
+        }
+    ],
+    "version": 15
+}

@@ -22,6 +22,7 @@
 #include <SceneSystems/SceneManager.h>
 #include <Drawer/InstancedObject3d.h>
 #include "Object3D/BaseObjectManager.h"
+#include "../Attack/EnemyAttackDatabase.h"
 
 namespace {
 	// BaseObjectManager 登録名の一意連番（プロセス内で単調増加）
@@ -57,6 +58,10 @@ void BattleEnemyManager::Initialize(YoRigine::Camera* camera) {
 	// 各StateはBattleEnemyManagerを知らないので、プール側の静的参照で引く。
 	attackTokens_.Clear();
 	AttackTokenPool::SetCurrent(&attackTokens_);
+
+	// フェーズ列で定義された攻撃データ。読めなくても
+	// 従来の攻撃Stateクラスで動くので、失敗しても処理は続行する。
+	EnemyAttackDatabase::GetInstance().Load();
 
 	camera_ = camera;
 	battleEnemies_.clear();   // 解除は BattleEnemy デストラクタが行う

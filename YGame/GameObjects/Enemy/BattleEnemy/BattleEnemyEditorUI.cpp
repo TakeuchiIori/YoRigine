@@ -4,6 +4,7 @@
 #include "BattleEnemyManager.h"
 #include "BattleEnemy.h"
 #include "../AI/EnemyAIContext.h"
+#include "../Attack/EnemyAttackDatabase.h"
 #include <Debugger/Logger.h>
 #include "imgui.h"
 #include <utility>
@@ -309,6 +310,65 @@ void BattleEnemyEditorUI::Draw(BattleEnemyManager& manager)
 	ImGui::SameLine();
 	if (ImGui::Button("全敵ダメージ(50)")) {
 		manager.DamageAllEnemies(50);
+	}
+
+	ImGui::Separator();
+
+	// --- データ駆動の攻撃（フェーズ列で定義した攻撃）---
+	if (ImGui::CollapsingHeader("攻撃データ (フェーズ列で定義)", ImGuiTreeNodeFlags_DefaultOpen)) {
+		auto& db = EnemyAttackDatabase::GetInstance();
+
+		ImGui::Checkbox("データ駆動の攻撃を使う", EnemyAttackDatabase::GetEnabledPtr());
+		ImGui::SameLine();
+		ImGui::TextDisabled("(?)");
+		if (ImGui::BeginItemTooltip()) {
+			ImGui::TextUnformatted("OFFにすると従来の攻撃Stateクラスが使われる。\n"
+			                       "移行中に元の挙動と見比べるためのスイッチ。");
+			ImGui::EndTooltip();
+		}
+
+		ImGui::Text("読み込み済み: %zu件", db.GetAll().size());
+
+		// 各攻撃のフェーズ構成を確認する（数値編集は今後のエディタで対応）
+		for (const auto& action : db.GetAll()) {
+			if (!ImGui::TreeNode(action.id.c_str(), "%s  [%.2f秒]",
+				action.displayName.c_str(), action.TotalDuration())) {
+				continue;
+			}
+
+			ImGui::TextDisabled("射程 %.1f〜%.1fm / 重み %.2f / %s",
+				action.minRange, action.maxRange, action.weight,
+				action.fast ? "速い技" : "溜め技");
+			if (action.parriable) {
+				ImGui::TextColored({ 0.4f, 0.8f, 1.0f, 1.0f }, "盾で止められる");
+			}
+
+			for (size_t i = 0; i < action.phases.size(); ++i) {
+				const auto& phase = action.phases[i];
+				const bool isLoop = action.loopBegin >= 0 &&
+					static_cast<int>(i) >= action.loopBegin &&
+					static_cast<int>(i) < action.loopEnd;
+
+				ImGui::Text("  %zu. %-14s %.2f秒 %s%s", i,
+					AttackPhaseTypeToString(phase.type), phase.duration,
+					phase.damageWindow >= 0 ? "[攻撃判定]" : "",
+					isLoop ? "[繰り返し]" : "");
+				if (!phase.label.empty()) {
+					ImGui::SameLine();
+					ImGui::TextDisabled("- %s", phase.label.c_str());
+				}
+			}
+			ImGui::TreePop();
+		}
+
+		ImGui::Separator();
+		if (ImGui::Button("攻撃データを保存")) {
+			db.Save();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("攻撃データを再読み込み")) {
+			db.Load();
+		}
 	}
 
 	ImGui::Separator();

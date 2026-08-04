@@ -1,11 +1,13 @@
 #pragma once
 #include "../../../AI/EnemyAIContext.h"
+#include "../../../Attack/EnemyAttackDatabase.h"
 #include "../../BattleEnemy.h"
 #include "BattleChargeRushAttackState.h"
 #include "BattleComboAttackState.h"
 #include "BattleJumpAttackState.h"
 #include "BattleRushAttackState.h"
 #include "BattleSpinAttackState.h"
+#include "EnemyAttackState.h"
 
 #include "Player/Player.h"
 #include <algorithm>
@@ -172,6 +174,12 @@ public:
       return std::make_unique<BattleRushAttackState>();
     }
 
+    // データ駆動が有効なら、JSONで定義された攻撃から選ぶ。
+    // 以降の距離バケット＋switch群は、移行中に元の挙動と比べるために残している。
+    if (auto dataDriven = SelectDataDrivenAttack(enemy)) {
+      return dataDriven;
+    }
+
     const auto &patterns = enemy.GetEnemyData().attackPatterns;
     Vector3 toPlayer = enemy.GetPlayerPosition() - enemy.GetTranslate();
     float distance = Length(toPlayer);
@@ -224,6 +232,48 @@ public:
     // 候補が空（その距離に適した攻撃を所持していない）場合は、
     // 全所持パターンから重み付けで選ぶフォールバックへ
     return SelectWeightedAttack(enemy);
+  }
+
+  /// <summary>
+  /// JSON定義の攻撃から1つ選んでランナーStateを作る。
+  /// データ駆動が無効、または条件に合う攻撃が無ければ nullptr。
+  /// </summary>
+  static std::unique_ptr<IEnemyState<BattleEnemy>>
+  SelectDataDrivenAttack(const BattleEnemy &enemy) {
+    if (!EnemyAttackDatabase::IsEnabled())
+      return nullptr;
+
+    const PerceptionParams &perception = enemy.GetEnemyData().perception;
+    const EnemyAIContext ctx =
+        EnemyAIContext::Capture(enemy, perception.facingHalfAngleDeg);
+
+    const EnemyAttackAction *action =
+        EnemyAttackPicker::Pick(enemy, ctx, perception);
+    if (!action)
+      return nullptr;
+
+    auto state = std::make_unique<EnemyAttackState>();
+    state->SetAction(action);
+    return state;
+  }
+
+  /// <summary>
+  /// 指定IDの攻撃を直接実行する（カウンターなど抽選を通さないもの）。
+  /// データ駆動が無効、またはIDが見つからなければ nullptr。
+  /// </summary>
+  static std::unique_ptr<IEnemyState<BattleEnemy>>
+  CreateActionById(const std::string &id) {
+    if (!EnemyAttackDatabase::IsEnabled())
+      return nullptr;
+
+    const EnemyAttackAction *action =
+        EnemyAttackDatabase::GetInstance().Find(id);
+    if (!action)
+      return nullptr;
+
+    auto state = std::make_unique<EnemyAttackState>();
+    state->SetAction(action);
+    return state;
   }
 
 private:

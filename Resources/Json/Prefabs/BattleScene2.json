@@ -2653,12 +2653,5 @@
             "visible": true
         }
     ],
-    "sceneSettings": {
-        "collisionFrustumCulling": true,
-        "drawFrustumCulling": true,
-        "showCollider": true,
-        "showColliderSelectedOnly": false,
-        "showSelectionOutline": true
-    },
     "version": 15
 }

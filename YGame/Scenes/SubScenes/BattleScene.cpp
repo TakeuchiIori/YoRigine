@@ -103,6 +103,16 @@ void BattleScene::Initialize(YoRigine::Camera *camera, Player *player) {
   Editor::GetInstance()->RegisterGameUI(
       "バトルモード:デバッグ情報",
       [this]() { battleEnemyManager_->ShowDebugInfo(); }, "Game");
+
+  // 攻撃の経路エディタ。制御点をギズモで置いて動きを作る。
+  motionPathEditor_.Initialize(sceneCamera_);
+  Editor::GetInstance()->RegisterGameUI(
+      "攻撃経路エディタ", [this]() { motionPathEditor_.Draw(); }, "Game");
+
+  // ImGuizmo はゲームビューの ImGui コンテキスト内でしか描けないので、
+  // Editor 側のギズモ描画タイミングに乗せてもらう。
+  motionGizmoCallbackId_ = Editor::GetInstance()->AddGizmoDrawCallback(
+      [this]() { motionPathEditor_.DrawGizmo(); });
 #endif
 
   //------------------------------------------------------------
@@ -308,6 +318,10 @@ void BattleScene::DrawLine() {
   // は重複描画を避けて除外)
   AreaManager::GetInstance()->Draw(line_.get(), {"BattleArea"});
   line_->DrawLine();
+
+  // 編集中の攻撃経路を線と制御点で表示する。
+  // 専用の Line インスタンスを持つので、上の line_ とは干渉しない。
+  motionPathEditor_.DrawPreview();
 
 #endif
 }
@@ -630,4 +644,12 @@ void BattleScene::Finalize() {
   if (battleEnemyManager_) {
     battleEnemyManager_->Finalize();
   }
+
+#ifdef USE_IMGUI
+  // 解除しないと破棄済みの this を指したままコールバックが呼ばれる
+  if (motionGizmoCallbackId_ != 0) {
+    Editor::GetInstance()->RemoveGizmoDrawCallback(motionGizmoCallbackId_);
+    motionGizmoCallbackId_ = 0;
+  }
+#endif
 }

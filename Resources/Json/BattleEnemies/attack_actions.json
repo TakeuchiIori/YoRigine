@@ -1,0 +1,276 @@
+{
+    "_comment": "既存の攻撃Stateをフェーズ列で再現したもの。新しい攻撃はここに1エントリ足すだけで作れる。",
+    "actions": [
+        {
+            "id": "rush",
+            "displayName": "Rush (基本突進)",
+            "minRange": 0.0,
+            "maxRange": 999.0,
+            "weight": 1.0,
+            "cooldown": 0.0,
+            "parriable": true,
+            "fast": true,
+            "phases": [
+                {
+                    "type": "anticipation",
+                    "label": "後ろに引く",
+                    "duration": 0.5,
+                    "distance": 1.5,
+                    "offsetAxis": { "x": 0.0, "y": 0.0, "z": -1.0 },
+                    "offsetCurve": "easeOutCubic",
+                    "scaleFrom": { "x": 1.0, "y": 1.0, "z": 1.0 },
+                    "scaleTo": { "x": 1.1, "y": 0.9, "z": 0.7 },
+                    "useColor": true,
+                    "color": { "x": 1.0, "y": 1.0, "z": 0.0, "w": 1.0 }
+                },
+                {
+                    "type": "charge",
+                    "label": "溜め (追尾)",
+                    "duration": 1.0,
+                    "faceTarget": true
+                },
+                {
+                    "type": "dash",
+                    "label": "突進",
+                    "duration": 0.5,
+                    "speedMultiplier": 7.0,
+                    "damageWindow": 0,
+                    "scaleFrom": { "x": 1.0, "y": 1.0, "z": 1.0 },
+                    "scaleTo": { "x": 0.8, "y": 0.8, "z": 1.3 },
+                    "scaleTime": 0.1,
+                    "useColor": true,
+                    "color": { "x": 1.0, "y": 0.0, "z": 0.0, "w": 1.0 }
+                },
+                { "type": "wait", "label": "後隙", "duration": 1.2 }
+            ]
+        },
+        {
+            "id": "chargeRush",
+            "displayName": "ChargeRush (強突進)",
+            "minRange": 6.0,
+            "maxRange": 999.0,
+            "weight": 1.0,
+            "cooldown": 0.0,
+            "parriable": true,
+            "fast": false,
+            "phases": [
+                {
+                    "type": "anticipation",
+                    "label": "踏み込み (沈む)",
+                    "duration": 0.8,
+                    "distance": 0.4,
+                    "offsetAxis": { "x": 0.0, "y": -1.0, "z": 0.0 },
+                    "offsetCurve": "hump",
+                    "faceTarget": true,
+                    "scaleFrom": { "x": 1.0, "y": 1.0, "z": 1.0 },
+                    "scaleTo": { "x": 1.2, "y": 0.7, "z": 1.2 },
+                    "useColor": true,
+                    "color": { "x": 1.0, "y": 0.5, "z": 0.0, "w": 1.0 }
+                },
+                {
+                    "type": "charge",
+                    "label": "溜め (震え)",
+                    "duration": 1.5,
+                    "faceTarget": true,
+                    "shake": true,
+                    "shakePower": 0.2
+                },
+                {
+                    "type": "dash",
+                    "label": "高速突進",
+                    "duration": 0.5,
+                    "speedMultiplier": 12.0,
+                    "damageWindow": 0,
+                    "scaleFrom": { "x": 1.0, "y": 1.0, "z": 1.0 },
+                    "scaleTo": { "x": 0.7, "y": 0.7, "z": 1.5 },
+                    "scaleTime": 0.1,
+                    "useColor": true,
+                    "color": { "x": 1.0, "y": 0.0, "z": 0.0, "w": 1.0 }
+                },
+                { "type": "wait", "label": "後隙", "duration": 1.0 }
+            ]
+        },
+        {
+            "id": "spin",
+            "displayName": "Spin (回転攻撃)",
+            "minRange": 0.0,
+            "maxRange": 8.0,
+            "weight": 1.0,
+            "cooldown": 0.0,
+            "parriable": true,
+            "fast": true,
+            "phases": [
+                {
+                    "type": "anticipation",
+                    "label": "体をひねる",
+                    "duration": 0.5,
+                    "rotations": 1.57,
+                    "scaleFrom": { "x": 1.0, "y": 1.0, "z": 1.0 },
+                    "scaleTo": { "x": 1.3, "y": 0.8, "z": 1.3 },
+                    "useColor": true,
+                    "color": { "x": 1.0, "y": 0.5, "z": 1.0, "w": 1.0 }
+                },
+                { "type": "charge", "label": "ひねり維持", "duration": 0.3 },
+                {
+                    "type": "spin",
+                    "label": "回転しながら前進",
+                    "duration": 1.0,
+                    "rotations": 2.0,
+                    "speedMultiplier": 2.0,
+                    "damageWindow": 0,
+                    "useColor": true,
+                    "color": { "x": 1.0, "y": 0.0, "z": 0.0, "w": 1.0 }
+                },
+                { "type": "wait", "label": "後隙", "duration": 0.5 }
+            ]
+        },
+        {
+            "id": "jump",
+            "displayName": "Jump (跳躍攻撃)",
+            "minRange": 6.0,
+            "maxRange": 999.0,
+            "weight": 1.0,
+            "cooldown": 0.0,
+            "parriable": true,
+            "fast": false,
+            "phases": [
+                {
+                    "type": "anticipation",
+                    "label": "しゃがむ",
+                    "duration": 0.7,
+                    "distance": 0.8,
+                    "offsetAxis": { "x": 0.0, "y": -1.0, "z": 0.0 },
+                    "offsetCurve": "sineIn",
+                    "scaleFrom": { "x": 1.0, "y": 1.0, "z": 1.0 },
+                    "scaleTo": { "x": 1.3, "y": 0.6, "z": 1.3 },
+                    "scaleTime": 0.3,
+                    "useColor": true,
+                    "color": { "x": 0.0, "y": 1.0, "z": 1.0, "w": 1.0 }
+                },
+                {
+                    "type": "anticipation",
+                    "label": "さらに沈む",
+                    "duration": 0.5,
+                    "distance": 0.3,
+                    "offsetAxis": { "x": 0.0, "y": -1.0, "z": 0.0 },
+                    "offsetCurve": "linear"
+                },
+                {
+                    "type": "leap",
+                    "label": "跳躍",
+                    "duration": 0.7,
+                    "height": 4.0,
+                    "damageWindow": 0,
+                    "scaleFrom": { "x": 1.3, "y": 0.6, "z": 1.3 },
+                    "scaleTo": { "x": 0.8, "y": 1.4, "z": 0.8 },
+                    "scaleTime": 0.15,
+                    "useColor": true,
+                    "color": { "x": 1.0, "y": 0.0, "z": 0.0, "w": 1.0 }
+                },
+                {
+                    "type": "wait",
+                    "label": "着地硬直",
+                    "duration": 0.6,
+                    "scaleFrom": { "x": 0.8, "y": 1.4, "z": 0.8 },
+                    "scaleTo": { "x": 1.2, "y": 0.8, "z": 1.2 },
+                    "scaleTime": 0.1
+                }
+            ]
+        },
+        {
+            "id": "combo",
+            "displayName": "Combo (3連撃)",
+            "minRange": 0.0,
+            "maxRange": 8.0,
+            "weight": 1.0,
+            "cooldown": 0.0,
+            "parriable": true,
+            "fast": true,
+            "loopBegin": 1,
+            "loopEnd": 3,
+            "loopCount": 3,
+            "loopSpeedGain": 1.0,
+            "phases": [
+                {
+                    "type": "anticipation",
+                    "label": "素早く後退",
+                    "duration": 0.4,
+                    "distance": 1.0,
+                    "offsetAxis": { "x": 0.0, "y": 0.0, "z": -1.0 },
+                    "offsetCurve": "easeOutQuad",
+                    "faceTarget": true,
+                    "scaleFrom": { "x": 1.0, "y": 1.0, "z": 1.0 },
+                    "scaleTo": { "x": 0.8, "y": 1.2, "z": 0.8 },
+                    "useColor": true,
+                    "color": { "x": 1.0, "y": 0.0, "z": 1.0, "w": 1.0 }
+                },
+                {
+                    "type": "charge",
+                    "label": "各段の溜め",
+                    "duration": 0.4,
+                    "faceTarget": true,
+                    "scaleFrom": { "x": 0.8, "y": 1.2, "z": 0.8 },
+                    "scaleTo": { "x": 1.0, "y": 0.9, "z": 0.9 }
+                },
+                {
+                    "type": "dash",
+                    "label": "各段の突進",
+                    "duration": 0.2,
+                    "speedMultiplier": 8.0,
+                    "damageWindow": 0,
+                    "scaleFrom": { "x": 1.0, "y": 0.9, "z": 0.9 },
+                    "scaleTo": { "x": 0.8, "y": 0.8, "z": 1.2 },
+                    "useColor": true,
+                    "color": { "x": 1.0, "y": 0.0, "z": 0.0, "w": 1.0 }
+                },
+                { "type": "wait", "label": "各段の余り", "duration": 0.2 },
+                { "type": "wait", "label": "後隙", "duration": 0.8 }
+            ]
+        },
+        {
+            "id": "counter",
+            "displayName": "Counter (反撃)",
+            "minRange": 0.0,
+            "maxRange": 999.0,
+            "weight": 0.0,
+            "cooldown": 0.0,
+            "parriable": false,
+            "fast": true,
+            "phases": [
+                {
+                    "type": "charge",
+                    "label": "起動 (無敵+追尾)",
+                    "duration": 0.2,
+                    "faceTarget": true,
+                    "invincible": true
+                },
+                {
+                    "type": "anticipation",
+                    "label": "後退 (無敵)",
+                    "duration": 0.5,
+                    "distance": 5.0,
+                    "offsetAxis": { "x": 0.0, "y": 0.0, "z": -1.0 },
+                    "offsetCurve": "easeOutCubic",
+                    "invincible": true
+                },
+                {
+                    "type": "charge",
+                    "label": "溜め (無敵解除)",
+                    "duration": 0.25,
+                    "faceTarget": true
+                },
+                {
+                    "type": "dash",
+                    "label": "ホーミング突進",
+                    "duration": 0.55,
+                    "speedMultiplier": 15.0,
+                    "homing": 1.5,
+                    "damageWindow": 0,
+                    "useColor": true,
+                    "color": { "x": 1.0, "y": 0.0, "z": 0.0, "w": 1.0 }
+                },
+                { "type": "wait", "label": "後隙", "duration": 0.8 }
+            ]
+        }
+    ]
+}
