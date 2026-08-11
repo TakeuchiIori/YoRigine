@@ -29,7 +29,8 @@ public:
 
 private:
   void DrawFileMenu(const ScenePanelContext &context);
-  void DrawWindowMenu(const WindowFlags &flags);
+  void DrawWindowMenu(const ScenePanelContext &context,
+                      const WindowFlags &flags);
   void DrawEditMenu(const ScenePanelContext &context);
   void DrawViewMenu(const ScenePanelContext &context);
 

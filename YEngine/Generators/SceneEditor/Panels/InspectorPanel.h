@@ -36,6 +36,9 @@ private:
 
   // 上部に常時出す「名前 / モデル」ヘッダ
   void DrawHeader(ObjectManager::PlacedObject &obj);
+  // モーションを持つモデルだけに出す「モーションエディタで編集」トグル
+  void DrawMotionEditorToggle(const ScenePanelContext &context,
+                              ObjectManager::PlacedObject &obj);
 
   YEditorWidget::TransformFields transformFields_;
   MaterialPanel materialPanel_;

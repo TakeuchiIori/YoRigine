@@ -7,6 +7,7 @@
 #include "../Edit/SceneLoadController.h"
 #include "../Edit/ScenePlacementService.h"
 #include "../ObjectSelector.h"
+#include <Motion/Editor/MotionEditor.h>
 
 namespace YoRigine {
 
@@ -45,7 +46,8 @@ void SceneMenuBar::DrawFileMenu(const ScenePanelContext &context) {
 //=============================================================================
 // ウィンドウ
 //=============================================================================
-void SceneMenuBar::DrawWindowMenu(const WindowFlags &flags) {
+void SceneMenuBar::DrawWindowMenu(const ScenePanelContext &context,
+                                  const WindowFlags &flags) {
   if (!ImGui::BeginMenu("ウィンドウ")) {
     return;
   }
@@ -68,6 +70,15 @@ void SceneMenuBar::DrawWindowMenu(const WindowFlags &flags) {
   }
   if (flags.colliderOverview) {
     ImGui::MenuItem("コライダー一覧", nullptr, flags.colliderOverview);
+  }
+
+  // モーションエディタは表示フラグを MotionEditor 自身が持つ。
+  // OFF にすると選択への追従とボーン描画ごと止まる。
+  if (MotionEditor *motionEditor = context.scene->motionEditor) {
+    const bool enabled = motionEditor->IsEnabled();
+    if (ImGui::MenuItem("モーションエディタ", nullptr, enabled)) {
+      motionEditor->SetEnabled(!enabled);
+    }
   }
 
   ImGui::EndMenu();
@@ -199,7 +210,7 @@ void SceneMenuBar::Draw(const ScenePanelContext &context,
   }
 
   DrawFileMenu(context);
-  DrawWindowMenu(flags);
+  DrawWindowMenu(context, flags);
   DrawEditMenu(context);
   DrawViewMenu(context);
 

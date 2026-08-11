@@ -6,6 +6,8 @@
 #include "../Edit/SceneGizmoLayer.h"
 #include "../Edit/ScenePlacementService.h"
 #include "../ObjectSelector.h"
+#include "Model.h"
+#include <Motion/Editor/MotionEditor.h>
 
 // C++
 #include <cstdio>
@@ -30,6 +32,33 @@ void InspectorPanel::DrawHeader(ObjectManager::PlacedObject &obj) {
   }
 
   ImGui::TextDisabled("ID %d   モデル: %s", obj.id, obj.modelName.c_str());
+  ImGui::Separator();
+}
+
+//=============================================================================
+// モーションエディタのトグル
+//=============================================================================
+void InspectorPanel::DrawMotionEditorToggle(const ScenePanelContext &context,
+                                            ObjectManager::PlacedObject &obj) {
+  MotionEditor *motionEditor = context.scene->motionEditor;
+  if (!motionEditor) {
+    return;
+  }
+
+  // モーションを持たないモデルはエディタ側で対象外になるので出さない
+  Model *model = obj.object ? obj.object->GetModel() : nullptr;
+  if (!model || !model->GetMotionSystem()) {
+    return;
+  }
+
+  bool enabled = motionEditor->IsEnabled();
+  if (ImGui::Checkbox("モーションエディタで編集", &enabled)) {
+    motionEditor->SetEnabled(enabled);
+  }
+  if (ImGui::IsItemHovered()) {
+    ImGui::SetTooltip("ON の間だけ Motion Editor "
+                      "が開き、選択中のモデルを編集対象にする");
+  }
   ImGui::Separator();
 }
 
@@ -199,6 +228,7 @@ void InspectorPanel::Draw(const ScenePanelContext &context) {
   }
 
   DrawHeader(*obj);
+  DrawMotionEditorToggle(context, *obj);
 
   if (!ImGui::BeginTabBar("##inspectorTabs")) {
     return;

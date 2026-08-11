@@ -1,0 +1,85 @@
+{
+    "objects": [
+        {
+            "anchorPoint": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "animationName": "",
+            "castShadow": true,
+            "colliderAabbMax": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "colliderAabbMin": {
+                "x": -1.0,
+                "y": -1.0,
+                "z": -1.0
+            },
+            "colliderCameraFade": false,
+            "colliderEnabled": false,
+            "colliderObbCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbEuler": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbSize": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "colliderShapeType": 0,
+            "colliderSphCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": {
+                "w": 1.0,
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "filePath": "Player\\Player.gltf",
+            "id": 91,
+            "isAnimation": true,
+            "modelName": "Player.gltf",
+            "nameTag": "",
+            "outlineEnabled": true,
+            "parentID": -1,
+            "pickable": true,
+            "position": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "rotate": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "scale": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "useAnchorPoint": false,
+            "uvScale": {
+                "x": 1.0,
+                "y": 1.0
+            },
+            "uvStochastic": 0.0,
+            "visible": true
+        }
+    ],
+    "version": 15
+}

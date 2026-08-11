@@ -246,8 +246,11 @@ void SceneEditor::Update() {
 
   shortcuts_.Update(editorActive, selector_.HasSelection(), stamping);
 
-  motionEditor_.SetTargetObjectId(selector_.GetPrimaryId());
-  motionEditor_.Update();
+  // モーションエディタは「使う」と明示したときだけ選択に追従させる
+  if (motionEditor_.IsEnabled()) {
+    motionEditor_.SetTargetObjectId(selector_.GetPrimaryId());
+    motionEditor_.Update();
+  }
 
   const ImVec2 viewPos = Editor::GetInstance()->GetGameViewPos();
   const ImVec2 viewSize = Editor::GetInstance()->GetGameViewSize();
