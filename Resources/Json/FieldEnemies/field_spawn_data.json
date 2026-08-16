@@ -2,14 +2,14 @@
     "spawnPoints": [
         {
             "comment": "",
-            "enemyId": "Purple_2",
-            "id": "Spawn_3",
+            "enemyId": "Mushnub_Evolved",
+            "id": "m_01",
             "isActive": false,
             "isEditorOnly": false,
             "position": {
-                "x": 29.733814239501953,
+                "x": -0.056192994117736816,
                 "y": 0.0,
-                "z": -65.95581817626953
+                "z": -80.69185638427734
             },
             "respawnAfterBattle": false,
             "respawnDelay": 30.0,
@@ -18,14 +18,14 @@
         },
         {
             "comment": "",
-            "enemyId": "Mushnub_Evolved",
-            "id": "m_01",
+            "enemyId": "Purple_2",
+            "id": "Spawn_3",
             "isActive": false,
             "isEditorOnly": false,
             "position": {
-                "x": -0.056192994117736816,
-                "y": 3.452881336212158,
-                "z": -80.69185638427734
+                "x": 29.733814239501953,
+                "y": 0.0,
+                "z": -65.95581817626953
             },
             "respawnAfterBattle": false,
             "respawnDelay": 30.0,
