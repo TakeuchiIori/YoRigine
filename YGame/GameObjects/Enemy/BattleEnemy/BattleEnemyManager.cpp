@@ -1,4 +1,4 @@
-#include "BattleEnemyManager.h"
+﻿#include "BattleEnemyManager.h"
 #include "Player/Player.h"
 
 // C++
@@ -22,7 +22,7 @@
 #include <SceneSystems/SceneManager.h>
 #include <Drawer/InstancedObject3d.h>
 #include "Object3D/BaseObjectManager.h"
-#include "../Attack/EnemyAttackDatabase.h"
+#include "../Attack/Runtime/EnemyAttackLibrary.h"
 
 namespace {
 	// BaseObjectManager 登録名の一意連番（プロセス内で単調増加）
@@ -61,7 +61,7 @@ void BattleEnemyManager::Initialize(YoRigine::Camera* camera) {
 
 	// フェーズ列で定義された攻撃データ。読めなくても
 	// 従来の攻撃Stateクラスで動くので、失敗しても処理は続行する。
-	EnemyAttackDatabase::GetInstance().Load();
+	EnemyAttackLibrary::GetInstance().Load();
 
 	camera_ = camera;
 	battleEnemies_.clear();   // 解除は BattleEnemy デストラクタが行う
@@ -733,6 +733,9 @@ bool BattleEnemyManager::SaveEnemyData(const std::string& filePath) const {
 			{"attackPatterns", json::array()}
 		};
 		for (AttackPatternType pattern : data.attackPatterns) {
+		// この敵が使えるカーブ攻撃のID一覧
+		enemyJson["attackIds"] = data.attackIds;
+
 			enemyJson["attackPatterns"].push_back(AttackPatternToString(pattern));
 		}
 
@@ -937,6 +940,14 @@ bool BattleEnemyManager::LoadEnemyData(const std::string& filePath) {
 			data.attackStateRange = enemyJson.value("attackStateRange", 10.0f);
 
 			// 攻撃パターンを読み込み
+			// カーブ攻撃のID一覧
+			data.attackIds.clear();
+			if (enemyJson.contains("attackIds") && enemyJson["attackIds"].is_array()) {
+				for (const auto& id : enemyJson["attackIds"]) {
+					data.attackIds.push_back(id.get<std::string>());
+				}
+			}
+
 			data.attackPatterns.clear();
 			if (enemyJson.contains("attackPatterns") && enemyJson["attackPatterns"].is_array()) {
 				for (const auto& pattern : enemyJson["attackPatterns"]) {

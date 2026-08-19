@@ -1,4 +1,4 @@
-#include "BattleRecoveryState.h"
+﻿#include "BattleRecoveryState.h"
 
 #include "Attack/AttackSelector.h"
 #include "Attack/BattleCounterAttackState.h"
@@ -44,7 +44,7 @@ void BattleRecoveryState::Update(BattleEnemy &enemy, float dt) {
   if (timer > recoveryDuration) {
     // 反撃。データ駆動が有効ならJSON定義のカウンターを使う。
     // 抽選を通さず直接IDで引くのは、これが連続被弾への決まった回答だから。
-    if (auto action = AttackSelector::CreateActionById("counter")) {
+    if (auto action = AttackSelector::CreateAttackById("counter")) {
       enemy.ChangeState(std::move(action));
     } else {
       enemy.ChangeState(std::make_unique<BattleCounterAttackState>());

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "../AI/EnemyAIContext.h" // PerceptionParams
 #include "Vector3.h"
 #include <string>
@@ -262,6 +262,12 @@ struct BattleEnemyData {
       AttackPatternType::Rush, AttackPatternType::Spin,
       AttackPatternType::ChargeRush, AttackPatternType::Combo,
       AttackPatternType::Jump};
+  // カーブ定義の攻撃ID一覧。
+  // この敵が使える攻撃をここで絞る。敵ごとの個性は
+  // 「同じ攻撃の数値が違う」ではなく「持っている技が違う」で表現する。
+  // 空の場合は旧 attackPatterns から自動変換される（移行用）。
+  std::vector<std::string> attackIds;
+
   // 攻撃調整用パラメータ
   EnemyAttackParams attackParams;
 

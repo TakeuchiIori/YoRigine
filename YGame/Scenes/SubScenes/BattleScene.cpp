@@ -1,4 +1,4 @@
-#include "BattleScene.h"
+﻿#include "BattleScene.h"
 
 // Engine
 #include "LightManager/LightManager.h"
@@ -113,6 +113,11 @@ void BattleScene::Initialize(YoRigine::Camera *camera, Player *player) {
   // Editor 側のギズモ描画タイミングに乗せてもらう。
   motionGizmoCallbackId_ = Editor::GetInstance()->AddGizmoDrawCallback(
       [this]() { motionPathEditor_.DrawGizmo(); });
+
+  // 攻撃エディタ。プレビューで実際の敵を動かすためマネージャを渡す。
+  attackEditor_.SetManager(battleEnemyManager_.get());
+  Editor::GetInstance()->RegisterGameUI(
+      "攻撃エディタ", [this]() { attackEditor_.Draw(); }, "Game");
 #endif
 
   //------------------------------------------------------------

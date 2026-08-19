@@ -1,4 +1,4 @@
-#include "AttackPlayer.h"
+﻿#include "AttackPlayer.h"
 
 #include "../../BaseEnemy.h"
 #include "../Motion/MotionPathLibrary.h"
@@ -49,6 +49,22 @@ void AttackPlayer::Stop(BaseEnemy &enemy) {
     return;
 
   enemy.SetTranslate(basePosition_);
+  enemy.SetRotate(baseRotation_);
+  enemy.SetScale(baseScale_);
+
+  playing_ = false;
+  finished_ = false;
+  time_ = 0.0f;
+  homingOffset_ = {};
+  attack_ = nullptr;
+}
+
+// ============================================================
+// 停止（回転とスケールだけ復帰）
+// ============================================================
+void AttackPlayer::StopKeepPosition(BaseEnemy &enemy) {
+  if (!playing_) return;
+
   enemy.SetRotate(baseRotation_);
   enemy.SetScale(baseScale_);
 

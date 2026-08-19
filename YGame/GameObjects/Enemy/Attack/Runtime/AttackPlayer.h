@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "../Data/EnemyAttack.h"
 
@@ -28,6 +28,14 @@ public:
 
   // 基準姿勢へ戻して停止する
   void Stop(BaseEnemy &enemy);
+
+  /// <summary>
+  /// 回転とスケールだけ基準へ戻して停止する。位置は攻撃結果として残す。
+  ///
+  /// プレビューは Stop() で完全に元へ戻すが、本番の攻撃で位置まで戻すと
+  /// 突進で詰めた距離が無かったことになってしまう。
+  /// </summary>
+  void StopKeepPosition(BaseEnemy &enemy);
 
   bool IsPlaying() const { return playing_; }
   bool IsFinished() const { return finished_; }

@@ -1,10 +1,10 @@
-#include "BattleEnemyEditorUI.h"
+﻿#include "BattleEnemyEditorUI.h"
 #ifdef USE_IMGUI
 
 #include "BattleEnemyManager.h"
 #include "BattleEnemy.h"
 #include "../AI/EnemyAIContext.h"
-#include "../Attack/EnemyAttackDatabase.h"
+#include "../Attack/Runtime/EnemyAttackLibrary.h"
 #include <Debugger/Logger.h>
 #include "imgui.h"
 #include <utility>
@@ -314,60 +314,70 @@ void BattleEnemyEditorUI::Draw(BattleEnemyManager& manager)
 
 	ImGui::Separator();
 
-	// --- データ駆動の攻撃（フェーズ列で定義した攻撃）---
-	if (ImGui::CollapsingHeader("攻撃データ (フェーズ列で定義)", ImGuiTreeNodeFlags_DefaultOpen)) {
-		auto& db = EnemyAttackDatabase::GetInstance();
+	// --- カーブ定義の攻撃 ---
+	if (ImGui::CollapsingHeader("攻撃データ (カーブで定義)", ImGuiTreeNodeFlags_DefaultOpen)) {
+		auto& library = EnemyAttackLibrary::GetInstance();
 
-		ImGui::Checkbox("データ駆動の攻撃を使う", EnemyAttackDatabase::GetEnabledPtr());
+		ImGui::Checkbox("カーブ定義の攻撃を使う", EnemyAttackLibrary::GetEnabledPtr());
 		ImGui::SameLine();
 		ImGui::TextDisabled("(?)");
 		if (ImGui::BeginItemTooltip()) {
-			ImGui::TextUnformatted("OFFにすると従来の攻撃Stateクラスが使われる。\n"
+			ImGui::TextUnformatted("OFFにすると従来のハードコード攻撃が使われる。\n"
 			                       "移行中に元の挙動と見比べるためのスイッチ。");
 			ImGui::EndTooltip();
 		}
 
-		ImGui::Text("読み込み済み: %zu件", db.GetAll().size());
+		ImGui::Text("読み込み済み: %zu件", library.GetAll().size());
 
-		// 各攻撃のフェーズ構成を確認する（数値編集は今後のエディタで対応）
-		for (const auto& action : db.GetAll()) {
-			if (!ImGui::TreeNode(action.id.c_str(), "%s  [%.2f秒]",
-				action.displayName.c_str(), action.TotalDuration())) {
+		// 内訳の確認用。カーブの編集は専用エディタで行う。
+		for (const auto& attack : library.GetAll()) {
+			if (!ImGui::TreeNode(attack.id.c_str(), "%s  [%.2f秒]",
+				attack.displayName.c_str(), attack.duration)) {
 				continue;
 			}
 
 			ImGui::TextDisabled("射程 %.1f〜%.1fm / 重み %.2f / %s",
-				action.minRange, action.maxRange, action.weight,
-				action.fast ? "速い技" : "溜め技");
-			if (action.parriable) {
+				attack.minRange, attack.maxRange, attack.weight,
+				attack.fast ? "速い技" : "溜め技");
+			if (attack.parriable) {
 				ImGui::TextColored({ 0.4f, 0.8f, 1.0f, 1.0f }, "盾で止められる");
 			}
 
-			for (size_t i = 0; i < action.phases.size(); ++i) {
-				const auto& phase = action.phases[i];
-				const bool isLoop = action.loopBegin >= 0 &&
-					static_cast<int>(i) >= action.loopBegin &&
-					static_cast<int>(i) < action.loopEnd;
-
-				ImGui::Text("  %zu. %-14s %.2f秒 %s%s", i,
-					AttackPhaseTypeToString(phase.type), phase.duration,
-					phase.damageWindow >= 0 ? "[攻撃判定]" : "",
-					isLoop ? "[繰り返し]" : "");
-				if (!phase.label.empty()) {
-					ImGui::SameLine();
-					ImGui::TextDisabled("- %s", phase.label.c_str());
-				}
+			// どのチャンネルを使っているか＝どんな動きかの要約になる
+			ImGui::TextUnformatted("使用チャンネル:");
+			ImGui::SameLine();
+			bool any = false;
+			for (size_t i = 0; i < static_cast<size_t>(AttackChannel::Count); ++i) {
+				const auto channel = static_cast<AttackChannel>(i);
+				if (!attack.tracks.HasKeys(channel)) continue;
+				if (any) ImGui::SameLine();
+				ImGui::TextColored({ 0.6f, 0.9f, 1.0f, 1.0f }, "%s",
+					AttackChannelToString(channel));
+				any = true;
 			}
+			if (!any) {
+				ImGui::TextDisabled("なし（動かない）");
+			}
+
+			for (const auto& modifier : attack.modifiers) {
+				ImGui::Text("  %-16s %.2f〜%.2f秒",
+					AttackModifierTypeToString(modifier.type),
+					modifier.startTime, modifier.endTime);
+			}
+			if (!attack.HasHitbox()) {
+				ImGui::TextColored({ 1.0f, 0.5f, 0.4f, 1.0f }, "攻撃判定がありません");
+			}
+
 			ImGui::TreePop();
 		}
 
 		ImGui::Separator();
 		if (ImGui::Button("攻撃データを保存")) {
-			db.Save();
+			library.Save();
 		}
 		ImGui::SameLine();
 		if (ImGui::Button("攻撃データを再読み込み")) {
-			db.Load();
+			library.Load();
 		}
 	}
 

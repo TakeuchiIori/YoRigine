@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 // C++
 #include <functional>
@@ -16,6 +16,7 @@
 
 // App
 #include "BaseSubScene.h"
+#include "Enemy/Attack/Editor/EnemyAttackEditor.h"
 #include "Enemy/Attack/Motion/MotionPathEditor.h"
 #include "Enemy/BattleEnemy/BattleEnemyManager.h"
 #include "Ground/Ground.h"
@@ -129,6 +130,9 @@ private:
   // Editor のギズモコールバックへ登録して呼んでもらう。
   MotionPathEditor motionPathEditor_;
   int motionGizmoCallbackId_ = 0;
+
+  // 攻撃をカーブで作るエディタ。プレビューは戦闘中の敵で再生する。
+  EnemyAttackEditor attackEditor_;
 #endif
   std::unique_ptr<YoRigine::Sprite> sprite_;
   std::unique_ptr<Ground> ground_;

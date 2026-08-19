@@ -1,13 +1,13 @@
-#pragma once
+﻿#pragma once
 #include "../../../AI/EnemyAIContext.h"
-#include "../../../Attack/EnemyAttackDatabase.h"
+#include "../../../Attack/Runtime/EnemyAttackLibrary.h"
 #include "../../BattleEnemy.h"
 #include "BattleChargeRushAttackState.h"
 #include "BattleComboAttackState.h"
 #include "BattleJumpAttackState.h"
 #include "BattleRushAttackState.h"
 #include "BattleSpinAttackState.h"
-#include "EnemyAttackState.h"
+#include "CurveAttackState.h"
 
 #include "Player/Player.h"
 #include <algorithm>
@@ -176,8 +176,8 @@ public:
 
     // データ駆動が有効なら、JSONで定義された攻撃から選ぶ。
     // 以降の距離バケット＋switch群は、移行中に元の挙動と比べるために残している。
-    if (auto dataDriven = SelectDataDrivenAttack(enemy)) {
-      return dataDriven;
+    if (auto curveAttack = SelectCurveAttack(enemy)) {
+      return curveAttack;
     }
 
     const auto &patterns = enemy.GetEnemyData().attackPatterns;
@@ -235,44 +235,43 @@ public:
   }
 
   /// <summary>
-  /// JSON定義の攻撃から1つ選んでランナーStateを作る。
-  /// データ駆動が無効、または条件に合う攻撃が無ければ nullptr。
+  /// カーブ定義の攻撃から1つ選んでステートを作る。
+  /// 無効、または条件に合う攻撃が無ければ nullptr。
   /// </summary>
   static std::unique_ptr<IEnemyState<BattleEnemy>>
-  SelectDataDrivenAttack(const BattleEnemy &enemy) {
-    if (!EnemyAttackDatabase::IsEnabled())
+  SelectCurveAttack(const BattleEnemy &enemy) {
+    if (!EnemyAttackLibrary::IsEnabled())
       return nullptr;
 
-    const PerceptionParams &perception = enemy.GetEnemyData().perception;
+    const BattleEnemyData &data = enemy.GetEnemyData();
     const EnemyAIContext ctx =
-        EnemyAIContext::Capture(enemy, perception.facingHalfAngleDeg);
+        EnemyAIContext::Capture(enemy, data.perception.facingHalfAngleDeg);
 
-    const EnemyAttackAction *action =
-        EnemyAttackPicker::Pick(enemy, ctx, perception);
-    if (!action)
+    // その敵が持っている技だけを候補にする
+    const EnemyAttack *attack =
+        EnemyAttackPicker::Pick(enemy, data.attackIds, ctx, data.perception);
+    if (!attack)
       return nullptr;
 
-    auto state = std::make_unique<EnemyAttackState>();
-    state->SetAction(action);
+    auto state = std::make_unique<CurveAttackState>();
+    state->SetAttack(attack);
     return state;
   }
 
   /// <summary>
   /// 指定IDの攻撃を直接実行する（カウンターなど抽選を通さないもの）。
-  /// データ駆動が無効、またはIDが見つからなければ nullptr。
   /// </summary>
   static std::unique_ptr<IEnemyState<BattleEnemy>>
-  CreateActionById(const std::string &id) {
-    if (!EnemyAttackDatabase::IsEnabled())
+  CreateAttackById(const std::string &id) {
+    if (!EnemyAttackLibrary::IsEnabled())
       return nullptr;
 
-    const EnemyAttackAction *action =
-        EnemyAttackDatabase::GetInstance().Find(id);
-    if (!action)
+    const EnemyAttack *attack = EnemyAttackLibrary::GetInstance().Find(id);
+    if (!attack)
       return nullptr;
 
-    auto state = std::make_unique<EnemyAttackState>();
-    state->SetAction(action);
+    auto state = std::make_unique<CurveAttackState>();
+    state->SetAttack(attack);
     return state;
   }
 
