@@ -21,6 +21,7 @@ namespace YoRigine {
 
 	float GameTime::accumulatedTime_ = 0.0f;
 	float GameTime::timeScale_ = 1.0f;
+	float GameTime::gameplaySustainedScale_ = 1.0f;
 	float GameTime::vfxTimeScale_ = 1.0f;
 		float GameTime::uiTimeScale_ = 1.0f;
 		bool  GameTime::channelPaused_[static_cast<int>(TimeChannel::Count)] = { false, false, false };
@@ -63,6 +64,7 @@ namespace YoRigine {
 		totalTime_ = 0.0f;
 		accumulatedTime_ = 0.0f;
 		timeScale_ = 1.0f;
+		gameplaySustainedScale_ = 1.0f;
 		vfxTimeScale_ = 1.0f;
 		fixedDeltaTime_ = std::chrono::duration<float, FrameRate>(1).count();
 		isPause_ = false;
@@ -121,7 +123,9 @@ namespace YoRigine {
 			const float gameplayScale = (hitStopTimer_ > 0.0f)
 				? hitStopFreezeScale_
 				: timeScale_;
-			deltaTime_ = unscaledDeltaTime_ * gameplayScale;
+			// 持続スケールは掛け算で合成する。timeScale_ は毎フレーム再計算されるため、
+			// そちらへ書き込む方式では「解除するまで遅い」を維持できない。
+			deltaTime_ = unscaledDeltaTime_ * gameplayScale * gameplaySustainedScale_;
 			totalTime_ += deltaTime_;
 			accumulatedTime_ += deltaTime_;
 		}

@@ -33,7 +33,7 @@
 
 #### 有効化
 
-ModelManipulatorで対象オブジェクトのコライダーを有効にし、`カメラフェード`をONにする。設定は`PlacedObject::colliderCameraFade`としてシーンJSONへ保存される。「この設定を同名オブジェクト全てにコピー」、オブジェクト複製、コピー＆貼り付けでも引き継がれる。
+SceneEditorで対象オブジェクトのコライダーを有効にし、`カメラフェード`をONにする。設定は`PlacedObject::colliderCameraFade`としてシーンJSONへ保存される。「この設定を同名オブジェクト全てにコピー」、オブジェクト複製、コピー＆貼り付けでも引き継がれる。
 
 対象コライダーのType IDは、`CameraCollisionResolver`の許可リスト（既定では`kStaticWall`と`kNavObstacle`）に含まれている必要がある。
 
@@ -43,7 +43,7 @@ ModelManipulatorで対象オブジェクトのコライダーを有効にし、`
 2. `CollisionManager::RaycastAllAllowTypes`がレイ上の全コライダーを距離順で返す。
 3. `IsCameraFadeMode()`が有効な全コライダーを`FadeHit`として収集する。家と、その奥にある木など複数の遮蔽物を同時に扱える。
 4. `PlayerCamera`が`PlacedObject*`ごとに現在のアルファ値を保持し、遮蔽中は目標値へ、レイから外れた後は`1.0`へ指数補間する。
-5. `ModelManipulator`がフェード中の静的モデルをディザー付きインスタンスとして通常の深度パスへ登録する。
+5. `SceneEditor`がフェード中の静的モデルをディザー付きインスタンスとして通常の深度パスへ登録する。
 6. `Object3dInstanced.PS.hlsl`が画面上のピクセル座標から固定ノイズ閾値を生成し、`clip()`でピクセルを間引く。
 
 #### 透明度
@@ -66,13 +66,13 @@ ModelManipulatorで対象オブジェクトのコライダーを有効にし、`
 | 全ヒットレイキャスト | `YEngine/Utilities/Collision/Core/CollisionManager.{h,cpp}` |
 | 遮蔽物の収集・目標アルファ計算 | `YEngine/Utilities/Systems/Camera/CameraCollisionResolver.{h,cpp}` |
 | 複数遮蔽物の補間・復帰 | `YGame/GameObjects/Player/Camera/PlayerCamera.{h,cpp}` |
-| ディザーインスタンス登録 | `YEngine/Graphics/Drawer/InstancedObject3d.{h,cpp}`、`YEngine/Generators/ModelManipulator/ModelManipulator.cpp` |
+| ディザーインスタンス登録 | `YEngine/Graphics/Drawer/InstancedObject3d.{h,cpp}`、`YEngine/Generators/SceneEditor/SceneEditor.cpp` |
 | ピクセル間引き | `Resources/Shaders/Object3d/Object3dInstanced.PS.hlsl` |
 | エディタ設定・保存 | `SceneEditorUI.cpp`、`SceneSerializer.cpp`、`ObjectManager.{h,cpp}` |
 
 #### 現在の制約
 
-- ディザーパスはModelManipulatorがインスタンシング描画する静的・非スキニングモデル向け。アニメーション付きモデルや特殊な個別描画オブジェクトへ適用する場合は、それぞれの描画シェーダーにも同等のディザーフラグと`clip()`処理が必要。
+- ディザーパスはSceneEditorがインスタンシング描画する静的・非スキニングモデル向け。アニメーション付きモデルや特殊な個別描画オブジェクトへ適用する場合は、それぞれの描画シェーダーにも同等のディザーフラグと`clip()`処理が必要。
 - 判定はpivot→cameraのレイ1本。画面上で大きな遮蔽物をより安定して検出したい場合は、将来的に球キャストまたは複数プローブへ拡張する。
 - `PlayerCamera`はフェード前の基準アルファを`1.0`として復帰させる。常設の半透明素材とカメラフェードを併用する場合は、元アルファを別途保存する必要がある。
 

@@ -8,25 +8,33 @@
 /// </summary>
 class BattleComboAttackState : public IEnemyState<BattleEnemy> {
 public:
-	void Enter(BattleEnemy& enemy) override;
+  void Enter(BattleEnemy &enemy) override;
 
-	void Update(BattleEnemy& enemy, float dt) override;
+  void Update(BattleEnemy &enemy, float dt) override;
 
-	void Exit(BattleEnemy& enemy) override;
+  void Exit(BattleEnemy &enemy) override;
+  const char *GetName() const override { return "Attack:Combo"; }
+  bool CanBeParried() const override { return parriable_; }
 
-	bool IsAttacking() const override { return true; }
-	bool IsContactDamageActive() const override { return contactDamageWindow_ >= 0; }
-	int GetContactDamageWindow() const override { return contactDamageWindow_; }
+  bool IsAttacking() const override { return true; }
+  bool IsContactDamageActive() const override {
+    return contactDamageWindow_ >= 0;
+  }
+  int GetContactDamageWindow() const override { return contactDamageWindow_; }
 
 private:
-	// --- 補助関数 (Helper Functions) ---
-	// プレイヤーの方向を向く
-	void UpdateOrientation(BattleEnemy& enemy);
-	// 突進移動を実行する
-	void ExecuteRush(BattleEnemy& enemy, float speedMultiplier, float dt);
+  // --- 補助関数 (Helper Functions) ---
+  // プレイヤーの方向を向く
+  void UpdateOrientation(BattleEnemy &enemy);
+  // 突進移動を実行する
+  void ExecuteRush(BattleEnemy &enemy, float speedMultiplier, float dt);
+
 private:
-	int comboCount_ = 0;
-	int contactDamageWindow_ = -1;
-	Vector3 anticipationStartPos_{};
-	bool hasPerformedAnticipation_ = false;
+  // Enter で攻撃データから読む（盾で受け止められる攻撃か）
+  bool parriable_ = false;
+
+  int comboCount_ = 0;
+  int contactDamageWindow_ = -1;
+  Vector3 anticipationStartPos_{};
+  bool hasPerformedAnticipation_ = false;
 };

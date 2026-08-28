@@ -1,0 +1,165 @@
+{
+    "name": "NewTutorial",
+    "steps": [
+        {
+            "additionalUIs": [],
+            "complete": {
+                "count": 5,
+                "name": "action.triggered.AttackHeavy",
+                "type": "signal"
+            },
+            "eventName": "",
+            "gameplaySpeed": 0.20000000298023224,
+            "gate": {
+                "allow": [],
+                "enabled": false
+            },
+            "highlight": {
+                "blink": false,
+                "blinkSeconds": 5.0,
+                "bringToFront": true,
+                "clipName": "",
+                "enabled": true,
+                "pulse": true,
+                "pulseSeconds": 0.5,
+                "scaleAmount": 1.2000000476837158,
+                "uiIds": [
+                    "ExLB"
+                ]
+            },
+            "layout": {
+                "hintOffset": {
+                    "x": 0.0,
+                    "y": 85.0
+                },
+                "hintPanelSize": {
+                    "x": 540.0,
+                    "y": 54.0
+                },
+                "panelPosition": {
+                    "x": 640.0,
+                    "y": 570.0
+                },
+                "panelSize": {
+                    "x": 1120.0,
+                    "y": 240.0
+                },
+                "textMaxWidth": 1020.0,
+                "textOffset": {
+                    "x": 0.0,
+                    "y": -35.0
+                }
+            },
+            "name": "チュートリアル始めよう！",
+            "once": false,
+            "pauseGameplay": false,
+            "skippable": true,
+            "speaker": "ddddd",
+            "spotlight": {
+                "dimColor": {
+                    "w": 0.9411764740943909,
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "enabled": true,
+                "fadeSeconds": 0.25,
+                "padding": 12.0,
+                "targets": [
+                    {
+                        "center": {
+                            "x": 800.0,
+                            "y": 450.0
+                        },
+                        "id": "ExLB",
+                        "kind": "ui",
+                        "radius": 1.0,
+                        "size": {
+                            "x": 200.0,
+                            "y": 100.0
+                        }
+                    }
+                ]
+            },
+            "targetUIId": "",
+            "text": "uhouhoohohohoh",
+            "trigger": {
+                "type": "none"
+            },
+            "waitSeconds": 2.0,
+            "waitType": "confirm"
+        }
+    ],
+    "style": {
+        "autoBuildControlHint": true,
+        "confirmGamepadButton": "A",
+        "confirmKeyboardKey": "ENTER",
+        "fadeInSeconds": 0.25,
+        "fadeOutSeconds": 1.0499999523162842,
+        "fontFamily": "Meiryo",
+        "fontFilePath": "Resources/Fonts/ipaexg.ttf",
+        "fontSize": 32.0,
+        "hintFontSize": 22.0,
+        "hintOutlineColor": {
+            "w": 1.0,
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "hintOutlineWidth": 1.0,
+        "hintPadding": 6.0,
+        "hintPanelColor": {
+            "w": 0.9490196108818054,
+            "x": 0.10196078568696976,
+            "y": 0.239215686917305,
+            "z": 0.6235294342041016
+        },
+        "hintPanelTexturePath": "",
+        "hintText": "[SPACE / A] 次へ",
+        "hintTextColor": {
+            "w": 1.0,
+            "x": 1.0,
+            "y": 0.949999988079071,
+            "z": 0.7200000286102295
+        },
+        "layer": 1000,
+        "outlineColor": {
+            "w": 1.0,
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "outlineWidth": 2.0,
+        "panelColor": {
+            "w": 0.8999999761581421,
+            "x": 0.029999999329447746,
+            "y": 0.03999999910593033,
+            "z": 0.07000000029802322
+        },
+        "panelTexturePath": "",
+        "shadowColor": {
+            "w": 0.6499999761581421,
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "shadowOffset": {
+            "x": 3.0,
+            "y": 3.0
+        },
+        "showControlHint": false,
+        "skipGamepadButton": "B",
+        "skipHintText": "[ESC / B] スキップ",
+        "skipKeyboardKey": "ESC",
+        "textAlign": 0,
+        "textColor": {
+            "w": 1.0,
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "textPadding": 8.0,
+        "textShadow": false
+    },
+    "version": 1
+}

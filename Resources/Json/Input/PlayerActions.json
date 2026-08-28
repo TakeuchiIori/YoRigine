@@ -1,0 +1,69 @@
+{
+    "version": 1,
+    "actions": [
+        {
+            "name": "AttackLight",
+            "key": [],
+            "pad": [
+                "A"
+            ]
+        },
+        {
+            "name": "AttackHeavy",
+            "key": [],
+            "pad": [
+                "B"
+            ]
+        },
+        {
+            "name": "Guard",
+            "key": [
+                "N"
+            ],
+            "pad": [
+                "X"
+            ]
+        },
+        {
+            "name": "StyleToggle",
+            "key": [],
+            "pad": [
+                "Y"
+            ]
+        },
+        {
+            "name": "LockOn",
+            "key": [],
+            "pad": [
+                "R_STICK"
+            ]
+        },
+        {
+            "name": "Run",
+            "key": [
+                "LSHIFT"
+            ],
+            "pad": []
+        }
+    ],
+    "axes": [
+        {
+            "name": "Move",
+            "stick": "Left",
+            "deadzone": 0.2,
+            "keyUp": "W",
+            "keyDown": "S",
+            "keyLeft": "A",
+            "keyRight": "D"
+        },
+        {
+            "name": "Look",
+            "stick": "Right",
+            "deadzone": 0.2,
+            "keyUp": "",
+            "keyDown": "",
+            "keyLeft": "",
+            "keyRight": ""
+        }
+    ]
+}

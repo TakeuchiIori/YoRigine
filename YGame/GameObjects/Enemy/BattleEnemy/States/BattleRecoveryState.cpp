@@ -1,60 +1,61 @@
-#include "BattleRecoveryState.h"
+﻿#include "BattleRecoveryState.h"
 
+#include "Attack/AttackSelector.h"
+#include "Attack/BattleCounterAttackState.h"
 #include "Attack/BattleRushAttackState.h"
 #include "BattleIdleState.h"
-#include "Attack/BattleCounterAttackState.h"
 
-void BattleRecoveryState::Enter(BattleEnemy& enemy) {
-    enemy.SetCanAct(false);
-    enemy.IsInvincible() = true;  // 無敵状態にする
-    enemy.ResetStateTimer();
-    hasPlayedAnimation_ = false;
+void BattleRecoveryState::Enter(BattleEnemy &enemy) {
+  enemy.SetCanAct(false);
+  enemy.IsInvincible() = true; // 無敵状態にする
+  enemy.ResetStateTimer();
+  hasPlayedAnimation_ = false;
 
-    // バウンススケールアニメーション（気合を溜めるような演出）
-    if (enemy.GetAnimation()) {
-        enemy.GetAnimation()->PlayBounceScaleAnimation(1.3f, 0.8f);
-    }
+  // バウンススケールアニメーション（気合を溜めるような演出）
+  if (enemy.GetAnimation()) {
+    enemy.GetAnimation()->PlayBounceScaleAnimation(1.3f, 0.8f);
+  }
 
-    // カラーアニメーション（青白く光る）
-    if (enemy.GetAnimation()) {
-        enemy.GetAnimation()->StartColorAnimation(
-            { 1.0f, 1.0f, 1.0f, 1.0f },
-            { 0.7f, 0.9f, 1.2f, 1.0f },
-            0.5f,
-            Easing::Function::EaseInOutQuad
-        );
-    }
+  // カラーアニメーション（青白く光る）
+  if (enemy.GetAnimation()) {
+    enemy.GetAnimation()->StartColorAnimation({1.0f, 1.0f, 1.0f, 1.0f},
+                                              {0.7f, 0.9f, 1.2f, 1.0f}, 0.5f,
+                                              Easing::Function::EaseInOutQuad);
+  }
 }
 
-void BattleRecoveryState::Update(BattleEnemy& enemy, float dt) {
-    (void)dt; // dtは今のところ使用しない
-    float timer = enemy.GetStateTimer();
-    const float recoveryDuration = enemy.GetEnemyData().attackParams.counter.recoveryDuration;
+void BattleRecoveryState::Update(BattleEnemy &enemy, float dt) {
+  (void)dt; // dtは今のところ使用しない
+  float timer = enemy.GetStateTimer();
+  const float recoveryDuration =
+      enemy.GetEnemyData().attackParams.counter.recoveryDuration;
 
-    // 回復時間の70%経過したら色を戻し始める
-    if (timer > recoveryDuration * 0.7f && !hasPlayedAnimation_) {
-        hasPlayedAnimation_ = true;
-        if (enemy.GetAnimation()) {
-            enemy.GetAnimation()->StartColorAnimation(
-                enemy.GetAnimation()->GetCurrentColor(),
-                { 1.0f, 1.0f, 1.0f, 1.0f },
-                0.3f,
-                Easing::Function::EaseOutQuad
-            );
-        }
+  // 回復時間の70%経過したら色を戻し始める
+  if (timer > recoveryDuration * 0.7f && !hasPlayedAnimation_) {
+    hasPlayedAnimation_ = true;
+    if (enemy.GetAnimation()) {
+      enemy.GetAnimation()->StartColorAnimation(
+          enemy.GetAnimation()->GetCurrentColor(), {1.0f, 1.0f, 1.0f, 1.0f},
+          0.3f, Easing::Function::EaseOutQuad);
     }
+  }
 
-    // 回復時間終了で攻撃状態へ
-    if (timer > recoveryDuration) {
-        // 反撃
-        enemy.ChangeState(std::make_unique<BattleCounterAttackState>());
+  // 回復時間終了で攻撃状態へ
+  if (timer > recoveryDuration) {
+    // 反撃。データ駆動が有効ならJSON定義のカウンターを使う。
+    // 抽選を通さず直接IDで引くのは、これが連続被弾への決まった回答だから。
+    if (auto action = AttackSelector::CreateAttackById("counter")) {
+      enemy.ChangeState(std::move(action));
+    } else {
+      enemy.ChangeState(std::make_unique<BattleCounterAttackState>());
     }
+  }
 }
 
-void BattleRecoveryState::Exit(BattleEnemy& enemy) {
-    enemy.SetCanAct(true);
-    enemy.IsInvincible() = false;
+void BattleRecoveryState::Exit(BattleEnemy &enemy) {
+  enemy.SetCanAct(true);
+  enemy.IsInvincible() = false;
 
-    // 念のため色をリセット
-    enemy.SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+  // 念のため色をリセット
+  enemy.SetColor({1.0f, 1.0f, 1.0f, 1.0f});
 }

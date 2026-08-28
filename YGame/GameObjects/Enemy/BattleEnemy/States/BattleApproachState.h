@@ -8,8 +8,8 @@
 /// </summary>
 class BattleApproachState : public IEnemyState<BattleEnemy> {
 public:
-	void Enter(BattleEnemy& enemy) override { enemy.SetHasTargetPosition(true); }
-	void Update(BattleEnemy& enemy, float dt) override;
-	void Exit(BattleEnemy& enemy) override { enemy.SetHasTargetPosition(false); }
+  void Enter(BattleEnemy &enemy) override { enemy.SetHasTargetPosition(true); }
+  void Update(BattleEnemy &enemy, float dt) override;
+  void Exit(BattleEnemy &enemy) override { enemy.SetHasTargetPosition(false); }
+  const char *GetName() const override { return "Approach"; }
 };
-

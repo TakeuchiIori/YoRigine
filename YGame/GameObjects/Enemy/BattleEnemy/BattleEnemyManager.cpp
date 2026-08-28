@@ -1,4 +1,4 @@
-#include "BattleEnemyManager.h"
+﻿#include "BattleEnemyManager.h"
 #include "Player/Player.h"
 
 // C++
@@ -22,6 +22,7 @@
 #include <SceneSystems/SceneManager.h>
 #include <Drawer/InstancedObject3d.h>
 #include "Object3D/BaseObjectManager.h"
+#include "../Attack/Runtime/EnemyAttackLibrary.h"
 
 namespace {
 	// BaseObjectManager 登録名の一意連番（プロセス内で単調増加）
@@ -41,6 +42,9 @@ BattleEnemyManager::BattleEnemyManager() = default;
 /// </summary>
 BattleEnemyManager::~BattleEnemyManager() {
 	if (current_ == this) current_ = nullptr;
+	if (AttackTokenPool::GetCurrent() == &attackTokens_) {
+		AttackTokenPool::SetCurrent(nullptr);
+	}
 }
 
 /// <summary>
@@ -49,6 +53,16 @@ BattleEnemyManager::~BattleEnemyManager() {
 /// <param name="camera">使用するカメラのポインタ</param>
 void BattleEnemyManager::Initialize(YoRigine::Camera* camera) {
 	current_ = this; // 全体攻撃などシーン外から敵一覧を引くための借用参照
+
+	// 攻撃権プールを現在のものとして公開する。
+	// 各StateはBattleEnemyManagerを知らないので、プール側の静的参照で引く。
+	attackTokens_.Clear();
+	AttackTokenPool::SetCurrent(&attackTokens_);
+
+	// フェーズ列で定義された攻撃データ。読めなくても
+	// 従来の攻撃Stateクラスで動くので、失敗しても処理は続行する。
+	EnemyAttackLibrary::GetInstance().Load();
+
 	camera_ = camera;
 	battleEnemies_.clear();   // 解除は BattleEnemy デストラクタが行う
 	enemyDataMap_.clear();
@@ -84,6 +98,9 @@ void BattleEnemyManager::Update() {
 
 	// 各敵の更新
 	UpdateBattleState();
+
+	// 攻撃権の再取得クールダウンを進める（毎フレーム必要）
+	attackTokens_.Update(deltaTime);
 
 	// 一定間隔でAIを更新
 	aiUpdateTimer_ += deltaTime;
@@ -716,6 +733,9 @@ bool BattleEnemyManager::SaveEnemyData(const std::string& filePath) const {
 			{"attackPatterns", json::array()}
 		};
 		for (AttackPatternType pattern : data.attackPatterns) {
+		// この敵が使えるカーブ攻撃のID一覧
+		enemyJson["attackIds"] = data.attackIds;
+
 			enemyJson["attackPatterns"].push_back(AttackPatternToString(pattern));
 		}
 
@@ -727,7 +747,8 @@ bool BattleEnemyManager::SaveEnemyData(const std::string& filePath) const {
 			{"chargeTime", data.attackParams.rush.chargeTime},
 			{"rushTime", data.attackParams.rush.rushTime},
 			{"speedMultiplier", data.attackParams.rush.speedMultiplier},
-			{"cooldownTime", data.attackParams.rush.cooldownTime}
+			{"cooldownTime", data.attackParams.rush.cooldownTime},
+			{"parriable", data.attackParams.rush.parriable}
 		};
 
 		// チャージ攻撃 (chargeRush)
@@ -735,7 +756,8 @@ bool BattleEnemyManager::SaveEnemyData(const std::string& filePath) const {
 			{"chargeTime", data.attackParams.chargeRush.chargeTime},
 			{"rushTime", data.attackParams.chargeRush.rushTime},
 			{"speedMultiplier", data.attackParams.chargeRush.speedMultiplier},
-			{"cooldownTime", data.attackParams.chargeRush.cooldownTime}
+			{"cooldownTime", data.attackParams.chargeRush.cooldownTime},
+			{"parriable", data.attackParams.chargeRush.parriable}
 		};
 
 		// 回転攻撃 (Spin)
@@ -744,7 +766,8 @@ bool BattleEnemyManager::SaveEnemyData(const std::string& filePath) const {
 			{"spinTime", data.attackParams.spin.spinTime},
 			{"rotationCount", data.attackParams.spin.rotationCount},
 			{"moveSpeedMultiplier", data.attackParams.spin.moveSpeedMultiplier},
-			{"cooldownTime", data.attackParams.spin.cooldownTime}
+			{"cooldownTime", data.attackParams.spin.cooldownTime},
+			{"parriable", data.attackParams.spin.parriable}
 		};
 
 		// ジャンプ攻撃 (jump)
@@ -753,7 +776,8 @@ bool BattleEnemyManager::SaveEnemyData(const std::string& filePath) const {
 			{"jumpTime", data.attackParams.jump.jumpTime},
 			{"jumpHeight", data.attackParams.jump.jumpHeight},
 			{"crouchDepth", data.attackParams.jump.crouchDepth},
-			{"cooldownTime", data.attackParams.jump.cooldownTime}
+			{"cooldownTime", data.attackParams.jump.cooldownTime},
+			{"parriable", data.attackParams.jump.parriable}
 		};
 
 		// コンボ攻撃 (Combo)
@@ -762,7 +786,8 @@ bool BattleEnemyManager::SaveEnemyData(const std::string& filePath) const {
 			{"subChargeTime", data.attackParams.combo.subChargeTime},
 			{"subRushTime", data.attackParams.combo.subRushTime},
 			{"rushSpeedMultiplier", data.attackParams.combo.rushSpeedMultiplier},
-			{"cooldownTime", data.attackParams.combo.cooldownTime}
+			{"cooldownTime", data.attackParams.combo.cooldownTime},
+			{"parriable", data.attackParams.combo.parriable}
 		};
 
 		// カウンター攻撃 (Counter) — 連続被弾→気合溜め→突進反撃
@@ -778,15 +803,74 @@ bool BattleEnemyManager::SaveEnemyData(const std::string& filePath) const {
 			{"rushTime", data.attackParams.counter.rushTime},
 			{"rushSpeedMultiplier", data.attackParams.counter.rushSpeedMultiplier},
 			{"rushHomingStrength", data.attackParams.counter.rushHomingStrength},
-			{"cooldownTime", data.attackParams.counter.cooldownTime}
+			{"cooldownTime", data.attackParams.counter.cooldownTime},
+			{"parriable", data.attackParams.counter.parriable}
 		};
 
 		// メインのJSONに攻撃パラメータを追加
 		enemyJson["attackParams"] = ap;
+
+		// 間合い取り（攻撃と攻撃の間の非攻撃行動）
+		enemyJson["spacing"] = {
+			{"preferredDistance", data.spacing.preferredDistance},
+			{"tooCloseDistance", data.spacing.tooCloseDistance},
+			{"faceRotationSpeed", data.spacing.faceRotationSpeed},
+			{"backstepDuration", data.spacing.backstepDuration},
+			{"backstepSpeedMultiplier", data.spacing.backstepSpeedMultiplier},
+			{"strafeMinDuration", data.spacing.strafeMinDuration},
+			{"strafeMaxDuration", data.spacing.strafeMaxDuration},
+			{"strafeSpeedMultiplier", data.spacing.strafeSpeedMultiplier},
+			{"strafeDistanceKeepStrength", data.spacing.strafeDistanceKeepStrength},
+			{"observeMinDuration", data.spacing.observeMinDuration},
+			{"observeMaxDuration", data.spacing.observeMaxDuration},
+			{"backstepWeight", data.spacing.backstepWeight},
+			{"strafeWeight", data.spacing.strafeWeight},
+			{"observeWeight", data.spacing.observeWeight}
+		};
+
+		// 知覚（プレイヤーの状態を見て行動を変える）
+		enemyJson["perception"] = {
+			{"enabled", data.perception.enabled},
+			{"facingHalfAngleDeg", data.perception.facingHalfAngleDeg},
+			{"openingOnStagger", data.perception.openingOnStagger},
+			{"openingOnOutOfCC", data.perception.openingOnOutOfCC},
+			{"openingOnLookAway", data.perception.openingOnLookAway},
+			{"openingOnLockedOther", data.perception.openingOnLockedOther},
+			{"openingAttackRangeBonus", data.perception.openingAttackRangeBonus},
+			{"openingFastAttackWeight", data.perception.openingFastAttackWeight},
+			{"openingSlowAttackWeight", data.perception.openingSlowAttackWeight},
+			{"threatBackstepWeight", data.perception.threatBackstepWeight},
+			{"guardStrafeWeight", data.perception.guardStrafeWeight},
+			{"baitSlowAttackWeight", data.perception.baitSlowAttackWeight}
+		};
+
+		// 被弾リアクション（硬直・のけぞり・ダウン）
+		enemyJson["damageReaction"] = {
+			{"staggerDuration", data.damageReaction.staggerDuration},
+			{"waitForKnockback", data.damageReaction.waitForKnockback},
+			{"punchScale", data.damageReaction.punchScale},
+			{"punchDuration", data.damageReaction.punchDuration},
+			{"flashDuration", data.damageReaction.flashDuration},
+			{"colorReturnDuration", data.damageReaction.colorReturnDuration},
+			{"blinkSpeed", data.damageReaction.blinkSpeed},
+			{"hitReactionAngle", data.damageReaction.hitReactionAngle},
+			{"hitReactionDuration", data.damageReaction.hitReactionDuration},
+			{"downedStandUpTime", data.damageReaction.downedStandUpTime},
+			{"downedWobbleSpeed", data.damageReaction.downedWobbleSpeed},
+			{"downedWobbleTilt", data.damageReaction.downedWobbleTilt}
+		};
+
 		enemyArray.push_back(enemyJson);
 	}
 
 	j["battleEnemies"] = enemyArray;
+
+	// 敵個体ではなく戦闘全体にかかる設定
+	j["battleSettings"] = {
+		{"attackTokenEnabled", attackTokens_.IsEnabled()},
+		{"attackTokenCount", attackTokens_.GetMaxTokens()},
+		{"attackTokenReacquireCooldown", attackTokens_.GetReacquireCooldown()}
+	};
 
 	// ファイルに書き出し
 	std::ofstream ofs(filePath);
@@ -825,6 +909,14 @@ bool BattleEnemyManager::LoadEnemyData(const std::string& filePath) {
 			return false;
 		}
 
+		// 戦闘全体の設定。未記載でも既定値で動く。
+		if (j.contains("battleSettings")) {
+			const auto& bs = j["battleSettings"];
+			attackTokens_.SetEnabled(bs.value("attackTokenEnabled", true));
+			attackTokens_.SetMaxTokens(bs.value("attackTokenCount", 1));
+			attackTokens_.SetReacquireCooldown(bs.value("attackTokenReacquireCooldown", 1.0f));
+		}
+
 		// 既存のデータをクリア
 		enemyDataMap_.clear();
 
@@ -848,6 +940,14 @@ bool BattleEnemyManager::LoadEnemyData(const std::string& filePath) {
 			data.attackStateRange = enemyJson.value("attackStateRange", 10.0f);
 
 			// 攻撃パターンを読み込み
+			// カーブ攻撃のID一覧
+			data.attackIds.clear();
+			if (enemyJson.contains("attackIds") && enemyJson["attackIds"].is_array()) {
+				for (const auto& id : enemyJson["attackIds"]) {
+					data.attackIds.push_back(id.get<std::string>());
+				}
+			}
+
 			data.attackPatterns.clear();
 			if (enemyJson.contains("attackPatterns") && enemyJson["attackPatterns"].is_array()) {
 				for (const auto& pattern : enemyJson["attackPatterns"]) {
@@ -869,6 +969,7 @@ bool BattleEnemyManager::LoadEnemyData(const std::string& filePath) {
 					target.rushTime = c.value("rushTime", 0.5f);
 					target.speedMultiplier = c.value("speedMultiplier", 7.0f);
 					target.cooldownTime = c.value("cooldownTime", 1.2f);
+					target.parriable = c.value("parriable", true);
 				}
 
 				// チャージ攻撃 (chargeRush)
@@ -883,6 +984,7 @@ bool BattleEnemyManager::LoadEnemyData(const std::string& filePath) {
 					target.rushTime = c.value("rushTime", 0.5f);
 					target.speedMultiplier = c.value("speedMultiplier", 12.0f);
 					target.cooldownTime = c.value("cooldownTime", 1.2f);
+					target.parriable = c.value("parriable", false);
 				}
 
 				// 回転攻撃 (spin)
@@ -898,6 +1000,7 @@ bool BattleEnemyManager::LoadEnemyData(const std::string& filePath) {
 					target.rotationCount = l.value("rotationCount", 2.0f);
 					target.moveSpeedMultiplier = l.value("moveSpeedMultiplier", 2.0f);
 					target.cooldownTime = l.value("cooldownTime", 0.5f);
+					target.parriable = l.value("parriable", false);
 				}
 
 				// ジャンプ攻撃 (jump)
@@ -913,6 +1016,7 @@ bool BattleEnemyManager::LoadEnemyData(const std::string& filePath) {
 					target.jumpHeight = l.value("jumpHeight", 4.0f);
 					target.crouchDepth = l.value("crouchDepth", 0.3f);
 					target.cooldownTime = l.value("cooldownTime", 0.6f);
+					target.parriable = l.value("parriable", false);
 				}
 
 				// コンボ攻撃 (Combo)
@@ -924,6 +1028,7 @@ bool BattleEnemyManager::LoadEnemyData(const std::string& filePath) {
 					target.subRushTime = cb.value("subRushTime", 0.2f);
 					target.rushSpeedMultiplier = cb.value("rushSpeedMultiplier", 8.0f);
 					target.cooldownTime = cb.value("cooldownTime", 0.8f);
+					target.parriable = cb.value("parriable", false);
 				}
 
 				// カウンター攻撃 (Counter)
@@ -942,7 +1047,65 @@ bool BattleEnemyManager::LoadEnemyData(const std::string& filePath) {
 					target.rushSpeedMultiplier  = ct.value("rushSpeedMultiplier", 15.0f);
 					target.rushHomingStrength   = ct.value("rushHomingStrength", 1.5f);
 					target.cooldownTime         = ct.value("cooldownTime", 0.8f);
+					target.parriable            = ct.value("parriable", false);
 				}
+			}
+
+			// 間合い取り（攻撃と攻撃の間の非攻撃行動）。
+			// 未記載の既存JSONでも既定値でそのまま動くようにしている。
+			if (enemyJson.contains("spacing")) {
+				const auto& sp = enemyJson["spacing"];
+				auto& target = data.spacing;
+				target.preferredDistance          = sp.value("preferredDistance", 6.0f);
+				target.tooCloseDistance           = sp.value("tooCloseDistance", 3.5f);
+				target.faceRotationSpeed          = sp.value("faceRotationSpeed", 6.0f);
+				target.backstepDuration           = sp.value("backstepDuration", 0.45f);
+				target.backstepSpeedMultiplier    = sp.value("backstepSpeedMultiplier", 2.2f);
+				target.strafeMinDuration          = sp.value("strafeMinDuration", 0.8f);
+				target.strafeMaxDuration          = sp.value("strafeMaxDuration", 1.8f);
+				target.strafeSpeedMultiplier      = sp.value("strafeSpeedMultiplier", 0.9f);
+				target.strafeDistanceKeepStrength = sp.value("strafeDistanceKeepStrength", 1.5f);
+				target.observeMinDuration         = sp.value("observeMinDuration", 0.4f);
+				target.observeMaxDuration         = sp.value("observeMaxDuration", 1.2f);
+				target.backstepWeight             = sp.value("backstepWeight", 1.0f);
+				target.strafeWeight               = sp.value("strafeWeight", 1.4f);
+				target.observeWeight              = sp.value("observeWeight", 1.0f);
+			}
+
+			// 知覚（プレイヤーの状態を見て行動を変える）。未記載なら既定値で動く。
+			if (enemyJson.contains("perception")) {
+				const auto& pc = enemyJson["perception"];
+				auto& target = data.perception;
+				target.enabled                 = pc.value("enabled", true);
+				target.facingHalfAngleDeg      = pc.value("facingHalfAngleDeg", 70.0f);
+				target.openingOnStagger        = pc.value("openingOnStagger", true);
+				target.openingOnOutOfCC        = pc.value("openingOnOutOfCC", true);
+				target.openingOnLookAway       = pc.value("openingOnLookAway", true);
+				target.openingOnLockedOther    = pc.value("openingOnLockedOther", true);
+				target.openingAttackRangeBonus = pc.value("openingAttackRangeBonus", 3.0f);
+				target.openingFastAttackWeight = pc.value("openingFastAttackWeight", 2.0f);
+				target.openingSlowAttackWeight = pc.value("openingSlowAttackWeight", 0.3f);
+				target.threatBackstepWeight    = pc.value("threatBackstepWeight", 3.0f);
+				target.guardStrafeWeight       = pc.value("guardStrafeWeight", 3.0f);
+				target.baitSlowAttackWeight    = pc.value("baitSlowAttackWeight", 1.5f);
+			}
+
+			// 被弾リアクション（硬直・のけぞり・ダウン）。未記載なら既定値で動く。
+			if (enemyJson.contains("damageReaction")) {
+				const auto& dr = enemyJson["damageReaction"];
+				auto& target = data.damageReaction;
+				target.staggerDuration      = dr.value("staggerDuration", 1.0f);
+				target.waitForKnockback     = dr.value("waitForKnockback", true);
+				target.punchScale           = dr.value("punchScale", 0.15f);
+				target.punchDuration        = dr.value("punchDuration", 0.25f);
+				target.flashDuration        = dr.value("flashDuration", 0.2f);
+				target.colorReturnDuration  = dr.value("colorReturnDuration", 0.15f);
+				target.blinkSpeed           = dr.value("blinkSpeed", 50.0f);
+				target.hitReactionAngle     = dr.value("hitReactionAngle", 0.20f);
+				target.hitReactionDuration  = dr.value("hitReactionDuration", 0.22f);
+				target.downedStandUpTime    = dr.value("downedStandUpTime", 3.5f);
+				target.downedWobbleSpeed    = dr.value("downedWobbleSpeed", 5.0f);
+				target.downedWobbleTilt     = dr.value("downedWobbleTilt", 0.3f);
 			}
 
 			// マップにデータを格納
@@ -1051,6 +1214,10 @@ void BattleEnemyManager::Finalize() {
 	player_ = nullptr;
 	battleEndCallback_ = nullptr;
 	if (current_ == this) current_ = nullptr;
+	attackTokens_.Clear();
+	if (AttackTokenPool::GetCurrent() == &attackTokens_) {
+		AttackTokenPool::SetCurrent(nullptr);
+	}
 
 	Logger("[BattleEnemyManager] 終了処理完了\n");
 }

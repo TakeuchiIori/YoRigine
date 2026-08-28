@@ -1,0 +1,51 @@
+{
+    "frontHalfAngleDeg": 100.0,
+    "guard": {
+        "ccCost": 1,
+        "ccRecover": 0,
+        "damageRate": 0.30000001192092896,
+        "enemyPushDuration": 0.0,
+        "enemyPushPower": 0.0,
+        "hitStop": 0.05000000074505806,
+        "hitStopEase": 0.0,
+        "selfPushDistance": 5.0,
+        "selfPushDuration": 0.11999999731779099,
+        "shakeDuration": 0.07999999821186066,
+        "shakeIntensity": 0.15000000596046448,
+        "shieldSquash": 1.5,
+        "shieldSquashAxisX": 0.6000000238418579,
+        "shieldSquashAxisY": 0.6000000238418579,
+        "shieldSquashAxisZ": -1.0,
+        "shieldSquashBounce": 1.600000023841858,
+        "shieldSquashTime": 0.25,
+        "vfxName": ""
+    },
+    "parry": {
+        "ccCost": 0,
+        "ccRecover": 1,
+        "damageRate": 0.0,
+        "enemyPushDuration": 0.25,
+        "enemyPushPower": 6.0,
+        "hitStop": 0.11999999731779099,
+        "hitStopEase": 0.05000000074505806,
+        "selfPushDistance": 0.0,
+        "selfPushDuration": 0.0,
+        "shakeDuration": 0.15000000596046448,
+        "shakeIntensity": 0.30000001192092896,
+        "shieldSquash": 3.0,
+        "shieldSquashAxisX": 1.0,
+        "shieldSquashAxisY": 1.0,
+        "shieldSquashAxisZ": 0.4000000059604645,
+        "shieldSquashBounce": 2.0,
+        "shieldSquashTime": 0.25,
+        "vfxName": ""
+    },
+    "timeline": {
+        "activeFrames": 21,
+        "fps": 60,
+        "parryEndFrame": 2,
+        "parryStartFrame": 0,
+        "recoveryFrames": 0,
+        "startupFrames": 0
+    }
+}

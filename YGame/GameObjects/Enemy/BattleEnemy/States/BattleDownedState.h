@@ -8,19 +8,12 @@
 /// </summary>
 class BattleDownedState : public IEnemyState<BattleEnemy> {
 public:
-	void Enter(BattleEnemy& enemy) override;
-	void Update(BattleEnemy& enemy, float dt) override;
-	void Exit(BattleEnemy& enemy) override;
-	bool KeepsStateWhenDamaged() const override { return true; }
+  void Enter(BattleEnemy &enemy) override;
+  void Update(BattleEnemy &enemy, float dt) override;
+  void Exit(BattleEnemy &enemy) override;
+  bool KeepsStateWhenDamaged() const override { return true; }
+  const char *GetName() const override { return "Downed"; }
 
-private:
-
-	// ダウン時間
-	float duration_ = 1.0f;
-	// 回転速度
-	float speed_ = 5.0f;
-	// 傾きの強さ
-	float tilt_ = 0.3f;
-	// 立ち上がりの時間
-	float standUpTime_ = 3.5f;
+  // ふらつきの速さ・傾き・立ち上がり時間は
+  // enemyData_.damageReaction から取るのでメンバは持たない。
 };

@@ -1,4 +1,4 @@
-#include "GameScene.h"
+﻿#include "GameScene.h"
 
 // Engine
 #include "Collision/AreaCollision/Base/AreaEditor.h"
@@ -9,12 +9,13 @@
 #include "LightManager/LightManager.h"
 #include "Loaders/Json/JsonManager.h"
 #include "MathFunc.h"
-#include "ModelManipulator/ModelManipulator.h"
 #include "Object3D/Object3dCommon.h"
 #include "OffScreen/PostEffectManager.h"
+#include "SceneEditor/SceneEditor.h"
 #include "Sprite/SpriteCommon.h"
 #include "Systems./Input./Input.h"
 #include "Systems/GameTime/GameTime.h"
+#include "Systems/Tutorial/TutorialSpotlight.h"
 #include <Debugger/Logger.h>
 #include <Editor/Editor.h>
 #include <SceneSystems/SceneManager.h>
@@ -74,7 +75,7 @@ void GameScene::Initialize() {
   YoRigine::CollisionManager::GetInstance()->SetCullingCamera(
       sceneCamera_.get());
   YoRigine::CollisionManager::GetInstance()->SetEnableFrustumCulling(true);
-  // ModelManipulator のシーン読み込みは FieldScene / BattleScene の OnEnter で
+  // SceneEditor のシーン読み込みは FieldScene / BattleScene の OnEnter で
   // 各サブシーン用の JSON ("Field.json" / "Battle.json") を読む方式に統一した。
   // ここで GameScene.json を読むと直後の SwitchToScene → OnEnter で上書きされる
   // だけなので、ロードはしない。
@@ -124,8 +125,18 @@ void GameScene::Initialize() {
   skyBox_->Initialize(sceneCamera_.get(),
                       "Resources/DDS/vz_classic_cubemap_ue.dds");
 
-  YoRigine::ModelManipulator::GetInstance()->SetCamera(sceneCamera_.get());
+  YoRigine::SceneEditor::GetInstance()->SetCamera(sceneCamera_.get());
   YoRigine::YGpuEmitManager::GetInstance()->SetCamera(sceneCamera_.get());
+
+  //------------------------------------------------------------
+  // チュートリアルのスポットライト
+  //   ワールド上の対象へ穴を開けるには、投影用カメラと位置の取得先が要る。
+  //   位置は関数で渡すので、対象が動いても矩形が追従する。
+  //------------------------------------------------------------
+  auto *spotlight = YoRigine::TutorialSpotlight::GetInstance();
+  spotlight->SetCamera(sceneCamera_.get());
+  spotlight->RegisterWorldTarget(
+      "Player", [this]() { return player_->GetWorldPosition(); });
 
   //------------------------------------------------------------
   // サブシーン管理初期化
@@ -171,25 +182,25 @@ void GameScene::Initialize() {
   });
 
   Editor::GetInstance()->RegisterGameUI(
-      "カメラエディター", [this]() { cameraEditor_->Update(); }, "Game");
+      "カメラエディター", [this]() { cameraEditor_->Update(); }, "Game", "ゲームプレイ");
   Editor::GetInstance()->RegisterGameUI(
-      "カメラモード切り替え", [this]() { UpdateCameraMode(); }, "Game");
+      "カメラモード切り替え", [this]() { UpdateCameraMode(); }, "Game", "ゲームプレイ");
   Editor::GetInstance()->RegisterGameUI(
-      "プレイヤーの状態情報", [this]() { player_->DrawImGui(); }, "Game");
+      "プレイヤーの状態情報", [this]() { player_->DrawImGui(); }, "Game", "ゲームプレイ");
   Editor::GetInstance()->RegisterGameUI(
       "プレイヤーカメラ",
       [this]() {
         if (player_->GetPlayerCamera())
           player_->GetPlayerCamera()->DrawImGui();
       },
-      "Game");
+      "Game", "ゲームプレイ");
   Editor::GetInstance()->RegisterGameUI(
       "ライティング",
       [this]() { YoRigine::LightManager::GetInstance()->ShowLightingEditor(); },
-      "Game");
+      "Game", "ゲームプレイ");
   Editor::GetInstance()->RegisterGameUI(
       "プレイヤー攻撃エディター", [this]() { attackEditor_->DrawImGui(); },
-      "Game");
+      "Game", "ゲームプレイ");
   Editor::GetInstance()->RegisterGameUI(
       "魔法攻撃エディター",
       [this]() {
@@ -200,10 +211,10 @@ void GameScene::Initialize() {
           player_->GetMagicController()->DrawEditorWindow();
         }
       },
-      "Game");
+      "Game", "ゲームプレイ");
   Editor::GetInstance()->RegisterGameUI(
       "YoRigine:パーティクルエディター",
-      [this]() { YParticleEditor::GetInstance().ShowEditorWindow(); }, "Game");
+      [this]() { YParticleEditor::GetInstance().ShowEditorWindow(); }, "Game", "ゲームプレイ");
 #endif
 
   //------------------------------------------------------------
@@ -332,7 +343,7 @@ void GameScene::Update() {
 
   gameUI_->Update();
 
-  YoRigine::ModelManipulator::GetInstance()->Update();
+  YoRigine::SceneEditor::GetInstance()->Update();
   YoRigine::CollisionManager::GetInstance()->Update();
   YParticleManager::GetInstance().Update(
       YoRigine::GameTime::GetDeltaTime(YoRigine::TimeChannel::Vfx));
@@ -416,7 +427,7 @@ void GameScene::DrawObject() {
   if (subSceneManager_) {
     subSceneManager_->DrawObject();
   }
-  YoRigine::ModelManipulator::GetInstance()->Draw();
+  YoRigine::SceneEditor::GetInstance()->Draw();
 }
 
 /// <summary>
@@ -424,7 +435,7 @@ void GameScene::DrawObject() {
 /// </summary>
 void GameScene::DrawLine() {
 
-  YoRigine::ModelManipulator::GetInstance()->DrawLine();
+  YoRigine::SceneEditor::GetInstance()->DrawLine();
   if (subSceneManager_) {
     subSceneManager_->DrawLine();
   }
@@ -640,6 +651,13 @@ void GameScene::Finalize() {
   YParticleManager::GetInstance().StopAndClearActiveEmitters();
   YoRigine::YGpuEmitManager::GetInstance()->StopAllEmitterGroups();
   YoRigine::JsonManager::ClearSceneInstances("GameScene");
+
+  // スポットライトへ渡したカメラと位置取得の関数は、このシーンの寿命に紐づく。
+  // シングルトン側に残すと解放済みのシーンを参照してしまうため必ず外す。
+  auto *spotlight = YoRigine::TutorialSpotlight::GetInstance();
+  spotlight->ClearWorldTargets();
+  spotlight->SetCamera(nullptr);
+
   if (subSceneManager_)
     subSceneManager_->Finalize();
   subSceneManager_ = nullptr;

@@ -83,7 +83,7 @@ void AttackCameraComponent::UpdatePost(float dt) {
         break;
     }
 
-                                  // ----------------------------------------------------------
+    // ----------------------------------------------------------
     case Phase::Playing: {
         const AttackCameraWork* work = FindWork(currentWorkName_);
         if (!work) { phase_ = Phase::Idle; ResetValues(); break; }
@@ -101,7 +101,7 @@ void AttackCameraComponent::UpdatePost(float dt) {
         break;
     }
 
-                       // ----------------------------------------------------------
+    // ----------------------------------------------------------
     case Phase::Returning: {
         returnTimer_ += dt;
         float t = (returnDuration_ > 0.0f)

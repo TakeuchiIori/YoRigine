@@ -7,11 +7,12 @@
 /// </summary>
 class BattleDeadState : public IEnemyState<BattleEnemy> {
 public:
-	void Enter(BattleEnemy& enemy) override;
-	void Update(BattleEnemy& enemy, float dt) override;
-	void Exit(BattleEnemy& enemy) override;
+  void Enter(BattleEnemy &enemy) override;
+  void Update(BattleEnemy &enemy, float dt) override;
+  void Exit(BattleEnemy &enemy) override;
+  const char *GetName() const override { return "Dead"; }
 
 private:
-	// 死亡演出経過時間
-	float deathTimer_ = 0.0f;
+  // 死亡演出経過時間
+  float deathTimer_ = 0.0f;
 };

@@ -1,4 +1,4 @@
-#include "FieldScene.h"
+﻿#include "FieldScene.h"
 
 // Engine
 #include "Systems./Input./Input.h"
@@ -12,7 +12,7 @@
 #include <Object3D/ObjectManager.h>
 #include "Object3D/BaseObjectManager.h"
 #include "Collision/AreaCollision/Base/AreaManager.h"
-#include <ModelManipulator/ModelManipulator.h>
+#include <SceneEditor/SceneEditor.h>
 #include "Collision/AreaCollision/Base/AreaEditor.h"
 #include "Generators/Trigger/EventTriggerEditor.h"
 #include "Generators/Trigger/WaypointManager.h"
@@ -107,7 +107,7 @@ void FieldScene::Initialize(YoRigine::Camera* camera, Player* player) {
 	});
 
 	// EventTrigger のロードはシーン入場のたびに必要なため、OnEnter 側で実行する
-	// (ModelManipulator::LoadScene が ObjectManager をクリアして PlacedObject を作り直すので、
+	// (SceneEditor::LoadScene が ObjectManager をクリアして PlacedObject を作り直すので、
 	//  EventTrigger も同タイミングで作り直さないとターゲット参照がずれる)。
 
 	sprite_ = std::make_unique<YoRigine::Sprite>();
@@ -131,12 +131,12 @@ void FieldScene::Initialize(YoRigine::Camera* camera, Player* player) {
 
 #ifdef USE_IMGUI
 	Editor::GetInstance()->RegisterGameUI("フィールドモード:デバッグ情報",
-		[this]() { fieldEnemyManager_->ShowDebugInfo(); }, "Game");
+		[this]() { fieldEnemyManager_->ShowDebugInfo(); }, "Game", "ゲームプレイ");
 
 	// AreaEditor は Game シーン全体(Field/Battle 両サブシーン)で開けるよう一度だけ登録。
 	// AreaEditor / AreaManager はシングルトンなのでサブシーンを跨いでも同じ状態を共有する。
 	Editor::GetInstance()->RegisterGameUI("AreaEditor",
-		[]() { AreaEditor::GetInstance()->Update(); }, "Game");
+		[]() { AreaEditor::GetInstance()->Update(); }, "Game", "ゲームプレイ");
 
 	// プレイヤースポーン地点エディタ
 	Editor::GetInstance()->RegisterGameUI("プレイヤースポーン", [this]() {
@@ -183,7 +183,7 @@ void FieldScene::Initialize(YoRigine::Camera* camera, Player* player) {
 		}
 		ImGui::SameLine();
 		ImGui::TextDisabled("(編集値はワープ or 起動時に反映)");
-	}, "Game");
+	}, "Game", "ゲームプレイ");
 
 	// NavGridConfig エディター（Editor::RegisterGameUI で登録）
 	Editor::GetInstance()->RegisterGameUI("NavGrid Config", [this]() {
@@ -208,11 +208,11 @@ void FieldScene::Initialize(YoRigine::Camera* camera, Player* player) {
 				navGridConfig_.aj_.SaveToFile(navGridConfig_.kDefaultPath);
 			}
 		}
-		}, "Game");
+		}, "Game", "ゲームプレイ");
 
 	Editor::GetInstance()->RegisterGameUI("EventTrigger", [this]() {
 		DrawEventTriggerEditor();
-	}, "Game");
+	}, "Game", "ゲームプレイ");
 #endif
 }
 
@@ -418,11 +418,11 @@ void FieldScene::OnEnter() {
 
 	Logger("[FieldScene] ===== OnEnter() START =====\n");
 
-	// フィールド用 ModelManipulator シーンへ切替。
+	// フィールド用 SceneEditor シーンへ切替。
 	// Field.json が無い場合は空シーンになるので、初回は GameScene.json から
 	// 必要なものだけ残して保存して Field.json を作る運用にする。
 	// (LoadScene 内で ObjectManager をクリアするため NavGrid も貼り直す)
-	YoRigine::ModelManipulator::GetInstance()->LoadScene("Field");
+	YoRigine::SceneEditor::GetInstance()->LoadScene("Field");
 
 	// EventTrigger は初回入場時のみロードする。
 	// バトル復帰時の再入場でも作り直すと OpenGateAction の currentCount_ が 0 に戻り、
@@ -519,7 +519,7 @@ void FieldScene::HandleDetailedEncounter(const EncountInfo& encounterInfo) {
 	transitionData.battleEnemyIds = encounterInfo.battleEnemyIds;
 	transitionData.battleEnemyScale = encounterInfo.encounterScale;
 	transitionData.playerPosition = GetPlayerPosition();
-	transitionData.playerHitDamage = encounterInfo.encounteredEnemy->GetTakeDamage();
+	transitionData.playerHitDamage = encounterInfo.encounteredEnemy->GetCarryOverDamage();
 	SaveCameraState(transitionData);
 
 	// エンカウント位置を自前で保存しておく。BattleScene を経由する FieldReturnData

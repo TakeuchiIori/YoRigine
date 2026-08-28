@@ -9,9 +9,330 @@
 
 #include <imgui.h>
 #include "Editor/Widgets/YEditorWidget.h"
+#include "Systems/Input/InputActionMap.h"
 #include "Systems/UI/UIManager.h"
 
 namespace {
+	// 条件ツリーの入れ子の深さ上限。UIが際限なく深くならないよう抑える。
+	constexpr int kMaxConditionDepth = 4;
+
+	// 完了条件ツリーの編集UI。all/any/not は子を持つため再帰的に描く。
+	bool DrawConditionEditor(YoRigine::TutorialCondition& condition,
+		const std::vector<std::string>& signalNames, int depth) {
+		using YoRigine::TutorialCondition;
+		using YoRigine::TutorialConditionType;
+
+		// 並び順は TutorialConditionType の宣言順と一致させること。
+		static constexpr std::string_view kTypeNames[] = {
+			"使わない（下の旧設定に従う）",
+			"シグナルを待つ",
+			"時間が経過する",
+			"決定入力を待つ",
+			"すべて成立したら",
+			"いずれか成立したら",
+			"成立しなければ",
+		};
+
+		bool changed = YEditorWidget::EnumCombo("条件の種類", condition.type, kTypeNames);
+
+		switch (condition.type) {
+		case TutorialConditionType::Signal:
+			if (!signalNames.empty()) {
+				changed |= YEditorWidget::StringCombo("シグナル名", condition.signalName, signalNames, true);
+			}
+			changed |= YEditorWidget::InputText("シグナル名を直接入力", condition.signalName);
+			YEditorWidget::HelpMarker(
+				"入力アクションは action.triggered.<アクション名> という名前で自動的に流れてきます。"
+				"ゲーム固有の出来事は TutorialSignal::Emit(\"名前\") をゲーム側から呼んでください");
+			changed |= YEditorWidget::DragInt("必要な回数", condition.requiredCount, 1.0f, 1, 99);
+			break;
+
+		case TutorialConditionType::Elapsed:
+			changed |= YEditorWidget::DragFloat("経過秒数", condition.seconds, 0.1f, 0.0f, 600.0f, "%.1f");
+			break;
+
+		case TutorialConditionType::All:
+		case TutorialConditionType::Any:
+		case TutorialConditionType::Not: {
+			// 「成立しなければ」は先頭の子だけを見るため、子は1つで足りる。
+			const bool acceptsMore = (condition.type != TutorialConditionType::Not)
+				|| condition.children.empty();
+
+			ImGui::Indent();
+			if (acceptsMore && ImGui::SmallButton("子の条件を追加")) {
+				condition.children.push_back(TutorialCondition{});
+				changed = true;
+			}
+
+			int removeIndex = -1;
+			for (int i = 0; i < static_cast<int>(condition.children.size()); ++i) {
+				ImGui::PushID(i);
+				const std::string header = "条件 " + std::to_string(i + 1);
+				if (ImGui::TreeNodeEx(header.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+					if (depth < kMaxConditionDepth) {
+						changed |= DrawConditionEditor(condition.children[i], signalNames, depth + 1);
+					}
+					else {
+						ImGui::TextDisabled("これ以上は入れ子にできません");
+					}
+					if (ImGui::SmallButton("この条件を削除")) removeIndex = i;
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
+			if (removeIndex >= 0) {
+				condition.children.erase(condition.children.begin() + removeIndex);
+				changed = true;
+			}
+			ImGui::Unindent();
+			break;
+		}
+
+		case TutorialConditionType::None:
+		case TutorialConditionType::Confirm:
+		default:
+			break;
+		}
+		return changed;
+	}
+
+	// 説明UI1要素ぶんの配置・色・アニメーションの編集UI。
+	// hasSize=false の文字要素は、ベイクしたテクスチャの実寸で描かれるためサイズを持たない。
+	bool DrawElementEditor(const char* label, const char* idScope,
+		YoRigine::TutorialElementLayout& element, bool hasSize) {
+		bool changed = false;
+		ImGui::PushID(idScope);
+		if (ImGui::TreeNodeEx(label, ImGuiTreeNodeFlags_DefaultOpen)) {
+			changed |= YEditorWidget::Checkbox("表示する", element.visible);
+			changed |= YEditorWidget::DragVec2("中心位置", element.position, 1.0f, -2048.0f, 4096.0f);
+			if (hasSize) {
+				changed |= YEditorWidget::DragVec2("サイズ", element.size, 1.0f, 1.0f, 4096.0f);
+			}
+			changed |= YEditorWidget::DragVec2("アンカー", element.anchorPoint, 0.01f, 0.0f, 1.0f);
+			YEditorWidget::HelpMarker(
+				"0,0 が左上、0.5,0.5 が中心、1,1 が右下。中心位置がどこを指すかを決めます");
+			changed |= YEditorWidget::Color("色の補正", element.colorTint);
+			YEditorWidget::HelpMarker("全ページ共通のデザインで決めた色に掛け算されます");
+			changed |= YEditorWidget::DragInt("重なり順", element.layerOffset, 1.0f, -8, 32);
+
+			// この要素に使えるクリップを、実行中のUIから拾って候補にする。
+			std::vector<std::string> clipNames;
+			const char* runtimeId =
+				(std::string(idScope) == "panel") ? "__TutorialRuntimePanel" :
+				(std::string(idScope) == "text") ? "__TutorialRuntimeText" :
+				(std::string(idScope) == "hintPanel") ? "__TutorialRuntimeHintPanel" :
+				"__TutorialRuntimeHintText";
+			if (UIBase* ui = YoRigine::UIManager::GetInstance()->GetUI(runtimeId)) {
+				for (const UIAnimationClip& clip : ui->GetClips()) clipNames.push_back(clip.name);
+			}
+			std::sort(clipNames.begin(), clipNames.end());
+			if (!clipNames.empty()) {
+				changed |= YEditorWidget::StringCombo("アニメーションクリップ", element.clipName, clipNames, true);
+			}
+			else {
+				changed |= YEditorWidget::InputText("アニメーションクリップ名", element.clipName);
+			}
+			YEditorWidget::HelpMarker(
+				"表示された瞬間に再生されます。スライドインなどの動きはクリップで作ってください");
+			ImGui::TreePop();
+		}
+		ImGui::PopID();
+		return changed;
+	}
+
+	// 入力ゲートの編集UI。許可するアクションをチェックで選ぶ。
+	bool DrawGateEditor(YoRigine::TutorialGate& gate) {
+		bool changed = YEditorWidget::Checkbox("この説明中は操作を制限する", gate.enabled);
+		YEditorWidget::HelpMarker(
+			"チェックした操作だけを受け付けます。移動もさせたい場合は Move も選んでください");
+		if (!gate.enabled) return changed;
+
+		YoRigine::InputActionMap* actionMap = YoRigine::InputActionMap::GetInstance();
+		const std::vector<std::string>& actionNames = actionMap->GetActionNames();
+		const std::vector<std::string>& axisNames = actionMap->GetAxisNames();
+
+		if (actionNames.empty() && axisNames.empty()) {
+			ImGui::TextDisabled("アクションが未登録です。ゲームを起動した状態で設定してください");
+			return changed;
+		}
+
+		auto drawToggles = [&](const std::vector<std::string>& names) {
+			for (const std::string& name : names) {
+				const auto found = std::find(gate.allow.begin(), gate.allow.end(), name);
+				bool allowed = (found != gate.allow.end());
+				if (ImGui::Checkbox(name.c_str(), &allowed)) {
+					if (allowed) {
+						gate.allow.push_back(name);
+					}
+					else {
+						gate.allow.erase(
+							std::remove(gate.allow.begin(), gate.allow.end(), name),
+							gate.allow.end());
+					}
+					changed = true;
+				}
+			}
+			};
+		ImGui::Indent();
+		drawToggles(actionNames);
+		drawToggles(axisNames);
+		ImGui::Unindent();
+		return changed;
+	}
+
+	// UI強調（拡縮の脈動・点滅）の編集UI。
+	bool DrawHighlightEditor(YoRigine::TutorialHighlight& highlight,
+		const std::vector<std::string>& uiIds) {
+		bool changed = YEditorWidget::Checkbox("UIを揺らして目立たせる", highlight.enabled);
+		YEditorWidget::HelpMarker(
+			"暗幕が「周りを暗くする」のに対し、こちらは「対象を動かす」演出です。併用できます");
+		if (!highlight.enabled) return changed;
+
+		// 対象UIが持っているアニメーションクリップを候補として集める。
+		// 凝った動きはここで選ぶ。プリセットは簡易用。
+		std::vector<std::string> clipNames;
+		for (const std::string& uiId : highlight.uiIds) {
+			UIBase* ui = YoRigine::UIManager::GetInstance()->GetUI(uiId);
+			if (!ui) continue;
+			for (const UIAnimationClip& clip : ui->GetClips()) {
+				if (std::find(clipNames.begin(), clipNames.end(), clip.name) == clipNames.end()) {
+					clipNames.push_back(clip.name);
+				}
+			}
+		}
+		std::sort(clipNames.begin(), clipNames.end());
+
+		if (!clipNames.empty()) {
+			changed |= YEditorWidget::StringCombo("アニメーションクリップ", highlight.clipName, clipNames, true);
+		}
+		else {
+			changed |= YEditorWidget::InputText("アニメーションクリップ名", highlight.clipName);
+			ImGui::TextDisabled("対象UIに保存されたクリップがここへ並びます");
+		}
+		YEditorWidget::HelpMarker(
+			"UIアニメーションエディタで作ったクリップを名前で指定します。"
+			"指定するとクリップが優先され、下のプリセットは使われません。"
+			"見つからない場合はプリセットへ自動で戻ります");
+
+		const bool usePreset = highlight.clipName.empty();
+		ImGui::BeginDisabled(!usePreset);
+		changed |= YEditorWidget::Checkbox("拡大縮小させる", highlight.pulse);
+		if (highlight.pulse) {
+			changed |= YEditorWidget::DragFloat("最大倍率", highlight.scaleAmount, 0.01f, 1.01f, 3.0f, "%.2f");
+			changed |= YEditorWidget::DragFloat("1往復の秒数", highlight.pulseSeconds, 0.05f, 0.05f, 5.0f, "%.2f");
+		}
+		changed |= YEditorWidget::Checkbox("点滅させる", highlight.blink);
+		if (highlight.blink) {
+			changed |= YEditorWidget::DragFloat("点滅の周期(秒)", highlight.blinkSeconds, 0.05f, 0.05f, 5.0f, "%.2f");
+		}
+		ImGui::EndDisabled();
+		changed |= YEditorWidget::Checkbox("最前面へ持ち上げる", highlight.bringToFront);
+
+		ImGui::Spacing();
+		if (ImGui::Button("目立たせるUIを追加")) {
+			highlight.uiIds.push_back(std::string());
+			changed = true;
+		}
+		int removeIndex = -1;
+		for (int i = 0; i < static_cast<int>(highlight.uiIds.size()); ++i) {
+			ImGui::PushID(i);
+			if (!uiIds.empty()) {
+				changed |= YEditorWidget::StringCombo("UI", highlight.uiIds[i], uiIds, true);
+			}
+			else {
+				changed |= YEditorWidget::InputText("UI ID", highlight.uiIds[i]);
+			}
+			ImGui::SameLine();
+			if (ImGui::SmallButton("削除")) removeIndex = i;
+			ImGui::PopID();
+		}
+		if (removeIndex >= 0) {
+			highlight.uiIds.erase(highlight.uiIds.begin() + removeIndex);
+			changed = true;
+		}
+		return changed;
+	}
+
+	// 暗幕（スポットライト）の編集UI。
+	bool DrawSpotlightEditor(YoRigine::TutorialSpotlightConfig& spotlight,
+		const std::vector<std::string>& uiIds) {
+		using YoRigine::TutorialSpotlightTarget;
+		using YoRigine::TutorialSpotlightTargetKind;
+
+		bool changed = YEditorWidget::Checkbox("注目させたい場所以外を暗くする", spotlight.enabled);
+		YEditorWidget::HelpMarker(
+			"指定した場所だけ穴を開けて、それ以外を暗幕で覆います。"
+			"穴の中は下にあるUIも3Dの画もそのまま明るく残ります");
+		if (!spotlight.enabled) return changed;
+
+		changed |= YEditorWidget::Color("暗幕の色", spotlight.dimColor);
+		changed |= YEditorWidget::DragFloat("穴の余白(px)", spotlight.padding, 1.0f, 0.0f, 200.0f, "%.0f");
+		changed |= YEditorWidget::DragFloat("暗転にかける時間(秒)", spotlight.fadeSeconds, 0.05f, 0.0f, 3.0f, "%.2f");
+
+		// 並び順は TutorialSpotlightTargetKind の宣言順と一致させること。
+		static constexpr std::string_view kKindNames[] = {
+			"UIを指定", "画面上の矩形を指定", "ワールド上の対象を指定",
+		};
+
+		if (ImGui::Button("注目させる場所を追加")) {
+			spotlight.targets.push_back(TutorialSpotlightTarget{});
+			changed = true;
+		}
+
+		const std::vector<std::string> worldNames =
+			YoRigine::TutorialSpotlight::GetInstance()->GetWorldTargetNames();
+
+		int removeIndex = -1;
+		for (int i = 0; i < static_cast<int>(spotlight.targets.size()); ++i) {
+			TutorialSpotlightTarget& target = spotlight.targets[i];
+			ImGui::PushID(i);
+			const std::string header = std::to_string(i + 1) + ". " +
+				(target.id.empty() ? std::string("(未設定)") : target.id);
+			if (ImGui::TreeNodeEx(header.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+				changed |= YEditorWidget::EnumCombo("対象の種類", target.kind, kKindNames);
+
+				switch (target.kind) {
+				case TutorialSpotlightTargetKind::Ui:
+					if (!uiIds.empty()) {
+						changed |= YEditorWidget::StringCombo("UI", target.id, uiIds, true);
+					}
+					else {
+						changed |= YEditorWidget::InputText("UI ID", target.id);
+					}
+					break;
+
+				case TutorialSpotlightTargetKind::Rect:
+					changed |= YEditorWidget::DragVec2("中心位置", target.center, 1.0f, -2048.0f, 4096.0f);
+					changed |= YEditorWidget::DragVec2("大きさ", target.size, 1.0f, 1.0f, 4096.0f);
+					break;
+
+				case TutorialSpotlightTargetKind::World:
+					if (!worldNames.empty()) {
+						changed |= YEditorWidget::StringCombo("登録名", target.id, worldNames, true);
+					}
+					else {
+						changed |= YEditorWidget::InputText("登録名", target.id);
+						ImGui::TextDisabled("ゲーム側から RegisterWorldTarget で登録された名前がここに並びます");
+					}
+					changed |= YEditorWidget::DragFloat("半径(ワールド単位)", target.radius, 0.1f, 0.1f, 100.0f, "%.1f");
+					break;
+
+				default:
+					break;
+				}
+
+				if (ImGui::SmallButton("この対象を削除")) removeIndex = i;
+				ImGui::TreePop();
+			}
+			ImGui::PopID();
+		}
+		if (removeIndex >= 0) {
+			spotlight.targets.erase(spotlight.targets.begin() + removeIndex);
+			changed = true;
+		}
+		return changed;
+	}
+
 	std::vector<std::string> ListTutorialFiles() {
 		std::vector<std::string> files;
 		std::error_code error;
@@ -344,42 +665,30 @@ namespace YoRigine {
 				}
 				ImGui::SameLine();
 				if (ImGui::Button("画面上に配置")) {
-					step.layout.panelPosition = { 640.0f, 150.0f };
-					step.layout.panelSize = { 1120.0f, 240.0f };
-					step.layout.textOffset = { 0.0f, -35.0f };
-					step.layout.textMaxWidth = 1020.0f;
-					step.layout.hintOffset = { 0.0f, 85.0f };
-					step.layout.hintPanelSize = { 540.0f, 54.0f };
+					step.layout = YoRigine::MakeLegacyStepLayout(
+						{ 640.0f, 150.0f }, { 1120.0f, 240.0f }, { 0.0f, -35.0f },
+						1020.0f, { 0.0f, 85.0f }, { 540.0f, 54.0f });
 					stepChanged = true;
 				}
 				ImGui::SameLine();
 				if (ImGui::Button("中央に配置")) {
-					step.layout.panelPosition = { 640.0f, 360.0f };
-					step.layout.panelSize = { 840.0f, 320.0f };
-					step.layout.textOffset = { 0.0f, -45.0f };
-					step.layout.textMaxWidth = 760.0f;
-					step.layout.hintOffset = { 0.0f, 115.0f };
-					step.layout.hintPanelSize = { 540.0f, 54.0f };
+					step.layout = YoRigine::MakeLegacyStepLayout(
+						{ 640.0f, 360.0f }, { 840.0f, 320.0f }, { 0.0f, -45.0f },
+						760.0f, { 0.0f, 115.0f }, { 540.0f, 54.0f });
 					stepChanged = true;
 				}
 				if (editorSelectedStep_ > 0 && ImGui::Button("前のページからレイアウトをコピー")) {
 					step.layout = editorData_.steps[editorSelectedStep_ - 1].layout;
 					stepChanged = true;
 				}
-				stepChanged |= YEditorWidget::DragVec2(
-					"説明パネルの中心位置", step.layout.panelPosition, 1.0f, -2048.0f, 4096.0f);
-				stepChanged |= YEditorWidget::DragVec2(
-					"説明パネルのサイズ", step.layout.panelSize, 1.0f, 1.0f, 4096.0f);
-				stepChanged |= YEditorWidget::DragVec2(
-					"説明文の相対位置", step.layout.textOffset, 1.0f, -2048.0f, 2048.0f);
-				YEditorWidget::HelpMarker("説明パネルの中心を基準にした位置です");
 				stepChanged |= YEditorWidget::DragFloat(
-					"説明文の最大幅", step.layout.textMaxWidth, 1.0f, 64.0f, 4096.0f, "%.0f");
-				stepChanged |= YEditorWidget::DragVec2(
-					"操作案内の相対位置", step.layout.hintOffset, 1.0f, -2048.0f, 2048.0f);
-				YEditorWidget::HelpMarker("説明パネルの中心を基準にした位置です");
-				stepChanged |= YEditorWidget::DragVec2(
-					"操作案内の背景サイズ", step.layout.hintPanelSize, 1.0f, 1.0f, 4096.0f);
+					"説明文の折り返し幅", step.layout.textMaxWidth, 1.0f, 64.0f, 4096.0f, "%.0f");
+				YEditorWidget::HelpMarker("配置ではなく、本文を何ピクセルで改行するかの設定です");
+
+				stepChanged |= DrawElementEditor("説明パネル", "panel", step.layout.panel, true);
+				stepChanged |= DrawElementEditor("説明文", "text", step.layout.text, false);
+				stepChanged |= DrawElementEditor("操作案内の背景", "hintPanel", step.layout.hintPanel, true);
+				stepChanged |= DrawElementEditor("操作案内の文字", "hintText", step.layout.hintText, false);
 
 				YEditorWidget::SectionHeader("このページの内容");
 				stepChanged |= YEditorWidget::InputText("管理名", step.name);
@@ -388,9 +697,31 @@ namespace YoRigine {
 				YEditorWidget::HelpMarker(
 					"初めて遊ぶ学生が、このページだけを読んでも操作と目的を理解できる文章にしてください");
 
+				YEditorWidget::SectionHeader("完了条件");
+				ImGui::TextDisabled("プレイヤーが実際に行動したら次へ進めたい場合はこちらを使います");
+				TutorialSignal::GetInstance()->ConnectEngineSources();
+				// 完了条件と開始条件は同じUIを使い回すため、ImGuiのIDが衝突する。
+				// PushID で名前空間を分けないと、片方の操作がもう片方へ反映される。
+				ImGui::PushID("complete");
+				stepChanged |= DrawConditionEditor(
+					step.complete, TutorialSignal::GetInstance()->GetKnownNames(), 0);
+				ImGui::PopID();
+
+				const bool usesCondition = step.complete.type != TutorialConditionType::None;
+				ImGui::Spacing();
+				if (usesCondition) {
+					ImGui::TextDisabled("旧設定は使用されません（上の完了条件が優先されます）");
+				}
+				else {
+					ImGui::TextDisabled("上を「使わない」にしている間は、この旧設定で進みます");
+				}
+				ImGui::BeginDisabled(usesCondition);
+
 				static constexpr const char* waitLabels[] = { "決定入力を待つ", "指定秒数を待つ", "ゲームイベントを待つ" };
 				int waitType = static_cast<int>(step.waitType);
-				if (ImGui::Combo("完了条件", &waitType, waitLabels, IM_ARRAYSIZE(waitLabels))) {
+				// 上の「条件の種類」と紛らわしいので、旧設定であることをラベルに書く。
+				YEditorWidget::SetNextItemWidthForLabel("旧設定の待ち方");
+				if (ImGui::Combo("旧設定の待ち方", &waitType, waitLabels, IM_ARRAYSIZE(waitLabels))) {
 					step.waitType = static_cast<TutorialWaitType>(waitType);
 					stepChanged = true;
 				}
@@ -414,11 +745,43 @@ namespace YoRigine {
 					}
 					YEditorWidget::HelpMarker("ゲーム側から TutorialManager::NotifyEvent(イベント名) を呼ぶと次へ進みます");
 				}
+				ImGui::EndDisabled();
+
+				YEditorWidget::SectionHeader("開始条件");
+				ImGui::TextDisabled("未設定なら、前のステップが終わった時点で順番に表示されます");
+				ImGui::PushID("trigger");
+				stepChanged |= DrawConditionEditor(
+					step.trigger, TutorialSignal::GetInstance()->GetKnownNames(), 0);
+				ImGui::PopID();
 				if (!uiIds.empty()) stepChanged |= YEditorWidget::StringCombo("強調するUI", step.targetUIId, uiIds, true);
 				else stepChanged |= YEditorWidget::InputText("強調するUI ID", step.targetUIId);
-				YEditorWidget::HelpMarker("UI管理に登録されているIDを指定すると、そのUIをパルス表示します");
+				YEditorWidget::HelpMarker(
+					"旧設定。下の「UIの強調」を使う場合はそちらが優先されます");
+
+				YEditorWidget::SectionHeader("UIの強調");
+				ImGui::PushID("highlight");
+				stepChanged |= DrawHighlightEditor(step.highlight, uiIds);
+				ImGui::PopID();
+
+				YEditorWidget::SectionHeader("スポットライト");
+				stepChanged |= DrawSpotlightEditor(step.spotlight, uiIds);
+
 				stepChanged |= YEditorWidget::Checkbox("ゲームを一時停止", step.pauseGameplay);
+				ImGui::BeginDisabled(step.pauseGameplay);
+				stepChanged |= YEditorWidget::DragFloat(
+					"表示中のゲーム速度", step.gameplaySpeed, 0.05f, 0.0f, 1.0f, "%.2f");
+				YEditorWidget::HelpMarker(
+					"1.00 で等速、0.30 ならスロー。遊ばせたまま考える時間を作りたいときに使います。"
+					"ヒットストップとは掛け算で合成されるので演出は潰れません");
+				ImGui::EndDisabled();
 				stepChanged |= YEditorWidget::Checkbox("チュートリアル全体を閉じられる", step.skippable);
+				stepChanged |= YEditorWidget::Checkbox("一度見たら二度と出さない", step.once);
+				YEditorWidget::HelpMarker(
+					"既読は Resources/Json/Tutorials/Progress.json へ保存されます。"
+					"ステップの管理名を変えると別物として扱われ、また表示されます");
+
+				YEditorWidget::SectionHeader("操作の制限");
+				stepChanged |= DrawGateEditor(step.gate);
 
 				YEditorWidget::SectionHeader("このページと一緒に表示する画像UI");
 				ImGui::TextDisabled("操作図やキー画像などを、本文とは別の位置へ複数配置できます");

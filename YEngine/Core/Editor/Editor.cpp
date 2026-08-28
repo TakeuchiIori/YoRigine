@@ -375,8 +375,8 @@ void Editor::DrawGameWindow()
 			if (ImGui::BeginDragDropTarget()) {
 				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("DND_MODEL_PATH")) {
 					const char* path = (const char*)payload->Data;
-					// 配置コールバックを呼び出す (ModelManipulator::PlaceObject が呼ばれるようにする)
-					YoRigine::ModelManipulator::GetInstance()->PlaceObject(path);
+					// 配置コールバックを呼び出す (SceneEditor::PlaceObject が呼ばれるようにする)
+					YoRigine::SceneEditor::GetInstance()->PlaceObject(path);
 				}
 				ImGui::EndDragDropTarget();
 			}

@@ -8,12 +8,14 @@
 /// </summary>
 class BattleRecoveryState : public IEnemyState<BattleEnemy> {
 public:
-    void Enter(BattleEnemy& enemy) override;
-    void Update(BattleEnemy& enemy, float dt) override;
-    void Exit(BattleEnemy& enemy) override;
+  void Enter(BattleEnemy &enemy) override;
+  void Update(BattleEnemy &enemy, float dt) override;
+  void Exit(BattleEnemy &enemy) override;
+  const char *GetName() const override { return "Recovery(反撃準備)"; }
 
 private:
-    // recoveryDuration は enemy.GetEnemyData().attackParams.counter.recoveryDuration から取得する
-    bool canCounter_ = false;        // カウンター可能フラグ
-    bool hasPlayedAnimation_ = false; // アニメーション再生フラグ
+  // recoveryDuration は
+  // enemy.GetEnemyData().attackParams.counter.recoveryDuration から取得する
+  bool canCounter_ = false;         // カウンター可能フラグ
+  bool hasPlayedAnimation_ = false; // アニメーション再生フラグ
 };

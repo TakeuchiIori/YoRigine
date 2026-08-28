@@ -3,6 +3,7 @@
 // ===========================================================
 #ifdef USE_IMGUI
 #include "YEditorWidget_Combo.h"
+#include "YEditorWidget_ItemWidth.h"
 
 namespace YEditorWidget {
 
@@ -14,7 +15,7 @@ bool Combo(const char* label, int& currentIndex,
             ? items[currentIndex]
             : "";
 
-    ImGui::SetNextItemWidth(-1);
+    SetNextItemWidthForLabel(label);
     bool changed = false;
     if (ImGui::BeginCombo(label, preview.data())) {
         for (int i = 0; i < static_cast<int>(items.size()); ++i) {
@@ -39,7 +40,7 @@ bool Combo(const char* label, int& currentIndex,
             ? items[currentIndex]
             : "";
 
-    ImGui::SetNextItemWidth(-1);
+    SetNextItemWidthForLabel(label);
     bool changed = false;
     if (ImGui::BeginCombo(label, preview)) {
         for (int i = 0; i < itemCount; ++i) {
@@ -60,7 +61,7 @@ bool StringCombo(const char* label, std::string& value,
 	std::span<const std::string> items, bool allowEmpty)
 {
 	const char* preview = value.empty() ? "(なし)" : value.c_str();
-	ImGui::SetNextItemWidth(-1);
+	SetNextItemWidthForLabel(label);
 	bool changed = false;
 	if (ImGui::BeginCombo(label, preview)) {
 		if (allowEmpty) {

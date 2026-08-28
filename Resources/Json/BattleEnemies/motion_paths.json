@@ -1,0 +1,38 @@
+{
+    "paths": [
+        {
+            "constantSpeed": true,
+            "name": "spline",
+            "points": [
+                {
+                    "x": 0.0,
+                    "y": 5.873974323272705,
+                    "z": 1.8788081407546997
+                },
+                {
+                    "x": 0.0,
+                    "y": 1.7194702625274658,
+                    "z": 8.51175308227539
+                },
+                {
+                    "x": 4.530519485473633,
+                    "y": 1.7194702625274658,
+                    "z": 5.766533851623535
+                }
+            ],
+            "space": "targetRelative",
+            "type": "spline"
+        },
+        {
+            "endHeight": -4.400000095367432,
+            "endRadius": 8.199999809265137,
+            "name": "orbit",
+            "space": "targetRelative",
+            "startAngleDeg": 75.0,
+            "startHeight": 1.2000000476837158,
+            "startRadius": 1.7000000476837158,
+            "sweepDeg": 964.0,
+            "type": "orbit"
+        }
+    ]
+}

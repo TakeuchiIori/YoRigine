@@ -1,7 +1,9 @@
 {
     "elements": [
         {
+            "blendMode": -1,
             "enabled": true,
+            "kind": 1,
             "label": "",
             "lightning": {
                 "bendAmount": 0.23999999463558197,
@@ -11,7 +13,7 @@
                     "y": 0.7831858396530151,
                     "z": 10.071000099182129
                 },
-                "branchJitter": 0.75,
+                "branchJitter": 2.0899999141693115,
                 "branches": 5,
                 "color": {
                     "w": 1.0,
@@ -19,13 +21,13 @@
                     "y": 1.0,
                     "z": 10.121999740600586
                 },
-                "coreWidth": 0.24,
+                "coreWidth": 0.23999999463558197,
                 "direction": {
                     "x": 0.0,
                     "y": 1.0,
                     "z": 0.0
                 },
-                "flickerRate": 24.0,
+                "flickerRate": 39.0,
                 "glowColor": {
                     "w": 1.0,
                     "x": 0.0,
@@ -34,14 +36,20 @@
                 },
                 "glowPower": 0.949999988079071,
                 "isEnable": true,
-                "jitter": 1.15,
+                "jitter": 3.3499999046325684,
                 "length": 16.649999618530273,
-                "outlineIntensity": 0.0,
+                "outlineIntensity": 0.4099999964237213,
                 "segments": 64,
-                "solidness": 0.62,
-                "width": 0.62
+                "solidness": 1.0,
+                "width": 0.6200000047683716
             },
             "offset": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "rotation": {
+                "w": 1.0,
                 "x": 0.0,
                 "y": 0.0,
                 "z": 0.0
@@ -50,7 +58,8 @@
             "typeName": "LightningBolt"
         }
     ],
-    "motions": [
+    "loopForever": false,
+    "modules": [
         {
             "acceleration": {
                 "x": 0.0,
