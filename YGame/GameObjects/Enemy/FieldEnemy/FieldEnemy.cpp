@@ -240,16 +240,6 @@ Vector3 FieldEnemy::GetCurrentWaypoint() const
 	return wt_.translate_;
 }
 // ============================================================
-// プレイヤーの位置を取得するユーティリティ
-// ============================================================
-Vector3 FieldEnemy::GetPlayerPosition() const {
-	if (player_) {
-		return player_->GetWorldPosition();
-	}
-	return Vector3(0.0f, 0.0f, 0.0f);
-}
-
-// ============================================================
 // エンカウントクールダウンの更新と管理
 // ============================================================
 void FieldEnemy::UpdateEncounterCooldown(float dt) {
@@ -311,7 +301,7 @@ void FieldEnemy::OnDirectionCollision([[maybe_unused]] BaseCollider* self, BaseC
 				TriggerEncounter();
 
 				if (player_ && player_->GetCombat()) {
-					TakeDamage(player_->GetCombat()->GetCombo()->GetCurrentDamage());
+					SetCarryOverDamage(player_->GetCombat()->GetCombo()->GetCurrentDamage());
 				}
 			}
 		}
@@ -345,14 +335,6 @@ void FieldEnemy::TriggerEncounter() {
 		// マネージャーに通知
 		fieldEnemyManager_->OnEnemyEncounter(this);
 	}
-}
-
-// ============================================================
-//　ダメージを受ける処理
-// ============================================================
-void FieldEnemy::TakeDamage(const float damage)
-{
-	takeDamage_ = damage;
 }
 
 // ============================================================
@@ -448,48 +430,4 @@ void FieldEnemy::SetCollisionActive(bool isActive)
 	if (sphereCollider_) sphereCollider_->SetActive(isActive);
 }
 
-// ============================================================
-// 指定した角度に補間回転する処理
-// ============================================================
-void FieldEnemy::RotateTowards(float targetAngle, float speed, float dt) {
-	float current = wt_.rotate_.y;
-
-	// 差分を [-π, π] に正規化
-	float diff = targetAngle - current;
-	while (diff > std::numbers::pi_v<float>) diff -= 2.0f * std::numbers::pi_v<float>;
-	while (diff < -std::numbers::pi_v<float>) diff += 2.0f * std::numbers::pi_v<float>;
-
-	float maxDelta = speed * dt;
-	if (std::abs(diff) <= maxDelta) {
-		wt_.rotate_.y = targetAngle;
-	}
-	else {
-		wt_.rotate_.y = current + std::copysign(maxDelta, diff);
-	}
-}
-
-// ============================================================
-// プレイヤーの方向に補間回転する処理
-// ============================================================
-void FieldEnemy::RotateTowardsPlayer(float speed, float dt) {
-	if (!HasPlayer()) return;
-
-	Vector3 dir = GetPlayerPosition() - GetPosition();
-	dir.y = 0.0f;
-	float dist = Length(dir);
-	if (dist < 0.1f) return;
-
-	float targetAngle = std::atan2(dir.x, dir.z);
-	RotateTowards(targetAngle, speed, dt);
-}
-
-// ============================================================
-// 移動方向に補間回転する処理
-// ============================================================
-void FieldEnemy::RotateTowardsDirection(const Vector3& direction, float speed, float dt) {
-	float dist = Length(direction);
-	if (dist < 0.1f) return;
-
-	float targetAngle = std::atan2(direction.x, direction.z);
-	RotateTowards(targetAngle, speed, dt);
-}
+// 回転ユーティリティ（RotateTowards 系）は BaseEnemy へ移動した。

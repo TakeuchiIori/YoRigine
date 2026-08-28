@@ -1,5 +1,6 @@
 #include "ObjectManager.h"
 #include "ModelManager.h"
+#include "Material/MaterialOverrideSet.h"
 #include <iostream>
 #include <algorithm>
 
@@ -319,6 +320,9 @@ ObjectManager::PlacedObject* ObjectManager::DuplicateObject(
 	duplicate->uvStochastic = original->uvStochastic;
 	ApplyObjectUV(*duplicate);
 
+	// メッシュ単位のマテリアル上書きも複製する
+	CopyMaterialOverrides(*original, *duplicate);
+
 	UpdateObjectTransform(*duplicate);
 
 	std::cout << "複製: 元ID=" << objectId << " 新ID=" << duplicate->id << std::endl;
@@ -595,6 +599,38 @@ void ObjectManager::ApplyObjectUV(PlacedObject& obj) {
 	// Object3d::uvScale は public メンバ。Draw() 内の UpdateUV() が拾って CB に書き込む。
 	obj.object->uvScale = obj.uvScale;
 	obj.object->SetStochasticStrength(obj.uvStochastic);
+}
+
+/// <summary>
+/// メッシュ単位のマテリアル上書きセットを取得する（無ければ生成）
+/// </summary>
+MaterialOverrideSet* ObjectManager::GetOrCreateMaterialOverrides(PlacedObject& obj) {
+	if (!obj.object) return nullptr;
+	return obj.object->EnsureMaterialOverrides();
+}
+
+MaterialOverrideSet* ObjectManager::GetMaterialOverrides(const PlacedObject& obj) const {
+	if (!obj.object) return nullptr;
+	return obj.object->GetMaterialOverrides();
+}
+
+/// <summary>
+/// マテリアル上書きを別オブジェクトへコピーする（複製・貼り付け用）
+/// </summary>
+void ObjectManager::CopyMaterialOverrides(const PlacedObject& src, PlacedObject& dst) {
+	MaterialOverrideSet* srcSet = GetMaterialOverrides(src);
+	if (!srcSet || !srcSet->HasAnyOverride()) return;
+
+	MaterialOverrideSet* dstSet = GetOrCreateMaterialOverrides(dst);
+	if (!dstSet) return;
+
+	const auto& srcSlots = srcSet->GetSlots();
+	dstSet->EnsureSlotCount(srcSlots.size());
+	auto& dstSlots = dstSet->GetSlots();
+	for (size_t i = 0; i < srcSlots.size() && i < dstSlots.size(); ++i) {
+		dstSlots[i] = srcSlots[i];
+	}
+	dstSet->MarkDirty();
 }
 
 bool ObjectManager::ComputeModelLocalAABB(const PlacedObject& obj, AABB& outAabb) const {

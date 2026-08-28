@@ -180,6 +180,8 @@ void CollisionManager::CheckCollisionPair(BaseCollider *a, BaseCollider *b) {
     if (!wasColliding) {
       a->CallOnEnterCollision(b);
       b->CallOnEnterCollision(a);
+      if (contactObserver_)
+        contactObserver_(a->GetTypeID(), b->GetTypeID(), true);
       collidingPairs_.emplace(key, 0);
     } else {
       it->second = 0; // 接触継続: missStreak をリセット
@@ -193,6 +195,8 @@ void CollisionManager::CheckCollisionPair(BaseCollider *a, BaseCollider *b) {
       if (++it->second > contactExitGraceFrames_) {
         a->CallOnExitCollision(b);
         b->CallOnExitCollision(a);
+        if (contactObserver_)
+          contactObserver_(a->GetTypeID(), b->GetTypeID(), false);
         collidingPairs_.erase(it);
       }
       // 猶予中は接触継続扱い (Enter も Exit も発火しない)
@@ -356,7 +360,7 @@ AABB CollisionManager::ComputeWorldAABB(BaseCollider *c) {
 // ============================================================
 // コライダー c の表面上で worldPoint に最も近い点を返す。
 //   Sphere/Capsule: 中心軸から worldPoint 方向へ半径ぶん出した球面/側面上の点。
-//   AABB/OBB:       ボックス内へクランプした点（外側なら表面、内側なら内部点）。
+//   AABB/OBB: ボックス内へクランプした点（外側なら表面、内側なら内部点）。
 // ============================================================
 Vector3 CollisionManager::ClosestPointOnCollider(BaseCollider *c,
                                                  const Vector3 &worldPoint) {
@@ -429,8 +433,7 @@ Vector3 CollisionManager::ComputeContactPoint(BaseCollider *a,
 //   Sphere/Capsule: 中心軸から b 方向への単位ベクトル。
 //   AABB/OBB:       b が最も張り出している軸を当たった面とし、その面法線。
 // ============================================================
-Vector3 CollisionManager::ComputeContactNormal(BaseCollider *a,
-                                               BaseCollider *b,
+Vector3 CollisionManager::ComputeContactNormal(BaseCollider *a, BaseCollider *b,
                                                const Vector3 &fallback) {
   if (!a || !b)
     return fallback;
@@ -681,7 +684,8 @@ void CollisionManager::CheckAllCollisions() {
   }
 
   // Broad Phase: 有効コライダーをグリッドに登録
-  // queryGrid_ (QuerySphere/CCD用) も同時に構築し、ComputeWorldAABB の二重計算を避ける
+  // queryGrid_ (QuerySphere/CCD用) も同時に構築し、ComputeWorldAABB
+  // の二重計算を避ける
   for (BaseCollider *c : colliders_) {
     if (!c)
       continue;

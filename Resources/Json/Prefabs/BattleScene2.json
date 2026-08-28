@@ -1,0 +1,2657 @@
+{
+    "objects": [
+        {
+            "anchorPoint": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "animationName": "",
+            "castShadow": true,
+            "colliderAabbMax": {
+                "x": 1.0255683660507202,
+                "y": 2.141460657119751,
+                "z": 1.1192142963409424
+            },
+            "colliderAabbMin": {
+                "x": -1.0082143545150757,
+                "y": -0.051976680755615234,
+                "z": -1.1105310916900635
+            },
+            "colliderCameraFade": true,
+            "colliderEnabled": true,
+            "colliderObbCenter": {
+                "x": 0.008677005767822266,
+                "y": 1.0447419881820679,
+                "z": 0.004341542720794678
+            },
+            "colliderObbEuler": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbSize": {
+                "x": 1.016891360282898,
+                "y": 1.096718668937683,
+                "z": 1.114872694015503
+            },
+            "colliderShapeType": 1,
+            "colliderSphCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": {
+                "w": 1.0,
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "filePath": "House_3\\House_3.obj",
+            "id": 64,
+            "isAnimation": false,
+            "modelName": "House_3.obj",
+            "nameTag": "",
+            "outlineEnabled": true,
+            "parentID": -1,
+            "pickable": true,
+            "position": {
+                "x": 41.723114013671875,
+                "y": 0.0,
+                "z": -38.64872741699219
+            },
+            "rotate": {
+                "x": -7.542178354924545e-05,
+                "y": -0.8255407214164734,
+                "z": 6.739386299159378e-05
+            },
+            "scale": {
+                "x": 3.9999988079071045,
+                "y": 5.0,
+                "z": 5.0
+            },
+            "useAnchorPoint": false,
+            "uvScale": {
+                "x": 1.0,
+                "y": 1.0
+            },
+            "uvStochastic": 0.0,
+            "visible": true
+        },
+        {
+            "anchorPoint": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "animationName": "",
+            "castShadow": true,
+            "colliderAabbMax": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "colliderAabbMin": {
+                "x": -1.0,
+                "y": -1.0,
+                "z": -1.0
+            },
+            "colliderCameraFade": false,
+            "colliderEnabled": false,
+            "colliderObbCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbEuler": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbSize": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "colliderShapeType": 0,
+            "colliderSphCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 0,
+            "color": {
+                "w": 1.0,
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "filePath": "Floor_Brick\\Floor_Brick.obj",
+            "id": 0,
+            "isAnimation": false,
+            "materialOverrides": [
+                {
+                    "baseColor": {
+                        "x": 0.6000000238418579,
+                        "y": 0.6000000238418579,
+                        "z": 0.6000000238418579
+                    },
+                    "overrideBaseColor": true,
+                    "slot": 1,
+                    "texturePath": "Resources/Models/Floor_UnevenBrick\\T_UnevenBrick_BaseColor.png"
+                }
+            ],
+            "modelName": "Floor_Brick.obj",
+            "nameTag": "",
+            "outlineEnabled": true,
+            "parentID": -1,
+            "pickable": false,
+            "position": {
+                "x": 0.0,
+                "y": 0.18004637956619263,
+                "z": 0.4492539167404175
+            },
+            "rotate": {
+                "x": 0.0,
+                "y": -0.0,
+                "z": 0.0
+            },
+            "scale": {
+                "x": 1000.0,
+                "y": 1.0,
+                "z": 1000.0
+            },
+            "useAnchorPoint": false,
+            "uvScale": {
+                "x": 1000.0,
+                "y": 1000.0
+            },
+            "uvStochastic": 1.0,
+            "visible": true
+        },
+        {
+            "anchorPoint": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "animationName": "",
+            "castShadow": true,
+            "colliderAabbMax": {
+                "x": 1.016891360282898,
+                "y": 1.1000304222106934,
+                "z": 1.1192142963409424
+            },
+            "colliderAabbMin": {
+                "x": -1.016891360282898,
+                "y": -0.026936471462249756,
+                "z": -1.1105310916900635
+            },
+            "colliderCameraFade": true,
+            "colliderEnabled": true,
+            "colliderObbCenter": {
+                "x": 0.0,
+                "y": 0.5365470051765442,
+                "z": 0.004341542720794678
+            },
+            "colliderObbEuler": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbSize": {
+                "x": 1.016891360282898,
+                "y": 0.563483476638794,
+                "z": 1.114872694015503
+            },
+            "colliderShapeType": 1,
+            "colliderSphCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": {
+                "w": 1.0,
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "filePath": "House_4\\House_4.obj",
+            "id": 65,
+            "isAnimation": false,
+            "modelName": "House_4.obj",
+            "nameTag": "",
+            "outlineEnabled": true,
+            "parentID": -1,
+            "pickable": true,
+            "position": {
+                "x": 36.37743377685547,
+                "y": 0.0,
+                "z": -44.86992263793945
+            },
+            "rotate": {
+                "x": -7.542178354924545e-05,
+                "y": -0.720820963382721,
+                "z": 6.739389937138185e-05
+            },
+            "scale": {
+                "x": 3.999999761581421,
+                "y": 5.0,
+                "z": 5.0
+            },
+            "useAnchorPoint": false,
+            "uvScale": {
+                "x": 1.0,
+                "y": 1.0
+            },
+            "uvStochastic": 0.0,
+            "visible": true
+        },
+        {
+            "anchorPoint": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "animationName": "",
+            "castShadow": true,
+            "colliderAabbMax": {
+                "x": 2.6634645462036133,
+                "y": 3.074552059173584,
+                "z": 1.7077034711837769
+            },
+            "colliderAabbMin": {
+                "x": -1.4709999561309814,
+                "y": -0.079032301902771,
+                "z": -1.3899999856948853
+            },
+            "colliderCameraFade": true,
+            "colliderEnabled": true,
+            "colliderObbCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbEuler": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbSize": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "colliderShapeType": 0,
+            "colliderSphCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": {
+                "w": 1.0,
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "filePath": "Blacksmith\\Blacksmith.obj",
+            "id": 1,
+            "isAnimation": false,
+            "modelName": "Blacksmith.obj",
+            "nameTag": "",
+            "outlineEnabled": true,
+            "parentID": -1,
+            "pickable": false,
+            "position": {
+                "x": -7.882999897003174,
+                "y": 0.0,
+                "z": 59.737918853759766
+            },
+            "rotate": {
+                "x": 3.1415884494781494,
+                "y": 0.07566525042057037,
+                "z": 3.1415908336639404
+            },
+            "scale": {
+                "x": 3.9999938011169434,
+                "y": 5.0,
+                "z": 5.000002861022949
+            },
+            "useAnchorPoint": false,
+            "uvScale": {
+                "x": 1.0,
+                "y": 1.0
+            },
+            "uvStochastic": 0.0,
+            "visible": true
+        },
+        {
+            "anchorPoint": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "animationName": "",
+            "castShadow": true,
+            "colliderAabbMax": {
+                "x": 1.016891360282898,
+                "y": 1.1000304222106934,
+                "z": 1.1192142963409424
+            },
+            "colliderAabbMin": {
+                "x": -1.016891360282898,
+                "y": -0.026936471462249756,
+                "z": -1.1105310916900635
+            },
+            "colliderCameraFade": true,
+            "colliderEnabled": true,
+            "colliderObbCenter": {
+                "x": 0.0,
+                "y": 0.5365470051765442,
+                "z": 0.004341542720794678
+            },
+            "colliderObbEuler": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbSize": {
+                "x": 1.016891360282898,
+                "y": 0.563483476638794,
+                "z": 1.114872694015503
+            },
+            "colliderShapeType": 1,
+            "colliderSphCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": {
+                "w": 1.0,
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "filePath": "House_4\\House_4.obj",
+            "id": 66,
+            "isAnimation": false,
+            "modelName": "House_4.obj",
+            "nameTag": "",
+            "outlineEnabled": true,
+            "parentID": -1,
+            "pickable": true,
+            "position": {
+                "x": 47.3551025390625,
+                "y": 0.0,
+                "z": -30.75279998779297
+            },
+            "rotate": {
+                "x": -7.542179082520306e-05,
+                "y": -1.0698864459991455,
+                "z": 6.739387026755139e-05
+            },
+            "scale": {
+                "x": 3.9999990463256836,
+                "y": 5.0,
+                "z": 5.000001907348633
+            },
+            "useAnchorPoint": false,
+            "uvScale": {
+                "x": 1.0,
+                "y": 1.0
+            },
+            "uvStochastic": 0.0,
+            "visible": true
+        },
+        {
+            "anchorPoint": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "animationName": "",
+            "castShadow": true,
+            "colliderAabbMax": {
+                "x": 2.6634645462036133,
+                "y": 3.074552059173584,
+                "z": 1.7077034711837769
+            },
+            "colliderAabbMin": {
+                "x": -1.4709999561309814,
+                "y": -0.079032301902771,
+                "z": -1.3899999856948853
+            },
+            "colliderCameraFade": true,
+            "colliderEnabled": true,
+            "colliderObbCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbEuler": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbSize": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "colliderShapeType": 0,
+            "colliderSphCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": {
+                "w": 1.0,
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "filePath": "Blacksmith\\Blacksmith.obj",
+            "id": 2,
+            "isAnimation": false,
+            "modelName": "Blacksmith.obj",
+            "nameTag": "",
+            "outlineEnabled": true,
+            "parentID": -1,
+            "pickable": false,
+            "position": {
+                "x": -24.663999557495117,
+                "y": 0.0,
+                "z": 59.70845031738281
+            },
+            "rotate": {
+                "x": 3.1415884494781494,
+                "y": 0.07566525042057037,
+                "z": 3.1415908336639404
+            },
+            "scale": {
+                "x": 3.9999938011169434,
+                "y": 5.0,
+                "z": 5.000002861022949
+            },
+            "useAnchorPoint": false,
+            "uvScale": {
+                "x": 1.0,
+                "y": 1.0
+            },
+            "uvStochastic": 0.0,
+            "visible": true
+        },
+        {
+            "anchorPoint": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "animationName": "",
+            "castShadow": true,
+            "colliderAabbMax": {
+                "x": 1.0255683660507202,
+                "y": 2.141460657119751,
+                "z": 1.1192142963409424
+            },
+            "colliderAabbMin": {
+                "x": -1.0082143545150757,
+                "y": -0.051976680755615234,
+                "z": -1.1105310916900635
+            },
+            "colliderCameraFade": true,
+            "colliderEnabled": true,
+            "colliderObbCenter": {
+                "x": 0.008677005767822266,
+                "y": 1.0447419881820679,
+                "z": 0.004341542720794678
+            },
+            "colliderObbEuler": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbSize": {
+                "x": 1.016891360282898,
+                "y": 1.096718668937683,
+                "z": 1.114872694015503
+            },
+            "colliderShapeType": 1,
+            "colliderSphCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": {
+                "w": 1.0,
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "filePath": "House_3\\House_3.obj",
+            "id": 67,
+            "isAnimation": false,
+            "modelName": "House_3.obj",
+            "nameTag": "",
+            "outlineEnabled": true,
+            "parentID": -1,
+            "pickable": true,
+            "position": {
+                "x": 41.77015686035156,
+                "y": 0.0,
+                "z": 38.13922882080078
+            },
+            "rotate": {
+                "x": 3.1415157318115234,
+                "y": -0.8848819136619568,
+                "z": -3.1415247917175293
+            },
+            "scale": {
+                "x": 3.9999992847442627,
+                "y": 5.0,
+                "z": 4.999999046325684
+            },
+            "useAnchorPoint": false,
+            "uvScale": {
+                "x": 1.0,
+                "y": 1.0
+            },
+            "uvStochastic": 0.0,
+            "visible": true
+        },
+        {
+            "anchorPoint": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "animationName": "",
+            "castShadow": true,
+            "colliderAabbMax": {
+                "x": 2.6634645462036133,
+                "y": 3.074552059173584,
+                "z": 1.7077034711837769
+            },
+            "colliderAabbMin": {
+                "x": -1.4709999561309814,
+                "y": -0.079032301902771,
+                "z": -1.3899999856948853
+            },
+            "colliderCameraFade": true,
+            "colliderEnabled": true,
+            "colliderObbCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbEuler": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbSize": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "colliderShapeType": 0,
+            "colliderSphCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": {
+                "w": 1.0,
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "filePath": "Blacksmith\\Blacksmith.obj",
+            "id": 3,
+            "isAnimation": false,
+            "modelName": "Blacksmith.obj",
+            "nameTag": "",
+            "outlineEnabled": true,
+            "parentID": -1,
+            "pickable": false,
+            "position": {
+                "x": 25.214000701904297,
+                "y": 0.0,
+                "z": 60.0
+            },
+            "rotate": {
+                "x": 3.1415884494781494,
+                "y": 0.07566525042057037,
+                "z": 3.1415908336639404
+            },
+            "scale": {
+                "x": 3.9999938011169434,
+                "y": 5.0,
+                "z": 5.000002861022949
+            },
+            "useAnchorPoint": false,
+            "uvScale": {
+                "x": 1.0,
+                "y": 1.0
+            },
+            "uvStochastic": 0.0,
+            "visible": true
+        },
+        {
+            "anchorPoint": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "animationName": "",
+            "castShadow": true,
+            "colliderAabbMax": {
+                "x": 1.016891360282898,
+                "y": 1.1000304222106934,
+                "z": 1.1192142963409424
+            },
+            "colliderAabbMin": {
+                "x": -1.016891360282898,
+                "y": -0.026936471462249756,
+                "z": -1.1105310916900635
+            },
+            "colliderCameraFade": true,
+            "colliderEnabled": true,
+            "colliderObbCenter": {
+                "x": 0.0,
+                "y": 0.5365470051765442,
+                "z": 0.004341542720794678
+            },
+            "colliderObbEuler": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbSize": {
+                "x": 1.016891360282898,
+                "y": 0.563483476638794,
+                "z": 1.114872694015503
+            },
+            "colliderShapeType": 1,
+            "colliderSphCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": {
+                "w": 1.0,
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "filePath": "House_4\\House_4.obj",
+            "id": 68,
+            "isAnimation": false,
+            "modelName": "House_4.obj",
+            "nameTag": "",
+            "outlineEnabled": true,
+            "parentID": -1,
+            "pickable": true,
+            "position": {
+                "x": 47.39814376831055,
+                "y": 0.0,
+                "z": 29.891658782958984
+            },
+            "rotate": {
+                "x": 3.1415157318115234,
+                "y": -1.0594148635864258,
+                "z": -3.1415247917175293
+            },
+            "scale": {
+                "x": 3.9999990463256836,
+                "y": 5.0,
+                "z": 5.000000953674316
+            },
+            "useAnchorPoint": false,
+            "uvScale": {
+                "x": 1.0,
+                "y": 1.0
+            },
+            "uvStochastic": 0.0,
+            "visible": true
+        },
+        {
+            "anchorPoint": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "animationName": "",
+            "castShadow": true,
+            "colliderAabbMax": {
+                "x": 2.6634645462036133,
+                "y": 3.074552059173584,
+                "z": 1.7077034711837769
+            },
+            "colliderAabbMin": {
+                "x": -1.4709999561309814,
+                "y": -0.079032301902771,
+                "z": -1.3899999856948853
+            },
+            "colliderCameraFade": true,
+            "colliderEnabled": true,
+            "colliderObbCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbEuler": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbSize": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "colliderShapeType": 0,
+            "colliderSphCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": {
+                "w": 1.0,
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "filePath": "Blacksmith\\Blacksmith.obj",
+            "id": 4,
+            "isAnimation": false,
+            "modelName": "Blacksmith.obj",
+            "nameTag": "",
+            "outlineEnabled": true,
+            "parentID": -1,
+            "pickable": false,
+            "position": {
+                "x": 9.0,
+                "y": 0.0,
+                "z": 59.737918853759766
+            },
+            "rotate": {
+                "x": 3.1415884494781494,
+                "y": 0.07566525042057037,
+                "z": 3.1415908336639404
+            },
+            "scale": {
+                "x": 3.9999938011169434,
+                "y": 5.0,
+                "z": 5.000002861022949
+            },
+            "useAnchorPoint": false,
+            "uvScale": {
+                "x": 1.0,
+                "y": 1.0
+            },
+            "uvStochastic": 0.0,
+            "visible": true
+        },
+        {
+            "anchorPoint": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "animationName": "",
+            "castShadow": true,
+            "colliderAabbMax": {
+                "x": 1.016891360282898,
+                "y": 1.1000304222106934,
+                "z": 1.1192142963409424
+            },
+            "colliderAabbMin": {
+                "x": -1.016891360282898,
+                "y": -0.026936471462249756,
+                "z": -1.1105310916900635
+            },
+            "colliderCameraFade": true,
+            "colliderEnabled": true,
+            "colliderObbCenter": {
+                "x": 0.0,
+                "y": 0.5365470051765442,
+                "z": 0.004341542720794678
+            },
+            "colliderObbEuler": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbSize": {
+                "x": 1.016891360282898,
+                "y": 0.563483476638794,
+                "z": 1.114872694015503
+            },
+            "colliderShapeType": 1,
+            "colliderSphCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": {
+                "w": 1.0,
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "filePath": "House_4\\House_4.obj",
+            "id": 69,
+            "isAnimation": false,
+            "modelName": "House_4.obj",
+            "nameTag": "",
+            "outlineEnabled": true,
+            "parentID": -1,
+            "pickable": true,
+            "position": {
+                "x": 34.58702850341797,
+                "y": 0.0,
+                "z": 44.61980438232422
+            },
+            "rotate": {
+                "x": 3.1415157318115234,
+                "y": -0.7103490233421326,
+                "z": -3.1415247917175293
+            },
+            "scale": {
+                "x": 3.999999523162842,
+                "y": 5.0,
+                "z": 5.000000476837158
+            },
+            "useAnchorPoint": false,
+            "uvScale": {
+                "x": 1.0,
+                "y": 1.0
+            },
+            "uvStochastic": 0.0,
+            "visible": true
+        },
+        {
+            "anchorPoint": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "animationName": "",
+            "castShadow": true,
+            "colliderAabbMax": {
+                "x": 2.6634645462036133,
+                "y": 3.074552059173584,
+                "z": 1.7077034711837769
+            },
+            "colliderAabbMin": {
+                "x": -1.4709999561309814,
+                "y": -0.079032301902771,
+                "z": -1.3899999856948853
+            },
+            "colliderCameraFade": true,
+            "colliderEnabled": true,
+            "colliderObbCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbEuler": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbSize": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "colliderShapeType": 0,
+            "colliderSphCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": {
+                "w": 1.0,
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "filePath": "Blacksmith\\Blacksmith.obj",
+            "id": 5,
+            "isAnimation": false,
+            "modelName": "Blacksmith.obj",
+            "nameTag": "",
+            "outlineEnabled": true,
+            "parentID": -1,
+            "pickable": false,
+            "position": {
+                "x": -7.883228302001953,
+                "y": 0.0,
+                "z": -59.13017654418945
+            },
+            "rotate": {
+                "x": -7.90043304732535e-06,
+                "y": -0.022888202220201492,
+                "z": 2.4583900994912256e-06
+            },
+            "scale": {
+                "x": 3.999985456466675,
+                "y": 5.0,
+                "z": 5.000003337860107
+            },
+            "useAnchorPoint": false,
+            "uvScale": {
+                "x": 1.0,
+                "y": 1.0
+            },
+            "uvStochastic": 0.0,
+            "visible": true
+        },
+        {
+            "anchorPoint": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "animationName": "",
+            "castShadow": true,
+            "colliderAabbMax": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "colliderAabbMin": {
+                "x": -1.0,
+                "y": -1.0,
+                "z": -1.0
+            },
+            "colliderCameraFade": true,
+            "colliderEnabled": true,
+            "colliderObbCenter": {
+                "x": 0.0,
+                "y": 2.3802006244659424,
+                "z": -0.010932505130767822
+            },
+            "colliderObbEuler": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbSize": {
+                "x": 1.016891360282898,
+                "y": 2.4993197917938232,
+                "z": 1.1699724197387695
+            },
+            "colliderShapeType": 1,
+            "colliderSphCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": {
+                "w": 1.0,
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "filePath": "Bell_Tower\\Bell_Tower.obj",
+            "id": 70,
+            "isAnimation": false,
+            "modelName": "Bell_Tower.obj",
+            "nameTag": "",
+            "outlineEnabled": true,
+            "parentID": -1,
+            "pickable": true,
+            "position": {
+                "x": 52.13874053955078,
+                "y": 0.0,
+                "z": -21.50314712524414
+            },
+            "rotate": {
+                "x": -7.542179082520306e-05,
+                "y": -1.2095128297805786,
+                "z": 6.739389937138185e-05
+            },
+            "scale": {
+                "x": 3.9999983310699463,
+                "y": 5.0,
+                "z": 5.000000953674316
+            },
+            "useAnchorPoint": false,
+            "uvScale": {
+                "x": 1.0,
+                "y": 1.0
+            },
+            "uvStochastic": 0.0,
+            "visible": true
+        },
+        {
+            "anchorPoint": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "animationName": "",
+            "castShadow": true,
+            "colliderAabbMax": {
+                "x": 2.6634645462036133,
+                "y": 3.074552059173584,
+                "z": 1.7077034711837769
+            },
+            "colliderAabbMin": {
+                "x": -1.4709999561309814,
+                "y": -0.079032301902771,
+                "z": -1.3899999856948853
+            },
+            "colliderCameraFade": true,
+            "colliderEnabled": true,
+            "colliderObbCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbEuler": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbSize": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "colliderShapeType": 0,
+            "colliderSphCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": {
+                "w": 1.0,
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "filePath": "Blacksmith\\Blacksmith.obj",
+            "id": 6,
+            "isAnimation": false,
+            "modelName": "Blacksmith.obj",
+            "nameTag": "",
+            "outlineEnabled": true,
+            "parentID": -1,
+            "pickable": false,
+            "position": {
+                "x": -24.664051055908203,
+                "y": 0.0,
+                "z": -59.15964889526367
+            },
+            "rotate": {
+                "x": -4.958189038006822e-06,
+                "y": -0.07116394490003586,
+                "z": 1.8007652897722437e-06
+            },
+            "scale": {
+                "x": 3.9999938011169434,
+                "y": 5.0,
+                "z": 5.000002861022949
+            },
+            "useAnchorPoint": false,
+            "uvScale": {
+                "x": 1.0,
+                "y": 1.0
+            },
+            "uvStochastic": 0.0,
+            "visible": true
+        },
+        {
+            "anchorPoint": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "animationName": "",
+            "castShadow": true,
+            "colliderAabbMax": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "colliderAabbMin": {
+                "x": -1.0,
+                "y": -1.0,
+                "z": -1.0
+            },
+            "colliderCameraFade": true,
+            "colliderEnabled": true,
+            "colliderObbCenter": {
+                "x": 0.0,
+                "y": 2.3802006244659424,
+                "z": -0.010932505130767822
+            },
+            "colliderObbEuler": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbSize": {
+                "x": 1.016891360282898,
+                "y": 2.4993197917938232,
+                "z": 1.1699724197387695
+            },
+            "colliderShapeType": 1,
+            "colliderSphCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": {
+                "w": 1.0,
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "filePath": "Bell_Tower\\Bell_Tower.obj",
+            "id": 71,
+            "isAnimation": false,
+            "modelName": "Bell_Tower.obj",
+            "nameTag": "",
+            "outlineEnabled": true,
+            "parentID": -1,
+            "pickable": true,
+            "position": {
+                "x": 52.92101287841797,
+                "y": 0.0,
+                "z": 20.161428451538086
+            },
+            "rotate": {
+                "x": -7.542178354924545e-05,
+                "y": -1.925098180770874,
+                "z": 6.739389937138185e-05
+            },
+            "scale": {
+                "x": 3.9999983310699463,
+                "y": 5.0,
+                "z": 5.000000953674316
+            },
+            "useAnchorPoint": false,
+            "uvScale": {
+                "x": 1.0,
+                "y": 1.0
+            },
+            "uvStochastic": 0.0,
+            "visible": true
+        },
+        {
+            "anchorPoint": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "animationName": "",
+            "castShadow": true,
+            "colliderAabbMax": {
+                "x": 2.6634645462036133,
+                "y": 3.074552059173584,
+                "z": 1.7077034711837769
+            },
+            "colliderAabbMin": {
+                "x": -1.4709999561309814,
+                "y": -0.079032301902771,
+                "z": -1.3899999856948853
+            },
+            "colliderCameraFade": true,
+            "colliderEnabled": true,
+            "colliderObbCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbEuler": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbSize": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "colliderShapeType": 0,
+            "colliderSphCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": {
+                "w": 1.0,
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "filePath": "Blacksmith\\Blacksmith.obj",
+            "id": 7,
+            "isAnimation": false,
+            "modelName": "Blacksmith.obj",
+            "nameTag": "",
+            "outlineEnabled": true,
+            "parentID": -1,
+            "pickable": false,
+            "position": {
+                "x": 25.21392059326172,
+                "y": 0.0,
+                "z": -59.13017654418945
+            },
+            "rotate": {
+                "x": -4.958189038006822e-06,
+                "y": -0.07116394490003586,
+                "z": 1.8007652897722437e-06
+            },
+            "scale": {
+                "x": 3.9999938011169434,
+                "y": 5.0,
+                "z": 5.000002861022949
+            },
+            "useAnchorPoint": false,
+            "uvScale": {
+                "x": 1.0,
+                "y": 1.0
+            },
+            "uvStochastic": 0.0,
+            "visible": true
+        },
+        {
+            "anchorPoint": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "animationName": "",
+            "castShadow": true,
+            "colliderAabbMax": {
+                "x": 2.6634645462036133,
+                "y": 3.074552059173584,
+                "z": 1.7077034711837769
+            },
+            "colliderAabbMin": {
+                "x": -1.4709999561309814,
+                "y": -0.079032301902771,
+                "z": -1.3899999856948853
+            },
+            "colliderCameraFade": true,
+            "colliderEnabled": true,
+            "colliderObbCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbEuler": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbSize": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "colliderShapeType": 0,
+            "colliderSphCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": {
+                "w": 1.0,
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "filePath": "Blacksmith\\Blacksmith.obj",
+            "id": 8,
+            "isAnimation": false,
+            "modelName": "Blacksmith.obj",
+            "nameTag": "",
+            "outlineEnabled": true,
+            "parentID": -1,
+            "pickable": false,
+            "position": {
+                "x": 9.0,
+                "y": 0.0,
+                "z": -59.0
+            },
+            "rotate": {
+                "x": -4.958189038006822e-06,
+                "y": -0.07116453349590302,
+                "z": 1.8007616517934366e-06
+            },
+            "scale": {
+                "x": 3.9999868869781494,
+                "y": 5.0,
+                "z": 4.999997138977051
+            },
+            "useAnchorPoint": false,
+            "uvScale": {
+                "x": 1.0,
+                "y": 1.0
+            },
+            "uvStochastic": 0.0,
+            "visible": true
+        },
+        {
+            "anchorPoint": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "animationName": "",
+            "castShadow": true,
+            "colliderAabbMax": {
+                "x": 1.0255683660507202,
+                "y": 2.141460657119751,
+                "z": 1.1192142963409424
+            },
+            "colliderAabbMin": {
+                "x": -1.0082143545150757,
+                "y": -0.051976680755615234,
+                "z": -1.1105310916900635
+            },
+            "colliderCameraFade": true,
+            "colliderEnabled": true,
+            "colliderObbCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbEuler": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbSize": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "colliderShapeType": 0,
+            "colliderSphCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": {
+                "w": 1.0,
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "filePath": "House_3\\House_3.obj",
+            "id": 48,
+            "isAnimation": false,
+            "modelName": "House_3.obj",
+            "nameTag": "",
+            "outlineEnabled": true,
+            "parentID": -1,
+            "pickable": true,
+            "position": {
+                "x": -53.222129821777344,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "rotate": {
+                "x": 0.0,
+                "y": 1.5707963705062866,
+                "z": 0.0
+            },
+            "scale": {
+                "x": 4.0,
+                "y": 5.0,
+                "z": 5.0
+            },
+            "useAnchorPoint": false,
+            "uvScale": {
+                "x": 1.0,
+                "y": 1.0
+            },
+            "uvStochastic": 0.0,
+            "visible": true
+        },
+        {
+            "anchorPoint": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "animationName": "",
+            "castShadow": true,
+            "colliderAabbMax": {
+                "x": 1.016891360282898,
+                "y": 1.1000304222106934,
+                "z": 1.1192142963409424
+            },
+            "colliderAabbMin": {
+                "x": -1.016891360282898,
+                "y": -0.026936471462249756,
+                "z": -1.1105310916900635
+            },
+            "colliderCameraFade": true,
+            "colliderEnabled": true,
+            "colliderObbCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbEuler": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbSize": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "colliderShapeType": 0,
+            "colliderSphCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": {
+                "w": 1.0,
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "filePath": "House_4\\House_4.obj",
+            "id": 49,
+            "isAnimation": false,
+            "modelName": "House_4.obj",
+            "nameTag": "",
+            "outlineEnabled": true,
+            "parentID": -1,
+            "pickable": true,
+            "position": {
+                "x": -52.484378814697266,
+                "y": 0.0,
+                "z": -9.064019203186035
+            },
+            "rotate": {
+                "x": -3.1415908336639404,
+                "y": 1.5707954168319702,
+                "z": -3.1415908336639404
+            },
+            "scale": {
+                "x": 4.0,
+                "y": 5.0,
+                "z": 5.0
+            },
+            "useAnchorPoint": false,
+            "uvScale": {
+                "x": 1.0,
+                "y": 1.0
+            },
+            "uvStochastic": 0.0,
+            "visible": true
+        },
+        {
+            "anchorPoint": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "animationName": "",
+            "castShadow": true,
+            "colliderAabbMax": {
+                "x": 1.016891360282898,
+                "y": 1.1000304222106934,
+                "z": 1.1192142963409424
+            },
+            "colliderAabbMin": {
+                "x": -1.016891360282898,
+                "y": -0.026936471462249756,
+                "z": -1.1105310916900635
+            },
+            "colliderCameraFade": true,
+            "colliderEnabled": true,
+            "colliderObbCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbEuler": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbSize": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "colliderShapeType": 0,
+            "colliderSphCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": {
+                "w": 1.0,
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "filePath": "House_4\\House_4.obj",
+            "id": 50,
+            "isAnimation": false,
+            "modelName": "House_4.obj",
+            "nameTag": "",
+            "outlineEnabled": true,
+            "parentID": -1,
+            "pickable": true,
+            "position": {
+                "x": -52.23571014404297,
+                "y": 0.0,
+                "z": 8.953113555908203
+            },
+            "rotate": {
+                "x": -3.1415908336639404,
+                "y": 1.5707954168319702,
+                "z": -3.1415908336639404
+            },
+            "scale": {
+                "x": 4.0,
+                "y": 5.0,
+                "z": 5.0
+            },
+            "useAnchorPoint": false,
+            "uvScale": {
+                "x": 1.0,
+                "y": 1.0
+            },
+            "uvStochastic": 0.0,
+            "visible": true
+        },
+        {
+            "anchorPoint": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "animationName": "",
+            "castShadow": true,
+            "colliderAabbMax": {
+                "x": 1.0255683660507202,
+                "y": 2.141460657119751,
+                "z": 1.1192142963409424
+            },
+            "colliderAabbMin": {
+                "x": -1.0082143545150757,
+                "y": -0.051976680755615234,
+                "z": -1.1105310916900635
+            },
+            "colliderCameraFade": true,
+            "colliderEnabled": true,
+            "colliderObbCenter": {
+                "x": 0.008677005767822266,
+                "y": 1.0447419881820679,
+                "z": 0.004341542720794678
+            },
+            "colliderObbEuler": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbSize": {
+                "x": 1.016891360282898,
+                "y": 1.096718668937683,
+                "z": 1.114872694015503
+            },
+            "colliderShapeType": 1,
+            "colliderSphCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": {
+                "w": 1.0,
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "filePath": "House_3\\House_3.obj",
+            "id": 51,
+            "isAnimation": false,
+            "modelName": "House_3.obj",
+            "nameTag": "",
+            "outlineEnabled": true,
+            "parentID": -1,
+            "pickable": true,
+            "position": {
+                "x": -40.056007385253906,
+                "y": 0.0,
+                "z": -38.64872741699219
+            },
+            "rotate": {
+                "x": 1.819925614654494e-06,
+                "y": 0.8726645708084106,
+                "z": 1.8198826410298352e-06
+            },
+            "scale": {
+                "x": 3.9999992847442627,
+                "y": 5.0,
+                "z": 5.0
+            },
+            "useAnchorPoint": false,
+            "uvScale": {
+                "x": 1.0,
+                "y": 1.0
+            },
+            "uvStochastic": 0.0,
+            "visible": true
+        },
+        {
+            "anchorPoint": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "animationName": "",
+            "castShadow": true,
+            "colliderAabbMax": {
+                "x": 1.016891360282898,
+                "y": 1.1000304222106934,
+                "z": 1.1192142963409424
+            },
+            "colliderAabbMin": {
+                "x": -1.016891360282898,
+                "y": -0.026936471462249756,
+                "z": -1.1105310916900635
+            },
+            "colliderCameraFade": true,
+            "colliderEnabled": true,
+            "colliderObbCenter": {
+                "x": 0.0,
+                "y": 0.5365470051765442,
+                "z": 0.004341542720794678
+            },
+            "colliderObbEuler": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbSize": {
+                "x": 1.016891360282898,
+                "y": 0.563483476638794,
+                "z": 1.114872694015503
+            },
+            "colliderShapeType": 1,
+            "colliderSphCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": {
+                "w": 1.0,
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "filePath": "House_4\\House_4.obj",
+            "id": 52,
+            "isAnimation": false,
+            "modelName": "House_4.obj",
+            "nameTag": "",
+            "outlineEnabled": true,
+            "parentID": -1,
+            "pickable": true,
+            "position": {
+                "x": -33.43769073486328,
+                "y": 0.0,
+                "z": -42.92007827758789
+            },
+            "rotate": {
+                "x": 1.819925614654494e-06,
+                "y": 0.7155848741531372,
+                "z": 1.819925614654494e-06
+            },
+            "scale": {
+                "x": 4.0,
+                "y": 5.0,
+                "z": 5.0
+            },
+            "useAnchorPoint": false,
+            "uvScale": {
+                "x": 1.0,
+                "y": 1.0
+            },
+            "uvStochastic": 0.0,
+            "visible": true
+        },
+        {
+            "anchorPoint": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "animationName": "",
+            "castShadow": true,
+            "colliderAabbMax": {
+                "x": 1.016891360282898,
+                "y": 1.1000304222106934,
+                "z": 1.1192142963409424
+            },
+            "colliderAabbMin": {
+                "x": -1.016891360282898,
+                "y": -0.026936471462249756,
+                "z": -1.1105310916900635
+            },
+            "colliderCameraFade": true,
+            "colliderEnabled": true,
+            "colliderObbCenter": {
+                "x": 0.0,
+                "y": 0.5365470051765442,
+                "z": 0.004341542720794678
+            },
+            "colliderObbEuler": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbSize": {
+                "x": 1.016891360282898,
+                "y": 0.563483476638794,
+                "z": 1.114872694015503
+            },
+            "colliderShapeType": 1,
+            "colliderSphCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": {
+                "w": 1.0,
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "filePath": "House_4\\House_4.obj",
+            "id": 53,
+            "isAnimation": false,
+            "modelName": "House_4.obj",
+            "nameTag": "",
+            "outlineEnabled": true,
+            "parentID": -1,
+            "pickable": true,
+            "position": {
+                "x": -44.09274673461914,
+                "y": 0.0,
+                "z": -32.176918029785156
+            },
+            "rotate": {
+                "x": 1.8199228861703887e-06,
+                "y": 0.9948366284370422,
+                "z": 1.819922772483551e-06
+            },
+            "scale": {
+                "x": 3.9999990463256836,
+                "y": 5.0,
+                "z": 5.000001430511475
+            },
+            "useAnchorPoint": false,
+            "uvScale": {
+                "x": 1.0,
+                "y": 1.0
+            },
+            "uvStochastic": 0.0,
+            "visible": true
+        },
+        {
+            "anchorPoint": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "animationName": "",
+            "castShadow": true,
+            "colliderAabbMax": {
+                "x": 1.0255683660507202,
+                "y": 2.141460657119751,
+                "z": 1.1192142963409424
+            },
+            "colliderAabbMin": {
+                "x": -1.0082143545150757,
+                "y": -0.051976680755615234,
+                "z": -1.1105310916900635
+            },
+            "colliderCameraFade": true,
+            "colliderEnabled": true,
+            "colliderObbCenter": {
+                "x": 0.008677005767822266,
+                "y": 1.0447419881820679,
+                "z": 0.004341542720794678
+            },
+            "colliderObbEuler": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbSize": {
+                "x": 1.016891360282898,
+                "y": 1.096718668937683,
+                "z": 1.114872694015503
+            },
+            "colliderShapeType": 1,
+            "colliderSphCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": {
+                "w": 1.0,
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "filePath": "House_3\\House_3.obj",
+            "id": 54,
+            "isAnimation": false,
+            "modelName": "House_3.obj",
+            "nameTag": "",
+            "outlineEnabled": true,
+            "parentID": -1,
+            "pickable": true,
+            "position": {
+                "x": -39.86356735229492,
+                "y": 0.0,
+                "z": 36.502952575683594
+            },
+            "rotate": {
+                "x": -3.1415908336639404,
+                "y": 0.8988444209098816,
+                "z": -3.1415908336639404
+            },
+            "scale": {
+                "x": 4.0,
+                "y": 5.0,
+                "z": 5.0
+            },
+            "useAnchorPoint": false,
+            "uvScale": {
+                "x": 1.0,
+                "y": 1.0
+            },
+            "uvStochastic": 0.0,
+            "visible": true
+        },
+        {
+            "anchorPoint": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "animationName": "",
+            "castShadow": true,
+            "colliderAabbMax": {
+                "x": 1.016891360282898,
+                "y": 1.1000304222106934,
+                "z": 1.1192142963409424
+            },
+            "colliderAabbMin": {
+                "x": -1.016891360282898,
+                "y": -0.026936471462249756,
+                "z": -1.1105310916900635
+            },
+            "colliderCameraFade": true,
+            "colliderEnabled": true,
+            "colliderObbCenter": {
+                "x": 0.0,
+                "y": 0.5365470051765442,
+                "z": 0.004341542720794678
+            },
+            "colliderObbEuler": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbSize": {
+                "x": 1.016891360282898,
+                "y": 0.563483476638794,
+                "z": 1.114872694015503
+            },
+            "colliderShapeType": 1,
+            "colliderSphCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": {
+                "w": 1.0,
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "filePath": "House_4\\House_4.obj",
+            "id": 55,
+            "isAnimation": false,
+            "modelName": "House_4.obj",
+            "nameTag": "",
+            "outlineEnabled": true,
+            "parentID": -1,
+            "pickable": true,
+            "position": {
+                "x": -45.11396026611328,
+                "y": 0.0,
+                "z": 28.679231643676758
+            },
+            "rotate": {
+                "x": -3.1415908336639404,
+                "y": 1.0035643577575684,
+                "z": -3.1415908336639404
+            },
+            "scale": {
+                "x": 3.999999523162842,
+                "y": 5.0,
+                "z": 5.000000476837158
+            },
+            "useAnchorPoint": false,
+            "uvScale": {
+                "x": 1.0,
+                "y": 1.0
+            },
+            "uvStochastic": 0.0,
+            "visible": true
+        },
+        {
+            "anchorPoint": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "animationName": "",
+            "castShadow": true,
+            "colliderAabbMax": {
+                "x": 1.016891360282898,
+                "y": 1.1000304222106934,
+                "z": 1.1192142963409424
+            },
+            "colliderAabbMin": {
+                "x": -1.016891360282898,
+                "y": -0.026936471462249756,
+                "z": -1.1105310916900635
+            },
+            "colliderCameraFade": true,
+            "colliderEnabled": true,
+            "colliderObbCenter": {
+                "x": 0.0,
+                "y": 0.5365470051765442,
+                "z": 0.004341542720794678
+            },
+            "colliderObbEuler": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbSize": {
+                "x": 1.016891360282898,
+                "y": 0.563483476638794,
+                "z": 1.114872694015503
+            },
+            "colliderShapeType": 1,
+            "colliderSphCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": {
+                "w": 1.0,
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "filePath": "House_4\\House_4.obj",
+            "id": 56,
+            "isAnimation": false,
+            "modelName": "House_4.obj",
+            "nameTag": "",
+            "outlineEnabled": true,
+            "parentID": -1,
+            "pickable": true,
+            "position": {
+                "x": -33.511634826660156,
+                "y": 0.0,
+                "z": 42.37432098388672
+            },
+            "rotate": {
+                "x": -3.1415908336639404,
+                "y": 0.6894049644470215,
+                "z": -3.1415908336639404
+            },
+            "scale": {
+                "x": 4.0,
+                "y": 5.0,
+                "z": 5.0
+            },
+            "useAnchorPoint": false,
+            "uvScale": {
+                "x": 1.0,
+                "y": 1.0
+            },
+            "uvStochastic": 0.0,
+            "visible": true
+        },
+        {
+            "anchorPoint": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "animationName": "",
+            "castShadow": true,
+            "colliderAabbMax": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "colliderAabbMin": {
+                "x": -1.0,
+                "y": -1.0,
+                "z": -1.0
+            },
+            "colliderCameraFade": true,
+            "colliderEnabled": true,
+            "colliderObbCenter": {
+                "x": 0.0,
+                "y": 2.3802006244659424,
+                "z": -0.010932505130767822
+            },
+            "colliderObbEuler": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbSize": {
+                "x": 1.016891360282898,
+                "y": 2.4993197917938232,
+                "z": 1.1699724197387695
+            },
+            "colliderShapeType": 1,
+            "colliderSphCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": {
+                "w": 1.0,
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "filePath": "Bell_Tower\\Bell_Tower.obj",
+            "id": 57,
+            "isAnimation": false,
+            "modelName": "Bell_Tower.obj",
+            "nameTag": "",
+            "outlineEnabled": true,
+            "parentID": -1,
+            "pickable": true,
+            "position": {
+                "x": -48.8863639831543,
+                "y": 0.0,
+                "z": -21.236183166503906
+            },
+            "rotate": {
+                "x": 0.0,
+                "y": 1.1693699359893799,
+                "z": 0.0
+            },
+            "scale": {
+                "x": 3.9999983310699463,
+                "y": 5.0,
+                "z": 5.0
+            },
+            "useAnchorPoint": false,
+            "uvScale": {
+                "x": 1.0,
+                "y": 1.0
+            },
+            "uvStochastic": 0.0,
+            "visible": true
+        },
+        {
+            "anchorPoint": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "animationName": "",
+            "castShadow": true,
+            "colliderAabbMax": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "colliderAabbMin": {
+                "x": -1.0,
+                "y": -1.0,
+                "z": -1.0
+            },
+            "colliderCameraFade": true,
+            "colliderEnabled": true,
+            "colliderObbCenter": {
+                "x": 0.0,
+                "y": 2.3802006244659424,
+                "z": -0.010932505130767822
+            },
+            "colliderObbEuler": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbSize": {
+                "x": 1.016891360282898,
+                "y": 2.4993197917938232,
+                "z": 1.1699724197387695
+            },
+            "colliderShapeType": 1,
+            "colliderSphCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": {
+                "w": 1.0,
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "filePath": "Bell_Tower\\Bell_Tower.obj",
+            "id": 58,
+            "isAnimation": false,
+            "modelName": "Bell_Tower.obj",
+            "nameTag": "",
+            "outlineEnabled": true,
+            "parentID": -1,
+            "pickable": true,
+            "position": {
+                "x": -49.504249572753906,
+                "y": 0.0,
+                "z": 20.161428451538086
+            },
+            "rotate": {
+                "x": -3.1415908336639404,
+                "y": 1.1868233680725098,
+                "z": -3.1415908336639404
+            },
+            "scale": {
+                "x": 3.9999985694885254,
+                "y": 5.0,
+                "z": 5.000000953674316
+            },
+            "useAnchorPoint": false,
+            "uvScale": {
+                "x": 1.0,
+                "y": 1.0
+            },
+            "uvStochastic": 0.0,
+            "visible": true
+        },
+        {
+            "anchorPoint": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "animationName": "",
+            "castShadow": true,
+            "colliderAabbMax": {
+                "x": 1.016891360282898,
+                "y": 1.1000304222106934,
+                "z": 1.1192142963409424
+            },
+            "colliderAabbMin": {
+                "x": -1.016891360282898,
+                "y": -0.026936471462249756,
+                "z": -1.1105310916900635
+            },
+            "colliderCameraFade": true,
+            "colliderEnabled": true,
+            "colliderObbCenter": {
+                "x": 0.0,
+                "y": 0.5365470051765442,
+                "z": 0.004341542720794678
+            },
+            "colliderObbEuler": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbSize": {
+                "x": 1.016891360282898,
+                "y": 0.563483476638794,
+                "z": 1.114872694015503
+            },
+            "colliderShapeType": 1,
+            "colliderSphCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": {
+                "w": 1.0,
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "filePath": "House_4\\House_4.obj",
+            "id": 59,
+            "isAnimation": false,
+            "modelName": "House_4.obj",
+            "nameTag": "",
+            "outlineEnabled": true,
+            "parentID": -1,
+            "pickable": true,
+            "position": {
+                "x": -33.511634826660156,
+                "y": 0.0,
+                "z": 42.37432098388672
+            },
+            "rotate": {
+                "x": -3.1415908336639404,
+                "y": 0.6894049644470215,
+                "z": -3.1415908336639404
+            },
+            "scale": {
+                "x": 4.0,
+                "y": 5.0,
+                "z": 5.0
+            },
+            "useAnchorPoint": false,
+            "uvScale": {
+                "x": 1.0,
+                "y": 1.0
+            },
+            "uvStochastic": 0.0,
+            "visible": true
+        },
+        {
+            "anchorPoint": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "animationName": "",
+            "castShadow": true,
+            "colliderAabbMax": {
+                "x": 1.016891360282898,
+                "y": 1.1000304222106934,
+                "z": 1.1192142963409424
+            },
+            "colliderAabbMin": {
+                "x": -1.016891360282898,
+                "y": -0.026936471462249756,
+                "z": -1.1105310916900635
+            },
+            "colliderCameraFade": true,
+            "colliderEnabled": true,
+            "colliderObbCenter": {
+                "x": 0.0,
+                "y": 0.5365470051765442,
+                "z": 0.004341542720794678
+            },
+            "colliderObbEuler": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbSize": {
+                "x": 1.016891360282898,
+                "y": 0.563483476638794,
+                "z": 1.114872694015503
+            },
+            "colliderShapeType": 1,
+            "colliderSphCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": {
+                "w": 1.0,
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "filePath": "House_4\\House_4.obj",
+            "id": 60,
+            "isAnimation": false,
+            "modelName": "House_4.obj",
+            "nameTag": "",
+            "outlineEnabled": true,
+            "parentID": -1,
+            "pickable": true,
+            "position": {
+                "x": -33.511634826660156,
+                "y": 0.0,
+                "z": 42.37432098388672
+            },
+            "rotate": {
+                "x": -3.1415908336639404,
+                "y": 0.6894049644470215,
+                "z": -3.1415908336639404
+            },
+            "scale": {
+                "x": 4.0,
+                "y": 5.0,
+                "z": 5.0
+            },
+            "useAnchorPoint": false,
+            "uvScale": {
+                "x": 1.0,
+                "y": 1.0
+            },
+            "uvStochastic": 0.0,
+            "visible": true
+        },
+        {
+            "anchorPoint": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "animationName": "",
+            "castShadow": true,
+            "colliderAabbMax": {
+                "x": 1.0255683660507202,
+                "y": 2.141460657119751,
+                "z": 1.1192142963409424
+            },
+            "colliderAabbMin": {
+                "x": -1.0082143545150757,
+                "y": -0.051976680755615234,
+                "z": -1.1105310916900635
+            },
+            "colliderCameraFade": true,
+            "colliderEnabled": true,
+            "colliderObbCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbEuler": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbSize": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "colliderShapeType": 0,
+            "colliderSphCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": {
+                "w": 1.0,
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "filePath": "House_3\\House_3.obj",
+            "id": 61,
+            "isAnimation": false,
+            "modelName": "House_3.obj",
+            "nameTag": "",
+            "outlineEnabled": true,
+            "parentID": -1,
+            "pickable": true,
+            "position": {
+                "x": 56.79610824584961,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "rotate": {
+                "x": -7.542178354924545e-05,
+                "y": -1.5230563879013062,
+                "z": 6.739389937138185e-05
+            },
+            "scale": {
+                "x": 3.999999761581421,
+                "y": 5.0,
+                "z": 5.0
+            },
+            "useAnchorPoint": false,
+            "uvScale": {
+                "x": 1.0,
+                "y": 1.0
+            },
+            "uvStochastic": 0.0,
+            "visible": true
+        },
+        {
+            "anchorPoint": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "animationName": "",
+            "castShadow": true,
+            "colliderAabbMax": {
+                "x": 1.016891360282898,
+                "y": 1.1000304222106934,
+                "z": 1.1192142963409424
+            },
+            "colliderAabbMin": {
+                "x": -1.016891360282898,
+                "y": -0.026936471462249756,
+                "z": -1.1105310916900635
+            },
+            "colliderCameraFade": true,
+            "colliderEnabled": true,
+            "colliderObbCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbEuler": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbSize": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "colliderShapeType": 0,
+            "colliderSphCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": {
+                "w": 1.0,
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "filePath": "House_4\\House_4.obj",
+            "id": 62,
+            "isAnimation": false,
+            "modelName": "House_4.obj",
+            "nameTag": "",
+            "outlineEnabled": true,
+            "parentID": -1,
+            "pickable": true,
+            "position": {
+                "x": 55.29997253417969,
+                "y": 0.0,
+                "z": -9.064019203186035
+            },
+            "rotate": {
+                "x": -3.1415908336639404,
+                "y": -1.5707963705062866,
+                "z": -3.1415908336639404
+            },
+            "scale": {
+                "x": 4.0,
+                "y": 5.0,
+                "z": 5.0
+            },
+            "useAnchorPoint": false,
+            "uvScale": {
+                "x": 1.0,
+                "y": 1.0
+            },
+            "uvStochastic": 0.0,
+            "visible": true
+        },
+        {
+            "anchorPoint": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "animationName": "",
+            "castShadow": true,
+            "colliderAabbMax": {
+                "x": 1.016891360282898,
+                "y": 1.1000304222106934,
+                "z": 1.1192142963409424
+            },
+            "colliderAabbMin": {
+                "x": -1.016891360282898,
+                "y": -0.026936471462249756,
+                "z": -1.1105310916900635
+            },
+            "colliderCameraFade": true,
+            "colliderEnabled": true,
+            "colliderObbCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbEuler": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderObbSize": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "colliderShapeType": 0,
+            "colliderSphCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "colliderSphRadius": 1.0,
+            "colliderTypeId": 8,
+            "color": {
+                "w": 1.0,
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "filePath": "House_4\\House_4.obj",
+            "id": 63,
+            "isAnimation": false,
+            "modelName": "House_4.obj",
+            "nameTag": "",
+            "outlineEnabled": true,
+            "parentID": -1,
+            "pickable": true,
+            "position": {
+                "x": 54.818115234375,
+                "y": 0.0,
+                "z": 8.953113555908203
+            },
+            "rotate": {
+                "x": -7.542178354924545e-05,
+                "y": -1.5230563879013062,
+                "z": 6.739389937138185e-05
+            },
+            "scale": {
+                "x": 3.999999761581421,
+                "y": 5.0,
+                "z": 5.0
+            },
+            "useAnchorPoint": false,
+            "uvScale": {
+                "x": 1.0,
+                "y": 1.0
+            },
+            "uvStochastic": 0.0,
+            "visible": true
+        }
+    ],
+    "version": 15
+}

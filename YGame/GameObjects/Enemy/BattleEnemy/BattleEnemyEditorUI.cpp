@@ -1,11 +1,264 @@
-#include "BattleEnemyEditorUI.h"
+﻿#include "BattleEnemyEditorUI.h"
 #ifdef USE_IMGUI
 
 #include "BattleEnemyManager.h"
 #include "BattleEnemy.h"
+#include "../AI/EnemyAIContext.h"
+#include "../Attack/Runtime/EnemyAttackLibrary.h"
 #include <Debugger/Logger.h>
 #include "imgui.h"
 #include <utility>
+
+namespace {
+
+/// <summary>
+/// 被弾リアクション（硬直・のけぞり・ダウン）の編集UI
+/// </summary>
+void DrawDamageReactionEditor(DamageReactionParams& dr, const char* idSuffix)
+{
+	ImGui::PushID(idSuffix);
+
+	ImGui::SeparatorText("被弾硬直");
+	ImGui::DragFloat("硬直時間", &dr.staggerDuration, 0.05f, 0.0f, 5.0f, "%.2f秒");
+	ImGui::SameLine();
+	ImGui::TextDisabled("(?)");
+	if (ImGui::BeginItemTooltip()) {
+		ImGui::TextUnformatted("被弾してから動き出すまでの秒数。\n長いと一方的に殴れてしまい、短いと反撃が理不尽になる。");
+		ImGui::EndTooltip();
+	}
+
+	ImGui::Checkbox("ノックバックが終わってから数え始める", &dr.waitForKnockback);
+	ImGui::SameLine();
+	ImGui::TextDisabled("(?)");
+	if (ImGui::BeginItemTooltip()) {
+		ImGui::TextUnformatted("ONだと実際の硬直は「ノックバック時間 + 硬直時間」になる。\nOFFにすると被弾した瞬間から数えるので、全体の硬直が短くなる。");
+		ImGui::EndTooltip();
+	}
+
+	ImGui::SeparatorText("被弾時の見た目");
+	ImGui::DragFloat("膨らむ量", &dr.punchScale, 0.01f, 0.0f, 1.0f, "%.2f");
+	ImGui::DragFloat("膨らみの戻り時間", &dr.punchDuration, 0.01f, 0.01f, 2.0f, "%.2f秒");
+	ImGui::DragFloat("赤くなるまでの時間", &dr.flashDuration, 0.01f, 0.01f, 2.0f, "%.2f秒");
+	ImGui::DragFloat("色を戻す時間", &dr.colorReturnDuration, 0.01f, 0.01f, 2.0f, "%.2f秒");
+	ImGui::DragFloat("点滅の速さ", &dr.blinkSpeed, 1.0f, 1.0f, 200.0f, "%.0f");
+
+	ImGui::SeparatorText("のけぞり（傾き）");
+	ImGui::DragFloat("のけぞり角度", &dr.hitReactionAngle, 0.01f, 0.0f, 1.5f, "%.2frad");
+	ImGui::DragFloat("のけぞり時間", &dr.hitReactionDuration, 0.01f, 0.0f, 2.0f, "%.2f秒");
+
+	ImGui::SeparatorText("ダウン（盾で弾いた時）");
+	ImGui::DragFloat("立ち上がるまで", &dr.downedStandUpTime, 0.1f, 0.1f, 15.0f, "%.1f秒");
+	ImGui::DragFloat("ふらつきの速さ", &dr.downedWobbleSpeed, 0.1f, 0.0f, 30.0f, "%.1f");
+	ImGui::DragFloat("ふらつきの傾き", &dr.downedWobbleTilt, 0.01f, 0.0f, 1.5f, "%.2frad");
+
+	ImGui::PopID();
+}
+
+/// <summary>
+/// 知覚パラメータの編集UI
+/// </summary>
+void DrawPerceptionEditor(PerceptionParams& pc, const char* idSuffix)
+{
+	ImGui::PushID(idSuffix);
+
+	ImGui::Checkbox("プレイヤーの状態を見る", &pc.enabled);
+	ImGui::SameLine();
+	ImGui::TextDisabled("(?)");
+	if (ImGui::BeginItemTooltip()) {
+		ImGui::TextUnformatted("OFFにすると距離とHPだけで判断する従来挙動に戻る。\nONとOFFを切り替えて手応えを比べるのに使う。");
+		ImGui::EndTooltip();
+	}
+
+	ImGui::BeginDisabled(!pc.enabled);
+
+	ImGui::SeparatorText("何を隙とみなすか");
+	ImGui::Checkbox("のけぞり・スタン中", &pc.openingOnStagger);
+	ImGui::Checkbox("CCが尽きている", &pc.openingOnOutOfCC);
+	ImGui::Checkbox("こちらを見ていない", &pc.openingOnLookAway);
+	ImGui::Checkbox("別の敵にロックオン中", &pc.openingOnLockedOther);
+	ImGui::DragFloat("正対とみなす角度", &pc.facingHalfAngleDeg, 1.0f, 5.0f, 180.0f, "±%.0f度");
+	ImGui::SameLine();
+	ImGui::TextDisabled("(?)");
+	if (ImGui::BeginItemTooltip()) {
+		ImGui::TextUnformatted("プレイヤーの正面からこの角度の外にいれば\n「見られていない」と判断する。\n小さくするほど敵は強気に回り込んでくる。");
+		ImGui::EndTooltip();
+	}
+
+	ImGui::SeparatorText("隙を見つけたとき");
+	ImGui::DragFloat("踏み込み距離ボーナス", &pc.openingAttackRangeBonus, 0.1f, 0.0f, 20.0f, "+%.1fm");
+	ImGui::DragFloat("速い技を選ぶ倍率", &pc.openingFastAttackWeight, 0.05f, 0.0f, 10.0f, "x%.2f");
+	ImGui::DragFloat("溜め技を避ける倍率", &pc.openingSlowAttackWeight, 0.05f, 0.0f, 10.0f, "x%.2f");
+
+	ImGui::SeparatorText("相手がこちらを向いて攻撃しているとき");
+	ImGui::DragFloat("後退を選ぶ倍率", &pc.threatBackstepWeight, 0.05f, 0.0f, 10.0f, "x%.2f");
+
+	ImGui::SeparatorText("相手がガード中のとき");
+	ImGui::DragFloat("回り込みを選ぶ倍率", &pc.guardStrafeWeight, 0.05f, 0.0f, 10.0f, "x%.2f");
+
+	ImGui::SeparatorText("相手が回避中のとき");
+	ImGui::DragFloat("溜め技で釣る倍率", &pc.baitSlowAttackWeight, 0.05f, 0.0f, 10.0f, "x%.2f");
+
+	ImGui::EndDisabled();
+	ImGui::PopID();
+}
+
+/// <summary>
+/// 状態名からカテゴリ色を決める。攻撃／間合い取り／被弾を一目で区別するため。
+/// </summary>
+ImVec4 StateColor(const std::string& name)
+{
+	if (name.rfind("Attack:", 0) == 0)  return { 1.00f, 0.45f, 0.35f, 1.0f }; // 赤 = 攻撃
+	if (name.rfind("Spacing:", 0) == 0) return { 0.40f, 0.80f, 1.00f, 1.0f }; // 青 = 間合い取り
+	if (name == "Damage" || name == "Downed") return { 1.00f, 0.85f, 0.30f, 1.0f }; // 黄 = 被弾
+	if (name == "Approach")             return { 0.60f, 1.00f, 0.60f, 1.0f }; // 緑 = 接近
+	return { 0.70f, 0.70f, 0.70f, 1.0f };
+}
+
+/// <summary>
+/// 現在の状態と直近の遷移履歴。
+/// 「攻撃のあとに間合い取りが挟まっているか」を目で確かめるためのもの。
+/// </summary>
+void DrawStateMonitor(BattleEnemy& enemy)
+{
+	const std::string current = enemy.GetStateName();
+	ImGui::TextUnformatted("現在:");
+	ImGui::SameLine();
+	ImGui::TextColored(StateColor(current), "%s", current.c_str());
+	ImGui::SameLine();
+	ImGui::TextDisabled("(%.2f秒)", enemy.GetTimeInCurrentState());
+
+	// 直近の遷移を新しい順に並べる。間合い取り(青)が攻撃(赤)の間に入っていれば成功。
+	if (ImGui::BeginChild("stateLog", ImVec2(0, 160), ImGuiChildFlags_Borders)) {
+		const auto& log = enemy.GetTransitionLog();
+		for (auto it = log.rbegin(); it != log.rend(); ++it) {
+			ImGui::TextDisabled("%6.1fs", it->lifeTime);
+			ImGui::SameLine();
+			ImGui::TextColored(StateColor(it->name), "%-18s", it->name.c_str());
+			ImGui::SameLine();
+			ImGui::TextDisabled("(前の状態 %.2f秒)", it->duration);
+		}
+	}
+	ImGui::EndChild();
+
+	if (ImGui::Button("ログをクリア")) {
+		enemy.ClearTransitionLog();
+	}
+}
+
+/// <summary>
+/// この敵が今プレイヤーをどう見ているかの実況表示。
+/// 知覚が実際に働いているかを目視で確認するために使う。
+/// </summary>
+void DrawPerceptionMonitor(const BattleEnemy& enemy)
+{
+	const PerceptionParams& perception = enemy.GetEnemyData().perception;
+	const EnemyAIContext ctx = EnemyAIContext::Capture(enemy, perception.facingHalfAngleDeg);
+	if (!ctx.hasPlayer) {
+		ImGui::TextDisabled("プレイヤー未設定");
+		return;
+	}
+
+	const ImVec4 on{ 0.35f, 1.0f, 0.35f, 1.0f };
+	const ImVec4 off{ 0.45f, 0.45f, 0.45f, 1.0f };
+	auto flag = [&](const char* label, bool value) {
+		ImGui::TextColored(value ? on : off, "%s", label);
+		ImGui::SameLine();
+	};
+
+	ImGui::Text("距離 %.2fm / 自HP %.0f%% / 敵HP %.0f%%",
+		ctx.distance, ctx.selfHpRatio * 100.0f, ctx.playerHpRatio * 100.0f);
+
+	// 向き。オートホーミングがあっても向きだけは埋まらないので、ここが主役になる。
+	ImGui::Text("正面からの角度 %.0f度", ctx.facingAngleDeg);
+	ImGui::SameLine();
+	if (ctx.playerIsFacingMe) {
+		ImGui::TextColored({ 1.0f, 0.5f, 0.4f, 1.0f }, "[見られている]");
+	} else {
+		ImGui::TextColored(on, "[死角にいる]");
+	}
+
+	// ロックオン
+	if (ctx.playerLockedOnMe) {
+		ImGui::TextColored({ 1.0f, 0.5f, 0.4f, 1.0f }, "ロックオン: 自分が狙われている");
+	} else if (ctx.playerLockedOnOther) {
+		ImGui::TextColored(on, "ロックオン: 別の敵が狙われている");
+	} else {
+		ImGui::TextDisabled("ロックオン: なし");
+	}
+
+	// 攻撃リソース
+	ImGui::Text("CC %.0f%%", ctx.playerCcRatio * 100.0f);
+	ImGui::SameLine();
+	if (ctx.playerIsOutOfCC) {
+		ImGui::TextColored(on, "[枯渇・攻撃できない]");
+	} else {
+		ImGui::TextDisabled("[攻撃可能]");
+	}
+
+	flag("攻撃中", ctx.playerIsAttacking);
+	flag("予備動作", ctx.playerIsWindingUp);
+	flag("振り終わり", ctx.playerIsRecovering);
+	ImGui::NewLine();
+
+	flag("ガード", ctx.playerIsGuarding);
+	flag("回避", ctx.playerIsDodging);
+	flag("のけぞり", ctx.playerIsStaggered);
+	flag("無敵", ctx.playerIsInvincible);
+	ImGui::NewLine();
+
+	flag("移動中", ctx.playerIsMoving);
+	flag("走行中", ctx.playerIsRunning);
+	ImGui::NewLine();
+
+	if (ctx.HasOpening(perception)) {
+		ImGui::TextColored({ 1.0f, 0.85f, 0.2f, 1.0f }, "→ 隙あり（差し込む）");
+	} else if (ctx.IsThreatening()) {
+		ImGui::TextColored({ 1.0f, 0.4f, 0.4f, 1.0f }, "→ 危険（下がる）");
+	} else {
+		ImGui::TextDisabled("→ 通常");
+	}
+}
+
+/// <summary>
+/// 間合い取りパラメータの編集UI。
+/// ベースデータ編集と個体編集の両方から呼ぶので関数に切り出している。
+/// </summary>
+void DrawSpacingEditor(SpacingParams& sp, const char* idSuffix)
+{
+	ImGui::PushID(idSuffix);
+
+	ImGui::SeparatorText("共通");
+	ImGui::DragFloat("維持したい間合い", &sp.preferredDistance, 0.1f, 1.0f, 30.0f, "%.1fm");
+	ImGui::DragFloat("近すぎ判定距離", &sp.tooCloseDistance, 0.1f, 0.5f, 20.0f, "%.1fm");
+	ImGui::DragFloat("プレイヤーへ向く速度", &sp.faceRotationSpeed, 0.1f, 0.1f, 30.0f, "%.1frad/s");
+
+	ImGui::SeparatorText("後退 (Backstep)");
+	ImGui::DragFloat("後退時間", &sp.backstepDuration, 0.05f, 0.05f, 3.0f, "%.2f秒");
+	ImGui::DragFloat("後退速度倍率", &sp.backstepSpeedMultiplier, 0.1f, 0.1f, 10.0f, "x%.1f");
+
+	ImGui::SeparatorText("横移動 (Strafe)");
+	ImGui::DragFloat("最短時間##strafe", &sp.strafeMinDuration, 0.05f, 0.05f, 5.0f, "%.2f秒");
+	ImGui::DragFloat("最長時間##strafe", &sp.strafeMaxDuration, 0.05f, 0.05f, 8.0f, "%.2f秒");
+	ImGui::DragFloat("横移動速度倍率", &sp.strafeSpeedMultiplier, 0.05f, 0.0f, 5.0f, "x%.2f");
+	ImGui::DragFloat("間合い維持の強さ", &sp.strafeDistanceKeepStrength, 0.05f, 0.0f, 10.0f, "%.2f");
+
+	ImGui::SeparatorText("様子見 (Observe)");
+	ImGui::DragFloat("最短時間##observe", &sp.observeMinDuration, 0.05f, 0.0f, 5.0f, "%.2f秒");
+	ImGui::DragFloat("最長時間##observe", &sp.observeMaxDuration, 0.05f, 0.0f, 8.0f, "%.2f秒");
+
+	ImGui::SeparatorText("攻撃後の選択重み");
+	ImGui::DragFloat("後退##weight", &sp.backstepWeight, 0.05f, 0.0f, 10.0f, "%.2f");
+	ImGui::DragFloat("横移動##weight", &sp.strafeWeight, 0.05f, 0.0f, 10.0f, "%.2f");
+	ImGui::DragFloat("様子見##weight", &sp.observeWeight, 0.05f, 0.0f, 10.0f, "%.2f");
+
+	// 最短 > 最長 になると乱数レンジが壊れるので、その場で入れ替えておく
+	if (sp.strafeMaxDuration < sp.strafeMinDuration)   std::swap(sp.strafeMinDuration, sp.strafeMaxDuration);
+	if (sp.observeMaxDuration < sp.observeMinDuration) std::swap(sp.observeMinDuration, sp.observeMaxDuration);
+
+	ImGui::PopID();
+}
+
+} // namespace
 
 void BattleEnemyEditorUI::Draw(BattleEnemyManager& manager)
 {
@@ -61,15 +314,136 @@ void BattleEnemyEditorUI::Draw(BattleEnemyManager& manager)
 
 	ImGui::Separator();
 
-	static char enemyIdBuffer[256] = "goblin";
-	static float spawnPos[3] = { 0.0f, 0.0f, 5.0f };
+	// --- カーブ定義の攻撃 ---
+	if (ImGui::CollapsingHeader("攻撃データ (カーブで定義)", ImGuiTreeNodeFlags_DefaultOpen)) {
+		auto& library = EnemyAttackLibrary::GetInstance();
 
-	ImGui::InputText("敵ID", enemyIdBuffer, sizeof(enemyIdBuffer));
-	ImGui::InputFloat3("生成位置", spawnPos);
+		ImGui::Checkbox("カーブ定義の攻撃を使う", EnemyAttackLibrary::GetEnabledPtr());
+		ImGui::SameLine();
+		ImGui::TextDisabled("(?)");
+		if (ImGui::BeginItemTooltip()) {
+			ImGui::TextUnformatted("OFFにすると従来のハードコード攻撃が使われる。\n"
+			                       "移行中に元の挙動と見比べるためのスイッチ。");
+			ImGui::EndTooltip();
+		}
 
-	if (ImGui::Button("デバッグ生成")) {
-		Vector3 position(spawnPos[0], spawnPos[1], spawnPos[2]);
-		manager.DebugSpawnEnemy(position, enemyIdBuffer);
+		ImGui::Text("読み込み済み: %zu件", library.GetAll().size());
+
+		// 内訳の確認用。カーブの編集は専用エディタで行う。
+		for (const auto& attack : library.GetAll()) {
+			if (!ImGui::TreeNode(attack.id.c_str(), "%s  [%.2f秒]",
+				attack.displayName.c_str(), attack.duration)) {
+				continue;
+			}
+
+			ImGui::TextDisabled("射程 %.1f〜%.1fm / 重み %.2f / %s",
+				attack.minRange, attack.maxRange, attack.weight,
+				attack.fast ? "速い技" : "溜め技");
+			if (attack.parriable) {
+				ImGui::TextColored({ 0.4f, 0.8f, 1.0f, 1.0f }, "盾で止められる");
+			}
+
+			// どのチャンネルを使っているか＝どんな動きかの要約になる
+			ImGui::TextUnformatted("使用チャンネル:");
+			ImGui::SameLine();
+			bool any = false;
+			for (size_t i = 0; i < static_cast<size_t>(AttackChannel::Count); ++i) {
+				const auto channel = static_cast<AttackChannel>(i);
+				if (!attack.tracks.HasKeys(channel)) continue;
+				if (any) ImGui::SameLine();
+				ImGui::TextColored({ 0.6f, 0.9f, 1.0f, 1.0f }, "%s",
+					AttackChannelToString(channel));
+				any = true;
+			}
+			if (!any) {
+				ImGui::TextDisabled("なし（動かない）");
+			}
+
+			for (const auto& modifier : attack.modifiers) {
+				ImGui::Text("  %-16s %.2f〜%.2f秒",
+					AttackModifierTypeToString(modifier.type),
+					modifier.startTime, modifier.endTime);
+			}
+			if (!attack.HasHitbox()) {
+				ImGui::TextColored({ 1.0f, 0.5f, 0.4f, 1.0f }, "攻撃判定がありません");
+			}
+
+			ImGui::TreePop();
+		}
+
+		ImGui::Separator();
+		if (ImGui::Button("攻撃データを保存")) {
+			library.Save();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("攻撃データを再読み込み")) {
+			library.Load();
+		}
+	}
+
+	ImGui::Separator();
+
+	// --- 攻撃権（同時に攻撃してよい敵の数）---
+	if (ImGui::CollapsingHeader("攻撃権 (同時に攻撃する敵の数)", ImGuiTreeNodeFlags_DefaultOpen)) {
+		AttackTokenPool& tokens = manager.GetAttackTokens();
+
+		ImGui::Checkbox("攻撃権による制限を使う", tokens.GetEnabledPtr());
+		ImGui::SameLine();
+		ImGui::TextDisabled("(?)");
+		if (ImGui::BeginItemTooltip()) {
+			ImGui::TextUnformatted("OFFにすると全員が自由に攻撃する（従来挙動）。\nONとOFFを切り替えて囲まれた時の圧を比べるのに使う。");
+			ImGui::EndTooltip();
+		}
+
+		ImGui::BeginDisabled(!tokens.IsEnabled());
+		ImGui::DragInt("同時に攻撃できる数", tokens.GetMaxTokensPtr(), 1, 1, 8);
+		ImGui::DragFloat("再攻撃までの待ち", tokens.GetReacquireCooldownPtr(), 0.05f, 0.0f, 10.0f, "%.2f秒");
+		ImGui::SameLine();
+		ImGui::TextDisabled("(?)");
+		if (ImGui::BeginItemTooltip()) {
+			ImGui::TextUnformatted("攻撃を終えた敵が、次に攻撃権を取れるようになるまでの秒数。\n0にすると同じ個体が連続で攻めてくることがある。");
+			ImGui::EndTooltip();
+		}
+		ImGui::EndDisabled();
+
+		// 今どの敵が攻撃権を持っているか
+		ImGui::Text("攻撃中: %d / %d", tokens.GetHolderCount(), tokens.GetMaxTokens());
+		for (size_t i = 0; i < manager.battleEnemies_.size(); ++i) {
+			const auto& enemy = manager.battleEnemies_[i];
+			if (!enemy) continue;
+
+			const bool holds = tokens.Holds(enemy.get());
+			const float cooldown = tokens.GetCooldownRemaining(enemy.get());
+			if (holds) {
+				ImGui::TextColored({ 1.0f, 0.45f, 0.35f, 1.0f }, "  敵%zu: 攻撃権あり [%s]", i, enemy->GetStateName());
+			} else if (cooldown > 0.0f) {
+				ImGui::TextColored({ 0.6f, 0.6f, 0.6f, 1.0f }, "  敵%zu: 待機中 (あと%.1f秒) [%s]", i, cooldown, enemy->GetStateName());
+			} else {
+				ImGui::TextColored({ 0.4f, 0.8f, 1.0f, 1.0f }, "  敵%zu: 順番待ち [%s]", i, enemy->GetStateName());
+			}
+		}
+
+		// 保存先は敵データと同じ enemy_data.json（battleSettings に入る）。
+		// 下の「敵ベースデータ編集」の中にも同じボタンがあるが、
+		// そこまで辿らないと保存できないのは分かりにくいのでここにも置く。
+		ImGui::Separator();
+		if (ImGui::Button("この設定をJSONに保存##tokens")) {
+			if (manager.SaveEnemyData(manager.enemyDataFilePath_)) {
+				Logger("[BattleEnemyManager] 攻撃権の設定をJSONファイルに保存しました。\n");
+			} else {
+				ThrowError("[BattleEnemyManager] 攻撃権の設定の保存に失敗しました。\n");
+			}
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("JSONから再読み込み##tokens")) {
+			manager.LoadEnemyData(manager.enemyDataFilePath_);
+		}
+		ImGui::SameLine();
+		ImGui::TextDisabled("(?)");
+		if (ImGui::BeginItemTooltip()) {
+			ImGui::TextUnformatted("敵データと同じ enemy_data.json に書き出す。\n敵ベースデータの変更も同時に保存される。");
+			ImGui::EndTooltip();
+		}
 	}
 
 	ImGui::Separator();
@@ -99,6 +473,22 @@ void BattleEnemyEditorUI::Draw(BattleEnemyManager& manager)
 				ImGui::DragFloat("追跡開始距離", &data.approachStateRange, 0.5f, 1.0f, 100.0f);
 				ImGui::DragFloat("攻撃開始距離", &data.attackStateRange, 0.5f, 1.0f, 50.0f);
 
+				// --- 間合い取り（攻撃と攻撃の「間」）---
+				// 戦っている感じはここの数値で決まるので、攻撃詳細より前に置いている。
+				if (ImGui::CollapsingHeader("間合い取り (攻撃の合間の動き)")) {
+					DrawSpacingEditor(data.spacing, "base");
+				}
+
+				// --- 知覚（プレイヤーの状態を見る）---
+				if (ImGui::CollapsingHeader("知覚 (プレイヤーの状態への反応)")) {
+					DrawPerceptionEditor(data.perception, "base");
+				}
+
+				// --- 被弾リアクション ---
+				if (ImGui::CollapsingHeader("被弾リアクション (硬直・のけぞり・ダウン)")) {
+					DrawDamageReactionEditor(data.damageReaction, "base");
+				}
+
 				// --- 攻撃詳細パラメータ ---
 				if (ImGui::CollapsingHeader("攻撃詳細設定 (各Stateの数値)")) {
 
@@ -111,6 +501,7 @@ void BattleEnemyEditorUI::Draw(BattleEnemyManager& manager)
 						ImGui::DragFloat("突進時間", &r.rushTime, 0.05f, 0.0f, 5.0f, "%.2f秒");
 						ImGui::DragFloat("速度倍率", &r.speedMultiplier, 0.1f, 0.0f, 20.0f, "x%.1f");
 						ImGui::DragFloat("後隙", &r.cooldownTime, 0.05f, 0.0f, 5.0f, "%.2f秒");
+						ImGui::Checkbox("盾で止められる", &r.parriable);
 						ImGui::TreePop();
 					}
 
@@ -121,6 +512,7 @@ void BattleEnemyEditorUI::Draw(BattleEnemyManager& manager)
 						ImGui::DragFloat("突進時間", &c.rushTime, 0.05f, 0.0f, 5.0f, "%.2f秒");
 						ImGui::DragFloat("速度倍率", &c.speedMultiplier, 0.1f, 0.0f, 30.0f, "x%.1f");
 						ImGui::DragFloat("後隙", &c.cooldownTime, 0.05f, 0.0f, 5.0f, "%.2f秒");
+						ImGui::Checkbox("盾で止められる", &c.parriable);
 						ImGui::TreePop();
 					}
 
@@ -132,6 +524,7 @@ void BattleEnemyEditorUI::Draw(BattleEnemyManager& manager)
 						ImGui::DragFloat("回転数", &s.rotationCount, 0.1f, 0.0f, 10.0f, "%.1f回");
 						ImGui::DragFloat("移動倍率", &s.moveSpeedMultiplier, 0.1f, 0.0f, 10.0f, "x%.1f");
 						ImGui::DragFloat("後隙", &s.cooldownTime, 0.05f, 0.0f, 5.0f, "%.2f秒");
+						ImGui::Checkbox("盾で止められる", &s.parriable);
 						ImGui::TreePop();
 					}
 
@@ -143,6 +536,7 @@ void BattleEnemyEditorUI::Draw(BattleEnemyManager& manager)
 						ImGui::DragFloat("ジャンプ高度", &l.jumpHeight, 0.1f, 0.0f, 20.0f, "%.1fm");
 						ImGui::DragFloat("しゃがみ深さ", &l.crouchDepth, 0.05f, 0.0f, 2.0f, "%.2fm");
 						ImGui::DragFloat("後隙", &l.cooldownTime, 0.05f, 0.0f, 5.0f, "%.2f秒");
+						ImGui::Checkbox("盾で止められる", &l.parriable);
 						ImGui::TreePop();
 					}
 
@@ -154,6 +548,7 @@ void BattleEnemyEditorUI::Draw(BattleEnemyManager& manager)
 						ImGui::DragFloat("段内突進", &cb.subRushTime, 0.05f, 0.0f, 2.0f, "%.2f秒");
 						ImGui::DragFloat("加速倍率", &cb.rushSpeedMultiplier, 0.1f, 0.0f, 20.0f, "x%.1f");
 						ImGui::DragFloat("全体後隙", &cb.cooldownTime, 0.05f, 0.0f, 5.0f, "%.2f秒");
+						ImGui::Checkbox("盾で止められる", &cb.parriable);
 						ImGui::TreePop();
 					}
 
@@ -179,6 +574,7 @@ void BattleEnemyEditorUI::Draw(BattleEnemyManager& manager)
 						ImGui::DragFloat(" 突進ホーミング強度", &ct.rushHomingStrength, 0.1f, 0.0f, 10.0f, "%.1f");
 						if (ImGui::IsItemHovered()) ImGui::SetTooltip("大きいほどプレイヤーを追尾する。1.5前後で読み避け可能");
 						ImGui::DragFloat(" クールダウン", &ct.cooldownTime, 0.05f, 0.0f, 3.0f, "%.2f秒");
+						ImGui::Checkbox("盾で止められる", &ct.parriable);
 						ImGui::TreePop();
 					}
 				}
@@ -290,15 +686,11 @@ void BattleEnemyEditorUI::Draw(BattleEnemyManager& manager)
 					int appliedCount = 0;
 					for (auto& enemy : manager.battleEnemies_) {
 						if (enemy && enemy->GetEnemyData().enemyId == data.enemyId) {
-							// 生成中の敵のデータを更新
-							BattleEnemyData& enemyData = enemy->GetEnemyData();
-							enemyData.attack = data.attack;
-							enemyData.defense = data.defense;
-							enemyData.moveSpeed = data.moveSpeed;
-							enemyData.approachStateRange = data.approachStateRange;
-							enemyData.attackStateRange = data.attackStateRange;
-							enemyData.attackPatterns = data.attackPatterns;
-							enemyData.attackParams = data.attackParams;
+							// 生成中の敵のデータを丸ごと差し替える。
+							// 以前はフィールドを1つずつ写していたため、BattleEnemyData に
+							// 項目を足すたびに写し忘れて「エディタで変えても効かない」が起きていた。
+							// 実行時のHPは BaseEnemy 側が持つので、丸ごとコピーしても現在HPは巻き戻らない。
+							enemy->GetEnemyData() = data;
 							appliedCount++;
 						}
 					}
@@ -355,6 +747,31 @@ void BattleEnemyEditorUI::Draw(BattleEnemyManager& manager)
 					ImGui::DragFloat("移動速度 (Current)", &enemyData.moveSpeed, 0.1f, 0.0f, 20.0f);
 					ImGui::DragFloat("攻撃状態に入る距離 (Current)", &enemyData.attackStateRange, 0.1f, 0.0f, 100.0f);
 					ImGui::DragFloat("追跡状態に入る距離 (Current)", &enemyData.approachStateRange, 0.1f, 0.0f, 100.0f);
+
+					// 状態モニタ（遷移が実際に起きているかの確認用）
+					if (ImGui::CollapsingHeader("状態モニタ (遷移ログ)", ImGuiTreeNodeFlags_DefaultOpen)) {
+						DrawStateMonitor(*enemy);
+					}
+
+					// 今この敵がプレイヤーをどう見ているか（読み取り専用）
+					if (ImGui::CollapsingHeader("知覚モニタ (リアルタイム)")) {
+						DrawPerceptionMonitor(*enemy);
+					}
+
+					// 間合い取り（この個体にだけ即座に効く。数値の当たりを付けるのに使う）
+					if (ImGui::CollapsingHeader("間合い取り (この個体のみ・即反映)")) {
+						DrawSpacingEditor(enemyData.spacing, "inst");
+					}
+
+					// 知覚（この個体にだけ即座に効く）
+					if (ImGui::CollapsingHeader("知覚 (この個体のみ・即反映)")) {
+						DrawPerceptionEditor(enemyData.perception, "inst");
+					}
+
+					// 被弾リアクション（この個体にだけ即座に効く）
+					if (ImGui::CollapsingHeader("被弾リアクション (この個体のみ・即反映)")) {
+						DrawDamageReactionEditor(enemyData.damageReaction, "inst");
+					}
 
 					// 攻撃パターン表示
 					ImGui::Text("攻撃パターン:");

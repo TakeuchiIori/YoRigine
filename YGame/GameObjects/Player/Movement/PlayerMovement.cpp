@@ -53,6 +53,16 @@ void PlayerMovement::Update(float deltaTime) {
 	}
 
 	// ------------------------------------------------------------
+	// デッドゾーンの調整元は MovementConfig 側に置いたままにする。
+	// エディタで値を変えたその場で効くよう、毎フレーム同期する。
+	// ------------------------------------------------------------
+	if (owner_) {
+		if (PlayerInput* input = owner_->GetPlayerInput()) {
+			input->SetMoveDeadzone(config_.analogDeadzone);
+		}
+	}
+
+	// ------------------------------------------------------------
 	// カメラ追従処理（プレイヤーの向きをカメラに合わせる）
 	// ------------------------------------------------------------
 	UpdateCameraFollow(deltaTime);
@@ -290,29 +300,31 @@ bool PlayerMovement::CanTransitionTo([[maybe_unused]] MovementState newState) co
 // 入力状態の取得
 // ============================================================
 InputState PlayerMovement::GetInputState() const {
-	YoRigine::Input* input = YoRigine::Input::GetInstance();
 	InputState state;
 
-	// ------------------------------------------------------------
-	// コントローラー入力を確認
-	// ------------------------------------------------------------
-	if (input->IsControllerConnected()) {
-		state = GetControllerInput();
-
-		if (state.moveDirection.Length() > 0.01f) {
-			state.isAnalogInput = true;
-			state.currentInputType = InputType::Gamepad;
-			return state;
-		}
+	PlayerInput* input = owner_ ? owner_->GetPlayerInput() : nullptr;
+	if (!input) {
+		state.currentInputType = lastInputType_;
+		return state;
 	}
 
-	// ------------------------------------------------------------
-	// キーボード入力を確認
-	// ------------------------------------------------------------
-	state = GetKeyboardInput();
-	if (state.moveDirection.Length() > 0.01f) {
-		state.isAnalogInput = false;
-		state.currentInputType = InputType::Keyboard;
+	// 移動軸はスティックとWASDの両方を束ねた1本の値として受け取る。
+	// どちらのデバイス由来かは axis.isAnalog / axis.device が持っている。
+	const YoRigine::InputAxisValue axis = input->MoveAxis();
+	state.moveDirection.x = axis.value.x;
+	state.moveDirection.z = axis.value.y;
+	state.isAnalogInput = axis.isAnalog;
+
+	// 走りはデバイスで判定が変わる。
+	// スティックは倒し量、キーボードは Run アクション（既定 LSHIFT）。
+	state.runPressed = axis.isAnalog
+		? (axis.magnitude >= config_.analogRunThreshold)
+		: input->RunHeld();
+
+	if (axis.magnitude > 0.01f) {
+		state.currentInputType = axis.isAnalog ? InputType::Gamepad : InputType::Keyboard;
+		// analogMagnitude はスティック入力のときだけ意味を持たせる（従来の挙動を維持）。
+		state.analogMagnitude = axis.isAnalog ? axis.magnitude : 0.0f;
 		return state;
 	}
 
@@ -320,59 +332,6 @@ InputState PlayerMovement::GetInputState() const {
 	// 入力がない場合は前回の入力タイプを維持
 	// ------------------------------------------------------------
 	state.currentInputType = lastInputType_;
-	return state;
-}
-
-// ============================================================
-// キーボード入力取得
-// ============================================================
-InputState PlayerMovement::GetKeyboardInput() const {
-	YoRigine::Input* input = YoRigine::Input::GetInstance();
-	InputState state;
-
-	if (input->PushKey(DIK_W)) state.moveDirection.z += 1.0f;
-	if (input->PushKey(DIK_S)) state.moveDirection.z -= 1.0f;
-	if (input->PushKey(DIK_A)) state.moveDirection.x -= 1.0f;
-	if (input->PushKey(DIK_D)) state.moveDirection.x += 1.0f;
-
-	if (state.moveDirection.Length() > 0.0f) {
-		state.moveDirection = state.moveDirection.Normalize();
-	}
-
-	state.runPressed = input->PushKey(DIK_LSHIFT);
-
-	return state;
-}
-
-// ============================================================
-// コントローラー入力取得
-// ============================================================
-InputState PlayerMovement::GetControllerInput() const {
-	YoRigine::Input* input = YoRigine::Input::GetInstance();
-	InputState state;
-
-	// ------------------------------------------------------------
-	// 左スティック入力を取得
-	// ------------------------------------------------------------
-	float lx = input->GetLeftStickX(0);
-	float ly = input->GetLeftStickY(0);
-
-	// ------------------------------------------------------------
-	// デッドゾーンを適用
-	// ------------------------------------------------------------
-	lx = ApplyDeadzone(lx, config_.analogDeadzone);
-	ly = ApplyDeadzone(ly, config_.analogDeadzone);
-
-	state.moveDirection.x = lx;
-	state.moveDirection.z = ly;
-
-	state.analogMagnitude = std::sqrt(lx * lx + ly * ly);
-	if (state.analogMagnitude > 1.0f) {
-		state.analogMagnitude = 1.0f;
-	}
-
-	state.runPressed = state.analogMagnitude >= config_.analogRunThreshold;
-
 	return state;
 }
 
@@ -433,15 +392,6 @@ float PlayerMovement::LerpAngle(float from, float to, float t) const {
 	while (diff < -std::numbers::pi_v<float>) diff += 2.0f * std::numbers::pi_v<float>;
 
 	return from + diff * t;
-}
-
-// ============================================================
-// デッドゾーン適用処理
-// ============================================================
-float PlayerMovement::ApplyDeadzone(float value, float deadzone) const {
-	if (std::abs(value) < deadzone) return 0.0f;
-	float sign = (value > 0.0f) ? 1.0f : -1.0f;
-	return sign * ((std::abs(value) - deadzone) / (1.0f - deadzone));
 }
 
 // ============================================================

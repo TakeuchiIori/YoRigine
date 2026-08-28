@@ -10,6 +10,7 @@
 #include "Material/MaterialColor.h"
 #include "Material/MaterialDissolve.h"
 #include "Material/MaterialLighting.h"
+#include "Material/MaterialOverrideSet.h"
 #include "Material/MaterialUV.h"
 #include "Model.h"
 #include "Motion/Core/MotionSystem.h"
@@ -140,6 +141,26 @@ public:
   void SetOutlineEnabled(bool enable) { outlineEnabled_ = enable; }
   bool IsOutlineEnabled() const { return outlineEnabled_; }
 
+  ///************************* マテリアル上書き *************************///
+  // モデルは共有されるため、色・粗さ・メタリック・テクスチャの個別変更は
+  // ここに持つ上書きセットを介して行う。マルチメッシュのモデルでも
+  // マテリアルスロット単位で別々に設定できる。
+
+  // 上書きセットを取得（未生成なら nullptr）。
+  MaterialOverrideSet *GetMaterialOverrides() const {
+    return materialOverrides_.get();
+  }
+
+  // 上書きセットを取得（無ければモデルのマテリアル数ぶん生成する）。
+  MaterialOverrideSet *EnsureMaterialOverrides();
+
+  // 上書きをすべて解除する（セット自体は保持する）。
+  void ClearMaterialOverrides();
+
+  // 描画時に渡すべき上書きセット。実際に上書きが無ければ nullptr を返すので、
+  // インスタンシングのバッチが不要に分裂しない。
+  MaterialOverrideSet *GetActiveMaterialOverrides() const;
+
   Vector4 &GetColor() { return materialColor_->GetColor(); }
   void SetMaterialColor(const Vector4 &color) {
     materialColor_->SetColor(color);
@@ -226,6 +247,9 @@ private:
   std::unique_ptr<MaterialLighting> materialLighting_;
   std::unique_ptr<MaterialUV> materialUV_;
   std::unique_ptr<MaterialDissolve> materialDissolve_;
+
+  // メッシュ (マテリアルスロット) 単位の上書き。使うまで生成されない。
+  std::unique_ptr<MaterialOverrideSet> materialOverrides_;
 
   // デフォルトのモデルパス
   static const std::string defaultModelPath_;

@@ -5,13 +5,14 @@
 #include "Editor/Tools/ImGuiStudio.h"
 #include "Systems/GameTime/GameTime.h"
 #include "Systems/Cinematic/CinematicManager.h"
-#include <ModelManipulator/ModelManipulator.h>
+#include <SceneEditor/SceneEditor.h>
 #include <PipCamera/PipCameraSystem.h>
 #include "OffScreen/PostEffectManager.h"
 #include "Material/ToonSettings.h"
 #include "Material/OutlineSettings.h"
 #include <Systems/UI/UIManager.h>
 #include <Systems/Text/TextTextureBaker.h>
+#include <Systems/Tutorial/TutorialManager.h>
 #include "GPUParticle/YGpuEmitManager.h"
 #include <Object3D/BaseObjectManager.h>
 #include <Drawer/InstancedObject3d.h>
@@ -94,7 +95,7 @@ void MyGame::Initialize() {
 	CompositeEffectManager::GetInstance()->ScanDirectory("Resources/Json/YComposites/");
 
 	// モデル操作関連の初期化
-	YoRigine::ModelManipulator::GetInstance()->Initialize();
+	YoRigine::SceneEditor::GetInstance()->Initialize();
 
 	// BaseObject 一括管理マネージャ
 #ifdef USE_IMGUI
@@ -130,7 +131,7 @@ void MyGame::Initialize() {
 	);
 
 	Editor::GetInstance()->SetGizmoDrawCallback([]() {
-		YoRigine::ModelManipulator::GetInstance()->DrawGizmo();
+		YoRigine::SceneEditor::GetInstance()->DrawGizmo();
 		YEmitterGroupEditor::GetInstance().DrawGizmo();
 		});
 
@@ -148,10 +149,17 @@ void MyGame::Initialize() {
 		"ImGui Studio",
 		[]() { ImGuiStudio::GetInstance()->Draw(); },
 		"AllScene", "システム");
+	// TutorialManager::DrawEditor は USE_IMGUI でのみ存在するため、登録ごと囲む。
+#ifdef USE_IMGUI
+	Editor::GetInstance()->RegisterGameUI(
+		"チュートリアル",
+		[]() { YoRigine::TutorialManager::GetInstance()->DrawEditor(); },
+		"AllScene", "システム");
+#endif
 	// ParticleEditor は旧システム専用のため削除済み。YParticleEditor を使用。
 	Editor::GetInstance()->RegisterGameUI(
 		"モデル操作",
-		[]() { YoRigine::ModelManipulator::GetInstance()->DrawImGui(); },
+		[]() { YoRigine::SceneEditor::GetInstance()->DrawImGui(); },
 		"AllScene", "シーン", true);
 	Editor::GetInstance()->RegisterGameUI(
 		"ポストエフェクト", []() { PostEffectManager::GetInstance()->ImGui(); },
@@ -212,7 +220,7 @@ void MyGame::Finalize() {
 	YoRigine::YGpuEmitManager::GetInstance()->Finalize();
 	CompositeEffectManager::GetInstance()->Finalize();
 	VfxMeshSpawner::GetInstance()->Finalize();
-	YoRigine::ModelManipulator::GetInstance()->Finalize();
+	YoRigine::SceneEditor::GetInstance()->Finalize();
 
 #ifdef USE_IMGUI
 	Editor::GetInstance()->Finalize();
@@ -244,6 +252,11 @@ void MyGame::Update() {
 	//------------------------------------------------------------
 	Framework::Update();
 	SceneManager::GetInstance()->Update();
+
+	// チュートリアルはシーン更新の後。
+	// 説明パネルのスプライトを UIManager::UpdateAll（シーン側UIが呼ぶ）より後に
+	// 差し込む必要があるため、この順序を崩さないこと。
+	YoRigine::TutorialManager::GetInstance()->Update();
 	PipCameraSystem::GetInstance()->Update();
 	YoRigine::CinematicManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime());
 
@@ -259,7 +272,7 @@ void MyGame::Update() {
 void MyGame::Draw() {
 
 
-	YoRigine::ModelManipulator::GetInstance()->DrawPickPass();
+	YoRigine::SceneEditor::GetInstance()->DrawPickPass();
 
 	//------------------------------------------------------------
 	// オフスクリーン描画
@@ -325,6 +338,11 @@ void MyGame::Draw() {
 	SceneManager::GetInstance()->DrawNonOffscreen();
 	// 映画風レターボックスは全シーン共通で最後（ImGui の手前）に描画
 	YoRigine::CinematicManager::GetInstance()->Draw();
+
+	// チュートリアルも全シーン共通で自前描画する。
+	// シーンごとのUI描画（GameUI は特定レイヤーしか描かない）に依存させると、
+	// 出るシーンと出ないシーンができてしまうため。
+	YoRigine::TutorialManager::GetInstance()->Draw();
 	dxCommon_->CopyBackBufferToFinalResult();
 	imguiManager_->Draw();
 

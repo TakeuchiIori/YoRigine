@@ -140,8 +140,38 @@ void Object3d::Draw(YoRigine::Camera *camera,
 
   // モデル描画（テクスチャ上書きが設定されていればそれを使う）
   if (model_) {
-    model_->Draw(overrideTexturePath_);
+    MaterialOverrideSet *overrides = GetActiveMaterialOverrides();
+    if (overrides) {
+      overrides->Apply(*model_);
+    }
+    model_->Draw(overrideTexturePath_, overrides);
   }
+}
+
+/// <summary>
+/// マテリアル上書きセットを取得する（無ければモデルのマテリアル数ぶん生成）
+/// </summary>
+MaterialOverrideSet *Object3d::EnsureMaterialOverrides() {
+  if (!materialOverrides_) {
+    materialOverrides_ = std::make_unique<MaterialOverrideSet>();
+  }
+  if (model_) {
+    materialOverrides_->EnsureSlotCount(model_->GetMaterialCount());
+  }
+  return materialOverrides_.get();
+}
+
+void Object3d::ClearMaterialOverrides() {
+  if (materialOverrides_) {
+    materialOverrides_->ClearAll();
+  }
+}
+
+MaterialOverrideSet *Object3d::GetActiveMaterialOverrides() const {
+  if (!materialOverrides_ || !materialOverrides_->HasAnyOverride()) {
+    return nullptr;
+  }
+  return materialOverrides_.get();
 }
 
 /// <summary>

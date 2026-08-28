@@ -1,28 +1,27 @@
 #include "DevelopScene.h"
 
 // Engine
+#include "Collision/Core/CollisionManager.h"
+#include "Loaders/Json/JsonManager.h"
+#include "OffScreen/PostEffectManager.h"
+#include "SceneEditor/SceneEditor.h"
 #include "Systems./Input./Input.h"
 #include "Systems/GameTime/GameTime.h"
-#include <Editor/Editor.h>
-#include "Loaders/Json/JsonManager.h"
-#include "ModelManipulator/ModelManipulator.h"
-#include "OffScreen/PostEffectManager.h"
 #include <Debugger/Logger.h>
+#include <Editor/Editor.h>
 #include <SceneSystems/SceneManager.h>
-#include "Collision/Core/CollisionManager.h"
 
-#include "Object3D/Object3dCommon.h"
-#include "LightManager/LightManager.h"
 #include "Collision/AreaCollision/Base/AreaManager.h"
+#include "LightManager/LightManager.h"
+#include "Object3D/Object3dCommon.h"
 
-#include "Particle/YParticleManager.h"
-#include "Particle/YParticleEditor.h"
-#include "Particle/YEmitterGroupEditor.h"
-#include "GPUParticle/YGpuEmitManager.h"
 #include "Composite/CompositeEffectManager.h"
+#include "GPUParticle/YGpuEmitManager.h"
+#include "Particle/YEmitterGroupEditor.h"
+#include "Particle/YParticleEditor.h"
+#include "Particle/YParticleManager.h"
 #include <Vfx/VfxMesh/Editor/VfxMeshEditor.h>
 #include <Vfx/VfxMesh/Runtime/VfxMeshSpawner.h>
-#include "Composite/CompositeEffectManager.h"
 
 // WebAPI
 #include <WebAPI/YWebApiManager.h>
@@ -31,91 +30,118 @@
 #include "Systems/Camera/Virtuals/DebugCamera/DebugCamera.h"
 
 // C++
+#include <Collision/AreaCollision/Base/AreaEditor.h>
+#include <Collision/AreaCollision/CircleArea.h>
 #include <cstdlib>
 #include <ctime>
-#include <Collision/AreaCollision/CircleArea.h>
-#include <Collision/AreaCollision/Base/AreaEditor.h>
 
 // ============================================================
 // シーンの初期化
 // ============================================================
 void DevelopScene::Initialize() {
 
-	//------------------------------------------------------------
-	// カメラ初期化
-	//------------------------------------------------------------
+  //------------------------------------------------------------
+  // カメラ初期化
+  //------------------------------------------------------------
 
-	// 出力用カメラの実体を生成
-	sceneCamera_ = std::make_unique<YoRigine::Camera>();
-	auto director = CameraDirector::GetInstance();
-	director->Initialize();
+  // 出力用カメラの実体を生成
+  sceneCamera_ = std::make_unique<YoRigine::Camera>();
+  auto director = CameraDirector::GetInstance();
+  director->Initialize();
 
-	// カメラエディタの登録
-	cameraEditor_ = std::make_unique<CameraEditor>();
-	cameraEditor_->Initialize();
-	cameraEditor_->SetFilePath("Resources/Json/VirtualCameraData/DevelopScene.json");
-	cameraEditor_->LoadFileOrDefault(cameraEditor_->GetFilePath(), "Develop");
-	
-	// デバッグモード
-	cameraMode_ = CameraMode::DEBUG;
+  // カメラエディタの登録
+  cameraEditor_ = std::make_unique<CameraEditor>();
+  cameraEditor_->Initialize();
+  cameraEditor_->SetFilePath(
+      "Resources/Json/VirtualCameraData/DevelopScene.json");
+  cameraEditor_->LoadFileOrDefault(cameraEditor_->GetFilePath(), "Develop");
 
+  // デバッグモード
+  cameraMode_ = CameraMode::DEBUG;
 
-	// ライン
-	line_ = std::make_unique<YoRigine::Line>();
-	line_->Initialize();
-	line_->SetCamera(sceneCamera_.get());
+  // ライン
+  line_ = std::make_unique<YoRigine::Line>();
+  line_->Initialize();
+  line_->SetCamera(sceneCamera_.get());
 
-	//------------------------------------------------------------
-	// システム初期化
-	//------------------------------------------------------------
-	YWebApiManager::GetInstance().Initialize();
-	YoRigine::GameTime::Initialize();
-	YoRigine::JsonManager::SetCurrentScene("DevelopScene");
-	YParticleManager::GetInstance().SetCamera(sceneCamera_.get());
-	AreaManager::GetInstance()->Initialize();
-	YoRigine::CollisionManager::GetInstance()->Initialize();
+  //------------------------------------------------------------
+  // システム初期化
+  //------------------------------------------------------------
+  YWebApiManager::GetInstance().Initialize();
+  YoRigine::GameTime::Initialize();
+  YoRigine::JsonManager::SetCurrentScene("DevelopScene");
+  YParticleManager::GetInstance().SetCamera(sceneCamera_.get());
+  AreaManager::GetInstance()->Initialize();
+  YoRigine::CollisionManager::GetInstance()->Initialize();
 
-	// VFX テスト用：Bloom 入りのポストエフェクトを読み込む（エミッシブ強度→Bloom の確認用）。
-	// エディタ「ポストエフェクト」でしきい値/強度を調整できる。
-	PostEffectManager::GetInstance()->LoadPreset("TD");
+  // VFX テスト用：Bloom 入りのポストエフェクトを読み込む（エミッシブ強度→Bloom
+  // の確認用）。 エディタ「ポストエフェクト」でしきい値/強度を調整できる。
+  PostEffectManager::GetInstance()->LoadPreset("TD");
 #ifdef USE_IMGUI
-	YEmitterGroupEditor::GetInstance().SetCamera(sceneCamera_.get());
-	YoRigine::VfxMeshEditor::GetInstance()->Initialize();
-	YoRigine::VfxMeshEditor::GetInstance()->SetCamera(sceneCamera_.get());
+  YEmitterGroupEditor::GetInstance().SetCamera(sceneCamera_.get());
+  YoRigine::VfxMeshEditor::GetInstance()->Initialize();
+  YoRigine::VfxMeshEditor::GetInstance()->SetCamera(sceneCamera_.get());
 #endif
-	YoRigine::ModelManipulator::GetInstance()->SetCamera(sceneCamera_.get());
-	YoRigine::ModelManipulator::GetInstance()->LoadScene("DevelopScene");
+  YoRigine::SceneEditor::GetInstance()->SetCamera(sceneCamera_.get());
+  YoRigine::SceneEditor::GetInstance()->LoadScene("DevelopScene");
 
-	YoRigine::YGpuEmitManager::GetInstance()->SetCamera(sceneCamera_.get());
-	// 視錐台外コライダーは BroadPhase 登録をスキップする (個別オプトアウトは BaseCollider::SetCheckOutsideCamera(false))
-	YoRigine::CollisionManager::GetInstance()->SetCullingCamera(sceneCamera_.get());
-	YoRigine::CollisionManager::GetInstance()->SetEnableFrustumCulling(true);
+  YoRigine::YGpuEmitManager::GetInstance()->SetCamera(sceneCamera_.get());
+  // 視錐台外コライダーは BroadPhase 登録をスキップする (個別オプトアウトは
+  // BaseCollider::SetCheckOutsideCamera(false))
+  YoRigine::CollisionManager::GetInstance()->SetCullingCamera(
+      sceneCamera_.get());
+  YoRigine::CollisionManager::GetInstance()->SetEnableFrustumCulling(true);
 
-	// エリア設定
-	auto battleFieldArea = std::make_shared<CircleArea>();
-	battleFieldArea->Initialize(Vector3(0, 0, 0), 50.0f);
-	battleFieldArea->SetPurpose(AreaPurpose::Boundary);  // 明示
-	battleFieldArea->SetCamera(sceneCamera_.get());
+  // エリア設定
+  auto battleFieldArea = std::make_shared<CircleArea>();
+  battleFieldArea->Initialize(Vector3(0, 0, 0), 50.0f);
+  battleFieldArea->SetPurpose(AreaPurpose::Boundary); // 明示
+  battleFieldArea->SetCamera(sceneCamera_.get());
 
-	auto* mgr = AreaManager::GetInstance();
-	mgr->AddArea("FieldArea", battleFieldArea);
-	mgr->SetDebugDrawEnabled(true);
+  auto *mgr = AreaManager::GetInstance();
+  mgr->AddArea("FieldArea", battleFieldArea);
+  mgr->SetDebugDrawEnabled(true);
 
-	//------------------------------------------------------------
-	// エディター用GUI登録
-	//------------------------------------------------------------
+  //------------------------------------------------------------
+  // エディター用GUI登録
+  //------------------------------------------------------------
 #ifdef USE_IMGUI
-	Editor::GetInstance()->RegisterGameUI("カメラエディター", [this]() {cameraEditor_->Update(); }, "Develop");
-	Editor::GetInstance()->RegisterGameUI("ライティング", [this]() { YoRigine::LightManager::GetInstance()->ShowLightingEditor(); }, "Develop");
-	Editor::GetInstance()->RegisterGameUI("GpuParticle", [this]() { YoRigine::YGpuEmitManager::GetInstance()->DrawImGui(); }, "Develop");
-	Editor::GetInstance()->RegisterGameUI("複合エフェクト(Composite)", [this]() { CompositeEffectManager::GetInstance()->DrawImGui(); }, "Develop");
-	Editor::GetInstance()->RegisterGameUI("YoRigine:パーティクルエディター", [this]() {YParticleEditor::GetInstance().ShowEditorWindow(); }, "Develop");
+  Editor::GetInstance()->RegisterGameUI(
+      "カメラエディター", [this]() { cameraEditor_->Update(); }, "Develop");
+  Editor::GetInstance()->RegisterGameUI(
+      "ライティング",
+      [this]() { YoRigine::LightManager::GetInstance()->ShowLightingEditor(); },
+      "Develop");
+  Editor::GetInstance()->RegisterGameUI(
+      "GpuParticle",
+      [this]() { YoRigine::YGpuEmitManager::GetInstance()->DrawImGui(); },
+      "Develop");
+  Editor::GetInstance()->RegisterGameUI(
+      "複合エフェクト(Composite)",
+      [this]() { CompositeEffectManager::GetInstance()->DrawImGui(); },
+      "Develop");
+  Editor::GetInstance()->RegisterGameUI(
+      "YoRigine:パーティクルエディター",
+      [this]() { YParticleEditor::GetInstance().ShowEditorWindow(); },
+      "Develop");
 
-	Editor::GetInstance()->RegisterGameUI("複合エフェクト(Composite)", [this]() { CompositeEffectManager::GetInstance()->DrawImGui(); }, "Develop");
-	Editor::GetInstance()->RegisterGameUI("VFX", [this]() { YoRigine::VfxMeshEditor::GetInstance()->DrawImGui(); }, "Develop");
-	Editor::GetInstance()->RegisterGameUI("YWebAPI", [this]() { YWebApiManager::GetInstance().DrawLogWindow(); }, "Develop");
-	Editor::GetInstance()->RegisterGameUI("AreaEditor", [this]() { AreaEditor::GetInstance()->Update();; }, "Develop");
-
+  Editor::GetInstance()->RegisterGameUI(
+      "複合エフェクト(Composite)",
+      [this]() { CompositeEffectManager::GetInstance()->DrawImGui(); },
+      "Develop");
+  Editor::GetInstance()->RegisterGameUI(
+      "VFX", [this]() { YoRigine::VfxMeshEditor::GetInstance()->DrawImGui(); },
+      "Develop");
+  Editor::GetInstance()->RegisterGameUI(
+      "YWebAPI", [this]() { YWebApiManager::GetInstance().DrawLogWindow(); },
+      "Develop");
+  Editor::GetInstance()->RegisterGameUI(
+      "AreaEditor",
+      [this]() {
+        AreaEditor::GetInstance()->Update();
+        ;
+      },
+      "Develop");
 
 #endif
 }
@@ -124,25 +150,30 @@ void DevelopScene::Initialize() {
 // シーンの更新
 // ============================================================
 void DevelopScene::Update() {
-	YoRigine::GameTime::Update();
-	UpdateCamera();
+  YoRigine::GameTime::Update();
+  UpdateCamera();
 
-	if (YoRigine::Input::GetInstance()->TriggerKey(DIK_8)) {
-		YVfxHandle::PlayOneShot("Explosion", Vector3{ 0,20,0 }, /*scale*/1.5f);
-		YVfxHandle::PlayBolt("Lightning", Vector3{ 0,50,0 }, Vector3{ 0,0,0 }, /*loop*/false);
-	}
-	YoRigine::CollisionManager::GetInstance()->Update();
-	YoRigine::ModelManipulator::GetInstance()->Update();
-	YParticleManager::GetInstance().Update(YoRigine::GameTime::GetDeltaTime(YoRigine::TimeChannel::Vfx));
-	VfxMeshSpawner::GetInstance()->SetCamera(sceneCamera_.get());
-	VfxMeshSpawner::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime(YoRigine::TimeChannel::Vfx));
-	YoRigine::LightManager::GetInstance()->UpdateShadowMatrix(sceneCamera_.get());
-	YoRigine::YGpuEmitManager::GetInstance()->Update();
-	CompositeEffectManager::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime(YoRigine::TimeChannel::Vfx));
+  if (YoRigine::Input::GetInstance()->TriggerKey(DIK_8)) {
+    YVfxHandle::PlayOneShot("Explosion", Vector3{0, 20, 0}, /*scale*/ 1.5f);
+    YVfxHandle::PlayBolt("Lightning", Vector3{0, 50, 0}, Vector3{0, 0, 0},
+                         /*loop*/ false);
+  }
+  YoRigine::CollisionManager::GetInstance()->Update();
+  YoRigine::SceneEditor::GetInstance()->Update();
+  YParticleManager::GetInstance().Update(
+      YoRigine::GameTime::GetDeltaTime(YoRigine::TimeChannel::Vfx));
+  VfxMeshSpawner::GetInstance()->SetCamera(sceneCamera_.get());
+  VfxMeshSpawner::GetInstance()->Update(
+      YoRigine::GameTime::GetDeltaTime(YoRigine::TimeChannel::Vfx));
+  YoRigine::LightManager::GetInstance()->UpdateShadowMatrix(sceneCamera_.get());
+  YoRigine::YGpuEmitManager::GetInstance()->Update();
+  CompositeEffectManager::GetInstance()->Update(
+      YoRigine::GameTime::GetDeltaTime(YoRigine::TimeChannel::Vfx));
 
 #ifdef USE_IMGUI
 
-	YoRigine::VfxMeshEditor::GetInstance()->Update(YoRigine::GameTime::GetDeltaTime(YoRigine::TimeChannel::Vfx));
+  YoRigine::VfxMeshEditor::GetInstance()->Update(
+      YoRigine::GameTime::GetDeltaTime(YoRigine::TimeChannel::Vfx));
 #endif
 }
 
@@ -150,119 +181,113 @@ void DevelopScene::Update() {
 // シーンの描画（PostEffectがかかる）
 // ============================================================
 void DevelopScene::Draw() {
-	//------------------------------------------------------------
-	// 3Dオブジェクト描画
-	//------------------------------------------------------------
-	Object3dCommon::GetInstance()->DrawPreference();
-	DrawObject();
+  //------------------------------------------------------------
+  // 3Dオブジェクト描画
+  //------------------------------------------------------------
+  Object3dCommon::GetInstance()->DrawPreference();
+  DrawObject();
 
-	//------------------------------------------------------------
-	// パーティクル描画
-	//------------------------------------------------------------
-	YParticleManager::GetInstance().Draw();
-	DrawLine();
-	YoRigine::YGpuEmitManager::GetInstance()->Draw();
+  //------------------------------------------------------------
+  // パーティクル描画
+  //------------------------------------------------------------
+  YParticleManager::GetInstance().Draw();
+  DrawLine();
+  YoRigine::YGpuEmitManager::GetInstance()->Draw();
 
-	//------------------------------------------------------------
-	// VFX描画（複合エフェクトの VfxMesh 用）
-	//------------------------------------------------------------
-	VfxMeshSpawner::GetInstance()->Draw();
+  //------------------------------------------------------------
+  // VFX描画（複合エフェクトの VfxMesh 用）
+  //------------------------------------------------------------
+  VfxMeshSpawner::GetInstance()->Draw();
 
 #ifdef USE_IMGUI
-	YoRigine::VfxMeshEditor::GetInstance()->DrawPreview();
+  YoRigine::VfxMeshEditor::GetInstance()->DrawPreview();
 #endif
-	
 }
 
 // ============================================================
-// PiP 用の 3D-only 描画 (ModelManipulator の配置オブジェクトのみ)。
+// PiP 用の 3D-only 描画 (SceneEditor の配置オブジェクトのみ)。
 // PipCameraSystem がシーンカメラ行列を PiP のものに差し替えた状態で呼ばれる。
 // UI / ライン / ポストエフェクト / シャドウは含めない。
 // ============================================================
 void DevelopScene::DrawScene3DOnly() {
-	Object3dCommon::GetInstance()->DrawPreference();
-	DrawObject();
+  Object3dCommon::GetInstance()->DrawPreference();
+  DrawObject();
 }
 
 // ============================================================
 // PostEffectを掛けたくないものを描画
 // ============================================================
-void DevelopScene::DrawNonOffscreen() {
-}
+void DevelopScene::DrawNonOffscreen() {}
 
 // ============================================================
 // 影の描画
 // ============================================================
-void DevelopScene::DrawShadow() {
-	DrawCommonShadow();
-}
+void DevelopScene::DrawShadow() { DrawCommonShadow(); }
 
 // ============================================================
 // 終了の処理
 // ============================================================
 void DevelopScene::Finalize() {
 
-	YoRigine::JsonManager::ClearSceneInstances("DevelopScene");
-	YWebApiManager::GetInstance().Finalize();
+  YoRigine::JsonManager::ClearSceneInstances("DevelopScene");
+  YWebApiManager::GetInstance().Finalize();
 }
 
 // ============================================================
 // オブジェクトの描画
 // ============================================================
 void DevelopScene::DrawObject() {
-	YoRigine::ModelManipulator::GetInstance()->Draw();
+  YoRigine::SceneEditor::GetInstance()->Draw();
 }
 
 // ============================================================
 // 線の描画
 // ============================================================
 void DevelopScene::DrawLine() {
-	// フレーム冒頭の頂点・マテリアル CB スロットのリセット。
-	// 複数の DrawLine() を 1 フレームで呼ぶ場合に必須。
-	line_->Reset();
+  // フレーム冒頭の頂点・マテリアル CB スロットのリセット。
+  // 複数の DrawLine() を 1 フレームで呼ぶ場合に必須。
+  line_->Reset();
 
-	YoRigine::ModelManipulator::GetInstance()->DrawLine();
-	// AreaEditor で追加したエリアも含めて全て描画。
-	// isDebugDrawEnabled_ / IsActive() / IsDebugDrawEnabled() を尊重する。
-	AreaManager::GetInstance()->Draw(line_.get());
-	line_->DrawLine();
-	CameraDirector::GetInstance()->DrawDebug3D(*line_);
+  YoRigine::SceneEditor::GetInstance()->DrawLine();
+  // AreaEditor で追加したエリアも含めて全て描画。
+  // isDebugDrawEnabled_ / IsActive() / IsDebugDrawEnabled() を尊重する。
+  AreaManager::GetInstance()->Draw(line_.get());
+  line_->DrawLine();
+  CameraDirector::GetInstance()->DrawDebug3D(*line_);
 }
-
 
 // ============================================================
 // カメラの更新処理
 // ============================================================
 void DevelopScene::UpdateCamera() {
-	auto director = CameraDirector::GetInstance();
+  auto director = CameraDirector::GetInstance();
 
-	if (YoRigine::GameTime::IsPause()) {
-		return;
-	}
+  if (YoRigine::GameTime::IsPause()) {
+    return;
+  }
 
-	// カメラの優先度
-	switch (cameraMode_) {
-	case CameraMode::DEBUG:
-		director->SetPriority("MainDebug", 10);
-		break;
-	}
+  // カメラの優先度
+  switch (cameraMode_) {
+  case CameraMode::DEBUG:
+    director->SetPriority("MainDebug", 10);
+    break;
+  }
 
-	//------------------------------------------------------------
-	// Directorの更新（VirtualCameraの計算 ＋ ブレンド処理）
-	//------------------------------------------------------------
-	director->Update(YoRigine::GameTime::GetDeltaTime());
+  //------------------------------------------------------------
+  // Directorの更新（VirtualCameraの計算 ＋ ブレンド処理）
+  //------------------------------------------------------------
+  director->Update(YoRigine::GameTime::GetDeltaTime());
 
-	//------------------------------------------------------------
-	// 出力用カメラ(sceneCamera_)への同期
-	//------------------------------------------------------------
-	// Directorが導き出した「理想の座標・回転・レンズ情報」をコピー
-	sceneCamera_->SetTranslate(director->GetActiveCameraPos());
-	sceneCamera_->SetRotate(director->GetActiveCameraRot());
-	sceneCamera_->SetFovY(director->GetFovY());
-	sceneCamera_->viewMatrix_ = director->GetViewMatrix();
-	// カメラ自体の更新（内部でのシェイク計算など）
-	sceneCamera_->Update();
-	// 最終的な行列の計算
-	sceneCamera_->UpdateMatrix();
+  //------------------------------------------------------------
+  // 出力用カメラ(sceneCamera_)への同期
+  //------------------------------------------------------------
+  // Directorが導き出した「理想の座標・回転・レンズ情報」をコピー
+  sceneCamera_->SetTranslate(director->GetActiveCameraPos());
+  sceneCamera_->SetRotate(director->GetActiveCameraRot());
+  sceneCamera_->SetFovY(director->GetFovY());
+  sceneCamera_->viewMatrix_ = director->GetViewMatrix();
+  // カメラ自体の更新（内部でのシェイク計算など）
+  sceneCamera_->Update();
+  // 最終的な行列の計算
+  sceneCamera_->UpdateMatrix();
 }
-

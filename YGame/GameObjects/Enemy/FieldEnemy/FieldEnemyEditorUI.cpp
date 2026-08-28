@@ -1,4 +1,4 @@
-#include "FieldEnemyEditorUI.h"
+﻿#include "FieldEnemyEditorUI.h"
 #ifdef USE_IMGUI
 
 #include "FieldEnemyManager.h"
@@ -62,7 +62,7 @@ void FieldEnemyEditorUI::ShowDebugInfo(FieldEnemyManager& manager)
 	if (ImGui::TreeNode("アクティブな敵一覧")) {
 		int enemyIndex = 0;
 		for (auto& enemy : manager.fieldEnemies_) {
-			if (enemy && enemy->IsActive()) {
+			if (enemy && !enemy->IsDespawned()) {
 				const auto& data = enemy->GetEnemyData();
 				std::string label = "[" + std::to_string(enemyIndex) + "] " + data.enemyId;
 

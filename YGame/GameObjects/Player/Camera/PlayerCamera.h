@@ -37,7 +37,8 @@ public:
 
   /// @param followCamera  CameraDirector が所有する FollowCamera インスタンス
   /// @param playerWT      プレイヤーの WorldTransform（ロックオン基準位置用）
-  void Initialize(FollowCamera *followCamera, const YoRigine::WorldTransform *playerWT);
+  void Initialize(FollowCamera *followCamera,
+                  const YoRigine::WorldTransform *playerWT);
 
   // スティック入力・ロックオン更新
   void UpdatePreDirector();

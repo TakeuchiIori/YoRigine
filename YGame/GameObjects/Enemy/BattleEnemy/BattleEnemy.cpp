@@ -8,7 +8,6 @@
 #include <json.hpp>
 
 #include "States/BattleIdleState.h"
-#include "States/Attack/BattleRushAttackState.h"
 #include "States/BattleDamageState.h"
 #include "States/BattleDownedState.h"
 #include "States/BattleDeadState.h"
@@ -17,6 +16,7 @@
 #include <Collision/AreaCollision/Base/AreaManager.h>
 #include "Object3D/BaseObjectManager.h"
 #include "States/BattleRecoveryState.h"
+#include "../AI/AttackTokenPool.h"
 #include "Particle/YEmitterGroupManager.h"
 
 #include <UI/Damage/DamageNumberManager.h>
@@ -27,6 +27,11 @@
 BattleEnemy::~BattleEnemy() {
 	// どの削除経路（撃破 / 全消去 / シーン終了）でも確実に登録解除する
 	BaseObjectManager::GetInstance()->Unregister(this);
+
+	// 攻撃権を握ったまま消えると、その枠が永久に埋まってしまう
+	if (auto* pool = AttackTokenPool::GetCurrent()) {
+		pool->Forget(this);
+	}
 
 	// 燃焼などの付着VFXを取り残さない
 	StopStatusVfx();
@@ -65,8 +70,7 @@ void BattleEnemy::InitializeBattleData(const BattleEnemyData& data, Vector3 posi
 {
 	// データ適用
 	enemyData_ = data;
-	enemyData_.maxHp_ = data.hp;
-	enemyData_.currentHp_ = enemyData_.maxHp_;
+	SetupHP(data.hp);
 
 	// モデル設定
 	if (obj_) {
@@ -80,12 +84,7 @@ void BattleEnemy::InitializeBattleData(const BattleEnemyData& data, Vector3 posi
 	// バトル開始演出中は敵のUpdateが停止するため、生成時点で描画用Transformも
 	// 同期しておく。これが無いと複数体が原点に重なり、1体だけに見える。
 	wt_.UpdateMatrix();
-	visualWt_.scale_ = wt_.scale_;
-	visualWt_.rotate_ = wt_.rotate_;
-	visualWt_.translate_ = wt_.translate_;
-	visualWt_.anchorPoint_ = wt_.anchorPoint_;
-	visualWt_.useAnchorPoint_ = wt_.useAnchorPoint_;
-	visualWt_.UpdateMatrix();
+	SyncVisualTransform();
 
 	// 攻撃時の punch/bounce アニメーションは baseScale_ を起点に補間するので、
 	// ここで揃えないと攻撃の瞬間にスケールが (1,1,1) へスナップしてしまう。
@@ -133,10 +132,8 @@ void BattleEnemy::InitJson() {
 	jsonManager_->Register("ノイズスケール", &dissolveNoiseScale_);
 	jsonManager_->ClearTreePrefix();
 
-	jsonManager_->SetTreePrefix("ヒットリアクション");
-	jsonManager_->Register("のけぞり角度(rad)", &hitReactionAngle_);
-	jsonManager_->Register("のけぞり時間(秒)", &hitReactionDuration_);
-	jsonManager_->ClearTreePrefix();
+	// のけぞりの角度・時間は enemy_data.json の damageReaction 側へ移した。
+	// 被弾まわりの数値が2箇所に分かれていると、どちらを触ればいいのか分からなくなる。
 }
 
 /*==========================================================================
@@ -150,7 +147,7 @@ void BattleEnemy::Update() {
 	// 死亡チェック（1度だけ遷移させる。毎フレーム走ると PlayDeathEffect で
 	// 有効化したディゾルブが直後の Exit() で無効化されてしまい、threshold も
 	// deathTimer もリセットされ続けるため、見た目には何も起きなくなる）
-	if (enemyData_.currentHp_ == 0 && logicalState_ != BattleEnemyState::Dead) {
+	if (currentHp_ == 0 && logicalState_ != BattleEnemyState::Dead) {
 		logicalState_ = BattleEnemyState::Dead;
 		StopStatusVfx(); // 死体が燃え続けないように付着VFXを止める
 		PlayDeathEffect();
@@ -159,24 +156,12 @@ void BattleEnemy::Update() {
 
 	float dt = YoRigine::GameTime::GetDeltaTime();
 	stateTimer_ += dt;
-	previousPosition_ = wt_.translate_;
+	timeInCurrentState_ += dt;
+	lifeTime_ += dt;
+	MarkPreviousPosition();
 
 	// アニメーター更新
-	if (animation_) {
-		animation_->Update(dt);
-
-		// アニメーション中の場合、スケールを適用
-		if (animation_->IsScaleAnimating()) {
-			wt_.scale_ = animation_->GetCurrentScale();
-		}
-
-		// カラーアニメーション中の場合、色を適用
-		if (animation_->IsColorAnimating()) {
-			if (obj_) {
-				obj_->SetMaterialColor(animation_->GetCurrentColor());
-			}
-		}
-	}
+	UpdateAnimation(dt);
 
 	// ヒットカウントのリセット処理（しきい値は CounterAttackParams 経由）
 	if (consecutiveHitCount_ > 0 && !isInvincible_) {
@@ -192,26 +177,17 @@ void BattleEnemy::Update() {
 		currentState_->Update(*this, dt);
 	}
 
-	// ノックバック更新
-	UpdateKnockback(dt);
-	UpdateDirectionalHitReaction(dt);
-
-	// 状態VFX（燃焼など）の追従・寿命更新
-	UpdateStatusVfx(dt);
+	// ノックバック・のけぞり・状態VFX（燃焼など）の更新
+	UpdateReactions(dt);
 
 	// エリア制限補正
 	AreaManager::GetInstance()->UpdateSingleObject(&wt_);
 
 	// 行列と更新
-	currentVelocity_ = wt_.translate_ - previousPosition_;
+	UpdateVelocity();
 	wt_.UpdateMatrix();
 	// 描画専用Transformにだけのけぞり回転を加える。コライダーはwt_のまま傾けない。
-	visualWt_.scale_ = wt_.scale_;
-	visualWt_.rotate_ = wt_.rotate_ + hitReactionRotation_;
-	visualWt_.translate_ = wt_.translate_;
-	visualWt_.anchorPoint_ = wt_.anchorPoint_;
-	visualWt_.useAnchorPoint_ = wt_.useAnchorPoint_;
-	visualWt_.UpdateMatrix();
+	SyncVisualTransform();
 	// コリジョン更新
 	if (obbCollider_) {
 		obbCollider_->Update();
@@ -227,23 +203,29 @@ void BattleEnemy::Update() {
 状態の切り替え
 //========================================================================*/
 void BattleEnemy::ChangeState(std::unique_ptr<IEnemyState<BattleEnemy>> newState) {
+	// 攻撃状態から抜けるときは必ず攻撃権を返す。
+	// 被弾・ダウン・死亡による中断もここを通るので、返し忘れが起きない。
+	if (currentState_ && currentState_->IsAttacking()) {
+		if (auto* pool = AttackTokenPool::GetCurrent()) {
+			pool->Release(this);
+		}
+	}
+
 	if (currentState_) currentState_->Exit(*this);
 	currentState_ = std::move(newState);
 	lastDealtContactDamageWindow_ = -1;
 	if (currentState_) currentState_->Enter(*this);
 	stateTimer_ = 0.0f;
-}
 
-/*==========================================================================
-プレイヤーの現在位置の取得
-//========================================================================*/
-Vector3 BattleEnemy::GetPlayerPosition() const {
-	if (player_) {
-		return player_->GetWorldPosition();
+	// 遷移をログに残す。エディタの状態モニタで「今どう動いているか」を見るために使う。
+	if (currentState_) {
+		transitionLog_.push_back({ currentState_->GetName(), timeInCurrentState_, lifeTime_ });
+		if (transitionLog_.size() > maxTransitionLog_) {
+			transitionLog_.erase(transitionLog_.begin());
+		}
 	}
-	return Vector3(0.0f, 0.0f, 0.0f);
+	timeInCurrentState_ = 0.0f;
 }
-
 
 /*==========================================================================
 攻撃の実行
@@ -252,9 +234,39 @@ void BattleEnemy::PerformBasicAttack() {
 	if (!player_) return;
 	// 突進（ホーミング）攻撃中など無敵のときはダメージものけぞりも与えない
 	if (player_->IsInvincible()) return;
-	player_->TakeDamage(enemyData_.attack);
-	// 被弾したプレイヤーをのけぞらせる（ヒットモーションへ遷移）
-	player_->ApplyHitReaction(wt_.translate_);
+
+	// ダメージ・ガード判定・プレイヤー側のリアクションはすべて向こうで処理される。
+	// こちらは結果を受け取って「攻撃を防がれた側」としての反応だけを決める。
+	const auto result = player_->ApplyDamage(enemyData_.attack, wt_.translate_);
+
+	if (result == PlayerGuard::GuardResult::GuardFail) return;
+
+	// 防がれたので突進の勢いを殺す。
+	// パリィなら大きく突き放され、通常ガードならその場で止まる程度。
+	// この押し合いの差が「弾き返した」と「受け止められた」の違いになる。
+	const PlayerGuard* guard = player_->GetCombat()->GetGuard();
+	const GuardOutcome* outcome = guard ? guard->GetOutcome(result) : nullptr;
+	if (outcome && outcome->enemyPushPower > 0.0f) {
+		Vector3 pushDir = wt_.translate_ - player_->GetWorldPosition();
+		pushDir.y = 0.0f;
+		if (Length(pushDir) > 0.001f) {
+			StartKnockback(Normalize(pushDir), outcome->enemyPushPower, outcome->enemyPushDuration);
+		}
+	} else {
+		knockbackData_.isKnockingBack_ = false;
+	}
+
+	// パリィが実際に成立し、かつその攻撃が盾で崩せる設定ならダウンさせる。
+	//
+	// 以前はここではなく盾コライダーの接触側で判定していて、
+	// 「盾に触れた + ガードがActiveかRecovery」だけを見ていた。
+	// パリィ窓を見ていなかったため、タイミングを外したガードでも
+	// 敵がダウンしてしまっていた。
+	if (result == PlayerGuard::GuardResult::ParrySuccess) {
+		if (currentState_ && currentState_->CanBeParried()) {
+			ChangeState(std::make_unique<BattleDownedState>());
+		}
+	}
 }
 
 /*==========================================================================
@@ -269,73 +281,6 @@ void BattleEnemy::PlayDeathEffect() {
 	obj_->SetDissolveNoiseScale(dissolveNoiseScale_);
 }
 
-/*==========================================================================
-ダメージを受ける処理
-//========================================================================*/
-void BattleEnemy::TakeDamage(int damage) {
-	if (isInvincible_ || !IsAlive()) return;
-	enemyData_.currentHp_ -= damage;
-	if (enemyData_.currentHp_ < 0) enemyData_.currentHp_ = 0;
-}
-
-/*==========================================================================
-HPの回復
-//========================================================================*/
-void BattleEnemy::Heal(int amount)
-{
-	if (!IsAlive()) return;
-	enemyData_.currentHp_ += amount;
-	if (enemyData_.currentHp_ > enemyData_.maxHp_) enemyData_.currentHp_ = enemyData_.maxHp_;
-}
-
-/*==========================================================================
-ダメージを受けた瞬間の点滅処理
-//========================================================================*/
-void BattleEnemy::UpdateBlinking(float dt) {
-	// ダメージ時の点滅中でなければ処理しない
-	if (!isDamageBlinking_) return;
-	blinkTimer_ += dt;
-
-	// サイン波を利用してα値を周期的に変化させる
-	float alpha = 0.65f + 0.35f * std::sin(blinkTimer_ * blinkSpeed_);
-
-	if (obj_) {
-		obj_->GetColor() = { 1.0f, 0.0f, 0.0f, alpha };
-	}
-}
-
-/*==========================================================================
-ノックバック開始の処理
-//========================================================================*/
-void BattleEnemy::StartKnockback(const Vector3& direction, float power, float duration)
-{
-	knockbackData_.isKnockingBack_ = true;
-	knockbackData_.knockbackDirection_ = Vector3::Normalize(direction);
-	knockbackData_.knockbackPower_ = power;
-	knockbackData_.knockbackDuration_ = duration;
-	knockbackData_.knockbackTimer_ = 0.0f;
-}
-
-/*==========================================================================
-ノックバック中の処理
-//========================================================================*/
-void BattleEnemy::UpdateKnockback(float dt)
-{
-	// ノックバック中でなければ処理しない
-	if (!knockbackData_.isKnockingBack_) return;
-	knockbackData_.knockbackTimer_ += dt;
-
-	// 時間経過でパワーを減衰
-	float currentPower = knockbackData_.knockbackPower_ * (1.0f - (knockbackData_.knockbackTimer_ / knockbackData_.knockbackDuration_));
-	Vector3 delta = knockbackData_.knockbackDirection_ * currentPower * dt;
-	AddTranslate(delta);
-
-	if (knockbackData_.knockbackTimer_ >= knockbackData_.knockbackDuration_) {
-		knockbackData_.isKnockingBack_ = false;
-		knockbackData_.knockbackPower_ = 0.0f;
-	}
-}
-
 void BattleEnemy::TryPerformContactAttack() {
 	if (!currentState_) return;
 	const int damageWindow = currentState_->GetContactDamageWindow();
@@ -347,174 +292,81 @@ void BattleEnemy::TryPerformContactAttack() {
 }
 
 /*==========================================================================
-攻撃方向に応じたのけぞり開始
-//========================================================================*/
-void BattleEnemy::StartDirectionalHitReaction(const Vector3& direction)
-{
-	hitReactionRotation_ = {};
-
-	Vector3 horizontalDirection = direction;
-	horizontalDirection.y = 0.0f;
-	if (Length(horizontalDirection) < 0.001f || hitReactionDuration_ <= 0.0f) {
-		isHitReacting_ = false;
-		return;
-	}
-	horizontalDirection = Normalize(horizontalDirection);
-
-	// 攻撃のワールド方向を、敵から見た前後・左右成分へ変換する。
-	const float yaw = wt_.rotate_.y;
-	const Vector3 forward = { std::sinf(yaw), 0.0f, std::cosf(yaw) };
-	const Vector3 right = { std::cosf(yaw), 0.0f, -std::sinf(yaw) };
-	const float forwardAmount = Dot(horizontalDirection, forward);
-	const float rightAmount = Dot(horizontalDirection, right);
-
-	hitReactionTargetRotation_ = {
-		-forwardAmount * hitReactionAngle_,
-		0.0f,
-		-rightAmount * hitReactionAngle_
-	};
-	hitReactionTimer_ = 0.0f;
-	isHitReacting_ = true;
-}
-
-/*==========================================================================
-攻撃方向に応じたのけぞり更新
-//========================================================================*/
-void BattleEnemy::UpdateDirectionalHitReaction(float dt)
-{
-	hitReactionRotation_ = {};
-
-	if (!isHitReacting_) return;
-
-	hitReactionTimer_ += dt;
-	const float progress = std::fminf(hitReactionTimer_ / hitReactionDuration_, 1.0f);
-	// 素早く最大まで傾き、そのまま滑らかに基準姿勢へ戻る。
-	constexpr float kPi = 3.14159265358979323846f;
-	const float weight = std::sinf(progress * kPi);
-	hitReactionRotation_ = hitReactionTargetRotation_ * weight;
-
-	if (progress >= 1.0f) {
-		isHitReacting_ = false;
-	}
-}
-
-/*==========================================================================
-状態VFX（燃焼など）の付着・追従・停止
-//========================================================================*/
-void BattleEnemy::AttachStatusVfx(const std::string& compositeName, float duration) {
-	if (compositeName.empty() || duration <= 0.0f || !isAlive_) return;
-
-	// 同じVFXの再付着は時間リフレッシュのみ（ループを二重再生しない）
-	if (statusVfx_.IsValid() && statusVfxName_ == compositeName) {
-		statusVfxTimer_ = duration;
-		return;
-	}
-
-	// 別のVFXが付いていたら止めてから付け直す
-	StopStatusVfx();
-	statusVfx_ = EffectHandle::Play(compositeName, wt_.translate_,
-		/*loop*/ true, /*emitCount*/ -1);
-	statusVfxName_ = compositeName;
-	statusVfxTimer_ = duration;
-}
-
-void BattleEnemy::UpdateStatusVfx(float dt) {
-	if (!statusVfx_.IsValid()) return;
-
-	statusVfxTimer_ -= dt;
-	if (statusVfxTimer_ <= 0.0f) {
-		StopStatusVfx();
-		return;
-	}
-	// 本体に追従（少し持ち上げて足元ではなく体に重ねる）
-	Vector3 pos = wt_.translate_;
-	pos.y += 1.0f;
-	statusVfx_.SetPosition(pos);
-}
-
-void BattleEnemy::StopStatusVfx() {
-	if (statusVfx_.IsValid()) {
-		statusVfx_.Stop();
-	}
-	statusVfxName_.clear();
-	statusVfxTimer_ = 0.0f;
-}
-
-/*==========================================================================
 ヒットした瞬間
 //========================================================================*/
 void BattleEnemy::OnEnterCollision([[maybe_unused]] BaseCollider* self, BaseCollider* other) {
 
-	if (isAlive_ && !isInvincible_) {
-		// 攻撃を食らった時
-		if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon)) {
-			// ダウン中などはダメージを受けても、その反撃チャンス状態を維持する。
-			const bool keepCurrentState = currentState_ && currentState_->KeepsStateWhenDamaged();
+	if (!isAlive_ || isInvincible_) return;
 
-			// --------------------- ダメージの処理 --------------------- //
-			int damage = static_cast<int>(player_->GetCombat()->GetCombo()->GetCurrentDamage());
-			TakeDamage(damage);
+	// 攻撃を食らった時。
+	// ここでは「誰にどう殴られたか」を集めるだけにして、
+	// 状態遷移やリアクションの判断は OnDamaged 側へ寄せる。
+	if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayerWeapon)) {
+		auto* combo = player_->GetCombat()->GetCombo();
 
-			// ダメージ数値UIをスポーン（頭上Yオフセットは DamageNumberManager 側でJSON調整）
-			bool isSine = (player_->GetCombat()->GetComboDamageMultiplier() > 1.0f);
-			DamageNumberManager::GetInstance()->SpawnDamage(damage, wt_.translate_, isSine);
-			// --------------------- ヒットエフェクトの処理 --------------------- //
-			//auto* enemyHitEmitterGroup_ = YEmitterGroupManager::GetInstance().GetGroup("EnemyHit");
-			//if (enemyHitEmitterGroup_) {
-			//	enemyHitEmitterGroup_->SetPosition(wt_.translate_);
-			//	enemyHitEmitterGroup_->SetActive(true);
-			//	enemyHitEmitterGroup_->SetAutoEmitAll(false);  // 自動射出OFF
-			//	enemyHitEmitterGroup_->EmitAll(10);
-			//}
+		DamageInfo info{};
+		info.amount = static_cast<int>(combo->GetCurrentDamage());
+		info.sourcePosition = player_->GetWorldPosition();
+		info.knockbackPower = combo->GetCurrentKnockback();
+		info.knockbackDuration = combo->GetCurrentKnockbackDuration();
 
-			// --------------------- ヒットカウントの処理 --------------------- //
-			// しきい値・有効フラグは CounterAttackParams (JSON 経由) で調整可能
-			if (!keepCurrentState) {
-				const auto& counterParams = enemyData_.attackParams.counter;
-				consecutiveHitCount_++;
-				hitCountResetTimer_ = 0.0f;
-				// 連続ヒット数が限界を超え、かつカウンター挙動が有効なら Recovery 状態へ
-				if (counterParams.enabled && consecutiveHitCount_ >= counterParams.triggerHitCount) {
-					ChangeState(std::make_unique<BattleRecoveryState>());
-					consecutiveHitCount_ = 0;  // リセット
-				}
-				else {
-					// 通常のダメージ状態
-					ChangeState(std::make_unique<BattleDamageState>());
-				}
-			}
+		ApplyDamage(info);
 
-			// --------------------- ノックバックの処理 --------------------- //
-			Vector3 knockbackDir = wt_.translate_ - player_->GetWorldPosition();
-			knockbackDir.y = 0.0f;
-			knockbackDir = Vector3::Normalize(knockbackDir);
+		// 攻撃ヒット時の前進ステップ（プレイヤー側の手応え演出）は
+		// 敵が死んでいても出したいので、リアクションとは別に発火する。
+		combo->OnHitStep(wt_.translate_);
+	}
 
-			float power = player_->GetCombat()->GetCombo()->GetCurrentKnockback();
-			float duration = player_->GetCombat()->GetCombo()->GetCurrentKnockbackDuration();
-			StartKnockback(knockbackDir, power, duration);
-			StartDirectionalHitReaction(knockbackDir);
+	// プレイヤー本体または盾に当たった時。攻撃実行中のStateの時だけ攻撃を成立させる。
+	//
+	// 盾も本体と同じ扱いにするのは、ガード中は盾が敵を押し返して
+	// 体同士が接触しないことがあり、そのままだとガード判定自体が走らないため。
+	// どちらに当たっても TryPerformContactAttack() が攻撃判定時間ごとに
+	// 一度だけ通すので、二重に成立することはない。
+	if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayer) ||
+		other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayerShield)) {
+		TryPerformContactAttack();
+	}
+}
 
-			// --------------------- 攻撃ヒット時の前進ステップを発火 --------------------- //
-			player_->GetCombat()->GetCombo()->OnHitStep(wt_.translate_);
+/*==========================================================================
+被弾リアクション（ダメージが実際に通ったときだけ呼ばれる）
+//========================================================================*/
+void BattleEnemy::OnDamaged(const DamageInfo& info) {
+	// ダウン中などはダメージを受けても、その反撃チャンス状態を維持する。
+	const bool keepCurrentState = currentState_ && currentState_->KeepsStateWhenDamaged();
 
+	// --------------------- ダメージ数値UI --------------------- //
+	// 頭上Yオフセットは DamageNumberManager 側でJSON調整
+	if (player_) {
+		const bool isSine = (player_->GetCombat()->GetComboDamageMultiplier() > 1.0f);
+		DamageNumberManager::GetInstance()->SpawnDamage(info.amount, wt_.translate_, isSine);
+	}
+
+	// --------------------- 連続被弾からのカウンター --------------------- //
+	// しきい値・有効フラグは CounterAttackParams (JSON 経由) で調整可能
+	if (!keepCurrentState) {
+		const auto& counterParams = enemyData_.attackParams.counter;
+		consecutiveHitCount_++;
+		hitCountResetTimer_ = 0.0f;
+
+		if (counterParams.enabled && consecutiveHitCount_ >= counterParams.triggerHitCount) {
+			ChangeState(std::make_unique<BattleRecoveryState>());
+			consecutiveHitCount_ = 0;
+		} else {
+			ChangeState(std::make_unique<BattleDamageState>());
 		}
+	}
 
-		// 盾に当たった時
-		if (dynamic_cast<BattleRushAttackState*>(GetCurrentState()) != nullptr) {
-			if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayerShield)) {
-				if (player_->GetCombat()->GetGuard()->GetState() == PlayerGuard::State::Active ||
-					player_->GetCombat()->GetGuard()->GetState() == PlayerGuard::State::Recovery) {
-					if (isAlive_) {
-						ChangeState(std::make_unique<BattleDownedState>());
-					}
-				}
-			}
-		}
-
-		// プレイヤー本体に当たった時。攻撃実行中のStateの時だけダメージを与える
-		if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayer)) {
-			TryPerformContactAttack();
-		}
+	// --------------------- ノックバックとのけぞり --------------------- //
+	Vector3 knockbackDir = wt_.translate_ - info.sourcePosition;
+	knockbackDir.y = 0.0f;
+	if (Length(knockbackDir) > 0.001f) {
+		knockbackDir = Vector3::Normalize(knockbackDir);
+		StartKnockback(knockbackDir, info.knockbackPower, info.knockbackDuration);
+		StartDirectionalHitReaction(knockbackDir,
+			enemyData_.damageReaction.hitReactionAngle,
+			enemyData_.damageReaction.hitReactionDuration);
 	}
 }
 
@@ -525,7 +377,9 @@ void BattleEnemy::OnCollision([[maybe_unused]] BaseCollider* self, [[maybe_unuse
 	if (!isAlive_) return;
 
 	// 溜め中から接触し続けたまま攻撃判定時間へ入った場合にも、一度だけ命中させる。
-	if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayer)) {
+	// 盾を本体と同じ扱いにする理由は OnEnterCollision 側のコメントを参照。
+	if (other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayer) ||
+		other->GetTypeID() == static_cast<uint32_t>(CollisionTypeIdDef::kPlayerShield)) {
 		TryPerformContactAttack();
 	}
 

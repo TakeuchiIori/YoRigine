@@ -9,14 +9,23 @@
 #include <wrl.h>
 
 #include "Material/MaterialLighting.h"
+#include "Material/MaterialOverrideSet.h"
 #include "Matrix4x4.h"
 #include "Object3D/ObjectManager.h" // PlacedObject (ネスト型なので前方宣言不可)
 #include "Vector4.h"
 
-namespace YoRigine { class Camera; }
-namespace YoRigine { class Model; }
-namespace YoRigine { class WorldTransform; }
-namespace YoRigine { class Object3d; }
+namespace YoRigine {
+class Camera;
+}
+namespace YoRigine {
+class Model;
+}
+namespace YoRigine {
+class WorldTransform;
+}
+namespace YoRigine {
+class Object3d;
+}
 
 namespace YoRigine {
 class DirectXCommon;
@@ -31,7 +40,7 @@ class SrvManager;
 ///   ...
 ///   // 毎フレーム
 ///   inst->Begin(camera);                     // このフレームのカメラを渡す
-///   // PlacedObject を積む場合 (ModelManipulator 等)
+///   // PlacedObject を積む場合 (SceneEditor 等)
 ///   for (auto* obj : placedObjects)  inst->Submit(*obj);
 ///   // 素の Object3d を積む場合 (WorldTransform は別途渡す)
 ///   for (auto& e : enemies)          inst->Submit(e.object, e.worldTransform);
@@ -53,7 +62,7 @@ public:
     Matrix4x4 uvTransform;
     float stochasticStrength = 0.0f;
     float outlineMask =
-        1.0f; // インバートハル輪郭線の掛け率(1=線あり, 0=線なし)
+        1.0f;                // インバートハル輪郭線の掛け率(1=線あり, 0=線なし)
     float ditherFade = 0.0f; // 1=alpha をスクリーンドア透過率として使用
     float _pad2 = 0.0f;
   };
@@ -85,8 +94,12 @@ public:
   // をそのまま入れる=影パス用)。
   // overrideTexturePath: 空でなければモデル既定の代わりにこのテクスチャを貼る。
   // 同一モデルでもテクスチャが異なると別バッチとして描画される。
+  // materialOverrides: メッシュ単位のマテリアル差し替え。マテリアルは
+  // ドローコール単位でしかバインドできないため、上書きが異なるオブジェクトは
+  // 別バッチになる (同じ設定同士はまとまるのでインスタンシングは維持される)。
   void Submit(YoRigine::Model *model, const Instance &src,
-              const std::string &overrideTexturePath = "");
+              const std::string &overrideTexturePath = "",
+              MaterialOverrideSet *materialOverrides = nullptr);
 
   // PlacedObject 用: model / world / 色 / UV / 輪郭線をすべて PlacedObject
   // から取り出して積む。 影パスでも同じ呼び出しでよい (Begin()
@@ -96,12 +109,14 @@ public:
   // Object3d 用: Object3d は自前の WorldTransform を持たないので transform
   // を別途渡す。 材質 (色 / UV / stochastic / 輪郭線) は Object3d
   // から取り出す。
-  void Submit(YoRigine::Object3d &object, const YoRigine::WorldTransform &transform);
+  void Submit(YoRigine::Object3d &object,
+              const YoRigine::WorldTransform &transform);
 
   // 低レベル: WVP / WIT を含む完成済みデータを積む。
   // overrideTexturePath が空でなければテクスチャ別のバッチに積む。
   void AddInstance(YoRigine::Model *model, const InstanceData &data,
-                   const std::string &overrideTexturePath = "");
+                   const std::string &overrideTexturePath = "",
+                   MaterialOverrideSet *materialOverrides = nullptr);
 
   // カラーパス: ObjectInstanced PSO で全バッチを描画
   void DrawAll(YoRigine::Camera *camera);
@@ -126,19 +141,22 @@ private:
   InstancedObject3d(const InstancedObject3d &) = delete;
   InstancedObject3d &operator=(const InstancedObject3d &) = delete;
 
-  // バッチ識別子: 同じモデルでもテクスチャ上書きが違えば別バッチにする。
-  // (インスタンシングは 1 ドロー = 1 テクスチャのため、テクスチャごとに分ける)
+  // バッチ識別子: 同じモデルでもテクスチャ上書き / マテリアル上書きが違えば
+  // 別バッチにする。(インスタンシングは 1 ドロー = 1 マテリアルのため)
   struct BatchKey {
     YoRigine::Model *model = nullptr;
     std::string overrideTexturePath;
+    MaterialOverrideSet *materialOverrides = nullptr;
     bool operator==(const BatchKey &o) const {
-      return model == o.model && overrideTexturePath == o.overrideTexturePath;
+      return model == o.model && overrideTexturePath == o.overrideTexturePath &&
+             materialOverrides == o.materialOverrides;
     }
   };
   struct BatchKeyHash {
     size_t operator()(const BatchKey &k) const {
       return std::hash<const void *>()(k.model) ^
-             (std::hash<std::string>()(k.overrideTexturePath) << 1);
+             (std::hash<std::string>()(k.overrideTexturePath) << 1) ^
+             (std::hash<const void *>()(k.materialOverrides) << 2);
     }
   };
 
