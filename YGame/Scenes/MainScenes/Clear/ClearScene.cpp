@@ -1,4 +1,4 @@
-#include "ClearScene.h"
+﻿#include "ClearScene.h"
 
 // Engine
 #include "Collision/Core/CollisionManager.h"
@@ -91,16 +91,16 @@ void ClearScene::Initialize() {
 
 #ifdef USE_IMGUI
   Editor::GetInstance()->RegisterGameUI(
-      "カメラエディター", [this]() { cameraEditor_->Update(); }, "Clear");
+      "カメラエディター", [this]() { cameraEditor_->Update(); }, "Clear", "ゲームプレイ");
   Editor::GetInstance()->RegisterGameUI(
-      "カメラモード切り替え", [this]() { UpdateCameraMode(); }, "Clear");
+      "カメラモード切り替え", [this]() { UpdateCameraMode(); }, "Clear", "ゲームプレイ");
   Editor::GetInstance()->RegisterGameUI(
       "ライティング",
       [this]() { YoRigine::LightManager::GetInstance()->ShowLightingEditor(); },
-      "Clear");
+      "Clear", "ゲームプレイ");
   Editor::GetInstance()->RegisterGameUI(
       "YoRigine:パーティクルエディター",
-      [this]() { YParticleEditor::GetInstance().ShowEditorWindow(); }, "Clear");
+      [this]() { YParticleEditor::GetInstance().ShowEditorWindow(); }, "Clear", "ゲームプレイ");
 #endif
 }
 

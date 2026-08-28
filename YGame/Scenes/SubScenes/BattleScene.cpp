@@ -102,12 +102,12 @@ void BattleScene::Initialize(YoRigine::Camera *camera, Player *player) {
 #ifdef USE_IMGUI
   Editor::GetInstance()->RegisterGameUI(
       "バトルモード:デバッグ情報",
-      [this]() { battleEnemyManager_->ShowDebugInfo(); }, "Game");
+      [this]() { battleEnemyManager_->ShowDebugInfo(); }, "Game", "ゲームプレイ");
 
   // 攻撃の経路エディタ。制御点をギズモで置いて動きを作る。
   motionPathEditor_.Initialize(sceneCamera_);
   Editor::GetInstance()->RegisterGameUI(
-      "攻撃経路エディタ", [this]() { motionPathEditor_.Draw(); }, "Game");
+      "攻撃経路エディタ", [this]() { motionPathEditor_.Draw(); }, "Game", "ゲームプレイ");
 
   // ImGuizmo はゲームビューの ImGui コンテキスト内でしか描けないので、
   // Editor 側のギズモ描画タイミングに乗せてもらう。
@@ -117,7 +117,7 @@ void BattleScene::Initialize(YoRigine::Camera *camera, Player *player) {
   // 攻撃エディタ。プレビューで実際の敵を動かすためマネージャを渡す。
   attackEditor_.SetManager(battleEnemyManager_.get());
   Editor::GetInstance()->RegisterGameUI(
-      "攻撃エディタ", [this]() { attackEditor_.Draw(); }, "Game");
+      "攻撃エディタ", [this]() { attackEditor_.Draw(); }, "Game", "ゲームプレイ");
 #endif
 
   //------------------------------------------------------------

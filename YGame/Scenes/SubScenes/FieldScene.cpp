@@ -1,4 +1,4 @@
-#include "FieldScene.h"
+﻿#include "FieldScene.h"
 
 // Engine
 #include "Systems./Input./Input.h"
@@ -131,12 +131,12 @@ void FieldScene::Initialize(YoRigine::Camera* camera, Player* player) {
 
 #ifdef USE_IMGUI
 	Editor::GetInstance()->RegisterGameUI("フィールドモード:デバッグ情報",
-		[this]() { fieldEnemyManager_->ShowDebugInfo(); }, "Game");
+		[this]() { fieldEnemyManager_->ShowDebugInfo(); }, "Game", "ゲームプレイ");
 
 	// AreaEditor は Game シーン全体(Field/Battle 両サブシーン)で開けるよう一度だけ登録。
 	// AreaEditor / AreaManager はシングルトンなのでサブシーンを跨いでも同じ状態を共有する。
 	Editor::GetInstance()->RegisterGameUI("AreaEditor",
-		[]() { AreaEditor::GetInstance()->Update(); }, "Game");
+		[]() { AreaEditor::GetInstance()->Update(); }, "Game", "ゲームプレイ");
 
 	// プレイヤースポーン地点エディタ
 	Editor::GetInstance()->RegisterGameUI("プレイヤースポーン", [this]() {
@@ -183,7 +183,7 @@ void FieldScene::Initialize(YoRigine::Camera* camera, Player* player) {
 		}
 		ImGui::SameLine();
 		ImGui::TextDisabled("(編集値はワープ or 起動時に反映)");
-	}, "Game");
+	}, "Game", "ゲームプレイ");
 
 	// NavGridConfig エディター（Editor::RegisterGameUI で登録）
 	Editor::GetInstance()->RegisterGameUI("NavGrid Config", [this]() {
@@ -208,11 +208,11 @@ void FieldScene::Initialize(YoRigine::Camera* camera, Player* player) {
 				navGridConfig_.aj_.SaveToFile(navGridConfig_.kDefaultPath);
 			}
 		}
-		}, "Game");
+		}, "Game", "ゲームプレイ");
 
 	Editor::GetInstance()->RegisterGameUI("EventTrigger", [this]() {
 		DrawEventTriggerEditor();
-	}, "Game");
+	}, "Game", "ゲームプレイ");
 #endif
 }
 

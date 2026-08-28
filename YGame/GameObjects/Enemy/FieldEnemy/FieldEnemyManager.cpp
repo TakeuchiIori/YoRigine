@@ -60,7 +60,7 @@ void FieldEnemyManager::Initialize(YoRigine::Camera* camera) {
 		"フィールドエネミーエディター",
 		[this]() {
 			FieldEnemyEditorUI::ShowEnemyEditor(*this);
-		}, "Game"
+		}, "Game", "ゲームプレイ"
 	);
 	spawnGizmoCtrl_.Initialize();
 	// ImGuizmo はゲームビュー ImGui ウィンドウのコンテキスト内で描画する必要があるため、

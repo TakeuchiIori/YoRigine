@@ -1,4 +1,4 @@
-#include "TitleScene.h"
+﻿#include "TitleScene.h"
 
 // Engine
 #include "LightManager/LightManager.h"
@@ -94,13 +94,13 @@ void TitleScene::Initialize() {
   //------------------------------------------------------------
 #ifdef USE_IMGUI
   Editor::GetInstance()->RegisterGameUI(
-      "カメラエディター", [this]() { cameraEditor_->Update(); }, "Title");
+      "カメラエディター", [this]() { cameraEditor_->Update(); }, "Title", "ゲームプレイ");
   Editor::GetInstance()->RegisterGameUI(
-      "カメラモード切り替え", [this]() { UpdateCameraMode(); }, "Title");
+      "カメラモード切り替え", [this]() { UpdateCameraMode(); }, "Title", "ゲームプレイ");
   Editor::GetInstance()->RegisterGameUI(
       "ライティング",
       [this]() { YoRigine::LightManager::GetInstance()->ShowLightingEditor(); },
-      "Title");
+      "Title", "ゲームプレイ");
 #endif
 }
 

@@ -1,4 +1,4 @@
-#include "GameScene.h"
+﻿#include "GameScene.h"
 
 // Engine
 #include "Collision/AreaCollision/Base/AreaEditor.h"
@@ -182,25 +182,25 @@ void GameScene::Initialize() {
   });
 
   Editor::GetInstance()->RegisterGameUI(
-      "カメラエディター", [this]() { cameraEditor_->Update(); }, "Game");
+      "カメラエディター", [this]() { cameraEditor_->Update(); }, "Game", "ゲームプレイ");
   Editor::GetInstance()->RegisterGameUI(
-      "カメラモード切り替え", [this]() { UpdateCameraMode(); }, "Game");
+      "カメラモード切り替え", [this]() { UpdateCameraMode(); }, "Game", "ゲームプレイ");
   Editor::GetInstance()->RegisterGameUI(
-      "プレイヤーの状態情報", [this]() { player_->DrawImGui(); }, "Game");
+      "プレイヤーの状態情報", [this]() { player_->DrawImGui(); }, "Game", "ゲームプレイ");
   Editor::GetInstance()->RegisterGameUI(
       "プレイヤーカメラ",
       [this]() {
         if (player_->GetPlayerCamera())
           player_->GetPlayerCamera()->DrawImGui();
       },
-      "Game");
+      "Game", "ゲームプレイ");
   Editor::GetInstance()->RegisterGameUI(
       "ライティング",
       [this]() { YoRigine::LightManager::GetInstance()->ShowLightingEditor(); },
-      "Game");
+      "Game", "ゲームプレイ");
   Editor::GetInstance()->RegisterGameUI(
       "プレイヤー攻撃エディター", [this]() { attackEditor_->DrawImGui(); },
-      "Game");
+      "Game", "ゲームプレイ");
   Editor::GetInstance()->RegisterGameUI(
       "魔法攻撃エディター",
       [this]() {
@@ -211,10 +211,10 @@ void GameScene::Initialize() {
           player_->GetMagicController()->DrawEditorWindow();
         }
       },
-      "Game");
+      "Game", "ゲームプレイ");
   Editor::GetInstance()->RegisterGameUI(
       "YoRigine:パーティクルエディター",
-      [this]() { YParticleEditor::GetInstance().ShowEditorWindow(); }, "Game");
+      [this]() { YParticleEditor::GetInstance().ShowEditorWindow(); }, "Game", "ゲームプレイ");
 #endif
 
   //------------------------------------------------------------
