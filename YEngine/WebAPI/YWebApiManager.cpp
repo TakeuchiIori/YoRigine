@@ -17,17 +17,24 @@ bool YWebApiManager::Initialize() {
         return true;
 
     // アプリケーション全体で一生に一度のcURLグローバル初期化
+    // (Finalize()まで維持する。ここで curl_global_cleanup() を呼ぶと、以降の
+    //  PerformRequest() がグローバル未初期化の状態でcURLを使うことになり未定義動作となる)
     if (curl_global_init(CURL_GLOBAL_ALL) != CURLE_OK) {
         AddLog("[YWebApiManager] cURLのグローバル初期化に失敗しました。");
         return false;
     }
-    curl_ = curl_easy_init();
-    if (curl_) {
-        initialized_ = true;
-        AddLog("[YWebApiManager] 初期化に成功しました。");
-        curl_easy_cleanup(curl_);
+
+    // ハンドル生成テスト（疎通確認用。実際のリクエストはPerformRequest側で都度生成する）
+    CURL* testHandle = curl_easy_init();
+    if (!testHandle) {
+        AddLog("[YWebApiManager] cURLハンドルの作成に失敗しました。");
+        curl_global_cleanup();
+        return false;
     }
-    curl_global_cleanup();
+    curl_easy_cleanup(testHandle);
+
+    initialized_ = true;
+    AddLog("[YWebApiManager] 初期化に成功しました。");
     return true;
 }
 
@@ -51,6 +58,56 @@ void YWebApiManager::DrawLogWindow() {
     if (ImGui::Button("Test Request (Local)")) {
         // ボタンを押したらテスト通信が走るようにしておくと超便利！
         SendGetRequest("http://localhost/Backend/api/ranking.php");
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Test Request (be1api /faculties)")) {
+        // 別サーバーで動いているbe1api（Express）の疎通確認用
+        SendGetRequestAsync("http://localhost:3000/faculties", {},
+            [this](nlohmann::json result) {
+                AddLog("[be1api] " + result.dump());
+            });
+    }
+
+    ImGui::Separator();
+
+    // --- faculties APIを手動で叩くフォーム ---
+    ImGui::Text("faculties API");
+    ImGui::InputText("URL", requestUrlBuffer_, sizeof(requestUrlBuffer_));
+    ImGui::InputText("name (POST/PATCH)", requestNameBuffer_, sizeof(requestNameBuffer_));
+    ImGui::InputText("id (PATCH/DELETE)", requestIdBuffer_, sizeof(requestIdBuffer_));
+
+    if (ImGui::Button("GET")) {
+        SendGetRequestAsync(requestUrlBuffer_, {},
+            [this](nlohmann::json result) {
+                AddLog("[GET] " + result.dump());
+            });
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("POST")) {
+        nlohmann::json body = { {"name", std::string(requestNameBuffer_)} };
+        SendPostRequestWithStatusAsync(requestUrlBuffer_, body,
+            { "Content-Type: application/json" },
+            [this](nlohmann::json result, long status) {
+                AddLog("[POST:" + std::to_string(status) + "] " + result.dump());
+            });
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("PATCH")) {
+        std::string url = std::string(requestUrlBuffer_) + "/" + requestIdBuffer_;
+        nlohmann::json body = { {"name", std::string(requestNameBuffer_)} };
+        SendPatchRequestWithStatusAsync(url, body,
+            { "Content-Type: application/json" },
+            [this](nlohmann::json result, long status) {
+                AddLog("[PATCH:" + std::to_string(status) + "] " + result.dump());
+            });
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("DELETE")) {
+        std::string url = std::string(requestUrlBuffer_) + "/" + requestIdBuffer_;
+        SendDeleteRequestWithStatusAsync(url, {},
+            [this](nlohmann::json result, long status) {
+                AddLog("[DELETE:" + std::to_string(status) + "] " + result.dump());
+            });
     }
 
     ImGui::Separator();
@@ -170,6 +227,21 @@ void YWebApiManager::SendPatchRequestWithStatusAsync(
         }).detach();
 }
 
+void YWebApiManager::SendDeleteRequestWithStatusAsync(
+    const std::string& url, const std::vector<std::string>& headers,
+    std::function<void(nlohmann::json body, long httpStatus)> callback) {
+    std::thread([this, url, headers, callback]() {
+        long httpStatus = 0;
+        nlohmann::json result =
+            PerformRequest("DELETE", url, nullptr, headers, &httpStatus);
+        std::lock_guard<std::mutex> lock(pendingMutex_);
+        pendingResults_.push_back([callback, result, httpStatus]() {
+            if (callback)
+                callback(result, httpStatus);
+            });
+        }).detach();
+}
+
 void YWebApiManager::Update() {
     std::vector<std::function<void()>> finished;
     {
@@ -226,6 +298,15 @@ nlohmann::json YWebApiManager::PerformRequest(
     }
     else if (method == "PATCH") {
         curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PATCH");
+        if (body) {
+            bodyString = body->dump();
+            curl_easy_setopt(curl, CURLOPT_POSTFIELDS, bodyString.c_str());
+            curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE,
+                static_cast<long>(bodyString.size()));
+        }
+    }
+    else if (method == "DELETE") {
+        curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
         if (body) {
             bodyString = body->dump();
             curl_easy_setopt(curl, CURLOPT_POSTFIELDS, bodyString.c_str());

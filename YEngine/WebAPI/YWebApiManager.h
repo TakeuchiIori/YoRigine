@@ -64,6 +64,11 @@ public:
         const std::string& url, const nlohmann::json& body,
         const std::vector<std::string>& headers,
         std::function<void(nlohmann::json body, long httpStatus)> callback);
+    // DELETE（存在しないIDを404で判定したい場合等、ステータスコードを受け取れる）
+    void SendDeleteRequestWithStatusAsync(
+        const std::string& url,
+        const std::vector<std::string>& headers,
+        std::function<void(nlohmann::json body, long httpStatus)> callback);
 
     void ClearLogs() { logs_.clear(); }
 
@@ -104,11 +109,13 @@ private:
     // ログの保存
     std::vector<std::string> logs_;
 
-    // cURLのハンドル (実体は CURL* = void*。curl.h を .h に持ち込まないため void* で保持)
-    void* curl_ = nullptr;
-
     // 非同期リクエストの結果待ちキュー（別スレッド→メインスレッドの受け渡し用）。
     // 呼び出し側のコールバック引数の型に依らないよう、結果を包んだ関数として溜める。
     std::mutex pendingMutex_;
     std::vector<std::function<void()>> pendingResults_;
+
+    // DrawLogWindow内の手動リクエストフォーム用の入力バッファ
+    char requestUrlBuffer_[256] = "http://localhost:3000/faculties";
+    char requestNameBuffer_[128] = "";
+    char requestIdBuffer_[16] = "";
 };
