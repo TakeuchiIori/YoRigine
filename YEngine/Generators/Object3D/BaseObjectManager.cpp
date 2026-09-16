@@ -58,7 +58,8 @@ void BaseObjectManager::Finalize() {
 // ============================================================
 // 生成済みオブジェクトを駆動対象に登録 (所有は移さない)
 // ============================================================
-void BaseObjectManager::Register(YoRigine::BaseObject *obj, const std::string &name) {
+void BaseObjectManager::Register(YoRigine::BaseObject *obj,
+                                 const std::string &name) {
   if (!obj)
     return;
 
@@ -220,8 +221,8 @@ void BaseObjectManager::DrawAllInstanced() {
 
   inst->DrawAll(camera_);
 
-  // インスタンス化した本体に付属する個別描画物 (例: プレイヤーの頭に乗る目) を、
-  // 本体のインスタンス描画が終わった後にまとめて描く。
+  // インスタンス化した本体に付属する個別描画物 (例: プレイヤーの頭に乗る目)
+  // を、 本体のインスタンス描画が終わった後にまとめて描く。
   for (auto &entry : entries_) {
     if (!entry.ptr || entry.pendingDestroy)
       continue;
@@ -237,7 +238,10 @@ void BaseObjectManager::DrawAllInstanced() {
 // 一括影描画（インスタンシング対応・影パス）
 // ============================================================
 void BaseObjectManager::DrawShadowAllInstanced() {
-  if (!instancedObject3d_ || !camera_) {
+  // 影パスは WVP を使わないため camera_ 不要（DrawAllInstanced 用のガードを
+  // 誤って流用すると、SetCamera() を呼ばないシーン (GameScene 等) で
+  // 影が一切描かれなくなる）。
+  if (!instancedObject3d_) {
     return;
   }
   assert(instancedObject3d_ &&

@@ -393,6 +393,7 @@ FodyWeavers.xsd
 /CLAUDE.md
 /AGENTS.md
 .claude
+Docs/
 
 # YoRigine エンジンの生成キャッシュ（再生成可能なのでリポジトリに含めない）
 # ※ Resources/Binary 直下の .anim 等のアセットは追跡対象のままにするため、

@@ -24,6 +24,7 @@
 #include <Vfx/VfxMesh/Runtime/VfxMeshSpawner.h>
 
 // WebAPI
+#include <WebAPI/YScoreGameUI.h>
 #include <WebAPI/YWebApiManager.h>
 
 // Camera
@@ -136,6 +137,9 @@ void DevelopScene::Initialize() {
       "YWebAPI", [this]() { YWebApiManager::GetInstance().DrawLogWindow(); },
       "Develop");
   Editor::GetInstance()->RegisterGameUI(
+      "ScoreGame", [this]() { YScoreGameUI::GetInstance().DrawImGui(); },
+      "Develop");
+  Editor::GetInstance()->RegisterGameUI(
       "AreaEditor",
       [this]() {
         AreaEditor::GetInstance()->Update();
@@ -152,6 +156,11 @@ void DevelopScene::Initialize() {
 void DevelopScene::Update() {
   YoRigine::GameTime::Update();
   UpdateCamera();
+
+  // 非同期WebAPIリクエストの完了コールバックをメインスレッドで処理する
+  YWebApiManager::GetInstance().Update();
+  YScoreGameUI::GetInstance().Update(
+      YoRigine::GameTime::GetDeltaTime(YoRigine::TimeChannel::UI));
 
   if (YoRigine::Input::GetInstance()->TriggerKey(DIK_8)) {
     YVfxHandle::PlayOneShot("Explosion", Vector3{0, 20, 0}, /*scale*/ 1.5f);

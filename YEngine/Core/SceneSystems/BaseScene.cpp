@@ -28,8 +28,11 @@ void BaseScene::DrawCommonShadow() {
   //------------------------------------------------------------
   // 登録オブジェクトの影描画もここで一括処理する。
   // 全シーンが本関数を呼んでいるため、シーン側に影描画コードは不要になる。
+  // ボーン無しオブジェクトはインスタンシングでまとめて描画する
+  // （色パスの DrawAllInstanced と対称。個別 DrawShadowAll は
+  //  敵1体ごとに非インスタンスDrawを積むため、敵が多いと影パスだけ重くなる）。
   //------------------------------------------------------------
-  BaseObjectManager::GetInstance()->DrawShadowAll();
+  BaseObjectManager::GetInstance()->DrawShadowAllInstanced();
   YoRigine::SceneEditor::GetInstance()->DrawShadow();
 }
 

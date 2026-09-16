@@ -94,9 +94,11 @@ void TitleScene::Initialize() {
   //------------------------------------------------------------
 #ifdef USE_IMGUI
   Editor::GetInstance()->RegisterGameUI(
-      "カメラエディター", [this]() { cameraEditor_->Update(); }, "Title", "ゲームプレイ");
+      "カメラエディター", [this]() { cameraEditor_->Update(); }, "Title",
+      "ゲームプレイ");
   Editor::GetInstance()->RegisterGameUI(
-      "カメラモード切り替え", [this]() { UpdateCameraMode(); }, "Title", "ゲームプレイ");
+      "カメラモード切り替え", [this]() { UpdateCameraMode(); }, "Title",
+      "ゲームプレイ");
   Editor::GetInstance()->RegisterGameUI(
       "ライティング",
       [this]() { YoRigine::LightManager::GetInstance()->ShowLightingEditor(); },
@@ -172,9 +174,10 @@ void TitleScene::DrawNonOffscreen() {
 /// 影の描画
 /// </summary>
 void TitleScene::DrawShadow() {
-  // DrawCommonShadow 内で登録オブジェクト（player_ 等）の影も一括描画される
+  // DrawCommonShadow 内で登録オブジェクト（player_ 等）の影も、
+  // SceneEditor 配置オブジェクトの影も一括描画される（二重描画防止のため
+  // ここでの SceneEditor::DrawShadow() 再呼び出しは行わない）
   DrawCommonShadow();
-  YoRigine::SceneEditor::GetInstance()->DrawShadow();
 }
 
 /// <summary>
