@@ -91,16 +91,19 @@ void ClearScene::Initialize() {
 
 #ifdef USE_IMGUI
   Editor::GetInstance()->RegisterGameUI(
-      "カメラエディター", [this]() { cameraEditor_->Update(); }, "Clear", "ゲームプレイ");
+      "カメラエディター", [this]() { cameraEditor_->Update(); }, "Clear",
+      "ゲームプレイ");
   Editor::GetInstance()->RegisterGameUI(
-      "カメラモード切り替え", [this]() { UpdateCameraMode(); }, "Clear", "ゲームプレイ");
+      "カメラモード切り替え", [this]() { UpdateCameraMode(); }, "Clear",
+      "ゲームプレイ");
   Editor::GetInstance()->RegisterGameUI(
       "ライティング",
       [this]() { YoRigine::LightManager::GetInstance()->ShowLightingEditor(); },
       "Clear", "ゲームプレイ");
   Editor::GetInstance()->RegisterGameUI(
       "YoRigine:パーティクルエディター",
-      [this]() { YParticleEditor::GetInstance().ShowEditorWindow(); }, "Clear", "ゲームプレイ");
+      [this]() { YParticleEditor::GetInstance().ShowEditorWindow(); }, "Clear",
+      "ゲームプレイ");
 #endif
 }
 
@@ -170,8 +173,9 @@ void ClearScene::DrawNonOffscreen() {
 /// 影の描画
 /// </summary>
 void ClearScene::DrawShadow() {
+  // DrawCommonShadow 内で SceneEditor::DrawShadow() も呼ばれるため、
+  // ここでの再呼び出しは二重描画になるので行わない
   DrawCommonShadow();
-  YoRigine::SceneEditor::GetInstance()->DrawShadow();
 }
 
 /// <summary>
