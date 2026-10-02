@@ -21,7 +21,7 @@ jobs:
       - name: Run Premake to Generate Solution
         shell: cmd # 明示的にコマンドプロンプトで実行
         run: |
-          .\premake.bat
+          .\Tools\premake.bat
 
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v2

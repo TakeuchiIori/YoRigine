@@ -1,0 +1,15 @@
+#!/bin/sh
+# ブランチ切り替え時のみ Premake を再生成する
+# $1=切替前 HEAD, $2=切替後 HEAD, $3=1 ならブランチ切替（0 ならファイル単位の checkout）
+
+[ "$3" = "1" ] || exit 0 
+[ "$1" = "$2" ] && exit 0
+
+cd "$(git rev-parse --show-toplevel)" || exit 0
+
+if [ ! -f Engine/Premake/engine.lua ]; then
+    git submodule update --init --recursive
+fi
+
+cmd.exe //c "Tools\\premake.bat"
+exit 0

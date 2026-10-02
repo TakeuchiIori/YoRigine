@@ -1,0 +1,11 @@
+#!/bin/sh
+# pull / merge の直後に Premake を再生成する
+cd "$(git rev-parse --show-toplevel)" || exit 0
+
+# Engine が未取得なら取得する（premake5.luaがengine.luaを必要とするため）
+if [ ! -f Engine/Premake/engine.lua ]; then
+    git submodule update --init --recursive
+fi
+
+cmd.exe //c "Tools\\premake.bat"
+exit 0

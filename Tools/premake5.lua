@@ -3,6 +3,9 @@
 --   このスクリプトは Tools/ にあるが、生成物(.sln)やパス解決は全て
 --   リポジトリルート基準で行う。premake はパスをスクリプトのある場所基準で
 --   解決するため、ルート基準にするには絶対パス化が必須。
+--
+--   Engine（YEngine / YMath / Externals）の定義は Engine/Premake/engine.lua にある。
+--   ここにはゲーム側（YGame / YMain / YResources）の定義だけを書く。
 -- =============================================================================
 
 -- Tools/ の 1 つ上をリポジトリルートとして絶対パス化する
@@ -13,85 +16,28 @@ local function r(p)  return root .. "/" .. p end
 -- xcopy 引数用に \ 区切りへ変換するヘルパー
 local function rw(p) return path.translate(root .. "/" .. p, "\\") end
 
--- 出力／中間ディレクトリ（$(SolutionDir) は .sln のある場所 = ルート）
-local parentDir = path.getabsolute(root .. "/..")
-local outputDir = parentDir .. "/generated/outputs/%{cfg.buildcfg}"
-local intDir    = parentDir .. "/generated/intermediates/%{prj.name}/%{cfg.buildcfg}"
+-- Engine サブモジュールの定義を読み込む（Engine 未取得なら分かりやすく止める）
+local engineLua = r"Engine/Premake/engine.lua"
+if not os.isfile(engineLua) then
+    error("Engine/Premake/engine.lua が見つかりません。サブモジュール未取得の可能性があります:\n"
+       .. "  git submodule update --init --recursive")
+end
+include(engineLua)
+local Y = YoRigine
+Y.init { root = root }
 
 -- =============================================================================
 -- ワークスペース定義
 -- =============================================================================
 workspace "YoRigine"
-    architecture "x64"
-    configurations { "Debug", "Develop", "Release" }
-    platforms { "x64" }
-
     startproject "YMain" -- EXEプロジェクトを開始プロジェクトに設定
     location (root)      -- .sln をリポジトリルートに生成する
 
-    language "C++"
-    cppdialect "C++20"
-    staticruntime "On"
-    warnings "Extra"
-    flags { "MultiProcessorCompile" }
-
-    -- PlatformToolset (v145 = VS2026 のツールセット)
-    toolset "v145"
-
-    -- /FS: /MP(MultiProcessorCompile) で複数 cl.exe が同じ vc143.pdb へ書く際の
-    --      書き込み競合(C1041)を防ぐ。並列ビルドや同時ビルドでも安全になる。
-    buildoptions { "/utf-8", "/permissive-", "/FS" }
-    defines { "NOMINMAX", "_WINDOWS" }
-
-    targetdir (outputDir)
-    objdir    (intDir)
-
-    -- Debug と Develop は同じデバッグ設定 (symbols / _DEBUG)
-    filter "configurations:Debug or Develop"
-        defines { "_DEBUG" }
-        symbols "On"
-        -- Edit&Continue(/ZI) を無効化し /Zi にする。コンパイル/リンクが軽くなる。
-        -- (デバッグ実行中のコード書き換え機能は使わない前提)
-        editandcontinue "Off"
-
-    -- Develop: Debug と同等のエディタ構成 + 起動シーンを DevelopScene にする。
-    -- エンジン機能 (パーティクル/当たり判定/VFX) のテスト専用。
-    -- Player を生成しないのでゲーム側のセーブは一切走らない。
-    filter "configurations:Develop"
-        defines { "DEVELOP_BUILD" }
-
-    filter "configurations:Release"
-        defines { "NDEBUG" }
-        optimize "On"
-
-    filter {}
+    Y.workspaceDefaults()
 
 -- =============================================================================
--- インクルードパスのリスト定義（すべてルート基準の絶対パス）
+-- ゲーム側インクルードパスのリスト定義（すべてルート基準の絶対パス）
 -- =============================================================================
-local engine_includes = {
-    r"YEngine",
-    r"YEngine/Core",
-    r"YEngine/Core/DirectX",
-    r"YEngine/Generators",
-    r"YEngine/Graphics",
-    r"YEngine/Systems",
-    r"YEngine/Utilities",
-    r"YEngine/Model",
-    r"YMath",
-    r"Externals/nlohmann",
-    r"Externals/DirectXTex",
-    r"Externals/imgui",
-    r"Externals/assimp/include",
-    r"Externals/icon",
-    r"Externals/meshoptimizer/src",
-    r"Externals/DirectXMesh/DirectXMesh"
-}
-
-local directx_libs = {
-    "d3d12", "dxgi", "dxguid", "dxcompiler", "dinput8", "xinput"
-}
-
 local game_includes = {
     r"YGame",
     r"YGame/Core",
@@ -105,143 +51,9 @@ local game_includes = {
 -- プロジェクト定義
 -- =============================================================================
 
---------------------------------------------------------------------------------
--- グループ: Externals (外部ライブラリ)
---------------------------------------------------------------------------------
-group "Externals"
-
-    --------------------- ImGui ---------------------
-    project "ImGui"
-        kind "StaticLib"
-        language "C++"
-        location (r"Externals/ImGui")
-        warnings "Default"
-
-        -- project location が Externals/ImGui でも、生成物は他プロジェクトと同じ
-        -- D:/GameEngine/generated 以下へ集約する。ここで明示的に再指定して、
-        -- 将来 workspace 設定を変更しても Externals/generated へ戻らないようにする。
-        targetdir (outputDir)
-        objdir    (intDir)
-
-        files { r"Externals/ImGui/**.h", r"Externals/ImGui/**.cpp" }
-
-        includedirs {
-            r"Externals/ImGui",
-            r"Externals/DirectXTex"
-        }
-
-    -- DirectXTex は毎回コンパイルすると遅く(21ファイル+fxcシェーダ生成)、かつ Rebuild 時に
-    -- コミット済みシェーダ生成物(Shaders/Compiled/*.inc)を破壊するため、assimp/curl と同様に
-    -- 「事前ビルド版 .lib を直接リンク」する方式に変更した。ビルドグラフからは外してある。
-    --   .lib の場所: Externals/DirectXTex/lib/{Debug,Release}/DirectXTex.lib
-    --   ★DirectXTex を更新したとき（滅多に無い）は、元 vcxproj
-    --     (Externals/DirectXTex/DirectXTex_Desktop_2022_Win10.vcxproj) を Debug/Release で
-    --     ビルドし、生成された DirectXTex.lib を上記フォルダへコピーして差し替えること。
-    -- （DirectXMesh はシェーダ生成の罠が無く Rebuild を壊さないため従来どおりソースビルド）
-
-    --------------------- DirectXMesh (既存のvcxprojを参照) ---------------------
-    externalproject "DirectXMesh"
-        location (r"Externals/DirectXMesh/DirectXMesh")
-        filename "DirectXMesh_Desktop_2022_Win10"
-        kind "StaticLib"
-        language "C++"
-        toolset "v145"
-        configmap { ["Develop"] = "Debug" }
-
-    --------------------- meshoptimizer ---------------------
-    project "meshoptimizer"
-        kind "StaticLib"
-        language "C++"
-        location (r"Externals/meshoptimizer")
-        warnings "Default"
-
-        files {
-            r"Externals/meshoptimizer/src/meshoptimizer.h",
-            r"Externals/meshoptimizer/src/**.cpp"
-        }
-
-        includedirs { r"Externals/meshoptimizer/src" }
-
---------------------------------------------------------------------------------
--- グループ: Engine (エンジン・コア)
---------------------------------------------------------------------------------
-group "Engine"
-
-    --------------------- YMath (Static Library) ---------------------
-    project "YMath"
-        kind "StaticLib"
-        language "C++"
-        cppdialect "C++20"
-        staticruntime "On"
-        location (r"YMath")
-
-        files {
-            r"YMath/**.h",
-            r"YMath/**.cpp"
-        }
-
-        includedirs {
-            r"YMath"
-        }
-
-        vpaths {
-            ["*"] = r"YMath/**"
-        }
-
-   --------------------- YEngine (Static Library) ---------------------
-    project "YEngine"
-        kind "StaticLib"
-        location (r"YEngine")
-        -- ※ GAME_BUILD_DLL は不要なら削除してください
-        defines { "GAME_BUILD_DLL" }
-
-        fatalwarnings { "All" }
-        linkoptions { "/ignore:4099" }
-
-        -- プリコンパイルヘッダ (コンパイル時間短縮)。
-        -- forceincludes で全 .cpp の先頭に pch.h を自動挿入するため、既存ソースは無改修。
-        pchheader "pch.h"
-        pchsource (r"YEngine/pch.cpp")
-        forceincludes { "pch.h" }
-
-        files {
-            r"YEngine/**.h",
-            r"YEngine/**.cpp",
-        }
-
-        vpaths {
-            ["YEngine/*"] = r"YEngine/**",
-        }
-
-        -- インクルードパス（ヘッダのみ。cURL を含む）
-        includedirs {
-            engine_includes,
-            r"Externals/curl/include"
-        }
-
-        -- YEngine は静的ライブラリ。外部 lib を links するとその obj が
-        -- YEngine.lib に丸ごとマージされ、最終リンクで LNK4006(重複)になる。
-        -- よってここでは link せず、build 順序のための dependson のみ残す。
-        -- 実際のリンクは最終バイナリ(Debug/Develop=YGame.dll / Release=YMain.exe)で行う。
-        -- DirectXTex は事前ビルド .lib 直リンクに変更したため dependson から外す。
-        dependson { "YMath", "DirectXMesh", "meshoptimizer" }
-
-        postbuildcommands {
-            -- DXC/DXIL DLLのコピー
-            'xcopy /Q /Y /I "$(WindowsSdkDir)bin\\$(TargetPlatformVersion)\\x64\\dxcompiler.dll" "%{cfg.targetdir}"',
-            'xcopy /Q /Y /I "$(WindowsSdkDir)bin\\$(TargetPlatformVersion)\\x64\\dxil.dll" "%{cfg.targetdir}"'
-        }
-
-        -- USE_IMGUI は YEngine のコンパイルに必要（#ifdef 分岐）。ImGui は
-        -- ヘッダ参照のみ。lib リンクは最終バイナリ側。dependson は build 順序用。
-        filter "configurations:Debug or Develop"
-            defines { "USE_IMGUI" }
-            dependson { "ImGui" }
-
-        filter "configurations:Release"
-            undefines { "USE_IMGUI" }
-
-        filter {}
+-- Engine 側（Externals: ImGui / DirectXMesh / meshoptimizer、Engine: YMath / YEngine）
+Y.externals()
+Y.engine()
 
 --------------------------------------------------------------------------------
 -- グループ: Game (ゲーム本体)
@@ -272,7 +84,7 @@ group "Game"
         }
 
         includedirs(game_includes)
-        includedirs(engine_includes)
+        includedirs(Y.engine_includes)
 
         dependson { "YEngine" }
 
@@ -283,22 +95,12 @@ group "Game"
             defines { "GAME_BUILD_DLL" }  -- dllexport が有効
             defines { "USE_IMGUI" }
             dependson { "ImGui" }
-            libdirs {
-                outputDir,
-                r"Externals/curl/lib",
-                r"Externals/assimp/lib/Debug",
-                r"Externals/DirectXTex/lib/Debug"  -- 事前ビルド版 DirectXTex.lib
-            }
-            links {
-                "YMath", "YEngine", "meshoptimizer", "ImGui",
-                "DirectXTex.lib", "DirectXMesh.lib", "libcurl", "assimp-vc143-mtd"
-            }
-            links(directx_libs)
+            Y.linkDebug()
 
         -- Develop: DirectXTex/DirectXMesh は externalproject で Debug 構成に
         -- マップされ Debug フォルダへ出力されるため、そこも検索対象に追加。
         filter "configurations:Develop"
-            libdirs { outputDir:gsub("%%{cfg.buildcfg}", "Debug") }
+            libdirs { Y.outputDir:gsub("%%{cfg.buildcfg}", "Debug") }
 
         -- Release: StaticLib として EXE に直接埋め込む。
         -- static なので外部 lib はここでリンクしない（マージ回避）。実リンクは YMain。
@@ -306,7 +108,7 @@ group "Game"
         filter "configurations:Release"
             kind "StaticLib"
             undefines { "USE_IMGUI" }
-            removefiles { r"Externals/imgui/**.cpp" }
+            removefiles { Y.e"Externals/imgui/**.cpp" }
 
         filter {}
 
@@ -326,15 +128,13 @@ group "Game"
         }
 
         includedirs { root }
-        includedirs(engine_includes)
+        includedirs(Y.engine_includes)
         includedirs(game_includes)
 
-        libdirs { outputDir }
+        libdirs { Y.outputDir }
 
-        -- 共通のビルド後コマンドとしてここに記述
-        postbuildcommands {
-            'xcopy /Q /Y /I "' .. rw("Externals/curl/bin/libcurl.dll") .. '" "%{cfg.targetdir}"'
-        }
+        -- 共通のビルド後コマンド: Engine 同梱 DLL(libcurl)を出力先へコピー
+        Y.copyRuntimeDlls()
 
         -- Debug/Develop: YGame は DLL。import lib(YGame.lib)だけリンクすれば、
         -- 実体(engine/外部lib)は DLL 側に含まれるので YMain は薄いまま。
@@ -347,17 +147,7 @@ group "Game"
         -- engine・ゲーム・外部ライブラリを全てここでリンクする。
         filter "configurations:Release"
             defines { "NDEBUG" }
-            libdirs {
-                outputDir,
-                r"Externals/curl/lib",
-                r"Externals/assimp/lib/Release",
-                r"Externals/DirectXTex/lib/Release"  -- 事前ビルド版 DirectXTex.lib
-            }
-            links {
-                "YGame", "YEngine", "YMath", "meshoptimizer",
-                "DirectXTex.lib", "DirectXMesh.lib", "libcurl", "assimp-vc143-mt"
-            }
-            links(directx_libs)
+            Y.linkRelease { "YGame" }
             postbuildcommands {
                  'xcopy /Q /E /I /Y "' .. rw("Resources") .. '" "%{cfg.targetdir}/Resources"'
             }
