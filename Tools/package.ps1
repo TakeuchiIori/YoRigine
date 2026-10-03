@@ -145,6 +145,7 @@ function Invoke-ExtractProject {
     # 除外ファイル（どの階層でも除外）
     $excludeFiles = @(
         '.gitignore', '.gitattributes', '.gitmodules',
+        '.git',   # Engine/.git（サブモジュールの gitdir 参照ファイル）。抽出先には親の .git が無く参照先が壊れるため除外
         'CLAUDE.md', 'exclusion.dic',
         'imgui.ini', 'editor_settings.ini',
         '*.user', '*.suo', '*.VC.db', '*.VC.opendb'
