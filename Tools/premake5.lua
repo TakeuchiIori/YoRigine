@@ -149,7 +149,10 @@ group "Game"
             defines { "NDEBUG" }
             Y.linkRelease { "YGame" }
             postbuildcommands {
-                 'xcopy /Q /E /I /Y "' .. rw("Resources") .. '" "%{cfg.targetdir}/Resources"'
+                 'xcopy /Q /E /I /Y "' .. rw("Resources") .. '" "%{cfg.targetdir}/Resources"',
+                 -- シェーダーソースは Engine の持ち物(Engine/Shaders)。実行時に DXC でコンパイルするので、
+                 -- 出力先にも Engine/Shaders を置く（YENGINE_SHADER_DIR = "Engine/Shaders/" と対応）
+                 'xcopy /Q /E /I /Y "' .. rw("Engine/Shaders") .. '" "%{cfg.targetdir}/Engine/Shaders"'
             }
             linkoptions { "/ignore:4006" }
 
