@@ -38,7 +38,7 @@ $ErrorActionPreference = "Stop"
 # ------------------------------------------------------------
 # Constants
 # ------------------------------------------------------------
-$SLN_PATH = Join-Path $PSScriptRoot "YoRigine.sln"
+$SLN_PATH = Join-Path (Split-Path $PSScriptRoot -Parent) "YoRigine.sln"   # Tools/ の1つ上（リポジトリルート）
 $PLATFORM  = "x64"
 $VSWHERE   = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
 

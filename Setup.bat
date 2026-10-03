@@ -13,11 +13,11 @@ if exist "Engine\Premake\engine.lua" (
 echo [2/3] git フックを確認...
 set "CUR_HOOKS="
 for /f "delims=" %%H in ('git config --get core.hooksPath') do set "CUR_HOOKS=%%H"
-if "%CUR_HOOKS%"==".githooks" (
+if "%CUR_HOOKS%"=="Tools/githooks" (
     echo       有効化済みのためスキップします。
 ) else (
     echo       有効化します...
-    git config core.hooksPath .githooks || goto :error
+    git config core.hooksPath Tools/githooks || goto :error
 )
 
 echo [3/3] Premake でソリューションを生成...

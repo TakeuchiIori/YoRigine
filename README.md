@@ -1,6 +1,21 @@
-# デバッグ状態
+# ゴルディン (Goldin)
+
 [![DebugBuild](https://github.com/TakeuchiIori/YoRigine/actions/workflows/Debug.yml/badge.svg)](https://github.com/TakeuchiIori/YoRigine/actions/workflows/Debug.yml)
 [![ReleaseBuild](https://github.com/TakeuchiIori/YoRigine/actions/workflows/Release.yml/badge.svg)](https://github.com/TakeuchiIori/YoRigine/actions/workflows/Release.yml)
+
+3Dフィールドを舞台に、敵を倒しながら進むアクションゲームです。
+コンセプトは **「操作感の良いアクションゲーム」**。自作エンジン **YoRigine**（DirectX 12 / C++20）で制作しています。
+
+<!-- TODO: ゲーム画面のスクリーンショット or GIF をここに貼る
+![Goldin](Docs/images/goldin.gif)
+-->
+
+| | |
+| :--- | :--- |
+| ジャンル | 3Dアクションゲーム |
+| エンジン | 自作エンジン（[YoRigine_Engine](https://github.com/TakeuchiIori/YoRigine_Engine)） |
+| 開発環境 | Visual Studio 2022 / MSVC v143 / C++20 / Premake5 |
+| 開発期間 | 開発継続中（15ヵ月〜） |
 
 # 構成
 
@@ -13,8 +28,12 @@
 | `YGame/` | ゲーム本体 |
 | `YMain/` | 起動用 EXE |
 | `Resources/` | リソース |
+| `Tools/` | Premake、ビルド（`Build.bat`）、配布用パッケージ作成（`Package.bat`）、git フック（`githooks/`） |
 
 # セットアップ（初回のみ）
+
+<details>
+<summary>手順を開く</summary>
 
 1. **サブモジュールごと**クローンします。
 
@@ -32,7 +51,12 @@
 > 必ず `git clone --recurse-submodules` を使ってください。
 > 先に普通に `git clone` した場合も、`Setup.bat` が Engine を取得します。
 
+</details>
+
 # 日常の運用
+
+<details>
+<summary>手順を開く</summary>
 
 * **`git pull` やブランチ切り替えのあとは、Premake が自動で実行されます**（git フック）。
   Visual Studio で「プロジェクトが変更されました」と出たら **再読み込み**してください。
@@ -48,7 +72,12 @@ Engine は別リポジトリです。Engine の変更は次の順で反映しま
 
 順番を逆にすると、他のメンバーが Engine を取得できなくなります。
 
+</details>
+
 # ※ビルドできない場合
+
+<details>
+<summary>対処を開く</summary>
 
 * `Engine/` が空 → `git submodule update --init --recursive` を実行してください。
 * `.sln` が無い／古い → `Tools\premake.bat` を実行してください。
@@ -61,3 +90,5 @@ Engine は別リポジトリです。Engine の変更は次の順で反映しま
 | :--- | :--- |
 | **✅ OK** | `C:\Users\username\Documents\project_name` |
 | **❌ NG** | `C:\**ユーザー**\**ドキュメント**\**プロジェクト名**` |
+
+</details>
