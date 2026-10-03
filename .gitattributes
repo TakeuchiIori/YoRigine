@@ -61,4 +61,4 @@
 #*.PDF   diff=astextplain
 #*.rtf   diff=astextplain
 #*.RTF   diff=astextplain
-.githooks/* text eol=lf
+Tools/githooks/* text eol=lf

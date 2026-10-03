@@ -13,6 +13,7 @@
 | `YGame/` | ゲーム本体 |
 | `YMain/` | 起動用 EXE |
 | `Resources/` | リソース |
+| `Tools/` | Premake、ビルド（`Build.bat`）、配布用パッケージ作成（`Package.bat`）、git フック（`githooks/`） |
 
 # セットアップ（初回のみ）
 
