@@ -19,7 +19,6 @@
 #include <Loaders/Texture/TextureManager.h>
 #include <ModelManager.h>
 #include <Collision/Core/CollisionManager.h>
-#include <Collision/Core/CollisionEditor.h>
 
 #include "Particle/YParticleManager.h"
 #include "Particle/YEmitterGroupEditor.h"
@@ -139,11 +138,8 @@ void MyGame::Initialize() {
 	Editor::GetInstance()->RegisterGameUI(
 		"ゲーム時間管理", &YoRigine::GameTime::ImGui,
 		"AllScene", "デバッグ");
-	YoRigine::CollisionEditor::GetInstance()->Initialize();
-	Editor::GetInstance()->RegisterGameUI(
-		"当たり判定Editor",
-		[]() { YoRigine::CollisionEditor::GetInstance()->DrawImGui(); },
-		"AllScene", "システム");
+	// 当たり判定エディタは CollisionManager が所有する (生成・設定読込・パネル登録まで一括)
+	YoRigine::CollisionManager::GetInstance()->InitEditor(*Editor::GetInstance());
 	ImGuiStudio::GetInstance()->Initialize();
 	Editor::GetInstance()->RegisterGameUI(
 		"ImGui Studio",
