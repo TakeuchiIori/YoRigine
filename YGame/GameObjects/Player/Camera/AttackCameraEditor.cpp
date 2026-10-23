@@ -216,9 +216,9 @@ void AttackCameraEditor::DrawKeyframeTimeline() {
 
     // 背景
     dl->AddRectFilled(origin, { origin.x + tlW, origin.y + tlH },
-        IM_COL32(30, 30, 30, 255), 4.0f);
+        IM_COL32(27, 27, 34, 255), 4.0f);
     dl->AddRect(origin, { origin.x + tlW, origin.y + tlH },
-        IM_COL32(80, 80, 80, 255), 4.0f);
+        IM_COL32(70, 70, 85, 255), 4.0f);
 
     // 再生カーソル
     if (isPreviewPlaying_ && component_->IsActive()) {

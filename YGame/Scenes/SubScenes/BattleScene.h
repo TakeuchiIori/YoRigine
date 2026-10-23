@@ -21,6 +21,7 @@
 #include "Enemy/BattleEnemy/BattleEnemyManager.h"
 #include "Ground/Ground.h"
 #include "SceneDataStructures.h"
+#include "GameIds.h"
 #include <UI/LockOn/LockOnUI.h>
 
 ///************************* バトルシーン *************************///
@@ -29,7 +30,7 @@ public:
   ///************************* 基本関数 *************************///
 
   // コンストラクタ
-  BattleScene() : BaseSubScene("Battle") {}
+  BattleScene() : BaseSubScene(SubSceneId::Battle) {}
 
   // 初期化処理
   void Initialize(YoRigine::Camera *camera, Player *player) override;
@@ -46,12 +47,6 @@ public:
   // UI描画処理
   void DrawUI() override;
 
-  // VFXの描画処理
-  void DrawVFX() override;
-
-  // 非オフスクリーン描画処理
-  void DrawNonOffscreen() override;
-
   // シャドウ描画処理
   void DrawShadow() override;
 
@@ -60,16 +55,13 @@ public:
 
   ///************************* ライフサイクル *************************///
 
-  // シーンに入ったときの処理
-  void OnEnter() override;
+  // シーンに入ったときの処理（エンカウントなら BattleTransitionData が来る）
+  void OnEnter(const SubScenePayload &payload) override;
 
   // シーンから出るときの処理
   void OnExit() override;
 
   ///************************* シーン固有処理 *************************///
-
-  // 戦闘を開始（SubSceneManager からフェード演出途中で型付き呼び出し）
-  void StartBattle(const BattleTransitionData &data);
 
   // 戦闘を強制終了
   void ForceBattleEnd();
@@ -105,6 +97,12 @@ public:
 
 private:
   ///************************* 内部処理 *************************///
+
+  // 戦闘を開始（OnEnter で受け取った遭遇データから敵を配置する）
+  void StartBattle(const BattleTransitionData &data);
+
+  // 最終戦勝利後のクリア演出を開始する
+  void StartClearCinematic();
 
   // 戦闘終了時の処理
   void HandleBattleEnd(BattleResult result, const BattleStats &stats);

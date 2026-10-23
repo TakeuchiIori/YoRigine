@@ -29,6 +29,7 @@
 #include "Trigger/WaypointManager.h"
 #include "LightManager/LightManager.h"
 #include "DsvManager.h"
+#include "GameIds.h"
 /// <summary>
 /// ゲーム全体の初期化処理（起動時に一度だけ実行）
 /// </summary>
@@ -201,9 +202,9 @@ void MyGame::Initialize() {
 #if defined(DEVELOP_BUILD)
 	SceneManager::GetInstance()->ChangeScene("Develop"); // Develop構成: エンジン機能テスト用シーン。Playerを生成しないのでゲームデータは保存されない
 #elif defined(_DEBUG)
-	SceneManager::GetInstance()->ChangeScene("Game");   // デバッグ時はゲームシーン
+	SceneManager::GetInstance()->ChangeScene(SceneId::Game);   // デバッグ時はゲームシーン
 #else
-	SceneManager::GetInstance()->ChangeScene("Title");  // 製品版はタイトルシーン
+	SceneManager::GetInstance()->ChangeScene(SceneId::Title);  // 製品版はタイトルシーン
 #endif
 }
 
