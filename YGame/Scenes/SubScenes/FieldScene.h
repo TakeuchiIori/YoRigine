@@ -22,6 +22,7 @@
 // Navigation
 #include "BaseSubScene.h"
 #include "SceneDataStructures.h"
+#include "GameIds.h"
 #include <Systems/Navigation/NavGrid.h>
 #include <Systems/Navigation/NavGridConfig.h>
 #include <Systems/Navigation/NavPathfinder.h>
@@ -35,7 +36,7 @@ public:
   ///************************* 基本関数 *************************///
 
   // コンストラクタ
-  FieldScene() : BaseSubScene("Field") {}
+  FieldScene() : BaseSubScene(SubSceneId::Field) {}
 
   // 初期化処理
   void Initialize(YoRigine::Camera *camera, Player *player) override;
@@ -52,32 +53,24 @@ public:
   // UI描画処理
   void DrawUI() override;
 
-  // VFX描画処理
-  void DrawVFX() override;
-
-  // 非オフスクリーン描画処理
-  void DrawNonOffscreen() override;
-
   // シャドウ描画処理
   void DrawShadow() override;
 
   // 終了処理
   void Finalize() override;
 
+  // リトライ：敵とスポーン位置を初期状態に戻す
+  void Restart() override;
+
   void RebakeNavGrid();
 
   ///************************* ライフサイクル *************************///
 
-  // シーンに入ったときの処理
-  void OnEnter() override;
+  // シーンに入ったときの処理（バトルからの復帰なら FieldReturnData が来る）
+  void OnEnter(const SubScenePayload &payload) override;
 
   // シーンから出るときの処理
   void OnExit() override;
-
-  ///************************* シーン固有処理 *************************///
-
-  // バトルシーンから戻った際の処理
-  void HandleBattleReturn(const FieldReturnData &data);
 
 #ifdef USE_IMGUI
   // EventTrigger エディタ (Editor::RegisterGameUI から呼ばれる)
@@ -98,17 +91,14 @@ public:
 private:
   ///************************* 内部処理 *************************///
 
-  // カメラモードを更新
-  void UpdateCameraMode();
-
   // 詳細なエンカウント処理を実行
   void HandleDetailedEncounter(const EncountInfo &encounterInfo);
 
+  // バトルシーンから戻った際の処理
+  void HandleBattleReturn(const FieldReturnData &data);
+
   // カメラ状態を保存
   void SaveCameraState(BattleTransitionData &data);
-
-  // カメラ状態を復元
-  void RestoreCameraState(const FieldReturnData &data);
 
 private:
   ///************************* メンバ変数 *************************///

@@ -1,144 +1,117 @@
 #pragma once
 
-#include <memory>
-#include <unordered_map>
-#include <string>
+// C++
 #include <functional>
+#include <memory>
+#include <string>
+#include <unordered_map>
 
+// Engine
+#include "SceneSystems/Transitions/Base/ISceneTransition.h"
+
+// App
 #include "BaseSubScene.h"
 #include "SceneDataStructures.h"
 
-///************************* サブシーン状態定義 *************************///
-enum class SubSceneState {
-	IDLE,
-	ACTIVE,
-	TRANSITIONING,
-};
-
 ///************************* サブシーン管理クラス *************************///
+/// GameScene 内のサブシーンを保持し、遷移演出付きで切り替える。
+/// 個々のサブシーンの型や中身は知らない（受け渡しデータは OnEnter
+/// に渡すだけ）。
 class SubSceneManager {
 public:
-	///************************* 基本関数 *************************///
+  using EventHandler = std::function<void(SubSceneEvent)>;
 
-	// コンストラクタ
-	SubSceneManager() = default;
+  ///************************* 基本関数 *************************///
 
-	// デストラクタ
-	~SubSceneManager() = default;
+  // 初期化処理（遷移演出の準備）
+  void Initialize();
 
-	// 初期化処理
-	void Initialize(YoRigine::Camera* camera, Player* player);
+  // 終了処理
+  void Finalize();
 
-	// 終了処理
-	void Finalize();
+  ///************************* サブシーン登録 *************************///
 
-	///************************* サブシーン登録 *************************///
+  // サブシーンを登録
+  template <typename T>
+  void RegisterSubScene(const std::string &name, std::unique_ptr<T> scene) {
+    static_assert(std::is_base_of<BaseSubScene, T>::value,
+                  "T must derive from BaseSubScene");
+    scene->SetTransitionCallback(
+        [this](const SubSceneTransitionRequest &request) {
+          SwitchToSceneWithTransition(request.targetSceneName, request.payload);
+        });
+    scene->SetEventCallback([this](SubSceneEvent event) {
+      if (eventHandler_) {
+        eventHandler_(event);
+      }
+    });
+    subScenes_[name] = std::move(scene);
+  }
 
-	// サブシーンを登録
-	template<typename T>
-	void RegisterSubScene(const std::string& name, std::unique_ptr<T> scene) {
-		static_assert(std::is_base_of<BaseSubScene, T>::value, "T must derive from BaseSubScene");
-		scene->SetTransitionCallback([this](const SubSceneTransitionRequest& request) {
-			HandleTransitionRequest(request);
-			});
-		subScenes_[name] = std::move(scene);
-	}
+  // サブシーンからの通知を受け取る関数を設定（GameScene が受け取る）
+  void SetEventHandler(EventHandler handler) {
+    eventHandler_ = std::move(handler);
+  }
 
-	///************************* シーン切り替え *************************///
+  ///************************* シーン切り替え *************************///
 
-	// 即時でシーンを切り替える
-	void SwitchToScene(const std::string& sceneName);
+  // 即時でシーンを切り替える
+  void SwitchToScene(const std::string &sceneName,
+                     const SubScenePayload &payload = {});
 
-	// フェード付きでシーンを切り替える
-	void SwitchToSceneWithFade(const std::string& sceneName);
+  // 遷移演出付きでシーンを切り替える。遷移中などで受け付けなかった場合は false
+  bool SwitchToSceneWithTransition(const std::string &sceneName,
+                                   const SubScenePayload &payload = {});
 
-	///************************* 更新・描画 *************************///
+  ///************************* 更新・描画 *************************///
 
-	// 更新処理
-	void Update();
+  void Update();
+  void DrawObject();
+  void DrawLine();
+  void DrawUI();
+  void DrawNonOffscreen();
+  void DrawShadow();
 
-	// オブジェクト描画処理
-	void DrawObject();
+  ///************************* アクセッサ *************************///
 
-	// ライン描画処理
-	void DrawLine();
+  // 指定名のシーンを取得
+  BaseSubScene *GetScene(const std::string &name) const;
 
-	// UI描画処理
-	void DrawUI();
+  // 現在のシーン名を取得
+  std::string GetCurrentSceneName() const {
+    return currentScene_ ? currentScene_->GetSceneName() : "";
+  }
 
-	// 非オフスクリーン描画処理
-	void DrawNonOffscreen();
-
-	// シャドウ描画処理
-	void DrawShadow();
-
-	///************************* 遷移処理 *************************///
-
-	// シーン遷移リクエストを処理
-	void HandleTransitionRequest(const SubSceneTransitionRequest& request);
-
-	///************************* アクセッサ *************************///
-
-	// 現在のシーンを取得
-	BaseSubScene* GetCurrentScene() const { return currentScene_; }
-
-	// 指定名のシーンを取得
-	BaseSubScene* GetScene(const std::string& name) const;
-
-	// 現在のシーン名を取得
-	std::string GetCurrentSceneName() const {
-		return currentScene_ ? currentScene_->GetSceneName() : "";
-	}
-
-	// 遷移中か確認
-	bool IsTransitioning() const { return state_ == SubSceneState::TRANSITIONING; }
-
-	// カメラモードを設定
-	void SetCameraMode(CameraMode mode);
-
-	// カメラモードを取得
-	CameraMode GetCameraMode() const;
-
-	// 遷移時間を設定
-	void SetTransitionDuration(float duration) { transitionDuration_ = duration; }
-
-	// シーン切り替えしきい値を設定
-	void SetSwitchThreshold(float threshold) { switchThreshold_ = threshold; }
+  // 遷移中か確認
+  bool IsTransitioning() const { return phase_ != TransitionPhase::None; }
 
 private:
-	///************************* 内部処理 *************************///
+  ///************************* 内部処理 *************************///
 
-	// シーンを有効化
-	void ActivateScene(const std::string& sceneName);
+  // 遷移演出の進行
+  void UpdateTransition();
 
-	// 現在のシーンを無効化
-	void DeactivateCurrentScene();
+  // 現在のシーンを抜けて、指定シーンに入る
+  void EnterScene(const std::string &sceneName, const SubScenePayload &payload);
 
-	// 遷移中の更新処理
-	void UpdateTransition();
-
-	// 遷移データを適用
-	void ApplyTransitionData();
+  // 描画対象になる現在シーン（無ければ nullptr）
+  BaseSubScene *GetDrawableScene() const;
 
 private:
-	///************************* メンバ変数 *************************///
+  ///************************* メンバ変数 *************************///
 
-	std::unordered_map<std::string, std::unique_ptr<BaseSubScene>> subScenes_;
-	BaseSubScene* currentScene_ = nullptr;
-	SubSceneState state_ = SubSceneState::IDLE;
+  // 遷移演出の段階（覆っている間に切り替え、明けたら操作再開）
+  enum class TransitionPhase { None, Covering, Revealing };
 
-	int shatterEffectIndex_ = -1;
-	int radialBlurEffectIndex_ = -1;
+  std::unordered_map<std::string, std::unique_ptr<BaseSubScene>> subScenes_;
+  BaseSubScene *currentScene_ = nullptr;
 
-	std::string pendingSceneName_;
-	float transitionTime_ = 0.0f;
-	float transitionDuration_ = 1.0f;
-	float switchThreshold_ = 0.6f;
-	bool hasSceneSwitched_ = false;
+  std::unique_ptr<ISceneTransition> transition_;
+  TransitionPhase phase_ = TransitionPhase::None;
 
-	SubScenePayload pendingPayload_;
-	SubSceneTransitionType pendingTransitionType_ = SubSceneTransitionType::TO_FIELD;
+  // 覆い終わった時点で入るシーンと、渡すデータ
+  std::string pendingSceneName_;
+  SubScenePayload pendingPayload_;
 
-	YoRigine::Camera* camera_ = nullptr;
-	Player* player_ = nullptr;
+  EventHandler eventHandler_;
 };

@@ -19,6 +19,7 @@
 #include <Editor/Editor.h>
 #include <Drawer/InstancedObject3d.h>
 #include "Object3D/BaseObjectManager.h"
+#include "GameIds.h"
 
 namespace {
 	// BaseObjectManager 登録名の一意連番（プロセス内で単調増加）
@@ -60,7 +61,7 @@ void FieldEnemyManager::Initialize(YoRigine::Camera* camera) {
 		"フィールドエネミーエディター",
 		[this]() {
 			FieldEnemyEditorUI::ShowEnemyEditor(*this);
-		}, "Game", "ゲームプレイ"
+		}, SceneId::Game, "ゲームプレイ"
 	);
 	spawnGizmoCtrl_.Initialize();
 	// ImGuizmo はゲームビュー ImGui ウィンドウのコンテキスト内で描画する必要があるため、

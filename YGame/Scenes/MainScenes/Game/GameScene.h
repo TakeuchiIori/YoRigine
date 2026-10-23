@@ -13,14 +13,10 @@
 #include "Object3D/Object3D.h"
 
 // Camera
-#include "Systems/Camera/Camera.h"
-#include "Systems/Camera/CameraDirector.h"
-#include "Systems/Camera/CameraEditor.h"
+#include "Systems/Camera/SceneCameraRig.h"
 
 // App
 #include "../../../GameObjects/Player/Combo/AttackEditor.h"
-#include "../../SubScenes/BattleScene.h"
-#include "../../SubScenes/FieldScene.h"
 #include "../../SubScenes/SceneDataStructures.h"
 #include "../../SubScenes/SubSceneManager.h"
 #include "../UI/GameUI.h"
@@ -35,21 +31,15 @@
 class GameScene : public BaseScene {
 public:
   ///************************* 基本関数 *************************///
-  GameScene() : BaseScene("Game") {}
+  GameScene();
   void Initialize() override;
   void Update() override;
   void Draw() override;
   void DrawNonOffscreen() override;
-  void DrawShadow() override;
   void Finalize() override;
 
-  // BaseSceneインターフェース
-  Matrix4x4 GetViewProjection() override {
-    return sceneCamera_->viewProjectionMatrix_;
-  }
-
   // PiP 用: シーンカメラのポインタを公開 + 3D だけ描画する軽量パス
-  YoRigine::Camera *GetSceneCamera() override { return sceneCamera_.get(); }
+  YoRigine::Camera *GetSceneCamera() override { return cameraRig_.GetCamera(); }
   void DrawScene3DOnly() override;
 
 private:
@@ -60,9 +50,9 @@ private:
   void DrawUI();
 
   void UpdateCamera();
-  void UpdateCameraMode();
-  void UpdateDebugCameraTimePause();
-  void SetDebugCameraActive(bool active);
+
+  // サブシーンからの通知を受け取る
+  void HandleSubSceneEvent(SubSceneEvent event);
 
   void HandleRetry();
   void HandleReturnToTitle();
@@ -74,23 +64,13 @@ private:
   // サブシーン管理
   std::unique_ptr<SubSceneManager> subSceneManager_;
 
-  // 出力用カメラ（実体）
-  std::unique_ptr<YoRigine::Camera> sceneCamera_;
-  CameraMode cameraMode_;
+  // 出力カメラ一式（通常はプレイヤー追従、F3 でデバッグカメラ）
+  SceneCameraRig cameraRig_;
 
   // プレイヤー（カメラの追従対象）
   std::unique_ptr<Player> player_;
-  std::unique_ptr<CameraEditor> cameraEditor_;
-
-  // デバッグフラグ
-  bool isDebugCamera_ = false;
-  bool pausedGameTimeForDebugCamera_ = false;
 
   std::unique_ptr<SkyBox> skyBox_;
-
-  // サウンド関連
-  YoRigine::Audio::SoundData soundData;
-  IXAudio2SourceVoice *sourceVoice;
 
   // UI
   std::unique_ptr<GameUI> gameUI_;
@@ -100,10 +80,6 @@ private:
 
   // ゲームオーバー状態管理
   bool wasPlayerDead_ = false;
-
-  // クリア状態管理
-  bool isGameCleared_ = false;
-  bool wasGameCleared_ = false;
 
   // ロックオン照準フラッシュ（画面外ヒット時・敵ワールド座標を投影して追従）
   bool lockFlashActive_ = false;

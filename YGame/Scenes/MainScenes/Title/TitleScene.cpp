@@ -2,10 +2,10 @@
 
 // Engine
 #include "LightManager/LightManager.h"
-#include "Loaders./Texture./TextureManager.h"
+#include "Loaders/Json/JsonManager.h"
 #include "Object3D/Object3dCommon.h"
 #include "OffScreen/PostEffectManager.h"
-#include "Particle/YEmitterGroupManager.h"
+#include "Particle/YParticleManager.h"
 #include "Sprite/SpriteCommon.h"
 #include "Systems./Input./Input.h"
 #include "Systems/Camera/CameraDirector.h"
@@ -16,11 +16,11 @@
 #include <SceneEditor/SceneEditor.h>
 #include <SceneSystems/SceneManager.h>
 #include <Systems/GameTime/GameTime.h>
-#include <Systems/UI/UIBase.h>
-#include <Systems/UI/UIManager.h>
-#ifdef USE_IMGUI
-#include "imgui.h"
-#endif
+
+// App
+#include "GameIds.h"
+
+TitleScene::TitleScene() : BaseScene(SceneId::Title) {}
 
 /// <summary>
 /// 初期化処理
@@ -30,25 +30,18 @@ void TitleScene::Initialize() {
   //------------------------------------------------------------
   // カメラ初期化
   //------------------------------------------------------------
-
-  // 出力用カメラの実体を生成
-  sceneCamera_ = std::make_unique<YoRigine::Camera>();
-  auto director = CameraDirector::GetInstance();
-  director->Initialize();
-
-  cameraEditor_ = std::make_unique<CameraEditor>();
-  cameraEditor_->Initialize();
-  cameraEditor_->SetFilePath(
-      "Resources/Json/VirtualCameraData/TitleScene.json");
-  cameraEditor_->LoadFileOrDefault(cameraEditor_->GetFilePath(), "Title");
-  cameraMode_ = CameraMode::TITLE;
-  // カメラの登録
-  auto titleCamera = director->GetCamera("TitleCamera");
-  auto debug = director->GetCamera("MainDebug");
+  SceneCameraRig::Desc cameraDesc;
+  cameraDesc.editorFilePath =
+      "Resources/Json/VirtualCameraData/TitleScene.json";
+  cameraDesc.editorPresetName = "Title";
+  cameraDesc.mainCameraId = CameraId::TitleCamera;
+  // 旋回カメラは毎フレームスナップしてブレンドを掛けない（従来の見た目を維持）
+  cameraDesc.snapMainEveryFrame = true;
+  cameraRig_.Initialize(cameraDesc);
+  YoRigine::Camera *sceneCamera = cameraRig_.GetCamera();
 
   // タイトル用のポストエフェクトの追加（TestGame: Fog + GodRays + Bloom 等）
-  auto postEffectManager = PostEffectManager::GetInstance();
-  postEffectManager->LoadPreset("TestGame");
+  PostEffectManager::GetInstance()->LoadPreset("TestGame");
 
   //------------------------------------------------------------
   // システム初期化
@@ -57,12 +50,12 @@ void TitleScene::Initialize() {
   YoRigine::JsonManager::SetCurrentScene("TitleScene");
   YoRigine::CollisionManager::GetInstance()->Initialize();
   YoRigine::SceneEditor::GetInstance()->LoadScene("TitleScene");
-  YoRigine::SceneEditor::GetInstance()->SetCamera(sceneCamera_.get());
+  YoRigine::SceneEditor::GetInstance()->SetCamera(sceneCamera);
 
-  YParticleManager::GetInstance().SetCamera(sceneCamera_.get());
+  YParticleManager::GetInstance().SetCamera(sceneCamera);
 
   // BaseObjectManager にカメラを 1 回だけ渡しておく（以降の一括駆動で使用）
-  BaseObjectManager::GetInstance()->SetCamera(sceneCamera_.get());
+  BaseObjectManager::GetInstance()->SetCamera(sceneCamera);
   //------------------------------------------------------------
   // タイトル専用要素の初期化
   //------------------------------------------------------------
@@ -70,39 +63,37 @@ void TitleScene::Initialize() {
   titleUI_->Initialize();
 
   player_ = std::make_unique<DemoPlayer>();
-  player_->Initialize(sceneCamera_.get());
+  player_->Initialize(sceneCamera);
   player_->SetMotion("Idle1");
   // 一括 Update/Draw/Shadow の対象に登録（所有は TitleScene のまま）
   BaseObjectManager::GetInstance()->Register(player_.get(), "Player");
 
-  auto playerCam = std::dynamic_pointer_cast<TitleCamera>(titleCamera);
-  playerCam->SetTarget(player_->GetWT());
-  playerCam->enableOrbit_ = true; // カメラ回転有効
+  auto titleCamera = std::dynamic_pointer_cast<TitleCamera>(
+      CameraDirector::GetInstance()->GetCamera(CameraId::TitleCamera));
+  if (titleCamera) {
+    titleCamera->SetTarget(player_->GetWT());
+    titleCamera->enableOrbit_ = true; // カメラ回転有効
+  }
 
   // スカイボックスは最初に描く特殊オブジェクトのため、マネージャには登録せず個別描画する
   skyBox_ = std::make_unique<SkyBox>();
-  skyBox_->Initialize(sceneCamera_.get(),
+  skyBox_->Initialize(sceneCamera,
                       "Resources/DDS/vz_sinister_land_cubemap_ue.dds");
 
   // Ground は BaseObject
   // 非継承の独立クラスのため、マネージャには登録せず個別に扱う
   ground_ = std::make_unique<Ground>();
-  ground_->Initialize(sceneCamera_.get());
+  ground_->Initialize(sceneCamera);
 
   //------------------------------------------------------------
   // エディター登録（デバッグ用）
   //------------------------------------------------------------
 #ifdef USE_IMGUI
-  Editor::GetInstance()->RegisterGameUI(
-      "カメラエディター", [this]() { cameraEditor_->Update(); }, "Title",
-      "ゲームプレイ");
-  Editor::GetInstance()->RegisterGameUI(
-      "カメラモード切り替え", [this]() { UpdateCameraMode(); }, "Title",
-      "ゲームプレイ");
+  cameraRig_.RegisterEditorPanels(SceneId::Title, "ゲームプレイ");
   Editor::GetInstance()->RegisterGameUI(
       "ライティング",
       [this]() { YoRigine::LightManager::GetInstance()->ShowLightingEditor(); },
-      "Title", "ゲームプレイ");
+      SceneId::Title, "ゲームプレイ");
 #endif
 }
 
@@ -110,34 +101,19 @@ void TitleScene::Initialize() {
 /// 更新処理
 /// </summary>
 void TitleScene::Update() {
-  YoRigine::GameTime::Update();
-  UpdateCamera();
-
-#ifdef _DEBUG
-  // デバッグカメラ切り替え
-  if (YoRigine::Input::GetInstance()->TriggerKey(DIK_LCONTROL) ||
-      YoRigine::Input::GetInstance()->IsPadTriggered(0,
-                                                     GamePadButton::R_Stick)) {
-    isDebugCamera_ = !isDebugCamera_;
-  }
-#endif
+  cameraRig_.Update();
 
   // スペースまたはAボタンでゲームシーンへ遷移
   if (YoRigine::Input::GetInstance()->PushKey(DIK_SPACE) ||
       YoRigine::Input::GetInstance()->IsPadTriggered(0, GamePadButton::A)) {
-    sceneManager_->ChangeScene("Game");
+    sceneManager_->ChangeScene(SceneId::Game);
   }
 
   // 各種更新（登録オブジェクトは一括 Update。スカイボックス / Ground は個別）
+  // 当たり判定・パーティクルなどの共通更新は SceneManager が行う
   UpdateObjects();
   skyBox_->Update();
   ground_->Update();
-
-  YoRigine::SceneEditor::GetInstance()->Update();
-  YoRigine::CollisionManager::GetInstance()->Update();
-  YParticleManager::GetInstance().Update(
-      YoRigine::GameTime::GetDeltaTime(YoRigine::TimeChannel::Vfx));
-  YoRigine::LightManager::GetInstance()->UpdateShadowMatrix(sceneCamera_.get());
   titleUI_->Update();
 }
 
@@ -152,15 +128,15 @@ void TitleScene::Draw() {
   Object3dCommon::GetInstance()->DrawPreference();
   DrawObject();
   YoRigine::SceneEditor::GetInstance()->Draw();
-
-  //------------------------------------------------------------
-  // パーティクル描画
-  //------------------------------------------------------------
-  // YParticleManager::GetInstance().Draw();
 }
 
 /// <summary>
-/// オフスクリーン外の描画処理（現状未使用）
+/// PiP 用の 3D-only 描画（スカイ + シーンオブジェクトのみ）
+/// </summary>
+void TitleScene::DrawScene3DOnly() { Draw(); }
+
+/// <summary>
+/// オフスクリーン外の描画処理
 /// </summary>
 void TitleScene::DrawNonOffscreen() {
   //------------------------------------------------------------
@@ -171,19 +147,10 @@ void TitleScene::DrawNonOffscreen() {
 }
 
 /// <summary>
-/// 影の描画
-/// </summary>
-void TitleScene::DrawShadow() {
-  // DrawCommonShadow 内で登録オブジェクト（player_ 等）の影も、
-  // SceneEditor 配置オブジェクトの影も一括描画される（二重描画防止のため
-  // ここでの SceneEditor::DrawShadow() 再呼び出しは行わない）
-  DrawCommonShadow();
-}
-
-/// <summary>
 /// 解放処理
 /// </summary>
 void TitleScene::Finalize() {
+  cameraRig_.Finalize();
   YoRigine::JsonManager::ClearSceneInstances("TitleScene");
 }
 
@@ -194,86 +161,4 @@ void TitleScene::DrawObject() {
   // Ground は個別描画、登録オブジェクト（player_）は一括描画
   ground_->Draw();
   DrawObjects();
-}
-
-/// <summary>
-/// ライン描画（デバッグ用）
-/// </summary>
-void TitleScene::DrawLine() {}
-
-/// <summary>
-/// UI描画（必要に応じて拡張）
-/// </summary>
-void TitleScene::DrawUI() {}
-
-/// <summary>
-/// カメラモード切り替えUI（ImGui）
-/// </summary>
-void TitleScene::UpdateCameraMode() {
-#ifdef USE_IMGUI
-  if (ImGui::Button("Title Camera")) {
-    cameraMode_ = CameraMode::CLEAR;
-    CameraDirector::GetInstance()->SetEnableBlending(false);
-  }
-  if (ImGui::Button("Debug Camera")) {
-    cameraMode_ = CameraMode::DEBUG;
-    CameraDirector::GetInstance()->SetEnableBlending(false);
-  }
-#endif
-}
-
-void TitleScene::UpdateCamera() {
-  auto director = CameraDirector::GetInstance();
-
-  if (YoRigine::GameTime::IsPause()) {
-    return;
-  }
-
-  // カメラの優先度
-  switch (cameraMode_) {
-  case CameraMode::TITLE:
-    director->SetPriority("Title", 10);
-    director->SetPriority("MainDebug", 0);
-    director->SnapToActiveCamera();
-    break;
-  case CameraMode::DEBUG:
-    director->SetPriority("MainDebug", 10);
-    director->SetPriority("Title", 0);
-    break;
-  }
-
-  //------------------------------------------------------------
-  // デバッグ用：カメラ切り替え入力
-  //------------------------------------------------------------
-#ifdef _DEBUG
-  YoRigine::Input *input = YoRigine::Input::GetInstance();
-  if (input->TriggerKey(DIK_F3)) {
-    isDebugCamera_ = !isDebugCamera_;
-    if (isDebugCamera_) {
-      cameraMode_ = CameraMode::DEBUG;
-      CameraDirector::GetInstance()->SetEnableBlending(false);
-    } else {
-      cameraMode_ = CameraMode::CLEAR;
-      CameraDirector::GetInstance()->SetEnableBlending(false);
-    }
-  }
-#endif
-
-  //------------------------------------------------------------
-  // Directorの更新（VirtualCameraの計算 ＋ ブレンド処理）
-  //------------------------------------------------------------
-  director->Update(YoRigine::GameTime::GetDeltaTime());
-
-  //------------------------------------------------------------
-  // 出力用カメラ(sceneCamera_)への同期
-  //------------------------------------------------------------
-  // Directorが導き出した「理想の座標・回転・レンズ情報」をコピー
-  sceneCamera_->SetTranslate(director->GetActiveCameraPos());
-  sceneCamera_->SetRotate(director->GetActiveCameraRot());
-  sceneCamera_->SetFovY(director->GetFovY());
-  sceneCamera_->viewMatrix_ = director->GetViewMatrix();
-  // カメラ自体の更新（内部でのシェイク計算など）
-  sceneCamera_->Update();
-  // 最終的な行列の計算
-  sceneCamera_->UpdateMatrix();
 }

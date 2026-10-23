@@ -131,12 +131,12 @@ void FieldScene::Initialize(YoRigine::Camera* camera, Player* player) {
 
 #ifdef USE_IMGUI
 	Editor::GetInstance()->RegisterGameUI("フィールドモード:デバッグ情報",
-		[this]() { fieldEnemyManager_->ShowDebugInfo(); }, "Game", "ゲームプレイ");
+		[this]() { fieldEnemyManager_->ShowDebugInfo(); }, SceneId::Game, "ゲームプレイ");
 
 	// AreaEditor は Game シーン全体(Field/Battle 両サブシーン)で開けるよう一度だけ登録。
 	// AreaEditor / AreaManager はシングルトンなのでサブシーンを跨いでも同じ状態を共有する。
 	Editor::GetInstance()->RegisterGameUI("AreaEditor",
-		[]() { AreaEditor::GetInstance()->Update(); }, "Game", "ゲームプレイ");
+		[]() { AreaEditor::GetInstance()->Update(); }, SceneId::Game, "ゲームプレイ");
 
 	// プレイヤースポーン地点エディタ
 	Editor::GetInstance()->RegisterGameUI("プレイヤースポーン", [this]() {
@@ -183,7 +183,7 @@ void FieldScene::Initialize(YoRigine::Camera* camera, Player* player) {
 		}
 		ImGui::SameLine();
 		ImGui::TextDisabled("(編集値はワープ or 起動時に反映)");
-	}, "Game", "ゲームプレイ");
+	}, SceneId::Game, "ゲームプレイ");
 
 	// NavGridConfig エディター（Editor::RegisterGameUI で登録）
 	Editor::GetInstance()->RegisterGameUI("NavGrid Config", [this]() {
@@ -208,11 +208,11 @@ void FieldScene::Initialize(YoRigine::Camera* camera, Player* player) {
 				navGridConfig_.aj_.SaveToFile(navGridConfig_.kDefaultPath);
 			}
 		}
-		}, "Game", "ゲームプレイ");
+		}, SceneId::Game, "ゲームプレイ");
 
 	Editor::GetInstance()->RegisterGameUI("EventTrigger", [this]() {
 		DrawEventTriggerEditor();
-	}, "Game", "ゲームプレイ");
+	}, SceneId::Game, "ゲームプレイ");
 #endif
 }
 
@@ -353,21 +353,6 @@ void FieldScene::DrawUI() {
 }
 
 /*==========================================================================
-	VFXの描画
-//========================================================================*/
-void FieldScene::DrawVFX()
-{
-
-}
-
-/*==========================================================================
-	ポストエフェクトに描画したくないものをここに描画
-//========================================================================*/
-void FieldScene::DrawNonOffscreen()
-{
-}
-
-/*==========================================================================
 	影の描画
 //========================================================================*/
 void FieldScene::DrawShadow()
@@ -408,8 +393,8 @@ void FieldScene::ApplySpawnPose() {
 	CameraDirector::GetInstance()->SnapToActiveCamera();
 }
 
-void FieldScene::OnEnter() {
-	BaseSubScene::OnEnter();
+void FieldScene::OnEnter(const SubScenePayload& payload) {
+	BaseSubScene::OnEnter(payload);
 
 	// フィールドでは脅威察知を無効化（背景・マップを自由に見渡せるようにする）
 	if (player_ && player_->GetPlayerCamera()) {
@@ -458,20 +443,22 @@ void FieldScene::OnEnter() {
 	if (fieldEnemyManager_) {
 		fieldEnemyManager_->SetAllEnemiesActive(true);
 		fieldEnemyManager_->ResetEnCount();
-		currentCameraMode_ = CameraMode::FOLLOW;
 	}
 
 	// リトライ/初回スポーン：フェード遷移の途中でプレイヤー位置が書き換わっても、
 	// シーン有効化時に確実にスポーン姿勢を再適用して「初期化時と同じ位置」を保証する。
-	// バトル復帰時は pendingSpawnReset_ が立たないので干渉せず、この後の
-	// ApplyTransitionData→HandleBattleReturn が復帰位置を上書きする。
+	// バトル復帰時は pendingSpawnReset_ が立たないので干渉せず、
+	// この後の HandleBattleReturn が復帰位置を上書きする。
 	if (pendingSpawnReset_) {
 		ApplySpawnPose();
 		pendingSpawnReset_ = false;
 	}
 
-	// バトルからの復帰データは SubSceneManager::ApplyTransitionData →
-	// HandleBattleReturn(data) で型付きに渡されるので、ここでは読まない。
+	// バトルからの復帰ならエンカウント位置へ戻し、勝敗を敵管理へ伝える
+	if (const auto* returnData = std::get_if<FieldReturnData>(&payload)) {
+		HandleBattleReturn(*returnData);
+	}
+
 	Logger("[FieldScene] ===== OnEnter() END =====\n");
 }
 
@@ -492,16 +479,6 @@ void FieldScene::OnExit() {
 	}
 
 	Logger("[FieldScene] ===== OnExit() END =====\n");
-}
-
-/*==========================================================================
-	カメラモードの切り替え
-//========================================================================*/
-void FieldScene::UpdateCameraMode() {
-#ifdef USE_IMGUI
-	if (ImGui::Button("Follow Camera")) { currentCameraMode_ = CameraMode::FOLLOW; }
-	if (ImGui::Button("Debug Camera")) { currentCameraMode_ = CameraMode::DEBUG; }
-#endif
 }
 
 /*==========================================================================
@@ -597,7 +574,6 @@ void FieldScene::HandleDetailedEncounter(const EncountInfo& encounterInfo) {
 //========================================================================*/
 void FieldScene::SaveCameraState(BattleTransitionData& data) {
 	data.cameraPosition = sceneCamera_->transform_.translate;
-	data.cameraMode = currentCameraMode_;
 }
 
 /*==========================================================================
@@ -662,13 +638,6 @@ void FieldScene::HandleBattleReturn(const FieldReturnData& data) {
 }
 
 /*==========================================================================
-	カメラ状態の復元
-//========================================================================*/
-void FieldScene::RestoreCameraState(const FieldReturnData& data) {
-	currentCameraMode_ = data.cameraMode;
-}
-
-/*==========================================================================
 	プレイヤーの位置取得
 //========================================================================*/
 Vector3 FieldScene::GetPlayerPosition() const {
@@ -709,6 +678,15 @@ void FieldScene::Finalize() {
 		fieldEnemyManager_->Finalize();
 	}
 	eventTriggerSystem_.Clear();
+}
+
+/*==========================================================================
+	リトライ
+	敵の再生成・スポーン姿勢の再適用は Initialize と同じ処理なので流用する。
+	（イベントトリガーは OnEnter で未ロード時だけ読むため、状態は維持される）
+//========================================================================*/
+void FieldScene::Restart() {
+	Initialize(sceneCamera_, player_);
 }
 
 void FieldScene::RebakeNavGrid()
