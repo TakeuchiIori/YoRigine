@@ -1,9 +1,16 @@
 {
     "groups": [
         {
-            "currentTime": 162.71240234375,
+            "currentTime": 194.990478515625,
             "emitters": [
                 {
+                    "accelerationFields": [],
+                    "bounceParams": {
+                        "friction": 0.20000000298023224,
+                        "groundY": 0.0,
+                        "isEnable": false,
+                        "restitution": 0.4000000059604645
+                    },
                     "boxParams": {
                         "count": 100.0,
                         "emitInterval": 1.0,
@@ -17,6 +24,11 @@
                             "y": 0.0,
                             "z": 0.0
                         }
+                    },
+                    "colorFlickerParams": {
+                        "intensity": 0.30000001192092896,
+                        "isEnable": false,
+                        "speed": 8.0
                     },
                     "coneParams": {
                         "count": 100.0,
@@ -34,8 +46,36 @@
                             "z": 0.0
                         }
                     },
+                    "dragParams": {
+                        "coefficient": 1.0,
+                        "isEnable": false
+                    },
+                    "emissiveParams": {
+                        "intensity": 3.0,
+                        "isEnable": false
+                    },
+                    "flipbookParams": {
+                        "cols": 4,
+                        "fps": 0.0,
+                        "isEnable": false,
+                        "rows": 4
+                    },
                     "forceFields": [],
                     "isActive": true,
+                    "lineParams": {
+                        "count": 100.0,
+                        "emitInterval": 1.0,
+                        "end": {
+                            "x": 5.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        },
+                        "start": {
+                            "x": -5.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        }
+                    },
                     "meshParams": {
                         "count": 10000.0,
                         "emitInterval": 1.0,
@@ -59,6 +99,7 @@
                         }
                     },
                     "name": "ss",
+                    "noiseFields": [],
                     "particleMeshParams": {
                         "angleDegree": 90.0,
                         "depth": 1.0,
@@ -142,6 +183,27 @@
                             "z": 0.10000000149011612
                         }
                     },
+                    "ringParams": {
+                        "count": 100.0,
+                        "emitInterval": 1.0,
+                        "innerRadius": 4.0,
+                        "normal": {
+                            "x": 0.0,
+                            "y": 1.0,
+                            "z": 0.0
+                        },
+                        "outerRadius": 5.0,
+                        "translate": {
+                            "x": 0.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        }
+                    },
+                    "scalePulseParams": {
+                        "amplitude": 0.20000000298023224,
+                        "frequency": 1.0,
+                        "isEnable": false
+                    },
                     "shape": 4,
                     "sphereParams": {
                         "count": 100.0,
@@ -152,6 +214,11 @@
                             "y": 0.0,
                             "z": 0.0
                         }
+                    },
+                    "stretchByVelocityParams": {
+                        "isEnable": false,
+                        "maxStretch": 5.0,
+                        "scale": 0.10000000149011612
                     },
                     "textureFilePath": "Resources/Effects\\circle.png",
                     "triangleParams": {
@@ -172,9 +239,23 @@
                             "y": 5.0,
                             "z": 0.0
                         }
+                    },
+                    "uvScrollParams": {
+                        "isEnable": false,
+                        "scrollSpeed": {
+                            "x": 0.10000000149011612,
+                            "y": 0.0
+                        }
                     }
                 },
                 {
+                    "accelerationFields": [],
+                    "bounceParams": {
+                        "friction": 0.20000000298023224,
+                        "groundY": 0.0,
+                        "isEnable": false,
+                        "restitution": 0.4000000059604645
+                    },
                     "boxParams": {
                         "count": 100.0,
                         "emitInterval": 1.0,
@@ -188,6 +269,11 @@
                             "y": 0.0,
                             "z": 0.0
                         }
+                    },
+                    "colorFlickerParams": {
+                        "intensity": 0.30000001192092896,
+                        "isEnable": false,
+                        "speed": 8.0
                     },
                     "coneParams": {
                         "count": 100.0,
@@ -205,8 +291,281 @@
                             "z": 0.0
                         }
                     },
+                    "dragParams": {
+                        "coefficient": 1.0,
+                        "isEnable": false
+                    },
+                    "emissiveParams": {
+                        "intensity": 3.0,
+                        "isEnable": false
+                    },
+                    "flipbookParams": {
+                        "cols": 4,
+                        "fps": 0.0,
+                        "isEnable": false,
+                        "rows": 4
+                    },
                     "forceFields": [],
                     "isActive": true,
+                    "lineParams": {
+                        "count": 100.0,
+                        "emitInterval": 1.0,
+                        "end": {
+                            "x": 5.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        },
+                        "start": {
+                            "x": -5.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        }
+                    },
+                    "meshParams": {
+                        "count": 100.0,
+                        "emitInterval": 1.0,
+                        "emitMode": 0,
+                        "modelName": "",
+                        "rotation": {
+                            "w": 1.0,
+                            "x": 0.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        },
+                        "scale": {
+                            "x": 1.0,
+                            "y": 1.0,
+                            "z": 1.0
+                        },
+                        "translate": {
+                            "x": 0.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        }
+                    },
+                    "name": "test",
+                    "noiseFields": [],
+                    "particleMeshParams": {
+                        "angleDegree": 90.0,
+                        "depth": 1.0,
+                        "divide": 16,
+                        "height": 1.0,
+                        "innerRadius": 0.25,
+                        "outerRadius": 0.5,
+                        "radius": 0.5,
+                        "subdivisions": 2,
+                        "width": 1.0
+                    },
+                    "particleMeshShape": 0,
+                    "particleParams": {
+                        "endColor": {
+                            "w": 0.0,
+                            "x": 1.0,
+                            "y": 1.0,
+                            "z": 1.0
+                        },
+                        "endColorVariance": {
+                            "w": 0.0,
+                            "x": 0.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        },
+                        "endScale": {
+                            "x": 0.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        },
+                        "endScaleVariance": {
+                            "x": 0.30000001192092896,
+                            "y": 0.30000001192092896,
+                            "z": 0.30000001192092896
+                        },
+                        "gravity": 0.0,
+                        "isBillboard": true,
+                        "isInheritScale": true,
+                        "isTrail": false,
+                        "lifeTime": 3.0,
+                        "lifeTimeVariance": 0.5,
+                        "rotation": 0.0,
+                        "rotationSpeed": 0.0,
+                        "rotationSpeedVariance": 0.0,
+                        "rotationVariance": 0.0,
+                        "startColor": {
+                            "w": 1.0,
+                            "x": 1.0,
+                            "y": 1.0,
+                            "z": 1.0
+                        },
+                        "startColorVariance": {
+                            "w": 0.0,
+                            "x": 0.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        },
+                        "startScale": {
+                            "x": 1.0,
+                            "y": 1.0,
+                            "z": 1.0
+                        },
+                        "startScaleVariance": {
+                            "x": 0.30000001192092896,
+                            "y": 0.30000001192092896,
+                            "z": 0.30000001192092896
+                        },
+                        "trailEmissionCount": 1,
+                        "trailEndScale": 0.0,
+                        "trailLifeTime": 0.5,
+                        "trailMinDistance": 0.5,
+                        "trailStartScale": 0.5,
+                        "velocity": {
+                            "x": 0.0,
+                            "y": 0.10000000149011612,
+                            "z": 0.0
+                        },
+                        "velocityVariance": {
+                            "x": 0.10000000149011612,
+                            "y": 0.05000000074505806,
+                            "z": 0.10000000149011612
+                        }
+                    },
+                    "ringParams": {
+                        "count": 100.0,
+                        "emitInterval": 1.0,
+                        "innerRadius": 4.0,
+                        "normal": {
+                            "x": 0.0,
+                            "y": 1.0,
+                            "z": 0.0
+                        },
+                        "outerRadius": 5.0,
+                        "translate": {
+                            "x": 0.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        }
+                    },
+                    "scalePulseParams": {
+                        "amplitude": 0.20000000298023224,
+                        "frequency": 1.0,
+                        "isEnable": false
+                    },
+                    "shape": 0,
+                    "sphereParams": {
+                        "count": 100.0,
+                        "emitInterval": 1.0,
+                        "radius": 10.0,
+                        "translate": {
+                            "x": 0.0,
+                            "y": 86.4000015258789,
+                            "z": 0.0
+                        }
+                    },
+                    "stretchByVelocityParams": {
+                        "isEnable": false,
+                        "maxStretch": 5.0,
+                        "scale": 0.10000000149011612
+                    },
+                    "textureFilePath": "Resources/Textures/uvChecker.png",
+                    "triangleParams": {
+                        "count": 100.0,
+                        "emitInterval": 1.0,
+                        "v1": {
+                            "x": -5.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        },
+                        "v2": {
+                            "x": 5.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        },
+                        "v3": {
+                            "x": 0.0,
+                            "y": 5.0,
+                            "z": 0.0
+                        }
+                    },
+                    "uvScrollParams": {
+                        "isEnable": false,
+                        "scrollSpeed": {
+                            "x": 0.10000000149011612,
+                            "y": 0.0
+                        }
+                    }
+                },
+                {
+                    "accelerationFields": [],
+                    "bounceParams": {
+                        "friction": 0.20000000298023224,
+                        "groundY": 0.0,
+                        "isEnable": false,
+                        "restitution": 0.4000000059604645
+                    },
+                    "boxParams": {
+                        "count": 100.0,
+                        "emitInterval": 1.0,
+                        "size": {
+                            "x": 10.0,
+                            "y": 10.0,
+                            "z": 10.0
+                        },
+                        "translate": {
+                            "x": 0.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        }
+                    },
+                    "colorFlickerParams": {
+                        "intensity": 0.30000001192092896,
+                        "isEnable": false,
+                        "speed": 8.0
+                    },
+                    "coneParams": {
+                        "count": 100.0,
+                        "direction": {
+                            "x": 0.0,
+                            "y": 1.0,
+                            "z": 0.0
+                        },
+                        "emitInterval": 1.0,
+                        "height": 20.0,
+                        "radius": 10.0,
+                        "translate": {
+                            "x": 0.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        }
+                    },
+                    "dragParams": {
+                        "coefficient": 1.0,
+                        "isEnable": false
+                    },
+                    "emissiveParams": {
+                        "intensity": 3.0,
+                        "isEnable": false
+                    },
+                    "flipbookParams": {
+                        "cols": 4,
+                        "fps": 0.0,
+                        "isEnable": false,
+                        "rows": 4
+                    },
+                    "forceFields": [],
+                    "isActive": true,
+                    "lineParams": {
+                        "count": 100.0,
+                        "emitInterval": 1.0,
+                        "end": {
+                            "x": 5.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        },
+                        "start": {
+                            "x": -5.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        }
+                    },
                     "meshParams": {
                         "count": 1000.0,
                         "emitInterval": 1.0,
@@ -230,6 +589,7 @@
                         }
                     },
                     "name": "dd",
+                    "noiseFields": [],
                     "particleMeshParams": {
                         "angleDegree": 90.0,
                         "depth": 1.0,
@@ -313,6 +673,27 @@
                             "z": 0.10000000149011612
                         }
                     },
+                    "ringParams": {
+                        "count": 100.0,
+                        "emitInterval": 1.0,
+                        "innerRadius": 4.0,
+                        "normal": {
+                            "x": 0.0,
+                            "y": 1.0,
+                            "z": 0.0
+                        },
+                        "outerRadius": 5.0,
+                        "translate": {
+                            "x": 0.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        }
+                    },
+                    "scalePulseParams": {
+                        "amplitude": 0.20000000298023224,
+                        "frequency": 1.0,
+                        "isEnable": false
+                    },
                     "shape": 4,
                     "sphereParams": {
                         "count": 100.0,
@@ -323,6 +704,11 @@
                             "y": 100.0,
                             "z": 0.0
                         }
+                    },
+                    "stretchByVelocityParams": {
+                        "isEnable": false,
+                        "maxStretch": 5.0,
+                        "scale": 0.10000000149011612
                     },
                     "textureFilePath": "Resources/Effects\\circle2.png",
                     "triangleParams": {
@@ -342,6 +728,13 @@
                             "x": 0.0,
                             "y": 5.0,
                             "z": 0.0
+                        }
+                    },
+                    "uvScrollParams": {
+                        "isEnable": false,
+                        "scrollSpeed": {
+                            "x": 0.10000000149011612,
+                            "y": 0.0
                         }
                     }
                 }

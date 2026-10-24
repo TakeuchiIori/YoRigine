@@ -133,6 +133,7 @@ void MyGame::Initialize() {
 	Editor::GetInstance()->SetGizmoDrawCallback([]() {
 		YoRigine::SceneEditor::GetInstance()->DrawGizmo();
 		YEmitterGroupEditor::GetInstance().DrawGizmo();
+		YoRigine::YGpuEmitManager::GetInstance()->DrawEditorGizmo();
 		});
 
 	// 各種ImGuiツール登録
