@@ -4,7 +4,7 @@
 #include "Collision/Core/ColliderFactory.h"
 #include "Collision/Core/CollisionTypeIdDef.h"
 #include "Collision/Sphere/SphereCollider.h"
-#include "GameObjects/Enemy/BattleEnemy/BattleEnemy.h"
+#include "GameObjects/Enemy/BaseEnemy.h"
 #include "GameObjects/Player/Camera/PlayerCamera.h"
 #include "GameObjects/Player/Player.h"
 #include "MagicCastGeometry.h"
@@ -197,7 +197,10 @@ void MagicAttackInstance::ApplyHit(BaseCollider *other) {
       return;
   }
 
-  BattleEnemy *enemy = other->GetOwnerAs<BattleEnemy>();
+  // GetOwnerAs は static_cast なので、実体の型より派生側を指定すると未定義動作になる。
+  // kBattleEnemy の持ち主は雑魚(BattleEnemy)とボス(BossEnemy)の両方があり得るため、
+  // 共通の親である BaseEnemy で受ける。ここで使う機能はすべて BaseEnemy にある。
+  BaseEnemy *enemy = other->GetOwnerAs<BaseEnemy>();
   if (!enemy || !enemy->IsAlive())
     return;
 

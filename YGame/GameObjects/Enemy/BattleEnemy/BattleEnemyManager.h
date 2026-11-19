@@ -1,6 +1,6 @@
 #pragma once
 #include "../AI/AttackTokenPool.h"
-#include "BattleEnemy.h"
+#include "BattleEnemyBase.h"
 #include <functional>
 #include <memory>
 #include <string>
@@ -55,7 +55,7 @@ struct BattleStats {
 using BattleEndCallback =
     std::function<void(BattleResult result, const BattleStats &stats)>;
 using BattleEnemyDefeatedCallback =
-    std::function<void(const BattleEnemy &enemy)>;
+    std::function<void(const BattleEnemyBase &enemy)>;
 
 ///************************* 戦闘用の敵管理クラス *************************///
 class BattleEnemyManager {
@@ -148,17 +148,17 @@ public:
   void DamageAllEnemies(int damage);
 
   // アクティブな敵一覧を取得
-  std::vector<BattleEnemy *> GetActiveBattleEnemies();
+  std::vector<BattleEnemyBase *> GetActiveBattleEnemies();
 
   // 指定範囲内の敵を取得
-  std::vector<BattleEnemy *> GetEnemiesInRange(const Vector3 &center,
+  std::vector<BattleEnemyBase *> GetEnemiesInRange(const Vector3 &center,
                                                float range);
 
   // 最も近い敵を取得
-  BattleEnemy *GetNearestEnemy(const Vector3 &position);
+  BattleEnemyBase *GetNearestEnemy(const Vector3 &position);
 
   // IDで敵を取得
-  BattleEnemy *GetEnemyById(const std::string &id);
+  BattleEnemyBase *GetEnemyById(const std::string &id);
 
   // アクティブな敵の数を取得
   size_t GetActiveEnemyCount() const;
@@ -185,6 +185,23 @@ public:
   // 敵データの保存・読み込み
   bool SaveEnemyData(const std::string &filePath) const;
   bool LoadEnemyData(const std::string &filePath);
+
+  // 敵データ表にその ID があるか（生成前の確認用）
+  bool HasEnemyData(const std::string &enemyId) const {
+    return enemyDataMap_.count(enemyId) > 0;
+  }
+
+  // 敵データ表の1件（エディタで書き換えて保存する用）。無ければ nullptr
+  BattleEnemyData *FindEnemyData(const std::string &enemyId) {
+    auto it = enemyDataMap_.find(enemyId);
+    return it != enemyDataMap_.end() ? &it->second : nullptr;
+  }
+
+  // 敵データ表を既定のファイルへ保存する
+  bool SaveEnemyDataToDefault() const { return SaveEnemyData(enemyDataFilePath_); }
+
+  // 生成中の敵を1体だけ取り除く（エディタで出し直す時など）
+  void RemoveEnemy(const BattleEnemyBase *enemy);
 
   // 指定エンカウントデータを取得
   EnemyEncounterData GetEncounterData(const std::string &encounterName) const;
@@ -221,6 +238,17 @@ public:
   // 最終バトルクリアフラグをリセット
   void ResetFinalBattleClearFlag() { isFinalBattleCleared_ = false; }
 
+  /// <summary>
+  /// 最終戦の取り巻きを倒し切った後、そのままボス戦へ続ける。
+  /// クリア待ちの状態を解除して最終戦モードは保つので、
+  /// 次に全滅（＝ボス撃破）した時にもう一度クリアフラグが立つ。
+  /// ボス自体の生成は呼び出し側が SpawnBattleEnemy で行う。
+  /// </summary>
+  void BeginBossPhase() {
+    isFinalBattleCleared_ = false;
+    isWaitingForClearTransition_ = false;
+  }
+
   // 戦闘結果を取得
   BattleResult GetBattleResult() const { return battleResult_; }
 
@@ -251,7 +279,11 @@ private:
   void CheckBattleEndConditions();
 
   // 敵撃破時の処理
-  void OnEnemyDefeated(BattleEnemy *enemy);
+  void OnEnemyDefeated(BattleEnemyBase *enemy);
+
+  // 敵データの archetype に応じて実体を作る。配置の仕組みはここ以外で雑魚とボスを区別しない
+  static std::unique_ptr<BattleEnemyBase>
+  CreateEnemyInstance(const BattleEnemyData &data);
 
   // 戦闘報酬を計算
   void CalculateBattleRewards();
@@ -275,7 +307,7 @@ private:
   static BattleEnemyManager *current_;
 
   // 敵管理
-  std::vector<std::unique_ptr<BattleEnemy>> battleEnemies_;
+  std::vector<std::unique_ptr<BattleEnemyBase>> battleEnemies_;
   std::unordered_map<std::string, BattleEnemyData> enemyDataMap_;
   const std::string enemyDataFilePath_ =
       "Resources/Json/BattleEnemies/enemy_data.json";

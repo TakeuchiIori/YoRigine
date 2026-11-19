@@ -17,6 +17,16 @@ bool EnemyAttack::HasHitbox() const {
   return false;
 }
 
+bool EnemyAttack::RequiresSkeleton() const {
+  if (animation.HasClip())
+    return true;
+  for (const auto &modifier : modifiers) {
+    if (modifier.IsJointHitbox())
+      return true;
+  }
+  return false;
+}
+
 namespace {
 
 // ── 補間モード ──
@@ -88,6 +98,16 @@ json ModifierToJson(const AttackModifier &m) {
     break;
   case AttackModifierType::Hitbox:
     j["damageWindow"] = m.damageWindow;
+    if (m.damageMultiplier != 1.0f)
+      j["damageMultiplier"] = m.damageMultiplier;
+    // 球の判定に使う値。ボスはジョイント指定なしの判定も「本体基準の球」として扱うので、
+    // ジョイントの有無にかかわらず書く（雑魚敵の体当たりはコライダーで判定するので使わない）。
+    if (!m.joint.empty())
+      j["joint"] = m.joint;
+    j["radius"] = m.radius;
+    j["jointOffset"] = {{"x", m.jointOffset.x},
+                        {"y", m.jointOffset.y},
+                        {"z", m.jointOffset.z}};
     break;
   case AttackModifierType::EmitProjectile:
     j["projectileId"] = m.projectileId;
@@ -119,6 +139,14 @@ AttackModifier ModifierFromJson(const json &j) {
     m.offset = {o.value("x", 0.0f), o.value("y", 1.0f), o.value("z", 0.0f)};
   }
   m.aimAtTarget = j.value("aimAtTarget", true);
+  m.joint = j.value("joint", std::string());
+  m.radius = j.value("radius", 0.8f);
+  if (j.contains("jointOffset")) {
+    const auto &o = j["jointOffset"];
+    m.jointOffset = {o.value("x", 0.0f), o.value("y", 0.0f),
+                     o.value("z", 0.0f)};
+  }
+  m.damageMultiplier = j.value("damageMultiplier", 1.0f);
   return m;
 }
 
@@ -155,6 +183,13 @@ bool EnemyAttackIO::Load(const std::string &path,
       attack.positionSource = AttackPositionSourceFromString(
           aj.value("positionSource", std::string("curves")));
       attack.pathName = aj.value("pathName", std::string());
+
+      // 骨格アニメ。無ければ空のまま＝雑魚敵のデータは従来どおり
+      if (aj.contains("animation")) {
+        const auto &anim = aj["animation"];
+        attack.animation.clip = anim.value("clip", std::string());
+        attack.animation.speed = anim.value("speed", 1.0f);
+      }
 
       // カーブ。書かれているチャンネルだけ読む。
       if (aj.contains("tracks")) {
@@ -213,6 +248,10 @@ bool EnemyAttackIO::Save(const std::string &path,
     aj["positionSource"] = AttackPositionSourceToString(attack.positionSource);
     if (!attack.pathName.empty())
       aj["pathName"] = attack.pathName;
+    if (attack.animation.HasClip()) {
+      aj["animation"] = {{"clip", attack.animation.clip},
+                         {"speed", attack.animation.speed}};
+    }
 
     // キーのあるチャンネルだけ書く
     json tracksJson = json::object();

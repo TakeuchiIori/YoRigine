@@ -6,13 +6,14 @@
 #include <memory>
 
 // 前方宣言
-class BattleEnemy;
+class BaseEnemy;
 namespace YoRigine { class Camera; }
 
 class EnemyHealthBarUI {
 public:
     // コンストラクタ
-    EnemyHealthBarUI(const BattleEnemy* enemy, YoRigine::Camera* camera);
+    // 雑魚・ボス共通で使えるよう、HP と位置だけを持つ BaseEnemy で受ける
+    EnemyHealthBarUI(const BaseEnemy* enemy, YoRigine::Camera* camera);
 
     // 初期化 (UIBase::Initializeをオーバーロード)
     void Initialize();
@@ -25,7 +26,7 @@ public:
 private:
     void InitJson();
 private:
-    const BattleEnemy* targetEnemy_ = nullptr; // 追従対象の敵
+    const BaseEnemy* targetEnemy_ = nullptr; // 追従対象の敵
     YoRigine::Camera* camera_ = nullptr;                 // カメラ
 
     // HPバーの背景とゲージ用

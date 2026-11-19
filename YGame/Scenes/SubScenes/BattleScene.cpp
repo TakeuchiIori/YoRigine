@@ -1,4 +1,5 @@
 ﻿#include "BattleScene.h"
+#include "Enemy/Boss/BossEnemy.h"
 
 // Engine
 #include "LightManager/LightManager.h"
@@ -57,13 +58,58 @@ void BattleScene::Initialize(YoRigine::Camera *camera, Player *player) {
   battleEnemyManager_->Initialize(sceneCamera_);
   battleEnemyManager_->SetPlayer(player_);
 
+  //------------------------------------------------------------
+  // ボス出現演出の調整値（JSON 保存・エディタで調整）
+  //------------------------------------------------------------
+  {
+    auto &s = bossAppearance_;
+    bossAppearanceJson_ = std::make_unique<YoRigine::JsonManager>(
+        "BossAppearance", "Resources/Json/Scenes/");
+    bossAppearanceJson_->SetCategory("BossAppearance");
+    bossAppearanceJson_->Register("ボスの敵ID", &s.bossEnemyId);
+    bossAppearanceJson_->Register("出現距離", &s.spawnDistance);
+
+    bossAppearanceJson_->SetTreePrefix("構図");
+    bossAppearanceJson_->Register("プレイヤーの立ち位置", &s.playerStandDistance);
+    bossAppearanceJson_->Register("カメラの肩ずらし", &s.cameraShoulderYaw);
+    bossAppearanceJson_->Register("カメラの見下ろし", &s.cameraPitch);
+    bossAppearanceJson_->Register("出現前の注視の高さ", &s.cameraLookHeight);
+    bossAppearanceJson_->Register("カメラの寄る速さ", &s.cameraBlendSpeed);
+    bossAppearanceJson_->ClearTreePrefix();
+
+    bossAppearanceJson_->SetTreePrefix("タイムライン");
+    bossAppearanceJson_->Register("霧が覆うまで", &s.fogInDuration);
+    bossAppearanceJson_->Register("ボス生成時刻", &s.spawnTime);
+    bossAppearanceJson_->Register("実体化の時間", &s.emergenceDuration);
+    bossAppearanceJson_->Register("霧が晴れ始める時刻", &s.fogLiftStart);
+    bossAppearanceJson_->Register("霧が晴れる時間", &s.fogLiftDuration);
+    bossAppearanceJson_->Register("演出全体", &s.totalDuration);
+    bossAppearanceJson_->ClearTreePrefix();
+
+    bossAppearanceJson_->SetTreePrefix("最も濃い霧");
+    bossAppearanceJson_->Register("色", &s.darkFogColor);
+    bossAppearanceJson_->Register("濃度", &s.darkFogDensity);
+    bossAppearanceJson_->Register("開始距離", &s.darkFogStart);
+    bossAppearanceJson_->Register("高さフォグ", &s.darkHeightFogDensity);
+    bossAppearanceJson_->Register("空のフォグ上限", &s.darkSkyFogClamp);
+    bossAppearanceJson_->ClearTreePrefix();
+
+    bossAppearanceJson_->SetTreePrefix("ボス戦中の霧");
+    bossAppearanceJson_->Register("色", &s.battleFogColor);
+    bossAppearanceJson_->Register("濃度", &s.battleFogDensity);
+    bossAppearanceJson_->Register("開始距離", &s.battleFogStart);
+    bossAppearanceJson_->Register("高さフォグ", &s.battleHeightFogDensity);
+    bossAppearanceJson_->Register("空のフォグ上限", &s.battleSkyFogClamp);
+    bossAppearanceJson_->ClearTreePrefix();
+  }
+
   // 戦闘終了時のコールバック設定
   battleEnemyManager_->SetBattleEndCallback(
       [this](BattleResult result, const BattleStats &stats) {
         HandleBattleEnd(result, stats);
       });
   battleEnemyManager_->SetEnemyDefeatedCallback(
-      [this](const BattleEnemy &) { FocusNearestEnemyAfterDefeat(); });
+      [this](const BattleEnemyBase &) { FocusNearestEnemyAfterDefeat(); });
 
   //------------------------------------------------------------
   // 環境オブジェクト初期化
@@ -116,6 +162,21 @@ void BattleScene::Initialize(YoRigine::Camera *camera, Player *player) {
   attackEditor_.SetManager(battleEnemyManager_.get());
   Editor::GetInstance()->RegisterGameUI(
       "攻撃エディタ", [this]() { attackEditor_.Draw(); }, SceneId::Game, "ゲームプレイ");
+
+  // ボス戦エディタ。出現演出はこのシーンが持つので、必要な口だけ渡す。
+  {
+    BossEditor::SceneHooks hooks;
+    hooks.appearance = &bossAppearance_;
+    hooks.appearanceJson = bossAppearanceJson_.get();
+    hooks.previewFog = [this](float t) { PreviewBossFog(t); };
+    hooks.endFogPreview = [this]() { RestoreFogAfterBossAppearance(); };
+    hooks.replayAppearance = [this]() { ReplayBossAppearance(); };
+    hooks.spawnBossNow = [this]() { SpawnBossNow(); };
+    bossEditor_.SetManager(battleEnemyManager_.get());
+    bossEditor_.SetSceneHooks(hooks);
+  }
+  Editor::GetInstance()->RegisterGameUI(
+      "ボス戦エディタ", [this]() { bossEditor_.Draw(); }, SceneId::Game, "ゲームプレイ");
 #endif
 
   //------------------------------------------------------------
@@ -145,8 +206,36 @@ void BattleScene::Update() {
     }
   }
 
-  // 最終戦に勝ったら、霧晴れ＋光芒のクリア演出を挟んでから Clear へ
+#ifdef _DEBUG
+  // 【一時的な確認用】YORIGINE_DEBUG_AUTOKILL=秒 で起動すると、開始演出明けから
+  // その秒数後に取り巻きを全滅させる（ボス出現演出を手で戦わずに確認するため）
+  {
+    static float s_autoKillTimer = -1.0f;
+    static bool s_autoKillRead = false;
+    if (!s_autoKillRead) {
+      s_autoKillRead = true;
+      char *value = nullptr;
+      size_t length = 0;
+      if (_dupenv_s(&value, &length, "YORIGINE_DEBUG_AUTOKILL") == 0 && value) {
+        s_autoKillTimer = static_cast<float>(std::atof(value));
+        free(value);
+      }
+    }
+    if (s_autoKillTimer >= 0.0f && !battleIntroActive_ && !bossPhaseStarted_) {
+      s_autoKillTimer -= YoRigine::GameTime::GetDeltaTime();
+      if (s_autoKillTimer < 0.0f) {
+        battleEnemyManager_->DamageAllEnemies(999999);
+      }
+    }
+  }
+#endif
+
+  // 最終戦の取り巻きを倒し切ったら、まず黒い霧の中からボスを出す。
+  // ボスまで倒したら（2回目の全滅）、霧晴れ＋光芒のクリア演出を挟んで Clear へ。
   if (battleEnemyManager_->IsFinalBattleCleared() && !clearCinematicStarted_) {
+    if (!bossPhaseStarted_ && StartBossAppearance()) {
+      return;
+    }
     StartClearCinematic();
     return;
   }
@@ -186,7 +275,31 @@ void BattleScene::Update() {
       }
     }
     player_->GetPlayerCamera()->SetThreatTargetPositions(enemyPositions);
+
+    // ボス戦フレーミング：生存中のボスがいれば、胸の位置と身長をカメラへ渡す。
+    // 雑魚戦ではボスがいないので何も渡さず、カメラは通常のまま。
+    bool hasBoss = false;
+    for (auto *enemy : battleEnemyManager_->GetActiveBattleEnemies()) {
+      auto *boss = dynamic_cast<BossEnemy *>(enemy);
+      if (!boss) {
+        continue;
+      }
+      Vector3 focus{};
+      float height = 0.0f;
+      if (boss->GetCameraFraming(focus, height)) {
+        player_->GetPlayerCamera()->SetBossFraming(focus, height,
+                                                   boss->GetPrimaryCollider());
+        hasBoss = true;
+        break;
+      }
+    }
+    if (!hasBoss) {
+      player_->GetPlayerCamera()->ClearBossFraming();
+    }
   }
+
+  // ボス出現演出中：カメラの注視点とプレイヤーの向く先をボスへ追従させる
+  UpdateBossAppearanceStaging();
 
   // 視覚効果・オブジェクト更新
   sprite_->Update();
@@ -279,11 +392,303 @@ void BattleScene::StartClearCinematic() {
   YoRigine::CinematicManager::GetInstance()->Play(std::move(seq));
 }
 
+/// <summary>
+/// ボス出現演出。
+/// 黒い霧がステージを覆う → カメラ正面の霧の中からボスが実体化して咆哮
+/// → 霧がボス戦用の暗さまで少し晴れ、操作が戻ってそのままボス戦。
+/// </summary>
+bool BattleScene::StartBossAppearance() {
+  const auto &s = bossAppearance_;
+  if (s.bossEnemyId.empty() || !battleEnemyManager_ || !player_) {
+    return false;
+  }
+  // 敵データに無い ID だと SpawnBattleEnemy がエラーで止まるので、ここで確かめる
+  if (!battleEnemyManager_->HasEnemyData(s.bossEnemyId)) {
+    Logger("[BattleScene] ボスの敵ID が敵データにありません: " + s.bossEnemyId +
+           "（ボス戦を飛ばしてクリアへ進みます）\n");
+    return false;
+  }
+
+  bossPhaseStarted_ = true;
+  bossAppearanceActive_ = true;
+
+  // クリアフラグだけ先に下ろす（毎フレームこの演出を始め直さないため）。
+  // クリア待ちの解除はボスを生成した瞬間に行う。先に解除すると、ボスが
+  // 現れるまでの間「敵がいない＝全滅」の判定が毎フレーム走ってしまう。
+  battleEnemyManager_->ResetFinalBattleClearFlag();
+
+  const Vector3 spawnPos = ComputeBossSpawnPosition();
+  bossAppearanceSpawnPos_ = spawnPos;
+
+  //------------------------------------------------------------
+  // プレイヤー：入力を止め、出現位置の手前まで歩かせてボスの方を向かせる。
+  // 取り巻きを倒した直後の攻撃・剣の軌跡・判定は BeginScriptedMove が片付ける。
+  //------------------------------------------------------------
+  player_->SetInvincible(true);
+  player_->BeginScriptedMove(ComputeBossAppearanceStandPosition(spawnPos), spawnPos);
+
+  //------------------------------------------------------------
+  // カメラ：プレイヤー越しに出現位置（生成後はボスの胸）を画面中央へ捉え続ける。
+  // スティックでよそを向けないよう、演出中はカメラ操作も受け付けない。
+  //------------------------------------------------------------
+  if (auto *camera = player_->GetPlayerCamera()) {
+    camera->BeginCinematicFocus(ComputeBossAppearanceFocus(), MakeBossAppearanceCameraParams());
+  }
+
+  // 霧：演出前の値を退避してから、最も濃い霧 → ボス戦中の霧 へ補間する
+  auto *chain = PostEffectManager::GetInstance()->GetEffectChain();
+  auto *fog = chain ? chain->GetFirstEffectByType(OffScreen::OffScreenEffectType::Fog)
+                    : nullptr;
+  if (fog && !hasSavedFog_) {
+    savedFog_ = fog->params.fog;
+    hasSavedFog_ = true;
+  }
+
+  auto seq = std::make_unique<YoRigine::CinematicSequencer>(s.totalDuration);
+
+  // --- 黒帯 ---
+  seq->Letterbox(true, 0.0f, kLetterboxInDuration, Easing::Function::EaseOutCubic);
+  seq->Letterbox(false, s.totalDuration - kLetterboxOutDuration, s.totalDuration,
+                 Easing::Function::EaseInCubic);
+
+  // --- 霧 ---
+  if (fog) {
+    const OffScreen::FogParams from = fog->params.fog;
+    // 1 本の進行度 t で全パラメータを動かす（項目ごとに Tween を並べるとズレやすい）
+    auto blendFog = [fog](const OffScreen::FogParams &a, const OffScreen::FogParams &b,
+                          float t) {
+      auto &f = fog->params.fog;
+      f.fogColor = Lerp(a.fogColor, b.fogColor, t);
+      f.fogDensity = Lerp(a.fogDensity, b.fogDensity, t);
+      f.fogStart = Lerp(a.fogStart, b.fogStart, t);
+      f.heightFogDensity = Lerp(a.heightFogDensity, b.heightFogDensity, t);
+      f.skyFogClamp = Lerp(a.skyFogClamp, b.skyFogClamp, t);
+      f.sunInscatterStrength = Lerp(a.sunInscatterStrength, b.sunInscatterStrength, t);
+    };
+
+    const OffScreen::FogParams dark = MakeDarkFog(from);
+    const OffScreen::FogParams battle = MakeBattleFog(from);
+
+    seq->Tween([blendFog, from, dark](float t) { blendFog(from, dark, t); },
+               0.0f, 1.0f, 0.0f, s.fogInDuration, Easing::Function::EaseInOutSine);
+    seq->Tween([blendFog, dark, battle](float t) { blendFog(dark, battle, t); },
+               0.0f, 1.0f, s.fogLiftStart, s.fogLiftStart + s.fogLiftDuration,
+               Easing::Function::EaseOutCubic);
+  }
+
+  // --- 霧が濃くなった頃、カメラ正面にボスを生成して実体化させる ---
+  const std::string bossId = s.bossEnemyId;
+  const float emergence = s.emergenceDuration;
+  seq->Callback(s.spawnTime, [this, bossId, spawnPos, emergence]() {
+    battleEnemyManager_->SpawnBattleEnemy(bossId, spawnPos);
+    battleEnemyManager_->BeginBossPhase(); // ここから最終戦のボス戦として続行
+    if (auto *spawned = battleEnemyManager_->GetEnemyById(bossId)) {
+      spawned->SetPlayer(player_);
+      if (auto *boss = dynamic_cast<BossEnemy *>(spawned)) {
+        boss->BeginEmergence(emergence);
+      }
+    }
+  });
+
+  // --- 終了：操作を返してボス戦開始 ---
+  seq->OnFinish([this]() {
+    bossAppearanceActive_ = false;
+    EndBossAppearanceStaging();
+  });
+
+  YoRigine::CinematicManager::GetInstance()->Play(std::move(seq));
+  Logger("[BattleScene] ボス出現演出を開始: " + bossId + "\n");
+  return true;
+}
+
+Vector3 BattleScene::ComputeBossAppearanceStandPosition(const Vector3 &spawnPos) const {
+  // 出現位置へ向かう直線上で、playerStandDistance だけ手前の点。
+  // 既にそれより近ければ（または真上に居れば）今の位置のまま向きだけ変える。
+  const Vector3 playerPos = player_->GetWT().translate_;
+  Vector3 toSpawn = spawnPos - playerPos;
+  toSpawn.y = 0.0f;
+  const float dist = Length(toSpawn);
+  const float stand = std::max(bossAppearance_.playerStandDistance, 0.0f);
+  if (dist <= stand || dist < 0.01f) {
+    return playerPos;
+  }
+  Vector3 standPos = spawnPos - toSpawn * (stand / dist);
+  standPos.y = playerPos.y;
+  return standPos;
+}
+
+Vector3 BattleScene::ComputeBossAppearanceFocus() const {
+  // ボスが居ればその胸、まだ居なければ出現位置の少し上（霧の中の“何か”を見ている構図）
+  if (battleEnemyManager_) {
+    if (auto *boss = dynamic_cast<BossEnemy *>(
+            battleEnemyManager_->GetEnemyById(bossAppearance_.bossEnemyId))) {
+      Vector3 focus{};
+      float height = 0.0f;
+      if (boss->GetCameraFraming(focus, height)) {
+        return focus;
+      }
+    }
+  }
+  return bossAppearanceSpawnPos_ + Vector3{0.0f, bossAppearance_.cameraLookHeight, 0.0f};
+}
+
+PlayerCamera::CinematicFocusParams BattleScene::MakeBossAppearanceCameraParams() const {
+  const auto &s = bossAppearance_;
+  PlayerCamera::CinematicFocusParams params;
+  params.shoulderYaw = s.cameraShoulderYaw;
+  params.pitch = s.cameraPitch;
+  params.blendSpeed = s.cameraBlendSpeed;
+  return params;
+}
+
+void BattleScene::UpdateBossAppearanceStaging() {
+  if (!bossAppearanceActive_ || !player_) {
+    return;
+  }
+  // 注視点はボスの生成・実体化に合わせて毎フレーム更新する（カメラ側で滑らかに追う）
+  const Vector3 focus = ComputeBossAppearanceFocus();
+  if (auto *camera = player_->GetPlayerCamera()) {
+    camera->SetCinematicFocusPoint(focus);
+  }
+  // 立ち止まった後は、出現したボスの方へ体を向け続ける
+  Vector3 face = focus;
+  face.y = player_->GetWT().translate_.y;
+  player_->SetScriptedFaceTarget(face);
+}
+
+void BattleScene::EndBossAppearanceStaging() {
+  if (!player_) {
+    return;
+  }
+  // 自動移動を解いてから操作を返す（順番が逆だと 1 フレーム入力が混ざる）
+  player_->EndScriptedMove();
+  if (auto *camera = player_->GetPlayerCamera()) {
+    camera->EndCinematicFocus();
+  }
+  player_->SetControlEnabled(true);
+  player_->SetInvincible(false);
+}
+
+Vector3 BattleScene::ComputeBossSpawnPosition() const {
+  // カメラを振り向かせずに済み、ボスが画面中央に現れる
+  const float cameraYaw = sceneCamera_ ? sceneCamera_->transform_.rotate.y : 0.0f;
+  const Vector3 forward = {std::sin(cameraYaw), 0.0f, std::cos(cameraYaw)};
+  Vector3 pos = player_ ? player_->GetWT().translate_ : Vector3{};
+  pos += forward * bossAppearance_.spawnDistance;
+  pos.y = 0.0f;
+  return pos;
+}
+
+void BattleScene::RemoveBosses() {
+  if (!battleEnemyManager_) {
+    return;
+  }
+  for (auto *enemy : battleEnemyManager_->GetActiveBattleEnemies()) {
+    if (dynamic_cast<BossEnemy *>(enemy)) {
+      battleEnemyManager_->RemoveEnemy(enemy);
+    }
+  }
+}
+
+void BattleScene::SpawnBossNow() {
+  const std::string &id = bossAppearance_.bossEnemyId;
+  if (!battleEnemyManager_ || !battleEnemyManager_->IsBattleActive() ||
+      !battleEnemyManager_->HasEnemyData(id)) {
+    Logger("[BattleScene] ボスを出せません（バトル外か、敵IDが無い）: " + id + "\n");
+    return;
+  }
+  RemoveBosses();
+  battleEnemyManager_->SpawnBattleEnemy(id, ComputeBossSpawnPosition());
+  if (auto *spawned = battleEnemyManager_->GetEnemyById(id)) {
+    spawned->SetPlayer(player_);
+  }
+}
+
+void BattleScene::ReplayBossAppearance() {
+  if (!battleEnemyManager_ || !battleEnemyManager_->IsBattleActive()) {
+    Logger("[BattleScene] バトル中でないため出現演出を再生できません\n");
+    return;
+  }
+  // 既にいるボスを消し、霧を演出前へ戻してから流し直す
+  RemoveBosses();
+  if (bossAppearanceActive_) {
+    YoRigine::CinematicManager::GetInstance()->Stop();
+    bossAppearanceActive_ = false;
+    // 演出の OnFinish は Stop では呼ばれないので、自動移動と注視をここで解く
+    EndBossAppearanceStaging();
+  }
+  RestoreFogAfterBossAppearance();
+  bossPhaseStarted_ = false;
+  StartBossAppearance();
+}
+
+OffScreen::FogParams BattleScene::MakeDarkFog(const OffScreen::FogParams &base) const {
+  const auto &s = bossAppearance_;
+  OffScreen::FogParams dark = base;
+  dark.fogColor = s.darkFogColor;
+  dark.fogDensity = s.darkFogDensity;
+  dark.fogStart = s.darkFogStart;
+  dark.heightFogDensity = s.darkHeightFogDensity;
+  dark.skyFogClamp = s.darkSkyFogClamp;
+  dark.sunInscatterStrength = 0.0f; // 太陽のにじみを消して、光の無い闇にする
+  return dark;
+}
+
+OffScreen::FogParams BattleScene::MakeBattleFog(const OffScreen::FogParams &base) const {
+  const auto &s = bossAppearance_;
+  OffScreen::FogParams battle = MakeDarkFog(base);
+  battle.fogColor = s.battleFogColor;
+  battle.fogDensity = s.battleFogDensity;
+  battle.fogStart = s.battleFogStart;
+  battle.heightFogDensity = s.battleHeightFogDensity;
+  battle.skyFogClamp = s.battleSkyFogClamp;
+  return battle;
+}
+
+void BattleScene::PreviewBossFog(float t) {
+  auto *chain = PostEffectManager::GetInstance()->GetEffectChain();
+  auto *fog = chain ? chain->GetFirstEffectByType(OffScreen::OffScreenEffectType::Fog)
+                    : nullptr;
+  if (!fog) {
+    return;
+  }
+  // 初回だけ演出前の霧を退避する（「霧を元に戻す」で戻す先）
+  if (!hasSavedFog_) {
+    savedFog_ = fog->params.fog;
+    hasSavedFog_ = true;
+  }
+  const OffScreen::FogParams dark = MakeDarkFog(savedFog_);
+  const OffScreen::FogParams battle = MakeBattleFog(savedFog_);
+  const OffScreen::FogParams &a = (t <= 1.0f) ? savedFog_ : dark;
+  const OffScreen::FogParams &b = (t <= 1.0f) ? dark : battle;
+  const float u = std::clamp(t <= 1.0f ? t : t - 1.0f, 0.0f, 1.0f);
+
+  auto &f = fog->params.fog;
+  f.fogColor = Lerp(a.fogColor, b.fogColor, u);
+  f.fogDensity = Lerp(a.fogDensity, b.fogDensity, u);
+  f.fogStart = Lerp(a.fogStart, b.fogStart, u);
+  f.heightFogDensity = Lerp(a.heightFogDensity, b.heightFogDensity, u);
+  f.skyFogClamp = Lerp(a.skyFogClamp, b.skyFogClamp, u);
+  f.sunInscatterStrength = Lerp(a.sunInscatterStrength, b.sunInscatterStrength, u);
+}
+
+void BattleScene::RestoreFogAfterBossAppearance() {
+  if (!hasSavedFog_) {
+    return;
+  }
+  auto *chain = PostEffectManager::GetInstance()->GetEffectChain();
+  if (auto *fog = chain ? chain->GetFirstEffectByType(OffScreen::OffScreenEffectType::Fog)
+                        : nullptr) {
+    fog->params.fog = savedFog_;
+  }
+  hasSavedFog_ = false;
+}
+
 void BattleScene::FocusNearestEnemyAfterDefeat() {
   if (!player_ || !player_->GetPlayerCamera() || !battleEnemyManager_)
     return;
 
-  BattleEnemy *nearest =
+  BattleEnemyBase *nearest =
       battleEnemyManager_->GetNearestEnemy(player_->GetWT().translate_);
   if (!nearest)
     return;
@@ -412,6 +817,8 @@ void BattleScene::OnEnter(const SubScenePayload &payload) {
 
   // クリア演出フラグをリセット（再戦・別バトル開始時のため）
   clearCinematicStarted_ = false;
+  bossPhaseStarted_ = false;
+  bossAppearanceActive_ = false;
 
   // プレイヤー位置リセット
   player_->SetInitialPosition();
@@ -443,8 +850,22 @@ void BattleScene::OnExit() {
   AreaManager::GetInstance()->RemoveArea("BattleArea");
   if (player_ && player_->GetPlayerCamera()) {
     player_->GetPlayerCamera()->ClearThreatTargetPositions();
+    player_->GetPlayerCamera()->ClearBossFraming();
     player_->GetPlayerCamera()->SetThreatAwarenessAllowed(false);
   }
+
+#ifdef USE_IMGUI
+  bossEditor_.StopPreview(); // プレビューで止めた AI・姿勢を戻す
+#endif
+
+  // ボス出現演出で暗くした霧を戻す（敗北・リトライでフィールドへ戻る場合など）
+  if (bossAppearanceActive_) {
+    YoRigine::CinematicManager::GetInstance()->Stop();
+    bossAppearanceActive_ = false;
+    // 演出の OnFinish は Stop では呼ばれないので、自動移動と注視をここで解く
+    EndBossAppearanceStaging();
+  }
+  RestoreFogAfterBossAppearance();
 
   // ロックオンUIを非表示にする
   lockOnUI_->SetIsVisible(false);

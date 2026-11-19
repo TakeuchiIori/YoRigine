@@ -23,6 +23,8 @@
 #include <Drawer/InstancedObject3d.h>
 #include "Object3D/BaseObjectManager.h"
 #include "../Attack/Runtime/EnemyAttackLibrary.h"
+#include "BattleEnemy.h"
+#include "../Boss/BossEnemy.h"
 
 namespace {
 	// BaseObjectManager 登録名の一意連番（プロセス内で単調増加）
@@ -175,7 +177,7 @@ void BattleEnemyManager::CheckBattleEndConditions() {
 void BattleEnemyManager::CleanupDefeatedEnemies() {
 	battleEnemies_.erase(
 		std::remove_if(battleEnemies_.begin(), battleEnemies_.end(),
-			[this](const std::unique_ptr<BattleEnemy>& enemy) {
+			[this](const std::unique_ptr<BattleEnemyBase>& enemy) {
 				if (enemy && !enemy->IsAlive()) {
 					OnEnemyDefeated(enemy.get());
 					return true;   // erase → BattleEnemy デストラクタで登録解除
@@ -190,7 +192,7 @@ void BattleEnemyManager::CleanupDefeatedEnemies() {
 /// 敵撃破時の処理（統計更新）
 /// </summary>
 /// <param name="enemy">撃破された敵</param>
-void BattleEnemyManager::OnEnemyDefeated(BattleEnemy* enemy) {
+void BattleEnemyManager::OnEnemyDefeated(BattleEnemyBase* enemy) {
 	if (!enemy) return;
 
 	const auto& enemyData = enemy->GetEnemyData();
@@ -338,6 +340,20 @@ void BattleEnemyManager::ForceBattleEnd() {
 
 
 /// <summary>
+/// 敵データの種類に応じて実体を作る。
+/// 雑魚とボスで違うのはここだけで、配置・更新・描画・撃破判定は共通の窓口を通る。
+/// </summary>
+std::unique_ptr<BattleEnemyBase> BattleEnemyManager::CreateEnemyInstance(const BattleEnemyData& data) {
+	switch (data.archetype) {
+	case BattleEnemyArchetype::Boss:
+		return std::make_unique<BossEnemy>();
+	case BattleEnemyArchetype::Normal:
+	default:
+		return std::make_unique<BattleEnemy>();
+	}
+}
+
+/// <summary>
 /// 指定した敵IDと位置から敵を生成
 /// </summary>
 /// <param name="enemyId">敵ID</param>
@@ -360,8 +376,8 @@ void BattleEnemyManager::SpawnBattleEnemy(const std::string& enemyId, const Vect
 	const BattleEnemyData& enemyData = it->second;
 	Logger(("[BattleEnemyManager] キャッシュから敵データ取得: " + enemyId + "\n").c_str());
 
-	// 敵オブジェクトの生成と初期化
-	auto newEnemy = std::make_unique<BattleEnemy>();
+	// 敵オブジェクトの生成と初期化（雑魚かボスかはデータの archetype で決まる）
+	auto newEnemy = CreateEnemyInstance(enemyData);
 	newEnemy->Initialize(camera_);
 	newEnemy->SetPlayer(player_);
 
@@ -427,12 +443,24 @@ void BattleEnemyManager::RemoveAllBattleEnemies() {
 }
 
 /// <summary>
+/// 生成中の敵を1体だけ取り除く
+/// </summary>
+void BattleEnemyManager::RemoveEnemy(const BattleEnemyBase* enemy) {
+	auto it = std::find_if(battleEnemies_.begin(), battleEnemies_.end(),
+		[enemy](const std::unique_ptr<BattleEnemyBase>& e) { return e.get() == enemy; });
+	if (it == battleEnemies_.end()) return;
+
+	AreaManager::GetInstance()->UnregisterObject(&(*it)->GetWT());
+	battleEnemies_.erase(it); // BaseObjectManager の登録解除はデストラクタで行われる
+}
+
+/// <summary>
 /// 全ての敵が撃破されているか確認
 /// </summary>
 /// <returns>全敵が倒されていれば true</returns>
 bool BattleEnemyManager::AreAllEnemiesDefeated() const {
 	return std::all_of(battleEnemies_.begin(), battleEnemies_.end(),
-		[](const std::unique_ptr<BattleEnemy>& enemy) {
+		[](const std::unique_ptr<BattleEnemyBase>& enemy) {
 			return !enemy || !enemy->IsAlive();
 		});
 }
@@ -488,8 +516,8 @@ void BattleEnemyManager::DamageAllEnemies(int damage) {
 /// アクティブな敵を取得
 /// </summary>
 /// <returns>生存中の敵リスト</returns>
-std::vector<BattleEnemy*> BattleEnemyManager::GetActiveBattleEnemies() {
-	std::vector<BattleEnemy*> result;
+std::vector<BattleEnemyBase*> BattleEnemyManager::GetActiveBattleEnemies() {
+	std::vector<BattleEnemyBase*> result;
 
 	for (auto& enemy : battleEnemies_) {
 		if (enemy && enemy->IsAlive()) {
@@ -505,8 +533,8 @@ std::vector<BattleEnemy*> BattleEnemyManager::GetActiveBattleEnemies() {
 /// <param name="center">中心座標</param>
 /// <param name="range">範囲距離</param>
 /// <returns>範囲内にいる敵リスト</returns>
-std::vector<BattleEnemy*> BattleEnemyManager::GetEnemiesInRange(const Vector3& center, float range) {
-	std::vector<BattleEnemy*> result;
+std::vector<BattleEnemyBase*> BattleEnemyManager::GetEnemiesInRange(const Vector3& center, float range) {
+	std::vector<BattleEnemyBase*> result;
 
 	for (auto& enemy : battleEnemies_) {
 		if (enemy && enemy->IsAlive()) {
@@ -524,8 +552,8 @@ std::vector<BattleEnemy*> BattleEnemyManager::GetEnemiesInRange(const Vector3& c
 /// </summary>
 /// <param name="position">基準位置</param>
 /// <returns>最も近い敵へのポインタ</returns>
-BattleEnemy* BattleEnemyManager::GetNearestEnemy(const Vector3& position) {
-	BattleEnemy* nearest = nullptr;
+BattleEnemyBase* BattleEnemyManager::GetNearestEnemy(const Vector3& position) {
+	BattleEnemyBase* nearest = nullptr;
 	float minDistance = FLT_MAX;
 
 	for (auto& enemy : battleEnemies_) {
@@ -545,7 +573,7 @@ BattleEnemy* BattleEnemyManager::GetNearestEnemy(const Vector3& position) {
 /// </summary>
 /// <param name="id">敵ID</param>
 /// <returns>該当する敵へのポインタ（見つからない場合nullptr）</returns>
-BattleEnemy* BattleEnemyManager::GetEnemyById(const std::string& id) {
+BattleEnemyBase* BattleEnemyManager::GetEnemyById(const std::string& id) {
 	for (auto& enemy : battleEnemies_) {
 		if (enemy && enemy->GetEnemyData().enemyId == id) {
 			return enemy.get();
@@ -560,7 +588,7 @@ BattleEnemy* BattleEnemyManager::GetEnemyById(const std::string& id) {
 /// <returns>アクティブな敵数</returns>
 size_t BattleEnemyManager::GetActiveEnemyCount() const {
 	return std::count_if(battleEnemies_.begin(), battleEnemies_.end(),
-		[](const std::unique_ptr<BattleEnemy>& enemy) {
+		[](const std::unique_ptr<BattleEnemyBase>& enemy) {
 			return enemy && enemy->IsAlive();
 		});
 }
@@ -722,6 +750,7 @@ bool BattleEnemyManager::SaveEnemyData(const std::string& filePath) const {
 
 		json enemyJson = {
 			{"enemyId", data.enemyId},
+			{"archetype", BattleEnemyArchetypeToString(data.archetype)},
 			{"modelPath", data.modelPath},
 			{"level", data.level},
 			{"hp", data.hp}, // ベースHPを保存
@@ -931,6 +960,8 @@ bool BattleEnemyManager::LoadEnemyData(const std::string& filePath) {
 
 			// JSONの値を取得。存在しない場合はデフォルト値を適用
 			data.modelPath = enemyJson.value("modelPath", "default_enemy.obj");
+			// 書かれていない既存データは雑魚扱い（従来どおり）
+			data.archetype = BattleEnemyArchetypeFromString(enemyJson.value("archetype", std::string("normal")));
 			data.level = enemyJson.value("level", 1);
 			data.hp = enemyJson.value("hp", 100);
 			data.attack = enemyJson.value("attack", 15);
@@ -1147,8 +1178,10 @@ void BattleEnemyManager::Draw() {
 	inst->Begin(camera_);
 	for (auto& enemy : battleEnemies_) {
 		if (!enemy || !enemy->GetObject3d()) continue;
-		if (enemy->GetObject3d()->IsDissolveEnabled()) {
-			enemy->Draw();   // ディゾルブは個別描画（Draw 内で ApplyDeathFade も走る）
+		// ディゾルブ中と骨格アニメ付き（ボス）は個別描画。
+		// 骨格アニメの敵は個体ごとに姿勢が違うので、まとめ描きに乗せられない。
+		if (enemy->GetObject3d()->IsDissolveEnabled() || !enemy->UsesInstancedDraw()) {
+			enemy->Draw();   // 個別描画（Draw 内で ApplyDeathFade も走る）
 		} else {
 			enemy->ApplyDeathFade();   // 旧 Draw と同じ発火条件で色を更新（Submit が読む）
 			inst->Submit(*enemy->GetObject3d(), enemy->GetVisualWT());
@@ -1177,7 +1210,7 @@ void BattleEnemyManager::DrawShadow()
 	inst->Begin();
 	for (auto& enemy : battleEnemies_) {
 		if (!enemy || !enemy->GetObject3d()) continue;
-		if (enemy->GetObject3d()->IsDissolveEnabled()) {
+		if (enemy->GetObject3d()->IsDissolveEnabled() || !enemy->UsesInstancedDraw()) {
 			enemy->DrawShadow();
 		} else {
 			inst->Submit(*enemy->GetObject3d(), enemy->GetVisualWT());

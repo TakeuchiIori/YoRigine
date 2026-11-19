@@ -63,6 +63,10 @@ public:
   void SetCanRotate(bool canRotate) { canRotate_ = canRotate; }
 
   float GetCurrentRotate() const { return currentRotateY_; }
+  // 外部（演出の自動移動など）が本体の向きを直接変えた後に呼ぶ。
+  // 内部で保持している向きを実際の向きへ合わせ、操作再開時に元の向きへ
+  // 振り戻されるのを防ぐ。
+  void SyncRotateFromOwner();
   Vector3 GetForwardDirection() const;
 
   Vector3 GetVelocity() const { return velocity_; }
@@ -176,8 +180,9 @@ private:
   // ------------------------------------------------------------
   // 入力デバイス管理
   // ------------------------------------------------------------
-  InputType lastInputType_ = InputType::Keyboard; // 直前に使用された入力デバイス（キーボード
-                                                  // or パッド）
+  InputType lastInputType_ =
+      InputType::Keyboard; // 直前に使用された入力デバイス（キーボード
+                           // or パッド）
   float inputSwitchCooldown_ =
       0.0f; // 入力デバイスが頻繁に切り替わるのを防ぐためのクールダウン時間
   std::function<void(InputType)>

@@ -22,6 +22,16 @@ void SubSceneManager::Initialize() {
 void SubSceneManager::Finalize() {
   pendingPayload_ = std::monostate{};
 
+  // 戦闘中やフィールド中に（ポーズ→タイトル等で）メインシーンごと抜けた場合も、
+  // サブシーン切り替え時と同じ退出処理を通す。
+  // BattleScene::OnExit
+  // はボス出現演出の停止・霧の復元・敵の全削除・境界エリアの除去を、
+  // FieldScene::OnExit は敵コライダーの停止・ビーコン非表示を行う。
+  if (currentScene_) {
+    currentScene_->OnExit();
+    currentScene_ = nullptr;
+  }
+
   for (auto &[name, scene] : subScenes_) {
     if (scene) {
       scene->Finalize();

@@ -106,6 +106,159 @@ void BaseEnemy::FacePlayer() {
 }
 
 /*==========================================================================
+骨格アニメーション
+//========================================================================*/
+void BaseEnemy::SetupSkeletalModel(const std::string &modelFile,
+                                   const std::string &initialClip) {
+  if (!obj_)
+    return;
+  obj_->SetModel(modelFile, true, initialClip);
+
+  // スケルトンを持たないモデルを渡された場合は骨格アニメ無しとして扱う
+  YoRigine::Model *model = obj_->GetModel();
+  if (!model || !model->GetSkeleton() || !model->GetMotionSystem()) {
+    motionModelFile_.clear();
+    return;
+  }
+  motionModelFile_ = modelFile;
+  PlayMotion(initialClip, true);
+}
+
+void BaseEnemy::PlayMotion(const std::string &clip, bool loop, float speed) {
+  if (!HasSkeletalMotion() || clip.empty())
+    return;
+
+  // SetChangeMotion
+  // は「同じクリップなら再生モードだけ変える」実装になっている。 その中で時刻が
+  // 0 に戻るので、同じ攻撃を連続で出しても先頭から再生される。
+  obj_->SetChangeMotion(motionModelFile_,
+                        loop ? MotionPlayMode::Loop : MotionPlayMode::Once,
+                        clip);
+  obj_->SetMotionSpeed(speed);
+}
+
+void BaseEnemy::SetMotionTime(float seconds) {
+  if (!HasSkeletalMotion())
+    return;
+  if (auto *motion = obj_->GetModel()->GetMotionSystem()) {
+    motion->SetAnimationTime(seconds);
+    // スクラブ中は Update で時刻を進めないので、姿勢だけ即座に反映する
+    motion->Apply();
+  }
+}
+
+float BaseEnemy::GetCurrentMotionDuration() {
+  if (!HasSkeletalMotion())
+    return 0.0f;
+  auto *motion = obj_->GetModel()->GetMotionSystem();
+  return motion ? motion->GetDuration() : 0.0f;
+}
+
+bool BaseEnemy::GetJointWorldPosition(const std::string &jointName,
+                                      const Vector3 &localOffset,
+                                      Vector3 &out) {
+  if (!HasSkeletalMotion())
+    return false;
+
+  Skeleton *skeleton = obj_->GetModel()->GetSkeleton();
+  auto &jointMap = skeleton->GetJointMap();
+  auto it = jointMap.find(jointName);
+  if (it == jointMap.end())
+    return false;
+
+  // スケルトン空間 → 描画用ワールド。デバッグのボーン描画と同じ合成順なので、
+  // 見えているメッシュの腕と判定の位置がずれない。
+  const Matrix4x4 jointWorld =
+      Multiply(skeleton->GetJoints()[it->second].GetSkeletonSpaceMatrix(),
+               visualWt_.matWorld_);
+
+  // 行ベクトル規約なので 0〜2 行目がジョイントの X/Y/Z 軸、3 行目が位置。
+  // 軸を正規化してから使うことで、モデルの単位やボーンのスケールに関係なく
+  // offset を「メートル」で指定できる。
+  auto axis = [&](int row) {
+    Vector3 a{jointWorld.m[row][0], jointWorld.m[row][1], jointWorld.m[row][2]};
+    const float len = Length(a);
+    return len > 1e-6f ? a / len : Vector3{};
+  };
+  out = Vector3{jointWorld.m[3][0], jointWorld.m[3][1], jointWorld.m[3][2]} +
+        axis(0) * localOffset.x + axis(1) * localOffset.y +
+        axis(2) * localOffset.z;
+  return true;
+}
+
+/*==========================================================================
+ルートモーション
+//========================================================================*/
+void BaseEnemy::SetRootMotionEnabled(bool enabled) {
+  // 有効にした瞬間の腰のずれを「ここから先の差分の起点」にする。
+  // これが無いと、直前の待機モーションのずれまで移動として拾ってしまう。
+  if (enabled && !rootMotionEnabled_) {
+    rootMotionResetLast_ = true;
+  }
+  rootMotionEnabled_ = enabled;
+}
+
+Vector3 BaseEnemy::ConsumeRootMotion() {
+  if (!HasSkeletalMotion() || rootMotionJoint_.empty())
+    return {};
+
+  YoRigine::Model *model = obj_->GetModel();
+  Skeleton *skeleton = model->GetSkeleton();
+  MotionSystem *motion = model->GetMotionSystem();
+  auto it = skeleton->GetJointMap().find(rootMotionJoint_);
+  if (it == skeleton->GetJointMap().end())
+    return {};
+
+  // 再生し終わったクリップは Apply
+  // されず、前フレームに固定した姿勢のまま残っている。
+  // ここで差分を取ると「固定位置－前回のずれ」で逆走してしまうので何もしない。
+  if (motion->IsFinished())
+    return {};
+
+  std::vector<Joint> &joints = skeleton->GetJoints();
+  Joint &root = joints[it->second];
+  QuaternionTransform pose = root.GetTransform();
+
+  // 最初に見た腰の位置を固定先にする（モデル読み込み直後の待機ポーズ）
+  if (!rootMotionAnchorSet_) {
+    rootMotionAnchor_ = pose.translate;
+    rootMotionAnchorSet_ = true;
+  }
+
+  // アニメが置こうとした位置（スケルトン空間）
+  const Vector3 sampled = Joint::ExtractJointPosition(root);
+
+  // 腰を基準の水平位置へ戻して、スケルトンとスキンを組み直す
+  pose.translate.x = rootMotionAnchor_.x;
+  pose.translate.z = rootMotionAnchor_.z;
+  root.SetTransform(pose);
+  skeleton->Update();
+  if (SkinCluster *skin = model->GetSkinCluster()) {
+    skin->UpdateMatrixPalette(joints);
+  }
+
+  // 固定後の位置との差が「基準からのずれ」。スケルトン空間で比べるので、
+  // 親ボーンのスケールやモデルの単位（cm/m）に左右されない。
+  Vector3 offset = sampled - Joint::ExtractJointPosition(root);
+  offset.y = 0.0f;
+
+  Vector3 step{};
+  if (rootMotionEnabled_) {
+    if (rootMotionResetLast_) {
+      rootMotionLastOffset_ = offset;
+      rootMotionResetLast_ = false;
+    }
+    step = offset - rootMotionLastOffset_;
+  }
+  rootMotionLastOffset_ = offset;
+
+  // スケルトン空間の移動量を、ジョイント座標と同じ変換でワールドへ
+  Vector3 worldStep = TransformNormal(step, visualWt_.matWorld_);
+  worldStep.y = 0.0f;
+  return worldStep;
+}
+
+/*==========================================================================
 ノックバック
 //========================================================================*/
 void BaseEnemy::StartKnockback(const Vector3 &direction, float power,

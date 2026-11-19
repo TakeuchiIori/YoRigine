@@ -20,7 +20,7 @@ EnemyAttack *EnemyAttackEditor::GetSelectedAttack() {
 // ============================================================
 // プレビュー対象の敵
 // ============================================================
-BattleEnemy *EnemyAttackEditor::GetPreviewEnemy() const {
+BattleEnemyBase *EnemyAttackEditor::GetPreviewEnemy() const {
 	if (!manager_) return nullptr;
 
 	auto enemies = manager_->GetActiveBattleEnemies();
@@ -41,7 +41,7 @@ void EnemyAttackEditor::StopPreview() {
 
 	if (previewTarget_) {
 		auto enemies = manager_ ? manager_->GetActiveBattleEnemies()
-		                        : std::vector<BattleEnemy *>{};
+		                        : std::vector<BattleEnemyBase *>{};
 		const bool stillAlive =
 			std::find(enemies.begin(), enemies.end(), previewTarget_) != enemies.end();
 
@@ -155,6 +155,30 @@ void EnemyAttackEditor::DrawBasicSettings(EnemyAttack &attack) {
 		ImGui::TextDisabled("攻撃経路エディタで作った経路の名前を指定します");
 	}
 
+	// 骨格アニメ。スケルトンを持つ敵（ボス）だけが再生する
+	ImGui::SeparatorText("骨格アニメ（ボス用）");
+	char clipBuffer[64];
+	std::snprintf(clipBuffer, sizeof(clipBuffer), "%s", attack.animation.clip.c_str());
+	if (ImGui::InputText("クリップ名", clipBuffer, sizeof(clipBuffer))) {
+		attack.animation.clip = clipBuffer;
+	}
+	ImGui::DragFloat("再生速度", &attack.animation.speed, 0.01f, 0.1f, 5.0f, "%.2f倍");
+	if (attack.animation.HasClip()) {
+		ImGui::TextDisabled("クリップを指定した技は、スケルトンの無い雑魚敵の抽選には出ません");
+
+		// クリップの長さはモデルから読むので、ボスでプレビュー中にだけ分かる
+		const float clipDuration = previewPlaying_ ? preview_.GetClipPlayDuration() : 0.0f;
+		if (clipDuration > 0.0f) {
+			char label[64];
+			std::snprintf(label, sizeof(label), "攻撃時間をクリップに合わせる (%.2f秒)", clipDuration);
+			if (ImGui::Button(label)) {
+				attack.duration = clipDuration;
+			}
+		} else {
+			ImGui::TextDisabled("ボスでプレビューすると、攻撃時間をクリップ長に合わせられます");
+		}
+	}
+
 	if (!attack.HasHitbox()) {
 		ImGui::TextColored({1.0f, 0.5f, 0.4f, 1.0f}, "攻撃判定がありません（当たりません）");
 	}
@@ -166,7 +190,7 @@ void EnemyAttackEditor::DrawBasicSettings(EnemyAttack &attack) {
 void EnemyAttackEditor::DrawPreviewControls(EnemyAttack &attack) {
 	ImGui::SeparatorText("プレビュー");
 
-	BattleEnemy *enemy = GetPreviewEnemy();
+	BattleEnemyBase *enemy = GetPreviewEnemy();
 	if (!enemy) {
 		ImGui::TextDisabled("戦闘中の敵がいません。バトルを開始してください");
 		previewPlaying_ = false;
@@ -184,6 +208,8 @@ void EnemyAttackEditor::DrawPreviewControls(EnemyAttack &attack) {
 	// 再生／停止
 	if (!previewPlaying_) {
 		if (ImGui::Button("再生")) {
+			// ゲームを止めたまま見たいので、アニメの時刻もプレビュー側で進める
+			preview_.SetDriveMotionClock(true);
 			preview_.Play(*enemy, &attack);
 			previewPlaying_ = true;
 			previewTarget_ = enemy;

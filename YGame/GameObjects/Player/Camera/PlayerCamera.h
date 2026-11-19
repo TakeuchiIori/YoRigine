@@ -111,6 +111,44 @@ public:
   void FaceDefeatNextEnemy(const Vector3 &enemyWorldPos);
 
   // ============================================================
+  // ボス戦フレーミング
+  //   等身大の敵向けのカメラ（距離・見下ろし・足元基準の注視）のままだと、
+  //   巨大なボスは脚しか映らない。BattleScene が毎フレーム生存中のボスの
+  //   「胸の位置・身長・本体コライダー」を渡し、次の3つを上乗せする。
+  //     ・身長に応じてカメラを引く（FollowCamera の距離倍率）
+  //     ・視線をボスの胸へ少し持ち上げる（ボスが前方にいる時だけ）
+  //     ・ボスにロックオンした時は足元ではなく胸を狙い、見下ろしを浅くする
+  //   ボスがいなくなれば滑らかに通常のカメラへ戻る。
+  // ============================================================
+  void SetBossFraming(const Vector3 &focus, float height,
+                      const BaseCollider *bossCollider);
+  void ClearBossFraming() { hasBoss_ = false; }
+
+  // ============================================================
+  // 演出注視（ボス出現など）
+  //   有効な間はスティック・バンパー・ロックオンの入力を受け付けず、
+  //   「プレイヤー越しに注視点を画面中央へ捉える」構図にカメラを固定する。
+  //     ・カメラ位置 … player→注視点 の軸から shoulderYaw だけ横へずらした背後
+  //                    （真後ろだとプレイヤーの背中が注視点を隠す）
+  //     ・カメラ向き … 注視点へ向ける（lookWeight=1 で画面中央に固定）
+  //   注視点は演出側が毎フレーム更新してよい（内部で滑らかに追う）。
+  // ============================================================
+  struct CinematicFocusParams {
+    float shoulderYaw = 0.30f; // 軸からのずらし角(rad)。符号で左右の肩を選ぶ
+    float pitch = 0.05f; // カメラの見下ろし角(rad)。小さいほど低い位置から煽る
+    float lookWeight = 1.0f; // 注視点へ向ける強さ(0〜1)
+    float blendSpeed = 3.0f; // 構図へ寄っていく速さ（入り・抜け）
+    float focusSmooth =
+        4.0f; // 注視点の追従の速さ（生成の瞬間などの飛びを均す）
+  };
+  void BeginCinematicFocus(const Vector3 &focus,
+                           const CinematicFocusParams &params);
+  void SetCinematicFocusPoint(const Vector3 &focus) { cinematicFocus_ = focus; }
+  // 操作を返す。構図はその場で切らず、blendSpeed で滑らかに通常へ戻す
+  void EndCinematicFocus() { cinematicFocusActive_ = false; }
+  bool IsCinematicFocusActive() const { return cinematicFocusActive_; }
+
+  // ============================================================
   // 見切れヒット演出
   // 画面外（フレーム外）の敵に攻撃がヒットした瞬間に呼ぶ。敵が画角外なら
   // 「決めカメラ」（背後リセンター＋ズーム寄り＋シェイク）を1回だけ発火し、
@@ -252,6 +290,23 @@ private:
   Vector3 PlayerPivotWorld() const;
   void ApplyLookAt(YoRigine::Camera *sceneCamera, LookAtTarget target,
                    float weight) const;
+  // 任意のワールド座標へ weight だけ向ける（ApplyLookAt の本体）
+  void ApplyLookAtPos(YoRigine::Camera *sceneCamera, const Vector3 &lookPos,
+                      float weight, bool pitchOnly = false) const;
+
+  // 演出注視（内部）
+  void UpdateCinematicFocus();                             // pre-director
+  void ApplyCinematicFocus(YoRigine::Camera *sceneCamera); // post-director
+
+  // ボス戦フレーミング（内部）
+  void UpdateBossFraming(float dt); // pre-director
+  void ApplyBossFraming(YoRigine::Camera *sceneCamera,
+                        float dt); // post-director
+  bool IsLockedOnBoss() const {
+    return isLockOn_ && lockedTarget_ && lockedTarget_ == bossCollider_;
+  }
+  void SaveBossFraming(nlohmann::json &j) const;
+  void LoadBossFraming(const nlohmann::json &j);
 
   // ============================================================
   // メンバ
@@ -303,6 +358,33 @@ private:
   // カメラ操作フィール（右スティック）。dt 基準・アナログ・カーブ・加速。
   //   extension JSON("cameraFeel") に永続化し、追従カメラ設定パネルで調整可能。
   // ============================================================
+  // ---- ボス戦フレーミング ----
+  bool bossFramingEnabled_ = true;
+  bool hasBoss_ = false;        // 今ボスの情報が渡されているか
+  Vector3 bossFocus_{};         // ボスの胸（BattleScene から毎フレーム）
+  Vector3 smoothedBossFocus_{}; // アニメの揺れを均した注視点
+  float bossHeight_ = 0.0f;     // ボスの身長（足元→頭）
+  const BaseCollider *bossCollider_ =
+      nullptr;             // ロックオン対象の照合用（非所有）
+  float bossBlend_ = 0.0f; // 0→1 で効き始め／終わりを滑らかに
+  // 調整値（extension JSON "bossFraming" に永続化）
+  float bossRefHeight_ = 2.5f; // これより背が低ければ引かない（等身大の敵）
+  float bossDistancePerMeter_ = 0.10f; // 身長 1m 超過あたりの距離倍率の増分
+  float bossMaxDistanceMul_ = 2.2f;    // 距離倍率の上限
+  float bossLookUpWeight_ = 0.45f;     // 視線をボスの胸へ持ち上げる割合（0〜1）
+  float bossLookUpYawLimit_ =
+      1.2f; // ボスがこの角度(rad)以内に見えている時だけ持ち上げる
+  float bossLockOnPitchBias_ = 0.02f; // ボスにロックオン中の見下ろし加算(rad)
+  float bossFocusSmooth_ = 6.0f;      // 注視点の追従の速さ
+  float bossBlendSpeed_ = 2.5f;       // 効き始め／終わりの速さ
+
+  // ---- 演出注視 ----
+  bool cinematicFocusActive_ = false; // 演出が注視を要求しているか
+  float cinematicBlend_ = 0.0f;       // 0→1 で構図へ寄る／1→0 で通常へ戻る
+  Vector3 cinematicFocus_{};          // 演出から渡される注視点
+  Vector3 smoothedCinematicFocus_{};  // 飛びを均した注視点
+  CinematicFocusParams cinematicParams_{};
+
   float camYawSpeed_ = 3.2f;   // ヨー最大角速度(rad/s)
   float camPitchSpeed_ = 2.4f; // ピッチ最大角速度(rad/s)
 

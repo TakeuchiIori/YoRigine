@@ -36,6 +36,17 @@ void AttackPlayer::Play(BaseEnemy &enemy, const EnemyAttack *attack) {
 
   instantFired_.assign(attack ? attack->modifiers.size() : 0, false);
 
+  // 骨格アニメ。時刻の基準はあくまで time_ で、アニメは同じ dt で並走させる。
+  // 両方とも GameTime の dt で進むので、ヒットストップ中も揃って止まる。
+  playedClip_ = false;
+  clipPlayDuration_ = 0.0f;
+  if (attack && attack->animation.HasClip() && enemy.HasSkeletalMotion()) {
+    const float speed = std::max(0.01f, attack->animation.speed);
+    enemy.PlayMotion(attack->animation.clip, false, speed);
+    playedClip_ = true;
+    clipPlayDuration_ = enemy.GetCurrentMotionDuration() / speed;
+  }
+
   if (playing_) {
     ApplyPose(enemy);
   }
@@ -51,6 +62,7 @@ void AttackPlayer::Stop(BaseEnemy &enemy) {
   enemy.SetTranslate(basePosition_);
   enemy.SetRotate(baseRotation_);
   enemy.SetScale(baseScale_);
+  playedClip_ = false;
 
   playing_ = false;
   finished_ = false;
@@ -67,6 +79,7 @@ void AttackPlayer::StopKeepPosition(BaseEnemy &enemy) {
 
   enemy.SetRotate(baseRotation_);
   enemy.SetScale(baseScale_);
+  playedClip_ = false;
 
   playing_ = false;
   finished_ = false;
@@ -97,6 +110,10 @@ void AttackPlayer::Update(BaseEnemy &enemy, float deltaTime) {
 
   ApplyPose(enemy);
 
+  if (driveMotionClock_ && playedClip_) {
+    enemy.SetMotionTime(time_ * std::max(0.01f, attack_->animation.speed));
+  }
+
   if (time_ >= attack_->duration) {
     time_ = attack_->duration;
     finished_ = true;
@@ -117,6 +134,11 @@ void AttackPlayer::Seek(BaseEnemy &enemy, float time) {
   homingOffset_ = {};
   instantFired_.assign(attack_->modifiers.size(), false);
   finished_ = (time_ >= attack_->duration);
+
+  // アニメも同じ時刻へ。スクラブでボスの腕の位置と判定区間を見比べられる。
+  if (playedClip_) {
+    enemy.SetMotionTime(time_ * std::max(0.01f, attack_->animation.speed));
+  }
 
   ApplyPose(enemy);
 }
@@ -287,12 +309,25 @@ int AttackPlayer::GetActiveDamageWindow() const {
     return -1;
 
   for (const auto &modifier : attack_->modifiers) {
-    if (modifier.type != AttackModifierType::Hitbox)
+    if (modifier.type != AttackModifierType::Hitbox || modifier.IsJointHitbox())
       continue;
     if (modifier.IsActiveAt(time_))
       return modifier.damageWindow;
   }
   return -1;
+}
+
+void AttackPlayer::CollectActiveHitboxes(
+    std::vector<const AttackModifier *> &out) const {
+  out.clear();
+  if (!playing_ || !attack_)
+    return;
+
+  for (const auto &modifier : attack_->modifiers) {
+    if (modifier.type == AttackModifierType::Hitbox &&
+        modifier.IsActiveAt(time_))
+      out.push_back(&modifier);
+  }
 }
 
 bool AttackPlayer::IsInvincibleNow() const {
@@ -303,6 +338,18 @@ bool AttackPlayer::IsInvincibleNow() const {
     if (modifier.type != AttackModifierType::Invincible)
       continue;
     if (modifier.IsActiveAt(time_))
+      return true;
+  }
+  return false;
+}
+
+bool AttackPlayer::IsSuperArmorNow() const {
+  if (!playing_ || !attack_)
+    return false;
+
+  for (const auto &modifier : attack_->modifiers) {
+    if (modifier.type == AttackModifierType::SuperArmor &&
+        modifier.IsActiveAt(time_))
       return true;
   }
   return false;

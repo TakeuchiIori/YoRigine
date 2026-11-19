@@ -1,7 +1,6 @@
 #pragma once
-#include "../BaseEnemy.h"
 #include "../IEnemyState.h"
-#include "BattleEnemyData.h"
+#include "BattleEnemyBase.h"
 #include "UI/HealthBar/EnemyHealthBarUI.h"
 
 #include <cmath>
@@ -13,7 +12,7 @@
 class Player;
 
 ///************************* 戦闘用の敵クラス *************************///
-class BattleEnemy : public BaseEnemy {
+class BattleEnemy : public BattleEnemyBase {
 public:
   ///************************* 基本関数 *************************///
 
@@ -25,7 +24,7 @@ public:
 
   // 戦闘データをもとに初期化（scale はフィールド敵から引き継ぐ見た目スケール）
   void InitializeBattleData(const BattleEnemyData &data, Vector3 position,
-                            const Vector3 &scale = Vector3(1.0f, 1.0f, 1.0f));
+                            const Vector3 &scale) override;
 
   // 当たり判定初期化
   void InitCollision() override;
@@ -40,13 +39,13 @@ public:
   void Draw() override;
 
   // プレイヤー敗北時の半透明フェード色更新（インスタンシング描画から呼ぶ）
-  void ApplyDeathFade();
+  void ApplyDeathFade() override;
 
   // UI描画
-  void DrawUI();
+  void DrawUI() override;
 
   // 影の処理
-  void DrawShadow();
+  void DrawShadow() override;
 
   // 当たり判定の可視化描画
   void DrawCollision() override;
@@ -88,7 +87,7 @@ public:
   }
 
   // 現在の状態名（デバッグ表示用）
-  const char *GetStateName() const {
+  const char *GetStateName() const override {
     return currentState_ ? currentState_->GetName() : "None";
   }
 
@@ -111,10 +110,6 @@ public:
   float GetTimeInCurrentState() const { return timeInCurrentState_; }
 
   ///************************* アクセッサ *************************///
-
-  // 敵データを取得
-  const BattleEnemyData &GetEnemyData() const { return enemyData_; }
-  BattleEnemyData &GetEnemyData() { return enemyData_; }
 
   // 死亡演出（ディゾルブ）パラメータ
   float GetDissolveDuration() const { return dissolveDuration_; }
@@ -143,9 +138,6 @@ private:
 
   // 論理状態
   BattleEnemyState logicalState_ = BattleEnemyState::Idle;
-
-  // 戦闘データ
-  BattleEnemyData enemyData_;
 
   // 同じ攻撃判定時間で二重にダメージを与えないための記録
   int lastDealtContactDamageWindow_ = -1;

@@ -21,6 +21,7 @@ enum class AttackModifierType {
   Hitbox,         // 接触ダメージを発生させる区間
   Invincible,     // 無敵になる区間
   EmitProjectile, // 弾を撃つ
+  SuperArmor,     // 被弾しても怯まない区間（HPは減る）
 };
 
 const char *AttackModifierTypeToString(AttackModifierType type);
@@ -50,6 +51,18 @@ struct AttackModifier {
   // ── Hitbox ──
   // 同じ番号の間は1回しか命中しない。多段攻撃は段ごとに変える。
   int damageWindow = 0;
+
+  // 判定をどこに置くか。
+  //   joint が空 … 本体の当たり判定で接触ダメージ（従来の雑魚敵の動作）
+  //   joint 指定 … そのジョイントに追従する球。腕や武器で殴るボス用
+  std::string joint;
+  float radius = 0.8f;           // ジョイント判定の球の半径（メートル）
+  Vector3 jointOffset{};         // ジョイントの向き基準のずらし量（剣先など）
+  float damageMultiplier = 1.0f; // 敵の攻撃力に掛ける倍率。大技を重くする
+
+  bool IsJointHitbox() const {
+    return type == AttackModifierType::Hitbox && !joint.empty();
+  }
 
   // ── EmitProjectile ──
   std::string projectileId;         // 撃つ弾の定義ID

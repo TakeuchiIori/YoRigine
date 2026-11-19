@@ -48,11 +48,36 @@ public:
   // 任意の時刻へ飛ばす（エディタのスクラブ用）
   void Seek(BaseEnemy &enemy, float time);
 
-  // 今このフレームで有効な攻撃判定の番号（無ければ -1）
+  // 今このフレームで有効な「本体の」攻撃判定の番号（無ければ -1）。
+  // ジョイント判定は含めない。雑魚敵の接触ダメージはこちらだけを見る。
   int GetActiveDamageWindow() const;
+
+  // 今このフレームで有効な攻撃判定を、本体・ジョイントの区別なく out へ集める。
+  // ボスはどちらも「球」として自前で重なりを調べるので、こちらを使う。
+  void
+  CollectActiveHitboxes(std::vector<const AttackModifier *> &out) const;
+
+  /// <summary>
+  /// true にすると Update のたびにアニメの時刻を time_ へ合わせ込む。
+  /// エディタのプレビューはゲームを止めたまま再生するので、
+  /// アニメ側が自力で進まない。そのためプレビューだけこれを使う。
+  /// </summary>
+  void SetDriveMotionClock(bool value) { driveMotionClock_ = value; }
+
+  // 外から足し込む移動量（ボスのルートモーションなど）。
+  // 位置は毎フレーム「基準位置＋カーブ」で書き直されるので、
+  // 追尾と同じ積み上げに入れておかないと次のフレームで消えてしまう。
+  void AddWorldOffset(const Vector3 &delta) { homingOffset_ += delta; }
 
   // 今無敵か
   bool IsInvincibleNow() const;
+
+  // 今スーパーアーマー（怯まない）区間か
+  bool IsSuperArmorNow() const;
+
+  // 再生中クリップの長さ÷再生速度（秒）。クリップが無ければ 0。
+  // エディタの「攻撃時間をクリップに合わせる」に使う。
+  float GetClipPlayDuration() const { return clipPlayDuration_; }
 
 private:
   // 現在時刻の姿勢を計算して敵へ書き込む
@@ -85,4 +110,9 @@ private:
 
   // 発火済みの瞬間モディファイア（添字）。同じ弾を毎フレーム撃たないため。
   std::vector<bool> instantFired_;
+
+  // 骨格アニメを再生したか。止めるときに待機モーションへ戻す必要があるかの判定
+  bool playedClip_ = false;
+  float clipPlayDuration_ = 0.0f;
+  bool driveMotionClock_ = false;
 };

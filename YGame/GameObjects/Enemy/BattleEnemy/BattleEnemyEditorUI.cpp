@@ -149,7 +149,7 @@ void DrawStateMonitor(BattleEnemy& enemy)
 /// この敵が今プレイヤーをどう見ているかの実況表示。
 /// 知覚が実際に働いているかを目視で確認するために使う。
 /// </summary>
-void DrawPerceptionMonitor(const BattleEnemy& enemy)
+void DrawPerceptionMonitor(const BattleEnemyBase& enemy)
 {
 	const PerceptionParams& perception = enemy.GetEnemyData().perception;
 	const EnemyAIContext ctx = EnemyAIContext::Capture(enemy, perception.facingHalfAngleDeg);
@@ -466,6 +466,13 @@ void BattleEnemyEditorUI::Draw(BattleEnemyManager& manager)
 
 			if (ImGui::TreeNode(data.enemyId.c_str())) {
 
+				// 生成するクラス。次に生成した個体から反映される（生成中の個体の型は変わらない）
+				int archetype = static_cast<int>(data.archetype);
+				const char* archetypeNames[] = { "雑魚 (BattleEnemy)", "ボス (BossEnemy)" };
+				if (ImGui::Combo("種類", &archetype, archetypeNames, IM_ARRAYSIZE(archetypeNames))) {
+					data.archetype = static_cast<BattleEnemyArchetype>(archetype);
+				}
+
 				ImGui::DragInt("HP", &data.hp, 1, 1, 9999);
 				ImGui::DragInt("攻撃力", &data.attack, 1, 1, 999);
 				ImGui::DragInt("防御力", &data.defense, 1, 1, 999);
@@ -749,8 +756,13 @@ void BattleEnemyEditorUI::Draw(BattleEnemyManager& manager)
 					ImGui::DragFloat("追跡状態に入る距離 (Current)", &enemyData.approachStateRange, 0.1f, 0.0f, 100.0f);
 
 					// 状態モニタ（遷移が実際に起きているかの確認用）
-					if (ImGui::CollapsingHeader("状態モニタ (遷移ログ)", ImGuiTreeNodeFlags_DefaultOpen)) {
-						DrawStateMonitor(*enemy);
+					// 遷移ログは雑魚敵(BattleEnemy)だけが持つ。ボスには出さない
+					if (auto* normal = dynamic_cast<BattleEnemy*>(enemy.get())) {
+						if (ImGui::CollapsingHeader("状態モニタ (遷移ログ)", ImGuiTreeNodeFlags_DefaultOpen)) {
+							DrawStateMonitor(*normal);
+						}
+					} else {
+						ImGui::Text("状態: %s", enemy->GetStateName());
 					}
 
 					// 今この敵がプレイヤーをどう見ているか（読み取り専用）

@@ -107,7 +107,13 @@ void ClearScene::Finalize() {
 /// 更新処理
 /// </summary>
 void ClearScene::Update() {
-  if (YoRigine::Input::GetInstance()->IsPadPressed(0, GamePadButton::A)) {
+  // A ボタン / スペースでタイトルへ戻る。
+  // 押しっぱなし判定(IsPadPressed)だと、戦闘中から A を押し続けていた場合に
+  // クリア画面を一瞬で飛ばしてしまうので「押した瞬間」で判定する。
+  // キーボードでもタイトルへ戻れるよう、Title と同じスペースキーも受け付ける。
+  auto *input = YoRigine::Input::GetInstance();
+  if (input->IsPadTriggered(0, GamePadButton::A) ||
+      input->TriggerKey(DIK_SPACE)) {
     sceneManager_->ChangeScene(SceneId::Title);
   }
   cameraRig_.Update();

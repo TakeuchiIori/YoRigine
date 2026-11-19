@@ -152,10 +152,36 @@ void GameScene::Initialize() {
   // RequestFieldTransition(returnData) を呼ぶので、ここでは何もしない。
   auto battleScene = std::make_unique<BattleScene>();
   battleScene->Initialize(sceneCamera, player_.get());
-  subSceneManager_->RegisterSubScene(SubSceneId::Battle, std::move(battleScene));
+  subSceneManager_->RegisterSubScene(SubSceneId::Battle,
+                                     std::move(battleScene));
 
   // 初期サブシーンをフィールドに設定
   subSceneManager_->SwitchToScene(SubSceneId::Field);
+
+#ifdef _DEBUG
+  // 【一時的な確認用】環境変数 YORIGINE_DEBUG_BATTLE に敵IDを入れて起動すると、
+  // フィールドを歩かずにその敵とのバトルへ直接入る。
+  // YORIGINE_DEBUG_FINAL を付けると最終戦として扱う（ボス出現演出の確認用）。
+  {
+    char *debugEnemyId = nullptr;
+    size_t length = 0;
+    if (_dupenv_s(&debugEnemyId, &length, "YORIGINE_DEBUG_BATTLE") == 0 &&
+        debugEnemyId) {
+      BattleTransitionData debugBattle;
+      debugBattle.enemyGroup = "DebugBattle";
+      debugBattle.battleEnemyId = debugEnemyId;
+      char *debugFinal = nullptr;
+      size_t finalLength = 0;
+      if (_dupenv_s(&debugFinal, &finalLength, "YORIGINE_DEBUG_FINAL") == 0 &&
+          debugFinal) {
+        debugBattle.isFinalBattle = true;
+        free(debugFinal);
+      }
+      subSceneManager_->SwitchToScene(SubSceneId::Battle, debugBattle);
+      free(debugEnemyId);
+    }
+  }
+#endif
 
   //------------------------------------------------------------
   // エディター用GUI登録
@@ -180,7 +206,8 @@ void GameScene::Initialize() {
 
   cameraRig_.RegisterEditorPanels(SceneId::Game, "ゲームプレイ");
   Editor::GetInstance()->RegisterGameUI(
-      "プレイヤーの状態情報", [this]() { player_->DrawImGui(); }, SceneId::Game, "ゲームプレイ");
+      "プレイヤーの状態情報", [this]() { player_->DrawImGui(); }, SceneId::Game,
+      "ゲームプレイ");
   Editor::GetInstance()->RegisterGameUI(
       "プレイヤーカメラ",
       [this]() {
@@ -208,7 +235,8 @@ void GameScene::Initialize() {
       SceneId::Game, "ゲームプレイ");
   Editor::GetInstance()->RegisterGameUI(
       "YoRigine:パーティクルエディター",
-      [this]() { YParticleEditor::GetInstance().ShowEditorWindow(); }, SceneId::Game, "ゲームプレイ");
+      [this]() { YParticleEditor::GetInstance().ShowEditorWindow(); },
+      SceneId::Game, "ゲームプレイ");
 #endif
 
   //------------------------------------------------------------
@@ -316,7 +344,8 @@ void GameScene::Update() {
     // （カメラが敵方向へ回り込むのに合わせて照準が敵へ寄っていく）
     if (lockFlashActive_) {
       auto proj = Coordinate::WorldToScreen(
-          lockFlashWorldPos_, cameraRig_.GetCamera()->GetViewProjectionMatrix());
+          lockFlashWorldPos_,
+          cameraRig_.GetCamera()->GetViewProjectionMatrix());
       if (proj.has_value()) {
         gameUI_->SetLockOnFlashPos(proj->screenPos);
       }
@@ -521,4 +550,9 @@ void GameScene::Finalize() {
   if (subSceneManager_)
     subSceneManager_->Finalize();
   subSceneManager_ = nullptr;
+
+  // エリア(境界)と制限対象(プレイヤーの WorldTransform)はこのシーンの寿命。
+  // 次に Game へ入るまで残すと、他シーン(Develop の AreaManager 描画など)から
+  // 破棄済みのプレイヤーを参照してしまうため、ここで空にする。
+  AreaManager::GetInstance()->Initialize();
 }

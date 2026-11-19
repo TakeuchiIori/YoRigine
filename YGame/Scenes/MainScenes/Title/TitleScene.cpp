@@ -104,7 +104,9 @@ void TitleScene::Update() {
   cameraRig_.Update();
 
   // スペースまたはAボタンでゲームシーンへ遷移
-  if (YoRigine::Input::GetInstance()->PushKey(DIK_SPACE) ||
+  // 押しっぱなし(PushKey)だと、クリア画面からスペースで戻った直後に
+  // 押し続けているだけでゲームが始まってしまうので「押した瞬間」で判定する
+  if (YoRigine::Input::GetInstance()->TriggerKey(DIK_SPACE) ||
       YoRigine::Input::GetInstance()->IsPadTriggered(0, GamePadButton::A)) {
     sceneManager_->ChangeScene(SceneId::Game);
   }

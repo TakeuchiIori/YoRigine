@@ -209,6 +209,13 @@ void Player::Update() {
 		return;
 	}
 
+	// 演出用の自動移動中は、入力・戦闘ステートを通さずに歩かせるだけにする。
+	// 演出(Cinematic)の再生中でも動かしたいので、下の全停止より先に処理する。
+	if (scriptedMove_.active) {
+		UpdateScriptedMove(YoRigine::GameTime::GetDeltaTime());
+		return;
+	}
+
 	// カットシーン演出中はプレイヤー操作・状態更新を全停止
 	if (YoRigine::CinematicManager::GetInstance()->IsActive()) {
 		return;
@@ -757,6 +764,127 @@ void Player::StartGuardPush(const Vector3& direction, float distance, float dura
 // ============================================================
 // ガードで押し込まれる移動の更新
 // ============================================================
+// ============================================================
+// 演出用の自動移動
+// ============================================================
+namespace {
+// 角度差を ±π に収める（359°→1° を -358° ではなく +2° として扱うため）
+float WrapAngle(float a) {
+	constexpr float kPi = 3.14159265358979f;
+	constexpr float kTwoPi = 6.28318530717958f;
+	while (a <= -kPi) a += kTwoPi;
+	while (a > kPi) a -= kTwoPi;
+	return a;
+}
+
+// 現在の向き yaw を、水平方向 dir の向きへ rate*dt の割合だけ近づける
+float TurnTowards(float yaw, const Vector3& dir, float rate, float dt) {
+	if (dir.x * dir.x + dir.z * dir.z < 1e-6f) return yaw;
+	const float targetYaw = std::atan2f(dir.x, dir.z);
+	const float t = std::clamp(rate * dt, 0.0f, 1.0f);
+	return WrapAngle(yaw + WrapAngle(targetYaw - yaw) * t);
+}
+} // namespace
+
+void Player::BeginScriptedMove(const Vector3& target, const Vector3& faceTarget) {
+	// 戦闘中の行動（攻撃の途中・ガード・魔法の詠唱など）を打ち切って待機へ戻す。
+	// 取り巻きを倒した一撃のモーションのまま歩き出さないようにするため。
+	// スタイル（剣／魔法）は変えない。ResetForBattleStart と違い装備はそのまま。
+	if (combat_) combat_->Reset();
+	if (magicController_) magicController_->Reset();
+	if (playerSword_) playerSword_->ResetRuntimeState();
+	if (playerCamera_) playerCamera_->StopAttackCameraWork();
+	guardPushTimer_ = 0.0f;
+
+	// 入力は止める（SetControlEnabled は移動ステートも Idle に落とす）
+	SetControlEnabled(false);
+
+	scriptedMove_.active = true;
+	scriptedMove_.arrived = false;
+	scriptedMove_.target = target;
+	scriptedMove_.faceTarget = faceTarget;
+	// 歩行アニメと移動量が噛み合うよう、操作時と同じ歩行速度を使う（足が滑らない）
+	scriptedMove_.speed = movement_ ? movement_->GetConfig().walkSpeed : 3.0f;
+
+	// 既に目標地点に近ければ歩かず、その場で向きだけ合わせる
+	Vector3 toTarget = target - wt_.translate_;
+	toTarget.y = 0.0f;
+	if (toTarget.Length() < 0.05f) {
+		scriptedMove_.arrived = true;
+	}
+
+	if (obj_) {
+		obj_->SetMotionSpeed(motionSpeed[0]);
+		obj_->SetChangeMotion("Player.gltf", MotionPlayMode::Loop,
+			scriptedMove_.arrived ? "Idle4" : "Walk1");
+	}
+}
+
+void Player::EndScriptedMove() {
+	if (!scriptedMove_.active) return;
+	scriptedMove_ = {};
+
+	// 自動移動で変えた向きを移動コンポーネントへ反映しておく。
+	// これをしないと、操作再開後に最初に動いた瞬間、演出前の向きへ振り戻される。
+	if (movement_) {
+		movement_->ForceStop();
+		movement_->SyncRotateFromOwner();
+	}
+	if (obj_) {
+		obj_->SetMotionSpeed(motionSpeed[0]);
+		obj_->SetChangeMotion("Player.gltf", MotionPlayMode::Loop, "Idle4");
+	}
+}
+
+void Player::UpdateScriptedMove(float deltaTime) {
+	//------------------------------------------------------------
+	// 移動：目標地点まで一定速度で歩き、着いたら止まる
+	//------------------------------------------------------------
+	if (!scriptedMove_.arrived) {
+		Vector3 toTarget = scriptedMove_.target - wt_.translate_;
+		toTarget.y = 0.0f;
+		const float dist = toTarget.Length();
+		const float step = scriptedMove_.speed * deltaTime;
+
+		if (dist <= step || dist < 0.05f) {
+			// 行き過ぎないよう目標地点にぴたりと止める
+			wt_.translate_.x = scriptedMove_.target.x;
+			wt_.translate_.z = scriptedMove_.target.z;
+			scriptedMove_.arrived = true;
+			if (obj_) {
+				obj_->SetMotionSpeed(motionSpeed[0]);
+				obj_->SetChangeMotion("Player.gltf", MotionPlayMode::Loop, "Idle4");
+			}
+		} else {
+			const Vector3 dir = toTarget * (1.0f / dist);
+			wt_.translate_ += dir * step;
+			// 歩いている間は進行方向を向く
+			wt_.rotate_.y = TurnTowards(wt_.rotate_.y, dir, kScriptedTurnSpeed, deltaTime);
+		}
+	}
+
+	//------------------------------------------------------------
+	// 着いた後：向く先（ボスなど）へ体を向ける
+	//------------------------------------------------------------
+	if (scriptedMove_.arrived) {
+		Vector3 toFace = scriptedMove_.faceTarget - wt_.translate_;
+		toFace.y = 0.0f;
+		wt_.rotate_.y = TurnTowards(wt_.rotate_.y, toFace, kScriptedTurnSpeed, deltaTime);
+	}
+
+	//------------------------------------------------------------
+	// 表示の更新（通常の Update の末尾と同じもの。入力・戦闘ステートは進めない）
+	//------------------------------------------------------------
+	UpdateMotionTime();
+	obj_->UpdateAnimation();
+	wt_.UpdateMatrix();
+	playerSword_->Update();
+	playerShield_->Update();
+	obbCollider_->Update();
+	obbCollider_->SetVelocity(Vector3{});
+	healthUI_->Update();
+}
+
 void Player::UpdateGuardPush(float deltaTime) {
 	if (guardPushTimer_ <= 0.0f) return;
 

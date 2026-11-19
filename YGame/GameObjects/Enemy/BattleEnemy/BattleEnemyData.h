@@ -240,9 +240,28 @@ struct EnemyAttackParams {
   CounterAttackParams counter;
 };
 
+///************************* 敵の種類 *************************///
+// バトルで生成するクラスを決める。配置（エンカウント・フォーメーション）は
+// 種類に関係なく同じ仕組みを通り、生成の瞬間だけここで分岐する。
+enum class BattleEnemyArchetype {
+  Normal, // 体全体をカーブで動かす雑魚敵（BattleEnemy）
+  Boss,   // 骨格アニメで攻撃するボス（BossEnemy）
+};
+
+inline const char *BattleEnemyArchetypeToString(BattleEnemyArchetype type) {
+  return type == BattleEnemyArchetype::Boss ? "boss" : "normal";
+}
+
+inline BattleEnemyArchetype
+BattleEnemyArchetypeFromString(const std::string &name) {
+  return name == "boss" ? BattleEnemyArchetype::Boss
+                        : BattleEnemyArchetype::Normal;
+}
+
 ///************************* 基本データ *************************///
 struct BattleEnemyData {
   std::string enemyId;
+  BattleEnemyArchetype archetype = BattleEnemyArchetype::Normal;
   std::vector<std::string> enemyIds;
   std::string modelPath;
 

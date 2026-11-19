@@ -68,6 +68,22 @@ public:
   void FacePosition(const Vector3 &worldPosition);
   void SetControlEnabled(bool enabled);
   bool IsControlEnabled() const { return controlEnabled_; }
+
+  // ============================================================
+  // 演出用の自動移動
+  //   入力を一切使わず、target まで歩いて止まり、faceTarget
+  //   の方を向いて待機する。 演出（CinematicManager）の再生中は通常の Update
+  //   が止まるが、 自動移動中だけは移動・アニメーション・装備追従を進める。
+  //   操作を返す前に必ず EndScriptedMove() を呼ぶこと。
+  // ============================================================
+  void BeginScriptedMove(const Vector3 &target, const Vector3 &faceTarget);
+  // 立ち止まる位置／向く先を差し替える（演出中に対象が動く場合など）
+  void SetScriptedFaceTarget(const Vector3 &faceTarget) {
+    scriptedMove_.faceTarget = faceTarget;
+  }
+  void EndScriptedMove();
+  bool IsScriptedMoveActive() const { return scriptedMove_.active; }
+  bool HasScriptedMoveArrived() const { return scriptedMove_.arrived; }
   // HPだけを減らす。ガード判定もリアクションも行わない。
   void TakeDamage(int damage);
 
@@ -187,6 +203,9 @@ private:
   // ガードで押し込まれる移動を進める（Update から毎フレーム呼ぶ）
   void UpdateGuardPush(float deltaTime);
 
+  // 演出用の自動移動を 1 フレーム進める（移動・旋回・アニメ・装備追従まで）
+  void UpdateScriptedMove(float deltaTime);
+
   // ガード／パリィ成立時の手応え（ヒットストップ・カメラ・盾）をまとめて再生する
   void PlayGuardFeedback(const GuardOutcome &outcome,
                          const Vector3 &attackerPos);
@@ -237,6 +256,18 @@ private:
   // ガード設定のドープシート付きエディタ（Debugのみ）
   GuardEditor guardEditor_;
 #endif
+
+  // 演出用の自動移動の状態
+  struct ScriptedMove {
+    bool active = false;  // 自動移動の制御下にあるか（到着後の待機中も true）
+    bool arrived = false; // 目標地点に着いたか
+    Vector3 target{};     // 歩いて向かう地点（Y は無視）
+    Vector3 faceTarget{}; // 着いた後に向く先
+    float speed = 0.0f;   // 歩く速さ(m/s)。開始時に移動設定の歩行速度を写す
+  };
+  ScriptedMove scriptedMove_;
+  // 自動移動中の旋回の速さ（1秒あたりの補間率）
+  static constexpr float kScriptedTurnSpeed = 8.0f;
 
   Vector3 guardPushDirection_{};
   float guardPushSpeed_ = 0.0f;    // 開始時の速度（距離と時間から算出）

@@ -18,6 +18,7 @@ DopeSheet::Color GetModifierColor(AttackModifierType type) {
 	case AttackModifierType::Invincible:   return DopeSheet::Color::Cyan();
 	case AttackModifierType::FaceTarget:   return DopeSheet::Color::Green();
 	case AttackModifierType::HomingOffset: return DopeSheet::Color::Orange();
+	case AttackModifierType::SuperArmor:   return DopeSheet::Color::Yellow();
 	default:                               return DopeSheet::Color::Purple();
 	}
 }
@@ -28,6 +29,7 @@ const char *GetModifierLabel(AttackModifierType type) {
 	case AttackModifierType::Invincible:   return "無敵";
 	case AttackModifierType::FaceTarget:   return "相手を向く";
 	case AttackModifierType::HomingOffset: return "追尾";
+	case AttackModifierType::SuperArmor:   return "スーパーアーマー";
 	default:                               return "弾を撃つ";
 	}
 }
@@ -36,6 +38,7 @@ const char *GetModifierLabel(AttackModifierType type) {
 constexpr AttackModifierType kTrackOrder[] = {
 	AttackModifierType::Hitbox,
 	AttackModifierType::Invincible,
+	AttackModifierType::SuperArmor,
 	AttackModifierType::FaceTarget,
 	AttackModifierType::HomingOffset,
 	AttackModifierType::EmitProjectile,
@@ -196,6 +199,37 @@ void AttackModifierPanel::DrawInspector(EnemyAttack &attack) {
 	case AttackModifierType::Hitbox:
 		ImGui::DragInt("判定番号", &modifier.damageWindow, 1, 0, 16);
 		ImGui::TextDisabled("同じ番号の間は1回しか当たりません。多段は番号を分けます");
+		ImGui::DragFloat("ダメージ倍率", &modifier.damageMultiplier, 0.05f, 0.0f, 10.0f, "%.2f倍");
+
+		// 判定の置き場所。空なら本体の当たり判定（雑魚敵の体当たり）
+		if (jointNames_ && !jointNames_->empty()) {
+			// モデルのジョイントから選ぶ。先頭の「(本体)」はジョイント指定なし
+			const char *preview = modifier.joint.empty() ? "(本体)" : modifier.joint.c_str();
+			if (ImGui::BeginCombo("ジョイント", preview)) {
+				if (ImGui::Selectable("(本体)", modifier.joint.empty())) {
+					modifier.joint.clear();
+				}
+				for (const auto &name : *jointNames_) {
+					if (ImGui::Selectable(name.c_str(), modifier.joint == name)) {
+						modifier.joint = name;
+					}
+				}
+				ImGui::EndCombo();
+			}
+		} else {
+			char jointBuffer[64];
+			std::snprintf(jointBuffer, sizeof(jointBuffer), "%s", modifier.joint.c_str());
+			if (ImGui::InputText("ジョイント", jointBuffer, sizeof(jointBuffer))) {
+				modifier.joint = jointBuffer;
+			}
+			ImGui::TextDisabled("例: RightHand / LeftHand。空なら本体基準");
+			ImGui::DragFloat("半径", &modifier.radius, 0.01f, 0.05f, 10.0f, "%.2fm");
+			ImGui::DragFloat3("ずらし量", &modifier.jointOffset.x, 0.01f);
+			ImGui::TextDisabled("%s", modifier.joint.empty()
+				? "ボスは腰の高さを基準に、正面+Zでずらした球で判定します。\n"
+				  "雑魚敵はこれを使わず本体のコライダーで当てます"
+				: "ジョイントの向き基準・メートル単位。剣先へ伸ばす時などに使う");
+		}
 		break;
 
 	case AttackModifierType::EmitProjectile: {

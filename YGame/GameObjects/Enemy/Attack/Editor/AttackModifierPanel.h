@@ -5,6 +5,7 @@
 #include "../Data/EnemyAttack.h"
 #include "Debugger/DopeSheet/DopeSheetEditor.h"
 
+#include <string>
 #include <vector>
 
 // ============================================================
@@ -23,6 +24,10 @@ public:
 
 	// 再生ヘッドの位置（秒）。負で非表示。
 	void SetPlayheadTime(float seconds) { playheadTime_ = seconds; }
+
+	// 攻撃判定の付け先に選べるジョイント名。渡すと手入力の代わりにプルダウンになる。
+	// 打ち間違えた名前は「判定が出ない」だけで何も教えてくれないので、選ばせる方が安全。
+	void SetJointNames(const std::vector<std::string> *names) { jointNames_ = names; }
 
 private:
 	// モディファイアからトラックを作る
@@ -60,6 +65,8 @@ private:
 	size_t builtCount_ = 0;
 
 	float playheadTime_ = -1.0f;
+
+	const std::vector<std::string> *jointNames_ = nullptr; // 非所有
 };
 
 #endif // USE_IMGUI

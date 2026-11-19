@@ -62,6 +62,12 @@ AttackPositionSource AttackPositionSourceFromString(const std::string &name);
 // ============================================================
 class AttackTracks {
 public:
+  // CurveChannel は生成時に「値1.0のキーを2つ」持っている（カーブエディタ用の既定）。
+  // そのままだと JSON に書かれていないチャンネルが「キー無し＝既定値」ではなく
+  // 定数1.0 と評価され、回転が全軸 +1rad、位置が (1,1,1) ずれる。
+  // 攻撃では「キーが無い＝変化なし」としたいので、最初に全部空にしておく。
+  AttackTracks() { Clear(); }
+
   // 時間を 0〜1 の進行度で受け取り、各要素を評価する
   Vector3 EvaluatePositionOffset(float t) const;
   Vector3 EvaluateRotationOffset(float t) const;

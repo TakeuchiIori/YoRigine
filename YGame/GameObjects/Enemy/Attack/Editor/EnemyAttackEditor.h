@@ -8,7 +8,7 @@
 #include "AttackModifierPanel.h"
 
 class BattleEnemyManager;
-class BattleEnemy;
+class BattleEnemyBase;
 
 // ============================================================
 // 攻撃エディタ
@@ -37,7 +37,7 @@ private:
   EnemyAttack *GetSelectedAttack();
 
   // プレビュー対象の敵（無ければ nullptr）
-  BattleEnemy *GetPreviewEnemy() const;
+  BattleEnemyBase *GetPreviewEnemy() const;
 
   // 再生を止めて姿勢を戻す
   void StopPreview();
@@ -58,7 +58,7 @@ private:
   bool previewLoop_ = true;
 
   // 再生中の敵。停止時に確実へ戻すため、対象が消えたかを判定する。
-  BattleEnemy *previewTarget_ = nullptr;
+  BattleEnemyBase *previewTarget_ = nullptr;
 
   char nameBuffer_[128] = {};
   bool loadedOnce_ = false;

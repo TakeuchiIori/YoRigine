@@ -112,8 +112,6 @@ const EnemyAttack *EnemyAttackPicker::Pick(const BaseEnemy &enemy,
                                            const std::vector<std::string> &attackIds,
                                            const EnemyAIContext &ctx,
                                            const PerceptionParams &perception) {
-	(void)enemy;
-
 	const auto &attacks = EnemyAttackLibrary::GetInstance().GetAll();
 	if (attacks.empty()) return nullptr;
 
@@ -128,6 +126,9 @@ const EnemyAttack *EnemyAttackPicker::Pick(const BaseEnemy &enemy,
 		if (attack.weight <= 0.0f) continue;
 
 		if (!IsUsableByEnemy(attack.id, attackIds)) continue;
+		// 骨格アニメ前提の技（ボスの技）をスケルトンの無い雑魚敵に出させない。
+		// attackIds が空の敵は全攻撃が候補になるので、ここで弾かないと混ざる。
+		if (attack.RequiresSkeleton() && !enemy.HasSkeletalMotion()) continue;
 		if (ctx.distance < attack.minRange) continue;
 		if (ctx.distance > attack.maxRange) continue;
 		if (ctx.selfHpRatio > attack.selfHpBelow) continue;

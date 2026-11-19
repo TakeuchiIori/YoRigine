@@ -6,6 +6,7 @@
 #include "Collision/Core/CollisionManager.h"
 #include "Collision/Core/CollisionTypeIdDef.h"
 #include "MathFunc.h"
+#include "Debugger/Logger.h"
 
 // BattleStartCameraState は Debug/Release 両方で必要
 #include "Systems/Camera/Virtuals/FollowCamera/BattleStartCameraState.h"
@@ -64,6 +65,11 @@ void PlayerCamera::Initialize(FollowCamera* followCamera, const YoRigine::WorldT
         LoadLockOnFraming(ext["lockOnFraming"]);
     }
 
+    // ボス戦フレーミングを extension JSON から復元
+    if (ext.contains("bossFraming")) {
+        LoadBossFraming(ext["bossFraming"]);
+    }
+
     // 見切れヒット演出パラメータを extension JSON から復元
     if (ext.contains("offscreenHitReaction")) {
         LoadOffscreenHitReaction(ext["offscreenHitReaction"]);
@@ -96,11 +102,21 @@ void PlayerCamera::UpdatePreDirector() {
     float dt = YoRigine::GameTime::GetDeltaTime();
     bool  inPerformance = IsInPerformance();
 
+    // ボス戦の距離（カメラの引き）は演出中も含めて常に更新する。
+    // 演出明けに距離が一気に変わると、そこでカメラが跳ねて見えるため。
+    UpdateBossFraming(dt);
+
     // 見切れヒット演出のクールダウンを進める（ヒットストップの影響を受けないよう非スケール）
     if (offscreenHitCdTimer_ > 0.0f) {
         offscreenHitCdTimer_ -= YoRigine::GameTime::GetUnscaledDeltaTime();
         if (offscreenHitCdTimer_ < 0.0f) offscreenHitCdTimer_ = 0.0f;
     }
+
+    // 演出注視：入り・抜けの補間を進め、演出中はカメラを構図へ固定する。
+    // 演出中はプレイヤーにカメラを触らせない（スティック・バンパー・ロックオン・
+    // 気配グランス・攻撃カメラをすべて飛ばす）。
+    UpdateCinematicFocus();
+    if (cinematicFocusActive_) return;
 
     if (!inPerformance) {
         // R3 でロックオン切り替え（isLockOn_ の状態に関わらず常にチェックする）
@@ -171,11 +187,19 @@ void PlayerCamera::ApplyPostDirector(YoRigine::Camera* sceneCamera, float dt) {
     // クローズアップの画角と位置を、脅威 FOV や攻撃カメラで上書きしない。
     if (followCamera_ && followCamera_->GetIsCloseUp()) return;
 
+    // 演出注視：注視点を画面中央へ向ける。演出中は他の後段効果を乗せない
+    // （抜けの間は弱まりながら残し、通常のカメラ処理と重ねて滑らかに戻す）。
+    ApplyCinematicFocus(sceneCamera);
+    if (cinematicFocusActive_) return;
+
     bool inPerformance = IsInPerformance();
     if (inPerformance) return;
 
     // 脅威察知：囲まれFOV拡大（攻撃カメラより先に適用。攻撃中は後段が上書きする）
     ApplyThreatFovWiden(sceneCamera, dt);
+
+    // ボス戦：視線をボスの胸へ持ち上げる（攻撃カメラワークより先。ワークはこの上に乗る）
+    ApplyBossFraming(sceneCamera, dt);
 
     // キーフレーム補間値を更新
     attackCamera_.UpdatePost(dt);
@@ -817,10 +841,18 @@ void PlayerCamera::UpdateLockOn() {
     // ことで、プレイヤーと敵が重ならない斜め2ショットにする。
     Vector3 pivot    = playerWT_->translate_ + Vector3(0.0f, pivotHeight_, 0.0f);
     Vector3 enemyPos = lockedTarget_->GetCenterPosition();
+    float   pitchBias = lockOnPitchBias_;
+
+    // ボスにロックオン中は、コライダー中心（巨体だと足元付近）ではなく胸を狙い、
+    // 見下ろしを浅くする。等身大の敵向けの見下ろしのままだと脚しか映らない。
+    if (IsLockedOnBoss() && bossBlend_ > 0.0f) {
+        enemyPos  = Lerp(enemyPos, smoothedBossFocus_, bossBlend_);
+        pitchBias = Lerp(lockOnPitchBias_, bossLockOnPitchBias_, bossBlend_);
+    }
     Vector3 dir      = Normalize(enemyPos - pivot);
 
     float targetYaw   = atan2f(dir.x, dir.z) + lockOnShoulderYaw_;
-    float targetPitch = std::clamp(asinf(-dir.y) + lockOnPitchBias_, minPitch_, maxPitch_);
+    float targetPitch = std::clamp(asinf(-dir.y) + pitchBias, minPitch_, maxPitch_);
 
     float t = std::clamp(lockOnLerpSpeed_ * YoRigine::GameTime::GetUnscaledDeltaTime(), 0.0f, 1.0f);
     Vector3 rot = followCamera_->GetRotate();
@@ -1010,6 +1042,16 @@ void PlayerCamera::ApplyLookAt(YoRigine::Camera* sceneCamera, LookAtTarget targe
 
     Vector3 lookPos{};
     if (!ResolveLookAtPos(target, lookPos)) return;
+    ApplyLookAtPos(sceneCamera, lookPos, weight);
+}
+
+// ============================================================
+// 注視ブレンド（位置指定版）
+// pitchOnly=true なら上下だけ向け、左右はそのまま（プレイヤー操作の yaw を奪わない）
+// ============================================================
+void PlayerCamera::ApplyLookAtPos(YoRigine::Camera* sceneCamera, const Vector3& lookPos,
+                                  float weight, bool pitchOnly) const {
+    if (!sceneCamera) return;
 
     Vector3 toTarget = lookPos - sceneCamera->transform_.translate;
     float   dist     = Length(toTarget);
@@ -1023,9 +1065,186 @@ void PlayerCamera::ApplyLookAt(YoRigine::Camera* sceneCamera, LookAtTarget targe
     float w = std::clamp(weight, 0.0f, 1.0f);
 
     // yaw は ±π 最短角で補間（巻き戻り防止）
-    float deltaYaw = WrapPi(desiredYaw - sceneCamera->transform_.rotate.y);
-    sceneCamera->transform_.rotate.y += deltaYaw * w;
+    if (!pitchOnly) {
+        float deltaYaw = WrapPi(desiredYaw - sceneCamera->transform_.rotate.y);
+        sceneCamera->transform_.rotate.y += deltaYaw * w;
+    }
     sceneCamera->transform_.rotate.x += (desiredPitch - sceneCamera->transform_.rotate.x) * w;
+}
+
+// ============================================================
+// ボス戦フレーミング
+// ============================================================
+void PlayerCamera::SetBossFraming(const Vector3& focus, float height,
+                                  const BaseCollider* bossCollider) {
+    // 初めて渡された時は均し済みの注視点を飛ばして合わせる（原点から滑ってこないように）
+    if (!hasBoss_ && bossBlend_ <= 0.0f) {
+        smoothedBossFocus_ = focus;
+    }
+
+    // 身長が大きく変わった時だけログに残す（調整値を決める目安。毎フレームは出さない）
+    static float s_loggedHeight = -100.0f;
+    if (std::abs(height - s_loggedHeight) > 1.0f) {
+        s_loggedHeight = height;
+        const float extra = (std::max)(0.0f, height - bossRefHeight_);
+        const float mul = std::clamp(1.0f + extra * bossDistancePerMeter_, 1.0f, bossMaxDistanceMul_);
+        Logger(("[PlayerCamera] ボス身長 " + std::to_string(height) +
+                "m / 距離倍率 " + std::to_string(mul) + "\n").c_str());
+    }
+    hasBoss_      = true;
+    bossFocus_    = focus;
+    bossHeight_   = height;
+    bossCollider_ = bossCollider;
+}
+
+// pre-director：効き具合の補間と、カメラの引き（距離倍率）
+void PlayerCamera::UpdateBossFraming([[maybe_unused]] float dt) {
+    if (!followCamera_) return;
+
+    // ヒットストップ中も滑らかに動かしたいので実時間で進める
+    const float realDt = YoRigine::GameTime::GetUnscaledDeltaTime();
+
+    const float targetBlend = (bossFramingEnabled_ && hasBoss_) ? 1.0f : 0.0f;
+    bossBlend_ += (targetBlend - bossBlend_) * std::clamp(bossBlendSpeed_ * realDt, 0.0f, 1.0f);
+    if (bossBlend_ < 0.001f) {
+        bossBlend_    = 0.0f;
+        bossCollider_ = nullptr; // ボスがいなくなったら照合対象も手放す
+    }
+
+    // 注視点の揺れ（アニメで胸が上下する分）を均す
+    smoothedBossFocus_ = Lerp(smoothedBossFocus_, bossFocus_,
+                              std::clamp(bossFocusSmooth_ * realDt, 0.0f, 1.0f));
+
+    // 身長が基準を超えた分だけ引く。等身大の敵では 1.0 のまま
+    const float extra   = (std::max)(0.0f, bossHeight_ - bossRefHeight_);
+    const float bossMul = std::clamp(1.0f + extra * bossDistancePerMeter_, 1.0f, bossMaxDistanceMul_);
+    followCamera_->SetDistanceMultiplier(1.0f + (bossMul - 1.0f) * bossBlend_);
+}
+
+// post-director：視線を胸へ持ち上げる＋プレイヤーを画面に残す
+void PlayerCamera::ApplyBossFraming(YoRigine::Camera* sceneCamera, float dt) {
+    if (!sceneCamera || bossBlend_ <= 0.0f) return;
+
+    // ボスが画面の正面寄りに見えている時だけ持ち上げる。
+    // 背後にいるボスの胸へ向けると、プレイヤーの操作と関係なく空を仰いでしまう。
+    Vector3 toBoss = smoothedBossFocus_ - sceneCamera->transform_.translate;
+    toBoss.y = 0.0f;
+    if (Length(toBoss) < 0.01f) return;
+    const float bossYaw   = atan2f(toBoss.x, toBoss.z);
+    const float yawOffset = std::abs(WrapPi(bossYaw - sceneCamera->transform_.rotate.y));
+    if (yawOffset >= bossLookUpYawLimit_) return;
+
+    // 正面ほど強く、見切れる角度へ近づくほど弱く
+    const float frontness = 1.0f - yawOffset / bossLookUpYawLimit_;
+    const float weight    = bossLookUpWeight_ * bossBlend_ * frontness;
+
+    // 左右はプレイヤー操作（またはロックオン）に任せ、上下だけ向ける
+    ApplyLookAtPos(sceneCamera, smoothedBossFocus_, weight, true);
+    sceneCamera->UpdateMatrix();
+
+    // 見上げた結果プレイヤーが画面下へ外れないよう、既存のガードで引き戻す
+    if (framingGuardEnabled_) {
+        EnsurePlayerInFrame(sceneCamera, dt);
+    }
+}
+
+// ============================================================
+// 演出注視
+// ============================================================
+void PlayerCamera::BeginCinematicFocus(const Vector3& focus,
+                                       const CinematicFocusParams& params) {
+    // 抜けの途中から入り直した場合は、均した注視点をそのまま引き継ぐ（飛ばない）
+    if (cinematicBlend_ <= 0.0f) {
+        smoothedCinematicFocus_ = focus;
+    }
+    cinematicFocusActive_ = true;
+    cinematicFocus_       = focus;
+    cinematicParams_      = params;
+
+    // 演出前のカメラ操作の名残を捨てる。ロックオンしたままだと
+    // 演出明けに倒した雑魚の位置へカメラが引っ張られる。
+    isLockOn_      = false;
+    lockedTarget_  = nullptr;
+    awarenessYawBias_     = 0.0f;
+    awarenessAppliedBias_ = 0.0f;
+    if (followCamera_) {
+        attackCamera_.Stop(followCamera_);
+    }
+    YoRigine::GameTime::SetTimeScale(1.0f);
+}
+
+// pre-director：入り・抜けの補間と、カメラ位置（FollowCamera の回転）の決定
+void PlayerCamera::UpdateCinematicFocus() {
+    if (!followCamera_ || !playerWT_) return;
+
+    // 演出は時間停止・スローと無関係に進めたいので実時間で動かす
+    const float realDt = YoRigine::GameTime::GetUnscaledDeltaTime();
+    const auto& p      = cinematicParams_;
+
+    const float targetBlend = cinematicFocusActive_ ? 1.0f : 0.0f;
+    cinematicBlend_ += (targetBlend - cinematicBlend_) *
+                       std::clamp(p.blendSpeed * realDt, 0.0f, 1.0f);
+    if (!cinematicFocusActive_ && cinematicBlend_ < 0.001f) {
+        cinematicBlend_ = 0.0f;
+    }
+
+    // ボスが生成された瞬間などに注視点が飛んでも、カメラが跳ねないよう均す
+    smoothedCinematicFocus_ = Lerp(smoothedCinematicFocus_, cinematicFocus_,
+                                   std::clamp(p.focusSmooth * realDt, 0.0f, 1.0f));
+
+    // 抜けの間はプレイヤーに操作を返しているので、位置はもう触らない
+    if (!cinematicFocusActive_) return;
+
+    // player→注視点 の水平軸。カメラはこの軸の背後から、肩の分だけずらして置く
+    Vector3 toFocus = smoothedCinematicFocus_ - playerWT_->translate_;
+    toFocus.y = 0.0f;
+    if (Length(toFocus) < 0.01f) return;
+
+    const float targetYaw   = atan2f(toFocus.x, toFocus.z) + p.shoulderYaw;
+    const float targetPitch = std::clamp(p.pitch, minPitch_, maxPitch_);
+    const float t = std::clamp(p.blendSpeed * realDt, 0.0f, 1.0f);
+
+    Vector3 rot = followCamera_->GetRotate();
+    rot.y = WrapPi(rot.y + WrapPi(targetYaw - rot.y) * t);
+    rot.x = Lerp(rot.x, targetPitch, t);
+    followCamera_->SetRotate(rot);
+
+    // 自動リセンター・決めカメラに割り込ませない
+    followCamera_->CancelRecenter(true);
+    followCamera_->NotifyCameraActive();
+}
+
+// post-director：最終カメラを注視点へ向ける（画面中央に捉える）
+void PlayerCamera::ApplyCinematicFocus(YoRigine::Camera* sceneCamera) {
+    if (!sceneCamera || cinematicBlend_ <= 0.0f) return;
+
+    const float weight = cinematicParams_.lookWeight * cinematicBlend_;
+    ApplyLookAtPos(sceneCamera, smoothedCinematicFocus_, weight);
+    sceneCamera->UpdateMatrix();
+}
+
+void PlayerCamera::SaveBossFraming(nlohmann::json& j) const {
+    j["enabled"]          = bossFramingEnabled_;
+    j["refHeight"]        = bossRefHeight_;
+    j["distancePerMeter"] = bossDistancePerMeter_;
+    j["maxDistanceMul"]   = bossMaxDistanceMul_;
+    j["lookUpWeight"]     = bossLookUpWeight_;
+    j["lookUpYawLimit"]   = bossLookUpYawLimit_;
+    j["lockOnPitchBias"]  = bossLockOnPitchBias_;
+    j["focusSmooth"]      = bossFocusSmooth_;
+    j["blendSpeed"]       = bossBlendSpeed_;
+}
+
+void PlayerCamera::LoadBossFraming(const nlohmann::json& j) {
+    bossFramingEnabled_   = j.value("enabled", true);
+    bossRefHeight_        = j.value("refHeight", 2.5f);
+    bossDistancePerMeter_ = j.value("distancePerMeter", 0.10f);
+    bossMaxDistanceMul_   = j.value("maxDistanceMul", 2.2f);
+    bossLookUpWeight_     = j.value("lookUpWeight", 0.45f);
+    bossLookUpYawLimit_   = j.value("lookUpYawLimit", 1.2f);
+    bossLockOnPitchBias_  = j.value("lockOnPitchBias", 0.02f);
+    bossFocusSmooth_      = j.value("focusSmooth", 6.0f);
+    bossBlendSpeed_       = j.value("blendSpeed", 2.5f);
 }
 
 // ============================================================
@@ -1198,6 +1417,32 @@ void PlayerCamera::DrawImGui() {
         SaveLockOnFraming(loJson);
         nlohmann::json ext = followCamera_->GetExtensionJson();
         ext["lockOnFraming"] = loJson;
+        followCamera_->SetExtensionJson(ext);
+    }
+
+    ImGui::Separator();
+
+    if (ImGui::CollapsingHeader("ボス戦フレーミング")) {
+        ImGui::Checkbox("有効##boss", &bossFramingEnabled_);
+        ImGui::Text("ボス: %s  身長 %.1fm  効き %.2f  距離倍率 %.2f",
+                    hasBoss_ ? "あり" : "なし", bossHeight_, bossBlend_,
+                    followCamera_->GetDistanceMultiplier());
+        ImGui::DragFloat("引き始める身長(m)", &bossRefHeight_, 0.1f, 0.0f, 20.0f, "%.1f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("これより背の低い敵では距離を変えない");
+        ImGui::DragFloat("1mあたりの引き", &bossDistancePerMeter_, 0.005f, 0.0f, 0.5f, "%.3f");
+        ImGui::DragFloat("距離倍率の上限", &bossMaxDistanceMul_, 0.05f, 1.0f, 4.0f, "%.2f");
+        ImGui::DragFloat("見上げる強さ", &bossLookUpWeight_, 0.01f, 0.0f, 1.0f, "%.2f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("視線をボスの胸へ持ち上げる割合。左右はプレイヤー操作のまま");
+        ImGui::DragFloat("見上げる範囲(rad)", &bossLookUpYawLimit_, 0.01f, 0.1f, 3.14f, "%.2f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("ボスが画面中央からこの角度以内にいる時だけ見上げる");
+        ImGui::DragFloat("ロックオン見下ろし(rad)", &bossLockOnPitchBias_, 0.01f, -0.5f, 0.8f, "%.2f");
+        ImGui::DragFloat("注視点の追従", &bossFocusSmooth_, 0.1f, 0.5f, 30.0f, "%.1f");
+        ImGui::DragFloat("切り替えの速さ", &bossBlendSpeed_, 0.1f, 0.1f, 20.0f, "%.1f");
+
+        nlohmann::json bfJson;
+        SaveBossFraming(bfJson);
+        nlohmann::json ext = followCamera_->GetExtensionJson();
+        ext["bossFraming"] = bfJson;
         followCamera_->SetExtensionJson(ext);
     }
 

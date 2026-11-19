@@ -343,6 +343,125 @@
                 "strafeWeight": 1.399999976158142,
                 "tooCloseDistance": 3.5
             }
+        },
+        {
+            "approachStateRange": 40.0,
+            "archetype": "boss",
+            "attack": 25,
+            "attackIds": [
+                "boss_punch",
+                "boss_swipe",
+                "boss_sword",
+                "boss_jump",
+                "boss_roar"
+            ],
+            "attackParams": {
+                "chargeRush": {
+                    "chargeTime": 1.75,
+                    "cooldownTime": 1.0,
+                    "parriable": true,
+                    "rushTime": 0.5,
+                    "speedMultiplier": 8.5
+                },
+                "combo": {
+                    "cooldownTime": 0.800000011920929,
+                    "parriable": true,
+                    "phaseDuration": 0.800000011920929,
+                    "rushSpeedMultiplier": 8.0,
+                    "subChargeTime": 0.4000000059604645,
+                    "subRushTime": 0.20000000298023224
+                },
+                "counter": {
+                    "anticipationDistance": 5.0,
+                    "anticipationTime": 0.5,
+                    "chargeTime": 0.25,
+                    "cooldownTime": 0.800000011920929,
+                    "enabled": true,
+                    "hitCountResetTime": 2.5,
+                    "parriable": true,
+                    "recoveryDuration": 1.5,
+                    "rushHomingStrength": 10.0,
+                    "rushSpeedMultiplier": 6.0,
+                    "rushTime": 0.550000011920929,
+                    "startupTime": 0.20000000298023224,
+                    "triggerHitCount": 4
+                },
+                "jump": {
+                    "chargeTime": 0.30000001192092896,
+                    "cooldownTime": 0.699999988079071,
+                    "crouchDepth": 0.30000001192092896,
+                    "jumpHeight": 6.0,
+                    "jumpTime": 0.699999988079071,
+                    "parriable": true
+                },
+                "rush": {
+                    "chargeTime": 1.0,
+                    "cooldownTime": 1.2000000476837158,
+                    "parriable": true,
+                    "rushTime": 0.5,
+                    "speedMultiplier": 7.0
+                },
+                "spin": {
+                    "chargeTime": 0.30000001192092896,
+                    "cooldownTime": 0.5,
+                    "moveSpeedMultiplier": 2.0,
+                    "parriable": true,
+                    "rotationCount": 2.0,
+                    "spinTime": 1.0
+                }
+            },
+            "attackPatterns": [],
+            "attackStateRange": 12.0,
+            "damageReaction": {
+                "blinkSpeed": 50.0,
+                "colorReturnDuration": 0.15000000596046448,
+                "downedStandUpTime": 3.5,
+                "downedWobbleSpeed": 5.0,
+                "downedWobbleTilt": 0.30000001192092896,
+                "flashDuration": 0.20000000298023224,
+                "hitReactionAngle": 0.20000000298023224,
+                "hitReactionDuration": 0.2199999988079071,
+                "punchDuration": 0.25,
+                "punchScale": 0.15000000596046448,
+                "staggerDuration": 1.0,
+                "waitForKnockback": true
+            },
+            "defense": 20,
+            "enemyId": "boss",
+            "hp": 1500,
+            "level": 10,
+            "modelPath": "Boss.gltf",
+            "moveSpeed": 3.5,
+            "perception": {
+                "baitSlowAttackWeight": 1.5,
+                "enabled": true,
+                "facingHalfAngleDeg": 70.0,
+                "guardStrafeWeight": 3.0,
+                "openingAttackRangeBonus": 3.0,
+                "openingFastAttackWeight": 2.0,
+                "openingOnLockedOther": true,
+                "openingOnLookAway": true,
+                "openingOnOutOfCC": true,
+                "openingOnStagger": true,
+                "openingSlowAttackWeight": 0.30000001192092896,
+                "threatBackstepWeight": 3.0
+            },
+            "spacing": {
+                "backstepDuration": 0.44999998807907104,
+                "backstepSpeedMultiplier": 2.200000047683716,
+                "backstepWeight": 1.0,
+                "faceRotationSpeed": 6.0,
+                "observeMaxDuration": 1.2000000476837158,
+                "observeMinDuration": 0.4000000059604645,
+                "observeWeight": 1.0,
+                "preferredDistance": 6.0,
+                "strafeDistanceKeepStrength": 1.5,
+                "strafeMaxDuration": 1.7999999523162842,
+                "strafeMinDuration": 0.800000011920929,
+                "strafeSpeedMultiplier": 0.8999999761581421,
+                "strafeWeight": 1.399999976158142,
+                "tooCloseDistance": 3.5
+            }
         }
     ],
     "battleSettings": {

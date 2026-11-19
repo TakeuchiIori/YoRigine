@@ -3,7 +3,6 @@
 #include "Collision/Core/BaseCollider.h"
 #include "Composite/CompositeEffectManager.h"
 #include "GPUParticle/YGpuEmitManager.h"
-#include "GameObjects/Enemy/BattleEnemy/BattleEnemy.h"
 #include "GameObjects/Enemy/BattleEnemy/BattleEnemyManager.h"
 #include "GameObjects/Player/Camera/PlayerCamera.h"
 #include "GameObjects/Player/Player.h"
@@ -132,14 +131,14 @@ void MagicVfxEventHandler::ExecuteStrikeAllEnemies(
   if (!manager)
     return;
 
-  const std::vector<BattleEnemy *> enemies = manager->GetActiveBattleEnemies();
+  const std::vector<BattleEnemyBase *> enemies = manager->GetActiveBattleEnemies();
   if (enemies.empty())
     return;
 
   const int damage = static_cast<int>(std::max(0.0f, event.power));
   bool anyStruck = false;
 
-  for (BattleEnemy *enemy : enemies) {
+  for (BattleEnemyBase *enemy : enemies) {
     if (!enemy || !enemy->IsAlive())
       continue;
 

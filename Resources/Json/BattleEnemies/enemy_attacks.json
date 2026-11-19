@@ -1,0 +1,262 @@
+{
+    "attacks": [
+        {
+            "animation": {
+                "clip": "Punch",
+                "speed": 1.0
+            },
+            "cooldown": 1.5,
+            "displayName": "boss_punch",
+            "duration": 1.12,
+            "fast": true,
+            "id": "boss_punch",
+            "maxRange": 11,
+            "minRange": 0,
+            "modifiers": [
+                {
+                    "endTime": 0.2,
+                    "startTime": 0.0,
+                    "strength": 8.0,
+                    "type": "faceTarget"
+                },
+                {
+                    "damageWindow": 0,
+                    "endTime": 0.4,
+                    "joint": "RightHand",
+                    "jointOffset": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "radius": 1.32,
+                    "startTime": 0.2,
+                    "type": "hitbox"
+                }
+            ],
+            "parriable": true,
+            "positionSource": "curves",
+            "selfHpBelow": 1.0,
+            "targetHpBelow": 1.0,
+            "tracks": {},
+            "weight": 1.2
+        },
+        {
+            "animation": {
+                "clip": "SwipAttack",
+                "speed": 1.0
+            },
+            "cooldown": 3.0,
+            "displayName": "boss_swipe",
+            "duration": 2.68,
+            "fast": false,
+            "id": "boss_swipe",
+            "maxRange": 12,
+            "minRange": 0,
+            "modifiers": [
+                {
+                    "endTime": 1.0,
+                    "startTime": 0.0,
+                    "strength": 3.0,
+                    "type": "faceTarget"
+                },
+                {
+                    "damageWindow": 0,
+                    "endTime": 1.45,
+                    "joint": "LeftHand",
+                    "jointOffset": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "radius": 1.54,
+                    "startTime": 1.1,
+                    "type": "hitbox"
+                },
+                {
+                    "damageWindow": 0,
+                    "endTime": 1.4,
+                    "joint": "RightHand",
+                    "jointOffset": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "radius": 1.1,
+                    "startTime": 1.15,
+                    "type": "hitbox"
+                }
+            ],
+            "parriable": true,
+            "positionSource": "curves",
+            "selfHpBelow": 1.0,
+            "targetHpBelow": 1.0,
+            "tracks": {},
+            "weight": 1.0
+        },
+        {
+            "animation": {
+                "clip": "SwordAttack",
+                "speed": 1.0
+            },
+            "cooldown": 5.0,
+            "displayName": "boss_sword",
+            "duration": 4.8,
+            "fast": false,
+            "id": "boss_sword",
+            "maxRange": 13,
+            "minRange": 0,
+            "modifiers": [
+                {
+                    "endTime": 0.35,
+                    "startTime": 0.0,
+                    "strength": 6.0,
+                    "type": "faceTarget"
+                },
+                {
+                    "damageWindow": 0,
+                    "endTime": 0.65,
+                    "joint": "RightHand",
+                    "jointOffset": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "radius": 1.54,
+                    "startTime": 0.35,
+                    "type": "hitbox"
+                },
+                {
+                    "endTime": 2.0,
+                    "startTime": 1.4,
+                    "strength": 4.0,
+                    "type": "faceTarget"
+                },
+                {
+                    "endTime": 2.45,
+                    "startTime": 1.6,
+                    "type": "superArmor"
+                },
+                {
+                    "damageMultiplier": 1.4,
+                    "damageWindow": 1,
+                    "endTime": 2.45,
+                    "joint": "RightHand",
+                    "jointOffset": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "radius": 1.76,
+                    "startTime": 2.05,
+                    "type": "hitbox"
+                },
+                {
+                    "damageMultiplier": 1.4,
+                    "damageWindow": 1,
+                    "endTime": 2.45,
+                    "joint": "LeftHand",
+                    "jointOffset": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "radius": 1.76,
+                    "startTime": 2.05,
+                    "type": "hitbox"
+                }
+            ],
+            "parriable": true,
+            "positionSource": "curves",
+            "selfHpBelow": 1.0,
+            "targetHpBelow": 1.0,
+            "tracks": {},
+            "weight": 0.8
+        },
+        {
+            "animation": {
+                "clip": "JumpAttack",
+                "speed": 1.0
+            },
+            "cooldown": 6.0,
+            "displayName": "boss_jump",
+            "duration": 3.72,
+            "fast": false,
+            "id": "boss_jump",
+            "maxRange": 30,
+            "minRange": 11,
+            "modifiers": [
+                {
+                    "endTime": 0.5,
+                    "startTime": 0.0,
+                    "strength": 4.0,
+                    "type": "faceTarget"
+                },
+                {
+                    "endTime": 1.7,
+                    "startTime": 0.3,
+                    "type": "superArmor"
+                },
+                {
+                    "damageMultiplier": 1.5,
+                    "damageWindow": 0,
+                    "endTime": 1.75,
+                    "joint": "",
+                    "jointOffset": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 3.0
+                    },
+                    "radius": 5.0,
+                    "startTime": 1.5,
+                    "type": "hitbox"
+                }
+            ],
+            "parriable": false,
+            "positionSource": "curves",
+            "selfHpBelow": 1.0,
+            "targetHpBelow": 1.0,
+            "tracks": {},
+            "weight": 0.8
+        },
+        {
+            "animation": {
+                "clip": "RoarAttack",
+                "speed": 1.0
+            },
+            "cooldown": 10.0,
+            "displayName": "boss_roar",
+            "duration": 2.38,
+            "fast": false,
+            "id": "boss_roar",
+            "maxRange": 16,
+            "minRange": 0,
+            "modifiers": [
+                {
+                    "endTime": 0.8,
+                    "startTime": 0.0,
+                    "type": "superArmor"
+                },
+                {
+                    "damageMultiplier": 0.6,
+                    "damageWindow": 0,
+                    "endTime": 0.75,
+                    "joint": "",
+                    "jointOffset": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "radius": 10.0,
+                    "startTime": 0.45,
+                    "type": "hitbox"
+                }
+            ],
+            "parriable": false,
+            "positionSource": "curves",
+            "selfHpBelow": 0.6,
+            "targetHpBelow": 1.0,
+            "tracks": {},
+            "weight": 1.0
+        }
+    ]
+}

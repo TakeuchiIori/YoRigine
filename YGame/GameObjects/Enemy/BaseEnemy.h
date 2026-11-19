@@ -181,6 +181,60 @@ public:
   // 本体のコライダー。ロックオン対象の照合などに使う（所有権は渡さない）
   const BaseCollider *GetPrimaryCollider() const { return obbCollider_.get(); }
 
+  ///************************* 骨格アニメーション *************************///
+  // スケルトン付きモデルで動く敵（ボスなど）だけが使う。
+  // 雑魚敵は体全体をカーブで動かすだけでスケルトンを持たないので、
+  // motionModelFile_ が空のまま＝以下はすべて何もしない。
+  // 「アニメを持つかどうか」を型ではなくデータで分けておくと、
+  // 攻撃の再生器（AttackPlayer）が敵の種類を知らずに済む。
+
+  // スケルトン付きモデルを読み込み、指定クリップをループ再生する
+  void SetupSkeletalModel(const std::string &modelFile,
+                          const std::string &initialClip);
+
+  bool HasSkeletalMotion() const { return !motionModelFile_.empty(); }
+
+  // クリップを切り替える。同じクリップでも先頭から再生し直す。
+  void PlayMotion(const std::string &clip, bool loop, float speed = 1.0f);
+
+  // 再生中クリップの時刻を直接指定する（エディタのスクラブ用）
+  void SetMotionTime(float seconds);
+
+  // 再生中クリップの長さ（秒）。骨格アニメが無ければ 0
+  float GetCurrentMotionDuration();
+
+  /// <summary>
+  /// ジョイントのワールド座標を求める。攻撃判定を腕や武器に追従させるために使う。
+  /// </summary>
+  /// <param
+  /// name="localOffset">ジョイントの向きを基準にしたずらし量（メートル）。
+  /// モデルの単位（cm/m）やボーンのスケールに左右されないよう、向きだけを使う。</param>
+  /// <returns>ジョイントが見つからなければ false</returns>
+  bool GetJointWorldPosition(const std::string &jointName,
+                             const Vector3 &localOffset, Vector3 &out);
+
+  ///************************* ルートモーション *************************///
+  // 攻撃アニメの腰（ルートジョイント）に焼き込まれた水平移動を取り出す。
+  //
+  // 取り出さないと「メッシュだけが跳んで本体と当たり判定は元の場所」になり、
+  // 攻撃が終わった瞬間にメッシュが元の位置へ瞬間移動する。
+  // 腰の水平位置は常に基準へ固定し、有効な間だけ動こうとした量を返す。
+
+  // ルートにするジョイント名（Mixamo 系なら "Hips"）
+  void SetRootMotionJoint(const std::string &jointName) {
+    rootMotionJoint_ = jointName;
+    rootMotionAnchorSet_ = false;
+  }
+
+  // 移動量の取り出しを始める／やめる。腰の固定はこれと関係なく常に行う
+  void SetRootMotionEnabled(bool enabled);
+
+  /// <summary>
+  /// 骨格アニメを更新した直後に毎フレーム呼ぶ。
+  /// 腰の水平位置を基準へ戻し、このフレームで動こうとした量（ワールド・Y除く）を返す。
+  /// </summary>
+  Vector3 ConsumeRootMotion();
+
   ///************************* 被弾リアクション *************************///
 
   void StartKnockback(const Vector3 &direction, float power, float duration);
@@ -253,6 +307,17 @@ protected:
   // ── 見た目 ──
   YoRigine::WorldTransform visualWt_;
   std::unique_ptr<ObjectAnimation> animation_;
+
+  // 骨格アニメのモデルファイル名（例 "Boss.gltf"）。空なら骨格アニメを使わない
+  std::string motionModelFile_;
+
+  // ── ルートモーション ──
+  std::string rootMotionJoint_;       // 空ならルートモーションを扱わない
+  bool rootMotionEnabled_ = false;    // 移動量を返すか
+  bool rootMotionAnchorSet_ = false;  // 基準位置を記録済みか
+  bool rootMotionResetLast_ = false;  // 次のフレームで前回値を取り直すか
+  Vector3 rootMotionAnchor_{};        // 腰を固定する水平位置（ジョイントのローカル）
+  Vector3 rootMotionLastOffset_{};    // 前フレームの「基準からのずれ」（スケルトン空間）
 
   // ── ダメージ点滅 ──
   bool isDamageBlinking_ = false;

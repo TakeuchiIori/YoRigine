@@ -1,9 +1,9 @@
 #include "EnemyHealthBarUI.h"
-#include "Enemy/BattleEnemy/BattleEnemy.h"
+#include "Enemy/BaseEnemy.h"
 #include <Systems/GameTime/GameTime.h>
 #include <Systems/UI/UIManager.h>
 
-EnemyHealthBarUI::EnemyHealthBarUI(const BattleEnemy* enemy, YoRigine::Camera* camera)
+EnemyHealthBarUI::EnemyHealthBarUI(const BaseEnemy* enemy, YoRigine::Camera* camera)
 {
 	targetEnemy_ = enemy;
 	camera_ = camera;
