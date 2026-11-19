@@ -10,6 +10,7 @@
 #include "Object3D/BaseObjectManager.h"
 #include "Player/Player.h"
 #include "Systems/GameTime/GameTime.h"
+#include "Systems/Input/Input.h"
 #include <Collision/AreaCollision/Base/AreaManager.h>
 #include <Loaders/Json/JsonManager.h>
 #include <UI/Damage/DamageNumberManager.h>
@@ -66,6 +67,9 @@ void BossEnemy::Initialize(YoRigine::Camera *camera) {
   debugLine_ = std::make_unique<YoRigine::Line>();
   debugLine_->Initialize();
   debugLine_->SetCamera(camera);
+
+  attackEffects_ = std::make_unique<BossAttackEffects>();
+  attackEffects_->Initialize(camera);
 }
 
 void BossEnemy::InitializeBattleData(const BattleEnemyData &data,
@@ -131,7 +135,9 @@ void BossEnemy::InitCollision() {
       this, &wt_, camera_,
       static_cast<uint32_t>(CollisionTypeIdDef::kBattleEnemy));
   obbCollider_->SetIsStatic(false);
-  obbCollider_->SetMass(1.0f);
+  // 質量は InitJson で調整値（既定 100000）に置き換える。
+  // プレイヤー(100)と同じ桁だと、歩くだけで巨体を押し込めてしまう。
+  obbCollider_->SetMass(params_.bodyMass);
   obbCollider_->SetLockPenetrationY(true);
 }
 
@@ -193,6 +199,19 @@ void BossEnemy::InitJson() {
   jsonManager_->SetTreePrefix("ボス:当たり判定");
   jsonManager_->Register("プレイヤー半径", &params_.playerHitRadius);
   jsonManager_->Register("プレイヤー高さ", &params_.playerHitHeight);
+  jsonManager_->Register("攻撃が届く高さ", &params_.hitReachHeight);
+  jsonManager_->Register("質量", &params_.bodyMass);
+  jsonManager_->ClearTreePrefix();
+
+  jsonManager_->SetTreePrefix("ボス:攻撃演出");
+  jsonManager_->Register("叩きつけとみなす高さ", &params_.groundImpactHeight);
+  jsonManager_->Register("衝撃波の半径", &params_.impactDamageRadius);
+  jsonManager_->Register("衝撃波の威力", &params_.impactDamageMultiplier);
+  jsonManager_->Register("衝撃エフェクトの大きさ", &params_.impactEffectScale);
+  jsonManager_->Register("衝撃波リングにする半径", &params_.blastRadiusThreshold);
+  jsonManager_->Register("衝撃の揺れ", &params_.impactShake);
+  jsonManager_->Register("揺れが届く距離", &params_.impactShakeRange);
+  jsonManager_->Register("命中の揺れ", &params_.hitShake);
   jsonManager_->ClearTreePrefix();
 
   jsonManager_->SetTreePrefix("ボス:出現");
@@ -205,6 +224,11 @@ void BossEnemy::InitJson() {
   jsonManager_->Register("エッジ発光色", &dissolveEdgeColor_);
   jsonManager_->Register("ノイズスケール", &dissolveNoiseScale_);
   jsonManager_->ClearTreePrefix();
+
+  // 質量は JSON を読んだ後に反映する（InitCollision の時点ではまだ既定値のため）
+  if (obbCollider_) {
+    obbCollider_->SetMass(params_.bodyMass);
+  }
 }
 
 /*==========================================================================
@@ -267,6 +291,7 @@ void BossEnemy::Update() {
   }
 
   ProcessAttackHits();
+  UpdateAttackEffects(YoRigine::GameTime::GetDeltaTime(YoRigine::TimeChannel::Vfx));
 
   if (obbCollider_) {
     obbCollider_->Update();
@@ -344,6 +369,15 @@ void BossEnemy::SetActiveAttack(AttackPlayer *player,
   activeAttackPlayer_ = player;
   currentAttack_ = attack;
   lastDealtWindow_ = -1; // 攻撃ごとに判定番号を数え直す
+  prevHitboxCenters_.clear();
+  swingBurstFired_.clear();
+  groundImpactFired_.clear();
+  lastEffectAttack_ = attack;
+  lastEffectTime_ = -1.0f;
+  // 中断（怯み・パリィ）で抜けた時は、出ている軌跡をその場で切る
+  if (!player && attackEffects_) {
+    attackEffects_->StopTrails();
+  }
 
   // 攻撃中だけアニメの前進を本体の移動として取り出す
   SetRootMotionEnabled(player != nullptr);
@@ -368,6 +402,9 @@ void BossEnemy::ProcessAttackHits() {
   // 判定の大きさはエンカウントのスケールにだけ合わせる。
   // モデル倍率は「素材の大きさの補正」なので、判定はメートルで作ったままにする。
   const float bodyScale = EncounterScale();
+  // 巨体の攻撃が届く高さ。0 なら見た目どおりのカプセルで調べる
+  const float reachTop =
+      params_.hitReachHeight > 0.0f ? params_.hitReachHeight * bodyScale : 0.0f;
 
   source->CollectActiveHitboxes(activeHitboxes_);
   for (const AttackModifier *hitbox : activeHitboxes_) {
@@ -378,13 +415,21 @@ void BossEnemy::ProcessAttackHits() {
 
     debugHitboxCenters_.push_back(center);
     debugHitboxRadii_.push_back(radius);
+
+    // 前フレームの中心から今の中心までを通り道とする（初回は今の位置だけ）
+    Vector3 from = center;
+    if (auto it = prevHitboxCenters_.find(hitbox); it != prevHitboxCenters_.end()) {
+      from = it->second;
+    }
+    prevHitboxCenters_[hitbox] = center;
+
     if (previewOnly)
       continue;
 
     // 同じ番号の判定は1回しか当てない（両手が同時に当たっても1ヒット）
     if (hitbox->damageWindow == lastDealtWindow_)
       continue;
-    if (!OverlapsPlayer(center, radius))
+    if (!SweptOverlapsPlayer(from, center, radius, reachTop))
       continue;
 
     lastDealtWindow_ = hitbox->damageWindow;
@@ -414,7 +459,8 @@ bool BossEnemy::ResolveHitboxCenter(const AttackModifier &hitbox,
   return true;
 }
 
-bool BossEnemy::OverlapsPlayer(const Vector3 &center, float radius) const {
+bool BossEnemy::OverlapsPlayer(const Vector3 &center, float radius,
+                               float reachTop) const {
   if (!player_)
     return false;
 
@@ -422,12 +468,33 @@ bool BossEnemy::OverlapsPlayer(const Vector3 &center, float radius) const {
   // 線分上の最も近い点との距離で判定する。
   const Vector3 feet = player_->GetWT().translate_;
   const float bottom = feet.y + params_.playerHitRadius;
-  const float top =
+  float top =
       feet.y + std::max(params_.playerHitHeight - params_.playerHitRadius, 0.0f);
+  // 巨体の攻撃は、頭上を通っても届く高さまでカプセルを伸ばして調べる
+  if (reachTop > 0.0f) {
+    top = std::max(top, feet.y + reachTop);
+  }
   const Vector3 closest = {feet.x, std::clamp(center.y, bottom, top), feet.z};
 
   const float reach = radius + params_.playerHitRadius;
   return LengthSquared(center - closest) <= reach * reach;
+}
+
+bool BossEnemy::SweptOverlapsPlayer(const Vector3 &from, const Vector3 &to,
+                                    float radius, float reachTop) const {
+  // 半径の半分ずつ刻めば、刻みの間に隙間はできない。
+  // 1フレームで極端に飛んだ時（ロード明けなど）に回数が膨らまないよう上限を置く
+  const float distance = Length(to - from);
+  const float step = std::max(radius * 0.5f, 0.1f);
+  const int count =
+      std::clamp(static_cast<int>(std::ceil(distance / step)), 1, 16);
+  for (int i = 0; i <= count; ++i) {
+    const float t = static_cast<float>(i) / static_cast<float>(count);
+    if (OverlapsPlayer(Lerp(from, to, t), radius, reachTop)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 void BossEnemy::DealDamageToPlayer(float multiplier, bool parriable) {
@@ -437,6 +504,19 @@ void BossEnemy::DealDamageToPlayer(float multiplier, bool parriable) {
   const int damage = std::max(
       1, static_cast<int>(std::lround(enemyData_.attack * multiplier)));
   const auto result = player_->ApplyDamage(damage, wt_.translate_);
+
+  // ── 命中の演出 ──
+  // 胸の高さに閃光と火花。ガードされた時は控えめにして、素通しとの差を見せる
+  const bool guarded = result != PlayerGuard::GuardResult::GuardFail;
+  if (attackEffects_) {
+    const Vector3 chest = player_->GetWT().translate_ +
+                          Vector3{0.0f, params_.playerHitHeight * 0.6f, 0.0f};
+    attackEffects_->PlayHitBurst(chest, guarded);
+  }
+  if (auto *camera = player_->GetPlayerCamera();
+      camera && params_.hitShake > 0.0f) {
+    camera->StartShake(params_.hitShake * (guarded ? 0.5f : 1.0f), 0.35f);
+  }
 
   // パリィされたら、その技が崩せる設定のときだけ大きく怯む。
   // スーパーアーマー中はパリィでも止まらない（大技を受け止めさせる設計にする時用）
@@ -451,6 +531,196 @@ void BossEnemy::DealDamageToPlayer(float multiplier, bool parriable) {
 /*==========================================================================
 被弾
 //========================================================================*/
+/*==========================================================================
+攻撃の演出
+//========================================================================*/
+void BossEnemy::UpdateAttackEffects(float deltaTime) {
+  if (!attackEffects_) {
+    return;
+  }
+
+  // 実戦の攻撃を優先し、無ければエディタのプレビューを見る（見た目の確認用）
+  const AttackPlayer *source =
+      activeAttackPlayer_ ? activeAttackPlayer_ : previewAttackPlayer_;
+  const EnemyAttack *attack =
+      activeAttackPlayer_ ? currentAttack_ : (source ? source->GetAttack() : nullptr);
+  const bool playing = source && attack && source->IsPlaying();
+  const float time = playing ? source->GetTime() : -1.0f;
+  const bool live = activeAttackPlayer_ != nullptr; // プレビューは見た目だけ
+
+  // 攻撃が変わった・プレビューで時間が巻き戻ったら、「1回だけ」の記録を数え直す
+  if (attack != lastEffectAttack_ || time < lastEffectTime_) {
+    swingBurstFired_.clear();
+    groundImpactFired_.clear();
+    lastEffectAttack_ = attack;
+  }
+  lastEffectTime_ = time;
+
+  //------------------------------------------------------------
+  // 手の軌跡：判定が出る少し前から終わるまで、その手に軌跡を引く
+  //------------------------------------------------------------
+  constexpr size_t kLeft = static_cast<size_t>(BossAttackEffects::Hand::Left);
+  constexpr size_t kRight = static_cast<size_t>(BossAttackEffects::Hand::Right);
+  std::array<std::string, 2> trailJoint = {"LeftHand", "RightHand"};
+  std::array<bool, 2> trailActive = {false, false};
+  if (playing) {
+    for (const auto &modifier : attack->modifiers) {
+      if (!modifier.IsJointHitbox())
+        continue;
+      if (time < modifier.startTime - kTrailLeadTime || time > modifier.endTime)
+        continue;
+      // 名前に Left を含む手は左の軌跡、それ以外（右手・武器など）は右の軌跡に乗せる
+      const size_t side =
+          modifier.joint.find("Left") != std::string::npos ? kLeft : kRight;
+      trailJoint[side] = modifier.joint;
+      trailActive[side] = true;
+    }
+  }
+  for (size_t side : {kLeft, kRight}) {
+    Vector3 tip;
+    if (!GetJointWorldPosition(trailJoint[side], {}, tip))
+      continue;
+    // 前腕から手先までを帯の幅にする（巨体なので腕の長さがそのまま迫力になる）
+    Vector3 root;
+    if (!GetJointWorldPosition(ForeArmJointOf(trailJoint[side]), {}, root)) {
+      root = Lerp(tip, wt_.translate_ + Vector3{0.0f, standingHeight_ * 0.5f, 0.0f}, 0.15f);
+    }
+    attackEffects_->UpdateHandTrail(static_cast<BossAttackEffects::Hand>(side),
+                                    tip, root, trailActive[side]);
+  }
+  attackEffects_->Update(deltaTime);
+
+  if (!playing) {
+    return;
+  }
+
+  //------------------------------------------------------------
+  // 一発もの：拳圧・地面への衝撃・広範囲の衝撃波
+  //------------------------------------------------------------
+  auto fired = [](const std::vector<const AttackModifier *> &list,
+                  const AttackModifier *modifier) {
+    return std::find(list.begin(), list.end(), modifier) != list.end();
+  };
+  const float bodyScale = EncounterScale();
+  const float groundY = GroundHeight();
+
+  for (const auto &modifier : attack->modifiers) {
+    if (modifier.type != AttackModifierType::Hitbox)
+      continue;
+
+    Vector3 center;
+    if (modifier.IsJointHitbox()) {
+      // 拳圧：判定が出た瞬間に手元で1回
+      if (modifier.IsActiveAt(time) && !fired(swingBurstFired_, &modifier) &&
+          ResolveHitboxCenter(modifier, center)) {
+        swingBurstFired_.push_back(&modifier);
+        attackEffects_->PlaySwingBurst(center);
+      }
+
+      // 叩きつけ：判定の範囲（＋猶予）の間に、手が地面近くまで降りたら1回。
+      // タイミングをデータに書かなくても、アニメの動きから自動で拾える
+      const bool inWindow =
+          time >= modifier.startTime && time <= modifier.endTime + kImpactGraceTime;
+      if (inWindow && !fired(groundImpactFired_, &modifier) &&
+          ResolveHitboxCenter(modifier, center) &&
+          center.y - groundY <= params_.groundImpactHeight * bodyScale) {
+        groundImpactFired_.push_back(&modifier);
+        TriggerGroundImpact({center.x, groundY, center.z}, &modifier, live);
+      }
+      continue;
+    }
+
+    // 本体の判定（着地・咆哮）：出た瞬間に足元で1回。
+    // ダメージは判定そのものが持つので、ここは見た目と揺れだけ
+    if (modifier.IsActiveAt(time) && !fired(groundImpactFired_, &modifier) &&
+        ResolveHitboxCenter(modifier, center)) {
+      groundImpactFired_.push_back(&modifier);
+      const Vector3 ground = {center.x, groundY, center.z};
+      const float radius = modifier.radius * bodyScale;
+      if (radius >= params_.blastRadiusThreshold * bodyScale) {
+        TriggerShockBlast(ground, radius, live);
+      } else {
+        TriggerGroundImpact(ground, nullptr, live);
+      }
+    }
+  }
+}
+
+void BossEnemy::TriggerGroundImpact(const Vector3 &groundPosition,
+                                    const AttackModifier *damageSource,
+                                    bool live) {
+  attackEffects_->PlayGroundImpact(groundPosition,
+                                   params_.impactEffectScale * EncounterScale());
+  if (!live) {
+    return;
+  }
+  ShakeByDistance(groundPosition, params_.impactShake);
+
+  // 衝撃波の範囲ダメージ。地面にいるプレイヤーを水平距離で調べる。
+  // 直撃と同じ判定番号を使うので、直撃した後に衝撃波でもう一度当たることはない
+  if (!damageSource || !player_ ||
+      damageSource->damageWindow == lastDealtWindow_) {
+    return;
+  }
+  Vector3 toPlayer = player_->GetWT().translate_ - groundPosition;
+  toPlayer.y = 0.0f;
+  const float reach =
+      params_.impactDamageRadius * EncounterScale() + params_.playerHitRadius;
+  if (LengthSquared(toPlayer) > reach * reach) {
+    return;
+  }
+  lastDealtWindow_ = damageSource->damageWindow;
+  // 地面を伝う衝撃はパリィで弾けない（ガードは効く）
+  DealDamageToPlayer(params_.impactDamageMultiplier * damageSource->damageMultiplier,
+                     false);
+}
+
+void BossEnemy::TriggerShockBlast(const Vector3 &groundPosition, float radius,
+                                  bool live) {
+  attackEffects_->PlayShockBlast(groundPosition, radius);
+  if (live) {
+    // 広範囲の衝撃は、範囲の外にいても少し揺れが届くよう強めにする
+    ShakeByDistance(groundPosition, params_.impactShake * 1.3f);
+  }
+}
+
+void BossEnemy::ShakeByDistance(const Vector3 &source, float strength) {
+  if (!player_ || strength <= 0.0f) {
+    return;
+  }
+  Vector3 toPlayer = player_->GetWT().translate_ - source;
+  toPlayer.y = 0.0f;
+  const float range = std::max(params_.impactShakeRange, 0.01f);
+  // 近いほど強く。距離 0 で 1、range で 0
+  const float nearness = 1.0f - std::clamp(Length(toPlayer) / range, 0.0f, 1.0f);
+  if (nearness <= 0.0f) {
+    return;
+  }
+
+  if (auto *camera = player_->GetPlayerCamera()) {
+    camera->StartShake(strength * nearness, 0.25f + 0.3f * nearness);
+  }
+  // 低音側（左モーター）を強めに回すと「重い地響き」になる
+  const auto low = static_cast<uint16_t>(52000.0f * nearness);
+  const auto high = static_cast<uint16_t>(26000.0f * nearness);
+  YoRigine::Input::GetInstance()->StartVibration(0, 0.2f + 0.25f * nearness, low,
+                                                 high);
+}
+
+std::string BossEnemy::ForeArmJointOf(const std::string &handJoint) {
+  // Mixamo 系の命名（LeftHand / LeftForeArm）に合わせる。
+  // 該当しなければ空を返し、呼び出し側が体の中心寄りの点で代用する
+  const auto pos = handJoint.rfind("Hand");
+  if (pos == std::string::npos) {
+    return {};
+  }
+  return handJoint.substr(0, pos) + "ForeArm";
+}
+
+float BossEnemy::GroundHeight() const {
+  return player_ ? player_->GetWT().translate_.y : wt_.translate_.y;
+}
+
 void BossEnemy::OnEnterCollision([[maybe_unused]] BaseCollider *self,
                                  BaseCollider *other) {
   if (!isAlive_ || isInvincible_ || !player_)
@@ -683,6 +953,12 @@ void BossEnemy::SetDissolveProgress(float t) {
 void BossEnemy::Draw() {
   if (obj_)
     obj_->Draw(camera_, visualWt_);
+}
+
+void BossEnemy::DrawVfx() {
+  if (attackEffects_) {
+    attackEffects_->Draw();
+  }
 }
 
 void BossEnemy::DrawShadow() {

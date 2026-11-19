@@ -174,6 +174,11 @@ void SubSceneManager::DrawNonOffscreen() {
     scene->DrawNonOffscreen();
 }
 
+void SubSceneManager::DrawVfx() {
+  if (auto *scene = GetDrawableScene())
+    scene->DrawVfx();
+}
+
 void SubSceneManager::DrawShadow() {
   if (auto *scene = GetDrawableScene())
     scene->DrawShadow();

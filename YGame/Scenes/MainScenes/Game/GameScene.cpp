@@ -387,6 +387,10 @@ void GameScene::Draw() {
   //------------------------------------------------------------
   VfxMeshSpawner::GetInstance()->Draw();
   player_->DrawVfx();
+  // 敵（ボス）の攻撃の軌跡
+  if (subSceneManager_) {
+    subSceneManager_->DrawVfx();
+  }
 }
 
 /// <summary>

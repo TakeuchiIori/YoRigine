@@ -30,6 +30,10 @@ public:
   // 頭上の体力バーなど、3D描画の後に重ねる UI
   virtual void DrawUI() {}
 
+  // 攻撃の軌跡など、専用の PSO で描くエフェクト。
+  // 敵の描画（最後にインスタンシング描画へ切り替わる）とは別の段で呼ばれる。
+  virtual void DrawVfx() {}
+
   // 影
   virtual void DrawShadow() = 0;
 

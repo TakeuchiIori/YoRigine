@@ -1,0 +1,234 @@
+{
+    "name": "FxBossSwingBurst",
+    "useTrail": false,
+    "motions": [
+        {
+            "type": 0,
+            "target": 0,
+            "ease": 0,
+            "startTime": 0.0,
+            "window": 0.4,
+            "duration": 0.4,
+            "velocity": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+            },
+            "acceleration": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+            },
+            "amplitude": 1.0,
+            "frequency": 1.0,
+            "scaleStart": 0.0,
+            "scaleEnd": 1.0,
+            "colorStart": {
+                "x": 1,
+                "y": 1,
+                "z": 1,
+                "w": 1
+            },
+            "colorEnd": {
+                "x": 1,
+                "y": 1,
+                "z": 1,
+                "w": 1
+            },
+            "fadeIn": 0.0,
+            "fadeOut": 0.0
+        }
+    ],
+    "subEffects": [
+        {
+            "enabled": true,
+            "label": "拳圧リング",
+            "type": 3,
+            "offset": {
+                "x": 0,
+                "y": 0.0,
+                "z": 0
+            },
+            "shockwave": {
+                "color": {
+                    "x": 3.4,
+                    "y": 0.9,
+                    "z": 3.8,
+                    "w": 1.0
+                },
+                "radius": 4.5,
+                "duration": 0.3,
+                "thickness": 0.28,
+                "isEnable": true
+            },
+            "motions": []
+        },
+        {
+            "enabled": true,
+            "label": "拳圧リング（外）",
+            "type": 3,
+            "offset": {
+                "x": 0,
+                "y": 0.0,
+                "z": 0
+            },
+            "shockwave": {
+                "color": {
+                    "x": 3.2,
+                    "y": 1.5,
+                    "z": 0.45,
+                    "w": 1.0
+                },
+                "radius": 6.5,
+                "duration": 0.4,
+                "thickness": 0.12,
+                "isEnable": true
+            },
+            "motions": [
+                {
+                    "type": 10,
+                    "target": 0,
+                    "ease": 0,
+                    "startTime": 0.05,
+                    "window": 0.4,
+                    "duration": 0.4,
+                    "velocity": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "acceleration": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "amplitude": 1.0,
+                    "frequency": 1.0,
+                    "scaleStart": 0.0,
+                    "scaleEnd": 1.0,
+                    "colorStart": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1,
+                        "w": 1
+                    },
+                    "colorEnd": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1,
+                        "w": 1
+                    },
+                    "fadeIn": 0.0,
+                    "fadeOut": 0.0
+                }
+            ]
+        },
+        {
+            "enabled": true,
+            "label": "手元の閃光",
+            "type": 0,
+            "offset": {
+                "x": 0,
+                "y": 0.0,
+                "z": 0
+            },
+            "lightVolume": {
+                "halfExtents": {
+                    "x": 1.8,
+                    "y": 1.8,
+                    "z": 1.8
+                },
+                "color": {
+                    "x": 3.4,
+                    "y": 1.4,
+                    "z": 3.8,
+                    "w": 0.45
+                },
+                "intensity": 1.0,
+                "edgeFade": 0.4,
+                "depthFade": 1.0,
+                "noiseTiling": 2.0,
+                "noiseStrength": 0.0,
+                "beamStrength": 0.0,
+                "beamRadius": 0.35,
+                "beamPower": 2.0,
+                "beamGlow": 1.0,
+                "isEnable": true
+            },
+            "motions": [
+                {
+                    "type": 6,
+                    "target": 0,
+                    "ease": 0,
+                    "startTime": 0.0,
+                    "window": 0.28,
+                    "duration": 0.28,
+                    "velocity": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "acceleration": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "amplitude": 1.0,
+                    "frequency": 1.0,
+                    "scaleStart": 0.0,
+                    "scaleEnd": 1.0,
+                    "colorStart": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1,
+                        "w": 1
+                    },
+                    "colorEnd": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1,
+                        "w": 1
+                    },
+                    "fadeIn": 0.01,
+                    "fadeOut": 0.22400000000000003
+                },
+                {
+                    "type": 4,
+                    "target": 0,
+                    "ease": 5,
+                    "startTime": 0.0,
+                    "window": 0.28,
+                    "duration": 0.28,
+                    "velocity": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "acceleration": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "amplitude": 1.0,
+                    "frequency": 1.0,
+                    "scaleStart": 0.4,
+                    "scaleEnd": 1.4,
+                    "colorStart": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1,
+                        "w": 1
+                    },
+                    "colorEnd": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1,
+                        "w": 1
+                    },
+                    "fadeIn": 0.0,
+                    "fadeOut": 0.0
+                }
+            ]
+        }
+    ]
+}

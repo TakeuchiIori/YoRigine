@@ -40,6 +40,8 @@ public:
   virtual void DrawShadow() {}
   virtual void DrawLine() {}
   virtual void DrawUI() {}
+  // 攻撃の軌跡など、専用の PSO で描くエフェクト（オブジェクト描画の後に呼ばれる）
+  virtual void DrawVfx() {}
   virtual void Finalize() {}
 
   // 最初からやり直す（リトライ）

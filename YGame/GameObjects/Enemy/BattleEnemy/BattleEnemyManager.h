@@ -89,6 +89,9 @@ public:
   // UI描画処理
   void DrawUI();
 
+  // 攻撃の軌跡などのエフェクト描画（敵本体の描画とは別の段で呼ぶ）
+  void DrawVfx();
+
   // 影描画処理
   void DrawShadow();
 

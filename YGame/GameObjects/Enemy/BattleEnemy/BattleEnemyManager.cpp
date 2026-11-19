@@ -1190,6 +1190,16 @@ void BattleEnemyManager::Draw() {
 	inst->DrawAll(camera_);
 }
 
+void BattleEnemyManager::DrawVfx()
+{
+	if (!isBattleActive_) return;
+	for (auto& enemy : battleEnemies_) {
+		if (enemy) {
+			enemy->DrawVfx();
+		}
+	}
+}
+
 void BattleEnemyManager::DrawUI()
 {
 	if (!isBattleActive_) return;

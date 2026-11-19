@@ -56,6 +56,9 @@ public:
   // シャドウ描画処理
   void DrawShadow() override;
 
+  // 敵の攻撃の軌跡などのエフェクト描画
+  void DrawVfx() override;
+
   // 終了処理
   void Finalize() override;
 

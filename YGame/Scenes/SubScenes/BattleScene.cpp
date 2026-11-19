@@ -766,6 +766,12 @@ void BattleScene::DrawUI() {
 /*==========================================================================
         VFXの描画
 //========================================================================*/
+void BattleScene::DrawVfx() {
+  if (battleEnemyManager_) {
+    battleEnemyManager_->DrawVfx();
+  }
+}
+
 void BattleScene::DrawShadow() {
   player_->DrawShadow();
   battleEnemyManager_->DrawShadow();

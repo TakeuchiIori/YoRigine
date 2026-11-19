@@ -1,0 +1,174 @@
+{
+    "name": "FxBossHitFlash",
+    "useTrail": false,
+    "motions": [
+        {
+            "type": 0,
+            "target": 0,
+            "ease": 0,
+            "startTime": 0.0,
+            "window": 0.35,
+            "duration": 0.35,
+            "velocity": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+            },
+            "acceleration": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+            },
+            "amplitude": 1.0,
+            "frequency": 1.0,
+            "scaleStart": 0.0,
+            "scaleEnd": 1.0,
+            "colorStart": {
+                "x": 1,
+                "y": 1,
+                "z": 1,
+                "w": 1
+            },
+            "colorEnd": {
+                "x": 1,
+                "y": 1,
+                "z": 1,
+                "w": 1
+            },
+            "fadeIn": 0.0,
+            "fadeOut": 0.0
+        }
+    ],
+    "subEffects": [
+        {
+            "enabled": true,
+            "label": "命中の閃光",
+            "type": 0,
+            "offset": {
+                "x": 0,
+                "y": 0.0,
+                "z": 0
+            },
+            "lightVolume": {
+                "halfExtents": {
+                    "x": 1.2,
+                    "y": 1.2,
+                    "z": 1.2
+                },
+                "color": {
+                    "x": 4.5,
+                    "y": 3.2,
+                    "z": 4.8,
+                    "w": 0.55
+                },
+                "intensity": 1.0,
+                "edgeFade": 0.4,
+                "depthFade": 1.0,
+                "noiseTiling": 2.0,
+                "noiseStrength": 0.0,
+                "beamStrength": 0.0,
+                "beamRadius": 0.35,
+                "beamPower": 2.0,
+                "beamGlow": 1.0,
+                "isEnable": true
+            },
+            "motions": [
+                {
+                    "type": 6,
+                    "target": 0,
+                    "ease": 0,
+                    "startTime": 0.0,
+                    "window": 0.22,
+                    "duration": 0.22,
+                    "velocity": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "acceleration": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "amplitude": 1.0,
+                    "frequency": 1.0,
+                    "scaleStart": 0.0,
+                    "scaleEnd": 1.0,
+                    "colorStart": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1,
+                        "w": 1
+                    },
+                    "colorEnd": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1,
+                        "w": 1
+                    },
+                    "fadeIn": 0.01,
+                    "fadeOut": 0.17600000000000002
+                },
+                {
+                    "type": 4,
+                    "target": 0,
+                    "ease": 5,
+                    "startTime": 0.0,
+                    "window": 0.22,
+                    "duration": 0.22,
+                    "velocity": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "acceleration": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "amplitude": 1.0,
+                    "frequency": 1.0,
+                    "scaleStart": 0.3,
+                    "scaleEnd": 1.6,
+                    "colorStart": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1,
+                        "w": 1
+                    },
+                    "colorEnd": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1,
+                        "w": 1
+                    },
+                    "fadeIn": 0.0,
+                    "fadeOut": 0.0
+                }
+            ]
+        },
+        {
+            "enabled": true,
+            "label": "命中リング",
+            "type": 3,
+            "offset": {
+                "x": 0,
+                "y": 0.0,
+                "z": 0
+            },
+            "shockwave": {
+                "color": {
+                    "x": 4.0,
+                    "y": 1.6,
+                    "z": 4.2,
+                    "w": 1.0
+                },
+                "radius": 3.0,
+                "duration": 0.25,
+                "thickness": 0.16,
+                "isEnable": true
+            },
+            "motions": []
+        }
+    ]
+}

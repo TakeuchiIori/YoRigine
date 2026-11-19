@@ -1,6 +1,7 @@
 #pragma once
 #include "../Attack/Runtime/AttackPlayer.h"
 #include "../BattleEnemy/BattleEnemyBase.h"
+#include "BossAttackEffects.h"
 #include "Player/StateMachine.h"
 #include "UI/HealthBar/EnemyHealthBarUI.h"
 
@@ -86,6 +87,33 @@ struct BossParams {
   // ── 当たり判定（プレイヤーを縦長のカプセルとみなす）──
   float playerHitRadius = 0.5f;
   float playerHitHeight = 1.7f;
+
+  // 巨体の攻撃が「届く」高さ（メートル。エンカウントのスケールが掛かる）。
+  // ボスの攻撃アニメは自分と同じ背丈の相手を殴る前提で作られているので、
+  // 16m の巨体だと拳は地上 6〜14m を通り、1.7m のプレイヤーの頭上を素通りする。
+  // この高さより下を通る攻撃判定は、真下にいるプレイヤーにも当たる
+  // （拳圧・風圧でなぎ倒す扱い）。0 にすると見た目どおりの判定に戻る。
+  float hitReachHeight = 9.0f;
+
+  // ── 重さ ──
+  // 押し合いの配分は質量比で決まる（重い方ほど動かない）。
+  // プレイヤーは 100 なので、桁違いに重くして「歩いて押し込めない」ようにする。
+  float bodyMass = 100000.0f;
+
+  // ── 地面への衝撃 ──
+  // 手の攻撃判定が地面からこの高さまで降りてきたら「叩きつけ」とみなし、
+  // その地点に衝撃波（エフェクト＋範囲ダメージ）を出す。
+  float groundImpactHeight = 2.5f;
+  float impactDamageRadius = 5.0f;     // 衝撃波の範囲ダメージの半径(m)
+  float impactDamageMultiplier = 0.6f; // 衝撃波の威力（攻撃力に掛ける）
+  float impactEffectScale = 1.0f;      // 衝撃エフェクトの大きさの倍率
+  // 半径がこれ以上の本体判定（咆哮など）は、地面を走る衝撃波リングとして見せる
+  float blastRadiusThreshold = 6.0f;
+
+  // ── 揺れ ──
+  float impactShake = 1.2f; // 叩きつけ・着地のカメラ揺れの強さ（至近距離）
+  float impactShakeRange = 35.0f; // この距離で揺れが 0 になる
+  float hitShake = 1.0f;          // 攻撃がプレイヤーに当たった時の追加の揺れ
 };
 
 ///************************* ボス本体 *************************///
@@ -115,6 +143,7 @@ public:
   void DrawShadow() override;
   void DrawUI() override;
   void DrawCollision() override;
+  void DrawVfx() override;
   const char *GetStateName() const override;
 
   ///************************* 当たり判定 *************************///
@@ -197,11 +226,14 @@ public:
   void ReturnToIdlePose() { PlayMotion(params_.idleClip, true); }
 
   // プレビュー中の攻撃。判定の球を表示するだけで、ダメージは与えない
-  void SetPreviewAttack(const AttackPlayer *player) { previewAttackPlayer_ = player; }
+  void SetPreviewAttack(const AttackPlayer *player) {
+    previewAttackPlayer_ = player;
+  }
 
   // モデルのジョイント名一覧（判定の付け先を選ぶプルダウン用）
   std::vector<std::string> GetJointNames();
-  // モデルに入っているアニメーション名一覧（glTF から読む。初回だけファイルを開く）
+  // モデルに入っているアニメーション名一覧（glTF
+  // から読む。初回だけファイルを開く）
   const std::vector<std::string> &GetAnimationClipNames();
 
   // ディゾルブの進行（Dead 状態から呼ぶ）
@@ -230,11 +262,48 @@ private:
   // ジョイント判定の中心（ジョイント指定が無い判定は本体基準）
   bool ResolveHitboxCenter(const AttackModifier &hitbox, Vector3 &out);
 
-  // プレイヤーを縦カプセルとみなして球と重なっているか
-  bool OverlapsPlayer(const Vector3 &center, float radius) const;
+  // プレイヤーを縦カプセルとみなして球と重なっているか。
+  // reachTop > 0 なら、カプセルの上端をその高さまで伸ばして調べる（巨体の攻撃用）
+  bool OverlapsPlayer(const Vector3 &center, float radius,
+                      float reachTop = 0.0f) const;
 
-  // ダメージをプレイヤーへ通す。パリィされたら崩れる
+  // 前フレームの位置から今の位置まで、球の通り道を刻んで重なりを調べる。
+  // 巨体の腕は1フレームで数m動くので、今の位置だけだとプレイヤーをすり抜ける。
+  bool SweptOverlapsPlayer(const Vector3 &from, const Vector3 &to, float radius,
+                           float reachTop) const;
+
+  // ダメージをプレイヤーへ通す。パリィされたら崩れる。
+  // 当たった時の演出（閃光・火花・揺れ）もここで出す
   void DealDamageToPlayer(float multiplier, bool parriable);
+
+  ///************************* 攻撃の演出 *************************///
+
+  // 攻撃中の演出（手の軌跡・拳圧・地面への衝撃・広範囲の衝撃波）を、
+  // 判定の時間帯と手の高さに合わせて出す。攻撃していない間も手の位置は渡す
+  void UpdateAttackEffects(float deltaTime);
+
+  // 叩きつけ・着地：エフェクト・揺れ・範囲ダメージ
+  //   damageSource が null なら見た目と揺れだけ（本体の判定が自分でダメージを持つ時）
+  //   live が false（エディタのプレビュー）なら見た目だけ
+  void TriggerGroundImpact(const Vector3 &groundPosition,
+                           const AttackModifier *damageSource, bool live);
+
+  // 咆哮など広範囲の衝撃波（判定そのものは通常の判定が受け持つので見た目と揺れだけ）
+  void TriggerShockBlast(const Vector3 &groundPosition, float radius, bool live);
+
+  // 地面の高さ（プレイヤーの足元。地面にコライダーが無く Y は 0 固定のため）
+  float GroundHeight() const;
+
+  // 発生源から近いほど強くカメラを揺らし、パッドを震わせる
+  void ShakeByDistance(const Vector3 &source, float strength);
+
+  // 手先と前腕のジョイント名（"RightHand" → "RightForeArm"）
+  static std::string ForeArmJointOf(const std::string &handJoint);
+
+  // 判定の範囲に、その判定が有効になる少し前から手の軌跡を出す
+  static constexpr float kTrailLeadTime = 0.15f;
+  // 判定の範囲が終わった後も、地面に届いたら衝撃を出す猶予
+  static constexpr float kImpactGraceTime = 0.2f;
 
 private:
   StateMachine<BossState> fsm_;
@@ -250,6 +319,17 @@ private:
   std::vector<Vector3> debugHitboxCenters_;            // 判定の可視化用
   std::vector<float> debugHitboxRadii_;
 
+  // ── 攻撃の演出・すり抜け防止 ──
+  std::unique_ptr<BossAttackEffects> attackEffects_;
+  // 判定ごとの前フレームの中心（すり抜け防止の通り道に使う）。攻撃ごとに空にする
+  std::unordered_map<const AttackModifier *, Vector3> prevHitboxCenters_;
+  // 1つの判定につき1回だけ出す演出の記録。攻撃ごとに空にする
+  std::vector<const AttackModifier *> swingBurstFired_;   // 拳圧
+  std::vector<const AttackModifier *> groundImpactFired_; // 地面への衝撃
+  // 演出の記録を数え直すきっかけ（攻撃が変わった／プレビューで時間が巻き戻った）
+  const EnemyAttack *lastEffectAttack_ = nullptr;
+  float lastEffectTime_ = -1.0f;
+
   // ── 怯み ──
   float poise_ = 0.0f;
   bool superArmor_ = false;
@@ -257,8 +337,9 @@ private:
 
   // ── エディタ ──
   bool aiPaused_ = false;
-  const AttackPlayer *previewAttackPlayer_ = nullptr; // 判定表示だけ行うプレビュー（非所有）
-  std::vector<std::string> clipNames_;                // glTF のアニメ名（遅延読み込み）
+  const AttackPlayer *previewAttackPlayer_ =
+      nullptr;                         // 判定表示だけ行うプレビュー（非所有）
+  std::vector<std::string> clipNames_; // glTF のアニメ名（遅延読み込み）
   bool clipNamesLoaded_ = false;
 
   // ── カメラ ──
@@ -269,7 +350,7 @@ private:
 
   // ── 出現演出（霧からの実体化）──
   float emergenceTimer_ = 0.0f;
-  float emergenceDuration_ = 0.0f; // 0 なら出現演出なし
+  float emergenceDuration_ = 0.0f;                   // 0 なら出現演出なし
   Vector3 emergenceEdgeColor_ = {1.2f, 0.35f, 1.8f}; // 実体化の縁の発光色（紫）
 
   // ── 死亡演出 ──

@@ -71,6 +71,7 @@ public:
   void DrawUI();
   void DrawNonOffscreen();
   void DrawShadow();
+  void DrawVfx();
 
   ///************************* アクセッサ *************************///
 
